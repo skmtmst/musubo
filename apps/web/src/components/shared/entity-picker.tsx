@@ -381,7 +381,10 @@ export function describePicked(items: EntityPickerItem[], folders: EntityPickerF
   if (candidatesStatus === 'loading') return { name: '読み込み中…', meta: '', missing: false }
   if (candidatesStatus === 'error') return { name: `${noun ?? '候補'}を読み込めませんでした`, meta: '', missing: false }
   const item = items.find((candidate) => candidate.id === value)
-  if (!item) return items.length || candidatesStatus === 'ready' ? { name: noun ? `${noun}は今は選べません` : '選べなくなっています', meta: '選び直してください。', missing: true } : { name: '読み込み中…', meta: '', missing: false }
+  if (!item) {
+    if (candidatesStatus === 'ready') return { name: noun ? `${noun}は今は選べません` : '選べなくなっています', meta: '選び直してください。', missing: true }
+    return items.length ? { name: '現在は選べません', meta: '選び直してください。', missing: true } : { name: '読み込み中…', meta: '', missing: false }
+  }
   const folder = item.folderId ? folders.find((entry) => entry.id === item.folderId) : null
   return { name: item.name, meta: item.folderId === null ? 'フォルダ：未分類' : folder ? `フォルダ：${folder.name}` : item.meta ?? '', missing: false }
 }
@@ -408,8 +411,8 @@ export function EntityPickerField(props: SingleField | MultiField) {
         const folder = item ? folderOf(item, folders) : null
         const missingName = props.candidatesStatus === 'loading' ? '読み込み中…'
           : props.candidatesStatus === 'error' ? `${noun}を読み込めませんでした`
-          : props.candidatesStatus === 'ready' ? `${noun}は今は選べません` : '見つかりません'
-        const name = props.candidatesStatus === 'loading' || props.candidatesStatus === 'error' ? missingName : item?.name ?? missingName
+          : props.candidatesStatus === 'ready' ? `${noun}は今は選べません` : '現在は選べません'
+        const name = item?.name ?? missingName
         return <TagPill key={value} name={name} color={folder ? folderDisplayColor(folder) : null} lockedReason={lockedReason}
           onRemove={readOnly || (!props.canChangeNow && disabled && !lockedReason) || item?.locked ? undefined : () => { if (!currentLock.current && canChangeNow()) props.onChange(props.value.filter((id) => id !== value)) }} />
       }) : undefined

@@ -33,6 +33,13 @@ function Single({ initial = '', readOnly = false, onChange = vi.fn() }: { initia
 }
 
 describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
+  it('候補の状態を指定しない欄は従来の欠落文言を保つ', () => {
+    const view = render(<EntityPickerField label="回答フォーム" noun="回答フォーム" items={[{ id: 'other', name: '別のフォーム' }]} value="gone" onChange={() => {}} />)
+    expect(screen.getByText('見つかりません')).toBeTruthy()
+    expect(screen.getByText('消されたか、使えなくなりました。選び直してください。')).toBeTruthy()
+    view.rerender(<EntityPickerField label="担当者" noun="担当者" items={[{ id: 'other', name: '別の担当者' }]} value="gone" onChange={() => {}} />)
+    expect(screen.getByText('見つかりません')).toBeTruthy()
+  })
   it('候補の取得状態に応じて、0件と未取得を区別する', () => {
     const props = { label: '担当者', noun: '担当者', items: [], value: 'gone', onChange: vi.fn() }
     const view = render(<EntityPickerField {...props} candidatesStatus="loading" />)
@@ -116,7 +123,7 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
 
   it('消された候補を指していたら、見つからないと出して選び直させる', () => {
     render(<Single initial="gone" />)
-    expect(screen.getByText('回答フォームは今は選べません')).toBeTruthy()
+    expect(screen.getByText('現在は選べません')).toBeTruthy()
     expect(screen.getByText('選び直してください。')).toBeTruthy()
     expect(screen.queryByText(/消されたか/)).toBeNull()
     expect(screen.getByRole('button', { name: '回答フォーム：変える' }).getAttribute('aria-invalid')).toBe('true')
@@ -130,8 +137,9 @@ describe('まとめて選ぶ窓', () => {
     const view = render(<EntityPickerField {...props} candidatesStatus="loading" />)
     expect(screen.getByText('読み込み中…')).toBeTruthy()
     view.rerender(<EntityPickerField {...props} items={[{ id: 'gone', name: '古い名前' }]} candidatesStatus="loading" />)
-    expect(screen.getByText('読み込み中…')).toBeTruthy()
-    expect(screen.queryByText('古い名前')).toBeNull()
+    expect(screen.getByText('古い名前')).toBeTruthy()
+    view.rerender(<EntityPickerField {...props} items={[{ id: 'gone', name: '古い名前' }]} candidatesStatus="error" />)
+    expect(screen.getByText('古い名前')).toBeTruthy()
     view.rerender(<EntityPickerField {...props} candidatesStatus="error" />)
     expect(screen.getByText('担当者を読み込めませんでした')).toBeTruthy()
     expect(screen.queryByText('担当者は今は選べません')).toBeNull()
