@@ -136,7 +136,7 @@ function SingleEntityPickerDialog({
       <div className={styles.tpFootLead}>
         {!readOnly ?
       <CreateLink href={createHref} label={createLabel} lockedReason={confirmLockedReason} disabled={changeDisabled} canChangeNow={canChangeNow ? canConfirmNow : undefined} /> : null}
-      <span className={styles.selection} title={picked?.name}>{picked ? `選んだもの：${picked.name}` : 'まだ選んでいません'}</span>
+      <span className={styles.selection} title={picked?.name}>{picked ? `選んだもの：${picked.name}` : listState && selected ? '選択済みの候補を確認できません' : 'まだ選んでいません'}</span>
       </div>
       <div className={styles.tpFootActions}>
       <Button disabled={busy || createBusy} onClick={onCancel}>{readOnly ? '閉じる' : 'キャンセル'}</Button>

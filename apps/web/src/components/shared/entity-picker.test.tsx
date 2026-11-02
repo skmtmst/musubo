@@ -25,6 +25,14 @@ const items: EntityPickerItem[] = [
   { id: 'd', name: '分類なし', folderId: null },
 ]
 
+it('取得中の窓は既存値を未選択と表示しない', () => {
+  const view = render(<EntityPickerDialog title="担当者を選ぶ" items={[]} initialId="saved" state={<p>取得中</p>} onCancel={() => {}} onConfirm={() => {}} />)
+  expect(screen.getByText('選択済みの候補を確認できません')).toBeTruthy()
+  expect(screen.queryByText('まだ選んでいません')).toBeNull()
+  view.rerender(<EntityPickerDialog title="担当者を選ぶ" items={[]} initialId="saved" state={<p>取得失敗</p>} onCancel={() => {}} onConfirm={() => {}} />)
+  expect(screen.getByText('選択済みの候補を確認できません')).toBeTruthy()
+})
+
 function Single({ initial = '', readOnly = false, onChange = vi.fn() }: { initial?: string; readOnly?: boolean; onChange?: (id: string) => void }) {
   const [value, setValue] = useState(initial)
   return <EntityPickerField label="回答フォーム" noun="回答フォーム" items={items} folders={folders} value={value} readOnly={readOnly}
