@@ -33,6 +33,18 @@ function Single({ initial = '', readOnly = false, onChange = vi.fn() }: { initia
 }
 
 describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
+  it('候補の取得状態に応じて、0件と未取得を区別する', () => {
+    const props = { label: '担当者', noun: '担当者', items: [], value: 'gone', onChange: vi.fn() }
+    const view = render(<EntityPickerField {...props} candidatesStatus="loading" />)
+    expect(screen.getByText('読み込み中…')).toBeTruthy()
+    view.rerender(<EntityPickerField {...props} candidatesStatus="error" />)
+    expect(screen.getByText('担当者を読み込めませんでした')).toBeTruthy()
+    expect(screen.queryByText('担当者は今は選べません')).toBeNull()
+    view.rerender(<EntityPickerField {...props} candidatesStatus="ready" />)
+    expect(screen.getByText('担当者は今は選べません')).toBeTruthy()
+    expect(screen.getByText('選び直してください。')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '担当者：変える' }).getAttribute('aria-invalid')).toBe('true')
+  })
   it('項目名を欄に残しても窓の候補名と確定するIDは変えない', async () => {
     const onChange = vi.fn()
     render(<EntityPickerField label="担当者" noun="担当者" items={items} value="a" valuePrefix="担当者：" onChange={onChange} />)
@@ -101,7 +113,7 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
 
   it('消された候補を指していたら、見つからないと出して選び直させる', () => {
     render(<Single initial="gone" />)
-    expect(screen.getByText('現在は選べません')).toBeTruthy()
+    expect(screen.getByText('回答フォームは今は選べません')).toBeTruthy()
     expect(screen.getByText('選び直してください。')).toBeTruthy()
     expect(screen.queryByText(/消されたか/)).toBeNull()
     expect(screen.getByRole('button', { name: '回答フォーム：変える' }).getAttribute('aria-invalid')).toBe('true')

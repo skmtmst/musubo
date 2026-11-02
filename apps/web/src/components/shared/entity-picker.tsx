@@ -371,15 +371,17 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
 }
 
 /** 選んでいるものの名前と補足（欄の1行に出す文）。 */
-export function describePicked(items: EntityPickerItem[], folders: EntityPickerFolder[], value: string | string[] | null | undefined, unit = '件', summarize?: (items: EntityPickerItem[]) => string) {
+export function describePicked(items: EntityPickerItem[], folders: EntityPickerFolder[], value: string | string[] | null | undefined, unit = '件', summarize?: (items: EntityPickerItem[]) => string, noun?: string, candidatesStatus?: 'loading' | 'ready' | 'error') {
   if (Array.isArray(value)) {
     if (!value.length) return { name: '', meta: '', missing: false }
     const chosen = items.filter((item) => value.includes(item.id))
     return { name: `${value.length}${unit === '件' ? '件' : ` ${unit}`}`, meta: summarize ? summarize(chosen) : chosen.map((item) => item.name).join('・'), missing: false }
   }
   if (!value) return { name: '', meta: '', missing: false }
+  if (candidatesStatus === 'loading') return { name: '読み込み中…', meta: '', missing: false }
+  if (candidatesStatus === 'error') return { name: `${noun ?? '候補'}を読み込めませんでした`, meta: '', missing: false }
   const item = items.find((candidate) => candidate.id === value)
-  if (!item) return items.length ? { name: '現在は選べません', meta: '選び直してください。', missing: true } : { name: '読み込み中…', meta: '', missing: false }
+  if (!item) return items.length || candidatesStatus === 'ready' ? { name: noun ? `${noun}は今は選べません` : '選べなくなっています', meta: '選び直してください。', missing: true } : { name: '読み込み中…', meta: '', missing: false }
   const folder = item.folderId ? folders.find((entry) => entry.id === item.folderId) : null
   return { name: item.name, meta: item.folderId === null ? 'フォルダ：未分類' : folder ? `フォルダ：${folder.name}` : item.meta ?? '', missing: false }
 }
@@ -391,7 +393,7 @@ export function EntityPickerField(props: SingleField | MultiField) {
   const changeDisabled = props.canChangeNow ? !lockedReason && (disabled || (!readOnly && props.canChangeNow() === false)) : disabled
   const [open, setOpen] = useState(props.defaultOpen ??false)
   const title = props.title ?? `${noun}を選ぶ`
-  const picked = describePicked(items, folders, props.value, props.multiple ? props.unit : undefined, props.multiple ? props.summarize : undefined)
+  const picked = describePicked(items, folders, props.value, props.multiple ? props.unit : undefined, props.multiple ? props.summarize : undefined, props.multiple ? undefined : noun, props.candidatesStatus)
   const pickedColor = props.multiple ? undefined : items.find(item => item.id === props.value)?.color
   const allItem = props.valuePrefix && !props.multiple ? items.find((item) => isAllOption({ value: item.id, label: item.name })) : undefined
   const prefixedValue = props.valuePrefix && !props.multiple && picked.name
