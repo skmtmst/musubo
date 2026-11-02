@@ -83,6 +83,7 @@ type KindFieldBase = {
   label: string
   options: ReadonlyArray<EntityLike>
   candidatesStatus?: 'loading' | 'ready' | 'error'
+  onRetryCandidates?: () => void
   /** 右の補足を差し替える（既定は更新日・停止中）。 */
   meta?: (row: EntityLike) => string | undefined
   /** フォルダの読み込み先のアカウント（既定は上のバーで選んでいるアカウント）。 */
@@ -125,10 +126,12 @@ export function EntityKindField(props: KindFieldBase & ({ multiple?: false; valu
   const items = useMemo(() => toPickerItems(kind, options, meta), [kind, options, meta])
   const hasFolderInfo = items.some((item) => item.folderId !== undefined)
   const { folders, failed, load } = useEntityFolders(kind, accountId)
+  const candidatesPending = props.candidatesStatus === 'loading' || props.candidatesStatus === 'error'
   const common = {
     label, noun: def.noun, icon: def.icon, items, candidatesStatus: props.candidatesStatus, folders: hasFolderInfo ? folders : undefined, foldersFailed: hasFolderInfo && failed,
     onOpen: hasFolderInfo ? load : undefined, placeholder, disabled, disabledReason, readOnly, invalid, description, id, buttonRef, describedBy,
-    createHref: def.createHref, createLabel: def.createLabel, actionHidden: props.actionHidden, lockedReason: props.lockedReason, canChangeNow: props.canChangeNow,
+    state: props.candidatesStatus === 'loading' ? <ListState kind="loading" /> : props.candidatesStatus === 'error' ? <ListState kind="error" title={`${def.noun}を読み込めませんでした`} onRetry={props.onRetryCandidates} /> : undefined,
+    createHref: candidatesPending ? undefined : def.createHref, createLabel: def.createLabel, actionHidden: props.actionHidden, lockedReason: props.lockedReason, canChangeNow: props.canChangeNow,
   }
   if (kind === 'tag') {
     return <TagPickerField id={id} buttonRef={buttonRef} describedBy={describedBy} multiple={Boolean(props.multiple)} label={label} options={options.map(row => ({ id: row.id, name: row.name ?? row.label ?? '', groupId: row.groupId }))} accountId={accountId} value={props.multiple ? props.value : props.value ? [props.value] : []} onChange={ids => props.multiple ? props.onChange(ids) : props.onChange(ids[0] ?? '')} disabled={disabled} disabledReason={disabledReason} readOnly={readOnly} invalid={invalid} lockedReason={props.lockedReason} canChangeNow={props.canChangeNow} createDisabled={props.createDisabled} createLockedReason={props.createLockedReason} canCreateNow={props.canCreateNow} />

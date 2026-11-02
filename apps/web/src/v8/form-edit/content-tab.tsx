@@ -55,6 +55,7 @@ type Props = {
   blocks: FormBlock[]
   refs: FormRefs
   bookingStaffErrors?: Record<string, boolean>
+  onRetryBookingStaff?: (menuId: string) => void
   selectedBlockId: string | null
   inputCount: number
   accountId: string | null
@@ -309,7 +310,7 @@ function OpenBlock(props: RowProps) {
         ) : null}
         <RowActions className={styles.more} subjectName={`「${blockTitleLine(block)}」`} menuItems={menuItems} destructiveItem={menu.destructiveItem} />
       </div>
-      {input ? <InputFields block={input} refs={refs} patch={patch} accountId={props.accountId} portable={props.portable} bookingStaffErrors={props.bookingStaffErrors} /> : <DecoFields block={block} patch={patch} accountId={props.accountId} />}
+      {input ? <InputFields block={input} refs={refs} patch={patch} accountId={props.accountId} portable={props.portable} bookingStaffErrors={props.bookingStaffErrors} onRetryBookingStaff={props.onRetryBookingStaff} /> : <DecoFields block={block} patch={patch} accountId={props.accountId} />}
       {input ? (
         <InlineSettings open={detailOpen} title={`「${blockTitleLine(block)}」の詳しい設定`} onClose={() => setDetailOpen(false)}>
           <BlockEditor block={block} index={props.index} sections={props.layout.sections} refs={refs} selected onSelect={() => {}} onChange={patch} />
@@ -323,7 +324,7 @@ function Labeled({ label, htmlFor, required, children }: { label: string; htmlFo
   return <Field label={label} htmlFor={htmlFor} required={required}>{children}</Field>
 }
 
-function InputFields({ block, refs, patch, accountId, portable = false, bookingStaffErrors }: { block: FormInputBlock; refs: FormRefs; patch: (next: Partial<FormBlock>) => void; accountId: string | null; portable?: boolean; bookingStaffErrors?: Record<string, boolean> }) {
+function InputFields({ block, refs, patch, accountId, portable = false, bookingStaffErrors, onRetryBookingStaff }: { block: FormInputBlock; refs: FormRefs; patch: (next: Partial<FormBlock>) => void; accountId: string | null; portable?: boolean; bookingStaffErrors?: Record<string, boolean>; onRetryBookingStaff?: (menuId: string) => void }) {
   const set = (next: Partial<FormInputBlock>) => patch(next as Partial<FormBlock>)
   const labelId = `fe-q-${block.id}`
   /* 保存を押したあと、質問文が空なら欄を赤くして真下に理由を出す。 */
@@ -342,7 +343,7 @@ function InputFields({ block, refs, patch, accountId, portable = false, bookingS
       {block.type === 'file' ? <FormFileSettings block={block} onChange={set} /> : null}
       {isChoiceType(block.type) ? <ChoiceFields block={block} set={set} /> : null}
       {block.fixedField === 'allergy' && accountId ? <AllergyOptionsSave accountId={accountId} block={block} set={set} /> : null}
-      {block.type === 'booking' ? <BookingFields block={block} refs={refs} set={set} portable={portable} bookingStaffErrors={bookingStaffErrors} /> : <SaveTo block={block} refs={refs} set={set} />}
+      {block.type === 'booking' ? <BookingFields block={block} refs={refs} set={set} portable={portable} bookingStaffErrors={bookingStaffErrors} onRetryBookingStaff={onRetryBookingStaff} /> : <SaveTo block={block} refs={refs} set={set} />}
     </>
   )
 }
@@ -485,8 +486,9 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
 const DAYS_AHEAD = [7, 14, 30, 60]
 const noMeta = () => undefined
 
-function BookingFields({ block, refs, set, portable = false, bookingStaffErrors }: { block: FormInputBlock; refs: FormRefs; set: (next: Partial<FormInputBlock>) => void; portable?: boolean; bookingStaffErrors?: Record<string, boolean> }) {
+function BookingFields({ block, refs, set, portable = false, bookingStaffErrors, onRetryBookingStaff }: { block: FormInputBlock; refs: FormRefs; set: (next: Partial<FormInputBlock>) => void; portable?: boolean; bookingStaffErrors?: Record<string, boolean>; onRetryBookingStaff?: (menuId: string) => void }) {
   const booking = block.booking ?? null
+  const menuId = booking?.menuId
   const menus = refs.bookingMenus ?? []
   const staff = booking?.menuId ? (refs.bookingMenuStaff?.[booking.menuId] ?? []) : []
   const days = booking?.daysAhead ?? 14
@@ -516,6 +518,7 @@ function BookingFields({ block, refs, set, portable = false, bookingStaffErrors 
             kind="staff"
             label="担当"
             candidatesStatus={portable || !booking?.menuId ? undefined : refs.bookingMenuStaff?.[booking.menuId] !== undefined ? 'ready' : bookingStaffErrors?.[booking.menuId] ? 'error' : 'loading'}
+            onRetryCandidates={menuId && onRetryBookingStaff ? () => onRetryBookingStaff(menuId) : undefined}
             options={staff}
             value={booking?.staffId ?? ''}
             onChange={(staffId) => setBooking({ staffId: staffId || null })}

@@ -1026,6 +1026,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             blocks={blocks}
             refs={refs}
             bookingStaffErrors={bookingStaffErrors}
+            onRetryBookingStaff={(menuId) => setBookingStaffErrors((prev) => { const next = { ...prev }; delete next[menuId]; return next })}
             selectedBlockId={selectedBlockId}
             inputCount={inputCount}
             accountId={host ? null : selectedAccountId}
