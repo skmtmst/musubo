@@ -406,7 +406,11 @@ export function EntityPickerField(props: SingleField | MultiField) {
   const pills = props.multiple && props.value.length ? props.value.map((value) => {
         const item = items.find((candidate) => candidate.id === value)
         const folder = item ? folderOf(item, folders) : null
-        return <TagPill key={value} name={item?.name ?? '見つかりません'} color={folder ? folderDisplayColor(folder) : null} lockedReason={lockedReason}
+        const missingName = props.candidatesStatus === 'loading' ? '読み込み中…'
+          : props.candidatesStatus === 'error' ? `${noun}を読み込めませんでした`
+          : props.candidatesStatus === 'ready' ? `${noun}は今は選べません` : '見つかりません'
+        const name = props.candidatesStatus === 'loading' || props.candidatesStatus === 'error' ? missingName : item?.name ?? missingName
+        return <TagPill key={value} name={name} color={folder ? folderDisplayColor(folder) : null} lockedReason={lockedReason}
           onRemove={readOnly || (!props.canChangeNow && disabled && !lockedReason) || item?.locked ? undefined : () => { if (!currentLock.current && canChangeNow()) props.onChange(props.value.filter((id) => id !== value)) }} />
       }) : undefined
   const selection = props.canChangeNow && changeDisabled && pills ? <fieldset disabled className="contents">{pills}</fieldset> : pills

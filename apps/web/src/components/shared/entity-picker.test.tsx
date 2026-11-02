@@ -37,6 +37,9 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
     const props = { label: '担当者', noun: '担当者', items: [], value: 'gone', onChange: vi.fn() }
     const view = render(<EntityPickerField {...props} candidatesStatus="loading" />)
     expect(screen.getByText('読み込み中…')).toBeTruthy()
+    view.rerender(<EntityPickerField {...props} items={[{ id: 'gone', name: '古い名前' }]} candidatesStatus="loading" />)
+    expect(screen.getByText('読み込み中…')).toBeTruthy()
+    expect(screen.queryByText('古い名前')).toBeNull()
     view.rerender(<EntityPickerField {...props} candidatesStatus="error" />)
     expect(screen.getByText('担当者を読み込めませんでした')).toBeTruthy()
     expect(screen.queryByText('担当者は今は選べません')).toBeNull()
@@ -121,6 +124,23 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
 })
 
 describe('まとめて選ぶ窓', () => {
+  it('複数選択の未取得・失敗・確定した欠落を区別し、値を勝手に外さない', () => {
+    const onChange = vi.fn()
+    const props = { label: '担当者', noun: '担当者', items: [], value: ['gone'], onChange, multiple: true as const }
+    const view = render(<EntityPickerField {...props} candidatesStatus="loading" />)
+    expect(screen.getByText('読み込み中…')).toBeTruthy()
+    view.rerender(<EntityPickerField {...props} items={[{ id: 'gone', name: '古い名前' }]} candidatesStatus="loading" />)
+    expect(screen.getByText('読み込み中…')).toBeTruthy()
+    expect(screen.queryByText('古い名前')).toBeNull()
+    view.rerender(<EntityPickerField {...props} candidatesStatus="error" />)
+    expect(screen.getByText('担当者を読み込めませんでした')).toBeTruthy()
+    expect(screen.queryByText('担当者は今は選べません')).toBeNull()
+    view.rerender(<EntityPickerField {...props} candidatesStatus="ready" />)
+    expect(screen.getByText('担当者は今は選べません')).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '担当者は今は選べませんを外す' }))
+    expect(onChange).toHaveBeenCalledWith([])
+  })
   it('フォルダの横のチェックでフォルダごと選び、一部だけなら「－」。選んだものだけ見て、確定で返す', async () => {
     const onConfirm = vi.fn()
     render(<EntityMultiPickerDialog title="配るアカウントを選ぶ" unit="アカウント" items={items} folders={folders} initialIds={['b']} onConfirm={onConfirm} onCancel={() => {}} />)
