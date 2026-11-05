@@ -161,7 +161,10 @@ export function gap3Respond(method, pathname, body = {}, query = new URLSearchPa
   }
 
   if (method === 'GET' && pathname === '/api/booking/admin/pass-plans') {
-    return ok({ items: PLANS, total: PLANS.length, summary: { onSale: 3, holders: 86, expiringIn30d: 9, billingFailed: null, billingStatus: 'unconfigured', billingSimulationFailed: 1, billingSimulationCancelled: 2 } })
+    const kind = query.get('kind') ?? '', status = query.get('status') ?? '', q = (query.get('q') ?? '').toLowerCase()
+    const offset = Number(query.get('offset') ?? 0), limit = Number(query.get('limit') ?? 20)
+    const matching = PLANS.filter((plan) => (!kind || plan.kind === kind) && (!status || plan.status === status) && plan.name.toLowerCase().includes(q))
+    return ok({ items: matching.slice(offset, offset + limit), total: matching.length, summary: { onSale: 3, holders: 86, expiringIn30d: 9, billingFailed: null, billingStatus: 'unconfigured', billingSimulationFailed: 1, billingSimulationCancelled: 2 } })
   }
   const holders = /^\/api\/booking\/admin\/pass-plans\/([^/]+)\/holders$/.exec(pathname)
   if (method === 'GET' && holders) {

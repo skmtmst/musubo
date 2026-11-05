@@ -51,6 +51,45 @@ describe('回数券・月謝の表', () => {
     expect(screen.getByText('下書き')).toBeTruthy()
   })
 
+  it('種類を API に渡し、絞った総数でページを送り、種類変更で最初に戻る', async () => {
+    api.list.mockImplementation(async (_a: string, _q: string, offset: number, _limit: number, kind?: string) => ({
+      success: true,
+      data: { items: [plan({ id: `${kind || 'all'}-${offset}`, kind: kind || 'ticket', name: `${kind || 'all'} ${offset}` })], total: kind === 'monthly' ? 21 : 41, summary: { onSale: 1, holders: 0, expiringIn30d: 0, billingFailed: null, billingStatus: 'unconfigured', billingSimulationFailed: 0, billingSimulationCancelled: 0 } },
+    }))
+    render(<PassesTabV8 accountId="a" canEdit={false} />)
+    await screen.findByText('all 0')
+    fireEvent.click(screen.getByLabelText('種類で絞り込む'))
+    fireEvent.click(within(await screen.findByRole('option', { name: '月謝' })).getByRole('button'))
+    await screen.findByText('monthly 0')
+    expect(api.list).toHaveBeenLastCalledWith('a', '', 0, 20, 'monthly')
+    expect(screen.getByText('21 件中 1〜20 件')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
+    await screen.findByText('monthly 20')
+    expect(api.list).toHaveBeenLastCalledWith('a', '', 20, 20, 'monthly')
+    expect(screen.getByText('21 件中 21〜21 件')).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('種類で絞り込む'))
+    fireEvent.click(within(await screen.findByRole('option', { name: 'すべて' })).getByRole('button'))
+    await screen.findByText('all 0')
+    expect(api.list).toHaveBeenLastCalledWith('a', '', 0, 20, undefined)
+    expect(screen.getByText('41 件中 1〜20 件')).toBeTruthy()
+  })
+
+  it('前の種類の応答が遅れても、選び直した結果を上書きしない', async () => {
+    let resolveOld!: (value: unknown) => void
+    const old = new Promise((resolve) => { resolveOld = resolve })
+    const summary = { onSale: 1, holders: 0, expiringIn30d: 0, billingFailed: null, billingStatus: 'unconfigured', billingSimulationFailed: 0, billingSimulationCancelled: 0 }
+    api.list.mockImplementation((_a: string, _q: string, _offset: number, _limit: number, kind?: string) =>
+      kind === 'monthly' ? Promise.resolve({ success: true, data: { items: [PLANS[1]], total: 1, summary } }) : old)
+    render(<PassesTabV8 accountId="a" canEdit={false} />)
+    await waitFor(() => expect(api.list).toHaveBeenCalled())
+    fireEvent.click(screen.getByLabelText('種類で絞り込む'))
+    fireEvent.click(within(await screen.findByRole('option', { name: '月謝' })).getByRole('button'))
+    await screen.findByText('ヨガ 月 4 回')
+    await act(async () => { resolveOld({ success: true, data: { items: [PLANS[0]], total: 99, summary } }); await old })
+    expect(screen.queryByText('ヨガ 10 回券')).toBeNull()
+    expect(screen.getByText('1 件中 1〜1 件')).toBeTruthy()
+  })
+
   it('試験が0件でも未接続の実課金を0件にせず、説明から集計の境界を読める', async () => {
     api.list.mockResolvedValueOnce({ success: true, data: { items: PLANS, total: 2, summary: { onSale: 1, holders: 86, expiringIn30d: 9, billingFailed: null, billingStatus: 'unconfigured', billingSimulationFailed: 0, billingSimulationCancelled: 0 } } })
     render(<PassesTabV8 accountId="a" canEdit={false} />)
