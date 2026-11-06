@@ -855,6 +855,7 @@
 - [handoff-cleanup](handoff-cleanup.md)
 - [dependency-notices](legal/dependency-notices.tsv)
 - [distribution-and-terms](legal/distribution-and-terms.md)
+- [musubo 専用リポジトリへの移行と権利表示の確認事項](legal/musubo-repository-transition.md) — 提案・権利未確定、確認 2026-11-06
 - [cleanup-d02-1020](qa/cleanup-d02-1020.md)
 - [1781-kenta-cleanup-d02](release-log/unreleased/1781-kenta-cleanup-d02.md)
 - [v8-change-map](v8-change-map.md)

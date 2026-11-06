@@ -36,7 +36,7 @@ jobs:
   authorize:
     if: >-
       github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
-      github.repository != 'Shudesu/line-harness-oss' && vars.LINE_HARNESS_CLOUDFLARE_DEPLOY == 'true'
+      github.repository == 'skmtmst/line-harness-oss' && vars.LINE_HARNESS_CLOUDFLARE_DEPLOY == 'true'
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 10

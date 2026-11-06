@@ -128,7 +128,7 @@ jobs:
 
   migrate:
     # Standalone production is read-only; all production writes belong to the parent release.
-    if: inputs.operation == 'migrate' && (inputs.environment == 'staging' || (inputs.environment == 'production' && inputs.mode == 'dry-run' && github.ref == 'refs/heads/main'))
+    if: github.repository == 'skmtmst/line-harness-oss' && inputs.operation == 'migrate' && (inputs.environment == 'staging' || (inputs.environment == 'production' && inputs.mode == 'dry-run' && github.ref == 'refs/heads/main'))
     concurrency:
       group: ${{ inputs.environment == 'production' && 'cloudflare-production' || 'migrate-d1-staging' }}
       cancel-in-progress: false
@@ -334,7 +334,7 @@ jobs:
           fi
 
   verify-operational-path:
-    if: inputs.operation == 'verify-operational-path' && inputs.environment == 'staging' && github.ref == 'refs/heads/codex/development'
+    if: github.repository == 'skmtmst/line-harness-oss' && inputs.operation == 'verify-operational-path' && inputs.environment == 'staging' && github.ref == 'refs/heads/codex/development'
     environment:
       name: staging
     runs-on: ubuntu-latest
