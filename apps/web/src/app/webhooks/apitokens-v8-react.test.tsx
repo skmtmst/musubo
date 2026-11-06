@@ -205,6 +205,24 @@ test('鍵の入れ替えの競合理由は一覧を取り直したあとも残�
   await waitFor(() => expect(host.textContent).toContain('ほかの操作が先にこの鍵を更新しました'))
 })
 
+test('鍵の表は名前とできることで残りの幅を分け合い、日付と状態は中身の幅', async () => {
+  await renderPage()
+  const table = host.querySelector('[aria-label="API 接続の鍵"]')!
+  const heads = [...table.querySelectorAll('thead th')]
+  expect(heads[0].textContent).toContain('名前')
+  expect(heads[1].textContent).toContain('できること')
+  // 残りの幅は名前：できること＝2：1で分け合う（見出しと本文で同じ値）。
+  expect(heads[0].getAttribute('data-cell-weight')).toBe('2')
+  expect(heads[1].getAttribute('data-cell-weight')).toBe('1')
+  const cells = [...table.querySelector('tbody tr')!.children]
+  expect(cells[0].getAttribute('data-cell-weight')).toBe('2')
+  expect(cells[1].getAttribute('data-cell-weight')).toBe('1')
+  // 日付と状態は中身の幅のまま（割合を指定しない）。
+  for (const cell of [heads[2], heads[3], heads[4], cells[2], cells[3], cells[4]]) {
+    expect(cell.getAttribute('data-cell-weight')).toBeNull()
+  }
+})
+
 test.each(['入れ替える', '止める'])('鍵を%s確認する窓に対象アカウントと環境を示す', async (action) => {
   await renderPage()
   const row = host.querySelector('[data-row-id="tok-1"]') as HTMLElement
