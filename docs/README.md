@@ -462,6 +462,7 @@
 
 ## 反映履歴
 
+- [DB復旧workflowの安全条件を確かめる試験](release-log/unreleased/10-masato-recovery-workflow-test.md) — 反映履歴、確認 2026-11-06。
 - [Instagramの同一統括内での複数アカウント接続](release-log/unreleased/2080-masato-instagram-shared-accounts.md)
 - [座席・卓管理のPenデザイン反映](release-log/unreleased/2074-masato-table-pen.md)
 - [Googleビジネスのパフォーマンス取得](release-log/unreleased/2026-11-04-masato-google-performance-sync.md)
