@@ -25,6 +25,22 @@ describe('Deploy Cloudflare Staging workflow', () => {
       expect(workflow.slice(start, end)).toContain('node scripts/deploy/verify-staging-forward.mjs');
     }
   });
+  it('stops if the legacy deployment or migration path can still run', () => {
+    expect(workflow).toContain("github.repository == 'skmtmst/musubo'");
+    const first = workflow.indexOf('Require retired legacy staging paths before this run');
+    expect(first).toBeGreaterThan(workflow.indexOf('actions/checkout@'));
+    expect(first).toBeLessThan(workflow.indexOf('Check deployment security settings'));
+    for (const [check, publish] of [
+      ['Recheck retired legacy paths before Worker publish', 'Deploy Worker to staging'],
+      ['Recheck retired legacy paths before Admin publish', 'Deploy Admin Panel to staging'],
+    ]) {
+      const start = workflow.indexOf(`- name: ${check}`);
+      const end = workflow.indexOf(`- name: ${publish}`);
+      expect(start).toBeGreaterThan(first);
+      expect(end).toBeGreaterThan(start);
+      expect(workflow.slice(start, end)).toContain('node scripts/deploy/verify-legacy-staging-retired.mjs');
+    }
+  });
   it.each([false, true])('passes source metadata to the actual Worker deploy command (replay=%s)', (replay) => {
     const sandbox = mkdtempSync(resolve(tmpdir(), 'staging-metadata-'));
     try {

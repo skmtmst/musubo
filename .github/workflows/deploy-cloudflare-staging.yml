@@ -74,7 +74,7 @@ concurrency:
 jobs:
   deploy:
     if: >-
-      github.repository == 'skmtmst/line-harness-oss' &&
+      github.repository == 'skmtmst/musubo' &&
       github.ref == 'refs/heads/codex/development' &&
       (github.event_name == 'workflow_dispatch' ||
        vars.NEN_STAGING_DELIVERY_MODE == 'dry-run' ||
@@ -100,6 +100,9 @@ jobs:
       STAGING_PAGES_PROJECT: nen-line-stg-admin-git
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Require retired legacy staging paths before this run
+        run: node scripts/deploy/verify-legacy-staging-retired.mjs
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
@@ -332,6 +335,10 @@ jobs:
         if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'admin'
         run: node scripts/deploy/verify-staging-forward.mjs
 
+      - name: Recheck retired legacy paths before Worker publish
+        if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'admin'
+        run: node scripts/deploy/verify-legacy-staging-retired.mjs
+
       - name: Deploy Worker to staging
         id: worker_deploy
         if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'admin'
@@ -425,6 +432,10 @@ jobs:
       - name: Recheck forward revisions before Admin publish
         if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'worker'
         run: node scripts/deploy/verify-staging-forward.mjs
+
+      - name: Recheck retired legacy paths before Admin publish
+        if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'worker'
+        run: node scripts/deploy/verify-legacy-staging-retired.mjs
 
       - name: Deploy Admin Panel to staging
         if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'worker'

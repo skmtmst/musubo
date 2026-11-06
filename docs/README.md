@@ -371,6 +371,8 @@
 
 ## 運用と配備
 
+- [musubo 新リポジトリへの共有検証配備の切り替え準備](deploy/musubo-staging-cutover.md) — 未実施の手順・確認記録、確認 2026-11-06。
+
 - [開発ガイド](development.md)
 - [PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md)
 - [GitHub 設定の運用メモ](../.github/README.md)
@@ -462,6 +464,8 @@
 
 ## 反映履歴
 
+- [新リポジトリへの検証配備切り替え前の安全確認](release-log/unreleased/9-masato-staging-cutover-gate.md) — 反映履歴、確認 2026-11-06。
+- [DB復旧workflowの安全条件を確かめる試験](release-log/unreleased/10-masato-recovery-workflow-test.md) — 反映履歴、確認 2026-11-06。
 - [Instagramの同一統括内での複数アカウント接続](release-log/unreleased/2080-masato-instagram-shared-accounts.md)
 - [座席・卓管理のPenデザイン反映](release-log/unreleased/2074-masato-table-pen.md)
 - [Googleビジネスのパフォーマンス取得](release-log/unreleased/2026-11-04-masato-google-performance-sync.md)
