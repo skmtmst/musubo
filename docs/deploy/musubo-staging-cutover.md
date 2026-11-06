@@ -12,6 +12,7 @@
 | 新 `codex/development` | `85a0b822af0df2670012cbf34af886e723311911`。旧版を履歴に含むが、以後の旧版更新は再照合する |
 | 公開中の検証 Worker・管理画面 | 両方とも `acfe29abe56664773c732e8cd31369f9b9f0a646`。公開の `/admin/version` と `/version.json` で確認 |
 | 旧配備 workflow | 有効。配備 workflow に `queued` が6件、`waiting` は0件。古い待機依頼も勝手に取消さない |
+| 旧D1更新 workflow | `disabled_manually` だが `queued` が2件。これも先行依頼として扱う |
 | 旧 `refs/deploy-locks/staging` | GitHub API では404（ロックなし） |
 | 新配備 workflow | `disabled_manually`。新リポジトリの `staging` Environment は未作成 |
 | 旧 `staging` Environment | 秘密名 `CF_ACCOUNT_ID`、`CF_API_TOKEN`、変数名 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` を確認。値は取得していない |
@@ -37,6 +38,6 @@ GitHub Actions の `cloudflare-staging` キューは**リポジトリごと**に
 
 ## 現在の停止条件
 
-旧配備 workflow に6件の先行待機があり、旧経路は有効のまま。したがって新 workflow の有効化、Cloudflare設定の移管、共有検証への dry-run/apply はまだ行わない。先に旧待機の状態が正常に解消するかを確認し、その時点の開発版と公開版を再照合する。
+旧配備 workflow に6件、旧D1更新workflowに2件の先行待機があり、旧配備経路は有効のまま。新側のコードには旧経路の状態を公開前に再確認する停止ゲートを追加したが、workflowは無効のままにする。新 workflow の有効化、Cloudflare設定の移管、共有検証への dry-run/apply はまだ行わない。先に旧待機の状態が正常に解消するかを確認し、その時点の開発版と公開版を再照合する。
 
 参照：[共通の配備ゲート](../DEPLOY-GATE.md)、[新リポジトリの移行方針](../legal/musubo-repository-transition.md)、[GitHub Actions のリポジトリ別 concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)、[GitHub のリポジトリ限定 GITHUB_TOKEN](https://docs.github.com/en/actions/concepts/security/compromised-runners)。
