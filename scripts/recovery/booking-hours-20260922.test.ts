@@ -159,6 +159,6 @@ describe('20260922 one-account recovery', () => {
     expect(job).toContain('RECOVERY_ARTIFACT_ID: ${{ steps.backup.outputs.artifact-id }}');
     expect(job.indexOf('uses: actions/upload-artifact@')).toBeLessThan(job.indexOf('booking-hours-20260922.ts apply'));
     expect(job).not.toMatch(/continue-on-error|wrangler|deploy |time-travel restore|_migrations/);
-    expect(source).toContain("if: inputs.operation == 'migrate'");
+    expect(source).toContain("if: github.repository == 'skmtmst/line-harness-oss' && inputs.operation == 'migrate'");
   });
 });

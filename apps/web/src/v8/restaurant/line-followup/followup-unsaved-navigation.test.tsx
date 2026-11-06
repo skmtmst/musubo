@@ -270,6 +270,7 @@ describe('編集窓とページの未保存変更', () => {
     f[key] = 'other'
     view.rerender(<LineFollowupV8 />)
     await waitFor(() => expect(f.read).toHaveBeenCalledWith(f.account, f.store))
+    await screen.findByRole('article', { name: FOLLOWUP_NAMES.reservation_created })
     act(() => oldConfirm())
     expect(f.push).not.toHaveBeenCalled()
     await open()
