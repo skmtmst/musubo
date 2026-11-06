@@ -74,7 +74,7 @@ describe('回数券・月謝の表', () => {
     expect(screen.getByText('41 件中 1〜20 件')).toBeTruthy()
   })
 
-  it('前の種類の応答が遅れても、選び直した結果を上書きしない', async () => {
+  it('種類変更後に遅れて届く応答は選択結果を上書きしない', async () => {
     let resolveOld!: (value: unknown) => void
     const old = new Promise((resolve) => { resolveOld = resolve })
     const summary = { onSale: 1, holders: 0, expiringIn30d: 0, billingFailed: null, billingStatus: 'unconfigured', billingSimulationFailed: 0, billingSimulationCancelled: 0 }
