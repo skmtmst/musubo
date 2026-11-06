@@ -371,6 +371,8 @@
 
 ## 運用と配備
 
+- [musubo 新リポジトリへの共有検証配備の切り替え準備](deploy/musubo-staging-cutover.md) — 未実施の手順・確認記録、確認 2026-11-06。
+
 - [開発ガイド](development.md)
 - [PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md)
 - [GitHub 設定の運用メモ](../.github/README.md)
