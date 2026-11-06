@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.repository != 'Shudesu/line-harness-oss' && vars.PAGES_DOCS_DEPLOY_ENABLED == 'true'
+    if: github.repository == 'skmtmst/line-harness-oss' && vars.PAGES_DOCS_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     environment: staging
     steps:
