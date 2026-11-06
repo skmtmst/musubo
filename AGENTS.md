@@ -7,6 +7,12 @@
 - LINE 公式アカウント向けの CRM（画面に出す名前は musubo）です。API・受信・自動処理は Cloudflare Workers と D1、管理画面は Next.js、お客さまの画面は LIFF で動きます。
 - どこに何があるかと開発の始め方は [docs/development.md](docs/development.md)、コードの置き場・名前・公開入口・依存の決まりは [docs/code-structure.md](docs/code-structure.md)、文書は目的別の入口 [docs/README.md](docs/README.md) から探します。
 
+### 新規 musubo 開発の作業先（2026-11-06・Masato 指示）
+
+- 今後新しく依頼される musubo の開発は `skmtmst/musubo` の最新 `codex/development` を基準に専用ブランチで始める。然-NEN EC の開発にはこの切り替えを適用しない。
+- 移行前に `skmtmst/line-harness-oss` で始まった PR は、担当者の確認と統合が終わるまで旧リポジトリで扱う。旧リポジトリの更新を新リポジトリへ取り込むときは、両方の最新 SHA と差分を確認し、通常の PR と検査を経る。履歴の上書きや無検査のコピーはしない。
+- 新リポジトリの開発用 Actions は有効だが、Cloudflare 配備・D1 更新の workflow は無効で、配備先の設定も未移行。新リポジトリで統合しただけでは検証・本番に反映されない。§7〜8 の配備手順は、[移行文書](docs/legal/musubo-repository-transition.md) に記した配備経路の切り替えと安全確認が終わるまで、新リポジトリからは実行しない。旧リポジトリから新リポジトリの変更を迂回配備しない。
+
 ## 1. 最初に読む（全員共通）
 
 - 新しいセッションを始めたら、回答や作業の前にこの順で読んでください。
