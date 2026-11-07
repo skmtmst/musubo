@@ -11,7 +11,7 @@ afterEach(cleanup)
 it('REM3-01 actual API fields.tables is displayed beside the editable seat map', async () => {
  net.floors.mockResolvedValue({ success: true, data: [{ id:'f',storeId:'s',name:'1階',width:800,height:600,version:1,outline:[],fixtures:[],tables:[{id:'t',x:10,y:10,width:100,height:80,rotation:0,shape:'rectangle',joinGroup:null}] }] })
  net.save.mockRejectedValue(new ApiError(400,'座席図の形・位置・版を確認してください',undefined,undefined,undefined,undefined,{tables:'卓の位置を確認してください',expectedVersion:'版を確認してください'}))
- render(<RestaurantFloorEditor accountId="a" storeId="s" resources={[]} canEdit onSelect={()=>{}} />)
+ render(<RestaurantFloorEditor accountId="a" storeId="s" resources={[{id:'t',label:'t',capacity:2,active:true}]} canEdit onSelect={()=>{}} />)
  const table=await screen.findByRole('button',{name:'t'})
  fireEvent.keyDown(table,{key:'ArrowRight'})
  fireEvent.click(screen.getByRole('button',{name:'保存'}))

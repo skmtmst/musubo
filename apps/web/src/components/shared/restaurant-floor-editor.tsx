@@ -14,6 +14,7 @@ import EntitySelect from './entity-select'
 import styles from './restaurant-floor-editor.module.css'
 
 import {planFloorTables} from './restaurant-floor-placement'
+import {refreshFloorDraft} from './restaurant-floor-refresh'
 type Viewport={x:number;y:number;size:number}
 function DuplicateTableMark({capacity,minCapacity=1,smokingPolicy,shoesAllowed}:{capacity:number;minCapacity?:number;smokingPolicy?:string;shoesAllowed?:boolean}){
  return <div className={styles.duplicateTableMark}><span className={styles.duplicateChairLeft}/><div className={styles.duplicateTableFace}><span>{minCapacity}〜{capacity}名</span><div className={styles.duplicateMarks}><span className={smokingPolicy==='smoking'?styles.allowedMark:styles.prohibitedMark}>{smokingPolicy==='smoking'?<Cigarette size={17}/>:<CigaretteOff size={17}/>}</span><span className={shoesAllowed===false?styles.prohibitedMark:styles.allowedMark}><Footprints size={17}/></span></div></div><span className={styles.duplicateChairRight}/></div>
@@ -51,13 +52,35 @@ export default function RestaurantFloorEditor({accountId,storeId,resources,canEd
  const draggedFloor=useRef('')
  const saveErrors=useSaveFormErrors()
  const observed=useRef(''),latest=useRef(0)
+ const currentFloor=useRef({draft,floors});currentFloor.current={draft,floors}
+ const [refreshConflict,setRefreshConflict]=useState(false)
  const resourceKey=JSON.stringify([refreshKey??'',resources.map(r=>r.id).sort()])
- const load=useCallback(async()=>{const ticket=++latest.current,requested=observed.current;setLoading(true);setError('');try{const result=await reservationBoardApi.floors(accountId,storeId);if(!Array.isArray(result.data))throw Error('invalid floor');if(ticket!==latest.current)return;setFloors(result.data);const floor=result.data.find(f=>f.id===draft?.id)??result.data[0]??null;setDraft(floor);setViewport(floor?initialFloorViewport(floor):null);setZoom(100);setRefreshPending(observed.current!==requested)}catch{if(ticket===latest.current)setError('座席図を読み込めませんでした。')}finally{if(ticket===latest.current)setLoading(false)}},[accountId,storeId,draft?.id])
+ const load=useCallback(async(preserveChanges=false)=>{
+  const ticket=++latest.current,requested=observed.current
+  setLoading(true);setError('')
+  try{
+   const result=await reservationBoardApi.floors(accountId,storeId)
+   if(!Array.isArray(result.data))throw Error('invalid floor')
+   if(ticket!==latest.current)return
+   if(observed.current!==requested){setRefreshPending(true);return}
+   const current=currentFloor.current
+   const incoming=result.data.find(f=>f.id===current.draft?.id)??result.data[0]??null
+   const base=current.floors.find(f=>f.id===current.draft?.id)
+   const merged=preserveChanges&&base&&current.draft&&incoming?.id===base.id
+    ?refreshFloorDraft(base,current.draft,incoming):null
+   const floor=merged?.draft??incoming
+   setFloors(result.data.map(f=>f.id===merged?.baseline.id?merged.baseline:f))
+   setDraft(floor);setRefreshConflict(merged?.conflict??false)
+   setSelected(id=>id.startsWith('fixture:')||floor?.tables.some(t=>t.id===id)?id:'')
+   setViewport(floor?initialFloorViewport(floor):null);setZoom(100);setRefreshPending(false)
+  }catch{if(ticket===latest.current)setError('座席図を読み込めませんでした。')}
+  finally{if(ticket===latest.current)setLoading(false)}
+ },[accountId,storeId])
  useEffect(()=>{observed.current=resourceKey;setFloors([]);setDraft(null);setSelected('');setZoom(100);setViewport(null);void load();return()=>{latest.current++}},[accountId,storeId]) // eslint-disable-line react-hooks/exhaustive-deps
  const dirty=!!draft&&JSON.stringify(draft)!==JSON.stringify(floors.find(f=>f.id===draft.id))
  const guard=useUnsavedGuard({dirty,busy:busy||loading})
  useEffect(()=>{if(observed.current!==resourceKey){observed.current=resourceKey;setRefreshPending(true)}},[resourceKey])
- useEffect(()=>{if(refreshPending&&!dirty&&!busy&&!loading){setRefreshPending(false);void load()}},[refreshPending,dirty,busy,loading,load])
+ useEffect(()=>{if(refreshPending&&!busy&&!loading){setRefreshPending(false);void load(true)}},[refreshPending,busy,loading,load])
  const save=async()=>{if(!draft||!canEdit||busy)return;setBusy(true);setError('');try{await reservationBoardApi.saveFloor(accountId,{...draft,expectedVersion:draft.version});const next={...draft,version:draft.version+1};setDraft(next);setFloors(fs=>fs.map(f=>f.id===next.id?next:f))}catch(cause){saveErrors.capture(cause);setError('保存できませんでした。版が変わった場合は、入力を控えて最新の座席図を読み込んでください。')}finally{setBusy(false)}}
  const addFloor=async()=>{if(!newName.trim()){setError('階・エリアの名前を入れてください。');return}setBusy(true);setError('');try{await reservationBoardApi.createFloor(accountId,storeId,newName.trim(),newKind,newKind==='area'?parent||null:null);setNewName('');setModal(null);await load()}catch{setError('階・エリアを追加できませんでした。名前と権限を確認してください。')}finally{setBusy(false)}}
  const moveFloor=(id:string,target:number)=>setOrderedIds(ids=>{const from=ids.indexOf(id);if(from<0||target<0||target>=ids.length||from===target)return ids;const next=[...ids];next.splice(from,1);next.splice(target,0,id);return next})
@@ -99,7 +122,7 @@ export default function RestaurantFloorEditor({accountId,storeId,resources,canEd
    for(const id of createdIds.reverse()){try{await restaurantTestApi.deleteTable(accountId,id);removed++}catch{/* the remaining count is shown below */}}
    resultError=created>removed?`${created-removed}卓が残りました。作成結果を座席図で確認してください。`:'卓を作成できませんでした。入力と配置を確認してください。'
   }else setModal(null)
-  try{await onCreated?.();await load()}catch{resultError=resultError||'座席図を読み直せませんでした。再読み込みしてください。'}
+  try{await onCreated?.();await load(true)}catch{resultError=resultError||'座席図を読み直せませんでした。再読み込みしてください。'}
   if(resultError)setError(resultError)
   setBusy(false)
  }
@@ -111,7 +134,7 @@ export default function RestaurantFloorEditor({accountId,storeId,resources,canEd
  const childAreas=draft?floors.filter(f=>f.parentFloorId===draft.id):[]
  const lastFloor=!!draft&&draft.kind!=='area'&&floors.filter(f=>f.kind!=='area').length<=1
  const deleteReason=draft?.tables.length?`${draft.tables.length}卓が残っています。卓を別の階・エリアへ移すか削除してください。`:childAreas.length?`${childAreas.length}件のエリアが残っています。先にエリアを削除してください。`:lastFloor?'最後の階は削除できません。先に別の階を追加してください。':null
- useEffect(()=>{if(selectedId)setSelected(selectedId)},[selectedId])
+ useEffect(()=>{if(selectedId!==undefined)setSelected(selectedId)},[selectedId])
  useEffect(()=>{if(duplicateRequest){openModal('duplicate');if(selectedId){setSource(selectedId);const selectedFloor=floors.find(f=>f.tables.some(t=>t.id===selectedId));if(selectedFloor)setTargetFloor(selectedFloor.id)}}},[duplicateRequest]) // eslint-disable-line react-hooks/exhaustive-deps
  const baseViewport=draft?viewport??initialFloorViewport(draft):null
  const visibleViewport=draft&&baseViewport?visibleFloorViewport(baseViewport,zoom,draft):null
@@ -119,12 +142,12 @@ export default function RestaurantFloorEditor({accountId,storeId,resources,canEd
  const panBy=(dx:number,dy:number)=>{if(!draft)return;setViewport(current=>panFloorViewport(current??initialFloorViewport(draft),zoom,draft,dx,dy))}
  return <SaveErrorScope errors={saveErrors}><div className={styles.editor}>
   {loading?<p className={styles.note} role="status">座席図を読み込み中です。</p>:null}
-  {refreshPending&&dirty?<Notice tone="warn">卓の情報が変わりました。配置の変更は残しています。<Button type="button" variant="text" size="inline" onClick={()=>guard.guarded(()=>void load())}>最新の座席図を読み込む</Button></Notice>:null}
+  {refreshConflict&&dirty?<Notice tone="warn">卓の情報が変わりました。配置の変更は残しています。<Button type="button" variant="text" size="inline" onClick={()=>guard.guarded(()=>void load())}>最新の座席図を読み込む</Button></Notice>:null}
   {error?<Notice tone="danger">{error}<Button type="button" variant="text" size="inline" onClick={()=>guard.guarded(()=>void load())}>もう一度読み込む</Button></Notice>:null}
   {draft?<><div className={styles.top}><div className={styles.tabs} role="tablist" aria-label="階・エリア">{floors.map(f=><button type="button" role="tab" aria-selected={f.id===draft.id} key={f.id} className={f.id===draft.id?styles.activeTab:''} onClick={()=>guard.guarded(()=>{setDraft(f);setViewport(initialFloorViewport(f));setSelected('');setZoom(100)})}>{f.name}</button>)}</div>{canEdit?<button type="button" className={styles.reorderButton} disabled={busy||loading||floors.length<2} onClick={()=>guard.guarded(()=>{setOrderedIds(floors.map(f=>f.id));setOrderError('');setOrderOpen(true)})}><span aria-hidden="true">⇅</span>並び替え</button>:null}</div>
    {canEdit?<div className={styles.actionLine}><div className={styles.createActions}><button type="button" className={styles.createButton} disabled={busy||loading} onClick={()=>onCreate?.(draft.id)}><Plus size={16}/>卓を作る</button><button type="button" className={styles.outlineButton} disabled={busy||loading} onClick={()=>openModal('add')}><Plus size={16}/>階・エリアを追加</button></div><button type="button" className={styles.deleteFloorButton} disabled={busy||loading} onClick={()=>guard.guarded(()=>openModal('delete'))}>この階・エリアを削除</button></div>:null}
    <div className={styles.mapFrame} onWheel={e=>{e.preventDefault();if(e.ctrlKey||e.metaKey){setZoom(z=>Math.min(250,Math.max(50,z+(e.deltaY<0?10:-10))));return}if(!visibleViewport)return;const scale=visibleViewport.size/e.currentTarget.getBoundingClientRect().width;const horizontal=e.shiftKey&&!e.deltaX;panBy(-(horizontal?e.deltaY:e.deltaX)*scale,-(horizontal?0:e.deltaY)*scale)}}>
-    <SaveErrorField names={['tables']}><RestaurantFloorMap floor={draft} labels={resources} viewport={viewBox} canEdit={canEdit&&!busy&&!loading} penTableStyle selectedId={selected} onSelect={id=>{setSelected(id);if(!id.startsWith('fixture:'))onSelect(id)}} onChange={tables=>setDraft({...draft,tables})} onFloorChange={setDraft} onPan={panBy}/></SaveErrorField>
+    <SaveErrorField names={['tables']}><RestaurantFloorMap floor={{...draft,tables:draft.tables.filter(t=>resources.some(r=>r.id===t.id))}} labels={resources} viewport={viewBox} canEdit={canEdit&&!busy&&!loading} penTableStyle selectedId={selected} onSelect={id=>{setSelected(id);if(!id.startsWith('fixture:'))onSelect(id)}} onChange={tables=>setDraft({...draft,tables})} onFloorChange={setDraft} onPan={panBy}/></SaveErrorField>
     <button type="button" className={styles.fullView} onClick={()=>{setViewport(initialFloorViewport(draft));setZoom(100)}}><Scan size={14} aria-hidden="true"/>全体表示</button>
     <div className={styles.zoom}><button type="button" aria-label="縮小" onClick={()=>setZoom(z=>Math.max(50,z-10))}><Minus size={15}/></button><span>{zoom}%</span><button type="button" aria-label="拡大" onClick={()=>setZoom(z=>Math.min(250,z+10))}><Plus size={15}/></button></div>
    </div>{canEdit?<div className={styles.saveRow}><span className={styles.saveStatus} role="status">{dirty?'未保存の変更があります':'保存済み'}</span><button type="button" className={styles.saveButton} disabled={!dirty||busy||loading} onClick={()=>void save()}><Save size={16} aria-hidden="true"/>保存</button></div>:null}

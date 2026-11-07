@@ -178,12 +178,17 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
       requestAnimationFrame(() => { const field = editorRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return
     }
+    const code = draft.code.trim()
+    if (rows.some(row => row.id !== editing?.id && row.code.trim() === code)) {
+      saveErrors.apply({code:'この卓番はすでに使われています。別の卓番を入力してください。'})
+      return
+    }
     const selectedFloor=floors.find(f=>f.id===draft.floorId)
     if(!editing&&selectedFloor&&selectedFloor.tables.length+createCount>200){setEditorError('1つの階・エリアに置ける卓は200卓までです。');return}
     const body = {
       floorId:draft.floorId,expectedTargetVersion:floors.find(f=>f.id===draft.floorId)?.version,
       expectedVersion:editing?.floor_version??1,
-      code: draft.code,
+      code,
       label: draft.label,
       seatType: draft.seatType,
       minCapacity: Number(draft.minCapacity),
@@ -212,13 +217,13 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
               if(floor&&!plan)throw new Error('この階には卓を配置できません。作成する数を減らしてください。')
               if(floor&&plan&&(plan.width!==floor.width||plan.height!==floor.height))await reservationBoardApi.saveFloor(selectedAccountId,{...floor,width:plan.width,height:plan.height,expectedVersion:floor.version})
               const created:string[]=[]
-              const usedCodes=new Set(rows.map(row=>row.code))
+              const usedCodes=new Set(rows.map(row=>row.code.trim()))
               const nameParts=draft.label.match(/^(.*?)(\d+)$/)
               try{
                 for(let index=0;index<createCount;index++){
-                  let candidate=index===0?draft.code:/^\d+$/.test(draft.code)?String(Number(draft.code)+index):`${draft.code}-${index+1}`
+                  let candidate=index===0?code:/^\d+$/.test(code)?String(Number(code)+index):`${code}-${index+1}`
                   let suffix=index+1
-                  while(usedCodes.has(candidate)){suffix++;candidate=/^\d+$/.test(draft.code)?String(Number(draft.code)+suffix):`${draft.code}-${suffix}`}
+                  while(index>0&&usedCodes.has(candidate)){suffix++;candidate=/^\d+$/.test(code)?String(Number(code)+suffix):`${code}-${suffix}`}
                   usedCodes.add(candidate)
                   const label=index===0?draft.label:nameParts?`${nameParts[1]}${Number(nameParts[2])+index}`:`${draft.label} ${index+1}`
                   const position=plan?.tables[index]
@@ -305,7 +310,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
 
   const activeRows = rows.filter((item) => item.is_active)
   const visibleRows=rows.filter(item=>statusFilter==='all'||(statusFilter==='active'?!!item.is_active:!item.is_active))
-  useEffect(()=>{if(rows.length&&!selectedId)setSelectedId(rows[0].id)},[rows,selectedId])
+  useEffect(()=>{if(!rows.some(row=>row.id===selectedId))setSelectedId(rows[0]?.id??'')},[rows,selectedId])
 
   return (
     <SaveErrorScope errors={saveErrors}><>
