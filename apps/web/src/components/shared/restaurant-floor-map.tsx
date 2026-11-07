@@ -55,7 +55,7 @@ export default function RestaurantFloorMap({floor,labels,onSelect,onChange,onFlo
  }}>
  {penTableStyle&&selectedId===t.id?<rect className={styles.selection} x={-17} y={-18} width={t.width+34} height={t.height+32} rx={7}/>:null}
  {chairs.map((chair,index)=>{const horizontal=chair.side==='top'||chair.side==='bottom';const x=horizontal?chair.offset*t.width-10:chair.side==='left'?-10:t.width+4;const y=horizontal?chair.side==='top'?-10:t.height+4:chair.offset*t.height-10;return <rect key={index} className={styles.chair} x={x} y={y} width={horizontal?20:6} height={horizontal?6:20} rx="3"/>})}
- {t.shape==='circle'?<ellipse cx={t.width/2} cy={t.height/2} rx={t.width/2} ry={t.height/2}/>:<rect width={t.width} height={t.height} rx={penTableStyle?10:t.shape==='counter'?t.height/2:8}/>}
+ {t.shape==='circle'?<circle cx={t.width/2} cy={t.height/2} r={Math.min(t.width,t.height)/2}/>:<rect width={t.width} height={t.height} rx={penTableStyle?10:t.shape==='counter'?t.height/2:8}/>}
  <title>{r?.label??t.id}</title>
  {penTableStyle?<>
   {showCapacity?<text x={t.width/2} y={showMarks?t.height/2-8:t.height/2}>{r?`${t.minCapacity??1}〜${t.maxCapacity??r.capacity}名`:'—'}</text>:null}

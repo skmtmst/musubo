@@ -120,10 +120,23 @@ it('席の条件を変更して保存する',async()=>{
  const detail=(await screen.findByRole('heading',{name:'卓一覧'})).closest('section')!
  fireEvent.click(within(detail).getAllByRole('button',{name:/のその他操作$/})[0])
  fireEvent.click(screen.getByRole('menuitem',{name:'変更'}))
- fireEvent.click(screen.getByRole('button',{name:'変更 ›'}))
+ fireEvent.click(screen.getByRole('button',{name:'席の条件を変更 ›'}))
+ expect(screen.queryByText('椅子の配置プレビュー')).toBeNull()
+ expect(screen.getByRole('button',{name:'プレビューへ戻る'})).toBeTruthy()
  fireEvent.click(screen.getByRole('button',{name:'喫煙'}))
  fireEvent.click(screen.getByRole('button',{name:'変更を保存'}))
  await waitFor(()=>expect(fixture.updateTable).toHaveBeenCalledWith('account-1','t1',expect.objectContaining({smokingPolicy:'smoking'})))
+})
+it('丸卓を作成すると縦横が同じ寸法で保存される',async()=>{
+ render(<TablesV8 />)
+ await screen.findByRole('group',{name:'1階の座席表'})
+ fireEvent.click(screen.getByRole('button',{name:'卓を作る'}))
+ const dialog=screen.getByRole('dialog',{name:'卓を作る'})
+ fireEvent.change(screen.getByRole('textbox',{name:'卓番'}),{target:{value:'T5'}})
+ fireEvent.change(screen.getByRole('textbox',{name:'表示名'}),{target:{value:'丸卓'}})
+ fireEvent.click(screen.getByRole('button',{name:'丸'}))
+ fireEvent.click(within(dialog).getByRole('button',{name:'卓を作る'}))
+ await waitFor(()=>expect(fixture.createTable).toHaveBeenCalledWith('account-1',expect.objectContaining({shape:'circle',width:80,height:80})))
 })
 it('ドラッグした配置をまとめて保存し、再取得した座標で表示する',async()=>{
  const saved={...floor,version:2,tables:floor.tables.map(t=>t.id==='t1'?{...t,x:60}:t)}
