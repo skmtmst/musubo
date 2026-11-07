@@ -27,8 +27,13 @@ const STALLED_RUNS = {
 }
 
 async function githubJson(path, fetcher, allowMissing = false) {
+  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN
   const response = await fetcher(`${API_ROOT}${path}`, {
-    headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     signal: AbortSignal.timeout(15000),
     cache: 'no-store',
   })
