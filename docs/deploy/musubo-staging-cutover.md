@@ -14,7 +14,7 @@
 | 旧配備・D1更新 workflow | 両方 `disabled_manually`。配備6件、D1更新2件が GitHub 上は `queued` のまま残る。全8件のジョブ数は0件。通常取消しと強制取消しは「まだキューに入っていない」と 409 を返した |
 | 旧検証資格情報 | 旧リポジトリ `staging` Environment の唯一の Cloudflare API トークン `CF_API_TOKEN` を削除済み。リポジトリ共通の秘密情報は0件。`CF_ACCOUNT_ID` のみ残る。ジョブ未生成の8件が後から始まっても旧経路は Cloudflare へ書き込めない |
 | 旧共有検証ロック | `refs/deploy-locks/staging` は404（なし） |
-| 新配備 workflow | `disabled_manually`。新 `staging` Environment は `codex/development` のみ許可し、公開 Turnstile サイトキーを設定済み。Cloudflare 秘密情報は未登録 |
+| 新配備 workflow | `disabled_manually`。新 `staging` Environment は `codex/development` のみ許可し、公開 Turnstile サイトキーを設定済み。`CF_API_TOKEN` と `CF_ACCOUNT_ID` の秘密名を確認済み（値は取得しない） |
 
 旧トークンの値は取得・保存していない。元の秘密情報をそのまま復元することはできず、必要なら新しいトークンを作る。新しい検証用トークンは**新リポジトリだけ**へ登録する。GitHub Actions の新リポジトリ用トークンから旧リポジトリの秘密情報一覧は確認できないため、旧資格情報の削除は切り替え担当が配備前に再確認する。
 
@@ -58,6 +58,6 @@ GitHub Actions の `cloudflare-staging` キューは**リポジトリごと**に
 
 ## 現在の停止条件
 
-新 `staging` Environment に Cloudflare トークンとアカウント ID がない。新 `codex/development` は公開中の旧コミットを履歴に含まない。旧リポジトリの進行中PRの整理も残る。したがって、新 workflow の有効化、共有検証への dry-run/apply はまだ行わない。旧8件が残る間は、旧資格情報が再登録されていないことを担当者が再確認する。
+新 `staging` Environment の秘密名は揃い、手元の配備前検査は合格した。ただしトークンの実際の権限はまだ配備ジョブで確認していない。新 `codex/development` は公開中の旧コミットを履歴に含まず、旧リポジトリの進行中PRの整理も残る。したがって、新 workflow の有効化、共有検証への dry-run/apply はまだ行わない。旧8件が残る間は、旧資格情報が再登録されていないことを担当者が再確認する。
 
 参照：[共通の配備ゲート](../DEPLOY-GATE.md)、[新リポジトリの移行方針](../legal/musubo-repository-transition.md)、[GitHub Actions のリポジトリ別 concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)、[GitHub のリポジトリ限定 GITHUB_TOKEN](https://docs.github.com/en/actions/concepts/security/compromised-runners)。
