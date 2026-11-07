@@ -16,6 +16,8 @@
 | 旧共有検証ロック | `refs/deploy-locks/staging` は404（なし） |
 | 新配備 workflow | `disabled_manually`。新 `staging` Environment は `codex/development` のみ許可し、公開 Turnstile サイトキーを設定済み。`CF_API_TOKEN` と `CF_ACCOUNT_ID` の秘密名を確認済み（値は取得しない） |
 
+公開版 `20bfff7251a5543c7da103c188ea18c8db89aff2` は専用枝 `codex/masato-published-sync-1107` に通常の merge で取り込んだ。この枝で祖先関係、差分、対象試験を確認した。新 `codex/development` に入ったかはPR統合後に再確認する。旧リポジトリの未完了PRは別担当の作業として扱う。
+
 旧トークンの値は取得・保存していない。元の秘密情報をそのまま復元することはできず、必要なら新しいトークンを作る。新しい検証用トークンは**新リポジトリだけ**へ登録する。GitHub Actions の新リポジトリ用トークンから旧リポジトリの秘密情報一覧は確認できないため、旧資格情報の削除は切り替え担当が配備前に再確認する。
 
 ### GitHub に残る8件の扱い
@@ -58,6 +60,6 @@ GitHub Actions の `cloudflare-staging` キューは**リポジトリごと**に
 
 ## 現在の停止条件
 
-新 `staging` Environment の秘密名は揃い、手元の配備前検査は合格した。ただしトークンの実際の権限はまだ配備ジョブで確認していない。新 `codex/development` は公開中の旧コミットを履歴に含まず、旧リポジトリの進行中PRの整理も残る。したがって、新 workflow の有効化、共有検証への dry-run/apply はまだ行わない。旧8件が残る間は、旧資格情報が再登録されていないことを担当者が再確認する。
+新 `staging` Environment の秘密名は揃い、手元の配備前検査は合格した。ただしトークンの実際の権限はまだ配備ジョブで確認していない。公開中の旧コミットは上記の専用枝へ取り込み済みで、PR統合後に新 `codex/development` の祖先関係を再確認する。旧リポジトリの進行中PRの整理も残る。新 workflow の有効化、共有検証への dry-run/apply は、切り替え前の必須ゲートを満たすまで行わない。旧8件が残る間は、旧資格情報が再登録されていないことを担当者が再確認する。
 
 参照：[共通の配備ゲート](../DEPLOY-GATE.md)、[新リポジトリの移行方針](../legal/musubo-repository-transition.md)、[GitHub Actions のリポジトリ別 concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)、[GitHub のリポジトリ限定 GITHUB_TOKEN](https://docs.github.com/en/actions/concepts/security/compromised-runners)。
