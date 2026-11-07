@@ -371,7 +371,7 @@
 
 ## 運用と配備
 
-- [musubo 新リポジトリへの共有検証配備の切り替え準備](deploy/musubo-staging-cutover.md) — 未実施の手順・確認記録、確認 2026-11-06。
+- [musubo 新リポジトリへの共有検証配備の切り替え準備](deploy/musubo-staging-cutover.md) — 旧経路の停止措置と残る切り替え手順、確認 2026-11-07。
 
 - [開発ガイド](development.md)
 - [PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md)
@@ -1178,3 +1178,4 @@
 - [本番候補の検証配備証拠の確認方法](release-log/unreleased/2093-masato-production-staging-proof.md) — 反映履歴、確認 2026-11-05。
 - [座席図の表示を最新Penに合わせる](release-log/unreleased/2098-masato-table-pen-visual.md) — 卓マーク、選択枠、保存表示の修正履歴。確認 2026-11-06。
 - [卓の追加・削除を座席図へ即時反映する](release-log/unreleased/21-masato-table-immediate-sync.md) — 未保存の配置を残して一覧と座席図を同期する修正履歴。確認 2026-11-07。
+- [旧配備経路の停止確認](release-log/unreleased/20-masato-staging-cutover-gate.md) — 検証配備の切り替え前に行う確認の反映履歴。確認 2026-11-07。

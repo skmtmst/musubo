@@ -177,7 +177,7 @@ for local_cloudflare_variable in \
 done
 
 if [[ "$local_cloudflare_credential_set" == "0" ]]; then
-  check_staging_secrets "skmtmst/line-harness-oss" "staging"
+  check_staging_secrets "skmtmst/musubo" "staging"
 fi
 
 if ((${#issues[@]} == 0)); then
