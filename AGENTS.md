@@ -11,7 +11,7 @@
 
 - 今後新しく依頼される musubo の開発は `skmtmst/musubo` の最新 `codex/development` を基準に専用ブランチで始める。然-NEN EC の開発にはこの切り替えを適用しない。
 - 移行前に `skmtmst/line-harness-oss` で始まった PR は、担当者の確認と統合が終わるまで旧リポジトリで扱う。旧リポジトリの更新を新リポジトリへ取り込むときは、両方の最新 SHA と差分を確認し、通常の PR と検査を経る。履歴の上書きや無検査のコピーはしない。
-- 新リポジトリの開発用 Actions は有効だが、Cloudflare 配備・D1 更新の workflow は無効で、配備先の設定も未移行。新リポジトリで統合しただけでは検証・本番に反映されない。§7〜8 の配備手順は、[移行文書](docs/legal/musubo-repository-transition.md) に記した配備経路の切り替えと安全確認が終わるまで、新リポジトリからは実行しない。旧リポジトリから新リポジトリの変更を迂回配備しない。
+- 共有検証環境の配備経路は 2026-11-07 に `skmtmst/musubo` へ切り替え済み。新リポジトリの `deploy-cloudflare-staging.yml` は有効で、最新 `codex/development` のみを共通キューと共有ロックで配備する。旧リポジトリの検証配備・D1更新 workflow は停止したまま維持し、旧経路で迂回配備しない。D1 更新 workflow と本番配備 workflow は別工程で、現時点では新リポジトリで無効。配備前に[切り替え記録と現行ゲート](docs/deploy/musubo-staging-cutover.md)および実際の設定・公開 SHA を再確認する。
 
 ## 1. 最初に読む（全員共通）
 
