@@ -1177,3 +1177,4 @@
 - [共有検証への反映順序と巻き戻し防止](release-log/unreleased/2090-masato-ordered-staging-delivery.md) — 反映履歴、確認 2026-11-05。
 - [本番候補の検証配備証拠の確認方法](release-log/unreleased/2093-masato-production-staging-proof.md) — 反映履歴、確認 2026-11-05。
 - [座席図の表示を最新Penに合わせる](release-log/unreleased/2098-masato-table-pen-visual.md) — 卓マーク、選択枠、保存表示の修正履歴。確認 2026-11-06。
+- [旧配備経路の停止確認](release-log/unreleased/20-masato-staging-cutover-gate.md) — 検証配備の切り替え前に行う確認の反映履歴。確認 2026-11-07。
