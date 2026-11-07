@@ -305,7 +305,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
 
   const activeRows = rows.filter((item) => item.is_active)
   const visibleRows=rows.filter(item=>statusFilter==='all'||(statusFilter==='active'?!!item.is_active:!item.is_active))
-  useEffect(()=>{if(rows.length&&!selectedId)setSelectedId(rows[0].id)},[rows,selectedId])
+  useEffect(()=>{if(!rows.some(row=>row.id===selectedId))setSelectedId(rows[0]?.id??'')},[rows,selectedId])
 
   return (
     <SaveErrorScope errors={saveErrors}><>

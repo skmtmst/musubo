@@ -54,6 +54,46 @@ beforeEach(() => {
 afterEach(() => { cleanup(); clearToastsForTest(); vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('BERxg 座席・卓管理', () => {
+  it.each(['追加','削除'] as const)('卓を%sしたら再読込せず一覧と図が更新され、動かしていた別卓は元に戻らない',async operation=>{
+    const first={...tables[0],label:'手前の卓'},second={...tables[1],label:'奥の卓',join_group:null}
+    let savedTables=[first,second]
+    const placed=(row:typeof first,x:number)=>({id:row.id,x,y:50,width:80,height:64,rotation:0,shape:'rectangle' as const,minCapacity:row.min_capacity,maxCapacity:row.max_capacity})
+    let savedFloor={id:'floor-store-1',storeId:'store-1',name:'1階',width:500,height:500,version:1,outline:[],fixtures:[],tables:[placed(first,50),placed(second,200)]}
+    fixture.snapshot.mockImplementation(async()=>({data:snapshotOf({tables:savedTables,reservations:[]})}))
+    floorApi.floors.mockImplementation(async()=>({data:[savedFloor]}))
+    fixture.createTable.mockImplementation(async(_account,body)=>{
+      const added={...first,id:'t-new',code:body.code,label:body.label}
+      savedTables=[...savedTables,added]
+      savedFloor={...savedFloor,version:2,tables:[...savedFloor.tables,placed(added,350)]}
+      return {success:true,data:{id:added.id}}
+    })
+    fixture.deleteTable.mockImplementation(async()=>{
+      savedTables=savedTables.filter(t=>t.id!==second.id)
+      savedFloor={...savedFloor,version:2,tables:savedFloor.tables.filter(t=>t.id!==second.id)}
+      return {success:true,data:{id:second.id}}
+    })
+    render(<TablesPage />)
+    fireEvent.keyDown(await screen.findByRole('button',{name:first.label}),{key:'ArrowRight'})
+    if(operation==='追加'){
+      fireEvent.click(screen.getByRole('button',{name:'卓を作る'}))
+      fireEvent.change(screen.getByLabelText('卓番'),{target:{value:'T9'}})
+      fireEvent.change(screen.getByLabelText('表示名'),{target:{value:'新しい卓'}})
+      fireEvent.click(within(screen.getByRole('dialog',{name:'卓を作る'})).getByRole('button',{name:'卓を作る'}))
+      expect(await screen.findByText('T9 · 新しい卓')).toBeTruthy()
+      expect(await screen.findByRole('button',{name:'新しい卓'})).toBeTruthy()
+    }else{
+      const row=screen.getByText('T2 · 奥の卓').closest('li')!
+      fireEvent.click(within(row).getByRole('button',{name:'T2・奥の卓のその他操作'}))
+      fireEvent.click(screen.getByRole('menuitem',{name:'削除'}))
+      fireEvent.click(screen.getByRole('button',{name:'削除する'}))
+      await waitFor(()=>expect(screen.queryByText('T2 · 奥の卓')).toBeNull())
+      expect(screen.queryByRole('button',{name:second.label})).toBeNull()
+      expect(screen.queryByRole('button',{name:second.id})).toBeNull()
+    }
+    await waitFor(()=>expect(screen.queryByText('座席図を読み込み中です。')).toBeNull())
+    expect(screen.getByRole('button',{name:first.label}).getAttribute('transform')).toContain('translate(60 50)')
+    expect(screen.getByText('未保存の変更があります')).toBeTruthy()
+  })
   it('割り当ての最終行は本文、保存操作は別の共通下部領域へ置き、版付き保存を保つ', async () => {
     location.query = 'view=assign'
     const { container } = render(<TablesPage />)
