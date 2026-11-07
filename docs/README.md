@@ -466,6 +466,7 @@
 
 - [新リポジトリへの検証配備切り替え前の安全確認](release-log/unreleased/9-masato-staging-cutover-gate.md) — 反映履歴、確認 2026-11-06。
 - [DB復旧workflowの安全条件を確かめる試験](release-log/unreleased/10-masato-recovery-workflow-test.md) — 反映履歴、確認 2026-11-06。
+- [座席図の卓プレビュー・タブ並び替え・拡大移動の修正](release-log/unreleased/2099-masato-seat-map-ux.md)
 - [Instagramの同一統括内での複数アカウント接続](release-log/unreleased/2080-masato-instagram-shared-accounts.md)
 - [座席・卓管理のPenデザイン反映](release-log/unreleased/2074-masato-table-pen.md)
 - [Googleビジネスのパフォーマンス取得](release-log/unreleased/2026-11-04-masato-google-performance-sync.md)
@@ -1179,3 +1180,4 @@
 - [座席図の表示を最新Penに合わせる](release-log/unreleased/2098-masato-table-pen-visual.md) — 卓マーク、選択枠、保存表示の修正履歴。確認 2026-11-06。
 - [卓の追加・削除を座席図へ即時反映する](release-log/unreleased/21-masato-table-immediate-sync.md) — 未保存の配置を残して一覧と座席図を同期する修正履歴。確認 2026-11-07。
 - [旧配備経路の停止確認](release-log/unreleased/20-masato-staging-cutover-gate.md) — 検証配備の切り替え前に行う確認の反映履歴。確認 2026-11-07。
+- [公開中の検証版の履歴を新リポジトリへ取り込む](release-log/unreleased/22-masato-published-history-sync.md) — 検証配備の巻き戻しを防ぐための履歴取り込み。確認 2026-11-07。

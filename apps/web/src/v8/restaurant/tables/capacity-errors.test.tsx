@@ -92,7 +92,7 @@ describe('卓の人数の理由', () => {
   it('修正後の追加は最新の人数と既存の送信項目で1回だけ行う', async () => {
     await openNew(); change('最小人数', '5'); submit(); change('最大人数', '6'); submit()
     await waitFor(() => expect(api.createTable).toHaveBeenCalledTimes(1))
-    expect(api.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', floorId: 'floor-store-1', expectedTargetVersion: 1, expectedVersion: 1, code: 'T5', label: '窓側', seatType: 'table', minCapacity: 5, maxCapacity: 6, floorX: 30, floorY: 152, joinGroup: null, shape: 'rectangle', smokingPolicy: 'non_smoking', shoesAllowed: true, visibleOnMap: true }))
+    expect(api.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', floorId: 'floor-store-1', expectedTargetVersion: 1, expectedVersion: 1, code: 'T5', label: '窓側', seatType: 'table', minCapacity: 5, maxCapacity: 6, floorX: 30, floorY: 168, width: 80, height: 80, joinGroup: null, shape: 'rectangle', smokingPolicy: 'non_smoking', shoesAllowed: true, visibleOnMap: true }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
   it('新規を閉じ直すと初期人数と理由なしへ戻る', async () => {

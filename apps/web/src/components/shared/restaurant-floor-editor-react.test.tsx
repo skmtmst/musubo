@@ -3,14 +3,14 @@ import {afterEach,beforeEach,expect,it,vi} from 'vitest'
 import {cleanup,fireEvent,render,screen,waitFor,within} from '@testing-library/react'
 import type {RestaurantFloor} from '@line-crm/shared'
 import RestaurantFloorEditor,{initialFloorViewport} from './restaurant-floor-editor'
-const api=vi.hoisted(()=>({floors:vi.fn(),saveFloor:vi.fn(),createFloor:vi.fn(),deleteFloor:vi.fn()}))
+const api=vi.hoisted(()=>({floors:vi.fn(),saveFloor:vi.fn(),createFloor:vi.fn(),deleteFloor:vi.fn(),reorderFloors:vi.fn()}))
 const tableApi=vi.hoisted(()=>({createTable:vi.fn(),deleteTable:vi.fn()}))
 vi.mock('next/navigation',()=>({useRouter:()=>({push:vi.fn()})}))
 vi.mock('@/lib/api/helpers/reservation-board',()=>({reservationBoardApi:api}))
 vi.mock('@/lib/restaurant-test-api',()=>({restaurantTestApi:tableApi}))
 const floor={id:'f',storeId:'s',name:'1階',width:500,height:300,version:7,outline:[],fixtures:[],tables:[{id:'t',x:50,y:50,width:80,height:60,rotation:0,shape:'rectangle'}]}
 const props={accountId:'a',storeId:'s',resources:[{id:'t',label:'T1',active:true,capacity:2}],onSelect:vi.fn()}
-beforeEach(()=>{api.floors.mockResolvedValue({data:[floor]});api.saveFloor.mockRejectedValue(new Error('409'));api.createFloor.mockReset();api.deleteFloor.mockReset();tableApi.createTable.mockReset();tableApi.deleteTable.mockReset()})
+beforeEach(()=>{api.floors.mockResolvedValue({data:[floor]});api.saveFloor.mockRejectedValue(new Error('409'));api.createFloor.mockReset();api.deleteFloor.mockReset();api.reorderFloors.mockReset();tableApi.createTable.mockReset();tableApi.deleteTable.mockReset()})
 afterEach(()=>{cleanup();vi.clearAllMocks()})
 it('保存操作を座席図の下に常時表示し、変更がある時だけ押せる',async()=>{
  api.saveFloor.mockResolvedValue({})
@@ -52,14 +52,28 @@ it('階とエリアの追加方法を表示し、親の階を指定して送信�
  fireEvent.click(screen.getByRole('button',{name:'エリアを追加'}))
  await waitFor(()=>expect(api.createFloor).toHaveBeenCalledWith('a','s','テラス','area','f'))
 })
-it('新しい階を選択中の階の次に追加する',async()=>{
+it('新しい階は並び順の指定なしで追加する',async()=>{
  api.createFloor.mockResolvedValue({data:{id:'f2'}})
  render(<RestaurantFloorEditor {...props} canEdit/>);await screen.findByRole('button',{name:'T1'})
  fireEvent.click(screen.getByRole('button',{name:'階・エリアを追加'}))
  fireEvent.change(screen.getByPlaceholderText('例：3階'),{target:{value:'2階'}})
- expect(screen.getByText('タブの表示位置')).toBeTruthy()
+ expect(screen.queryByText('タブの表示位置')).toBeNull()
+ expect(screen.queryByText('追加後の表示')).toBeNull()
  fireEvent.click(screen.getByRole('button',{name:'階を追加する'}))
- await waitFor(()=>expect(api.createFloor).toHaveBeenCalledWith('a','s','2階','floor',null,'f'))
+ await waitFor(()=>expect(api.createFloor).toHaveBeenCalledWith('a','s','2階','floor',null))
+})
+it('階とエリアを矢印で並べ替えて保存する',async()=>{
+ const area={...floor,id:'area',name:'テラス',kind:'area',parentFloorId:'f',tables:[]}
+ api.floors.mockResolvedValue({data:[floor,area]})
+ api.reorderFloors.mockResolvedValue({data:{orderedIds:['area','f']}})
+ render(<RestaurantFloorEditor {...props} canEdit/>)
+ await screen.findByRole('tab',{name:'テラス'})
+ fireEvent.click(screen.getByRole('button',{name:'並び替え'}))
+ const dialog=screen.getByRole('dialog',{name:'タブの並び替え'})
+ fireEvent.click(within(dialog).getByRole('button',{name:'テラスを上へ移動'}))
+ expect(within(dialog).getByText('この順番で表示').nextElementSibling?.textContent).toBe('テラス1階')
+ fireEvent.click(within(dialog).getByRole('button',{name:'並び順を保存'}))
+ await waitFor(()=>expect(api.reorderFloors).toHaveBeenCalledWith('a','s',['area','f'],['f','area']))
 })
 it('主操作の「卓を作る」から選択中の階を指定して作成画面へ進む',async()=>{
  const onCreate=vi.fn()
