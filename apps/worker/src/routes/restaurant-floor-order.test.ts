@@ -32,6 +32,12 @@ function request(path:string,body?:unknown){
  app.route('/',restaurantTest)
  return app.request(path,body===undefined?{headers:{Authorization:'Bearer owner-key'}}:{method:'POST',headers:{Authorization:'Bearer owner-key','Content-Type':'application/json'},body:JSON.stringify(body)},env)
 }
+function put(path:string,body:unknown){
+ const app=new Hono<Env>()
+ app.use('*',authMiddleware)
+ app.route('/',restaurantTest)
+ return app.request(path,{method:'PUT',headers:{Authorization:'Bearer owner-key','Content-Type':'application/json'},body:JSON.stringify(body)},env)
+}
 beforeEach(()=>{
  auth.getStaffByApiKey.mockReset().mockResolvedValue(null)
  auth.getStaffByAdminSession.mockReset().mockResolvedValue(null)
@@ -53,4 +59,17 @@ it('階を指定したタブの次に追加し、階なしのエリアも保存�
  const data=(await response.json() as {data:Array<{name:string;parentFloorId:string|null}>}).data
  expect(data.findIndex(f=>f.name==='中2階')).toBeLessThan(data.findIndex(f=>f.name==='2階'))
  expect(data.find(f=>f.name==='テラス')?.parentFloorId).toBeNull()
+})
+it('同じ店舗の全タブだけを並べ替え、古い順番からの保存を拒否する',async()=>{
+ seedRestaurantFixture(testDb)
+ const path='/api/restaurant-test/floors?account_id=account-1'
+ expect((await request(path,{storeId:'store-ginza',name:'2階',kind:'floor'})).status).toBe(201)
+ const before=(await (await request(`${path}&storeId=store-ginza`)).json() as {data:Array<{id:string;name:string}>}).data
+ const expectedIds=before.map(f=>f.id),orderedIds=[...expectedIds].reverse()
+ const response=await put('/api/restaurant-test/floors/order?account_id=account-1',{storeId:'store-ginza',orderedIds,expectedIds})
+ expect(response.status).toBe(200)
+ const after=(await (await request(`${path}&storeId=store-ginza`)).json() as {data:Array<{id:string}>}).data
+ expect(after.map(f=>f.id)).toEqual(orderedIds)
+ expect((await put('/api/restaurant-test/floors/order?account_id=account-1',{storeId:'store-ginza',orderedIds:expectedIds,expectedIds})).status).toBe(409)
+ expect((await put('/api/restaurant-test/floors/order?account_id=account-1',{storeId:'store-ginza',orderedIds:[orderedIds[0],'another-store'],expectedIds:orderedIds})).status).toBe(400)
 })

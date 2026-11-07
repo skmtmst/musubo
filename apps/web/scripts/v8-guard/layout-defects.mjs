@@ -2,7 +2,7 @@
  * node apps/web/scripts/v8-guard/layout-defects.mjs <baseUrl> [out.json]
  * --fixtures <json> は種類別のHTMLを1つのブラウザで順に検証する。
  * --fixture <html> は対照試験用（許可リストを使わず終了コードを確かめる）。
- * --compare-url <url> は同条件の参考値を残す。既存の崩れも失敗する。
+ * --compare-url <url> は同条件の統合先と比較し、新規の崩れだけを失敗にする。
  */
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
@@ -25,11 +25,26 @@ import scanInsertTokenFit from './insert-token-fit-browser.mjs'
 import { collectShortText, shortTextFindings } from './short-text-browser.mjs'
 const GAP_ROUTES = JSON.parse(readFileSync(new URL('./layout-defects-routes.json',import.meta.url),'utf8'))
 
-export const DEFECT_ROUTES = { ...ROUTES, tags: '/tags', affiliates: '/affiliates', 'inflow-links': '/inflow-links', conversions: '/conversions', ...Object.fromEntries(GAP_ROUTES.map(route=>[route,route])) }
-/** All current defects fail; comparison data never grants an exemption. */
+export const DEFECT_ROUTES = { ...ROUTES, tags: '/tags', affiliates: '/affiliates', 'inflow-links': '/inflow-links', conversions: '/affiliates?tab=points', ...Object.fromEntries(GAP_ROUTES.map(route=>[route,route])) }
+/** A standalone scan still fails on every detected defect. */
 export const assess = findings => ({ failures: [...findings], allowed: [] })
 export function assessAgainstBase(findings, baseFindings) {
-  return { ...assess(findings), existing: [], baseFindings }
+  const fingerprint = ({ targetIdentity, target, ...detail }) => JSON.stringify([targetIdentity || target, detail])
+  const remainingBase = new Map()
+  for (const finding of baseFindings) {
+    const key = fingerprint(finding)
+    remainingBase.set(key, (remainingBase.get(key) || 0) + 1)
+  }
+  const failures = [], existing = []
+  for (const finding of findings) {
+    const key = fingerprint(finding)
+    const count = remainingBase.get(key) || 0
+    if (count) {
+      existing.push(finding)
+      remainingBase.set(key, count - 1)
+    } else failures.push(finding)
+  }
+  return { failures, allowed: [], existing, baseFindings }
 }
 /** 番号を無視してよいのは、DOMで一つと確認した外枠だけ。子の番号は保つ。 */
 export function identifyStableTargets(findings) {

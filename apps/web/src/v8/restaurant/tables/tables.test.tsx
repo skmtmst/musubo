@@ -346,7 +346,7 @@ describe('BERxg 座席・卓管理', () => {
     fireEvent.click(within(floorPicker).getByRole('button', { name: '選ぶ' }))
     fireEvent.click(within(screen.getByRole('dialog', { name: '卓を作る' })).getByRole('button', { name: /^卓を作る$/ }))
     await waitFor(() => expect(fixture.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ floorId: 'floor-2', expectedTargetVersion: 7 })))
-    expect(fixture.createTable.mock.calls[0][1]).toMatchObject({floorX:30,floorY:152})
+    expect(fixture.createTable.mock.calls[0][1]).toMatchObject({floorX:30,floorY:168,width:80,height:80})
   })
 
   it('作成する数を増やすと卓番と名前を分けて重ならない位置へ作る',async()=>{

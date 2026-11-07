@@ -23,10 +23,27 @@ it('＋／−は表示倍率だけを変え、配置は保存しない',async()=
  expect(map.getAttribute('viewBox')).toBe(initial)
  expect(api.saveFloor).not.toHaveBeenCalled()
 })
-it('古い卓合わせ・全体表示・外形描画・つまんで置くを出さない',async()=>{
+it('全体表示は拡大後の表示範囲を元に戻し、配置は保存しない',async()=>{
  api.floors.mockResolvedValue({data:[floor]});render(<RestaurantFloorEditor {...props}/>)
- await screen.findByRole('group',{name:'1階の座席表'})
+ const map=await screen.findByRole('group',{name:'1階の座席表'})
+ const initial=map.getAttribute('viewBox')
+ fireEvent.click(screen.getByRole('button',{name:'拡大'}))
+ expect(map.getAttribute('viewBox')).not.toBe(initial)
+ fireEvent.click(screen.getByRole('button',{name:'全体表示'}))
+ expect(map.getAttribute('viewBox')).toBe(initial)
+ expect(api.saveFloor).not.toHaveBeenCalled()
  for(const name of ['卓に合わせて表示','全体を表示','外形を線で描く','つまんで置く'])expect(screen.queryByRole('button',{name})).toBeNull()
+})
+it('拡大後のトラックパッド操作で座席図を横へ動かせる',async()=>{
+ api.floors.mockResolvedValue({data:[floor]});render(<RestaurantFloorEditor {...props}/>)
+ const map=await screen.findByRole('group',{name:'1階の座席表'})
+ const frame=map.closest('[class*="mapFrame"]') as HTMLElement
+ vi.spyOn(frame,'getBoundingClientRect').mockReturnValue({width:604,height:604,left:0,right:604,top:0,bottom:604,x:0,y:0,toJSON:()=>({})})
+ fireEvent.click(screen.getByRole('button',{name:'拡大'}))
+ const before=Number(map.getAttribute('viewBox')?.split(' ')[0])
+ fireEvent.wheel(frame,{deltaX:50,deltaY:0})
+ expect(Number(map.getAttribute('viewBox')?.split(' ')[0])).toBeGreaterThan(before)
+ expect(api.saveFloor).not.toHaveBeenCalled()
 })
 it('回転した卓の表示範囲の計算は維持する',()=>{
  const [x,y,w,h]=floorTableViewBox({...floor,tables:[{...floor.tables[0],rotation:90}]}).split(' ').map(Number)

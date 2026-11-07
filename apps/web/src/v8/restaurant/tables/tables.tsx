@@ -194,7 +194,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
       shape:draft.seatType==='counter'?'counter':draft.shape,
       seatDetailType:draft.seatDetailType,
       width:draft.shape==='long'?(draft.orientation==='vertical'?64:120):draft.seatType==='counter'?(draft.orientation==='vertical'?64:80):80,
-      height:draft.shape==='long'?(draft.orientation==='vertical'?120:64):draft.seatType==='counter'?(draft.orientation==='vertical'?80:64):64,
+      height:draft.shape==='long'?(draft.orientation==='vertical'?120:64):draft.seatType==='counter'?(draft.orientation==='vertical'?80:64):80,
       rotation:0,smokingPolicy:draft.smokingPolicy,partition:draft.partition,shoesAllowed:draft.shoesAllowed,visibleOnMap:draft.visibleOnMap,chairArrangement:draft.chairArrangement,chairSide:draft.seatType==='counter'||draft.chairArrangement==='one'?draft.chairSide:null,
       ...(!editing?{isActive:draft.isActive}:{}),
       ...(editing&&draft.isActive&&!editing.is_active?{isActive:true}:{}),

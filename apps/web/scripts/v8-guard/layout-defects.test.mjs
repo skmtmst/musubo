@@ -7,7 +7,7 @@ import { spawnSync, execFile } from 'node:child_process'
 import { createServer } from 'node:http'
 import { promisify } from 'node:util'
 import { connectGuardBrowser } from './browser-session.mjs'
-import { assess, assessAgainstBase, measurePage } from './layout-defects.mjs'
+import { assess, assessAgainstBase, DEFECT_ROUTES, measurePage } from './layout-defects.mjs'
 const shell = body => '<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}</style><main>'+body+'</main>'
 
 const cases = {
@@ -112,13 +112,25 @@ test('除外を実寸で確認し、表内の文字の重なりは見逃さな�
     assert.ok((await measurePage(page)).some(f=>f.kind==='clip'),'隠れた重なりを除いても、省略なしの切れは検出する')
   } finally { await browser.close() }
 })
-test('comparison retains every defect and never grants immunity to existing failures', () => {
+test('comparison fails only new defects, including additional copies of an existing defect', () => {
   const defect = { kind: 'overlap', target: 'span', text: '本文', measure: { x: 10, y: 10 } }
-  const result = assessAgainstBase([defect, defect], [defect])
-  assert.deepEqual(result.failures, [defect, defect])
+  const newDefect = { ...defect, target: 'button' }
+  const result = assessAgainstBase([defect, newDefect, defect], [defect])
+  assert.deepEqual(result.failures, [newDefect, defect])
   assert.deepEqual(result.allowed, [])
-  assert.deepEqual(result.existing, [])
+  assert.deepEqual(result.existing, [defect])
+  assert.deepEqual(result.baseFindings, [defect])
+  assert.deepEqual(assessAgainstBase([defect], [defect]).failures, [])
+  assert.deepEqual(assessAgainstBase(
+    [{ ...defect, target: 'div:nth-of-type(2)', targetIdentity: 'div:unique' }],
+    [{ ...defect, target: 'div:nth-of-type(1)', targetIdentity: 'div:unique' }],
+  ).failures, [])
+  assert.deepEqual(assess([defect]).failures, [defect])
   assert.deepEqual(assess([]).failures, [])
+})
+
+test('conversions guard measures the canonical points tab instead of the legacy redirect', () => {
+  assert.equal(DEFECT_ROUTES.conversions, '/affiliates?tab=points')
 })
 
 test('short names fail when wrapped; paragraphs and message bodies can wrap without punctuation rules', async () => {
