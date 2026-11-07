@@ -24,6 +24,20 @@ import { applyDueRestaurantMenuPrices, expireRestaurantHolds, validateRestaurant
 import { hasOrganizationSelector, requiredAccount, organizationFor, storeBelongsTo, acquireLock, adjustInventoryReservedCount, releaseLock } from './restaurant-test-definition.js';
 import type { Context } from 'hono';
 
+function duplicateTableCode(c: Context<Env>) {
+ return inputError(c,{success:false,code:'duplicate_table_code',error:'この卓番はすでに使われています。別の卓番を入力してください。'},400,['code']);
+}
+
+function isDuplicateTableCode(error: unknown): boolean {
+ const seen = new Set<unknown>();
+ while (error && typeof error === 'object' && !seen.has(error)) {
+  seen.add(error);
+  if ('message' in error && typeof error.message === 'string' && /UNIQUE constraint failed:\s*rt_tables\.store_id,\s*rt_tables\.code\b/i.test(error.message)) return true;
+  error = 'cause' in error ? error.cause : undefined;
+ }
+ return false;
+}
+
 type TableVisualInput = {shape?:string;width?:number;height?:number;rotation?:number;smokingPolicy?:string;partition?:string;shoesAllowed?:boolean;visibleOnMap?:boolean;chairArrangement?:string;chairSide?:string|null;isActive?:boolean;seatDetailType?:string};
 function validTableVisual(b:TableVisualInput):boolean {
  return (b.shape===undefined||['rectangle','circle','long','counter','sofa'].includes(b.shape))
@@ -79,16 +93,23 @@ export const post__api_restaurant_test_tables_2 = async (c: Context<Env, "/api/r
   const max = Number(body.maxCapacity);
   if (!body.code?.trim() || !body.label?.trim() || !seatTypes.includes(body.seatType || '') || !Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max < min || !validTableVisual(body)) return inputError(c, { success: false, error: '卓の入力内容が正しくありません' }, 400, ["code","label","seatType","minCapacity","maxCapacity","shape"]);
   if (!validFloorCoordinate(body.floorX === undefined ? 0 : body.floorX) || !validFloorCoordinate(body.floorY === undefined ? 0 : body.floorY) || !validJoinGroup(body.joinGroup ?? null)) return inputError(c, { success: false, error: '卓の配置が正しくありません' }, 400, ["floorX","floorY","joinGroup"]);
+  if(await dbFor(c.env,body.storeId).prepare('SELECT id FROM rt_tables WHERE store_id=? AND code=?').bind(body.storeId,body.code.trim()).first())return duplicateTableCode(c);
   if(body.floorId&&!await dbFor(c.env,body.storeId).prepare('SELECT id FROM rt_floors WHERE id=? AND store_id=? AND archived_at IS NULL').bind(body.floorId,body.storeId).first())return inputError(c,{success:false,error:'階が正しくありません'},400,['floorId']);
   const db=dbFor(c.env,body.storeId),firstFloor=await db.prepare('SELECT id FROM rt_floors WHERE store_id=? AND archived_at IS NULL ORDER BY sort_order,name,id LIMIT 1').bind(body.storeId).first<{id:string}>(),floorId=body.floorId??firstFloor?.id??'floor-'+body.storeId;
   const floor=await readRestaurantFloor(db,floorId,body.storeId);if(!floor)return inputError(c,{success:false,error:'階を確認してください'},400,['floorId']);
   const shape=body.shape??'rectangle',width=body.width??(shape==='long'?120:shape==='counter'?64:80),height=body.height??(shape==='long'?64:shape==='counter'?80:64),rotation=body.rotation??0;
   const position=body.floorX===undefined&&body.floorY===undefined?firstTablePlacement(floor,width,height):{x:body.floorX??0,y:body.floorY??0};
   if(!position||!tablePlacementFits(floor,{id:'new',...position,width,height,rotation,shape:shape as RestaurantFloorWrite['tables'][number]['shape']}))return inputError(c,{success:false,error:'座席図の空いている位置を選んでください'},400,['floorX','floorY']);
-  const id=crypto.randomUUID();const saved=await db.batch([
+  const id=crypto.randomUUID();
+  try {
+   const saved=await db.batch([
    db.prepare('UPDATE rt_floors SET version=version+1 WHERE id=? AND store_id=? AND archived_at IS NULL AND version=?').bind(floorId,body.storeId,floor.expectedVersion),
    db.prepare('INSERT INTO rt_tables (id,store_id,code,label,seat_type,min_capacity,max_capacity,floor_x,floor_y,join_group,floor_id,shape,width,height,rotation,smoking_policy,partition_type,shoes_allowed,visible_on_map,chair_arrangement,chair_side,is_active,seat_detail_type) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE changes()=1').bind(id,body.storeId,body.code.trim(),body.label.trim(),body.seatType,min,max,position.x,position.y,body.joinGroup?.trim()||null,floorId,shape,width,height,rotation,body.smokingPolicy??'non_smoking',body.partition??'open',Number(body.shoesAllowed??true),Number(body.visibleOnMap??true),body.chairArrangement??'both',body.chairSide??null,Number(body.isActive??true),body.seatDetailType??body.seatType)
   ]);if(!saved[0].meta.changes)return c.json({success:false,code:'version_conflict',error:'座席図が変わりました。読み直してください'},409);
+  } catch (error) {
+   if(isDuplicateTableCode(error))return duplicateTableCode(c);
+   throw error;
+  }
   return c.json({ success: true, data: { id } }, 201);
 };
 
@@ -173,6 +194,7 @@ export const patch__api_restaurant_test_tables_id_4 = async (c: Context<Env, "/a
     return inputError(c, { success: false, error: '卓の入力内容が正しくありません' }, 400, ["code","label","seatType","minCapacity","maxCapacity","isActive","floorX","floorY","joinGroup"]);
   }
   const db=dbFor(c.env,current.store_id),movingFloor=body.floorId!==undefined&&body.floorId!==current.floor_id,changesLayout=movingFloor||body.floorX!==undefined||body.floorY!==undefined||body.joinGroup!==undefined||body.shape!==undefined||body.width!==undefined||body.height!==undefined||body.rotation!==undefined;
+  if(await db.prepare('SELECT id FROM rt_tables WHERE store_id=? AND code=? AND id<>?').bind(current.store_id,code.trim(),c.req.param('id')).first())return duplicateTableCode(c);
   if(changesLayout&&(!Number.isInteger(body.expectedVersion)||Number(body.expectedVersion)<1))return inputError(c,{success:false,error:'座席図の版を指定してください'},400,['expectedVersion']);
   if(movingFloor&&(!Number.isInteger(body.expectedTargetVersion)||!await db.prepare('SELECT id FROM rt_floors WHERE id=? AND store_id=? AND archived_at IS NULL').bind(body.floorId!,current.store_id).first()))return inputError(c,{success:false,error:'移動先の階と版を確認してください'},400,['floorId','expectedTargetVersion']);
   if(movingFloor||body.floorX!==undefined||body.floorY!==undefined||body.shape!==undefined||body.width!==undefined||body.height!==undefined||body.rotation!==undefined){
@@ -182,7 +204,12 @@ export const patch__api_restaurant_test_tables_id_4 = async (c: Context<Env, "/a
   }
   const update=db.prepare(`UPDATE rt_tables SET code = ?, label = ?, seat_type = ?, min_capacity = ?, max_capacity = ?, is_active = ?, floor_x = ?, floor_y = ?, join_group = ?,floor_id=?,shape=COALESCE(?,shape),width=COALESCE(?,width),height=COALESCE(?,height),rotation=COALESCE(?,rotation),smoking_policy=COALESCE(?,smoking_policy),partition_type=COALESCE(?,partition_type),shoes_allowed=COALESCE(?,shoes_allowed),visible_on_map=COALESCE(?,visible_on_map),chair_arrangement=COALESCE(?,chair_arrangement),chair_side=CASE WHEN ?=1 THEN ? ELSE chair_side END,seat_detail_type=COALESCE(?,seat_detail_type), updated_at = datetime('now') WHERE id = ? AND (?=0 OR changes()=1)`)
     .bind(code.trim(), label.trim(), seatType, min, max, body.isActive === undefined ? current.is_active : Number(body.isActive), body.floorX ?? current.floor_x, body.floorY ?? current.floor_y, body.joinGroup === undefined ? current.join_group : body.joinGroup?.trim() || null, body.floorId??current.floor_id,body.shape??null,body.width??null,body.height??null,body.rotation??null,body.smokingPolicy??null,body.partition??null,body.shoesAllowed===undefined?null:Number(body.shoesAllowed),body.visibleOnMap===undefined?null:Number(body.visibleOnMap),body.chairArrangement??null,Number(body.chairSide!==undefined),body.chairSide??null,body.seatDetailType??null,c.req.param('id'),Number(changesLayout));
-  if(changesLayout){const saved=await db.batch([db.prepare('UPDATE rt_floors SET version=version+1 WHERE id=? AND archived_at IS NULL AND version=? AND (?=0 OR EXISTS(SELECT 1 FROM rt_floors target WHERE target.id=? AND target.archived_at IS NULL AND target.version=?))').bind(current.floor_id,body.expectedVersion!,Number(movingFloor),body.floorId??current.floor_id,body.expectedTargetVersion??0),...(movingFloor?[db.prepare('UPDATE rt_floors SET version=version+1 WHERE id=? AND archived_at IS NULL AND version=? AND changes()=1').bind(body.floorId!,body.expectedTargetVersion!)]:[]),update]);if(!saved[0].meta.changes)return c.json({success:false,code:'version_conflict',error:'座席図を読み直してください'},409)}else await update.run();
+  try {
+   if(changesLayout){const saved=await db.batch([db.prepare('UPDATE rt_floors SET version=version+1 WHERE id=? AND archived_at IS NULL AND version=? AND (?=0 OR EXISTS(SELECT 1 FROM rt_floors target WHERE target.id=? AND target.archived_at IS NULL AND target.version=?))').bind(current.floor_id,body.expectedVersion!,Number(movingFloor),body.floorId??current.floor_id,body.expectedTargetVersion??0),...(movingFloor?[db.prepare('UPDATE rt_floors SET version=version+1 WHERE id=? AND archived_at IS NULL AND version=? AND changes()=1').bind(body.floorId!,body.expectedTargetVersion!)]:[]),update]);if(!saved[0].meta.changes)return c.json({success:false,code:'version_conflict',error:'座席図を読み直してください'},409)}else await update.run();
+  } catch (error) {
+   if(isDuplicateTableCode(error))return duplicateTableCode(c);
+   throw error;
+  }
   return c.json({ success: true, data: { id: c.req.param('id') } });
 };
 
