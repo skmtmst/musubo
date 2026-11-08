@@ -1,0 +1,39 @@
+.page { width: 100%; color: #202428; }
+.breadcrumb { margin: 0 0 20px; color: #647386; font-size: 13px; }
+.page h1 { margin: 0 0 8px; font-size: 29px; line-height: 1.35; }
+.lead { margin: 0 0 26px; color: #59687b; font-size: 14px; line-height: 1.7; }
+.columns { display: grid; grid-template-columns: minmax(0,1.28fr) minmax(320px,.75fr); align-items: stretch; gap: 20px; }
+.card { min-width: 0; border: 1px solid #dfe5e7; border-radius: 13px; background: #fff; padding: 28px; }
+.card h2 { margin: 0 0 21px; font-size: 21px; line-height: 1.4; }
+.choices { display: grid; gap: 13px; }
+.choice, .choiceSelected { display: flex; align-items: flex-start; gap: 14px; border: 1px solid #dbe2e5; border-radius: 11px; background: #fff; padding: 19px 20px; cursor: pointer; }
+.choiceSelected { border: 2px solid #087c43; background: #eff8f2; padding: 18px 19px; }
+.choice input, .choiceSelected input { flex: none; width: 19px; height: 19px; margin: 3px 0 0; accent-color: #087c43; }
+.choiceBody { display: grid; gap: 7px; min-width: 0; color: #526176; font-size: 13px; line-height: 1.6; }
+.choiceHeading { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; color: #202428; font-size: 16px; font-weight: 700; }
+.choiceHeading em { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 24px; border-radius: 999px; background: #dff2e6; color: #087c43; padding: 2px 9px; font-size: 11px; font-style: normal; line-height: 1.3; }
+.choiceNote { color: #087c43; font-weight: 700; }
+.small { margin: 20px 0 0; color: #657487; font-size: 12px; line-height: 1.7; }
+.details { margin: 0; }
+.details > div { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; border-bottom: 1px solid #e9edee; padding: 14px 0; }
+.details dt { color: #637285; font-size: 13px; }
+.details dd { max-width: 60%; margin: 0; color: #202428; font-size: 14px; font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+.summaryNote { margin: 20px 0 0; border-radius: 8px; background: #f4f7f7; padding: 16px; color: #526176; font-size: 12px; line-height: 1.7; }
+.bottom { display: flex; align-items: center; justify-content: flex-end; gap: 14px; border-top: 1px solid #e3e9eb; margin-top: 25px; padding-top: 20px; }
+.primary, .danger, .secondary { min-width: 190px; min-height: 48px; border: 0; border-radius: 8px; background: #087c43; color: #fff; padding: 11px 20px; text-align: center; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.primary:hover { background: #066b3a; }
+.danger { background: #b94b31; }
+.danger:hover { background: #a13b25; }
+.secondary { min-width: 105px; border: 1px solid #dbe2e5; background: #fff; color: #526176; }
+.primary:disabled, .danger:disabled, .secondary:disabled { opacity: .55; cursor: not-allowed; }
+.confirmBox { display: flex; align-items: flex-start; gap: 15px; border: 1px solid #f0cebd; border-radius: 10px; background: #fff6f0; padding: 21px; }
+.warningIcon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: #ffe7d8; color: #a33c1f; font-size: 21px; font-weight: 800; line-height: 1; }
+.confirmBox strong { font-size: 16px; }
+.confirmBox p { margin: 8px 0 0; color: #59687b; font-size: 13px; line-height: 1.7; }
+.result { display: flex; align-items: center; gap: 18px; border: 1px solid #c7e6d0; border-radius: 13px; background: #eff8f2; padding: 26px; }
+.resultIcon { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: 50%; background: #dbf1e3; color: #087c43; font-size: 24px; font-weight: 700; }
+.result h2 { margin: 0 0 7px; font-size: 20px; }
+.result p { margin: 0; color: #59687b; font-size: 13px; line-height: 1.6; }
+.error { color: #a92f2f; font-size: 13px; }
+@media (max-width: 880px) { .columns { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .page h1 { font-size: 24px; } .card { padding: 19px; } .bottom { align-items: stretch; flex-direction: column-reverse; } .primary, .danger, .secondary { width: 100%; } .details > div { align-items: flex-start; } .details dd { max-width: 55%; } }

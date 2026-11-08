@@ -46,9 +46,14 @@ describe('見積もりの同意期限', () => {
 });
 
 describe('解約と連携枠減額', () => {
-  it('最後のLINEは月払いの次回請求日に終了、体験中は即時終了が初期値', () => {
-    expect(finalLineEndOption({ billingState: 'active', interval: 'month', nextMonthlyChargeAt: '2027-02-01T00:00:00.000Z' }, '2027-01-12T00:00:00.000Z').defaultEndAt).toBe('2027-02-01T00:00:00.000Z');
-    expect(finalLineEndOption({ billingState: 'trialing', interval: 'year' }, '2027-01-12T00:00:00.000Z').defaultEndAt).toBe('2027-01-12T00:00:00.000Z');
+  it('無料体験・月払い・年払いとも次の請求前日までを初期選択とする', () => {
+    expect(finalLineEndOption({ billingState: 'active', interval: 'month', nextMonthlyChargeAt: '2027-02-01T00:00:00.000Z' }, '2027-01-12T00:00:00.000Z')).toMatchObject({
+      defaultEndAt: '2027-01-31T15:00:00.000Z', lastUsableDateJst: '2027-01-31',
+    });
+    expect(finalLineEndOption({ billingState: 'trialing', interval: 'year', trialFirstChargeAt: '2026-12-08T00:00:00+09:00' }, '2026-11-30T00:00:00+09:00')).toMatchObject({
+      defaultEndAt: '2026-12-07T15:00:00.000Z', lastUsableDateJst: '2026-12-07',
+    });
+    expect(finalLineEndOption({ billingState: 'active', interval: 'year', nextAnnualRenewalAt: '2027-12-08T10:00:00+09:00' }, '2027-01-01T00:00:00+09:00').lastUsableDateJst).toBe('2027-12-07');
   });
   it('追加連携枠の解除は即時停止し、次回月次請求から減額する', () => {
     expect(linkedSlotRemoval({ disconnectedAt: '2027-01-12T00:00:00.000Z', nextMonthlyChargeAt: '2027-02-01T00:00:00.000Z' })).toEqual({

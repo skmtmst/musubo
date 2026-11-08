@@ -88,24 +88,41 @@ export function pendingAdditionAccess(state: PendingAdditionState, now: string):
   return { state: status, holdUntil: new Date(holdUntil).toISOString(), existingUsageAllowed: true };
 }
 
+function jstCalendarDate(timestamp: number): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(timestamp));
+  const get = (type: string) => parts.find((part) => part.type === type)?.value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
 /**
- * The final LINE defaults to an end date matching the paid period. A trial can
- * close immediately without starting a charge. Earlier voluntary closure is an
- * explicit alternate action and does not imply a refund.
+ * The final LINE normally stays available through the day BEFORE the next charge.
+ * Trial uses the first-charge date, monthly uses the next monthly charge and annual
+ * uses the next annual renewal. Immediate closure is a separate explicit choice.
  */
 export function finalLineEndOption(input: {
   billingState: 'trialing' | 'active';
   interval: 'month' | 'year';
+  trialFirstChargeAt?: string;
   nextMonthlyChargeAt?: string;
   nextAnnualRenewalAt?: string;
-}, now: string): { defaultEndAt: string; immediateAllowed: true; refundOnImmediateEnd: false } {
+}, now: string): { defaultEndAt: string; lastUsableDateJst: string; immediateAllowed: true; refundOnImmediateEnd: false } {
   const current = instant(now, 'now');
-  if (input.billingState === 'trialing') {
-    return { defaultEndAt: new Date(current).toISOString(), immediateAllowed: true, refundOnImmediateEnd: false };
-  }
-  const endAt = input.interval === 'month' ? input.nextMonthlyChargeAt : input.nextAnnualRenewalAt;
-  if (!endAt || instant(endAt, 'endAt') <= current) throw new RangeError('A future paid-period end is required');
-  return { defaultEndAt: new Date(instant(endAt, 'endAt')).toISOString(), immediateAllowed: true, refundOnImmediateEnd: false };
+  const chargeAt = input.billingState === 'trialing' ? input.trialFirstChargeAt
+    : input.interval === 'month' ? input.nextMonthlyChargeAt : input.nextAnnualRenewalAt;
+  if (!chargeAt) throw new RangeError('A next charge or renewal date is required');
+  const chargeDateJst = jstCalendarDate(instant(chargeAt, 'chargeAt'));
+  const endsAt = Date.parse(`${chargeDateJst}T00:00:00+09:00`);
+  if (endsAt <= current) throw new RangeError('The final usable date must be in the future');
+  const previous = new Date(`${chargeDateJst}T00:00:00.000Z`);
+  previous.setUTCDate(previous.getUTCDate() - 1);
+  return {
+    defaultEndAt: new Date(endsAt).toISOString(),
+    lastUsableDateJst: previous.toISOString().slice(0, 10),
+    immediateAllowed: true,
+    refundOnImmediateEnd: false,
+  };
 }
 
 /** Slot deletion stops the connection now; the lower charge starts on the next monthly invoice even on an annual LINE plan. */
