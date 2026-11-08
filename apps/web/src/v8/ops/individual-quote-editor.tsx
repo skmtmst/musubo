@@ -169,7 +169,7 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
         <label className={styles.field}><span>見積もり有効期限</span>
           <input type="datetime-local" value={jstLocal(draft.expiresAt)}
             onChange={(event) => { if (event.target.value) setDraft((current) => ({ ...current, expiresAt: localToIso(event.target.value) })) }} />
-          <small>発行日から30日を初期入力します。</small></label>
+          <small>お客様が見積もりに同意できる期限を設定します。</small></label>
         <p className={styles.small}>{trial}。送信後の変更は新しい番号で再発行します。期限前の同意で単価と適用条件が確定します。</p>
         {error && <p className={styles.error} role="alert">{error}</p>}
         <div className={styles.actions}><button type="button" className={styles.secondary} disabled={busy || !price}
