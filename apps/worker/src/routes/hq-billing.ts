@@ -63,7 +63,12 @@ function exemptMonthlyImages(c: Context<Env>): number | undefined {
 /** 管理画面の URL。Checkout から戻る先に使う。`ADMIN_ORIGIN` の先頭。 */
 function adminOrigin(c: Context<Env>): string | null {
   const first = (c.env.ADMIN_ORIGIN ?? '').split(',').map((s) => s.trim()).find(Boolean);
-  return first ?? null;
+  if (!first) return null;
+  try {
+    const url = new URL(first);
+    return url.protocol === 'https:' && !url.username && !url.password && url.pathname === '/'
+      && !url.search && !url.hash ? url.origin : null;
+  } catch { return null; }
 }
 
 function stripeReady(c: Context<Env>): boolean {

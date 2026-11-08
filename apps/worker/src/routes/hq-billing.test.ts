@@ -262,6 +262,16 @@ describe('請求前のカード登録', () => {
     expect(await res.json()).toEqual({ success: true, data: { registered: true } });
     expect(JSON.stringify(await (await call('GET', '/api/hq/billing/card-status')).json())).not.toContain('pm_test');
   });
+
+  it('Stripeの戻り先がHTTPSの管理画面originでなければカード登録を開始しない', async () => {
+    for (const origin of ['http://admin.example.com', 'https://admin.example.com/other',
+      'https://user:pass@admin.example.com', 'https://admin.example.com/?next=other']) {
+      expect((await call('POST', '/api/hq/billing/card-setup', undefined, { env: { ADMIN_ORIGIN: origin } })).status)
+        .toBe(503);
+    }
+    expect(stripe.createCustomer).not.toHaveBeenCalled();
+    expect(stripe.createCardSetupSession).not.toHaveBeenCalled();
+  });
 });
 
 describe('ポータルと支払い履歴', () => {
