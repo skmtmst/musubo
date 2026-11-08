@@ -7,7 +7,7 @@ import { createAuthEmailToken, toJstString } from '@line-crm/db';
 import { sha256Hex } from '../middleware/auth.js';
 
 const mail = vi.hoisted(() => ({
-  sendPlainMail: vi.fn(async (_env: unknown, _message: { to: string; subject: string; body: string }) => {}),
+  sendPlainMail: vi.fn(async (_env: unknown, _message: { to: string; subject: string; body: string; html?: string }) => {}),
 }));
 vi.mock('../services/plain-mail.js', () => ({ sendPlainMail: mail.sendPlainMail }));
 
@@ -107,6 +107,39 @@ async function issueApprovedInvite(): Promise<string> {
 }
 
 describe('会員登録（36-4）', () => {
+  it('期限切れの承認リンクは登録先だけに24時間の新リンクを送り、旧リンクを失効させる', async () => {
+    await call('POST', '/api/auth/register/request', validRequest);
+    const token = await issueApprovedInvite();
+    testDb.raw.prepare('UPDATE auth_email_tokens SET expires_at = ? WHERE token_hash = ?')
+      .run(toJstString(new Date(Date.now() - 1_000)), await sha256Hex(token));
+
+    const checked = await call('GET', `/api/auth/register/check?token=${encodeURIComponent(token)}`);
+    expect(checked.status).toBe(410);
+    const checkBody = await checked.json() as { code: string; data: { maskedEmail: string } };
+    expect(checkBody.code).toBe('expired');
+    expect(checkBody.data.maskedEmail).toBe('o•••@example.com');
+
+    const resent = await call('POST', '/api/auth/register/resend-expired', { token });
+    expect(resent.status).toBe(200);
+    expect(lastMailSubject()).toBe('【musubo】アカウント作成のご案内（再送）');
+    const newToken = lastMailToken();
+    expect(newToken).toBeTruthy();
+    expect(newToken).not.toBe(token);
+    const sentMail = mail.sendPlainMail.mock.calls.at(-1)?.[1];
+    expect(sentMail?.to).toBe('owner@example.com');
+    expect(sentMail?.html).toContain('アカウント作成へ');
+    expect((await call('GET', `/api/auth/register/check?token=${encodeURIComponent(newToken)}`)).status).toBe(200);
+    expect((await call('GET', `/api/auth/register/check?token=${encodeURIComponent(token)}`)).status).toBe(410);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM audit_events WHERE action = ?').get('registration.signup_link_resent')).toEqual({ n: 1 });
+  });
+
+  it('識別できないリンクや登録済みの申込から再送せず情報を返さない', async () => {
+    const unknown = await call('POST', '/api/auth/register/resend-expired', { token: 'unknown_registration_token_0123456789' });
+    expect(unknown.status).toBe(404);
+    expect(JSON.stringify(await unknown.json())).not.toContain('owner@example.com');
+    expect(mail.sendPlainMail).not.toHaveBeenCalled();
+  });
+
   it('申込後は承認まで登録できず、承認招待から統括とオーナーができる', async () => {
     const requested = await call('POST', '/api/auth/register/request', validRequest);
     expect(requested.status).toBe(200);

@@ -36,7 +36,7 @@ function CompletePending() {
   )
 }
 
-type TokenCheck = { state: 'checking' } | { state: 'ok'; email: string; trialDays: number; companyName: string; contactName: string } | { state: 'pending' } | { state: 'bad'; message: string }
+type TokenCheck = { state: 'checking' } | { state: 'ok'; email: string; trialDays: number; companyName: string; contactName: string } | { state: 'pending' } | { state: 'expired'; maskedEmail: string } | { state: 'bad'; message: string }
 
 function CompleteInner() {
   const params = useSearchParams()
@@ -47,6 +47,7 @@ function CompleteInner() {
   const [messages, setMessages] = useState<Record<string, string | null>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle')
 
   useEffect(() => {
     let alive = true
@@ -54,16 +55,31 @@ function CompleteInner() {
       setCheck({ state: 'bad', message: 'この URL は正しくありません。メールの URL をそのまま開いてください' })
       return
     }
-    void authRequest<{ email: string; trialDays: number; companyName: string; contactName: string }>(`/api/auth/register/check?token=${encodeURIComponent(token)}`).then((res) => {
+    void authRequest<{ email: string; trialDays: number; companyName: string; contactName: string } | { maskedEmail: string; canResend: boolean }>(`/api/auth/register/check?token=${encodeURIComponent(token)}`).then((res) => {
       if (!alive) return
-      if (res.ok && res.data) setCheck({ state: 'ok', email: res.data.email, trialDays: res.data.trialDays, companyName: res.data.companyName, contactName: res.data.contactName })
+      if (res.ok && res.data && 'email' in res.data) setCheck({ state: 'ok', email: res.data.email, trialDays: res.data.trialDays, companyName: res.data.companyName, contactName: res.data.contactName })
       else if (res.code === 'approval_required') setCheck({ state: 'pending' })
+      else if (res.code === 'expired' && res.data && 'maskedEmail' in res.data && res.data.canResend) {
+        setCheck({ state: 'expired', maskedEmail: res.data.maskedEmail })
+      }
       else setCheck({ state: 'bad', message: res.error || 'この URL は使えません' })
     })
     return () => {
       alive = false
     }
   }, [token])
+
+  const resendExpired = async () => {
+    setResendState('sending')
+    setError('')
+    const res = await authRequest<{ maskedEmail: string; sent: boolean }>('/api/auth/register/resend-expired', { token })
+    if (res.ok && res.data) {
+      setResendState('sent')
+      return
+    }
+    setError(res.error ?? 'ご案内メールを送れませんでした。時間をおいて再度お試しください')
+    setResendState('idle')
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -103,15 +119,35 @@ function CompleteInner() {
   }
 
   if (check.state === 'checking') return <CompletePending />
+  if (check.state === 'expired') {
+    return <AuthCard node="xdN8H" applicationFlow="recovery" title="ログイン設定のご案内"
+      description={resendState === 'sent' ? '申込時のメールアドレスに、新しいアカウント作成リンクをお送りしました。' : 'お申し込みは承認済みです。新しいご案内を申込時のメールアドレスへお送りします。'}>
+      <div className={styles.recoveryPanel}>
+        <span className={styles.recoveryIcon} aria-hidden="true">{resendState === 'sent' ? '✓' : '!'}</span>
+        <h2>{resendState === 'sent' ? 'ご案内メールをお送りしました' : 'アカウント作成のリンクが期限切れです'}</h2>
+        <p>送信先 <strong>{check.maskedEmail}</strong></p>
+        <p>{resendState === 'sent' ? 'メールの「アカウント作成へ」から設定を続けてください。' : '送信先は申込時のアドレスに固定されています。'}</p>
+        <p>新しいリンクは送信から24時間有効です。再送後、以前のリンクは利用できません。</p>
+      </div>
+      {error ? <Notice tone="danger" message={error} /> : null}
+      {resendState !== 'sent' ? <Button type="button" variant="primary" disabled={resendState === 'sending'}
+        busy={resendState === 'sending'} busyLabel="送信しています…" className={styles.recoveryButton}
+        onClick={() => void resendExpired()}>案内メールを再送する</Button> : null}
+      <a href="/login" className={styles.login}>すでに設定を終えた方はログインへ</a>
+      <a href={CONTACT_URL} target="_blank" rel="noreferrer" className={styles.recoveryLink}>リンクを確認できない場合はお問い合わせへ</a>
+    </AuthCard>
+  }
   if (check.state === 'bad') {
     return (
-      <AuthCard node="jk88n" cardNode="oVX3x" title="本登録" description={check.message}>
-        <Button href="/register" variant="primary" className="w-full">
-          もう一度メールアドレスを入力する
-        </Button>
-        <Button href="/login" className="w-full">
-          ログインへ
-        </Button>
+      <AuthCard node="r2pk7" applicationFlow="recovery" title="ログイン設定のご案内" description="このリンクが正しくないか、すでに使われています。">
+        <div className={styles.recoveryPanel}>
+          <span className={styles.recoveryIcon} aria-hidden="true">!</span>
+          <h2>このリンクを確認できません</h2>
+          <p>安全のため、この画面では申込情報を表示しません。</p>
+          <p>まだアカウントを作成していない場合は、申込時のメールアドレスを添えてお問い合わせください。担当者が登録状況を確認します。</p>
+        </div>
+        <a href={CONTACT_URL} target="_blank" rel="noreferrer" className={styles.contact}>お問い合わせへ</a>
+        <a href="/login" className={styles.login}>すでに設定を終えた方はログインへ</a>
       </AuthCard>
     )
   }

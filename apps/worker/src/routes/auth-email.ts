@@ -10,6 +10,7 @@ import {
   bumpAuthThrottle,
   clearAuthThrottle,
   consumeAuthEmailToken,
+  consumeOtherSignupTokens,
   createAuthEmailToken,
   createStaffMember,
   createTrialTenant,
@@ -41,7 +42,10 @@ import {
   sendAlreadyRegisteredMail,
   sendPasswordResetMail,
   sendRegistrationReceiptMail,
+  sendSignupResendMail,
+  SIGNUP_TOKEN_TTL_MS,
 } from '../services/auth-mail.js';
+import { maskAuditIp } from '@line-crm/db';
 import { TRIAL_DAYS } from '../services/billing-plans.js';
 
 /**
@@ -137,6 +141,11 @@ function readToken(c: Context<Env>, body?: Body): string {
   return /^[A-Za-z0-9_-]{20,256}$/.test(raw) ? raw : '';
 }
 
+function maskedSignupEmail(email: string): string {
+  const at = email.lastIndexOf('@');
+  return `${email.slice(0, 1)}•••${email.slice(at)}`;
+}
+
 // ---------------------------------------------------------------------------
 // 会員登録
 // ---------------------------------------------------------------------------
@@ -210,6 +219,13 @@ authEmail.get('/api/auth/register/check', async (c) => {
   const token = readToken(c);
   const row = token ? await getAuthEmailToken(c.env.DB, 'signup', await sha256Hex(token)) : null;
   const state = tokenState(row);
+  if (state === 'expired' && row?.application_id) {
+    const application = await getRegistrationApplication(c.env.DB, row.application_id);
+    if (application?.status === 'approved' && application.email === row.email && !application.tenant_id) {
+      return c.json({ success: false, code: 'expired', error: 'アカウント作成のリンクが期限切れです',
+        data: { maskedEmail: maskedSignupEmail(row.email), canResend: true } }, 410);
+    }
+  }
   if (state !== 'valid') return inputError(c, { success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410, []);
   const application = row!.application_id ? await getRegistrationApplication(c.env.DB, row!.application_id) : null;
   if (!application || application.status !== 'approved' || application.email !== row!.email) {
@@ -217,6 +233,54 @@ authEmail.get('/api/auth/register/check', async (c) => {
   }
   return c.json({ success: true, data: { email: row!.email, trialDays: TRIAL_DAYS,
     companyName: application.company_name, contactName: application.contact_name } });
+});
+
+/** Resend only to the immutable application address identified by an expired signup token. */
+authEmail.post('/api/auth/register/resend-expired', inputJsonBoundary(), async (c) => {
+  const body = await readBody(c);
+  const token = readToken(c, body);
+  const row = token ? await getAuthEmailToken(c.env.DB, 'signup', await sha256Hex(token)) : null;
+  if (tokenState(row) !== 'expired' || !row?.application_id) {
+    return c.json({ success: false, code: 'invalid', error: 'このリンクから再送できません。お問い合わせください' }, 404);
+  }
+  const application = await getRegistrationApplication(c.env.DB, row.application_id);
+  if (!application || application.status !== 'approved' || application.tenant_id || application.email !== row.email || await hasStaffWithEmail(c.env.DB, row.email)) {
+    return c.json({ success: false, code: 'invalid', error: 'このリンクから再送できません。お問い合わせください' }, 404);
+  }
+  const ipHash = await ipHashOf(c);
+  const ipAttempts = await bumpAuthThrottle(c.env.DB, `signup-resend:ip:${ipHash}`, DAY_MS);
+  if (ipAttempts > 10) return c.json({ success: false, code: 'rate_limited', error: TOO_MANY }, 429);
+  const applicationAttempts = await bumpAuthThrottle(c.env.DB, `signup-resend:application:${application.id}`, DAY_MS);
+  if (applicationAttempts > 3) return c.json({ success: false, code: 'rate_limited', error: TOO_MANY }, 429);
+  const duplicate = await bumpAuthThrottle(c.env.DB, `signup-resend:cooldown:${application.id}`, 10 * 60 * 1000);
+  const maskedEmail = maskedSignupEmail(row.email);
+  if (duplicate > 1) return c.json({ success: true, data: { maskedEmail, sent: false } });
+  const base = adminBase(c);
+  if (!base) {
+    await clearAuthThrottle(c.env.DB, `signup-resend:cooldown:${application.id}`);
+    return c.json({ success: false, error: '送信設定を確認できません。お問い合わせください' }, 503);
+  }
+  const newRawToken = randomToken();
+  const newToken = await createAuthEmailToken(c.env.DB, {
+    purpose: 'signup', tokenHash: await sha256Hex(newRawToken), email: row.email,
+    applicationId: application.id, ipHash: row.ip_hash, deviceMarker: row.device_marker,
+    expiresAt: toJstString(new Date(Date.now() + SIGNUP_TOKEN_TTL_MS)),
+  });
+  try {
+    await sendSignupResendMail(c.env, { email: row.email,
+      completeUrl: `${base}/register/complete?token=${encodeURIComponent(newRawToken)}` });
+  } catch {
+    await consumeAuthEmailToken(c.env.DB, newToken.id);
+    await clearAuthThrottle(c.env.DB, `signup-resend:cooldown:${application.id}`);
+    logger.error('registration_application.public_resend_failed');
+    return c.json({ success: false, error: 'ご案内メールを送れませんでした。時間をおいて再度お試しください' }, 502);
+  }
+  await consumeOtherSignupTokens(c.env.DB, application.id, newToken.id);
+  await recordAuditEvent(c.env.DB, { category: 'auth', action: 'registration.signup_link_resent',
+    sourceKind: 'registration_application', sourceId: application.id,
+    targetKind: 'auth_email_token', targetId: newToken.id,
+    ipPrefix: maskAuditIp(clientIp(c)), retentionClass: 'security' });
+  return c.json({ success: true, data: { maskedEmail, sent: true } });
 });
 
 /**

@@ -3,3 +3,11 @@
 .pendingNext strong { color: #1d1d1f; }
 .contact { display: grid; place-items: center; width: 100%; min-height: 44px; border: 1px solid #c9ced6; border-radius: 10px; background: #fff; color: #1d1d1f; font-size: 13px; font-weight: 700; text-decoration: none; }
 .login { align-self: center; margin-top: 12px; color: #087a3e; font-size: 13px; font-weight: 700; text-decoration: none; }
+.recoveryPanel { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; padding: 24px 20px; border-radius: 14px; background: #f5f8f6; color: #526174; text-align: center; }
+.recoveryPanel h2 { margin: 0; color: #202428; font-size: 20px; font-weight: 700; line-height: 1.45; }
+.recoveryPanel p { margin: 0; font-size: 14px; line-height: 1.7; }
+.recoveryPanel strong { color: #202428; font-weight: 700; }
+.recoveryIcon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #fff1d6; color: #a26208; font-size: 24px; font-weight: 800; line-height: 1; }
+.recoveryButton { display: flex; justify-content: center; width: min(100%, 280px); margin-inline: auto; text-align: center; }
+.recoveryLink { align-self: center; color: #087a3e; font-size: 13px; font-weight: 700; line-height: 1.5; text-align: center; text-decoration: none; }
+.recoveryLink:hover, .recoveryLink:focus-visible, .login:hover, .login:focus-visible { text-decoration: underline; }
