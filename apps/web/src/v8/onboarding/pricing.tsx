@@ -199,13 +199,21 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
             <div className={styles.today}><span>本日の請求</span><strong>¥0</strong></div>
             {!price && <p className={styles.secondary}>友だち数を入力すると、予定料金を表示します。</p>}
             {price && <>
-              <div className={styles.amountRow}><span>{interval === 'month' ? lineCount + '個すべてを有効にした場合' : 'LINE基本料金（年払い）'}</span>
-                <strong>{interval === 'month' ? yen(price.monthlyTotalYen) + ' / 月' : yen(price.annualLineChargeYen) + ' / 年'}</strong></div>
+              <div className={styles.amountRow}><span>{interval === 'month'
+                ? price.linkedAccountSlots > 0 ? 'LINE 1個の基本料金（追加連携枠を除く）' : lineCount + '個すべてを有効にした場合'
+                : 'LINE基本料金（年払い）'}</span>
+                <strong>{interval === 'month'
+                  ? yen(price.lineBasicMonthlyYen + price.headquartersMonthlyYen) + ' / 月'
+                  : yen(price.annualLineChargeYen) + ' / 年'}</strong></div>
               {interval === 'year' && <p className={styles.annualNote}>年払いはLINE基本料金のみ。オプション料金{yen(price.optionsMonthlyYen)}／月は毎月別に請求します。</p>}
               <div className={styles.amountRow}><span>友だち数{new Intl.NumberFormat('ja-JP').format(friendCount)}人の追加料金</span>
                 <strong>{yen(price.friendOverageMonthlyYen)} / 月</strong></div>
-              {price.linkedAccountSlots > 0 && <div className={styles.amountRow}><span>追加連携枠 {price.linkedAccountSlots}枠</span>
-                <strong>{yen(price.linkedAccountSlotsMonthlyYen)} / 月</strong></div>}
+              {price.linkedAccountSlots > 0 && <div className={styles.amountRow}><span>{interval === 'month'
+                ? `追加連携枠${price.linkedAccountSlots}枠を利用した場合`
+                : `追加連携枠 ${price.linkedAccountSlots}枠`}</span>
+                <strong>{yen(interval === 'month'
+                  ? price.lineBasicMonthlyYen + price.headquartersMonthlyYen + price.linkedAccountSlotsMonthlyYen
+                  : price.linkedAccountSlotsMonthlyYen)} / 月</strong></div>}
             </>}
             <p className={styles.smallNote}>基本枠超過の友だち：1万人ごと{yen(condition.schedule.extraFriendBlockYen)}<br />
               追加連携枠：1枠{yen(condition.schedule.linkedAccountSlotYen)}／月（税込）</p>

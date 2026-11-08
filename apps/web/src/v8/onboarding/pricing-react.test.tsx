@@ -42,12 +42,22 @@ describe('Penの利用料金確認', () => {
     await act(async () => { inputValue('friend-count', '2800') })
     expect(host.textContent).toContain('¥5,900 / 月')
     await act(async () => { selectValue('google-count', '2') })
+    expect(host.textContent).toContain('LINE 1個の基本料金（追加連携枠を除く）')
+    expect(host.textContent).toContain('追加連携枠1枠を利用した場合')
     expect(host.textContent).toContain('¥9,200 / 月')
     const agree = host.querySelector<HTMLInputElement>('input[type=checkbox]')!
     await act(async () => { agree.click() })
     const proceed = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('同意してカード登録へ'))!
     await act(async () => { proceed.click() })
     expect(continueFlow).toHaveBeenCalledWith(expect.objectContaining({ lineCount: 1, friendCountExcludingBlocked: 2800, googleBusinessCount: 2 }))
+  })
+
+  it('友だち超過を基本料金へ重複加算せず、追加料金として分けて表示する', async () => {
+    await act(async () => { root.render(<OnboardingPricing onContinue={continueFlow} onContact={contactFlow} />) })
+    await act(async () => { inputValue('friend-count', '13001') })
+    expect(host.textContent).toContain('¥5,900 / 月')
+    expect(host.textContent).toContain('¥2,200 / 月')
+    expect(host.textContent).not.toContain('¥8,100 / 月')
   })
 
   it('11個以上は金額と同意欄を出さず、問い合わせに進む', async () => {
