@@ -171,6 +171,7 @@ export function musuboLinkedAccountMail(input: {
   if ((added && afterSlots !== beforeSlots + 1) || (!added && afterSlots > beforeSlots)) throw new RangeError('Invalid slot direction');
   const chargeReduced = !added && afterSlots < beforeSlots;
   if (added && input.amountPaidNowYen === undefined) throw new RangeError('Paid amount is required for activation mail');
+  if (added && (!Number.isSafeInteger(input.amountPaidNowYen) || input.amountPaidNowYen! < 0)) throw new RangeError('Invalid current charge');
   const label = input.service === 'googleBusiness' ? 'Googleマイビジネス' : 'Instagram';
   const beforeCount = input.before[input.service];
   const afterCount = input.after[input.service];
@@ -182,7 +183,9 @@ export function musuboLinkedAccountMail(input: {
     title: added ? `${label}を追加しました` : '連携先を解除しました',
     intro: added ? `${input.lineName}の連携先を追加しました。` : `${input.lineName}の${label}1個の連携を停止しました。`,
     detail: added
-      ? `追加分の決済を確認し、新しい${label}を有効化しました。今回のお支払いと次回の料金をご確認ください。`
+      ? input.amountPaidNowYen! > 0
+        ? `追加分の決済を確認し、新しい${label}を有効化しました。今回のお支払いと次回の料金をご確認ください。`
+        : `新しい${label}を有効化しました。今回のお支払いはありません。次回以降の料金をご確認ください。`
       : chargeReduced
         ? '連携はすでに停止しています。追加枠の料金は、次の月次請求日から減額します。'
         : '連携はすでに停止しています。もう一方のサービスの連携数が追加枠の基準のため、今回の解除では料金は変わりません。',
@@ -195,7 +198,10 @@ export function musuboLinkedAccountMail(input: {
       { label: added ? '次回から' : chargeReduced ? '減額後の追加枠料金' : '追加枠料金', value: `${mailMoney(nextMonthly)}／月（税込）` },
     ], buttonLabel: '連携先と料金を確認', buttonUrl: input.actionUrl,
     notes: added
-      ? ['追加分は次の月次請求日までの残期間で日割り計算しました。', '年払いでも追加連携枠は月次請求です。LINE基本料金の割引は追加枠に適用しません。']
+      ? [input.amountPaidNowYen! > 0
+        ? '追加分は次の月次請求日までの残期間で日割り計算しました。'
+        : '今回の請求はありません。次回以降の料金は適用中の利用条件に従います。',
+        '年払いでも追加連携枠は月次請求です。LINE基本料金の割引は追加枠に適用しません。']
       : chargeReduced
         ? ['支払済み期間の返金はありません。年払いでも追加枠の料金は月次請求です。', '次の月次請求日までに枠を再利用した場合は、減額予定を再計算します。']
         : ['GoogleマイビジネスとInstagramの多いほうの連携数で追加枠を数えます。', 'ほかの連携先を解除すると、次の月次請求から減額となる場合があります。'],

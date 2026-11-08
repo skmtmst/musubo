@@ -52,6 +52,24 @@ describe('LINE追加・連携解除のメール', () => {
     expect(removed.text).toContain('追加枠料金：¥6,600／月');
     expect(removed.text).not.toContain('減額開始');
   });
+
+  it('無料期間などで今回0円の連携先追加は決済済み・日割り請求と誤案内しない', () => {
+    const added = musuboLinkedAccountMail({
+      event: 'added', lineName: '公式LINE A', service: 'instagram',
+      before: { googleBusiness: 1, instagram: 1 }, after: { googleBusiness: 1, instagram: 2 },
+      amountPaidNowYen: 0, linkedAccountSlotYen: 3300,
+      nextMonthlyChargeAt: '2027-02-08T00:00:00+09:00', actionUrl,
+    });
+    expect(added.text).toContain('今回のお支払いはありません');
+    expect(added.text).not.toContain('決済を確認し');
+    expect(added.text).not.toContain('日割り計算しました');
+    expect(() => musuboLinkedAccountMail({
+      event: 'added', lineName: '公式LINE A', service: 'instagram',
+      before: { googleBusiness: 1, instagram: 1 }, after: { googleBusiness: 1, instagram: 2 },
+      amountPaidNowYen: -1, linkedAccountSlotYen: 3300,
+      nextMonthlyChargeAt: '2027-02-08T00:00:00+09:00', actionUrl,
+    })).toThrow(/Invalid current charge/);
+  });
 });
 
 describe('最後のLINEの利用終了・再開メール', () => {
