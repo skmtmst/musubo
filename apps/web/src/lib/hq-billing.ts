@@ -53,7 +53,7 @@ export interface BillingSummary {
   plans: BillingPlanView[]
 }
 
-export interface BillingPaymentFailureView {
+export type BillingPaymentFailureView = {
   invoiceId: string
   amountYen: number
   invoiceCreatedAt: string
@@ -61,6 +61,15 @@ export interface BillingPaymentFailureView {
   graceDeadlineAt: string
   state: 'grace' | 'suspended'
   paymentUrl: string | null
+} | {
+  invoiceId: string
+  amountYen: number
+  invoiceCreatedAt: string
+  graceDeadlineAt: string
+  paidAt: string
+  nextChargeAt: string | null
+  state: 'recovered'
+  paymentUrl: null
 }
 
 export interface BillingInvoice {

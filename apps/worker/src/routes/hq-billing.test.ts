@@ -593,6 +593,26 @@ describe('課金 Webhook', () => {
     } }>()).data).toMatchObject({ state: 'active', canSend: true, paymentFailure: null });
   });
 
+  it('支払いが反映されて契約が復帰した後は直近の復旧内容を返す', async () => {
+    const failedAt = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
+    const paidAt = failedAt + 60;
+    setTenant({ stripe_customer_id: 'cus_recovered', stripe_subscription_id: 'sub_recovered', plan_status: 'active', plan_key: 'light' });
+    const invoice = { id: 'in_recovered', customer: 'cus_recovered', subscription: 'sub_recovered',
+      created: failedAt - 60, amount_due: 5900, amount_paid: 0, currency: 'jpy', status: 'open' };
+    expect((await webhook({ id: 'evt_recovered_failure', type: 'invoice.payment_failed', created: failedAt,
+      data: { object: invoice } })).status).toBe(200);
+    expect(tenantRow().plan_status).toBe('past_due');
+    expect((await webhook({ id: 'evt_recovered_payment', type: 'invoice.paid', created: paidAt,
+      data: { object: { ...invoice, status: 'paid', amount_paid: 5900,
+        status_transitions: { paid_at: paidAt } } } })).status).toBe(200);
+    expect(tenantRow().plan_status).toBe('active');
+    const detail = (await (await call('GET', '/api/hq/billing/payment-failure')).json<{ data: {
+      invoiceId: string; state: string; amountYen: number; paidAt: string;
+    } }>()).data;
+    expect(detail).toMatchObject({ invoiceId: invoice.id, state: 'recovered', amountYen: 5900,
+      paidAt: new Date(paidAt * 1000).toISOString() });
+  });
+
   it('入金済み請求書の金額・入金日・年払いを保存し、同じイベントは増やさない', async () => {
     setTenant({ stripe_customer_id: 'cus_1', plan_status: 'past_due' });
     const paid = {

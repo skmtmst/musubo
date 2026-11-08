@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import { getBillingPaymentFailure, paymentFailureState, trustedHostedInvoiceUrl } from './billing-payment-failure.js';
+import { getBillingPaymentFailure, getRecentBillingPaymentRecovery, paymentFailureState, trustedHostedInvoiceUrl } from './billing-payment-failure.js';
 
 const subscription = 'sub_current';
 const billing = { id: DEFAULT_TENANT_ID, plan_status: 'past_due' as const, stripe_subscription_id: subscription };
@@ -55,6 +55,30 @@ describe('有料請求失敗の7日猶予', () => {
       db.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
         VALUES ('evt_old','invoice.payment_failed',?,'{"state":"completed","created":100}')`).run(DEFAULT_TENANT_ID);
       expect(await getBillingPaymentFailure(db.db, billing, new Date('2026-11-20T00:00:00Z'))).toBeNull();
+    } finally { db.raw.close(); }
+  });
+
+  it('同じ契約の失敗→入金→利用復帰を検証できた直後だけ回復画面へ返す', async () => {
+    const db = createTestD1();
+    const paidAt = '2026-11-10T09:00:00Z';
+    try {
+      db.raw.prepare(`INSERT INTO billing_invoices
+        (id,tenant_id,subscription_id,status,amount_due,amount_paid,currency,synced_at,created_at,paid_at)
+        VALUES ('in_recovered',?,?,'paid',5900,5900,'jpy',?,?,?)`)
+        .run(DEFAULT_TENANT_ID, subscription, paidAt, '2026-11-01T00:00:00Z', paidAt);
+      const addEvent = (id: string, type: string, applied: number) => db.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
+        VALUES (?,?,?,?)`).run(id, type, DEFAULT_TENANT_ID,
+        JSON.stringify({ state: 'completed', subjectId: 'in_recovered', created: failedAtSeconds, applied }));
+      addEvent('evt_recovered_failed', 'invoice.payment_failed', 0);
+      const active = { ...billing, plan_status: 'active' as const, current_period_ends_at: '2026-12-01T00:00:00Z' };
+      expect(await getRecentBillingPaymentRecovery(db.db, active, new Date('2026-11-11T00:00:00Z'))).toBeNull();
+      addEvent('evt_recovered_paid', 'invoice.paid', 1);
+      expect(await getRecentBillingPaymentRecovery(db.db, active, new Date('2026-11-11T00:00:00Z')))
+        .toMatchObject({ invoiceId: 'in_recovered', amountYen: 5900, state: 'recovered', paidAt: '2026-11-10T09:00:00.000Z',
+          graceDeadlineAt: '2026-11-16T03:00:00.000Z',
+          nextChargeAt: active.current_period_ends_at });
+      expect(await getRecentBillingPaymentRecovery(db.db, active, new Date('2026-11-18T00:00:00Z'))).toBeNull();
+      expect(await getRecentBillingPaymentRecovery(db.db, { ...active, stripe_subscription_id: 'sub_other' }, new Date('2026-11-11T00:00:00Z'))).toBeNull();
     } finally { db.raw.close(); }
   });
 });

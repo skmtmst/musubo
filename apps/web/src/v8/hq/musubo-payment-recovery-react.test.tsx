@@ -63,4 +63,12 @@ describe('決済失敗と回復の画面', () => {
     expect(host.textContent).toContain('お支払い確認日確認中')
     expect(host.textContent).not.toContain('2026年12月15日 10:00')
   })
+
+  it('確認済みの支払日と次回請求日を復旧画面へ表示する', async () => {
+    await act(async () => { renderView({ ...invoice, state: 'recovered',
+      paidAt: '2026-12-10T09:00:00+09:00', nextChargeAt: '2027-01-08T00:00:00+09:00' }) })
+    expect(host.textContent).toContain('お支払い確認日2026年12月10日 09:00')
+    expect(host.textContent).toContain('次回請求予定2027年1月8日')
+    expect(host.textContent).toContain('通常の利用に戻りました')
+  })
 })

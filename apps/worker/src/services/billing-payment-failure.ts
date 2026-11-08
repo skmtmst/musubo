@@ -20,6 +20,17 @@ export interface BillingPaymentFailure {
   paymentUrl: string | null;
 }
 
+export interface BillingPaymentRecovery {
+  invoiceId: string;
+  amountYen: number;
+  invoiceCreatedAt: string;
+  graceDeadlineAt: string;
+  paidAt: string;
+  nextChargeAt: string | null;
+  state: 'recovered';
+  paymentUrl: null;
+}
+
 export function trustedHostedInvoiceUrl(value: string | null): string | null {
   if (!value) return null;
   try {
@@ -95,4 +106,48 @@ export async function getBillingPaymentFailure(
     if (failure && (!earliest || failure.failedAt < earliest.failedAt)) earliest = failure;
   }
   return earliest;
+}
+
+/** Show a recent, verified recovery after Stripe has restored this tenant's current subscription. */
+export async function getRecentBillingPaymentRecovery(
+  db: D1Database,
+  billing: Pick<TenantBilling, 'id' | 'plan_status' | 'stripe_subscription_id' | 'current_period_ends_at'> | null,
+  now = new Date(),
+): Promise<BillingPaymentRecovery | null> {
+  if (billing?.plan_status !== 'active' || !billing.stripe_subscription_id || !Number.isFinite(now.getTime())) return null;
+  const since = new Date(now.getTime() - GRACE_MS).toISOString();
+  const row = await db.prepare(`SELECT bi.id, bi.amount_due, bi.amount_paid, bi.created_at, bi.paid_at
+    FROM billing_invoices bi
+    WHERE bi.tenant_id=? AND bi.subscription_id=? AND bi.status='paid'
+      AND bi.amount_due>0 AND bi.amount_paid>=bi.amount_due
+      AND bi.paid_at IS NOT NULL AND julianday(bi.paid_at)>=julianday(?)
+      AND NOT EXISTS (SELECT 1 FROM billing_invoices open_invoice
+        WHERE open_invoice.tenant_id=bi.tenant_id AND open_invoice.subscription_id=bi.subscription_id
+          AND open_invoice.status IN ('open','uncollectible') AND open_invoice.amount_due>open_invoice.amount_paid)
+      AND EXISTS (SELECT 1 FROM billing_events failed
+        WHERE failed.tenant_id=bi.tenant_id AND failed.type='invoice.payment_failed'
+          AND json_valid(failed.summary) AND json_extract(failed.summary,'$.state')='completed'
+          AND json_extract(failed.summary,'$.subjectId')=bi.id)
+      AND EXISTS (SELECT 1 FROM billing_events paid
+        WHERE paid.tenant_id=bi.tenant_id AND paid.type='invoice.paid'
+          AND json_valid(paid.summary) AND json_extract(paid.summary,'$.state')='completed'
+          AND json_extract(paid.summary,'$.subjectId')=bi.id
+          AND json_extract(paid.summary,'$.applied')=1)
+    ORDER BY julianday(bi.paid_at) DESC, bi.id DESC LIMIT 1`)
+    .bind(billing.id, billing.stripe_subscription_id, since)
+    .first<{ id: string; amount_due: number; amount_paid: number; created_at: string; paid_at: string }>();
+  if (!row) return null;
+  const paid = new Date(row.paid_at);
+  if (!Number.isFinite(paid.getTime()) || paid.getTime() > now.getTime()) return null;
+  const firstFailure = await firstInvoiceFailureSeconds(db, billing.id, row.id);
+  if (!firstFailure || paid.getTime() < firstFailure * 1000) return null;
+  return {
+    invoiceId: row.id,
+    amountYen: row.amount_paid,
+    invoiceCreatedAt: invoiceCreatedIso(row.created_at, paid),
+    graceDeadlineAt: new Date(firstFailure * 1000 + GRACE_MS).toISOString(),
+    paidAt: paid.toISOString(),
+    nextChargeAt: billing.current_period_ends_at,
+    state: 'recovered', paymentUrl: null,
+  };
 }

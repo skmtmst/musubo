@@ -32,7 +32,7 @@ import {
   type PlanKey,
 } from '../services/billing-plans.js';
 import { billingInvoiceInput } from '../services/billing-invoices-sync.js';
-import { getBillingPaymentFailure } from '../services/billing-payment-failure.js';
+import { getBillingPaymentFailure, getRecentBillingPaymentRecovery } from '../services/billing-payment-failure.js';
 import { deliverBillingRecoveryNotice, deliverCurrentBillingFailureNotice } from '../services/billing-invoice-notifications.js';
 import { StripeApiError, stripeApi, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
@@ -221,7 +221,8 @@ hqBilling.get('/api/hq/billing/payment-failure', requireRole('owner', 'admin'), 
   const billing = await getTenantBilling(c.env.DB, tenantOf(c));
   if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
   const failure = await getBillingPaymentFailure(c.env.DB, billing);
-  return c.json({ success: true, data: failure });
+  const data = failure ?? await getRecentBillingPaymentRecovery(c.env.DB, billing);
+  return c.json({ success: true, data });
 });
 
 // 即時変更を仮定した参考額だけを取得する。契約・顧客・DBは変更しない。

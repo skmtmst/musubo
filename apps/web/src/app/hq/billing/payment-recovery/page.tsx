@@ -61,14 +61,16 @@ export default function BillingPaymentRecoveryPage() {
   </section>)
 
   return frame(<MusuboPaymentRecovery
-    view={{
-      kind: 'invoice',
-      state: failure.state,
-      amountYen: failure.amountYen,
-      invoiceDate: failure.invoiceCreatedAt,
-      graceDeadline: failure.graceDeadlineAt,
+    view={failure.state === 'recovered' ? {
+      kind: 'invoice', state: 'recovered', amountYen: failure.amountYen,
+      invoiceDate: failure.invoiceCreatedAt, graceDeadline: failure.graceDeadlineAt,
+      paidAt: failure.paidAt, nextChargeAt: failure.nextChargeAt,
+    } : {
+      kind: 'invoice', state: failure.state, amountYen: failure.amountYen,
+      invoiceDate: failure.invoiceCreatedAt, graceDeadline: failure.graceDeadlineAt,
     }}
     onPrimary={async () => {
+      if (failure.state === 'recovered') { router.push('/hq/billing'); return }
       if (failure.paymentUrl && isStripePaymentUrl(failure.paymentUrl, 'invoice.stripe.com')) {
         window.location.assign(failure.paymentUrl)
         return
@@ -77,6 +79,6 @@ export default function BillingPaymentRecoveryPage() {
       if (!result.success || !isStripePaymentUrl(result.data.url, 'billing.stripe.com')) throw new Error('invalid_payment_url')
       window.location.assign(result.data.url)
     }}
-    onSecondary={() => router.push('/hq/billing')}
+    onSecondary={() => router.push(failure.state === 'recovered' ? '/accounts' : '/hq/billing')}
   />)
 }
