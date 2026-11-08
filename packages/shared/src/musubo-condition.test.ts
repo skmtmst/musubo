@@ -42,6 +42,15 @@ describe('運営が承認時に選ぶ利用条件', () => {
     })).toThrow(/deadline/);
   });
 
+  it('個別見積もりに引き継ぐ11個目以降の単価と友だち基準も検証する', () => {
+    expect(() => musuboConditionPreview({ ...special, schedule: {
+      ...special.schedule, eleventhAndLaterLineYen: -1,
+    } })).toThrow(/eleventhAndLaterLineYen/);
+    expect(() => musuboConditionPreview({ ...special, schedule: {
+      ...special.schedule, friendAllowanceForElevenOrMore: -10,
+    } })).toThrow(/friendAllowanceForElevenOrMore/);
+  });
+
   it('期間限定割引は終了日までは基本料金へ適用し、翌日から外す', () => {
     const applied = applyMusuboConditionAtApproval({ ...special, discountEndsOn: '2027-01-31' }, {
       companyName: special.allowedCompanyName!, approvedAt: '2026-11-08',

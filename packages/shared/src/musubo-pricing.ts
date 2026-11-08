@@ -94,6 +94,8 @@ export function musuboPrice(input: MusuboPriceInput): MusuboPriceBreakdown {
   for (const name of ['firstLineYen', 'secondToFifthLineYen', 'sixthToTenthLineYen', 'headquartersYen', 'linkedAccountSlotYen', 'extraFriendBlockYen'] as const) {
     wholeNonnegative(schedule[name], name);
   }
+  if (schedule.eleventhAndLaterLineYen !== undefined) wholeNonnegative(schedule.eleventhAndLaterLineYen, 'eleventhAndLaterLineYen');
+  if (schedule.friendAllowanceForElevenOrMore !== undefined) wholeNonnegative(schedule.friendAllowanceForElevenOrMore, 'friendAllowanceForElevenOrMore');
   positive(schedule.extraFriendBlockSize, 'extraFriendBlockSize');
   const linked = input.linkedAccountsByLine ?? [];
   if (linked.length > lineCount) throw new RangeError('More linked account entries than LINE accounts');

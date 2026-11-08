@@ -64,6 +64,12 @@ export function validateMusuboCondition(definition: MusuboConditionDefinition): 
     'headquartersYen', 'linkedAccountSlotYen', 'extraFriendBlockYen'] as const) {
     validPrice(definition.schedule[key], key);
   }
+  if (definition.schedule.eleventhAndLaterLineYen !== undefined) {
+    validPrice(definition.schedule.eleventhAndLaterLineYen, 'eleventhAndLaterLineYen');
+  }
+  if (definition.schedule.friendAllowanceForElevenOrMore !== undefined) {
+    validPrice(definition.schedule.friendAllowanceForElevenOrMore, 'friendAllowanceForElevenOrMore');
+  }
   if (!Number.isSafeInteger(definition.schedule.extraFriendBlockSize) || definition.schedule.extraFriendBlockSize < 1) {
     throw new RangeError('Invalid friend block size');
   }
