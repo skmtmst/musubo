@@ -168,7 +168,8 @@ export function musuboLinkedAccountMail(input: {
   const added = input.event === 'added';
   const beforeSlots = linkedAccountSlots(input.before);
   const afterSlots = linkedAccountSlots(input.after);
-  if ((added && afterSlots !== beforeSlots + 1) || (!added && afterSlots > beforeSlots)) throw new RangeError('Invalid slot direction');
+  if ((added && (afterSlots < beforeSlots || afterSlots > beforeSlots + 1))
+    || (!added && afterSlots > beforeSlots)) throw new RangeError('Invalid slot direction');
   const chargeReduced = !added && afterSlots < beforeSlots;
   if (added && input.amountPaidNowYen === undefined) throw new RangeError('Paid amount is required for activation mail');
   if (added && (!Number.isSafeInteger(input.amountPaidNowYen) || input.amountPaidNowYen! < 0)) throw new RangeError('Invalid current charge');
