@@ -35,9 +35,8 @@ $input = json_decode($body, true);
 $to = is_array($input) ? ($input['to'] ?? '') : '';
 $subject = is_array($input) ? ($input['subject'] ?? '') : '';
 $text = is_array($input) ? ($input['body'] ?? '') : '';
-$html = is_array($input) ? ($input['html'] ?? null) : null;
 if (!filter_var($to, FILTER_VALIDATE_EMAIL) || !is_string($subject) || !is_string($text)
-    || $text === '' || strlen($text) > 50000 || ($html !== null && (!is_string($html) || $html === '' || strlen($html) > 100000))) {
+    || $text === '' || strlen($text) > 50000) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Invalid message']);
     exit;
@@ -51,6 +50,9 @@ $headers = [
     'Reply-To: <'.FROM_EMAIL.'>',
     'Message-ID: '.$messageId,
     'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=UTF-8',
+    // 本番と同じ。本文を丸ごと base64 にすると迷惑メール判定の材料になる。
+    'Content-Transfer-Encoding: quoted-printable',
 ];
 if (!empty($input['inReplyTo'])) {
     $headers[] = 'In-Reply-To: '.$cleanHeader($input['inReplyTo']);
@@ -60,18 +62,7 @@ if (!empty($input['references'])) {
 }
 $encodedSubject = '=?UTF-8?B?'.base64_encode($cleanHeader($subject)).'?=';
 // 改行を CRLF に揃えてから符号化する。混ざると受信側で行が崩れる。
-$encodePart = static fn (string $value): string => quoted_printable_encode(preg_replace("/\r\n|\r|\n/", "\r\n", $value));
-if ($html !== null) {
-    $boundary = 'musubo-'.bin2hex(random_bytes(16));
-    $headers[] = 'Content-Type: multipart/alternative; boundary="'.$boundary.'"';
-    $encodedBody = '--'.$boundary."\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n"
-        .$encodePart($text)."\r\n--".$boundary."\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n"
-        .$encodePart($html)."\r\n--".$boundary."--\r\n";
-} else {
-    $headers[] = 'Content-Type: text/plain; charset=UTF-8';
-    $headers[] = 'Content-Transfer-Encoding: quoted-printable';
-    $encodedBody = $encodePart($text);
-}
+$encodedBody = quoted_printable_encode(preg_replace("/\r\n|\r|\n/", "\r\n", $text));
 $sent = mail($to, $encodedSubject, $encodedBody, implode("\r\n", $headers), '-f'.FROM_EMAIL);
 if (!$sent) {
     http_response_code(502);
