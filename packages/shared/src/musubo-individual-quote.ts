@@ -85,6 +85,7 @@ export function suggestMusuboQuoteAnnualLineCharge(schedule: MusuboPriceSchedule
 /** Acceptance locks the final units and trial condition, even if the quote expires before card registration. */
 export function acceptMusuboIndividualQuote(quote: MusuboIndividualQuote, acceptedAt: string): MusuboIndividualQuote {
   musuboIndividualQuotePrice(quote);
+  if (quote.acceptedAt !== null && individualQuoteAccess(quote, quote.acceptedAt) === 'accepted') return quote;
   const access = individualQuoteAccess(quote, acceptedAt);
   if (access === 'accepted') return quote;
   if (access !== 'available') throw new RangeError('This quote can no longer be accepted');
@@ -100,6 +101,9 @@ export function acceptMusuboIndividualQuote(quote: MusuboIndividualQuote, accept
 /** A replacement invalidates an unaccepted old link. Accepted contract terms remain untouched. */
 export function supersedeMusuboIndividualQuote(quote: MusuboIndividualQuote, supersededAt: string): MusuboIndividualQuote {
   musuboIndividualQuotePrice(quote);
+  if (quote.acceptedAt !== null && individualQuoteAccess(quote, quote.acceptedAt) === 'accepted') {
+    throw new RangeError('An accepted quote cannot be superseded');
+  }
   const access = individualQuoteAccess(quote, supersededAt);
   if (access === 'accepted') throw new RangeError('An accepted quote cannot be superseded');
   if (access === 'superseded') return quote;

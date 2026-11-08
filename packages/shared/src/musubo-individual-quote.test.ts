@@ -37,6 +37,8 @@ describe('会社ごとの個別見積もり', () => {
     expect(accepted.acceptedAt).toBe('2026-12-07T14:20:00+09:00');
     expect(accepted.finalSchedule).not.toBe(quote().finalSchedule);
     expect(acceptMusuboIndividualQuote(accepted, '2026-12-10T00:00:00+09:00')).toBe(accepted);
+    expect(acceptMusuboIndividualQuote(accepted, '2026-12-06T00:00:00+09:00')).toBe(accepted);
+    expect(() => supersedeMusuboIndividualQuote(accepted, '2026-12-06T00:00:00+09:00')).toThrow(/accepted quote/);
   });
 
   it('未同意の期限切れは承認できず、再発行は旧リンクを無効にする', () => {
