@@ -44,7 +44,9 @@ describe('最後のLINEの利用終了', () => {
 
   it('無料体験中は初回請求前日までの利用を示す', async () => {
     await act(async () => root.render(<LastLineEnd {...base} schedule={{ billingState: 'trialing', interval: 'month', trialFirstChargeAt: '2027-01-08T10:00:00+09:00' }} />))
-    expect(host.textContent).toContain('無料体験の終了日に終了する')
+    expect(host.textContent).toContain('無料体験の最終日まで利用する')
+    expect(host.textContent).toContain('無料体験後の初回請求日')
+    expect(host.textContent).toContain('2027年1月7日')
     expect(host.textContent).toContain('2027年1月8日の請求は発生しません')
   })
 })

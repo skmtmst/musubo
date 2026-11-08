@@ -44,10 +44,10 @@ export default function LastLineEnd({
   const saveErrors = useSaveFormErrors()
   const option = useMemo(() => finalLineEndOption(schedule, now), [schedule, now])
   const isTrial = schedule.billingState === 'trialing'
-  const dateLabel = isTrial ? '無料体験の終了日' : schedule.interval === 'month' ? '次の請求日' : '次の年次更新日'
+  const dateLabel = isTrial ? '無料体験後の初回請求日' : schedule.interval === 'month' ? '次の請求日' : '次の年次更新日'
   const chargeDate = isTrial ? schedule.trialFirstChargeAt! : schedule.interval === 'month'
     ? schedule.nextMonthlyChargeAt! : schedule.nextAnnualRenewalAt!
-  const defaultTitle = isTrial ? '無料体験の終了日に終了する'
+  const defaultTitle = isTrial ? '無料体験の最終日まで利用する'
     : schedule.interval === 'month' ? '次の請求日の前日に終了する' : '年次更新日の前日に終了する'
 
   const submit = async (action: () => Promise<void> | void) => {
