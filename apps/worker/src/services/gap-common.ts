@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from './account-access.js';
+import { isHqBusinessOperation } from '../middleware/hq-role-policy.js';
 export class GapError extends Error {
   constructor(public code:string, public status:400|401|403|404|409|410|429|503=400) {super(code);}
 }
@@ -13,7 +14,8 @@ export async function gapAccount(c:Context<Env>, explicit?:string) {
 }
 export function gapWrite(c:Context<Env>, options:{admin?:boolean;impersonation?:boolean}={}) {
   const staff=c.get('staff');
-  if(!staff || staff.readOnly || (options.admin && !['owner','admin'].includes(staff.role))) throw new GapError('forbidden',403);
+  if(!staff || staff.readOnly || (options.admin && !['owner','admin'].includes(staff.role)
+    && !(staff.hqRole === 'operator' && isHqBusinessOperation(c.req.method,c.req.path,staff.id)))) throw new GapError('forbidden',403);
   if(c.get('impersonation') && !options.impersonation) throw new GapError('IMPERSONATION_WRITE_BLOCKED',403);
 }
 export function gapVersion(v:unknown):number {

@@ -7,6 +7,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const invite = vi.hoisted(() => ({ send: vi.fn(), line: vi.fn() }));
 vi.mock('../services/staff-invite.js', () => ({ sendStaffInviteEmail: invite.send, sendStaffLineLinkEmail: invite.line }));
+vi.mock('../lib/step-up.js', () => ({ sensitiveStepUpSatisfied: vi.fn().mockResolvedValue(true), consumeStepUpToken: vi.fn() }));
 
 const { staff } = await import('./staff.js');
 
@@ -61,6 +62,48 @@ beforeEach(() => {
 });
 
 describe('統括のメンバー管理', () => {
+  it('統括の担当者を個別権限なしで招待し、店舗スタッフとは別に保存する', async () => {
+    const res = await call('POST', '/api/staff', {
+      name: '担当者', email: 'operator@example.com', role: 'staff',
+      managementContext: 'hq', assignedLineAccountId: null,
+      accountScope: 'all', scopedLineAccountIds: [],
+    });
+    expect(res.status).toBe(201);
+    const row = testDb.raw.prepare("SELECT role_bundle, permission_keys, account_scope FROM staff_members WHERE email='operator@example.com'")
+      .get() as { role_bundle: string; permission_keys: string; account_scope: string };
+    expect(row).toMatchObject({ role_bundle: 'hq_operator', permission_keys: '[]', account_scope: 'all' });
+    expect(invite.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('統括の閲覧のみは更新できない役割として保存する', async () => {
+    const res = await call('POST', '/api/staff', {
+      name: '閲覧者', email: 'viewer@example.com', role: 'viewer',
+      managementContext: 'hq', assignedLineAccountId: null,
+      accountScope: 'all', scopedLineAccountIds: [],
+    });
+    expect(res.status).toBe(201);
+    const row = testDb.raw.prepare("SELECT role_bundle, access_level FROM staff_members WHERE email='viewer@example.com'")
+      .get() as { role_bundle: string; access_level: string };
+    expect(row).toMatchObject({ role_bundle: 'hq_viewer', access_level: 'read_only' });
+  });
+
+  it('管理者が統括の閲覧のみを担当者へ変更すると役割が保存される', async () => {
+    const created = await call('POST', '/api/staff', {
+      name: '閲覧者', email: 'viewer@example.com', role: 'viewer',
+      managementContext: 'hq', assignedLineAccountId: null,
+      accountScope: 'all', scopedLineAccountIds: [],
+    });
+    expect(created.status).toBe(201);
+    const row = testDb.raw.prepare("SELECT id, policy_version FROM staff_members WHERE email='viewer@example.com'")
+      .get() as { id: string; policy_version: number };
+    const updated = await call('PATCH', `/api/staff/${row.id}`, {
+      role: 'staff', managementContext: 'hq', expectedPolicyVersion: row.policy_version,
+    });
+    expect(updated.status).toBe(200);
+    expect(testDb.raw.prepare('SELECT role_bundle, access_level FROM staff_members WHERE id=?').get(row.id))
+      .toMatchObject({ role_bundle: 'hq_operator', access_level: 'full' });
+  });
+
   it('最終ログインは成功したログインの最新だけを人ごとに返す', async () => {
     const res = await call('GET', '/api/staff/last-logins');
     expect(res.status).toBe(200);

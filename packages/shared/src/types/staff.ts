@@ -56,6 +56,8 @@ export interface StaffMember {
   scopedLineAccountIds?: string[];
   /** 役割bundle。role は初期値、こちらが監査・画面の共通語彙。 */
   roleBundle?: 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom';
+  /** 統括画面で選んだ3役割。店舗スタッフの個別権限とは分ける。 */
+  hqRole?: 'operator' | 'viewer' | null;
   /** 「見えるだけ」のキー（GET系のみ許可）。 */
   permissionViewKeys?: string[];
   /** 機能ごとの3択（none/view/edit）。編集画面の復元用。 */

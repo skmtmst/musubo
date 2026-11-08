@@ -14,6 +14,7 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { ADMIN_SESSION_BEARER_PREFIX, CSRF_HEADER, adminSessionTokenFromCookie, csrfTokenFromCookie, sha256Hex } from './auth/credentials/auth.js';
 import { toAuthenticatedStaff, isTenantUnavailable, isTenantSuspensionExemptPath, TENANT_SUSPENDED_CODE, TENANT_SUSPENDED_ERROR, type AuthenticatedStaff } from './auth/principal/auth.js';
 import { gap2ReadOperation, gap2SelfPreference, readOperationPermissions, permissionForApiPath, isStaffSelfEndpoint, isStaffExplicitAllow } from './auth/permissions/auth.js';
+import { isHqBusinessOperation } from './hq-role-policy.js';
 
 export { ADMIN_AUTH_COOKIE, ADMIN_SESSION_BEARER_PREFIX, CSRF_COOKIE, CSRF_HEADER, SESSION_DEFAULT_MAX_AGE, SESSION_REMEMBER_MAX_AGE, SESSION_MAX_AGE, adminSessionTokenHashFromRequest, adminSessionTokenFromCookie, csrfTokenFromCookie, adminSessionCookie, csrfCookie, expiredCookie, sha256Hex } from './auth/credentials/auth.js';
 export { toAuthenticatedStaff, isTenantUnavailable, isTenantSuspensionExemptPath, TENANT_SUSPENDED_CODE, TENANT_SUSPENDED_ERROR, type AuthenticatedStaff, type StaffRole, type TenantStatus } from './auth/principal/auth.js';
@@ -185,7 +186,9 @@ async function authenticateRequest(c: Context<Env>, next: Next): Promise<Respons
   if (staff.role === 'staff'
       && !usesPlatformAdminAuthorization
       && !isStaffSelfEndpoint(method, path, staff.id)
-      && !isStaffExplicitAllow(method, path)) {
+      && !isStaffExplicitAllow(method, path)
+      && !(staff.hqRole === 'operator' && isHqBusinessOperation(method, path, staff.id))
+      && !(staff.hqRole === 'viewer' && SAFE_METHODS.has(method) && isHqBusinessOperation(method, path, staff.id))) {
     const requiredPermission = permissionForApiPath(path);
     const requiredPermissions = readOperationPermissions(method, path) ?? (requiredPermission ? [requiredPermission] : []);
     // 閲覧鍵は安全なメソッドか、表に登録された読取操作だけに使う。

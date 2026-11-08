@@ -97,7 +97,7 @@ function subscriptionPatch(c: Context<Env>, tenant: TenantBilling, subscription:
 
 hqBilling.get('/api/hq/billing/metrics',requireRole('owner','admin'),async c=>{
   const actor=c.get('staff'),member=actor?await getStaffById(c.env.DB,actor.id):null;
-  if(!actor?.tenantId||!member||member.is_active!==1||member.tenant_id!==actor.tenantId||member.account_scope==='accounts'||!['owner','admin'].includes(member.role))return c.json({success:false,error:'統括の閲覧権限が必要です'},403);
+  if(!actor?.tenantId||!member||member.is_active!==1||member.tenant_id!==actor.tenantId||member.account_scope==='accounts'||(!['owner','admin'].includes(member.role)&&!actor.hqRole))return c.json({success:false,error:'統括の閲覧権限が必要です'},403);
   const data=await hqBillingMetrics(c.env.DB,actor.tenantId);
   return data?c.json({success:true,data}):c.json({success:false,error:'統括が見つかりません'},404);
 });
@@ -183,7 +183,7 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
 });
 
 // 即時変更を仮定した参考額だけを取得する。契約・顧客・DBは変更しない。
-hqBilling.get('/api/hq/billing/preview', requireRole('owner'), async (c) => {
+hqBilling.get('/api/hq/billing/preview', requireRole('owner', 'admin'), async (c) => {
   c.header('Cache-Control', 'no-store');
   const plan = findPlan(c.req.query('planKey'));
   const interval = c.req.query('interval');
@@ -237,7 +237,7 @@ hqBilling.get('/api/hq/billing/preview', requireRole('owner'), async (c) => {
 
 // ================================================================ checkout
 
-hqBilling.post('/api/hq/billing/checkout', requireRole('owner'), inputJsonBoundary({ planKey: ['string'], interval: ['string'] }), async (c) => {
+hqBilling.post('/api/hq/billing/checkout', requireRole('owner', 'admin'), inputJsonBoundary({ planKey: ['string'], interval: ['string'] }), async (c) => {
   try {
     const tenantId = tenantOf(c);
     const body = await c.req.json<{ planKey?: string; interval?: unknown } | null>().catch(() => null);

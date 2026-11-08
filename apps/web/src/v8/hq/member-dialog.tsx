@@ -1,6 +1,6 @@
 'use client'
 
-import { canManageRole } from '@/lib/staff-role'
+import { canAdministerRole } from '@/lib/staff-role'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { useContext, useEffect, useId, useState, type ReactNode } from 'react'
@@ -65,10 +65,10 @@ function initial(member: StaffMember | null): MemberDialogValue {
     name: member?.name ?? '',
     email: member?.email ?? '',
     /*
-     * 招待は「閲覧のみ」から始める。広い権限は選んだときだけ渡す。
+     * 統括の招待は承認済みの画面どおり「担当者」から始める。
      * 変更は今の役割のまま（互換経路は担当者を管理者に置き換えていた）。
      */
-    role: member ? (member.role === 'viewer' ? 'viewer' : member.role === 'staff' ? 'staff' : 'admin') : 'viewer',
+    role: member ? (member.role === 'viewer' ? 'viewer' : member.role === 'staff' ? 'staff' : 'admin') : 'staff',
     /* 統括からの新規招待は全体権限。既存メンバーの編集では保存済みの範囲を保つ。 */
     accountScope: member?.accountScope ?? 'all',
     scopedLineAccountIds: member?.scopedLineAccountIds ?? [],
@@ -151,10 +151,9 @@ export default function MemberDialogV8({
 
   /* 絵 ：変更の窓には決まりの注をいつも出す（自分・招待中の人のどちらでも同じ文）。 */
   const note = member ? '自分の役割と状態は変えられません。招待中の人には「招待メールを再送」が出ます。' : ''
-  /* 担当者は今その役割の人にだけ出す（新しく担当者にするには機能ごとの権限が要るので、ログインユーザーの画面で決める）。 */
   const roleOptions = [
-    { value: 'admin', label: '管理者（すべて操作できる）' },
-    ...(member?.role === 'staff' ? [{ value: 'staff', label: '担当者（担当範囲のアカウントだけ）' }] : []),
+    { value: 'admin', label: '管理者（メンバーと決済も管理できる）' },
+    { value: 'staff', label: '担当者（業務を操作できる）' },
     { value: 'viewer', label: '閲覧のみ（見るだけ）' },
   ]
 
@@ -206,7 +205,7 @@ export default function MemberDialogV8({
           </div>
         ) : null}
 
-        <Field label="役割" htmlFor={`${uid}-role`} note={isSelf ? '自分の役割は変えられません' : undefined}>
+        <Field label="役割" required htmlFor={`${uid}-role`} note={isSelf ? '自分の役割は変えられません' : undefined}>
 
           <SaveErrorField names={["role","value.role"]}><Select
             aria-label="役割"
@@ -222,7 +221,7 @@ export default function MemberDialogV8({
 
         <div className={styles.group} role="group" aria-labelledby={`${uid}-scope-label`}>
           <span id={`${uid}-scope-label`} className={styles.label}>担当範囲</span>
-          <p className={styles.note}>{value.accountScope === 'all' ? '統括のすべてのアカウントを見て操作できます。' : 'この権限者は担当するアカウントだけを見て操作できます。'}</p>
+          <p className={styles.note}>{value.role === 'staff' ? '予約・配信などの業務を操作できます。メンバーの追加や決済の変更はできません。' : value.role === 'viewer' ? '統括のすべてのアカウントを閲覧できます。変更はできません。' : '統括のすべてのアカウントで、メンバーや決済を含む管理ができます。'}</p>
           <FieldError id={`${uid}-scope-error`}>{fieldErrors.scope}</FieldError>
         </div>
 
@@ -245,7 +244,7 @@ export default function MemberDialogV8({
 
 const ROLE_WORD: Record<string, string> = { owner: 'オーナー', admin: '管理者', staff: '担当者', viewer: '閲覧のみ' }
 /** 請求の画面を見られるのはオーナーと管理者だけ。 */
-const seesBilling = (role: string) => canManageRole(role)
+const seesBilling = (role: string) => canAdministerRole(role)
 
 /** 板 「権限を変える確認」。変える前に変更前→変更後を並べる。 */
 export function MemberChangeConfirmV8({ member, value, accountNames, busy, error, onCancel, onConfirm }: {

@@ -140,7 +140,7 @@ styles.route('/',styleMeetUpdates);
 styles.get(base + '/starter-items', async (c) => {
   const a = await account(c);
   const staff = c.get('staff');
-  const includeContents = Boolean(staff && !staff.readOnly && ['owner', 'admin'].includes(staff.role));
+  const includeContents = Boolean(staff && !staff.readOnly && (['owner', 'admin'].includes(staff.role) || staff.hqRole === 'operator'));
   const rows = (
     await c.env.DB.prepare(
       'SELECT * FROM style_starter_items WHERE line_account_id=? ORDER BY applied_at,item_key',

@@ -279,8 +279,8 @@ export const get__api_webinars_id_analytics_9 = async (c: Context<Env, "/api/web
   if (!row) return c.json({ success: false, error: 'Not found' }, 404);
   // 個人の視聴履歴(participants)はオーナー・管理者だけ。staff には
   // summary/daily/dropoff などの集計だけ返し、個人配列は取りに行かない。
-  const role = c.get('staff')?.role;
-  const canSeeIndividuals = role === 'owner' || role === 'admin';
+  const staff = c.get('staff');
+  const canSeeIndividuals = staff?.role === 'owner' || staff?.role === 'admin' || staff?.hqRole === 'operator';
   const completionThreshold = Math.max(1, Math.floor(row.duration_seconds * 0.9));
   const [sessions, dropoff, participants, summary, daily, formFunnel, viewSegments, editor, retention, startedViewers, heartbeatRejects, ctas] = await Promise.all([
     getWebinarSessionStats(c.env.DB, id),

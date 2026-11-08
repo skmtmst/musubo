@@ -100,15 +100,15 @@ describe('V8 統括のメンバーの窓', () => {
     expect(screen.getByRole('heading', { name: '二段階認証' })).toBeTruthy()
   })
 
-  it('招待は閲覧のみから始め、範囲の選択は無く全アカウントを付けて送る', async () => {
+  it('招待は担当者から始め、範囲の選択は無く全アカウントを付けて送る', async () => {
     await act(async () => { buttonByText('招待する')!.click() })
     await flush()
     expect(dialogTitles()).toContain('権限者を招待')
     const dialog = document.querySelector('[role="dialog"]')!
     // 範囲の選び直しは無い（統括の招待は全アカウント固定）。
     expect(screen.queryByRole('radio', { name: '指定したアカウントだけ' })).toBeNull()
-    expect(dialog.textContent).toContain('統括のすべてのアカウントを見て操作できます。')
-    expect(dialog.textContent).toContain('閲覧のみ（見るだけ）')
+    expect(dialog.textContent).toContain('予約・配信などの業務を操作できます。メンバーの追加や決済の変更はできません。')
+    expect(dialog.textContent).toContain('担当者（業務を操作できる）')
     const name = screen.getByRole('textbox', { name: '名前' }) as HTMLInputElement
     const email = screen.getByRole('textbox', { name: 'メールアドレス' }) as HTMLInputElement
     await act(async () => { fireEvent.change(name, { target: { value: '新井 一郎' } }) })
@@ -117,7 +117,7 @@ describe('V8 統括のメンバーの窓', () => {
     await flush()
     expect(create).toHaveBeenCalledTimes(1)
     expect(create.mock.calls[0][0]).toEqual(expect.objectContaining({
-      name: '新井 一郎', email: 'arai@example.com', role: 'viewer',
+      name: '新井 一郎', email: 'arai@example.com', role: 'staff',
       accountScope: 'all', scopedLineAccountIds: [], assignedLineAccountId: null,
     }))
   })
@@ -143,7 +143,7 @@ describe('V8 統括のメンバーの窓', () => {
     await act(async () => { buttonByText('権限を変更する')!.click() })
     await flush()
     expect(dialogTitles()).toEqual(['メンバーの権限を変更する'])
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('担当するアカウントだけを見て操作できます。')
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('予約・配信などの業務を操作できます。メンバーの追加や決済の変更はできません。')
     // 担当者のまま。状態だけ無効にする。
     const inactive = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')).find((r) => r.value === 'inactive')!
     await act(async () => { inactive.click() })

@@ -25,7 +25,7 @@ SIDEBAR_FEATURE_BY_HREF,
 SPECIALIZED_FEATURE_KEYS,
 } from '@/lib/feature-settings'
 import { HQ_MENU_SECTIONS,isHqShellPath,menuOwnerForScreen,orderedMenuSections,restaurantMenuSections,type MenuItem,type MenuSection } from '@/lib/menu'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole, canAdministerRole } from '@/lib/staff-role'
 import { useBrand } from '@/lib/use-brand'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -381,13 +381,13 @@ export default function Sidebar({
         // 移行中のV2画面では、承認画像どおり「タグ」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
 
-        if (item.href === '/staff' && !canManageRole(staffReadRole)) return false
+        if (item.href === '/staff' && !canAdministerRole(staffReadRole)) return false
         // N-411: staff 専用項目（自分の勤務）は owner/admin には出さない。
         if (item.staffOnly && staffReadRole !== 'staff') return false
         // 失敗時にも必須ナビは残す。任意機能だけを権限・可視性で絞る。
         // 変えられる権限でも見えるだけ権限でも、メニューには出す（N-424）。
         const permissionKey = item.permissionKey ?? item.href
-        if (staffReadRole === 'staff' && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
+        if (staffReadRole === 'staff' && !canManageRole(staffReadRole) && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
         const gated = featureGateVisibility(item); if (gated !== undefined) return gated
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
         if (!featureKey) return true
