@@ -168,7 +168,7 @@ function CompleteInner() {
       node="x73h3"
       applicationFlow="setup"
       title="利用開始の設定"
-      description={`お申し込みが承認されました。設定を完了すると${check.trialDays}日間無料でmusuboを利用できます。`}
+      description="お申し込みが承認されました。ログイン用アカウントを作成し、料金と無料期間を確認してからLINEを接続します。"
     >
       <div className={styles.approved}>✓ 承認済み　初期設定を完了してください</div>
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
@@ -185,7 +185,7 @@ function CompleteInner() {
         <AuthField label="パスワード（確認）" htmlFor="complete-confirm" error={messages.confirm}>
           <PasswordField id="complete-confirm" value={confirm} onChange={setConfirm} invalid={Boolean(messages.confirm)} autoComplete="new-password" />
         </AuthField>
-        <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="設定しています…">設定を完了してmusuboを始める
+        <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="設定しています…">アカウントを作成する
         </Button>
       </form>
     </AuthCard>

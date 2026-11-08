@@ -84,7 +84,7 @@ export default function RegisterPage() {
     >
       <div className="w-full rounded-control bg-accent-soft px-4 py-3 text-caption text-ink-secondary">
         <strong className="block text-ink">お申し込み後の流れ</strong>
-        内容確認 → 担当者から連絡 → 承認・利用開始（30日間無料）
+        内容確認・担当者から連絡 → 承認 → アカウント作成 → 料金確認・カード登録 → LINE接続から無料期間開始
       </div>
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
