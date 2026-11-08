@@ -40,6 +40,7 @@ describe('有料請求の通知', () => {
       expect(mail.send).toHaveBeenCalledTimes(1);
       expect(mail.send.mock.calls[0]?.[1]).toMatchObject({ to: 'owner@example.test',
         subject: '【musubo】お支払いの確認をお願いします' });
+      expect(mail.send.mock.calls[0]?.[1].body).toContain('/hq/billing/payment-recovery');
 
       expect(await sweepBillingFailureNotices(env, new Date('2026-11-15T04:00:00Z'))).toMatchObject({ checked: 1, failed: 0 });
       expect(await sweepBillingFailureNotices(env, new Date('2026-11-16T03:00:00Z'))).toMatchObject({ checked: 1, failed: 0 });
@@ -60,6 +61,7 @@ describe('有料請求の通知', () => {
       expect(mail.send.mock.calls[3]?.[1]).toMatchObject({
         subject: '【musubo】お支払いを確認しました',
       });
+      expect(mail.send.mock.calls[3]?.[1].body).toContain('/hq/billing/payment-recovery');
       expect(mail.send.mock.calls[3]?.[1].body).toContain('2026年12月9日');
     } finally { fixture.raw.close(); }
   });

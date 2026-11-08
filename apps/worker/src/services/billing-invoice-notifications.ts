@@ -8,12 +8,12 @@ import { sendRecordedNotification } from './recorded-notification-send.js';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 100;
 
-function adminBillingUrl(env: Env['Bindings'], recovery: boolean): string | null {
+function adminBillingUrl(env: Env['Bindings']): string | null {
   const origin = (env.ADMIN_PUBLIC_URL || env.ADMIN_ORIGIN?.split(',')[0] || '').trim();
   try {
     const url = new URL(origin);
     if (url.protocol !== 'https:') return null;
-    url.pathname = recovery ? '/hq/billing/payment-recovery' : '/hq/billing';
+    url.pathname = '/hq/billing/payment-recovery';
     url.search = '';
     url.hash = '';
     return url.toString();
@@ -52,7 +52,7 @@ async function deliverNotice(env: Env['Bindings'], input: {
   graceDeadlineAt: string;
   nextChargeAt?: string | null;
 }): Promise<boolean> {
-  const billingUrl = adminBillingUrl(env, input.event !== 'recovered');
+  const billingUrl = adminBillingUrl(env);
   const recipient = await billingRecipient(env.DB, input.tenantId);
   if (!billingUrl || !recipient) return false;
   const mail = musuboInvoiceMail({
