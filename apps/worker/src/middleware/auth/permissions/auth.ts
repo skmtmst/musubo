@@ -54,6 +54,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/restaurant-test/inventory-rules', '/restaurant-test/inventory'],
   ['/api/restaurant-test/channel-close-tasks', '/restaurant-test/inventory'],
   ['/api/restaurant-test/assignment-settings', 'booking.settings'],
+  ['/api/restaurant-test/table-auto-assignment-settings', 'booking.settings'],
 ];
 
 /** URL 互換性で /api/friends 配下にある別機能を先に解決し、friends 権限だけでチャットや属性へアクセスできないようにする。 */

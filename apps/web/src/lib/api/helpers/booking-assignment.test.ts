@@ -2,6 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bookingAssignmentApi } from './booking-assignment';
 afterEach(() => vi.unstubAllGlobals());
 describe('割り当て設定の画面向けAPI関数', () => {
+  it('自動配席は店舗とアカウントを指定して単一スイッチと版だけ保存する',async()=>{
+    const fetchMock=vi.fn(async()=>Response.json({success:true,data:{enabled:false,version:1}}));vi.stubGlobal('fetch',fetchMock);
+    await bookingAssignmentApi.getTableAutomation('a & b','store/1');
+    await bookingAssignmentApi.saveTableAutomation('a & b','store/1',{enabled:false,expectedVersion:0});
+    const [url,init]=fetchMock.mock.calls[1] as unknown as [string,RequestInit];
+    expect(url).toContain('/table-auto-assignment-settings?account_id=a%20%26%20b&storeId=store%2F1');
+    expect(JSON.parse(init.body as string)).toEqual({enabled:false,expectedVersion:0});
+  });
   it('人と卓の読み取りでアカウント・店舗をエンコードする', async () => {
     const payload = { success: true, data: { storageReady: false, effectiveMethod: 'legacy_first' } };
     const fetchMock = vi.fn(async () => Response.json(payload)); vi.stubGlobal('fetch', fetchMock);

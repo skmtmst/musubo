@@ -32,7 +32,7 @@
   flex-direction: column;
   gap: var(--rs-dlg-body-gap, var(--tpl-rs-dlg-gap));
   width: 100%;
-  margin-top: var(--tpl-rs-dlg-pull);
+  margin-top: var(--rs-dlg-body-offset, var(--tpl-rs-dlg-pull));
 }
 
 /*
@@ -63,6 +63,8 @@
   min-width: 0;
   margin-bottom: calc(var(--rs-dlg-actions-pad-top, var(--tpl-rs-dlg-gap)) - var(--space-8));
 }
+.inlineFooterNote { flex:1; min-width:0; margin-right:auto; color:var(--color-ink-secondary); font-size:var(--text-micro); font-weight:400; }
+@media(max-width:600px) { .inlineFooterNote { flex-basis:100%; } }
 
 .scrollHint {
   flex: 1;

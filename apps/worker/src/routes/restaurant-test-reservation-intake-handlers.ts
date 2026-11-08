@@ -8,6 +8,7 @@ import { publicClosure, closuresForRange, closureAffectsTable, openSeatTables } 
 
 import type { Env } from '../worker-env.js';
 
+import { restaurantSeatCapacity } from '../services/restaurant-seat-capacity.js';
 import { assignRestaurantTable } from '../features/booking/booking-assignment/index.js';
 import { sendRestaurantLineConfirmation, type RestaurantLineNotice } from '../services/restaurant-line-confirmation.js';
 import { promoteSeatWaitlist } from '../services/restaurant-seat-waitlist.js';
@@ -132,26 +133,23 @@ export const post__api_restaurant_test_reservations_manual_3 = async (c: Context
     const blocked = closures.filter(r => checked.value.tableId ? closureAffectsTable(r, checked.value.tableId) : true);
     const open = await openSeatTables(dbFor(c.env, storeId), storeId, checked.value.startsAt, checked.value.endsAt, checked.value.guestCount, true);
     if (blocked.length && (checked.value.tableId || !open.length)) return c.json({ success: false, error: 'closure_conflict', code: 'closure_conflict', reason: '臨時休業・貸切の日時と卓に重なります', data: { closures: blocked.map(publicClosure) }, closures: blocked.map(publicClosure) }, 409);
-    const freeTables = [];
-    for (const row of tables.results) {
-      if (closures.some(r => closureAffectsTable(r, row.id))) continue;
-      if (!await overlappingReservationExists(dbFor(c.env, storeId), storeId, row.id, checked.value.startsAt, checked.value.endsAt)) freeTables.push(row);
-    }
     if(checked.value.tableId&&!open.some(t=>t.id===checked.value.tableId||t.tableIds?.includes(checked.value.tableId!)))return inputError(c,{success:false,error:'卓に入る人数を確認してください'},400,['guestCount','tableId']);
     const candidates=await openSeatTables(dbFor(c.env,storeId),storeId,checked.value.startsAt,checked.value.endsAt,checked.value.guestCount);
-    const tableId=checked.value.tableId || (await assignRestaurantTable(dbFor(c.env,storeId),storeId,checked.value.startsAt,checked.value.guestCount,candidates))?.id;
-    if(!tableId || !candidates.some(t=>t.id===tableId||t.tableIds?.includes(tableId)))return c.json({success:false,code:'availability_conflict',error:'人数が入る空き卓がありません'},409);
+    const capacity=await restaurantSeatCapacity(dbFor(c.env,storeId),storeId,checked.value.startsAt,checked.value.endsAt);
+    const selected=capacity.select({startsAt:checked.value.startsAt,endsAt:checked.value.endsAt,guestCount:checked.value.guestCount,tableId:checked.value.tableId});
+    const tableId=checked.value.tableId || (capacity.settings.enabled?(selected?.id??null):null);
+    if(!selected || !candidates.some(t=>t.id===selected.id||t.tableIds?.includes(selected.id)))return c.json({success:false,code:'availability_conflict',error:'人数が入る空き卓がありません'},409);
     if (tableId && await overlappingReservationExists(dbFor(c.env, storeId), storeId, tableId, checked.value.startsAt, checked.value.endsAt, undefined, c.env)) {
       return c.json({ success: false, error: '同じ卓に重なる時間の予約があるため登録できません' }, 409);
     }
     const id = crypto.randomUUID();
-    await dbFor(c.env, storeId).prepare(`INSERT INTO rt_reservations
+    await capacity.commit([dbFor(c.env, storeId).prepare(`INSERT INTO rt_reservations
       (id, store_id, source, external_id, customer_name, customer_phone, line_uid, guest_count, starts_at, ends_at, table_id, course_id, status, allergy_note, note)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
         id, storeId, body.source === 'phone' ? 'phone' : 'manual', checked.value.externalId, checked.value.customerName, checked.value.customerPhone,
         checked.value.lineUid, checked.value.guestCount, checked.value.startsAt, checked.value.endsAt,
         tableId, checked.value.courseId, checked.value.status, checked.value.allergyNote, checked.value.note,
-      ).run();
+      )]);
     if (reservationSlotActive(checked.value.status)) {
       await adjustInventoryReservedCount(dbFor(c.env, storeId), storeId, checked.value.startsAt, checked.value.guestCount);
     }
@@ -207,21 +205,18 @@ export const post__api_restaurant_test_reservations_walk_in_4 = async (c: Contex
     const blocked = closures.filter(r => checked.value.tableId ? closureAffectsTable(r, checked.value.tableId) : true);
     const open = await openSeatTables(dbFor(c.env, storeId), storeId, checked.value.startsAt, checked.value.endsAt, checked.value.guestCount, true);
     if (blocked.length && (checked.value.tableId || !open.length)) return c.json({ success: false, error: 'closure_conflict', code: 'closure_conflict', reason: '臨時休業・貸切の日時と卓に重なります', data: { closures: blocked.map(publicClosure) }, closures: blocked.map(publicClosure) }, 409);
-    const freeTables = [];
-    for (const row of tables.results) {
-      if (closures.some(r => closureAffectsTable(r, row.id))) continue;
-      if (!await overlappingReservationExists(dbFor(c.env, storeId), storeId, row.id, checked.value.startsAt, checked.value.endsAt)) freeTables.push(row);
-    }
     if(checked.value.tableId&&!open.some(t=>t.id===checked.value.tableId||t.tableIds?.includes(checked.value.tableId!)))return inputError(c,{success:false,error:'卓に入る人数を確認してください'},400,['guestCount','tableId']);
     const candidates=await openSeatTables(dbFor(c.env,storeId),storeId,checked.value.startsAt,checked.value.endsAt,checked.value.guestCount);
-    const tableId=checked.value.tableId || (await assignRestaurantTable(dbFor(c.env,storeId),storeId,checked.value.startsAt,checked.value.guestCount,candidates))?.id;
-    if(!tableId || !candidates.some(t=>t.id===tableId||t.tableIds?.includes(tableId)))return c.json({success:false,code:'availability_conflict',error:'人数が入る空き卓がありません'},409);
+    const capacity=await restaurantSeatCapacity(dbFor(c.env,storeId),storeId,checked.value.startsAt,checked.value.endsAt);
+    const selected=capacity.select({startsAt:checked.value.startsAt,endsAt:checked.value.endsAt,guestCount:checked.value.guestCount,tableId:checked.value.tableId});
+    const tableId=checked.value.tableId || (capacity.settings.enabled?(selected?.id??null):null);
+    if(!selected || !candidates.some(t=>t.id===selected.id||t.tableIds?.includes(selected.id)))return c.json({success:false,code:'availability_conflict',error:'人数が入る空き卓がありません'},409);
     if (tableId && await overlappingReservationExists(dbFor(c.env, storeId), storeId, tableId, checked.value.startsAt, checked.value.endsAt, undefined, c.env)) {
       return c.json({ success: false, error: '同じ卓に重なる時間の予約があるため登録できません' }, 409);
     }
     const id = crypto.randomUUID();
     const db = dbFor(c.env, storeId);
-    await db.batch([
+    await capacity.commit([
       db.prepare(`INSERT INTO rt_reservations
         (id, store_id, source, external_id, customer_name, customer_phone, line_uid, guest_count, starts_at, ends_at, table_id, course_id, status, allergy_note, note)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
@@ -372,6 +367,8 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
     return c.json({ success: false, error: '同じ卓に重なる時間の予約があるため変更できません' }, 409);
   }
   const db = dbFor(c.env, current.store_id);
+  const capacity = changesSlot && reservationSlotActive(next.status) ? await restaurantSeatCapacity(db,current.store_id,next.starts_at,next.ends_at,current.id) : null;
+  if(capacity && !capacity.select({startsAt:next.starts_at,endsAt:next.ends_at,guestCount:next.guest_count,tableId:next.table_id}))return c.json({success:false,code:'availability_conflict',error:'未配席の予約を含め、人数が入る空き卓がありません'},409);
   const update = db.prepare(`UPDATE rt_reservations SET
     customer_name = ?, customer_phone = ?, guest_count = ?, starts_at = ?, ends_at = ?,
     table_id = ?, course_id = ?, status = ?, allergy_note = ?, note = ?, cancel_reason = ?, customer_version=customer_version+1, updated_at = datetime('now')
@@ -386,7 +383,8 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
       new Date().toISOString(), c.get('staff')?.id ?? null, crypto.randomUUID(), current.customer_version + 1, current.id, current.status === 'no_show' ? 'no_show' : 'visited',
     ));
   }
-  const [savedUpdate] = await db.batch(statements);
+  const results = await (capacity?.commit ?? db.batch.bind(db))(statements);
+  const savedUpdate=results[capacity?1:0];
   if (!savedUpdate.meta.changes) return c.json({success:false,error:"ほかの人が変更しました。最新を読み込んでください",code:"version_conflict"},409);
   await applyReservationInventoryChange(
     dbFor(c.env, current.store_id), current.store_id,

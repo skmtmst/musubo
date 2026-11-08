@@ -3093,15 +3093,15 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     const month = query.get('month')
     return { success: true, data: RESTAURANT_CLOSURES.filter((c) => !month || (c.startDate.slice(0, 7) <= month && c.endDate.slice(0, 7) >= month)) }
   }
-  if (method === 'GET' && pathname === '/api/restaurant-test/opening-hours') {
-    return { success: true, data: RESTAURANT_OPENING_HOURS }
-  }
+  const restaurantSettings = method === 'GET' ? {
+    '/api/restaurant-test/opening-hours': RESTAURANT_OPENING_HOURS,
+    '/api/restaurant-test/close-notification-settings': { ...RESTAURANT_CLOSE_NOTIFICATION, storeId: query.get('storeId') || 'store-sby' },
+    '/api/restaurant-test/table-auto-assignment-settings': { enabled: true, version: 0 },
+  } : null
+  if (restaurantSettings && Object.hasOwn(restaurantSettings, pathname)) return { success: true, data: restaurantSettings[pathname] }
   {
     const contact = method === 'GET' ? /^\/api\/restaurant-test\/closures\/([^/]+)\/contact-status$/.exec(pathname) : null
     if (contact) return { success: true, data: restaurantClosureContact(contact[1]) }
-  }
-  if (method === 'GET' && pathname === '/api/restaurant-test/close-notification-settings') {
-    return { success: true, data: { ...RESTAURANT_CLOSE_NOTIFICATION, storeId: query.get('storeId') || 'store-sby' } }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/channels') {
     return { success: true, data: RESTAURANT_CHANNELS }

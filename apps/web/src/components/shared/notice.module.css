@@ -18,6 +18,10 @@
   line-height: var(--tpl-ro-band-lh);
 }
 .notice[hidden] { display: none; }
+.notice[data-appearance='caution'] { border:0; border-radius:var(--space-8); box-shadow:none; background:var(--color-caution-band); color:var(--color-warning); padding:var(--space-12); font-size:13px; font-weight:400; line-height:1.6; }
+.notice[data-appearance='caution'] .content { align-items:flex-start; gap:var(--space-8); }
+.notice[data-appearance='caution'] .subtleIcon { color:inherit; }
+:root .notice[data-appearance='caution'] { margin-block:0; }
 .content { display: flex; align-items: baseline; gap: var(--polish-space-field); min-width: 0; flex: 1; min-height: calc((var(--tpl-ro-band-lh) + var(--space-8)) / 2); }
 /* 点と札に必要な最小の高さだけ確保し、本文を下へ押さない。 */
 .content:has([data-notice-status-word]) { min-height: var(--tpl-ro-band-lh); }

@@ -34,6 +34,9 @@
 html:root aside.surface[data-detail-layout='detail'] { padding: 0; }
 
 .previewTitleRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-8); min-width: 0; }
+.previewTitleGroup { display: flex; align-items: center; gap: var(--space-12); min-width: 0; }
+.previewTitleGroup > * { flex: none; }
+.previewTitleRow:has(.previewTitleGroup) { flex-wrap: wrap; }
 
 .note { color: var(--color-ink-secondary); font-size: var(--detail-label-size); }
 

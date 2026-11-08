@@ -46,6 +46,7 @@ function isCoveredRoute(method: string, path: string): boolean {
   if (path.startsWith('/api/restaurant-test') && ![
     '/api/restaurant-test/menus/:id/payment',
     '/api/restaurant-test/assignment-settings',
+    '/api/restaurant-test/table-auto-assignment-settings',
     '/api/restaurant-test/store-groups', '/api/restaurant-test/store-groups/:id/members/:storeId', '/api/restaurant-test/stores/:id/referral-location',
     '/api/restaurant-test/closures', '/api/restaurant-test/closures/preview', '/api/restaurant-test/closures/:id',
     '/api/restaurant-test/availability', '/api/restaurant-test/google/hours/from-closure',
@@ -440,6 +441,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/booking/admin/assignment-settings',
   'GET /api/restaurant-test/assignment-settings',
   'PUT /api/restaurant-test/assignment-settings',
+  'GET /api/restaurant-test/table-auto-assignment-settings',
+  'PUT /api/restaurant-test/table-auto-assignment-settings',
   'GET /api/hq/templates/media',
   'GET /api/hq/templates/resources',
   'GET /api/hq/templates/{id}/distribution-targets',

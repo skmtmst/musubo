@@ -1,7 +1,7 @@
 'use client'
 
 import { Children, Fragment, cloneElement, isValidElement, useCallback, useEffect, useState, type ComponentPropsWithRef, type HTMLAttributes, type ReactNode } from 'react'
-import { Check, Info, X } from 'lucide-react'
+import { Check, Info, TriangleAlert, X } from 'lucide-react'
 import HelpTip from './help-tip'
 import './notice-tokens.css'
 import styles from './notice.module.css'
@@ -81,7 +81,7 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   /** カード内などの小さな帯。案内・成功の本文は1行に省略し、title で全文を渡す。警告・危険は折り返す。 */
   compact?: boolean
   /** 枠線のない注意帯を描く板だけで指定する。既定の帯は変えない。 */
-  appearance?: 'soft' | 'subtle'
+  appearance?: 'soft' | 'subtle' | 'caution'
   /** 本文（1〜2文）。`children` があるときはそちらが勝つ。 */
   message?: string
   children?: ReactNode
@@ -146,7 +146,7 @@ export default function Notice({
   void marker
   const canonical = tone
   const body = typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))
-  const word = statusWord === false ? undefined : STATUS_WORD_BY_TONE[canonical]
+  const word = statusWord === false || appearance === 'caution' ? undefined : STATUS_WORD_BY_TONE[canonical]
   const lead = heading ? heading : body
   // 呼び出し側がもう同じ言葉で書き出している時（「失敗した処理が…」など）は重ねない。
   const prefix = word && !leadingText(lead).startsWith(word)
@@ -180,7 +180,7 @@ export default function Notice({
       data-design-node={props['data-design-node'] ?? node}
     >
       <div className={styles.content}>
-        <span className={appearance === 'subtle' ? styles.subtleIcon : styles.dotLine} aria-hidden="true">{appearance === 'subtle' ? <Info size={16}/> : <span className={styles.dot} data-notice-dot aria-hidden="true" />}</span>
+        <span className={appearance === 'subtle' || appearance === 'caution' ? styles.subtleIcon : styles.dotLine} aria-hidden="true">{appearance === 'caution' ? <TriangleAlert size={16}/> : appearance === 'subtle' ? <Info size={16}/> : <span className={styles.dot} data-notice-dot aria-hidden="true" />}</span>
         <div className={styles.message} data-notice-message>
           {heading ? <><div className={styles.headingRow}><div className={styles.heading} data-notice-heading>{labeledLead}</div>{hasHelp ? helpTip : null}</div><div className={styles.description}>{body}</div></>
             : <>{labeledLead}</>}

@@ -10,11 +10,12 @@ export type OperationAccountTarget = { id: string; name?: string | null; label?:
 export type OperationStoreTarget = { id: string; name?: string | null }
 
 /** 操作先を呼び出し側から受け取り、現在選択中の別の対象で穴埋めしない。 */
-export default function OperationTargetSummary({ accounts, allAccounts = false, showAccountCount = false, compactAccounts = false, store, externalTarget }: {
+export default function OperationTargetSummary({ accounts, allAccounts = false, showAccountCount = false, compactAccounts = false, showEnvironment = true, store, externalTarget }: {
   accounts: OperationAccountTarget[]
   allAccounts?: boolean
   showAccountCount?: boolean
   compactAccounts?: boolean
+  showEnvironment?: boolean
   store?: OperationStoreTarget
   externalTarget?: { label: string; name?: string | null }
 }) {
@@ -42,6 +43,6 @@ export default function OperationTargetSummary({ accounts, allAccounts = false, 
     </div>})}
     {store ? <div><dt>店舗</dt><dd><span className="block min-w-0 truncate" title={store.name?.trim() ? `${store.name}（${store.id}）` : store.id}>{store.name?.trim() || '名前を確認できません'}</span></dd></div> : null}
     {externalTarget ? <div><dt>{externalTarget.label}</dt><dd><span className="block min-w-0 truncate" title={externalTarget.name?.trim() || undefined}>{externalTarget.name?.trim() || '名前を確認できません'}</span></dd></div> : null}
-    <div><dt>環境</dt><dd><span className="block min-w-0 truncate" title={environment}>{environment}</span></dd></div>
+    {showEnvironment ? <div><dt>環境</dt><dd><span className="block min-w-0 truncate" title={environment}>{environment}</span></dd></div> : null}
   </DetailFields></DetailSection></DetailContent>
 }

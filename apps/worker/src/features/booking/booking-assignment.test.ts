@@ -57,28 +57,28 @@ describe('実績を読み直す割り当て', () => {
     booking('limit', 's1');
     expect(await assignBookingStaff(f.db, 'a', start, 'Asia/Tokyo', ['s1', 's2'])).toBe('s2');
   });
-  it('卓は結合対応表で数え、確定済みの小卓が多くても大卓より先に選ぶ', async () => {
+  it('卓は過去の件数に左右されず、最小の空き候補から固定順で選ぶ', async () => {
     seat('r1', 't1');
-    expect((await assignRestaurantTable(f.db, 'store', start, 2, [...tables, { id: 'big', label: '大', minCapacity: 1, maxCapacity: 6 }], { random: seededAssignmentRandom(7) }))?.id).toBe('t2');
+    expect((await assignRestaurantTable(f.db, 'store', start, 2, [...tables, { id: 'big', label: '大', minCapacity: 1, maxCapacity: 6 }], { random: seededAssignmentRandom(7) }))?.id).toBe('t1');
     expect((await assignRestaurantTable(f.db, 'store', start, 2, [tables[0], { id: 'big', label: '大', minCapacity: 1, maxCapacity: 6 }]))?.id).toBe('t1');
   });
-  it('来店・退店後の実績は残り、期限切れの仮押さえは数えない', async () => {
+  it('卓の過去の予約件数で選び方を変えない', async () => {
     seat('visited', 't1', 'visited', "INSERT INTO rt_seat_visit_marks(id,reservation_id,store_id,kind,marked_at) VALUES('mark','visited','store','visited','2030-01-08T01:00:00Z'); UPDATE rt_reservations SET departed_at=ends_at WHERE id='visited'");
     seat('expired', 't2', 'pending', "UPDATE rt_reservations SET hold_expires_at='2000-01-01T00:00:00Z' WHERE id='expired'");
-    expect((await assignRestaurantTable(f.db, 'store', start, 2, tables))?.id).toBe('t2');
+    expect((await assignRestaurantTable(f.db, 'store', start, 2, tables))?.id).toBe('t1');
   });
-  it('結合卓の一方の上限で結合組全体を除外する', async () => {
+  it('廃止した卓ごとの日別上限を自動配席へ残さない', async () => {
     seat('r1', 't2');
     await d1AssignmentSettingsStore(f.db).save({ kind: 'table', id: 'store' }, { method: 'balanced', balancePeriod: 'day', expectedVersion: 0,
       resources: [{ resourceId: 't2', priority: 'normal', dailyLimit: 1, sortOrder: 0 }] });
-    expect(await assignRestaurantTable(f.db, 'store', start, 4, [{ ...tables[0], tableIds: ['t1', 't2'], maxCapacity: 4 }])).toBeNull();
+    expect((await assignRestaurantTable(f.db, 'store', start, 4, [{ ...tables[0], tableIds: ['t1', 't2'], maxCapacity: 4 }]))?.tableIds).toEqual(['t1','t2']);
   });
-  it('空き待ちの自動案内でも先着の組を保ち、同じ大きさの卓は設定で選ぶ', async () => {
+  it('空き待ちは先着順を保ち、廃止した優先度で順番を変えない', async () => {
     await d1AssignmentSettingsStore(f.db).save({ kind: 'table', id: 'store' }, { method: 'priority', balancePeriod: 'day', expectedVersion: 0,
       resources: [{ resourceId: 't2', priority: 'preferred', dailyLimit: null, sortOrder: 0 }] });
     f.raw.prepare(`INSERT INTO rt_seat_waitlist(id,store_id,starts_at,ends_at,guest_count,customer_name,identity_key)
       VALUES('waiting','store',?,datetime(?,'+30 minutes'),2,'先頭の組','name:first')`).run(start,start);
-    expect(await promoteSeatWaitlist(f.db, {storeId:'store',startsAt:start,tableId:'t1'})).toMatchObject({promoted:true,entry:{id:'waiting',table_id:'t2'}});
+    expect(await promoteSeatWaitlist(f.db, {storeId:'store',startsAt:start,tableId:'t1'})).toMatchObject({promoted:true,entry:{id:'waiting',table_id:'t1'}});
   });
   it('日・週の境界を店舗時間で決め、夏時間の23時間の日も正しく数える', () => {
     const w = assignmentWindows('2030-01-07T15:01:00Z', 'Asia/Tokyo', 'week');

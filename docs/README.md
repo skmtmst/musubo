@@ -465,6 +465,7 @@
 ## 反映履歴
 
 - [メンバー招待メールのデザイン更新](release-log/unreleased/25-masato-staff-invite-email.md) — 反映履歴、確認 2026-11-08。
+- [自動配席の設定を簡素化](release-log/unreleased/26-masato-simple-table-assignment.md) — 反映履歴、確認 2026-11-08。
 - [統括メンバーの3役割](release-log/unreleased/27-masato-hq-three-roles.md) — 管理者・担当者・閲覧のみの画面と権限制御、確認 2026-11-08。
 - [新リポジトリへの検証配備切り替え前の安全確認](release-log/unreleased/9-masato-staging-cutover-gate.md) — 反映履歴、確認 2026-11-06。
 - [DB復旧workflowの安全条件を確かめる試験](release-log/unreleased/10-masato-recovery-workflow-test.md) — 反映履歴、確認 2026-11-06。
@@ -1181,5 +1182,6 @@
 - [本番候補の検証配備証拠の確認方法](release-log/unreleased/2093-masato-production-staging-proof.md) — 反映履歴、確認 2026-11-05。
 - [座席図の表示を最新Penに合わせる](release-log/unreleased/2098-masato-table-pen-visual.md) — 卓マーク、選択枠、保存表示の修正履歴。確認 2026-11-06。
 - [卓の追加・削除を座席図へ即時反映する](release-log/unreleased/21-masato-table-immediate-sync.md) — 未保存の配置を残して一覧と座席図を同期する修正履歴。確認 2026-11-07。
+- [卓の削除確認の環境表示を省く](release-log/unreleased/24-masato-table-delete-context.md) — 削除対象の確認に必要な項目を残す修正履歴。確認 2026-11-08。
 - [旧配備経路の停止確認](release-log/unreleased/20-masato-staging-cutover-gate.md) — 検証配備の切り替え前に行う確認の反映履歴。確認 2026-11-07。
 - [公開中の検証版の履歴を新リポジトリへ取り込む](release-log/unreleased/22-masato-published-history-sync.md) — 検証配備の巻き戻しを防ぐための履歴取り込み。確認 2026-11-07。
