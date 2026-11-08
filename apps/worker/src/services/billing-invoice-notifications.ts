@@ -22,10 +22,10 @@ function adminBillingUrl(env: Env['Bindings'], recovery: boolean): string | null
 
 async function billingRecipient(db: D1Database, tenantId: string): Promise<string | null> {
   const row = await db.prepare(`SELECT
-    COALESCE(NULLIF(t.contact_email,''),
-      (SELECT a.email FROM registration_applications a
+    COALESCE(NULLIF(trim(t.contact_email),''),
+      (SELECT NULLIF(trim(a.email),'') FROM registration_applications a
         WHERE a.tenant_id=t.id AND a.status='activated' ORDER BY a.created_at DESC LIMIT 1),
-      (SELECT sm.email FROM staff_members sm
+      (SELECT NULLIF(trim(sm.email),'') FROM staff_members sm
         WHERE sm.tenant_id=t.id AND sm.role='owner' AND sm.is_active=1
         AND sm.email IS NOT NULL ORDER BY sm.created_at ASC LIMIT 1)) AS email
     FROM tenants t WHERE t.id=?`)

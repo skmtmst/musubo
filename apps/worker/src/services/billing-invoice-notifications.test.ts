@@ -25,6 +25,7 @@ describe('有料請求の通知', () => {
         (id,name,email,role,api_key,tenant_id,is_active)
         VALUES ('notice_owner','Owner','owner@example.test','owner','key',?,1)`)
         .run(DEFAULT_TENANT_ID);
+      fixture.raw.prepare("UPDATE tenants SET contact_email='   ' WHERE id=?").run(DEFAULT_TENANT_ID);
       fixture.raw.prepare(`INSERT INTO billing_invoices
         (id,tenant_id,subscription_id,status,amount_due,amount_paid,currency,synced_at,created_at)
         VALUES ('in_notice',?,'sub_notice','open',5900,0,'jpy','2026-11-09T03:00:00Z','2026-11-08T03:00:00Z')`)
