@@ -57,4 +57,10 @@ describe('決済失敗と回復の画面', () => {
     expect(host.textContent).toContain('日割り額が変わるため、最新の料金に再同意')
     expect(host.textContent).toContain('料金を再確認する')
   })
+
+  it('決済成功日時が未反映の間に猶予期限を支払日として表示しない', async () => {
+    await act(async () => { renderView({ ...invoice, state: 'recovered' }) })
+    expect(host.textContent).toContain('お支払い確認日確認中')
+    expect(host.textContent).not.toContain('2026年12月15日 10:00')
+  })
 })

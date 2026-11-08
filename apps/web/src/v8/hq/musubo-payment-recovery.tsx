@@ -157,7 +157,9 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
           <span className={success ? styles.amountSuccess : styles.amountWarning}>{amountBadge}</span></div>
         <dl className={styles.details}>
           {invoice ? <><div><dt>請求日</dt><dd>{date(view.invoiceDate)}</dd></div>
-            <div><dt>{success ? 'お支払い確認日' : 'お支払い期限'}</dt><dd>{date(success ? view.paidAt ?? view.graceDeadline : view.graceDeadline, true)}</dd></div>
+            <div><dt>{success ? 'お支払い確認日' : 'お支払い期限'}</dt><dd>{success
+              ? view.paidAt ? date(view.paidAt, true) : '確認中'
+              : date(view.graceDeadline, true)}</dd></div>
             <div><dt>{success ? '次回請求予定' : processing ? '決済状況' : suspended ? '現在の利用状態' : '次回の自動再請求'}</dt>
               <dd>{success ? view.nextChargeAt ? date(view.nextChargeAt) : '確認中'
                 : processing ? '結果の反映待ち' : suspended ? '一時停止中'
