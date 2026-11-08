@@ -42,7 +42,7 @@ export default function CardRegistration({ returnState = null, onContinue, onBac
     setState('checking')
     setActionError('')
     try {
-      const result = await api.hqBilling.cardStatus()
+      const result = await api.hqBilling.cardStatus({ cache: 'reload' })
       if (!result.success) throw new Error(result.error)
       setState(result.data.registered ? 'registered' : 'unregistered')
     } catch {
@@ -55,7 +55,7 @@ export default function CardRegistration({ returnState = null, onContinue, onBac
     let timer: ReturnType<typeof setTimeout> | undefined
     const check = async (attempt: number) => {
       try {
-        const result = await api.hqBilling.cardStatus()
+        const result = await api.hqBilling.cardStatus({ cache: 'reload' })
         if (disposed) return
         if (!result.success) throw new Error(result.error)
         if (result.data.registered) {

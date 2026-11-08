@@ -53,6 +53,7 @@ describe('Stripeカード登録からLINE接続へ', () => {
     const next = vi.fn()
     await act(async () => { root.render(<CardRegistration returnState="success" onContinue={next} />) })
     expect(calls.cardStatus).toHaveBeenCalledOnce()
+    expect(calls.cardStatus).toHaveBeenCalledWith({ cache: 'reload' })
     expect(host.textContent).toContain('カードの登録が完了しました')
     const button = [...host.querySelectorAll('button')].find((element) => element.textContent?.includes('LINEアカウントの接続へ'))!
     await act(async () => { button.click() })
