@@ -254,6 +254,18 @@ describe('請求前のカード登録', () => {
     expect(tenantRow()).toMatchObject({ plan_status: 'trialing', trial_ends_at: null, stripe_subscription_id: null, stripe_customer_id: 'cus_setup' });
   });
 
+  it('同時に別画面がStripe顧客を確定した場合は、その顧客でカード登録する', async () => {
+    stripe.createCustomer.mockImplementationOnce(async () => {
+      setTenant({ stripe_customer_id: 'cus_winner' });
+      return { id: 'cus_loser', email: null, name: null };
+    });
+    const res = await call('POST', '/api/hq/billing/card-setup');
+    expect(res.status).toBe(200);
+    expect(stripe.createCardSetupSession).toHaveBeenCalledWith(expect.anything(),
+      expect.objectContaining({ customerId: 'cus_winner' }));
+    expect(tenantRow().stripe_customer_id).toBe('cus_winner');
+  });
+
   it('カード状態はStripeの既定支払い方法の有無だけ返す', async () => {
     setTenant({ stripe_customer_id: 'cus_setup' });
     stripe.retrieveCustomer.mockResolvedValue({ id: 'cus_setup', invoice_settings: { default_payment_method: 'pm_test' } });

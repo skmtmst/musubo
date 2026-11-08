@@ -75,6 +75,23 @@ function stripeReady(c: Context<Env>): boolean {
   return Boolean(c.env.STRIPE_SECRET_KEY);
 }
 
+/** Concurrent card/checkout requests must both use the customer that won the DB claim. */
+async function stripeCustomerForTenant(c: Context<Env>, billing: TenantBilling): Promise<string> {
+  if (billing.stripe_customer_id) return billing.stripe_customer_id;
+  const staff = c.get('staff');
+  const member = staff?.id ? await getStaffById(c.env.DB, staff.id).catch(() => null) : null;
+  const customer = await stripeApi.createCustomer(c.env, {
+    name: billing.name, email: member?.email ?? null, tenantId: billing.id,
+  });
+  const claim = prepareTenantBillingUpdate(c.env.DB, billing.id, { stripe_customer_id: customer.id },
+    { sql: 'stripe_customer_id IS NULL', values: [] });
+  if (!claim) throw new Error('Stripe customer claim could not be prepared');
+  await claim.run();
+  const current = await getTenantBilling(c.env.DB, billing.id);
+  if (!current?.stripe_customer_id) throw new Error('Stripe customer claim could not be confirmed');
+  return current.stripe_customer_id;
+}
+
 function periodEndIso(subscription: Pick<StripeSubscription, 'current_period_end' | 'items'>): string | null {
   const periodEnd = subscription.current_period_end ?? subscription.items?.data?.[0]?.current_period_end;
   return periodEnd ? new Date(periodEnd * 1000).toISOString() : null;
@@ -272,14 +289,7 @@ hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inpu
     if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
     if (billing.plan_status === 'exempt') return c.json({ success: false, error: 'この統括はカード登録の対象外です' }, 409);
 
-    let customerId = billing.stripe_customer_id;
-    if (!customerId) {
-      const staff = c.get('staff');
-      const member = staff?.id ? await getStaffById(c.env.DB, staff.id).catch(() => null) : null;
-      const customer = await stripeApi.createCustomer(c.env, { name: billing.name, email: member?.email ?? null, tenantId });
-      customerId = customer.id;
-      await updateTenantBilling(c.env.DB, tenantId, { stripe_customer_id: customerId });
-    }
+    const customerId = await stripeCustomerForTenant(c, billing);
     const session = await stripeApi.createCardSetupSession(c.env, {
       customerId, tenantId,
       successUrl: `${origin}/hq/onboarding/card?setup=success`,
@@ -332,14 +342,7 @@ hqBilling.post('/api/hq/billing/checkout', requireRole('owner', 'admin'), inputJ
       return c.json({ success: false, error: 'すでに契約中です。プランの変更や解約は「支払い方法を管理」から行ってください' }, 409);
     }
 
-    let customerId = billing.stripe_customer_id;
-    if (!customerId) {
-      const staff = c.get('staff');
-      const member = staff?.id ? await getStaffById(c.env.DB, staff.id).catch(() => null) : null;
-      const customer = await stripeApi.createCustomer(c.env, { name: billing.name, email: member?.email ?? null, tenantId });
-      customerId = customer.id;
-      await updateTenantBilling(c.env.DB, tenantId, { stripe_customer_id: customerId });
-    }
+    const customerId = await stripeCustomerForTenant(c, billing);
 
     const session = await stripeApi.createCheckoutSession(c.env, {
       customerId,
