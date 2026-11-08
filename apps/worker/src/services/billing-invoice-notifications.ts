@@ -22,16 +22,19 @@ function adminBillingUrl(env: Env['Bindings'], recovery: boolean): string | null
 
 async function billingRecipient(db: D1Database, tenantId: string): Promise<string | null> {
   const row = await db.prepare(`SELECT
-    COALESCE(NULLIF(trim(t.contact_email),''),
-      (SELECT NULLIF(trim(a.email),'') FROM registration_applications a
-        WHERE a.tenant_id=t.id AND a.status='activated' ORDER BY a.created_at DESC LIMIT 1),
-      (SELECT NULLIF(trim(sm.email),'') FROM staff_members sm
-        WHERE sm.tenant_id=t.id AND sm.role='owner' AND sm.is_active=1
-        AND sm.email IS NOT NULL ORDER BY sm.created_at ASC LIMIT 1)) AS email
+    t.contact_email AS contact_email,
+    (SELECT a.email FROM registration_applications a
+      WHERE a.tenant_id=t.id AND a.status='activated' ORDER BY a.created_at DESC LIMIT 1) AS application_email,
+    (SELECT sm.email FROM staff_members sm
+      WHERE sm.tenant_id=t.id AND sm.role='owner' AND sm.is_active=1
+      AND sm.email IS NOT NULL ORDER BY sm.created_at ASC LIMIT 1) AS owner_email
     FROM tenants t WHERE t.id=?`)
-    .bind(tenantId).first<{ email: string | null }>();
-  const email = row?.email?.trim() ?? '';
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
+    .bind(tenantId).first<{ contact_email: string | null; application_email: string | null; owner_email: string | null }>();
+  for (const candidate of [row?.contact_email, row?.application_email, row?.owner_email]) {
+    const email = candidate?.trim() ?? '';
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return email;
+  }
+  return null;
 }
 
 export function billingFailureNoticePhase(failure: BillingPaymentFailure, now: Date): MusuboInvoiceMailEvent {
