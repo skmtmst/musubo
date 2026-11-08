@@ -58,4 +58,13 @@ describe('運営が承認時に選ぶ利用条件', () => {
     expect(lineBasicDiscountForDate(applied, '2027-01-31')).toBe(50);
     expect(lineBasicDiscountForDate(applied, '2027-02-01')).toBe(0);
   });
+
+  it('割引終了後に古い特別条件を承認しない', () => {
+    expect(() => applyMusuboConditionAtApproval({ ...special, discountEndsOn: '2026-11-07' }, {
+      companyName: special.allowedCompanyName!, approvedAt: '2026-11-08',
+    })).toThrow(/discount has already ended/);
+    expect(() => applyMusuboConditionAtApproval({ ...special, discountEndsOn: '2026-11-08' }, {
+      companyName: special.allowedCompanyName!, approvedAt: '2026-11-08',
+    })).not.toThrow();
+  });
 });

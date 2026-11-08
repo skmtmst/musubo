@@ -90,6 +90,9 @@ export function applyMusuboConditionAtApproval(definition: MusuboConditionDefini
   if (definition.approvalUseUntil !== null && approvedAt > definition.approvalUseUntil) {
     throw new RangeError('Condition approval deadline has passed');
   }
+  if (definition.lineBasicDiscountPercent > 0 && definition.discountEndsOn !== null && approvedAt > definition.discountEndsOn) {
+    throw new RangeError('LINE basic discount has already ended before approval');
+  }
   if (definition.allowedCompanyName !== null
     && normalizedCompanyName(input.companyName) !== normalizedCompanyName(definition.allowedCompanyName)) {
     throw new RangeError('Condition is restricted to another company');
