@@ -6,7 +6,8 @@ export interface MusuboLinkedAdditionInput {
   before: LinkedAccountCounts;
   service: MusuboLinkedService;
   slotUnitYen: number;
-  billing: { kind: 'trialing' } | { kind: 'paid'; daysRemaining: number; daysInPeriod: number };
+  /** Additional linked slots bill monthly, including when LINE base fees bill annually. */
+  billing: { kind: 'trialing' } | { kind: 'paid'; monthlyDaysRemaining: number; monthlyDaysInPeriod: number };
 }
 
 export interface MusuboLinkedAdditionPrice {
@@ -38,7 +39,7 @@ export function musuboLinkedAdditionPrice(input: MusuboLinkedAdditionInput): Mus
   }
   const dueNowYen = input.billing.kind === 'trialing' ? 0
     : input.billing.kind === 'paid'
-      ? prorateMonthlyIncrement(monthlyIncreaseYen, input.billing.daysRemaining, input.billing.daysInPeriod)
+      ? prorateMonthlyIncrement(monthlyIncreaseYen, input.billing.monthlyDaysRemaining, input.billing.monthlyDaysInPeriod)
       : (() => { throw new RangeError('Invalid billing phase'); })();
   return { before: { ...input.before }, after, slotsBefore, slotsAfter, addedSlots,
     monthlyIncreaseYen, monthlySlotsAfterYen, dueNowYen };

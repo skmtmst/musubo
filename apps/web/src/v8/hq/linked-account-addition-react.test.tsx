@@ -22,7 +22,7 @@ const base = { lineName: '青山店LINE', slotUnitYen: 3_300, onContinue, onBack
 describe('追加連携枠の確認', () => {
   it('多いほうの連携数が増えたときだけ日割り額を表示し、同意後に進む', async () => {
     await act(async () => { root.render(<LinkedAccountAddition {...base} service="googleBusiness"
-      before={{ googleBusiness: 2, instagram: 2 }} billing={{ kind: 'paid', daysRemaining: 15, daysInPeriod: 30 }} />) })
+      before={{ googleBusiness: 2, instagram: 2 }} billing={{ kind: 'paid', monthlyDaysRemaining: 15, monthlyDaysInPeriod: 30 }} />) })
     expect(host.textContent).toContain('追加連携枠の料金を確認')
     expect(host.textContent).toContain('＋¥3,300 / 月')
     expect(host.textContent).toContain('決済成功時のお支払い ¥1,650')
@@ -34,7 +34,7 @@ describe('追加連携枠の確認', () => {
 
   it('Instagramが既存のGoogleマイビジネス件数に追いつく場合は決済なし', async () => {
     await act(async () => { root.render(<LinkedAccountAddition {...base} service="instagram"
-      before={{ googleBusiness: 2, instagram: 1 }} billing={{ kind: 'paid', daysRemaining: 15, daysInPeriod: 30 }} />) })
+      before={{ googleBusiness: 2, instagram: 1 }} billing={{ kind: 'paid', monthlyDaysRemaining: 15, monthlyDaysInPeriod: 30 }} />) })
     expect(host.textContent).toContain('追加料金はかかりません')
     expect(host.textContent).toContain('追加枠 1枠のまま')
     expect(host.textContent).toContain('カード決済はありません')
@@ -50,7 +50,7 @@ describe('追加連携枠の確認', () => {
 
   it('特別料金で単価0円なら枠数の増加と決済不要の両方を正しく示す', async () => {
     await act(async () => { root.render(<LinkedAccountAddition {...base} slotUnitYen={0} service="googleBusiness"
-      before={{ googleBusiness: 2, instagram: 2 }} billing={{ kind: 'paid', daysRemaining: 15, daysInPeriod: 30 }} />) })
+      before={{ googleBusiness: 2, instagram: 2 }} billing={{ kind: 'paid', monthlyDaysRemaining: 15, monthlyDaysInPeriod: 30 }} />) })
     expect(host.textContent).toContain('追加枠 1枠→2枠')
     expect(host.textContent).toContain('追加枠の料金は0円です')
     expect(host.textContent).toContain('料金の同意や決済は不要です')
@@ -58,7 +58,7 @@ describe('追加連携枠の確認', () => {
 
   it('11個目は通常料金の確認画面に進めず、戻る案内を表示する', async () => {
     await act(async () => { root.render(<LinkedAccountAddition {...base} service="googleBusiness"
-      before={{ googleBusiness: 10, instagram: 1 }} billing={{ kind: 'paid', daysRemaining: 15, daysInPeriod: 30 }} />) })
+      before={{ googleBusiness: 10, instagram: 1 }} billing={{ kind: 'paid', monthlyDaysRemaining: 15, monthlyDaysInPeriod: 30 }} />) })
     expect(host.textContent).toContain('料金を表示できません')
     expect(host.textContent).not.toContain('料金に同意して連携へ')
     await act(async () => { host.querySelector('button')!.click() })

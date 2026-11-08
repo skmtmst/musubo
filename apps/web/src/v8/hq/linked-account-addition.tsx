@@ -81,7 +81,7 @@ export default function LinkedAccountAddition({ lineName, service, before, slotU
     <div className={styles.afterPrice}><span>追加後の連携枠料金（税込）</span>
       <strong>{yen(result.monthlySlotsAfterYen)} / 月{charged ? '' : '（料金は変更なし）'}</strong></div>
     <div className={styles.dueBox}><span>{charged && billing.kind === 'paid'
-      ? `今回の追加分（次回請求まで残り${billing.daysRemaining}/${billing.daysInPeriod}日の見込み）`
+      ? `今回の追加分（次の月次請求まで残り${billing.monthlyDaysRemaining}/${billing.monthlyDaysInPeriod}日の見込み）`
       : '今回のお支払い'}</span>
       <strong>{charged && billing.kind === 'paid' ? `決済成功時のお支払い ${yen(result.dueNowYen)}（税込）`
         : charged ? '¥0｜無料期間中のため今は請求しません' : '¥0｜カード決済はありません'}</strong></div>
