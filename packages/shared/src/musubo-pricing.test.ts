@@ -105,5 +105,7 @@ describe('trial and incremental billing dates', () => {
       .toBe(366);
     expect(() => prorateAnnualLineIncrement({ annualIncrementYen: 100,
       periodStartDateJst: '2026-12-08', activationDateJst: '2027-12-08', renewalDateJst: '2027-12-08' })).toThrow();
+    expect(() => prorateAnnualLineIncrement({ annualIncrementYen: 100,
+      periodStartDateJst: '2027-01-01', activationDateJst: '2027-06-01', renewalDateJst: '2027-12-01' })).toThrow();
   });
 });

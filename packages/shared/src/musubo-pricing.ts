@@ -210,6 +210,9 @@ export function prorateAnnualLineIncrement(input: {
   }
   const annualPeriodDays = (renewal - start) / (24 * 60 * 60 * 1000);
   const remainingDays = (renewal - activated) / (24 * 60 * 60 * 1000);
+  if (annualPeriodDays !== 365 && annualPeriodDays !== 366) {
+    throw new RangeError('Annual billing period must contain 365 or 366 calendar days');
+  }
   return {
     chargeYen: Math.floor(annual * remainingDays / annualPeriodDays),
     remainingDays,
