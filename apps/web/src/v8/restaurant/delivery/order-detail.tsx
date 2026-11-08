@@ -33,7 +33,7 @@ import {
   SERVICE_TONES,
   formatClock,
   formatOrderNumber,
-  formatShortStamp,
+  formatDetailStamp,
   formatYen,
 } from './format'
 import { UrgencyMark } from './orders'
@@ -306,16 +306,16 @@ export function OrderDetailDialog({
               {/* 絵（hjdqV）は同じ日の受け取りなので時刻だけを出す。 */}
               <Fact label="希望時刻">{formatClock(order.wantedAt)}</Fact>
               {order.acceptedAt ? (
-                <Fact label="受付">{formatShortStamp(order.acceptedAt)}</Fact>
+                <Fact label="受付">{formatDetailStamp(order.acceptedAt)}</Fact>
               ) : null}
               {order.readyAt ? (
-                <Fact label="準備完了">{formatShortStamp(order.readyAt)}</Fact>
+                <Fact label="準備完了">{formatDetailStamp(order.readyAt)}</Fact>
               ) : null}
               {order.handedOverAt ? (
-                <Fact label="受け渡し">{formatShortStamp(order.handedOverAt)}</Fact>
+                <Fact label="受け渡し">{formatDetailStamp(order.handedOverAt)}</Fact>
               ) : null}
               {order.canceledAt ? (
-                <Fact label="キャンセル">{formatShortStamp(order.canceledAt)}</Fact>
+                <Fact label="キャンセル">{formatDetailStamp(order.canceledAt)}</Fact>
               ) : null}
               <Fact label="お客様の備考">{order.customerNote || DASH}</Fact>
             </dl>
