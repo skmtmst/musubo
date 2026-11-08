@@ -542,7 +542,9 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
           sql.push("NOT (plan_status='canceled' AND stripe_subscription_id=?)"); values.push(subscriptionId);
         }
       } else if (event.type.startsWith('invoice.')) {
-        sql.push("plan_status=? AND (stripe_subscription_id IS NULL OR ? IS NULL OR stripe_subscription_id=?)");
+        // A one-off invoice for the same Stripe customer is not a subscription
+        // failure or recovery. Only the bound subscription may change access.
+        sql.push('plan_status=? AND ? IS NOT NULL AND (stripe_subscription_id IS NULL OR stripe_subscription_id=?)');
         values.push(event.type==='invoice.paid'?'past_due':'active',subscriptionId,subscriptionId);
         if (event.type === 'invoice.paid') {
           // 入金した請求書だけでなく、同じ契約に残る未払いも確認する。

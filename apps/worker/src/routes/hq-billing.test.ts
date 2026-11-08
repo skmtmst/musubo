@@ -357,9 +357,9 @@ describe('課金 Webhook', () => {
   });
 
   it('業務更新が止まった受信は未完了で残り、同じIDで再開する', async () => {
-    setTenant({ stripe_customer_id: 'cus_1', plan_status: 'past_due' });
+    setTenant({ stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1', plan_status: 'past_due' });
     const event = { id: 'evt_retry_atomic', type: 'invoice.paid', created: 200,
-      data: { object: { id: 'in_atomic', customer: 'cus_1', status: 'paid', amount_paid: 9800 } } };
+      data: { object: { id: 'in_atomic', customer: 'cus_1', subscription: 'sub_1', status: 'paid', amount_paid: 9800 } } };
     testDb.raw.exec("CREATE TRIGGER fail_billing_update BEFORE UPDATE ON tenants BEGIN SELECT RAISE(ABORT, 'injected'); END");
     expect((await webhook(event)).status).toBe(500);
     expect(testDb.raw.prepare("SELECT id FROM billing_invoices WHERE id='in_atomic'").get()).toBeUndefined();
@@ -371,8 +371,8 @@ describe('課金 Webhook', () => {
   });
 
   it('完了印の保存失敗でも業務更新を巻き戻し、再通知で一度だけ保存する', async () => {
-    setTenant({ stripe_customer_id: 'cus_1', plan_status: 'past_due' });
-    const event = { id: 'evt_commit_failure', type: 'invoice.paid', data: { object: { id: 'in_commit', customer: 'cus_1' } } };
+    setTenant({ stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1', plan_status: 'past_due' });
+    const event = { id: 'evt_commit_failure', type: 'invoice.paid', data: { object: { id: 'in_commit', customer: 'cus_1', subscription: 'sub_1' } } };
     testDb.raw.exec("CREATE TRIGGER fail_completed_event BEFORE UPDATE ON billing_events BEGIN SELECT RAISE(ABORT, 'injected'); END");
     expect((await webhook(event)).status).toBe(500);
     expect(tenantRow().plan_status).toBe('past_due');
@@ -543,6 +543,24 @@ describe('課金 Webhook', () => {
     expect(tenantRow().plan_status).toBe('canceled');
     const summary = (await (await call('GET', '/api/hq/billing/summary')).json<{ data: { canSend: boolean; state: string } }>()).data;
     expect(summary).toMatchObject({ state: 'canceled', canSend: false });
+  });
+
+  it('同じStripe顧客の単発請求では契約の停止や再開をしない', async () => {
+    setTenant({ stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1', plan_status: 'active' });
+    const standalone = { id: 'in_standalone', customer: 'cus_1', subscription: null,
+      amount_due: 5_900, amount_paid: 0, currency: 'jpy' };
+    await webhook({ id: 'evt_standalone_failed', type: 'invoice.payment_failed',
+      data: { object: standalone } });
+    expect(tenantRow().plan_status).toBe('active');
+    expect(testDb.raw.prepare("SELECT json_extract(summary,'$.applied') AS applied FROM billing_events WHERE id='evt_standalone_failed'").get())
+      .toEqual({ applied: 0 });
+
+    setTenant({ plan_status: 'past_due' });
+    await webhook({ id: 'evt_standalone_paid', type: 'invoice.paid',
+      data: { object: { ...standalone, status: 'paid', amount_paid: 5_900 } } });
+    expect(tenantRow().plan_status).toBe('past_due');
+    expect(testDb.raw.prepare("SELECT json_extract(summary,'$.applied') AS applied FROM billing_events WHERE id='evt_standalone_paid'").get())
+      .toEqual({ applied: 0 });
   });
 
   it('請求失敗の7日後は利用を停止し、未払い請求の支払い先は権限者だけに返す', async () => {
