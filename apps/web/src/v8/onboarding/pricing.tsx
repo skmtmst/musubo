@@ -113,7 +113,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
   const nextFriendBlock = allowance + 1
   const exampleEnd = allowance + condition.schedule.extraFriendBlockSize
   const headline = quoteRequired ? 'ご利用予定を確認' : '料金を確認'
-  return <ListPage title="利用開始の準備" help="料金を確かめてからカードを登録し、LINE公式アカウントを接続します。">
+  return <ListPage heightMode="viewport" title="利用開始の準備" help="料金を確かめてからカードを登録し、LINE公式アカウントを接続します。">
     <PageContent>
       <p className={styles.lead}>{quoteRequired
         ? '11個以上の連携は、予定を確認してからお見積もりをご案内します。'
