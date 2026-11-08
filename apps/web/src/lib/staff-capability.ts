@@ -25,6 +25,7 @@ export function isOwnerOrAdmin(role: string | null = null): boolean {
 
 export function canEditFeature(permission: string, role: string | null = null): boolean {
   if (isOwnerOrAdmin(role)) return true;
+  if (role === 'staff' && readStaffIdentity()?.hqRole === 'operator') return permission !== 'administrator';
   if (permission === 'administrator') return false;
   return role === 'staff' && typeof window !== 'undefined'
     && effectiveStaffEditKeys(permissionKeys(role)).includes(permission);
@@ -33,9 +34,10 @@ export function canEditFeature(permission: string, role: string | null = null): 
 export function canViewFeature(permission: string, role: string | null = null): boolean {
   if (role === 'viewer') {
     const identity = readStaffIdentity();
-    return hasStaffAccess(identity && { role: identity.role, permissionKeys: effectiveStaffEditKeys(identity.permissionKeys ?? []), viewPermissionKeys: identity.permissionViewKeys, readOnly: true }, permission, true);
+    return hasStaffAccess(identity && { role: identity.role, hqRole: identity.hqRole, permissionKeys: effectiveStaffEditKeys(identity.permissionKeys ?? []), viewPermissionKeys: identity.permissionViewKeys, readOnly: true }, permission, true);
   }
   if (isOwnerOrAdmin(role)) return true;
+  if (role === 'staff' && readStaffIdentity()?.hqRole === 'operator') return permission !== 'administrator';
   if (permission === 'administrator') return false;
   return role === 'staff' && typeof window !== 'undefined'
     && (effectiveStaffEditKeys(permissionKeys(role)).includes(permission)

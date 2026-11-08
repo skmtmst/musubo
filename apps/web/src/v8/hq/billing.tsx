@@ -38,7 +38,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
 import { fetchHqBillingMetrics } from '@/lib/api/helpers/hq-billing'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { useStaffRole, canAdministerRole } from '@/lib/staff-role'
 import {
   INVOICE_STATUS_LABELS,
   billingBanner,
@@ -155,7 +155,7 @@ function BillingInner() {
     let cancelled = false
     setMetrics(null)
     setMetricsFailed(false)
-    if (!canManageRole(role)) {
+    if (!canAdministerRole(role)) {
       setMetricsLoading(false)
       return () => { cancelled = true }
     }
@@ -214,7 +214,7 @@ function BillingInner() {
    * 設定の画面はどれも「左に設定の列・右に中身」にそろえる（メンバーと同じ）。
    * 数の帯も右の中身の先頭に置き、左の列より上へ横いっぱいに張り出さない。
    */
-  const metricsBand = status === 'ready' && canManageRole(role) ? (
+  const metricsBand = status === 'ready' && canAdministerRole(role) ? (
     <KpiBand data-template-region="stats">
       <KpiCard title="今月の請求" value={metrics?.thisMonthBilledYen} valueText={metrics?.thisMonthBilledYen != null ? yen(metrics.thisMonthBilledYen) : undefined} unit="" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.thisMonthBilledYen == null ? '今月の請求は未取得' : '保存済みの請求から集計'} loading={metricsLoading} onRetry={metricsFailed ? () => setMetricsAttempt((attempt) => attempt + 1) : undefined} />
       <KpiCard title="契約中" value={metrics?.contractCount} unit="契約" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.activeAccountCount != null && metrics.trialCount != null ? `稼働中 ${metrics.activeAccountCount}アカウント・トライアル ${metrics.trialCount}` : '未取得'} help="統括単位の契約数です。LINEアカウントごとの契約数ではありません。" loading={metricsLoading} />
@@ -238,7 +238,7 @@ function BillingInner() {
 
   const banner = billingBanner(summary)
   const isOwner = role === 'owner'
-  const canManagePayment = canManageRole(role)
+  const canManagePayment = canAdministerRole(role)
   const canChoose = isOwner && summary.state !== 'exempt' && summary.state !== 'active' && summary.state !== 'past_due'
   const currentKey = currentPlanKey(summary)
   /* 契約中の変更は支払いの管理（Stripe の画面）で。管理画面が無い・課金の対象外は運営へ頼む。 */

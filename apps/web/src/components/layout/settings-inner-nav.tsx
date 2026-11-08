@@ -1,6 +1,6 @@
 'use client'
 
-import { effectiveStaffRole, useStaffIdentity, canManageRole } from '@/lib/staff-role'
+import { effectiveStaffRole, useStaffIdentity, canManageRole, canAdministerRole } from '@/lib/staff-role'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -152,9 +152,10 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
    */
   const itemVisible = (item: MenuItem): boolean => {
     if (item.href === '/ec-commerce' && !styleMenuItemVisible(item, accountStyle.data?.style ?? null, null, accountStyle.data?.styleSelected === true)) return false
-    if ((item.href === '/staff' || item.href === '/settings/customer-look') && !canManageRole(staffRole)) return false
+    if (item.href === '/staff' && !canAdministerRole(staffRole)) return false
+    if (item.href === '/settings/customer-look' && !canManageRole(staffRole)) return false
     const permissionKey = item.permissionKey ?? item.href
-    if (staffRole === 'staff' && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
+    if (staffRole === 'staff' && !canManageRole(staffRole) && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
     const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
     if (!featureKey) return true
     if (visibilityAccount !== selectedAccountId || !visibility || visibility[featureKey] !== true) return false

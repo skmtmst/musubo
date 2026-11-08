@@ -20,7 +20,7 @@ export async function hq(c: Context<Env>, allowScoped = false) {
     !m.is_active ||
     m.tenant_id !== s.tenantId ||
     (m.account_scope === 'accounts' && !allowScoped) ||
-    !['owner', 'admin'].includes(m.role) ||
+    (!['owner', 'admin'].includes(m.role) && s.hqRole !== 'operator' && s.hqRole !== 'viewer') ||
     (!['GET', 'HEAD'].includes(c.req.method) && m.access_level === 'read_only')
   )
     throw new StyleError('forbidden', 403);
@@ -56,7 +56,7 @@ export function edit(c: Context<Env>, permission?: string) {
     s.readOnly ||
     (permission
       ? !hasStaffPermission(c, permission)
-      : !['owner', 'admin'].includes(s.role))
+      : !['owner', 'admin'].includes(s.role) && s.hqRole !== 'operator')
   )
     throw new StyleError('forbidden', 403);
 }

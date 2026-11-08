@@ -12,6 +12,20 @@ export type FeatureAccessLevel = 'edit' | 'view' | 'none';
 /** 個人情報（スタッフのメールアドレス）の見せ方。 */
 export type EmailMaskLevel = 'full' | 'masked' | 'none';
 
+/** 全アカウントの統括メンバーだけを店舗スタッフの個別設定と区別する。 */
+export function hqRoleForStaff(row: {
+  role: string;
+  role_bundle?: string | null;
+  access_level?: string | null;
+  assigned_line_account_id?: string | null;
+  account_scope?: string | null;
+}): 'operator' | 'viewer' | null {
+  if (row.role !== 'staff' || row.assigned_line_account_id != null || row.account_scope !== 'all') return null;
+  if (row.access_level === 'read_only' && row.role_bundle === 'hq_viewer') return 'viewer';
+  if (row.access_level !== 'read_only' && row.role_bundle === 'hq_operator') return 'operator';
+  return null;
+}
+
 export type AccessRoleBundleId =
   | 'administrator'
   | 'operations'
@@ -86,6 +100,7 @@ export type DeliveryFeature = keyof typeof DELIVERY_FEATURE_POLICIES;
 export type StaffFeatureOperation = 'view' | 'edit' | 'test' | 'export' | 'publish' | 'archive';
 export interface StaffAccessSubject {
   role?: string | null;
+  hqRole?: 'operator' | 'viewer' | null;
   permissionKeys?: readonly string[];
   viewPermissionKeys?: readonly string[];
   readOnly?: boolean;
@@ -100,6 +115,8 @@ export function deliveryPermissionKey(feature: DeliveryFeature, operation: Staff
 export function hasStaffAccess(subject: StaffAccessSubject | null | undefined, key: string, read = false): boolean {
   if (!subject?.role || (!read && subject.readOnly)) return false;
   if (subject.role === 'owner' || subject.role === 'admin') return true;
+  if (subject.hqRole === 'operator') return key !== 'administrator';
+  if (subject.hqRole === 'viewer') return read && key !== 'administrator';
   if (subject.role !== 'staff' || key === 'administrator') return false;
   return subject.permissionKeys?.includes(key) === true
     || (read && subject.viewPermissionKeys?.includes(key) === true);
@@ -108,7 +125,7 @@ export function hasStaffAccess(subject: StaffAccessSubject | null | undefined, k
 export function hasDeliveryAccess(subject: StaffAccessSubject | null | undefined, feature: DeliveryFeature, operation: StaffFeatureOperation): boolean {
   if (operation === 'export' && subject?.readOnly) return false;
   const policy: { key: string; managersOnly?: readonly StaffFeatureOperation[] } = DELIVERY_FEATURE_POLICIES[feature];
-  if (policy.managersOnly?.includes(operation) && subject?.role !== 'owner' && subject?.role !== 'admin') return false;
+  if (policy.managersOnly?.includes(operation) && subject?.role !== 'owner' && subject?.role !== 'admin' && subject?.hqRole !== 'operator') return false;
   const read = operation === 'view';
   return hasStaffAccess(subject, DELIVERY_FEATURE_POLICIES[feature].key, read)
     && hasStaffAccess(subject, deliveryPermissionKey(feature, operation), read);

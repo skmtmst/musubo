@@ -3,7 +3,7 @@
 import { Suspense, useSyncExternalStore, type ReactNode } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { HQ_MENU_SECTIONS, MENU_SECTIONS, isHqShellPath, menuOwnerForScreen, type MenuItem } from '@/lib/menu'
-import { canManageRole, effectiveStaffRole, useStaffIdentityLoad } from '@/lib/staff-role'
+import { canManageRole, canAdministerRole, effectiveStaffRole, useStaffIdentityLoad } from '@/lib/staff-role'
 import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
 import { readPermissionSessionSnapshot as readSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot'
 import TargetMissing from '@/components/shared/target-missing'
@@ -73,8 +73,8 @@ function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
   const items = menuItemsForPath(pathname, search)
   const signedInRole = staffIdentity?.role ?? role
   const canRead = (item: MenuItem) => {
-    if (item.href === '/staff' && !canManageRole(signedInRole)) return false
-    if (item.href === '/accounts' && signedInRole === 'staff') return false
+    if (item.href === '/staff' && !canAdministerRole(signedInRole)) return false
+    if (item.href === '/accounts' && signedInRole === 'staff' && !canManageRole(signedInRole)) return false
     if (item.staffOnly && signedInRole !== 'staff') return false
     const key = item.permissionKey ?? item.href
     return item.required || canEditFeature(key, role) || canViewFeature(key, role)

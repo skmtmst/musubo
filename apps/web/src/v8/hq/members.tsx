@@ -1,6 +1,6 @@
 'use client'
 
-import { loadStaffIdentity, useTenantWideAccess } from '@/lib/staff-role'
+import { loadStaffIdentity, useTenantAdministratorAccess } from '@/lib/staff-role'
 import { PageFrame } from '@/components/templates/page-frame'
 import { UserPlus } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
@@ -131,7 +131,7 @@ function MembersInner() {
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / 6))
   const visibleRows = filteredRows.slice((Math.min(page, pageCount) - 1) * 6, Math.min(page, pageCount) * 6)
   const missingMfa = members.filter(member => memberStatus(member) === 'active' && !member.twoFactorEnabled).length
-  const canManage = useTenantWideAccess()
+  const canManage = useTenantAdministratorAccess()
   const restricted = me?.accountScope === 'accounts'
 
   const submitDialog = async (value: MemberDialogValue, stepUpToken?: string) => {

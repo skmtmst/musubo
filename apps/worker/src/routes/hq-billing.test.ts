@@ -213,9 +213,10 @@ describe('申込（checkout）', () => {
     expect((stripe.createCheckoutSession.mock.calls[0][1] as { customerId: string }).customerId).toBe('cus_existing');
   });
 
-  it('管理者は申し込めない（オーナーだけ）', async () => {
+  it('管理者もプランを申し込める', async () => {
     const res = await call('POST', '/api/hq/billing/checkout', { planKey: 'light' }, { staff: staffOf({ role: 'admin' }) });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    expect(stripe.createCheckoutSession).toHaveBeenCalledTimes(1);
   });
 
   it('課金対象外・契約中・設定なし・不正なプランは断る', async () => {
@@ -580,8 +581,12 @@ describe('即時変更の日割り見積り', () => {
     const res = await call('GET', path.replace('month', 'year'));
     expect((await res.json<{ data: Record<string, unknown> }>()).data).toMatchObject({ afterAmountYen: 303000, prorationDifferenceYen: -1000, nextBillingAt: null });
   });
-  it.each(['admin', 'staff'] as const)('オーナー以外（%s）は拒否する', async (role) => {
-    expect((await call('GET', path, undefined, { staff: staffOf({ role }) })).status).toBe(403);
+  it('管理者も日割り見積りを確認できる', async () => {
+    expect((await call('GET', path, undefined, { staff: staffOf({ role: 'admin' }) })).status).toBe(200);
+    expect(stripe.createInvoicePreview).toHaveBeenCalledTimes(1);
+  });
+  it('担当者は日割り見積りを確認できない', async () => {
+    expect((await call('GET', path, undefined, { staff: staffOf({ role: 'staff' }) })).status).toBe(403);
     expect(stripe.createInvoicePreview).not.toHaveBeenCalled();
   });
   it('未認証、設定なし、不正入力、契約なしを外部呼び出し前に拒否する', async () => {

@@ -10,7 +10,7 @@ import {
 import { getHqTemplateAdapter, hqTemplateAdapterRegistry } from './registry.js';
 
 describe('統括ひな形の共通contract', () => {
-  test('owner/adminかつ非readOnly・非account scopeだけを許可する', () => {
+  test('管理者と統括の担当者だけが全アカウントのひな形を操作できる', () => {
     expect(requireHqTemplateAuthority({
       tenantId: 'tenant-1',
       actorId: 'staff-1',
@@ -32,6 +32,15 @@ describe('統括ひな形の共通contract', () => {
       readOnly: false,
       accountScoped: true,
     })).toEqual({ kind: 'FORBIDDEN', reason: 'ACCOUNT_SCOPED' });
+    expect(requireHqTemplateAuthority({
+      tenantId: 'tenant-1', actorId: 'staff-4', role: 'staff', hqRole: 'operator', readOnly: false, accountScoped: false,
+    }).kind).toBe('AUTHORIZED');
+    expect(requireHqTemplateAuthority({
+      tenantId: 'tenant-1', actorId: 'staff-5', role: 'staff', hqRole: 'viewer', readOnly: false, accountScoped: false,
+    }).kind).toBe('FORBIDDEN');
+    expect(requireHqTemplateAuthority({
+      tenantId: 'tenant-1', actorId: 'staff-5', role: 'staff', hqRole: 'viewer', readOnly: true, accountScoped: false,
+    }).kind).toBe('AUTHORIZED');
   });
 
   test('snapshot tokenはroot・参照・子・画像keyの複合状態から作る', async () => {
