@@ -2,7 +2,7 @@
 
 import Button from '@/components/shared/button'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { musuboLinkedRemovalPrice, type LinkedAccountCounts, type MusuboLinkedService } from '@line-crm/shared'
+import { musuboLinkedRemovalPrice, utcCalendarDate, type LinkedAccountCounts, type MusuboLinkedService } from '@line-crm/shared'
 import styles from './linked-account-addition.module.css'
 
 interface BaseProps {
@@ -42,7 +42,7 @@ export default function LinkedAccountRemovalModal(props: Props) {
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(props.nextMonthlyChargeAt)) return null
     const calendarPart = props.nextMonthlyChargeAt.slice(0, 10)
     const calendar = new Date(`${calendarPart}T00:00:00.000Z`)
-    if (Number.isNaN(calendar.getTime()) || calendar.toISOString().slice(0, 10) !== calendarPart) return null
+    if (Number.isNaN(calendar.getTime()) || utcCalendarDate(calendar) !== calendarPart) return null
     const date = new Date(props.nextMonthlyChargeAt)
     return Number.isNaN(date.getTime()) ? null : day(props.nextMonthlyChargeAt)
   }, [props.nextMonthlyChargeAt])
