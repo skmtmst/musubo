@@ -518,6 +518,20 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
       } else if (event.type.startsWith('invoice.')) {
         sql.push("plan_status=? AND (stripe_subscription_id IS NULL OR ? IS NULL OR stripe_subscription_id=?)");
         values.push(event.type==='invoice.paid'?'past_due':'active',subscriptionId,subscriptionId);
+        if (event.type === 'invoice.paid') {
+          // 入金した請求書だけでなく、同じ契約に残る未払いも確認する。
+          sql.push(`NOT EXISTS (SELECT 1 FROM billing_invoices bi
+            WHERE bi.tenant_id=tenants.id AND bi.status IN ('open','uncollectible')
+              AND bi.amount_due>bi.amount_paid
+              AND (bi.subscription_id IS NULL OR tenants.stripe_subscription_id IS NULL
+                OR bi.subscription_id=tenants.stripe_subscription_id))`);
+        } else if (event.type === 'invoice.payment_failed') {
+          // 入金済み請求書への遅延した失敗イベントで、利用を再び止めない。
+          sql.push(`EXISTS (SELECT 1 FROM billing_invoices bi
+            WHERE bi.id=? AND bi.tenant_id=tenants.id AND bi.status='open'
+              AND bi.amount_due>bi.amount_paid)`);
+          values.push(subjectId);
+        }
       }
       const statement=prepareTenantBillingUpdate(c.env.DB,tenant!.id,patch,{sql:sql.join(' AND '),values});
       if(statement){statements.push(statement);hasTenantWrite=true;}

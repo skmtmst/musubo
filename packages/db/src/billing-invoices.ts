@@ -76,7 +76,9 @@ export function prepareBillingInvoice(db: D1Database, input: BillingInvoiceInput
        paid_at = COALESCE(excluded.paid_at, billing_invoices.paid_at),
        hosted_invoice_url = COALESCE(excluded.hosted_invoice_url, billing_invoices.hosted_invoice_url),
        raw_updated_at = COALESCE(excluded.raw_updated_at, billing_invoices.raw_updated_at),
-       synced_at = excluded.synced_at`,
+       synced_at = excluded.synced_at
+     WHERE billing_invoices.status NOT IN ('paid', 'void')
+       OR excluded.status IN ('paid', 'void')`,
   ).bind(
     input.id,
     input.tenantId,

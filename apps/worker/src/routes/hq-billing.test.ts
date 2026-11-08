@@ -480,10 +480,18 @@ describe('課金 Webhook', () => {
 
   it('解約・支払い失敗・支払い成功で状態が動く', async () => {
     await webhook(completed());
-    await webhook({ id: 'evt_2', type: 'invoice.payment_failed', data: { object: { id: 'in_1', customer: 'cus_1' } } });
+    const invoice = { id: 'in_1', customer: 'cus_1', subscription: 'sub_1', amount_due: 5900, amount_paid: 0, currency: 'jpy' };
+    await webhook({ id: 'evt_2', type: 'invoice.payment_failed', data: { object: invoice } });
     expect(tenantRow().plan_status).toBe('past_due');
-    await webhook({ id: 'evt_3', type: 'invoice.paid', data: { object: { id: 'in_2', customer: 'cus_1' } } });
+    await webhook({ id: 'evt_other_paid', type: 'invoice.paid', data: { object: {
+      ...invoice, id: 'in_2', status: 'paid', amount_paid: 5900,
+    } } });
+    expect(tenantRow().plan_status).toBe('past_due');
+    await webhook({ id: 'evt_3', type: 'invoice.paid', data: { object: { ...invoice, status: 'paid', amount_paid: 5900 } } });
     expect(tenantRow().plan_status).toBe('active');
+    await webhook({ id: 'evt_late_failure', type: 'invoice.payment_failed', data: { object: invoice } });
+    expect(tenantRow().plan_status).toBe('active');
+    expect(testDb.raw.prepare("SELECT status FROM billing_invoices WHERE id='in_1'").get()).toMatchObject({ status: 'paid' });
     await webhook({ id: 'evt_4', type: 'customer.subscription.deleted', data: { object: { id: 'sub_1', status: 'canceled', customer: 'cus_1', items: { data: [{ price: { id: 'price_standard' } }] } } } });
     expect(tenantRow().plan_status).toBe('canceled');
     const summary = (await (await call('GET', '/api/hq/billing/summary')).json<{ data: { canSend: boolean; state: string } }>()).data;
