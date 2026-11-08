@@ -1,3 +1,5 @@
+import { safeMailUrl } from './musubo-mail-layout.js';
+
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -6,7 +8,7 @@ function escapeHtml(value: string): string {
 
 /** Email-client friendly version of the approved account-creation mail. */
 export function signupMailHtml(url: string, resent: boolean): string {
-  const href = escapeHtml(url);
+  const href = escapeHtml(safeMailUrl(url));
   const title = resent ? '新しい設定リンクをお送りします' : 'お申し込みが承認されました';
   const intro = resent
     ? 'musuboへのお申し込みは承認済みです。新しいリンクからログイン用アカウントを作成してください。'

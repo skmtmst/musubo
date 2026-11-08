@@ -21,4 +21,9 @@ describe('申込メールのHTML', () => {
     }
     expect(resent).toContain('以前のリンクは利用できません');
   });
+
+  it('アカウント作成リンクはHTTPSだけを許可する', () => {
+    expect(() => signupMailHtml('http://admin.example.com/register/complete?token=abc', false)).toThrow();
+    expect(() => signupMailHtml('javascript:alert(1)', true)).toThrow();
+  });
 });
