@@ -74,7 +74,7 @@ export function LineResumptionReview({ view, onContinue, onPayOutstanding, onBac
     <p className={styles.breadcrumb}>ホーム › 統括の設定 › 請求 › 利用再開</p>
     <h1>{title}</h1>
     <p className={styles.lead}>{unpaid
-      ? '過去のお支払いを確認しました。お支払いが完了すると料金確認から再開できます。'
+      ? '過去の未払いがあります。お支払いの完了を確認した後、再開時の料金をご案内します。'
       : '同じ会社アカウントで再開できます。料金を確認してからLINEを接続してください。'}</p>
     <StatusBand warning={unpaid} title={status[0]} description={status[1]} badge={status[2]} />
     <div className={styles.columns}>

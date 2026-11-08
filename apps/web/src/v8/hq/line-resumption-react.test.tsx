@@ -63,6 +63,8 @@ describe('最後のLINE終了後の利用再開', () => {
       periodStart: '2026-12-08T00:00:00+09:00', periodEnd: '2027-01-07T23:59:59+09:00',
     }} onContinue={onContinue} onPayOutstanding={onPayOutstanding} onBack={onBack} />) })
     expect(host.textContent).toContain('利用再開を保留しています')
+    expect(host.textContent).toContain('過去の未払いがあります')
+    expect(host.textContent).not.toContain('過去のお支払いを確認しました')
     const pay = [...host.querySelectorAll('button')].find((button) => button.textContent === '未払いを支払う')!
     await act(async () => { pay.click() })
     expect(onPayOutstanding).toHaveBeenCalledOnce()
