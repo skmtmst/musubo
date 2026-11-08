@@ -16,7 +16,7 @@ import { updateStaffPolicy } from './staff.js';
 
 import type { Env } from '../worker-env.js';
 
-import { assignRestaurantTable } from '../features/booking/booking-assignment/index.js';
+import { restaurantSeatCapacity } from '../services/restaurant-seat-capacity.js';
 import { dbFor } from '../services/db-router.js';
 
 import { restaurantTableCapacity, validateRestaurantOpeningHours } from '../services/restaurant-inventory.js';
@@ -573,18 +573,20 @@ export const post__api_restaurant_test_reservations_holds_23 = async (c: Context
   try {
     const closures = await closuresForRange(db, body.storeId, body.startsAt, body.endsAt);
     const tables = await openSeatTables(db, body.storeId, body.startsAt, body.endsAt, body.guestCount);
-    const tableId = body.tableId ? tables.find(t => t.id === body.tableId)?.id : (await assignRestaurantTable(db, body.storeId, body.startsAt, body.guestCount, tables))?.id;
-    if (!tableId) {
+    const capacity=await restaurantSeatCapacity(db,body.storeId,body.startsAt,body.endsAt);
+    const selected=capacity.select({startsAt:body.startsAt,endsAt:body.endsAt,guestCount:body.guestCount,tableId:body.tableId});
+    const tableId=body.tableId || (capacity.settings.enabled?(selected?.id??null):null);
+    if (!selected || !tables.some(t=>t.id===selected.id||t.tableIds?.includes(selected.id))) {
       const blocked = closures.filter(r => body.tableId ? closureAffectsTable(r, body.tableId) : true);
       if (blocked.length) return c.json({ success: false, error: 'closure_conflict', code: 'closure_conflict', reason: '臨時休業・貸切の日時と卓に重なります', data: { closures: blocked.map(publicClosure) }, closures: blocked.map(publicClosure) }, 409);
       return c.json({ success: false, error: '人数が入る空き卓がありません' }, 409);
     }
     const id = crypto.randomUUID();
     const holdExpiresAt = new Date(Date.now() + body.holdMinutes * 60_000).toISOString();
-    await db.prepare(`INSERT INTO rt_reservations
+    await capacity.commit([db.prepare(`INSERT INTO rt_reservations
       (id, store_id, source, customer_name, guest_count, starts_at, ends_at, table_id, status, note, hold_expires_at)
       VALUES (?, ?, 'manual', '押さえ', ?, ?, ?, ?, 'pending', ?, ?)`)
-      .bind(id, body.storeId, body.guestCount, body.startsAt, body.endsAt, tableId, body.note?.trim() || null, holdExpiresAt).run();
+      .bind(id, body.storeId, body.guestCount, body.startsAt, body.endsAt, tableId, body.note?.trim() || null, holdExpiresAt)]);
     await adjustInventoryReservedCount(db, body.storeId, body.startsAt, body.guestCount);
     return c.json({ success: true, data: { id, tableId, holdExpiresAt } }, 201);
   } finally { await releaseLock(db, key, owner); }

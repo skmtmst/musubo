@@ -8,6 +8,14 @@ import Notice, { NoticeStack } from './notice'
 afterEach(() => cleanup())
 
 describe('帯（Notice）の4種類', () => {
+  it('常設の注意欄は文章をそのまま読み、確認操作や閉じる操作を追加しない',()=>{
+    const text='ほかのグルメサイトからの予約と、席が重複する（ダブルブッキング）場合がありますので、ご留意ください。'
+    const {container}=render(<Notice tone="warn" appearance="caution">{text}</Notice>)
+    expect(screen.getByRole('note').textContent).toBe(text)
+    expect(container.querySelector('[data-notice-status-word]')).toBeNull()
+    expect(screen.queryByRole('checkbox')).toBeNull()
+    expect(screen.queryByRole('button')).toBeNull()
+  })
   it('並べた知らせも失敗の読み上げと再試行の操作を保つ', () => {
     const retry = vi.fn()
     render(<NoticeStack><Notice tone="info">内容は残っています</Notice><Notice tone="danger" action={<button onClick={retry}>もう一度読み込む</button>}>取得できませんでした</Notice></NoticeStack>)

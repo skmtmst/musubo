@@ -1,4 +1,5 @@
 import { getRestaurantReservationForm,putRestaurantReservationForm } from './restaurant-reservation-form.js';
+import { restaurantTableAutomationResponse } from './restaurant-table-automation.js';
 import { registerRestaurantSetupProgressRoutes } from './restaurant-setup-progress.js';
 import { getRestaurantFollowupEngines,initializeRestaurantFollowupEngines,saveRestaurantFollowupEngine,testRestaurantFollowupEngineHandler,startRestaurantFollowupEngineHandler } from './restaurant-followup-engine.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -47,6 +48,9 @@ restaurantTest.use('/api/restaurant-test/*', use__api_restaurant_test__4);
 restaurantTest.get('/api/restaurant-test/assignment-settings', requireRole('owner', 'admin', 'staff'), get__api_restaurant_test_assignment_settings_5);
 
 restaurantTest.put('/api/restaurant-test/assignment-settings', requireRole('owner', 'admin', 'staff'), requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), put__api_restaurant_test_assignment_settings_6);
+
+restaurantTest.get('/api/restaurant-test/table-auto-assignment-settings', requireRole('owner', 'admin', 'staff'), restaurantTableAutomationResponse);
+restaurantTest.put('/api/restaurant-test/table-auto-assignment-settings', requireRole('owner', 'admin', 'staff'), requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), restaurantTableAutomationResponse);
 
 registerRestaurantSetupProgressRoutes(restaurantTest);
 

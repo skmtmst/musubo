@@ -22,3 +22,13 @@ export interface BookingAssignmentSettings {
   storageReady: boolean;
   effectiveMethod: BookingAssignmentMethod | 'legacy_first';
 }
+
+/** 飲食店全体の自動配席。担当スタッフの割り当て設定とは別に保存する。 */
+export interface RestaurantTableAssignmentSettings {
+  enabled: boolean;
+  version: number;
+}
+export interface RestaurantTableAssignmentWrite {
+  enabled: boolean;
+  expectedVersion: number;
+}

@@ -1,6 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { defaultRestaurantReservationForm } from '@line-crm/shared';
 import { saveRestaurantReservationForm } from '../services/restaurant-reservation-form.js';
+import { saveTableAutomation } from '../services/restaurant-table-automation.js';
 import { Hono } from 'hono';
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
@@ -54,6 +55,33 @@ const hold = (requestId = 'request_123', token = 'one') =>
     { storeId: 'store', startsAt: start, guestCount: 2, requestId },
     token,
   );
+
+describe('未配席で受け付ける自動配席オフ',()=>{
+  it('卓を決めずに確保・確定し、同じ時間の次の組を空席以上に受け付けない',async()=>{
+    db.raw.exec("UPDATE rt_tables SET is_active=0 WHERE id='table2'");
+    await saveTableAutomation(db.db,'a1','store',{enabled:false,expectedVersion:0});
+    const first=await hold('manual_seating');
+    expect(first.status).toBe(201);
+    const booking=(await read(first)).data;
+    expect(db.raw.prepare('SELECT table_id FROM rt_reservations WHERE id=?').get(booking.id)).toEqual({table_id:null});
+    const confirmed=await request(`/api/liff/restaurant/reservations/${booking.id}/confirm`,{expectedVersion:booking.version});
+    expect(confirmed.status).toBe(200);
+    expect(db.raw.prepare('SELECT table_id,status FROM rt_reservations WHERE id=?').get(booking.id)).toEqual({table_id:null,status:'confirmed'});
+    expect((await hold('second_party','two')).status).toBe(409);
+    await saveTableAutomation(db.db,'a1','store',{enabled:true,expectedVersion:1});
+    expect((await hold('after_enable','two')).status).toBe(409);
+  });
+  it('オフに切り替えても既存予約の卓は変えず、未配席の同時受付も一組だけにする',async()=>{
+    const assigned=(await read(await hold('assigned'))).data;
+    const before=db.raw.prepare('SELECT table_id FROM rt_reservations WHERE id=?').get(assigned.id);
+    await saveTableAutomation(db.db,'a1','store',{enabled:false,expectedVersion:0});
+    expect(db.raw.prepare('SELECT table_id FROM rt_reservations WHERE id=?').get(assigned.id)).toEqual(before);
+    const results=await Promise.all([hold('off_party_one','two'),hold('off_party_two','two')]);
+    expect(results.map(r=>r.status).sort()).toEqual([201,409]);
+    const unassigned=db.raw.prepare('SELECT COUNT(*) n FROM rt_reservations WHERE table_id IS NULL').get();
+    expect(unassigned).toEqual({n:1});
+  });
+});
 beforeEach(() => {
   vi.clearAllMocks();
   db = createTestD1();

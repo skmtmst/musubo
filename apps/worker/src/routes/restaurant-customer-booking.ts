@@ -5,7 +5,7 @@ import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { normalizePhone } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { identity } from './restaurant-customer-identity.js';
-import { assignRestaurantTable } from '../features/booking/booking-assignment/index.js';
+import { restaurantSeatCapacity } from '../services/restaurant-seat-capacity.js';
 import { referralCandidates } from '../services/restaurant-referrals.js';
 import { collectInputs, parseLayout, normalizeBookingValue } from '@line-crm/shared';
 import { respondToRestaurantConfirmation, type RestaurantConfirmationResponse } from '../services/restaurant-confirmations.js';
@@ -23,7 +23,6 @@ import type { RestaurantCustomerHoldInput, RestaurantCustomerConfirmInput } from
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { dbFor } from '../services/db-router.js';
 import { tzDateStr } from '../services/availability.js';
-import { openSeatTables } from '../services/restaurant-closures.js';
 import {
   customerAvailability,
   customerCourse,
@@ -41,7 +40,7 @@ export const restaurantCustomerBooking = new Hono<Env>();
 restaurantCustomerBooking.onError((e, c) => {
   if(String(e).includes('RESTAURANT_FORM_CHANGED'))return liffBookingJson(c,{success:false,error:'reservation_form_changed'},409);
   if(e instanceof RestaurantReservationFormError)return liffBookingJson(c,{success:false,error:'reservation_form_unavailable'},503);
-  if (/customer_table_conflict|customer_duplicate_booking|customer_line_capacity|restaurant_table_conflict|closure_conflict|UNIQUE constraint/.test(String(e))) {
+  if (/RESTAURANT_CAPACITY_CHANGED|customer_table_conflict|customer_duplicate_booking|customer_line_capacity|restaurant_table_conflict|closure_conflict|UNIQUE constraint/.test(String(e))) {
     return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
   }
   throw new UnexpectedRouteError(c, { success: false, error: 'booking_failed' });
@@ -171,28 +170,21 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
     );
   if (!result || !slot)
     return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
-  const tables = await openSeatTables(
-      db,
-      store.id,
-      startsAt,
-      slot.endsAt,
-      body.guestCount,
-    ),
-    id = crypto.randomUUID();
-  const assignedTable = await assignRestaurantTable(db, store.id, startsAt, body.guestCount, tables);
-  if (!assignedTable)
-    return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
+  const capacity = await restaurantSeatCapacity(db, store.id, startsAt, slot.endsAt, old?.id);
+  const assignedTable = capacity.select({ startsAt, endsAt: slot.endsAt, guestCount: body.guestCount });
+  if (!assignedTable) return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
+  const id = crypto.randomUUID(), tableId = capacity.settings.enabled ? assignedTable.id : null;
   const expires = new Date(
     Math.min(Date.now() + result.holdMinutes * 60000, Date.parse(startsAt)),
   ).toISOString();
   if(old){
-    const refreshed=await db.prepare(`UPDATE rt_reservations SET starts_at=?,ends_at=?,table_id=?,hold_expires_at=?,customer_version=customer_version+1,updated_at=datetime('now') WHERE id=? AND customer_version=? AND status='pending' AND julianday(hold_expires_at)<=julianday('now') AND EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?)) AND EXISTS(SELECT 1 FROM rt_tables WHERE id=? AND store_id=? AND is_active=1)`).bind(startsAt,slot.endsAt,assignedTable.id,expires,old.id,old.customer_version,store.id,result.hoursVersion,body.courseId||null,body.courseId||null,store.id,course?.durationMinutes??null,assignedTable.id,store.id).run();
+    const [,refreshed]=await capacity.commit([db.prepare(`UPDATE rt_reservations SET starts_at=?,ends_at=?,table_id=?,hold_expires_at=?,customer_version=customer_version+1,updated_at=datetime('now') WHERE id=? AND customer_version=? AND status='pending' AND julianday(hold_expires_at)<=julianday('now') AND EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?)) AND EXISTS(SELECT 1 FROM rt_tables WHERE id=? AND store_id=? AND is_active=1)`).bind(startsAt,slot.endsAt,tableId,expires,old.id,old.customer_version,store.id,result.hoursVersion,body.courseId||null,body.courseId||null,store.id,course?.durationMinutes??null,assignedTable.id,store.id)]);
     if(!refreshed.meta.changes)return liffBookingJson(c, {success:false,error:'version_conflict'},409);
     const row=await db.prepare('SELECT *,NULL seat_type FROM rt_reservations WHERE id=?').bind(old.id).first<CustomerReservationRow>();
     return liffBookingJson(c, {success:true,data:customerBooking(row!)});
   }
   // 営業時間を読んだ版と同じときだけ作る。席・本人・残枠はDBトリガーでも守る。
-  await db
+  await capacity.commit([db
     .prepare(
       `INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,hold_expires_at,customer_request_id,note,customer_phone,course_id,allergy_note) SELECT ?,?,'line',?,?,?,?,?,?,?,'pending',?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?)) AND EXISTS(SELECT 1 FROM rt_tables WHERE id=? AND store_id=? AND is_active=1)`,
     )
@@ -205,7 +197,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
       body.guestCount,
       startsAt,
       slot.endsAt,
-      assignedTable.id,
+      tableId,
       expires,
       body.requestId,
       customerDetailValue(body.note),
@@ -216,8 +208,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
       result.hoursVersion,
       body.courseId || null, body.courseId || null, store.id, course?.durationMinutes ?? null,
       assignedTable.id, store.id,
-    )
-    .run();
+    )]);
   const saved = await db
     .prepare('SELECT *, (SELECT seat_type FROM rt_tables t WHERE t.id=rt_reservations.table_id AND t.store_id=rt_reservations.store_id) AS seat_type, (SELECT name FROM rt_menu_items m WHERE m.id=rt_reservations.course_id AND m.store_id=rt_reservations.store_id) AS course_name FROM rt_reservations WHERE id=?')
     .bind(id)
@@ -349,22 +340,12 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
           return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
         ends = slot.endsAt;
         hoursVersion = available.hoursVersion;
-        // 候補を上の検査と同じく、自分の古い予約だけ除外して絞る。
-        const candidates = await openSeatTables(
-          db,
-          store.id,
-          starts,
-          ends,
-          count,
-          true,
-        );
-        const occupied=(await db.prepare(`SELECT l.table_id FROM rt_reservations r JOIN rt_reservation_table_links l ON l.reservation_id=r.id WHERE r.store_id=? AND r.id<>? AND r.departed_at IS NULL AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(?) AND julianday(r.ends_at)>julianday(?) UNION SELECT l.table_id FROM rt_seat_waitlist w JOIN rt_seat_waitlist_table_links l ON l.waitlist_id=w.id WHERE w.store_id=? AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND julianday(w.starts_at)<julianday(?) AND julianday(w.ends_at)>julianday(?)`).bind(store.id,row.id,ends,starts,store.id,ends,starts).all<{table_id:string}>()).results;
-        const busy=new Set(occupied.map(r=>r.table_id));
-        const free=await assignRestaurantTable(db,store.id,starts,count,candidates.filter(t=>(t.tableIds??[t.id]).every(id=>!busy.has(id))),{excludeReservationId:row.id});
-        table=free?.id??null;
-        seatType=free?.seatType??null;
-        if (!table)
-          return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
+      }
+      const capacity = action === 'cancel' ? null : await restaurantSeatCapacity(db, store.id, starts, ends, row.id);
+      if (capacity) {
+        const free = capacity.select({ startsAt: starts, endsAt: ends, guestCount: count, tableId: action === 'confirm' ? table : null });
+        if (!free) return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
+        if (action === 'reschedule') { table = capacity.settings.enabled ? free.id : null; seatType = table ? free.seatType ?? null : null; }
       }
       if(action==='confirm'){
         const available=await customerAvailability(db,store,tzDateStr(store.timezone,new Date(starts)),count,row.id,courseId);
@@ -387,7 +368,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         customer_version: row.customer_version + 1,
         hold_expires_at: null,
       };
-      const results = await db.batch([
+      const results = await (capacity?.commit ?? db.batch.bind(db))([
         ...(formSnapshot?[formSnapshot.guard]:[]),
         db
           .prepare(
@@ -434,7 +415,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         if(formSnapshot&&!await formSnapshot.isCurrent())throw new Error('RESTAURANT_FORM_CHANGED');
         throw error;
       });
-      if (!results[form?1:0]!.meta.changes)
+      if (!results[(form?1:0)+(capacity?1:0)]!.meta.changes)
         return liffBookingJson(c, { success: false, error: 'version_conflict' }, 409);
       await finish(c, store);
       const saved=await db.prepare('SELECT *,NULL seat_type,(SELECT name FROM rt_menu_items WHERE id=rt_reservations.course_id) course_name FROM rt_reservations WHERE id=?').bind(next.id).first<CustomerReservationRow>();

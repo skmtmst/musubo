@@ -42,7 +42,7 @@ export const onError_route_2 = (error: Error, c: Context<Env>) => {
   if (/followup_approval_version_conflict|edit_restaurant_followup_in_common_scenario/.test(String(error))) return c.json({success:false,error:'version_conflict',message:'共通シナリオの最新の版を読み直してください'},409);
   if (/departure_requires_visit|undo_departure_first/.test(String(error))) return c.json({success:false,error:'来店・退店の記録を確認してください'},409);
   if (String(error).includes('closure_conflict')) return c.json({ success: false, error: 'closure_conflict', code: 'closure_conflict', reason: '臨時休業・貸切の日時と卓に重なるため受付できません' }, 409);
-  if (/(restaurant|customer)_table_conflict/.test(String(error))) return c.json({ success: false, error: '同じ卓に重なる予約または仮押さえがあります' }, 409);
+  if (/RESTAURANT_CAPACITY_CHANGED|(restaurant|customer)_table_conflict/.test(String(error))) return c.json({ success: false, error: '同じ卓に重なる予約または仮押さえがあります' }, 409);
   throw error;
 };
 

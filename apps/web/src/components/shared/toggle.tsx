@@ -29,7 +29,7 @@ export default function Toggle({
   id?: string
   invalid?: boolean
   checked: boolean
-  size?: 'large'
+  size?: 'large' | 'restaurant'
   /** 消せない項目。オンのまま押せない。 */
   locked?: boolean
   /** 一時的に押せない（保存中など）。見た目のオン・オフはそのまま。 */
@@ -81,7 +81,7 @@ export function ToggleField({ id: controlId, children, description, 'aria-label'
   title?: string
   className?: string
   checked: boolean
-  size?: 'large'
+  size?: 'large' | 'restaurant'
   disabled?: boolean
   locked?: boolean
   lockedReason?: string
