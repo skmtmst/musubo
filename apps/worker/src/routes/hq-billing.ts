@@ -446,7 +446,7 @@ async function resolveRefundedInvoiceId(c: Context<Env>, object: Record<string, 
   }
 }
 
-async function findTenantForEvent(c: Context<Env>, object: Record<string, unknown>): Promise<TenantBilling | null> {
+async function findTenantForEvent(c: Context<Env>, object: Record<string, unknown>, eventType: string): Promise<TenantBilling | null> {
   const metadata = (object.metadata ?? {}) as Record<string, string>;
   const byMeta = metadata.tenant_id ?? (typeof object.client_reference_id === 'string' ? object.client_reference_id : null);
   if (byMeta) {
@@ -455,11 +455,14 @@ async function findTenantForEvent(c: Context<Env>, object: Record<string, unknow
       const customer = stripeExpandableId(object.customer);
       // Metadata is useful for routing, but a signed event for another Stripe customer
       // must never update this tenant's invoices or billing state.
-      if (customer && tenant.stripe_customer_id && tenant.stripe_customer_id !== customer) return null;
+      if (customer && tenant.stripe_customer_id !== customer
+        // Older Checkout sessions can be the first event to bind a customer. The
+        // subscription is retrieved and its customer verified before any write.
+        && !(eventType === 'checkout.session.completed' && object.mode !== 'setup' && !tenant.stripe_customer_id)) return null;
       return tenant;
     }
   }
-  const customer = typeof object.customer === 'string' ? object.customer : null;
+  const customer = stripeExpandableId(object.customer);
   return customer ? getTenantBillingByStripeCustomer(c.env.DB, customer) : null;
 }
 
@@ -490,7 +493,7 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     const refundedInvoiceId = event.type === 'charge.refunded'
       ? await resolveRefundedInvoiceId(c, object)
       : undefined;
-    const tenant = await findTenantForEvent(c, object);
+    const tenant = await findTenantForEvent(c, object, event.type);
     // 保存済みの受領記録は完了済みとして扱う。新しい記録は、業務更新と完了印を一緒に確定するまで pending に残す。
     await c.env.DB.prepare('INSERT OR IGNORE INTO billing_events (id,type,tenant_id,summary) VALUES (?,?,?,?)')
       .bind(event.id,event.type,tenant?.id ?? null,'pending').run();

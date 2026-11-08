@@ -622,6 +622,19 @@ describe('課金 Webhook', () => {
       .toEqual({ n: 0 });
   });
 
+  it('Stripe顧客が未登録の統括にも、メタデータだけで請求書を結び付けない', async () => {
+    setTenant({ stripe_customer_id: null, plan_status: 'active' });
+    const res = await webhook({ id: 'evt_unbound_invoice_customer', type: 'invoice.payment_failed',
+      data: { object: { id: 'in_unbound_customer', customer: 'cus_other', subscription: 'sub_other',
+        metadata: { tenant_id: DEFAULT_TENANT_ID }, amount_due: 5900, amount_paid: 0,
+        currency: 'jpy', created: 1_760_000_000, lines: { data: [] } } } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { matched: false } });
+    expect(tenantRow().plan_status).toBe('active');
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS n FROM billing_invoices WHERE id='in_unbound_customer'").get())
+      .toEqual({ n: 0 });
+  });
+
   it('請求書のないEC-CUBE返金は対象外として記録し、請求書を変更しない', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const res = await webhook({
