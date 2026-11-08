@@ -155,7 +155,7 @@ function BillingInner() {
     let cancelled = false
     setMetrics(null)
     setMetricsFailed(false)
-    if (!role) {
+    if (!canAdministerRole(role)) {
       setMetricsLoading(false)
       return () => { cancelled = true }
     }
@@ -214,7 +214,7 @@ function BillingInner() {
    * 設定の画面はどれも「左に設定の列・右に中身」にそろえる（メンバーと同じ）。
    * 数の帯も右の中身の先頭に置き、左の列より上へ横いっぱいに張り出さない。
    */
-  const metricsBand = status === 'ready' && role !== null ? (
+  const metricsBand = status === 'ready' && canAdministerRole(role) ? (
     <KpiBand data-template-region="stats">
       <KpiCard title="今月の請求" value={metrics?.thisMonthBilledYen} valueText={metrics?.thisMonthBilledYen != null ? yen(metrics.thisMonthBilledYen) : undefined} unit="" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.thisMonthBilledYen == null ? '今月の請求は未取得' : '保存済みの請求から集計'} loading={metricsLoading} onRetry={metricsFailed ? () => setMetricsAttempt((attempt) => attempt + 1) : undefined} />
       <KpiCard title="契約中" value={metrics?.contractCount} unit="契約" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.activeAccountCount != null && metrics.trialCount != null ? `稼働中 ${metrics.activeAccountCount}アカウント・トライアル ${metrics.trialCount}` : '未取得'} help="統括単位の契約数です。LINEアカウントごとの契約数ではありません。" loading={metricsLoading} />
