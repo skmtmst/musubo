@@ -756,6 +756,10 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   const target = await getStaffById(c.env.DB, id);
   if (!target || !isInCurrentTenant(c, target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   const current = c.get('staff');
+  if (!await canAccessStaffMember(c.env.DB, current, target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
+  if (body.managementContext === 'hq' && !await hasAllAccountScope(c.env.DB, current)) {
+    return c.json({ success: false, error: '全店舗の担当者だけが統括側の権限者を変更できます' }, 403);
+  }
   const targetIsHqMember = target.role_bundle === 'hq_operator' || target.role_bundle === 'hq_viewer';
   if (targetIsHqMember && body.managementContext !== 'hq' && (body.role !== undefined || body.roleBundle !== undefined || body.permissionKeys !== undefined || body.permissionScope !== undefined || body.permissionViewKeys !== undefined)) {
     return c.json({ success: false, error: '統括メンバーの役割は統括のメンバー画面で変更してください' }, 400);
@@ -765,10 +769,6 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   }
   if (body.managementContext === 'hq' && (target.assigned_line_account_id || target.account_scope !== 'all')) {
     return c.json({ success: false, error: '店舗の権限者は統括の役割に変更できません' }, 400);
-  }
-  if (!await canAccessStaffMember(c.env.DB, current, target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
-  if (body.managementContext === 'hq' && !await hasAllAccountScope(c.env.DB, current)) {
-    return c.json({ success: false, error: '全店舗の担当者だけが統括側の権限者を変更できます' }, 403);
   }
   const administrator = current.role === 'owner' || current.role === 'admin';
   if (!administrator && current.id !== id) {
