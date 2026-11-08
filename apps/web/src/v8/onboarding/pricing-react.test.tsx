@@ -66,6 +66,12 @@ describe('Penの利用料金確認', () => {
     expect(host.textContent).toContain('料金は個別にご案内します')
     expect(host.textContent).not.toContain('本日の請求')
     expect(host.querySelector('input[type=checkbox]')).toBeNull()
+    const details = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('標準料金のしくみを見る'))!
+    await act(async () => { details.click() })
+    expect(host.textContent).toContain('友だち数の基準と超過料金は、個別のお見積もり')
+    expect(host.textContent).not.toContain('例｜LINE 1個の場合')
+    const close = [...host.querySelectorAll('button')].find((button) => button.textContent === '料金確認に戻る')!
+    await act(async () => { close.click() })
     const contact = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('お問い合わせフォームへ'))!
     await act(async () => { contact.click() })
     expect(contactFlow).toHaveBeenCalledWith(expect.objectContaining({ lineCount: 11, friendCountExcludingBlocked: null }))

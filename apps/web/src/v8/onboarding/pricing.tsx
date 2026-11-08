@@ -247,7 +247,9 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
             <h3>利用量による追加料金</h3>
             <p>友だち数の基準：1個 3,000人／2〜5個 15,000人／6〜10個 50,000人</p>
             <p>基準を超えた人数を10,000人単位で切り上げ、1枠ごとに{yen(condition.schedule.extraFriendBlockYen)}／月（税込）です。</p>
-            <div className={styles.explainer}>例｜LINE {lineCount <= 10 ? lineCount : 1}個の場合、{new Intl.NumberFormat('ja-JP').format(allowance || 3_000)}人までは追加料金なし。{new Intl.NumberFormat('ja-JP').format(nextFriendBlock || 3_001)}〜{new Intl.NumberFormat('ja-JP').format(exampleEnd || 13_000)}人は1枠分です。</div>
+            {lineCount > 10
+              ? <div className={styles.explainer}>LINEが11個以上の場合の友だち数の基準と超過料金は、個別のお見積もりでご案内します。</div>
+              : <div className={styles.explainer}>例｜LINE {lineCount}個の場合、{new Intl.NumberFormat('ja-JP').format(allowance || 3_000)}人までは追加料金なし。{new Intl.NumberFormat('ja-JP').format(nextFriendBlock || 3_001)}〜{new Intl.NumberFormat('ja-JP').format(exampleEnd || 13_000)}人は1枠分です。</div>}
             <p>各LINEでGoogleマイビジネスとInstagramはそれぞれ1個まで基本料金内です。多いほうの2個目から追加料金を数えます。複数LINEの追加連携枠は、それぞれの連携前に料金を確認します。</p>
           </div>
           <p>年払いはLINE基本料金のみ10%割引。友だち超過・追加連携枠は毎月別請求です。</p>
