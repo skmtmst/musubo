@@ -60,4 +60,18 @@ describe('招待メールの有効期限の案内', () => {
     expect(mail.html).toContain('href="https://stg-api.musubo.jp/api/auth/line?invite=token"');
     expect(mail.html).toContain('https://stg-admin.musubo.jp/brand/musubo-color.png');
   });
+
+  it('ローカル開発のHTTPは使え、外部HTTPリンクは送信前に拒否する', async () => {
+    await sendStaffInviteEmail(env(), {
+      name: 'テスト', email: 'invitee@example.test',
+      verifyUrl: 'http://localhost:3000/staff/invite#invite=token',
+    });
+    expect(relay.sendXServerMail.mock.calls[0][1].html).toContain('http://localhost:3000/staff/invite#invite=token');
+    relay.sendXServerMail.mockClear();
+    await expect(sendStaffInviteEmail(env(), {
+      name: 'テスト', email: 'invitee@example.test',
+      verifyUrl: 'http://example.test/staff/invite#invite=token',
+    })).rejects.toThrow('STAFF_INVITE_URL_INSECURE');
+    expect(relay.sendXServerMail).not.toHaveBeenCalled();
+  });
 });

@@ -12,7 +12,8 @@ function escapeHtml(value: string): string {
 function secureUrl(value: string | undefined): string {
   if (!value) throw new Error('STAFF_INVITE_URL_MISSING');
   const url = new URL(value);
-  if (url.protocol !== 'https:') throw new Error('STAFF_INVITE_URL_INSECURE');
+  const localHttp = url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  if (url.protocol !== 'https:' && !localHttp) throw new Error('STAFF_INVITE_URL_INSECURE');
   return url.toString();
 }
 
