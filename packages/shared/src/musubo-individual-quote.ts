@@ -35,6 +35,13 @@ export function musuboIndividualQuotePrice(quote: MusuboIndividualQuote): {
 } {
   if (!quote.quoteNumber || !quote.companyName.trim()) throw new RangeError('Quote number and company name are required');
   individualQuoteAccess(quote, quote.issuedAt);
+  const trial = quote.trialPeriod;
+  if (!Number.isSafeInteger(trial.value) || trial.value < 1
+    || (trial.unit === 'days' && trial.value > 365)
+    || (trial.unit === 'months' && trial.value > 12)
+    || (trial.unit !== 'days' && trial.unit !== 'months')) {
+    throw new RangeError('Quote trial period must be 1–365 days or 1–12 months');
+  }
   const price = musuboPrice({
     lineCount: quote.plannedLineCount,
     friendCountExcludingBlocked: quote.plannedFriendCountExcludingBlocked,

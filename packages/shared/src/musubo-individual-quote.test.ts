@@ -45,4 +45,9 @@ describe('会社ごとの個別見積もり', () => {
     expect(() => acceptMusuboIndividualQuote(superseded, '2026-12-02T00:00:00+09:00')).toThrow();
     expect(() => supersedeMusuboIndividualQuote(acceptMusuboIndividualQuote(quote(), '2026-12-01T00:00:00+09:00'), '2026-12-02T00:00:00+09:00')).toThrow();
   });
+
+  it('不正な無料期間を見積もりとして確定しない', () => {
+    expect(() => musuboIndividualQuotePrice(quote({ trialPeriod: { unit: 'months', value: 13 } }))).toThrow();
+    expect(() => musuboIndividualQuotePrice(quote({ trialPeriod: { unit: 'days', value: 0 } }))).toThrow();
+  });
 });
