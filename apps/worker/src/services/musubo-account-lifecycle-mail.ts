@@ -169,6 +169,7 @@ export function musuboLinkedAccountMail(input: {
   const beforeSlots = linkedAccountSlots(input.before);
   const afterSlots = linkedAccountSlots(input.after);
   if ((added && afterSlots !== beforeSlots + 1) || (!added && afterSlots > beforeSlots)) throw new RangeError('Invalid slot direction');
+  const chargeReduced = !added && afterSlots < beforeSlots;
   if (added && input.amountPaidNowYen === undefined) throw new RangeError('Paid amount is required for activation mail');
   const label = input.service === 'googleBusiness' ? 'Googleマイビジネス' : 'Instagram';
   const beforeCount = input.before[input.service];
@@ -182,16 +183,21 @@ export function musuboLinkedAccountMail(input: {
     intro: added ? `${input.lineName}の連携先を追加しました。` : `${input.lineName}の${label}1個の連携を停止しました。`,
     detail: added
       ? `追加分の決済を確認し、新しい${label}を有効化しました。今回のお支払いと次回の料金をご確認ください。`
-      : '連携はすでに停止しています。追加枠の料金は、次の月次請求日から減額します。',
-    summaryTitle: added ? '追加後の連携枠料金' : '料金変更の予定',
+      : chargeReduced
+        ? '連携はすでに停止しています。追加枠の料金は、次の月次請求日から減額します。'
+        : '連携はすでに停止しています。もう一方のサービスの連携数が追加枠の基準のため、今回の解除では料金は変わりません。',
+    summaryTitle: added ? '追加後の連携枠料金' : chargeReduced ? '料金変更の予定' : '解除後の連携枠料金',
     rows: [
       { label, value: `${beforeCount}個 → ${afterCount}個` },
       { label: '追加連携枠', value: `${beforeSlots}枠 → ${afterSlots}枠` },
-      { label: added ? '今回のお支払い' : '減額開始', value: added ? `${mailMoney(input.amountPaidNowYen!)}（税込）` : mailJstDate(input.nextMonthlyChargeAt) },
-      { label: '次回から', value: `${mailMoney(nextMonthly)}／月（税込）` },
+      { label: added ? '今回のお支払い' : chargeReduced ? '減額開始' : '料金変更',
+        value: added ? `${mailMoney(input.amountPaidNowYen!)}（税込）` : chargeReduced ? mailJstDate(input.nextMonthlyChargeAt) : 'なし' },
+      { label: added ? '次回から' : chargeReduced ? '減額後の追加枠料金' : '追加枠料金', value: `${mailMoney(nextMonthly)}／月（税込）` },
     ], buttonLabel: '連携先と料金を確認', buttonUrl: input.actionUrl,
     notes: added
       ? ['追加分は次の月次請求日までの残期間で日割り計算しました。', '年払いでも追加連携枠は月次請求です。LINE基本料金の割引は追加枠に適用しません。']
-      : ['支払済み期間の返金はありません。年払いでも追加枠の料金は月次請求です。', '次の月次請求日までに枠を再利用した場合は、減額予定を再計算します。'],
+      : chargeReduced
+        ? ['支払済み期間の返金はありません。年払いでも追加枠の料金は月次請求です。', '次の月次請求日までに枠を再利用した場合は、減額予定を再計算します。']
+        : ['GoogleマイビジネスとInstagramの多いほうの連携数で追加枠を数えます。', 'ほかの連携先を解除すると、次の月次請求から減額となる場合があります。'],
   });
 }

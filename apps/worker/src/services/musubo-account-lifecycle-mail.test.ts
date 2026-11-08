@@ -39,6 +39,19 @@ describe('LINE追加・連携解除のメール', () => {
     expect(added.text).toContain('¥1,650');
     expect(added.text).toContain('¥6,600／月');
   });
+
+  it('多いほうの連携数が変わらない解除では減額を案内しない', () => {
+    const removed = musuboLinkedAccountMail({
+      event: 'removed', lineName: '公式LINE A', service: 'googleBusiness',
+      before: { googleBusiness: 3, instagram: 3 },
+      after: { googleBusiness: 2, instagram: 3 },
+      linkedAccountSlotYen: 3300, nextMonthlyChargeAt: '2027-02-08T00:00:00+09:00', actionUrl,
+    });
+    expect(removed.text).toContain('今回の解除では料金は変わりません');
+    expect(removed.text).toContain('料金変更：なし');
+    expect(removed.text).toContain('追加枠料金：¥6,600／月');
+    expect(removed.text).not.toContain('減額開始');
+  });
 });
 
 describe('最後のLINEの利用終了・再開メール', () => {
