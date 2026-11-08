@@ -1,5 +1,6 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
+.autoAssignmentExplanation { margin:var(--space-12) 0 0; font-size:13px; font-weight:400; line-height:1.7; color:var(--color-ink-secondary); }
 /*
  * ★V8 座席・卓管理（Pencil BERxg・止める ・追加と変更 ）。
  * 値は globals.css の --tpl-rs-*。

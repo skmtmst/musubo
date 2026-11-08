@@ -97,7 +97,7 @@ export * from './security-monitor.js';
 export * from './report-period.js';
 
 export * from './hq-catalog-templates.js';
-export type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentWrite, BookingAssignmentSettings } from './booking-assignment.js';
+export type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentWrite, BookingAssignmentSettings, RestaurantTableAssignmentSettings, RestaurantTableAssignmentWrite } from './booking-assignment.js';
 
 export * from './booking-entitlements.js';
 export type { MonthlyContractState, MonthlyCycleState, MonthlyStopReason, MonthlyRightState, MonthlyClassKind, MonthlyCycleView, MonthlyContractView, MonthlyApplyInput, MonthlyOperationInput, MonthlyWaiverInput } from './booking-monthly.js';

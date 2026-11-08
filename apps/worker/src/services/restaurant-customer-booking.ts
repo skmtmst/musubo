@@ -1,3 +1,4 @@
+import { restaurantSeatCapacity } from './restaurant-seat-capacity.js';
 import { getBookingAdminSettings } from '@line-crm/db';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
@@ -100,6 +101,7 @@ export async function customerAvailability(
   const eligible = (await db.prepare('SELECT id,seat_type FROM rt_tables WHERE store_id=? AND is_active=1 AND min_capacity<=? AND max_capacity>=?').bind(store.id,count,count).all<{id:string;seat_type:string}>()).results;
   const from = restaurantCivilTime(date,0,store.timezone), to = restaurantCivilTime(date,1440,store.timezone);
   const closures = await closuresForRange(db,store.id,from,to);
+  const capacity = await restaurantSeatCapacity(db, store.id, from, new Date(Date.parse(to) + duration * 60000).toISOString(), excludeId);
   const reasonFor = (startsAt:string,endsAt:string): import('@line-crm/shared').RestaurantUnavailableReason => {
     const overlapping = closures.filter(c => (JSON.parse(c.periods_json) as Array<{startsAt:string;endsAt:string}>).some(p => Date.parse(p.startsAt)<Date.parse(endsAt) && Date.parse(p.endsAt)>Date.parse(startsAt)));
     if (overlapping.some(c=>JSON.parse(c.table_ids_json).length===0)
@@ -169,6 +171,7 @@ export async function customerAvailability(
         ).results;
         if (inventories.some((i) => i.line_capacity - i.used < count))
           tables = [];
+        if (tables.length && !capacity.select({ startsAt, endsAt, guestCount: count })) tables = [];
         slots.push({
           startsAt,
           endsAt,

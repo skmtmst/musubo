@@ -12,7 +12,7 @@ vi.hoisted(() => {
 const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createTable: vi.fn(), deleteTable: vi.fn(), updateTable: vi.fn(), updateReservation: vi.fn(), saveTableLayout: vi.fn() }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const floorApi = vi.hoisted(() => ({ floors: vi.fn() }))
-const assignmentApi = vi.hoisted(() => ({ getTables: vi.fn(), saveTables: vi.fn() }))
+const assignmentApi = vi.hoisted(() => ({ getTables: vi.fn(), saveTables: vi.fn(), getTableAutomation: vi.fn(), saveTableAutomation: vi.fn() }))
 const location = vi.hoisted(() => ({ query: '' }))
 const account = vi.hoisted(() => ({ selectedAccountId: 'account-1' }))
 
@@ -44,6 +44,8 @@ beforeEach(() => {
   role.value = 'owner'
   account.selectedAccountId = 'account-1'
   location.query = ''
+  assignmentApi.getTableAutomation.mockResolvedValue({success:true,data:{enabled:true,version:4}})
+  assignmentApi.saveTableAutomation.mockResolvedValue({success:true,data:{enabled:false,version:5}})
   const assignment = { method: 'balanced', balancePeriod: 'day', resources: [], version: 4, storageReady: true, effectiveMethod: 'balanced' }
   assignmentApi.getTables.mockResolvedValue({ success: true, data: assignment })
   assignmentApi.saveTables.mockImplementation(async (_account, _store, input) => ({ success: true, data: { ...assignment, ...input, version: 5 } }))
@@ -146,40 +148,62 @@ describe('BERxg 座席・卓管理', () => {
     expect(screen.getByRole('button',{name:first.label}).getAttribute('transform')).toContain('translate(60 50)')
     expect(screen.getByText('未保存の変更があります')).toBeTruthy()
   })
-  it('割り当ての最終行は本文、保存操作は別の共通下部領域へ置き、版付き保存を保つ', async () => {
-    location.query = 'view=assign'
-    const { container } = render(<TablesPage />)
-    await waitFor(() => expect(screen.getByRole('radio', { name: /ランダム/ }).hasAttribute('disabled')).toBe(false))
-    const frame = container.querySelector('[data-design-node="jmVYJ"]')!
-    const body = frame.querySelector(':scope > [data-template-region="body"]')!
-    const footer = frame.querySelector(':scope > [data-template-region="footer"]')!
-    expect(body.querySelectorAll('tbody > tr')).toHaveLength(tables.filter(table => table.is_active).length)
-    expect(body.querySelector('[data-shared-part="sticky-bar"]')).toBeNull()
-    const save = screen.getByRole('button', { name: /保存する/ }) as HTMLButtonElement
-    expect(footer.contains(save)).toBe(true)
-    expect(save.disabled).toBe(true)
-    fireEvent.click(screen.getByRole('radio', { name: /ランダム/ }))
-    expect(save.disabled).toBe(false)
-    fireEvent.click(save)
-    await waitFor(() => expect(assignmentApi.saveTables).toHaveBeenCalledWith('account-1', 'store-1', expect.objectContaining({ method: 'random', expectedVersion: 4 })))
+  it('卓一覧の横から単一スイッチの窓を開き、版付きで保存できる', async () => {
+    render(<TablesPage />)
+    const open=await screen.findByRole('button',{name:'自動配席の設定'})
+    expect(open.closest('header')?.textContent).toContain('卓一覧')
+    fireEvent.click(open)
+    const dialog=screen.getByRole('dialog',{name:'自動配席の設定'})
+    const toggle=await within(dialog).findByRole('switch',{name:'予約の卓を自動で決める'})
+    expect(within(dialog).queryByRole('radio')).toBeNull()
+    expect(within(dialog).queryByText('優先度')).toBeNull()
+    expect(within(dialog).getByText(/ダブルブッキング/)).toBeTruthy()
+    fireEvent.click(toggle)
+    fireEvent.click(within(dialog).getByRole('button',{name:'変更を保存'}))
+    await waitFor(()=>expect(assignmentApi.saveTableAutomation).toHaveBeenCalledWith('account-1','store-1',{enabled:false,expectedVersion:4}))
+    await waitFor(()=>expect(screen.queryByRole('dialog',{name:'自動配席の設定'})).toBeNull())
   })
 
-  it('下部領域の分離後も競合時の入力を保持し、閲覧のみでは保存欄を隠す', async () => {
-    location.query = 'view=assign'
-    assignmentApi.saveTables.mockRejectedValue({ status: 409 })
-    const view = render(<TablesPage />)
-    await waitFor(() => expect(screen.getByRole('radio', { name: /ランダム/ }).hasAttribute('disabled')).toBe(false))
-    fireEvent.click(screen.getByRole('radio', { name: /ランダム/ }))
-    fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
-    await screen.findByRole('button', { name: '違いを比べる' })
-    expect((screen.getByRole('radio', { name: /ランダム/ }) as HTMLInputElement).checked).toBe(true)
-    view.unmount()
-    role.value = 'staff'
-    const readOnly = render(<TablesPage />)
-    await screen.findByText('卓の割り当て方')
-    expect(readOnly.container.querySelector('[data-template-region="footer"]')).toBeNull()
-    expect(screen.queryByRole('button', { name: /保存する/ })).toBeNull()
-    expect(screen.queryByRole('radio')).toBeNull()
+  it('旧リンクも同じモーダルを開き、競合では入力を残す',async()=>{
+    location.query='view=assign'
+    assignmentApi.saveTableAutomation.mockRejectedValue(new ApiError(409,'競合','version_conflict'))
+    render(<TablesPage />)
+    const dialog=await screen.findByRole('dialog',{name:'自動配席の設定'})
+    const toggle=await within(dialog).findByRole('switch')
+    fireEvent.click(toggle)
+    fireEvent.click(within(dialog).getByRole('button',{name:'変更を保存'}))
+    await within(dialog).findByRole('button',{name:'最新を確認する'})
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    expect(within(dialog).getByRole('button',{name:'変更を保存'}).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('設定の変更を破棄して閉じても、背景の座席図を再取得・保存しない',async()=>{
+    render(<TablesPage />)
+    fireEvent.click(await screen.findByRole('button',{name:'自動配席の設定'}))
+    const dialog=screen.getByRole('dialog',{name:'自動配席の設定'})
+    fireEvent.click(await within(dialog).findByRole('switch'))
+    const reads=floorApi.floors.mock.calls.length
+    fireEvent.click(within(dialog).getByRole('button',{name:'キャンセル'}))
+    fireEvent.click(await screen.findByRole('button',{name:'編集を続ける'}))
+    expect(within(dialog).getByRole('switch').getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(within(dialog).getByRole('button',{name:'キャンセル'}))
+    fireEvent.click(await screen.findByRole('button',{name:'保存せずに閉じる'}))
+    await waitFor(()=>expect(screen.queryByRole('dialog',{name:'自動配席の設定'})).toBeNull())
+    expect(assignmentApi.saveTableAutomation).not.toHaveBeenCalled()
+    expect(fixture.saveTableLayout).not.toHaveBeenCalled()
+    expect(floorApi.floors).toHaveBeenCalledTimes(reads)
+  })
+
+  it('閲覧だけでも設定を読めるが、スイッチと保存は権限で止める',async()=>{
+    role.value='staff'
+    render(<TablesPage />)
+    fireEvent.click(await screen.findByRole('button',{name:'自動配席の設定'}))
+    const dialog=screen.getByRole('dialog',{name:'自動配席の設定'})
+    const toggle=await within(dialog).findByRole('switch')
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(within(dialog).getByRole('button',{name:'変更を保存'}))
+    expect(assignmentApi.saveTableAutomation).not.toHaveBeenCalled()
   })
 
   it('最小・最大人数は必須として読み上げ、空欄なら卓を作らない', async () => {

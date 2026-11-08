@@ -34,9 +34,9 @@ export function DetailFields({ children }: { children: ReactNode }) {
 }
 
 /** 埋め込みの補助欄も、浮く詳細面と同じ題・本文・操作帯を使う。 */
-export function DetailPreview({ title, description, children, actions, headerActions, titleId }: { title: string; titleId?: string; description?: string; children: ReactNode; actions?: DetailActionsProps; headerActions?: ReactNode }) {
+export function DetailPreview({ title, description, children, actions, headerActions, titleActions, titleId }: { title: string; titleId?: string; description?: string; children: ReactNode; actions?: DetailActionsProps; headerActions?: ReactNode; titleActions?: ReactNode }) {
   return <section className={`${styles.preview} ${styles.surface}`} data-detail-preview aria-label={titleId ? undefined : title} aria-labelledby={titleId}>
-    <header className={styles.previewHeader}><div className={styles.previewTitleRow}><h2 id={titleId} className={styles.title} title={title}>{title}</h2>{headerActions}</div>{description ? <div className={styles.summary}>{description}</div> : null}</header>
+    <header className={styles.previewHeader}><div className={styles.previewTitleRow}>{titleActions ? <div className={styles.previewTitleGroup}><h2 id={titleId} className={styles.title} title={title}>{title}</h2>{titleActions}</div> : <h2 id={titleId} className={styles.title} title={title}>{title}</h2>}{headerActions}</div>{description ? <div className={styles.summary}>{description}</div> : null}</header>
     <div className={styles.previewBody}><DetailContent>{children}</DetailContent></div>
     {hasDetailActions(actions) ? <footer className={styles.previewFooter}><DetailActions {...actions} /></footer> : null}
   </section>

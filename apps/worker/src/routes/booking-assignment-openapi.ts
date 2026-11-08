@@ -24,6 +24,10 @@ function path(tables = false) {
   };
 }
 export const bookingAssignmentPaths = {
+  '/api/restaurant-test/table-auto-assignment-settings': {
+    get: { tags: ['Booking'], summary: '店舗全体の自動配席のオン・オフを読む', parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }, { name: 'storeId', in: 'query', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'enabledとversion。未保存はオン・版0' }, '404': { description: '対象外の店舗' }, '503': { description: '設定を取得できない' } } },
+    put: { tags: ['Booking'], summary: '店舗全体の自動配席のオン・オフを保存', description: '予約設定の編集権限とexpectedVersionが必要。既存予約の卓は変更しない。オフでも未配席で予約を受け付け、空席検査は継続する。', parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }, { name: 'storeId', in: 'query', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['enabled', 'expectedVersion'], properties: { enabled: { type: 'boolean' }, expectedVersion: { type: 'integer', minimum: 0 } } } } } }, responses: { '200': { description: '保存したenabledとversion' }, '400': { description: '入力不正' }, '403': { description: '閲覧のみ・権限不足' }, '404': { description: '対象外の店舗' }, '409': { description: '版の競合' }, '503': { description: '設定を保存できない' } } },
+  },
   '/api/booking/admin/assignment-settings': path(),
   '/api/restaurant-test/assignment-settings': path(true),
 };

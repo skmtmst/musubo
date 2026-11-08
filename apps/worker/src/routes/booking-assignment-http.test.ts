@@ -18,17 +18,57 @@ const input = { method: 'balanced', balancePeriod: 'day', expectedVersion: 0,
   resources: [{ resourceId: 's1', priority: 'preferred', dailyLimit: 3, sortOrder: 0 }] };
 const people = '/api/booking/admin/assignment-settings?account_id=a';
 const tables = '/api/restaurant-test/assignment-settings?account_id=a&storeId=store';
-function request(path: string, body?: unknown) {
+const automation = '/api/restaurant-test/table-auto-assignment-settings?account_id=a&storeId=store';
+function request(path: string, body?: unknown, method = 'PUT') {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => { c.set('staff', { id: 'login', name: '試験', role, readOnly,
     permissionKeys: edit ? ['booking.settings'] : [], viewPermissionKeys: ['booking.settings'] }); await next(); });
   app.route('/', booking); app.route('/', restaurantTest);
-  return app.request(path, body === undefined ? {} : { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+  return app.request(path, body === undefined ? {} : { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
     { DB: f.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings']);
 }
 beforeEach(() => { f = createTestD1(); seedAssignmentFixture(f); role = 'owner'; readOnly = false; edit = false; access.allow = true; });
 afterEach(() => f.raw.close());
 describe('割り当て設定API', () => {
+  it('オフでもスタッフ指定の卓を保ち、保存直前に設定が変われば来店記録ごと残さない',async()=>{
+    f.raw.exec("UPDATE rt_tables SET is_active=0 WHERE id IN('t2','big')");
+    expect((await request(automation,{enabled:false,expectedVersion:0})).status).toBe(200);
+    const path='/api/restaurant-test/reservations/walk-in?account_id=a';
+    const body={storeId:'store',guestCount:2,tableId:'t1'};
+    const prepare=f.db.prepare.bind(f.db);
+    const race=vi.spyOn(f.db,'prepare').mockImplementation(sql=>{
+      if(sql.includes('RESTAURANT_CAPACITY_CHANGED'))f.raw.exec("UPDATE account_settings SET value=json_set(value,'$.version',2,'$.data.enabled',json('true')) WHERE key='restaurant.table_auto_assignment:store'");
+      return prepare(sql);
+    });
+    expect((await request(path,body,'POST')).status).toBe(409);
+    race.mockRestore();
+    expect(f.raw.prepare('SELECT COUNT(*) n FROM rt_reservations').get()).toEqual({n:0});
+    expect(f.raw.prepare('SELECT COUNT(*) n FROM rt_seat_visit_marks').get()).toEqual({n:0});
+    expect((await request(automation,{enabled:false,expectedVersion:2})).status).toBe(200);
+    expect((await request(path,body,'POST')).status).toBe(201);
+    expect(f.raw.prepare('SELECT table_id FROM rt_reservations').get()).toEqual({table_id:'t1'});
+    expect((await request(path,body,'POST')).status).toBe(409);
+  });
+  it('シンプルな自動配席を読み、版付きでオフにし、同時保存と別店舗を守る', async () => {
+    expect(await (await request(automation)).json()).toEqual({success:true,data:{enabled:true,version:0}});
+    const result=await Promise.all([request(automation,{enabled:false,expectedVersion:0}),request(automation,{enabled:true,expectedVersion:0})]);
+    expect(result.map(r=>r.status).sort()).toEqual([200,409]);
+    expect((await request(automation.replace('storeId=store','storeId=other-store'))).status).toBe(404);
+    expect((await request(automation,{enabled:'false',expectedVersion:1})).status).toBe(400);
+    expect((await request(automation,{enabled:false,expectedVersion:0})).status).toBe(409);
+  });
+  it('自動配席も閲覧のみと予約設定権限を検査し、破損した設定を黙って上書きしない', async()=>{
+    role='staff';
+    expect((await request(automation)).status).toBe(200);
+    expect((await request(automation,{enabled:false,expectedVersion:0})).status).toBe(403);
+    edit=true;readOnly=true;
+    expect((await request(automation,{enabled:false,expectedVersion:0})).status).toBe(403);
+    readOnly=false;
+    expect((await request(automation,{enabled:false,expectedVersion:0})).status).toBe(200);
+    f.raw.exec("UPDATE account_settings SET value='broken' WHERE key='restaurant.table_auto_assignment:store'");
+    expect((await request(automation)).status).toBe(503);
+    expect((await request(automation,{enabled:true,expectedVersion:0})).status).toBe(503);
+  });
   it('未移行は初期値と従来方式を明示し、保存は503で断る', async () => {
     f.raw.exec('DROP TABLE booking_assignment_settings');
     expect(await (await request(people)).json()).toMatchObject({ success: true, data: {

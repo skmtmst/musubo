@@ -1,3 +1,4 @@
+import { readTableAutomation } from '../../services/restaurant-table-automation.js';
 import type { RestaurantSeatAvailability } from '@line-crm/shared';
 import { tzDateStr } from '../../services/availability.js';
 import { restaurantCivilTime } from '../../services/restaurant-booking.js';
@@ -51,28 +52,10 @@ export async function assignBookingStaff(db: D1Database, accountId: string, star
   return selectAssignment(candidates, { method, random: options.random })?.id ?? null;
 }
 
-/** 空いている候補のサイズ・結合組を保ち、構成する全卓の設定と実績を見る。 */
-export async function assignRestaurantTable(db: D1Database, storeId: string, startsAt: string, guestCount: number,
-  tables: RestaurantSeatAvailability['tables'], options: SelectionOptions = {}) {
-  if (!tables.length) return null;
-  // 保存先がない間は追加の店舗/実績読取も行わず、既存の先頭をそのまま使う。
-  const store = options.store ?? d1AssignmentSettingsStore(db);
-  const scope: AssignmentScope = { kind: 'table', id: storeId };
-  const settings = await store.read(scope);
-  if (!settings.storageReady) return selectAssignment(tables.map(t => ({ ...t, ...defaultAssignmentResource(t.id),
-    periodCount: 0, dailyCount: 0 })), { method: 'legacy_first', guestCount });
-  const row = await db.prepare('SELECT timezone FROM rt_stores WHERE id=?').bind(storeId).first<{ timezone: string }>();
-  if (!row) return null;
-  const ids = [...new Set(tables.flatMap(t => t.tableIds ?? [t.id]))];
-  const { method, candidates } = await assignmentCandidates(db, scope, startsAt, row.timezone, ids, { ...options, store: { ...store, read: async () => settings } });
-  const byId = new Map(candidates.map(c => [c.id, c]));
-  const rank = { preferred: 0, normal: 1, low: 2 } as const;
-  const choices = tables.map(t => {
-    const members = (t.tableIds ?? [t.id]).map(id => byId.get(id)!);
-    const weakest = members.reduce((a, b) => rank[a.priority] >= rank[b.priority] ? a : b);
-    return { ...t, priority: weakest.priority, sortOrder: Math.max(...members.map(m => m.sortOrder)),
-      lastAssignedAt: members.map(m => m.lastAssignedAt).filter((t): t is string => !!t).sort((a,b) => Date.parse(b)-Date.parse(a))[0] ?? null,
-      periodCount: members.reduce((sum, m) => sum + m.periodCount, 0), dailyCount: 0, dailyLimit: null, members } satisfies AssignmentCandidate;
-  });
-  return selectAssignment(choices, { method, guestCount, random: options.random });
+/** 飲食店は最小の空き卓から固定順で選ぶ。担当スタッフの均等化設定と分離する。 */
+export async function assignRestaurantTable(db: D1Database, storeId: string, _startsAt: string, guestCount: number,
+  tables: RestaurantSeatAvailability['tables'], _options: SelectionOptions = {}) {
+  if (!tables.length || !(await readTableAutomation(db, storeId)).enabled) return null;
+  return [...tables].filter(t => t.minCapacity <= guestCount && guestCount <= t.maxCapacity)
+    .sort((a, b) => a.maxCapacity - b.maxCapacity || a.id.localeCompare(b.id))[0] ?? null;
 }

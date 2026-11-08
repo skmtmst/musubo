@@ -19,7 +19,7 @@ import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import KpiCard from '@/components/shared/kpi-card'
 import { useEffect,useMemo, useRef, useState } from 'react'
-import { Grid2X2, Inbox, Plus } from 'lucide-react'
+import { Grid2X2, Inbox, Plus, Settings2 } from 'lucide-react'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -33,9 +33,8 @@ import { pickMoveTarget, reservationLine } from './move'
 import styles from '@/components/shared/restaurant-table-board.module.css'
 import TableRowActions from './table-row-actions'
 import StatusBadge from '@/components/shared/status-badge'
-import TablesAssignBoard from './assign'
+import TableAutoAssignmentDialog from './auto-assignment-dialog'
 import { useSearchParams } from 'next/navigation'
-import { Map as MapIcon } from 'lucide-react'
 import TablePenEditor, {type Draft} from '@/components/shared/restaurant-table-pen-editor'
 import RestaurantTableHeaderActions from '@/components/shared/restaurant-table-header-actions'
 import RestaurantFloorPanel from '@/components/shared/restaurant-floor-panel'
@@ -69,7 +68,7 @@ function seatTypeLabel(value: string): string {
 
 type MoveMode = 'move' | 'unassign'
 
-function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
+function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8Context; initialAutomationOpen?: boolean }) {
   const saveErrors = useSaveFormErrors()
   const { data, store, busy, mutate, tableDefinition } = ctx
   const { selectedAccountId, accounts } = useAccount()
@@ -88,6 +87,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const canEditRef = useRef(canEdit); canEditRef.current = canEdit
   const rows = useMemo(() => (store ? data.tables.filter((row) => row.store_id === store.id) : data.tables), [data.tables, store])
   const [asideExpanded, setAsideExpanded] = useState(false)
+  const [automationOpen, setAutomationOpen] = useState(initialAutomationOpen)
   const [selectedId, setSelectedId] = useState('')
   const [duplicateRequest,setDuplicateRequest]=useState(0)
   const [statusFilter,setStatusFilter]=useState<'all'|'active'|'suspended'>('all')
@@ -320,7 +320,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <KpiCard title="受付中の定員" value={activeRows.reduce((sum, item) => sum + item.max_capacity, 0)} unit="名" detail="最大人数の合計" icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="個室" value={rows.filter((item) => item.partition_type === 'private').length} unit="卓" detail="個室の卓数" icon={<Inbox size={16} aria-hidden />} presentation="band" />
       </StatRow>
-      <DetailColumns variant="restaurant-tables" asideLabel="卓一覧を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title="卓一覧" headerActions={<RestaurantTableHeaderActions statusFilter={statusFilter} onStatusFilter={setStatusFilter}/>}>
+      <DetailColumns variant="restaurant-tables" asideLabel="卓一覧を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title="卓一覧" titleActions={<Button presentation="restaurant" disabled={!selectedAccountId || !store || !snapshotAccountCurrent} onClick={() => setAutomationOpen(true)}><Settings2 size={15} aria-hidden="true" />自動配席の設定</Button>} headerActions={<RestaurantTableHeaderActions statusFilter={statusFilter} onStatusFilter={setStatusFilter}/>}>
           <ul className={styles.detailList}>
             {visibleRows.map((item) => (
               <li key={item.id} className={`${styles.detailRow} ${item.id === selectedId ? styles.detailRowSelected : ''}`}>
@@ -340,6 +340,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
           {store&&selectedAccountId?<RestaurantFloorEditor accountId={selectedAccountId} storeId={store.id} refreshKey={JSON.stringify(rows.map(t=>[t.id,t.floor_id,t.floor_version,t.label,t.min_capacity,t.max_capacity,t.shape,t.width,t.height,t.smoking_policy,t.shoes_allowed,t.visible_on_map,t.chair_arrangement,t.chair_side,t.is_active]))} resources={rows.map(t=>({id:t.id,label:t.label,capacity:t.max_capacity,active:!!t.is_active}))} existingCodes={rows.map(t=>t.code)} canEdit={canEdit} onSelect={setSelectedId} onCreate={openNew} selectedId={selectedId} duplicateRequest={duplicateRequest} onCreated={async()=>{await ctx.reload()}}/>:null}
         </RestaurantFloorPanel>
       </DetailColumns>
+      {automationOpen && selectedAccountId && store ? <TableAutoAssignmentDialog key={`${selectedAccountId}:${store.id}`} accountId={selectedAccountId} storeId={store.id} canEdit={canEdit} onClose={() => setAutomationOpen(false)} /> : null}
       <RsDialog open={Boolean(deleting)} title="この卓を削除しますか？" width={480} top={300} busy={busy}
         onCancel={() => { if (deleteScope?.ticket === deleteTicket.current) { deleteTicket.current = null; setDeleteId('') } }} actions={<>
           <Button disabled={busy} onClick={() => { if (deleteScope?.ticket === deleteTicket.current) { deleteTicket.current = null; setDeleteId('') } }}>キャンセル</Button>
@@ -434,15 +435,11 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
 }
 
 export default function TablesPage() {
-  const canEdit=canManageRole(useStaffRole())
-  /* ?view=assign：卓の割り当て方（jmVYJ・）。座席表へは［座席表を直す］で戻る。 */
+  /* 旧リンクも座席表を保ったまま、同じ設定モーダルを開く。 */
   const assignView=useSearchParams().get('view')==='assign'
-  if(assignView) return (
-    <RestaurantShell templateHeading boundary={false} boardId="jmVYJ" title="座席・卓管理" description={ctx=>ctx?.store?.name??''} headAfter={(_ctx,picker)=><>{picker}<Button presentation="restaurant" href="/restaurant-test/tables"><MapIcon size={16} aria-hidden="true"/>座席表を直す</Button></>} renderPage={(ctx, heading, notice) => <TablesAssignBoard ctx={ctx} canEdit={canEdit} heading={heading} notice={notice} />} />
-  )
   return (
     <RestaurantShell templateHeading boundary={false} boardId="BERxg" title="座席・卓管理" description={ctx=>ctx?.store?.name??''} headAfter={(_ctx,picker)=><>{picker}</>}>
-      {(ctx) => <TablesBoard ctx={ctx} />}
+      {(ctx) => <TablesBoard ctx={ctx} initialAutomationOpen={assignView} />}
     </RestaurantShell>
   )
 }

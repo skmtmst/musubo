@@ -137,3 +137,10 @@ html:root .toggle.on[data-size='large']:not([data-permission-locked]) { backgrou
 html:root .toggle[data-size='large']::after { width:18px; height:18px; top:3px; left:3px; }
 
 .field[data-size='large'] { font-size:14px; }
+html:root .toggle[data-size='restaurant'] { --toggle-width:46px; --toggle-height:26px; box-shadow:none; }
+html:root .toggle[data-size='restaurant']::after { width:20px; height:20px; top:3px; left:3px; }
+html:root .toggle.on[data-size='restaurant']::after { transform:translateX(20px); }
+.field[data-size='restaurant'] { font-size:14px; }
+.field[data-size='restaurant'] .fieldBody { gap:var(--space-8); }
+.field[data-size='restaurant'] label { font-weight:700; }
+.field[data-size='restaurant'] .description { font-size:12px; font-weight:400; }

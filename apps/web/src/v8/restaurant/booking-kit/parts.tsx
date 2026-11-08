@@ -28,11 +28,12 @@ export function RowMore({ subject, items }: { subject: string; items: ActionMenu
  * （題の段のあと 14 の間・各段 14・下の線の上 14）で置く。
  * onSubmit を渡すと中身を form にする（Enter で保存できる）。
  */
-export function RsDialog({ open, title, titleNote, width, exactWidth = false, minHeight, top, tone, busy, designNode, titleIcon, titleRow, plainTitle = false, headerHeight, contentPadding, bodyGap, footerPlain = false, footerGap, actionsPlacement = 'body', footerNote, onCancel, onSubmit, noValidate = false, actions, children }: {
+export function RsDialog({ open, title, titleNote, titleSize, width, exactWidth = false, minHeight, top, tone, busy, designNode, titleIcon, titleRow, plainTitle = false, headerHeight, contentPadding, bodyGap, bodyOffset, footerPlain = false, footerGap, actionsPlacement = 'body', footerNote, footerNotePlacement = 'above', onCancel, onSubmit, noValidate = false, actions, children }: {
   open: boolean
   title: string
   /** 題の下の小さな補足（絵の窓の頭が題＋1行のとき）。渡さないときは出ない。 */
   titleNote?: ReactNode
+  titleSize?: number
   width: number
   exactWidth?: boolean
   minHeight?: number
@@ -53,6 +54,8 @@ export function RsDialog({ open, title, titleNote, width, exactWidth = false, mi
   headerHeight?: number
   /** 中身の段どうしの間を絵の値にする。既定は 14。 */
   bodyGap?: number
+  /** 長さの短い設定窓など、既定の上への引き上げを使わないときの位置。 */
+  bodyOffset?: number
   /** 下のボタンの段に上の線を引かない（絵に線が無いとき）。 */
   footerPlain?: boolean
   /** 下のボタンの段の上の間を絵の値にする。既定は線ありで 14・線なしで 8。 */
@@ -65,6 +68,7 @@ export function RsDialog({ open, title, titleNote, width, exactWidth = false, mi
   {
     actionsPlacement?: 'body'
     footerNote?: never
+    footerNotePlacement?: never
     onSubmit?: () => void
     /** 本文内に操作を置く窓だけ、絵の余白を受け取る。 */
     contentPadding?: string
@@ -73,8 +77,9 @@ export function RsDialog({ open, title, titleNote, width, exactWidth = false, mi
     /** onClickで動く操作を本文から分け、共通の余白で下に固定する。 */
     actionsPlacement: 'footer'
     footerNote?: ReactNode
+    footerNotePlacement?: 'above' | 'inline'
     onSubmit?: never
-    contentPadding?: never
+    contentPadding?: string
   }
 )) {
   const scrollHint = useDialogScrollHint()
@@ -84,9 +89,9 @@ export function RsDialog({ open, title, titleNote, width, exactWidth = false, mi
    * （`components/shared/form-controls`）を出すので、間はその欄の `contentGap`
    * （`--field-content-gap`）だけが効く。窓側の変数は届かない。
    */
-  const bodyStyle = bodyGap === undefined
+  const bodyStyle = bodyGap === undefined && bodyOffset === undefined
     ? undefined
-    : ({ '--rs-dlg-body-gap': `${bodyGap}px` } as CSSProperties)
+    : ({ ...(bodyGap === undefined ? {} : { '--rs-dlg-body-gap': `${bodyGap}px` }), ...(bodyOffset === undefined ? {} : { '--rs-dlg-body-offset': `${bodyOffset}px` }) } as CSSProperties)
   const actionRow = (
     <div
       className={footerPlain ? styles.dialogActionsPlain : styles.dialogActions}
@@ -102,8 +107,8 @@ export function RsDialog({ open, title, titleNote, width, exactWidth = false, mi
     : `${footerGap}px`
   const footer = actionsPlacement === 'footer' ? (
     <DialogActions padding={footerPlain ? 'none' : undefined}>
-      {footerNote ? <div className={styles.footerNote} style={{ '--rs-dlg-actions-pad-top': footerTop } as CSSProperties}>{footerNote}</div> : null}
-      <p data-scroll-hint className={styles.scrollHint} style={{ visibility: scrollHint.hasMore ? 'visible' : 'hidden' }} aria-hidden={!scrollHint.hasMore} title="スクロールして続きを確認"><span aria-hidden="true">↓ </span>スクロールして続きを確認</p>
+      {footerNote ? <div className={footerNotePlacement === 'inline' ? styles.inlineFooterNote : styles.footerNote} style={{ '--rs-dlg-actions-pad-top': footerTop } as CSSProperties}>{footerNote}</div> : null}
+      {footerNotePlacement !== 'inline' || scrollHint.hasMore ? <p data-scroll-hint className={styles.scrollHint} style={{ visibility: scrollHint.hasMore ? 'visible' : 'hidden' }} aria-hidden={!scrollHint.hasMore} title="スクロールして続きを確認"><span aria-hidden="true">↓ </span>スクロールして続きを確認</p> : null}
       {actions}
     </DialogActions>
   ) : undefined
@@ -112,6 +117,7 @@ export function RsDialog({ open, title, titleNote, width, exactWidth = false, mi
       open={open}
       title={title}
       titleNote={titleNote}
+      titleContent={titleSize ? <span style={{ fontSize: titleSize }}>{title}</span> : undefined}
       tone={tone}
       busy={busy}
       titleIcon={titleIcon}
@@ -122,8 +128,8 @@ export function RsDialog({ open, title, titleNote, width, exactWidth = false, mi
       designMinHeight={minHeight}
       designTop={top}
       designHeaderHeight={headerHeight}
-      designContentPadding={actionsPlacement === 'footer' ? 'var(--space-16) var(--space-24) 0' : contentPadding}
-      designFooterPadding={actionsPlacement === 'footer' ? `${footerNote ? '0' : footerTop} var(--space-24) var(--space-20)` : undefined}
+      designContentPadding={contentPadding ?? (actionsPlacement === 'footer' ? 'var(--space-16) var(--space-24) 0' : undefined)}
+      designFooterPadding={actionsPlacement === 'footer' ? `${footerNote && footerNotePlacement === 'above' ? '0' : footerTop} var(--space-24) var(--space-20)` : undefined}
       footerDivider={actionsPlacement === 'footer' ? !footerPlain : undefined}
       footer={footer}
       designNode={designNode}
