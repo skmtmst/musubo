@@ -28,9 +28,11 @@ export function individualQuoteAccess(quote: IndividualQuoteState, now: string):
   const expires = instant(quote.expiresAt, 'expiresAt');
   const current = instant(now, 'now');
   if (expires <= issued) throw new RangeError('expiresAt must be after issuedAt');
+  if (current < issued) throw new RangeError('Quote has not been issued');
   const accepted = quote.acceptedAt === null ? null : instant(quote.acceptedAt, 'acceptedAt');
   const superseded = quote.supersededAt === null ? null : instant(quote.supersededAt, 'supersededAt');
-  if (accepted !== null && accepted >= issued && accepted <= expires && (superseded === null || accepted < superseded)) {
+  if (accepted !== null && accepted >= issued && accepted <= expires && accepted <= current
+    && (superseded === null || accepted < superseded)) {
     return 'accepted';
   }
   if (superseded !== null && superseded <= current) return 'superseded';

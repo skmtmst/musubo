@@ -43,6 +43,11 @@ describe('見積もりの同意期限', () => {
     expect(individualQuoteAccess(base, '2027-02-02T00:00:00.000Z')).toBe('expired');
     expect(individualQuoteAccess({ ...base, supersededAt: '2027-01-15T00:00:00.000Z' }, '2027-01-16T00:00:00.000Z')).toBe('superseded');
   });
+  it('発行前の同意は許可せず、未来の同意も先取りして表示しない', () => {
+    expect(() => individualQuoteAccess(base, '2026-12-31T23:59:00.000Z')).toThrow(/not been issued/);
+    expect(individualQuoteAccess({ ...base, acceptedAt: '2027-01-10T00:00:00.000Z' },
+      '2027-01-09T00:00:00.000Z')).toBe('available');
+  });
 });
 
 describe('解約と連携枠減額', () => {
