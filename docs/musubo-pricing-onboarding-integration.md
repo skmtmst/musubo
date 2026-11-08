@@ -20,7 +20,7 @@
 | 承認条件・会社制限 | `packages/shared/src/musubo-condition.ts` | 利用条件の変更を承認済み企業へ遡及させない。 |
 | 個別見積もり | `packages/shared/src/musubo-individual-quote.ts`, `musubo-billing-flow.ts` | 最終単価を再割引せず、期限内の同意時刻を保持する。 |
 | 追加連携枠 | `packages/shared/src/musubo-linked-addition.ts`, `musubo-linked-removal.ts` | 年払い利用中でも追加枠の日割り基準は月次期間。 |
-| 顧客画面 | `apps/web/src/v8/onboarding/`, `apps/web/src/v8/hq/` の `musubo-*`・`linked-*`・`line-resumption*` | Penの各分岐を表示できる部品。サーバー確定の料金・日付だけを渡す。 |
+| 顧客画面 | `apps/web/src/v8/onboarding/`, `apps/web/src/v8/hq/` の `musubo-*`・`linked-*`・`line-resumption*` | Penの各分岐を表示できる部品。サーバー確定の料金・日付だけを渡す。Stripeカード設定の戻り先 `/hq/onboarding/card` は登録状態を再照会する。 |
 | 運営画面 | `apps/web/src/v8/ops/` の利用条件・個別見積もり部品 | 保存と送信は認可済みAPIへ接続する。 |
 | メール | `apps/worker/src/services/` の `musubo-*mail.ts`, `quote-mail-design.ts`, `signup-mail-design.ts` | 検証済みのイベント後に送る。カード番号などは渡さない。 |
 | 既存の有料請求失敗 | `apps/worker/src/services/billing-payment-failure.ts`, `billing-invoice-notifications.ts`, `apps/web/src/app/hq/billing/payment-recovery/page.tsx` | 失敗から7日間の猶予と通知は既存課金で動く。追加分失敗とは状態を分ける。 |
@@ -32,7 +32,7 @@
 3. **顧客API**：承認済み条件の取得、料金プレビュー、見積もり同意、カード登録、追加・解除・最後のLINEの終了予約と取消、再開をサーバーの現在状態から処理する。画面の見積もり額や日付をそのまま請求根拠にしない。
 4. **Stripe契約**：既存のStripe契約は旧 `light/standard/pro` とAPI `2024-06-20` を前提としている。新しい年払いのLINE基本料金と月次オプションを同じ契約で扱う方式を、Stripeの現行仕様で確定し、検証環境で請求・日割り・Webhook順序を再現する。追加分の請求失敗を通常の更新請求失敗と識別し、既存利用へ `past_due` を伝播させない。
 5. **有効化ゲート**：最初のLINE接続と有効化が完了したときだけ無料期間を開始する。追加分は決済成功・必要な認証・接続確認のすべてが揃うまで有効化しない。重複Webhook・再試行・保留期限切れで二重請求や二重有効化をしない。
-6. **画面の入口**：現在の新料金画面部品は大半がルート未接続。承認、ログイン、料金確認、Stripeカード登録、既存LINEウィザード、請求、運営コンソールを状態に応じてつなぐ。旧ウィザードの友だち数質問 `Q3. 友だちの数は50万人を超えていますか？` は新しい料金入力・大規模相談の判定が保存されてから削除する。
+6. **画面の入口**：現在の新料金画面部品は大半がルート未接続。カード設定のStripe戻り先と既存請求失敗・復旧画面は接続済み。承認、ログイン、料金確認、カード設定に進む入口、既存LINEウィザード、運営コンソールを状態に応じてつなぐ。旧ウィザードの友だち数質問 `Q3. 友だちの数は50万人を超えていますか？` は新しい料金入力・大規模相談の判定が保存されてから削除する。
 7. **メール・通知**：Mail 01〜25の発火条件、再送の冪等性、受信者、送信失敗後の回復を接続する。送信処理を本番で有効にする段階では通常の外部通信承認ゲートを守る。
 8. **検証と配備**：機能別の試験、型検査、ビルド、PenとのPC・スマートフォン照合、共有検証環境の順番待ちと完全SHA確認を行う。Codexの担当範囲はコミットまで。push・PR・統合・配備はリポジトリの司令塔運用に従う。
 

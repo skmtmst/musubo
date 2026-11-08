@@ -64,8 +64,8 @@ function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
   // 本人の権限が分かるまで子をマウントせず、自動下書きや読込を始めさせない。
   if (role === null) return <PagePending failed={failed} onRetry={retry} />
 
-  if (pathname === '/hq/billing/payment-recovery' && !canAdministerRole(role)) return <PageFrame kind="detail">
-    <PageHeading title="お支払いの確認" />
+  if ((pathname === '/hq/billing/payment-recovery' || pathname === '/hq/onboarding/card') && !canAdministerRole(role)) return <PageFrame kind="detail">
+    <PageHeading title={pathname === '/hq/onboarding/card' ? 'お支払い情報' : 'お支払いの確認'} />
     <TargetMissing kind="forbidden" title="この画面を見る権限がありません" description="お支払いの確認はオーナーか管理者に頼んでください。" backHref="/hq/billing" backLabel="請求へ" />
   </PageFrame>
 
