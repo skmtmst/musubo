@@ -60,5 +60,7 @@ describe('追加連携枠の解除', () => {
     await act(async () => { root.render(<LinkedAccountRemovalModal {...base} nextMonthlyChargeAt="" phase="review" onConfirm={onConfirm} />) })
     expect(host.textContent).toContain('料金を表示できません')
     expect(host.textContent).not.toContain('この連携を解除する')
+    await act(async () => { root.render(<LinkedAccountRemovalModal {...base} nextMonthlyChargeAt="2027-02-30T00:00:00+09:00" phase="review" onConfirm={onConfirm} />) })
+    expect(host.textContent).toContain('料金を表示できません')
   })
 })
