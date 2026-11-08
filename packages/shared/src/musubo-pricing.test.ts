@@ -72,6 +72,16 @@ describe('musubo LINE pricing', () => {
     expect(() => musuboPrice({ ...base, lineCount: 1, friendCountExcludingBlocked: -1 })).toThrow();
     expect(() => musuboPrice({ ...base, lineCount: 1, lineBasicDiscountPercent: 101 })).toThrow();
   });
+
+  it('calculates variable quotes in integer yen and rejects totals outside safe range', () => {
+    const large = Number.MAX_SAFE_INTEGER;
+    const exact = musuboPrice({ ...base, lineCount: 1, lineBasicDiscountPercent: 99,
+      schedule: { ...DEFAULT_MUSUBO_PRICE_SCHEDULE, firstLineYen: large } });
+    expect(exact.lineBasicMonthlyYen).toBe(Number(BigInt(large) / 100n));
+    expect(exact.lineBasicAnnualYen).toBe(Number(BigInt(large) * 12n * 90n / 10_000n));
+    expect(() => musuboPrice({ ...base, lineCount: 2,
+      schedule: { ...DEFAULT_MUSUBO_PRICE_SCHEDULE, firstLineYen: large } })).toThrow(/safe JPY/);
+  });
 });
 
 describe('trial and incremental billing dates', () => {
@@ -91,6 +101,8 @@ describe('trial and incremental billing dates', () => {
     expect(prorateMonthlyIncrement(13_400, 15, 30)).toBe(6_700);
     expect(prorateMonthlyIncrement(3_300, 15, 30)).toBe(1_650);
     expect(() => prorateMonthlyIncrement(3_300, 31, 30)).toThrow();
+    expect(prorateMonthlyIncrement(Number.MAX_SAFE_INTEGER, 1, 3))
+      .toBe(Number(BigInt(Number.MAX_SAFE_INTEGER) / 3n));
   });
 
   it('prorates annual LINE additions using the actual 365- or 366-day period', () => {

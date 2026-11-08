@@ -66,6 +66,13 @@ function positive(value: number, name: string): number {
   return value;
 }
 
+function safeYen(value: bigint, name: string): number {
+  if (value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new RangeError(`${name} exceeds the safe JPY range`);
+  }
+  return Number(value);
+}
+
 /** More of Google Business and Instagram, minus the first included slot. */
 export function linkedAccountSlots(counts: LinkedAccountCounts): number {
   const google = wholeNonnegative(counts.googleBusiness, 'googleBusiness');
@@ -103,21 +110,25 @@ export function musuboPrice(input: MusuboPriceInput): MusuboPriceBreakdown {
     throw new RangeError('An accepted individual quote is required for eleven or more linked accounts');
   }
   const allowance = friendAllowanceForLineCount(lineCount, schedule);
-  const basicBeforeDiscount = schedule.firstLineYen
-    + Math.min(Math.max(lineCount - 1, 0), 4) * schedule.secondToFifthLineYen
-    + Math.min(Math.max(lineCount - 5, 0), 5) * schedule.sixthToTenthLineYen
-    + Math.max(lineCount - 10, 0) * (schedule.eleventhAndLaterLineYen ?? 0);
   if (lineCount > 10 && schedule.eleventhAndLaterLineYen === undefined) {
     throw new RangeError('An individual quote is required for eleven or more LINE accounts');
   }
-  const lineBasicMonthlyYen = Math.floor(basicBeforeDiscount * (100 - discount) / 100);
-  const lineBasicAnnualYen = Math.floor(basicBeforeDiscount * (100 - discount) * 12 * 90 / 10_000);
+  const basicBeforeDiscountBig = BigInt(schedule.firstLineYen)
+    + BigInt(Math.min(Math.max(lineCount - 1, 0), 4)) * BigInt(schedule.secondToFifthLineYen)
+    + BigInt(Math.min(Math.max(lineCount - 5, 0), 5)) * BigInt(schedule.sixthToTenthLineYen)
+    + BigInt(Math.max(lineCount - 10, 0)) * BigInt(schedule.eleventhAndLaterLineYen ?? 0);
+  const discountedBasic = basicBeforeDiscountBig * BigInt(100 - discount);
+  const basicBeforeDiscount = safeYen(basicBeforeDiscountBig, 'lineBasicBeforeDiscountYen');
+  const lineBasicMonthlyYen = safeYen(discountedBasic / 100n, 'lineBasicMonthlyYen');
+  const lineBasicAnnualYen = safeYen(discountedBasic * 12n * 90n / 10_000n, 'lineBasicAnnualYen');
   const extraFriendBlocks = Math.ceil(Math.max(friendCount - allowance, 0) / schedule.extraFriendBlockSize);
-  const slots = linked.reduce((sum, counts) => sum + linkedAccountSlots(counts), 0);
+  const slots = safeYen(linked.reduce((sum, counts) => sum + BigInt(linkedAccountSlots(counts)), 0n), 'linkedAccountSlots');
   const headquartersMonthlyYen = lineCount > 1 ? schedule.headquartersYen : 0;
-  const friendOverageMonthlyYen = extraFriendBlocks * schedule.extraFriendBlockYen;
-  const linkedAccountSlotsMonthlyYen = slots * schedule.linkedAccountSlotYen;
-  const optionsMonthlyYen = headquartersMonthlyYen + friendOverageMonthlyYen + linkedAccountSlotsMonthlyYen;
+  const friendOverageMonthlyYen = safeYen(BigInt(extraFriendBlocks) * BigInt(schedule.extraFriendBlockYen), 'friendOverageMonthlyYen');
+  const linkedAccountSlotsMonthlyYen = safeYen(BigInt(slots) * BigInt(schedule.linkedAccountSlotYen), 'linkedAccountSlotsMonthlyYen');
+  const optionsMonthlyYen = safeYen(BigInt(headquartersMonthlyYen) + BigInt(friendOverageMonthlyYen)
+    + BigInt(linkedAccountSlotsMonthlyYen), 'optionsMonthlyYen');
+  const monthlyTotalYen = safeYen(BigInt(lineBasicMonthlyYen) + BigInt(optionsMonthlyYen), 'monthlyTotalYen');
   return {
     lineCount,
     friendAllowance: allowance,
@@ -130,7 +141,7 @@ export function musuboPrice(input: MusuboPriceInput): MusuboPriceBreakdown {
     friendOverageMonthlyYen,
     linkedAccountSlotsMonthlyYen,
     optionsMonthlyYen,
-    monthlyTotalYen: lineBasicMonthlyYen + optionsMonthlyYen,
+    monthlyTotalYen,
     annualLineChargeYen: lineBasicAnnualYen,
   };
 }
@@ -189,7 +200,7 @@ export function prorateMonthlyIncrement(monthlyIncrementYen: number, daysRemaini
   wholeNonnegative(daysRemaining, 'daysRemaining');
   positive(daysInPeriod, 'daysInPeriod');
   if (daysRemaining > daysInPeriod) throw new RangeError('daysRemaining exceeds daysInPeriod');
-  return Math.floor(monthlyIncrementYen * daysRemaining / daysInPeriod);
+  return safeYen(BigInt(monthlyIncrementYen) * BigInt(daysRemaining) / BigInt(daysInPeriod), 'proratedMonthlyYen');
 }
 
 /**
@@ -216,7 +227,7 @@ export function prorateAnnualLineIncrement(input: {
     throw new RangeError('Annual billing period must contain 365 or 366 calendar days');
   }
   return {
-    chargeYen: Math.floor(annual * remainingDays / annualPeriodDays),
+    chargeYen: safeYen(BigInt(annual) * BigInt(remainingDays) / BigInt(annualPeriodDays), 'proratedAnnualYen'),
     remainingDays,
     annualPeriodDays,
   };
