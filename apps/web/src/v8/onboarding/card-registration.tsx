@@ -135,7 +135,7 @@ export default function CardRegistration({ returnState = null, onContinue, onBac
             : state === 'checking'
               ? <button type="button" className={styles.primary} disabled>確認中…</button>
               : <>
-                <Button type="button" className={styles.primary} onClick={() => void openCardForm()} busy={busy} busyLabel="画面を開いています…">
+                <Button type="button" variant="primary" className={styles.primary} onClick={() => void openCardForm()} busy={busy} busyLabel="画面を開いています…">
                   {returnState === 'cancel' ? 'カードを登録し直す' : 'Stripeでカードを登録する'}
                 </Button>
                 {(state === 'error' || returnState === 'success') && <button type="button" className={styles.secondary} onClick={() => void refresh()}>登録状況を再確認</button>}

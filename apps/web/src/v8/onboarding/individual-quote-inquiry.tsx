@@ -134,7 +134,7 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
         <div className={styles.footer}>
           <div>{onBack && <button type="button" className={styles.back} onClick={onBack}>ご利用予定を修正</button>}
             <p>送信後、登録メールアドレスへ受付のお知らせを送ります。</p></div>
-          <Button type="button" className={styles.primary} busy={busy} busyLabel="送信中…" disabled={!canSubmit} onClick={() => void send()}>
+          <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="送信中…" disabled={!canSubmit} onClick={() => void send()}>
             この内容で問い合わせる</Button>
         </div>
         {error && <p className={styles.error} role="alert">{error}</p>}

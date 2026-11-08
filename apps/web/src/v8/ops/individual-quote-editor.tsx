@@ -106,7 +106,7 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
     </div>
     {error && <p className={styles.error} role="alert">{error}</p>}
     <div className={styles.actions}>{!sent && <button type="button" className={styles.secondary} onClick={() => setReview(false)}>料金条件を編集する</button>}
-      <Button type="button" className={styles.primary} busy={busy} busyLabel="送信中…" disabled={sent}
+      <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="送信中…" disabled={sent}
         onClick={() => void run(async () => { await onSend(draft); setSent(true) })}>
         {sent ? '送信済み' : 'この内容でメールを送信'}</Button></div>
     {sent && <p className={styles.sent} role="status">登録メールアドレスへ見積もりを送信しました。</p>}

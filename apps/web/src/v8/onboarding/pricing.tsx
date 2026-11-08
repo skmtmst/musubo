@@ -150,8 +150,9 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
             <label className={styles.field} htmlFor="friend-count">
               <span>既存のLINEアカウントの合計（ブロック除く）</span>
               <span className={styles.numberField}><TextField id="friend-count" type="text" inputMode="numeric" value={friendCountText}
+                style={{ height: 'var(--mp-px-50)', paddingRight: 'var(--mp-px-48)' }}
                 placeholder="現在の友だち数" aria-invalid={friendCountText !== '' && !friendCountValid}
-                onChange={(event) => setFriendCountText(event.target.value.replaceAll(',', ''))} /><span>人</span></span>
+                onChange={(event) => setFriendCountText(event.target.value.replaceAll(',', ''))} /><span aria-hidden="true">人</span></span>
               <small>接続後に実数で確定します</small>
             </label>
           </div>
@@ -230,7 +231,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
         <p>{quoteRequired
           ? 'お問い合わせ後に料金と利用開始の手順をご案内します。カード登録はこの段階では不要です。'
           : 'カード情報はStripeが管理し、musuboには保存されません。カード登録だけでは無料体験も請求も始まりません。'}</p>
-        <Button type="button" className={styles.primary} busy={busy} busyLabel="処理中…" disabled={!friendCountValid || (!quoteRequired && !consent)}
+        <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="処理中…" disabled={!friendCountValid || (!quoteRequired && !consent)}
           onClick={() => void advance()}>{quoteRequired ? 'お問い合わせフォームへ' : '同意してカード登録へ'}</Button>
       </div>
       {error && <p role="alert" className={styles.error}>{error}</p>}

@@ -79,7 +79,7 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
             : expired ? '再発行前にカードの登録や請求が始まることはありません。'
               : '未同意の旧見積もりは無効です。新しい見積もりの内容を確認して同意してください。'}</p>
           {error && <p className={styles.error} role="alert">{error}</p>}
-          <Button type="button" className={styles.primary} busy={busy} busyLabel="処理中…" onClick={() => {
+          <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="処理中…" onClick={() => {
             if (accepted) onResumeCardRegistration(quote.quoteNumber)
             else if (expired) void perform(() => onRequestReissue(quote.quoteNumber))
             else onOpenLatestQuote()
@@ -124,7 +124,7 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
         </Checkbox>
         <p className={styles.small}>同意した単価と適用条件は確定します。請求額は実際の連携数で決まり、期限後もカード登録を再開できます。カード情報はmusuboに保存しません。</p>
         {error && <p className={styles.error} role="alert">{error}</p>}
-        <Button type="button" className={styles.primary} busy={busy} busyLabel="処理中…" disabled={!agreed}
+        <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="処理中…" disabled={!agreed}
           onClick={() => void perform(async () => {
             await onAccept(quote.quoteNumber)
             onResumeCardRegistration(quote.quoteNumber)

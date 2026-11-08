@@ -126,7 +126,7 @@ export default function LastLineEnd({
     {error && <p role="alert" className={styles.error}>{error}</p>}
     <div className={styles.bottom}>
       <button type="button" className={styles.secondary} onClick={confirmImmediate ? () => setConfirmImmediate(false) : onBack}>戻る</button>
-      <Button type="button" className={confirmImmediate ? styles.danger : styles.primary} busy={busy} busyLabel="処理中…"
+      <Button type="button" variant={confirmImmediate ? 'danger' : 'primary'} className={confirmImmediate ? styles.danger : styles.primary} busy={busy} busyLabel="処理中…"
         onClick={() => {
           if (confirmImmediate) void submit(onEndNow)
           else if (selection === 'immediate') setConfirmImmediate(true)

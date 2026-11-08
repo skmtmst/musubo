@@ -175,7 +175,7 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
         <ol className={styles.steps}>{steps.map((step, index) => <li key={step}><span className={styles.number}>{index + 1}</span><strong>{step}</strong></li>)}</ol>
         <p className={styles.footnote}>{footnote}</p>
         {error && <p className={styles.error} role="alert">{error}</p>}
-        <Button type="button" className={styles.primary} busy={busy} busyLabel="処理中…" onClick={() => void invoke()}>{primary}</Button>
+        <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="処理中…" onClick={() => void invoke()}>{primary}</Button>
         <button type="button" className={styles.secondary} onClick={onSecondary}>{secondary}</button>
       </section>
     </div>

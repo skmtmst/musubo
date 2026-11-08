@@ -11,11 +11,8 @@
 .secondary { margin: 0 0 var(--mp-px-28); font-size: var(--mp-px-14); }
 .inputGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--mp-px-18); }
 .field { display: flex; flex-direction: column; min-width: 0; gap: var(--mp-px-9); color: var(--mp-color-202428); font-size: var(--mp-px-14); font-weight: 700; }
-.numberField { width: 100%; height: var(--mp-px-50); border: 1px solid var(--mp-color-d4dee2); border-radius: var(--mp-px-9); background: var(--mp-color-fff); color: var(--mp-color-202428); font: inherit; font-weight: 400; }
-.numberField:focus-within { outline: var(--mp-px-2) solid var(--mp-color-087c43); outline-offset: var(--mp-px-2); }
-.numberField { display: flex; align-items: center; gap: var(--mp-px-8); padding: 0 var(--mp-px-14); }
-.numberField input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; outline: 0; color: var(--mp-color-202428); font: inherit; font-weight: 400; }
-.numberField > span { color: var(--mp-color-58667a); font-weight: 400; }
+.numberField { position: relative; display: block; width: 100%; height: var(--mp-px-50); }
+.numberField > span { position: absolute; top: 50%; right: var(--mp-px-14); transform: translateY(-50%); color: var(--mp-color-58667a); font-weight: 400; pointer-events: none; }
 .field small { color: var(--mp-color-59687b); font-size: var(--mp-px-12); font-weight: 400; }
 .groupTitle { margin: var(--mp-px-28) 0 var(--mp-px-15); font-size: var(--mp-px-16); }
 .explainer { margin: var(--mp-px-22) 0; border-radius: var(--mp-px-10); background: var(--mp-color-f0f8f3); padding: var(--mp-px-17) var(--mp-px-19); color: var(--mp-color-425364); font-size: var(--mp-px-14); line-height: 1.8; }
@@ -72,6 +69,6 @@
   .steps li span { width: var(--mp-px-30); height: var(--mp-px-30); flex-basis: var(--mp-px-30); }
   .card { padding: var(--mp-px-20); }
   .inputGrid { grid-template-columns: 1fr; }
+  .planGrid { grid-template-columns: 1fr; }
   .modal { padding: var(--mp-px-24) var(--mp-px-18); }
-  .discountBadge { white-space: normal; }
 }

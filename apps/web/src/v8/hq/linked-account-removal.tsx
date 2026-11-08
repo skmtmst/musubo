@@ -100,7 +100,7 @@ export default function LinkedAccountRemoval({ view, onRemove, onBack, onViewCon
     <div className={styles.bottom}>
       <button type="button" className={styles.secondary} onClick={onBack}>{view.phase === 'complete' ? 'アカウント一覧へ' : '戻る'}</button>
       {view.phase === 'confirm'
-        ? <Button type="button" className={styles.primary} busy={busy} busyLabel="処理中…" onClick={() => void remove()}>この連携を解除する</Button>
+        ? <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="処理中…" onClick={() => void remove()}>この連携を解除する</Button>
         : onViewConnections && <button type="button" className={styles.primary} onClick={onViewConnections}>連携先を確認する</button>}
     </div>
   </div>

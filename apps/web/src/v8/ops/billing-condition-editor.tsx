@@ -152,7 +152,7 @@ export default function BillingConditionEditor({ conditions, onSave, onCreate }:
         </div>
         <p className={styles.help}>保存後の変更は、承認済みの会社に自動で遡及しません。</p>
         {error && <p className={styles.error} role="alert">{error}</p>}
-        <div className={styles.footer}><Button type="button" className={styles.primary} busy={busy} busyLabel="保存中…" disabled={!preview}
+        <div className={styles.footer}><Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="保存中…" disabled={!preview}
           onClick={() => void save()}>変更を保存</Button></div>
       </section>}
     </div>
