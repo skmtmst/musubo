@@ -27,6 +27,9 @@ export function musuboIndividualQuotePrice(quote: MusuboIndividualQuote): {
   finalLineBasicMonthlyYen: number;
   finalAnnualLineChargeYen: number | null;
   optionsMonthlyYen: number;
+  headquartersMonthlyYen: number;
+  friendOverageMonthlyYen: number;
+  linkedAccountSlotsMonthlyYen: number;
   plannedMonthlyTotalYen: number | null;
   linkedSlots: number;
 } {
@@ -51,6 +54,9 @@ export function musuboIndividualQuotePrice(quote: MusuboIndividualQuote): {
     finalLineBasicMonthlyYen: price.lineBasicMonthlyYen,
     finalAnnualLineChargeYen: quote.finalAnnualLineChargeYen,
     optionsMonthlyYen: price.optionsMonthlyYen,
+    headquartersMonthlyYen: price.headquartersMonthlyYen,
+    friendOverageMonthlyYen: price.friendOverageMonthlyYen,
+    linkedAccountSlotsMonthlyYen: price.linkedAccountSlotsMonthlyYen,
     plannedMonthlyTotalYen: quote.interval === 'month' ? price.monthlyTotalYen : null,
     linkedSlots: price.linkedAccountSlots,
   };
