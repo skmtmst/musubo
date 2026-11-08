@@ -505,6 +505,14 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
           sql.push('stripe_subscription_id=?'); values.push(subscriptionId);
         }
         sql.push("(stripe_customer_id IS NULL OR stripe_customer_id=?)"); values.push(stripeExpandableId(object.customer));
+        if (patch.plan_status === 'active') {
+          // 契約の状態通知が先に届いても、未払い請求が残る間は猶予状態を維持する。
+          sql.push(`NOT EXISTS (SELECT 1 FROM billing_invoices bi
+            WHERE bi.tenant_id=tenants.id AND bi.status IN ('open','uncollectible')
+              AND bi.amount_due>bi.amount_paid
+              AND (bi.subscription_id IS NULL OR bi.subscription_id=?))`);
+          values.push(subscriptionId);
+        }
         // 受領記録は到着時刻でなく、事業者の発生時刻を保持する。
         if (created) {
           sql.push(`NOT EXISTS (SELECT 1 FROM billing_events e WHERE e.tenant_id=tenants.id

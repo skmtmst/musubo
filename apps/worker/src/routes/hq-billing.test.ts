@@ -483,6 +483,10 @@ describe('課金 Webhook', () => {
     const invoice = { id: 'in_1', customer: 'cus_1', subscription: 'sub_1', amount_due: 5900, amount_paid: 0, currency: 'jpy' };
     await webhook({ id: 'evt_2', type: 'invoice.payment_failed', data: { object: invoice } });
     expect(tenantRow().plan_status).toBe('past_due');
+    await webhook({ id: 'evt_subscription_active', type: 'customer.subscription.updated', data: { object: {
+      id: 'sub_1', status: 'active', customer: 'cus_1', items: { data: [{ price: { id: 'price_standard' } }] },
+    } } });
+    expect(tenantRow().plan_status).toBe('past_due');
     await webhook({ id: 'evt_other_paid', type: 'invoice.paid', data: { object: {
       ...invoice, id: 'in_2', status: 'paid', amount_paid: 5900,
     } } });
