@@ -605,6 +605,19 @@ describe('課金 Webhook', () => {
     expect(testDb.raw.prepare(`SELECT status, amount_refunded FROM billing_invoices WHERE id = 'in_status'`).get()).toMatchObject({ status: 'paid', amount_refunded: 4_000 });
   });
 
+  it('統括IDが一致しても別のStripe顧客の請求書は取り込まない', async () => {
+    setTenant({ stripe_customer_id: 'cus_1', plan_status: 'active' });
+    const res = await webhook({ id: 'evt_wrong_invoice_customer', type: 'invoice.payment_failed',
+      data: { object: { id: 'in_wrong_customer', customer: 'cus_other', subscription: 'sub_other',
+        metadata: { tenant_id: DEFAULT_TENANT_ID }, amount_due: 5900, amount_paid: 0,
+        currency: 'jpy', created: 1_760_000_000, lines: { data: [] } } } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { matched: false } });
+    expect(tenantRow().plan_status).toBe('active');
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS n FROM billing_invoices WHERE id='in_wrong_customer'").get())
+      .toEqual({ n: 0 });
+  });
+
   it('請求書のないEC-CUBE返金は対象外として記録し、請求書を変更しない', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const res = await webhook({

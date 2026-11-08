@@ -451,7 +451,13 @@ async function findTenantForEvent(c: Context<Env>, object: Record<string, unknow
   const byMeta = metadata.tenant_id ?? (typeof object.client_reference_id === 'string' ? object.client_reference_id : null);
   if (byMeta) {
     const tenant = await getTenantBilling(c.env.DB, byMeta);
-    if (tenant) return tenant;
+    if (tenant) {
+      const customer = stripeExpandableId(object.customer);
+      // Metadata is useful for routing, but a signed event for another Stripe customer
+      // must never update this tenant's invoices or billing state.
+      if (customer && tenant.stripe_customer_id && tenant.stripe_customer_id !== customer) return null;
+      return tenant;
+    }
   }
   const customer = typeof object.customer === 'string' ? object.customer : null;
   return customer ? getTenantBillingByStripeCustomer(c.env.DB, customer) : null;
