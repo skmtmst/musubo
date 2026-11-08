@@ -106,6 +106,9 @@ export function musuboPrice(input: MusuboPriceInput): MusuboPriceBreakdown {
   positive(schedule.extraFriendBlockSize, 'extraFriendBlockSize');
   const linked = input.linkedAccountsByLine ?? [];
   if (linked.length > lineCount) throw new RangeError('More linked account entries than LINE accounts');
+  if (lineCount > 10 && !input.individualQuoteAccepted) {
+    throw new RangeError('An accepted individual quote is required for eleven or more LINE accounts');
+  }
   if (linked.some((counts) => counts.googleBusiness > 10 || counts.instagram > 10) && !input.individualQuoteAccepted) {
     throw new RangeError('An accepted individual quote is required for eleven or more linked accounts');
   }
