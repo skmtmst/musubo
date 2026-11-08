@@ -64,8 +64,8 @@ describe('musubo LINE pricing', () => {
     const quotedSchedule = {
       ...DEFAULT_MUSUBO_PRICE_SCHEDULE, eleventhAndLaterLineYen: 6_900, friendAllowanceForElevenOrMore: 50_000,
     };
-    expect(() => musuboPrice({ ...base, lineCount: 11, schedule: quotedSchedule })).toThrow(/accepted individual quote/);
-    const quoted = musuboPrice({ ...base, lineCount: 11, schedule: quotedSchedule, individualQuoteAccepted: true });
+    expect(() => musuboPrice({ ...base, lineCount: 11, schedule: quotedSchedule })).toThrow(/individual quote/);
+    const quoted = musuboPrice({ ...base, lineCount: 11, schedule: quotedSchedule, individualQuoteContext: true });
     expect(quoted.lineBasicBeforeDiscountYen).toBe(78_900);
   });
 

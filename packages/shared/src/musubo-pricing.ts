@@ -34,8 +34,8 @@ export interface MusuboPriceInput {
   /** A company-specific discount on LINE base prices only. */
   lineBasicDiscountPercent?: number;
   schedule?: MusuboPriceSchedule;
-  /** Only an accepted individual quote may price eleven or more linked accounts. */
-  individualQuoteAccepted?: boolean;
+  /** Only quote authoring or a verified quote flow may calculate eleven or more accounts. */
+  individualQuoteContext?: boolean;
 }
 
 export interface MusuboPriceBreakdown {
@@ -106,11 +106,11 @@ export function musuboPrice(input: MusuboPriceInput): MusuboPriceBreakdown {
   positive(schedule.extraFriendBlockSize, 'extraFriendBlockSize');
   const linked = input.linkedAccountsByLine ?? [];
   if (linked.length > lineCount) throw new RangeError('More linked account entries than LINE accounts');
-  if (lineCount > 10 && !input.individualQuoteAccepted) {
-    throw new RangeError('An accepted individual quote is required for eleven or more LINE accounts');
+  if (lineCount > 10 && !input.individualQuoteContext) {
+    throw new RangeError('An individual quote is required for eleven or more LINE accounts');
   }
-  if (linked.some((counts) => counts.googleBusiness > 10 || counts.instagram > 10) && !input.individualQuoteAccepted) {
-    throw new RangeError('An accepted individual quote is required for eleven or more linked accounts');
+  if (linked.some((counts) => counts.googleBusiness > 10 || counts.instagram > 10) && !input.individualQuoteContext) {
+    throw new RangeError('An individual quote is required for eleven or more linked accounts');
   }
   const allowance = friendAllowanceForLineCount(lineCount, schedule);
   if (lineCount > 10 && schedule.eleventhAndLaterLineYen === undefined) {

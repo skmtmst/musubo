@@ -23,6 +23,7 @@ function validMoney(value: number, name: string): void {
   if (!Number.isSafeInteger(value) || value < 0) throw new RangeError(name + ' must be a nonnegative integer');
 }
 
+/** Previewing a draft is allowed; activation must separately verify acceptedAt in persisted data. */
 export function musuboIndividualQuotePrice(quote: MusuboIndividualQuote): {
   finalLineBasicMonthlyYen: number;
   finalAnnualLineChargeYen: number | null;
@@ -49,7 +50,7 @@ export function musuboIndividualQuotePrice(quote: MusuboIndividualQuote): {
     schedule: quote.finalSchedule,
     interval: 'month',
     lineBasicDiscountPercent: 0,
-    individualQuoteAccepted: true,
+    individualQuoteContext: true,
   });
   if (quote.interval === 'year') {
     if (quote.finalAnnualLineChargeYen === null) throw new RangeError('Final annual LINE charge is required');
@@ -76,7 +77,7 @@ export function suggestMusuboQuoteAnnualLineCharge(schedule: MusuboPriceSchedule
     friendCountExcludingBlocked: 0,
     interval: 'year',
     schedule,
-    individualQuoteAccepted: true,
+    individualQuoteContext: true,
   });
   return price.annualLineChargeYen;
 }
