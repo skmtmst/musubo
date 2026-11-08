@@ -85,8 +85,8 @@ export function pendingAdditionAccess(state: PendingAdditionState, now: string):
   const paid = state.paymentSucceededAt ? instant(state.paymentSucceededAt, 'paymentSucceededAt') : null;
   const cancelled = state.cancelledAt ? instant(state.cancelledAt, 'cancelledAt') : null;
   let status: 'pending' | 'activate' | 'expired' | 'cancelled' = 'pending';
-  if (cancelled !== null && cancelled <= current) status = 'cancelled';
-  else if (paid !== null && paid <= current && paid < holdUntil) status = 'activate';
+  if (paid !== null && paid <= current && paid < holdUntil && (cancelled === null || paid < cancelled)) status = 'activate';
+  else if (cancelled !== null && cancelled <= current) status = 'cancelled';
   else if (current >= holdUntil) status = 'expired';
   return { state: status, holdUntil: new Date(holdUntil).toISOString(), existingUsageAllowed: true };
 }

@@ -27,6 +27,14 @@ describe('追加分の決済失敗', () => {
     expect(pendingAdditionAccess({ requestedAt, paymentSucceededAt: '2027-01-03T00:00:00.000Z' }, '2027-01-03T00:00:01.000Z').state).toBe('activate');
     expect(pendingAdditionAccess({ requestedAt, paymentSucceededAt: '2027-01-08T00:00:00.000Z' }, '2027-01-08T00:00:01.000Z').state).toBe('expired');
   });
+  it('決済が先に成功した場合は遅れて届いた取消で有効化を覆さない', () => {
+    expect(pendingAdditionAccess({ requestedAt,
+      paymentSucceededAt: '2027-01-03T00:00:00.000Z', cancelledAt: '2027-01-03T00:00:01.000Z',
+    }, '2027-01-03T00:00:02.000Z').state).toBe('activate');
+    expect(pendingAdditionAccess({ requestedAt,
+      cancelledAt: '2027-01-03T00:00:00.000Z', paymentSucceededAt: '2027-01-03T00:00:01.000Z',
+    }, '2027-01-03T00:00:02.000Z').state).toBe('cancelled');
+  });
 });
 
 describe('見積もりの同意期限', () => {
