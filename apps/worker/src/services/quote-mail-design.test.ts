@@ -50,6 +50,7 @@ describe('個別見積もりメール', () => {
     expect(receipt.html).toContain('&lt;script&gt;');
     expect(receipt.html).not.toContain('<script>');
     expect(() => individualQuoteMail({ quote, reviewUrl: 'javascript:alert(1)', kind: 'issued' })).toThrow();
+    expect(() => individualQuoteMail({ quote, reviewUrl: 'http://admin.example.com/quote?token=abc', kind: 'issued' })).toThrow();
     expect(() => individualQuoteMail({ quote: { ...quote, supersededAt: quote.issuedAt },
       reviewUrl: 'https://admin.example.com/quote', kind: 'issued' })).toThrow();
   });

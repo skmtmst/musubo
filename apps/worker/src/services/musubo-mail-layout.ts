@@ -7,7 +7,7 @@ export function escapeMailHtml(value: string): string {
 
 export function safeMailUrl(value: string): string {
   const url = new URL(value);
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new RangeError('Email link must be HTTP or HTTPS');
+  if (url.protocol !== 'https:') throw new RangeError('Email link must be HTTPS');
   return url.toString();
 }
 

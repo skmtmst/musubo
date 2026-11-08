@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { safeMailUrl } from './musubo-mail-layout.js';
 import { musuboInvoiceMail } from './musubo-invoice-mail.js';
 import { musuboTrialMail } from './musubo-trial-mail.js';
 
@@ -25,6 +26,8 @@ describe('有料請求の通知メール', () => {
 
   it('危険なURLを拒否し、次回請求日が未確定なら請求画面を案内する', () => {
     expect(() => musuboInvoiceMail({ ...invoice, event: 'failed', billingUrl: 'javascript:alert(1)' })).toThrow();
+    expect(() => safeMailUrl('http://admin.example.com/hq/billing')).toThrow();
+    expect(safeMailUrl('https://admin.example.com/hq/billing')).toBe(invoice.billingUrl);
     expect(musuboInvoiceMail({ ...invoice, event: 'recovered' }).text).toContain('請求画面でご確認ください');
   });
 });
