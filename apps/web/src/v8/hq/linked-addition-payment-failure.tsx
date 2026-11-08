@@ -13,8 +13,8 @@ export interface LinkedAdditionPaymentFailureView {
   amountYen: number
   monthlyIncreaseYen: number
   /** Server-confirmed, fixed proration snapshot for this pending addition. */
-  remainingDays: number
-  periodDays: number
+  monthlyDaysRemaining: number
+  monthlyDaysInPeriod: number
 }
 
 const yen = (amount: number) => `¥${new Intl.NumberFormat('ja-JP').format(amount)}`
@@ -49,7 +49,7 @@ export default function LinkedAdditionPaymentFailure({ view, onRetry, onCancel }
     <div className={styles.columns}>
       <section className={styles.card} aria-labelledby="linked-failure-price-title">
         <h2 id="linked-failure-price-title">連携枠の追加分</h2>
-        <div className={styles.amountRow}><div><span>今回の追加分（税込・{view.remainingDays}/{view.periodDays}日）</span>
+        <div className={styles.amountRow}><div><span>今回の追加分（税込・{view.monthlyDaysRemaining}/{view.monthlyDaysInPeriod}日）</span>
           <strong>{yen(view.amountYen)}</strong></div><span className={styles.amountWarning}>追加は保留中</span></div>
         <dl className={styles.details}>
           <div><dt>LINEアカウント</dt><dd>{view.lineName}</dd></div>

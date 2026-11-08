@@ -15,7 +15,7 @@ describe('追加連携枠の決済失敗', () => {
   it('新しい連携だけ保留し、既存利用を継続する案内と日割り額を示す', async () => {
     await act(async () => { root.render(<LinkedAdditionPaymentFailure view={{
       lineName: '公式LINE A', service: 'googleBusiness', addedOrdinal: 2, activeServiceCount: 1,
-      amountYen: 1_650, monthlyIncreaseYen: 3_300, remainingDays: 15, periodDays: 30,
+      amountYen: 1_650, monthlyIncreaseYen: 3_300, monthlyDaysRemaining: 15, monthlyDaysInPeriod: 30,
     }} onRetry={onRetry} onCancel={onCancel} />) })
     expect(host.textContent).toContain('Googleマイビジネス2個目の連携は有効化待ち')
     expect(host.textContent).toContain('既存のLINEと連携先は通常どおり利用できます')
