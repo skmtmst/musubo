@@ -29,6 +29,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { sendPlainMail } from '../services/plain-mail.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { findPlan, formatJstMonthDay } from '../services/billing-plans.js';
+import { musuboQuoteInquiryReceiptMail } from '../services/quote-mail-design.js';
 
 /**
  * 統括から運営へのお問い合わせ（★36-3）。
@@ -197,6 +198,16 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
     if (!(HQ_SUPPORT_KINDS as readonly string[]).includes(kind)) {
       return inputError(c, { success: false, error: '種類を選んでください' }, 400, ["kind"]);
     }
+    const quoteInquiry = body.purpose === 'individual_quote';
+    if (body.purpose !== undefined && !quoteInquiry) {
+      return inputError(c, { success: false, error: 'お問い合わせの種類を確認してください' }, 400, ['purpose']);
+    }
+    if (quoteInquiry && kind !== 'billing') {
+      return inputError(c, { success: false, error: 'お見積もりは料金についてのお問い合わせを選んでください' }, 400, ['kind']);
+    }
+    if (quoteInquiry && staff?.role !== 'owner' && staff?.role !== 'admin') {
+      return c.json({ success: false, error: 'お見積もりのお問い合わせは管理者に依頼してください' }, 403);
+    }
     const subject = typeof body.subject === 'string' ? body.subject.trim() : '';
     if (!subject) return inputError(c, { success: false, error: '件名を入力してください' }, 400, ["subject"]);
     if (subject.length > SUBJECT_MAX) return inputError(c, { success: false, error: `件名は${SUBJECT_MAX}文字以内で入力してください` }, 400, ["subject"]);
@@ -256,6 +267,10 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
 
     const tenant = await c.env.DB.prepare('SELECT name FROM tenants WHERE id = ?').bind(tenantId).first<{ name: string }>().catch(() => null);
     const staffEmail = member?.email ?? null;
+    const applicant = quoteInquiry ? await c.env.DB.prepare(`SELECT email FROM registration_applications
+      WHERE tenant_id=? AND status='activated' ORDER BY created_at DESC LIMIT 1`)
+      .bind(tenantId).first<{ email: string }>().catch(() => null) : null;
+    const receiptEmail = applicant?.email ?? staffEmail;
 
     const request = await createHqSupportRequest(c.env.DB, {
       tenantId,
@@ -285,24 +300,29 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
     ].filter((line): line is string => line !== null);
     let notified = false;
     const operatorTo = c.env.SUPPORT_NOTIFY_EMAIL || c.env.CONTACT_EMAIL;
-    try {
-      if (operatorTo) {
+    if (operatorTo) {
+      try {
         await sendPlainMail(c.env, {
           to: operatorTo,
           subject: `【musubo お問い合わせ】${kindLabel}: ${subject}`,
           body: lines.join('\n'),
         });
         notified = true;
-      }
-      if (staffEmail) {
-        await sendPlainMail(c.env, {
-          to: staffEmail,
-          subject: `【musubo】お問い合わせを受け付けました: ${subject}`,
-          body: `${staffName} 様\n\nお問い合わせを受け付けました。返信は登録メールアドレスに届きます（平日 2営業日以内）。\n\n${lines.join('\n')}`,
-        });
-      }
-    } catch (error) {
-      logger.warn("hq_support.send_request_notification_failed");
+      } catch { logger.warn('hq_support.send_request_notification_failed'); }
+    }
+    if (receiptEmail) {
+      try {
+        if (quoteInquiry) {
+          const mail = musuboQuoteInquiryReceiptMail();
+          await sendPlainMail(c.env, { to: receiptEmail, subject: mail.subject, body: mail.text, html: mail.html });
+        } else {
+          await sendPlainMail(c.env, {
+            to: receiptEmail,
+            subject: `【musubo】お問い合わせを受け付けました: ${subject}`,
+            body: `${staffName} 様\n\nお問い合わせを受け付けました。返信は登録メールアドレスに届きます（平日 2営業日以内）。\n\n${lines.join('\n')}`,
+          });
+        }
+      } catch { logger.warn('hq_support.send_request_receipt_failed'); }
     }
     if (notified) await markHqSupportRequestNotified(c.env.DB, request.id);
 

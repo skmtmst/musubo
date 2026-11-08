@@ -35,7 +35,7 @@ export function individualQuoteInquiryBody(selection: PricingSelection, exactLin
 }
 
 async function submitViaSupport(subject: string, body: string): Promise<string> {
-  const result = await api.hqSupport.create({ kind: 'billing', subject, body })
+  const result = await api.hqSupport.create({ kind: 'billing', purpose: 'individual_quote', subject, body })
   if (!result.success) throw new Error(result.error)
   return result.data.id
 }
@@ -49,7 +49,8 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
   const [error, setError] = useState('')
   const [ticketId, setTicketId] = useState('')
   const linked = selection.lineCount === 1
-  const exactCountValid = exactLineCount === '' || (/^\d{1,3}$/.test(exactLineCount) && Number(exactLineCount) >= 11)
+  const exactCountValid = exactLineCount === '' || (/^\d+$/.test(exactLineCount)
+    && Number.isSafeInteger(Number(exactLineCount)) && Number(exactLineCount) >= 11)
   const body = individualQuoteInquiryBody(selection, exactLineCount, notes)
   const canSubmit = exactCountValid && body.length <= 4000 && !busy
 
