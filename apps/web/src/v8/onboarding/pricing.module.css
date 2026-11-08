@@ -56,7 +56,7 @@
 .modal h3 { margin: 0 0 12px; font-size: 16px; }
 .modal p { color: #59687b; font-size: 14px; line-height: 1.7; }
 .modal .primary { display: block; margin-left: auto; }
-.close { position: absolute; top: 20px; right: 20px; border: 0; background: transparent; color: #59687b; font-size: 26px; cursor: pointer; }
+.close { position: absolute; top: 20px; right: 20px; }
 .detailBlock { border-radius: 10px; margin: 22px 0; padding: 20px; background: #f5f7f8; }
 .detailBlock dl { margin: 0; }
 .detailBlock dl div { display: flex; justify-content: space-between; gap: 15px; margin: 8px 0; }

@@ -10,6 +10,7 @@ import {
 import { ListPage } from '@/components/templates'
 import { PageContent } from '@/components/templates/page-frame'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import CloseButton from '@/components/shared/close-button'
 import styles from './pricing.module.css'
 
 export interface OnboardingCondition {
@@ -207,7 +208,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
         if (event.target === event.currentTarget) setDetailsOpen(false)
       }}>
         <section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="details-heading">
-          <button type="button" className={styles.close} aria-label="閉じる" onClick={() => setDetailsOpen(false)}>×</button>
+          <CloseButton className={styles.close} onClick={() => setDetailsOpen(false)} />
           <h2 id="details-heading">料金の詳しい条件</h2>
           <p>接続したLINE公式アカウントの数に応じて料金が決まります。</p>
           <div className={styles.detailBlock}>
