@@ -76,7 +76,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
   const [error, setError] = useState('')
 
   const friendCount = Number(friendCountText.replaceAll(',', ''))
-  const quoteRequired = lineCount > 10 || googleBusinessCount > 10 || instagramCount > 10
+  const quoteRequired = lineCount > 10 || (lineCount === 1 && (googleBusinessCount > 10 || instagramCount > 10))
   const friendCountValid = (quoteRequired && friendCountText === '') || (/^\d{1,9}$/.test(friendCountText.replaceAll(',', '')) && Number.isSafeInteger(friendCount))
   const selection: PricingSelection = {
     lineCount,
@@ -90,7 +90,10 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
     return musuboPrice({
       lineCount,
       friendCountExcludingBlocked: friendCount,
-      linkedAccountsByLine: [{ googleBusiness: googleBusinessCount, instagram: instagramCount }],
+      linkedAccountsByLine: Array.from({ length: lineCount }, () => ({
+        googleBusiness: lineCount === 1 ? googleBusinessCount : 1,
+        instagram: lineCount === 1 ? instagramCount : 1,
+      })),
       interval,
       lineBasicDiscountPercent: condition.lineBasicDiscountPercent,
       schedule: condition.schedule,
@@ -131,7 +134,13 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
             ? '11個以上のご利用は個別見積もりです。分かる範囲の予定を確認してお問い合わせください。'
             : '予定数は見積り用。実際に有効になったLINE数で請求します。'}</p>
           <div className={styles.inputGrid}>
-            <PlannedCountSelect label="連携するLINEアカウント数" id="line-count" value={lineCount} onChange={setLineCount} />
+            <PlannedCountSelect label="連携するLINEアカウント数" id="line-count" value={lineCount} onChange={(count) => {
+              setLineCount(count)
+              if (count > 1) {
+                setGoogleBusinessCount(1)
+                setInstagramCount(1)
+              }
+            }} />
             <label className={styles.field} htmlFor="friend-count">
               <span>既存のLINEアカウントの合計（ブロック除く）</span>
               <span className={styles.numberField}><input id="friend-count" type="text" inputMode="numeric" value={friendCountText}
@@ -141,19 +150,27 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
             </label>
           </div>
           {friendCountText !== '' && !friendCountValid && <p className={styles.error}>友だち数は0以上の整数で入力してください。</p>}
-          <h3 className={styles.groupTitle}>このLINEに連携するアカウント数</h3>
-          <div className={styles.inputGrid}>
-            <PlannedCountSelect linked label="Googleマイビジネス" id="google-count" value={googleBusinessCount} onChange={setGoogleBusinessCount} />
-            <PlannedCountSelect linked label="Instagramアカウント" id="instagram-count" value={instagramCount} onChange={setInstagramCount} />
-          </div>
-          {!quoteRequired && <div className={styles.explainer}>
+          {lineCount === 1 && <>
+            <h3 className={styles.groupTitle}>このLINEに連携するアカウント数</h3>
+            <div className={styles.inputGrid}>
+              <PlannedCountSelect linked label="Googleマイビジネス" id="google-count" value={googleBusinessCount} onChange={setGoogleBusinessCount} />
+              <PlannedCountSelect linked label="Instagramアカウント" id="instagram-count" value={instagramCount} onChange={setInstagramCount} />
+            </div>
+          </>}
+          {lineCount === 1 && !quoteRequired && <div className={styles.explainer}>
             GoogleマイビジネスとInstagramは、それぞれ1個までLINEの基本料金に含まれます。
             追加料金は数が多いほうの2個目から、1個につき月額{yen(condition.schedule.linkedAccountSlotYen)}（税込）です。
             たとえばGoogleマイビジネス2個・Instagram1個なら、追加は1個分です。
           </div>}
+          {lineCount > 1 && lineCount <= 10 && <div className={styles.explainer}>
+            各LINEでGoogleマイビジネスとInstagramの連携数を設定します。各サービス1個目は基本料金内。
+            2個目以降の連携前に追加料金を確認します。ここで表示する予定料金には追加連携枠を含みません。
+          </div>}
           <p className={styles.note}>{quoteRequired
             ? '友だち数は概算でも大丈夫です。正確な連携数が未定の場合もご相談いただけます。'
-            : '未接続のLINE・連携先は請求対象外です。LINEまたは連携先が11個以上なら個別にご案内します。'}</p>
+            : lineCount === 1
+              ? '未接続のLINE・連携先は請求対象外です。LINEまたは連携先が11個以上なら個別にご案内します。'
+              : '未接続のLINE・連携先は請求対象外です。連携先の追加分は、各LINEの接続時に確認します。'}</p>
           {!quoteRequired && <label className={styles.consent}>
             <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
             <span>料金条件と無料体験後のカード請求に同意します</span>
@@ -223,7 +240,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
             <p>友だち数の基準：1個 3,000人／2〜5個 15,000人／6〜10個 50,000人</p>
             <p>基準を超えた人数を10,000人単位で切り上げ、1枠ごとに{yen(condition.schedule.extraFriendBlockYen)}／月（税込）です。</p>
             <div className={styles.explainer}>例｜LINE {lineCount <= 10 ? lineCount : 1}個の場合、{new Intl.NumberFormat('ja-JP').format(allowance || 3_000)}人までは追加料金なし。{new Intl.NumberFormat('ja-JP').format(nextFriendBlock || 3_001)}〜{new Intl.NumberFormat('ja-JP').format(exampleEnd || 13_000)}人は1枠分です。</div>
-            <p>GoogleマイビジネスとInstagramは各1個まで基本料金内です。多いほうの2個目から追加料金を数えます。</p>
+            <p>各LINEでGoogleマイビジネスとInstagramはそれぞれ1個まで基本料金内です。多いほうの2個目から追加料金を数えます。複数LINEの追加連携枠は、それぞれの連携前に料金を確認します。</p>
           </div>
           <p>年払いはLINE基本料金のみ10%割引。友だち超過・追加連携枠は毎月別請求です。</p>
           <p>無料体験は最初のLINE有効化日から{trialLabel(condition.trialPeriod)}。有効化前はカード登録済みでも請求しません。</p>

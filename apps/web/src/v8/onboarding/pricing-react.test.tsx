@@ -61,6 +61,24 @@ describe('Penの利用料金確認', () => {
     expect(contactFlow).toHaveBeenCalledWith(expect.objectContaining({ lineCount: 11 }))
   })
 
+  it('複数LINEでは各LINEの連携数を先取りせず、追加枠を予定料金に含めない', async () => {
+    await act(async () => { root.render(<OnboardingPricing onContinue={continueFlow} onContact={contactFlow} />) })
+    await act(async () => { inputValue('friend-count', '2800') })
+    await act(async () => { selectValue('google-count', '2') })
+    expect(host.textContent).toContain('¥9,200 / 月')
+    await act(async () => { selectValue('line-count', '2') })
+    expect(host.querySelector('#google-count')).toBeNull()
+    expect(host.querySelector('#instagram-count')).toBeNull()
+    expect(host.textContent).toContain('ここで表示する予定料金には追加連携枠を含みません')
+    expect(host.textContent).toContain('¥19,300 / 月')
+    expect(host.textContent).not.toContain('追加連携枠 1枠')
+    const agree = host.querySelector<HTMLInputElement>('input[type=checkbox]')!
+    await act(async () => { agree.click() })
+    const proceed = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('同意してカード登録へ'))!
+    await act(async () => { proceed.click() })
+    expect(continueFlow).toHaveBeenCalledWith(expect.objectContaining({ lineCount: 2, googleBusinessCount: 1, instagramCount: 1 }))
+  })
+
   it('特別条件の割引はLINE基本料金だけに適用し、年払いのオプションは月次と示す', async () => {
     await act(async () => { root.render(<OnboardingPricing
       condition={{ name: '特別条件A', trialPeriod: { unit: 'months', value: 3 },
