@@ -1,6 +1,8 @@
 'use client'
 
+import Button from '@/components/shared/button'
 import { useMemo, useState } from 'react'
+import Checkbox from '@/components/shared/checkbox'
 import {
   individualQuoteAccess,
   musuboIndividualQuotePrice,
@@ -77,11 +79,11 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
             : expired ? '再発行前にカードの登録や請求が始まることはありません。'
               : '未同意の旧見積もりは無効です。新しい見積もりの内容を確認して同意してください。'}</p>
           {error && <p className={styles.error} role="alert">{error}</p>}
-          <button type="button" className={styles.primary} disabled={busy} onClick={() => {
+          <Button type="button" className={styles.primary} busy={busy} busyLabel="処理中…" onClick={() => {
             if (accepted) onResumeCardRegistration(quote.quoteNumber)
             else if (expired) void perform(() => onRequestReissue(quote.quoteNumber))
             else onOpenLatestQuote()
-          }}>{busy ? '処理中…' : accepted ? 'カード登録を再開する' : expired ? '再発行を依頼する' : '最新のお見積もりを開く'}</button>
+          }}>{accepted ? 'カード登録を再開する' : expired ? '再発行を依頼する' : '最新のお見積もりを開く'}</Button>
         </div>
       </div>
     </div>
@@ -117,12 +119,16 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
           <div><dt>カード登録時の請求</dt><dd>{money(0)}</dd></div>
           <div><dt>見積もり有効期限</dt><dd>{dateJst(quote.expiresAt)}</dd></div></dl>
         <p className={styles.small}>無料期間は最初のLINEを有効化した日から始まります。終了後の初回請求日は、LINE有効化後に表示します。</p>
-        <label className={styles.consent}><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />
-          <span>料金条件・無料期間・今後の請求について確認し、同意します</span></label>
+        <Checkbox className={styles.consent} checked={agreed} onCheckedChange={setAgreed}>
+          料金条件・無料期間・今後の請求について確認し、同意します
+        </Checkbox>
         <p className={styles.small}>同意した単価と適用条件は確定します。請求額は実際の連携数で決まり、期限後もカード登録を再開できます。カード情報はmusuboに保存しません。</p>
         {error && <p className={styles.error} role="alert">{error}</p>}
-        <button type="button" className={styles.primary} disabled={!agreed || busy}
-          onClick={() => void perform(() => onAccept(quote.quoteNumber))}>{busy ? '処理中…' : '同意してカード登録へ'}</button>
+        <Button type="button" className={styles.primary} busy={busy} busyLabel="処理中…" disabled={!agreed}
+          onClick={() => void perform(async () => {
+            await onAccept(quote.quoteNumber)
+            onResumeCardRegistration(quote.quoteNumber)
+          })}>同意してカード登録へ</Button>
       </section>
     </div>
   </div>

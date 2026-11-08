@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @import "tailwindcss";
 @import "../components/shared/kpi-band-v8.css";
-@import "../components/shared/phone-preview-tokens.css";
+@import "../components/shared/phone-preview-tokens.css"; @import "../components/shared/musubo-pricing-tokens.css";
 @import "../components/shared/focus-ring.css"; @import "../components/shared/scrollbars.css"; @import "../components/shared/autofill.css";
 
 [data-design-node="yPkWe"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }

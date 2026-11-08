@@ -1,5 +1,6 @@
 'use client'
 
+import Button from '@/components/shared/button'
 import { useState } from 'react'
 import { linkedAccountSlots, type LinkedAccountCounts } from '@line-crm/shared'
 import styles from './linked-account-removal.module.css'
@@ -48,7 +49,7 @@ export default function LinkedAccountRemoval({ view, onRemove, onBack, onViewCon
     finally { setBusy(false) }
   }
 
-  return <main className={styles.page}>
+  return <div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › アカウント › 連携サービス › 連携解除</p>
     <h1>{view.phase === 'confirm' ? 'このアカウントの連携を解除しますか' : '連携を解除しました'}</h1>
     <p className={styles.lead}>{view.phase === 'confirm'
@@ -99,8 +100,8 @@ export default function LinkedAccountRemoval({ view, onRemove, onBack, onViewCon
     <div className={styles.bottom}>
       <button type="button" className={styles.secondary} onClick={onBack}>{view.phase === 'complete' ? 'アカウント一覧へ' : '戻る'}</button>
       {view.phase === 'confirm'
-        ? <button type="button" className={styles.primary} disabled={busy} onClick={() => void remove()}>{busy ? '処理中…' : 'この連携を解除する'}</button>
+        ? <Button type="button" className={styles.primary} busy={busy} busyLabel="処理中…" onClick={() => void remove()}>この連携を解除する</Button>
         : onViewConnections && <button type="button" className={styles.primary} onClick={onViewConnections}>連携先を確認する</button>}
     </div>
-  </main>
+  </div>
 }

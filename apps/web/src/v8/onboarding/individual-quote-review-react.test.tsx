@@ -46,6 +46,7 @@ describe('お客様の個別見積もり', () => {
     expect(button.disabled).toBe(false)
     await act(async () => { button.click() })
     expect(onAccept).toHaveBeenCalledWith('Q-2026-1108-01')
+    expect(onResumeCardRegistration).toHaveBeenCalledWith('Q-2026-1108-01')
   })
 
   it('期限内に同意済みなら期限後もカード登録を再開できる', async () => {
@@ -54,6 +55,16 @@ describe('お客様の個別見積もり', () => {
     const button = [...host.querySelectorAll('button')].find((item) => item.textContent === 'カード登録を再開する')!
     await act(async () => { button.click() })
     expect(onResumeCardRegistration).toHaveBeenCalledWith('Q-2026-1108-01')
+  })
+
+  it('同意の保存に失敗した場合はカード登録へ進めない', async () => {
+    onAccept.mockRejectedValueOnce(new Error('save failed'))
+    await act(async () => { renderQuote() })
+    await act(async () => { host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click() })
+    const button = [...host.querySelectorAll('button')].find((item) => item.textContent === '同意してカード登録へ')!
+    await act(async () => { button.click() })
+    expect(onResumeCardRegistration).not.toHaveBeenCalled()
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('処理を完了できませんでした')
   })
 
   it('未同意の期限切れは再発行依頼に分岐する', async () => {

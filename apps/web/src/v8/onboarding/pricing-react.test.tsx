@@ -3,6 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OnboardingPricing from './pricing'
+import PricingQuoteFlow from './pricing-quote-flow'
 import { DEFAULT_MUSUBO_PRICE_SCHEDULE } from '@line-crm/shared'
 
 let host: HTMLDivElement
@@ -22,10 +23,13 @@ afterEach(() => {
   host.remove()
 })
 
-function selectValue(id: string, value: string) {
-  const select = host.querySelector<HTMLSelectElement>('#' + id)!
-  select.value = value
-  select.dispatchEvent(new Event('change', { bubbles: true }))
+async function selectValue(id: string, value: string) {
+  const trigger = host.querySelector<HTMLButtonElement>('#' + id)!
+  await act(async () => { trigger.click() })
+  const label = value === '11' ? '11個以上' : `${value}個`
+  const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"] button')]
+    .find((button) => button.title === label)!
+  await act(async () => { option.click() })
 }
 function inputValue(id: string, value: string) {
   const input = host.querySelector<HTMLInputElement>('#' + id)!
@@ -35,15 +39,30 @@ function inputValue(id: string, value: string) {
 }
 
 describe('Penの利用料金確認', () => {
+  it('個別見積もり画面から戻っても入力した予定を保つ', async () => {
+    await act(async () => { root.render(<PricingQuoteFlow onContinue={continueFlow} />) })
+    await selectValue('line-count', '11')
+    await act(async () => { inputValue('friend-count', '2800') })
+    const contact = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('お問い合わせフォームへ'))!
+    await act(async () => { contact.click() })
+    expect(host.textContent).toContain('お見積もりのお問い合わせ')
+    const back = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('ご利用予定を修正'))!
+    await act(async () => { back.click() })
+    expect(host.querySelector('#line-count [data-select-value]')?.textContent).toBe('11個以上')
+    expect(host.querySelector<HTMLInputElement>('#friend-count')?.value).toBe('2800')
+    expect(host.textContent).toContain('お問い合わせフォームへ')
+  })
+
   it('1個を初期選択し、友だちと追加連携枠に応じた料金を示す', async () => {
     await act(async () => { root.render(<OnboardingPricing onContinue={continueFlow} onContact={contactFlow} />) })
-    expect(host.querySelector<HTMLSelectElement>('#line-count')?.value).toBe('1')
+    expect(host.querySelector('#line-count [data-select-value]')?.textContent).toBe('1個')
     expect(host.textContent).toContain('友だち数を入力すると')
     await act(async () => { inputValue('friend-count', '2800') })
     expect(host.textContent).toContain('¥5,900 / 月')
-    await act(async () => { selectValue('google-count', '2') })
-    expect(host.textContent).toContain('LINE 1個の基本料金（追加連携枠を除く）')
-    expect(host.textContent).toContain('追加連携枠1枠を利用した場合')
+    await selectValue('google-count', '2')
+    expect(host.textContent).toContain('LINE 1個の基本料金')
+    expect(host.textContent).toContain('追加連携枠 1枠')
+    expect(host.textContent).toContain('¥3,300 / 月')
     expect(host.textContent).toContain('¥9,200 / 月')
     const agree = host.querySelector<HTMLInputElement>('input[type=checkbox]')!
     await act(async () => { agree.click() })
@@ -52,17 +71,17 @@ describe('Penの利用料金確認', () => {
     expect(continueFlow).toHaveBeenCalledWith(expect.objectContaining({ lineCount: 1, friendCountExcludingBlocked: 2800, googleBusinessCount: 2 }))
   })
 
-  it('友だち超過を基本料金へ重複加算せず、追加料金として分けて表示する', async () => {
+  it('友だち超過を基本料金へ重複加算せず、内訳と合計を示す', async () => {
     await act(async () => { root.render(<OnboardingPricing onContinue={continueFlow} onContact={contactFlow} />) })
     await act(async () => { inputValue('friend-count', '13001') })
     expect(host.textContent).toContain('¥5,900 / 月')
     expect(host.textContent).toContain('¥2,200 / 月')
-    expect(host.textContent).not.toContain('¥8,100 / 月')
+    expect(host.textContent).toContain('¥8,100 / 月')
   })
 
   it('11個以上は金額と同意欄を出さず、問い合わせに進む', async () => {
     await act(async () => { root.render(<OnboardingPricing onContinue={continueFlow} onContact={contactFlow} />) })
-    await act(async () => { selectValue('line-count', '11') })
+    await selectValue('line-count', '11')
     expect(host.textContent).toContain('料金は個別にご案内します')
     expect(host.textContent).not.toContain('本日の請求')
     expect(host.querySelector('input[type=checkbox]')).toBeNull()
@@ -80,9 +99,9 @@ describe('Penの利用料金確認', () => {
   it('複数LINEでは各LINEの連携数を先取りせず、追加枠を予定料金に含めない', async () => {
     await act(async () => { root.render(<OnboardingPricing onContinue={continueFlow} onContact={contactFlow} />) })
     await act(async () => { inputValue('friend-count', '2800') })
-    await act(async () => { selectValue('google-count', '2') })
+    await selectValue('google-count', '2')
     expect(host.textContent).toContain('¥9,200 / 月')
-    await act(async () => { selectValue('line-count', '2') })
+    await selectValue('line-count', '2')
     expect(host.querySelector('#google-count')).toBeNull()
     expect(host.querySelector('#instagram-count')).toBeNull()
     expect(host.textContent).toContain('ここで表示する予定料金には追加連携枠を含みません')
@@ -101,7 +120,7 @@ describe('Penの利用料金確認', () => {
         lineBasicDiscountPercent: 50, schedule: DEFAULT_MUSUBO_PRICE_SCHEDULE }}
       onContinue={continueFlow} onContact={contactFlow} />) })
     await act(async () => { inputValue('friend-count', '2800') })
-    await act(async () => { selectValue('google-count', '2') })
+    await selectValue('google-count', '2')
     expect(host.textContent).toContain('¥6,250 / 月')
     const annual = [...host.querySelectorAll('button')].find((button) => button.textContent === '年払い')!
     await act(async () => { annual.click() })

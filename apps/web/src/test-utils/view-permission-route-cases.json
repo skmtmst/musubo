@@ -73,6 +73,7 @@
   {"route":"/hq/banners","boundary":null,"expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/hq/banners/project","boundary":null,"expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/hq/billing","boundary":null,"expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
+  {"route":"/hq/billing/payment-recovery","boundary":null,"expected":{"staff-none":false,"staff-view":false,"staff-edit":false,"viewer-staff":false,"viewer-owner":false,"owner":true,"admin":true}},
   {"route":"/hq/broadcasts/detail","boundary":null,"expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/hq/broadcasts/new","boundary":null,"expected":{"staff-none":false,"staff-view":false,"staff-edit":true,"viewer-staff":false,"viewer-owner":false,"owner":true,"admin":true}},
   {"route":"/hq/broadcasts","boundary":null,"expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},

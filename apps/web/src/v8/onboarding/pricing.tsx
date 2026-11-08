@@ -1,5 +1,6 @@
 'use client'
 
+import Button from '@/components/shared/button'
 import { useMemo, useState } from 'react'
 import {
   DEFAULT_MUSUBO_PRICE_SCHEDULE,
@@ -11,6 +12,9 @@ import { ListPage } from '@/components/templates'
 import { PageContent } from '@/components/templates/page-frame'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import CloseButton from '@/components/shared/close-button'
+import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
+import { TextField } from '@/components/shared/text-field'
 import styles from './pricing.module.css'
 
 export interface OnboardingCondition {
@@ -30,6 +34,7 @@ export interface PricingSelection {
 
 interface Props {
   condition?: OnboardingCondition
+  initialSelection?: PricingSelection
   onContinue: (selection: PricingSelection) => Promise<void>
   onContact: (selection: PricingSelection) => Promise<void>
 }
@@ -53,23 +58,23 @@ function PlannedCountSelect({ label, id, value, onChange, linked = false }: {
   onChange: (value: number) => void
   linked?: boolean
 }) {
-  return <label className={styles.field} htmlFor={id}>
+  return <div className={styles.field}>
     <span>{label}</span>
-    <select id={id} value={value} onChange={(event) => onChange(Number(event.target.value))}>
-      {(linked ? linkedCountOptions : countOptions).map((count) => <option value={count} key={count}>{count}個</option>)}
-      <option value={11}>11個以上</option>
-    </select>
-  </label>
+    <Select aria-label={label} id={id} size="full" value={String(value)}
+      onChange={(next) => onChange(Number(next))}
+      options={[...(linked ? linkedCountOptions : countOptions).map((count) => ({ value: String(count), label: `${count}個` })),
+        { value: '11', label: '11個以上' }]} />
+  </div>
 }
 
-export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onContinue, onContact }: Props) {
+export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initialSelection, onContinue, onContact }: Props) {
   usePageTitle('利用開始の準備')
   usePageCrumbs([{ label: 'ホーム', href: '/hq' }])
-  const [lineCount, setLineCount] = useState(1)
-  const [friendCountText, setFriendCountText] = useState('')
-  const [googleBusinessCount, setGoogleBusinessCount] = useState(1)
-  const [instagramCount, setInstagramCount] = useState(1)
-  const [interval, setInterval] = useState<'month' | 'year'>('month')
+  const [lineCount, setLineCount] = useState(initialSelection?.lineCount ?? 1)
+  const [friendCountText, setFriendCountText] = useState(initialSelection?.friendCountExcludingBlocked?.toString() ?? '')
+  const [googleBusinessCount, setGoogleBusinessCount] = useState(initialSelection?.googleBusinessCount ?? 1)
+  const [instagramCount, setInstagramCount] = useState(initialSelection?.instagramCount ?? 1)
+  const [interval, setInterval] = useState<'month' | 'year'>(initialSelection?.interval ?? 'month')
   const [consent, setConsent] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -109,6 +114,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
       else await onContinue(selection)
     } catch {
       setError('手続きを開始できませんでした。入力内容を確認して、もう一度お試しください。')
+    } finally {
       setBusy(false)
     }
   }
@@ -143,7 +149,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
             }} />
             <label className={styles.field} htmlFor="friend-count">
               <span>既存のLINEアカウントの合計（ブロック除く）</span>
-              <span className={styles.numberField}><input id="friend-count" type="text" inputMode="numeric" value={friendCountText}
+              <span className={styles.numberField}><TextField id="friend-count" type="text" inputMode="numeric" value={friendCountText}
                 placeholder="現在の友だち数" aria-invalid={friendCountText !== '' && !friendCountValid}
                 onChange={(event) => setFriendCountText(event.target.value.replaceAll(',', ''))} /><span>人</span></span>
               <small>接続後に実数で確定します</small>
@@ -171,10 +177,9 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
             : lineCount === 1
               ? '未接続のLINE・連携先は請求対象外です。LINEまたは連携先が11個以上なら個別にご案内します。'
               : '未接続のLINE・連携先は請求対象外です。連携先の追加分は、各LINEの接続時に確認します。'}</p>
-          {!quoteRequired && <label className={styles.consent}>
-            <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-            <span>料金条件と無料体験後のカード請求に同意します</span>
-          </label>}
+          {!quoteRequired && <Checkbox className={styles.consent} checked={consent} onCheckedChange={setConsent}>
+            料金条件と無料体験後のカード請求に同意します
+          </Checkbox>}
           <button type="button" className={styles.detailsLink} onClick={() => setDetailsOpen(true)}>
             {quoteRequired ? '標準料金のしくみを見る' : '料金の詳しい条件を見る'} ↗
           </button>
@@ -200,20 +205,20 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
             {!price && <p className={styles.secondary}>友だち数を入力すると、予定料金を表示します。</p>}
             {price && <>
               <div className={styles.amountRow}><span>{interval === 'month'
-                ? price.linkedAccountSlots > 0 ? 'LINE 1個の基本料金（追加連携枠を除く）' : lineCount + '個すべてを有効にした場合'
+                ? `LINE ${lineCount}個の基本料金`
                 : 'LINE基本料金（年払い）'}</span>
                 <strong>{interval === 'month'
-                  ? yen(price.lineBasicMonthlyYen + price.headquartersMonthlyYen) + ' / 月'
+                  ? yen(price.lineBasicMonthlyYen) + ' / 月'
                   : yen(price.annualLineChargeYen) + ' / 年'}</strong></div>
               {interval === 'year' && <p className={styles.annualNote}>年払いはLINE基本料金のみ。オプション料金{yen(price.optionsMonthlyYen)}／月は毎月別に請求します。</p>}
+              {price.headquartersMonthlyYen > 0 && <div className={styles.amountRow}><span>統括機能</span>
+                <strong>{yen(price.headquartersMonthlyYen)} / 月</strong></div>}
               <div className={styles.amountRow}><span>友だち数{new Intl.NumberFormat('ja-JP').format(friendCount)}人の追加料金</span>
                 <strong>{yen(price.friendOverageMonthlyYen)} / 月</strong></div>
-              {price.linkedAccountSlots > 0 && <div className={styles.amountRow}><span>{interval === 'month'
-                ? `追加連携枠${price.linkedAccountSlots}枠を利用した場合`
-                : `追加連携枠 ${price.linkedAccountSlots}枠`}</span>
-                <strong>{yen(interval === 'month'
-                  ? price.lineBasicMonthlyYen + price.headquartersMonthlyYen + price.linkedAccountSlotsMonthlyYen
-                  : price.linkedAccountSlotsMonthlyYen)} / 月</strong></div>}
+              {price.linkedAccountSlots > 0 && <div className={styles.amountRow}><span>追加連携枠 {price.linkedAccountSlots}枠</span>
+                <strong>{yen(price.linkedAccountSlotsMonthlyYen)} / 月</strong></div>}
+              {interval === 'month' && <div className={styles.totalRow}><span>すべて有効にした場合の月額（税込）</span>
+                <strong>{yen(price.monthlyTotalYen)} / 月</strong></div>}
             </>}
             <p className={styles.smallNote}>基本枠超過の友だち：1万人ごと{yen(condition.schedule.extraFriendBlockYen)}<br />
               追加連携枠：1枠{yen(condition.schedule.linkedAccountSlotYen)}／月（税込）</p>
@@ -225,8 +230,8 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
         <p>{quoteRequired
           ? 'お問い合わせ後に料金と利用開始の手順をご案内します。カード登録はこの段階では不要です。'
           : 'カード情報はStripeが管理し、musuboには保存されません。カード登録だけでは無料体験も請求も始まりません。'}</p>
-        <button type="button" className={styles.primary} disabled={busy || !friendCountValid || (!quoteRequired && !consent)}
-          onClick={() => void advance()}>{busy ? '処理中…' : quoteRequired ? 'お問い合わせフォームへ' : '同意してカード登録へ'}</button>
+        <Button type="button" className={styles.primary} busy={busy} busyLabel="処理中…" disabled={!friendCountValid || (!quoteRequired && !consent)}
+          onClick={() => void advance()}>{quoteRequired ? 'お問い合わせフォームへ' : '同意してカード登録へ'}</Button>
       </div>
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {detailsOpen && <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => {

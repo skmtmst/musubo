@@ -1,5 +1,7 @@
 'use client'
 
+import Button from '@/components/shared/button'
+import { TextArea, TextField } from '@/components/shared/text-field'
 import { useState } from 'react'
 import Link from 'next/link'
 import { ListPage } from '@/components/templates'
@@ -95,7 +97,7 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
             <div className={styles.fields}>
               <div className={styles.field}><span>連携するLINEアカウント数</span><div className={styles.readonly}>{countLabel(selection.lineCount)}</div></div>
               {!linked && <label className={styles.field} htmlFor="exact-line-count"><span>具体的な予定数（任意）</span>
-                <input id="exact-line-count" inputMode="numeric" value={exactLineCount} placeholder="例：12個"
+                <TextField id="exact-line-count" inputMode="numeric" value={exactLineCount} placeholder="例：12個"
                   aria-invalid={!exactCountValid} onChange={(event) => setExactLineCount(event.target.value)} />
                 {!exactCountValid && <small className={styles.error}>11以上の整数で入力してください。</small>}
               </label>}
@@ -106,7 +108,7 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
                 <div className={styles.field}><span>Instagramアカウントの連携予定数</span><div className={styles.readonly}>{countLabel(selection.instagramCount)}</div></div>
               </div>}
               <label className={styles.field} htmlFor="inquiry-notes"><span>{linked ? '連携方法・現在の運用' : 'Googleマイビジネス・Instagramの連携予定'}（任意）</span>
-                <textarea id="inquiry-notes" rows={4} maxLength={3500} value={notes}
+                <TextArea id="inquiry-notes" rows={4} maxLength={3500} value={notes}
                   placeholder={linked ? '例：Googleマイビジネス11個とInstagram1個を、このLINEに連携予定' : '例：LINEを12個、Googleマイビジネス12個とInstagram1個を連携予定'}
                   onChange={(event) => setNotes(event.target.value)} /></label>
             </div>
@@ -132,8 +134,8 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
         <div className={styles.footer}>
           <div>{onBack && <button type="button" className={styles.back} onClick={onBack}>ご利用予定を修正</button>}
             <p>送信後、登録メールアドレスへ受付のお知らせを送ります。</p></div>
-          <button type="button" className={styles.primary} disabled={!canSubmit} onClick={() => void send()}>
-            {busy ? '送信中…' : 'この内容で問い合わせる'}</button>
+          <Button type="button" className={styles.primary} busy={busy} busyLabel="送信中…" disabled={!canSubmit} onClick={() => void send()}>
+            この内容で問い合わせる</Button>
         </div>
         {error && <p className={styles.error} role="alert">{error}</p>}
       </>}

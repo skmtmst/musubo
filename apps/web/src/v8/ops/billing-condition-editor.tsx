@@ -1,6 +1,10 @@
 'use client'
 
+import Button from '@/components/shared/button'
 import { useMemo, useState } from 'react'
+import Select from '@/components/shared/select'
+import { TextField } from '@/components/shared/text-field'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import {
   musuboConditionPreview,
   validateMusuboCondition,
@@ -28,6 +32,7 @@ export default function BillingConditionEditor({ conditions, onSave, onCreate }:
   const [draft, setDraft] = useState<MusuboConditionDefinition | null>(selected ? clone(selected) : null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const saveErrors = useSaveFormErrors()
   const preview = useMemo(() => {
     if (!draft) return null
     try { return musuboConditionPreview(draft) } catch { return null }
@@ -55,13 +60,13 @@ export default function BillingConditionEditor({ conditions, onSave, onCreate }:
       setError('')
       await onSave(draft)
     } catch (caught) {
-      setError(caught instanceof RangeError ? '入力された料金・期間・会社名を確認してください。' : '利用条件を保存できませんでした。時間をおいて再度お試しください。')
+      if (!saveErrors.capture(caught)) setError(caught instanceof RangeError ? '入力された料金・期間・会社名を確認してください。' : '利用条件を保存できませんでした。時間をおいて再度お試しください。')
     } finally {
       setBusy(false)
     }
   }
 
-  return <div className={styles.page}>
+  return <SaveErrorScope errors={saveErrors}><div className={styles.page}>
     <div className={styles.heading}>
       <div><h1>利用条件</h1><p>承認時に会社へ付与する料金・無料期間を作成し、管理します。</p></div>
       <button type="button" className={styles.primary} onClick={onCreate}>＋ 新しい条件</button>
@@ -85,41 +90,38 @@ export default function BillingConditionEditor({ conditions, onSave, onCreate }:
           <span className={draft.status === 'active' ? styles.active : styles.inactive}>{draft.status === 'active' ? '有効' : '無効'}</span></div>
         <div className={styles.grid}>
           <label className={styles.field}><span>名称（運営用）</span>
-            <input value={draft.internalName} maxLength={80} onChange={(event) => change({ internalName: event.target.value })} /></label>
-          <label className={styles.field}><span>状態</span>
-            <select value={draft.status} onChange={(event) => change({ status: event.target.value as MusuboConditionDefinition['status'] })}>
-              <option value="active">有効</option><option value="inactive">無効</option>
-            </select></label>
-          <label className={styles.field}><span>無料期間（初回LINE有効化から）</span>
+            <TextField value={draft.internalName} maxLength={80} onChange={(event) => change({ internalName: event.target.value })} /></label>
+          <div className={styles.field}><span>状態</span>
+            <Select aria-label="状態" size="full" value={draft.status}
+              onChange={(value) => change({ status: value as MusuboConditionDefinition['status'] })}
+              options={[{ value: 'active', label: '有効' }, { value: 'inactive', label: '無効' }]} /></div>
+          <div className={styles.field}><span>無料期間（初回LINE有効化から）</span>
             <span className={styles.inlineFields}>
-              <input type="number" min={1} max={draft.trialPeriod.unit === 'months' ? 12 : 365}
+              <TextField type="number" aria-label="無料期間の長さ" min={1} max={draft.trialPeriod.unit === 'months' ? 12 : 365}
                 value={draft.trialPeriod.value} onChange={(event) => change({ trialPeriod: { ...draft.trialPeriod, value: Number(event.target.value) } })} />
-              <select value={draft.trialPeriod.unit} aria-label="無料期間の単位"
-                onChange={(event) => change({ trialPeriod: { unit: event.target.value as 'days' | 'months', value: draft.trialPeriod.value } })}>
-                <option value="days">日</option><option value="months">か月</option>
-              </select>
-            </span></label>
+              <Select aria-label="無料期間の単位" size="content" value={draft.trialPeriod.unit}
+                onChange={(value) => change({ trialPeriod: { unit: value as 'days' | 'months', value: draft.trialPeriod.value } })}
+                options={[{ value: 'days', label: '日' }, { value: 'months', label: 'か月' }]} />
+            </span></div>
           <label className={styles.field}><span>LINE基本料金の割引率</span>
-            <span className={styles.percent}><input type="number" min={0} max={100} value={draft.lineBasicDiscountPercent}
+            <span className={styles.percent}><TextField type="number" min={0} max={100} value={draft.lineBasicDiscountPercent}
               onChange={(event) => change({ lineBasicDiscountPercent: Number(event.target.value) })} /><span>%</span></span></label>
-          <label className={styles.field}><span>割引期間</span>
-            <select value={draft.discountEndsOn === null ? 'forever' : 'date'}
-              onChange={(event) => change({ discountEndsOn: event.target.value === 'forever' ? null : todayJst() })}>
-              <option value="forever">期限なし</option><option value="date">終了日を指定</option>
-            </select>
+          <div className={styles.field}><span>割引期間</span>
+            <Select aria-label="割引期間" size="full" value={draft.discountEndsOn === null ? 'forever' : 'date'}
+              onChange={(value) => change({ discountEndsOn: value === 'forever' ? null : todayJst() })}
+              options={[{ value: 'forever', label: '期限なし' }, { value: 'date', label: '終了日を指定' }]} />
             {draft.discountEndsOn !== null && <input type="date" value={draft.discountEndsOn}
               aria-label="割引終了日" onChange={(event) => change({ discountEndsOn: event.target.value })} />}
-          </label>
-          <label className={styles.field}><span>承認に使える期限</span>
-            <select value={draft.approvalUseUntil === null ? 'forever' : 'date'}
-              onChange={(event) => change({ approvalUseUntil: event.target.value === 'forever' ? null : todayJst() })}>
-              <option value="forever">期限なし</option><option value="date">期限を指定</option>
-            </select>
+          </div>
+          <div className={styles.field}><span>承認に使える期限</span>
+            <Select aria-label="承認に使える期限" size="full" value={draft.approvalUseUntil === null ? 'forever' : 'date'}
+              onChange={(value) => change({ approvalUseUntil: value === 'forever' ? null : todayJst() })}
+              options={[{ value: 'forever', label: '期限なし' }, { value: 'date', label: '期限を指定' }]} />
             {draft.approvalUseUntil !== null && <input type="date" value={draft.approvalUseUntil}
               aria-label="承認に使える期限日" onChange={(event) => change({ approvalUseUntil: event.target.value })} />}
-          </label>
+          </div>
           <label className={styles.field}><span>適用できる会社名（任意）</span>
-            <input value={draft.allowedCompanyName ?? ''} placeholder="特定の会社だけに使う場合"
+            <TextField value={draft.allowedCompanyName ?? ''} placeholder="特定の会社だけに使う場合"
               onChange={(event) => change({ allowedCompanyName: event.target.value || null })} />
             <small>入力した場合、承認する会社名が一致するときだけ選べます。</small>
           </label>
@@ -138,7 +140,7 @@ export default function BillingConditionEditor({ conditions, onSave, onCreate }:
               ['linkedAccountSlotYen', '追加連携枠（1枠あたり）'],
             ] as const).map(([key, label]) => <label className={styles.field} key={key}>
               <span>{label}</span>
-              <span className={styles.yen}><input type="number" min={0} step={1} value={draft.schedule[key]}
+              <span className={styles.yen}><TextField type="number" min={0} step={1} value={draft.schedule[key]}
                 onChange={(event) => changePrice(key, Number(event.target.value))} /><span>円／月</span></span>
             </label>)}
           </div>
@@ -150,9 +152,9 @@ export default function BillingConditionEditor({ conditions, onSave, onCreate }:
         </div>
         <p className={styles.help}>保存後の変更は、承認済みの会社に自動で遡及しません。</p>
         {error && <p className={styles.error} role="alert">{error}</p>}
-        <div className={styles.footer}><button type="button" className={styles.primary} disabled={busy || !preview}
-          onClick={() => void save()}>{busy ? '保存中…' : '変更を保存'}</button></div>
+        <div className={styles.footer}><Button type="button" className={styles.primary} busy={busy} busyLabel="保存中…" disabled={!preview}
+          onClick={() => void save()}>変更を保存</Button></div>
       </section>}
     </div>
-  </div>
+  </div></SaveErrorScope>
 }

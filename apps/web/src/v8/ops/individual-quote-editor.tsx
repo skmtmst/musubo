@@ -1,6 +1,9 @@
 'use client'
 
+import Button from '@/components/shared/button'
 import { useMemo, useState } from 'react'
+import Select from '@/components/shared/select'
+import { TextField } from '@/components/shared/text-field'
 import { musuboIndividualQuotePrice, suggestMusuboQuoteAnnualLineCharge,
   type MusuboIndividualQuote, type MusuboPriceSchedule } from '@line-crm/shared'
 import styles from './individual-quote-editor.module.css'
@@ -102,10 +105,10 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
       </section>
     </div>
     {error && <p className={styles.error} role="alert">{error}</p>}
-    <div className={styles.actions}><button type="button" className={styles.secondary} onClick={() => setReview(false)}>料金条件を編集する</button>
-      <button type="button" className={styles.primary} disabled={busy || sent}
+    <div className={styles.actions}>{!sent && <button type="button" className={styles.secondary} onClick={() => setReview(false)}>料金条件を編集する</button>}
+      <Button type="button" className={styles.primary} busy={busy} busyLabel="送信中…" disabled={sent}
         onClick={() => void run(async () => { await onSend(draft); setSent(true) })}>
-        {busy ? '送信中…' : sent ? '送信済み' : 'この内容でメールを送信'}</button></div>
+        {sent ? '送信済み' : 'この内容でメールを送信'}</Button></div>
     {sent && <p className={styles.sent} role="status">登録メールアドレスへ見積もりを送信しました。</p>}
   </div>
 
@@ -123,14 +126,14 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
               ['firstLineYen', '1個目'], ['secondToFifthLineYen', '2〜5個目・1個あたり'],
               ['sixthToTenthLineYen', '6〜10個目・1個あたり'],
             ] as const).map(([key, label]) => <label className={styles.field} key={key}><span>{label}</span>
-              <input type="number" min={0} step={1} value={draft.finalSchedule[key]}
+              <TextField type="number" min={0} step={1} value={draft.finalSchedule[key]}
                 onChange={(event) => changeSchedule(key, Number(event.target.value))} /></label>)}
             {draft.plannedLineCount > 10 && <label className={styles.field}><span>11個目以降・1個あたり <b>必須</b></span>
-              <input type="number" min={0} step={1} placeholder="金額を入力"
+              <TextField type="number" min={0} step={1} placeholder="金額を入力"
                 value={draft.finalSchedule.eleventhAndLaterLineYen ?? ''}
                 onChange={(event) => changeSchedule('eleventhAndLaterLineYen', event.target.value === '' ? undefined : Number(event.target.value))} /></label>}
             {draft.plannedLineCount > 10 && <label className={styles.field}><span>友だち数の基準（11個以上）</span>
-              <input type="number" min={0} step={1} value={draft.finalSchedule.friendAllowanceForElevenOrMore ?? 50_000}
+              <TextField type="number" min={0} step={1} value={draft.finalSchedule.friendAllowanceForElevenOrMore ?? 50_000}
                 onChange={(event) => changeSchedule('friendAllowanceForElevenOrMore', Number(event.target.value))} />
               <small>この人数を超えると、1万人単位で追加料金がかかります。</small></label>}
           </div>
@@ -140,14 +143,14 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
           <div className={styles.fieldGrid}>
             {([['headquartersYen', '統括オプション（月額）'], ['linkedAccountSlotYen', '追加連携枠・1枠あたり（月額）']] as const)
               .map(([key, label]) => <label className={styles.field} key={key}><span>{label}</span>
-                <input type="number" min={0} step={1} value={draft.finalSchedule[key]}
+                <TextField type="number" min={0} step={1} value={draft.finalSchedule[key]}
                   onChange={(event) => changeSchedule(key, Number(event.target.value))} /></label>)}
           </div>
         </section>
         <section className={styles.card} aria-labelledby="quote-rules-title"><h2 id="quote-rules-title">この見積もりに適用する共通ルール</h2>
           <p className={styles.small}>友だち数の超過分は1万人ごとに{money(draft.finalSchedule.extraFriendBlockYen)}／月。年払い割引はLINE基本料金のみです。特別割引は最終単価に反映済みです。</p>
           {draft.interval === 'year' && <label className={styles.field}><span>LINE基本料金・最終年額（税込）</span>
-            <input type="number" min={0} step={1} value={draft.finalAnnualLineChargeYen ?? ''}
+            <TextField type="number" min={0} step={1} value={draft.finalAnnualLineChargeYen ?? ''}
               onChange={(event) => setDraft((current) => ({ ...current, finalAnnualLineChargeYen: event.target.value === '' ? null : Number(event.target.value) }))} />
             <small>この金額を保存し、請求時に再割引しません。</small></label>}
         </section>
@@ -160,9 +163,9 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
           <strong>{price ? draft.interval === 'month' ? `${money(price.plannedMonthlyTotalYen!)}／月` : `${money(price.finalAnnualLineChargeYen!)}／年` : '—'}</strong>
           <small>{price ? draft.interval === 'year' ? `オプション料金 ${money(price.optionsMonthlyYen)}／月を別請求`
             : `追加連携 ${price.linkedSlots}枠を含む予定料金` : '必要な金額を入力すると表示します'}</small></div>
-        <label className={styles.field}><span>お支払いプラン</span><select value={draft.interval}
-          onChange={(event) => setInterval(event.target.value as 'month' | 'year')}>
-          <option value="month">月払い</option><option value="year">年払い</option></select></label>
+        <div className={styles.field}><span>お支払いプラン</span><Select aria-label="お支払いプラン" size="full" value={draft.interval}
+          onChange={(value) => setInterval(value as 'month' | 'year')}
+          options={[{ value: 'month', label: '月払い' }, { value: 'year', label: '年払い' }]} /></div>
         <label className={styles.field}><span>見積もり有効期限</span>
           <input type="datetime-local" value={jstLocal(draft.expiresAt)}
             onChange={(event) => { if (event.target.value) setDraft((current) => ({ ...current, expiresAt: localToIso(event.target.value) })) }} />
