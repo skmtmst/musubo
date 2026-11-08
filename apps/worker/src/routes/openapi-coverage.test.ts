@@ -781,6 +781,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/hq/banners/usage',
   'GET /api/hq/billing/invoices',
   'GET /api/hq/billing/card-status',
+  'GET /api/hq/billing/payment-failure',
   'GET /api/hq/billing/summary',
   'GET /api/hq/support/context',
   'GET /api/hq/support/kinds',

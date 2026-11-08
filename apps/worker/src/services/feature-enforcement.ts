@@ -15,7 +15,7 @@ import {
   type FeatureId,
 } from '@line-crm/shared';
 
-import { featureContractIsAvailable, resolveEntitlements } from './billing-plans.js';
+import { featureContractIsAvailable, resolveEntitlements, resolveTenantEntitlements } from './billing-plans.js';
 import {
   PERSONAL_DATA_RETENTION_JOB,
   TENANT_DATA_RETENTION_JOB,
@@ -628,7 +628,7 @@ async function tenantEntitlements(
   tenantId: string,
   context?: FeatureAvailabilityRequestContext,
 ): Promise<ReturnType<typeof resolveEntitlements>> {
-  const load = async () => resolveEntitlements(await getTenantBilling(db, tenantId));
+  const load = async () => resolveTenantEntitlements(db, await getTenantBilling(db, tenantId));
   if (!context) return load();
   const cached = context.entitlementsByTenant.get(tenantId);
   if (cached) return cached;
@@ -664,9 +664,7 @@ async function contractAvailability(
     ])) as Record<FeatureId, boolean>;
   }
   // tenant_id 読取 + tenants 読取の2往復を1往復の結合読取へ。
-  const entitlements = resolveEntitlements(
-    await getTenantBillingByLineAccount(db, accountId),
-  );
+  const entitlements = await resolveTenantEntitlements(db, await getTenantBillingByLineAccount(db, accountId));
   return Object.fromEntries(FEATURE_CATALOG.map((entry) => [
     entry.featureId,
     featureContractIsAvailable(entitlements, entry.entitlementKey),

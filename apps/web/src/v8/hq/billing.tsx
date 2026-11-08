@@ -239,12 +239,12 @@ function BillingInner() {
   const banner = billingBanner(summary)
   const isOwner = role === 'owner'
   const canManagePayment = canAdministerRole(role)
-  const canChoose = isOwner && summary.state !== 'exempt' && summary.state !== 'active' && summary.state !== 'past_due'
+  const canChoose = isOwner && summary.state !== 'exempt' && summary.state !== 'active' && summary.state !== 'past_due' && summary.state !== 'payment_suspended'
   const currentKey = currentPlanKey(summary)
   /* 契約中の変更は支払いの管理（Stripe の画面）で。管理画面が無い・課金の対象外は運営へ頼む。 */
   const changeRoute: ChangeRoute | null = summary.state === 'exempt'
     ? 'contact'
-    : summary.state === 'active' || summary.state === 'past_due'
+    : summary.state === 'active' || summary.state === 'past_due' || summary.state === 'payment_suspended'
       ? (summary.portalAvailable ? 'portal' : 'contact')
       : null
   const yearlyMins = summary.plans
@@ -272,6 +272,13 @@ function BillingInner() {
       ) : (
         <div data-design="Status"><Notice tone={banner.tone} message={bannerSentence(banner.title, banner.body)} /></div>
       )}
+      {summary.paymentFailure && canManagePayment ? (
+        <div className={styles.recoveryAction}>
+          <Button onClick={() => router.push('/hq/billing/payment-recovery')}>
+            未払いのお支払いを確認
+          </Button>
+        </div>
+      ) : null}
 
       <div className={styles.intervalRow} data-design="Interval">
         <SegmentedControl<BillingInterval>

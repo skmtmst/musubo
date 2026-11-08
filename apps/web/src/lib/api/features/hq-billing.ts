@@ -1,4 +1,4 @@
-import type { PlanKey, BillingInterval, BillingSummary, BillingInvoice } from '../../hq-billing'
+import type { PlanKey, BillingInterval, BillingSummary, BillingInvoice, BillingPaymentFailureView } from '../../hq-billing'
 import { fetchApi } from '../transport/request'
 import type { ApiResponse } from '@line-crm/shared'
 import type { FetchApiOptions } from '../types/transport'
@@ -11,6 +11,7 @@ export const hqBillingMethods = {
         estimatedAt: string; isEstimate: true; notice: string }>>(
         `/api/hq/billing/preview?${new URLSearchParams({ planKey, interval })}`),
     summary: (options?: FetchApiOptions) => fetchApi<ApiResponse<BillingSummary>>('/api/hq/billing/summary', options),
+    paymentFailure: (options?: FetchApiOptions) => fetchApi<ApiResponse<BillingPaymentFailureView | null>>('/api/hq/billing/payment-failure', options),
     /** Stripe の申込画面の URL。オーナーだけ。 */
     checkout: (planKey: PlanKey, interval: BillingInterval = 'month') =>
       fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/checkout', { method: 'POST', body: JSON.stringify({ planKey, interval }) }),

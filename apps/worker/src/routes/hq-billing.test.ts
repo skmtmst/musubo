@@ -490,6 +490,36 @@ describe('課金 Webhook', () => {
     expect(summary).toMatchObject({ state: 'canceled', canSend: false });
   });
 
+  it('請求失敗の7日後は利用を停止し、未払い請求の支払い先は権限者だけに返す', async () => {
+    const failedAt = Math.floor(Date.now() / 1000) - 8 * 24 * 60 * 60;
+    setTenant({ stripe_customer_id: 'cus_grace', stripe_subscription_id: 'sub_grace', plan_status: 'active', plan_key: 'light' });
+    const invoice = {
+      id: 'in_grace', customer: 'cus_grace', subscription: 'sub_grace', created: failedAt - 24 * 60 * 60,
+      amount_due: 5900, amount_paid: 0, currency: 'jpy', status: 'open',
+      hosted_invoice_url: 'https://invoice.stripe.com/i/test_grace',
+    };
+    expect((await webhook({ id: 'evt_grace_failed', type: 'invoice.payment_failed', created: failedAt,
+      data: { object: invoice } })).status).toBe(200);
+    const summary = (await (await call('GET', '/api/hq/billing/summary')).json<{ data: {
+      state: string; canSend: boolean; canGenerate: boolean; paymentFailure: Record<string, unknown>;
+    } }>()).data;
+    expect(summary).toMatchObject({ state: 'payment_suspended', canSend: false, canGenerate: false,
+      paymentFailure: { state: 'suspended' } });
+    expect(summary.paymentFailure).not.toHaveProperty('paymentUrl');
+    const detail = (await (await call('GET', '/api/hq/billing/payment-failure')).json<{ data: {
+      amountYen: number; paymentUrl: string;
+    } }>()).data;
+    expect(detail).toMatchObject({ amountYen: 5900, paymentUrl: invoice.hosted_invoice_url });
+    expect((await call('GET', '/api/hq/billing/payment-failure', undefined,
+      { staff: staffOf({ role: 'staff' }) })).status).toBe(403);
+
+    expect((await webhook({ id: 'evt_grace_paid', type: 'invoice.paid', created: failedAt + 10,
+      data: { object: { ...invoice, status: 'paid', amount_paid: 5900 } } })).status).toBe(200);
+    expect((await (await call('GET', '/api/hq/billing/summary')).json<{ data: {
+      state: string; canSend: boolean; paymentFailure: unknown;
+    } }>()).data).toMatchObject({ state: 'active', canSend: true, paymentFailure: null });
+  });
+
   it('入金済み請求書の金額・入金日・年払いを保存し、同じイベントは増やさない', async () => {
     setTenant({ stripe_customer_id: 'cus_1', plan_status: 'past_due' });
     const paid = {

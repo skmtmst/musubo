@@ -7,6 +7,16 @@ export const hqBillingPaths = {
       responses: { '200': { description: 'Tenant billing summary and plan entitlements' }, '404': { description: 'Tenant not found' } },
     },
   },
+  '/api/hq/billing/payment-failure': {
+    get: {
+      tags: ['HQ Billing'], summary: '現在の未払い請求と7日間の猶予・Stripeの支払い先を取得',
+      responses: {
+        '200': { description: '未払いが無ければdataはnull。請求先URLはStripeの請求書ドメインに限定する' },
+        '403': { description: 'Owner or admin role required' },
+        '404': { description: 'Tenant not found' },
+      },
+    },
+  },
   '/api/hq/billing/preview': {
     get: {
       tags: ['HQ Billing'], summary: 'プラン変更の参考額を取得（契約・DBは変更しない）',

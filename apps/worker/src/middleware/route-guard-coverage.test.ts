@@ -472,6 +472,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/hq/billing/card-status',
     'GET /api/hq/billing/invoices',
     'GET /api/hq/billing/metrics',
+    'GET /api/hq/billing/payment-failure',
     'GET /api/hq/billing/preview',
     'GET /api/hq/billing/summary',
     'GET /api/hq/operator-history',

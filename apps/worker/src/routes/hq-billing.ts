@@ -32,6 +32,7 @@ import {
   type PlanKey,
 } from '../services/billing-plans.js';
 import { billingInvoiceInput } from '../services/billing-invoices-sync.js';
+import { getBillingPaymentFailure } from '../services/billing-payment-failure.js';
 import { StripeApiError, stripeApi, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
 
@@ -107,7 +108,11 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
     const tenantId = tenantOf(c);
     const billing = await getTenantBilling(c.env.DB, tenantId);
     if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
-    const entitlements = resolveEntitlements(billing, { exemptMonthlyImages: exemptMonthlyImages(c) });
+    const paymentFailure = await getBillingPaymentFailure(c.env.DB, billing).catch(() => null);
+    const entitlements = resolveEntitlements(billing, {
+      exemptMonthlyImages: exemptMonthlyImages(c),
+      paymentSuspended: paymentFailure?.state === 'suspended',
+    });
 
     // 金額は Stripe の価格が正本。取れなければ仮の表示。
     const readPrice = async (key: PlanKey, interval: BillingInterval): Promise<number | null> => {
@@ -155,6 +160,11 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
         canSend: entitlements.canSend,
         canGenerate: entitlements.canGenerate,
         blockedReason: entitlements.blockedReason,
+        paymentFailure: paymentFailure ? {
+          failedAt: paymentFailure.failedAt,
+          graceDeadlineAt: paymentFailure.graceDeadlineAt,
+          state: paymentFailure.state,
+        } : null,
         dataRetentionDays: DATA_RETENTION_DAYS,
         stripeReady: stripeReady(c),
         portalAvailable: stripeReady(c) && Boolean(billing.stripe_customer_id),
@@ -180,6 +190,15 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
   } catch (err) {
     throw err;
   }
+});
+
+/** 未払い請求の支払い先は請求管理権限を持つ担当者だけに返す。 */
+hqBilling.get('/api/hq/billing/payment-failure', requireRole('owner', 'admin'), async (c) => {
+  c.header('Cache-Control', 'no-store');
+  const billing = await getTenantBilling(c.env.DB, tenantOf(c));
+  if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
+  const failure = await getBillingPaymentFailure(c.env.DB, billing);
+  return c.json({ success: true, data: failure });
 });
 
 // 即時変更を仮定した参考額だけを取得する。契約・顧客・DBは変更しない。
@@ -471,6 +490,8 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     const pending = {sql:"EXISTS (SELECT 1 FROM billing_events WHERE id=? AND summary='pending')",values:[event.id] as unknown[]};
     const subscriptionId = event.type.startsWith('customer.subscription.') ? stripeExpandableId(object.id)
       : stripeExpandableId(object.subscription);
+    // 請求失敗の猶予は「請求書作成日」ではなく、この請求書の最初の失敗通知から数える。
+    const subjectId = event.type.startsWith('invoice.') ? stripeExpandableId(object.id) : null;
     const created = typeof event.created === 'number' && Number.isSafeInteger(event.created) && event.created > 0 ? event.created : 0;
     const writeTenant = (patch: Parameters<typeof updateTenantBilling>[2], subscription = false) => {
       const sql = [pending.sql]; const values = [...pending.values];
@@ -502,8 +523,8 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
       if(statement){statements.push(statement);hasTenantWrite=true;}
     };
     const finish = async () => {
-      statements.push(c.env.DB.prepare(`UPDATE billing_events SET summary=json_object('state','completed','created',?,'subscriptionId',?,'applied',${hasTenantWrite?'changes()':'0'}) WHERE id=? AND summary='pending'`)
-        .bind(created,subscriptionId,event.id));
+      statements.push(c.env.DB.prepare(`UPDATE billing_events SET summary=json_object('state','completed','created',?,'subscriptionId',?,'subjectId',?,'applied',${hasTenantWrite?'changes()':'0'}) WHERE id=? AND summary='pending'`)
+        .bind(created,subscriptionId,subjectId,event.id));
       const results = await c.env.DB.batch(statements);
       if (refundStatementIndex !== undefined && !results[refundStatementIndex]?.meta.changes) {
         logger.warn('routes_hq_billing_warn');

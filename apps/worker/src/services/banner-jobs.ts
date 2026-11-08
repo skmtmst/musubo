@@ -10,7 +10,7 @@ import {
 
 
 import type { Env } from '../worker-env.js';
-import { resolveEntitlements } from './billing-plans.js';
+import { resolveTenantEntitlements } from './billing-plans.js';
 import { findBannerPreset } from './banner-prompt.js';
 import { resizeBannerToPreset,type BannerCropPosition } from './banner-resize.js';
 import { generateOpenAIImage,OpenAIImageError,DEFAULT_OPENAI_IMAGE_MODEL,type OpenAIReferenceImage } from './openai-images.js';
@@ -95,7 +95,7 @@ async function processNextImage(env:Env['Bindings'],g:BannerGeneration,root:Work
         let providerStarted=false;
         try{
           const exempt=Number(env.BANNER_MONTHLY_IMAGES) || 150;
-          const entitlements=resolveEntitlements(await getTenantBilling(db,g.tenant_id),{exemptMonthlyImages:exempt});
+          const entitlements=await resolveTenantEntitlements(db,await getTenantBilling(db,g.tenant_id),{exemptMonthlyImages:exempt});
           const [month,today,failures]=await Promise.all([getBannerUsageThisMonth(db,g.tenant_id),getBannerUsageToday(db,g.tenant_id),
             countRecentFailedBannerGenerations(db,g.tenant_id,toJstString(new Date(Date.now()-15*60_000)))]);
           if(!entitlements.canGenerate || month>=entitlements.monthlyImages || today>=Math.max(1,Math.ceil(entitlements.monthlyImages/5)) || failures>=3)

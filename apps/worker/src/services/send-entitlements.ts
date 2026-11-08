@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { getTenantBilling } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-import { resolveEntitlements, type Entitlements } from './billing-plans.js';
+import { resolveTenantEntitlements, type Entitlements } from './billing-plans.js';
 
 /**
  * 「この店舗（LINE公式アカウント）の統括は、いま配信できるか」。
@@ -48,7 +48,7 @@ export async function getSendPermissionForTenant(
   let result: SendPermission;
   try {
     const billing = (await getTenantBilling(db, tenantId)) ?? null;
-    const entitlements = resolveEntitlements(billing);
+    const entitlements = await resolveTenantEntitlements(db, billing);
     result = { allowed: entitlements.canSend, reason: entitlements.blockedReason, tenantId, state: entitlements.state };
   } catch (error) {
     logger.warn("send_entitlements.get_send_permission_for_tenant_failed");
