@@ -106,26 +106,27 @@ describe('メンバー（36-5）', () => {
     expect(document.querySelectorAll('h1')).toHaveLength(0)
   })
 
-  it('招待で選べる役割は管理者と閲覧のみだけ。送る口は統括の扱いにする', async () => {
+  it('招待で管理者・担当者・閲覧のみを選べ、送る口は統括の扱いにする', async () => {
     render(<HqMembersV8 />)
     fireEvent.click(await screen.findByRole('button', { name: '招待する' }))
     const dialog = await screen.findByRole('dialog', { name: '権限者を招待' })
-    expect(optionNames('役割')).toEqual(['管理者（すべて操作できる）', '閲覧のみ（見るだけ）'])
+    expect(optionNames('役割')).toEqual(['管理者（メンバーと決済も管理できる）', '担当者（業務を操作できる）', '閲覧のみ（見るだけ）'])
+    expect(within(dialog).getByText('予約・配信などの業務を操作できます。メンバーの追加や決済の変更はできません。')).toBeTruthy()
     fireEvent.change(within(dialog).getByRole('textbox', { name: '名前' }), { target: { value: '山田 太郎' } })
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'メールアドレス' }), { target: { value: 'yamada@example.com' } })
-    await choose('役割', '管理者（すべて操作できる）')
+    await choose('役割', '管理者（メンバーと決済も管理できる）')
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '招待メールを送る' })) })
     await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
     expect(mocks.create.mock.calls[0][0]).toMatchObject({ name: '山田 太郎', email: 'yamada@example.com', role: 'admin', managementContext: 'hq' })
   })
 
-  it('担当者を変えるときだけ担当者の役割を残して選べ、役割を変えなければ役割を送らない', async () => {
+  it('担当者の役割を残して選べ、役割を変えなければ役割を送らない', async () => {
     render(<HqMembersV8 />)
     fireEvent.click(await screen.findByRole('button', { name: '中川 由美のその他操作' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: '権限を変更する' }))
     await screen.findByRole('dialog')
-    expect(optionNames('役割')).toEqual(['管理者（すべて操作できる）', '担当者（担当範囲のアカウントだけ）', '閲覧のみ（見るだけ）'])
-    expect(screen.getByRole('button', { name: '役割' }).textContent).toContain('担当者（担当範囲のアカウントだけ）')
+    expect(optionNames('役割')).toEqual(['管理者（メンバーと決済も管理できる）', '担当者（業務を操作できる）', '閲覧のみ（見るだけ）'])
+    expect(screen.getByRole('button', { name: '役割' }).textContent).toContain('担当者（業務を操作できる）')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '変更を保存する' })) })
     const confirm = document.querySelector('[data-design-node="M4jS9"]')!
     const go = [...confirm.querySelectorAll('button')].find((button) => (button.textContent ?? '').trim().endsWith('変える'))!

@@ -180,7 +180,7 @@ describe('権限を変える確認（板 M4jS9）', () => {
     const edit = document.body.querySelector('[data-design-node="BHEl9"]')
     expect(edit, '変更の窓に目印がない').not.toBeNull()
     expect(edit?.textContent ?? '').not.toContain('最初に表示するアカウント')
-    expect(edit?.textContent ?? '').toContain('統括のすべてのアカウントを見て操作できます。')
+    expect(edit?.textContent ?? '').toContain('統括のすべてのアカウントで、メンバーや決済を含む管理ができます。')
     const save = Array.from(document.body.querySelectorAll('button')).find((b) => (b.textContent ?? '').trim() === '変更を保存する')
     await act(async () => { (save as HTMLButtonElement).click() })
     await flush()
