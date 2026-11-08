@@ -126,3 +126,30 @@ export async function sweepBillingFailureNotices(env: Env['Bindings'], now = new
   }
   return { checked: rows.results?.length ?? 0, failed };
 }
+
+/** Reconciles a paid webhook whose recovery email was interrupted after the invoice was saved. */
+export async function sweepBillingRecoveryNotices(env: Env['Bindings'], now = new Date()): Promise<{ checked: number; failed: number }> {
+  // The window keeps deployment from mailing old payments. A page rotates on each delivery tick,
+  // so a burst of payments cannot permanently hide later invoices behind the first 100.
+  const since = new Date(now.getTime() - 72 * 60 * 60 * 1000).toISOString();
+  const condition = `bi.status='paid' AND bi.amount_due>0 AND bi.amount_paid>=bi.amount_due
+    AND julianday(bi.synced_at)>=julianday(?) AND EXISTS (SELECT 1 FROM billing_events e
+      WHERE e.tenant_id=bi.tenant_id AND e.type='invoice.payment_failed'
+        AND json_extract(CASE WHEN json_valid(e.summary) THEN e.summary ELSE '{}' END,'$.state')='completed'
+        AND json_extract(CASE WHEN json_valid(e.summary) THEN e.summary ELSE '{}' END,'$.subjectId')=bi.id)`;
+  const total = await env.DB.prepare(`SELECT COUNT(*) AS n FROM billing_invoices bi WHERE ${condition}`)
+    .bind(since).first<{ n: number }>();
+  const count = total?.n ?? 0;
+  if (!count) return { checked: 0, failed: 0 };
+  const pages = Math.ceil(count / PAGE_SIZE);
+  const page = Math.floor(now.getTime() / (5 * 60 * 1000)) % pages;
+  const rows = await env.DB.prepare(`SELECT bi.id FROM billing_invoices bi WHERE ${condition}
+    ORDER BY julianday(bi.synced_at) DESC, bi.id LIMIT ? OFFSET ?`)
+    .bind(since, PAGE_SIZE, page * PAGE_SIZE).all<{ id: string }>();
+  let failed = 0;
+  for (const row of rows.results ?? []) {
+    try { await deliverBillingRecoveryNotice(env, row.id); }
+    catch { failed += 1; }
+  }
+  return { checked: rows.results?.length ?? 0, failed };
+}

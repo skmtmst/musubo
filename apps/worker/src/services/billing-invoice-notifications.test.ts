@@ -8,7 +8,7 @@ vi.mock('./plain-mail.js', () => ({ sendPlainMail: mail.send }));
 
 import {
   deliverBillingRecoveryNotice, deliverCurrentBillingFailureNotice,
-  sweepBillingFailureNotices,
+  sweepBillingFailureNotices, sweepBillingRecoveryNotices,
 } from './billing-invoice-notifications.js';
 
 const failedAt = Math.floor(Date.parse('2026-11-09T03:00:00Z') / 1000);
@@ -79,6 +79,30 @@ describe('有料請求の通知', () => {
       const env = { DB: fixture.db, ADMIN_PUBLIC_URL: 'https://admin.example.test' } as Env['Bindings'];
       expect(await deliverBillingRecoveryNotice(env, 'in_paid')).toBe(false);
       expect(mail.send).not.toHaveBeenCalled();
+    } finally { fixture.raw.close(); }
+  });
+
+  it('入金済みWebhook後に送信処理が中断されても、定期処理で復旧通知を一度だけ回収する', async () => {
+    const fixture = createTestD1();
+    mail.send.mockClear();
+    try {
+      fixture.raw.prepare(`UPDATE tenants SET plan_status='active', stripe_subscription_id='sub_notice',
+        contact_email='owner@example.test' WHERE id=?`).run(DEFAULT_TENANT_ID);
+      fixture.raw.prepare(`INSERT INTO billing_invoices
+        (id,tenant_id,subscription_id,status,amount_due,amount_paid,currency,synced_at,created_at)
+        VALUES ('in_recovered',?,'sub_notice','paid',5900,5900,'jpy','2026-11-09T13:00:00.000+09:00','2026-11-08T03:00:00Z')`)
+        .run(DEFAULT_TENANT_ID);
+      fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
+        VALUES ('evt_recovered_failure','invoice.payment_failed',?,?)`)
+        .run(DEFAULT_TENANT_ID, JSON.stringify({ state: 'completed', created: failedAt, subjectId: 'in_recovered' }));
+      const env = { DB: fixture.db, ADMIN_PUBLIC_URL: 'https://admin.example.test' } as Env['Bindings'];
+      const now = new Date('2026-11-09T05:00:00Z');
+      expect(await sweepBillingRecoveryNotices(env, now)).toMatchObject({ checked: 1, failed: 0 });
+      expect(await sweepBillingRecoveryNotices(env, now)).toMatchObject({ checked: 1, failed: 0 });
+      expect(mail.send).toHaveBeenCalledTimes(1);
+      expect(mail.send.mock.calls[0]?.[1].subject).toBe('【musubo】お支払いを確認しました');
+      expect(await sweepBillingRecoveryNotices(env, new Date('2026-11-13T05:00:00Z')))
+        .toMatchObject({ checked: 0, failed: 0 });
     } finally { fixture.raw.close(); }
   });
 });

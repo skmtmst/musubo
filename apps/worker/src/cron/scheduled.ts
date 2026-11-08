@@ -37,7 +37,7 @@ import { runScheduledOperationHealthChecks } from '../services/operations-health
 import { observeOperationDispatcher } from '../services/operation-dispatch-health.js';
 import { processOperationNotificationOutbox } from '../services/operation-notifications.js';
 import { processOperationAlertNotificationOutbox } from '../services/operation-alert-notifications.js';
-import { sweepBillingFailureNotices } from '../services/billing-invoice-notifications.js';
+import { sweepBillingFailureNotices, sweepBillingRecoveryNotices } from '../services/billing-invoice-notifications.js';
 import { OPERATOR_NOTIFICATION_SWEEP_LIMIT, sweepOperatorNotifications } from '../services/operator-notification-dispatch.js';
 
 import { runIsolatedScheduledJobs, scheduledLane } from '../services/scheduled-job-isolation.js';
@@ -130,6 +130,13 @@ export async function scheduled(
     if (result.failed > 0) logger.error('billing_invoice_notification_sweep_failed');
   } catch {
     logger.error('billing_invoice_notification_sweep_failed');
+  }
+
+  try {
+    const result = await sweepBillingRecoveryNotices(env, new Date(event.scheduledTime));
+    if (result.failed > 0) logger.error('billing_recovery_notification_sweep_failed');
+  } catch {
+    logger.error('billing_recovery_notification_sweep_failed');
   }
 
   //  公開済み運用者通知ルールの送り残しを回収する。
