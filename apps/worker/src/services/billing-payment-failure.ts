@@ -61,6 +61,18 @@ export function paymentFailureState(
   };
 }
 
+/** A completed, signed webhook is the only source for the first failure time. */
+export async function firstInvoiceFailureSeconds(db: D1Database, tenantId: string, invoiceId: string): Promise<number | null> {
+  const row = await db.prepare(`SELECT MIN(CAST(json_extract(safe_summary,'$.created') AS INTEGER)) AS first_failure
+    FROM (SELECT CASE WHEN json_valid(summary) THEN summary ELSE '{}' END AS safe_summary
+      FROM billing_events WHERE tenant_id=? AND type='invoice.payment_failed')
+    WHERE json_extract(safe_summary,'$.state')='completed'
+      AND CAST(json_extract(safe_summary,'$.created') AS INTEGER)>0
+      AND json_extract(safe_summary,'$.subjectId')=?`)
+    .bind(tenantId, invoiceId).first<{ first_failure: number | null }>();
+  return row?.first_failure ?? null;
+}
+
 /**
  * 現在の契約に属する未払い請求だけを調べる。古いイベントで請求書IDを記録して
  * いないものは失敗日時を確定できないため、停止の根拠にしない。
@@ -78,14 +90,8 @@ export async function getBillingPaymentFailure(
     .bind(billing.id, billing.stripe_subscription_id).all<OpenInvoiceRow>();
   let earliest: BillingPaymentFailure | null = null;
   for (const invoice of invoices.results ?? []) {
-    const row = await db.prepare(`SELECT MIN(CAST(json_extract(safe_summary,'$.created') AS INTEGER)) AS first_failure
-      FROM (SELECT CASE WHEN json_valid(summary) THEN summary ELSE '{}' END AS safe_summary
-        FROM billing_events WHERE tenant_id=? AND type='invoice.payment_failed')
-      WHERE json_extract(safe_summary,'$.state')='completed'
-        AND CAST(json_extract(safe_summary,'$.created') AS INTEGER)>0
-        AND json_extract(safe_summary,'$.subjectId')=?`)
-      .bind(billing.id, invoice.id).first<{ first_failure: number | null }>();
-    const failure = paymentFailureState(invoice, row?.first_failure ?? 0, now);
+    const firstFailure = await firstInvoiceFailureSeconds(db, billing.id, invoice.id);
+    const failure = paymentFailureState(invoice, firstFailure ?? 0, now);
     if (failure && (!earliest || failure.failedAt < earliest.failedAt)) earliest = failure;
   }
   return earliest;

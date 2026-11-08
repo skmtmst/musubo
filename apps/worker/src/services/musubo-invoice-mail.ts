@@ -45,7 +45,6 @@ export function musuboInvoiceMail(input: MusuboInvoiceMailInput): { subject: str
       notes: ['お支払いを確認したら、同じLINE接続で利用を再開できます。', '停止中に送れなかった予約配信は自動送信しません。'],
     });
     case 'recovered': {
-      if (!input.nextChargeAt) throw new RangeError('nextChargeAt is required for recovery mail');
       return musuboSimpleMail({
         subject: '【musubo】お支払いを確認しました', eyebrow: 'お支払い完了',
         title: 'お支払いを確認しました', intro: 'musuboをご利用いただきありがとうございます。',
@@ -53,7 +52,7 @@ export function musuboInvoiceMail(input: MusuboInvoiceMailInput): { subject: str
         summaryTitle: 'お支払い内容', rows: [
           { label: 'お支払い額', value: amount },
           { label: '対象の請求', value: mailJstDate(input.invoiceAt) },
-          { label: '次回請求予定', value: mailJstDate(input.nextChargeAt) },
+          { label: '次回請求予定', value: input.nextChargeAt ? mailJstDate(input.nextChargeAt) : '請求画面でご確認ください' },
         ], buttonLabel: '請求を確認する', buttonUrl: input.billingUrl,
         notes: ['お支払い履歴と次回の請求予定はmusuboの請求画面から確認できます。', '停止中に送れなかった予約配信がある場合は、再開後に内容をご確認ください。'],
       });

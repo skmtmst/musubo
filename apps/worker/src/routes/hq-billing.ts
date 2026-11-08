@@ -33,6 +33,7 @@ import {
 } from '../services/billing-plans.js';
 import { billingInvoiceInput } from '../services/billing-invoices-sync.js';
 import { getBillingPaymentFailure } from '../services/billing-payment-failure.js';
+import { deliverBillingRecoveryNotice, deliverCurrentBillingFailureNotice } from '../services/billing-invoice-notifications.js';
 import { StripeApiError, stripeApi, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
 
@@ -651,6 +652,16 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
         break;
     }
     await finish();
+    if (subjectId && (event.type === 'invoice.payment_failed' || event.type === 'invoice.paid')) {
+      // 通知の失敗で決済Webhookを再適用しない。送信台帳で二重送信を防ぎ、
+      // 請求失敗の未送信分は定期ジョブでも拾う。
+      const notification = (event.type === 'invoice.paid'
+        ? deliverBillingRecoveryNotice(c.env, subjectId)
+        : deliverCurrentBillingFailureNotice(c.env, tenant.id))
+        .catch(() => logger.error('billing_invoice_notification_failed'));
+      try { c.executionCtx.waitUntil(notification); }
+      catch { await notification; }
+    }
     return c.json({ success: true, data: { received: true } });
   } catch (err) {
     throw err;

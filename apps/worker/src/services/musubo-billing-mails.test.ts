@@ -23,9 +23,9 @@ describe('有料請求の通知メール', () => {
     expect(recovered.text).toContain('2027年1月8日');
   });
 
-  it('危険なURLと復帰時の欠落日付を拒否する', () => {
+  it('危険なURLを拒否し、次回請求日が未確定なら請求画面を案内する', () => {
     expect(() => musuboInvoiceMail({ ...invoice, event: 'failed', billingUrl: 'javascript:alert(1)' })).toThrow();
-    expect(() => musuboInvoiceMail({ ...invoice, event: 'recovered' })).toThrow();
+    expect(musuboInvoiceMail({ ...invoice, event: 'recovered' }).text).toContain('請求画面でご確認ください');
   });
 });
 
