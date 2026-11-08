@@ -6,6 +6,7 @@ import type { RestaurantTableAssignmentSettings } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { isSaveConflict } from '@/components/shared/save-conflict'
 import { ToggleField } from '@/components/shared/toggle'
 import { notifySaved } from '@/components/shared/toast'
 import { bookingAssignmentApi } from '@/lib/api/helpers/booking-assignment'
@@ -51,7 +52,7 @@ export default function TableAutoAssignmentDialog({ accountId, storeId, canEdit,
       guard.disarm(); notifySaved('自動配席の設定を保存しました'); onClose()
     } catch (cause) {
       if (!alive.current) return
-      if (cause instanceof ApiError && cause.status === 409) setConflict(true)
+      if (isSaveConflict(cause)) setConflict(true)
       else setError(cause instanceof ApiError && cause.status === 403 ? '設定を変更する権限がありません。' : '保存できませんでした。もう一度お試しください。')
     } finally { writing.current = false; if (alive.current) setSaving(false) }
   }
