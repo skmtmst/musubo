@@ -4,6 +4,7 @@ import {
   linkedAccountSlots,
   musuboPrice,
   musuboTrialDates,
+  prorateAnnualLineIncrement,
   prorateMonthlyIncrement,
 } from './musubo-pricing.js';
 
@@ -90,5 +91,19 @@ describe('trial and incremental billing dates', () => {
     expect(prorateMonthlyIncrement(13_400, 15, 30)).toBe(6_700);
     expect(prorateMonthlyIncrement(3_300, 15, 30)).toBe(1_650);
     expect(() => prorateMonthlyIncrement(3_300, 31, 30)).toThrow();
+  });
+
+  it('prorates annual LINE additions using the actual 365- or 366-day period', () => {
+    expect(prorateAnnualLineIncrement({ annualIncrementYen: 85_320,
+      periodStartDateJst: '2026-12-08', activationDateJst: '2027-06-08', renewalDateJst: '2027-12-08' }))
+      .toEqual({ chargeYen: 42_776, remainingDays: 183, annualPeriodDays: 365 });
+    expect(prorateAnnualLineIncrement({ annualIncrementYen: 42_660,
+      periodStartDateJst: '2027-02-08', activationDateJst: '2027-08-08', renewalDateJst: '2028-02-08' }))
+      .toEqual({ chargeYen: 21_505, remainingDays: 184, annualPeriodDays: 365 });
+    expect(prorateAnnualLineIncrement({ annualIncrementYen: 100,
+      periodStartDateJst: '2027-12-08', activationDateJst: '2028-06-08', renewalDateJst: '2028-12-08' }).annualPeriodDays)
+      .toBe(366);
+    expect(() => prorateAnnualLineIncrement({ annualIncrementYen: 100,
+      periodStartDateJst: '2026-12-08', activationDateJst: '2027-12-08', renewalDateJst: '2027-12-08' })).toThrow();
   });
 });

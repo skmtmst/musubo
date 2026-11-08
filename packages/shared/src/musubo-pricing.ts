@@ -189,3 +189,30 @@ export function prorateMonthlyIncrement(monthlyIncrementYen: number, daysRemaini
   if (daysRemaining > daysInPeriod) throw new RangeError('daysRemaining exceeds daysInPeriod');
   return Math.floor(monthlyIncrementYen * daysRemaining / daysInPeriod);
 }
+
+/**
+ * An annual LINE addition charges only the remaining JST calendar days of the
+ * already paid annual period. The annual increment already includes any
+ * company discount and the LINE-only ten percent annual discount.
+ */
+export function prorateAnnualLineIncrement(input: {
+  annualIncrementYen: number;
+  periodStartDateJst: string;
+  activationDateJst: string;
+  renewalDateJst: string;
+}): { chargeYen: number; remainingDays: number; annualPeriodDays: number } {
+  const annual = wholeNonnegative(input.annualIncrementYen, 'annualIncrementYen');
+  const start = parseIsoDate(input.periodStartDateJst).getTime();
+  const activated = parseIsoDate(input.activationDateJst).getTime();
+  const renewal = parseIsoDate(input.renewalDateJst).getTime();
+  if (start >= renewal || activated < start || activated >= renewal) {
+    throw new RangeError('Activation must fall within the annual billing period');
+  }
+  const annualPeriodDays = (renewal - start) / (24 * 60 * 60 * 1000);
+  const remainingDays = (renewal - activated) / (24 * 60 * 60 * 1000);
+  return {
+    chargeYen: Math.floor(annual * remainingDays / annualPeriodDays),
+    remainingDays,
+    annualPeriodDays,
+  };
+}
