@@ -6,7 +6,9 @@ export const ADDITION_HOLD_DAYS = 7;
 
 function instant(value: string, name: string): number {
   const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp) || !/(?:Z|[+-]\d{2}:?\d{2})$/.test(value)) {
+  const date = /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})$/.exec(value);
+  const calendar = date ? new Date(`${date[1]}T00:00:00.000Z`) : null;
+  if (!Number.isFinite(timestamp) || !calendar || utcCalendarDate(calendar) !== date?.[1]) {
     throw new RangeError(name + ' must be an ISO timestamp with timezone');
   }
   return timestamp;
@@ -53,8 +55,10 @@ export function invoiceFailureAccess(state: InvoiceFailureState, now: string): {
 } {
   const failed = instant(state.failedAt, 'failedAt');
   const current = instant(now, 'now');
+  if (current < failed) throw new RangeError('Invoice failure has not occurred');
   const deadline = failed + PAYMENT_GRACE_DAYS * DAY_MS;
   const paid = state.paidAt ? instant(state.paidAt, 'paidAt') : null;
+  if (paid !== null && paid < failed) throw new RangeError('Payment cannot precede invoice failure');
   if (paid !== null && paid >= failed && paid <= current) {
     return { state: 'recovered', deadline: new Date(deadline).toISOString(), daysRemaining: 0, sendDaySixWarning: false };
   }
@@ -81,9 +85,12 @@ export function pendingAdditionAccess(state: PendingAdditionState, now: string):
 } {
   const requested = instant(state.requestedAt, 'requestedAt');
   const current = instant(now, 'now');
+  if (current < requested) throw new RangeError('Addition has not been requested');
   const holdUntil = requested + ADDITION_HOLD_DAYS * DAY_MS;
   const paid = state.paymentSucceededAt ? instant(state.paymentSucceededAt, 'paymentSucceededAt') : null;
   const cancelled = state.cancelledAt ? instant(state.cancelledAt, 'cancelledAt') : null;
+  if (paid !== null && paid < requested) throw new RangeError('Payment cannot precede addition request');
+  if (cancelled !== null && cancelled < requested) throw new RangeError('Cancellation cannot precede addition request');
   let status: 'pending' | 'activate' | 'expired' | 'cancelled' = 'pending';
   if (paid !== null && paid <= current && paid < holdUntil && (cancelled === null || paid < cancelled)) status = 'activate';
   else if (cancelled !== null && cancelled <= current) status = 'cancelled';

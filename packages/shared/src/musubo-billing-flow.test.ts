@@ -15,6 +15,10 @@ describe('有料請求失敗後の利用状態', () => {
   it('支払いが確認できれば利用を再開する', () => {
     expect(invoiceFailureAccess({ failedAt, paidAt: '2027-01-09T00:00:00.000Z' }, '2027-01-09T00:00:01.000Z').state).toBe('recovered');
   });
+  it('失敗通知より前の決済や時刻を猶予期間として扱わない', () => {
+    expect(() => invoiceFailureAccess({ failedAt }, '2026-12-31T23:59:59.000Z')).toThrow();
+    expect(() => invoiceFailureAccess({ failedAt, paidAt: '2026-12-31T23:59:59.000Z' }, '2027-01-02T00:00:00.000Z')).toThrow();
+  });
 });
 
 describe('追加分の決済失敗', () => {
@@ -34,6 +38,11 @@ describe('追加分の決済失敗', () => {
     expect(pendingAdditionAccess({ requestedAt,
       cancelledAt: '2027-01-03T00:00:00.000Z', paymentSucceededAt: '2027-01-03T00:00:01.000Z',
     }, '2027-01-03T00:00:02.000Z').state).toBe('cancelled');
+  });
+  it('追加依頼より前の決済や取消では利用状態を確定しない', () => {
+    expect(() => pendingAdditionAccess({ requestedAt }, '2026-12-31T23:59:59.000Z')).toThrow();
+    expect(() => pendingAdditionAccess({ requestedAt, paymentSucceededAt: '2026-12-31T23:59:59.000Z' }, '2027-01-02T00:00:00.000Z')).toThrow();
+    expect(() => pendingAdditionAccess({ requestedAt, cancelledAt: '2026-12-31T23:59:59.000Z' }, '2027-01-02T00:00:00.000Z')).toThrow();
   });
 });
 
@@ -55,6 +64,10 @@ describe('見積もりの同意期限', () => {
     expect(() => individualQuoteAccess(base, '2026-12-31T23:59:00.000Z')).toThrow(/not been issued/);
     expect(individualQuoteAccess({ ...base, acceptedAt: '2027-01-10T00:00:00.000Z' },
       '2027-01-09T00:00:00.000Z')).toBe('available');
+  });
+  it('暦にない日付の期限は受け付けない', () => {
+    expect(() => individualQuoteAccess({ ...base, expiresAt: '2027-02-30T00:00:00.000Z' },
+      '2027-01-09T00:00:00.000Z')).toThrow();
   });
 });
 
