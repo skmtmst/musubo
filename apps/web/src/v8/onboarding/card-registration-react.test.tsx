@@ -60,6 +60,21 @@ describe('Stripeカード登録からLINE接続へ', () => {
     expect(next).toHaveBeenCalledOnce()
   })
 
+  it('Stripeから戻った直後にWebhookが未反映でも、再照会して登録完了を表示する', async () => {
+    vi.useFakeTimers()
+    try {
+      calls.cardStatus
+        .mockResolvedValueOnce({ success: true, data: { registered: false } })
+        .mockResolvedValueOnce({ success: true, data: { registered: true } })
+      await act(async () => { root.render(<CardRegistration returnState="success" />) })
+      expect(host.textContent).toContain('カードの登録状況を確認しています')
+      await act(async () => { await vi.advanceTimersByTimeAsync(2_000) })
+      expect(calls.cardStatus).toHaveBeenCalledTimes(2)
+      expect(calls.cardStatus).toHaveBeenNthCalledWith(2, { cache: 'reload' })
+      expect(host.textContent).toContain('カードの登録が完了しました')
+    } finally { vi.useRealTimers() }
+  })
+
   it('登録が中断されたら料金を保ったまま再開を案内する', async () => {
     calls.cardStatus.mockResolvedValue({ success: true, data: { registered: false } })
     await act(async () => { root.render(<CardRegistration returnState="cancel" />) })
