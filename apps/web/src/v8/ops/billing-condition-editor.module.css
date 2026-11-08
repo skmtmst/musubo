@@ -1,0 +1,54 @@
+.page { width: 100%; color: #202428; }
+.heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; margin-bottom: 25px; }
+.heading h1 { margin: 0 0 7px; font-size: 27px; }
+.heading p { margin: 0; color: #59687b; font-size: 14px; line-height: 1.6; }
+.primary { border: 0; border-radius: 8px; background: #087c43; padding: 12px 20px; color: #fff; font: inherit; font-size: 14px; font-weight: 700; text-align: center; cursor: pointer; }
+.primary:hover { background: #066b3a; }
+.primary:disabled { background: #97b8a7; cursor: not-allowed; }
+.columns { display: grid; grid-template-columns: minmax(220px, 0.8fr) minmax(0, 2fr); gap: 20px; align-items: start; }
+.listCard, .editorCard { min-width: 0; border: 1px solid #dfe5e7; border-radius: 14px; background: #fff; padding: 24px; }
+.listCard h2, .editorHeading h2 { margin: 0; font-size: 20px; }
+.conditionList { display: flex; flex-direction: column; gap: 10px; margin: 22px 0; }
+.condition, .conditionSelected { width: 100%; display: flex; align-items: flex-start; flex-direction: column; gap: 5px; border: 1px solid #dfe5e7; border-radius: 9px; background: #fff; padding: 15px; text-align: left; cursor: pointer; font: inherit; }
+.conditionSelected { border-color: #087c43; background: #eff8f2; }
+.condition strong, .conditionSelected strong { color: #202428; font-size: 14px; }
+.condition span, .conditionSelected span { color: #59687b; font-size: 12px; line-height: 1.5; }
+.condition small, .conditionSelected small { color: #087c43; font-size: 11px; font-weight: 700; }
+.editorHeading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 22px; }
+.active, .inactive { border-radius: 999px; padding: 6px 12px; background: #e4f6eb; color: #087c43; font-size: 12px; font-weight: 700; }
+.inactive { background: #f0f2f4; color: #59687b; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.field { display: flex; flex-direction: column; min-width: 0; gap: 8px; color: #202428; font-size: 13px; font-weight: 700; }
+.field > input, .field > select, .inlineFields input, .inlineFields select, .percent input, .yen input { width: 100%; min-width: 0; height: 43px; border: 1px solid #d4dee2; border-radius: 7px; background: #fff; padding: 0 12px; color: #202428; font: inherit; font-size: 14px; font-weight: 400; }
+.field input:focus-visible, .field select:focus-visible { outline: 2px solid #087c43; outline-offset: 2px; }
+.field small { color: #59687b; font-size: 12px; font-weight: 400; line-height: 1.5; }
+.inlineFields { display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: 8px; }
+.percent { display: flex; align-items: center; position: relative; }
+.percent input { padding-right: 35px; }
+.percent > span { position: absolute; right: 14px; color: #59687b; font-weight: 400; }
+.yen { display: flex; align-items: center; position: relative; }
+.yen input { padding-right: 76px; }
+.yen > span { position: absolute; right: 12px; color: #59687b; font-size: 12px; font-weight: 400; }
+.locked { display: flex; align-items: center; min-height: 43px; border: 1px solid #dfe5e7; border-radius: 7px; background: #f5f7f8; padding: 10px 12px; color: #425364; font-size: 14px; }
+.priceSection { margin-top: 28px; padding-top: 24px; border-top: 1px solid #e4e8eb; }
+.priceSection h3 { margin: 0 0 6px; font-size: 17px; }
+.priceSection p { margin: 0 0 18px; color: #59687b; font-size: 12px; line-height: 1.6; }
+.preview { margin-top: 25px; border-radius: 10px; background: #eff8f2; padding: 20px; }
+.preview h3 { margin: 0 0 9px; color: #087c43; font-size: 15px; }
+.preview p { margin: 0 0 8px; color: #202428; font-size: 16px; font-weight: 700; line-height: 1.5; }
+.preview small, .help { color: #59687b; font-size: 12px; line-height: 1.6; }
+.help { margin: 16px 0 0; }
+.error { color: #ad2f2f; font-size: 13px; }
+.footer { display: flex; justify-content: flex-end; margin-top: 20px; }
+@media (max-width: 850px) {
+  .columns { grid-template-columns: 1fr; }
+  .conditionList { flex-direction: row; overflow-x: auto; }
+  .condition, .conditionSelected { min-width: 220px; }
+}
+@media (max-width: 600px) {
+  .heading { flex-direction: column; }
+  .heading .primary { width: 100%; }
+  .grid { grid-template-columns: 1fr; }
+  .listCard, .editorCard { padding: 20px; }
+  .footer .primary { width: 100%; }
+}
