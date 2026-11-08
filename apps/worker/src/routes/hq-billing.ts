@@ -583,27 +583,23 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
           break;
         }
         const subscriptionId = typeof object.subscription === 'string' ? object.subscription : null;
-        const customerId = typeof object.customer === 'string' ? object.customer : tenant.stripe_customer_id;
-        const metadata = (object.metadata ?? {}) as Record<string, string>;
-        let applied = false;
-        if (subscriptionId && stripeReady(c)) {
-          try {
-            const subscription = await stripeApi.retrieveSubscription(c.env, subscriptionId);
-            writeTenant(subscriptionPatch(c, tenant, subscription), true);
-            applied = true;
-          } catch (error) {
-            logger.warn("routes_hq_billing_warn");
-          }
+        if (!subscriptionId || !stripeReady(c)) {
+          return c.json({ success: false, error: '契約状態を確認できませんでした' }, 503);
         }
-        if (!applied) {
-          writeTenant({
-            plan_key: findPlan(metadata.plan_key)?.key ?? tenant.plan_key,
-            plan_status: 'active',
-            stripe_subscription_id: subscriptionId,
-            stripe_customer_id: customerId,
-            trial_ends_at: null,
-          }, true);
+        let subscription: StripeSubscription;
+        try {
+          subscription = await stripeApi.retrieveSubscription(c.env, subscriptionId);
+        } catch {
+          // Keep the event pending so Stripe can retry. Checkout completion alone does not
+          // prove that the first subscription invoice succeeded.
+          logger.warn('routes_hq_billing_warn');
+          return c.json({ success: false, error: '契約状態を確認できませんでした' }, 503);
         }
+        if (subscription.id !== subscriptionId || subscription.customer !== stripeExpandableId(object.customer)) {
+          logger.warn('routes_hq_billing_warn');
+          return c.json({ success: false, error: '契約状態を確認できませんでした' }, 503);
+        }
+        writeTenant(subscriptionPatch(c, tenant, subscription), true);
         break;
       }
       case 'customer.subscription.created':

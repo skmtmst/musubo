@@ -419,6 +419,23 @@ describe('課金 Webhook', () => {
     expect(tenantRow()).toMatchObject({ plan_status: 'active', plan_key: 'standard', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1', trial_ends_at: null });
   });
 
+  it('Checkout完了後に契約を確認できない間は有効化せず、再通知で確認してから進める', async () => {
+    stripe.retrieveSubscription.mockRejectedValueOnce(new Error('Stripe temporarily unavailable'));
+    expect((await webhook(completed('evt_retry_checkout'))).status).toBe(503);
+    expect(tenantRow()).toMatchObject({ plan_status: 'trialing', stripe_subscription_id: null });
+    expect(testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_retry_checkout'").get())
+      .toEqual({ summary: 'pending' });
+    expect((await webhook(completed('evt_retry_checkout'))).status).toBe(200);
+    expect(tenantRow()).toMatchObject({ plan_status: 'active', stripe_subscription_id: 'sub_1' });
+  });
+
+  it('Checkout通知と取得した契約の顧客が違えば有効化しない', async () => {
+    stripe.retrieveSubscription.mockResolvedValueOnce({ id: 'sub_1', status: 'active', customer: 'cus_other',
+      items: { data: [{ price: { id: 'price_standard' } }] } });
+    expect((await webhook(completed('evt_wrong_customer'))).status).toBe(503);
+    expect(tenantRow()).toMatchObject({ plan_status: 'trialing', stripe_subscription_id: null });
+  });
+
   it('active のあとに incomplete の作成通知が届いても契約中を保つ', async () => {
     await webhook(completed());
     stripe.retrieveSubscription.mockRejectedValueOnce(new Error('temporary Stripe failure'));
