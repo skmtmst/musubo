@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_MUSUBO_PRICE_SCHEDULE, type MusuboIndividualQuote } from '@line-crm/shared';
-import { individualQuoteMail, quoteReissueRequestReceiptMail } from './quote-mail-design.js';
+import { individualQuoteMail, musuboQuoteInquiryReceiptMail, quoteReissueRequestReceiptMail } from './quote-mail-design.js';
 
 const quote: MusuboIndividualQuote = {
   quoteNumber: 'Q-2026-1108-01', companyName: '株式会社サンプルフード',
@@ -13,6 +13,14 @@ const quote: MusuboIndividualQuote = {
 };
 
 describe('個別見積もりメール', () => {
+  it('11個以上の問い合わせ受付では料金確定前の流れを案内する', () => {
+    const receipt = musuboQuoteInquiryReceiptMail();
+    expect(receipt.subject).toBe('【musubo】お見積もりのお問い合わせを受け付けました');
+    expect(receipt.text).toContain('Googleマイビジネス数とInstagram数を確認');
+    expect(receipt.text).toContain('同意後に利用開始の準備');
+    expect(receipt.text).toContain('この時点でカード登録やお支払いは必要ありません');
+    expect(receipt.html).toContain('今後のご案内');
+  });
   it('承認済みのメールデザインと変数料金、中央ボタン、無料期間を出す', () => {
     const mail = individualQuoteMail({ quote, reviewUrl: 'https://admin.example.com/hq/quote?token=abc', kind: 'issued' });
     expect(mail.subject).toBe('【musubo】個別見積もりのご案内');

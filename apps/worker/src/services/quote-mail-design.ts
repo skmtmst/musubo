@@ -101,3 +101,32 @@ ${steps.map(([heading, detail], index) => `<p style="margin:0 0 15px;color:#2024
     '', 'musubo（ムスボ）', 'このメールは送信専用です。'].join('\n');
   return { subject, text, html };
 }
+
+/** Pen mail 06: receipt for an eleven-or-more LINE or linked-account inquiry. */
+export function musuboQuoteInquiryReceiptMail(): { subject: string; text: string; html: string } {
+  const subject = '【musubo】お見積もりのお問い合わせを受け付けました';
+  const title = 'お問い合わせを受け付けました';
+  const intro = 'musuboへお問い合わせいただき、ありがとうございます。';
+  const detail = 'ご利用予定を確認し、担当者から料金と利用開始までの手順をメールでご案内します。';
+  const steps = [
+    ['ご利用予定を確認', 'LINE数、友だち数、Googleマイビジネス数とInstagram数を確認します。'],
+    ['個別料金をご案内', 'ご利用条件とお支払い予定料金をメールでお送りします。'],
+    ['同意後に利用開始の準備', '内容をご確認いただいてからカード登録とLINE接続へ進みます。'],
+  ];
+  const html = shell(`<p style="margin:0 0 12px;color:#087c43;font-size:14px;font-weight:700;">お見積もり受付</p>
+<h1 style="margin:0 0 26px;font-size:26px;line-height:1.45;">${title}</h1>
+<p style="margin:0 0 15px;color:#425364;font-size:16px;line-height:1.7;">${intro}</p>
+<p style="margin:0 0 25px;color:#425364;font-size:16px;line-height:1.7;">${detail}</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eef8f1;border-radius:11px;"><tr><td style="padding:22px;">
+<p style="margin:0 0 16px;color:#087c43;font-size:17px;font-weight:700;">今後のご案内</p>
+${steps.map(([heading, explanation], index) => `<p style="margin:0 0 16px;color:#202428;font-size:14px;line-height:1.6;"><strong style="color:#087c43;">0${index + 1}</strong>　<strong>${heading}</strong><br><span style="color:#59687b;">${explanation}</span></p>`).join('')}
+</td></tr></table>
+<p style="margin:22px 0 12px;color:#59687b;font-size:14px;line-height:1.7;">この時点でカード登録やお支払いは必要ありません。</p>
+<p style="margin:0;color:#59687b;font-size:14px;line-height:1.7;">お心当たりがない場合は、このメールを破棄してください。</p>`);
+  const text = [title, '', intro, detail, '', '今後のご案内',
+    ...steps.map(([heading, explanation], index) => `0${index + 1} ${heading}：${explanation}`),
+    '', 'この時点でカード登録やお支払いは必要ありません。',
+    'お心当たりがない場合は、このメールを破棄してください。',
+    '', 'musubo（ムスボ）', 'このメールは送信専用です。'].join('\n');
+  return { subject, text, html };
+}
