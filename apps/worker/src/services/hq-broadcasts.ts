@@ -27,7 +27,7 @@ export async function hqBroadcastAuthority(db:D1Database,staff:AuthenticatedStaf
   if(!member||member.tenant_id!==staff.tenantId||!member.is_active)throw new StampError('統括の編集権限が必要です',403);
   const result=requireHqTemplateAuthority({tenantId:staff.tenantId,actorId:staff.id,role:member.role,
     hqRole:staff.hqRole,
-    readOnly:staff.readOnly||member.access_level==='read_only',accountScoped:member.account_scope==='accounts'});
+    readOnly:read&&staff.hqRole!=='viewer'?false:staff.readOnly||member.access_level==='read_only',accountScoped:member.account_scope==='accounts'});
   if(result.kind!=='AUTHORIZED'||(!read&&result.authority.readOnly))throw new StampError('統括全体の編集権限が必要です',403);return result.authority;
 }
 export async function prepareHqBroadcast(db:D1Database,tenantId:string,actorId:string,b:HqBroadcastInput, update?:{run:RunRow;expectedVersion:number}) {
