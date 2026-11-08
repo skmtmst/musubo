@@ -101,7 +101,9 @@ export default function LinkedAccountRemovalModal(props: Props) {
       <strong>{dateText}（次の月次請求日）</strong></div>
     <p className={styles.note}>{props.phase === 'review'
       ? `連携は今すぐ停止します。支払済み期間の返金はなく、${hasReduction ? '次の月次請求日から減額します' : '追加枠の料金は変わりません'}。年払いでも追加枠は毎月請求します。`
-      : '支払済みの枠は次回請求日まで別の連携先に使えます。再追加した場合は減額予定を再計算します。'}</p>
+      : hasReduction
+        ? '支払済みの枠は次回請求日まで別の連携先に使えます。再追加した場合は減額予定を再計算します。'
+        : 'ほかの連携先は引き続き利用できます。連携先を追加するときは料金を確認してから進みます。'}</p>
     {error && <p className={styles.error} role="alert">{error}</p>}
     <div className={styles.actions}><button ref={backRef} type="button" className={styles.back} disabled={busy}
       onClick={props.phase === 'review' ? props.onBack : props.onBilling}>{props.phase === 'review' ? '戻る' : '請求を見る'}</button>

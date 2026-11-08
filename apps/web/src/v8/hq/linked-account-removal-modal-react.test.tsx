@@ -50,6 +50,12 @@ describe('追加連携枠の解除', () => {
     expect(onBilling).toHaveBeenCalledOnce()
   })
 
+  it('減額がない解除の完了画面では支払済み枠が空くと誤案内しない', async () => {
+    await act(async () => { root.render(<LinkedAccountRemovalModal {...base} service="instagram" phase="complete" onAccounts={onAccounts} onBilling={onBilling} />) })
+    expect(host.textContent).toContain('ほかの連携先は引き続き利用できます')
+    expect(host.textContent).not.toContain('支払済みの枠は')
+  })
+
   it('有効な月次請求日がなければ減額日を推測せず先に進めない', async () => {
     await act(async () => { root.render(<LinkedAccountRemovalModal {...base} nextMonthlyChargeAt="" phase="review" onConfirm={onConfirm} />) })
     expect(host.textContent).toContain('料金を表示できません')
