@@ -93,6 +93,16 @@ export async function deliverBillingRecoveryNotice(env: Env['Bindings'], invoice
     }>();
   if (!row || row.plan_status !== 'active' || !row.subscription_id
     || row.subscription_id !== row.stripe_subscription_id) return false;
+  // Only the paid event that actually restored access should announce recovery.
+  // Otherwise the sweep can send another "recovered" mail for an older paid
+  // invoice once the final unpaid invoice is settled.
+  const restored = await env.DB.prepare(`SELECT 1 AS found FROM billing_events
+    WHERE tenant_id=? AND type='invoice.paid' AND json_valid(summary)
+      AND json_extract(summary,'$.state')='completed'
+      AND json_extract(summary,'$.subjectId')=?
+      AND json_extract(summary,'$.applied')=1 LIMIT 1`)
+    .bind(row.tenant_id, row.id).first<{ found: number }>();
+  if (!restored) return false;
   const firstFailure = await firstInvoiceFailureSeconds(env.DB, row.tenant_id, row.id);
   if (!firstFailure) return false;
   const stillUnpaid = await env.DB.prepare(`SELECT 1 AS found FROM billing_invoices
@@ -136,7 +146,12 @@ export async function sweepBillingRecoveryNotices(env: Env['Bindings'], now = ne
     AND julianday(bi.synced_at)>=julianday(?) AND EXISTS (SELECT 1 FROM billing_events e
       WHERE e.tenant_id=bi.tenant_id AND e.type='invoice.payment_failed'
         AND json_extract(CASE WHEN json_valid(e.summary) THEN e.summary ELSE '{}' END,'$.state')='completed'
-        AND json_extract(CASE WHEN json_valid(e.summary) THEN e.summary ELSE '{}' END,'$.subjectId')=bi.id)`;
+        AND json_extract(CASE WHEN json_valid(e.summary) THEN e.summary ELSE '{}' END,'$.subjectId')=bi.id)
+    AND EXISTS (SELECT 1 FROM billing_events p WHERE p.tenant_id=bi.tenant_id
+      AND p.type='invoice.paid' AND json_valid(p.summary)
+      AND json_extract(p.summary,'$.state')='completed'
+      AND json_extract(p.summary,'$.subjectId')=bi.id
+      AND json_extract(p.summary,'$.applied')=1)`;
   const total = await env.DB.prepare(`SELECT COUNT(*) AS n FROM billing_invoices bi WHERE ${condition}`)
     .bind(since).first<{ n: number }>();
   const count = total?.n ?? 0;

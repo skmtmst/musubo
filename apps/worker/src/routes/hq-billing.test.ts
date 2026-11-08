@@ -518,8 +518,12 @@ describe('課金 Webhook', () => {
       ...invoice, id: 'in_2', status: 'paid', amount_paid: 5900,
     } } });
     expect(tenantRow().plan_status).toBe('past_due');
+    expect(testDb.raw.prepare("SELECT json_extract(summary,'$.applied') AS applied FROM billing_events WHERE id='evt_other_paid'").get())
+      .toEqual({ applied: 0 });
     await webhook({ id: 'evt_3', type: 'invoice.paid', data: { object: { ...invoice, status: 'paid', amount_paid: 5900 } } });
     expect(tenantRow().plan_status).toBe('active');
+    expect(testDb.raw.prepare("SELECT json_extract(summary,'$.applied') AS applied FROM billing_events WHERE id='evt_3'").get())
+      .toEqual({ applied: 1 });
     await webhook({ id: 'evt_late_failure', type: 'invoice.payment_failed', data: { object: invoice } });
     expect(tenantRow().plan_status).toBe('active');
     expect(testDb.raw.prepare("SELECT status FROM billing_invoices WHERE id='in_1'").get()).toMatchObject({ status: 'paid' });

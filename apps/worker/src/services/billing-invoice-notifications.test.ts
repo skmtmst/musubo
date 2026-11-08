@@ -51,6 +51,9 @@ describe('有料請求の通知', () => {
 
       fixture.raw.prepare("UPDATE billing_invoices SET status='paid', amount_paid=5900 WHERE id='in_notice'").run();
       fixture.raw.prepare("UPDATE tenants SET plan_status='active' WHERE id=?").run(DEFAULT_TENANT_ID);
+      fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
+        VALUES ('evt_notice_paid','invoice.paid',?,?)`)
+        .run(DEFAULT_TENANT_ID, JSON.stringify({ state: 'completed', subjectId: 'in_notice', applied: 1 }));
       expect(await deliverBillingRecoveryNotice(env, 'in_notice')).toBe(true);
       await deliverBillingRecoveryNotice(env, 'in_notice');
       expect(mail.send).toHaveBeenCalledTimes(4);
@@ -95,6 +98,9 @@ describe('有料請求の通知', () => {
       fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
         VALUES ('evt_recovered_failure','invoice.payment_failed',?,?)`)
         .run(DEFAULT_TENANT_ID, JSON.stringify({ state: 'completed', created: failedAt, subjectId: 'in_recovered' }));
+      fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
+        VALUES ('evt_recovered_paid','invoice.paid',?,?)`)
+        .run(DEFAULT_TENANT_ID, JSON.stringify({ state: 'completed', subjectId: 'in_recovered', applied: 1 }));
       const env = { DB: fixture.db, ADMIN_PUBLIC_URL: 'https://admin.example.test' } as Env['Bindings'];
       const now = new Date('2026-11-09T05:00:00Z');
       expect(await sweepBillingRecoveryNotices(env, now)).toMatchObject({ checked: 1, failed: 0 });
@@ -103,6 +109,32 @@ describe('有料請求の通知', () => {
       expect(mail.send.mock.calls[0]?.[1].subject).toBe('【musubo】お支払いを確認しました');
       expect(await sweepBillingRecoveryNotices(env, new Date('2026-11-13T05:00:00Z')))
         .toMatchObject({ checked: 0, failed: 0 });
+    } finally { fixture.raw.close(); }
+  });
+
+  it('複数の未払いを順に解消しても、復旧メールは利用再開を確定した最後の入金だけに送る', async () => {
+    const fixture = createTestD1();
+    mail.send.mockClear();
+    try {
+      fixture.raw.prepare(`UPDATE tenants SET plan_status='active', stripe_subscription_id='sub_notice',
+        contact_email='owner@example.test' WHERE id=?`).run(DEFAULT_TENANT_ID);
+      for (const [id, applied] of [['in_earlier', 0], ['in_final', 1]] as const) {
+        fixture.raw.prepare(`INSERT INTO billing_invoices
+          (id,tenant_id,subscription_id,status,amount_due,amount_paid,currency,synced_at,created_at)
+          VALUES (? ,?,'sub_notice','paid',5900,5900,'jpy','2026-11-09T13:00:00+09:00','2026-11-08T03:00:00Z')`)
+          .run(id, DEFAULT_TENANT_ID);
+        fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary) VALUES (?,?,?,?)`)
+          .run(`evt_failure_${id}`, 'invoice.payment_failed', DEFAULT_TENANT_ID,
+            JSON.stringify({ state: 'completed', created: failedAt, subjectId: id }));
+        fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary) VALUES (?,?,?,?)`)
+          .run(`evt_paid_${id}`, 'invoice.paid', DEFAULT_TENANT_ID,
+            JSON.stringify({ state: 'completed', subjectId: id, applied }));
+      }
+      const env = { DB: fixture.db, ADMIN_PUBLIC_URL: 'https://admin.example.test' } as Env['Bindings'];
+      expect(await sweepBillingRecoveryNotices(env, new Date('2026-11-09T05:00:00Z')))
+        .toMatchObject({ checked: 1, failed: 0 });
+      expect(mail.send).toHaveBeenCalledTimes(1);
+      expect(await deliverBillingRecoveryNotice(env, 'in_earlier')).toBe(false);
     } finally { fixture.raw.close(); }
   });
 });
