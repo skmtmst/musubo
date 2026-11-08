@@ -467,6 +467,7 @@
 - [メンバー招待メールのデザイン更新](release-log/unreleased/25-masato-staff-invite-email.md) — 反映履歴、確認 2026-11-08。
 - [自動配席の設定を簡素化](release-log/unreleased/26-masato-simple-table-assignment.md) — 反映履歴、確認 2026-11-08。
 - [統括メンバーの3役割](release-log/unreleased/27-masato-hq-three-roles.md) — 管理者・担当者・閲覧のみの画面と権限制御、確認 2026-11-08。
+- [階・エリア追加の入力を簡素化](release-log/unreleased/28-masato-simple-floor-area.md) — 反映履歴、確認 2026-11-08。
 - [新リポジトリへの検証配備切り替え前の安全確認](release-log/unreleased/9-masato-staging-cutover-gate.md) — 反映履歴、確認 2026-11-06。
 - [DB復旧workflowの安全条件を確かめる試験](release-log/unreleased/10-masato-recovery-workflow-test.md) — 反映履歴、確認 2026-11-06。
 - [座席図の卓プレビュー・タブ並び替え・拡大移動の修正](release-log/unreleased/2099-masato-seat-map-ux.md)
