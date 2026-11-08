@@ -9,7 +9,11 @@ const stripe = vi.hoisted(() => ({
   createInvoicePreview: vi.fn(),
   createCustomer: vi.fn(),
   createCheckoutSession: vi.fn(),
+  createCardSetupSession: vi.fn(),
   createPortalSession: vi.fn(),
+  retrieveSetupIntent: vi.fn(),
+  retrieveCustomer: vi.fn(),
+  setCustomerDefaultPaymentMethod: vi.fn(),
   retrievePrice: vi.fn(),
   retrieveSubscription: vi.fn(),
   retrievePaymentIntent: vi.fn(),
@@ -231,6 +235,35 @@ describe('申込（checkout）', () => {
   });
 });
 
+describe('請求前のカード登録', () => {
+  beforeEach(() => {
+    setTenant({ plan_status: 'trialing', trial_ends_at: null });
+    stripe.createCustomer.mockResolvedValue({ id: 'cus_setup', email: 'masato@example.com', name: '既定の統括' });
+    stripe.createCardSetupSession.mockResolvedValue({ id: 'cs_setup', mode: 'setup', url: 'https://checkout.stripe.com/c/setup/cs_setup' });
+  });
+
+  it('登録時はsetupモードだけを作り、無料期間と請求を開始しない', async () => {
+    const res = await call('POST', '/api/hq/billing/card-setup');
+    expect(res.status).toBe(200);
+    expect((await res.json<{ data: { url: string } }>()).data.url).toContain('checkout.stripe.com');
+    expect(stripe.createCardSetupSession).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      customerId: 'cus_setup', tenantId: DEFAULT_TENANT_ID,
+      successUrl: 'https://admin.example.com/hq/onboarding/card?setup=success',
+    }));
+    expect(stripe.createCheckoutSession).not.toHaveBeenCalled();
+    expect(tenantRow()).toMatchObject({ plan_status: 'trialing', trial_ends_at: null, stripe_subscription_id: null, stripe_customer_id: 'cus_setup' });
+  });
+
+  it('カード状態はStripeの既定支払い方法の有無だけ返す', async () => {
+    setTenant({ stripe_customer_id: 'cus_setup' });
+    stripe.retrieveCustomer.mockResolvedValue({ id: 'cus_setup', invoice_settings: { default_payment_method: 'pm_test' } });
+    const res = await call('GET', '/api/hq/billing/card-status');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, data: { registered: true } });
+    expect(JSON.stringify(await (await call('GET', '/api/hq/billing/card-status')).json())).not.toContain('pm_test');
+  });
+});
+
 describe('ポータルと支払い履歴', () => {
   it('契約前はポータルが無く、履歴は空', async () => {
     expect((await call('POST', '/api/hq/billing/portal')).status).toBe(409);
@@ -259,6 +292,46 @@ describe('課金 Webhook', () => {
   beforeEach(() => {
     setTenant({ plan_status: 'trialing', trial_ends_at: '2020-01-01T00:00:00.000' });
     stripe.retrieveSubscription.mockResolvedValue({ id: 'sub_1', status: 'active', customer: 'cus_1', current_period_end: 1_760_000_000, items: { data: [{ price: { id: 'price_standard' } }] } });
+  });
+
+  it('カードsetup完了通知は契約開始と区別し、Stripeの既定カードだけ更新する', async () => {
+    setTenant({ stripe_customer_id: 'cus_setup', plan_status: 'trialing', trial_ends_at: null });
+    stripe.retrieveSetupIntent.mockResolvedValue({ id: 'seti_1', status: 'succeeded', customer: 'cus_setup', payment_method: 'pm_setup' });
+    const event = { id: 'evt_card_setup_1', type: 'checkout.session.completed', created: 100,
+      data: { object: { id: 'cs_setup', mode: 'setup', customer: 'cus_setup', setup_intent: 'seti_1',
+        client_reference_id: DEFAULT_TENANT_ID, metadata: { tenant_id: DEFAULT_TENANT_ID, purpose: 'musubo_card_setup' } } } };
+    expect((await webhook(event)).status).toBe(200);
+    expect(stripe.setCustomerDefaultPaymentMethod).toHaveBeenCalledWith(expect.anything(), 'cus_setup', 'pm_setup');
+    expect(tenantRow()).toMatchObject({ plan_status: 'trialing', trial_ends_at: null, stripe_subscription_id: null });
+    expect((await webhook(event)).status).toBe(200);
+    expect(stripe.setCustomerDefaultPaymentMethod).toHaveBeenCalledTimes(1);
+  });
+
+  it('setupの顧客がテナントと違う場合はカードを更新しない', async () => {
+    setTenant({ stripe_customer_id: 'cus_right', plan_status: 'trialing', trial_ends_at: null });
+    const event = { id: 'evt_card_setup_other', type: 'checkout.session.completed', created: 100,
+      data: { object: { id: 'cs_setup', mode: 'setup', customer: 'cus_other', setup_intent: 'seti_1',
+        client_reference_id: DEFAULT_TENANT_ID, metadata: { tenant_id: DEFAULT_TENANT_ID, purpose: 'musubo_card_setup' } } } };
+    expect((await webhook(event)).status).toBe(200);
+    expect(stripe.retrieveSetupIntent).not.toHaveBeenCalled();
+    expect(stripe.setCustomerDefaultPaymentMethod).not.toHaveBeenCalled();
+    expect(tenantRow().plan_status).toBe('trialing');
+  });
+
+  it('SetupIntentが未完了ならWebhookを完了扱いせず、再通知でカードを登録する', async () => {
+    setTenant({ stripe_customer_id: 'cus_setup', plan_status: 'trialing', trial_ends_at: null });
+    const event = { id: 'evt_card_setup_retry', type: 'checkout.session.completed', created: 100,
+      data: { object: { id: 'cs_setup', mode: 'setup', customer: 'cus_setup', setup_intent: 'seti_retry',
+        client_reference_id: DEFAULT_TENANT_ID, metadata: { tenant_id: DEFAULT_TENANT_ID, purpose: 'musubo_card_setup' } } } };
+    stripe.retrieveSetupIntent.mockResolvedValueOnce({ id: 'seti_retry', status: 'processing', customer: 'cus_setup', payment_method: 'pm_setup' });
+    expect((await webhook(event)).status).toBe(500);
+    expect(stripe.setCustomerDefaultPaymentMethod).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_card_setup_retry'").get()).toMatchObject({ summary: 'pending' });
+
+    stripe.retrieveSetupIntent.mockResolvedValueOnce({ id: 'seti_retry', status: 'succeeded', customer: 'cus_setup', payment_method: 'pm_setup' });
+    expect((await webhook(event)).status).toBe(200);
+    expect(stripe.setCustomerDefaultPaymentMethod).toHaveBeenCalledTimes(1);
+    expect(tenantRow()).toMatchObject({ plan_status: 'trialing', trial_ends_at: null, stripe_subscription_id: null });
   });
 
   it('業務更新が止まった受信は未完了で残り、同じIDで再開する', async () => {

@@ -49,6 +49,18 @@ export const hqBillingPaths = {
       responses: { '200': { description: 'Checkout URL' }, '400': { description: 'Invalid plan' }, '403': { description: 'Owner role required' }, '409': { description: 'Already subscribed or billing exempt' }, '503': { description: 'Stripe or price configuration unavailable' } },
     },
   },
+  '/api/hq/billing/card-setup': {
+    post: {
+      tags: ['HQ Billing'], summary: '請求を始めずにStripeのカード登録画面を開く',
+      responses: { '200': { description: 'Setup-mode Checkout URL' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Tenant not found' }, '409': { description: 'Billing exempt' }, '502': { description: 'Stripe API unavailable' }, '503': { description: 'Stripe configuration unavailable' } },
+    },
+  },
+  '/api/hq/billing/card-status': {
+    get: {
+      tags: ['HQ Billing'], summary: 'カード登録済みかをStripeから確認する（カード情報は返さない）',
+      responses: { '200': { description: 'Card registration boolean' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Tenant not found' }, '502': { description: 'Stripe API unavailable' } },
+    },
+  },
   '/api/hq/billing/portal': {
     post: {
       tags: ['HQ Billing'], summary: 'StripeカスタマーポータルURLを作成',

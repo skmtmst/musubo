@@ -235,6 +235,53 @@ hqBilling.get('/api/hq/billing/preview', requireRole('owner', 'admin'), async (c
   }
 });
 
+// ================================================================ card setup (no charge or subscription)
+
+hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+  try {
+    if (!stripeReady(c)) return c.json({ success: false, error: '決済の接続設定がまだありません。運営にお問い合わせください' }, 503);
+    const origin = adminOrigin(c);
+    if (!origin) return c.json({ success: false, error: '管理画面のURLが設定されていません' }, 503);
+    const tenantId = tenantOf(c);
+    const billing = await getTenantBilling(c.env.DB, tenantId);
+    if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
+    if (billing.plan_status === 'exempt') return c.json({ success: false, error: 'この統括はカード登録の対象外です' }, 409);
+
+    let customerId = billing.stripe_customer_id;
+    if (!customerId) {
+      const staff = c.get('staff');
+      const member = staff?.id ? await getStaffById(c.env.DB, staff.id).catch(() => null) : null;
+      const customer = await stripeApi.createCustomer(c.env, { name: billing.name, email: member?.email ?? null, tenantId });
+      customerId = customer.id;
+      await updateTenantBilling(c.env.DB, tenantId, { stripe_customer_id: customerId });
+    }
+    const session = await stripeApi.createCardSetupSession(c.env, {
+      customerId, tenantId,
+      successUrl: `${origin}/hq/onboarding/card?setup=success`,
+      cancelUrl: `${origin}/hq/onboarding/card?setup=cancel`,
+    });
+    if (!session.url) return c.json({ success: false, error: 'カード登録画面のURLを作れませんでした' }, 502);
+    return c.json({ success: true, data: { url: session.url } });
+  } catch (error) {
+    if (error instanceof StripeApiError) return c.json({ success: false, error: 'カード登録画面を開けませんでした。時間をおいてもう一度お試しください' }, 502);
+    throw error;
+  }
+});
+
+hqBilling.get('/api/hq/billing/card-status', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const billing = await getTenantBilling(c.env.DB, tenantOf(c));
+    if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
+    if (!billing.stripe_customer_id) return c.json({ success: true, data: { registered: false } });
+    if (!stripeReady(c)) return c.json({ success: false, error: '決済の接続設定がまだありません' }, 503);
+    const customer = await stripeApi.retrieveCustomer(c.env, billing.stripe_customer_id);
+    return c.json({ success: true, data: { registered: Boolean(customer.invoice_settings?.default_payment_method) } });
+  } catch (error) {
+    if (error instanceof StripeApiError) return c.json({ success: false, error: 'カード登録状況を確認できませんでした' }, 502);
+    throw error;
+  }
+});
+
 // ================================================================ checkout
 
 hqBilling.post('/api/hq/billing/checkout', requireRole('owner', 'admin'), inputJsonBoundary({ planKey: ['string'], interval: ['string'] }), async (c) => {
@@ -473,6 +520,24 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
 
     switch (event.type) {
       case 'checkout.session.completed': {
+        if (object.mode === 'setup') {
+          const metadata = (object.metadata ?? {}) as Record<string, string>;
+          const customerId = stripeExpandableId(object.customer);
+          const setupIntentId = stripeExpandableId(object.setup_intent);
+          // A signed event can still refer to another customer. Never use tenant metadata alone.
+          if (metadata.purpose === 'musubo_card_setup' && metadata.tenant_id === tenant.id
+            && customerId && customerId === tenant.stripe_customer_id && setupIntentId) {
+            if (!stripeReady(c)) throw new StripeApiError(503, 'Stripe is not configured');
+            const setupIntent = await stripeApi.retrieveSetupIntent(c.env, setupIntentId);
+            if (setupIntent.status !== 'succeeded' || setupIntent.customer !== customerId || !setupIntent.payment_method) {
+              throw new StripeApiError(502, 'SetupIntent has not completed');
+            }
+            await stripeApi.setCustomerDefaultPaymentMethod(c.env, customerId, setupIntent.payment_method);
+          } else {
+            logger.warn('routes_hq_billing_warn');
+          }
+          break;
+        }
         const subscriptionId = typeof object.subscription === 'string' ? object.subscription : null;
         const customerId = typeof object.customer === 'string' ? object.customer : tenant.stripe_customer_id;
         const metadata = (object.metadata ?? {}) as Record<string, string>;

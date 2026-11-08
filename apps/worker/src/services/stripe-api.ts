@@ -97,6 +97,7 @@ export interface StripeCustomer {
   id: string;
   email: string | null;
   name: string | null;
+  invoice_settings?: { default_payment_method?: string | null } | null;
 }
 
 export interface StripeCheckoutSession {
@@ -104,8 +105,17 @@ export interface StripeCheckoutSession {
   url: string | null;
   customer: string | null;
   subscription: string | null;
+  setup_intent?: string | null;
+  mode?: 'payment' | 'setup' | 'subscription';
   client_reference_id: string | null;
   metadata?: Record<string, string>;
+}
+
+export interface StripeSetupIntent {
+  id: string;
+  status: string;
+  customer: string | null;
+  payment_method: string | null;
 }
 
 export interface StripePortalSession {
@@ -214,6 +224,34 @@ export const stripeApi = {
       metadata: { tenant_id: input.tenantId, plan_key: input.planKey },
       subscription_data: { metadata: { tenant_id: input.tenantId, plan_key: input.planKey } },
     }, { fetchImpl }),
+
+  /** Card collection without a charge or a subscription. The webhook must verify the SetupIntent. */
+  createCardSetupSession: (
+    env: StripeEnv,
+    input: { customerId: string; tenantId: string; successUrl: string; cancelUrl: string },
+    fetchImpl?: typeof fetch,
+  ) => stripeRequest<StripeCheckoutSession>(env, 'POST', '/v1/checkout/sessions', {
+    mode: 'setup',
+    customer: input.customerId,
+    client_reference_id: input.tenantId,
+    currency: 'jpy',
+    payment_method_types: ['card'],
+    success_url: input.successUrl,
+    cancel_url: input.cancelUrl,
+    locale: 'ja',
+    metadata: { tenant_id: input.tenantId, purpose: 'musubo_card_setup' },
+  }, { fetchImpl }),
+
+  retrieveSetupIntent: (env: StripeEnv, setupIntentId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeSetupIntent>(env, 'GET', `/v1/setup_intents/${encodeURIComponent(setupIntentId)}`, undefined, { fetchImpl }),
+
+  retrieveCustomer: (env: StripeEnv, customerId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeCustomer>(env, 'GET', `/v1/customers/${encodeURIComponent(customerId)}`, undefined, { fetchImpl }),
+
+  setCustomerDefaultPaymentMethod: (env: StripeEnv, customerId: string, paymentMethodId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeCustomer>(env, 'POST', `/v1/customers/${encodeURIComponent(customerId)}`, {
+      invoice_settings: { default_payment_method: paymentMethodId },
+    }, { fetchImpl, idempotencyKey: `default-card-${customerId}-${paymentMethodId}` }),
 
   createPortalSession: (env: StripeEnv, input: { customerId: string; returnUrl: string }, fetchImpl?: typeof fetch) =>
     stripeRequest<StripePortalSession>(env, 'POST', '/v1/billing_portal/sessions', {
