@@ -142,11 +142,19 @@ export interface MusuboTrialPeriod {
 function parseIsoDate(date: string): Date {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new RangeError('Expected YYYY-MM-DD');
   const parsed = new Date(`${date}T00:00:00.000Z`);
-  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) throw new RangeError('Invalid date');
+  if (Number.isNaN(parsed.getTime()) || utcCalendarDate(parsed) !== date) throw new RangeError('Invalid date');
   return parsed;
 }
 
-function isoDate(date: Date): string { return date.toISOString().slice(0, 10); }
+/** Date-only arithmetic here uses UTC fields as a timezone-free calendar. */
+export function utcCalendarDate(date: Date): string {
+  const year = String(date.getUTCFullYear()).padStart(4, '0');
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isoDate(date: Date): string { return utcCalendarDate(date); }
 
 /** `firstChargeDate` is exclusive: the last free date is the previous JST calendar date. */
 export function musuboTrialDates(activationDateJst: string, period: MusuboTrialPeriod): {

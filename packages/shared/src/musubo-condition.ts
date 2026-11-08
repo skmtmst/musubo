@@ -1,4 +1,4 @@
-import { DEFAULT_MUSUBO_PRICE_SCHEDULE, musuboPrice, type MusuboPriceSchedule, type MusuboTrialPeriod } from './musubo-pricing.js';
+import { DEFAULT_MUSUBO_PRICE_SCHEDULE, musuboPrice, utcCalendarDate, type MusuboPriceSchedule, type MusuboTrialPeriod } from './musubo-pricing.js';
 
 export interface MusuboConditionDefinition {
   id: string;
@@ -30,7 +30,7 @@ export interface AppliedMusuboCondition {
 function validDate(value: string, name: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new RangeError(name + ' must be YYYY-MM-DD');
   const date = new Date(value + 'T00:00:00.000Z');
-  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new RangeError(name + ' is invalid');
+  if (Number.isNaN(date.getTime()) || utcCalendarDate(date) !== value) throw new RangeError(name + ' is invalid');
   return value;
 }
 

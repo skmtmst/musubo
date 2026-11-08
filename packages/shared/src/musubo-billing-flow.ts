@@ -1,4 +1,5 @@
 /** Billing rules agreed for the new musubo onboarding. All timestamps are absolute ISO instants. */
+import { utcCalendarDate } from './musubo-pricing.js';
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const PAYMENT_GRACE_DAYS = 7;
 export const ADDITION_HOLD_DAYS = 7;
@@ -119,7 +120,7 @@ export function finalLineEndOption(input: {
   previous.setUTCDate(previous.getUTCDate() - 1);
   return {
     defaultEndAt: new Date(endsAt).toISOString(),
-    lastUsableDateJst: previous.toISOString().slice(0, 10),
+    lastUsableDateJst: utcCalendarDate(previous),
     immediateAllowed: true,
     refundOnImmediateEnd: false,
   };
