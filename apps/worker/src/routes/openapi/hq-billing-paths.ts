@@ -9,9 +9,9 @@ export const hqBillingPaths = {
   },
   '/api/hq/billing/payment-failure': {
     get: {
-      tags: ['HQ Billing'], summary: '現在の未払い請求と7日間の猶予・Stripeの支払い先を取得',
+      tags: ['HQ Billing'], summary: '未払い請求の猶予・支払い先、または直近の支払い復旧を取得',
       responses: {
-        '200': { description: '未払いが無ければdataはnull。請求先URLはStripeの請求書ドメインに限定する' },
+        '200': { description: '未払い請求、直近7日以内の復旧、またはnull。請求先URLはStripeの請求書ドメインに限定する' },
         '403': { description: 'Owner or admin role required' },
         '404': { description: 'Tenant not found' },
       },
