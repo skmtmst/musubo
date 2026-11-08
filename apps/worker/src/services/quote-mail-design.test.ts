@@ -34,6 +34,7 @@ describe('個別見積もりメール', () => {
   it('再発行のメールは旧リンク無効と再同意を案内する', () => {
     const mail = individualQuoteMail({ quote, reviewUrl: 'https://admin.example.com/hq/quote?token=new', kind: 'reissued' });
     expect(mail.subject).toContain('再発行');
+    expect(mail.text).toContain('以前のお見積もりは無効');
     expect(mail.html).toContain('旧リンクからは同意できません');
     expect(mail.text).toContain('改めて同意');
   });

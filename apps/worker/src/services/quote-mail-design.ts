@@ -41,7 +41,7 @@ export function individualQuoteMail(input: {
   const title = reissued ? '新しいお見積もりをご用意しました' : 'お見積もりをご用意しました';
   const subject = reissued ? '【musubo】個別見積もり再発行のご案内' : '【musubo】個別見積もりのご案内';
   const intro = reissued
-    ? '以前の見積もりは期限切れとなりました。新しい料金と有効期限をご確認のうえ、改めて同意してください。'
+    ? '以前のお見積もりは無効になりました。新しい料金と有効期限をご確認のうえ、改めて同意してください。'
     : 'ご利用予定に合わせた料金をご用意しました。ログインして内容をご確認のうえ、同意してカード登録へお進みください。';
   const amount = quote.interval === 'month'
     ? `${money(price.plannedMonthlyTotalYen!)}／月（税込）`
