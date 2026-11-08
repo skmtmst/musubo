@@ -59,6 +59,7 @@ describe('musubo LINE pricing', () => {
   it('requires an individual quote at eleven and supports explicit quoted prices', () => {
     expect(() => musuboPrice({ ...base, lineCount: 11 })).toThrow(/individual quote/);
     expect(() => musuboPrice({ ...base, lineCount: 1, linkedAccountsByLine: [{ googleBusiness: 11, instagram: 1 }] })).toThrow(/individual quote/);
+    expect(() => musuboPrice({ ...base, lineCount: 1, schedule: DEFAULT_MUSUBO_PRICE_SCHEDULE, linkedAccountsByLine: [{ googleBusiness: 11, instagram: 1 }] })).toThrow(/individual quote/);
     const quoted = musuboPrice({ ...base, lineCount: 11, schedule: {
       ...DEFAULT_MUSUBO_PRICE_SCHEDULE, eleventhAndLaterLineYen: 6_900, friendAllowanceForElevenOrMore: 50_000,
     } });
