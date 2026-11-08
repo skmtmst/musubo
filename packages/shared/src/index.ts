@@ -97,6 +97,7 @@ export * from './security-monitor.js';
 export * from './report-period.js';
 
 export * from './hq-catalog-templates.js';
+export * from './musubo-pricing.js';
 export type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentWrite, BookingAssignmentSettings, RestaurantTableAssignmentSettings, RestaurantTableAssignmentWrite } from './booking-assignment.js';
 
 export * from './booking-entitlements.js';
