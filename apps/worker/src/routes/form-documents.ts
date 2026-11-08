@@ -83,7 +83,7 @@ formDocuments.get('/api/form-files/:id/content', requireRole('owner', 'admin', '
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!row || !scope.ids.includes(row.line_account_id)) return c.json({ success: false, error: '書類が見つかりません' }, 404);
   c.set('outputAudit', { count: 1, accountId: row.line_account_id, targetId: row.id });
-  if (row.file_kind === 'identity' && !['owner', 'admin'].includes(c.get('staff')?.role ?? '')) return c.json({ success: false, error: '見る権限がありません' }, 403);
+  if (row.file_kind === 'identity' && !['owner', 'admin'].includes(c.get('staff')?.role ?? '') && c.get('staff')?.hqRole !== 'operator') return c.json({ success: false, error: '見る権限がありません' }, 403);
   if (await customerDeletionPending(c.env.DB, row.friend_id, row.submission_id)) return c.json({ success: false, error: 'この書類は削除中です。もう一度削除を実行してください。' }, 409);
   if (row.scan_status === 'quarantined') return c.json({ success: false, error: '危ないファイルのため開けません' }, 409);
   if (row.scan_status === 'rejected') return c.json({ success: false, error: '安全を確認できませんでした。別のファイルを選んでください' }, 409);

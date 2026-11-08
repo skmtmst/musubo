@@ -147,7 +147,7 @@ booking.put('/api/booking/admin/staff/:id/shifts', requireOwnBookingStaffOrAdmin
   }>().catch(() => null);
   if (!b || !Array.isArray(b.shifts)) return inputError(c, { error: 'shifts_must_be_an_array' }, 400, ["shifts"]);
   if(b.shifts.some(s=>s.is_responsible!==undefined&&typeof s.is_responsible!=='boolean'))return inputError(c, {error:'責任者の指定を確認してください'}, 400, ["shifts"]);
-  if(b.shifts.some(s=>s.is_responsible!==undefined)&&!['owner','admin'].includes(c.get('staff')?.role??''))return c.json({error:'責任者を指定できるのは管理者です'},403);
+  if(b.shifts.some(s=>s.is_responsible!==undefined)&&!['owner','admin'].includes(c.get('staff')?.role??'')&&c.get('staff')?.hqRole!=='operator')return c.json({error:'責任者を指定できるのは管理者か統括の担当者です'},403);
   if (b.shifts.length > 366) return inputError(c, { error: 'too_many_shifts' }, 400, ["shifts"]);
   const invalid = b.shifts.find((shift) => (
     !isValidShiftDate(shift.work_date)

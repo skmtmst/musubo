@@ -1,7 +1,7 @@
 import { readAuthenticatedStaffRecord } from '../lib/authenticated-staff-record.js';
 import { logger } from '@line-crm/shared/server';
 import { mfaEncryptionConfigured } from '../lib/mfa-config.js';
-import { effectiveStaffEditKeys, SCOPE_OPERATION_KEYS } from '@line-crm/shared';
+import { effectiveStaffEditKeys, hqRoleForStaff, SCOPE_OPERATION_KEYS } from '@line-crm/shared';
 import {
   ACCESS_ROLE_BUNDLE_IDS, SCOPE_ITEMS, BUNDLE_PRESETS, scopeLevelsToKeys, keysToScopeLevels,
   type AccessRoleBundleId, type FeatureAccessLevel, type EmailMaskLevel, type ScopeLevels,
@@ -84,6 +84,8 @@ function parseRoleBundle(value: string | null | undefined): AccessRoleBundleId |
 }
 
 function staffBundle(member: Pick<StaffMember, 'role' | 'access_level' | 'role_bundle'>): AccessRoleBundleId {
+  if (member.role_bundle === 'hq_operator') return 'operations';
+  if (member.role_bundle === 'hq_viewer') return 'view_only';
   const saved = parseRoleBundle(member.role_bundle);
   if (saved) return saved;
   if (member.access_level === 'read_only') return 'view_only';
@@ -198,6 +200,7 @@ async function serializeStaff(
     email: emailVisibility === 'full' ? row.email : emailVisibility === 'masked' ? maskEmail(row.email) : null,
     role: displayRole(row),
     roleBundle: staffBundle(row),
+    hqRole: hqRoleForStaff(row),
     emailMask,
     lineLinked: Boolean(row.line_user_id),
     twoFactorEnabled: Boolean(row.totp_enabled_at && row.totp_secret_enc),
@@ -523,6 +526,9 @@ staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return inputError(c, { success: false, error: '正しいメールアドレスを入力してください' }, 400, ["email"]);
     if (emailTooLong(email)) return inputError(c, { success: false, error: 'メールアドレスは254文字以内で入力してください' }, 400, ["email"]);
     if (!body.role || !['admin', 'staff', 'viewer'].includes(body.role)) return inputError(c, { success: false, error: '役割を選択してください' }, 400, ["role"]);
+    if (body.managementContext === 'hq' && body.permissionKeys?.length) {
+      return inputError(c, { success: false, error: '統括の担当者は役割だけを選んでください' }, 400, ["permissionKeys"]);
+    }
     if (!body.assignedLineAccountId && !(body.managementContext === 'hq' && accountScope.accountScope === 'all')) {
       return inputError(c, { success: false, error: '担当するLINEアカウントを選択してください' }, 400, ["assignedLineAccountId"]);
     }
@@ -583,7 +589,9 @@ staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name
         name, email,
         role: body.role === 'admin' ? 'admin' : 'staff',
         access_level: body.role === 'viewer' ? 'read_only' : 'full',
-        role_bundle: body.role === 'admin' ? 'administrator' : body.role === 'viewer' ? 'view_only' : 'custom',
+        role_bundle: body.role === 'admin' ? 'administrator' : body.managementContext === 'hq'
+          ? body.role === 'viewer' ? 'hq_viewer' : 'hq_operator'
+          : body.role === 'viewer' ? 'view_only' : 'custom',
         view_permission_keys: body.role === 'viewer' ? scopeLevelsToKeys(BUNDLE_PRESETS.view_only.levels).view : [],
         email_mask: body.role === 'admin' ? 'full' : 'masked',
         is_active: 0,
@@ -748,6 +756,16 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   const target = await getStaffById(c.env.DB, id);
   if (!target || !isInCurrentTenant(c, target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   const current = c.get('staff');
+  const targetIsHqMember = target.role_bundle === 'hq_operator' || target.role_bundle === 'hq_viewer';
+  if (targetIsHqMember && body.managementContext !== 'hq' && (body.role !== undefined || body.roleBundle !== undefined || body.permissionKeys !== undefined || body.permissionScope !== undefined || body.permissionViewKeys !== undefined)) {
+    return c.json({ success: false, error: '統括メンバーの役割は統括のメンバー画面で変更してください' }, 400);
+  }
+  if (body.managementContext === 'hq' && (body.roleBundle !== undefined || body.permissionKeys !== undefined || body.permissionScope !== undefined || body.permissionViewKeys !== undefined || body.emailMask !== undefined)) {
+    return c.json({ success: false, error: '統括の権限は管理者・担当者・閲覧のみから選んでください' }, 400);
+  }
+  if (body.managementContext === 'hq' && (target.assigned_line_account_id || target.account_scope !== 'all')) {
+    return c.json({ success: false, error: '店舗の権限者は統括の役割に変更できません' }, 400);
+  }
   if (!await canAccessStaffMember(c.env.DB, current, target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   if (body.managementContext === 'hq' && !await hasAllAccountScope(c.env.DB, current)) {
     return c.json({ success: false, error: '全店舗の担当者だけが統括側の権限者を変更できます' }, 403);
@@ -924,7 +942,9 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
     }
   } else if (body.role !== undefined) {
     // 旧来の role 指定も bundle へ写す（画面・監査で同じ言葉を使うため）。
-    bundleWrite = body.role === 'admin' ? 'administrator' : body.role === 'viewer' ? 'view_only' : 'custom';
+    bundleWrite = body.role === 'admin' ? 'administrator' : body.managementContext === 'hq'
+      ? body.role === 'viewer' ? 'hq_viewer' : 'hq_operator'
+      : body.role === 'viewer' ? 'view_only' : 'custom';
     if (body.role === 'viewer' && viewKeysWrite === undefined) {
       viewKeysWrite = mergeKeys(
         scopeLevelsToKeys(BUNDLE_PRESETS.view_only.levels).view,

@@ -20,7 +20,7 @@ companySettings.use('/api/settings/company', async (c, next) => {
     return c.json({ success: false, code: 'FORBIDDEN', error: '所属する会社を確認できません' }, 403);
   }
   if (c.req.method === 'PUT' && (staff.readOnly || member.access_level === 'read_only'
-    || !['owner', 'admin'].includes(member.role))) {
+    || (!['owner', 'admin'].includes(member.role) && staff.hqRole !== 'operator'))) {
     return c.json({ success: false, code: 'FORBIDDEN', error: '会社全体の編集権限が必要です' }, 403);
   }
   await next();

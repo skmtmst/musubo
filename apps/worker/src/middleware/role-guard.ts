@@ -4,6 +4,7 @@ import type { Context, MiddlewareHandler } from 'hono';
 import type { Env } from '../worker-env.js';
 import type { StaffRole } from './auth/principal/auth.js';
 import { readOperationPermissions } from './auth/permissions/auth.js';
+import { isHqBusinessOperation } from './hq-role-policy.js';
 
 /**
  * 役割による門番。
@@ -18,7 +19,12 @@ import { readOperationPermissions } from './auth/permissions/auth.js';
 export function requireRole(...allowed: StaffRole[]): MiddlewareHandler<Env> {
   return async (c, next) => {
     const staff = c.get('staff');
-    if (!staff || !allowed.includes(staff.role)) {
+    const hqBusiness = staff?.hqRole === 'operator' && allowed.includes('admin')
+      && isHqBusinessOperation(c.req.method, c.req.path, staff.id);
+    const hqRead = staff?.hqRole === 'viewer' && allowed.includes('admin')
+      && ['GET', 'HEAD', 'OPTIONS'].includes(c.req.method.toUpperCase())
+      && isHqBusinessOperation(c.req.method, c.req.path, staff.id);
+    if (!staff || (!allowed.includes(staff.role) && !hqBusiness && !hqRead)) {
       return c.json(
         { success: false, error: `この操作には${roleLabel(allowed[0])}権限が必要です` },
         403,
@@ -41,6 +47,8 @@ export function hasStaffPermission(c: Context<Env>, permission: string): boolean
   const staff = c.get('staff');
   if (!staff) return false;
   if (staff.role === 'owner' || staff.role === 'admin') return true;
+  if (staff.hqRole === 'operator') return permission !== 'administrator';
+  if (staff.hqRole === 'viewer') return ['GET', 'HEAD', 'OPTIONS'].includes(c.req.method.toUpperCase()) && permission !== 'administrator';
   const safeRead = c.req.method === 'GET' || c.req.method === 'HEAD' || c.req.method === 'OPTIONS';
   return staff.permissionKeys?.includes(permission) === true
     || (safeRead && staff.viewPermissionKeys?.includes(permission) === true);

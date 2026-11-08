@@ -30,6 +30,18 @@ it('統括の招待では全アカウントだけを付与する', () => {
   expect(submit).toHaveBeenCalledWith(expect.objectContaining({ scopedLineAccountIds: [], accountScope: 'all' }))
 })
 
+it('担当者を選ぶと、業務操作と管理者だけの操作の違いが分かる', () => {
+  const submit = vi.fn()
+  render(<MemberDialog open session={1} member={null} onSubmit={submit} onCancel={() => {}} />)
+  fireEvent.change(screen.getByLabelText('名前'), { target: { value: '担当者' } })
+  fireEvent.change(screen.getByLabelText('メールアドレス'), { target: { value: 'staff@example.com' } })
+  fireEvent.click(screen.getByLabelText('役割'))
+  fireEvent.click(screen.getByRole('option', { name: '担当者（業務を操作できる）' }).querySelector('button')!)
+  expect(screen.getByText('予約・配信などの業務を操作できます。メンバーの追加や決済の変更はできません。')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '招待メールを送る' }))
+  expect(submit).toHaveBeenCalledWith(expect.objectContaining({ role: 'staff', accountScope: 'all' }))
+})
+
 
 it('不正なメールの貼り付けはその場で知らせ、招待を送らない', () => {
   const submit = vi.fn()

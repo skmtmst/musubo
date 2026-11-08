@@ -1,4 +1,4 @@
-import { effectiveStaffEditKeys } from '@line-crm/shared';
+import { effectiveStaffEditKeys, hqRoleForStaff } from '@line-crm/shared';
 
 export type TenantStatus = 'active' | 'suspended' | 'archived';
 export const TENANT_SUSPENDED_CODE = 'TENANT_SUSPENDED';
@@ -16,6 +16,7 @@ export type AuthenticatedStaff = {
   role: StaffRole;
   /** true なら役割にかかわらず更新・削除・設定変更をさせない。 */
   readOnly: boolean;
+  hqRole?: 'operator' | 'viewer' | null;
   permissionKeys?: string[];
   /** 「見えるだけ」の key。GET系だけを許可し、変更系は edit の key が要る。 */
   viewPermissionKeys?: string[];
@@ -49,6 +50,8 @@ type StaffAuthenticationRecord = {
   name: string;
   role: StaffRole;
   access_level?: 'full' | 'read_only';
+  role_bundle?: string | null;
+  account_scope?: 'all' | 'accounts';
   permission_keys?: string;
   view_permission_keys?: string | null;
   email_mask?: string | null;
@@ -75,11 +78,13 @@ export function toAuthenticatedStaff(staff: StaffAuthenticationRecord): Authenti
   const emailMask = staff.email_mask === 'full' || staff.email_mask === 'masked' || staff.email_mask === 'none'
     ? staff.email_mask
     : null;
+  const hqRole = hqRoleForStaff(staff);
   return {
     id: staff.id,
     name: staff.name,
     role: staff.role,
     readOnly: staff.access_level === 'read_only',
+    hqRole,
     permissionKeys,
     viewPermissionKeys,
     emailMask,

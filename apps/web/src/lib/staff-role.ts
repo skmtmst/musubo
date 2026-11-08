@@ -6,6 +6,13 @@ import { api } from '@/lib/api'
 
 /** 役割だけで管理者に限定する操作。機能を任されたstaffの操作は別の鍵で判定する。 */
 export function canManageRole(role: string | null | undefined): boolean {
+  if (role === 'owner' || role === 'admin') return true
+  const identity = readStaffIdentity()
+  return role === 'staff' && identity?.role === 'staff' && identity.hqRole === 'operator' && !identity.readOnly
+}
+
+/** メンバー管理・契約・決済を変更できる役割。 */
+export function canAdministerRole(role: string | null | undefined): boolean {
   return role === 'owner' || role === 'admin'
 }
 
@@ -116,4 +123,11 @@ export function useTenantWideAccess(): boolean {
   const identity = useStaffIdentity()
   return Boolean(identity && canManageRole(identity.role)
     && !identity.readOnly && identity.roleBundle !== 'view_only' && identity.accountScope !== 'accounts')
+}
+
+/** 統括メンバー・契約・決済の管理を行える人。 */
+export function useTenantAdministratorAccess(): boolean {
+  const identity = useStaffIdentity()
+  return Boolean(identity && canAdministerRole(identity.role)
+    && !identity.readOnly && identity.accountScope !== 'accounts')
 }

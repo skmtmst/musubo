@@ -15,8 +15,9 @@ export const VERSION_CONFLICT_MESSAGE = '配布先で編集がありました。
 export type HqTemplateAuthority = Readonly<{
   tenantId: string;
   actorId: string;
-  role: 'owner' | 'admin';
-  readOnly: false;
+  role: 'owner' | 'admin' | 'staff';
+  hqRole?: 'operator' | 'viewer';
+  readOnly: boolean;
   accountScoped: false;
 }>;
 
@@ -24,6 +25,7 @@ export type HqTemplateAuthorityCandidate = Readonly<{
   tenantId: string | null | undefined;
   actorId: string | null | undefined;
   role: string | null | undefined;
+  hqRole?: 'operator' | 'viewer' | null;
   readOnly: boolean;
   accountScoped: boolean;
 }>;
@@ -37,10 +39,10 @@ export function requireHqTemplateAuthority(
 ): HqTemplateAuthorityResult {
   if (!candidate.tenantId) return { kind: 'FORBIDDEN', reason: 'TENANT_REQUIRED' };
   if (!candidate.actorId) return { kind: 'FORBIDDEN', reason: 'ACTOR_REQUIRED' };
-  if (candidate.role !== 'owner' && candidate.role !== 'admin') {
+  if (candidate.role !== 'owner' && candidate.role !== 'admin' && !(candidate.role === 'staff' && (candidate.hqRole === 'operator' || candidate.hqRole === 'viewer'))) {
     return { kind: 'FORBIDDEN', reason: 'ROLE_REQUIRED' };
   }
-  if (candidate.readOnly) return { kind: 'FORBIDDEN', reason: 'READ_ONLY' };
+  if (candidate.hqRole === 'viewer' ? !candidate.readOnly : candidate.readOnly) return { kind: 'FORBIDDEN', reason: 'READ_ONLY' };
   if (candidate.accountScoped) return { kind: 'FORBIDDEN', reason: 'ACCOUNT_SCOPED' };
   return {
     kind: 'AUTHORIZED',
@@ -48,7 +50,8 @@ export function requireHqTemplateAuthority(
       tenantId: candidate.tenantId,
       actorId: candidate.actorId,
       role: candidate.role,
-      readOnly: false,
+      ...(candidate.role === 'staff' ? { hqRole: candidate.hqRole! } : {}),
+      readOnly: candidate.readOnly,
       accountScoped: false,
     },
   };

@@ -36,7 +36,7 @@ async function authority(c: Context<Env>): Promise<HqTemplateAuthority> {
   // DB 上の本人が見つからないことを、統括全体の管理権限として扱わない。
   if (!member || member.is_active !== 1 || member.tenant_id !== staff.tenantId) throw new HqTemplateError('FORBIDDEN', 403);
   const auth = requireHqTemplateAuthority({ tenantId: staff.tenantId, actorId: staff.id,
-    role: member.role, readOnly: !['GET','HEAD'].includes(c.req.method) && (staff.readOnly || member.access_level === 'read_only'), accountScoped: member.account_scope === 'accounts' });
+    role: member.role, hqRole: staff.hqRole, readOnly: staff.readOnly || member.access_level === 'read_only', accountScoped: member.account_scope === 'accounts' });
   if (auth.kind !== 'AUTHORIZED') throw new HqTemplateError('FORBIDDEN', 403);
   return auth.authority;
 }
