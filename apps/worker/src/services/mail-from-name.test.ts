@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-type RelayMessage = { to: string; subject: string; body: string; fromName?: string };
+type RelayMessage = { to: string; subject: string; body: string; html?: string; fromName?: string };
 
 // 差出人名は引数として渡るので、引数の型まで書いておく（型検査で中身を確かめるため）。
 const sendViaXServerRelay = vi.hoisted(() =>
@@ -58,6 +58,16 @@ describe('sendPlainMail の差出人名', () => {
     expect(sendViaXServerRelay.mock.calls[0]?.[2]).toMatchObject({
       to: 'user@example.test',
       fromName: MUSUBO_FROM_NAME,
+    });
+  });
+
+  it('検証環境の中継へHTMLと文字版を両方渡す', async () => {
+    await sendPlainMail(env, {
+      to: 'user@example.test', subject: '【musubo】管理画面への招待',
+      body: '文字版', html: '<p>HTML版</p>',
+    });
+    expect(sendViaXServerRelay.mock.calls[0]?.[2]).toMatchObject({
+      body: '文字版', html: '<p>HTML版</p>', fromName: MUSUBO_FROM_NAME,
     });
   });
 

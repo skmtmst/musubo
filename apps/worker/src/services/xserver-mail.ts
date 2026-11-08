@@ -21,6 +21,7 @@ type SendMailInput = {
   from: string;
   subject: string;
   body: string;
+  html?: string;
   /** 差出人の表示名。省略時は 然-NEN- の窓口名。 */
   fromName?: string;
   inReplyTo?: string;
@@ -328,10 +329,17 @@ export async function sendXServerMail(env: XServerMailEnv, input: SendMailInput)
       ...(input.inReplyTo ? [`In-Reply-To: ${safeHeader(input.inReplyTo)}`] : []),
       ...(input.references ? [`References: ${safeHeader(input.references)}`] : []),
       'MIME-Version: 1.0',
-      'Content-Type: text/plain; charset=UTF-8',
-      'Content-Transfer-Encoding: base64',
+      ...(input.html
+        ? [`Content-Type: multipart/alternative; boundary="${messageId.slice(1, -1)}"`]
+        : ['Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64']),
     ];
-    await transport.write(`${headers.join('\r\n')}\r\n\r\n${foldBase64(encodeBase64(input.body))}\r\n.\r\n`);
+    const boundary = messageId.slice(1, -1);
+    const content = input.html
+      ? [`--${boundary}`, 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', foldBase64(encodeBase64(input.body)),
+        `--${boundary}`, 'Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', foldBase64(encodeBase64(input.html)),
+        `--${boundary}--`, ''].join('\r\n')
+      : `${foldBase64(encodeBase64(input.body))}\r\n`;
+    await transport.write(`${headers.join('\r\n')}\r\n\r\n${content}.\r\n`);
     await smtpResponse(transport, 250);
     await smtpCommand(transport, 'QUIT', 221).catch(() => undefined);
     return messageId;
