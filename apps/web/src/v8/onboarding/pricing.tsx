@@ -22,7 +22,7 @@ export interface OnboardingCondition {
 
 export interface PricingSelection {
   lineCount: number
-  friendCountExcludingBlocked: number
+  friendCountExcludingBlocked: number | null
   googleBusinessCount: number
   instagramCount: number
   interval: 'month' | 'year'
@@ -80,7 +80,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, onCon
   const friendCountValid = (quoteRequired && friendCountText === '') || (/^\d{1,9}$/.test(friendCountText.replaceAll(',', '')) && Number.isSafeInteger(friendCount))
   const selection: PricingSelection = {
     lineCount,
-    friendCountExcludingBlocked: friendCountValid ? friendCount : 0,
+    friendCountExcludingBlocked: friendCountText === '' ? null : friendCountValid ? friendCount : null,
     googleBusinessCount,
     instagramCount,
     interval,

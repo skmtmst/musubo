@@ -58,7 +58,7 @@ describe('Penの利用料金確認', () => {
     expect(host.querySelector('input[type=checkbox]')).toBeNull()
     const contact = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('お問い合わせフォームへ'))!
     await act(async () => { contact.click() })
-    expect(contactFlow).toHaveBeenCalledWith(expect.objectContaining({ lineCount: 11 }))
+    expect(contactFlow).toHaveBeenCalledWith(expect.objectContaining({ lineCount: 11, friendCountExcludingBlocked: null }))
   })
 
   it('複数LINEでは各LINEの連携数を先取りせず、追加枠を予定料金に含めない', async () => {
