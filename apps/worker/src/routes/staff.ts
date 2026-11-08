@@ -90,6 +90,11 @@ function staffBundle(member: Pick<StaffMember, 'role' | 'access_level' | 'role_b
   return member.role === 'owner' || member.role === 'admin' ? 'administrator' : 'custom';
 }
 
+function inviteRoleLabel(member: Pick<StaffMember, 'role' | 'access_level' | 'role_bundle'>): '管理者' | '担当者' | '閲覧のみ' {
+  const bundle = staffBundle(member);
+  return bundle === 'administrator' ? '管理者' : bundle === 'view_only' ? '閲覧のみ' : '担当者';
+}
+
 function parseEmailMask(value: unknown): EmailMaskLevel | null | undefined {
   if (value === undefined) return undefined;
   return value === 'full' || value === 'masked' || value === 'none' ? value : null;
@@ -477,6 +482,7 @@ staff.post('/api/staff/:id/resend-invite', requireRole('owner', 'admin'), inputJ
       name: member.name,
       email: member.email,
       verifyUrl: `${new URL(c.req.url).origin}/api/staff/invitations/${encodeURIComponent(token)}/verify`,
+      roleLabel: inviteRoleLabel(member),
     });
     const refreshed = await getStaffById(c.env.DB, member.id);
     return c.json({ success: true, data: await serializeStaff(c.env.DB, refreshed ?? member) });
@@ -602,6 +608,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name
       await sendStaffInviteEmail(c.env, {
         name, email,
         verifyUrl: invitationConfirmationUrl(c, token),
+        roleLabel: inviteRoleLabel(member),
       });
     } catch (error) {
       // 後片付け自体が失敗しても握り潰さない。本人と範囲を一緒に消し、
@@ -685,6 +692,7 @@ staff.post('/api/staff/:id/resend-invitation', requireRole('owner', 'admin'), in
         await sendStaffInviteEmail(c.env, {
           name: updated.name, email: updated.email ?? target.email,
           verifyUrl: invitationConfirmationUrl(c, token),
+          roleLabel: inviteRoleLabel(updated),
         });
       }
     } catch (error) {
