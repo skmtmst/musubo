@@ -39,6 +39,18 @@ function inputValue(id: string, value: string) {
 }
 
 describe('Penの利用料金確認', () => {
+  it('料金詳細を開くと閉じるボタンに焦点を移し、Escで元の操作へ戻す', async () => {
+    await act(async () => { root.render(<OnboardingPricing onContinue={continueFlow} onContact={contactFlow} />) })
+    const details = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('料金の詳しい条件を見る'))!
+    details.focus()
+    await act(async () => { details.click() })
+    const dialog = host.querySelector<HTMLElement>('[role="dialog"]')!
+    expect(document.activeElement).toBe(dialog.querySelector('button[aria-label="閉じる"]'))
+    await act(async () => { dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.activeElement).toBe(details)
+  })
+
   it('個別見積もり画面から戻っても入力した予定を保つ', async () => {
     await act(async () => { root.render(<PricingQuoteFlow onContinue={continueFlow} />) })
     await selectValue('line-count', '11')

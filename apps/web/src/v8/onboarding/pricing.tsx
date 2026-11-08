@@ -1,7 +1,7 @@
 'use client'
 
 import Button from '@/components/shared/button'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import {
   DEFAULT_MUSUBO_PRICE_SCHEDULE,
   musuboPrice,
@@ -77,8 +77,37 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
   const [interval, setInterval] = useState<'month' | 'year'>(initialSelection?.interval ?? 'month')
   const [consent, setConsent] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const detailsDialogRef = useRef<HTMLElement>(null)
+  const detailsCloseRef = useRef<HTMLButtonElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!detailsOpen) return
+    const returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    detailsCloseRef.current?.focus()
+    return () => { returnTo?.focus() }
+  }, [detailsOpen])
+
+  const detailsKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Escape') {
+      event.stopPropagation()
+      setDetailsOpen(false)
+      return
+    }
+    if (event.key !== 'Tab') return
+    const focusable = [...(detailsDialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled)') ?? [])]
+    if (focusable.length === 0) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
 
   const friendCount = Number(friendCountText.replaceAll(',', ''))
   const quoteRequired = lineCount > 10 || (lineCount === 1 && (googleBusinessCount > 10 || instagramCount > 10))
@@ -238,8 +267,8 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
       {detailsOpen && <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => {
         if (event.target === event.currentTarget) setDetailsOpen(false)
       }}>
-        <section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="details-heading">
-          <CloseButton className={styles.close} onClick={() => setDetailsOpen(false)} />
+        <section ref={detailsDialogRef} className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="details-heading" onKeyDown={detailsKeyDown}>
+          <CloseButton ref={detailsCloseRef} className={styles.close} onClick={() => setDetailsOpen(false)} />
           <h2 id="details-heading">料金の詳しい条件</h2>
           <p>接続したLINE公式アカウントの数に応じて料金が決まります。</p>
           <div className={styles.detailBlock}>
