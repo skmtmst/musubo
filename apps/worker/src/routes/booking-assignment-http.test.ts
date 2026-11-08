@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { seedAssignmentFixture } from '../test-utils/assignment-fixture.js';
+import { permissionForApiPath } from '../middleware/auth.js';
 const access = vi.hoisted(() => ({ allow: true }));
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: vi.fn(async () => access.allow),
@@ -30,6 +31,9 @@ function request(path: string, body?: unknown, method = 'PUT') {
 beforeEach(() => { f = createTestD1(); seedAssignmentFixture(f); role = 'owner'; readOnly = false; edit = false; access.allow = true; });
 afterEach(() => f.raw.close());
 describe('割り当て設定API', () => {
+  it('自動配席APIを予約設定の権限へ所属させる',()=>{
+    expect(permissionForApiPath('/api/restaurant-test/table-auto-assignment-settings')).toBe('booking.settings');
+  });
   it('オフでもスタッフ指定の卓を保ち、保存直前に設定が変われば来店記録ごと残さない',async()=>{
     f.raw.exec("UPDATE rt_tables SET is_active=0 WHERE id IN('t2','big')");
     expect((await request(automation,{enabled:false,expectedVersion:0})).status).toBe(200);

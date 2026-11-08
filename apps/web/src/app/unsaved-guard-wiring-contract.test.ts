@@ -113,8 +113,8 @@ const GUARDED = [
   'app/reminders/new/page.tsx',
   'v8/restaurant/google/profile-edit.tsx',
   'v8/restaurant/google/hours.tsx',
-  // 卓の割り当て方（jmVYJ）。下の帯で保存する変更を、離れる前に確認する。
-  'v8/restaurant/tables/assign.tsx',
+  // 自動配席の編集窓。保存前の変更を、離れる前に確認する。
+  'v8/restaurant/tables/auto-assignment-dialog.tsx',
   'v8/restaurant/google/profile-hours.tsx',
   'v8/rich-menus/new/create.tsx',
   'app/rich-menus/new/page.tsx',
@@ -252,14 +252,13 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
   'v8/booking-menus/meeting-mode.tsx': 'v8/booking-menus/menu-form.tsx',
   'v8/booking-menus/staff-calendar.tsx': 'components/shared/form-leave-guard.tsx',
   'v8/booking-menus/tabs/staff-tab.tsx': 'v8/booking-menus/settings.tsx',
-  'v8/booking-payments/assignment.tsx': ['v8/booking-menus/settings.tsx', 'v8/restaurant/tables/assign.tsx'],
+  'v8/booking-payments/assignment.tsx': 'v8/booking-menus/settings.tsx',
   'v8/booking-payments/cancellation.tsx': 'v8/booking-menus/settings.tsx',
   'v8/booking-payments/menu-deposit.tsx': 'v8/booking-menus/menu-form.tsx',
   'v8/booking-payments/menu-payment.tsx': 'v8/booking-menus/menu-form.tsx',
   'v8/booking-payments/payments-tab.tsx': 'v8/booking-menus/settings.tsx',
   'v8/inbox-chat/routing-drawer.tsx': 'components/shared/form-leave-guard.tsx',
   'v8/restaurant/menu/edit.tsx': 'components/templates/create-page.tsx',
-  'v8/restaurant/tables/assign.tsx': 'components/shared/form-leave-guard.tsx',
 
   // ③-2 第3波：作る画面は CreatePage の dirty、編集の引き出しは Drawer の離脱の確認、ランクの段の窓は Dialog が守る。
   'v8/booking-passes/create.tsx': 'components/templates/create-page.tsx',

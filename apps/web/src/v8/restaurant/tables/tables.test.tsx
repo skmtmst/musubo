@@ -177,6 +177,21 @@ describe('BERxg 座席・卓管理', () => {
     expect(within(dialog).getByRole('button',{name:'変更を保存'}).hasAttribute('disabled')).toBe(true)
   })
 
+  it('保存時の入力エラーをスイッチへ結び付け、値と編集中の内容を残す',async()=>{
+    assignmentApi.saveTableAutomation.mockRejectedValue(new ApiError(400,'入力を確認してください','invalid_table_auto_assignment',undefined,undefined,undefined,{enabled:'設定を選び直してください。'}))
+    render(<TablesPage />)
+    fireEvent.click(await screen.findByRole('button',{name:'自動配席の設定'}))
+    const dialog=screen.getByRole('dialog',{name:'自動配席の設定'})
+    const toggle=await within(dialog).findByRole('switch')
+    fireEvent.click(toggle)
+    fireEvent.click(within(dialog).getByRole('button',{name:'変更を保存'}))
+    expect(await within(dialog).findByText('設定を選び直してください。')).toBeTruthy()
+    expect(toggle.getAttribute('aria-invalid')).toBe('true')
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(toggle)
+    await waitFor(()=>expect(within(dialog).queryByText('設定を選び直してください。')).toBeNull())
+  })
+
   it('設定の変更を破棄して閉じても、背景の座席図を再取得・保存しない',async()=>{
     render(<TablesPage />)
     fireEvent.click(await screen.findByRole('button',{name:'自動配席の設定'}))
