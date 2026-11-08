@@ -38,18 +38,21 @@ const trial = {
 describe('無料体験の通知メール', () => {
   it('30日の開始と終了7日前で初回請求日を一致させる', () => {
     const started = musuboTrialMail({ ...trial, event: 'started' });
+    expect(started.subject).toContain('30日間の無料体験');
+    expect(started.text).toContain('30日間の無料体験が始まりました');
     expect(started.text).toContain('2026年11月8日～2026年12月7日（30日）');
     expect(started.text).toContain('2026年12月8日');
     expect(started.html).toContain('width:280px');
     expect(started.html).toContain('text-align:center');
     const ending = musuboTrialMail({ ...trial, event: 'ending' });
+    expect(ending.text).toContain('30日間の無料体験はまもなく終了します');
     expect(ending.text).toContain('現在の予定額：¥5,900（税込）');
   });
 
   it('3か月無料と基本料金50%割引を変数から表示し、オプションを割引しない', () => {
     const special = musuboTrialMail({ ...trial, event: 'ending', trialPeriod: { unit: 'months', value: 3 },
       estimatedFirstChargeYen: 2950, lineBasicDiscountPercent: 50 });
-    expect(special.text).toContain('3か月無料体験');
+    expect(special.text).toContain('3か月の無料体験');
     expect(special.text).toContain('2027年2月7日');
     expect(special.text).toContain('2027年2月8日');
     expect(special.text).toContain('LINE基本料金のみ50%オフ');

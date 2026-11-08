@@ -22,14 +22,15 @@ export function musuboTrialMail(input: MusuboTrialMailInput): { subject: string;
     throw new RangeError('Invalid LINE basic discount');
   }
   const period = `${input.trialPeriod.value}${input.trialPeriod.unit === 'months' ? 'か月' : '日'}`;
+  const periodInTitle = input.trialPeriod.unit === 'months' ? `${period}の` : `${period}間の`;
   const special = input.lineBasicDiscountPercent > 0;
   const discountNote = special
     ? `LINE基本料金のみ${input.lineBasicDiscountPercent}%オフを反映しています。統括機能・友だち超過料金・追加連携枠は割引対象外です。`
     : '予定額は請求時点の有効LINE数・友だち数・追加連携枠数の利用状況により変わります。';
   if (input.event === 'started') return musuboSimpleMail({
-    subject: `【musubo】${input.trialPeriod.unit === 'months' ? `${period}の` : ''}無料体験が始まりました`,
+    subject: `【musubo】${periodInTitle}無料体験が始まりました`,
     eyebrow: special ? '特別条件での利用開始' : '利用開始のお知らせ',
-    title: `${special ? period : ''}無料体験が始まりました`,
+    title: `${periodInTitle}無料体験が始まりました`,
     intro: 'LINE公式アカウントの接続が完了しました。',
     detail: '本日からmusuboをご利用いただけます。適用中の無料期間と初回請求予定をご確認ください。',
     summaryTitle: '利用開始の内容',
@@ -44,7 +45,7 @@ export function musuboTrialMail(input: MusuboTrialMailInput): { subject: string;
   });
   return musuboSimpleMail({
     subject: '【musubo】無料体験終了と初回請求のご案内', eyebrow: '初回請求の事前案内',
-    title: special ? `${period}無料体験はまもなく終了します` : '無料体験はまもなく終了します',
+    title: `${periodInTitle}無料体験はまもなく終了します`,
     intro: 'musuboのご利用ありがとうございます。',
     detail: '無料期間の終了後は、登録済みのカードへ請求します。請求日と現在の予定額をご確認ください。',
     summaryTitle: '初回請求予定',
