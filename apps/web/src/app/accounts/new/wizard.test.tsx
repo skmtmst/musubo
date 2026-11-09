@@ -242,16 +242,16 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(screen.getByText('Q2. いまの友だちを引き継ぎますか？', { selector: 'h3' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '次へ' })).toBeNull()
     ack('認証済みアカウントであることを確認した')
-    expect(screen.getByText('Q3. 友だちの数は50万人を超えていますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.getByText('Q3. ほかのLINE配信ツールを使っていますか？', { selector: 'h3' })).toBeTruthy()
   })
 
   it('①の条件付き質問を自動で進め、最後の次へだけで②へ進む', () => {
     render(<NewLineAccountPage />)
     pick('はい、あります')
     pick('いいえ、引き継ぎません')
-    expect(screen.getByText('Q4. ほかのLINE配信ツールを使っていますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.getByText('Q3. ほかのLINE配信ツールを使っていますか？', { selector: 'h3' })).toBeTruthy()
     pick('使っています')
-    expect(screen.getByText('Q5. そのツールを、これからどうしますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.getByText('Q4. そのツールを、これからどうしますか？', { selector: 'h3' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '次へ' })).toBeNull()
     pick(/musuboに乗り換える/)
     expect(screen.getByText('あなたの接続前チェック結果')).toBeTruthy()
@@ -269,22 +269,18 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(screen.getByText('Q2. いまの友だちを引き継ぎますか？', { selector: 'h3' })).toBeTruthy()
     pick('はい、引き継ぎます')
     ack('認証済みアカウントであることを確認した')
-    expect(screen.getByText('Q3. 友だちの数は50万人を超えていますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.getByText('Q3. ほかのLINE配信ツールを使っていますか？', { selector: 'h3' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '戻る' }))
     expect(screen.getByText('Q2. いまの友だちを引き継ぎますか？', { selector: 'h3' })).toBeTruthy()
   })
 
-  it('①-2 Q3がはいなら相談の案内を出し、先へ進めない', () => {
+  it('友だちを引き継ぐ場合も人数を再質問しない', () => {
     render(<NewLineAccountPage />)
     pick('はい、あります')
     pick('はい、引き継ぎます')
     ack('認証済みアカウントであることを確認した')
-    expect(screen.getByText('Q3. 友だちの数は50万人を超えていますか？', { selector: 'h3' })).toBeTruthy()
-    pick('はい、超えています')
-    const link = screen.getByRole('link', { name: /サポートへ問い合わせる/ })
-    expect(link.getAttribute('href')).toBe('/hq/support')
-    expect(link.getAttribute('target')).toBeNull()
-    expect(screen.queryByRole('button', { name: '次へ' })).toBeNull()
+    expect(screen.getByText('Q3. ほかのLINE配信ツールを使っていますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.queryByText(/友だちの数は50万人/)).toBeNull()
   })
 
   it('②Step1は Messaging API の2項目を必須にし、マニュアルを別タブで開く', () => {
