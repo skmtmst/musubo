@@ -41,7 +41,7 @@ export default function MusuboLineAdditionPage() {
     return () => { disposed = true }
   }, [load])
 
-  const confirm = async (token?: string) => {
+  const acceptAddition = async (token?: string) => {
     if (!state || busy) return
     setBusy(true); setError('')
     try {
@@ -60,7 +60,7 @@ export default function MusuboLineAdditionPage() {
       }
     } catch (caught) {
       if (!token && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'line_account.connect', action: 'LINEの追加料金を確定する', retry: confirm })
+        setStepUp({ purpose: 'line_account.connect', action: 'LINEの追加料金を確定する', retry: acceptAddition })
       } else setError('決済状況を確認できませんでした。内容を読み直して再度お試しください。')
     } finally { setBusy(false) }
   }
@@ -119,10 +119,10 @@ export default function MusuboLineAdditionPage() {
             : pending?.canConnect && !expired ? <Button href="/accounts/new">LINE接続へ</Button>
               : failed ? <>
                 {pending?.paymentUrl && <Button variant="secondary" external href={pending.paymentUrl}>Stripeでお支払いを確認</Button>}
-                <Button type="button" busy={busy} onClick={() => void confirm()}>カードを確認して再試行</Button>
+                <Button type="button" busy={busy} onClick={() => void acceptAddition()}>カードを確認して再試行</Button>
               </> : checking ? <Button type="button" busy={busy} onClick={() => void load()}>決済状況を再確認</Button>
-                : expired ? <Button type="button" busy={busy} onClick={() => void confirm()}>最新の料金でLINE接続へ</Button>
-                  : <Button type="button" busy={busy} onClick={() => void confirm()}>確認してLINE接続へ</Button>}
+                : expired ? <Button type="button" busy={busy} onClick={() => void acceptAddition()}>最新の料金でLINE接続へ</Button>
+                  : <Button type="button" busy={busy} onClick={() => void acceptAddition()}>確認してLINE接続へ</Button>}
         </div>
       </Card>
     </div>

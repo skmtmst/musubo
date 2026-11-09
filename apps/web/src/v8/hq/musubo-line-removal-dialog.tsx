@@ -7,6 +7,7 @@ import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import styles from './musubo-line-removal-dialog.module.css'
 
@@ -49,7 +50,7 @@ export default function MusuboLineRemovalDialog({ lineId, onClose, onChanged }: 
         })
       } else {
         await load().catch(() => undefined)
-        setError(cause instanceof Error ? cause.message : '利用終了の状態を確認できませんでした。')
+        setError(japaneseDetailOf(cause) || '利用終了の状態を確認できませんでした。')
       }
     } finally { setBusy(false) }
   }

@@ -1,6 +1,6 @@
 import type { ApiResponse } from '@line-crm/shared'
 import { fetchApi } from '../transport/request'
-import type { LineResumeCompleteView, LineResumeReviewView } from '@/v8/hq/line-resumption'
+import type { LineResumeCompleteView, LineResumeReviewView } from '@/lib/musubo-line-resumption-types'
 
 export interface MusuboLineResumptionState {
   review: LineResumeReviewView

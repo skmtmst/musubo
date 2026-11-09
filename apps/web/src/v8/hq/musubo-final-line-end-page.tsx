@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import type { MusuboFinalLineEndState } from '@/lib/api/features/musubo-final-line-end'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import LastLineEnd, { type LastLineEndSchedule } from './last-line-end'
 
@@ -45,8 +46,8 @@ export default function MusuboFinalLineEndPage() {
         return
       }
       await load().catch(() => undefined)
-      setError(caught instanceof Error ? caught.message
-        : '状態を確認できませんでした。内容を読み直してから再度お試しください。')
+      setError(japaneseDetailOf(caught)
+        || '状態を確認できませんでした。内容を読み直してから再度お試しください。')
     }
   }
 

@@ -11,6 +11,8 @@ import { ListPage } from '@/components/templates'
 import { PageContent } from '@/components/templates/page-frame'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import type { PricingSelection } from './pricing'
 import styles from './individual-quote-inquiry.module.css'
 
@@ -53,6 +55,10 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [ticketId, setTicketId] = useState('')
+  const leave = useUnsavedGuard({
+    dirty: !ticketId && (exactLineCount.trim() !== '' || notes.trim() !== ''), busy,
+    subject: 'お見積もりのお問い合わせ',
+  })
   const linked = selection.lineCount === 1
   const exactCountValid = exactLineCount === '' || (/^\d+$/.test(exactLineCount)
     && Number.isSafeInteger(Number(exactLineCount)) && Number(exactLineCount) >= 11)
@@ -65,6 +71,7 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
     setError('')
     try {
       const id = await submit('個別見積もりのお問い合わせ', body)
+      leave.disarm()
       setTicketId(id)
       onSubmitted?.(id)
     } catch {
@@ -134,13 +141,15 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
           </section>
         </div>
         <div className={styles.footer}>
-          <div>{onBack && <Button type="button" variant="secondary" onClick={onBack}>ご利用予定を修正</Button>}
+          <div>{onBack && <Button type="button" variant="secondary" onClick={() => leave.guarded(onBack)}>ご利用予定を修正</Button>}
             <p>送信後、登録メールアドレスへ受付のお知らせを送ります。</p></div>
           <Button type="button" variant="primary" busy={busy} busyLabel="送信中…" disabled={!canSubmit} onClick={() => void send()}>
             この内容で問い合わせる</Button>
         </div>
         {error && <Notice tone="danger" role="alert">{error}</Notice>}
       </>}
+      <UnsavedLeaveDialog open={leave.leaveTarget !== null} subject="お見積もりのお問い合わせ"
+        busy={busy} onConfirm={leave.confirmLeave} onCancel={leave.cancelLeave} />
     </PageContent>
   </ListPage>
 }

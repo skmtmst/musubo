@@ -64,7 +64,7 @@ function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
   // 本人の権限が分かるまで子をマウントせず、自動下書きや読込を始めさせない。
   if (role === null) return <PagePending failed={failed} onRetry={retry} />
 
-  if ((pathname === '/hq/billing/payment-recovery' || pathname === '/hq/onboarding/card'
+  if ((pathname.startsWith('/hq/billing/') || pathname === '/hq/onboarding/card'
     || pathname === '/hq/onboarding/pricing' || pathname === '/hq/onboarding/quotes')
     && !canAdministerRole(role)) return <PageFrame kind="detail">
     <PageHeading title={pathname === '/hq/onboarding/card' ? 'お支払い情報'
