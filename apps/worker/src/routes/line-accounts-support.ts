@@ -41,9 +41,13 @@ export async function musuboFirstLineGate(c: Context<Env>): Promise<'first' | 'l
   return 'first';
 }
 
-export async function startFirstMusuboLine(c: Context<Env>, lineAccountId: string): Promise<void> {
+export async function startFirstMusuboLine(c: Context<Env>, lineAccountId: string, insight?: {
+  friendsExcludingBlocked: number; measuredOn: string;
+}): Promise<void> {
   const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
-  await activateFirstMusuboLine(c.env.DB, { tenantId, lineAccountId });
+  await activateFirstMusuboLine(c.env.DB, { tenantId, lineAccountId,
+    friendCountExcludingBlocked: insight?.friendsExcludingBlocked,
+    friendCountMeasuredOn: insight?.measuredOn });
   try {
     await ensureMusuboCoreContract(c.env, tenantId);
     await ensureMusuboOptionsContract(c.env, tenantId);

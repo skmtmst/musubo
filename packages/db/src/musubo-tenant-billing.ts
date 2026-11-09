@@ -101,6 +101,8 @@ export async function musuboLineConnectionAllowed(db: D1Database, tenantId: stri
 export async function activateFirstMusuboLine(db: D1Database, input: {
   tenantId: string;
   lineAccountId: string;
+  friendCountExcludingBlocked?: number;
+  friendCountMeasuredOn?: string;
   now?: string;
 }): Promise<MusuboTenantBillingRecord | null> {
   const billing = await getMusuboTenantBilling(db, input.tenantId);
@@ -109,6 +111,11 @@ export async function activateFirstMusuboLine(db: D1Database, input: {
     throw new Error('New LINE additions require payment confirmation');
   }
   const now = input.now ?? jstNow();
+  if (input.friendCountExcludingBlocked !== undefined &&
+    (!Number.isSafeInteger(input.friendCountExcludingBlocked) || input.friendCountExcludingBlocked < 0 ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(input.friendCountMeasuredOn ?? ''))) {
+    throw new RangeError('LINE friend insight is invalid');
+  }
   const snapshot = JSON.parse(billing.pricing_snapshot_json) as AppliedMusuboCondition;
   const dates = musuboTrialDates(now.slice(0, 10), snapshot.trialPeriod);
   const results = await db.batch([
@@ -118,9 +125,10 @@ export async function activateFirstMusuboLine(db: D1Database, input: {
       WHERE tenant_id=? AND status='awaiting_first_line' AND first_line_activated_at IS NULL`)
       .bind(now, dates.lastFreeDate, dates.firstChargeDate, now, input.tenantId),
     db.prepare(`INSERT INTO musubo_line_usage
-      (line_account_id,tenant_id,status,activated_at,updated_at)
-      SELECT ?,?,'active',?,? WHERE changes()=1`)
-      .bind(input.lineAccountId, input.tenantId, now, now),
+      (line_account_id,tenant_id,status,activated_at,friend_count_excluding_blocked,friend_count_measured_on,updated_at)
+      SELECT ?,?,'active',?,?,?,? WHERE changes()=1`)
+      .bind(input.lineAccountId, input.tenantId, now,
+        input.friendCountExcludingBlocked ?? null, input.friendCountMeasuredOn ?? null, now),
   ]);
   if ((results[0]?.meta?.changes ?? 0) !== 1 || (results[1]?.meta?.changes ?? 0) !== 1) {
     throw new Error('First LINE trial was already started');

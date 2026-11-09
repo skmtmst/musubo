@@ -2,6 +2,7 @@ import {
   getMusuboIndividualQuote, getMusuboTenantBilling, getTenantBilling, musuboQuoteFromRecord,
 } from '@line-crm/db';
 import type { AppliedMusuboCondition } from '@line-crm/shared';
+import { friendAllowanceForLineCount } from '@line-crm/shared';
 import type { WorkerBindings } from '../worker-bindings.js';
 import { firstMusuboCoreTerms } from './musubo-contract-terms.js';
 import { ensureMusuboSubscription } from './musubo-subscription-reconciliation.js';
@@ -64,9 +65,30 @@ export async function ensureMusuboOptionsContract(env: WorkerBindings, tenantId:
   if (!billing.core_subscription_id) throw new Error('Core contract must be ready first');
   const legacy = await getTenantBilling(env.DB, tenantId);
   if (!legacy?.stripe_customer_id) throw new Error('Stripe customer is unavailable');
+  const active = await env.DB.prepare(`SELECT friend_count_excluding_blocked FROM musubo_line_usage
+    WHERE tenant_id=? AND status IN ('active','ending') ORDER BY activated_at`)
+    .bind(tenantId).all<{ friend_count_excluding_blocked: number | null }>();
+  if (!active.results?.length || active.results.some((row) => row.friend_count_excluding_blocked === null)) {
+    throw new Error('Verified LINE friend count is unavailable');
+  }
+  const condition = JSON.parse(billing.pricing_snapshot_json) as AppliedMusuboCondition;
+  const quote = billing.quote_id ? await getMusuboIndividualQuote(env.DB, billing.quote_id) : null;
+  if (billing.quote_id && (!quote || quote.status !== 'accepted' || quote.tenant_id !== tenantId)) {
+    throw new Error('Accepted quote is unavailable');
+  }
+  const acceptedQuote = quote ? musuboQuoteFromRecord(quote) : null;
+  const schedule = acceptedQuote?.finalSchedule ?? condition.schedule;
+  const contractedCapacity = acceptedQuote?.plannedLineCount ?? active.results.length;
+  const allowance = friendAllowanceForLineCount(
+    contractedCapacity > 10 ? contractedCapacity : active.results.length, schedule);
+  const friends = active.results.reduce((sum, row) => sum + row.friend_count_excluding_blocked!, 0);
+  const friendBlocks = Math.ceil(Math.max(friends - allowance, 0) / schedule.extraFriendBlockSize);
+  const optionsAmountYen = friendBlocks * schedule.extraFriendBlockYen
+    + (active.results.length > 1 ? schedule.headquartersYen : 0);
+  if (!Number.isSafeInteger(optionsAmountYen)) throw new RangeError('Musubo options amount exceeds the safe range');
   const subscription = await ensureMusuboSubscription(env, {
     customerId: legacy.stripe_customer_id, tenantId, productId,
-    purpose: 'options', interval: 'month', unitAmountYen: 0,
+    purpose: 'options', interval: 'month', unitAmountYen: optionsAmountYen,
     firstChargeDateJst: billing.first_charge_date,
     idempotencyKey: `musubo-options-${tenantId}`,
   });

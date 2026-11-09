@@ -35,7 +35,7 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { LINE_LIVE_ACCOUNT_CONCURRENCY, hasTenantWideLineAccountScope, lifecycleConflict, mapWithConcurrency, musuboFirstLineGate, startFirstMusuboLine } from './line-accounts-support.js';
 import { readCapacity, normalizeOptionalString, validateLoginChannelPair, readConnectBody, type ConnectBody } from './line-accounts-input.js';
 import { serializeLineAccount, serializeLineAccountFull } from './line-accounts-view.js';
-import { fetchPreConnectFollowerTotal, musuboLargeLineConsultation } from '../services/musubo-large-line-consultation.js';
+import { fetchPreConnectFollowerTotal, fetchPreConnectFollowerInsight } from '../services/musubo-large-line-consultation.js';
 
 const lineAccounts = new Hono<Env>();
 
@@ -1087,7 +1087,12 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
       data: publicConnectData(prepared, prepared.steps, { capability: 'unknown', phase: 'not_started' }),
     }, 400, []);
   }
-  if (musuboGate === 'first' && await musuboLargeLineConsultation(prepared.channelAccessToken))
+  const musuboInsight = musuboGate === 'first'
+    ? await fetchPreConnectFollowerInsight(prepared.channelAccessToken) : null;
+  if (musuboGate === 'first' && !musuboInsight)
+    return c.json({ success: false, code: 'MUSUBO_LINE_INSIGHT_UNAVAILABLE',
+      error: 'LINEの前日分の友だち数を確認できませんでした。統計が確定してから再度お試しください' }, 503);
+  if (musuboInsight && musuboInsight.followers > 500_000)
     return c.json({ success: false, code: 'MUSUBO_LARGE_LINE_CONSULTATION',
       error: 'このLINEは友だちの累計が50万人を超えています。接続前に運営へご相談ください' }, 409);
 
@@ -1157,7 +1162,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
 
     await applyRegistrationOptions(c.env.DB,account.id,c.get('staff').id,registration);
     const started = parsed.value.importFriends && followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
-    if (musuboGate === 'first') await startFirstMusuboLine(c, account.id);
+    if (musuboGate === 'first') await startFirstMusuboLine(c, account.id, musuboInsight!);
     savingStyle = true;
     await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,parsed.value.style,starterCatalogRuntime(c));
     savingStyle = false; try { if (parsed.value.importFriends) scheduleInitialFollowerImport(c.executionCtx, c.env.DB, new LineClient(prepared.channelAccessToken) as unknown as FollowerImportClient, account.id, started, () => logger.error('line_accounts.initial_follower_import_failed')); } catch { /* 単体試験は executionCtx を持たない */ }
@@ -1333,7 +1338,12 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
       return inputError(c, { success: false, error: 'すべての接続確認を完了してください', details: { connection: verification.errors } }, 400, ["channelAccessToken"]);
     }
 
-    if (musuboGate === 'first' && await musuboLargeLineConsultation(body.channelAccessToken.trim()))
+    const musuboInsight = musuboGate === 'first'
+      ? await fetchPreConnectFollowerInsight(body.channelAccessToken.trim()) : null;
+    if (musuboGate === 'first' && !musuboInsight)
+      return c.json({ success: false, code: 'MUSUBO_LINE_INSIGHT_UNAVAILABLE',
+        error: 'LINEの前日分の友だち数を確認できませんでした。統計が確定してから再度お試しください' }, 503);
+    if (musuboInsight && musuboInsight.followers > 500_000)
       return c.json({ success: false, code: 'MUSUBO_LARGE_LINE_CONSULTATION',
         error: 'このLINEは友だちの累計が50万人を超えています。接続前に運営へご相談ください' }, 409);
 
@@ -1387,7 +1397,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
 
     if (musuboGate === 'first') {
       try {
-        await startFirstMusuboLine(c, account.id);
+        await startFirstMusuboLine(c, account.id, musuboInsight!);
       } catch {
         await deleteUncommittedLineAccount(c.env.DB, account.id);
         return c.json({ success: false, error: 'LINEの利用開始を確定できませんでした。時間をおいて再度お試しください' }, 409);

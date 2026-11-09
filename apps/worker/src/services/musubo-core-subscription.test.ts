@@ -13,7 +13,7 @@ vi.mock('./musubo-subscription-reconciliation.js', () => ({
 
 import { ensureMusuboCoreContract, ensureMusuboOptionsContract } from './musubo-core-subscription.js';
 
-it('claims both trial contracts once, with options kept monthly and initially at zero', async () => {
+it('claims both trial contracts once and charges verified friend overage only on monthly options', async () => {
   ensureSubscription.mockClear();
   const fixture = createTestD1();
   const tenantId = DEFAULT_TENANT_ID;
@@ -29,6 +29,12 @@ it('claims both trial contracts once, with options kept monthly and initially at
       billing_interval,status,first_line_activated_at,first_charge_date,created_at,updated_at)
     VALUES (?,?,?,'2026-11-09','year','trialing','2026-11-09','2026-12-09','2026-11-09','2026-11-09')`)
     .run(tenantId, JSON.stringify(condition), JSON.stringify({ selection: { lineCount: 1 } }));
+  fixture.raw.prepare(`INSERT INTO line_accounts
+    (id,channel_id,name,channel_access_token,channel_secret,tenant_id)
+    VALUES ('line-first','channel-first','公式LINE','token','secret',?)`).run(tenantId);
+  fixture.raw.prepare(`INSERT INTO musubo_line_usage
+    (line_account_id,tenant_id,status,activated_at,friend_count_excluding_blocked,friend_count_measured_on,updated_at)
+    VALUES ('line-first',?,'active','2026-11-09',3100,'2026-11-08','2026-11-09')`).run(tenantId);
   const env = { DB: fixture.db, STRIPE_PRODUCT_MUSUBO_CORE: 'prod_core',
     STRIPE_PRODUCT_MUSUBO_OPTIONS: 'prod_options' } as WorkerBindings;
   expect(await ensureMusuboCoreContract(env, tenantId)).toBe('sub_core');
@@ -40,6 +46,6 @@ it('claims both trial contracts once, with options kept monthly and initially at
     interval: 'year', unitAmountYen: 63_720, firstChargeDateJst: '2026-12-09',
   });
   expect(ensureSubscription.mock.calls[1]?.[1]).toMatchObject({
-    interval: 'month', unitAmountYen: 0, firstChargeDateJst: '2026-12-09',
+    interval: 'month', unitAmountYen: 1_100, firstChargeDateJst: '2026-12-09',
   });
 });

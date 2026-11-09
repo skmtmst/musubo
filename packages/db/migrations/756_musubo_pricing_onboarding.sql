@@ -143,6 +143,8 @@ CREATE TABLE musubo_line_usage (
   ended_at TEXT,
   google_business_count INTEGER NOT NULL DEFAULT 0 CHECK (google_business_count >= 0),
   instagram_count INTEGER NOT NULL DEFAULT 0 CHECK (instagram_count >= 0),
+  friend_count_excluding_blocked INTEGER CHECK (friend_count_excluding_blocked IS NULL OR friend_count_excluding_blocked >= 0),
+  friend_count_measured_on TEXT,
   billed_linked_slots INTEGER NOT NULL DEFAULT 0 CHECK (billed_linked_slots >= 0),
   linked_slots_reduction_at TEXT,
   updated_at TEXT NOT NULL
