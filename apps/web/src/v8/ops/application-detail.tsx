@@ -12,7 +12,7 @@ import { PageFrame } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import { OPS_READONLY_LOCK_REASON, useOpsReadOnlyState } from './use-ops-read-only'
 import { TextArea } from '@/components/shared/text-field'
-import Select from '@/components/shared/select'
+import EntitySelect from '@/components/shared/entity-select'
 import type { StoredMusuboPricingCondition } from '@/lib/api/features/pricing-conditions'
 import styles from './application-detail.module.css'
 
@@ -195,7 +195,7 @@ function ApprovalConfirm({ open, application, busy, conditions, selectedConditio
         </dl>
         <div className={styles.conditionChoice}>
           <label htmlFor="approval-pricing-condition">適用する利用条件</label>
-          <Select id="approval-pricing-condition" aria-label="適用する利用条件" size="full" value={selectedConditionId}
+          <EntitySelect id="approval-pricing-condition" aria-label="適用する利用条件" size="full" value={selectedConditionId}
             onChange={onSelectCondition} options={conditions.map((condition) => ({
               value: condition.id,
               label: `${condition.internalName}・${condition.trialPeriod.value}${condition.trialPeriod.unit === 'months' ? 'か月' : '日'}無料${condition.lineBasicDiscountPercent ? `・LINE基本料金${condition.lineBasicDiscountPercent}%オフ` : ''}`,

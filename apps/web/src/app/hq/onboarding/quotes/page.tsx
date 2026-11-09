@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { MusuboIndividualQuote } from '@line-crm/shared'
 import ListState from '@/components/shared/list-state'
 import { api } from '@/lib/api'
@@ -10,8 +10,8 @@ import IndividualQuoteReview from '@/v8/onboarding/individual-quote-review'
 type View = { quote: MusuboIndividualQuote; now: string }
 
 /** The mailed link opens the current server-backed quote, never embedded mail content. */
-export default function IndividualQuoteReviewPage() {
-  const params = useParams<{ id: string }>()
+function IndividualQuoteReviewContent() {
+  const id = useSearchParams().get('id')
   const router = useRouter()
   const [view, setView] = useState<View | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -20,14 +20,15 @@ export default function IndividualQuoteReviewPage() {
     let disposed = false
     const load = async () => {
       try {
-        const response = await api.individualQuotes.customer.get(params.id)
+        if (!id) throw new Error('quote_id_missing')
+        const response = await api.individualQuotes.customer.get(id)
         if (!response.success) throw new Error(response.error)
         if (!disposed) { setView({ quote: response.data.quote, now: new Date().toISOString() }); setState('ready') }
       } catch { if (!disposed) setState('error') }
     }
     void load()
     return () => { disposed = true }
-  }, [params.id])
+  }, [id])
 
   if (state === 'loading') return <ListState kind="loading" title="お見積もりを確認しています" />
   if (state === 'error' || !view) return <ListState kind="error" title="お見積もりを表示できませんでした" />
@@ -48,7 +49,13 @@ export default function IndividualQuoteReviewPage() {
     }}
     onOpenLatestQuote={() => {
       void api.individualQuotes.customer.latest().then((result) => {
-        if (result.success) router.push(`/hq/onboarding/quotes/${encodeURIComponent(result.data.quoteId)}`)
+        if (result.success) router.push(`/hq/onboarding/quotes?id=${encodeURIComponent(result.data.quoteId)}`)
       })
     }} />
+}
+
+export default function IndividualQuoteReviewPage() {
+  return <Suspense fallback={<ListState kind="loading" title="お見積もりを確認しています" />}>
+    <IndividualQuoteReviewContent />
+  </Suspense>
 }

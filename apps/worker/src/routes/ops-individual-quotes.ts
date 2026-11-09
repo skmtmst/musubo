@@ -39,7 +39,7 @@ function reviewUrl(env: Env['Bindings'], quoteId: string): string {
   if (!base) throw new Error('ADMIN_PUBLIC_URL not configured');
   const url = new URL(base);
   if (url.protocol !== 'https:') throw new Error('ADMIN_PUBLIC_URL must be HTTPS');
-  return new URL(`/hq/onboarding/quotes/${encodeURIComponent(quoteId)}`, url).toString();
+  return new URL(`/hq/onboarding/quotes?id=${encodeURIComponent(quoteId)}`, url).toString();
 }
 
 async function previewHash(recipient: string, termsJson: string): Promise<string> {

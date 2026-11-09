@@ -76,7 +76,7 @@
   {"route":"/hq/billing/payment-recovery","boundary":null,"expected":{"staff-none":false,"staff-view":false,"staff-edit":false,"viewer-staff":false,"viewer-owner":false,"owner":true,"admin":true}},
   {"route":"/hq/onboarding/card","boundary":null,"expected":{"staff-none":false,"staff-view":false,"staff-edit":false,"viewer-staff":false,"viewer-owner":false,"owner":true,"admin":true}},
   {"route":"/hq/onboarding/pricing","boundary":null,"expected":{"staff-none":false,"staff-view":false,"staff-edit":false,"viewer-staff":false,"viewer-owner":false,"owner":true,"admin":true}},
-  {"route":"/hq/onboarding/quotes/[id]","boundary":null,"expected":{"staff-none":false,"staff-view":false,"staff-edit":false,"viewer-staff":false,"viewer-owner":false,"owner":true,"admin":true}},
+  {"route":"/hq/onboarding/quotes","boundary":null,"expected":{"staff-none":false,"staff-view":false,"staff-edit":false,"viewer-staff":false,"viewer-owner":false,"owner":true,"admin":true}},
   {"route":"/hq/broadcasts/detail","boundary":null,"expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/hq/broadcasts/new","boundary":null,"expected":{"staff-none":false,"staff-view":false,"staff-edit":true,"viewer-staff":false,"viewer-owner":false,"owner":true,"admin":true}},
   {"route":"/hq/broadcasts","boundary":null,"expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},

@@ -18,7 +18,7 @@ export default function MusuboOnboardingPricingPage() {
       if (disposed) return
       if (!result.success) { setError(true); return }
       if (result.data.quoteId) {
-        router.replace(`/hq/onboarding/quotes/${encodeURIComponent(result.data.quoteId)}`)
+        router.replace(`/hq/onboarding/quotes?id=${encodeURIComponent(result.data.quoteId)}`)
         return
       }
       setState(result.data)

@@ -39,7 +39,7 @@ it('表示先の失敗・再試行中もホームの題を保ち、取得後に�
 it.each([
   [{ status: 'awaiting_first_line', quoteId: null, consentedAt: null }, '/hq/onboarding/pricing'],
   [{ status: 'awaiting_first_line', quoteId: null, consentedAt: '2026-11-09' }, '/hq/onboarding/card'],
-  [{ status: 'awaiting_first_line', quoteId: 'q1', consentedAt: null }, '/hq/onboarding/quotes/q1'],
+  [{ status: 'awaiting_first_line', quoteId: 'q1', consentedAt: null }, '/hq/onboarding/quotes?id=q1'],
   [{ status: 'trialing', quoteId: null, consentedAt: null }, '/hq'],
 ] as const)('LINE未接続の再ログイン先を保存状態から決める: %s', async (data, path) => {
   state.error = null

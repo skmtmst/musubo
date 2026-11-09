@@ -19,14 +19,14 @@ function CardRegistrationReturn() {
           const response = await api.individualQuotes.customer.get(quoteId)
           if (!response.success) throw new Error(response.error)
           if (!response.data.cardRegistrationAvailable) {
-            router.replace(`/hq/onboarding/quotes/${encodeURIComponent(quoteId)}`)
+            router.replace(`/hq/onboarding/quotes?id=${encodeURIComponent(quoteId)}`)
             return
           }
         } else {
           const response = await api.musuboOnboardingPricing.get()
           if (!response.success) throw new Error(response.error)
           if (response.data.quoteId) {
-            router.replace(`/hq/onboarding/quotes/${encodeURIComponent(response.data.quoteId)}`)
+            router.replace(`/hq/onboarding/quotes?id=${encodeURIComponent(response.data.quoteId)}`)
             return
           }
           if (!response.data.consentedAt) {

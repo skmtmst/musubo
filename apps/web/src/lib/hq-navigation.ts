@@ -53,7 +53,7 @@ export function musuboOnboardingResumePath(state: {
   consentedAt: string | null
 }): string | null {
   if (state.status !== 'awaiting_first_line') return null
-  if (state.quoteId) return `/hq/onboarding/quotes/${encodeURIComponent(state.quoteId)}`
+  if (state.quoteId) return `/hq/onboarding/quotes?id=${encodeURIComponent(state.quoteId)}`
   return state.consentedAt ? '/hq/onboarding/card' : '/hq/onboarding/pricing'
 }
 

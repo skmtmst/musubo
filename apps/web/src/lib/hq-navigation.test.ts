@@ -50,7 +50,7 @@ describe('登録途中の再開先', () => {
     expect(musuboOnboardingResumePath({ status: 'awaiting_first_line', quoteId: null, consentedAt: '2026-11-09' }))
       .toBe('/hq/onboarding/card')
     expect(musuboOnboardingResumePath({ status: 'awaiting_first_line', quoteId: 'quote-1', consentedAt: null }))
-      .toBe('/hq/onboarding/quotes/quote-1')
+      .toBe('/hq/onboarding/quotes?id=quote-1')
     expect(musuboOnboardingResumePath({ status: 'trialing', quoteId: null, consentedAt: '2026-11-09' }))
       .toBeNull()
   })
