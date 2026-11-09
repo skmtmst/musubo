@@ -15,7 +15,9 @@ hqMusuboLineAddition.get('/api/hq/billing/musubo/line-addition', requireRole('ow
   const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
   try {
     const pending = await getPendingMusuboLineAddition(c.env.DB, tenantId);
-    if (pending && pending.status === 'awaiting_payment' && pending.expires_at <= new Date().toISOString()) {
+    if (pending && (pending.status === 'awaiting_payment'
+      || (pending.amount_due_yen === 0 && pending.line_account_id === null))
+      && pending.expires_at <= new Date().toISOString()) {
       const quote = await quoteMusuboLineAddition(c.env, tenantId);
       return c.json({ success: true, data: { price: quote.price, activeLineCount: quote.activeLineCount,
         recurringAfter: quote.recurringAfter, monthlyPeriod: quote.monthlyPeriod,

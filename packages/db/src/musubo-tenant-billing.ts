@@ -97,7 +97,7 @@ export async function musuboLineConnectionAllowed(db: D1Database, tenantId: stri
   if (billing.status === 'trialing' || billing.status === 'active') {
     const paid = await db.prepare(`SELECT id FROM musubo_pending_additions
       WHERE tenant_id=? AND kind='line' AND status IN ('awaiting_payment','paid')
-        AND line_account_id IS NULL AND (status='paid' OR expires_at>?) LIMIT 1`)
+        AND line_account_id IS NULL AND expires_at>? LIMIT 1`)
       .bind(tenantId, new Date().toISOString()).first<{ id: string }>();
     if (paid) return 'reserved_addition';
   }

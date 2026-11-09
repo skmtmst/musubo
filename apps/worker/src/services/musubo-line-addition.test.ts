@@ -5,9 +5,23 @@ import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import type { WorkerBindings } from '../worker-bindings.js';
 import { StripeApiError, stripeApi, type StripeInvoice, type StripeSubscription } from './stripe-api.js';
 import { collectMusuboLineAddition, connectReservedMusuboLine,
-  reserveMusuboLineAddition, type MusuboPendingLineAddition } from './musubo-line-addition.js';
+  reserveMusuboLineAddition, sweepMusuboLineAdditions, type MusuboPendingLineAddition } from './musubo-line-addition.js';
 
 afterEach(() => vi.restoreAllMocks());
+
+it('expires an unused free reservation so it cannot be connected after its price period', async () => {
+  const fixture = createTestD1();
+  const tenantId = DEFAULT_TENANT_ID;
+  fixture.raw.prepare(`INSERT INTO musubo_pending_additions
+    (id,tenant_id,kind,status,amount_due_yen,price_snapshot_json,expires_at,
+      paid_at,created_at,updated_at)
+    VALUES ('free-expired',?,'line','paid',0,'{}','2020-01-01','2020-01-01',
+      '2020-01-01','2020-01-01')`).run(tenantId);
+  expect(await sweepMusuboLineAdditions({ DB: fixture.db } as WorkerBindings))
+    .toEqual({ attempted: 1, failed: 0 });
+  expect(fixture.raw.prepare('SELECT status FROM musubo_pending_additions WHERE id=?').get('free-expired'))
+    .toEqual({ status: 'expired' });
+});
 
 it('keeps a trial LINE inactive until both recurring contracts match, without charging on confirmation', async () => {
   const fixture = createTestD1();

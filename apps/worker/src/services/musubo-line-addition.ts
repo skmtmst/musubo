@@ -1,5 +1,5 @@
 import {
-  getMusuboIndividualQuote, getMusuboTenantBilling, getTenantBilling, musuboQuoteFromRecord,
+  getLineAccountsByIds, getMusuboIndividualQuote, getMusuboTenantBilling, getTenantBilling, musuboQuoteFromRecord,
 } from '@line-crm/db';
 import {
   ADDITION_HOLD_DAYS, friendAllowanceForLineCount, jstDate, lineBasicDiscountForDate,
@@ -8,6 +8,7 @@ import {
 import type { WorkerBindings } from '../worker-bindings.js';
 import { musuboLineAdditionPrice } from './musubo-line-addition-price.js';
 import { StripeApiError, stripeApi, type StripeInvoice, type StripeSubscription } from './stripe-api.js';
+import { fetchPreConnectFollowerInsight } from './musubo-large-line-consultation.js';
 
 export interface MusuboPendingLineAddition {
   id: string;
@@ -200,7 +201,10 @@ export async function reserveMusuboLineAddition(env: WorkerBindings, tenantId: s
   }
   const existing = await getPendingMusuboLineAddition(env.DB, tenantId);
   const now = new Date();
-  if (existing && (existing.status === 'paid' || existing.expires_at > now.toISOString())) {
+  const expiredFreeReservation = Boolean(existing?.status === 'paid' && existing.amount_due_yen === 0
+    && existing.line_account_id === null && existing.expires_at <= now.toISOString());
+  if (existing && !expiredFreeReservation
+    && (existing.status === 'paid' || existing.expires_at > now.toISOString())) {
     const snapshot = JSON.parse(existing.price_snapshot_json) as { activeLineCount: number };
     if (existing.amount_due_yen !== confirmedAmountYen
       || snapshot.activeLineCount !== confirmedActiveLineCount) {
@@ -210,6 +214,12 @@ export async function reserveMusuboLineAddition(env: WorkerBindings, tenantId: s
   }
   let connectedLineId: string | null = null;
   if (existing) {
+    if (expiredFreeReservation) {
+      const retired = await env.DB.prepare(`UPDATE musubo_pending_additions SET status='expired',updated_at=?
+        WHERE id=? AND status='paid' AND amount_due_yen=0 AND line_account_id IS NULL AND expires_at<=?`)
+        .bind(now.toISOString(), existing.id, now.toISOString()).run();
+      if ((retired.meta?.changes ?? 0) !== 1) throw new Error('The free reservation changed during renewal');
+    } else {
     const legacy = await getTenantBilling(env.DB, tenantId);
     if (!legacy?.stripe_customer_id) throw new Error('Stripe customer is unavailable');
     let invoice = existing.stripe_invoice_id
@@ -232,6 +242,7 @@ export async function reserveMusuboLineAddition(env: WorkerBindings, tenantId: s
       .bind(now.toISOString(), existing.id, now.toISOString()).run();
     if ((retired.meta?.changes ?? 0) !== 1) throw new Error('The prior addition changed during renewal');
     connectedLineId = existing.line_account_id;
+    }
   }
   const quote = await quoteMusuboLineAddition(env, tenantId, now);
   if (quote.price.dueNowYen !== confirmedAmountYen || quote.activeLineCount !== confirmedActiveLineCount) {
@@ -271,7 +282,8 @@ export async function connectReservedMusuboLine(env: WorkerBindings, input: {
   const pending = await getPendingMusuboLineAddition(env.DB, input.tenantId);
   if (!pending || !['awaiting_payment', 'paid'].includes(pending.status)
     || pending.line_account_id && pending.line_account_id !== input.lineAccountId
-    || pending.status === 'awaiting_payment' && pending.expires_at <= new Date().toISOString()) {
+    || (pending.status === 'awaiting_payment' || pending.amount_due_yen === 0)
+      && pending.expires_at <= new Date().toISOString()) {
     throw new Error('A confirmed LINE addition is unavailable');
   }
   const now = new Date().toISOString();
@@ -410,11 +422,40 @@ export async function sweepMusuboLineAdditions(env: WorkerBindings): Promise<{ a
   const now = new Date().toISOString();
   const rows = await env.DB.prepare(`SELECT * FROM musubo_pending_additions
     WHERE kind='line' AND ((status='awaiting_payment' AND expires_at<=?)
+      OR (status IN ('awaiting_payment','paid') AND line_account_id IS NULL)
       OR (status='paid' AND line_account_id IS NOT NULL))
     ORDER BY created_at LIMIT 20`).bind(now).all<MusuboPendingLineAddition>();
   let failed = 0;
   for (const row of rows.results ?? []) {
     try {
+      if (row.status === 'paid' && row.amount_due_yen === 0
+        && row.line_account_id === null && row.expires_at <= now) {
+        await env.DB.prepare(`UPDATE musubo_pending_additions SET status='expired',updated_at=?
+          WHERE id=? AND status='paid' AND line_account_id IS NULL AND amount_due_yen=0`)
+          .bind(now, row.id).run();
+        continue;
+      }
+      if (!row.line_account_id && (row.expires_at > now || row.status === 'paid')) {
+        const possible = await env.DB.prepare(`SELECT a.id FROM line_accounts a
+          WHERE a.tenant_id=? AND a.is_active=0 AND a.archived_at IS NULL
+            AND datetime(a.created_at)>=datetime(?) AND NOT EXISTS
+              (SELECT 1 FROM musubo_line_usage u WHERE u.line_account_id=a.id)
+          ORDER BY a.created_at LIMIT 2`).bind(row.tenant_id, row.created_at).all<{ id: string }>();
+        if (possible.results?.length === 1) {
+          const accounts = await getLineAccountsByIds(env.DB, [possible.results[0]!.id],
+            env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+          const account = accounts[0];
+          if (!account?.channel_access_token) throw new Error('Saved LINE credential is unavailable');
+          const insight = await fetchPreConnectFollowerInsight(account.channel_access_token);
+          if (!insight) throw new Error('Saved LINE statistics are unavailable');
+          await connectReservedMusuboLine(env, { tenantId: row.tenant_id,
+            lineAccountId: account.id, friendsExcludingBlocked: insight.friendsExcludingBlocked,
+            measuredOn: insight.measuredOn });
+        } else if (row.status === 'paid' && row.amount_due_yen > 0 && row.expires_at <= now) {
+          throw new Error('Paid addition has no unique saved LINE to activate');
+        }
+        continue;
+      }
       if (row.status === 'paid') {
         await reconcilePaidMusuboLine(env, row.id, row.tenant_id);
         continue;
