@@ -3,6 +3,7 @@ import {
   DEFAULT_MUSUBO_PRICE_SCHEDULE,
   linkedAccountSlots,
   musuboPrice,
+  musuboChargeDateEpoch,
   musuboTrialDates,
   prorateAnnualLineIncrement,
   prorateMonthlyIncrement,
@@ -97,6 +98,12 @@ describe('trial and incremental billing dates', () => {
     expect(musuboTrialDates('2026-11-08', { unit: 'months', value: 3 }).firstChargeDate).toBe('2027-02-08');
     expect(musuboTrialDates('2027-01-31', { unit: 'months', value: 1 }).firstChargeDate).toBe('2027-02-28');
     expect(musuboTrialDates('2028-01-31', { unit: 'months', value: 1 }).firstChargeDate).toBe('2028-02-29');
+  });
+
+  it('uses the displayed JST first-charge date as the Stripe trial end', () => {
+    expect(new Date(musuboChargeDateEpoch('2027-02-08') * 1000).toISOString())
+      .toBe('2027-02-07T15:00:00.000Z');
+    expect(() => musuboChargeDateEpoch('2027-02-30')).toThrow(RangeError);
   });
 
   it('prorates a successful addition but not more than a full period', () => {

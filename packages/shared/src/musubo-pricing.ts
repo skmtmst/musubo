@@ -197,6 +197,12 @@ export function musuboTrialDates(activationDateJst: string, period: MusuboTrialP
   return { activationDate: activationDateJst, lastFreeDate: isoDate(lastFree), firstChargeDate: isoDate(end) };
 }
 
+/** The first paid invoice begins at midnight in Japan on the displayed charge date. */
+export function musuboChargeDateEpoch(firstChargeDateJst: string): number {
+  parseIsoDate(firstChargeDateJst);
+  return Date.parse(`${firstChargeDateJst}T00:00:00+09:00`) / 1000;
+}
+
 /** Calculate an immediate incremental charge for the remaining days of this monthly period. */
 export function prorateMonthlyIncrement(monthlyIncrementYen: number, daysRemaining: number, daysInPeriod: number): number {
   wholeNonnegative(monthlyIncrementYen, 'monthlyIncrementYen');

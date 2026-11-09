@@ -1,4 +1,5 @@
 import { tracedFetch as fetch } from '@line-crm/shared/server';
+import { musuboChargeDateEpoch } from '@line-crm/shared';
 import { boundedHttpRequest } from '../lib/external-call/bounded-http.js';
 /**
  * Stripe の API を呼ぶ小さな道具。SDK は使わず fetch で叩く（Workers で軽く保つ）。
@@ -134,6 +135,8 @@ export interface StripeSubscription {
   id: string;
   status: string;
   customer: string;
+  trial_end?: number | null;
+  latest_invoice?: string | null;
   current_period_end?: number;
   cancel_at_period_end?: boolean;
   metadata?: Record<string, string>;
@@ -186,7 +189,53 @@ export interface StripePaymentIntent {
   invoice: string | null;
 }
 
+export interface MusuboSubscriptionInput {
+  customerId: string;
+  tenantId: string;
+  productId: string;
+  purpose: 'core' | 'options';
+  interval: 'month' | 'year';
+  unitAmountYen: number;
+  firstChargeDateJst: string;
+  idempotencyKey: string;
+}
+
+function validMusuboSubscription(input: MusuboSubscriptionInput): void {
+  if (!/^cus_[A-Za-z0-9]+$/.test(input.customerId)
+    || !/^prod_[A-Za-z0-9]+$/.test(input.productId)
+    || !input.tenantId.trim()
+    || !['core', 'options'].includes(input.purpose)
+    || !['month', 'year'].includes(input.interval)
+    || !Number.isSafeInteger(input.unitAmountYen) || input.unitAmountYen < 0
+    || !/^\d{4}-\d{2}-\d{2}$/.test(input.firstChargeDateJst)
+    || !input.idempotencyKey || input.idempotencyKey.length > 255) {
+    throw new RangeError('Invalid musubo subscription request');
+  }
+}
+
 export const stripeApi = {
+  /** 年払いの基本料金と月払いのオプションは別契約にし、同じ無料期間終了日で開始する。 */
+  createMusuboSubscription: (
+    env: StripeEnv,
+    input: MusuboSubscriptionInput,
+    fetchImpl?: typeof fetch,
+  ) => {
+    validMusuboSubscription(input);
+    const trialEndEpoch = musuboChargeDateEpoch(input.firstChargeDateJst);
+    return stripeRequest<StripeSubscription>(env, 'POST', '/v1/subscriptions', {
+      customer: input.customerId,
+      collection_method: 'charge_automatically',
+      payment_behavior: 'default_incomplete',
+      trial_end: trialEndEpoch,
+      trial_settings: { end_behavior: { missing_payment_method: 'create_invoice' } },
+      items: [{ price_data: {
+        currency: 'jpy', product: input.productId, unit_amount: input.unitAmountYen,
+        tax_behavior: 'inclusive', recurring: { interval: input.interval },
+      }, quantity: 1 }],
+      metadata: { tenant_id: input.tenantId, purpose: `musubo_${input.purpose}` },
+    }, { fetchImpl, idempotencyKey: input.idempotencyKey });
+  },
+
   createInvoicePreview: (
     env: StripeEnv,
     input: { subscriptionId: string; itemId: string; priceId: string; quantity: number; prorationDate: number },
