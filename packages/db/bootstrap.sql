@@ -5573,9 +5573,13 @@ CREATE TABLE musubo_tenant_billing (
   termination_effective_at TEXT,
   termination_synced_at TEXT,
   ended_at TEXT,
+  resumption_generation INTEGER NOT NULL DEFAULT 0 CHECK (resumption_generation >= 0),
+  resumption_offer_json TEXT CHECK (resumption_offer_json IS NULL OR json_valid(resumption_offer_json)),
+  resumption_consented_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   CHECK (pricing_consented_at IS NULL OR pricing_selection_json IS NOT NULL),
+  CHECK (resumption_consented_at IS NULL OR resumption_offer_json IS NOT NULL),
   CHECK (first_line_activated_at IS NOT NULL OR
     (trial_last_free_date IS NULL AND first_charge_date IS NULL))
 );

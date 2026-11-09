@@ -47,6 +47,25 @@ describe('最後のLINE終了後の利用再開', () => {
     expect(host.textContent).toContain('2027年12月8日')
   })
 
+  it('月払い済み期間は次の月次請求日まで二重請求しない', async () => {
+    const view = { kind: 'monthly_paid' as const, conditionName: '通常条件',
+      paidThrough: '2027-02-08T23:59:59+09:00',
+      renewalAt: '2027-02-09T00:00:00+09:00', nextLineBaseYen: 5_900 }
+    await act(async () => { root.render(<LineResumptionReview view={view}
+      onContinue={onContinue} onPayOutstanding={onPayOutstanding} onBack={onBack} />) })
+    expect(host.textContent).toContain('月払い済み')
+    expect(host.textContent).toContain('LINE接続時の請求¥0')
+    expect(host.textContent).toContain('2027年2月9日')
+    expect(host.textContent).toContain('¥5,900／月（税込）')
+    await act(async () => { root.render(<LineResumptionComplete view={{
+      kind: 'monthly_paid', restartedAt: '2027-01-25T12:00:00+09:00',
+      paidThrough: view.paidThrough, renewalAt: view.renewalAt,
+      nextLineBaseYen: view.nextLineBaseYen,
+    }} onAccounts={onBack} />) })
+    expect(host.textContent).toContain('再開日のLINE基本料金¥0')
+    expect(host.textContent).toContain('次の月次請求：2027年2月9日')
+  })
+
   it('支払い済み期間が終わっていれば接続成功時の請求と再試用なしを示す', async () => {
     await act(async () => { root.render(<LineResumptionReview view={{
       kind: 'paid_expired', conditionName: '通常条件', interval: 'month',

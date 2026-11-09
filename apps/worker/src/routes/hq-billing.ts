@@ -37,6 +37,7 @@ import {
 import { billingInvoiceInput } from '../services/billing-invoices-sync.js';
 import { getBillingPaymentFailure, getRecentBillingPaymentRecovery } from '../services/billing-payment-failure.js';
 import { musuboBillingOverview } from '../services/musubo-billing-overview.js';
+import { acceptedMusuboLineResumption } from '../services/musubo-line-resumption-review.js';
 import { processMusuboBillingEvent } from '../services/musubo-billing-webhook.js';
 import { deliverBillingRecoveryNotice, deliverCurrentBillingFailureNotice } from '../services/billing-invoice-notifications.js';
 import { StripeApiError, stripeApi, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
@@ -333,7 +334,7 @@ hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inpu
     const origin = adminOrigin(c);
     if (!origin) return c.json({ success: false, error: '管理画面のURLが設定されていません' }, 503);
     const tenantId = tenantOf(c);
-    const body = await c.req.json<{ quoteId?: unknown } | null>().catch(() => null);
+    const body = await c.req.json<{ quoteId?: unknown; resumption?: unknown } | null>().catch(() => null);
     const quoteId = body?.quoteId;
     if (quoteId !== undefined && (typeof quoteId !== 'string' || quoteId.length > 100)) {
       return c.json({ success: false, error: 'お見積もりを読み直してください' }, 400);
@@ -348,6 +349,14 @@ hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inpu
     if (quoteId !== undefined && !latestQuote) {
       return c.json({ success: false, error: '同意済みのお見積もりが見つかりません' }, 409);
     }
+    if (body?.resumption !== undefined && body.resumption !== true) {
+      return c.json({ success: false, error: 'カード登録の手続きが正しくありません' }, 400);
+    }
+    if (body?.resumption === true) {
+      if (quoteId !== undefined) return c.json({ success: false, error: '再開条件を読み直してください' }, 400);
+      try { await acceptedMusuboLineResumption(c.env.DB, tenantId); }
+      catch { return c.json({ success: false, error: '再開時の料金を再確認してください' }, 409); }
+    }
     const billing = await getTenantBilling(c.env.DB, tenantId);
     if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
     if (billing.plan_status === 'exempt' && !musuboBilling) {
@@ -358,10 +367,12 @@ hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inpu
     }
 
     const customerId = await stripeCustomerForTenant(c, billing);
+    const cardReturn = body?.resumption === true ? `${origin}/hq/billing/resume/card`
+      : `${origin}/hq/onboarding/card`;
     const session = await stripeApi.createCardSetupSession(c.env, {
       customerId, tenantId,
-      successUrl: `${origin}/hq/onboarding/card?setup=success${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
-      cancelUrl: `${origin}/hq/onboarding/card?setup=cancel${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
+      successUrl: `${cardReturn}?setup=success${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
+      cancelUrl: `${cardReturn}?setup=cancel${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
     });
     if (!session.url) return c.json({ success: false, error: 'カード登録画面のURLを作れませんでした' }, 502);
     return c.json({ success: true, data: { url: session.url } });

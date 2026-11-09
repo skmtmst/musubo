@@ -8,12 +8,14 @@ type Interval = 'month' | 'year'
 
 export type LineResumeReviewView =
   | { kind: 'trial_remaining'; conditionName: string; freeUntil: string; nextChargeAt: string; nextLineBaseYen: number; trialPeriodLabel: string; interval: Interval }
+  | { kind: 'monthly_paid'; conditionName: string; paidThrough: string; renewalAt: string; nextLineBaseYen: number }
   | { kind: 'annual_paid'; conditionName: string; paidThrough: string; renewalAt: string; nextAnnualLineBaseYen: number }
   | { kind: 'paid_expired'; conditionName: string; interval: Interval; dueOnConnectionYen: number; nextLineBaseYen: number }
   | { kind: 'unpaid'; amountDueYen: number; invoiceAt: string; periodStart: string; periodEnd: string }
 
 export type LineResumeCompleteView =
   | { kind: 'trial_remaining'; restartedAt: string; freeUntil: string; nextChargeAt: string; nextLineBaseYen: number; interval: Interval }
+  | { kind: 'monthly_paid'; restartedAt: string; paidThrough: string; renewalAt: string; nextLineBaseYen: number }
   | { kind: 'annual_paid'; restartedAt: string; paidThrough: string; renewalAt: string; nextAnnualLineBaseYen: number }
   | { kind: 'paid'; restartedAt: string; chargedNowYen: number; nextChargeAt: string; nextLineBaseYen: number; interval: Interval }
 
@@ -58,8 +60,8 @@ export function LineResumptionReview({ view, onContinue, onPayOutstanding, onBac
   const title = unpaid ? '再開前にお支払いが必要です' : '利用を再開する'
   const status = view.kind === 'trial_remaining'
     ? ['無料体験の残り期間で再開できます', '最初のLINE有効化日から数えた無料期間を引き継ぎます。', '無料体験の残り']
-    : view.kind === 'annual_paid'
-      ? ['お支払い済み期間内は再請求しません', `LINE基本料金1個分は${date(view.paidThrough)}までお支払い済みです。`, '年払い済み']
+    : view.kind === 'annual_paid' || view.kind === 'monthly_paid'
+      ? ['お支払い済み期間内は再請求しません', `LINE基本料金1個分は${date(view.paidThrough)}までお支払い済みです。`, view.kind === 'annual_paid' ? '年払い済み' : '月払い済み']
       : view.kind === 'paid_expired'
         ? ['LINE接続成功日から有料利用を再開', '支払い済み期間は終了しています。無料体験の再適用はありません。', '有料再開']
         : ['未払いがあるため利用再開を保留しています', '支払い状況が反映されるまでLINE接続には進めません。', '再開を保留']
@@ -91,15 +93,16 @@ export function LineResumptionReview({ view, onContinue, onPayOutstanding, onBac
             <dl className={styles.details}>
               <DetailRow label="LINE接続時の請求" value={view.kind === 'paid_expired' ? `${money(view.dueOnConnectionYen)}（税込）` : '¥0'} />
               <DetailRow label="次の請求日" value={view.kind === 'trial_remaining' ? date(view.nextChargeAt)
-                : view.kind === 'annual_paid' ? date(view.renewalAt)
+                : view.kind === 'annual_paid' || view.kind === 'monthly_paid' ? date(view.renewalAt)
                   : view.interval === 'month' ? 'LINE有効化日の1か月後' : 'LINE有効化日の1年後'} />
               <DetailRow label="次回のLINE基本料金" value={view.kind === 'annual_paid'
                 ? `${money(view.nextAnnualLineBaseYen)}／年（税込）`
+                : view.kind === 'monthly_paid' ? `${money(view.nextLineBaseYen)}／月（税込）`
                 : `${money(view.nextLineBaseYen)}／${cadence(view.interval)}（税込）`} />
             </dl>
             <p className={styles.info}>{view.kind === 'trial_remaining'
               ? `無料期間は${date(view.freeUntil)}までです。再開しても新しい${view.trialPeriodLabel}の無料期間は始まりません。`
-              : view.kind === 'annual_paid'
+              : view.kind === 'annual_paid' || view.kind === 'monthly_paid'
                 ? `${date(view.paidThrough)}までの1個分を二重請求せず、${date(view.renewalAt)}に更新します。`
                 : 'LINE接続に成功した日に1個目の基本料金を請求します。接続前の請求はありません。'}</p></>}
       </section>
@@ -117,7 +120,7 @@ export function LineResumptionReview({ view, onContinue, onPayOutstanding, onBac
       ? 'カード情報はmusuboに保存しません。お支払い完了後に再開の料金確認へ戻ります。'
       : view.kind === 'trial_remaining'
         ? '無料期間と初回請求日は、適用中の利用条件から表示します。カード情報はmusuboに保存しません。'
-        : view.kind === 'annual_paid'
+        : view.kind === 'annual_paid' || view.kind === 'monthly_paid'
           ? 'お支払い済みの範囲は再請求しません。追加分は接続前に別途料金を確認します。'
           : '実際の請求日と次回請求日はLINE接続成功日から確定します。無料体験は再適用されません。'}</p>
       <button type="button" className={styles.back} onClick={onBack}>{unpaid ? '請求履歴を見る' : '請求に戻る'}</button></div>
@@ -168,9 +171,9 @@ export function LineResumptionHandover({ phase, onPrimary, onBack }: {
 /** Shown only after the existing LINE wizard confirms an active connection. */
 export function LineResumptionComplete({ view, onAccounts }: { view: LineResumeCompleteView; onAccounts: () => void }) {
   const trial = view.kind === 'trial_remaining'
-  const annual = view.kind === 'annual_paid'
+  const paidRemainder = view.kind === 'annual_paid' || view.kind === 'monthly_paid'
   const statusTitle = trial ? '無料体験の残り期間で再開しました'
-    : annual ? 'お支払い済みの期間で利用を再開しました' : '有料利用を再開しました'
+    : paidRemainder ? 'お支払い済みの期間で利用を再開しました' : '有料利用を再開しました'
   const charge = view.kind === 'paid' ? view.chargedNowYen : 0
   return <div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › アカウント › 登録完了</p>
@@ -179,13 +182,14 @@ export function LineResumptionComplete({ view, onAccounts }: { view: LineResumeC
     <section className={styles.completeCard} aria-label="利用再開の結果">
       <div className={styles.completeHeading}><span className={styles.iconSuccess} aria-hidden="true">✓</span><h2>{statusTitle}</h2></div>
       <p>{trial ? '適用中の利用条件の残り期間を引き継ぎます。再開しても無料期間は最初からやり直しません。'
-        : annual ? '支払い済みの1個分のLINE基本料金を二重請求しません。'
+        : paidRemainder ? '支払い済みの1個分のLINE基本料金を二重請求しません。'
           : '無料体験の再適用はありません。請求はLINEの接続成功時から始まります。'}</p>
       <div className={styles.completeSummary}><div><span>有効なLINE公式アカウント</span><strong>1個</strong></div>
         <div><span>再開日のLINE基本料金</span><strong className={styles.greenAmount}>{money(charge)}</strong></div>
         <p>再開日：{date(view.restartedAt)}<br />
           {trial ? <>元の無料期間終了：{date(view.freeUntil)}<br />初回請求予定：{date(view.nextChargeAt)}（{cadence(view.interval)}額 {money(view.nextLineBaseYen)}・税込）</>
-            : annual ? <>お支払い済みの期間：{date(view.paidThrough)}まで<br />次の年次更新：{date(view.renewalAt)}（{money(view.nextAnnualLineBaseYen)}・税込）</>
+            : view.kind === 'annual_paid' ? <>お支払い済みの期間：{date(view.paidThrough)}まで<br />次の年次更新：{date(view.renewalAt)}（{money(view.nextAnnualLineBaseYen)}・税込）</>
+              : view.kind === 'monthly_paid' ? <>お支払い済みの期間：{date(view.paidThrough)}まで<br />次の月次請求：{date(view.renewalAt)}（{money(view.nextLineBaseYen)}・税込）</>
               : <>今回の請求：{money(view.chargedNowYen)}（税込）<br />次の請求予定：{date(view.nextChargeAt)}（{cadence(view.interval)}額 {money(view.nextLineBaseYen)}・税込）</>}</p>
       </div>
       <p className={styles.completeHint}>LINEを増やすときは、接続前に増分の料金をご確認いただけます。</p>

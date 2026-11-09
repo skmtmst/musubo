@@ -21,6 +21,9 @@ export interface MusuboTenantBillingRecord {
   termination_effective_at: string | null;
   termination_synced_at: string | null;
   ended_at: string | null;
+  resumption_generation: number;
+  resumption_offer_json: string | null;
+  resumption_consented_at: string | null;
   created_at: string;
   updated_at: string;
 }

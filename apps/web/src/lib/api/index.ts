@@ -46,6 +46,7 @@ import { pricingConditionMethods } from './features/pricing-conditions'
 import { musuboOnboardingPricingMethods } from './features/musubo-onboarding-pricing'
 import { musuboLineAdditionMethods } from './features/musubo-line-addition'
 import { musuboFinalLineEndMethods } from './features/musubo-final-line-end'
+import { musuboLineResumptionMethods } from './features/musubo-line-resumption'
 import { accountMigrationsMethods } from './features/account-migrations'
 import { accountsMethods } from './features/accounts'
 import { conversionsMethods } from './features/conversions'
@@ -77,6 +78,7 @@ export const api = {
   musuboOnboardingPricing: musuboOnboardingPricingMethods.musuboOnboardingPricing,
   musuboLineAddition: musuboLineAdditionMethods.musuboLineAddition,
   musuboFinalLineEnd: musuboFinalLineEndMethods.musuboFinalLineEnd,
+  musuboLineResumption: musuboLineResumptionMethods.musuboLineResumption,
   system: authenticationMethods.system,
   auth: authenticationMethods.auth,
   searchConsole: analyticsMethods.searchConsole,
