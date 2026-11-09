@@ -14,7 +14,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOptionsError } from '../services/connect-registration.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
-import { getStaffById, getLineAccountListStats, getLineAccountTag, getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
+import { getLineAccountListStats, getLineAccountTag, getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow } from '@line-crm/db';
 import type { LineAccount as DbLineAccount, LineAccountConnectionCheck } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
@@ -33,46 +33,12 @@ import { getLineRegistrationReceipt } from '../services/line-registration-receip
 import { getAuthorizedLineAccount, getVisibleLineAccountEntry } from './line-account-access.js';
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-
+import { activateFirstMusuboLine } from '@line-crm/db';
+import { LINE_LIVE_ACCOUNT_CONCURRENCY, hasTenantWideLineAccountScope, lifecycleConflict, mapWithConcurrency, musuboFirstLineGate } from './line-accounts-support.js';
 import { readCapacity, normalizeOptionalString, validateLoginChannelPair, readConnectBody, type ConnectBody } from './line-accounts-input.js';
 import { serializeLineAccount, serializeLineAccountFull } from './line-accounts-view.js';
 
 const lineAccounts = new Hono<Env>();
-
-async function hasTenantWideLineAccountScope(c: Context<Env>): Promise<boolean> {
-  const actor = c.get('staff');
-  if (actor.id === 'env-owner') return true;
-  const member = await getStaffById(c.env.DB, actor.id);
-  return Boolean(member?.is_active && member.account_scope === 'all');
-}
-
-function lifecycleConflict(error: unknown): { success: false; error: string } | null {
-  if (!(error instanceof LineAccountLifecycleError)) return null;
-  return { success: false, error: error.code };
-}
-
-const LINE_LIVE_ACCOUNT_CONCURRENCY = 2;
-
-async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  concurrency: number,
-  mapper: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let nextIndex = 0;
-  const workers = Array.from(
-    { length: Math.min(concurrency, items.length) },
-    async () => {
-      while (nextIndex < items.length) {
-        const index = nextIndex;
-        nextIndex += 1;
-        results[index] = await mapper(items[index]!);
-      }
-    },
-  );
-  await Promise.all(workers);
-  return results;
-}
 
 // LINE の実データ取得は重いため、live=1 の明示要求時だけにする。
 lineAccounts.get('/api/line-accounts', async (c) => {
@@ -1117,6 +1083,8 @@ lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner', 'admi
 // UI用の自動接続・保存。5段目が完了しなければ作成途中の行を必ず巻き戻す。
 lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
   if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
+  const musuboGate = await musuboFirstLineGate(c);
+  if (musuboGate instanceof Response) return musuboGate;
   // LINE の接続（新しいアカウントの接続）は大事な操作（V）。
   if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
@@ -1205,6 +1173,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
 
     await applyRegistrationOptions(c.env.DB,account.id,c.get('staff').id,registration);
     const started = parsed.value.importFriends && followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
+    if (musuboGate === 'first') await activateFirstMusuboLine(c.env.DB, { tenantId: account.tenant_id ?? DEFAULT_TENANT_ID, lineAccountId: account.id });
     savingStyle = true;
     await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,parsed.value.style,starterCatalogRuntime(c));
     savingStyle = false; try { if (parsed.value.importFriends) scheduleInitialFollowerImport(c.executionCtx, c.env.DB, new LineClient(prepared.channelAccessToken) as unknown as FollowerImportClient, account.id, started, () => logger.error('line_accounts.initial_follower_import_failed')); } catch { /* 単体試験は executionCtx を持たない */ }
@@ -1243,6 +1212,8 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
 // POST /api/line-accounts - create
 lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
   if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
+  const musuboGate = await musuboFirstLineGate(c);
+  if (musuboGate instanceof Response) return musuboGate;
   // LINE の接続の追加は大事な操作（V）。
   if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
@@ -1426,6 +1397,14 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
       logger.error("line_accounts.create_failed");
     }
 
+    if (musuboGate === 'first') {
+      try {
+        await activateFirstMusuboLine(c.env.DB, { tenantId: account.tenant_id ?? DEFAULT_TENANT_ID, lineAccountId: account.id });
+      } catch {
+        await deleteUncommittedLineAccount(c.env.DB, account.id);
+        return c.json({ success: false, error: 'LINEの利用開始を確定できませんでした。時間をおいて再度お試しください' }, 409);
+      }
+    }
     try {
       await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,body.style,starterCatalogRuntime(c));
     } catch {

@@ -5555,6 +5555,8 @@ CREATE TABLE musubo_tenant_billing (
   application_id TEXT REFERENCES registration_applications(id),
   quote_id TEXT REFERENCES musubo_individual_quotes(id),
   pricing_snapshot_json TEXT NOT NULL CHECK (json_valid(pricing_snapshot_json)),
+  pricing_selection_json TEXT CHECK (pricing_selection_json IS NULL OR json_valid(pricing_selection_json)),
+  pricing_consented_at TEXT,
   billing_interval TEXT NOT NULL CHECK (billing_interval IN ('month', 'year')),
   status TEXT NOT NULL DEFAULT 'awaiting_first_line'
     CHECK (status IN ('awaiting_first_line', 'trialing', 'active', 'past_due', 'ended')),
@@ -5570,6 +5572,7 @@ CREATE TABLE musubo_tenant_billing (
   ended_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
+  CHECK (pricing_consented_at IS NULL OR pricing_selection_json IS NOT NULL),
   CHECK (first_line_activated_at IS NOT NULL OR
     (trial_last_free_date IS NULL AND first_charge_date IS NULL))
 );

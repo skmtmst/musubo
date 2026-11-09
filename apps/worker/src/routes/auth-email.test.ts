@@ -5,6 +5,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { hashPassword } from '../services/password-hash.js';
 import { createAuthEmailToken, toJstString } from '@line-crm/db';
 import { sha256Hex } from '../middleware/auth.js';
+import { DEFAULT_MUSUBO_PRICE_SCHEDULE } from '@line-crm/shared';
 
 const mail = vi.hoisted(() => ({
   sendPlainMail: vi.fn(async (_env: unknown, _message: { to: string; subject: string; body: string; html?: string }) => {}),
@@ -107,6 +108,26 @@ async function issueApprovedInvite(): Promise<string> {
 }
 
 describe('会員登録（36-4）', () => {
+  it('新料金で承認した申込はカード・LINE接続前に無料期間を開始しない', async () => {
+    await call('POST', '/api/auth/register/request', validRequest);
+    const token = await issueApprovedInvite();
+    const snapshot = JSON.stringify({ sourceConditionId: 'partner', sourceVersion: 1,
+      internalName: '特約店', appliedAt: '2026-11-09',
+      trialPeriod: { unit: 'months', value: 3 }, lineBasicDiscountPercent: 50,
+      discountEndsOn: null, schedule: DEFAULT_MUSUBO_PRICE_SCHEDULE });
+    testDb.raw.prepare('UPDATE registration_applications SET pricing_condition_id=?,pricing_snapshot_json=?')
+      .run('partner', snapshot);
+    const completed = await call('POST', '/api/auth/register/complete', {
+      token, tenantName: '株式会社サンプル', name: '山田 太郎', password: 'StrongPassword1!',
+    });
+    expect(completed.status).toBe(200);
+    const tenantId = (await json(completed)).data.tenantId;
+    expect(testDb.raw.prepare('SELECT plan_status,trial_ends_at FROM tenants WHERE id=?').get(tenantId))
+      .toEqual({ plan_status: 'exempt', trial_ends_at: null });
+    expect(testDb.raw.prepare(`SELECT status,first_line_activated_at,first_charge_date
+      FROM musubo_tenant_billing WHERE tenant_id=?`).get(tenantId))
+      .toEqual({ status: 'awaiting_first_line', first_line_activated_at: null, first_charge_date: null });
+  });
   it('期限切れの承認リンクは登録先だけに24時間の新リンクを送り、旧リンクを失効させる', async () => {
     await call('POST', '/api/auth/register/request', validRequest);
     const token = await issueApprovedInvite();

@@ -33,6 +33,10 @@ const dbMocks = {
   getAccountSetting: vi.fn(),
   setAccountSetting: vi.fn(),
   getStaffById: vi.fn(),
+  getTenantBilling: vi.fn(),
+  getMusuboTenantBilling: vi.fn(),
+  musuboLineConnectionAllowed: vi.fn(async () => 'legacy'),
+  activateFirstMusuboLine: vi.fn(),
   getStaffAccountScopeIds: vi.fn(),
   CredentialEncryptionKeyError: class CredentialEncryptionKeyError extends Error {},
   LineAccountRevisionConflictError: class LineAccountRevisionConflictError extends Error {},
@@ -171,6 +175,8 @@ beforeEach(() => {
   lineClientMocks.getFollowersInsight.mockReset();
   lineClientMocks.getFollowerIds.mockReset();
   dbMocks.getAccountSetting.mockResolvedValue(null);
+  dbMocks.musuboLineConnectionAllowed.mockResolvedValue('legacy');
+  dbMocks.getMusuboTenantBilling.mockResolvedValue(null);
   dbMocks.getLineAccountFoldersByAccountIds.mockResolvedValue({});
   dbMocks.getLineAccountTag.mockResolvedValue({id:'folder-1'});
   dbMocks.listLineAccountTags.mockResolvedValue([{id:'tag-own',tenant_id:'tenant-1'}]);
@@ -235,6 +241,21 @@ beforeEach(() => {
     if (url.endsWith('/v2/bot/message/quota')) return Response.json({ type: 'limited', value: 200 });
     return new Response(null, { status: 404 });
   }));
+});
+
+test.each([
+  ['/api/line-accounts/connect', 'requires_payment'],
+  ['/api/line-accounts', 'requires_payment'],
+  ['/api/line-accounts/connect', 'first'],
+  ['/api/line-accounts', 'first'],
+] as const)('new pricing gate blocks unpaid LINE connection: %s / %s', async (path, state) => {
+  dbMocks.musuboLineConnectionAllowed.mockResolvedValue(state);
+  if (state === 'first') dbMocks.getTenantBilling.mockResolvedValue({ stripe_customer_id: null });
+  const response = await setupApp('owner').request(path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+  });
+  expect(response.status).toBe(409);
+  expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
 });
 
 describe('LINE account default and archive lifecycle', () => {

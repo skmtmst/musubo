@@ -14,6 +14,7 @@ import {
   createAuthEmailToken,
   createStaffMember,
   createTrialTenant,
+  createMusuboPendingTenant,
   createRegistrationApplication,
   getRegistrationApplication,
   getActiveStaffByEmail,
@@ -333,11 +334,16 @@ authEmail.post('/api/auth/register/complete', inputJsonBoundary(), async (c) => 
 
   const deviceMarker = markers[0] ?? randomToken(24);
   const now = new Date();
-  const tenantId = await createTrialTenant(c.env.DB, {
-    name: tenantName,
-    trialEndsAt: toJstString(new Date(now.getTime() + TRIAL_DAYS * DAY_MS)),
-    deviceMarker,
-  });
+  const tenantId = application.pricing_snapshot_json
+    ? await createMusuboPendingTenant(c.env.DB, {
+      name: tenantName, applicationId: application.id,
+      pricingSnapshotJson: application.pricing_snapshot_json, deviceMarker,
+    })
+    : await createTrialTenant(c.env.DB, {
+      name: tenantName,
+      trialEndsAt: toJstString(new Date(now.getTime() + TRIAL_DAYS * DAY_MS)),
+      deviceMarker,
+    });
   const created = await createStaffMember(c.env.DB, {
     name,
     email: row!.email,

@@ -8,6 +8,7 @@ import {
   getStaffById,
   getTenantBilling,
   getLatestTenantMusuboIndividualQuote,
+  getMusuboTenantBilling,
   getTenantBillingByStripeCustomer,
   prepareTenantBillingUpdate,
   prepareBillingInvoice,
@@ -293,8 +294,10 @@ hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inpu
       return c.json({ success: false, error: 'お見積もりを読み直してください' }, 400);
     }
     const latestQuote = await getLatestTenantMusuboIndividualQuote(c.env.DB, tenantId);
+    const musuboBilling = await getMusuboTenantBilling(c.env.DB, tenantId);
     if (latestQuote && (latestQuote.status !== 'accepted' ||
-      (quoteId !== undefined && latestQuote.id !== quoteId))) {
+      (quoteId !== undefined && latestQuote.id !== quoteId)
+      || (musuboBilling && musuboBilling.quote_id !== latestQuote.id))) {
       return c.json({ success: false, error: '個別見積もりへの同意を完了してください' }, 409);
     }
     if (quoteId !== undefined && !latestQuote) {
@@ -302,7 +305,12 @@ hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inpu
     }
     const billing = await getTenantBilling(c.env.DB, tenantId);
     if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
-    if (billing.plan_status === 'exempt') return c.json({ success: false, error: 'この統括はカード登録の対象外です' }, 409);
+    if (billing.plan_status === 'exempt' && !musuboBilling) {
+      return c.json({ success: false, error: 'この統括はカード登録の対象外です' }, 409);
+    }
+    if (musuboBilling && !musuboBilling.quote_id && !musuboBilling.pricing_consented_at) {
+      return c.json({ success: false, error: '料金条件を確認してからカードを登録してください' }, 409);
+    }
 
     const customerId = await stripeCustomerForTenant(c, billing);
     const session = await stripeApi.createCardSetupSession(c.env, {

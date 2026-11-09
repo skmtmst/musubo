@@ -1190,6 +1190,11 @@ export {
   supersedeMusuboIndividualQuote, updateMusuboIndividualQuoteDraft,
 } from './musubo-individual-quotes.js';
 export type { MusuboIndividualQuoteRecord } from './musubo-individual-quotes.js';
+export {
+  activateFirstMusuboLine, attachAcceptedMusuboQuote, createMusuboPendingTenant,
+  getMusuboTenantBilling, musuboLineConnectionAllowed, recordMusuboPricingSelection,
+} from './musubo-tenant-billing.js';
+export type { MusuboTenantBillingRecord } from './musubo-tenant-billing.js';
 export type {
   AuthEmailToken, AuthEmailTokenPurpose, CreateAuthEmailTokenInput, CreateTrialTenantInput,
 } from './auth-email';
