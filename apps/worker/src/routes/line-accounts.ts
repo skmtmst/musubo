@@ -13,7 +13,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOptionsError } from '../services/connect-registration.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
-import { getLineAccountListStats, getLineAccountTag, getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow } from '@line-crm/db';
+import { getLineAccountListStats, getLineAccountTag, getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, getMusuboTenantBilling, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow } from '@line-crm/db';
 import type { LineAccount as DbLineAccount, LineAccountConnectionCheck } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
@@ -533,6 +533,14 @@ async function archiveAccountResponse(
   }
   if (account.archived_at) {
     return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
+  }
+  const musuboBilling = await getMusuboTenantBilling(c.env.DB, account.tenant_id ?? DEFAULT_TENANT_ID);
+  if (musuboBilling && musuboBilling.status !== 'ended') {
+    const usage = await c.env.DB.prepare(`SELECT status FROM musubo_line_usage
+      WHERE line_account_id=? AND tenant_id=? AND status IN ('pending','active','ending')`)
+      .bind(id, account.tenant_id ?? DEFAULT_TENANT_ID).first<{ status: string }>();
+    if (usage) return c.json({ success: false, code: 'MUSUBO_BILLING_LINE_ACTIVE',
+      error: '利用中のLINEは請求画面で利用終了日と料金を確認してから終了してください' }, 409);
   }
   const blockers = await getLineAccountArchiveBlockers(c.env.DB, id);
   if (blockers.length > 0) {
