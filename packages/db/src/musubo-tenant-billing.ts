@@ -89,11 +89,18 @@ export async function attachAcceptedMusuboQuote(db: D1Database, tenantId: string
 }
 
 /** The current wizard may connect the first LINE; further paid additions need their own checkout. */
-export async function musuboLineConnectionAllowed(db: D1Database, tenantId: string): Promise<'first' | 'legacy' | 'requires_payment' | 'ended'> {
+export async function musuboLineConnectionAllowed(db: D1Database, tenantId: string): Promise<'first' | 'reserved_addition' | 'legacy' | 'requires_payment' | 'ended'> {
   const billing = await getMusuboTenantBilling(db, tenantId);
   if (!billing) return 'legacy';
   if (billing.status === 'awaiting_first_line' && billing.first_line_activated_at === null) return 'first';
   if (billing.status === 'ended') return 'ended';
+  if (billing.status === 'trialing' || billing.status === 'active') {
+    const paid = await db.prepare(`SELECT id FROM musubo_pending_additions
+      WHERE tenant_id=? AND kind='line' AND status IN ('awaiting_payment','paid')
+        AND line_account_id IS NULL AND (status='paid' OR expires_at>?) LIMIT 1`)
+      .bind(tenantId, new Date().toISOString()).first<{ id: string }>();
+    if (paid) return 'reserved_addition';
+  }
   return 'requires_payment';
 }
 

@@ -42,11 +42,6 @@ export function firstMusuboCoreTerms(input: {
       contractedLineCapacity: 1,
     };
   }
-  if (condition.lineBasicDiscountPercent > 0 && condition.discountEndsOn !== null
-    && condition.discountEndsOn >= firstChargeDate) {
-    // A fixed Stripe price would continue the temporary discount after its agreed end.
-    throw new Error('Temporary LINE discount requires scheduled repricing');
-  }
   const first = musuboPrice({
     lineCount: 1, friendCountExcludingBlocked: 0, interval,
     schedule: condition.schedule,

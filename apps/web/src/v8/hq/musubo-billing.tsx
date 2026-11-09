@@ -54,7 +54,7 @@ export default function MusuboBilling({ pricing, invoices, invoiceFailed, onRetr
           <li key={line.id}><span>{line.name}</span><span className={styles.active}>利用中</span></li>)}</ul>
           : <p className={styles.muted}>まだLINEは接続されていません。</p>}
         {pricing.status !== 'ended' && canManagePayment ? <div className={styles.actions}>
-          <Button href={pricing.status === 'awaiting_first_line' ? '/hq/onboarding/card' : '/accounts/new'}>
+          <Button href={pricing.status === 'awaiting_first_line' ? '/hq/onboarding/card' : '/hq/billing/line-addition'}>
             {pricing.status === 'awaiting_first_line' ? '利用開始の準備へ' : 'LINEを追加する'}
           </Button>
         </div> : null}

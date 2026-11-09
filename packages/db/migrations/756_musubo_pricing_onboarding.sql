@@ -174,3 +174,7 @@ CREATE UNIQUE INDEX idx_musubo_pending_additions_invoice
   WHERE stripe_invoice_id IS NOT NULL;
 CREATE INDEX idx_musubo_pending_additions_tenant
   ON musubo_pending_additions(tenant_id, status, expires_at);
+-- One in-flight addition per tenant prevents two payments from buying the same ordinal.
+CREATE UNIQUE INDEX idx_musubo_pending_additions_one_in_flight
+  ON musubo_pending_additions(tenant_id)
+  WHERE status IN ('awaiting_payment', 'paid');

@@ -138,9 +138,11 @@ export interface StripeSubscription {
   trial_end?: number | null;
   latest_invoice?: string | null;
   current_period_end?: number;
+  current_period_start?: number;
+  cancel_at?: number | null;
   cancel_at_period_end?: boolean;
   metadata?: Record<string, string>;
-  items: { data: Array<{ id?: string; quantity?: number; price: {
+  items: { data: Array<{ id?: string; quantity?: number; current_period_start?: number; price: {
     id: string; product?: string; unit_amount?: number | null; currency?: string;
     tax_behavior?: string; recurring?: { interval: string } | null;
   }; current_period_end?: number }> };
@@ -170,6 +172,7 @@ export interface StripeInvoice {
   customer: string | null;
   subscription: string | null;
   billing_reason?: string | null;
+  metadata?: Record<string, string> | null;
   charge: string | { id: string; amount_refunded: number } | null;
   period_start: number | null;
   period_end: number | null;
@@ -177,6 +180,9 @@ export interface StripeInvoice {
   hosted_invoice_url: string | null;
   invoice_pdf: string | null;
   lines?: { data: Array<{
+    id?: string;
+    amount?: number;
+    metadata?: Record<string, string> | null;
     description: string | null;
     price?: { recurring?: { interval?: string | null } | null } | null;
   }> };
@@ -218,6 +224,72 @@ function validMusuboSubscription(input: MusuboSubscriptionInput): void {
 }
 
 export const stripeApi = {
+  updateMusuboRecurringAmount: (env: StripeEnv, input: {
+    subscriptionId: string; itemId: string; productId: string;
+    interval: 'month' | 'year'; amountYen: number; idempotencyKey: string;
+  }, fetchImpl?: typeof fetch) => {
+    if (!/^sub_[A-Za-z0-9]+$/.test(input.subscriptionId)
+      || !/^si_[A-Za-z0-9]+$/.test(input.itemId)
+      || !/^prod_[A-Za-z0-9]+$/.test(input.productId)
+      || !Number.isSafeInteger(input.amountYen) || input.amountYen < 0) {
+      throw new RangeError('Invalid musubo recurring amount');
+    }
+    return stripeRequest<StripeSubscription>(env, 'POST',
+      `/v1/subscriptions/${encodeURIComponent(input.subscriptionId)}`, {
+        items: [{ id: input.itemId, price_data: {
+          currency: 'jpy', product: input.productId, unit_amount: input.amountYen,
+          tax_behavior: 'inclusive', recurring: { interval: input.interval },
+        }, quantity: 1 }],
+        proration_behavior: 'none', payment_behavior: 'error_if_incomplete',
+      }, { fetchImpl, idempotencyKey: input.idempotencyKey });
+  },
+  /** An addition invoice owns its only line item; unrelated pending items are excluded. */
+  createMusuboAdditionInvoice: (
+    env: StripeEnv,
+    input: { customerId: string; tenantId: string; additionId: string },
+    fetchImpl?: typeof fetch,
+  ) => stripeRequest<StripeInvoice>(env, 'POST', '/v1/invoices', {
+    customer: input.customerId,
+    collection_method: 'charge_automatically',
+    auto_advance: false,
+    pending_invoice_items_behavior: 'exclude',
+    currency: 'jpy',
+    metadata: { tenant_id: input.tenantId, purpose: 'musubo_addition', addition_id: input.additionId },
+  }, { fetchImpl, idempotencyKey: `musubo-addition-invoice-${input.additionId}` }),
+
+  createMusuboAdditionInvoiceItem: (
+    env: StripeEnv,
+    input: { customerId: string; invoiceId: string; additionId: string; amountYen: number; description: string },
+    fetchImpl?: typeof fetch,
+  ) => stripeRequest<{ id: string; invoice: string; amount: number }>(env, 'POST', '/v1/invoiceitems', {
+    customer: input.customerId,
+    invoice: input.invoiceId,
+    amount: input.amountYen,
+    currency: 'jpy',
+    description: input.description,
+    metadata: { addition_id: input.additionId },
+  }, { fetchImpl, idempotencyKey: `musubo-addition-item-${input.additionId}` }),
+
+  finalizeMusuboAdditionInvoice: (env: StripeEnv, invoiceId: string, additionId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeInvoice>(env, 'POST', `/v1/invoices/${encodeURIComponent(invoiceId)}/finalize`, {
+      auto_advance: false,
+    }, { fetchImpl, idempotencyKey: `musubo-addition-finalize-${additionId}` }),
+
+  payMusuboAdditionInvoice: (env: StripeEnv, invoiceId: string, additionId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeInvoice>(env, 'POST', `/v1/invoices/${encodeURIComponent(invoiceId)}/pay`, undefined,
+      { fetchImpl, idempotencyKey: `musubo-addition-pay-${additionId}` }),
+
+  retrieveInvoice: (env: StripeEnv, invoiceId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeInvoice>(env, 'GET', `/v1/invoices/${encodeURIComponent(invoiceId)}`, undefined, { fetchImpl }),
+
+  voidInvoice: (env: StripeEnv, invoiceId: string, additionId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeInvoice>(env, 'POST', `/v1/invoices/${encodeURIComponent(invoiceId)}/void`, undefined,
+      { fetchImpl, idempotencyKey: `musubo-addition-void-${additionId}` }),
+
+  listInvoiceLines: (env: StripeEnv, invoiceId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<{ data: Array<{ id: string; amount: number; metadata?: Record<string, string> | null }>; has_more: boolean }>(
+      env, 'GET', `/v1/invoices/${encodeURIComponent(invoiceId)}/lines`, { limit: 100 }, { fetchImpl }),
+
   listCustomerSubscriptions: (
     env: StripeEnv, customerId: string, startingAfter?: string, fetchImpl?: typeof fetch,
   ) => stripeRequest<{ data: StripeSubscription[]; has_more: boolean }>(env, 'GET', '/v1/subscriptions', {

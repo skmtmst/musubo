@@ -7,11 +7,12 @@ import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { stripeApi } from '../services/stripe-api.js';
 import { ensureMusuboCoreContract, ensureMusuboOptionsContract } from '../services/musubo-core-subscription.js';
+import { connectReservedMusuboLine } from '../services/musubo-line-addition.js';
 import { logger } from '@line-crm/shared/server';
 
 export const LINE_LIVE_ACCOUNT_CONCURRENCY = 2;
 
-export async function musuboFirstLineGate(c: Context<Env>): Promise<'first' | 'legacy' | Response> {
+export async function musuboFirstLineGate(c: Context<Env>): Promise<'first' | 'reserved_addition' | 'legacy' | Response> {
   const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
   const state = await musuboLineConnectionAllowed(c.env.DB, tenantId);
   if (state === 'legacy') return 'legacy';
@@ -19,6 +20,7 @@ export async function musuboFirstLineGate(c: Context<Env>): Promise<'first' | 'l
   if (state === 'requires_payment') {
     return c.json({ success: false, error: 'LINEの追加料金を確認し、お支払いを完了してから接続してください' }, 409);
   }
+  if (state === 'reserved_addition') return 'reserved_addition';
   const musuboBilling = await getMusuboTenantBilling(c.env.DB, tenantId);
   if (musuboBilling && !musuboBilling.quote_id && !musuboBilling.pricing_consented_at) {
     return c.json({ success: false, error: '先に利用料金を確認してください' }, 409);
@@ -39,6 +41,15 @@ export async function musuboFirstLineGate(c: Context<Env>): Promise<'first' | 'l
     return c.json({ success: false, error: 'カードの登録状況を確認できませんでした。時間をおいて再度お試しください' }, 502);
   }
   return 'first';
+}
+
+export async function startReservedMusuboLine(c: Context<Env>, lineAccountId: string, insight: {
+  friendsExcludingBlocked: number; measuredOn: string;
+}): Promise<'active' | 'pending_payment' | 'pending_reconciliation'> {
+  return connectReservedMusuboLine(c.env, {
+    tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID,
+    lineAccountId, ...insight,
+  });
 }
 
 export async function startFirstMusuboLine(c: Context<Env>, lineAccountId: string, insight?: {

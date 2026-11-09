@@ -584,7 +584,8 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
         customerId: tenant.stripe_customer_id, billing: musuboBilling,
       }) === 'retry') return c.json({ success: false, error: '新料金の契約状態を確認できませんでした' }, 503);
       if ((event.type === 'invoice.paid' || event.type === 'invoice.payment_failed')
-        && stripeExpandableId(object.id)) {
+        && stripeExpandableId(object.id)
+        && (object.metadata as Record<string, unknown> | undefined)?.purpose !== 'musubo_addition') {
         const invoiceId = stripeExpandableId(object.id)!;
         const notice = (event.type === 'invoice.paid'
           ? deliverBillingRecoveryNotice(c.env, invoiceId)

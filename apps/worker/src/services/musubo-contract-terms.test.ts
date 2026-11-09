@@ -23,11 +23,11 @@ describe('first musubo core contract', () => {
       .toBe(31_860);
   });
 
-  it('does not silently keep a temporary discount after its end date', () => {
-    expect(() => firstMusuboCoreTerms({
+  it('uses the temporary discount for the first invoice while later invoices are repriced', () => {
+    expect(firstMusuboCoreTerms({
       condition: { ...condition, lineBasicDiscountPercent: 50, discountEndsOn: '2027-01-31' },
       interval: 'month', firstChargeDate: '2026-12-09',
-    })).toThrow('requires scheduled repricing');
+    }).amountYen).toBe(2_950);
   });
 
   it('charges the accepted 11-LINE capacity even when only the first LINE is connected', () => {

@@ -11051,6 +11051,10 @@ CREATE UNIQUE INDEX idx_musubo_pending_additions_invoice
   ON musubo_pending_additions(stripe_invoice_id)
   WHERE stripe_invoice_id IS NOT NULL;
 
+CREATE UNIQUE INDEX idx_musubo_pending_additions_one_in_flight
+  ON musubo_pending_additions(tenant_id)
+  WHERE status IN ('awaiting_payment', 'paid');
+
 CREATE INDEX idx_musubo_pending_additions_tenant
   ON musubo_pending_additions(tenant_id, status, expires_at);
 

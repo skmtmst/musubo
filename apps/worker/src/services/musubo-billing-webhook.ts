@@ -28,6 +28,48 @@ export async function processMusuboBillingEvent(input: {
 }): Promise<'completed' | 'retry'> {
   const { db, event, tenantId, customerId, billing } = input;
   const object = event.data.object;
+  const metadata = (object.metadata ?? {}) as Record<string, unknown>;
+  if (event.type.startsWith('invoice.') && metadata.purpose === 'musubo_addition') {
+    const invoice = object as unknown as StripeInvoice;
+    const invoiceId = stripeId(object.id);
+    const additionId = metadata.addition_id;
+    if (!invoiceId || typeof additionId !== 'string' || metadata.tenant_id !== tenantId
+      || stripeId(object.customer) !== customerId || invoice.currency !== 'jpy'
+      || !Number.isSafeInteger(invoice.amount_due) || !Number.isSafeInteger(invoice.amount_paid)) return 'retry';
+    const addition = await db.prepare(`SELECT amount_due_yen,status FROM musubo_pending_additions
+      WHERE id=? AND tenant_id=? AND stripe_invoice_id=? AND kind IN ('line','linked_slot')`)
+      .bind(additionId, tenantId, invoiceId).first<{ amount_due_yen: number; status: string }>();
+    if (!addition || addition.amount_due_yen !== invoice.amount_due) return 'retry';
+    const pending = { sql: "EXISTS (SELECT 1 FROM billing_events WHERE id=? AND summary='pending')", values: [event.id] };
+    const statements: D1PreparedStatement[] = [];
+    if (event.type === 'invoice.paid' || event.type === 'invoice.payment_failed'
+      || event.type === 'invoice.voided' || event.type === 'invoice.marked_uncollectible') {
+      const status = event.type === 'invoice.paid' ? 'paid'
+        : event.type === 'invoice.payment_failed' ? 'open'
+        : event.type === 'invoice.voided' ? 'void' : 'uncollectible';
+      statements.push(prepareBillingInvoice(db, billingInvoiceInput({ ...invoice, status,
+        customer: customerId, subscription: null }, { tenantId }), pending));
+      if (event.type === 'invoice.paid' && invoice.amount_paid >= addition.amount_due_yen) {
+        const paidAt = new Date((invoice.status_transitions?.paid_at ?? event.created ?? Date.now() / 1000) * 1000).toISOString();
+        statements.push(db.prepare(`UPDATE musubo_pending_additions
+          SET status='paid',paid_at=?,updated_at=?
+          WHERE id=? AND tenant_id=? AND stripe_invoice_id=? AND status='awaiting_payment'
+            AND EXISTS (SELECT 1 FROM billing_events WHERE id=? AND summary='pending')`)
+          .bind(paidAt, paidAt, additionId, tenantId, invoiceId, event.id));
+      }
+      if (event.type === 'invoice.voided') {
+        statements.push(db.prepare(`UPDATE musubo_pending_additions SET status='cancelled',updated_at=?
+          WHERE id=? AND tenant_id=? AND stripe_invoice_id=? AND status='awaiting_payment'
+            AND EXISTS (SELECT 1 FROM billing_events WHERE id=? AND summary='pending')`)
+          .bind(new Date().toISOString(), additionId, tenantId, invoiceId, event.id));
+      }
+    }
+    statements.push(db.prepare(`UPDATE billing_events SET summary=json_object(
+      'state','completed','subjectId',?,'additionId',?,'applied',1)
+      WHERE id=? AND summary='pending'`).bind(invoiceId, additionId, event.id));
+    await db.batch(statements);
+    return 'completed';
+  }
   const subscriptionId = event.type.startsWith('customer.subscription.')
     ? stripeId(object.id) : stripeId(object.subscription);
   if (!subscriptionId) return 'retry';

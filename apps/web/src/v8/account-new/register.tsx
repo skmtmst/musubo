@@ -7,6 +7,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, ArrowRight, Check, CircleAlert, CircleDashed, Copy, Plug,
 } from 'lucide-react'
@@ -97,6 +98,7 @@ export default function AccountRegisterV8() {
 }
 
 function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | null; resumeKey: string | null }) {
+  const router = useRouter()
   const saveErrors = useSaveFormErrors()
 
   // ①事前確認（v07 p6zMkA）。答えと、いま出している面。
@@ -481,6 +483,14 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
       if (!response.success) {
         setCheckRunning(false)
         setError(response.error)
+        return
+      }
+      if (response.data.additionState === 'pending_payment'
+        || response.data.additionState === 'pending_reconciliation') {
+        providerGuard.current.active = false
+        providerGuard.current.confirmed = false
+        setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
+        router.push('/hq/billing/line-addition')
         return
       }
       setConnection(response.data)

@@ -32,7 +32,7 @@ import { getLineRegistrationReceipt } from '../services/line-registration-receip
 import { getAuthorizedLineAccount, getVisibleLineAccountEntry } from './line-account-access.js';
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-import { LINE_LIVE_ACCOUNT_CONCURRENCY, hasTenantWideLineAccountScope, lifecycleConflict, mapWithConcurrency, musuboFirstLineGate, startFirstMusuboLine } from './line-accounts-support.js';
+import { LINE_LIVE_ACCOUNT_CONCURRENCY, hasTenantWideLineAccountScope, lifecycleConflict, mapWithConcurrency, musuboFirstLineGate, startFirstMusuboLine, startReservedMusuboLine } from './line-accounts-support.js';
 import { readCapacity, normalizeOptionalString, validateLoginChannelPair, readConnectBody, type ConnectBody } from './line-accounts-input.js';
 import { serializeLineAccount, serializeLineAccountFull } from './line-accounts-view.js';
 import { fetchPreConnectFollowerTotal, fetchPreConnectFollowerInsight } from '../services/musubo-large-line-consultation.js';
@@ -1087,9 +1087,9 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
       data: publicConnectData(prepared, prepared.steps, { capability: 'unknown', phase: 'not_started' }),
     }, 400, []);
   }
-  const musuboInsight = musuboGate === 'first'
+  const musuboInsight = musuboGate === 'first' || musuboGate === 'reserved_addition'
     ? await fetchPreConnectFollowerInsight(prepared.channelAccessToken) : null;
-  if (musuboGate === 'first' && !musuboInsight)
+  if ((musuboGate === 'first' || musuboGate === 'reserved_addition') && !musuboInsight)
     return c.json({ success: false, code: 'MUSUBO_LINE_INSIGHT_UNAVAILABLE',
       error: 'LINEの前日分の友だち数を確認できませんでした。統計が確定してから再度お試しください' }, 503);
   if (musuboInsight && musuboInsight.followers > 500_000)
@@ -1106,6 +1106,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
   let savingStyle = false;
   try {
     account = await createLineAccount(c.env.DB, {
+      initialActive: musuboGate !== 'reserved_addition',
       createdByStaffId: c.get('staff').id,
       channelId: parsed.value.channelId,
       name: parsed.value.name || prepared.bot.displayName,
@@ -1162,20 +1163,32 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
 
     await applyRegistrationOptions(c.env.DB,account.id,c.get('staff').id,registration);
     const started = parsed.value.importFriends && followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
-    if (musuboGate === 'first') await startFirstMusuboLine(c, account.id, musuboInsight!);
     savingStyle = true;
     await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,parsed.value.style,starterCatalogRuntime(c));
-    savingStyle = false; try { if (parsed.value.importFriends) scheduleInitialFollowerImport(c.executionCtx, c.env.DB, new LineClient(prepared.channelAccessToken) as unknown as FollowerImportClient, account.id, started, () => logger.error('line_accounts.initial_follower_import_failed')); } catch { /* 単体試験は executionCtx を持たない */ }
+    savingStyle = false;
+    if (musuboGate === 'first') await startFirstMusuboLine(c, account.id, musuboInsight!);
+    const additionState = musuboGate === 'reserved_addition'
+      ? await startReservedMusuboLine(c, account.id, musuboInsight!) : null;
+    try { if (parsed.value.importFriends && (!additionState || additionState === 'active')) scheduleInitialFollowerImport(c.executionCtx, c.env.DB, new LineClient(prepared.channelAccessToken) as unknown as FollowerImportClient, account.id, started, () => logger.error('line_accounts.initial_follower_import_failed')); } catch { /* 単体試験は executionCtx を持たない */ }
     const steps = [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed', parsed.value.importFriends ? undefined : '友だちは引き継ぎません。')];
     return c.json({
       success: true,
-      data: publicConnectData(prepared, steps, {
+      data: { ...publicConnectData(prepared, steps, {
         capability: started.capability,
         phase: started.phase,
-      }, account.id),
-    }, 201);
+      }, account.id), additionState },
+    }, additionState === 'pending_payment' || additionState === 'pending_reconciliation' ? 202 : 201);
   } catch (error) {
+    if (account && savingStyle && musuboGate === 'reserved_addition') {
+      await deleteUncommittedLineAccount(c.env.DB, account.id);
+      return c.json({ success: false, error: 'LINEの設定を保存できませんでした。料金の確認画面から接続をやり直してください' }, 502);
+    }
     if (account && savingStyle) return c.json({ success: false, error: 'style_save_failed', data: { accountId: account.id, style: parsed.value.style ?? null, styleSaved: false, retryAt: `/api/dashboard/style?account_id=${encodeURIComponent(account.id)}`, starterRetryAt: `/api/dashboard/style/starter-items/ensure?account_id=${encodeURIComponent(account.id)}` } }, 502);
+    if (account && musuboGate === 'reserved_addition') {
+      return c.json({ success: false, code: 'MUSUBO_ADDITION_PENDING_RECONCILIATION',
+        error: '接続情報を保存しました。追加分の料金を確認しています。既存のLINEはそのまま利用できます',
+        data: { accountId: account.id } }, 202);
+    }
     if (account) await deleteUncommittedLineAccount(c.env.DB, account.id);
     if (error instanceof RegistrationOptionsError) return inputError(c, {success:false,error:'登録中にタグ・親・担当範囲が変わりました。選び直してください',code:error.code}, error.status, []);
     if (error instanceof CredentialEncryptionKeyError) {
@@ -1203,6 +1216,8 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
   if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   const musuboGate = await musuboFirstLineGate(c);
   if (musuboGate instanceof Response) return musuboGate;
+  if (musuboGate === 'reserved_addition') return c.json({ success: false,
+    error: '料金を確認したLINE追加は接続ウィザードから完了してください' }, 409);
   // LINE の接続の追加は大事な操作（V）。
   if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');

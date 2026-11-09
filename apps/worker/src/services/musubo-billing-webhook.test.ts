@@ -4,6 +4,41 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { processMusuboBillingEvent } from './musubo-billing-webhook.js';
 
+it('keeps a failed addition pending and activates only its payment receipt', async () => {
+  const fixture = createTestD1();
+  const tenantId = DEFAULT_TENANT_ID;
+  fixture.raw.prepare(`INSERT INTO musubo_tenant_billing
+    (tenant_id,pricing_snapshot_json,billing_interval,status,first_line_activated_at,
+      first_charge_date,core_subscription_id,options_subscription_id,created_at,updated_at)
+    VALUES (?,'{}','month','active','2026-11-09','2026-12-09','sub_core','sub_options','2026-11-09','2026-11-09')`)
+    .run(tenantId);
+  fixture.raw.prepare(`INSERT INTO musubo_pending_additions
+    (id,tenant_id,kind,status,amount_due_yen,price_snapshot_json,stripe_invoice_id,
+      expires_at,created_at,updated_at)
+    VALUES ('addition-one',?,'line','awaiting_payment',6700,'{}','in_addition',
+      '2026-12-20T00:00:00Z','2026-12-13T00:00:00Z','2026-12-13T00:00:00Z')`).run(tenantId);
+  const billing = (await getMusuboTenantBilling(fixture.db, tenantId))!;
+  const send = async (id: string, type: string, paid: number) => {
+    fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
+      VALUES (?,?,?,'pending')`).run(id, type, tenantId);
+    return processMusuboBillingEvent({ db: fixture.db, tenantId, customerId: 'cus_1', billing,
+      event: { id, type, created: Date.parse('2026-12-14T00:00:00Z') / 1000,
+        data: { object: { id: 'in_addition', customer: 'cus_1', subscription: null,
+          metadata: { tenant_id: tenantId, purpose: 'musubo_addition', addition_id: 'addition-one' },
+          amount_due: 6700, amount_paid: paid, currency: 'jpy',
+          status: paid ? 'paid' : 'open' } } },
+    });
+  };
+  expect(await send('evt_add_failed', 'invoice.payment_failed', 0)).toBe('completed');
+  expect((await getMusuboTenantBilling(fixture.db, tenantId))?.status).toBe('active');
+  expect(fixture.raw.prepare('SELECT status FROM musubo_pending_additions WHERE id=?')
+    .get('addition-one')).toEqual({ status: 'awaiting_payment' });
+  expect(await send('evt_add_paid', 'invoice.paid', 6700)).toBe('completed');
+  expect(fixture.raw.prepare('SELECT status FROM musubo_pending_additions WHERE id=?')
+    .get('addition-one')).toEqual({ status: 'paid' });
+  expect((await getMusuboTenantBilling(fixture.db, tenantId))?.status).toBe('active');
+});
+
 it('keeps the paid core invoice separate from options and restores access after payment', async () => {
   const fixture = createTestD1();
   const tenantId = DEFAULT_TENANT_ID;

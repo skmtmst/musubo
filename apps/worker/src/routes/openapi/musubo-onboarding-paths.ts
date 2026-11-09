@@ -4,6 +4,10 @@ const id = { name: 'id', in: 'path', required: true, schema: { type: 'string' } 
 const jsonBody = { required: true, content: { 'application/json': { schema: { type: 'object' } } } };
 
 export const musuboOnboardingPaths = {
+  '/api/hq/billing/musubo/line-addition': {
+    get: { tags: ['Musubo billing'], summary: '次のLINE追加料金または保留中の決済を取得', responses: { '200': { description: '追加料金または決済状態' }, '409': { description: '追加不可' } } },
+    post: { tags: ['Musubo billing'], summary: '確認済み料金でLINE追加の支払いを開始または再試行', requestBody: jsonBody, responses: { '200': { description: '追加の決済状態' }, '400': { description: '料金への同意なし' }, '409': { description: '料金または決済状態が変化' } } },
+  },
   '/api/hq/onboarding/pricing': {
     get: { tags: ['Musubo onboarding'], summary: '承認済みの料金条件と保存済みの選択を取得', responses: { '200': { description: '統括の料金条件と選択' }, '403': { description: '権限なし' }, '404': { description: '条件なし' } } },
     post: { tags: ['Musubo onboarding'], summary: '予定数から料金を再計算して同意を保存', requestBody: jsonBody, responses: { '200': { description: '確定した料金選択' }, '400': { description: '不正な選択' }, '409': { description: '状態が変化' } } },

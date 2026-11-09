@@ -41,6 +41,7 @@ export type LineAccountConnectVerification = {
 }
 
 export type LineAccountConnectData = {
+  additionState?: 'active' | 'pending_payment' | 'pending_reconciliation' | null
   steps: LineAccountConnectStep[]
   /** V8 登録④の5行に載る内訳。古い応答には無いことがある。 */
   verification?: LineAccountConnectVerification
