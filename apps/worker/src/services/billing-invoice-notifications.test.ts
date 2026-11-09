@@ -14,6 +14,41 @@ import {
 const failedAt = Math.floor(Date.parse('2026-11-09T03:00:00Z') / 1000);
 
 describe('有料請求の通知', () => {
+  it('新料金の基本契約でも失敗・猶予・復旧を送信し、オプションの失敗は混ぜない', async () => {
+    const fixture = createTestD1();
+    mail.send.mockClear();
+    try {
+      fixture.raw.prepare(`UPDATE tenants SET contact_email='owner@example.test' WHERE id=?`).run(DEFAULT_TENANT_ID);
+      fixture.raw.prepare(`INSERT INTO musubo_tenant_billing
+        (tenant_id,pricing_snapshot_json,billing_interval,status,core_subscription_id,
+          options_subscription_id,created_at,updated_at)
+        VALUES (?,'{}','month','past_due','sub_core','sub_options','2026-11-09','2026-11-09')`)
+        .run(DEFAULT_TENANT_ID);
+      for (const [id, subscriptionId] of [['in_core','sub_core'], ['in_options','sub_options']] as const) {
+        fixture.raw.prepare(`INSERT INTO billing_invoices
+          (id,tenant_id,subscription_id,status,amount_due,amount_paid,currency,synced_at,created_at)
+          VALUES (?,?,?,'open',5900,0,'jpy','2026-11-09T03:00:00Z','2026-11-09T03:00:00Z')`)
+          .run(id, DEFAULT_TENANT_ID, subscriptionId);
+        fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
+          VALUES (?,'invoice.payment_failed',?,?)`)
+          .run(`evt_${id}`, DEFAULT_TENANT_ID,
+            JSON.stringify({ state: 'completed', created: failedAt, subjectId: id }));
+      }
+      const env = { DB: fixture.db, ADMIN_PUBLIC_URL: 'https://admin.example.test' } as Env['Bindings'];
+      expect(await sweepBillingFailureNotices(env, new Date('2026-11-09T04:00:00Z')))
+        .toMatchObject({ checked: 1, failed: 0 });
+      expect(mail.send).toHaveBeenCalledTimes(1);
+      fixture.raw.prepare("UPDATE billing_invoices SET status='paid',amount_paid=5900 WHERE id='in_core'").run();
+      fixture.raw.prepare("UPDATE musubo_tenant_billing SET status='active' WHERE tenant_id=?").run(DEFAULT_TENANT_ID);
+      fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
+        VALUES ('evt_core_paid','invoice.paid',?,?)`).run(DEFAULT_TENANT_ID,
+          JSON.stringify({ state: 'completed', subjectId: 'in_core', applied: 1 }));
+      expect(await deliverBillingRecoveryNotice(env, 'in_core')).toBe(true);
+      expect(await deliverBillingRecoveryNotice(env, 'in_options')).toBe(false);
+      expect(mail.send).toHaveBeenCalledTimes(2);
+    } finally { fixture.raw.close(); }
+  });
+
   it('請求書ごとに失敗・6日目・停止・復旧を一度ずつ送る', async () => {
     const fixture = createTestD1();
     mail.send.mockClear();

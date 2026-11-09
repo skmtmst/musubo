@@ -248,10 +248,20 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
 /** 未払い請求の支払い先は請求管理権限を持つ担当者だけに返す。 */
 hqBilling.get('/api/hq/billing/payment-failure', requireRole('owner', 'admin'), async (c) => {
   c.header('Cache-Control', 'no-store');
-  const billing = await getTenantBilling(c.env.DB, tenantOf(c));
+  const tenantId = tenantOf(c);
+  const billing = await getTenantBilling(c.env.DB, tenantId);
   if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
-  const failure = await getBillingPaymentFailure(c.env.DB, billing);
-  const data = failure ?? await getRecentBillingPaymentRecovery(c.env.DB, billing);
+  const musubo = await getMusuboTenantBilling(c.env.DB, tenantId);
+  const current = musubo ? {
+    id: tenantId,
+    plan_status: musubo.status === 'ended' ? 'canceled' as const
+      : musubo.status === 'awaiting_first_line' ? 'exempt' as const : musubo.status,
+    stripe_subscription_id: musubo.core_subscription_id,
+    current_period_ends_at: musubo.billing_interval === 'year'
+      ? musubo.next_annual_renewal_at : musubo.next_monthly_charge_at,
+  } : billing;
+  const failure = await getBillingPaymentFailure(c.env.DB, current);
+  const data = failure ?? await getRecentBillingPaymentRecovery(c.env.DB, current);
   return c.json({ success: true, data });
 });
 
@@ -569,6 +579,16 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
         db: c.env.DB, event, tenantId: tenant.id,
         customerId: tenant.stripe_customer_id, billing: musuboBilling,
       }) === 'retry') return c.json({ success: false, error: '新料金の契約状態を確認できませんでした' }, 503);
+      if ((event.type === 'invoice.paid' || event.type === 'invoice.payment_failed')
+        && stripeExpandableId(object.id)) {
+        const invoiceId = stripeExpandableId(object.id)!;
+        const notice = (event.type === 'invoice.paid'
+          ? deliverBillingRecoveryNotice(c.env, invoiceId)
+          : deliverCurrentBillingFailureNotice(c.env, tenant.id))
+          .catch(() => logger.error('billing_invoice_notification_failed'));
+        try { c.executionCtx.waitUntil(notice); }
+        catch { await notice; }
+      }
       return c.json({ success: true, data: { received: true } });
     }
     const statements: D1PreparedStatement[] = [];

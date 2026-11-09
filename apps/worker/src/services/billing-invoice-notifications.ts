@@ -1,4 +1,4 @@
-import { getTenantBilling, type TenantBilling } from '@line-crm/db';
+import { getMusuboTenantBilling, getTenantBilling } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { firstInvoiceFailureSeconds, getBillingPaymentFailure, type BillingPaymentFailure } from './billing-payment-failure.js';
 import { musuboInvoiceMail, type MusuboInvoiceMailEvent } from './musubo-invoice-mail.js';
@@ -72,7 +72,13 @@ async function deliverNotice(env: Env['Bindings'], input: {
 /** Sends only the notice appropriate now, so a late sweep never floods old warnings. */
 export async function deliverCurrentBillingFailureNotice(env: Env['Bindings'], tenantId: string, now = new Date()): Promise<boolean> {
   const billing = await getTenantBilling(env.DB, tenantId);
-  const failure = await getBillingPaymentFailure(env.DB, billing, now);
+  const musubo = await getMusuboTenantBilling(env.DB, tenantId);
+  const current = musubo ? {
+    id: tenantId, plan_status: musubo.status === 'past_due' ? 'past_due' as const : 'active' as const,
+    stripe_subscription_id: musubo.core_subscription_id,
+  } : billing;
+  const failure = musubo?.status === 'past_due' || !musubo
+    ? await getBillingPaymentFailure(env.DB, current, now) : null;
   if (!failure) return false;
   return deliverNotice(env, {
     tenantId, invoiceId: failure.invoiceId,
@@ -85,17 +91,23 @@ export async function deliverCurrentBillingFailureNotice(env: Env['Bindings'], t
 /** A paid event restores the subscription first; the email is a separate, idempotent effect. */
 export async function deliverBillingRecoveryNotice(env: Env['Bindings'], invoiceId: string): Promise<boolean> {
   const row = await env.DB.prepare(`SELECT bi.id, bi.tenant_id, bi.subscription_id, bi.amount_due, bi.amount_paid,
-      bi.created_at, t.plan_status, t.stripe_subscription_id, t.current_period_ends_at
+      bi.created_at,
+      CASE WHEN mb.tenant_id IS NOT NULL THEN mb.status ELSE t.plan_status END AS effective_status,
+      CASE WHEN mb.tenant_id IS NOT NULL THEN mb.core_subscription_id ELSE t.stripe_subscription_id END AS effective_subscription_id,
+      CASE WHEN mb.tenant_id IS NOT NULL THEN
+        CASE WHEN mb.billing_interval='year' THEN mb.next_annual_renewal_at ELSE mb.next_monthly_charge_at END
+        ELSE t.current_period_ends_at END AS effective_next_charge_at
     FROM billing_invoices bi JOIN tenants t ON t.id=bi.tenant_id
+      LEFT JOIN musubo_tenant_billing mb ON mb.tenant_id=t.id
     WHERE bi.id=? AND bi.status='paid' AND bi.amount_paid>=bi.amount_due AND bi.amount_due>0`)
     .bind(invoiceId).first<{
       id: string; tenant_id: string; subscription_id: string | null;
       amount_due: number; amount_paid: number; created_at: string;
-      plan_status: TenantBilling['plan_status']; stripe_subscription_id: string | null;
-      current_period_ends_at: string | null;
+      effective_status: string; effective_subscription_id: string | null;
+      effective_next_charge_at: string | null;
     }>();
-  if (!row || row.plan_status !== 'active' || !row.subscription_id
-    || row.subscription_id !== row.stripe_subscription_id) return false;
+  if (!row || row.effective_status !== 'active' || !row.subscription_id
+    || row.subscription_id !== row.effective_subscription_id) return false;
   // Only the paid event that actually restored access should announce recovery.
   // Otherwise the sweep can send another "recovered" mail for an older paid
   // invoice once the final unpaid invoice is settled.
@@ -117,21 +129,25 @@ export async function deliverBillingRecoveryNotice(env: Env['Bindings'], invoice
     tenantId: row.tenant_id, invoiceId: row.id, event: 'recovered',
     amountYen: row.amount_paid, invoiceAt: row.created_at,
     graceDeadlineAt: new Date(firstFailure * 1000 + 7 * DAY_MS).toISOString(),
-    nextChargeAt: row.current_period_ends_at,
+    nextChargeAt: row.effective_next_charge_at,
   });
 }
 
 /** Round-robin pages prevent the same first 100 tenants monopolizing each tick. */
 export async function sweepBillingFailureNotices(env: Env['Bindings'], now = new Date()): Promise<{ checked: number; failed: number }> {
-  const total = await env.DB.prepare(`SELECT COUNT(*) AS n FROM tenants
-    WHERE plan_status='past_due' AND stripe_subscription_id IS NOT NULL`).first<{ n: number }>();
+  const condition = `((t.plan_status='past_due' AND t.stripe_subscription_id IS NOT NULL
+      AND mb.tenant_id IS NULL)
+    OR (mb.status='past_due' AND mb.core_subscription_id IS NOT NULL))`;
+  const total = await env.DB.prepare(`SELECT COUNT(*) AS n FROM tenants t
+    LEFT JOIN musubo_tenant_billing mb ON mb.tenant_id=t.id WHERE ${condition}`)
+    .first<{ n: number }>();
   const count = total?.n ?? 0;
   if (count === 0) return { checked: 0, failed: 0 };
   const pages = Math.ceil(count / PAGE_SIZE);
   const page = Math.floor(now.getTime() / (5 * 60 * 1000)) % pages;
-  const rows = await env.DB.prepare(`SELECT id FROM tenants
-    WHERE plan_status='past_due' AND stripe_subscription_id IS NOT NULL
-    ORDER BY id LIMIT ? OFFSET ?`).bind(PAGE_SIZE, page * PAGE_SIZE).all<{ id: string }>();
+  const rows = await env.DB.prepare(`SELECT t.id FROM tenants t
+    LEFT JOIN musubo_tenant_billing mb ON mb.tenant_id=t.id WHERE ${condition}
+    ORDER BY t.id LIMIT ? OFFSET ?`).bind(PAGE_SIZE, page * PAGE_SIZE).all<{ id: string }>();
   let failed = 0;
   for (const row of rows.results ?? []) {
     try { await deliverCurrentBillingFailureNotice(env, row.id, now); }

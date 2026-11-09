@@ -120,7 +120,10 @@ export interface BillingSyncTenant {
 export async function listBillingSyncTenants(db: D1Database, excludeTenantId: string): Promise<BillingSyncTenant[]> {
   const { results } = await db.prepare(
     `SELECT id, stripe_customer_id FROM tenants
-      WHERE id <> ? AND status <> 'archived' AND plan_status <> 'exempt'
+      WHERE id <> ? AND status <> 'archived'
+        AND (plan_status <> 'exempt' OR EXISTS (
+          SELECT 1 FROM musubo_tenant_billing mb
+          WHERE mb.tenant_id=tenants.id AND mb.core_subscription_id IS NOT NULL))
         AND stripe_customer_id IS NOT NULL AND stripe_customer_id <> ''
       ORDER BY id`,
   ).bind(excludeTenantId).all<BillingSyncTenant>();
@@ -131,7 +134,10 @@ export async function countBillingInvoices(db: D1Database, excludeTenantId: stri
   const row = await db.prepare(
     `SELECT COUNT(*) AS n FROM billing_invoices bi
       JOIN tenants t ON t.id = bi.tenant_id
-      WHERE t.id <> ? AND t.status <> 'archived' AND t.plan_status <> 'exempt'`,
+      WHERE t.id <> ? AND t.status <> 'archived'
+        AND (t.plan_status <> 'exempt' OR EXISTS (
+          SELECT 1 FROM musubo_tenant_billing mb
+          WHERE mb.tenant_id=t.id AND mb.core_subscription_id IS NOT NULL))`,
   ).bind(excludeTenantId).first<{ n: number }>();
   return row?.n ?? 0;
 }
@@ -153,7 +159,10 @@ export async function billingRevenueTotals(
      JOIN tenants t ON t.id = bi.tenant_id
      WHERE bi.status = 'paid' AND lower(bi.currency) = 'jpy'
        AND bi.paid_at >= ? AND bi.paid_at < ?
-       AND t.id <> ? AND t.status <> 'archived' AND t.plan_status <> 'exempt'`,
+       AND t.id <> ? AND t.status <> 'archived'
+       AND (t.plan_status <> 'exempt' OR EXISTS (
+         SELECT 1 FROM musubo_tenant_billing mb
+         WHERE mb.tenant_id=t.id AND mb.core_subscription_id IS NOT NULL))`,
   ).bind(input.from, input.to, input.excludeTenantId).first<{ revenue: number; refunds: number }>();
   return { revenue: row?.revenue ?? 0, refunds: row?.refunds ?? 0 };
 }
@@ -168,7 +177,10 @@ export async function latestPaidBillingInvoices(
        FROM billing_invoices bi
        JOIN tenants t ON t.id = bi.tenant_id
        WHERE bi.status = 'paid' AND lower(bi.currency) = 'jpy'
-         AND t.id <> ? AND t.status <> 'archived' AND t.plan_status <> 'exempt'
+         AND t.id <> ? AND t.status <> 'archived'
+         AND (t.plan_status <> 'exempt' OR EXISTS (
+           SELECT 1 FROM musubo_tenant_billing mb
+           WHERE mb.tenant_id=t.id AND mb.core_subscription_id IS NOT NULL))
      ) WHERE rn = 1`,
   ).bind(input.excludeTenantId).all<BillingInvoice & { rn: number }>();
   return new Map((results ?? []).map((row) => [row.tenant_id, row]));

@@ -27,13 +27,13 @@
 | 顧客画面 | `apps/web/src/v8/onboarding/`, `apps/web/src/v8/hq/` の `musubo-*`・`linked-*`・`line-resumption*` | Penの各分岐を表示できる部品。サーバー確定の料金・日付だけを渡す。Stripeカード設定の戻り先 `/hq/onboarding/card` は登録状態を再照会する。 |
 | 運営画面 | `apps/web/src/v8/ops/` の利用条件・個別見積もり部品 | 保存と送信は認可済みAPIへ接続する。 |
 | メール | `apps/worker/src/services/` の `musubo-*mail.ts`, `quote-mail-design.ts`, `signup-mail-design.ts` | 検証済みのイベント後に送る。カード番号などは渡さない。 |
-| 既存の有料請求失敗 | `apps/worker/src/services/billing-payment-failure.ts`, `billing-invoice-notifications.ts`, `apps/web/src/app/hq/billing/payment-recovery/page.tsx` | 失敗から7日間の猶予と通知は既存課金で動く。追加分失敗とは状態を分ける。 |
+| 有料請求失敗 | `apps/worker/src/services/billing-payment-failure.ts`, `musubo-billing-webhook.ts`, `routes/hq-billing.ts`, `apps/web/src/app/hq/billing/payment-recovery/page.tsx` | 新料金の基本契約で失敗した請求だけを7日間の猶予へつなぎ、回復画面は旧 `exempt` 欄でなく新契約IDから読む。追加分失敗とは状態を分ける。通知の新料金契約への発火条件は未接続。 |
 | 永続化の土台 | `packages/db/migrations/756_musubo_pricing_onboarding.sql` | オーナー承認を受けてファイルを作成。DBには未適用。既存の契約行は変更しない。 |
 | 利用条件の保存と承認 | `packages/db/src/musubo-pricing-conditions.ts`, `apps/worker/src/routes/ops-pricing-conditions.ts`, `ops-applications.ts` | 条件を版で保存し、会社名・期限を照合して承認時に固定する。運営画面の選択操作まで接続した。 |
 | 個別見積もりの保存と同意 | `packages/db/src/musubo-individual-quotes.ts`, `apps/worker/src/routes/ops-individual-quotes.ts`, `hq-musubo-quotes.ts` | 送信前プレビューの一致を確認してメール送信。期限内同意を永続化し、同意後は期限切れでもカード登録を再開できる。運営画面と顧客の閲覧画面は接続済み。 |
 | 初回LINEの無料期間 | `packages/db/src/musubo-tenant-billing.ts`, `apps/worker/src/routes/auth-email.ts`, `line-accounts.ts` | 新料金の登録時は旧トライアルを起動せず、カード登録後の最初のLINE接続時に無料期間を開始する。2個目以降は支払いの接続ができるまで安全側で停止する。 |
 | Stripe請求の組立部品 | `apps/worker/src/services/stripe-api.ts`, `musubo-subscription-reconciliation.ts`, `musubo-core-subscription.ts`, `musubo-billing-webhook.ts` | 税込の基本料金と月額オプションを別契約にし、最初のLINE接続で無料期間を開始して両契約を作成する。結果不明後はStripeの既存契約を照合し、未完了は定期再試行する。請求書の署名済み通知を契約IDごとに処理する。追加分の料金変更・有効化と期限付き割引の将来改定は未接続。旧プランのCheckout・見積もりは新料金企業へ使わせない。 |
-| 請求画面の読み取り | `apps/worker/src/services/musubo-billing-overview.ts`, `routes/hq-billing.ts` | 実際に有効なLINEだけを一覧にし、申込時の予定数を有効数へ混ぜない。申込時の合計友だち数は予定LINE数と有効数が一致するときだけ推定額へ使い、Stripeの確定請求額に流用しない。新料金企業には旧プラン一覧を返さない。Penの請求画面への表示接続は未完了。 |
+| 請求画面の読み取り | `apps/worker/src/services/musubo-billing-overview.ts`, `routes/hq-billing.ts`, `billing-invoices-sync.ts` | 実際に有効なLINEだけを一覧にし、申込時の予定数を有効数へ混ぜない。申込時の合計友だち数は予定LINE数と有効数が一致するときだけ推定額へ使い、Stripeの確定請求額に流用しない。新料金企業には旧プラン一覧を返さない。旧プラン状態が `exempt` の新料金企業も請求書同期対象に含める。請求画面は読み取り接続済みで、追加・終了の操作は未接続。 |
 | 通常料金の確認と同意 | `apps/worker/src/routes/hq-musubo-pricing.ts`, `apps/web/src/app/hq/onboarding/pricing/page.tsx` | 承認済み条件を読み、1〜10個の料金をサーバーで再計算して同意を保存する。カード登録は同意済みの通常料金または受諾済みの個別見積もりに限る。 |
 
 ## 公開前に必要な接続
