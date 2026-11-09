@@ -87,6 +87,7 @@ export function musuboFinalLineMail(input: {
   nextChargeAt?: string;
   nextChargeYen?: number;
   amountPaidNowYen?: number;
+  optionsMonthlyYen?: number;
 }): { subject: string; html: string; text: string } {
   const lineName = input.lineName.trim();
   if (!lineName) throw new RangeError('lineName is required');
@@ -146,10 +147,11 @@ export function musuboFinalLineMail(input: {
     rows: [
       { label: '有効LINE', value: '1個' },
       { label: '再開日', value: mailJstDate(input.resumedAt) },
-      { label: '本日のLINE基本料金', value: mailMoney(input.amountPaidNowYen) },
+      { label: '本日の請求合計', value: mailMoney(input.amountPaidNowYen) },
       { label: input.interval === 'year' ? '次の年次更新' : '次の月次請求', value: charge },
+      { label: '追加料金（月額）', value: mailMoney(input.optionsMonthlyYen ?? 0) },
     ], buttonLabel: 'アカウント一覧を開く', buttonUrl: input.actionUrl,
-    notes: ['お支払い済みの期間は二重請求しません。料金は適用中の条件から表示します。', '無料体験の再適用はありません。追加連携などは利用状況に応じて別途計算します。'],
+    notes: ['お支払い済みの期間は二重請求しません。料金は適用中の条件から表示します。', '無料体験の再適用はありません。友だち超過・追加連携枠は追加料金に含めて表示します。'],
   });
 }
 

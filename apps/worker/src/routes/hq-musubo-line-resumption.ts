@@ -9,6 +9,7 @@ import { acceptMusuboLineResumption, getMusuboLineResumptionOffer } from
   '../services/musubo-line-resumption-review.js';
 import { getMusuboLineResumptionComplete, reconcileMusuboLineResumption, requestMusuboLineResumption } from
   '../services/musubo-line-resumption.js';
+import { deliverMusuboResumptionNotice } from '../services/musubo-resumption-notification.js';
 
 export const hqMusuboLineResumption = new Hono<Env>();
 
@@ -60,6 +61,7 @@ hqMusuboLineResumption.post('/api/hq/billing/musubo/resumption/connect',
     }
     try {
       const active = await reconcileMusuboLineResumption(c.env, tenantId);
+      if (active) await deliverMusuboResumptionNotice(c.env, tenantId).catch(() => undefined);
       return c.json({ success: true, data: { active } });
     } catch {
       return c.json({ success: true, data: { active: false,

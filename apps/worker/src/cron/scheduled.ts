@@ -179,6 +179,14 @@ export async function scheduled(
     logger.error('musubo_line_resumption_sweep_failed');
   }
 
+  try {
+    const { sweepMusuboResumptionNotices } = await import('../services/musubo-resumption-notification.js');
+    const result = await sweepMusuboResumptionNotices(env, new Date(event.scheduledTime));
+    if (result.failed > 0) logger.error('musubo_resumption_notice_sweep_failed');
+  } catch {
+    logger.error('musubo_resumption_notice_sweep_failed');
+  }
+
   //  公開済み運用者通知ルールの送り残しを回収する。
   //
   // 初回の送信は業務イベントの側で同期に行う。ここが拾うのは、そこで

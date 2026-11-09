@@ -20,7 +20,7 @@ function adminBillingUrl(env: Env['Bindings']): string | null {
   } catch { return null; }
 }
 
-async function billingRecipient(db: D1Database, tenantId: string): Promise<string | null> {
+export async function billingRecipient(db: D1Database, tenantId: string): Promise<string | null> {
   const row = await db.prepare(`SELECT
     t.contact_email AS contact_email,
     (SELECT a.email FROM registration_applications a
