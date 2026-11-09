@@ -401,6 +401,7 @@
 - [保存が失敗した時の表示](form-save-errors.md)
 - [統括「バナー生成」— 仕組みと設定（2026-09-12）](hq-banner-generation.md)
 - [統括の課金プラン（月払い・年払い）](hq-billing.md)
+- [musubo 新料金・利用開始フローの実装接続図](musubo-pricing-onboarding-integration.md) — 新料金の接続済み範囲と公開前の残作業、確認 2026-11-09。
 - [会員登録・メールログイン・パスワード再設定（0-1／36-4／36-6）](hq-signup-and-password-login.md)
 - [Instagram同時投稿のためのMetaアプリ準備手順](instagram-meta-app-setup.md)
 - [デリバリー3社 API連携の問い合わせ先と送信文（下書き）](integrations/delivery-api-inquiry.md)
