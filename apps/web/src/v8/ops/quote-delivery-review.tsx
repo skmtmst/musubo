@@ -77,7 +77,7 @@ export default function QuoteDeliveryReview({ applicationId, quote }: {
         <h2>配信履歴で確認すること</h2>
         <p className={styles.small}>宛先・見積もり番号・送信時刻を照合します。結果を確認するまで、同じメールは再送しません。</p>
         <Field label="照合記録" required note="配信履歴で確認した事実を12〜500文字で残してください。">
-          <TextArea className={styles.reviewEvidence} value={evidence}
+          <TextArea value={evidence}
             onChange={(event) => setEvidence(event.target.value)} maxLength={500}
             placeholder="例：メールサービスの配信履歴で宛先と送信時刻を確認しました" />
         </Field>
