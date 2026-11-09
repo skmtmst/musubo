@@ -36,7 +36,7 @@ function CompletePending() {
   )
 }
 
-type TokenCheck = { state: 'checking' } | { state: 'ok'; email: string; trialDays: number; companyName: string; contactName: string } | { state: 'pending' } | { state: 'expired'; maskedEmail: string } | { state: 'bad'; message: string }
+type TokenCheck = { state: 'checking' } | { state: 'ok'; email: string; trialDays: number | null; companyName: string; contactName: string } | { state: 'pending' } | { state: 'expired'; maskedEmail: string } | { state: 'bad'; message: string }
 
 function CompleteInner() {
   const params = useSearchParams()
@@ -55,7 +55,7 @@ function CompleteInner() {
       setCheck({ state: 'bad', message: 'この URL は正しくありません。メールの URL をそのまま開いてください' })
       return
     }
-    void authRequest<{ email: string; trialDays: number; companyName: string; contactName: string } | { maskedEmail: string; canResend: boolean }>(`/api/auth/register/check?token=${encodeURIComponent(token)}`).then((res) => {
+    void authRequest<{ email: string; trialDays: number | null; companyName: string; contactName: string } | { maskedEmail: string; canResend: boolean }>(`/api/auth/register/check?token=${encodeURIComponent(token)}`).then((res) => {
       if (!alive) return
       if (res.ok && res.data && 'email' in res.data) setCheck({ state: 'ok', email: res.data.email, trialDays: res.data.trialDays, companyName: res.data.companyName, contactName: res.data.contactName })
       else if (res.code === 'approval_required') setCheck({ state: 'pending' })
@@ -91,7 +91,7 @@ function CompleteInner() {
     if (Object.values(next).some(Boolean)) return
     setBusy(true)
     setError('')
-    const res = await authRequest<{ tenantId: string; deviceMarker: string; sessionToken?: string; twoFactorSetup?: boolean; challengeToken?: string }>('/api/auth/register/complete', {
+    const res = await authRequest<{ tenantId: string; deviceMarker: string; newPricingFlow?: boolean; sessionToken?: string; twoFactorSetup?: boolean; challengeToken?: string }>('/api/auth/register/complete', {
       token,
       password,
       deviceMarker: readDeviceMarker(),
@@ -106,7 +106,10 @@ function CompleteInner() {
     resetAuthSelectionCleared(localStorage, sessionStorage)
     // オーナーは二段階認証が必須（N-426）。設定画面へ進み、完了後にセッションが出る。
     if (res.data.twoFactorSetup && res.data.challengeToken) {
-      window.location.assign(twoFactorChallengeHandoffPath('/login/two-factor/setup?next=musubo-pricing', res.data.challengeToken))
+      window.location.assign(twoFactorChallengeHandoffPath(
+        res.data.newPricingFlow ? '/login/two-factor/setup?next=musubo-pricing' : '/login/two-factor/setup',
+        res.data.challengeToken,
+      ))
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
@@ -115,7 +118,7 @@ function CompleteInner() {
       // 投げたままにすると登録中の表示で止まる。
       try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie session is sufficient */ }
     }
-    window.location.assign('/hq/onboarding/pricing')
+    window.location.assign(res.data.newPricingFlow ? '/hq/onboarding/pricing' : '/hq')
   }
 
   if (check.state === 'checking') return <CompletePending />

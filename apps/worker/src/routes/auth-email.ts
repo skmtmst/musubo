@@ -1,4 +1,5 @@
 import { logger } from '@line-crm/shared/server';
+import type { AppliedMusuboCondition } from '@line-crm/shared';
 import { readCookie } from '../middleware/auth-http.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -232,7 +233,11 @@ authEmail.get('/api/auth/register/check', async (c) => {
   if (!application || application.status !== 'approved' || application.email !== row!.email) {
     return c.json({ success: false, code: 'approval_required', error: 'お申し込みを確認中です。承認のご案内をお待ちください' }, 403);
   }
-  return c.json({ success: true, data: { email: row!.email, trialDays: TRIAL_DAYS,
+  const applied = application.pricing_snapshot_json
+    ? JSON.parse(application.pricing_snapshot_json) as AppliedMusuboCondition : null;
+  return c.json({ success: true, data: { email: row!.email,
+    trialDays: applied ? applied.trialPeriod.unit === 'days' ? applied.trialPeriod.value : null : TRIAL_DAYS,
+    ...(applied ? { trialPeriod: applied.trialPeriod } : {}),
     companyName: application.company_name, contactName: application.contact_name } });
 });
 
@@ -369,6 +374,7 @@ authEmail.post('/api/auth/register/complete', inputJsonBoundary(), async (c) => 
     data: {
       tenantId,
       deviceMarker,
+      newPricingFlow: Boolean(application.pricing_snapshot_json),
       ...challenge,
     },
   });

@@ -117,11 +117,16 @@ describe('会員登録（36-4）', () => {
       discountEndsOn: null, schedule: DEFAULT_MUSUBO_PRICE_SCHEDULE });
     testDb.raw.prepare('UPDATE registration_applications SET pricing_condition_id=?,pricing_snapshot_json=?')
       .run('partner', snapshot);
+    const checked = await call('GET', `/api/auth/register/check?token=${encodeURIComponent(token)}`);
+    expect((await json(checked)).data).toMatchObject({ trialDays: null,
+      trialPeriod: { unit: 'months', value: 3 } });
     const completed = await call('POST', '/api/auth/register/complete', {
       token, tenantName: '株式会社サンプル', name: '山田 太郎', password: 'StrongPassword1!',
     });
     expect(completed.status).toBe(200);
-    const tenantId = (await json(completed)).data.tenantId;
+    const completedBody = await json(completed);
+    expect(completedBody.data.newPricingFlow).toBe(true);
+    const tenantId = completedBody.data.tenantId;
     expect(testDb.raw.prepare('SELECT plan_status,trial_ends_at FROM tenants WHERE id=?').get(tenantId))
       .toEqual({ plan_status: 'exempt', trial_ends_at: null });
     expect(testDb.raw.prepare(`SELECT status,first_line_activated_at,first_charge_date
@@ -183,6 +188,7 @@ describe('会員登録（36-4）', () => {
     const body = await json(completed);
     // この試験は明示したOffの登録・セッション互換を確かめる。
     expect(body.data.twoFactorSetup).toBeUndefined();
+    expect(body.data.newPricingFlow).toBe(false);
     expect(body.data.deviceMarker).toMatch(/^[A-Za-z0-9_-]{16,}$/);
     expect(completed.headers.get('set-cookie') ?? '').toContain('lh_admin_session=');
     expect(completed.headers.get('set-cookie')).toContain('lh_signup_marker=');

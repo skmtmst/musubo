@@ -53,7 +53,7 @@ describe('ログイン前の画面（0-1／36-4／36-6）', () => {
     expect(page).toContain('/api/auth/register/check?token=')
     expect(page).toContain('/api/auth/register/complete')
     expect(page).toContain('storeDeviceMarker(')
-    expect(page).toContain("window.location.assign('/hq/onboarding/pricing')")
+    expect(page).toContain("res.data.newPricingFlow ? '/hq/onboarding/pricing' : '/hq'")
     expect(page).toContain('autoComplete="new-password"')
   })
 
