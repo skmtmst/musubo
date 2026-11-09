@@ -1,5 +1,5 @@
 import { prepareBillingInvoice, type MusuboTenantBillingRecord } from '@line-crm/db';
-import { musuboChargeDateEpoch } from '@line-crm/shared';
+import { jstDate, musuboChargeDateEpoch } from '@line-crm/shared';
 import { billingInvoiceInput } from './billing-invoices-sync.js';
 import type { StripeInvoice } from './stripe-api.js';
 
@@ -56,6 +56,20 @@ export async function processMusuboBillingEvent(input: {
     statements.push(prepareBillingInvoice(db, billingInvoiceInput({
       ...invoice, customer: customerId, subscription: subscriptionId, status: invoiceStatus,
     }, { tenantId }), pending));
+    // A paid renewal is the source of truth for the next billing date. Ignore
+    // prorations and stale deliveries so they cannot move the date backwards.
+    if (event.type === 'invoice.paid' && invoice.billing_reason === 'subscription_cycle'
+      && Number.isSafeInteger(invoice.period_end) && (invoice.period_end ?? 0) > 0) {
+      const nextDate = jstDate(new Date(invoice.period_end! * 1000));
+      const column = kind === 'options' || billing.billing_interval === 'month'
+        ? 'next_monthly_charge_at' : 'next_annual_renewal_at';
+      statements.push(db.prepare(`UPDATE musubo_tenant_billing
+        SET ${column}=?,updated_at=?
+        WHERE tenant_id=? AND ${kind === 'core' ? 'core_subscription_id' : 'options_subscription_id'}=?
+          AND (${column} IS NULL OR ${column}<?)
+          AND EXISTS (SELECT 1 FROM billing_events WHERE id=? AND summary='pending')`)
+        .bind(nextDate, new Date().toISOString(), tenantId, subscriptionId, nextDate, event.id));
+    }
     if (kind === 'core' && (event.type === 'invoice.payment_failed'
       || event.type === 'invoice.marked_uncollectible')
       && (invoice.amount_due ?? 0) > (invoice.amount_paid ?? 0)) {

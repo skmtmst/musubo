@@ -56,3 +56,31 @@ it('does not start seven-day grace without a signed failure timestamp', async ()
   })).toBe('retry');
   expect((await getMusuboTenantBilling(fixture.db, tenantId))?.status).toBe('active');
 });
+
+it('records next renewal dates only from paid subscription cycles and never moves them backwards', async () => {
+  const fixture = createTestD1();
+  const tenantId = DEFAULT_TENANT_ID;
+  fixture.raw.prepare(`INSERT INTO musubo_tenant_billing
+    (tenant_id,pricing_snapshot_json,billing_interval,status,first_line_activated_at,
+      first_charge_date,core_subscription_id,options_subscription_id,created_at,updated_at)
+    VALUES (?,'{}','year','active','2026-11-09','2026-12-09','sub_core','sub_options','2026-11-09','2026-11-09')`)
+    .run(tenantId);
+  const billing = (await getMusuboTenantBilling(fixture.db, tenantId))!;
+  const paid = async (id: string, subscription: string, next: string, reason = 'subscription_cycle') => {
+    fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
+      VALUES (?,'invoice.paid',?,'pending')`).run(id, tenantId);
+    return processMusuboBillingEvent({ db: fixture.db, tenantId, customerId: 'cus_1', billing,
+      event: { id, type: 'invoice.paid', created: Date.parse('2026-12-09T01:00:00Z') / 1000,
+        data: { object: { id: `in_${id}`, customer: 'cus_1', subscription,
+          amount_due: 100, amount_paid: 100, currency: 'jpy', billing_reason: reason,
+          period_end: Date.parse(next) / 1000 } } },
+    });
+  };
+  await paid('annual', 'sub_core', '2027-12-08T15:00:00Z');
+  await paid('monthly', 'sub_options', '2027-01-08T15:00:00Z');
+  await paid('late', 'sub_core', '2027-01-08T15:00:00Z');
+  await paid('proration', 'sub_options', '2027-03-08T15:00:00Z', 'subscription_update');
+  const updated = await getMusuboTenantBilling(fixture.db, tenantId);
+  expect(updated?.next_annual_renewal_at).toBe('2027-12-09');
+  expect(updated?.next_monthly_charge_at).toBe('2027-01-09');
+});

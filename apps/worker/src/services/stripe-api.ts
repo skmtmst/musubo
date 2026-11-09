@@ -169,6 +169,7 @@ export interface StripeInvoice {
   created: number;
   customer: string | null;
   subscription: string | null;
+  billing_reason?: string | null;
   charge: string | { id: string; amount_refunded: number } | null;
   period_start: number | null;
   period_end: number | null;
