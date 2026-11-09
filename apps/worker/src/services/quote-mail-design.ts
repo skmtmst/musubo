@@ -43,33 +43,40 @@ export function individualQuoteMail(input: {
   const intro = reissued
     ? '以前のお見積もりは無効になりました。新しい料金と有効期限をご確認のうえ、改めて同意してください。'
     : 'ご利用予定に合わせた料金をご用意しました。ログインして内容をご確認のうえ、同意してカード登録へお進みください。';
+  const fixedLineCapacity = quote.plannedLineCount > 10;
   const amount = quote.interval === 'month'
-    ? `${money(price.plannedMonthlyTotalYen!)}／月（税込）`
+    ? `${money(fixedLineCapacity ? price.finalLineBasicMonthlyYen : price.plannedMonthlyTotalYen!)}／月（税込）`
     : `${money(price.finalAnnualLineChargeYen!)}／年（税込）`;
-  const options = quote.interval === 'year'
+  const options = fixedLineCapacity
+    ? '統括機能・友だち超過・追加連携枠は、実際の利用に応じて月次請求します。'
+    : quote.interval === 'year'
     ? `オプション料金 ${money(price.optionsMonthlyYen)}／月は毎月別に請求します。` : '';
   const trial = `${quote.trialPeriod.value}${quote.trialPeriod.unit === 'months' ? 'か月' : '日'}無料`;
   const expiry = dateJst(quote.expiresAt);
   const note = reissued
     ? `新見積もり ${quote.quoteNumber} の有効期限：${expiry}。旧リンクからは同意できません。`
     : `見積もり有効期限：${expiry}。期限後は再発行を依頼できます。`;
-  const trialNote = reissued
+  const trialNote = fixedLineCapacity
+    ? `最初のLINE有効化日から${trial}です。無料期間終了後は接続済みが${quote.plannedLineCount}個未満でも、契約枠${quote.plannedLineCount}個分のLINE基本料金を請求します。枠内の後続接続で基本料金は増えません。`
+    : reissued
     ? '同意後は単価と適用条件が確定します。請求額は実際の連携数で決まります。カード登録は見積もり期限後も進められます。'
     : `カード登録だけでは請求も無料期間も始まりません。最初のLINE有効化日から${trial}です。`;
-  const summary = `LINE ${quote.plannedLineCount}個 ＋ 追加連携${price.linkedSlots}枠`;
+  const summary = fixedLineCapacity ? `LINE ${quote.plannedLineCount}個の契約枠`
+    : `LINE ${quote.plannedLineCount}個 ＋ 追加連携${price.linkedSlots}枠`;
+  const amountLabel = fixedLineCapacity ? '契約するLINE基本料金' : 'ご利用予定がすべて有効になった場合';
   const html = shell(`<p style="margin:0 0 12px;color:#087c43;font-size:14px;font-weight:700;">${reissued ? '個別見積もりの再発行' : '個別見積もりのご案内'}</p>
 <h1 style="margin:0 0 26px;font-size:26px;line-height:1.45;">${escapeHtml(title)}</h1>
 <p style="margin:0 0 15px;color:#425364;font-size:16px;line-height:1.7;">musuboをご利用いただき、ありがとうございます。</p>
 <p style="margin:0 0 25px;color:#425364;font-size:16px;line-height:1.7;">${escapeHtml(intro)}</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eef8f1;border-radius:11px;"><tr><td style="padding:22px;">
-<p style="margin:0 0 8px;color:#425364;font-size:14px;">ご利用予定がすべて有効になった場合</p>
+<p style="margin:0 0 8px;color:#425364;font-size:14px;">${escapeHtml(amountLabel)}</p>
 <p style="margin:0 0 8px;color:#087c43;font-size:25px;font-weight:800;">${escapeHtml(amount)}</p>
 <p style="margin:0;color:#526476;font-size:13px;line-height:1.6;">${escapeHtml(summary)}${options ? `<br>${escapeHtml(options)}` : ''}</p>
 </td></tr></table>${button(input.reviewUrl, 'お見積もりを確認する')}
 <p style="margin:0 0 12px;color:#59687b;font-size:14px;line-height:1.7;">${escapeHtml(note)}</p>
 <p style="margin:0;color:#59687b;font-size:14px;line-height:1.7;">${escapeHtml(trialNote)}</p>`);
   const text = [title, '', 'musuboをご利用いただき、ありがとうございます。', intro, '',
-    'ご利用予定がすべて有効になった場合', amount, summary, options, '',
+    amountLabel, amount, summary, options, '',
     'お見積もりを確認する', safeUrl(input.reviewUrl), '', note, trialNote,
     '', 'musubo（ムスボ）', 'このメールは送信専用です。'].filter(Boolean).join('\n');
   return { subject, text, html };

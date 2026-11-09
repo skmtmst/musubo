@@ -97,12 +97,14 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
     <div className={styles.columns}>
       <section className={styles.card} aria-labelledby="quote-summary">
         <p className={styles.eyebrow}>個別見積もり · {quote.quoteNumber}</p>
-        <h2 id="quote-summary">予定の連携がすべて有効になった場合</h2>
-        {quote.interval === 'month' ? <div className={styles.amount}>{money(price.plannedMonthlyTotalYen!)}<small>／月（税込）</small></div>
+        <h2 id="quote-summary">{quote.plannedLineCount > 10 ? `LINE${quote.plannedLineCount}個の契約枠・基本料金` : '予定の連携がすべて有効になった場合'}</h2>
+        {quote.interval === 'month' ? <div className={styles.amount}>{money(quote.plannedLineCount > 10
+          ? price.finalLineBasicMonthlyYen : price.plannedMonthlyTotalYen!)}<small>／月（税込）</small></div>
           : <><div className={styles.amount}>{money(price.finalAnnualLineChargeYen!)}<small>／年（税込）</small></div>
             <p className={styles.annualNote}>オプション料金 {money(price.optionsMonthlyYen)}／月は毎月別に請求します。</p></>}
         <p className={styles.scope}>LINE {quote.plannedLineCount}個{firstLine && quote.plannedLineCount === 1
-          ? `・Googleマイビジネス${firstLine.googleBusiness}個・Instagram${firstLine.instagram}個` : ''}の予定で計算しています。</p>
+          ? `・Googleマイビジネス${firstLine.googleBusiness}個・Instagram${firstLine.instagram}個` : ''}{quote.plannedLineCount > 10
+          ? 'の契約枠で計算しています。' : 'の予定で計算しています。'}</p>
         <div className={styles.rule} />
         <h3>料金の内訳</h3>
         <dl className={styles.breakdown}>
@@ -111,7 +113,9 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
           {price.linkedSlots > 0 && <div><dt>追加連携枠・{price.linkedSlots}枠</dt><dd>{money(price.linkedAccountSlotsMonthlyYen)}／月</dd></div>}
           {price.friendOverageMonthlyYen > 0 && <div><dt>友だち数の追加料金</dt><dd>{money(price.friendOverageMonthlyYen)}／月</dd></div>}
         </dl>
-        <div className={styles.info}><strong>料金は接続した分から決まります</strong><p>各サービスの1個目は基本料金内です。追加連携を増やす前に、料金の増分を確認できます。</p></div>
+        <div className={styles.info}>{quote.plannedLineCount > 10 ? <><strong>LINE基本料金は契約枠で確定します</strong>
+          <p>無料期間終了後は、接続済みが契約枠より少なくてもLINE基本料金を請求します。枠内の後続接続で基本料金は増えません。オプションは実際の利用に応じて別に計算します。</p></>
+          : <><strong>料金は接続した分から決まります</strong><p>各サービスの1個目は基本料金内です。追加連携を増やす前に、料金の増分を確認できます。</p></>}</div>
       </section>
       <section className={styles.card} aria-labelledby="quote-terms">
         <h2 id="quote-terms">適用する利用条件</h2>
@@ -122,7 +126,9 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
         <Checkbox className={styles.consent} checked={agreed} onCheckedChange={setAgreed}>
           料金条件・無料期間・今後の請求について確認し、同意します
         </Checkbox>
-        <p className={styles.small}>同意した単価と適用条件は確定します。請求額は実際の連携数で決まり、期限後もカード登録を再開できます。カード情報はmusuboに保存しません。</p>
+        <p className={styles.small}>{quote.plannedLineCount > 10
+          ? 'LINE基本料金は契約枠の個数で請求します。オプションは実際の利用で計算します。期限後もカード登録を再開できます。カード情報はmusuboに保存しません。'
+          : '同意した単価と適用条件は確定します。請求額は実際の連携数で決まり、期限後もカード登録を再開できます。カード情報はmusuboに保存しません。'}</p>
         {error && <p className={styles.error} role="alert">{error}</p>}
         <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="処理中…" disabled={!agreed}
           onClick={() => void perform(async () => {

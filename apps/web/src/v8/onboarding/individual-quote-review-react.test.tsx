@@ -36,6 +36,15 @@ function renderQuote(changes: Partial<MusuboIndividualQuote> = {}, now = '2026-1
 }
 
 describe('お客様の個別見積もり', () => {
+  it('LINE11個以上は未接続でも契約枠の基本料金を請求すると明示する', async () => {
+    await act(async () => { renderQuote({ plannedLineCount: 11, plannedLinkedAccountsByLine: [],
+      finalSchedule: { ...DEFAULT_MUSUBO_PRICE_SCHEDULE,
+        eleventhAndLaterLineYen: 6_500, friendAllowanceForElevenOrMore: 50_000 } }) })
+    expect(host.textContent).toContain('LINE11個の契約枠・基本料金')
+    expect(host.textContent).toContain('¥78,500')
+    expect(host.textContent).toContain('接続済みが契約枠より少なくてもLINE基本料金を請求します')
+    expect(host.textContent).not.toContain('請求額は実際の連携数で決まり')
+  })
   it('内容を確認し同意したときだけカード登録へ進める', async () => {
     await act(async () => { renderQuote() })
     expect(host.textContent).toContain('¥38,900')

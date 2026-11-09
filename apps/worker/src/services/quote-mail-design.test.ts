@@ -46,6 +46,16 @@ describe('個別見積もりメール', () => {
     expect(mail.html).toContain('¥33,000／月は毎月別に請求');
   });
 
+  it('LINE11個の見積もりは契約枠の基本料金を示し、接続数による減額を示唆しない', () => {
+    const mail = individualQuoteMail({ quote: { ...quote, plannedLineCount: 11,
+      plannedLinkedAccountsByLine: [], finalSchedule: { ...quote.finalSchedule,
+        eleventhAndLaterLineYen: 6_500, friendAllowanceForElevenOrMore: 50_000 } },
+    reviewUrl: 'https://admin.example.com/quote', kind: 'reissued' });
+    expect(mail.html).toContain('¥78,500／月（税込）');
+    expect(mail.text).toContain('接続済みが11個未満でも');
+    expect(mail.text).not.toContain('請求額は実際の連携数で決まります');
+  });
+
   it('再発行依頼の受付を知らせ、HTML注入と危険なリンクを防ぐ', () => {
     const receipt = quoteReissueRequestReceiptMail({ quoteNumber: '<script>alert(1)</script>' });
     expect(receipt.html).toContain('&lt;script&gt;');
