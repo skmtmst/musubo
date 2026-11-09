@@ -127,11 +127,13 @@ jobs:
           pnpm exec tsx scripts/recovery/booking-hours-20260922.ts apply
 
   migrate:
-    # The musubo repository only migrates staging from the latest integrated development SHA.
-    # Production remains on the separately approved release path.
-    if: github.repository == 'skmtmst/musubo' && github.ref == 'refs/heads/codex/development' && inputs.operation == 'migrate' && inputs.environment == 'staging'
+    # Staging writes use the latest integrated development SHA. Standalone production stays read-only.
+    if: >-
+      github.repository == 'skmtmst/musubo' && inputs.operation == 'migrate' &&
+      ((inputs.environment == 'staging' && github.ref == 'refs/heads/codex/development') ||
+       (inputs.environment == 'production' && inputs.mode == 'dry-run' && github.ref == 'refs/heads/main'))
     concurrency:
-      group: cloudflare-staging
+      group: ${{ inputs.environment == 'production' && 'cloudflare-production' || 'cloudflare-staging' }}
       queue: max
       cancel-in-progress: false
     environment:
