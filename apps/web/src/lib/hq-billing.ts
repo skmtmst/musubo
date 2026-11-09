@@ -51,6 +51,24 @@ export interface BillingSummary {
   stripeReady: boolean
   portalAvailable: boolean
   plans: BillingPlanView[]
+  newPricing?: {
+    status: 'awaiting_first_line' | 'trialing' | 'active' | 'past_due' | 'ended'
+    billingInterval: BillingInterval
+    activeLines: Array<{ id: string; name: string }>
+    trialLastFreeDate: string | null
+    firstChargeDate: string | null
+    estimatedPrice: {
+      monthlyTotalYen: number
+      annualLineChargeYen: number
+      optionsMonthlyYen: number
+      lineBasicMonthlyYen: number
+      headquartersMonthlyYen: number
+      friendOverageMonthlyYen: number
+      linkedAccountSlotsMonthlyYen: number
+    } | null
+    contractedCore: { lineCapacity: number; amountYen: number; interval: BillingInterval } | null
+    quoteId: string | null
+  }
 }
 
 export type BillingPaymentFailureView = {

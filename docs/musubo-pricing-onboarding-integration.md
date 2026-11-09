@@ -13,6 +13,7 @@
 - 有料利用中の追加は支払いが成功するまで新しいLINE・連携先だけを保留し、既存の利用は継続する。保留期限は7日。連携解除は即時、追加枠の減額は次の月次請求日から。支払済み期間を返金しない。
 - 最後のLINEを0個にする場合、無料期間中は請求を始めず終了する。月払いは次の請求日、年払いは次の更新日での終了を初期選択にし、即時終了は別に選べる。会社アカウントと請求履歴を残す。再開時に新しい無料期間を与えない。
 - 個別見積もりは最終単価と期限を保存し、期限内の同意を確定させる。同意済みなら見積もり期限後もカード登録を続けられる。未同意で期限切れなら再発行と再同意が必要。
+- LINEが11個以上の個別見積もりは、同意したLINE契約枠の基本料金を無料期間終了後の初回請求から適用する。接続済みが契約枠より少なくても基本料金は減らず、契約枠内の後続接続で基本料金を重ねて請求しない。追加連携枠と友だち超過などのオプションは実際の利用に応じて別計算する。契約枠を超える追加・枠数の減少は見積もりの改定と同意を要する。この条件を見積書・同意画面へ明記する。
 - 接続後のLINE統計は、LINE公式APIの `followers` から `blocks` を引き、両値が確定した前日分だけ採用する。未確定・欠損時は人数を推測して確定請求しない。ただし `followers` は退会後も減らない累積値なので、この差分も厳密な現在人数とは限らない。請求の正本として採用する前に、[LINE公式の指標定義](https://developers.line.biz/en/reference/messaging-api/nojs)と顧客への表示を確認する。
 
 ## すでにコード化した部品
@@ -32,7 +33,7 @@
 | 個別見積もりの保存と同意 | `packages/db/src/musubo-individual-quotes.ts`, `apps/worker/src/routes/ops-individual-quotes.ts`, `hq-musubo-quotes.ts` | 送信前プレビューの一致を確認してメール送信。期限内同意を永続化し、同意後は期限切れでもカード登録を再開できる。運営画面と顧客の閲覧画面は接続済み。 |
 | 初回LINEの無料期間 | `packages/db/src/musubo-tenant-billing.ts`, `apps/worker/src/routes/auth-email.ts`, `line-accounts.ts` | 新料金の登録時は旧トライアルを起動せず、カード登録後の最初のLINE接続時に無料期間を開始する。2個目以降は支払いの接続ができるまで安全側で停止する。 |
 | Stripe請求の組立部品 | `apps/worker/src/services/stripe-api.ts`, `musubo-subscription-reconciliation.ts`, `packages/shared/src/musubo-pricing.ts` | 税込の基本料金とオプションを別契約にし、表示する日本時間の初回請求日を同じ無料期間終了時刻へ変換する。作成前に同じ会社・用途の既存契約を照合して二重作成を避ける。LINE接続後の自動契約作成とWebhook反映はまだ接続しない。旧プランのCheckout・見積もりは新料金企業へ使わせない。新料金企業の契約通知は旧Webhookが完了扱いにせず、再処理待ちの受領記録と503で止める。 |
-| 請求画面の読み取り | `apps/worker/src/services/musubo-billing-overview.ts`, `routes/hq-billing.ts` | 実際に有効なLINEだけを一覧にし、申込時の予定数を有効数へ混ぜない。申込時の友だち数による額は推定額と明示し、Stripeの確定請求額に流用しない。新料金企業には旧プラン一覧を返さない。Penの請求画面への表示接続は未完了。 |
+| 請求画面の読み取り | `apps/worker/src/services/musubo-billing-overview.ts`, `routes/hq-billing.ts` | 実際に有効なLINEだけを一覧にし、申込時の予定数を有効数へ混ぜない。申込時の合計友だち数は予定LINE数と有効数が一致するときだけ推定額へ使い、Stripeの確定請求額に流用しない。新料金企業には旧プラン一覧を返さない。Penの請求画面への表示接続は未完了。 |
 | 通常料金の確認と同意 | `apps/worker/src/routes/hq-musubo-pricing.ts`, `apps/web/src/app/hq/onboarding/pricing/page.tsx` | 承認済み条件を読み、1〜10個の料金をサーバーで再計算して同意を保存する。カード登録は同意済みの通常料金または受諾済みの個別見積もりに限る。 |
 
 ## 公開前に必要な接続

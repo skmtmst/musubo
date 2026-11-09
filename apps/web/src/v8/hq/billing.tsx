@@ -53,6 +53,7 @@ import {
 import { billingFailureMessage } from './billing-failure'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import styles from './billing.module.css'
+import MusuboBilling from './musubo-billing'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 
@@ -223,9 +224,9 @@ function BillingInner() {
     </KpiBand>
   ) : null
 
-  const frame = (body: React.ReactNode) => (
+  const frame = (body: React.ReactNode, showLegacyMetrics = true) => (
     <ListPage boardId="JB8V1" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />} folderNav={settingsNav}>
-      <PageContent>{metricsBand}{body}</PageContent>
+      <PageContent>{showLegacyMetrics ? metricsBand : null}{body}</PageContent>
     </ListPage>
   )
 
@@ -234,6 +235,15 @@ function BillingInner() {
   if (status === 'forbidden' || role === 'staff') return frame(<ListState permissionScope="hq" kind="forbidden" />)
   if (status === 'error' || !summary) {
     return frame(<ListState permissionScope="hq" kind="error" title="契約状況を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load(true)} />)
+  }
+
+  if (summary.newPricing) {
+    return frame(<>
+      {error ? <Notice tone="danger" message={error} /> : null}
+      <MusuboBilling pricing={summary.newPricing} invoices={invoices} invoiceFailed={invoiceFailed}
+        onRetry={() => void load(true)} portalAvailable={summary.portalAvailable}
+        canManagePayment={canAdministerRole(role)} onPortal={() => { void portal() }} />
+    </>, false)
   }
 
   const banner = billingBanner(summary)

@@ -1,5 +1,7 @@
-import { musuboPrice, type AppliedMusuboCondition, type MusuboPriceBreakdown } from '@line-crm/shared';
-import type { MusuboTenantBillingRecord } from '@line-crm/db';
+import { musuboIndividualQuotePrice, musuboPrice,
+  type AppliedMusuboCondition, type MusuboPriceBreakdown } from '@line-crm/shared';
+import { getMusuboIndividualQuote, musuboQuoteFromRecord,
+  type MusuboTenantBillingRecord } from '@line-crm/db';
 
 interface ActiveLineRow {
   id: string;
@@ -16,6 +18,7 @@ export interface MusuboBillingOverview {
   firstChargeDate: string | null;
   /** The saved signup friend count is only an estimate until LINE insight is ready. */
   estimatedPrice: MusuboPriceBreakdown | null;
+  contractedCore: { lineCapacity: number; amountYen: number; interval: 'month' | 'year' } | null;
   quoteId: string | null;
 }
 
@@ -31,14 +34,30 @@ export async function musuboBillingOverview(
     ORDER BY u.activated_at,a.id`).bind(tenantId).all<ActiveLineRow>();
   const active = response.results ?? [];
   let estimatedPrice: MusuboPriceBreakdown | null = null;
+  let contractedCore: MusuboBillingOverview['contractedCore'] = null;
+  if (billing.quote_id) {
+    const row = await getMusuboIndividualQuote(db, billing.quote_id);
+    if (!row || row.tenant_id !== tenantId || row.status !== 'accepted') {
+      throw new Error('Accepted individual quote is unavailable');
+    }
+    const quote = musuboQuoteFromRecord(row);
+    if (quote.plannedLineCount > 10) {
+      const amount = musuboIndividualQuotePrice(quote);
+      contractedCore = {
+        lineCapacity: quote.plannedLineCount,
+        amountYen: quote.interval === 'year' ? amount.finalAnnualLineChargeYen! : amount.finalLineBasicMonthlyYen,
+        interval: quote.interval,
+      };
+    }
+  }
   if (!billing.quote_id && billing.pricing_selection_json && active.length > 0) {
-    const saved = JSON.parse(billing.pricing_selection_json) as {
-      selection: { friendCountExcludingBlocked: number };
-    };
     const condition = JSON.parse(billing.pricing_snapshot_json) as AppliedMusuboCondition;
-    estimatedPrice = musuboPrice({
+    const planned = JSON.parse(billing.pricing_selection_json) as {
+      selection: { lineCount: number; friendCountExcludingBlocked: number };
+    };
+    if (planned.selection.lineCount === active.length) estimatedPrice = musuboPrice({
       lineCount: active.length,
-      friendCountExcludingBlocked: saved.selection.friendCountExcludingBlocked,
+      friendCountExcludingBlocked: planned.selection.friendCountExcludingBlocked,
       linkedAccountsByLine: active.map((row) => ({
         googleBusiness: row.google_business_count,
         instagram: row.instagram_count,
@@ -55,6 +74,7 @@ export async function musuboBillingOverview(
     trialLastFreeDate: billing.trial_last_free_date,
     firstChargeDate: billing.first_charge_date,
     estimatedPrice,
+    contractedCore,
     quoteId: billing.quote_id,
   };
 }
