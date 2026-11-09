@@ -163,6 +163,14 @@ export async function scheduled(
     logger.error('musubo_recurring_prices_sweep_failed');
   }
 
+  try {
+    const { sweepMusuboFinalLineEnds } = await import('../services/musubo-final-line-end.js');
+    const result = await sweepMusuboFinalLineEnds(env, new Date(event.scheduledTime).toISOString());
+    if (result.failed > 0) logger.error('musubo_final_line_end_sweep_failed');
+  } catch {
+    logger.error('musubo_final_line_end_sweep_failed');
+  }
+
   //  公開済み運用者通知ルールの送り残しを回収する。
   //
   // 初回の送信は業務イベントの側で同期に行う。ここが拾うのは、そこで

@@ -17,6 +17,8 @@ export async function musuboFirstLineGate(c: Context<Env>): Promise<'first' | 'r
   const state = await musuboLineConnectionAllowed(c.env.DB, tenantId);
   if (state === 'legacy') return 'legacy';
   if (state === 'ended') return c.json({ success: false, error: '利用を終了した統括です。再開手続きを確認してください' }, 409);
+  if (state === 'termination_pending') return c.json({ success: false,
+    error: '利用終了の予約中はLINEを追加できません。先に終了予約を取り消してください' }, 409);
   if (state === 'requires_payment') {
     return c.json({ success: false, error: 'LINEの追加料金を確認し、お支払いを完了してから接続してください' }, 409);
   }

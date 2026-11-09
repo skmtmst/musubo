@@ -48,7 +48,7 @@ export function encodeForm(input: Record<string, FormValue>): string {
 
 export async function stripeRequest<T>(
   env: StripeEnv,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   body?: Record<string, FormValue>,
   options: { idempotencyKey?: string; fetchImpl?: typeof fetch; signal?: AbortSignal } = {},
@@ -78,7 +78,7 @@ export async function stripeRequest<T>(
   try {
     res = await boundedHttpRequest(url, { method, headers, body: payload, signal: options.signal }, { timeoutMs: 10_000, maxResponseBytes: 1024 * 1024, fetch: fetchImpl });
   } catch {
-    throw new StripeApiError(502, '決済サービスにつながりませんでした', 'network_unreachable', method === 'POST');
+    throw new StripeApiError(502, '決済サービスにつながりませんでした', 'network_unreachable', method !== 'GET');
   }
   const text = await res.text();
   let json: unknown = null;
@@ -89,7 +89,7 @@ export async function stripeRequest<T>(
   }
   if (!res.ok) {
     const error = (json as { error?: { message?: string; code?: string } } | null)?.error;
-    throw new StripeApiError(res.status, error?.message ?? `Stripe error ${res.status}`, error?.code ?? null, method === 'POST' && (res.status === 408 || res.status >= 500));
+    throw new StripeApiError(res.status, error?.message ?? `Stripe error ${res.status}`, error?.code ?? null, method !== 'GET' && (res.status === 408 || res.status >= 500));
   }
   return json as T;
 }
@@ -224,6 +224,29 @@ function validMusuboSubscription(input: MusuboSubscriptionInput): void {
 }
 
 export const stripeApi = {
+  scheduleMusuboTermination: (env: StripeEnv, subscriptionId: string, endEpoch: number,
+    idempotencyKey: string, fetchImpl?: typeof fetch) => {
+    if (!/^sub_[A-Za-z0-9]+$/.test(subscriptionId) || !Number.isSafeInteger(endEpoch)
+      || endEpoch <= 0) throw new RangeError('Invalid musubo termination');
+    return stripeRequest<StripeSubscription>(env, 'POST',
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      { cancel_at: endEpoch, proration_behavior: 'none' }, { fetchImpl, idempotencyKey });
+  },
+  undoMusuboTermination: (env: StripeEnv, subscriptionId: string,
+    idempotencyKey: string, fetchImpl?: typeof fetch) => {
+    if (!/^sub_[A-Za-z0-9]+$/.test(subscriptionId)) throw new RangeError('Invalid musubo termination');
+    return stripeRequest<StripeSubscription>(env, 'POST',
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      { cancel_at: '', cancel_at_period_end: false, proration_behavior: 'none' },
+      { fetchImpl, idempotencyKey });
+  },
+  cancelMusuboSubscription: (env: StripeEnv, subscriptionId: string,
+    idempotencyKey: string, fetchImpl?: typeof fetch) => {
+    if (!/^sub_[A-Za-z0-9]+$/.test(subscriptionId)) throw new RangeError('Invalid musubo termination');
+    return stripeRequest<StripeSubscription>(env, 'DELETE',
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      { invoice_now: false, prorate: false }, { fetchImpl, idempotencyKey });
+  },
   updateMusuboRecurringAmount: (env: StripeEnv, input: {
     subscriptionId: string; itemId: string; productId: string;
     interval: 'month' | 'year'; amountYen: number; idempotencyKey: string;

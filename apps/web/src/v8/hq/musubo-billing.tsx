@@ -16,6 +16,8 @@ function shortDate(value: string | null): string {
 }
 
 function statusMessage(pricing: NewPricing): string {
+  if (pricing.terminationPhase === 'scheduled') return '最後のLINEの利用終了を予約しています。終了予定日は手続き画面で確認・変更できます。'
+  if (pricing.terminationPhase === 'ending') return '最後のLINEの利用終了を確認しています。手続き画面で現在の状態を確認できます。'
   switch (pricing.status) {
     case 'awaiting_first_line': return 'LINEを接続すると無料期間が始まります。カード登録だけでは請求されません。'
     case 'trialing': return `無料体験中です。無料期間は${shortDate(pricing.trialLastFreeDate)}までです。`
@@ -54,9 +56,14 @@ export default function MusuboBilling({ pricing, invoices, invoiceFailed, onRetr
           <li key={line.id}><span>{line.name}</span><span className={styles.active}>利用中</span></li>)}</ul>
           : <p className={styles.muted}>まだLINEは接続されていません。</p>}
         {pricing.status !== 'ended' && canManagePayment ? <div className={styles.actions}>
+          {pricing.terminationPhase === 'scheduled' || pricing.terminationPhase === 'ending'
+            ? <Button variant="secondary" href="/hq/billing/last-line-end">利用終了の状況を確認</Button>
+            : <>
           <Button href={pricing.status === 'awaiting_first_line' ? '/hq/onboarding/card' : '/hq/billing/line-addition'}>
             {pricing.status === 'awaiting_first_line' ? '利用開始の準備へ' : 'LINEを追加する'}
           </Button>
+          {pricing.activeLines.length === 1 && <Button variant="secondary" href="/hq/billing/last-line-end">最後のLINEの利用を終了する</Button>}
+          </>}
         </div> : null}
       </Card>
       <Card as="section" layout="vertical" padding="default" gap="normal">

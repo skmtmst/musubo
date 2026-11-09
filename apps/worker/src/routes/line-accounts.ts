@@ -658,6 +658,13 @@ lineAccounts.post('/api/line-accounts/:id/activate', requireRole('owner', 'admin
     if (account.archived_at) {
       return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
     }
+    const musuboBilling = await getMusuboTenantBilling(c.env.DB, account.tenant_id ?? DEFAULT_TENANT_ID);
+    if (musuboBilling && (musuboBilling.status === 'ended'
+      || (musuboBilling.termination_effective_at
+        && musuboBilling.termination_effective_at <= new Date().toISOString()))) {
+      return c.json({ success: false,
+        error: '利用終了したLINEはこの画面から再開できません。請求画面から再開手続きをしてください' }, 409);
+    }
 
     const body = await c.req
       .json<{ reason?: unknown }>()

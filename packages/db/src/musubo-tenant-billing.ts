@@ -19,6 +19,7 @@ export interface MusuboTenantBillingRecord {
   next_annual_renewal_at: string | null;
   termination_requested_at: string | null;
   termination_effective_at: string | null;
+  termination_synced_at: string | null;
   ended_at: string | null;
   created_at: string;
   updated_at: string;
@@ -89,11 +90,12 @@ export async function attachAcceptedMusuboQuote(db: D1Database, tenantId: string
 }
 
 /** The current wizard may connect the first LINE; further paid additions need their own checkout. */
-export async function musuboLineConnectionAllowed(db: D1Database, tenantId: string): Promise<'first' | 'reserved_addition' | 'legacy' | 'requires_payment' | 'ended'> {
+export async function musuboLineConnectionAllowed(db: D1Database, tenantId: string): Promise<'first' | 'reserved_addition' | 'legacy' | 'requires_payment' | 'termination_pending' | 'ended'> {
   const billing = await getMusuboTenantBilling(db, tenantId);
   if (!billing) return 'legacy';
   if (billing.status === 'awaiting_first_line' && billing.first_line_activated_at === null) return 'first';
   if (billing.status === 'ended') return 'ended';
+  if (billing.termination_requested_at) return 'termination_pending';
   if (billing.status === 'trialing' || billing.status === 'active') {
     const paid = await db.prepare(`SELECT id FROM musubo_pending_additions
       WHERE tenant_id=? AND kind='line' AND status IN ('awaiting_payment','paid')

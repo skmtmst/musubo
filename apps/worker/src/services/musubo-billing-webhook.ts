@@ -139,8 +139,9 @@ export async function processMusuboBillingEvent(input: {
     // Remove access until operations reconcile it; never report it as a voluntary termination.
     statements.push(db.prepare(`UPDATE musubo_tenant_billing SET status='past_due',updated_at=?
       WHERE tenant_id=? AND core_subscription_id=? AND status IN ('trialing','active')
+        AND (termination_effective_at IS NULL OR termination_effective_at>?)
         AND EXISTS (SELECT 1 FROM billing_events WHERE id=? AND summary='pending')`)
-      .bind(new Date().toISOString(), tenantId, subscriptionId, event.id));
+      .bind(new Date().toISOString(), tenantId, subscriptionId, new Date().toISOString(), event.id));
   }
   statements.push(db.prepare(`UPDATE billing_events SET summary=json_object(
     'state','completed','created',?,'subscriptionId',?,'subjectId',?,'applied',1)

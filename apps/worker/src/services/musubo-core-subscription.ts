@@ -14,7 +14,8 @@ export async function ensureMusuboCoreContract(env: WorkerBindings, tenantId: st
     throw new Error('Musubo core product is not configured');
   }
   const billing = await getMusuboTenantBilling(env.DB, tenantId);
-  if (!billing?.first_line_activated_at || !billing.first_charge_date || billing.status === 'ended') {
+  if (!billing?.first_line_activated_at || !billing.first_charge_date
+    || billing.status === 'ended' || billing.termination_requested_at) {
     throw new Error('First LINE is not active');
   }
   if (billing.core_subscription_id) return billing.core_subscription_id;
@@ -43,7 +44,8 @@ export async function ensureMusuboCoreContract(env: WorkerBindings, tenantId: st
   });
   const claimed = await env.DB.prepare(`UPDATE musubo_tenant_billing
     SET core_subscription_id=?,updated_at=?
-    WHERE tenant_id=? AND core_subscription_id IS NULL AND status IN ('trialing','active','past_due')`)
+    WHERE tenant_id=? AND core_subscription_id IS NULL AND termination_requested_at IS NULL
+      AND status IN ('trialing','active','past_due')`)
     .bind(subscription.id, new Date().toISOString(), tenantId).run();
   if ((claimed.meta?.changes ?? 0) === 1) return subscription.id;
   const current = await getMusuboTenantBilling(env.DB, tenantId);
@@ -58,7 +60,8 @@ export async function ensureMusuboOptionsContract(env: WorkerBindings, tenantId:
     throw new Error('Musubo options product is not configured');
   }
   const billing = await getMusuboTenantBilling(env.DB, tenantId);
-  if (!billing?.first_line_activated_at || !billing.first_charge_date || billing.status === 'ended') {
+  if (!billing?.first_line_activated_at || !billing.first_charge_date
+    || billing.status === 'ended' || billing.termination_requested_at) {
     throw new Error('First LINE is not active');
   }
   if (billing.options_subscription_id) return billing.options_subscription_id;
@@ -95,6 +98,7 @@ export async function ensureMusuboOptionsContract(env: WorkerBindings, tenantId:
   const claimed = await env.DB.prepare(`UPDATE musubo_tenant_billing
     SET options_subscription_id=?,updated_at=?
     WHERE tenant_id=? AND options_subscription_id IS NULL AND core_subscription_id IS NOT NULL
+      AND termination_requested_at IS NULL
       AND status IN ('trialing','active','past_due')`)
     .bind(subscription.id, new Date().toISOString(), tenantId).run();
   if ((claimed.meta?.changes ?? 0) === 1) return subscription.id;
@@ -109,7 +113,7 @@ export async function sweepMusuboContracts(env: WorkerBindings): Promise<{ attem
     return { attempted: 0, failed: 0 };
   }
   const rows = await env.DB.prepare(`SELECT tenant_id FROM musubo_tenant_billing
-    WHERE status IN ('trialing','active','past_due')
+    WHERE status IN ('trialing','active','past_due') AND termination_requested_at IS NULL
       AND (core_subscription_id IS NULL OR options_subscription_id IS NULL)
     AND first_line_activated_at IS NOT NULL ORDER BY first_line_activated_at LIMIT 20`)
     .all<{ tenant_id: string }>();

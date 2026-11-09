@@ -68,6 +68,8 @@ export interface BillingSummary {
     } | null
     contractedCore: { lineCapacity: number; amountYen: number; interval: BillingInterval } | null
     quoteId: string | null
+    terminationPhase?: 'none' | 'scheduled' | 'ending' | 'ended'
+    terminationEffectiveAt?: string | null
   }
 }
 

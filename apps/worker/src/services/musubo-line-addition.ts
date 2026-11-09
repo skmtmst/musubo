@@ -46,7 +46,7 @@ function assertContract(subscription: StripeSubscription, tenantId: string, cust
 /** The server and Stripe dates, never a client price, determine the incremental charge. */
 export async function quoteMusuboLineAddition(env: WorkerBindings, tenantId: string, now = new Date()) {
   const billing = await getMusuboTenantBilling(env.DB, tenantId);
-  if (!billing || !['trialing', 'active'].includes(billing.status)
+  if (!billing || billing.termination_requested_at || !['trialing', 'active'].includes(billing.status)
     || !billing.core_subscription_id || !billing.options_subscription_id) {
     throw new Error('The musubo contract is not ready for an addition');
   }
@@ -324,7 +324,7 @@ export async function reconcilePaidMusuboLine(env: WorkerBindings, additionId: s
   if (pending.status !== 'paid' || !pending.line_account_id) return false;
   const billing = await getMusuboTenantBilling(env.DB, tenantId);
   const legacy = await getTenantBilling(env.DB, tenantId);
-  if (!billing || !legacy?.stripe_customer_id || !billing.core_subscription_id
+  if (!billing || billing.termination_requested_at || !legacy?.stripe_customer_id || !billing.core_subscription_id
     || !billing.options_subscription_id || !['trialing', 'active'].includes(billing.status)) {
     throw new Error('The musubo contract cannot activate the paid LINE');
   }

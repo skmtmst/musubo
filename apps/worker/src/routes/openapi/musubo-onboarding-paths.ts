@@ -4,6 +4,11 @@ const id = { name: 'id', in: 'path', required: true, schema: { type: 'string' } 
 const jsonBody = { required: true, content: { 'application/json': { schema: { type: 'object' } } } };
 
 export const musuboOnboardingPaths = {
+  '/api/hq/billing/musubo/last-line-end': {
+    get: { tags: ['Musubo billing'], summary: '最後のLINEの終了日と未払い金額を取得', responses: { '200': { description: '終了条件と状態' }, '409': { description: '対象のLINEを確認できない' } } },
+    post: { tags: ['Musubo billing'], summary: '最後のLINEの終了予約・即時終了・予約取消', requestBody: jsonBody,
+      responses: { '200': { description: '終了手続きの状態' }, '400': { description: '終了方法が不正' }, '409': { description: '終了状態が変化' } } },
+  },
   '/api/hq/billing/musubo/line-addition': {
     get: { tags: ['Musubo billing'], summary: '次のLINE追加料金または保留中の決済を取得', responses: { '200': { description: '追加料金または決済状態' }, '409': { description: '追加不可' } } },
     post: { tags: ['Musubo billing'], summary: '確認済み料金でLINE追加の支払いを開始または再試行', requestBody: jsonBody, responses: { '200': { description: '追加の決済状態' }, '400': { description: '料金への同意なし' }, '409': { description: '料金または決済状態が変化' } } },

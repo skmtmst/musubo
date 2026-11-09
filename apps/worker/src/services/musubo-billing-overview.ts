@@ -20,6 +20,8 @@ export interface MusuboBillingOverview {
   estimatedPrice: MusuboPriceBreakdown | null;
   contractedCore: { lineCapacity: number; amountYen: number; interval: 'month' | 'year' } | null;
   quoteId: string | null;
+  terminationPhase: 'none' | 'scheduled' | 'ending' | 'ended';
+  terminationEffectiveAt: string | null;
 }
 
 /** Read-only view. No saved signup number becomes a final Stripe charge here. */
@@ -33,6 +35,11 @@ export async function musuboBillingOverview(
     WHERE u.tenant_id=? AND u.status IN ('active','ending')
     ORDER BY u.activated_at,a.id`).bind(tenantId).all<ActiveLineRow>();
   const active = response.results ?? [];
+  const now = new Date().toISOString();
+  const terminationPhase = billing.status === 'ended' ? 'ended'
+    : !billing.termination_requested_at ? 'none'
+      : billing.termination_effective_at && billing.termination_effective_at > now
+        && billing.termination_synced_at ? 'scheduled' : 'ending';
   let estimatedPrice: MusuboPriceBreakdown | null = null;
   let contractedCore: MusuboBillingOverview['contractedCore'] = null;
   if (billing.quote_id) {
@@ -70,11 +77,15 @@ export async function musuboBillingOverview(
   return {
     status: billing.status,
     billingInterval: billing.billing_interval,
-    activeLines: active.map(({ id, name }) => ({ id, name })),
+    activeLines: terminationPhase === 'ending' && billing.termination_effective_at
+      && billing.termination_effective_at <= now ? []
+      : active.map(({ id, name }) => ({ id, name })),
     trialLastFreeDate: billing.trial_last_free_date,
     firstChargeDate: billing.first_charge_date,
     estimatedPrice,
     contractedCore,
     quoteId: billing.quote_id,
+    terminationPhase,
+    terminationEffectiveAt: billing.termination_effective_at,
   };
 }

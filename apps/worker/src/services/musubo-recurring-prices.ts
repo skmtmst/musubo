@@ -74,7 +74,8 @@ export async function reconcileMusuboRecurringPrices(env: WorkerBindings, tenant
   const billing = await getMusuboTenantBilling(env.DB, tenantId);
   if (!billing || !['trialing', 'active'].includes(billing.status)
     || !billing.core_subscription_id || !billing.options_subscription_id
-    || billing.termination_effective_at) return false;
+    || (billing.termination_effective_at
+      && billing.termination_effective_at <= new Date().toISOString())) return false;
   const pending = await env.DB.prepare(`SELECT id FROM musubo_pending_additions WHERE tenant_id=?
     AND status IN ('awaiting_payment','paid') LIMIT 1`).bind(tenantId).first<{ id: string }>();
   if (pending) return false;

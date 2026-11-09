@@ -59,3 +59,23 @@ it('不正な金額やStripe商品IDは送信前に止める', async () => {
   }, fakeFetch as typeof fetch)).toThrow(RangeError);
   expect(called).toBe(false);
 });
+
+it('利用終了の予約と即時停止で日割り・追加請求を作らない', async () => {
+  const sent: Array<{ method: string; body: URLSearchParams }> = [];
+  const fakeFetch = async (_url: string | URL | Request, init?: RequestInit) => {
+    sent.push({ method: String(init?.method), body: new URLSearchParams(String(init?.body)) });
+    return Response.json({ id: 'sub_core', customer: 'cus_test', status: 'canceled',
+      items: { data: [] } });
+  };
+  const env = { STRIPE_SECRET_KEY: 'sk_test_example' };
+  await stripeApi.scheduleMusuboTermination(env, 'sub_core', 1800000000,
+    'end-scheduled', fakeFetch as typeof fetch);
+  await stripeApi.cancelMusuboSubscription(env, 'sub_core',
+    'end-now', fakeFetch as typeof fetch);
+  expect(sent[0].method).toBe('POST');
+  expect(sent[0].body.get('cancel_at')).toBe('1800000000');
+  expect(sent[0].body.get('proration_behavior')).toBe('none');
+  expect(sent[1].method).toBe('DELETE');
+  expect(sent[1].body.get('invoice_now')).toBe('false');
+  expect(sent[1].body.get('prorate')).toBe('false');
+});

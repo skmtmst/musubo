@@ -121,6 +121,7 @@ CREATE TABLE musubo_tenant_billing (
   next_annual_renewal_at TEXT,
   termination_requested_at TEXT,
   termination_effective_at TEXT,
+  termination_synced_at TEXT,
   ended_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
