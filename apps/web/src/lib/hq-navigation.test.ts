@@ -6,6 +6,7 @@ import {
   clearSelectionAfterAuthentication,
   decideRootLanding,
   hqOpenHref,
+  musuboOnboardingResumePath,
   resolveHqOpenTarget,
   resolveStoreReturnPath,
   resetAuthSelectionCleared,
@@ -39,6 +40,19 @@ describe('ログイン直後の着地点', () => {
   it('選択済みなら店舗ダッシュボードを表示する', () => {
     expect(decideRootLanding(false, 'account-2', ['account-1', 'account-2']))
       .toEqual({ action: 'show-dashboard' })
+  })
+})
+
+describe('登録途中の再開先', () => {
+  it('保存済みの段階へ戻し、利用開始後と旧契約は対象にしない', () => {
+    expect(musuboOnboardingResumePath({ status: 'awaiting_first_line', quoteId: null, consentedAt: null }))
+      .toBe('/hq/onboarding/pricing')
+    expect(musuboOnboardingResumePath({ status: 'awaiting_first_line', quoteId: null, consentedAt: '2026-11-09' }))
+      .toBe('/hq/onboarding/card')
+    expect(musuboOnboardingResumePath({ status: 'awaiting_first_line', quoteId: 'quote-1', consentedAt: null }))
+      .toBe('/hq/onboarding/quotes/quote-1')
+    expect(musuboOnboardingResumePath({ status: 'trialing', quoteId: null, consentedAt: '2026-11-09' }))
+      .toBeNull()
   })
 })
 

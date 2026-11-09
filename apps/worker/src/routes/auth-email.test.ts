@@ -46,12 +46,14 @@ type AuthJson = {
   errors: Record<string, string>;
   data: {
     email: string;
-    trialDays: number;
+    trialDays: number | null;
+    trialPeriod?: { unit: 'days' | 'months'; value: number };
     deviceMarker: string;
     tenantId: string;
     twoFactor: boolean;
     twoFactorSetup: boolean;
     challengeToken: string;
+    newPricingFlow?: boolean;
   };
 };
 

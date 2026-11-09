@@ -50,7 +50,9 @@ hqMusuboPricing.get('/api/hq/onboarding/pricing', requireRole('owner', 'admin'),
     },
     selection: saved?.selection ?? null,
     consentedAt: billing.pricing_consented_at,
-    quoteId: latestQuote?.id ?? billing.quote_id,
+    status: billing.status,
+    quoteId: latestQuote && (latestQuote.status === 'sent' || latestQuote.status === 'accepted')
+      ? latestQuote.id : billing.quote_id,
   } });
 });
 

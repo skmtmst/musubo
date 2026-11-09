@@ -46,6 +46,17 @@ export function decideRootLanding(
   return { action: 'go-hq' }
 }
 
+/** 登録途中の統括だけを、確定済みの利用開始手順へ戻す。 */
+export function musuboOnboardingResumePath(state: {
+  status: string
+  quoteId: string | null
+  consentedAt: string | null
+}): string | null {
+  if (state.status !== 'awaiting_first_line') return null
+  if (state.quoteId) return `/hq/onboarding/quotes/${encodeURIComponent(state.quoteId)}`
+  return state.consentedAt ? '/hq/onboarding/card' : '/hq/onboarding/pricing'
+}
+
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
 /**

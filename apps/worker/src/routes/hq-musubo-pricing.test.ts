@@ -39,7 +39,8 @@ const selection = {
 it('stores consent with server-calculated prices before card setup', async () => {
   const read = await app().request(path, {}, env());
   expect(read.status).toBe(200);
-  expect(await read.json()).toMatchObject({ data: { condition: { name: '通常条件' }, consentedAt: null } });
+  expect(await read.json()).toMatchObject({ data: { condition: { name: '通常条件' },
+    consentedAt: null, status: 'awaiting_first_line', quoteId: null } });
   const response = await app().request(path, { method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ selection, consent: true, price: { monthlyTotalYen: 1 } }),

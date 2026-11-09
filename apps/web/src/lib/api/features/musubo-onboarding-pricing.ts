@@ -19,6 +19,7 @@ export interface MusuboOnboardingPricingState {
   }
   selection: PricingSelection | null
   consentedAt: string | null
+  status: 'awaiting_first_line' | 'trialing' | 'active' | 'past_due' | 'ended'
   quoteId: string | null
 }
 
