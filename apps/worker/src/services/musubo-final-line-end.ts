@@ -3,6 +3,7 @@ import { getMusuboTenantBilling, getTenantBilling,
   type MusuboTenantBillingRecord } from '@line-crm/db';
 import type { WorkerBindings } from '../worker-bindings.js';
 import { stripeApi, type StripeSubscription } from './stripe-api.js';
+import { cancellationNoticeSnapshot, finalLineNoticeInsert } from './musubo-final-line-notice-record.js';
 
 type EndState = 'choose' | 'scheduled' | 'ending' | 'ended';
 
@@ -149,7 +150,10 @@ export async function reconcileMusuboFinalLineEnd(env: WorkerBindings, tenantId:
   if (latest?.termination_requested_at !== billing.termination_requested_at
     || latest.termination_effective_at !== effective) return stateOf(latest!, now);
   if (cancelRequested) {
-    await env.DB.batch([
+    const line = await lastLine(env, tenantId);
+    if (!line) throw new Error('The final LINE is unavailable');
+    const snapshot = await cancellationNoticeSnapshot(env.DB, billing, line.name, now);
+    const results = await env.DB.batch([
       env.DB.prepare(`UPDATE musubo_tenant_billing SET termination_requested_at=NULL,
         termination_synced_at=NULL,updated_at=?
         WHERE tenant_id=? AND termination_requested_at=? AND termination_effective_at IS NULL`)
@@ -159,13 +163,26 @@ export async function reconcileMusuboFinalLineEnd(env: WorkerBindings, tenantId:
           SELECT 1 FROM musubo_tenant_billing WHERE tenant_id=?
             AND termination_requested_at IS NULL AND termination_effective_at IS NULL)`)
         .bind(now, tenantId, tenantId),
+      finalLineNoticeInsert(env.DB, { tenantId, event: 'cancelled',
+        requestedAt: billing.termination_requested_at, createdAt: now, snapshot }),
     ]);
+    if ((results[0]?.meta?.changes ?? 0) !== 1) throw new Error('Termination state changed');
     return 'choose';
   }
   if (!due) {
-    await env.DB.prepare(`UPDATE musubo_tenant_billing SET termination_synced_at=?,updated_at=?
-      WHERE tenant_id=? AND termination_requested_at=? AND termination_effective_at=?`)
-      .bind(now, now, tenantId, billing.termination_requested_at, effective).run();
+    const line = await lastLine(env, tenantId);
+    if (!line) throw new Error('The final LINE is unavailable');
+    const lastUsableAt = new Date(Date.parse(effective!) - 1).toISOString();
+    const results = await env.DB.batch([
+      env.DB.prepare(`UPDATE musubo_tenant_billing SET termination_synced_at=?,updated_at=?
+        WHERE tenant_id=? AND termination_requested_at=? AND termination_effective_at=?`)
+        .bind(now, now, tenantId, billing.termination_requested_at, effective),
+      finalLineNoticeInsert(env.DB, { tenantId, event: 'scheduled',
+        requestedAt: billing.termination_requested_at, createdAt: now,
+        snapshot: { lineName: line.name, interval: billing.billing_interval,
+          endAt: effective!, lastUsableAt } }),
+    ]);
+    if ((results[0]?.meta?.changes ?? 0) !== 1) throw new Error('Termination state changed');
     return 'scheduled';
   }
   const line = await lastLine(env, tenantId);
@@ -184,6 +201,9 @@ export async function reconcileMusuboFinalLineEnd(env: WorkerBindings, tenantId:
       WHERE id=? AND tenant_id=? AND is_active=1
         AND EXISTS (SELECT 1 FROM musubo_tenant_billing WHERE tenant_id=? AND status='ended')`)
       .bind(now, now, line.line_account_id, tenantId, tenantId),
+    finalLineNoticeInsert(env.DB, { tenantId, event: 'immediate',
+      requestedAt: billing.termination_requested_at, createdAt: now,
+      snapshot: { lineName: line.name, interval: billing.billing_interval, endAt: now } }),
   ]);
   if ((result[0]?.meta?.changes ?? 0) !== 1) throw new Error('Termination state changed');
   return 'ended';

@@ -5472,6 +5472,15 @@ CREATE TABLE mileage_wallets (
   PRIMARY KEY (program_id, beneficiary_key)
 );
 
+CREATE TABLE musubo_final_line_notices (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  event TEXT NOT NULL CHECK (event IN ('scheduled', 'immediate', 'cancelled')),
+  snapshot_json TEXT NOT NULL CHECK (json_valid(snapshot_json)),
+  created_at TEXT NOT NULL,
+  delivered_at TEXT
+);
+
 CREATE TABLE musubo_individual_quotes (
   id TEXT PRIMARY KEY,
   application_id TEXT NOT NULL REFERENCES registration_applications(id),
@@ -11056,6 +11065,9 @@ CREATE INDEX idx_musubo_conditions_code
 CREATE INDEX idx_musubo_conditions_company
   ON musubo_pricing_conditions(company_name_key, status, valid_until)
   WHERE company_name_key IS NOT NULL;
+
+CREATE INDEX idx_musubo_final_line_notices_pending
+  ON musubo_final_line_notices(delivered_at, created_at);
 
 CREATE INDEX idx_musubo_line_usage_tenant
   ON musubo_line_usage(tenant_id, status);

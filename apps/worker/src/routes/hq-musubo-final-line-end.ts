@@ -5,6 +5,7 @@ import { inputJsonBoundary } from '../lib/input-errors.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
 import { getMusuboFinalLineEnd, requestMusuboFinalLineEnd } from '../services/musubo-final-line-end.js';
+import { deliverLatestMusuboFinalLineNotice } from '../services/musubo-final-line-notification.js';
 
 export const hqMusuboFinalLineEnd = new Hono<Env>();
 
@@ -32,6 +33,9 @@ hqMusuboFinalLineEnd.post('/api/hq/billing/musubo/last-line-end',
     const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
     try {
       const phase = await requestMusuboFinalLineEnd(c.env, tenantId, action);
+      await deliverLatestMusuboFinalLineNotice(c.env, tenantId,
+        action === 'schedule' ? 'scheduled' : action === 'cancel' ? 'cancelled' : 'immediate')
+        .catch(() => undefined);
       return c.json({ success: true, data: { phase,
         end: await getMusuboFinalLineEnd(c.env, tenantId) } });
     } catch (error) {

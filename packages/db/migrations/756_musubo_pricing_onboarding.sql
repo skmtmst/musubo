@@ -191,3 +191,15 @@ CREATE INDEX idx_musubo_pending_additions_tenant
 CREATE UNIQUE INDEX idx_musubo_pending_additions_one_in_flight
   ON musubo_pending_additions(tenant_id)
   WHERE status IN ('awaiting_payment', 'paid');
+
+-- 最後のLINEの終了・予約取消を、状態変更と同じトランザクションで通知待ちにする。
+CREATE TABLE musubo_final_line_notices (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  event TEXT NOT NULL CHECK (event IN ('scheduled', 'immediate', 'cancelled')),
+  snapshot_json TEXT NOT NULL CHECK (json_valid(snapshot_json)),
+  created_at TEXT NOT NULL,
+  delivered_at TEXT
+);
+CREATE INDEX idx_musubo_final_line_notices_pending
+  ON musubo_final_line_notices(delivered_at, created_at);

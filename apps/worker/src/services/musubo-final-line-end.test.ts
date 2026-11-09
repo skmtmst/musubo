@@ -64,10 +64,15 @@ it('schedules both contracts at the next monthly charge and allows undo before t
   expect(setup.schedule).toHaveBeenCalledTimes(2);
   expect(setup.sqlite.raw.prepare('SELECT is_active FROM line_accounts WHERE id=?').get('line-one'))
     .toMatchObject({ is_active: 1 });
+  expect(setup.sqlite.raw.prepare(`SELECT event,snapshot_json FROM musubo_final_line_notices
+    WHERE tenant_id=? AND event='scheduled'`).get(setup.tenantId))
+    .toMatchObject({ event: 'scheduled' });
   expect(await requestMusuboFinalLineEnd(setup.env, setup.tenantId, 'cancel', now)).toBe('choose');
   expect(setup.undo).toHaveBeenCalledTimes(2);
   expect(setup.sqlite.raw.prepare('SELECT termination_effective_at FROM musubo_tenant_billing WHERE tenant_id=?')
     .get(setup.tenantId)).toMatchObject({ termination_effective_at: null });
+  expect(setup.sqlite.raw.prepare(`SELECT COUNT(*) AS count FROM musubo_final_line_notices
+    WHERE tenant_id=? AND event='cancelled'`).get(setup.tenantId)).toMatchObject({ count: 1 });
 });
 
 it('stops the final LINE immediately and cancels both contracts without a new invoice', async () => {
@@ -79,6 +84,8 @@ it('stops the final LINE immediately and cancels both contracts without a new in
     .get(setup.tenantId)).toMatchObject({ status: 'ended' });
   expect(setup.sqlite.raw.prepare('SELECT is_active FROM line_accounts WHERE id=?').get('line-one'))
     .toMatchObject({ is_active: 0 });
+  expect(setup.sqlite.raw.prepare(`SELECT COUNT(*) AS count FROM musubo_final_line_notices
+    WHERE tenant_id=? AND event='immediate'`).get(setup.tenantId)).toMatchObject({ count: 1 });
 });
 
 it('keeps the annual contract and monthly options until the annual renewal, then ends both', async () => {
@@ -121,9 +128,13 @@ it('recovers a partial Stripe failure from the saved intent without reactivating
   const now = '2027-01-09T00:00:00.000Z';
   setup.cancel.mockRejectedValueOnce(new Error('Stripe unavailable'));
   await expect(requestMusuboFinalLineEnd(setup.env, setup.tenantId, 'now', now)).rejects.toThrow();
+  expect(setup.sqlite.raw.prepare(`SELECT COUNT(*) AS count FROM musubo_final_line_notices
+    WHERE tenant_id=?`).get(setup.tenantId)).toMatchObject({ count: 0 });
   expect(setup.sqlite.raw.prepare('SELECT is_active FROM line_accounts WHERE id=?').get('line-one'))
     .toMatchObject({ is_active: 0 });
   expect(await sweepMusuboFinalLineEnds(setup.env, now)).toEqual({ processed: 1, failed: 0 });
   expect(setup.sqlite.raw.prepare('SELECT status FROM musubo_tenant_billing WHERE tenant_id=?')
     .get(setup.tenantId)).toMatchObject({ status: 'ended' });
+  expect(setup.sqlite.raw.prepare(`SELECT COUNT(*) AS count FROM musubo_final_line_notices
+    WHERE tenant_id=? AND event='immediate'`).get(setup.tenantId)).toMatchObject({ count: 1 });
 });

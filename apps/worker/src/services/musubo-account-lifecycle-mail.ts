@@ -123,8 +123,9 @@ export function musuboFinalLineMail(input: {
       notes: ['未払いの請求は終了後もお支払いが必要です。', 'お支払い済みの料金がある場合、利用終了による返金はありません。', '再開するときは料金を再確認します。無料体験の再適用はありません。'],
     });
   }
-  if (!input.nextChargeAt || input.nextChargeYen === undefined) throw new RangeError('The next charge is required');
-  const charge = `${mailJstDate(input.nextChargeAt)}　${mailMoney(input.nextChargeYen)}（税込）`;
+  const charge = input.nextChargeAt && input.nextChargeYen !== undefined
+    ? `${mailJstDate(input.nextChargeAt)}　${mailMoney(input.nextChargeYen)}（税込）`
+    : '請求画面で確認';
   if (input.event === 'cancelled') return musuboSimpleMail({
     subject: '【musubo】LINE利用終了予約の取り消し', eyebrow: '終了予約取り消しのご案内',
     title: 'LINEの利用終了予約を取り消しました',
@@ -139,6 +140,7 @@ export function musuboFinalLineMail(input: {
     notes: ['LINEを終了する場合は、請求画面で利用終了日をご確認ください。', '年払い10%OFFはLINE基本料金のみ対象です。'],
   });
   if (!input.resumedAt || input.amountPaidNowYen === undefined) throw new RangeError('Resume payment details are required');
+  if (!input.nextChargeAt || input.nextChargeYen === undefined) throw new RangeError('The next charge is required');
   return musuboSimpleMail({
     subject: '【musubo】LINEの利用を再開しました', eyebrow: '利用再開のお知らせ',
     title: 'LINEの利用を再開しました', intro: 'LINE公式アカウントの接続が完了しました。',
