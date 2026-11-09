@@ -9,7 +9,7 @@ import { Field } from '@/components/shared/form-controls'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import { PageHeading } from '@/components/templates/page-frame'
+import { PageContent, PageHeading } from '@/components/templates/page-frame'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import {
   musuboConditionPreview,
@@ -75,7 +75,7 @@ export default function BillingConditionEditor({ conditions, onSave, onCreate }:
   return <SaveErrorScope errors={saveErrors}><div className={styles.page}>
     <PageHeading title="利用条件" subtitle="承認時に会社へ付与する料金・無料期間を作成し、管理します。"
       actions={<Button type="button" variant="primary" onClick={onCreate}>＋ 新しい条件</Button>} />
-    <div className={styles.columns}>
+    <PageContent><div className={styles.columns}>
       <section className={styles.listCard} aria-labelledby="conditions-heading">
         <h2 id="conditions-heading">登録済みの条件</h2>
         <div className={styles.conditionList}><RadioCardGroup legend="登録済みの利用条件">
@@ -157,6 +157,6 @@ export default function BillingConditionEditor({ conditions, onSave, onCreate }:
         <div className={styles.footer}><Button type="button" variant="primary" busy={busy} busyLabel="保存中…" disabled={!preview}
           onClick={() => void save()}>変更を保存</Button></div>
       </section>}
-    </div>
+    </div></PageContent>
   </div></SaveErrorScope>
 }
