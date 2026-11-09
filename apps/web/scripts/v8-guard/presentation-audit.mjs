@@ -25,7 +25,13 @@ function walk(dir, parts = []) {
 walk(fileURLToPath(new URL('../../src/app', import.meta.url)))
 // 各入口は既存の固定URL（idを含む）で開く。まだ地図にない入口も省かない。
 // 電話専用の入口はPC管理画面と分け、既存の390/430pxの見張りで検査する。
-const routes = [...known, ...pages.filter(path => !known.some(r => r.split('?')[0] === path))].filter(route => !/^\/m(?:\/|\?|$)/.test(route))
+const queryFixtures = {
+  '/hq/onboarding/quotes': '/hq/onboarding/quotes?id=MQ-VISUAL-01',
+  '/ops/applications/quote': '/ops/applications/quote?id=visual-qa-application',
+}
+const routes = [...known, ...pages.filter(path => !known.some(r => r.split('?')[0] === path))]
+  .filter(route => !/^\/m(?:\/|\?|$)/.test(route))
+  .map(route => queryFixtures[route] ?? route)
 const selected = process.env.PRESENTATION_ROUTES?.split(',') ?? routes
 const browser = await chromium.launch()
 const rows = []
