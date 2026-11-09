@@ -8,6 +8,7 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { stripeApi } from '../services/stripe-api.js';
 import { ensureMusuboCoreContract, ensureMusuboOptionsContract } from '../services/musubo-core-subscription.js';
 import { connectReservedMusuboLine } from '../services/musubo-line-addition.js';
+import { deliverMusuboTrialNotice } from '../services/musubo-trial-notification.js';
 import { logger } from '@line-crm/shared/server';
 
 export const LINE_LIVE_ACCOUNT_CONCURRENCY = 2;
@@ -66,6 +67,8 @@ export async function startFirstMusuboLine(c: Context<Env>, lineAccountId: strin
     await ensureMusuboOptionsContract(c.env, tenantId);
   }
   catch { logger.error('musubo_core_contract_pending_retry'); }
+  try { await deliverMusuboTrialNotice(c.env, tenantId, 'started'); }
+  catch { logger.error('musubo_trial_start_notice_pending_retry'); }
 }
 
 export async function hasTenantWideLineAccountScope(c: Context<Env>): Promise<boolean> {

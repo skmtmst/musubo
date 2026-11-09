@@ -172,6 +172,14 @@ export async function scheduled(
   }
 
   try {
+    const { sweepMusuboTrialNotices } = await import('../services/musubo-trial-notification.js');
+    const result = await sweepMusuboTrialNotices(env, new Date(event.scheduledTime));
+    if (result.failed > 0) logger.error('musubo_trial_notice_sweep_failed');
+  } catch {
+    logger.error('musubo_trial_notice_sweep_failed');
+  }
+
+  try {
     const { sweepMusuboFinalLineEnds } = await import('../services/musubo-final-line-end.js');
     const result = await sweepMusuboFinalLineEnds(env, new Date(event.scheduledTime).toISOString());
     if (result.failed > 0) logger.error('musubo_final_line_end_sweep_failed');

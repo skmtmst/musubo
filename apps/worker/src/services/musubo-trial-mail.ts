@@ -7,6 +7,9 @@ export interface MusuboTrialMailInput {
   trialPeriod: MusuboTrialPeriod;
   activeLineCount: number;
   estimatedFirstChargeYen: number;
+  billingInterval?: 'month' | 'year';
+  estimatedCoreYen?: number;
+  estimatedOptionsMonthlyYen?: number;
   lineBasicDiscountPercent: number;
   accountUrl: string;
   billingUrl: string;
@@ -24,6 +27,18 @@ export function musuboTrialMail(input: MusuboTrialMailInput): { subject: string;
   const period = `${input.trialPeriod.value}${input.trialPeriod.unit === 'months' ? 'か月' : '日'}`;
   const periodInTitle = input.trialPeriod.unit === 'months' ? `${period}の` : `${period}間の`;
   const special = input.lineBasicDiscountPercent > 0;
+  if (input.billingInterval === 'year' && (!Number.isSafeInteger(input.estimatedCoreYen)
+    || !Number.isSafeInteger(input.estimatedOptionsMonthlyYen)
+    || input.estimatedCoreYen! + input.estimatedOptionsMonthlyYen! !== input.estimatedFirstChargeYen)) {
+    throw new RangeError('Annual first charge must separate annual core and monthly options');
+  }
+  const chargeRows = input.billingInterval === 'year' ? [
+    { label: 'LINE基本料金（年払い）', value: `${mailMoney(input.estimatedCoreYen!)}（税込）` },
+    { label: '月額オプション', value: `${mailMoney(input.estimatedOptionsMonthlyYen!)}（税込）` },
+  ] : [];
+  const annualNote = input.billingInterval === 'year'
+    ? 'LINE基本料金は年払い、統括機能・友だち超過・追加連携枠は月払いです。'
+    : null;
   const discountNote = special
     ? `LINE基本料金のみ${input.lineBasicDiscountPercent}%オフを反映しています。統括機能・友だち超過料金・追加連携枠は割引対象外です。`
     : '予定額は請求時点の有効LINE数・友だち数・追加連携枠数の利用状況により変わります。';
@@ -38,10 +53,12 @@ export function musuboTrialMail(input: MusuboTrialMailInput): { subject: string;
       { label: '有効LINE', value: `${input.activeLineCount}個` },
       { label: '無料期間', value: `${localDay(dates.activationDate)}～${localDay(dates.lastFreeDate)}（${period}）` },
       { label: '初回請求予定', value: `${localDay(dates.firstChargeDate)}　${mailMoney(input.estimatedFirstChargeYen)}（税込・予定）` },
+      ...chargeRows,
     ],
     buttonLabel: 'アカウント一覧を開く', buttonUrl: input.accountUrl,
     notes: ['無料期間中のご請求は¥0です。終了日と予定額は適用中の条件から表示します。',
-      special ? discountNote : 'LINEを追加する場合は、接続前に料金の増分を確認できます。'],
+      special ? discountNote : 'LINEを追加する場合は、接続前に料金の増分を確認できます。',
+      ...(annualNote ? [annualNote] : [])],
   });
   return musuboSimpleMail({
     subject: '【musubo】無料体験終了と初回請求のご案内', eyebrow: '初回請求の事前案内',
@@ -53,8 +70,10 @@ export function musuboTrialMail(input: MusuboTrialMailInput): { subject: string;
       { label: '無料体験終了', value: localDay(dates.lastFreeDate) },
       { label: '初回請求予定', value: localDay(dates.firstChargeDate) },
       { label: '現在の予定額', value: `${mailMoney(input.estimatedFirstChargeYen)}（税込）` },
+      ...chargeRows,
     ],
     buttonLabel: '請求予定額とカードを確認', buttonUrl: input.billingUrl,
-    notes: [discountNote, 'カードを変更する場合は、請求画面からお手続きください。'],
+    notes: [discountNote, 'カードを変更する場合は、請求画面からお手続きください。',
+      ...(annualNote ? [annualNote] : [])],
   });
 }

@@ -5578,6 +5578,8 @@ CREATE TABLE musubo_tenant_billing (
   first_line_activated_at TEXT,
   trial_last_free_date TEXT,
   first_charge_date TEXT,
+  trial_started_mail_sent_at TEXT,
+  trial_ending_mail_sent_at TEXT,
   core_subscription_id TEXT,
   options_subscription_id TEXT,
   next_monthly_charge_at TEXT,
