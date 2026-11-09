@@ -14,6 +14,7 @@ type ReturnState = 'success' | 'cancel' | null
 interface Props {
   /** Stripe Checkout から戻る入口だけが渡す。戻り値だけでは登録完了とみなさない。 */
   returnState?: ReturnState
+  quoteId?: string | null
   onContinue?: () => void
   onBackToPricing?: () => void
   onOpenStripe?: (url: string) => void
@@ -31,7 +32,7 @@ export function isStripeCardSetupUrl(value: string): boolean {
   }
 }
 
-export default function CardRegistration({ returnState = null, onContinue, onBackToPricing, onOpenStripe }: Props) {
+export default function CardRegistration({ returnState = null, quoteId, onContinue, onBackToPricing, onOpenStripe }: Props) {
   usePageTitle('お支払い情報')
   usePageCrumbs([{ label: 'ホーム', href: '/hq' }, { label: '利用開始の準備' }])
   const [state, setState] = useState<CardState>('checking')
@@ -80,7 +81,7 @@ export default function CardRegistration({ returnState = null, onContinue, onBac
     setBusy(true)
     setActionError('')
     try {
-      const result = await api.hqBilling.cardSetup()
+      const result = await api.hqBilling.cardSetup(quoteId ?? undefined)
       if (!result.success || !isStripeCardSetupUrl(result.data.url)) throw new Error('invalid_checkout_url')
       if (onOpenStripe) onOpenStripe(result.data.url)
       else window.location.assign(result.data.url)

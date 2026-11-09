@@ -7,6 +7,7 @@ import { Hono, type Context } from 'hono'
 import {
   getStaffById,
   getTenantBilling,
+  getLatestTenantMusuboIndividualQuote,
   getTenantBillingByStripeCustomer,
   prepareTenantBillingUpdate,
   prepareBillingInvoice,
@@ -286,6 +287,19 @@ hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inpu
     const origin = adminOrigin(c);
     if (!origin) return c.json({ success: false, error: '管理画面のURLが設定されていません' }, 503);
     const tenantId = tenantOf(c);
+    const body = await c.req.json<{ quoteId?: unknown } | null>().catch(() => null);
+    const quoteId = body?.quoteId;
+    if (quoteId !== undefined && (typeof quoteId !== 'string' || quoteId.length > 100)) {
+      return c.json({ success: false, error: 'お見積もりを読み直してください' }, 400);
+    }
+    const latestQuote = await getLatestTenantMusuboIndividualQuote(c.env.DB, tenantId);
+    if (latestQuote && (latestQuote.status !== 'accepted' ||
+      (quoteId !== undefined && latestQuote.id !== quoteId))) {
+      return c.json({ success: false, error: '個別見積もりへの同意を完了してください' }, 409);
+    }
+    if (quoteId !== undefined && !latestQuote) {
+      return c.json({ success: false, error: '同意済みのお見積もりが見つかりません' }, 409);
+    }
     const billing = await getTenantBilling(c.env.DB, tenantId);
     if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
     if (billing.plan_status === 'exempt') return c.json({ success: false, error: 'この統括はカード登録の対象外です' }, 409);
@@ -293,8 +307,8 @@ hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inpu
     const customerId = await stripeCustomerForTenant(c, billing);
     const session = await stripeApi.createCardSetupSession(c.env, {
       customerId, tenantId,
-      successUrl: `${origin}/hq/onboarding/card?setup=success`,
-      cancelUrl: `${origin}/hq/onboarding/card?setup=cancel`,
+      successUrl: `${origin}/hq/onboarding/card?setup=success${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
+      cancelUrl: `${origin}/hq/onboarding/card?setup=cancel${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
     });
     if (!session.url) return c.json({ success: false, error: 'カード登録画面のURLを作れませんでした' }, 502);
     return c.json({ success: true, data: { url: session.url } });

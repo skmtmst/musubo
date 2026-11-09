@@ -16,8 +16,8 @@ export const hqBillingMethods = {
     checkout: (planKey: PlanKey, interval: BillingInterval = 'month') =>
       fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/checkout', { method: 'POST', body: JSON.stringify({ planKey, interval }) }),
     /** 請求・契約を作らず、Stripe 上でカードだけ登録する。 */
-    cardSetup: () => fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/card-setup', {
-      method: 'POST', body: JSON.stringify({}),
+    cardSetup: (quoteId?: string) => fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/card-setup', {
+      method: 'POST', body: JSON.stringify(quoteId ? { quoteId } : {}),
     }),
     /** カード番号を返さず、Stripe の既定支払い方法があるかだけ確認する。 */
     cardStatus: (options?: FetchApiOptions) => fetchApi<ApiResponse<{ registered: boolean }>>('/api/hq/billing/card-status', options),

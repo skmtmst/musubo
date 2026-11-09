@@ -7,7 +7,8 @@ import CardRegistration from '@/v8/onboarding/card-registration'
 
 function CardRegistrationReturn() {
   const setup = useSearchParams().get('setup')
-  return <CardRegistration returnState={setup === 'success' || setup === 'cancel' ? setup : null} />
+  const quoteId = useSearchParams().get('quote')
+  return <CardRegistration returnState={setup === 'success' || setup === 'cancel' ? setup : null} quoteId={quoteId} />
 }
 
 /** Stripe Checkout returns here; the page verifies card status with the server. */

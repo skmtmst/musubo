@@ -41,6 +41,7 @@ import { hqBillingMethods } from './features/hq-billing'
 import { hqSupportMethods } from './features/hq-support'
 import { hqBannersMethods } from './features/hq-banners'
 import { onboardingMethods } from './features/onboarding'
+import { individualQuoteMethods } from './features/individual-quotes'
 import { accountMigrationsMethods } from './features/account-migrations'
 import { accountsMethods } from './features/accounts'
 import { conversionsMethods } from './features/conversions'
@@ -67,6 +68,7 @@ import { entryRoutesMethods } from './features/entry-routes'
 import { identityMethods } from './features/identity'
 import { adsMethods } from './features/ads'
 export const api = {
+  individualQuotes: individualQuoteMethods.individualQuotes,
   system: authenticationMethods.system,
   auth: authenticationMethods.auth,
   searchConsole: analyticsMethods.searchConsole,

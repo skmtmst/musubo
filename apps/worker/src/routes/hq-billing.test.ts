@@ -4,6 +4,7 @@ import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { createRegistrationApplication } from '@line-crm/db';
 
 const stripe = vi.hoisted(() => ({
   createInvoicePreview: vi.fn(),
@@ -252,6 +253,30 @@ describe('請求前のカード登録', () => {
     }));
     expect(stripe.createCheckoutSession).not.toHaveBeenCalled();
     expect(tenantRow()).toMatchObject({ plan_status: 'trialing', trial_ends_at: null, stripe_subscription_id: null, stripe_customer_id: 'cus_setup' });
+  });
+
+  it('個別見積もりが届いた統括は、同意後の同じ見積もりからだけカード登録できる', async () => {
+    await createRegistrationApplication(testDb.db, {
+      companyName: '見積もり会社', contactName: '担当者', email: 'owner@example.test',
+      phone: '03-1234-5678', referralSource: 'other', ipHash: 'ip', deviceMarker: null,
+    });
+    const application = testDb.raw.prepare('SELECT id FROM registration_applications').get() as { id: string };
+    testDb.raw.prepare('UPDATE registration_applications SET status=?,tenant_id=? WHERE id=?')
+      .run('activated', DEFAULT_TENANT_ID, application.id);
+    testDb.raw.prepare(`INSERT INTO musubo_individual_quotes
+      (id,application_id,tenant_id,revision,status,final_prices_json,customer_summary_json,
+       expires_at,created_by,created_at,sent_at)
+      VALUES ('quote-1',?,?,1,'sent','{}','{}','2027-12-31T23:59:59+09:00','ops','2026-11-09T00:00:00+09:00','2026-11-09T00:01:00+09:00')`)
+      .run(application.id, DEFAULT_TENANT_ID);
+    expect((await call('POST', '/api/hq/billing/card-setup')).status).toBe(409);
+    expect(stripe.createCardSetupSession).not.toHaveBeenCalled();
+    testDb.raw.prepare(`UPDATE musubo_individual_quotes
+      SET status='accepted',accepted_at='2026-11-09T01:00:00+09:00',accepted_by='staff-1' WHERE id='quote-1'`).run();
+    expect((await call('POST', '/api/hq/billing/card-setup', { quoteId: 'wrong' })).status).toBe(409);
+    expect((await call('POST', '/api/hq/billing/card-setup', { quoteId: 'quote-1' })).status).toBe(200);
+    expect(stripe.createCardSetupSession).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      successUrl: 'https://admin.example.com/hq/onboarding/card?setup=success&quote=quote-1',
+    }));
   });
 
   it('同時に別画面がStripe顧客を確定した場合は、その顧客でカード登録する', async () => {
