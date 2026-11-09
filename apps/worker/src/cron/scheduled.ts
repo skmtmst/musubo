@@ -139,6 +139,14 @@ export async function scheduled(
     logger.error('billing_recovery_notification_sweep_failed');
   }
 
+  try {
+    const { sweepMusuboContracts } = await import('../services/musubo-core-subscription.js');
+    const result = await sweepMusuboContracts(env);
+    if (result.failed > 0) logger.error('musubo_contract_sweep_failed');
+  } catch {
+    logger.error('musubo_contract_sweep_failed');
+  }
+
   //  公開済み運用者通知ルールの送り残しを回収する。
   //
   // 初回の送信は業務イベントの側で同期に行う。ここが拾うのは、そこで

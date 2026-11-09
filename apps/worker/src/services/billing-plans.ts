@@ -1,4 +1,4 @@
-import type { TenantBilling } from '@line-crm/db';
+import { getMusuboTenantBilling, type TenantBilling, type MusuboTenantBillingRecord } from '@line-crm/db';
 import type { FeatureEntitlementKey } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { getBillingPaymentFailure } from './billing-payment-failure.js';
@@ -207,6 +207,10 @@ export async function resolveTenantEntitlements(
   billing: TenantBilling | null,
   options: { exemptMonthlyImages?: number; now?: Date } = {},
 ): Promise<Entitlements> {
+  if (billing) {
+    const musubo = await getMusuboTenantBilling(db, billing.id);
+    if (musubo) return resolveMusuboEntitlements(db, musubo, options);
+  }
   if (billing?.plan_status !== 'past_due') return resolveEntitlements(billing, options);
   try {
     const failure = await getBillingPaymentFailure(db, billing, options.now);
@@ -215,6 +219,42 @@ export async function resolveTenantEntitlements(
     logger.warn('billing_payment_failure_state_unavailable');
     return resolveEntitlements(billing, options);
   }
+}
+
+async function resolveMusuboEntitlements(db: D1Database, billing: MusuboTenantBillingRecord,
+  options: { exemptMonthlyImages?: number; now?: Date }): Promise<Entitlements> {
+  const now = options.now ?? new Date();
+  const blocked = (state: EntitlementState, reason: string): Entitlements => ({
+    state, canSend: false, canGenerate: false, monthlyImages: 0,
+    blockedReason: reason, trialDaysLeft: null, plan: null,
+  });
+  const allowed = (state: EntitlementState, trialDaysLeft: number | null = null): Entitlements => ({
+    state, canSend: true, canGenerate: true,
+    monthlyImages: options.exemptMonthlyImages ?? EXEMPT_MONTHLY_IMAGES,
+    blockedReason: null, trialDaysLeft, plan: null,
+  });
+  if (billing.status === 'awaiting_first_line') {
+    return blocked('trial_expired', 'LINEの接続を完了すると利用を開始できます');
+  }
+  if (billing.status === 'ended') return blocked('canceled', 'LINEの利用を終了しています');
+  if (!billing.core_subscription_id || !billing.options_subscription_id || !billing.first_charge_date) {
+    return blocked('trial_expired', '請求の準備を確認中です。運営にお問い合わせください');
+  }
+  if (billing.status === 'trialing') {
+    const firstCharge = Date.parse(`${billing.first_charge_date}T00:00:00+09:00`);
+    if (!Number.isFinite(firstCharge) || now.getTime() >= firstCharge) {
+      return blocked('trial_expired', '無料期間が終了しました。お支払いの確認をお待ちください');
+    }
+    return allowed('trialing', Math.max(1, Math.ceil((firstCharge - now.getTime()) / 86_400_000)));
+  }
+  if (billing.status === 'active') return allowed('active');
+  const failure = await getBillingPaymentFailure(db, {
+    id: billing.tenant_id, plan_status: 'past_due', stripe_subscription_id: billing.core_subscription_id,
+  }, now);
+  if (!failure) return blocked('payment_suspended', '未払いの確認が必要です。請求画面からお支払いを確認してください');
+  return failure.state === 'suspended'
+    ? blocked('payment_suspended', '未払いから7日が経過したため、配信とバナー生成を一時停止しています')
+    : allowed('past_due');
 }
 
 /** 共有カタログの契約キーを、既存の料金プラン判定へ接続する。 */

@@ -1,11 +1,13 @@
 import { type Context } from 'hono';
 import {
-  getMusuboTenantBilling, getStaffById, getTenantBilling, musuboLineConnectionAllowed,
+  activateFirstMusuboLine, getMusuboTenantBilling, getStaffById, getTenantBilling, musuboLineConnectionAllowed,
   LineAccountLifecycleError,
 } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { stripeApi } from '../services/stripe-api.js';
+import { ensureMusuboCoreContract, ensureMusuboOptionsContract } from '../services/musubo-core-subscription.js';
+import { logger } from '@line-crm/shared/server';
 
 export const LINE_LIVE_ACCOUNT_CONCURRENCY = 2;
 
@@ -21,6 +23,9 @@ export async function musuboFirstLineGate(c: Context<Env>): Promise<'first' | 'l
   if (musuboBilling && !musuboBilling.quote_id && !musuboBilling.pricing_consented_at) {
     return c.json({ success: false, error: '先に利用料金を確認してください' }, 409);
   }
+  if (!c.env.STRIPE_PRODUCT_MUSUBO_CORE || !c.env.STRIPE_PRODUCT_MUSUBO_OPTIONS) {
+    return c.json({ success: false, error: '請求の準備がまだ完了していません。運営にお問い合わせください' }, 503);
+  }
   const billing = await getTenantBilling(c.env.DB, tenantId);
   if (!billing?.stripe_customer_id) {
     return c.json({ success: false, error: '先にお支払い情報を登録してください' }, 409);
@@ -34,6 +39,16 @@ export async function musuboFirstLineGate(c: Context<Env>): Promise<'first' | 'l
     return c.json({ success: false, error: 'カードの登録状況を確認できませんでした。時間をおいて再度お試しください' }, 502);
   }
   return 'first';
+}
+
+export async function startFirstMusuboLine(c: Context<Env>, lineAccountId: string): Promise<void> {
+  const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+  await activateFirstMusuboLine(c.env.DB, { tenantId, lineAccountId });
+  try {
+    await ensureMusuboCoreContract(c.env, tenantId);
+    await ensureMusuboOptionsContract(c.env, tenantId);
+  }
+  catch { logger.error('musubo_core_contract_pending_retry'); }
 }
 
 export async function hasTenantWideLineAccountScope(c: Context<Env>): Promise<boolean> {

@@ -30,12 +30,14 @@ import {
   planKeyForPrice,
   priceIdForPlan,
   resolveEntitlements,
+  resolveTenantEntitlements,
   type BillingInterval,
   type PlanKey,
 } from '../services/billing-plans.js';
 import { billingInvoiceInput } from '../services/billing-invoices-sync.js';
 import { getBillingPaymentFailure, getRecentBillingPaymentRecovery } from '../services/billing-payment-failure.js';
 import { musuboBillingOverview } from '../services/musubo-billing-overview.js';
+import { processMusuboBillingEvent } from '../services/musubo-billing-webhook.js';
 import { deliverBillingRecoveryNotice, deliverCurrentBillingFailureNotice } from '../services/billing-invoice-notifications.js';
 import { StripeApiError, stripeApi, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
@@ -137,17 +139,23 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
     const musuboBilling = await getMusuboTenantBilling(c.env.DB, tenantId);
     if (musuboBilling) {
       const newPricing = await musuboBillingOverview(c.env.DB, tenantId, musuboBilling);
-      const state = musuboBilling.status === 'awaiting_first_line' ? 'exempt'
-        : musuboBilling.status === 'ended' ? 'canceled' : musuboBilling.status;
+      const entitlements = await resolveTenantEntitlements(c.env.DB, billing,
+        { exemptMonthlyImages: exemptMonthlyImages(c) });
+      const paymentFailure = musuboBilling.status === 'past_due'
+        ? await getBillingPaymentFailure(c.env.DB, {
+          id: tenantId, plan_status: 'past_due',
+          stripe_subscription_id: musuboBilling.core_subscription_id,
+        }) : null;
+      const state = musuboBilling.status === 'awaiting_first_line' ? 'exempt' : entitlements.state;
       return c.json({ success: true, data: {
         state, planKey: null, planInterval: musuboBilling.billing_interval,
         planName: 'musubo', planStatus: state,
-        trialEndsAt: null, trialEndsLabel: null, trialDaysLeft: null,
+        trialEndsAt: musuboBilling.first_charge_date, trialEndsLabel: null,
+        trialDaysLeft: entitlements.trialDaysLeft,
         trialMonthlyImages: TRIAL_MONTHLY_IMAGES,
         currentPeriodEndsAt: null, currentPeriodEndsLabel: null,
-        canSend: musuboBilling.status === 'trialing' || musuboBilling.status === 'active',
-        canGenerate: musuboBilling.status === 'trialing' || musuboBilling.status === 'active',
-        blockedReason: null, paymentFailure: null,
+        canSend: entitlements.canSend, canGenerate: entitlements.canGenerate,
+        blockedReason: entitlements.blockedReason, paymentFailure,
         dataRetentionDays: DATA_RETENTION_DAYS, stripeReady: stripeReady(c),
         portalAvailable: stripeReady(c) && Boolean(billing.stripe_customer_id),
         plans: [], newPricing,
@@ -554,9 +562,14 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     // New-price contracts use separate core/options subscriptions. The legacy
     // handler has one plan slot and must not acknowledge or apply those events.
     // Keep the receipt pending until the new contract handler can reconcile it.
-    if (tenant && await getMusuboTenantBilling(c.env.DB, tenant.id)
+    const musuboBilling = tenant ? await getMusuboTenantBilling(c.env.DB, tenant.id) : null;
+    if (tenant && musuboBilling
       && !(event.type === 'checkout.session.completed' && object.mode === 'setup')) {
-      return c.json({ success: false, error: '新料金の契約状態を確認できませんでした' }, 503);
+      if (!tenant.stripe_customer_id || await processMusuboBillingEvent({
+        db: c.env.DB, event, tenantId: tenant.id,
+        customerId: tenant.stripe_customer_id, billing: musuboBilling,
+      }) === 'retry') return c.json({ success: false, error: '新料金の契約状態を確認できませんでした' }, 503);
+      return c.json({ success: true, data: { received: true } });
     }
     const statements: D1PreparedStatement[] = [];
     let refundStatementIndex: number | undefined;

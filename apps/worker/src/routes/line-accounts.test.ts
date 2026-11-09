@@ -69,7 +69,7 @@ vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: 
 
 type TestEnv = {
   Variables: { staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean; assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean; tenantId?: string | null } };
-  Bindings: { DB: D1Database };
+  Bindings: { DB: D1Database; STRIPE_PRODUCT_MUSUBO_CORE: string; STRIPE_PRODUCT_MUSUBO_OPTIONS: string };
 };
 
 // 一意性の検証は既定で未検出とし、重複を試す場合だけ firstResult を変える。
@@ -92,7 +92,7 @@ function setupApp(
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
     c.set('staff', { id: 'test-staff', name: 'Test', role, readOnly: false, ...staffOverride });
-    c.env = { DB: dbStub };
+    c.env = { DB: dbStub, STRIPE_PRODUCT_MUSUBO_CORE: 'prod_test', STRIPE_PRODUCT_MUSUBO_OPTIONS: 'prod_options' };
     // 大事な操作の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
     c.req.raw.headers.set('x-step-up-token', 'test-step-up');
     await next();
