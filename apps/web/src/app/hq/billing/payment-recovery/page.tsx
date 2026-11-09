@@ -42,9 +42,9 @@ export default function BillingPaymentRecoveryPage() {
 
   useEffect(() => { void load() }, [load])
 
-  const frame = (content: React.ReactNode) => (
+  const frame = (content: React.ReactNode, withHeading = true) => (
     <PageFrame kind="detail" heightMode="viewport">
-      <PageHeading title="お支払いの確認" />
+      {withHeading && <PageHeading title="お支払いの確認" />}
       <PageContent>{content}</PageContent>
     </PageFrame>
   )
@@ -78,5 +78,5 @@ export default function BillingPaymentRecoveryPage() {
       window.location.assign(result.data.url)
     }}
     onSecondary={() => router.push(failure.state === 'recovered' ? '/accounts' : '/hq/billing')}
-  />)
+  />, false)
 }

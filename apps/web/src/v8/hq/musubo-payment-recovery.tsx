@@ -148,7 +148,7 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
 
   return <div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › {invoice ? '統括の設定 › 請求' : 'アカウント › LINE追加'} › お支払い</p>
-    <PageHeading title={title} subtitle={subtitle} />
+    <PageHeading title={title} subtitle={subtitle} inset="none" />
     <div className={success ? styles.statusSuccess : styles.statusWarning}>
       <span className={success ? styles.iconSuccess : styles.iconWarning} aria-hidden="true">{success ? '✓' : processing ? '…' : '!'}</span>
       <div className={styles.statusCopy}><h2>{statusTitle}</h2><p>{statusDescription}</p></div>
