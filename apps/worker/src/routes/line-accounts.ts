@@ -1,7 +1,6 @@
 import { starterCatalogRuntime } from './style-starter-runtime.js';
 import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { readLineAccountListMetadata } from '../services/line-account-list-metadata.js';
-import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { verifyLineMessagingIdentity } from '../services/line-messaging-identity.js';
 import { expectedWebhookUrl as accountWebhookUrl } from '../lib/webhook-endpoint.js';
@@ -36,6 +35,7 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { LINE_LIVE_ACCOUNT_CONCURRENCY, hasTenantWideLineAccountScope, lifecycleConflict, mapWithConcurrency, musuboFirstLineGate, startFirstMusuboLine } from './line-accounts-support.js';
 import { readCapacity, normalizeOptionalString, validateLoginChannelPair, readConnectBody, type ConnectBody } from './line-accounts-input.js';
 import { serializeLineAccount, serializeLineAccountFull } from './line-accounts-view.js';
+import { fetchPreConnectFollowerTotal, musuboLargeLineConsultation } from '../services/musubo-large-line-consultation.js';
 
 const lineAccounts = new Hono<Env>();
 
@@ -987,24 +987,6 @@ function stepPassed(steps: LineConnectStep[], order: LineConnectStep['order']): 
   return steps.some((item) => item.order === order && item.state === 'passed');
 }
 
-/* 友だち数の統計は前日分しか無い。日本時間の昨日を yyyyMMdd で返す。 */
-export function insightDateJst(now: Date = new Date()): string {
-  return japanDateOffset(-1, now).replaceAll('-', '');
-}
-
-/*
- * 登録前の友だち総数。V8 ④の結果窓（``）のボット情報に出す。
- * 取れなければ null（表示は名前だけにする）。検査の合否には使わない。
- */
-export async function fetchPreConnectFollowerTotal(channelAccessToken: string): Promise<number | null> {
-  try {
-    const insight = await new LineClient(channelAccessToken).getFollowersInsight(insightDateJst());
-    return typeof insight.followers === 'number' ? insight.followers : null;
-  } catch {
-    return null;
-  }
-}
-
 function publicConnectData(
   prepared: Awaited<ReturnType<typeof prepareLineConnection>>,
   steps: LineConnectStep[],
@@ -1105,6 +1087,9 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
       data: publicConnectData(prepared, prepared.steps, { capability: 'unknown', phase: 'not_started' }),
     }, 400, []);
   }
+  if (musuboGate === 'first' && await musuboLargeLineConsultation(prepared.channelAccessToken))
+    return c.json({ success: false, code: 'MUSUBO_LARGE_LINE_CONSULTATION',
+      error: 'このLINEは友だちの累計が50万人を超えています。接続前に運営へご相談ください' }, 409);
 
   const duplicate = await checkUniqueLoginAndLiff(c.env.DB, {
     loginChannelId: parsed.value.loginChannelId,
@@ -1347,6 +1332,10 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
     if (!verification.messagingApi || !verification.webhook || !verification.lineLogin || !verification.liff) {
       return inputError(c, { success: false, error: 'すべての接続確認を完了してください', details: { connection: verification.errors } }, 400, ["channelAccessToken"]);
     }
+
+    if (musuboGate === 'first' && await musuboLargeLineConsultation(body.channelAccessToken.trim()))
+      return c.json({ success: false, code: 'MUSUBO_LARGE_LINE_CONSULTATION',
+        error: 'このLINEは友だちの累計が50万人を超えています。接続前に運営へご相談ください' }, 409);
 
     if (!await verifyLineMessagingIdentity({ channelId: body.channelId.trim(), channelSecret: body.channelSecret.trim(), channelAccessToken: body.channelAccessToken.trim() })) {
       return inputError(c, { success: false, error: '同じMessaging APIチャネルのID・シークレット・アクセストークンを指定してください' }, 422, ['channelId', 'channelSecret', 'channelAccessToken']);
