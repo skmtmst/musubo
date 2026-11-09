@@ -1,9 +1,3 @@
-.lead { margin: 0 0 var(--mp-px-22); color: var(--mp-color-59687b); font-size: var(--mp-px-15); line-height: 1.7; }
-.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--mp-px-16); margin: 0 0 var(--mp-px-24); padding: 0; list-style: none; }
-.steps li { display: flex; justify-content: center; align-items: center; gap: var(--mp-px-11); color: var(--mp-color-59687b); font-size: var(--mp-px-14); font-weight: 700; }
-.steps span { display: grid; place-items: center; width: var(--mp-px-34); height: var(--mp-px-34); flex: 0 0 var(--mp-px-34); border: 1px solid var(--mp-color-d4dee2); border-radius: 50%; background: var(--mp-color-fff); }
-.steps .current { color: var(--mp-color-202428); }
-.steps .current span { border: var(--mp-px-2) solid var(--mp-color-087c43); color: var(--mp-color-087c43); }
 .card { width: 100%; border: 1px solid var(--mp-color-dce5e6); border-radius: var(--mp-px-16); background: var(--mp-color-fff); padding: var(--mp-px-32); }
 .stateHeading { display: flex; align-items: flex-start; gap: var(--mp-px-20); }
 .cardIcon, .successIcon { display: grid; place-items: center; width: var(--mp-px-48); height: var(--mp-px-48); flex: 0 0 var(--mp-px-48); border-radius: 50%; background: var(--mp-color-fff1d8); color: var(--mp-color-a7650b); font-size: var(--mp-px-26); font-weight: 800; line-height: 1; }
@@ -14,25 +8,14 @@
 .statusBox strong { display: block; margin-bottom: var(--mp-px-10); color: var(--mp-color-202428); }
 .statusBox p { margin: var(--mp-px-7) 0; }
 .note { margin: 0; color: var(--mp-color-59687b); font-size: var(--mp-px-14); line-height: 1.7; }
-.error { color: var(--mp-color-b02e2e); font-size: var(--mp-px-13); }
 .actions { display: flex; align-items: center; justify-content: center; gap: var(--mp-px-16); margin-top: var(--mp-px-27); }
-.primary { width: min(100%, var(--mp-px-310)); min-height: var(--mp-px-52); border: 0; border-radius: var(--mp-px-9); background: var(--mp-color-087c43); padding: var(--mp-px-12) var(--mp-px-20); color: var(--mp-color-fff); text-align: center; font: inherit; font-size: var(--mp-px-15); font-weight: 700; cursor: pointer; }
-.primary:hover { background: var(--mp-color-066b3a); }
-.primary:disabled { background: var(--mp-color-9bbdaa); cursor: not-allowed; }
-.secondary { min-height: var(--mp-px-48); border: 1px solid var(--mp-color-d4dee2); border-radius: var(--mp-px-9); background: var(--mp-color-fff); padding: var(--mp-px-10) var(--mp-px-16); color: var(--mp-color-425364); font: inherit; font-size: var(--mp-px-14); font-weight: 700; cursor: pointer; }
 .footer { display: flex; align-items: center; justify-content: space-between; gap: var(--mp-px-20); margin-top: var(--mp-px-21); color: var(--mp-color-59687b); font-size: var(--mp-px-13); }
 .footer p { margin: 0; line-height: 1.6; }
-.footer button { border: 0; background: none; color: var(--mp-color-087c43); font: inherit; font-weight: 700; cursor: pointer; }
 @media (max-width: 700px) {
-  .lead { font-size: var(--mp-px-14); }
-  .steps { gap: var(--mp-px-5); }
-  .steps li { flex-direction: column; gap: var(--mp-px-5); text-align: center; font-size: var(--mp-px-12); }
-  .steps span { width: var(--mp-px-30); height: var(--mp-px-30); flex-basis: var(--mp-px-30); }
   .card { padding: var(--mp-px-22); }
   .stateHeading { gap: var(--mp-px-12); }
   .cardIcon, .successIcon { width: var(--mp-px-38); height: var(--mp-px-38); flex-basis: var(--mp-px-38); font-size: var(--mp-px-21); }
   .stateHeading h2 { font-size: var(--mp-px-18); }
   .actions { align-items: stretch; flex-direction: column; }
-  .primary { width: 100%; }
   .footer { align-items: flex-start; flex-direction: column; }
 }

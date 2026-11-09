@@ -1,7 +1,9 @@
 'use client'
 
 import Button from '@/components/shared/button'
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
+import { useMemo, useState } from 'react'
 import { musuboLinkedRemovalPrice, utcCalendarDate, type LinkedAccountCounts, type MusuboLinkedService } from '@line-crm/shared'
 import styles from './linked-account-addition.module.css'
 
@@ -31,9 +33,6 @@ const day = (value: string) => new Intl.DateTimeFormat('ja-JP', {
 export default function LinkedAccountRemovalModal(props: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const dialogRef = useRef<HTMLElement>(null)
-  const primaryRef = useRef<HTMLButtonElement>(null)
-  const backRef = useRef<HTMLButtonElement>(null)
   const result = useMemo(() => {
     try { return musuboLinkedRemovalPrice(props) }
     catch { return null }
@@ -47,22 +46,6 @@ export default function LinkedAccountRemovalModal(props: Props) {
     return Number.isNaN(date.getTime()) ? null : day(props.nextMonthlyChargeAt)
   }, [props.nextMonthlyChargeAt])
 
-  useEffect(() => {
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    primaryRef.current?.focus()
-    return () => { previous?.focus() }
-  }, [])
-
-  const keyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Escape') { event.stopPropagation(); if (!busy) props.onBack(); return }
-    if (event.key !== 'Tab') return
-    const first = backRef.current
-    const last = primaryRef.current
-    if (!first || !last || !dialogRef.current) return
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
-  }
-
   const confirmRemoval = async () => {
     if (props.phase !== 'review' || busy) return
     setBusy(true); setError('')
@@ -71,24 +54,23 @@ export default function LinkedAccountRemovalModal(props: Props) {
     finally { setBusy(false) }
   }
 
-  if (!result || !dateText) return <div className={styles.backdrop} role="presentation">
-    <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="linked-removal-error-title">
-      <h2 id="linked-removal-error-title">料金を表示できません</h2>
+  if (!result || !dateText) return <Dialog open title="料金を表示できません" size="medium" onCancel={props.onBack}
+    footer={<Button type="button" variant="secondary" onClick={props.onBack}>戻る</Button>}>
       <p>連携数、料金、または次回の請求日を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
-      <button type="button" className={styles.backOnly} onClick={props.onBack}>戻る</button>
-    </section>
-  </div>
+  </Dialog>
 
   const label = serviceName(props.service)
   const hasReduction = result.monthlyDecreaseYen > 0
   const counts = `Googleマイビジネス ${result.after.googleBusiness}個・Instagram ${result.after.instagram}個`
-  return <div className={styles.backdrop} role="presentation" onMouseDown={(event) => {
-    if (event.target === event.currentTarget && !busy) props.onBack()
-  }}><section ref={dialogRef} className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="linked-removal-title" onKeyDown={keyDown}>
-    <h2 id="linked-removal-title">{props.phase === 'review' ? `${label}の連携を解除しますか` : '連携を解除しました'}</h2>
-    <p className={styles.lead}>{props.phase === 'review'
+  return <Dialog open title={props.phase === 'review' ? `${label}の連携を解除しますか` : '連携を解除しました'}
+    description={props.phase === 'review'
       ? `${props.lineName}の「${props.connectionName}」を今すぐ停止します。`
-      : `「${props.connectionName}」の連携は停止しています。`}</p>
+      : `「${props.connectionName}」の連携は停止しています。`} size="medium" onCancel={props.onBack} busy={busy}
+    footer={<><Button type="button" variant="secondary" disabled={busy}
+      onClick={props.phase === 'review' ? props.onBack : props.onBilling}>{props.phase === 'review' ? '戻る' : '請求を見る'}</Button>
+      <Button type="button" variant="primary" busy={busy} busyLabel="処理中…"
+        onClick={props.phase === 'review' ? () => void confirmRemoval() : props.onAccounts}>
+        {props.phase === 'review' ? 'この連携を解除する' : 'アカウント一覧へ'}</Button></>}>
     <div className={styles.priceBox}>
       <span>{props.phase === 'review' ? '次の月次請求からの減額（税込）' : '現在の追加枠'}</span>
       <strong>{props.phase === 'review'
@@ -107,11 +89,6 @@ export default function LinkedAccountRemovalModal(props: Props) {
       : hasReduction
         ? '支払済みの枠は次回請求日まで別の連携先に使えます。再追加した場合は減額予定を再計算します。'
         : 'ほかの連携先は引き続き利用できます。連携先を追加するときは料金を確認してから進みます。'}</p>
-    {error && <p className={styles.error} role="alert">{error}</p>}
-    <div className={styles.actions}><button ref={backRef} type="button" className={styles.back} disabled={busy}
-      onClick={props.phase === 'review' ? props.onBack : props.onBilling}>{props.phase === 'review' ? '戻る' : '請求を見る'}</button>
-      <Button ref={primaryRef} type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="処理中…"
-        onClick={props.phase === 'review' ? () => void confirmRemoval() : props.onAccounts}>
-        {props.phase === 'review' ? 'この連携を解除する' : 'アカウント一覧へ'}</Button></div>
-  </section></div>
+    {error && <Notice tone="danger" role="alert">{error}</Notice>}
+  </Dialog>
 }

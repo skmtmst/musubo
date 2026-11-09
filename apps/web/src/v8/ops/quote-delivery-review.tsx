@@ -3,6 +3,10 @@
 import { useEffect, useState } from 'react'
 import type { MusuboIndividualQuote } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 import styles from './individual-quote-editor.module.css'
 
 interface Review {
@@ -47,8 +51,8 @@ export default function QuoteDeliveryReview({ applicationId, quote }: {
 
   return <main className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › 個別見積もり › 送信結果の確認</p>
-    <h1>メールの送信結果を確認</h1>
-    <p className={styles.lead}>送信要求の結果が不明です。メールサービスの配信履歴で宛先と見積もり番号を照合してください。</p>
+    <PageHeading title="メールの送信結果を確認"
+      subtitle="送信要求の結果が不明です。メールサービスの配信履歴で宛先と見積もり番号を照合してください。" />
     <div className={styles.target}><strong>{quote.companyName}</strong>
       <span>見積もり番号 {quote.quoteNumber}</span><span>宛先 {review?.to ?? '確認中'}</span></div>
     {resolved ? <section className={styles.card} role="status">
@@ -70,19 +74,18 @@ export default function QuoteDeliveryReview({ applicationId, quote }: {
       <section className={styles.card}>
         <h2>配信履歴で確認すること</h2>
         <p className={styles.small}>宛先・見積もり番号・送信時刻を照合します。結果を確認するまで、同じメールは再送しません。</p>
-        <label className={styles.field}>照合記録
+        <Field label="照合記録" required note="配信履歴で確認した事実を12〜500文字で残してください。">
           <textarea className={styles.reviewEvidence} value={evidence}
             onChange={(event) => setEvidence(event.target.value)} maxLength={500}
             placeholder="例：メールサービスの配信履歴で宛先と送信時刻を確認しました" />
-          <small>配信履歴で確認した事実を12〜500文字で残してください。</small>
-        </label>
+        </Field>
         <p className={styles.small}>配信を確認できた場合は送信済みに確定します。未送信を確認した場合は取り下げ、新しい見積もり番号で再発行します。</p>
-        {error && <p className={styles.error} role="alert">{error}</p>}
+        {error && <Notice tone="danger" role="alert">{error}</Notice>}
         <div className={styles.reviewActions}>
-          <button type="button" className={styles.secondary} disabled={busy || !review}
-            onClick={() => void resolve('not_delivered')}>未送信を確認して取り下げる</button>
-          <button type="button" className={styles.primary} disabled={busy || !review}
-            onClick={() => void resolve('delivered')}>配信確認済みとして確定</button>
+          <Button type="button" variant="secondary" disabled={busy || !review}
+            onClick={() => void resolve('not_delivered')}>未送信を確認して取り下げる</Button>
+          <Button type="button" variant="primary" disabled={busy || !review}
+            onClick={() => void resolve('delivered')}>配信確認済みとして確定</Button>
         </div>
       </section>
     </div>}

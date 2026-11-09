@@ -1,16 +1,12 @@
 .page { display: grid; gap: var(--mp-px-24); min-width: 0; }
-.metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--mp-px-12); }
-.metrics > div { display: grid; gap: var(--mp-px-9); padding: var(--mp-px-18) var(--mp-px-20); background: var(--mp-color-fff); border: 1px solid var(--mp-color-e1e7e5); border-radius: var(--mp-px-14); }
-.metrics span { color: var(--mp-color-607081); font-size: var(--mp-px-13); }
-.metrics strong { color: var(--mp-color-182421); font-size: var(--mp-px-24); line-height: 1.2; }
 .heading { margin: var(--mp-px-4) 0 0; color: var(--mp-color-1c2522); font-size: var(--mp-px-20); line-height: 1.4; }
 .columns { display: grid; grid-template-columns: var(--mp-billing-grid-columns); gap: var(--mp-px-16); }
 .cardHead { display: flex; align-items: center; justify-content: space-between; gap: var(--mp-px-16); }
 .cardHead h3 { margin: 0; font-size: var(--mp-px-17); color: var(--mp-color-1c2522); }
 .cardHead strong { white-space: nowrap; color: var(--mp-color-087c43); }
 .lineList, .invoiceList { list-style: none; padding: 0; margin: 0; }
-.lineList li, .invoiceList li { display: flex; align-items: center; justify-content: space-between; gap: var(--mp-px-16); padding: var(--mp-px-13) 0; border-bottom: 1px solid var(--mp-color-e8eeec); }
-.lineList li:last-child, .invoiceList li:last-child { border-bottom: 0; }
+.lineRow, .invoiceRow { display: flex; align-items: center; justify-content: space-between; gap: var(--mp-px-16); padding: var(--mp-px-13) 0; border-bottom: 1px solid var(--mp-color-e8eeec); }
+.lineRow:last-child, .invoiceRow:last-child { border-bottom: 0; }
 .active { color: var(--mp-color-087c43); font-size: var(--mp-px-13); white-space: nowrap; }
 .lineActions { display: inline-flex; align-items: center; gap: var(--mp-px-12); }
 .removeLink { border: 0; background: none; color: var(--mp-color-087c43); padding: var(--mp-px-4); font: inherit; font-size: var(--mp-px-13); font-weight: 700; white-space: nowrap; cursor: pointer; }
@@ -23,16 +19,10 @@
 .textButton { align-self: flex-start; padding: var(--mp-px-4) 0; border: 0; background: none; color: var(--mp-color-087c43); font: inherit; font-weight: 600; cursor: pointer; }
 .history { display: grid; gap: var(--mp-px-14); min-width: 0; }
 .historyState { color: var(--mp-color-667589); }
-.historyState button { margin-left: var(--mp-px-8); border: 0; background: none; color: var(--mp-color-087c43); cursor: pointer; }
 .invoiceList { background: var(--mp-color-fff); border: 1px solid var(--mp-color-e1e7e5); border-radius: var(--mp-px-14); padding: var(--mp-px-2) var(--mp-px-18); }
-.invoiceList li { flex-wrap: wrap; }
-.invoiceList a { color: var(--mp-color-087c43); }
+.invoiceRow { flex-wrap: wrap; }
 @media (max-width: 850px) {
-  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .columns { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 520px) {
-  .metrics { gap: var(--mp-px-8); }
-  .metrics > div { padding: var(--mp-px-14); }
-  .metrics strong { font-size: var(--mp-px-19); }
 }

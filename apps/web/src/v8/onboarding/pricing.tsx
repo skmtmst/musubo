@@ -1,7 +1,7 @@
 'use client'
 
 import Button from '@/components/shared/button'
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useMemo, useState } from 'react'
 import {
   DEFAULT_MUSUBO_PRICE_SCHEDULE,
   musuboPrice,
@@ -10,9 +10,14 @@ import {
 } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
 import { PageContent } from '@/components/templates/page-frame'
+import { Steps } from '@/components/templates/steps'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import CloseButton from '@/components/shared/close-button'
 import Checkbox from '@/components/shared/checkbox'
+import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
+import StatusBadge from '@/components/shared/status-badge'
+import { Field } from '@/components/shared/form-controls'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import styles from './pricing.module.css'
@@ -58,13 +63,12 @@ function PlannedCountSelect({ label, id, value, onChange, linked = false }: {
   onChange: (value: number) => void
   linked?: boolean
 }) {
-  return <div className={styles.field}>
-    <span>{label}</span>
+  return <Field label={label} htmlFor={id} optional={false}>
     <Select aria-label={label} id={id} size="full" value={String(value)}
       onChange={(next) => onChange(Number(next))}
       options={[...(linked ? linkedCountOptions : countOptions).map((count) => ({ value: String(count), label: `${count}個` })),
         { value: '11', label: '11個以上' }]} />
-  </div>
+  </Field>
 }
 
 export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initialSelection, onContinue, onContact }: Props) {
@@ -77,37 +81,8 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
   const [interval, setInterval] = useState<'month' | 'year'>(initialSelection?.interval ?? 'month')
   const [consent, setConsent] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const detailsDialogRef = useRef<HTMLElement>(null)
-  const detailsCloseRef = useRef<HTMLButtonElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (!detailsOpen) return
-    const returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    detailsCloseRef.current?.focus()
-    return () => { returnTo?.focus() }
-  }, [detailsOpen])
-
-  const detailsKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Escape') {
-      event.stopPropagation()
-      setDetailsOpen(false)
-      return
-    }
-    if (event.key !== 'Tab') return
-    const focusable = [...(detailsDialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled)') ?? [])]
-    if (focusable.length === 0) return
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first.focus()
-    }
-  }
 
   const friendCount = Number(friendCountText.replaceAll(',', ''))
   const quoteRequired = lineCount > 10 || (lineCount === 1 && (googleBusinessCount > 10 || instagramCount > 10))
@@ -152,15 +127,17 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
   const nextFriendBlock = allowance + 1
   const exampleEnd = allowance + condition.schedule.extraFriendBlockSize
   const headline = quoteRequired ? 'ご利用予定を確認' : '料金を確認'
-  return <ListPage heightMode="viewport" title="利用開始の準備" help="料金を確かめてからカードを登録し、LINE公式アカウントを接続します。">
+  return <ListPage heightMode="viewport" title="利用開始の準備"
+    subtitle={quoteRequired
+      ? '11個以上の連携は、予定を確認してからお見積もりをご案内します。'
+      : '料金を確かめてからカードを登録し、LINE公式アカウントを接続します。'}
+    help="料金を確かめてからカードを登録し、LINE公式アカウントを接続します。"
+    steps={<Steps label="利用開始の手順" steps={[
+      { key: 'price', label: headline, state: 'current' },
+      { key: 'next', label: quoteRequired ? 'お問い合わせ' : 'カードを登録', state: 'todo' },
+      { key: 'connect', label: quoteRequired ? '料金をご案内' : 'LINEを接続', state: 'todo' },
+    ]} />}>
     <PageContent>
-      <p className={styles.lead}>{quoteRequired
-        ? '11個以上の連携は、予定を確認してからお見積もりをご案内します。'
-        : '料金を確かめてからカードを登録し、LINE公式アカウントを接続します。'}</p>
-      <ol className={styles.steps} aria-label="利用開始の手順">
-        {[headline, quoteRequired ? 'お問い合わせ' : 'カードを登録', quoteRequired ? '料金をご案内' : 'LINEを接続'].map((label, index) =>
-          <li key={label} className={index === 0 ? styles.currentStep : ''}><span>{index + 1}</span>{label}</li>)}
-      </ol>
 
       <div className={styles.columns}>
         <section className={styles.card} aria-labelledby="planned-heading">
@@ -176,14 +153,13 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
                 setInstagramCount(1)
               }
             }} />
-            <label className={styles.field} htmlFor="friend-count">
-              <span>既存のLINEアカウントの合計（ブロック除く）</span>
+            <Field label="既存のLINEアカウントの合計（ブロック除く）" htmlFor="friend-count" optional={false}
+              note="接続後に実数で確定します">
               <span className={styles.numberField}><TextField id="friend-count" type="text" inputMode="numeric" value={friendCountText}
                 style={{ height: 'var(--mp-px-50)', paddingRight: 'var(--mp-px-48)' }}
                 placeholder="現在の友だち数" aria-invalid={friendCountText !== '' && !friendCountValid}
                 onChange={(event) => setFriendCountText(event.target.value.replaceAll(',', ''))} /><span aria-hidden="true">人</span></span>
-              <small>接続後に実数で確定します</small>
-            </label>
+            </Field>
           </div>
           {friendCountText !== '' && !friendCountValid && <p className={styles.error}>友だち数は0以上の整数で入力してください。</p>}
           {lineCount === 1 && <>
@@ -207,27 +183,27 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
             : lineCount === 1
               ? '未接続のLINE・連携先は請求対象外です。LINEまたは連携先が11個以上なら個別にご案内します。'
               : '未接続のLINE・連携先は請求対象外です。連携先の追加分は、各LINEの接続時に確認します。'}</p>
-          {!quoteRequired && <Checkbox className={styles.consent} checked={consent} onCheckedChange={setConsent}>
+          {!quoteRequired && <Checkbox checked={consent} onCheckedChange={setConsent}>
             料金条件と無料体験後のカード請求に同意します
           </Checkbox>}
-          <button type="button" className={styles.detailsLink} onClick={() => setDetailsOpen(true)}>
+          <Button type="button" variant="text" onClick={() => setDetailsOpen(true)}>
             {quoteRequired ? '標準料金のしくみを見る' : '料金の詳しい条件を見る'} ↗
-          </button>
+          </Button>
         </section>
 
         <section className={styles.card} aria-labelledby="cost-heading">
           {quoteRequired ? <QuoteRequired /> : <div>
             <h2 id="cost-heading">お支払い予定料金</h2>
             <div className={styles.planHeading}>お支払いプラン</div>
-            <div className={styles.planGrid}>
-              <button type="button" aria-pressed={interval === 'month'} className={interval === 'month' ? styles.planSelected : styles.plan}
-                onClick={() => setInterval('month')}>月払い</button>
+            <RadioCardGroup className={styles.planGrid} legend="お支払いプラン">
+              <RadioCard name="billing-interval" value="month" checked={interval === 'month'}
+                onChange={() => setInterval('month')} title="月払い" height="fit" />
               <div className={styles.annualChoice}>
-                <span className={styles.discountBadge}>年払いでLINE基本料金10%OFF</span>
-                <button type="button" aria-pressed={interval === 'year'} className={interval === 'year' ? styles.planSelected : styles.plan}
-                  onClick={() => setInterval('year')}>年払い</button>
+                <StatusBadge tone="success" dot={false}>年払いでLINE基本料金10%OFF</StatusBadge>
+                <RadioCard name="billing-interval" value="year" checked={interval === 'year'}
+                  onChange={() => setInterval('year')} title="年払い" height="fit" />
               </div>
-            </div>
+            </RadioCardGroup>
             <div className={styles.conditionLabel}>適用中の条件</div>
             <div className={styles.conditionValue}>{condition.name}・{trialLabel(condition.trialPeriod)}無料
               {condition.lineBasicDiscountPercent > 0 ? '・LINE基本料金' + condition.lineBasicDiscountPercent + '%OFF' : ''}</div>
@@ -260,17 +236,14 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
         <p>{quoteRequired
           ? 'お問い合わせ後に料金と利用開始の手順をご案内します。カード登録はこの段階では不要です。'
           : 'カード情報はStripeが管理し、musuboには保存されません。カード登録だけでは無料体験も請求も始まりません。'}</p>
-        <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="処理中…" disabled={!friendCountValid || (!quoteRequired && !consent)}
+        <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" disabled={!friendCountValid || (!quoteRequired && !consent)}
           onClick={() => void advance()}>{quoteRequired ? 'お問い合わせフォームへ' : '同意してカード登録へ'}</Button>
       </div>
-      {error && <p role="alert" className={styles.error}>{error}</p>}
-      {detailsOpen && <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => {
-        if (event.target === event.currentTarget) setDetailsOpen(false)
-      }}>
-        <section ref={detailsDialogRef} className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="details-heading" onKeyDown={detailsKeyDown}>
-          <CloseButton ref={detailsCloseRef} className={styles.close} onClick={() => setDetailsOpen(false)} />
-          <h2 id="details-heading">料金の詳しい条件</h2>
-          <p>接続したLINE公式アカウントの数に応じて料金が決まります。</p>
+      {error && <Notice tone="danger" role="alert">{error}</Notice>}
+      <Dialog open={detailsOpen} title="料金の詳しい条件" size="large"
+        description="接続したLINE公式アカウントの数に応じて料金が決まります。"
+        onCancel={() => setDetailsOpen(false)}
+        footer={<Button type="button" variant="primary" onClick={() => setDetailsOpen(false)}>料金確認に戻る</Button>}>
           <div className={styles.detailBlock}>
             <h3>LINE公式アカウントの基本料金（税込）</h3>
             <dl><div><dt>1個目</dt><dd>{yen(condition.schedule.firstLineYen)} / 月</dd></div>
@@ -289,9 +262,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
           </div>
           <p>年払いはLINE基本料金のみ10%割引。友だち超過・追加連携枠は毎月別請求です。</p>
           <p>無料体験は最初のLINE有効化日から{trialLabel(condition.trialPeriod)}。有効化前はカード登録済みでも請求しません。</p>
-          <button type="button" className={styles.primary} onClick={() => setDetailsOpen(false)}>料金確認に戻る</button>
-        </section>
-      </div>}
+      </Dialog>
     </PageContent>
   </ListPage>
 }

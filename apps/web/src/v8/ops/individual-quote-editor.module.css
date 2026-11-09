@@ -14,10 +14,6 @@
 .fieldGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--mp-px-18); margin-top: var(--mp-px-20); }
 .field { display: flex; flex-direction: column; gap: var(--mp-px-8); min-width: 0; margin: var(--mp-px-17) 0 0; color: var(--mp-color-202428); font-size: var(--mp-px-13); font-weight: 700; }
 .fieldGrid .field { margin: 0; }
-.field input { width: 100%; min-width: 0; height: var(--mp-px-45); border: 1px solid var(--mp-color-d4dee2); border-radius: var(--mp-px-7); background: var(--mp-color-fff); padding: 0 var(--mp-px-12); color: var(--mp-color-202428); font: inherit; font-size: var(--mp-px-14); font-weight: 400; }
-.field input:focus-visible { outline: var(--mp-px-2) solid var(--mp-color-087c43); outline-offset: var(--mp-px-2); }
-.field small { color: var(--mp-color-59687b); font-size: var(--mp-px-11); font-weight: 400; line-height: 1.5; }
-.field b { color: var(--mp-color-b65e00); font-size: var(--mp-px-11); }
 .badge { position: absolute; top: var(--mp-px-25); right: var(--mp-px-25); display: inline-flex; justify-content: center; align-items: center; min-height: var(--mp-px-27); border-radius: var(--mp-px-999); background: var(--mp-color-eef1f3); color: var(--mp-color-526476); padding: var(--mp-px-5) var(--mp-px-13); font-size: var(--mp-px-11); font-weight: 700; }
 .previewLabel { margin: var(--mp-px-28) 0 var(--mp-px-5); color: var(--mp-color-59687b); font-size: var(--mp-px-12); }
 .priceBox { display: flex; flex-direction: column; gap: var(--mp-px-7); margin: var(--mp-px-24) 0; border-radius: var(--mp-px-10); background: var(--mp-color-eff8f2); padding: var(--mp-px-20); }

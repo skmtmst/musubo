@@ -1,6 +1,9 @@
 'use client'
 
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { PageHeading } from '@/components/templates/page-frame'
+import { Steps } from '@/components/templates/steps'
 import { useState } from 'react'
 import type { MusuboLinkedService } from '@line-crm/shared'
 import styles from './musubo-payment-recovery.module.css'
@@ -38,8 +41,7 @@ export default function LinkedAdditionPaymentFailure({ view, onRetry, onCancel }
   }
   return <div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › アカウント › 連携先を追加 › お支払い</p>
-    <h1>追加連携枠のお支払いが未完了です</h1>
-    <p className={styles.lead}>{serviceName}{view.addedOrdinal}個目の連携は有効化待ちです。既存の連携は使えます。</p>
+    <PageHeading title="追加連携枠のお支払いが未完了です" subtitle={`${serviceName}${view.addedOrdinal}個目の連携は有効化待ちです。既存の連携は使えます。`} />
     <div className={styles.statusWarning}>
       <span className={styles.iconWarning} aria-hidden="true">!</span>
       <div className={styles.statusCopy}><h2>追加連携枠のお支払いが未完了です</h2>
@@ -62,16 +64,17 @@ export default function LinkedAdditionPaymentFailure({ view, onRetry, onCancel }
       <section className={styles.card} aria-labelledby="linked-failure-next-title">
         <h2 id="linked-failure-next-title">連携先の追加を完了するには</h2>
         <p className={styles.actionLead}>お支払い方法を確認し、追加1枠分の決済を再試行してください。</p>
-        <ol className={styles.steps}>
-          <li><span className={styles.number}>1</span><div className={styles.stepCopy}><strong>お支払い方法を確認</strong><small>Stripeの画面でカードを更新できます</small></div></li>
-          <li><span className={styles.number}>2</span><div className={styles.stepCopy}><strong>必要な認証を完了</strong><small>本人認証が求められた場合のみ</small></div></li>
-          <li><span className={styles.number}>3</span><div className={styles.stepCopy}><strong>成功後に連携先を有効化</strong><small>{serviceName}を使えます</small></div></li>
-        </ol>
+        <Steps label="連携先の追加手順" steps={[
+          { key: 'payment', label: 'お支払い方法を確認', state: 'current' },
+          { key: 'verification', label: '必要な認証を完了', state: 'todo' },
+          { key: 'activation', label: '成功後に連携先を有効化', state: 'todo' },
+        ]} />
+        <p className={styles.info}>Stripeでカードを確認し、求められた場合は本人認証を完了してください。決済成功後に{serviceName}を使えるようにします。</p>
         <p className={styles.footnote}>処理中は再度請求しません。カード情報はStripeで扱い、musuboには保存しません。</p>
-        {error && <p className={styles.error} role="alert">{error}</p>}
-        <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="処理中…"
+        {error && <Notice tone="danger" role="alert">{error}</Notice>}
+        <Button type="button" variant="primary" busy={busy} busyLabel="処理中…"
           onClick={() => void retry()}>カードを確認して再試行</Button>
-        <button type="button" className={styles.secondary} disabled={busy} onClick={onCancel}>追加を取り消す</button>
+        <Button type="button" variant="secondary" disabled={busy} onClick={onCancel}>追加を取り消す</Button>
       </section>
     </div>
   </div>

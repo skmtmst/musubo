@@ -13,6 +13,7 @@ import Button from '@/components/shared/button'
 import { OPS_READONLY_LOCK_REASON, useOpsReadOnlyState } from './use-ops-read-only'
 import { TextArea } from '@/components/shared/text-field'
 import EntitySelect from '@/components/shared/entity-select'
+import { Field } from '@/components/shared/form-controls'
 import type { StoredMusuboPricingCondition } from '@/lib/api/features/pricing-conditions'
 import styles from './application-detail.module.css'
 
@@ -194,14 +195,15 @@ function ApprovalConfirm({ open, application, busy, conditions, selectedConditio
           <div><dt>招待メール送信先</dt><dd>{application.email}</dd></div>
         </dl>
         <div className={styles.conditionChoice}>
-          <label htmlFor="approval-pricing-condition">適用する利用条件</label>
+          <Field label="適用する利用条件" htmlFor="approval-pricing-condition" optional={false}>
           <EntitySelect id="approval-pricing-condition" aria-label="適用する利用条件" size="full" value={selectedConditionId}
             onChange={onSelectCondition} options={conditions.map((condition) => ({
               value: condition.id,
               label: `${condition.internalName}・${condition.trialPeriod.value}${condition.trialPeriod.unit === 'months' ? 'か月' : '日'}無料${condition.lineBasicDiscountPercent ? `・LINE基本料金${condition.lineBasicDiscountPercent}%オフ` : ''}`,
             }))} />
+          </Field>
           <small>選んだ条件は承認時に固定されます。あとから条件を変更しても、この会社の料金は変わりません。</small>
-          <a href="/ops/pricing-conditions">利用条件の設定を開く</a>
+          <a className={styles.conditionHelpLink} href="/ops/pricing-conditions">利用条件の設定を開く</a>
         </div>
         <p className={styles.confirmNote}>申込内容と連絡記録を確認してから進めてください。</p>
       </div>

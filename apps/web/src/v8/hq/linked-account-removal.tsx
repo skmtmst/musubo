@@ -1,6 +1,8 @@
 'use client'
 
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { PageHeading } from '@/components/templates/page-frame'
 import { useState } from 'react'
 import { linkedAccountSlots, type LinkedAccountCounts } from '@line-crm/shared'
 import styles from './linked-account-removal.module.css'
@@ -51,10 +53,9 @@ export default function LinkedAccountRemoval({ view, onRemove, onBack, onViewCon
 
   return <div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › アカウント › 連携サービス › 連携解除</p>
-    <h1>{view.phase === 'confirm' ? 'このアカウントの連携を解除しますか' : '連携を解除しました'}</h1>
-    <p className={styles.lead}>{view.phase === 'confirm'
+    <PageHeading title={view.phase === 'confirm' ? 'このアカウントの連携を解除しますか' : '連携を解除しました'} subtitle={view.phase === 'confirm'
       ? '解除すると、このアカウントへの投稿や情報の取得はすぐに停止します。'
-      : `「${view.linkedAccountName}」との連携は停止しました。料金の変更日をご確認ください。`}</p>
+      : `「${view.linkedAccountName}」との連携は停止しました。料金の変更日をご確認ください。`} />
 
     <div className={view.phase === 'complete' ? styles.statusSuccess : styles.statusWarning}>
       <span className={view.phase === 'complete' ? styles.statusIconSuccess : styles.statusIconWarning} aria-hidden="true">{view.phase === 'complete' ? '✓' : '!'}</span>
@@ -96,12 +97,12 @@ export default function LinkedAccountRemoval({ view, onRemove, onBack, onViewCon
     </div>
 
     {view.phase === 'complete' && <p className={styles.afterNote}>次回の月次請求までは、お支払い済みの追加枠に別の連携先を設定できます。再び連携数を増やす場合は、表示される料金を確認してから進みます。</p>}
-    {error && <p role="alert" className={styles.error}>{error}</p>}
+    {error && <Notice tone="danger" role="alert">{error}</Notice>}
     <div className={styles.bottom}>
-      <button type="button" className={styles.secondary} onClick={onBack}>{view.phase === 'complete' ? 'アカウント一覧へ' : '戻る'}</button>
+      <Button type="button" variant="secondary" onClick={onBack}>{view.phase === 'complete' ? 'アカウント一覧へ' : '戻る'}</Button>
       {view.phase === 'confirm'
-        ? <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="処理中…" onClick={() => void remove()}>この連携を解除する</Button>
-        : onViewConnections && <button type="button" className={styles.primary} onClick={onViewConnections}>連携先を確認する</button>}
+        ? <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" onClick={() => void remove()}>この連携を解除する</Button>
+        : onViewConnections && <Button type="button" variant="primary" onClick={onViewConnections}>連携先を確認する</Button>}
     </div>
   </div>
 }

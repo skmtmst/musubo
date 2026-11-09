@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import type { MusuboLineRemovalState } from '@/lib/api/features/musubo-line-removal'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
+import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import styles from './musubo-line-removal-dialog.module.css'
 
@@ -51,18 +54,23 @@ export default function MusuboLineRemovalDialog({ lineId, onClose, onChanged }: 
     } finally { setBusy(false) }
   }
 
-  const selectedDate = selection === 'schedule' ? state?.scheduledEndAt : null
   const endLabel = state?.billingStatus === 'trialing' ? '無料体験の終了日'
     : state?.billingInterval === 'year' ? '次の年次更新日' : '次の月次請求日'
-  return <div className={styles.backdrop} role="presentation" onMouseDown={(event) => {
-    if (event.target === event.currentTarget && !busy) onClose()
-  }}>
-    <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="line-removal-title">
-      <div className={styles.head}><div><p className={styles.eyebrow}>LINEアカウントの利用終了</p>
-        <h2 id="line-removal-title">{state?.lineName ?? 'LINE'}の利用を終了しますか</h2></div>
-        <button type="button" className={styles.close} aria-label="閉じる" onClick={onClose}>×</button></div>
-      {error && <p className={styles.error} role="alert">{error}</p>}
-      {!state ? <p className={styles.loading}>利用状況を確認しています…</p>
+  return <>
+    <Dialog open title={`${state?.lineName ?? 'LINE'}の利用を終了しますか`}
+      description="LINEアカウントの利用終了" size="large" onCancel={onClose} busy={busy}
+      error={error || undefined} dirty={false}
+      footer={<div className={styles.actions}>
+        {state?.phase === 'scheduled' ? <Button type="button" variant="secondary" disabled={busy}
+          onClick={() => void change('cancel')}>終了予約を取り消す</Button> : null}
+        {state?.phase === 'choose' ? <Button type="button" variant={confirmNow ? 'danger' : 'primary'}
+          disabled={busy || !state.priceEstimate} onClick={() => {
+            if (selection === 'now' && !confirmNow) { setConfirmNow(true); return }
+            void change(selection)
+          }}>{confirmNow ? '今すぐ利用を終了する' : selection === 'schedule'
+            ? 'この内容で終了を予約する' : '終了内容を確認する'}</Button> : null}
+      </div>}>
+      {!state ? <Notice tone="info">利用状況を確認しています…</Notice>
         : state.phase === 'ended' ? <div className={styles.result} role="status">
           <span className={styles.resultIcon} aria-hidden="true">✓</span>
           <div><h3>LINEの利用を終了しました</h3>
@@ -71,10 +79,10 @@ export default function MusuboLineRemovalDialog({ lineId, onClose, onChanged }: 
           <span className={styles.resultIcon} aria-hidden="true">✓</span>
           <div><h3>{date(state.requestedEndAt)}に終了します</h3>
             <p>{lastUsableDate(state.requestedEndAt)}まで利用できます。支払済みの基本料金の返金はありません。</p></div></div>
-        : state.phase !== 'choose' ? <p className={styles.loading} role="status">
-          決済サービスとの料金照合を確認しています。少し待ってから再読み込みしてください。</p>
+        : state.phase !== 'choose' ? <Notice tone="info">
+          決済サービスとの料金照合を確認しています。少し待ってから再読み込みしてください。</Notice>
         : <>
-          <p className={styles.intro}>残すLINEは「{state.otherLineName}」です。終了日を選んでください。</p>
+          <p>残すLINEは「{state.otherLineName}」です。終了日を選んでください。</p>
           <RadioCardGroup className={styles.choices} legend="利用終了日">
             <RadioCard name="line-removal" value="schedule" checked={selection === 'schedule'}
               onChange={() => { setSelection('schedule'); setConfirmNow(false) }}
@@ -100,19 +108,8 @@ export default function MusuboLineRemovalDialog({ lineId, onClose, onChanged }: 
           </div>
           {confirmNow && <p className={styles.warning}>確定すると、このLINEはすぐに利用できなくなります。</p>}
         </>}
-      <div className={styles.actions}>
-        {state?.phase === 'scheduled' ? <button type="button" className={styles.secondary} disabled={busy}
-          onClick={() => void change('cancel')}>終了予約を取り消す</button> : null}
-        <button type="button" className={styles.secondary} disabled={busy} onClick={onClose}>閉じる</button>
-        {state?.phase === 'choose' ? <button type="button" className={confirmNow ? styles.danger : styles.primary}
-          disabled={busy || !state.priceEstimate} onClick={() => {
-            if (selection === 'now' && !confirmNow) { setConfirmNow(true); return }
-            void change(selection)
-          }}>{confirmNow ? '今すぐ利用を終了する' : selection === 'schedule'
-            ? 'この内容で終了を予約する' : '終了内容を確認する'}</button> : null}
-      </div>
-    </section>
+    </Dialog>
     {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)}
       onClose={() => setStepUp(null)} />}
-  </div>
+  </>
 }

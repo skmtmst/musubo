@@ -1,9 +1,4 @@
 .lead { margin: 0 0 var(--mp-px-20); color: var(--mp-color-58667a); font-size: var(--mp-px-16); line-height: 1.7; }
-.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--mp-px-16); margin: 0 0 var(--mp-px-24); padding: 0; list-style: none; }
-.steps li { display: flex; align-items: center; gap: var(--mp-px-12); justify-content: center; color: var(--mp-color-58667a); font-weight: 700; }
-.steps li span { display: grid; place-items: center; width: var(--mp-px-36); height: var(--mp-px-36); flex: 0 0 var(--mp-px-36); border: 1px solid var(--mp-color-dce4e7); border-radius: 50%; background: var(--mp-color-fff); color: var(--mp-color-58667a); }
-.steps .currentStep { color: var(--mp-color-202428); }
-.steps .currentStep span { border: var(--mp-px-2) solid var(--mp-color-087c43); color: var(--mp-color-087c43); }
 .columns { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(var(--mp-px-320), 1fr); gap: var(--mp-px-22); align-items: stretch; }
 .card { min-width: 0; border: 1px solid var(--mp-color-dfe5e7); border-radius: var(--mp-px-16); padding: var(--mp-px-28); background: var(--mp-color-fff); }
 .card h2 { margin: 0 0 var(--mp-px-12); color: var(--mp-color-202428); font-size: var(--mp-px-23); line-height: 1.4; }
@@ -64,9 +59,6 @@
   .footer .primary { align-self: center; }
 }
 @media (max-width: 600px) {
-  .steps { gap: var(--mp-px-5); }
-  .steps li { flex-direction: column; gap: var(--mp-px-6); text-align: center; font-size: var(--mp-px-12); }
-  .steps li span { width: var(--mp-px-30); height: var(--mp-px-30); flex-basis: var(--mp-px-30); }
   .card { padding: var(--mp-px-20); }
   .inputGrid { grid-template-columns: 1fr; }
   .planGrid { grid-template-columns: 1fr; }

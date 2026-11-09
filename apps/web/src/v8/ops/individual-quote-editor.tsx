@@ -4,6 +4,10 @@ import Button from '@/components/shared/button'
 import { useMemo, useState } from 'react'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
+import DateTimeField from '@/components/shared/date-time-field'
+import { Field } from '@/components/shared/form-controls'
+import Notice from '@/components/shared/notice'
+import { PageHeading } from '@/components/templates/page-frame'
 import { musuboIndividualQuotePrice, suggestMusuboQuoteAnnualLineCharge,
   type MusuboIndividualQuote, type MusuboPriceSchedule } from '@line-crm/shared'
 import styles from './individual-quote-editor.module.css'
@@ -95,8 +99,8 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
 
   if (review) return <div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › 個別見積もり › 送信前確認</p>
-    <h1>個別見積もりの送信前確認</h1>
-    <p className={styles.lead}>お客様に見える見積もりとメールを確認してから、登録メールアドレスへ送信します。</p>
+    <PageHeading title="個別見積もりの送信前確認"
+      subtitle="お客様に見える見積もりとメールを確認してから、登録メールアドレスへ送信します。" />
     <div className={styles.reviewGrid}>
       <section className={styles.card} aria-labelledby="mail-review-title">
         <h2 id="mail-review-title">送信するメール</h2>
@@ -131,9 +135,9 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
         <p className={styles.small}>送信後の変更は新しい番号で再発行します。期限前の同意で単価と適用条件が確定し、カード登録は期限後も可能です。</p>
       </section>
     </div>
-    {error && <p className={styles.error} role="alert">{error}</p>}
-    <div className={styles.actions}>{!sent && <button type="button" className={styles.secondary} onClick={() => setReview(false)}>料金条件を編集する</button>}
-      <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="送信中…" disabled={sent}
+    {error && <Notice tone="danger" role="alert">{error}</Notice>}
+    <div className={styles.actions}>{!sent && <Button type="button" variant="secondary" onClick={() => setReview(false)}>料金条件を編集する</Button>}
+      <Button type="button" variant="primary" busy={busy} busyLabel="送信中…" disabled={sent}
         onClick={() => void run(async () => { await onSend(draft, mailPreview ?? undefined); setSent(true) })}>
         {sent ? '送信済み' : 'この内容でメールを送信'}</Button></div>
     {sent && <p className={styles.sent} role="status">登録メールアドレスへ見積もりを送信しました。</p>}
@@ -141,28 +145,28 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
 
   return <div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › 利用条件 › 個別見積もり</p>
-    <h1>個別見積もりの料金条件</h1>
-    <p className={styles.lead}>お問い合わせ内容に合わせて会社ごとの料金を作成します。送信前にお客様向けの表示を確認できます。</p>
+    <PageHeading title="個別見積もりの料金条件"
+      subtitle="お問い合わせ内容に合わせて会社ごとの料金を作成します。送信前にお客様向けの表示を確認できます。" />
     <div className={styles.target}><strong>{draft.companyName}</strong><span>{summary}</span></div>
     <div className={styles.columns}>
       <div className={styles.editorStack}>
         <section className={styles.card} aria-labelledby="quote-usage-title"><h2 id="quote-usage-title">お客様の利用予定</h2>
           <p className={styles.small}>お問い合わせ内容を確認し、予定数を入力してください。料金はここで保存した数と単価から計算します。</p>
           <div className={styles.fieldGrid}>
-            <label className={styles.field}><span>連携するLINEアカウント数</span>
+            <Field label="連携するLINEアカウント数" optional={false}>
               <TextField type="number" min={1} max={9999} step={1} value={draft.plannedLineCount || ''}
-                onChange={(event) => setDraft((current) => ({ ...current, plannedLineCount: Number(event.target.value) }))} /></label>
-            <label className={styles.field}><span>既存のLINEアカウントの合計（ブロック除く）</span>
+                onChange={(event) => setDraft((current) => ({ ...current, plannedLineCount: Number(event.target.value) }))} /></Field>
+            <Field label="既存のLINEアカウントの合計（ブロック除く）" optional={false}>
               <TextField type="number" min={0} step={1} value={draft.plannedFriendCountExcludingBlocked}
                 onChange={(event) => setDraft((current) => ({ ...current,
-                  plannedFriendCountExcludingBlocked: Number(event.target.value) }))} /></label>
+                  plannedFriendCountExcludingBlocked: Number(event.target.value) }))} /></Field>
             {draft.plannedLineCount === 1 && <>
-              <label className={styles.field}><span>Googleマイビジネスの連携予定数</span>
+              <Field label="Googleマイビジネスの連携予定数" optional={false}>
                 <TextField type="number" min={0} step={1} value={firstLinked.googleBusiness}
-                  onChange={(event) => changeLinked('googleBusiness', Number(event.target.value))} /></label>
-              <label className={styles.field}><span>Instagramアカウントの連携予定数</span>
+                  onChange={(event) => changeLinked('googleBusiness', Number(event.target.value))} /></Field>
+              <Field label="Instagramアカウントの連携予定数" optional={false}>
                 <TextField type="number" min={0} step={1} value={firstLinked.instagram}
-                  onChange={(event) => changeLinked('instagram', Number(event.target.value))} /></label>
+                  onChange={(event) => changeLinked('instagram', Number(event.target.value))} /></Field>
             </>}
           </div>
         </section>
@@ -172,34 +176,34 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
             {([
               ['firstLineYen', '1個目'], ['secondToFifthLineYen', '2〜5個目・1個あたり'],
               ['sixthToTenthLineYen', '6〜10個目・1個あたり'],
-            ] as const).map(([key, label]) => <label className={styles.field} key={key}><span>{label}</span>
+            ] as const).map(([key, label]) => <Field label={label} optional={false} key={key}>
               <TextField type="number" min={0} step={1} value={draft.finalSchedule[key]}
-                onChange={(event) => changeSchedule(key, Number(event.target.value))} /></label>)}
-            {draft.plannedLineCount > 10 && <label className={styles.field}><span>11個目以降・1個あたり <b>必須</b></span>
+                onChange={(event) => changeSchedule(key, Number(event.target.value))} /></Field>)}
+            {draft.plannedLineCount > 10 && <Field label="11個目以降・1個あたり" required>
               <TextField type="number" min={0} step={1} placeholder="金額を入力"
                 value={draft.finalSchedule.eleventhAndLaterLineYen ?? ''}
-                onChange={(event) => changeSchedule('eleventhAndLaterLineYen', event.target.value === '' ? undefined : Number(event.target.value))} /></label>}
-            {draft.plannedLineCount > 10 && <label className={styles.field}><span>友だち数の基準（11個以上）</span>
+                onChange={(event) => changeSchedule('eleventhAndLaterLineYen', event.target.value === '' ? undefined : Number(event.target.value))} /></Field>}
+            {draft.plannedLineCount > 10 && <Field label="友だち数の基準（11個以上）" optional={false}
+              note="この人数を超えると、1万人単位で追加料金がかかります。">
               <TextField type="number" min={0} step={1} value={draft.finalSchedule.friendAllowanceForElevenOrMore ?? 50_000}
-                onChange={(event) => changeSchedule('friendAllowanceForElevenOrMore', Number(event.target.value))} />
-              <small>この人数を超えると、1万人単位で追加料金がかかります。</small></label>}
+                onChange={(event) => changeSchedule('friendAllowanceForElevenOrMore', Number(event.target.value))} /></Field>}
           </div>
         </section>
         <section className={styles.card} aria-labelledby="option-price-title"><h2 id="option-price-title">オプション料金</h2>
           <p className={styles.small}>統括はLINE2個以上で加算。追加連携枠は各LINEの連携数から計算します。</p>
           <div className={styles.fieldGrid}>
             {([['headquartersYen', '統括オプション（月額）'], ['linkedAccountSlotYen', '追加連携枠・1枠あたり（月額）']] as const)
-              .map(([key, label]) => <label className={styles.field} key={key}><span>{label}</span>
+              .map(([key, label]) => <Field label={label} optional={false} key={key}>
                 <TextField type="number" min={0} step={1} value={draft.finalSchedule[key]}
-                  onChange={(event) => changeSchedule(key, Number(event.target.value))} /></label>)}
+                  onChange={(event) => changeSchedule(key, Number(event.target.value))} /></Field>)}
           </div>
         </section>
         <section className={styles.card} aria-labelledby="quote-rules-title"><h2 id="quote-rules-title">この見積もりに適用する共通ルール</h2>
           <p className={styles.small}>友だち数の超過分は1万人ごとに{money(draft.finalSchedule.extraFriendBlockYen)}／月。年払い割引はLINE基本料金のみです。特別割引は最終単価に反映済みです。</p>
-          {draft.interval === 'year' && <label className={styles.field}><span>LINE基本料金・最終年額（税込）</span>
+          {draft.interval === 'year' && <Field label="LINE基本料金・最終年額（税込）" optional={false}
+            note="この金額を保存し、請求時に再割引しません。">
             <TextField type="number" min={0} step={1} value={draft.finalAnnualLineChargeYen ?? ''}
-              onChange={(event) => setDraft((current) => ({ ...current, finalAnnualLineChargeYen: event.target.value === '' ? null : Number(event.target.value) }))} />
-            <small>この金額を保存し、請求時に再割引しません。</small></label>}
+              onChange={(event) => setDraft((current) => ({ ...current, finalAnnualLineChargeYen: event.target.value === '' ? null : Number(event.target.value) }))} /></Field>}
         </section>
       </div>
       <section className={styles.card} aria-labelledby="quote-preview-title"><h2 id="quote-preview-title">見積もりプレビュー</h2>
@@ -213,16 +217,16 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
         <div className={styles.field}><span>お支払いプラン</span><Select aria-label="お支払いプラン" size="full" value={draft.interval}
           onChange={(value) => setInterval(value as 'month' | 'year')}
           options={[{ value: 'month', label: '月払い' }, { value: 'year', label: '年払い' }]} /></div>
-        <label className={styles.field}><span>見積もり有効期限</span>
-          <input type="datetime-local" value={jstLocal(draft.expiresAt)}
-            onChange={(event) => { if (event.target.value) setDraft((current) => ({ ...current, expiresAt: localToIso(event.target.value) })) }} />
-          <small>お客様が見積もりに同意できる期限を設定します。</small></label>
+        <Field label="見積もり有効期限" optional={false} note="お客様が見積もりに同意できる期限を設定します。">
+          <DateTimeField value={jstLocal(draft.expiresAt)}
+            onChange={(value) => { if (value) setDraft((current) => ({ ...current, expiresAt: localToIso(value) })) }} />
+        </Field>
         <p className={styles.small}>{trial}。送信後の変更は新しい番号で再発行します。期限前の同意で単価と適用条件が確定します。</p>
-        {error && <p className={styles.error} role="alert">{error}</p>}
-        <div className={styles.actions}><button type="button" className={styles.secondary} disabled={busy || !price}
-          onClick={() => void save(false)}>下書きを保存</button>
-          <button type="button" className={styles.primary} disabled={busy || !price}
-            onClick={() => void save(true)}>お客様向けの表示を確認</button></div>
+        {error && <Notice tone="danger" role="alert">{error}</Notice>}
+        <div className={styles.actions}><Button type="button" variant="secondary" disabled={busy || !price}
+          onClick={() => void save(false)}>下書きを保存</Button>
+          <Button type="button" variant="primary" disabled={busy || !price}
+            onClick={() => void save(true)}>お客様向けの表示を確認</Button></div>
         <p className={styles.small}>送信前の下書きです。お客様にはまだ表示されません。</p>
       </section>
     </div>

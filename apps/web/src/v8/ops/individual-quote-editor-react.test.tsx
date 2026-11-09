@@ -53,7 +53,8 @@ describe('運営コンソールの個別見積もり', () => {
     await act(async () => { root.render(<IndividualQuoteEditor initialQuote={{ ...example, plannedLineCount: 12 }}
       recipientEmail="you@example.com" onSaveDraft={onSaveDraft} onSend={onSend} />) })
     expect(button('お客様向けの表示を確認').disabled).toBe(true)
-    const input = [...host.querySelectorAll('label')].find((item) => item.textContent?.includes('11個目以降・1個あたり'))!.querySelector('input')!
+    const label = [...host.querySelectorAll('label')].find((item) => item.textContent?.includes('11個目以降・1個あたり'))!
+    const input = document.getElementById(label.htmlFor) as HTMLInputElement
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
     await act(async () => { setter.call(input, '6500'); input.dispatchEvent(new Event('input', { bubbles: true })) })
     expect(button('お客様向けの表示を確認').disabled).toBe(false)

@@ -1,6 +1,10 @@
 'use client'
 
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import StatusBadge from '@/components/shared/status-badge'
+import { PageHeading } from '@/components/templates/page-frame'
+import { Steps } from '@/components/templates/steps'
 import { useState } from 'react'
 import styles from './musubo-payment-recovery.module.css'
 
@@ -87,7 +91,7 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
     ? success ? 'お支払い済みの金額（税込）' : processing ? '確認中の金額（税込）' : 'お支払い金額（税込）'
     : success ? '追加分のお支払い（税込）' : processing ? '確認中の追加分（税込）'
       : expired ? '前回の見積もり額（税込）' : '今回の追加分（税込）'
-  const amountBadge = success ? '支払い済み' : processing ? '確認中' : expired ? '期限切れ'
+  const amountStatusLabel = success ? '支払い済み' : processing ? '確認中' : expired ? '期限切れ'
     : invoice ? '未払い' : '追加は保留中'
   const guidance = invoice
     ? view.state === 'grace' ? `${date(view.graceDeadline, true)}の停止予定時刻までは、LINEの接続と機能を通常どおり利用できます。`
@@ -144,17 +148,17 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
 
   return <div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › {invoice ? '統括の設定 › 請求' : 'アカウント › LINE追加'} › お支払い</p>
-    <h1>{title}</h1><p className={styles.lead}>{subtitle}</p>
+    <PageHeading title={title} subtitle={subtitle} />
     <div className={success ? styles.statusSuccess : styles.statusWarning}>
       <span className={success ? styles.iconSuccess : styles.iconWarning} aria-hidden="true">{success ? '✓' : processing ? '…' : '!'}</span>
       <div className={styles.statusCopy}><h2>{statusTitle}</h2><p>{statusDescription}</p></div>
-      <span className={success ? styles.badgeSuccess : styles.badgeWarning}>{badge}</span>
+      <StatusBadge tone={success ? 'success' : 'warning'} dot={false}>{badge}</StatusBadge>
     </div>
     <div className={styles.columns}>
       <section className={styles.card} aria-labelledby="payment-detail-title">
         <h2 id="payment-detail-title">{mainTitle}</h2>
         <div className={styles.amountRow}><div><span>{amountLabel}</span><strong>{money(view.amountYen)}</strong></div>
-          <span className={success ? styles.amountSuccess : styles.amountWarning}>{amountBadge}</span></div>
+          <StatusBadge tone={success ? 'success' : 'warning'} dot={false}>{amountStatusLabel}</StatusBadge></div>
         <dl className={styles.details}>
           {invoice ? <><div><dt>請求日</dt><dd>{date(view.invoiceDate)}</dd></div>
             <div><dt>{success ? 'お支払い確認日' : 'お支払い期限'}</dt><dd>{success
@@ -174,11 +178,13 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
       </section>
       <section className={styles.card} aria-labelledby="payment-action-title">
         <h2 id="payment-action-title">{heading}</h2><p className={styles.actionLead}>{description}</p>
-        <ol className={styles.steps}>{steps.map((step, index) => <li key={step}><span className={styles.number}>{index + 1}</span><strong>{step}</strong></li>)}</ol>
+        <Steps label={heading} steps={steps.map((step, index) => ({
+          key: String(index), label: step, state: index === 0 ? 'current' : 'todo',
+        }))} />
         <p className={styles.footnote}>{footnote}</p>
-        {error && <p className={styles.error} role="alert">{error}</p>}
-        <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="処理中…" onClick={() => void invoke()}>{primary}</Button>
-        <button type="button" className={styles.secondary} onClick={onSecondary}>{secondary}</button>
+        {error && <Notice tone="danger" role="alert">{error}</Notice>}
+        <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" onClick={() => void invoke()}>{primary}</Button>
+        <Button type="button" variant="secondary" onClick={onSecondary}>{secondary}</Button>
       </section>
     </div>
   </div>

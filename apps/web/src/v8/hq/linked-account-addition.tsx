@@ -1,7 +1,9 @@
 'use client'
 
 import Button from '@/components/shared/button'
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
+import { useMemo, useState } from 'react'
 import { musuboLinkedAdditionPrice, type LinkedAccountCounts, type MusuboLinkedAdditionInput,
   type MusuboLinkedService } from '@line-crm/shared'
 import styles from './linked-account-addition.module.css'
@@ -23,29 +25,10 @@ const serviceName = (service: MusuboLinkedService) => service === 'googleBusines
 export default function LinkedAccountAddition({ lineName, service, before, slotUnitYen, billing, onContinue, onBack }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const dialogRef = useRef<HTMLElement>(null)
-  const primaryRef = useRef<HTMLButtonElement>(null)
-  const backRef = useRef<HTMLButtonElement>(null)
   const result = useMemo(() => {
     try { return musuboLinkedAdditionPrice({ before, service, slotUnitYen, billing }) }
     catch { return null }
   }, [before, service, slotUnitYen, billing])
-
-  useEffect(() => {
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    primaryRef.current?.focus()
-    return () => { previous?.focus() }
-  }, [])
-
-  const keyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Escape') { event.stopPropagation(); if (!busy) onBack(); return }
-    if (event.key !== 'Tab') return
-    const first = backRef.current
-    const last = primaryRef.current
-    if (!first || !last || !dialogRef.current) return
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
-  }
 
   const advance = async () => {
     if (busy) return
@@ -55,24 +38,21 @@ export default function LinkedAccountAddition({ lineName, service, before, slotU
     finally { setBusy(false) }
   }
 
-  if (!result) return <div className={styles.backdrop} role="presentation" onMouseDown={(event) => {
-    if (event.target === event.currentTarget) onBack()
-  }}><section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="linked-addition-error-title" onKeyDown={keyDown}>
-    <h2 id="linked-addition-error-title">料金を表示できません</h2>
+  if (!result) return <Dialog open title="料金を表示できません" size="medium" onCancel={onBack}
+    footer={<Button type="button" variant="secondary" onClick={onBack}>戻る</Button>}>
     <p>連携数または料金を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
-    <button type="button" className={styles.backOnly} onClick={onBack}>戻る</button>
-  </section></div>
+  </Dialog>
 
   const addedSlot = result.addedSlots > 0
   const charged = result.monthlyIncreaseYen > 0
   const label = serviceName(service)
   const beforeText = `Googleマイビジネス ${result.before.googleBusiness}個${service === 'googleBusiness' ? `→${result.after.googleBusiness}個` : ''}・Instagram ${result.before.instagram}個${service === 'instagram' ? `→${result.after.instagram}個` : ''}`
   const slotText = addedSlot ? `追加枠 ${result.slotsBefore}枠→${result.slotsAfter}枠` : `追加枠 ${result.slotsAfter}枠のまま`
-  return <div className={styles.backdrop} role="presentation" onMouseDown={(event) => {
-    if (event.target === event.currentTarget && !busy) onBack()
-  }}><section ref={dialogRef} className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="linked-addition-title" onKeyDown={keyDown}>
-    <h2 id="linked-addition-title">{charged ? '追加連携枠の料金を確認' : '追加料金はかかりません'}</h2>
-    <p className={styles.lead}>{lineName}に{label}を1個追加します。</p>
+  return <Dialog open title={charged ? '追加連携枠の料金を確認' : '追加料金はかかりません'}
+    description={`${lineName}に${label}を1個追加します。`} size="medium" onCancel={onBack} busy={busy}
+    footer={<><Button type="button" variant="secondary" disabled={busy} onClick={onBack}>戻る</Button>
+      <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" onClick={() => void advance()}>
+        {charged ? '料金に同意して連携へ' : `${label}の連携へ`}</Button></>}>
     <div className={styles.priceBox}>
       <span>{charged ? '次回からの月額増分（税込）' : addedSlot ? '追加枠の料金は0円です' : '追加枠数は変わりません'}</span>
       <strong>{charged ? `＋${yen(result.monthlyIncreaseYen)} / 月` : '追加料金 ¥0'}</strong>
@@ -90,9 +70,6 @@ export default function LinkedAccountAddition({ lineName, service, before, slotU
         ? '接続情報を確認後に決済し、成功したら追加先を有効化します。追加枠は年払いでも毎月請求します。'
         : '接続を確認後に追加先を有効化します。無料期間の終了後、追加枠は毎月請求します。'
       : `${addedSlot ? '適用中の条件では追加料金が0円のため' : '追加枠数が変わらないため'}、料金の同意や決済は不要です。接続確認後に${label}を有効化します。`}</p>
-    {error && <p className={styles.error} role="alert">{error}</p>}
-    <div className={styles.actions}><button ref={backRef} type="button" className={styles.back} disabled={busy} onClick={onBack}>戻る</button>
-      <Button ref={primaryRef} type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="処理中…" onClick={() => void advance()}>
-        {charged ? '料金に同意して連携へ' : `${label}の連携へ`}</Button></div>
-  </section></div>
+    {error && <Notice tone="danger" role="alert">{error}</Notice>}
+  </Dialog>
 }

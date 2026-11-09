@@ -1,7 +1,11 @@
 'use client'
 
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { PageHeading } from '@/components/templates/page-frame'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Card from '@/components/shared/card'
+import { LoaderCircle } from 'lucide-react'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { useMemo, useState } from 'react'
 import { finalLineEndOption } from '@line-crm/shared'
@@ -64,50 +68,47 @@ export default function LastLineEnd({
 
   if (phase === 'ended') return <SaveErrorScope errors={saveErrors}><div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › アカウント › LINEの利用終了</p>
-    <h1>LINEの利用を終了しました</h1>
-    <p className={styles.lead}>「{lineName}」の接続を停止しました。</p>
+    <PageHeading title="LINEの利用を終了しました" subtitle={`「${lineName}」の接続を停止しました。`} />
     <section className={styles.result} aria-label="利用終了の結果">
       <span className={styles.resultIcon} aria-hidden="true">✓</span>
       <div><h2>有効なLINEは0個です</h2><p>アカウントと請求履歴は引き続き確認できます。</p></div>
     </section>
-    <div className={styles.bottom}><button type="button" className={styles.primary} onClick={onBack}>アカウント一覧へ</button></div>
+    <div className={styles.bottom}><Button type="button" variant="primary" onClick={onBack}>アカウント一覧へ</Button></div>
   </div></SaveErrorScope>
 
   if (phase === 'ending') return <SaveErrorScope errors={saveErrors}><div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › アカウント › LINEの利用終了</p>
-    <h1>{scheduledEndAt && Date.parse(scheduledEndAt) > Date.parse(now)
-      ? '終了予約を確認しています' : '利用終了の手続きを確認しています'}</h1>
-    <p className={styles.lead}>決済サービスとLINEの状態を確認中です。少し待ってから画面を再読み込みしてください。</p>
+    <PageHeading title={scheduledEndAt && Date.parse(scheduledEndAt) > Date.parse(now)
+      ? '終了予約を確認しています' : '利用終了の手続きを確認しています'}
+      subtitle="決済サービスとLINEの状態を確認中です。少し待ってから画面を再読み込みしてください。" />
     <section className={styles.result} aria-label="利用終了の処理状況">
-      <span className={styles.resultIcon} aria-hidden="true">…</span>
+      <span className={styles.resultIcon} aria-hidden="true"><LoaderCircle size={22} /></span>
       <div><h2>「{lineName}」の{scheduledEndAt && Date.parse(scheduledEndAt) > Date.parse(now)
         ? '終了予約を確認中' : '終了処理中'}</h2><p>確定済みの未払い分は請求対象です。</p></div>
     </section>
-    <div className={styles.bottom}><button type="button" className={styles.primary} onClick={onBack}>アカウント一覧へ</button></div>
+    <div className={styles.bottom}><Button type="button" variant="primary" onClick={onBack}>アカウント一覧へ</Button></div>
   </div></SaveErrorScope>
 
   if (phase === 'scheduled') return <SaveErrorScope errors={saveErrors}><div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › アカウント › LINEの利用終了</p>
-    <h1>LINEの利用終了を予約しました</h1>
-    <p className={styles.lead}>「{lineName}」は{day(scheduledEndAt!)}の前日まで利用できます。</p>
+    <PageHeading title="LINEの利用終了を予約しました" subtitle={`「${lineName}」は${day(scheduledEndAt!)}の前日まで利用できます。`} />
     <section className={styles.result} aria-label="利用終了の予約内容">
       <span className={styles.resultIcon} aria-hidden="true">✓</span>
       <div><h2>{day(scheduledEndAt!)}に利用を終了します</h2>
         <p>終了後の次回請求は発生しません。すでに確定した未払い分は請求対象です。</p></div>
     </section>
     <div className={styles.bottom}>
-      {onCancelSchedule && <button type="button" className={styles.secondary} disabled={busy} onClick={() => void submit(onCancelSchedule)}>終了予約を取り消す</button>}
-      <button type="button" className={styles.primary} onClick={onBack}>アカウント一覧へ</button>
+      {onCancelSchedule && <Button type="button" variant="secondary" disabled={busy} onClick={() => void submit(onCancelSchedule)}>終了予約を取り消す</Button>}
+      <Button type="button" variant="primary" onClick={onBack}>アカウント一覧へ</Button>
     </div>
-    {error && <p role="alert" className={styles.error}>{error}</p>}
+    {error && <Notice tone="danger" role="alert">{error}</Notice>}
   </div></SaveErrorScope>
 
   return <SaveErrorScope errors={saveErrors}><div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › アカウント › LINEの利用終了</p>
-    <h1>{confirmImmediate ? '今すぐLINEの利用を終了しますか' : '最後のLINEの利用を終了しますか'}</h1>
-    <p className={styles.lead}>{confirmImmediate
+    <PageHeading title={confirmImmediate ? '今すぐLINEの利用を終了しますか' : '最後のLINEの利用を終了しますか'} subtitle={confirmImmediate
       ? 'この操作を確定すると、LINEの接続と有料機能はすぐに停止します。'
-      : '利用終了日を選んでください。終了後もアカウントと請求履歴を確認できます。'}</p>
+      : '利用終了日を選んでください。終了後もアカウントと請求履歴を確認できます。'} />
 
     <div className={styles.columns}>
       <section className={styles.card} aria-labelledby="end-choice-title">
@@ -130,7 +131,7 @@ export default function LastLineEnd({
         </RadioCardGroup>}
         <p className={styles.small}>有効なLINEが0個になると、有料機能は利用できなくなります。請求履歴とアカウント情報は引き続き確認できます。</p>
       </section>
-      <aside className={styles.card} aria-labelledby="end-summary-title">
+      <Card variant="aside" padding="default" aria-labelledby="end-summary-title">
         <h2 id="end-summary-title">利用終了のご確認</h2>
         <dl className={styles.details}>
           <div><dt>対象のLINE</dt><dd>{lineName}</dd></div>
@@ -140,12 +141,12 @@ export default function LastLineEnd({
           <div><dt>確定済みの未払い</dt><dd>{yen(unpaidInvoiceYen)}</dd></div>
         </dl>
         <p className={styles.summaryNote}>終了日以降の新しい請求はありません。すでに確定した未払い分は残ります。</p>
-      </aside>
+      </Card>
     </div>
-    {error && <p role="alert" className={styles.error}>{error}</p>}
+    {error && <Notice tone="danger" role="alert">{error}</Notice>}
     <div className={styles.bottom}>
-      <button type="button" className={styles.secondary} onClick={confirmImmediate ? () => setConfirmImmediate(false) : onBack}>戻る</button>
-      <Button type="button" variant={confirmImmediate ? 'danger' : 'primary'} className={confirmImmediate ? styles.danger : styles.primary} busy={busy} busyLabel="処理中…"
+      <Button type="button" variant="secondary" onClick={confirmImmediate ? () => setConfirmImmediate(false) : onBack}>戻る</Button>
+      <Button type="button" variant={confirmImmediate ? 'danger' : 'primary'} busy={busy} busyLabel="処理中…"
         onClick={() => {
           if (confirmImmediate) void submit(onEndNow)
           else if (effectiveSelection === 'immediate') setConfirmImmediate(true)

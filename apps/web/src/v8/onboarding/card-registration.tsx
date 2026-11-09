@@ -1,9 +1,11 @@
 'use client'
 
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { useCallback, useEffect, useState } from 'react'
 import { ListPage } from '@/components/templates'
 import { PageContent } from '@/components/templates/page-frame'
+import { Steps } from '@/components/templates/steps'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api } from '@/lib/api'
 import styles from './card-registration.module.css'
@@ -96,12 +98,11 @@ export default function CardRegistration({ returnState = null, quoteId, onContin
     else window.location.assign('/accounts/new')
   }
 
-  return <ListPage heightMode="viewport" title="お支払い情報" help="カード登録後、LINE公式アカウントを接続します。">
+  return <ListPage heightMode="viewport" title="お支払い情報" help="カード登録後、LINE公式アカウントを接続します。"
+    steps={<Steps label="利用開始の手順" steps={[{ key: 'price', label: '料金を確認', state: 'done' },
+      { key: 'card', label: 'カードを登録', state: 'current' }, { key: 'line', label: 'LINEを接続', state: 'todo' }]} />}>
     <PageContent>
-      <p className={styles.lead}>カード情報はStripeの安全な画面で入力します。musuboにカード番号やセキュリティコードは保存されません。</p>
-      <ol className={styles.steps} aria-label="利用開始の手順">
-        <li><span>1</span>料金を確認</li><li className={styles.current}><span>2</span>カードを登録</li><li><span>3</span>LINEを接続</li>
-      </ol>
+      <Notice tone="info">カード情報はStripeの安全な画面で入力します。musuboにカード番号やセキュリティコードは保存されません。</Notice>
       <section className={styles.card} aria-labelledby="card-state-title">
         <div className={styles.stateHeading}>
           <span className={state === 'registered' ? styles.successIcon : styles.cardIcon} aria-hidden="true">
@@ -129,23 +130,23 @@ export default function CardRegistration({ returnState = null, quoteId, onContin
           <p>カード登録時の請求：¥0</p>
         </div>
         <p className={styles.note}>カードを登録するだけでは請求は始まりません。無料期間と初回請求日は、最初のLINEを有効化した後に確認できます。</p>
-        {actionError && <p className={styles.error} role="alert">{actionError}</p>}
+        {actionError && <Notice tone="danger" role="alert">{actionError}</Notice>}
         <div className={styles.actions}>
           {state === 'registered'
-            ? <button type="button" className={styles.primary} onClick={next}>LINEアカウントの接続へ</button>
+            ? <Button type="button" variant="primary" onClick={next}>LINEアカウントの接続へ</Button>
             : state === 'checking'
-              ? <button type="button" className={styles.primary} disabled>確認中…</button>
+              ? <Button type="button" variant="primary" disabled>確認中…</Button>
               : <>
-                <Button type="button" variant="primary" className={styles.primary} onClick={() => void openCardForm()} busy={busy} busyLabel="画面を開いています…">
+                <Button type="button" variant="primary" onClick={() => void openCardForm()} busy={busy} busyLabel="画面を開いています…">
                   {returnState === 'cancel' ? 'カードを登録し直す' : 'Stripeでカードを登録する'}
                 </Button>
-                {(state === 'error' || returnState === 'success') && <button type="button" className={styles.secondary} onClick={() => void refresh()}>登録状況を再確認</button>}
+                {(state === 'error' || returnState === 'success') && <Button type="button" variant="secondary" onClick={() => void refresh()}>登録状況を再確認</Button>}
               </>}
         </div>
       </section>
       <div className={styles.footer}>
         <p>後で再開する場合は、ログイン後の「利用開始の準備」から続けられます。</p>
-        {onBackToPricing && <button type="button" onClick={onBackToPricing}>料金の確認に戻る</button>}
+        {onBackToPricing && <Button type="button" variant="text" onClick={onBackToPricing}>料金の確認に戻る</Button>}
       </div>
     </PageContent>
   </ListPage>

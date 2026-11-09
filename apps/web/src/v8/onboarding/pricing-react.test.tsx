@@ -44,10 +44,10 @@ describe('Penの利用料金確認', () => {
     const details = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('料金の詳しい条件を見る'))!
     details.focus()
     await act(async () => { details.click() })
-    const dialog = host.querySelector<HTMLElement>('[role="dialog"]')!
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
     expect(document.activeElement).toBe(dialog.querySelector('button[aria-label="閉じる"]'))
     await act(async () => { dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
-    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
     expect(document.activeElement).toBe(details)
   })
 
@@ -99,9 +99,9 @@ describe('Penの利用料金確認', () => {
     expect(host.querySelector('input[type=checkbox]')).toBeNull()
     const details = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('標準料金のしくみを見る'))!
     await act(async () => { details.click() })
-    expect(host.textContent).toContain('友だち数の基準と超過料金は、個別のお見積もり')
-    expect(host.textContent).not.toContain('例｜LINE 1個の場合')
-    const close = [...host.querySelectorAll('button')].find((button) => button.textContent === '料金確認に戻る')!
+    expect(document.body.textContent).toContain('友だち数の基準と超過料金は、個別のお見積もり')
+    expect(document.body.textContent).not.toContain('例｜LINE 1個の場合')
+    const close = [...document.querySelectorAll('button')].find((button) => button.textContent === '料金確認に戻る')!
     await act(async () => { close.click() })
     const contact = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('お問い合わせフォームへ'))!
     await act(async () => { contact.click() })
@@ -134,7 +134,7 @@ describe('Penの利用料金確認', () => {
     await act(async () => { inputValue('friend-count', '2800') })
     await selectValue('google-count', '2')
     expect(host.textContent).toContain('¥6,250 / 月')
-    const annual = [...host.querySelectorAll('button')].find((button) => button.textContent === '年払い')!
+    const annual = host.querySelector<HTMLInputElement>('input[type="radio"][value="year"]')!
     await act(async () => { annual.click() })
     expect(host.textContent).toContain('¥31,860 / 年')
     expect(host.textContent).toContain('オプション料金¥3,300／月は毎月別に請求します')

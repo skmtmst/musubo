@@ -6,6 +6,9 @@ import { api, ApiError } from '@/lib/api'
 import type { MusuboLineResumptionState } from '@/lib/api/features/musubo-line-resumption'
 import type { LineResumeCompleteView } from './line-resumption'
 import ListState from '@/components/shared/list-state'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { PageHeading } from '@/components/templates/page-frame'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import { LineResumptionComplete, LineResumptionConnectionRecovery, LineResumptionPaymentRecovery,
   LineResumptionHandover, LineResumptionReview } from './line-resumption'
@@ -91,9 +94,9 @@ export function MusuboLineResumptionCardPage() {
     expired={state.payment.kind === 'payment_expired'}
     onCardUpdate={updateCard} onRecheck={load} />
   if (state.reconciliationPending) return <div role="status">
-    <h1>お支払いとLINE接続を確認しています</h1>
-    <p>再開の結果を確認中です。重複したお支払いは行わず、結果が確定すると利用を再開します。</p>
-    <button type="button" onClick={() => void load()}>状態を再確認する</button>
+    <PageHeading title="お支払いとLINE接続を確認しています"
+      subtitle="再開の結果を確認中です。重複したお支払いは行わず、結果が確定すると利用を再開します。" />
+    <Button type="button" variant="secondary" onClick={() => void load()}>状態を再確認する</Button>
   </div>
   const primary = async (token?: string) => {
     if (!cardReady) {
@@ -118,7 +121,7 @@ export function MusuboLineResumptionCardPage() {
     }
   }
   return <>
-    {error && <p role="alert">{error}</p>}
+    {error && <Notice tone="danger" role="alert">{error}</Notice>}
     <LineResumptionHandover phase={cardReady ? 'ready' : 'card_required'}
       onPrimary={() => primary()} onBack={() => router.push(reviewPath)} />
     {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)}

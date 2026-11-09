@@ -9,6 +9,7 @@ import PasswordRequirements from '@/components/auth/password-requirements'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import TextLink from '@/components/shared/text-link'
 import { storeAdminSession, twoFactorChallengeHandoffPath } from '@/lib/admin-session'
 import { authRequest, confirmError, CONTACT_URL, internalAuthFailureCopy, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
@@ -149,7 +150,7 @@ function CompleteInner() {
           <p>安全のため、この画面では申込情報を表示しません。</p>
           <p>まだアカウントを作成していない場合は、申込時のメールアドレスを添えてお問い合わせください。担当者が登録状況を確認します。</p>
         </div>
-        <a href={CONTACT_URL} target="_blank" rel="noreferrer" className={styles.contact}>お問い合わせへ</a>
+        <TextLink external href={CONTACT_URL}>お問い合わせへ</TextLink>
         <a href="/login" className={styles.login}>すでに設定を終えた方はログインへ</a>
       </AuthCard>
     )
@@ -161,7 +162,7 @@ function CompleteInner() {
         <strong>次に行うこと</strong>
         お申し込み時のメールをご確認ください。担当者からの連絡がない場合はお問い合わせください。
       </div>
-      <a href={CONTACT_URL} target="_blank" rel="noreferrer" className={styles.contact}>お問い合わせ</a>
+      <TextLink external href={CONTACT_URL}>お問い合わせ</TextLink>
       <a href="/login" className={styles.login}>ログイン画面に戻る</a>
     </AuthCard>
   }

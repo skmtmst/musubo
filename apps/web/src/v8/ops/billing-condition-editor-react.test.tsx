@@ -23,7 +23,8 @@ afterEach(() => {
 })
 
 function editInput(label: string, value: string) {
-  const input = [...host.querySelectorAll('label')].find((item) => item.textContent?.includes(label))?.querySelector('input')
+  const fieldLabel = [...host.querySelectorAll('label')].find((item) => item.textContent?.includes(label))
+  const input = fieldLabel?.htmlFor ? document.getElementById(fieldLabel.htmlFor) as HTMLInputElement | null : null
   expect(input).toBeTruthy()
   const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
   setter.call(input, value)

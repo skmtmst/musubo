@@ -5,6 +5,8 @@ import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import TextLink from '@/components/shared/text-link'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import type { BillingInvoice, BillingSummary } from '@/lib/hq-billing'
 import { formatYen } from '@line-crm/shared'
 import styles from './musubo-billing.module.css'
@@ -45,25 +47,25 @@ export default function MusuboBilling({ pricing, invoices, invoiceFailed, onRetr
   const firstCharge = pricing.status === 'awaiting_first_line' ? 'LINE接続後に確定'
     : shortDate(pricing.firstChargeDate)
   return <div className={styles.page} data-design="MusuboBilling">
-    <div className={styles.metrics}>
-      <div><span>今月の請求</span><strong>{pricing.status === 'trialing' ? '¥0' : '確認中'}</strong></div>
-      <div><span>有効なLINE</span><strong>{pricing.activeLines.length}個</strong></div>
-      <div><span>未払い</span><strong>{openInvoices === null ? '確認中' : `${openInvoices}件`}</strong></div>
-      <div><span>初回請求日</span><strong>{firstCharge}</strong></div>
-    </div>
+    <KpiBand appearance="cards" maxColumns={4}>
+      <KpiCard title="今月の請求" value={null} valueText={pricing.status === 'trialing' ? '¥0' : '確認中'} unit="" detail="" />
+      <KpiCard title="有効なLINE" value={pricing.activeLines.length} unit="個" detail="" />
+      <KpiCard title="未払い" value={openInvoices} valueText={openInvoices === null ? '確認中' : undefined} unit="件" detail="" />
+      <KpiCard title="初回請求日" value={null} valueText={firstCharge} unit="" detail="" />
+    </KpiBand>
     <Notice tone={pricing.status === 'past_due' ? 'danger' : 'info'} message={statusMessage(pricing)} />
     <h2 className={styles.heading}>現在の利用と次の請求</h2>
     <div className={styles.columns}>
       <Card as="section" layout="vertical" padding="default" gap="normal">
         <div className={styles.cardHead}><h3>有効なLINEアカウント</h3><strong>{pricing.activeLines.length}個</strong></div>
         {pricing.activeLines.length ? <ul className={styles.lineList}>{pricing.activeLines.map((line) =>
-          <li key={line.id}><span>{line.name}</span><span className={styles.lineActions}>
+          <li className={styles.lineRow} key={line.id}><span>{line.name}</span><span className={styles.lineActions}>
             <span className={styles.active}>{pricing.lineRemoval?.lineAccountId === line.id
               ? '利用終了予約中' : '利用中'}</span>
             {canManagePayment && pricing.activeLines.length === 2 && !pricing.quoteId
               && (!pricing.lineRemoval || pricing.lineRemoval.lineAccountId === line.id)
-              ? <button type="button" className={styles.removeLink}
-                onClick={() => setRemovalLineId(line.id)}>{pricing.lineRemoval ? '予約を確認' : '利用を終了'}</button> : null}
+              ? <Button type="button" variant="text" onClick={() => setRemovalLineId(line.id)}>
+                {pricing.lineRemoval ? '予約を確認' : '利用を終了'}</Button> : null}
           </span></li>)}</ul>
           : <p className={styles.muted}>まだLINEは接続されていません。</p>}
         {pricing.status !== 'ended' && canManagePayment ? <div className={styles.actions}>
@@ -92,14 +94,14 @@ export default function MusuboBilling({ pricing, invoices, invoiceFailed, onRetr
           <p className={styles.muted}>申込時の友だち数による概算です。確定額は接続後に確認できます。</p>
         </> : <p className={styles.muted}>接続するLINEと料金条件が確定すると表示されます。</p>}
         {pricing.firstChargeDate ? <p className={styles.date}>初回請求予定日：{shortDate(pricing.firstChargeDate)}</p> : null}
-        {portalAvailable && canManagePayment ? <button className={styles.textButton} onClick={onPortal}>カード情報を確認・変更 →</button> : null}
+        {portalAvailable && canManagePayment ? <Button type="button" variant="text" onClick={onPortal}>カード情報を確認・変更 →</Button> : null}
       </Card>
     </div>
     <section className={styles.history}>
       <h2 className={styles.heading}>支払い履歴</h2>
-      {invoiceFailed ? <div className={styles.historyState}>支払い履歴を読み込めませんでした。<button onClick={onRetry}>再読み込み</button></div>
+      {invoiceFailed ? <div className={styles.historyState}>支払い履歴を読み込めませんでした。<Button type="button" variant="text" onClick={onRetry}>再読み込み</Button></div>
         : invoices?.length ? <ul className={styles.invoiceList}>{invoices.map((invoice) =>
-          <li key={invoice.id}><span>{invoice.description ?? invoice.number ?? '請求'}</span>
+          <li className={styles.invoiceRow} key={invoice.id}><span>{invoice.description ?? invoice.number ?? '請求'}</span>
             <strong>{formatYen(invoice.amountYen)}</strong>
             {invoice.hostedUrl ? <TextLink external href={invoice.hostedUrl}>明細を見る</TextLink> : null}</li>)}</ul>
           : <p className={styles.muted}>まだお支払いはありません。</p>}

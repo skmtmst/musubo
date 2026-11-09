@@ -1,6 +1,9 @@
 'use client'
 
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { PageHeading } from '@/components/templates/page-frame'
+import { Steps } from '@/components/templates/steps'
 import { useState } from 'react'
 import styles from './line-resumption.module.css'
 
@@ -50,8 +53,11 @@ function ProgressSteps({ payment = false }: { payment?: boolean }) {
   const steps = payment
     ? [['過去の請求を支払う', 'Stripeの画面で確認します'], ['決済完了を確認', '結果を自動で反映します'], ['再開料金を確認', '新しい請求前に内容を確認']]
     : [['料金を確認', '適用条件と請求日を確認します'], ['カードを確認', '更新が必要な場合だけStripeへ'], ['LINEを接続', '前回の接続情報を確認します']]
-  return <ol className={styles.steps}>{steps.map(([title, note], index) =>
-    <li key={title}><span className={styles.stepNumber}>{index + 1}</span><div><strong>{title}</strong><small>{note}</small></div></li>)}</ol>
+  return <>
+    <Steps label={payment ? '未払い後の再開手順' : 'LINEの利用再開手順'}
+      steps={steps.map(([title], index) => ({ key: String(index), label: title, state: index === 0 ? 'current' : 'todo' }))} />
+    <p className={styles.cardLead}>{steps.map(([, note]) => note).join(' → ')}</p>
+  </>
 }
 
 /** Present a server-verified renewal offer. This component never starts a charge itself. */
@@ -81,10 +87,9 @@ export function LineResumptionReview({ view, onContinue, onPayOutstanding, onBac
   }
   return <div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › 統括の設定 › 請求 › 利用再開</p>
-    <h1>{title}</h1>
-    <p className={styles.lead}>{unpaid
+    <PageHeading title={title} subtitle={unpaid
       ? '過去の未払いがあります。お支払いの完了を確認した後、再開時の料金をご案内します。'
-      : '同じ会社アカウントで再開できます。料金を確認してからLINEを接続してください。'}</p>
+      : '同じ会社アカウントで再開できます。料金を確認してからLINEを接続してください。'} />
     <StatusBand warning={unpaid} title={status[0]} description={status[1]} badge={status[2]} />
     <div className={styles.columns}>
       <section className={styles.card} aria-labelledby="resume-price-title">
@@ -125,8 +130,8 @@ export function LineResumptionReview({ view, onContinue, onPayOutstanding, onBac
         <p className={styles.cardLead}>{unpaid ? '決済完了を確認してから再開の料金をご案内します。'
           : '会社情報やログイン用アカウントの再登録は不要です。'}</p>
         <ProgressSteps payment={unpaid} />
-        {error && <p className={styles.error} role="alert">{error}</p>}
-        <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="処理中…" onClick={() => void perform()}>
+        {error && <Notice tone="danger" role="alert">{error}</Notice>}
+        <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" onClick={() => void perform()}>
           {unpaid ? '未払いを支払う' : '確認して次へ進む'}</Button>
       </section>
     </div>
@@ -137,7 +142,7 @@ export function LineResumptionReview({ view, onContinue, onPayOutstanding, onBac
         : view.kind === 'annual_paid' || view.kind === 'monthly_paid'
           ? 'お支払い済みの範囲は再請求しません。友だち超過と追加連携枠の料金もこの画面で確認できます。'
           : '実際の請求日と次回請求日はLINE接続成功日から確定します。無料体験は再適用されません。'}</p>
-      <button type="button" className={styles.back} onClick={onBack}>{unpaid ? '請求履歴を見る' : '請求に戻る'}</button></div>
+      <Button type="button" variant="secondary" onClick={onBack}>{unpaid ? '請求履歴を見る' : '請求に戻る'}</Button></div>
   </div>
 }
 
@@ -159,10 +164,9 @@ export function LineResumptionHandover({ phase, onPrimary, onBack }: {
   }
   return <div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › 統括の設定 › 請求 › 利用再開</p>
-    <h1>{card ? 'お支払い方法を確認' : 'LINEを接続して再開'}</h1>
-    <p className={styles.lead}>{card
+    <PageHeading title={card ? 'お支払い方法を確認' : 'LINEを接続して再開'} subtitle={card
       ? '再開時の料金は確認済みです。登録済みカードの更新が必要な場合だけ手続きします。'
-      : '料金とお支払い方法を確認しました。続けて前回のLINE接続を確認してください。'}</p>
+      : '料金とお支払い方法を確認しました。続けて前回のLINE接続を確認してください。'} />
     <section className={styles.handoverCard} aria-label="再開手続きの確認">
       <StatusBand warning={card} title={card ? 'カードの確認が必要です' : '再開の準備ができました'}
         description={card
@@ -175,9 +179,9 @@ export function LineResumptionHandover({ phase, onPrimary, onBack }: {
         ? 'カード情報はStripeが管理します。更新だけでは新しいLINE基本料金の請求は始まりません。'
         : 'LINEの接続情報を確認し、決済が必要な場合は成功後に利用を再開します。'}</p>
     </section>
-    {error && <p className={styles.error} role="alert">{error}</p>}
-    <div className={styles.bottom}><button type="button" className={styles.back} onClick={onBack}>再開料金の確認に戻る</button>
-      <Button type="button" variant="primary" className={styles.bottomPrimary} busy={busy} busyLabel="処理中…" onClick={() => void perform()}>
+    {error && <Notice tone="danger" role="alert">{error}</Notice>}
+    <div className={styles.bottom}><Button type="button" variant="secondary" onClick={onBack}>再開料金の確認に戻る</Button>
+      <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" onClick={() => void perform()}>
         {card ? 'Stripeでカードを更新' : '前回のLINEを確認して再開'}</Button></div>
   </div>
 }
@@ -190,8 +194,7 @@ export function LineResumptionConnectionRecovery({ lineAccountId, onBack }: {
     ? `/accounts/detail?id=${encodeURIComponent(lineAccountId)}` : '/accounts'
   return <div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › 統括の設定 › 請求 › 利用再開</p>
-    <h1>前回のLINE接続を確認できません</h1>
-    <p className={styles.lead}>接続情報を更新した後に、最新の友だち数と再開料金を確認してください。</p>
+    <PageHeading title="前回のLINE接続を確認できません" subtitle="接続情報を更新した後に、最新の友だち数と再開料金を確認してください。" />
     <section className={styles.handoverCard} aria-label="接続情報の更新">
       <StatusBand warning title="接続情報の更新が必要です"
         description="前回のLINEチャネルの接続情報を確認できませんでした。アカウント設定で更新してください。" />
@@ -200,8 +203,8 @@ export function LineResumptionConnectionRecovery({ lineAccountId, onBack }: {
         <p>○　接続情報を更新し、最新の料金を再確認</p></div>
       <p className={styles.handoverNote}>接続情報の更新だけでは請求されません。料金を再確認し、本人確認後に再開できます。</p>
     </section>
-    <div className={styles.bottom}><button type="button" className={styles.back} onClick={onBack}>請求に戻る</button>
-      <Button href={settingsHref} variant="primary" className={styles.bottomPrimary}>アカウント設定を開く</Button></div>
+    <div className={styles.bottom}><Button type="button" variant="secondary" onClick={onBack}>請求に戻る</Button>
+      <Button href={settingsHref} variant="primary">アカウント設定を開く</Button></div>
   </div>
 }
 
@@ -219,8 +222,8 @@ export function LineResumptionPaymentRecovery({ hostedInvoiceUrl, expired, onCar
   }
   return <div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › 統括の設定 › 請求 › 利用再開</p>
-    <h1>{expired ? '再開分のお支払いを確認できません' : 'お支払いを確認できませんでした'}</h1>
-    <p className={styles.lead}>LINEはまだ再開していません。お支払いの状況を確認してください。</p>
+    <PageHeading title={expired ? '再開分のお支払いを確認できません' : 'お支払いを確認できませんでした'}
+      subtitle="LINEはまだ再開していません。お支払いの状況を確認してください。" />
     <section className={styles.handoverCard} aria-label="再開分のお支払い">
       <StatusBand warning title={expired ? 'お支払いの期限が切れました' : '再開分のお支払いが必要です'}
         description={expired ? 'この再開分の決済は期限切れです。サポートにお問い合わせください。'
@@ -229,14 +232,12 @@ export function LineResumptionPaymentRecovery({ hostedInvoiceUrl, expired, onCar
         <p>✓　再開時の料金と請求日を確認済み</p><p>○　決済確認待ち・LINE未接続</p></div>
       <p className={styles.handoverNote}>決済が成功するまでLINEは有効化されません。お支払い後、この画面で状態を再確認してください。</p>
     </section>
-    {error && <p className={styles.error} role="alert">{error}</p>}
+    {error && <Notice tone="danger" role="alert">{error}</Notice>}
     <div className={styles.bottom}>
-      <button type="button" className={styles.back} disabled={busy} onClick={() => void perform(onRecheck)}>再開の状態を再確認する</button>
-      {expired ? <Button href="/hq/support" variant="primary"
-        className={styles.bottomPrimary}>お問い合わせへ</Button> : <div className={styles.recoveryActions}>
-        <button type="button" className={styles.back} disabled={busy} onClick={() => void perform(onCardUpdate)}>カードを更新する</button>
-        {hostedInvoiceUrl && <Button href={hostedInvoiceUrl} external variant="primary"
-          className={styles.bottomPrimary}>Stripeで支払いを完了</Button>}
+      <Button type="button" variant="secondary" disabled={busy} onClick={() => void perform(onRecheck)}>再開の状態を再確認する</Button>
+      {expired ? <Button href="/hq/support" variant="primary">お問い合わせへ</Button> : <div className={styles.recoveryActions}>
+        <Button type="button" variant="secondary" disabled={busy} onClick={() => void perform(onCardUpdate)}>カードを更新する</Button>
+        {hostedInvoiceUrl && <Button href={hostedInvoiceUrl} external variant="primary">Stripeで支払いを完了</Button>}
       </div>}
     </div>
   </div>
@@ -251,8 +252,7 @@ export function LineResumptionComplete({ view, onAccounts }: { view: LineResumeC
   const charge = view.chargedNowYen ?? 0
   return <div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › アカウント › 登録完了</p>
-    <h1>LINEの利用を再開しました</h1>
-    <p className={styles.lead}>LINEの接続確認が完了し、musuboの機能を再び利用できます。</p>
+    <PageHeading title="LINEの利用を再開しました" subtitle="LINEの接続確認が完了し、musuboの機能を再び利用できます。" />
     <section className={styles.completeCard} aria-label="利用再開の結果">
       <div className={styles.completeHeading}><span className={styles.iconSuccess} aria-hidden="true">✓</span><h2>{statusTitle}</h2></div>
       <p>{trial ? '適用中の利用条件の残り期間を引き継ぎます。再開しても無料期間は最初からやり直しません。'
@@ -269,6 +269,6 @@ export function LineResumptionComplete({ view, onAccounts }: { view: LineResumeC
       <p className={styles.completeHint}>追加料金：{money(view.optionsMonthlyYen ?? 0)}／月（税込）。LINEを増やすときは、接続前に増分の料金をご確認いただけます。</p>
     </section>
     <div className={styles.bottom}><p>再開後の料金と請求日は、請求画面でも確認できます。</p>
-      <button type="button" className={styles.bottomPrimary} onClick={onAccounts}>アカウント一覧へ</button></div>
+      <Button type="button" variant="primary" onClick={onAccounts}>アカウント一覧へ</Button></div>
   </div>
 }

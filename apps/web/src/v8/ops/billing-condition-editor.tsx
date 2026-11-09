@@ -4,6 +4,12 @@ import Button from '@/components/shared/button'
 import { useMemo, useState } from 'react'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
+import DateField from '@/components/shared/date-field'
+import { Field } from '@/components/shared/form-controls'
+import Notice from '@/components/shared/notice'
+import StatusBadge from '@/components/shared/status-badge'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { PageHeading } from '@/components/templates/page-frame'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import {
   musuboConditionPreview,
@@ -67,66 +73,63 @@ export default function BillingConditionEditor({ conditions, onSave, onCreate }:
   }
 
   return <SaveErrorScope errors={saveErrors}><div className={styles.page}>
-    <div className={styles.heading}>
-      <div><h1>利用条件</h1><p>承認時に会社へ付与する料金・無料期間を作成し、管理します。</p></div>
-      <button type="button" className={styles.primary} onClick={onCreate}>＋ 新しい条件</button>
-    </div>
+    <PageHeading title="利用条件" subtitle="承認時に会社へ付与する料金・無料期間を作成し、管理します。"
+      actions={<Button type="button" variant="primary" onClick={onCreate}>＋ 新しい条件</Button>} />
     <div className={styles.columns}>
       <section className={styles.listCard} aria-labelledby="conditions-heading">
         <h2 id="conditions-heading">登録済みの条件</h2>
-        <div className={styles.conditionList}>
-          {conditions.map((condition) => <button type="button" key={condition.id}
-            className={condition.id === selectedId ? styles.conditionSelected : styles.condition}
-            onClick={() => choose(condition)}>
-            <strong>{condition.internalName}</strong>
-            <span>{condition.trialPeriod.value}{condition.trialPeriod.unit === 'months' ? 'か月' : '日'}無料・LINE基本料金{condition.lineBasicDiscountPercent}%オフ</span>
-            <small>{condition.status === 'active' ? '有効' : '無効'}</small>
-          </button>)}
-        </div>
+        <div className={styles.conditionList}><RadioCardGroup legend="登録済みの利用条件">
+          {conditions.map((condition) => <RadioCard key={condition.id} name="billing-condition"
+            value={condition.id} checked={condition.id === selectedId} onChange={() => choose(condition)}
+            title={condition.internalName}
+            note={`${condition.trialPeriod.value}${condition.trialPeriod.unit === 'months' ? 'か月' : '日'}無料・LINE基本料金${condition.lineBasicDiscountPercent}%オフ`}>
+            <StatusBadge tone={condition.status === 'active' ? 'success' : 'neutral'} dot={false}>
+              {condition.status === 'active' ? '有効' : '無効'}</StatusBadge>
+          </RadioCard>)}
+        </RadioCardGroup></div>
         <p className={styles.help}>承認画面には「有効」の条件だけを表示します。変更履歴は監査ログに記録します。</p>
       </section>
       {draft && <section className={styles.editorCard} aria-labelledby="editor-heading">
         <div className={styles.editorHeading}><h2 id="editor-heading">{draft.internalName || '新しい条件'}</h2>
           <span className={draft.status === 'active' ? styles.active : styles.inactive}>{draft.status === 'active' ? '有効' : '無効'}</span></div>
         <div className={styles.grid}>
-          <label className={styles.field}><span>名称（運営用）</span>
-            <TextField value={draft.internalName} maxLength={80} onChange={(event) => change({ internalName: event.target.value })} /></label>
-          <div className={styles.field}><span>状態</span>
+          <Field label="名称（運営用）" optional={false}>
+            <TextField value={draft.internalName} maxLength={80} onChange={(event) => change({ internalName: event.target.value })} /></Field>
+          <Field label="状態" optional={false}>
             <Select aria-label="状態" size="full" value={draft.status}
               onChange={(value) => change({ status: value as MusuboConditionDefinition['status'] })}
-              options={[{ value: 'active', label: '有効' }, { value: 'inactive', label: '無効' }]} /></div>
-          <div className={styles.field}><span>無料期間（初回LINE有効化から）</span>
+              options={[{ value: 'active', label: '有効' }, { value: 'inactive', label: '無効' }]} /></Field>
+          <Field label="無料期間（初回LINE有効化から）" optional={false}>
             <span className={styles.inlineFields}>
               <TextField type="number" aria-label="無料期間の長さ" min={1} max={draft.trialPeriod.unit === 'months' ? 12 : 365}
                 value={draft.trialPeriod.value} onChange={(event) => change({ trialPeriod: { ...draft.trialPeriod, value: Number(event.target.value) } })} />
               <Select aria-label="無料期間の単位" size="content" value={draft.trialPeriod.unit}
                 onChange={(value) => change({ trialPeriod: { unit: value as 'days' | 'months', value: draft.trialPeriod.value } })}
                 options={[{ value: 'days', label: '日' }, { value: 'months', label: 'か月' }]} />
-            </span></div>
-          <label className={styles.field}><span>LINE基本料金の割引率</span>
+            </span></Field>
+          <Field label="LINE基本料金の割引率" optional={false}>
             <span className={styles.percent}><TextField type="number" min={0} max={100} value={draft.lineBasicDiscountPercent}
-              onChange={(event) => change({ lineBasicDiscountPercent: Number(event.target.value) })} /><span>%</span></span></label>
-          <div className={styles.field}><span>割引期間</span>
+              onChange={(event) => change({ lineBasicDiscountPercent: Number(event.target.value) })} /><span>%</span></span></Field>
+          <Field label="割引期間" optional={false}>
             <Select aria-label="割引期間" size="full" value={draft.discountEndsOn === null ? 'forever' : 'date'}
               onChange={(value) => change({ discountEndsOn: value === 'forever' ? null : todayJst() })}
               options={[{ value: 'forever', label: '期限なし' }, { value: 'date', label: '終了日を指定' }]} />
-            {draft.discountEndsOn !== null && <input type="date" value={draft.discountEndsOn}
-              aria-label="割引終了日" onChange={(event) => change({ discountEndsOn: event.target.value })} />}
-          </div>
-          <div className={styles.field}><span>承認に使える期限</span>
+            {draft.discountEndsOn !== null && <DateField value={draft.discountEndsOn}
+              aria-label="割引終了日" onChange={(value) => change({ discountEndsOn: value })} />}
+          </Field>
+          <Field label="承認に使える期限" optional={false}>
             <Select aria-label="承認に使える期限" size="full" value={draft.approvalUseUntil === null ? 'forever' : 'date'}
               onChange={(value) => change({ approvalUseUntil: value === 'forever' ? null : todayJst() })}
               options={[{ value: 'forever', label: '期限なし' }, { value: 'date', label: '期限を指定' }]} />
-            {draft.approvalUseUntil !== null && <input type="date" value={draft.approvalUseUntil}
-              aria-label="承認に使える期限日" onChange={(event) => change({ approvalUseUntil: event.target.value })} />}
-          </div>
-          <label className={styles.field}><span>適用できる会社名（任意）</span>
+            {draft.approvalUseUntil !== null && <DateField value={draft.approvalUseUntil}
+              aria-label="承認に使える期限日" onChange={(value) => change({ approvalUseUntil: value })} />}
+          </Field>
+          <Field label="適用できる会社名" optional note="入力した場合、承認する会社名が一致するときだけ選べます。">
             <TextField value={draft.allowedCompanyName ?? ''} placeholder="特定の会社だけに使う場合"
               onChange={(event) => change({ allowedCompanyName: event.target.value || null })} />
-            <small>入力した場合、承認する会社名が一致するときだけ選べます。</small>
-          </label>
-          <div className={styles.field}><span>割引対象</span><div className={styles.locked}>LINEアカウント基本料金のみ（固定）</div>
-            <small>統括機能・超過料金・その他オプションは対象外です。</small></div>
+          </Field>
+          <Field label="割引対象" optional={false} note="統括機能・超過料金・その他オプションは対象外です。">
+            <div className={styles.locked}>LINEアカウント基本料金のみ（固定）</div></Field>
         </div>
         <div className={styles.priceSection}>
           <h3>月額単価（税込）</h3>
@@ -138,11 +141,10 @@ export default function BillingConditionEditor({ conditions, onSave, onCreate }:
               ['sixthToTenthLineYen', 'LINE 6〜10個目の基本料金（1個あたり）'],
               ['headquartersYen', '統括機能'],
               ['linkedAccountSlotYen', '追加連携枠（1枠あたり）'],
-            ] as const).map(([key, label]) => <label className={styles.field} key={key}>
-              <span>{label}</span>
+            ] as const).map(([key, label]) => <Field label={label} optional={false} key={key}>
               <span className={styles.yen}><TextField type="number" min={0} step={1} value={draft.schedule[key]}
                 onChange={(event) => changePrice(key, Number(event.target.value))} /><span>円／月</span></span>
-            </label>)}
+            </Field>)}
           </div>
         </div>
         <div className={styles.preview}><h3>料金プレビュー（月払い・税込）</h3>
@@ -151,8 +153,8 @@ export default function BillingConditionEditor({ conditions, onSave, onCreate }:
           <small>2個目の料金には統括機能 {money(draft.schedule.headquartersYen)}（割引対象外）を含みます。</small>
         </div>
         <p className={styles.help}>保存後の変更は、承認済みの会社に自動で遡及しません。</p>
-        {error && <p className={styles.error} role="alert">{error}</p>}
-        <div className={styles.footer}><Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="保存中…" disabled={!preview}
+        {error && <Notice tone="danger" role="alert">{error}</Notice>}
+        <div className={styles.footer}><Button type="button" variant="primary" busy={busy} busyLabel="保存中…" disabled={!preview}
           onClick={() => void save()}>変更を保存</Button></div>
       </section>}
     </div>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import type { MusuboFinalLineEndState } from '@/lib/api/features/musubo-final-line-end'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import LastLineEnd, { type LastLineEndSchedule } from './last-line-end'
 
@@ -59,7 +60,7 @@ export default function MusuboFinalLineEndPage() {
     nextAnnualRenewalAt: instant(end.nextAnnualRenewalDate),
   }
   return <>
-    {error && <p role="alert">{error}</p>}
+    {error && <Notice tone="danger" role="alert">{error}</Notice>}
     <LastLineEnd lineName={end.lineName} schedule={schedule} now={now}
       phase={end.phase} scheduledEndAt={end.scheduledEndAt ?? undefined}
       unpaidInvoiceYen={end.unpaidInvoiceYen}
