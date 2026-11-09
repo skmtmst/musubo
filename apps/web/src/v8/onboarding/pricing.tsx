@@ -13,7 +13,7 @@ import { PageContent } from '@/components/templates/page-frame'
 import { Steps } from '@/components/templates/steps'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Checkbox from '@/components/shared/checkbox'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { Field } from '@/components/shared/form-controls'
@@ -243,7 +243,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
       <Dialog open={detailsOpen} title="料金の詳しい条件" size="large"
         description="接続したLINE公式アカウントの数に応じて料金が決まります。"
         onCancel={() => setDetailsOpen(false)}
-        footer={<Button type="button" variant="primary" onClick={() => setDetailsOpen(false)}>料金確認に戻る</Button>}>
+        footer={<DialogActions><Button type="button" variant="primary" onClick={() => setDetailsOpen(false)}>料金確認に戻る</Button></DialogActions>}>
           <div className={styles.detailBlock}>
             <h3>LINE公式アカウントの基本料金（税込）</h3>
             <dl><div><dt>1個目</dt><dd>{yen(condition.schedule.firstLineYen)} / 月</dd></div>

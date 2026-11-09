@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import type { MusuboLineRemovalState } from '@/lib/api/features/musubo-line-removal'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -61,7 +61,7 @@ export default function MusuboLineRemovalDialog({ lineId, onClose, onChanged }: 
     <Dialog open title={`${state?.lineName ?? 'LINE'}の利用を終了しますか`}
       description="LINEアカウントの利用終了" size="large" onCancel={onClose} busy={busy}
       error={error || undefined} dirty={false}
-      footer={<div className={styles.actions}>
+      footer={<DialogActions>
         {state?.phase === 'scheduled' ? <Button type="button" variant="secondary" disabled={busy}
           onClick={() => void change('cancel')}>終了予約を取り消す</Button> : null}
         {state?.phase === 'choose' ? <Button type="button" variant={confirmNow ? 'danger' : 'primary'}
@@ -70,7 +70,7 @@ export default function MusuboLineRemovalDialog({ lineId, onClose, onChanged }: 
             void change(selection)
           }}>{confirmNow ? '今すぐ利用を終了する' : selection === 'schedule'
             ? 'この内容で終了を予約する' : '終了内容を確認する'}</Button> : null}
-      </div>}>
+      </DialogActions>}>
       {!state ? <Notice tone="info">利用状況を確認しています…</Notice>
         : state.phase === 'ended' ? <div className={styles.result} role="status">
           <span className={styles.resultIcon} aria-hidden="true">✓</span>

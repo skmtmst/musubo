@@ -1,7 +1,7 @@
 'use client'
 
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import { useMemo, useState } from 'react'
 import { musuboLinkedRemovalPrice, utcCalendarDate, type LinkedAccountCounts, type MusuboLinkedService } from '@line-crm/shared'
@@ -55,7 +55,7 @@ export default function LinkedAccountRemovalModal(props: Props) {
   }
 
   if (!result || !dateText) return <Dialog open title="料金を表示できません" size="medium" onCancel={props.onBack}
-    footer={<Button type="button" variant="secondary" onClick={props.onBack}>戻る</Button>}>
+    footer={<DialogActions><Button type="button" variant="secondary" onClick={props.onBack}>戻る</Button></DialogActions>}>
       <p>連携数、料金、または次回の請求日を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
   </Dialog>
 
@@ -66,11 +66,11 @@ export default function LinkedAccountRemovalModal(props: Props) {
     description={props.phase === 'review'
       ? `${props.lineName}の「${props.connectionName}」を今すぐ停止します。`
       : `「${props.connectionName}」の連携は停止しています。`} size="medium" onCancel={props.onBack} busy={busy}
-    footer={<><Button type="button" variant="secondary" disabled={busy}
+    footer={<DialogActions><Button type="button" variant="secondary" disabled={busy}
       onClick={props.phase === 'review' ? props.onBack : props.onBilling}>{props.phase === 'review' ? '戻る' : '請求を見る'}</Button>
       <Button type="button" variant="primary" busy={busy} busyLabel="処理中…"
         onClick={props.phase === 'review' ? () => void confirmRemoval() : props.onAccounts}>
-        {props.phase === 'review' ? 'この連携を解除する' : 'アカウント一覧へ'}</Button></>}>
+        {props.phase === 'review' ? 'この連携を解除する' : 'アカウント一覧へ'}</Button></DialogActions>}>
     <div className={styles.priceBox}>
       <span>{props.phase === 'review' ? '次の月次請求からの減額（税込）' : '現在の追加枠'}</span>
       <strong>{props.phase === 'review'

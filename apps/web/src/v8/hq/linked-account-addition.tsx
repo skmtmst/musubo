@@ -1,7 +1,7 @@
 'use client'
 
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import { useMemo, useState } from 'react'
 import { musuboLinkedAdditionPrice, type LinkedAccountCounts, type MusuboLinkedAdditionInput,
@@ -39,7 +39,7 @@ export default function LinkedAccountAddition({ lineName, service, before, slotU
   }
 
   if (!result) return <Dialog open title="料金を表示できません" size="medium" onCancel={onBack}
-    footer={<Button type="button" variant="secondary" onClick={onBack}>戻る</Button>}>
+    footer={<DialogActions><Button type="button" variant="secondary" onClick={onBack}>戻る</Button></DialogActions>}>
     <p>連携数または料金を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
   </Dialog>
 
@@ -50,9 +50,9 @@ export default function LinkedAccountAddition({ lineName, service, before, slotU
   const slotText = addedSlot ? `追加枠 ${result.slotsBefore}枠→${result.slotsAfter}枠` : `追加枠 ${result.slotsAfter}枠のまま`
   return <Dialog open title={charged ? '追加連携枠の料金を確認' : '追加料金はかかりません'}
     description={`${lineName}に${label}を1個追加します。`} size="medium" onCancel={onBack} busy={busy}
-    footer={<><Button type="button" variant="secondary" disabled={busy} onClick={onBack}>戻る</Button>
+    footer={<DialogActions><Button type="button" variant="secondary" disabled={busy} onClick={onBack}>戻る</Button>
       <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" onClick={() => void advance()}>
-        {charged ? '料金に同意して連携へ' : `${label}の連携へ`}</Button></>}>
+        {charged ? '料金に同意して連携へ' : `${label}の連携へ`}</Button></DialogActions>}>
     <div className={styles.priceBox}>
       <span>{charged ? '次回からの月額増分（税込）' : addedSlot ? '追加枠の料金は0円です' : '追加枠数は変わりません'}</span>
       <strong>{charged ? `＋${yen(result.monthlyIncreaseYen)} / 月` : '追加料金 ¥0'}</strong>
