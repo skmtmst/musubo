@@ -230,6 +230,9 @@ hqBilling.get('/api/hq/billing/payment-failure', requireRole('owner', 'admin'), 
 // 即時変更を仮定した参考額だけを取得する。契約・顧客・DBは変更しない。
 hqBilling.get('/api/hq/billing/preview', requireRole('owner', 'admin'), async (c) => {
   c.header('Cache-Control', 'no-store');
+  if (await getMusuboTenantBilling(c.env.DB, tenantOf(c))) {
+    return c.json({ success: false, error: '新しい料金条件は利用料金の画面で確認してください' }, 409);
+  }
   const plan = findPlan(c.req.query('planKey'));
   const interval = c.req.query('interval');
   if (!plan || (interval !== 'month' && interval !== 'year')) {
@@ -345,6 +348,9 @@ hqBilling.get('/api/hq/billing/card-status', requireRole('owner', 'admin'), asyn
 hqBilling.post('/api/hq/billing/checkout', requireRole('owner', 'admin'), inputJsonBoundary({ planKey: ['string'], interval: ['string'] }), async (c) => {
   try {
     const tenantId = tenantOf(c);
+    if (await getMusuboTenantBilling(c.env.DB, tenantId)) {
+      return c.json({ success: false, error: 'この統括には新しい料金条件が適用されています。利用料金の画面をご確認ください' }, 409);
+    }
     const body = await c.req.json<{ planKey?: string; interval?: unknown } | null>().catch(() => null);
     const plan = findPlan(body?.planKey);
     if (!plan) return inputError(c, { success: false, error: 'プランを選んでください' }, 400, ["planKey"]);

@@ -98,6 +98,12 @@ function tenantRow() {
   return testDb.raw.prepare('SELECT plan_key, plan_status, trial_ends_at, stripe_customer_id, stripe_subscription_id, current_period_ends_at FROM tenants WHERE id = ?').get(DEFAULT_TENANT_ID) as Record<string, string | null>;
 }
 
+function seedNewPricingTenant() {
+  testDb.raw.prepare(`INSERT INTO musubo_tenant_billing
+    (tenant_id,pricing_snapshot_json,billing_interval,status,created_at,updated_at)
+    VALUES (?,'{}','month','awaiting_first_line','2026-11-09','2026-11-09')`).run(DEFAULT_TENANT_ID);
+}
+
 beforeEach(() => {
   testDb = createTestD1();
   for (const fn of Object.values(stripe)) fn.mockReset();
@@ -234,6 +240,22 @@ describe('申込（checkout）', () => {
     expect((await call('POST', '/api/hq/billing/checkout', { planKey: 'light' })).status).toBe(409);
     expect(stripe.createCheckoutSession).not.toHaveBeenCalled();
   });
+
+  it('新料金の統括は旧プランのCheckoutを開始できない', async () => {
+    seedNewPricingTenant();
+    const res = await call('POST', '/api/hq/billing/checkout', { planKey: 'light', interval: 'month' });
+    expect(res.status).toBe(409);
+    expect(stripe.createCustomer).not.toHaveBeenCalled();
+    expect(stripe.createCheckoutSession).not.toHaveBeenCalled();
+  });
+});
+
+it('新料金の統括は旧プランの即時変更見積もりを取得できない', async () => {
+  seedNewPricingTenant();
+  const res = await call('GET', '/api/hq/billing/preview?planKey=light&interval=month');
+  expect(res.status).toBe(409);
+  expect(stripe.retrieveSubscription).not.toHaveBeenCalled();
+  expect(stripe.createInvoicePreview).not.toHaveBeenCalled();
 });
 
 describe('請求前のカード登録', () => {
