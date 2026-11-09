@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock() }))
 import OnboardingPricing from './pricing'
 import PricingQuoteFlow from './pricing-quote-flow'
 import { DEFAULT_MUSUBO_PRICE_SCHEDULE } from '@line-crm/shared'
