@@ -1,6 +1,10 @@
-import { getMusuboIndividualQuote, getMusuboTenantBilling, musuboQuoteFromRecord } from '@line-crm/db';
-import { jstDate, type AppliedMusuboCondition } from '@line-crm/shared';
+import { getLineAccountsByIds, getMusuboIndividualQuote, getMusuboTenantBilling,
+  musuboQuoteFromRecord } from '@line-crm/db';
+import { friendAllowanceForLineCount, jstDate, linkedAccountSlots,
+  type AppliedMusuboCondition } from '@line-crm/shared';
+import type { WorkerBindings } from '../worker-bindings.js';
 import { firstMusuboCoreTerms } from './musubo-contract-terms.js';
+import { fetchPreConnectFollowerInsight } from './musubo-large-line-consultation.js';
 
 interface InvoiceRow {
   subscription_id: string | null;
@@ -22,6 +26,24 @@ export type MusuboLineResumptionReview =
   | { kind: 'paid_expired'; conditionName: string; interval: 'month' | 'year';
     dueOnConnectionYen: number; nextLineBaseYen: number }
   | { kind: 'unpaid'; amountDueYen: number; invoiceAt: string; periodStart: string; periodEnd: string };
+
+export interface MusuboResumptionOptionQuote {
+  friendCount: number;
+  measuredOn: string;
+  friendBlocks: number;
+  linkedSlots: number;
+  googleBusinessCount: number;
+  instagramCount: number;
+  friendOverageMonthlyYen: number;
+  linkedSlotsMonthlyYen: number;
+  optionsMonthlyYen: number;
+  optionsChargeAt: string | null;
+  optionsDueNowYen: number;
+  totalDueNowYen: number;
+}
+
+export type MusuboLineResumptionOffer = Extract<MusuboLineResumptionReview, { kind: 'unpaid' }>
+  | (Exclude<MusuboLineResumptionReview, { kind: 'unpaid' }> & { options: MusuboResumptionOptionQuote });
 
 function asInstant(value: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error('Billing date is invalid');
@@ -103,31 +125,98 @@ export async function getMusuboLineResumptionReview(db: D1Database, tenantId: st
     dueOnConnectionYen: amount, nextLineBaseYen: amount };
 }
 
+/** Price the previous LINE from its current published insight before asking for consent. */
+export async function getMusuboLineResumptionOffer(env: WorkerBindings, tenantId: string,
+  now = new Date()): Promise<MusuboLineResumptionOffer> {
+  const review = await getMusuboLineResumptionReview(env.DB, tenantId, now);
+  if (review.kind === 'unpaid') return review;
+  const billing = await getMusuboTenantBilling(env.DB, tenantId);
+  if (!billing) throw new Error('Resumption contract is unavailable');
+  const line = await env.DB.prepare(`SELECT line_account_id,google_business_count,instagram_count
+    FROM musubo_line_usage WHERE tenant_id=? AND status='ended'
+    ORDER BY ended_at DESC LIMIT 1`).bind(tenantId).first<{
+      line_account_id: string; google_business_count: number; instagram_count: number }>();
+  if (!line) throw new Error('Previous LINE is unavailable');
+  const [account] = await getLineAccountsByIds(env.DB, [line.line_account_id],
+    env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+  if (!account || account.tenant_id !== tenantId || account.archived_at || account.is_active
+    || !account.channel_access_token || !account.channel_secret) {
+    throw new Error('Previous LINE credentials are unavailable');
+  }
+  const insight = await fetchPreConnectFollowerInsight(account.channel_access_token, now);
+  if (!insight || insight.followers > 500_000) {
+    throw new Error('Current LINE statistics require individual review');
+  }
+  const condition = JSON.parse(billing.pricing_snapshot_json) as AppliedMusuboCondition;
+  const quoteRow = billing.quote_id ? await getMusuboIndividualQuote(env.DB, billing.quote_id) : null;
+  if (billing.quote_id && (!quoteRow || quoteRow.tenant_id !== tenantId || quoteRow.status !== 'accepted')) {
+    throw new Error('Accepted quote is unavailable');
+  }
+  const quote = quoteRow ? musuboQuoteFromRecord(quoteRow) : null;
+  const schedule = quote?.finalSchedule ?? condition.schedule;
+  const allowance = friendAllowanceForLineCount(quote && quote.plannedLineCount > 10
+    ? quote.plannedLineCount : 1, schedule);
+  const friendBlocks = Math.ceil(Math.max(0, insight.friendsExcludingBlocked - allowance)
+    / schedule.extraFriendBlockSize);
+  const linkedSlots = linkedAccountSlots({ googleBusiness: line.google_business_count,
+    instagram: line.instagram_count });
+  const friendOverageMonthlyYen = friendBlocks * schedule.extraFriendBlockYen;
+  const linkedSlotsMonthlyYen = linkedSlots * schedule.linkedAccountSlotYen;
+  const optionsMonthlyYen = friendOverageMonthlyYen + linkedSlotsMonthlyYen;
+  if (!Number.isSafeInteger(optionsMonthlyYen)) throw new Error('Option price is invalid');
+  let optionsChargeAt: string | null = review.kind === 'trial_remaining'
+    ? review.nextChargeAt : null;
+  if (!optionsChargeAt && billing.options_subscription_id) {
+    const paid = await env.DB.prepare(`SELECT period_start,period_end FROM billing_invoices
+      WHERE tenant_id=? AND subscription_id=? AND status='paid'
+        AND period_start IS NOT NULL AND period_end IS NOT NULL
+      ORDER BY created_at DESC LIMIT 12`)
+      .bind(tenantId, billing.options_subscription_id)
+      .all<{ period_start: string; period_end: string }>();
+    optionsChargeAt = paid.results?.find((row) => Date.parse(row.period_start) <= now.getTime()
+      && Date.parse(row.period_end) > now.getTime())?.period_end ?? null;
+  }
+  if (optionsChargeAt && Date.parse(optionsChargeAt) <= now.getTime()) optionsChargeAt = null;
+  const optionsDueNowYen = optionsChargeAt ? 0 : optionsMonthlyYen;
+  const totalDueNowYen = optionsDueNowYen
+    + (review.kind === 'paid_expired' ? review.dueOnConnectionYen : 0);
+  if (!Number.isSafeInteger(totalDueNowYen)) throw new Error('Resumption total is invalid');
+  return { ...review, options: { friendCount: insight.friendsExcludingBlocked,
+    measuredOn: insight.measuredOn, friendBlocks, linkedSlots,
+    googleBusinessCount: line.google_business_count, instagramCount: line.instagram_count,
+    friendOverageMonthlyYen, linkedSlotsMonthlyYen, optionsMonthlyYen,
+    optionsChargeAt, optionsDueNowYen, totalDueNowYen } };
+}
+
 /** Consent captures the server's current offer; reactivation must compare it again. */
-export async function acceptMusuboLineResumption(db: D1Database, tenantId: string,
-  now = new Date()): Promise<Exclude<MusuboLineResumptionReview, { kind: 'unpaid' }>> {
-  const review = await getMusuboLineResumptionReview(db, tenantId, now);
+export async function acceptMusuboLineResumption(env: WorkerBindings, tenantId: string,
+  now = new Date()): Promise<Exclude<MusuboLineResumptionOffer, { kind: 'unpaid' }>> {
+  const db = env.DB;
+  const review = await getMusuboLineResumptionOffer(env, tenantId, now);
   if (review.kind === 'unpaid') throw new Error('Past invoices must be paid before resumption');
   const billing = await getMusuboTenantBilling(db, tenantId);
   if (!billing || billing.status !== 'ended') throw new Error('An ended musubo contract is required');
+  if (billing.resumption_requested_at) throw new Error('Resumption reconciliation is in progress');
   const offer = JSON.stringify(review);
   if (billing.resumption_consented_at && billing.resumption_offer_json === offer) return review;
   const result = await db.prepare(`UPDATE musubo_tenant_billing
     SET resumption_generation=resumption_generation+1,
       resumption_offer_json=?,resumption_consented_at=?,updated_at=?
-    WHERE tenant_id=? AND status='ended' AND resumption_generation=?`)
+    WHERE tenant_id=? AND status='ended' AND resumption_requested_at IS NULL
+      AND resumption_generation=?`)
     .bind(offer, now.toISOString(), now.toISOString(), tenantId, billing.resumption_generation).run();
   if ((result.meta?.changes ?? 0) !== 1) throw new Error('Resumption offer changed');
   return review;
 }
 
-export async function acceptedMusuboLineResumption(db: D1Database, tenantId: string,
-  now = new Date()): Promise<{ generation: number; review: Exclude<MusuboLineResumptionReview,
+export async function acceptedMusuboLineResumption(env: WorkerBindings, tenantId: string,
+  now = new Date()): Promise<{ generation: number; review: Exclude<MusuboLineResumptionOffer,
   { kind: 'unpaid' }> }> {
+  const db = env.DB;
   const billing = await getMusuboTenantBilling(db, tenantId);
   if (!billing || billing.status !== 'ended' || !billing.resumption_consented_at
     || !billing.resumption_offer_json) throw new Error('Resumption consent is unavailable');
-  const review = await getMusuboLineResumptionReview(db, tenantId, now);
+  const review = await getMusuboLineResumptionOffer(env, tenantId, now);
   if (review.kind === 'unpaid' || JSON.stringify(review) !== billing.resumption_offer_json) {
     throw new Error('Resumption price or payment status changed');
   }

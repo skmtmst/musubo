@@ -1,11 +1,16 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { DEFAULT_MUSUBO_PRICE_SCHEDULE } from '@line-crm/shared';
+import type { WorkerBindings } from '../worker-bindings.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { acceptMusuboLineResumption, acceptedMusuboLineResumption,
   getMusuboLineResumptionReview } from './musubo-line-resumption-review.js';
 
 const tenantId = DEFAULT_TENANT_ID;
+vi.mock('./musubo-large-line-consultation.js', () => ({
+  fetchPreConnectFollowerInsight: vi.fn(async () => ({ followers: 3000,
+    friendsExcludingBlocked: 2800, measuredOn: '2027-01-24' })),
+}));
 const condition = JSON.stringify({ sourceConditionId: 'normal', sourceVersion: 1,
   internalName: '通常条件', appliedAt: '2026-11-09',
   trialPeriod: { unit: 'days', value: 30 }, lineBasicDiscountPercent: 0,
@@ -20,6 +25,13 @@ function ended(interval: 'month' | 'year', firstChargeDate = '2026-12-09') {
       '2026-12-08',?,'sub_core','sub_options','2027-01-20T00:00:00+09:00',
       '2026-11-09T00:00:00+09:00','2027-01-20T00:00:00+09:00')`)
     .run(tenantId, condition, interval, firstChargeDate);
+  fixture.raw.prepare(`INSERT INTO line_accounts
+    (id,channel_id,name,channel_access_token,channel_secret,tenant_id,is_active,archived_at)
+    VALUES ('line-old','123456','旧LINE','token','secret',?,0,NULL)`).run(tenantId);
+  fixture.raw.prepare(`INSERT INTO musubo_line_usage
+    (line_account_id,tenant_id,status,activated_at,ended_at,updated_at)
+    VALUES ('line-old',?,'ended','2026-11-09T00:00:00+09:00',
+      '2027-01-20T00:00:00+09:00','2027-01-20T00:00:00+09:00')`).run(tenantId);
   return fixture;
 }
 
@@ -80,12 +92,13 @@ it('does not infer paid coverage from a future date without a settled invoice', 
 it('saves consent once and invalidates it when an invoice becomes unpaid', async () => {
   const fixture = ended('month');
   const now = new Date('2027-01-25T00:00:00+09:00');
-  const accepted = await acceptMusuboLineResumption(fixture.db, tenantId, now);
+  const env = { DB: fixture.db } as WorkerBindings;
+  const accepted = await acceptMusuboLineResumption(env, tenantId, now);
   expect(accepted.kind).toBe('paid_expired');
-  await acceptMusuboLineResumption(fixture.db, tenantId, now);
-  expect((await acceptedMusuboLineResumption(fixture.db, tenantId, now)).generation).toBe(1);
+  await acceptMusuboLineResumption(env, tenantId, now);
+  expect((await acceptedMusuboLineResumption(env, tenantId, now)).generation).toBe(1);
   invoice(fixture, { id: 'in_late', subscription: 'sub_core', status: 'open', due: 5_900, paid: 0,
     start: '2027-01-09T00:00:00+09:00', end: '2027-02-09T00:00:00+09:00' });
-  await expect(acceptedMusuboLineResumption(fixture.db, tenantId, now))
+  await expect(acceptedMusuboLineResumption(env, tenantId, now))
     .rejects.toThrow('changed');
 });

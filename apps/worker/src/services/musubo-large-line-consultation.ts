@@ -6,12 +6,12 @@ export function insightDateJst(now: Date = new Date()): string {
   return jstDateOffset(-1, now).replaceAll('-', '');
 }
 
-export async function fetchPreConnectFollowerInsight(channelAccessToken: string): Promise<{
+export async function fetchPreConnectFollowerInsight(channelAccessToken: string, now = new Date()): Promise<{
   followers: number;
   friendsExcludingBlocked: number;
   measuredOn: string;
 } | null> {
-  const measuredOn = jstDateOffset(-1);
+  const measuredOn = jstDateOffset(-1, now);
   try {
     const insight = await new LineClient(channelAccessToken).getFollowersInsight(measuredOn.replaceAll('-', ''));
     const friendsExcludingBlocked = musuboFriendsExcludingBlocked(insight);

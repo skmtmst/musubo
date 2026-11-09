@@ -30,7 +30,7 @@ describe('最後のLINE終了後の利用再開', () => {
     expect(host.textContent).toContain('無料体験の残り期間で再開できます')
     expect(host.textContent).toContain('2026年12月7日まで')
     expect(host.textContent).toContain('新しい30日間の無料期間は始まりません')
-    expect(host.textContent).toContain('LINE接続時の請求¥0')
+    expect(host.textContent).toContain('LINE接続時の請求合計¥0')
     const next = [...host.querySelectorAll('button')].find((button) => button.textContent === '確認して次へ進む')!
     await act(async () => { next.click() })
     expect(onContinue).toHaveBeenCalledOnce()
@@ -54,7 +54,7 @@ describe('最後のLINE終了後の利用再開', () => {
     await act(async () => { root.render(<LineResumptionReview view={view}
       onContinue={onContinue} onPayOutstanding={onPayOutstanding} onBack={onBack} />) })
     expect(host.textContent).toContain('月払い済み')
-    expect(host.textContent).toContain('LINE接続時の請求¥0')
+    expect(host.textContent).toContain('LINE接続時の請求合計¥0')
     expect(host.textContent).toContain('2027年2月9日')
     expect(host.textContent).toContain('¥5,900／月（税込）')
     await act(async () => { root.render(<LineResumptionComplete view={{
@@ -62,7 +62,7 @@ describe('最後のLINE終了後の利用再開', () => {
       paidThrough: view.paidThrough, renewalAt: view.renewalAt,
       nextLineBaseYen: view.nextLineBaseYen,
     }} onAccounts={onBack} />) })
-    expect(host.textContent).toContain('再開日のLINE基本料金¥0')
+    expect(host.textContent).toContain('再開日の請求合計¥0')
     expect(host.textContent).toContain('次の月次請求：2027年2月9日')
   })
 
@@ -72,8 +72,22 @@ describe('最後のLINE終了後の利用再開', () => {
       dueOnConnectionYen: 5_900, nextLineBaseYen: 5_900,
     }} onContinue={onContinue} onPayOutstanding={onPayOutstanding} onBack={onBack} />) })
     expect(host.textContent).toContain('無料体験の再適用はありません')
-    expect(host.textContent).toContain('LINE接続時の請求¥5,900（税込）')
+    expect(host.textContent).toContain('LINE接続時の請求合計¥5,900（税込）')
     expect(host.textContent).toContain('接続前の請求はありません')
+  })
+
+  it('友だち超過と追加連携の金額を同意前に分けて表示する', async () => {
+    await act(async () => { root.render(<LineResumptionReview view={{
+      kind: 'paid_expired', conditionName: '通常条件', interval: 'month',
+      dueOnConnectionYen: 5_900, nextLineBaseYen: 5_900,
+      options: { friendCount: 12_000, measuredOn: '2027-01-24', friendBlocks: 1,
+        linkedSlots: 2, friendOverageMonthlyYen: 1_100,
+        linkedSlotsMonthlyYen: 6_600, optionsMonthlyYen: 7_700,
+        optionsChargeAt: null, optionsDueNowYen: 7_700, totalDueNowYen: 13_600 },
+    }} onContinue={onContinue} onPayOutstanding={onPayOutstanding} onBack={onBack} />) })
+    expect(host.textContent).toContain('友だち超過（1枠）¥1,100／月（税込）')
+    expect(host.textContent).toContain('追加連携（2枠）¥6,600／月（税込）')
+    expect(host.textContent).toContain('LINE接続時の請求合計¥13,600（税込）')
   })
 
   it('未払いがある場合は支払いのみへ進み、LINE接続へ直進させない', async () => {
@@ -95,8 +109,8 @@ describe('最後のLINE終了後の利用再開', () => {
     expect(host.textContent).toContain('更新だけでは新しいLINE基本料金の請求は始まりません')
     expect(host.textContent).toContain('Stripeでカードを更新')
     await act(async () => { root.render(<LineResumptionHandover phase="ready" onPrimary={onContinue} onBack={onBack} />) })
-    expect(host.textContent).toContain('接続を中断しても利用は再開しません')
-    expect(host.textContent).toContain('LINEアカウントを接続')
+    expect(host.textContent).toContain('決済が必要な場合は成功後に利用を再開します')
+    expect(host.textContent).toContain('前回のLINEを確認して再開')
   })
 
   it('接続確認後に元の無料期間と次回請求を表示する', async () => {
@@ -107,6 +121,6 @@ describe('最後のLINE終了後の利用再開', () => {
     }} onAccounts={onBack} />) })
     expect(host.textContent).toContain('無料体験の残り期間で再開しました')
     expect(host.textContent).toContain('初回請求予定：2026年12月8日')
-    expect(host.textContent).toContain('再開日のLINE基本料金¥0')
+    expect(host.textContent).toContain('再開日の請求合計¥0')
   })
 })

@@ -79,3 +79,34 @@ it('利用終了の予約と即時停止で日割り・追加請求を作らな�
   expect(sent[1].body.get('invoice_now')).toBe('false');
   expect(sent[1].body.get('prorate')).toBe('false');
 });
+
+it('再開時の支払い済み期間を元の請求日まで引き継ぐ', async () => {
+  let body = new URLSearchParams();
+  const fakeFetch = async (_url: string | URL | Request, init?: RequestInit) => {
+    body = new URLSearchParams(String(init?.body));
+    return Response.json({ id: 'sub_new', customer: 'cus_test', status: 'trialing', items: { data: [] } });
+  };
+  await stripeApi.createMusuboResumptionSubscription({ STRIPE_SECRET_KEY: 'sk_test_example' }, {
+    customerId: 'cus_test', tenantId: 'tenant-1', productId: 'prod_core', purpose: 'core',
+    interval: 'month', unitAmountYen: 5_900, generation: 2,
+    chargeAtEpoch: 1800000000, idempotencyKey: 'resume-2-core',
+  }, fakeFetch as typeof fetch);
+  expect(body.get('trial_end')).toBe('1800000000');
+  expect(body.get('metadata[resumption_generation]')).toBe('2');
+  expect(body.get('payment_behavior')).toBe('default_incomplete');
+});
+
+it('支払い済み期間終了後の再開は即時決済に失敗したら契約を進めない', async () => {
+  let body = new URLSearchParams();
+  const fakeFetch = async (_url: string | URL | Request, init?: RequestInit) => {
+    body = new URLSearchParams(String(init?.body));
+    return Response.json({ id: 'sub_new', customer: 'cus_test', status: 'active', items: { data: [] } });
+  };
+  await stripeApi.createMusuboResumptionSubscription({ STRIPE_SECRET_KEY: 'sk_test_example' }, {
+    customerId: 'cus_test', tenantId: 'tenant-1', productId: 'prod_core', purpose: 'core',
+    interval: 'month', unitAmountYen: 5_900, generation: 3,
+    idempotencyKey: 'resume-3-core',
+  }, fakeFetch as typeof fetch);
+  expect(body.has('trial_end')).toBe(false);
+  expect(body.get('payment_behavior')).toBe('error_if_incomplete');
+});

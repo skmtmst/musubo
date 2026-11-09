@@ -341,6 +341,35 @@ export const stripeApi = {
     }, { fetchImpl, idempotencyKey: input.idempotencyKey });
   },
 
+  /** A restarted contract is a new generation; prepaid time is deferred, expired time bills now. */
+  createMusuboResumptionSubscription: (env: StripeEnv, input: {
+    customerId: string; tenantId: string; productId: string; purpose: 'core' | 'options';
+    interval: 'month' | 'year'; unitAmountYen: number; generation: number;
+    chargeAtEpoch?: number; idempotencyKey: string;
+  }, fetchImpl?: typeof fetch) => {
+    if (!/^cus_[A-Za-z0-9]+$/.test(input.customerId)
+      || !/^prod_[A-Za-z0-9]+$/.test(input.productId) || !input.tenantId.trim()
+      || !Number.isSafeInteger(input.generation) || input.generation < 1
+      || !Number.isSafeInteger(input.unitAmountYen) || input.unitAmountYen < 0
+      || (input.chargeAtEpoch !== undefined && (!Number.isSafeInteger(input.chargeAtEpoch)
+        || input.chargeAtEpoch <= Math.floor(Date.now() / 1000)))
+      || !input.idempotencyKey || input.idempotencyKey.length > 255) {
+      throw new RangeError('Invalid musubo resumption subscription request');
+    }
+    return stripeRequest<StripeSubscription>(env, 'POST', '/v1/subscriptions', {
+      customer: input.customerId,
+      collection_method: 'charge_automatically',
+      payment_behavior: input.chargeAtEpoch ? 'default_incomplete' : 'error_if_incomplete',
+      ...(input.chargeAtEpoch ? { trial_end: input.chargeAtEpoch,
+        trial_settings: { end_behavior: { missing_payment_method: 'create_invoice' } } } : {}),
+      items: [{ price_data: { currency: 'jpy', product: input.productId,
+        unit_amount: input.unitAmountYen, tax_behavior: 'inclusive',
+        recurring: { interval: input.interval } }, quantity: 1 }],
+      metadata: { tenant_id: input.tenantId, purpose: `musubo_${input.purpose}`,
+        resumption_generation: String(input.generation) },
+    }, { fetchImpl, idempotencyKey: input.idempotencyKey });
+  },
+
   createInvoicePreview: (
     env: StripeEnv,
     input: { subscriptionId: string; itemId: string; priceId: string; quantity: number; prorationDate: number },

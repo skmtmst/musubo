@@ -65,6 +65,9 @@ export default function MusuboBilling({ pricing, invoices, invoiceFailed, onRetr
           {pricing.activeLines.length === 1 && <Button variant="secondary" href="/hq/billing/last-line-end">最後のLINEの利用を終了する</Button>}
           </>}
         </div> : null}
+        {pricing.status === 'ended' && canManagePayment ? <div className={styles.actions}>
+          <Button href="/hq/billing/resume">LINEの利用を再開する</Button>
+        </div> : null}
       </Card>
       <Card as="section" layout="vertical" padding="default" gap="normal">
         <div className={styles.cardHead}><h3>次回のお支払い予定料金</h3></div>
