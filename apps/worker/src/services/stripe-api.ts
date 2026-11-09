@@ -140,7 +140,10 @@ export interface StripeSubscription {
   current_period_end?: number;
   cancel_at_period_end?: boolean;
   metadata?: Record<string, string>;
-  items: { data: Array<{ id?: string; quantity?: number; price: { id: string }; current_period_end?: number }> };
+  items: { data: Array<{ id?: string; quantity?: number; price: {
+    id: string; product?: string; unit_amount?: number | null; currency?: string;
+    tax_behavior?: string; recurring?: { interval: string } | null;
+  }; current_period_end?: number }> };
 }
 
 export interface StripeInvoicePreview {
@@ -214,6 +217,12 @@ function validMusuboSubscription(input: MusuboSubscriptionInput): void {
 }
 
 export const stripeApi = {
+  listCustomerSubscriptions: (
+    env: StripeEnv, customerId: string, startingAfter?: string, fetchImpl?: typeof fetch,
+  ) => stripeRequest<{ data: StripeSubscription[]; has_more: boolean }>(env, 'GET', '/v1/subscriptions', {
+    customer: customerId, status: 'all', limit: 100, starting_after: startingAfter,
+  }, { fetchImpl }),
+
   /** 年払いの基本料金と月払いのオプションは別契約にし、同じ無料期間終了日で開始する。 */
   createMusuboSubscription: (
     env: StripeEnv,
