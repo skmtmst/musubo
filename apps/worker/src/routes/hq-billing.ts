@@ -354,8 +354,11 @@ hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inpu
     }
     if (body?.resumption === true) {
       if (quoteId !== undefined) return c.json({ success: false, error: '再開条件を読み直してください' }, 400);
-      try { await acceptedMusuboLineResumption(c.env, tenantId); }
-      catch { return c.json({ success: false, error: '再開時の料金を再確認してください' }, 409); }
+      if (!(musuboBilling?.status === 'ended' && musuboBilling.resumption_requested_at
+        && musuboBilling.resumption_offer_json && musuboBilling.resumption_consented_at)) {
+        try { await acceptedMusuboLineResumption(c.env, tenantId); }
+        catch { return c.json({ success: false, error: '再開時の料金を再確認してください' }, 409); }
+      }
     }
     const billing = await getTenantBilling(c.env.DB, tenantId);
     if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);

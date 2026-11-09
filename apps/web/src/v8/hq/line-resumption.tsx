@@ -205,6 +205,43 @@ export function LineResumptionConnectionRecovery({ lineAccountId, onBack }: {
   </div>
 }
 
+export function LineResumptionPaymentRecovery({ hostedInvoiceUrl, expired, onCardUpdate, onRecheck }: {
+  hostedInvoiceUrl: string | null; expired: boolean
+  onCardUpdate: () => Promise<void> | void; onRecheck: () => Promise<void> | void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const perform = async (action: () => Promise<void> | void) => {
+    if (busy) return
+    setBusy(true); setError('')
+    try { await action() } catch { setError('状態を確認できませんでした。時間をおいて再度お試しください。') }
+    finally { setBusy(false) }
+  }
+  return <div className={styles.page}>
+    <p className={styles.breadcrumb}>ホーム › 統括の設定 › 請求 › 利用再開</p>
+    <h1>{expired ? '再開分のお支払いを確認できません' : 'お支払いを確認できませんでした'}</h1>
+    <p className={styles.lead}>LINEはまだ再開していません。お支払いの状況を確認してください。</p>
+    <section className={styles.handoverCard} aria-label="再開分のお支払い">
+      <StatusBand warning title={expired ? 'お支払いの期限が切れました' : '再開分のお支払いが必要です'}
+        description={expired ? 'この再開分の決済は期限切れです。サポートにお問い合わせください。'
+          : 'Stripeでお支払いを完了してください。カードの変更が必要な場合は更新できます。'} />
+      <div className={styles.progressBox}><strong>再開手続きの状態</strong>
+        <p>✓　再開時の料金と請求日を確認済み</p><p>○　決済確認待ち・LINE未接続</p></div>
+      <p className={styles.handoverNote}>決済が成功するまでLINEは有効化されません。お支払い後、この画面で状態を再確認してください。</p>
+    </section>
+    {error && <p className={styles.error} role="alert">{error}</p>}
+    <div className={styles.bottom}>
+      <button type="button" className={styles.back} disabled={busy} onClick={() => void perform(onRecheck)}>再開の状態を再確認する</button>
+      {expired ? <Button href="/hq/support" variant="primary"
+        className={styles.bottomPrimary}>お問い合わせへ</Button> : <div className={styles.recoveryActions}>
+        <button type="button" className={styles.back} disabled={busy} onClick={() => void perform(onCardUpdate)}>カードを更新する</button>
+        {hostedInvoiceUrl && <Button href={hostedInvoiceUrl} external variant="primary"
+          className={styles.bottomPrimary}>Stripeで支払いを完了</Button>}
+      </div>}
+    </div>
+  </div>
+}
+
 /** Shown only after the saved LINE credentials, payment, and activation are confirmed. */
 export function LineResumptionComplete({ view, onAccounts }: { view: LineResumeCompleteView; onAccounts: () => void }) {
   const trial = view.kind === 'trial_remaining'

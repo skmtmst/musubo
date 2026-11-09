@@ -122,3 +122,22 @@ it('holds LINE access when one Stripe subscription cannot be confirmed, then ret
   expect(fixture.raw.prepare('SELECT status FROM musubo_tenant_billing WHERE tenant_id=?')
     .get(tenantId)).toMatchObject({ status: 'active' });
 });
+
+it('rejects a saved offer whose immediate charge no longer matches its itemized total', async () => {
+  const { fixture, env, tenantId } = setup();
+  const now = new Date('2027-01-25T00:00:00+09:00');
+  await acceptMusuboLineResumption(env, tenantId, now);
+  await requestMusuboLineResumption(env, tenantId, now);
+  const billing = fixture.raw.prepare(`SELECT resumption_offer_json FROM musubo_tenant_billing
+    WHERE tenant_id=?`).get(tenantId) as { resumption_offer_json: string };
+  const altered = JSON.parse(billing.resumption_offer_json) as { options: { totalDueNowYen: number } };
+  altered.options.totalDueNowYen += 1_100;
+  fixture.raw.prepare(`UPDATE musubo_tenant_billing SET resumption_offer_json=? WHERE tenant_id=?`)
+    .run(JSON.stringify(altered), tenantId);
+  ensure.mockClear();
+  await expect(reconcileMusuboLineResumption(env, tenantId, now))
+    .rejects.toThrow('does not match');
+  expect(ensure).not.toHaveBeenCalled();
+  expect(fixture.raw.prepare('SELECT status FROM musubo_tenant_billing WHERE tenant_id=?')
+    .get(tenantId)).toMatchObject({ status: 'ended' });
+});

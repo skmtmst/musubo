@@ -359,7 +359,7 @@ export const stripeApi = {
     return stripeRequest<StripeSubscription>(env, 'POST', '/v1/subscriptions', {
       customer: input.customerId,
       collection_method: 'charge_automatically',
-      payment_behavior: input.chargeAtEpoch ? 'default_incomplete' : 'error_if_incomplete',
+      payment_behavior: 'default_incomplete',
       ...(input.chargeAtEpoch ? { trial_end: input.chargeAtEpoch,
         trial_settings: { end_behavior: { missing_payment_method: 'create_invoice' } } } : {}),
       items: [{ price_data: { currency: 'jpy', product: input.productId,

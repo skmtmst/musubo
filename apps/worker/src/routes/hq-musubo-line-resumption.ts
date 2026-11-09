@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { getMusuboTenantBilling } from '@line-crm/db';
+import { getMusuboTenantBilling, getTenantBilling } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
@@ -10,8 +10,16 @@ import { acceptMusuboLineResumption, getMusuboLineResumptionOffer } from
 import { getMusuboLineResumptionComplete, reconcileMusuboLineResumption, requestMusuboLineResumption } from
   '../services/musubo-line-resumption.js';
 import { deliverMusuboResumptionNotice } from '../services/musubo-resumption-notification.js';
+import { getMusuboResumptionPaymentState } from '../services/musubo-resumption-subscription.js';
+import type { WorkerBindings } from '../worker-bindings.js';
 
 export const hqMusuboLineResumption = new Hono<Env>();
+
+async function pendingPayment(env: WorkerBindings, tenantId: string, generation: number) {
+  const legacy = await getTenantBilling(env.DB, tenantId);
+  if (!legacy?.stripe_customer_id) return null;
+  return getMusuboResumptionPaymentState(env, legacy.stripe_customer_id, tenantId, generation);
+}
 
 hqMusuboLineResumption.get('/api/hq/billing/musubo/resumption', requireRole('owner'), async (c) => {
   const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
@@ -19,9 +27,10 @@ hqMusuboLineResumption.get('/api/hq/billing/musubo/resumption', requireRole('own
     const billing = await getMusuboTenantBilling(c.env.DB, tenantId);
     if (billing?.status === 'ended' && billing.resumption_requested_at
       && billing.resumption_offer_json) {
+      const payment = await pendingPayment(c.env, tenantId, billing.resumption_generation);
       return c.json({ success: true, data: {
         review: JSON.parse(billing.resumption_offer_json),
-        consented: true, reconciliationPending: true } });
+        consented: true, reconciliationPending: true, payment } });
     }
     const review = await getMusuboLineResumptionOffer(c.env, tenantId);
     return c.json({ success: true, data: { review,
@@ -74,8 +83,13 @@ hqMusuboLineResumption.post('/api/hq/billing/musubo/resumption/connect',
       if (active) await deliverMusuboResumptionNotice(c.env, tenantId).catch(() => undefined);
       return c.json({ success: true, data: { active } });
     } catch {
+      const billing = await getMusuboTenantBilling(c.env.DB, tenantId);
+      const payment = billing?.resumption_requested_at
+        ? await pendingPayment(c.env, tenantId, billing.resumption_generation).catch(() => null) : null;
       return c.json({ success: true, data: { active: false,
-        message: '決済とLINE接続を確認しています。完了まで追加の操作は不要です' } }, 202);
+        payment, message: payment?.kind === 'payment_required'
+          ? '再開分のお支払いを確認できませんでした。Stripeでお支払いを完了してください'
+          : '決済とLINE接続を確認しています。結果が確定するまでLINEは有効化されません' } }, 202);
     }
   });
 

@@ -7,7 +7,7 @@ import type { MusuboLineResumptionState } from '@/lib/api/features/musubo-line-r
 import type { LineResumeCompleteView } from './line-resumption'
 import ListState from '@/components/shared/list-state'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
-import { LineResumptionComplete, LineResumptionConnectionRecovery,
+import { LineResumptionComplete, LineResumptionConnectionRecovery, LineResumptionPaymentRecovery,
   LineResumptionHandover, LineResumptionReview } from './line-resumption'
 
 const reviewPath = '/hq/billing/resume'
@@ -81,6 +81,15 @@ export function MusuboLineResumptionCardPage() {
   if (!state.consented) return <ListState kind="error" title="料金の確認が必要です"
     description="再開時の料金が変わったか、未払いが発生しました。料金を読み直してください。"
     action={<a href={reviewPath}>料金を確認する</a>} />
+  const updateCard = async () => {
+    const result = await api.hqBilling.cardSetup(undefined, true)
+    if (!result.success) throw new Error(result.error)
+    window.location.assign(result.data.url)
+  }
+  if (state.reconciliationPending && state.payment) return <LineResumptionPaymentRecovery
+    hostedInvoiceUrl={state.payment.hostedInvoiceUrl}
+    expired={state.payment.kind === 'payment_expired'}
+    onCardUpdate={updateCard} onRecheck={load} />
   if (state.reconciliationPending) return <div role="status">
     <h1>お支払いとLINE接続を確認しています</h1>
     <p>再開の結果を確認中です。重複したお支払いは行わず、結果が確定すると利用を再開します。</p>

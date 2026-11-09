@@ -3,7 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LineResumptionComplete, LineResumptionConnectionRecovery,
-  LineResumptionHandover, LineResumptionReview } from './line-resumption'
+  LineResumptionHandover, LineResumptionPaymentRecovery, LineResumptionReview } from './line-resumption'
 
 let host: HTMLDivElement
 let root: Root
@@ -120,6 +120,17 @@ describe('最後のLINE終了後の利用再開', () => {
     expect(host.textContent).toContain('接続情報を更新した後に、最新の友だち数と再開料金を確認')
     expect(host.querySelector('a')?.getAttribute('href'))
       .toBe('/accounts/detail?id=old%20%2F%3F%26')
+  })
+
+  it('再開分の決済が失敗したときはLINEを有効化せずStripeの請求へ案内する', async () => {
+    await act(async () => { root.render(<LineResumptionPaymentRecovery
+      hostedInvoiceUrl="https://invoice.stripe.com/i/test" expired={false}
+      onCardUpdate={onContinue} onRecheck={onBack} />) })
+    expect(host.textContent).toContain('LINEはまだ再開していません')
+    expect(host.querySelector('a')?.getAttribute('href')).toBe('https://invoice.stripe.com/i/test')
+    const recheck = [...host.querySelectorAll('button')].find((button) => button.textContent === '再開の状態を再確認する')!
+    await act(async () => { recheck.click() })
+    expect(onBack).toHaveBeenCalledOnce()
   })
 
   it('接続確認後に元の無料期間と次回請求を表示する', async () => {

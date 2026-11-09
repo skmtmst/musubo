@@ -6,6 +6,7 @@ export interface MusuboLineResumptionState {
   review: LineResumeReviewView
   consented: boolean
   reconciliationPending: boolean
+  payment?: { kind: 'payment_required' | 'payment_expired'; hostedInvoiceUrl: string | null } | null
 }
 
 const path = '/api/hq/billing/musubo/resumption'
@@ -16,7 +17,8 @@ export const musuboLineResumptionMethods = {
     accept: () => fetchApi<ApiResponse<MusuboLineResumptionState>>(`${path}/accept`, {
       method: 'POST', body: JSON.stringify({}),
     }),
-    connect: (stepUpToken?: string) => fetchApi<ApiResponse<{ active: boolean; message?: string }>>(`${path}/connect`, {
+    connect: (stepUpToken?: string) => fetchApi<ApiResponse<{ active: boolean; message?: string;
+      payment?: MusuboLineResumptionState['payment'] }>>(`${path}/connect`, {
       method: 'POST', headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
       body: JSON.stringify({}),
     }),

@@ -110,6 +110,11 @@ export async function reconcileMusuboLineResumption(env: WorkerBindings, tenantI
     throw new Error('Linked accounts changed after consent');
   }
   const optionsYen = review.options.optionsMonthlyYen;
+  if (review.options.optionsDueNowYen !== (review.options.optionsChargeAt ? 0 : optionsYen)
+    || review.options.totalDueNowYen !== review.options.optionsDueNowYen
+      + (review.kind === 'paid_expired' ? review.dueOnConnectionYen : 0)) {
+    throw new Error('Accepted resumption charge does not match the saved offer');
+  }
   const coreYen = review.kind === 'annual_paid' ? review.nextAnnualLineBaseYen
     : review.nextLineBaseYen;
   const coreChargeAt = review.kind === 'trial_remaining' ? review.nextChargeAt

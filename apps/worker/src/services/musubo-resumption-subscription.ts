@@ -11,6 +11,40 @@ export interface ResumptionSubscriptionInput {
   chargeAtEpoch?: number;
 }
 
+export interface ResumptionPaymentState {
+  kind: 'payment_required' | 'payment_expired';
+  hostedInvoiceUrl: string | null;
+}
+
+/** Inspect only subscriptions belonging to the accepted generation. No payment is attempted here. */
+export async function getMusuboResumptionPaymentState(env: StripeEnv, customerId: string,
+  tenantId: string, generation: number): Promise<ResumptionPaymentState | null> {
+  let cursor: string | undefined;
+  for (let pageIndex = 0; pageIndex < 6; pageIndex += 1) {
+    const page = await stripeApi.listCustomerSubscriptions(env, customerId, cursor);
+    for (const item of page.data) {
+      if (item.customer !== customerId || item.metadata?.tenant_id !== tenantId
+        || item.metadata?.resumption_generation !== String(generation)
+        || !['musubo_core', 'musubo_options'].includes(item.metadata?.purpose ?? '')) continue;
+      if (item.status === 'incomplete_expired') return { kind: 'payment_expired', hostedInvoiceUrl: null };
+      if (!['incomplete', 'past_due'].includes(item.status) || !item.latest_invoice) continue;
+      const invoice = await stripeApi.retrieveInvoice(env, item.latest_invoice);
+      if (invoice.customer !== customerId || invoice.subscription !== item.id) {
+        throw new Error('Resumption invoice identity does not match');
+      }
+      if (invoice.status === 'open' && invoice.amount_remaining > 0) {
+        return { kind: 'payment_required',
+          hostedInvoiceUrl: invoice.hosted_invoice_url?.startsWith('https://invoice.stripe.com/')
+            ? invoice.hosted_invoice_url : null };
+      }
+    }
+    if (!page.has_more) break;
+    cursor = page.data.at(-1)?.id;
+    if (!cursor || pageIndex === 5) throw new Error('Stripe subscription search is incomplete');
+  }
+  return null;
+}
+
 function matches(subscription: StripeSubscription, input: ResumptionSubscriptionInput): boolean {
   const price = subscription.items?.data?.[0]?.price;
   return subscription.customer === input.customerId
@@ -59,7 +93,7 @@ export async function ensureMusuboResumptionSubscription(env: StripeEnv,
     const invoice = await stripeApi.retrieveInvoice(env, subscription.latest_invoice);
     if (invoice.status !== 'paid' || invoice.customer !== input.customerId
       || invoice.subscription !== subscription.id || invoice.currency !== 'jpy'
-      || invoice.amount_paid < input.unitAmountYen) {
+      || invoice.amount_paid !== input.unitAmountYen) {
       throw new Error('Immediate resumption payment is not confirmed');
     }
   }
