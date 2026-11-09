@@ -26,7 +26,7 @@
 | 追加連携枠 | `packages/shared/src/musubo-linked-addition.ts`, `musubo-linked-removal.ts` | 年払い利用中でも追加枠の日割り基準は月次期間。 |
 | 顧客画面 | `apps/web/src/v8/onboarding/`, `apps/web/src/v8/hq/` の `musubo-*`・`linked-*`・`line-resumption*` | Penの各分岐を表示できる部品。サーバー確定の料金・日付だけを渡す。Stripeカード設定の戻り先 `/hq/onboarding/card` は登録状態を再照会する。 |
 | 運営画面 | `apps/web/src/v8/ops/` の利用条件・個別見積もり部品 | 保存と送信は認可済みAPIへ接続する。 |
-| メール | `apps/worker/src/services/` の `musubo-*mail.ts`, `quote-mail-design.ts`, `signup-mail-design.ts` | 検証済みのイベント後に送る。カード番号などは渡さない。最後のLINE終了予約・実終了・予約取消のMail 15/16/18は状態変更と同じDB処理で通知待ちを記録し、配送記録と定期回復を接続済み。利用再開完了のMail 17は同意世代ごとの配送記録と定期回復を接続済み。 |
+| メール | `apps/worker/src/services/` の `musubo-*mail.ts`, `quote-mail-design.ts`, `signup-mail-design.ts` | 検証済みのイベント後に送る。カード番号などは渡さない。LINE追加の決済失敗・期限切れ・有効化のMail 19/20/05は追加状態と確定料金を保存し、配送記録と定期回復を接続済み。最後のLINE終了予約・実終了・予約取消のMail 15/16/18は状態変更と同じDB処理で通知待ちを記録し、配送記録と定期回復を接続済み。利用再開完了のMail 17は同意世代ごとの配送記録と定期回復を接続済み。 |
 | 有料請求失敗 | `apps/worker/src/services/billing-payment-failure.ts`, `musubo-billing-webhook.ts`, `routes/hq-billing.ts`, `apps/web/src/app/hq/billing/payment-recovery/page.tsx` | 新料金の基本契約で失敗した請求だけを7日間の猶予へつなぎ、回復画面は旧 `exempt` 欄でなく新契約IDから読む。失敗直後・6日目・停止・入金後の通知を基本契約に接続し、オプションの失敗を基本料金の停止通知に混ぜない。 |
 | 永続化の土台 | `packages/db/migrations/756_musubo_pricing_onboarding.sql` | オーナー承認を受けてファイルを作成。DBには未適用。既存の契約行は変更しない。 |
 | 利用条件の保存と承認 | `packages/db/src/musubo-pricing-conditions.ts`, `apps/worker/src/routes/ops-pricing-conditions.ts`, `ops-applications.ts` | 条件を版で保存し、会社名・期限を照合して承認時に固定する。運営画面の選択操作まで接続した。 |

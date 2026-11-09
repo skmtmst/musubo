@@ -156,6 +156,14 @@ export async function scheduled(
   }
 
   try {
+    const { sweepMusuboLineAdditionNotices } = await import('../services/musubo-line-addition-notification.js');
+    const result = await sweepMusuboLineAdditionNotices(env);
+    if (result.failed > 0) logger.error('musubo_line_addition_notice_sweep_failed');
+  } catch {
+    logger.error('musubo_line_addition_notice_sweep_failed');
+  }
+
+  try {
     const { sweepMusuboRecurringPrices } = await import('../services/musubo-recurring-prices.js');
     const result = await sweepMusuboRecurringPrices(env);
     if (result.failed > 0) logger.error('musubo_recurring_prices_sweep_failed');

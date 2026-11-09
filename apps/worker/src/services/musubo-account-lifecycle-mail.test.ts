@@ -18,12 +18,20 @@ describe('LINE追加・連携解除のメール', () => {
 
   it('追加分の成功確認後だけ料金と有効LINE数を表示する', () => {
     const mail = musuboAddedLineMail({ previousLineCount: 1, activeLineCount: 2, trialing: false,
-      amountPaidNowYen: 6700, nextMonthlyTotalYen: 19300, accountUrl: actionUrl });
+      amountPaidNowYen: 6700, nextCoreYen: 13800, coreInterval: 'month',
+      nextOptionsMonthlyYen: 5500, accountUrl: actionUrl });
     expect(mail.text).toContain('1個 → 2個');
     expect(mail.text).toContain('¥6,700');
-    expect(mail.text).toContain('¥19,300');
+    expect(mail.text).toContain('¥13,800／月');
+    expect(mail.text).toContain('¥5,500／月');
     expect(() => musuboAddedLineMail({ previousLineCount: 1, activeLineCount: 3, trialing: false,
-      amountPaidNowYen: 0, nextMonthlyTotalYen: 0, accountUrl: actionUrl })).toThrow();
+      amountPaidNowYen: 0, nextCoreYen: 0, coreInterval: 'month',
+      nextOptionsMonthlyYen: 0, accountUrl: actionUrl })).toThrow();
+    const annual = musuboAddedLineMail({ previousLineCount: 1, activeLineCount: 2, trialing: false,
+      amountPaidNowYen: 20_000, nextCoreYen: 147_960, coreInterval: 'year',
+      nextOptionsMonthlyYen: 5_500, accountUrl: actionUrl });
+    expect(annual.text).toContain('¥147,960／年');
+    expect(annual.text).toContain('¥5,500／月');
   });
 
   it('連携解除はすぐ停止、減額は次の月次請求と伝える', () => {

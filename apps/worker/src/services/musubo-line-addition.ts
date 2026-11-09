@@ -22,6 +22,10 @@ export interface MusuboPendingLineAddition {
   expires_at: string;
   paid_at: string | null;
   activated_at: string | null;
+  payment_failed_at: string | null;
+  mail05_sent_at: string | null;
+  mail19_sent_at: string | null;
+  mail20_sent_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -181,6 +185,10 @@ export async function collectMusuboLineAddition(env: WorkerBindings, addition: M
     catch (error) {
       if (!(error instanceof StripeApiError) || error.resultUnknown) throw error;
       invoice = await stripeApi.retrieveInvoice(env, invoice.id);
+    }
+    if (invoice.status === 'open') {
+      await env.DB.prepare(`UPDATE musubo_pending_additions SET payment_failed_at=COALESCE(payment_failed_at,?),updated_at=?
+        WHERE id=? AND status='awaiting_payment'`).bind(now, now, addition.id).run();
     }
   }
   if (invoice.status === 'paid' && invoice.amount_paid >= addition.amount_due_yen) {
@@ -402,9 +410,13 @@ export async function reconcilePaidMusuboLine(env: WorkerBindings, additionId: s
   await reconcile(options, optionsAmountYen, env.STRIPE_PRODUCT_MUSUBO_OPTIONS, 'month', 'options');
   const activatedAt = new Date().toISOString();
   const updates = await env.DB.batch([
-    env.DB.prepare(`UPDATE musubo_pending_additions SET status='activated',activated_at=?,updated_at=?
+    env.DB.prepare(`UPDATE musubo_pending_additions SET status='activated',activated_at=?,updated_at=?,
+      price_snapshot_json=json_set(price_snapshot_json,'$.activatedCoreYen',?,'$.activatedOptionsYen',?,
+        '$.activatedTrialing',?,'$.activatedInterval',?)
       WHERE id=? AND tenant_id=? AND line_account_id=? AND status='paid'`)
-      .bind(activatedAt, activatedAt, additionId, tenantId, pending.line_account_id),
+      .bind(activatedAt, activatedAt, coreAmountYen, optionsAmountYen,
+        billing.status === 'trialing' ? 1 : 0, billing.billing_interval,
+        additionId, tenantId, pending.line_account_id),
     env.DB.prepare(`UPDATE musubo_line_usage SET status='active',activated_at=?,updated_at=?
       WHERE line_account_id=? AND tenant_id=? AND status='pending' AND changes()=1`)
       .bind(activatedAt, activatedAt, pending.line_account_id, tenantId),

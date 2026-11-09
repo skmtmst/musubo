@@ -12,7 +12,9 @@ export function musuboAddedLineMail(input: {
   activeLineCount: number;
   trialing: boolean;
   amountPaidNowYen: number;
-  nextMonthlyTotalYen: number;
+  nextCoreYen: number;
+  coreInterval: 'month' | 'year';
+  nextOptionsMonthlyYen: number;
   accountUrl: string;
 }): { subject: string; html: string; text: string } {
   if (count(input.previousLineCount, 'previousLineCount') < 1 || input.activeLineCount !== input.previousLineCount + 1) {
@@ -29,11 +31,13 @@ export function musuboAddedLineMail(input: {
     rows: [
       { label: '有効LINE', value: `${input.previousLineCount}個 → ${ordinal}個` },
       { label: input.trialing ? '本日の請求' : '今回の追加分', value: `${mailMoney(input.amountPaidNowYen)}（税込）` },
-      { label: '次回から', value: `${mailMoney(input.nextMonthlyTotalYen)}／月（税込・予定）` },
+      { label: 'LINE基本料金', value: `${mailMoney(input.nextCoreYen)}／${input.coreInterval === 'year' ? '年' : '月'}（税込・予定）` },
+      { label: '統括・追加料金', value: `${mailMoney(input.nextOptionsMonthlyYen)}／月（税込・予定）` },
     ], buttonLabel: 'アカウントと料金を確認', buttonUrl: input.accountUrl,
     notes: input.trialing
       ? ['無料体験の終了日は、最初のLINE有効化日から変わりません。', '有料利用中は、接続日からの日割り額と次回以降の料金を表示します。']
-      : ['今回分は接続日から次の請求基準日までの残期間で日割り計算しました。', '次回以降の料金は、有効LINE数・友だち数・追加連携枠数の利用状況に応じます。'],
+      : ['今回分は接続日から次の請求基準日までの残期間で日割り計算しました。',
+        '年払い割引はLINE基本料金のみ対象です。統括機能・友だち超過・追加連携枠は月次請求です。'],
   });
 }
 
