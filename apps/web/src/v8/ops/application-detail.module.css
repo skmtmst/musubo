@@ -1,17 +1,17 @@
 /* この画面だけの寸法と色。共通に無い値はここに閉じる（値は元のまま）。 */
 .panel, .overlay {
-  --ad-panel-min-h: 862px; --ad-main-title-size: 24px; --ad-status-min-w: 90px; --ad-status-gap-r: 269px;
-  --ad-status-radius: 8px; --ad-main-max: 712px; --ad-side-min: 320px; --ad-side-max: 364px;
-  --ad-col-min-h: 562px; --ad-pane-title-size: 18px; --ad-pane-title-lh: 26px; --ad-field-min-h: 78px;
-  --ad-value-size: 14px; --ad-value-lh: 20px; --ad-step-min-h: 46px; --ad-memo-min-h: 93px;
+  --ad-panel-min-h: 862px; --ad-main-title-size: var(--mp-px-24); --ad-status-min-w: 90px; --ad-status-gap-r: 269px;
+  --ad-status-radius: var(--mp-px-8); --ad-main-max: 712px; --ad-side-min: 320px; --ad-side-max: 364px;
+  --ad-col-min-h: 562px; --ad-pane-title-size: var(--mp-px-18); --ad-pane-title-lh: 26px; --ad-field-min-h: 78px;
+  --ad-value-size: var(--mp-px-14); --ad-value-lh: var(--mp-px-20); --ad-step-min-h: 46px; --ad-memo-min-h: 93px;
   --ad-band-min-h: 80px; --ad-band-gap-t: 27px; --ad-band-lh: 22px;
-  --ad-approve-w: 295px; --ad-modal-w: 580px; --ad-modal-title-size: 22px; --ad-modal-title-lh: 32px;
-  --ad-modal-lead-lh: 20px; --ad-note-pad-y: 19px; --ad-modal-btn-min-h: 44px; --ad-side-min-s: 290px;
+  --ad-approve-w: 295px; --ad-modal-w: 580px; --ad-modal-title-size: 22px; --ad-modal-title-lh: var(--mp-px-32);
+  --ad-modal-lead-lh: var(--mp-px-20); --ad-note-pad-y: var(--mp-px-19); --ad-modal-btn-min-h: 44px; --ad-side-min-s: 290px;
   --ad-line: #eceef1; --ad-faint: #626a73; --ad-muted: #4a5565; --ad-wash: #fafafc;
   --ad-warn-bg: #fdf3e1; --ad-warn: #94600a; --ad-info-bg: #e7f0ff; --ad-info: #1260b8;
   --ad-ok-bg: #e8f8ee; --ad-off-bg: #ebedf1; --ad-dot-line: #9ca3af; --ad-field-line: #c9ced6;
   --ad-overlay-bg: #1d1d1f66;
-  --ad-panel-shadow: 0 4px 12px #1d1d1f08; --ad-modal-shadow: 0 20px 50px #1d1d1f26;
+  --ad-panel-shadow: 0 var(--mp-px-4) var(--mp-px-12) #1d1d1f08; --ad-modal-shadow: 0 var(--mp-px-20) 50px #1d1d1f26;
 }
 .panel { min-height: var(--ad-panel-min-h); padding: calc(var(--space-24) + 1px) calc(var(--space-24) + var(--space-4)) calc(var(--space-24) + var(--space-6)); border-radius: var(--radius-panel); background: white; box-shadow: var(--ad-panel-shadow); color: var(--color-ink); }
 .heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-20); margin-top: calc(var(--space-24) + 1px); padding-bottom: calc(var(--space-14) + 1px); border-bottom: 1px solid var(--ad-line); }
@@ -58,7 +58,7 @@
 .conditionChoice { display: grid; gap: var(--space-8); margin-top: var(--space-16); }
 .conditionChoice label { font-size: var(--text-body); font-weight: 700; }
 .conditionChoice small { color: var(--ad-muted); font-size: var(--text-caption); line-height: 1.5; }
-.conditionChoice a { color: var(--color-success); font-size: var(--text-caption); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.conditionChoice a { color: var(--color-success); font-size: var(--text-caption); font-weight: 700; text-decoration: underline; text-underline-offset: var(--mp-px-3); }
 .modalFooter { display: flex; justify-content: flex-end; gap: var(--space-12); padding: calc(var(--space-16) + var(--space-2)) calc(var(--space-24) + var(--space-4)); border-top: 1px solid var(--ad-line); }
 .modalFooter button { min-height: var(--ad-modal-btn-min-h); padding: 0 calc(var(--space-24) + var(--space-6)); border-radius: var(--radius-tile); font-size: var(--text-body); font-weight: 700; cursor: pointer; }
 .modalFooter button:first-child { border: 1px solid var(--ad-field-line); background: white; color: var(--color-ink); }

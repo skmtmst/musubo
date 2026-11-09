@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import TextLink from '@/components/shared/text-link'
 import type { BillingInvoice, BillingSummary } from '@/lib/hq-billing'
 import { formatYen } from '@line-crm/shared'
 import styles from './musubo-billing.module.css'
@@ -100,7 +101,7 @@ export default function MusuboBilling({ pricing, invoices, invoiceFailed, onRetr
         : invoices?.length ? <ul className={styles.invoiceList}>{invoices.map((invoice) =>
           <li key={invoice.id}><span>{invoice.description ?? invoice.number ?? '請求'}</span>
             <strong>{formatYen(invoice.amountYen)}</strong>
-            {invoice.hostedUrl ? <a href={invoice.hostedUrl} target="_blank" rel="noopener noreferrer">明細を見る</a> : null}</li>)}</ul>
+            {invoice.hostedUrl ? <TextLink external href={invoice.hostedUrl}>明細を見る</TextLink> : null}</li>)}</ul>
           : <p className={styles.muted}>まだお支払いはありません。</p>}
     </section>
     {removalLineId && <MusuboLineRemovalDialog lineId={removalLineId}

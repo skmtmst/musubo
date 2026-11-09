@@ -23,6 +23,6 @@
 .danger { border: 0; background: var(--mp-color-b94b31); color: var(--mp-color-fff); }
 .secondary { border: 1px solid var(--mp-color-dbe2e5); background: var(--mp-color-fff); color: var(--mp-color-526176); }
 .primary:disabled, .danger:disabled, .secondary:disabled { opacity: .55; cursor: not-allowed; }
-.primary:focus-visible, .danger:focus-visible, .secondary:focus-visible, .close:focus-visible { outline: 2px solid var(--mp-color-087c43); outline-offset: 2px; }
+.primary:focus-visible, .danger:focus-visible, .secondary:focus-visible, .close:focus-visible { outline: var(--mp-px-2) solid var(--mp-color-087c43); outline-offset: var(--mp-px-2); }
 .error { color: var(--mp-color-a92f2f); font-size: var(--mp-px-13); }
 @media (max-width: 600px) { .dialog { padding: var(--mp-px-18); } .actions { flex-direction: column; } .primary, .danger, .secondary { width: 100%; } }

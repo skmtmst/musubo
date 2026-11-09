@@ -5,19 +5,25 @@
   --mp-color-087c43: #087c43;
   --mp-color-1424190a: #1424190a;
   --mp-color-173f35: #173f35;
+  --mp-color-182421: #182421;
+  --mp-color-1b2421: #1b2421;
+  --mp-color-1c2522: #1c2522;
   --mp-color-202428: #202428;
   --mp-color-202c35a8: #202c35a8;
   --mp-color-3e6751: #3e6751;
+  --mp-color-394b55: #394b55;
   --mp-color-425364: #425364;
   --mp-color-526176: #526176;
   --mp-color-526476: #526476;
   --mp-color-58667a: #58667a;
   --mp-color-59687b: #59687b;
+  --mp-color-607081: #607081;
   --mp-color-627286: #627286;
   --mp-color-637285: #637285;
   --mp-color-647386: #647386;
   --mp-color-657386: #657386;
   --mp-color-657487: #657487;
+  --mp-color-667589: #667589;
   --mp-color-97b8a7: #97b8a7;
   --mp-color-986012: #986012;
   --mp-color-9bbdaa: #9bbdaa;
@@ -50,6 +56,7 @@
   --mp-color-dfe5e7: #dfe5e7;
   --mp-color-dff2e6: #dff2e6;
   --mp-color-e1f5e8: #e1f5e8;
+  --mp-color-e1e7e5: #e1e7e5;
   --mp-color-e3e8ea: #e3e8ea;
   --mp-color-e3e9eb: #e3e9eb;
   --mp-color-e4e8eb: #e4e8eb;
@@ -57,6 +64,7 @@
   --mp-color-e5eaec: #e5eaec;
   --mp-color-e6f5ec: #e6f5ec;
   --mp-color-e8edef: #e8edef;
+  --mp-color-e8eeec: #e8eeec;
   --mp-color-e8f6ee: #e8f6ee;
   --mp-color-e9edee: #e9edee;
   --mp-color-eccd97: #eccd97;
@@ -81,6 +89,7 @@
   --mp-color-fff9ef: #fff9ef;
   --mp-px-10: 10px;
   --mp-px-100: 100px;
+  --mp-px-126: 126px;
   --mp-px-105: 105px;
   --mp-px-108: 108px;
   --mp-px-11: 11px;
@@ -110,6 +119,8 @@
   --mp-px-27: 27px;
   --mp-px-28: 28px;
   --mp-px-280: 280px;
+  --mp-px-270: 270px;
+  --mp-px-290: 290px;
   --mp-px-29: 29px;
   --mp-px-3: 3px;
   --mp-px-30: 30px;
@@ -138,6 +149,9 @@
   --mp-px-51: 51px;
   --mp-px-52: 52px;
   --mp-px-570: 570px;
+  --mp-px-620: 620px;
+  --mp-px-625: 625px;
+  --mp-px-65: 65px;
   --mp-px-6: 6px;
   --mp-px-60: 60px;
   --mp-px-660: 660px;
@@ -146,6 +160,8 @@
   --mp-px-8: 8px;
   --mp-px-9: 9px;
   --mp-px-900: 900px;
+  --mp-px-92: 92px;
   --mp-px-95: 95px;
   --mp-px-999: 999px;
+  --mp-billing-grid-columns: minmax(0, 1.15fr) minmax(290px, .85fr);
 }
