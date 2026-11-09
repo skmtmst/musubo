@@ -26,7 +26,7 @@ it('starts a three-month trial only on the first LINE activation', async () => {
     raw.pragma('foreign_keys=ON');
     raw.exec(`
       CREATE TABLE tenants(id TEXT PRIMARY KEY, name TEXT NOT NULL, status TEXT NOT NULL,
-        plan_status TEXT NOT NULL, trial_ends_at TEXT, plan_updated_at TEXT,
+        plan_key TEXT, plan_status TEXT NOT NULL, trial_ends_at TEXT, plan_updated_at TEXT,
         signup_device_marker TEXT, created_at TEXT, updated_at TEXT);
       CREATE TABLE line_accounts(id TEXT PRIMARY KEY, tenant_id TEXT);
       CREATE TABLE registration_applications(id TEXT PRIMARY KEY, status TEXT NOT NULL,
