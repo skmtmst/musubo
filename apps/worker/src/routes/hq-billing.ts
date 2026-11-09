@@ -35,6 +35,7 @@ import {
 } from '../services/billing-plans.js';
 import { billingInvoiceInput } from '../services/billing-invoices-sync.js';
 import { getBillingPaymentFailure, getRecentBillingPaymentRecovery } from '../services/billing-payment-failure.js';
+import { musuboBillingOverview } from '../services/musubo-billing-overview.js';
 import { deliverBillingRecoveryNotice, deliverCurrentBillingFailureNotice } from '../services/billing-invoice-notifications.js';
 import { StripeApiError, stripeApi, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
@@ -133,6 +134,25 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
     const tenantId = tenantOf(c);
     const billing = await getTenantBilling(c.env.DB, tenantId);
     if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
+    const musuboBilling = await getMusuboTenantBilling(c.env.DB, tenantId);
+    if (musuboBilling) {
+      const newPricing = await musuboBillingOverview(c.env.DB, tenantId, musuboBilling);
+      const state = musuboBilling.status === 'awaiting_first_line' ? 'exempt'
+        : musuboBilling.status === 'ended' ? 'canceled' : musuboBilling.status;
+      return c.json({ success: true, data: {
+        state, planKey: null, planInterval: musuboBilling.billing_interval,
+        planName: 'musubo', planStatus: state,
+        trialEndsAt: null, trialEndsLabel: null, trialDaysLeft: null,
+        trialMonthlyImages: TRIAL_MONTHLY_IMAGES,
+        currentPeriodEndsAt: null, currentPeriodEndsLabel: null,
+        canSend: musuboBilling.status === 'trialing' || musuboBilling.status === 'active',
+        canGenerate: musuboBilling.status === 'trialing' || musuboBilling.status === 'active',
+        blockedReason: null, paymentFailure: null,
+        dataRetentionDays: DATA_RETENTION_DAYS, stripeReady: stripeReady(c),
+        portalAvailable: stripeReady(c) && Boolean(billing.stripe_customer_id),
+        plans: [], newPricing,
+      } });
+    }
     const paymentFailure = await getBillingPaymentFailure(c.env.DB, billing).catch(() => null);
     const entitlements = resolveEntitlements(billing, {
       exemptMonthlyImages: exemptMonthlyImages(c),
