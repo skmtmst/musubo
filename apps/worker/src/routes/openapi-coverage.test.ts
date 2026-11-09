@@ -142,6 +142,19 @@ const ALLOWLIST_MAX = 769;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/hq/onboarding/pricing',
+  'GET /api/hq/onboarding/quotes/latest',
+  'GET /api/hq/onboarding/quotes/{id}',
+  'GET /api/ops/applications/{applicationId}/quotes',
+  'GET /api/ops/applications/{applicationId}/quotes/{id}/mail-preview',
+  'GET /api/ops/pricing-conditions',
+  'POST /api/hq/onboarding/pricing',
+  'POST /api/hq/onboarding/quotes/{id}/accept',
+  'POST /api/ops/applications/{applicationId}/quotes',
+  'POST /api/ops/applications/{applicationId}/quotes/{id}/send',
+  'POST /api/ops/pricing-conditions',
+  'PUT /api/ops/applications/{applicationId}/quotes/{id}',
+  'PUT /api/ops/pricing-conditions/{id}',
   'GET /api/forms/{id}/images/{blockId}',
   'GET /api/liff/events',
   'POST /api/liff/tracked-link-identity',

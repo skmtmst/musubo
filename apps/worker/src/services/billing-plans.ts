@@ -207,7 +207,8 @@ export async function resolveTenantEntitlements(
   billing: TenantBilling | null,
   options: { exemptMonthlyImages?: number; now?: Date } = {},
 ): Promise<Entitlements> {
-  if (billing) {
+  // 新料金で作った統括だけを追加で読む。旧契約の全APIにD1往復を増やさない。
+  if (billing?.plan_key === 'musubo') {
     const musubo = await getMusuboTenantBilling(db, billing.id);
     if (musubo) return resolveMusuboEntitlements(db, musubo, options);
   }

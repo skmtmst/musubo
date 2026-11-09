@@ -99,6 +99,7 @@ function tenantRow() {
 }
 
 function seedNewPricingTenant() {
+  testDb.raw.prepare("UPDATE tenants SET plan_key='musubo' WHERE id=?").run(DEFAULT_TENANT_ID);
   testDb.raw.prepare(`INSERT INTO musubo_tenant_billing
     (tenant_id,pricing_snapshot_json,billing_interval,status,created_at,updated_at)
     VALUES (?,'{}','month','awaiting_first_line','2026-11-09','2026-11-09')`).run(DEFAULT_TENANT_ID);

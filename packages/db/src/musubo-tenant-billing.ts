@@ -63,8 +63,8 @@ export async function createMusuboPendingTenant(db: D1Database, input: {
   const now = jstNow();
   await db.batch([
     db.prepare(`INSERT INTO tenants
-      (id,name,status,plan_status,trial_ends_at,plan_updated_at,signup_device_marker,created_at,updated_at)
-      VALUES (?,?,'active','exempt',NULL,?,?,?,?)`)
+      (id,name,status,plan_key,plan_status,trial_ends_at,plan_updated_at,signup_device_marker,created_at,updated_at)
+      VALUES (?,?,'active','musubo','exempt',NULL,?,?,?,?)`)
       .bind(id, input.name, now, input.deviceMarker, now, now),
     db.prepare(`INSERT INTO musubo_tenant_billing
       (tenant_id,application_id,pricing_snapshot_json,billing_interval,status,created_at,updated_at)

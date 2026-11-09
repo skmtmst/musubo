@@ -63,7 +63,7 @@ export default function LinkedAccountRemovalModal(props: Props) {
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
   }
 
-  const confirm = async () => {
+  const confirmRemoval = async () => {
     if (props.phase !== 'review' || busy) return
     setBusy(true); setError('')
     try { await props.onConfirm() }
@@ -111,7 +111,7 @@ export default function LinkedAccountRemovalModal(props: Props) {
     <div className={styles.actions}><button ref={backRef} type="button" className={styles.back} disabled={busy}
       onClick={props.phase === 'review' ? props.onBack : props.onBilling}>{props.phase === 'review' ? '戻る' : '請求を見る'}</button>
       <Button ref={primaryRef} type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="処理中…"
-        onClick={props.phase === 'review' ? () => void confirm() : props.onAccounts}>
+        onClick={props.phase === 'review' ? () => void confirmRemoval() : props.onAccounts}>
         {props.phase === 'review' ? 'この連携を解除する' : 'アカウント一覧へ'}</Button></div>
   </section></div>
 }

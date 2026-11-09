@@ -136,7 +136,8 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
     const tenantId = tenantOf(c);
     const billing = await getTenantBilling(c.env.DB, tenantId);
     if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
-    const musuboBilling = await getMusuboTenantBilling(c.env.DB, tenantId);
+    const musuboBilling = billing.plan_key === 'musubo'
+      ? await getMusuboTenantBilling(c.env.DB, tenantId) : null;
     if (musuboBilling) {
       const newPricing = await musuboBillingOverview(c.env.DB, tenantId, musuboBilling);
       const entitlements = await resolveTenantEntitlements(c.env.DB, billing,

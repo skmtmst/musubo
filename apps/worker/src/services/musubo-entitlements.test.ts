@@ -7,6 +7,7 @@ import { resolveTenantEntitlements } from './billing-plans.js';
 it('starts the new trial only after LINE and core contract are ready', async () => {
   const fixture = createTestD1();
   const tenantId = DEFAULT_TENANT_ID;
+  fixture.raw.prepare("UPDATE tenants SET plan_key='musubo' WHERE id=?").run(tenantId);
   fixture.raw.prepare(`INSERT INTO musubo_tenant_billing
     (tenant_id,pricing_snapshot_json,billing_interval,status,first_line_activated_at,
       first_charge_date,core_subscription_id,options_subscription_id,created_at,updated_at)
@@ -26,6 +27,7 @@ it('starts the new trial only after LINE and core contract are ready', async () 
 it('allows seven days after a paid core invoice fails, then suspends', async () => {
   const fixture = createTestD1();
   const tenantId = DEFAULT_TENANT_ID;
+  fixture.raw.prepare("UPDATE tenants SET plan_key='musubo' WHERE id=?").run(tenantId);
   fixture.raw.prepare(`INSERT INTO musubo_tenant_billing
     (tenant_id,pricing_snapshot_json,billing_interval,status,first_line_activated_at,
       first_charge_date,core_subscription_id,options_subscription_id,created_at,updated_at)
