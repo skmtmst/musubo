@@ -531,6 +531,13 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
       .bind(event.id,event.type,tenant?.id ?? null,'pending').run();
     const receipt = await c.env.DB.prepare('SELECT summary FROM billing_events WHERE id=?').bind(event.id).first<{summary:string}>();
     if (receipt?.summary !== 'pending') return c.json({ success:true,data:{received:true,duplicate:true} });
+    // New-price contracts use separate core/options subscriptions. The legacy
+    // handler has one plan slot and must not acknowledge or apply those events.
+    // Keep the receipt pending until the new contract handler can reconcile it.
+    if (tenant && await getMusuboTenantBilling(c.env.DB, tenant.id)
+      && !(event.type === 'checkout.session.completed' && object.mode === 'setup')) {
+      return c.json({ success: false, error: '新料金の契約状態を確認できませんでした' }, 503);
+    }
     const statements: D1PreparedStatement[] = [];
     let refundStatementIndex: number | undefined;
     let hasTenantWrite=false;

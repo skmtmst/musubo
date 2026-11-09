@@ -363,6 +363,19 @@ describe('課金 Webhook', () => {
     stripe.retrieveSubscription.mockResolvedValue({ id: 'sub_1', status: 'active', customer: 'cus_1', current_period_end: 1_760_000_000, items: { data: [{ price: { id: 'price_standard' } }] } });
   });
 
+  it('新料金の契約通知を旧プランへ適用せず、再処理可能な受領状態で残す', async () => {
+    seedNewPricingTenant();
+    setTenant({ plan_status: 'exempt', stripe_customer_id: 'cus_1' });
+    const event = { id: 'evt_musubo_core', type: 'customer.subscription.created', created: 100,
+      data: { object: { id: 'sub_musubo_core', customer: 'cus_1', status: 'trialing',
+        metadata: { tenant_id: DEFAULT_TENANT_ID, purpose: 'musubo_core' },
+        items: { data: [{ price: { id: 'price_musubo_core' } }] } } } };
+    expect((await webhook(event)).status).toBe(503);
+    expect(tenantRow()).toMatchObject({ plan_status: 'exempt', stripe_subscription_id: null });
+    expect(testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_musubo_core'").get())
+      .toMatchObject({ summary: 'pending' });
+  });
+
   it('カードsetup完了通知は契約開始と区別し、Stripeの既定カードだけ更新する', async () => {
     setTenant({ stripe_customer_id: 'cus_setup', plan_status: 'trialing', trial_ends_at: null });
     stripe.retrieveSetupIntent.mockResolvedValue({ id: 'seti_1', status: 'succeeded', customer: 'cus_setup', payment_method: 'pm_setup' });
