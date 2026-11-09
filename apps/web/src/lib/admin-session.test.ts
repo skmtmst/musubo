@@ -36,6 +36,7 @@ describe('二段階認証後の戻り先', () => {
     }
     expect(go('/login/two-factor?next=m')).toBe('/m')
     expect(go('/login/two-factor?next=ops')).toBe('/ops')
+    expect(go('/login/two-factor/setup?next=musubo-pricing')).toBe('/hq/onboarding/pricing')
     expect(go('/login/two-factor')).toBe('/')
     // 決まった印だけを受ける（任意の住所へは送らない）。
     expect(go('/login/two-factor?next=https://evil.invalid/')).toBe('/')

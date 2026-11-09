@@ -42,6 +42,8 @@ import { hqSupportMethods } from './features/hq-support'
 import { hqBannersMethods } from './features/hq-banners'
 import { onboardingMethods } from './features/onboarding'
 import { individualQuoteMethods } from './features/individual-quotes'
+import { pricingConditionMethods } from './features/pricing-conditions'
+import { musuboOnboardingPricingMethods } from './features/musubo-onboarding-pricing'
 import { accountMigrationsMethods } from './features/account-migrations'
 import { accountsMethods } from './features/accounts'
 import { conversionsMethods } from './features/conversions'
@@ -69,6 +71,8 @@ import { identityMethods } from './features/identity'
 import { adsMethods } from './features/ads'
 export const api = {
   individualQuotes: individualQuoteMethods.individualQuotes,
+  pricingConditions: pricingConditionMethods.pricingConditions,
+  musuboOnboardingPricing: musuboOnboardingPricingMethods.musuboOnboardingPricing,
   system: authenticationMethods.system,
   auth: authenticationMethods.auth,
   searchConsole: analyticsMethods.searchConsole,

@@ -38,6 +38,7 @@
 .compact dt { flex: 0 0 var(--mp-px-120); color: var(--mp-color-59687b); font-size: var(--mp-px-12); }
 .compact dd { margin: 0; overflow-wrap: anywhere; text-align: right; font-size: var(--mp-px-13); font-weight: 700; }
 .mailPreview { max-width: var(--mp-px-570); margin: var(--mp-px-25) auto 0; border: 1px solid var(--mp-color-dfe5e7); border-radius: var(--mp-px-13); background: var(--mp-color-fff); padding: var(--mp-px-27); box-shadow: 0 var(--mp-px-3) var(--mp-px-12) var(--mp-color-1424190a); }
+.mailPreviewFrame { display: block; width: 100%; height: 620px; margin: var(--mp-px-25) auto 0; border: 1px solid var(--mp-color-dfe5e7); border-radius: var(--mp-px-13); background: var(--mp-color-fff); }
 .brand { padding-bottom: var(--mp-px-17); border-bottom: 1px solid var(--mp-color-e8edef); color: var(--mp-color-087c43); font-size: var(--mp-px-28); font-weight: 800; }
 .brand span { margin-left: var(--mp-px-7); color: var(--mp-color-173f35); font-size: var(--mp-px-25); }
 .greenLabel { margin: var(--mp-px-26) 0 var(--mp-px-8); color: var(--mp-color-087c43); font-size: var(--mp-px-13); font-weight: 700; }

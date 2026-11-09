@@ -103,13 +103,14 @@ describe('N-426: 登録完了直後の二段階設定への分岐', () => {
     await render()
     await fillAndSubmit()
     expect(window.location.pathname).toBe('/login/two-factor/setup')
+    expect(window.location.search).toBe('?next=musubo-pricing')
     expect(new URLSearchParams(window.location.hash.slice(1)).get('lh_2fa')).toBe('setup-tok-9')
     expect(new URLSearchParams(window.location.hash.slice(1)).get('lh_nonce')).toMatch(/^[0-9a-f-]{36}$/)
     expect(captureTwoFactorChallenge()).toBe('setup-tok-9')
     expect(window.sessionStorage.getItem('lh_admin_session_fallback')).toBeNull()
   })
 
-  it('twoFactorSetup でなければ従来どおりセッションを受け取り /hq へ進む', async () => {
+  it('twoFactorSetup でなければセッションを受け取り料金確認へ進む', async () => {
     fixture.completeResponse = {
       ok: true,
       data: { tenantId: 't1', deviceMarker: 'dm-1', sessionToken: 'sess-9' },
@@ -117,7 +118,7 @@ describe('N-426: 登録完了直後の二段階設定への分岐', () => {
     }
     await render()
     await fillAndSubmit()
-    expect(window.location.pathname).toBe('/hq')
+    expect(window.location.pathname).toBe('/hq/onboarding/pricing')
     expect(window.sessionStorage.getItem('lh_admin_session_fallback')).toBe('sess-9')
   })
 
@@ -139,6 +140,6 @@ describe('N-426: 登録完了直後の二段階設定への分岐', () => {
     }
     await render()
     await fillAndSubmit()
-    expect(window.location.pathname).toBe('/hq')
+    expect(window.location.pathname).toBe('/hq/onboarding/pricing')
   })
 })

@@ -11,8 +11,16 @@ import styles from './individual-quote-editor.module.css'
 interface Props {
   initialQuote: MusuboIndividualQuote
   recipientEmail: string
-  onSaveDraft: (quote: MusuboIndividualQuote) => Promise<void>
-  onSend: (quote: MusuboIndividualQuote) => Promise<void>
+  onSaveDraft: (quote: MusuboIndividualQuote) => Promise<MusuboIndividualQuote | void>
+  onLoadMailPreview?: (quote: MusuboIndividualQuote) => Promise<QuoteMailPreview>
+  onSend: (quote: MusuboIndividualQuote, preview?: QuoteMailPreview) => Promise<void>
+}
+
+export interface QuoteMailPreview {
+  to: string
+  subject: string
+  html: string
+  previewHash: string
 }
 
 const money = (yen: number) => `¥${new Intl.NumberFormat('ja-JP').format(yen)}`
@@ -22,7 +30,8 @@ const jstLocal = (iso: string) => new Intl.DateTimeFormat('sv-SE', {
 }).format(new Date(iso)).replace(' ', 'T')
 const localToIso = (value: string) => `${value}:00+09:00`
 
-export default function IndividualQuoteEditor({ initialQuote, recipientEmail, onSaveDraft, onSend }: Props) {
+export default function IndividualQuoteEditor({ initialQuote, recipientEmail, onSaveDraft,
+  onLoadMailPreview, onSend }: Props) {
   const [draft, setDraft] = useState<MusuboIndividualQuote>({
     ...initialQuote, finalSchedule: {
       ...initialQuote.finalSchedule,
@@ -36,6 +45,7 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [mailPreview, setMailPreview] = useState<QuoteMailPreview | null>(null)
   const price = useMemo(() => {
     try { return musuboIndividualQuotePrice(draft) } catch { return null }
   }, [draft])
@@ -62,10 +72,26 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
   }
   const save = async (showReview: boolean) => {
     if (!price) { setError('必要な料金と有効期限を入力してください。'); return }
-    await run(async () => { await onSaveDraft(draft); if (showReview) setReview(true) })
+    await run(async () => {
+      const saved = await onSaveDraft(draft)
+      const current = saved ?? draft
+      if (saved) setDraft(saved)
+      if (showReview) {
+        setMailPreview(onLoadMailPreview ? await onLoadMailPreview(current) : null)
+        setReview(true)
+      }
+    })
   }
   const trial = `${draft.trialPeriod.value}${draft.trialPeriod.unit === 'months' ? 'か月' : '日'}無料`
   const summary = `LINE ${draft.plannedLineCount}個予定 · 友だち ${new Intl.NumberFormat('ja-JP').format(draft.plannedFriendCountExcludingBlocked)}人`
+  const firstLinked = draft.plannedLinkedAccountsByLine[0] ?? { googleBusiness: 0, instagram: 0 }
+  const changeLinked = (service: 'googleBusiness' | 'instagram', value: number) => {
+    setDraft((current) => ({ ...current,
+      plannedLinkedAccountsByLine: [{ ...(current.plannedLinkedAccountsByLine[0] ?? { googleBusiness: 0, instagram: 0 }),
+        [service]: value }],
+    }))
+    setError('')
+  }
 
   if (review) return <div className={styles.page}>
     <p className={styles.breadcrumb}>ホーム › 個別見積もり › 送信前確認</p>
@@ -74,9 +100,10 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
     <div className={styles.reviewGrid}>
       <section className={styles.card} aria-labelledby="mail-review-title">
         <h2 id="mail-review-title">送信するメール</h2>
-        <dl className={styles.compact}><div><dt>宛先</dt><dd>{recipientEmail}</dd></div>
-          <div><dt>件名</dt><dd>【musubo】個別見積もりのご案内</dd></div></dl>
-        <div className={styles.mailPreview}>
+        <dl className={styles.compact}><div><dt>宛先</dt><dd>{mailPreview?.to ?? recipientEmail}</dd></div>
+          <div><dt>件名</dt><dd>{mailPreview?.subject ?? '【musubo】個別見積もりのご案内'}</dd></div></dl>
+        {mailPreview ? <iframe className={styles.mailPreviewFrame} title="送信するメールのプレビュー"
+          sandbox="" srcDoc={mailPreview.html} /> : <div className={styles.mailPreview}>
           <div className={styles.brand}>m <span>musubo</span></div>
           <p className={styles.greenLabel}>個別見積もりのご案内</p>
           <h3>お見積もりをご用意しました</h3>
@@ -87,7 +114,7 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
             {draft.interval === 'year' && <small>オプション料金 {money(price!.optionsMonthlyYen)}／月は毎月別に請求します。</small>}</div>
           <div className={styles.mailButton}>お見積もりを確認する</div>
           <p>カード登録だけでは請求も無料期間も始まりません。</p>
-        </div>
+        </div>}
       </section>
       <section className={styles.card} aria-labelledby="send-check-title">
         <h2 id="send-check-title">送信前の確認</h2>
@@ -107,7 +134,7 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
     {error && <p className={styles.error} role="alert">{error}</p>}
     <div className={styles.actions}>{!sent && <button type="button" className={styles.secondary} onClick={() => setReview(false)}>料金条件を編集する</button>}
       <Button type="button" variant="primary" className={styles.primary} busy={busy} busyLabel="送信中…" disabled={sent}
-        onClick={() => void run(async () => { await onSend(draft); setSent(true) })}>
+        onClick={() => void run(async () => { await onSend(draft, mailPreview ?? undefined); setSent(true) })}>
         {sent ? '送信済み' : 'この内容でメールを送信'}</Button></div>
     {sent && <p className={styles.sent} role="status">登録メールアドレスへ見積もりを送信しました。</p>}
   </div>
@@ -119,6 +146,26 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
     <div className={styles.target}><strong>{draft.companyName}</strong><span>{summary}</span></div>
     <div className={styles.columns}>
       <div className={styles.editorStack}>
+        <section className={styles.card} aria-labelledby="quote-usage-title"><h2 id="quote-usage-title">お客様の利用予定</h2>
+          <p className={styles.small}>お問い合わせ内容を確認し、予定数を入力してください。料金はここで保存した数と単価から計算します。</p>
+          <div className={styles.fieldGrid}>
+            <label className={styles.field}><span>連携するLINEアカウント数</span>
+              <TextField type="number" min={1} max={9999} step={1} value={draft.plannedLineCount || ''}
+                onChange={(event) => setDraft((current) => ({ ...current, plannedLineCount: Number(event.target.value) }))} /></label>
+            <label className={styles.field}><span>既存のLINEアカウントの合計（ブロック除く）</span>
+              <TextField type="number" min={0} step={1} value={draft.plannedFriendCountExcludingBlocked}
+                onChange={(event) => setDraft((current) => ({ ...current,
+                  plannedFriendCountExcludingBlocked: Number(event.target.value) }))} /></label>
+            {draft.plannedLineCount === 1 && <>
+              <label className={styles.field}><span>Googleマイビジネスの連携予定数</span>
+                <TextField type="number" min={0} step={1} value={firstLinked.googleBusiness}
+                  onChange={(event) => changeLinked('googleBusiness', Number(event.target.value))} /></label>
+              <label className={styles.field}><span>Instagramアカウントの連携予定数</span>
+                <TextField type="number" min={0} step={1} value={firstLinked.instagram}
+                  onChange={(event) => changeLinked('instagram', Number(event.target.value))} /></label>
+            </>}
+          </div>
+        </section>
         <section className={styles.card} aria-labelledby="basic-price-title"><h2 id="basic-price-title">LINE基本料金</h2>
           <p className={styles.small}>適用条件を反映した最終単価を初期入力します。送信前に会社ごとの金額を調整できます。</p>
           <div className={styles.fieldGrid}>

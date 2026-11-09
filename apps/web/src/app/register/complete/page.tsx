@@ -106,7 +106,7 @@ function CompleteInner() {
     resetAuthSelectionCleared(localStorage, sessionStorage)
     // オーナーは二段階認証が必須（N-426）。設定画面へ進み、完了後にセッションが出る。
     if (res.data.twoFactorSetup && res.data.challengeToken) {
-      window.location.assign(twoFactorChallengeHandoffPath('/login/two-factor/setup', res.data.challengeToken))
+      window.location.assign(twoFactorChallengeHandoffPath('/login/two-factor/setup?next=musubo-pricing', res.data.challengeToken))
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
@@ -115,7 +115,7 @@ function CompleteInner() {
       // 投げたままにすると登録中の表示で止まる。
       try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie session is sufficient */ }
     }
-    window.location.assign('/hq')
+    window.location.assign('/hq/onboarding/pricing')
   }
 
   if (check.state === 'checking') return <CompletePending />
