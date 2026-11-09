@@ -5,6 +5,20 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { hqBilling } from './hq-billing.js';
 
+it('does not show a legacy free plan when the new contract row is missing', async () => {
+  const fixture = createTestD1();
+  fixture.raw.prepare("UPDATE tenants SET plan_key='musubo' WHERE id=?").run(DEFAULT_TENANT_ID);
+  const app = new Hono<Env>();
+  app.use('*', async (c, next) => {
+    c.set('staff', { id: 'owner', name: 'Owner', role: 'owner', readOnly: false,
+      tenantId: DEFAULT_TENANT_ID });
+    await next();
+  });
+  app.route('/', hqBilling);
+  const response = await app.request('/api/hq/billing/summary', {}, { DB: fixture.db } as Env['Bindings']);
+  expect(response.status).toBe(503);
+});
+
 it('new pricing summary does not expose the legacy plan catalog', async () => {
   const fixture = createTestD1();
   fixture.raw.prepare("UPDATE tenants SET plan_key='musubo' WHERE id=?").run(DEFAULT_TENANT_ID);

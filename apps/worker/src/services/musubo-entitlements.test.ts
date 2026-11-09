@@ -4,6 +4,14 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { resolveTenantEntitlements } from './billing-plans.js';
 
+it('blocks access when a musubo billing marker has no matching contract row', async () => {
+  const fixture = createTestD1();
+  fixture.raw.prepare("UPDATE tenants SET plan_key='musubo' WHERE id=?").run(DEFAULT_TENANT_ID);
+  const legacy = await getTenantBilling(fixture.db, DEFAULT_TENANT_ID);
+  expect(await resolveTenantEntitlements(fixture.db, legacy))
+    .toMatchObject({ state: 'trial_expired', canSend: false, canGenerate: false });
+});
+
 it('starts the new trial only after LINE and core contract are ready', async () => {
   const fixture = createTestD1();
   const tenantId = DEFAULT_TENANT_ID;

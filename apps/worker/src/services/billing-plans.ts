@@ -211,6 +211,12 @@ export async function resolveTenantEntitlements(
   if (billing?.plan_key === 'musubo') {
     const musubo = await getMusuboTenantBilling(db, billing.id);
     if (musubo) return resolveMusuboEntitlements(db, musubo, options);
+    // マーカーと新契約行が不整合なら旧exemptへ落として無料利用を許さない。
+    return {
+      state: 'trial_expired', canSend: false, canGenerate: false, monthlyImages: 0,
+      blockedReason: '請求の状態を確認できません。運営にお問い合わせください',
+      trialDaysLeft: null, plan: null,
+    };
   }
   if (billing?.plan_status !== 'past_due') return resolveEntitlements(billing, options);
   try {
