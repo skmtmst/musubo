@@ -92,17 +92,25 @@ function buildBootstrapSql() {
       .map((row) => `${String(row.sql).trim()};`)
       .join("\n\n");
 
-    // sqlite_master contains schema objects but not migration seed rows. Fresh
-    // databases still need the fixed default tenant used by migration 176.
+    // sqlite_master contains schema objects but not migration seed rows.
+    const quote = (value) => "'" + String(value).replaceAll("'", "''") + "'";
+    const sqlValue = (value) => value === null ? 'NULL' : typeof value === 'number' ? String(value) : quote(value);
+    const normalColumns = ['id', 'condition_key', 'version', 'name', 'status', 'trial_unit',
+      'trial_value', 'line_discount_percent', 'price_schedule_json', 'created_by', 'created_at', 'activated_at'];
+    const normalCondition = db.prepare(`SELECT ${normalColumns.join(',')} FROM musubo_pricing_conditions WHERE id='normal'`).get();
+    const normalSeed = normalCondition
+      ? `INSERT OR IGNORE INTO musubo_pricing_conditions (${normalColumns.join(',')}) VALUES (${normalColumns.map((key) => sqlValue(normalCondition[key])).join(',')});`
+      : '';
+    // Fresh databases need the fixed tenant and the editable default pricing condition.
     const seedData = [
       "-- Seed data required by tenant-aware inserts on a fresh database.",
       "INSERT OR IGNORE INTO tenants (id, name) VALUES",
       "  ('00000000-0000-4000-8000-000000000001', '既定の統括');",
+      normalSeed,
     ].join("\n");
 
 
     // 固定7欄は新規DBにも必要。schemaだけでは対応表が空になる。
-    const quote = (value) => "'" + String(value).replaceAll("'", "''") + "'";
     const fixedRows = db.prepare(`SELECT fixed.fixed_key, f.id, f.name, f.field_key, f.type, f.display_order
       FROM friend_fixed_fields fixed JOIN friend_fields f ON f.id = fixed.field_id
       ORDER BY f.display_order`).all();

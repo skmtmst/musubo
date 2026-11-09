@@ -19,6 +19,8 @@ export interface RegistrationApplication {
   tenant_id: string | null;
   ip_hash: string | null;
   device_marker: string | null;
+  pricing_condition_id: string | null;
+  pricing_snapshot_json: string | null;
   created_at: string;
   updated_at: string;
 }
