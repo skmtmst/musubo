@@ -3,7 +3,7 @@ import {
   claimMusuboIndividualQuoteSend, createMusuboIndividualQuoteDraft,
   getMusuboIndividualQuote, getRegistrationApplication, listMusuboIndividualQuotesForApplication,
   markMusuboIndividualQuoteSent, musuboQuoteFromRecord, recordPlatformAudit,
-  updateMusuboIndividualQuoteDraft,
+  resolveMusuboIndividualQuoteSend, updateMusuboIndividualQuoteDraft,
 } from '@line-crm/db';
 import { individualQuoteAccess, musuboIndividualQuotePrice,
   type MusuboIndividualQuote } from '@line-crm/shared';
@@ -53,9 +53,56 @@ opsIndividualQuotes.get('/api/ops/applications/:applicationId/quotes', async (c)
   if (!application) return c.json({ success: false, error: '申込が見つかりません' }, 404);
   const rows = await listMusuboIndividualQuotesForApplication(db, applicationId);
   return c.json({ success: true, data: rows.map((row) => ({
-    quote: musuboQuoteFromRecord(row), status: row.status, revision: row.revision, sentAt: row.sent_at,
+    quote: musuboQuoteFromRecord(row), status: row.status, revision: row.revision,
+    sentAt: row.sent_at, sendClaimedAt: row.send_claimed_at,
   })) });
 });
+
+opsIndividualQuotes.get('/api/ops/applications/:applicationId/quotes/:id/send-review', async (c) => {
+  const db = dbFor(c.env);
+  const row = await getMusuboIndividualQuote(db, c.req.param('id'));
+  if (!row || row.application_id !== c.req.param('applicationId') || row.status !== 'sending') {
+    return c.json({ success: false, error: '確認が必要な見積もりはありません' }, 404);
+  }
+  const application = await getRegistrationApplication(db, row.application_id);
+  if (!application) return c.json({ success: false, error: '申込が見つかりません' }, 404);
+  const previous = await listMusuboIndividualQuotesForApplication(db, row.application_id);
+  const kind = previous.some((item) => item.id !== row.id && item.sent_at) ? 'reissued' : 'issued';
+  const mail = individualQuoteMail({ quote: musuboQuoteFromRecord(row),
+    reviewUrl: reviewUrl(c.env, row.id), kind });
+  return c.json({ success: true, data: { quoteId: row.id, status: row.status,
+    sendClaimedAt: row.send_claimed_at, to: application.email,
+    subject: mail.subject, html: mail.html, text: mail.text } });
+});
+
+opsIndividualQuotes.post('/api/ops/applications/:applicationId/quotes/:id/resolve-send',
+  requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
+    const body = await c.req.json<unknown>().catch(() => null);
+    const values = body && typeof body === 'object' && !Array.isArray(body)
+      ? body as Record<string, unknown> : {};
+    const outcome = values.outcome;
+    const evidence = typeof values.evidence === 'string' ? values.evidence.trim() : '';
+    if ((outcome !== 'delivered' && outcome !== 'not_delivered')
+      || evidence.length < 12 || evidence.length > 500) {
+      return c.json({ success: false,
+        error: '配信履歴の確認結果と照合記録（12〜500文字）を入力してください' }, 400);
+    }
+    const db = dbFor(c.env);
+    const row = await getMusuboIndividualQuote(db, c.req.param('id'));
+    if (!row || row.application_id !== c.req.param('applicationId') || row.status !== 'sending') {
+      return c.json({ success: false, error: '送信状態が変わりました。読み直してください' }, 409);
+    }
+    if (!await resolveMusuboIndividualQuoteSend(db, { id: row.id, outcome })) {
+      return c.json({ success: false, error: '送信状態が変わりました。読み直してください' }, 409);
+    }
+    const staff = c.get('staff');
+    await recordPlatformAudit(db, { staffId: staff.id, staffName: staff.name,
+      action: 'individual_quote.resolve_send', detail: { applicationId: row.application_id,
+        quoteId: row.id, outcome, evidence, sendClaimedAt: row.send_claimed_at },
+      ip: clientIp(c), visibleToTenant: false });
+    return c.json({ success: true, data: { quoteId: row.id,
+      status: outcome === 'delivered' ? 'sent' : 'superseded' } });
+  });
 
 opsIndividualQuotes.post('/api/ops/applications/:applicationId/quotes', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const proposed = proposedQuote(await c.req.json<unknown>().catch(() => null));

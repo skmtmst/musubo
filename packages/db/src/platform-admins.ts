@@ -211,6 +211,7 @@ export const PLATFORM_AUDIT_ACTIONS = [
   'individual_quote.create',
   'individual_quote.update',
   'individual_quote.send',
+  'individual_quote.resolve_send',
   'tenant.create',
   'tenant.status.change',
   'tenant.feature_packs.change',

@@ -2,7 +2,8 @@ import { fetchApi } from '../transport/request'
 import type { ApiResponse, MusuboIndividualQuote } from '@line-crm/shared'
 
 type QuoteStatus = 'draft' | 'sending' | 'sent' | 'accepted' | 'superseded' | 'expired'
-type QuoteRow = { quote: MusuboIndividualQuote; status: QuoteStatus; revision?: number; sentAt?: string | null }
+type QuoteRow = { quote: MusuboIndividualQuote; status: QuoteStatus; revision?: number;
+  sentAt?: string | null; sendClaimedAt?: string | null }
 type QuoteAccess = 'available' | 'expired' | 'accepted' | 'superseded'
 type Proposed = Omit<MusuboIndividualQuote,
   'quoteNumber' | 'companyName' | 'issuedAt' | 'acceptedAt' | 'supersededAt'>
@@ -36,6 +37,15 @@ export const individualQuoteMethods = {
         quoteId: string; status: 'sent'; recipient: string
       }>>(`${applicationBase(applicationId)}/${encodeURIComponent(id)}/send`,
         { method: 'POST', body: JSON.stringify({ previewHash }) }),
+      sendReview: (applicationId: string, id: string) => fetchApi<ApiResponse<{
+        quoteId: string; status: 'sending'; sendClaimedAt: string | null;
+        to: string; subject: string; html: string; text: string
+      }>>(`${applicationBase(applicationId)}/${encodeURIComponent(id)}/send-review`),
+      resolveSend: (applicationId: string, id: string, input: {
+        outcome: 'delivered' | 'not_delivered'; evidence: string
+      }) => fetchApi<ApiResponse<{ quoteId: string; status: 'sent' | 'superseded' }>>(
+        `${applicationBase(applicationId)}/${encodeURIComponent(id)}/resolve-send`,
+        { method: 'POST', body: JSON.stringify(input) }),
     },
   },
 }

@@ -1187,6 +1187,7 @@ export {
   getLatestTenantMusuboIndividualQuote, getTenantMusuboIndividualQuote,
   listMusuboIndividualQuotesForApplication,
   markMusuboIndividualQuoteSent, musuboQuoteFromRecord,
+  resolveMusuboIndividualQuoteSend,
   supersedeMusuboIndividualQuote, updateMusuboIndividualQuoteDraft,
 } from './musubo-individual-quotes.js';
 export type { MusuboIndividualQuoteRecord } from './musubo-individual-quotes.js';

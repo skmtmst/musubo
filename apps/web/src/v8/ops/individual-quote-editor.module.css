@@ -48,6 +48,9 @@
 .mailPrice strong { color: var(--mp-color-087c43); font-size: var(--mp-px-21); }
 .mailPrice small { color: var(--mp-color-526476); line-height: 1.5; }
 .mailButton { width: min(100%,var(--mp-px-280)); margin: var(--mp-px-23) auto; border-radius: var(--mp-px-8); background: var(--mp-color-087c43); color: var(--mp-color-fff); padding: var(--mp-px-14) var(--mp-px-18); text-align: center; font-size: var(--mp-px-14); font-weight: 700; }
+.reviewEvidence { width: 100%; min-height: var(--mp-px-120); resize: vertical; border: 1px solid var(--mp-color-d4dee2); border-radius: var(--mp-px-7); padding: var(--mp-px-12); color: var(--mp-color-202428); font: inherit; font-size: var(--mp-px-13); font-weight: 400; line-height: 1.5; }
+.reviewEvidence:focus-visible { outline: var(--mp-px-2) solid var(--mp-color-087c43); outline-offset: var(--mp-px-2); }
+.reviewActions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--mp-px-12); margin-top: var(--mp-px-25); }
 @media (max-width: 1000px) { .columns, .reviewGrid { grid-template-columns: 1fr; } }
 @media (max-width: 600px) {
   .page h1 { font-size: var(--mp-px-23); }
@@ -56,6 +59,7 @@
   .badge { top: var(--mp-px-20); right: var(--mp-px-20); }
   .actions { flex-direction: column; }
   .actions button { width: 100%; }
+  .reviewActions button { width: 100%; }
   .compact > div { flex-direction: column; gap: var(--mp-px-4); }
   .compact dt { flex-basis: auto; }
   .compact dd { text-align: left; }

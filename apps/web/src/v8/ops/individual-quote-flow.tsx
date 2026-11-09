@@ -10,6 +10,7 @@ import ListState from '@/components/shared/list-state'
 import { PageFrame } from '@/components/templates/page-frame'
 import { api, type OpsApplication } from '@/lib/api'
 import IndividualQuoteEditor, { type QuoteMailPreview } from './individual-quote-editor'
+import QuoteDeliveryReview from './quote-delivery-review'
 
 function initialQuote(application: OpsApplication): MusuboIndividualQuote {
   let condition: AppliedMusuboCondition | null = null
@@ -49,6 +50,7 @@ export default function IndividualQuoteFlow() {
   const applicationId = useSearchParams().get('id') ?? ''
   const [application, setApplication] = useState<OpsApplication | null>(null)
   const [quote, setQuote] = useState<MusuboIndividualQuote | null>(null)
+  const [sendingQuote, setSendingQuote] = useState<MusuboIndividualQuote | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
@@ -61,6 +63,7 @@ export default function IndividualQuoteFlow() {
       ])
       if (!applicationResult.success || !quotesResult.success) throw new Error('load_failed')
       setApplication(applicationResult.data)
+      setSendingQuote(quotesResult.data.find((item) => item.status === 'sending')?.quote ?? null)
       const draft = quotesResult.data.find((item) => item.status === 'draft')
       setQuote(draft?.quote ?? initialQuote(applicationResult.data))
       setError(false)
@@ -93,6 +96,7 @@ export default function IndividualQuoteFlow() {
   return <PageFrame kind="detail" standalone>
     {loading ? <ListState kind="loading" title="個別見積もりを読み込んでいます" />
       : error || !application || !quote ? <ListState kind="error" title="個別見積もりを表示できませんでした" onRetry={() => void load()} />
+        : sendingQuote ? <QuoteDeliveryReview applicationId={applicationId} quote={sendingQuote} />
         : <IndividualQuoteEditor key={quote.quoteNumber} initialQuote={quote}
           recipientEmail={application.email} onSaveDraft={saveDraft}
           onLoadMailPreview={loadMailPreview} onSend={send} />}

@@ -128,6 +128,21 @@ export async function markMusuboIndividualQuoteSent(db: D1Database, id: string, 
   return (result.meta?.changes ?? 0) === 1;
 }
 
+/** Never retry an uncertain external send automatically. An operator must verify the delivery log. */
+export async function resolveMusuboIndividualQuoteSend(db: D1Database, input: {
+  id: string; outcome: 'delivered' | 'not_delivered'; now?: string;
+}): Promise<boolean> {
+  const now = input.now ?? jstNow();
+  const result = input.outcome === 'delivered'
+    ? await db.prepare(`UPDATE musubo_individual_quotes SET status='sent',sent_at=?
+      WHERE id=? AND status='sending' AND send_claimed_at IS NOT NULL`)
+      .bind(now, input.id).run()
+    : await db.prepare(`UPDATE musubo_individual_quotes SET status='superseded',superseded_at=?
+      WHERE id=? AND status='sending' AND send_claimed_at IS NOT NULL`)
+      .bind(now, input.id).run();
+  return (result.meta?.changes ?? 0) === 1;
+}
+
 /** Acceptance is guarded in SQLite to handle simultaneous requests and expiry exactly once. */
 export async function acceptTenantMusuboIndividualQuote(db: D1Database, input: {
   tenantId: string;

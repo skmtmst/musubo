@@ -103,4 +103,34 @@ describe('operations individual quote flow', () => {
       json({ previewHash: 'a'.repeat(64) }), env())).status).toBe(409);
     expect(mail.send).not.toHaveBeenCalled();
   });
+
+  it('holds an uncertain send for manual delivery review without an automatic resend', async () => {
+    const id = appId();
+    const base = `/api/ops/applications/${id}/quotes`;
+    fixture.raw.prepare('UPDATE registration_applications SET status=?,tenant_id=? WHERE id=?')
+      .run('activated', tenantStaff.tenantId, id);
+    const created = await app(operator).request(base, json({ proposed }), env());
+    const quoteId = ((await created.json()) as { data: { quote: { quoteNumber: string } } })
+      .data.quote.quoteNumber;
+    const preview = (await (await app(operator).request(`${base}/${quoteId}/mail-preview`, {}, env()))
+      .json()) as { data: { previewHash: string } };
+    mail.send.mockRejectedValueOnce(new Error('mail result unknown'));
+    expect((await app(operator).request(`${base}/${quoteId}/send`,
+      json({ previewHash: preview.data.previewHash }), env())).status).toBe(502);
+    expect(fixture.raw.prepare('SELECT status FROM musubo_individual_quotes WHERE id=?').get(quoteId))
+      .toEqual({ status: 'sending' });
+    expect((await app(operator).request(`${base}/${quoteId}/send`,
+      json({ previewHash: preview.data.previewHash }), env())).status).toBe(409);
+    expect(mail.send).toHaveBeenCalledTimes(1);
+    const review = await app(operator).request(`${base}/${quoteId}/send-review`, {}, env());
+    expect(review.status).toBe(200);
+    expect(await review.json()).toMatchObject({ data: { to: 'owner@example.test', status: 'sending' } });
+    expect((await app(viewer).request(`${base}/${quoteId}/resolve-send`,
+      json({ outcome: 'not_delivered', evidence: '配信ログで未送信を確認' }), env())).status).toBe(403);
+    expect((await app(operator).request(`${base}/${quoteId}/resolve-send`,
+      json({ outcome: 'not_delivered', evidence: '配信ログでこの見積もりは未送信と確認' }), env())).status).toBe(200);
+    expect(fixture.raw.prepare('SELECT status FROM musubo_individual_quotes WHERE id=?').get(quoteId))
+      .toEqual({ status: 'superseded' });
+    expect(mail.send).toHaveBeenCalledTimes(1);
+  });
 });
