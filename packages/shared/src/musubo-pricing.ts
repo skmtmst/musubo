@@ -26,6 +26,19 @@ export interface LinkedAccountCounts {
   instagram: number;
 }
 
+/** LINE's ready insight reports cumulative adds and current blocks for one date. */
+export function musuboFriendsExcludingBlocked(insight: {
+  status: string;
+  followers?: number | null;
+  blocks?: number | null;
+}): number | null {
+  if (insight.status !== 'ready' || typeof insight.followers !== 'number'
+    || typeof insight.blocks !== 'number' || !Number.isSafeInteger(insight.followers)
+    || !Number.isSafeInteger(insight.blocks) || insight.followers < 0 || insight.blocks < 0
+    || insight.blocks > insight.followers) return null;
+  return insight.followers - insight.blocks;
+}
+
 export interface MusuboPriceInput {
   lineCount: number;
   friendCountExcludingBlocked: number;

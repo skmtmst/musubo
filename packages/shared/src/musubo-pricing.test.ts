@@ -4,6 +4,7 @@ import {
   linkedAccountSlots,
   musuboPrice,
   musuboChargeDateEpoch,
+  musuboFriendsExcludingBlocked,
   musuboTrialDates,
   prorateAnnualLineIncrement,
   prorateMonthlyIncrement,
@@ -12,6 +13,12 @@ import {
 const base = { friendCountExcludingBlocked: 2_800, interval: 'month' as const };
 
 describe('musubo LINE pricing', () => {
+  it('subtracts LINE blocks only from a ready, internally consistent insight', () => {
+    expect(musuboFriendsExcludingBlocked({ status: 'ready', followers: 3_100, blocks: 100 })).toBe(3_000);
+    expect(musuboFriendsExcludingBlocked({ status: 'unready', followers: 3_100, blocks: 100 })).toBeNull();
+    expect(musuboFriendsExcludingBlocked({ status: 'ready', followers: 3_100, blocks: null })).toBeNull();
+    expect(musuboFriendsExcludingBlocked({ status: 'ready', followers: 50, blocks: 51 })).toBeNull();
+  });
   it('uses the Pen amounts at the first, second, third, and sixth LINE', () => {
     expect(musuboPrice({ ...base, lineCount: 1 }).monthlyTotalYen).toBe(5_900);
     expect(musuboPrice({ ...base, lineCount: 2 }).monthlyTotalYen).toBe(19_300);
