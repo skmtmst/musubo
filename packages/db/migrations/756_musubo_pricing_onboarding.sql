@@ -167,6 +167,48 @@ CREATE TABLE musubo_line_usage (
 CREATE INDEX idx_musubo_line_usage_tenant
   ON musubo_line_usage(tenant_id, status);
 
+-- 有料LINEの終了日は請求の切替と別に保持する。要求を先に保存し、Stripe照合後に接続を止める。
+CREATE TABLE musubo_line_removals (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  status TEXT NOT NULL CHECK (status IN ('requested', 'scheduled', 'cancelling', 'ended', 'cancelled')),
+  effective_at TEXT NOT NULL,
+  requested_at TEXT NOT NULL,
+  synced_at TEXT,
+  ended_at TEXT,
+  cancelled_at TEXT,
+  updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX idx_musubo_line_removals_in_flight
+  ON musubo_line_removals(tenant_id)
+  WHERE status IN ('requested', 'scheduled', 'cancelling');
+CREATE INDEX idx_musubo_line_removals_due
+  ON musubo_line_removals(status, effective_at);
+CREATE TABLE musubo_line_removal_notices (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  event TEXT NOT NULL CHECK (event IN ('scheduled','ended','cancelled')),
+  snapshot_json TEXT NOT NULL CHECK (json_valid(snapshot_json)),
+  created_at TEXT NOT NULL,
+  delivered_at TEXT
+);
+CREATE INDEX idx_musubo_line_removal_notices_pending
+  ON musubo_line_removal_notices(delivered_at, created_at);
+
+-- 年払い更新予定は対象日ごとに一度だけ案内し、送信結果を再照合する。
+CREATE TABLE musubo_annual_renewal_notices (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  renewal_date TEXT NOT NULL,
+  snapshot_json TEXT NOT NULL CHECK (json_valid(snapshot_json)),
+  created_at TEXT NOT NULL,
+  delivered_at TEXT,
+  UNIQUE (tenant_id, renewal_date)
+);
+CREATE INDEX idx_musubo_annual_renewal_notices_pending
+  ON musubo_annual_renewal_notices(delivered_at, created_at);
+
 -- 追加分の支払い失敗は既存利用を止めず、対象だけを保留する。
 CREATE TABLE musubo_pending_additions (
   id TEXT PRIMARY KEY,

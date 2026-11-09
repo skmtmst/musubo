@@ -180,6 +180,30 @@ export async function scheduled(
   }
 
   try {
+    const { sweepMusuboLineRemovals } = await import('../services/musubo-line-removal.js');
+    const result = await sweepMusuboLineRemovals(env, new Date(event.scheduledTime).toISOString());
+    if (result.failed > 0) logger.error('musubo_line_removal_sweep_failed');
+  } catch {
+    logger.error('musubo_line_removal_sweep_failed');
+  }
+
+  try {
+    const { sweepMusuboLineRemovalNotices } = await import('../services/musubo-line-removal-notification.js');
+    const result = await sweepMusuboLineRemovalNotices(env);
+    if (result.failed > 0) logger.error('musubo_line_removal_notice_sweep_failed');
+  } catch {
+    logger.error('musubo_line_removal_notice_sweep_failed');
+  }
+
+  try {
+    const { sweepMusuboAnnualRenewalNotices } = await import('../services/musubo-annual-renewal-notification.js');
+    const result = await sweepMusuboAnnualRenewalNotices(env, new Date(event.scheduledTime).toISOString());
+    if (result.failed > 0) logger.error('musubo_annual_renewal_notice_sweep_failed');
+  } catch {
+    logger.error('musubo_annual_renewal_notice_sweep_failed');
+  }
+
+  try {
     const { sweepMusuboFinalLineEnds } = await import('../services/musubo-final-line-end.js');
     const result = await sweepMusuboFinalLineEnds(env, new Date(event.scheduledTime).toISOString());
     if (result.failed > 0) logger.error('musubo_final_line_end_sweep_failed');

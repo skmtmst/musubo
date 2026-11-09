@@ -5472,6 +5472,16 @@ CREATE TABLE mileage_wallets (
   PRIMARY KEY (program_id, beneficiary_key)
 );
 
+CREATE TABLE musubo_annual_renewal_notices (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  renewal_date TEXT NOT NULL,
+  snapshot_json TEXT NOT NULL CHECK (json_valid(snapshot_json)),
+  created_at TEXT NOT NULL,
+  delivered_at TEXT,
+  UNIQUE (tenant_id, renewal_date)
+);
+
 CREATE TABLE musubo_final_line_notices (
   id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL REFERENCES tenants(id),
@@ -5501,6 +5511,28 @@ CREATE TABLE musubo_individual_quotes (
   UNIQUE (application_id, revision),
   CHECK ((accepted_at IS NULL AND accepted_by IS NULL)
     OR (accepted_at IS NOT NULL AND accepted_by IS NOT NULL))
+);
+
+CREATE TABLE musubo_line_removal_notices (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  event TEXT NOT NULL CHECK (event IN ('scheduled','ended','cancelled')),
+  snapshot_json TEXT NOT NULL CHECK (json_valid(snapshot_json)),
+  created_at TEXT NOT NULL,
+  delivered_at TEXT
+);
+
+CREATE TABLE musubo_line_removals (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  status TEXT NOT NULL CHECK (status IN ('requested', 'scheduled', 'cancelling', 'ended', 'cancelled')),
+  effective_at TEXT NOT NULL,
+  requested_at TEXT NOT NULL,
+  synced_at TEXT,
+  ended_at TEXT,
+  cancelled_at TEXT,
+  updated_at TEXT NOT NULL
 );
 
 CREATE TABLE musubo_line_usage (
@@ -11055,6 +11087,9 @@ CREATE INDEX idx_mileage_spend_allocations_grant
 CREATE INDEX idx_mileage_step_deliveries_reconcile
   ON mileage_redemption_step_deliveries (needs_reconcile, lease_expires_at);
 
+CREATE INDEX idx_musubo_annual_renewal_notices_pending
+  ON musubo_annual_renewal_notices(delivered_at, created_at);
+
 CREATE UNIQUE INDEX idx_musubo_billing_core_subscription
   ON musubo_tenant_billing(core_subscription_id) WHERE core_subscription_id IS NOT NULL;
 
@@ -11074,6 +11109,16 @@ CREATE INDEX idx_musubo_conditions_company
 
 CREATE INDEX idx_musubo_final_line_notices_pending
   ON musubo_final_line_notices(delivered_at, created_at);
+
+CREATE INDEX idx_musubo_line_removal_notices_pending
+  ON musubo_line_removal_notices(delivered_at, created_at);
+
+CREATE INDEX idx_musubo_line_removals_due
+  ON musubo_line_removals(status, effective_at);
+
+CREATE UNIQUE INDEX idx_musubo_line_removals_in_flight
+  ON musubo_line_removals(tenant_id)
+  WHERE status IN ('requested', 'scheduled', 'cancelling');
 
 CREATE INDEX idx_musubo_line_usage_tenant
   ON musubo_line_usage(tenant_id, status);

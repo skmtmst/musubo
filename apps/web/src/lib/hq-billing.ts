@@ -70,6 +70,7 @@ export interface BillingSummary {
     quoteId: string | null
     terminationPhase?: 'none' | 'scheduled' | 'ending' | 'ended'
     terminationEffectiveAt?: string | null
+    lineRemoval?: { lineAccountId: string; phase: 'requested' | 'scheduled' | 'cancelling'; effectiveAt: string } | null
   }
 }
 

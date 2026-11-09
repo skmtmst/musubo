@@ -38,12 +38,12 @@ function currentPrice(subscription: StripeSubscription, input: {
 }
 
 /** Refresh only completed LINE statistics; never estimate an unconfirmed friend count. */
-async function currentUsage(env: WorkerBindings, tenantId: string): Promise<Usage[]> {
+async function currentUsage(env: WorkerBindings, tenantId: string, excludedLineId?: string): Promise<Usage[]> {
   const rows = await env.DB.prepare(`SELECT line_account_id,friend_count_excluding_blocked,
     friend_count_measured_on,google_business_count,instagram_count
     FROM musubo_line_usage WHERE tenant_id=? AND status IN ('active','ending')
     ORDER BY activated_at LIMIT 100`).bind(tenantId).all<Usage>();
-  const usage = rows.results ?? [];
+  const usage = (rows.results ?? []).filter((row) => row.line_account_id !== excludedLineId);
   if (!usage.length || usage.length >= 100) throw new Error('Active LINE usage is unavailable');
   const yesterday = jstDateOffset(-1);
   const stale = usage.filter((row) => row.friend_count_measured_on !== yesterday);
@@ -81,7 +81,6 @@ export async function reconcileMusuboRecurringPrices(env: WorkerBindings, tenant
   if (pending) return false;
   const legacy = await getTenantBilling(env.DB, tenantId);
   if (!legacy?.stripe_customer_id) throw new Error('Stripe customer is unavailable');
-  const usage = await currentUsage(env, tenantId);
   const condition = JSON.parse(billing.pricing_snapshot_json) as AppliedMusuboCondition;
   const quoteRow = billing.quote_id ? await getMusuboIndividualQuote(env.DB, billing.quote_id) : null;
   if (billing.quote_id && (!quoteRow || quoteRow.status !== 'accepted' || quoteRow.tenant_id !== tenantId)) {
@@ -96,21 +95,36 @@ export async function reconcileMusuboRecurringPrices(env: WorkerBindings, tenant
   if (!nextCoreCharge || !nextOptionsCharge) throw new Error('Next charge dates are unavailable');
   const coreDate = nextCoreCharge.includes('T') ? jstDate(new Date(nextCoreCharge)) : nextCoreCharge;
   const optionsDate = nextOptionsCharge.includes('T') ? jstDate(new Date(nextOptionsCharge)) : nextOptionsCharge;
-  const friends = usage.reduce((sum, row) => sum + row.friend_count_excluding_blocked!, 0);
+  const removal = await env.DB.prepare(`SELECT line_account_id,effective_at FROM musubo_line_removals
+    WHERE tenant_id=? AND status IN ('requested','scheduled') LIMIT 1`)
+    .bind(tenantId).first<{ line_account_id: string; effective_at: string }>();
+  const projectedAt = (chargeDate: string) => removal
+    && Date.parse(removal.effective_at) <= Date.parse(`${chargeDate}T00:00:00+09:00`);
+  const coreProjected = projectedAt(coreDate);
+  const optionsProjected = projectedAt(optionsDate);
+  const includedUsage = await currentUsage(env, tenantId,
+    coreProjected && optionsProjected ? removal!.line_account_id : undefined);
+  const coreUsage = coreProjected
+    ? includedUsage.filter((row) => row.line_account_id !== removal!.line_account_id) : includedUsage;
+  const optionsUsage = optionsProjected
+    ? includedUsage.filter((row) => row.line_account_id !== removal!.line_account_id) : includedUsage;
+  if (!coreUsage.length || !optionsUsage.length) throw new Error('A paid LINE must remain');
+  const coreFriends = coreUsage.reduce((sum, row) => sum + row.friend_count_excluding_blocked!, 0);
+  const optionsFriends = optionsUsage.reduce((sum, row) => sum + row.friend_count_excluding_blocked!, 0);
   const capacity = quote?.plannedLineCount && quote.plannedLineCount > 10
-    ? quote.plannedLineCount : usage.length;
+    ? quote.plannedLineCount : optionsUsage.length;
   const allowance = friendAllowanceForLineCount(capacity, schedule);
-  const blocks = Math.ceil(Math.max(0, friends - allowance) / schedule.extraFriendBlockSize);
-  const slots = usage.reduce((sum, row) => sum + linkedAccountSlots({
+  const blocks = Math.ceil(Math.max(0, optionsFriends - allowance) / schedule.extraFriendBlockSize);
+  const slots = optionsUsage.reduce((sum, row) => sum + linkedAccountSlots({
     googleBusiness: row.google_business_count, instagram: row.instagram_count,
   }), 0);
   const optionsAmount = blocks * schedule.extraFriendBlockYen
-    + (usage.length > 1 ? schedule.headquartersYen : 0) + slots * schedule.linkedAccountSlotYen;
+    + (optionsUsage.length > 1 ? schedule.headquartersYen : 0) + slots * schedule.linkedAccountSlotYen;
   const coreAmount = quote && quote.plannedLineCount > 10
     ? (() => { const price = musuboIndividualQuotePrice(quote);
       return billing.billing_interval === 'year' ? price.finalAnnualLineChargeYen! : price.finalLineBasicMonthlyYen; })()
     : (() => { const price = musuboPrice({
-      lineCount: usage.length, friendCountExcludingBlocked: friends,
+      lineCount: coreUsage.length, friendCountExcludingBlocked: coreFriends,
       interval: billing.billing_interval, schedule,
       lineBasicDiscountPercent: quote ? 0 : lineBasicDiscountForDate(condition, coreDate),
       individualQuoteContext: Boolean(quote),

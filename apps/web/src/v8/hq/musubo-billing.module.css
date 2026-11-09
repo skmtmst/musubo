@@ -12,6 +12,9 @@
 .lineList li, .invoiceList li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 0; border-bottom: 1px solid #e8eeec; }
 .lineList li:last-child, .invoiceList li:last-child { border-bottom: 0; }
 .active { color: #087c42; font-size: 13px; white-space: nowrap; }
+.lineActions { display: inline-flex; align-items: center; gap: var(--mp-px-12); }
+.removeLink { border: 0; background: none; color: var(--mp-color-087c43); padding: var(--mp-px-4); font: inherit; font-size: var(--mp-px-13); font-weight: 700; white-space: nowrap; cursor: pointer; }
+.removeLink:focus-visible { outline: 2px solid var(--mp-color-087c43); outline-offset: 2px; }
 .muted { margin: 0; color: #667589; font-size: 14px; line-height: 1.6; }
 .actions { display: flex; margin-top: auto; padding-top: 12px; }
 .amount { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin: 0; font-size: 29px; font-weight: 700; color: #1b2421; }

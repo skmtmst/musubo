@@ -22,6 +22,7 @@ export interface MusuboBillingOverview {
   quoteId: string | null;
   terminationPhase: 'none' | 'scheduled' | 'ending' | 'ended';
   terminationEffectiveAt: string | null;
+  lineRemoval: { lineAccountId: string; phase: 'requested' | 'scheduled' | 'cancelling'; effectiveAt: string } | null;
 }
 
 /** Read-only view. No saved signup number becomes a final Stripe charge here. */
@@ -35,6 +36,10 @@ export async function musuboBillingOverview(
     WHERE u.tenant_id=? AND u.status IN ('active','ending')
     ORDER BY u.activated_at,a.id`).bind(tenantId).all<ActiveLineRow>();
   const active = response.results ?? [];
+  const removal = await db.prepare(`SELECT line_account_id,status,effective_at FROM musubo_line_removals
+    WHERE tenant_id=? AND status IN ('requested','scheduled','cancelling') LIMIT 1`)
+    .bind(tenantId).first<{ line_account_id: string; status: 'requested' | 'scheduled' | 'cancelling';
+      effective_at: string }>();
   const now = new Date().toISOString();
   const terminationPhase = billing.status === 'ended' ? 'ended'
     : !billing.termination_requested_at ? 'none'
@@ -87,5 +92,7 @@ export async function musuboBillingOverview(
     quoteId: billing.quote_id,
     terminationPhase,
     terminationEffectiveAt: billing.termination_effective_at,
+    lineRemoval: removal ? { lineAccountId: removal.line_account_id,
+      phase: removal.status, effectiveAt: removal.effective_at } : null,
   };
 }

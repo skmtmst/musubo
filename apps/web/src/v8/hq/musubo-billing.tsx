@@ -1,11 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import type { BillingInvoice, BillingSummary } from '@/lib/hq-billing'
 import { formatYen } from '@line-crm/shared'
 import styles from './musubo-billing.module.css'
+import MusuboLineRemovalDialog from './musubo-line-removal-dialog'
 
 type NewPricing = NonNullable<BillingSummary['newPricing']>
 
@@ -37,6 +39,7 @@ export default function MusuboBilling({ pricing, invoices, invoiceFailed, onRetr
   canManagePayment: boolean
   onPortal: () => void
 }) {
+  const [removalLineId, setRemovalLineId] = useState<string | null>(null)
   const openInvoices = invoices?.filter((invoice) => invoice.status === 'open').length ?? null
   const firstCharge = pricing.status === 'awaiting_first_line' ? 'LINE接続後に確定'
     : shortDate(pricing.firstChargeDate)
@@ -53,7 +56,14 @@ export default function MusuboBilling({ pricing, invoices, invoiceFailed, onRetr
       <Card as="section" layout="vertical" padding="default" gap="normal">
         <div className={styles.cardHead}><h3>有効なLINEアカウント</h3><strong>{pricing.activeLines.length}個</strong></div>
         {pricing.activeLines.length ? <ul className={styles.lineList}>{pricing.activeLines.map((line) =>
-          <li key={line.id}><span>{line.name}</span><span className={styles.active}>利用中</span></li>)}</ul>
+          <li key={line.id}><span>{line.name}</span><span className={styles.lineActions}>
+            <span className={styles.active}>{pricing.lineRemoval?.lineAccountId === line.id
+              ? '利用終了予約中' : '利用中'}</span>
+            {canManagePayment && pricing.activeLines.length === 2 && !pricing.quoteId
+              && (!pricing.lineRemoval || pricing.lineRemoval.lineAccountId === line.id)
+              ? <button type="button" className={styles.removeLink}
+                onClick={() => setRemovalLineId(line.id)}>{pricing.lineRemoval ? '予約を確認' : '利用を終了'}</button> : null}
+          </span></li>)}</ul>
           : <p className={styles.muted}>まだLINEは接続されていません。</p>}
         {pricing.status !== 'ended' && canManagePayment ? <div className={styles.actions}>
           {pricing.terminationPhase === 'scheduled' || pricing.terminationPhase === 'ending'
@@ -93,5 +103,7 @@ export default function MusuboBilling({ pricing, invoices, invoiceFailed, onRetr
             {invoice.hostedUrl ? <a href={invoice.hostedUrl} target="_blank" rel="noopener noreferrer">明細を見る</a> : null}</li>)}</ul>
           : <p className={styles.muted}>まだお支払いはありません。</p>}
     </section>
+    {removalLineId && <MusuboLineRemovalDialog lineId={removalLineId}
+      onClose={() => setRemovalLineId(null)} onChanged={onRetry} />}
   </div>
 }
