@@ -23,7 +23,7 @@ export interface MusuboPendingLineAddition {
   paid_at: string | null;
   activated_at: string | null;
   payment_failed_at: string | null;
-  mail05_sent_at: string | null;
+  activation_mail_sent_at: string | null;
   mail19_sent_at: string | null;
   mail20_sent_at: string | null;
   created_at: string;
@@ -412,10 +412,12 @@ export async function reconcilePaidMusuboLine(env: WorkerBindings, additionId: s
   const updates = await env.DB.batch([
     env.DB.prepare(`UPDATE musubo_pending_additions SET status='activated',activated_at=?,updated_at=?,
       price_snapshot_json=json_set(price_snapshot_json,'$.activatedCoreYen',?,'$.activatedOptionsYen',?,
-        '$.activatedTrialing',?,'$.activatedInterval',?)
+        '$.activatedTrialing',?,'$.activatedInterval',?,'$.activatedDiscountPercent',?)
       WHERE id=? AND tenant_id=? AND line_account_id=? AND status='paid'`)
       .bind(activatedAt, activatedAt, coreAmountYen, optionsAmountYen,
         billing.status === 'trialing' ? 1 : 0, billing.billing_interval,
+        quote ? 0 : lineBasicDiscountForDate(condition,
+          billing.status === 'trialing' ? billing.first_charge_date! : jstDate(new Date(activatedAt))),
         additionId, tenantId, pending.line_account_id),
     env.DB.prepare(`UPDATE musubo_line_usage SET status='active',activated_at=?,updated_at=?
       WHERE line_account_id=? AND tenant_id=? AND status='pending' AND changes()=1`)

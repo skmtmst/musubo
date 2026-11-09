@@ -73,6 +73,12 @@ it('keeps a trial LINE inactive until both recurring contracts match, without ch
     .toEqual({ is_active: 1 });
   expect(fixture.raw.prepare('SELECT status FROM musubo_pending_additions WHERE id=?').get(pending.id))
     .toEqual({ status: 'activated' });
+  const activated = fixture.raw.prepare('SELECT price_snapshot_json FROM musubo_pending_additions WHERE id=?')
+    .get(pending.id) as { price_snapshot_json: string };
+  expect(JSON.parse(activated.price_snapshot_json)).toMatchObject({
+    activatedCoreYen: 13800, activatedOptionsYen: 5500,
+    activatedTrialing: 1, activatedInterval: 'month', activatedDiscountPercent: 0,
+  });
 });
 
 it('leaves only the new LINE pending after its one-off invoice payment fails', async () => {

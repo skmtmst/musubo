@@ -182,7 +182,7 @@ CREATE TABLE musubo_pending_additions (
   paid_at TEXT,
   activated_at TEXT,
   payment_failed_at TEXT,
-  mail05_sent_at TEXT,
+  activation_mail_sent_at TEXT,
   mail19_sent_at TEXT,
   mail20_sent_at TEXT,
   created_at TEXT NOT NULL,
