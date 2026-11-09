@@ -2,15 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ListPage } from '@/components/templates'
-import { PageContent } from '@/components/templates/page-frame'
+import { PageContent, PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
 import type { BillingPaymentFailureView } from '@/lib/hq-billing'
 import MusuboPaymentRecovery from '@/v8/hq/musubo-payment-recovery'
-import HqSettingsNavV8, { useHqSettingsFolderNav } from '@/v8/hq/settings-nav'
 
 type LoadState = 'loading' | 'ready' | 'forbidden' | 'error'
 
@@ -26,7 +24,6 @@ function isStripePaymentUrl(value: string, host: 'invoice.stripe.com' | 'billing
 export default function BillingPaymentRecoveryPage() {
   usePageTitle('お支払いの確認')
   usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }, { label: '請求', href: '/hq/billing' }])
-  const folderNav = useHqSettingsFolderNav('billing')
   const router = useRouter()
   const [state, setState] = useState<LoadState>('loading')
   const [failure, setFailure] = useState<BillingPaymentFailureView | null>(null)
@@ -46,9 +43,10 @@ export default function BillingPaymentRecoveryPage() {
   useEffect(() => { void load() }, [load])
 
   const frame = (content: React.ReactNode) => (
-    <ListPage heightMode="viewport" title="お支払いの確認" folders={<HqSettingsNavV8 active="billing" />} folderNav={folderNav}>
+    <PageFrame kind="detail" heightMode="viewport">
+      <PageHeading title="お支払いの確認" />
       <PageContent>{content}</PageContent>
-    </ListPage>
+    </PageFrame>
   )
 
   if (state === 'loading') return frame(<ListState permissionScope="hq" kind="loading" title="お支払い状況を確認しています" />)

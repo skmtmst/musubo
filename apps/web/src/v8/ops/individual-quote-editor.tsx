@@ -7,7 +7,7 @@ import { TextField } from '@/components/shared/text-field'
 import DateTimeField from '@/components/shared/date-time-field'
 import { Field } from '@/components/shared/form-controls'
 import Notice from '@/components/shared/notice'
-import { PageHeading } from '@/components/templates/page-frame'
+import { PageContent, PageHeading } from '@/components/templates/page-frame'
 import { musuboIndividualQuotePrice, suggestMusuboQuoteAnnualLineCharge,
   type MusuboIndividualQuote, type MusuboPriceSchedule } from '@line-crm/shared'
 import styles from './individual-quote-editor.module.css'
@@ -147,7 +147,7 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
     <p className={styles.breadcrumb}>ホーム › 利用条件 › 個別見積もり</p>
     <PageHeading title="個別見積もりの料金条件"
       subtitle="お問い合わせ内容に合わせて会社ごとの料金を作成します。送信前にお客様向けの表示を確認できます。" />
-    <div className={styles.target}><strong>{draft.companyName}</strong><span>{summary}</span></div>
+    <PageContent><div className={styles.target}><strong>{draft.companyName}</strong><span>{summary}</span></div>
     <div className={styles.columns}>
       <div className={styles.editorStack}>
         <section className={styles.card} aria-labelledby="quote-usage-title"><h2 id="quote-usage-title">お客様の利用予定</h2>
@@ -218,7 +218,7 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
           onChange={(value) => setInterval(value as 'month' | 'year')}
           options={[{ value: 'month', label: '月払い' }, { value: 'year', label: '年払い' }]} /></div>
         <Field label="見積もり有効期限" optional={false} note="お客様が見積もりに同意できる期限を設定します。">
-          <DateTimeField value={jstLocal(draft.expiresAt)}
+          <DateTimeField value={jstLocal(draft.expiresAt)} clearable={false}
             onChange={(value) => { if (value) setDraft((current) => ({ ...current, expiresAt: localToIso(value) })) }} />
         </Field>
         <p className={styles.small}>{trial}。送信後の変更は新しい番号で再発行します。期限前の同意で単価と適用条件が確定します。</p>
@@ -229,6 +229,6 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
             onClick={() => void save(true)}>お客様向けの表示を確認</Button></div>
         <p className={styles.small}>送信前の下書きです。お客様にはまだ表示されません。</p>
       </section>
-    </div>
+    </div></PageContent>
   </div>
 }
