@@ -24,6 +24,11 @@ export interface MusuboTenantBillingRecord {
   resumption_generation: number;
   resumption_offer_json: string | null;
   resumption_consented_at: string | null;
+  resumption_requested_at: string | null;
+  resumption_line_account_id: string | null;
+  resumption_friend_count: number | null;
+  resumption_friend_measured_on: string | null;
+  resumed_at: string | null;
   created_at: string;
   updated_at: string;
 }
