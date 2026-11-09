@@ -4,12 +4,16 @@ import type { WorkerBindings } from '../worker-bindings.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { acceptMusuboLineResumption, acceptedMusuboLineResumption,
-  getMusuboLineResumptionReview } from './musubo-line-resumption-review.js';
+  getMusuboLineResumptionOffer, getMusuboLineResumptionReview } from './musubo-line-resumption-review.js';
+import { verifyLineMessagingIdentity } from './line-messaging-identity.js';
 
 const tenantId = DEFAULT_TENANT_ID;
 vi.mock('./musubo-large-line-consultation.js', () => ({
   fetchPreConnectFollowerInsight: vi.fn(async () => ({ followers: 3000,
     friendsExcludingBlocked: 2800, measuredOn: '2027-01-24' })),
+}));
+vi.mock('./line-messaging-identity.js', () => ({
+  verifyLineMessagingIdentity: vi.fn(async () => true),
 }));
 const condition = JSON.stringify({ sourceConditionId: 'normal', sourceVersion: 1,
   internalName: '通常条件', appliedAt: '2026-11-09',
@@ -101,4 +105,11 @@ it('saves consent once and invalidates it when an invoice becomes unpaid', async
     start: '2027-01-09T00:00:00+09:00', end: '2027-02-09T00:00:00+09:00' });
   await expect(acceptedMusuboLineResumption(env, tenantId, now))
     .rejects.toThrow('changed');
+});
+
+it('refuses a price offer when the previous LINE credentials no longer verify', async () => {
+  const fixture = ended('month');
+  vi.mocked(verifyLineMessagingIdentity).mockResolvedValueOnce(false);
+  await expect(getMusuboLineResumptionOffer({ DB: fixture.db } as WorkerBindings, tenantId,
+    new Date('2027-01-25T00:00:00+09:00'))).rejects.toThrow('credentials are unavailable');
 });

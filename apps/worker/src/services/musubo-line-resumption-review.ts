@@ -5,6 +5,7 @@ import { friendAllowanceForLineCount, jstDate, linkedAccountSlots,
 import type { WorkerBindings } from '../worker-bindings.js';
 import { firstMusuboCoreTerms } from './musubo-contract-terms.js';
 import { fetchPreConnectFollowerInsight } from './musubo-large-line-consultation.js';
+import { verifyLineMessagingIdentity } from './line-messaging-identity.js';
 
 interface InvoiceRow {
   subscription_id: string | null;
@@ -143,10 +144,13 @@ export async function getMusuboLineResumptionOffer(env: WorkerBindings, tenantId
     || !account.channel_access_token || !account.channel_secret) {
     throw new Error('Previous LINE credentials are unavailable');
   }
-  const insight = await fetchPreConnectFollowerInsight(account.channel_access_token, now);
-  if (!insight || insight.followers > 500_000) {
-    throw new Error('Current LINE statistics require individual review');
+  if (!await verifyLineMessagingIdentity({ channelId: account.channel_id,
+    channelSecret: account.channel_secret, channelAccessToken: account.channel_access_token })) {
+    throw new Error('Previous LINE credentials are unavailable');
   }
+  const insight = await fetchPreConnectFollowerInsight(account.channel_access_token, now);
+  if (!insight) throw new Error('Previous LINE statistics are unavailable');
+  if (insight.followers > 500_000) throw new Error('Current LINE statistics require individual review');
   const condition = JSON.parse(billing.pricing_snapshot_json) as AppliedMusuboCondition;
   const quoteRow = billing.quote_id ? await getMusuboIndividualQuote(env.DB, billing.quote_id) : null;
   if (billing.quote_id && (!quoteRow || quoteRow.tenant_id !== tenantId || quoteRow.status !== 'accepted')) {

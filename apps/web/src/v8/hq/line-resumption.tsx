@@ -182,7 +182,30 @@ export function LineResumptionHandover({ phase, onPrimary, onBack }: {
   </div>
 }
 
-/** Shown only after the existing LINE wizard confirms an active connection. */
+/** Credential recovery keeps the original company account and returns to price consent. */
+export function LineResumptionConnectionRecovery({ lineAccountId, onBack }: {
+  lineAccountId: string | null; onBack: () => void
+}) {
+  const settingsHref = lineAccountId
+    ? `/accounts/detail?id=${encodeURIComponent(lineAccountId)}` : '/accounts'
+  return <div className={styles.page}>
+    <p className={styles.breadcrumb}>ホーム › 統括の設定 › 請求 › 利用再開</p>
+    <h1>前回のLINE接続を確認できません</h1>
+    <p className={styles.lead}>接続情報を更新した後に、最新の友だち数と再開料金を確認してください。</p>
+    <section className={styles.handoverCard} aria-label="接続情報の更新">
+      <StatusBand warning title="接続情報の更新が必要です"
+        description="前回のLINEチャネルの接続情報を確認できませんでした。アカウント設定で更新してください。" />
+      <div className={styles.progressBox}><strong>再開手続きの状態</strong>
+        <p>✓　会社アカウントと請求履歴は保持</p>
+        <p>○　接続情報を更新し、最新の料金を再確認</p></div>
+      <p className={styles.handoverNote}>接続情報の更新だけでは請求されません。料金を再確認し、本人確認後に再開できます。</p>
+    </section>
+    <div className={styles.bottom}><button type="button" className={styles.back} onClick={onBack}>請求に戻る</button>
+      <Button href={settingsHref} variant="primary" className={styles.bottomPrimary}>アカウント設定を開く</Button></div>
+  </div>
+}
+
+/** Shown only after the saved LINE credentials, payment, and activation are confirmed. */
 export function LineResumptionComplete({ view, onAccounts }: { view: LineResumeCompleteView; onAccounts: () => void }) {
   const trial = view.kind === 'trial_remaining'
   const paidRemainder = view.kind === 'annual_paid' || view.kind === 'monthly_paid'

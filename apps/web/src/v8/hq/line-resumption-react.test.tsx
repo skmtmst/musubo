@@ -2,7 +2,8 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { LineResumptionComplete, LineResumptionHandover, LineResumptionReview } from './line-resumption'
+import { LineResumptionComplete, LineResumptionConnectionRecovery,
+  LineResumptionHandover, LineResumptionReview } from './line-resumption'
 
 let host: HTMLDivElement
 let root: Root
@@ -111,6 +112,14 @@ describe('最後のLINE終了後の利用再開', () => {
     await act(async () => { root.render(<LineResumptionHandover phase="ready" onPrimary={onContinue} onBack={onBack} />) })
     expect(host.textContent).toContain('決済が必要な場合は成功後に利用を再開します')
     expect(host.textContent).toContain('前回のLINEを確認して再開')
+  })
+
+  it('前回のLINE接続を確認できなければ、そのアカウントの設定へ戻せる', async () => {
+    await act(async () => { root.render(<LineResumptionConnectionRecovery
+      lineAccountId="old /?&" onBack={onBack} />) })
+    expect(host.textContent).toContain('接続情報を更新した後に、最新の友だち数と再開料金を確認')
+    expect(host.querySelector('a')?.getAttribute('href'))
+      .toBe('/accounts/detail?id=old%20%2F%3F%26')
   })
 
   it('接続確認後に元の無料期間と次回請求を表示する', async () => {

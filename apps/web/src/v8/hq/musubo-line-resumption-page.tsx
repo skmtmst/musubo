@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import type { MusuboLineResumptionState } from '@/lib/api/features/musubo-line-resumption'
 import type { LineResumeCompleteView } from './line-resumption'
 import ListState from '@/components/shared/list-state'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
-import { LineResumptionComplete, LineResumptionHandover, LineResumptionReview } from './line-resumption'
+import { LineResumptionComplete, LineResumptionConnectionRecovery,
+  LineResumptionHandover, LineResumptionReview } from './line-resumption'
 
 const reviewPath = '/hq/billing/resume'
 const cardPath = '/hq/billing/resume/card'
@@ -17,12 +18,20 @@ export function MusuboLineResumptionReviewPage() {
   const router = useRouter()
   const [state, setState] = useState<MusuboLineResumptionState | null>(null)
   const [error, setError] = useState('')
+  const [recoveryId, setRecoveryId] = useState<string | null | undefined>(undefined)
   const load = useCallback(async () => {
     const result = await api.musuboLineResumption.get()
     if (!result.success) throw new Error(result.error)
     setState(result.data)
   }, [])
-  useEffect(() => { void load().catch(() => setError('再開時の料金を表示できませんでした。')) }, [load])
+  useEffect(() => { void load().catch((caught: unknown) => {
+    if (caught instanceof ApiError && caught.code === 'MUSUBO_RESUMPTION_LINE_RECONNECT') {
+      const data = caught.data as { previousLineAccountId?: unknown } | null
+      setRecoveryId(typeof data?.previousLineAccountId === 'string' ? data.previousLineAccountId : null)
+    } else setError('再開時の料金を表示できませんでした。')
+  }) }, [load])
+  if (recoveryId !== undefined) return <LineResumptionConnectionRecovery lineAccountId={recoveryId}
+    onBack={() => router.push('/hq/billing')} />
   if (!state) return <ListState kind={error ? 'error' : 'loading'}
     title={error || '再開時の料金を確認しています'} />
   const accept = async () => {
@@ -49,9 +58,15 @@ export function MusuboLineResumptionCardPage() {
   const [error, setError] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const load = useCallback(async () => {
-    const [resume, card] = await Promise.all([
-      api.musuboLineResumption.get(), api.hqBilling.cardStatus(),
-    ])
+    let resume: Awaited<ReturnType<typeof api.musuboLineResumption.get>>
+    try { resume = await api.musuboLineResumption.get() }
+    catch (caught) {
+      if (caught instanceof ApiError && caught.code === 'MUSUBO_RESUMPTION_LINE_RECONNECT') {
+        router.push(reviewPath); return
+      }
+      throw caught
+    }
+    const card = await api.hqBilling.cardStatus()
     if (!resume.success) {
       const complete = await api.musuboLineResumption.complete()
       if (complete.success) { router.push(completePath); return }

@@ -28,7 +28,17 @@ hqMusuboLineResumption.get('/api/hq/billing/musubo/resumption', requireRole('own
       consented: review.kind !== 'unpaid' && billing?.resumption_offer_json === JSON.stringify(review)
         && Boolean(billing.resumption_consented_at),
       reconciliationPending: Boolean(billing?.resumption_requested_at) } });
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message === 'Previous LINE credentials are unavailable'
+      || message === 'Previous LINE statistics are unavailable') {
+      const line = await c.env.DB.prepare(`SELECT line_account_id FROM musubo_line_usage
+        WHERE tenant_id=? AND status='ended' ORDER BY ended_at DESC LIMIT 1`)
+        .bind(tenantId).first<{ line_account_id: string }>();
+      return c.json({ success: false, code: 'MUSUBO_RESUMPTION_LINE_RECONNECT',
+        error: '前回のLINE接続を確認できませんでした。接続情報を更新してから料金を再確認してください',
+        data: { previousLineAccountId: line?.line_account_id ?? null } }, 409);
+    }
     return c.json({ success: false,
       error: '再開時の料金を確認できませんでした。請求の状況を確認してからやり直してください' }, 409);
   }
