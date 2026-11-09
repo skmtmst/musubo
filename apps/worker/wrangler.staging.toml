@@ -65,6 +65,8 @@ retry_delay = 60
 
 [vars]
 DEPLOY_ENV = "staging"
+STRIPE_PRODUCT_MUSUBO_CORE = "prod_Vazw5NlIbx7p4p"
+STRIPE_PRODUCT_MUSUBO_OPTIONS = "prod_VazxwxtpbbwBs8"
 # Q-75 is opened deliberately by the staging operator; enabling it forces the outbound stop.
 STAGING_QA_ENABLED = "false"
 STAGING_QA_OUTBOUND_DISABLED = "false"
