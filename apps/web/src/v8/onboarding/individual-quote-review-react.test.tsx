@@ -58,12 +58,12 @@ describe('お客様の個別見積もり', () => {
     expect(host.querySelectorAll('input[type=checkbox]')).toHaveLength(1)
     expect(text.indexOf('初回の請求について')).toBeLessThan(text.indexOf('LINE12個の契約枠・無料期間・今後の請求'))
   })
-  it('内容を確認し同意したときだけカード登録へ進める', async () => {
+  it('内容を確認し同意したときだけクレジットカード登録へ進める', async () => {
     await act(async () => { renderQuote() })
     expect(host.textContent).toContain('¥38,900')
     expect(host.textContent).toContain('Googleマイビジネス11個')
     expect(host.textContent).toContain('退会したユーザーは累計追加数に残る')
-    const button = [...host.querySelectorAll('button')].find((item) => item.textContent === '同意してカード登録へ')!
+    const button = [...host.querySelectorAll('button')].find((item) => item.textContent === '同意してクレジットカード登録へ')!
     expect(button.disabled).toBe(true)
     await act(async () => { host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click() })
     expect(button.disabled).toBe(false)
@@ -72,19 +72,19 @@ describe('お客様の個別見積もり', () => {
     expect(onResumeCardRegistration).toHaveBeenCalledWith('Q-2026-1108-01')
   })
 
-  it('期限内に同意済みなら期限後もカード登録を再開できる', async () => {
+  it('期限内に同意済みなら期限後もクレジットカード登録を再開できる', async () => {
     await act(async () => { renderQuote({ acceptedAt: '2026-12-07T14:20:00+09:00' }, '2026-12-20T00:00:00+09:00') })
-    expect(host.textContent).toContain('カード登録から再開できます')
-    const button = [...host.querySelectorAll('button')].find((item) => item.textContent === 'カード登録を再開する')!
+    expect(host.textContent).toContain('クレジットカード登録から再開できます')
+    const button = [...host.querySelectorAll('button')].find((item) => item.textContent === 'クレジットカード登録を再開する')!
     await act(async () => { button.click() })
     expect(onResumeCardRegistration).toHaveBeenCalledWith('Q-2026-1108-01')
   })
 
-  it('同意の保存に失敗した場合はカード登録へ進めない', async () => {
+  it('同意の保存に失敗した場合はクレジットカード登録へ進めない', async () => {
     onAccept.mockRejectedValueOnce(new Error('save failed'))
     await act(async () => { renderQuote() })
     await act(async () => { host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click() })
-    const button = [...host.querySelectorAll('button')].find((item) => item.textContent === '同意してカード登録へ')!
+    const button = [...host.querySelectorAll('button')].find((item) => item.textContent === '同意してクレジットカード登録へ')!
     await act(async () => { button.click() })
     expect(onResumeCardRegistration).not.toHaveBeenCalled()
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('処理を完了できませんでした')

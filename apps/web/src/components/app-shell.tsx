@@ -30,6 +30,7 @@ import { useEffect, useState } from 'react'
 import ViewPermissionGate from './view-permission-gate'
 import { PagePendingLayout } from './templates/page-pending'
 import { routePendingForPath } from '@/lib/route-pending'
+import MusuboLogo from './shared/musubo-logo'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -37,6 +38,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function AppShellContent({ children, pathname }: { children: React.ReactNode; pathname: string }) {
+  const onboarding = pathname.startsWith('/hq/onboarding/')
   /*
    * LINEアカウントを登録（/accounts/new）。互換経路は外枠の無い専用の全画面。
    * ★V8 は絵（〜）どおり、ほかの画面と同じ外枠（左メニュー・上の帯）で出す（2026-10-07 司令塔）。
@@ -92,7 +94,7 @@ function AppShellContent({ children, pathname }: { children: React.ReactNode; pa
       <AccountProvider>
         <PageChromeProvider>
           {(
-            <div className={styles.shell}>
+            <div className={`${styles.shell} ${onboarding ? styles.onboardingShell : ''}`}>
               {/*
                 本文へ移動（★V7 修正方針 §2）。ふだんは見えず、Tab で最初に焦点が来たときだけ
                 左上に出る。更新案内とメニュー11項目を飛ばして本文へ行ける（WCAG 2.4.1）。
@@ -107,13 +109,13 @@ function AppShellContent({ children, pathname }: { children: React.ReactNode; pa
                   メニューの一番下の「Ver.」が持つ。 */}
               {/* 代理ログイン中の赤い帯（★V6 37-5）。運営マスター以外には出ない。 */}
               <ImpersonationNotice />
-              <div className={styles.workspace}>
+              <div className={`${styles.workspace} ${onboarding ? styles.onboardingWorkspace : ''}`}>
                 {/* V8 の先読み（F①）。V8 のときだけ中の聞き耳が働く。 */}
                 <HoverPrefetch />
                 <RowEntranceSettle />
                 {/* V8 の探す窓（F②）。⌘K・Ctrl+K で開く。帯には置かない。 */}
                 <CommandPalette />
-                <Sidebar />
+                {onboarding ? <div className={styles.onboardingBrand}><MusuboLogo /></div> : <Sidebar />}
                 <Workspace>
                   {guardedContent}
                 </Workspace>

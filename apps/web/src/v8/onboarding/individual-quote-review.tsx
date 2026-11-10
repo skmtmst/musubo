@@ -62,33 +62,33 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
     return <div className={styles.page}>
       <div className={styles.breadcrumb}>ホーム › 利用開始の準備 › お見積もりの確認</div>
       <PageHeading title={accepted ? '見積もりの同意は完了しています' : expired ? 'お見積もりの有効期限が切れました' : '新しいお見積もりをご確認ください'}
-        subtitle={accepted ? '料金条件は確定済みです。続きのカード登録から手続きを再開できます。'
-        : expired ? '期限内の同意がなかったため、この見積もりからカード登録には進めません。'
+        subtitle={accepted ? '料金条件は確定済みです。続きのクレジットカード登録から手続きを再開できます。'
+        : expired ? '期限内の同意がなかったため、この見積もりからクレジットカード登録には進めません。'
           : 'このリンクの見積もりは新しい内容に差し替えられました。'} />
       <div className={styles.statusCard}>
         <div className={accepted ? styles.statusIconSuccess : styles.statusIconWarning} aria-hidden="true">{accepted ? '✓' : '!'}</div>
         <div className={styles.statusContent}>
-          <div className={styles.statusHead}><h2>{accepted ? 'カード登録から再開できます' : expired ? '新しい見積もりをご依頼ください' : '新しい見積もりをご確認ください'}</h2>
+          <div className={styles.statusHead}><h2>{accepted ? 'クレジットカード登録から再開できます' : expired ? '新しい見積もりをご依頼ください' : '新しい見積もりをご確認ください'}</h2>
             <StatusBadge tone={accepted ? 'success' : 'warning'} dot={false}>{accepted ? '同意済み' : expired ? '期限切れ' : '旧リンク無効'}</StatusBadge></div>
-          <p>{accepted ? '見積もり期限内に同意した単価と適用条件は確定しています。カード登録がまだでも、期限後にそのまま続けられます。'
-            : expired ? '料金条件を確認して新しい見積もりをお送りします。新しい内容への同意後にカード登録へ進めます。'
+          <p>{accepted ? '見積もり期限内に同意した単価と適用条件は確定しています。クレジットカード登録がまだでも、期限後にそのまま続けられます。'
+            : expired ? '料金条件を確認して新しい見積もりをお送りします。新しい内容への同意後にクレジットカード登録へ進めます。'
               : '変更前の見積もりには同意できません。登録メールアドレスへお送りした新しい見積もりで料金をご確認ください。'}</p>
           <dl className={styles.statusDetails}><div><dt>{accepted ? '同意した見積もり' : '元の見積もり番号'}</dt><dd>{quote.quoteNumber}</dd></div>
             <div><dt>{accepted ? '同意日時' : '有効期限'}</dt><dd>{dateJst(accepted ? quote.acceptedAt! : quote.expiresAt)}</dd></div></dl>
           <h3>このあとの流れ</h3>
-          <ol>{(accepted ? ['Stripeでカードを登録', '既存のウィザードでLINEを接続', 'LINE有効化日から無料期間を開始']
-            : expired ? ['再発行を依頼', '運営が料金を確認してメールでご案内', '新しい見積もりに同意してカード登録']
-              : ['新しいご案内メールを確認', '変更後の料金と有効期限を確認', '新しい見積もりに同意してカード登録'])
+          <ol>{(accepted ? ['Stripeでクレジットカードを登録', '既存のウィザードでLINEを接続', 'LINE有効化日から無料期間を開始']
+            : expired ? ['再発行を依頼', '運営が料金を確認してメールでご案内', '新しい見積もりに同意してクレジットカード登録']
+              : ['新しいご案内メールを確認', '変更後の料金と有効期限を確認', '新しい見積もりに同意してクレジットカード登録'])
             .map((step) => <li className={styles.statusStep} key={step}>{step}</li>)}</ol>
-          <p className={styles.note}>{accepted ? '見積もりの再同意は不要です。カード登録だけでは請求も無料期間も始まりません。'
-            : expired ? '再発行前にカードの登録や請求が始まることはありません。'
+          <p className={styles.note}>{accepted ? '見積もりの再同意は不要です。クレジットカード登録だけでは請求も無料期間も始まりません。'
+            : expired ? '再発行前にクレジットカードの登録や請求が始まることはありません。'
               : '未同意の旧見積もりは無効です。新しい見積もりの内容を確認して同意してください。'}</p>
           {error && <Notice tone="danger" role="alert">{error}</Notice>}
           <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" onClick={() => {
             if (accepted) onResumeCardRegistration(quote.quoteNumber)
             else if (expired) void perform(() => onRequestReissue(quote.quoteNumber))
             else onOpenLatestQuote()
-          }}>{accepted ? 'カード登録を再開する' : expired ? '再発行を依頼する' : '最新のお見積もりを開く'}</Button>
+          }}>{accepted ? 'クレジットカード登録を再開する' : expired ? '再発行を依頼する' : '最新のお見積もりを開く'}</Button>
         </div>
       </div>
     </div>
@@ -96,9 +96,9 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
 
   return <div className={styles.page}>
     <div className={styles.breadcrumb}>ホーム › 利用開始の準備 › お見積もりの確認</div>
-    <PageHeading title="お見積もりの確認" subtitle="料金と無料期間をご確認のうえ、同意してカード登録へお進みください。"
+    <PageHeading title="お見積もりの確認" subtitle="料金と無料期間をご確認のうえ、同意してクレジットカード登録へお進みください。"
       steps={<Steps label="利用開始の手順" steps={[{ key: 'quote', label: '見積もりを確認', state: 'current' },
-        { key: 'card', label: 'カードを登録', state: 'todo' }, { key: 'line', label: 'LINEを接続', state: 'todo' }]} />} />
+        { key: 'card', label: 'クレジットカードを登録', state: 'todo' }, { key: 'line', label: 'LINEを接続', state: 'todo' }]} />} />
     <div className={`${styles.columns} ${hasContractCapacity ? styles.contractColumns : ''}`}>
       <section className={styles.card} aria-labelledby="quote-summary">
         <p className={styles.eyebrow}>個別見積もり · {quote.quoteNumber}</p>
@@ -132,27 +132,27 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
         {hasContractCapacity ? <>
           <div className={styles.trialBox}><span>無料期間</span><strong>{trialText}</strong>
             <small>最初のLINEを有効化した日から始まります</small></div>
-          <dl className={styles.terms}><div><dt>カード登録時の請求</dt><dd>{money(0)}</dd></div></dl>
+          <dl className={styles.terms}><div><dt>クレジットカード登録時の請求</dt><dd>{money(0)}</dd></div></dl>
           <div className={styles.firstCharge}><h3>初回の請求について</h3>
             <p>無料期間終了後に契約枠{quote.plannedLineCount}個分の基本料金を初回請求します。初回請求日はLINE有効化後に表示します。</p></div>
           <dl className={styles.terms}><div><dt>見積もり有効期限</dt><dd>{dateJst(quote.expiresAt)}</dd></div></dl>
           {quote.interval === 'month' && <p className={styles.small}>年払いをご希望の場合は、同意前に担当者へご相談ください。</p>}
         </> : <>
           <dl className={styles.terms}><div><dt>無料期間</dt><dd>{trialText}</dd></div>
-            <div><dt>カード登録時の請求</dt><dd>{money(0)}</dd></div>
+            <div><dt>クレジットカード登録時の請求</dt><dd>{money(0)}</dd></div>
             <div><dt>見積もり有効期限</dt><dd>{dateJst(quote.expiresAt)}</dd></div></dl>
           <p className={styles.small}>無料期間は最初のLINEを有効化した日から始まります。終了後の初回請求日は、LINE有効化後に表示します。</p>
           <p className={styles.small}>友だち数はLINE公式APIの累計追加数からブロック数を引いて計算します。退会したユーザーは累計追加数に残るため、現在メッセージを届けられる人数と異なる場合があります。</p>
           <div className={styles.consent}><Checkbox checked={agreed} onCheckedChange={setAgreed}>
             料金条件・無料期間・今後の請求について確認し、同意します
           </Checkbox></div>
-          <p className={styles.small}>同意した単価と適用条件は確定します。請求額は実際の連携数で決まり、期限後もカード登録を再開できます。カード情報はmusuboに保存しません。</p>
+          <p className={styles.small}>同意した単価と適用条件は確定します。請求額は実際の連携数で決まり、期限後もクレジットカード登録を再開できます。カード情報はmusuboに保存しません。</p>
           {error && <Notice tone="danger" role="alert">{error}</Notice>}
           <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" disabled={!agreed}
             onClick={() => void perform(async () => {
               await onAccept(quote.quoteNumber)
               onResumeCardRegistration(quote.quoteNumber)
-            })}>同意してカード登録へ</Button>
+            })}>同意してクレジットカード登録へ</Button>
         </>}
       </section>
     </div>
@@ -161,14 +161,14 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
         <div className={styles.consent}><Checkbox checked={agreed} onCheckedChange={setAgreed}>
           LINE{quote.plannedLineCount}個の契約枠・無料期間・今後の請求を確認し、同意します
         </Checkbox></div>
-        <p className={styles.small}>同意後はStripeのカード登録画面へ進めます。カード情報はmusuboに保存しません。</p>
+        <p className={styles.small}>同意後はStripeのクレジットカード登録画面へ進めます。カード情報はmusuboに保存しません。</p>
         {error && <Notice tone="danger" role="alert">{error}</Notice>}
       </div>
       <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" disabled={!agreed}
         onClick={() => void perform(async () => {
           await onAccept(quote.quoteNumber)
           onResumeCardRegistration(quote.quoteNumber)
-        })}>同意してカード登録へ</Button>
+        })}>同意してクレジットカード登録へ</Button>
     </div>}
   </div>
 }

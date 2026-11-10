@@ -108,7 +108,7 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
       : expired ? '追加を希望する場合' : '追加後に確認すること'
   const description = invoice
     ? view.state === 'grace' ? 'Stripeの画面でカード情報の更新や認証を行えます。'
-      : processing ? '結果が確定するまで、再度のカード登録は不要です。'
+      : processing ? '結果が確定するまで、再度のクレジットカード登録は不要です。'
         : suspended ? '未払いのお支払いが完了すると利用を再開します。' : 'LINEの接続と設定はそのまま利用できます。'
     : view.state === 'failed' ? 'カードの更新や本人認証を行い、同じ追加分の決済を再試行できます。'
       : processing ? '決済成功なら追加LINEを有効化し、失敗なら再試行をご案内します。'
