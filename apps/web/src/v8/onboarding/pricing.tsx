@@ -232,7 +232,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
                 <strong>{yen(price.friendOverageMonthlyYen)} / 月</strong></div>}
               {lineCount === 1 && price.linkedAccountSlots > 0 && <div className={styles.amountRow}><span>追加連携枠 {price.linkedAccountSlots}枠</span>
                 <strong>{yen(price.linkedAccountSlotsMonthlyYen)} / 月</strong></div>}
-              {interval === 'month' && (lineCount > 1 || price.linkedAccountSlots > 0 || price.friendOverageMonthlyYen > 0) && <div className={styles.totalRow}><span>{lineCount > 1 ? `予定の${lineCount}個すべて有効にした場合` : 'すべて有効にした場合の月額（税込）'}</span>
+              {interval === 'month' && (lineCount > 1 || price.linkedAccountSlots > 0 || price.friendOverageMonthlyYen > 0) && <div className={lineCount > 1 ? styles.amountRow : styles.totalRow}><span>{lineCount > 1 ? `予定の${lineCount}個すべて有効にした場合` : 'すべて有効にした場合の月額（税込）'}</span>
                 <strong>{yen(price.monthlyTotalYen)} / 月</strong></div>}
               {interval === 'year' && lineCount > 1 && <div className={styles.totalRow}><span>予定の{lineCount}個すべて有効にした場合のLINE基本料金</span>
                 <strong>{yen(price.annualLineChargeYen)} / 年</strong></div>}
