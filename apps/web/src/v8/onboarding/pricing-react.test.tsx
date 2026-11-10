@@ -101,6 +101,7 @@ describe('Penの利用料金確認', () => {
     const details = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('標準料金のしくみを見る'))!
     await act(async () => { details.click() })
     expect(document.body.textContent).toContain('友だち数の基準と超過料金は、個別のお見積もり')
+    expect(document.body.textContent).toContain('累計追加数からブロック数を引いて計算します')
     expect(document.body.textContent).not.toContain('例｜LINE 1個の場合')
     const close = [...document.querySelectorAll('button')].find((button) => button.textContent === '料金確認に戻る')!
     await act(async () => { close.click() })

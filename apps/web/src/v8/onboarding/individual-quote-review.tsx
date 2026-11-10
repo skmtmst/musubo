@@ -127,6 +127,7 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
           <div><dt>カード登録時の請求</dt><dd>{money(0)}</dd></div>
           <div><dt>見積もり有効期限</dt><dd>{dateJst(quote.expiresAt)}</dd></div></dl>
         <p className={styles.small}>無料期間は最初のLINEを有効化した日から始まります。終了後の初回請求日は、LINE有効化後に表示します。</p>
+        <p className={styles.small}>友だち数はLINE公式APIの累計追加数からブロック数を引いて計算します。退会したユーザーは累計追加数に残るため、現在メッセージを届けられる人数と異なる場合があります。</p>
         <div className={styles.consent}><Checkbox checked={agreed} onCheckedChange={setAgreed}>
           料金条件・無料期間・今後の請求について確認し、同意します
         </Checkbox></div>

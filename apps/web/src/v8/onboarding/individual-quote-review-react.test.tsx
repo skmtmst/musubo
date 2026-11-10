@@ -49,6 +49,7 @@ describe('お客様の個別見積もり', () => {
     await act(async () => { renderQuote() })
     expect(host.textContent).toContain('¥38,900')
     expect(host.textContent).toContain('Googleマイビジネス11個')
+    expect(host.textContent).toContain('退会したユーザーは累計追加数に残る')
     const button = [...host.querySelectorAll('button')].find((item) => item.textContent === '同意してカード登録へ')!
     expect(button.disabled).toBe(true)
     await act(async () => { host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click() })
