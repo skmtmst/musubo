@@ -34,14 +34,14 @@ const BOOKING_MENUS = read('booking', 'menus', 'page.tsx')
 const TAG_ACTIONS = read('..', 'components', 'shared', 'action-list.tsx')
 const TAG_REORDER = read('..', 'components', 'shared', 'reorder-handle.tsx')
 
-describe('#670 15 登録メディアの札の操作は「使用箇所＋…」の1行', () => {
+describe('#670 15 登録メディアの札の操作は「…」にまとめる', () => {
   it('札にボタンを並べず、取得・編集・退避・削除は「…」の中へ集める', () => {
     const card = CONTENTS.slice(CONTENTS.indexOf('function MediaCardV8'))
     expect(card).toContain('<RowMenu')
     expect(card).toContain("label: 'ダウンロード'")
     expect(card).toContain("label: '削除する'")
     expect(card).toContain("qaOpen: 'YfTfJ'")
-    expect(card).toContain('使用先：')
+    expect(card).toContain('showGroupHeadings={false}')
 
   })
 })

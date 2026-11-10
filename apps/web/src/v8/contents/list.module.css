@@ -50,8 +50,8 @@
 .selectCorner {
   position: absolute;
   z-index: 1;
-  top: 8px;
-  right: 8px;
+  top: var(--tpl-ev-md-select-inset);
+  right: var(--tpl-ev-md-select-inset);
   display: flex;
   align-items: center;
   justify-content: center;
