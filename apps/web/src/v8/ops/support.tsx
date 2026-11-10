@@ -305,13 +305,13 @@ export default function OpsSupportV8() {
   const ticket = detail?.ticket ?? null
   const closed = ticket?.stage === 'closed'
   const pick = (id: string) => { deepLink.current = null; setSelectedId(id) }
-  const openTemplates = () => { insertAt.current = replyCaretKnown.current ? insertAt.current : reply.length; setTemplateOpen(true) }
+  const openTemplates = () => { insertAt.current = replyCaretKnown.current ? replyRef.current?.selectionStart ?? insertAt.current : reply.length; setTemplateOpen(true) }
   const insertTemplate = (body: string): boolean => {
     const point = Math.min(insertAt.current, reply.length)
     const before = reply.slice(0, point)
     const after = reply.slice(point)
-    const leading = before && !before.endsWith('\n') && !body.startsWith('\n') ? '\n\n' : ''
-    const trailing = after && !after.startsWith('\n') && !body.endsWith('\n') ? '\n\n' : ''
+    const leading = point === reply.length && before && !before.endsWith('\n') && !body.startsWith('\n') ? '\n\n' : ''
+    const trailing = point === 0 && after && !after.startsWith('\n') && !body.endsWith('\n') ? '\n\n' : ''
     const next = `${before}${leading}${body}${trailing}${after}`
     if (next.length > 4000) return false
     setReply(next)
@@ -419,7 +419,7 @@ export default function OpsSupportV8() {
                       className={styles.replyBox}
                       rows={10}
                       value={reply}
-                      onChange={(e) => setReply(e.target.value)}
+                      onChange={(e) => { setReply(e.target.value); insertAt.current = e.currentTarget.selectionStart; replyCaretKnown.current = true }}
                       onSelect={(e) => { insertAt.current = e.currentTarget.selectionStart; replyCaretKnown.current = true }}
                       placeholder={mobile ? '返信文を入力してください。' : '返信文を入力してください。引用した内容はここで編集できます。'}
                       aria-label="返信"

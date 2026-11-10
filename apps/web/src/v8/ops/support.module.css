@@ -5,7 +5,7 @@
   margin-bottom: var(--tpl-op-section-gap);
 }
 
-.createAction.createAction { min-width: var(--support-create-width); min-height: var(--support-create-height); justify-content: center; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); color: var(--color-accent); }
+.createAction.createAction { min-width: var(--support-create-width); min-height: var(--support-create-height); justify-content: center; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); color: var(--color-accent-deep); }
 
 .columns {
   display: flex;

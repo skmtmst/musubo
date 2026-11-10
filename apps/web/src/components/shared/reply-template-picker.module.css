@@ -1,4 +1,7 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 .overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: var(--space-16); background: var(--polish-window-backdrop); }
+.panel button:focus-visible, .panel input:focus-visible, .panel textarea:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 .panel { display: flex; flex-direction: column; width: min(100%, 896px); height: min(760px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); overflow: hidden; border-radius: var(--radius-panel); background: var(--color-canvas); box-shadow: var(--card-shadow); color: var(--color-ink); }
 .panelNewFolder { width: min(100%, 640px); height: min(390px, calc(100dvh - 32px)); }
 .panelNewTemplate { width: min(100%, 840px); height: min(750px, calc(100dvh - 32px)); }
@@ -12,15 +15,15 @@
 .desktopFolders { display: flex; flex-direction: column; gap: var(--space-4); border-radius: var(--radius-control); background: var(--color-surface-pearl); padding: var(--space-12); }
 .desktopFolders > strong, .templateColumn > strong { font-size: var(--text-micro); }
 .desktopFolders > button:not(:last-child) { display: flex; align-items: center; gap: var(--space-8); width: 100%; min-height: 36px; border: 0; border-radius: var(--radius-control); background: transparent; padding: 0 var(--space-8); text-align: left; font-size: var(--text-micro); color: var(--color-ink); }
-.desktopFolders > button[aria-current='true'] { background: var(--color-accent-soft); color: var(--color-accent); font-weight: 700; }
+.desktopFolders > button[aria-current='true'] { background: var(--color-accent-soft); color: var(--color-accent-deep); font-weight: 700; }
 .desktopFolders svg, .desktopToolbar svg { width: 16px; height: 16px; flex: none; }
-.desktopFolders > button:last-child { width: 100%; margin-top: auto; border: 1px solid var(--color-accent); border-radius: var(--radius-control); color: var(--color-accent); justify-content: center; }
+.desktopFolders > button:last-child { width: 100%; margin-top: auto; border: 1px solid var(--color-accent); border-radius: var(--radius-control); color: var(--color-accent-deep); justify-content: center; }
 .desktopTemplates { display: flex; flex-direction: column; gap: var(--space-16); min-width: 0; }
 .desktopToolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-16); }
-.desktopToolbar > button { border: 1px solid var(--color-accent); color: var(--color-accent); }
+.desktopToolbar > button { border: 1px solid var(--color-accent); color: var(--color-accent-deep); }
 .search, .mobileSearch { display: flex; align-items: center; gap: var(--space-8); min-width: 0; height: 42px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: 0 var(--space-12); color: var(--color-ink-secondary); }
 .search { flex: 1; }
-.search input, .mobileSearch input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: var(--text-micro); }
+.search input, .mobileSearch input { width: 100%; min-width: 0; border: 0; background: transparent; font: inherit; font-size: var(--text-micro); }
 .desktopSplit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-12); flex: 1; min-height: 0; }
 .templateColumn { display: flex; flex-direction: column; gap: var(--space-8); }
 .templateList { display: flex; flex-direction: column; gap: var(--space-8); overflow-y: auto; }
@@ -53,7 +56,7 @@
 .insertHint { margin: auto 0 0; color: var(--color-ink-secondary); font-size: var(--text-micro); }
 .folderChoices { display: flex; flex-direction: column; gap: var(--space-8); }
 .folderChoices button { display: flex; align-items: center; gap: var(--space-12); width: 100%; min-height: 52px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: 0 var(--space-16); text-align: left; color: var(--color-ink); }
-.folderChoices button[aria-current='true'] { border-color: var(--color-accent); background: var(--color-accent-soft); color: var(--color-accent); font-weight: 700; }
+.folderChoices button[aria-current='true'] { border-color: var(--color-accent); background: var(--color-accent-soft); color: var(--color-accent-deep); font-weight: 700; }
 .folderChoices svg { width: 16px; height: 16px; flex: none; }
 .folderChoices svg:last-child:not(:first-child) { margin-left: auto; }
 
@@ -76,7 +79,7 @@
   .sectionHead button { min-height: 28px; border: 0; background: transparent; color: var(--color-ink-secondary); font-size: var(--text-micro); }
   .folderSelect { display: flex; align-items: center; gap: var(--space-8); width: 100%; min-height: 44px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: 0 var(--space-16); color: var(--color-ink); font-weight: 600; }
   .folderSelect svg { width: 16px; height: 16px; flex: none; }
-  .folderSelect svg:first-child { color: var(--color-accent); }
+  .folderSelect svg:first-child { color: var(--color-accent-deep); }
   .folderSelect svg:last-child { margin-left: auto; }
   .mobileTemplates .templateList { margin-bottom: var(--space-16); overflow: visible; }
   .mobileTemplates .templateList button { min-height: 80px; }
@@ -93,4 +96,5 @@
   .desktopHint { display: none; }
   .mobileHint { display: inline; }
   .insertHint { display: none; }
+}
 }
