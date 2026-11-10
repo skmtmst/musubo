@@ -55,8 +55,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: var(--tpl-ev-md-select-size);
+  height: var(--tpl-ev-md-select-size);
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
