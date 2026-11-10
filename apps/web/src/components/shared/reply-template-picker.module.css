@@ -25,7 +25,7 @@
 .templateColumn { display: flex; flex-direction: column; gap: var(--space-8); }
 .templateList { display: flex; flex-direction: column; gap: var(--space-8); overflow-y: auto; }
 .templateList button { display: flex; flex-direction: column; gap: var(--space-4); width: 100%; min-height: 72px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: var(--space-12); text-align: left; color: var(--color-ink); }
-.templateList button[aria-current='true'] { border-color: var(--color-accent); background: var(--color-accent-soft); }
+.templateList button[aria-current='true'] { border-color: var(--color-accent-border); background: var(--color-accent-soft); }
 .templateList strong { overflow: hidden; font-size: var(--text-caption); text-overflow: ellipsis; white-space: nowrap; }
 .templateList span { overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
 .preview { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
@@ -42,8 +42,7 @@
 .mobileHeader, .mobileTitle, .mobileSearch, .mobileFolders, .mobileTemplates, .mobilePreviewTitle { display: none; }
 .field { display: block; margin-bottom: var(--space-16); font-size: var(--text-caption); font-weight: 600; }
 .field span { color: var(--color-ink-secondary); font-size: var(--text-micro); }
-.field input, .field select, .field textarea { display: block; margin-top: var(--space-8); }
-.field select { width: 100%; min-height: 44px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: 0 var(--space-12); color: var(--color-ink); }
+.field input, .field textarea, .field [data-entity-picker-field] { display: block; margin-top: var(--space-8); }
 .field textarea { min-height: 280px; }
 .panelNewFolder .field input { min-height: 52px; }
 .panelNewTemplate .field textarea { min-height: 230px; }
@@ -77,6 +76,7 @@
   .sectionHead button { min-height: 28px; border: 0; background: transparent; color: var(--color-ink-secondary); font-size: var(--text-micro); }
   .folderSelect { display: flex; align-items: center; gap: var(--space-8); width: 100%; min-height: 44px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: 0 var(--space-16); color: var(--color-ink); font-weight: 600; }
   .folderSelect svg { width: 16px; height: 16px; flex: none; }
+  .folderSelect svg:first-child { color: var(--color-accent); }
   .folderSelect svg:last-child { margin-left: auto; }
   .mobileTemplates .templateList { margin-bottom: var(--space-16); overflow: visible; }
   .mobileTemplates .templateList button { min-height: 80px; }
