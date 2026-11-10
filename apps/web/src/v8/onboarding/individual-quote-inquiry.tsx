@@ -95,7 +95,7 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
       {ticketId ? <section className={styles.receipt} aria-label="お問い合わせ受付の結果">
         <Notice tone="success" heading="お問い合わせを受け付けました">
           <p>担当者がご利用予定を確認し、料金と利用開始の手順をご案内します。受付内容はお問い合わせから確認できます。</p>
-          <p>料金への同意後にカード登録へ進みます。この時点では請求は始まりません。</p>
+          <p>料金への同意後にクレジットカード登録へ進みます。この時点では請求は始まりません。</p>
         </Notice>
         <Button variant="primary" href={`/hq/support/detail?id=${encodeURIComponent(ticketId)}`}>お問い合わせ内容を確認する</Button>
       </section> : <>
@@ -137,7 +137,7 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
               </> : <div><dt>連携先の予定</dt><dd>{notes.trim() ? '入力内容を共有' : '未入力'}</dd></div>}
             </dl>
             <Notice tone="info" heading="この時点で請求は始まりません">
-              料金のご案内後、内容に同意してからカード登録とLINE接続へ進みます。</Notice>
+              料金のご案内後、内容に同意してからクレジットカード登録とLINE接続へ進みます。</Notice>
           </section>
         </div>
         <div className={styles.footer}>

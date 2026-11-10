@@ -4,6 +4,7 @@ import Button from '@/components/shared/button'
 import { useMemo, useState } from 'react'
 import {
   DEFAULT_MUSUBO_PRICE_SCHEDULE,
+  friendAllowanceForLineCount,
   musuboPrice,
   type MusuboPriceSchedule,
   type MusuboTrialPeriod,
@@ -15,7 +16,6 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
-import StatusBadge from '@/components/shared/status-badge'
 import { Field } from '@/components/shared/form-controls'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
@@ -64,7 +64,7 @@ function PlannedCountSelect({ label, id, value, onChange, linked = false }: {
   linked?: boolean
 }) {
   return <Field label={label} htmlFor={id} optional={false}>
-    <Select aria-label={label} id={id} size="full" value={String(value)}
+    <Select aria-label={label} id={id} className={styles.plannedSelect} size="full" value={String(value)}
       onChange={(next) => onChange(Number(next))}
       options={[...(linked ? linkedCountOptions : countOptions).map((count) => ({ value: String(count), label: `${count}個` })),
         { value: '11', label: '11個以上' }]} />
@@ -123,18 +123,21 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
     }
   }
 
-  const allowance = price?.friendAllowance ?? 0
+  const allowance = lineCount <= 10 ? friendAllowanceForLineCount(lineCount, condition.schedule) : 0
   const nextFriendBlock = allowance + 1
   const exampleEnd = allowance + condition.schedule.extraFriendBlockSize
+  const secondFriendBlock = exampleEnd + 1
+  const secondExampleEnd = exampleEnd + condition.schedule.extraFriendBlockSize
+  const formatCount = (count: number) => new Intl.NumberFormat('ja-JP').format(count)
   const headline = quoteRequired ? 'ご利用予定を確認' : '料金を確認'
   return <ListPage heightMode="viewport" title="利用開始の準備"
     subtitle={quoteRequired
       ? '11個以上の連携は、予定を確認してからお見積もりをご案内します。'
-      : '料金を確かめてからカードを登録し、LINE公式アカウントを接続します。'}
-    help="料金を確かめてからカードを登録し、LINE公式アカウントを接続します。"
+      : '料金を確かめてからクレジットカードを登録し、LINE公式アカウントを接続します。'}
+    help="料金を確かめてからクレジットカードを登録し、LINE公式アカウントを接続します。"
     steps={<Steps label="利用開始の手順" steps={[
       { key: 'price', label: headline, state: 'current' },
-      { key: 'next', label: quoteRequired ? 'お問い合わせ' : 'カードを登録', state: 'todo' },
+      { key: 'next', label: quoteRequired ? 'お問い合わせ' : 'クレジットカードを登録', state: 'todo' },
       { key: 'connect', label: quoteRequired ? '料金をご案内' : 'LINEを接続', state: 'todo' },
     ]} />}>
     <PageContent>
@@ -154,10 +157,10 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
               }
             }} />
             <Field label="既存のLINEアカウントの合計（ブロック除く）" htmlFor="friend-count" optional={false}
-              note="接続後に実数で確定します">
+              note="現在の友だち数を入力（接続後に実数で確定）">
               <span className={styles.numberField}><TextField id="friend-count" type="text" inputMode="numeric" value={friendCountText}
-                style={{ height: 'var(--mp-px-50)', paddingRight: 'var(--mp-px-48)' }}
-                placeholder="現在の友だち数" aria-invalid={friendCountText !== '' && !friendCountValid}
+                style={{ height: 'var(--mp-px-44)', paddingRight: 'var(--mp-px-48)' }}
+                placeholder="例：2,800" aria-invalid={friendCountText !== '' && !friendCountValid}
                 onChange={(event) => setFriendCountText(event.target.value.replaceAll(',', ''))} /><span aria-hidden="true">人</span></span>
             </Field>
           </div>
@@ -186,9 +189,9 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
           {!quoteRequired && <Checkbox checked={consent} onCheckedChange={setConsent}>
             料金条件と無料体験後のカード請求に同意します
           </Checkbox>}
-          <Button type="button" variant="text" onClick={() => setDetailsOpen(true)}>
+          <button type="button" className={styles.detailsLink} onClick={() => setDetailsOpen(true)}>
             {quoteRequired ? '標準料金のしくみを見る' : '料金の詳しい条件を見る'} ↗
-          </Button>
+          </button>
         </section>
 
         <section className={styles.card} aria-labelledby="cost-heading">
@@ -199,7 +202,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
               <RadioCard name="billing-interval" value="month" checked={interval === 'month'}
                 onChange={() => setInterval('month')} title="月払い" height="fit" />
               <div className={styles.annualChoice}>
-                <StatusBadge tone="success" dot={false}>年払いでLINE基本料金10%OFF</StatusBadge>
+                <span className={styles.discountBadge}>年払いでLINE基本料金10%OFF</span>
                 <RadioCard name="billing-interval" value="year" checked={interval === 'year'}
                   onChange={() => setInterval('year')} title="年払い" height="fit" />
               </div>
@@ -234,10 +237,10 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
       </div>
       <div className={styles.footer}>
         <p>{quoteRequired
-          ? 'お問い合わせ後に料金と利用開始の手順をご案内します。カード登録はこの段階では不要です。'
-          : 'カード情報はStripeが管理し、musuboには保存されません。カード登録だけでは無料体験も請求も始まりません。'}</p>
+          ? 'お問い合わせ後に料金と利用開始の手順をご案内します。クレジットカード登録はこの段階では不要です。'
+          : 'カード情報はStripeが管理し、musuboには保存されません。クレジットカード登録だけでは無料体験も請求も始まりません。'}</p>
         <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" disabled={!friendCountValid || (!quoteRequired && !consent)}
-          onClick={() => void advance()}>{quoteRequired ? 'お問い合わせフォームへ' : '同意してカード登録へ'}</Button>
+          onClick={() => void advance()}>{quoteRequired ? 'お問い合わせフォームへ' : '同意してクレジットカード登録へ'}</Button>
       </div>
       {error && <Notice tone="danger" role="alert">{error}</Notice>}
       <Dialog open={detailsOpen} title="料金の詳しい条件" size="large"
@@ -258,11 +261,13 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
             <p>友だち数はLINE公式APIの累計追加数からブロック数を引いて計算します。退会したユーザーは累計追加数に残るため、現在メッセージを届けられる人数と異なる場合があります。</p>
             {lineCount > 10
               ? <div className={styles.explainer}>LINEが11個以上の場合の友だち数の基準と超過料金は、個別のお見積もりでご案内します。</div>
-              : <div className={styles.explainer}>例｜LINE {lineCount}個の場合、{new Intl.NumberFormat('ja-JP').format(allowance || 3_000)}人までは追加料金なし。{new Intl.NumberFormat('ja-JP').format(nextFriendBlock || 3_001)}〜{new Intl.NumberFormat('ja-JP').format(exampleEnd || 13_000)}人は1枠分です。</div>}
+              : <div className={styles.explainer}>例｜LINE {lineCount}個の場合、{formatCount(allowance)}人までは追加料金なし。<br />
+                {formatCount(nextFriendBlock)}〜{formatCount(exampleEnd)}人 → 1枠分 +{yen(condition.schedule.extraFriendBlockYen)}／月<br />
+                {formatCount(secondFriendBlock)}〜{formatCount(secondExampleEnd)}人 → 2枠分 +{yen(condition.schedule.extraFriendBlockYen * 2)}／月</div>}
             <p>各LINEでGoogleマイビジネスとInstagramはそれぞれ1個まで基本料金内です。多いほうの2個目から追加料金を数えます。複数LINEの追加連携枠は、それぞれの連携前に料金を確認します。</p>
           </div>
           <p>年払いはLINE基本料金のみ10%割引。友だち超過・追加連携枠は毎月別請求です。</p>
-          <p>無料体験は最初のLINE有効化日から{trialLabel(condition.trialPeriod)}。有効化前はカード登録済みでも請求しません。</p>
+          <p>無料体験は最初のLINE有効化日から{trialLabel(condition.trialPeriod)}。有効化前はクレジットカード登録済みでも請求しません。</p>
       </Dialog>
     </PageContent>
   </ListPage>
@@ -273,7 +278,7 @@ function QuoteRequired() {
     <span className={styles.quoteBadge}>個別見積もり</span>
     <h2 id="cost-heading">料金は個別にご案内します</h2>
     <p>連携数と使い方を確認し、御社に合う料金と利用開始の手順をお伝えします。</p>
-    <div className={styles.explainer}>この画面で料金や請求は確定しません。カード情報の入力もまだ不要です。</div>
+    <div className={styles.explainer}>この画面で料金や請求は確定しません。クレジットカード情報の入力もまだ不要です。</div>
     <h3>お問い合わせ後の流れ</h3>
     <ol><li>お問い合わせ内容を送信</li><li>担当者から料金をご案内</li><li>ご同意後、利用開始の準備へ</li></ol>
   </div>

@@ -52,6 +52,27 @@ describe('Penの利用料金確認', () => {
     expect(document.activeElement).toBe(details)
   })
 
+  it('友だち数が未入力でもLINE数ごとの超過基準と2枠目を正しく示す', async () => {
+    await act(async () => { root.render(<OnboardingPricing onContinue={continueFlow} onContact={contactFlow} />) })
+    const details = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('料金の詳しい条件を見る'))!
+    const cases = [
+      { count: '1', free: '3,000人までは追加料金なし', first: '3,001〜13,000人', second: '13,001〜23,000人' },
+      { count: '3', free: '15,000人までは追加料金なし', first: '15,001〜25,000人', second: '25,001〜35,000人' },
+      { count: '6', free: '50,000人までは追加料金なし', first: '50,001〜60,000人', second: '60,001〜70,000人' },
+    ]
+    for (const example of cases) {
+      if (example.count !== '1') await selectValue('line-count', example.count)
+      await act(async () => { details.click() })
+      const content = document.querySelector('[role="dialog"]')?.textContent ?? ''
+      expect(content).toContain(example.free)
+      expect(content).toContain(example.first)
+      expect(content).toContain(example.second)
+      expect(content).not.toContain('1〜10,000人')
+      const close = document.querySelector<HTMLButtonElement>('[role="dialog"] button[aria-label="閉じる"]')!
+      await act(async () => { close.click() })
+    }
+  })
+
   it('個別見積もり画面から戻っても入力した予定を保つ', async () => {
     await act(async () => { root.render(<PricingQuoteFlow onContinue={continueFlow} />) })
     await selectValue('line-count', '11')
@@ -79,7 +100,7 @@ describe('Penの利用料金確認', () => {
     expect(host.textContent).toContain('¥9,200 / 月')
     const agree = host.querySelector<HTMLInputElement>('input[type=checkbox]')!
     await act(async () => { agree.click() })
-    const proceed = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('同意してカード登録へ'))!
+    const proceed = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('同意してクレジットカード登録へ'))!
     await act(async () => { proceed.click() })
     expect(continueFlow).toHaveBeenCalledWith(expect.objectContaining({ lineCount: 1, friendCountExcludingBlocked: 2800, googleBusinessCount: 2 }))
   })
@@ -123,7 +144,7 @@ describe('Penの利用料金確認', () => {
     expect(host.textContent).not.toContain('追加連携枠 1枠')
     const agree = host.querySelector<HTMLInputElement>('input[type=checkbox]')!
     await act(async () => { agree.click() })
-    const proceed = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('同意してカード登録へ'))!
+    const proceed = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('同意してクレジットカード登録へ'))!
     await act(async () => { proceed.click() })
     expect(continueFlow).toHaveBeenCalledWith(expect.objectContaining({ lineCount: 2, googleBusinessCount: 1, instagramCount: 1 }))
   })
