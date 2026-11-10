@@ -171,6 +171,13 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).toContain('CLOUDFLARE_API_TOKEN: ${{ env.PAGES_API_TOKEN }}');
   });
 
+  it('uses a dedicated R2 configuration token for staging CORS writes', () => {
+    expect(workflow).toContain('R2_CORS_API_TOKEN: ${{ secrets.CF_R2_CORS_TOKEN }}');
+    expect(workflow).toMatch(
+      /Ensure staging R2 allows uploads from the current Admin origin[\s\S]*?CLOUDFLARE_R2_CORS_WRITE_TOKEN: \$\{\{ env\.R2_CORS_API_TOKEN \}\}/,
+    );
+  });
+
   it('can deploy Worker and Admin independently', () => {
     expect(workflow).toContain("env.DELIVERY_TARGET != 'admin'");
     expect(workflow).toContain("env.DELIVERY_TARGET != 'worker'");

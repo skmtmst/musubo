@@ -60,6 +60,8 @@ async function main() {
   const before = await cloudflare('GET', endpoint, token)
   const rules = plannedCorsRules(before?.rules)
   const changed = JSON.stringify(before.rules) !== JSON.stringify(rules)
+  const writeToken = process.env.CLOUDFLARE_R2_CORS_WRITE_TOKEN
+  if (changed && !writeToken) throw new Error('Staging R2 CORS requires the dedicated write token before deployment')
   console.log(`Staging R2 CORS: ${changed ? `add ${origin}` : `${origin} already present`}`)
   if (process.env.GITHUB_STEP_SUMMARY) {
     const { appendFile } = await import('node:fs/promises')
@@ -69,7 +71,7 @@ async function main() {
   if (changed) {
     const backupPath = join(process.env.RUNNER_TEMP ?? '/tmp', `staging-r2-cors-before-${process.env.GITHUB_RUN_ID ?? 'local'}.json`)
     await writeFile(backupPath, JSON.stringify(before, null, 2))
-    await cloudflare('PUT', endpoint, token, { rules })
+    await cloudflare('PUT', endpoint, writeToken, { rules })
     const after = await cloudflare('GET', endpoint, token)
     if (JSON.stringify(after?.rules) !== JSON.stringify(rules)) throw new Error('Cloudflare R2 CORS readback did not match the requested policy')
     console.log(`Staging R2 CORS updated and read back. Backup: ${backupPath}`)
