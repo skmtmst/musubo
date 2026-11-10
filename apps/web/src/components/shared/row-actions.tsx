@@ -103,6 +103,8 @@ export type RowMenuProps = {
   lockedReason?: string
   /** 「…」の中の項目。危ない操作（tone: 'danger'）は部品が最後・区切りの下へ回す。 */
   items: ActionMenuItem[]
+  /** 操作数が少ない一覧では自動の分類見出しを省く。区切りと危険色は残す。 */
+  showGroupHeadings?: boolean
   /** 「…」ボタンの読み上げ名（例：「春のセールの操作」）。 */
   label: string
   /** メニューの読み上げ名。省略時は label。 */
@@ -145,6 +147,7 @@ export type RowMenuProps = {
 export function RowMenu({
   lockedReason,
   items,
+  showGroupHeadings = true,
   label,
   menuLabel,
   note,
@@ -192,6 +195,7 @@ export function RowMenu({
         ariaLabel={menuLabel ?? label}
         onClose={() => setOpen(false)}
         items={orderRowMenuItems(items)}
+        showGroupHeadings={showGroupHeadings}
         note={note ?? (items.length ? undefined : 'この行に使える操作はありません')}
         anchorRef={triggerRef}
       />

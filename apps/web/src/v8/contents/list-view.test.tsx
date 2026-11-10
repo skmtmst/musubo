@@ -234,19 +234,23 @@ describe('数の帯と札', () => {
     expect(calls.some((call) => call.path === '/api/media/quota' && call.params.get('accountId') === 'account-a')).toBe(true)
   })
 
-  it('札は種別と容量・使用先を出し、未取得の使用数を0件に見せない', async () => {
+  it('札は写真・名前・種別と容量だけを出し、選択は写真の右上に置く', async () => {
     await render()
-    const cardOf = (name: string) => host.querySelector(`button[aria-label="${name}のプレビューを見る"]`)!.parentElement!
+    const cardOf = (name: string) => host.querySelector(`button[aria-label="${name}のプレビューを見る"]`)!.closest('[data-design-part="card"]')!
     const photo = cardOf('秋の新商品.jpg')
-    expect(photo.textContent).toContain('使用先：2 か所')
+    expect(photo.textContent).not.toContain('使用先：')
     expect(photo.querySelector('p[title]')?.getAttribute('title')).toBe('JPG ／ 1200×800 ／ 1.1 MB')
     const movie = cardOf('使い方ガイド.mp4')
-    expect(movie.textContent).toContain('使用先：どこでも使っていない')
+    expect(movie.textContent).not.toContain('使用先：')
     expect(movie.querySelector('p[title]')?.getAttribute('title')).toBe('MP4 ／ 60秒 ／ 36.2 MB')
     const doc = cardOf('メニュー表.pdf')
-    expect(doc.textContent).toContain('使用先：確かめられません')
-    expect(doc.textContent).not.toContain('どこでも使っていない')
+    expect(doc.textContent).not.toContain('使用先：')
     expect(doc.querySelector('p[title]')?.getAttribute('title')).toBe('PDF ／ 2.0 MB')
+    for (const name of ['秋の新商品.jpg', '使い方ガイド.mp4', 'メニュー表.pdf']) {
+      const preview = host.querySelector(`button[aria-label="${name}のプレビューを見る"]`)!
+      const select = host.querySelector(`input[aria-label="${name}を選ぶ"]`)!
+      expect(select.closest('[class*="selectCorner"]')?.parentElement).toBe(preview.parentElement)
+    }
   })
 
   it('使っている・使用先が分からない札は選べず、理由を添える。使っていない札だけ選べて一括の帯が出る', async () => {
@@ -265,10 +269,11 @@ describe('数の帯と札', () => {
   it('管理者の「…」は全部の操作を出し、削除は危ない操作として区切りの下に置く', async () => {
     await render()
     await click(host.querySelector('button[aria-label="使い方ガイド.mp4のその他操作"]'))
-    expect(menuItems()).toEqual(['プレビュー', '使用箇所を見る', 'ダウンロード', '名前を変える', 'フォルダへ移す', 'アーカイブ', '別のメディアに差し替える', '削除する'])
+    expect(menuItems()).toEqual(['プレビュー', 'ダウンロード', '名前を変える', 'フォルダへ移す', 'アーカイブ', '削除する'])
+    expect(document.querySelector('[role="menu"]')?.textContent).not.toContain('変える・整理する')
     const deleteItem = [...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === '削除する')
     expect(deleteItem?.closest('[data-menu-group]')?.getAttribute('data-menu-group')).toBe('destructive')
-    for (const [label, icon] of [['プレビュー', 'eye'], ['使用箇所を見る', 'list'], ['ダウンロード', 'download'], ['名前を変える', 'pencil'], ['フォルダへ移す', 'folder-input'], ['アーカイブ', 'archive'], ['別のメディアに差し替える', 'refresh-cw'], ['削除する', 'trash-2']]) {
+    for (const [label, icon] of [['プレビュー', 'eye'], ['ダウンロード', 'download'], ['名前を変える', 'pencil'], ['フォルダへ移す', 'folder-input'], ['アーカイブ', 'archive'], ['削除する', 'trash-2']]) {
       const row = [...document.querySelectorAll('[role="menuitem"]')].find((candidate) => candidate.textContent?.trim() === label)
       expect(row?.querySelector(`svg.lucide-${icon}`), `${label} の印`).not.toBeNull()
     }
@@ -311,9 +316,8 @@ describe('数の帯と札', () => {
   })
 
   it('詳細の利用期限・同意の保存も詳細で読んだ版を送る', async () => {
+    window.history.replaceState(null, '', '/contents?id=m-movie')
     await render()
-    await click(host.querySelector('button[aria-label="使い方ガイド.mp4のその他操作"]'))
-    await click([...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === '使用箇所を見る'))
     await click(button('記録する', host))
     const field = host.querySelector<HTMLInputElement>('input[placeholder^="例：出演者"]')!
     await act(async () => {
@@ -327,9 +331,8 @@ describe('数の帯と札', () => {
 
   it('詳細の保存が競合したら入力を残し、最新を読み込んで再編集できる', async () => {
     conflictRename = true
+    window.history.replaceState(null, '', '/contents?id=m-movie')
     await render()
-    await click(host.querySelector('button[aria-label="使い方ガイド.mp4のその他操作"]'))
-    await click([...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === '使用箇所を見る'))
     await click(button('記録する', host))
     const field = host.querySelector<HTMLInputElement>('input[placeholder^="例：出演者"]')!
     await act(async () => {
