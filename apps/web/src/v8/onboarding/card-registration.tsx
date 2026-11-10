@@ -35,7 +35,7 @@ export function isStripeCardSetupUrl(value: string): boolean {
 }
 
 export default function CardRegistration({ returnState = null, quoteId, onContinue, onBackToPricing, onOpenStripe }: Props) {
-  usePageTitle('お支払い情報')
+  usePageTitle(returnState === 'cancel' ? 'クレジットカード登録を続ける' : 'お支払い情報')
   usePageCrumbs([{ label: 'ホーム', href: '/hq' }, { label: '利用開始の準備' }])
   const [state, setState] = useState<CardState>('checking')
   const [busy, setBusy] = useState(false)
@@ -96,6 +96,32 @@ export default function CardRegistration({ returnState = null, quoteId, onContin
   const next = () => {
     if (onContinue) onContinue()
     else window.location.assign('/accounts/new')
+  }
+
+  if (returnState === 'cancel' && state === 'unregistered') {
+    return <ListPage heightMode="viewport" title="クレジットカード登録を続ける"
+      subtitle="クレジットカード登録はまだ完了していません。料金の確認内容は保存されています。">
+      <PageContent>
+        <section className={`${styles.card} ${styles.retryCard}`} aria-labelledby="card-state-title">
+          <div className={styles.stateHeading}>
+            <span className={styles.cardIcon} aria-hidden="true">!</span>
+            <h2 id="card-state-title">クレジットカードを登録できませんでした</h2>
+          </div>
+          <p className={styles.retryReason}>入力が中断されたか、カードを確認できませんでした。もう一度登録画面を開いてください。</p>
+          <div className={styles.statusBox}>
+            <strong>現在の状態</strong>
+            <p>✓ 料金条件を確認済み</p>
+            <p>○ クレジットカード未登録・LINE未接続・本日の請求 ¥0</p>
+          </div>
+          <p className={styles.note}>後で再開する場合は、ログイン後の「利用開始の準備」から続けられます。</p>
+          {actionError && <Notice tone="danger" role="alert">{actionError}</Notice>}
+        </section>
+        <div className={styles.retryFooter}>
+          {onBackToPricing && <Button type="button" variant="text" onClick={onBackToPricing}>料金確認に戻る</Button>}
+          <Button type="button" variant="primary" onClick={() => void openCardForm()} busy={busy} busyLabel="画面を開いています…">クレジットカードを登録し直す</Button>
+        </div>
+      </PageContent>
+    </ListPage>
   }
 
   return <ListPage heightMode="viewport" title="お支払い情報" help="クレジットカード登録後、LINE公式アカウントを接続します。"
