@@ -122,6 +122,7 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
       { id: 'pools', featureKey: 'multi_store_hierarchy' },
       { id: 'staff', required: true },
       { id: 'settings', required: true },
+      { id: 'google-business-hours', required: true },
       { id: 'emergency', required: true },
       { id: 'ec-commerce', featureKey: 'ec_commerce' },
     ],
