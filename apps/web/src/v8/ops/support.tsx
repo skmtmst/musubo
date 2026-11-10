@@ -384,7 +384,7 @@ export default function OpsSupportV8() {
             ) : <ListState permissionScope="hq" kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
           ) : (
             <>
-              <div className={styles.mobileTop}><Button variant="text" textTone="ink" className={styles.mobileBack} onClick={() => setSelectedId(null)}><ChevronLeft aria-hidden="true" />お問い合わせ</Button><RowMenu label="その他の操作" appearance="outlined" items={proxyMenuItems} /></div>
+              <div className={styles.mobileTop}><Button variant="text" textTone="ink" className={styles.mobileBack} onClick={() => setSelectedId(null)}><ChevronLeft aria-hidden="true" />お問い合わせ</Button><RowMenu label="その他の操作" appearance="outlined" className={styles.outlinedMore} items={proxyMenuItems} /></div>
               <div className={styles.detailTitleRow}><CardHeader size="content" title={<TruncatedText value={`${ticket.ticketLabel} ${ticket.subject}`} />} /></div>
               <div className={styles.detailControls}>
                 <div className={styles.statusWrap}><Button variant="text" data-stage={ticket.stage} className={styles.statusButton} aria-label="状態を変更" aria-expanded={stageOpen} disabled={busy || unknown || access !== 'writer'} title={lock} onClick={() => setStageOpen((value) => !value)}><StatusBadge tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge><span aria-hidden="true">⌄</span></Button>
@@ -394,7 +394,7 @@ export default function OpsSupportV8() {
                   <SaveErrorField names={["priority","ticket.priority"]}><Select size="page-size" aria-label="優先度を変える" lockedReason={lock} disabled={unknown} value={ticket.priority} onChange={(value) => void changePriority(value as OpsSupportPriority)} options={PRIORITY_OPTIONS} /></SaveErrorField>
                 </span>
                 <Button variant="text" textTone="quiet" className={styles.contractLink} href={tenantDetailHref(ticket.tenantId)}><Building2 aria-hidden="true" />契約先を開く</Button>
-                <div className={styles.moreWrap}><RowMenu label="その他の操作" appearance="outlined" items={proxyMenuItems} /></div>
+                <div className={styles.moreWrap}><RowMenu label="その他の操作" appearance="outlined" className={styles.outlinedMore} items={proxyMenuItems} /></div>
               </div>
               <ol className={styles.messages} aria-label="やり取り">
                 <Message mine={false} at={ticket.createdAt} author={`${ticket.staffName || ticket.tenantName}（${shortDateTime(ticket.createdAt)}）`} body={ticket.body} attachments={ticket.attachments} />

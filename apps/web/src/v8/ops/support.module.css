@@ -168,6 +168,12 @@
 
 .detailControls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-8) var(--space-12); min-width: 0; }
 .moreWrap { position: relative; margin-left: auto; }
+html:root .outlinedMore[data-row-menu]:not(:focus-visible) {
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  box-shadow: var(--control-shadow);
+}
 .mobileTop { display: none; }
 .statusWrap { position: relative; order: 4; flex-basis: 100%; }
 .statusButton { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-8); min-height: var(--support-status-height); border: 0; border-radius: var(--radius-control); padding: 0 var(--space-12); }
