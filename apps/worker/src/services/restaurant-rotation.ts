@@ -1,6 +1,6 @@
 import { restaurantCivilTime, validRestaurantDate } from './restaurant-booking.js';
 import { closuresForRange, closureAffectsTable } from './restaurant-closures.js';
-import { reservationInstant, type RestaurantOpeningDay } from '@line-crm/shared';
+import { addDays, reservationInstant, type RestaurantOpeningDay } from '@line-crm/shared';
 import { connectedGoogleProfile, googleOpeningDay } from './restaurant-google-hours-source.js';
 
 type Interval=[number,number];
@@ -17,7 +17,7 @@ export async function restaurantRotation(db:D1Database,storeId:string,date:strin
  const from=restaurantCivilTime(date,0,store.timezone),to=restaurantCivilTime(date,1440,store.timezone),start=Date.parse(from),end=Date.parse(to);
  const minute=(t:string)=>Number(t.slice(0,2))*60+Number(t.slice(3));
  const localWeek=setting&&!googleConnection?JSON.parse(setting.hours_json) as RestaurantOpeningDay[]:[];
- const previousDate=new Date(Date.parse(`${date}T00:00:00Z`)-86400000).toISOString().slice(0,10);
+ const previousDate=addDays(date,-1);
  const operating:Interval[]=[previousDate,date].flatMap(openDate=>{
   const weekday=new Date(`${openDate}T00:00:00Z`).getUTCDay();
   const periods=googleConnection?(googleProfile?googleOpeningDay(googleProfile,openDate):null):localWeek.find(d=>d.weekday===weekday)?.periods??[];

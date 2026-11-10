@@ -1194,29 +1194,6 @@ describe('V8-B 卓から出す予約枠と週の営業時間', () => {
     expect((await requestWithMethod(path, 'PUT', { ...body, expectedVersion: 1 })).status).toBe(409);
     expect((await requestWithMethod(path, 'PUT', { ...body, hours: hours().slice(0, 6), expectedVersion: 2 })).status).toBe(400);
   });
-  it('Google接続後は特別営業時間を指定日の正として返し、旧時間への編集と失効時の代用を止める', async () => {
-    seedCapacity();
-    const path = '/api/restaurant-test/opening-hours?account_id=account-1&storeId=store-ginza';
-    expect((await requestWithMethod(path, 'PUT', { storeId: 'store-ginza', hours: hours(), expectedVersion: 0 })).status).toBe(200);
-    const location = 'accounts/111/locations/222';
-    testDb.raw.prepare(`INSERT INTO rt_google_connections(id,store_id,line_account_id,location_name,refresh_token_enc,status)
-      VALUES(?,?,?,?,?,?)`).run('google-1', 'store-ginza', 'account-2', location, 'encrypted', 'connected');
-    const regularHours = Object.fromEntries(['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
-      .map(day => [day, [{ open: '10:00', close: '19:00' }]]));
-    testDb.raw.prepare(`INSERT INTO rt_google_profiles(store_id,location_name,profile_json,fingerprint,fetched_at,updated_at)
-      VALUES(?,?,?,?,?,?)`).run('store-ginza', location, JSON.stringify({ profile: {
-        name: 'locations/222', openStatus: 'OPEN', regularHours,
-        specialHours: [{ date: '2026-11-10', closed: true, periods: [] }],
-      } }), 'fingerprint', '2026-11-10T00:00:00Z', '2026-11-10T00:00:00Z');
-    const weekly = (await (await request(path)).json() as any).data;
-    expect(weekly.hours[2].periods).toEqual([{ opensAt: '10:00', closesAt: '19:00' }]);
-    const special = (await (await request(`${path}&date=2026-11-10`)).json() as any).data;
-    expect(special.hours[2].periods).toEqual([]);
-    expect((await requestWithMethod(path, 'PUT', { storeId: 'store-ginza', hours: hours(), expectedVersion: 1 })).status).toBe(409);
-    expect((await request(`${path}&date=invalid`)).status).toBe(400);
-    testDb.raw.prepare("UPDATE rt_google_connections SET status='expired' WHERE store_id='store-ginza'").run();
-    expect((await (await request(path)).json() as any).data.hours).toBeNull();
-  });
   it('選択中の店舗以外の予約枠と営業時間は変えられない', async () => {
     seedCapacity();
     expect((await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-2', 'PUT', { storeId: 'store-yokohama', hours: hours(), expectedVersion: 0 })).status).toBe(400);

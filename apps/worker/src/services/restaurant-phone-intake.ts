@@ -1,6 +1,7 @@
 import { tzDateStr } from './availability.js';
 import { restaurantCivilTime } from './restaurant-booking.js';
 import { connectedGoogleProfile, googleOpeningDay } from './restaurant-google-hours-source.js';
+import { addDays } from '@line-crm/shared';
 /** 受付時の通信・端末時計のわずかなずれを許す。大きな過去日時は記録しない。 */
 const REQUEST_CLOCK_TOLERANCE_MS = 60_000;
 
@@ -15,7 +16,7 @@ export async function phoneIntakeFailure(db: D1Database, storeId: string, starts
     const store = await db.prepare('SELECT timezone FROM rt_stores WHERE id=?').bind(storeId).first<{ timezone: string }>();
     if (!store) return 'opening_hours_unconfigured';
     const date = tzDateStr(store.timezone, new Date(startsAt));
-    const previousDate = new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+    const previousDate = addDays(date, -1);
     const minutes = (value: string) => Number(value.slice(0, 2)) * 60 + Number(value.slice(3));
     const inside = [previousDate, date].some(openDate => googleOpeningDay(profile, openDate)?.some(period => {
       const open = minutes(period.opensAt);

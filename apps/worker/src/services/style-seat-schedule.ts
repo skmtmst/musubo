@@ -1,4 +1,4 @@
-import type { StyleSchedule, StyleSnapshot, RestaurantOpeningDay } from '@line-crm/shared';
+import { addDays, type StyleSchedule, type StyleSnapshot, type RestaurantOpeningDay } from '@line-crm/shared';
 
 import { civilDate, instant } from './style-analytics.js';
 import { StyleError } from './style-setup.js';
@@ -68,7 +68,7 @@ export async function seatSchedule(db:D1Database,account:string,query:Record<str
       const closedDates: string[] = [];
       const candidates: ClosurePeriod[] = [];
       for (const day of days) {
-        const previousDate = new Date(Date.parse(`${day.date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+        const previousDate = addDays(day.date, -1);
         const openingDays = [previousDate, day.date].map(openDate => ({
           openDate,
           periods: googleProfile ? googleOpeningDay(googleProfile, openDate) ?? []
