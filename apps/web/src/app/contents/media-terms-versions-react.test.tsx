@@ -70,6 +70,7 @@ vi.mock('@/lib/api', () => ({
         fixture.updates.push({ id, accountId, data })
         const updated: MediaItem = {
           ...ITEM,
+          revision: 4,
           usageExpiresAt: (data.usageExpiresAt as string | null) ?? null,
           usageConsentNote: (data.usageConsentNote as string | null) ?? null,
         }
@@ -96,6 +97,7 @@ const { default: MediaDetailDialog } = await import('@/v8/contents/media-detail-
 
 const ITEM: MediaItem = {
   id: 'media-a',
+  revision: 3,
   lineAccountId: 'account-a',
   folderId: null,
   kind: 'image',
@@ -271,7 +273,7 @@ describe('IDEA-15 利用期限・同意の表示と記録', () => {
     expect(fixture.updates).toEqual([{
       id: 'media-a',
       accountId: 'account-a',
-      data: { usageExpiresAt: '2027-03-31', usageConsentNote: '同意書確認済み' },
+      data: { expectedRevision: 3, usageExpiresAt: '2027-03-31', usageConsentNote: '同意書確認済み' },
     }])
     expect(fixture.itemUpdated.length).toBe(2) // updateの返り値とonItemUpdatedの両方
     expect(fixture.itemUpdated[1]?.usageExpiresAt).toBe('2027-03-31')
@@ -286,7 +288,7 @@ describe('IDEA-15 利用期限・同意の表示と記録', () => {
     await setInputValue(noteInput, '   ')
     await clickButton('保存する')
 
-    expect(fixture.updates[0]?.data).toEqual({ usageExpiresAt: null, usageConsentNote: null })
+    expect(fixture.updates[0]?.data).toEqual({ expectedRevision: 3, usageExpiresAt: null, usageConsentNote: null })
   })
 
   it('staffには記録の入口を出さない', async () => {
