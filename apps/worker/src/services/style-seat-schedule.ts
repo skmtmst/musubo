@@ -68,11 +68,21 @@ export async function seatSchedule(db:D1Database,account:string,query:Record<str
       const closedDates: string[] = [];
       const candidates: ClosurePeriod[] = [];
       for (const day of days) {
-        const weekday = new Date(day.date + 'T00:00:00Z').getUTCDay();
-        const periods = googleProfile ? googleOpeningDay(googleProfile, day.date) ?? [] : hours.find((h) => h.weekday === weekday)?.periods ?? [];
+        const previousDate = new Date(Date.parse(`${day.date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+        const openingDays = [previousDate, day.date].map(openDate => ({
+          openDate,
+          periods: googleProfile ? googleOpeningDay(googleProfile, openDate) ?? []
+            : hours.find(h => h.weekday === new Date(`${openDate}T00:00:00Z`).getUTCDay())?.periods ?? [],
+        }));
+        const minute = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+        const hasDayHours = openingDays.some(({ openDate, periods }) => periods.some(period => {
+          const opens = minute(period.opensAt);
+          const closes = minute(period.closesAt) + (minute(period.closesAt) < opens ? 1440 : 0);
+          return openDate === day.date || closes > 1440;
+        }));
         if (
           hasHours &&
-          (!periods.length ||
+          (!hasDayHours ||
             closed.some(
               (c) =>
                 c.all_day &&
@@ -84,9 +94,7 @@ export async function seatSchedule(db:D1Database,account:string,query:Record<str
           closedDates.push(day.date);
         // 営業時間だけで空きと扱わず、表示する各候補を既存の席数検査へ通す。
         const seen = new Set<number>();
-        for (const period of periods) {
-          const minute = (t: string) =>
-            Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+        for (const { openDate, periods } of openingDays) for (const period of periods) {
           const opens = minute(period.opensAt);
           const closes = minute(period.closesAt) + (minute(period.closesAt) < opens ? 1440 : 0);
           for (
@@ -94,18 +102,19 @@ export async function seatSchedule(db:D1Database,account:string,query:Record<str
             start + duration <= closes;
             start += 30
           ) {
-            if (seen.has(start)) continue;
-            seen.add(start);
             const startsAt = restaurantCivilTime(
-                day.date,
+                openDate,
                 start,
                 store.timezone,
               ),
               endsAt = restaurantCivilTime(
-                day.date,
+                openDate,
                 start + duration,
                 store.timezone,
               );
+            if (civilDate(instant(startsAt), store.timezone) !== day.date) continue;
+            if (seen.has(instant(startsAt))) continue;
+            seen.add(instant(startsAt));
             if (instant(startsAt) < instant(asOf)) continue;
             candidates.push({ startsAt, endsAt });
           }
