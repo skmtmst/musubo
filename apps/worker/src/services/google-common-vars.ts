@@ -1,5 +1,5 @@
 import { resolveCommonVarValuesAt } from '@line-crm/db';
-import { accountOpeningHours, openingWeek } from './account-opening-hours.js';
+import { accountOpeningHours, openingWeek, shiftCalendarDate } from './account-opening-hours.js';
 
 /** Existing business_hours common variables keep their identity/version for send snapshots; Google supplies their text. */
 export async function resolveMusuboCommonVarsAt(
@@ -17,9 +17,7 @@ export async function resolveMusuboCommonVarsAt(
   const lines = week.map(day => `${weekdays[day.weekday]}：${day.intervals.length
     ? day.intervals.map(interval => `${interval.start}〜${interval.end}`).join('、') : '休業'}`);
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(executionAt));
-  const limit = new Date(`${today}T00:00:00Z`);
-  limit.setUTCDate(limit.getUTCDate() + 30);
-  const until = limit.toISOString().slice(0, 10);
+  const until = shiftCalendarDate(today, 30);
   const specials = state.profile.specialHours.filter(day => today <= day.date && day.date <= until)
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(day => `${day.date}：${day.closed ? '休業' : day.periods.map(period => `${period.open}〜${period.close}`).join('、')}`);

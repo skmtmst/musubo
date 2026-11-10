@@ -8,7 +8,7 @@ import { SLOT_GRANULARITY_CHOICES, SLOT_GRANULARITY_MINUTES } from '../features/
 import { getStaffGoogleBusy } from '../features/booking/booking-calendar-sync/index.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
 import { storeSeatsForSlot, type StoreCapacityWindow } from '../features/booking/booking-store-capacity/index.js';
-import { accountOpeningHours, openingDay, type AccountOpeningHours } from './account-opening-hours.js';
+import { accountOpeningHours, openingDay, openingCapacitySegments, type AccountOpeningHours } from './account-opening-hours.js';
 
 export interface Interval {
   start: string; // HH:MM
@@ -39,12 +39,6 @@ export interface ComputeSlotsInput {
   /** 同時に受けられる件数。省略時は1（従来どおり重ねない） */
   capacity?: number;
 }
-
-
-
-
-
-
 /** 重なる稼働区間をまとめる。例外日が複数ある日の union 用。 */
 function mergeIntervals(intervals: Interval[]): Interval[] {
   const sorted = intervals
@@ -138,8 +132,6 @@ export function computeSlots(input: ComputeSlotsInput): Interval[] {
   }
   return out;
 }
-
-
 
 const FALLBACK_TIME_ZONE = 'Asia/Tokyo';
 
@@ -456,18 +448,10 @@ function storeCapacityWindows(hours: BusinessHour[], timeZone: string, startMs: 
   for (const date of eachDate(tzDateStr(timeZone, new Date(startMs)), tzDateStr(timeZone, new Date(endMs - 1)))) {
     const local = hours.filter(h => h.weekday === weekdayForDate(date));
     const google = source ? openingDay(source, date) : null;
-    const periods = google ?? local.map(h => ({ start: h.start_time, end: h.end_time }));
-    for (const period of periods) {
-      const boundaries = google ? [period.start, period.end, ...local.flatMap(h => [h.start_time, h.end_time])
-        .filter(time => period.start < time && time < period.end)].sort() : [period.start, period.end];
-      for (let index = 0; index < boundaries.length - 1; index++) {
-        const segmentStart = boundaries[index];
-        const segmentEnd = boundaries[index + 1];
-        const start = Math.max(startMs, zonedTimeToUtcMs(timeZone, date, segmentStart));
-        const end = Math.min(endMs, zonedTimeToUtcMs(timeZone, date, segmentEnd));
-        const capacity = Number(local.find(h => h.start_time <= segmentStart && segmentEnd <= h.end_time)?.capacity ?? 1);
-        if (start < end) windows.push({ start: new Date(start).toISOString(), end: new Date(end).toISOString(), capacity });
-      }
+    for (const segment of openingCapacitySegments(local, google)) {
+      const start = Math.max(startMs, zonedTimeToUtcMs(timeZone, date, segment.start));
+      const end = Math.min(endMs, zonedTimeToUtcMs(timeZone, date, segment.end));
+      if (start < end) windows.push({ start: new Date(start).toISOString(), end: new Date(end).toISOString(), capacity: segment.capacity });
     }
   }
   return windows;
