@@ -200,11 +200,17 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
             各LINEでGoogleマイビジネスとInstagramの連携数を設定します。各サービス1個目は基本料金内。
             2個目以降の連携前に追加料金を確認します。ここで表示する予定料金には追加連携枠を含みません。
           </div>}
+          {quoteRequired && <div className={styles.explainer}>
+            {lineCount > 10
+              ? 'LINEを11個以上連携する場合は、利用規模に合わせて料金をご案内します。Googleマイビジネス・Instagramの連携予定も担当者と確認できます。'
+              : 'Googleマイビジネス・Instagramのどちらかを11個以上連携する場合は、利用規模に合わせて料金をご案内します。'}
+          </div>}
           <p className={styles.note}>{quoteRequired
             ? '友だち数は概算でも大丈夫です。正確な連携数が未定の場合もご相談いただけます。'
             : lineCount === 1
               ? '未接続のLINE・連携先は請求対象外です。LINEまたは連携先が11個以上なら個別にご案内します。'
               : '未接続のLINE・連携先は請求対象外です。連携先の追加分は、各LINEの接続時に確認します。'}</p>
+          {quoteRequired && <p className={styles.quoteInputNote}>LINE数、Googleマイビジネス数、Instagram数や利用方法は、次の画面で入力できます。</p>}
           {!quoteRequired && <Checkbox checked={consent} onCheckedChange={setConsent}>
             料金条件と無料体験後のカード請求に同意します
           </Checkbox>}
