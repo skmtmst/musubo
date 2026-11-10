@@ -171,8 +171,7 @@
 .inlineBar[data-presentation='support-reply'] { position: sticky; bottom: 0; z-index: 2; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-12); background: var(--color-board-tint); }
 .inlineBar[data-presentation='support-reply'] > :first-child { margin-right: auto; }
 .inlineBar[data-presentation='support-reply'] :global([data-choice-field][aria-label='送信後の状態']) { min-height: 32px; border: 0 !important; background: transparent !important; box-shadow: none !important; }
-.inlineBar[data-presentation='support-reply'] > :last-child { min-width: 146px; justify-content: center; }
-.inlineBar[data-presentation='support-reply'] > :last-child:disabled { border-color: #e2e7e4 !important; background: #e2e7e4; color: #718078; box-shadow: none; opacity: 1; }
+.inlineBar[data-presentation='support-reply'] > :last-child { min-width: 146px; justify-content: center; box-shadow: none; }
 @media (min-width: 1024px) and (max-width: 1250px) {
   .inlineBar[data-presentation='support-reply'] > :last-child { width: 100%; }
 }
