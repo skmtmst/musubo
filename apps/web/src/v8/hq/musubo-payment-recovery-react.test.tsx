@@ -36,6 +36,7 @@ describe('決済失敗と回復の画面', () => {
     expect(host.textContent).toContain('利用継続中')
     expect(host.textContent).toContain('2026年12月15日 10:00')
     expect(host.textContent).toContain('¥5,900')
+    expect(host.textContent).toContain('結果を画面とメールでお知らせします')
     const pay = [...host.querySelectorAll('button')].find((item) => item.textContent === 'お支払いへ進む')!
     await act(async () => { pay.click() })
     expect(onPrimary).toHaveBeenCalledOnce()
@@ -47,12 +48,14 @@ describe('決済失敗と回復の画面', () => {
     expect(host.textContent).toContain('追加は保留中')
     expect(host.textContent).toContain('決済成功まで有効化しません')
     expect(host.textContent).toContain('カードを確認して再試行')
+    expect(host.textContent).toContain('本人認証が求められた場合のみ')
   })
 
   it('追加決済確認中は再請求を促さず、期限切れなら再見積もりへ進む', async () => {
     await act(async () => { renderView({ ...addition, state: 'processing' }) })
     expect(host.textContent).toContain('決済状況を更新')
     expect(host.textContent).toContain('このボタンで新たな決済は発生しません')
+    expect(host.textContent).toContain('失敗時も次の操作をお知らせします')
     await act(async () => { renderView({ ...addition, state: 'expired' }) })
     expect(host.textContent).toContain('日割り額が変わるため、最新の料金に再同意')
     expect(host.textContent).toContain('料金を再確認する')

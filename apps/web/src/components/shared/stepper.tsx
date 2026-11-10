@@ -7,6 +7,8 @@ export interface StepperStep {
   /** 省略時は label を使う。同名の段が並ぶときだけ付ける。 */
   key?: string
   label: string
+  /** 案内用の縦並び手順で、操作名の下に表示する補足。 */
+  description?: string
   /** 1始まりの表示番号。省略時は上からの順番。 */
   order?: number
   /**
