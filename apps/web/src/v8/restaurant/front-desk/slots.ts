@@ -65,7 +65,9 @@ export function openTimes(date: string, hours: RestaurantOpeningDay[] | null, no
   const list: number[] = []
   if (periods && periods.length > 0) {
     for (const period of periods) {
-      for (let t = toMinutes(period.opensAt); t + STAY_MINUTES <= toMinutes(period.closesAt); t += 30) list.push(t)
+      const start = toMinutes(period.opensAt)
+      const close = toMinutes(period.closesAt) + (toMinutes(period.closesAt) < start ? 1440 : 0)
+      for (let t = start; t < 1440 && t + STAY_MINUTES <= close; t += 30) list.push(t)
     }
   }
   const today = toYmd(now) === date

@@ -1,6 +1,7 @@
 import { restaurantCivilTime, validRestaurantDate } from './restaurant-booking.js';
 import { closuresForRange, closureAffectsTable } from './restaurant-closures.js';
-import { reservationInstant, type RestaurantOpeningDay } from '@line-crm/shared';
+import { addDays, reservationInstant, type RestaurantOpeningDay } from '@line-crm/shared';
+import { connectedGoogleProfile, googleOpeningDay } from './restaurant-google-hours-source.js';
 
 type Interval=[number,number];
 function union(intervals:Interval[]):Interval[] {const out:Interval[]=[];for(const range of intervals.sort((a,b)=>a[0]-b[0])){const last=out.at(-1);if(last&&range[0]<=last[1])last[1]=Math.max(last[1],range[1]);else if(range[1]>range[0])out.push([...range]);}return out;}
@@ -10,10 +11,23 @@ export async function restaurantRotation(db:D1Database,storeId:string,date:strin
  if(!validRestaurantDate(date))throw new Error('invalid_date');
  const store=await db.prepare('SELECT timezone FROM rt_stores WHERE id=?').bind(storeId).first<{timezone:string}>();if(!store)throw new Error('store_missing');
  const setting=await db.prepare('SELECT hours_json FROM rt_opening_hours_settings WHERE store_id=?').bind(storeId).first<{hours_json:string}>();
+ const googleConnection=await db.prepare('SELECT status FROM rt_google_connections WHERE store_id=?').bind(storeId).first<{status:string}>();
+ const googleProfile=googleConnection?await connectedGoogleProfile(db,storeId):null;
+ const hasHours=googleConnection?Boolean(googleProfile):Boolean(setting);
  const from=restaurantCivilTime(date,0,store.timezone),to=restaurantCivilTime(date,1440,store.timezone),start=Date.parse(from),end=Date.parse(to);
- const weekday=new Date(date+'T00:00:00Z').getUTCDay(),minute=(t:string)=>Number(t.slice(0,2))*60+Number(t.slice(3));
- const periods=setting?(JSON.parse(setting.hours_json) as RestaurantOpeningDay[]).find(d=>d.weekday===weekday)?.periods??[]:null;
- const operating:Interval[]=periods?.map(p=>[Date.parse(restaurantCivilTime(date,minute(p.opensAt),store.timezone)),Date.parse(restaurantCivilTime(date,minute(p.closesAt),store.timezone))])??[];
+ const minute=(t:string)=>Number(t.slice(0,2))*60+Number(t.slice(3));
+ const localWeek=setting&&!googleConnection?JSON.parse(setting.hours_json) as RestaurantOpeningDay[]:[];
+ const previousDate=addDays(date,-1);
+ const operating:Interval[]=[previousDate,date].flatMap(openDate=>{
+  const weekday=new Date(`${openDate}T00:00:00Z`).getUTCDay();
+  const periods=googleConnection?(googleProfile?googleOpeningDay(googleProfile,openDate):null):localWeek.find(d=>d.weekday===weekday)?.periods??[];
+  return (periods??[]).flatMap(p=>{
+   const opens=minute(p.opensAt),closes=minute(p.closesAt)+(minute(p.closesAt)<opens?1440:0);
+   const a=Math.max(start,Date.parse(restaurantCivilTime(openDate,opens,store.timezone)));
+   const b=Math.min(end,Date.parse(restaurantCivilTime(openDate,closes,store.timezone)));
+   return b>a?[[a,b] as Interval]:[];
+  });
+ });
  const tables=(await db.prepare('SELECT id FROM rt_tables WHERE store_id=? AND is_active=1').bind(storeId).all<{id:string}>()).results;
  const closures=await closuresForRange(db,storeId,from,to);
  const open=new Map(tables.map(t=>[t.id,subtract(operating,closures.filter(c=>closureAffectsTable(c,t.id)).flatMap(c=>(JSON.parse(c.periods_json) as Array<{startsAt:string;endsAt:string}>).map(p=>[Date.parse(p.startsAt),Date.parse(p.endsAt)] as Interval)))]));
@@ -28,7 +42,7 @@ export async function restaurantRotation(db:D1Database,storeId:string,date:strin
  const denominator=[...open.values()].reduce((sum,x)=>sum+length(x),0),activeTables=[...open.values()].filter(x=>length(x)>0).length;
  const unmeasured=visits.filter(v=>!v.arrived_at&&(!v.departed_at||Date.parse(reservationInstant(v.departed_at))>=start)).length;
  const bookings=await db.prepare(`SELECT COUNT(*) AS total,SUM(CASE WHEN status='no_show' THEN 1 ELSE 0 END) AS no_shows FROM rt_reservations WHERE store_id=? AND status<>'cancelled' AND hold_expires_at IS NULL AND julianday(starts_at)>=julianday(?) AND julianday(starts_at)<julianday(?)`).bind(storeId,from,to).first<{total:number;no_shows:number|null}>();
- return {date,activeTables,openTableMinutes:setting?denominator/60000:null,occupiedTableMinutes:setting&&!unmeasured?[...occupied.values()].reduce((sum,x)=>sum+length(x),0)/60000:null,measuredDepartures:stay.length,totalStayMinutes:stay.reduce((a,b)=>a+b,0),departedGroups:completed.length,turnover:setting&&activeTables?completed.length/activeTables:null,
-  utilization:setting&&denominator&&!unmeasured?[...occupied.values()].reduce((sum,x)=>sum+length(x),0)/denominator:null,
+ return {date,activeTables,openTableMinutes:hasHours?denominator/60000:null,occupiedTableMinutes:hasHours&&!unmeasured?[...occupied.values()].reduce((sum,x)=>sum+length(x),0)/60000:null,measuredDepartures:stay.length,totalStayMinutes:stay.reduce((a,b)=>a+b,0),departedGroups:completed.length,turnover:hasHours&&activeTables?completed.length/activeTables:null,
+  utilization:hasHours&&denominator&&!unmeasured?[...occupied.values()].reduce((sum,x)=>sum+length(x),0)/denominator:null,
   averageStayMinutes:stay.length?stay.reduce((a,b)=>a+b,0)/stay.length:null,noShowRate:bookings?.total?(bookings.no_shows??0)/bookings.total:null,unmeasuredVisits:unmeasured};
 }

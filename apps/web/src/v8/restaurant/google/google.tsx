@@ -115,6 +115,11 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   const connected = data?.connection.status === 'connected' || data?.connection.status === 'expired' || data?.connection.status === 'no_permission'
   const requestedTab = searchParams.get('tab') as GoogleTab | null
   const tab: GoogleTab = requestedTab === 'profile' && searchParams.get('view') === 'hours' ? 'hours' : requestedTab && requestedTab in TAB_LABELS ? requestedTab : 'reviews'
+  const hoursConnected = data?.connection.status === 'connected' && Boolean(data.connection.locationName)
+  useEffect(() => {
+    if (tab === 'hours' && selectedAccountId && !accountLoading && !loading && !error && data && !hoursConnected)
+      samePageUrl.replace('/settings/sns?source=hours')
+  }, [tab, selectedAccountId, accountLoading, loading, error, data, hoursConnected, samePageUrl])
   const { allowed: canManage } = useGooglePermission('manager')
   const view = searchParams.get('view')
   const id = searchParams.get('id')
@@ -181,7 +186,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     )
   })()
 
-  if (tab === 'hours' && connected && selectedAccountId && !loading && !error) {
+  if (tab === 'hours' && hoursConnected && selectedAccountId && !loading && !error) {
     return <SaveErrorScope errors={saveErrors}><HoursPage key={selectedAccountId} accountId={selectedAccountId} tabs={googleTabs} initialMode={searchParams.get('mode')} initialDate={searchParams.get('date')} /></SaveErrorScope>
   }
 
