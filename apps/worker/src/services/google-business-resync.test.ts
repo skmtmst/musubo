@@ -119,6 +119,7 @@ beforeEach(async () => {
   errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
   testDb = createTestD1();
+  testDb.raw.prepare('UPDATE tenants SET feature_packs = ? WHERE id = ?').run('["restaurant"]', TENANT);
   calls = [];
   env = {
     DB: testDb.db,
@@ -197,11 +198,24 @@ describe('processGoogleBusinessHourlyResync', () => {
     expect(JSON.parse(row.hours_json)[1].periods).toEqual([{ opensAt: '10:00', closesAt: '19:00' }]);
   });
 
-  it('機能 restaurant_test がオフのアカウントは同期しない', async () => {
+  it('飲食店機能がオフでもGoogle営業時間を更新し、口コミと投稿は同期しない', async () => {
     await setAccountSetting(testDb.db, 'account-2', 'feature.restaurant_test', 'false');
     const result = await processGoogleBusinessHourlyResync(env, { now: NOW, fetch: googleFetch(), sleep: noSleep });
-    expect(result).toMatchObject({ reviewsSynced: 0, postsSynced: 0, skipped: 1, failed: 0 });
-    expect(calls).toHaveLength(0);
+    expect(result).toMatchObject({ reviewsSynced: 0, postsSynced: 0, skipped: 0, failed: 0 });
+    expect(calls.some(call => call.url.includes('mybusinessbusinessinformation.googleapis.com/v1/locations/222?'))).toBe(true);
+    expect(calls.some(call => call.url.includes('/reviews') || call.url.includes('/localPosts'))).toBe(false);
+    const row = testDb.raw.prepare('SELECT updated_by FROM rt_opening_hours_settings WHERE store_id=?').get('store-shibuya') as { updated_by: string };
+    expect(row.updated_by).toBe('google_business');
+  });
+
+  it('飲食店パックのない業種でもGoogle営業時間だけを定期更新する', async () => {
+    testDb.raw.prepare('UPDATE tenants SET feature_packs = ? WHERE id = ?').run('[]', TENANT);
+    const result = await processGoogleBusinessHourlyResync(env, { now: NOW, fetch: googleFetch(), sleep: noSleep });
+    expect(result).toMatchObject({ reviewsSynced: 0, postsSynced: 0, skipped: 0, failed: 0 });
+    expect(calls.some(call => call.url.includes('mybusinessbusinessinformation.googleapis.com/v1/locations/222?'))).toBe(true);
+    expect(calls.some(call => call.url.includes('/reviews') || call.url.includes('/localPosts'))).toBe(false);
+    const row = testDb.raw.prepare('SELECT updated_by FROM rt_opening_hours_settings WHERE store_id=?').get('store-shibuya') as { updated_by: string };
+    expect(row.updated_by).toBe('google_business');
   });
 
   it('1店舗の失敗が他店舗の同期を止めない', async () => {

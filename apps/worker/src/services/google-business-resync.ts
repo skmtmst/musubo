@@ -29,6 +29,7 @@ import {
 import { applyGooglePostsSync } from '../routes/restaurant-google-posts.js';
 import { getProfile } from './google-business-profile.js';
 import { syncGoogleOpeningWeek } from './restaurant-google-hours-source.js';
+import { tenantHasFeaturePack } from './tenant-features.js';
 
 const HOURLY_STALE_MS = 55 * 60 * 1000;
 const METRICS_BACKFILL_DAYS = 180;
@@ -49,6 +50,7 @@ type ResyncConnectionRow = ConnectionRow & {
   last_metrics_synced_at: string | null;
   last_profile_fetched_at: string | null;
   store_line_account_id: string | null;
+  tenant_id: string;
 };
 
 function jstDate(iso: string): string {
@@ -67,9 +69,10 @@ function isStale(lastSyncedAt: string | null, nowIso: string, staleMs: number): 
 }
 
 async function listActiveConnections(env: Env['Bindings'], storeId?: string): Promise<ResyncConnectionRow[]> {
-  const base = `SELECT c.*, s.line_account_id AS store_line_account_id, p.fetched_at AS last_profile_fetched_at
+  const base = `SELECT c.*, s.line_account_id AS store_line_account_id, o.tenant_id, p.fetched_at AS last_profile_fetched_at
        FROM rt_google_connections c
        JOIN rt_stores s ON s.id = c.store_id
+       JOIN rt_organizations o ON o.id = s.organization_id
        LEFT JOIN rt_google_profiles p ON p.store_id = c.store_id AND p.location_name = c.location_name
       WHERE c.status = 'connected' AND c.location_name IS NOT NULL AND s.status = 'active'`;
   const rows = storeId
@@ -151,28 +154,16 @@ export async function processGoogleBusinessHourlyResync(
       skipped += 1;
       continue;
     }
-    if (!(await gate.canRun(env.DB, connection.store_line_account_id, 'restaurant_test', 'google business resync'))) {
+    const syncRestaurantContent = (dueReviews || duePosts)
+      && await tenantHasFeaturePack(env.DB, connection.tenant_id, 'restaurant')
+      && await gate.canRun(env.DB, connection.store_line_account_id, 'restaurant_test', 'google business resync');
+    if (!dueProfile && !syncRestaurantContent) {
       skipped += 1;
       continue;
     }
     try {
       const accessToken = await accessTokenForConnection(env, connection);
       const options = { fetch: fetchFn, accessToken, sleep: input.sleep };
-      if (dueReviews) {
-        const result = await listAllReviews(options, connection.location_name!);
-        await upsertReviewsForEnv(env, connection.store_id, result.reviews);
-        await recordReviewSyncResult(env, connection.store_id, result);
-        reviewsSynced += 1;
-      }
-      if (duePosts) {
-        const googlePosts = await listLocalPosts(options, connection.location_name!);
-        await applyGooglePostsSync(env, connection.store_id, googlePosts);
-        await dbFor(env, connection.store_id)
-          .prepare(`UPDATE rt_google_connections SET last_posts_synced_at = ?, updated_at = ? WHERE store_id = ?`)
-          .bind(input.now, input.now, connection.store_id)
-          .run();
-        postsSynced += 1;
-      }
       if (dueProfile) {
         const profile = await getProfile(options, connection.location_name!);
         const db = dbFor(env, connection.store_id);
@@ -185,6 +176,21 @@ export async function processGoogleBusinessHourlyResync(
           profile_json=excluded.profile_json,fingerprint=excluded.fingerprint,fetched_at=excluded.fetched_at,updated_at=excluded.updated_at`)
           .bind(connection.store_id, connection.location_name, JSON.stringify({ profile, extras }), profile.fingerprint, input.now, input.now).run();
         await syncGoogleOpeningWeek(db, connection.store_id, connection.location_name!, profile);
+      }
+      if (dueReviews && syncRestaurantContent) {
+        const result = await listAllReviews(options, connection.location_name!);
+        await upsertReviewsForEnv(env, connection.store_id, result.reviews);
+        await recordReviewSyncResult(env, connection.store_id, result);
+        reviewsSynced += 1;
+      }
+      if (duePosts && syncRestaurantContent) {
+        const googlePosts = await listLocalPosts(options, connection.location_name!);
+        await applyGooglePostsSync(env, connection.store_id, googlePosts);
+        await dbFor(env, connection.store_id)
+          .prepare(`UPDATE rt_google_connections SET last_posts_synced_at = ?, updated_at = ? WHERE store_id = ?`)
+          .bind(input.now, input.now, connection.store_id)
+          .run();
+        postsSynced += 1;
       }
     } catch (error) {
       failed += 1;
