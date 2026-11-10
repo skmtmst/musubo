@@ -116,6 +116,7 @@ export default function OpsSupportV8() {
   const [stageOpen, setStageOpen] = useState(false)
   const replyRef = useRef<HTMLTextAreaElement>(null)
   const insertAt = useRef(0)
+  const replyCaretKnown = useRef(false)
   const detailRequest = useRef(0)
   const listRequest = useRef(0)
   const deepLink = useRef<string | null>(null)
@@ -197,6 +198,7 @@ export default function OpsSupportV8() {
     setDetail(res.data)
     if (options?.keepReply) return
     setReplyStage(res.data.ticket.stage)
+    replyCaretKnown.current = false
     setReply(res.data.draft?.body ?? '')
   }, [])
 
@@ -303,13 +305,20 @@ export default function OpsSupportV8() {
   const ticket = detail?.ticket ?? null
   const closed = ticket?.stage === 'closed'
   const pick = (id: string) => { deepLink.current = null; setSelectedId(id) }
-  const openTemplates = () => { insertAt.current = replyRef.current?.selectionStart ?? reply.length; setTemplateOpen(true) }
+  const openTemplates = () => { insertAt.current = replyCaretKnown.current ? insertAt.current : reply.length; setTemplateOpen(true) }
   const insertTemplate = (body: string): boolean => {
     const point = Math.min(insertAt.current, reply.length)
-    const next = `${reply.slice(0, point)}${body}${reply.slice(point)}`
+    const before = reply.slice(0, point)
+    const after = reply.slice(point)
+    const leading = before && !before.endsWith('\n') && !body.startsWith('\n') ? '\n\n' : ''
+    const trailing = after && !after.startsWith('\n') && !body.endsWith('\n') ? '\n\n' : ''
+    const next = `${before}${leading}${body}${trailing}${after}`
     if (next.length > 4000) return false
     setReply(next)
-    requestAnimationFrame(() => { replyRef.current?.focus(); replyRef.current?.setSelectionRange(point + body.length, point + body.length) })
+    const nextPoint = before.length + leading.length + body.length
+    insertAt.current = nextPoint
+    replyCaretKnown.current = true
+    requestAnimationFrame(() => { replyRef.current?.focus(); replyRef.current?.setSelectionRange(nextPoint, nextPoint) })
     return true
   }
   const proxyMenuItems = ticket ? [{ id: 'proxy-login', label: '代理ログイン', icon: <LogIn aria-hidden="true" />, disabled: busy || unknown, lockedReason: lock, onSelect: () => { if (access === 'writer') void impersonate(ticket.tenantId, setBusy, setError) } }] : []
@@ -411,6 +420,7 @@ export default function OpsSupportV8() {
                       rows={10}
                       value={reply}
                       onChange={(e) => setReply(e.target.value)}
+                      onSelect={(e) => { insertAt.current = e.currentTarget.selectionStart; replyCaretKnown.current = true }}
                       placeholder={mobile ? '返信文を入力してください。' : '返信文を入力してください。引用した内容はここで編集できます。'}
                       aria-label="返信"
                       disabled={closed || access !== 'writer'}
