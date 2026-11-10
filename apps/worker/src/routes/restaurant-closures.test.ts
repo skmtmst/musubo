@@ -47,11 +47,11 @@ let testDb: SqliteD1;
 let env: Env['Bindings'];
 
 const TENANT = '00000000-0000-4000-8000-000000000001';
-// SQLite's julianday('now') uses the wall clock even when Vitest fakes Date.
-// Keep waitlist fixtures in the future so the registration cutoff stays testable.
-const SLOT_DATE = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
-const SLOT = `${SLOT_DATE}T09:00:00.000Z`;
-const SLOT_END = `${SLOT_DATE}T11:00:00.000Z`;
+const slotDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+slotDate.setUTCHours(9, 0, 0, 0);
+const SLOT = slotDate.toISOString();
+const SLOT_END = new Date(slotDate.getTime() + 2 * 60 * 60 * 1000).toISOString();
+const SLOT_DATE = SLOT.slice(0, 10);
 
 function seedStore() {
   testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`).run(TENANT);
@@ -243,7 +243,7 @@ describe('日付で席予約を閉じる',()=>{
   const denied=await post('/api/restaurant-test/reservations/manual',reservationInput());expect(denied.status).toBe(409);expect((await denied.json() as any).code).toBe('closure_conflict');
   const hold=await post('/api/restaurant-test/reservations/holds',{...reservationInput(),holdMinutes:30});expect(hold.status).toBe(409);expect((await hold.json() as any).code).toBe('closure_conflict');
   const remaining=await post('/api/restaurant-test/reservations/manual',{...reservationInput(),tableId:undefined});expect(remaining.status).toBe(201);expect((await remaining.json() as any).data.tableId).toBe('table-2');
-  const boundary=await post('/api/restaurant-test/reservations/holds',{...reservationInput('table-1',SLOT_END,`${SLOT_DATE}T12:00:00Z`),holdMinutes:30});expect(boundary.status).toBe(201);
+  const boundary=await post('/api/restaurant-test/reservations/holds',{...reservationInput('table-1',SLOT_END,new Date(slotDate.getTime()+3*60*60*1000).toISOString()),holdMinutes:30});expect(boundary.status).toBe(201);
  });
  test('全卓の休業は待機・仮押さえ・空き判定を止める。既存待機の招待と受諾も止まる',async()=>{
   const wait=await post('/api/restaurant-test/seat-waitlist',{storeId:'store-s',startsAt:SLOT,guestCount:2,customerName:'待機'});expect(wait.status).toBe(201);

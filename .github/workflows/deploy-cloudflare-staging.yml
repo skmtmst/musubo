@@ -93,6 +93,7 @@ jobs:
       EXPECTED_GOOGLE_BUSINESS_WRITE_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_google_business_write_enabled || 'skip' }}
       GH_TOKEN: ${{ github.token }}
       WORKER_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
+      R2_CORS_API_TOKEN: ${{ secrets.CF_R2_CORS_TOKEN }}
       PAGES_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}
       D1_STAGING_DATABASE_NAME: ${{ secrets.D1_STAGING_DATABASE_NAME }}
@@ -201,6 +202,7 @@ jobs:
         if: env.DELIVERY_MODE == 'dry-run'
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
+          CLOUDFLARE_R2_CORS_WRITE_TOKEN: ${{ env.R2_CORS_API_TOKEN }}
         run: node scripts/deploy/staging-r2-cors.mjs dry-run
 
       - name: Prepare the deployed Worker source for config replay
@@ -295,6 +297,7 @@ jobs:
         if: env.DELIVERY_MODE == 'apply'
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
+          CLOUDFLARE_R2_CORS_WRITE_TOKEN: ${{ env.R2_CORS_API_TOKEN }}
         run: node scripts/deploy/staging-r2-cors.mjs apply
 
       - name: Bind the staging Cloudflare account
