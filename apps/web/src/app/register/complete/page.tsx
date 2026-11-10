@@ -9,6 +9,7 @@ import PasswordRequirements from '@/components/auth/password-requirements'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import TextLink from '@/components/shared/text-link'
 import { storeAdminSession, twoFactorChallengeHandoffPath } from '@/lib/admin-session'
 import { authRequest, confirmError, CONTACT_URL, internalAuthFailureCopy, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
@@ -36,7 +37,7 @@ function CompletePending() {
   )
 }
 
-type TokenCheck = { state: 'checking' } | { state: 'ok'; email: string; trialDays: number; companyName: string; contactName: string } | { state: 'pending' } | { state: 'bad'; message: string }
+type TokenCheck = { state: 'checking' } | { state: 'ok'; email: string; trialDays: number | null; companyName: string; contactName: string } | { state: 'pending' } | { state: 'expired'; maskedEmail: string } | { state: 'bad'; message: string }
 
 function CompleteInner() {
   const params = useSearchParams()
@@ -47,6 +48,7 @@ function CompleteInner() {
   const [messages, setMessages] = useState<Record<string, string | null>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle')
 
   useEffect(() => {
     let alive = true
@@ -54,16 +56,31 @@ function CompleteInner() {
       setCheck({ state: 'bad', message: 'この URL は正しくありません。メールの URL をそのまま開いてください' })
       return
     }
-    void authRequest<{ email: string; trialDays: number; companyName: string; contactName: string }>(`/api/auth/register/check?token=${encodeURIComponent(token)}`).then((res) => {
+    void authRequest<{ email: string; trialDays: number | null; companyName: string; contactName: string } | { maskedEmail: string; canResend: boolean }>(`/api/auth/register/check?token=${encodeURIComponent(token)}`).then((res) => {
       if (!alive) return
-      if (res.ok && res.data) setCheck({ state: 'ok', email: res.data.email, trialDays: res.data.trialDays, companyName: res.data.companyName, contactName: res.data.contactName })
+      if (res.ok && res.data && 'email' in res.data) setCheck({ state: 'ok', email: res.data.email, trialDays: res.data.trialDays, companyName: res.data.companyName, contactName: res.data.contactName })
       else if (res.code === 'approval_required') setCheck({ state: 'pending' })
+      else if (res.code === 'expired' && res.data && 'maskedEmail' in res.data && res.data.canResend) {
+        setCheck({ state: 'expired', maskedEmail: res.data.maskedEmail })
+      }
       else setCheck({ state: 'bad', message: res.error || 'この URL は使えません' })
     })
     return () => {
       alive = false
     }
   }, [token])
+
+  const resendExpired = async () => {
+    setResendState('sending')
+    setError('')
+    const res = await authRequest<{ maskedEmail: string; sent: boolean }>('/api/auth/register/resend-expired', { token })
+    if (res.ok && res.data) {
+      setResendState('sent')
+      return
+    }
+    setError(res.error ?? 'ご案内メールを送れませんでした。時間をおいて再度お試しください')
+    setResendState('idle')
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -75,7 +92,7 @@ function CompleteInner() {
     if (Object.values(next).some(Boolean)) return
     setBusy(true)
     setError('')
-    const res = await authRequest<{ tenantId: string; deviceMarker: string; sessionToken?: string; twoFactorSetup?: boolean; challengeToken?: string }>('/api/auth/register/complete', {
+    const res = await authRequest<{ tenantId: string; deviceMarker: string; newPricingFlow?: boolean; sessionToken?: string; twoFactorSetup?: boolean; challengeToken?: string }>('/api/auth/register/complete', {
       token,
       password,
       deviceMarker: readDeviceMarker(),
@@ -90,7 +107,10 @@ function CompleteInner() {
     resetAuthSelectionCleared(localStorage, sessionStorage)
     // オーナーは二段階認証が必須（N-426）。設定画面へ進み、完了後にセッションが出る。
     if (res.data.twoFactorSetup && res.data.challengeToken) {
-      window.location.assign(twoFactorChallengeHandoffPath('/login/two-factor/setup', res.data.challengeToken))
+      window.location.assign(twoFactorChallengeHandoffPath(
+        res.data.newPricingFlow ? '/login/two-factor/setup?next=musubo-pricing' : '/login/two-factor/setup',
+        res.data.challengeToken,
+      ))
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
@@ -99,19 +119,39 @@ function CompleteInner() {
       // 投げたままにすると登録中の表示で止まる。
       try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie session is sufficient */ }
     }
-    window.location.assign('/hq')
+    window.location.assign(res.data.newPricingFlow ? '/hq/onboarding/pricing' : '/hq')
   }
 
   if (check.state === 'checking') return <CompletePending />
+  if (check.state === 'expired') {
+    return <AuthCard node="xdN8H" applicationFlow="recovery" title="ログイン設定のご案内"
+      description={resendState === 'sent' ? '申込時のメールアドレスに、新しいアカウント作成リンクをお送りしました。' : 'お申し込みは承認済みです。新しいご案内を申込時のメールアドレスへお送りします。'}>
+      <div className={styles.recoveryPanel}>
+        <span className={styles.recoveryIcon} aria-hidden="true">{resendState === 'sent' ? '✓' : '!'}</span>
+        <h2>{resendState === 'sent' ? 'ご案内メールをお送りしました' : 'アカウント作成のリンクが期限切れです'}</h2>
+        <p>送信先 <strong>{check.maskedEmail}</strong></p>
+        <p>{resendState === 'sent' ? 'メールの「アカウント作成へ」から設定を続けてください。' : '送信先は申込時のアドレスに固定されています。'}</p>
+        <p>新しいリンクは送信から24時間有効です。再送後、以前のリンクは利用できません。</p>
+      </div>
+      {error ? <Notice tone="danger" message={error} /> : null}
+      {resendState !== 'sent' ? <Button type="button" variant="primary" disabled={resendState === 'sending'}
+        busy={resendState === 'sending'} busyLabel="送信しています…" className={styles.recoveryButton}
+        onClick={() => void resendExpired()}>案内メールを再送する</Button> : null}
+      <a href="/login" className={styles.login}>すでに設定を終えた方はログインへ</a>
+      <a href={CONTACT_URL} target="_blank" rel="noreferrer" className={styles.recoveryLink}>リンクを確認できない場合はお問い合わせへ</a>
+    </AuthCard>
+  }
   if (check.state === 'bad') {
     return (
-      <AuthCard node="jk88n" cardNode="oVX3x" title="本登録" description={check.message}>
-        <Button href="/register" variant="primary" className="w-full">
-          もう一度メールアドレスを入力する
-        </Button>
-        <Button href="/login" className="w-full">
-          ログインへ
-        </Button>
+      <AuthCard node="r2pk7" applicationFlow="recovery" title="ログイン設定のご案内" description="このリンクが正しくないか、すでに使われています。">
+        <div className={styles.recoveryPanel}>
+          <span className={styles.recoveryIcon} aria-hidden="true">!</span>
+          <h2>このリンクを確認できません</h2>
+          <p>安全のため、この画面では申込情報を表示しません。</p>
+          <p>まだアカウントを作成していない場合は、申込時のメールアドレスを添えてお問い合わせください。担当者が登録状況を確認します。</p>
+        </div>
+        <TextLink external href={CONTACT_URL}>お問い合わせへ</TextLink>
+        <a href="/login" className={styles.login}>すでに設定を終えた方はログインへ</a>
       </AuthCard>
     )
   }
@@ -122,7 +162,7 @@ function CompleteInner() {
         <strong>次に行うこと</strong>
         お申し込み時のメールをご確認ください。担当者からの連絡がない場合はお問い合わせください。
       </div>
-      <a href={CONTACT_URL} target="_blank" rel="noreferrer" className={styles.contact}>お問い合わせ</a>
+      <TextLink external href={CONTACT_URL}>お問い合わせ</TextLink>
       <a href="/login" className={styles.login}>ログイン画面に戻る</a>
     </AuthCard>
   }
@@ -132,7 +172,7 @@ function CompleteInner() {
       node="x73h3"
       applicationFlow="setup"
       title="利用開始の設定"
-      description={`お申し込みが承認されました。設定を完了すると${check.trialDays}日間無料でmusuboを利用できます。`}
+      description="お申し込みが承認されました。ログイン用アカウントを作成し、料金と無料期間を確認してからLINEを接続します。"
     >
       <div className={styles.approved}>✓ 承認済み　初期設定を完了してください</div>
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
@@ -149,7 +189,7 @@ function CompleteInner() {
         <AuthField label="パスワード（確認）" htmlFor="complete-confirm" error={messages.confirm}>
           <PasswordField id="complete-confirm" value={confirm} onChange={setConfirm} invalid={Boolean(messages.confirm)} autoComplete="new-password" />
         </AuthField>
-        <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="設定しています…">設定を完了してmusuboを始める
+        <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="設定しています…">アカウントを作成する
         </Button>
       </form>
     </AuthCard>

@@ -36,6 +36,24 @@ describe('配信の可否（課金の状態）', () => {
     expect((await getSendPermissionForAccount(testDb.db, 'acc-missing')).tenantId).toBe(DEFAULT_TENANT_ID);
   });
 
+  it('未払いから7日が過ぎると配信を止め、入金後は再開する', async () => {
+    const failedAt = Math.floor(Date.now() / 1000) - 8 * 24 * 60 * 60;
+    testDb.raw.prepare("UPDATE tenants SET plan_status='past_due', stripe_subscription_id='sub_active' WHERE id='tenant-active'").run();
+    testDb.raw.prepare(`INSERT INTO billing_invoices
+      (id,tenant_id,subscription_id,status,amount_due,amount_paid,currency,synced_at,created_at)
+      VALUES ('in_active','tenant-active','sub_active','open',5900,0,'jpy','2026-11-09T00:00:00Z','2026-11-01T00:00:00Z')`).run();
+    testDb.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
+      VALUES ('evt_active','invoice.payment_failed','tenant-active',?)`)
+      .run(JSON.stringify({ state: 'completed', subjectId: 'in_active', created: failedAt }));
+    expect(await getSendPermissionForAccount(testDb.db, 'acc-active')).toMatchObject({
+      allowed: false, state: 'payment_suspended',
+    });
+    testDb.raw.prepare("UPDATE tenants SET plan_status='active' WHERE id='tenant-active'").run();
+    expect(await getSendPermissionForAccount(testDb.db, 'acc-active')).toMatchObject({
+      allowed: true, state: 'active',
+    });
+  });
+
   it('同じ cron の中では統括ごとに1回だけ読む（キャッシュ）', async () => {
     const cache: SendPermissionCache = new Map();
     await getSendPermissionForAccount(testDb.db, 'acc-expired', cache);

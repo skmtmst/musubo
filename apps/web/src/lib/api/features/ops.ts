@@ -44,7 +44,8 @@ export const opsMethods = {
       list: () => fetchApi<ApiResponse<OpsApplication[]>>('/api/ops/applications'),
       get: (id: string) => fetchApi<ApiResponse<OpsApplication>>(`/api/ops/applications/${encodeURIComponent(id)}`),
       contact: (id: string, note: string) => fetchApi<ApiResponse<OpsApplication>>(`/api/ops/applications/${encodeURIComponent(id)}/contact`, { method: 'POST', body: JSON.stringify({ note }) }),
-      approve: (id: string) => fetchApi<ApiResponse<{ application: OpsApplication; mailSent: boolean }>>(`/api/ops/applications/${encodeURIComponent(id)}/approve`, { method: 'POST', body: '{}' }),
+      approve: (id: string, conditionId?: string) => fetchApi<ApiResponse<{ application: OpsApplication; mailSent: boolean }>>(`/api/ops/applications/${encodeURIComponent(id)}/approve`,
+        { method: 'POST', body: JSON.stringify(conditionId ? { conditionId } : {}) }),
       resendInvite: (id: string) => fetchApi<ApiResponse<OpsApplication>>(`/api/ops/applications/${encodeURIComponent(id)}/resend-invite`, { method: 'POST', body: '{}' }),
     },
     tenants: (params?: { q?: string; status?: string }) => {

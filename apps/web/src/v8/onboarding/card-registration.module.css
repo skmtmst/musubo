@@ -1,0 +1,21 @@
+.card { width: 100%; border: 1px solid var(--mp-color-dce5e6); border-radius: var(--mp-px-16); background: var(--mp-color-fff); padding: var(--mp-px-32); }
+.stateHeading { display: flex; align-items: flex-start; gap: var(--mp-px-20); }
+.cardIcon, .successIcon { display: grid; place-items: center; width: var(--mp-px-48); height: var(--mp-px-48); flex: 0 0 var(--mp-px-48); border-radius: 50%; background: var(--mp-color-fff1d8); color: var(--mp-color-a7650b); font-size: var(--mp-px-26); font-weight: 800; line-height: 1; }
+.successIcon { background: var(--mp-color-e1f5e8); color: var(--mp-color-087c43); }
+.stateHeading h2 { margin: 0 0 var(--mp-px-8); color: var(--mp-color-202428); font-size: var(--mp-px-22); line-height: 1.4; }
+.stateHeading p { margin: 0; color: var(--mp-color-59687b); font-size: var(--mp-px-14); line-height: 1.7; }
+.statusBox { margin: var(--mp-px-28) 0 var(--mp-px-20); border-radius: var(--mp-px-10); background: var(--mp-color-f5f7f8); padding: var(--mp-px-18) var(--mp-px-22); color: var(--mp-color-425364); font-size: var(--mp-px-14); }
+.statusBox strong { display: block; margin-bottom: var(--mp-px-10); color: var(--mp-color-202428); }
+.statusBox p { margin: var(--mp-px-7) 0; }
+.note { margin: 0; color: var(--mp-color-59687b); font-size: var(--mp-px-14); line-height: 1.7; }
+.actions { display: flex; align-items: center; justify-content: center; gap: var(--mp-px-16); margin-top: var(--mp-px-27); }
+.footer { display: flex; align-items: center; justify-content: space-between; gap: var(--mp-px-20); margin-top: var(--mp-px-21); color: var(--mp-color-59687b); font-size: var(--mp-px-13); }
+.footer p { margin: 0; line-height: 1.6; }
+@media (max-width: 700px) {
+  .card { padding: var(--mp-px-22); }
+  .stateHeading { gap: var(--mp-px-12); }
+  .cardIcon, .successIcon { width: var(--mp-px-38); height: var(--mp-px-38); flex-basis: var(--mp-px-38); font-size: var(--mp-px-21); }
+  .stateHeading h2 { font-size: var(--mp-px-18); }
+  .actions { align-items: stretch; flex-direction: column; }
+  .footer { align-items: flex-start; flex-direction: column; }
+}

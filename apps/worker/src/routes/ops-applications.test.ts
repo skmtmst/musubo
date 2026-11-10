@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import { createRegistrationApplication } from '@line-crm/db';
+import { activateMusuboPricingCondition, createMusuboPricingCondition, createRegistrationApplication } from '@line-crm/db';
+import { DEFAULT_MUSUBO_PRICE_SCHEDULE } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -55,6 +56,11 @@ describe('申込承認の運営 API', () => {
     const approved = await app(master).request(`${endpoint}/approve`, post({}), environment());
     expect(approved.status).toBe(200);
     expect(await approved.json()).toMatchObject({ data: { mailSent: true, application: { status: 'approved' } } });
+    const saved = database.raw.prepare('SELECT pricing_snapshot_json FROM registration_applications WHERE id=?')
+      .get(id) as { pricing_snapshot_json: string };
+    expect(JSON.parse(saved.pricing_snapshot_json)).toMatchObject({
+      sourceConditionId: 'normal', trialPeriod: { unit: 'days', value: 30 }, lineBasicDiscountPercent: 0,
+    });
     expect(mail.sendPlainMail).toHaveBeenCalledTimes(1);
     const message = mail.sendPlainMail.mock.calls[0]?.[1] as { body: string } | undefined;
     expect(message?.body).toContain('/register/complete?token=');
@@ -63,5 +69,34 @@ describe('申込承認の運営 API', () => {
     expect((await app(master).request(`${endpoint}/resend-invite`, post({}), environment())).status).toBe(200);
     expect(mail.sendPlainMail).toHaveBeenCalledTimes(2);
     expect(database.raw.prepare('SELECT COUNT(*) AS n FROM auth_email_tokens WHERE application_id = ? AND consumed_at IS NULL').get(id)).toEqual({ n: 1 });
+  });
+
+  it('特別条件は承認する会社と期限を照合してから固定する', async () => {
+    const id = (database.raw.prepare('SELECT id FROM registration_applications').get() as { id: string }).id;
+    await app(master).request(`/api/ops/applications/${id}/contact`, post({ note: '本人確認済み' }), environment());
+    const definition = {
+      id: 'partner-v1', version: 1, internalName: '特約店', status: 'inactive' as const,
+      trialPeriod: { unit: 'months' as const, value: 3 }, lineBasicDiscountPercent: 50,
+      discountEndsOn: null, approvalUseUntil: '2999-12-31', allowedCompanyName: '別会社',
+      schedule: { ...DEFAULT_MUSUBO_PRICE_SCHEDULE },
+    };
+    await createMusuboPricingCondition(database.db, {
+      conditionKey: 'partner', definition, codeDigest: null, validFrom: null,
+      createdBy: master.id,
+    });
+    await activateMusuboPricingCondition(database.db, definition.id);
+    expect((await app(master).request(`/api/ops/applications/${id}/approve`,
+      post({ conditionId: definition.id }), environment())).status).toBe(409);
+    expect(mail.sendPlainMail).not.toHaveBeenCalled();
+    database.raw.prepare('UPDATE registration_applications SET company_name=? WHERE id=?').run('別会社', id);
+    const approved = await app(master).request(`/api/ops/applications/${id}/approve`,
+      post({ conditionId: definition.id }), environment());
+    expect(approved.status).toBe(200);
+    const saved = database.raw.prepare('SELECT pricing_snapshot_json FROM registration_applications WHERE id=?')
+      .get(id) as { pricing_snapshot_json: string };
+    expect(JSON.parse(saved.pricing_snapshot_json)).toMatchObject({
+      sourceConditionId: definition.id, sourceVersion: 1,
+      trialPeriod: { unit: 'months', value: 3 }, lineBasicDiscountPercent: 50,
+    });
   });
 });

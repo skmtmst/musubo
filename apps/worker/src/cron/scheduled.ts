@@ -37,6 +37,7 @@ import { runScheduledOperationHealthChecks } from '../services/operations-health
 import { observeOperationDispatcher } from '../services/operation-dispatch-health.js';
 import { processOperationNotificationOutbox } from '../services/operation-notifications.js';
 import { processOperationAlertNotificationOutbox } from '../services/operation-alert-notifications.js';
+import { sweepBillingFailureNotices, sweepBillingRecoveryNotices } from '../services/billing-invoice-notifications.js';
 import { OPERATOR_NOTIFICATION_SWEEP_LIMIT, sweepOperatorNotifications } from '../services/operator-notification-dispatch.js';
 
 import { runIsolatedScheduledJobs, scheduledLane } from '../services/scheduled-job-isolation.js';
@@ -122,6 +123,116 @@ export async function scheduled(
     await processOperationAlertNotificationOutbox(env);
   } catch (error) {
     logger.error("src_index_failed");
+  }
+
+  try {
+    const result = await sweepBillingFailureNotices(env, new Date(event.scheduledTime));
+    if (result.failed > 0) logger.error('billing_invoice_notification_sweep_failed');
+  } catch {
+    logger.error('billing_invoice_notification_sweep_failed');
+  }
+
+  try {
+    const result = await sweepBillingRecoveryNotices(env, new Date(event.scheduledTime));
+    if (result.failed > 0) logger.error('billing_recovery_notification_sweep_failed');
+  } catch {
+    logger.error('billing_recovery_notification_sweep_failed');
+  }
+
+  try {
+    const { sweepMusuboContracts } = await import('../services/musubo-core-subscription.js');
+    const result = await sweepMusuboContracts(env);
+    if (result.failed > 0) logger.error('musubo_contract_sweep_failed');
+  } catch {
+    logger.error('musubo_contract_sweep_failed');
+  }
+
+  try {
+    const { sweepMusuboLineAdditions } = await import('../services/musubo-line-addition.js');
+    const result = await sweepMusuboLineAdditions(env);
+    if (result.failed > 0) logger.error('musubo_line_addition_sweep_failed');
+  } catch {
+    logger.error('musubo_line_addition_sweep_failed');
+  }
+
+  try {
+    const { sweepMusuboLineAdditionNotices } = await import('../services/musubo-line-addition-notification.js');
+    const result = await sweepMusuboLineAdditionNotices(env);
+    if (result.failed > 0) logger.error('musubo_line_addition_notice_sweep_failed');
+  } catch {
+    logger.error('musubo_line_addition_notice_sweep_failed');
+  }
+
+  try {
+    const { sweepMusuboRecurringPrices } = await import('../services/musubo-recurring-prices.js');
+    const result = await sweepMusuboRecurringPrices(env);
+    if (result.failed > 0) logger.error('musubo_recurring_prices_sweep_failed');
+  } catch {
+    logger.error('musubo_recurring_prices_sweep_failed');
+  }
+
+  try {
+    const { sweepMusuboTrialNotices } = await import('../services/musubo-trial-notification.js');
+    const result = await sweepMusuboTrialNotices(env, new Date(event.scheduledTime));
+    if (result.failed > 0) logger.error('musubo_trial_notice_sweep_failed');
+  } catch {
+    logger.error('musubo_trial_notice_sweep_failed');
+  }
+
+  try {
+    const { sweepMusuboLineRemovals } = await import('../services/musubo-line-removal.js');
+    const result = await sweepMusuboLineRemovals(env, new Date(event.scheduledTime).toISOString());
+    if (result.failed > 0) logger.error('musubo_line_removal_sweep_failed');
+  } catch {
+    logger.error('musubo_line_removal_sweep_failed');
+  }
+
+  try {
+    const { sweepMusuboLineRemovalNotices } = await import('../services/musubo-line-removal-notification.js');
+    const result = await sweepMusuboLineRemovalNotices(env);
+    if (result.failed > 0) logger.error('musubo_line_removal_notice_sweep_failed');
+  } catch {
+    logger.error('musubo_line_removal_notice_sweep_failed');
+  }
+
+  try {
+    const { sweepMusuboAnnualRenewalNotices } = await import('../services/musubo-annual-renewal-notification.js');
+    const result = await sweepMusuboAnnualRenewalNotices(env, new Date(event.scheduledTime).toISOString());
+    if (result.failed > 0) logger.error('musubo_annual_renewal_notice_sweep_failed');
+  } catch {
+    logger.error('musubo_annual_renewal_notice_sweep_failed');
+  }
+
+  try {
+    const { sweepMusuboFinalLineEnds } = await import('../services/musubo-final-line-end.js');
+    const result = await sweepMusuboFinalLineEnds(env, new Date(event.scheduledTime).toISOString());
+    if (result.failed > 0) logger.error('musubo_final_line_end_sweep_failed');
+  } catch {
+    logger.error('musubo_final_line_end_sweep_failed');
+  }
+
+  try {
+    const { sweepMusuboFinalLineNotices } = await import('../services/musubo-final-line-notification.js');
+    const result = await sweepMusuboFinalLineNotices(env);
+    if (result.failed > 0) logger.error('musubo_final_line_notice_sweep_failed');
+  } catch {
+    logger.error('musubo_final_line_notice_sweep_failed');
+  }
+
+  try {
+    const { sweepMusuboLineResumptions } = await import('../services/musubo-line-resumption.js');
+    const result = await sweepMusuboLineResumptions(env, new Date(event.scheduledTime));
+    if (result.failed > 0) logger.error('musubo_line_resumption_sweep_failed');
+  } catch {
+    logger.error('musubo_line_resumption_sweep_failed');
+  }
+
+  try {
+    const { sweepMusuboResumptionNotices } = await import('../services/musubo-resumption-notification.js');
+    const result = await sweepMusuboResumptionNotices(env, new Date(event.scheduledTime));
+    if (result.failed > 0) logger.error('musubo_resumption_notice_sweep_failed');
+  } catch {
+    logger.error('musubo_resumption_notice_sweep_failed');
   }
 
   //  公開済み運用者通知ルールの送り残しを回収する。

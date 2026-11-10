@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import {
   consumeOtherSignupTokens, createAuthEmailToken, getRegistrationApplication, listRegistrationApplications,
-  markRegistrationApplicationApproved, markRegistrationApplicationContacted,
+  approveRegistrationWithMusuboCondition, markRegistrationApplicationContacted,
   markRegistrationApplicationInviteSent, recordPlatformAudit, toJstString,
 } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -63,15 +63,28 @@ async function sendInvite(c: Context<Env>, id: string): Promise<boolean> {
   return true;
 }
 
-opsApplications.post('/api/ops/applications/:id/approve', requirePlatformAdminWrite(), async (c) => {
+opsApplications.post('/api/ops/applications/:id/approve', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const id = c.req.param('id');
   const staff = c.get('staff');
-  if (!await markRegistrationApplicationApproved(db, id, staff.id)) {
-    return c.json({ success: false, error: '連絡済みの申込だけ承認できます。読み直してください' }, 409);
+  const body = await c.req.json<unknown>().catch(() => null);
+  const conditionId = body && typeof body === 'object' && !Array.isArray(body) && 'conditionId' in body
+    ? body.conditionId : null;
+  if (conditionId !== undefined && conditionId !== null
+    && (typeof conditionId !== 'string' || conditionId.length > 100)) {
+    return c.json({ success: false, error: '利用条件を選び直してください' }, 400);
+  }
+  const snapshot = await approveRegistrationWithMusuboCondition(db, {
+    applicationId: id,
+    conditionId: typeof conditionId === 'string' ? conditionId : null,
+    actorId: staff.id,
+  });
+  if (!snapshot) {
+    return c.json({ success: false, error: '申込または利用条件の状態が変わりました。読み直してください' }, 409);
   }
   await recordPlatformAudit(db, { staffId: staff.id, staffName: staff.name,
-    action: 'application.approve', detail: { applicationId: id },
+    action: 'application.approve', detail: { applicationId: id,
+      conditionId: snapshot.sourceConditionId, conditionVersion: snapshot.sourceVersion },
     ip: clientIp(c), visibleToTenant: false });
   let mailSent = false;
   try { mailSent = await sendInvite(c, id); }

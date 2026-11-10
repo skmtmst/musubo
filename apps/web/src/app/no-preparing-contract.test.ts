@@ -117,7 +117,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(216)  // 2026-10-29 に友だち引継ぎの再開（/accounts/new/handover）と運営の申込（/ops/applications・/ops/applications/detail）の3画面を追加。2026-10-16 に飲食のコース編集（/restaurant-test/menu/edit）を追加。2026-10-16 に AI の操作の記録（/webhooks/ai-log）を追加。2026-10-16 ③-2 第3波の画面で店の比較（/hq/store-comparison）と回数券・月謝を作る（/booking/passes/new）を追加（作業役 F）。2026-10-16 に 〜 の見本のリッチメニュー（/rich-menus/sample）・統括の対応が要るもの（/hq/attention）・スタイルの初期セット（/hq/templates/starter-sets）を追加。2026-10-12 に設定のデリバリー連携（/settings/delivery、承認案 DL-1 `dF4Ov`）を追加。2026-10-11 に開発枝のお客様の見え方（/settings/customer-look）を取り込み。2026-10-10 に開発枝の編集画面3枚（/conversions/edit・/inflow-links/edit・/staff/edit）を取り込み。2026-10-09 に飲食店向けテストのデリバリー受注（/restaurant-test/delivery）を追加。2026-10-08 に V2〜管理画面 の見本 6 画面（visual-qa/friend-attributes・-v2・-v3・管理画面-combobox・管理画面-progress-filedrop・管理画面-target-missing）を撤去。2026-10-07 に提案 E-7 の来店スタンプ（/visit-stamps）、提案 E-4 予約サイト・グルメ媒体（/settings/booking-media）と E-9 統括の一括配信（/hq/broadcasts・new・detail）を追加。同日に提案 E の枠を閉じる知らせ（/restaurant-test/close-tasks）と SNS 連携（/settings/sns）を追加。情報欄の編集画面と運営専用ナレッジ（37-11）、★管理画面見本（管理画面-progress-filedrop・管理画面-combobox・管理画面-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。2026-09-28 にイベントの変更の確認・お客様表示の確認の2画面を追加（U）。同日に付与ルールの下書き編集画面を追加（R296）。2026-10-01 に ★V8 新部品の見本画面（visual-qa/v8-parts）を追加。2026-10-03 に /scenarios/new の転送画面を追加。2026-10-04 に予約からの売上（/booking/sales）を追加。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(227)
   })
 
   it('共通部品に「準備中」が1つも無い', () => {

@@ -4,33 +4,30 @@
  * 1ファイル400行）を越えたので切り出した。中身・判定は変えていない。
  * 読む側の import を変えないよう、logic.ts からそのまま出し直している。
  *
- * ①は「質問を1つずつ出して、答えに合わせて次を決める」画面。絵では10枚の状態
- * （①-0〜①-9）に分かれているが、中身は下の5問とその答えから組み立てられる。
- * Q3 は Q2 が「はい」のとき、Q5 は Q4 が「はい」のときだけ尋ねる。
+ * ①は質問を1つずつ出す。新料金の事前確認で友だち人数を尋ねるため、
+ * 旧Q3の50万人確認はこのウィザードでは尋ねない。
  */
 
-export type PrecheckKey = 'q1' | 'q2' | 'q3' | 'q4' | 'q5'
+export type PrecheckKey = 'q1' | 'q2' | 'q4' | 'q5'
 export type PrecheckYesNo = 'yes' | 'no'
 export type PrecheckUse = 'both' | 'switch' | 'try'
 export interface PrecheckAnswers {
-  q1?: PrecheckYesNo; q2?: PrecheckYesNo; q3?: PrecheckYesNo; q4?: PrecheckYesNo; q5?: PrecheckUse
+  q1?: PrecheckYesNo; q2?: PrecheckYesNo; q4?: PrecheckYesNo; q5?: PrecheckUse
 }
 /** ①で今出している面。全部答え終わると 'done'（チェック結果・①-7）。 */
 export type PrecheckAt = PrecheckKey | 'done'
 
-export const PRECHECK_ORDER: readonly PrecheckKey[] = ['q1', 'q2', 'q3', 'q4', 'q5']
+export const PRECHECK_ORDER: readonly PrecheckKey[] = ['q1', 'q2', 'q4', 'q5']
 
 export const PRECHECK_TITLES: Record<PrecheckKey, string> = {
   q1: 'Q1. LINE公式アカウントはありますか？',
   q2: 'Q2. いまの友だちを引き継ぎますか？',
-  q3: 'Q3. 友だちの数は50万人を超えていますか？',
-  q4: 'Q4. ほかのLINE配信ツールを使っていますか？',
-  q5: 'Q5. そのツールを、これからどうしますか？',
+  q4: 'Q3. ほかのLINE配信ツールを使っていますか？',
+  q5: 'Q4. そのツールを、これからどうしますか？',
 }
 export const PRECHECK_HELPS: Record<PrecheckKey, string> = {
   q1: 'お店用のLINE公式アカウントのことです。ふだんの個人のLINEとは別のものです。',
   q2: 'いまのLINE公式アカウントの友だちを、musuboで続けて使うかどうかです。',
-  q3: 'ブロックされた人を除いた、メッセージが届く友だちの数です。',
   q4: 'LINE公式アカウントにつないで、メッセージの配信や自動応答を行うツールのことです。',
   q5: 'あてはまるものを1つ選んでください。',
 }
@@ -38,7 +35,6 @@ export interface PrecheckChoice { value: string; title: string; note?: string }
 export const PRECHECK_CHOICES: Record<PrecheckKey, readonly PrecheckChoice[]> = {
   q1: [{ value: 'yes', title: 'はい、あります' }, { value: 'no', title: 'いいえ、まだありません' }],
   q2: [{ value: 'yes', title: 'はい、引き継ぎます' }, { value: 'no', title: 'いいえ、引き継ぎません' }],
-  q3: [{ value: 'yes', title: 'はい、超えています' }, { value: 'no', title: 'いいえ、超えていません' }],
   q4: [{ value: 'yes', title: '使っています' }, { value: 'no', title: '使っていません' }],
   q5: [
     { value: 'both', title: 'ほかのツールと併用する', note: 'musuboとほかのツールを、しばらく両方使います。' },
@@ -48,38 +44,35 @@ export const PRECHECK_CHOICES: Record<PrecheckKey, readonly PrecheckChoice[]> = 
 }
 
 export const PRECHECK_SUMMARY_LABELS: Record<PrecheckKey, string> = {
-  q1: 'Q1. LINE公式アカウント', q2: 'Q2. 友だちの引き継ぎ', q3: 'Q3. 友だち50万人超',
-  q4: 'Q4. ほかの配信ツール', q5: 'Q5. これからの使い方',
+  q1: 'Q1. LINE公式アカウント', q2: 'Q2. 友だちの引き継ぎ',
+  q4: 'Q3. ほかの配信ツール', q5: 'Q4. これからの使い方',
 }
 const PRECHECK_SUMMARY_VALUES: Record<PrecheckKey, Record<string, string>> = {
   q1: { yes: 'あります', no: 'ありません' },
   q2: { yes: 'はい、引き継ぎます', no: 'いいえ、引き継ぎません' },
-  q3: { yes: '超えています', no: '超えていません' },
   q4: { yes: '使っています', no: '使っていません' },
   q5: { both: 'ほかのツールと併用する', switch: 'musuboに乗り換える', try: 'まずは試してみる' },
 }
 
-/** ①の札。「質問 1」〜「質問 5」と「チェック完了」。②③の `stepLabel` は①では空を返す。 */
+/** ①の札。「質問 1」〜「質問 4」と「チェック完了」。②③の `stepLabel` は①では空を返す。 */
 export function precheckStateLabel(at: PrecheckAt): string {
   return at === 'done' ? 'チェック完了' : `質問 ${PRECHECK_ORDER.indexOf(at) + 1}`
 }
 
-/** Q3はQ2=はい、Q5はQ4=はいのときだけ尋ねる。 */
+/** 最後のツールの使い方は、ほかのツールを使う場合だけ尋ねる。 */
 export function precheckAsked(key: PrecheckKey, answers: PrecheckAnswers): boolean {
-  if (key === 'q3') return answers.q2 === 'yes'
   if (key === 'q5') return answers.q4 === 'yes'
   return true
 }
 
 /**
- * 次に出す面。未回答のときと、行き止まり（Q1=いいえ・Q3=はい）では null を返す。
+ * 次に出す面。未回答のときと、行き止まり（Q1=いいえ）では null を返す。
  * null のあいだは「次へ」を押せない＝②へ進めない。
  */
 export function precheckNext(at: PrecheckAt, answers: PrecheckAnswers): PrecheckAt | null {
   if (at === 'done') return null
   if (answers[at] === undefined) return null
   if (at === 'q1' && answers.q1 === 'no') return null
-  if (at === 'q3' && answers.q3 === 'yes') return null
   const rest = PRECHECK_ORDER.slice(PRECHECK_ORDER.indexOf(at) + 1).filter((key) => precheckAsked(key, answers))
   return rest[0] ?? 'done'
 }
@@ -149,13 +142,6 @@ export function precheckNote(at: PrecheckAt, answers: PrecheckAnswers): Precheck
       ack: { key: PRECHECK_VERIFIED_ACK, label: '認証済みアカウントであることを確認した' },
     }
   }
-  if (at === 'q3' && answers.q3 === 'yes') {
-    return {
-      tone: 'warn', title: '接続の前に、musuboへご相談ください',
-      body: '友だちが50万人を超える大きなアカウントは、切り替えのときに配信へ影響が出ることがあります。先に下のボタンからご相談ください。',
-      link: { label: 'サポートへ問い合わせる', href: '/hq/support', note: '管理画面のお問い合わせページが開きます。' },
-    }
-  }
   if (at === 'q5' && answers.q5 === 'both') {
     return {
       tone: 'warn', title: '自動の受け取りが使えるのは1つのツールだけです',
@@ -193,7 +179,7 @@ export function readPrecheckAnswers(value: unknown): PrecheckAnswers {
     raw[key] === 'yes' || raw[key] === 'no' ? raw[key] as PrecheckYesNo : undefined
   const use = raw.q5 === 'both' || raw.q5 === 'switch' || raw.q5 === 'try' ? raw.q5 as PrecheckUse : undefined
   const answers: PrecheckAnswers = {}
-  for (const key of ['q1', 'q2', 'q3', 'q4'] as const) {
+  for (const key of ['q1', 'q2', 'q4'] as const) {
     const answer = yesNo(key)
     if (answer) answers[key] = answer
   }

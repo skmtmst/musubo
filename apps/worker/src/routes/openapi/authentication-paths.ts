@@ -42,6 +42,13 @@ export const authenticationPaths = {
       responses: { '200': { description: 'Tenant and owner account created' }, '400': { description: 'Invalid or expired token' }, '409': { description: 'Account already exists' } },
     },
   },
+  '/api/auth/register/resend-expired': {
+    post: {
+      tags: ['Auth'], summary: '期限切れの承認済みアカウント作成リンクを元の宛先へ再送', security: [],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['token'], properties: { token: { type: 'string' } } } } } },
+      responses: { '200': { description: '元の申込先へ再送済み、または短時間の重複依頼' }, '404': { description: '再送できないリンク' }, '429': { description: '送信回数の上限' }, '502': { description: 'メール送信失敗' } },
+    },
+  },
   '/api/auth/password/login': {
     post: {
       tags: ['Auth'], summary: 'メールアドレスとパスワードでログイン', security: [],

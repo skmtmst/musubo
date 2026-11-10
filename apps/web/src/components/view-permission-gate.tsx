@@ -64,6 +64,15 @@ function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
   // 本人の権限が分かるまで子をマウントせず、自動下書きや読込を始めさせない。
   if (role === null) return <PagePending failed={failed} onRetry={retry} />
 
+  if ((pathname.startsWith('/hq/billing/') || pathname === '/hq/onboarding/card'
+    || pathname === '/hq/onboarding/pricing' || pathname === '/hq/onboarding/quotes')
+    && !canAdministerRole(role)) return <PageFrame kind="detail">
+    <PageHeading title={pathname === '/hq/onboarding/card' ? 'お支払い情報'
+      : pathname === '/hq/onboarding/pricing' ? '利用料金のご確認'
+        : pathname === '/hq/onboarding/quotes' ? 'お見積もりの確認' : 'お支払いの確認'} />
+    <TargetMissing kind="forbidden" title="この画面を見る権限がありません" description="お支払いの確認はオーナーか管理者に頼んでください。" backHref="/hq/billing" backLabel="請求へ" />
+  </PageFrame>
+
   // LINEアカウントの管理画面は統括の所属だけ。店舗の管理者でもURLから開けない。
   if ((pathname === '/accounts' || pathname.startsWith('/accounts/')) && staffIdentity?.accountScope !== 'all') return <PageFrame kind="detail">
     <PageHeading title={entryTitleForPath(pathname) || 'LINEアカウント'} />

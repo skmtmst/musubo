@@ -51,7 +51,6 @@ async function confirmation(answer: boolean, restored?: boolean, explicit = fals
   fireEvent.click(screen.getByRole('radio', { name: answer ? 'はい、引き継ぎます' : 'いいえ、引き継ぎません' }))
   if (answer) {
     fireEvent.click(screen.getByRole('checkbox', { name: '認証済みアカウントであることを確認した' }))
-    fireEvent.click(screen.getByRole('radio', { name: 'いいえ、超えていません' }))
   }
   fireEvent.click(screen.getByRole('radio', { name: '使っていません' }))
   fireEvent.click(screen.getByRole('button', { name: '次へ', exact: true }))
@@ -102,7 +101,7 @@ it('画面で手動オフにして戻り、事前確認を変えてもオフの�
   for (const name of ['LINEログインへ戻る', 'Webhook の設定へ戻る', 'プロバイダーIDへ戻る', 'Messaging API へ戻る', '事前確認へ戻る']) {
     fireEvent.click(screen.getByRole('button', { name }))
   }
-  for (let i = 0; i < 3; i++) fireEvent.click(screen.getByRole('button', { name: '戻る', exact: true }))
+  for (let i = 0; i < 2; i++) fireEvent.click(screen.getByRole('button', { name: '戻る', exact: true }))
   fireEvent.click(screen.getByRole('radio', { name: 'いいえ、引き継ぎません' }))
   fireEvent.click(screen.getByRole('button', { name: '戻る', exact: true }))
   fireEvent.click(screen.getByRole('radio', { name: 'はい、引き継ぎます' }))

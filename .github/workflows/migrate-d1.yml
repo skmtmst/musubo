@@ -60,7 +60,12 @@ on:
         default: ''
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: ${{ inputs.environment == 'production' && 'cloudflare-production' || 'cloudflare-staging' }}
+  queue: max
+  cancel-in-progress: false
 
 jobs:
   restore-booking-hours-20260922:
@@ -127,10 +132,13 @@ jobs:
           pnpm exec tsx scripts/recovery/booking-hours-20260922.ts apply
 
   migrate:
-    # Standalone production is read-only; all production writes belong to the parent release.
-    if: github.repository == 'skmtmst/line-harness-oss' && inputs.operation == 'migrate' && (inputs.environment == 'staging' || (inputs.environment == 'production' && inputs.mode == 'dry-run' && github.ref == 'refs/heads/main'))
+    # Staging writes use the latest integrated development SHA. Standalone production stays read-only.
+    if: >-
+      github.repository == 'skmtmst/musubo' && inputs.operation == 'migrate' &&
+      ((inputs.environment == 'staging' && github.ref == 'refs/heads/codex/development') ||
+       (inputs.environment == 'production' && inputs.mode == 'dry-run' && github.ref == 'refs/heads/main'))
     concurrency:
-      group: ${{ inputs.environment == 'production' && 'cloudflare-production' || 'migrate-d1-staging' }}
+      group: ${{ inputs.environment == 'production' && 'migrate-d1-cloudflare-production-readonly' || 'migrate-d1-staging-only' }}
       cancel-in-progress: false
     environment:
       name: ${{ inputs.environment }}
@@ -149,6 +157,29 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      - name: Require an explicitly named staging migration
+        env:
+          TARGET_MIGRATION: ${{ inputs.migration }}
+        run: |
+          test -n "$TARGET_MIGRATION" || { echo "::error::検証DBは対象ファイルを1件指定してください"; exit 1; }
+
+      - name: Acquire the shared staging lock
+        id: staging_lock
+        if: inputs.mode == 'apply'
+        run: |
+          git config user.name "NEN staging delivery"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          pnpm deploy:lock acquire staging \
+            --note "D1 migration ${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}" \
+            --remote origin
+          pnpm deploy:lock verify staging --sha "$GITHUB_SHA" --remote origin
+
+      - name: Verify latest source and published ancestry before DB write
+        if: inputs.mode == 'apply'
+        env:
+          DELIVERY_TARGET: all
+        run: node scripts/deploy/verify-staging-forward.mjs
 
       # データベース名の決め方。
       #
@@ -229,6 +260,10 @@ jobs:
           fi
 
           apply_count=$(wc -l < "$apply_file" | tr -d ' ')
+          if [ "$TARGET_MIGRATION" != '' ] && [ "$pending_count" -gt "$apply_count" ]; then
+            echo "::error::指定外の未適用マイグレーションがあります。適用順序を確認してください。"
+            exit 1
+          fi
           echo "count=$apply_count" >> "$GITHUB_OUTPUT"
           echo "total_count=$pending_count" >> "$GITHUB_OUTPUT"
           echo "未適用の総数: ${pending_count} 件 / 今回の対象: ${apply_count} 件"
@@ -310,6 +345,14 @@ jobs:
           bash scripts/deploy/apply-d1-migrations.sh \
             "$DB_NAME" "$RUNNER_TEMP/d1-pending-migrations.txt"
 
+      - name: Verify the migration is no longer pending
+        if: inputs.mode == 'apply' && steps.pending.outputs.count != '0' && steps.apply.outcome == 'success'
+        env:
+          DB_NAME: ${{ steps.db.outputs.name }}
+        run: |
+          node scripts/deploy/d1-pending-readonly.mjs "$DB_NAME" > "$RUNNER_TEMP/d1-after.json"
+          node -e 'const status = require(process.argv[1]); if (status.count !== 0) process.exit(1)' "$RUNNER_TEMP/d1-after.json"
+
       - name: Say what happened
         if: always()
         env:
@@ -332,6 +375,10 @@ jobs:
           else
             echo "$COUNT 件を当てました。上のサマリーに復元点が出ています。"
           fi
+
+      - name: Release the shared staging lock
+        if: always() && steps.staging_lock.outcome == 'success'
+        run: pnpm deploy:lock release staging --remote origin
 
   verify-operational-path:
     if: github.repository == 'skmtmst/line-harness-oss' && inputs.operation == 'verify-operational-path' && inputs.environment == 'staging' && github.ref == 'refs/heads/codex/development'

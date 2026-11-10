@@ -41,6 +41,13 @@ import { hqBillingMethods } from './features/hq-billing'
 import { hqSupportMethods } from './features/hq-support'
 import { hqBannersMethods } from './features/hq-banners'
 import { onboardingMethods } from './features/onboarding'
+import { individualQuoteMethods } from './features/individual-quotes'
+import { pricingConditionMethods } from './features/pricing-conditions'
+import { musuboOnboardingPricingMethods } from './features/musubo-onboarding-pricing'
+import { musuboLineAdditionMethods } from './features/musubo-line-addition'
+import { musuboFinalLineEndMethods } from './features/musubo-final-line-end'
+import { musuboLineRemovalMethods } from './features/musubo-line-removal'
+import { musuboLineResumptionMethods } from './features/musubo-line-resumption'
 import { accountMigrationsMethods } from './features/account-migrations'
 import { accountsMethods } from './features/accounts'
 import { conversionsMethods } from './features/conversions'
@@ -67,6 +74,13 @@ import { entryRoutesMethods } from './features/entry-routes'
 import { identityMethods } from './features/identity'
 import { adsMethods } from './features/ads'
 export const api = {
+  individualQuotes: individualQuoteMethods.individualQuotes,
+  pricingConditions: pricingConditionMethods.pricingConditions,
+  musuboOnboardingPricing: musuboOnboardingPricingMethods.musuboOnboardingPricing,
+  musuboLineAddition: musuboLineAdditionMethods.musuboLineAddition,
+  musuboFinalLineEnd: musuboFinalLineEndMethods.musuboFinalLineEnd,
+  musuboLineRemoval: musuboLineRemovalMethods.musuboLineRemoval,
+  musuboLineResumption: musuboLineResumptionMethods.musuboLineResumption,
   system: authenticationMethods.system,
   auth: authenticationMethods.auth,
   searchConsole: analyticsMethods.searchConsole,

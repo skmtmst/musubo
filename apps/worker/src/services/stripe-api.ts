@@ -1,4 +1,5 @@
 import { tracedFetch as fetch } from '@line-crm/shared/server';
+import { musuboChargeDateEpoch } from '@line-crm/shared';
 import { boundedHttpRequest } from '../lib/external-call/bounded-http.js';
 /**
  * Stripe の API を呼ぶ小さな道具。SDK は使わず fetch で叩く（Workers で軽く保つ）。
@@ -47,7 +48,7 @@ export function encodeForm(input: Record<string, FormValue>): string {
 
 export async function stripeRequest<T>(
   env: StripeEnv,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   body?: Record<string, FormValue>,
   options: { idempotencyKey?: string; fetchImpl?: typeof fetch; signal?: AbortSignal } = {},
@@ -77,7 +78,7 @@ export async function stripeRequest<T>(
   try {
     res = await boundedHttpRequest(url, { method, headers, body: payload, signal: options.signal }, { timeoutMs: 10_000, maxResponseBytes: 1024 * 1024, fetch: fetchImpl });
   } catch {
-    throw new StripeApiError(502, '決済サービスにつながりませんでした', 'network_unreachable', method === 'POST');
+    throw new StripeApiError(502, '決済サービスにつながりませんでした', 'network_unreachable', method !== 'GET');
   }
   const text = await res.text();
   let json: unknown = null;
@@ -88,7 +89,7 @@ export async function stripeRequest<T>(
   }
   if (!res.ok) {
     const error = (json as { error?: { message?: string; code?: string } } | null)?.error;
-    throw new StripeApiError(res.status, error?.message ?? `Stripe error ${res.status}`, error?.code ?? null, method === 'POST' && (res.status === 408 || res.status >= 500));
+    throw new StripeApiError(res.status, error?.message ?? `Stripe error ${res.status}`, error?.code ?? null, method !== 'GET' && (res.status === 408 || res.status >= 500));
   }
   return json as T;
 }
@@ -97,6 +98,7 @@ export interface StripeCustomer {
   id: string;
   email: string | null;
   name: string | null;
+  invoice_settings?: { default_payment_method?: string | null } | null;
 }
 
 export interface StripeCheckoutSession {
@@ -104,8 +106,17 @@ export interface StripeCheckoutSession {
   url: string | null;
   customer: string | null;
   subscription: string | null;
+  setup_intent?: string | null;
+  mode?: 'payment' | 'setup' | 'subscription';
   client_reference_id: string | null;
   metadata?: Record<string, string>;
+}
+
+export interface StripeSetupIntent {
+  id: string;
+  status: string;
+  customer: string | null;
+  payment_method: string | null;
 }
 
 export interface StripePortalSession {
@@ -124,10 +135,17 @@ export interface StripeSubscription {
   id: string;
   status: string;
   customer: string;
+  trial_end?: number | null;
+  latest_invoice?: string | null;
   current_period_end?: number;
+  current_period_start?: number;
+  cancel_at?: number | null;
   cancel_at_period_end?: boolean;
   metadata?: Record<string, string>;
-  items: { data: Array<{ id?: string; quantity?: number; price: { id: string }; current_period_end?: number }> };
+  items: { data: Array<{ id?: string; quantity?: number; current_period_start?: number; price: {
+    id: string; product?: string; unit_amount?: number | null; currency?: string;
+    tax_behavior?: string; recurring?: { interval: string } | null;
+  }; current_period_end?: number }> };
 }
 
 export interface StripeInvoicePreview {
@@ -153,6 +171,8 @@ export interface StripeInvoice {
   created: number;
   customer: string | null;
   subscription: string | null;
+  billing_reason?: string | null;
+  metadata?: Record<string, string> | null;
   charge: string | { id: string; amount_refunded: number } | null;
   period_start: number | null;
   period_end: number | null;
@@ -160,6 +180,9 @@ export interface StripeInvoice {
   hosted_invoice_url: string | null;
   invoice_pdf: string | null;
   lines?: { data: Array<{
+    id?: string;
+    amount?: number;
+    metadata?: Record<string, string> | null;
     description: string | null;
     price?: { recurring?: { interval?: string | null } | null } | null;
   }> };
@@ -176,7 +199,177 @@ export interface StripePaymentIntent {
   invoice: string | null;
 }
 
+export interface MusuboSubscriptionInput {
+  customerId: string;
+  tenantId: string;
+  productId: string;
+  purpose: 'core' | 'options';
+  interval: 'month' | 'year';
+  unitAmountYen: number;
+  firstChargeDateJst: string;
+  idempotencyKey: string;
+}
+
+function validMusuboSubscription(input: MusuboSubscriptionInput): void {
+  if (!/^cus_[A-Za-z0-9]+$/.test(input.customerId)
+    || !/^prod_[A-Za-z0-9]+$/.test(input.productId)
+    || !input.tenantId.trim()
+    || !['core', 'options'].includes(input.purpose)
+    || !['month', 'year'].includes(input.interval)
+    || !Number.isSafeInteger(input.unitAmountYen) || input.unitAmountYen < 0
+    || !/^\d{4}-\d{2}-\d{2}$/.test(input.firstChargeDateJst)
+    || !input.idempotencyKey || input.idempotencyKey.length > 255) {
+    throw new RangeError('Invalid musubo subscription request');
+  }
+}
+
 export const stripeApi = {
+  scheduleMusuboTermination: (env: StripeEnv, subscriptionId: string, endEpoch: number,
+    idempotencyKey: string, fetchImpl?: typeof fetch) => {
+    if (!/^sub_[A-Za-z0-9]+$/.test(subscriptionId) || !Number.isSafeInteger(endEpoch)
+      || endEpoch <= 0) throw new RangeError('Invalid musubo termination');
+    return stripeRequest<StripeSubscription>(env, 'POST',
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      { cancel_at: endEpoch, proration_behavior: 'none' }, { fetchImpl, idempotencyKey });
+  },
+  undoMusuboTermination: (env: StripeEnv, subscriptionId: string,
+    idempotencyKey: string, fetchImpl?: typeof fetch) => {
+    if (!/^sub_[A-Za-z0-9]+$/.test(subscriptionId)) throw new RangeError('Invalid musubo termination');
+    return stripeRequest<StripeSubscription>(env, 'POST',
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      { cancel_at: '', cancel_at_period_end: false, proration_behavior: 'none' },
+      { fetchImpl, idempotencyKey });
+  },
+  cancelMusuboSubscription: (env: StripeEnv, subscriptionId: string,
+    idempotencyKey: string, fetchImpl?: typeof fetch) => {
+    if (!/^sub_[A-Za-z0-9]+$/.test(subscriptionId)) throw new RangeError('Invalid musubo termination');
+    return stripeRequest<StripeSubscription>(env, 'DELETE',
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      { invoice_now: false, prorate: false }, { fetchImpl, idempotencyKey });
+  },
+  updateMusuboRecurringAmount: (env: StripeEnv, input: {
+    subscriptionId: string; itemId: string; productId: string;
+    interval: 'month' | 'year'; amountYen: number; idempotencyKey: string;
+  }, fetchImpl?: typeof fetch) => {
+    if (!/^sub_[A-Za-z0-9]+$/.test(input.subscriptionId)
+      || !/^si_[A-Za-z0-9]+$/.test(input.itemId)
+      || !/^prod_[A-Za-z0-9]+$/.test(input.productId)
+      || !Number.isSafeInteger(input.amountYen) || input.amountYen < 0) {
+      throw new RangeError('Invalid musubo recurring amount');
+    }
+    return stripeRequest<StripeSubscription>(env, 'POST',
+      `/v1/subscriptions/${encodeURIComponent(input.subscriptionId)}`, {
+        items: [{ id: input.itemId, price_data: {
+          currency: 'jpy', product: input.productId, unit_amount: input.amountYen,
+          tax_behavior: 'inclusive', recurring: { interval: input.interval },
+        }, quantity: 1 }],
+        proration_behavior: 'none', payment_behavior: 'error_if_incomplete',
+      }, { fetchImpl, idempotencyKey: input.idempotencyKey });
+  },
+  /** An addition invoice owns its only line item; unrelated pending items are excluded. */
+  createMusuboAdditionInvoice: (
+    env: StripeEnv,
+    input: { customerId: string; tenantId: string; additionId: string },
+    fetchImpl?: typeof fetch,
+  ) => stripeRequest<StripeInvoice>(env, 'POST', '/v1/invoices', {
+    customer: input.customerId,
+    collection_method: 'charge_automatically',
+    auto_advance: false,
+    pending_invoice_items_behavior: 'exclude',
+    currency: 'jpy',
+    metadata: { tenant_id: input.tenantId, purpose: 'musubo_addition', addition_id: input.additionId },
+  }, { fetchImpl, idempotencyKey: `musubo-addition-invoice-${input.additionId}` }),
+
+  createMusuboAdditionInvoiceItem: (
+    env: StripeEnv,
+    input: { customerId: string; invoiceId: string; additionId: string; amountYen: number; description: string },
+    fetchImpl?: typeof fetch,
+  ) => stripeRequest<{ id: string; invoice: string; amount: number }>(env, 'POST', '/v1/invoiceitems', {
+    customer: input.customerId,
+    invoice: input.invoiceId,
+    amount: input.amountYen,
+    currency: 'jpy',
+    description: input.description,
+    metadata: { addition_id: input.additionId },
+  }, { fetchImpl, idempotencyKey: `musubo-addition-item-${input.additionId}` }),
+
+  finalizeMusuboAdditionInvoice: (env: StripeEnv, invoiceId: string, additionId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeInvoice>(env, 'POST', `/v1/invoices/${encodeURIComponent(invoiceId)}/finalize`, {
+      auto_advance: false,
+    }, { fetchImpl, idempotencyKey: `musubo-addition-finalize-${additionId}` }),
+
+  payMusuboAdditionInvoice: (env: StripeEnv, invoiceId: string, additionId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeInvoice>(env, 'POST', `/v1/invoices/${encodeURIComponent(invoiceId)}/pay`, undefined,
+      { fetchImpl, idempotencyKey: `musubo-addition-pay-${additionId}` }),
+
+  retrieveInvoice: (env: StripeEnv, invoiceId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeInvoice>(env, 'GET', `/v1/invoices/${encodeURIComponent(invoiceId)}`, undefined, { fetchImpl }),
+
+  voidInvoice: (env: StripeEnv, invoiceId: string, additionId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeInvoice>(env, 'POST', `/v1/invoices/${encodeURIComponent(invoiceId)}/void`, undefined,
+      { fetchImpl, idempotencyKey: `musubo-addition-void-${additionId}` }),
+
+  listInvoiceLines: (env: StripeEnv, invoiceId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<{ data: Array<{ id: string; amount: number; metadata?: Record<string, string> | null }>; has_more: boolean }>(
+      env, 'GET', `/v1/invoices/${encodeURIComponent(invoiceId)}/lines`, { limit: 100 }, { fetchImpl }),
+
+  listCustomerSubscriptions: (
+    env: StripeEnv, customerId: string, startingAfter?: string, fetchImpl?: typeof fetch,
+  ) => stripeRequest<{ data: StripeSubscription[]; has_more: boolean }>(env, 'GET', '/v1/subscriptions', {
+    customer: customerId, status: 'all', limit: 100, starting_after: startingAfter,
+  }, { fetchImpl }),
+
+  /** 年払いの基本料金と月払いのオプションは別契約にし、同じ無料期間終了日で開始する。 */
+  createMusuboSubscription: (
+    env: StripeEnv,
+    input: MusuboSubscriptionInput,
+    fetchImpl?: typeof fetch,
+  ) => {
+    validMusuboSubscription(input);
+    const trialEndEpoch = musuboChargeDateEpoch(input.firstChargeDateJst);
+    return stripeRequest<StripeSubscription>(env, 'POST', '/v1/subscriptions', {
+      customer: input.customerId,
+      collection_method: 'charge_automatically',
+      payment_behavior: 'default_incomplete',
+      trial_end: trialEndEpoch,
+      trial_settings: { end_behavior: { missing_payment_method: 'create_invoice' } },
+      items: [{ price_data: {
+        currency: 'jpy', product: input.productId, unit_amount: input.unitAmountYen,
+        tax_behavior: 'inclusive', recurring: { interval: input.interval },
+      }, quantity: 1 }],
+      metadata: { tenant_id: input.tenantId, purpose: `musubo_${input.purpose}` },
+    }, { fetchImpl, idempotencyKey: input.idempotencyKey });
+  },
+
+  /** A restarted contract is a new generation; prepaid time is deferred, expired time bills now. */
+  createMusuboResumptionSubscription: (env: StripeEnv, input: {
+    customerId: string; tenantId: string; productId: string; purpose: 'core' | 'options';
+    interval: 'month' | 'year'; unitAmountYen: number; generation: number;
+    chargeAtEpoch?: number; idempotencyKey: string;
+  }, fetchImpl?: typeof fetch) => {
+    if (!/^cus_[A-Za-z0-9]+$/.test(input.customerId)
+      || !/^prod_[A-Za-z0-9]+$/.test(input.productId) || !input.tenantId.trim()
+      || !Number.isSafeInteger(input.generation) || input.generation < 1
+      || !Number.isSafeInteger(input.unitAmountYen) || input.unitAmountYen < 0
+      || (input.chargeAtEpoch !== undefined && (!Number.isSafeInteger(input.chargeAtEpoch)
+        || input.chargeAtEpoch <= Math.floor(Date.now() / 1000)))
+      || !input.idempotencyKey || input.idempotencyKey.length > 255) {
+      throw new RangeError('Invalid musubo resumption subscription request');
+    }
+    return stripeRequest<StripeSubscription>(env, 'POST', '/v1/subscriptions', {
+      customer: input.customerId,
+      collection_method: 'charge_automatically',
+      payment_behavior: input.chargeAtEpoch ? 'default_incomplete' : 'error_if_incomplete',
+      ...(input.chargeAtEpoch ? { trial_end: input.chargeAtEpoch,
+        trial_settings: { end_behavior: { missing_payment_method: 'create_invoice' } } } : {}),
+      items: [{ price_data: { currency: 'jpy', product: input.productId,
+        unit_amount: input.unitAmountYen, tax_behavior: 'inclusive',
+        recurring: { interval: input.interval } }, quantity: 1 }],
+      metadata: { tenant_id: input.tenantId, purpose: `musubo_${input.purpose}`,
+        resumption_generation: String(input.generation) },
+    }, { fetchImpl, idempotencyKey: input.idempotencyKey });
+  },
+
   createInvoicePreview: (
     env: StripeEnv,
     input: { subscriptionId: string; itemId: string; priceId: string; quantity: number; prorationDate: number },
@@ -214,6 +407,34 @@ export const stripeApi = {
       metadata: { tenant_id: input.tenantId, plan_key: input.planKey },
       subscription_data: { metadata: { tenant_id: input.tenantId, plan_key: input.planKey } },
     }, { fetchImpl }),
+
+  /** Card collection without a charge or a subscription. The webhook must verify the SetupIntent. */
+  createCardSetupSession: (
+    env: StripeEnv,
+    input: { customerId: string; tenantId: string; successUrl: string; cancelUrl: string },
+    fetchImpl?: typeof fetch,
+  ) => stripeRequest<StripeCheckoutSession>(env, 'POST', '/v1/checkout/sessions', {
+    mode: 'setup',
+    customer: input.customerId,
+    client_reference_id: input.tenantId,
+    currency: 'jpy',
+    payment_method_types: ['card'],
+    success_url: input.successUrl,
+    cancel_url: input.cancelUrl,
+    locale: 'ja',
+    metadata: { tenant_id: input.tenantId, purpose: 'musubo_card_setup' },
+  }, { fetchImpl }),
+
+  retrieveSetupIntent: (env: StripeEnv, setupIntentId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeSetupIntent>(env, 'GET', `/v1/setup_intents/${encodeURIComponent(setupIntentId)}`, undefined, { fetchImpl }),
+
+  retrieveCustomer: (env: StripeEnv, customerId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeCustomer>(env, 'GET', `/v1/customers/${encodeURIComponent(customerId)}`, undefined, { fetchImpl }),
+
+  setCustomerDefaultPaymentMethod: (env: StripeEnv, customerId: string, paymentMethodId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeCustomer>(env, 'POST', `/v1/customers/${encodeURIComponent(customerId)}`, {
+      invoice_settings: { default_payment_method: paymentMethodId },
+    }, { fetchImpl, idempotencyKey: `default-card-${customerId}-${paymentMethodId}` }),
 
   createPortalSession: (env: StripeEnv, input: { customerId: string; returnUrl: string }, fetchImpl?: typeof fetch) =>
     stripeRequest<StripePortalSession>(env, 'POST', '/v1/billing_portal/sessions', {

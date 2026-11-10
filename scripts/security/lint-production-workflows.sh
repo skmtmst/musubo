@@ -22,9 +22,11 @@ tar -xzf "$lint_temp/actionlint.tar.gz" -C "$lint_temp" actionlint
 # GitHubが受け付ける queue: max を固定版actionlintがまだ認識しない。
 # 値・組み合わせは check_production_workflows.py で厳密に確認する。
 "$lint_temp/actionlint" -shellcheck='' \
+  -ignore '^unexpected key "queue" for "concurrency" section\.' \
+  .github/workflows/migrate-d1.yml
+"$lint_temp/actionlint" -shellcheck='' \
   .github/workflows/migrate-d1-production.yml \
   .github/workflows/deploy-cloudflare-worker.yml \
   .github/workflows/deploy-cloudflare-admin.yml \
-  .github/workflows/migrate-d1.yml \
   .github/workflows/migrate-line-credentials.yml
 echo 'production_actionlint: PASS'

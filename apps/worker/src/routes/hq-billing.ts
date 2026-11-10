@@ -7,6 +7,8 @@ import { Hono, type Context } from 'hono'
 import {
   getStaffById,
   getTenantBilling,
+  getLatestTenantMusuboIndividualQuote,
+  getMusuboTenantBilling,
   getTenantBillingByStripeCustomer,
   prepareTenantBillingUpdate,
   prepareBillingInvoice,
@@ -28,10 +30,16 @@ import {
   planKeyForPrice,
   priceIdForPlan,
   resolveEntitlements,
+  resolveTenantEntitlements,
   type BillingInterval,
   type PlanKey,
 } from '../services/billing-plans.js';
 import { billingInvoiceInput } from '../services/billing-invoices-sync.js';
+import { getBillingPaymentFailure, getRecentBillingPaymentRecovery } from '../services/billing-payment-failure.js';
+import { musuboBillingOverview } from '../services/musubo-billing-overview.js';
+import { acceptedMusuboLineResumption } from '../services/musubo-line-resumption-review.js';
+import { processMusuboBillingEvent } from '../services/musubo-billing-webhook.js';
+import { deliverBillingRecoveryNotice, deliverCurrentBillingFailureNotice } from '../services/billing-invoice-notifications.js';
 import { StripeApiError, stripeApi, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
 
@@ -61,11 +69,33 @@ function exemptMonthlyImages(c: Context<Env>): number | undefined {
 /** 管理画面の URL。Checkout から戻る先に使う。`ADMIN_ORIGIN` の先頭。 */
 function adminOrigin(c: Context<Env>): string | null {
   const first = (c.env.ADMIN_ORIGIN ?? '').split(',').map((s) => s.trim()).find(Boolean);
-  return first ?? null;
+  if (!first) return null;
+  try {
+    const url = new URL(first);
+    return url.protocol === 'https:' && !url.username && !url.password && url.pathname === '/'
+      && !url.search && !url.hash ? url.origin : null;
+  } catch { return null; }
 }
 
 function stripeReady(c: Context<Env>): boolean {
   return Boolean(c.env.STRIPE_SECRET_KEY);
+}
+
+/** Concurrent card/checkout requests must both use the customer that won the DB claim. */
+async function stripeCustomerForTenant(c: Context<Env>, billing: TenantBilling): Promise<string> {
+  if (billing.stripe_customer_id) return billing.stripe_customer_id;
+  const staff = c.get('staff');
+  const member = staff?.id ? await getStaffById(c.env.DB, staff.id).catch(() => null) : null;
+  const customer = await stripeApi.createCustomer(c.env, {
+    name: billing.name, email: member?.email ?? null, tenantId: billing.id,
+  });
+  const claim = prepareTenantBillingUpdate(c.env.DB, billing.id, { stripe_customer_id: customer.id },
+    { sql: 'stripe_customer_id IS NULL', values: [] });
+  if (!claim) throw new Error('Stripe customer claim could not be prepared');
+  await claim.run();
+  const current = await getTenantBilling(c.env.DB, billing.id);
+  if (!current?.stripe_customer_id) throw new Error('Stripe customer claim could not be confirmed');
+  return current.stripe_customer_id;
 }
 
 function periodEndIso(subscription: Pick<StripeSubscription, 'current_period_end' | 'items'>): string | null {
@@ -107,7 +137,40 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
     const tenantId = tenantOf(c);
     const billing = await getTenantBilling(c.env.DB, tenantId);
     if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
-    const entitlements = resolveEntitlements(billing, { exemptMonthlyImages: exemptMonthlyImages(c) });
+    const musuboBilling = billing.plan_key === 'musubo'
+      ? await getMusuboTenantBilling(c.env.DB, tenantId) : null;
+    if (billing.plan_key === 'musubo' && !musuboBilling) {
+      return c.json({ success: false, error: '請求の状態を確認できません。運営にお問い合わせください' }, 503);
+    }
+    if (musuboBilling) {
+      const newPricing = await musuboBillingOverview(c.env.DB, tenantId, musuboBilling);
+      const entitlements = await resolveTenantEntitlements(c.env.DB, billing,
+        { exemptMonthlyImages: exemptMonthlyImages(c) });
+      const paymentFailure = musuboBilling.status === 'past_due'
+        ? await getBillingPaymentFailure(c.env.DB, {
+          id: tenantId, plan_status: 'past_due',
+          stripe_subscription_id: musuboBilling.core_subscription_id,
+        }) : null;
+      const state = musuboBilling.status === 'awaiting_first_line' ? 'exempt' : entitlements.state;
+      return c.json({ success: true, data: {
+        state, planKey: null, planInterval: musuboBilling.billing_interval,
+        planName: 'musubo', planStatus: state,
+        trialEndsAt: musuboBilling.first_charge_date, trialEndsLabel: null,
+        trialDaysLeft: entitlements.trialDaysLeft,
+        trialMonthlyImages: TRIAL_MONTHLY_IMAGES,
+        currentPeriodEndsAt: null, currentPeriodEndsLabel: null,
+        canSend: entitlements.canSend, canGenerate: entitlements.canGenerate,
+        blockedReason: entitlements.blockedReason, paymentFailure,
+        dataRetentionDays: DATA_RETENTION_DAYS, stripeReady: stripeReady(c),
+        portalAvailable: stripeReady(c) && Boolean(billing.stripe_customer_id),
+        plans: [], newPricing,
+      } });
+    }
+    const paymentFailure = await getBillingPaymentFailure(c.env.DB, billing).catch(() => null);
+    const entitlements = resolveEntitlements(billing, {
+      exemptMonthlyImages: exemptMonthlyImages(c),
+      paymentSuspended: paymentFailure?.state === 'suspended',
+    });
 
     // 金額は Stripe の価格が正本。取れなければ仮の表示。
     const readPrice = async (key: PlanKey, interval: BillingInterval): Promise<number | null> => {
@@ -155,6 +218,11 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
         canSend: entitlements.canSend,
         canGenerate: entitlements.canGenerate,
         blockedReason: entitlements.blockedReason,
+        paymentFailure: paymentFailure ? {
+          failedAt: paymentFailure.failedAt,
+          graceDeadlineAt: paymentFailure.graceDeadlineAt,
+          state: paymentFailure.state,
+        } : null,
         dataRetentionDays: DATA_RETENTION_DAYS,
         stripeReady: stripeReady(c),
         portalAvailable: stripeReady(c) && Boolean(billing.stripe_customer_id),
@@ -182,9 +250,32 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
   }
 });
 
+/** 未払い請求の支払い先は請求管理権限を持つ担当者だけに返す。 */
+hqBilling.get('/api/hq/billing/payment-failure', requireRole('owner', 'admin'), async (c) => {
+  c.header('Cache-Control', 'no-store');
+  const tenantId = tenantOf(c);
+  const billing = await getTenantBilling(c.env.DB, tenantId);
+  if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
+  const musubo = await getMusuboTenantBilling(c.env.DB, tenantId);
+  const current = musubo ? {
+    id: tenantId,
+    plan_status: musubo.status === 'ended' ? 'canceled' as const
+      : musubo.status === 'awaiting_first_line' ? 'exempt' as const : musubo.status,
+    stripe_subscription_id: musubo.core_subscription_id,
+    current_period_ends_at: musubo.billing_interval === 'year'
+      ? musubo.next_annual_renewal_at : musubo.next_monthly_charge_at,
+  } : billing;
+  const failure = await getBillingPaymentFailure(c.env.DB, current);
+  const data = failure ?? await getRecentBillingPaymentRecovery(c.env.DB, current);
+  return c.json({ success: true, data });
+});
+
 // 即時変更を仮定した参考額だけを取得する。契約・顧客・DBは変更しない。
 hqBilling.get('/api/hq/billing/preview', requireRole('owner', 'admin'), async (c) => {
   c.header('Cache-Control', 'no-store');
+  if (await getMusuboTenantBilling(c.env.DB, tenantOf(c))) {
+    return c.json({ success: false, error: '新しい料金条件は利用料金の画面で確認してください' }, 409);
+  }
   const plan = findPlan(c.req.query('planKey'));
   const interval = c.req.query('interval');
   if (!plan || (interval !== 'month' && interval !== 'year')) {
@@ -235,11 +326,87 @@ hqBilling.get('/api/hq/billing/preview', requireRole('owner', 'admin'), async (c
   }
 });
 
+// ================================================================ card setup (no charge or subscription)
+
+hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+  try {
+    if (!stripeReady(c)) return c.json({ success: false, error: '決済の接続設定がまだありません。運営にお問い合わせください' }, 503);
+    const origin = adminOrigin(c);
+    if (!origin) return c.json({ success: false, error: '管理画面のURLが設定されていません' }, 503);
+    const tenantId = tenantOf(c);
+    const body = await c.req.json<{ quoteId?: unknown; resumption?: unknown } | null>().catch(() => null);
+    const quoteId = body?.quoteId;
+    if (quoteId !== undefined && (typeof quoteId !== 'string' || quoteId.length > 100)) {
+      return c.json({ success: false, error: 'お見積もりを読み直してください' }, 400);
+    }
+    const latestQuote = await getLatestTenantMusuboIndividualQuote(c.env.DB, tenantId);
+    const musuboBilling = await getMusuboTenantBilling(c.env.DB, tenantId);
+    if (latestQuote && (latestQuote.status !== 'accepted' ||
+      (quoteId !== undefined && latestQuote.id !== quoteId)
+      || (musuboBilling && musuboBilling.quote_id !== latestQuote.id))) {
+      return c.json({ success: false, error: '個別見積もりへの同意を完了してください' }, 409);
+    }
+    if (quoteId !== undefined && !latestQuote) {
+      return c.json({ success: false, error: '同意済みのお見積もりが見つかりません' }, 409);
+    }
+    if (body?.resumption !== undefined && body.resumption !== true) {
+      return c.json({ success: false, error: 'カード登録の手続きが正しくありません' }, 400);
+    }
+    if (body?.resumption === true) {
+      if (quoteId !== undefined) return c.json({ success: false, error: '再開条件を読み直してください' }, 400);
+      if (!(musuboBilling?.status === 'ended' && musuboBilling.resumption_requested_at
+        && musuboBilling.resumption_offer_json && musuboBilling.resumption_consented_at)) {
+        try { await acceptedMusuboLineResumption(c.env, tenantId); }
+        catch { return c.json({ success: false, error: '再開時の料金を再確認してください' }, 409); }
+      }
+    }
+    const billing = await getTenantBilling(c.env.DB, tenantId);
+    if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
+    if (billing.plan_status === 'exempt' && !musuboBilling) {
+      return c.json({ success: false, error: 'この統括はカード登録の対象外です' }, 409);
+    }
+    if (musuboBilling && !musuboBilling.quote_id && !musuboBilling.pricing_consented_at) {
+      return c.json({ success: false, error: '料金条件を確認してからカードを登録してください' }, 409);
+    }
+
+    const customerId = await stripeCustomerForTenant(c, billing);
+    const cardReturn = body?.resumption === true ? `${origin}/hq/billing/resume/card`
+      : `${origin}/hq/onboarding/card`;
+    const session = await stripeApi.createCardSetupSession(c.env, {
+      customerId, tenantId,
+      successUrl: `${cardReturn}?setup=success${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
+      cancelUrl: `${cardReturn}?setup=cancel${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
+    });
+    if (!session.url) return c.json({ success: false, error: 'カード登録画面のURLを作れませんでした' }, 502);
+    return c.json({ success: true, data: { url: session.url } });
+  } catch (error) {
+    if (error instanceof StripeApiError) return c.json({ success: false, error: 'カード登録画面を開けませんでした。時間をおいてもう一度お試しください' }, 502);
+    throw error;
+  }
+});
+
+hqBilling.get('/api/hq/billing/card-status', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const billing = await getTenantBilling(c.env.DB, tenantOf(c));
+    if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
+    if (!billing.stripe_customer_id) return c.json({ success: true, data: { registered: false } });
+    if (!stripeReady(c)) return c.json({ success: false, error: '決済の接続設定がまだありません' }, 503);
+    const customer = await stripeApi.retrieveCustomer(c.env, billing.stripe_customer_id);
+    return c.json({ success: true, data: { registered: Boolean(customer.invoice_settings?.default_payment_method) } });
+  } catch (error) {
+    if (error instanceof StripeApiError) return c.json({ success: false, error: 'カード登録状況を確認できませんでした' }, 502);
+    throw error;
+  }
+});
+
 // ================================================================ checkout
 
 hqBilling.post('/api/hq/billing/checkout', requireRole('owner', 'admin'), inputJsonBoundary({ planKey: ['string'], interval: ['string'] }), async (c) => {
   try {
     const tenantId = tenantOf(c);
+    if (await getMusuboTenantBilling(c.env.DB, tenantId)) {
+      return c.json({ success: false, error: 'この統括には新しい料金条件が適用されています。利用料金の画面をご確認ください' }, 409);
+    }
     const body = await c.req.json<{ planKey?: string; interval?: unknown } | null>().catch(() => null);
     const plan = findPlan(body?.planKey);
     if (!plan) return inputError(c, { success: false, error: 'プランを選んでください' }, 400, ["planKey"]);
@@ -260,14 +427,7 @@ hqBilling.post('/api/hq/billing/checkout', requireRole('owner', 'admin'), inputJ
       return c.json({ success: false, error: 'すでに契約中です。プランの変更や解約は「支払い方法を管理」から行ってください' }, 409);
     }
 
-    let customerId = billing.stripe_customer_id;
-    if (!customerId) {
-      const staff = c.get('staff');
-      const member = staff?.id ? await getStaffById(c.env.DB, staff.id).catch(() => null) : null;
-      const customer = await stripeApi.createCustomer(c.env, { name: billing.name, email: member?.email ?? null, tenantId });
-      customerId = customer.id;
-      await updateTenantBilling(c.env.DB, tenantId, { stripe_customer_id: customerId });
-    }
+    const customerId = await stripeCustomerForTenant(c, billing);
 
     const session = await stripeApi.createCheckoutSession(c.env, {
       customerId,
@@ -374,14 +534,23 @@ async function resolveRefundedInvoiceId(c: Context<Env>, object: Record<string, 
   }
 }
 
-async function findTenantForEvent(c: Context<Env>, object: Record<string, unknown>): Promise<TenantBilling | null> {
+async function findTenantForEvent(c: Context<Env>, object: Record<string, unknown>, eventType: string): Promise<TenantBilling | null> {
   const metadata = (object.metadata ?? {}) as Record<string, string>;
   const byMeta = metadata.tenant_id ?? (typeof object.client_reference_id === 'string' ? object.client_reference_id : null);
   if (byMeta) {
     const tenant = await getTenantBilling(c.env.DB, byMeta);
-    if (tenant) return tenant;
+    if (tenant) {
+      const customer = stripeExpandableId(object.customer);
+      // Metadata is useful for routing, but a signed event for another Stripe customer
+      // must never update this tenant's invoices or billing state.
+      if (customer && tenant.stripe_customer_id !== customer
+        // Older Checkout sessions can be the first event to bind a customer. The
+        // subscription is retrieved and its customer verified before any write.
+        && !(eventType === 'checkout.session.completed' && object.mode !== 'setup' && !tenant.stripe_customer_id)) return null;
+      return tenant;
+    }
   }
-  const customer = typeof object.customer === 'string' ? object.customer : null;
+  const customer = stripeExpandableId(object.customer);
   return customer ? getTenantBillingByStripeCustomer(c.env.DB, customer) : null;
 }
 
@@ -412,18 +581,43 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     const refundedInvoiceId = event.type === 'charge.refunded'
       ? await resolveRefundedInvoiceId(c, object)
       : undefined;
-    const tenant = await findTenantForEvent(c, object);
+    const tenant = await findTenantForEvent(c, object, event.type);
     // 保存済みの受領記録は完了済みとして扱う。新しい記録は、業務更新と完了印を一緒に確定するまで pending に残す。
     await c.env.DB.prepare('INSERT OR IGNORE INTO billing_events (id,type,tenant_id,summary) VALUES (?,?,?,?)')
       .bind(event.id,event.type,tenant?.id ?? null,'pending').run();
     const receipt = await c.env.DB.prepare('SELECT summary FROM billing_events WHERE id=?').bind(event.id).first<{summary:string}>();
     if (receipt?.summary !== 'pending') return c.json({ success:true,data:{received:true,duplicate:true} });
+    // New-price contracts use separate core/options subscriptions. The legacy
+    // handler has one plan slot and must not acknowledge or apply those events.
+    // Keep the receipt pending until the new contract handler can reconcile it.
+    const musuboBilling = tenant ? await getMusuboTenantBilling(c.env.DB, tenant.id) : null;
+    if (tenant && musuboBilling
+      && !(event.type === 'checkout.session.completed' && object.mode === 'setup')) {
+      if (!tenant.stripe_customer_id || await processMusuboBillingEvent({
+        db: c.env.DB, event, tenantId: tenant.id,
+        customerId: tenant.stripe_customer_id, billing: musuboBilling,
+      }) === 'retry') return c.json({ success: false, error: '新料金の契約状態を確認できませんでした' }, 503);
+      if ((event.type === 'invoice.paid' || event.type === 'invoice.payment_failed')
+        && stripeExpandableId(object.id)
+        && (object.metadata as Record<string, unknown> | undefined)?.purpose !== 'musubo_addition') {
+        const invoiceId = stripeExpandableId(object.id)!;
+        const notice = (event.type === 'invoice.paid'
+          ? deliverBillingRecoveryNotice(c.env, invoiceId)
+          : deliverCurrentBillingFailureNotice(c.env, tenant.id))
+          .catch(() => logger.error('billing_invoice_notification_failed'));
+        try { c.executionCtx.waitUntil(notice); }
+        catch { await notice; }
+      }
+      return c.json({ success: true, data: { received: true } });
+    }
     const statements: D1PreparedStatement[] = [];
     let refundStatementIndex: number | undefined;
     let hasTenantWrite=false;
     const pending = {sql:"EXISTS (SELECT 1 FROM billing_events WHERE id=? AND summary='pending')",values:[event.id] as unknown[]};
     const subscriptionId = event.type.startsWith('customer.subscription.') ? stripeExpandableId(object.id)
       : stripeExpandableId(object.subscription);
+    // 請求失敗の猶予は「請求書作成日」ではなく、この請求書の最初の失敗通知から数える。
+    const subjectId = event.type.startsWith('invoice.') ? stripeExpandableId(object.id) : null;
     const created = typeof event.created === 'number' && Number.isSafeInteger(event.created) && event.created > 0 ? event.created : 0;
     const writeTenant = (patch: Parameters<typeof updateTenantBilling>[2], subscription = false) => {
       const sql = [pending.sql]; const values = [...pending.values];
@@ -436,6 +630,14 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
           sql.push('stripe_subscription_id=?'); values.push(subscriptionId);
         }
         sql.push("(stripe_customer_id IS NULL OR stripe_customer_id=?)"); values.push(stripeExpandableId(object.customer));
+        if (patch.plan_status === 'active') {
+          // 契約の状態通知が先に届いても、未払い請求が残る間は猶予状態を維持する。
+          sql.push(`NOT EXISTS (SELECT 1 FROM billing_invoices bi
+            WHERE bi.tenant_id=tenants.id AND bi.status IN ('open','uncollectible')
+              AND bi.amount_due>bi.amount_paid
+              AND (bi.subscription_id IS NULL OR bi.subscription_id=?))`);
+          values.push(subscriptionId);
+        }
         // 受領記録は到着時刻でなく、事業者の発生時刻を保持する。
         if (created) {
           sql.push(`NOT EXISTS (SELECT 1 FROM billing_events e WHERE e.tenant_id=tenants.id
@@ -448,15 +650,31 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
           sql.push("NOT (plan_status='canceled' AND stripe_subscription_id=?)"); values.push(subscriptionId);
         }
       } else if (event.type.startsWith('invoice.')) {
-        sql.push("plan_status=? AND (stripe_subscription_id IS NULL OR ? IS NULL OR stripe_subscription_id=?)");
+        // A one-off invoice for the same Stripe customer is not a subscription
+        // failure or recovery. Only the bound subscription may change access.
+        sql.push('plan_status=? AND ? IS NOT NULL AND (stripe_subscription_id IS NULL OR stripe_subscription_id=?)');
         values.push(event.type==='invoice.paid'?'past_due':'active',subscriptionId,subscriptionId);
+        if (event.type === 'invoice.paid') {
+          // 入金した請求書だけでなく、同じ契約に残る未払いも確認する。
+          sql.push(`NOT EXISTS (SELECT 1 FROM billing_invoices bi
+            WHERE bi.tenant_id=tenants.id AND bi.status IN ('open','uncollectible')
+              AND bi.amount_due>bi.amount_paid
+              AND (bi.subscription_id IS NULL OR tenants.stripe_subscription_id IS NULL
+                OR bi.subscription_id=tenants.stripe_subscription_id))`);
+        } else if (event.type === 'invoice.payment_failed') {
+          // 入金済み請求書への遅延した失敗イベントで、利用を再び止めない。
+          sql.push(`EXISTS (SELECT 1 FROM billing_invoices bi
+            WHERE bi.id=? AND bi.tenant_id=tenants.id AND bi.status='open'
+              AND bi.amount_due>bi.amount_paid)`);
+          values.push(subjectId);
+        }
       }
       const statement=prepareTenantBillingUpdate(c.env.DB,tenant!.id,patch,{sql:sql.join(' AND '),values});
       if(statement){statements.push(statement);hasTenantWrite=true;}
     };
     const finish = async () => {
-      statements.push(c.env.DB.prepare(`UPDATE billing_events SET summary=json_object('state','completed','created',?,'subscriptionId',?,'applied',${hasTenantWrite?'changes()':'0'}) WHERE id=? AND summary='pending'`)
-        .bind(created,subscriptionId,event.id));
+      statements.push(c.env.DB.prepare(`UPDATE billing_events SET summary=json_object('state','completed','created',?,'subscriptionId',?,'subjectId',?,'applied',${hasTenantWrite?'changes()':'0'}) WHERE id=? AND summary='pending'`)
+        .bind(created,subscriptionId,subjectId,event.id));
       const results = await c.env.DB.batch(statements);
       if (refundStatementIndex !== undefined && !results[refundStatementIndex]?.meta.changes) {
         logger.warn('routes_hq_billing_warn');
@@ -473,28 +691,42 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
 
     switch (event.type) {
       case 'checkout.session.completed': {
-        const subscriptionId = typeof object.subscription === 'string' ? object.subscription : null;
-        const customerId = typeof object.customer === 'string' ? object.customer : tenant.stripe_customer_id;
-        const metadata = (object.metadata ?? {}) as Record<string, string>;
-        let applied = false;
-        if (subscriptionId && stripeReady(c)) {
-          try {
-            const subscription = await stripeApi.retrieveSubscription(c.env, subscriptionId);
-            writeTenant(subscriptionPatch(c, tenant, subscription), true);
-            applied = true;
-          } catch (error) {
-            logger.warn("routes_hq_billing_warn");
+        if (object.mode === 'setup') {
+          const metadata = (object.metadata ?? {}) as Record<string, string>;
+          const customerId = stripeExpandableId(object.customer);
+          const setupIntentId = stripeExpandableId(object.setup_intent);
+          // A signed event can still refer to another customer. Never use tenant metadata alone.
+          if (metadata.purpose === 'musubo_card_setup' && metadata.tenant_id === tenant.id
+            && customerId && customerId === tenant.stripe_customer_id && setupIntentId) {
+            if (!stripeReady(c)) throw new StripeApiError(503, 'Stripe is not configured');
+            const setupIntent = await stripeApi.retrieveSetupIntent(c.env, setupIntentId);
+            if (setupIntent.status !== 'succeeded' || setupIntent.customer !== customerId || !setupIntent.payment_method) {
+              throw new StripeApiError(502, 'SetupIntent has not completed');
+            }
+            await stripeApi.setCustomerDefaultPaymentMethod(c.env, customerId, setupIntent.payment_method);
+          } else {
+            logger.warn('routes_hq_billing_warn');
           }
+          break;
         }
-        if (!applied) {
-          writeTenant({
-            plan_key: findPlan(metadata.plan_key)?.key ?? tenant.plan_key,
-            plan_status: 'active',
-            stripe_subscription_id: subscriptionId,
-            stripe_customer_id: customerId,
-            trial_ends_at: null,
-          }, true);
+        const subscriptionId = typeof object.subscription === 'string' ? object.subscription : null;
+        if (!subscriptionId || !stripeReady(c)) {
+          return c.json({ success: false, error: '契約状態を確認できませんでした' }, 503);
         }
+        let subscription: StripeSubscription;
+        try {
+          subscription = await stripeApi.retrieveSubscription(c.env, subscriptionId);
+        } catch {
+          // Keep the event pending so Stripe can retry. Checkout completion alone does not
+          // prove that the first subscription invoice succeeded.
+          logger.warn('routes_hq_billing_warn');
+          return c.json({ success: false, error: '契約状態を確認できませんでした' }, 503);
+        }
+        if (subscription.id !== subscriptionId || subscription.customer !== stripeExpandableId(object.customer)) {
+          logger.warn('routes_hq_billing_warn');
+          return c.json({ success: false, error: '契約状態を確認できませんでした' }, 503);
+        }
+        writeTenant(subscriptionPatch(c, tenant, subscription), true);
         break;
       }
       case 'customer.subscription.created':
@@ -551,6 +783,16 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
         break;
     }
     await finish();
+    if (subjectId && (event.type === 'invoice.payment_failed' || event.type === 'invoice.paid')) {
+      // 通知の失敗で決済Webhookを再適用しない。送信台帳で二重送信を防ぎ、
+      // 請求失敗の未送信分は定期ジョブでも拾う。
+      const notification = (event.type === 'invoice.paid'
+        ? deliverBillingRecoveryNotice(c.env, subjectId)
+        : deliverCurrentBillingFailureNotice(c.env, tenant.id))
+        .catch(() => logger.error('billing_invoice_notification_failed'));
+      try { c.executionCtx.waitUntil(notification); }
+      catch { await notification; }
+    }
     return c.json({ success: true, data: { received: true } });
   } catch (err) {
     throw err;

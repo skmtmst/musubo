@@ -1,0 +1,159 @@
+'use client'
+
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { PageHeading } from '@/components/templates/page-frame'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Card from '@/components/shared/card'
+import { LoaderCircle } from 'lucide-react'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useMemo, useState } from 'react'
+import { finalLineEndOption } from '@line-crm/shared'
+import styles from './last-line-end.module.css'
+
+export interface LastLineEndSchedule {
+  billingState: 'trialing' | 'active'
+  interval: 'month' | 'year'
+  trialFirstChargeAt?: string
+  nextMonthlyChargeAt?: string
+  nextAnnualRenewalAt?: string
+}
+
+interface Props {
+  lineName: string
+  schedule: LastLineEndSchedule
+  now: string
+  phase?: 'choose' | 'scheduled' | 'ending' | 'ended'
+  scheduledEndAt?: string
+  unpaidInvoiceYen?: number
+  onSchedule: (endAt: string) => Promise<void> | void
+  onEndNow: () => Promise<void> | void
+  onCancelSchedule?: () => Promise<void> | void
+  onBack: () => void
+}
+
+const day = (iso: string) => new Intl.DateTimeFormat('ja-JP', {
+  timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric',
+}).format(new Date(iso))
+const yen = (value: number) => `¥${new Intl.NumberFormat('ja-JP').format(value)}`
+
+export default function LastLineEnd({
+  lineName, schedule, now, phase = 'choose', scheduledEndAt, unpaidInvoiceYen = 0,
+  onSchedule, onEndNow, onCancelSchedule, onBack,
+}: Props) {
+  const [selection, setSelection] = useState<'scheduled' | 'immediate'>('scheduled')
+  const [confirmImmediate, setConfirmImmediate] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const saveErrors = useSaveFormErrors()
+  const option = useMemo(() => {
+    if (phase !== 'choose') return null
+    try { return finalLineEndOption(schedule, now) } catch { return null }
+  }, [schedule, now, phase])
+  const effectiveSelection = option ? selection : 'immediate'
+  const isTrial = schedule.billingState === 'trialing'
+  const dateLabel = isTrial ? '無料体験後の初回請求日' : schedule.interval === 'month' ? '次の請求日' : '次の年次更新日'
+  const chargeDate = isTrial ? schedule.trialFirstChargeAt! : schedule.interval === 'month'
+    ? schedule.nextMonthlyChargeAt! : schedule.nextAnnualRenewalAt!
+  const defaultTitle = isTrial ? '無料体験の最終日まで利用する'
+    : schedule.interval === 'month' ? '次の請求日の前日に終了する' : '年次更新日の前日に終了する'
+
+  const submit = async (action: () => Promise<void> | void) => {
+    if (busy) return
+    setBusy(true); setError('')
+    try { await action() }
+    catch (caught) { if (!saveErrors.capture(caught)) setError('手続きを完了できませんでした。時間をおいて再度お試しください。') }
+    finally { setBusy(false) }
+  }
+
+  if (phase === 'ended') return <SaveErrorScope errors={saveErrors}><div className={styles.page}>
+    <p className={styles.breadcrumb}>ホーム › アカウント › LINEの利用終了</p>
+    <PageHeading title="LINEの利用を終了しました" subtitle={`「${lineName}」の接続を停止しました。`} />
+    <section className={styles.result} aria-label="利用終了の結果">
+      <span className={styles.resultIcon} aria-hidden="true">✓</span>
+      <div><h2>有効なLINEは0個です</h2><p>アカウントと請求履歴は引き続き確認できます。</p></div>
+    </section>
+    <div className={styles.bottom}><Button type="button" variant="primary" onClick={onBack}>アカウント一覧へ</Button></div>
+  </div></SaveErrorScope>
+
+  if (phase === 'ending') return <SaveErrorScope errors={saveErrors}><div className={styles.page}>
+    <p className={styles.breadcrumb}>ホーム › アカウント › LINEの利用終了</p>
+    <PageHeading title={scheduledEndAt && Date.parse(scheduledEndAt) > Date.parse(now)
+      ? '終了予約を確認しています' : '利用終了の手続きを確認しています'}
+      subtitle="決済サービスとLINEの状態を確認中です。少し待ってから画面を再読み込みしてください。" />
+    <section className={styles.result} aria-label="利用終了の処理状況">
+      <span className={styles.resultIcon} aria-hidden="true"><LoaderCircle size={22} /></span>
+      <div><h2>「{lineName}」の{scheduledEndAt && Date.parse(scheduledEndAt) > Date.parse(now)
+        ? '終了予約を確認中' : '終了処理中'}</h2><p>確定済みの未払い分は請求対象です。</p></div>
+    </section>
+    <div className={styles.bottom}><Button type="button" variant="primary" onClick={onBack}>アカウント一覧へ</Button></div>
+  </div></SaveErrorScope>
+
+  if (phase === 'scheduled') return <SaveErrorScope errors={saveErrors}><div className={styles.page}>
+    <p className={styles.breadcrumb}>ホーム › アカウント › LINEの利用終了</p>
+    <PageHeading title="LINEの利用終了を予約しました" subtitle={`「${lineName}」は${day(scheduledEndAt!)}の前日まで利用できます。`} />
+    <section className={styles.result} aria-label="利用終了の予約内容">
+      <span className={styles.resultIcon} aria-hidden="true">✓</span>
+      <div><h2>{day(scheduledEndAt!)}に利用を終了します</h2>
+        <p>終了後の次回請求は発生しません。すでに確定した未払い分は請求対象です。</p></div>
+    </section>
+    <div className={styles.bottom}>
+      {onCancelSchedule && <Button type="button" variant="secondary" disabled={busy} onClick={() => void submit(onCancelSchedule)}>終了予約を取り消す</Button>}
+      <Button type="button" variant="primary" onClick={onBack}>アカウント一覧へ</Button>
+    </div>
+    {error && <Notice tone="danger" role="alert">{error}</Notice>}
+  </div></SaveErrorScope>
+
+  return <SaveErrorScope errors={saveErrors}><div className={styles.page}>
+    <p className={styles.breadcrumb}>ホーム › アカウント › LINEの利用終了</p>
+    <PageHeading title={confirmImmediate ? '今すぐLINEの利用を終了しますか' : '最後のLINEの利用を終了しますか'} subtitle={confirmImmediate
+      ? 'この操作を確定すると、LINEの接続と有料機能はすぐに停止します。'
+      : '利用終了日を選んでください。終了後もアカウントと請求履歴を確認できます。'} />
+
+    <div className={styles.columns}>
+      <section className={styles.card} aria-labelledby="end-choice-title">
+        <h2 id="end-choice-title">{confirmImmediate ? '終了前の最終確認' : '終了日を選択'}</h2>
+        {confirmImmediate ? <div className={styles.confirmBox}>
+          <span className={styles.warningIcon} aria-hidden="true">!</span>
+          <div><strong>「{lineName}」を今すぐ停止します</strong>
+            <p>予約配信を含む有料機能は停止し、この操作は取り消せません。お支払い済み期間の返金はありません。</p></div>
+        </div> : <RadioCardGroup className={styles.choices} legend="利用終了日">
+          {option && <>
+          <RadioCard name="last-line-end" value="scheduled" checked={selection === 'scheduled'}
+            onChange={() => setSelection('scheduled')} title={defaultTitle} height="fit"
+            note={<>{day(option.defaultEndAt)}に終了。{day(`${option.lastUsableDateJst}T12:00:00+09:00`)}まで利用できます。<br />{day(chargeDate)}の請求は発生しません。</>}>
+            <span className={styles.recommended}>推奨</span>
+          </RadioCard>
+          </>}
+          <RadioCard name="last-line-end" value="immediate" checked={effectiveSelection === 'immediate'}
+            onChange={() => setSelection('immediate')} title="今すぐ終了する" height="fit"
+            note={<>確定すると、LINEの接続と有料機能をすぐに停止します。{!isTrial && <>お支払い済み期間の返金はありません。</>}</>} />
+        </RadioCardGroup>}
+        <p className={styles.small}>有効なLINEが0個になると、有料機能は利用できなくなります。請求履歴とアカウント情報は引き続き確認できます。</p>
+      </section>
+      <Card variant="aside" padding="default" aria-labelledby="end-summary-title">
+        <h2 id="end-summary-title">利用終了のご確認</h2>
+        <dl className={styles.details}>
+          <div><dt>対象のLINE</dt><dd>{lineName}</dd></div>
+          {chargeDate && <div><dt>{dateLabel}</dt><dd>{day(chargeDate)}</dd></div>}
+          <div><dt>利用できる最終日</dt><dd>{confirmImmediate || effectiveSelection === 'immediate' ? '今すぐ終了' : day(`${option!.lastUsableDateJst}T12:00:00+09:00`)}</dd></div>
+          <div><dt>終了後の有効LINE</dt><dd>0個</dd></div>
+          <div><dt>確定済みの未払い</dt><dd>{yen(unpaidInvoiceYen)}</dd></div>
+        </dl>
+        <p className={styles.summaryNote}>終了日以降の新しい請求はありません。すでに確定した未払い分は残ります。</p>
+      </Card>
+    </div>
+    {error && <Notice tone="danger" role="alert">{error}</Notice>}
+    <div className={styles.bottom}>
+      <Button type="button" variant="secondary" onClick={confirmImmediate ? () => setConfirmImmediate(false) : onBack}>戻る</Button>
+      <Button type="button" variant={confirmImmediate ? 'danger' : 'primary'} busy={busy} busyLabel="処理中…"
+        onClick={() => {
+          if (confirmImmediate) void submit(onEndNow)
+          else if (effectiveSelection === 'immediate') setConfirmImmediate(true)
+          else void submit(() => onSchedule(option!.defaultEndAt))
+        }}>
+        {confirmImmediate ? '今すぐ利用を終了する' : effectiveSelection === 'immediate' ? '終了内容を確認する' : 'この内容で終了を予約する'}
+      </Button>
+    </div>
+  </div></SaveErrorScope>
+}

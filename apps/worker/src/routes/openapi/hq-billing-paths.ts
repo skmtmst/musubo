@@ -7,6 +7,16 @@ export const hqBillingPaths = {
       responses: { '200': { description: 'Tenant billing summary and plan entitlements' }, '404': { description: 'Tenant not found' } },
     },
   },
+  '/api/hq/billing/payment-failure': {
+    get: {
+      tags: ['HQ Billing'], summary: '未払い請求の猶予・支払い先、または直近の支払い復旧を取得',
+      responses: {
+        '200': { description: '未払い請求、直近7日以内の復旧、またはnull。請求先URLはStripeの請求書ドメインに限定する' },
+        '403': { description: 'Owner or admin role required' },
+        '404': { description: 'Tenant not found' },
+      },
+    },
+  },
   '/api/hq/billing/preview': {
     get: {
       tags: ['HQ Billing'], summary: 'プラン変更の参考額を取得（契約・DBは変更しない）',
@@ -47,6 +57,18 @@ export const hqBillingPaths = {
       tags: ['HQ Billing'], summary: 'Stripe Checkoutの申込URLを作成',
       requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['planKey'], properties: { planKey: { type: 'string', enum: ['light', 'standard', 'pro'] } } } } } },
       responses: { '200': { description: 'Checkout URL' }, '400': { description: 'Invalid plan' }, '403': { description: 'Owner role required' }, '409': { description: 'Already subscribed or billing exempt' }, '503': { description: 'Stripe or price configuration unavailable' } },
+    },
+  },
+  '/api/hq/billing/card-setup': {
+    post: {
+      tags: ['HQ Billing'], summary: '請求を始めずにStripeのカード登録画面を開く',
+      responses: { '200': { description: 'Setup-mode Checkout URL' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Tenant not found' }, '409': { description: 'Billing exempt' }, '502': { description: 'Stripe API unavailable' }, '503': { description: 'Stripe configuration unavailable' } },
+    },
+  },
+  '/api/hq/billing/card-status': {
+    get: {
+      tags: ['HQ Billing'], summary: 'カード登録済みかをStripeから確認する（カード情報は返さない）',
+      responses: { '200': { description: 'Card registration boolean' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Tenant not found' }, '502': { description: 'Stripe API unavailable' } },
     },
   },
   '/api/hq/billing/portal': {

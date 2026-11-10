@@ -33,6 +33,10 @@ const dbMocks = {
   getAccountSetting: vi.fn(),
   setAccountSetting: vi.fn(),
   getStaffById: vi.fn(),
+  getTenantBilling: vi.fn(),
+  getMusuboTenantBilling: vi.fn(),
+  musuboLineConnectionAllowed: vi.fn(async () => 'legacy'),
+  activateFirstMusuboLine: vi.fn(),
   getStaffAccountScopeIds: vi.fn(),
   CredentialEncryptionKeyError: class CredentialEncryptionKeyError extends Error {},
   LineAccountRevisionConflictError: class LineAccountRevisionConflictError extends Error {},
@@ -65,7 +69,7 @@ vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: 
 
 type TestEnv = {
   Variables: { staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean; assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean; tenantId?: string | null } };
-  Bindings: { DB: D1Database };
+  Bindings: { DB: D1Database; STRIPE_PRODUCT_MUSUBO_CORE: string; STRIPE_PRODUCT_MUSUBO_OPTIONS: string };
 };
 
 // 一意性の検証は既定で未検出とし、重複を試す場合だけ firstResult を変える。
@@ -88,7 +92,7 @@ function setupApp(
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
     c.set('staff', { id: 'test-staff', name: 'Test', role, readOnly: false, ...staffOverride });
-    c.env = { DB: dbStub };
+    c.env = { DB: dbStub, STRIPE_PRODUCT_MUSUBO_CORE: 'prod_test', STRIPE_PRODUCT_MUSUBO_OPTIONS: 'prod_options' };
     // 大事な操作の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
     c.req.raw.headers.set('x-step-up-token', 'test-step-up');
     await next();
@@ -171,6 +175,8 @@ beforeEach(() => {
   lineClientMocks.getFollowersInsight.mockReset();
   lineClientMocks.getFollowerIds.mockReset();
   dbMocks.getAccountSetting.mockResolvedValue(null);
+  dbMocks.musuboLineConnectionAllowed.mockResolvedValue('legacy');
+  dbMocks.getMusuboTenantBilling.mockResolvedValue(null);
   dbMocks.getLineAccountFoldersByAccountIds.mockResolvedValue({});
   dbMocks.getLineAccountTag.mockResolvedValue({id:'folder-1'});
   dbMocks.listLineAccountTags.mockResolvedValue([{id:'tag-own',tenant_id:'tenant-1'}]);
@@ -235,6 +241,21 @@ beforeEach(() => {
     if (url.endsWith('/v2/bot/message/quota')) return Response.json({ type: 'limited', value: 200 });
     return new Response(null, { status: 404 });
   }));
+});
+
+test.each([
+  ['/api/line-accounts/connect', 'requires_payment'],
+  ['/api/line-accounts', 'requires_payment'],
+  ['/api/line-accounts/connect', 'first'],
+  ['/api/line-accounts', 'first'],
+] as const)('new pricing gate blocks unpaid LINE connection: %s / %s', async (path, state) => {
+  dbMocks.musuboLineConnectionAllowed.mockResolvedValue(state);
+  if (state === 'first') dbMocks.getTenantBilling.mockResolvedValue({ stripe_customer_id: null });
+  const response = await setupApp('owner').request(path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+  });
+  expect(response.status).toBe(409);
+  expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
 });
 
 describe('LINE account default and archive lifecycle', () => {

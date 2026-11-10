@@ -175,6 +175,7 @@ const GUARDED = [
   'v8/restaurant/inventory/stock.tsx',
   'v8/restaurant/inventory/rules.tsx',
   'v8/hq/support.tsx',
+  'v8/onboarding/individual-quote-inquiry.tsx',
   'v8/hq/support-detail.tsx',
   /* 2026-10-07：src/v8 に一から書いた画面（まとめの取り込みで見張りの対象に入った）。それぞれ自分で useUnsavedGuard と離脱確認を持つ。 */
   'v8/tag-edit/search-edit.tsx',
@@ -305,6 +306,7 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'v8/hq/musubo-line-removal-dialog.tsx': '終了方法のラジオ選択はサーバーへ保存しない確認中の選択。閉じてもLINEの終了予約や利用状態は変更されず、確定ボタンでのみ操作する。',
   'components/shared/managed-folder-panel.tsx': '共通フォルダ列は追加窓を開く操作を既存の未保存確認へ委ねる。名前・色の入力は子窓が持ち、各呼び出し元での画面離脱は別途確認する。',
   'components/shared/inline-edit.tsx': '共有入力部品であり独立した画面ではない。保存前の値を保持するオプションは呼び出し側へ状態を通知し、紹介者画面では同画面の番兵が守る。他の利用箇所は別途点検する。',
   'v8/events/list.tsx': 'イベント詳細の名前は use-inline-detail-guard.tsx が保護する。検索・絞り込みは表示条件で、その他の窓は別途確認する。',

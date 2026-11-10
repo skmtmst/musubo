@@ -117,6 +117,8 @@ export interface LineAccountCredentialHealth {
 }
 
 export interface CreateLineAccountInput {
+  /** Paid musubo additions remain invisible to runtime until recurring prices reconcile. */
+  initialActive?: boolean;
   createdByStaffId?: string | null;
   channelId: string;
   name: string;

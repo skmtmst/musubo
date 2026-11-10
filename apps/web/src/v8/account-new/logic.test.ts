@@ -54,13 +54,10 @@ describe('LINEアカウントを登録（★V8）の小さな計算', () => {
 })
 
 describe('①事前確認（v07 p6zMkA）の出しわけ', () => {
-  it('Q3はQ2=はいのときだけ、Q5はQ4=はいのときだけ尋ねる', () => {
+  it('友だち人数の質問はなく、他ツールの使い方は利用者だけに尋ねる', () => {
     expect(precheckAsked('q1', {})).toBe(true)
     expect(precheckAsked('q2', {})).toBe(true)
     expect(precheckAsked('q4', {})).toBe(true)
-    expect(precheckAsked('q3', {})).toBe(false)
-    expect(precheckAsked('q3', { q2: 'no' })).toBe(false)
-    expect(precheckAsked('q3', { q2: 'yes' })).toBe(true)
     expect(precheckAsked('q5', {})).toBe(false)
     expect(precheckAsked('q5', { q4: 'no' })).toBe(false)
     expect(precheckAsked('q5', { q4: 'yes' })).toBe(true)
@@ -70,22 +67,19 @@ describe('①事前確認（v07 p6zMkA）の出しわけ', () => {
     expect(precheckNext('q1', { q1: 'yes' })).toBe('q2')
     expect(precheckNext('q2', { q1: 'yes', q2: 'no' })).toBe('q4')
     expect(precheckNext('q4', { q1: 'yes', q2: 'no', q4: 'no' })).toBe('done')
-    // 引き継ぐ・ほかのツールを使う、と答えたときは Q3・Q5 も尋ねる。
-    expect(precheckNext('q2', { q2: 'yes' })).toBe('q3')
-    expect(precheckNext('q3', { q2: 'yes', q3: 'no' })).toBe('q4')
+    // 引き継ぐ場合も人数を再質問せず、ほかのツールの有無へ進む。
+    expect(precheckNext('q2', { q2: 'yes' })).toBe('q4')
     expect(precheckNext('q4', { q4: 'yes' })).toBe('q5')
     expect(precheckNext('q5', { q4: 'yes', q5: 'both' })).toBe('done')
   })
 
-  it('答えていない・行き止まり（Q1いいえ・Q3はい）では次の面を返さない＝先へ進めない', () => {
+  it('答えていない・行き止まり（Q1いいえ）では先へ進めない', () => {
     expect(precheckNext('q1', {})).toBeNull()
     expect(precheckNext('q2', { q1: 'yes' })).toBeNull()
     expect(precheckNext('q1', { q1: 'no' })).toBeNull()
-    expect(precheckNext('q3', { q2: 'yes', q3: 'yes' })).toBeNull()
     expect(precheckNext('done', { q1: 'yes' })).toBeNull()
     expect(precheckBlocked('q1', {}, {})).toBe(true)
     expect(precheckBlocked('q1', { q1: 'no' }, {})).toBe(true)
-    expect(precheckBlocked('q3', { q2: 'yes', q3: 'yes' }, {})).toBe(true)
     expect(precheckBlocked('q1', { q1: 'yes' }, {})).toBe(false)
     expect(precheckBlocked('done', { q1: 'yes' }, {})).toBe(false)
   })
@@ -101,12 +95,9 @@ describe('①事前確認（v07 p6zMkA）の出しわけ', () => {
     expect(precheckBlocked('q2', { q2: 'no' }, {})).toBe(false)
   })
 
-  it('案内のリンクは、外のページだけ別タブ。相談は管理画面の中の画面へ', () => {
+  it('案内のリンクは外のページだけ別タブで開く', () => {
     expect(precheckNote('q1', { q1: 'no' })?.link).toMatchObject({ href: 'https://manager.line.biz/', external: true })
     expect(precheckNote('q2', { q2: 'yes' })?.link).toMatchObject({ href: 'https://www.lycbiz.com/jp/service/line-official-account/account-type/', external: true })
-    const support = precheckNote('q3', { q2: 'yes', q3: 'yes' })?.link
-    expect(support?.href).toBe('/hq/support')
-    expect(support?.external).toBeUndefined()
     // Q5は案内だけでリンクを持たない（3つとも文を出す）。
     for (const answer of ['both', 'switch', 'try'] as const) {
       const note = precheckNote('q5', { q4: 'yes', q5: answer })
@@ -121,8 +112,7 @@ describe('①事前確認（v07 p6zMkA）の出しわけ', () => {
     expect(precheckBack('q2', answers)).toBe('q1')
     expect(precheckBack('q4', answers)).toBe('q2')
     expect(precheckBack('done', answers)).toBe('q4')
-    // Q3を尋ねた道では、Q4の前はQ3。
-    expect(precheckBack('q4', { q2: 'yes', q3: 'no' })).toBe('q3')
+    expect(precheckBack('q4', { q2: 'yes' })).toBe('q2')
   })
 
   it('答えの一覧は答えた質問だけ出す', () => {
@@ -136,7 +126,7 @@ describe('①事前確認（v07 p6zMkA）の出しわけ', () => {
 
   it('札は「質問 n」。最後だけ「チェック完了」で、結果は4項目', () => {
     expect(precheckStateLabel('q1')).toBe('質問 1')
-    expect(precheckStateLabel('q5')).toBe('質問 5')
+    expect(precheckStateLabel('q5')).toBe('質問 4')
     expect(precheckStateLabel('done')).toBe('チェック完了')
     expect(PRECHECK_RESULT.map((item) => item.title)).toEqual(['用意するもの', '接続後に変わること', '作り直すもの', 'かかる時間'])
     for (const item of PRECHECK_RESULT) expect(item.body.length).toBeGreaterThan(0)
@@ -147,7 +137,7 @@ describe('①事前確認（v07 p6zMkA）の出しわけ', () => {
     expect(readPrecheckAnswers({ q5: 'zzz' })).toEqual({})
     expect(readPrecheckAnswers(null)).toEqual({})
     expect(readPrecheckAt('q3', {})).toBe('q1')
-    expect(readPrecheckAt('q3', { q2: 'yes' })).toBe('q3')
+    expect(readPrecheckAt('q3', { q2: 'yes' })).toBe('q1')
     expect(readPrecheckAt('done', {})).toBe('done')
     expect(readPrecheckAt('zzz', {})).toBe('q1')
   })

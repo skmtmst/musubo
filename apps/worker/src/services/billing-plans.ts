@@ -1,5 +1,7 @@
-import type { TenantBilling } from '@line-crm/db';
+import { getMusuboTenantBilling, type TenantBilling, type MusuboTenantBillingRecord } from '@line-crm/db';
 import type { FeatureEntitlementKey } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
+import { getBillingPaymentFailure } from './billing-payment-failure.js';
 
 /**
  * 金額は Stripe の価格を正本とし、取得できる場合は画面の仮表示より優先する。課金状態の意味は migration 291 を参照する。
@@ -123,7 +125,7 @@ export function priceIdForPlan(
   return id || null;
 }
 
-export type EntitlementState = 'exempt' | 'trialing' | 'active' | 'past_due' | 'trial_expired' | 'canceled';
+export type EntitlementState = 'exempt' | 'trialing' | 'active' | 'past_due' | 'payment_suspended' | 'trial_expired' | 'canceled';
 
 export interface Entitlements {
   state: EntitlementState;
@@ -153,12 +155,12 @@ function parseDate(value: string | null): Date | null {
  * - exempt: 何も止めない（運営・移行前の統括）
  * - trialing: 期限内なら全部使える。過ぎたら trial_expired として止める
  * - active: 全部使える
- * - past_due: 止めない。案内だけ（Stripe が再試行している間に止めると、支払えば戻る人まで止まる）
+ * - past_due: 請求失敗から7日間は使える。期限後だけ配信と生成を止める
  * - canceled: 配信と生成を止め、閲覧はできる
  */
 export function resolveEntitlements(
   billing: Pick<TenantBilling, 'plan_key' | 'plan_status' | 'trial_ends_at'> | null,
-  options: { exemptMonthlyImages?: number; now?: Date } = {},
+  options: { exemptMonthlyImages?: number; now?: Date; paymentSuspended?: boolean } = {},
 ): Entitlements {
   const now = options.now ?? new Date();
   const exemptImages = options.exemptMonthlyImages ?? EXEMPT_MONTHLY_IMAGES;
@@ -184,7 +186,9 @@ export function resolveEntitlements(
 
   if (!billing || billing.plan_status === 'exempt') return allowed('exempt', exemptImages);
   if (billing.plan_status === 'active') return allowed('active', plan?.monthlyImages ?? exemptImages);
-  if (billing.plan_status === 'past_due') return allowed('past_due', plan?.monthlyImages ?? exemptImages);
+  if (billing.plan_status === 'past_due') return options.paymentSuspended
+    ? blocked('payment_suspended', '未払いのお支払いから7日が経過したため、配信とバナー生成を一時停止しています。請求画面からお支払いを完了すると再開します')
+    : allowed('past_due', plan?.monthlyImages ?? exemptImages);
   if (billing.plan_status === 'canceled') {
     return blocked('canceled', '契約が終了しているため、配信とバナー生成は止まっています。課金プランからプランを選ぶと再開します');
   }
@@ -195,6 +199,69 @@ export function resolveEntitlements(
     return allowed('trialing', TRIAL_MONTHLY_IMAGES, daysLeft);
   }
   return blocked('trial_expired', '無料トライアルが終了したため、配信とバナー生成は止まっています。課金プランからプランを選ぶと再開します');
+}
+
+/** 請求書IDを伴う失敗通知がある場合だけ7日後の停止を適用する。 */
+export async function resolveTenantEntitlements(
+  db: D1Database,
+  billing: TenantBilling | null,
+  options: { exemptMonthlyImages?: number; now?: Date } = {},
+): Promise<Entitlements> {
+  // 新料金で作った統括だけを追加で読む。旧契約の全APIにD1往復を増やさない。
+  if (billing?.plan_key === 'musubo') {
+    const musubo = await getMusuboTenantBilling(db, billing.id);
+    if (musubo) return resolveMusuboEntitlements(db, musubo, options);
+    // マーカーと新契約行が不整合なら旧exemptへ落として無料利用を許さない。
+    return {
+      state: 'trial_expired', canSend: false, canGenerate: false, monthlyImages: 0,
+      blockedReason: '請求の状態を確認できません。運営にお問い合わせください',
+      trialDaysLeft: null, plan: null,
+    };
+  }
+  if (billing?.plan_status !== 'past_due') return resolveEntitlements(billing, options);
+  try {
+    const failure = await getBillingPaymentFailure(db, billing, options.now);
+    return resolveEntitlements(billing, { ...options, paymentSuspended: failure?.state === 'suspended' });
+  } catch {
+    logger.warn('billing_payment_failure_state_unavailable');
+    return resolveEntitlements(billing, options);
+  }
+}
+
+async function resolveMusuboEntitlements(db: D1Database, billing: MusuboTenantBillingRecord,
+  options: { exemptMonthlyImages?: number; now?: Date }): Promise<Entitlements> {
+  const now = options.now ?? new Date();
+  const blocked = (state: EntitlementState, reason: string): Entitlements => ({
+    state, canSend: false, canGenerate: false, monthlyImages: 0,
+    blockedReason: reason, trialDaysLeft: null, plan: null,
+  });
+  const allowed = (state: EntitlementState, trialDaysLeft: number | null = null): Entitlements => ({
+    state, canSend: true, canGenerate: true,
+    monthlyImages: options.exemptMonthlyImages ?? EXEMPT_MONTHLY_IMAGES,
+    blockedReason: null, trialDaysLeft, plan: null,
+  });
+  if (billing.status === 'awaiting_first_line') {
+    return blocked('trial_expired', 'LINEの接続を完了すると利用を開始できます');
+  }
+  if (billing.status === 'ended') return blocked('canceled', 'LINEの利用を終了しています');
+  if (!billing.core_subscription_id || !billing.options_subscription_id || !billing.first_charge_date) {
+    return blocked('trial_expired', '請求の準備を確認中です。運営にお問い合わせください');
+  }
+  if (billing.status === 'trialing') {
+    const firstCharge = Date.parse(`${billing.first_charge_date}T00:00:00+09:00`);
+    if (!Number.isFinite(firstCharge) || now.getTime() >= firstCharge) {
+      return blocked('trial_expired', '無料期間が終了しました。お支払いの確認をお待ちください');
+    }
+    return allowed('trialing', Math.max(1, Math.ceil((firstCharge - now.getTime()) / 86_400_000)));
+  }
+  if (billing.status === 'active') return allowed('active');
+  const failure = await getBillingPaymentFailure(db, {
+    id: billing.tenant_id, plan_status: 'past_due', stripe_subscription_id: billing.core_subscription_id,
+  }, now);
+  if (!failure) return blocked('payment_suspended', '未払いの確認が必要です。請求画面からお支払いを確認してください');
+  return failure.state === 'suspended'
+    ? blocked('payment_suspended', '未払いから7日が経過したため、配信とバナー生成を一時停止しています')
+    : allowed('past_due');
 }
 
 /** 共有カタログの契約キーを、既存の料金プラン判定へ接続する。 */

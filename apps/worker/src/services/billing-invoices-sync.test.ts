@@ -53,6 +53,19 @@ beforeEach(() => {
 });
 
 describe('Stripe請求書同期', () => {
+  it('新料金の契約は旧plan_statusがexemptでも同期対象に含める', async () => {
+    testDb.raw.prepare(`INSERT INTO musubo_tenant_billing
+      (tenant_id,pricing_snapshot_json,billing_interval,status,core_subscription_id,created_at,updated_at)
+      VALUES ('tenant-exempt','{}','month','active','sub_new','2026-11-09','2026-11-09')`).run();
+    listInvoices.mockResolvedValue({ data: [], has_more: false });
+    const result = await syncBillingInvoices(
+      { DB: testDb.db, STRIPE_SECRET_KEY: 'sk_test_x' },
+      { since: new Date('2026-11-01T00:00:00Z'), now: new Date('2026-11-09T00:00:00Z') },
+    );
+    expect(result).toMatchObject({ tenants: 3, failed: 0 });
+    expect(listInvoices.mock.calls.map((call) => call[1])).toContain('cus_exempt');
+  });
+
   it('3ページを最後まで取り込み、再実行しても請求書が重複しない', async () => {
     listInvoices.mockImplementation(async (_env, customer: string, options: { startingAfter?: string; createdGte?: number }) => {
       if (customer === 'cus_b') return { data: [], has_more: false };

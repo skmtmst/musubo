@@ -4,7 +4,7 @@ import { PRODUCT_SCOPE } from '@/lib/product-scope'
  * 統括の課金（★管理画面 36-2）の型と小さな計算。API の形は `apps/worker/src/routes/hq-billing.ts` が正本。
  */
 
-export type BillingState = 'exempt' | 'trialing' | 'active' | 'past_due' | 'trial_expired' | 'canceled'
+export type BillingState = 'exempt' | 'trialing' | 'active' | 'past_due' | 'payment_suspended' | 'trial_expired' | 'canceled'
 export type PlanKey = 'light' | 'standard' | 'pro'
 export type BillingInterval = 'month' | 'year'
 
@@ -42,10 +42,55 @@ export interface BillingSummary {
   canSend: boolean
   canGenerate: boolean
   blockedReason: string | null
+  paymentFailure: {
+    failedAt: string
+    graceDeadlineAt: string
+    state: 'grace' | 'suspended'
+  } | null
   dataRetentionDays: number
   stripeReady: boolean
   portalAvailable: boolean
   plans: BillingPlanView[]
+  newPricing?: {
+    status: 'awaiting_first_line' | 'trialing' | 'active' | 'past_due' | 'ended'
+    billingInterval: BillingInterval
+    activeLines: Array<{ id: string; name: string }>
+    trialLastFreeDate: string | null
+    firstChargeDate: string | null
+    estimatedPrice: {
+      monthlyTotalYen: number
+      annualLineChargeYen: number
+      optionsMonthlyYen: number
+      lineBasicMonthlyYen: number
+      headquartersMonthlyYen: number
+      friendOverageMonthlyYen: number
+      linkedAccountSlotsMonthlyYen: number
+    } | null
+    contractedCore: { lineCapacity: number; amountYen: number; interval: BillingInterval } | null
+    quoteId: string | null
+    terminationPhase?: 'none' | 'scheduled' | 'ending' | 'ended'
+    terminationEffectiveAt?: string | null
+    lineRemoval?: { lineAccountId: string; phase: 'requested' | 'scheduled' | 'cancelling'; effectiveAt: string } | null
+  }
+}
+
+export type BillingPaymentFailureView = {
+  invoiceId: string
+  amountYen: number
+  invoiceCreatedAt: string
+  failedAt: string
+  graceDeadlineAt: string
+  state: 'grace' | 'suspended'
+  paymentUrl: string | null
+} | {
+  invoiceId: string
+  amountYen: number
+  invoiceCreatedAt: string
+  graceDeadlineAt: string
+  paidAt: string
+  nextChargeAt: string | null
+  state: 'recovered'
+  paymentUrl: null
 }
 
 export interface BillingInvoice {
@@ -69,6 +114,8 @@ export function billingChip(summary: Pick<BillingSummary, 'state' | 'planName' |
       return { label: summary.planName ?? '契約中', tone: 'ok' }
     case 'past_due':
       return { label: '支払いを確認中', tone: 'danger' }
+    case 'payment_suspended':
+      return { label: '利用を一時停止中', tone: 'danger' }
     case 'trial_expired':
       return { label: 'トライアル終了', tone: 'danger' }
     case 'canceled':
@@ -108,7 +155,13 @@ export function billingBanner(summary: BillingSummary): { tone: 'info' | 'warn' 
       return {
         tone: 'danger',
         title: `支払いを確認できていません${interval ? `（${interval}）` : ''}`,
-        body: 'カードの期限切れなどで引き落としができていません。「支払い方法を管理」から更新してください。確認できるまで機能は止めません。',
+        body: `カードの期限切れなどで引き落としができていません。「支払い方法を管理」から更新してください。${summary.paymentFailure ? `お支払いを確認できない場合、${new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', dateStyle: 'long', timeStyle: 'short' }).format(new Date(summary.paymentFailure.graceDeadlineAt))}に配信とバナー生成を一時停止します。` : 'お支払い状況を確認しています。'}`,
+      }
+    case 'payment_suspended':
+      return {
+        tone: 'danger',
+        title: 'お支払いが確認できないため利用を一時停止しています',
+        body: '配信とバナー生成を一時停止しています。未払いのお支払いを完了すると再開します。保存済みの設定や請求履歴は確認できます。',
       }
     case 'trial_expired':
       return { tone: 'danger', title: '無料トライアルが終了しました', body: `配信とバナー生成が止まっています。プランを選ぶとすぐ再開します。${keep}` }
