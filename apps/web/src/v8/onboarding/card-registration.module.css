@@ -11,7 +11,7 @@
 .actions { display: flex; align-items: center; justify-content: center; gap: var(--mp-px-16); margin-top: var(--mp-px-27); }
 .footer { display: flex; align-items: center; justify-content: space-between; gap: var(--mp-px-20); margin-top: var(--mp-px-21); color: var(--mp-color-59687b); font-size: var(--mp-px-13); }
 .footer p { margin: 0; line-height: 1.6; }
-.retryCard { margin-top: var(--mp-px-28); min-height: 494px; }
+.retryCard { margin-top: var(--mp-px-28); }
 .retryCard .stateHeading { align-items: center; }
 .retryReason { margin: var(--mp-px-24) 0 0; color: var(--mp-color-59687b); font-size: var(--mp-px-14); line-height: 1.7; }
 .retryCard .statusBox { margin-top: var(--mp-px-28); margin-bottom: var(--mp-px-26); }
@@ -25,7 +25,6 @@
   .stateHeading h2 { font-size: var(--mp-px-18); }
   .actions { align-items: stretch; flex-direction: column; }
   .footer { align-items: flex-start; flex-direction: column; }
-  .retryCard { min-height: 0; }
   .retryFooter { align-items: stretch; flex-direction: column-reverse; }
   .retryFooter > :last-child { margin-left: 0; }
 }
