@@ -298,8 +298,13 @@ function QuoteRequired() {
     <span className={styles.quoteBadge}>個別見積もり</span>
     <h2 id="cost-heading">料金は個別にご案内します</h2>
     <p>連携数と使い方を確認し、御社に合う料金と利用開始の手順をお伝えします。</p>
-    <div className={styles.explainer}>この画面で料金や請求は確定しません。クレジットカード情報の入力もまだ不要です。</div>
+    <div className={styles.quoteDivider} />
     <h3>お問い合わせ後の流れ</h3>
-    <ol><li>お問い合わせ内容を送信</li><li>担当者から料金をご案内</li><li>ご同意後、利用開始の準備へ</li></ol>
+    <Steps label="お問い合わせ後の流れ" layout="guidance" steps={[
+      { key: 'contact', label: 'お問い合わせ内容を送信', description: '予定数とご利用方法を共有', state: 'todo' },
+      { key: 'quote', label: '担当者から料金をご案内', description: 'ご利用条件と開始手順を確認', state: 'todo' },
+      { key: 'start', label: 'ご同意後、利用開始の準備へ', description: 'クレジットカード登録後にLINEを接続', state: 'todo' },
+    ]} />
+    <div className={styles.quoteNotice}>この画面で料金や請求は確定しません。<br />クレジットカード情報の入力もまだ不要です。</div>
   </div>
 }

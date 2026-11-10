@@ -40,9 +40,9 @@ html:root .plannedSelect :global(button[data-choice-field]) { height: var(--mp-p
 .error { color: var(--mp-color-ad2f2f); font-size: var(--mp-px-13); }
 .quoteBadge { display: inline-block; border-radius: var(--mp-px-999); margin: 0 0 var(--mp-px-16); padding: var(--mp-px-8) var(--mp-px-14); background: var(--mp-color-e6f5ec); color: var(--mp-color-087c43); font-size: var(--mp-px-12); font-weight: 700; }
 .quoteRequired h3 { margin: var(--mp-px-26) 0 var(--mp-px-12); font-size: var(--mp-px-16); }
-.quoteRequired p, .quoteRequired li { color: var(--mp-color-59687b); line-height: 1.7; }
-.quoteRequired ol { padding-left: var(--mp-px-25); }
-.quoteRequired li { margin-bottom: var(--mp-px-8); }
+.quoteRequired p { color: var(--mp-color-59687b); line-height: 1.7; }
+.quoteDivider { height: 1px; margin: var(--mp-px-24) 0; background: var(--mp-color-dfe5e7); }
+.quoteNotice { margin-top: var(--mp-px-24); border-radius: var(--mp-px-10); padding: var(--mp-px-16); background: var(--mp-color-e4f6eb); color: var(--mp-color-425364); font-size: var(--mp-px-13); line-height: 1.6; }
 .modalBackdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: var(--mp-px-24); background: var(--mp-color-202c35a8); }
 .modal { position: relative; width: min(100%, var(--mp-px-660)); max-height: min(92vh, var(--mp-px-900)); overflow: auto; border-radius: var(--mp-px-14); background: var(--mp-color-fff); padding: var(--mp-px-32); box-shadow: 0 var(--mp-px-20) var(--mp-px-60) var(--mp-color-0002); color: var(--mp-color-202428); }
 .modal h2 { margin: 0 0 var(--mp-px-8); font-size: var(--mp-px-24); }
