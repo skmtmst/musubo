@@ -95,14 +95,14 @@ describe('Y8SjT2 予約枠・在庫', () => {
     expect(save.disabled).toBe(false)
   })
 
-  it('下の帯の保存は、配分（全部の時間帯）と開ける時間を今の口へ送る', async () => {
+  it('配分だけを変えた保存では営業時間を再送しない', async () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
     fireEvent.change(screen.getByRole('spinbutton', { name: '予約サイト' }), { target: { value: '7' } })
     fireEvent.click(screen.getByRole('button', { name: /受付時間と配分を保存/ }))
-    await waitFor(() => expect(fixture.saveOpeningHours).toHaveBeenCalled())
+    await waitFor(() => expect(fixture.saveInventoryAllocation).toHaveBeenCalled())
     expect(fixture.saveInventoryAllocation).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', otaCapacity: 7, slots: [{ id: 's17', expectedVersion: 3 }, { id: 's19', expectedVersion: 3 }] }))
-    expect(fixture.saveOpeningHours).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', expectedVersion: 4 }))
+    expect(fixture.saveOpeningHours).not.toHaveBeenCalled()
   })
 
   it('ほかの担当者が先に保存していたら（409）競合の帯を出し、上の帯は重ねない', async () => {

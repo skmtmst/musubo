@@ -5,6 +5,7 @@ import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { readRestaurantFollowupSetupProgress } from '../services/restaurant-followup-preferences.js';
 import { dbFor } from '../services/db-router.js';
+import { connectedGoogleProfile, googleOpeningWeek } from '../services/restaurant-google-hours-source.js';
 import { hasOrganizationSelector, organizationFor, requiredAccount, storeBelongsTo } from './restaurant-test-definition.js';
 
 /** 一覧の上限や満席に左右されず、選択店舗の設定の実物だけを読む。書込・送信をしない。 */
@@ -29,13 +30,16 @@ export function registerRestaurantSetupProgressRoutes(routes: Hono<Env>) {
     if (!row) return c.json({ success: false, error: '店舗が見つかりません' }, 404);
     // JSON不正は想定外のエラーとして共通の報告経路へ渡す。空配列だけが未設定。
     const hours: unknown = row.hours_json === null ? [] : JSON.parse(row.hours_json);
-    const hoursReady = Array.isArray(hours) && hours.some(day => day && Array.isArray(day.periods)
+    const profile = await connectedGoogleProfile(dbFor(c.env, storeId), storeId);
+    const googleWeek = profile ? googleOpeningWeek(profile) : null;
+    const hoursReady = Boolean(googleWeek?.some(day => day.periods.length > 0));
+    const bookingHoursReady = Array.isArray(hours) && hours.some(day => day && Array.isArray(day.periods)
       && day.periods.some((period: { opensAt?: string; closesAt?: string }) => /^\d{2}:\d{2}$/.test(period.opensAt ?? '')
         && /^\d{2}:\d{2}$/.test(period.closesAt ?? '') && period.opensAt !== period.closesAt));
     const followupSetup = await readRestaurantFollowupSetupProgress(dbFor(c.env, storeId), storeId);
     const data: RestaurantSetupProgress = {
       storeId: row.id, tables: Boolean(row.tables_ready), hours: hoursReady, menus: Boolean(row.menus_ready),
-      reception: Boolean(row.tables_ready && hoursReady && row.reception_ready),
+      reception: Boolean(row.tables_ready && hoursReady && bookingHoursReady && row.reception_ready),
       followup: Boolean(row.followup_ready),
       ...(row.line_account_id?{reservationForm:await readRestaurantReservationFormHealth(dbFor(c.env,storeId),storeId,row.line_account_id)}:{}),
       ...(followupSetup ? { followupSetup } : {}),

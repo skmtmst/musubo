@@ -100,6 +100,7 @@ describe('電話予約（E-2）', () => {
   it('電話番号で友だちを探し、押すと名前が入り、時刻を選んで source=phone で保存する（LINE で確認を送る）', async () => {
     const onSaved = vi.fn()
     render(<PhoneReservationDrawer staffRole="owner" storeName="人工店舗" open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={onSaved} />)
+    await waitFor(() => expect(api.openingHours).toHaveBeenCalledWith('acc', 'store-1', '2026-10-10'))
     const changeTable = screen.getByRole('button', { name: '変える' }) as HTMLButtonElement
     expect(changeTable.disabled).toBe(true)
     expect(changeTable.title).toBe('空いている時刻を選ぶと卓を変えられます')
@@ -156,6 +157,7 @@ it('UTCの端末でも日付と受け付ける時刻を日本時間で選ぶ', (
     expect(toYmd(now)).toBe('2026-10-11')
     expect(openTimes('2026-10-11', [{ weekday: 0, periods: [{ opensAt: '00:00', closesAt: '03:00' }] }] as Parameters<typeof openTimes>[1], now)).toEqual(['00:30', '01:00'])
     expect(openTimes('2026-10-12', [{ weekday: 1, periods: [{ opensAt: '00:00', closesAt: '03:00' }] }] as Parameters<typeof openTimes>[1], now)).toEqual(['00:00', '00:30', '01:00'])
+    expect(openTimes('2026-10-12', [{ weekday: 1, periods: [{ opensAt: '23:00', closesAt: '01:00' }] }] as Parameters<typeof openTimes>[1], now)).toEqual(['23:00'])
   } finally {
     if(previous === undefined) delete process.env.TZ
     else process.env.TZ = previous

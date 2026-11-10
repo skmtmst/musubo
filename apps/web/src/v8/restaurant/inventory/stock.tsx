@@ -4,7 +4,7 @@ import type { Alloc, Hours, SlotInfo, Conflict } from './stock-types'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Armchair, Check, X } from 'lucide-react'
-import type { RestaurantOpeningDay } from '@line-crm/shared'
+import type { RestaurantOpeningDay, RestaurantOpeningHours } from '@line-crm/shared'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -100,6 +100,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   const [hoursVersion, setHoursVersion] = useState(0)
   const [hoursDraft, setHoursDraft] = useState<Hours | null>(null)
   const [hoursError, setHoursError] = useState('')
+  const [googleStatus, setGoogleStatus] = useState<RestaurantOpeningHours['googleStatus']>(null)
   const [channelsError,setChannelsError]=useState(false)
   const [channelsRetry,setChannelsRetry]=useState(0)
   const [channels, setChannels] = useState<RestaurantChannel[]>([])
@@ -139,7 +140,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
     if (!selectedAccountId || !storeId) return Promise.resolve()
     return restaurantTestApi.openingHours(selectedAccountId, storeId).then((res) => {
       const week = res.data.hours || emptyWeek()
-      setHours(week); setHoursDraft(week); setHoursVersion(res.data.version); setHoursError('')
+      setHours(week); setHoursDraft(week); setHoursVersion(res.data.version); setGoogleStatus(res.data.googleStatus ?? null); setHoursError('')
       if (scope === hoursScope.current && request === latestHoursRequest.current && scope.accountId === selectedAccountId && scope.storeId === storeId && res.data.storeId === storeId) {
         setHoursReceipt({ scope, request, hours: week, version: res.data.version })
       }
@@ -147,7 +148,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
     }).catch(() => { setHoursError('開ける時間を読み込めませんでした。再読込してください。') })
   }
   useEffect(() => {
-    setHours(null); setHoursDraft(null); setHoursError('')
+    setHours(null); setHoursDraft(null); setHoursError(''); setGoogleStatus(null)
     void loadHours()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId, storeId])
@@ -296,7 +297,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   const saveAll = (force = false) => {
     if (!canEdit || busy || !selectedAccountId || !store || allocInvalid) return
     const attemptedAlloc = rows.length > 0 ? { ...alloc } : null
-    const attemptedHours = hoursDraft
+    const attemptedHours = hoursChanged ? hoursDraft : null
     void mutate(async () => {
       try {
         if (attemptedAlloc) {
@@ -444,7 +445,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
             <StockListHeading date={date} busy={busy} onChange={changeDate}>
               {slots.length > 0 ? <RowActions subjectName="時間帯ごとの在庫" menuButtonProps={{ disabled: busy || !hoursVersion || allocInvalid, 'aria-description': missingHoursReason }} menuItems={[{ id: 'generate', label: 'この日の枠を作る', lockedReason, disabled: !canEdit, onSelect: generateSlots }]} /> : null}
             </StockListHeading>
-            {missingHoursReason ? <DialogNote>{missingHoursReason}{' '}<Button variant="text" size="inline" href="#rs-hours-title">開ける時間を設定する</Button></DialogNote> : null}
+            {missingHoursReason ? <DialogNote>{missingHoursReason}{' '}<Button variant="text" size="inline" href={googleStatus !== null ? '/restaurant-test/google?tab=hours' : '#rs-hours-title'}>開ける時間を設定する</Button></DialogNote> : null}
             {dayRows === null ? (
               <div className={styles.stateBox}><ListState kind="loading" /></div>
             ) : slots.length === 0 ? (
@@ -524,9 +525,13 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
                 </div>
               </Card>
             ) : null}
-            <CardHeader size="stacked" titleId="rs-hours-title" title="開ける時間" meta="曜日ごとに予約を受ける時間を決めます（予約設定の受付枠と同じ決め方。違うのは、受けられる数が「人」ではなく「席」で決まること）" />
+            <CardHeader size="stacked" titleId="rs-hours-title" title="開ける時間" meta={googleStatus !== null ? 'Googleビジネスの営業時間を基準にします。予約枠と席の配分は、この画面で設定します。' : '曜日ごとに予約を受ける時間を決めます（予約設定の受付枠と同じ決め方。違うのは、受けられる数が「人」ではなく「席」で決まること）'} />
             {hoursError ? <Notice tone="danger" className={styles.hoursErrorNoticePlacement} >{hoursError}</Notice> : null}
-            {hoursDraft ? WEEK_ORDER.map((weekday) => {
+            {googleStatus !== null ? <>
+              <Notice tone={googleStatus === 'connected' ? 'info' : 'warn'}>営業時間の変更は Googleビジネスで行います。接続に問題がある場合は、接続画面で確認してください。</Notice>
+              <Button variant="text" href="/restaurant-test/google?tab=hours">Googleビジネスの営業時間を開く →</Button>
+              {hours?.map((day) => <p key={day.weekday}>{WEEKDAY_LABEL[day.weekday]}曜日：{periodsText(day)}</p>)}
+            </> : hoursDraft ? WEEK_ORDER.map((weekday) => {
               const day = hoursDraft.find((item) => item.weekday === weekday) ?? { weekday, periods: [] }
               const open = day.periods.length > 0
               const name = WEEKDAY_LABEL[weekday]

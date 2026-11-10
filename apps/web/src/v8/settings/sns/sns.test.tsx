@@ -296,12 +296,13 @@ describe('Google のカード', () => {
   })
 
   it('接続済みならSNS連携内に再接続と解除を表示する', async () => {
-    fixture.googleConnection.mockResolvedValue({ ...googleData(), connection: { status: 'connected', locationTitle: '然カフェ 本店' } })
+    fixture.googleConnection.mockResolvedValue({ ...googleData(), connection: { status: 'connected', locationName: 'locations/1', locationTitle: '然カフェ 本店' } })
     fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
     render(<SnsSettingsPage />)
 
     const card = within(await screen.findByRole('region', { name: 'Google ビジネス' }))
     expect(await card.findByText('接続済み')).toBeTruthy()
+    expect(screen.getByRole('link', { name: '営業時間へ' }).getAttribute('href')).toBe('/restaurant-test/google?tab=hours')
     expect(card.getByRole('button', { name: 'つなぎ直す' })).toBeTruthy()
     fireEvent.click(card.getByRole('button', { name: '接続を解除する' }))
     expect(await screen.findByText('Googleアカウントの接続を解除しますか？')).toBeTruthy()

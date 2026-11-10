@@ -84,6 +84,13 @@ function googleFetch(overrides: { failLocationId?: string } = {}): FetchLike {
         ],
       });
     }
+    if (url.includes('mybusinessbusinessinformation.googleapis.com/v1/locations/222?')) {
+      return jsonResponse({
+        name: 'locations/222',
+        openInfo: { status: 'OPEN' },
+        regularHours: { periods: [{ openDay: 'MONDAY', openTime: { hours: 10 }, closeDay: 'MONDAY', closeTime: { hours: 19 } }] },
+      });
+    }
     return jsonResponse({}, 404);
   };
 }
@@ -158,9 +165,36 @@ describe('processGoogleBusinessHourlyResync', () => {
     testDb.raw
       .prepare('UPDATE rt_google_connections SET last_synced_at = ?, last_posts_synced_at = ? WHERE store_id = ?')
       .run(recent, recent, 'store-shibuya');
+    testDb.raw.prepare(`INSERT INTO rt_google_profiles(store_id,location_name,profile_json,fingerprint,fetched_at,updated_at)
+      VALUES(?,?,?,?,?,?)`).run('store-shibuya', LOCATION, JSON.stringify({ profile: {} }), 'recent', recent, recent);
     const result = await processGoogleBusinessHourlyResync(env, { now: NOW, fetch: googleFetch(), sleep: noSleep });
     expect(result).toMatchObject({ reviewsSynced: 0, postsSynced: 0, skipped: 1, failed: 0 });
     expect(calls).toHaveLength(0);
+  });
+
+  it('接続済みでプロフィールの写しがない店舗も次の同期で営業時間を取り込む', async () => {
+    const recent = '2026-09-28T17:40:00.000Z';
+    testDb.raw.prepare('UPDATE rt_google_connections SET last_synced_at=?,last_posts_synced_at=? WHERE store_id=?')
+      .run(recent, recent, 'store-shibuya');
+    const result = await processGoogleBusinessHourlyResync(env, { now: NOW, fetch: googleFetch(), sleep: noSleep });
+    expect(result.failed).toBe(0);
+    expect(calls.some(call => call.url.includes('mybusinessbusinessinformation.googleapis.com/v1/locations/222?'))).toBe(true);
+    const row = testDb.raw.prepare('SELECT updated_by FROM rt_opening_hours_settings WHERE store_id=?').get('store-shibuya') as { updated_by: string };
+    expect(row.updated_by).toBe('google_business');
+  });
+
+  it('Google側で変わった営業時間を次の同期で予約用の週時間へ反映する', async () => {
+    const recent = '2026-09-28T17:40:00.000Z';
+    testDb.raw.prepare('UPDATE rt_google_connections SET last_synced_at=?,last_posts_synced_at=? WHERE store_id=?')
+      .run(recent, recent, 'store-shibuya');
+    testDb.raw.prepare(`INSERT INTO rt_google_profiles(store_id,location_name,profile_json,fingerprint,fetched_at,updated_at)
+      VALUES(?,?,?,?,?,?)`).run('store-shibuya', LOCATION, JSON.stringify({ profile: {} }), 'old', '2026-09-28T16:00:00.000Z', '2026-09-28T16:00:00.000Z');
+    const result = await processGoogleBusinessHourlyResync(env, { now: NOW, fetch: googleFetch(), sleep: noSleep });
+    expect(result.failed).toBe(0);
+    expect(calls.some(call => call.url.includes('mybusinessbusinessinformation.googleapis.com/v1/locations/222?'))).toBe(true);
+    const row = testDb.raw.prepare('SELECT hours_json,updated_by FROM rt_opening_hours_settings WHERE store_id=?').get('store-shibuya') as { hours_json: string; updated_by: string };
+    expect(row.updated_by).toBe('google_business');
+    expect(JSON.parse(row.hours_json)[1].periods).toEqual([{ opensAt: '10:00', closesAt: '19:00' }]);
   });
 
   it('機能 restaurant_test がオフのアカウントは同期しない', async () => {
