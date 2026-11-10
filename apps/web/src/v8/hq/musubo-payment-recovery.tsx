@@ -2,7 +2,6 @@
 
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
-import StatusBadge from '@/components/shared/status-badge'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Steps } from '@/components/templates/steps'
 import { useState } from 'react'
@@ -161,13 +160,13 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
     <div className={success ? styles.statusSuccess : styles.statusWarning}>
       <span className={success ? styles.iconSuccess : styles.iconWarning} aria-hidden="true">{success ? '✓' : processing ? '…' : '!'}</span>
       <div className={styles.statusCopy}><h2>{statusTitle}</h2><p>{statusDescription}</p></div>
-      <StatusBadge tone={success ? 'success' : 'warning'} dot={false}>{badge}</StatusBadge>
+      <span className={success ? styles.badgeSuccess : styles.badgeWarning}>{badge}</span>
     </div>
     <div className={styles.columns}>
       <section className={styles.card} aria-labelledby="payment-detail-title">
         <h2 id="payment-detail-title">{mainTitle}</h2>
         <div className={styles.amountRow}><div><span>{amountLabel}</span><strong>{money(view.amountYen)}</strong></div>
-          <StatusBadge tone={success ? 'success' : 'warning'} dot={false}>{amountStatusLabel}</StatusBadge></div>
+          <span className={success ? styles.amountSuccess : styles.amountWarning}>{amountStatusLabel}</span></div>
         <dl className={styles.details}>
           {invoice ? <><div><dt>請求日</dt><dd>{date(view.invoiceDate)}</dd></div>
             <div><dt>{success ? 'お支払い確認日' : 'お支払い期限'}</dt><dd>{success
