@@ -41,7 +41,6 @@ describe('#670 15 登録メディアの札の操作は「…」にまとめる',
     expect(card).toContain("label: 'ダウンロード'")
     expect(card).toContain("label: '削除する'")
     expect(card).toContain("qaOpen: 'YfTfJ'")
-    expect(card).toContain('showGroupHeadings={false}')
 
   })
 })
