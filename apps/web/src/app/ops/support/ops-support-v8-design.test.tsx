@@ -16,6 +16,7 @@ import OpsSupportPage from './page'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <a>{children}</a> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/ops/support' }))
 
 const ticket = {
   id: 't1', ticketNo: 1042, ticketLabel: '#1042', tenantId: 'tenant-a', tenantName: '然-NEN-本部',
@@ -42,8 +43,6 @@ function respond(url: string) {
         tenant: { accountCount: 4, staffCount: 6, staffWithLine: 5, pastTickets: 12, pastOpen: 0 },
         messages: [],
         draft: null,
-        knowledge: undefined,
-        ai: { available: true },
       },
     })
   }

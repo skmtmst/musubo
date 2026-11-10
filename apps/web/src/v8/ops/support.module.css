@@ -1,5 +1,5 @@
 /* 運営のお問い合わせ。 */
-.createAction, .columns { --support-create-width: 168px; --support-create-height: 40px; --support-priority-width: 34px; --support-priority-height: 22px; --support-detail-offset: 246px; --support-status-height: 30px; --support-menu-width: 170px; --support-reply-desktop-height: 260px; --support-reply-compact-height: 220px; --support-mobile-header-height: 58px; --support-mobile-message-height: 114px; --support-reply-mobile-height: 464px; }
+.createAction, .columns { --support-create-width: 168px; --support-create-height: 40px; --support-priority-width: 34px; --support-priority-height: 22px; --support-detail-offset: 246px; --support-status-height: 30px; --support-menu-width: 170px; --support-reply-desktop-height: 260px; --support-reply-compact-height: 220px; --support-mobile-header-height: 58px; --support-mobile-message-height: 114px; --support-reply-mobile-height: 464px; --support-mobile-pad: 18px; --support-draft-bottom: 30px; }
 
 .notice {
   margin-bottom: var(--tpl-op-section-gap);
@@ -187,7 +187,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-op-panel-gap);
-  margin: 6px 0 0;
+  margin: var(--space-6) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -233,7 +233,7 @@
   outline: 1px solid var(--color-hairline);
   outline-offset: -1px;
   padding: var(--tpl-op-note-pad);
-  margin-top: 16px;
+  margin-top: var(--space-16);
 }
 
 .replyHeading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); }
@@ -370,19 +370,19 @@
   .columnsSelected { padding: 0; }
   .columnsSelected .list { display: none; }
   .columns:not(.columnsSelected) .detail { display: none; }
-  .detail { width: 100%; max-height: none; overflow: visible; border: 0; border-radius: 0; outline: 0; gap: var(--space-16); padding: 0 var(--space-18, 18px) var(--space-12); box-shadow: none; }
-  .mobileTop { display: flex; align-items: center; justify-content: space-between; position: relative; height: var(--support-mobile-header-height); margin: 0 calc(-1 * var(--space-18, 18px)); border-bottom: 1px solid var(--color-hairline); padding: 0 var(--space-18, 18px); background: var(--color-canvas); }
+  .detail { width: 100%; max-height: none; overflow: visible; border: 0; border-radius: 0; outline: 0; gap: var(--space-16); padding: 0 var(--support-mobile-pad) var(--space-12); box-shadow: none; }
+  .mobileTop { display: flex; align-items: center; justify-content: space-between; position: relative; height: var(--support-mobile-header-height); margin: 0 calc(-1 * var(--support-mobile-pad)); border-bottom: 1px solid var(--color-hairline); padding: 0 var(--support-mobile-pad); background: var(--color-canvas); }
   .mobileBack { display: inline-flex; align-items: center; gap: var(--space-8); min-height: var(--support-create-height); border: 0; background: transparent; color: var(--color-ink); font-weight: 600; }
-  .mobileBack svg { width: var(--space-18, 18px); height: var(--space-18, 18px); }
+  .mobileBack svg { width: var(--support-mobile-pad); height: var(--support-mobile-pad); }
   .detailControls { flex-wrap: nowrap; gap: var(--space-8); }
   .statusWrap { order: 0; flex-basis: auto; }
   .prioritySelect { order: 1; }
   .contractLink { order: 2; }
   .moreWrap { display: none; }
   .messages .message:first-child { min-height: var(--support-mobile-message-height); }
-  .messages { margin-top: 24px; }
+  .messages { margin-top: var(--space-24); }
   .draft { margin-top: 0; }
-  .draft { padding-bottom: 30px; }
+  .draft { padding-bottom: var(--support-draft-bottom); }
   .replyBox.replyBox { min-height: var(--support-reply-mobile-height); }
 }
 

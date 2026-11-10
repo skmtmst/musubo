@@ -8,7 +8,10 @@ import { useOverlayFocus, useOverlayLayer } from '@/components/shared/overlay-ut
 import { opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import EntitySelect from '@/components/shared/entity-select'
 import styles from './reply-template-picker.module.css'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 type View = 'list' | 'folders' | 'newFolder' | 'newTemplate'
 
@@ -19,7 +22,6 @@ export default function SupportTemplatePicker({ open, onClose, onInsert, writabl
   writable: boolean
 }) {
   const layer = useOverlayLayer(open)
-  const ref = useOverlayFocus<HTMLElement>(open, onClose)
   const [mounted, setMounted] = useState(false)
   const [view, setView] = useState<View>('list')
   const [catalog, setCatalog] = useState<OpsSupportTemplateCatalog | null>(null)
@@ -31,6 +33,9 @@ export default function SupportTemplatePicker({ open, onClose, onInsert, writabl
   const [body, setBody] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const guard = useUnsavedGuard({ dirty: open && (view === 'newFolder' ? folderName.trim().length > 0 : view === 'newTemplate' && (title.trim().length > 0 || body.trim().length > 0)), busy, subject: '作りかけのテンプレート' })
+  const guardedClose = () => guard.guarded(onClose)
+  const ref = useOverlayFocus<HTMLElement>(open, guardedClose)
 
   useEffect(() => setMounted(true), [])
   useEffect(() => {
@@ -81,8 +86,8 @@ export default function SupportTemplatePicker({ open, onClose, onInsert, writabl
   }
 
   if (!open) return null
-  const back = () => { setError(''); if (view === 'list') onClose(); else setView('list') }
-  const panel = <div className={styles.overlay} style={{ zIndex: layer }} onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
+  const back = () => { guard.guarded(() => { setError(''); if (view === 'list') onClose(); else setView('list') }) }
+  const panel = <><div className={styles.overlay} style={{ zIndex: layer }} onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) guardedClose() }}>
     <section className={`${styles.panel} ${view === 'newFolder' ? styles.panelNewFolder : view === 'newTemplate' ? styles.panelNewTemplate : ''}`} role="dialog" aria-modal="true" aria-label={view === 'folders' ? 'フォルダを選択' : view === 'newFolder' ? 'フォルダ作成' : view === 'newTemplate' ? 'テンプレート作成' : 'テンプレート引用'} ref={ref} tabIndex={-1}>
       <header className={styles.mobileHeader}>
         <button type="button" className={styles.back} onClick={back}><ChevronLeft aria-hidden="true" />{view === 'list' ? '返信に戻る' : 'テンプレート引用'}</button>
@@ -90,7 +95,7 @@ export default function SupportTemplatePicker({ open, onClose, onInsert, writabl
       <header className={styles.desktopHeader}>
         <div><h2>{view === 'newFolder' ? 'フォルダを作成' : view === 'newTemplate' ? 'テンプレートを作成' : 'テンプレート引用'}</h2>
           {view === 'list' ? <p>フォルダとテンプレートを選び、内容を確認して返信文へ挿入します。</p> : view === 'newFolder' ? <p>初期フォルダに加えて、用途に合わせたフォルダを作成できます。</p> : view === 'newTemplate' ? <p>よく使う応対文を保存します。引用後はチケットごとに編集できます。</p> : null}</div>
-        <button type="button" aria-label="閉じる" className={styles.close} onClick={onClose}><X aria-hidden="true" /></button>
+        <button type="button" aria-label="閉じる" className={styles.close} onClick={guardedClose}><X aria-hidden="true" /></button>
       </header>
       <div className={styles.content}>
         {view === 'list' ? <>
@@ -117,7 +122,7 @@ export default function SupportTemplatePicker({ open, onClose, onInsert, writabl
           {[{ id: 'all', name: 'すべて' }, ...(catalog?.folders ?? [])].map((folder) => <button type="button" key={folder.id} aria-current={folderId === folder.id ? 'true' : undefined} onClick={() => chooseFolder(folder.id)}><Folder aria-hidden="true" />{folder.name}{folderId === folder.id ? <Check aria-hidden="true" /> : null}</button>)}
         </div></> : null}
         {view === 'newFolder' ? <><h2 className={styles.mobileTitle}>フォルダ作成</h2><label className={styles.field}>フォルダ名 <span>必須</span><TextField value={folderName} onChange={(e) => setFolderName(e.target.value)} placeholder="例：キャンペーン対応" maxLength={60} /></label><p className={styles.hint}>作成後、このフォルダにテンプレートを追加できます。</p></> : null}
-        {view === 'newTemplate' ? <><h2 className={styles.mobileTitle}>テンプレート作成</h2><label className={styles.field}>保存先フォルダ <span>必須</span><select value={folderId === 'all' ? 'contracts' : folderId} onChange={(e) => setFolderId(e.target.value)}>{catalog?.folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select></label><label className={styles.field}>テンプレート名 <span>必須</span><TextField value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：解約手続きのご案内" maxLength={120} /></label><label className={styles.field}>本文 <span>必須</span><TextArea value={body} onChange={(e) => setBody(e.target.value)} placeholder={'お問い合わせありがとうございます。\n\nご契約の解約をご希望とのこと、承知しました。\n担当者が内容を確認し、必要な手続きをご案内します。'} maxLength={4000} /></label><p className={styles.hint}><span className={styles.desktopHint}>送信前に、引用した内容を返信欄で確認・編集してください。</span><span className={styles.mobileHint}>引用後の返信欄で編集できます。</span></p></> : null}
+        {view === 'newTemplate' ? <><h2 className={styles.mobileTitle}>テンプレート作成</h2><label className={styles.field}>保存先フォルダ <span>必須</span><EntitySelect size="full" aria-label="保存先フォルダ" value={folderId === 'all' ? 'contracts' : folderId} onChange={setFolderId} options={(catalog?.folders ?? []).map((folder) => ({ value: folder.id, label: folder.name }))} /></label><label className={styles.field}>テンプレート名 <span>必須</span><TextField value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：解約手続きのご案内" maxLength={120} /></label><label className={styles.field}>本文 <span>必須</span><TextArea value={body} onChange={(e) => setBody(e.target.value)} placeholder={'お問い合わせありがとうございます。\n\nご契約の解約をご希望とのこと、承知しました。\n担当者が内容を確認し、必要な手続きをご案内します。'} maxLength={4000} /></label><p className={styles.hint}><span className={styles.desktopHint}>送信前に、引用した内容を返信欄で確認・編集してください。</span><span className={styles.mobileHint}>引用後の返信欄で編集できます。</span></p></> : null}
         {error ? <p role="alert" className={styles.error}>{error}</p> : null}
       </div>
       {view !== 'folders' ? <footer className={styles.footer}>
@@ -125,7 +130,7 @@ export default function SupportTemplatePicker({ open, onClose, onInsert, writabl
         <Button variant="primary" fullWidth={view !== 'list'} disabled={busy || (view === 'list' ? !selected || !writable : !writable)} busy={busy} onClick={view === 'list' ? insert : view === 'newFolder' ? createFolder : createTemplate}>{view === 'list' ? '返信に引用する' : view === 'newFolder' ? 'フォルダを作成' : 'テンプレートを保存'}</Button>
       </footer> : null}
     </section>
-  </div>
+  </div><UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="作りかけのテンプレート" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy} /></>
   return mounted ? createPortal(panel, document.body) : panel
 }
 
