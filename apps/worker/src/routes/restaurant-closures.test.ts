@@ -47,8 +47,11 @@ let testDb: SqliteD1;
 let env: Env['Bindings'];
 
 const TENANT = '00000000-0000-4000-8000-000000000001';
-const SLOT = '2026-11-10T09:00:00.000Z';
-const SLOT_END = '2026-11-10T11:00:00.000Z';
+// SQLite's julianday('now') uses the wall clock even when Vitest fakes Date.
+// Keep waitlist fixtures in the future so the registration cutoff stays testable.
+const SLOT_DATE = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+const SLOT = `${SLOT_DATE}T09:00:00.000Z`;
+const SLOT_END = `${SLOT_DATE}T11:00:00.000Z`;
 
 function seedStore() {
   testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`).run(TENANT);
@@ -190,7 +193,7 @@ function configurePhoneIntake() {
  const hours=Array.from({length:7},(_,weekday)=>({weekday,periods:[{opensAt:'17:00',closesAt:'23:00'}]}));
  testDb.raw.prepare("INSERT INTO rt_opening_hours_settings(store_id,hours_json,updated_by) VALUES('store-s',?,'test')").run(JSON.stringify(hours));
 }
-const closureInput={storeId:'store-s',startDate:'2026-11-10',endDate:'2026-11-10',allDay:false,startTime:'18:00',endTime:'20:00',kind:'temporary_closed'};
+const closureInput={storeId:'store-s',startDate:SLOT_DATE,endDate:SLOT_DATE,allDay:false,startTime:'18:00',endTime:'20:00',kind:'temporary_closed'};
 const closurePath='/api/restaurant-test/closures';
 async function create(input:unknown=closureInput){const res=await post(closurePath,input);return {status:res.status,body:await res.json() as any};}
 async function request(method:string,path:string,body:unknown){return app().request(`${path}?account_id=account-1`,{method,headers:{Authorization:'Bearer owner-key','Content-Type':'application/json'},body:JSON.stringify(body)},env);}
@@ -240,7 +243,7 @@ describe('日付で席予約を閉じる',()=>{
   const denied=await post('/api/restaurant-test/reservations/manual',reservationInput());expect(denied.status).toBe(409);expect((await denied.json() as any).code).toBe('closure_conflict');
   const hold=await post('/api/restaurant-test/reservations/holds',{...reservationInput(),holdMinutes:30});expect(hold.status).toBe(409);expect((await hold.json() as any).code).toBe('closure_conflict');
   const remaining=await post('/api/restaurant-test/reservations/manual',{...reservationInput(),tableId:undefined});expect(remaining.status).toBe(201);expect((await remaining.json() as any).data.tableId).toBe('table-2');
-  const boundary=await post('/api/restaurant-test/reservations/holds',{...reservationInput('table-1',SLOT_END,'2026-11-10T12:00:00Z'),holdMinutes:30});expect(boundary.status).toBe(201);
+  const boundary=await post('/api/restaurant-test/reservations/holds',{...reservationInput('table-1',SLOT_END,`${SLOT_DATE}T12:00:00Z`),holdMinutes:30});expect(boundary.status).toBe(201);
  });
  test('全卓の休業は待機・仮押さえ・空き判定を止める。既存待機の招待と受諾も止まる',async()=>{
   const wait=await post('/api/restaurant-test/seat-waitlist',{storeId:'store-s',startsAt:SLOT,guestCount:2,customerName:'待機'});expect(wait.status).toBe(201);
@@ -259,7 +262,7 @@ describe('日付で席予約を閉じる',()=>{
   testDb.raw.exec(`INSERT INTO rt_media(id,code,name,parser_key) VALUES('m1','media1','媒体1','p1'),('m2','media2','媒体2','p2'),('m3','media3','媒体3','p3');
    INSERT INTO rt_store_media_links(store_id,media_id,close_on_booking) VALUES('store-s','m1',1),('store-s','m2',1),('store-s','m3',0);`);
   const saved=await create();expect(saved.status).toBe(201);const id=saved.body.data.closure.id;
-  const tasks=await get('/api/restaurant-test/channel-close-tasks?storeId=store-s');const rows=(await tasks.json() as any).data;expect(rows).toHaveLength(2);expect(rows[0]).toMatchObject({reason:'closure',closureId:id,startDate:'2026-11-10',startTime:'18:00',endTime:'20:00'});
+  const tasks=await get('/api/restaurant-test/channel-close-tasks?storeId=store-s');const rows=(await tasks.json() as any).data;expect(rows).toHaveLength(2);expect(rows[0]).toMatchObject({reason:'closure',closureId:id,startDate:SLOT_DATE,startTime:'18:00',endTime:'20:00'});
   expect((await post('/api/restaurant-test/channel-close-tasks/'+rows[0].id+'/done',{})).status).toBe(200);
   expect((await request('DELETE',closurePath+'/'+id,{expectedVersion:1})).status).toBe(200);
   expect(testDb.raw.prepare('SELECT channel,status FROM rt_closure_close_tasks ORDER BY channel').all()).toEqual([{channel:'media1',status:'reopen'},{channel:'media2',status:'reopen'}]);
@@ -305,9 +308,9 @@ test('日別在庫の空き席は閉じた卓を差し引き、既存予約と�
  testDb.raw.prepare(`INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity,line_capacity,ota_capacity,walk_in_capacity) VALUES('slot','store-s',?,8,4,2,2)`).run(SLOT);
  seedReservation('existing');
  expect((await create({...closureInput,kind:'private_event',tableIds:['table-1']})).status).toBe(201);
- const partial=await get('/api/restaurant-test/inventory/day?storeId=store-s&date=2026-11-10');expect((await partial.json() as any).data[0]).toMatchObject({freeSeats:6,closedTableIds:['table-1']});
+ const partial=await get(`/api/restaurant-test/inventory/day?storeId=store-s&date=${SLOT_DATE}`);expect((await partial.json() as any).data[0]).toMatchObject({freeSeats:6,closedTableIds:['table-1']});
  expect((await create({...closureInput,tableIds:['table-2']})).status).toBe(201);
- const all=await get('/api/restaurant-test/inventory/day?storeId=store-s&date=2026-11-10');expect((await all.json() as any).data[0].freeSeats).toBe(0);
+ const all=await get(`/api/restaurant-test/inventory/day?storeId=store-s&date=${SLOT_DATE}`);expect((await all.json() as any).data[0].freeSeats).toBe(0);
 });
 test('既存の仮押さえを休業保存後に確定予約へ変えられない',async()=>{
  configurePhoneIntake();
@@ -342,7 +345,7 @@ test('変更のpreviewは自分だけを除外し、他店や存在しないID�
 test('重なり409のdataに相手の名前と日付が入り、previewに電話・LINE友だちを返す',async()=>{
  seedReservation('with-phone');testDb.raw.exec("UPDATE rt_reservations SET customer_phone='09012345678' WHERE id='with-phone'");
  const preview=await post(closurePath+'/preview',closureInput);expect((await preview.json() as any).data.reservations[0]).toMatchObject({customerPhone:'09012345678',friendId:null,isLineFriend:false});
- await create({...closureInput,memo:'設備の交換'});const res=await create();expect(res.body).toMatchObject({code:'closure_overlap',data:{conflicts:[expect.objectContaining({name:'設備の交換',startDate:'2026-11-10',endDate:'2026-11-10'})]}});
+ await create({...closureInput,memo:'設備の交換'});const res=await create();expect(res.body).toMatchObject({code:'closure_overlap',data:{conflicts:[expect.objectContaining({name:'設備の交換',startDate:SLOT_DATE,endDate:SLOT_DATE})]}});
 });
 test('連絡済みは作成後に担当者が手動送信した重なる予約だけを数え、同じ予約は一度',async()=>{
  seedReservation('r1');seedReservation('r2','confirmed','table-2');seedReservation('r3','confirmed',null);
