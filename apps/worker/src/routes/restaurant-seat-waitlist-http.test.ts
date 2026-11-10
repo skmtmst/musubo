@@ -52,8 +52,9 @@ let testDb: SqliteD1;
 let env: Env['Bindings'];
 
 const TENANT = '00000000-0000-4000-8000-000000000001';
-const SLOT = '2026-11-10T09:00:00.000Z';
-const SLOT_END = '2026-11-10T11:00:00.000Z';
+const SLOT = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+const SLOT_END = new Date(Date.parse(SLOT) + 2 * 60 * 60 * 1000).toISOString();
+const SLOT_DATE = SLOT.slice(0, 10);
 
 function seedStore() {
   testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`).run(TENANT);
@@ -268,16 +269,17 @@ describe('飲食2の共通受付と権限',()=>{
   expect((await depart()).status).toBe(200);expect((await depart()).status).toBe(200);
   expect(cardSender).not.toHaveBeenCalled();expect(commonSender).toHaveBeenCalledTimes(1);
   expect(testDb.raw.prepare('SELECT status,table_id FROM rt_seat_waitlist').get()).toMatchObject({status:'invited',table_id:'table-1'});
-  expect((await get('/api/restaurant-test/rotation?storeId=store-s&date=2026-11-10')).status).toBe(200);
+  expect((await get(`/api/restaurant-test/rotation?storeId=store-s&date=${SLOT_DATE}`)).status).toBe(200);
  });
  test('閲覧のみは更新できず、別組織の予約と集計は読めない',async()=>{
   seedReservation('res-own');
   authMocks.getStaffByApiKey.mockResolvedValue({id:'viewer-1',name:'閲覧',role:'staff',access_level:'read_only',tenant_id:TENANT,is_active:1} as never);
   expect((await post('/api/restaurant-test/reservations/res-own/attendance',{action:'visited',expectedVersion:1,requestId:'forbidden'})).status).toBe(403);
   authMocks.getStaffByApiKey.mockResolvedValue(null);
-  testDb.raw.exec("INSERT INTO rt_organizations(id,account_id,name) VALUES('other-o','other-account','別組織');INSERT INTO rt_stores(id,organization_id,name,code) VALUES('other-s','other-o','別店','X');INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at,status) VALUES('other-r','other-s','phone','架空客',1,'2026-11-10T09:00:00Z','2026-11-10T10:00:00Z','confirmed')");
+  testDb.raw.exec("INSERT INTO rt_organizations(id,account_id,name) VALUES('other-o','other-account','別組織');INSERT INTO rt_stores(id,organization_id,name,code) VALUES('other-s','other-o','別店','X')");
+  testDb.raw.prepare("INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at,status) VALUES('other-r','other-s','phone','架空客',1,?,?,'confirmed')").run(SLOT, SLOT_END);
   expect((await post('/api/restaurant-test/reservations/other-r/attendance',{action:'visited',expectedVersion:1,requestId:'other'})).status).toBe(404);
-  expect((await get('/api/restaurant-test/rotation?storeId=other-s&date=2026-11-10')).status).toBe(404);
+  expect((await get(`/api/restaurant-test/rotation?storeId=other-s&date=${SLOT_DATE}`)).status).toBe(404);
   expect(testDb.raw.prepare("SELECT customer_version FROM rt_reservations WHERE id='other-r'").get()).toEqual({customer_version:1});
  });
 });
