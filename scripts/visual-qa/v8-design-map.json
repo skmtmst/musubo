@@ -3143,7 +3143,7 @@
           "fill:本文={名前}さん、10月の営業日のお知らせです。10/12（月）は臨時休業いたします。",
           "日時を決める",
           "承認する人",
-          "承認する人：佐藤 美咲（管理者）",
+          "承認する人：見本 121（管理者）",
           "選ぶ"
         ],
         "viewportHeight": 900,
@@ -3172,7 +3172,7 @@
                 "representatives": [
                   {
                     "friendId": "friend-1",
-                    "displayName": "Kenta Kawano",
+                    "displayName": "Demo Person",
                     "pictureUrl": null,
                     "summary": "予約・未対応"
                   },
@@ -3184,7 +3184,7 @@
                   },
                   {
                     "friendId": "friend-3",
-                    "displayName": "菅野 亮",
+                    "displayName": "見本 15",
                     "pictureUrl": null,
                     "summary": "予約・未対応"
                   }
@@ -5157,7 +5157,7 @@
       "exportHtml": "html/Z0jHp.html",
       "exportTexts": "pencil-texts/Z0jHp.tsv",
       "exportSha256": "09d802691062c03650e1e109e7586f1405391161f1721030ad675a2430adc950",
-      "textsSha256": "ee994f7933f8223fd9c9b40bbd06c404ca011c79bfdeed2ade294e0330510587"
+      "textsSha256": "ee994f7933f8223fd9c9b40bbd06c404ca011c79bfdeed2ade294e0300000587"
     },
     "Z0uO6": {
       "doc": "V8",
@@ -6531,7 +6531,7 @@
                     "store_name": "然 渋谷店",
                     "source": "line",
                     "external_id": null,
-                    "customer_name": "佐藤 健二",
+                    "customer_name": "見本 115",
                     "customer_phone": null,
                     "line_uid": "U-demo",
                     "guest_count": 2,
@@ -6552,7 +6552,7 @@
                     "store_name": "然 渋谷店",
                     "source": "phone",
                     "external_id": null,
-                    "customer_name": "鈴木 美咲",
+                    "customer_name": "見本 183",
                     "customer_phone": null,
                     "line_uid": null,
                     "guest_count": 4,
@@ -6573,7 +6573,7 @@
                     "store_name": "然 渋谷店",
                     "source": "line",
                     "external_id": null,
-                    "customer_name": "高橋 さくら（初来店）",
+                    "customer_name": "見本 187（初来店）",
                     "customer_phone": null,
                     "line_uid": "U-demo",
                     "guest_count": 2,
@@ -6594,7 +6594,7 @@
                     "store_name": "然 渋谷店",
                     "source": "line",
                     "external_id": null,
-                    "customer_name": "田中 大輔",
+                    "customer_name": "見本 166",
                     "customer_phone": null,
                     "line_uid": "U-demo",
                     "guest_count": 4,
@@ -6615,7 +6615,7 @@
                     "store_name": "然 渋谷店",
                     "source": "phone",
                     "external_id": null,
-                    "customer_name": "伊藤 由紀",
+                    "customer_name": "見本 108",
                     "customer_phone": null,
                     "line_uid": null,
                     "guest_count": 6,
@@ -6636,7 +6636,7 @@
                     "store_name": "然 渋谷店",
                     "source": "hotpepper",
                     "external_id": null,
-                    "customer_name": "渡辺 翔",
+                    "customer_name": "見本 160",
                     "customer_phone": null,
                     "line_uid": null,
                     "guest_count": 3,
@@ -6657,7 +6657,7 @@
                     "store_name": "然 渋谷店",
                     "source": "line",
                     "external_id": null,
-                    "customer_name": "山本 彩",
+                    "customer_name": "見本 140",
                     "customer_phone": null,
                     "line_uid": "U-demo",
                     "guest_count": 2,
@@ -8513,8 +8513,8 @@
       "state": {
         "click": [
           "電話予約",
-          "fill:電話番号=090-1111-2222",
-          "山田 花子 LINE の友だち・090-1111-2222"
+          "fill:電話番号=090-0000-2222",
+          "見本 143 LINE の友だち・090-0000-2222"
         ],
         "api": [
           {
@@ -8530,7 +8530,7 @@
                     "store_name": "然 渋谷店",
                     "source": "line",
                     "external_id": null,
-                    "customer_name": "佐藤 健二",
+                    "customer_name": "見本 115",
                     "customer_phone": null,
                     "line_uid": "U-demo",
                     "guest_count": 2,
@@ -8551,7 +8551,7 @@
                     "store_name": "然 渋谷店",
                     "source": "phone",
                     "external_id": null,
-                    "customer_name": "鈴木 美咲",
+                    "customer_name": "見本 183",
                     "customer_phone": null,
                     "line_uid": null,
                     "guest_count": 4,
@@ -8572,7 +8572,7 @@
                     "store_name": "然 渋谷店",
                     "source": "line",
                     "external_id": null,
-                    "customer_name": "高橋 さくら（初来店）",
+                    "customer_name": "見本 187（初来店）",
                     "customer_phone": null,
                     "line_uid": "U-demo",
                     "guest_count": 2,
@@ -8593,7 +8593,7 @@
                     "store_name": "然 渋谷店",
                     "source": "line",
                     "external_id": null,
-                    "customer_name": "田中 大輔",
+                    "customer_name": "見本 166",
                     "customer_phone": null,
                     "line_uid": "U-demo",
                     "guest_count": 4,
@@ -8614,7 +8614,7 @@
                     "store_name": "然 渋谷店",
                     "source": "phone",
                     "external_id": null,
-                    "customer_name": "伊藤 由紀",
+                    "customer_name": "見本 108",
                     "customer_phone": null,
                     "line_uid": null,
                     "guest_count": 6,
@@ -8635,7 +8635,7 @@
                     "store_name": "然 渋谷店",
                     "source": "hotpepper",
                     "external_id": null,
-                    "customer_name": "渡辺 翔",
+                    "customer_name": "見本 160",
                     "customer_phone": null,
                     "line_uid": null,
                     "guest_count": 3,
@@ -8656,7 +8656,7 @@
                     "store_name": "然 渋谷店",
                     "source": "line",
                     "external_id": null,
-                    "customer_name": "山本 彩",
+                    "customer_name": "見本 140",
                     "customer_phone": null,
                     "line_uid": "U-demo",
                     "guest_count": 2,
@@ -10422,7 +10422,7 @@
       "exportHtml": "html/xOQKw.html",
       "exportTexts": "pencil-texts/xOQKw.tsv",
       "exportSha256": "e7b51ba4f8d3c38414d12a63d69a846180596a0a1f345dc6c80825eb97b6f2f7",
-      "textsSha256": "3987bbce52578e6422ccdd1188ba0652382972fd76057688d4638c2109ffc509"
+      "textsSha256": "3987bbce52578e6422ccdd1188ba0600002972fd76057688d4638c2109ffc509"
     },
     "Z3gJS": {
       "doc": "V8",

@@ -49,7 +49,7 @@ export const settingsMethods = {
     getAllergyOptions: (accountId: string) => fetchApi<{ success: boolean; data: {version: number; options: string[]}; error?: string }>(`/api/account-settings/allergy-options?accountId=${encodeURIComponent(accountId)}`),
     saveAllergyOptions: (accountId: string, options: string[], expectedVersion: number) => fetchApi<{success: boolean; data?: {version: number}; error?: string}>('/api/account-settings/allergy-options', { method: 'PUT', body: JSON.stringify({accountId, options, expectedVersion}) }),
     getTestRecipients: (accountId: string) =>
-      fetchApi<{ success: boolean; data: Array<{ id: string; displayName: string; pictureUrl: string | null }> }>(`/api/account-settings/test-recipients?accountId=${accountId}`),
+      fetchApi<{ success: boolean; confirmationRevision: number; data: Array<{ id: string; displayName: string; pictureUrl: string | null }> }>(`/api/account-settings/test-recipients?accountId=${accountId}`),
     getTestRecipientLoginUsers: (accountId: string) =>
       fetchApi<{
         success: boolean

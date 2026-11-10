@@ -106,7 +106,7 @@ export async function runExpirer(
     // requested 行に対してのみ expired 化する。changes=0 なら後続処理（通知/reminders cancel）
     // をスキップして、誤通知を防ぐ。
     const upd = await db
-      .prepare(`UPDATE bookings SET status='expired', decided_at = ? WHERE id = ? AND status = 'requested'
+      .prepare(`UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status='expired', decided_at = ? WHERE id = ? AND status = 'requested'
         AND NOT EXISTS (SELECT 1 FROM booking_payments p WHERE p.booking_id = bookings.id
           AND p.line_account_id = bookings.line_account_id AND p.status = 'paid')`)
       .bind(params.now.toISOString(), row.id)

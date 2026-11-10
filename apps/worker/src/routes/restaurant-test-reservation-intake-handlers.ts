@@ -370,7 +370,7 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
   const capacity = changesSlot && reservationSlotActive(next.status) ? await restaurantSeatCapacity(db,current.store_id,next.starts_at,next.ends_at,current.id) : null;
   if(capacity && !capacity.select({startsAt:next.starts_at,endsAt:next.ends_at,guestCount:next.guest_count,tableId:next.table_id}))return c.json({success:false,code:'availability_conflict',error:'未配席の予約を含め、人数が入る空き卓がありません'},409);
   const update = db.prepare(`UPDATE rt_reservations SET
-    customer_name = ?, customer_phone = ?, guest_count = ?, starts_at = ?, ends_at = ?,
+    confirmation_revision = confirmation_revision + 1, customer_name = ?, customer_phone = ?, guest_count = ?, starts_at = ?, ends_at = ?,
     table_id = ?, course_id = ?, status = ?, allergy_note = ?, note = ?, cancel_reason = ?, customer_version=customer_version+1, updated_at = datetime('now')
     WHERE id = ? AND customer_version = ?`).bind(
       next.customer_name, next.customer_phone, next.guest_count, next.starts_at, next.ends_at,
@@ -472,24 +472,33 @@ export const delete__api_restaurant_test_seat_waitlist_id_8 = async (c: Context<
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const id = c.req.param('id');
+  const rawRevision = c.req.query('expectedConfirmationRevision');
+  if (rawRevision !== undefined && (!/^[1-9]\d*$/.test(rawRevision) || !Number.isSafeInteger(Number(rawRevision)))) {
+    return c.json({ success: false, error: '確認した版が不正です' }, 400);
+  }
+  const expectedRevision = rawRevision === undefined ? null : Number(rawRevision);
   const entry = await dbFor(c.env).prepare(
-    `SELECT w.store_id, w.starts_at, w.status, w.table_id FROM rt_seat_waitlist w
+    `SELECT w.store_id, w.starts_at, w.status, w.table_id, w.confirmation_revision FROM rt_seat_waitlist w
        JOIN rt_stores s ON s.id = w.store_id
       WHERE w.id = ? AND s.organization_id = ?
         AND (? IS NULL OR s.id = ?)`,
   ).bind(id, organization.id, organization.scopedStoreId, organization.scopedStoreId)
-    .first<{ store_id: string; starts_at: string; status: string; table_id: string | null }>();
+    .first<{ store_id: string; starts_at: string; status: string; table_id: string | null; confirmation_revision: number }>();
   if (!entry) return c.json({ success: false, error: '見つかりません' }, 404);
+  if (expectedRevision !== null && entry.confirmation_revision !== expectedRevision) return c.json({ success: false, error: '状態が変わりました。読み直してください', current: entry }, 409);
   if (entry.status !== 'waiting' && entry.status !== 'invited') {
-    return c.json({ success: false, error: 'すでに終わっています' }, 409);
+    return c.json({ success: false, error: 'すでに終わっています', current: entry }, 409);
   }
   const wasInvited = entry.status === 'invited';
   const updated = await dbFor(c.env, entry.store_id).prepare(
-    `UPDATE rt_seat_waitlist SET status = 'cancelled', updated_at = datetime('now')
-      WHERE id = ? AND status IN ('waiting', 'invited')`,
-  ).bind(id).run();
+    `UPDATE rt_seat_waitlist SET confirmation_revision=confirmation_revision+1, status = 'cancelled', updated_at = datetime('now')
+      WHERE id = ? AND status IN ('waiting', 'invited')
+        AND (? IS NULL OR (confirmation_revision = ? AND status = ? AND store_id = ?))`,
+  ).bind(id, expectedRevision, expectedRevision, entry.status, entry.store_id).run();
   if ((updated.meta?.changes ?? 0) === 0) {
-    return c.json({ success: false, error: 'すでに終わっています' }, 409);
+    if (expectedRevision === null) return c.json({ success: false, error: 'すでに終わっています' }, 409);
+    const current = await dbFor(c.env, entry.store_id).prepare('SELECT store_id, starts_at, status, table_id, confirmation_revision FROM rt_seat_waitlist WHERE id = ? AND store_id = ?').bind(id, entry.store_id).first();
+    return c.json({ success: false, error: '状態が変わりました。読み直してください', current }, 409);
   }
   if (wasInvited && entry.table_id) {
     // 見送りで仮押さえが空いたら、その卓に入る次の組へすぐ回す。
@@ -538,7 +547,7 @@ export const post__api_restaurant_test_seat_waitlist_id_convert_9 = async (c: Co
     return c.json({ success: false, error: '予約が待ちと合いません' }, 409);
   }
   const updated=await dbFor(c.env, entry.store_id).prepare(
-    `UPDATE rt_seat_waitlist SET status = 'converted', updated_at = datetime('now')
+    `UPDATE rt_seat_waitlist SET confirmation_revision=confirmation_revision+1, status = 'converted', updated_at = datetime('now')
       WHERE id = ? AND status='invited' AND julianday(hold_expires_at)>julianday('now')`,
   ).bind(id).run();
   if(!updated.meta.changes)return c.json({success:false,error:'案内の期限または状態が変わりました'},409);
@@ -628,7 +637,7 @@ export const post__api_restaurant_test_inbound_reservations_13 = async (c: Conte
     await dbFor(c.env, body.storeId).prepare(`INSERT INTO rt_reservations
       (id, store_id, source, external_id, hub_source, customer_name, customer_phone, line_uid, guest_count, starts_at, ends_at, table_id, course_id, status, allergy_note, note, source_updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(store_id, source, external_id) DO UPDATE SET
+      ON CONFLICT(store_id, source, external_id) DO UPDATE SET confirmation_revision = rt_reservations.confirmation_revision + 1,
         customer_name = excluded.customer_name, customer_phone = excluded.customer_phone,
         line_uid = excluded.line_uid, guest_count = excluded.guest_count, starts_at = excluded.starts_at,
         ends_at = excluded.ends_at, table_id = excluded.table_id, course_id = excluded.course_id,

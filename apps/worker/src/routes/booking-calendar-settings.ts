@@ -64,7 +64,7 @@ bookingCalendarSettings.post('/api/booking/admin/bookings/:id/meeting',async (c:
  gapWrite(c);const a=await gapAccount(c),b=await gapBody(c),id=c.req.param('id'),v=gapVersion(b.expectedVersion);
  if(b.action!=='set_manual'&&b.action!=='refresh_fixed')throw new GapError('automatic_meeting_not_available',409);
  if(b.action==='set_manual'&&(!validMeetingUrl(b.url)||b.url===null))throw new GapError('invalid_meeting_url');
- const r=await c.env.DB.prepare(`UPDATE bookings SET meeting_url=CASE WHEN ?='set_manual' THEN ? ELSE COALESCE((SELECT fixed_meeting_url FROM staff WHERE id=bookings.staff_id),(SELECT fixed_meeting_url FROM menus WHERE id=bookings.menu_id)) END,
+ const r=await c.env.DB.prepare(`UPDATE bookings SET confirmation_revision = confirmation_revision + 1, meeting_url=CASE WHEN ?='set_manual' THEN ? ELSE COALESCE((SELECT fixed_meeting_url FROM staff WHERE id=bookings.staff_id),(SELECT fixed_meeting_url FROM menus WHERE id=bookings.menu_id)) END,
   meeting_url_source=CASE WHEN ?='set_manual' THEN 'manual' WHEN (SELECT fixed_meeting_url FROM staff WHERE id=bookings.staff_id) IS NOT NULL THEN 'staff' ELSE 'menu' END,
   lock_version=lock_version+1 WHERE id=? AND line_account_id=? AND status='confirmed' AND meeting_mode='online' AND lock_version=?`)
  .bind(b.action,b.url??null,b.action,id,a,v).run();
@@ -80,7 +80,7 @@ bookingCalendarSettings.post('/api/booking/admin/bookings/:id/calendar/rewrite',
  if(!sw.writeEnabled||!store.writeEnabled)throw new GapError('calendar_write_disabled',409);
  const token=crypto.randomUUID();
  const r=await c.env.DB.batch([
-  c.env.DB.prepare('UPDATE bookings SET lock_version=lock_version+1 WHERE id=? AND line_account_id=? AND lock_version=?').bind(id,account,v),
+  c.env.DB.prepare('UPDATE bookings SET confirmation_revision = confirmation_revision + 1, lock_version=lock_version+1 WHERE id=? AND line_account_id=? AND lock_version=?').bind(id,account,v),
   c.env.DB.prepare(`INSERT INTO booking_calendar_switch_jobs(id,line_account_id,staff_id,booking_id,action,switch_scope,switch_version,created_at)
    SELECT ?,?,?,?,'write',?,?,? WHERE changes()=1 ON CONFLICT(booking_id,action,switch_scope,switch_version) DO UPDATE SET status='pending',attempts=0,error_code=NULL`)
    .bind(token,account,booking.staff_id,id,booking.staff_id,sw.version,new Date().toISOString())

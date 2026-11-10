@@ -564,7 +564,7 @@ export async function cancelMeetConsultation(
   const claimId = crypto.randomUUID();
   const claimed = await db
     .prepare(
-      `UPDATE meet_consultations SET status='cancelled', cancel_claim_id=?, updated_at=?
+      `UPDATE meet_consultations SET confirmation_revision = confirmation_revision + 1, status='cancelled', cancel_claim_id=?, updated_at=?
         WHERE id=?
           AND (booking_version = ? OR (booking_version IS NULL AND ? IS NULL))
           AND (booking_id = ? OR (booking_id IS NULL AND ? IS NULL)) AND schedule_revision=?`,
@@ -629,7 +629,7 @@ export async function cancelMeetConsultation(
       // 再送で回復できる。
       await db
         .prepare(
-          `UPDATE meet_consultations SET status=?, cancel_claim_id=NULL, updated_at=?
+          `UPDATE meet_consultations SET confirmation_revision = confirmation_revision + 1, status=?, cancel_claim_id=NULL, updated_at=?
             WHERE id=? AND status='cancelled' AND cancel_claim_id=?`,
         )
         .bind(consultation.status, nowIso, consultation.id, claimId)

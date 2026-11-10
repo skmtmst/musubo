@@ -218,10 +218,22 @@ export function HqTestSendDialog({
   const scope = useRef({ open, chosen, generation: 0 })
   if (scope.current.open !== open || scope.current.chosen !== chosen) scope.current = { open, chosen, generation: scope.current.generation + 1 }
   const renderedScope = scope.current
+  const [recipients, setRecipients] = useState<{ scope: typeof renderedScope; count: number; recipients: Array<{id:string;displayName:string|null}>; token: string } | null>(null)
+  const [recipientsError, setRecipientsError] = useState(false)
+  useEffect(() => {
+    let alive = true
+    setRecipients(null); setRecipientsError(false)
+    if (renderedScope.open && renderedScope.chosen) void hqBroadcastsApi.testRecipients(renderedScope.chosen).then(result => {
+      if (alive && result.success && Number.isSafeInteger(result.data.count) && result.data.count > 0 && result.data.count <= 5 && Array.isArray(result.data.recipients) && result.data.recipients.length === result.data.count && result.data.recipients.every(person => typeof person.id === 'string' && (person.displayName === null || typeof person.displayName === 'string')) && /^[a-f0-9]{64}$/.test(result.data.token)) setRecipients({ scope: renderedScope, ...result.data })
+      else if (alive) setRecipientsError(true)
+    }).catch(() => { if (alive) setRecipientsError(true) })
+    return () => { alive = false }
+  }, [renderedScope])
   const lock = useRef<object | null>(null)
   useEffect(() => { lock.current = null; setBusy(false); setError('') }, [renderedScope])
   const send = async () => {
-    if (!open || !chosen || busy || lock.current || renderedScope !== scope.current) return
+    if (!open || !chosen || busy || lock.current || renderedScope !== scope.current || !recipients || recipients.scope !== renderedScope) return
+    const confirmedRecipients = recipients
     const ticket = {}; lock.current = ticket
     const current = () => scope.current === renderedScope && lock.current === ticket
     setBusy(true); setError('')
@@ -229,12 +241,19 @@ export function HqTestSendDialog({
       const id = await prepare()
       if (!current()) return
       if (!id) { setError('先に入れていない所を直してください。'); return }
-      const result = (await hqBroadcastsApi.testSend(id, chosen)).data
+      const result = (await hqBroadcastsApi.testSend(id, chosen, confirmedRecipients.token)).data
       if (!current()) return
       notifyToast(result.failed ? `テストを ${formatNumber(result.sent)} 人に送りました（${formatNumber(result.failed)} 人は送れませんでした）` : `テストを ${formatNumber(result.sent)} 人に送りました`)
       onClose()
     } catch (caught) {
-      if (current()) setError(errorText(caught, 'テストを送れませんでした。アカウントのテスト送信の宛先を確かめてください。'))
+      if (current()) {
+        if (caught instanceof ApiError && caught.status === 409 && caught.code === 'HQ_TEST_RECIPIENT_CHANGED') {
+          const data = caught.data as {count?:unknown} | undefined
+          const count = typeof data?.count === 'number' && Number.isSafeInteger(data.count) ? `現在 ${formatNumber(data.count)} 人です。` : ''
+          setRecipients(null); setRecipientsError(true)
+          setError(`テスト宛先が変わりました。${count}閉じて確認し直してください。`)
+        } else setError(errorText(caught, 'テストを送れませんでした。アカウントのテスト送信の宛先を確かめてください。'))
+      }
     } finally {
       if (current()) { lock.current = null; setBusy(false) }
     }
@@ -249,9 +268,12 @@ export function HqTestSendDialog({
       busy={busy}
       error={error || undefined}
       onCancel={() => { if (!busy) { setError(''); onClose() } }}
-      onConfirm={chosen ? () => send() : undefined}
+      confirmDisabled={recipients?.scope !== renderedScope}
+      confirmDisabledReason="テスト送信の宛先を確認してください。"
+      onConfirm={() => send()}
     >
       {chosen && <OperationTargetSummary accounts={[{ id: chosen, name: accounts.find(account => account.id === chosen)?.name }]} />}
+      {recipients?.scope === renderedScope ? <p>送信先 {formatNumber(recipients.count)} 人：{recipients.recipients.map(person => person.displayName || '名前未設定').join('、')}</p> : <p>{recipientsError ? 'テスト送信の宛先を確認できません。' : 'テスト送信の宛先を確認しています。'}</p>}
       {accounts.length === 0 ? <p className="text-ink-faint text-xs">先に送るアカウントを選んでください。</p> : (
         <HqAccountSelectField label="テストを送るアカウント" accounts={accounts} value={chosen} onChange={setAccountId} disabled={busy} />
       )}

@@ -18,7 +18,7 @@ vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNod
 const ticket = {
   id: 't1', ticketNo: 312, ticketLabel: '#MB-0312', tenantId: 'tenant-a', tenantName: '株式会社サンプル',
   tenantPlanKey: 'standard', tenantPlanStatus: 'active', tenantStatus: 'active',
-  staffId: 's1', staffName: '山田 太郎', staffRole: 'owner', staffEmailRegistered: true,
+  staffId: 's1', staffName: '見本 141', staffRole: 'owner', staffEmailRegistered: true,
   kind: 'bug', kindLabel: '不具合', subject: '回答フォームからタグが付かない', subjectAuto: false,
   body: '設定したタグが友だちに付きません。', attachments: [{ key: 'support/a.png', url: 'https://api.example.test/images/support/a.png', name: 'a.png' }],
   stage: 'new', stageLabel: '新規', priority: 'high', priorityLabel: '高', channel: 'admin', channelLabel: '管理画面',
@@ -58,7 +58,7 @@ function respond(url: string, init?: RequestInit) {
   if (url.endsWith('/reply')) return json({ success: true, data: { ticket: { ...ticket, stage: 'waiting', stageLabel: '待ち' }, message: {}, mailSent: true, mailSkippedReason: null } }, 201)
   if (url.endsWith('/api/ops/support/tickets/t1')) {
     return json({ success: true, data: { ticket, tenant: { accountCount: 4, staffCount: 6, staffWithLine: 5, pastTickets: 12, pastOpen: 0 }, messages: [
-      { id: 'm1', authorKind: 'ops', authorName: '坂本 真人', body: '該当のフォームを確認します。', attachments: [], aiAssisted: false, deliveredVia: ['screen', 'email'], createdAt: '2026-09-15T09:05:00.000+09:00' },
+      { id: 'm1', authorKind: 'ops', authorName: '見本 25', body: '該当のフォームを確認します。', attachments: [], aiAssisted: false, deliveredVia: ['screen', 'email'], createdAt: '2026-09-15T09:05:00.000+09:00' },
     ], draft, knowledge, ai: { available: true } } })
   }
   return json({ success: false, error: `unexpected ${method} ${url}` }, 404)
@@ -240,7 +240,7 @@ describe('画面', () => {
     expect(information).toContain('6人中5人')
     // m22d: 一覧の件数と重なる「○件」は出さない。未解決を先に言う。
     expect(information).toContain('これまで12のうち未解決0件')
-    expect(text).toContain('運営 坂本 真人')
+    expect(text).toContain('運営 見本 25')
     expect(text).toContain('a.png（契約先から）')
     expect(text).toContain('AIで下書きを作る')
     expect(host.querySelector('[data-design-node="P0jhqO"]')).not.toBeNull()

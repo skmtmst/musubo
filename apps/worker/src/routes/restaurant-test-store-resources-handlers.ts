@@ -73,7 +73,7 @@ export const put__api_restaurant_test_tables_layout_1 = async (c: Context<Env, "
   const result=await db.batch([db.prepare(`UPDATE rt_floors SET version=version+1 WHERE id='floor-'||? AND version=? AND (SELECT COUNT(*) FROM rt_tables WHERE store_id=? AND floor_id=rt_floors.id AND id IN(SELECT json_extract(value,'$.id') FROM json_each(?)))=?`).bind(body.storeId,body.expectedVersion,body.storeId,JSON.stringify(rows),rows.length),db.prepare(`WITH positions AS MATERIALIZED (
     SELECT json_extract(value,'$.id') AS id,json_extract(value,'$.floorX') AS x,json_extract(value,'$.floorY') AS y,json_extract(value,'$.joinGroup') AS join_group FROM json_each(?)
   ), eligible AS MATERIALIZED (SELECT t.id FROM rt_tables t JOIN positions p ON p.id=t.id WHERE t.store_id=?)
-  UPDATE rt_tables SET floor_x=(SELECT x FROM positions WHERE id=rt_tables.id),floor_y=(SELECT y FROM positions WHERE id=rt_tables.id),
+  UPDATE rt_tables SET confirmation_revision=confirmation_revision+1, floor_x=(SELECT x FROM positions WHERE id=rt_tables.id),floor_y=(SELECT y FROM positions WHERE id=rt_tables.id),
     join_group=(SELECT join_group FROM positions WHERE id=rt_tables.id),updated_at=datetime('now')
     WHERE id IN (SELECT id FROM eligible) AND (SELECT COUNT(*) FROM eligible)=? AND changes()=1`)
     .bind(JSON.stringify(rows), body.storeId, rows.length)]);
@@ -202,7 +202,7 @@ export const patch__api_restaurant_test_tables_id_4 = async (c: Context<Env, "/a
    const shape=source?.tables.find(t=>t.id===c.req.param('id'));
    if(!target||!shape||!tablePlacementFits(target,{...shape,x:body.floorX??current.floor_x,y:body.floorY??current.floor_y,width:body.width??shape.width,height:body.height??shape.height,rotation:body.rotation??shape.rotation,shape:(body.shape??shape.shape) as typeof shape.shape}))return inputError(c,{success:false,error:'座席図の空いている位置を選んでください'},400,['floorX','floorY','floorId']);
   }
-  const update=db.prepare(`UPDATE rt_tables SET code = ?, label = ?, seat_type = ?, min_capacity = ?, max_capacity = ?, is_active = ?, floor_x = ?, floor_y = ?, join_group = ?,floor_id=?,shape=COALESCE(?,shape),width=COALESCE(?,width),height=COALESCE(?,height),rotation=COALESCE(?,rotation),smoking_policy=COALESCE(?,smoking_policy),partition_type=COALESCE(?,partition_type),shoes_allowed=COALESCE(?,shoes_allowed),visible_on_map=COALESCE(?,visible_on_map),chair_arrangement=COALESCE(?,chair_arrangement),chair_side=CASE WHEN ?=1 THEN ? ELSE chair_side END,seat_detail_type=COALESCE(?,seat_detail_type), updated_at = datetime('now') WHERE id = ? AND (?=0 OR changes()=1)`)
+  const update=db.prepare(`UPDATE rt_tables SET confirmation_revision=confirmation_revision+1, code = ?, label = ?, seat_type = ?, min_capacity = ?, max_capacity = ?, is_active = ?, floor_x = ?, floor_y = ?, join_group = ?,floor_id=?,shape=COALESCE(?,shape),width=COALESCE(?,width),height=COALESCE(?,height),rotation=COALESCE(?,rotation),smoking_policy=COALESCE(?,smoking_policy),partition_type=COALESCE(?,partition_type),shoes_allowed=COALESCE(?,shoes_allowed),visible_on_map=COALESCE(?,visible_on_map),chair_arrangement=COALESCE(?,chair_arrangement),chair_side=CASE WHEN ?=1 THEN ? ELSE chair_side END,seat_detail_type=COALESCE(?,seat_detail_type), updated_at = datetime('now') WHERE id = ? AND (?=0 OR changes()=1)`)
     .bind(code.trim(), label.trim(), seatType, min, max, body.isActive === undefined ? current.is_active : Number(body.isActive), body.floorX ?? current.floor_x, body.floorY ?? current.floor_y, body.joinGroup === undefined ? current.join_group : body.joinGroup?.trim() || null, body.floorId??current.floor_id,body.shape??null,body.width??null,body.height??null,body.rotation??null,body.smokingPolicy??null,body.partition??null,body.shoesAllowed===undefined?null:Number(body.shoesAllowed),body.visibleOnMap===undefined?null:Number(body.visibleOnMap),body.chairArrangement??null,Number(body.chairSide!==undefined),body.chairSide??null,body.seatDetailType??null,c.req.param('id'),Number(changesLayout));
   try {
    if(changesLayout){const saved=await db.batch([db.prepare('UPDATE rt_floors SET version=version+1 WHERE id=? AND archived_at IS NULL AND version=? AND (?=0 OR EXISTS(SELECT 1 FROM rt_floors target WHERE target.id=? AND target.archived_at IS NULL AND target.version=?))').bind(current.floor_id,body.expectedVersion!,Number(movingFloor),body.floorId??current.floor_id,body.expectedTargetVersion??0),...(movingFloor?[db.prepare('UPDATE rt_floors SET version=version+1 WHERE id=? AND archived_at IS NULL AND version=? AND changes()=1').bind(body.floorId!,body.expectedTargetVersion!)]:[]),update]);if(!saved[0].meta.changes)return c.json({success:false,code:'version_conflict',error:'座席図を読み直してください'},409)}else await update.run();
@@ -387,11 +387,23 @@ export const delete__api_restaurant_test_menus_id_12 = async (c: Context<Env, "/
     WHERE m.id = ? AND s.organization_id = ? AND (? IS NULL OR s.id = ?)`)
     .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
     .first<{ id: string; store_id: string }>();
-  if (!menu || !await storeBelongsTo(c,organization.id,menu.store_id)) return c.json({ success: false, error: 'メニューが見つかりません' }, 404);
+  if (!menu || !await storeBelongsTo(c,organization.id,menu.store_id)) return c.json({ success: false, error: 'すでに削除されています' }, 404);
+  let body: { expectedVersion?: number } = {};
+  if (c.req.raw.body) {
+    const raw = await c.req.text();
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) body = parsed as typeof body;
+      else if (/expectedVersion/i.test(raw)) return inputError(c, { success: false, error: '確認した版が正しくありません' }, 400, ['expectedVersion']);
+    } catch {
+      if (/expectedVersion/i.test(raw)) return inputError(c, { success: false, error: '確認した版が正しくありません' }, 400, ['expectedVersion']);
+    }
+  }
+  if (body.expectedVersion !== undefined && (!Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1)) return inputError(c, { success: false, error: '確認した版が正しくありません' }, 400, ['expectedVersion']);
   const key=`reservation:${menu.store_id}`,owner=crypto.randomUUID();
   if (!await acquireLock(db,key,owner)) return c.json({success:false,code:'resource_busy',error:'店舗を更新中です。少し待ってからお試しください'},409);
   try {
-    const result = await db.prepare(`DELETE FROM rt_menu_items WHERE id = ? AND store_id = ?
+    const result = await db.prepare(`DELETE FROM rt_menu_items WHERE id = ? AND store_id = ? AND (? IS NULL OR confirmation_revision = ?)
       AND NOT EXISTS (SELECT 1 FROM rt_resource_locks l WHERE substr(l.resource_key,1,length('form-course:'||rt_menu_items.id||':'))='form-course:'||rt_menu_items.id||':' AND datetime(l.expires_at)>datetime('now'))
       AND NOT EXISTS (SELECT 1 FROM rt_menu_change_requests WHERE menu_id = rt_menu_items.id)
       AND NOT EXISTS (SELECT 1 FROM restaurant_course_payment_settings WHERE menu_id = rt_menu_items.id)
@@ -407,7 +419,12 @@ export const delete__api_restaurant_test_menus_id_12 = async (c: Context<Env, "/
       AND NOT EXISTS (SELECT 1 FROM style_starter_items f, json_tree(COALESCE(f.source_snapshot,'{}')) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)
       AND NOT EXISTS (SELECT 1 FROM style_starter_items f, json_tree(COALESCE(f.pending_update,'{}')) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)
       AND NOT EXISTS (SELECT 1 FROM style_starter_sets f, json_tree(f.definition_json) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)` )
-      .bind(menu.id,menu.store_id).run();
+      .bind(menu.id,menu.store_id,body.expectedVersion ?? null,body.expectedVersion ?? null).run();
+    if (!result.meta.changes) {
+      const latest = await db.prepare('SELECT * FROM rt_menu_items WHERE id = ? AND store_id = ?').bind(menu.id, menu.store_id).first<{ confirmation_revision: number }>();
+      if (!latest) return c.json({ success: false, error: 'すでに削除されています' }, 404);
+      if (body.expectedVersion !== undefined && latest.confirmation_revision !== body.expectedVersion) return c.json({ success: false, code: 'menu_confirmation_conflict', error: 'メニューが変更されました。最新の内容を確認してください', data: latest }, 409);
+    }
     if (!result.meta.changes) return c.json({ success: false, code:'resource_in_use', error: '予約やフォーム、設定などで使われているメニューは削除できません。停止してください' }, 409);
     auditLog(c,'restaurant.menu.delete',{id:menu.id,kind:'rt_menu_item'});
     return c.json({ success: true, data: { id: menu.id } });
@@ -475,9 +492,10 @@ export const put__api_restaurant_test_followups_storeId_steps_stepId_messages_16
   const found=await db.prepare('SELECT id FROM templates WHERE line_account_id=? AND id IN (SELECT value FROM json_each(?))').bind(target.line_account_id,JSON.stringify(templateIds)).all<{id:string}>();
   if(found.results.length!==templateIds.length)return inputError(c,{success:false,error:'この店舗のテンプレートを選んでください'},422,['messageBubbles']);
  }
- const changed=await db.prepare(`UPDATE scenario_steps SET message_bubbles_json=?,message_type=?,message_content=?,template_id=NULL
+ const [changed]=await db.batch([db.prepare(`UPDATE scenario_steps SET message_bubbles_json=?,message_type=?,message_content=?,template_id=NULL
    WHERE id=? AND EXISTS(SELECT 1 FROM rt_store_followup_templates t WHERE t.store_id=? AND t.scenario_id=scenario_steps.scenario_id AND t.template_version=?)`)
-   .bind(JSON.stringify(body.messageBubbles),parts[0].messageType,parts[0].messageContent,stepId,storeId,body.expectedVersion).run();
+   .bind(JSON.stringify(body.messageBubbles),parts[0].messageType,parts[0].messageContent,stepId,storeId,body.expectedVersion),
+  db.prepare('UPDATE scenarios SET content_revision=content_revision+1 WHERE id=? AND changes()>0').bind(target.scenario_id)]);
  if(!changed.meta.changes)return c.json({success:false,error:'version_conflict'},409);
  await refreshScenarioReferences(db,target.scenario_id);
  return c.json({success:true,data:{stepId,messageBubbles:body.messageBubbles,version:Number(body.expectedVersion)+1,sendingStatus:'stopped'}});

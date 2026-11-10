@@ -32,9 +32,11 @@ function useQrImage(url:string|undefined,width:number) {
 export function StorefrontQr({card,accountId,shop,canManage}: {card:VisitStampCard;accountId:string;shop:string;canManage:boolean}) {
   const [qr,setQr]=useState<VisitStampQr|null>(null),[loaded,setLoaded]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false)
   const [confirm,setConfirm]=useState(false),[print,setPrint]=useState(false)
-  const scope=JSON.stringify([card.id,card.version,accountId])
+  const scope=JSON.stringify([card.id,card.version,accountId,qr?.id??null,canManage])
+  const currentScope=useRef(scope),confirmTicket=useRef<object|null>(null)
+  if(currentScope.current!==scope){currentScope.current=scope;confirmTicket.current=null}
+  const renderedTicket=confirmTicket.current
   const [confirmScope,setConfirmScope]=useState('')
-  useEffect(()=>{setConfirm(false);setConfirmScope('')},[scope])
   const pending=useRef<VisitStampQrInput|null>(null),live=useRef(true)
   useEffect(()=>{let cancelled=false;live.current=true;setQr(null);setLoaded(false);setError('');pending.current=null;void visitStampsApi.storefrontQr(card.id,accountId).then(r=>{if(!cancelled){setQr(r.data);setLoaded(true)}}).catch(e=>{if(!cancelled){setError(reason(e));setLoaded(true)}});return()=>{cancelled=true;live.current=false}},[card.id,card.version,accountId])
   const image=useQrImage(qr?.status==='active'?qr.url:undefined,1024)
@@ -51,12 +53,12 @@ export function StorefrontQr({card,accountId,shop,canManage}: {card:VisitStampCa
     <div className={styles.storeRow}>{image.src?<img width={96} height={96} className={styles.thumb} src={image.src} alt="店頭のQR" />:null}
       <div className={styles.storeDetails}><span className={styles.sub}>{`${card.name}・この店で1つ`}</span>
         {qr?.status==='active'?<><div className={styles.actions}><Button variant="secondary" disabled={!image.src} onClick={()=>setPrint(true)}><QrCode size={16} aria-hidden="true" />保存・印刷</Button></div>
-          <div className={styles.actions}>{canManage?<Button variant="text" onClick={()=>{pending.current=null;setConfirmScope(scope);setConfirm(true)}}><RefreshCw size={16} aria-hidden="true" />作り直す</Button>:null}<span className={styles.sub}>{`最後に作り直した日 ${new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric'}).format(new Date(qr.issuedAt))}`}</span></div></>
+          <div className={styles.actions}>{canManage?<Button variant="text" onClick={()=>{pending.current=null;confirmTicket.current={};setConfirmScope(scope);setConfirm(true)}}><RefreshCw size={16} aria-hidden="true" />作り直す</Button>:null}<span className={styles.sub}>{`最後に作り直した日 ${new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric'}).format(new Date(qr.issuedAt))}`}</span></div></>
           :loaded?canManage?<Button variant="secondary" busy={busy} busyLabel="発行しています…" onClick={()=>issue()}>{qr?'店頭のQRを作り直す':'店頭のQRを作る'}</Button>:<span className={styles.sub}>店頭のQRは管理者が発行します。</span>:<span className={styles.sub}>QRを読み込んでいます…</span>}
       </div>
     </div>
     {error||image.error?<Notice tone="danger" message={error||image.error}/>:null}
-    <Dialog open={confirm && confirmScope===scope} designNode="PYDUP" designWidth={560} tone="destructive" confirmation confirmIcon={<RefreshCw size={16} aria-hidden="true"/>} title="店頭の QR を作り直しますか？" confirmLabel="作り直す" busy={busy} error={error||undefined} onCancel={()=>setConfirm(false)} onConfirm={()=>{if(confirmScope===scope)return issue()}}>
+    <Dialog open={confirm && confirmScope===scope && renderedTicket!==null} designNode="PYDUP" designWidth={560} tone="destructive" confirmation confirmIcon={<RefreshCw size={16} aria-hidden="true"/>} title="店頭の QR を作り直しますか？" confirmLabel="作り直す" busy={busy} error={error||undefined} onCancel={()=>{confirmTicket.current=null;setConfirm(false)}} onConfirm={()=>{if(renderedTicket && renderedTicket===confirmTicket.current && confirmScope===currentScope.current && canManage)return issue()}}>
       <OperationTargetSummary accounts={[{id:accountId}]} externalTarget={{label:'カード',name:card.name}} />
       <div className={styles.dialogBody}><p>今の店頭の QR は使えなくなります。印刷した紙を貼り替えてください。</p><p className={styles.sub}>新しい QR は、作り直したあとに［保存・印刷］から出せます。</p></div>
     </Dialog>

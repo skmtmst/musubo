@@ -370,7 +370,7 @@ async function changeScenarioStatus(
   const from = operation === 'stop' ? "('active', 'delivering')" : "('paused')";
   const to = operation === 'stop' ? 'paused' : 'active';
   await context.db.prepare(
-    `UPDATE friend_scenarios SET status = ?, updated_at = ?
+    `UPDATE friend_scenarios SET confirmation_revision = confirmation_revision + 1, status = ?, updated_at = ?
       WHERE friend_id = ? AND scenario_id = ? AND status IN ${from}`,
   ).bind(to, jstNow(), friend.id, scenario.id).run();
 }

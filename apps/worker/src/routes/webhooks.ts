@@ -27,7 +27,7 @@ webhooks.patch('/api/webhooks/incoming/:id/config', requireRole('owner', 'admin'
 
 webhooks.post('/api/webhooks/incoming', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"sourceType":["string"],"secret":["string"],"lineAccountId":["string"],"isActive":["boolean"]}), post__api_webhooks_incoming_4);
 
-webhooks.put('/api/webhooks/incoming/:id', requireRole('owner', 'admin'), requireWebhookSecretOwner, inputJsonBoundary({"name":["string"],"sourceType":["string"],"secret":["string"],"isActive":["boolean"]}), put__api_webhooks_incoming_id_5);
+webhooks.put('/api/webhooks/incoming/:id', requireRole('owner', 'admin'), requireWebhookSecretOwner, inputJsonBoundary({"name":["string"],"sourceType":["string"],"secret":["string"],"isActive":["boolean"],"expectedVersion":["number"]}), put__api_webhooks_incoming_id_5);
 
 webhooks.delete('/api/webhooks/incoming/:id', requireRole('owner'), delete__api_webhooks_incoming_id_6);
 

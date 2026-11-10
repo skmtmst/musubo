@@ -172,7 +172,7 @@ export function Steps({
 }
 
 /** 入力を作り直さず、進む・戻る方向だけを示す。次の操作で前の動きを取り消す。 */
-export function StepContent({ step, children, as: Element = 'div', disabled, elementRef, ...props }: HTMLAttributes<HTMLElement> & { step: number | null; as?: 'div' | 'fieldset'; disabled?: boolean; elementRef?: Ref<HTMLElement> }) {
+export function StepContent({ step, children, as: Element = 'div', disabled, elementRef, slide = true, ...props }: HTMLAttributes<HTMLElement> & { step: number | null; as?: 'div' | 'fieldset'; disabled?: boolean; elementRef?: Ref<HTMLElement>; slide?: boolean }) {
   const ref = useRef<HTMLDivElement & HTMLFieldSetElement>(null)
   useImperativeHandle(elementRef, () => ref.current!)
   const previous = useRef(step)
@@ -181,14 +181,14 @@ export function StepContent({ step, children, as: Element = 'div', disabled, ele
     previous.current = step
     const panel = ref.current
     if (step === null || from === null || from === step || !panel?.animate || !shouldAnimateLeave()) return
-    const animation = panel.animate([
+    const animation = panel.animate(slide ? [
       { transform: step > from ? 'translateX(var(--polish-space-card))' : 'translateX(calc(-1 * var(--polish-space-card)))' },
       { transform: 'translateX(0)' },
-    ], { duration: motionMs('--motion-exit', 150), easing: motionEasing() })
+    ] : [{ opacity: 0 }, { opacity: 1 }], { duration: motionMs('--motion-exit', 150), easing: motionEasing() })
     // 次の操作や閉じる操作による取消は、保存や画面の失敗ではない。
     void animation.finished?.catch(() => {})
     return () => animation.cancel()
-  }, [step])
+  }, [step, slide])
   return <Element {...props} data-step-content disabled={Element === 'fieldset' ? disabled : undefined} ref={ref}>{children}</Element>
 }
 

@@ -1125,7 +1125,7 @@ export default function MediaLibraryListV8() {
           closeDeleteDialog()
         }}
         footer={deleting && impact && (impact.usageCount > 0 || canDeleteMedia({ impact, busy: false })) ? (
-          <DialogActions leadingAction={impact && impact.verified !== false && !impact.canDelete ? '使用先から外すと削除できます' : undefined}>
+          <DialogActions leadingAction={impact && impact.verified !== false && !impact.canDelete ? '使用先から外して削除' : undefined}>
             <>
               <Button type="button" onClick={closeDeleteDialog} disabled={deleteBusy}>
                 キャンセル

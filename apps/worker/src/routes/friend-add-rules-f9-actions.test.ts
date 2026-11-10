@@ -242,7 +242,7 @@ describe('F9: 4つの操作の保存・参照・実行', () => {
 
   it('実行: 4つの操作が友だち追加で実際に動く', async () => {
     seedPublishedRule(testDb.raw, ACTIONS);
-    insertFriend(testDb.raw, 'friend-9', { line_account_id: 'account-1', display_name: '山田 太郎' });
+    insertFriend(testDb.raw, 'friend-9', { line_account_id: 'account-1', display_name: '見本 141' });
 
     const result = await applyFriendAddRouting(testDb.db, 'account-1', { id: 'friend-9' }, undefined, {
       entryRouteId: 'route-1',
@@ -277,7 +277,7 @@ describe('F9: 4つの操作の保存・参照・実行', () => {
     seedPublishedRule(testDb.raw, [
       { type: 'set_friend_field', label: 'x', targetId: 'field-x', value: 'v' },
     ]);
-    insertFriend(testDb.raw, 'friend-9b', { line_account_id: 'account-1', display_name: '鈴木 次郎' });
+    insertFriend(testDb.raw, 'friend-9b', { line_account_id: 'account-1', display_name: '見本 181' });
 
     const result = await applyFriendAddRouting(testDb.db, 'account-1', { id: 'friend-9b' }, undefined, {
       entryRouteId: 'route-1',

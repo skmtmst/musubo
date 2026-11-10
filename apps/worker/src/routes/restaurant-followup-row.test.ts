@@ -242,6 +242,14 @@ it('LINE未接続は版競合と区別して案内する',async()=>{
  expect(response.status).toBe(409);expect(await response.json()).toMatchObject({code:'line_account_required'});
 });
 
+it('来店フォローは長い店名を含むシナリオを作れる', async () => {
+ newStore(); const name = '長い店舗名'.repeat(14);
+ testDb.raw.prepare("UPDATE rt_stores SET name=? WHERE id='new'").run(name);
+ const response = await requestWithMethod(path+'/rows/reservation_created'+scope,'PUT',{expectedRowVersion:1,enabled:true});
+ expect(response.status).toBe(200);
+ expect(testDb.raw.prepare("SELECT name FROM scenarios WHERE line_account_id='account-1'").get()).toEqual({ name: 'LINE来店フォロー：' + name });
+});
+
 describe('来店フォローを使わない判断の保存',()=>{
  it('未保存は未確認、全オフの明示保存は店ごとに残り、古い版を拒否する',async()=>{
   newStore();

@@ -58,7 +58,7 @@ export async function respondToRestaurantConfirmation(db: D1Database, input: {
     }
     const writes: D1PreparedStatement[] = [];
     if (input.response === 'cancel')
-        writes.push(db.prepare(`UPDATE rt_reservations SET status='cancelled',
+        writes.push(db.prepare(`UPDATE rt_reservations SET confirmation_revision = confirmation_revision + 1, status='cancelled',
   customer_version=customer_version+1,hold_expires_at=NULL,updated_at=datetime('now')
   WHERE id=? AND customer_version=? AND status='confirmed'
   AND EXISTS(SELECT 1 FROM rt_reservation_confirmations WHERE request_id=? AND response IS NULL AND julianday(expires_at)>julianday(?))`)

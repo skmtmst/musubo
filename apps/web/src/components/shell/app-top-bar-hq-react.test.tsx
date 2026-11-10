@@ -97,7 +97,7 @@ describe('★V8 統括の上の帯', () => {
     fixture.followerImportState.mockReset()
     fixture.followerImportState.mockResolvedValue({ success: true, data: { phase: 'not_started' } })
     document.documentElement.dataset.theme = fixture.theme
-    window.localStorage.setItem('lh_staff_name', 'Kenta Kawano')
+    window.localStorage.setItem('lh_staff_name', 'Demo Person')
     window.localStorage.setItem('lh_staff_role', 'owner')
     rememberStaffIdentity({ role: 'owner' } as StaffMember)
   })
@@ -127,7 +127,7 @@ describe('★V8 統括の上の帯', () => {
     expect(view.getAllByText('LINEアカウント')).toHaveLength(1)
     expect(view.getAllByText('統括').length).toBeGreaterThanOrEqual(1)
     // ★V8 左下の自分とメニュー（オーナー 2026-10-07）：上の帯に名前とログアウトを出さない。
-    expect(view.queryAllByText('Kenta Kawano')).toHaveLength(0)
+    expect(view.queryAllByText('Demo Person')).toHaveLength(0)
     expect(view.queryAllByRole('button', { name: 'ログアウト' })).toHaveLength(0)
     expect(view.queryAllByText('オーナー')).toHaveLength(0)
     expect(view.getByRole('link', { name: 'ホーム' }).getAttribute('href')).toBe('/hq')
@@ -320,7 +320,7 @@ describe('★V8 統括の上の帯', () => {
     expect(fixture.tenantsMe).not.toHaveBeenCalled()
     expect(view.getAllByText('LINEアカウント')).toHaveLength(2)
     // ★V8：名前・役割・ログアウトは左下へ移した（オーナー 2026-10-07）。上の帯には出さない。
-    expect(view.queryAllByText('Kenta Kawano')).toHaveLength(0)
+    expect(view.queryAllByText('Demo Person')).toHaveLength(0)
     expect(view.queryAllByText('オーナー')).toHaveLength(0)
     expect(view.queryAllByRole('button', { name: 'ログアウト' })).toHaveLength(0)
     expect(view.getByRole('link', { name: 'ホーム' }).getAttribute('href')).toBe('/')
@@ -365,7 +365,7 @@ describe('★V8 統括の上の帯', () => {
     await waitFor(() => expect(view.getAllByText('然 -NEN- 本部').length).toBeGreaterThan(0))
     expect(fixture.tenantsMe).toHaveBeenCalledOnce()
     expect(view.getByRole('link', { name: 'ホーム' }).getAttribute('href')).toBe('/hq')
-    expect(view.queryAllByText('Kenta Kawano')).toHaveLength(0)
+    expect(view.queryAllByText('Demo Person')).toHaveLength(0)
     expect(view.queryAllByRole('button', { name: 'ログアウト' })).toHaveLength(0)
   })
 
@@ -375,7 +375,7 @@ describe('★V8 統括の上の帯', () => {
     fixture.pathname = '/friends'
     const view = render(<AppTopBar />)
     await act(async () => { await Promise.resolve() })
-    expect(view.queryAllByText('Kenta Kawano')).toHaveLength(0)
+    expect(view.queryAllByText('Demo Person')).toHaveLength(0)
     expect(view.queryAllByText('オーナー')).toHaveLength(0)
     expect(view.queryAllByRole('button', { name: 'ログアウト' })).toHaveLength(0)
     expect(fixture.tenantsMe).not.toHaveBeenCalled()

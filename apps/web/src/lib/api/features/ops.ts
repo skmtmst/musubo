@@ -65,9 +65,9 @@ export const opsMethods = {
     impersonation: {
       current: () => fetchApi<ApiResponse<OpsImpersonation | null>>('/api/ops/impersonation/current'),
       start: (tenantId: string) => fetchApi<ApiResponse<OpsImpersonation>>('/api/ops/impersonation/start', { method: 'POST', body: JSON.stringify({ tenantId }) }),
-      write: (reason: string) => fetchApi<ApiResponse<OpsImpersonation>>('/api/ops/impersonation/write', { method: 'POST', body: JSON.stringify({ reason }) }),
+      write: (reason: string, expectedSessionId?: string) => fetchApi<ApiResponse<OpsImpersonation>>('/api/ops/impersonation/write', { method: 'POST', body: JSON.stringify({ reason, expectedSessionId }) }),
       read: () => fetchApi<ApiResponse<OpsImpersonation>>('/api/ops/impersonation/read', { method: 'POST', body: '{}' }),
-      revealPii: (reason: string) => fetchApi<ApiResponse<OpsImpersonation>>('/api/ops/impersonation/pii-reveal', { method: 'POST', body: JSON.stringify({ reason }) }),
+      revealPii: (reason: string, expectedSessionId?: string) => fetchApi<ApiResponse<OpsImpersonation>>('/api/ops/impersonation/pii-reveal', { method: 'POST', body: JSON.stringify({ reason, expectedSessionId }) }),
       end: () => fetchApi<ApiResponse<null>>('/api/ops/impersonation/end', { method: 'POST', body: '{}' }),
     },
     audit: (params?: { tenantId?: string; action?: string; from?: string; to?: string; limit?: number; offset?: number }) => {

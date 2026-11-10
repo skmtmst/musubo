@@ -102,6 +102,13 @@ export async function updateMedia(
   return getMediaById(db, id, lineAccountId);
 }
 
-export async function deleteMedia(db: D1Database, id: string, lineAccountId: string): Promise<void> {
-  await db.prepare(`DELETE FROM media WHERE id = ? AND line_account_id = ?`).bind(id, lineAccountId).run();
+export async function deleteMedia(db: D1Database, id: string, lineAccountId: string, guard?: { lockId: string; token: string; r2Key: string }): Promise<void> {
+  if (!guard) { await db.prepare(`DELETE FROM media WHERE id = ? AND line_account_id = ?`).bind(id, lineAccountId).run(); return; }
+  await db.batch([
+    db.prepare("SELECT json(CASE WHEN EXISTS(SELECT 1 FROM operation_audit WHERE id=? AND action='deleting' AND json_extract(detail_json,'$.token')=?) THEN '{}' ELSE 'FILE_DELETE_CONFLICT' END)").bind(guard.lockId, guard.token),
+    db.prepare("UPDATE media_file_scans SET confirmation_revision=confirmation_revision+1 WHERE line_account_id=? AND (media_id=? OR (subject_kind='media' AND subject_id=?))").bind(lineAccountId, id, id),
+    db.prepare('DELETE FROM media WHERE id=? AND line_account_id=? AND r2_key=?').bind(id, lineAccountId, guard.r2Key),
+    db.prepare("SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'FILE_DELETE_CONFLICT' END)"),
+    db.prepare("UPDATE operation_audit SET action='released' WHERE id=? AND action='deleting' AND json_extract(detail_json,'$.token')=?").bind(guard.lockId, guard.token),
+  ]);
 }

@@ -73,6 +73,7 @@ afterEach(() => {
 
 const scanOf = (overrides: Partial<FileScanItem> = {}): FileScanItem => ({
   id: 'scan-1',
+  confirmationRevision: 7,
   lineAccountId: 'acc-1',
   subjectKind: 'media',
   subjectId: 'md-1',
@@ -83,7 +84,7 @@ const scanOf = (overrides: Partial<FileScanItem> = {}): FileScanItem => ({
   status: 'quarantined',
   reasonCode: 'pdf_active_content',
   reasonLabel: '危険な仕掛けが見つかりました',
-  uploaderLabel: '川野',
+  uploaderLabel: '見本',
   attempts: 0,
   nextRetryAt: null,
   scannedAt: '2026-09-25T10:00:00+09:00',
@@ -113,6 +114,7 @@ beforeEach(() => {
 
 describe('ファイルの安全確認の設定画面', () => {
   const externalConfig = {
+    confirmationRevision: 7,
     externalProvider: 'scanner', externalEndpointUrl: 'https://scan.example.com/check',
     externalSecretRef: 'FILE_SCAN_SECRET_PRIMARY', externalEnabled: true,
     externalTimeoutMs: 10000, maxBytesOverride: null, maxPixelsOverride: null, updatedAt: '2026-10-12T00:00:00Z',
@@ -203,7 +205,7 @@ describe('ファイルの安全確認の設定画面', () => {
     await waitFor(() => {
       expect(screen.getByText('invoice.pdf')).toBeTruthy()
     })
-    expect(screen.getByText('川野')).toBeTruthy()
+    expect(screen.getByText('見本')).toBeTruthy()
     expect(screen.getByText('危険な仕掛けが見つかりました')).toBeTruthy()
     // ★V8 ：件数は札「しまったファイル N」に出す。
     expect(screen.getByRole('button', { name: /^しまったファイル \d+$/ })).toBeTruthy()
@@ -298,6 +300,7 @@ describe('ファイルの安全確認の設定画面', () => {
     expect(mocks.release).not.toHaveBeenCalled()
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '使えるように戻す' }))
     await waitFor(() => expect(mocks.release).toHaveBeenCalledTimes(1))
+    expect(mocks.release).toHaveBeenCalledWith('scan-1', 'acc-1', '安全を確認したため', 7)
   })
 
   test('51件以上あるときページ送りが出て、先のページを取りに行く (監査R132)', async () => {
@@ -344,6 +347,7 @@ describe('ファイルの安全確認の設定画面', () => {
       success: true,
       data: {
         config: {
+          confirmationRevision: 7,
           externalProvider: 'acme-scan',
           externalEndpointUrl: 'https://scan.example.com/check',
           externalSecretRef: 'FILE_SCAN_API_KEY',
@@ -375,8 +379,25 @@ describe('ファイルの安全確認の設定画面', () => {
         externalProvider: null,
         externalEndpointUrl: null,
         externalSecretRef: null,
+        expectedConfirmationRevision: 7,
       })
     })
+  })
+
+  test('外部検査を止める確認窓は開いた時の版を固定する', async () => {
+    ready()
+    const config = { ...externalConfig }
+    mocks.getConfig.mockResolvedValue({ success: true, data: { config } })
+    mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1, limit: 50, offset: 0 } })
+    mocks.saveConfig.mockResolvedValue({ success: true, data: { lineAccountId: 'acc-1' } })
+    render(<FileScanSettingsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '外の検査を止める' }))
+    await screen.findByRole('heading', { name: '外の検査を止める' })
+    config.confirmationRevision = 8
+    confirmInDialog('外の検査を止める')
+    await waitFor(() => expect(mocks.saveConfig).toHaveBeenCalledWith('acc-1', {
+      externalProvider: null, externalEndpointUrl: null, externalSecretRef: null, expectedConfirmationRevision: 7,
+    }))
   })
 
   test('外部検査の停止中に切り替えても切替先の設定を操作できる', async () => {
@@ -455,13 +476,26 @@ describe('ファイルの安全確認の設定画面', () => {
     })
     expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('LINEアカウント')
     expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('環境')
+    mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf({ confirmationRevision: 8, filename: 'new.pdf' })], total: 1, limit: 50, offset: 0 } })
     confirmInDialog('削除する')
-    const message = 'しまった・使えないファイルだけ消せます。一覧を読み直してください。'
+    const message = '確認した内容が変わりました。一覧を読み直してください。'
     await waitFor(() => {
       expect(screen.getByText(message)).toBeTruthy()
     })
-    expect(screen.getByText('「invoice.pdf」を削除しますか？')).toBeTruthy()
+    expect(mocks.remove).toHaveBeenCalledWith('scan-1', 'acc-1', 7)
+    expect(await screen.findByText('「new.pdf」を削除しますか？')).toBeTruthy()
     expect(container.querySelector('p[role="alert"]')).toBeNull()
+  })
+
+  test('消せない状態の409は状態の理由を表示する', async () => {
+    ready()
+    mocks.remove.mockRejectedValueOnce(new ApiError(409, 'しまった・使えないファイルだけ消せます', 'file_scan_not_disposable'))
+    mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1, limit: 50, offset: 0 } })
+    render(<FileScanSettingsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'invoice.pdfのその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+    confirmInDialog('削除する')
+    expect(await screen.findByText('しまった・使えないファイルだけ消せます。一覧を読み直してください。')).toBeTruthy()
   })
 
   test('外の検査を止める失敗（500）は窓の中に理由を出す (D017)', async () => {
@@ -471,6 +505,7 @@ describe('ファイルの安全確認の設定画面', () => {
       success: true,
       data: {
         config: {
+          confirmationRevision: 7,
           externalProvider: 'acme-scan',
           externalEndpointUrl: 'https://scan.example.com/check',
           externalSecretRef: 'FILE_SCAN_API_KEY',

@@ -43,6 +43,23 @@ describe('率の値と単位', () => {
     expect(metricValue()).toEqual({ value: null, unit: '', reason: '口から返っていません' })
   })
 
+  it('ごく小さい正の率を0%と区別して各表示に出す', () => {
+    const tiny = { ...rate, value: 0.0004, numerator: 4, denominator: 10000 }
+    expect(metricValue(tiny)).toMatchObject({ valueText: '0.1%未満' })
+    expect(metricValue({ ...tiny, value: 0 })).toMatchObject({ value: 0, unit: '%' })
+    expect(metricValue({ ...tiny, value: 0.0005 })).toEqual({ value: 0.1, unit: '%', reason: '' })
+    const s = snapshot('lesson')
+    s.metrics.onlineOccupancy = tiny
+    s.metrics.noShowRate = tiny
+    expect(kpisFor('lesson', s, 'today').find(k => k.id === 'fill')?.detail).toBe('オンラインは 0.1%未満')
+    expect(selectedKpis('lesson', s, 'today', ['noShowRate'])[0].valueText).toBe('0.1%未満')
+    const data = toAnalytics('salon', { ...s, analytics: { staff: [{ staffId: 'staff', bookings: 1, utilization: tiny }] } }, 'staff', {})
+    expect(data.cards.find(card => card.id === 'noshow')?.valueText).toBe('0.1%未満')
+    expect(data.table?.rows[0].cells[1]).toEqual({ text: '0.1%未満' })
+    render(<StyleAnalyticsView data={data} error={false} onTab={vi.fn()} onRetry={vi.fn()} onRowOpen={vi.fn()} />)
+    expect(screen.getAllByText('0.1%未満').length).toBeGreaterThan(0)
+  })
+
   it('比較は百分率の差をptで出し、良い向きと欠損を保つ', () => {
     const prev = { ...rate, value: 0.07, numerator: 7 }
     expect(metricDelta(rate, prev, true)).toEqual({ text: '−2pt', tone: 'up' })

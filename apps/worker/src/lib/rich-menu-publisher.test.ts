@@ -276,7 +276,7 @@ describe('validateRichMenuGroupForPublish', () => {
     });
 
     it('https:// 以外に LINE が通す tel: と mailto: は許可する', () => {
-      accepts(groupWith('uri', { uri: 'tel:0312345678' }));
+      accepts(groupWith('uri', { uri: 'tel:0300005678' }));
       accepts(groupWith('uri', { uri: 'mailto:info@example.com' }));
     });
   });
@@ -960,12 +960,12 @@ describe('intent から LINE の action への変換', () => {
           id: 'a1',
           bounds: BOUNDS,
           actionType: 'uri',
-          actionData: { tel: '03-1234-5678' },
+          actionData: { tel: '03-0000-5678' },
           intent: 'tel',
         },
       ]),
     );
-    expect(action).toEqual({ type: 'uri', uri: 'tel:0312345678' });
+    expect(action).toEqual({ type: 'uri', uri: 'tel:0300005678' });
   });
 
   it('回答フォームを開く → アカウントの LIFF に form を付けた uri', async () => {

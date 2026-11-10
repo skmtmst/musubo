@@ -290,7 +290,7 @@ export async function planAutoReplyInternalMemoStatements(
         now,
       ),
       db.prepare(
-        `UPDATE auto_replies SET current_published_version_id = ? WHERE id = ?`,
+        `UPDATE auto_replies SET confirmation_revision = confirmation_revision + 1, current_published_version_id = ? WHERE id = ?`,
       ).bind(versionId, rule.id),
     ],
     draftUpdated: false,

@@ -270,6 +270,8 @@ function previousSecretUsableUntil(
 export function serializeInteraction(row: WebhookInteractionRow) {
   return {
     id: row.id,
+    confirmationRevision: row.confirmation_revision,
+    webhookRevision: (row as WebhookInteractionListRow).linked_webhook_revision ?? null,
     direction: row.direction,
     webhookName: row.webhook_name,
     eventType: row.event_type,

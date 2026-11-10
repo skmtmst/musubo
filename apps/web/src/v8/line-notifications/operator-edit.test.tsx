@@ -35,9 +35,9 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined
 
 const recipients = {
   items: [
-    { id: 'a', name: '高田 誠', lineLinked: true, emailVerified: false, channels: { line: true, email: false, dashboard: true }, canReceive: true },
-    { id: 'b', name: '山本 健', lineLinked: false, emailVerified: false, channels: { line: false, email: false, dashboard: true }, canReceive: true },
-    { id: 'c', name: '佐藤 杏', lineLinked: true, emailVerified: false, channels: { line: true, email: false, dashboard: true }, canReceive: true },
+    { id: 'a', name: '見本 18', lineLinked: true, emailVerified: false, channels: { line: true, email: false, dashboard: true }, canReceive: true },
+    { id: 'b', name: '見本 139', lineLinked: false, emailVerified: false, channels: { line: false, email: false, dashboard: true }, canReceive: true },
+    { id: 'c', name: '見本 118', lineLinked: true, emailVerified: false, channels: { line: true, email: false, dashboard: true }, canReceive: true },
   ],
   summary: { staff: 3, canReceive: 3, line: 2, email: 0, dashboard: 3, unavailable: 0 },
 }
@@ -69,7 +69,7 @@ beforeEach(() => {
     if (url.includes('/api/notifications/teams')) return json({ success: true, data: [] })
     if (url.includes('/operator-rules/rule-9')) return json({ success: true, data: rule })
     if (url.includes('/operator-rules') && (init?.method ?? 'GET') === 'POST') return json({ success: true, data: { ...rule, id: 'rule-new', version: 1 } })
-    if (url.endsWith('/api/staff')) return json({ success: true, data: [{ id: 'a', name: '高田 誠', role: 'admin' }, { id: 'b', name: '山本 健', role: 'staff' }] })
+    if (url.endsWith('/api/staff')) return json({ success: true, data: [{ id: 'a', name: '見本 18', role: 'admin' }, { id: 'b', name: '見本 139', role: 'staff' }] })
     return json({ success: false, error: 'not mocked' })
   }))
 })
@@ -95,9 +95,9 @@ describe('運用者へのお知らせを なおす（hiBO8）', () => {
     expect(host?.querySelector('[data-design-node="hiBO8"]')).not.toBeNull()
     expect(host?.querySelector('[data-template-region="heading"] h1')?.textContent).toBe('「新しい予約が入りました」を編集する')
     fireEvent.click(screen.getByRole('button', { name: '受け取るスタッフ' }))
-    const rows = screen.getAllByRole('checkbox').filter((node) => node.closest('[role="dialog"]')).filter((node) => ['高田 誠', '山本 健', '佐藤 杏'].includes(node.getAttribute('aria-label') ?? '')).map((node) => node.closest('label')?.textContent ?? '')
+    const rows = screen.getAllByRole('checkbox').filter((node) => node.closest('[role="dialog"]')).filter((node) => ['見本 18', '見本 139', '見本 118'].includes(node.getAttribute('aria-label') ?? '')).map((node) => node.closest('label')?.textContent ?? '')
     expect(rows.length).toBe(3)
-    expect(document.body.textContent).toContain('山本 健')
+    expect(document.body.textContent).toContain('見本 139')
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     expect(host?.textContent).toContain('選択 2 人／LINEで受け取れる 1 人／管理画面で受け取れる 2 人')
     // 保存ずみの「メールでも送る」を戻す。
@@ -177,9 +177,9 @@ describe('公開前の確認の窓（sDXNy）', () => {
     ])
     const rows = Array.from(dialog?.querySelectorAll('table[aria-label="受け取る人"] tbody tr') ?? []).map((li) => Array.from(li.children).map((c) => c.textContent))
     expect(rows).toEqual([
-      ['高田 誠', '管理者', 'LINE'],
-      ['山本 健', 'スタッフ', '画面だけ'],
-      ['佐藤 杏', '—', 'LINE'],
+      ['見本 18', '管理者', 'LINE'],
+      ['見本 139', 'スタッフ', '画面だけ'],
+      ['見本 118', '—', 'LINE'],
     ])
     expect(dialog?.textContent).toContain('LINE 未登録の人には、管理画面のお知らせだけで届きます。')
     const send = Array.from(dialog?.querySelectorAll('button') ?? []).find((b) => b.textContent?.includes('公開して'))
@@ -212,7 +212,7 @@ test('名前が空の保存は止め、理由を欄に一度だけ出して欄�
 
 test('宛先をすべて外した保存は止め、欄の理由と赤枠を出す', async () => {
   await render()
-  await pickEntities('受け取るスタッフ', ['高田 誠', '山本 健'])
+  await pickEntities('受け取るスタッフ', ['見本 18', '見本 139'])
   await act(async () => {
     [...host!.querySelectorAll('button')].find(button => button.textContent === '下書きを保存する')!.click()
   })

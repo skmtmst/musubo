@@ -142,6 +142,16 @@ describe('シナリオ変更の共通境界(N-051)', () => {
     expect(nameOf('sc-2')).toBe('支店の筋書き');
   });
 
+  test('長い名前も担当外と存在しないシナリオを同じ404で返す', async () => {
+    const body = { name: 'あ'.repeat(61) };
+    const hidden = await put('sc-2', body, scopedEditStaff);
+    const missing = await put('missing', body, scopedEditStaff);
+    expect(hidden.status).toBe(404);
+    expect(missing.status).toBe(404);
+    expect(await hidden.json()).toEqual(await missing.json());
+    expect(nameOf('sc-2')).toBe('支店の筋書き');
+  });
+
   test('表示だけ・キーなし・readOnlyは403で、行は動かない', async () => {
     for (const staff of [viewStaff, noKeyStaff, readOnlyStaff]) {
       const res = await put('sc-1', { name: '書き換え' }, staff);

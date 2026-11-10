@@ -30,7 +30,7 @@ beforeEach(() => {
   ).run('account-2', 'channel-2', '別店', TENANT_ID);
   sqlite.exec(`
     INSERT INTO friends (id, line_user_id, display_name, line_account_id)
-    VALUES ('friend-1', 'U1', '田中 花子', 'account-1'),
+    VALUES ('friend-1', 'U1', '見本 171', 'account-1'),
            ('friend-2', 'U2', '別店の人', 'account-2');
   `);
   db = asD1(sqlite);
@@ -75,7 +75,7 @@ describe('migration 320 EC order and action read models', () => {
     expect(orders).toMatchObject({
       total: 1,
       items: [{
-        orderNumber: 'NEN-1001', customerName: '田中 花子', totalAmount: 4200,
+        orderNumber: 'NEN-1001', customerName: '見本 171', totalAmount: 4200,
         version: 1, orderLines: [{ productName: '鹿肉フード', quantity: 2, lineAmount: 4200 }],
       }],
     });
@@ -165,10 +165,10 @@ describe('migration 320 EC order and action read models', () => {
          'eccube:account-1', 'customer-1', 'fingerprint', ?, ?, ?, ?, ?)`,
     ).run(
       'candidate-1', TENANT_ID, 'event-candidate', 'account-1',
-      JSON.stringify({ label: '田中', attributes: [{ label: 'メール', valuePreview: 'tanaka@example.jp' }] }),
+      JSON.stringify({ label: '田中', attributes: [{ label: 'メール', valuePreview: 'tanaka@example.com' }] }),
       'account-1',
-      JSON.stringify({ label: '田中 花子', attributes: [{ label: '電話', valuePreview: '09012341234' }] }),
-      JSON.stringify([{ key: 'email', label: 'メール', valuePreview: 'tanaka@example.jp' }]),
+      JSON.stringify({ label: '見本 171', attributes: [{ label: '電話', valuePreview: '09000001234' }] }),
+      JSON.stringify([{ key: 'email', label: 'メール', valuePreview: 'tanaka@example.com' }]),
       JSON.stringify([{ key: 'order_amount', label: '売上', value: 4200, unit: '円' }]),
       '2026-09-07T00:00:00.000Z', '2026-09-07T00:00:00.000Z', '2026-09-07T00:00:00.000Z',
     );
@@ -180,10 +180,10 @@ describe('migration 320 EC order and action read models', () => {
       summary: { unmatched: 1, candidates: 1, candidateExternalCustomers: 1, potentialRevenue: 4200 },
     });
     const text = JSON.stringify(result);
-    expect(text).toContain('ta***@example.jp');
+    expect(text).toContain('ta***@example.com');
     expect(text).toContain('***1234');
-    expect(text).not.toContain('tanaka@example.jp');
-    expect(text).not.toContain('09012341234');
+    expect(text).not.toContain('tanaka@example.com');
+    expect(text).not.toContain('09000001234');
     expect(await listEcIdentityCandidates(db, {
       tenantId: TENANT_ID, lineAccountId: 'account-2', status: 'pending', limit: 20, offset: 0,
     })).toMatchObject({ total: 0, items: [] });
@@ -213,7 +213,7 @@ describe('migration 320 EC order and action read models', () => {
       'candidate-unknown-key', TENANT_ID, 'event-unknown-key', 'account-1',
       JSON.stringify({ label: '田中', attributes: [] }),
       'account-1',
-      JSON.stringify({ label: '田中 花子', attributes: [] }),
+      JSON.stringify({ label: '見本 171', attributes: [] }),
       JSON.stringify([]),
       JSON.stringify([
         { key: 'order_amount', label: '売上', value: 4200, unit: '円' },

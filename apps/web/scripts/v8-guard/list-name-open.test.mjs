@@ -118,15 +118,19 @@ test('一覧の名前を押したら一覧のままにならず詳細が開く',
       const page = await openList(browser, route)
       try {
         const links = page.locator('a[data-row-link]')
+        // 読み込み直後の空欄を判定せず、偽APIの行が描画されるまで待つ。
+        await links.first().waitFor({ state: 'attached', timeout: 10000 }).catch(() => {})
+        await page.waitForLoadState('networkidle')
         const count = await links.count()
         // 行が無い画面があっても後ろの画面まで見て、最後にまとめて落とす。
-        if (count === 0) { failures.push(`${route} に押せる名前が無い（偽APIの行を確認）`); continue }
+        if (count === 0) { const main = page.locator('main'); const text = (await (await main.count() ? main.first() : page.locator('body')).innerText()).replace(/\s+/g, ' ').slice(0, 500); failures.push(`${route} に押せる名前が無い（偽APIの行を確認）: ${text}`); continue }
         const first = links.first()
         await first.scrollIntoViewIfNeeded()
         const handle = await first.elementHandle()
         const listUrl = page.url()
         const hadDialog = await page.evaluate(() => Boolean(document.querySelector('[role="dialog"], [data-dialog], [data-drawer]'))).catch(() => false)
-        await first.click()
+        assert.ok(await handle.evaluate(el => el.isConnected), `${route}: 押す前に行が消えた`)
+        await handle.click()
         const result = await openedDetail(page, handle, listUrl, hadDialog)
         console.log(`${route}: ${count}行 → ${result} ${page.url().replace(base, '')}`)
         if (result !== 'opened' && result !== 'navigated') failures.push(`${route} は ${result}（${page.url().replace(base, '')}）`)

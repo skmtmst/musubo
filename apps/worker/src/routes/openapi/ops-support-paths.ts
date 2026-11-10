@@ -68,13 +68,13 @@ export const opsSupportPaths = {
     post: { tags: ['Ops Console'], summary: '代理ログインを開始（既定は閲覧のみ）', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['tenantId'], properties: { tenantId: { type: 'string' } } } } } }, responses: { '200': { description: 'Impersonation started in read mode' }, '400': { description: 'Archived tenant' }, '404': { description: 'Tenant not found' } } },
   },
   '/api/ops/impersonation/write': {
-    post: { tags: ['Ops Console'], summary: '書き込みに切り替える（理由必須）', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['reason'], properties: { reason: { type: 'string', minLength: 4, maxLength: 500 } } } } } }, responses: { '200': { description: 'Switched to write mode; audit visible to tenant' }, '400': { description: 'Missing reason or not impersonating' } } },
+    post: { tags: ['Ops Console'], summary: '書き込みに切り替える（理由必須）', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['reason'], properties: { reason: { type: 'string', minLength: 4, maxLength: 500 }, expectedSessionId: { type: 'string', description: '確認時の代理ログインID（任意）' } } } } } }, responses: { '200': { description: 'Switched to write mode; audit visible to tenant' }, '400': { description: 'Missing reason or not impersonating' }, '409': { description: 'Impersonation changed after confirmation' } } },
   },
   '/api/ops/impersonation/read': {
     post: { tags: ['Ops Console'], summary: '閲覧のみに戻す', responses: { '200': { description: 'Switched to read mode' }, '400': { description: 'Not impersonating' } } },
   },
   '/api/ops/impersonation/pii-reveal': {
-    post: { tags: ['Ops Console'], summary: '個人情報を一時的に表示（理由必須）', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['reason'], properties: { reason: { type: 'string', minLength: 4, maxLength: 500 } } } } } }, responses: { '200': { description: 'PII revealed for this impersonation; logged' }, '400': { description: 'Missing reason or not impersonating' } } },
+    post: { tags: ['Ops Console'], summary: '個人情報を一時的に表示（理由必須）', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['reason'], properties: { reason: { type: 'string', minLength: 4, maxLength: 500 }, expectedSessionId: { type: 'string', description: '確認時の代理ログインID（任意）' } } } } } }, responses: { '200': { description: 'PII revealed for this impersonation; logged' }, '400': { description: 'Missing reason or not impersonating' }, '409': { description: 'Impersonation changed after confirmation' } } },
   },
   '/api/ops/impersonation/end': {
     post: { tags: ['Ops Console'], summary: '代理ログインを終える', responses: { '200': { description: 'Ended (or nothing active)' } } },

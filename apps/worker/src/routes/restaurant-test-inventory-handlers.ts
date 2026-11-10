@@ -418,10 +418,13 @@ export const post__api_restaurant_test_store_groups_25 = async (c: Context<Env, 
 export const patch__api_restaurant_test_store_groups_id_members_storeId_26 = async (c: Context<Env, "/api/restaurant-test/store-groups/:id/members/:storeId">) => {
  if(!hasOrganizationSelector(c))return requiredAccount(c);
  const org=await organizationFor(c,{ignoreSession:true});if(!org||!await storeBelongsTo(c,org.id,c.req.param('storeId')))return c.json({success:false,error:'not_found'},404);
- const b=await c.req.json<{referralEnabled:boolean;maxDistance:number}>();
- if(!b||typeof b.referralEnabled!=='boolean'||!Number.isFinite(b.maxDistance)||b.maxDistance<0||b.maxDistance>1000)return inputError(c,{success:false,error:'invalid_member'},400,['referralEnabled','maxDistance']);
- const r=await dbFor(c.env).prepare('UPDATE rt_store_group_members SET referral_enabled=?,max_distance=? WHERE group_id=? AND store_id=? AND EXISTS(SELECT 1 FROM rt_store_groups WHERE id=? AND organization_id=?)').bind(b.referralEnabled?1:0,b.maxDistance,c.req.param('id'),c.req.param('storeId'),c.req.param('id'),org.id).run();
- return r.meta.changes?c.json({success:true,data:{updated:true}}):c.json({success:false,error:'not_found'},404);
+ const b=await c.req.json<{referralEnabled:boolean;maxDistance:number;expectedVersion?:number}>();
+ if(!b||typeof b.referralEnabled!=='boolean'||!Number.isFinite(b.maxDistance)||b.maxDistance<0||b.maxDistance>1000||(b.expectedVersion!==undefined&&(!Number.isSafeInteger(b.expectedVersion)||b.expectedVersion<1)))return inputError(c,{success:false,error:'invalid_member'},400,['referralEnabled','maxDistance','expectedVersion']);
+ const db=dbFor(c.env),groupId=c.req.param('id'),storeId=c.req.param('storeId');
+ const r=await db.prepare('UPDATE rt_store_group_members SET referral_enabled=?,max_distance=?,version=version+1 WHERE group_id=? AND store_id=? AND (? IS NULL OR version=?) AND EXISTS(SELECT 1 FROM rt_store_groups WHERE id=? AND organization_id=?)').bind(b.referralEnabled?1:0,b.maxDistance,groupId,storeId,b.expectedVersion??null,b.expectedVersion??null,groupId,org.id).run();
+ if(r.meta.changes)return c.json({success:true,data:{updated:true}});
+ const current=await db.prepare('SELECT m.* FROM rt_store_group_members m JOIN rt_store_groups g ON g.id=m.group_id WHERE m.group_id=? AND m.store_id=? AND g.organization_id=?').bind(groupId,storeId,org.id).first();
+ return current&&b.expectedVersion!==undefined?c.json({success:false,code:'version_conflict',error:'案内設定が変わりました。読み直してから、もう一度選んでください',data:{current}},409):c.json({success:false,error:'not_found'},404);
 };
 
 export const put__api_restaurant_test_stores_id_referral_location_27 = async (c: Context<Env, "/api/restaurant-test/stores/:id/referral-location">) => {

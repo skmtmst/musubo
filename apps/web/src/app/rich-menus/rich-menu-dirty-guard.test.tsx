@@ -75,6 +75,7 @@ const GROUP = {
   targetingCondition: null, targetingPriority: 0, targetingEnabled: false,
   folderId: null,
   version: 1,
+  publishingGeneration: 0,
   pages: [{
     id: 'pg-1', orderIndex: 0, name: 'トップ', aliasId: '',
     lineRichmenuId: null, imageR2Key: null, imageContentType: null, areas: [],

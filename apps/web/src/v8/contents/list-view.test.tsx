@@ -66,7 +66,7 @@ beforeEach(() => {
       return json({ success: true, data: { usageBytes: 3_221_225_472, reservedBytes: 0, limitBytes: 10_737_418_240, remainingBytes: 7_516_192_768, usageRate: 0.3, state: 'normal' } })
     }
     if (url.pathname === '/api/folders' && method === 'GET') {
-      return json({ success: true, data: [{ id: 'mf-photo', kind: 'media', accountId: 'account-a', name: '01_商品写真', parentId: null, displayOrder: 0, color: '#2f6fde', itemCount: 1 }], unfiledCount: 2 })
+      return json({ success: true, data: [{ id: 'mf-photo', kind: 'media', accountId: 'account-a', name: '01_商品写真', parentId: null, displayOrder: 0, color: '#2f6fde', itemCount: 1, revision: 1 }], unfiledCount: 2 })
     }
     if (url.pathname.startsWith('/api/folders/') && method === 'DELETE') return json({ success: true, data: null })
     if (url.pathname === '/api/media' && method === 'GET') {

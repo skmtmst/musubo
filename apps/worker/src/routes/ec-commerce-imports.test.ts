@@ -69,7 +69,7 @@ describe('Issue #685 EC取込一覧API', () => {
       INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
       VALUES ('account-a', 'channel-a', '本店', 'token-a', 'secret-a');
       INSERT INTO friends (id, line_user_id, display_name, line_account_id)
-      VALUES ('friend-a', 'U-a', '田中 花子', 'account-a');
+      VALUES ('friend-a', 'U-a', '見本 171', 'account-a');
     `);
 
     const now = Date.now();

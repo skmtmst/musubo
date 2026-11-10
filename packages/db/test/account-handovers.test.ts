@@ -140,6 +140,10 @@ describe('切り戻し（X-5）', () => {
   async function complete(sqlite: ReturnType<typeof Database>, db: ReturnType<typeof asD1>) {
     await saveDecision(db, { handoverId: 'h-1', fromFriendId: 'friend-1', decision: 'link', bucket: 'auto' });
     await saveDecision(db, { handoverId: 'h-1', fromFriendId: 'friend-2', decision: 'new', bucket: 'review' });
+    sqlite.prepare(`INSERT INTO account_handover_moves (handover_id, friend_id, from_account_id, to_account_id, tenant_id, moved_at)
+      VALUES ('h-1', ?, 'from-acc', 'to-acc', 'tenant-a', '2026-09-20')`).run('friend-1');
+    sqlite.prepare(`INSERT INTO account_handover_moves (handover_id, friend_id, from_account_id, to_account_id, tenant_id, moved_at)
+      VALUES ('h-1', ?, 'from-acc', 'to-acc', 'tenant-a', '2026-09-20')`).run('friend-2');
     sqlite.prepare(`
       UPDATE account_handovers SET status = 'completed',
              completed_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') || '+09:00'

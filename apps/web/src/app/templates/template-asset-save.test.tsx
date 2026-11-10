@@ -135,10 +135,6 @@ async function setDateTime(label: string, iso: string) {
     await settle()
   })
   const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  await act(async () => {
-    picker.querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
-    await settle()
-  })
   for (let i = 0; i < 24; i += 1) {
     const grid = document.querySelector('[role="grid"]')
     const currentLabel = /^(\d+)年(\d+)月$/.exec(grid?.getAttribute('aria-label') ?? '')
@@ -158,11 +154,10 @@ async function setDateTime(label: string, iso: string) {
     )!.click()
     await settle()
   })
-  await act(async () => { Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!.click() })
   const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await setTimeControl(reopened.querySelector('input[role="combobox"]'), `${hour}:${minute}`)
   await act(async () => {
-    const close = Array.from(reopened.querySelectorAll('button')).find((b) => b.textContent?.trim() === '閉じる')!
+    const close = Array.from(reopened.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!
     close.click()
     await settle()
   })

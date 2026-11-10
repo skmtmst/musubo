@@ -3,7 +3,7 @@ import { computeScenarioStats } from './scenario-stats.js';
 
 // total はユニーク friend_id 数を返す（COUNT(DISTINCT friend_id)）。
 function mockDb(handlers: {
-  enrollment: { total: number; active_count: number; completed_count: number; paused_count: number };
+  enrollment: { total: number; active_count: number; completed_count: number; paused_count: number } | null;
   steps: Array<{ step_order: number; reached_count: number }>;
 }): D1Database {
   return {
@@ -23,6 +23,14 @@ function mockDb(handlers: {
 }
 
 describe('computeScenarioStats', () => {
+  it('集計結果を取得できなければ0人と表示せず失敗を返す', async () => {
+    await expect(computeScenarioStats(mockDb({enrollment:null,steps:[]}), 'scenario-1')).rejects.toThrow();
+  });
+  it.each(['total','active_count','completed_count','paused_count'] as const)('集計列 %s が欠けた場合も0人と表示しない', async key => {
+    const enrollment={total:1,active_count:1,completed_count:0,paused_count:0};
+    enrollment[key]=NaN;
+    await expect(computeScenarioStats(mockDb({enrollment,steps:[]}), 'scenario-1')).rejects.toThrow();
+  });
   it('enrollment ゼロなら全 0', async () => {
     const stats = await computeScenarioStats(
       mockDb({

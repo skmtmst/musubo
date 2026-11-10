@@ -148,23 +148,23 @@ vi.mock('@/components/identity/identity-review', async (importOriginal: () => Pr
       items: [
         {
           id: 'ec-identity-1',
-          left: { label: '田中 美咲', detail: 'customer-3', attributes: [{ label: 'メール', valuePreview: 'mi***@example.jp' }] },
-          right: { label: '田中 みさき', lineAccountName: '画面確認アカウント' },
+          left: { label: '見本 170', detail: 'customer-3', attributes: [{ label: 'メール', valuePreview: 'mi***@example.com' }] },
+          right: { label: '見本 162', lineAccountName: '画面確認アカウント' },
           evidenceSummary: ['メールアドレス', '氏名'],
           confidence: { label: 'high', score: 94 },
           detectedAt: '2026-08-25T08:40:00.000Z',
         },
         {
           id: 'ec-identity-2',
-          left: { label: '佐藤 健', detail: 'customer-7', attributes: [{ label: '電話', valuePreview: '***1034' }] },
-          right: { label: '佐藤 けん', lineAccountName: '画面確認アカウント' },
+          left: { label: '見本 114', detail: 'customer-7', attributes: [{ label: '電話', valuePreview: '***1034' }] },
+          right: { label: '見本 113', lineAccountName: '画面確認アカウント' },
           evidenceSummary: ['電話番号', '氏名'],
           confidence: { label: 'medium', score: 82 },
           detectedAt: '2026-08-25T08:12:00.000Z',
         },
         {
           id: 'ec-identity-3',
-          left: { label: '鈴木 あおい', detail: 'customer-8', attributes: [] },
+          left: { label: '見本 175', detail: 'customer-8', attributes: [] },
           right: { label: null, lineAccountName: null },
           evidenceSummary: ['メールアドレス'],
           confidence: { label: 'medium', score: 71 },
@@ -301,9 +301,9 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     fns.friendMigrationsJobs.mockResolvedValue({
       success: true,
       data: [
-        { id: 'import-1', kind: 'import', line_account_id: 'visual-qa-account', total_count: 231, update_count: 34, conflict_count: 3, status: 'completed', created_by_name: '河野 健太', created_at: '2026-09-03T05:20:00.000Z' },
-        { id: 'import-2', kind: 'import', line_account_id: 'visual-qa-account', total_count: 231, update_count: 34, conflict_count: 3, status: 'previewed', created_by_name: '坂本 真人', created_at: '2026-09-03T02:05:00.000Z' },
-        { id: 'export-1', kind: 'export', line_account_id: 'visual-qa-account', row_count: 231, status: 'expired', created_by_name: '坂本 真人', created_at: '2026-09-02T10:40:00.000Z', expires_at: '2026-09-09T10:40:00.000Z' },
+        { id: 'import-1', kind: 'import', line_account_id: 'visual-qa-account', total_count: 231, update_count: 34, conflict_count: 3, status: 'completed', created_by_name: '見本 太郎', created_at: '2026-09-03T05:20:00.000Z' },
+        { id: 'import-2', kind: 'import', line_account_id: 'visual-qa-account', total_count: 231, update_count: 34, conflict_count: 3, status: 'previewed', created_by_name: '見本 25', created_at: '2026-09-03T02:05:00.000Z' },
+        { id: 'export-1', kind: 'export', line_account_id: 'visual-qa-account', row_count: 231, status: 'expired', created_by_name: '見本 25', created_at: '2026-09-02T10:40:00.000Z', expires_at: '2026-09-09T10:40:00.000Z' },
       ],
     })
     await renderPage(React.createElement(MigrationsPage))

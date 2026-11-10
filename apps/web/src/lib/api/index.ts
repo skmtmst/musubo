@@ -543,6 +543,7 @@ export type {
   NenCampaignAfterAction,
   NenColumn,
   NenColumnCreateInput,
+  NenColumnDeliveryPreview,
   NenPetProfile,
   NenUnavailableMetric,
   NenMetricsRange,

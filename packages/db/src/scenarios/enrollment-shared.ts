@@ -41,7 +41,7 @@ export async function completeFriendScenario(
   await db
     .prepare(
       `UPDATE friend_scenarios
-       SET status = 'completed',
+       SET confirmation_revision = confirmation_revision + 1, status = 'completed',
            next_delivery_at = NULL,
            pause_reason = NULL,
            updated_at = ?

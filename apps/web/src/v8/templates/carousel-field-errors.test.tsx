@@ -64,6 +64,29 @@ describe('カルーセルの欄ごとの誤り', () => {
     await act(async () => { await oldClick({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
     expect(calls.publish).not.toHaveBeenCalled()
   })
+  it('確認後に最新の下書きが変わっても窓を開いた時の版を公開APIへ渡す', async () => {
+    verifiedStaffRole('owner')
+    calls.get.mockResolvedValueOnce({ success:true, data:{ accountId:'a-1', publishedVersion:2, draftRevision:3, usedBy:{ scenarios:[{ id:'s-1' }] } } })
+      .mockResolvedValue({ success:true, data:{ accountId:'a-1', publishedVersion:4, draftRevision:5, usedBy:{ scenarios:[{ id:'s-1' }] } } })
+    calls.publish.mockResolvedValue({ success:true, data:{} })
+    render(<Carousel />); fillFirst(); fireEvent.click(screen.getByRole('button',{name:'保存して公開'}))
+    const dialog=await screen.findByRole('dialog',{name:'この内容を公開しますか？'})
+    fireEvent.click(within(dialog).getByRole('button',{name:'公開する'}))
+    await waitFor(()=>expect(calls.publish).toHaveBeenCalledWith('template-1',{expectedVersion:2,expectedDraftRevision:3}))
+  })
+  it('公開確認を閉じたあとの古い確定口では公開しない', async () => {
+    verifiedStaffRole('owner')
+    calls.get.mockResolvedValue({ success:true, data:{ accountId:'a-1', publishedVersion:2, draftRevision:3, usedBy:{ scenarios:[{ id:'s-1' }] } } })
+    calls.publish.mockResolvedValue({ success:true, data:{} })
+    render(<Carousel />); fillFirst(); fireEvent.click(screen.getByRole('button',{name:'保存して公開'}))
+    const dialog=await screen.findByRole('dialog',{name:'この内容を公開しますか？'})
+    const button=within(dialog).getByRole('button',{name:'公開する'})
+    const key=Object.keys(button).find(k=>k.startsWith('__reactProps$'))!
+    const oldClick=(button as unknown as Record<string,{onClick:(event:unknown)=>void}>)[key].onClick
+    fireEvent.click(within(dialog).getByRole('button',{name:'キャンセル'}))
+    await act(async()=>{await oldClick({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button})})
+    expect(calls.publish).not.toHaveBeenCalled()
+  })
   it.each(['shop', 'hq'] as const)('閲覧のみでは順番の絵を灰色と理由で出し、変更を送らない: %s', scope => {
     const onSave = vi.fn()
     verifiedStaffRole('viewer')

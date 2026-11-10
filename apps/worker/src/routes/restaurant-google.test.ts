@@ -537,8 +537,9 @@ describe('Googleビジネス：設定（接続）', () => {
     expect(((await unconfirmed.json()) as { code?: string }).code).toBe('switch_confirmation_required');
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_reviews').get()).toEqual({ n: 1 });
 
+    const confirmedConnection = testDb.raw.prepare('SELECT id, confirmation_revision AS revision FROM rt_google_connections').get() as { id: string; revision: number };
     const confirmed = await call('/api/restaurant-test/google/connect/select-location?account_id=account-2', {
-      body: { locationName: 'accounts/555/locations/777', confirmSwitch: true },
+      body: { locationName: 'accounts/555/locations/777', confirmSwitch: true, expectedConnectionId: confirmedConnection.id, expectedConfirmationRevision: confirmedConnection.revision },
     });
     expect(confirmed.status).toBe(200);
     expect(
@@ -595,6 +596,76 @@ describe('Googleビジネス：設定（接続）', () => {
       .all() as Array<{ kind: string; before_text: string | null }>;
     expect(logs.map((log) => log.kind).sort()).toEqual(['disconnect', 'review_reply']);
     expect(logs.every((log) => log.before_text === null)).toBe(true);
+  });
+
+  it('古い接続の確認では解除せずGoogleへ通知しない', async () => {
+    seedStore();
+    await seedConnection();
+    const conn = testDb.raw.prepare('SELECT id, confirmation_revision AS revision FROM rt_google_connections').get() as { id: string; revision: number };
+    testDb.raw.prepare('UPDATE rt_google_connections SET confirmation_revision = confirmation_revision + 1 WHERE id = ?').run(conn.id);
+    const result = await call('/api/restaurant-test/google/disconnect?account_id=account-2', { body: { confirmed: true, expectedConnectionId: conn.id, expectedConfirmationRevision: conn.revision } });
+    expect(result.status).toBe(409);
+    expect(googleCalls).toHaveLength(0);
+    expect(testDb.raw.prepare('SELECT status FROM rt_google_connections').get()).toEqual({ status: 'connected' });
+  });
+
+  it('古い接続の確認では店舗を切り替えず既存データを消さない', async () => {
+    seedStore();
+    await seedConnection({ status: 'pending_location' });
+    testDb.raw.prepare("INSERT INTO rt_google_location_candidates(id,store_id,location_name,location_title) VALUES('candidate','store-shibuya','accounts/555/locations/777','別の店')").run();
+    testDb.raw.prepare("INSERT INTO rt_google_reviews(id,store_id,review_name,star_rating,create_time) VALUES('review','store-shibuya','review/1',5,'2026-01-01')").run();
+    const conn = testDb.raw.prepare('SELECT id, confirmation_revision AS revision FROM rt_google_connections').get() as { id: string; revision: number };
+    testDb.raw.prepare('UPDATE rt_google_connections SET confirmation_revision=confirmation_revision+1 WHERE id=?').run(conn.id);
+    googleHandler = (url) => url.startsWith('https://mybusinessaccountmanagement.googleapis.com/v1/accounts')
+      ? jsonResponse({ accounts: [{ name: 'accounts/555' }] })
+      : jsonResponse({ locations: [{ name: 'locations/777', title: '別の店' }] });
+    const result = await call('/api/restaurant-test/google/connect/select-location?account_id=account-2', {
+      body: { locationName: 'accounts/555/locations/777', confirmSwitch: true, expectedConnectionId: conn.id, expectedConfirmationRevision: conn.revision },
+    });
+    expect(result.status).toBe(409);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_reviews').get()).toEqual({ n: 1 });
+  });
+
+  it('店舗確認の途中に接続が変われば古い店舗のデータを消さない', async () => {
+    seedStore();
+    await seedConnection({ status: 'pending_location' });
+    testDb.raw.prepare("INSERT INTO rt_google_location_candidates(id,store_id,location_name,location_title) VALUES('candidate','store-shibuya','accounts/555/locations/777','別の店')").run();
+    testDb.raw.prepare("INSERT INTO rt_google_reviews(id,store_id,review_name,star_rating,create_time) VALUES('review','store-shibuya','review/1',5,'2026-01-01')").run();
+    const conn = testDb.raw.prepare('SELECT id, confirmation_revision AS revision FROM rt_google_connections').get() as { id: string; revision: number };
+    googleHandler = (url) => {
+      if (url.startsWith('https://mybusinessaccountmanagement.googleapis.com/v1/accounts')) return jsonResponse({ accounts: [{ name: 'accounts/555' }] });
+      testDb.raw.prepare('UPDATE rt_google_connections SET confirmation_revision=confirmation_revision+1 WHERE id=?').run(conn.id);
+      return jsonResponse({ locations: [{ name: 'locations/777', title: '別の店' }] });
+    };
+    const result = await call('/api/restaurant-test/google/connect/select-location?account_id=account-2', {
+      body: { locationName: 'accounts/555/locations/777', confirmSwitch: true, expectedConnectionId: conn.id, expectedConfirmationRevision: conn.revision },
+    });
+    expect(result.status).toBe(409);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_reviews').get()).toEqual({ n: 1 });
+  });
+
+  it('確認した接続の版が一致すれば解除できる', async () => {
+    seedStore();
+    await seedConnection();
+    const conn = testDb.raw.prepare('SELECT id, confirmation_revision AS revision FROM rt_google_connections').get() as { id: string; revision: number };
+    googleHandler = () => jsonResponse({});
+    const body = { confirmed: true, expectedConnectionId: conn.id, expectedConfirmationRevision: conn.revision };
+    expect((await call('/api/restaurant-test/google/disconnect?account_id=account-2', { body })).status).toBe(200);
+    expect((await call('/api/restaurant-test/google/disconnect?account_id=account-2', { body })).status).toBe(409);
+    expect(testDb.raw.prepare('SELECT status FROM rt_google_connections').get()).toEqual({ status: 'disconnected' });
+  });
+
+  it('解除の途中で別の接続に変わったら新しい接続を消さない', async () => {
+    seedStore();
+    await seedConnection();
+    const conn = testDb.raw.prepare('SELECT id, confirmation_revision AS revision FROM rt_google_connections').get() as { id: string; revision: number };
+    googleHandler = () => {
+      testDb.raw.prepare("UPDATE rt_google_connections SET confirmation_revision=confirmation_revision+1, location_name='new-location' WHERE id=?").run(conn.id);
+      return jsonResponse({});
+    };
+    const response = await call('/api/restaurant-test/google/disconnect?account_id=account-2', { body: { confirmed: true, expectedConnectionId: conn.id, expectedConfirmationRevision: conn.revision } });
+    expect(response.status).toBe(409);
+    expect(testDb.raw.prepare('SELECT status,location_name FROM rt_google_connections').get()).toEqual({ status: 'connected', location_name: 'new-location' });
   });
 
   it('別テナントの範囲外 LINE アカウントは 403', async () => {

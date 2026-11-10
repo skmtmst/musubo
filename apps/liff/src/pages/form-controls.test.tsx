@@ -15,9 +15,9 @@ async function open(filePatch: Partial<FormInputBlock> = {}) {
   const layout = emptyLayout()
   layout.options.confirmDialog = { enabled: false }
   const fields: Partial<FormInputBlock>[] = [
-    { type: 'text', name: 'name', label: 'お名前', placeholder: '例：山田 太郎' },
+    { type: 'text', name: 'name', label: 'お名前', placeholder: '例：見本 141' },
     { type: 'text', name: 'email', label: 'メール', limit: { format: 'email' }, placeholder: '例：sample@example.com' },
-    { type: 'text', name: 'tel', label: '電話', limit: { format: 'tel' }, placeholder: '例：090-1234-5678' },
+    { type: 'text', name: 'tel', label: '電話', limit: { format: 'tel' }, placeholder: '例：090-0000-5678' },
     { type: 'textarea', name: 'note', label: '自由に書く', placeholder: '例：ご希望を記入' },
     { type: 'date', name: 'date', label: '日付', placeholder: '例：2026/10/09' },
     { type: 'text', name: 'time', label: '時刻', limit: { format: 'time' }, placeholder: '例：13:00' },
@@ -35,7 +35,7 @@ async function open(filePatch: Partial<FormInputBlock> = {}) {
 describe('編集した参考の文字と実際の入力', () => {
   it('入力ごとの参考の文字を出すが、参考の文字を回答として送らない', async () => {
     await open()
-    for (const hint of ['例：山田 太郎', '例：sample@example.com', '例：090-1234-5678', '例：ご希望を記入', '例：2026/10/09', '例：13:00', '例：1-2-3']) {
+    for (const hint of ['例：見本 141', '例：sample@example.com', '例：090-0000-5678', '例：ご希望を記入', '例：2026/10/09', '例：13:00', '例：1-2-3']) {
       expect((screen.getByPlaceholderText(hint) as HTMLInputElement).value).toBe('')
     }
     fireEvent.click(screen.getByRole('button', { name: '送信する' }))

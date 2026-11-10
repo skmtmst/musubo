@@ -62,8 +62,12 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
   onClose: () => void
   onReserved: () => void
 }) {
-  const opened = useRef({ accountId, friendId })
-  const scopeChanged = opened.current.accountId !== accountId || opened.current.friendId !== friendId
+  const scope = useRef({ accountId, friendId })
+  if (scope.current.accountId !== accountId || scope.current.friendId !== friendId) scope.current = { accountId, friendId }
+  const opened = useRef(scope.current)
+  const closed = useRef(false)
+  const isCurrent = () => !closed.current && opened.current === scope.current
+  const scopeChanged = opened.current !== scope.current
   const [content, setContent] = useState('')
   const [templates, setTemplates] = useState<Template[]>([])
   const [templateMenuOpen, setTemplateMenuOpen] = useState(false)
@@ -80,7 +84,7 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
   useEffect(() => {
     setTemplates([])
     void api.templates.list(undefined, accountId ?? undefined).then((res) => {
-      if (res.success) {
+      if (isCurrent() && res.success) {
         setTemplates((res.data as unknown as Template[]).filter((t) => t.messageType === 'text'))
       }
     })
@@ -95,10 +99,11 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
   const disabledReason = scheduledMessageInputReason(content, Boolean(image), scheduledAt)
 
   useEffect(() => { setImage(null); setImagePickerOpen(false) }, [accountId, friendId])
-  useEffect(() => { if (scopeChanged) onClose() }, [scopeChanged, onClose])
+  useEffect(() => { if (scopeChanged) { closed.current = true; onClose() } }, [scopeChanged, onClose])
+  useEffect(() => { closed.current = false; return () => { closed.current = true } }, [])
 
   const reserve = async () => {
-    if (lock.current) return
+    if (!isCurrent() || lock.current) return
     if (!content.trim() && !image) {
       setError('送るものを入力してください')
       return
@@ -119,6 +124,7 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
         const input = { content: item.content, ...(item.messageType ? { messageType: item.messageType } : {}), scheduledAt: `${scheduledAt}:00+09:00` }
         const signature = JSON.stringify({ friendId, accountId, ...input })
         const result = await api.chats.schedule(friendId, input, keysRef.current.get(signature))
+        if (!isCurrent()) return
         if (!result.success) {
           setError(result.error || '残っている送るものを予約できませんでした。もう一度お試しください。')
           return
@@ -127,15 +133,16 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
         item.done()
         completed += 1
       }
+      closed.current = true
       onReserved()
       onClose()
     } catch {
       // 結果が分からない失敗では鍵を残し、同じ予約の再試行を二重に作らない。
       // 先に予約できた分は入力から外してあるので、何件済んだかを添える（部分成功）。
-      setError(`${completed ? `${completed}件は予約済みです。残りを` : ''}予約できませんでした。通信状態を確認して、もう一度お試しください。`)
+      if (isCurrent()) setError(`${completed ? `${completed}件は予約済みです。残りを` : ''}予約できませんでした。通信状態を確認して、もう一度お試しください。`)
     } finally {
       lock.current = false
-      setBusy(false)
+      if (isCurrent()) setBusy(false)
     }
   }
 
@@ -149,7 +156,7 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
       busy={busy}
       error={error}
       designNode="MyJP7"
-      onCancel={onClose}
+      onCancel={() => { closed.current = true; onClose() }}
     >
       <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
       <div className={styles.body}>

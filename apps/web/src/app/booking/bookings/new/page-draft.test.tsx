@@ -134,8 +134,8 @@ function setValue(element: HTMLElement, value: string) {
 function seedDraft(extra: Record<string, unknown> = {}) {
   window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
     phoneCustomer: true,
-    customerName: '山田 花子',
-    customerPhone: '09012345678',
+    customerName: '見本 143',
+    customerPhone: '09000005678',
     petName: 'ポチ',
     friend: null,
     customer: null,
@@ -185,7 +185,7 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
     api.createCustomer.mockResolvedValue({
       customer: {
         id: 'cust-ny', line_account_id: 'account-ny', friend_id: null,
-        display_name: '山田 花子', phone_last4: '5678', pet_name: 'ポチ',
+        display_name: '見本 143', phone_last4: '5678', pet_name: 'ポチ',
         is_line_linked: false,
         created_at: '2026-10-01T00:00:00.000Z', updated_at: '2026-10-01T00:00:00.000Z',
       },
@@ -202,8 +202,8 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
     await mount()
     await flush()
 
-    expect(valueOf(byLabel('電話客の名前'))).toBe('山田 花子')
-    expect(valueOf(byLabel('電話客の電話番号'))).toBe('09012345678')
+    expect(valueOf(byLabel('電話客の名前'))).toBe('見本 143')
+    expect(valueOf(byLabel('電話客の電話番号'))).toBe('09000005678')
     expect(valueOf(byLabel('電話客のペット名'))).toBe('ポチ')
     expect(valueOf(byLabel('予約メニュー'))).toBe('menu-ny')
     // 担当・時刻は一覧と空き枠の到着後に確かめてから選ぶ。
@@ -369,23 +369,23 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
   })
   it('電話の表記をそろえて保存し、予約失敗後の再確認でも台帳を二重作成しない', async () => {
     api.createProxyBooking.mockRejectedValueOnce(new Error('network'))
-    seedDraft({ customerPhone: '０９０－１２３４－５６７８' })
+    seedDraft({ customerPhone: '０９０－００００－５６７８' })
     await mount(); await flush()
     const click = async (text: string) => { await act(async () => { all('button').find((b) => b.textContent?.includes(text))!.click() }); await flush() }
     await click('予約内容を確認する'); await click('この内容で予約を入れる')
-    expect(api.createCustomer).toHaveBeenCalledWith('account-ny', expect.objectContaining({ phone: '09012345678' }), expect.any(String))
+    expect(api.createCustomer).toHaveBeenCalledWith('account-ny', expect.objectContaining({ phone: '09000005678' }), expect.any(String))
     await click('入力に戻る')
-    await act(async () => { setValue(byLabel('電話客の電話番号'), '090 1234 5678') }); await flush()
+    await act(async () => { setValue(byLabel('電話客の電話番号'), '090 0000 5678') }); await flush()
     await click('予約内容を確認する'); await click('この内容で予約を入れる')
     expect(api.createCustomer).toHaveBeenCalledTimes(1)
   })
   it('WEB304：復元した電話客の名前を直したら新しい入力で確定する', async () => {
-    seedDraft({ customer: { id: 'old', line_account_id: 'account-ny', display_name: '山田 花子', phone_last4: '5678', pet_name: 'ポチ', is_line_linked: false } })
+    seedDraft({ customer: { id: 'old', line_account_id: 'account-ny', display_name: '見本 143', phone_last4: '5678', pet_name: 'ポチ', is_line_linked: false } })
     await mount(); await flush()
-    await act(async () => { setValue(byLabel('電話客の名前'), '山田 次郎') })
+    await act(async () => { setValue(byLabel('電話客の名前'), '見本 142') })
     await act(async () => { all('button').find((b) => b.textContent?.includes('予約内容を確認する'))!.click() }); await flush()
     await act(async () => { all('button').find((b) => b.textContent?.includes('この内容で予約を入れる'))!.click() }); await flush()
-    expect(api.createCustomer).toHaveBeenCalledWith('account-ny', expect.objectContaining({ display_name: '山田 次郎' }), expect.any(String))
+    expect(api.createCustomer).toHaveBeenCalledWith('account-ny', expect.objectContaining({ display_name: '見本 142' }), expect.any(String))
   })
   it('WEB305：別の担当の候補を選んだら、空き枠の確認後も候補の時刻を残す', async () => {
     api.listMenuStaff.mockResolvedValue({ staff: [

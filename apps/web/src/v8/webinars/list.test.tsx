@@ -12,6 +12,9 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const access = vi.hoisted(() => ({ canEdit: true }))
+vi.mock('@/lib/use-feature-access', () => ({ useFeatureAccess: () => access.canEdit }))
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   usePathname: () => '/webinars',
@@ -62,6 +65,7 @@ let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
+  access.canEdit = true
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -191,4 +195,15 @@ it('フォルダ取得失敗と空を分け、読み直して分類を復帰す�
  expect(host.textContent).not.toContain('フォルダを読み込めませんでした')
  expect(host.textContent).toContain('セミナー')
  expect(reads).toBe(2)
+})
+
+
+it.each([true, false])('説明のアーカイブ案内は編集可否 %s に合う', async canEdit => {
+  access.canEdit = canEdit
+  await render()
+  const help = host.querySelector<HTMLButtonElement>('button[aria-label="この画面の説明"]')!
+  await act(async () => help.click())
+  const note = document.querySelector('[role="note"][id]')!
+  expect(note.textContent).toContain('参加者・分析・コメント演出')
+  expect(Boolean(note.textContent?.includes('アーカイブ'))).toBe(canEdit)
 })

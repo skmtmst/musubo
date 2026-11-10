@@ -131,10 +131,10 @@ export const automationsMethods = {
     restore: (id: string, accountId: string) =>
       fetchApi<ApiResponse<{ id: string; status: 'draft' | 'active' | 'stopped' }>>(`/api/automations/${encodeURIComponent(id)}/restore?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'POST', body: '{}' }),
     // 稼働切替と「保管」。実行記録は残る。
-    setStatus: (id: string, status: 'active' | 'stopped' | 'archived') =>
+    setStatus: (id: string, status: 'active' | 'stopped' | 'archived', expectedConfirmationRevision?: number) =>
       fetchApi<ApiResponse<{ id: string; status: 'active' | 'stopped' | 'archived' }>>(
         `/api/automations/${encodeURIComponent(id)}/status`,
-        { method: 'POST', body: JSON.stringify({ status }) },
+        { method: 'POST', body: JSON.stringify({ status, expectedConfirmationRevision }) },
       ),
     // #942 N-354: 実行記録1件の詳細（版番号・テスト印・処理ごとの結果）。
     getRun: (id: string) =>
@@ -256,10 +256,10 @@ export const automationsMethods = {
     updateBinding: (
       id: string,
       accountId: string,
-      data: { bindingId: string; versionId: string; expectedVersionId: string },
+      data: { bindingId: string; versionId: string; expectedVersionId: string; expectedConfirmationRevision?: number },
     ) => fetchApi<ApiResponse<{ updated: true }>>(
       `/api/common-actions/${id}/bindings/${data.bindingId}/version?account_id=${encodeURIComponent(accountId)}`,
-      { method: 'POST', body: JSON.stringify({ versionId: data.versionId, expectedVersionId: data.expectedVersionId }) },
+      { method: 'POST', body: JSON.stringify({ versionId: data.versionId, expectedVersionId: data.expectedVersionId, expectedConfirmationRevision: data.expectedConfirmationRevision }) },
     ),
   },
 }

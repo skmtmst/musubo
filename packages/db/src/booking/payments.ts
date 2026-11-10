@@ -198,7 +198,7 @@ export async function markBookingPayment(
   const now = jstNow();
   await db.prepare(
     `UPDATE booking_payments
-        SET status = ?, provider_payment_id = COALESCE(?, provider_payment_id),
+        SET confirmation_revision=confirmation_revision+1, status = ?, provider_payment_id = COALESCE(?, provider_payment_id),
             paid_at = CASE WHEN ? = 'paid' THEN COALESCE(paid_at, ?) ELSE paid_at END,
             refunded_at = CASE WHEN ? = 'refunded' THEN COALESCE(refunded_at, ?) ELSE refunded_at END,
             updated_at = ?

@@ -322,7 +322,7 @@ export async function getCommonActionDetail(
         ORDER BY version_number DESC`,
     ).bind(owner.id).all<VersionRow>(),
     db.prepare(
-      `SELECT b.id, b.consumer_type, b.consumer_id, b.consumer_path,
+      `SELECT b.id, b.confirmation_revision, b.consumer_type, b.consumer_id, b.consumer_path,
               b.common_action_version_id, b.updated_at, v.version_number,
               pv.version_number AS latest_version_number,
               /* 監査 R472: 利用先の呼び出し箇所と実行の目印を突き合わせる。
@@ -382,7 +382,7 @@ export async function getCommonActionDetail(
         WHERE b.common_action_id = ? AND b.line_account_id = ?
         ORDER BY b.updated_at DESC`,
     ).bind(owner.current_published_version_id, owner.id, input.lineAccountId).all<{
-      id: string; consumer_type: string; consumer_id: string; consumer_path: string;
+      id: string; confirmation_revision: number; consumer_type: string; consumer_id: string; consumer_path: string;
       common_action_version_id: string; updated_at: string; version_number: number;
       latest_version_number: number | null; running_count: number | null; waiting_count: number | null;
       older_running_count: number | null; older_waiting_count: number | null;
@@ -400,6 +400,7 @@ export async function getCommonActionDetail(
   }));
   const bindings = (bindingsResult.results ?? []).map((row) => ({
     id: row.id,
+    confirmationRevision: row.confirmation_revision,
     consumerType: row.consumer_type,
     consumerId: row.consumer_id,
     consumerPath: row.consumer_path,
@@ -434,6 +435,7 @@ export async function updateCommonActionBindingVersion(
     lineAccountId: string;
     versionId: unknown;
     expectedVersionId: unknown;
+    expectedConfirmationRevision?: unknown;
     actorId?: string | null;
   },
 ): Promise<void> {
@@ -441,6 +443,9 @@ export async function updateCommonActionBindingVersion(
   const expectedVersionId = requiredString(
     input.expectedVersionId, 'expectedVersionId', '現在利用中の版',
   );
+  if (input.expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(input.expectedConfirmationRevision) || (input.expectedConfirmationRevision as number) < 1)) {
+    throw new CommonActionValidationError('revision_invalid', '確認した版が不正です', 'expectedConfirmationRevision');
+  }
   const version = await db.prepare(
     `SELECT cav.id
        FROM common_action_versions cav
@@ -460,17 +465,17 @@ export async function updateCommonActionBindingVersion(
               common_action_version_id, ?, ?, ?
          FROM common_action_bindings
         WHERE id = ? AND common_action_id = ? AND line_account_id = ?
-          AND common_action_version_id = ?`,
+          AND common_action_version_id = ? AND (? IS NULL OR confirmation_revision = ?)`,
     ).bind(
       eventId, version.id, input.actorId ?? null, now,
-      input.bindingId, input.id, input.lineAccountId, expectedVersionId,
+      input.bindingId, input.id, input.lineAccountId, expectedVersionId, input.expectedConfirmationRevision ?? null, input.expectedConfirmationRevision ?? null,
     ),
     db.prepare(
-      `UPDATE common_action_bindings SET common_action_version_id = ?, updated_at = ?
+      `UPDATE common_action_bindings SET common_action_version_id = ?, updated_at = ?, confirmation_revision = confirmation_revision + 1
         WHERE id = ? AND common_action_id = ? AND line_account_id = ?
-          AND common_action_version_id = ?`,
+          AND common_action_version_id = ? AND (? IS NULL OR confirmation_revision = ?)`,
     ).bind(
-      version.id, now, input.bindingId, input.id, input.lineAccountId, expectedVersionId,
+      version.id, now, input.bindingId, input.id, input.lineAccountId, expectedVersionId, input.expectedConfirmationRevision ?? null, input.expectedConfirmationRevision ?? null,
     ),
   ]);
   if ((results[0].meta?.changes ?? 0) !== 1 || (results[1].meta?.changes ?? 0) !== 1) {

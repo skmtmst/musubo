@@ -49,7 +49,7 @@ export async function startRestaurantFollowupEngine(db:D1Database,input:{storeId
    const draft=await getAutomationDraft(db,{id:targetId,lineAccountId:target.line_account_id});
    const status=await db.prepare('SELECT status FROM automation_definitions WHERE id=?').bind(targetId).first<{status:string}>();
    await publishAutomationDraft(db,{id:targetId,lineAccountId:target.line_account_id,expectedDraftVersionId:draft.draftVersionId,expectedStatus:status?.status,activate:true,
-    transaction:{before,after:()=>[...after,db.prepare("UPDATE automation_definitions SET status='active' WHERE id=? AND current_published_version_id=?").bind(targetId,snapshot.versionId)]}});
+    transaction:{before,after:()=>[...after,db.prepare("UPDATE automation_definitions SET confirmation_revision = confirmation_revision + 1, status='active' WHERE id=? AND current_published_version_id=?").bind(targetId,snapshot.versionId)]}});
   }
  }catch(error){if(String(error).includes('malformed JSON'))throw new FollowupDraftError('version_conflict','公開する内容が変わりました。読み直してください');throw error;}
  return {targetId,versionId:snapshot.versionId,approvalId,sendingStatus:'active' as const};

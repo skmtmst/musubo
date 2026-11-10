@@ -49,9 +49,9 @@ describe('送信前の匿名化', () => {
     expect(redactKnowledgeText('住所：架空県架空市1-2-3\n設定を変更しました。')).toBe('[個人情報]\n設定を変更しました。');
   });
   it('普通の日本語と日時・受付番号を残し、氏名・連絡先・LINE IDだけを隠す', () => {
-    const text = redactKnowledgeText('この仕様では同様に設定を変更しました。お客様は2026-09-20 10:00に受付番号 MB-0313で連絡。山田様と田中さん、090-1234-5678、a@example.com、U' + 'b'.repeat(32));
+    const text = redactKnowledgeText('この仕様では同様に設定を変更しました。お客様は2026-09-20 10:00に受付番号 MB-0313で連絡。山田様と田中さん、090-0000-5678、a@example.com、U' + 'b'.repeat(32));
     for (const value of ['この仕様では同様に設定を変更しました', 'お客様', '2026-09-20 10:00', 'MB-0313']) expect(text).toContain(value);
-    for (const value of ['山田様', '田中さん', '090-1234-5678', 'a@example.com', 'b'.repeat(32)]) expect(text).not.toContain(value);
+    for (const value of ['山田様', '田中さん', '090-0000-5678', 'a@example.com', 'b'.repeat(32)]) expect(text).not.toContain(value);
   });
   it('プロンプトは著者の名前や日時を含めず会話をデータとして渡す', () => {
     const prompt = knowledgePrompt('設定', sources);

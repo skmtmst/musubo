@@ -23,7 +23,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 
 function loginEvent(id: string, result: AuditEventItem['result']): AuditEventItem {
   return {
-    id, category: 'auth', lineAccountId: 'account-a', actor: { id: 'staff-1', name: '河野', role: 'admin' },
+    id, category: 'auth', lineAccountId: 'account-a', actor: { id: 'staff-1', name: '見本', role: 'admin' },
     action: 'auth.login', target: null, result, before: null, after: null, reason: null, requestTraceId: null,
     ipPrefix: null, deviceFamily: null, riskLevel: 'normal', retentionClass: 'security', createdAt: '2026-10-01T00:00:00.000Z',
   }

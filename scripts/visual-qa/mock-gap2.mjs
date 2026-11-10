@@ -55,7 +55,7 @@ export function gap2Respond(method, pathname, body = {}) {
     return ok({ items: ['2026-12-11', '2026-12-18', '2026-12-25', '2027-01-01', '2027-01-08'].map((day, i) => ({ bookingId: `bk-series-${i + 4}`, startsAt: `${day}T05:00:00.000Z`, after: `${day}T07:00:00.000Z`, blocked: i === 3, fee: i === 0 ? { amount: 4200, percent: 50, reason: '24 時間前を過ぎた' } : null })) })
   }
   if (method === 'GET' && /^\/api\/booking\/admin\/bookings\/[^/]+\/group$/.test(pathname)) {
-    return ok(/\/(bk-4|bk-party-2)\//.test(pathname) ? { groupId: 'grp-1', ownerName: '山田 花子', version: 1, members: [
+    return ok(/\/(bk-4|bk-party-2)\//.test(pathname) ? { groupId: 'grp-1', ownerName: '見本 143', version: 1, members: [
       { bookingId: 'bk-4', label: 'チョコ', menuName: '爪切り', staffName: 'Kenta', startsAt: '2026-10-01T04:30:00.000Z', endsAt: '2026-10-01T04:45:00.000Z', status: 'confirmed' },
       { bookingId: 'bk-party-2', label: 'マロン', menuName: 'トリミング（中型犬）', staffName: '佐々木', startsAt: '2026-10-01T04:00:00.000Z', endsAt: '2026-10-01T05:30:00.000Z', status: 'confirmed' },
     ] } : null)

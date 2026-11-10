@@ -433,9 +433,18 @@ export const post__api_auto_replies_id_stop_3 = async (c: Context<Env, "/api/aut
     if (!validIdempotencyKey(requestKey)) {
       return inputError(c, { success: false, error: '停止操作の確認キーが必要です' }, 400, []);
     }
-    const body: { reason?: unknown } = await c.req
-      .json<{ reason?: unknown }>()
-      .catch(() => ({}));
+    let body: { reason?: unknown; expectedVersion?: unknown } = {};
+    const raw = await c.req.text().catch(() => '');
+    if (raw) {
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) body = parsed as typeof body;
+        else if (/expectedVersion/i.test(raw)) return inputError(c, { success: false, error: 'invalid_confirmation_version' }, 400, ['expectedVersion']);
+      } catch {
+        if (/expectedVersion/i.test(raw)) return inputError(c, { success: false, error: 'invalid_confirmation_version' }, 400, ['expectedVersion']);
+      }
+    }
+    if (body.expectedVersion !== undefined && (!Number.isSafeInteger(body.expectedVersion) || Number(body.expectedVersion) < 1)) return inputError(c, { success: false, error: 'invalid_confirmation_version' }, 400, ['expectedVersion']);
     let reason: string | null = null;
     if (body.reason !== undefined && body.reason !== null) {
       if (typeof body.reason !== 'string') {
@@ -455,6 +464,7 @@ export const post__api_auto_replies_id_stop_3 = async (c: Context<Env, "/api/aut
       staffId: c.get('staff')?.id ?? null,
       reason,
       idempotencyKey: requestKey,
+      expectedVersion: body.expectedVersion as number | undefined,
     });
     if (!stopped) {
       return fail(c, 404, 'AUTO_REPLY_NOT_FOUND');
@@ -464,6 +474,10 @@ export const post__api_auto_replies_id_stop_3 = async (c: Context<Env, "/api/aut
     await resolveStoppedByNames(c.env.DB, [data]);
     return c.json({ success: true, data });
   } catch (err) {
+    if (err instanceof Error && err.message === 'AUTO_REPLY_CONFIRMATION_CONFLICT') {
+      const current = await getAutoReplyById(c.env.DB, c.req.param('id'));
+      return c.json({ success: false, code: 'auto_reply_confirmation_conflict', error: '自動応答が変更されました。最新の内容を確認してください', data: current ? serializeAutoReply(current) : null }, 409);
+    }
     throw err;
   }
 };

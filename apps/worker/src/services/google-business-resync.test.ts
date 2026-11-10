@@ -7,6 +7,7 @@ import {
   processGoogleBusinessTokenKeepalive,
 } from './google-business-resync.js';
 import type { FetchLike } from './google-business.js';
+import { setConnectionStatusForEnv } from '../routes/restaurant-google.js';
 
 type Env = import('../index.js').Env;
 
@@ -153,6 +154,22 @@ describe('processGoogleBusinessHourlyResync', () => {
     expect(connection.average_rating).toBe(4.5);
   });
 
+  it('内容が変わらない定期同期では接続と投稿の確認版を変えない', async () => {
+    await processGoogleBusinessHourlyResync(env, { now: NOW, fetch: googleFetch(), sleep: noSleep });
+    const connection = () => testDb.raw.prepare("SELECT confirmation_revision FROM rt_google_connections WHERE store_id='store-shibuya'").get();
+    const post = () => testDb.raw.prepare("SELECT confirmation_revision FROM rt_google_posts WHERE store_id='store-shibuya'").get();
+    expect(connection()).toEqual({ confirmation_revision: 1 });
+    const postRevision = post();
+    testDb.raw.exec("UPDATE rt_google_connections SET last_synced_at=NULL,last_posts_synced_at=NULL WHERE store_id='store-shibuya'");
+    await processGoogleBusinessHourlyResync(env, { now: NOW, fetch: googleFetch(), sleep: noSleep });
+    expect(connection()).toEqual({ confirmation_revision: 1 });
+    expect(post()).toEqual(postRevision);
+    testDb.raw.exec("UPDATE rt_google_posts SET google_state='SCHEDULED', status='scheduled' WHERE store_id='store-shibuya'");
+    testDb.raw.exec("UPDATE rt_google_connections SET last_synced_at=NULL,last_posts_synced_at=NULL WHERE store_id='store-shibuya'");
+    await processGoogleBusinessHourlyResync(env, { now: NOW, fetch: googleFetch(), sleep: noSleep });
+    expect(post()).toEqual({ confirmation_revision: (postRevision as { confirmation_revision: number }).confirmation_revision + 1 });
+  });
+
   it('55分以内に同期済みならGoogleを呼ばない', async () => {
     const recent = '2026-09-28T17:40:00.000Z';
     testDb.raw
@@ -265,6 +282,22 @@ describe('processGoogleBusinessDailyMetrics', () => {
     // 応答に無い指標は null（0件と区別）
     expect(row.menu_clicks).toBeNull();
     expect(connectionRow('store-shibuya').last_metrics_synced_at).toBe(NOW);
+  });
+
+  it('指標の同期だけでは接続の確認版を進めない', async () => {
+    const before = connectionRow('store-shibuya').confirmation_revision;
+    expect((await processGoogleBusinessDailyMetrics(env, { now: NOW, fetch: googleFetch(), sleep: noSleep })).synced).toBe(1);
+    expect(connectionRow('store-shibuya').confirmation_revision).toBe(before);
+  });
+
+  it('同じ接続状態では版を保ち、状態が変わった時だけ進める', async () => {
+    const before = Number(connectionRow('store-shibuya').confirmation_revision);
+    await setConnectionStatusForEnv(env, 'store-shibuya', 'connected', 'internal_error');
+    expect(connectionRow('store-shibuya').confirmation_revision).toBe(before);
+    await setConnectionStatusForEnv(env, 'store-shibuya', 'no_permission', 'no_permission');
+    expect(connectionRow('store-shibuya').confirmation_revision).toBe(before + 1);
+    await setConnectionStatusForEnv(env, 'store-shibuya', 'no_permission', 'no_permission');
+    expect(connectionRow('store-shibuya').confirmation_revision).toBe(before + 1);
   });
 
   it('同じJST日の2回目はスキップし、翌日は直近7日だけ取り直す', async () => {

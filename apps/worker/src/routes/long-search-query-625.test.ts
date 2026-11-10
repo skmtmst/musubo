@@ -223,7 +223,7 @@ describe('#625 イベント予約一覧 GET /api/events/admin/events', () => {
 
 describe('#625 受信箱 GET /api/chats', () => {
   test('2000文字の検索語でも500にならず0件で返り、SQLにLIKEを使わない', async () => {
-    seedLineThread('friend-1', { name: '河野' });
+    seedLineThread('friend-1', { name: '見本' });
     const res = await appFor(chats).request(
       `/api/chats?${new URLSearchParams({ lineAccountId: 'account-a', q: LONG_QUERY })}`,
       {}, { DB: db.db },
@@ -236,12 +236,12 @@ describe('#625 受信箱 GET /api/chats', () => {
   });
 
   test('名前と本文への通常検索はこれまでどおり当たる', async () => {
-    seedLineThread('by-name', { name: '河野' });
+    seedLineThread('by-name', { name: '見本' });
     seedLineThread('by-body', { name: '別人', content: '解約したい' });
     const app = appFor(chats);
 
     const byName = await app.request(
-      `/api/chats?${new URLSearchParams({ lineAccountId: 'account-a', q: '河野' })}`,
+      `/api/chats?${new URLSearchParams({ lineAccountId: 'account-a', q: '見本' })}`,
       {}, { DB: db.db },
     );
     expect(byName.status).toBe(200);
@@ -260,8 +260,8 @@ describe('#625 受信箱 GET /api/chats', () => {
 
 describe('#625 受信箱タブ件数 GET /api/chats/quick-counts', () => {
   test('2000文字の検索語でも500にならず0件で返り、SQLにLIKEを使わない', async () => {
-    seedLineThread('friend-1', { name: '河野' });
-    seedEmailThread('mail-1', { name: '河野' });
+    seedLineThread('friend-1', { name: '見本' });
+    seedEmailThread('mail-1', { name: '見本' });
     const res = await appFor(chats).request(
       `/api/chats/quick-counts?${new URLSearchParams({ channel: 'all', q: LONG_QUERY })}`,
       {}, { DB: db.db },
@@ -283,10 +283,10 @@ describe('#625 受信箱タブ件数 GET /api/chats/quick-counts', () => {
   });
 
   test('通常の検索語はLINE・メールとも件数に当たる', async () => {
-    seedLineThread('friend-1', { name: '河野' });
-    seedEmailThread('mail-1', { name: '河野' });
+    seedLineThread('friend-1', { name: '見本' });
+    seedEmailThread('mail-1', { name: '見本' });
     const res = await appFor(chats).request(
-      `/api/chats/quick-counts?${new URLSearchParams({ channel: 'all', q: '河野' })}`,
+      `/api/chats/quick-counts?${new URLSearchParams({ channel: 'all', q: '見本' })}`,
       {}, { DB: db.db },
     );
     expect(res.status).toBe(200);
@@ -334,7 +334,7 @@ describe('#625 受信箱の保存検索 GET /api/inbox/saved-views', () => {
 
 describe('#625 未対応一覧 computeUnansweredInbox', () => {
   test('2000文字の検索語でも例外を投げず0件を返し、通常検索は当たる', async () => {
-    seedLineThread('friend-1', { name: '河野', content: '導入相談' });
+    seedLineThread('friend-1', { name: '見本', content: '導入相談' });
 
     const empty = await computeUnansweredInbox(db.db, {
       q: LONG_QUERY,
@@ -346,7 +346,7 @@ describe('#625 未対応一覧 computeUnansweredInbox', () => {
     expectNoLikeOrGlob(preparedSql);
 
     const hit = await computeUnansweredInbox(db.db, {
-      q: '河野',
+      q: '見本',
       allowedAccountIds: ['account-a'],
       canSeeUnassigned: true,
     });

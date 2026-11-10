@@ -14,13 +14,13 @@ import type { InlineAction } from './draft-fields'
 
 afterEach(cleanup)
 
-const opts = { tags: [{ id: 't1', name: '予約' }], fields: [], marks: [{ id: 'm1', name: '予約変更' }], scenarios: [], vars: [], notificationRules: [{ id: 'r1', name: 'Kenta Kawano', version: 1 }] }
+const opts = { tags: [{ id: 't1', name: '予約' }], fields: [], marks: [{ id: 'm1', name: '予約変更' }], scenarios: [], vars: [], notificationRules: [{ id: 'r1', name: 'Demo Person', version: 1 }] }
 const a = (over: Partial<InlineAction>): InlineAction => ({ key: 'k1', actionType: 'support_mark', config: { markId: 'm1' }, onFailure: 'continue', ...over })
 
 describe('返したあとに行うこと（V8 の行）', () => {
   it('何をするか「どれを」を1行で出す', () => {
     expect(actionRowTitle(a({}), opts)).toBe('対応マークを付ける「予約変更」')
-    expect(actionRowTitle(a({ actionType: 'notify_staff', config: { notificationRuleId: 'r1' } }), opts)).toBe('担当者へ知らせる「Kenta Kawano」')
+    expect(actionRowTitle(a({ actionType: 'notify_staff', config: { notificationRuleId: 'r1' } }), opts)).toBe('担当者へ知らせる「Demo Person」')
     expect(actionRowTitle(a({ actionType: 'tag', config: { op: 'remove', tagIds: ['t1'] } }), opts)).toBe('タグを外す「予約」')
   })
 

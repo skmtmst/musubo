@@ -44,7 +44,7 @@ describe('users tenant and account access scope', () => {
         VALUES
         ('user-a1', '${DEFAULT_TENANT_ID}', 'a1@example.com', '09000000001', NULL, 'A1', '2026-09-01', '2026-09-01'),
         ('user-a2', '${DEFAULT_TENANT_ID}', 'a2@example.com', '09000000002', NULL, 'A2', '2026-09-02', '2026-09-02'),
-        ('user-b', 'tenant-b', 'secret@example.com', '09099999999', NULL, 'B', '2026-09-03', '2026-09-03'),
+        ('user-b', 'tenant-b', 'secret@example.com', '09000009999', NULL, 'B', '2026-09-03', '2026-09-03'),
         ('user-legacy', NULL, 'legacy@example.com', '09000000003', NULL, 'Legacy', '2026-09-04', '2026-09-04'),
         ('user-mixed', NULL, 'mixed@example.com', '09000000004', NULL, 'Mixed', '2026-09-05', '2026-09-05'),
         ('user-unlinked', '${DEFAULT_TENANT_ID}', 'unlinked@example.com', '09000000005', NULL, 'Unlinked', '2026-09-06', '2026-09-06');

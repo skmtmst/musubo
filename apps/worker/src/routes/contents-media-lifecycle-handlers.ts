@@ -13,6 +13,7 @@ import type { Env } from '../worker-env.js';
 
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { claimFileDeletion, fileDeletionGuard, mediaDeletionLockId, releaseFileDeletion } from '../services/file-deletion-lock.js';
 import { scanSingleMediaUsage } from '../features/media/media-usage-scan/index.js';
 import { checkMediaGate, getMediaGateInfo } from '../services/file-scan.js';
 import { isValidUsageExpiryDate, uploaderNameMap, serializeMedia, mediaArchiveRoute, replacementImpact, RequestBodyError, COMMON_VAR_USAGE_KIND_LABELS, serializeVar, emptyCommonVarUsageImpact, serializeCommonVarDeleteImpact } from './contents-definition.js';
@@ -524,14 +525,23 @@ export const delete__api_media_id_8 = async (c: Context<Env, "/api/media/:id">) 
     }
 
     // 実体の削除失敗は記録を保持して再試行できるようにする。
-    const keys = await getMediaVersionKeys(c.env.DB, id);
     if (!c.env.IMAGES) return c.json({ success: false, code: 'MEDIA_STORAGE_UNAVAILABLE', error: '保管庫へ接続できないため削除していません' }, 503);
+    const lock = await claimFileDeletion(c.env.DB, mediaDeletionLockId(id), c.get('staff')?.id ?? 'unknown');
+    if (!lock) return c.json({ success: false, error: 'ファイルの状態が変わりました。読み直してください' }, 409);
     try {
+      const latest = await getMediaById(c.env.DB, id, accountId);
+      if (!latest || latest.r2_key !== existing.r2_key) {
+        await releaseFileDeletion(c.env.DB, lock);
+        return c.json({ success: false, error: 'ファイルの状態が変わりました。読み直してください' }, 409);
+      }
+      const keys = await getMediaVersionKeys(c.env.DB, id);
+      await fileDeletionGuard(c.env.DB, lock).first();
       await c.env.IMAGES.delete([...new Set([existing.r2_key, ...keys])]);
+      await deleteMedia(c.env.DB, id, accountId, { lockId: lock.id, token: lock.token, r2Key: existing.r2_key });
     } catch {
+      await releaseFileDeletion(c.env.DB, lock).catch(() => {});
       return c.json({ success: false, code: 'MEDIA_STORAGE_DELETE_FAILED', error: 'ファイルを削除できませんでした。記録を保持しているので、もう一度お試しください' }, 503);
     }
-    await deleteMedia(c.env.DB, id, accountId);
     return c.json({ success: true, data: null });
   } catch (err) {
     logger.error("contents.media_id_delete_failed");

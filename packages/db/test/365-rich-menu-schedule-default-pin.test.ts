@@ -34,6 +34,7 @@ function setup() {
       account_id TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'draft',
       publishing_at TEXT,
+      confirmation_revision INTEGER NOT NULL DEFAULT 1,
       is_default_for_all INTEGER NOT NULL DEFAULT 0,
       updated_at TEXT NOT NULL DEFAULT '2026-09-06T00:00:00+09:00'
     );
@@ -44,7 +45,7 @@ function setup() {
       updated_at TEXT NOT NULL DEFAULT '2026-09-06T00:00:00+09:00'
     );
     INSERT INTO line_accounts VALUES ('account-1');
-    INSERT INTO rich_menu_groups VALUES ('menu-1', 'account-1', 'draft', NULL, 0, '2026-09-06T00:00:00+09:00');
+    INSERT INTO rich_menu_groups VALUES ('menu-1', 'account-1', 'draft', NULL, 1, 0, '2026-09-06T00:00:00+09:00');
     INSERT INTO rich_menu_pages VALUES ('p1', 'menu-1', 'line-old-1', '2026-09-06T00:00:00+09:00');
   `)
   sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/291_rich_menu_schedules.sql'), 'utf8'))
@@ -53,6 +54,7 @@ function setup() {
   sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/355_rich_menu_schedule_lease.sql'), 'utf8'))
   // 365は列追加だけのため、ALTERが素直に通ることもここで確かめる。
   sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/365_rich_menu_schedule_default_pin.sql'), 'utf8'))
+  sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/539_rich_menu_group_version.sql'), 'utf8'))
   return sqlite
 }
 
@@ -82,8 +84,9 @@ function asD1(sqlite: Database.Database): D1Database {
       }
     },
     batch: async (stmts: unknown[]) => {
-      for (const stmt of stmts as Array<{ run: () => Promise<unknown> }>) await stmt.run()
-      return []
+      const results = []
+      for (const stmt of stmts as Array<{ run: () => Promise<unknown> }>) results.push(await stmt.run())
+      return results
     },
   } as unknown as D1Database
 }
@@ -171,6 +174,21 @@ describe('365 default固定とlease所有権（実D1）', () => {
     expect(row.publishing_owner).toBe('run-A')
     expect(row.publishing_expires_at).toBe(publishLeaseExpiresAt(NOW))
     expect(row.publishing_generation).toBe(1)
+  })
+
+  test('確認から確保までに版が変わればleaseを取らない', async () => {
+    const row = sqlite.prepare("SELECT publishing_generation, confirmation_revision FROM rich_menu_groups WHERE id='menu-1'").get() as { publishing_generation: number; confirmation_revision: number }
+    sqlite.exec("UPDATE rich_menu_groups SET confirmation_revision=confirmation_revision+1 WHERE id='menu-1'")
+    expect(await acquirePublishLease(db, 'menu-1', 'run-A', NOW, undefined, undefined, undefined, row.publishing_generation, row.confirmation_revision)).toBeNull()
+    expect(sqlite.prepare("SELECT publishing_owner FROM rich_menu_groups WHERE id='menu-1'").get()).toEqual({ publishing_owner: null })
+  })
+
+  test('確認版と公開世代の両方を照合し、更新後の版変更も検知する', async () => {
+    const generation = await acquirePublishLease(db, 'menu-1', 'run-A', NOW, undefined, undefined, undefined, 0, 1)
+    expect(generation).toBe(1)
+    expect(sqlite.prepare("SELECT confirmation_revision FROM rich_menu_groups WHERE id='menu-1'").get()).toEqual({ confirmation_revision: 1 })
+    sqlite.exec("UPDATE rich_menu_groups SET confirmation_revision=confirmation_revision+1 WHERE id='menu-1'")
+    expect(await renewPublishLease(db, 'menu-1', { owner: 'run-A', generation: 1 }, NOW, undefined, 1)).toBe(false)
   })
 
   test('期限切れは別runが回収でき、旧所有者はrenewも解放もできない', async () => {

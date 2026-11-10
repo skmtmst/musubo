@@ -318,7 +318,7 @@ function InputFields({ block, refs, patch, accountId, portable = false }: { bloc
       </Labeled>
       {['text', 'textarea', 'address', 'date'].includes(block.type) ? (
         <Labeled label="参考の文字（入力欄の中に薄く出る）" htmlFor={`${labelId}-placeholder`}>
-          <SaveErrorField names={["placeholder","block.placeholder"]}><TextField id={`${labelId}-placeholder`} value={block.placeholder ?? ''} placeholder="例：山田 太郎" onChange={(e) => set({ placeholder: e.target.value })} /></SaveErrorField>
+          <SaveErrorField names={["placeholder","block.placeholder"]}><TextField id={`${labelId}-placeholder`} value={block.placeholder ?? ''} placeholder="例：見本 141" onChange={(e) => set({ placeholder: e.target.value })} /></SaveErrorField>
         </Labeled>
       ) : null}
       {block.type === 'file' ? <FormFileSettings block={block} onChange={set} /> : null}

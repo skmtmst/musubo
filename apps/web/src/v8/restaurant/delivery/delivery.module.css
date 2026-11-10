@@ -264,6 +264,10 @@
  * 絵では段の区切りを窓の段の間だけで取るので、受け取り情報の段と違い
  * 下の余白と線を持たない（持つと次の欄の題が 6 下がる）。
  */
+.targetSummary {
+  padding-top: var(--space-12);
+}
+
 .dialogLead {
   margin: 0;
   color: var(--color-ink);

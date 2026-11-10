@@ -398,14 +398,14 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       preparing.open(`${name}の連携の解除`)
       return
     }
-    if (!selectedAccountId) return
+    if (!selectedAccountId || !Number.isSafeInteger(disconnecting.connectionVersion) || (disconnecting.connectionVersion ?? 0) < 1) return
     const accountId = selectedAccountId
     const service = disconnecting
     const request = beginOperation(service.id, 'disconnect')
     if (request === null) return
     setDisconnectError('')
     try {
-      const response = await restaurantDeliveryApi.ubereatsDisconnect(accountId)
+      const response = await restaurantDeliveryApi.ubereatsDisconnect(accountId, service.connectionVersion!)
       if (!operationIsCurrent(request, accountId)) return
       if (!isUberConnectionMutationData(response) || response.connection.status !== 'disconnected') {
         throw new Error('disconnect_not_confirmed')

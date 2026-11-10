@@ -245,7 +245,7 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
   return (
     <SaveErrorScope errors={saveErrors}><Drawer open={open} width="narrow" heightMode="viewport" title="電話予約を入れる" dirty={dirty} showDirtyIndicator={false} busy={busy} error={error || undefined} onClose={onClose} footer={footer}>
       <div className={styles.form} data-design-node="wEzuG">
-        <Field label="電話番号"><SaveErrorField names={["phone","customerPhone"]}><TextField {...fields.bind('phone')} type="tel" inputMode="tel" autoComplete="off" invalid={fields.invalid('phone')} aria-describedby={describedBy('phone')} value={phone} onChange={(event) => { setPhone(event.target.value); if (friend) choose(null) }} placeholder="090-1234-5678" /></SaveErrorField><FieldError id="e2-phone-error">{fields.error('phone')}</FieldError></Field>
+        <Field label="電話番号"><SaveErrorField names={["phone","customerPhone"]}><TextField {...fields.bind('phone')} type="tel" inputMode="tel" autoComplete="off" invalid={fields.invalid('phone')} aria-describedby={describedBy('phone')} value={phone} onChange={(event) => { setPhone(event.target.value); if (friend) choose(null) }} placeholder="090-0000-5678" /></SaveErrorField><FieldError id="e2-phone-error">{fields.error('phone')}</FieldError></Field>
         {friends.length > 0 ? (
           <div className={styles.friendBox} role="group" aria-label="LINE の友だちの候補">
             <p className={styles.friendTitle}>LINE の友だちが見つかりました</p>

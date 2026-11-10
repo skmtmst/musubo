@@ -237,6 +237,37 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
     await waitFor(() => expect(fixture.igDisconnect).toHaveBeenCalledWith('acc-1', 3))
   })
 
+  it('解除の窓を閉じて開くと古い確定は使えない', async () => {
+    fixture.igDisconnect.mockResolvedValue({ success: true })
+    setup('connected', CONNECTED)
+    await openIgMenu()
+    fireEvent.click(screen.getAllByRole('menuitem', { name: '接続を解除する' })[0])
+    const dialog = within(await screen.findByRole('alertdialog'))
+    const button = dialog.getByRole('button', { name: '解除する' })
+    const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+    const oldClick = (button as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+    fireEvent.click(dialog.getByRole('button', { name: 'キャンセル' }))
+    await openIgMenu()
+    fireEvent.click(screen.getAllByRole('menuitem', { name: '接続を解除する' })[0])
+    oldClick({ preventDefault() {}, stopPropagation() {} })
+    expect(fixture.igDisconnect).not.toHaveBeenCalled()
+  })
+
+  it('確認中に接続先の版が変わると古い窓は使えない', async () => {
+    fixture.igRefresh.mockResolvedValue({ success: true })
+    setup('connected', CONNECTED)
+    const refresh = await igCard().findByRole('button', { name: '接続を確かめる' })
+    await openIgMenu()
+    fireEvent.click(screen.getAllByRole('menuitem', { name: '接続を解除する' })[0])
+    const dialog = within(await screen.findByRole('alertdialog'))
+    const stale = dialog.getByRole('button', { name: '解除する' })
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('connected', { ...CONNECTED, instagramId: 'ig-2', version: 4 }) })
+    fireEvent.click(refresh)
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    fireEvent.click(stale)
+    expect(fixture.igDisconnect).not.toHaveBeenCalled()
+  })
+
   it('解除前に対象と環境を示し、アカウントが変わると元の確認を実行できない', async () => {
     fixture.googleConnection.mockResolvedValue(googleData())
     fixture.igConnection.mockResolvedValue({ success: true, data: status('connected', CONNECTED) })
@@ -245,6 +276,7 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
     fireEvent.click(screen.getAllByRole('menuitem', { name: '接続を解除する' })[0])
     const dialog = within(await screen.findByRole('alertdialog'))
     expect(dialog.getByText('LINEアカウント')).toBeTruthy()
+    expect(dialog.getByText('@nen_cafe')).toBeTruthy()
     expect(await dialog.findByText('移行前の店')).toBeTruthy()
     expect(dialog.getByText('検証環境')).toBeTruthy()
     const staleConfirm = dialog.getByRole('button', { name: '解除する' })
@@ -316,7 +348,7 @@ describe('Google のカード', () => {
     const card = within(await screen.findByRole('region', { name: 'Google ビジネス' }))
     fireEvent.click(await card.findByText('渋谷店'))
     fireEvent.click(card.getByRole('button', { name: 'この店舗を接続する' }))
-    await waitFor(() => expect(fixture.googleSelectLocation).toHaveBeenCalledWith('acc-1', 'accounts/1/locations/2', false))
+    await waitFor(() => expect(fixture.googleSelectLocation).toHaveBeenCalledWith('acc-1', 'accounts/1/locations/2', false, undefined))
   })
 })
 

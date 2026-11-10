@@ -36,11 +36,12 @@ type Props = {
   canMutate: boolean
   lockedReason?: string
   onChanged: () => void
+  onScopeGuardChange?: (guard: ((action: () => void) => void) | null) => void
 }
 type AssetFolder = { id: string; name: string }
 
 export default function AssetTemplatesList(props: Props) {
-  return <BroadcastAssetManager kind={props.kind} onChanged={props.onChanged}
+  return <BroadcastAssetManager kind={props.kind} onChanged={props.onChanged} onScopeGuardChange={props.onScopeGuardChange}
     renderLayout={state => <AssetListLayout {...props} {...state} />} />
 }
 

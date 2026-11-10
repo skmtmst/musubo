@@ -384,10 +384,10 @@ export default function QuestionEditor({
                   if (!choiceColumns) setOpenChoice(openChoice === index ? null : index)
                 }}
                 aria-expanded={choiceColumns || openChoice === index || Boolean(labelError)}
-                className="text-ink min-w-0 text-left text-sm font-bold"
+                className="text-ink flex min-w-0 flex-1 items-center text-left text-sm font-bold"
               >
-                選択肢{index + 1}
-                <span className="text-ink-secondary ml-2 font-medium">
+                <span className="shrink-0 whitespace-nowrap">選択肢{index + 1}</span>
+                <span className="text-ink-secondary ml-2 min-w-0 truncate font-medium" title={choice.label || undefined}>
                   {choice.label || '（未入力）'}
                 </span>
               </button>

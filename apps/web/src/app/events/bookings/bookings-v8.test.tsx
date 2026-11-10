@@ -83,7 +83,7 @@ function applicant(over: Record<string, unknown>) {
     source: 'booking',
     id: 'b1',
     friendId: 'f1',
-    displayName: '山田 太郎',
+    displayName: '見本 141',
     pictureUrl: null,
     status: 'requested',
     partySize: 1,
@@ -119,8 +119,8 @@ function applicantsPayload() {
     },
     applicants: [
       applicant({ id: 'b1', status: 'requested' }),
-      applicant({ id: 'b2', displayName: '田中 明子', status: 'confirmed', offerExpiresAt: null, firstParticipation: { isFirst: false, attendedCount: 2, checkedAt: null } }),
-      applicant({ source: 'waitlist', id: 'w1', displayName: '鈴木 真理', status: 'offered', offerExpiresAt: '2026-10-02T12:00:00.000Z', appliedAt: '2026-09-28T01:12:00.000Z' }),
+      applicant({ id: 'b2', displayName: '見本 169', status: 'confirmed', offerExpiresAt: null, firstParticipation: { isFirst: false, attendedCount: 2, checkedAt: null } }),
+      applicant({ source: 'waitlist', id: 'w1', displayName: '見本 182', status: 'offered', offerExpiresAt: '2026-10-02T12:00:00.000Z', appliedAt: '2026-09-28T01:12:00.000Z' }),
     ],
     waitlistHistory: [
       {
@@ -133,7 +133,7 @@ function applicantsPayload() {
         offerExpiresAt: null,
         notifiedAt: null,
         updatedAt: '2026-09-29T13:15:00.000Z',
-        displayName: '加藤 舞',
+        displayName: '見本 14',
         convertedBookingId: null,
       },
     ],
@@ -378,8 +378,8 @@ describe('V8-B 申込者（Mu8qW）', () => {
     expect(document.body.textContent).toContain('お知らせを送る')
     expect(document.body.textContent).toContain('初参加')
     expect(document.body.textContent).toContain('過去のイベント参加あり')
-    expect(document.body.textContent).toContain('加藤 舞')
-    expect(host.querySelector('[data-page-template="detail"] [data-template-region="content"]')?.textContent).toContain('加藤 舞')
+    expect(document.body.textContent).toContain('見本 14')
+    expect(host.querySelector('[data-page-template="detail"] [data-template-region="content"]')?.textContent).toContain('見本 14')
   })
 
   it('開催回の入口は曜日と時刻を1つのボタンで示し、選ぶ窓を開ける', async () => {
@@ -397,7 +397,7 @@ describe('V8-B 申込者（Mu8qW）', () => {
     await renderV8()
     const approve = [...document.querySelectorAll('button')].find((b) => b.textContent === '承認する')
     expect(approve, '承認する口がある').toBeTruthy()
-    const applicantRow = [...document.querySelectorAll<HTMLElement>('[role="row"]')].find((row) => row.textContent?.includes('山田 太郎'))!
+    const applicantRow = [...document.querySelectorAll<HTMLElement>('[role="row"]')].find((row) => row.textContent?.includes('見本 141'))!
     expect(applicantRow.querySelectorAll('button')).toHaveLength(2)
     const more = applicantRow.querySelector<HTMLButtonElement>('[data-row-menu]')!
     await act(async () => { more.click() })

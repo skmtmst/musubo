@@ -54,7 +54,7 @@ const STATUS_OPTIONS = [
 type Load = { kind: 'loading' } | { kind: 'ready'; items: QaEntry[]; total: number; scope: object } | { kind: 'error'; error: unknown }
 type Pending = { kind: 'publish' | 'stop' | 'delete'; entry: QaEntry; accountId: string; scope: object }
 
-export const QA_HELP = 'よくある質問と店の答えを登録します。公開した Q&A は返信案の元になり、自動で答えるをオンにした店では答えの文をそのまま返します。行を押すと編集、「…」に公開・止める・削除。'
+export const QA_HELP = 'よくある質問と店の答えを登録します。公開した Q&A は返信案の元になり、自動で答えるをオンにした店では答えの文をそのまま返します。'
 
 export default function QaListV8() {
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -133,7 +133,7 @@ export default function QaListV8() {
       headingSize="regular"
       heightMode="content"
       title="自動応答"
-      help={QA_HELP}
+      help={`${QA_HELP}${permissions.editQa ? '行を押すと編集。' : ''}${permissions.publishQa ? '「…」に公開・止める・削除。' : ''}`}
       actions={actions}
       tabs={<AutoReplyTabs active="qa" />}
       stats={<div className={styles.bands}>

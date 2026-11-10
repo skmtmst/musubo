@@ -20,6 +20,7 @@ import {
   PERSONAL_DATA_RETENTION_JOB,
   TENANT_DATA_RETENTION_JOB,
   GOOGLE_CONTENT_RETENTION_JOB,
+  REGISTRATION_APPLICATION_RETENTION_JOB,
 } from './retention-job-manifest.js';
 
 const FEATURE_SETTINGS_BUNDLE_KEY = 'feature.settings_bundle_v1';
@@ -395,6 +396,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   GOOGLE_CONTENT_RETENTION_JOB,
+  REGISTRATION_APPLICATION_RETENTION_JOB,
   {
     name: 'automation deliveries',
     dispatchLane: 'delivery',

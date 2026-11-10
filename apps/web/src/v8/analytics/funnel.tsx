@@ -42,7 +42,7 @@ import AggregationStatus from '@/components/shared/aggregation-status'
  */
 
 type FunnelStatus = 'active' | 'stopped' | 'archived'
-type FunnelSummary = { id: string; name: string; windowDays: number; createdAt: string; status: FunnelStatus; currentVersion: { id: string; versionNumber: number; createdAt: string } | null; migrationState: 'ready' | 'needs_migration' }
+type FunnelSummary = { id: string; name: string; windowDays: number; createdAt: string; status: FunnelStatus; confirmationRevision: number; currentVersion: { id: string; versionNumber: number; createdAt: string } | null; migrationState: 'ready' | 'needs_migration' }
 export type FunnelEditDraft = {
   funnelId: string
   name: string
@@ -219,23 +219,24 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   }
 
   // 停止は再開できる。保管は終端で、一覧と再集計から外れて戻せない。
-  const [statusTarget, setStatusTarget] = useState<{ funnel: { id: string; name: string; status: FunnelStatus }; to: FunnelStatus; accountId: string; window: object } | null>(null)
+  const [statusTarget, setStatusTarget] = useState<{ funnel: { id: string; name: string; status: FunnelStatus; confirmationRevision: number }; to: FunnelStatus; accountId: string; window: object } | null>(null)
   const statusWindow = useRef<object>({})
   const currentAccount = useRef(accountId)
   if (currentAccount.current !== accountId) statusWindow.current = {}
   currentAccount.current = accountId
   const statusMounted = useRef(false)
   useEffect(() => { statusMounted.current = true; return () => { statusMounted.current = false } }, [])
-  const openStatus = (funnel: { id: string; name: string; status: FunnelStatus }, to: FunnelStatus) => {
+  const openStatus = (funnel: { id: string; name: string; status: FunnelStatus; confirmationRevision: number }, to: FunnelStatus) => {
+    if (!Number.isSafeInteger(funnel.confirmationRevision) || funnel.confirmationRevision < 1) { setRunError('ファネルを読み直してから操作してください'); return }
     statusWindow.current = {}
-    setStatusTarget({ funnel, to, accountId, window: statusWindow.current })
+    setStatusTarget({ funnel: { ...funnel }, to, accountId, window: statusWindow.current })
   }
   const [statusBusy, setStatusBusy] = useState(false)
   const applyStatusChange = async () => {
     if (!statusTarget || statusBusy || !statusMounted.current || currentAccount.current !== statusTarget.accountId || statusWindow.current !== statusTarget.window) return
     setStatusBusy(true); setRunError('')
     try {
-      const res = await api.analytics.v6Funnels.setStatus(accountId, statusTarget.funnel.id, { status: statusTarget.to, expectedStatus: statusTarget.funnel.status })
+      const res = await api.analytics.v6Funnels.setStatus(accountId, statusTarget.funnel.id, { status: statusTarget.to, expectedStatus: statusTarget.funnel.status, expectedRevision: statusTarget.funnel.confirmationRevision })
       if (!res.success) { setRunError(explainStartError(res.error, '状態を変えられませんでした')); return }
       statusWindow.current = {}; setStatusTarget(null)
       notifyToast(statusTarget.to === 'archived' ? '計測の流れを削除しました。過去の結果は残ります。' : '状態を変更しました')
@@ -363,7 +364,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
           {run && run.state === 'partial' ? <p className={styles.warnText}>{run.stateReason ?? '一部の期間・種類のデータが無いため、実際より少なく数えている可能性があります。'}</p> : null}
           {/* 結果は集計時の版の写し。いまの定義とずれていたら断り、再集計へ誘導する。 */}
           {run && selectedFunnel?.currentVersion && run.versionNumber != null && run.versionNumber !== selectedFunnel.currentVersion.versionNumber
-            ? <p className={styles.warnText} role="status">{`この結果は定義版${run.versionNumber}で集計したものです。いまの定義は版${selectedFunnel.currentVersion.versionNumber}です。「この${funnelDays}日を再集計」で、いまの定義の結果に更新できます。`}</p> : null}
+            ? <p className={styles.warnText} role="status">{`この結果は定義版${run.versionNumber}で集計したものです。いまの定義は版${selectedFunnel.currentVersion.versionNumber}です。${canManage ? `「この${funnelDays}日を再集計」で、いまの定義の結果に更新できます。` : '管理者に再集計を依頼してください。'}`}</p> : null}
 
           {result ? <div className={styles.routesSplit}>
             <section className={styles.funnelFlow} aria-labelledby="funnel-flow-title">

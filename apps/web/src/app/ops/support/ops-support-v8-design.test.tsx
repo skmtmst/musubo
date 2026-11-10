@@ -21,7 +21,7 @@ vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNod
 const ticket = {
   id: 't1', ticketNo: 1042, ticketLabel: '#1042', tenantId: 'tenant-a', tenantName: '然-NEN-本部',
   tenantPlanKey: 'standard', tenantPlanStatus: 'active', tenantStatus: 'active',
-  staffId: 's1', staffName: '高田 誠', staffRole: 'owner', staffEmailRegistered: true,
+  staffId: 's1', staffName: '見本 18', staffRole: 'owner', staffEmailRegistered: true,
   kind: 'bug', kindLabel: '不具合', subject: 'LINE の Webhook が遅れる', subjectAuto: false,
   body: '9/30 の朝から、予約が入った知らせが 5〜10 分遅れて届きます。', attachments: [],
   stage: 'in_progress', stageLabel: '対応中', priority: 'high', priorityLabel: '高', channel: 'line', channelLabel: 'LINE',

@@ -72,9 +72,9 @@ const REVIEW_ITEM = {
   version: 1,
   confidence: { score: 82, label: 'high' },
   left: {
-    kind: 'ec_event', id: 'ec-left-1', label: '山田 太郎', detail: '注文 #1001',
+    kind: 'ec_event', id: 'ec-left-1', label: '見本 141', detail: '注文 #1001',
     lineAccountId: 'acc-1', lineAccountName: 'テスト店', shopKey: null,
-    attributes: [{ label: 'メールアドレス', valuePreview: 'ya***@example.jp', verified: true }],
+    attributes: [{ label: 'メールアドレス', valuePreview: 'ya***@example.com', verified: true }],
   },
   right: {
     kind: 'friend', id: 'friend-right-1', label: '山田 たろう', detail: null,
@@ -126,7 +126,7 @@ afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
 describe('R600 運用集計の失敗でも会員候補を残す', () => {
   test('正常：候補の行・判定入口・集計の数を出す', async () => {
     render(<EcIdentityCandidatesPage />)
-    expect(await screen.findByText('山田 太郎')).toBeTruthy()
+    expect(await screen.findByText('見本 141')).toBeTruthy()
     // 判定入口（1行ごとの操作）は候補と一緒に見える。
     // 行の右端は「…」1つ。判定入口はその中。
     fireEvent.click(screen.getAllByRole('button', { name: /の候補の操作/ })[0])
@@ -141,7 +141,7 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
     mocks.operations.mockRejectedValue(new ApiError(503))
     render(<EcIdentityCandidatesPage />)
     // 取得済みの候補と判定入口は隠さない。
-    expect(await screen.findByText('山田 太郎')).toBeTruthy()
+    expect(await screen.findByText('見本 141')).toBeTruthy()
     fireEvent.click(screen.getAllByRole('button', { name: /の候補の操作/ })[0])
     expect(await screen.findByRole('menuitem', { name: '決める' })).toBeTruthy()
     // 集計欄はその場所で失敗を言い、やり直せる。
@@ -156,7 +156,7 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
   test('運用集計だけ403：候補は残し、権限の案内にする（再試行は出さない）', async () => {
     mocks.operations.mockRejectedValue(new ApiError(403))
     render(<EcIdentityCandidatesPage />)
-    expect(await screen.findByText('山田 太郎')).toBeTruthy()
+    expect(await screen.findByText('見本 141')).toBeTruthy()
     fireEvent.click(screen.getAllByRole('button', { name: /の候補の操作/ })[0])
     expect(await screen.findByRole('menuitem', { name: '決める' })).toBeTruthy()
     expect(screen.getAllByText('表示する権限がありません').length).toBeGreaterThan(0)
@@ -167,7 +167,7 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
   test('再試行で運用集計が戻る', async () => {
     mocks.operations.mockRejectedValue(new ApiError(503))
     render(<EcIdentityCandidatesPage />)
-    expect(await screen.findByText('山田 太郎')).toBeTruthy()
+    expect(await screen.findByText('見本 141')).toBeTruthy()
     mocks.operations.mockResolvedValue(OPERATIONS_OK)
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     // 集計の数が戻り、失敗の文言は消える。
@@ -179,7 +179,7 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
     mocks.list.mockRejectedValue(new ApiError(503))
     render(<EcIdentityCandidatesPage />)
     expect(await screen.findByText('本人照合の候補を読み込めませんでした')).toBeTruthy()
-    expect(screen.queryByText('山田 太郎')).toBeNull()
+    expect(screen.queryByText('見本 141')).toBeNull()
   })
 
   test('両方0件：空の案内にする', async () => {
@@ -190,7 +190,7 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
 })
 
  test('candidate-free people and revenue come from independent full summaries', async () => {
-  render(<EcIdentityCandidatesPage />); await screen.findByText('山田 太郎');
+  render(<EcIdentityCandidatesPage />); await screen.findByText('見本 141');
   expect(screen.getByText('候補なし').closest('[data-kpi-presentation]')?.textContent).toContain('7');
   expect(screen.getByText(/50,000/)).toBeTruthy();
  });

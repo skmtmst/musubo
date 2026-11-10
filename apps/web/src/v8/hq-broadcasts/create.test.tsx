@@ -29,7 +29,7 @@ const hq = vi.hoisted(() => ({
   folders: vi.fn(async () => ({ success: true, data: [] })),
   approvalCandidates: vi.fn(async () => ({ success: true, data: [] })),
   approval: vi.fn(async () => ({ success: true, data: { approval: { status: 'none', requestedByStaffId: null, requestedAt: null, approverStaffId: null, note: null, decidedByStaffId: null, decidedAt: null, rejectReason: null, confirmedCount: null }, gate: { required: false, recipientCount: 0, threshold: 1000, singleOperator: false, operatorCount: 2 }, viewer: { isApprover: false, canApprove: false, isRequester: false } } })),
-  testSend: vi.fn(),
+  testSend: vi.fn(), testRecipients: vi.fn(async () => ({ success: true, data: { count: 1, recipients: [{ id: 'f', displayName: '確認先' }], token: 'a'.repeat(64) } })),
 }))
 const accounts = vi.hoisted(() => vi.fn())
 const folders = vi.hoisted(() => vi.fn())
@@ -43,7 +43,7 @@ const replace = vi.hoisted(() => vi.fn())
 const params = vi.hoisted(() => ({ value: new URLSearchParams() }))
 
 vi.mock('@/lib/hq-broadcasts-api', () => ({ hqBroadcastsApi: hq }))
-vi.mock('@/lib/api/helpers/gap1', () => ({ chatSafetyApi: { hqSendPreview: async () => ({ success: true, data: { recipients: 6120, excluded: { blocked: 0, optedOut: 0, duplicate: 0 }, purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '本文', sender: null, expectedVersion: 2, perAccount: [] } }) } }))
+vi.mock('@/lib/api/helpers/gap1', () => ({ chatSafetyApi: { hqSendPreview: async () => ({ success: true, data: { recipients: 6120, excluded: { blocked: 0, optedOut: 0, duplicate: 0 }, purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '本文', sender: null, expectedVersion: 2, perAccount: [{ accountId: 'a1', recipients: 6120, recipientToken: 'a'.repeat(64), excluded: { blocked: 0, optedOut: 0, duplicate: 0 } }] } }) } }))
 vi.mock('@/lib/hq-templates-api', async (original) => ({ ...await original<typeof import('@/lib/hq-templates-api')>(), hqTemplatesApi: tpl }))
 /*
  * その場で作る：店のカルーセル・リッチメッセージの作る部品（host の口）は、ここでは口だけの代わりにする。
@@ -76,7 +76,7 @@ it('通常の最終確認にも送信先だけと環境を示す', async () => {
   await screen.findByText('送る：1アカウント・6,120 人')
   fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
   const dialog = await screen.findByRole('dialog', { name: '送る前の確かめ' })
-  expect(within(dialog).getByText('銀座店')).toBeTruthy()
+  await waitFor(() => expect(within(dialog).getAllByText('銀座店')).toHaveLength(2))
   expect(within(dialog).queryByText('新宿店')).toBeNull()
   expect(within(dialog).getByText('環境')).toBeTruthy()
   expect(hq.send).not.toHaveBeenCalled()
@@ -289,7 +289,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect(replace).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
     fireEvent.click(await screen.findByRole('button', { name: /人に.*予約する$/ }))
-    await waitFor(() => expect(hq.send).toHaveBeenCalledWith('run-1', 2))
+    await waitFor(() => expect(hq.send).toHaveBeenCalledWith('run-1', 2, undefined, [{ accountId: 'a1', recipientCount: 6120, recipientToken: 'a'.repeat(64) }]))
     expect(push).toHaveBeenCalledWith('/hq/broadcasts/detail?id=run-1')
   })
 
@@ -1054,4 +1054,41 @@ describe('読み込めない配信の保護', () => {
     expect(screen.queryByRole('button', { name: /下書きを保存する|今すぐ送る|予約する/ })).toBeNull()
     expect(hq.create).not.toHaveBeenCalled(); expect(hq.update).not.toHaveBeenCalled(); expect(hq.send).not.toHaveBeenCalled()
   })
+})
+
+it('一括配信の最終確認を閉じた後は古い確定から送らない', async () => {
+  render(<HqBroadcastCreate />)
+  await fillToConfirm()
+  await screen.findByText('送る：1アカウント・6,120 人')
+  fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
+  const dialog = within(await screen.findByRole('dialog', { name: '送る前の確かめ' }))
+  const button = await dialog.findByRole('button', { name: /人に予約する$/ })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const held = (button as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+  fireEvent.click(dialog.getByRole('button', { name: '戻る' }))
+  fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
+  const reopened = within(await screen.findByRole('dialog', { name: '送る前の確かめ' }))
+  await reopened.findByRole('button', { name: /人に予約する$/ })
+  await act(async () => { await held({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:button, target:button }) })
+  expect(hq.send).not.toHaveBeenCalled()
+  fireEvent.click(reopened.getByRole('button', { name: /人に予約する$/ }))
+  await waitFor(() => expect(hq.send).toHaveBeenCalledOnce())
+})
+
+it('単独運用の最終確認を閉じた後は古い確定から送らない', async () => {
+  const originalApproval = hq.approval.getMockImplementation()
+  hq.approval.mockResolvedValue({ success: true, data: { approval: { status: 'none', requestedByStaffId: null, requestedAt: null, approverStaffId: null, note: null, decidedByStaffId: null, decidedAt: null, rejectReason: null, confirmedCount: null }, gate: { required: true, recipientCount: 6120, threshold: 1000, singleOperator: true, operatorCount: 1 }, viewer: { isApprover: false, canApprove: false, isRequester: false } } })
+  render(<HqBroadcastCreate />)
+  await fillToConfirm()
+  await screen.findByText('送る：1アカウント・6,120 人')
+  fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
+  const dialog = within(await screen.findByRole('dialog', { name: '1アカウントに送ります' }))
+  fireEvent.change(dialog.getByLabelText('人数を入れる'), { target: { value: '6120' } })
+  const button = dialog.getByRole('button', { name: '予約する' })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const held = (button as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+  fireEvent.click(dialog.getByRole('button', { name: 'キャンセル' }))
+  await act(async () => { await held({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:button, target:button }) })
+  expect(hq.send).not.toHaveBeenCalled()
+  if (originalApproval) hq.approval.mockImplementation(originalApproval)
 })

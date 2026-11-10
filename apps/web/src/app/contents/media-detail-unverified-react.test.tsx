@@ -139,9 +139,9 @@ describe('使用箇所の未確認（R34、実React）', () => {
 describe('入れた人の表示（R35、実React）', () => {
   it('内部IDではなく担当者の表示名を出す', async () => {
     fixture.impact = { ...BASE_IMPACT, verified: true, canDelete: true, recommendedAction: 'delete' }
-    await renderDialog({ ...ITEM, uploadedBy: 'c0ffee-uuid', uploadedByName: '山田 太郎' })
+    await renderDialog({ ...ITEM, uploadedBy: 'c0ffee-uuid', uploadedByName: '見本 141' })
 
-    expect(host.textContent).toContain('山田 太郎')
+    expect(host.textContent).toContain('見本 141')
     expect(host.textContent).not.toContain('c0ffee-uuid')
   })
 

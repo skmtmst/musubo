@@ -253,6 +253,7 @@ export default function RichMenusListV8() {
   const [impact, setImpact] = useState<RichMenuDeleteImpact | null>(null)
   const [impactPhase, setImpactPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const impactRequestRef = useRef<DeleteImpactRequest | null>(null)
+  const renderedDeleteRequest = impactRequestRef.current
   const impactRequestGenerationRef = useRef(0)
   const impactLoadGenerationRef = useRef(0)
   const [importTarget, setImportTarget] = useState<LineMenu | null>(null)
@@ -649,20 +650,26 @@ export default function RichMenusListV8() {
     }
   }
 
-  async function confirmDelete() {
-    if (!deleteTarget || deleteBusy) return
-    const request = impactRequestRef.current
-    if (!request || request.accountId !== selectedAccount?.id) return
+  async function confirmDelete(request: DeleteImpactRequest | null) {
+    if (!deleteTarget || deleteBusy || !request || !sameDeleteImpactRequest(impactRequestRef.current, request)) return
+    if (request.accountId !== selectedAccount?.id) return
     const action = deleteTarget.kind === 'managed'
       ? deleteTarget.group.status === 'published' ? 'unpublish' : 'delete'
       : 'externalDelete'
+    if(deleteTarget.kind==='managed'&&action==='unpublish'&&(!impact||impactPhase!=='ready'||impact.group.id!==deleteTarget.group.id||impact.group.name!==deleteTarget.group.name||impact.group.status!=='published'||!Number.isSafeInteger(impact.group.version)||!Number.isSafeInteger(impact.group.publishingGeneration)||typeof impact.lineResources.isDefaultForAll!=='boolean'||!Array.isArray(impact.lineResources.pages))){
+      setDeleteError('公開内容を確認できません。閉じてもう一度お試しください。');return
+    }
     setDeleteBusy(true)
     setDeleteError(null)
     try {
       if (deleteTarget.kind === 'managed') {
+        if (deleteTarget.group.status === 'draft' && (!Number.isSafeInteger(deleteTarget.group.version) || (deleteTarget.group.version ?? 0) < 1)) {
+          setDeleteError('版を確認できません。一覧を読み直してから、もう一度選んでください。')
+          return
+        }
         const res = deleteTarget.group.status === 'published'
-          ? await api.richMenuGroups.unpublish(deleteTarget.group.id)
-          : await api.richMenuGroups.delete(deleteTarget.group.id)
+          ? await api.richMenuGroups.unpublish(deleteTarget.group.id,{expectedVersion:impact!.group.version!,expectedPublishGeneration:impact!.group.publishingGeneration!,expectedIsDefaultForAll:impact!.lineResources.isDefaultForAll,expectedPages:impact!.lineResources.pages!})
+          : await api.richMenuGroups.delete(deleteTarget.group.id, deleteTarget.group.version)
         if (!res.success) throw new Error('delete_failed')
       } else {
         if (!selectedAccount?.id) throw new Error('account_missing')
@@ -682,6 +689,13 @@ export default function RichMenusListV8() {
       const fieldFailure = saveErrors.capture(e)
       /* 409は「読んだあとに状態が変わった」。新しい影響を描き直す。 */
       if (e instanceof ApiError && e.status === 409) {
+        if(action==='unpublish'&&e.code==='RICH_MENU_CONFIRMATION_CHANGED'){
+          setDeleteTarget(null)
+          const partial = Boolean(e.data && typeof e.data === 'object' && 'partial' in e.data && e.data.partial === true)
+          notifyToast(partial ? '公開内容が変わりました。一部の取り下げが進んだ可能性があります。最新の状態を確認してください。' : '公開内容が変わりました。最新の状態を確認してください。',{tone:'error'})
+          void reload()
+          return
+        }
         const latest = impactFromError(e.data);
 
         if (latest && impactMatchesRequest(latest, request)) {
@@ -1147,7 +1161,7 @@ export default function RichMenusListV8() {
   if (blockedDelete && impact && managedDelete) {
     const keys = impact.blockers
     const unpublish = managedDelete.status === 'published' && canEdit
-      ? { label: 'LINEから取り下げる', onSelect: () => void confirmDelete() }
+      ? { label: 'LINEから取り下げる', onSelect: () => void confirmDelete(renderedDeleteRequest) }
       : null
     for (const key of keys) {
       if (key === 'default_for_all') {
@@ -1182,7 +1196,7 @@ export default function RichMenusListV8() {
       error={deleteError}
       onClose={closeDelete}
       footer={managedDelete.status === 'published' && canEdit ? (
-          <Button type="button" variant="secondary" onClick={() => void confirmDelete()} disabled={deleteBusy} busy={Boolean(deleteBusy)} busyLabel="処理中…">
+          <Button type="button" variant="secondary" onClick={() => void confirmDelete(renderedDeleteRequest)} disabled={deleteBusy} busy={Boolean(deleteBusy)} busyLabel="処理中…">
             <CloudOff size={16} aria-hidden="true" />
             LINEから取り下げる
           </Button>
@@ -1211,7 +1225,7 @@ export default function RichMenusListV8() {
       error={deleteError ?? undefined}
       onCancel={closeDelete}
       {...(deleteTarget?.kind === 'external' || (deleteTarget?.kind === 'managed' && deleteTarget.group.status === 'published') || canDeleteImpact({ impact, busy: deleteBusy })
-        ? { onConfirm: () => void confirmDelete() }
+        ? { onConfirm: () => void confirmDelete(renderedDeleteRequest) }
         : {})}
     >
       <OperationTargetSummary accounts={[{ id: impactRequestRef.current?.accountId ?? '' }]} />

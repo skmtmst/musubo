@@ -448,3 +448,77 @@ styles.post(base + '/activate', async (c) => {
     data: { complete: items.every((i) => i.success), items },
   });
 });
+
+/** 確認時の予約と版を固定し、変更があれば休業を1件も作らない。 */
+styles.post(base + '/closures/confirmation', async (c) => {
+  edit(c, 'booking.settings');
+  const a = await account(c), b = await json(c);
+  const { parseClosureConfirmation, readClosureSnapshot, readClosureExceptionSnapshot } = await import('../services/style-closure-confirmation.js');
+  const input = parseClosureConfirmation(b);
+  const accountRow = await c.env.DB.prepare(`SELECT COALESCE(timezone,'Asia/Tokyo') AS timezone FROM line_accounts WHERE id=?`).bind(a).first<{ timezone: string }>();
+  if (!accountRow) throw new StyleError('not_found', 404);
+  const result = await readClosureSnapshot(c.env.DB, a, input, accountRow.timezone);
+  const exceptions = await readClosureExceptionSnapshot(c.env.DB, a, input);
+  return c.json({ success: true, data: { reservations: result.reservations, snapshot: JSON.stringify({ input, timezone: accountRow.timezone, rows: result.snapshot, exceptions }) } });
+});
+
+styles.post(base + '/closures/confirmed', async (c) => {
+  edit(c, 'booking.settings');
+  const a = await account(c), b = await json(c);
+  const { parseClosureConfirmation, closureSnapshotQuery, closureExceptionSnapshotQuery, readClosureSnapshot } = await import('../services/style-closure-confirmation.js');
+  const input = parseClosureConfirmation(b);
+  if (typeof b.expectedSnapshot !== 'string' || b.expectedSnapshot.length > 90000) throw new StyleError('invalid_confirmation');
+  let expected: { input: unknown; timezone: string; rows: string; exceptions: string };
+  try { expected = JSON.parse(b.expectedSnapshot); } catch { throw new StyleError('invalid_confirmation'); }
+  if (!expected || typeof expected.timezone !== 'string' || typeof expected.rows !== 'string' || typeof expected.exceptions !== 'string') throw new StyleError('invalid_confirmation');
+  const db = c.env.DB;
+  const row = await db.prepare(`SELECT COALESCE(timezone,'Asia/Tokyo') AS timezone FROM line_accounts WHERE id=?`).bind(a).first<{ timezone: string }>();
+  if (!row) throw new StyleError('not_found', 404);
+  if (row.timezone !== expected.timezone || JSON.stringify(expected.input) !== JSON.stringify(input)) {
+    const current = await readClosureSnapshot(db, a, input, row.timezone);
+    return c.json({ success: false, error: 'confirmation_changed', code: 'confirmation_changed', data: { count: current.reservations.length } }, 409);
+  }
+  const query = closureSnapshotQuery(a, input, row.timezone);
+  const exceptions = closureExceptionSnapshotQuery(a, input);
+  const writes: D1PreparedStatement[] = [db.prepare(`SELECT json(CASE WHEN (${query.sql})=? AND (${exceptions.sql})=? AND EXISTS(
+    SELECT 1 FROM line_accounts WHERE id=? AND COALESCE(timezone,'Asia/Tokyo')=?) THEN '{}' ELSE 'CLOSURE_CONFIRMATION_CHANGED' END)`)
+    .bind(...query.binds, expected.rows, ...exceptions.binds, expected.exceptions, a, row.timezone)];
+  for (const scopeId of input.target === 'staff' ? input.staffIds : [null]) {
+    let open: Array<{ start: string; end: string }> = [];
+    if (!input.allDay) {
+      const weekday = new Date(input.date + 'T00:00:00Z').getUTCDay();
+      if (scopeId === null) {
+        open = (await db.prepare(`SELECT h.start_time start,h.end_time end FROM booking_business_hours h JOIN booking_settings s ON s.id=h.booking_settings_id WHERE s.line_account_id=? AND h.weekday=?`)
+          .bind(a, weekday).all<{ start: string; end: string }>()).results;
+      } else {
+        const shifts = (await db.prepare(`SELECT sh.start_time start,sh.end_time end FROM staff_shifts sh JOIN staff s ON s.id=sh.staff_id WHERE s.line_account_id=? AND s.id=? AND sh.work_date=?`)
+          .bind(a, scopeId, input.date).all<{ start: string; end: string }>()).results;
+        open = shifts.length ? shifts : (await db.prepare(`SELECT r.start_time start,r.end_time end FROM staff_availability_rules r JOIN staff s ON s.id=r.staff_id WHERE s.line_account_id=? AND s.id=? AND r.weekday=? AND r.is_active=1`)
+          .bind(a, scopeId, weekday).all<{ start: string; end: string }>()).results;
+      }
+      const existing = await db.prepare(`SELECT 1 FROM booking_availability_exceptions WHERE line_account_id=? AND date_from<=? AND date_to>=? AND (scope_kind='store' OR (scope_kind='staff' AND scope_id IS ?)) LIMIT 1`)
+        .bind(a, input.date, input.date, scopeId).first();
+      if (existing) throw new StyleError('existing_exception_use_edit', 409);
+      if (!open.length) throw new StyleError('working_hours_unconfigured', 422);
+      open = open.flatMap(i => i.end <= input.startTime! || i.start >= input.endTime! ? [i] : [
+        ...(i.start < input.startTime! ? [{ start: i.start, end: input.startTime! }] : []),
+        ...(i.end > input.endTime! ? [{ start: input.endTime!, end: i.end }] : []),
+      ]);
+    }
+    const now = new Date().toISOString(), id = crypto.randomUUID();
+    writes.push(db.prepare(`INSERT INTO booking_availability_exceptions
+      (id,line_account_id,scope_kind,scope_id,date_from,date_to,kind,hours_json,reason,created_at,updated_at)
+      SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE (? IS NULL OR EXISTS(SELECT 1 FROM staff WHERE id=? AND line_account_id=? AND is_active=1))
+        AND (?=1 OR NOT EXISTS(SELECT 1 FROM booking_availability_exceptions
+          WHERE line_account_id=? AND date_from<=? AND date_to>=? AND (scope_kind='store' OR (scope_kind='staff' AND scope_id IS ?))))`)
+      .bind(id, a, input.target, scopeId, input.date, input.date, input.allDay || !open.length ? 'closed' : 'custom_hours', JSON.stringify(open), input.reason, now, now, scopeId, scopeId, a, Number(input.allDay), a, input.date, input.date, scopeId));
+    writes.push(db.prepare(`SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'CLOSURE_SCOPE_CHANGED' END)`));
+  }
+  try { await db.batch(writes); }
+  catch (error) {
+    if (!String(error).includes('malformed JSON')) throw error;
+    const current = await readClosureSnapshot(db, a, input, row.timezone);
+    return c.json({ success: false, error: 'confirmation_changed', code: 'confirmation_changed', data: { count: current.reservations.length } }, 409);
+  }
+  return c.json({ success: true, data: { count: input.target === 'staff' ? input.staffIds.length : 1 } }, 201);
+});

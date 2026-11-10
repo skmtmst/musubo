@@ -299,6 +299,7 @@ beforeEach(() => {
   fixture.testSend.mockResolvedValue({ success: true, data: { sent: 1 } })
   fixture.getTestRecipients.mockResolvedValue({
     success: true,
+    confirmationRevision: 2,
     data: [
       { id: 'friend-t1', displayName: 'テスト 一郎', pictureUrl: null },
       { id: 'friend-t2', displayName: 'テスト 二郎', pictureUrl: null },
@@ -1374,6 +1375,7 @@ describe('#988 テスト送信は宛先を見せる確認を挟む', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'テスト受信者 2名へ送信' }))
     await waitFor(() => expect(fixture.testSend).toHaveBeenCalledTimes(1))
+    expect(fixture.testSend.mock.calls[0][0]).toMatchObject({ accountId: 'account-a', expectedRecipientIds: ['friend-t1', 'friend-t2'], expectedConfirmationRevision: 2 })
     await waitFor(() => expect(screen.getByText('テスト受信者 1名へ送信しました。')).toBeTruthy())
   })
 
@@ -1414,7 +1416,7 @@ describe('#988 テスト送信は宛先を見せる確認を挟む', () => {
 })
 
 /*
- * #988 NEXT-06: 「注文完了らすぐ」「なし（全員に送る）」「高橋 直人さんには
+ * #988 NEXT-06: 「注文完了らすぐ」「なし（全員に送る）」「見本 16さんには
  * こう届きます」を、実際の動作に合わせた説明へ直す。宛先は一斉配信ではなく、
  * その出来事に関わるお客さまだけ。見本は架空の注文による表示例と明記する。
  */
@@ -1444,7 +1446,7 @@ describe('#988 条件説明と表示例は実際の意味に合わせる', () =>
     expect(screen.queryByText(/送らない相手/)).toBeNull()
     // 見本は架空だと明記し、実在の人物名を宛先のように見せない。
     expect(screen.getByText('架空の注文による表示例')).toBeTruthy()
-    expect(screen.queryByText(/高橋 直人/)).toBeNull()
+    expect(screen.queryByText(/見本 16/)).toBeNull()
   })
 
   it('入金・発送・キャンセル・定期便でも文法と対象範囲が正しい', async () => {

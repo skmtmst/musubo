@@ -225,10 +225,14 @@ export async function failMediaUploadSession(
   lineAccountId: string,
   failureCode: string,
 ): Promise<void> {
-  await db.prepare(
+  const fail = db.prepare(
     `UPDATE media_upload_sessions SET status = 'failed', failure_code = ?, completed_at = ?
-      WHERE id = ? AND line_account_id = ? AND status = 'pending'`,
-  ).bind(failureCode, jstNow(), id, lineAccountId).run();
+      WHERE id = ? AND line_account_id = ? AND status = 'pending' AND NOT EXISTS (
+        SELECT 1 FROM media_file_scans fs JOIN operation_audit l ON l.id=CASE WHEN fs.media_id IS NOT NULL THEN 'file-scan-delete:media:' || fs.media_id ELSE 'file-scan-delete:scan:' || fs.id END AND l.action='deleting'
+        WHERE fs.subject_kind='upload_session' AND fs.subject_id=media_upload_sessions.id
+      )`,
+  ).bind(failureCode, jstNow(), id, lineAccountId);
+  await db.batch([fail, db.prepare("UPDATE media_file_scans SET confirmation_revision=confirmation_revision+1 WHERE subject_kind='upload_session' AND subject_id=? AND line_account_id=? AND changes()>0").bind(id, lineAccountId)]);
 }
 
 export async function verifyMediaUploadSession(
@@ -248,16 +252,20 @@ export async function verifyMediaUploadSession(
     : `width = COALESCE(?, width), height = COALESCE(?, height),
         duration_ms = COALESCE(?, duration_ms), page_count = COALESCE(?, page_count),
         codec = COALESCE(?, codec)`;
-  await db.prepare(
+  const verify = db.prepare(
     `UPDATE media_upload_sessions SET status = 'verified', etag = ?, completed_at = ?,
         r2_key = COALESCE(?, r2_key), ${setClause}
-      WHERE id = ? AND line_account_id = ? AND status = 'pending'`,
+      WHERE id = ? AND line_account_id = ? AND status = 'pending' AND NOT EXISTS (
+        SELECT 1 FROM media_file_scans fs JOIN operation_audit l ON l.id=CASE WHEN fs.media_id IS NOT NULL THEN 'file-scan-delete:media:' || fs.media_id ELSE 'file-scan-delete:scan:' || fs.id END AND l.action='deleting'
+        WHERE fs.subject_kind='upload_session' AND fs.subject_id=media_upload_sessions.id
+      )`,
   ).bind(
     etag, jstNow(), finalizedR2Key ?? null,
     measured?.width ?? null, measured?.height ?? null, measured?.duration_ms ?? null,
     measured?.page_count ?? null, measured?.codec ?? null,
     id, lineAccountId,
-  ).run();
+  );
+  await db.batch([verify, db.prepare("UPDATE media_file_scans SET confirmation_revision=confirmation_revision+1 WHERE subject_kind='upload_session' AND subject_id=? AND line_account_id=? AND changes()>0").bind(id, lineAccountId)]);
   return getMediaUploadSession(db, id, lineAccountId);
 }
 
@@ -474,12 +482,14 @@ export async function createMediaVersionFromUpload(
       db.prepare(
         `UPDATE media SET filename = ?, mime_type = ?, size_bytes = ?, r2_key = ?,
             width = ?, height = ?, duration_ms = ?, uploaded_by = ?
-          WHERE id = ? AND line_account_id = ?`,
+          WHERE id = ? AND line_account_id = ? AND NOT EXISTS (SELECT 1 FROM operation_audit WHERE id='file-scan-delete:media:' || media.id AND action='deleting')`,
       ).bind(
         session.filename, session.expected_mime, session.expected_size, session.r2_key,
         session.width, session.height, session.duration_ms,
         input.uploadedBy ?? session.created_by, input.mediaId, input.lineAccountId,
       ),
+      db.prepare("SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'FILE_DELETE_CONFLICT' END)"),
+      db.prepare("UPDATE media_file_scans SET confirmation_revision=confirmation_revision+1 WHERE line_account_id=? AND (media_id=? OR (subject_kind='media' AND subject_id=?))").bind(input.lineAccountId, input.mediaId, input.mediaId),
       db.prepare(
         `UPDATE media_upload_sessions
             SET status = 'completed', result_media_id = ?, completed_at = ?

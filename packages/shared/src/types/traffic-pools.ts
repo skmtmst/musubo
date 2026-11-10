@@ -4,6 +4,7 @@
 
 export interface TrafficPool {
   id: string;
+  confirmationRevision?: number;
   slug: string;
   name: string;
   activeAccountId: string | null;

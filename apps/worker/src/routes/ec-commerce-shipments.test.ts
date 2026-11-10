@@ -50,7 +50,7 @@ function orderRow(over: Row = {}): Row {
     id: 'evt-1',
     event_type: 'ec.order.confirmed',
     friend_id: 'f-1',
-    friend_name: '小林 彩',
+    friend_name: '見本 48',
     received_at: '2026-08-14T09:00:00+09:00',
     order_number: 'NEN-1001',
     occurred_at: '2026-08-14T09:00:00+09:00',

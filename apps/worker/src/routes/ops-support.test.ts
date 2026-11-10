@@ -41,9 +41,9 @@ function environment(ai?: { run: (model: string, input: unknown) => Promise<unkn
   } as Env['Bindings'];
 }
 
-const master: AuthenticatedStaff = { id: 'master-1', name: '坂本 真人', role: 'owner', readOnly: false, tenantId: null };
+const master: AuthenticatedStaff = { id: 'master-1', name: '見本 25', role: 'owner', readOnly: false, tenantId: null };
 const readOnlyMaster: AuthenticatedStaff = { ...master, id: 'master-ro', readOnly: true };
-const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '山田 太郎', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
+const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '見本 141', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
 
 function json(body: unknown, method = 'POST') {
   return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
@@ -51,7 +51,7 @@ function json(body: unknown, method = 'POST') {
 
 async function seedTicket(subject = '回答フォームからタグが付かない') {
   return createHqSupportRequest(testDb.db, {
-    tenantId: 'tenant-a', staffId: 'owner-1', staffName: '山田 太郎', staffEmail: 'yamada@example.com',
+    tenantId: 'tenant-a', staffId: 'owner-1', staffName: '見本 141', staffEmail: 'yamada@example.com',
     kind: 'bug', subject, body: '設定したタグが友だちに付きません。', lineAccountId: null, attachmentKeys: [],
   });
 }
@@ -61,9 +61,9 @@ beforeEach(() => {
   mail.sendPlainMail.mockClear();
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_key, plan_status) VALUES ('tenant-a', '株式会社サンプル', 'active', 'standard', 'active')`).run();
   for (const [id, name, tenant, email] of [
-    ['master-1', '坂本 真人', null, null],
+    ['master-1', '見本 25', null, null],
     ['master-ro', '閲覧のみ', null, null],
-    ['owner-1', '山田 太郎', 'tenant-a', 'yamada@example.com'],
+    ['owner-1', '見本 141', 'tenant-a', 'yamada@example.com'],
   ] as const) {
     testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, email) VALUES (?, ?, 'owner', ?, ?, ?)`)
       .run(id, name, `${id}-key`, tenant, email);
@@ -84,7 +84,7 @@ describe('チケット番号と一覧', () => {
     const body = await res.json() as { data: Array<{ ticketLabel: string; stage: string; tenantName: string; staffName: string }>; total: number };
     expect(body.total).toBe(2);
     expect(body.data[0].ticketLabel).toBe('#MB-0002');
-    expect(body.data[0]).toMatchObject({ stage: 'new', tenantName: '株式会社サンプル', staffName: '山田 太郎' });
+    expect(body.data[0]).toMatchObject({ stage: 'new', tenantName: '株式会社サンプル', staffName: '見本 141' });
     const summary = await app(master).request('/api/ops/support/summary');
     const s = await summary.json() as { data: { byStage: Record<string, number>; kpis: { untouched: number } } };
     expect(s.data.byStage.new).toBe(2);
@@ -210,7 +210,7 @@ describe('返信', () => {
     expect(list.data[0].ticketLabel).toBe('#MB-0001');
     expect(list.data[0].status).toBe('answered');
     expect(list.data[0].replies).toHaveLength(1);
-    expect(list.data[0].replies[0].authorName).toBe('坂本 真人');
+    expect(list.data[0].replies[0].authorName).toBe('見本 25');
     const audit = testDb.raw.prepare(`SELECT action, visible_to_tenant FROM platform_audit_logs WHERE action = 'ticket.reply'`).get() as { action: string; visible_to_tenant: number };
     expect(audit.visible_to_tenant).toBe(1);
   });
@@ -260,7 +260,7 @@ describe('下書きと AI', () => {
     const t = await seedTicket();
     const none = await app(master).request(`/api/ops/support/tickets/${t.id}/draft/ai`, json({}));
     expect(none.status).toBe(503);
-    const run = vi.fn(async (_model: string, _input: unknown) => ({ response: '山田さま\nご連絡ありがとうございます。' }));
+    const run = vi.fn(async (_model: string, _input: unknown) => ({ response: '見本さま\nご連絡ありがとうございます。' }));
     const res = await app(master, { run }).request(`/api/ops/support/tickets/${t.id}/draft/ai`, json({}));
     expect(res.status).toBe(201);
     const body = await res.json() as { data: { body: string; aiGenerated: boolean; generatedAt: string | null } };
@@ -271,7 +271,7 @@ describe('下書きと AI', () => {
     const input = run.mock.calls[0][1] as { messages: Array<{ role: string; content: string }> };
     // 個人のメールアドレスは AI に渡さない
     expect(input.messages.map((m) => m.content).join('\n')).not.toContain('yamada@example.com');
-    expect(input.messages.map((m) => m.content).join('\n')).not.toContain('山田');
+    expect(input.messages.map((m) => m.content).join('\n')).not.toContain('見本');
     expect(input.messages.map((m) => m.content).join('\n')).not.toContain('株式会社サンプル');
   });
 
@@ -299,7 +299,7 @@ describe('下書きと AI', () => {
     testDb.raw.prepare(`INSERT INTO platform_knowledge_articles (id,source_request_id,source_revision,title,question,answer,kind,article_kind,review_state,status,created_at,updated_at)
       VALUES ('billing-example',?,0,'請求書の再発行','請求書','未確認の回答例','billing','answer_example','approved','active','2026-09-21','2026-09-21')`).run(exampleSource.id);
     const t = await seedTicket('画面がうまく使えない');
-    await addSupportTenantMessage(testDb.db, { requestId: t.id, staffId: 'owner-1', staffName: '山田 太郎', body: '説明を訂正します。請求書の再発行です。再ログインは実施済みです。', attachmentKeys: [] });
+    await addSupportTenantMessage(testDb.db, { requestId: t.id, staffId: 'owner-1', staffName: '見本 141', body: '説明を訂正します。請求書の再発行です。再ログインは実施済みです。', attachmentKeys: [] });
     const run = vi.fn(async () => ({ response: '状況を確認するため追加の情報をお願いします。' }));
     const res = await app(master, { run }).request(`/api/ops/support/tickets/${t.id}/draft/ai`, json({}));
     expect(res.status).toBe(201);
@@ -335,12 +335,12 @@ describe('下書きと AI', () => {
 
   it('AI へ渡す材料にはやり取りと担当者名が入り、署名の指示がある', () => {
     const prompt = buildDraftPrompt({
-      ticket: { ticketLabel: '#MB-0312', subject: '件名', body: '本文', kindLabel: '不具合', staffName: '山田 太郎', staffRole: 'オーナー', tenantName: '株式会社サンプル', planLabel: 'スタンダード' },
-      messages: [{ authorKind: 'ops', authorName: '坂本 真人', body: '確認します。' }],
-      opsName: '坂本 真人',
+      ticket: { ticketLabel: '#MB-0312', subject: '件名', body: '本文', kindLabel: '不具合', staffName: '見本 141', staffRole: 'オーナー', tenantName: '株式会社サンプル', planLabel: 'スタンダード' },
+      messages: [{ authorKind: 'ops', authorName: '見本 25', body: '確認します。' }],
+      opsName: '見本 25',
     });
     expect(prompt.user).toContain('#MB-0312');
-    expect(prompt.user).toContain('musubo 運営 ／ 坂本 真人');
+    expect(prompt.user).toContain('musubo 運営 ／ 見本 25');
     expect(prompt.system).toContain('署名');
   });
 });
@@ -352,7 +352,7 @@ describe('運営が起票する', () => {
     const res = await app(master).request('/api/ops/support/tickets', json({ tenantId: 'tenant-a', subject: '電話で受けた相談', body: '配信が届かないとのこと', priority: 'high', staffId: 'owner-1' }));
     expect(res.status).toBe(201);
     const body = await res.json() as { data: { ticketLabel: string; channel: string; priority: string; stage: string; staffName: string } };
-    expect(body.data).toMatchObject({ ticketLabel: '#MB-0001', channel: 'ops', priority: 'high', stage: 'new', staffName: '山田 太郎' });
+    expect(body.data).toMatchObject({ ticketLabel: '#MB-0001', channel: 'ops', priority: 'high', stage: 'new', staffName: '見本 141' });
     const audit = testDb.raw.prepare(`SELECT COUNT(*) AS n FROM platform_audit_logs WHERE action = 'ticket.create'`).get() as { n: number };
     expect(audit.n).toBe(1);
   });

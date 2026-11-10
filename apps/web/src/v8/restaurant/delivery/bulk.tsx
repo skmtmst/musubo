@@ -47,7 +47,7 @@ import { intakeActionReason } from './intake-access'
 import { formatNumber } from '@/lib/format'
 
 /*
- * 受付停止の確認（XCVGd）。上からの位置は絵のとおり 230。
+ * 受付停止の確認（XCVGd）。長い本文と操作欄が収まる位置にする。
  * 幅は絵が 500 だが、窓の幅は正本で 480／560／720／960 の4段に決まっている
  * （docs/v8-design-rules.md §6.12 の項目8・ の `DIALOG_WIDTHS`）。500 は4段に無いので
  * 共通部品の `dialogWidth` が 480 へ寄せる。暗に寄せられるのに任せず、
@@ -55,7 +55,7 @@ import { formatNumber } from '@/lib/format'
  * （この差は「絵と正本の食い違いを正本で解いた分」として記録する）。
  */
 const STOP_WIDTH = 480
-const STOP_TOP = 230
+const STOP_TOP = 80
 /*
  * 絵（XCVGd）の段の間。絵は段ごとに下の余白を持ち、一文の下が 10・欄の下が 12。
  * 段の間は1つの値しか持てないので小さい方の 10 に合わせる。
@@ -356,7 +356,7 @@ export function IntakeStopDialog({
         </>
       )}
     >
-      <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} store={store ?? { id: '' }} />
+      <div className={styles.targetSummary}><OperationTargetSummary accounts={[{ id: accountId ?? '' }]} store={store ?? { id: '' }} /></div>
       <p className={styles.dialogLead}>
         選んだサービスで新しい注文の受け付けを止めます。すでに受け付けた注文の調理・受け渡しはそのまま続きます。
       </p>

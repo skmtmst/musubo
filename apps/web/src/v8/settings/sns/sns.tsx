@@ -128,6 +128,9 @@ export default function SnsSettingsPage() {
   const googleStatus = visibleGoogle?.connection.status ?? null
   const igState = visibleInstagram?.state ?? null
   const igConnection = visibleInstagram?.connection ?? null
+  const disconnectTicket = useRef<{ scope: typeof renderedAccountScope; version: number; instagramId: string } | null>(null)
+  if (disconnectTicket.current && (disconnectTicket.current.scope !== accountScope.current || !canManage || disconnectTicket.current.version !== igConnection?.version || disconnectTicket.current.instagramId !== igConnection?.instagramId)) disconnectTicket.current = null
+  const renderedDisconnectTicket = disconnectTicket.current
 
   const connectInstagram = async () => {
     if (!accountId) return
@@ -163,11 +166,11 @@ export default function SnsSettingsPage() {
   }
 
   const runDisconnect = async () => {
-    if (!accountId || confirmAccountId !== accountId || renderedAccountScope !== accountScope.current || confirmScope.current !== renderedAccountScope || loadedAccountId !== accountId) return
+    if (!renderedDisconnectTicket || renderedDisconnectTicket !== disconnectTicket.current || !canManage || !accountId || confirmAccountId !== accountId || renderedAccountScope !== accountScope.current || confirmScope.current !== renderedAccountScope || loadedAccountId !== accountId) return
     setBusy(true)
     setActionError('')
     try {
-      await api.instagram.disconnect(accountId, igConnection?.version ?? 0)
+      await api.instagram.disconnect(accountId, renderedDisconnectTicket.version)
       setConfirm(null)
       await load()
       return true
@@ -246,7 +249,7 @@ export default function SnsSettingsPage() {
             {igStatus ? <StatusBadge tone={igStatus.tone} size="compact">{igStatus.label}</StatusBadge> : null}
             {(igState === 'connected' || igState === 'expired') && canManage ? (
               <RowActions menuAppearance="box" menuSize="row" subjectName="Instagram の連携"
-                destructiveItem={{ id: 'disconnect', label: '接続を解除する', onSelect: () => { setActionError(''); confirmScope.current = accountScope.current; setConfirmAccountId(accountId); setConfirm('instagram') } }} />
+                destructiveItem={{ id: 'disconnect', label: '接続を解除する', onSelect: () => { if (!igConnection || !Number.isSafeInteger(igConnection.version) || igConnection.version < 1) return; disconnectTicket.current = { scope: accountScope.current, version: igConnection.version, instagramId: igConnection.instagramId }; setActionError(''); confirmScope.current = accountScope.current; setConfirmAccountId(accountId); setConfirm('instagram') } }} />
             ) : null}
           </div>
           {!accountId ? (
@@ -297,15 +300,15 @@ export default function SnsSettingsPage() {
       </div>
 
       <ConfirmDialog
-        open={confirm === 'instagram' && confirmAccountId === accountId && accountId !== null && confirmScope.current === accountScope.current}
+        open={confirm === 'instagram' && renderedDisconnectTicket !== null && confirmAccountId === accountId && accountId !== null && confirmScope.current === accountScope.current}
         destructive
         title="Instagram の接続を解除しますか？"
         description="解除すると、Googleビジネスの投稿を Instagram へ同時に出せなくなります。あとでもう一度つなぎ直せます。"
         confirmLabel="解除する"
         busy={busy}
-        error={actionError || undefined} onSuccess={() => setConfirm(null)} onConfirm={() => runDisconnect()}
-        onCancel={() => setConfirm(null)}
-      ><OperationTargetSummary accounts={[{ id: confirmAccountId ?? '' }]} /></ConfirmDialog>
+        error={actionError || undefined} onSuccess={() => { disconnectTicket.current = null; setConfirm(null) }} onConfirm={() => runDisconnect()}
+        onCancel={() => { disconnectTicket.current = null; setConfirm(null) }}
+      ><OperationTargetSummary accounts={[{ id: confirmAccountId ?? '' }]} externalTarget={{ label: 'Instagram', name: igConnection?.username ? `@${igConnection.username}` : null }} /></ConfirmDialog>
     </PageFrame></SaveErrorScope>
   )
 }

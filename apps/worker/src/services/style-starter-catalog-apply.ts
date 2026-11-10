@@ -116,8 +116,10 @@ export async function applyCatalogStarter(db: D1Database, tenant: string, accoun
         : await distributeTemplate(scoped, authority, selection.templateId, runId, choices, runtime.bucket, runtime.publicBaseUrl,(target,resolutions)=>catalogResourceCommit(scoped,tenant,target,resolutions));
       const state = applied.stores.find(row => row.accountId === account)?.status;
       if (state !== 'succeeded') throw new StyleError(state === 'pending' || state === 'staged' ? 'catalog_in_progress' : 'catalog_distribution_failed', 409);
+      const succeededAt = new Date().toISOString();
       await scoped.batch([scoped.prepare(`UPDATE style_starter_catalog_items SET state='succeeded',error_code=NULL,lease_token=NULL,lease_until=NULL,updated_at=?
-        WHERE line_account_id=? AND template_id=? AND lease_token=?`).bind(new Date().toISOString(), account, selection.templateId, lease)]);
+        WHERE line_account_id=? AND template_id=? AND lease_token=?`).bind(succeededAt, account, selection.templateId, lease),
+        scoped.prepare(`UPDATE account_styles SET first_starter_at=COALESCE(first_starter_at,?) WHERE line_account_id=? AND changes()=1`).bind(succeededAt, account)]);
       result.items.push({ ...selection, state: 'succeeded', reason: null });
     } catch (error) {
       const reason = error instanceof StyleError || error instanceof HqTemplateError ? error.code : 'catalog_distribution_failed';

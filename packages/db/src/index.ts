@@ -723,7 +723,7 @@ export {
   getWebinarFormFunnelStats, getWebinarList, getWebinarMonitoringSummary, getWebinarOverview, getWebinarParticipantOperations, getWebinarParticipantStats,
   getWebinarPublicAccount, getWebinarRegistration, getWebinarRetention, getWebinarSession, getWebinarSessionStats, getWebinarUserComments,
   getWebinarVideoAsset, getWebinarViewSegmentCoverage, getWebinarWatchedSeconds, getWebinars, insertWebinarActionExecutionIgnore, insertWebinarUserComment,
-  isWebinarMissedInWindow, isWebinarVideoReady, markWebinarRegistrationNotified, mergeWebinarWatchedSeconds, parseWebinarHeartbeatPlayerState, publishWebinarEditorVersion,
+  isWebinarMissedInWindow, isWebinarVideoReady, markWebinarRegistrationNotified, mergeWebinarWatchedSeconds, parseWebinarHeartbeatPlayerState, publishWebinarAndActivate, publishWebinarEditorVersion,
   purgeWebinarVideoAsset, recordWebinarCtaClick, recordWebinarFunnelEvent, recordWebinarHeartbeat, recordWebinarPickerOpen, recordWebinarViewSegment,
   releaseWebinarSeat, replaceWebinarActions, replaceWebinarComments, replaceWebinarCtas, reserveWebinarSeat, saveWebinarEditorSettings,
   setWebinarSessionCapacity, updateWebinar, updateWebinarViewerPosition, upsertWebinarRegistration, upsertWebinarViewer, webinarListSort,

@@ -742,6 +742,17 @@ describe('industry metrics', () => {
       estimatedRevenue: { value: 5000 },
     });
   });
+  test('Meet の担当変更と復帰では確認版がそれぞれ進む', async () => {
+    raw.exec("INSERT INTO meet_consultations(id,external_event_id,friend_id,title,starts_at,ends_at,meet_url,status,staff_id,updated_at) VALUES('solo','cal2','g','面談','2026-10-15T02:00:00Z','2026-10-15T02:30:00Z','https://meet.google.com/abc-defg-hij','confirmed','s','old')");
+    const first = await write('/meet/solo', { expectedUpdatedAt: 'old', staffId: null }, 'PATCH');
+    expect(first.status).toBe(200);
+    const current = raw.prepare("SELECT updated_at,confirmation_revision FROM meet_consultations WHERE id='solo'").get() as { updated_at: string; confirmation_revision: number };
+    expect(current.confirmation_revision).toBe(2);
+    const second = await write('/meet/solo', { expectedUpdatedAt: current.updated_at, staffId: 's' }, 'PATCH');
+    expect(second.status).toBe(200);
+    expect(raw.prepare("SELECT confirmation_revision FROM meet_consultations WHERE id='solo'").get()).toEqual({ confirmation_revision: 3 });
+  });
+
   test('Meet and person bookings merge into one timeline without linked duplicates; outcome is per booking', async () => {
     booking('b', '2026-10-15T01:00:00Z', 'completed');
     raw.exec(
@@ -810,6 +821,59 @@ describe('industry metrics', () => {
   });
 });
 describe('classes, closure, and HQ attention', () => {
+  test('人の予約とレッスン予約の編集は確認専用の版を進める', async () => {
+    booking('person', '2026-10-15T01:00:00Z');
+    expect((await write('/bookings/person', { expectedVersion: 0, outcome: 'won' }, 'PATCH')).status).toBe(200);
+    expect(raw.prepare("SELECT confirmation_revision FROM bookings WHERE id='person'").get()).toEqual({ confirmation_revision: 2 });
+    event();
+    raw.exec("INSERT INTO event_bookings(id,line_account_id,event_id,slot_id,friend_id,status,requested_at) VALUES('eb','a','e','slot','f','confirmed','2026-10-01T00:00:00Z')");
+    expect((await write('/event-bookings/eb', { participationMode: 'online' }, 'PATCH')).status).toBe(200);
+    expect(raw.prepare("SELECT confirmation_revision FROM event_bookings WHERE id='eb'").get()).toEqual({ confirmation_revision: 2 });
+  });
+
+  test('休業の確認後に予約の版が変われば409、一致なら作成する', async () => {
+    booking('b', '2026-10-15T01:00:00Z');
+    const input = { date: '2026-10-15', target: 'store', staffIds: [], allDay: true, reason: '臨時休業' };
+    const preview = await write('/closures/confirmation', input, 'POST');
+    expect(preview.status).toBe(200);
+    const first = (await value(preview)).data;
+    expect(first.reservations).toHaveLength(1);
+    expect((await write('/bookings/b', { expectedVersion: 0, outcome: 'won' }, 'PATCH')).status).toBe(200);
+    const conflict = await write('/closures/confirmed', { ...input, expectedSnapshot: first.snapshot }, 'POST');
+    expect(conflict.status).toBe(409);
+    expect(raw.prepare('SELECT COUNT(*) n FROM booking_availability_exceptions').get()).toEqual({ n: 0 });
+    const next = (await value(await write('/closures/confirmation', input, 'POST'))).data;
+    expect((await write('/closures/confirmed', { ...input, expectedSnapshot: next.snapshot }, 'POST')).status).toBe(201);
+  });
+
+  test('複数担当の予約が変われば全件止まり、一致した確認は1回しか使えない', async () => {
+    raw.exec("INSERT INTO staff(id,line_account_id,name,display_name,is_active) VALUES('s2','a','担当B','担当B',1)");
+    booking('b1','2026-10-15T01:00:00Z','confirmed','f','s');
+    booking('b2','2026-10-15T03:00:00Z','confirmed','g','s2');
+    const input = { date:'2026-10-15', target:'staff', staffIds:['s','s2'], allDay:true, reason:'研修' };
+    const first = (await value(await write('/closures/confirmation', input, 'POST'))).data;
+    expect(first.reservations).toHaveLength(2);
+    expect((await write('/bookings/b2',{expectedVersion:0,outcome:'won'},'PATCH')).status).toBe(200);
+    expect((await write('/closures/confirmed',{...input,expectedSnapshot:first.snapshot},'POST')).status).toBe(409);
+    expect(raw.prepare('SELECT COUNT(*) n FROM booking_availability_exceptions').get()).toEqual({n:0});
+    const current=(await value(await write('/closures/confirmation',input,'POST'))).data;
+    expect((await write('/closures/confirmed',{...input,expectedSnapshot:current.snapshot},'POST')).status).toBe(201);
+    expect(raw.prepare('SELECT COUNT(*) n FROM booking_availability_exceptions').get()).toEqual({n:2});
+    expect((await write('/closures/confirmed',{...input,expectedSnapshot:current.snapshot},'POST')).status).toBe(409);
+    expect(raw.prepare('SELECT COUNT(*) n FROM booking_availability_exceptions').get()).toEqual({n:2});
+  });
+
+  test('予約が0件の確認後に新しい予約が入ったら休業を作らない', async () => {
+    const input={date:'2026-10-15',target:'store',staffIds:[],allDay:true,reason:'臨時休業'};
+    const first=(await value(await write('/closures/confirmation',input,'POST'))).data;
+    expect(first.reservations).toHaveLength(0);
+    booking('later','2026-10-15T01:00:00Z');
+    const result=await write('/closures/confirmed',{...input,expectedSnapshot:first.snapshot},'POST');
+    expect(result.status).toBe(409);
+    expect((await value(result)).data.count).toBe(1);
+    expect(raw.prepare('SELECT COUNT(*) n FROM booking_availability_exceptions').get()).toEqual({n:0});
+  });
+
   test('separate class capacities are atomic and cannot shrink below occupied seats', async () => {
     event();
     expect(
