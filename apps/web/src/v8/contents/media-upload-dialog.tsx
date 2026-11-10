@@ -10,18 +10,18 @@ import type { Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
-import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
+import { AttachmentRow } from '@/components/shared/file-drop'
+import MediaSlot, { formatBytes, formatNamesOf } from '@/components/shared/media-slot'
 import Notice from '@/components/shared/notice'
 import Progress from '@/components/shared/progress'
 import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
-import { MEDIA_ACCEPT, extractMediaMetadata, putMediaFile, validateMediaFile } from './media-direct-upload'
+import { MEDIA_ACCEPT, extractMediaMetadata, mediaFileLimitBytes, putMediaFile, validateMediaFile } from './media-direct-upload'
 import { formatMediaSize } from './media-usage-display'
 import { formatNumber } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import MediaPreviewOverlay from './media-preview-overlay'
-import styles from './media-upload-dialog.module.css'
 
 
 
@@ -47,10 +47,10 @@ function scanChipProps(status: NonNullable<UploadEntry['scanStatus']>): { tone: 
 }
 
 const LIMITS = [
-  '写真 JPG・PNG・GIF・WebP：10MBまで',
-  '動画 MP4：200MBまで',
-  '音声 MP3・M4A：200MBまで',
-  'PDF：20MBまで',
+  { label: '写真', types: 'image/jpeg,image/png,image/gif,image/webp', example: 'image/png' },
+  { label: '動画', types: 'video/mp4', example: 'video/mp4' },
+  { label: '音声', types: 'audio/mpeg,audio/mp4', example: 'audio/mpeg' },
+  { label: 'PDF', types: 'application/pdf', example: 'application/pdf' },
 ]
 const MAX_FILES = 10
 
@@ -136,6 +136,8 @@ export default function MediaUploadDialog({
   */
   const attempted = entries.some((entry) => entry.state === 'done' || (entry.state === 'error' && entry.retryable))
   const uploadErrorCount = entries.filter((entry) => entry.state === 'error' && entry.retryable).length
+  const selectedCountLabel = `選択したファイル（${formatNumber(entries.length)} / ${MAX_FILES}件）`
+  const firstPhoto = entries.find((entry) => entry.previewUrl)
 
   function removeEntry(index: number) {
     setEntries((current) => current.filter((_, entryIndex) => entryIndex !== index))
@@ -239,24 +241,23 @@ export default function MediaUploadDialog({
           </>
         </DialogActions>)}>{}
         <div className="space-y-4 p-6">
-        <FileDropzone
-          variant="upload"
-          className={styles.picker}
+        <MediaSlot kind="file"
           title="ファイルを選ぶ・ここにドラッグ"
-          hint="一度に10件まで"
+          size="compact"
           accept={MEDIA_ACCEPT}
           busy={busy}
           onFiles={stage}
-          multiple
         />
-        <div className={styles.limits} aria-label="ファイルのサイズ上限">
-          {LIMITS.map((limit) => <span key={limit}>{limit}</span>)}
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-secondary" aria-label="ファイルのサイズ上限">
+          {LIMITS.map((limit) => <span key={limit.label}>
+            {limit.label}{limit.label === 'PDF' ? '' : ` ${formatNamesOf(limit.types)}`}：{formatBytes(mediaFileLimitBytes({ type: limit.example })!)}まで
+          </span>)}
         </div>
 
         {entries.length > 0 ? (
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-ink text-sm font-bold">選択したファイル（{entries.length} / {MAX_FILES}件）</p>
+              <p className="text-ink text-sm font-bold">{selectedCountLabel}</p>
             </div>
             {/* 全体の進みは登録を実行してから出す（実測の完了数だけ）。 */}
             {busy ? (
@@ -277,21 +278,17 @@ export default function MediaUploadDialog({
                 className="mb-3"
               />
             ) : null}
-            {entries.find((entry) => entry.previewUrl) ? (() => {
-              const photo = entries.find((entry) => entry.previewUrl)!
-              return <button type="button" className={styles.heroPreview} onClick={() => setPreview(photo)} aria-label={`「${photo.file.name}」を大きく見る`}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photo.previewUrl} alt={`${photo.file.name}の登録前プレビュー`} />
-                <span>写真を大きく見る</span>
-              </button>
-            })() : null}
+            {firstPhoto?.previewUrl ? <div>
+              <MediaSlot kind="image" title="登録前の写真" value={firstPhoto.previewUrl} previewAlt={`${firstPhoto.file.name}の登録前プレビュー`} fit="contain" readOnly />
+              <Button type="button" variant="text" size="inline" textTone="accent" onClick={() => setPreview(firstPhoto)}>写真を大きく見る</Button>
+            </div> : null}
             <ul className="max-h-64 space-y-2 overflow-y-auto">
               {entries.map((entry, index) => {
                 const sizeText = formatMediaSize(entry.file.size)
                 const tone = entry.file.type.startsWith('image/') ? 'photo' as const : 'document' as const
                 const thumbnail = entry.previewUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={entry.previewUrl} alt="" className={styles.thumbnail} />
+                  <img src={entry.previewUrl} alt="" className="h-full w-full object-cover" />
                 ) : undefined
                 if (entry.state === 'uploading' || entry.state === 'preparing' || entry.state === 'verifying') {
                   return (
@@ -348,7 +345,7 @@ export default function MediaUploadDialog({
                       thumbnail={thumbnail}
                       onRemove={busy ? undefined : () => removeEntry(index)}
                     />
-                    {entry.previewUrl ? <button type="button" className={styles.previewLink} onClick={() => setPreview(entry)}>写真を大きく見る</button> : null}
+                    {entry.previewUrl ? <Button type="button" variant="text" size="inline" textTone="accent" className="ml-12 mt-1" onClick={() => setPreview(entry)}>写真を大きく見る</Button> : null}
                     {scan ? (
                       <p className="mt-1 flex items-center gap-2">
                         <Chip tone={scan.tone}>{scan.label}</Chip>
@@ -371,7 +368,7 @@ export default function MediaUploadDialog({
             onCreate={onCreateFolder}
             onChange={setFolderId}
           /></SaveErrorField></Field></div>
-        <details className={styles.help}>
+        <details className="text-xs text-ink-secondary">
           <summary>登録時の注意事項</summary>
           <Notice tone="info">
             <p>PDFはLINEで直接送れません。リンクとして使います。</p>
