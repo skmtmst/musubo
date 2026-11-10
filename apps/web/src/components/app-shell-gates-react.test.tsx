@@ -53,4 +53,13 @@ describe('外枠の門', () => {
     expect(view.container.querySelector('[data-top-bar]')).not.toBeNull()
     expect(view.container.querySelector('[data-sidebar]')).not.toBeNull()
   })
+
+  it.each(['/hq/onboarding/pricing', '/hq/onboarding/card', '/hq/onboarding/quotes'])('%s では接続前の左メニューを表示しない', (pathname) => {
+    fixture.pathname = pathname
+    const view = render(<AppShell><p data-page="">本文</p></AppShell>)
+    expect(view.container.querySelector('[data-sidebar]')).toBeNull()
+    expect(view.container.querySelector('img[alt="musubo"]')).not.toBeNull()
+    expect(view.container.querySelector('[data-top-bar]')).not.toBeNull()
+    expect(chain(view.container.querySelector('[data-page]')!)).toEqual(['feature-disabled', 'store-selection', 'root-landing', 'view-permission', 'hq-access', 'auth'])
+  })
 })

@@ -182,6 +182,7 @@ export function SelectMenu({
 
 export interface SelectMenuOptionProps {
   label: string
+  trailing?: string
   selected: boolean
   active?: boolean
   disabled?: boolean
@@ -197,6 +198,7 @@ export interface SelectMenuOptionProps {
 
 export function SelectMenuOption({
   label,
+  trailing,
   selected,
   active = false,
   disabled = false,
@@ -219,7 +221,7 @@ export function SelectMenuOption({
         data-described={description ? '' : undefined}
         onMouseEnter={onHover}
         onClick={onSelect}
-        title={description ? `${label}：${description}` : label}
+        title={description ? `${label}：${description}` : trailing ? `${label}：${trailing}` : label}
       >
         {leading ? <span className={styles.leading} aria-hidden="true">{leading}</span> : null}
         {description ? (
@@ -230,6 +232,7 @@ export function SelectMenuOption({
         ) : (
           <span className={styles.label}>{label}</span>
         )}
+        {trailing ? <span className={styles.trailing}>{trailing}</span> : null}
         {selected ? <Check className={styles.check} aria-hidden="true" /> : null}
       </button>
     </li>

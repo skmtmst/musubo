@@ -43,7 +43,9 @@ function CardRegistrationReturn() {
   if (entry === 'checking') return <ListState kind="loading" title="料金の確認状況を読み込んでいます" />
   if (entry === 'error') return <ListState kind="error" title="料金の確認状況を表示できませんでした" />
   return <CardRegistration returnState={setup === 'success' || setup === 'cancel' ? setup : null}
-    quoteId={quoteId} onBackToPricing={quoteId ? undefined : () => router.push('/hq/onboarding/pricing')} />
+    quoteId={quoteId} onBackToPricing={() => router.push(quoteId
+      ? `/hq/onboarding/quotes?id=${encodeURIComponent(quoteId)}`
+      : '/hq/onboarding/pricing')} />
 }
 
 /** Stripe Checkout returns here; the page verifies card status with the server. */
