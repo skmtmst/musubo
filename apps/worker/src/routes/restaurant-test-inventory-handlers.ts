@@ -12,6 +12,7 @@ import type { Env } from '../worker-env.js';
 
 import { dbFor } from '../services/db-router.js';
 import { restaurantTableCapacity, validateRestaurantOpeningHours } from '../services/restaurant-inventory.js';
+import { connectedGoogleProfile, googleOpeningDay } from '../services/restaurant-google-hours-source.js';
 import { validRestaurantDate, restaurantCivilTime } from '../services/restaurant-booking.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { hasOrganizationSelector, requiredAccount, organizationFor, storeBelongsTo, acquireLock, adjustInventoryReservedCount, releaseLock } from './restaurant-test-definition.js';
@@ -32,10 +33,16 @@ export const post__api_restaurant_test_inventory_generate_1 = async (c: Context<
   const allocation = [body.otaCapacity, body.lineCapacity, body.walkInCapacity,body.sameDayCapacity??0];
   if (allocation.some(n => !Number.isSafeInteger(n) || Number(n)<0) || allocation.reduce<number>((sum,n)=>sum+Number(n),0)>total) return inputError(c, { success: false, error: '稼働中の卓の席数以内で配分してください' }, 400, ["otaCapacity","lineCapacity","walkInCapacity","sameDayCapacity","storeId"]);
   const hours = validateRestaurantOpeningHours(JSON.parse(setting.hours_json))!;
+  const googleConnection = await db.prepare('SELECT status FROM rt_google_connections WHERE store_id=?')
+    .bind(body.storeId).first<{ status: string }>();
+  const googleProfile = googleConnection ? await connectedGoogleProfile(db, body.storeId) : null;
+  if (googleConnection && !googleProfile) return c.json({ success: false, error: 'Googleビジネスの接続と営業時間を確認してください' }, 409);
   const weekday = new Date(body.date!).getUTCDay();
   const mins = (time: string) => Number(time.slice(0,2))*60+Number(time.slice(3));
   const starts: string[] = [];
-  for (const p of hours.find(d=>d.weekday===weekday)!.periods) {
+  const dayPeriods = googleProfile ? googleOpeningDay(googleProfile, body.date!) : hours.find(d=>d.weekday===weekday)?.periods;
+  if (!dayPeriods) return c.json({ success: false, error: 'Googleビジネスの営業時間を確認してください' }, 409);
+  for (const p of dayPeriods) {
     const start = mins(p.opensAt); const close = mins(p.closesAt); const end = close <= start ? close+1440 : close;
     for (let minute=start; minute<end; minute+=30) starts.push(restaurantCivilTime(body.date!, minute, setting.timezone));
   }

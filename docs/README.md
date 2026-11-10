@@ -1191,3 +1191,4 @@
 - [旧配備経路の停止確認](release-log/unreleased/20-masato-staging-cutover-gate.md) — 検証配備の切り替え前に行う確認の反映履歴。確認 2026-11-07。
 - [公開中の検証版の履歴を新リポジトリへ取り込む](release-log/unreleased/22-masato-published-history-sync.md) — 検証配備の巻き戻しを防ぐための履歴取り込み。確認 2026-11-07。
 - [musuboの新料金・申込フロー](release-log/unreleased/29-masato-musubo-pricing.md) — 料金、申込、請求の反映履歴。確認 2026-11-10。
+- [Googleビジネスの営業時間を予約全体の基準にする](release-log/unreleased/34-masato-google-hours.md) — 接続案内、予約・受付・在庫の営業時間統一。確認 2026-11-10。

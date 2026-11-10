@@ -161,10 +161,11 @@ export function useStoreToday(accountId: string | null): StoreToday {
     let current = true
     if (!accountId || !storeId) return
     void loadStore()
-    void restaurantTestApi.openingHours(accountId, storeId)
+    const loadHours = () => restaurantTestApi.openingHours(accountId, storeId, toYmd(new Date()))
       .then((res) => { if (current) setHours(res.data.hours ?? null) })
       .catch(() => { if (current) setHours(null) })
-    const timer = setInterval(() => { void loadStore() }, 30_000)
+    void loadHours()
+    const timer = setInterval(() => { void loadStore(); void loadHours() }, 30_000)
     return () => { current = false; clearInterval(timer) }
   }, [accountId, storeId, loadStore])
 
