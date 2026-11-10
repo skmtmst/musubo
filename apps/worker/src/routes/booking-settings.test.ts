@@ -119,6 +119,37 @@ describe('店舗共通の予約設定API', () => {
 
   afterEach(() => sqlite.close());
 
+  test('全業種の予約設定はGoogle営業時間を表示し、接続後の手入力を拒否する', async () => {
+    sqlite.exec(`
+      INSERT INTO rt_organizations(id,account_id,name,status) VALUES('org-a','account-a','相談室','active');
+      INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store-a','org-a','相談室','CONSULT','account-a');
+      INSERT INTO rt_google_connections(id,store_id,line_account_id,location_name,status)
+        VALUES('connection-a','store-a','account-a','accounts/1/locations/2','connected');
+    `);
+    const profile = { profile: { name: 'locations/2', openStatus: 'OPEN', regularHours: {
+      SUNDAY: [], MONDAY: [{ open: '10:00', close: '18:00' }], TUESDAY: [], WEDNESDAY: [],
+      THURSDAY: [], FRIDAY: [], SATURDAY: [],
+    }, specialHours: [] } };
+    sqlite.prepare(`INSERT INTO rt_google_profiles(store_id,location_name,profile_json,fingerprint,fetched_at)
+      VALUES('store-a','accounts/1/locations/2',?,'fp','2026-11-11T00:00:00Z')`).run(JSON.stringify(profile));
+    const { app, env } = makeApp(db);
+    const read = await app.request('/api/booking/admin/settings?account_id=account-a', {}, env);
+    expect(read.status).toBe(200);
+    await expect(read.json()).resolves.toMatchObject({ data: {
+      openingHoursSource: 'google_business', businessHoursConfigured: true,
+      businessHours: expect.arrayContaining([{ weekday: 1, intervals: [{ start: '10:00', end: '18:00', capacity: 1 }] }]),
+    } });
+    const write = await app.request('/api/booking/admin/settings?account_id=account-a', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        expectedVersion: 1, timeZone: 'Asia/Tokyo', bookingWindowDays: 60, cutoffMinutesBefore: 1440,
+        cancelDeadlineMinutesBefore: 720, maxActiveBookingsPerFriend: 1, approvalMode: 'manual',
+        holdMinutes: 15, slotGranularityMinutes: 15,
+        businessHours: Array.from({ length: 7 }, (_, weekday) => ({ weekday, intervals: [] })),
+      }),
+    }, env);
+    expect(write.status).toBe(409);
+  });
+
   test('通常設定は店舗の営業時間・例外日・実メニュー件数を返す', async () => {
     const { app, env } = makeApp(db);
     const res = await app.request('/api/booking/admin/settings?account_id=account-a', {}, env);

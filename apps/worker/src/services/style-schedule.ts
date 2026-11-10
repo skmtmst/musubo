@@ -5,6 +5,7 @@ import { addDate, civilDate, instant, styleRows, cancelled } from './style-analy
 import { StyleError } from './style-setup.js';
 import { getAvailability } from './availability.js';
 import { eventModeRemaining } from './event-mode-capacity.js';
+import { accountOpeningHours, openingWeek } from './account-opening-hours.js';
 
 import { restaurantCivilTime } from './restaurant-booking.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
@@ -214,13 +215,15 @@ export async function styleSchedule(
     );
   }
   if (style === 'salon' || style === 'consult') {
+    const hoursSource = await accountOpeningHours(db, account);
+    const googleWeek = openingWeek(hoursSource);
     const configured = await db
       .prepare(
         'SELECT business_hours_configured FROM booking_settings WHERE line_account_id=?',
       )
       .bind(account)
       .first<{ business_hours_configured: number }>();
-    if (!configured?.business_hours_configured) {
+    if (hoursSource.source === 'google_unavailable' || (hoursSource.source === 'google_business' && !googleWeek?.some(day => day.intervals.length > 0)) || (hoursSource.source === 'manual' && !configured?.business_hours_configured)) {
       availability.status = 'unconfigured';
       availability.reason = 'business_hours_required';
     }

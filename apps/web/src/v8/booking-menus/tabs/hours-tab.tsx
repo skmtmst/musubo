@@ -74,7 +74,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
     if (settings) setDraft(initialBusinessHours(settings))
   }, [settings])
 
-  const dirty = draft !== null && settings !== null
+  const dirty = settings?.openingHoursSource === undefined && draft !== null && settings !== null
     && JSON.stringify(draft) !== JSON.stringify(initialBusinessHours(settings))
 
   useV8TabEdit({
@@ -82,7 +82,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
     saving,
     subject: '受付時間への変更',
     saveLabel: settings?.version === 0 ? '受付枠を作る' : '開ける時間を保存',
-    saveDisabled: !canEdit,
+    saveDisabled: !canEdit || settings?.openingHoursSource !== undefined,
     onSave: () => void submit(),
     onReset: () => { if (settings) { setDraft(initialBusinessHours(settings)); setSaveError(null) } },
   })
@@ -99,7 +99,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
   const isBad = (weekday: number, index: number, part: 'start' | 'end' | 'capacity') => Boolean(badHours && badHours.weekday === weekday && badHours.index === index && badHours.parts.includes(part))
 
   async function submit() {
-    if (!canEdit || !settings || !draft || inFlightRef.current) return
+    if (!canEdit || !settings || settings.openingHoursSource !== undefined || !draft || inFlightRef.current) return
     const generation = saveGenerationRef.current
     const alive = () => generation === saveGenerationRef.current
     const validationError = validateBusinessHours(draft)
@@ -174,7 +174,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.tabStack} data-design="Week">
-      {canEdit && copySource ? <HoursCopyDialog key={`${accountId}:${copySource.weekday}`} source={copySource} days={draft}
+      {canEdit && settings.openingHoursSource === undefined && copySource ? <HoursCopyDialog key={`${accountId}:${copySource.weekday}`} source={copySource} days={draft}
         onCancel={() => setCopySource(null)} onCopy={(targets) => {
           setDraft((current) => current?.map((day) => targets.includes(day.weekday) && day.intervals.length > 0
             ? { ...day, intervals: copySource.intervals.map((interval) => ({ ...interval })) } : day) ?? current)
@@ -183,15 +183,26 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
           setCopySource(null)
         }} /> : null}
       <Notice tone="info">「同時」は1時間に受けられる数ではなく、同じ時間に重ねられる予約の数です。</Notice>
-      {!settings.businessHoursConfigured ? (
+      {settings.openingHoursSource === undefined && !settings.businessHoursConfigured ? (
         <Band tone="warn">まだ週全体の営業時間を保存していません。時間帯がない曜日は現在は担当者の勤務時間どおりに受け付けます。保存すると、その曜日は休業になります。</Band>
       ) : null}
 
       <Card layout="vertical" padding="roomy" gap="normal">
         <div className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}>開ける時間</h2>
-          <p className={styles.sectionDesc}>曜日ごとに受付の時間と休憩を決めます</p>
+          <h2 className={styles.sectionTitle}>営業時間</h2>
+          <p className={styles.sectionDesc}>{settings.openingHoursSource === undefined ? '曜日ごとに受付の時間と休憩を決めます' : 'Googleビジネスプロフィールの営業時間を基準にします'}</p>
         </div>
+        {settings.openingHoursSource === 'manual' ? <Notice tone="info">Googleビジネスプロフィールを接続すると、通常・特別営業時間が予約と共通機能に反映されます。<TextLink href="/settings/sns">Googleビジネスの接続画面を開く</TextLink></Notice> : null}
+        {settings.openingHoursSource === 'google_unavailable' ? <Notice tone="danger">Googleの営業時間を確認できないため、予約枠を閉じています。<TextLink href="/settings/sns">接続状態を確認する</TextLink></Notice> : null}
+        {settings.openingHoursSource === 'google_business' ? <>
+          <Notice tone="info">営業時間はGoogleビジネスプロフィールから読み込んでいます。予約の定員・担当者・設備はmusuboで設定します。</Notice>
+          <div className={styles.dayBody}>{DAYS.map(({ weekday, label }) => {
+            const intervals = draft.find(day => day.weekday === weekday)?.intervals ?? []
+            return <p key={weekday}>{label}：{intervals.length ? intervals.map(interval => `${interval.start}〜${interval.end}`).join('、') : '休業'}</p>
+          })}</div>
+          <TextLink href="/settings/google-hours">Googleビジネスの営業時間を開く</TextLink>
+        </> : null}
+        {settings.openingHoursSource === undefined ? <>
         <div className="contents">
           {DAYS.map(({ weekday, label }) => {
             const day = draft.find((entry) => entry.weekday === weekday)
@@ -278,6 +289,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
           })}
         </div>
         {saveError ? <Notice tone="danger" className="mt-3" >{saveError}{saveConflict ? <Button onClick={onReload}>最新の内容を読み直す</Button> : null}</Notice> : null}
+        </> : null}
 
         {/* 絵 yRPxl：設備と空きの確かめは、開ける時間の白い板の中の入れ子の箱（枠・角12・内側16）。 */}
         <div className={styles.innerStack}>

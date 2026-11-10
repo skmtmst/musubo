@@ -24,9 +24,9 @@ import { dateLabel, hasHoursDraft, hoursText, workspaceDay, hoursHistoryStamp } 
 import { WEEKDAY_JA, errorMessage } from './format'
 import styles from './hours.module.css'
 
-export default function HoursPage({ accountId, tabs, initialMode, initialDate }: {accountId:string;tabs:ReactNode;initialMode?:string|null;initialDate?:string|null}) {
+export default function HoursPage({ accountId, tabs, initialMode, initialDate, shared = false }: {accountId:string;tabs:ReactNode;initialMode?:string|null;initialDate?:string|null;shared?:boolean}) {
  const m=useHoursWorkspace(accountId)
- const {allowed,lockedReason,known}=useGooglePermission('manager')
+ const {allowed,lockedReason,known}=useGooglePermission('manager', true, shared ? '/settings/sns' : '/restaurant-test/google')
  const [panel,setPanel]=useState<HoursPanel|null>(()=>initialMode?initialMode==='weekly'?{kind:'weekly'}:initialMode==='text'?{kind:'text'}:{kind:'dates',dates:initialDate?[initialDate]:[]}:null)
  const [expanded,setExpanded]=useState(false),[history,setHistory]=useState(false),[calendar,setCalendar]=useState(false),[month,setMonth]=useState(''),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[actionError,setActionError]=useState(''),[sent,setSent]=useState<'google'|'local'|null>(null)
  const [calendarDate,setCalendarDate]=useState('')

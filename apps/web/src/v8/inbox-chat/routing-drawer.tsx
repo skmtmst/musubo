@@ -141,7 +141,7 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
                   </Field>
                 </div>
                 <Checkbox checked={draft.businessHoursOnly} disabled={!draft.enabled} onCheckedChange={(next) => setDraft({ ...draft, businessHoursOnly: next })}>
-                  営業時間の中だけ数える（予約の受付時間から。予約を使っていない店は 9:00〜18:00）
+                  営業時間の中だけ数える（Googleビジネスの営業時間を使用）
                 </Checkbox>
                 <Field label="過ぎたら知らせる先" htmlFor="routing-team">
                   <EntitySelect id="routing-team" aria-label="過ぎたら知らせる先" size="full" disabled={!draft.enabled} value={draft.escalateTeamId ?? ''}

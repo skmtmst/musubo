@@ -8,6 +8,7 @@ import { SLOT_GRANULARITY_CHOICES, SLOT_GRANULARITY_MINUTES } from '../features/
 import { getStaffGoogleBusy } from '../features/booking/booking-calendar-sync/index.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
 import { storeSeatsForSlot, type StoreCapacityWindow } from '../features/booking/booking-store-capacity/index.js';
+import { accountOpeningHours, openingDay, type AccountOpeningHours } from './account-opening-hours.js';
 
 export interface Interval {
   start: string; // HH:MM
@@ -401,6 +402,7 @@ interface LoadedAvailability {
   staffRows: Array<{ id: string; display_name: string; is_designation_optional: number }>;
   businessHours: BusinessHour[];
   businessHoursConfigured: boolean;
+  openingHours: AccountOpeningHours;
   requiredResources: RequiredResource[];
   resourceCapacity: number;
   menuResourceIds: Set<string>;
@@ -449,13 +451,23 @@ interface BusinessHour {
   capacity: number;
 }
 
-function storeCapacityWindows(hours: BusinessHour[], timeZone: string, startMs: number, endMs: number): StoreCapacityWindow[] {
+function storeCapacityWindows(hours: BusinessHour[], timeZone: string, startMs: number, endMs: number, source?: AccountOpeningHours): StoreCapacityWindow[] {
   const windows: StoreCapacityWindow[] = [];
   for (const date of eachDate(tzDateStr(timeZone, new Date(startMs)), tzDateStr(timeZone, new Date(endMs - 1)))) {
-    for (const hour of hours.filter(h => h.weekday === weekdayForDate(date))) {
-      const start = Math.max(startMs, zonedTimeToUtcMs(timeZone, date, hour.start_time));
-      const end = Math.min(endMs, zonedTimeToUtcMs(timeZone, date, hour.end_time));
-      if (start < end) windows.push({ start: new Date(start).toISOString(), end: new Date(end).toISOString(), capacity: Number(hour.capacity) });
+    const local = hours.filter(h => h.weekday === weekdayForDate(date));
+    const google = source ? openingDay(source, date) : null;
+    const periods = google ?? local.map(h => ({ start: h.start_time, end: h.end_time }));
+    for (const period of periods) {
+      const boundaries = google ? [period.start, period.end, ...local.flatMap(h => [h.start_time, h.end_time])
+        .filter(time => period.start < time && time < period.end)].sort() : [period.start, period.end];
+      for (let index = 0; index < boundaries.length - 1; index++) {
+        const segmentStart = boundaries[index];
+        const segmentEnd = boundaries[index + 1];
+        const start = Math.max(startMs, zonedTimeToUtcMs(timeZone, date, segmentStart));
+        const end = Math.min(endMs, zonedTimeToUtcMs(timeZone, date, segmentEnd));
+        const capacity = Number(local.find(h => h.start_time <= segmentStart && segmentEnd <= h.end_time)?.capacity ?? 1);
+        if (start < end) windows.push({ start: new Date(start).toISOString(), end: new Date(end).toISOString(), capacity });
+      }
     }
   }
   return windows;
@@ -485,8 +497,9 @@ export async function getStoreCapacitySnapshot(
   const rows = snapshot.results ?? [];
   const timeZone = normalizeTimeZone(rows[0]?.timezone ?? FALLBACK_TIME_ZONE);
   const hours = rows.filter((row) => row.weekday != null);
+  const source = await accountOpeningHours(db, accountId);
   return {
-    windows: storeCapacityWindows(hours, timeZone, start.getTime(), end.getTime()),
+    windows: storeCapacityWindows(hours, timeZone, start.getTime(), end.getTime(), source),
     settingsVersion: Number(rows[0]?.version ?? 0),
   };
 }
@@ -617,7 +630,7 @@ async function loadAvailabilityData(
   const staffIds = staffRows.results.map((s) => s.id);
   const placeholders = sqlIdSet(staffIds).sql;
 
-  const [businessHours, menuResources, exceptionsResult, settingsRow] = await Promise.all([
+  const [businessHours, menuResources, exceptionsResult, settingsRow, openingHours] = await Promise.all([
     db.prepare(`SELECT bh.weekday, bh.start_time, bh.end_time, bh.capacity
       FROM booking_business_hours bh
       INNER JOIN booking_settings bs ON bs.id = bh.booking_settings_id
@@ -649,6 +662,7 @@ async function loadAvailabilityData(
     db.prepare(`SELECT timezone, business_hours_configured, booking_window_days, cutoff_minutes_before, slot_granularity_minutes FROM booking_settings WHERE line_account_id = ?`)
       .bind(params.lineAccountId)
       .first<{ timezone: string | null; business_hours_configured: number; booking_window_days: number | null; cutoff_minutes_before: number | null; slot_granularity_minutes: number | null }>(),
+    accountOpeningHours(db, params.lineAccountId),
   ]);
   // 店舗のタイムゾーンで日付・時刻を読む。未設定・壊れた値は Asia/Tokyo。
   const timeZone = normalizeTimeZone(settingsRow?.timezone ?? FALLBACK_TIME_ZONE);
@@ -828,7 +842,7 @@ async function loadAvailabilityData(
     list.push({ startMs, endMs, sameMenu: b.menu_id === params.menuId });
     bookingMsByStaff.set(b.staff_id, list);
   }
-  const storeWindows = storeCapacityWindows(businessHours.results ?? [], timeZone, rangeStart.getTime(), rangeEnd.getTime());
+  const storeWindows = storeCapacityWindows(businessHours.results ?? [], timeZone, rangeStart.getTime(), rangeEnd.getTime(), openingHours);
 
   return {
     kind: 'ok',
@@ -839,6 +853,7 @@ async function loadAvailabilityData(
       staffRows: staffRows.results,
       businessHours: businessHours.results ?? [],
       businessHoursConfigured: settingsRow?.business_hours_configured === 1,
+      openingHours,
       requiredResources,
       resourceCapacity,
       menuResourceIds,
@@ -979,11 +994,10 @@ function computeDayWorking(
    * そちらを採る。`closed` と `custom_hours` の扱いはこれまでどおり。
    */
   const dayHours = d.businessHours.filter((hour) => hour.weekday === weekdayForDate(date));
-  const businessIntervals = mergeIntervals(
-    dayHours.map((hour) => ({ start: hour.start_time, end: hour.end_time })),
-  );
+  const googleDay = openingDay(d.openingHours, date);
+  const businessIntervals = mergeIntervals(googleDay ?? dayHours.map((hour) => ({ start: hour.start_time, end: hour.end_time })));
   const shouldApplyBusinessHours = businessIntervals.length > 0
-    || d.businessHoursConfigured;
+    || d.businessHoursConfigured || googleDay !== null;
   const coreWithinBusiness = shouldApplyBusinessHours
     ? intersectIntervals(coreWorking, businessIntervals)
     : coreWorking;
@@ -1003,6 +1017,8 @@ function computeDayWorking(
     workingList = intersectIntervals(workingList, mergeIntervals(hours));
     if (workingList.length === 0) break;
   }
+  // 店舗・担当の臨時 open でも Google の営業時間を超えて枠を出さない。
+  if (googleDay !== null) workingList = intersectIntervals(workingList, businessIntervals);
   // 休憩を勤務区間から差し引く。その日だけの休憩と、その曜日の
   // いつもの休憩の両方を見る。壊れた行は保存口で弾くため、ここでは
   // 時刻の形が正しいものだけを差し引く。

@@ -1,4 +1,5 @@
-import { getFormAccountIds, formBelongsToLineAccount, isSecretLikeValue, resolveCommonVarValuesAt } from '@line-crm/db';
+import { getFormAccountIds, formBelongsToLineAccount, isSecretLikeValue } from '@line-crm/db';
+import { resolveMusuboCommonVarsAt } from '../../services/google-common-vars.js';
 import { jstDate, type FormLayout, type FormReferenceDefinition, type PublicFormImage, type PublicFormReference, type PublicStoreInformation } from '@line-crm/shared';
 import { storePhotoVisibility } from '../booking/booking-photos/index.js';
 import { checkMediaGate } from '../../services/file-scan.js';
@@ -80,7 +81,7 @@ function publicUrl(value: string): boolean {
 async function storeInformation(db: D1Database, accountId: string, reference: Extract<FormReferenceDefinition, { kind: 'store_information' }>): Promise<PublicStoreInformation | null> {
   const entries = Object.entries(reference.fields);
   if (!entries.length) return {};
-  const resolved = await resolveCommonVarValuesAt(db, accountId, entries.map(([, source]) => source.varKey), new Date().toISOString());
+  const resolved = await resolveMusuboCommonVarsAt(db, accountId, entries.map(([, source]) => source.varKey), new Date().toISOString());
   if (!resolved.ok) return null;
   const content: PublicStoreInformation = {};
   for (const [field, source] of entries) {

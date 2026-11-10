@@ -233,7 +233,7 @@ export default function SnsSettingsPage() {
                 <Link className={styles.link} href="/restaurant-test/google?tab=reviews">口コミへ<ArrowRight size={16} aria-hidden /></Link>
                 <Link className={styles.link} href="/restaurant-test/google?tab=posts">投稿へ<ArrowRight size={16} aria-hidden /></Link>
                 <Link className={styles.link} href="/restaurant-test/google?tab=profile">プロフィールへ<ArrowRight size={16} aria-hidden /></Link>
-                {googleStatus === 'connected' && visibleGoogle.connection.locationName ? <Link className={styles.link} href="/restaurant-test/google?tab=hours">営業時間へ<ArrowRight size={16} aria-hidden /></Link> : null}
+                {googleStatus === 'connected' && visibleGoogle.connection.locationName ? <Link className={styles.link} href="/settings/google-hours">営業時間へ<ArrowRight size={16} aria-hidden /></Link> : null}
               </div> : null}
               <GoogleConnectionSettings key={accountId} accountId={accountId} data={visibleGoogle} onChanged={() => { void load() }} />
             </>

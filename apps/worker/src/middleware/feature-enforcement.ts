@@ -272,6 +272,12 @@ export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadat
     classification: { kind: 'core', reason: 'SNS連携設定のGoogle接続管理は、機能停止中も行える。Googleの利用と店舗所属・接続権限はrouteで確認する' },
   },
   {
+    pattern: /^\/api\/restaurant-test\/google\/(?:profile(?:\/sync)?|hours\/(?:workspace|review|propose)|holidays|changes(?:\/[^/]+(?:\/(?:send|cancel))?)?)$/,
+    methods: ['GET', 'POST', 'PUT'],
+    accountResolver: 'none',
+    classification: { kind: 'core', reason: 'Googleの営業時間は全業種の共通設定。Google接続・所属・操作権限はrouteで検査する' },
+  },
+  {
     pattern: /^\/api\/hq\/style(?:\*|-template-samples|-starter-sets(?:\/[^/]+)?|-attention)$/,
     methods: ['ALL', 'GET', 'PUT'],
     accountResolver: 'none',
