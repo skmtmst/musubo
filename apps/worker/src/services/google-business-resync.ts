@@ -146,7 +146,7 @@ export async function processGoogleBusinessHourlyResync(
   for (const connection of connections) {
     const dueReviews = isStale(connection.last_synced_at, input.now, HOURLY_STALE_MS);
     const duePosts = isStale(connection.last_posts_synced_at, input.now, HOURLY_STALE_MS);
-    const dueProfile = connection.last_profile_fetched_at !== null && isStale(connection.last_profile_fetched_at, input.now, HOURLY_STALE_MS);
+    const dueProfile = isStale(connection.last_profile_fetched_at, input.now, HOURLY_STALE_MS);
     if (!dueReviews && !duePosts && !dueProfile) {
       skipped += 1;
       continue;
