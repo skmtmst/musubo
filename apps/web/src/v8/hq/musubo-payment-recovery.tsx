@@ -32,6 +32,7 @@ interface Props {
   view: MusuboPaymentRecoveryView
   onPrimary: () => Promise<void> | void
   onSecondary: () => void
+  secondaryLabel?: string
 }
 
 const money = (yen: number) => `¥${new Intl.NumberFormat('ja-JP').format(yen)}`
@@ -40,7 +41,7 @@ const date = (iso: string, time = false) => new Intl.DateTimeFormat('ja-JP', {
   ...(time ? { hour: '2-digit', minute: '2-digit', hour12: false } : {}),
 }).format(new Date(iso))
 
-export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: Props) {
+export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary, secondaryLabel }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const invoice = view.kind === 'invoice'
@@ -155,7 +156,6 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
   }
 
   return <div className={styles.page}>
-    <p className={styles.breadcrumb}>ホーム › {invoice ? '統括の設定 › 請求' : 'アカウント › LINE追加'} › お支払い</p>
     <PageHeading title={title} subtitle={subtitle} inset="none" />
     <div className={success ? styles.statusSuccess : styles.statusWarning}>
       <span className={success ? styles.iconSuccess : styles.iconWarning} aria-hidden="true">{success ? '✓' : processing ? '…' : '!'}</span>
@@ -195,7 +195,7 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
     </div>
     <div className={styles.footerBar}>
       <p>{footnote}</p>
-      {!processing && <Button type="button" variant="text" textTone="accent" onClick={onSecondary}>{secondary}</Button>}
+      {!processing && <Button type="button" variant="text" textTone="accent" onClick={onSecondary}>{secondaryLabel ?? secondary}</Button>}
     </div>
   </div>
 }

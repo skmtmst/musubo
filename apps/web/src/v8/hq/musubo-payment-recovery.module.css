@@ -39,6 +39,7 @@
 @media (max-width: 950px) { .columns { grid-template-columns: 1fr; } }
 @media (max-width: 600px) {
   .page h1 { font-size: var(--mp-px-24); }
+  :root .page :global([data-template-region='heading'] h1) { overflow: visible; text-overflow: clip; white-space: normal; }
   .breadcrumb { font-size: var(--mp-px-11); }
   .statusWarning, .statusSuccess { flex-wrap: wrap; gap: var(--mp-px-11); padding: var(--mp-px-18); }
   .iconWarning, .iconSuccess { width: var(--mp-px-40); height: var(--mp-px-40); font-size: var(--mp-px-22); }
