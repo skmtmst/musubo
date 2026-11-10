@@ -14,6 +14,7 @@ export type RestaurantOpeningDay = { weekday: number; periods: Array<{ opensAt: 
 export type RestaurantOpeningHours = {
   storeId: string; hours: RestaurantOpeningDay[] | null; version: number;
   updatedBy: string | null; updatedAt: string | null;
+  googleStatus?: 'connected' | 'pending_location' | 'expired' | 'no_permission' | 'disconnected' | null;
   lateArrivalPolicy?: import('./restaurant-customer-booking.js').RestaurantLateArrivalPolicy | null;
 };
 export type RestaurantAllocation = { otaCapacity: number; lineCapacity: number; walkInCapacity: number; sameDayCapacity?: number };

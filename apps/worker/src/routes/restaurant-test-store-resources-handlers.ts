@@ -319,7 +319,9 @@ export const get__api_restaurant_test_opening_hours_8 = async (c: Context<Env, "
   if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
   const row = await dbFor(c.env, storeId).prepare('SELECT hours_json, version, updated_by, updated_at, late_cancel_after_minutes, late_arrival_message FROM rt_opening_hours_settings WHERE store_id = ?')
     .bind(storeId).first<{ hours_json: string; version: number; updated_by: string; updated_at: string; late_cancel_after_minutes: number | null; late_arrival_message: string | null }>();
-  return c.json({ success: true, data: { storeId, hours: row ? JSON.parse(row.hours_json) : null, version: row?.version ?? 0, updatedBy: row?.updated_by ?? null, updatedAt: row?.updated_at ?? null, lateArrivalPolicy: row?.late_cancel_after_minutes != null && row.late_arrival_message ? {cancelAfterMinutes:row.late_cancel_after_minutes,message:row.late_arrival_message} : null } });
+  const connection = await dbFor(c.env, storeId).prepare('SELECT status FROM rt_google_connections WHERE store_id=?')
+    .bind(storeId).first<{ status: import('@line-crm/shared').RestaurantOpeningHours['googleStatus'] }>();
+  return c.json({ success: true, data: { storeId, hours: row ? JSON.parse(row.hours_json) : null, version: row?.version ?? 0, updatedBy: row?.updated_by ?? null, updatedAt: row?.updated_at ?? null, googleStatus: connection?.status ?? null, lateArrivalPolicy: row?.late_cancel_after_minutes != null && row.late_arrival_message ? {cancelAfterMinutes:row.late_cancel_after_minutes,message:row.late_arrival_message} : null } });
 };
 
 export const put__api_restaurant_test_opening_hours_9 = async (c: Context<Env, "/api/restaurant-test/opening-hours">) => {
@@ -329,6 +331,10 @@ export const put__api_restaurant_test_opening_hours_9 = async (c: Context<Env, "
   const body: { storeId?: string; hours?: unknown; expectedVersion?: number; lateArrivalPolicy?: import('@line-crm/shared').RestaurantLateArrivalPolicy | null } = (await c.req.json().catch(() => null)) || {};
   const storeId = typeof body.storeId === 'string' ? body.storeId : body.storeId === undefined ? organization.scopedStoreId : null;
   if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) return inputError(c, { success: false, error: '店舗が正しくありません' }, 400, ["storeId"]);
+  const googleConnection = await dbFor(c.env, storeId).prepare('SELECT status FROM rt_google_connections WHERE store_id=?')
+    .bind(storeId).first<{ status: string }>();
+  if (googleConnection && googleConnection.status !== 'disconnected')
+    return c.json({ success: false, error: '営業時間はGoogleビジネスで変更してください', code: 'google_hours_source' }, 409);
   const hours = validateRestaurantOpeningHours(body.hours);
   if (!hours || !Number.isSafeInteger(body.expectedVersion) || (body.expectedVersion ?? -1) < 0) {
     return inputError(c, { success: false, error: '曜日0〜6の営業時間とexpectedVersionを指定してください。重なる営業時間は保存できません' }, 400, ["hours","expectedVersion"]);

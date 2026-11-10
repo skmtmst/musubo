@@ -5,6 +5,7 @@ import { StyleError } from './style-setup.js';
 
 import { closuresForRange, openSeatTablePeriods, type ClosurePeriod } from './restaurant-closures.js';
 import { restaurantCivilTime } from './restaurant-booking.js';
+import { connectedGoogleProfile, googleOpeningDay } from './restaurant-google-hours-source.js';
 
 export async function seatSchedule(db:D1Database,account:string,query:Record<string,string|undefined>,style:StyleSnapshot['style'],from:string,to:string,asOf:string,timeZone:string,days:StyleSchedule['days'],closures:StyleSchedule['closures'],availability:StyleSchedule['availability']) {
   if (style === 'restaurant') {
@@ -39,11 +40,15 @@ export async function seatSchedule(db:D1Database,account:string,query:Record<str
         )
         .bind(store.id)
         .first<{ hours_json: string }>();
-      if (!setting) {
+      const googleConnection = await db.prepare('SELECT status FROM rt_google_connections WHERE store_id=?')
+        .bind(store.id).first<{ status: string }>();
+      const googleProfile = googleConnection ? await connectedGoogleProfile(db, store.id) : null;
+      const hasHours = googleConnection ? Boolean(googleProfile) : Boolean(setting);
+      if (!hasHours) {
         availability.status = 'unconfigured';
         availability.reason = 'business_hours_required';
       }
-      const hours: RestaurantOpeningDay[] = setting
+      const hours: RestaurantOpeningDay[] = setting && !googleConnection
         ? JSON.parse(setting.hours_json)
         : [];
       const closed = await closuresForRange(db, store.id, from, to);
@@ -64,9 +69,9 @@ export async function seatSchedule(db:D1Database,account:string,query:Record<str
       const candidates: ClosurePeriod[] = [];
       for (const day of days) {
         const weekday = new Date(day.date + 'T00:00:00Z').getUTCDay();
-        const periods = hours.find((h) => h.weekday === weekday)?.periods ?? [];
+        const periods = googleProfile ? googleOpeningDay(googleProfile, day.date) ?? [] : hours.find((h) => h.weekday === weekday)?.periods ?? [];
         if (
-          setting &&
+          hasHours &&
           (!periods.length ||
             closed.some(
               (c) =>
@@ -82,9 +87,11 @@ export async function seatSchedule(db:D1Database,account:string,query:Record<str
         for (const period of periods) {
           const minute = (t: string) =>
             Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+          const opens = minute(period.opensAt);
+          const closes = minute(period.closesAt) + (minute(period.closesAt) < opens ? 1440 : 0);
           for (
-            let start = minute(period.opensAt);
-            start + duration <= minute(period.closesAt);
+            let start = opens;
+            start + duration <= closes;
             start += 30
           ) {
             if (seen.has(start)) continue;

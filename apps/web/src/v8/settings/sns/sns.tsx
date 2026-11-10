@@ -195,6 +195,7 @@ export default function SnsSettingsPage() {
       />
       <div className={styles.body}>
         {role !== null && !canManage ? <ReadOnlyNotice /> : null}
+        {searchParams.get('source') === 'hours' ? <Notice tone="info">営業時間は Google ビジネスの店舗情報を基準にします。Googleアカウントを接続し、店舗を選んでください。</Notice> : null}
         {flash ? (
           <Notice tone={flash.tone} role="status" onClose={() => router.replace('/settings/sns', { scroll: false })}>
             {flash.text}
@@ -232,6 +233,7 @@ export default function SnsSettingsPage() {
                 <Link className={styles.link} href="/restaurant-test/google?tab=reviews">口コミへ<ArrowRight size={16} aria-hidden /></Link>
                 <Link className={styles.link} href="/restaurant-test/google?tab=posts">投稿へ<ArrowRight size={16} aria-hidden /></Link>
                 <Link className={styles.link} href="/restaurant-test/google?tab=profile">プロフィールへ<ArrowRight size={16} aria-hidden /></Link>
+                <Link className={styles.link} href="/restaurant-test/google?tab=hours">営業時間へ<ArrowRight size={16} aria-hidden /></Link>
               </div> : null}
               <GoogleConnectionSettings key={accountId} accountId={accountId} data={visibleGoogle} onChanged={() => { void load() }} />
             </>
