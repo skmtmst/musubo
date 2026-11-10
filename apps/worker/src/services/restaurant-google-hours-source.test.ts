@@ -3,6 +3,7 @@ import type { GoogleProfile, Weekday } from './google-business-profile.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { seedRestaurantFixture } from '../test-utils/restaurant-fixture.js';
 import { connectedGoogleProfile, googleOpeningDay, googleOpeningWeek, syncGoogleOpeningWeek } from './restaurant-google-hours-source.js';
+import { phoneIntakeFailure } from './restaurant-phone-intake.js';
 
 const location = 'accounts/111/locations/store-ginza';
 const profileName = 'locations/store-ginza';
@@ -66,4 +67,18 @@ it('別のGoogle店舗の写しは使わない', async () => {
   connection();
   cached(profile(), 'locations/other');
   expect(await connectedGoogleProfile(database.db, 'store-ginza')).toBeNull();
+});
+
+it('電話受付もGoogleの通常時間と特別休業日を守る', async () => {
+  const value = profile();
+  connection();
+  cached(value);
+  await syncGoogleOpeningWeek(database.db, 'store-ginza', location, value);
+  const start = '2026-11-16T01:00:00Z'; // 日本時間の月曜10時
+  expect(await phoneIntakeFailure(database.db, 'store-ginza', start, '2026-11-16T03:00:00Z')).toBeNull();
+  expect(await phoneIntakeFailure(database.db, 'store-ginza', '2026-11-16T08:00:00Z', '2026-11-16T10:00:00Z')).toBe('outside_opening_hours');
+  value.specialHours = [{ date: '2026-11-16', closed: true, periods: [] }];
+  database.raw.prepare('UPDATE rt_google_profiles SET profile_json=? WHERE store_id=?')
+    .run(JSON.stringify({ profile: value }), 'store-ginza');
+  expect(await phoneIntakeFailure(database.db, 'store-ginza', start, '2026-11-16T03:00:00Z')).toBe('outside_opening_hours');
 });

@@ -67,7 +67,7 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
 }) {
   const canConfigure = staffRole === 'owner' || staffRole === 'admin'
   const canWrite = canConfigure || staffRole === 'staff'
-  const hoursHref = `/restaurant-test/inventory?storeId=${encodeURIComponent(storeId)}#rs-hours-title`
+  const hoursHref = '/restaurant-test/google?tab=hours'
   const saveErrors = useSaveFormErrors()
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -87,6 +87,7 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
   const capacityReason = tableCapacityReason(tableDefinition, accountId, storeId, tables, guests)
   const [dayChoice, setDayChoice] = useState<DayChoice>('today')
   const [picked, setPicked] = useState('')
+  const date = dayChoice === 'today' ? toYmd(now) : dayChoice === 'tomorrow' ? toYmd(addDays(now, 1)) : picked
   const [time, setTime] = useState('')
   const [tableId, setTableId] = useState('auto')
   const [changingTable, setChangingTable] = useState(false)
@@ -100,7 +101,7 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
   const [dayAttempt, setDayAttempt] = useState(0)
   const [hoursFailure, setHoursFailure] = useState('')
   const [dayFailure, setDayFailure] = useState('')
-  const scopeKey = JSON.stringify([accountId, storeId])
+  const scopeKey = JSON.stringify([accountId, storeId, date])
   const [hoursData, setHoursData] = useState<{ key: string; hours: RestaurantOpeningDay[] | null } | null>(null)
   const hours = open && accountId && storeId && hoursData?.key === scopeKey ? hoursData.hours : null
   const [dayData, setDayData] = useState<{ key: string; rows: RestaurantReservation[] } | null>(null)
@@ -115,15 +116,14 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
     setTime(''); setTableId('auto'); setChangingTable(false); setMemo(''); setNotify(false); setError('')
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
 
-  const date = dayChoice === 'today' ? toYmd(now) : dayChoice === 'tomorrow' ? toYmd(addDays(now, 1)) : picked
   useEffect(() => { setTime('') }, [date])
 
   useEffect(() => {
     let current = true
     setHoursData(null)
     setHoursFailure('')
-    if (!open || !accountId || !storeId) return
-    void restaurantTestApi.openingHours(accountId, storeId)
+    if (!open || !accountId || !storeId || !date) return
+    void restaurantTestApi.openingHours(accountId, storeId, date)
       .then((res) => { if (current) { if (res.data.hours === undefined) setHoursFailure(scopeKey); else setHoursData({ key: scopeKey, hours: res.data.hours }) } })
       .catch(() => { if (current) setHoursFailure(scopeKey) })
     return () => { current = false }

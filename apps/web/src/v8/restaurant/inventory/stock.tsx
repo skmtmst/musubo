@@ -445,7 +445,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
             <StockListHeading date={date} busy={busy} onChange={changeDate}>
               {slots.length > 0 ? <RowActions subjectName="時間帯ごとの在庫" menuButtonProps={{ disabled: busy || !hoursVersion || allocInvalid, 'aria-description': missingHoursReason }} menuItems={[{ id: 'generate', label: 'この日の枠を作る', lockedReason, disabled: !canEdit, onSelect: generateSlots }]} /> : null}
             </StockListHeading>
-            {missingHoursReason ? <DialogNote>{missingHoursReason}{' '}<Button variant="text" size="inline" href={googleStatus && googleStatus !== 'disconnected' ? '/restaurant-test/google?tab=hours' : '#rs-hours-title'}>開ける時間を設定する</Button></DialogNote> : null}
+            {missingHoursReason ? <DialogNote>{missingHoursReason}{' '}<Button variant="text" size="inline" href={googleStatus !== null ? '/restaurant-test/google?tab=hours' : '#rs-hours-title'}>開ける時間を設定する</Button></DialogNote> : null}
             {dayRows === null ? (
               <div className={styles.stateBox}><ListState kind="loading" /></div>
             ) : slots.length === 0 ? (
@@ -525,9 +525,9 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
                 </div>
               </Card>
             ) : null}
-            <CardHeader size="stacked" titleId="rs-hours-title" title="開ける時間" meta={googleStatus && googleStatus !== 'disconnected' ? 'Googleビジネスの営業時間を基準にします。予約枠と席の配分は、この画面で設定します。' : '曜日ごとに予約を受ける時間を決めます（予約設定の受付枠と同じ決め方。違うのは、受けられる数が「人」ではなく「席」で決まること）'} />
+            <CardHeader size="stacked" titleId="rs-hours-title" title="開ける時間" meta={googleStatus !== null ? 'Googleビジネスの営業時間を基準にします。予約枠と席の配分は、この画面で設定します。' : '曜日ごとに予約を受ける時間を決めます（予約設定の受付枠と同じ決め方。違うのは、受けられる数が「人」ではなく「席」で決まること）'} />
             {hoursError ? <Notice tone="danger" className={styles.hoursErrorNoticePlacement} >{hoursError}</Notice> : null}
-            {googleStatus && googleStatus !== 'disconnected' ? <>
+            {googleStatus !== null ? <>
               <Notice tone={googleStatus === 'connected' ? 'info' : 'warn'}>営業時間の変更は Googleビジネスで行います。接続に問題がある場合は、接続画面で確認してください。</Notice>
               <Button variant="text" href="/restaurant-test/google?tab=hours">Googleビジネスの営業時間を開く →</Button>
               {hours?.map((day) => <p key={day.weekday}>{WEEKDAY_LABEL[day.weekday]}曜日：{periodsText(day)}</p>)}
