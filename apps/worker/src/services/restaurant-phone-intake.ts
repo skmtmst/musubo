@@ -15,15 +15,14 @@ export async function phoneIntakeFailure(db: D1Database, storeId: string, starts
     const store = await db.prepare('SELECT timezone FROM rt_stores WHERE id=?').bind(storeId).first<{ timezone: string }>();
     if (!store) return 'opening_hours_unconfigured';
     const date = tzDateStr(store.timezone, new Date(startsAt));
-    const periods = googleOpeningDay(profile, date);
-    if (!periods) return 'opening_hours_unconfigured';
+    const previousDate = new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
     const minutes = (value: string) => Number(value.slice(0, 2)) * 60 + Number(value.slice(3));
-    const inside = periods.some(period => {
+    const inside = [previousDate, date].some(openDate => googleOpeningDay(profile, openDate)?.some(period => {
       const open = minutes(period.opensAt);
       const close = minutes(period.closesAt) + (minutes(period.closesAt) < open ? 1440 : 0);
-      return Date.parse(startsAt) >= Date.parse(restaurantCivilTime(date, open, store.timezone))
-        && Date.parse(endsAt) <= Date.parse(restaurantCivilTime(date, close, store.timezone));
-    });
+      return Date.parse(startsAt) >= Date.parse(restaurantCivilTime(openDate, open, store.timezone))
+        && Date.parse(endsAt) <= Date.parse(restaurantCivilTime(openDate, close, store.timezone));
+    }));
     if (!inside) return 'outside_opening_hours';
   }
   return null;

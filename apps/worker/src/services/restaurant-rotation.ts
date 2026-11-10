@@ -15,9 +15,19 @@ export async function restaurantRotation(db:D1Database,storeId:string,date:strin
  const googleProfile=googleConnection?await connectedGoogleProfile(db,storeId):null;
  const hasHours=googleConnection?Boolean(googleProfile):Boolean(setting);
  const from=restaurantCivilTime(date,0,store.timezone),to=restaurantCivilTime(date,1440,store.timezone),start=Date.parse(from),end=Date.parse(to);
- const weekday=new Date(date+'T00:00:00Z').getUTCDay(),minute=(t:string)=>Number(t.slice(0,2))*60+Number(t.slice(3));
- const periods=googleConnection?(googleProfile?googleOpeningDay(googleProfile,date):null):setting?(JSON.parse(setting.hours_json) as RestaurantOpeningDay[]).find(d=>d.weekday===weekday)?.periods??[]:null;
- const operating:Interval[]=periods?.map(p=>[Date.parse(restaurantCivilTime(date,minute(p.opensAt),store.timezone)),Date.parse(restaurantCivilTime(date,minute(p.closesAt),store.timezone))])??[];
+ const minute=(t:string)=>Number(t.slice(0,2))*60+Number(t.slice(3));
+ const localWeek=setting&&!googleConnection?JSON.parse(setting.hours_json) as RestaurantOpeningDay[]:[];
+ const previousDate=new Date(Date.parse(`${date}T00:00:00Z`)-86400000).toISOString().slice(0,10);
+ const operating:Interval[]=[previousDate,date].flatMap(openDate=>{
+  const weekday=new Date(`${openDate}T00:00:00Z`).getUTCDay();
+  const periods=googleConnection?(googleProfile?googleOpeningDay(googleProfile,openDate):null):localWeek.find(d=>d.weekday===weekday)?.periods??[];
+  return (periods??[]).flatMap(p=>{
+   const opens=minute(p.opensAt),closes=minute(p.closesAt)+(minute(p.closesAt)<opens?1440:0);
+   const a=Math.max(start,Date.parse(restaurantCivilTime(openDate,opens,store.timezone)));
+   const b=Math.min(end,Date.parse(restaurantCivilTime(openDate,closes,store.timezone)));
+   return b>a?[[a,b] as Interval]:[];
+  });
+ });
  const tables=(await db.prepare('SELECT id FROM rt_tables WHERE store_id=? AND is_active=1').bind(storeId).all<{id:string}>()).results;
  const closures=await closuresForRange(db,storeId,from,to);
  const open=new Map(tables.map(t=>[t.id,subtract(operating,closures.filter(c=>closureAffectsTable(c,t.id)).flatMap(c=>(JSON.parse(c.periods_json) as Array<{startsAt:string;endsAt:string}>).map(p=>[Date.parse(p.startsAt),Date.parse(p.endsAt)] as Interval)))]));
