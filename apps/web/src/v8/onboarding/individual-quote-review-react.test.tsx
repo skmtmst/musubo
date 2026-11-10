@@ -45,6 +45,19 @@ describe('お客様の個別見積もり', () => {
     expect(host.textContent).toContain('接続済みが契約枠より少なくてもLINE基本料金を請求します')
     expect(host.textContent).not.toContain('請求額は実際の連携数で決まり')
   })
+  it('12個の見積もりは契約枠・初回請求・同意をPenの順序で表示する', async () => {
+    await act(async () => { renderQuote({ plannedLineCount: 12, plannedLinkedAccountsByLine: [],
+      finalSchedule: { ...DEFAULT_MUSUBO_PRICE_SCHEDULE,
+        eleventhAndLaterLineYen: 5_900, friendAllowanceForElevenOrMore: 50_000 } }) })
+    const text = host.textContent ?? ''
+    expect(text).toContain('LINE12個の契約枠・基本料金¥83,800')
+    expect(text).toContain('11個目以降は各¥5,900／月')
+    expect(text).toContain('LINE基本料金は契約枠12個分で確定')
+    expect(text).toContain('無料期間終了後に契約枠12個分の基本料金を初回請求します')
+    expect(text).toContain('LINE12個の契約枠・無料期間・今後の請求を確認し、同意します')
+    expect(host.querySelectorAll('input[type=checkbox]')).toHaveLength(1)
+    expect(text.indexOf('初回の請求について')).toBeLessThan(text.indexOf('LINE12個の契約枠・無料期間・今後の請求'))
+  })
   it('内容を確認し同意したときだけカード登録へ進める', async () => {
     await act(async () => { renderQuote() })
     expect(host.textContent).toContain('¥38,900')
