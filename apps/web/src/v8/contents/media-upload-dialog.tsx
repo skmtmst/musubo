@@ -11,16 +11,18 @@ import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import { AttachmentRow } from '@/components/shared/file-drop'
-import MediaSlot from '@/components/shared/media-slot'
+import MediaSlot, { formatBytes, formatNamesOf } from '@/components/shared/media-slot'
 import Notice from '@/components/shared/notice'
+import Disclosure from '@/components/shared/disclosure'
 import Progress from '@/components/shared/progress'
 import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
-import { MEDIA_ACCEPT, extractMediaMetadata, putMediaFile, validateMediaFile } from './media-direct-upload'
+import { MEDIA_ACCEPT, extractMediaMetadata, mediaFileLimitBytes, putMediaFile, validateMediaFile } from './media-direct-upload'
 import { formatMediaSize } from './media-usage-display'
 import { formatNumber } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import MediaPreviewOverlay from './media-preview-overlay'
 
 
 
@@ -32,6 +34,7 @@ type UploadEntry = {
   message: string
   retryable: boolean
   progress: number
+  previewUrl?: string
   mediaId?: string | null
   /** 検査の状態。確かめ終わるまで中身は出さない。 */
   scanStatus?: 'pending' | 'clean' | 'rejected' | 'quarantined' | null
@@ -45,11 +48,12 @@ function scanChipProps(status: NonNullable<UploadEntry['scanStatus']>): { tone: 
 }
 
 const LIMITS = [
-  { label: '画像', note: 'JPG・PNG・GIF・WebP ／ 10MBまで' },
-  { label: '音声', note: 'MP3・M4A ／ 200MBまで' },
-  { label: '動画', note: 'MP4 ／ 200MBまで' },
-  { label: 'PDF', note: '20MBまで。LINEでは直接送れないので、リンクとして使います' },
+  { label: '写真', types: 'image/jpeg,image/png,image/gif,image/webp', example: 'image/png' },
+  { label: '動画', types: 'video/mp4', example: 'video/mp4' },
+  { label: '音声', types: 'audio/mpeg,audio/mp4', example: 'audio/mpeg' },
+  { label: 'PDF', types: 'application/pdf', example: 'application/pdf' },
 ]
+const MAX_FILES = 10
 
 export default function MediaUploadDialog({
   open,
@@ -74,6 +78,20 @@ export default function MediaUploadDialog({
   const [folderId, setFolderId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [preview, setPreview] = useState<UploadEntry | null>(null)
+  const previewUrls = useRef(new Set<string>())
+  useEffect(() => () => {
+    for (const url of previewUrls.current) URL.revokeObjectURL(url)
+    previewUrls.current.clear()
+  }, [])
+  useEffect(() => {
+    const active = new Set(entries.map((entry) => entry.previewUrl).filter((url): url is string => Boolean(url)))
+    for (const url of previewUrls.current) {
+      if (active.has(url)) continue
+      URL.revokeObjectURL(url)
+      previewUrls.current.delete(url)
+    }
+  }, [entries])
   const pendingFiles = entries.some(entry => entry.state !== 'done')
   const depth = useContext(OverlayDepthContext)
   const guard = useUnsavedGuard({ dirty: open && (pendingFiles || busy), busy: open && busy, onDiscard: onClose })
@@ -97,6 +115,7 @@ export default function MediaUploadDialog({
     setFolderId(initialFolderId === '__ungrouped__' ? '' : initialFolderId)
     setBusy(false)
     setError('')
+    setPreview(null)
   }, [initialFolderId, open])
 
   const readyCount = useMemo(
@@ -118,18 +137,25 @@ export default function MediaUploadDialog({
   */
   const attempted = entries.some((entry) => entry.state === 'done' || (entry.state === 'error' && entry.retryable))
   const uploadErrorCount = entries.filter((entry) => entry.state === 'error' && entry.retryable).length
+  const selectedCountLabel = `選択したファイル（${formatNumber(entries.length)} / ${MAX_FILES}件）`
+  const firstPhoto = entries.find((entry) => entry.previewUrl)
 
   function removeEntry(index: number) {
     setEntries((current) => current.filter((_, entryIndex) => entryIndex !== index))
   }
 
   function stage(files: File[]) {
-    const next = files.slice(0, 20).map((file) => {
+    const next = files.slice(0, MAX_FILES).map((file) => {
       const message = validateMediaFile(file)
-      return { file, state: message ? 'error' : 'ready', message, retryable: false, progress: 0 } satisfies UploadEntry
+      const previewUrl = !message && file.type.startsWith('image/') && typeof URL.createObjectURL === 'function'
+        ? URL.createObjectURL(file)
+        : undefined
+      if (previewUrl) previewUrls.current.add(previewUrl)
+      return { file, state: message ? 'error' : 'ready', message, retryable: false, progress: 0, previewUrl } satisfies UploadEntry
     })
     setEntries(next)
-    setError(files.length > 20 ? 'いちどに登録できるのは20件までです。先頭の20件を表示しています。' : '')
+    setPreview(null)
+    setError(files.length > MAX_FILES ? '一度に登録できるのは10件までです。先頭の10件を表示しています。' : '')
   }
 
   async function uploadReady() {
@@ -143,26 +169,21 @@ export default function MediaUploadDialog({
     setEntries((current) => current.map((entry) => (
       entry.state === 'ready' ? { ...entry, state: 'preparing', message: '送信を準備しています', progress: 0 } : entry
     )))
-    try {
-      const prepared = await api.media.prepareUploads({
-        accountId,
-        files: await Promise.all(pending.map(async ({ entry }) => ({
-          filename: entry.file.name,
-          mimeType: entry.file.type,
-          sizeBytes: entry.file.size,
-          folderId: folderId || null,
-          metadata: await extractMediaMetadata(entry.file),
-        }))),
-      })
-      if (!prepared.success || prepared.data.sessions.length !== pending.length) {
-        throw new Error('送信の準備結果を確認できませんでした。時間をおいて、もう一度お試しください。')
-      }
-      for (let position = 0; position < pending.length; position += 1) {
-        const selected = pending[position]
-        const session = prepared.data.sessions[position]
-        if (!selected || !session) continue
-        const { index, entry } = selected
-        try {
+    for (const { index, entry } of pending) {
+      try {
+        // 大きなファイルを順番に送っても、後続の署名URLが待機中に失効しない。
+        const prepared = await api.media.prepareUploads({
+          accountId,
+          files: [{
+            filename: entry.file.name,
+            mimeType: entry.file.type,
+            sizeBytes: entry.file.size,
+            folderId: folderId || null,
+            metadata: await extractMediaMetadata(entry.file),
+          }],
+        })
+        const session = prepared.success ? prepared.data.sessions[0] : null
+        if (!session) throw new Error('送信の準備結果を確認できませんでした。時間をおいて、もう一度お試しください。')
           setEntries((current) => current.map((item, entryIndex) => (
             entryIndex === index ? { ...item, state: 'uploading', message: '送信中 0%', progress: 0 } : item
           )))
@@ -197,19 +218,12 @@ export default function MediaUploadDialog({
               // 読めなくても登録自体は済んでいる。確かめ中として置く。
             }
           }
-        } catch (caught) {
-          const message = describeApiFailure(caught, '登録')
-          setEntries((current) => current.map((item, entryIndex) => (
-            entryIndex === index ? { ...item, state: 'error', message, retryable: true } : item
-          )))
-        }
+      } catch (caught) {
+        const message = describeApiFailure(caught, '登録')
+        setEntries((current) => current.map((item, entryIndex) => (
+          entryIndex === index ? { ...item, state: 'error', message, retryable: true } : item
+        )))
       }
-    } catch (caught) {
-      const message = describeApiFailure(caught, '送信')
-      setEntries((current) => current.map((item) => (
-        item.state === 'preparing' ? { ...item, state: 'error', message, retryable: true } : item
-      )))
-      setError(message)
     }
     setBusy(false)
     if (completed > 0) onComplete()
@@ -229,33 +243,24 @@ export default function MediaUploadDialog({
         </DialogActions>)}>{}
         <div className="space-y-4 p-6">
         <MediaSlot kind="file"
-          title="ここにファイルをドラッグ、または押して選ぶ"
-          help="いちどに20件まで"
+          title="ファイルを選ぶ・ここにドラッグ"
+          size="compact"
           accept={MEDIA_ACCEPT}
           busy={busy}
           onFiles={stage}
         />
-
-        <Notice tone="info">
-          <p className="font-bold">LINEで送れる大きさ（超えると入れられません）</p>
-          {LIMITS.map((limit) => <p key={limit.label}>{limit.label} {limit.note}</p>)}
-          <p className="mt-2 font-semibold">大きなファイルも管理画面を経由せず、保存先へ直接送ります。</p>
-          <p className="mt-2 font-semibold">中身の形式とファイル名の拡張子が食い違うものは保存できません。</p>
-          <p className="font-semibold">公開リンクが作られるため、個人情報の取り扱いに注意してください。</p>
-        </Notice>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-secondary" aria-label="ファイルのサイズ上限">
+          {LIMITS.map((limit) => <span key={limit.label}>
+            {limit.label}{limit.label === 'PDF' ? '' : ` ${formatNamesOf(limit.types)}`}：{formatBytes(mediaFileLimitBytes({ type: limit.example })!)}まで
+          </span>)}
+        </div>
 
         {entries.length > 0 ? (
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-ink text-sm font-bold">入れているもの</p>
-              {busy || attempted ? null : (
-                <p className="text-ink-faint text-xs">{formatNumber(entries.length)} 件中 {formatNumber(doneCount)} 件 完了</p>
-              )}
+              <p className="text-ink text-sm font-bold">{selectedCountLabel}</p>
             </div>
-            {/*
-              全体の進みは登録を実行してから出す（実測の完了数だけ）。
-              登録前は同じ数字の重複になるので、上の「X件中 Y件 完了」だけにする。
-            */}
+            {/* 全体の進みは登録を実行してから出す（実測の完了数だけ）。 */}
             {busy ? (
               <Progress
                 state="active"
@@ -274,10 +279,18 @@ export default function MediaUploadDialog({
                 className="mb-3"
               />
             ) : null}
+            {firstPhoto?.previewUrl ? <div>
+              <MediaSlot kind="image" title="登録前の写真" value={firstPhoto.previewUrl} previewAlt={`${firstPhoto.file.name}の登録前プレビュー`} fit="contain" readOnly />
+              <Button type="button" variant="text" size="inline" textTone="accent" onClick={() => setPreview(firstPhoto)}>写真を大きく見る</Button>
+            </div> : null}
             <ul className="max-h-64 space-y-2 overflow-y-auto">
               {entries.map((entry, index) => {
                 const sizeText = formatMediaSize(entry.file.size)
                 const tone = entry.file.type.startsWith('image/') ? 'photo' as const : 'document' as const
+                const thumbnail = entry.previewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={entry.previewUrl} alt="" className="h-full w-full object-cover" />
+                ) : undefined
                 if (entry.state === 'uploading' || entry.state === 'preparing' || entry.state === 'verifying') {
                   return (
                     <li key={`${entry.file.name}-${entry.file.size}-${index}`} aria-live="polite">
@@ -287,6 +300,7 @@ export default function MediaUploadDialog({
                         percent={entry.progress}
                         uploadingText={entry.message || `送信中 ${entry.progress}%`}
                         tone={tone}
+                        thumbnail={thumbnail}
                       />
                     </li>
                   )
@@ -299,6 +313,8 @@ export default function MediaUploadDialog({
                         status="error"
                         errorText={entry.message}
                         tone={tone}
+                        thumbnail={thumbnail}
+                        retryLabel="もう一度試す"
                         onRetry={() => setEntries((current) => current.map((item, entryIndex) => (
                           entryIndex === index ? { ...item, state: 'ready', message: '', retryable: false, progress: 0 } : item
                         )))}
@@ -314,6 +330,7 @@ export default function MediaUploadDialog({
                         status="error"
                         errorText={entry.message}
                         tone={tone}
+                        thumbnail={thumbnail}
                         onRemove={() => removeEntry(index)}
                       />
                     </li>
@@ -326,8 +343,10 @@ export default function MediaUploadDialog({
                       name={entry.file.name}
                       meta={entry.state === 'done' ? `${sizeText}・入りました` : `${sizeText}・${entry.message || '登録できます'}`}
                       tone={tone}
+                      thumbnail={thumbnail}
                       onRemove={busy ? undefined : () => removeEntry(index)}
                     />
+                    {entry.previewUrl ? <Button type="button" variant="text" size="inline" textTone="accent" className="ml-12 mt-1" onClick={() => setPreview(entry)}>写真を大きく見る</Button> : null}
                     {scan ? (
                       <p className="mt-1 flex items-center gap-2">
                         <Chip tone={scan.tone}>{scan.label}</Chip>
@@ -350,6 +369,17 @@ export default function MediaUploadDialog({
             onCreate={onCreateFolder}
             onChange={setFolderId}
           /></SaveErrorField></Field></div>
+        <Disclosure appearance="inset" size="compact" title="登録時の注意事項">
+          <Notice tone="info">
+            <p>PDFはLINEで直接送れません。リンクとして使います。</p>
+            <p>大きなファイルも管理画面を経由せず、保存先へ直接送ります。</p>
+            <p>中身の形式と拡張子が違うファイルは登録できません。</p>
+            <p>公開リンクが作られるため、個人情報の取り扱いに注意してください。</p>
+          </Notice>
+        </Disclosure>
         </div>
-  </Dialog><OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="選択したファイル" busy={busy} onConfirm={discardAndLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></>
+  </Dialog><OverlayDepthContext.Provider value={depth + 1}>
+    {preview?.previewUrl ? <MediaPreviewOverlay filename={preview.file.name} kind="image" src={preview.previewUrl} onClose={() => setPreview(null)} /> : null}
+    <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="選択したファイル" busy={busy} onConfirm={discardAndLeave} onCancel={guard.cancelLeave} />
+  </OverlayDepthContext.Provider></>
 }

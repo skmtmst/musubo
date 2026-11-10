@@ -62,6 +62,10 @@ let onComplete = vi.fn()
 let onClose = vi.fn()
 
 beforeEach(() => {
+  vi.stubGlobal('URL', class extends URL {
+    static createObjectURL = vi.fn((file: File) => `blob:preview-${file.name}`)
+    static revokeObjectURL = vi.fn()
+  })
   calls.prepare.length = 0
   calls.put.length = 0
   calls.complete.length = 0
@@ -76,6 +80,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  vi.unstubAllGlobals()
 })
 
 const settle = async () => {
@@ -106,18 +111,18 @@ describe('メディアを入れる窓', () => {
   it('LINEで送れる大きさと、保存先へ直接送ることを先に書く', async () => {
     await render()
     const text = dialog().textContent ?? ''
-    expect(text).toContain('音声 MP3・M4A ／ 200MBまで')
-    expect(text).toContain('動画 MP4 ／ 200MBまで')
+    expect(text).toContain('音声 MP3・M4A：200MBまで')
+    expect(text).toContain('動画 MP4：200MBまで')
     expect(text).toContain('大きなファイルも管理画面を経由せず、保存先へ直接送ります。')
   })
 
-  it('選んだ分を1回の準備で予約し、1件ずつ保存先へ直接送ってから確認を頼む', async () => {
+  it('送信直前に1件ずつ予約し、保存先へ直接送ってから確認を頼む', async () => {
     await render()
     await pick(png('a.png'), png('b.png'))
     await press('2件を登録する')
-    expect(calls.prepare).toHaveLength(1)
+    expect(calls.prepare).toHaveLength(2)
     expect(calls.prepare[0].accountId).toBe('account-a')
-    expect(calls.prepare[0].files.map((file) => file.filename)).toEqual(['a.png', 'b.png'])
+    expect(calls.prepare.map((call) => call.files.map((file) => file.filename))).toEqual([['a.png'], ['b.png']])
     expect(calls.put).toEqual(['session-a.png', 'session-b.png'])
     expect(calls.complete).toEqual([
       ['session-a.png', { accountId: 'account-a', etag: 'etag-a.png' }],
@@ -125,6 +130,38 @@ describe('メディアを入れる窓', () => {
     ])
     expect(dialog().textContent).toContain('2 件を登録しました')
     expect(onComplete).toHaveBeenCalledTimes(1)
+  })
+
+  it('選んだ写真を送信前に実画像で確認でき、添付一覧を選択欄の直下に表示する', async () => {
+    await render()
+    await pick(png('photo.png'))
+    const image = dialog().querySelector<HTMLImageElement>('img[alt="photo.pngの登録前プレビュー"]')
+    expect(image?.src).toBe('blob:preview-photo.png')
+    expect(dialog().textContent).toContain('選択したファイル（1 / 10件）')
+    expect(calls.prepare).toHaveLength(0)
+    await press('写真を大きく見る')
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(2)
+    expect(document.body.querySelector<HTMLImageElement>('img[alt="photo.png"]')?.src).toBe('blob:preview-photo.png')
+  })
+
+  it('1回に10件まで表示し、11件目以降は選択に含めない', async () => {
+    await render()
+    await pick(...Array.from({ length: 11 }, (_, index) => png(`${index}.png`)))
+    expect(dialog().textContent).toContain('先頭の10件を表示しています')
+    expect(dialog().textContent).toContain('選択したファイル（10 / 10件）')
+    expect(dialog().textContent).not.toContain('10.png')
+  })
+
+  it('前の大きなファイルを送っている間は次の署名URLを発行しない', async () => {
+    let release: () => void = () => {}
+    calls.putAnswer.set('a.png', () => new Promise((resolve) => { release = () => resolve('etag-a') }))
+    await render()
+    await pick(png('a.png'), png('b.png'))
+    await press('2件を登録する')
+    expect(calls.prepare.map((call) => call.files[0].filename)).toEqual(['a.png'])
+    await act(async () => { release() })
+    await settle()
+    expect(calls.prepare.map((call) => call.files[0].filename)).toEqual(['a.png', 'b.png'])
   })
 
   it('送っている間は1件ごとの進みを読み上げ欄に出す', async () => {
@@ -145,7 +182,7 @@ describe('メディアを入れる窓', () => {
     expect(dialog().textContent).toContain('1 件を登録しました')
   })
 
-  it('送れなかった1件だけを「選び直す」で登録待ちへ戻し、その1件だけを送り直す', async () => {
+  it('送れなかった1件だけを「もう一度試す」で登録待ちへ戻し、その1件だけを送り直す', async () => {
     calls.putAnswer.set('b.png', () => Promise.reject(new Error('network')))
     await render()
     await pick(png('a.png'), png('b.png'))
@@ -155,7 +192,7 @@ describe('メディアを入れる窓', () => {
     expect(onComplete).toHaveBeenCalledTimes(1)
 
     calls.putAnswer.delete('b.png')
-    await act(async () => { dialog().querySelector<HTMLButtonElement>('button[aria-label="「b.png」を選び直す"]')!.click() })
+    await act(async () => { dialog().querySelector<HTMLButtonElement>('button[aria-label="「b.png」をもう一度試す"]')!.click() })
     await settle()
     await press('1件を登録する')
     expect(calls.prepare.at(-1)?.files.map((file) => file.filename)).toEqual(['b.png'])
