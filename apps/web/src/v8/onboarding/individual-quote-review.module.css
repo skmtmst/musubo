@@ -1,5 +1,10 @@
 .page { width: 100%; color: var(--mp-color-202428); }
-.breadcrumb { margin: 0 0 var(--mp-px-22); color: var(--mp-color-637285); font-size: var(--mp-px-13); }
+.stepsBand { width: 100%; border-radius: var(--mp-px-10); background: var(--mp-color-f5f7f8); padding: var(--mp-px-14) var(--mp-px-12); }
+.stepsBand :global([data-step-line]) { display: none; }
+.stepsBand :global([data-step-state] > span:not([data-step-line])),
+.stepsBand :global([data-step-state] > button) { flex-direction: row; align-items: center; justify-content: flex-start; gap: var(--mp-px-10); padding-inline: var(--mp-px-4); text-align: left; }
+.stepsBand :global([data-step-name]) { max-width: calc(100% - var(--mp-px-40)); }
+.stepsBand :global([data-step-dot='current']) { background: var(--mp-color-087c43); color: var(--mp-color-fff); box-shadow: none; }
 .columns { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(var(--mp-px-320), .9fr); gap: var(--mp-px-20); align-items: stretch; }
 .contractColumns { grid-template-columns: minmax(0, 1.6fr) minmax(var(--mp-px-320), .9fr); margin-top: var(--mp-px-26); }
 .card, .statusCard { min-width: 0; border: 1px solid var(--mp-color-dce5e6); border-radius: var(--mp-px-14); background: var(--mp-color-fff); padding: var(--mp-px-28); }
@@ -55,7 +60,10 @@
   .consentFooter { align-items: stretch; flex-direction: column; }
   .consentFooter .small { margin-left: 0; }
   .consentFooter button { width: 100%; }
-  .breadcrumb { margin-bottom: var(--mp-px-16); font-size: var(--mp-px-12); }
+  .stepsBand { padding: var(--mp-px-10) var(--mp-px-5); }
+  .stepsBand :global([data-step-state] > span:not([data-step-line])),
+  .stepsBand :global([data-step-state] > button) { flex-direction: column; gap: var(--mp-px-5); padding-inline: 0; text-align: center; }
+  .stepsBand :global([data-step-name]) { max-width: 100%; white-space: normal; text-overflow: clip; }
   .card { padding: var(--mp-px-21); }
   .card h2 { font-size: var(--mp-px-18); }
   .amount { font-size: var(--mp-px-32); }

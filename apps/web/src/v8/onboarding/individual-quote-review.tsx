@@ -5,6 +5,7 @@ import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Steps } from '@/components/templates/steps'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useMemo, useState } from 'react'
 import Checkbox from '@/components/shared/checkbox'
 import {
@@ -31,6 +32,8 @@ const dateJst = (iso: string) => new Intl.DateTimeFormat('ja-JP', {
 
 export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCardRegistration,
   onRequestReissue, onOpenLatestQuote }: Props) {
+  usePageTitle('お見積もりの確認')
+  usePageCrumbs([{ label: 'ホーム', href: '/hq' }, { label: '利用開始の準備', href: '/hq/onboarding' }])
   const [agreed, setAgreed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -60,7 +63,6 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
     const accepted = access === 'accepted'
     const expired = access === 'expired'
     return <div className={styles.page}>
-      <div className={styles.breadcrumb}>ホーム › 利用開始の準備 › お見積もりの確認</div>
       <PageHeading title={accepted ? '見積もりの同意は完了しています' : expired ? 'お見積もりの有効期限が切れました' : '新しいお見積もりをご確認ください'}
         subtitle={accepted ? '料金条件は確定済みです。続きのクレジットカード登録から手続きを再開できます。'
         : expired ? '期限内の同意がなかったため、この見積もりからクレジットカード登録には進めません。'
@@ -95,10 +97,9 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
   }
 
   return <div className={styles.page}>
-    <div className={styles.breadcrumb}>ホーム › 利用開始の準備 › お見積もりの確認</div>
     <PageHeading title="お見積もりの確認" subtitle="料金と無料期間をご確認のうえ、同意してクレジットカード登録へお進みください。"
-      steps={<Steps label="利用開始の手順" steps={[{ key: 'quote', label: '見積もりを確認', state: 'current' },
-        { key: 'card', label: 'クレジットカードを登録', state: 'todo' }, { key: 'line', label: 'LINEを接続', state: 'todo' }]} />} />
+      steps={<div className={styles.stepsBand}><Steps label="利用開始の手順" steps={[{ key: 'quote', label: '見積もりを確認', state: 'current' },
+        { key: 'card', label: 'クレジットカードを登録', state: 'todo' }, { key: 'line', label: 'LINEを接続', state: 'todo' }]} /></div>} />
     <div className={`${styles.columns} ${hasContractCapacity ? styles.contractColumns : ''}`}>
       <section className={styles.card} aria-labelledby="quote-summary">
         <p className={styles.eyebrow}>個別見積もり · {quote.quoteNumber}</p>
