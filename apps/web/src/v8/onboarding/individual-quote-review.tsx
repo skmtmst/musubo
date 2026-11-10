@@ -138,30 +138,27 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
           <dl className={styles.terms}><div><dt>見積もり有効期限</dt><dd>{dateJst(quote.expiresAt)}</dd></div></dl>
           {quote.interval === 'month' && <p className={styles.small}>年払いをご希望の場合は、同意前に担当者へご相談ください。</p>}
         </> : <>
-          <dl className={styles.terms}><div><dt>無料期間</dt><dd>{trialText}</dd></div>
-            <div><dt>クレジットカード登録時の請求</dt><dd>{money(0)}</dd></div>
-            <div><dt>見積もり有効期限</dt><dd>{dateJst(quote.expiresAt)}</dd></div></dl>
-          <p className={styles.small}>無料期間は最初のLINEを有効化した日から始まります。終了後の初回請求日は、LINE有効化後に表示します。</p>
+          <div className={styles.trialBox}><span>無料期間</span><strong>{trialText}</strong>
+            <small>最初のLINEを有効化した日から始まります</small></div>
+          <dl className={styles.terms}><div><dt>クレジットカード登録時の請求</dt><dd>{money(0)}</dd></div></dl>
+          <div className={styles.firstCharge}><h3>初回の請求について</h3>
+            <p>無料期間が終わった翌日が初回請求予定日です。LINE有効化後に日付を表示します。</p></div>
+          <dl className={styles.terms}><div><dt>見積もり有効期限</dt><dd>{dateJst(quote.expiresAt)}</dd></div></dl>
+          {quote.interval === 'month' && <p className={styles.small}>年払いをご希望の場合は、同意前に担当者へご相談ください。</p>}
           <p className={styles.small}>友だち数はLINE公式APIの累計追加数からブロック数を引いて計算します。退会したユーザーは累計追加数に残るため、現在メッセージを届けられる人数と異なる場合があります。</p>
-          <div className={styles.consent}><Checkbox checked={agreed} onCheckedChange={setAgreed}>
-            料金条件・無料期間・今後の請求について確認し、同意します
-          </Checkbox></div>
-          <p className={styles.small}>同意した単価と適用条件は確定します。請求額は実際の連携数で決まり、期限後もクレジットカード登録を再開できます。カード情報はmusuboに保存しません。</p>
-          {error && <Notice tone="danger" role="alert">{error}</Notice>}
-          <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" disabled={!agreed}
-            onClick={() => void perform(async () => {
-              await onAccept(quote.quoteNumber)
-              onResumeCardRegistration(quote.quoteNumber)
-            })}>同意してクレジットカード登録へ</Button>
         </>}
       </section>
     </div>
-    {hasContractCapacity && <div className={styles.consentFooter}>
+    <div className={styles.consentFooter}>
       <div className={styles.consentCopy}>
         <div className={styles.consent}><Checkbox checked={agreed} onCheckedChange={setAgreed}>
-          LINE{quote.plannedLineCount}個の契約枠・無料期間・今後の請求を確認し、同意します
+          {hasContractCapacity
+            ? `LINE${quote.plannedLineCount}個の契約枠・無料期間・今後の請求を確認し、同意します`
+            : '料金条件・無料期間・今後の請求について確認し、同意します'}
         </Checkbox></div>
-        <p className={styles.small}>同意後はStripeのクレジットカード登録画面へ進めます。カード情報はmusuboに保存しません。</p>
+        <p className={styles.small}>{hasContractCapacity
+          ? '同意後はStripeのクレジットカード登録画面へ進めます。カード情報はmusuboに保存しません。'
+          : '同意した単価と適用条件は確定します。期限後もクレジットカード登録を再開できます。カード情報はmusuboに保存しません。'}</p>
         {error && <Notice tone="danger" role="alert">{error}</Notice>}
       </div>
       <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" disabled={!agreed}
@@ -169,6 +166,6 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
           await onAccept(quote.quoteNumber)
           onResumeCardRegistration(quote.quoteNumber)
         })}>同意してクレジットカード登録へ</Button>
-    </div>}
+    </div>
   </div>
 }

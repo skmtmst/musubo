@@ -63,6 +63,9 @@ describe('お客様の個別見積もり', () => {
     expect(host.textContent).toContain('¥38,900')
     expect(host.textContent).toContain('Googleマイビジネス11個')
     expect(host.textContent).toContain('退会したユーザーは累計追加数に残る')
+    expect(host.querySelector('[class*="consentFooter"]')).not.toBeNull()
+    expect(host.textContent).toContain('初回の請求について')
+    expect(host.textContent).toContain('最初のLINEを有効化した日から始まります')
     const button = [...host.querySelectorAll('button')].find((item) => item.textContent === '同意してクレジットカード登録へ')!
     expect(button.disabled).toBe(true)
     await act(async () => { host.querySelector<HTMLInputElement>('input[type=checkbox]')!.click() })
