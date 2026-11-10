@@ -94,7 +94,7 @@ describe('Penの利用料金確認', () => {
     await act(async () => { inputValue('friend-count', '2800') })
     expect(host.textContent).toContain('¥5,900 / 月')
     await selectValue('google-count', '2')
-    expect(host.textContent).toContain('LINE 1個の基本料金')
+    expect(host.textContent).toContain('1個を有効にした場合')
     expect(host.textContent).toContain('追加連携枠 1枠')
     expect(host.textContent).toContain('¥3,300 / 月')
     expect(host.textContent).toContain('¥9,200 / 月')
@@ -141,12 +141,27 @@ describe('Penの利用料金確認', () => {
     expect(host.querySelector('#instagram-count')).toBeNull()
     expect(host.textContent).toContain('ここで表示する予定料金には追加連携枠を含みません')
     expect(host.textContent).toContain('¥19,300 / 月')
+    expect(host.textContent).toContain('予定の2個すべて有効にした場合')
+    expect(host.textContent).toContain('¥5,900 / 月')
     expect(host.textContent).not.toContain('追加連携枠 1枠')
     const agree = host.querySelector<HTMLInputElement>('input[type=checkbox]')!
     await act(async () => { agree.click() })
     const proceed = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('同意してクレジットカード登録へ'))!
     await act(async () => { proceed.click() })
     expect(continueFlow).toHaveBeenCalledWith(expect.objectContaining({ lineCount: 2, googleBusinessCount: 1, instagramCount: 1 }))
+  })
+
+  it('Penと同じく最初の1個と予定数すべての料金を並べる', async () => {
+    await act(async () => { root.render(<OnboardingPricing onContinue={continueFlow} onContact={contactFlow} />) })
+    await act(async () => { inputValue('friend-count', '2800') })
+    expect(host.textContent).toContain('1個を有効にした場合')
+    expect(host.textContent).not.toContain('予定の1個すべて有効にした場合')
+    await selectValue('line-count', '3')
+    expect(host.textContent).toContain('予定の3個すべて有効にした場合')
+    expect(host.textContent).toContain('¥27,200 / 月')
+    await selectValue('line-count', '6')
+    expect(host.textContent).toContain('予定の6個すべて有効にした場合')
+    expect(host.textContent).toContain('¥49,900 / 月')
   })
 
   it('特別条件の割引はLINE基本料金だけに適用し、年払いのオプションは月次と示す', async () => {

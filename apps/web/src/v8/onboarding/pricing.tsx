@@ -108,6 +108,14 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
       schedule: condition.schedule,
     })
   }, [condition, friendCount, friendCountValid, googleBusinessCount, instagramCount, interval, lineCount, quoteRequired])
+  const firstLinePrice = useMemo(() => musuboPrice({
+    lineCount: 1,
+    friendCountExcludingBlocked: 0,
+    linkedAccountsByLine: [{ googleBusiness: 1, instagram: 1 }],
+    interval,
+    lineBasicDiscountPercent: condition.lineBasicDiscountPercent,
+    schedule: condition.schedule,
+  }), [condition, interval])
 
   const advance = async () => {
     if (!friendCountValid || busy || (!quoteRequired && !consent)) return
@@ -215,21 +223,19 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
             <div className={styles.today}><span>本日の請求</span><strong>¥0</strong></div>
             {!price && <p className={styles.secondary}>友だち数を入力すると、予定料金を表示します。</p>}
             {price && <>
-              <div className={styles.amountRow}><span>{interval === 'month'
-                ? `LINE ${lineCount}個の基本料金`
-                : 'LINE基本料金（年払い）'}</span>
+              <div className={styles.amountRow}><span>1個を有効にした場合</span>
                 <strong>{interval === 'month'
-                  ? yen(price.lineBasicMonthlyYen) + ' / 月'
-                  : yen(price.annualLineChargeYen) + ' / 年'}</strong></div>
+                  ? yen(firstLinePrice.lineBasicMonthlyYen) + ' / 月'
+                  : yen(firstLinePrice.annualLineChargeYen) + ' / 年'}</strong></div>
               {interval === 'year' && <p className={styles.annualNote}>年払いはLINE基本料金のみ。オプション料金{yen(price.optionsMonthlyYen)}／月は毎月別に請求します。</p>}
-              {price.headquartersMonthlyYen > 0 && <div className={styles.amountRow}><span>統括機能</span>
-                <strong>{yen(price.headquartersMonthlyYen)} / 月</strong></div>}
-              <div className={styles.amountRow}><span>友だち数{new Intl.NumberFormat('ja-JP').format(friendCount)}人の追加料金</span>
-                <strong>{yen(price.friendOverageMonthlyYen)} / 月</strong></div>
-              {price.linkedAccountSlots > 0 && <div className={styles.amountRow}><span>追加連携枠 {price.linkedAccountSlots}枠</span>
+              {lineCount === 1 && <div className={styles.amountRow}><span>友だち数{new Intl.NumberFormat('ja-JP').format(friendCount)}人の追加料金</span>
+                <strong>{yen(price.friendOverageMonthlyYen)} / 月</strong></div>}
+              {lineCount === 1 && price.linkedAccountSlots > 0 && <div className={styles.amountRow}><span>追加連携枠 {price.linkedAccountSlots}枠</span>
                 <strong>{yen(price.linkedAccountSlotsMonthlyYen)} / 月</strong></div>}
-              {interval === 'month' && <div className={styles.totalRow}><span>すべて有効にした場合の月額（税込）</span>
+              {interval === 'month' && (lineCount > 1 || price.linkedAccountSlots > 0 || price.friendOverageMonthlyYen > 0) && <div className={styles.totalRow}><span>{lineCount > 1 ? `予定の${lineCount}個すべて有効にした場合` : 'すべて有効にした場合の月額（税込）'}</span>
                 <strong>{yen(price.monthlyTotalYen)} / 月</strong></div>}
+              {interval === 'year' && lineCount > 1 && <div className={styles.totalRow}><span>予定の{lineCount}個すべて有効にした場合のLINE基本料金</span>
+                <strong>{yen(price.annualLineChargeYen)} / 年</strong></div>}
             </>}
             <p className={styles.smallNote}>基本枠超過の友だち：1万人ごと{yen(condition.schedule.extraFriendBlockYen)}<br />
               追加連携枠：1枠{yen(condition.schedule.linkedAccountSlotYen)}／月（税込）</p>
