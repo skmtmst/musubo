@@ -37,7 +37,10 @@ describe('決済失敗と回復の画面', () => {
     expect(host.textContent).toContain('2026年12月15日 10:00')
     expect(host.textContent).toContain('¥5,900')
     expect(host.textContent).toContain('結果を画面とメールでお知らせします')
+    expect(host.querySelector('section')?.textContent).not.toContain('カード情報はmusuboに保存しません')
+    expect(host.querySelector('[class*="footerBar"]')?.textContent).toContain('請求に戻る')
     const pay = [...host.querySelectorAll('button')].find((item) => item.textContent === 'お支払いへ進む')!
+    expect(pay.hasAttribute('data-full-width')).toBe(true)
     await act(async () => { pay.click() })
     expect(onPrimary).toHaveBeenCalledOnce()
   })
