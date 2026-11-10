@@ -250,3 +250,11 @@ button.step:focus-visible {
 .root[data-variant='auth'] .name {
   max-width: 100%;
 }
+
+/* 料金・決済の案内では、番号と短い説明を縦に読む。 */
+.guidanceList { display: grid; gap: var(--mp-px-24); margin: 0; padding: 0; list-style: none; }
+.guidanceItem { display: flex; align-items: flex-start; gap: var(--mp-px-12); }
+.guidanceNumber { display: grid; place-items: center; flex: none; width: var(--mp-px-30); height: var(--mp-px-30); border-radius: 50%; background: var(--mp-color-e1f5e8); color: var(--mp-color-087c43); font-size: var(--mp-px-14); font-weight: 700; }
+.guidanceCopy { display: grid; gap: var(--mp-px-3); min-width: 0; }
+.guidanceCopy strong { color: var(--mp-color-202428); font-size: var(--mp-px-14); line-height: 1.4; }
+.guidanceCopy small { color: var(--mp-color-637285); font-size: var(--mp-px-12); line-height: 1.5; }

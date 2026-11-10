@@ -24,7 +24,7 @@ function statusMessage(pricing: NewPricing): string {
   if (pricing.terminationPhase === 'scheduled') return '最後のLINEの利用終了を予約しています。終了予定日は手続き画面で確認・変更できます。'
   if (pricing.terminationPhase === 'ending') return '最後のLINEの利用終了を確認しています。手続き画面で現在の状態を確認できます。'
   switch (pricing.status) {
-    case 'awaiting_first_line': return 'LINEを接続すると無料期間が始まります。カード登録だけでは請求されません。'
+    case 'awaiting_first_line': return 'LINEを接続すると無料期間が始まります。クレジットカード登録だけでは請求されません。'
     case 'trialing': return `無料体験中です。無料期間は${shortDate(pricing.trialLastFreeDate)}までです。`
     case 'active': return 'LINEアカウントを利用中です。現在の利用状況を確認できます。'
     case 'past_due': return 'お支払いを確認しています。カード情報と未払い請求を確認してください。'

@@ -4,6 +4,7 @@ import Button from '@/components/shared/button'
 import { useMemo, useState } from 'react'
 import {
   DEFAULT_MUSUBO_PRICE_SCHEDULE,
+  friendAllowanceForLineCount,
   musuboPrice,
   type MusuboPriceSchedule,
   type MusuboTrialPeriod,
@@ -15,7 +16,6 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
-import StatusBadge from '@/components/shared/status-badge'
 import { Field } from '@/components/shared/form-controls'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
@@ -56,18 +56,28 @@ const trialLabel = (period: MusuboTrialPeriod) => period.value + (period.unit ==
 const countOptions = Array.from({ length: 10 }, (_, index) => index + 1)
 const linkedCountOptions = Array.from({ length: 11 }, (_, index) => index)
 
-function PlannedCountSelect({ label, id, value, onChange, linked = false }: {
+function PlannedCountSelect({ label, id, value, onChange, linked = false, otherLinkedCount = 1, linkedSlotYen = 3300 }: {
   label: string
   id: string
   value: number
   onChange: (value: number) => void
   linked?: boolean
+  otherLinkedCount?: number
+  linkedSlotYen?: number
 }) {
+  const otherService = label === 'Googleマイビジネス' ? 'Instagram' : 'Googleマイビジネス'
+  const priceHint = (count: number) => {
+    if (otherLinkedCount > 10) return '個別見積もり'
+    const slots = Math.max(count, otherLinkedCount) - 1
+    return slots > 0 ? `+${yen(slots * linkedSlotYen)}／月` : '追加料金なし'
+  }
   return <Field label={label} htmlFor={id} optional={false}>
-    <Select aria-label={label} id={id} size="full" value={String(value)}
+    <Select aria-label={label} id={id} className={styles.plannedSelect} size="full" value={String(value)}
+      menuHeading={linked ? `${otherService}${otherLinkedCount}個を選んだ場合の追加料金` : undefined}
       onChange={(next) => onChange(Number(next))}
-      options={[...(linked ? linkedCountOptions : countOptions).map((count) => ({ value: String(count), label: `${count}個` })),
-        { value: '11', label: '11個以上' }]} />
+      options={[...(linked ? linkedCountOptions : countOptions).map((count) => ({ value: String(count), label: `${count}個`,
+        trailing: linked ? priceHint(count) : undefined })),
+        { value: '11', label: '11個以上', trailing: 'お問い合わせへ' }]} />
   </Field>
 }
 
@@ -108,6 +118,14 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
       schedule: condition.schedule,
     })
   }, [condition, friendCount, friendCountValid, googleBusinessCount, instagramCount, interval, lineCount, quoteRequired])
+  const firstLinePrice = useMemo(() => musuboPrice({
+    lineCount: 1,
+    friendCountExcludingBlocked: 0,
+    linkedAccountsByLine: [{ googleBusiness: 1, instagram: 1 }],
+    interval,
+    lineBasicDiscountPercent: condition.lineBasicDiscountPercent,
+    schedule: condition.schedule,
+  }), [condition, interval])
 
   const advance = async () => {
     if (!friendCountValid || busy || (!quoteRequired && !consent)) return
@@ -123,18 +141,20 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
     }
   }
 
-  const allowance = price?.friendAllowance ?? 0
+  const allowance = lineCount <= 10 ? friendAllowanceForLineCount(lineCount, condition.schedule) : 0
   const nextFriendBlock = allowance + 1
   const exampleEnd = allowance + condition.schedule.extraFriendBlockSize
+  const secondFriendBlock = exampleEnd + 1
+  const secondExampleEnd = exampleEnd + condition.schedule.extraFriendBlockSize
+  const formatCount = (count: number) => new Intl.NumberFormat('ja-JP').format(count)
   const headline = quoteRequired ? 'ご利用予定を確認' : '料金を確認'
   return <ListPage heightMode="viewport" title="利用開始の準備"
     subtitle={quoteRequired
       ? '11個以上の連携は、予定を確認してからお見積もりをご案内します。'
-      : '料金を確かめてからカードを登録し、LINE公式アカウントを接続します。'}
-    help="料金を確かめてからカードを登録し、LINE公式アカウントを接続します。"
+      : '料金を確かめてからクレジットカードを登録し、LINE公式アカウントを接続します。'}
     steps={<Steps label="利用開始の手順" steps={[
       { key: 'price', label: headline, state: 'current' },
-      { key: 'next', label: quoteRequired ? 'お問い合わせ' : 'カードを登録', state: 'todo' },
+      { key: 'next', label: quoteRequired ? 'お問い合わせ' : 'クレジットカードを登録', state: 'todo' },
       { key: 'connect', label: quoteRequired ? '料金をご案内' : 'LINEを接続', state: 'todo' },
     ]} />}>
     <PageContent>
@@ -154,10 +174,10 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
               }
             }} />
             <Field label="既存のLINEアカウントの合計（ブロック除く）" htmlFor="friend-count" optional={false}
-              note="接続後に実数で確定します">
+              note="現在の友だち数を入力（接続後に実数で確定）">
               <span className={styles.numberField}><TextField id="friend-count" type="text" inputMode="numeric" value={friendCountText}
-                style={{ height: 'var(--mp-px-50)', paddingRight: 'var(--mp-px-48)' }}
-                placeholder="現在の友だち数" aria-invalid={friendCountText !== '' && !friendCountValid}
+                style={{ height: 'var(--mp-px-44)', paddingRight: 'var(--mp-px-48)' }}
+                placeholder="例：2,800" aria-invalid={friendCountText !== '' && !friendCountValid}
                 onChange={(event) => setFriendCountText(event.target.value.replaceAll(',', ''))} /><span aria-hidden="true">人</span></span>
             </Field>
           </div>
@@ -165,8 +185,10 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
           {lineCount === 1 && <>
             <h3 className={styles.groupTitle}>このLINEに連携するアカウント数</h3>
             <div className={styles.inputGrid}>
-              <PlannedCountSelect linked label="Googleマイビジネス" id="google-count" value={googleBusinessCount} onChange={setGoogleBusinessCount} />
-              <PlannedCountSelect linked label="Instagramアカウント" id="instagram-count" value={instagramCount} onChange={setInstagramCount} />
+              <PlannedCountSelect linked label="Googleマイビジネス" id="google-count" value={googleBusinessCount} onChange={setGoogleBusinessCount}
+                otherLinkedCount={instagramCount} linkedSlotYen={condition.schedule.linkedAccountSlotYen} />
+              <PlannedCountSelect linked label="Instagramアカウント" id="instagram-count" value={instagramCount} onChange={setInstagramCount}
+                otherLinkedCount={googleBusinessCount} linkedSlotYen={condition.schedule.linkedAccountSlotYen} />
             </div>
           </>}
           {lineCount === 1 && !quoteRequired && <div className={styles.explainer}>
@@ -178,17 +200,25 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
             各LINEでGoogleマイビジネスとInstagramの連携数を設定します。各サービス1個目は基本料金内。
             2個目以降の連携前に追加料金を確認します。ここで表示する予定料金には追加連携枠を含みません。
           </div>}
+          {quoteRequired && <div className={styles.explainer}>
+            {lineCount > 10
+              ? 'LINEを11個以上連携する場合は、利用規模に合わせて料金をご案内します。Googleマイビジネス・Instagramの連携予定も担当者と確認できます。'
+              : 'Googleマイビジネス・Instagramのどちらかを11個以上連携する場合は、利用規模に合わせて料金をご案内します。'}
+          </div>}
           <p className={styles.note}>{quoteRequired
             ? '友だち数は概算でも大丈夫です。正確な連携数が未定の場合もご相談いただけます。'
             : lineCount === 1
               ? '未接続のLINE・連携先は請求対象外です。LINEまたは連携先が11個以上なら個別にご案内します。'
               : '未接続のLINE・連携先は請求対象外です。連携先の追加分は、各LINEの接続時に確認します。'}</p>
+          {quoteRequired && <p className={styles.quoteInputNote}>LINE数、Googleマイビジネス数、Instagram数や利用方法は、次の画面で入力できます。</p>}
           {!quoteRequired && <Checkbox checked={consent} onCheckedChange={setConsent}>
             料金条件と無料体験後のカード請求に同意します
           </Checkbox>}
-          <Button type="button" variant="text" onClick={() => setDetailsOpen(true)}>
-            {quoteRequired ? '標準料金のしくみを見る' : '料金の詳しい条件を見る'} ↗
-          </Button>
+          <div className={styles.detailsAction}>
+            <Button type="button" variant="text" textTone="accent" onClick={() => setDetailsOpen(true)}>
+              {quoteRequired ? '標準料金のしくみを見る' : '料金の詳しい条件を見る'} ↗
+            </Button>
+          </div>
         </section>
 
         <section className={styles.card} aria-labelledby="cost-heading">
@@ -199,7 +229,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
               <RadioCard name="billing-interval" value="month" checked={interval === 'month'}
                 onChange={() => setInterval('month')} title="月払い" height="fit" />
               <div className={styles.annualChoice}>
-                <StatusBadge tone="success" dot={false}>年払いでLINE基本料金10%OFF</StatusBadge>
+                <span className={styles.discountBadge}>年払いでLINE基本料金10%OFF</span>
                 <RadioCard name="billing-interval" value="year" checked={interval === 'year'}
                   onChange={() => setInterval('year')} title="年払い" height="fit" />
               </div>
@@ -210,21 +240,19 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
             <div className={styles.today}><span>本日の請求</span><strong>¥0</strong></div>
             {!price && <p className={styles.secondary}>友だち数を入力すると、予定料金を表示します。</p>}
             {price && <>
-              <div className={styles.amountRow}><span>{interval === 'month'
-                ? `LINE ${lineCount}個の基本料金`
-                : 'LINE基本料金（年払い）'}</span>
+              <div className={styles.amountRow}><span>1個を有効にした場合</span>
                 <strong>{interval === 'month'
-                  ? yen(price.lineBasicMonthlyYen) + ' / 月'
-                  : yen(price.annualLineChargeYen) + ' / 年'}</strong></div>
+                  ? yen(firstLinePrice.lineBasicMonthlyYen) + ' / 月'
+                  : yen(firstLinePrice.annualLineChargeYen) + ' / 年'}</strong></div>
               {interval === 'year' && <p className={styles.annualNote}>年払いはLINE基本料金のみ。オプション料金{yen(price.optionsMonthlyYen)}／月は毎月別に請求します。</p>}
-              {price.headquartersMonthlyYen > 0 && <div className={styles.amountRow}><span>統括機能</span>
-                <strong>{yen(price.headquartersMonthlyYen)} / 月</strong></div>}
-              <div className={styles.amountRow}><span>友だち数{new Intl.NumberFormat('ja-JP').format(friendCount)}人の追加料金</span>
-                <strong>{yen(price.friendOverageMonthlyYen)} / 月</strong></div>
-              {price.linkedAccountSlots > 0 && <div className={styles.amountRow}><span>追加連携枠 {price.linkedAccountSlots}枠</span>
+              {lineCount === 1 && <div className={styles.amountRow}><span>友だち数{new Intl.NumberFormat('ja-JP').format(friendCount)}人の追加料金</span>
+                <strong>{yen(price.friendOverageMonthlyYen)} / 月</strong></div>}
+              {lineCount === 1 && price.linkedAccountSlots > 0 && <div className={styles.amountRow}><span>追加連携枠 {price.linkedAccountSlots}枠</span>
                 <strong>{yen(price.linkedAccountSlotsMonthlyYen)} / 月</strong></div>}
-              {interval === 'month' && <div className={styles.totalRow}><span>すべて有効にした場合の月額（税込）</span>
+              {interval === 'month' && (lineCount > 1 || price.linkedAccountSlots > 0 || price.friendOverageMonthlyYen > 0) && <div className={lineCount > 1 ? styles.amountRow : styles.totalRow}><span>{lineCount > 1 ? `予定の${lineCount}個すべて有効にした場合` : 'すべて有効にした場合の月額（税込）'}</span>
                 <strong>{yen(price.monthlyTotalYen)} / 月</strong></div>}
+              {interval === 'year' && lineCount > 1 && <div className={styles.totalRow}><span>予定の{lineCount}個すべて有効にした場合のLINE基本料金</span>
+                <strong>{yen(price.annualLineChargeYen)} / 年</strong></div>}
             </>}
             <p className={styles.smallNote}>基本枠超過の友だち：1万人ごと{yen(condition.schedule.extraFriendBlockYen)}<br />
               追加連携枠：1枠{yen(condition.schedule.linkedAccountSlotYen)}／月（税込）</p>
@@ -234,10 +262,10 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
       </div>
       <div className={styles.footer}>
         <p>{quoteRequired
-          ? 'お問い合わせ後に料金と利用開始の手順をご案内します。カード登録はこの段階では不要です。'
-          : 'カード情報はStripeが管理し、musuboには保存されません。カード登録だけでは無料体験も請求も始まりません。'}</p>
+          ? 'お問い合わせ後に料金と利用開始の手順をご案内します。クレジットカード登録はこの段階では不要です。'
+          : 'カード情報はStripeが管理し、musuboには保存されません。クレジットカード登録だけでは無料体験も請求も始まりません。'}</p>
         <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" disabled={!friendCountValid || (!quoteRequired && !consent)}
-          onClick={() => void advance()}>{quoteRequired ? 'お問い合わせフォームへ' : '同意してカード登録へ'}</Button>
+          onClick={() => void advance()}>{quoteRequired ? 'お問い合わせフォームへ' : '同意してクレジットカード登録へ'}</Button>
       </div>
       {error && <Notice tone="danger" role="alert">{error}</Notice>}
       <Dialog open={detailsOpen} title="料金の詳しい条件" size="large"
@@ -258,11 +286,13 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
             <p>友だち数はLINE公式APIの累計追加数からブロック数を引いて計算します。退会したユーザーは累計追加数に残るため、現在メッセージを届けられる人数と異なる場合があります。</p>
             {lineCount > 10
               ? <div className={styles.explainer}>LINEが11個以上の場合の友だち数の基準と超過料金は、個別のお見積もりでご案内します。</div>
-              : <div className={styles.explainer}>例｜LINE {lineCount}個の場合、{new Intl.NumberFormat('ja-JP').format(allowance || 3_000)}人までは追加料金なし。{new Intl.NumberFormat('ja-JP').format(nextFriendBlock || 3_001)}〜{new Intl.NumberFormat('ja-JP').format(exampleEnd || 13_000)}人は1枠分です。</div>}
+              : <div className={styles.explainer}>例｜LINE {lineCount}個の場合、{formatCount(allowance)}人までは追加料金なし。<br />
+                {formatCount(nextFriendBlock)}〜{formatCount(exampleEnd)}人 → 1枠分 +{yen(condition.schedule.extraFriendBlockYen)}／月<br />
+                {formatCount(secondFriendBlock)}〜{formatCount(secondExampleEnd)}人 → 2枠分 +{yen(condition.schedule.extraFriendBlockYen * 2)}／月</div>}
             <p>各LINEでGoogleマイビジネスとInstagramはそれぞれ1個まで基本料金内です。多いほうの2個目から追加料金を数えます。複数LINEの追加連携枠は、それぞれの連携前に料金を確認します。</p>
           </div>
           <p>年払いはLINE基本料金のみ10%割引。友だち超過・追加連携枠は毎月別請求です。</p>
-          <p>無料体験は最初のLINE有効化日から{trialLabel(condition.trialPeriod)}。有効化前はカード登録済みでも請求しません。</p>
+          <p>無料体験は最初のLINE有効化日から{trialLabel(condition.trialPeriod)}。有効化前はクレジットカード登録済みでも請求しません。</p>
       </Dialog>
     </PageContent>
   </ListPage>
@@ -273,8 +303,13 @@ function QuoteRequired() {
     <span className={styles.quoteBadge}>個別見積もり</span>
     <h2 id="cost-heading">料金は個別にご案内します</h2>
     <p>連携数と使い方を確認し、御社に合う料金と利用開始の手順をお伝えします。</p>
-    <div className={styles.explainer}>この画面で料金や請求は確定しません。カード情報の入力もまだ不要です。</div>
+    <div className={styles.quoteDivider} />
     <h3>お問い合わせ後の流れ</h3>
-    <ol><li>お問い合わせ内容を送信</li><li>担当者から料金をご案内</li><li>ご同意後、利用開始の準備へ</li></ol>
+    <Steps label="お問い合わせ後の流れ" layout="guidance" steps={[
+      { key: 'contact', label: 'お問い合わせ内容を送信', description: '予定数とご利用方法を共有', state: 'todo' },
+      { key: 'quote', label: '担当者から料金をご案内', description: 'ご利用条件と開始手順を確認', state: 'todo' },
+      { key: 'start', label: 'ご同意後、利用開始の準備へ', description: 'クレジットカード登録後にLINEを接続', state: 'todo' },
+    ]} />
+    <div className={styles.quoteNotice}>この画面で料金や請求は確定しません。<br />クレジットカード情報の入力もまだ不要です。</div>
   </div>
 }

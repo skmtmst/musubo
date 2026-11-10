@@ -167,6 +167,15 @@
   white-space: nowrap;
 }
 
+.trailing {
+  flex: none;
+  margin-left: auto;
+  color: var(--color-ink-secondary);
+  font-size: var(--select-menu-desc-size);
+  font-weight: var(--font-weight-ui);
+  white-space: nowrap;
+}
+
 .check {
   width: var(--select-menu-check);
   height: var(--select-menu-check);

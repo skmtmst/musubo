@@ -353,6 +353,10 @@ describe('画像・動画・ファイルの送信予約', () => {
     db.raw.prepare('UPDATE scheduled_chat_sends SET scheduled_at=? WHERE id=?').run('2000-01-01T00:00:00Z', data.id);
     bindings.WORKER_URL = '';
     expect((await processDueScheduledChatSends(bindings)).sent).toBe(1);
-    expect(payload().messages[0].originalContentUrl).toBe(attachment.url);
+    const uploadedUrl = new URL(attachment.url);
+    const sentUrl = new URL(payload().messages[0].originalContentUrl);
+    expect(`${sentUrl.origin}${sentUrl.pathname}`).toBe(`${uploadedUrl.origin}${uploadedUrl.pathname}`);
+    expect(sentUrl.searchParams.get('signature')).toMatch(/^[a-f0-9]{64}$/);
+    expect(Number(sentUrl.searchParams.get('expires'))).toBeGreaterThanOrEqual(Number(uploadedUrl.searchParams.get('expires')));
   });
 });

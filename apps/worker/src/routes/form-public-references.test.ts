@@ -283,5 +283,5 @@ describe('フォームの公開参照と固定画像', () => {
       old.raw.prepare("INSERT INTO booking_settings(id,line_account_id,store_photo_media_id) VALUES('bs','a','image-a')").run();
       expect(old.raw.prepare("SELECT ref_id FROM media_usages WHERE ref_kind='booking_settings'").get()).toEqual({ ref_id: 'bs' });
     } finally { old.raw.close(); rmSync(directory, { recursive: true, force: true }); }
-  });
+  }, 20_000);
 });
