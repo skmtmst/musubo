@@ -89,8 +89,7 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
       { key: 'plan', label: 'ご利用予定を確認', state: 'done' },
       { key: 'inquiry', label: 'お問い合わせ', state: 'current' },
       { key: 'quote', label: '料金をご案内', state: 'todo' },
-    ]} />}
-    help="ご利用予定を送信すると、担当者から個別料金をご案内します。">
+    ]} />}>
     <PageContent>
       {ticketId ? <section className={styles.receipt} aria-label="お問い合わせ受付の結果">
         <Notice tone="success" heading="お問い合わせを受け付けました">

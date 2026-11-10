@@ -124,7 +124,7 @@ export default function CardRegistration({ returnState = null, quoteId, onContin
     </ListPage>
   }
 
-  return <ListPage heightMode="viewport" title="お支払い情報" help="クレジットカード登録後、LINE公式アカウントを接続します。"
+  return <ListPage heightMode="viewport" title="お支払い情報"
     steps={<Steps label="利用開始の手順" steps={[{ key: 'price', label: '料金を確認', state: 'done' },
       { key: 'card', label: 'クレジットカードを登録', state: 'current' }, { key: 'line', label: 'LINEを接続', state: 'todo' }]} />}>
     <PageContent>

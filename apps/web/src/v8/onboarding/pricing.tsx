@@ -152,7 +152,6 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
     subtitle={quoteRequired
       ? '11個以上の連携は、予定を確認してからお見積もりをご案内します。'
       : '料金を確かめてからクレジットカードを登録し、LINE公式アカウントを接続します。'}
-    help="料金を確かめてからクレジットカードを登録し、LINE公式アカウントを接続します。"
     steps={<Steps label="利用開始の手順" steps={[
       { key: 'price', label: headline, state: 'current' },
       { key: 'next', label: quoteRequired ? 'お問い合わせ' : 'クレジットカードを登録', state: 'todo' },
