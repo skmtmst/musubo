@@ -157,8 +157,8 @@
     box-shadow: var(--shadow-board);
   }
 
-  .onboardingWorkspace .side .main {
-    width: min(1194px, calc(100% - 32px));
+  .onboardingMain {
+    inline-size: min(1194px, calc(100% - 32px));
     margin: 0 auto 12px;
   }
 

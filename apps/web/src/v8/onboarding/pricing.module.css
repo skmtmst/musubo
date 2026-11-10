@@ -15,9 +15,7 @@ html:root .plannedSelect :global(button[data-choice-field]) { height: var(--mp-p
 .explainer { margin: var(--mp-px-22) 0; border-radius: var(--mp-px-10); background: var(--mp-color-f0f8f3); padding: var(--mp-px-17) var(--mp-px-19); color: var(--mp-color-425364); font-size: var(--mp-px-14); line-height: 1.8; }
 .note { margin: var(--mp-px-26) 0 var(--mp-px-18); font-size: var(--mp-px-13); }
 .consent { display: flex; align-items: center; gap: var(--mp-px-12); cursor: pointer; font-size: var(--mp-px-14); font-weight: 700; line-height: 1.5; }
-.detailsLink { display: block; margin: var(--mp-px-16) 0 0 var(--mp-px-30); border: 0; padding: 0; background: transparent; color: var(--mp-color-087c43); font: inherit; font-size: var(--mp-px-14); font-weight: 700; cursor: pointer; text-align: left; }
-.detailsLink:hover { text-decoration: underline; }
-.detailsLink:focus-visible { outline: 2px solid var(--mp-color-087c43); outline-offset: 4px; border-radius: 2px; }
+.detailsAction { display: block; margin: var(--mp-px-16) 0 0 var(--mp-px-30); }
 .planHeading, .conditionLabel { margin: var(--mp-px-20) 0 var(--mp-px-10); font-size: var(--mp-px-14); font-weight: 700; }
 .planGrid { display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: var(--mp-px-12); }
 .annualChoice { display: flex; flex-direction: column; gap: var(--mp-px-7); }

@@ -198,7 +198,7 @@ export function Workspace({ children }: { children: React.ReactNode }) {
   return (
     <div className={styles.side}>
       <AppTopBar />
-      <main id="main-content" tabIndex={-1} className={styles.main}>
+      <main id="main-content" tabIndex={-1} className={`${styles.main} ${pathname?.startsWith('/hq/onboarding/') ? styles.onboardingMain : ''}`}>
         {/* V-2: いつもと違う端末・場所からのログイン。そのログイン中だけ、白いカードで出す。 */}
         <UnfamiliarLoginNotice className={styles.securityNotice} />
         {/* V6 共通メニュー J33xq と同じ256pxサイドバーを基準にする。 */}
