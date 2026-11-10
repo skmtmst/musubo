@@ -2,7 +2,6 @@
 
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
-import StatusBadge from '@/components/shared/status-badge'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Steps } from '@/components/templates/steps'
 import { useState } from 'react'
@@ -33,6 +32,7 @@ interface Props {
   view: MusuboPaymentRecoveryView
   onPrimary: () => Promise<void> | void
   onSecondary: () => void
+  secondaryLabel?: string
 }
 
 const money = (yen: number) => `¥${new Intl.NumberFormat('ja-JP').format(yen)}`
@@ -41,7 +41,7 @@ const date = (iso: string, time = false) => new Intl.DateTimeFormat('ja-JP', {
   ...(time ? { hour: '2-digit', minute: '2-digit', hour12: false } : {}),
 }).format(new Date(iso))
 
-export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: Props) {
+export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary, secondaryLabel }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const invoice = view.kind === 'invoice'
@@ -85,7 +85,7 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
   const badge = invoice
     ? view.state === 'grace' ? '利用継続中' : processing ? '決済確認中' : suspended ? '一時停止中' : '通常利用'
     : success ? `${view.activeLineCount}個 利用中` : '既存利用中'
-  const mainTitle = invoice ? success ? 'お支払いの記録' : '未払いのご請求'
+  const mainTitle = invoice ? success ? 'お支払いの記録' : processing ? '今回のご請求' : '未払いのご請求'
     : success ? '今回のお支払い' : expired ? '期限切れの追加申込' : '追加分のお支払い'
   const amountLabel = invoice
     ? success ? 'お支払い済みの金額（税込）' : processing ? '確認中の金額（税込）' : 'お支払い金額（税込）'
@@ -108,7 +108,7 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
       : expired ? '追加を希望する場合' : '追加後に確認すること'
   const description = invoice
     ? view.state === 'grace' ? 'Stripeの画面でカード情報の更新や認証を行えます。'
-      : processing ? '結果が確定するまで、再度のカード登録は不要です。'
+      : processing ? '結果が確定するまで、再度のクレジットカード登録は不要です。'
         : suspended ? '未払いのお支払いが完了すると利用を再開します。' : 'LINEの接続と設定はそのまま利用できます。'
     : view.state === 'failed' ? 'カードの更新や本人認証を行い、同じ追加分の決済を再試行できます。'
       : processing ? '決済成功なら追加LINEを有効化し、失敗なら再試行をご案内します。'
@@ -123,6 +123,15 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
       : processing ? ['決済結果を確認', '成功ならLINEを有効化', '結果をメールでご案内']
         : expired ? ['最新の料金を確認', '料金に同意して再開', '決済成功後に有効化']
           : ['LINEの設定を確認', '今回の料金を確認', '次回の料金を確認']
+  const stepDescriptions = invoice
+    ? view.state === 'grace' ? ['未払いの請求を確認します', '必要な場合だけ手続きします', '結果を画面とメールでお知らせします']
+      : processing ? ['Stripeからの結果を反映します', '完了または再対応をお知らせします', '失敗した場合だけ再手続きします']
+        : suspended ? ['Stripeの画面で手続きします', '完了後に利用状態が変わります', '停止中の未送信分を確認します']
+          : ['LINEの機能を利用できます', 'お支払い履歴を確認できます', '停止中の未送信分をご確認ください']
+    : view.state === 'failed' ? ['Stripeの画面でカードを更新できます', '本人認証が求められた場合のみ', '追加LINEを使えるようにします']
+      : processing ? ['Stripeからの結果を反映します', '追加したLINEを使えるようにします', '失敗時も次の操作をお知らせします']
+        : expired ? ['残り日数に応じて再計算します', '必要ならカードを更新します', '追加LINEを使えるようにします']
+          : ['接続したアカウントを確認できます', '請求履歴に記録されています', '利用状況に応じた料金を表示します']
   const primary = invoice
     ? success ? '請求を確認する' : processing ? '請求状況を更新' : 'お支払いへ進む'
     : success ? 'アカウント一覧へ' : processing ? '決済状況を更新'
@@ -147,18 +156,17 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
   }
 
   return <div className={styles.page}>
-    <p className={styles.breadcrumb}>ホーム › {invoice ? '統括の設定 › 請求' : 'アカウント › LINE追加'} › お支払い</p>
     <PageHeading title={title} subtitle={subtitle} inset="none" />
     <div className={success ? styles.statusSuccess : styles.statusWarning}>
       <span className={success ? styles.iconSuccess : styles.iconWarning} aria-hidden="true">{success ? '✓' : processing ? '…' : '!'}</span>
       <div className={styles.statusCopy}><h2>{statusTitle}</h2><p>{statusDescription}</p></div>
-      <StatusBadge tone={success ? 'success' : 'warning'} dot={false}>{badge}</StatusBadge>
+      <span className={success ? styles.badgeSuccess : styles.badgeWarning}>{badge}</span>
     </div>
     <div className={styles.columns}>
       <section className={styles.card} aria-labelledby="payment-detail-title">
         <h2 id="payment-detail-title">{mainTitle}</h2>
         <div className={styles.amountRow}><div><span>{amountLabel}</span><strong>{money(view.amountYen)}</strong></div>
-          <StatusBadge tone={success ? 'success' : 'warning'} dot={false}>{amountStatusLabel}</StatusBadge></div>
+          <span className={success ? styles.amountSuccess : styles.amountWarning}>{amountStatusLabel}</span></div>
         <dl className={styles.details}>
           {invoice ? <><div><dt>請求日</dt><dd>{date(view.invoiceDate)}</dd></div>
             <div><dt>{success ? 'お支払い確認日' : 'お支払い期限'}</dt><dd>{success
@@ -168,7 +176,7 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
               <dd>{success ? view.nextChargeAt ? date(view.nextChargeAt) : '確認中'
                 : processing ? '結果の反映待ち' : suspended ? '一時停止中'
                   : view.nextAutomaticRetryAt ? date(view.nextAutomaticRetryAt) : '案内待ち'}</dd></div></>
-            : <><div><dt>追加対象</dt><dd>{view.addedLineOrdinal}個目のLINE</dd></div>
+            : <><div><dt>{success ? '追加したLINE' : '追加対象'}</dt><dd>{view.addedLineOrdinal}個目のLINE</dd></div>
               <div><dt>{success ? '有効LINE' : '現在の有効LINE'}</dt><dd>{success ? `${view.activeLineCount - 1}個 → ${view.activeLineCount}個` : `${view.activeLineCount}個（通常利用中）`}</dd></div>
               <div><dt>{success ? '次回からの月額（税込）' : processing ? '追加LINEの状態' : expired ? '前回の保留期限' : '保留期限'}</dt>
                 <dd>{success ? view.nextMonthlyYen == null ? '確認中' : `${money(view.nextMonthlyYen)}／月`
@@ -178,14 +186,16 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary }: 
       </section>
       <section className={styles.card} aria-labelledby="payment-action-title">
         <h2 id="payment-action-title">{heading}</h2><p className={styles.actionLead}>{description}</p>
-        <Steps label={heading} steps={steps.map((step, index) => ({
-          key: String(index), label: step, state: index === 0 ? 'current' : 'todo',
+        <Steps label={heading} layout="guidance" steps={steps.map((step, index) => ({
+          key: String(index), label: step, description: stepDescriptions[index], state: 'todo',
         }))} />
-        <p className={styles.footnote}>{footnote}</p>
         {error && <Notice tone="danger" role="alert">{error}</Notice>}
-        <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" onClick={() => void invoke()}>{primary}</Button>
-        <Button type="button" variant="secondary" onClick={onSecondary}>{secondary}</Button>
+        <Button type="button" variant="primary" fullWidth busy={busy} busyLabel="処理中…" onClick={() => void invoke()}>{primary}</Button>
       </section>
+    </div>
+    <div className={styles.footerBar}>
+      <p>{footnote}</p>
+      {!processing && <Button type="button" variant="text" textTone="accent" onClick={onSecondary}>{secondaryLabel ?? secondary}</Button>}
     </div>
   </div>
 }

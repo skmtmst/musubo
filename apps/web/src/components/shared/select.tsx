@@ -373,6 +373,7 @@ export default function Select({
               <SelectMenuOption
                 key={option.value}
                 label={heads.labelOf(option)}
+                trailing={option.trailing}
                 leading={option.leading}
                 description={windowed ? undefined : option.description}
                 selected={option.value === value}

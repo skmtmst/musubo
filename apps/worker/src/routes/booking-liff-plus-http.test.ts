@@ -65,11 +65,13 @@ const execCtx = {
   passThroughOnException: () => undefined,
 } as unknown as ExecutionContext;
 
-// Keep the slot within the 365-day booking window as the test suite ages.
-const slotDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-slotDate.setUTCHours(5, 0, 0, 0);
-const SLOT = slotDate.toISOString();
-const SLOT_END = new Date(slotDate.getTime() + 60 * 60 * 1000).toISOString();
+// Keep the waitlist slot in the future so the registration tests do not expire.
+const SLOT = (() => {
+  const date = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  date.setUTCHours(5, 0, 0, 0);
+  return date.toISOString();
+})();
+const SLOT_END = new Date(Date.parse(SLOT) + 60 * 60 * 1000).toISOString();
 
 function seed() {
   sqlite.exec(`
@@ -203,8 +205,8 @@ describe('LIFF 自分のキャンセル待ち', () => {
     sqlite.prepare(`INSERT INTO bookings
       (id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at, block_ends_at,
        status, price_at_booking, requested_at)
-      VALUES ('full', 'account-a', 'friend-b', 'staff-a', 'menu-a', ?, '${SLOT_END}', '${SLOT_END}', 'confirmed', 0, ?)`)
-      .run(SLOT, SLOT);
+      VALUES ('full', 'account-a', 'friend-b', 'staff-a', 'menu-a', ?, ?, ?, 'confirmed', 0, ?)`)
+      .run(SLOT, SLOT_END, SLOT_END, SLOT);
   }
 
   test('空いている枠には登録できない', async () => {

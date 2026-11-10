@@ -1,20 +1,22 @@
 .lead { margin: 0 0 var(--mp-px-20); color: var(--mp-color-58667a); font-size: var(--mp-px-16); line-height: 1.7; }
 .columns { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(var(--mp-px-320), 1fr); gap: var(--mp-px-22); align-items: stretch; }
-.card { min-width: 0; border: 1px solid var(--mp-color-dfe5e7); border-radius: var(--mp-px-16); padding: var(--mp-px-28); background: var(--mp-color-fff); }
+.card { min-width: 0; border: 1px solid var(--mp-color-dfe5e7); border-radius: var(--mp-px-16); padding: var(--mp-px-22); background: var(--mp-color-fff); }
 .card h2 { margin: 0 0 var(--mp-px-12); color: var(--mp-color-202428); font-size: var(--mp-px-23); line-height: 1.4; }
 .secondary, .note, .smallNote, .annualNote { color: var(--mp-color-59687b); line-height: 1.7; }
 .secondary { margin: 0 0 var(--mp-px-28); font-size: var(--mp-px-14); }
-.inputGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--mp-px-18); }
+.inputGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--mp-px-12); }
+.plannedSelect { width: 100%; }
+html:root .plannedSelect :global(button[data-choice-field]) { height: var(--mp-px-44); min-height: var(--mp-px-44); max-height: var(--mp-px-44); }
 .field { display: flex; flex-direction: column; min-width: 0; gap: var(--mp-px-9); color: var(--mp-color-202428); font-size: var(--mp-px-14); font-weight: 700; }
-.numberField { position: relative; display: block; width: 100%; height: var(--mp-px-50); }
+.numberField { position: relative; display: block; width: 100%; height: var(--mp-px-44); }
 .numberField > span { position: absolute; top: 50%; right: var(--mp-px-14); transform: translateY(-50%); color: var(--mp-color-58667a); font-weight: 400; pointer-events: none; }
 .field small { color: var(--mp-color-59687b); font-size: var(--mp-px-12); font-weight: 400; }
 .groupTitle { margin: var(--mp-px-28) 0 var(--mp-px-15); font-size: var(--mp-px-16); }
 .explainer { margin: var(--mp-px-22) 0; border-radius: var(--mp-px-10); background: var(--mp-color-f0f8f3); padding: var(--mp-px-17) var(--mp-px-19); color: var(--mp-color-425364); font-size: var(--mp-px-14); line-height: 1.8; }
 .note { margin: var(--mp-px-26) 0 var(--mp-px-18); font-size: var(--mp-px-13); }
+.quoteInputNote { margin: 0 0 var(--mp-px-18); color: var(--mp-color-59687b); font-size: var(--mp-px-13); line-height: 1.7; }
 .consent { display: flex; align-items: center; gap: var(--mp-px-12); cursor: pointer; font-size: var(--mp-px-14); font-weight: 700; line-height: 1.5; }
-.detailsLink { margin: var(--mp-px-16) 0 0 var(--mp-px-30); border: 0; padding: 0; background: transparent; color: var(--mp-color-087c43); font: inherit; font-size: var(--mp-px-14); font-weight: 700; cursor: pointer; }
-.detailsLink:hover { text-decoration: underline; }
+.detailsAction { display: block; margin: var(--mp-px-8) 0 0 var(--mp-px-16); }
 .planHeading, .conditionLabel { margin: var(--mp-px-20) 0 var(--mp-px-10); font-size: var(--mp-px-14); font-weight: 700; }
 .planGrid { display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: var(--mp-px-12); }
 .annualChoice { display: flex; flex-direction: column; gap: var(--mp-px-7); }
@@ -39,9 +41,9 @@
 .error { color: var(--mp-color-ad2f2f); font-size: var(--mp-px-13); }
 .quoteBadge { display: inline-block; border-radius: var(--mp-px-999); margin: 0 0 var(--mp-px-16); padding: var(--mp-px-8) var(--mp-px-14); background: var(--mp-color-e6f5ec); color: var(--mp-color-087c43); font-size: var(--mp-px-12); font-weight: 700; }
 .quoteRequired h3 { margin: var(--mp-px-26) 0 var(--mp-px-12); font-size: var(--mp-px-16); }
-.quoteRequired p, .quoteRequired li { color: var(--mp-color-59687b); line-height: 1.7; }
-.quoteRequired ol { padding-left: var(--mp-px-25); }
-.quoteRequired li { margin-bottom: var(--mp-px-8); }
+.quoteRequired p { color: var(--mp-color-59687b); line-height: 1.7; }
+.quoteDivider { height: 1px; margin: var(--mp-px-24) 0; background: var(--mp-color-dfe5e7); }
+.quoteNotice { margin-top: var(--mp-px-24); border-radius: var(--mp-px-10); padding: var(--mp-px-16); background: var(--mp-color-e4f6eb); color: var(--mp-color-425364); font-size: var(--mp-px-13); line-height: 1.6; }
 .modalBackdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: var(--mp-px-24); background: var(--mp-color-202c35a8); }
 .modal { position: relative; width: min(100%, var(--mp-px-660)); max-height: min(92vh, var(--mp-px-900)); overflow: auto; border-radius: var(--mp-px-14); background: var(--mp-color-fff); padding: var(--mp-px-32); box-shadow: 0 var(--mp-px-20) var(--mp-px-60) var(--mp-color-0002); color: var(--mp-color-202428); }
 .modal h2 { margin: 0 0 var(--mp-px-8); font-size: var(--mp-px-24); }

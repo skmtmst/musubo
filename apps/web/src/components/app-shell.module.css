@@ -10,6 +10,11 @@
   flex: 1;
 }
 
+.onboardingWorkspace { position: relative; }
+.onboardingBrand { position: absolute; z-index: 2; top: 12px; left: 24px; }
+.onboardingWorkspace :global(button[aria-label='メニューを畳む・広げる']) { display: none; }
+.onboardingWorkspace :global(.v8-topbar-wrap) { margin-left: 198px; }
+
 /*
  * 共通メニューの右側。縦に「トップバー」と「本文」。
  *
@@ -152,10 +157,35 @@
     box-shadow: var(--shadow-board);
   }
 
+  :root :global(#main-content).onboardingMain {
+    inline-size: min(1194px, calc(100% - 32px));
+    margin: 0 auto 12px;
+  }
+
   /* 板の中の余白は板が持つ。内容の左右は 24px。 */
   :root .content,
   :root .contentFull {
     padding: 20px 24px 24px;
+  }
+}
+
+@media (max-width: 1279.98px) {
+  .onboardingShell { padding-top: 64px; }
+  .onboardingBrand { position: fixed; top: 14px; left: 20px; }
+}
+
+@media (max-width: 600px) {
+  :root :global(#main-content).onboardingMain h1[title] {
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+    font-size: 28px;
+  }
+  .onboardingMain :global([data-step-name]) {
+    max-width: 100%;
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
   }
 }
 
