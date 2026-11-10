@@ -92,7 +92,6 @@ async function renderDialog(item: MediaItem = ITEM) {
         folderName=""
         canManage
         onClose={() => undefined}
-        onOpenReplacement={() => undefined}
         onVersionCreated={() => undefined}
       />,
     )
