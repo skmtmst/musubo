@@ -56,18 +56,28 @@ const trialLabel = (period: MusuboTrialPeriod) => period.value + (period.unit ==
 const countOptions = Array.from({ length: 10 }, (_, index) => index + 1)
 const linkedCountOptions = Array.from({ length: 11 }, (_, index) => index)
 
-function PlannedCountSelect({ label, id, value, onChange, linked = false }: {
+function PlannedCountSelect({ label, id, value, onChange, linked = false, otherLinkedCount = 1, linkedSlotYen = 3300 }: {
   label: string
   id: string
   value: number
   onChange: (value: number) => void
   linked?: boolean
+  otherLinkedCount?: number
+  linkedSlotYen?: number
 }) {
+  const otherService = label === 'Googleマイビジネス' ? 'Instagram' : 'Googleマイビジネス'
+  const priceHint = (count: number) => {
+    if (otherLinkedCount > 10) return '個別見積もり'
+    const slots = Math.max(count, otherLinkedCount) - 1
+    return slots > 0 ? `+${yen(slots * linkedSlotYen)}／月` : '追加料金なし'
+  }
   return <Field label={label} htmlFor={id} optional={false}>
     <Select aria-label={label} id={id} className={styles.plannedSelect} size="full" value={String(value)}
+      menuHeading={linked ? `${otherService}${otherLinkedCount}個を選んだ場合の追加料金` : undefined}
       onChange={(next) => onChange(Number(next))}
-      options={[...(linked ? linkedCountOptions : countOptions).map((count) => ({ value: String(count), label: `${count}個` })),
-        { value: '11', label: '11個以上' }]} />
+      options={[...(linked ? linkedCountOptions : countOptions).map((count) => ({ value: String(count), label: `${count}個`,
+        trailing: linked ? priceHint(count) : undefined })),
+        { value: '11', label: '11個以上', trailing: 'お問い合わせへ' }]} />
   </Field>
 }
 
@@ -176,8 +186,10 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
           {lineCount === 1 && <>
             <h3 className={styles.groupTitle}>このLINEに連携するアカウント数</h3>
             <div className={styles.inputGrid}>
-              <PlannedCountSelect linked label="Googleマイビジネス" id="google-count" value={googleBusinessCount} onChange={setGoogleBusinessCount} />
-              <PlannedCountSelect linked label="Instagramアカウント" id="instagram-count" value={instagramCount} onChange={setInstagramCount} />
+              <PlannedCountSelect linked label="Googleマイビジネス" id="google-count" value={googleBusinessCount} onChange={setGoogleBusinessCount}
+                otherLinkedCount={instagramCount} linkedSlotYen={condition.schedule.linkedAccountSlotYen} />
+              <PlannedCountSelect linked label="Instagramアカウント" id="instagram-count" value={instagramCount} onChange={setInstagramCount}
+                otherLinkedCount={googleBusinessCount} linkedSlotYen={condition.schedule.linkedAccountSlotYen} />
             </div>
           </>}
           {lineCount === 1 && !quoteRequired && <div className={styles.explainer}>

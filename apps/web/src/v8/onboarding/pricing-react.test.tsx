@@ -29,7 +29,7 @@ async function selectValue(id: string, value: string) {
   await act(async () => { trigger.click() })
   const label = value === '11' ? '11個以上' : `${value}個`
   const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"] button')]
-    .find((button) => button.title === label)!
+    .find((button) => button.title === label || button.title.startsWith(`${label}：`))!
   await act(async () => { option.click() })
 }
 function inputValue(id: string, value: string) {
@@ -40,6 +40,21 @@ function inputValue(id: string, value: string) {
 }
 
 describe('Penの利用料金確認', () => {
+  it('連携先の個数候補に、もう一方の個数を含む月額を表示する', async () => {
+    await act(async () => { root.render(<OnboardingPricing onContinue={continueFlow} onContact={contactFlow} />) })
+    await act(async () => { host.querySelector<HTMLButtonElement>('#google-count')!.click() })
+    expect(document.body.textContent).toContain('Instagram1個を選んだ場合の追加料金')
+    expect([...document.querySelectorAll<HTMLButtonElement>('[role="option"] button')].find((button) => button.title.startsWith('2個：'))?.title)
+      .toBe('2個：+¥3,300／月')
+    await act(async () => { document.querySelector<HTMLButtonElement>('[role="option"] button[title="2個：+¥3,300／月"]')!.click() })
+    await act(async () => { host.querySelector<HTMLButtonElement>('#instagram-count')!.click() })
+    expect(document.body.textContent).toContain('Googleマイビジネス2個を選んだ場合の追加料金')
+    expect([...document.querySelectorAll<HTMLButtonElement>('[role="option"] button')].find((button) => button.title.startsWith('1個：'))?.title)
+      .toBe('1個：+¥3,300／月')
+    expect([...document.querySelectorAll<HTMLButtonElement>('[role="option"] button')].find((button) => button.title.startsWith('3個：'))?.title)
+      .toBe('3個：+¥6,600／月')
+  })
+
   it('料金詳細を開くと閉じるボタンに焦点を移し、Escで元の操作へ戻す', async () => {
     await act(async () => { root.render(<OnboardingPricing onContinue={continueFlow} onContact={contactFlow} />) })
     const details = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('料金の詳しい条件を見る'))!
