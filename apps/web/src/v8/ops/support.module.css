@@ -1,5 +1,5 @@
 /* 運営のお問い合わせ。 */
-.createAction, .columns { --support-create-width: 168px; --support-create-height: 40px; --support-priority-width: 34px; --support-priority-height: 22px; --support-detail-offset: 246px; --support-status-height: 30px; --support-menu-width: 170px; --support-reply-desktop-height: 260px; --support-reply-compact-height: 220px; --support-mobile-header-height: 58px; --support-mobile-message-height: 114px; --support-reply-mobile-height: 464px; --support-mobile-pad: 18px; --support-draft-bottom: 30px; }
+.createAction, .columns { --support-create-width: 168px; --support-create-height: 40px; --support-priority-width: 34px; --support-priority-height: 22px; --support-detail-offset: 246px; --support-status-height: 30px; --support-menu-width: 170px; --support-reply-desktop-height: 260px; --support-reply-compact-height: 220px; --support-mobile-header-height: 58px; --support-mobile-message-height: 114px; --support-reply-mobile-height: 464px; --support-mobile-pad: 18px; --support-draft-bottom: 30px; --support-send-surface: #c3cdc7; --support-send-height: 44px; }
 
 .notice {
   margin-bottom: var(--tpl-op-section-gap);
@@ -245,6 +245,8 @@ html:root .outlinedMore[data-row-menu]:not(:focus-visible) {
 .replyHeading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); }
 .replyHeading strong { font-size: var(--text-caption); }
 .replyHeading svg { width: var(--space-16); height: var(--space-16); }
+.sendSurface { display: inline-flex; align-items: stretch; border-radius: var(--radius-primary-action); background: var(--support-send-surface); overflow: hidden; }
+.sendSurface :global([data-shared-button]) { height: 100%; box-shadow: none; outline: 0; }
 
 .draftHead {
   display: flex;

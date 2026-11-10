@@ -430,7 +430,7 @@ export default function OpsSupportV8() {
                   <StickyBar presentation="support-reply" actions={<>
                     <Button variant="text" textTone="quiet" lockedReason={lock} onClick={() => saveDraft()} disabled={busy || unknown || draftSaving || closed} busy={draftSaving}>下書き保存</Button>
                     <SaveErrorField names={["replyStage","nextStage","reply_stage"]}><Select aria-label="送信後の状態" label="送信後" size="content" lockedReason={lock} value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || unknown || closed} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.label }))} /></SaveErrorField>
-                    <Button variant="primary" lockedReason={lock} onClick={() => { setError(''); setConfirmReply(true) }} disabled={busy || unknown || closed || !reply.trim()}><Send aria-hidden="true" />返信する</Button>
+                    <span className={styles.sendSurface}><Button variant={busy || unknown || closed || !reply.trim() ? 'secondary' : 'primary'} fullWidth lockedReason={lock} onClick={() => { setError(''); setConfirmReply(true) }} disabled={busy || unknown || closed || !reply.trim()}><Send aria-hidden="true" />返信する</Button></span>
                   </>} />
                 </>
               )}
