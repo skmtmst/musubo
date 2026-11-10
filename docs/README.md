@@ -465,6 +465,7 @@
 
 ## 反映履歴
 
+- [登録メディアの写真確認とアップロード修正](release-log/unreleased/30-masato-media-upload.md) — 反映履歴、確認 2026-11-10。
 - [メンバー招待メールのデザイン更新](release-log/unreleased/25-masato-staff-invite-email.md) — 反映履歴、確認 2026-11-08。
 - [自動配席の設定を簡素化](release-log/unreleased/26-masato-simple-table-assignment.md) — 反映履歴、確認 2026-11-08。
 - [統括メンバーの3役割](release-log/unreleased/27-masato-hq-three-roles.md) — 管理者・担当者・閲覧のみの画面と権限制御、確認 2026-11-08。

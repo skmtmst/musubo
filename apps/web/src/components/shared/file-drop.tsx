@@ -251,6 +251,7 @@ export function AttachmentRow({
   errorText,
   onRemove,
   onRetry,
+  retryLabel = '選び直す',
   disabled,
   lockedReason,
   thumbnail,
@@ -271,6 +272,8 @@ export function AttachmentRow({
   onRemove?: () => void
   /** 渡すと「選び直す」を出す。error 用。 */
   onRetry?: () => void
+  /** 再試行が同じファイルを送る場合の操作名。 */
+  retryLabel?: string
   disabled?: boolean
   /** 権限による外す・選び直す操作の拒否理由。 */
   lockedReason?: string
@@ -317,7 +320,7 @@ export function AttachmentRow({
         ) : null}
       </span>
       {status === 'error' && onRetry ? (
-        <IconButton aria-label={`「${name}」を選び直す`} aria-describedby={describedId} disabled={disabled} lockedReason={lockedReason} onClick={onRetry}>
+        <IconButton aria-label={`「${name}」を${retryLabel}`} aria-describedby={describedId} disabled={disabled} lockedReason={lockedReason} onClick={onRetry}>
           <RotateCcw aria-hidden="true" size={16} />
         </IconButton>
       ) : onRemove ? (

@@ -65,7 +65,11 @@ const execCtx = {
   passThroughOnException: () => undefined,
 } as unknown as ExecutionContext;
 
-const SLOT = '2026-11-10T05:00:00.000Z';
+// Keep the slot within the 365-day booking window as the test suite ages.
+const slotDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+slotDate.setUTCHours(5, 0, 0, 0);
+const SLOT = slotDate.toISOString();
+const SLOT_END = new Date(slotDate.getTime() + 60 * 60 * 1000).toISOString();
 
 function seed() {
   sqlite.exec(`
@@ -199,7 +203,7 @@ describe('LIFF 自分のキャンセル待ち', () => {
     sqlite.prepare(`INSERT INTO bookings
       (id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at, block_ends_at,
        status, price_at_booking, requested_at)
-      VALUES ('full', 'account-a', 'friend-b', 'staff-a', 'menu-a', ?, '2026-11-10T06:00:00.000Z', '2026-11-10T06:00:00.000Z', 'confirmed', 0, ?)`)
+      VALUES ('full', 'account-a', 'friend-b', 'staff-a', 'menu-a', ?, '${SLOT_END}', '${SLOT_END}', 'confirmed', 0, ?)`)
       .run(SLOT, SLOT);
   }
 

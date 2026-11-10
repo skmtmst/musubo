@@ -197,6 +197,12 @@ jobs:
             exit 1
           fi
 
+      - name: Inspect staging R2 upload CORS without changing it
+        if: env.DELIVERY_MODE == 'dry-run'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
+        run: node scripts/deploy/staging-r2-cors.mjs dry-run
+
       - name: Prepare the deployed Worker source for config replay
         id: worker_source
         env:
@@ -284,6 +290,12 @@ jobs:
       - name: Reject staging rollback after acquiring the shared lock
         if: env.DELIVERY_MODE == 'apply'
         run: node scripts/deploy/verify-staging-forward.mjs
+
+      - name: Ensure staging R2 allows uploads from the current Admin origin
+        if: env.DELIVERY_MODE == 'apply'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
+        run: node scripts/deploy/staging-r2-cors.mjs apply
 
       - name: Bind the staging Cloudflare account
         run: |
