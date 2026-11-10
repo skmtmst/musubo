@@ -85,7 +85,13 @@ function makeApp(db: D1Database, route: Hono<Env>) {
 }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
-const SLOT = '2026-11-10T05:00:00.000Z';
+// Keep the waitlist slot in the future so the registration tests do not expire.
+const SLOT = (() => {
+  const date = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  date.setUTCHours(5, 0, 0, 0);
+  return date.toISOString();
+})();
+const SLOT_END = new Date(Date.parse(SLOT) + 60 * 60 * 1000).toISOString();
 
 let sqlite: Database.Database;
 let db: D1Database;
@@ -166,7 +172,7 @@ describe('キャンセル待ちの口', () => {
       (id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at, block_ends_at,
        status, price_at_booking, requested_at)
       VALUES ('booking-full', 'account-a', 'friend-a', 'staff-a', 'menu-a',
-        '${SLOT}', '${SLOT}', '${SLOT}', 'confirmed', 5000, '2026-10-01T00:00:00.000Z')`).run();
+        ?, ?, ?, 'confirmed', 5000, '2026-10-01T00:00:00.000Z')`).run(SLOT, SLOT_END, SLOT_END);
 
     const cancelled = await app.request('/api/booking/admin/requests/booking-full?account_id=account-a', {
       method: 'PATCH',
@@ -201,15 +207,16 @@ describe('キャンセル待ちの口', () => {
       (id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at, block_ends_at,
        status, price_at_booking, requested_at)
       VALUES ('booking-new', 'account-a', 'friend-a', 'staff-a', 'menu-a',
-        '${SLOT}', '${SLOT}', '${SLOT}', 'confirmed', 5000, '2026-10-01T00:00:00.000Z')`).run();
+        ?, ?, ?, 'confirmed', 5000, '2026-10-01T00:00:00.000Z')`).run(SLOT, SLOT, SLOT);
 
-    sqlite.prepare(`UPDATE booking_waitlist SET status='invited',ends_at='2026-10-10T06:00:00.000Z',block_ends_at='2026-10-10T06:00:00.000Z',hold_expires_at='2099-01-01T00:00:00Z' WHERE id=?`).run(id);
+    // Zero-length booking fixture keeps the slot unoccupied while testing manual conversion.
+    sqlite.prepare(`UPDATE booking_waitlist SET status='invited',ends_at=?,block_ends_at=?,hold_expires_at='2099-01-01T00:00:00Z' WHERE id=?`).run(SLOT, SLOT, id);
     const converted = await app.request(`/api/booking/admin/waitlist/${id}/convert?account_id=account-a`, {
       method: 'POST',
       headers: JSON_HEADERS,
       body: JSON.stringify({ booking_id: 'booking-new' }),
     }, env);
-    expect(converted.status).toBe(200);
+    expect(converted.status, await converted.clone().text()).toBe(200);
     expect(sqlite.prepare(`SELECT status FROM booking_waitlist WHERE id = ?`).get(id))
       .toMatchObject({ status: 'converted' });
 
