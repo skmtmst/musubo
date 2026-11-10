@@ -255,6 +255,11 @@
 /* 運営の板も固定絵の外側24を共通の外枠が持つ。 */
 :root .content[data-content-layout='ops'] { padding: var(--polish-space-section); }
 
+@media (max-width: 640px) {
+  :global(body[data-ops-support-detail]) .shell { padding-top: 0; }
+  :global(body[data-ops-support-detail]) .content[data-content-layout='ops'] { padding: 0; }
+}
+
 /* 固定絵が内容の下で終わる板。送りは main 内に保つ。 */
 :root .main:has([data-height-mode='content']) { flex: 0 1 auto; }
 

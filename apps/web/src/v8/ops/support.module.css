@@ -1,8 +1,10 @@
-/* 運営のお問い合わせ V8（・代わりに起票 ）。値は --tpl-op-*。 */
+/* 運営のお問い合わせ。 */
 
 .notice {
   margin-bottom: var(--tpl-op-section-gap);
 }
+
+.createAction.createAction { min-width: 168px; min-height: 40px; justify-content: center; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); color: var(--color-accent); }
 
 .columns {
   display: flex;
@@ -18,6 +20,7 @@
   flex-direction: column;
   gap: var(--tpl-op-me-gap);
 }
+.list :global([data-toolbar-role='sort']) { margin-left: 0 !important; }
 
 .chipRow {
   display: flex;
@@ -83,6 +86,12 @@
   gap: var(--tpl-op-auth-field-gap);
 }
 
+.badges { display: inline-flex; align-items: center; gap: var(--space-8); flex: none; }
+.priorityhigh, .prioritymedium, .prioritylow { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 22px; border-radius: var(--radius-mini); padding: 0 var(--space-8); font-size: var(--text-micro); font-weight: 700; line-height: 1; }
+.priorityhigh { color: var(--color-status-danger); background: var(--color-danger-bg); }
+.prioritymedium { color: var(--color-status-warn-deep); background: var(--color-warning-bg); }
+.prioritylow { color: var(--color-status-info); background: var(--color-info-bg); }
+
 .ticketNo {
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
@@ -113,11 +122,13 @@
   flex: 1;
   flex-direction: column;
   gap: var(--tpl-op-panel-gap);
+  max-height: calc(100dvh - 286px);
+  overflow-y: auto;
   border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
+  outline: 0;
   outline-offset: -1px;
   padding: var(--tpl-op-panel-pad);
-  box-shadow: var(--card-shadow);
+  box-shadow: none;
 }
 
 .detailHead {
@@ -153,15 +164,33 @@
   font-size: var(--text-micro);
 }
 
+.detailControls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-8) var(--space-12); min-width: 0; }
+.moreWrap { position: relative; margin-left: auto; }
+.mobileTop, .mobileMore, .mobileActionMenu { display: none; }
+.iconAction { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); color: var(--color-ink); }
+.iconAction svg { width: 18px; height: 18px; }
+.statusWrap { position: relative; order: 4; flex-basis: 100%; }
+.statusButton { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-8); min-height: 30px; border: 0; border-radius: var(--radius-control); padding: 0 var(--space-12); }
+.statusButton[data-stage='resolved'] { background: var(--color-success-bg); }
+.statusButton[data-stage='new'] { background: var(--color-danger-bg); }
+.statusButton[data-stage='in_progress'] { background: var(--color-info-bg); }
+.statusButton[data-stage='waiting'] { background: var(--color-warning-bg); }
+.statusButton[data-stage='closed'] { background: var(--color-surface-pearl); }
+.statusButton:disabled { opacity: .45; }
+.actionMenu { position: absolute; z-index: 10; top: 100%; right: 0; display: flex; min-width: 170px; flex-direction: column; gap: var(--space-4); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: var(--space-8); box-shadow: var(--card-shadow); }
+.actionMenu > button { justify-content: flex-start; min-height: 36px; border: 0; border-radius: var(--radius-mini); background: transparent; padding: 0 var(--space-8); text-align: left; color: var(--color-ink); white-space: nowrap; }
+.actionMenu > button:hover { background: var(--color-surface-pearl); }
+
 .prioritySelect {
   flex-shrink: 0;
 }
+.contractLink.contractLink[data-variant='text'] { color: var(--color-ink-secondary) !important; }
 
 .messages {
   display: flex;
   flex-direction: column;
   gap: var(--tpl-op-panel-gap);
-  margin: 0;
+  margin: 6px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -204,10 +233,22 @@
   flex-direction: column;
   gap: var(--tpl-op-auth-field-gap);
   border-radius: var(--radius-control);
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-hairline);
   outline-offset: -1px;
   padding: var(--tpl-op-note-pad);
+  margin-top: 16px;
 }
+
+.replyHeading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); }
+.replyHeading strong { font-size: var(--text-caption); }
+.replyHeading button[data-variant='text'] { color: var(--color-ink-secondary) !important; }
+.replyHeading svg { width: 16px; height: 16px; }
+.replyActions { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-12); flex-wrap: wrap; background: var(--color-board-tint); }
+.replyActions > button:first-child { margin-right: auto; }
+.replyActions > button:first-child { padding-inline: 0; color: var(--color-ink-secondary) !important; }
+.replyActions :global([data-choice-field][aria-label='送信後の状態']) { min-height: 32px; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+.replyActions > button:last-child { min-width: 146px; justify-content: center; }
+.replyActions > button:last-child:disabled { border-color: #e2e7e4 !important; background: #e2e7e4; color: #718078; box-shadow: none; opacity: 1; }
 
 .draftHead {
   display: flex;
@@ -222,13 +263,15 @@
 }
 
 .replyBox.replyBox {
-  min-height: var(--tpl-op-sp-reply-h);
-  border: 0;
-  padding: 0;
+  min-height: 260px;
+  border: 1px solid var(--color-hairline);
+  padding: var(--space-12);
   font-size: var(--text-caption);
   line-height: var(--tpl-op-ann-body-lh);
   box-shadow: none;
 }
+
+.mobileBack { display: none; }
 
 .draftNote {
   margin: 0;
@@ -327,7 +370,40 @@
   }
 }
 
+@media (min-width: 1024px) and (max-width: 1250px) {
+  .replyBox.replyBox { min-height: 220px; }
+  .replyActions > button:last-child { width: 100%; }
+}
+
+@media (max-width: 640px) {
+  .overviewSelected { display: none; }
+  .columns { padding-inline: var(--space-16); }
+  .columnsSelected { padding: 0; }
+  .columnsSelected .list { display: none; }
+  .columns:not(.columnsSelected) .detail { display: none; }
+  .detail { width: 100%; max-height: none; overflow: visible; border: 0; border-radius: 0; outline: 0; gap: var(--space-16); padding: 0 var(--space-18, 18px) var(--space-12); box-shadow: none; }
+  .mobileTop { display: flex; align-items: center; justify-content: space-between; position: relative; height: 58px; margin: 0 calc(-1 * var(--space-18, 18px)); border-bottom: 1px solid var(--color-hairline); padding: 0 var(--space-18, 18px); background: var(--color-canvas); }
+  .mobileBack { display: inline-flex; align-items: center; gap: var(--space-8); min-height: 40px; border: 0; background: transparent; color: var(--color-ink); font-weight: 600; }
+  .mobileBack svg { width: 18px; height: 18px; }
+  .mobileMore { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); }
+  .mobileMore svg { width: 18px; height: 18px; }
+  .mobileActionMenu { display: flex; position: absolute; z-index: 10; top: 48px; right: var(--space-16); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: var(--space-8); box-shadow: var(--card-shadow); }
+  .detailControls { flex-wrap: nowrap; gap: var(--space-8); }
+  .statusWrap { order: 0; flex-basis: auto; }
+  .prioritySelect { order: 1; }
+  .contractLink { order: 2; }
+  .moreWrap { display: none; }
+  .messages .message:first-child { min-height: 114px; }
+  .messages { margin-top: 24px; }
+  .draft { margin-top: 0; }
+  .draft { padding-bottom: 30px; }
+  .replyBox.replyBox { min-height: 464px; }
+  .replyActions { position: sticky; bottom: 0; z-index: 2; gap: var(--space-8); background: var(--color-canvas); margin: 0 calc(-1 * var(--space-18, 18px)); padding: var(--space-12) var(--space-18, 18px); }
+  .replyActions > button:last-child { width: 100%; min-height: 50px; }
+}
+
 /* 数の帯は題・道具の行と同じ内側の余白に収める（板の端にくっつけない）。下の注意帯とは間 4。 */
 .band {
   margin-bottom: var(--tpl-op-support-negative-gap);
 }
+.band :global([data-kpi-strip]) { border: 1px solid var(--color-hairline); box-shadow: none; }

@@ -5,19 +5,17 @@ import { PRIORITY_FILTER, SORT_OPTIONS } from './support-list-options'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
-import { Building2, Check, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles } from 'lucide-react'
+import { Building2, ChevronLeft, FileText, LogIn, MoreHorizontal, Paperclip, Plus, Send } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, type OpsKnowledgeReference, type OpsSupportDetail, type OpsSupportPriority, type OpsSupportStage, type OpsSupportSummary, type OpsSupportTicket, type OpsTenantRow } from '@/lib/api'
-import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge-ticket'
-import { planLabel, tenantDetailHref, opsCall, formatDateTime, PLAN_STATUS_LABEL, ROLE_LABEL } from '@/components/ops/ops-ui'
-import { compareLabel, durationLabel, elapsedLabel } from '@/v8/ops/support/format'
+import { api, type OpsSupportDetail, type OpsSupportPriority, type OpsSupportStage, type OpsSupportSummary, type OpsSupportTicket, type OpsTenantRow } from '@/lib/api'
+import { tenantDetailHref, opsCall, formatDateTime } from '@/components/ops/ops-ui'
+import { elapsedLabel } from '@/v8/ops/support/format'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
-import { ListToolbarEnd, ListToolbarRow } from '@/components/shared/list-toolbar'
-import SectionHeader from '@/components/shared/section-header'
+import { ListToolbarRow } from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -31,19 +29,20 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError, Field } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './support.module.css'
-import { formatDate as polishFormatDate, formatNumber } from '@/lib/format'
+import { formatDate as polishFormatDate } from '@/lib/format'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
+import SupportTemplatePicker from './support-template-picker'
 
 /**
- * 運営のお問い合わせ V8（絵の代わりに起票 ）。
+ * 運営のお問い合わせ。確定した Pen の一覧・返信・テンプレート引用に対応する。
  *
  * 動きは 管理画面（app/ops/support）と同じ口：一覧（段階・優先度・並び・検索）、内容と返信、
- * AI の下書き（作る・作り直す・消す・待たずに手で書く）、下書きの保存、返信の前の確認、
- * 解決済み・クローズ・対応中に戻す、代わりに起票、`?id=` で1件を開く。
+ * テンプレート引用、下書きの保存、返信の前の確認、
+ * 解決・クローズ・対応中に戻す、チケット作成、`?id=` で1件を開く。
  * 閲覧のみの運営メンバーには、起票・返信・段階の変更を出さない（読むだけ）。
  */
 
@@ -108,16 +107,17 @@ export default function OpsSupportV8() {
   const [form, setForm] = useState({ tenantId: '', subject: '', body: '', kind: 'usage', priority: 'medium' as OpsSupportPriority })
   const [busy, setBusy] = useState(false)
   const [reply, setReply] = useState('')
+  const [mobile, setMobile] = useState(false)
   const [replyStage, setReplyStage] = useState<OpsSupportStage>('new')
-  const [replyFromAi, setReplyFromAi] = useState<{ generatedAt: string | null } | null>(null)
-  const [aiBusy, setAiBusy] = useState(false)
   const [draftSaving, setDraftSaving] = useState(false)
-  const aiAbort = useRef<{ cancelled: boolean } | null>(null)
+  const [templateOpen, setTemplateOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [stageOpen, setStageOpen] = useState(false)
+  const replyRef = useRef<HTMLTextAreaElement>(null)
+  const insertAt = useRef(0)
   const detailRequest = useRef(0)
   const listRequest = useRef(0)
   const deepLink = useRef<string | null>(null)
-  const [references, setReferences] = useState<OpsKnowledgeReference[]>([])
-  const [excluded, setExcluded] = useState<string[]>([])
   const [listFailed, setListFailed] = useState(false)
   const [detailFailed, setDetailFailed] = useState(false)
   const [confirmReply, setConfirmReply] = useState(false)
@@ -126,7 +126,21 @@ export default function OpsSupportV8() {
   useEffect(() => {
     deepLink.current = new URLSearchParams(window.location.search).get('id')
     if (deepLink.current) setSelectedId(deepLink.current)
-    return () => { detailRequest.current += 1; listRequest.current += 1; if (aiAbort.current) aiAbort.current.cancelled = true }
+    return () => { detailRequest.current += 1; listRequest.current += 1 }
+  }, [])
+
+  useEffect(() => {
+    document.body.toggleAttribute('data-ops-support-detail', Boolean(selectedId))
+    return () => document.body.removeAttribute('data-ops-support-detail')
+  }, [selectedId])
+
+  useEffect(() => {
+    const query = window.matchMedia?.('(max-width: 640px)')
+    if (!query) return
+    const update = () => setMobile(query.matches)
+    update()
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
   }, [])
 
   const loadSummary = useCallback(async () => {
@@ -183,47 +197,17 @@ export default function OpsSupportV8() {
     if (options?.keepReply) return
     setReplyStage(res.data.ticket.stage)
     setReply(res.data.draft?.body ?? '')
-    setReplyFromAi(res.data.draft?.aiGenerated ? { generatedAt: res.data.draft.generatedAt } : null)
-    setReferences(res.data.draft?.references ?? [])
   }, [])
 
   useEffect(() => { void loadSummary() }, [loadSummary])
   useEffect(() => { void loadList() }, [loadList])
   useEffect(() => {
-    if (aiAbort.current) aiAbort.current.cancelled = true
-    setAiBusy(false); setExcluded([]); setReferences([]); setReply(''); setReplyFromAi(null)
+    setReply(''); setTemplateOpen(false); setMoreOpen(false); setStageOpen(false)
     detailRequest.current += 1
     setDetail(null)
     if (!selectedId) return
     void loadDetail(selectedId)
   }, [selectedId, loadDetail])
-
-  // ナレッジの確認（Cron が止まっていても進むよう、画面から順に進める）。返信の下書きは触らない。
-  const knowledgePending = detail?.knowledge?.job?.source_current === 1 && ['queued', 'running'].includes(detail.knowledge.job.status)
-  const knowledgeRequestId = detail?.ticket.id
-  const knowledgeJobId = detail?.knowledge?.job?.id
-  const canProcessKnowledge = detail?.knowledge?.canProcess === true
-  useEffect(() => {
-    if (!knowledgeRequestId || !knowledgePending) return
-    let active = true
-    const id = knowledgeRequestId
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const tick = async () => {
-      const res = canProcessKnowledge
-        ? await opsCall(api.ops.knowledge.process(id))
-        : await opsCall(api.ops.support.ticket(id).then((r) => (r.success ? { ...r, data: r.data.knowledge } : r)))
-      if (!active) return
-      if (!res.success) { setError(res.error || 'ナレッジの確認を再開できませんでした。時間をおいて、もう一度お試しください。'); return }
-      const knowledge = res.data
-      setDetail((current) => (current?.ticket.id === id ? { ...current, knowledge } : current))
-      if (knowledge?.job?.source_current === 1 && ['queued', 'running'].includes(knowledge.job.status)) {
-        timer = setTimeout(() => { void tick() }, 15_000)
-      }
-    }
-    if (canProcessKnowledge) void tick()
-    else timer = setTimeout(() => { void tick() }, 15_000)
-    return () => { active = false; clearTimeout(timer) }
-  }, [knowledgeRequestId, knowledgeJobId, canProcessKnowledge, knowledgePending])
 
   useEffect(() => {
     if (!creating || tenants.length > 0) return
@@ -263,48 +247,15 @@ export default function OpsSupportV8() {
     const res = await opsCall(api.ops.support.saveDraft(detail.ticket.id, reply))
     setDraftSaving(false)
     if (!res.success) { setError(res.error || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。'); return }
-    setReplyFromAi(null)
-    setReferences([])
     notifySaved(res.data ? '下書きを保存しました' : '下書きを消しました')
-  }
-
-  const generateAi = async (excludeIds = excluded) => {
-    if (!detail || access !== 'writer') return
-    const token = { cancelled: false }
-    aiAbort.current = token
-    setAiBusy(true)
-    setError('')
-    const res = await opsCall(api.ops.support.aiDraft(detail.ticket.id, excludeIds))
-    if (token.cancelled) return
-    setAiBusy(false)
-    if (!res.success) { setError(res.error || 'AI の下書きを作れませんでした'); return }
-    setReply(res.data.body)
-    setReplyFromAi({ generatedAt: res.data.generatedAt })
-    setReferences(res.data.references ?? [])
-  }
-
-  const skipAi = () => {
-    if (aiAbort.current) aiAbort.current.cancelled = true
-    setAiBusy(false)
-  }
-
-  const discardAi = async () => {
-    if (!detail || access !== 'writer') return
-    const res = await opsCall(api.ops.support.deleteDraft(detail.ticket.id))
-    if (!res.success) { setError(res.error || '下書きを消せませんでした'); return }
-    setReply('')
-    setReplyFromAi(null)
   }
 
   const clearDraftFromConfirm = async () => {
     if (!detail || busy || access !== 'writer') return
-    if (replyFromAi) {
-      setBusy(true)
-      const res = await opsCall(api.ops.support.deleteDraft(detail.ticket.id))
-      setBusy(false)
-      if (!res.success) { setError(res.error || '下書きを消せませんでした'); return }
-      setReplyFromAi(null)
-    }
+    setBusy(true)
+    const res = await opsCall(api.ops.support.deleteDraft(detail.ticket.id))
+    setBusy(false)
+    if (!res.success) { setError(res.error || '下書きを消せませんでした'); return }
     setReply('')
     setConfirmReply(false)
   }
@@ -314,11 +265,10 @@ export default function OpsSupportV8() {
     setBusy(true)
     setError('')
     // WEB217：送信時に選んだ状態へ進める。既定は開いたときの状態。
-    const res = await opsCall(api.ops.support.reply(detail.ticket.id, { body: reply, nextStage: replyStage, aiAssisted: replyFromAi !== null }))
+    const res = await opsCall(api.ops.support.reply(detail.ticket.id, { body: reply, nextStage: replyStage }))
     setBusy(false)
     if (!res.success) { setError(res.error || '返信できませんでした。時間をおいて、もう一度お試しください。'); return }
     setReply('')
-    setReplyFromAi(null)
     setConfirmReply(false)
     setNotice(res.data.mailSent
       ? `${res.data.ticket.ticketLabel} に返信しました。登録メールにも送りました`
@@ -351,26 +301,37 @@ export default function OpsSupportV8() {
   }
   const ticket = detail?.ticket ?? null
   const closed = ticket?.stage === 'closed'
-  const pick = (id: string) => { deepLink.current = null; if (aiAbort.current) aiAbort.current.cancelled = true; setSelectedId(id) }
+  const pick = (id: string) => { deepLink.current = null; setSelectedId(id) }
+  const openTemplates = () => { insertAt.current = replyRef.current?.selectionStart ?? reply.length; setTemplateOpen(true) }
+  const insertTemplate = (body: string): boolean => {
+    const point = Math.min(insertAt.current, reply.length)
+    const next = `${reply.slice(0, point)}${body}${reply.slice(point)}`
+    if (next.length > 4000) return false
+    setReply(next)
+    requestAnimationFrame(() => { replyRef.current?.focus(); replyRef.current?.setSelectionRange(point + body.length, point + body.length) })
+    return true
+  }
 
   return (
     <PageFrame kind="list" boardId="P0jhqO" standalone skeleton>
+      <div className={selectedId ? styles.overviewSelected : styles.overview}>
       <OpsHead
         title="お問い合わせ"
-        description={<span title={summary?.kpis ? `未対応のチケット ${summary.kpis.untouched}件・LINEから受付 ${summary.kpis.untouchedFromLine}件・初回返信 ${durationLabel(summary.kpis.avgFirstReplyMinutes)}（${compareLabel(summary.kpis.avgFirstReplyMinutes, summary.kpis.prevAvgFirstReplyMinutes, 'time')}）・解決率 ${summary.kpis.resolutionRate ?? '—'}%（${compareLabel(summary.kpis.resolutionRate, summary.kpis.prevResolutionRate, 'rate')}）・解決まで ${durationLabel(summary.kpis.avgResolutionMinutes)}（${compareLabel(summary.kpis.avgResolutionMinutes, summary.kpis.prevAvgResolutionMinutes, 'time')}）` : undefined}>統括の管理画面「お問い合わせ」から送られたものが新規として並びます。電話や LINE で受けた相談は、運営が代わりに起票できます</span>}
+        description="チケットを選び、返信や状態の変更を行います。"
         band={(
           <div className={styles.band}>
           <OpsSupportStats summary={summary} loading={loading && summary === null} />
           </div>
         )}
         actions={(
-          <Button lockedReason={lock} disabled={unknown} onClick={() => { setCreateError(''); createFields.reset(); setCreating(true) }}><Plus aria-hidden="true" />代わりに起票する</Button>
+          <Button variant="secondary" className={styles.createAction} lockedReason={lock} disabled={unknown} onClick={() => { setCreateError(''); createFields.reset(); setCreating(true) }}><Plus aria-hidden="true" />チケット作成</Button>
         )}
       />
+      </div>
       {notice ? <p role="status" className={`${parts.status} ${styles.notice}`}>{notice}</p> : null}
       {error && !listFailed && !detailFailed ? <Notice tone="danger" >{error}</Notice> : null}
 
-      <div className={styles.columns}>
+      <div data-ops-support-detail={selectedId ? '' : undefined} className={`${styles.columns} ${selectedId ? styles.columnsSelected : ''}`}>
         <section aria-label="チケットの一覧" className={styles.list}>
           <SearchField value={q} onChange={setQ} onClear={() => setQ('')} placeholder="チケットを探す" aria-label="チケットを探す" />
           <ListToolbarRow>
@@ -391,10 +352,10 @@ export default function OpsSupportV8() {
                   <button type="button" aria-current={t.id === selectedId ? 'true' : undefined} onClick={() => pick(t.id)} className={`${styles.ticket} ${t.id === selectedId ? styles.ticketSelected : ''}`}>
                     <span className={styles.ticketTop}>
                       <span className={styles.ticketNo}>{t.ticketLabel}</span>
-                      <StatusBadge tone={STAGE_TONE[t.stage]}>{stageLabel(t.stage, t.stageLabel)}</StatusBadge>
+                      <span className={styles.badges}><StatusBadge tone={STAGE_TONE[t.stage]}>{stageLabel(t.stage, t.stageLabel)}</StatusBadge><span className={styles[`priority${t.priority}`]}>{t.priorityLabel}</span></span>
                     </span>
                     <span className={styles.ticketSubject}>{t.subject}</span>
-                    <span className={styles.ticketMeta} title={`${t.staffName || emptyValue('unknown')}・${t.channelLabel}・最終のやり取り ${formatDateTime(t.lastMessageAt)}（${elapsedLabel(t.lastMessageAt)}）`}>{`${t.tenantName}・優先度 ${t.priorityLabel}`}</span>
+                    <span className={styles.ticketMeta} title={`${t.staffName || emptyValue('unknown')}・${t.channelLabel}・最終のやり取り ${formatDateTime(t.lastMessageAt)}（${elapsedLabel(t.lastMessageAt)}）`}>{t.tenantName}</span>
                   </button>
                 </li>
               ))}
@@ -412,21 +373,19 @@ export default function OpsSupportV8() {
             ) : <ListState permissionScope="hq" kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
           ) : (
             <>
+              <div className={styles.mobileTop}><button type="button" className={styles.mobileBack} onClick={() => setSelectedId(null)}><ChevronLeft aria-hidden="true" />お問い合わせ</button><button type="button" className={styles.mobileMore} aria-label="その他の操作" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}><MoreHorizontal aria-hidden="true" /></button>{moreOpen ? <div className={styles.mobileActionMenu}><Button lockedReason={lock} disabled={busy || unknown} onClick={() => { setMoreOpen(false); if (access === 'writer') void impersonate(ticket.tenantId, setBusy, setError) }}><LogIn aria-hidden="true" />代理ログイン</Button></div> : null}</div>
               <CardHeader size="content" title={<TruncatedText value={`${ticket.ticketLabel} ${ticket.subject}`} />} />
-              <ListToolbarRow>
-
+              <div className={styles.detailControls}>
+                <div className={styles.statusWrap}><button type="button" data-stage={ticket.stage} className={styles.statusButton} aria-label="状態を変更" aria-expanded={stageOpen} disabled={busy || unknown || access !== 'writer'} title={lock} onClick={() => setStageOpen((value) => !value)}><StatusBadge tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge><span aria-hidden="true">⌄</span></button>
+                  {stageOpen ? <div className={styles.actionMenu}>{(ticket.stage === 'resolved' || ticket.stage === 'closed' ? [{ value: 'in_progress' as const, label: '対応中に戻す' }] : [{ value: 'resolved' as const, label: '解決する' }, { value: 'closed' as const, label: 'クローズする' }]).map((item) => <button type="button" key={item.value} onClick={() => { setStageOpen(false); void changeStage(item.value) }}>{item.label}</button>)}</div> : null}
+                </div>
                 <span className={styles.prioritySelect}>
                   <SaveErrorField names={["priority","ticket.priority"]}><Select size="page-size" aria-label="優先度を変える" lockedReason={lock} disabled={unknown} value={ticket.priority} onChange={(value) => void changePriority(value as OpsSupportPriority)} options={PRIORITY_OPTIONS} /></SaveErrorField>
                 </span>
-                <Button href={tenantDetailHref(ticket.tenantId)}><Building2 aria-hidden="true" />契約先を開く</Button>
-                <Button lockedReason={lock} disabled={busy || unknown} onClick={() => { if (access !== 'writer') return; impersonate(ticket.tenantId, setBusy, setError) }} busy={Boolean(busy)} busyLabel="処理中…"><LogIn aria-hidden="true" />代理ログイン</Button>
-              </ListToolbarRow>
-              <div className={styles.detailMeta}>
-                <StatusBadge tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge>
-                <span title={`起票者 ${ticket.staffName || emptyValue('unknown')}${ticket.staffRole ? `（${ROLE_LABEL[ticket.staffRole] ?? ticket.staffRole}）` : ''}・受付 ${ticket.channel === 'admin' ? '管理画面のお問い合わせ' : ticket.channelLabel}・プラン ${planLabel(ticket.tenantPlanKey)}／${PLAN_STATUS_LABEL[ticket.tenantPlanStatus] ?? ticket.tenantPlanStatus}${detail ? `・店舗 ${detail.tenant.accountCount}・LINE登録 ${formatNumber(detail.tenant.staffCount)}人中${detail.tenant.staffWithLine}人・これまで${detail.tenant.pastTickets}のうち未解決${detail.tenant.pastOpen}件` : ''}`}>{`${ticket.tenantName}・${planLabel(ticket.tenantPlanKey)}・LINE登録${detail && detail.tenant.staffWithLine > 0 ? 'あり' : emptyValue('none')}・${ticket.kindLabel}・優先度 ${ticket.priorityLabel}`}</span>
-                {ticket.subjectAuto ? <StatusBadge tone="neutral">自動で付けた件名</StatusBadge> : null}
+                <Button variant="text" className={styles.contractLink} href={tenantDetailHref(ticket.tenantId)}><Building2 aria-hidden="true" />契約先を開く</Button>
+                <div className={styles.moreWrap}><button type="button" className={styles.iconAction} aria-label="その他の操作" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}><MoreHorizontal aria-hidden="true" /></button>
+                  {moreOpen ? <div className={styles.actionMenu}><Button lockedReason={lock} disabled={busy || unknown} onClick={() => { setMoreOpen(false); if (access === 'writer') void impersonate(ticket.tenantId, setBusy, setError) }}><LogIn aria-hidden="true" />代理ログイン</Button></div> : null}</div>
               </div>
-              {detail ? <TicketKnowledge key={ticket.id} detail={detail} onRefresh={() => void loadDetail(ticket.id)} /> : null}
               <ol className={styles.messages} aria-label="やり取り">
                 <Message mine={false} at={ticket.createdAt} author={`${ticket.staffName || ticket.tenantName}（${shortDateTime(ticket.createdAt)}）`} body={ticket.body} attachments={ticket.attachments} />
                 {detail?.messages.map((m) => (
@@ -444,58 +403,24 @@ export default function OpsSupportV8() {
               {(
                 <>
                   <div className={styles.draft}>
-                    <SectionHeader wrap title={<span className={styles.draftHead}>
-                      <Sparkles aria-hidden="true" />
-                      <span className={styles.draftTitle} title={replyFromAi ? `${formatDateTime(replyFromAi.generatedAt)} に作成` : undefined}>{aiBusy ? 'AI の下書きを作成中…' : replyFromAi ? 'AI の下書き' : '返信'}</span>
-                    </span>} actions={<ListToolbarEnd>
-                      {aiBusy ? (
-                        <Button onClick={skipAi}>待たずに手で書く</Button>
-                      ) : replyFromAi ? (
-                        <>
-                          <Button lockedReason={lock} onClick={() => discardAi()} disabled={busy || unknown}>下書きを削除する</Button>
-                          <Button lockedReason={lock} onClick={() => generateAi()} disabled={busy || unknown || !detail?.ai.available} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden="true" />作り直す</Button>
-                        </>
-                      ) : (
-                        <Button lockedReason={lock} onClick={() => generateAi()} disabled={busy || unknown || closed || !detail?.ai.available} title={detail?.ai.available ? undefined : 'この環境では AI の下書きを使えません'} busy={Boolean(busy)} busyLabel="処理中…">
-                          <Sparkles aria-hidden="true" />AIで下書きを作る
-                        </Button>
-                      )}
-                    </ListToolbarEnd>} />
-                    {aiBusy ? (
-                      <p className={styles.draftNote} role="status">AIが下書きを作っています。5〜15秒ほどかかります。</p>
-                    ) : (
-                      <>
-                        <KnowledgeReferences key={ticket.id} references={replyFromAi ? references : []} requestId={ticket.id} busy={busy} onExclude={(id) => {
-                          const next = [...new Set([...excluded, id])]; setExcluded(next); void generateAi(next)
-                        }} />
-                        <SaveErrorField names={["reply","body"]}><TextArea
-                          className={styles.replyBox}
-                          rows={2}
-                          value={reply}
-                          onChange={(e) => setReply(e.target.value)}
-                          placeholder="返信を入力します。「AIで下書きを作る」を押すと、これまでのやり取りから下書きを作ります。"
-                          aria-label="返信"
-                          disabled={closed || access !== 'writer'}
-                          maxLength={4000}
-                        /></SaveErrorField>
-                        <p className={styles.draftNote}>
-                          {replyFromAi
-                            ? 'お客様の状況・やり取りとナレッジをもとに作った下書きです。内容を確認してから送ってください。'
-                            : `返信は管理画面のお問い合わせ履歴に載り、登録メールに届きます。${ticket.staffEmailRegistered ? '' : '（起票者のメールが未登録のため、今回は履歴だけに載ります）'}`}
-                        </p>
-                      </>
-                    )}
+                    <div className={styles.replyHeading}><strong>返信</strong><Button variant="text" lockedReason={lock} disabled={busy || unknown || closed} onClick={openTemplates}><FileText aria-hidden="true" />テンプレート引用</Button></div>
+                    <SaveErrorField names={["reply","body"]}><TextArea
+                      ref={replyRef}
+                      className={styles.replyBox}
+                      rows={10}
+                      value={reply}
+                      onChange={(e) => setReply(e.target.value)}
+                      placeholder={mobile ? '返信文を入力してください。' : '返信文を入力してください。引用した内容はここで編集できます。'}
+                      aria-label="返信"
+                      disabled={closed || access !== 'writer'}
+                      maxLength={4000}
+                    /></SaveErrorField>
                   </div>
-                  <DialogActions padding="none" leadingAction={<>
-                    {ticket.stage === 'resolved' || ticket.stage === 'closed'
-                      ? <Button lockedReason={lock} disabled={busy || unknown} onClick={() => changeStage('in_progress')} busy={Boolean(busy)} busyLabel="処理中…">対応中に戻す</Button>
-                      : <Button lockedReason={lock} disabled={busy || unknown} onClick={() => changeStage('resolved')} busy={Boolean(busy)} busyLabel="処理中…"><Check aria-hidden="true" />解決済みにする</Button>}
-                    {closed ? null : <Button lockedReason={lock} disabled={busy || unknown} onClick={() => changeStage('closed')} busy={Boolean(busy)} busyLabel="処理中…">クローズする</Button>}
-                  </>}>
-                    <Button lockedReason={lock} onClick={() => saveDraft()} disabled={busy || unknown || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
-                    <SaveErrorField names={["replyStage","nextStage","reply_stage"]}><Select aria-label="送信後の状態" label="送ったあと" size="content" lockedReason={lock} value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || unknown || closed || aiBusy} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.key === 'new' ? '未対応' : item.label }))} /></SaveErrorField>
-                    <Button variant="primary" lockedReason={lock} onClick={() => { setError(''); setConfirmReply(true) }} disabled={busy || unknown || closed || aiBusy || !reply.trim()}><Send aria-hidden="true" />返信する</Button>
-                  </DialogActions>
+                  <div className={styles.replyActions}>
+                    <Button variant="text" lockedReason={lock} onClick={() => saveDraft()} disabled={busy || unknown || draftSaving || closed} busy={draftSaving}>下書き保存</Button>
+                    <SaveErrorField names={["replyStage","nextStage","reply_stage"]}><Select aria-label="送信後の状態" label="送信後" size="content" lockedReason={lock} value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || unknown || closed} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.label }))} /></SaveErrorField>
+                    <Button variant="primary" lockedReason={lock} onClick={() => { setError(''); setConfirmReply(true) }} disabled={busy || unknown || closed || !reply.trim()}><Send aria-hidden="true" />返信する</Button>
+                  </div>
                 </>
               )}
             </>
@@ -507,8 +432,8 @@ export default function OpsSupportV8() {
         open={creating}
         designWidth={560}
         designTop={160}
-        title="チケットを作る"
-        confirmLabel="作る"
+        title="チケット作成"
+        confirmLabel="作成する"
         cancelLabel="キャンセル"
         confirmIcon={<Plus size={16} aria-hidden="true" />}
         busy={busy}
@@ -543,9 +468,7 @@ export default function OpsSupportV8() {
 <FieldError id="sup-subject-error">{createFields.error('subject')}</FieldError></Field></div>
           <div className={styles.field}><Field label="内容" htmlFor="sup-body" requirement={createFields.requirement('body')}><SaveErrorField names={["body","form.body"]}><TextArea {...createFields.bind('body')} id="sup-body" invalid={createFields.invalid('body')} aria-describedby={createFields.invalid('body') ? 'sup-body-error' : undefined} className={styles.createBody} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} aria-label="内容" /></SaveErrorField>
 <FieldError id="sup-body-error">{createFields.error('body')}</FieldError></Field></div>
-          <Notice tone="info">
-            電話や LINE で受けた相談を、運営が代わりに起票します。相手にはメールは届きません。
-          </Notice>
+          <Notice tone="info">電話や LINE で受けた相談をチケットとして登録します。相手にはメールは届きません。</Notice>
         </div>
       </Dialog>
 
@@ -574,15 +497,11 @@ export default function OpsSupportV8() {
               <div className={styles.fact}><dt>状態</dt><dd>{`${ticket.stageLabel} → ${STAGE_CHIPS.find(item => item.key === replyStage)?.label ?? replyStage}（送ったあと）`}</dd></div>
               <div className={styles.fact}><dt>優先度</dt><dd>{ticket.priorityLabel}</dd></div>
             </dl>
-            {replyFromAi && references.length > 0 ? (
-              <Notice tone="info">
-                {`AI の下書きの根拠：${references.map((ref) => `ナレッジ「${ref.title}」`).join('・')}をもとに作成`}
-              </Notice>
-            ) : null}
             <p className={styles.confirmBody}>{reply}</p>
           </div>
         </Dialog>
       ) : null}
+      <SupportTemplatePicker open={templateOpen} onClose={() => setTemplateOpen(false)} onInsert={insertTemplate} writable={access === 'writer'} />
     </PageFrame>
   )
 }

@@ -46,6 +46,10 @@
   padding: var(--tpl-op-mobile-pad);
 }
 
+@media (max-width: 640px) {
+  :global(body[data-ops-support-detail]) .mobileBar { display: none; }
+}
+
 .mobileButton {
   display: flex;
   min-height: var(--tpl-op-touch);
