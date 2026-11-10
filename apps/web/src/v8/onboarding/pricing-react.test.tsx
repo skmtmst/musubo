@@ -40,6 +40,27 @@ function inputValue(id: string, value: string) {
 }
 
 describe('Penの利用料金確認', () => {
+  it('画面下のLINE個数欄を開くときは下向きの一覧が見える位置へ移す', async () => {
+    await act(async () => { root.render(<OnboardingPricing onContinue={continueFlow} onContact={contactFlow} />) })
+    const trigger = host.querySelector<HTMLButtonElement>('#line-count')!
+    const originalHeight = window.innerHeight
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 500 })
+    const scrollIntoView = vi.fn()
+    trigger.scrollIntoView = scrollIntoView
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({ bottom: 470 } as DOMRect)
+    try {
+      await act(async () => { trigger.click() })
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'auto' })
+      expect(document.querySelector('[data-menu-portal]')?.getAttribute('data-placement')).toBe('down')
+      expect([...document.querySelectorAll('[role="option"]')].some((option) => option.textContent?.includes('11個以上'))).toBe(true)
+      await act(async () => { trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+      await act(async () => { trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })) })
+      expect(scrollIntoView).toHaveBeenCalledTimes(2)
+    } finally {
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: originalHeight })
+    }
+  })
+
   it('連携先の個数候補に、もう一方の個数を含む月額を表示する', async () => {
     await act(async () => { root.render(<OnboardingPricing onContinue={continueFlow} onContact={contactFlow} />) })
     await act(async () => { host.querySelector<HTMLButtonElement>('#google-count')!.click() })

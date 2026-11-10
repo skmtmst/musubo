@@ -96,4 +96,6 @@ export interface SelectProps {
   menuHeading?: string
   /** 列の右端の操作は、開く板も右端へそろえる。 */
   menuAlign?: 'start' | 'end'
+  /** 長い候補を入力欄の下に見せる画面では、開く前に欄を画面内へ移す。 */
+  menuPlacement?: 'down'
 }

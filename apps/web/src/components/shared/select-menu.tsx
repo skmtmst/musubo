@@ -78,6 +78,7 @@ export function SelectValueText({ head, value, filterState }: { head: string; va
 export interface SelectMenuProps {
   textSize?: 'body'
   align?: 'start' | 'end'
+  placement?: 'down'
   open: boolean
   getAnchor: () => HTMLElement | null
   onClose: () => void
@@ -110,6 +111,7 @@ export interface SelectMenuProps {
 export function SelectMenu({
   textSize,
   align = 'start',
+  placement,
   open,
   getAnchor,
   onClose,
@@ -129,6 +131,7 @@ export function SelectMenu({
     <MenuPortal
       open={open}
       align={align}
+      placement={placement}
       matchWidth="min"
       getAnchor={getAnchor}
       onClose={onClose}
