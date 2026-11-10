@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import WaitlistOfferSheet from './waitlist-offer-sheet.js';
 import { PAYMENT_UNKNOWN } from '../lib/customer-words.js';
 const mocks = vi.hoisted(() => ({ bookingWaitlists: vi.fn(), acceptWaitlist: vi.fn(), bookingPaymentStatus: vi.fn() }));
@@ -22,5 +22,6 @@ it.each([
   const dialog = screen.getByRole('dialog');
   expect(within(dialog).queryAllByRole('heading')).toHaveLength(headings);
   expect(within(dialog).queryByRole('heading', { name: '空きが出ました' })).toBeNull();
-  expect(mocks.acceptWaitlist).toHaveBeenCalledTimes(1); expect(mocks.bookingPaymentStatus).toHaveBeenCalledWith('b');
+  expect(mocks.acceptWaitlist).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(mocks.bookingPaymentStatus).toHaveBeenCalledWith('b'));
 });
