@@ -26,6 +26,7 @@ it.each(['2026-11-02T18:15:00+09:00', '2026-11-02T18:00:00+09:00'])('R1-11: %s�
   vi.setSystemTime(new Date(now))
   open()
   await screen.findByRole('button', { name: '18:30', exact: true })
+  expect(api.openingHours).toHaveBeenCalledWith('account-1', 'store-1', '2026-11-02')
   for (const time of ['17:00', '17:30', '18:00']) expect(screen.queryByRole('button', { name: time, exact: true })).toBeNull()
 })
 it('R1-11: JSTで翌日なら営業時間の先頭から出す', async () => {

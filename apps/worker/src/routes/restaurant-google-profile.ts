@@ -61,6 +61,7 @@ import {
 import { holidayNameOf, upcomingHolidays } from '../services/jp-holidays.js';
 import { effectiveOpeningDate, hoursDateAdd, HOURS_SERVICE_LABELS } from '@line-crm/shared';
 import { restaurantGoogleHoursWorkspace, readHoursWorkspace, validateHoursWorkspace } from './restaurant-google-hours-workspace.js';
+import { syncGoogleOpeningWeek } from '../services/restaurant-google-hours-source.js';
 import {
   GoogleAiTimeout,
   accessTokenFor,
@@ -214,6 +215,7 @@ async function saveProfile(c: Context<Env>, storeId: string, locationName: strin
     )
     .bind(storeId, locationName, JSON.stringify({ profile, extras: keep }), profile.fingerprint, fetchedAt, fetchedAt)
     .run();
+  await syncGoogleOpeningWeek(dbFor(c.env, storeId), storeId, locationName, profile);
   return fetchedAt;
 }
 
@@ -230,6 +232,7 @@ async function refreshProfile(c: Context<Env>, store: StoreContext, connection: 
     };
     const fetchedAt = await saveProfile(c, store.id, connection.location_name!, profile, extras);
     if (connection.status !== 'connected') await setConnectionStatus(c, store.id, 'connected', null);
+    if (connection.status !== 'connected') await syncGoogleOpeningWeek(dbFor(c.env, store.id), store.id, connection.location_name!, profile);
     return { profile, extras, fetchedAt };
   } catch (error) {
     if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, store.id, 'no_permission', 'no_permission');

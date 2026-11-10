@@ -130,7 +130,7 @@ export function stepsForStyle(steps: ReadonlyArray<StepResult>, style: AccountSt
           const before = key === 'hours' ? copy.findIndex(item => item.key === 'friendAdd') : copy.findIndex(item => item.key === 'firstMessage')
           copy.splice(before < 0 ? copy.length : before, 0, step)
         }
-        add('hours', '営業時間を設定する', '/restaurant-test/inventory#rs-hours-title', '予約を受け付ける曜日と営業時間が設定されている')
+        add('hours', '営業時間を設定する', '/restaurant-test/google?tab=hours', 'Googleビジネスの店舗と営業時間が設定されている')
         add('followup', 'LINE来店フォローを確認する', '/restaurant-test/line-followup', '選んだ来店フォローの設定を確認している')
       }
       break

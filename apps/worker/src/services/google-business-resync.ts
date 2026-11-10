@@ -27,6 +27,8 @@ import {
   type ConnectionRow,
 } from '../routes/restaurant-google.js';
 import { applyGooglePostsSync } from '../routes/restaurant-google-posts.js';
+import { getProfile } from './google-business-profile.js';
+import { syncGoogleOpeningWeek } from './restaurant-google-hours-source.js';
 
 const HOURLY_STALE_MS = 55 * 60 * 1000;
 const METRICS_BACKFILL_DAYS = 180;
@@ -45,6 +47,7 @@ interface ResyncInput {
 type ResyncConnectionRow = ConnectionRow & {
   last_posts_synced_at: string | null;
   last_metrics_synced_at: string | null;
+  last_profile_fetched_at: string | null;
   store_line_account_id: string | null;
 };
 
@@ -64,9 +67,10 @@ function isStale(lastSyncedAt: string | null, nowIso: string, staleMs: number): 
 }
 
 async function listActiveConnections(env: Env['Bindings'], storeId?: string): Promise<ResyncConnectionRow[]> {
-  const base = `SELECT c.*, s.line_account_id AS store_line_account_id
+  const base = `SELECT c.*, s.line_account_id AS store_line_account_id, p.fetched_at AS last_profile_fetched_at
        FROM rt_google_connections c
        JOIN rt_stores s ON s.id = c.store_id
+       LEFT JOIN rt_google_profiles p ON p.store_id = c.store_id AND p.location_name = c.location_name
       WHERE c.status = 'connected' AND c.location_name IS NOT NULL AND s.status = 'active'`;
   const rows = storeId
     ? await env.DB.prepare(`${base} AND c.store_id = ? ORDER BY s.line_account_id`).bind(storeId).all<ResyncConnectionRow>()
@@ -142,7 +146,8 @@ export async function processGoogleBusinessHourlyResync(
   for (const connection of connections) {
     const dueReviews = isStale(connection.last_synced_at, input.now, HOURLY_STALE_MS);
     const duePosts = isStale(connection.last_posts_synced_at, input.now, HOURLY_STALE_MS);
-    if (!dueReviews && !duePosts) {
+    const dueProfile = isStale(connection.last_profile_fetched_at, input.now, HOURLY_STALE_MS);
+    if (!dueReviews && !duePosts && !dueProfile) {
       skipped += 1;
       continue;
     }
@@ -167,6 +172,19 @@ export async function processGoogleBusinessHourlyResync(
           .bind(input.now, input.now, connection.store_id)
           .run();
         postsSynced += 1;
+      }
+      if (dueProfile) {
+        const profile = await getProfile(options, connection.location_name!);
+        const db = dbFor(env, connection.store_id);
+        const previous = await db.prepare('SELECT profile_json FROM rt_google_profiles WHERE store_id=? AND location_name=?')
+          .bind(connection.store_id, connection.location_name).first<{ profile_json: string }>();
+        let extras: unknown = { photoCount: null, googleUpdates: null };
+        try { extras = JSON.parse(previous?.profile_json ?? '{}').extras ?? extras; } catch { /* 本体を優先 */ }
+        await db.prepare(`INSERT INTO rt_google_profiles(store_id,location_name,profile_json,fingerprint,fetched_at,updated_at)
+          VALUES(?,?,?,?,?,?) ON CONFLICT(store_id) DO UPDATE SET location_name=excluded.location_name,
+          profile_json=excluded.profile_json,fingerprint=excluded.fingerprint,fetched_at=excluded.fetched_at,updated_at=excluded.updated_at`)
+          .bind(connection.store_id, connection.location_name, JSON.stringify({ profile, extras }), profile.fingerprint, input.now, input.now).run();
+        await syncGoogleOpeningWeek(db, connection.store_id, connection.location_name!, profile);
       }
     } catch (error) {
       failed += 1;

@@ -41,7 +41,7 @@ const store = { id: 'store-1', organization_id: 'org-1', name: '渋谷店', code
 const connectionData = {
   success: true,
   store: { id: 'store-1', name: '渋谷店', lineAccountId: 'account-1' },
-  connection: { status: 'connected', googleAccountEmail: 't@example.com', locationTitle: '渋谷店', locationMapsUrl: null, connectedAt: null, lastSyncedAt: null, lastSyncError: null, averageRating: 4.2, totalReviewCount: 24 },
+  connection: { status: 'connected', googleAccountEmail: 't@example.com', locationName: 'accounts/111/locations/222', locationTitle: '渋谷店', locationMapsUrl: null, connectedAt: null, lastSyncedAt: null, lastSyncError: null, averageRating: 4.2, totalReviewCount: 24 },
   candidates: [],
   summary: { unrepliedCount: 2, draftCount: 1, attentionCount: 1, newCount: 0, storedCount: 24, postsAttentionCount: 0, syncStale: false },
   writeEnabled: true,
