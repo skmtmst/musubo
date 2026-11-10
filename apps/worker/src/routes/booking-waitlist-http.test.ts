@@ -85,7 +85,11 @@ function makeApp(db: D1Database, route: Hono<Env>) {
 }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
-const SLOT = '2026-11-10T05:00:00.000Z';
+// Keep the slot within the 365-day booking window as the test suite ages.
+const slotDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+slotDate.setUTCHours(5, 0, 0, 0);
+const SLOT = slotDate.toISOString();
+const SLOT_END = new Date(slotDate.getTime() + 60 * 60 * 1000).toISOString();
 
 let sqlite: Database.Database;
 let db: D1Database;
@@ -203,7 +207,7 @@ describe('キャンセル待ちの口', () => {
       VALUES ('booking-new', 'account-a', 'friend-a', 'staff-a', 'menu-a',
         '${SLOT}', '${SLOT}', '${SLOT}', 'confirmed', 5000, '2026-10-01T00:00:00.000Z')`).run();
 
-    sqlite.prepare(`UPDATE booking_waitlist SET status='invited',ends_at='2026-10-10T06:00:00.000Z',block_ends_at='2026-10-10T06:00:00.000Z',hold_expires_at='2099-01-01T00:00:00Z' WHERE id=?`).run(id);
+    sqlite.prepare(`UPDATE booking_waitlist SET status='invited',ends_at='${SLOT_END}',block_ends_at='${SLOT_END}',hold_expires_at='2099-01-01T00:00:00Z' WHERE id=?`).run(id);
     const converted = await app.request(`/api/booking/admin/waitlist/${id}/convert?account_id=account-a`, {
       method: 'POST',
       headers: JSON_HEADERS,
