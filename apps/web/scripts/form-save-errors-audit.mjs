@@ -24,6 +24,12 @@ function componentOf(node) {
 function hasScope(component, root) {
   return /<SaveErrorScope\b|fields=\{|return\s*\{\s*saveErrors\b/.test(component.getText(root))
 }
+function isFieldlessConnectionAction(node, component, root) {
+  const action = node.getText(root)
+  const screen = component.getText(root)
+  return /api(?:\.\w+)+\.connect\s*\(/.test(action)
+    && !/<(?:input|textarea|select|TextField|TextArea|SelectField|Checkbox|RadioGroup)\b/.test(screen)
+}
 
 /** 保存するcatch自身を見る。importだけ・別のcatchで受けるだけでは合格しない。 */
 export function auditFormSaveErrors(source, filename = 'screen.tsx') {
@@ -47,6 +53,8 @@ export function auditFormSaveErrors(source, filename = 'screen.tsx') {
     if (!saves) return
     const component = componentOf(node)
     if (!component) return // 非画面のAPIヘルパーは呼び出し側へエラーを渡す。
+    // LINE再接続は入力欄のない操作。失敗は通知で案内し、保存欄エラーの対象にしない。
+    if (isFieldlessConnectionAction(node.tryBlock, component, root)) return
     const catchText = node.catchClause.getText(root)
     const wired = /\.capture\s*\(|\.setServerErrors\s*\(/.test(catchText)
     const scope = hasScope(component, root)

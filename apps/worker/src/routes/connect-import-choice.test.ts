@@ -28,7 +28,7 @@ beforeEach(()=>{
  app=new Hono<Env>();app.use('*',async(c,next)=>{c.set('staff',{id:'owner',name:'管理',role:'owner',readOnly:false,tenantId:'t'});await next()});app.route('/',lineAccounts);
  prepared.mockReset();prepared.mockResolvedValue({success:true,channelAccessToken:'fixture-issued',bot:{displayName:'試験公式',pictureUrl:null,basicId:'@fixture'},liffId:'200123-existing',steps:[1,2,3,4].map(order=>({order,state:'passed',message:'確認済み'})),webhook:{expectedUrl:'https://worker.test/webhook',registeredUrl:'https://worker.test/webhook',active:true,testPassed:true}});
  followerIds.mockReset();followerIds.mockRejectedValue(new Error('LINE API error: 403 Forbidden'));
- followerInsight.mockReset();followerInsight.mockResolvedValue({followers:3});
+ followerInsight.mockReset();followerInsight.mockResolvedValue({status:'ready',followers:3,blocks:0});
  followerProfile.mockReset();followerProfile.mockResolvedValue({displayName:'架空の友だち'});
 });
 afterEach(async()=>{await Promise.allSettled(pending);sql.close()});

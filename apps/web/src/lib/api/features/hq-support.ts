@@ -19,6 +19,7 @@ export const hqSupportMethods = {
       kind: HqSupportKind
       subject: string
       body: string
+      purpose?: 'individual_quote'
       lineAccountId?: string | null
       attachments?: Array<{ mimeType: string; data: string }>
     }) =>

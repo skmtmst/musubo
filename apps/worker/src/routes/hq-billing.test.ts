@@ -4,12 +4,17 @@ import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { createRegistrationApplication } from '@line-crm/db';
 
 const stripe = vi.hoisted(() => ({
   createInvoicePreview: vi.fn(),
   createCustomer: vi.fn(),
   createCheckoutSession: vi.fn(),
+  createCardSetupSession: vi.fn(),
   createPortalSession: vi.fn(),
+  retrieveSetupIntent: vi.fn(),
+  retrieveCustomer: vi.fn(),
+  setCustomerDefaultPaymentMethod: vi.fn(),
   retrievePrice: vi.fn(),
   retrieveSubscription: vi.fn(),
   retrievePaymentIntent: vi.fn(),
@@ -91,6 +96,13 @@ function setTenant(patch: Record<string, string | null>) {
 
 function tenantRow() {
   return testDb.raw.prepare('SELECT plan_key, plan_status, trial_ends_at, stripe_customer_id, stripe_subscription_id, current_period_ends_at FROM tenants WHERE id = ?').get(DEFAULT_TENANT_ID) as Record<string, string | null>;
+}
+
+function seedNewPricingTenant() {
+  testDb.raw.prepare("UPDATE tenants SET plan_key='musubo' WHERE id=?").run(DEFAULT_TENANT_ID);
+  testDb.raw.prepare(`INSERT INTO musubo_tenant_billing
+    (tenant_id,pricing_snapshot_json,billing_interval,status,created_at,updated_at)
+    VALUES (?,'{}','month','awaiting_first_line','2026-11-09','2026-11-09')`).run(DEFAULT_TENANT_ID);
 }
 
 beforeEach(() => {
@@ -229,6 +241,97 @@ describe('申込（checkout）', () => {
     expect((await call('POST', '/api/hq/billing/checkout', { planKey: 'light' })).status).toBe(409);
     expect(stripe.createCheckoutSession).not.toHaveBeenCalled();
   });
+
+  it('新料金の統括は旧プランのCheckoutを開始できない', async () => {
+    seedNewPricingTenant();
+    const res = await call('POST', '/api/hq/billing/checkout', { planKey: 'light', interval: 'month' });
+    expect(res.status).toBe(409);
+    expect(stripe.createCustomer).not.toHaveBeenCalled();
+    expect(stripe.createCheckoutSession).not.toHaveBeenCalled();
+  });
+});
+
+it('新料金の統括は旧プランの即時変更見積もりを取得できない', async () => {
+  seedNewPricingTenant();
+  const res = await call('GET', '/api/hq/billing/preview?planKey=light&interval=month');
+  expect(res.status).toBe(409);
+  expect(stripe.retrieveSubscription).not.toHaveBeenCalled();
+  expect(stripe.createInvoicePreview).not.toHaveBeenCalled();
+});
+
+describe('請求前のカード登録', () => {
+  beforeEach(() => {
+    setTenant({ plan_status: 'trialing', trial_ends_at: null });
+    stripe.createCustomer.mockResolvedValue({ id: 'cus_setup', email: 'masato@example.com', name: '既定の統括' });
+    stripe.createCardSetupSession.mockResolvedValue({ id: 'cs_setup', mode: 'setup', url: 'https://checkout.stripe.com/c/setup/cs_setup' });
+  });
+
+  it('登録時はsetupモードだけを作り、無料期間と請求を開始しない', async () => {
+    const res = await call('POST', '/api/hq/billing/card-setup');
+    expect(res.status).toBe(200);
+    expect((await res.json<{ data: { url: string } }>()).data.url).toContain('checkout.stripe.com');
+    expect(stripe.createCardSetupSession).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      customerId: 'cus_setup', tenantId: DEFAULT_TENANT_ID,
+      successUrl: 'https://admin.example.com/hq/onboarding/card?setup=success',
+    }));
+    expect(stripe.createCheckoutSession).not.toHaveBeenCalled();
+    expect(tenantRow()).toMatchObject({ plan_status: 'trialing', trial_ends_at: null, stripe_subscription_id: null, stripe_customer_id: 'cus_setup' });
+  });
+
+  it('個別見積もりが届いた統括は、同意後の同じ見積もりからだけカード登録できる', async () => {
+    await createRegistrationApplication(testDb.db, {
+      companyName: '見積もり会社', contactName: '担当者', email: 'owner@example.test',
+      phone: '03-1234-5678', referralSource: 'other', ipHash: 'ip', deviceMarker: null,
+    });
+    const application = testDb.raw.prepare('SELECT id FROM registration_applications').get() as { id: string };
+    testDb.raw.prepare('UPDATE registration_applications SET status=?,tenant_id=? WHERE id=?')
+      .run('activated', DEFAULT_TENANT_ID, application.id);
+    testDb.raw.prepare(`INSERT INTO musubo_individual_quotes
+      (id,application_id,tenant_id,revision,status,final_prices_json,customer_summary_json,
+       expires_at,created_by,created_at,sent_at)
+      VALUES ('quote-1',?,?,1,'sent','{}','{}','2027-12-31T23:59:59+09:00','ops','2026-11-09T00:00:00+09:00','2026-11-09T00:01:00+09:00')`)
+      .run(application.id, DEFAULT_TENANT_ID);
+    expect((await call('POST', '/api/hq/billing/card-setup')).status).toBe(409);
+    expect(stripe.createCardSetupSession).not.toHaveBeenCalled();
+    testDb.raw.prepare(`UPDATE musubo_individual_quotes
+      SET status='accepted',accepted_at='2026-11-09T01:00:00+09:00',accepted_by='staff-1' WHERE id='quote-1'`).run();
+    expect((await call('POST', '/api/hq/billing/card-setup', { quoteId: 'wrong' })).status).toBe(409);
+    expect((await call('POST', '/api/hq/billing/card-setup', { quoteId: 'quote-1' })).status).toBe(200);
+    expect(stripe.createCardSetupSession).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      successUrl: 'https://admin.example.com/hq/onboarding/card?setup=success&quote=quote-1',
+    }));
+  });
+
+  it('同時に別画面がStripe顧客を確定した場合は、その顧客でカード登録する', async () => {
+    stripe.createCustomer.mockImplementationOnce(async () => {
+      setTenant({ stripe_customer_id: 'cus_winner' });
+      return { id: 'cus_loser', email: null, name: null };
+    });
+    const res = await call('POST', '/api/hq/billing/card-setup');
+    expect(res.status).toBe(200);
+    expect(stripe.createCardSetupSession).toHaveBeenCalledWith(expect.anything(),
+      expect.objectContaining({ customerId: 'cus_winner' }));
+    expect(tenantRow().stripe_customer_id).toBe('cus_winner');
+  });
+
+  it('カード状態はStripeの既定支払い方法の有無だけ返す', async () => {
+    setTenant({ stripe_customer_id: 'cus_setup' });
+    stripe.retrieveCustomer.mockResolvedValue({ id: 'cus_setup', invoice_settings: { default_payment_method: 'pm_test' } });
+    const res = await call('GET', '/api/hq/billing/card-status');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, data: { registered: true } });
+    expect(JSON.stringify(await (await call('GET', '/api/hq/billing/card-status')).json())).not.toContain('pm_test');
+  });
+
+  it('Stripeの戻り先がHTTPSの管理画面originでなければカード登録を開始しない', async () => {
+    for (const origin of ['http://admin.example.com', 'https://admin.example.com/other',
+      'https://user:pass@admin.example.com', 'https://admin.example.com/?next=other']) {
+      expect((await call('POST', '/api/hq/billing/card-setup', undefined, { env: { ADMIN_ORIGIN: origin } })).status)
+        .toBe(503);
+    }
+    expect(stripe.createCustomer).not.toHaveBeenCalled();
+    expect(stripe.createCardSetupSession).not.toHaveBeenCalled();
+  });
 });
 
 describe('ポータルと支払い履歴', () => {
@@ -261,10 +364,63 @@ describe('課金 Webhook', () => {
     stripe.retrieveSubscription.mockResolvedValue({ id: 'sub_1', status: 'active', customer: 'cus_1', current_period_end: 1_760_000_000, items: { data: [{ price: { id: 'price_standard' } }] } });
   });
 
+  it('新料金の契約通知を旧プランへ適用せず、再処理可能な受領状態で残す', async () => {
+    seedNewPricingTenant();
+    setTenant({ plan_status: 'exempt', stripe_customer_id: 'cus_1' });
+    const event = { id: 'evt_musubo_core', type: 'customer.subscription.created', created: 100,
+      data: { object: { id: 'sub_musubo_core', customer: 'cus_1', status: 'trialing',
+        metadata: { tenant_id: DEFAULT_TENANT_ID, purpose: 'musubo_core' },
+        items: { data: [{ price: { id: 'price_musubo_core' } }] } } } };
+    expect((await webhook(event)).status).toBe(503);
+    expect(tenantRow()).toMatchObject({ plan_status: 'exempt', stripe_subscription_id: null });
+    expect(testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_musubo_core'").get())
+      .toMatchObject({ summary: 'pending' });
+  });
+
+  it('カードsetup完了通知は契約開始と区別し、Stripeの既定カードだけ更新する', async () => {
+    setTenant({ stripe_customer_id: 'cus_setup', plan_status: 'trialing', trial_ends_at: null });
+    stripe.retrieveSetupIntent.mockResolvedValue({ id: 'seti_1', status: 'succeeded', customer: 'cus_setup', payment_method: 'pm_setup' });
+    const event = { id: 'evt_card_setup_1', type: 'checkout.session.completed', created: 100,
+      data: { object: { id: 'cs_setup', mode: 'setup', customer: 'cus_setup', setup_intent: 'seti_1',
+        client_reference_id: DEFAULT_TENANT_ID, metadata: { tenant_id: DEFAULT_TENANT_ID, purpose: 'musubo_card_setup' } } } };
+    expect((await webhook(event)).status).toBe(200);
+    expect(stripe.setCustomerDefaultPaymentMethod).toHaveBeenCalledWith(expect.anything(), 'cus_setup', 'pm_setup');
+    expect(tenantRow()).toMatchObject({ plan_status: 'trialing', trial_ends_at: null, stripe_subscription_id: null });
+    expect((await webhook(event)).status).toBe(200);
+    expect(stripe.setCustomerDefaultPaymentMethod).toHaveBeenCalledTimes(1);
+  });
+
+  it('setupの顧客がテナントと違う場合はカードを更新しない', async () => {
+    setTenant({ stripe_customer_id: 'cus_right', plan_status: 'trialing', trial_ends_at: null });
+    const event = { id: 'evt_card_setup_other', type: 'checkout.session.completed', created: 100,
+      data: { object: { id: 'cs_setup', mode: 'setup', customer: 'cus_other', setup_intent: 'seti_1',
+        client_reference_id: DEFAULT_TENANT_ID, metadata: { tenant_id: DEFAULT_TENANT_ID, purpose: 'musubo_card_setup' } } } };
+    expect((await webhook(event)).status).toBe(200);
+    expect(stripe.retrieveSetupIntent).not.toHaveBeenCalled();
+    expect(stripe.setCustomerDefaultPaymentMethod).not.toHaveBeenCalled();
+    expect(tenantRow().plan_status).toBe('trialing');
+  });
+
+  it('SetupIntentが未完了ならWebhookを完了扱いせず、再通知でカードを登録する', async () => {
+    setTenant({ stripe_customer_id: 'cus_setup', plan_status: 'trialing', trial_ends_at: null });
+    const event = { id: 'evt_card_setup_retry', type: 'checkout.session.completed', created: 100,
+      data: { object: { id: 'cs_setup', mode: 'setup', customer: 'cus_setup', setup_intent: 'seti_retry',
+        client_reference_id: DEFAULT_TENANT_ID, metadata: { tenant_id: DEFAULT_TENANT_ID, purpose: 'musubo_card_setup' } } } };
+    stripe.retrieveSetupIntent.mockResolvedValueOnce({ id: 'seti_retry', status: 'processing', customer: 'cus_setup', payment_method: 'pm_setup' });
+    expect((await webhook(event)).status).toBe(500);
+    expect(stripe.setCustomerDefaultPaymentMethod).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_card_setup_retry'").get()).toMatchObject({ summary: 'pending' });
+
+    stripe.retrieveSetupIntent.mockResolvedValueOnce({ id: 'seti_retry', status: 'succeeded', customer: 'cus_setup', payment_method: 'pm_setup' });
+    expect((await webhook(event)).status).toBe(200);
+    expect(stripe.setCustomerDefaultPaymentMethod).toHaveBeenCalledTimes(1);
+    expect(tenantRow()).toMatchObject({ plan_status: 'trialing', trial_ends_at: null, stripe_subscription_id: null });
+  });
+
   it('業務更新が止まった受信は未完了で残り、同じIDで再開する', async () => {
-    setTenant({ stripe_customer_id: 'cus_1', plan_status: 'past_due' });
+    setTenant({ stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1', plan_status: 'past_due' });
     const event = { id: 'evt_retry_atomic', type: 'invoice.paid', created: 200,
-      data: { object: { id: 'in_atomic', customer: 'cus_1', status: 'paid', amount_paid: 9800 } } };
+      data: { object: { id: 'in_atomic', customer: 'cus_1', subscription: 'sub_1', status: 'paid', amount_paid: 9800 } } };
     testDb.raw.exec("CREATE TRIGGER fail_billing_update BEFORE UPDATE ON tenants BEGIN SELECT RAISE(ABORT, 'injected'); END");
     expect((await webhook(event)).status).toBe(500);
     expect(testDb.raw.prepare("SELECT id FROM billing_invoices WHERE id='in_atomic'").get()).toBeUndefined();
@@ -276,8 +432,8 @@ describe('課金 Webhook', () => {
   });
 
   it('完了印の保存失敗でも業務更新を巻き戻し、再通知で一度だけ保存する', async () => {
-    setTenant({ stripe_customer_id: 'cus_1', plan_status: 'past_due' });
-    const event = { id: 'evt_commit_failure', type: 'invoice.paid', data: { object: { id: 'in_commit', customer: 'cus_1' } } };
+    setTenant({ stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1', plan_status: 'past_due' });
+    const event = { id: 'evt_commit_failure', type: 'invoice.paid', data: { object: { id: 'in_commit', customer: 'cus_1', subscription: 'sub_1' } } };
     testDb.raw.exec("CREATE TRIGGER fail_completed_event BEFORE UPDATE ON billing_events BEGIN SELECT RAISE(ABORT, 'injected'); END");
     expect((await webhook(event)).status).toBe(500);
     expect(tenantRow().plan_status).toBe('past_due');
@@ -346,6 +502,23 @@ describe('課金 Webhook', () => {
     expect(tenantRow()).toMatchObject({ plan_status: 'active', plan_key: 'standard', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1', trial_ends_at: null });
   });
 
+  it('Checkout完了後に契約を確認できない間は有効化せず、再通知で確認してから進める', async () => {
+    stripe.retrieveSubscription.mockRejectedValueOnce(new Error('Stripe temporarily unavailable'));
+    expect((await webhook(completed('evt_retry_checkout'))).status).toBe(503);
+    expect(tenantRow()).toMatchObject({ plan_status: 'trialing', stripe_subscription_id: null });
+    expect(testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_retry_checkout'").get())
+      .toEqual({ summary: 'pending' });
+    expect((await webhook(completed('evt_retry_checkout'))).status).toBe(200);
+    expect(tenantRow()).toMatchObject({ plan_status: 'active', stripe_subscription_id: 'sub_1' });
+  });
+
+  it('Checkout通知と取得した契約の顧客が違えば有効化しない', async () => {
+    stripe.retrieveSubscription.mockResolvedValueOnce({ id: 'sub_1', status: 'active', customer: 'cus_other',
+      items: { data: [{ price: { id: 'price_standard' } }] } });
+    expect((await webhook(completed('evt_wrong_customer'))).status).toBe(503);
+    expect(tenantRow()).toMatchObject({ plan_status: 'trialing', stripe_subscription_id: null });
+  });
+
   it('active のあとに incomplete の作成通知が届いても契約中を保つ', async () => {
     await webhook(completed());
     stripe.retrieveSubscription.mockRejectedValueOnce(new Error('temporary Stripe failure'));
@@ -407,14 +580,98 @@ describe('課金 Webhook', () => {
 
   it('解約・支払い失敗・支払い成功で状態が動く', async () => {
     await webhook(completed());
-    await webhook({ id: 'evt_2', type: 'invoice.payment_failed', data: { object: { id: 'in_1', customer: 'cus_1' } } });
+    const invoice = { id: 'in_1', customer: 'cus_1', subscription: 'sub_1', amount_due: 5900, amount_paid: 0, currency: 'jpy' };
+    await webhook({ id: 'evt_2', type: 'invoice.payment_failed', data: { object: invoice } });
     expect(tenantRow().plan_status).toBe('past_due');
-    await webhook({ id: 'evt_3', type: 'invoice.paid', data: { object: { id: 'in_2', customer: 'cus_1' } } });
+    await webhook({ id: 'evt_subscription_active', type: 'customer.subscription.updated', data: { object: {
+      id: 'sub_1', status: 'active', customer: 'cus_1', items: { data: [{ price: { id: 'price_standard' } }] },
+    } } });
+    expect(tenantRow().plan_status).toBe('past_due');
+    await webhook({ id: 'evt_other_paid', type: 'invoice.paid', data: { object: {
+      ...invoice, id: 'in_2', status: 'paid', amount_paid: 5900,
+    } } });
+    expect(tenantRow().plan_status).toBe('past_due');
+    expect(testDb.raw.prepare("SELECT json_extract(summary,'$.applied') AS applied FROM billing_events WHERE id='evt_other_paid'").get())
+      .toEqual({ applied: 0 });
+    await webhook({ id: 'evt_3', type: 'invoice.paid', data: { object: { ...invoice, status: 'paid', amount_paid: 5900 } } });
     expect(tenantRow().plan_status).toBe('active');
+    expect(testDb.raw.prepare("SELECT json_extract(summary,'$.applied') AS applied FROM billing_events WHERE id='evt_3'").get())
+      .toEqual({ applied: 1 });
+    await webhook({ id: 'evt_late_failure', type: 'invoice.payment_failed', data: { object: invoice } });
+    expect(tenantRow().plan_status).toBe('active');
+    expect(testDb.raw.prepare("SELECT status FROM billing_invoices WHERE id='in_1'").get()).toMatchObject({ status: 'paid' });
     await webhook({ id: 'evt_4', type: 'customer.subscription.deleted', data: { object: { id: 'sub_1', status: 'canceled', customer: 'cus_1', items: { data: [{ price: { id: 'price_standard' } }] } } } });
     expect(tenantRow().plan_status).toBe('canceled');
     const summary = (await (await call('GET', '/api/hq/billing/summary')).json<{ data: { canSend: boolean; state: string } }>()).data;
     expect(summary).toMatchObject({ state: 'canceled', canSend: false });
+  });
+
+  it('同じStripe顧客の単発請求では契約の停止や再開をしない', async () => {
+    setTenant({ stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1', plan_status: 'active' });
+    const standalone = { id: 'in_standalone', customer: 'cus_1', subscription: null,
+      amount_due: 5_900, amount_paid: 0, currency: 'jpy' };
+    await webhook({ id: 'evt_standalone_failed', type: 'invoice.payment_failed',
+      data: { object: standalone } });
+    expect(tenantRow().plan_status).toBe('active');
+    expect(testDb.raw.prepare("SELECT json_extract(summary,'$.applied') AS applied FROM billing_events WHERE id='evt_standalone_failed'").get())
+      .toEqual({ applied: 0 });
+
+    setTenant({ plan_status: 'past_due' });
+    await webhook({ id: 'evt_standalone_paid', type: 'invoice.paid',
+      data: { object: { ...standalone, status: 'paid', amount_paid: 5_900 } } });
+    expect(tenantRow().plan_status).toBe('past_due');
+    expect(testDb.raw.prepare("SELECT json_extract(summary,'$.applied') AS applied FROM billing_events WHERE id='evt_standalone_paid'").get())
+      .toEqual({ applied: 0 });
+  });
+
+  it('請求失敗の7日後は利用を停止し、未払い請求の支払い先は権限者だけに返す', async () => {
+    const failedAt = Math.floor(Date.now() / 1000) - 8 * 24 * 60 * 60;
+    setTenant({ stripe_customer_id: 'cus_grace', stripe_subscription_id: 'sub_grace', plan_status: 'active', plan_key: 'light' });
+    const invoice = {
+      id: 'in_grace', customer: 'cus_grace', subscription: 'sub_grace', created: failedAt - 24 * 60 * 60,
+      amount_due: 5900, amount_paid: 0, currency: 'jpy', status: 'open',
+      hosted_invoice_url: 'https://invoice.stripe.com/i/test_grace',
+    };
+    expect((await webhook({ id: 'evt_grace_failed', type: 'invoice.payment_failed', created: failedAt,
+      data: { object: invoice } })).status).toBe(200);
+    const summary = (await (await call('GET', '/api/hq/billing/summary')).json<{ data: {
+      state: string; canSend: boolean; canGenerate: boolean; paymentFailure: Record<string, unknown>;
+    } }>()).data;
+    expect(summary).toMatchObject({ state: 'payment_suspended', canSend: false, canGenerate: false,
+      paymentFailure: { state: 'suspended' } });
+    expect(summary.paymentFailure).not.toHaveProperty('paymentUrl');
+    const detail = (await (await call('GET', '/api/hq/billing/payment-failure')).json<{ data: {
+      amountYen: number; paymentUrl: string;
+    } }>()).data;
+    expect(detail).toMatchObject({ amountYen: 5900, paymentUrl: invoice.hosted_invoice_url });
+    expect((await call('GET', '/api/hq/billing/payment-failure', undefined,
+      { staff: staffOf({ role: 'staff' }) })).status).toBe(403);
+
+    expect((await webhook({ id: 'evt_grace_paid', type: 'invoice.paid', created: failedAt + 10,
+      data: { object: { ...invoice, status: 'paid', amount_paid: 5900 } } })).status).toBe(200);
+    expect((await (await call('GET', '/api/hq/billing/summary')).json<{ data: {
+      state: string; canSend: boolean; paymentFailure: unknown;
+    } }>()).data).toMatchObject({ state: 'active', canSend: true, paymentFailure: null });
+  });
+
+  it('支払いが反映されて契約が復帰した後は直近の復旧内容を返す', async () => {
+    const failedAt = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
+    const paidAt = failedAt + 60;
+    setTenant({ stripe_customer_id: 'cus_recovered', stripe_subscription_id: 'sub_recovered', plan_status: 'active', plan_key: 'light' });
+    const invoice = { id: 'in_recovered', customer: 'cus_recovered', subscription: 'sub_recovered',
+      created: failedAt - 60, amount_due: 5900, amount_paid: 0, currency: 'jpy', status: 'open' };
+    expect((await webhook({ id: 'evt_recovered_failure', type: 'invoice.payment_failed', created: failedAt,
+      data: { object: invoice } })).status).toBe(200);
+    expect(tenantRow().plan_status).toBe('past_due');
+    expect((await webhook({ id: 'evt_recovered_payment', type: 'invoice.paid', created: paidAt,
+      data: { object: { ...invoice, status: 'paid', amount_paid: 5900,
+        status_transitions: { paid_at: paidAt } } } })).status).toBe(200);
+    expect(tenantRow().plan_status).toBe('active');
+    const detail = (await (await call('GET', '/api/hq/billing/payment-failure')).json<{ data: {
+      invoiceId: string; state: string; amountYen: number; paidAt: string;
+    } }>()).data;
+    expect(detail).toMatchObject({ invoiceId: invoice.id, state: 'recovered', amountYen: 5900,
+      paidAt: new Date(paidAt * 1000).toISOString() });
   });
 
   it('入金済み請求書の金額・入金日・年払いを保存し、同じイベントは増やさない', async () => {
@@ -461,6 +718,32 @@ describe('課金 Webhook', () => {
     await webhook({ id: 'evt_paid_again', type: 'invoice.paid', data: { object: { ...invoice, status: 'paid', status_transitions: { paid_at: 1_760_000_100 } } } });
     await webhook({ id: 'evt_refund', type: 'charge.refunded', data: { object: { id: 'ch_1', customer: 'cus_1', invoice: 'in_status', amount_refunded: 4_000 } } });
     expect(testDb.raw.prepare(`SELECT status, amount_refunded FROM billing_invoices WHERE id = 'in_status'`).get()).toMatchObject({ status: 'paid', amount_refunded: 4_000 });
+  });
+
+  it('統括IDが一致しても別のStripe顧客の請求書は取り込まない', async () => {
+    setTenant({ stripe_customer_id: 'cus_1', plan_status: 'active' });
+    const res = await webhook({ id: 'evt_wrong_invoice_customer', type: 'invoice.payment_failed',
+      data: { object: { id: 'in_wrong_customer', customer: 'cus_other', subscription: 'sub_other',
+        metadata: { tenant_id: DEFAULT_TENANT_ID }, amount_due: 5900, amount_paid: 0,
+        currency: 'jpy', created: 1_760_000_000, lines: { data: [] } } } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { matched: false } });
+    expect(tenantRow().plan_status).toBe('active');
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS n FROM billing_invoices WHERE id='in_wrong_customer'").get())
+      .toEqual({ n: 0 });
+  });
+
+  it('Stripe顧客が未登録の統括にも、メタデータだけで請求書を結び付けない', async () => {
+    setTenant({ stripe_customer_id: null, plan_status: 'active' });
+    const res = await webhook({ id: 'evt_unbound_invoice_customer', type: 'invoice.payment_failed',
+      data: { object: { id: 'in_unbound_customer', customer: 'cus_other', subscription: 'sub_other',
+        metadata: { tenant_id: DEFAULT_TENANT_ID }, amount_due: 5900, amount_paid: 0,
+        currency: 'jpy', created: 1_760_000_000, lines: { data: [] } } } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { matched: false } });
+    expect(tenantRow().plan_status).toBe('active');
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS n FROM billing_invoices WHERE id='in_unbound_customer'").get())
+      .toEqual({ n: 0 });
   });
 
   it('請求書のないEC-CUBE返金は対象外として記録し、請求書を変更しない', async () => {

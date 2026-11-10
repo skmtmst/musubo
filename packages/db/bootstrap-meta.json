@@ -667,7 +667,8 @@
     "752_restaurant_menu_media.sql",
     "753_restaurant_table_pen_layout.sql",
     "754_instagram_shared_within_tenant.sql",
-    "755_restaurant_floor_archive.sql"
+    "755_restaurant_floor_archive.sql",
+    "756_musubo_pricing_onboarding.sql"
   ],
-  "migrationCount": 668
+  "migrationCount": 669
 }

@@ -1,7 +1,6 @@
 import { starterCatalogRuntime } from './style-starter-runtime.js';
 import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { readLineAccountListMetadata } from '../services/line-account-list-metadata.js';
-import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { verifyLineMessagingIdentity } from '../services/line-messaging-identity.js';
 import { expectedWebhookUrl as accountWebhookUrl } from '../lib/webhook-endpoint.js';
@@ -14,8 +13,8 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOptionsError } from '../services/connect-registration.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
-import { getStaffById, getLineAccountListStats, getLineAccountTag, getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
-import type { LineAccount as DbLineAccount, LineAccountConnectionCheck } from '@line-crm/db';
+import { getLineAccountListStats, getLineAccountTag, getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, getMusuboTenantBilling, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow } from '@line-crm/db';
+import type { LineAccount as DbLineAccount } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
@@ -33,46 +32,14 @@ import { getLineRegistrationReceipt } from '../services/line-registration-receip
 import { getAuthorizedLineAccount, getVisibleLineAccountEntry } from './line-account-access.js';
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-
+import { LINE_LIVE_ACCOUNT_CONCURRENCY, hasTenantWideLineAccountScope, lifecycleConflict, mapWithConcurrency, musuboFirstLineGate, startFirstMusuboLine, startReservedMusuboLine } from './line-accounts-support.js';
 import { readCapacity, normalizeOptionalString, validateLoginChannelPair, readConnectBody, type ConnectBody } from './line-accounts-input.js';
 import { serializeLineAccount, serializeLineAccountFull } from './line-accounts-view.js';
+import { fetchPreConnectFollowerTotal, fetchPreConnectFollowerInsight } from '../services/musubo-large-line-consultation.js';
+import { acceptedWebhookUrls, isAcceptedWebhookUrl, publicAccountUrls,
+  connectionCheckResponse } from './line-accounts-connection-view.js';
 
 const lineAccounts = new Hono<Env>();
-
-async function hasTenantWideLineAccountScope(c: Context<Env>): Promise<boolean> {
-  const actor = c.get('staff');
-  if (actor.id === 'env-owner') return true;
-  const member = await getStaffById(c.env.DB, actor.id);
-  return Boolean(member?.is_active && member.account_scope === 'all');
-}
-
-function lifecycleConflict(error: unknown): { success: false; error: string } | null {
-  if (!(error instanceof LineAccountLifecycleError)) return null;
-  return { success: false, error: error.code };
-}
-
-const LINE_LIVE_ACCOUNT_CONCURRENCY = 2;
-
-async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  concurrency: number,
-  mapper: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let nextIndex = 0;
-  const workers = Array.from(
-    { length: Math.min(concurrency, items.length) },
-    async () => {
-      while (nextIndex < items.length) {
-        const index = nextIndex;
-        nextIndex += 1;
-        results[index] = await mapper(items[index]!);
-      }
-    },
-  );
-  await Promise.all(workers);
-  return results;
-}
 
 // LINE の実データ取得は重いため、live=1 の明示要求時だけにする。
 lineAccounts.get('/api/line-accounts', async (c) => {
@@ -207,69 +174,6 @@ type ConnectionCheckDraft = {
   webhookActive?: boolean | null;
   httpStatus?: number | null;
 };
-
-function trimTrailingSlash(value: string): string {
-  return value.trim().replace(/\/+$/, '');
-}
-
-/** 正規 URL と WORKER_URL・設定済みの別名は同じ Worker を指すため、いずれに LINE が登録されていても不一致としない。 */
-export function acceptedWebhookUrls(
-  env: Pick<Env['Bindings'], 'WORKER_PUBLIC_URL' | 'WORKER_URL' | 'WORKER_ALIAS_URLS'>,
-  canonicalWebhookUrl: string,
-): string[] {
-  const origins = [
-    env.WORKER_PUBLIC_URL,
-    env.WORKER_URL,
-    ...(env.WORKER_ALIAS_URLS ?? '').split(','),
-  ]
-    .map((value) => (value ? trimTrailingSlash(value) : ''))
-    .filter((value) => /^https:\/\/[^/]+$/.test(value));
-  const path = new URL(canonicalWebhookUrl).pathname.replace(/\/+$/, '');
-  const urls = [trimTrailingSlash(canonicalWebhookUrl), ...origins.map((origin) => `${origin}${path}`)];
-  return [...new Set(urls)];
-}
-
-function isAcceptedWebhookUrl(registeredUrl: string | null | undefined, accepted: readonly string[]): boolean {
-  if (!registeredUrl) return false;
-  return accepted.includes(trimTrailingSlash(registeredUrl));
-}
-
-function publicAccountUrls(c: Context<Env>, liffId: string | null, channelId: string) {
-  const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
-  return {
-    webhook: accountWebhookUrl(base, channelId),
-    webhookAccepted: [...acceptedWebhookUrls(c.env, accountWebhookUrl(base, channelId)), ...acceptedWebhookUrls(c.env, `${base}/webhook`)],
-    callback: `${base}/auth/callback`,
-    liffEndpoint: liffId ? `${base}?liffId=${encodeURIComponent(liffId)}` : null,
-  };
-}
-
-function serializeConnectionCheck(row: LineAccountConnectionCheck) {
-  return {
-    kind: row.check_kind,
-    result: row.result,
-    expectedUrl: row.expected_url,
-    registeredUrl: row.registered_url,
-    webhookActive: row.webhook_active == null ? null : Boolean(row.webhook_active),
-    httpStatus: row.http_status,
-  };
-}
-
-function connectionCheckResponse(
-  account: DbLineAccount,
-  rows: LineAccountConnectionCheck[],
-  urls: ReturnType<typeof publicAccountUrls>,
-) {
-  const first = rows[0];
-  return {
-    accountId: account.id,
-    revision: first?.account_revision ?? account.revision ?? 1,
-    checkedAt: first?.checked_at ?? null,
-    correlationId: first?.correlation_id ?? null,
-    expectedUrls: urls,
-    checks: rows.map(serializeConnectionCheck),
-  };
-}
 
 async function collectConnectionChecks(
   account: DbLineAccount,
@@ -569,6 +473,14 @@ async function archiveAccountResponse(
   if (account.archived_at) {
     return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
   }
+  const musuboBilling = await getMusuboTenantBilling(c.env.DB, account.tenant_id ?? DEFAULT_TENANT_ID);
+  if (musuboBilling && musuboBilling.status !== 'ended') {
+    const usage = await c.env.DB.prepare(`SELECT status FROM musubo_line_usage
+      WHERE line_account_id=? AND tenant_id=? AND status IN ('pending','active','ending')`)
+      .bind(id, account.tenant_id ?? DEFAULT_TENANT_ID).first<{ status: string }>();
+    if (usage) return c.json({ success: false, code: 'MUSUBO_BILLING_LINE_ACTIVE',
+      error: '利用中のLINEは請求画面で利用終了日と料金を確認してから終了してください' }, 409);
+  }
   const blockers = await getLineAccountArchiveBlockers(c.env.DB, id);
   if (blockers.length > 0) {
     return c.json({
@@ -684,6 +596,13 @@ lineAccounts.post('/api/line-accounts/:id/activate', requireRole('owner', 'admin
     if (!account) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     if (account.archived_at) {
       return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
+    }
+    const musuboBilling = await getMusuboTenantBilling(c.env.DB, account.tenant_id ?? DEFAULT_TENANT_ID);
+    if (musuboBilling && (musuboBilling.status === 'ended'
+      || (musuboBilling.termination_effective_at
+        && musuboBilling.termination_effective_at <= new Date().toISOString()))) {
+      return c.json({ success: false,
+        error: '利用終了したLINEはこの画面から再開できません。請求画面から再開手続きをしてください' }, 409);
     }
 
     const body = await c.req
@@ -1022,24 +941,6 @@ function stepPassed(steps: LineConnectStep[], order: LineConnectStep['order']): 
   return steps.some((item) => item.order === order && item.state === 'passed');
 }
 
-/* 友だち数の統計は前日分しか無い。日本時間の昨日を yyyyMMdd で返す。 */
-export function insightDateJst(now: Date = new Date()): string {
-  return japanDateOffset(-1, now).replaceAll('-', '');
-}
-
-/*
- * 登録前の友だち総数。V8 ④の結果窓（``）のボット情報に出す。
- * 取れなければ null（表示は名前だけにする）。検査の合否には使わない。
- */
-export async function fetchPreConnectFollowerTotal(channelAccessToken: string): Promise<number | null> {
-  try {
-    const insight = await new LineClient(channelAccessToken).getFollowersInsight(insightDateJst());
-    return typeof insight.followers === 'number' ? insight.followers : null;
-  } catch {
-    return null;
-  }
-}
-
 function publicConnectData(
   prepared: Awaited<ReturnType<typeof prepareLineConnection>>,
   steps: LineConnectStep[],
@@ -1117,6 +1018,8 @@ lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner', 'admi
 // UI用の自動接続・保存。5段目が完了しなければ作成途中の行を必ず巻き戻す。
 lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
   if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
+  const musuboGate = await musuboFirstLineGate(c);
+  if (musuboGate instanceof Response) return musuboGate;
   // LINE の接続（新しいアカウントの接続）は大事な操作（V）。
   if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
@@ -1138,6 +1041,14 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
       data: publicConnectData(prepared, prepared.steps, { capability: 'unknown', phase: 'not_started' }),
     }, 400, []);
   }
+  const musuboInsight = musuboGate === 'first' || musuboGate === 'reserved_addition'
+    ? await fetchPreConnectFollowerInsight(prepared.channelAccessToken) : null;
+  if ((musuboGate === 'first' || musuboGate === 'reserved_addition') && !musuboInsight)
+    return c.json({ success: false, code: 'MUSUBO_LINE_INSIGHT_UNAVAILABLE',
+      error: 'LINEの前日分の友だち数を確認できませんでした。統計が確定してから再度お試しください' }, 503);
+  if (musuboInsight && musuboInsight.followers > 500_000)
+    return c.json({ success: false, code: 'MUSUBO_LARGE_LINE_CONSULTATION',
+      error: 'このLINEは友だちの累計が50万人を超えています。接続前に運営へご相談ください' }, 409);
 
   const duplicate = await checkUniqueLoginAndLiff(c.env.DB, {
     loginChannelId: parsed.value.loginChannelId,
@@ -1149,6 +1060,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
   let savingStyle = false;
   try {
     account = await createLineAccount(c.env.DB, {
+      initialActive: musuboGate !== 'reserved_addition',
       createdByStaffId: c.get('staff').id,
       channelId: parsed.value.channelId,
       name: parsed.value.name || prepared.bot.displayName,
@@ -1207,17 +1119,30 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
     const started = parsed.value.importFriends && followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
     savingStyle = true;
     await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,parsed.value.style,starterCatalogRuntime(c));
-    savingStyle = false; try { if (parsed.value.importFriends) scheduleInitialFollowerImport(c.executionCtx, c.env.DB, new LineClient(prepared.channelAccessToken) as unknown as FollowerImportClient, account.id, started, () => logger.error('line_accounts.initial_follower_import_failed')); } catch { /* 単体試験は executionCtx を持たない */ }
+    savingStyle = false;
+    if (musuboGate === 'first') await startFirstMusuboLine(c, account.id, musuboInsight!);
+    const additionState = musuboGate === 'reserved_addition'
+      ? await startReservedMusuboLine(c, account.id, musuboInsight!) : null;
+    try { if (parsed.value.importFriends && (!additionState || additionState === 'active')) scheduleInitialFollowerImport(c.executionCtx, c.env.DB, new LineClient(prepared.channelAccessToken) as unknown as FollowerImportClient, account.id, started, () => logger.error('line_accounts.initial_follower_import_failed')); } catch { /* 単体試験は executionCtx を持たない */ }
     const steps = [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed', parsed.value.importFriends ? undefined : '友だちは引き継ぎません。')];
     return c.json({
       success: true,
-      data: publicConnectData(prepared, steps, {
+      data: { ...publicConnectData(prepared, steps, {
         capability: started.capability,
         phase: started.phase,
-      }, account.id),
-    }, 201);
+      }, account.id), additionState },
+    }, additionState === 'pending_payment' || additionState === 'pending_reconciliation' ? 202 : 201);
   } catch (error) {
+    if (account && savingStyle && musuboGate === 'reserved_addition') {
+      await deleteUncommittedLineAccount(c.env.DB, account.id);
+      return c.json({ success: false, error: 'LINEの設定を保存できませんでした。料金の確認画面から接続をやり直してください' }, 502);
+    }
     if (account && savingStyle) return c.json({ success: false, error: 'style_save_failed', data: { accountId: account.id, style: parsed.value.style ?? null, styleSaved: false, retryAt: `/api/dashboard/style?account_id=${encodeURIComponent(account.id)}`, starterRetryAt: `/api/dashboard/style/starter-items/ensure?account_id=${encodeURIComponent(account.id)}` } }, 502);
+    if (account && musuboGate === 'reserved_addition') {
+      return c.json({ success: false, code: 'MUSUBO_ADDITION_PENDING_RECONCILIATION',
+        error: '接続情報を保存しました。追加分の料金を確認しています。既存のLINEはそのまま利用できます',
+        data: { accountId: account.id } }, 202);
+    }
     if (account) await deleteUncommittedLineAccount(c.env.DB, account.id);
     if (error instanceof RegistrationOptionsError) return inputError(c, {success:false,error:'登録中にタグ・親・担当範囲が変わりました。選び直してください',code:error.code}, error.status, []);
     if (error instanceof CredentialEncryptionKeyError) {
@@ -1243,6 +1168,10 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
 // POST /api/line-accounts - create
 lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
   if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
+  const musuboGate = await musuboFirstLineGate(c);
+  if (musuboGate instanceof Response) return musuboGate;
+  if (musuboGate === 'reserved_addition') return c.json({ success: false,
+    error: '料金を確認したLINE追加は接続ウィザードから完了してください' }, 409);
   // LINE の接続の追加は大事な操作（V）。
   if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
@@ -1378,6 +1307,15 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
       return inputError(c, { success: false, error: 'すべての接続確認を完了してください', details: { connection: verification.errors } }, 400, ["channelAccessToken"]);
     }
 
+    const musuboInsight = musuboGate === 'first'
+      ? await fetchPreConnectFollowerInsight(body.channelAccessToken.trim()) : null;
+    if (musuboGate === 'first' && !musuboInsight)
+      return c.json({ success: false, code: 'MUSUBO_LINE_INSIGHT_UNAVAILABLE',
+        error: 'LINEの前日分の友だち数を確認できませんでした。統計が確定してから再度お試しください' }, 503);
+    if (musuboInsight && musuboInsight.followers > 500_000)
+      return c.json({ success: false, code: 'MUSUBO_LARGE_LINE_CONSULTATION',
+        error: 'このLINEは友だちの累計が50万人を超えています。接続前に運営へご相談ください' }, 409);
+
     if (!await verifyLineMessagingIdentity({ channelId: body.channelId.trim(), channelSecret: body.channelSecret.trim(), channelAccessToken: body.channelAccessToken.trim() })) {
       return inputError(c, { success: false, error: '同じMessaging APIチャネルのID・シークレット・アクセストークンを指定してください' }, 422, ['channelId', 'channelSecret', 'channelAccessToken']);
     }
@@ -1426,6 +1364,14 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
       logger.error("line_accounts.create_failed");
     }
 
+    if (musuboGate === 'first') {
+      try {
+        await startFirstMusuboLine(c, account.id, musuboInsight!);
+      } catch {
+        await deleteUncommittedLineAccount(c.env.DB, account.id);
+        return c.json({ success: false, error: 'LINEの利用開始を確定できませんでした。時間をおいて再度お試しください' }, 409);
+      }
+    }
     try {
       await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,body.style,starterCatalogRuntime(c));
     } catch {

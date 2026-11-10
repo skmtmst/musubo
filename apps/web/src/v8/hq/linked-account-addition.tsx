@@ -1,0 +1,75 @@
+'use client'
+
+import Button from '@/components/shared/button'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
+import { useMemo, useState } from 'react'
+import { musuboLinkedAdditionPrice, type LinkedAccountCounts, type MusuboLinkedAdditionInput,
+  type MusuboLinkedService } from '@line-crm/shared'
+import styles from './linked-account-addition.module.css'
+
+interface Props {
+  lineName: string
+  service: MusuboLinkedService
+  before: LinkedAccountCounts
+  slotUnitYen: number
+  billing: MusuboLinkedAdditionInput['billing']
+  /** The server must recheck these inputs and the persisted billing state before any charge or activation. */
+  onContinue: () => Promise<void> | void
+  onBack: () => void
+}
+
+const yen = (value: number) => `¥${new Intl.NumberFormat('ja-JP').format(value)}`
+const serviceName = (service: MusuboLinkedService) => service === 'googleBusiness' ? 'Googleマイビジネス' : 'Instagram'
+
+export default function LinkedAccountAddition({ lineName, service, before, slotUnitYen, billing, onContinue, onBack }: Props) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const result = useMemo(() => {
+    try { return musuboLinkedAdditionPrice({ before, service, slotUnitYen, billing }) }
+    catch { return null }
+  }, [before, service, slotUnitYen, billing])
+
+  const advance = async () => {
+    if (busy) return
+    setBusy(true); setError('')
+    try { await onContinue() }
+    catch { setError('連携を開始できませんでした。時間をおいて再度お試しください。') }
+    finally { setBusy(false) }
+  }
+
+  if (!result) return <Dialog open title="料金を表示できません" size="medium" onCancel={onBack}
+    footer={<DialogActions><Button type="button" variant="secondary" onClick={onBack}>戻る</Button></DialogActions>}>
+    <p>連携数または料金を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
+  </Dialog>
+
+  const addedSlot = result.addedSlots > 0
+  const charged = result.monthlyIncreaseYen > 0
+  const label = serviceName(service)
+  const beforeText = `Googleマイビジネス ${result.before.googleBusiness}個${service === 'googleBusiness' ? `→${result.after.googleBusiness}個` : ''}・Instagram ${result.before.instagram}個${service === 'instagram' ? `→${result.after.instagram}個` : ''}`
+  const slotText = addedSlot ? `追加枠 ${result.slotsBefore}枠→${result.slotsAfter}枠` : `追加枠 ${result.slotsAfter}枠のまま`
+  return <Dialog open title={charged ? '追加連携枠の料金を確認' : '追加料金はかかりません'}
+    description={`${lineName}に${label}を1個追加します。`} size="medium" onCancel={onBack} busy={busy}
+    footer={<DialogActions><Button type="button" variant="secondary" disabled={busy} onClick={onBack}>戻る</Button>
+      <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" onClick={() => void advance()}>
+        {charged ? '料金に同意して連携へ' : `${label}の連携へ`}</Button></DialogActions>}>
+    <div className={styles.priceBox}>
+      <span>{charged ? '次回からの月額増分（税込）' : addedSlot ? '追加枠の料金は0円です' : '追加枠数は変わりません'}</span>
+      <strong>{charged ? `＋${yen(result.monthlyIncreaseYen)} / 月` : '追加料金 ¥0'}</strong>
+      <p>{beforeText}｜{slotText}</p>
+    </div>
+    <div className={styles.afterPrice}><span>追加後の連携枠料金（税込）</span>
+      <strong>{yen(result.monthlySlotsAfterYen)} / 月{charged ? '' : '（料金は変更なし）'}</strong></div>
+    <div className={styles.dueBox}><span>{charged && billing.kind === 'paid'
+      ? `今回の追加分（次の月次請求まで残り${billing.monthlyDaysRemaining}/${billing.monthlyDaysInPeriod}日の見込み）`
+      : '今回のお支払い'}</span>
+      <strong>{charged && billing.kind === 'paid' ? `決済成功時のお支払い ${yen(result.dueNowYen)}（税込）`
+        : charged ? '¥0｜無料期間中のため今は請求しません' : '¥0｜カード決済はありません'}</strong></div>
+    <p className={styles.note}>{charged
+      ? billing.kind === 'paid'
+        ? '接続情報を確認後に決済し、成功したら追加先を有効化します。追加枠は年払いでも毎月請求します。'
+        : '接続を確認後に追加先を有効化します。無料期間の終了後、追加枠は毎月請求します。'
+      : `${addedSlot ? '適用中の条件では追加料金が0円のため' : '追加枠数が変わらないため'}、料金の同意や決済は不要です。接続確認後に${label}を有効化します。`}</p>
+    {error && <Notice tone="danger" role="alert">{error}</Notice>}
+  </Dialog>
+}

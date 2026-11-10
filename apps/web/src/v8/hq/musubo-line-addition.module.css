@@ -1,0 +1,14 @@
+.page { display: grid; gap: var(--mp-px-24); min-width: 0; }
+.columns { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(var(--mp-px-320), 1fr); gap: var(--mp-px-22); align-items: stretch; }
+.columns h2 { margin: 0; font-size: var(--mp-px-23); color: var(--mp-color-202428); }
+.priceRows { display: grid; gap: var(--mp-px-12); }
+.priceRows > div { display: flex; justify-content: space-between; align-items: baseline; gap: var(--mp-px-18); padding-block: var(--mp-px-8); border-bottom: 1px solid var(--mp-color-dfe5e7); }
+.priceRows span, .explanation { color: var(--mp-color-59687b); font-size: var(--mp-px-14); line-height: 1.7; }
+.priceRows strong { text-align: right; color: var(--mp-color-202428); }
+.due { display: flex; justify-content: space-between; align-items: baseline; gap: var(--mp-px-18); color: var(--mp-color-58667a); }
+.due strong { font-size: var(--mp-px-31); color: var(--mp-color-087c43); }
+.explanation { margin: 0; }
+.flow { display: grid; gap: var(--mp-px-16); padding-inline-start: var(--mp-px-25); margin: 0; line-height: 1.6; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--mp-px-12); margin-top: auto; }
+@media (max-width: 850px) { .columns { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .priceRows > div, .due { align-items: flex-start; flex-direction: column; gap: var(--mp-px-5); } .priceRows strong { text-align: left; } }

@@ -12,6 +12,7 @@ vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: vi.fn() } }))
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => null }))
 vi.mock('./resume-style', () => ({ default: () => null }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
 beforeEach(() => {
   localStorage.clear(); sessionStorage.clear(); vi.clearAllMocks(); verifiedStaffRole('owner')
@@ -26,7 +27,6 @@ it.each([false, true])('友だちの引き継ぎが %s でも、チャット停�
   fireEvent.click(screen.getByRole('radio', { name: inherit ? 'はい、引き継ぎます' : 'いいえ、引き継ぎません' }))
   if (inherit) {
     fireEvent.click(screen.getByRole('checkbox', { name: '認証済みアカウントであることを確認した' }))
-    fireEvent.click(screen.getByRole('radio', { name: 'いいえ、超えていません' }))
   }
   fireEvent.click(screen.getByRole('radio', { name: '使っていません' }))
   const guidance = screen.getByText('接続後に変わること').parentElement!.textContent!

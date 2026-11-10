@@ -5,6 +5,7 @@
 .card[data-flow='sent'] { min-height: 600px; padding-top: 32px; }
 .card[data-flow='setup'] { min-height: 940px; }
 .card[data-flow='pending'] { min-height: 574px; }
+.card[data-flow='recovery'] { min-height: 0; }
 .stateIcon { display: grid; place-items: center; width: 72px; height: 72px; margin-top: 26px; border-radius: 50%; }
 .stateIcon svg { width: 30px; height: 30px; }
 .stateIcon[data-tone='success'] { background: #e8f8ee; color: #087a3e; }

@@ -120,19 +120,25 @@ export function captureTwoFactorChallenge(): string {
     if (!accepted) return readSessionStorage(TWO_FACTOR_CHALLENGE_STORAGE_KEY) || ''
     if (isOpsTwoFactorReturn(window.location.search, '', null)) writeSessionStorage(TWO_FACTOR_NEXT_STORAGE_KEY, 'ops')
     else if (isMobileLoginReturn(window.location.search)) writeSessionStorage(TWO_FACTOR_NEXT_STORAGE_KEY, MOBILE_LOGIN_NEXT)
+    else if (new URLSearchParams(window.location.search).get('next') === 'musubo-pricing') {
+      writeSessionStorage(TWO_FACTOR_NEXT_STORAGE_KEY, 'musubo-pricing')
+    }
     writeSessionStorage(TWO_FACTOR_CHALLENGE_STORAGE_KEY, token)
   }
 
   return token || readSessionStorage(TWO_FACTOR_CHALLENGE_STORAGE_KEY) || ''
 }
 
-/** 2 要素認証のあとの戻り先。'/ops'・'/m'（電話の画面）・'/' の決まった 3 つだけ。読んだら消す。 */
+/** 2 要素認証のあとの戻り先。固定した運営・電話・料金確認・通常の4経路だけ。読んだら消す。 */
 export function takeTwoFactorNextPath(): string {
   if (typeof window === 'undefined') return '/'
   const next = readSessionStorage(TWO_FACTOR_NEXT_STORAGE_KEY)
   removeSessionStorage(TWO_FACTOR_NEXT_STORAGE_KEY)
   if (isOpsTwoFactorReturn(window.location.search, window.location.hash, next)) return '/ops'
   if (next === MOBILE_LOGIN_NEXT || isMobileLoginReturn(window.location.search)) return MOBILE_ROOT
+  if (next === 'musubo-pricing' || new URLSearchParams(window.location.search).get('next') === 'musubo-pricing') {
+    return '/hq/onboarding/pricing'
+  }
   return '/'
 }
 

@@ -5,9 +5,10 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { hashPassword } from '../services/password-hash.js';
 import { createAuthEmailToken, toJstString } from '@line-crm/db';
 import { sha256Hex } from '../middleware/auth.js';
+import { DEFAULT_MUSUBO_PRICE_SCHEDULE } from '@line-crm/shared';
 
 const mail = vi.hoisted(() => ({
-  sendPlainMail: vi.fn(async (_env: unknown, _message: { to: string; subject: string; body: string }) => {}),
+  sendPlainMail: vi.fn(async (_env: unknown, _message: { to: string; subject: string; body: string; html?: string }) => {}),
 }));
 vi.mock('../services/plain-mail.js', () => ({ sendPlainMail: mail.sendPlainMail }));
 
@@ -45,12 +46,14 @@ type AuthJson = {
   errors: Record<string, string>;
   data: {
     email: string;
-    trialDays: number;
+    trialDays: number | null;
+    trialPeriod?: { unit: 'days' | 'months'; value: number };
     deviceMarker: string;
     tenantId: string;
     twoFactor: boolean;
     twoFactorSetup: boolean;
     challengeToken: string;
+    newPricingFlow?: boolean;
   };
 };
 
@@ -107,6 +110,64 @@ async function issueApprovedInvite(): Promise<string> {
 }
 
 describe('会員登録（36-4）', () => {
+  it('新料金で承認した申込はカード・LINE接続前に無料期間を開始しない', async () => {
+    await call('POST', '/api/auth/register/request', validRequest);
+    const token = await issueApprovedInvite();
+    const snapshot = JSON.stringify({ sourceConditionId: 'partner', sourceVersion: 1,
+      internalName: '特約店', appliedAt: '2026-11-09',
+      trialPeriod: { unit: 'months', value: 3 }, lineBasicDiscountPercent: 50,
+      discountEndsOn: null, schedule: DEFAULT_MUSUBO_PRICE_SCHEDULE });
+    testDb.raw.prepare('UPDATE registration_applications SET pricing_condition_id=?,pricing_snapshot_json=?')
+      .run('partner', snapshot);
+    const checked = await call('GET', `/api/auth/register/check?token=${encodeURIComponent(token)}`);
+    expect((await json(checked)).data).toMatchObject({ trialDays: null,
+      trialPeriod: { unit: 'months', value: 3 } });
+    const completed = await call('POST', '/api/auth/register/complete', {
+      token, tenantName: '株式会社サンプル', name: '山田 太郎', password: 'StrongPassword1!',
+    });
+    expect(completed.status).toBe(200);
+    const completedBody = await json(completed);
+    expect(completedBody.data.newPricingFlow).toBe(true);
+    const tenantId = completedBody.data.tenantId;
+    expect(testDb.raw.prepare('SELECT plan_status,trial_ends_at FROM tenants WHERE id=?').get(tenantId))
+      .toEqual({ plan_status: 'exempt', trial_ends_at: null });
+    expect(testDb.raw.prepare(`SELECT status,first_line_activated_at,first_charge_date
+      FROM musubo_tenant_billing WHERE tenant_id=?`).get(tenantId))
+      .toEqual({ status: 'awaiting_first_line', first_line_activated_at: null, first_charge_date: null });
+  });
+  it('期限切れの承認リンクは登録先だけに24時間の新リンクを送り、旧リンクを失効させる', async () => {
+    await call('POST', '/api/auth/register/request', validRequest);
+    const token = await issueApprovedInvite();
+    testDb.raw.prepare('UPDATE auth_email_tokens SET expires_at = ? WHERE token_hash = ?')
+      .run(toJstString(new Date(Date.now() - 1_000)), await sha256Hex(token));
+
+    const checked = await call('GET', `/api/auth/register/check?token=${encodeURIComponent(token)}`);
+    expect(checked.status).toBe(410);
+    const checkBody = await checked.json() as { code: string; data: { maskedEmail: string } };
+    expect(checkBody.code).toBe('expired');
+    expect(checkBody.data.maskedEmail).toBe('o•••@example.com');
+
+    const resent = await call('POST', '/api/auth/register/resend-expired', { token });
+    expect(resent.status).toBe(200);
+    expect(lastMailSubject()).toBe('【musubo】アカウント作成のご案内（再送）');
+    const newToken = lastMailToken();
+    expect(newToken).toBeTruthy();
+    expect(newToken).not.toBe(token);
+    const sentMail = mail.sendPlainMail.mock.calls.at(-1)?.[1];
+    expect(sentMail?.to).toBe('owner@example.com');
+    expect(sentMail?.html).toContain('アカウント作成へ');
+    expect((await call('GET', `/api/auth/register/check?token=${encodeURIComponent(newToken)}`)).status).toBe(200);
+    expect((await call('GET', `/api/auth/register/check?token=${encodeURIComponent(token)}`)).status).toBe(410);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM audit_events WHERE action = ?').get('registration.signup_link_resent')).toEqual({ n: 1 });
+  });
+
+  it('識別できないリンクや登録済みの申込から再送せず情報を返さない', async () => {
+    const unknown = await call('POST', '/api/auth/register/resend-expired', { token: 'unknown_registration_token_0123456789' });
+    expect(unknown.status).toBe(404);
+    expect(JSON.stringify(await unknown.json())).not.toContain('owner@example.com');
+    expect(mail.sendPlainMail).not.toHaveBeenCalled();
+  });
+
   it('申込後は承認まで登録できず、承認招待から統括とオーナーができる', async () => {
     const requested = await call('POST', '/api/auth/register/request', validRequest);
     expect(requested.status).toBe(200);
@@ -129,6 +190,7 @@ describe('会員登録（36-4）', () => {
     const body = await json(completed);
     // この試験は明示したOffの登録・セッション互換を確かめる。
     expect(body.data.twoFactorSetup).toBeUndefined();
+    expect(body.data.newPricingFlow).toBe(false);
     expect(body.data.deviceMarker).toMatch(/^[A-Za-z0-9_-]{16,}$/);
     expect(completed.headers.get('set-cookie') ?? '').toContain('lh_admin_session=');
     expect(completed.headers.get('set-cookie')).toContain('lh_signup_marker=');

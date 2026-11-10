@@ -7,9 +7,18 @@ const state = vi.hoisted(() => ({
   get: vi.fn(), contact: vi.fn(), approve: vi.fn(), resendInvite: vi.fn(),
   access: 'writer' as 'unknown' | 'readonly' | 'writer',
 }))
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('id=application-1') }))
+vi.mock('next/navigation', async () => ({
+  ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useSearchParams: () => new URLSearchParams('id=application-1'),
+}))
 vi.mock('./use-ops-read-only', async (importOriginal) => ({ ...(await importOriginal<typeof import('./use-ops-read-only')>()), useOpsReadOnlyState: () => state.access }))
-vi.mock('@/lib/api', () => ({ api: { ops: { applications: state } } }))
+vi.mock('@/lib/api', () => ({ api: {
+  ops: { applications: state },
+  pricingConditions: { list: () => Promise.resolve({ success: true, data: [{
+    id: 'normal', conditionKey: 'normal', internalName: '通常条件', status: 'active',
+    trialPeriod: { unit: 'days', value: 30 }, lineBasicDiscountPercent: 0,
+  }] }) },
+} }))
 
 import OpsApplicationDetail from './application-detail'
 
@@ -40,7 +49,7 @@ describe('申込詳細の連絡から承認まで', () => {
     fireEvent.click(approve)
     expect(screen.getByRole('dialog', { name: 'この申込を承認しますか？' })).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '承認して招待を送る' }))
-    await waitFor(() => expect(state.approve).toHaveBeenCalledWith('application-1'))
+    await waitFor(() => expect(state.approve).toHaveBeenCalledWith('application-1', 'normal'))
     expect(await screen.findByText('承認し、招待メールを送りました')).not.toBeNull()
   })
 

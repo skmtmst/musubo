@@ -74,6 +74,30 @@ beforeEach(() => {
 });
 
 describe('統括からのお問い合わせ', () => {
+  it('個別見積もりは申込時のメールアドレスへ確定デザインの控えを送る', async () => {
+    testDb.raw.prepare(`INSERT INTO registration_applications
+      (id,company_name,contact_name,email,phone,referral_source,status,tenant_id,created_at,updated_at)
+      VALUES ('app-quote','サンプル株式会社','担当者','applicant@example.com','0312345678','紹介','activated',?,?,?)`)
+      .run(DEFAULT_TENANT_ID, '2026-11-01T00:00:00+09:00', '2026-11-01T00:00:00+09:00');
+    const res = await call('POST', '/api/hq/support/requests', {
+      kind: 'billing', purpose: 'individual_quote', subject: '個別見積もりのお問い合わせ',
+      body: 'LINE 11個以上、友だち2,800人',
+    });
+    expect(res.status).toBe(201);
+    const sent = mail.send.mock.calls.map((call) => call[1] as { to: string; subject: string; body: string; html?: string });
+    expect(sent).toHaveLength(2);
+    expect(sent[0]?.to).toBe('ops@example.com');
+    expect(sent[1]).toMatchObject({ to: 'applicant@example.com',
+      subject: '【musubo】お見積もりのお問い合わせを受け付けました' });
+    expect(sent[1]?.html).toContain('今後のご案内');
+    expect((await call('POST', '/api/hq/support/requests', {
+      kind: 'usage', purpose: 'individual_quote', subject: '不正な目的', body: '内容',
+    })).status).toBe(400);
+    expect((await call('POST', '/api/hq/support/requests', {
+      kind: 'billing', purpose: 'individual_quote', subject: '個別見積もりのお問い合わせ', body: '内容',
+    }, { staff: staffOf({ role: 'staff' }) })).status).toBe(403);
+  });
+
   it('送ると記録が残り、運営へ知らせ、送信者に控えを送る', async () => {
     const res = await call('POST', '/api/hq/support/requests', { ...REQUEST, lineAccountId: 'account-1' });
     expect(res.status).toBe(201);

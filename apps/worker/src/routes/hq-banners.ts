@@ -49,7 +49,7 @@ import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { resolveEntitlements } from '../services/billing-plans.js';
+import { resolveTenantEntitlements } from '../services/billing-plans.js';
 import {
   BANNER_MAX_COUNT,
   BANNER_PRESETS,
@@ -134,7 +134,7 @@ function exemptMonthlyImages(c: Context<Env>): number {
 
 async function tenantEntitlements(c: Context<Env>, tenantId: string) {
   const billing = await getTenantBilling(c.env.DB, tenantId).catch(() => null);
-  return resolveEntitlements(billing, { exemptMonthlyImages: exemptMonthlyImages(c) });
+  return resolveTenantEntitlements(c.env.DB, billing, { exemptMonthlyImages: exemptMonthlyImages(c) });
 }
 
 type UsageSnapshot = {

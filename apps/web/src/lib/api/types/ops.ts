@@ -55,6 +55,7 @@ export type OpsApplication = {
   approved_at: string | null
   invite_sent_at: string | null
   tenant_id: string | null
+  pricing_snapshot_json?: string | null
   created_at: string
 }
 

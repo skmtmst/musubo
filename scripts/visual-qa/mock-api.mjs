@@ -1,5 +1,6 @@
 import { createGoogleHoursWorkspace, createGoogleHoursProfile, GOOGLE_STORE, GOOGLE_CONNECTION, GOOGLE_REVIEWS, GOOGLE_CONNECTION_DATA, GOOGLE_POSTS, GOOGLE_POST_LIST, GOOGLE_PERFORMANCE } from './google-hours-profile-fixture.mjs'
 import { RESTAURANT_LINE_FLOWS, restaurantFollowupRead } from './mock-restaurant-followup.mjs'
+import { musuboFlowRead } from './musubo-flow-fixtures.mjs'
 import { templateFolderList } from './mock-template-folders.mjs'
 import {seatBoardEntry} from '../../packages/shared/dist/reservation-board.js'
 import {DEFAULT_CUSTOMER_LOOK} from '../../packages/shared/dist/customer-look.js'
@@ -30,7 +31,6 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 // Web と同じ QR 生成器を使う。画像の口を JSON で返すと小窓が壊れる。
 const QRCode = createRequire(new URL('../../apps/web/package.json', import.meta.url))('qrcode')
-
 import { QA_CLOCK, storeAt, storeYmd } from './qa-clock.mjs'
 import { mockFingerprint } from './mock-fingerprint.mjs'
 import { gap3Respond } from './mock-gap3.mjs'
@@ -193,7 +193,6 @@ const RICH_MENU_PUBLISH_RUNS = {
     draftDiffersFromPublished: false,
   },
 }
-
 
 /* タグの編集の絵（Qat9s）の「EC顧客連携済み」。一覧の行（TAGS の先頭）と同じ値に、保存済みの連動の動きを足した形。 */
 const TAG_EC_CUSTOMER_ACTIONS = [
@@ -2961,6 +2960,7 @@ function gapuiCWrite(method, pathname, query) {
 }
 
 function bodyFor(method, pathname, query = new URLSearchParams()) {
+  { const musuboFlow = musuboFlowRead(method, pathname); if (musuboFlow) return musuboFlow }
   { const followup = restaurantFollowupRead(method, pathname); if (followup) return followup }
   { const gapuiC = gapuiCRead(method, pathname, query); if (gapuiC) return gapuiC }
   { const ab = broadcastAbRead(method, pathname); if (ab) return ab }

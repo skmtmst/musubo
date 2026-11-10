@@ -23,6 +23,12 @@
   line-height: var(--tpl-hq-contract-lh);
 }
 
+.recoveryAction {
+  display: flex;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
 .intervalRow {
   display: flex;
   align-items: center;

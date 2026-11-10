@@ -44,7 +44,7 @@ export default function AuthCard({
   /** 中身が広いカード（二段階認証の設定）。 */
   wide?: boolean
   /** 申込承認フロー v01 のカード。既存のログイン画面には適用しない。 */
-  applicationFlow?: 'form' | 'sent' | 'setup' | 'pending'
+  applicationFlow?: 'form' | 'sent' | 'setup' | 'pending' | 'recovery'
 }) {
   // ログイン前の画面もタブの題を「<見出し> | musubo」にする。
   useDocumentTitle(title)

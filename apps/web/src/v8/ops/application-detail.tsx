@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { api, type OpsApplication } from '@/lib/api'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
@@ -12,6 +12,9 @@ import { PageFrame } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import { OPS_READONLY_LOCK_REASON, useOpsReadOnlyState } from './use-ops-read-only'
 import { TextArea } from '@/components/shared/text-field'
+import EntitySelect from '@/components/shared/entity-select'
+import { Field } from '@/components/shared/form-controls'
+import type { StoredMusuboPricingCondition } from '@/lib/api/features/pricing-conditions'
 import styles from './application-detail.module.css'
 
 const statusLabel: Record<OpsApplication['status'], string> = {
@@ -28,6 +31,7 @@ export default function OpsApplicationDetail() {
 
 function Detail() {
   const id = useSearchParams().get('id') ?? ''
+  const router = useRouter()
   const access = useOpsReadOnlyState()
   const lock = access === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined
   const [application, setApplication] = useState<OpsApplication | null>(null)
@@ -37,6 +41,9 @@ function Detail() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [conditions, setConditions] = useState<StoredMusuboPricingCondition[]>([])
+  const [selectedConditionId, setSelectedConditionId] = useState('normal')
+  const [conditionsReady, setConditionsReady] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) { setError('申込が指定されていません'); setLoading(false); return }
@@ -50,6 +57,20 @@ function Detail() {
     finally { setLoading(false) }
   }, [id])
   useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    let disposed = false
+    void api.pricingConditions.list().then((result) => {
+      if (disposed) return
+      if (!result.success) throw new Error('conditions_unavailable')
+      const active = result.data.filter((condition) => condition.status === 'active')
+      setConditions(active)
+      setSelectedConditionId(active.find((condition) => condition.conditionKey === 'normal')?.id ?? active[0]?.id ?? '')
+      setConditionsReady(true)
+    }).catch(() => {
+      if (!disposed) { setConditionsReady(false); setError('利用条件を読み込めませんでした。再読み込みしてから承認してください') }
+    })
+    return () => { disposed = true }
+  }, [])
 
   const contact = async () => {
     if (!application || busy || !note.trim() || access !== 'writer') return
@@ -63,10 +84,11 @@ function Detail() {
   }
 
   const approve = async () => {
-    if (!application || busy || access !== 'writer') return
+    if (!application || busy || access !== 'writer' || !conditionsReady
+      || !applicableConditions.some((condition) => condition.id === selectedConditionId)) return
     setBusy(true); setError(''); setMessage('')
     try {
-      const result = await api.ops.applications.approve(application.id)
+      const result = await api.ops.applications.approve(application.id, selectedConditionId)
       if (!result.success) { setError(result.error || '承認できませんでした'); return }
       setApplication(result.data.application)
       setConfirmOpen(false)
@@ -87,7 +109,13 @@ function Detail() {
   }
 
   const canEdit = !!application && ['pending', 'contacted'].includes(application.status)
-  const canApprove = application?.status === 'contacted' && !!application.contact_note
+  const canApprove = application?.status === 'contacted' && !!application.contact_note && conditionsReady
+  const companyKey = (value: string) => value.normalize('NFKC').replace(/[\s\u3000]/g, '').toLowerCase()
+  const todayJst = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo', year: 'numeric',
+    month: '2-digit', day: '2-digit' }).format(new Date())
+  const applicableConditions = conditions.filter((condition) =>
+    (!condition.allowedCompanyName || companyKey(condition.allowedCompanyName) === companyKey(application?.company_name ?? ''))
+    && (!condition.approvalUseUntil || condition.approvalUseUntil >= todayJst))
   const writer = access === 'writer'
   const unknown = access === 'unknown'
 
@@ -128,15 +156,32 @@ function Detail() {
         <div className={styles.actionBand}>
           <p>担当者から連絡し、内容を確認してから承認してください。<br />連絡済みを保存すると、承認して招待できます。</p>
           {application.status === 'approved' ? <Button variant="primary" className={styles.approve} lockedReason={lock} disabled={busy || unknown} onClick={() => void resend()}>{application.invite_sent_at ? '招待メールを再送' : '招待メールを送る'}</Button>
-            : <Button variant="primary" className={styles.approve} lockedReason={lock} disabled={!canApprove || busy || unknown} onClick={() => setConfirmOpen(true)}>承認して招待メールを送る</Button>}
+            : application.status === 'activated' ? <Button variant="primary" className={styles.approve} lockedReason={lock} disabled={busy || unknown}
+              onClick={() => router.push(`/ops/applications/quote?id=${encodeURIComponent(application.id)}`)}>個別見積もりを作成・確認</Button>
+              : <Button variant="primary" className={styles.approve} lockedReason={lock}
+                disabled={!canApprove || applicableConditions.length === 0 || busy || unknown}
+                onClick={() => {
+                  if (!applicableConditions.some((condition) => condition.id === selectedConditionId)) {
+                    setSelectedConditionId(applicableConditions[0]?.id ?? '')
+                  }
+                  setConfirmOpen(true)
+                }}>承認して招待メールを送る</Button>}
         </div>
       </>}
     </article>
-    <ApprovalConfirm open={confirmOpen} application={application} busy={busy} onConfirm={() => void approve()} onCancel={() => setConfirmOpen(false)} />
+    <ApprovalConfirm open={confirmOpen} application={application} busy={busy}
+      conditions={applicableConditions} selectedConditionId={selectedConditionId}
+      onSelectCondition={setSelectedConditionId}
+      onConfirm={() => void approve()} onCancel={() => setConfirmOpen(false)} />
   </PageFrame>
 }
 
-function ApprovalConfirm({ open, application, busy, onConfirm, onCancel }: { open: boolean; application: OpsApplication | null; busy: boolean; onConfirm: () => void; onCancel: () => void }) {
+function ApprovalConfirm({ open, application, busy, conditions, selectedConditionId,
+  onSelectCondition, onConfirm, onCancel }: {
+  open: boolean; application: OpsApplication | null; busy: boolean;
+  conditions: StoredMusuboPricingCondition[]; selectedConditionId: string;
+  onSelectCondition: (id: string) => void; onConfirm: () => void; onCancel: () => void;
+}) {
   const ref = useOverlayFocus<HTMLDivElement>(open, onCancel, busy)
   const layer = useOverlayLayer(open)
   if (!open || !application || typeof document === 'undefined') return null
@@ -149,11 +194,22 @@ function ApprovalConfirm({ open, application, busy, onConfirm, onCancel }: { ope
           <div><dt>会社名</dt><dd>{application.company_name}</dd></div>
           <div><dt>招待メール送信先</dt><dd>{application.email}</dd></div>
         </dl>
+        <div className={styles.conditionChoice}>
+          <Field label="適用する利用条件" htmlFor="approval-pricing-condition" optional={false}>
+          <EntitySelect id="approval-pricing-condition" aria-label="適用する利用条件" size="full" value={selectedConditionId}
+            onChange={onSelectCondition} options={conditions.map((condition) => ({
+              value: condition.id,
+              label: `${condition.internalName}・${condition.trialPeriod.value}${condition.trialPeriod.unit === 'months' ? 'か月' : '日'}無料${condition.lineBasicDiscountPercent ? `・LINE基本料金${condition.lineBasicDiscountPercent}%オフ` : ''}`,
+            }))} />
+          </Field>
+          <small>選んだ条件は承認時に固定されます。あとから条件を変更しても、この会社の料金は変わりません。</small>
+          <a className={styles.conditionHelpLink} href="/ops/pricing-conditions">利用条件の設定を開く</a>
+        </div>
         <p className={styles.confirmNote}>申込内容と連絡記録を確認してから進めてください。</p>
       </div>
       <div className={styles.modalFooter}>
         <button type="button" onClick={onCancel} disabled={busy}>キャンセル</button>
-        <button type="button" onClick={onConfirm} disabled={busy}>{busy ? '承認しています…' : '承認して招待を送る'}</button>
+        <button type="button" onClick={onConfirm} disabled={busy || !conditions.some((item) => item.id === selectedConditionId)}>{busy ? '承認しています…' : '承認して招待を送る'}</button>
       </div>
     </div>
   </div>, document.body)

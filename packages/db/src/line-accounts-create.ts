@@ -41,7 +41,7 @@ export async function createLineAccount(
           parent_line_account_id, tenant_id,
           line_display_name, line_picture_url, line_basic_id, line_profile_synced_at,
           created_by_staff_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
          CASE WHEN EXISTS (
            SELECT 1 FROM line_accounts
             WHERE COALESCE(tenant_id, ?) = ? AND archived_at IS NULL
@@ -64,6 +64,7 @@ export async function createLineAccount(
       null,
       encryptedLoginSecret,
       input.liffId ?? null,
+      input.initialActive === false ? 0 : 1,
       DEFAULT_TENANT_ID,
       input.tenantId ?? DEFAULT_TENANT_ID,
       displayOrder,

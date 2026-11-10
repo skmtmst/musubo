@@ -34,4 +34,12 @@ describe('全V8画面の保存失敗を欄へ返す見張り', () => {
       return <SaveErrorScope errors={errors}><input /></SaveErrorScope>
     }`)).toHaveLength(1)
   })
+  it('入力欄のないLINE再接続は通知で扱い、入力欄があれば保存欄エラーを要求する', () => {
+    const action = `function Resume() {
+      async function reconnect() { try { await api.musuboLineResumption.connect(token) } catch(e) { setError('再接続できませんでした') } }
+      return <Button onClick={reconnect}>再接続</Button>
+    }`
+    expect(auditFormSaveErrors(action)).toEqual([])
+    expect(auditFormSaveErrors(action.replace('<Button onClick={reconnect}>', '<input /><Button onClick={reconnect}>'))).toHaveLength(1)
+  })
 })
