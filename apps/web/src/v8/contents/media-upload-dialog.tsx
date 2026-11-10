@@ -13,6 +13,7 @@ import Chip from '@/components/shared/chip'
 import { AttachmentRow } from '@/components/shared/file-drop'
 import MediaSlot, { formatBytes, formatNamesOf } from '@/components/shared/media-slot'
 import Notice from '@/components/shared/notice'
+import Disclosure from '@/components/shared/disclosure'
 import Progress from '@/components/shared/progress'
 import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
@@ -368,15 +369,14 @@ export default function MediaUploadDialog({
             onCreate={onCreateFolder}
             onChange={setFolderId}
           /></SaveErrorField></Field></div>
-        <details className="text-xs text-ink-secondary">
-          <summary>登録時の注意事項</summary>
+        <Disclosure appearance="inset" size="compact" title="登録時の注意事項">
           <Notice tone="info">
             <p>PDFはLINEで直接送れません。リンクとして使います。</p>
             <p>大きなファイルも管理画面を経由せず、保存先へ直接送ります。</p>
             <p>中身の形式と拡張子が違うファイルは登録できません。</p>
             <p>公開リンクが作られるため、個人情報の取り扱いに注意してください。</p>
           </Notice>
-        </details>
+        </Disclosure>
         </div>
   </Dialog><OverlayDepthContext.Provider value={depth + 1}>
     {preview?.previewUrl ? <MediaPreviewOverlay filename={preview.file.name} kind="image" src={preview.previewUrl} onClose={() => setPreview(null)} /> : null}
