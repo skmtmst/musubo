@@ -158,6 +158,18 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Require the dedicated staging D1 Write token
+        if: inputs.environment == 'staging'
+        env:
+          CF_D1_WRITE_TOKEN: ${{ secrets.CF_D1_WRITE_TOKEN }}
+        run: |
+          if [ -z "$CF_D1_WRITE_TOKEN" ]; then
+            echo "::error::staging environment secret CF_D1_WRITE_TOKEN が設定されていません"
+            exit 1
+          fi
+          # Use the migration-only credential for every subsequent D1 operation.
+          printf 'CLOUDFLARE_API_TOKEN=%s\n' "$CF_D1_WRITE_TOKEN" >> "$GITHUB_ENV"
+
       - name: Require an explicitly named staging migration
         env:
           TARGET_MIGRATION: ${{ inputs.migration }}
