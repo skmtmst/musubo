@@ -118,6 +118,9 @@ test('一覧の名前を押したら一覧のままにならず詳細が開く',
       const page = await openList(browser, route)
       try {
         const links = page.locator('a[data-row-link]')
+        // networkidle can precede React's final list render on a busy CI runner.
+        // Keep the missing-row assertion, but allow the hydrated row to appear first.
+        await links.first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {})
         const count = await links.count()
         // 行が無い画面があっても後ろの画面まで見て、最後にまとめて落とす。
         if (count === 0) { failures.push(`${route} に押せる名前が無い（偽APIの行を確認）`); continue }
