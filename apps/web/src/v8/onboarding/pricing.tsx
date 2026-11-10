@@ -198,7 +198,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
             料金条件と無料体験後のカード請求に同意します
           </Checkbox>}
           <div className={styles.detailsAction}>
-            <Button type="button" variant="text" onClick={() => setDetailsOpen(true)}>
+            <Button type="button" variant="text" textTone="accent" onClick={() => setDetailsOpen(true)}>
               {quoteRequired ? '標準料金のしくみを見る' : '料金の詳しい条件を見る'} ↗
             </Button>
           </div>
