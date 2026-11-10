@@ -106,7 +106,7 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
               <Field label="連携するLINEアカウント数" optional={false}><TextField value={countLabel(selection.lineCount)} readOnly /></Field>
               {!linked && <Field label="具体的な予定数" optional htmlFor="exact-line-count"
                 error={!exactCountValid ? '11以上の整数で入力してください。' : undefined}>
-                <TextField id="exact-line-count" inputMode="numeric" value={exactLineCount} placeholder="例：12個"
+                <TextField id="exact-line-count" inputMode="numeric" value={exactLineCount} placeholder="例：12"
                   onChange={(event) => setExactLineCount(event.target.value)} />
               </Field>}
               <Field label="既存のLINEアカウントの合計（ブロック除く）" optional={false}>
