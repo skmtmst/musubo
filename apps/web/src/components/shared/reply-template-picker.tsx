@@ -8,7 +8,7 @@ import { useOverlayFocus, useOverlayLayer } from '@/components/shared/overlay-ut
 import { opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import { TextArea, TextField } from '@/components/shared/text-field'
-import styles from './support-template-picker.module.css'
+import styles from './reply-template-picker.module.css'
 
 type View = 'list' | 'folders' | 'newFolder' | 'newTemplate'
 

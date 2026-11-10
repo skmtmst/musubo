@@ -5,7 +5,7 @@ import { PRIORITY_FILTER, SORT_OPTIONS } from './support-list-options'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
-import { Building2, ChevronLeft, FileText, LogIn, MoreHorizontal, Paperclip, Plus, Send } from 'lucide-react'
+import { Building2, ChevronLeft, FileText, LogIn, Paperclip, Plus, Send } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -35,7 +35,9 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
-import SupportTemplatePicker from './support-template-picker'
+import SupportTemplatePicker from '@/components/shared/reply-template-picker'
+import { RowMenu } from '@/components/shared/row-actions'
+import StickyBar from '@/components/shared/sticky-bar'
 
 /**
  * 運営のお問い合わせ。確定した Pen の一覧・返信・テンプレート引用に対応する。
@@ -111,7 +113,6 @@ export default function OpsSupportV8() {
   const [replyStage, setReplyStage] = useState<OpsSupportStage>('new')
   const [draftSaving, setDraftSaving] = useState(false)
   const [templateOpen, setTemplateOpen] = useState(false)
-  const [moreOpen, setMoreOpen] = useState(false)
   const [stageOpen, setStageOpen] = useState(false)
   const replyRef = useRef<HTMLTextAreaElement>(null)
   const insertAt = useRef(0)
@@ -202,7 +203,7 @@ export default function OpsSupportV8() {
   useEffect(() => { void loadSummary() }, [loadSummary])
   useEffect(() => { void loadList() }, [loadList])
   useEffect(() => {
-    setReply(''); setTemplateOpen(false); setMoreOpen(false); setStageOpen(false)
+    setReply(''); setTemplateOpen(false); setStageOpen(false)
     detailRequest.current += 1
     setDetail(null)
     if (!selectedId) return
@@ -311,6 +312,7 @@ export default function OpsSupportV8() {
     requestAnimationFrame(() => { replyRef.current?.focus(); replyRef.current?.setSelectionRange(point + body.length, point + body.length) })
     return true
   }
+  const proxyMenuItems = ticket ? [{ id: 'proxy-login', label: '代理ログイン', icon: <LogIn aria-hidden="true" />, disabled: busy || unknown, lockedReason: lock, onSelect: () => { if (access === 'writer') void impersonate(ticket.tenantId, setBusy, setError) } }] : []
 
   return (
     <PageFrame kind="list" boardId="P0jhqO" standalone skeleton>
@@ -373,18 +375,17 @@ export default function OpsSupportV8() {
             ) : <ListState permissionScope="hq" kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
           ) : (
             <>
-              <div className={styles.mobileTop}><button type="button" className={styles.mobileBack} onClick={() => setSelectedId(null)}><ChevronLeft aria-hidden="true" />お問い合わせ</button><button type="button" className={styles.mobileMore} aria-label="その他の操作" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}><MoreHorizontal aria-hidden="true" /></button>{moreOpen ? <div className={styles.mobileActionMenu}><Button lockedReason={lock} disabled={busy || unknown} onClick={() => { setMoreOpen(false); if (access === 'writer') void impersonate(ticket.tenantId, setBusy, setError) }}><LogIn aria-hidden="true" />代理ログイン</Button></div> : null}</div>
-              <CardHeader size="content" title={<TruncatedText value={`${ticket.ticketLabel} ${ticket.subject}`} />} />
+              <div className={styles.mobileTop}><Button variant="text" textTone="ink" className={styles.mobileBack} onClick={() => setSelectedId(null)}><ChevronLeft aria-hidden="true" />お問い合わせ</Button><RowMenu label="その他の操作" appearance="outlined" items={proxyMenuItems} /></div>
+              <div className={styles.detailTitleRow}><CardHeader size="content" title={<TruncatedText value={`${ticket.ticketLabel} ${ticket.subject}`} />} /></div>
               <div className={styles.detailControls}>
-                <div className={styles.statusWrap}><button type="button" data-stage={ticket.stage} className={styles.statusButton} aria-label="状態を変更" aria-expanded={stageOpen} disabled={busy || unknown || access !== 'writer'} title={lock} onClick={() => setStageOpen((value) => !value)}><StatusBadge tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge><span aria-hidden="true">⌄</span></button>
-                  {stageOpen ? <div className={styles.actionMenu}>{(ticket.stage === 'resolved' || ticket.stage === 'closed' ? [{ value: 'in_progress' as const, label: '対応中に戻す' }] : [{ value: 'resolved' as const, label: '解決する' }, { value: 'closed' as const, label: 'クローズする' }]).map((item) => <button type="button" key={item.value} onClick={() => { setStageOpen(false); void changeStage(item.value) }}>{item.label}</button>)}</div> : null}
+                <div className={styles.statusWrap}><Button variant="text" data-stage={ticket.stage} className={styles.statusButton} aria-label="状態を変更" aria-expanded={stageOpen} disabled={busy || unknown || access !== 'writer'} title={lock} onClick={() => setStageOpen((value) => !value)}><StatusBadge tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge><span aria-hidden="true">⌄</span></Button>
+                  {stageOpen ? <div className={styles.actionMenu}>{(ticket.stage === 'resolved' || ticket.stage === 'closed' ? [{ value: 'in_progress' as const, label: '対応中に戻す' }] : [{ value: 'resolved' as const, label: '解決する' }, { value: 'closed' as const, label: 'クローズする' }]).map((item) => <Button variant="text" textTone="ink" key={item.value} onClick={() => { setStageOpen(false); void changeStage(item.value) }}>{item.label}</Button>)}</div> : null}
                 </div>
                 <span className={styles.prioritySelect}>
                   <SaveErrorField names={["priority","ticket.priority"]}><Select size="page-size" aria-label="優先度を変える" lockedReason={lock} disabled={unknown} value={ticket.priority} onChange={(value) => void changePriority(value as OpsSupportPriority)} options={PRIORITY_OPTIONS} /></SaveErrorField>
                 </span>
-                <Button variant="text" className={styles.contractLink} href={tenantDetailHref(ticket.tenantId)}><Building2 aria-hidden="true" />契約先を開く</Button>
-                <div className={styles.moreWrap}><button type="button" className={styles.iconAction} aria-label="その他の操作" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}><MoreHorizontal aria-hidden="true" /></button>
-                  {moreOpen ? <div className={styles.actionMenu}><Button lockedReason={lock} disabled={busy || unknown} onClick={() => { setMoreOpen(false); if (access === 'writer') void impersonate(ticket.tenantId, setBusy, setError) }}><LogIn aria-hidden="true" />代理ログイン</Button></div> : null}</div>
+                <Button variant="text" textTone="quiet" className={styles.contractLink} href={tenantDetailHref(ticket.tenantId)}><Building2 aria-hidden="true" />契約先を開く</Button>
+                <div className={styles.moreWrap}><RowMenu label="その他の操作" appearance="outlined" items={proxyMenuItems} /></div>
               </div>
               <ol className={styles.messages} aria-label="やり取り">
                 <Message mine={false} at={ticket.createdAt} author={`${ticket.staffName || ticket.tenantName}（${shortDateTime(ticket.createdAt)}）`} body={ticket.body} attachments={ticket.attachments} />
@@ -403,7 +404,7 @@ export default function OpsSupportV8() {
               {(
                 <>
                   <div className={styles.draft}>
-                    <div className={styles.replyHeading}><strong>返信</strong><Button variant="text" lockedReason={lock} disabled={busy || unknown || closed} onClick={openTemplates}><FileText aria-hidden="true" />テンプレート引用</Button></div>
+                    <div className={styles.replyHeading}><strong>返信</strong><Button variant="text" textTone="quiet" lockedReason={lock} disabled={busy || unknown || closed} onClick={openTemplates}><FileText aria-hidden="true" />テンプレート引用</Button></div>
                     <SaveErrorField names={["reply","body"]}><TextArea
                       ref={replyRef}
                       className={styles.replyBox}
@@ -416,11 +417,11 @@ export default function OpsSupportV8() {
                       maxLength={4000}
                     /></SaveErrorField>
                   </div>
-                  <div className={styles.replyActions}>
-                    <Button variant="text" lockedReason={lock} onClick={() => saveDraft()} disabled={busy || unknown || draftSaving || closed} busy={draftSaving}>下書き保存</Button>
+                  <StickyBar presentation="support-reply" actions={<>
+                    <Button variant="text" textTone="quiet" lockedReason={lock} onClick={() => saveDraft()} disabled={busy || unknown || draftSaving || closed} busy={draftSaving}>下書き保存</Button>
                     <SaveErrorField names={["replyStage","nextStage","reply_stage"]}><Select aria-label="送信後の状態" label="送信後" size="content" lockedReason={lock} value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || unknown || closed} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.label }))} /></SaveErrorField>
                     <Button variant="primary" lockedReason={lock} onClick={() => { setError(''); setConfirmReply(true) }} disabled={busy || unknown || closed || !reply.trim()}><Send aria-hidden="true" />返信する</Button>
-                  </div>
+                  </>} />
                 </>
               )}
             </>

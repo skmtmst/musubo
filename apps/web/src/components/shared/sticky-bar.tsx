@@ -71,7 +71,7 @@ export default function StickyBar({
   /** 左の一覧と右の作る欄を分ける板だけで使う。 */
   split?: { lead?: ReactNode; trailingWidth: string }
   /** 本文につながるアカウントの操作行。指定した画面だけ浮かせない。 */
-  presentation?: 'account-registration' | 'account-handover' | 'distribution'
+  presentation?: 'account-registration' | 'account-handover' | 'distribution' | 'support-reply'
   className?: string
 }) {
   const separated = separateStickyInputReasons(presentation ? actions : normalizeStickySaveActions(actions))
