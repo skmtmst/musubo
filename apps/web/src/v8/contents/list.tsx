@@ -150,10 +150,11 @@ export default function MediaLibraryListV8() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   /** 名前を直している札。null なら誰も直していない。 */
-  const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null)
+  const [renaming, setRenaming] = useState<{ id: string; value: string; revision?: number } | null>(null)
   // 名前変更の多重押し防ぎと、札のそばに出す失敗文。一覧全体の欄には出さない。
   const [renamingBusy, setRenamingBusy] = useState(false)
   const [renameError, setRenameError] = useState('')
+  const [renameConflict, setRenameConflict] = useState(false)
   const depth = useContext(OverlayDepthContext)
   const renameOriginal = renaming ? items.find(item => item.id === renaming.id)?.filename : undefined
   const editBusy = renamingBusy || (archiveTarget !== null && archiveBusy) || (moveTarget !== null && moveBusy)
@@ -468,23 +469,57 @@ export default function MediaLibraryListV8() {
     if (!renaming || !selectedAccountId || renamingBusy) return
     const accountAtRequest = selectedAccountId
     const filename = renaming.value.trim()
-    if (!filename) return
+    if (!filename) {
+      setRenameError('ファイル名を入力してください。')
+      return
+    }
+    if (!renaming.revision) {
+      setRenameError('現在の版を確認できません。最新の名前を読み直してください。')
+      setRenameConflict(true)
+      return
+    }
     setRenamingBusy(true)
     setRenameError('')
     try {
-      const res = await api.media.update(renaming.id, accountAtRequest, { filename })
+      const res = await api.media.update(renaming.id, accountAtRequest, { filename, expectedRevision: renaming.revision })
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
         setRenameError(`「${renaming.value}」に変更できませんでした。${res.error}`)
         return
       }
       setRenaming(null)
+      notifyToast(`「${res.data.filename}」に名前を変更しました。`, { tone: 'success' })
       void load()
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
+      if (saveFailure instanceof ApiError && saveFailure.status === 409) {
+        setRenameError('ほかの人が先に変更しました。最新の名前を読み直してください。')
+        setRenameConflict(true)
+      } else if (!fieldFailure) {
+        setRenameError(describeApiFailure(saveFailure, '名前の変更'))
+      }
+    } finally {
+      setRenamingBusy(false)
+    }
+  }
 
-      { if (!fieldFailure)
-      setRenameError('名前の変更に失敗しました。もう一度お試しください。') }
+  const reloadRename = async () => {
+    if (!renaming || !selectedAccountId || renamingBusy) return
+    const accountAtRequest = selectedAccountId
+    setRenamingBusy(true)
+    try {
+      const response = await api.media.detail(renaming.id, accountAtRequest)
+      if (accountAtRequest !== latestAccountRef.current) return
+      if (!response.success || !response.data.item.revision) {
+        setRenameError('最新の名前を読み込めませんでした。もう一度お試しください。')
+        return
+      }
+      setRenaming({ id: renaming.id, value: response.data.item.filename, revision: response.data.item.revision })
+      setItems((current) => current.map((item) => item.id === renaming.id ? response.data.item : item))
+      setRenameConflict(false)
+      setRenameError('')
+    } catch (failure) {
+      setRenameError(describeApiFailure(failure, '最新の名前の読み込み'))
     } finally {
       setRenamingBusy(false)
     }
@@ -643,12 +678,17 @@ export default function MediaLibraryListV8() {
    */
   async function confirmMove() {
     if (!moveTarget || !selectedAccountId || moveBusy) return
+    if (!moveTarget.revision) {
+      setMoveError('現在の版を確認できません。一覧を読み直してから選び直してください。')
+      return
+    }
     const accountAtRequest = selectedAccountId
     const { id, filename } = moveTarget
     setMoveBusy(true)
     setMoveError('')
     try {
       const res = await api.media.update(id, accountAtRequest, {
+        expectedRevision: moveTarget.revision,
         folderId: moveFolderId || null,
       })
       if (accountAtRequest !== latestAccountRef.current) return
@@ -664,8 +704,9 @@ export default function MediaLibraryListV8() {
       const fieldFailure = saveErrors.capture(e);
 
       if (e instanceof ApiError && e.status === 409) {
-        { if (!fieldFailure)
-        setMoveError('直前に誰かが変えたため、移動できませんでした。一覧を読み直しました。') }
+        if (!fieldFailure) setMoveError('直前に誰かが変えました。一覧を読み直してから選び直してください。')
+        setMoveTarget(null)
+        notifyToast('直前に誰かが変えたため移動できませんでした。一覧を読み直して選び直してください。', { tone: 'error' })
         void load();
 
         return
@@ -1411,6 +1452,7 @@ export default function MediaLibraryListV8() {
                   menuOpen={openMenuId === item.id}
                   renaming={renaming?.id === item.id ? renaming : null}
                   renamingBusy={renamingBusy}
+                  renameConflict={renameConflict}
                   renameError={renameError}
                   onToggleSelect={() =>
                     setSelected((prev) => {
@@ -1425,10 +1467,11 @@ export default function MediaLibraryListV8() {
                   onCloseMenu={() => setOpenMenuId(null)}
                   onDetail={() => guard.guarded(() => setDetailUrl(item.id))}
                   onDownload={() => { void downloadItem(item) }}
-                  onRenameStart={() => guard.guarded(() => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) })}
+                  onRenameStart={() => guard.guarded(() => { setRenameError(''); setRenameConflict(false); setRenaming({ id: item.id, value: item.filename, revision: item.revision }) })}
                   onRenameCancel={() => guard.guarded(() => setRenaming(null))}
-                  onRenameChange={(value) => setRenaming({ id: item.id, value })}
+                  onRenameChange={(value) => setRenaming((current) => current?.id === item.id ? { ...current, value } : current)}
                   onRenameConfirm={() => { void rename() }}
+                  onRenameReload={() => { void reloadRename() }}
                   onMoveStart={() => guard.guarded(() => { setMoveError(''); setMoveFolderId(item.folderId ?? ''); setMoveTarget(item) })}
                   onArchiveStart={() => guard.guarded(() => { setArchiveError(''); setArchiveReason(''); setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' }) })}
                   onDeleteStart={() => guard.guarded(() => { void openDelete(item) })}

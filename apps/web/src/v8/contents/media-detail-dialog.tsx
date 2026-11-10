@@ -7,7 +7,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import type { MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
-import { api, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
+import { api, ApiError, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import MediaSlot from '@/components/shared/media-slot'
@@ -248,10 +248,15 @@ export default function MediaDetailDialog({
   /** 利用期限・同意の記録。空欄は「記録なし＝不明」へ戻す。 */
   async function saveTerms() {
     if (!item || !accountId || termsBusy) return
+    if (!item.revision) {
+      setTermsError('現在の版を確認できません。画面を開き直してから保存してください。')
+      return
+    }
     setTermsBusy(true)
     setTermsError('')
     try {
       const response = await api.media.update(item.id, accountId, {
+        expectedRevision: item.revision,
         usageExpiresAt: termsExpiresAt || null,
         usageConsentNote: termsConsentNote.trim() || null,
       })
@@ -261,8 +266,11 @@ export default function MediaDetailDialog({
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
 
-      { if (!fieldFailure)
-      setTermsError(describeApiFailure(caught, '保存')) }
+      if (caught instanceof ApiError && caught.status === 409) {
+        setTermsError('ほかの人が先に変更しました。画面を開き直して最新の内容を確認してください。')
+      } else if (!fieldFailure) {
+        setTermsError(describeApiFailure(caught, '保存'))
+      }
     } finally {
       setTermsBusy(false)
     }

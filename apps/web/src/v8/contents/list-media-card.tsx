@@ -13,6 +13,7 @@ import { formatMediaDetails,isKnownUnused,MediaView } from './list-model'
 import styles from './list.module.css'
 import { formatMediaSize } from './media-usage-display'
 import { TextField as SharedTextField } from '@/components/shared/text-field'
+import { Archive, ArchiveRestore, Download, Eye, FolderInput, List, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 
 export type MediaCardV8Props = {
   item: MediaItem
@@ -26,8 +27,9 @@ export type MediaCardV8Props = {
   selected: boolean
   downloading: boolean
   menuOpen: boolean
-  renaming: { id: string; value: string } | null
+  renaming: { id: string; value: string; revision?: number } | null
   renamingBusy: boolean
+  renameConflict: boolean
   renameError: string
   onToggleSelect: () => void
   onPreview: () => void
@@ -39,6 +41,7 @@ export type MediaCardV8Props = {
   onRenameCancel: () => void
   onRenameChange: (value: string) => void
   onRenameConfirm: () => void
+  onRenameReload: () => void
   onMoveStart: () => void
   onArchiveStart: () => void
   onDeleteStart: () => void
@@ -65,6 +68,7 @@ export function MediaCardV8({
   menuOpen,
   renaming,
   renamingBusy,
+  renameConflict,
   renameError,
   onToggleSelect,
   onPreview,
@@ -76,6 +80,7 @@ export function MediaCardV8({
   onRenameCancel,
   onRenameChange,
   onRenameConfirm,
+  onRenameReload,
   onMoveStart,
   onArchiveStart,
   onDeleteStart,
@@ -101,33 +106,35 @@ export function MediaCardV8({
           {
             id: 'preview',
             label: 'プレビュー',
+            icon: <Eye size={16} aria-hidden="true" />,
             onSelect: onPreview,
           },
           ...(canManageMedia
-            ? [{ id: 'detail', label: '使用箇所を見る', onSelect: onDetail }]
+            ? [{ id: 'detail', label: '使用箇所を見る', icon: <List size={16} aria-hidden="true" />, onSelect: onDetail }]
             : []),
           ...(canManageMedia && !item.archivedAt
-            ? [{ id: 'rename', label: '名前を変える', onSelect: onRenameStart }]
+            ? [{ id: 'rename', label: '名前を変える', icon: <Pencil size={16} aria-hidden="true" />, onSelect: onRenameStart }]
             : []),
           ...(canManageMedia && !item.archivedAt
-            ? [{ id: 'move', label: 'フォルダへ移す', onSelect: onMoveStart }]
+            ? [{ id: 'move', label: 'フォルダへ移す', icon: <FolderInput size={16} aria-hidden="true" />, onSelect: onMoveStart }]
             : []),
           {
             id: 'download',
             label: 'ダウンロード',
+            icon: <Download size={16} aria-hidden="true" />,
             disabled: downloading,
             disabledReason: downloading ? 'ファイルを取り出しています' : undefined,
             onSelect: onDownload,
           },
           ...(canManageMedia
-            ? [{ id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', onSelect: onArchiveStart }]
+            ? [{ id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', icon: item.archivedAt ? <ArchiveRestore size={16} aria-hidden="true" /> : <Archive size={16} aria-hidden="true" />, onSelect: onArchiveStart }]
             : []),
           // 削除確認の窓の撮影は「…」→この項目の2手で開ける。
           ...(canManageMedia && !item.archivedAt
-            ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, dividerBefore: true, qaOpen: 'YfTfJ', onSelect: onDeleteStart }]
+            ? [{ id: 'delete', label: '削除する', icon: <Trash2 size={16} aria-hidden="true" />, tone: 'danger' as const, dividerBefore: true, qaOpen: 'YfTfJ', onSelect: onDeleteStart }]
             : []),
           ...(canManageMedia && !item.archivedAt
-            ? [{ id: 'replace', label: '別のメディアに差し替える', onSelect: onReplaceStart }]
+            ? [{ id: 'replace', label: '別のメディアに差し替える', icon: <RefreshCw size={16} aria-hidden="true" />, onSelect: onReplaceStart }]
             : []),
         ]}
       />
@@ -163,12 +170,13 @@ export function MediaCardV8({
             {renameError && (
               <p className={styles.renameError} role="alert">{renameError}</p>
             )}
+            {renameConflict ? <Button variant="secondary" onClick={onRenameReload} disabled={renamingBusy}>最新を読み直す</Button> : null}
             {mediaMenu}
             <div className={styles.renameActions}>
               <Button variant="secondary" onClick={onRenameCancel} disabled={renamingBusy}>
                 キャンセル
               </Button>
-              <Button variant="primary" onClick={onRenameConfirm} disabled={renamingBusy} busy={renamingBusy} busyLabel="保存中…">
+              <Button variant="primary" onClick={onRenameConfirm} disabled={renamingBusy || renameConflict} busy={renamingBusy} busyLabel="保存中…">
                 保存する
               </Button>
             </div>
