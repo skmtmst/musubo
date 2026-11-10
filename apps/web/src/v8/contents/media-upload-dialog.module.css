@@ -1,0 +1,90 @@
+.picker {
+  min-height: 120px;
+}
+
+.limits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.limits span {
+  white-space: nowrap;
+}
+
+.heroPreview {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 220px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-sunken);
+  cursor: zoom-in;
+}
+
+.heroPreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.heroPreview span {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  border-radius: 999px;
+  background: var(--color-canvas);
+  padding: 5px 10px;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 1px 5px rgb(0 0 0 / 12%);
+}
+
+.heroPreview:focus-visible,
+.previewLink:focus-visible {
+  outline: 2px solid var(--color-accent-deep);
+  outline-offset: 2px;
+}
+
+.thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.previewLink {
+  margin: 4px 0 0 48px;
+  color: var(--color-accent-deep);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.help {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.help summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.help > :not(summary) {
+  margin-top: 8px;
+}
+
+@media (max-width: 640px) {
+  .picker { min-height: 112px; }
+  .heroPreview { height: 180px; }
+  .limits span { white-space: normal; }
+}
