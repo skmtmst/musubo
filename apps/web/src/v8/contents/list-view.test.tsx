@@ -302,10 +302,10 @@ describe('数の帯と札', () => {
     await click(host.querySelector('button[aria-label="使い方ガイド.mp4のその他操作"]'))
     await click([...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === '名前を変える'))
     await click(button('保存する', host))
-    expect(host.textContent).toContain('ほかの人が先に変更しました')
+    expect(host.textContent).toContain('ほかの人が先に名前を変更しました')
     expect((host.querySelector('input[aria-label="ファイル名"]') as HTMLInputElement).value).toBe('使い方ガイド.mp4')
     expect(button('保存する', host)?.disabled).toBe(true)
-    await click(button('最新を読み直す', host))
+    await click(button('最新を読み込んで続ける', host))
     expect((host.querySelector('input[aria-label="ファイル名"]') as HTMLInputElement).value).toBe('別の人の名前.mp4')
     expect(button('保存する', host)?.disabled).toBe(false)
   })
@@ -323,6 +323,26 @@ describe('数の帯と札', () => {
     await click(button('保存する', host))
     expect(calls.find((call) => call.method === 'PATCH' && call.path === '/api/media/m-movie')?.ifMatch).toBe('3')
     expect(host.textContent).toContain('利用許諾を確認済み')
+  })
+
+  it('詳細の保存が競合したら入力を残し、最新を読み込んで再編集できる', async () => {
+    conflictRename = true
+    await render()
+    await click(host.querySelector('button[aria-label="使い方ガイド.mp4のその他操作"]'))
+    await click([...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === '使用箇所を見る'))
+    await click(button('記録する', host))
+    const field = host.querySelector<HTMLInputElement>('input[placeholder^="例：出演者"]')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '入力中の記録')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(button('保存する', host))
+    expect(host.textContent).toContain('ほかの人が先に利用の期限・同意を変更しました')
+    expect(field.value).toBe('入力中の記録')
+    expect(button('保存する', host)?.disabled).toBe(true)
+    await click(button('最新を読み込んで続ける', host))
+    expect(field.value).toBe('')
+    expect(button('保存する', host)?.disabled).toBe(false)
   })
 
   it('閲覧のみの「…」はプレビューとダウンロードだけで、選ぶ札も出さない', async () => {

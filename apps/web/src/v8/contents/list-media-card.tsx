@@ -7,6 +7,7 @@ import { FolderDot,type FolderDotFolder } from '@/components/shared/folder-dot'
 import MediaThumbnail from '@/components/shared/media-thumbnail'
 import { RowMenu } from '@/components/shared/row-actions'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import TruncatedText from '@/components/shared/truncated-text'
 import type { MediaItem } from '@line-crm/shared'
 import { formatMediaDetails,isKnownUnused,MediaView } from './list-model'
@@ -170,7 +171,7 @@ export function MediaCardV8({
             {renameError && (
               <p className={styles.renameError} role="alert">{renameError}</p>
             )}
-            {renameConflict ? <Button variant="secondary" onClick={onRenameReload} disabled={renamingBusy}>最新を読み直す</Button> : null}
+            {renameConflict ? <SaveConflictBand title="ほかの人が先に名前を変更しました" description="入力中の名前は保存されていません。最新を読み込んでから編集してください。" reloadVariant="secondary" onReload={onRenameReload} /> : null}
             {mediaMenu}
             <div className={styles.renameActions}>
               <Button variant="secondary" onClick={onRenameCancel} disabled={renamingBusy}>

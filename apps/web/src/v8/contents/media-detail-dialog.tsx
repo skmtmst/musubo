@@ -7,11 +7,12 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import type { MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
-import { api, ApiError, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
+import { api, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import MediaSlot from '@/components/shared/media-slot'
 import Notice from '@/components/shared/notice'
+import { isSaveConflict, SaveConflictBand } from '@/components/shared/save-conflict'
 import Select from '@/components/shared/select'
 import { formatMediaSize } from './media-usage-display'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
@@ -171,6 +172,7 @@ export default function MediaDetailDialog({
   const [termsConsentNote, setTermsConsentNote] = useState('')
   const [termsBusy, setTermsBusy] = useState(false)
   const [termsError, setTermsError] = useState('')
+  const [termsConflict, setTermsConflict] = useState(false)
   const [termsDiscardOpen, setTermsDiscardOpen] = useState(false)
   const [versionNotice, setVersionNotice] = useState('')
   const [pendingVersionMessage, setPendingVersionMessage] = useState<string | null>(null)
@@ -242,12 +244,14 @@ export default function MediaDetailDialog({
     setTermsExpiresAt(item.usageExpiresAt ?? '')
     setTermsConsentNote(item.usageConsentNote ?? '')
     setTermsError('')
+    setTermsConflict(false)
     setTermsEditing(true)
   }
 
   /** 利用期限・同意の記録。空欄は「記録なし＝不明」へ戻す。 */
   async function saveTerms() {
     if (!item || !accountId || termsBusy) return
+    if (termsConflict) return
     if (!item.revision) {
       setTermsError('現在の版を確認できません。画面を開き直してから保存してください。')
       return
@@ -262,15 +266,38 @@ export default function MediaDetailDialog({
       })
       if (!response.success) throw new Error(response.error)
       setTermsEditing(false)
+      setTermsConflict(false)
       onItemUpdated?.(response.data)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
 
-      if (caught instanceof ApiError && caught.status === 409) {
-        setTermsError('ほかの人が先に変更しました。画面を開き直して最新の内容を確認してください。')
+      if (isSaveConflict(caught)) {
+        setTermsError('')
+        setTermsConflict(true)
       } else if (!fieldFailure) {
         setTermsError(describeApiFailure(caught, '保存'))
       }
+    } finally {
+      setTermsBusy(false)
+    }
+  }
+
+  async function reloadTerms() {
+    if (!item || !accountId || termsBusy) return
+    setTermsBusy(true)
+    setTermsError('')
+    try {
+      const response = await api.media.detail(item.id, accountId)
+      if (!response.success || !response.data.item.revision) {
+        setTermsError('最新の内容を読み込めませんでした。もう一度お試しください。')
+        return
+      }
+      onItemUpdated?.(response.data.item)
+      setTermsExpiresAt(response.data.item.usageExpiresAt ?? '')
+      setTermsConsentNote(response.data.item.usageConsentNote ?? '')
+      setTermsConflict(false)
+    } catch (caught) {
+      setTermsError(describeApiFailure(caught, '最新の内容の読み込み'))
     } finally {
       setTermsBusy(false)
     }
@@ -349,6 +376,7 @@ export default function MediaDetailDialog({
     setVersionDownloadError('')
     setTermsEditing(false)
     setTermsError('')
+    setTermsConflict(false)
     setVersionNotice('')
     setPendingVersionMessage(null)
   }, [item?.id])
@@ -611,9 +639,10 @@ export default function MediaDetailDialog({
                     placeholder="例：出演者の同意書を確認済み（2026-01-10）"
                   /></SaveErrorField></Field></div>
                 {termsError ? <Notice tone="danger" message={termsError} /> : null}
+                {termsConflict ? <SaveConflictBand title="ほかの人が先に利用の期限・同意を変更しました" description="入力中の内容は保存されていません。最新を読み込んでから編集してください。" reloadVariant="secondary" onReload={() => void reloadTerms()} /> : null}
                 <div className="flex justify-end gap-2">
                   <Button type="button" onClick={() => { if (termsDirty) setTermsDiscardOpen(true); else setTermsEditing(false) }} disabled={termsBusy}>キャンセル</Button>
-                  <Button type="button" variant="primary" onClick={() => void saveTerms()} disabled={termsBusy} busy={termsBusy} busyLabel="保存しています…">保存する
+                  <Button type="button" variant="primary" onClick={() => void saveTerms()} disabled={termsBusy || termsConflict} busy={termsBusy} busyLabel="保存しています…">保存する
                   </Button>
                 </div>
               </div>

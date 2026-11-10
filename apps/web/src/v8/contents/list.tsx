@@ -34,6 +34,7 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { isSaveConflict } from '@/components/shared/save-conflict'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import { notifyToast } from '@/components/shared/toast'
@@ -492,8 +493,8 @@ export default function MediaLibraryListV8() {
       void load()
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
-      if (saveFailure instanceof ApiError && saveFailure.status === 409) {
-        setRenameError('ほかの人が先に変更しました。最新の名前を読み直してください。')
+      if (isSaveConflict(saveFailure)) {
+        setRenameError('')
         setRenameConflict(true)
       } else if (!fieldFailure) {
         setRenameError(describeApiFailure(saveFailure, '名前の変更'))
