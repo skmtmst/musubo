@@ -29,6 +29,7 @@ const fixture = vi.hoisted(() => ({
   igDisconnect: vi.fn(),
   replace: vi.fn(),
   role: { value: 'owner' as string | null },
+  style: { value: 'restaurant' as string },
   search: { value: '' },
   account: { selected: 'acc-1', accounts: [] as Array<{ id: string }> },
   selectAccount: vi.fn(),
@@ -58,6 +59,9 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.account.selected, accounts: fixture.account.accounts, setSelectedAccountId: fixture.selectAccount }),
+}))
+vi.mock('@/hooks/use-account-style', () => ({
+  useAccountStyle: () => ({ status: 'ready', data: { style: fixture.style.value } }),
 }))
 vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '稼働版を確認' }) }))
 vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'acc-1', name: '移行前の店' }, { id: 'acc-2', name: '移行先の店' }] })) }))
@@ -124,6 +128,7 @@ async function openIgMenu() {
 afterEach(() => {
   cleanup()
   fixture.role.value = 'owner'
+  fixture.style.value = 'restaurant'
   fixture.search.value = ''
   fixture.account.selected = 'acc-1'
   fixture.account.accounts = []
@@ -307,6 +312,20 @@ describe('Google のカード', () => {
     fireEvent.click(card.getByRole('button', { name: '接続を解除する' }))
     expect(await screen.findByText('Googleアカウントの接続を解除しますか？')).toBeTruthy()
     expect(fixture.googleDisconnect).not.toHaveBeenCalled()
+  })
+
+  it('飲食店以外は営業時間だけへ案内し、飲食店専用画面へのリンクを出さない', async () => {
+    fixture.style.value = 'salon'
+    fixture.googleConnection.mockResolvedValue({ ...googleData(), connection: { status: 'connected', locationName: 'locations/1', locationTitle: 'サロン' } })
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    render(<SnsSettingsPage />)
+    const card = within(await screen.findByRole('region', { name: 'Google ビジネス' }))
+    expect(await card.findByRole('link', { name: '営業時間へ' })).toBeTruthy()
+    expect(card.queryByRole('link', { name: '口コミへ' })).toBeNull()
+    expect(card.queryByRole('link', { name: '投稿へ' })).toBeNull()
+    expect(card.queryByRole('link', { name: 'プロフィールへ' })).toBeNull()
+    expect(card.queryByText('口コミ')).toBeNull()
+    expect(card.queryByText('投稿')).toBeNull()
   })
 
   it('店舗の選択待ちなら候補を選んで接続できる', async () => {
