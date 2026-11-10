@@ -175,6 +175,12 @@
 }
 
 @media (max-width: 600px) {
+  :root :global(#main-content).onboardingMain h1[title] {
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+    font-size: 28px;
+  }
   .onboardingMain :global([data-step-name]) {
     max-width: 100%;
     overflow: visible;
