@@ -249,6 +249,8 @@ export const app = new Hono<Env>();
 export const ADMIN_REQUEST_HEADERS = [
   'Content-Type',
   'Authorization',
+  'If-Match',
+  'If-None-Match',
   'X-CSRF-Token',
   'X-Line-Account-Id',
   'x-admin-api-key',

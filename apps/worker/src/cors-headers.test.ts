@@ -46,6 +46,10 @@ describe('CORS の許可ヘッダ', () => {
     expect(allowed.has('x-step-up-token')).toBe(true);
   });
 
+  it('登録メディアの版確認ヘッダが入っている', () => {
+    expect(allowed.has('if-match')).toBe(true);
+  });
+
   it('管理画面が実際に送るヘッダが、すべて許されている', () => {
     /*
      * 画面のコードから、リクエストヘッダとして書かれている名前を拾う。
@@ -58,7 +62,7 @@ describe('CORS の許可ヘッダ', () => {
       for (const m of source.matchAll(/['"]([A-Za-z][A-Za-z0-9-]*-[A-Za-z0-9-]+)['"]\s*:/g)) {
         const name = m[1].toLowerCase();
         // ヘッダらしい名前だけを見る。CSS の kebab-case などを避ける。
-        if (/^(x-|content-|authorization|idempotency-|accept-)/.test(name)) found.add(name);
+        if (/^(x-|content-|authorization|idempotency-|accept-|if-)/.test(name)) found.add(name);
       }
     }
     const missing = [...found].filter((h) => !allowed.has(h));

@@ -63,4 +63,20 @@ describe('取得の待ち時間と実WorkerのCORS', () => {
     expect(result.headers.get('Access-Control-Max-Age')).toBe('600');
     expect(db.prepare).not.toHaveBeenCalled();
   });
+  it('登録メディアの名前変更・フォルダ移動の事前確認で If-Match を許す', async () => {
+    const result = await app.request('https://api.fixture.test/api/media/synthetic?accountId=synthetic', {
+      method: 'OPTIONS',
+      headers: {
+        Origin: origin,
+        'Access-Control-Request-Method': 'PATCH',
+        'Access-Control-Request-Headers': 'content-type,if-match,x-csrf-token',
+      },
+    }, env);
+    expect(result.status).toBe(204);
+    expect(result.headers.get('Access-Control-Allow-Origin')).toBe(origin);
+    expect(result.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+    const allowedHeaders = result.headers.get('Access-Control-Allow-Headers')?.toLowerCase().split(',');
+    expect(allowedHeaders).toEqual(expect.arrayContaining(['content-type', 'if-match', 'x-csrf-token']));
+    expect(db.prepare).not.toHaveBeenCalled();
+  });
 });
