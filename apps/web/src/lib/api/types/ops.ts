@@ -170,6 +170,9 @@ export type OpsKnowledgeArticleKind = 'verified' | 'answer_example'
 export type OpsKnowledgeReference = { id: string; version: number; title: string; articleKind: OpsKnowledgeArticleKind }
 
 export type OpsSupportDraft = { body: string; aiGenerated: boolean; generatedAt: string | null; updatedAt: string; references?: OpsKnowledgeReference[] }
+export type OpsSupportTemplateFolder = { id: string; name: string }
+export type OpsSupportReplyTemplate = { id: string; folderId: string; title: string; body: string; createdAt: string; updatedAt: string }
+export type OpsSupportTemplateCatalog = { folders: OpsSupportTemplateFolder[]; templates: OpsSupportReplyTemplate[] }
 
 export type OpsKnowledgeReviewState = 'pending' | 'approved' | 'needs_review' | 'dismissed'
 
@@ -330,5 +333,5 @@ export type OpsSupportDetail = {
   tenant: { accountCount: number; staffCount: number; staffWithLine: number; pastTickets: number; pastOpen: number }
   messages: OpsSupportMessage[]
   draft: OpsSupportDraft | null
-  ai: { available: boolean }
+  ai?: { available: boolean }
 }

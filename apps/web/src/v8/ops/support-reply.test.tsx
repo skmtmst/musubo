@@ -100,13 +100,13 @@ test('217：返信の送信時に選んだ状態を確認して送る', async ()
   await waitFor(() => expect(net.reply).toHaveBeenCalledWith('t1', expect.objectContaining({ nextStage: 'in_progress' })))
 })
 
-test('代わりに起票する窓で、契約先・件名・内容が空なら口を呼ばず欄が赤くなり、契約先の欄へ移る', async () => {
+test('チケット作成の窓で、契約先・件名・内容が空なら口を呼ばず欄が赤くなり、契約先の欄へ移る', async () => {
   const { api } = await import('@/lib/api')
   const create = vi.spyOn(api.ops.support, 'create')
   vi.spyOn(api.ops, 'tenants').mockResolvedValue({ success: true, data: [] } as never)
   render(<OpsSupportV8 />)
-  await act(async () => { (await screen.findByRole('button', { name: '代わりに起票する' })).click() })
-  await act(async () => { screen.getByRole('button', { name: '作る' }).click() })
+  await act(async () => { (await screen.findByRole('button', { name: 'チケット作成' })).click() })
+  await act(async () => { screen.getByRole('button', { name: '作成する' }).click() })
   await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
   expect(create).not.toHaveBeenCalled()
   expect(document.querySelector('#sup-tenant-error')?.textContent).toBe('契約先を選んでください')

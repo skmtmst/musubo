@@ -1,8 +1,11 @@
-/* 運営のお問い合わせ V8（・代わりに起票 ）。値は --tpl-op-*。 */
+/* 運営のお問い合わせ。 */
+.createAction, .columns { --support-create-width: 168px; --support-create-height: 40px; --support-priority-width: 34px; --support-priority-height: 22px; --support-detail-offset: 246px; --support-status-height: 30px; --support-menu-width: 170px; --support-reply-desktop-height: 260px; --support-reply-compact-height: 220px; --support-mobile-header-height: 58px; --support-mobile-message-height: 114px; --support-reply-mobile-height: 464px; --support-mobile-pad: 18px; --support-draft-bottom: 30px; --support-send-surface: #c3cdc7; --support-send-height: 44px; }
 
 .notice {
   margin-bottom: var(--tpl-op-section-gap);
 }
+
+.createAction.createAction { min-width: var(--support-create-width); min-height: var(--support-create-height); justify-content: center; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); color: var(--color-accent-deep); }
 
 .columns {
   display: flex;
@@ -18,6 +21,7 @@
   flex-direction: column;
   gap: var(--tpl-op-me-gap);
 }
+.list :global([data-toolbar-role='sort']) { margin-left: 0 !important; }
 
 .chipRow {
   display: flex;
@@ -83,6 +87,12 @@
   gap: var(--tpl-op-auth-field-gap);
 }
 
+.badges { display: inline-flex; align-items: center; gap: var(--space-8); flex: none; }
+.priorityhigh, .prioritymedium, .prioritylow { display: inline-flex; align-items: center; justify-content: center; min-width: var(--support-priority-width); height: var(--support-priority-height); border-radius: var(--radius-mini); padding: 0 var(--space-8); font-size: var(--text-micro); font-weight: 700; line-height: 1; }
+.priorityhigh { color: var(--color-status-danger); background: var(--color-danger-bg); }
+.prioritymedium { color: var(--color-status-warn-deep); background: var(--color-warning-bg); }
+.prioritylow { color: var(--color-status-info); background: var(--color-info-bg); }
+
 .ticketNo {
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
@@ -113,11 +123,13 @@
   flex: 1;
   flex-direction: column;
   gap: var(--tpl-op-panel-gap);
+  max-height: calc(100dvh - var(--support-detail-offset));
+  overflow-y: auto;
   border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
+  outline: 0;
   outline-offset: -1px;
   padding: var(--tpl-op-panel-pad);
-  box-shadow: var(--card-shadow);
+  box-shadow: none;
 }
 
 .detailHead {
@@ -125,6 +137,7 @@
   align-items: center;
   gap: var(--tpl-op-me-gap);
 }
+@media (min-width: 641px) { .detailTitleRow { min-height: var(--space-24); } }
 
 .detailHead svg,
 .draftHead svg {
@@ -153,6 +166,25 @@
   font-size: var(--text-micro);
 }
 
+.detailControls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-8) var(--space-12); min-width: 0; }
+.moreWrap { position: relative; margin-left: auto; }
+html:root .outlinedMore[data-row-menu]:not(:focus-visible) {
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  box-shadow: var(--control-shadow);
+}
+.mobileTop { display: none; }
+.statusWrap { position: relative; order: 4; flex-basis: 100%; }
+.statusButton { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-8); min-height: var(--support-status-height); border: 0; border-radius: var(--radius-control); padding: 0 var(--space-12); }
+.statusButton[data-stage='resolved'] { background: var(--color-success-bg); }
+.statusButton[data-stage='new'] { background: var(--color-danger-bg); }
+.statusButton[data-stage='in_progress'] { background: var(--color-info-bg); }
+.statusButton[data-stage='waiting'] { background: var(--color-warning-bg); }
+.statusButton[data-stage='closed'] { background: var(--color-surface-pearl); }
+.statusButton:disabled { opacity: .45; }
+.actionMenu { position: absolute; z-index: 10; top: 100%; right: 0; display: flex; min-width: var(--support-menu-width); flex-direction: column; gap: var(--space-4); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: var(--space-8); box-shadow: var(--card-shadow); }
+
 .prioritySelect {
   flex-shrink: 0;
 }
@@ -161,7 +193,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-op-panel-gap);
-  margin: 0;
+  margin: var(--space-6) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -204,10 +236,17 @@
   flex-direction: column;
   gap: var(--tpl-op-auth-field-gap);
   border-radius: var(--radius-control);
-  outline: 1px solid var(--color-accent);
+  outline: 1px solid var(--color-hairline);
   outline-offset: -1px;
   padding: var(--tpl-op-note-pad);
+  margin-top: var(--space-16);
 }
+
+.replyHeading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); }
+.replyHeading strong { font-size: var(--text-caption); }
+.replyHeading svg { width: var(--space-16); height: var(--space-16); }
+.sendSurface { display: inline-flex; align-items: stretch; border-radius: var(--radius-primary-action); background: var(--support-send-surface); overflow: hidden; }
+.sendSurface :global([data-shared-button]) { height: 100%; box-shadow: none; outline: 0; }
 
 .draftHead {
   display: flex;
@@ -222,13 +261,15 @@
 }
 
 .replyBox.replyBox {
-  min-height: var(--tpl-op-sp-reply-h);
-  border: 0;
-  padding: 0;
+  min-height: var(--support-reply-desktop-height);
+  border: 1px solid var(--color-hairline);
+  padding: var(--space-12);
   font-size: var(--text-caption);
   line-height: var(--tpl-op-ann-body-lh);
   box-shadow: none;
 }
+
+.mobileBack { display: none; }
 
 .draftNote {
   margin: 0;
@@ -327,7 +368,34 @@
   }
 }
 
+@media (min-width: 1024px) and (max-width: 1250px) {
+  .replyBox.replyBox { min-height: var(--support-reply-compact-height); }
+}
+
+@media (max-width: 640px) {
+  .overviewSelected { display: none; }
+  .columns { padding-inline: var(--space-16); }
+  .columnsSelected { padding: 0; }
+  .columnsSelected .list { display: none; }
+  .columns:not(.columnsSelected) .detail { display: none; }
+  .detail { width: 100%; max-height: none; overflow: visible; border: 0; border-radius: 0; outline: 0; gap: var(--space-16); padding: 0 var(--support-mobile-pad) var(--space-12); box-shadow: none; }
+  .mobileTop { display: flex; align-items: center; justify-content: space-between; position: relative; height: var(--support-mobile-header-height); margin: 0 calc(-1 * var(--support-mobile-pad)); border-bottom: 1px solid var(--color-hairline); padding: 0 var(--support-mobile-pad); background: var(--color-canvas); }
+  .mobileBack { display: inline-flex; align-items: center; gap: var(--space-8); min-height: var(--support-create-height); border: 0; background: transparent; color: var(--color-ink); font-weight: 600; }
+  .mobileBack svg { width: var(--support-mobile-pad); height: var(--support-mobile-pad); }
+  .detailControls { flex-wrap: nowrap; gap: var(--space-8); }
+  .statusWrap { order: 0; flex-basis: auto; }
+  .prioritySelect { order: 1; }
+  .contractLink { order: 2; }
+  .moreWrap { display: none; }
+  .messages .message:first-child { min-height: var(--support-mobile-message-height); }
+  .messages { margin-top: var(--space-24); }
+  .draft { margin-top: 0; }
+  .draft { padding-bottom: var(--support-draft-bottom); }
+  .replyBox.replyBox { min-height: var(--support-reply-mobile-height); }
+}
+
 /* 数の帯は題・道具の行と同じ内側の余白に収める（板の端にくっつけない）。下の注意帯とは間 4。 */
 .band {
   margin-bottom: var(--tpl-op-support-negative-gap);
 }
+.band :global([data-kpi-strip]) { border: 1px solid var(--color-hairline); box-shadow: none; }

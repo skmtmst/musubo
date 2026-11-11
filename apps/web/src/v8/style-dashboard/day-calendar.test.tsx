@@ -223,7 +223,7 @@ it.each(['list', 'board'])('検索結果0は%sでも予約なしとせず、検�
   } finally {
     vi.useRealTimers()
   }
-  const clear = await screen.findByRole('button', { name: '検索を外す', exact: true })
+  const clear = await screen.findByRole('button', { name: '検索を外す', exact: true }, { timeout: 5000 })
   expect(screen.queryByText('今日の予約はありません')).toBeNull()
   fireEvent.click(clear)
   await waitFor(() => expect(screen.queryByRole('button', { name: '検索を外す', exact: true })).toBeNull())

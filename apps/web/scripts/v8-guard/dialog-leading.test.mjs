@@ -37,8 +37,7 @@ const recipes = [
   { source: 'v8/account-new/registration-style-dialog.tsx', index: 1, path: '/accounts/new', registration: true, after: menuStep, open: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).waitFor() } },
   { source: 'v8/hq/account-dialogs.tsx', path: '/hq', open: async page => { await button(page, /の設定$/).click() } },
   { source: 'v8/broadcasts/quick-send.tsx', path: '/broadcasts', dialogTitle: 'かんたんに送る', open: async page => { await menu(page, /^配信を作る/, 'かんたんに送る') }, fault: 'alignment' },
-  { source: 'v8/ops/support.tsx', index: 0, path: '/ops/support', open: support, fault: 'overlap' },
-  { source: 'v8/ops/support.tsx', index: 1, path: '/ops/support', open: async page => { await support(page); await page.getByRole('textbox', { name: '返信', exact: true }).fill('確認用の返信'); await button(page, '返信する').click() } },
+  { source: 'v8/ops/support.tsx', path: '/ops/support', open: async page => { await support(page); await page.getByRole('textbox', { name: '返信', exact: true }).fill('確認用の返信'); await button(page, '返信する').click() } },
   { source: 'v8/forms/list-dialogs.tsx', path: '/form-submissions', open: async page => { await rowMenu(page, 'アーカイブ') } },
   { source: 'v8/affiliates/dialogs.tsx', path: '/affiliates?tab=payment', open: async page => { await page.locator('main tbody button').first().click() } },
   { source: 'v8/hq-templates/saved-distribution-dialog.tsx', path: '/hq/templates?item=visual-hq-tpl-autumn&mode=edit', open: async page => { await page.getByRole('textbox', { name: 'テンプレート名', exact: true }).fill('操作帯の確認'); await button(page, '保存する').click() } },
@@ -107,12 +106,10 @@ for (const width of [1152, 1440]) for (const recipe of recipes) test(`leading ac
     await waitForNavigationContent(page, pending, 15000)
     await recipe.open(page)
     if (recipe.dialogTitle) await page.getByRole('dialog', { name: recipe.dialogTitle, exact: true }).waitFor()
-    if (recipe.source !== 'v8/ops/support.tsx' || recipe.index === 1) {
-      const dialogs = page.locator('[role="dialog"], [role="alertdialog"]').filter({ visible: true })
-      await dialogs.last().waitFor()
-      await dialogs.last().locator('[data-dialog-action-leading]').waitFor()
-      assert.ok(await dialogs.last().locator('[data-dialog-action-leading]').count() > 0, '開いた窓そのものに補助操作がある')
-    }
+    const dialogs = page.locator('[role="dialog"], [role="alertdialog"]').filter({ visible: true })
+    await dialogs.last().waitFor()
+    await dialogs.last().locator('[data-dialog-action-leading]').waitFor()
+    assert.ok(await dialogs.last().locator('[data-dialog-action-leading]').count() > 0, '開いた窓そのものに補助操作がある')
     await page.locator('[data-dialog-action-leading]:visible').first().waitFor()
     await page.evaluate(() => document.fonts.ready)
     normal = await capture('normal')

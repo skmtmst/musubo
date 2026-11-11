@@ -119,7 +119,7 @@ export type RowMenuProps = {
    * 見た目。'plain' は一覧の標準操作、'box' は行内の小さい印ボタン。
    * 通常は線なし、乗せたときだけ薄い灰を見せる。
    */
-  appearance?: 'box' | 'plain'
+  appearance?: 'box' | 'plain' | 'outlined'
   /**
    * 「…」の大きさ（'box' のときだけ）。'row' は 28角（★V8  など、行の「その他の操作」が 28 の板）。
    * 省略時は KspUx の 36角（友だち一覧  など 36 の板）。板ごとに絵の大きさを選ぶ。
@@ -182,7 +182,7 @@ export function RowMenu({
       {appearance === 'plain' ? (
         <MoreAction {...common} label={label} buttonRef={triggerRef} className={className} data-size={size} data-row-menu="" />
       ) : (
-        <IconButton {...common} ref={triggerRef} aria-label={label} title={lockedReason ? undefined : title ?? label} className={className} size={size} variant="plain" data-row-menu="">
+        <IconButton {...common} ref={triggerRef} aria-label={label} title={lockedReason ? undefined : title ?? label} className={className} size={size} variant={appearance === 'outlined' ? undefined : 'plain'} data-row-menu="">
           <MoreHorizontal size={size === 'row' ? 14 : 16} aria-hidden="true" />
         </IconButton>
       )}
