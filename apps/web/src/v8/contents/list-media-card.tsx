@@ -134,8 +134,9 @@ export function MediaCardV8({
   )
   return (
     <Card padding="rows" layout={view === 'grid' ? 'media' : 'horizontal'} overflow="hidden">
-      <div className={view === 'grid' ? styles.thumbnailWrap : `${styles.thumbnailWrap} ${styles.thumbnailNarrow}`}>
+      <div data-media-thumbnail-actions="" className={view === 'grid' ? styles.thumbnailWrap : `${styles.thumbnailWrap} ${styles.thumbnailNarrow}`}>
         <button
+          data-media-preview=""
           onClick={onPreview}
           title="プレビューを見る"
           aria-label={`${item.filename}のプレビューを見る`}
@@ -144,8 +145,9 @@ export function MediaCardV8({
           <MediaThumbnail kind={item.kind} src={displaySrc} alt={item.filename} />
         </button>
         {canManageMedia && !renaming ? (
-          <span className={styles.selectCorner} title={selectTitle}>
+          <span data-media-select-corner="" className={styles.selectCorner} title={selectTitle}>
             <SaveErrorField names={["selected"]}><Checkbox
+              data-media-select=""
               checked={selected}
               disabled={!isKnownUnused(item) || !!item.archivedAt}
               onCheckedChange={onToggleSelect}

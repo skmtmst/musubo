@@ -391,6 +391,21 @@ test('同じ段の押せるもの同士の外枠が 1px でも重なると落ち
   } finally { await browser.close() }
 })
 
+test('写真の右上の選択欄は前面で押せる時だけプレビューとの重なりを許す', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const collisions = async () => (await page.evaluate(scan)).filter(f => f.kind === 'control-collide')
+    await page.setContent('<main><div data-media-thumbnail-actions style="position:relative;width:200px;height:120px"><button data-media-preview aria-label="プレビュー" style="position:absolute;inset:0;width:100%;height:100%"></button><span data-media-select-corner style="position:absolute;right:8px;top:8px;z-index:1"><input data-media-select aria-label="選ぶ" type="checkbox" style="width:20px;height:20px"></span></div></main>')
+    assert.deepEqual(await collisions(), [])
+    await page.locator('[data-media-preview]').evaluate(el => { el.style.zIndex = '2' })
+    assert.equal((await collisions()).length, 1)
+    await page.locator('[data-media-preview]').evaluate(el => { el.style.zIndex = 'auto' })
+    await page.locator('[data-media-select]').evaluate(el => { el.removeAttribute('data-media-select') })
+    assert.equal((await collisions()).length, 1)
+  } finally { await browser.close() }
+})
+
 test('ボタンが丸ごと重なる場合も落ち、カードの外へ出た操作を検出する', async () => {
   const browser = await connectGuardBrowser()
   try {
