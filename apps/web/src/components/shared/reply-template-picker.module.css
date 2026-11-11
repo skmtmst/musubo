@@ -5,8 +5,8 @@
 .panel { display: flex; flex-direction: column; width: min(100%, 896px); height: min(760px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); overflow: hidden; border-radius: var(--radius-panel); background: var(--color-canvas); box-shadow: var(--card-shadow); color: var(--color-ink); }
 .panelNewFolder { width: min(100%, 640px); height: min(390px, calc(100dvh - 32px)); }
 .panelNewTemplate { width: min(100%, 840px); height: min(750px, calc(100dvh - 32px)); }
-.desktopHeader { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-16); padding: var(--space-24) var(--space-28, 28px) var(--space-16); border-bottom: 1px solid var(--color-hairline); }
-.desktopHeader h2 { margin: 0; font-size: var(--text-heading); font-weight: 700; }
+.desktopHeader { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-16); min-height: 90px; padding: var(--space-24) var(--space-28, 28px) var(--space-16); border-bottom: 1px solid var(--color-hairline); }
+.desktopHeader h2 { margin: 0; font-size: 22px; line-height: 28px; font-weight: 700; }
 .desktopHeader p { margin: var(--space-4) 0 0; font-size: var(--text-micro); color: var(--color-ink-secondary); }
 .close { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-ink-secondary); }
 .close svg { width: 18px; height: 18px; }
@@ -27,7 +27,7 @@
 .desktopSplit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-12); flex: 1; min-height: 0; }
 .templateColumn { display: flex; flex-direction: column; gap: var(--space-8); }
 .templateList { display: flex; flex-direction: column; gap: var(--space-8); overflow-y: auto; }
-.templateList button { display: flex; flex-direction: column; gap: var(--space-4); width: 100%; min-height: 72px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: var(--space-12); text-align: left; color: var(--color-ink); }
+.templateList button { display: flex; flex-direction: column; gap: var(--space-4); width: 100%; min-height: 80px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: var(--space-12); text-align: left; color: var(--color-ink); }
 .templateList button[aria-current='true'] { border-color: var(--color-accent-border); background: var(--color-accent-soft); }
 .templateList strong { overflow: hidden; font-size: var(--text-caption); text-overflow: ellipsis; white-space: nowrap; }
 .templateList span { overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
@@ -37,18 +37,18 @@
 .previewCard h3 { margin: var(--space-12) 0; font-size: var(--text-caption); }
 .previewCard h3 { border-bottom: 1px solid var(--color-hairline); padding-bottom: var(--space-12); }
 .previewCard p { margin: var(--space-12) 0 0; font-size: var(--text-caption); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
-.footer { display: flex; justify-content: flex-end; align-items: center; gap: var(--space-12); flex: none; min-height: 76px; border-top: 1px solid var(--color-hairline); padding: var(--space-12) var(--space-24); }
-.footer button:last-child { width: 144px; justify-content: center; }
+.footer { display: flex; justify-content: flex-end; align-items: flex-start; gap: var(--space-12); flex: none; min-height: 112px; border-top: 1px solid var(--color-hairline); padding: 20px var(--space-28, 28px) 44px; }
+.footer > button { width: 144px; min-height: 46px; justify-content: center; }
 .panelNewFolder .footer button:last-child { width: 178px; }
 .panelNewTemplate .footer button:last-child { width: 185px; }
-.desktopCancel button { width: 116px; justify-content: center; }
+.desktopCancel button { width: 116px; min-height: 46px; justify-content: center; }
 .mobileHeader, .mobileTitle, .mobileSearch, .mobileFolders, .mobileTemplates, .mobilePreviewTitle { display: none; }
 .field { display: block; margin-bottom: var(--space-16); font-size: var(--text-caption); font-weight: 600; }
 .field span { color: var(--color-ink-secondary); font-size: var(--text-micro); }
 .field input, .field textarea, .field [data-entity-picker-field] { display: block; margin-top: var(--space-8); }
 .field textarea { min-height: 280px; }
 .panelNewFolder .field input { min-height: 52px; }
-.panelNewTemplate .field textarea { min-height: 230px; }
+.panelNewTemplate .field textarea { min-height: 230px !important; }
 .hint { color: var(--color-ink-secondary); font-size: var(--text-micro); }
 .mobileHint { display: none; }
 .error { color: var(--color-status-danger); font-size: var(--text-caption); }
@@ -73,26 +73,26 @@
   .mobileSearch { display: flex; margin-bottom: var(--space-16); }
   .mobileSearch svg { width: 16px; height: 16px; flex: none; }
   .mobileFolders, .mobileTemplates { display: block; }
-  .mobileFolders { margin-bottom: var(--space-16); }
-  .sectionHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); margin-bottom: var(--space-12); }
+  .mobileFolders { margin-bottom: 10px; }
+  .sectionHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); margin-bottom: 6px; }
   .sectionHead strong { font-size: var(--text-caption); }
   .sectionHead button { min-height: 28px; border: 0; background: transparent; color: var(--color-ink-secondary); font-size: var(--text-micro); }
   .folderSelect { display: flex; align-items: center; gap: var(--space-8); width: 100%; min-height: 44px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: 0 var(--space-16); color: var(--color-ink); font-weight: 600; }
   .folderSelect svg { width: 16px; height: 16px; flex: none; }
   .folderSelect svg:first-child { color: var(--color-accent-deep); }
   .folderSelect svg:last-child { margin-left: auto; }
-  .mobileTemplates .templateList { margin-bottom: var(--space-16); overflow: visible; }
+  .mobileTemplates .templateList { margin-bottom: var(--space-24); overflow: visible; }
   .mobileTemplates .templateList button { min-height: 80px; }
   .mobileTemplates .preview { display: flex; }
   .mobilePreviewTitle { display: block; font-size: var(--text-caption); }
   .desktopPreviewTitle { display: none; }
-  .previewCard h3 { border-bottom: 0; padding-bottom: 0; }
+  .previewCard h3 { display: none; }
   .previewCard { min-height: 184px; }
-  .footer { min-height: 83px; background: var(--color-canvas); padding: var(--space-12) var(--space-18, 18px); }
-  .footer > button { width: 100% !important; min-height: 50px; }
+  .footer { align-items: flex-start; min-height: 83px; background: var(--color-canvas); padding: var(--space-12) var(--space-18, 18px); }
+  .footer > button { align-self: flex-start !important; width: 100% !important; min-height: 51px; }
   .field textarea { min-height: 40dvh; }
   .panelNewFolder .content { padding-top: 36px; }
-  .panelNewTemplate .field textarea { min-height: 40dvh; }
+  .panelNewTemplate .field textarea { min-height: 40dvh !important; }
   .desktopHint { display: none; }
   .mobileHint { display: inline; }
   .insertHint { display: none; }

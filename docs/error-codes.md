@@ -1013,7 +1013,6 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `invalid_weekly_template` | [宣言](../apps/worker/src/routes/booking/register-staff-calendar.ts)（1か所） |
 | `KEY_CHANGED` | [宣言](../apps/worker/src/routes/staff-api-key.ts)（1か所） |
 | `KIND_REQUIRED` | [宣言](../apps/worker/src/routes/identity-candidates.ts)（1か所） |
-| `knowledge_ai_unavailable` | [宣言](../apps/worker/src/services/platform-knowledge.ts)（1か所） |
 | `late_minutes_not_needed` | [宣言](../apps/worker/src/routes/booking/register-today.ts)（1か所） |
 | `late_payment_conflict` | [宣言](../apps/worker/src/features/booking/booking-late-payment.ts)（1か所） |
 | `late_payment_reconcile_failed` | [宣言](../apps/worker/src/features/booking/booking-late-payment.ts)（1か所） |

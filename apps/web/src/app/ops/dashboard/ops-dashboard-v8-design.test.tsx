@@ -2,7 +2,7 @@
 /*
  * 板  運営ダッシュボードの絵合わせ（V8）。
  * - 頭：説明＋今月・先月・今年が右
- * - 数の帯：契約中の月額合計・今月の売上・トライアル中・今月のAI利用の順と内訳
+ * - 数の帯：契約中の月額合計・今月の売上・トライアル中の順と内訳
  * - 要対応：何が・件数の見出しと開くボタン
  * - 上限の表：5列・使用率は％で出す
  * - チケット：3つの数＋すべて見る →／プランの1行／LINE未登録の1行
@@ -34,7 +34,6 @@ const payload = {
   alerts: { pastDue: 1, trialEndingSoon: 1, lineTokenExpiring: 2, unansweredTickets: 2 },
   tickets: { newCount: 2, inProgressCount: 3, avgFirstReplyMinutes: 144, closedInPeriod: 5 },
   lineRegistration: { registered: 8, total: 10, unregisteredCount: 2 },
-  ai: { callsThisMonth: 312, draftsThisMonth: 200, articlesActive: 5 },
   usage: [
     { tenantId: 't1', tenantName: '然-NEN-本部', planKey: 'standard', planLabel: 'スタンダード', messages: 8200, bannerUnits: 73, mediaBytes: 4.1 * GB, limits: { messages: 10000, images: 100, mediaBytes: 10 * GB }, usageRate: 82 },
     { tenantId: 't2', tenantName: 'ペットサロン Mori', planKey: 'pro', planLabel: 'プロ', messages: 6400, bannerUnits: 22, mediaBytes: 5.8 * GB, limits: { messages: 10000, images: 100, mediaBytes: 10 * GB }, usageRate: 64 },
@@ -100,10 +99,11 @@ describe('CyW0E ダッシュボードの絵合わせ', () => {
     expect(help.getAttribute('aria-expanded')).toBe('false')
     expect(body).not.toContain('のようす')
     // 数の帯の順と内訳
-    const order = ['契約中の月額合計', '今月の売上', 'トライアル中', '今月の AI 利用']
+    const order = ['契約中の月額合計', '今月の売上', 'トライアル中']
     const positions = order.map((t) => body.indexOf(t))
     expect(positions.every((p) => p >= 0)).toBe(true)
     expect([...positions].sort((a, b) => a - b)).toEqual(positions)
+    expect(body).not.toContain('今月の AI 利用')
     const revenueHelp = host.querySelector<HTMLButtonElement>('button[aria-label="今月の売上の説明"]')!
     expect(revenueHelp).toBeTruthy()
     await act(async () => { revenueHelp.click() })
@@ -114,7 +114,6 @@ describe('CyW0E ダッシュボードの絵合わせ', () => {
     expect(body).toContain('契約中 3・決済失敗 1（トライアルは入れない）')
     expect(body).toContain('決済失敗 1 社')
     expect(body).toContain('期限 3日以内 1')
-    expect(body).toContain('バナー生成・下書き')
     expect(body).not.toContain('解約')
     // 要対応
     expect(body).toContain('何が')

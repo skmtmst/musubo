@@ -1,5 +1,5 @@
 /* 運営のお問い合わせ。 */
-.createAction, .columns { --support-create-width: 168px; --support-create-height: 40px; --support-priority-width: 34px; --support-priority-height: 22px; --support-detail-offset: 246px; --support-status-height: 30px; --support-menu-width: 170px; --support-reply-desktop-height: 260px; --support-reply-compact-height: 220px; --support-mobile-header-height: 58px; --support-mobile-message-height: 114px; --support-reply-mobile-height: 464px; --support-mobile-pad: 18px; --support-draft-bottom: 30px; --support-send-surface: #c3cdc7; --support-send-height: 44px; }
+.createAction, .columns { --support-create-width: 168px; --support-create-height: 40px; --support-priority-width: 34px; --support-priority-height: 22px; --support-detail-offset: 246px; --support-status-height: 30px; --support-menu-width: 170px; --support-reply-desktop-height: 260px; --support-reply-compact-height: 220px; --support-mobile-header-height: 58px; --support-mobile-message-height: 114px; --support-reply-mobile-height: 464px; --support-mobile-pad: 18px; --support-mobile-priority-width: 98px; --support-mobile-message-gap: 18px; --support-draft-bottom: 30px; --support-send-surface: #c3cdc7; --support-send-height: 44px; }
 
 .notice {
   margin-bottom: var(--tpl-op-section-gap);
@@ -137,6 +137,7 @@
   align-items: center;
   gap: var(--tpl-op-me-gap);
 }
+.detailTitleRow { --tpl-section-title-size: 17px; --card-title-line-height: 21px; }
 @media (min-width: 641px) { .detailTitleRow { min-height: var(--space-24); } }
 
 .detailHead svg,
@@ -378,17 +379,21 @@ html:root .outlinedMore[data-row-menu]:not(:focus-visible) {
   .columnsSelected { padding: 0; }
   .columnsSelected .list { display: none; }
   .columns:not(.columnsSelected) .detail { display: none; }
-  .detail { width: 100%; max-height: none; overflow: visible; border: 0; border-radius: 0; outline: 0; gap: var(--space-16); padding: 0 var(--support-mobile-pad) var(--space-12); box-shadow: none; }
-  .mobileTop { display: flex; align-items: center; justify-content: space-between; position: relative; height: var(--support-mobile-header-height); margin: 0 calc(-1 * var(--support-mobile-pad)); border-bottom: 1px solid var(--color-hairline); padding: 0 var(--support-mobile-pad); background: var(--color-canvas); }
-  .mobileBack { display: inline-flex; align-items: center; gap: var(--space-8); min-height: var(--support-create-height); border: 0; background: transparent; color: var(--color-ink); font-weight: 600; }
-  .mobileBack svg { width: var(--support-mobile-pad); height: var(--support-mobile-pad); }
+  .detail { width: 100%; max-height: none; overflow: visible; border: 0; border-radius: 0; outline: 0; gap: var(--space-16); padding: 0 var(--support-mobile-pad) calc(var(--space-32) + var(--space-32) + var(--space-32) + var(--space-32) + var(--space-16) + env(safe-area-inset-bottom, 0px)); box-shadow: none; }
+  .mobileTop { display: flex; align-items: center; justify-content: space-between; position: relative; height: var(--support-mobile-header-height); margin: 0 calc(-1 * var(--support-mobile-pad)); border-bottom: 1px solid var(--color-hairline); padding: 0 var(--space-16); background: var(--color-canvas); }
+  html:root .mobileBack { display: inline-flex; align-items: center; gap: var(--space-8); min-height: var(--support-create-height); border: 0; padding: 0; background: transparent; color: var(--color-ink); font-weight: 600; }
+  html:root .mobileTop .mobileBack > svg { width: var(--support-mobile-pad); height: var(--support-mobile-pad); }
+  html:root .mobileTop .outlinedMore[data-row-menu] { width: var(--space-32); min-width: var(--space-32); height: var(--control-h); flex-basis: var(--space-32); }
+  html:root .mobileTop .outlinedMore[data-row-menu] > svg { width: var(--support-mobile-pad); height: var(--support-mobile-pad); }
+  .detailTitleRow { --tpl-section-title-size: 21px; --card-title-line-height: 25px; }
   .detailControls { flex-wrap: nowrap; gap: var(--space-8); }
   .statusWrap { order: 0; flex-basis: auto; }
   .prioritySelect { order: 1; }
-  .contractLink { order: 2; }
+  :root .prioritySelect :global([data-design-node]) { width: var(--support-mobile-priority-width); min-width: var(--support-mobile-priority-width); }
+  .contractLink { order: 2; margin-left: calc(-1 * var(--space-8)); }
   .moreWrap { display: none; }
   .messages .message:first-child { min-height: var(--support-mobile-message-height); }
-  .messages { margin-top: var(--space-24); }
+  .messages { margin-top: var(--support-mobile-message-gap); }
   .draft { margin-top: 0; }
   .draft { padding-bottom: var(--support-draft-bottom); }
   .replyBox.replyBox { min-height: var(--support-reply-mobile-height); }

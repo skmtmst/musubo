@@ -8,7 +8,7 @@
     "review/PEN-ID-CHANGES-1011.tsv"
   ],
   "designDir": "/Users/kentakenta/lh-work/design/v8",
-  "boardCount": 612,
+  "boardCount": 610,
   "retired": [],
   "boards": {
     "jQRsr": {
@@ -3538,22 +3538,6 @@
         "captureNotes": "作る題はこのURLで確認。中身は /booking/menus/new?menu=bm-1 と比較し、題の違いは状態差として扱う。"
       }
     },
-    "R5ckwJ": {
-      "doc": "V8-B",
-      "name": "運営 ナレッジの記事 V8｜状態は型の見本 LS のとおり",
-      "kind": "画面",
-      "route": "/ops/knowledge",
-      "routes": [
-        "/ops"
-      ],
-      "width": 1440,
-      "shot": null,
-      "url": "/ops/knowledge",
-      "exportHtml": "html/R5ckwJ.html",
-      "exportTexts": "pencil-texts/R5ckwJ.tsv",
-      "exportSha256": "77edb2145dfb5e26eccdde53f8aa69cd48fdb74192d8508eadcd9e80dfe0a05c",
-      "textsSha256": "ab9eb042576493d03a33a4e46a91d68931967daedd15545d02022fbd6b6220fc"
-    },
     "R6kIG": {
       "doc": "V8-B",
       "name": "マイル 友だちのマイル詳細（新）V8｜状態は型の見本 CS のとおり",
@@ -6396,22 +6380,6 @@
       "exportTexts": "pencil-texts/gzkXs.tsv",
       "exportSha256": "1c13876e4140523319580415ed04211df216f96469d4d313e7760fa06d78988b",
       "textsSha256": "612b815dc93febaff78b3442060e7fc12eaf004f108bcaece5016f8b4a832c5d"
-    },
-    "h114s": {
-      "doc": "V8-B",
-      "name": "運営 ナレッジ V8｜状態は型の見本 LS のとおり",
-      "kind": "画面",
-      "route": "/ops/knowledge",
-      "routes": [
-        "/ops"
-      ],
-      "width": 1440,
-      "shot": null,
-      "url": "/ops/knowledge",
-      "exportHtml": "html/h114s.html",
-      "exportTexts": "pencil-texts/h114s.tsv",
-      "exportSha256": "58c9bb3b76f2c935bfd1c04c48236e58df86e81ee58e07c86e571656e2f6803f",
-      "textsSha256": "5db83505d168b52345dcb4af84be0d56a31e084c722d50f417dac9c8b6aa7936"
     },
     "h1G4d": {
       "doc": "V8-B",
@@ -10974,6 +10942,7 @@
     "JXq9G",
     "K0gu1",
     "PbdMa",
+    "R5ckwJ",
     "UUQ7T",
     "V1RQfI",
     "Y8SjT2",
@@ -10984,6 +10953,7 @@
     "gQabc",
     "glL3g",
     "gobhu",
+    "h114s",
     "hKRRF",
     "hQQlt",
     "km8EG",

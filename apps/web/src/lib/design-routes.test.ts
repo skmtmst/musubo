@@ -20,6 +20,7 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 const DOC = join(ROOT, 'docs', 'v8-board-to-code.md');
+const DESIGN_MAP = join(ROOT, 'scripts', 'visual-qa', 'v8-design-map.json');
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 const APP = join(SRC, 'app');
 
@@ -49,7 +50,12 @@ function toPath(route: string): string {
   return path === '' ? '/' : path;
 }
 
-const ROWS = readRows();
+// 旧対応表は保護文書のため、このレーンでは更新しない。廃止済みの板は
+// 現行デザインマップを正本として除外する。
+const deletedBoards = new Set(
+  (JSON.parse(readFileSync(DESIGN_MAP, 'utf8')) as { deletedBoards: string[] }).deletedBoards,
+);
+const ROWS = readRows().filter((row) => !deletedBoards.has(row.board));
 const ROUTED = ROWS.filter((r) => r.route.startsWith('/'));
 
 describe('★V8 の板とコードの対応表', () => {

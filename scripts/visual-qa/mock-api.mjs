@@ -2,6 +2,7 @@ import { createGoogleHoursWorkspace, createGoogleHoursProfile, GOOGLE_STORE, GOO
 import { RESTAURANT_LINE_FLOWS, restaurantFollowupRead } from './mock-restaurant-followup.mjs'
 import { musuboFlowRead } from './musubo-flow-fixtures.mjs'
 import { templateFolderList } from './mock-template-folders.mjs'
+import { OPS_SUPPORT_SUMMARY, OPS_SUPPORT_TEMPLATE_CATALOG } from './ops-support-fixture.mjs'
 import {seatBoardEntry} from '../../packages/shared/dist/reservation-board.js'
 import {DEFAULT_CUSTOMER_LOOK} from '../../packages/shared/dist/customer-look.js'
 /**
@@ -476,7 +477,7 @@ const EMPTY_PAGE = { items: [], total: 0, page: 1, limit: 20 }
 /**
  * 運営コンソール（`/ops/*`）の見本データ。形は Worker の
  * `apps/worker/src/routes/ops.ts`・`ops-dashboard.ts`・`ops-support.ts`・
- * `ops-knowledge.ts`・`ops-announcements.ts` と `apps/web/src/lib/api.ts`
+ * `ops-announcements.ts` と `apps/web/src/lib/api.ts`
  * の `Ops*` 型に合わせる。名前はすべて作り物で、実在の個人情報は入れない。
  * 日時は固定（撮るたびに同じ絵になる）。
  */
@@ -596,7 +597,6 @@ const OPS_DASHBOARD = {
   periodLabel: '2026年9月',
   pricing: 'list_price',
   lastSyncedAt: null,
-  ai: { callsThisMonth: 312, draftsThisMonth: 9, articlesActive: 3 },
   plans: [
     { key: 'light', label: 'ライト', monthlyYen: 9800 },
     { key: 'standard', label: 'スタンダード', monthlyYen: 29800 },
@@ -651,15 +651,6 @@ const OPS_LINE_UNREGISTERED = {
     { staffId: 'visual-staff-1', name: '検証 一郎', tenantName: '検証商事', hasEmail: true },
     { staffId: 'visual-staff-2', name: '見本 二郎', tenantName: '見本物産', hasEmail: false },
   ],
-}
-const OPS_SUPPORT_SUMMARY = {
-  byStage: { all: 5, new: 2, in_progress: 3, waiting: 1, resolved: 12, closed: 40 },
-  kpis: {
-    untouched: 2, untouchedFromLine: 1,
-    avgFirstReplyMinutes: 95, prevAvgFirstReplyMinutes: 120,
-    resolutionRate: 80, prevResolutionRate: 75,
-    avgResolutionMinutes: 300, prevAvgResolutionMinutes: 360,
-  },
 }
 /* 運営のお問い合わせ（V8 P0jhqO）の並び：優先度順に5件。名前は作り物。 */
 const OPS_SUPPORT_TICKETS = [
@@ -746,17 +737,11 @@ const OPS_SUPPORT_DETAIL = {
     {
       id: 'visual-msg-2', authorKind: 'ops', authorName: '検証 太郎',
       body: '確認しました。受け口の処理を直しました。今朝以降はいかがでしょうか。', attachments: [],
-      aiAssisted: false, deliveredVia: ['admin'],
+      deliveredVia: ['admin'],
       createdAt: '2026-09-30T13:12:00+09:00',
     },
   ],
-  // 絵は AI の下書きがある形（作り直す・下書きを保存する・返信する）。
-  draft: {
-    body: 'ご確認ありがとうございます。10/1 以降の受け口の記録では遅れは出ていません。',
-    aiGenerated: true, generatedAt: '2026-10-01T09:00:00+09:00', updatedAt: '2026-10-01T09:00:00+09:00', references: [],
-  },
-  ai: { available: true },
-  knowledge: { article: null, job: null },
+  draft: null,
 }
 /**
  * 統括のお問い合わせの続き（`/hq/support/detail?id=…`）。
@@ -802,61 +787,6 @@ const HQ_SUPPORT_DETAIL = {
   ],
   canFollowUp: true,
 }
-const OPS_KNOWLEDGE = [
-  {
-    id: 'visual-article-1', version: 1,
-    title: 'Webhook の通知が遅れるとき', question: '画面確認用の質問文。', answer: '画面確認用の回答文。',
-    kind: 'bug', keywords: ['検証', '手順'],
-    sourceRequestId: 'visual-ticket-1', ticketNo: 1, sourceCurrent: true,
-    articleKind: 'verified',
-    reviewState: 'approved', status: 'active', reviewReason: '',
-    evidence: [], usedCount: 12, helpfulCount: 9, unhelpfulCount: 0,
-    updatedAt: '2026-10-01T10:00:00+09:00',
-  },
-  {
-    id: 'visual-article-3', version: 1,
-    title: 'バナー生成で日本語が崩れる', question: 'バナーの文字が崩れたり、別の字になったりします。', answer: '日本語の文字は崩れることがあります。文字は短くし、仕上がりを確かめてください。',
-    kind: 'usage', keywords: ['バナー', '文字化け', '日本語', '生成'],
-    sourceRequestId: 'visual-ticket-1', ticketNo: 1045, sourceCurrent: true,
-    articleKind: 'answer_example',
-    reviewState: 'pending', status: 'disabled', reviewReason: '',
-    evidence: [
-      { messageId: 'visual-msg-1', createdAt: '2026-10-02T10:00:00+09:00', authorKind: 'ops', quote: '文字を短くして作り直してください', role: 'answer' },
-    ],
-    usedCount: 0, helpfulCount: 0, unhelpfulCount: 0,
-    updatedAt: '2026-10-02T10:00:00+09:00',
-  },
-  {
-    id: 'visual-article-4', version: 1,
-    title: '年払いへの切り替え方法', question: '画面確認用の質問文。', answer: '画面確認用の回答文。',
-    kind: 'billing', keywords: ['料金'],
-    sourceRequestId: 'visual-ticket-1', ticketNo: 3, sourceCurrent: true,
-    articleKind: 'verified',
-    reviewState: 'approved', status: 'active', reviewReason: '',
-    evidence: [], usedCount: 8, helpfulCount: 7, unhelpfulCount: 0,
-    updatedAt: '2026-09-21T10:00:00+09:00',
-  },
-  {
-    id: 'visual-article-2', version: 2,
-    title: '検証用の回答例', question: '画面確認用の質問文その2。', answer: '画面確認用の回答文その2。',
-    kind: 'usage', keywords: ['検証'],
-    sourceRequestId: 'visual-ticket-2', ticketNo: 2, sourceCurrent: false,
-    articleKind: 'answer_example',
-    reviewState: 'needs_review', status: 'active', reviewReason: '',
-    evidence: [], usedCount: 0, helpfulCount: 0, unhelpfulCount: 1,
-    updatedAt: '2026-09-30T10:00:00+09:00',
-  },
-  {
-    id: 'visual-article-5', version: 1,
-    title: '請求書の宛名変更', question: '画面確認用の質問文。', answer: '画面確認用の回答文。',
-    kind: 'billing', keywords: ['請求'],
-    sourceRequestId: 'visual-ticket-2', ticketNo: 4, sourceCurrent: true,
-    articleKind: 'answer_example',
-    reviewState: 'dismissed', status: 'disabled', reviewReason: '',
-    evidence: [], usedCount: 0, helpfulCount: 0, unhelpfulCount: 0,
-    updatedAt: '2026-09-12T10:00:00+09:00',
-  },
-]
 const OPS_ANNOUNCEMENTS = [
   {
     id: 'visual-announcement-sent', subject: '9/20 深夜のメンテナンス', body: '画面確認用のお知らせ本文。',
@@ -3289,6 +3219,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/ops/support/summary') {
     return { success: true, data: OPS_SUPPORT_SUMMARY }
   }
+  if (method === 'GET' && pathname === '/api/ops/support/templates') {
+    return { success: true, data: OPS_SUPPORT_TEMPLATE_CATALOG }
+  }
   if (method === 'GET' && pathname === '/api/ops/support/tickets') {
     return { success: true, data: OPS_SUPPORT_TICKETS, total: OPS_SUPPORT_TICKETS.length }
   }
@@ -3301,17 +3234,6 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         success: true,
         data: { ...OPS_SUPPORT_DETAIL, ticket: { ...OPS_SUPPORT_DETAIL.ticket, ...ticket, replyCount: 1 } },
       }
-    }
-  }
-  if (method === 'GET' && pathname === '/api/ops/knowledge') {
-    return { success: true, data: OPS_KNOWLEDGE, total: OPS_KNOWLEDGE.length }
-  }
-  {
-    const knowledgeDetail = /^\/api\/ops\/knowledge\/([^/]+)$/.exec(pathname)
-    if (method === 'GET' && knowledgeDetail) {
-      const id = decodeURIComponent(knowledgeDetail[1])
-      const article = OPS_KNOWLEDGE.find((row) => row.id === id) ?? OPS_KNOWLEDGE[0]
-      return { success: true, data: { ...article, sourceSubject: null } }
     }
   }
   if (method === 'GET' && pathname === '/api/ops/announcements') {

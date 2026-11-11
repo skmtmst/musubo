@@ -91,8 +91,6 @@ export const BOARD_URLS = {
   e7ljE: '/ops/audit', // 運営 監査ログ V8
   CyW0E: '/ops/dashboard', // 運営 ダッシュボード V8
   tVaUh: '/ops/invite', // 運営 メンバーの招待 V8
-  R5ckwJ: '/ops/knowledge', // 運営 ナレッジの記事 V8
-  h114s: '/ops/knowledge', // 運営 ナレッジ V8
   D9JALJ: '/ops/login', // 運営 ログイン V8
   FvbHW: '/ops/members', // 運営 メンバー管理 V8
   P0jhqO: '/ops/support', // 運営 お問い合わせ V8
