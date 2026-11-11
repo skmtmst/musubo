@@ -10,7 +10,6 @@ import OpsInvitePage from './invite/page'
 import OpsLoginPage from './login/page'
 import OpsTwoFactorPage from './two-factor/page'
 import OpsTenantsPage from './tenants/page'
-import KnowledgeList from '@/v8/ops/knowledge'
 import { qrToDataURL } from '@/lib/qr-image'
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
@@ -47,27 +46,19 @@ const ANN = src('v8', 'ops', 'announcements.tsx')
 const LOG = src('v8', 'ops', 'login.tsx')
 const TEN = src('v8', 'ops', 'tenants.tsx')
 const TFA = src('v8', 'ops', 'two-factor.tsx')
-const KNL = src('v8', 'ops', 'knowledge.tsx')
 
 /**
- * M038・M040・M042・M039・M041・M504 の失敗表示の契約。
+ * M038・M042・M039・M041・M504 の失敗表示の契約。
  * 一覧の読み込み失敗は捕まえた失敗をそのまま ListState へ渡し、
  * 403 で再試行を隠し・429 で待ち案内にする。再読み込みの口は残す。
  */
 
-describe('M038/M040/M042 一覧の403契約（ソース）', () => {
+describe('M038/M042 一覧の403契約（ソース）', () => {
   it('M038 お知らせは捕まえた失敗を ListState へ渡して読み直す', () => {
     expect(ANN).toContain('setLoadError(caught)')
     expect(ANN).toContain('error={loadError ?? undefined}')
     expect(ANN).toContain('description={loadDescription(loadError)}')
     expect(ANN).toContain('onRetry={() => void load()}')
-  })
-
-  it('M040 ナレッジは捕まえた失敗を ListState へ渡して読み直す', () => {
-    expect(KNL).toContain('setError(caught)')
-    expect(KNL).toContain('error={error ?? undefined}')
-    expect(KNL).toContain('description={loadDescription(error)}')
-    expect(KNL).toContain('onRetry={() => void load()}')
   })
 
   it('M042 契約先は捕まえた失敗を ListState へ渡して読み直す', () => {
@@ -178,22 +169,6 @@ describe('M042 契約先の403（動作）', () => {
       return new Response(JSON.stringify({ success: true, data: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }))
     await act(async () => { root.render(<OpsTenantsPage />) })
-    await flush()
-
-    expect(host.querySelector('[data-list-state="error"]')).not.toBeNull()
-    expect(host.textContent).toContain('権限')
-    expect(retryButton()).toBeTruthy()
-  })
-})
-
-describe('M040 ナレッジの403（動作）', () => {
-  it('403では権限の案内を出し、再読み込みの口を出す', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => {
-      return new Response(JSON.stringify({ success: false, error: 'forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
-    }))
-    await act(async () => { root.render(<KnowledgeList />) })
-    await flush()
-    await waitMs(250)
     await flush()
 
     expect(host.querySelector('[data-list-state="error"]')).not.toBeNull()

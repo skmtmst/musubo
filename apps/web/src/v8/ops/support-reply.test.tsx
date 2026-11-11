@@ -40,7 +40,6 @@ vi.mock('@/lib/api', async (importOriginal) => {
           reply: (...args: unknown[]) => net.reply(...args),
           update: (...args: unknown[]) => net.update(...args),
         },
-        knowledge: { ...actual.api.ops.knowledge },
       },
     },
   }
@@ -51,7 +50,7 @@ import OpsSupportV8 from './support'
 
 beforeEach(() => {
   net.tickets.mockImplementation(async (params: { offset?: number }) => ({ success: true, data: (params.offset ?? 0) === 0 ? Array.from({ length: 50 }, (_, i) => ticket(i + 1)) : [ticket(51)] }))
-  net.ticket.mockImplementation(async (id: string) => ({ success: true, data: { ticket: { ...ticket(Number(id.slice(1))), id }, messages: [], draft: { body: 'サーバーの下書き', aiGenerated: false, generatedAt: null, updatedAt: '' }, knowledge: null, tenant: { accountCount: 1, staffCount: 1, staffWithLine: 0, pastTickets: 0, pastOpen: 0 }, ai: { available: false } } }))
+  net.ticket.mockImplementation(async (id: string) => ({ success: true, data: { ticket: { ...ticket(Number(id.slice(1))), id }, messages: [], draft: { body: 'サーバーの下書き', updatedAt: '' }, tenant: { accountCount: 1, staffCount: 1, staffWithLine: 0, pastTickets: 0, pastOpen: 0 } } }))
   net.update.mockResolvedValue({ success: true, data: { ...ticket(1), priority: 'high', priorityLabel: '高' } })
   net.reply.mockResolvedValue({ success: true, data: { ticket: ticket(1), message: {}, mailSent: true, mailSkippedReason: null } })
 })

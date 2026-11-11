@@ -1,4 +1,3 @@
-import type { HqSupportKind } from '../../hq-support'
 
 // ---------------------------------------------------------------------------
 // 運営コンソール（★管理画面 37）
@@ -160,32 +159,14 @@ export type OpsSupportMessage = {
   authorName: string
   body: string
   attachments: OpsSupportAttachment[]
-  aiAssisted: boolean
   deliveredVia: string[]
   createdAt: string
 }
 
-export type OpsKnowledgeArticleKind = 'verified' | 'answer_example'
-
-export type OpsKnowledgeReference = { id: string; version: number; title: string; articleKind: OpsKnowledgeArticleKind }
-
-export type OpsSupportDraft = { body: string; aiGenerated: boolean; generatedAt: string | null; updatedAt: string; references?: OpsKnowledgeReference[] }
+export type OpsSupportDraft = { body: string; updatedAt: string }
 export type OpsSupportTemplateFolder = { id: string; name: string }
 export type OpsSupportReplyTemplate = { id: string; folderId: string; title: string; body: string; createdAt: string; updatedAt: string }
 export type OpsSupportTemplateCatalog = { folders: OpsSupportTemplateFolder[]; templates: OpsSupportReplyTemplate[] }
-
-export type OpsKnowledgeReviewState = 'pending' | 'approved' | 'needs_review' | 'dismissed'
-
-export type OpsKnowledgeInput = { title: string; question: string; answer: string; kind: HqSupportKind; keywords: string[] }
-
-export type OpsKnowledgeArticle = OpsKnowledgeInput & {
-  sourceSubject?: string | null
-  id: string; version: number; sourceRequestId: string; ticketNo: number | null; sourceCurrent: boolean
-  articleKind: OpsKnowledgeArticleKind
-  reviewState: OpsKnowledgeReviewState; status: 'active' | 'disabled'; reviewReason: string
-  evidence: Array<{ messageId: string; createdAt: string; authorKind: 'tenant' | 'ops'; quote: string; role: 'action' | 'result' | 'condition' | 'question' | 'answer' }>
-  usedCount: number; helpfulCount: number; unhelpfulCount: number; updatedAt: string
-}
 
 export type OpsSupportSummary = {
   byStage: Record<OpsSupportStage | 'all', number>
@@ -205,7 +186,6 @@ export type OpsSupportSummary = {
 export type OpsDashboardPeriod = 'month' | 'prev_month' | 'year'
 
 export type OpsDashboard = {
-  ai?: { callsThisMonth: number; draftsThisMonth: number; articlesActive: number }
   period: OpsDashboardPeriod
   periodLabel: string
   pricing: 'stripe_actual' | 'list_price'
@@ -328,10 +308,8 @@ export type HqLineRegistration =
 export type HqLineRegistrationStatus = { linked: boolean }
 
 export type OpsSupportDetail = {
-  knowledge?: { canProcess?: boolean; article: OpsKnowledgeArticle | null; job: { id?: string; status: 'queued' | 'running' | 'done' | 'failed' | 'stale'; source_current: number } | null }
   ticket: OpsSupportTicket
   tenant: { accountCount: number; staffCount: number; staffWithLine: number; pastTickets: number; pastOpen: number }
   messages: OpsSupportMessage[]
   draft: OpsSupportDraft | null
-  ai?: { available: boolean }
 }

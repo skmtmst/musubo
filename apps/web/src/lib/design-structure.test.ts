@@ -15,7 +15,7 @@ import { readUiSource } from '../../scripts/test-ui-source.mjs'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 const APP = join(SRC, 'app')
 
-const CURRENT_ROUTES = ["/ops/knowledge", "/hq/billing", "/hq/open", "/hq/members", "/", "/chats", "/friends", "/tags", "/templates", "/scenarios", "/reminders", "/booking/bookings", "/booking/bookings/detail", "/booking/staff", "/inflow-links", "/inflow-links/new", "/inflow-links/detail", "/broadcasts/new", "/templates/detail", "/templates/edit", "/templates/carousel", "/rich-menus", "/rich-menus/edit", "/rich-menus/new", "/webinars", "/staff/new", "/settings", "/tags/new", "/tags/fields/new", "/tags/fields/migrate", "/nen-members", "/ec-commerce", "/login", "/friends/detail", "/accounts/new", "/register", "/register/sent", "/register/complete", "/password/forgot", "/password/reset"] as const
+const CURRENT_ROUTES = ["/hq/billing", "/hq/open", "/hq/members", "/", "/chats", "/friends", "/tags", "/templates", "/scenarios", "/reminders", "/booking/bookings", "/booking/bookings/detail", "/booking/staff", "/inflow-links", "/inflow-links/new", "/inflow-links/detail", "/broadcasts/new", "/templates/detail", "/templates/edit", "/templates/carousel", "/rich-menus", "/rich-menus/edit", "/rich-menus/new", "/webinars", "/staff/new", "/settings", "/tags/new", "/tags/fields/new", "/tags/fields/migrate", "/nen-members", "/ec-commerce", "/login", "/friends/detail", "/accounts/new", "/register", "/register/sent", "/register/complete", "/password/forgot", "/password/reset"] as const
 function entryFile(route: string) { return join(APP, route, 'page.tsx') }
 function readWithParts(route: string) { return readUiSource(entryFile(route), 'utf8') }
 function entryBody(route: string) {

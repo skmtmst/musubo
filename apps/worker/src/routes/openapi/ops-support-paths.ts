@@ -116,30 +116,6 @@ export const opsSupportPaths = {
     get: { tags: ['Ops Console'], summary: 'お知らせの一覧（下書き・予約・配信済み）', responses: { '200': { description: 'Announcements' } } },
     post: { tags: ['Ops Console'], summary: 'お知らせを作る（下書き／予約／今すぐ送る）', parameters: [{ name: 'Idempotency-Key', in: 'header', required: false, schema: { type: 'string' }, description: '二重押し止めの再実行キー（UUID）。同じキー・同じ内容の再送は保存済みを返し、別内容は409。' }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['subject', 'body', 'channels'], properties: { subject: { type: 'string' }, body: { type: 'string' }, audienceKind: { type: 'string', enum: ['all', 'plan', 'tenants'] }, audiencePlans: { type: 'array', items: { type: 'string' } }, audienceTenantIds: { type: 'array', items: { type: 'string' } }, channels: { type: 'array', items: { type: 'string', enum: ['line', 'screen', 'email'] } }, publishAt: { type: 'string' }, mode: { type: 'string', enum: ['draft', 'schedule', 'send'] } } } } } }, responses: { '200': { description: 'Idempotent replay of the saved announcement' }, '201': { description: 'Created' }, '400': { description: 'Validation error' }, '409': { description: 'Notice LINE account missing or idempotency-key reuse with different content' } } },
   },
-  '/api/ops/knowledge': {
-    get: { tags: ['Ops Console'], summary: '運営専用ナレッジ一覧（検索・種別・承認状態・ページ送り）', responses: { '200': { description: 'Articles and total' }, '403': { description: 'Platform admin required' } } },
-  },
-  '/api/ops/knowledge/{id}': {
-    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-    get: { tags: ['Ops Console'], summary: 'ナレッジ記事と解決根拠', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Article' }, '404': { description: 'Not found' } } },
-    put: { tags: ['Ops Console'], summary: 'ナレッジ記事を編集（承認失効・版照合）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Updated' }, '409': { description: 'Version conflict' } } },
-  },
-  '/api/ops/knowledge/{id}/review': {
-    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-    post: { tags: ['Ops Console'], summary: '根拠確認後の承認・見送り・無効化（版照合）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Reviewed' }, '400': { description: 'Confirmation required' }, '409': { description: 'Source or version changed' } } },
-  },
-  '/api/ops/knowledge/{id}/feedback': {
-    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-    post: { tags: ['Ops Console'], summary: '参照した記事の評価', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Feedback recorded' }, '409': { description: 'Usage not found or changed' } } },
-  },
-  '/api/ops/knowledge/tickets/{id}/process': {
-    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-    post: { tags: ['Ops Console'], summary: '対象の解決済み問い合わせのナレッジ生成予約を実行（運営書込権限必須・二重実行防止）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Current knowledge and job state' }, '403': { description: 'Forbidden' }, '404': { description: 'Ticket not found' }, '503': { description: 'AI unavailable' } } },
-  },
-  '/api/ops/knowledge/tickets/{id}/retry': {
-    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-    post: { tags: ['Ops Console'], summary: '失敗した記事生成の再試行を予約', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '202': { description: 'Queued' }, '409': { description: 'Not retryable' } } },
-  },
   '/api/ops/announcements/preview': {
     post: { tags: ['Ops Console'], summary: '宛先の見積もり（契約先数・権限者数・LINE登録済み数）', responses: { '200': { description: 'Audience preview' } } },
   },

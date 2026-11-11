@@ -112,11 +112,6 @@ vi.mock('@/components/shell/page-chrome', async (importOriginal: () => Promise<t
   return { ...actual, usePageTitle: () => {} }
 })
 
-vi.mock('@/components/ops/knowledge-ticket', () => ({
-  KnowledgeReferences: () => null,
-  TicketKnowledge: () => null,
-}))
-
 import {
   AUTO_REPLIES,
   AUTO_REPLY_FOLDERS,
