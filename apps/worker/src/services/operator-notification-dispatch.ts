@@ -4,6 +4,7 @@ export type { OperatorRuleConditions } from './operator-rule-types.js';
 import type { OperatorRuleConditions } from './operator-rule-types.js';
 import {deliverOperatorPush} from './operator-push.js';
 import { ensureOperatorInstance } from './operator-notification-instance.js';
+import { accountOpeningHours, openingDay } from './account-opening-hours.js';
 //  公開済み運用者通知ルールの自動実行と回復。
 //
 // 業務イベント → dispatchOperatorEvent → 公開ルールだけ発火 → 台帳へ先に積む
@@ -567,14 +568,17 @@ export async function operatorRuleDeferredUntil(db: D1Database, accountId: strin
   }
   if (conditions.schedule === 'business_hours') {
     const setting = await db.prepare('SELECT timezone FROM booking_settings WHERE line_account_id=?').bind(accountId).first<{timezone:string}>();
-    let weekday:number,time:string;
+    let weekday:number,time:string,date:string;
     try {
-      const parts=new Intl.DateTimeFormat('en-US',{timeZone:setting?.timezone??'Asia/Tokyo',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now);
+      const parts=new Intl.DateTimeFormat('en-US',{timeZone:setting?.timezone??'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now);
       const part=(kind:string)=>parts.find(value=>value.type===kind)?.value??'';
       weekday=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(part('weekday'));
       time=`${part('hour')}:${part('minute')}`;
+      date=`${part('year')}-${part('month')}-${part('day')}`;
     } catch {return new Date(now.getTime()+60_000).toISOString();}
-    const open = await db.prepare(`SELECT 1 FROM booking_business_hours h JOIN booking_settings s ON s.id=h.booking_settings_id
+    const source = await accountOpeningHours(db, accountId);
+    const google = openingDay(source, date!);
+    const open = google !== null ? google.some(period => period.start <= time && time < period.end) : await db.prepare(`SELECT 1 FROM booking_business_hours h JOIN booking_settings s ON s.id=h.booking_settings_id
       WHERE s.line_account_id=? AND s.business_hours_configured=1 AND h.weekday=? AND h.start_time<=? AND h.end_time>?`).bind(accountId,weekday,time,time).first();
     if (!open) return new Date(now.getTime()+60_000).toISOString();
   }

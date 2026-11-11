@@ -19,6 +19,7 @@ import { GOOGLE_CONNECTION_STATUS, INSTAGRAM_CONNECTION_STATUS } from '@/lib/sta
 import { RowActions } from '@/components/shared/row-actions'
 import { usePageTitle, usePageCrumbs } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import { useAccountStyle } from '@/hooks/use-account-style'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
 import { GoogleConnectionSettings } from '@/v8/restaurant/google'
 import { api } from '@/lib/api'
@@ -82,6 +83,8 @@ export default function SnsSettingsPage() {
 
   const returnedAccountId = searchParams.get('account_id')
   const accountId = returnedAccountId && accounts.some((account) => account.id === returnedAccountId) ? returnedAccountId : selectedAccountId
+  const accountStyle = useAccountStyle(accountId)
+  const restaurantStyle = accountStyle.status === 'ready' && accountStyle.data?.style === 'restaurant'
   const accountScope = useRef({ id: accountId })
   if (accountScope.current.id !== accountId) accountScope.current = { id: accountId }
   const renderedAccountScope = accountScope.current
@@ -225,15 +228,19 @@ export default function SnsSettingsPage() {
                 rows={[
                   { label: '店舗', value: googleLocation ?? '—' },
                   { label: '最後に取り込んだ日時', value: formatDate(visibleGoogle.connection.lastSyncedAt, { style: 'detail', fallback: '—' }) },
-                  { label: '口コミ', value: visibleGoogle.summary.storedCount > 0 ? `${formatNumber(visibleGoogle.summary.storedCount)}件・未返信 ${formatNumber(visibleGoogle.summary.unrepliedCount)}件` : '—' },
-                  { label: '投稿', value: visibleGoogle.summary.postsAttentionCount > 0 ? `要対応 ${formatNumber(visibleGoogle.summary.postsAttentionCount)}件` : '—' },
+                  ...(restaurantStyle ? [
+                    { label: '口コミ', value: visibleGoogle.summary.storedCount > 0 ? `${formatNumber(visibleGoogle.summary.storedCount)}件・未返信 ${formatNumber(visibleGoogle.summary.unrepliedCount)}件` : '—' },
+                    { label: '投稿', value: visibleGoogle.summary.postsAttentionCount > 0 ? `要対応 ${formatNumber(visibleGoogle.summary.postsAttentionCount)}件` : '—' },
+                  ] : []),
                 ]}
               /> : null}
               {googleStatus !== 'disconnected' && googleStatus !== 'pending_location' ? <div className={styles.links}>
-                <Link className={styles.link} href="/restaurant-test/google?tab=reviews">口コミへ<ArrowRight size={16} aria-hidden /></Link>
-                <Link className={styles.link} href="/restaurant-test/google?tab=posts">投稿へ<ArrowRight size={16} aria-hidden /></Link>
-                <Link className={styles.link} href="/restaurant-test/google?tab=profile">プロフィールへ<ArrowRight size={16} aria-hidden /></Link>
-                {googleStatus === 'connected' && visibleGoogle.connection.locationName ? <Link className={styles.link} href="/restaurant-test/google?tab=hours">営業時間へ<ArrowRight size={16} aria-hidden /></Link> : null}
+                {restaurantStyle ? <>
+                  <Link className={styles.link} href="/restaurant-test/google?tab=reviews">口コミへ<ArrowRight size={16} aria-hidden /></Link>
+                  <Link className={styles.link} href="/restaurant-test/google?tab=posts">投稿へ<ArrowRight size={16} aria-hidden /></Link>
+                  <Link className={styles.link} href="/restaurant-test/google?tab=profile">プロフィールへ<ArrowRight size={16} aria-hidden /></Link>
+                </> : null}
+                {googleStatus === 'connected' && visibleGoogle.connection.locationName ? <Link className={styles.link} href="/settings/google-hours">営業時間へ<ArrowRight size={16} aria-hidden /></Link> : null}
               </div> : null}
               <GoogleConnectionSettings key={accountId} accountId={accountId} data={visibleGoogle} onChanged={() => { void load() }} />
             </>

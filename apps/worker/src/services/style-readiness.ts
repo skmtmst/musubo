@@ -10,6 +10,7 @@ import {
 } from './style-setup-core.js';
 import { profile, profileAnswers } from './style-profile.js';
 import { connectedGoogleProfile, googleOpeningWeek } from './restaurant-google-hours-source.js';
+import { accountOpeningHours, openingWeek } from './account-opening-hours.js';
 export async function featureReadiness(
   db: D1Database,
   account: string,
@@ -43,11 +44,14 @@ export async function featureReadiness(
         }
       }
     } else {
+    const hoursSource = await accountOpeningHours(db, account);
+    const googleWeek = openingWeek(hoursSource);
+    const googleReady = hoursSource.source === 'manual' || !!googleWeek?.some(day => day.intervals.length > 0);
     const sql =
       selectedStyle === 'lesson'
           ? `SELECT 1 FROM events e JOIN event_slots s ON s.event_id=e.id WHERE e.line_account_id=? AND e.is_published=1 AND e.deleted_at IS NULL AND s.deleted_at IS NULL AND s.is_active=1 LIMIT 1`
-          : `SELECT 1 FROM menus m JOIN booking_settings b ON b.line_account_id=m.line_account_id JOIN staff_menus sm ON sm.menu_id=m.id AND sm.is_offered=1 JOIN staff s ON s.id=sm.staff_id AND s.line_account_id=m.line_account_id WHERE m.line_account_id=? AND m.is_active=1 AND m.deleted_at IS NULL AND s.is_active=1 AND s.deleted_at IS NULL AND b.business_hours_configured=1 LIMIT 1`;
-    configured = !!(await db.prepare(sql).bind(account).first());
+          : `SELECT 1 FROM menus m JOIN booking_settings b ON b.line_account_id=m.line_account_id JOIN staff_menus sm ON sm.menu_id=m.id AND sm.is_offered=1 JOIN staff s ON s.id=sm.staff_id AND s.line_account_id=m.line_account_id WHERE m.line_account_id=? AND m.is_active=1 AND m.deleted_at IS NULL AND s.is_active=1 AND s.deleted_at IS NULL ${hoursSource.source === 'manual' ? 'AND b.business_hours_configured=1' : ''} LIMIT 1`;
+    configured = googleReady && !!(await db.prepare(sql).bind(account).first());
     }
   }
   if(feature==='tickets')configured=!!await db.prepare("SELECT 1 FROM booking_pass_plans WHERE line_account_id=? AND status='on_sale' LIMIT 1").bind(account).first();

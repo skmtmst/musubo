@@ -186,6 +186,7 @@
   {"route":"/settings/booking-media","boundary":null,"expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/settings/customer-look","boundary":null,"expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/settings/delivery","boundary":null,"expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
+  {"route":"/settings/google-hours","boundary":null,"expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/settings/features","boundary":null,"expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/settings/file-scan","boundary":null,"expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/settings/manual-links","boundary":null,"expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},

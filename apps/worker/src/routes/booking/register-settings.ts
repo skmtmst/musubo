@@ -11,6 +11,20 @@ import { assignmentSettingsResponse } from '../booking-assignment-settings.js';
 import { resolveAccountIdAdmin } from './identity.js';
 import { googleCredentials } from './availability.js';
 import { readBookingAdminSettings, readBookingResourceInput, readBookingException } from './settings-input.js';
+import { accountOpeningHours, openingWeek } from '../../services/account-opening-hours.js';
+
+async function withOpeningHours(db: D1Database, accountId: string, settings: NonNullable<Awaited<ReturnType<typeof getBookingAdminSettings>>>) {
+  const state = await accountOpeningHours(db, accountId);
+  const googleWeek = openingWeek(state);
+  const businessHours = googleWeek?.map(day => ({
+    weekday: day.weekday,
+    intervals: day.intervals.map(interval => ({
+      ...interval,
+      capacity: settings.businessHours.find(local => local.weekday === day.weekday)?.intervals[0]?.capacity ?? 1,
+    })),
+  })) ?? settings.businessHours;
+  return { ...settings, businessHours, businessHoursConfigured: state.source === 'google_business' || (state.source === 'manual' && settings.businessHoursConfigured), openingHoursSource: state.source };
+}
 
 export function registerSettings(booking: Hono<Env>): void {
 booking.get('/api/booking/admin/channels', async (c) => {
@@ -98,7 +112,7 @@ booking.get('/api/booking/admin/settings', async (c) => {
   try {
     const settings = await getBookingAdminSettings(c.env.DB, accountId);
     if (!settings) return c.json({ success: false, error: 'not_found' }, 404);
-    return c.json({ success: true, data: settings });
+    return c.json({ success: true, data: await withOpeningHours(c.env.DB, accountId, settings) });
   } catch {
     logger.error("booking.read_settings_failed");
     return c.json({ success: false, error: 'booking_settings_unavailable' }, 503);
@@ -113,6 +127,9 @@ booking.put('/api/booking/admin/settings', requirePermission(BOOKING_SETTINGS_KE
     if (!body) return inputError(c, { success: false, error: 'invalid_json' }, 400, []);
     const parsed = readBookingAdminSettings(body);
     if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, 400, ["expectedVersion","timeZone","bookingWindowDays","cutoffMinutesBefore","cancelDeadlineMinutesBefore","maxActiveBookingsPerFriend","approvalMode","holdMinutes","waitlistHoldMinutes","slotGranularityMinutes","businessHours","reminderDayBeforeTime","reminderHoursBefore","liffDateView"]);
+    if (parsed.value.businessHours !== undefined && (await accountOpeningHours(c.env.DB, accountId)).source !== 'manual') {
+      return c.json({ success: false, error: '営業時間はGoogleビジネスで変更してください' }, 409);
+    }
     /*
      * 同時編集の見分けは「最後に直した日時で比べる」。
      * expectedUpdatedAt が送られてきたときだけ、保存前の値と照合する。
@@ -146,7 +163,7 @@ booking.put('/api/booking/admin/settings', requirePermission(BOOKING_SETTINGS_KE
       }, 409);
     }
     return c.json(
-      { success: true, data: result.item },
+      { success: true, data: await withOpeningHours(c.env.DB, accountId, result.item) },
       result.status === 'created' ? 201 : 200,
     );
   } catch {

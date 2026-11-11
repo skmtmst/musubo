@@ -151,13 +151,13 @@ export const PENDING: Record<string, Question> = {
     todo: { title: 'クラスの定員を決める', note: '1 回のクラスで受け付ける人数です', action: '決める' },
   },
   hours: {
-    key: 'hours', short: '営業時間', title: '予約を受け付ける時間は？', description: '予約を受け付ける曜日と時間です。休みの日はあとで足せます。',
+    key: 'hours', short: '営業時間', title: 'Googleビジネスの営業時間を設定しますか？', description: 'Googleビジネスプロフィールの通常・特別営業時間をmusuboの基準にします。',
     choices: [
-      { value: 'day', icon: 'clock', label: '11:00〜22:00（毎日）', note: '昼と夜の両方で受け付けます' },
-      { value: 'night', icon: 'clock', label: '17:00〜23:00（毎日）', note: '夜だけ受け付けます' },
+      { value: 'google_business', icon: 'clock', label: 'Googleビジネスで設定する', note: '接続画面から店舗を選びます' },
+      { value: 'later', icon: 'clock', label: 'あとで設定する', note: '接続後に営業時間が反映されます' },
     ],
-    where: '予約設定 › 営業時間', manualHref: '/booking/menus?tab=hours', manualNote: '営業時間の画面を開きます',
-    todo: { title: '営業時間を入れる', note: '予約を受け付ける曜日と時間です', action: '入れる' },
+    where: 'Googleビジネス › 営業時間', manualHref: '/settings/google-hours', manualNote: '未接続ならGoogleビジネスの接続画面を開きます',
+    todo: { title: '営業時間を設定する', note: 'Googleビジネスプロフィールの営業時間を使います', action: '設定する' },
   },
   partySize: {
     key: 'partySize', short: '受け付ける人数', title: '1 回の予約で受け付ける人数は？', description: 'LINE から予約できる人数です。多い人数はお店へ連絡してもらいます。',

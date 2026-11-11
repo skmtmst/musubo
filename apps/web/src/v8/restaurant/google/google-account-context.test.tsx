@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const connectionFn = vi.hoisted(() => vi.fn())
 const location = vi.hoisted(() => ({ search: 'tab=settings', replace: vi.fn() }))
 
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(location.search) }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(location.search), usePathname: () => '/restaurant-test/google' }))
 vi.mock('@/lib/use-same-page-url', () => ({ useSamePageUrl: () => ({ replace: location.replace, push: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'a', setSelectedAccountId: vi.fn(), accounts: [], loading: false }),

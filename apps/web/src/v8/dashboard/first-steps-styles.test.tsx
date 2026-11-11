@@ -9,11 +9,11 @@ afterEach(cleanup)
 const base = () => buildStepsFromApi(['accounts', 'featureSet', 'attributes', 'friendAdd', 'scenario', 'firstMessage'].map(key => ({ key, state: key === 'accounts' || key === 'featureSet' ? 'done' : 'todo', href: '/getting-started', reason: null })) as Parameters<typeof buildStepsFromApi>[0])
 const restaurant: StyleSetupProgress = { style: 'restaurant', steps: { attributes: { complete: false }, hours: { complete: false }, friendAdd: { complete: true }, scenario: { complete: false }, followup: { complete: false } } }
 
-it.each(ACCOUNT_STYLES)('%sも同じカードの段・数・直接リンクを使い、既存の標準6段を保つ', style => {
+it.each(ACCOUNT_STYLES)('%sも同じカードの段・数・直接リンクを使い、営業時間の段を含める', style => {
   const summary = summarizeFirstSteps(base(), style, style === 'restaurant' ? restaurant : undefined)
   render(<FirstStepsCard summary={summary} folded={false} onToggle={() => {}} />)
   const list = screen.getByRole('list')
-  expect(within(list).getAllByRole('listitem')).toHaveLength(style === 'restaurant' ? 8 : 6)
+  expect(within(list).getAllByRole('listitem')).toHaveLength(style === 'restaurant' ? 8 : 7)
   const progress = screen.getByRole('progressbar')
   expect(progress.getAttribute('aria-valuemax')).toBe(String(summary.total))
   expect(progress.getAttribute('aria-valuenow')).toBe(String(summary.done))

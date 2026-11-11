@@ -1,5 +1,6 @@
 import type { FormSnapshot, BookingResource } from './form-snapshot-types.js';
-import { formMediaUsageQueries, resolveCommonVarValuesAt, normalizeScopedTagName } from '@line-crm/db';
+import { formMediaUsageQueries, normalizeScopedTagName } from '@line-crm/db';
+import { resolveMusuboCommonVarsAt } from '../google-common-vars.js';
 import { DEFAULT_TENANT_ID, collectInputs, layoutToFields, normalizeLayout, validateFormDefinition, type FormLayout } from '@line-crm/shared';
 
 import { unsupportedHqTemplateAdapter, requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAuthority, type HqTemplateReference, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
@@ -274,7 +275,7 @@ async function verifyStoreReferences(db: D1Database, accountId: string, layout: 
         throw new FormTemplateError('PUBLIC_IMAGE_REFERENCE_UNSUPPORTED');
     const keys = (layout?.references ?? []).flatMap(reference => reference.kind === 'store_information'
         ? Object.values(reference.fields).map(source => source!.varKey) : []);
-    if (keys.length && !(await resolveCommonVarValuesAt(db, accountId, keys, new Date().toISOString())).ok)
+    if (keys.length && !(await resolveMusuboCommonVarsAt(db, accountId, keys, new Date().toISOString())).ok)
         throw new FormTemplateError('FORM_STORE_REFERENCE_UNAVAILABLE');
 }
 export async function inspectFormTemplate(db: D1Database, authority: HqTemplateAuthority, accountId: string, input: HqTemplateAdapterInput) {

@@ -3,11 +3,11 @@ import { normalizeStoreInterpolations, isBroadcastAssetKind } from '@line-crm/sh
 import {
   getFriendFieldMap,
   getCommonVarMap,
-  resolveCommonVarValuesAt,
   type CommonVarResolutionFailureReason,
 } from '@line-crm/db';
 
 import { commonVarKeysInContent } from './common-var-snapshot.js';
+import { resolveMusuboCommonVarsAt } from './google-common-vars.js';
 
 /**
  * 差し込みに使う値をまとめて用意する。
@@ -46,6 +46,10 @@ export async function resolveInterpolationExtra(
     needsFields ? getFriendFieldMap(db, friendId) : Promise.resolve(undefined),
     needsVars ? getCommonVarMap(db, account?.line_account_id) : Promise.resolve(undefined),
   ]);
+  if (vars && account?.line_account_id && commonVarKeysInContent(content).includes('business_hours')) {
+    const resolved = await resolveMusuboCommonVarsAt(db, account.line_account_id, ['business_hours'], new Date().toISOString());
+    vars.business_hours = resolved.ok ? resolved.values.business_hours : '';
+  }
   return { fields, vars };
 }
 
@@ -116,7 +120,7 @@ export async function resolveSendCommonVars(
       source,
     );
   }
-  const resolved = await resolveCommonVarValuesAt(db, lineAccountId, varKeys, executionAt);
+  const resolved = await resolveMusuboCommonVarsAt(db, lineAccountId, varKeys, executionAt);
   if (!resolved.ok) {
     const now = new Date().toISOString();
     try {

@@ -27,6 +27,7 @@ export function conversationAiUiEnabled(
 
 /** Google だけを飲食店の試験スイッチから分ける。似た名前のパスは含めない。 */
 export function environmentFeatureForPath(path: string): 'google-business' | 'restaurant-test' | null {
+  if (path === '/settings/google-hours') return 'google-business'
   if (path === '/restaurant-test/google' || path.startsWith('/restaurant-test/google/')) return 'google-business'
   if (path === '/restaurant-test' || path.startsWith('/restaurant-test/') || path === '/settings/booking-media' || path === '/settings/delivery') return 'restaurant-test'
   return null

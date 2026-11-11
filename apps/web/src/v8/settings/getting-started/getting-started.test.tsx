@@ -91,7 +91,7 @@ it.each(['viewer', 'staff'])('%sの未完了の段は灰色の入口を残す', 
   state.stepState = 'forbidden'
   const { container } = render(<GettingStarted />)
   const rows = [...container.querySelectorAll('[data-step-state="forbidden"]')]
-  expect(rows).toHaveLength(6)
+  expect(rows).toHaveLength(7)
   for (const row of rows) {
     const button = row.querySelector('button')!
     expect(button.getAttribute('aria-disabled')).toBe('true')
