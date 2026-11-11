@@ -70,7 +70,7 @@ it.each(['restaurant', 'salon', 'consult', 'lesson'] as const)('%sの専用画�
   const view = render(<StyleDashboard style={style} />)
   const title = await screen.findByRole('heading', { name: 'はじめにやること' })
   const card = title.closest('section')!
-  expect(card.querySelectorAll('#first-steps-list > li')).toHaveLength(style === 'restaurant' ? 8 : 6)
+  expect(card.querySelectorAll('#first-steps-list > li')).toHaveLength(style === 'restaurant' ? 8 : 7)
   const band = view.container.querySelector('[data-style-dashboard]')!
   expect(card.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })

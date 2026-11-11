@@ -6,11 +6,11 @@ import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 const net = vi.hoisted(() => ({
   routes: vi.fn(), progress: vi.fn(), style: vi.fn(), warnings: vi.fn(), items: vi.fn(), features: vi.fn(),
   save: vi.fn(), activate: vi.fn(), starterSet: vi.fn(),
-  role: 'owner' as string | null, search: '', replace: vi.fn(), push: vi.fn(),
+  role: 'owner' as string | null, search: '', replace: vi.fn(), push: vi.fn(), googleHoursComplete: false,
 }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(net.search), usePathname: () => '/', useRouter: () => ({ replace: net.replace, push: net.push }) }))
 vi.mock('@/components/shared/list-navigation', async original => ({ ...await original<typeof import('@/components/shared/list-navigation')>(), useListNavigationRouter: () => ({ replace: net.replace, push: net.push }) }))
-vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: (_account: string | null, style: import('@line-crm/shared').AccountStyle | null) => ({ progress: style ? { style, steps: {} } : undefined, reload: vi.fn() }) }))
+vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: (_account: string | null, style: import('@line-crm/shared').AccountStyle | null) => ({ progress: style ? { style, steps: net.googleHoursComplete ? { hours: { complete: true } } : {} } : undefined, reload: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ refreshAccounts: vi.fn(), selectedAccountId: 'A', selectedAccount: { channelId: 'channel-A', displayName: 'A' }, loading: false }) }))
 vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => net.role, useStaffIdentity: () => null }))
 vi.mock('@/lib/api', async original => {
@@ -61,7 +61,7 @@ beforeAll(async () => { await import('@/v8/onboarding/wizard') })
 
 beforeEach(() => {
   vi.clearAllMocks()
-  net.role = 'owner'; net.search = ''
+  net.role = 'owner'; net.search = ''; net.googleHoursComplete = false
   net.routes.mockReset().mockResolvedValue(ok([]))
   window.localStorage.clear(); window.sessionStorage.clear(); window.history.replaceState(null, '', '/')
   setTestReducedMotion(true)
@@ -112,7 +112,7 @@ it('カードの進みは基本6段の1つだけにし、選んだ機能の設�
   net.progress.mockResolvedValue(basic(true))
   render(<DashboardV8 />)
   await pendingSetup()
-  expect(within(guide()).getByText('6 / 6 済み')).toBeTruthy()
+  expect(within(guide()).getByText('6 / 7 済み')).toBeTruthy()
   expect(within(guide()).getAllByRole('progressbar')).toHaveLength(1)
   expect(within(guide()).queryByRole('progressbar', { name: '使い方の設定の進み' })).toBeNull()
   expect(guide().textContent).not.toMatch(/質問 \d|済み \d+件/)
@@ -186,7 +186,7 @@ it('基本6段の進みだけを示し、畳んでも後回しの設定操作を
   render(<DashboardV8 />)
   await pendingSetup()
   expect(screen.getAllByRole('progressbar')).toHaveLength(1)
-  expect(within(guide()).getByText('6 / 6 済み')).toBeTruthy()
+  expect(within(guide()).getByText('6 / 7 済み')).toBeTruthy()
   expect(within(guide()).getByText('リッチメニューなどの見た目を決める')).toBeTruthy()
   fireEvent.click(within(guide()).getByRole('button', { name: '畳む', exact: true }))
   expect(screen.getByRole('button', { name: '使い方の設定を開く', exact: true })).toBeTruthy()
@@ -196,12 +196,13 @@ it('基本6段の進みだけを示し、畳んでも後回しの設定操作を
 })
 
 it('基本が全完了で後回しの設定行が無ければ済みの1行へ畳む', async () => {
+  net.googleHoursComplete = true
   net.progress.mockResolvedValue(basic(true)); net.style.mockResolvedValue(style(false))
   render(<DashboardV8 />)
   await waitFor(() => { expect(net.progress).toHaveBeenCalledTimes(1); expect(net.style).toHaveBeenCalledTimes(1) })
   await act(async () => { await Promise.resolve() })
   expect(screen.getByRole('heading', { name: 'はじめにやること', exact: true })).toBeTruthy()
-  expect(within(guide()).getByText('6 / 6 済み')).toBeTruthy()
+  expect(within(guide()).getByText('7 / 7 済み')).toBeTruthy()
   expect(within(guide()).queryByRole('list')).toBeNull()
   expect(screen.getByRole('progressbar', {name:'はじめにやることの進み'})).toBeTruthy()
 })
@@ -270,8 +271,8 @@ it('既知の業種を設定取得の失敗で標準へ戻さず、実物が未�
   const card = guide()
   expect(within(card).getByText('ストアをつなぐ')).toBeTruthy()
   expect(within(card).getByText('ストアの商品を確認する')).toBeTruthy()
-  expect(within(card).getAllByText('（未確認）')).toHaveLength(3)
-  expect(within(card).getAllByRole('button', { name: /の未確認の理由$/ })).toHaveLength(3)
+  expect(within(card).getAllByText('（未確認）')).toHaveLength(4)
+  expect(within(card).getAllByRole('button', { name: /の未確認の理由$/ })).toHaveLength(4)
   expect(within(card).queryByText('友だちの分け方を決める')).toBeNull()
   expect(screen.queryByRole('button', { name: '使い方の設定を開く', exact: true })).toBeNull()
 })

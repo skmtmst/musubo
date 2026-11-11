@@ -56,7 +56,7 @@ export const features: Record<string, string | null> = {
   content: '/templates',
   cancelDeadline: '/booking/menus?tab=rules',
   seats: '/restaurant-test/tables',
-  hours: '/booking/menus?tab=hours',
+  hours: '/settings/google-hours',
   partySize: '/booking/menus?tab=rules',
   nomination: '/booking/menus?tab=staff',
   assignment: '/booking/menus?tab=staff',

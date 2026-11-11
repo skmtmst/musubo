@@ -1,9 +1,9 @@
 import { normalizeStoreInterpolations } from '@line-crm/shared';
 import {
-  resolveCommonVarValuesAt,
   type CommonVarResolutionEntry,
   type CommonVarResolutionFailureReason,
 } from '@line-crm/db';
+import { resolveMusuboCommonVarsAt } from './google-common-vars.js';
 
 
 export interface BroadcastCommonVarSnapshot {
@@ -109,7 +109,7 @@ export async function prepareBroadcastCommonVarSnapshot(
   const snapshot: BroadcastCommonVarSnapshot = { executionAt, accounts: {} };
   const failures: BroadcastCommonVarResolutionError['failures'] = [];
   for (const accountId of accountIds) {
-    const resolved = await resolveCommonVarValuesAt(db, accountId, varKeys, executionAt);
+    const resolved = await resolveMusuboCommonVarsAt(db, accountId, varKeys, executionAt);
     if (!resolved.ok) {
       failures.push(...resolved.failures.map((failure) => ({ accountId, ...failure })));
       continue;

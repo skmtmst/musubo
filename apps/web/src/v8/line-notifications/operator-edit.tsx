@@ -644,7 +644,7 @@ function OperatorEditInner() {
                 <Field id="operator-schedule" label="送る時間" value={schedule} onChange={setSchedule} options={SCHEDULE_OPTIONS} readOnly={!canWrite} />
                 {schedule === 'business_hours' || schedule === 'morning_digest' ? (
                   <p className={styles.cardNote}>{schedule === 'business_hours'
-                    ? '営業時間外のお知らせは、予約設定の営業時間になってから送ります。'
+                    ? '営業時間外のお知らせは、Googleビジネスの営業時間になってから送ります。'
                     : '翌朝の、設定されたおまとめ時刻に送ります。'}</p>
                 ) : null}
               </FormSection>

@@ -122,6 +122,7 @@ export interface BookingSettings {
   activeMenuCount: number;
   inactiveMenuCount: number;
   businessHoursConfigured: boolean;
+  openingHoursSource?: 'manual' | 'google_business' | 'google_unavailable';
   businessHours: Array<{
     weekday: number;
     intervals: Array<{ start: string; end: string; capacity?: number }>;

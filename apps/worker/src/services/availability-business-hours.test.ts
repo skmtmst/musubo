@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
-import { getAvailability } from './availability.js';
+import { getAvailability, getStoreCapacitySnapshot } from './availability.js';
 
 function asD1(sqlite: Database.Database): D1Database {
   const db = {
@@ -75,6 +75,33 @@ function businessHour(id: string, start: string, end: string, capacity = 1): voi
   ).run(id, start, end, capacity);
 }
 
+function connectGoogleHours(specialHours: unknown[] = []): void {
+  sqlite.exec(`
+    INSERT INTO rt_organizations(id,account_id,name,status) VALUES('org-1','acc-1','サロン','active');
+    INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store-1','org-1','サロン','S1','acc-1');
+    INSERT INTO rt_google_connections(id,store_id,line_account_id,location_name,status)
+      VALUES('gc-1','store-1','acc-1','accounts/111/locations/222','connected');
+  `);
+  const profile = {
+    profile: { name: 'locations/222', openStatus: 'OPEN', regularHours: {
+      SUNDAY: [], MONDAY: [{ open: '11:00', close: '16:00' }], TUESDAY: [], WEDNESDAY: [],
+      THURSDAY: [], FRIDAY: [], SATURDAY: [],
+    }, specialHours },
+  };
+  sqlite.prepare(`INSERT INTO rt_google_profiles(store_id,location_name,profile_json,fingerprint,fetched_at)
+    VALUES('store-1','accounts/111/locations/222',?,'fp','2026-09-01T00:00:00Z')`).run(JSON.stringify(profile));
+}
+
+test('Google営業時間へ移行しても時間帯ごとの既存定員を保持する', async () => {
+  businessHour('morning', '10:00', '12:00', 2);
+  businessHour('afternoon', '12:00', '15:00', 1);
+  connectGoogleHours();
+  const snapshot = await getStoreCapacitySnapshot(db, 'acc-1',
+    new Date(`${MONDAY}T00:00:00+09:00`), new Date(`${MONDAY}T23:59:00+09:00`));
+  expect(snapshot.windows.map(window => [window.start.slice(11, 16), window.end.slice(11, 16), window.capacity]))
+    .toEqual([['02:00', '03:00', 2], ['03:00', '06:00', 1], ['06:00', '07:00', 1]]);
+});
+
 function booking(id: string, startsAt: string, endsAt: string): void {
   sqlite.prepare(
     `INSERT INTO bookings
@@ -93,6 +120,20 @@ async function slots(): Promise<Array<{ start: string; end: string }>> {
 }
 
 describe('営業時間が枠の開閉に効く（#748 / N-403）', () => {
+  test('サロンもGoogleの通常営業時間を使い、手入力の営業時間は予約枠を広げない', async () => {
+    businessHour('bh-1', '09:00', '18:00');
+    connectGoogleHours();
+    const starts = (await slots()).map(slot => slot.start);
+    expect(starts[0]).toBe('11:00');
+    expect(starts.at(-1)).toBe('15:00');
+  });
+
+  test('Googleの特別休業日は、手入力の営業曜日でも枠を閉じる', async () => {
+    businessHour('bh-1', '09:00', '18:00');
+    connectGoogleHours([{ date: MONDAY, closed: true, periods: [] }]);
+    expect(await slots()).toEqual([]);
+  });
+
   test('営業 10:00-17:00・勤務 09:00-18:00 なら、営業時間の外に枠を出さない', async () => {
     businessHour('bh-1', '10:00', '17:00');
     const list = await slots();

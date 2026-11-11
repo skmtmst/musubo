@@ -36,7 +36,7 @@ it('M017: 実画面の失敗表示から再取得し、保存済みの進捗を�
   const retry = await screen.findByRole('button', { name: 'もう一度読み込む' })
   expect(screen.queryByRole('progressbar', { name: 'はじめの設定の進み具合' })).toBeNull()
   fireEvent.click(retry)
-  await screen.findByText('1 / 6 済み')
+  await screen.findByText('1 / 7 済み')
   expect(get).toHaveBeenLastCalledWith('account-1', 'v8')
   expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()
 })

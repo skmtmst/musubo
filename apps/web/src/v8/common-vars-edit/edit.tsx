@@ -751,6 +751,7 @@ function EditCommonVarV8Inner() {
       {canWrite ? null : (
         <div className={styles.roBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       )}
+      {item?.varKey === 'business_hours' ? <Notice tone="info">Googleビジネスと接続済みのときは、配信に差し込む営業時間もGoogleの通常・特別営業時間を使います。<Button href="/settings/google-hours" variant="text">Googleの営業時間を開く</Button></Notice> : null}
 
       {error && item ? (
         <Notice tone="danger" message={error} onClose={() => setError('')} />
