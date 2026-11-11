@@ -385,7 +385,7 @@ html:root .outlinedMore[data-row-menu]:not(:focus-visible) {
   .detailControls { flex-wrap: nowrap; gap: var(--space-8); }
   .statusWrap { order: 0; flex-basis: auto; }
   .prioritySelect { order: 1; }
-  :root .prioritySelect :global([data-design-node='niGPF']) { width: 98px; min-width: 98px; }
+  :root .prioritySelect :global([data-design-node]) { width: 98px; min-width: 98px; }
   .contractLink { order: 2; margin-left: calc(-1 * var(--space-8)); }
   .moreWrap { display: none; }
   .messages .message:first-child { min-height: var(--support-mobile-message-height); }
