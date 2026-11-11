@@ -137,7 +137,7 @@
   align-items: center;
   gap: var(--tpl-op-me-gap);
 }
-html:root .detailTitleRow [data-design-node='t0jk8p'] h2 { font-size: 17px; line-height: 21px; }
+.detailTitleRow { --tpl-section-title-size: 17px; --card-title-line-height: 21px; }
 @media (min-width: 641px) { .detailTitleRow { min-height: var(--space-24); } }
 
 .detailHead svg,
@@ -385,7 +385,7 @@ html:root .outlinedMore[data-row-menu]:not(:focus-visible) {
   html:root .mobileTop .mobileBack > svg { width: var(--support-mobile-pad); height: var(--support-mobile-pad); }
   html:root .mobileTop .outlinedMore[data-row-menu] { width: 32px; min-width: 32px; height: 36px; flex-basis: 32px; }
   html:root .mobileTop .outlinedMore[data-row-menu] > svg { width: 18px; height: 18px; }
-  html:root .detailTitleRow [data-design-node='t0jk8p'] h2 { font-size: 21px; line-height: 25px; }
+  .detailTitleRow { --tpl-section-title-size: 21px; --card-title-line-height: 25px; }
   .detailControls { flex-wrap: nowrap; gap: var(--space-8); }
   .statusWrap { order: 0; flex-basis: auto; }
   .prioritySelect { order: 1; }
