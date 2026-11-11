@@ -120,7 +120,7 @@ describe('Issue #637 /booking/staff/shifts 全ボタンにアクセシブルな�
 
     const { container } = render(<BookingSettingsV8 accountId={fixture.selectedAccountId} />)
     // タブと右の写しは別々の動的 import。両方の応答と描画を待つ。
-    await screen.findByRole('heading', { name: '開ける時間' })
+    await screen.findByRole('heading', { name: '営業時間' })
     await screen.findByText('設備はまだありません。')
     await screen.findByText('この期間に空きはありません。')
     const unnamed = buttonsWithoutAccessibleName(container)

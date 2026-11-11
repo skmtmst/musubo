@@ -4,20 +4,23 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { ACCOUNT_STYLES } from '@line-crm/shared'
 import { loadStyleSetupProgress } from './style-setup-progress'
 import { useStyleSetupProgress } from './use-style-setup-progress'
-const net = vi.hoisted(() => ({ menus: vi.fn(), staff: vi.fn(), settings: vi.fn(), account: vi.fn(), events: vi.fn(), members: vi.fn(), snapshot: vi.fn(), context: vi.fn(), restaurantProgress: vi.fn(), hours: vi.fn(), connector: vi.fn() }))
+const net = vi.hoisted(() => ({ menus: vi.fn(), staff: vi.fn(), settings: vi.fn(), account: vi.fn(), events: vi.fn(), members: vi.fn(), snapshot: vi.fn(), context: vi.fn(), restaurantProgress: vi.fn(), hours: vi.fn(), connector: vi.fn(), googleProfile: vi.fn(), googleConnection: vi.fn() }))
 vi.mock('@/lib/api', () => ({
   api: { lineAccounts: { get: net.account }, ecCommerce: { connector: net.connector } },
   bookingApi: { listMenus: net.menus, listStaff: net.staff, getSettings: net.settings }, eventsApi: { listEvents: net.events },
 }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { members: net.members } }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: { snapshot: net.snapshot, listStores: net.snapshot, storeContext: net.context, setupProgress: net.restaurantProgress, openingHours: net.hours } }))
+vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: { profile: net.googleProfile, connection: net.googleConnection } }))
 vi.mock('@/hooks/use-account-style', () => ({ ACCOUNT_STYLE_UPDATED: 'account-style-updated' }))
 
 beforeEach(() => {
   vi.resetAllMocks()
   net.menus.mockResolvedValue({ menus: [{ id: 'menu', is_active: 1, assigned_staff: [{ id: 'staff' }] }] })
   net.staff.mockResolvedValue({ staff: [{ id: 'staff', is_active: 1 }] })
-  net.settings.mockImplementation((id: string) => Promise.resolve({ success: true, data: { lineAccountId: id, businessHoursConfigured: true, businessHours: [{ intervals: [{ start: '09:00', end: '18:00' }] }] } }))
+  net.settings.mockImplementation((id: string) => Promise.resolve({ success: true, data: { lineAccountId: id, openingHoursSource: 'google_business', businessHoursConfigured: true, businessHours: [{ intervals: [{ start: '09:00', end: '18:00' }] }] } }))
+  net.googleProfile.mockImplementation((id: string) => Promise.resolve({ success: true, store: { lineAccountId: id }, closed: false, profile: { regularHours: { MONDAY: [{ open: '09:00', close: '18:00' }] } } }))
+  net.googleConnection.mockImplementation((id: string) => Promise.resolve({ success: true, store: { lineAccountId: id }, connection: { status: 'connected', locationName: 'accounts/1/locations/2' } }))
   net.account.mockImplementation((id: string) => Promise.resolve({ success: true, data: { id, liffId: '123-booking' } }))
   net.events.mockResolvedValue({ items: [{ id: 'class', is_published: 1, lifecycle_status: 'published', next_slot_starts_at: '2099-10-28T10:00:00+09:00' }], total: 1 })
   net.members.mockResolvedValue({ success: true, data: [{ line_account_id: 'a', joined_at: '2026-10-28', ended_at: null, expires_at: null }] })
@@ -37,24 +40,24 @@ const values = (progress: Awaited<ReturnType<typeof loadStyleSetupProgress>>) =>
 it.each(ACCOUNT_STYLES)('%sはその段の既存APIの実設定だけを使う', async style => {
   const progress = await loadStyleSetupProgress('a', style)
   expect(progress.style).toBe(style)
-  expect(values(progress)).toEqual(style === 'standard' ? [] : style === 'ec' ? [true, null, true] : style === 'restaurant' ? [true, true, true, true, true] : [true, true, true])
-  if (style === 'standard') for (const method of Object.values(net)) expect(method).not.toHaveBeenCalled()
+  expect(values(progress)).toEqual(style === 'standard' ? [true] : style === 'ec' ? [true, true, null, true] : style === 'restaurant' ? [true, true, true, true, true] : [true, true, true, true])
+  if (style === 'standard') for (const [name, method] of Object.entries(net)) if (!['googleProfile', 'googleConnection'].includes(name)) expect(method).not.toHaveBeenCalled()
   if (style === 'ec') expect(progress.steps.friendAdd?.reason).toContain('商品を確認できる情報がまだありません')
 })
 
 it.each(['restaurant', 'salon', 'consult', 'lesson', 'ec'] as const)('%sの取得失敗を設定済みにせず、未確認の理由を渡す', async style => {
   for (const method of Object.values(net)) method.mockRejectedValue(new Error('offline'))
   const progress = await loadStyleSetupProgress('a', style)
-  expect(values(progress)).toEqual(style === 'restaurant' ? [null, null, null, null, null] : [null, null, null])
+  expect(values(progress)).toEqual(style === 'restaurant' ? [null, null, null, null, null] : [null, null, null, null])
   for (const step of Object.values(progress.steps)) expect(step?.reason).toBeTruthy()
 })
 
 it('読めた未登録はfalse、開催日時や商品の情報が足りない時はnullにする', async () => {
   net.events.mockResolvedValue({ items: [], total: 0 })
   net.members.mockResolvedValue({ success: true, data: [] })
-  expect(values(await loadStyleSetupProgress('a', 'lesson'))).toEqual([false, false, false])
+  expect(values(await loadStyleSetupProgress('a', 'lesson'))).toEqual([true, false, false, false])
   net.events.mockResolvedValue({ items: [{ id: 'draft', is_published: 0, next_slot_starts_at: null }], total: 1 })
-  expect(values(await loadStyleSetupProgress('a', 'lesson'))).toEqual([null, false, false])
+  expect(values(await loadStyleSetupProgress('a', 'lesson'))).toEqual([true, null, false, false])
   net.snapshot.mockResolvedValue({ success: true, data: { stores: [], tables: [], menuItems: [], inventory: [] } })
   expect(values(await loadStyleSetupProgress('a', 'restaurant'))).toEqual([null, null, null, null, null])
 })
@@ -64,7 +67,7 @@ it('担当者がいてもメニューとの対応や営業時間を確かめな�
   expect((await loadStyleSetupProgress('a', 'salon')).steps.scenario?.complete).toBeNull()
   net.menus.mockResolvedValue({ menus: [{ id: 'menu', is_active: 1, assigned_staff: [] }] })
   expect((await loadStyleSetupProgress('a', 'salon')).steps.scenario?.complete).toBe(false)
-  net.settings.mockResolvedValue({ success: true, data: { lineAccountId: 'a', businessHoursConfigured: false, businessHours: [] } })
+  net.googleProfile.mockResolvedValue({ success: true, store: { lineAccountId: 'a' }, closed: true, profile: { regularHours: { MONDAY: [{ open: '09:00', close: '18:00' }] } } })
   expect((await loadStyleSetupProgress('a', 'consult')).steps.attributes?.complete).toBe(false)
 })
 
@@ -74,6 +77,15 @@ it('別の店の店舗・会員・予約ページを済みの根拠にしない'
   expect((await loadStyleSetupProgress('other', 'lesson')).steps.friendAdd?.complete).toBe(false)
   net.account.mockResolvedValue({ success: true, data: { id: 'other', liffId: '123-other' } })
   expect((await loadStyleSetupProgress('a', 'consult')).steps.friendAdd?.complete).toBeNull()
+  net.googleProfile.mockResolvedValue({ success: true, store: { lineAccountId: 'other' }, closed: false, profile: { regularHours: { MONDAY: [{ open: '09:00', close: '18:00' }] } } })
+  expect((await loadStyleSetupProgress('a', 'standard')).steps.hours?.complete).toBeNull()
+})
+
+it('予約機能が無い標準業種もGoogle接続だけで営業時間の未設定を判定する', async () => {
+  net.googleConnection.mockResolvedValue({ success: true, store: { lineAccountId: 'a' }, connection: { status: 'disconnected', locationName: null } })
+  expect((await loadStyleSetupProgress('a', 'standard')).steps.hours?.complete).toBe(false)
+  expect(net.googleProfile).not.toHaveBeenCalled()
+  expect(net.settings).not.toHaveBeenCalled()
 })
 
 it('店を切り替えた直後に証拠をクリアし、遅い旧店舗の返事を捨てる', async () => {

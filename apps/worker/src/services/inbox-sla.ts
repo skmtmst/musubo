@@ -1,4 +1,5 @@
 import {getAccountTimeZone,tzDateStr} from './availability.js';
+import { accountOpeningHours, openingDay } from './account-opening-hours.js';
 export interface SlaSettings {enabled:boolean;firstResponseMinutes:number;businessHoursOnly:boolean;version:number;escalateTeamId:string|null}
 export async function inboxSlaSettings(db:D1Database,account:string):Promise<SlaSettings> {
  const r=await db.prepare('SELECT * FROM inbox_routing_settings WHERE account_id=?').bind(account).first<Record<string,unknown>>();
@@ -10,15 +11,17 @@ function utc(tz:string,date:string,time:string) {
  return guess;
 }
 export async function businessWindows(db:D1Database,account:string,from:string) {
+ const source=await accountOpeningHours(db,account);
  const settings=await db.prepare('SELECT id,business_hours_configured FROM booking_settings WHERE line_account_id=?').bind(account).first<{id:string;business_hours_configured:number}>();
  const hours=settings?.business_hours_configured ? (await db.prepare('SELECT weekday,start_time,end_time FROM booking_business_hours WHERE booking_settings_id=?').bind(settings.id).all<{weekday:number;start_time:string;end_time:string}>()).results
   : Array.from({length:7},(_,weekday)=>({weekday,start_time:'09:00',end_time:'18:00'}));
  const holidays=new Set((await db.prepare('SELECT date FROM style_holidays WHERE line_account_id=?').bind(account).all<{date:string}>()).results.map(r=>r.date));
  const exceptions=(await db.prepare("SELECT date_from,date_to,kind,hours_json FROM booking_availability_exceptions WHERE line_account_id=? AND scope_kind='store'").bind(account).all<{date_from:string;date_to:string;kind:string;hours_json:string}>()).results;
  const tz=await getAccountTimeZone(db,account),day=Date.parse(`${tzDateStr(tz,new Date(from))}T00:00:00Z`),windows:Array<[number,number]>=[];
- for(let n=0;n<370;n++) {const d=new Date(day+n*86400000),date=d.toISOString().slice(0,10);if(holidays.has(date))continue;
-  const ex=exceptions.find(e=>e.date_from<=date&&date<=e.date_to);if(ex?.kind==='closed')continue;
-  const intervals=ex?.kind==='custom_hours' ? (JSON.parse(ex.hours_json) as Array<{start:string;end:string}>).map(h=>({start_time:h.start,end_time:h.end})) : hours.filter(h=>h.weekday===d.getUTCDay());
+ for(let n=0;n<370;n++) {const d=new Date(day+n*86400000),date=d.toISOString().slice(0,10);if(source.source==='manual'&&holidays.has(date))continue;
+  const ex=source.source==='manual'?exceptions.find(e=>e.date_from<=date&&date<=e.date_to):null;if(ex?.kind==='closed')continue;
+  const google=openingDay(source,date);
+  const intervals=google!==null?google.map(h=>({start_time:h.start,end_time:h.end})):ex?.kind==='custom_hours' ? (JSON.parse(ex.hours_json) as Array<{start:string;end:string}>).map(h=>({start_time:h.start,end_time:h.end})) : hours.filter(h=>h.weekday===d.getUTCDay());
   for(const h of intervals) windows.push([utc(tz,date,h.start_time),utc(tz,date,h.end_time)]);
  }
  return windows.sort((a,b)=>a[0]-b[0]);
