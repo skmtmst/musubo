@@ -123,7 +123,6 @@ function serializeMessage(m: SupportMessage, base: string) {
     authorName: m.author_name,
     body: m.body,
     attachments: safeKeys(m.attachment_keys).map((key) => ({ key, url: `${base}/images/${key}`, name: key.split('/').pop() ?? key })),
-    aiAssisted: m.ai_assisted === 1,
     deliveredVia: safeKeys(m.delivered_via),
     createdAt: m.created_at,
   };
@@ -221,7 +220,7 @@ opsSupport.get('/api/ops/support/tickets/:id', async (c) => {
       ticket: serializeTicket(ticket, base, messages.filter((m) => m.author_kind === 'ops').length),
       tenant,
       messages: messages.map((m) => serializeMessage(m, base)),
-      draft: draft ? { body: draft.body, aiGenerated: draft.ai_generated === 1, generatedAt: draft.generated_at, updatedAt: draft.updated_at } : null,
+      draft: draft ? { body: draft.body, updatedAt: draft.updated_at } : null,
     },
   });
 });
@@ -257,7 +256,7 @@ opsSupport.patch('/api/ops/support/tickets/:id', requirePlatformAdminWrite(), in
 });
 
 // ---------------------------------------------------------------------------
-// 返信・下書き・AI下書き
+// 返信・下書き
 // ---------------------------------------------------------------------------
 
 function replyMailBody(input: { staffName: string; ticketLabel: string; subject: string; reply: string; opsName: string; adminUrl: string }): string {
@@ -318,7 +317,6 @@ opsSupport.post('/api/ops/support/tickets/:id/reply', requirePlatformAdminWrite(
     authorStaffId: staff.id,
     authorName: staff.name,
     body: text,
-    aiAssisted: false,
     deliveredVia,
     nextStage,
   });
@@ -349,8 +347,8 @@ opsSupport.put('/api/ops/support/tickets/:id/draft', requirePlatformAdminWrite()
     await deleteSupportReplyDraft(db, ticket.id);
     return c.json({ success: true, data: null });
   }
-  const draft = await saveSupportReplyDraft(db, { requestId: ticket.id, body: text, aiGenerated: false, authorStaffId: staff.id });
-  return c.json({ success: true, data: { body: draft.body, aiGenerated: false, generatedAt: null, updatedAt: draft.updated_at } });
+  const draft = await saveSupportReplyDraft(db, { requestId: ticket.id, body: text, authorStaffId: staff.id });
+  return c.json({ success: true, data: { body: draft.body, updatedAt: draft.updated_at } });
 });
 
 opsSupport.delete('/api/ops/support/tickets/:id/draft', requirePlatformAdminWrite(), async (c) => {

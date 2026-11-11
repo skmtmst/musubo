@@ -229,11 +229,6 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: { mode: 'exempt', reason: '運営が契約先の権限者へ送るお知らせで、アカウント機能に属さない' },
   },
   {
-    name: 'platform knowledge',
-    classification: { kind: 'core', reason: '運営専用の解決済み問い合わせナレッジ' },
-    enforcement: { mode: 'exempt', reason: '運営専用でアカウント機能に属さない' },
-  },
-  {
     name: 'billing invoice sync',
     classification: { kind: 'core', reason: '運営ダッシュボードのStripe入金実績' },
     enforcement: { mode: 'exempt', reason: '契約先の課金台帳同期で、アカウント機能に属さない' },

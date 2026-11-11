@@ -92,7 +92,6 @@ const ROUTE_TO_SCREEN: ReadonlyArray<readonly [string, string]> = [
   ['/hq', '36-7'],
   ['/hq/members', '36-5'],
   ['/hq/billing', '36-2'],
-  ['/ops/knowledge', '37-11'],
 ]
 
 // 長いほうから当てる。`/friends/detail` が `/friends` に負けないように。

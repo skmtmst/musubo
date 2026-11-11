@@ -15,8 +15,6 @@ import type {
   OpsDashboard,
   OpsLineUnregistered,
   OpsFirstRunFunnel,
-  OpsKnowledgeArticle,
-  OpsKnowledgeInput,
   OpsSupportDetail,
   OpsAnnouncement,
   OpsAnnouncementAudience,
@@ -109,25 +107,6 @@ export const opsMethods = {
     lineUnregistered: () => fetchApi<ApiResponse<OpsLineUnregistered>>('/api/ops/dashboard/line-unregistered'),
     firstRun: (period?: OpsDashboardPeriod) =>
       fetchApi<ApiResponse<OpsFirstRunFunnel>>(`/api/ops/dashboard/first-run${period ? `?period=${period}` : ''}`),
-    /** 運営専用ナレッジ ★管理画面 37-11。 */
-    knowledge: {
-      list: (params: { q?: string; kind?: string; articleKind?: string; state?: string; offset?: number } = {}) => {
-        const query = new URLSearchParams()
-        for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== '') query.set(key, String(value))
-        return fetchApi<ApiResponse<OpsKnowledgeArticle[]> & { total: number }>(`/api/ops/knowledge?${query}`)
-      },
-      article: (id: string) => fetchApi<ApiResponse<OpsKnowledgeArticle>>(`/api/ops/knowledge/${encodeURIComponent(id)}`),
-      update: (id: string, version: number, input: OpsKnowledgeInput) =>
-        fetchApi<ApiResponse<OpsKnowledgeArticle>>(`/api/ops/knowledge/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ version, ...input }) }),
-      review: (id: string, input: { version: number; action: 'approve' | 'dismiss' | 'disable'; confirmed?: boolean }) =>
-        fetchApi<ApiResponse<OpsKnowledgeArticle>>(`/api/ops/knowledge/${encodeURIComponent(id)}/review`, { method: 'POST', body: JSON.stringify(input) }),
-      feedback: (id: string, requestId: string, feedback: 'helpful' | 'unhelpful') =>
-        fetchApi<ApiResponse<null>>(`/api/ops/knowledge/${encodeURIComponent(id)}/feedback`, { method: 'POST', body: JSON.stringify({ requestId, feedback }) }),
-      retry: (requestId: string) =>
-        fetchApi<ApiResponse<null>>(`/api/ops/knowledge/tickets/${encodeURIComponent(requestId)}/retry`, { method: 'POST' }),
-      process: (requestId: string) =>
-        fetchApi<ApiResponse<NonNullable<OpsSupportDetail['knowledge']>>>(`/api/ops/knowledge/tickets/${encodeURIComponent(requestId)}/process`, { method: 'POST' }),
-    },
     /** お知らせ配信 ★管理画面 37-7。 */
     announcements: {
       list: () => fetchApi<ApiResponse<OpsAnnouncement[]> & { linked: { linked: number; total: number }; noticeLineConfigured: boolean }>('/api/ops/announcements'),

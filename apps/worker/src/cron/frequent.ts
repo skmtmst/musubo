@@ -173,13 +173,6 @@ export async function runFrequentHeavyJobs(
       },
     },
     {
-      name: 'platform knowledge',
-      run: async () => {
-        const { processKnowledgeJob } = await import('../services/platform-knowledge.js');
-        await processKnowledgeJob(env);
-      },
-    },
-    {
       name: 'mileage reward delivery retry',
       run: async () => {
         const result = await processDueMileageRewardDeliveries(env.DB, {

@@ -132,7 +132,6 @@
   {"route":"/ops/audit","boundary":"ops-shell","expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/ops/dashboard","boundary":"ops-shell","expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/ops/invite","boundary":"public-auth","expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
-  {"route":"/ops/knowledge","boundary":"ops-shell","expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/ops/login","boundary":"public-auth","expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/ops/members","boundary":"ops-shell","expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/ops","boundary":"ops-shell","expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},

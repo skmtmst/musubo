@@ -20,7 +20,7 @@ const { hqSupport } = await import('./hq-support.js');
 
 let testDb: SqliteD1;
 
-function app(staff: AuthenticatedStaff, ai?: { run: (model: string, input: unknown) => Promise<unknown> }) {
+function app(staff: AuthenticatedStaff) {
   const instance = new Hono<Env>();
   instance.use('*', async (c, next) => {
     c.set('staff', staff);
@@ -28,16 +28,15 @@ function app(staff: AuthenticatedStaff, ai?: { run: (model: string, input: unkno
   });
   instance.route('/', opsSupport);
   instance.route('/', hqSupport);
-  return { request: (path: string, init?: RequestInit) => instance.request(path, init, environment(ai)) };
+  return { request: (path: string, init?: RequestInit) => instance.request(path, init, environment()) };
 }
 
-function environment(ai?: { run: (model: string, input: unknown) => Promise<unknown> }): Env['Bindings'] {
+function environment(): Env['Bindings'] {
   return {
     DB: testDb.db,
     ADMIN_ORIGIN: 'https://admin.example.com',
     ADMIN_PUBLIC_URL: 'https://admin.example.com',
     WORKER_URL: 'https://api.example.com',
-    AI: ai as unknown as Ai,
   } as Env['Bindings'];
 }
 
@@ -178,6 +177,10 @@ describe('詳細・状態・優先度', () => {
     let row = testDb.raw.prepare('SELECT stage, status, resolved_at, closed_at FROM hq_support_requests WHERE id = ?').get(t.id) as Record<string, unknown>;
     expect(row).toMatchObject({ stage: 'resolved', status: 'closed' });
     expect(row.resolved_at).toBeTruthy();
+    const knowledgeJobs = testDb.raw.prepare('SELECT COUNT(*) AS n FROM platform_knowledge_jobs').get() as { n: number };
+    expect(knowledgeJobs.n).toBe(0);
+    const revision = testDb.raw.prepare('SELECT knowledge_revision AS n FROM hq_support_requests WHERE id = ?').get(t.id) as { n: number };
+    expect(revision.n).toBe(0);
     expect(row.closed_at).toBeNull();
     await app(master).request(`/api/ops/support/tickets/${t.id}`, json({ stage: 'closed' }, 'PATCH'));
     row = testDb.raw.prepare('SELECT stage, status, closed_at FROM hq_support_requests WHERE id = ?').get(t.id) as Record<string, unknown>;
@@ -215,7 +218,7 @@ describe('詳細・状態・優先度', () => {
 describe('返信', () => {
   it('返信すると登録メールへ送り、統括の履歴に載り、待ちになる', async () => {
     const t = await seedTicket();
-    const res = await app(master).request(`/api/ops/support/tickets/${t.id}/reply`, json({ body: 'ご連絡ありがとうございます。確認します。', aiAssisted: false }));
+    const res = await app(master).request(`/api/ops/support/tickets/${t.id}/reply`, json({ body: 'ご連絡ありがとうございます。確認します。' }));
     expect(res.status).toBe(201);
     const body = await res.json() as { data: { ticket: { stage: string; replyCount: number; firstRepliedAt: string | null }; message: { authorKind: string; deliveredVia: string[] }; mailSent: boolean } };
     expect(body.data.ticket.stage).toBe('waiting');
@@ -268,13 +271,13 @@ describe('返信', () => {
   });
 });
 
-describe('下書きと AI', () => {
+describe('下書き', () => {
   it('下書きは保存・上書き・削除でき、返信すると消える', async () => {
     const t = await seedTicket();
     const saved = await app(master).request(`/api/ops/support/tickets/${t.id}/draft`, json({ body: '書きかけ' }, 'PUT'));
     expect(saved.status).toBe(200);
-    let detail = await (await app(master).request(`/api/ops/support/tickets/${t.id}`)).json() as { data: { draft: { body: string; aiGenerated: boolean } | null } };
-    expect(detail.data.draft).toMatchObject({ body: '書きかけ', aiGenerated: false });
+    let detail = await (await app(master).request(`/api/ops/support/tickets/${t.id}`)).json() as { data: { draft: { body: string } | null } };
+    expect(detail.data.draft).toMatchObject({ body: '書きかけ' });
     await app(master).request(`/api/ops/support/tickets/${t.id}/draft`, json({ body: '' }, 'PUT'));
     detail = await (await app(master).request(`/api/ops/support/tickets/${t.id}`)).json() as { data: { draft: null } };
     expect(detail.data.draft).toBeNull();

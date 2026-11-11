@@ -1243,14 +1243,6 @@ export type {
   NenRankRules, NenRankSetting,
 } from './nen-member-ranks';
 export {
-  claimKnowledgeJob, editKnowledgeArticle, failKnowledgeJob, finishKnowledgeJob, getKnowledgeArticle, knowledgeFeedback,
-  knowledgeForTicket, knowledgeMetrics, listKnowledgeArticles, queueKnowledgeStatement, recordKnowledgeUsage, recordPlatformAiCall,
-  retryKnowledgeJob, reviewKnowledgeArticle, searchKnowledge,
-} from './platform-knowledge.js';
-export type {
-  KnowledgeArticle, KnowledgeArticleInput, KnowledgeArticleKind, KnowledgeEvidence, KnowledgeJob, KnowledgeReviewState,
-} from './platform-knowledge.js';
-export {
   INTEGRATION_API_SCOPES, INTEGRATION_API_TOKEN_PREFIX, createIntegrationApiToken, generateIntegrationApiToken, getIntegrationApiTokenById, hashIntegrationApiToken,
   listIntegrationApiTokens, reactivateIntegrationApiToken, resolveIntegrationApiToken, revokeIntegrationApiToken, rotateIntegrationApiToken, tokenHasScope,
 } from './integration-api-tokens';

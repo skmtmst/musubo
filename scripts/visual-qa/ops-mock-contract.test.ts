@@ -27,7 +27,6 @@ describe('運営コンソールの画面確認モック', () => {
       "'/api/ops/dashboard/line-unregistered'",
       "'/api/ops/support/summary'",
       "'/api/ops/support/tickets'",
-      "'/api/ops/knowledge'",
       "'/api/ops/announcements'",
       "'/api/ops/notice-line-account'",
       "'/api/ops/audit'",
@@ -51,8 +50,6 @@ describe('運営コンソールの画面確認モック', () => {
       'contractMonthlyTotal',
       'filledByListPriceCount',
       'lastSyncedAt',
-      'callsThisMonth',
-      'draftsThisMonth',
     ]) {
       expect(block, `OPS_DASHBOARD に ${key} がない`).toContain(key);
     }
