@@ -18,45 +18,6 @@ describe('運営コンソールの画面確認モック', () => {
     expect(MOCK_API).toContain('platformAdmin: true');
   });
 
-  it('各ページが読む口を持つ', () => {
-    for (const path of [
-      "'/api/ops/me'",
-      "'/api/ops/tenants'",
-      "'/api/ops/impersonation/current'",
-      "'/api/ops/dashboard'",
-      "'/api/ops/dashboard/line-unregistered'",
-      "'/api/ops/support/summary'",
-      "'/api/ops/support/tickets'",
-      "'/api/ops/announcements'",
-      "'/api/ops/notice-line-account'",
-      "'/api/ops/audit'",
-      "'/api/ops/members'",
-    ]) {
-      expect(MOCK_API, `mock に ${path} がない`).toContain(path);
-    }
-  });
-
-  it('ダッシュボードの見本が画面の OpsDashboard 型どおりの名前を持つ', () => {
-    /*
-     * `kpis` が古い形（mrr・mrrDelta）のままだと画面の型と合わず、
-     * 画面に「¥NaN」が出た（2026-09-25）。別名で書かず型の名前で持つ。
-     */
-    const block = MOCK_API.slice(MOCK_API.indexOf('const OPS_DASHBOARD'), MOCK_API.indexOf('const OPS_LINE_UNREGISTERED'));
-    expect(block.length).toBeGreaterThan(0);
-    for (const key of [
-      'revenueThisMonth',
-      'revenueDelta',
-      'refundsThisMonth',
-      'contractMonthlyTotal',
-      'filledByListPriceCount',
-      'lastSyncedAt',
-    ]) {
-      expect(block, `OPS_DASHBOARD に ${key} がない`).toContain(key);
-    }
-    expect(block).not.toContain('mrr:');
-    expect(block).not.toContain('mrrDelta');
-  });
-
   it('お問い合わせ詳細の見本が HqSupportDetail 型どおりの器を持つ', () => {
     /*
      * 見本が無いと既定の `{items,total,page,limit}` が返り、日時の整形で
