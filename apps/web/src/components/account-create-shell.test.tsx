@@ -22,7 +22,7 @@ vi.mock('./layout/settings-inner-nav', () => ({
 vi.mock('./shell/app-top-bar', () => ({ default: () => <header data-test="topbar" /> }))
 vi.mock('./update/update-banner', () => ({ UpdateBanner: () => null }))
 vi.mock('./session-lost-notice', () => ({ default: () => <div data-test="session" /> }))
-vi.mock('./auth-guard', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="auth">{children}</div> }))
+vi.mock('./auth-guard', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="auth">{children}</div>, useOnboardingAccess: () => false }))
 vi.mock('@/contexts/account-context', () => ({ AccountProvider: ({ children }: { children: ReactNode }) => <div data-test="account">{children}</div> }))
 vi.mock('./hq-access-gate', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="hq-access">{children}</div> }))
 vi.mock('./view-permission-gate', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="permission">{children}</div> }))

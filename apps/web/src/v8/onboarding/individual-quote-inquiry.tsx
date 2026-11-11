@@ -49,7 +49,7 @@ async function submitViaSupport(subject: string, body: string): Promise<string> 
 
 export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted, submit = submitViaSupport }: Props) {
   usePageTitle('お見積もりのお問い合わせ')
-  usePageCrumbs([{ label: 'ホーム', href: '/hq' }, { label: '利用開始の準備', href: '/hq/onboarding' }])
+  usePageCrumbs([{ label: '利用開始の準備' }])
   const [exactLineCount, setExactLineCount] = useState('')
   const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)

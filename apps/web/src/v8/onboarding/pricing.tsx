@@ -83,7 +83,7 @@ function PlannedCountSelect({ label, id, value, onChange, linked = false, otherL
 
 export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initialSelection, onContinue, onContact }: Props) {
   usePageTitle('利用開始の準備')
-  usePageCrumbs([{ label: 'ホーム', href: '/hq' }])
+  usePageCrumbs(null)
   const [lineCount, setLineCount] = useState(initialSelection?.lineCount ?? 1)
   const [friendCountText, setFriendCountText] = useState(initialSelection?.friendCountExcludingBlocked?.toString() ?? '')
   const [googleBusinessCount, setGoogleBusinessCount] = useState(initialSelection?.googleBusinessCount ?? 1)

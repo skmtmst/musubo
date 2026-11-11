@@ -36,7 +36,7 @@ export function isStripeCardSetupUrl(value: string): boolean {
 
 export default function CardRegistration({ returnState = null, quoteId, onContinue, onBackToPricing, onOpenStripe }: Props) {
   usePageTitle(returnState === 'cancel' ? 'クレジットカード登録を続ける' : 'お支払い情報')
-  usePageCrumbs([{ label: 'ホーム', href: '/hq' }, { label: '利用開始の準備' }])
+  usePageCrumbs([{ label: '利用開始の準備' }])
   const [state, setState] = useState<CardState>('checking')
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')

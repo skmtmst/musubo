@@ -79,6 +79,10 @@ export interface TopBarProps {
    * 押しても何も起きない偽の操作になる。
    */
   v8Chrome?: boolean
+  /** 初回利用開始中は左メニューが無いため、畳むボタンを描画しない。 */
+  showSidebarToggle?: boolean
+  /** 初回利用開始中は通常ホームに戻れないため、ホーム導線を描画しない。 */
+  showHomeBreadcrumb?: boolean
   /** 画面の絵に合わせた外側の形。統括などの既存の形は default。 */
   chromeVariant?: 'default' | 'shell'
   menuCollapsed?: boolean
@@ -137,6 +141,8 @@ export default function TopBar({
   notificationUnreadCount = 0,
   renderNotifications,
   v8Chrome = false,
+  showSidebarToggle = true,
+  showHomeBreadcrumb = true,
   chromeVariant = 'default',
   menuCollapsed = false,
   crumbs,
@@ -195,7 +201,7 @@ export default function TopBar({
       */}
       {v8Chrome ? (
         <div className={`${styles.v8Left}`}>
-          <button
+          {showSidebarToggle ? <button
             type="button"
             className={styles.iconButton}
             aria-label="メニューを畳む・広げる"
@@ -203,16 +209,16 @@ export default function TopBar({
             onClick={() => window.dispatchEvent(new Event(SIDEBAR_TOGGLE_EVENT))}
           >
             {chromeVariant === 'shell' ? (menuCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />) : <PanelLeftIcon />}
-          </button>
+          </button> : null}
           <nav className={styles.crumbs} aria-label="パンくず">
             {/*
               ★V8 殻合わせ（絵 `V8-B/JKjsE`）：手前はホーム。格子印＋
               「ホーム」で最初の画面へ（統括もふだんの画面も同じ殻）。
             */}
-            <Link prefetch={false} href={homeHref} className={styles.crumbHome}>
+            {showHomeBreadcrumb ? <><Link prefetch={false} href={homeHref} className={styles.crumbHome}>
               <HomeGridIcon /><span>ホーム</span>
             </Link>
-            <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={16} /> : '›'}</span>
+            <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={16} /> : '›'}</span></> : null}
             {/*
               手前の段。ページが crumbs を渡したらそれを出す
               （一覧からの詳細で「一斉配信 › 配信名」）。渡さない画面は

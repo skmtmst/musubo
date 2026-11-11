@@ -1,55 +1,33 @@
-/*
- * ログインの確認を初めて待つあいだの外枠（auth-pending-shell.tsx）。
- * 色・余白は共通の変数だけ。幅は左メニュー（layout/sidebar.module.css の .desktop）と
- * 本文（app-shell.module.css）の決まりをそのまま使う。
- */
+.pending {
+  position: relative;
+  min-height: 100dvh;
+  background: #f3f5f7;
+}
+
 .brand {
   display: flex;
-  height: 64px;
-  flex-shrink: 0;
   align-items: center;
-  gap: 12px;
-  padding: 0 16px;
+  height: 64px;
+  padding: 0 20px;
 }
 
-.nav {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 20px 16px;
+.progress {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  margin: -14px;
+  border: 3px solid #d9e8df;
+  border-top-color: #087c43;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
-.topBar {
-  display: none;
-  height: 56px;
-  flex-shrink: 0;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-@media (min-width: 1280px) {
-  .topBar {
-    display: block;
-  }
-}
-
-@media (min-width: 1024px) {
-  :global(:root) .topBar {
-    display: block;
-  }
-}
-
-.rows {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 24px;
-}
-
-/* ★V8 の外枠は、左メニューと上の帯が灰色の地のまま（線も地も持たない）。白いのは本文の板だけ。 */
-:global(:root) .brand {
-  border-bottom: 0;
-}
-
-:global(:root) .topBar {
-  border-bottom: 0;
-  background: transparent;
+@media (prefers-reduced-motion: reduce) {
+  .progress { animation: none; }
 }
