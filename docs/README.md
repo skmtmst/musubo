@@ -465,6 +465,7 @@
 
 ## 反映履歴
 
+- [運営コンソールのお問い合わせをPen確定案に合わせて刷新](release-log/unreleased/37-masato-ops-support-pen.md) — 返信テンプレートとスマートフォン操作、確認 2026-11-10。
 - [登録メディアの写真確認とアップロード修正](release-log/unreleased/30-masato-media-upload.md) — 反映履歴、確認 2026-11-10。
 - [登録メディアの検証R2設定更新](release-log/unreleased/33-masato-media-upload-cors-token.md) — 反映履歴、確認 2026-11-10。
 - [メンバー招待メールのデザイン更新](release-log/unreleased/25-masato-staff-invite-email.md) — 反映履歴、確認 2026-11-08。

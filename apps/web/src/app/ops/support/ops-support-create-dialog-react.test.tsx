@@ -11,7 +11,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 /**
- * お問い合わせの「代わりに起票する」は V8-B 板  の小窓で出す。
+ * お問い合わせの「チケット作成」は小窓で出す。
  * 契約先・種類・優先度・件名・内容を持ち、送ったら知らせが出て閉じる。再発防止。
  */
 
@@ -69,8 +69,8 @@ async function flush() {
 
 function openButton(): HTMLElement {
   const buttons = Array.from(host.querySelectorAll('button'))
-  const open = buttons.find((button) => (button.textContent ?? '').includes('代わりに起票する'))
-  if (!open) throw new Error('「代わりに起票する」ボタンがない')
+  const open = buttons.find((button) => (button.textContent ?? '').includes('チケット作成'))
+  if (!open) throw new Error('「チケット作成」ボタンがない')
   return open as HTMLElement
 }
 
@@ -86,7 +86,7 @@ function setFieldValue(element: HTMLInputElement | HTMLTextAreaElement, value: s
   element.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
-describe('代わりに起票する小窓（板 Izau1）', () => {
+describe('チケット作成の小窓', () => {
   it('一覧には出さず、押したときだけ小窓が出る', async () => {
     await act(async () => { root.render(<OpsSupportPage />) })
     await flush()
@@ -96,7 +96,7 @@ describe('代わりに起票する小窓（板 Izau1）', () => {
     const window = dialog()
     expect(window, '小窓が出ない').not.toBeNull()
     const text = window?.textContent ?? ''
-    for (const row of ['チケットを作る', '契約先', '種類', '優先度', '件名', '内容', '相手にはメールは届きません', 'キャンセル', '作る']) {
+    for (const row of ['チケット作成', '契約先', '種類', '優先度', '件名', '内容', '相手にはメールは届きません', 'キャンセル', '作成する']) {
       expect(text, `「${row}」がない`).toContain(row)
     }
   })
@@ -119,7 +119,7 @@ describe('代わりに起票する小窓（板 Izau1）', () => {
       setFieldValue(body!, '9月から友だち追加が止まっているとのこと')
     })
     const buttons = Array.from(document.body.querySelectorAll('[data-design-node="Izau1"] button'))
-    const create = buttons.find((button) => (button.textContent ?? '').trim().endsWith('作る'))
+    const create = buttons.find((button) => (button.textContent ?? '').trim().endsWith('作成する'))
     await act(async () => { create?.click() })
     await flush()
     expect(postedBody).toMatchObject({ subject: '電話で受けた配信の相談', body: '9月から友だち追加が止まっているとのこと' })
