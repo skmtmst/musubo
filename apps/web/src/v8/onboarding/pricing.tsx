@@ -72,7 +72,7 @@ function PlannedCountSelect({ label, id, value, onChange, linked = false, otherL
     return slots > 0 ? `+${yen(slots * linkedSlotYen)}／月` : '追加料金なし'
   }
   return <Field label={label} htmlFor={id} optional={false}>
-    <Select aria-label={label} id={id} className={styles.plannedSelect} size="full" value={String(value)}
+    <Select aria-label={label} id={id} className={styles.plannedSelect} size="full" value={String(value)} menuPlacement="down"
       menuHeading={linked ? `${otherService}${otherLinkedCount}個を選んだ場合の追加料金` : undefined}
       onChange={(next) => onChange(Number(next))}
       options={[...(linked ? linkedCountOptions : countOptions).map((count) => ({ value: String(count), label: `${count}個`,
