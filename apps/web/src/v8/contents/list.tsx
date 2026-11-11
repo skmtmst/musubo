@@ -57,7 +57,6 @@ import { blockedReason,canDelete as canDeleteMedia,checkedAtText,dialogTitle,ref
 import MediaDetailDialog from './media-detail-dialog'
 import MediaPreviewOverlay from './media-preview-overlay'
 import { MediaQuotaGuidance } from './media-quota-guidance'
-import MediaReplacementDialog from './media-replacement-dialog'
 import MediaUploadDialog from './media-upload-dialog'
 import { formatMediaSize } from './media-usage-display'
 import { TextField as SharedTextField } from '@/components/shared/text-field'
@@ -183,7 +182,6 @@ export default function MediaLibraryListV8() {
   const [detailRetry, setDetailRetry] = useState(0)
   const detailRequestRef = useRef(0)
   const detailAccountRef = useRef<string | null | undefined>(undefined)
-  const [replacementFor, setReplacementFor] = useState<MediaItem | null>(null)
   /*
     1件ずつの削除確認（設計 `YfTfJ`）。**窓を開けてから読む。**
     一覧を出すたびに全件ぶん読むと、消さない人にも7種類の走査が走る。
@@ -430,7 +428,6 @@ export default function MediaLibraryListV8() {
     if (accountLoading) return
     setSelected(new Set())
     setDetailsFor(null)
-    setReplacementFor(null)
     setPreview(null)
     setPage(1)
     // m26m: 別アカウントの総数を残さない。読み直すまで「すべて」は未知。
@@ -873,10 +870,6 @@ export default function MediaLibraryListV8() {
         folderName={detailsFor.folderId ? detailFolderName ?? '—（未取得）' : '未分類'}
         canManage={canManageMedia}
         onClose={() => setDetailUrl(null)}
-        onOpenReplacement={(item) => {
-          setDetailUrl(null)
-          setReplacementFor(item)
-        }}
         onVersionCreated={(message) => {
           setDetailUrl(null)
           notifyToast(message)
@@ -1107,9 +1100,6 @@ export default function MediaLibraryListV8() {
       )}
       pagination={(
         <div className={styles.footBlock}>
-          <p className={styles.helpNote}>
-            「…」から プレビュー・使用箇所を見る・名前を変える・フォルダへ移す・ダウンロード・アーカイブ・削除（使っているものは消せません）。
-          </p>
           {listKnown && !loadFailed ? (
             <ListPager>
                 <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />
@@ -1172,18 +1162,6 @@ export default function MediaLibraryListV8() {
               <Button type="button" onClick={closeDeleteDialog} disabled={deleteBusy}>
                 キャンセル
               </Button>
-              {deleting && impact && impact.usageCount > 0 ? (<Button
-                  type="button"
-                  variant="primary"
-                  disabled={deleteBusy}
-                  onClick={() => {
-                    const source = deleting
-                    closeDeleteDialog()
-                    setReplacementFor(source)
-                  }}
-                >
-                  別のメディアに差し替える
-                </Button>) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
               {canDeleteMedia({ impact, busy: deleteBusy }) ? (<Button type="button" variant="primary" onClick={() => void confirmDeleteOne()} busy={deleteBusy} busyLabel="処理中…">削除する
                 </Button>) : null}
@@ -1236,7 +1214,7 @@ export default function MediaLibraryListV8() {
             ) : null}
 
             <p>
-              {impact.verified !== false && impact.usageCount > 0 ? <>使われている場所から外すと削除できます。別のメディアを選ぶと、使用先をまとめて差し替えられます。<br /></> : null}
+              {impact.verified !== false && impact.usageCount > 0 ? <>使われている場所から外すと削除できます。<br /></> : null}
               {checkedAtText(impact.checkedAt)} 時点で、{impact.verified === false ? '確認できなかった場所があります。' : '登録メディアの使用先を確認しました。'}
             </p>
           </div>
@@ -1380,18 +1358,6 @@ export default function MediaLibraryListV8() {
         }}
       />
 
-      <MediaReplacementDialog
-        source={replacementFor}
-        accountId={selectedAccountId}
-        onClose={() => setReplacementFor(null)}
-        onComplete={(message) => {
-          setReplacementFor(null)
-          notifyToast(message)
-          void load()
-        }}
-      />
-
-
       {preview && (
         <MediaPreviewOverlay
           filename={preview.filename}
@@ -1466,7 +1432,6 @@ export default function MediaLibraryListV8() {
                   onPreview={() => setPreview(item)}
                   onToggleMenu={() => setOpenMenuId((currentId) => (currentId === item.id ? null : item.id))}
                   onCloseMenu={() => setOpenMenuId(null)}
-                  onDetail={() => guard.guarded(() => setDetailUrl(item.id))}
                   onDownload={() => { void downloadItem(item) }}
                   onRenameStart={() => guard.guarded(() => { setRenameError(''); setRenameConflict(false); setRenaming({ id: item.id, value: item.filename, revision: item.revision }) })}
                   onRenameCancel={() => guard.guarded(() => setRenaming(null))}
@@ -1476,10 +1441,6 @@ export default function MediaLibraryListV8() {
                   onMoveStart={() => guard.guarded(() => { setMoveError(''); setMoveFolderId(item.folderId ?? ''); setMoveTarget(item) })}
                   onArchiveStart={() => guard.guarded(() => { setArchiveError(''); setArchiveReason(''); setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' }) })}
                   onDeleteStart={() => guard.guarded(() => { void openDelete(item) })}
-                  onReplaceStart={() => guard.guarded(() => {
-                    closeDeleteDialog()
-                    setReplacementFor(item)
-                  })}
                 />
               ))}
             </ListPageCards>

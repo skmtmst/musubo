@@ -132,7 +132,6 @@ async function renderDialog(item: MediaItem = ITEM, canManage = true) {
         folderName=""
         canManage={canManage}
         onClose={() => undefined}
-        onOpenReplacement={() => undefined}
         onVersionCreated={() => undefined}
         onItemUpdated={(next) => fixture.itemUpdated.push(next)}
       />,

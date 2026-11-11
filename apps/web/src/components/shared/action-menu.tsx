@@ -84,6 +84,7 @@ export function orderActionMenuItems(items: ActionMenuItem[]): ActionMenuItem[] 
 export type ActionMenuProps = {
   open: boolean
   items: ActionMenuItem[]
+  showGroupHeadings?: boolean
   note?: string
   onClose: () => void
   ariaLabel?: string
@@ -105,7 +106,7 @@ export type ActionMenuProps = {
 }
 
 /** Pencil ★V8 `hnuY9`「その他操作メニュー」を正本にした小型操作メニュー。 */
-export default function ActionMenu({ open, items, note, onClose, ariaLabel = '操作', inline = false, anchorRef, align = 'end', choiceHeading }: ActionMenuProps) {
+export default function ActionMenu({ open, items, showGroupHeadings = true, note, onClose, ariaLabel = '操作', inline = false, anchorRef, align = 'end', choiceHeading }: ActionMenuProps) {
   const navigationHref = useListNavigationHref()
   const leaving = useV8Leave(open, 80)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -223,6 +224,9 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
     buttons[next].focus()
   }
 
+  const orderedItems = choiceHeading === undefined
+    ? orderActionMenuItems(items).map((item) => showGroupHeadings ? item : { ...item, sectionBefore: undefined })
+    : items.map((item, index) => ({ ...item, sectionBefore: index === 0 ? choiceHeading : undefined }))
   const menu = (
     <div
       ref={menuRef}
@@ -242,7 +246,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       data-design-part="action-menu"
       data-design-node="xifuV"
     >
-      {(choiceHeading === undefined ? orderActionMenuItems(items) : items.map((item, index) => ({ ...item, sectionBefore: index === 0 ? choiceHeading : undefined }))).map((item, index) => {
+      {orderedItems.map((item, index) => {
         const itemLabel = normalizeActionLabel(item.label.replace(/(?:…|\.{3})\s*$/u, ''))
         const locked = Boolean(item.lockedReason)
         const blocked = item.disabled || locked

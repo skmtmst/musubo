@@ -129,7 +129,6 @@ export default function MediaDetailDialog({
   folderName,
   canManage,
   onClose,
-  onOpenReplacement,
   onVersionCreated,
   onItemUpdated,
 }: {
@@ -139,7 +138,6 @@ export default function MediaDetailDialog({
   /** owner/admin のみ true。staff には押して失敗する口を見せない。 */
   canManage: boolean
   onClose: () => void
-  onOpenReplacement: (item: MediaItem) => void
   onVersionCreated: (message: string) => void
   /** 利用期限・同意の記録を保存したとき、一覧側の表示を新しい行へ追従させる。 */
   onItemUpdated?: (item: MediaItem) => void
@@ -501,9 +499,6 @@ export default function MediaDetailDialog({
           <Button type="button" onClick={() => void downloadItem()} disabled={downloading} busy={downloading} busyLabel="取得中…">ダウンロード
           </Button>
           {downloadError ? <Notice tone="danger" >{downloadError}</Notice> : null}
-          {impact && impact.usageCount > 0 ? (
-            <Button type="button" variant="primary" onClick={() => guard.guarded(() => onOpenReplacement(item))}>使用先を差し替える</Button>
-          ) : null}
         </div>
       </div>
 
