@@ -295,6 +295,8 @@
 | V8-B | e7ljE | 運営 監査ログ V8｜状態は型の見本 LS のとおり | /ops/audit | `app/ops/audit/page.tsx` | `v8/ops/audit.tsx` |
 | V8-B | CyW0E | 運営 ダッシュボード V8｜状態は型の見本 LS のとおり | /ops/dashboard | `app/ops/dashboard/page.tsx` | `v8/ops/dashboard.tsx` |
 | V8-B | tVaUh | 運営 メンバーの招待 V8｜状態は型の見本 LS のとおり | /ops/invite | `app/ops/invite/page.tsx` | `v8/ops/invite.tsx` |
+| V8-B | h114s | 運営 ナレッジ V8｜状態は型の見本 LS のとおり | /ops/knowledge | `app/ops/knowledge/page.tsx` | `v8/ops/knowledge.tsx` |
+| V8-B | R5ckwJ | 運営 ナレッジの記事 V8｜状態は型の見本 LS のとおり | /ops/knowledge | `app/ops/knowledge/page.tsx` | `v8/ops/knowledge.tsx` |
 | V8-B | D9JALJ | 運営 ログイン V8｜状態は型の見本 LS のとおり | /ops/login | `app/ops/login/page.tsx` | `v8/ops/login.tsx` |
 | V8-B | FvbHW | 運営 メンバー管理 V8｜状態は型の見本 LS のとおり | /ops/members | `app/ops/members/page.tsx` | `v8/ops/members.tsx` |
 | V8-B | VUyYu | 運営 メンバーを停止 V8｜状態は型の見本 LS のとおり | /ops/members | `app/ops/members/page.tsx` | `v8/ops/members.tsx` |
