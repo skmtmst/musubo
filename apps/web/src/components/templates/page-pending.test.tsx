@@ -8,12 +8,12 @@ import PagePending, { PagePendingLayout } from './page-pending'
 
 afterEach(cleanup)
 
-it('ホームは認証前の書き出しから同じ見出しを持ち、画面の情報は出さない', () => {
+it('認証前はホームの見出しや通常画面を描画せず、利用状況の確認だけを示す', () => {
   const html = renderToStaticMarkup(<PagePendingLayout variant="dashboard"><AuthPendingShell /></PagePendingLayout>)
-  expect(html).toContain('data-page-template="dashboard"')
-  expect(html).toContain('<h1')
-  expect(html).toContain('ダッシュボード')
-  expect(html).toContain('data-page-pending="auth"')
+  expect(html).toContain('data-auth-pending=""')
+  expect(html).toContain('利用状況を確認しています')
+  expect(html).not.toContain('data-page-template="dashboard"')
+  expect(html).not.toContain('ダッシュボード')
   expect(html).not.toContain('権限')
 })
 
@@ -28,9 +28,10 @@ it.each(['identity', 'route', 'root', 'store', 'handover', 'style'] as const)('%
   expect(view.container.querySelector('[data-page-template="detail"]')).not.toBeNull()
 })
 
-it('ホーム以外の認証待機は名前のない骨組みを保つ', () => {
+it('詳細画面の認証待機も通常画面の骨組みを出さない', () => {
   render(<PagePendingLayout variant="detail"><AuthPendingShell /></PagePendingLayout>)
   expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
+  expect(screen.getByRole('status', { name: '利用状況を確認しています' })).toBeTruthy()
 })
 
 it('読み込み失敗の理由と再試行を残す', () => {

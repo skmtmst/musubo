@@ -19,9 +19,10 @@ it('店舗ダッシュボードは題付きのダッシュボード型で待つ'
   expect(view.container.querySelector('[data-page-template="dashboard"]')).toBeTruthy()
   expect(screen.getAllByRole('heading', { level: 1 }).map(node => node.textContent)).toEqual(['ダッシュボード'])
 })
-it('外枠から認証と共通ゲートへ同じ題を配り、移動時には前の題を残さない', () => {
+it('認証中は画面名を出さず、認証後の共通ゲートでは移動先の題だけを出す', () => {
   const view = render(<PagePendingLayout variant="detail" title="友だち"><AuthPendingShell /></PagePendingLayout>)
-  expect(screen.getAllByRole('heading', { level: 1 }).map(node => node.textContent)).toEqual(['友だち'])
+  expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
+  expect(screen.getByRole('status', { name: '利用状況を確認しています' })).toBeTruthy()
   view.rerender(<PagePendingLayout variant="detail" title="通知"><PagePending stage="identity" /></PagePendingLayout>)
   expect(screen.getAllByRole('heading', { level: 1 }).map(node => node.textContent)).toEqual(['通知'])
   view.rerender(<PagePendingLayout variant="detail"><PagePending stage="identity" /></PagePendingLayout>)

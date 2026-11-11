@@ -24,6 +24,8 @@ vi.mock('@line-crm/db', async original => ({
     : null),
   getPlatformAdminRecord: vi.fn(async () => null),
   getPlatformSetting: vi.fn(async () => 'false'),
+  // 認証ミドルウェアのfixtureには料金DBを作らない。利用開始状態は専用の実DB試験で確認する。
+  getMusuboTenantBilling: vi.fn(async () => null),
   recordAuditEvent: vi.fn(async () => undefined),
   readAuthThrottle: vi.fn(async () => 0),
   bumpAuthThrottle: vi.fn(async () => 1),
