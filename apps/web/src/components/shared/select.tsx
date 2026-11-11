@@ -57,6 +57,7 @@ export default function Select({
   createAction: explicitCreateAction,
   menuHeading,
   menuAlign,
+  menuPlacement,
 }: SelectProps) {
   const narrowFolderActions = React.useContext(FolderNarrowActionsContext)
   const narrowFolderAction = narrowFolderPicker ? uniqueFolderAction(narrowFolderActions, action => (JSON.parse(action.rowIds) as string[]).every(id => suppliedOptions.some(option => option.value === id))) : undefined
@@ -234,6 +235,15 @@ export default function Select({
     setActiveIndex((current) => (current + direction + rowCount) % rowCount)
   }
 
+  const revealMenuBelow = () => {
+    if (menuPlacement !== 'down') return
+    const trigger = triggerRef.current
+    const menuHeight = options.length * SELECT_MENU_ROW_STRIDE + (heads.heading ?? menuHeading ? 32 : 0) + 24
+    if (trigger && window.innerHeight - trigger.getBoundingClientRect().bottom - 8 < menuHeight) {
+      trigger.scrollIntoView({ block: 'start', behavior: 'auto' })
+    }
+  }
+
   const onButtonKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     // 日本語の変換中のキー（確定の Enter・候補の上下）は選ぶ欄で使わない。
     if (isImeComposing(event)) return
@@ -244,7 +254,7 @@ export default function Select({
     }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
-      if (!open) setOpen(true)
+      if (!open) { revealMenuBelow(); setOpen(true) }
       else move(event.key === 'ArrowDown' ? 1 : -1)
       return
     }
@@ -252,7 +262,7 @@ export default function Select({
       event.preventDefault()
       if (open && createActive) startCreate()
       else if (open && enabledOptions[activeIndex]) choose(enabledOptions[activeIndex])
-      else setOpen(true)
+      else { revealMenuBelow(); setOpen(true) }
       return
     }
     if (event.key === 'Escape' && open) {
@@ -315,7 +325,10 @@ export default function Select({
         aria-invalid={Boolean(error) || invalid || undefined}
         aria-describedby={joinDescribedBy(field?.describedBy)}
         disabled={disabled}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          if (!open) revealMenuBelow()
+          setOpen((current) => !current)
+        }}
         onKeyDown={onButtonKeyDown}
         {...lock.handlers}
       >
@@ -343,6 +356,7 @@ export default function Select({
           getAnchor={() => triggerRef.current}
           onClose={() => setOpen(false)}
           align={menuAlign}
+          placement={menuPlacement}
           listboxId={listboxId}
           labelledBy={buttonId}
           heading={heads.heading ?? menuHeading}
