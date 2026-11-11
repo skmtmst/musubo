@@ -8,7 +8,7 @@ import PagePending, { PagePendingLayout } from './page-pending'
 
 afterEach(cleanup)
 
-it('認証前はホームの見出しや通常画面を描画せず、利用状況の確認だけを示す', () => {
+it('認証中はホームの見出しや通常画面を描画せず、利用状況の確認だけを示す', () => {
   const html = renderToStaticMarkup(<PagePendingLayout variant="dashboard"><AuthPendingShell /></PagePendingLayout>)
   expect(html).toContain('data-auth-pending=""')
   expect(html).toContain('利用状況を確認しています')
