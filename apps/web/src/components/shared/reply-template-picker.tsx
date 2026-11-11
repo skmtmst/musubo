@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronDown, ChevronLeft, FileText, Folder, Plus, Search, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, FileText, Folder, List, Plus, Search, X } from 'lucide-react'
 import { api, type OpsSupportTemplateCatalog } from '@/lib/api'
 import { useOverlayFocus, useOverlayLayer } from '@/components/shared/overlay-utils'
 import { opsCall } from '@/components/ops/ops-ui'
@@ -119,7 +119,7 @@ export default function SupportTemplatePicker({ open, onClose, onInsert, writabl
           <div className={styles.mobileTemplates}><div className={styles.sectionHead}><strong>テンプレート</strong><button type="button" disabled={!writable} onClick={() => setView('newTemplate')}>＋ 作成</button></div><TemplateList templates={filtered} selectedId={selected?.id} onSelect={setSelectedId} /><Preview title={selected?.title} body={selected?.body} /></div>
         </> : null}
         {view === 'folders' ? <><h2 className={styles.mobileTitle}>フォルダを選択</h2><div className={styles.folderChoices}>
-          {[{ id: 'all', name: 'すべて' }, ...(catalog?.folders ?? [])].map((folder) => <button type="button" key={folder.id} aria-current={folderId === folder.id ? 'true' : undefined} onClick={() => chooseFolder(folder.id)}><Folder aria-hidden="true" />{folder.name}{folderId === folder.id ? <Check aria-hidden="true" /> : null}</button>)}
+          {[{ id: 'all', name: 'すべて' }, ...(catalog?.folders ?? [])].map((folder) => <button type="button" key={folder.id} aria-current={folderId === folder.id ? 'true' : undefined} onClick={() => chooseFolder(folder.id)}>{folder.id === 'all' ? <List aria-hidden="true" /> : <Folder aria-hidden="true" />}{folder.name}{folderId === folder.id ? <Check aria-hidden="true" /> : null}</button>)}
         </div></> : null}
         {view === 'newFolder' ? <><h2 className={styles.mobileTitle}>フォルダ作成</h2><label className={styles.field}>フォルダ名 <span>必須</span><TextField value={folderName} onChange={(e) => setFolderName(e.target.value)} placeholder="例：キャンペーン対応" maxLength={60} /></label><p className={styles.hint}>作成後、このフォルダにテンプレートを追加できます。</p></> : null}
         {view === 'newTemplate' ? <><h2 className={styles.mobileTitle}>テンプレート作成</h2><label className={styles.field}>保存先フォルダ <span>必須</span><EntitySelect size="full" aria-label="保存先フォルダ" value={folderId === 'all' ? 'contracts' : folderId} onChange={setFolderId} options={(catalog?.folders ?? []).map((folder) => ({ value: folder.id, label: folder.name }))} /></label><label className={styles.field}>テンプレート名 <span>必須</span><TextField value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：解約手続きのご案内" maxLength={120} /></label><label className={styles.field}>本文 <span>必須</span><TextArea value={body} onChange={(e) => setBody(e.target.value)} placeholder={'お問い合わせありがとうございます。\n\nご契約の解約をご希望とのこと、承知しました。\n担当者が内容を確認し、必要な手続きをご案内します。'} maxLength={4000} /></label><p className={styles.hint}><span className={styles.desktopHint}>送信前に、引用した内容を返信欄で確認・編集してください。</span><span className={styles.mobileHint}>引用後の返信欄で編集できます。</span></p></> : null}
