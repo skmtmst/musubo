@@ -119,7 +119,7 @@ test('一覧の名前を押したら一覧のままにならず詳細が開く',
       try {
         const links = page.locator('a[data-row-link]')
         // networkidle は React の一覧描画完了を保証しない。CI の負荷下でも行の表示を待つ。
-        await links.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {})
+        await links.first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {})
         const count = await links.count()
         // 行が無い画面があっても後ろの画面まで見て、最後にまとめて落とす。
         if (count === 0) { failures.push(`${route} に押せる名前が無い（偽APIの行を確認）`); continue }

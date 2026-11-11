@@ -107,7 +107,7 @@ describe('運営コンソールの V8 外枠', () => {
     await act(async () => {
       root.render(<OpsShellV8 me={ME} meError="" onRetryMe={() => {}} pathname="/ops/members"><p>中身</p></OpsShellV8>)
     })
-    for (const label of ['ダッシュボード', '契約先アカウント', 'お問い合わせ', 'お知らせ', 'ナレッジ', '監査ログ', 'メンバー管理']) {
+    for (const label of ['ダッシュボード', '契約先アカウント', 'お問い合わせ', 'お知らせ', '監査ログ', 'メンバー管理']) {
       expect(text()).toContain(label)
     }
     expect(text()).toContain('運営 › メンバー管理')

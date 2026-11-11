@@ -1,11 +1,10 @@
 // @vitest-environment happy-dom
 /*
  * 板  運営お問い合わせの絵合わせ（V8）。
- * - 頭：説明＋代わりに起票する
+ * - 頭：チケット作成
  * - 左：チケットを探す、状態・優先度・並びの選ぶ欄、
- *   優先度：すべて、並び替え：優先度、行に契約先・優先度
- * - 右：契約先を開く・代理ログイン、1行の契約先情報、
- *   足元に解決済みにする・クローズする・下書きを保存する・返信する
+ *   優先度：すべて、並び替え：優先度、状態と優先度は横並び
+ * - 右：契約先を開く・その他、返信欄にテンプレート引用、足元に返信する
  * - 数のカード・上の段切り替えは V8 では出さない
  */
 import React, { act } from 'react'
@@ -17,6 +16,7 @@ import OpsSupportPage from './page'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <a>{children}</a> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/ops/support' }))
 
 const ticket = {
   id: 't1', ticketNo: 1042, ticketLabel: '#1042', tenantId: 'tenant-a', tenantName: '然-NEN-本部',
@@ -43,8 +43,6 @@ function respond(url: string) {
         tenant: { accountCount: 4, staffCount: 6, staffWithLine: 5, pastTickets: 12, pastOpen: 0 },
         messages: [],
         draft: null,
-        knowledge: undefined,
-        ai: { available: true },
       },
     })
   }
@@ -87,16 +85,7 @@ describe('P0jhqO お問い合わせの絵合わせ', () => {
     await settle()
     const body = text()
     // 頭
-    // 見出し下の説明は共通の「？」から読む。説明の欠落と開閉の動きを検査する。
-    const help = host.querySelector<HTMLButtonElement>('button[aria-label="お問い合わせの説明"]')!
-    expect(help).toBeTruthy()
-    expect(help.getAttribute('aria-expanded')).toBe('false')
-    await act(async () => { help.click() })
-    expect(help.getAttribute('aria-expanded')).toBe('true')
-    expect(document.getElementById(help.getAttribute('aria-describedby')!)?.textContent).toContain('統括の管理画面「お問い合わせ」から送られたものが新規として並びます')
-    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
-    expect(help.getAttribute('aria-expanded')).toBe('false')
-    expect(body).toContain('代わりに起票する')
+    expect(body).toContain('チケット作成')
     // ：細い列に札を並べず、状態の選択で同じ取得口へ届く。
     expect(host.querySelector('.v6-filter-chip')).toBeNull()
     const state = host.querySelector<HTMLButtonElement>('button[aria-label="状態で絞る"]')!
@@ -120,15 +109,18 @@ describe('P0jhqO お問い合わせの絵合わせ', () => {
     expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('sort=newest'))).toBe(true)
     // 行
     expect(body).toContain('#1042')
-    expect(body).toContain('然-NEN-本部・優先度 高')
+    expect(body).toContain('然-NEN-本部')
+    expect(host.querySelector('[class*="badges"]')?.textContent).toContain('対応中高')
     // 右
     expect(body).toContain('契約先を開く')
-    expect(body).toContain('代理ログイン')
-    expect(body).toContain('LINE登録あり・不具合・優先度 高')
+    expect(host.querySelector('button[aria-label="その他の操作"]')).toBeTruthy()
     // 足元
-    for (const action of ['解決済みにする', 'クローズする', '下書きを保存する', '返信する']) {
+    for (const action of ['テンプレート引用', '下書き保存', '返信する']) {
       expect(body).toContain(action)
     }
+    expect(body).not.toContain('AIで下書き')
+    expect(body).not.toContain('ナレッジ')
+    expect(body).not.toContain('返信は管理画面のお問い合わせ履歴に載り')
     // V8 では出さない塊
     expect(body).not.toContain('未対応のチケット')
     expect(body).not.toContain('解決率')
