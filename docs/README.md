@@ -1196,3 +1196,4 @@
 - [Googleビジネスの営業時間を予約全体の基準にする](release-log/unreleased/34-masato-google-hours.md) — 接続案内、予約・受付・在庫の営業時間統一。確認 2026-11-10。
 - [Googleビジネスの営業時間を全業種の基準にする](release-log/unreleased/39-masato-google-hours-all-styles.md) — 共通の接続案内、予約・通知・受信箱・差し込みの統一。確認 2026-11-11。
 - [登録メディアの名前変更と操作メニュー](release-log/unreleased/35-masato-media-actions-fix.md) — 登録後の編集と操作表示の修正履歴。確認 2026-11-10。
+- [登録メディア一覧の操作をシンプルにする](release-log/unreleased/40-masato-media-list-simplify.md) — 選択枠の位置と一覧表示の整理。確認 2026-11-11。

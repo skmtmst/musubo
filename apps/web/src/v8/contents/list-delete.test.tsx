@@ -243,16 +243,13 @@ describe('1件ずつの削除確認（YfTfJ）', () => {
     expect(confirmSpy).not.toHaveBeenCalled()
   })
 
-  it('使用中は削除ではなく、影響確認つきの差し替えの窓へ進める', async () => {
+  it('使用中は削除を止め、使用先の確認だけを示す', async () => {
     impacts.set('m-1', { usageCount: 1, canDelete: false, references: [{ kind: 'template', name: '秋のごあいさつ', href: null, state: 'available' }] })
     await render()
     await openDeleteFor('秋の新商品.png')
-    expect(dialog()?.textContent).toContain('使用先をまとめて差し替えられます')
-    await click(buttonIn(dialog(), '別のメディアに差し替える'))
-    expect(document.body.textContent).not.toContain('「秋の新商品.png」は削除できません')
-    // 差し替えの窓は、元のメディアを除いた候補を読む。
-    const candidateRead = calls.filter((call) => call.path === '/api/media' && call.params.get('excludeId') === 'm-1')
-    expect(candidateRead.length).toBeGreaterThan(0)
+    expect(dialog()?.textContent).toContain('秋のごあいさつ')
+    expect(dialog()?.textContent).not.toContain('差し替え')
+    expect(buttonIn(dialog(), '削除する')).toBeUndefined()
   })
 
   it('409 は「いま使われ始めた」と言い、使用先を読み直してから見せる', async () => {
@@ -271,7 +268,7 @@ describe('1件ずつの削除確認（YfTfJ）', () => {
 })
 
 describe('使用状況に合わせた削除確認の案内', () => {
-  it.each([true, undefined])('確認済みの未使用では外す・差し替える案内を出さず、時刻と削除の門を保つ（verified=%s）', async (verified) => {
+  it.each([true, undefined])('確認済みの未使用では使用先を外す案内を出さず、時刻と削除の門を保つ（verified=%s）', async (verified) => {
     impacts.set('m-1', { usageCount: 0, canDelete: true, verified })
     if (verified === undefined) {
       const original = fetch
@@ -288,7 +285,7 @@ describe('使用状況に合わせた削除確認の案内', () => {
     const text = dialog()?.textContent ?? ''
     expect(text).toContain('どこでも使っていません。')
     expect(text).not.toContain('使われている場所から外すと削除できます。')
-    expect(text).not.toContain('使用先をまとめて差し替えられます。')
+    expect(text).not.toContain('差し替え')
     expect(text).toContain('時点で、登録メディアの使用先を確認しました。')
     expect(buttonIn(dialog(), '削除する')).toBeDefined()
     expect(impactCalls('m-1')).toHaveLength(1)
@@ -296,15 +293,14 @@ describe('使用状況に合わせた削除確認の案内', () => {
     expect(deleteCalls()).toHaveLength(0)
   })
 
-  it('使用中は外す・差し替える案内と使用先を保ち、削除できない', async () => {
+  it('使用中は使用先を外す案内を示し、削除できない', async () => {
     impacts.set('m-1', { usageCount: 1, canDelete: false, verified: true, references: [{ kind: 'template', name: '秋のごあいさつ', href: '/templates?id=t-1', state: 'available' }] })
     await render()
     await openDeleteFor('秋の新商品.png')
     expect(dialog()?.textContent).toContain('いま 1か所で使われています。')
     expect(dialog()?.textContent).toContain('使われている場所から外すと削除できます。')
-    expect(dialog()?.textContent).toContain('使用先をまとめて差し替えられます。')
+    expect(dialog()?.textContent).not.toContain('差し替え')
     expect(dialog()?.textContent).toContain('秋のごあいさつ')
-    expect(buttonIn(dialog(), '別のメディアに差し替える')).toBeDefined()
     expect(buttonIn(dialog(), '削除する')).toBeUndefined()
     expect(deleteCalls()).toHaveLength(0)
   })

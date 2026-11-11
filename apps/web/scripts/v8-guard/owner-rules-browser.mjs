@@ -243,12 +243,26 @@ export default function scanOwnerRules() {
     .filter(({ r }) => r.right - r.left > 2 && r.bottom - r.top > 2)
   const inside = (a, b) => a.left >= b.left - 0.5 && a.right <= b.right + 0.5 && a.top >= b.top - 0.5 && a.bottom <= b.bottom + 0.5
   const label = el => (el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || el.tagName).replace(/\s+/g, ' ').trim().slice(0, 40)
+  const mediaSelectionIsAbovePreview = (first, second) => {
+    const preview = first.matches('button[data-media-preview]') ? first : second.matches('button[data-media-preview]') ? second : null
+    const selection = first.matches('input[data-media-select]') ? first : second.matches('input[data-media-select]') ? second : null
+    if (!preview || !selection) return false
+    const thumbnail = preview.closest('[data-media-thumbnail-actions]')
+    const corner = selection.closest('[data-media-select-corner]')
+    if (!thumbnail || !corner || !thumbnail.contains(corner)) return false
+    const rect = selection.getBoundingClientRect()
+    const onScreen = rect.top >= 0 && rect.left >= 0 && rect.bottom <= innerHeight && rect.right <= innerWidth
+    if (!onScreen) return Number(css(corner).zIndex) > (Number(css(preview).zIndex) || 0)
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+    if (hit && thumbnail.contains(hit)) return corner.contains(hit)
+    return Number(css(corner).zIndex) > (Number(css(preview).zIndex) || 0)
+  }
   for (let i = 0; i < controls.length; i++) for (let j = i + 1; j < controls.length; j++) {
     const a = controls[i], b = controls[j]
     if (a.layer !== b.layer || a.el.contains(b.el) || b.el.contains(a.el)) continue
     const width = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left)
     const height = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top)
-    if (width < 1 || height < 1 || (a.el.matches('input,textarea') && inside(b.r, a.r) && a.el.parentElement?.contains(b.el)) || (b.el.matches('input,textarea') && inside(a.r, b.r) && b.el.parentElement?.contains(a.el))) continue
+    if (width < 1 || height < 1 || mediaSelectionIsAbovePreview(a.el, b.el) || (a.el.matches('input,textarea') && inside(b.r, a.r) && a.el.parentElement?.contains(b.el)) || (b.el.matches('input,textarea') && inside(a.r, b.r) && b.el.parentElement?.contains(a.el))) continue
     add('control-collide', a.el, { width: Math.round(width), height: Math.round(height) }, `${label(a.el)} ⟂ ${label(b.el)}`, b.el)
   }
   // カードに置いた操作は、カードの外へ出さない（無効な操作も見た目を測る）。
