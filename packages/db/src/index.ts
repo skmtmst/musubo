@@ -1119,6 +1119,10 @@ export type {
   SupportTicketRow,
 } from './ops-support';
 export {
+  DEFAULT_SUPPORT_TEMPLATE_FOLDERS, createSupportReplyTemplate, createSupportTemplateFolder, listSupportTemplateCatalog,
+} from './ops-support-templates';
+export type { SupportReplyTemplate, SupportTemplateFolder } from './ops-support-templates';
+export {
   canceledAtByTenant, countBillingEventsByType, dashboardAlerts, dashboardLineRegistration, dashboardTickets, dashboardUsage,
   listContractTenants,
 } from './ops-dashboard';

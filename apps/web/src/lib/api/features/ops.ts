@@ -29,6 +29,9 @@ import type {
   OpsSupportTicket,
   OpsSupportMessage,
   OpsSupportDraft,
+  OpsSupportTemplateCatalog,
+  OpsSupportTemplateFolder,
+  OpsSupportReplyTemplate,
   HqNotice,
   HqLineRegistration,
   HqLineRegistrationStatus,
@@ -158,6 +161,11 @@ export const opsMethods = {
     /** お問い合わせ（チケット）★管理画面 37-6。 */
     support: {
       summary: () => fetchApi<ApiResponse<OpsSupportSummary>>('/api/ops/support/summary'),
+      templates: () => fetchApi<ApiResponse<OpsSupportTemplateCatalog>>('/api/ops/support/templates'),
+      createTemplateFolder: (name: string) =>
+        fetchApi<ApiResponse<OpsSupportTemplateFolder>>('/api/ops/support/template-folders', { method: 'POST', body: JSON.stringify({ name }) }),
+      createTemplate: (input: { folderId: string; title: string; body: string }) =>
+        fetchApi<ApiResponse<OpsSupportReplyTemplate>>('/api/ops/support/templates', { method: 'POST', body: JSON.stringify(input) }),
       tickets: (params?: { stage?: OpsSupportStage | 'all'; priority?: OpsSupportPriority; q?: string; sort?: 'newest' | 'oldest' | 'priority'; limit?: number; offset?: number }) => {
         const query = new URLSearchParams()
         if (params?.stage) query.set('stage', params.stage)
@@ -172,14 +180,12 @@ export const opsMethods = {
       ticket: (id: string) => fetchApi<ApiResponse<OpsSupportDetail>>(`/api/ops/support/tickets/${encodeURIComponent(id)}`),
       update: (id: string, input: { stage?: OpsSupportStage; priority?: OpsSupportPriority }) =>
         fetchApi<ApiResponse<OpsSupportTicket>>(`/api/ops/support/tickets/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }),
-      reply: (id: string, input: { body: string; nextStage?: OpsSupportStage; aiAssisted?: boolean }) =>
+      reply: (id: string, input: { body: string; nextStage?: OpsSupportStage }) =>
         fetchApi<ApiResponse<{ ticket: OpsSupportTicket; message: OpsSupportMessage; mailSent: boolean; mailSkippedReason: 'no_email' | 'send_failed' | null }>>(`/api/ops/support/tickets/${encodeURIComponent(id)}/reply`, { method: 'POST', body: JSON.stringify(input) }),
       saveDraft: (id: string, body: string) =>
         fetchApi<ApiResponse<OpsSupportDraft | null>>(`/api/ops/support/tickets/${encodeURIComponent(id)}/draft`, { method: 'PUT', body: JSON.stringify({ body }) }),
       deleteDraft: (id: string) =>
         fetchApi<ApiResponse<null>>(`/api/ops/support/tickets/${encodeURIComponent(id)}/draft`, { method: 'DELETE' }),
-      aiDraft: (id: string, excludeArticleIds: string[] = []) =>
-        fetchApi<ApiResponse<OpsSupportDraft>>(`/api/ops/support/tickets/${encodeURIComponent(id)}/draft/ai`, { method: 'POST', body: JSON.stringify({ excludeArticleIds }) }),
       create: (input: { tenantId: string; subject: string; body: string; kind?: string; priority?: OpsSupportPriority; channel?: 'ops' | 'line'; staffId?: string }) =>
         fetchApi<ApiResponse<OpsSupportTicket>>('/api/ops/support/tickets', { method: 'POST', body: JSON.stringify(input) }),
     },
