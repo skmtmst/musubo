@@ -1,7 +1,7 @@
 .pending {
   position: relative;
   min-height: 100dvh;
-  background: #f3f5f7;
+  background: var(--color-ground);
 }
 
 .brand {
@@ -15,11 +15,11 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 28px;
-  height: 28px;
-  margin: -14px;
-  border: 3px solid #d9e8df;
-  border-top-color: #087c43;
+  width: var(--space-32);
+  height: var(--space-32);
+  margin: calc(var(--space-16) * -1);
+  border: var(--space-2) solid var(--color-progress-track);
+  border-top-color: var(--color-progress-on);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
