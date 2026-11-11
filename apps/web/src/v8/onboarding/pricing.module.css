@@ -6,7 +6,7 @@
 .secondary { margin: 0 0 var(--mp-px-28); font-size: var(--mp-px-14); }
 .inputGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--mp-px-12); }
 .plannedSelect { width: 100%; }
-html:root .plannedSelect :global(button[data-choice-field]) { height: var(--mp-px-44); min-height: var(--mp-px-44); max-height: var(--mp-px-44); }
+html:root .plannedSelect :global(button[data-choice-field]) { height: var(--mp-px-44); min-height: var(--mp-px-44); max-height: var(--mp-px-44); scroll-margin-top: var(--mp-px-120); }
 .field { display: flex; flex-direction: column; min-width: 0; gap: var(--mp-px-9); color: var(--mp-color-202428); font-size: var(--mp-px-14); font-weight: 700; }
 .numberField { position: relative; display: block; width: 100%; height: var(--mp-px-44); }
 .numberField > span { position: absolute; top: 50%; right: var(--mp-px-14); transform: translateY(-50%); color: var(--mp-color-58667a); font-weight: 400; pointer-events: none; }
