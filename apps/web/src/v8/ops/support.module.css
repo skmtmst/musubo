@@ -137,6 +137,7 @@
   align-items: center;
   gap: var(--tpl-op-me-gap);
 }
+html:root .detailTitleRow [data-design-node='t0jk8p'] h2 { font-size: 17px; line-height: 21px; }
 @media (min-width: 641px) { .detailTitleRow { min-height: var(--space-24); } }
 
 .detailHead svg,
@@ -379,9 +380,12 @@ html:root .outlinedMore[data-row-menu]:not(:focus-visible) {
   .columnsSelected .list { display: none; }
   .columns:not(.columnsSelected) .detail { display: none; }
   .detail { width: 100%; max-height: none; overflow: visible; border: 0; border-radius: 0; outline: 0; gap: var(--space-16); padding: 0 var(--support-mobile-pad) calc(var(--space-32) + var(--space-32) + var(--space-32) + var(--space-32) + var(--space-16) + env(safe-area-inset-bottom, 0px)); box-shadow: none; }
-  .mobileTop { display: flex; align-items: center; justify-content: space-between; position: relative; height: var(--support-mobile-header-height); margin: 0 calc(-1 * var(--support-mobile-pad)); border-bottom: 1px solid var(--color-hairline); padding: 0 var(--support-mobile-pad); background: var(--color-canvas); }
-  .mobileBack { display: inline-flex; align-items: center; gap: var(--space-8); min-height: var(--support-create-height); border: 0; background: transparent; color: var(--color-ink); font-weight: 600; }
-  .mobileBack svg { width: var(--support-mobile-pad); height: var(--support-mobile-pad); }
+  .mobileTop { display: flex; align-items: center; justify-content: space-between; position: relative; height: var(--support-mobile-header-height); margin: 0 calc(-1 * var(--support-mobile-pad)); border-bottom: 1px solid var(--color-hairline); padding: 0 var(--space-16); background: var(--color-canvas); }
+  html:root .mobileBack { display: inline-flex; align-items: center; gap: var(--space-8); min-height: var(--support-create-height); border: 0; padding: 0; background: transparent; color: var(--color-ink); font-weight: 600; }
+  html:root .mobileTop .mobileBack > svg { width: var(--support-mobile-pad); height: var(--support-mobile-pad); }
+  html:root .mobileTop .outlinedMore[data-row-menu] { width: 32px; min-width: 32px; height: 36px; flex-basis: 32px; }
+  html:root .mobileTop .outlinedMore[data-row-menu] > svg { width: 18px; height: 18px; }
+  html:root .detailTitleRow [data-design-node='t0jk8p'] h2 { font-size: 21px; line-height: 25px; }
   .detailControls { flex-wrap: nowrap; gap: var(--space-8); }
   .statusWrap { order: 0; flex-basis: auto; }
   .prioritySelect { order: 1; }
@@ -389,7 +393,7 @@ html:root .outlinedMore[data-row-menu]:not(:focus-visible) {
   .contractLink { order: 2; margin-left: calc(-1 * var(--space-8)); }
   .moreWrap { display: none; }
   .messages .message:first-child { min-height: var(--support-mobile-message-height); }
-  .messages { margin-top: var(--space-24); }
+  .messages { margin-top: var(--space-18, 18px); }
   .draft { margin-top: 0; }
   .draft { padding-bottom: var(--support-draft-bottom); }
   .replyBox.replyBox { min-height: var(--support-reply-mobile-height); }
