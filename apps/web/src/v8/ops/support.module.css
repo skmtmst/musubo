@@ -378,7 +378,7 @@ html:root .outlinedMore[data-row-menu]:not(:focus-visible) {
   .columnsSelected { padding: 0; }
   .columnsSelected .list { display: none; }
   .columns:not(.columnsSelected) .detail { display: none; }
-  .detail { width: 100%; max-height: none; overflow: visible; border: 0; border-radius: 0; outline: 0; gap: var(--space-16); padding: 0 var(--support-mobile-pad) var(--space-12); box-shadow: none; }
+  .detail { width: 100%; max-height: none; overflow: visible; border: 0; border-radius: 0; outline: 0; gap: var(--space-16); padding: 0 var(--support-mobile-pad) calc(144px + env(safe-area-inset-bottom, 0px)); box-shadow: none; }
   .mobileTop { display: flex; align-items: center; justify-content: space-between; position: relative; height: var(--support-mobile-header-height); margin: 0 calc(-1 * var(--support-mobile-pad)); border-bottom: 1px solid var(--color-hairline); padding: 0 var(--support-mobile-pad); background: var(--color-canvas); }
   .mobileBack { display: inline-flex; align-items: center; gap: var(--space-8); min-height: var(--support-create-height); border: 0; background: transparent; color: var(--color-ink); font-weight: 600; }
   .mobileBack svg { width: var(--support-mobile-pad); height: var(--support-mobile-pad); }

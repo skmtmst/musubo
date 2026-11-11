@@ -110,7 +110,7 @@ export default function SupportTemplatePicker({ open, onClose, onInsert, writabl
             </aside>
             <div className={styles.desktopTemplates}>
               <div className={styles.desktopToolbar}><div className={styles.search}><Search aria-hidden="true" /><input aria-label="テンプレートを検索" placeholder="テンプレートを検索" value={query} onChange={(e) => setQuery(e.target.value)} /></div><Button disabled={!writable} onClick={() => setView('newTemplate')}><Plus aria-hidden="true" />テンプレートを作成</Button></div>
-              <div className={styles.desktopSplit}><div className={styles.templateColumn}><strong>テンプレート</strong><TemplateList templates={filtered} selectedId={selected?.id} onSelect={setSelectedId} /></div><Preview title={selected?.title} body={selected?.body} /></div>
+              <div className={styles.desktopSplit}><div className={styles.templateColumn}><strong>{activeFolder ? `${activeFolder.name}のテンプレート` : 'テンプレート'}</strong><TemplateList templates={filtered} selectedId={selected?.id} onSelect={setSelectedId} /></div><Preview title={selected?.title} body={selected?.body} /></div>
               <p className={styles.insertHint}>返信文のカーソル位置に挿入します。既存の文は残り、引用後も編集できます。</p>
             </div>
           </div>
@@ -127,7 +127,7 @@ export default function SupportTemplatePicker({ open, onClose, onInsert, writabl
       </div>
       {view !== 'folders' ? <footer className={styles.footer}>
         <div className={styles.desktopCancel}><Button onClick={back}>キャンセル</Button></div>
-        <Button variant="primary" fullWidth={view !== 'list'} disabled={busy || (view === 'list' ? !selected || !writable : !writable)} busy={busy} onClick={view === 'list' ? insert : view === 'newFolder' ? createFolder : createTemplate}>{view === 'list' ? '返信に引用する' : view === 'newFolder' ? 'フォルダを作成' : 'テンプレートを保存'}</Button>
+        <Button variant="primary" fullWidth={view !== 'list'} widthReserve="idle" disabled={busy || (view === 'list' ? !selected || !writable : !writable)} busy={busy} onClick={view === 'list' ? insert : view === 'newFolder' ? createFolder : createTemplate}>{view === 'list' ? '返信に引用する' : view === 'newFolder' ? 'フォルダを作成' : 'テンプレートを保存'}</Button>
       </footer> : null}
     </section>
   </div><UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="作りかけのテンプレート" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy} /></>
