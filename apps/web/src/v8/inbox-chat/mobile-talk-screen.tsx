@@ -1,4 +1,5 @@
 'use client'
+import { useReservationWarning } from './use-reservation-warning'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -216,8 +217,10 @@ function MobileTalkThread() {
   const hasContent = Boolean(draft.messageContent.trim() || draft.pendingImage || draft.pendingAttachment?.status === 'ready')
   const ready = Boolean(chatDetail) && !deepLinkNotice
 
+  const reservationWarning = useReservationWarning(selectedChatId, draft.messageContent)
   const composer = canReply && ready ? (
     <div className={styles.composer}>
+      {reservationWarning ? <Notice tone="warn" message={reservationWarning} /> : null}
       {sendError ? (
         <Notice tone="danger" message={sendError} action={<Button size="compact" onClick={() => void handleSendMessage()} busy={sending} busyLabel="送っています…">もう一度送る</Button>} />
       ) : null}
