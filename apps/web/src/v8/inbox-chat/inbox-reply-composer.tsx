@@ -1,6 +1,7 @@
 'use client'
 
-import { useReservationWarning } from './use-reservation-warning'
+import { useInboxPreview } from './use-reservation-warning'
+import TruncatedText from '@/components/shared/truncated-text'
 import { terms } from '@/lib/terms'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
@@ -29,7 +30,7 @@ import { MESSAGE_MAX_LENGTH, formatByteSize, formatJstScheduledAt, isoToJstDatet
 import { TextArea as SharedTextArea } from '@/components/shared/text-field'
 type Props = Pick<ConversationProps, 'dropOver' | 'setDropOver' | 'handlePickAttachment' | 'chatPollStalled' | 'setChatPollRetryKey' | 'setShowTemplatePicker' | 'showComposerOptions' | 'setShowComposerOptions' | 'showMemoEditor' | 'setShowMemoEditor' | 'sendMode' | 'setSendMode' | 'memoPopoverRef' | 'memoDraft' | 'setMemoDraft' | 'memoError' | 'closeMemoEditor' | 'handleSaveMemo' | 'memoSaving' | 'chatDetail' | 'quotedMessage' | 'setQuotedMessage' | 'pendingImage' | 'setImagePreviewOpen' | 'pendingImageMeta' | 'imageInputRef' | 'imageUploading' | 'clearPendingImage' | 'pendingAttachment' | 'sending' | 'scheduling' | 'clearPendingAttachment' | 'retryAttachment' | 'textareaRef' | 'messageContent' | 'setMessageContent' | 'handleKeyDown' | 'isComposingRef' | 'messageOverLimit' | 'messageLength' | 'selectedChatId' | 'imageError' | 'staffRole' | 'selectedAccountId' | 'senderId' | 'setSenderId' | 'setShowSchedulePanel' | 'showSchedulePanel' | 'scheduledSends' | 'handleSendMessage' | 'scheduleInput' | 'setScheduleInput' | 'handleScheduleSend' | 'sendError' | 'error' | 'scheduledSendsFailed' | 'loadScheduledSends' | 'handleReschedule' | 'handleCancelScheduled' | 'showTemplatePicker' | 'setPendingPack' | 'pendingPack' | 'handleSendPack'>
 export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, chatDetail, quotedMessage, setQuotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, textareaRef, messageContent, setMessageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, selectedChatId, imageError, staffRole, selectedAccountId, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, sendError, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack }: Props) {
-  const reservationWarning = useReservationWarning(selectedChatId, messageContent)
+  const { preview, warning: reservationWarning } = useInboxPreview(selectedChatId, messageContent)
   const friendId = chatDetail?.id === selectedChatId ? chatDetail.friendId : null
   const scheduleContext = useRef({ accountId: selectedAccountId, chatId: selectedChatId, friendId, generation: 0 })
   if (scheduleContext.current.accountId !== selectedAccountId || scheduleContext.current.chatId !== selectedChatId || scheduleContext.current.friendId !== friendId) {
@@ -334,6 +335,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
         placeholder="メッセージを入力"
         aria-label="メッセージを入力"
         aria-invalid={messageOverLimit} />
+      {preview !== null ? <Notice tone="info" heading="送るとこうなります："><TruncatedText value={preview} /></Notice> : null}
 
       <InboxDraftCount
       >

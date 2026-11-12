@@ -1,5 +1,6 @@
 'use client'
-import { useReservationWarning } from './use-reservation-warning'
+import { useInboxPreview } from './use-reservation-warning'
+import TruncatedText from '@/components/shared/truncated-text'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -217,7 +218,7 @@ function MobileTalkThread() {
   const hasContent = Boolean(draft.messageContent.trim() || draft.pendingImage || draft.pendingAttachment?.status === 'ready')
   const ready = Boolean(chatDetail) && !deepLinkNotice
 
-  const reservationWarning = useReservationWarning(selectedChatId, draft.messageContent)
+  const { preview, warning: reservationWarning } = useInboxPreview(selectedChatId, draft.messageContent)
   const composer = canReply && ready ? (
     <div className={styles.composer}>
       {reservationWarning ? <Notice tone="warn" message={reservationWarning} /> : null}
@@ -248,6 +249,7 @@ function MobileTalkThread() {
         aria-label="メッセージを入力"
         aria-invalid={overLimit}
       />
+      {preview !== null ? <Notice tone="info" heading="送るとこうなります："><TruncatedText value={preview} /></Notice> : null}
       <div className={styles.composerRow}>
         <AttachMenu disabled={sending} onPick={(file, slot) => void draft.handlePickAttachment(file, slot)} />
         <span className={styles.count} data-over={overLimit || undefined} title={ATTACH_NOTE}>
