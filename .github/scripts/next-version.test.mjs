@@ -16,6 +16,7 @@ test('workflow は変更判定後に既存の全幅検査を起動する', async
   const { readFileSync } = await import('node:fs')
   const workflow = readFileSync('.github/workflows/required-pr-gate.yml', 'utf8')
   assert.match(workflow, /next_changed=\$\(node \.github\/scripts\/next-version\.mjs/)
+  assert.match(workflow, /if ! next_changed=[\s\S]*?echo "run=true"[\s\S]*?exit 0/)
   assert.match(workflow, /if \[ "\$next_changed" = "true" \]; then[\s\S]*?echo "run=true"/)
   assert.match(workflow, /No V8 layout breaks at 1152, 1440 and 1920[\s\S]*?layout-overflow\.mjs/)
   const browserEnv = readFileSync('apps/web/scripts/v8-guard/browser-env.mjs', 'utf8')
