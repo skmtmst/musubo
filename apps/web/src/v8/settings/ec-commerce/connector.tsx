@@ -9,6 +9,7 @@ import { PageFooter } from '@/components/templates/page-footer'
 import Checkbox from '@/components/shared/checkbox'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
@@ -105,7 +106,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
   const [replacingSecret, setReplacingSecret] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   /* 全部外すこと自体は止めない。保存の直前に確認を1枚だけ挟む。 */
-  const [emptyConfirm, setEmptyConfirm] = useState<{ events: boolean; rules: boolean } | null>(null)
+  const [emptyConfirm, setEmptyConfirm] = useState<{ events: boolean; rules: boolean; accountId: string; form: Form; epoch: number } | null>(null)
 
   /*
    * WEB192：アカウントを変えたら、前のアカウントの遅い応答を捨てる（A の設定を B の欄へ入れない）。
@@ -114,6 +115,8 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
   const gate = useResponseGate()
   const accountRef = useRef(accountId)
   accountRef.current = accountId
+  const scopeRef = useRef({ accountId, canEdit, epoch: 0 })
+  if (scopeRef.current.accountId !== accountId || scopeRef.current.canEdit !== canEdit) scopeRef.current = { accountId, canEdit, epoch: scopeRef.current.epoch + 1 }
   const load = useCallback(async () => {
     const token = gate.begin()
     if (!accountId) { setData(null); setForm(EMPTY_FORM); setState('empty'); return }
@@ -159,21 +162,27 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
     })
   }
 
-  const save = async () => {
+  const save = async (confirmation?: NonNullable<typeof emptyConfirm>) => {
     if (!canEdit || saving || !dirty || !accountId) return
-    const accountAtSave = accountId
+    if (confirmation && (confirmation.epoch !== scopeRef.current.epoch || confirmation.accountId !== accountId || confirmation.form !== form)) {
+      setNotice({ tone: 'error', text: '対象や内容が変わりました。閉じてから、もう一度選んでください。' })
+      return false
+    }
+    const accountAtSave = confirmation?.accountId ?? accountId
+    const formAtSave = confirmation?.form ?? form
+    const epochAtSave = scopeRef.current.epoch
     setSaving(true)
     setNotice(null)
     try {
-      const response = await api.ecCommerce.updateConnector(accountId, form)
-      if (accountRef.current !== accountAtSave) return
+      const response = await api.ecCommerce.updateConnector(accountAtSave, formAtSave)
+      if (scopeRef.current.epoch !== epochAtSave) return
       if (!response.success) throw new Error('save_failed')
       setForm((current) => ({ ...current, inboundSecret: '', expectedVersion: response.data.version }))
       notifySaved('つなぎ先の設定を保存しました。')
       void load()
       return true
     } catch (error) {
-      if (accountRef.current !== accountAtSave) return
+      if (scopeRef.current.epoch !== epochAtSave) return
       const fieldFailure = saveErrors.capture(error);
 
       if (error instanceof ApiError && error.status === 409) { saveConflict.mark(); setNotice({ tone: 'error', text: 'ほかの人が先に保存しました。閉じて最新の内容と比べてください。' }); return false }
@@ -202,7 +211,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
     }
     const events = form.eventTypes.length === 0
     const rules = form.identityRules.length === 0
-    if (events || rules) { setEmptyConfirm({ events, rules }); return }
+    if (events || rules) { setEmptyConfirm({ events, rules, accountId, form, epoch: scopeRef.current.epoch }); return }
     void save()
   }
 
@@ -338,18 +347,19 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
       {canEdit && (dirty || saving) ? <PageFooter actions={<><Button disabled={saving} onClick={() => { setForm(toForm(connector ?? null)); setReplacingSecret(false); setErrors({}); setNotice(null); saveErrors.reset() }}>キャンセル</Button><Button type="button" variant="primary" disabled={saving} onClick={requestSave} busy={saving} busyLabel="保存しています…">設定を保存する</Button></>} /> : null}
 
       <ConfirmDialog
-        open={emptyConfirm !== null}
+        open={emptyConfirm !== null && emptyConfirm.epoch === scopeRef.current.epoch}
         title={emptyConfirm?.events && emptyConfirm?.rules ? '取り込みと照合をすべて止めますか？' : emptyConfirm?.events ? 'すべての出来事の取り込みを止めますか？' : '自動の照合をすべて止めますか？'}
         description={[
           emptyConfirm?.events ? '取り込む出来事が1つも選ばれていません。保存すると、すべての出来事の取り込みが止まります。' : null,
           emptyConfirm?.rules ? '人を照らし合わせる決めごとが1つも選ばれていません。保存すると、自動の照合がすべて止まります。' : null,
         ].filter(Boolean).join('')}
         confirmLabel="止めて保存する"
+        confirmIcon={false}
         destructive
         busy={saving}
-        error={notice?.tone === 'error' ? notice.text : undefined} confirmDisabled={Boolean(saveConflict.conflict)} confirmDisabledReason="閉じて最新の内容と比べてください。" onSuccess={() => setEmptyConfirm(null)} onConfirm={() => save()}
+        error={notice?.tone === 'error' ? notice.text : undefined} confirmDisabled={Boolean(saveConflict.conflict)} confirmDisabledReason="閉じて最新の内容と比べてください。" onSuccess={() => setEmptyConfirm(null)} onConfirm={() => emptyConfirm ? save(emptyConfirm) : undefined}
         onCancel={() => { if (!saving) setEmptyConfirm(null) }}
-      />
+      ><OperationTargetSummary accounts={[{ id: emptyConfirm?.accountId ?? '' }]} /></ConfirmDialog>
       <UnsavedLeaveDialog
         open={leaveTarget !== null}
         description={pendingStatusChange

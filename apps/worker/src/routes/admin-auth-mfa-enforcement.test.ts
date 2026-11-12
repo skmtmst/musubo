@@ -81,7 +81,7 @@ function seedStaff(id: string, overrides: Record<string, unknown> = {}) {
 async function seedOwnerWithPassword(password = 'Abcdefg1') {
   const hash = await hashPassword(password);
   testDb.raw
-    .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, password_hash) VALUES ('s1', '山田 太郎', 'owner@example.com', 'owner', 'key-1', 1, ?)`)
+    .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, password_hash) VALUES ('s1', '見本 141', 'owner@example.com', 'owner', 'key-1', 1, ?)`)
     .run(hash);
 }
 

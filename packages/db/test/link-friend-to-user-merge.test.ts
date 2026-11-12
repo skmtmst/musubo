@@ -36,8 +36,8 @@ function seed() {
   ).run();
   sqlite.prepare(
     `INSERT INTO friends (id, line_user_id, display_name, user_id, line_account_id)
-     VALUES ('friend-a', 'UA', '田中 花子', NULL, 'account-a'),
-            ('friend-b', 'UB', '田中 はなこ', NULL, 'account-a')`,
+     VALUES ('friend-a', 'UA', '見本 171', NULL, 'account-a'),
+            ('friend-b', 'UB', '見本 161', NULL, 'account-a')`,
   ).run();
   sqlite.prepare(
     `INSERT INTO identity_candidates (

@@ -22,7 +22,7 @@ vi.mock('@/lib/api', () => ({ api: {
   folders: { list: async () => ({ success: true, data: [] }) },
   chats: { renderPreview: async (_id: string, body: { content: string }) => {
     fixture.previews.push(body.content)
-    return { success: true, data: { content: body.content.replaceAll('{{name}}', '山田 太郎').replaceAll('{{var.company_name}}', '確認用のお店'), unresolved: [] } }
+    return { success: true, data: { content: body.content.replaceAll('{{name}}', '見本 141').replaceAll('{{var.company_name}}', '確認用のお店'), unresolved: [] } }
   } },
 } }))
 const { default: TemplatePicker } = await import('./template-picker')

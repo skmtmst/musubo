@@ -4,10 +4,22 @@ import ts from 'typescript'
 import { hasExportedV8Component } from './v8-component-source.mjs'
 
 const mutationMethod = /^(?:(?:create|update|save|register|upsert|replace|publish|connect|set|patch|edit)(?:$|[A-Z_])|(?:bulk|batch)(?:Create|Update|Save))/
+// メニュー一覧の保管・再開には入力欄がない。名前や価格の編集は引き続き対象にする。
+function isMenuStatusOnly(call) {
+  if (call.expression.getText() !== 'restaurantTestApi.updateMenu' || call.arguments.length !== 3) return false
+  const payload = call.arguments[2]
+  if (!ts.isObjectLiteralExpression(payload) || payload.properties.length !== 2) return false
+  const props = payload.properties
+  if (!props.every(ts.isPropertyAssignment)) return false
+  const status = props.find(prop => prop.name.getText() === 'status')
+  return !!status && ts.isStringLiteral(status.initializer) && ['active', 'archived'].includes(status.initializer.text)
+    && props.some(prop => prop.name.getText() === 'expectedVersion')
+}
 function hasMutation(node) {
   let found = false
   visit(node, (child) => {
     if (!ts.isCallExpression(child)) return
+    if (isMenuStatusOnly(child)) return
     const expression = child.expression
     if (ts.isPropertyAccessExpression(expression) && /^(?:api|[A-Za-z]\w*Api)\./.test(expression.getText()) && mutationMethod.test(expression.name.text) && !/(?:Validation|Preview|Impact)$/.test(expression.name.text)) found = true
     if (/^(?:saveTemplateEdit|save\w*Draft|onSave|host\.save|host\.onSave)$/.test(expression.getText())) found = true

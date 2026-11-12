@@ -9,7 +9,7 @@ const calls = vi.hoisted(() => ({
     data: {
       kinds: [{ key: 'billing', label: '料金・契約について' }],
       accounts: [{ id: 'line-1', name: '表参道店' }],
-      sender: { tenantName: '株式会社サンプル', name: '山田 太郎', email: 'owner@example.com', planLabel: 'スタンダード' },
+      sender: { tenantName: '株式会社サンプル', name: '見本 141', email: 'owner@example.com', planLabel: 'スタンダード' },
     },
   })),
   list: vi.fn(async () => ({ success: true, data: [] })),
@@ -54,7 +54,7 @@ describe('停止中のお問い合わせ本文（管理画面 IwfA0）', () => {
     expect(calls.list).toHaveBeenCalledTimes(1)
     expect(host.textContent).toContain('関係する店舗')
     expect(host.textContent).toContain('株式会社サンプル')
-    expect(host.textContent).toContain('山田 太郎')
+    expect(host.textContent).toContain('見本 141')
     expect(host.textContent).toContain('owner@example.com')
     expect(host.textContent).toContain('スタンダード')
     expect(host.querySelector('[data-line-guide]')).toBeNull()

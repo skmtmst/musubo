@@ -61,7 +61,7 @@ it('閲覧から理由付き書込へ切り替えると元の編集許可を使�
   fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: '隔離された試験の確認' } })
   fireEvent.click(within(dialog).getByRole('button', { name: '書き込みに切り替える' }))
   await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
-  expect(mock.write).toHaveBeenCalledExactlyOnceWith('隔離された試験の確認')
+  expect(mock.write).toHaveBeenCalledExactlyOnceWith('隔離された試験の確認', 'proxy')
   expect(readSessionSnapshot()).toEqual({ ...known, impersonation: initial })
   expect(readAuthCheck('fixture-fingerprint')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: '設定を保存する' }))

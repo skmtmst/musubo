@@ -9,6 +9,7 @@ import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditEventStatement, recordAuditEvent } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { claimFileDeletion, fileDeletionGuard, releaseFileDeletion, scanDeletionLockId, UNLOCKED_SCAN_SQL } from '../services/file-deletion-lock.js';
 import {
   FILE_SCAN_REASON_LABELS,
   FORM_FILE_SCAN_MAX_ATTEMPTS,
@@ -25,6 +26,7 @@ import {
   resolveExternalScanner,
   runScanForStoredObject,
   ScanRetryableError,
+  type FileScanConfig,
   type FileScanRow,
   type FileScanStatus,
   type FileScanSubjectKind,
@@ -46,6 +48,7 @@ function reasonLabel(code: string | null): string | null {
 function serializeScan(row: FileScanRow) {
   return {
     id: row.id,
+    confirmationRevision: row.confirmation_revision,
     lineAccountId: row.line_account_id,
     subjectKind: row.subject_kind,
     subjectId: row.subject_id,
@@ -68,33 +71,47 @@ function serializeScan(row: FileScanRow) {
   };
 }
 
+function serializeConfig(config: FileScanConfig, env: Env['Bindings']) {
+  return {
+    confirmationRevision: config.confirmation_revision,
+    externalProvider: config.external_provider,
+    externalEndpointUrl: config.external_endpoint_url,
+    externalSecretRef: config.external_secret_ref,
+    externalEnabled: resolveExternalScanner(env as unknown as Record<string, string | undefined>, config) !== null,
+    externalTimeoutMs: config.external_timeout_ms,
+    maxBytesOverride: config.max_bytes_override,
+    maxPixelsOverride: config.max_pixels_override,
+    updatedAt: config.updated_at,
+  };
+}
+
 async function findR2Key(
   db: D1Database,
   scan: FileScanRow,
 ): Promise<{ key: string; width: number | null; height: number | null; etag?: string } | null> {
   if (scan.subject_kind === 'media_version') {
     const version = await db.prepare(
-      `SELECT r2_key, width, height, etag FROM media_versions WHERE id = ? AND media_id = ?`,
-    ).bind(scan.subject_id, scan.media_id).first<{ r2_key: string; width: number | null; height: number | null; etag: string | null }>();
+      `SELECT v.r2_key, v.width, v.height, v.etag FROM media_versions v JOIN media m ON m.id=v.media_id WHERE v.id = ? AND v.media_id = ? AND m.line_account_id IS ?`,
+    ).bind(scan.subject_id, scan.media_id, scan.line_account_id).first<{ r2_key: string; width: number | null; height: number | null; etag: string | null }>();
     return version ? { key: version.r2_key, width: version.width, height: version.height, ...(version.etag ? { etag: version.etag.replace(/^"|"$/g, '') } : {}) } : null;
   }
   if (scan.subject_kind === 'upload_session') {
     const session = await db.prepare(
-      `SELECT r2_key, width, height FROM media_upload_sessions WHERE id = ?`,
-    ).bind(scan.subject_id).first<{ r2_key: string; width: number | null; height: number | null }>();
+      `SELECT r2_key, width, height FROM media_upload_sessions WHERE id = ? AND line_account_id IS ?`,
+    ).bind(scan.subject_id, scan.line_account_id).first<{ r2_key: string; width: number | null; height: number | null }>();
     return session ? { key: session.r2_key, width: session.width, height: session.height } : null;
   }
   if (scan.subject_kind === 'media' || scan.media_id) {
     const media = await db.prepare(
-      `SELECT r2_key, width, height FROM media WHERE id = ?`,
-    ).bind(scan.media_id ?? scan.subject_id)
+      `SELECT r2_key, width, height FROM media WHERE id = ? AND line_account_id IS ?`,
+    ).bind(scan.media_id ?? scan.subject_id, scan.line_account_id)
       .first<{ r2_key: string; width: number | null; height: number | null }>();
     if (media) return { key: media.r2_key, width: media.width, height: media.height };
   }
   if (scan.subject_kind === 'photo') {
     const photo = await db.prepare(
-      `SELECT r2_key, image_width, image_height FROM nen_photo_submissions WHERE id = ?`,
-    ).bind(scan.subject_id)
+      `SELECT r2_key, image_width, image_height FROM nen_photo_submissions WHERE id = ? AND line_account_id IS ?`,
+    ).bind(scan.subject_id, scan.line_account_id)
       .first<{ r2_key: string; image_width: number | null; image_height: number | null }>();
     if (photo) return { key: photo.r2_key, width: photo.image_width, height: photo.image_height };
   }
@@ -317,9 +334,10 @@ fileScan.post('/api/file-scans/:id/retry', requireRole('owner', 'admin'), inputJ
   }
   // 二重実行は行の状態で抑える。pending の再試行は時刻だけ前倒しする。
   const now = new Date().toISOString();
-  await c.env.DB.prepare(
-    `UPDATE media_file_scans SET status = 'pending', next_retry_at = ?, updated_at = ? WHERE id = ?`,
+  const retried = await c.env.DB.prepare(
+    `UPDATE media_file_scans SET status = 'pending', confirmation_revision=confirmation_revision+1, next_retry_at = ?, updated_at = ? WHERE id = ? AND ${UNLOCKED_SCAN_SQL}`,
   ).bind(now, now, scan.id).run();
+  if (!retried.meta.changes) return c.json({ success: false, error: 'このファイルは処理中です。読み直してください', current: serializeScan(scan) }, 409);
   await recordAuditEvent(c.env.DB, {
     lineAccountId: accountId,
     category: 'business',
@@ -335,31 +353,38 @@ fileScan.post('/api/file-scans/:id/retry', requireRole('owner', 'admin'), inputJ
 
 /** 誤りなので戻す。理由の記録は必須。quarantined だけ戻せる。 */
 fileScan.post('/api/file-scans/:id/release', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
-  const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>().catch(() => null);
+  const body = await c.req.json<{ accountId?: unknown; reason?: unknown; expectedConfirmationRevision?: unknown }>().catch(() => null);
   const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
   const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
   if (!accountId || !reason) {
     return inputError(c, { success: false, error: 'accountId と理由が必要です' }, 400, ["accountId","reason"]);
   }
+  const expected = body?.expectedConfirmationRevision;
+  if (expected !== undefined && (!Number.isSafeInteger(expected) || Number(expected) < 1)) return c.json({ success: false, error: '確認した版が正しくありません' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   const scan = await c.env.DB.prepare(`SELECT * FROM media_file_scans WHERE id = ?`)
     .bind(c.req.param('id')).first<FileScanRow>();
   if (!scan || scan.line_account_id !== accountId) {
+    if (expected !== undefined) return c.json({ success: false, error: '検査の状態が変わりました。一覧を読み直してください', current: null }, 409);
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   if (isPrivateFormDocumentScan(scan)) return c.json({ success: false, error: '回答の書類は戻せません。別のファイルを選んでください' }, 409);
   if (scan.status !== 'quarantined') {
-    return c.json({ success: false, code: 'file_scan_not_quarantined', error: 'しまったファイルだけ戻せます' }, 409);
+    return c.json({ success: false, code: 'file_scan_not_quarantined', error: 'しまったファイルだけ戻せます', current: serializeScan(scan) }, 409);
   }
   const now = new Date().toISOString();
-  await c.env.DB.prepare(
+  const changed = await c.env.DB.prepare(
     `UPDATE media_file_scans
-        SET status = 'clean', released_at = ?, release_reason = ?,
+        SET status = 'clean', confirmation_revision=confirmation_revision+1, released_at = ?, release_reason = ?,
             released_by = ?, next_retry_at = NULL, updated_at = ?
-      WHERE id = ? AND status = 'quarantined'`,
-  ).bind(now, reason.slice(0, 500), c.get('staff')?.id ?? null, now, scan.id).run();
+      WHERE id = ? AND line_account_id = ? AND status = 'quarantined' AND (? IS NULL OR confirmation_revision = ?) AND ${UNLOCKED_SCAN_SQL}`,
+  ).bind(now, reason.slice(0, 500), c.get('staff')?.id ?? null, now, scan.id, accountId, expected ?? null, expected ?? null).run();
+  if (!changed.meta.changes) {
+    const current = await c.env.DB.prepare('SELECT * FROM media_file_scans WHERE id=? AND line_account_id=?').bind(scan.id, accountId).first<FileScanRow>();
+    return c.json({ success: false, error: '検査の状態が変わりました。一覧を読み直してください', current: current ? serializeScan(current) : null }, 409);
+  }
   await recordAuditEvent(c.env.DB, {
     lineAccountId: accountId,
     category: 'business',
@@ -376,6 +401,9 @@ fileScan.post('/api/file-scans/:id/release', requireRole('owner', 'admin'), inpu
 /** しまった・使えないファイルの消去。記録は監査に残し、中身は出さない。 */
 fileScan.delete('/api/file-scans/:id', requireRole('owner', 'admin'), async (c) => {
   const accountId = (c.req.query('accountId') ?? '').trim();
+  const supplied = c.req.query('expectedConfirmationRevision');
+  const expected = supplied === undefined ? undefined : Number(supplied);
+  if (supplied !== undefined && (!/^[1-9]\d*$/.test(supplied) || !Number.isSafeInteger(expected))) return c.json({ success: false, error: '確認した版が正しくありません' }, 400);
   if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
@@ -383,22 +411,52 @@ fileScan.delete('/api/file-scans/:id', requireRole('owner', 'admin'), async (c) 
   const scan = await c.env.DB.prepare(`SELECT * FROM media_file_scans WHERE id = ?`)
     .bind(c.req.param('id')).first<FileScanRow>();
   if (!scan || scan.line_account_id !== accountId) {
+    if (expected !== undefined) return c.json({ success: false, error: '検査の状態が変わりました。一覧を読み直してください', current: null }, 409);
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   if (scan.status !== 'quarantined' && scan.status !== 'rejected') {
-    return c.json({ success: false, code: 'file_scan_not_disposable', error: 'しまった・使えないファイルだけ消せます' }, 409);
+    return c.json({ success: false, code: 'file_scan_not_disposable', error: 'しまった・使えないファイルだけ消せます', current: serializeScan(scan) }, 409);
   }
-  const target = await findR2Key(c.env.DB, scan);
-  if (isPrivateFormDocumentScan(scan)) {
-    if (!await purgeUnsafeFormDocuments(c.env.DB, c.env.IMAGES, scan.id)) return c.json({ success: false, error: '書類を消せませんでした。もう一度お試しください' }, 503);
-  } else if (target) await c.env.IMAGES.delete(target.key).catch(() => {});
-  if (scan.media_id) {
-    await c.env.DB.prepare(
-      `UPDATE media SET archived_at = ?, archived_by = ?, archive_reason = ?
-        WHERE id = ? AND line_account_id = ?`,
-    ).bind(new Date().toISOString(), c.get('staff')?.id ?? null, '検査でしまったため', scan.media_id, accountId).run();
+  const db = c.env.DB;
+  const confirmedTarget = await findR2Key(db, scan);
+  if (expected !== undefined && !confirmedTarget && !isPrivateFormDocumentScan(scan)) {
+    return c.json({ success: false, error: 'ファイルの状態が変わりました。一覧を読み直してください', current: serializeScan(scan) }, 409);
   }
-  if (!isPrivateFormDocumentScan(scan)) await c.env.DB.prepare(`DELETE FROM media_file_scans WHERE id = ?`).bind(scan.id).run();
+  const lock = await claimFileDeletion(db, scanDeletionLockId(scan), c.get('staff')?.id ?? 'unknown', { id: scan.id, accountId, expected });
+  if (!lock) {
+    const current = await db.prepare('SELECT * FROM media_file_scans WHERE id=? AND line_account_id=?').bind(scan.id, accountId).first<FileScanRow>();
+    return c.json({ success: false, error: '検査の状態が変わりました。一覧を読み直してください', current: current ? serializeScan(current) : null }, 409);
+  }
+  try {
+    const claimed = await db.prepare('SELECT * FROM media_file_scans WHERE id=? AND line_account_id=?').bind(scan.id, accountId).first<FileScanRow>();
+    const target = await findR2Key(db, scan);
+    if (!claimed || (expected !== undefined && ((!target && !isPrivateFormDocumentScan(scan)) || target?.key !== confirmedTarget?.key))) {
+      await releaseFileDeletion(db, lock);
+      return c.json({ success: false, error: 'ファイルの状態が変わりました。一覧を読み直してください', current: claimed ? serializeScan(claimed) : null }, 409);
+    }
+    await fileDeletionGuard(db, lock).first();
+    if (isPrivateFormDocumentScan(scan)) {
+      if (!await purgeUnsafeFormDocuments(db, c.env.IMAGES, scan.id)) {
+        await releaseFileDeletion(db, lock);
+        return c.json({ success: false, error: '書類を消せませんでした。もう一度お試しください' }, 503);
+      }
+    } else if (target) {
+      if (expected === undefined) await c.env.IMAGES.delete(target.key).catch(() => {});
+      else await c.env.IMAGES.delete(target.key);
+    }
+    await db.batch([
+      fileDeletionGuard(db, lock),
+      ...(scan.media_id ? [db.prepare(`UPDATE media SET archived_at=?, archived_by=?, archive_reason=? WHERE id=? AND line_account_id=?${target && expected !== undefined ? ' AND r2_key=?' : ''}`)
+        .bind(new Date().toISOString(), c.get('staff')?.id ?? null, '検査でしまったため', scan.media_id, accountId, ...(target && expected !== undefined ? [target.key] : []))] : []),
+      ...(!isPrivateFormDocumentScan(scan) ? [db.prepare('DELETE FROM media_file_scans WHERE id=? AND line_account_id=? AND confirmation_revision=?').bind(scan.id, accountId, claimed.confirmation_revision),
+        db.prepare("SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'FILE_DELETE_CONFLICT' END)")] : []),
+      db.prepare("UPDATE operation_audit SET action='released' WHERE id=? AND action='deleting' AND json_extract(detail_json,'$.token')=?").bind(lock.id, lock.token),
+    ]);
+  } catch (error) {
+    await releaseFileDeletion(db, lock).catch(() => {});
+    if (/malformed JSON/i.test(String(error))) return c.json({ success: false, error: '検査の状態が変わりました。一覧を読み直してください', current: null }, 409);
+    return c.json({ success: false, error: 'ファイルを消せませんでした。もう一度お試しください' }, 503);
+  }
   await recordAuditEvent(c.env.DB, {
     lineAccountId: accountId,
     category: 'business',
@@ -422,18 +480,7 @@ fileScan.get('/api/file-scans/config', requireRole('owner', 'admin'), async (c) 
   return c.json({
     success: true,
     data: {
-      config: config ? {
-        externalProvider: config.external_provider,
-        externalEndpointUrl: config.external_endpoint_url,
-        // 鍵そのものは返さない。名前だけ。
-        externalSecretRef: config.external_secret_ref,
-        // 許可境界だけを判定する。鍵の値や実在、通信の健康状態は返さない。
-        externalEnabled: resolveExternalScanner(c.env as unknown as Record<string, string | undefined>, config) !== null,
-        externalTimeoutMs: config.external_timeout_ms,
-        maxBytesOverride: config.max_bytes_override,
-        maxPixelsOverride: config.max_pixels_override,
-        updatedAt: config.updated_at,
-      } : null,
+      config: config ? serializeConfig(config, c.env) : null,
     },
   });
 });
@@ -447,9 +494,12 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
     externalTimeoutMs?: unknown;
     maxBytesOverride?: unknown;
     maxPixelsOverride?: unknown;
+    expectedConfirmationRevision?: unknown;
   }>().catch(() => null);
   const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
   if (!accountId) return inputError(c, { success: false, error: 'accountId が必要です' }, 400, ["accountId"]);
+  const expected = body?.expectedConfirmationRevision;
+  if (expected !== undefined && (!Number.isSafeInteger(expected) || Number(expected) < 1)) return c.json({ success: false, error: '確認した版が正しくありません' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
@@ -491,7 +541,9 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
   const auditHost = endpointHost && (endpointHost.length > 200 || /[A-Za-z0-9_-]{32,}|[0-9-]{6,}/.test(endpointHost))
     ? { endpointHostParts: [endpointHost.slice(0, 150).match(/.{1,3}/g)!, ...(endpointHost.length > 150 ? [endpointHost.slice(150).match(/.{1,3}/g)!] : [])] }
     : { endpointHost };
-  const statement = c.env.DB.prepare(
+  const args = [provider, endpoint, secretRef, Number.isSafeInteger(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000,
+    numOrNull(body?.maxBytesOverride), numOrNull(body?.maxPixelsOverride), c.get('staff')?.id ?? null, now];
+  const statement = expected === undefined ? c.env.DB.prepare(
     `INSERT INTO file_scan_configs
       (line_account_id, external_provider, external_endpoint_url, external_secret_ref,
        external_timeout_ms, max_bytes_override, max_pixels_override, updated_by, updated_at)
@@ -503,16 +555,16 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
        external_timeout_ms = excluded.external_timeout_ms,
        max_bytes_override = excluded.max_bytes_override,
        max_pixels_override = excluded.max_pixels_override,
+       confirmation_revision = file_scan_configs.confirmation_revision + 1,
        updated_by = excluded.updated_by,
        updated_at = excluded.updated_at`,
   ).bind(
-    accountId, provider, endpoint, secretRef,
-    Number.isSafeInteger(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000,
-    numOrNull(body?.maxBytesOverride), numOrNull(body?.maxPixelsOverride),
-    c.get('staff')?.id ?? null, now,
-  );
+    accountId, ...args,
+  ) : c.env.DB.prepare(`UPDATE file_scan_configs SET external_provider=?, external_endpoint_url=?, external_secret_ref=?,
+    external_timeout_ms=?, max_bytes_override=?, max_pixels_override=?, updated_by=?, updated_at=?,
+    confirmation_revision=confirmation_revision+1 WHERE line_account_id=? AND confirmation_revision=?`).bind(...args, accountId, expected);
   // 設定と監査を同じbatchで確定。宛先のパス・クエリ・鍵の値は記録しない。
-  await c.env.DB.batch([statement, auditEventStatement(c.env.DB, {
+  try { await c.env.DB.batch([statement, ...(expected === undefined ? [] : [c.env.DB.prepare("SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'FILE_SCAN_CONFIG_CONFLICT' END)")]), auditEventStatement(c.env.DB, {
     tenantId: c.get('staff')?.tenantId,
     lineAccountId: accountId,
     category: 'business',
@@ -524,7 +576,13 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
     result: 'success',
     after: auditHost,
     createdAt: now,
-  })]);
+  })]); } catch (error) {
+    if (expected !== undefined && /malformed JSON/i.test(String(error))) {
+      const current = await getFileScanConfig(c.env.DB, accountId);
+      return c.json({ success: false, error: '設定が変わりました。読み直してください', current: current ? serializeConfig(current, c.env) : null }, 409);
+    }
+    throw error;
+  }
   return c.json({ success: true, data: { lineAccountId: accountId } });
 });
 

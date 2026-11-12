@@ -19,7 +19,7 @@ export type RestaurantMembership = {
 }
 export type RestaurantStoreGroup = {
   id: string; organization_id: string; name: string;
-  members: Array<{ group_id: string; store_id: string; referral_enabled: 0 | 1; max_distance: number }>
+  members: Array<{ group_id: string; store_id: string; referral_enabled: 0 | 1; max_distance: number; version: number }>
 }
 export type RestaurantApproval = {
   id: string; store_id: string | null; kind: 'gbp_post' | 'line_message' | 'menu_change'; title: string;
@@ -35,12 +35,12 @@ export type RestaurantReservation = {
   customer_name: string; customer_phone: string | null; line_uid: string | null; guest_count: number;
   starts_at: string; ends_at: string; table_id: string | null; table_label: string | null;
   course_id: string | null; course_name: string | null; status: string; allergy_note: string | null; note: string | null;
-  hold_expires_at?: string | null; customer_version?: number; dining_snapshot_json?: string | null; table_ids_json?: string;
+  hold_expires_at?: string | null; customer_version?: number; confirmation_revision?: number; dining_snapshot_json?: string | null; table_ids_json?: string;
   sync_direction: 'inbound_only'
 }
 export type RestaurantTable = {
   id: string; store_id: string; code: string; label: string; seat_type: string; min_capacity: number;
-  max_capacity: number; floor_id?:string; floor_version?:number; floor_x: number; floor_y: number; join_group: string | null; is_active: number;
+  max_capacity: number; floor_id?:string; floor_version?:number; confirmation_revision?:number; floor_x: number; floor_y: number; join_group: string | null; is_active: number;
   shape?: 'rectangle'|'circle'|'long'|'counter'|'sofa'; width?:number; height?:number; rotation?:number;
   smoking_policy?:'non_smoking'|'smoking'|'heated_tobacco'; partition_type?:'open'|'semi_private'|'private'; shoes_allowed?:number;
   visible_on_map?:number; chair_arrangement?:'both'|'one'|'all'; chair_side?:'top'|'right'|'bottom'|'left'|null; seat_detail_type?:string|null
@@ -53,6 +53,7 @@ export type SeatVisitMark = {
 }
 export type SeatWaitlistEntry = {
   id: string; store_id: string; starts_at: string; guest_count: number; customer_name: string;
+  confirmation_revision?: number;
   status: 'waiting' | 'invited' | 'converted' | 'cancelled' | 'finished'; hold_minutes: number;
   table_id: string | null; table_label?: string | null;
   invited_at: string | null; hold_expires_at: string | null; notified_at: string | null; created_at: string
@@ -64,7 +65,7 @@ export type RestaurantInventory = {
 }
 export type RestaurantMenuItem = {
   id: string; store_id: string; kind: 'course' | 'a_la_carte'; name: string; price: number;
-  description?: string | null; image_media_id?: string | null;
+  description?: string | null; image_media_id?: string | null; confirmation_revision: number;
   tax_mode: string; allergens_json: string; service_periods_json: string; duration_minutes: number | null; status: string; pendingPrice?: number | null; pendingEffectiveAt?: string | null; priceChangeStatus?: string | null
 }
 export type RestaurantConnector = {
@@ -110,7 +111,7 @@ const withOptionalAccount = (path: string, accountId: string | null) =>
 
 export const restaurantTestApi = {
   storeGroups: (accountId: string) => fetchApi<{ success: true; data: RestaurantStoreGroup[] }>(withAccount('/api/restaurant-test/store-groups', accountId)),
-  updateStoreGroupMember: (accountId: string, groupId: string, storeId: string, body: { referralEnabled: boolean; maxDistance: number }) => fetchApi<{ success: true; data: { updated: true } }>(withAccount(`/api/restaurant-test/store-groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(storeId)}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
+  updateStoreGroupMember: (accountId: string, groupId: string, storeId: string, body: { referralEnabled: boolean; maxDistance: number; expectedVersion?: number }) => fetchApi<{ success: true; data: { updated: true } }>(withAccount(`/api/restaurant-test/store-groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(storeId)}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
   closures: (accountId:string,storeId:string,month?:string)=>fetchApi<{success:true;data:RestaurantClosure[]}>(withAccount(`/api/restaurant-test/closures?${new URLSearchParams({storeId,...(month?{month}:{})})}`,accountId)),
   closureContactStatus:(accountId:string,id:string)=>fetchApi<{success:true;data:RestaurantClosurePreview}>(withAccount(`/api/restaurant-test/closures/${encodeURIComponent(id)}/contact-status`,accountId)),
   previewClosure: (accountId:string,body:RestaurantClosureInput & {excludeId?:string})=>fetchApi<{success:true;data:RestaurantClosurePreview}>(withAccount('/api/restaurant-test/closures/preview',accountId),{method:'POST',body:JSON.stringify(body)}),
@@ -168,6 +169,7 @@ export const restaurantTestApi = {
   decideApproval: (accountId: string, id: string, action: 'approve' | 'return', comment?: string) => fetchApi<{ success: true; data: RestaurantApprovalDecision }>(withAccount(`/api/restaurant-test/approvals/${id}`, accountId), { method: 'PATCH', body: JSON.stringify({ action, comment }) }),
   createReservation: (accountId: string, body: Record<string, unknown>) => fetchApi<{ success: true; data: { id: string; tableId: string | null; lineNotice: { sent: boolean; reason: string | null } } }>(withAccount('/api/restaurant-test/reservations/manual', accountId), { method: 'POST', body: JSON.stringify(body) }),
   updateReservation: (accountId: string, id: string, body: Record<string, unknown>) => fetchApi(withAccount(`/api/restaurant-test/reservations/${id}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
+  stopTable: (accountId: string, id: string, body: { storeId: string; expectedTableRevision: number; asOf: string; reservations: Array<{ id: string; expectedRevision: number; targetTableId: string | null }> }) => fetchApi(withAccount(`/api/restaurant-test/tables/${id}/stop`, accountId), { method: 'POST', body: JSON.stringify(body) }),
   attendance:(accountId:string,id:string,body:{action:'visited'|'depart'|'undo_departure'|'undo_visit'|'no_show';expectedVersion:number;requestId:string})=>fetchApi<{success:true;data:{stamp:{status:string;count:number}}}>(withAccount(`/api/restaurant-test/reservations/${encodeURIComponent(id)}/attendance`,accountId),{method:'POST',body:JSON.stringify(body)}),
   rotation:(accountId:string,storeId:string,date:string)=>fetchApi<{success:true;data:RestaurantRotation}>(withAccount(`/api/restaurant-test/rotation?storeId=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`,accountId)),
   /** 席の来店の印（booking-plus 6 の席対応）。 */
@@ -192,9 +194,9 @@ export const restaurantTestApi = {
     )
   },
   /** 席の空き待ちを取り消す。 */
-  cancelSeatWaitlist: (accountId: string, id: string) =>
+  cancelSeatWaitlist: (accountId: string, id: string, expectedConfirmationRevision?: number) =>
     fetchApi<{ success: true; data: { status: string } }>(
-      withAccount(`/api/restaurant-test/seat-waitlist/${id}`, accountId),
+      withAccount(`/api/restaurant-test/seat-waitlist/${id}${expectedConfirmationRevision === undefined ? '' : `?expectedConfirmationRevision=${expectedConfirmationRevision}`}`, accountId),
       { method: 'DELETE' },
     ),
   importReservation: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/inbound/reservations', accountId), { method: 'POST', body: JSON.stringify(body) }),

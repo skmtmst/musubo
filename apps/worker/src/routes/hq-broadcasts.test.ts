@@ -302,3 +302,106 @@ it('UNS-19: send-previewは外へ照会せず、統括の合計と店ごとの�
  const data=(await response.json() as any).data;
  expect(data.recipients).toBe(1);expect(data.perAccount.reduce((n:number,p:any)=>n+p.recipients,0)).toBe(data.recipients);expect(data.needsApproval).toBe(false);expect(fetch).not.toHaveBeenCalled();
 });
+
+it('統括テスト送信は確認後に宛先のLINE連携先が変われば409で誰にも送らない',async()=>{
+ f.raw.exec(`INSERT INTO account_settings(line_account_id,key,value) VALUES('shop','test_recipients','["friend"]')`);
+ const run=await made({messageBubbles:[{id:'one',type:'text',content:{text:'本文'}}]});
+ const preview=await call('/api/hq/broadcasts/test-recipients?accountId=shop');expect(preview.status).toBe(200);
+ const before=(await preview.json() as any).data;expect(before.count).toBe(1);expect(before.token).toEqual(expect.any(String));
+ f.raw.exec("UPDATE friends SET line_user_id='U-changed' WHERE id='friend'");vi.mocked(fetch).mockClear();
+ const response=await call(`/api/hq/broadcasts/${run.id}/test-send`,'POST',{accountId:'shop',expectedRecipientToken:before.token});
+ expect(response.status).toBe(409);expect(await response.json()).toMatchObject({code:'HQ_TEST_RECIPIENT_CHANGED',data:{count:1}});
+ expect(vi.mocked(fetch).mock.calls.filter(([u])=>String(u).endsWith('/message/push'))).toHaveLength(0);
+ expect((f.raw.prepare("SELECT COUNT(*) n FROM messages_log WHERE delivery_type='test'").get() as any).n).toBe(0);
+});
+
+it('テスト送信直前に宛先が変わっても新旧どちらにも送らない',async()=>{
+ f.raw.exec(`INSERT INTO account_settings(line_account_id,key,value) VALUES('shop','test_recipients','["friend"]')`);
+ const run=await made({messageBubbles:[{id:'one',type:'text',content:{text:'本文'}}]});
+ const before=(await (await call('/api/hq/broadcasts/test-recipients?accountId=shop')).json() as any).data;
+ const prepare=f.db.prepare.bind(f.db);let reads=0;
+ const spy=vi.spyOn(f.db,'prepare').mockImplementation(sql=>{
+  if(sql.includes("key='test_recipients'")&&++reads===2)f.raw.exec("UPDATE friends SET line_user_id='U-changed' WHERE id='friend'");
+  return prepare(sql);
+ });
+ try{
+  vi.mocked(fetch).mockClear();const response=await call(`/api/hq/broadcasts/${run.id}/test-send`,'POST',{accountId:'shop',expectedRecipientToken:before.token});
+  expect(reads).toBe(2);expect(response.status).toBe(409);
+  expect(vi.mocked(fetch).mock.calls.filter(([u])=>String(u).endsWith('/message/push'))).toHaveLength(0);
+ }finally{spy.mockRestore();}
+});
+
+it('同じテスト宛先なら確認情報つきでも1回送り、旧呼び出しも受け付ける',async()=>{
+ f.raw.exec(`INSERT INTO account_settings(line_account_id,key,value) VALUES('shop','test_recipients','["friend"]')`);
+ const run=await made({messageBubbles:[{id:'one',type:'text',content:{text:'本文'}}]});
+ const before=(await (await call('/api/hq/broadcasts/test-recipients?accountId=shop')).json() as any).data;
+ vi.mocked(fetch).mockClear();expect((await call(`/api/hq/broadcasts/${run.id}/test-send`,'POST',{accountId:'shop',expectedRecipientToken:before.token})).status).toBe(200);
+ expect(vi.mocked(fetch).mock.calls.filter(([u])=>String(u).endsWith('/message/push'))).toHaveLength(1);
+ f.raw.exec("DELETE FROM hq_broadcast_audit WHERE action='test_send'");vi.mocked(fetch).mockClear();
+ expect((await call(`/api/hq/broadcasts/${run.id}/test-send`,'POST',{accountId:'shop'})).status).toBe(200);
+ expect(vi.mocked(fetch).mock.calls.filter(([u])=>String(u).endsWith('/message/push'))).toHaveLength(1);
+});
+
+it('統括配信は人数が同じでも確認後に対象者が入れ替わったら送らず409を返す',async()=>{
+ const run=await made();
+ const preview=await call(`/api/hq/broadcasts/${run.id}/send-preview`);expect(preview.status).toBe(200);
+ const data=(await preview.json() as any).data;
+ expect(data.perAccount[0].recipientToken).toEqual(expect.any(String));
+ f.raw.exec("UPDATE friends SET is_following=0 WHERE id='friend'; INSERT INTO friends(id,line_user_id,line_account_id) VALUES('other','U-other','shop')");vi.mocked(fetch).mockClear();
+ const confirmedAudiences=data.perAccount.map((p:any)=>({accountId:p.accountId,recipientCount:p.recipients,recipientToken:p.recipientToken}));
+ const response=await call(`/api/hq/broadcasts/${run.id}/send`,'POST',{expectedVersion:run.version,confirmedAudiences},true);
+ expect(response.status).toBe(409);
+ expect((await response.json() as any).data.count).toBe(1);
+ expect(f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get()).toEqual({n:0});
+ expect(vi.mocked(fetch).mock.calls.filter(([u])=>/\/message\/(push|multicast|broadcast)$/.test(String(u)))).toHaveLength(0);
+});
+
+it('統括配信の受付直前に対象者が変わっても一店舗も配信を作らない',async()=>{
+ const run=await made();const preview=(await (await call(`/api/hq/broadcasts/${run.id}/send-preview`)).json() as any).data;
+ const confirmedAudiences=preview.perAccount.map((p:any)=>({accountId:p.accountId,recipientCount:p.recipients,recipientToken:p.recipientToken}));
+ const batch=f.db.batch.bind(f.db);let injected=false;
+ const spy=vi.spyOn(f.db,'batch').mockImplementation(async statements=>{
+  if(!injected){injected=true;f.raw.exec("UPDATE friends SET is_following=0 WHERE id='friend'; INSERT INTO friends(id,line_user_id,line_account_id) VALUES('other','U-other','shop')");}
+  return batch(statements);
+ });
+ try{
+  const response=await call(`/api/hq/broadcasts/${run.id}/send`,'POST',{expectedVersion:run.version,confirmedAudiences},true);
+  expect(injected).toBe(true);expect(response.status).toBe(409);
+  expect((await response.json() as any).data.count).toBe(1);
+  expect(f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get()).toEqual({n:0});
+  expect(f.raw.prepare('SELECT status,version FROM hq_broadcast_runs WHERE id=?').get(run.id)).toEqual({status:'prepared',version:run.version});
+ }finally{spy.mockRestore()}
+});
+
+it('統括配信の受付直前に対象が増えたら確認した人数のまま処理を始めない',async()=>{
+ const run=await made();const preview=(await (await call(`/api/hq/broadcasts/${run.id}/send-preview`)).json() as any).data;
+ const confirmedAudiences=preview.perAccount.map((p:any)=>({accountId:p.accountId,recipientCount:p.recipients,recipientToken:p.recipientToken}));
+ const batch=f.db.batch.bind(f.db);let injected=false;
+ const spy=vi.spyOn(f.db,'batch').mockImplementation(async statements=>{if(!injected){injected=true;f.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('late','U-late','shop')");}return batch(statements)});
+ try{
+  const response=await call(`/api/hq/broadcasts/${run.id}/send`,'POST',{expectedVersion:run.version,confirmedAudiences},true);
+  expect(injected).toBe(true);expect(response.status).toBe(409);expect((await response.json() as any).data.count).toBe(2);
+  expect(f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get()).toEqual({n:0});
+ }finally{spy.mockRestore()}
+});
+
+it('統括配信の受付直前に同じ友だちのLINE宛先が変わっても409で受け付けない',async()=>{
+ const run=await made();const preview=(await (await call(`/api/hq/broadcasts/${run.id}/send-preview`)).json() as any).data;
+ const confirmedAudiences=preview.perAccount.map((p:any)=>({accountId:p.accountId,recipientCount:p.recipients,recipientToken:p.recipientToken}));
+ const batch=f.db.batch.bind(f.db);let injected=false;
+ const spy=vi.spyOn(f.db,'batch').mockImplementation(async statements=>{if(!injected){injected=true;f.raw.exec("UPDATE friends SET line_user_id='U-changed' WHERE id='friend'");}return batch(statements)});
+ try{
+  const response=await call(`/api/hq/broadcasts/${run.id}/send`,'POST',{expectedVersion:run.version,confirmedAudiences},true);
+  expect(injected).toBe(true);expect(response.status).toBe(409);expect(f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get()).toEqual({n:0});
+ }finally{spy.mockRestore()}
+});
+
+it('送信受付済みの古い確認は409を返し、従来の再呼出しは受け付ける',async()=>{
+ const run=await made();const preview=(await (await call(`/api/hq/broadcasts/${run.id}/send-preview`)).json() as any).data;
+ const confirmedAudiences=preview.perAccount.map((p:any)=>({accountId:p.accountId,recipientCount:p.recipients,recipientToken:p.recipientToken}));
+ expect((await call(`/api/hq/broadcasts/${run.id}/send`,'POST',{expectedVersion:run.version},true)).status).toBe(200);
+ const stale=await call(`/api/hq/broadcasts/${run.id}/send`,'POST',{expectedVersion:run.version,confirmedAudiences},true);
+ expect(stale.status).toBe(409);expect((await stale.json() as any).data.count).toBe(1);
+ expect((await call(`/api/hq/broadcasts/${run.id}/send`,'POST',{expectedVersion:run.version},true)).status).toBe(200);
+ expect(f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get()).toEqual({n:1});
+});

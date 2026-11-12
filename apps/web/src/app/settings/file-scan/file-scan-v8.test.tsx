@@ -58,7 +58,7 @@ const scanOf = (overrides: Partial<FileScanItem> = {}): FileScanItem => ({
   status: 'quarantined',
   reasonCode: 'pdf_active_content',
   reasonLabel: '危険な仕掛けが見つかりました',
-  uploaderLabel: '川野',
+  uploaderLabel: '見本',
   attempts: 0,
   nextRetryAt: null,
   scannedAt: '2026-09-25T10:00:00+09:00',

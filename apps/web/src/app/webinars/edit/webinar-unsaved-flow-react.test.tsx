@@ -29,7 +29,7 @@ const fixture = vi.hoisted(() => ({
 }))
 
 const net = vi.hoisted(() => ({
-  calls: [] as Array<{ path: string; method: string }>,
+  calls: [] as Array<{ path: string; method: string; body?: string }>,
   /** PUT /api/webinars/:id を失敗させる。 */
   updateFail: false,
   /** user-comments を 500 にする。 */
@@ -129,7 +129,7 @@ function installFetch() {
     const url = new URL(raw.startsWith('http') ? raw : `https://test.local${raw}`)
     const path = url.pathname + url.search
     const method = init?.method ?? 'GET'
-    net.calls.push({ path, method })
+    net.calls.push({ path, method, ...(typeof init?.body === 'string' ? { body: init.body } : {}) })
     if (path === '/api/staff/me') return json({ role: 'admin' })
     if (path.includes('/api/media')) return json({ items: [], nextCursor: null })
     if (path.includes('/api/webinars/webinar-1/participants')) {
@@ -150,7 +150,9 @@ function installFetch() {
     }
     if (path.endsWith('/api/webinars/webinar-1/notifications')) return json({ settings: { webinarId: 'webinar-1', version: 3, registrationEnabled: method === 'PUT', dayBeforeEnabled: false, dayBeforeTime: '18:00', hourBeforeEnabled: false, hourBeforeMinutes: 60, startEnabled: false, missedEnabled: false, missedTime: '20:00', completedEnabled: false, updatedAt: '2026-10-01T00:00:00Z' }, overview: null })
     if (path.endsWith('/api/webinars/webinar-1/actions')) return json([])
-    if (path.endsWith('/api/webinars/webinar-1/notifications/test')) return json({ sent: 2, failed: 0 })
+    if (path.endsWith('/api/webinars/webinar-1/notifications/test')) return method === 'GET'
+      ? json({ count: 1, recipients: [{ id: 'f1', displayName: '確認の人' }], token: 'a'.repeat(64), confirmationId: '00000000-0000-4000-8000-000000000001' })
+      : json({ sent: 2, failed: 0 })
     if (path.endsWith('/api/webinars/webinar-1/publish-validation')) {
       return json({ version: 3, checks: [], blockers: [], warnings: [] })
     }
@@ -500,12 +502,15 @@ describe('DETAIL-05 無反応のボタンを残さない', () => {
     await act(async () => { buttonByText('テストを送る').click() })
     await flush()
     /* 送信前に相手と文面を確認する。押した瞬間に送らない。 */
+    expect(document.body.textContent).toContain('確認の人')
+    expect(net.calls.some((call) => call.method === 'POST' && call.path.endsWith('/notifications/test'))).toBe(false)
     const confirm = (Array.from(host.querySelectorAll('[role="dialog"] button')).find((b) => b.textContent?.trim() === 'テストを送る') ?? querySupplementaryPageAction('テストを送る')) as HTMLButtonElement | undefined
     expect(confirm).toBeDefined()
     await act(async () => { confirm!.click() })
     await flush()
 
     expect(net.calls.some((call) => call.method === 'POST' && call.path.endsWith('/notifications/test'))).toBe(true)
+    expect(JSON.parse(net.calls.find(call => call.method === 'POST' && call.path.endsWith('/notifications/test'))!.body!)).toMatchObject({ expectedRecipientToken: 'a'.repeat(64), confirmationId: '00000000-0000-4000-8000-000000000001' })
     expect(host.textContent).toContain('テスト送信しました。成功 2 件・失敗 0 件')
   })
 

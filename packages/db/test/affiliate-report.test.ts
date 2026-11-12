@@ -740,7 +740,9 @@ describe('report confirmedReward — 承認時の版を確定額に使う', () =
     // 判定できない。ここだけ変更件数を返す包みを使う。
     db = {
       prepare(query: string) {
+        const all = async <T>() => ({ results: sqlite.prepare(query).all() as T[], success: true, meta: {} });
         return {
+          all,
           bind(...params: unknown[]) {
             const stmt = sqlite.prepare(query);
             return {

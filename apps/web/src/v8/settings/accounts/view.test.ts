@@ -38,3 +38,9 @@ describe('★V8 LINEアカウント一覧（V7vn3）の数と並び', () => {
 it('接続の問題はWebhookの補足でなく保存したconnectionを使う', () => {
   expect(accountKpis([account('warning', { connection: { status: 'warn' } }), account('unknown'), account('old-hook', { connection: { status: 'ok' }, webhook: { status: 'mismatched' } as LineAccount['webhook'] })]).problem).toBe(1)
 })
+
+it('友だちの合計は不明な店があれば不明、全店0なら0。保管済みの不明は含めない', () => {
+  expect(accountKpis([account('unknown', { stats: undefined }), account('zero')]).friends).toBeNull()
+  expect(accountKpis([account('zero')]).friends).toBe(0)
+  expect(accountKpis([account('zero'), account('old', { archivedAt: '2026-01-01', stats: undefined })]).friends).toBe(0)
+})

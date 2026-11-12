@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useTestRecipients } from './use-test-recipients'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
@@ -42,6 +43,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testConfirm, setTestConfirm] = useState(false)
+  const testRecipients = useTestRecipients(webinar.id, testConfirm)
   const [testResult, setTestResult] = useState('')
   const lock = useRef(false)
   const folderRequest = useRef(0)
@@ -143,12 +145,13 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
   }, [registerSave, readOnly])
 
   const runTest = async () => {
-    if (testing || readOnly || lock.current) return
+    if (testing || readOnly || lock.current || !testConfirm || !testRecipients.preview) return
     setTesting(true)
     setTestResult('')
     try {
       if (dirty && !(await save())) return
-      const response = await webinarApi.testNotifications(webinar.id)
+      if (!testRecipients.isCurrent() || !testRecipients.preview) return
+      const response = await webinarApi.testNotifications(webinar.id, testRecipients.preview.token, testRecipients.preview.confirmationId)
       setTestResult(`通知テスト：成功 ${formatNumber(response.data.sent)} 件・失敗 ${formatNumber(response.data.failed)} 件`)
       setTestConfirm(false)
     } catch (cause) {
@@ -202,12 +205,14 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
         title="通知をテスト送信しますか？"
         description="登録したテスト受信者へ、有効な通知の本文をLINEで送ります。申込者全員には届きません。"
         confirmLabel="テストを送る"
+        confirmDisabled={!testRecipients.preview || testRecipients.preview.count === 0}
         busy={saving || testing}
         error={error || undefined}
         onCancel={() => { if (!saving && !testing) setTestConfirm(false) }}
         onConfirm={() => runTest()}
       >
         <OperationTargetSummary accounts={[{ id: webinar.accountId ?? '' }]} />
+        <p>{testRecipients.preview ? `テスト受信者 ${testRecipients.preview.count} 人：${testRecipients.preview.recipients.map(person => person.displayName || '名前未設定').join('、')}` : testRecipients.error ? 'テスト受信者を確認できません。設定を確かめて開き直してください。' : 'テスト受信者を確認しています。'}</p>
         {dirty ? <p className={styles.cardNote}>変えた基本設定を保存してから送ります。</p> : null}
       </ConfirmDialog>
     </CreatePage></SaveErrorScope>

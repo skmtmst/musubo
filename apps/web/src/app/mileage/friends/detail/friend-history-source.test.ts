@@ -14,7 +14,7 @@ function adminItem(overrides: Partial<MileageAdminHistoryItem> = {}): MileageAdm
   return {
     id: 'ledger-1',
     primaryFriendId: 'friend-1',
-    displayName: '田中 太郎',
+    displayName: '見本 167',
     pictureUrl: null,
     entryType: 'grant',
     status: 'available',

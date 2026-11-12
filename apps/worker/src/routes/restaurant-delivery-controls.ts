@@ -9,10 +9,10 @@ import type { AuditAction } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';
 import { fail } from './restaurant-google.js';
 import type { StoreContext } from './restaurant-google.js';
-import { DELIVERY_SERVICES, DELIVERY_SERVICE_LABELS, isDeliveryService, isIntakeStopPreset, intakeStopUntil, nowSec } from '../services/restaurant-delivery.js';
+import { DELIVERY_SERVICES, DELIVERY_SERVICE_LABELS, isDeliveryService, isIntakeStopPreset, deliveryTargetFingerprint, intakeStopUntil, nowSec } from '../services/restaurant-delivery.js';
 import type { DeliveryAction, DeliveryDispatchResult } from '../services/restaurant-delivery.js';
 import type { DeliveryService } from '../services/delivery-service-types.js';
-import { upsertIntake, INTAKE_STOP_CONFIRM_TOKEN, isoOrNull, deliveryStore, sendWithLedger } from './restaurant-delivery-common.js';
+import { upsertIntake, INTAKE_STOP_CONFIRM_TOKEN, isoOrNull, deliveryStore, sendWithLedger, serviceStates, menuTargetFingerprint } from './restaurant-delivery-common.js';
 
 export function registerDeliveryControls(restaurantDelivery: Hono<Env>): void {
   // ---------- D-5 `h7OeT` 商品と品切れ一括 ----------
@@ -76,10 +76,12 @@ export function registerDeliveryControls(restaurantDelivery: Hono<Env>): void {
       return c.json({
         success: true,
         store: { id: store.id, name: store.name },
-        items: rows.map((row) => {
+        items: await Promise.all(rows.map(async (row) => {
           const ids = externalItemIds(row);
           return {
             id: row.id,
+            version: row.version,
+            target: await menuTargetFingerprint(c.env, row.external_item_ids_json),
             name: row.name,
             category: row.category,
             price: row.price,
@@ -91,7 +93,7 @@ export function registerDeliveryControls(restaurantDelivery: Hono<Env>): void {
               label: DELIVERY_SERVICE_LABELS[service],
             })),
           };
-        }),
+        })),
       });
     },
   );
@@ -107,8 +109,8 @@ export function registerDeliveryControls(restaurantDelivery: Hono<Env>): void {
       const store = await deliveryStore(c);
       if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
       const body = await c.req
-        .json<{ item_ids?: unknown; sold_out?: unknown }>()
-        .catch(() => ({}) as { item_ids?: unknown; sold_out?: unknown });
+        .json<{ item_ids?: unknown; sold_out?: unknown; expectedStoreId?: unknown; expectedItems?: unknown }>()
+        .catch(() => ({}) as { item_ids?: unknown; sold_out?: unknown; expectedStoreId?: unknown; expectedItems?: unknown });
       const requestedIds = Array.isArray(body.item_ids)
         ? body.item_ids.filter((value): value is string => typeof value === 'string' && !!value.trim())
         : [];
@@ -119,7 +121,16 @@ export function registerDeliveryControls(restaurantDelivery: Hono<Env>): void {
       }
       const soldOut = body.sold_out;
       const rows = await menuItemsFor(c, store, requestedIds);
+      if (rows.length === 0 && body.expectedItems !== undefined) return fail(c, 409, '商品が変わりました。画面を読み直してください', { code: 'STALE_MENU', storeId: store.id, items: [] });
       if (rows.length === 0) return fail(c, 404, '対象の商品が見つかりません');
+      let expected: Array<{ id: string; version: number; target: string }> | null = null;
+      if (body.expectedItems !== undefined) {
+        if (typeof body.expectedStoreId !== 'string' || !Array.isArray(body.expectedItems) || body.expectedItems.length !== requestedIds.length || body.expectedItems.some((item: any) => !item || typeof item.id !== 'string' || !Number.isSafeInteger(item.version) || item.version < 1 || typeof item.target !== 'string')) return fail(c, 400, '確認した商品を読み直してください');
+        expected = body.expectedItems as Array<{ id: string; version: number; target: string }>;
+        if (new Set(requestedIds).size !== requestedIds.length || new Set(expected.map((item) => item.id)).size !== requestedIds.length || requestedIds.some((id) => !expected?.some((item) => item.id === id))) return fail(c, 400, '確認した商品を読み直してください');
+        const current = await Promise.all(rows.map(async (row) => ({ id: row.id, name: row.name, soldOut: row.sold_out === 1, services: DELIVERY_SERVICES.filter((service) => externalItemIds(row)[service]), version: row.version, target: await menuTargetFingerprint(c.env, row.external_item_ids_json) })));
+        if (body.expectedStoreId !== store.id || current.length !== expected.length || current.some((entry) => !expected?.some((item) => item.id === entry.id && item.version === entry.version && item.target === entry.target))) return fail(c, 409, '商品が変わりました。画面を読み直してください', { code: 'STALE_MENU', storeId: store.id, items: current });
+      }
 
       const now = nowSec();
       const action: DeliveryAction = soldOut ? 'menu_sold_out' : 'menu_resume';
@@ -144,11 +155,17 @@ export function registerDeliveryControls(restaurantDelivery: Hono<Env>): void {
             action,
             targetKind: 'menu_item',
             targetId: row.id,
+            expectedMenu: expected?.find((item) => item.id === row.id),
             externalId: ids[service] ?? null,
             body: { sold_out: soldOut },
             now,
           });
           if (!result.ok) {
+            if (expected && result.error.code === 'delivery_menu_conflict') {
+              const latest = await menuItemsFor(c, store, requestedIds);
+              const current = await Promise.all(latest.map(async (item) => ({ id: item.id, name: item.name, soldOut: item.sold_out === 1, services: DELIVERY_SERVICES.filter((service) => externalItemIds(item)[service]), version: item.version, target: await menuTargetFingerprint(c.env, item.external_item_ids_json) })));
+              return fail(c, 409, '商品が変わりました。一部は反映済みの可能性があります。画面を読み直してください', { code: 'STALE_MENU', storeId: store.id, items: current, updated });
+            }
             firstError = result;
             break;
           }
@@ -162,14 +179,19 @@ export function registerDeliveryControls(restaurantDelivery: Hono<Env>): void {
           });
           continue;
         }
-        await dbFor(c.env, store.id)
+        const written = await dbFor(c.env, store.id)
           .prepare(
             `UPDATE rt_delivery_menu_items
               SET sold_out = ?, sold_out_at = ?, version = version + 1, updated_at = ?
-            WHERE id = ? AND store_id = ?`,
+            WHERE id = ? AND store_id = ? AND (? IS NULL OR version = ?)`,
           )
-          .bind(soldOut ? 1 : 0, soldOut ? now : null, now, row.id, store.id)
+          .bind(soldOut ? 1 : 0, soldOut ? now : null, now, row.id, store.id, expected ? row.version : null, expected ? row.version : null)
           .run();
+        if (expected && (written.meta?.changes ?? 0) !== 1) {
+          const latest = await menuItemsFor(c, store, requestedIds);
+          const current = await Promise.all(latest.map(async (item) => ({ id: item.id, name: item.name, soldOut: item.sold_out === 1, services: DELIVERY_SERVICES.filter((service) => externalItemIds(item)[service]), version: item.version, target: await menuTargetFingerprint(c.env, item.external_item_ids_json) })));
+          return fail(c, 409, '商品が変わりました。一部は反映済みの可能性があります。画面を読み直してください', { code: 'STALE_MENU', storeId: store.id, items: current, updated });
+        }
         updated.push(row.id);
       }
 
@@ -218,13 +240,22 @@ export function registerDeliveryControls(restaurantDelivery: Hono<Env>): void {
       const store = await deliveryStore(c);
       if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
       const body = await c.req
-        .json<{ services?: unknown; preset?: unknown }>()
-        .catch(() => ({}) as { services?: unknown; preset?: unknown });
+        .json<{ services?: unknown; preset?: unknown; expectedStoreId?: unknown; expectedStates?: unknown }>()
+        .catch(() => ({}) as { services?: unknown; preset?: unknown; expectedStoreId?: unknown; expectedStates?: unknown });
       if (!isIntakeStopPreset(body.preset)) {
         return fail(c, 400, '停止する長さを選んでください');
       }
       const services = targetServices(body.services);
       if (!services) return fail(c, 400, '対象のサービスが選べていません');
+      let expected: Array<{ service: DeliveryService; version: number; target: string }> | null = null;
+      if (body.expectedStates !== undefined) {
+        if (typeof body.expectedStoreId !== 'string' || !Array.isArray(body.expectedStates) || body.expectedStates.length !== services.length || body.expectedStates.some((entry: any) => !entry || !isDeliveryService(entry.service) || !Number.isSafeInteger(entry.version) || entry.version < 0 || typeof entry.target !== 'string')) return fail(c, 400, '確認したサービスを読み直してください');
+        expected = body.expectedStates as Array<{ service: DeliveryService; version: number; target: string }>;
+        if (!expected || new Set(expected.map((entry) => entry.service)).size !== services.length || services.some((service) => !expected?.some((entry) => entry.service === service))) return fail(c, 400, '確認したサービスを読み直してください');
+        const states = await serviceStates(c, store);
+        const current = await Promise.all(services.map(async (service) => ({ service, version: states.find((state) => state.service === service)?.version ?? 0, intakeStatus: states.find((state) => state.service === service)?.intake_status ?? 'open', connectionStatus: states.find((state) => state.service === service)?.connection_status ?? 'disconnected', target: await deliveryTargetFingerprint(c.env, service) })));
+        if (body.expectedStoreId !== store.id || current.some((entry) => !expected?.some((item) => item.service === entry.service && item.version === entry.version && item.target === entry.target))) return fail(c, 409, '対象の状態が変わりました。画面を読み直してください', { code: 'STALE_INTAKE', storeId: store.id, states: current });
+      }
 
       const now = nowSec();
       const stopUntil = intakeStopUntil(body.preset, now);
@@ -236,10 +267,16 @@ export function registerDeliveryControls(restaurantDelivery: Hono<Env>): void {
           action: 'intake_stop',
           targetKind: 'service',
           targetId: service,
+          expectedIntake: expected?.find((entry) => entry.service === service),
           body: { stop_until: stopUntil },
           now,
         });
         if (!result.ok) {
+          if (expected && result.error.code === 'delivery_intake_conflict') {
+            const states = await serviceStates(c, store);
+            const current = await Promise.all(services.map(async (item) => ({ service: item, version: states.find((state) => state.service === item)?.version ?? 0, intakeStatus: states.find((state) => state.service === item)?.intake_status ?? 'open', connectionStatus: states.find((state) => state.service === item)?.connection_status ?? 'disconnected', target: await deliveryTargetFingerprint(c.env, item) })));
+            return fail(c, 409, '対象の状態が変わりました。一部は停止済みの可能性があります。画面を読み直してください', { code: 'STALE_INTAKE', storeId: store.id, states: current, stopped });
+          }
           failed.push({
             service,
             code: result.error.code,
@@ -247,12 +284,18 @@ export function registerDeliveryControls(restaurantDelivery: Hono<Env>): void {
           });
           continue;
         }
-        await upsertIntake(c, store, service, {
+        const written = await upsertIntake(c, store, service, {
           intake: 'stopped',
           stopUntil,
           requestedBy: c.get('staff')?.id ?? 'unknown',
           now,
+          expectedVersion: expected?.find((entry) => entry.service === service)?.version,
         });
+        if (expected && written !== true) {
+          const states = await serviceStates(c, store);
+          const current = await Promise.all(services.map(async (item) => ({ service: item, version: states.find((state) => state.service === item)?.version ?? 0, intakeStatus: states.find((state) => state.service === item)?.intake_status ?? 'open', connectionStatus: states.find((state) => state.service === item)?.connection_status ?? 'disconnected', target: await deliveryTargetFingerprint(c.env, item) })));
+          return fail(c, 409, '受付状態が変わりました。一部は停止済みの可能性があります。画面を読み直してください', { code: 'STALE_INTAKE', storeId: store.id, states: current, stopped });
+        }
         stopped.push(service);
       }
 

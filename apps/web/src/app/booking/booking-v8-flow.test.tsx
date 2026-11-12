@@ -230,7 +230,7 @@ describe('V8 予約の通し：受ける→取り消す', () => {
     fireEvent.click(await screen.findByRole('button', { name: '承認する' }))
     const dialog = await screen.findByRole('dialog')
     expect(dialog.textContent).toContain('「承認」')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '戻る' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(decideRequest).not.toHaveBeenCalled()
 

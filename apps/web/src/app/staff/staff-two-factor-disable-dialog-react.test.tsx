@@ -50,13 +50,13 @@ function accessUser(overrides: Record<string, unknown>) {
 const state = {
   members: [
     member({}),
-    member({ id: 'yamada', name: '山田 太郎', email: 'yamada@mail.test', role: 'staff' }),
-    member({ id: 'sato', name: '佐藤 花子', email: 'x-sato@mail.test', role: 'staff' }),
+    member({ id: 'yamada', name: '見本 141', email: 'yamada@mail.test', role: 'staff' }),
+    member({ id: 'sato', name: '見本 122', email: 'x-sato@mail.test', role: 'staff' }),
   ],
   users: [
     accessUser({}),
-    accessUser({ id: 'yamada', name: '山田 太郎', email: 'yamada@mail.test', roleBundle: 'operations', featureCount: 3 }),
-    accessUser({ id: 'sato', name: '佐藤 花子', email: 'x-sato@mail.test', roleBundle: 'view_only', featureCount: 2 }),
+    accessUser({ id: 'yamada', name: '見本 141', email: 'yamada@mail.test', roleBundle: 'operations', featureCount: 3 }),
+    accessUser({ id: 'sato', name: '見本 122', email: 'x-sato@mail.test', roleBundle: 'view_only', featureCount: 2 }),
   ],
 }
 

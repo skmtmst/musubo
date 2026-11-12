@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { buildTemplatePreview } from '../../components/templates/template-preview-model'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readUiSource(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
@@ -53,7 +54,7 @@ describe('V8の作成画面', () => {
     expect(MESSAGE_EDITOR).toContain('本文に入れたURLの扱い')
     // : 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(MESSAGE_EDITOR).toContain('<LinePreview')
-    expect(MESSAGE_EDITOR).toContain("if (name === 'name') return '山田 太郎'")
+    expect(buildTemplatePreview('{{name}}', { friendFields: [], commonVars: [] }).content).toBe('見本 141')
     expect(MESSAGE_EDITOR).toContain('preview.unresolved.length > 0')
     expect(EDIT_PAGE).not.toContain('内容 / JSON')
   })

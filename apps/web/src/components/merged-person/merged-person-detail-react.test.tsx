@@ -19,6 +19,7 @@ vi.hoisted(() => {
 const calls = vi.hoisted(() => ({
   get: vi.fn(),
   unlink: vi.fn(),
+  selectedAccountId: 'account-a',
 }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -41,6 +42,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 const { ApiError } = await import('@/lib/api')
 import MergedPersonDetailView from './merged-person-detail-v8'
 import MergedPersonV8 from '@/v8/friends/merged/person'
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: calls.selectedAccountId }) }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/friends' }))
@@ -51,10 +53,10 @@ function personFixture(revision: number, linked: boolean) {
   return {
     success: true,
     data: {
-      id: 'user-a', status: 'active', revision, primaryDisplayName: '田中 花子',
+      id: 'user-a', status: 'active', revision, primaryDisplayName: '見本 171',
       linkedFriends: linked
         ? [{
-          friendId: 'friend-a', displayName: '田中 花子', lineAccountId: 'account-a',
+          friendId: 'friend-a', displayName: '見本 171', lineAccountId: 'account-a',
           lineAccountName: '本店', isFollowing: true, linkedAt: '2026-08-30T09:00:00.000Z',
           linkMethod: 'operator_review', confidence: 92, candidateId: 'candidate-a', candidateVersion: 2,
         }]
@@ -73,6 +75,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  calls.selectedAccountId = 'account-a'
   calls.get.mockReset()
   calls.unlink.mockReset()
   host = document.createElement('div')
@@ -103,6 +106,43 @@ function buttonByText(text: string, scope: ParentNode = document.body): HTMLButt
   if (!found) throw new Error(`button "${text}" not found`)
   return found
 }
+
+it.each([MergedPersonDetailView, MergedPersonV8])('解除窓に結び付け先のアカウントと環境を出す (%#)', async (View) => {
+  calls.get.mockResolvedValue(personFixture(1, true))
+  await renderView(vi.fn(), View); await flush()
+  fireEvent.click(buttonByText('解除する')); await flush()
+  const dialog = document.body.querySelector('[role="dialog"], [role="alertdialog"]')
+  expect(dialog?.textContent).toContain('LINEアカウント')
+  expect(dialog?.textContent).toContain('本店')
+  expect(dialog?.textContent).toContain('環境')
+})
+
+it.each([MergedPersonDetailView, MergedPersonV8])('統合ユーザーを変えたら古い解除は送らない (%#)', async (View) => {
+  calls.get.mockResolvedValue(personFixture(1, true))
+  await renderView(vi.fn(), View); await flush()
+  fireEvent.click(buttonByText('解除する')); await flush()
+  const dialog = document.body.querySelector('[role="dialog"], [role="alertdialog"]')!
+  fireEvent.change(dialog.querySelector('textarea')!, { target: { value: '確認した根拠' } })
+  await act(async () => { root.render(<View personId="user-b" onClose={vi.fn()} />) })
+  const stale = document.body.querySelector('[role="dialog"], [role="alertdialog"]')
+  if (stale) fireEvent.click(buttonByText('結び付けを解除', stale))
+  await flush()
+  expect(calls.unlink).not.toHaveBeenCalled()
+})
+
+it.each([MergedPersonDetailView, MergedPersonV8])('選択アカウントを切り替えた古い解除を送らない (%#)', async (View) => {
+  calls.get.mockResolvedValue(personFixture(1, true))
+  await renderView(vi.fn(), View); await flush()
+  fireEvent.click(buttonByText('解除する')); await flush()
+  const dialog = document.body.querySelector('[role="dialog"], [role="alertdialog"]')!
+  fireEvent.change(dialog.querySelector('textarea')!, { target: { value: '確認した根拠' } })
+  calls.selectedAccountId = 'account-b'
+  await act(async () => { root.render(<View personId="user-a" onClose={vi.fn()} />) })
+  const stale = document.body.querySelector('[role="dialog"], [role="alertdialog"]')
+  if (stale) fireEvent.click(buttonByText('結び付けを解除', stale))
+  await flush()
+  expect(calls.unlink).not.toHaveBeenCalled()
+})
 
 describe('R389 解除の競合は窓を閉じて読み直す', () => {
   it.each([MergedPersonDetailView, MergedPersonV8])('409の後は古い結び付きの窓を残さず、成功した解除だけが残る (%#)', async (View) => {

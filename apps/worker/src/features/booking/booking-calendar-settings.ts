@@ -27,7 +27,7 @@ export async function processCalendarSwitchJobs(db:D1Database,credentials:Google
      if(b.external_event_id!==j.external_event_id||b.external_calendar_id!==j.calendar_id){await db.prepare("UPDATE booking_calendar_switch_jobs SET status='cancelled' WHERE id=?").bind(j.id).run();continue;}
      const client=await clientForConnection(conn,credentials,{db,accountId:j.line_account_id});
      await deleteBookingCalendarEvent(db,{bookingId:j.booking_id,lineAccountId:j.line_account_id,calendarId:j.calendar_id,eventId:j.external_event_id,connectionId:conn.id,client});
-     await db.prepare('UPDATE bookings SET external_event_id=NULL,external_calendar_id=NULL WHERE id=? AND external_event_id=? AND lock_version=?').bind(j.booking_id,j.external_event_id,b.lock_version).run();
+     await db.prepare('UPDATE bookings SET confirmation_revision = confirmation_revision + 1, external_event_id=NULL,external_calendar_id=NULL WHERE id=? AND external_event_id=? AND lock_version=?').bind(j.booking_id,j.external_event_id,b.lock_version).run();
     }
    } else {const result=await runBookingGoogleSync(db,{bookingId:j.booking_id,lineAccountId:j.line_account_id,credentials,now});if(result==='retry_wait')throw new Error('calendar_write_failed');}
    await db.prepare("UPDATE booking_calendar_switch_jobs SET status='done',attempts=attempts+1,error_code=NULL WHERE id=?").bind(j.id).run();

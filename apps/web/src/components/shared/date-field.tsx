@@ -24,6 +24,7 @@ import { joinDescribedBy, useFieldContext } from './field-context'
 export default function DateField({
   value,
   onChange,
+  inline = false,
   min,
   max,
   disabled = false,
@@ -40,6 +41,8 @@ export default function DateField({
   'aria-describedby': ariaDescribedBy,
 }: {
   value: string
+  /** 日時選択などの窓内に暦だけを表示する。 */
+  inline?: boolean
   onChange: (value: string) => void
   min?: string
   max?: string
@@ -65,7 +68,7 @@ export default function DateField({
   const fieldId = id ?? field?.controlId ?? autoId
   const dialogId = `${fieldId}-calendar`
   const selected = parseDate(value)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(inline)
   const [draftValue, setDraftValue] = useState(value)
   const openedValue = useRef(value)
   const [focused, setFocused] = useState<Date>(() => selected ?? today())
@@ -98,6 +101,10 @@ export default function DateField({
   const confirmDisabled = disabled || stale || draftInvalid
   const confirmReason = stale ? 'ほかで日付が変わりました。開き直してください。' : draftInvalid ? '選んだ日付を確認してください。' : disabled ? '日付を変更できません。' : undefined
 
+  useEffect(() => {
+    if (inline) setDraftValue(value)
+  }, [inline, value])
+
   // 外側を押したときの扱いは MenuPortal に任せる（箱の中の日付押しで閉じない）。
 
   useEffect(() => {
@@ -106,7 +113,7 @@ export default function DateField({
   }, [open, focused])
 
   useEffect(() => {
-    if (!open) return
+    if (!open || inline) return
     const dismissOutside = (event: PointerEvent) => {
       const target = event.target as Node
       if (triggerRef.current?.contains(target) || document.getElementById(dialogId)?.contains(target)) return
@@ -114,7 +121,7 @@ export default function DateField({
     }
     document.addEventListener('pointerdown', dismissOutside, true)
     return () => document.removeEventListener('pointerdown', dismissOutside, true)
-  }, [open, dialogId])
+  }, [open, dialogId, inline])
 
   const openCalendar = () => {
     if (disabled) return
@@ -132,13 +139,13 @@ export default function DateField({
 
   // Esc は欄へ戻すため、箱の中に焦点があっても欄側で閉じる。
   useEffect(() => {
-    if (!open) return
+    if (!open || inline) return
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') close()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open])
+  }, [open, inline])
 
   const moveTo = (next: Date) => {
     if (next.getFullYear() !== focused.getFullYear() || next.getMonth() !== focused.getMonth()) {
@@ -150,6 +157,7 @@ export default function DateField({
   const choose = (day: Date) => {
     if (isDisabled(day)) return
     setDraftValue(formatValue(day))
+    if (inline) onChange(formatValue(day))
     moveTo(day)
   }
 
@@ -174,66 +182,18 @@ export default function DateField({
   }
 
   const onRootKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape' && open) {
+    if (event.key === 'Escape' && open && !inline) {
       event.preventDefault()
       close()
     }
   }
 
-  return (
-    <div ref={rootRef} className={[styles.root, className].filter(Boolean).join(' ')} onKeyDown={onRootKeyDown}>
-      {name ? <input type="hidden" name={name} value={value} /> : null}
-      <button
-        ref={triggerRef}
-        id={fieldId}
-        type="button"
-        className={styles.field}
-        data-input-field
-        data-size={size}
-        data-clearable={selected && !disabled && clearable || undefined}
-        disabled={disabled}
-        data-invalid={invalid || undefined}
-        // 狭い欄で切れても、重ねれば全文が読める（短い文字列は1行省略＋titleの決まり）。
-        title={selected ? formatLabel(selected) : undefined}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? dialogId : undefined}
-        aria-label={ariaLabel}
-        aria-labelledby={ariaLabelledBy}
-        aria-required={field?.required || undefined} aria-invalid={invalid || undefined}
-        aria-describedby={joinDescribedBy(ariaDescribedBy, field?.describedBy)}
-        data-open={open || undefined}
-        onClick={() => (open ? setOpen(false) : openCalendar())}
-        onKeyDown={(event) => {
-          if (event.key === 'ArrowDown' && !open) {
-            event.preventDefault()
-            openCalendar()
-          }
-        }}
-      >
-        <Calendar aria-hidden="true" className={styles.icon} />
-        <span className={selected ? styles.value : styles.placeholder}>{selected ? displayFormat === 'short' ? `${selected.getMonth() + 1}/${selected.getDate()}（${WEEKDAYS[selected.getDay()]}）` : displayFormat === 'day' ? `${selected.getMonth() + 1}月${selected.getDate()}日（${WEEKDAYS[selected.getDay()]}）` : formatLabel(selected) : placeholder}</span>
-        <ChevronDown aria-hidden="true" className={styles.chevron} />
-      </button>
-      {selected && !disabled && clearable ? (
-        <button type="button" className={styles.clear} aria-label="日付を消す" onClick={() => onChange('')}>
-          <X aria-hidden="true" />
-        </button>
-      ) : null}
-
-      {open ? (
-        <MenuPortal
-          open={open}
-          align="start"
-          getAnchor={() => triggerRef.current}
-          onClose={() => setOpen(false)}
-          className={selectStyles.surface}
-        >
+  const calendar = (
         <div
           id={dialogId}
-          role="dialog"
+          role={inline ? 'group' : 'dialog'}
           aria-label="日付を選ぶ"
-          className={styles.popover}
+          className={[styles.popover, inline ? styles.inlineCalendar : undefined].filter(Boolean).join(' ')}
           // 最上層では absolute 指定を無効にする（位置は器が決める）。
           style={{ position: 'static' }}
           // 箱の中の押下はここで止める。呼び出し側が `<label>` で欄全体を包んでいると、
@@ -292,7 +252,7 @@ export default function DateField({
               </div>
             ))}
           </div>
-          <div className={styles.footer}>
+          {!inline ? <div className={styles.footer}>
             <div className={styles.footerGroup}>
               <Button type="button" size="inline" variant="text" textTone="accent" disabled={isDisabled(today())} onClick={() => choose(today())}>今日</Button>
               <Button type="button" size="inline" variant="text" textTone="quiet" onClick={() => setDraftValue('')}>消す</Button>
@@ -301,8 +261,61 @@ export default function DateField({
               <Button type="button" size="compact" variant="secondary" onClick={close}>キャンセル</Button>
               <Button type="button" size="compact" variant="primary" disabled={confirmDisabled} disabledReason={confirmReason} onClick={() => { if (confirmDisabled) return; onChange(draftValue); close() }}>確定</Button>
             </div>
-          </div>
+          </div> : <div className={styles.footer}><Button type="button" size="inline" variant="text" textTone="accent" disabled={isDisabled(today())} onClick={() => choose(today())}>今日</Button></div>}
         </div>
+  )
+
+  return (
+    <div ref={rootRef} className={[styles.root, className].filter(Boolean).join(' ')} onKeyDown={onRootKeyDown}>
+      {name ? <input type="hidden" name={name} value={value} /> : null}
+      {!inline ? <><button
+        ref={triggerRef}
+        id={fieldId}
+        type="button"
+        className={styles.field}
+        data-input-field
+        data-size={size}
+        data-clearable={selected && !disabled && clearable || undefined}
+        disabled={disabled}
+        data-invalid={invalid || undefined}
+        // 狭い欄で切れても、重ねれば全文が読める（短い文字列は1行省略＋titleの決まり）。
+        title={selected ? formatLabel(selected) : undefined}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={open ? dialogId : undefined}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        aria-required={field?.required || undefined} aria-invalid={invalid || undefined}
+        aria-describedby={joinDescribedBy(ariaDescribedBy, field?.describedBy)}
+        data-open={open || undefined}
+        onClick={() => (open ? setOpen(false) : openCalendar())}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown' && !open) {
+            event.preventDefault()
+            openCalendar()
+          }
+        }}
+      >
+        <Calendar aria-hidden="true" className={styles.icon} />
+        <span className={selected ? styles.value : styles.placeholder}>{selected ? displayFormat === 'short' ? `${selected.getMonth() + 1}/${selected.getDate()}（${WEEKDAYS[selected.getDay()]}）` : displayFormat === 'day' ? `${selected.getMonth() + 1}月${selected.getDate()}日（${WEEKDAYS[selected.getDay()]}）` : formatLabel(selected) : placeholder}</span>
+        <ChevronDown aria-hidden="true" className={styles.chevron} />
+      </button>
+      {selected && !disabled && clearable ? (
+        <button type="button" className={styles.clear} aria-label="日付を消す" onClick={() => onChange('')}>
+          <X aria-hidden="true" />
+        </button>
+      ) : null}
+
+      </> : null}
+      {inline ? calendar : open ? (
+        <MenuPortal
+          open={open}
+          align="start"
+          getAnchor={() => triggerRef.current}
+          onClose={() => setOpen(false)}
+          className={selectStyles.surface}
+        >
+{calendar}
         </MenuPortal>
       ) : null}
     </div>

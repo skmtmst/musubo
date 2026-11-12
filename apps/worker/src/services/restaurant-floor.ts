@@ -21,7 +21,7 @@ export async function saveRestaurantFloor(db:D1Database,f:RestaurantFloorWrite):
  db.prepare(`UPDATE rt_floors SET name=?,width=?,height=?,outline_json=?,fixtures_json=?,version=version+1
  WHERE id=? AND store_id=? AND archived_at IS NULL AND version=? AND (SELECT COUNT(*) FROM rt_tables WHERE floor_id=rt_floors.id)=? AND (SELECT COUNT(*) FROM rt_tables WHERE floor_id=rt_floors.id AND store_id=? AND id IN(SELECT json_extract(value,'$.id') FROM json_each(?)))=?`)
  .bind(f.name.trim(),f.width,f.height,JSON.stringify(f.outline),JSON.stringify(f.fixtures),f.id,f.storeId,f.expectedVersion,f.tables.length,f.storeId,JSON.stringify(f.tables),f.tables.length),
- db.prepare(`UPDATE rt_tables SET floor_id=?,floor_x=json_extract(p.value,'$.x'),floor_y=json_extract(p.value,'$.y'),
+ db.prepare(`UPDATE rt_tables SET confirmation_revision=confirmation_revision+1, floor_id=?,floor_x=json_extract(p.value,'$.x'),floor_y=json_extract(p.value,'$.y'),
  width=json_extract(p.value,'$.width'),height=json_extract(p.value,'$.height'),shape=json_extract(p.value,'$.shape'),rotation=json_extract(p.value,'$.rotation'),updated_at=datetime('now')
  FROM json_each(?) p WHERE rt_tables.id=json_extract(p.value,'$.id') AND rt_tables.store_id=? AND changes()=1`)
  .bind(f.id,JSON.stringify(f.tables),f.storeId),

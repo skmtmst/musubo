@@ -129,6 +129,7 @@ const draftRule = {
   keywords: null,
   respondToAll: false,
   isActive: true,
+  confirmationRevision: 1,
   lifecycleStatus: 'published',
   hits: { period: 3, total: 10 },
   responseContent: 'ご予約を承ります',

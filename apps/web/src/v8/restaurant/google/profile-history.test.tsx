@@ -94,3 +94,9 @@ describe('Googleの変更履歴を現在の共通の一覧で使う', () => {
     await waitFor(() => expect(createUrl).toHaveBeenCalledTimes(1))
   })
 })
+
+it('失敗した変更の案内は、操作権限や環境に関わらず確認できることだけを伝える', async () => {
+  await open()
+  expect(screen.getByText(/失敗した変更は、その画面で内容を確認できます/)).toBeTruthy()
+  expect(screen.queryByText(/失敗した変更は、その画面からやり直せます/)).toBeNull()
+})

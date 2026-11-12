@@ -28,6 +28,7 @@ export type CommonActionSummary = {
 };
 
 export type AutomationListItem = Automation & {
+  confirmationRevision?: number;
   followupManagement?:RestaurantFollowupManagement;
   folderId?: string | null
   triggerConfig: Record<string, unknown>;
@@ -53,6 +54,7 @@ export type CommonActionVersion = {
 
 export type CommonActionBinding = {
   id: string;
+  confirmationRevision?: number;
   consumerType: string;
   consumerId: string;
   consumerPath: string;

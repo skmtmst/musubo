@@ -591,6 +591,7 @@ export async function getFunnelsWithCurrentVersions(
       window_days: row.window_days,
       created_at: row.created_at,
       status: row.status,
+      confirmation_revision: row.confirmation_revision,
       currentVersion: row.current_version_id === null
         ? null
         : {
@@ -635,6 +636,7 @@ export async function setFunnelStatus(
     funnelId: string;
     status: FunnelStatus;
     expectedStatus: FunnelStatus;
+    expectedRevision?: number;
   },
 ): Promise<Funnel> {
   const funnel = await getFunnelById(db, input.lineAccountId, input.funnelId);
@@ -647,9 +649,10 @@ export async function setFunnelStatus(
     throw new Error('analytics_funnel_invalid_transition');
   }
   const result = await db.prepare(
-    `UPDATE funnels SET status = ?
-      WHERE id = ? AND line_account_id = ? AND status = ?`,
-  ).bind(input.status, input.funnelId, input.lineAccountId, input.expectedStatus).run();
+    `UPDATE funnels SET status = ?, confirmation_revision = confirmation_revision + 1
+      WHERE id = ? AND line_account_id = ? AND status = ?
+        AND (? IS NULL OR confirmation_revision = ?)`,
+  ).bind(input.status, input.funnelId, input.lineAccountId, input.expectedStatus, input.expectedRevision ?? null, input.expectedRevision ?? null).run();
   if (!result.meta?.changes) throw new Error('analytics_funnel_status_conflict');
   return (await getFunnelById(db, input.lineAccountId, input.funnelId))!;
 }
@@ -723,7 +726,7 @@ export async function createFunnelVersion(
     ...(name === null
       ? []
       : [db.prepare(
-        `UPDATE funnels SET name = ? WHERE id = ? AND line_account_id = ? AND status = 'active'
+        `UPDATE funnels SET name = ?, confirmation_revision = confirmation_revision + 1 WHERE id = ? AND line_account_id = ? AND status = 'active'
            AND EXISTS (SELECT 1 FROM analytics_funnel_versions WHERE id = ? AND funnel_id = funnels.id)`,
       ).bind(name, input.funnelId, input.lineAccountId, id)]),
   ];

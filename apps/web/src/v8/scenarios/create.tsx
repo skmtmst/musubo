@@ -124,7 +124,8 @@ export default function ScenarioCreateV8() {
     const trimmed = name.trim()
     const nextFolder = nextFolderId || null
     if (!scenario || !trimmed) return Promise.resolve(false)
-    if (trimmed === scenario.name && nextFolder === (scenario.folderId ?? null)) {
+    const nameToSave = name === scenario.name ? scenario.name : trimmed
+    if (nameToSave === scenario.name && nextFolder === (scenario.folderId ?? null)) {
       return Promise.resolve(true)
     }
 
@@ -132,7 +133,7 @@ export default function ScenarioCreateV8() {
       setDetailsSaving(true)
       setError('')
       try {
-        const res = await api.scenarios.update(id, { name: trimmed, folderId: nextFolder })
+        const res = await api.scenarios.update(id, { name: nameToSave, folderId: nextFolder })
         if (!requireWrite()) return false
         if (!res.success) {
           setError('シナリオ情報を保存できませんでした。時間をおいてもう一度お試しください。')
@@ -301,7 +302,7 @@ export default function ScenarioCreateV8() {
       }
       // 名前と方式は同じ受け口で一度に保存する。
       const res = await api.scenarios.update(id, {
-        name: trimmed,
+        name: scenario && name === scenario.name ? scenario.name : trimmed,
         folderId: folderId || null,
         deliveryMode: mode,
       })
@@ -507,13 +508,13 @@ export default function ScenarioCreateV8() {
         <CardHeader size="stacked" title="シナリオ情報" />
         <SettingsFormRow layout="name-folder">
           <div ref={nameWrapRef}>
-            <Field label="シナリオ名" required count={{ value: name.length, max: 80 }} error={nameError} errorId="scenario-name-error">
+            <Field label="シナリオ名" required count={{ value: name.length, max: 60 }} error={nameError} errorId="scenario-name-error">
             <SaveErrorField names={["name"]}><TextField
               value={name}
               disabled={fieldsDisabled}
               onChange={(e) => { if (!canSaveNow()) return; setName(e.target.value); if (nameError) setNameError('') }}
               onBlur={() => void saveDetails()}
-              maxLength={80}
+              maxLength={60}
               placeholder="例：友だち追加ウェルカム"
               invalid={Boolean(nameError)}
               aria-label="シナリオ名"

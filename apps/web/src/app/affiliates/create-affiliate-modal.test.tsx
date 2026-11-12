@@ -7,7 +7,7 @@ const fixture = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn() }))
 vi.mock('@/lib/api', async original => ({
   ...await original<typeof import('@/lib/api')>(),
   api: {
-    friends: { list: async () => ({ success: true, data: { items: [{ id: 'friend-kenta', displayName: 'Kenta Kawano(Obama)' }], total: 1 } }) },
+    friends: { list: async () => ({ success: true, data: { items: [{ id: 'friend-kenta', displayName: 'Demo Person(Obama)' }], total: 1 } }) },
     affiliates: { create: fixture.create, update: fixture.update },
   },
 }))
@@ -40,7 +40,7 @@ describe('現役V8の紹介者登録', () => {
 
   test('選んだ友だちとLINEアカウントを作成に送り、一覧へ戻る', async () => {
     render(<CreateAffiliateV8 />)
-    await chooseAffiliateFriend('Kenta Kawano(Obama)')
+    await chooseAffiliateFriend('Demo Person(Obama)')
     fillName()
     await act(async () => { fireEvent.click(submit()) })
     expect(fixture.create).toHaveBeenCalledWith(expect.objectContaining({ friendId: 'friend-kenta', lineAccountId: 'line-acc-stg-nen' }))

@@ -350,13 +350,6 @@
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
   },
   {
-    "filename": "src/v8/settings/line-notifications/screen.tsx",
-    "fingerprint": "fedae9f3306b61d1",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
     "filename": "src/v8/tags/field-model.ts",
     "fingerprint": "b135da5aff5f52e7",
     "disposition": "local-parser",
@@ -425,5 +418,19 @@
     "disposition": "error-visible",
     "count": 1,
     "reason": "登録メディアの取得失敗は候補を空にしたうえで窓の中に失敗文を出し、件数は不明（null）にする。古い要求の応答は request の世代で捨てる。空の正常結果には見せない。"
+  },
+  {
+    "filename": "src/v8/friend-detail/delivery-consent.tsx",
+    "fingerprint": "60237edef46bb3a0",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "取得失敗は error 状態にし、配信同意の要約に読み込み失敗を表示する。古い対象の応答は表示しない。"
+  },
+  {
+    "filename": "src/v8/settings/line-notifications/screen.tsx",
+    "fingerprint": "25033ce1da3d49ed",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "宛先の取得失敗を確認窓に表示し、送信を許さない。古いアカウントの応答は捨てる。"
   }
 ]

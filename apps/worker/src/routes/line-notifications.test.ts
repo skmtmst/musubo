@@ -159,7 +159,7 @@ describe('LINE notification APIs', () => {
         (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
       VALUES ('account-2', 'channel-2', '店舗2', 'token-2', 'secret-2', 1, 'tenant-2')
     `).run();
-    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', display_name: '山田 太郎' });
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', display_name: '見本 141' });
   });
 
   afterEach(() => {
@@ -194,7 +194,7 @@ describe('LINE notification APIs', () => {
     });
     expect(body.pagination).toEqual({ total: 4, limit: 20, offset: 0 });
     expect(body.data.items.find((item) => item.status === 'accepted')).toMatchObject({
-      friendName: '山田 太郎', orderNumber: 'NEN-1001', version: 1,
+      friendName: '見本 141', orderNumber: 'NEN-1001', version: 1,
       clickedAt: '2026-09-07T10:05:00+09:00',
     });
     expect(JSON.stringify(body)).not.toMatch(/届きました|開きました|既読/);

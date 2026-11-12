@@ -637,15 +637,16 @@ export async function stopFriendAddRule(
 
 export async function archiveFriendAddRule(
   db: D1Database,
-  input: { lineAccountId: string; ruleId: string },
+  input: { lineAccountId: string; ruleId: string; expectedVersion?: number; expectedStatus?: string },
 ): Promise<void> {
   const now = jstNow();
   const result = await db.prepare(
     `UPDATE friend_add_rules SET status = 'archived', archived_at = ?, updated_at = ?, lock_version = lock_version + 1
       WHERE id = ? AND line_account_id = ?
-        AND is_unknown_route_fallback = 0 AND archived_at IS NULL`,
-  ).bind(now, now, input.ruleId, input.lineAccountId).run();
-  if ((result.meta?.changes ?? 0) !== 1) throw new Error('FRIEND_ADD_RULE_NOT_ARCHIVED');
+        AND is_unknown_route_fallback = 0 AND archived_at IS NULL
+        AND (? IS NULL OR lock_version = ?) AND (? IS NULL OR status = ?)`,
+  ).bind(now, now, input.ruleId, input.lineAccountId, input.expectedVersion ?? null, input.expectedVersion ?? null, input.expectedStatus ?? null, input.expectedStatus ?? null).run();
+  if ((result.meta?.changes ?? 0) !== 1) throw new Error(input.expectedVersion === undefined ? 'FRIEND_ADD_RULE_NOT_ARCHIVED' : 'FRIEND_ADD_RULE_VERSION_CONFLICT');
 }
 
 /**

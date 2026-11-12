@@ -38,7 +38,7 @@ const at = (dayOffset: number, hour: number, minute = 0) => {
 
 const slot = (id: string, hour: number, occupied: string[], seats: number, over: Record<string, unknown> = {}) => ({
   id, store_id: 'store-1', starts_at: at(0, hour), slot_minutes: 30, total_capacity: 20, ota_capacity: 8, line_capacity: 6, walk_in_capacity: 6,
-  reserved_count: seats, occupied_seats: seats, occupiedTableIds: occupied, freeSeats: 20 - seats, version: 3, updated_by_name: '中川 由美', updated_at: at(0, 14, 2), ...over,
+  reserved_count: seats, occupied_seats: seats, occupiedTableIds: occupied, freeSeats: 20 - seats, version: 3, updated_by_name: '見本 30', updated_at: at(0, 14, 2), ...over,
 })
 const days = [slot('s17', 17, ['pa'], 8), slot('s19', 19, ['pa', 't1', 't2', 't3', 't4'], 18, { ota_capacity: 6, line_capacity: 4, walk_in_capacity: 4 })]
 const hours = Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: weekday === 1 ? [] : [{ opensAt: '17:00', closesAt: '22:00' }] }))
@@ -112,7 +112,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
     fireEvent.change(screen.getByRole('spinbutton', { name: '予約サイト' }), { target: { value: '7' } })
     fireEvent.click(screen.getByRole('button', { name: /受付時間と配分を保存/ }))
     const band = await screen.findByRole('alert')
-    expect(band.textContent).toContain('中川さんが 14:02 に予約枠・在庫を保存しました')
+    expect(band.textContent).toContain('見本さんが 14:02 に予約枠・在庫を保存しました')
     expect(screen.getByRole('button', { name: /比べてから保存/ })).not.toBeNull()
     expect(screen.queryByRole('status')).toBeNull()
     expect(screen.queryByText('行を押したとき：19:00 の配分だけ直す')).toBeNull()

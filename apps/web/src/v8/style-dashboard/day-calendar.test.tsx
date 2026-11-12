@@ -8,7 +8,7 @@ import type { ButtonProps } from '@/components/shared/button'
 import { STYLE_CONFIG } from './config'
 import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
 import { toToday } from './adapter'
-import { WeekCalendar } from './calendar'
+import { DayList, WeekCalendar } from './calendar'
 import { StaffBoard } from './staff-board'
 import StyleDashboard from './style-dashboard'
 import { setTestReducedMotion } from '@/test-utils/reduced-motion'
@@ -212,11 +212,16 @@ it.each(['salon', 'consult'] as const)('%sの閲覧のみも空日操作を灰�
 it.each(['list', 'board'])('検索結果0は%sでも予約なしとせず、検索を外せる', async view => {
   state.search = 'view=' + view
   render(<StyleDashboard style="salon" />)
-  await screen.findByRole('searchbox')
+  const searchbox = await screen.findByRole('searchbox') as HTMLInputElement
+  await screen.findByText('予約者')
+  // 初回の値同期エフェクトを完了してから、検索の時計を進める。
+  await act(async () => {})
+  expect(searchbox.value).toBe('')
   // SearchField は入力後 300ms に絞り込む。実時間と CPU 負荷に依存させず、通知まで進める。
   vi.useFakeTimers()
   try {
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '検索に一致しない名前' } })
+    fireEvent.change(searchbox, { target: { value: '検索に一致しない名前' } })
+    expect(searchbox.value).toBe('検索に一致しない名前')
     await act(async () => { await vi.advanceTimersByTimeAsync(299) })
     expect(screen.queryByRole('button', { name: '検索を外す', exact: true })).toBeNull()
     await act(async () => { await vi.advanceTimersByTimeAsync(1) })
@@ -474,4 +479,12 @@ it('教室の週は日ごとのクラスを判定し、休業日と日またぎ�
   expect(weekdays()).toEqual(['満', '満'])
   schedule.entries[0].endsAt = '2026-10-22T00:00:00+09:00'
   expect(weekdays()).toEqual(['満', 'クラスなし'])
+})
+
+
+it.each([true, false])('月表示の休み操作の案内は編集可否 %s に合う', canWrite => {
+  const month = { title: '11月', days: [], selected: { title: '11月1日', total: '0件', rows: [], moreLabel: '一覧へ' } }
+  render(<DayList month={month} href="/bookings" canWrite={canWrite} />)
+  expect(screen.getByText(/日を押すと、その日の予約がここに出ます/)).toBeTruthy()
+  expect(Boolean(screen.queryByText(/休みは［休みを入れる］から/))).toBe(canWrite)
 })

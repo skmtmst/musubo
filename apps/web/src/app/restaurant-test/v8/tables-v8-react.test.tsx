@@ -3,7 +3,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createTable: vi.fn(), updateTable: vi.fn(), saveTableLayout: vi.fn() }))
+const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createTable: vi.fn(), updateTable: vi.fn(), stopTable: vi.fn(), saveTableLayout: vi.fn() }))
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
@@ -21,7 +21,7 @@ const data = {
   stores: [store],
   memberships: [],
   tables: [
-    { id: 't1', store_id: 'store-1', floor_id: 'floor-1', code: 'T1', label: '2人卓', seat_type: 'table', min_capacity: 1, max_capacity: 2, floor_x: 0, floor_y: 0, join_group: null, is_active: 1 },
+    { id: 't1', confirmation_revision: 1, store_id: 'store-1', floor_id: 'floor-1', code: 'T1', label: '2人卓', seat_type: 'table', min_capacity: 1, max_capacity: 2, floor_x: 0, floor_y: 0, join_group: null, is_active: 1 },
     { id: 't2', store_id: 'store-1', floor_id: 'floor-1', code: 'T2', label: '2人卓', seat_type: 'table', min_capacity: 1, max_capacity: 2, floor_x: 1, floor_y: 0, join_group: 'A', is_active: 1 },
     { id: 't3', store_id: 'store-1', floor_id: 'floor-1', code: 'T3', label: '窓側4人卓', seat_type: 'table', min_capacity: 2, max_capacity: 4, floor_x: 2, floor_y: 0, join_group: 'A', is_active: 1 },
     { id: 'pb', store_id: 'store-1', floor_id: 'floor-1', code: '個室B', label: '個室', seat_type: 'private_room', min_capacity: 4, max_capacity: 8, floor_x: 0, floor_y: 1, join_group: null, is_active: 0 },
@@ -47,6 +47,7 @@ beforeEach(() => {
   fixture.createTable.mockResolvedValue({ success: true })
   fixture.saveTableLayout.mockResolvedValue({success:true})
   fixture.updateTable.mockResolvedValue({ success: true })
+  fixture.stopTable.mockResolvedValue({ success: true })
 })
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals() })
 
@@ -91,7 +92,8 @@ describe('BERxg 座席・卓管理のV8', () => {
     fireEvent.click(within(detail).getAllByRole('button', { name: /のその他操作$/ })[0])
     fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     fireEvent.click(screen.getByRole('button', { name: '止める' }))
-    await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 't1', expect.objectContaining({ isActive: false })))
+    await waitFor(() => expect(fixture.stopTable).toHaveBeenCalledWith('account-1', 't1', expect.objectContaining({ storeId: 'store-1', expectedTableRevision: 1, reservations: [] })))
+    expect(fixture.updateTable).not.toHaveBeenCalledWith('account-1', 't1', expect.objectContaining({ isActive: false }))
     await waitFor(() => expect((within(detail).getByRole('button', { name: '個室B・個室のその他操作' }) as HTMLButtonElement).disabled).toBe(false))
     fireEvent.click(within(detail).getByRole('button', { name: '個室B・個室のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '再開' }))

@@ -1,7 +1,7 @@
 import { applyVideoMediaSelection } from './webinar-video-selection.js';
 import { inputError } from '../lib/input-errors.js';
 
-import { getWebinarById, getWebinarBySlug, createWebinar, updateWebinar, getWebinarCtas, getWebinarVideoAsset, advanceWebinarVideoAsset, getWebinarSession, setWebinarSessionCapacity, type WebinarVideoStage, recordWebinarFunnelEvent, getWebinarOverview, getWebinarList, countWebinarList, webinarListSort, type WebinarListFilters, getWebinarEditorSettings, saveWebinarEditorSettings, publishWebinarEditorVersion, getFormById, formBelongsToLineAccount, getFolderById, getWebinarRegistration, type WebinarEditorSettingsInput } from '@line-crm/db';
+import { getWebinarById, getWebinarBySlug, createWebinar, updateWebinar, getWebinarCtas, getWebinarVideoAsset, advanceWebinarVideoAsset, getWebinarSession, setWebinarSessionCapacity, type WebinarVideoStage, recordWebinarFunnelEvent, getWebinarOverview, getWebinarList, countWebinarList, webinarListSort, type WebinarListFilters, getWebinarEditorSettings, saveWebinarEditorSettings, publishWebinarAndActivate, getFormById, formBelongsToLineAccount, getFolderById, getWebinarRegistration, type WebinarEditorSettingsInput } from '@line-crm/db';
 
 import { resolveWebinarCaller } from '../features/webinars/webinar-caller/index.js';
 import { getWebinarNotificationOverview, getWebinarNotificationSettings, saveWebinarNotificationSettings, type WebinarNotificationSettingsInput } from '../features/webinars/webinar-notifications/index.js';
@@ -314,13 +314,20 @@ export const post__api_webinars_id_publish_11 = async (c: Context<Env, "/api/web
   if (!Number.isInteger(body.expectedVersion)) {
     return inputError(c, { success: false, error: 'expected_version_required' }, 400, ["expectedVersion"]);
   }
+  const currentSettings = await getWebinarEditorSettings(c.env.DB, id);
+  if (!currentSettings || currentSettings.version !== Number(body.expectedVersion) || row.status === 'archived') {
+    return c.json({ success: false, error: 'version_conflict', currentVersion: currentSettings?.version ?? null, currentStatus: row.status }, 409);
+  }
   const validation = await buildPublishValidation(c, row);
   if (validation.blockers.length > 0) {
     return c.json({ success: false, error: 'publish_validation_failed', data: validation }, 409);
   }
-  const published = await publishWebinarEditorVersion(c.env.DB, id, Number(body.expectedVersion));
-  if (!published) return c.json({ success: false, error: 'version_conflict' }, 409);
-  const updated = await updateWebinar(c.env.DB, id, { status: 'active' });
+  const published = await publishWebinarAndActivate(c.env.DB, id, Number(body.expectedVersion));
+  if (!published) {
+    const [current, webinar] = await Promise.all([getWebinarEditorSettings(c.env.DB, id), getWebinarById(c.env.DB, id)]);
+    return c.json({ success: false, error: 'version_conflict', currentVersion: current?.version ?? null, currentStatus: webinar?.status ?? null }, 409);
+  }
+  const updated = await getWebinarById(c.env.DB, id);
   auditLog(c, 'webinar.publish', { kind: 'webinar', id });
   return c.json({ success: true, data: { webinar: serializeWebinar(updated!), validation } });
 };
@@ -417,9 +424,13 @@ export const post__api_webinars_id_pause_16 = async (c: Context<Env, "/api/webin
   const body = await c.req.json<{ expectedVersion?: unknown }>();
   const settings = await getWebinarEditorSettings(c.env.DB, id);
   if (!Number.isInteger(body.expectedVersion) || settings?.version !== Number(body.expectedVersion)) {
-    return c.json({ success: false, error: 'version_conflict' }, 409);
+    return c.json({ success: false, error: 'version_conflict', currentVersion: settings?.version ?? null, currentStatus: row.status }, 409);
   }
-  const updated = await updateWebinar(c.env.DB, id, { status: 'draft' });
+  const updated = await updateWebinar(c.env.DB, id, { status: 'draft' }, Number(body.expectedVersion), 'active');
+  if (!updated) {
+    const [current, webinar] = await Promise.all([getWebinarEditorSettings(c.env.DB, id), getWebinarById(c.env.DB, id)]);
+    return c.json({ success: false, error: 'version_conflict', currentVersion: current?.version ?? null, currentStatus: webinar?.status ?? null }, 409);
+  }
   auditLog(c, 'webinar.pause', { kind: 'webinar', id });
   return c.json({ success: true, data: serializeWebinar(updated!) });
 };

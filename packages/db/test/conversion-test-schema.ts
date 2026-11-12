@@ -56,7 +56,7 @@ export function applyConversionTestSchema(db: Database.Database): void {
       id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL, friend_id TEXT NOT NULL,
       user_id TEXT, affiliate_code TEXT, metadata TEXT,
       affiliate_id TEXT, attributed_ref_code TEXT,
-      approval_status TEXT, approved_at TEXT,
+      approval_status TEXT, approved_at TEXT, approval_revision INTEGER NOT NULL DEFAULT 1,
       point_name_snapshot TEXT, event_type_snapshot TEXT, value_snapshot REAL,
       point_version_snapshot INTEGER,
       idempotency_key TEXT, created_at TEXT NOT NULL,

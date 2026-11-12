@@ -17,7 +17,7 @@ vi.mock('@/lib/api', () => ({
   api: {
     autoReplies: {
       runs: runsMock,
-      get: vi.fn().mockResolvedValue({ success: true, data: { id: 'rule-1', lineAccountId: null } }),
+      get: vi.fn().mockResolvedValue({ success: true, data: { id: 'rule-1', lineAccountId: null, confirmationRevision: 1 } }),
       retryRun: actions.retry,
       stop: actions.stop,
       update: vi.fn(),
@@ -187,7 +187,7 @@ describe('R530 実行結果の出し分け（役割×操作）', () => {
     await act(async () => { button('一時停止する').click() })
     const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
     await act(async () => { [...dialog.querySelectorAll('button')].find(b => b.textContent?.trim() === '一時停止する')!.click() })
-    expect(actions.stop).toHaveBeenCalledExactlyOnceWith('rule-1', { reason: null }, expect.any(String))
+    expect(actions.stop).toHaveBeenCalledExactlyOnceWith('rule-1', { reason: null, expectedVersion: 1 }, expect.any(String))
   })
 
   it('本人未知は帯と理由無しでdisabled、owner確定後は操作できる', async () => {

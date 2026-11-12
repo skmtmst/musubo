@@ -898,7 +898,7 @@ async function executeUndo(
       ).bind(expectedId).first<{ id: string; status: string }>() : null;
       if (!expectedId || !current || current.status !== after?.status) conflict();
       if (before && typeof before.id === 'string') {
-        await db.prepare(`UPDATE friend_scenarios SET status = ?, updated_at = ? WHERE id = ?`)
+        await db.prepare(`UPDATE friend_scenarios SET confirmation_revision = confirmation_revision + 1, status = ?, updated_at = ? WHERE id = ?`)
           .bind(before.status, now, before.id).run();
       } else if (after && typeof after.id === 'string') {
         await db.prepare(`DELETE FROM friend_scenarios WHERE id = ?`).bind(after.id).run();

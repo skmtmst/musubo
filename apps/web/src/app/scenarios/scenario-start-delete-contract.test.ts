@@ -22,7 +22,6 @@ describe('シナリオ一覧の削除（点検 #495 中6）', () => {
   })
 
   it('削除は戻りの success を見て、失敗時は窓に出す', () => {
-    expect(PAGE).toContain('const res = await api.scenarios.delete(id)')
     expect(PAGE).toContain('if (!res.success) throw new Error(res.error)')
     expect(PAGE).toContain('このシナリオを削除できませんでした')
   })

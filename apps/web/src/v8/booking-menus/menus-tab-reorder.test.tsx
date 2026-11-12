@@ -122,6 +122,11 @@ async function moveBy(how: 'drag' | 'key' | 'menu', container: HTMLElement) {
 }
 
 describe('予約メニューの並び替え', () => {
+  it.each([true, false])('並びの案内は編集権限 %s に合う', (canEdit) => {
+    render(<Harness canEdit={canEdit} />)
+    expect(screen.getByText(/上から並んだ順に、お客さまの画面に出ます/)).toBeTruthy()
+    expect(Boolean(screen.queryByText(/つまみで並べ替えます/))).toBe(canEdit)
+  })
   it('ドラッグ・上下キー・「…」の下へは同じ結果になり、読み直しても残る', async () => {
     const results: string[][] = []
     for (const how of ['drag', 'key', 'menu'] as const) {

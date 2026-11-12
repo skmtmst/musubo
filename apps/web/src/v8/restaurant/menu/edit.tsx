@@ -75,6 +75,9 @@ function MenuEditBody() {
   const saveErrors = useSaveFormErrors()
   const { selectedAccountId } = useAccount()
   const contextKey = JSON.stringify([selectedAccountId, id, storeParam])
+  const currentContext = useRef(contextKey)
+  currentContext.current = contextKey
+  const loadSequence = useRef(0)
   const canEdit = canManageRole(useStaffRole())
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [item, setItem] = useState<RestaurantMenuItem | null>(null)
@@ -87,15 +90,18 @@ function MenuEditBody() {
   const [saved, setSaved] = useState<Draft>(draftOf(null))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [menuConflict, setMenuConflict] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmingPrice, setConfirmingPrice] = useState(false)
   const [confirmingPublish, setConfirmingPublish] = useState(false)
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
+    const sequence = ++loadSequence.current
     setState('loading')
     try {
       const response = await restaurantTestApi.snapshot(selectedAccountId)
+      if (sequence !== loadSequence.current || currentContext.current !== contextKey) return
       const found = id ? response.data.menuItems.find((row) => row.id === id) ?? null : null
       setItem(found)
       const nextStoreId = found?.store_id ?? storeParam ?? response.data.stores[0]?.id ?? null
@@ -103,12 +109,13 @@ function MenuEditBody() {
       setStoreIdentity(nextStoreId ? { accountId: selectedAccountId, id: nextStoreId, name: response.data.stores.find(store => store.id === nextStoreId)?.name ?? null } : null)
       setStoreAccountId(response.data.stores.find(store => store.id === nextStoreId)?.line_account_id ?? null)
       setDraft(draftOf(found)); setSaved(draftOf(found))
+      setMenuConflict(false); setError(null)
       setState('ready')
     } catch {
-      setState('error')
+      if (sequence === loadSequence.current && currentContext.current === contextKey) setState('error')
     }
-  }, [selectedAccountId, id, storeParam])
-  useEffect(() => { void load() }, [load])
+  }, [selectedAccountId, id, storeParam, contextKey])
+  useEffect(() => { void load(); return () => { loadSequence.current++ } }, [load])
 
   useEffect(() => {
     let active = true
@@ -135,16 +142,17 @@ function MenuEditBody() {
   const priceError = draft.price === '' ? undefined : Number(draft.price) < 0 ? '値段は0円以上で入れてください。' : exceedsPriceLimit ? '値段は1,000,000円以下で入れてください。' : !Number.isInteger(Number(draft.price)) ? '値段は整数で入れてください。' : undefined
 
   const [confirmationScope, setConfirmationScope] = useState('')
+  const [confirmedRevision, setConfirmedRevision] = useState<number | null>(null)
   const confirmationVersion = useRef({ key: contextKey, generation: 0 })
   if (confirmationVersion.current.key !== contextKey) confirmationVersion.current = { key: contextKey, generation: confirmationVersion.current.generation + 1 }
   const currentConfirmationScope = JSON.stringify([contextKey, confirmationVersion.current.generation])
   const mutationContext = useRef<{ key: string; menuSignature: string | null }>({ key: contextKey, menuSignature: null })
   if (mutationContext.current.key !== contextKey) mutationContext.current = { key: contextKey, menuSignature: null }
-  useEffect(() => { setBusy(false); setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setError(null) }, [contextKey])
+  useEffect(() => { setBusy(false); setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setMenuConflict(false); setError(null) }, [contextKey])
 
-  async function save() {
-    if (!canEdit || !selectedAccountId || !valid) return
-    if (editing && !dirty) return
+  async function save(version = confirmedRevision) {
+    if (!canEdit || !selectedAccountId || !valid || menuConflict) return
+    if (editing && (!dirty || !Number.isSafeInteger(version) || !version)) return
     const isCurrent = captureResource()
     if (!isCurrent()) return
     const attempt = mutationContext.current
@@ -159,7 +167,7 @@ function MenuEditBody() {
     }
     try {
       if (editing) {
-        const updateBody = { ...body, ...(editing.status === 'draft' && draft.status === 'active' ? { status: 'active' } : {}) }
+        const updateBody = { ...body, expectedVersion: version!, ...(editing.status === 'draft' && draft.status === 'active' ? { status: 'active' } : {}) }
         const signature = JSON.stringify([editing.id, updateBody])
         if (attempt.menuSignature !== signature) {
           await restaurantTestApi.updateMenu(selectedAccountId, editing.id, updateBody)
@@ -180,6 +188,12 @@ function MenuEditBody() {
       return true
     } catch (cause) {
       if (!stillHere()) return
+      if (cause instanceof ApiError && cause.code === 'menu_confirmation_conflict') {
+        setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setConfirmedRevision(null)
+        setMenuConflict(true)
+        setError('ほかの人が変更しました。最新を読み込むと入力は消えます。')
+        return false
+      }
       /* お支払いの版が古い（409）ときは共通の帯と比べる窓で選んでもらう。ページの中身は保存済み。 */
       if (cause instanceof PaymentConflictError) { setSaved(draft); setError('メニュー本体は保存しました。お支払いの設定は、閉じて最新の内容と比べてください。'); return false }
       saveErrors.capture(cause)
@@ -192,14 +206,14 @@ function MenuEditBody() {
   }
 
   async function remove() {
-    if (!editing || !selectedAccountId) return
+    if (menuConflict || !editing || !selectedAccountId || !Number.isSafeInteger(confirmedRevision) || !confirmedRevision) return
     const isCurrent = captureResource()
     if (!isCurrent()) return
     const attempt = mutationContext.current
     const stillHere = () => isCurrent() && mutationContext.current === attempt
     setBusy(true); setError(null)
     try {
-      await fetchApi(`/api/restaurant-test/menus/${encodeURIComponent(editing.id)}?account_id=${encodeURIComponent(selectedAccountId)}`, { method: 'DELETE' })
+      await fetchApi(`/api/restaurant-test/menus/${encodeURIComponent(editing.id)}?account_id=${encodeURIComponent(selectedAccountId)}`, { method: 'DELETE', body: JSON.stringify({ expectedVersion: confirmedRevision }) })
       if (!stillHere()) return
       notifySaved('メニューを削除しました。')
       setSaved(draft)
@@ -207,6 +221,11 @@ function MenuEditBody() {
       return true
     } catch (error) {
       if (!stillHere()) return
+      if (error instanceof ApiError && error.code === 'menu_confirmation_conflict') {
+        setDeleting(false); setConfirmedRevision(null); setMenuConflict(true)
+        setError('ほかの人が変更しました。最新を読み込むと入力は消えます。')
+        return false
+      }
       setError(japaneseDetailOf(error) || '削除できませんでした。')
       return false
     } finally {
@@ -239,13 +258,13 @@ function MenuEditBody() {
         preview={side}
         previewSurface="plain"
         previewToggle={<PreviewLauncher title="お支払いの説明" label="お支払いの説明を見る">{side}</PreviewLauncher>}
-        destructive={canEdit && editing ? <Button variant="text" textTone="danger" onClick={() => { setConfirmationScope(currentConfirmationScope); setError(null); setDeleting(true) }} disabled={busy}>削除する</Button> : undefined}
+        destructive={canEdit && editing ? <Button variant="text" textTone="danger" onClick={() => { setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing.confirmation_revision); setError(null); setDeleting(true) }} disabled={busy || menuConflict}>削除する</Button> : undefined}
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
-          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid || (Boolean(editing) && !dirty)} disabledReason={!valid ? priceError ? '値段を確認してください。' : '名前と値段を入力してください。' : editing && !dirty ? '変更していません' : undefined} onClick={() => { setConfirmationScope(currentConfirmationScope); setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save() }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
+          {canEdit ? <Button variant="primary" busy={busy} disabled={menuConflict || !valid || (Boolean(editing) && !dirty)} disabledReason={!valid ? priceError ? '値段を確認してください。' : '名前と値段を入力してください。' : editing && !dirty ? '変更していません' : undefined} onClick={() => { setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing?.confirmation_revision ?? null); setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save(editing?.confirmation_revision ?? null) }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
         </>}
       >
-        {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
+        {error ? <Notice tone="danger" role="alert">{error}{menuConflict ? <Button onClick={() => { void load() }}>最新を読み込む</Button> : null}</Notice> : null}
         {canEdit ? (
           <Card variant="form" gap="normal">
             <CardHeader size="stacked" title="基本" />

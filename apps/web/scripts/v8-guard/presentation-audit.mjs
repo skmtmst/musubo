@@ -93,8 +93,9 @@ try {
       console.error(width, route, headError)
     } else {
       const result = base && !baseError ? assessAgainstBase(problems(head), problems(base)) : assess(problems(head))
-      rows.push({ ...head, baseError, newFindings: result.failures, existingFindings: result.existing ?? [], baselineFindings: base && !baseError ? problems(base) : null })
-      console.log(`${width} ${route} : ${head.title ?? '題なし'} / 新規${result.failures.length} / 既存${result.existing?.length ?? 0}`)
+      const reviewFindings = result.needsReview ?? []
+      rows.push({ ...head, baseError, newFindings: [...result.failures, ...reviewFindings], existingFindings: result.existing ?? [], baselineFindings: base && !baseError ? problems(base) : null })
+      console.log(`${width} ${route} : ${head.title ?? '題なし'} / 新規${result.failures.length} / 要確認${reviewFindings.length} / 既存${result.existing?.length ?? 0}`)
     }
     writeFileSync(join(out, 'presentation.json'), JSON.stringify(rows, null, 2) + '\n')
   }

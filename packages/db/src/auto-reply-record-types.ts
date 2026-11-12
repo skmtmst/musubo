@@ -10,6 +10,7 @@ export interface AutoReply {
   reply_delay_seconds?: number | null;
   unmatched_action?: string | null;
 
+  confirmation_revision?: number;
   id: string;
   keyword: string;
   match_type: 'exact' | 'contains';

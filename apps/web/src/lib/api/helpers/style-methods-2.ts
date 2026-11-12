@@ -190,6 +190,11 @@ export const methods2 = {
     },
   ) => fetchApi(url(root + '/closures', accountId), write('POST', body)),
 
+  closureConfirmation: (accountId: string, body: { date: string; target: 'store' | 'staff'; staffIds: string[]; allDay: boolean; startTime?: string; endTime?: string; reason?: string }) =>
+    fetchApi<{ success: true; data: { snapshot: string; reservations: Array<{ id: string; name: string; startsAt: string; endsAt: string; partySize: number }> } }>(url(root + '/closures/confirmation', accountId), write('POST', body)),
+  closeHoursConfirmed: (accountId: string, body: { date: string; target: 'store' | 'staff'; staffIds: string[]; allDay: boolean; startTime?: string; endTime?: string; reason?: string; expectedSnapshot: string }) =>
+    fetchApi<{ success: true; data: { count: number } }>(url(root + '/closures/confirmed', accountId), write('POST', body)),
+
   // Existing restaurant closures include preview, table selection and affected reservations.
   closeRestaurant: restaurantTestApi.createClosure,
 

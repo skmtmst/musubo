@@ -28,7 +28,7 @@ describe("友だちの顔", () => {
   it('頭文字はいつも1字（英字は頭の1字・日本語は最初の1字）', () => {
     expect(avatarInitials('Kyohei Yamamoto')).toBe('K')
     expect(avatarInitials('Masato.S')).toBe('M')
-    expect(avatarInitials('菅野 亮')).toBe('菅')
+    expect(avatarInitials('見本 15')).toBe('見')
   })
 
   it('会社名は法人格と記号を飛ばしてから1字（アカウントのアイコンも同じ）', () => {
@@ -56,21 +56,21 @@ describe("友だちの顔", () => {
   })
 
   it('人の顔（丸）は今までどおり薄い地のまま', () => {
-    const { container } = render(<Avatar name="菅野 亮" />)
+    const { container } = render(<Avatar name="見本 15" />)
     const root = container.firstElementChild as HTMLElement
     expect(root.dataset.avatar).toBe('initials')
     expect(root.dataset.avatarTone).toBeUndefined()
   })
 
   it('同じ名前はいつも同じ色', () => {
-    expect(avatarToneIndex('菅野 亮')).toBe(avatarToneIndex('菅野 亮'))
+    expect(avatarToneIndex('見本 15')).toBe(avatarToneIndex('見本 15'))
     expect(avatarToneIndex('')).toBeGreaterThanOrEqual(0)
   })
 
   it.each([
     ...Array.from({ length: 6 }, (_, i) => ({ name: String.fromCharCode(65 + i), shape: 'circle' as const, tone: 'neutral' as const })),
     { name: '株式会社 然', shape: 'rounded' as const, tone: 'neutral' as const },
-    { name: '菅野 亮', shape: 'circle' as const, tone: 'soft' as const },
+    { name: '見本 15', shape: 'circle' as const, tone: 'soft' as const },
   ])('頭文字の実効色は4.5:1以上（$name・$shape・$tone）', props => {
     const { container } = render(<Avatar {...props} />)
     const style = getComputedStyle(container.firstElementChild!)

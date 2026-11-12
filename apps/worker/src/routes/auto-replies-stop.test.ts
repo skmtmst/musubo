@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
+import { updateAutoReply, deleteAutoReply, restoreAutoReply, ensureAutoReplyPublishedVersion, getAutoReplyById } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -65,6 +66,84 @@ describe('機能08 点検: 自動応答の専用停止口と履歴を残す削�
       headers: { 'content-type': 'application/json', ...(init.headers ?? {}) },
       ...init,
     }, target.bindings);
+
+  const revision = () => (testDb.raw.prepare("SELECT confirmation_revision AS v FROM auto_replies WHERE id='rule-1'").get() as {v:number}).v;
+
+  it('自動応答の設定更新で確認版を進める', async () => {
+    const before = revision();
+    await updateAutoReply(testDb.db, 'rule-1', {name:'変更後'});
+    expect(revision()).toBe(before + 1);
+  });
+
+  it('自動応答の削除で確認版を進める', async () => {
+    const before = revision();
+    await deleteAutoReply(testDb.db, 'rule-1', 'admin-1');
+    expect(revision()).toBe(before + 1);
+  });
+
+  it('自動応答の復元で確認版を進める', async () => {
+    await deleteAutoReply(testDb.db, 'rule-1', 'admin-1');
+    const before = revision();
+    await restoreAutoReply(testDb.db, 'rule-1');
+    expect(revision()).toBe(before + 1);
+  });
+
+  it('確認版の不一致は409、一致と版なしは停止できる', async () => {
+    const target=app(testDb.db);
+    testDb.raw.prepare("UPDATE auto_replies SET confirmation_revision=3 WHERE id='rule-1'").run();
+    const invoke=(id:string,key:string,expectedVersion?:number)=>stop(target,id,{headers:{'Idempotency-Key':key},body:JSON.stringify({expectedVersion})});
+    const conflict = await invoke('rule-1','version-stale-001',1);
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toMatchObject({code:'auto_reply_confirmation_conflict',data:{confirmationRevision:3}});
+    expect(testDb.raw.prepare("SELECT is_active FROM auto_replies WHERE id='rule-1'").get()).toEqual({is_active:1});
+    expect((await invoke('rule-1','version-current-002',3)).status).toBe(200);
+    expect(testDb.raw.prepare("SELECT confirmation_revision FROM auto_replies WHERE id='rule-1'").get()).toEqual({confirmation_revision:4});
+    expect((await invoke('rule-2','version-legacy-003')).status).toBe(200);
+  });
+
+  it('実行版が作り直されても確認した停止を受け付ける', async () => {
+    const row = (await getAutoReplyById(testDb.db, 'rule-1'))!;
+    await ensureAutoReplyPublishedVersion(testDb.db, row);
+    expect(revision()).toBe(1);
+    const response = await stop(app(testDb.db), 'rule-1', {headers:{'Idempotency-Key':'runtime-version-01'},body:JSON.stringify({expectedVersion:1})});
+    expect(response.status).toBe(200);
+    expect(testDb.raw.prepare("SELECT is_active FROM auto_replies WHERE id='rule-1'").get()).toEqual({is_active:0});
+  });
+
+  it('JSON以外の版指定は拒み、版のない従来本文は受け付ける', async () => {
+    const target = app(testDb.db);
+    const response = await stop(target, 'rule-1', {headers:{'Idempotency-Key':'non-json-version-01','content-type':'application/x-www-form-urlencoded'},body:'expectedVersion=1'});
+    expect(response.status).toBe(400);
+    expect(testDb.raw.prepare("SELECT is_active FROM auto_replies WHERE id='rule-1'").get()).toEqual({is_active:1});
+    expect((await stop(target, 'rule-1', {headers:{'Idempotency-Key':'legacy-plain-0001','content-type':'text/plain'},body:'legacy'})).status).toBe(200);
+  });
+
+  it('読み取り後に別の更新が割り込んだら停止しない', async () => {
+    let interrupted = false;
+    const db = new Proxy(testDb.db, { get(target, prop) {
+      if (prop !== 'prepare') return Reflect.get(target, prop);
+      return (sql: string) => {
+        const statement = target.prepare(sql);
+        if (!sql.includes('UPDATE auto_replies') || !sql.includes('stop_idempotency_key')) return statement;
+        return new Proxy(statement, { get(stmt, key) {
+          if (key !== 'bind') return Reflect.get(stmt, key);
+          return (...args: unknown[]) => {
+            const bound = stmt.bind(...args);
+            return new Proxy(bound, { get(prepared, method) {
+              if (method !== 'run') return Reflect.get(prepared, method);
+              return async () => {
+                if (!interrupted) { interrupted = true; testDb.raw.prepare("UPDATE auto_replies SET name='割り込み', confirmation_revision=confirmation_revision+1 WHERE id='rule-1'").run(); }
+                return prepared.run();
+              };
+            } });
+          };
+        } });
+      };
+    } });
+    const response = await stop(app(db), 'rule-1', { headers: { 'Idempotency-Key': 'version-race-0001' }, body: JSON.stringify({ expectedVersion: 1 }) });
+    expect(response.status).toBe(409);
+    expect(testDb.raw.prepare("SELECT name, is_active, confirmation_revision FROM auto_replies WHERE id='rule-1'").get()).toEqual({name:'割り込み',is_active:1,confirmation_revision:2});
+  });
 
   it('E-01: 停止口が理由・停止者・停止日時を記録し、一覧へ返す', async () => {
     const target = app(testDb.db);

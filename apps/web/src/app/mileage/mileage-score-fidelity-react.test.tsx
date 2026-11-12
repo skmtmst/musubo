@@ -43,7 +43,7 @@ function stubFetch() {
           items: [
             {
               friendId: 'friend-1',
-              displayName: 'Kenta Kawano',
+              displayName: 'Demo Person',
               pictureUrl: null,
               currentScore: 82,
               band: 'high',
@@ -53,7 +53,7 @@ function stubFetch() {
             },
             {
               friendId: 'friend-2',
-              displayName: '菅野 亮',
+              displayName: '見本 15',
               pictureUrl: null,
               currentScore: 35,
               band: 'low',

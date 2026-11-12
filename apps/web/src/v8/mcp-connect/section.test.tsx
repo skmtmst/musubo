@@ -2,7 +2,7 @@
 import React from 'react'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 /*
@@ -64,6 +64,47 @@ it('操作記録から止める前に全アカウントと環境を示す', asyn
   expect(within(dialog).queryByText('対象アカウント数')).toBeNull()
   expect(within(dialog).getByRole('button', { name: '止める' }).querySelector('.lucide-trash-2')).toBeNull()
   expect(within(dialog).getByText('環境')).toBeTruthy()
+})
+
+it('操作記録で確認中に接続が切り替わったら古い確認では止めない', async () => {
+  apiMock.logs.mockImplementation(async ({ connectionId }: { connectionId?: string }) => ({
+    success: true,
+    data: { items: [], total: 0, connection: connectionId === 'mcp-2' ? { ...CONNECTION, id: 'mcp-2', name: '別の接続' } : CONNECTION },
+  }))
+  render(<McpLogV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: 'その他の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'この接続を止める' }))
+  expect(screen.getByRole('alertdialog').textContent).toContain('Claude（Kenta）')
+  await act(async () => {
+    window.history.pushState(null, '', '?connection=mcp-2')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  await screen.findByText(/別の接続・/)
+  const dialog = screen.queryByRole('alertdialog')
+  if (dialog) fireEvent.click(within(dialog).getByRole('button', { name: '止める' }))
+  expect(apiMock.stop).not.toHaveBeenCalled()
+  window.history.replaceState(null, '', window.location.pathname)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+})
+
+it('接続切替前の読込が遅れて戻っても、別の接続に表示が戻らない', async () => {
+  let finishFirst!: (value: unknown) => void
+  const first = new Promise(resolve => { finishFirst = resolve })
+  apiMock.logs.mockImplementation(({ connectionId }: { connectionId?: string }) => connectionId === 'mcp-2'
+    ? Promise.resolve({ success: true, data: { items: [], total: 0, connection: { ...CONNECTION, id: 'mcp-2', name: '別の接続' } } })
+    : first)
+  render(<McpLogV8 />)
+  await waitFor(() => expect(apiMock.logs).toHaveBeenCalled())
+  await act(async () => {
+    window.history.pushState(null, '', '?connection=mcp-2')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  await screen.findByText(/別の接続・/)
+  await act(async () => { finishFirst({ success: true, data: { items: [], total: 0, connection: CONNECTION } }) })
+  expect(screen.queryByText(/Claude（Kenta）・/)).toBeNull()
+  expect(screen.getByText(/別の接続・/)).toBeTruthy()
+  window.history.replaceState(null, '', window.location.pathname)
+  window.dispatchEvent(new PopStateEvent('popstate'))
 })
 
 it('6件以上の対象は5件と残数を示し、全名を title に残す', async () => {

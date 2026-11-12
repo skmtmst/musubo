@@ -440,6 +440,7 @@ export function normalizeDeliveryStatus(value: unknown): string | undefined {
 
 export const NEN_SKIPPED_REASONS = [
   'friend_unavailable',
+  'recipient_changed',
   'line_account_unavailable',
   'line_account_mismatch',
   'campaign_snapshot_missing',
@@ -477,6 +478,7 @@ function safeFailureReason(status: string, error: string | null, attempts: numbe
   if (status !== 'failed' && status !== 'skipped') return null;
   const known: Record<string, string> = {
     friend_unavailable: '友だちが配信対象ではありません',
+    recipient_changed: '確認したLINE宛先が変わったため送りません',
     line_account_unavailable: 'LINE公式アカウントの送信設定を確認できません',
     line_account_mismatch: '友だちと配信元のLINE公式アカウントが一致しません',
     campaign_snapshot_missing: '予約時の配信内容を確認できません',
@@ -565,7 +567,7 @@ export async function listNenDeliveries(
   // 生文をキーとして出さない。
   const skippedRows = await db.prepare(
     `SELECT CASE WHEN last_error IN (
-              'friend_unavailable', 'line_account_unavailable', 'line_account_mismatch',
+              'friend_unavailable', 'recipient_changed', 'line_account_unavailable', 'line_account_mismatch',
               'campaign_snapshot_missing', 'campaign_disabled', 'campaign_form_already_submitted',
               'frequency_suppressed', 'order_cancelled', 'order_refunded'
             ) THEN last_error ELSE 'unknown' END AS reason, COUNT(*) AS total
@@ -740,6 +742,8 @@ function skippedRetryBlockedMessage(status: string, lastError: string | null): s
     switch (lastError) {
       case 'friend_unavailable':
         return '友だちが配信対象ではないため、この記録は再送できません';
+      case 'recipient_changed':
+        return '確認したLINE宛先が変わったため、この記録は再送できません';
       case 'campaign_snapshot_missing':
         return '予約時の配信内容を確認できないため、この記録は再送できません';
       case 'line_account_mismatch':
