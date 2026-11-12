@@ -536,6 +536,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     loadOlderMessages,
     refreshChatDetailQuietly,
   } = useInboxConversation({
+    sendLockRef,
     CHAT_MESSAGE_PAGE_SIZE,
     selectedChatIdRef,
     detailAccountRef,
