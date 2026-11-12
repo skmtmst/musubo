@@ -46,6 +46,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
   restaurantGoogleApi,
+  type GoogleConnectionData,
   type GooglePost,
   type GooglePostCtaType,
   type GooglePostDraftInput,
@@ -122,7 +123,7 @@ function instagramFact(ig: NonNullable<GooglePost['instagram']>): string {
   return ig.caption ? 'Google と同時に出します（Instagram 用の文章あり）' : 'Google と同時に出します（本文をそのまま使います）'
 }
 
-export function PostsBoard({ accountId, go, store, googleLocation }: { accountId: string; go: GoogleNav; store?: { id: string; name?: string | null }; googleLocation?: string | null }) {
+export function PostsBoard({ accountId, go, store, googleLocation, connection, onConnectionReloaded }: { accountId: string; go: GoogleNav; store?: { id: string; name?: string | null }; googleLocation?: string | null; connection?: { id?: string; confirmationRevision?: number }; onConnectionReloaded?: (data: GoogleConnectionData) => void }) {
   const scope = useRef({ id: accountId, generation: 0 })
   if (scope.current.id !== accountId) scope.current = { id: accountId, generation: scope.current.generation + 1 }
   const loadedScope = useRef(-1)
@@ -137,7 +138,10 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
   const [loadError, setLoadError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<GooglePost | null>(null)
-  const [removeScope, setRemoveScope] = useState<{ id: string; generation: number; store?: { id: string; name?: string | null }; googleLocation?: string | null } | null>(null)
+  const removeTicket = useRef<object | null>(null)
+  const renderedRemoveTicket = removeTicket.current
+  const [removeScope, setRemoveScope] = useState<{ id: string; generation: number; store?: { id: string; name?: string | null }; googleLocation?: string | null; connectionId?: string; connectionRevision?: number } | null>(null)
+
   const [actionError, setActionError] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const { allowed: canPublish, lockedReason: publishReason, canView } = useGooglePermission('manager', data?.permissions?.canPublish ?? false)
@@ -184,15 +188,39 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
 
   const removePost = async () => {
     if (!canPublish || busyId || !confirmRemove) return
+    const requestScope = scope.current
+    const requestTicket = removeTicket.current
     setBusyId(confirmRemove.id)
     setActionError('')
     try {
-      await restaurantGoogleApi.removePost(accountId, confirmRemove.id)
+      if (!Number.isSafeInteger(confirmRemove.confirmationRevision) || !Number.isSafeInteger(removeScope?.connectionRevision) || !removeScope?.connectionId) throw new Error('確認した版がありません')
+      await restaurantGoogleApi.removePost(accountId, confirmRemove.id, { expectedPostRevision: confirmRemove.confirmationRevision!, expectedConnectionRevision: removeScope.connectionRevision!, expectedConnectionId: removeScope.connectionId })
+      if (!alive.current || requestScope !== scope.current || requestTicket !== removeTicket.current) return false
+      removeTicket.current = null
+
       setConfirmRemove(null)
       await load()
       return true
     } catch (err) {
+      if (!alive.current || requestScope !== scope.current || requestTicket !== removeTicket.current) return false
       setActionError(errorMessage(err, '削除できませんでした。'))
+      if (err instanceof ApiError && err.status === 409) {
+        const generation = scope.current.generation
+        try {
+          const [latestPosts, latestConnection] = await Promise.all([
+            restaurantGoogleApi.posts(accountId, { filter, kind, page, perPage }),
+            restaurantGoogleApi.connection(accountId),
+          ])
+          if (!alive.current || generation !== scope.current.generation) return false
+          const latest = latestConnection.connection?.id && Number.isSafeInteger(latestConnection.connection.confirmationRevision)
+            ? latestPosts.posts.find(item => item.id === confirmRemove.id && item.status === 'published') : undefined
+          onConnectionReloaded?.(latestConnection)
+          setData(latestPosts)
+          setConfirmRemove(latest ?? null)
+          setRemoveScope(previous => previous && latest ? { ...previous, googleLocation: latestConnection.connection?.locationTitle,
+            connectionId: latestConnection.connection?.id, connectionRevision: latestConnection.connection?.confirmationRevision } : null)
+        } catch { if (alive.current && generation === scope.current.generation) setConfirmRemove(null) }
+      }
       return false
     } finally {
       setBusyId(null)
@@ -223,7 +251,8 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
     if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', group: 'view', external: true, href: post.searchUrl ?? '' })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
     if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => void retryInstagram(post) })
-    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublishRef.current && loadedScope.current === scope.current.generation) { setActionError(''); setRemoveScope({ id: accountId, generation: scope.current.generation, store, googleLocation }); setConfirmRemove(post) } } })
+    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublishRef.current && loadedScope.current === scope.current.generation) { removeTicket.current = {}; setActionError(''); setRemoveScope({ id: accountId, generation: scope.current.generation, store, googleLocation, connectionId: connection?.id, connectionRevision: connection?.confirmationRevision }); setConfirmRemove(post) } } })
+
     if (!canView) return items.map(item => ({ ...item, disabled: true, lockedReason: undefined }))
     return lockMenuItems(canSync, items, 'feature', item => item.id === 'open' || item.id === 'google')
   }
@@ -290,8 +319,8 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
         confirmLabel="削除する"
         destructive
         busy={busyId === confirmRemove?.id}
-        error={actionError || undefined} onSuccess={() => setConfirmRemove(null)} onConfirm={() => { if (alive.current && canPublishRef.current && removeScope?.generation === scope.current.generation) return removePost() }}
-        onCancel={() => setConfirmRemove(null)}
+        error={actionError || undefined} onSuccess={() => { removeTicket.current = null; setConfirmRemove(null) }} onConfirm={() => { if (renderedRemoveTicket && renderedRemoveTicket === removeTicket.current && alive.current && canPublishRef.current && removeScope?.generation === scope.current.generation) return removePost() }}
+        onCancel={() => { removeTicket.current = null; setConfirmRemove(null) }}
       >{removeScope ? <OperationTargetSummary accounts={[{ id: removeScope.id }]} store={removeScope.store} externalTarget={{ label: 'Googleの店舗', name: removeScope.googleLocation }} /> : null}</ConfirmDialog>
     </>
   )
@@ -843,11 +872,11 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
       <p className={styles.muted}>Googleに公開される内容と日時を確認してください。</p>
       <OperationTargetSummary accounts={[{ id: accountId }]} store={{ id: storeId, name: storeName }} />
       {sent ? <Notice tone="success">{sent.alreadyPublished ? 'この内容はすでにGoogleに届いていました。送信はしていません。' : post.status === 'published' ? 'Googleに投稿を送信し、公開を確認しました。' : 'Googleに投稿を送信しました。反映を確認できるまで「審査中」と表示します。'}</Notice> : null}
-      {post.status === 'rejected' ? <Notice tone="danger">Googleの審査で公開されませんでした。内容を見直して作り直してください。</Notice> : null}
-      {post.status === 'pending_confirm' && !sent ? <Notice tone="warn">前回の送信結果を確認できていません。「この内容で予約する」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}
+      {post.status === 'rejected' ? <Notice tone="danger">Googleの審査で公開されませんでした。{canEdit ? '内容を見直して作り直してください。' : '管理者に内容の確認を依頼してください。'}</Notice> : null}
+      {post.status === 'pending_confirm' && !sent ? <Notice tone="warn">前回の送信結果を確認できていません。{canSend && writeEnabled ? '「この内容で予約する」を押すと、先にGoogle側の状態を照合してから送信します。' : 'Google側の状態を確認してください。'}</Notice> : null}
       {!writeEnabled ? <Notice tone="warn">この環境ではGoogleへの投稿が許可されていません。内容の確認まではできます。</Notice> : null}
       {writeEnabled && !canPublish ? <Notice tone="warn">Googleへの投稿は店舗管理者以上が行います。この下書きは保存されているので、管理者が確認して投稿できます。</Notice> : null}
-      {post.instagram?.status === 'failed' ? <Notice tone="warn">{`Instagram へは出せませんでした${post.instagram.error ? `（${post.instagram.error}）` : ''}。Google への公開はそのまま残っています。投稿一覧の「…」から「Instagram へ再送」でもう一度送れます。`}</Notice> : null}
+      {post.instagram?.status === 'failed' ? <Notice tone="warn">{`Instagram へは出せませんでした${post.instagram.error ? `（${post.instagram.error}）` : ''}。Google への公開はそのまま残っています。${canSend ? '投稿一覧の「…」から「Instagram へ再送」でもう一度送れます。' : '管理者に確認を依頼してください。'}`}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       <dl className={styles.facts}>
         <div className={styles.factRow}><dt className={styles.factKey}>投稿先</dt><dd className={styles.factValue}>{storeName}</dd></div>

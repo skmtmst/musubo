@@ -7,7 +7,7 @@ import { spawnSync, execFile } from 'node:child_process'
 import { createServer } from 'node:http'
 import { promisify } from 'node:util'
 import { connectGuardBrowser } from './browser-session.mjs'
-import { assess, assessAgainstBase, DEFECT_ROUTES, measurePage } from './layout-defects.mjs'
+import { assess, assessAgainstBase, scopeFailed, DEFECT_ROUTES, measurePage } from './layout-defects.mjs'
 const shell = body => '<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}</style><main>'+body+'</main>'
 
 const cases = {
@@ -81,7 +81,7 @@ test('種類ごとに実物を壊し、検出・終了コード1・修復後0を
     assert.equal(run.status,1,run.stdout+run.stderr)
     for (const kind of Object.keys(cases)) {
       assert.match(run.stdout,new RegExp('崩れ 1152 /fixture/'+kind+': 新規[1-9]'))
-      assert.match(run.stdout,new RegExp('  '+kind+' '))
+      assert.match(run.stdout,new RegExp('  (新規|要確認) '+kind+' '))
     }
     writeFileSync(manifest,JSON.stringify(Object.fromEntries(Object.entries(repairs).map(([k,v])=>[k,shell(v)]))))
     const fixed = spawnSync(process.execPath,['apps/web/scripts/v8-guard/layout-defects.mjs','--fixtures',manifest],{encoding:'utf8',timeout:60000})
@@ -131,6 +131,46 @@ test('comparison fails only new defects, including additional copies of an exist
 
 test('conversions guard measures the canonical points tab instead of the legacy redirect', () => {
   assert.equal(DEFECT_ROUTES.conversions, '/affiliates?tab=points')
+})
+
+test('new-only buckets: new, review and unmeasurable scopes fail; existing-only passes', () => {
+  const base = { kind: 'overlap', target: 'span', text: '本文', measure: { x: 1 } }
+  // 既存だけなら通る。
+  const same = assessAgainstBase([{ ...base }], [{ ...base }])
+  assert.deepEqual(same.failures, [])
+  assert.deepEqual(same.needsReview, [])
+  assert.deepEqual(same.fixed, [])
+  assert.equal(scopeFailed(same), false)
+  // 種類が違う新規は新規＋解消で落ちる（中身違いで件数同じ場合も同じ）。
+  const other = { kind: 'clip', target: 'span', text: '本文', measure: { x: 1 } }
+  const added = assessAgainstBase([other], [base])
+  assert.deepEqual(added.failures, [other])
+  assert.deepEqual(added.fixed, [base])
+  assert.deepEqual(added.needsReview, [])
+  assert.equal(scopeFailed(added), true)
+  // 同じ種類の対は要確認にまとめ、本線側を添えて落とす（場所の移動か別物かは人が見る）。
+  const moved = { ...base, target: 'div' }
+  const review = assessAgainstBase([moved], [base])
+  assert.deepEqual(review.failures, [])
+  assert.equal(review.needsReview.length, 1)
+  assert.deepEqual(review.needsReview[0].base, base)
+  assert.equal(scopeFailed(review), true)
+  // 生成ハッシュだけ違う対象は既存。
+  const hashed = { ...base, target: '.button_button__ZmqfD' }
+  const rebuilt = { ...base, target: '.button_button__A1b2C3' }
+  const hashedResult = assessAgainstBase([hashed], [rebuilt])
+  assert.deepEqual(hashedResult.failures, [])
+  assert.equal(scopeFailed(hashedResult), false)
+  // 測れなかった区画は通さない。
+  assert.equal(scopeFailed({ failures: [], needsReview: [], error: '指定画面を開けませんでした' }), true)
+  assert.equal(scopeFailed({ failures: [], needsReview: [] }), false)
+  // 切り替え：0で旧来の判定（全件失敗）に戻る。
+  process.env.V8_GUARD_NEW_ONLY = '0'
+  try {
+    assert.deepEqual(assessAgainstBase([base], [base]).failures.length, 1)
+  } finally {
+    delete process.env.V8_GUARD_NEW_ONLY
+  }
 })
 
 test('short names fail when wrapped; paragraphs and message bodies can wrap without punctuation rules', async () => {

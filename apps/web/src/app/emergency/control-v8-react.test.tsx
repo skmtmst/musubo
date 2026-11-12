@@ -325,7 +325,8 @@ test('EA8rM: 全部そろうと本人確認の上で止める', async () => {
 test('EA8rM: 窓に止める対象・止まらないもの・取り消せないこと・本人確認の方法を出す', async () => {
   await openStopDialog()
   const dialog = document.body.querySelector('[data-design-node="EA8rM"]')
-  expect(dialog?.textContent).toContain('止める対象：すべてのアカウント')
+  expect(dialog?.textContent).toContain('すべてのLINEアカウント')
+  expect(dialog?.textContent).toContain('環境')
   expect(dialog?.textContent).toContain('停止前にすでに LINE へ渡したものは取り消せません。')
   expect(dialog?.textContent).toMatch(/止まらないもの：.*受信箱からの手の返信/)
   expect(dialog?.textContent).toContain('本人確認（認証アプリの6桁）')

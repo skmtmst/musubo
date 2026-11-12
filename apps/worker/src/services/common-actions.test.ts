@@ -291,18 +291,25 @@ describe('共通アクション', () => {
     });
     expect(detail.bindings[0]).toMatchObject({ versionNumber: 1, hasNewerVersion: true });
 
+    await expect(updateCommonActionBindingVersion(testDb.db, {
+      id: created.id, bindingId: 'binding-1', lineAccountId: 'account-1',
+      versionId: draft2.draftVersionId, expectedVersionId: created.draftVersionId,
+      ...{ expectedConfirmationRevision: 2 },
+    })).rejects.toMatchObject({ code: 'version_conflict' });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM common_action_binding_migration_events').get()).toEqual({ count: 0 });
     await updateCommonActionBindingVersion(testDb.db, {
       id: created.id,
       bindingId: 'binding-1',
       lineAccountId: 'account-1',
       versionId: draft2.draftVersionId,
       expectedVersionId: created.draftVersionId,
+      ...{ expectedConfirmationRevision: 1 },
       actorId: 'staff-1',
     });
     detail = await getCommonActionDetail(testDb.db, {
       id: created.id, lineAccountId: 'account-1',
     });
-    expect(detail.bindings[0]).toMatchObject({ versionNumber: 2, hasNewerVersion: false });
+    expect(detail.bindings[0]).toMatchObject({ versionNumber: 2, hasNewerVersion: false, confirmationRevision: 2 });
     expect(testDb.raw.prepare(
       `SELECT from_action_version_id, to_action_version_id, actor_id
          FROM common_action_binding_migration_events`,
@@ -322,6 +329,18 @@ describe('共通アクション', () => {
     expect(testDb.raw.prepare(
       `SELECT COUNT(*) AS count FROM common_action_binding_migration_events`,
     ).get()).toEqual({ count: 1 });
+    // 版なしの旧呼び出しで元へ戻した後も、最初の確認は再利用できない。
+    await updateCommonActionBindingVersion(testDb.db, {
+      id: created.id, bindingId: 'binding-1', lineAccountId: 'account-1',
+      versionId: created.draftVersionId, expectedVersionId: draft2.draftVersionId,
+    });
+    await expect(updateCommonActionBindingVersion(testDb.db, {
+      id: created.id, bindingId: 'binding-1', lineAccountId: 'account-1',
+      versionId: draft2.draftVersionId, expectedVersionId: created.draftVersionId,
+      expectedConfirmationRevision: 1,
+    })).rejects.toMatchObject({ code: 'version_conflict' });
+    expect(testDb.raw.prepare('SELECT confirmation_revision FROM common_action_bindings WHERE id = ?').get('binding-1'))
+      .toEqual({ confirmation_revision: 3 });
   });
 
   it('共通アクション同士の循環を公開できない', async () => {

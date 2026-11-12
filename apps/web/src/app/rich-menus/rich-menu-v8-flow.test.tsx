@@ -98,6 +98,7 @@ const okGroup = () => ({
   folderId: null,
   defaultOpen: false,
   version: 1,
+  publishingGeneration: 0,
   pages: [{
     id: 'pg-1',
     orderIndex: 0,

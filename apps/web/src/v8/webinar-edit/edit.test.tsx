@@ -67,8 +67,8 @@ const analytics = {
 }
 const participants = {
   items: [
-    { friendId: 'f-1', friendName: 'Kenta Kawano', pictureUrl: null, sessions: 2, registered: true, firstJoinedAt: '2026-09-30T01:12:00Z', latestJoinedAt: '2026-09-30T01:12:00Z', maxWatchedSeconds: 872, ctaClickedAt: '2026-09-30T01:20:00Z', formSubmittedAt: null, classification: 'completed' },
-    { friendId: 'f-2', friendName: '山田 太郎', pictureUrl: null, sessions: 0, registered: true, firstJoinedAt: null, latestJoinedAt: null, maxWatchedSeconds: 0, ctaClickedAt: null, formSubmittedAt: null, classification: 'unviewed' },
+    { friendId: 'f-1', friendName: 'Demo Person', pictureUrl: null, sessions: 2, registered: true, firstJoinedAt: '2026-09-30T01:12:00Z', latestJoinedAt: '2026-09-30T01:12:00Z', maxWatchedSeconds: 872, ctaClickedAt: '2026-09-30T01:20:00Z', formSubmittedAt: null, classification: 'completed' },
+    { friendId: 'f-2', friendName: '見本 141', pictureUrl: null, sessions: 0, registered: true, firstJoinedAt: null, latestJoinedAt: null, maxWatchedSeconds: 0, ctaClickedAt: null, formSubmittedAt: null, classification: 'unviewed' },
   ],
   nextCursor: null,
 }
@@ -424,6 +424,18 @@ it('WEB-166：公開中は編集の…から版を確認して停止する', asy
   expect(puts.some(p => p.path.endsWith('/pause') && (p.body as { expectedVersion: number }).expectedVersion === 3)).toBe(true)
 });
 
+
+it('停止の確認中に対象ウェビナーが切り替わると古い窓から停止しない', async () => {
+  await render(<WebinarEditV8 />)
+  await act(async () => { buttons().find(b => b.getAttribute('aria-label') === 'ウェビナーの操作')!.click() })
+  const choice = [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '停止') as HTMLElement
+  await act(async () => { choice.click() })
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('停止')
+  nav.search = 'id=webinar-2&pane=basic'
+  await render(<WebinarEditV8 />)
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent ?? '').not.toContain('停止しますか')
+  expect(puts.some(p => p.path.endsWith('/pause'))).toBe(false)
+})
 
 it('編集の複製は保存済みの版を送り、一覧で下書きを光らせる行き先へ移る', async () => {
   nav.search = 'id=webinar-1&pane=participants'

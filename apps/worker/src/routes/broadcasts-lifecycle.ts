@@ -361,6 +361,16 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
   return c.json({ success: true, data: updated ? serializeBroadcast(updated) : null });
 };
 
+function containsCancelVersion(text: string): boolean {
+  // Decode individual escapes even if another part of the body is malformed.
+  let normalized = text;
+  for (let i = 0; i < 3; i++) {
+    normalized = normalized.replace(/%([0-9a-f]{2})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
+      .replace(/\\u([0-9a-f]{4})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+  }
+  return /expected\s*version/i.test(normalized);
+}
+
 export const post__api_broadcasts_id_cancel_2 = async (c: Context<Env, "/api/broadcasts/:id/cancel">) => {
   const id = c.req.param('id');
   const existing = await getBroadcastById(c.env.DB, id);
@@ -376,7 +386,13 @@ export const post__api_broadcasts_id_cancel_2 = async (c: Context<Env, "/api/bro
     if(bytes.length){
       const type=(c.req.header('content-type')??'').split(';')[0].trim().toLowerCase();
       if(type==='application/x-www-form-urlencoded') {
-        const values=new URLSearchParams(new TextDecoder().decode(bytes)).getAll('expectedVersion');
+        const text=new TextDecoder().decode(bytes);
+        const values=new URLSearchParams(text).getAll('expectedVersion');
+        if (containsCancelVersion(text)) {
+          if (values.length === 0) return inputError(c,{success:false,error:'版を確認してください'},400,['expectedVersion']);
+          try { new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes); decodeURIComponent(text.replace(/\+/g, ' ')); }
+          catch { return inputError(c,{success:false,error:'送信内容の形式を確認してください'},400,['expectedVersion']); }
+        }
         if(values.length>1)return inputError(c,{success:false,error:'版を確認してください'},400,['expectedVersion']);
         value=values[0];
       } else if(type==='multipart/form-data') {
@@ -387,13 +403,23 @@ export const post__api_broadcasts_id_cancel_2 = async (c: Context<Env, "/api/bro
           value=values[0];
         } catch { return inputError(c,{success:false,error:'送信内容の形式を確認してください'},400); }
       } else {
-        // 従来どおり本文だけの呼び出しは受けるが、版を含みそうなら無視しない。
+        // Content-Type が違っても JSON またはフォームとして読める版は照合する。
         const text=new TextDecoder().decode(bytes);
-        let decoded=text;
-        try { decoded=decodeURIComponent(text); } catch { /* 不正なエスケープはそのまま調べる。 */ }
-        let hasVersion=/expected\s*version/i.test(decoded);
-        try { const object=JSON.parse(text);hasVersion ||= !!object&&typeof object==='object'&&'expectedVersion' in object; } catch { /* JSON以外の従来本文。 */ }
-        if(hasVersion)return inputError(c,{success:false,error:'版はJSONまたはフォームで指定してください'},400,['expectedVersion']);
+        if (containsCancelVersion(text)) {
+          try {
+            new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes);
+            if (text.trimStart().startsWith('{')) {
+              const parsed: unknown = JSON.parse(text);
+              if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !('expectedVersion' in parsed)) throw new Error('invalid version');
+              body.expectedVersion = (parsed as Record<string, unknown>).expectedVersion;
+            } else {
+              decodeURIComponent(text.replace(/\+/g, ' '));
+              const values = new URLSearchParams(text).getAll('expectedVersion');
+              if (values.length !== 1) throw new Error('invalid version');
+              value = values[0];
+            }
+          } catch { return inputError(c,{success:false,error:'送信内容の版を確認してください'},400,['expectedVersion']); }
+        }
       }
     }
     if(value!==undefined) {

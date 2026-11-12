@@ -43,7 +43,7 @@ vi.mock('@/components/shell/page-chrome', async (importOriginal: () => Promise<t
   return { ...actual, usePageTitle: (title: string) => { pageTitle(title); return actual.usePageTitle(title) } }
 })
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
+  useAccount: () => ({ selectedAccountId: fixture.accountId, accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
 }))
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => null,
@@ -104,7 +104,7 @@ function installFetch() {
       if (fixture.roleMode === 'pending') return new Promise<Response>((resolve) => { releaseRole = resolve })
       return reply({ role: fixture.role }, fixture.roleMode === 'failed' ? 503 : 200)
     }
-    if (path.includes('/delete-impact')) return reply({ definition: DEFINITION, usages: [], eventCount: 5, canDelete: false, stopImpact: { affectedUsageCount: 1, preservesPastEvents: true, preservesUsages: true }, replacementCandidates: [] })
+    if (path.includes('/delete-impact')) return reply({ definition: { ...DEFINITION, id: 'point-0' }, usages: [], eventCount: 5, canDelete: false, stopImpact: { affectedUsageCount: 1, preservesPastEvents: true, preservesUsages: true }, replacementCandidates: [] })
     if (path.endsWith('/stop')) return reply({ id: DEFINITION.id, status: 'stopped', version: 4, stoppedAt: '2026-10-04' })
     if (path.startsWith('/api/conversions/definitions')) {
       return new Response(JSON.stringify(listBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })

@@ -700,15 +700,11 @@ export default function TemplatesListV8() {
     const lock = {}; bulkLock.current = lock; setBulkDeleting(true)
     setBulkDeleteError('')
     try {
-      let failed = 0
-      for (const t of pendingBulkDelete) {
-        if (!current()) return
-        const result = await api.templates.delete(t.id)
-        if (!current()) return
-        if (!result.success) failed += 1
-      }
-      if (failed > 0) {
-        setBulkDeleteError(`${formatNumber(failed)} 件を削除できませんでした。状態を読み直してからお試しください。`)
+      if (pendingBulkDelete.some(t => !Number.isSafeInteger(t.confirmationRevision) || !t.confirmationRevision || t.confirmationRevision < 1)) throw new Error('確認した版を読み直してください')
+      const result = await api.templates.bulkDelete(pendingBulkDelete.map(t => ({ id: t.id, expectedRevision: t.confirmationRevision! })))
+      if (!current()) return
+      if (!result.success) {
+        setBulkDeleteError(`${formatNumber(pendingBulkDelete.length)} 件を削除できませんでした。状態を読み直してからお試しください。`)
         await Promise.all([load(), loadFolders()])
         return
       }
@@ -1001,12 +997,18 @@ export default function TemplatesListV8() {
     <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} range={{ total: filteredTemplates.length, first: (safePage - 1) * pageSize + 1, last: Math.min(safePage * pageSize, filteredTemplates.length) }} />
   )
 
+  const assetScopeGuard = useRef<((action: () => void) => void) | null>(null)
+  const setAssetScopeGuard = useCallback((guard: ((action: () => void) => void) | null) => { assetScopeGuard.current = guard }, [])
   const isTemplateSection = activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video'
-  const switchSection = (next: Section) => requestUnsavedAction(() => {
-    setUrlView({ tab: next, page: '1' })
-    if (next === 'message' || next === 'question' || next === 'rich_video') setFolderSection(next)
-    setSelectedIds(new Set())
-  })
+  const switchSection = (next: Section) => {
+    const change = () => requestUnsavedAction(() => {
+      setUrlView({ tab: next, page: '1' })
+      if (next === 'message' || next === 'question' || next === 'rich_video') setFolderSection(next)
+      setSelectedIds(new Set())
+    })
+    if (assetScopeGuard.current) assetScopeGuard.current(change)
+    else change()
+  }
 
   /* 種類のタブ（件数つき）。閲覧のみの帯（）はタブの上。 */
   const tabs = (
@@ -1042,7 +1044,7 @@ export default function TemplatesListV8() {
 
   if (!isTemplateSection && selectedAccountId) {
     return <>{detailGuard.dialog}<AssetTemplatesList key={`${selectedAccountId}:${activeSection}`} kind={activeSection}
-      accountId={selectedAccountId} tabs={tabs} canMutate={canMutateTemplates}
+      accountId={selectedAccountId} tabs={tabs} canMutate={canMutateTemplates} onScopeGuardChange={setAssetScopeGuard}
       lockedReason={lockedReason} onChanged={() => void loadAssetCounts()} /></>
   }
 

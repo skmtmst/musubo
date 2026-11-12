@@ -72,7 +72,8 @@ it('閲覧のみとプレビューURL無しでも、準備完了の案内と同�
   net.canEdit = false; net.withUrl = false
   const { container } = render(<Settings accountId="account-a" />)
   await waitFor(() => expect(content(container).getAttribute('data-content-spacing')).toBe('notice-after-preview'))
-  expect(screen.getByText(lead)).toBeTruthy()
+  expect(screen.getByText('上から並んだ順に、お客さまの画面に出ます。')).toBeTruthy()
+  expect(screen.queryByText(/つまみで並べ替えます/)).toBeNull()
   expect(screen.queryByRole('button', { name: /並び替える/ })).toBeNull()
   expect(screen.queryByRole('link', { name: '予約メニューを作る' })).toBeNull()
   expect(screen.queryByRole('link', { name: 'お客さまに見える画面を確かめる' })).toBeNull()

@@ -4,6 +4,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, expect, it, vi } from 'vitest'
 import NotificationsPane from '@/test-utils/webinar-notifications'
 import ActualNotificationsPane from './notifications'
+import BasicPane from './basic'
+import ReviewPane from './review'
 import { webinarEditContext, webinarWizardChrome } from '@/test-utils/webinar-edit'
 import type { Webinar, WebinarEditor } from '@/lib/api'
 const net = vi.hoisted(() => ({ test: vi.fn() }))
@@ -19,9 +21,23 @@ vi.mock('@/lib/api', async original => {
       hourBeforeMinutes: 15, startEnabled: true, missedEnabled: false, missedTime: '10:00', missedWindowDays: 3, completedEnabled: true },
       overview: { total: 4, sent: 2, failed: 0, skipped: 0 } } }),
     actions: async () => ({ data: [] }), editor: async () => ({ data: { version: 2, notificationTest: null } }), testNotifications: net.test,
+    testNotificationRecipients: async () => ({data:{count:1,recipients:[{id:'friend',displayName:'確認の人'}],token:'a'.repeat(64),confirmationId:'00000000-0000-4000-8000-000000000001'}}),
   } }
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
+it.each(['基本設定','確認'])('%s のテスト送信も確認した宛先を渡す', async pane => {
+  net.test.mockResolvedValue({data:{sent:1,failed:0}})
+  const editor={version:2,notificationTest:null,deliveryKind:'on_demand',viewingCondition:{label:''},actionPolicy:{missingResultPolicy:'escalate'}} as WebinarEditor
+  const ctx=webinarEditContext({id:'webinar',title:'確認用',slug:'test',status:'draft',schedule:[],durationSeconds:3600,accountId:'target'} as Webinar,editor)
+  if(pane==='基本設定')render(<BasicPane ctx={ctx} chrome={webinarWizardChrome} onDirtyChange={()=>{}} registerSave={()=>{}} />)
+  else render(<ReviewPane ctx={ctx} chromeFor={primary=>({...webinarWizardChrome,footerActions:primary})} />)
+  const buttons=await screen.findAllByRole('button',{name:pane==='基本設定'?'テストを送る':'通知のテストを送る',exact:true})
+  fireEvent.click(buttons[0])
+  const dialog=within(await screen.findByRole('dialog',{name:'通知をテスト送信しますか？'}))
+  await dialog.findByText('テスト受信者 1 人：確認の人')
+  fireEvent.click(dialog.getByRole('button',{name:'テストを送る',exact:true}))
+  await waitFor(()=>expect(net.test).toHaveBeenCalledWith('webinar','a'.repeat(64),'00000000-0000-4000-8000-000000000001'))
+})
 it('通知のテスト前に、取得できないアカウントと環境を確認できる', async () => {
   render(<NotificationsPane webinarId="webinar" editor={{ version: 2, notificationTest: null } as WebinarEditor} />)
   fireEvent.click(await screen.findByRole('button', { name: 'テストを送る', exact: true }))
@@ -47,8 +63,10 @@ it.each(['成功', '失敗'])('前の%sの文を新しく開いた確認窓の�
   render(<NotificationsPane webinarId="webinar" editor={{ version: 2, notificationTest: null } as WebinarEditor} />)
   fireEvent.click(await screen.findByRole('button', { name: 'テストを送る', exact: true }))
   const first = await screen.findByRole('dialog', { name: '通知をテスト送信しますか？' })
+  await within(first).findByText('テスト受信者 1 人：確認の人')
   await act(async () => { fireEvent.click(within(first).getByRole('button', { name: 'テストを送る', exact: true })) })
   expect(net.test).toHaveBeenCalledTimes(1)
+  expect(net.test).toHaveBeenCalledWith('webinar', 'a'.repeat(64), '00000000-0000-4000-8000-000000000001')
   if (previous === '失敗') {
     expect(within(first).getByRole('alert')).toBeTruthy()
     fireEvent.click(within(first).getByRole('button', { name: 'キャンセル' }))

@@ -64,6 +64,7 @@ export async function setRestaurantFollowupRow(db: D1Database, storeId: string, 
       batch.push(
         db.prepare(`INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft)
           SELECT ?,?,COALESCE(MAX(step_order)+1,0),?,?,0 FROM scenario_steps WHERE scenario_id=?`).bind(stepId,scenarioId,message.type,message.content,scenarioId),
+        db.prepare('UPDATE scenarios SET content_revision=content_revision+1 WHERE id=? AND changes()>0').bind(scenarioId),
       );
     }
     batch.push(db.prepare(`INSERT INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled)

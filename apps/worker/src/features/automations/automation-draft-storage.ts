@@ -37,7 +37,7 @@ export function automationDraftCreationStatements(db:D1Database,input:{
         input.lineAccountId,
       ),
       db.prepare(
-        `UPDATE automation_definitions SET current_draft_version_id = ?
+        `UPDATE automation_definitions SET confirmation_revision = confirmation_revision + 1, current_draft_version_id = ?
           WHERE id = ? AND line_account_id = ? AND status = 'draft'
             AND current_draft_version_id IS NULL`,
       ).bind(versionId, id, input.lineAccountId),

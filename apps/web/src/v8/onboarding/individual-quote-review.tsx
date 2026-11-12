@@ -78,7 +78,7 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
           <dl className={styles.statusDetails}><div><dt>{accepted ? '同意した見積もり' : '元の見積もり番号'}</dt><dd>{quote.quoteNumber}</dd></div>
             <div><dt>{accepted ? '同意日時' : '有効期限'}</dt><dd>{dateJst(accepted ? quote.acceptedAt! : quote.expiresAt)}</dd></div></dl>
           <h3>このあとの流れ</h3>
-          <ol>{(accepted ? ['Stripeでクレジットカードを登録', '既存のウィザードでLINEを接続', 'LINE有効化日から無料期間を開始']
+          <ol>{(accepted ? ['クレジットカードを登録', '既存のウィザードでLINEを接続', 'LINE有効化日から無料期間を開始']
             : expired ? ['再発行を依頼', '運営が料金を確認してメールでご案内', '新しい見積もりに同意してクレジットカード登録']
               : ['新しいご案内メールを確認', '変更後の料金と有効期限を確認', '新しい見積もりに同意してクレジットカード登録'])
             .map((step) => <li className={styles.statusStep} key={step}>{step}</li>)}</ol>
@@ -158,7 +158,7 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
             : '料金条件・無料期間・今後の請求について確認し、同意します'}
         </Checkbox></div>
         <p className={styles.small}>{hasContractCapacity
-          ? '同意後はStripeのクレジットカード登録画面へ進めます。カード情報はmusuboに保存しません。'
+          ? '同意後はクレジットカード登録画面へ進めます。musuboにはカード番号やセキュリティコードを保存しません。'
           : '同意した単価と適用条件は確定します。期限後もクレジットカード登録を再開できます。カード情報はmusuboに保存しません。'}</p>
         {error && <Notice tone="danger" role="alert">{error}</Notice>}
       </div>

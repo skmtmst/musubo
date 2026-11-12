@@ -1,5 +1,9 @@
 'use client'
 
+import { isConflictResponse } from '@/components/shared/save-conflict'
+
+import type { ScenarioConfirmation } from '@/lib/api/types/scenarios'
+
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 import { type ScenarioQuestion } from '@/components/scenarios/question-editor'
@@ -17,7 +21,7 @@ export function useScenarioCopy({
   duplicateRemainder, saveErrors, sortedSteps, deliveryMode,
   id, setDuplicateRemainder, setDuplicateOpen, discardingDuplicate,
   setDiscardingDuplicate, setDiscardDuplicateError, setDiscardDuplicateOpen, deletingScenario,
-  setDeletingScenario, setDeleteScenarioError, setDeleteScenarioOpen, router,
+  setDeletingScenario, setDeleteScenarioError, deleteConfirmation, deleteConfirmationValid, refreshDeleteConfirmation, setDeleteScenarioOpen, router,
 }: {
   scenario: ScenarioWithSteps | null
   duplicating: boolean
@@ -35,6 +39,9 @@ export function useScenarioCopy({
   setDiscardDuplicateError: Dispatch<SetStateAction<string>>
   setDiscardDuplicateOpen: Dispatch<SetStateAction<boolean>>
   deletingScenario: boolean
+  deleteConfirmation: ScenarioConfirmation | null
+  deleteConfirmationValid: () => boolean
+  refreshDeleteConfirmation: () => Promise<void>
   setDeletingScenario: Dispatch<SetStateAction<boolean>>
   setDeleteScenarioError: Dispatch<SetStateAction<string>>
   setDeleteScenarioOpen: Dispatch<SetStateAction<boolean>>
@@ -249,15 +256,21 @@ export function useScenarioCopy({
   }
 
   const handleDeleteScenario = async () => {
-    if (!scenario || deletingScenario) return
+    if (!scenario || deletingScenario || !deleteConfirmation || !deleteConfirmationValid()) return
     setDeletingScenario(true)
     setDeleteScenarioError('')
     try {
-      const res = await api.scenarios.delete(id)
+      if (!deleteConfirmationValid()) return
+      const res = await api.scenarios.delete(id, deleteConfirmation)
       if (!res.success) throw new Error(res.error)
       setDeleteScenarioOpen(false)
       router.push('/scenarios')
     } catch (saveFailure) {
+      if (isConflictResponse(saveFailure) && saveFailure.code === 'scenario_confirmation_conflict') {
+        await refreshDeleteConfirmation()
+        setDeleteScenarioError('確認した内容が変わりました。もう一度確認してください。')
+        return
+      }
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)

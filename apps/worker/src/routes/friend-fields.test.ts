@@ -308,7 +308,7 @@ describe('R181 既定値は個別値と同じ物差しで検証する', () => {
   });
 
   it('正しい電話番号の既定値は作れる', async () => {
-    const res = await createDefault('tel', '090-1234-5678');
+    const res = await createDefault('tel', '090-0000-5678');
     expect(res.status).toBe(201);
   });
 
@@ -458,7 +458,7 @@ describe('項目の削除', () => {
 describe('項目移行の事前確認', () => {
   it('選択中アカウントの値だけを種類に合わせて数える', async () => {
     mocks.getFriendFieldValuesForMigration.mockResolvedValue([
-      { friend_id: 'friend-1', value: '090-1234-5678' },
+      { friend_id: 'friend-1', value: '090-0000-5678' },
       { friend_id: 'friend-2', value: '電話なし' },
       { friend_id: 'friend-3', value: '' },
     ]);
@@ -517,7 +517,7 @@ describe('項目移行の事前確認', () => {
     const target = { ...FIELD, id: 'ff-2', field_key: 'pet_name_new', type: 'tel', version: 2 };
     mocks.getFriendFieldByIdForScope.mockImplementation(async (_db: unknown, id: string) =>
       id === 'ff-2' ? target : { ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
-    mocks.getFriendFieldValuesForMigration.mockResolvedValue([{ friend_id: 'friend-1', value: '090-1234-5678' }]);
+    mocks.getFriendFieldValuesForMigration.mockResolvedValue([{ friend_id: 'friend-1', value: '090-0000-5678' }]);
     mocks.getFriendFieldUsageForScope.mockResolvedValue([
       { kind: 'form', id: 'form-1', name: '申込フォーム', fieldId: 'ff-1', switchable: true },
     ]);

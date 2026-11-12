@@ -8,6 +8,8 @@ import { PageFrame, PageHeading, PageContent } from '@/components/templates/page
 import { DetailColumns } from '@/components/templates/detail-columns'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+import { useAccount } from '@/contexts/account-context'
 import ListState from '@/components/shared/list-state'
 import Toggle from '@/components/shared/toggle'
 import { TextArea } from '@/components/shared/text-field'
@@ -44,9 +46,10 @@ const FIELD_WORD: Record<string, string> = { メールアドレス: 'メール',
 
 export default function MergedPersonV8({ personId, onClose, onDirtyChange }: { personId: string; onClose: () => void; onDirtyChange?: (dirty: boolean) => void }) {
   usePageTitle('統合ユーザーの詳細')
-  const m = useMergedPerson(personId)
   const staffRole = useStaffRole()
   const canManage = canManageRole(staffRole)
+  const { selectedAccountId } = useAccount()
+  const m = useMergedPerson(personId, selectedAccountId, canManage)
   const manageLockedReason = usePermissionLockReason(canManage, 'manager')
   const [valuesExpanded, setValuesExpanded] = useState(false)
 
@@ -228,6 +231,7 @@ export default function MergedPersonV8({ personId, onClose, onDirtyChange }: { p
             <Button type="button" variant="danger" onClick={m.unlink} disabled={m.unlinking || !m.unlinkReason.trim()} busy={m.unlinking} busyLabel="解除中…">結び付けを解除</Button>
           </DialogActions>)}
       >
+        <OperationTargetSummary accounts={[{ id: m.unlinkTarget?.lineAccountId ?? '', name: m.unlinkTarget?.lineAccountId ? m.unlinkTarget.lineAccountName : '不明' }]} externalTarget={{ label: '友だち', name: m.unlinkTarget?.displayName }} />
         <p className={styles.small}>{`解除する友だち：${m.unlinkTarget?.displayName ?? ''}`}</p>
         <Field label="解除する理由" required><SaveErrorField names={["unlinkReason","m.unlinkReason","unlink_reason","m.unlink_reason"]}><TextArea value={m.unlinkReason} onChange={(event) => m.setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" /></SaveErrorField></Field>
       </Dialog>

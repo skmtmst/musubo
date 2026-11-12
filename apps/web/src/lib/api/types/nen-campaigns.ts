@@ -54,6 +54,14 @@ export type NenColumn = {
   sourceColumnId: string | null
 }
 
+export type NenColumnDeliveryPreview = {
+  recipientCount: number
+  confirmationToken: string
+  column: Pick<NenColumn, 'id' | 'title' | 'excerpt' | 'introText' | 'articleUrl' | 'imageUrl' | 'targetMode' | 'targetTagId' | 'updatedAt'>
+  campaign: { updatedAt: string; buttonLabel: string | null }
+  messages: Array<{ type: 'text'; text: string } | { type: 'flex'; altText: string; contents: unknown }>
+}
+
 export type NenColumnCreateInput = {
   title: string
   category?: string

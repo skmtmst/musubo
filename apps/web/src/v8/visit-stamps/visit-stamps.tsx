@@ -68,7 +68,7 @@ import Toggle from '@/components/shared/toggle'
  * 呼ぶ口は visit-stamps-api（Codex の API-7）だけ。動き・権限は BEHAVIOR.md。
  */
 
-type PaperRow = { id: string; card_id?: string; friend_id: string; photo_url: string; stamps: number; status: string; created_at?: string }
+type PaperRow = { id: string; card_id?: string; line_account_id?: string | null; friend_id: string; photo_url: string; stamps: number; status: string; created_at?: string }
 type FriendLite = { id: string; displayName?: string | null; metadata?: Record<string, unknown> | null }
 
 const SLOT_OPTIONS = [5, 6, 8, 10, 12, 15, 20, 30].map((n) => ({ value: String(n), label: `${n} 個` }))
@@ -149,6 +149,8 @@ function VisitStampsScreen() {
   /* 役割が分かるまでは出す（最後の守りはサーバの 403）。閲覧のみ（viewer）には変える操作を置かない。 */
   const canManage = canManageRole(role)
   const canStamp = canManageRole(role) || role === 'staff'
+  const confirmScope = useRef({ selectedAccountId, role, epoch: 0 })
+  if (confirmScope.current.selectedAccountId !== selectedAccountId || confirmScope.current.role !== role) confirmScope.current = { selectedAccountId, role, epoch: confirmScope.current.epoch + 1 }
 
   const [cards, setCards] = useState<VisitStampCard[] | null>(null)
   const [loadError, setLoadError] = useState<unknown>(null)
@@ -287,20 +289,23 @@ function VisitStampsScreen() {
   const [paper, setPaper] = useState<PaperRow[] | null>(null)
   const [paperError, setPaperError] = useState<unknown>(null)
   const paperRequest = useRef(0)
+  const paperEpoch = useRef(-1)
   const loadPaper = useCallback(async () => {
     const request = ++paperRequest.current
+    const epoch = confirmScope.current.epoch
     setPaper(null)
     setPaperError(null)
     if (!selectedAccountId) return
     try {
       const res = await visitStampsApi.paperRequests(selectedAccountId)
-      if (request !== paperRequest.current) return
+      if (request !== paperRequest.current || epoch !== confirmScope.current.epoch) return
+      paperEpoch.current = epoch
       setPaper(res.data as PaperRow[]); setPaperError(null)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught);
- if (request === paperRequest.current) { if (!fieldFailure) setPaperError(caught) }
+ if (request === paperRequest.current && epoch === confirmScope.current.epoch) { if (!fieldFailure) setPaperError(caught) }
   }
-  }, [selectedAccountId, saveErrors])
+  }, [selectedAccountId, role, saveErrors])
   useEffect(() => {
     void loadPaper();
 
@@ -313,21 +318,24 @@ function VisitStampsScreen() {
   const [logPage, setLogPage] = useListUrlValue('logPage', 1)
   const [logPageSize, setLogPageSize] = useListUrlValue('logPageSize', 20)
   const logRequest = useRef(0)
+  const logEpoch = useRef(-1)
   const loadLog = useCallback(async () => {
     const request = ++logRequest.current
+    const epoch = confirmScope.current.epoch
     setLog(null)
     setLogError(null)
     if (!selectedAccountId) return
     try {
       const res = await visitStampsApi.entries({ accountId: selectedAccountId, page: logPage, pageSize: logPageSize })
-      if (request !== logRequest.current) return
+      if (request !== logRequest.current || epoch !== confirmScope.current.epoch) return
+      logEpoch.current = epoch
       const lastPage = Math.max(1, Math.ceil(res.data.total / logPageSize))
       if (logPage > lastPage) { setLogPage(lastPage); return }
       setLog(res.data); setLogError(null)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught);
- if (request === logRequest.current) { if (!fieldFailure) setLogError(caught) } }
-  }, [selectedAccountId, logPage, logPageSize, saveErrors])
+ if (request === logRequest.current && epoch === confirmScope.current.epoch) { if (!fieldFailure) setLogError(caught) } }
+  }, [selectedAccountId, role, logPage, logPageSize, saveErrors])
   useEffect(() => { setLogPage(1) }, [selectedAccountId])
   useEffect(() => {
     void loadLog()
@@ -348,7 +356,7 @@ function VisitStampsScreen() {
   }, [paper, log, friendById])
 
   const [busy, setBusy] = useState('')
-  const [rejecting, setRejecting] = useState<PaperRow | null>(null)
+  const [rejecting, setRejecting] = useState<{ row: PaperRow; epoch: number; accountId: string | null; friendName: string | null } | null>(null)
   const [dialogError, setDialogError] = useState('')
   const [photo, setPhoto] = useState<PaperRow | null>(null)
   const review = async (row: PaperRow, action: 'approve' | 'reject', reason: string) => {
@@ -412,7 +420,7 @@ function VisitStampsScreen() {
 
   /* ── ④ の行（取り消しは元の行にまとめる） ── */
   const rows = useMemo(() => historyRows(log?.items ?? [], staffName), [log, staffName])
-  const [reversing, setReversing] = useState<string | null>(null)
+  const [reversing, setReversing] = useState<{ id: string; epoch: number; accountId: string | null; friendName: string | null } | null>(null)
   const reverse = async (entryId: string, why: string) => {
     setBusy(entryId); setDialogError('')
     try {
@@ -723,7 +731,7 @@ function VisitStampsScreen() {
                                     {row.status === 'pending' && canStamp ? (
                                       <>
                                         {/* 109: 承認は主（右）、却下は赤い文字だけ。並びは［却下］［承認］。 */}
-                                        <Button size="compact" variant="text" textTone="danger" disabled={!!busy} onClick={() => { setDialogError(''); setRejecting(row) }}>却下</Button>
+                                        <Button size="compact" variant="text" textTone="danger" disabled={!!busy} onClick={() => { if (paperEpoch.current !== confirmScope.current.epoch) return; setDialogError(''); const friend = friendById(row.friend_id); setRejecting({ row, epoch: confirmScope.current.epoch, accountId: row.line_account_id ?? null, friendName: friend ? friendLabel(friend) : null }) }}>却下</Button>
                                         <Button size="compact" variant="primary" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${withHonorific(names.name)}の ${row.stamps}個を承認`} busy={Boolean(busy)} busyLabel="処理中…"><Check size={16} aria-hidden="true" />承認</Button>
                                       </>
                                     ) : null}
@@ -764,7 +772,7 @@ function VisitStampsScreen() {
                           <HistoryTable rows={rows} canManage={canManage}
                             friendName={id => { const friend = friendById(id); return friend ? friendNames(friend).name : '友だち' }}
                             onOpenFriend={id => router.push(`/friends/detail?id=${encodeURIComponent(id)}`)}
-                            onReverse={id => { setDialogError(''); setReversing(id) }} />
+                            onReverse={id => { const entry = log?.items.find(item => item.id === id); if (!entry || logEpoch.current !== confirmScope.current.epoch) return; const friend = friendById(entry.friendId); setDialogError(''); setReversing({ id: entry.id, epoch: confirmScope.current.epoch, accountId: entry.accountId ?? null, friendName: friend ? friendLabel(friend) : null }) }} />
                         )}
                 {log ? (
                   <Pagination page={logPage} pageCount={logPages} onPageChange={setLogPage} ariaLabel="記録のページ送り"
@@ -832,10 +840,10 @@ function VisitStampsScreen() {
       <RankDialog open={rankOpen} settings={settings} onClose={() => setRankOpen(false)} onSave={(rankMultipliers) => { set({ rankMultipliers }); setRankOpen(false) }} />
       <StoresDialog open={storesOpen} accounts={accounts.map((a) => ({ id: a.id, name: a.displayName || a.name }))} value={accountIds} onClose={() => setStoresOpen(false)} onSave={(ids) => { setAccountIds(ids); setStoresOpen(false) }} />
       <PinDialog open={pinOpen} staff={staff.filter((s) => s.role !== 'viewer')} busy={pinBusy} error={dialogError || undefined} onClose={() => setPinOpen(false)} onSave={(id, pin) => void savePin(id, pin)} />
-      <ReasonDialog open={!!rejecting} title="申請を却下する" description="却下するとカードには足しません。お客さまはもう一度申請できます。" confirmLabel="却下する" busy={!!busy} error={dialogError || undefined}
-        onClose={() => setRejecting(null)} onConfirm={(why) => { if (rejecting) void review(rejecting, 'reject', why) }} />
-      <ReasonDialog open={!!reversing} title="記録を取り消す" description="スタンプの数を元に戻します。取り消したことも記録に残ります。" confirmLabel="取り消す" busy={!!busy} error={dialogError || undefined}
-        onClose={() => setReversing(null)} onConfirm={(why) => { if (reversing) void reverse(reversing, why) }} />
+      <ReasonDialog open={!!rejecting && rejecting.epoch === confirmScope.current.epoch && canStamp} target={rejecting ? { accountId: rejecting.accountId, accountName: accounts.find(a => a.id === rejecting.accountId)?.name, friendName: rejecting.friendName } : undefined} title="申請を却下する" description="却下するとカードには足しません。お客さまはもう一度申請できます。" confirmLabel="却下する" busy={!!busy} error={dialogError || undefined}
+        onClose={() => setRejecting(null)} onConfirm={(why) => { if (rejecting && rejecting.epoch === confirmScope.current.epoch && canStamp) void review(rejecting.row, 'reject', why) }} />
+      <ReasonDialog open={!!reversing && reversing.epoch === confirmScope.current.epoch && canManage} target={reversing ? { accountId: reversing.accountId, accountName: accounts.find(a => a.id === reversing.accountId)?.name, friendName: reversing.friendName } : undefined} title="記録を取り消す" description="スタンプの数を元に戻します。取り消したことも記録に残ります。" confirmLabel="取り消す" busy={!!busy} error={dialogError || undefined}
+        onClose={() => setReversing(null)} onConfirm={(why) => { if (reversing && reversing.epoch === confirmScope.current.epoch && canManage) void reverse(reversing.id, why) }} />
       {saveConflict.conflict ? <SaveConflictBand title="ほかの人が来店スタンプを先に保存しました" compareBusy={saveConflict.compareBusy} onCompare={saveConflict.compare} onReload={saveConflict.reloadLatest} /> : null}
       <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} onCancel={saveConflict.closeCompare} onReload={saveConflict.reloadLatest} lines={saveConflict.latest ? [{ text: `名前：入力 ${name} ／ 最新 ${saveConflict.latest.name}` }, { text: `設定：入力 ${JSON.stringify(settings)} ／ 最新 ${JSON.stringify(saveConflict.latest.settings)}` }, { text: `店舗：入力 ${accountIds.join('・')} ／ 最新 ${saveConflict.latest.accountIds.join('・')}` }] : null} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="保存していないカードの設定" onConfirm={confirmLeave} onCancel={cancelLeave} />

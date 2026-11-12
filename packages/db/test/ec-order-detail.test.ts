@@ -33,7 +33,7 @@ beforeEach(() => {
     VALUES ('account-1', 'channel-1', '本店', 'token', 'secret', '${TENANT_ID}'),
            ('account-2', 'channel-2', '別店', 'token', 'secret', '${TENANT_ID}');
     INSERT INTO friends (id, line_user_id, display_name, line_account_id)
-    VALUES ('friend-1', 'U1', '田中 花子', 'account-1'),
+    VALUES ('friend-1', 'U1', '見本 171', 'account-1'),
            ('friend-2', 'U2', '別店の人', 'account-2');
     INSERT INTO mileage_programs (id, code, name, status, created_at, updated_at)
     VALUES ('default', 'default', '標準', 'active', '2026-01-01', '2026-01-01');
@@ -197,7 +197,7 @@ describe('getEcOrderDetail', () => {
     expect(detail).not.toBeNull();
     expect(detail!.order.orderNumber).toBe('NEN-1001');
     expect(detail!.order.orderLines).toHaveLength(1);
-    expect(detail!.order.customerName).toBe('田中 花子');
+    expect(detail!.order.customerName).toBe('見本 171');
 
     expect(detail!.events).toHaveLength(1);
     const event = detail!.events[0];

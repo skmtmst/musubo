@@ -57,7 +57,7 @@ const base = {
 }
 const company = { ...base, id: 'v-company', folderId: 'f-shop', name: '会社名', varKey: 'company_name', value: '株式会社NEN', usageCount: 15 }
 const hours = { ...base, id: 'v-hours', folderId: null, name: '営業時間', varKey: 'hours', value: '10時から', usageCount: 3 }
-const SHOP = { id: 'f-shop', kind: 'common_var', accountId: 'account-a', name: '店舗案内', parentId: null, displayOrder: 0, color: '#2f6fde', itemCount: 1 }
+const SHOP = { id: 'f-shop', kind: 'common_var', accountId: 'account-a', name: '店舗案内', parentId: null, displayOrder: 0, color: '#2f6fde', itemCount: 1, revision: 1 }
 
 let host: HTMLDivElement
 let root: Root
@@ -116,7 +116,7 @@ describe('R37 共通情報のフォルダの名前変更・削除', () => {
     expect(removeFolder).not.toHaveBeenCalled()
     const readsBefore = listVars.mock.calls.length
     await click(button('削除する'))
-    expect(removeFolder.mock.calls.map((call) => call.slice(0, 2))).toEqual([['f-shop', 'account-a']])
+    expect(removeFolder.mock.calls.map((call) => call.slice(0, 3))).toEqual([['f-shop', 'account-a', 1]])
     expect(listVars.mock.calls.length).toBeGreaterThan(readsBefore)
   })
 
@@ -137,7 +137,7 @@ describe('R37 共通情報のフォルダの名前変更・削除', () => {
     await click(menuItem('フォルダを削除する'))
     expect(document.body.textContent).toContain('「店舗案内」を削除しますか？')
     await click(button('削除する'))
-    expect(removeFolder.mock.calls.map((call) => call.slice(0, 2))).toEqual([['f-shop', 'account-a']])
+    expect(removeFolder.mock.calls.map((call) => call.slice(0, 3))).toEqual([['f-shop', 'account-a', 1]])
 
     await renderInShop()
     await click(toolbarRegion()?.querySelector('button[aria-label="フォルダ「店舗案内」の操作"]'))

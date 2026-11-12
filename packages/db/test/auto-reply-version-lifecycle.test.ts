@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createAutoReplyWithDraftVersion, ensureAutoReplyPublishedVersion, getAutoReplyDraftVersion, getAutoReplyPublishedVersion, parseAutoReplyVersionSettings, publishAutoReplyDraftVersion, recordAutoReplyDraftTest, saveAutoReplyDraftVersion } from '../src/auto-reply-runs.js';
+import { createAutoReplyWithDraftVersion, ensureAutoReplyPublishedVersion, getAutoReplyDraftVersion, getAutoReplyPublishedVersion, parseAutoReplyVersionSettings, publishAutoReplyDraftVersion, recordAutoReplyDraftTest, saveAutoReplyDraftVersion, saveAutoReplyInternalMemo } from '../src/auto-reply-runs.js';
 import { type AutoReplyDraftSettings } from '../src/auto-reply-runs-types.js';
 import { getAutoReplyById } from '../src/auto-replies.js';
 
@@ -72,6 +72,52 @@ describe('自動応答の下書き・試験・公開版', () => {
     sqlite = new Database(':memory:');
     sqlite.exec(readFileSync(join(ROOT, 'bootstrap.sql'), 'utf8'));
     db = asD1(sqlite);
+  });
+
+  const revision = (id: string) => (sqlite.prepare('SELECT confirmation_revision AS revision FROM auto_replies WHERE id=?').get(id) as {revision:number}).revision;
+  const createPublished = async () => {
+    const created = await createAutoReplyWithDraftVersion(db, settings());
+    await recordAutoReplyDraftTest(db, created.version.id, {succeeded:true,staffId:'staff-1'});
+    return created;
+  };
+
+  it('下書きを公開したとき確認版を進める', async () => {
+    const created = await createPublished();
+    const before = revision(created.rule.id);
+    await publishAutoReplyDraftVersion(db, created.rule.id, {staffId:'staff-1',idempotencyKey:'revision-publish'});
+    expect(revision(created.rule.id)).toBe(before + 1);
+  });
+
+  it('公開済みの定義に新たな下書きを作ると確認版を進める', async () => {
+    const created = await createPublished();
+    await publishAutoReplyDraftVersion(db, created.rule.id, {staffId:'staff-1',idempotencyKey:'revision-draft'});
+    const before = revision(created.rule.id);
+    await saveAutoReplyDraftVersion(db, created.rule.id, settings({name:'次の定義'}));
+    expect(revision(created.rule.id)).toBe(before + 1);
+  });
+
+  it('実行用の公開版を新しく作っても確認版を変えない', async () => {
+    const created = await createAutoReplyWithDraftVersion(db, settings());
+    const before = revision(created.rule.id);
+    await ensureAutoReplyPublishedVersion(db, (await getAutoReplyById(db, created.rule.id))!);
+    expect(revision(created.rule.id)).toBe(before);
+  });
+
+  it('既存の公開版を指し直しても確認版を変えない', async () => {
+    const created = await createAutoReplyWithDraftVersion(db, settings());
+    await ensureAutoReplyPublishedVersion(db, (await getAutoReplyById(db, created.rule.id))!);
+    sqlite.prepare('UPDATE auto_replies SET current_published_version_id=NULL WHERE id=?').run(created.rule.id);
+    const before = revision(created.rule.id);
+    await ensureAutoReplyPublishedVersion(db, (await getAutoReplyById(db, created.rule.id))!);
+    expect(revision(created.rule.id)).toBe(before);
+  });
+
+  it('公開版だけのルールに社内メモを保存すると確認版を進める', async () => {
+    const created = await createPublished();
+    await publishAutoReplyDraftVersion(db, created.rule.id, {staffId:'staff-1',idempotencyKey:'revision-memo'});
+    const before = revision(created.rule.id);
+    await saveAutoReplyInternalMemo(db, (await getAutoReplyById(db, created.rule.id))!, '次の担当へ');
+    expect(revision(created.rule.id)).toBe(before + 1);
   });
 
   it('通知とタグ付けの設定を同じ版に保存し、読み直しても変えない', async () => {

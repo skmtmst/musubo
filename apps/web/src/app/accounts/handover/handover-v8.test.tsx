@@ -82,6 +82,7 @@ function dialog(): HTMLElement | null {
 function handoverDetail(over: Record<string, unknown> = {}) {
   return {
     id: 'h1',
+    confirmationRevision: 3,
     status: 'previewed',
     code: 'ABC123',
     fromAccountId: 'acc-1',
@@ -96,7 +97,7 @@ function handoverDetail(over: Record<string, unknown> = {}) {
         decision: 'link',
         bucket: 'review',
         note: null,
-        sourceName: '高橋 直人',
+        sourceName: '見本 16',
         candidateName: '高橋 なおと',
         evidenceLabel: '電話番号が同じ',
       },
@@ -107,7 +108,7 @@ function handoverDetail(over: Record<string, unknown> = {}) {
         decision: 'new',
         bucket: 'review',
         note: null,
-        sourceName: '森 涼太',
+        sourceName: '見本 157',
         candidateName: null,
         evidenceLabel: '候補なし',
       },
@@ -263,7 +264,7 @@ describe('V8-B 乗り換え（x2dSNv）', () => {
     const confirm = [...dialog()!.querySelectorAll('button')].find((b) => b.textContent?.trim() === '本実行する') as HTMLButtonElement
     await act(async () => { confirm.click() })
     await flush()
-    expect(handoversExecute).toHaveBeenCalledWith('h1', 'token')
+    expect(handoversExecute).toHaveBeenCalledWith('h1', 'token', 3)
     expect(toast).toHaveBeenCalledWith('本実行が終わりました。12 人を移しました。')
   })
 

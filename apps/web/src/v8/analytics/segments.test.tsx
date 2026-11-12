@@ -16,7 +16,7 @@ const { default: SegmentsV8 } = await import('./segments')
 
 const cells = Array.from({ length: 25 }, (_, i) => ({ r: 1 + Math.floor(i / 5), f: 1 + (i % 5), name: `マス${i + 1}`, count: i === 12 ? 88 : 10, optedOutCount: 0 }))
 const DATA = { cells, outside: { count: 312 }, total: 1284, computedAt: '2026-10-16T04:00:00.000Z', status: 'ready' }
-const FRIENDS = { items: [{ id: 'f1', display_name: '佐藤 健', activity_count: 1, amount: 0, last_activity_at: '2026-08-02T01:00:00Z' }], total: 88, optedOutCount: 6, nextCursor: '20' }
+const FRIENDS = { items: [{ id: 'f1', display_name: '見本 114', activity_count: 1, amount: 0, last_activity_at: '2026-08-02T01:00:00Z' }], total: 88, optedOutCount: 6, nextCursor: '20' }
 
 beforeEach(() => {
   api.get.mockResolvedValue({ success: true, data: DATA })
@@ -47,7 +47,7 @@ describe('お客さまの分け方', () => {
     render(<SegmentsV8 accountId="a" canManage />)
     await screen.findByText('全員 1,284 人')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'マス13 88 人' })) })
-    expect(await screen.findByText('佐藤 健')).toBeTruthy()
+    expect(await screen.findByText('見本 114')).toBeTruthy()
     expect(screen.getByText(/宣伝を止めている人 6 人/)).toBeTruthy()
     expect(api.friends).toHaveBeenCalledWith('a', 3, 3, 'both', 'count')
     fireEvent.click(screen.getByRole('button', { name: 'この 88 人に LINE を送る' }))
@@ -66,7 +66,7 @@ describe('お客さまの分け方', () => {
     render(<SegmentsV8 accountId="a" canManage={false} />)
     await screen.findByText('全員 1,284 人')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'マス13 88 人' })) })
-    await screen.findByText('佐藤 健')
+    await screen.findByText('見本 114')
     const save = await findDetailMenuItem('保存した検索にする')
     expect(save.getAttribute('aria-disabled') === 'true' || save.hasAttribute('disabled')).toBe(true)
     const send = screen.getByRole('button', { name: /LINE を送る/ })
@@ -96,4 +96,12 @@ it('読込中・失敗でも通常の本文と同じ共通の段に収め、再�
   fireEvent.click(screen.getByRole('button', { name: /もう一度|読み直す|やり直す/ }))
   await screen.findByText('全員 1,284 人')
   expect(container.firstElementChild?.className).toBe(layoutClass)
+})
+
+it.each([true, false])('RFMの説明は編集可否 %s に合わせる', async canManage => {
+  render(<SegmentsV8 accountId="a" canManage={canManage} />)
+  await screen.findByText('全員 1,284 人')
+  fireEvent.click(screen.getByRole('button', { name: 'RFM の表の説明' }))
+  expect(await screen.findByText(/マスを押すと、その人たちを見/)).toBeTruthy()
+  expect(Boolean(screen.queryByText(/LINE を送れます/))).toBe(canManage)
 })

@@ -61,7 +61,7 @@ beforeEach(() => {
       : url.endsWith('/api/ops/billing/sync')
         ? { success: true, data: { tenants: 2, imported: 7, failed: 1, completed: false, since: '2025-09-27T00:00:00.000Z', syncedAt: null } }
         : url.includes('line-unregistered')
-          ? { success: true, data: { registered: 21, total: 24, people: [{ staffId: 's1', name: '木下 花', tenantName: 'カフェ ムスビ', hasEmail: true }] } }
+          ? { success: true, data: { registered: 21, total: 24, people: [{ staffId: 's1', name: '見本 148', tenantName: 'カフェ ムスビ', hasEmail: true }] } }
           : { success: true, data: { ...payload, periodLabel: url.includes('prev_month') ? '先月' : '今月' } }
     return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }))
@@ -235,7 +235,7 @@ describe('画面', () => {
     const guide = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('人を見る'))
     await act(async () => { guide!.click() })
     await flush()
-    expect(document.body.textContent).toContain('木下 花')
+    expect(document.body.textContent).toContain('見本 148')
     expect(urls.some((u) => u.endsWith('/api/ops/dashboard/line-unregistered'))).toBe(true)
   })
 
@@ -283,7 +283,7 @@ describe('画面', () => {
         return new Response(JSON.stringify({ error: 'server' }), { status: 500 })
       }
       const body = url.includes('line-unregistered')
-        ? { success: true, data: { registered: 21, total: 24, people: [{ staffId: 's1', name: '木下 花', tenantName: 'カフェ ムスビ', hasEmail: true }] } }
+        ? { success: true, data: { registered: 21, total: 24, people: [{ staffId: 's1', name: '見本 148', tenantName: 'カフェ ムスビ', hasEmail: true }] } }
         : { success: true, data: payload }
       return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }))
@@ -299,6 +299,6 @@ describe('画面', () => {
     fail = false
     await act(async () => { retry!.click() })
     await flush()
-    expect(document.body.textContent).toContain('木下 花')
+    expect(document.body.textContent).toContain('見本 148')
   })
 })

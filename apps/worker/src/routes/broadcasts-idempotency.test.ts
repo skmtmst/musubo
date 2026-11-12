@@ -294,10 +294,11 @@ describe('POST /api/broadcasts/:id/cancel', () => {
     ['application/json', '{"expectedVersion":2}'],
     ['application/x-www-form-urlencoded', 'expectedVersion=2'],
     ['text/plain', 'expectedVersion=2'],
+    ['text/plain', '{\"expectedVersion\":2}'],
   ])('古い版を本文 %s で送ると無条件に取り消さない', async (contentType, body) => {
     dbMocks.getBroadcastById.mockResolvedValue(row);
     const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {method:'POST',headers:{'Content-Type':contentType},body});
-    expect([400,409]).toContain(response.status);
+    expect(response.status).toBe(409);
     expect(d1Prepare).not.toHaveBeenCalled();
   });
   test('古い版を multipart で送ると取り消さない',async()=>{
@@ -314,11 +315,13 @@ describe('POST /api/broadcasts/:id/cancel', () => {
     expect(d1Prepare).toHaveBeenCalledWith(expect.stringMatching(/WHERE[\s\S]*COALESCE\(lock_version, 1\)\s*=\s*\?/));
     expect(bind).toHaveBeenCalledWith(KEY,3,3);
   });
-  test.each(['json','form','multipart'])('一致する版を%sで送ると取り消せる',async kind=>{
+  test.each(['json','form','multipart','plain-form','plain-json'])('一致する版を%sで送ると取り消せる',async kind=>{
     dbMocks.getBroadcastById.mockResolvedValueOnce(row).mockResolvedValueOnce({...row,status:'draft',scheduled_at:null});
     const app=setupApp();const form=new FormData();form.set('expectedVersion','3');
     const init:RequestInit=kind==='json'?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedVersion:3})}
-      :kind==='form'?{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'expectedVersion=3'}:{method:'POST',body:form};
+      :kind==='form'?{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'expectedVersion=3'}
+      :kind==='plain-form'?{method:'POST',headers:{'Content-Type':'text/plain'},body:'expectedVersion=3'}
+      :kind==='plain-json'?{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({expectedVersion:3})}:{method:'POST',body:form};
     expect((await app.request(`/api/broadcasts/${KEY}/cancel`,init)).status).toBe(200);
     expect(d1Prepare).toHaveBeenCalledWith(expect.stringMatching(/WHERE[\s\S]*COALESCE\(lock_version, 1\)\s*=\s*\?/));
   });
@@ -326,6 +329,45 @@ describe('POST /api/broadcasts/:id/cancel', () => {
     dbMocks.getBroadcastById.mockResolvedValueOnce(row);
     const response=await setupApp().request(`/api/broadcasts/${KEY}/cancel`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
     expect(response.status).toBe(400);expect(d1Prepare).not.toHaveBeenCalled();
+  });
+  test.each([
+    ['application/json', '{"expectedVersion":3'],
+    ['application/x-www-form-urlencoded', 'expectedVersion=3&other=%ZZ'],
+    ['application/x-www-form-urlencoded', 'expectedVersion%ZZ=3'],
+    ['application/x-www-form-urlencoded', 'expected%2556ersion=3'],
+    ['text/plain', 'expected%2556ersion=3'],
+    ['application/x-www-form-urlencoded', 'expected%56ersion=3&other=%ZZ'],
+    ['text/plain', 'expected%56ersion=3&other=%ZZ'],
+    ['text/plain', '{"expected\\u0056ersion":3'],
+  ])('壊れた %s の本文に版があれば取消を拒否する', async (contentType, body) => {
+    dbMocks.getBroadcastById.mockResolvedValue(row);
+    const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {method:'POST',headers:{'Content-Type':contentType},body});
+    expect(response.status).toBe(400);
+    expect(d1Prepare).not.toHaveBeenCalled();
+  });
+  test('版付きフォームに壊れたUTF-8があれば取り消さない', async () => {
+    dbMocks.getBroadcastById.mockResolvedValue(row);
+    const bytes = Uint8Array.from([...new TextEncoder().encode('expectedVersion=3&other='), 0xff]);
+    const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: bytes.buffer,
+    });
+    expect(response.status).toBe(400);
+    expect(d1Prepare).not.toHaveBeenCalled();
+  });
+  test.each([
+    ['application/json', '{}'],
+    ['application/x-www-form-urlencoded', 'other=value'],
+  ])('版なしの旧来の %s を受け付ける', async (contentType, body) => {
+    dbMocks.getBroadcastById.mockResolvedValueOnce(row).mockResolvedValueOnce({...row,status:'draft',scheduled_at:null});
+    const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {method:'POST',headers:{'Content-Type':contentType},body});
+    expect(response.status).toBe(200);
+  });
+  test('他店の古い版より店舗境界を先に確認する', async () => {
+    dbMocks.getBroadcastById.mockResolvedValue(row);
+    accountAccess.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'expectedVersion=2'});
+    expect(response.status).toBe(404);
+    expect(d1Prepare).not.toHaveBeenCalled();
   });
   test('版のない旧来のテキスト本文を受け付ける',async()=>{
     dbMocks.getBroadcastById.mockResolvedValueOnce(row).mockResolvedValueOnce({...row,status:'draft',scheduled_at:null});

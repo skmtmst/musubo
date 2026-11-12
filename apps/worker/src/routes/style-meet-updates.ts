@@ -48,7 +48,7 @@ styleMeetUpdates.patch(base + '/meet/:id', async (c) => {
         : oneOf(b.attendance, ['visited', 'late', 'no_show'], true),
     now = new Date().toISOString();
   const changed = await c.env.DB.prepare(
-    'UPDATE meet_consultations SET staff_id=?,attendance=?,consultation_outcome=?,outcome_recorded_at=?,outcome_recorded_by=?,updated_at=? WHERE id=? AND updated_at=?',
+    'UPDATE meet_consultations SET confirmation_revision = confirmation_revision + 1, staff_id=?,attendance=?,consultation_outcome=?,outcome_recorded_at=?,outcome_recorded_by=?,updated_at=? WHERE id=? AND updated_at=?',
   )
     .bind(
       staffId,

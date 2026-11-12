@@ -200,7 +200,7 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
     { title: '回答フォームで集める', icon: ClipboardList, value: null, unit: '件', detail: '回答で自動で入る' },
     { title: '今月の変更', icon: Pencil, value: null, unit: '件', detail: '追加・名前の変更' },
   ] : [
-    { title: 'マーク', icon: Flag, value: status === 'ready' ? stats?.totalTemplates ?? entries.length : null, unit: '種類', detail: entries.some((entry) => entry.row.friend_count == null) ? '使っている —' : `使っている ${entries.filter((entry) => (entry.row.friend_count ?? 0) > 0).length}` },
+    { title: 'マーク', icon: Flag, value: status === 'ready' ? stats?.totalTemplates ?? entries.length : null, unit: '種類', detail: status !== 'ready' || entries.some((entry) => entry.row.friend_count == null) ? '使っている —' : `使っている ${entries.filter((entry) => (entry.row.friend_count ?? 0) > 0).length}` },
     { title: '未対応', icon: CircleDot, value: markStats?.supportStatus?.unhandledFriendCount ?? null, unit: '人', detail: markStats?.supportStatus ? `受信箱の ${markStats.supportStatus.unhandledPercent == null ? '—' : `${markStats.supportStatus.unhandledPercent.toFixed(1)}%`}` : '受信箱の —' },
     { title: '対応中', icon: Loader, value: markStats?.supportStatus?.inProgressFriendCount ?? null, unit: '人', detail: '担当が付いている' },
     { title: '過去7日の変更', icon: History, value: markStats?.markChanges?.count ?? null, unit: '回', detail: markStats?.markChanges ? '記録に残った分・手動と自動' : '手動・自動' },

@@ -1,5 +1,6 @@
 'use client'
 
+import { Undo2 } from 'lucide-react'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 
 
@@ -142,7 +143,7 @@ export function ExecuteConfirmDialog({
       <ul className={styles.bullets}>
         <li>{`対象：${name(active.fromAccountId)} → ${name(active.toAccountId)}`}</li>
         <li>{`結び付け ${active.decisionCounts?.link ?? emptyValue('unknown')} 件・除外 ${active.decisionCounts?.exclude ?? emptyValue('unknown')} 件・新規作成の判断 ${active.decisionCounts?.create ?? emptyValue('unknown')} 件（自動反映できない行は失敗として記録されます）`}</li>
-        <li>実行権限：ownerのみ。テスト移行を作成した本人は実行できません。</li>
+        <li>実行権限：オーナーのみ。テスト移行を作成した本人は実行できません。</li>
         <li>復旧：実行後、この履歴から反映済みの分だけ切り戻せます。移行後に別の変更があった行は切り戻しを止めて表示します。</li>
       </ul>
       {me && !isOwnerRole(me.role) && !lockedReason ? <p className={styles.dangerNote}>本移行の実行はownerの権限が必要です。</p> : null}
@@ -174,6 +175,7 @@ export function RollbackConfirmDialog({
       title="この移行を切り戻します"
       description={`反映した ${formatNumber(active.counts.applied)} 件を移行前の紐付けに戻します。移行後に別の変更があった行は切り戻さず、競合として表示します。`}
       confirmLabel="切り戻す"
+      confirmIcon={<Undo2 size={16} aria-hidden="true" />}
       destructive
       busy={busy}
       error={error ?? undefined}
@@ -189,7 +191,7 @@ export function RollbackConfirmDialog({
       <ul className={styles.bullets}>
         <li>{`対象：この履歴で反映済みの ${formatNumber(active.counts.applied)} 行だけです。失敗・除外の行は変更しません。`}</li>
         <li>制約：移行後に統合ユーザーへ別の変更があった行は切り戻せません。</li>
-        <li>実行権限：ownerのみ。</li>
+        <li>実行権限：オーナーのみ。</li>
       </ul>
       {conflicts.length > 0 ? (
         <ul className={`${styles.bullets} ${styles.dangerNote}`}>

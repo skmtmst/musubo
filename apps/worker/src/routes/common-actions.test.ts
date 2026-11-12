@@ -58,6 +58,24 @@ describe('共通アクションAPI', () => {
     await expect(response.json()).resolves.toMatchObject({ success: false });
   });
 
+  it('利用先の古い確認版は409と現在値を返し、一致版と旧呼び出しは通る', async () => {
+    const created = await createCommonAction(testDb.db, { lineAccountId: 'account-1', name: '確認', actions: action });
+    await publishCommonActionDraft(testDb.db, { id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId, expectedDraftRevision: 1 });
+    testDb.raw.prepare(`INSERT INTO common_action_bindings
+      (id,line_account_id,common_action_id,common_action_version_id,consumer_type,consumer_id,consumer_path)
+      VALUES ('binding','account-1',?,?,'automation','auto','step')`).run(created.id, created.draftVersionId);
+    const app = setupApp(testDb.db, admin);
+    const change = (expectedConfirmationRevision?: number) => app.request(`/api/common-actions/${created.id}/bindings/binding/version?account_id=account-1`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ versionId: created.draftVersionId, expectedVersionId: created.draftVersionId, expectedConfirmationRevision }),
+    });
+    const stale = await change(2);
+    expect(stale.status).toBe(409);
+    await expect(stale.json()).resolves.toMatchObject({ current: { id: 'binding', confirmationRevision: 1, versionId: created.draftVersionId } });
+    expect((await change(1)).status).toBe(200);
+    expect((await change()).status).toBe(200);
+  });
+
   it('別統括のアカウントは存在も明かさない', async () => {
     const response = await setupApp(testDb.db, admin)
       .request('/api/common-actions?account_id=account-2');

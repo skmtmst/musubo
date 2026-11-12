@@ -18,6 +18,8 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import Select from '@/components/shared/select';
 import HelpTip from '@/components/shared/help-tip';
 import { useOverlayFocus } from '@/components/shared/overlay-utils';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { formatNumber } from '@/lib/format';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
@@ -140,6 +142,10 @@ export default function AdvancedSearchDialog({
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [savedNotice, setSavedNotice] = useState('')
+  const conditionBaseline = useRef<string | null>(null)
+  const conditionSnapshot = JSON.stringify([blocks, any, extraAll, visibility, sort, limit])
+  const guard = useUnsavedGuard({ dirty: open && (saveName.trim() !== '' || (conditionBaseline.current !== null && conditionSnapshot !== conditionBaseline.current)), busy: open && saving, subject: '検索条件への変更', onDiscard: () => { setSaveName(''); setSaveOpen(false) } })
+  const requestClose = () => guard.guarded(onClose)
   /*
     FRIEND-13: 共通ダイアログと同じ約束（role=dialog・aria-modal・
     開いたら窓の中へフォーカス・Tabは窓の中で回る・Escapeで閉じる・
@@ -155,7 +161,7 @@ export default function AdvancedSearchDialog({
   const saveOpenRef = useRef(saveOpen)
   saveOpenRef.current = saveOpen
   const panelRef = useOverlayFocus(open, () => {
-    if (!saveOpenRef.current) onClose()
+    if (!saveOpenRef.current) requestClose()
   })
   const savePanelRef = useOverlayFocus(saveOpen, () => setSaveOpen(false), saving)
 
@@ -180,12 +186,18 @@ export default function AdvancedSearchDialog({
   useEffect(() => {
     if (open && !wasOpenRef.current) {
       const state = applied?.editorState
-      setBlocks(state?.blocks ?? defaultBlocks(fieldsFeatureEnabled))
-      setAny(state?.any ?? [])
-      setExtraAll(state?.extraAll ?? [])
-      setVisibility(state?.visibility ?? 'visible')
+      const initialBlocks = state?.blocks ?? defaultBlocks(fieldsFeatureEnabled)
+      const initialAny = state?.any ?? []
+      const initialExtraAll = state?.extraAll ?? []
+      const initialVisibility = state?.visibility ?? 'visible'
+      const safeLimit = PAGE_SIZE_OPTIONS.includes(initialLimit as (typeof PAGE_SIZE_OPTIONS)[number]) ? initialLimit : 20
+      conditionBaseline.current = JSON.stringify([initialBlocks, initialAny, initialExtraAll, initialVisibility, initialSort, safeLimit])
+      setBlocks(initialBlocks)
+      setAny(initialAny)
+      setExtraAll(initialExtraAll)
+      setVisibility(initialVisibility)
       setSort(initialSort)
-      setLimit(PAGE_SIZE_OPTIONS.includes(initialLimit as (typeof PAGE_SIZE_OPTIONS)[number]) ? initialLimit : 20)
+      setLimit(safeLimit)
       setSavedNotice('')
       setCountFailed(false)
     }
@@ -206,13 +218,14 @@ export default function AdvancedSearchDialog({
       const found = res.data.items.find((view) => view.id === savedId)
       if (!found) return
       const state = conditionsToEditorState(found.conditions)
+      conditionBaseline.current = JSON.stringify([state.blocks, state.any, state.extraAll, state.visibility, initialSort, PAGE_SIZE_OPTIONS.includes(initialLimit as (typeof PAGE_SIZE_OPTIONS)[number]) ? initialLimit : 20])
       setBlocks(state.blocks)
       setAny(state.any)
       setExtraAll(state.extraAll)
       setVisibility(state.visibility)
     }).catch(() => {})
     return () => { cancelled = true }
-  }, [open, applied, accountId, savedSearchEnabled])
+  }, [open, applied, accountId, savedSearchEnabled, initialSort, initialLimit])
 
   const params = useMemo<AdvancedSearchResult['params']>(() => {
     /*
@@ -399,6 +412,7 @@ export default function AdvancedSearchDialog({
         setSaveError(res.error)
         return
       }
+      guard.disarm()
       setSaveName('')
       setSaveOpen(false)
       setSavedNotice('条件を保存しました')
@@ -412,11 +426,11 @@ export default function AdvancedSearchDialog({
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><div
+    <SaveErrorScope errors={saveErrors}><><div
       className="fixed inset-0 flex items-center justify-center bg-scrim p-4"
       style={{ zIndex: layer }}
       data-design-node="CYJ0L"
-      onClick={onClose}
+      onClick={requestClose}
     >
       <div
         ref={panelRef}
@@ -441,11 +455,11 @@ export default function AdvancedSearchDialog({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {onLoadSaved && savedSearchEnabled ? (
-              <Button type="button" onClick={onLoadSaved}>
+              <Button type="button" onClick={() => guard.guarded(onLoadSaved)}>
                 保存した検索から読み込む
               </Button>
             ) : null}
-            <CloseButton onClick={onClose} />
+            <CloseButton onClick={requestClose} />
           </div>
         </div>
 
@@ -788,7 +802,7 @@ export default function AdvancedSearchDialog({
             ) : null}
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
-            <Button type="button" onClick={onClose}>
+            <Button type="button" onClick={requestClose}>
               キャンセル
             </Button>
             {/* #976 U084: 主操作は共通Buttonの primary（`$accent-deep` + 白文字）。 */}
@@ -796,7 +810,7 @@ export default function AdvancedSearchDialog({
               type="button"
               variant="primary"
               className="px-5"
-              onClick={() => onApply({ params, summary, editorState })} busy={counting} busyLabel="再計算中…">
+              onClick={() => { const apply = () => onApply({ params, summary, editorState }); if (saveName.trim()) guard.guarded(apply); else apply() }} busy={counting} busyLabel="再計算中…">
               {count === null ? 'この条件で表示' : `${formatNumber(count)}人を表示`}
             </Button>
           </div>
@@ -833,7 +847,7 @@ export default function AdvancedSearchDialog({
           </section>
         </div>
       ) : null}
-    </div></SaveErrorScope>
+    </div><UnsavedLeaveDialog subject="検索条件への変更" open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></></SaveErrorScope>
   )
 }
 

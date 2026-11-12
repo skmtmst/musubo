@@ -21,7 +21,7 @@ function insertRow(table: PortableTable, row: DbRow): HqTemplateStatement {
 }
 function updateScenarioRow(row: DbRow, id: string, accountId: string): HqTemplateStatement {
   const columns = Object.keys(row).filter(column => !['id', 'line_account_id', 'created_at', 'updated_at'].includes(column));
-  return { sql: `UPDATE scenarios SET ${columns.map(column => `${column}=?`).join(',')},updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`, bindings: [...columns.map(column => row[column]), id, accountId] };
+  return { sql: `UPDATE scenarios SET content_revision = content_revision + 1, ${columns.map(column => `${column}=?`).join(',')},updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`, bindings: [...columns.map(column => row[column]), id, accountId] };
 }
 const formReferenceKey = (kind: string, sourceId: string) => `${kind}:${sourceId}`;
 function formReferenceSelection(reference: { kind: string; sourceId: string }, context: HqTemplateAdapterContext) {
@@ -152,7 +152,7 @@ export function createFormReferenceResolver({ db, authority }: { db: D1Database;
       delete clone.created_at; delete clone.updated_at;
       if (mode === 'overwrite') {
         const columns = Object.keys(clone).filter(column => !['id','line_account_id'].includes(column));
-        statements.push({ sql: `UPDATE templates SET ${columns.map(column => `${column}=?`).join(',')},updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`, bindings: [...columns.map(column => clone[column]), targetId, context.targetAccountId] });
+        statements.push({ sql: `UPDATE templates SET confirmation_revision=confirmation_revision+1, ${columns.map(column => `${column}=?`).join(',')},updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`, bindings: [...columns.map(column => clone[column]), targetId, context.targetAccountId] });
       } else statements.push(insertRow('templates', clone));
     }
     const ordered: string[] = [], seen = new Set<string>();

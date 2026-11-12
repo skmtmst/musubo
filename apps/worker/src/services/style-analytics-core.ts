@@ -40,13 +40,21 @@ export const missing = (formula: string): StyleMetric => ({
   unit: '件',
   status: 'unconfigured',
 });
+const civilDateFormatters = new Map<string, Intl.DateTimeFormat>();
 export function civilDate(now: number, timeZone: string) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(now));
+  let formatter = civilDateFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    // 異なるタイムゾーンが増え続けても Worker のメモリを占有しない。
+    if (civilDateFormatters.size >= 128) civilDateFormatters.clear();
+    civilDateFormatters.set(timeZone, formatter);
+  }
+  return formatter.format(new Date(now));
 }
 export function addDate(date: string, days: number) {
   return new Date(Date.parse(date + 'T00:00:00Z') + days * DAY)

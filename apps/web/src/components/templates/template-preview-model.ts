@@ -82,7 +82,7 @@ export function buildTemplatePreview(
 
   const preview = content.replace(interpolation, (token, rawName: string) => {
     const name = rawName.trim()
-    if (name === 'name') return '山田 太郎'
+    if (name === 'name') return '見本 141'
     if (name === 'liff_id') return '［LIFF ID］'
 
     const fieldKey = /^field\.([a-z][a-z0-9_]*)$/.exec(name)?.[1]

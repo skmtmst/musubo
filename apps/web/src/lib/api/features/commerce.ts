@@ -124,7 +124,7 @@ export const commerceMethods = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    testSend: (data: { eventType: string; accountId: string; title: string; introText: string; outroText: string; buttonLabel: string; buttonUrl: string; imageUrl: string }) =>
+    testSend: (data: { eventType: string; accountId: string; title: string; introText: string; outroText: string; buttonLabel: string; buttonUrl: string; imageUrl: string; expectedRecipientIds?: string[]; expectedConfirmationRevision?: number }) =>
       fetchApi<ApiResponse<{ sent: number }>>('/api/ec-commerce/test-send', {
         method: 'POST',
         body: JSON.stringify(data),

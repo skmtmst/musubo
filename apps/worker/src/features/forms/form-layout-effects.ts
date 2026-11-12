@@ -774,7 +774,7 @@ export async function runFormAction(
         // 別の値を書くと、再開の導線から外れて戻せなくなる。
         await db
           .prepare(
-            `UPDATE friend_scenarios SET status = 'paused', updated_at = ?
+            `UPDATE friend_scenarios SET confirmation_revision = confirmation_revision + 1, status = 'paused', updated_at = ?
              WHERE friend_id = ? AND scenario_id = ? AND status IN ('active','delivering')`,
           )
           .bind(jstNow(), friendId, action.scenarioId)

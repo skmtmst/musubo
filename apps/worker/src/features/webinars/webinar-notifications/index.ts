@@ -1,4 +1,4 @@
-export { enqueueWebinarCompletedNotification, getWebinarNotificationOverview, getWebinarNotificationSettings, registerWebinarSession, saveWebinarNotificationSettings, sendWebinarNotificationTest } from '../webinar-notifications.js';
+export { enqueueWebinarCompletedNotification, getWebinarNotificationOverview, getWebinarNotificationSettings, registerWebinarSession, saveWebinarNotificationSettings, sendWebinarNotificationTest, webinarTestRecipientPreview, WebinarTestRecipientsChanged } from '../webinar-notifications.js';
 export type { WebinarNotificationSettingsInput } from '../webinar-notifications.js';
 
 

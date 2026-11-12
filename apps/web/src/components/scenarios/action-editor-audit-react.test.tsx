@@ -8,6 +8,7 @@ import React, { act } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ActionEditor from './action-editor'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 
 const net = vi.hoisted(() => ({

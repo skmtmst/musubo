@@ -29,7 +29,7 @@ test('seven answers persist with source, real name sync, and unsubmitted friend 
   const specs = [
     ['name','text','名前','山田花子'], ['kana','text','ふりがな','やまだはなこ'],
     ['birthday','date','生年月日','2000-01-01'], ['age','text','年齢','23'],
-    ['email','text','メール','HANAKO@example.com'], ['tel','text','電話','090-1234-5678'],
+    ['email','text','メール','HANAKO@example.com'], ['tel','text','電話','090-0000-5678'],
     ['address','address','住所',{ postalCode:'1234567',prefecture:'東京都',city:'新宿区',addressLine1:'1-2',addressLine2:'101' }],
   ] as const
   layout.sections[0].blocks = specs.map(([key,type,label]) => ({ id:key, name:key, kind:'input', type, label, fixedField:key }) as FormInputBlock)

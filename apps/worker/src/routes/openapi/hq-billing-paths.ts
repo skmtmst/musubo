@@ -67,8 +67,22 @@ export const hqBillingPaths = {
   },
   '/api/hq/billing/card-status': {
     get: {
-      tags: ['HQ Billing'], summary: 'カード登録済みかをStripeから確認する（カード情報は返さない）',
+      tags: ['HQ Billing'], summary: 'カード登録済みかを決済サービスから確認する（カード情報は返さない）',
       responses: { '200': { description: 'Card registration boolean' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Tenant not found' }, '502': { description: 'Stripe API unavailable' } },
+    },
+  },
+  '/api/hq/billing/card-confirm': {
+    post: {
+      tags: ['HQ Billing'], summary: '戻り先の登録セッションと決済サービス上の登録完了を照合する',
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['sessionId'], properties: { sessionId: { type: 'string' } } } } } },
+      responses: {
+        '200': { description: 'Card registration confirmed without returning card details' },
+        '400': { description: 'Invalid session ID' },
+        '403': { description: 'Owner or admin role required' },
+        '409': { description: 'Session does not belong to this tenant or setup is incomplete' },
+        '502': { description: 'Payment provider unavailable' },
+        '503': { description: 'Payment provider is not configured' },
+      },
     },
   },
   '/api/hq/billing/portal': {

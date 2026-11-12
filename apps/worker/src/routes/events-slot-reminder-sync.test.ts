@@ -22,7 +22,7 @@ vi.mock('../services/account-access.js', () => accountAccessMocks);
 
 // 通知の外部送信は抑える (連動の検証が目的)。
 const notifierMocks = vi.hoisted(() => ({ sendEventBookingNotification: vi.fn(async () => {}) }));
-vi.mock('../services/event-booking-notifier.js', () => notifierMocks);
+vi.mock('../services/event-booking-notifier.js', async (importOriginal) => ({ ...await importOriginal<typeof import('../services/event-booking-notifier.js')>(), ...notifierMocks }));
 
 const { default: events } = await import('./events.js');
 
@@ -106,6 +106,20 @@ async function putSlot(app: Hono<Env>, env: { DB: D1Database }) {
 }
 
 describe('イベント枠の日程変更の再送可能性', () => {
+  it('イベント予約の承認・取消・編集では確認版がそれぞれ1進む', async () => {
+    const { db, raw } = createTestD1(); seed(raw); const { app, env } = makeApp(db);
+    raw.prepare("UPDATE event_bookings SET status='requested' WHERE id='eb-1'").run();
+    const url='/api/events/admin/events/ev-1/bookings/eb-1';
+    const revision=()=>(raw.prepare("SELECT confirmation_revision FROM event_bookings WHERE id='eb-1'").get() as {confirmation_revision:number}).confirmation_revision;
+    const before=revision();
+    expect((await app.request(url+'/decide?account_id=account-1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'confirm'})},env)).status).toBe(200);
+    expect(revision()).toBe(before+1);
+    expect((await app.request(url+'?account_id=account-1',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({internal_note:'変更'})},env)).status).toBe(200);
+    expect(revision()).toBe(before+2);
+    expect((await app.request(url+'/cancel?account_id=account-1',{method:'POST'},env)).status).toBe(200);
+    expect(revision()).toBe(before+3);
+  });
+
   it('初回失敗では枠を変えず、同一リクエスト再送でlegacy行も新日時へ直る', async () => {
     const { db, raw } = createTestD1();
     seed(raw);

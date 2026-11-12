@@ -73,7 +73,7 @@ describe('R214: 行き先の形が正しくない選択肢は保存しない', (
   it('正しい URL・電話・メールは通す', () => {
     expect(check({ question: question({ choices: [
       { label: '見る', behavior: 'url', url: 'https://example.com/a' },
-      { label: '電話', behavior: 'tel', tel: '03-1234-5678' },
+      { label: '電話', behavior: 'tel', tel: '03-0000-5678' },
       { label: 'メール', behavior: 'mail', email: 'a@example.com' },
     ] }) })).toBeNull()
   })

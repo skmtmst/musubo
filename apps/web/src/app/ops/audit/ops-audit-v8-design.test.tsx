@@ -18,7 +18,7 @@ import type { OpsAuditRow } from '@/lib/api'
 const row = (index: number, action: string): OpsAuditRow => ({
   id: `log-${index}`,
   created_at: '2026-10-01T15:20:00.000+09:00',
-  staff_name: '河野',
+  staff_name: '見本',
   tenant_name: '然-NEN-本部',
   action,
   reason: '問い合わせ #1042 の確認',

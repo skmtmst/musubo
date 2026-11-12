@@ -265,6 +265,7 @@ describe('通知の再試行 (R323・R324)', () => {
 
   test('R329: 送信中の取消は 409 で巻き戻し、成立していない履歴を残さない', async () => {
     insertBooking(sqlite, { id: 'B1', friend: 'f1' });
+    sqlite.exec("INSERT INTO booking_groups(id,line_account_id,friend_id,version,created_at,idempotency_key,request_json) VALUES('group-race','acc1','f1',1,'now','group-race','{}'); UPDATE bookings SET group_id='group-race' WHERE id='B1'");
     // の送信権を持つ登録を用意する (liveGuard が止める)。
     // friend_reminders.reminder_id は reminders への外部キー。
     sqlite.exec(`
@@ -292,6 +293,7 @@ describe('通知の再試行 (R323・R324)', () => {
     // 予約は元に戻り、取消の履歴は残らない。
     const booking = sqlite.prepare(`SELECT status FROM bookings WHERE id = 'B1'`).get() as { status: string };
     expect(booking.status).toBe('confirmed');
+    expect(sqlite.prepare("SELECT version FROM booking_groups WHERE id='group-race'").get()).toEqual({ version: 2 });
     const audits = sqlite.prepare(
       `SELECT action, after_json FROM booking_audit_logs WHERE booking_id = 'B1'`,
     ).all() as Array<{ action: string; after_json: string }>;

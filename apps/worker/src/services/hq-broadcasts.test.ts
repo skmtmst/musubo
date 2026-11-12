@@ -218,7 +218,7 @@ it('店の電話番号と予約ページは決定した共通キーで調べ、�
  const b={...input,accountIds:['shop1'],messageContent:'{店の電話番号} / {予約ページ}'};const r=await prepareHqBroadcast(f.db,tenant,'owner',b);
  const check=await preflightHqBroadcast(f.db,r);expect(check[0].blockedReasons).toContain('店舗の共通情報を確認してください');
  await expect(dispatchHqBroadcast(f.db,r,'owner',1)).rejects.toMatchObject({status:409});expect(f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get()).toEqual({n:0});
- f.raw.exec("INSERT INTO common_vars(id,var_key,name,value,line_account_id) VALUES('phone','store_phone','電話','03-1234-5678','shop1'),('url','reservation_url','予約','https://example.test/book','shop1')");
+ f.raw.exec("INSERT INTO common_vars(id,var_key,name,value,line_account_id) VALUES('phone','store_phone','電話','03-0000-5678','shop1'),('url','reservation_url','予約','https://example.test/book','shop1')");
  expect((await preflightHqBroadcast(f.db,r))[0].blockedReasons).toEqual([]);
  f.raw.exec("UPDATE common_vars SET value=' ' WHERE var_key='store_phone'");expect((await preflightHqBroadcast(f.db,r))[0].blockedReasons).toContain('店舗の共通情報を確認してください');
 });

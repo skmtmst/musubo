@@ -105,14 +105,17 @@ export async function retryWebhookInteraction(
   db: D1Database,
   original: WebhookInteractionRow,
   keys?: WebhookKeyInput | string,
+  expected?: { interactionRevision: number; webhookRevision: number },
 ): Promise<WebhookInteractionRow> {
+  if (expected && original.confirmation_revision !== expected.interactionRevision) throw new Error('confirmation_conflict');
   if (original.direction !== 'outgoing' || original.status !== 'failed' || !original.webhook_id) {
-    throw new Error('not_retryable');
+    throw new Error(expected ? 'confirmation_conflict' : 'not_retryable');
   }
   const webhookId = original.webhook_id;
   const webhook = await getOutgoingWebhookById(db, webhookId, original.line_account_id);
-  if (!webhook) throw new Error('webhook_not_found');
-  if (!webhook.is_active) throw new Error('webhook_inactive');
+  if (!webhook) throw new Error(expected ? 'confirmation_conflict' : 'webhook_not_found');
+  if (!webhook.is_active) throw new Error(expected ? 'confirmation_conflict' : 'webhook_inactive');
+  if (expected && webhook.confirmation_revision !== expected.webhookRevision) throw new Error('confirmation_conflict');
   if (!original.request_body_json) throw new Error('payload_unavailable');
 
   let delivery = await findOutgoingDeliveryByKey(db, webhookId, original.idempotency_key);
@@ -163,6 +166,8 @@ export async function retryWebhookInteraction(
   // 記録が無い」形は残らない。
   const { claimed, retryId } = await claimWebhookInteractionRetryAndInsert(db, original, {
     webhookId,
+    expectedInteractionRevision: expected?.interactionRevision,
+    expectedWebhookRevision: expected?.webhookRevision,
     webhookName: original.webhook_name,
     eventType: original.event_type,
     triggerSummary: original.trigger_summary,
@@ -171,7 +176,7 @@ export async function retryWebhookInteraction(
   });
   if (!claimed) {
     await releaseDelivery(delivery, deliveryLease);
-    throw new Error('already_retried');
+    throw new Error(expected ? 'confirmation_conflict' : 'already_retried');
   }
 
   // d23b : 畳み込み〜送信のあいだに止まった・消えた分を、送る前に
@@ -183,8 +188,9 @@ export async function retryWebhookInteraction(
       throw new Error('emergency_stopped');
     }
     const fresh = await getOutgoingWebhookById(db, webhookId, original.line_account_id);
-    if (!fresh) throw new Error('webhook_not_found');
-    if (!fresh.is_active) throw new Error('webhook_inactive');
+    if (!fresh) throw new Error(expected ? 'confirmation_conflict' : 'webhook_not_found');
+    if (!fresh.is_active) throw new Error(expected ? 'confirmation_conflict' : 'webhook_inactive');
+    if (expected && fresh.confirmation_revision !== expected.webhookRevision) throw new Error('confirmation_conflict');
     sendTarget = fresh;
   } catch (error) {
     await deletePendingWebhookInteraction(db, retryId, original.line_account_id).catch(() => {});

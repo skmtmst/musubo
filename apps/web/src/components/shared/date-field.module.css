@@ -127,6 +127,21 @@
   animation: date-field-in var(--motion-fast) var(--motion-ease-out);
 }
 
+.inlineCalendar {
+  width: 100%;
+  padding: 0;
+  animation: none;
+}
+
+.inlineCalendar .footer {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.inlineCalendar .header { margin-bottom: 6px; }
+.inlineCalendar .week > div { height: 36px; }
+
 @keyframes date-field-in {
   from {
     opacity: 0;

@@ -3,7 +3,7 @@ export type RestaurantClosureKind = 'temporary_closed' | 'private_event' | 'main
 export interface RestaurantClosureInput {
   storeId: string; startDate: string; endDate: string; allDay: boolean;
   startTime?: string | null; endTime?: string | null; kind: RestaurantClosureKind;
-  memo?: string | null; tableIds?: string[]; notifyMedia?: boolean;
+  memo?: string | null; tableIds?: string[]; notifyMedia?: boolean; expectedSnapshot?: string;
 }
 export interface RestaurantClosure extends RestaurantClosureInput {
   id: string; notifyMedia: boolean; name: string; startTime: string | null; endTime: string | null; memo: string | null;
@@ -11,11 +11,11 @@ export interface RestaurantClosure extends RestaurantClosureInput {
   createdAt: string; updatedAt: string; version: number;
 }
 export interface RestaurantClosureReservation {
-  id: string; startsAt: string; endsAt: string; guestCount: number; customerName: string;
+  id: string; startsAt: string; endsAt: string; guestCount: number; customerName: string; confirmationRevision?: number;
   customerPhone: string | null; contacted: boolean; source: string; tableId: string | null; friendId: string | null; isLineFriend: boolean;
 }
 export interface RestaurantClosurePreview {
-  contactedCount: number; reservations: RestaurantClosureReservation[]; waitlistCount: number; conflicts: RestaurantClosure[];
+  contactedCount: number; reservations: RestaurantClosureReservation[]; waitlistCount: number; conflicts: RestaurantClosure[]; confirmationSnapshot?: string;
 }
 export interface RestaurantClosureSaveResult extends RestaurantClosurePreview { closure: RestaurantClosure; }
 export interface RestaurantSeatAvailability {

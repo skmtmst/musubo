@@ -30,6 +30,7 @@ export type FileScanStatus = 'pending' | 'clean' | 'rejected' | 'quarantined'
 
 export type FileScanItem = {
   id: string
+  confirmationRevision?: number
   lineAccountId: string | null
   subjectKind: string
   subjectId: string
@@ -53,6 +54,7 @@ export type FileScanItem = {
 }
 
 export type FileScanConfig = {
+  confirmationRevision?: number
   externalProvider: string | null
   externalEndpointUrl: string | null
   externalSecretRef: string | null

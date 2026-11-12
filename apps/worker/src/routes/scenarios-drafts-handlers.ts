@@ -14,6 +14,7 @@ import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundary } from '../services/request-boundary.js';
+import { scenarioSubscriptionScope } from './scenarios-definition.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { resumeQuestionAnswer, registerLegacyQuestionAnswers } from '../features/scenarios/scenario-question-answer/index.js';
@@ -258,6 +259,9 @@ export const post__api_scenarios_6 = async (c: Context<Env, "/api/scenarios">) =
     if (!body.name || !body.triggerType) {
       return inputError(c, { success: false, error: 'name and triggerType are required' }, 400, ["name","triggerType"]);
     }
+    if (body.name.length > 60) {
+      return inputError(c, { success: false, error: 'シナリオ名は60文字以内で入力してください' }, 400, ['name']);
+    }
 
     if (body.lineAccountId
       && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
@@ -283,7 +287,7 @@ export const post__api_scenarios_6 = async (c: Context<Env, "/api/scenarios">) =
 
 
     if (body.lineAccountId) {
-      await c.env.DB.prepare(`UPDATE scenarios SET line_account_id = ? WHERE id = ?`)
+      await c.env.DB.prepare(`UPDATE scenarios SET content_revision = content_revision + 1, line_account_id = ? WHERE id = ?`)
         .bind(body.lineAccountId, scenario.id).run();
     }
 
@@ -309,6 +313,8 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
       triggerType?: ScenarioTriggerType;
       triggerTagId?: string | null;
       isActive?: boolean;
+      expectedContentRevision?: number;
+      expectedSubscriptions?: { activeCount: number; rowIdSum: number; rowIdSquareSum: number };
       /** isActive: false で止めるときの理由（任意・200字まで）。 */
       reason?: string;
       deliveryMode?: DeliveryMode;
@@ -321,6 +327,24 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
       onCompleteScenarioId?: string | null;
     }>();
 
+    const stopScope = body.isActive === false ? await scenarioSubscriptionScope(c, id) : null;
+    if (body.isActive === false && !stopScope) return c.json({ success: false, error: '関連する対象を確認できないため操作できません' }, 403);
+    if (body.expectedContentRevision !== undefined && (!Number.isSafeInteger(body.expectedContentRevision) || body.expectedContentRevision < 1)) {
+      return inputError(c, { success: false, error: 'invalid_confirmation_revision' }, 400, ['expectedContentRevision']);
+    }
+    if (body.expectedSubscriptions !== undefined && (body.expectedContentRevision === undefined || !validSubscriptionSummary(body.expectedSubscriptions))) {
+      return inputError(c, { success: false, error: 'invalid_confirmation_subscriptions' }, 400, ['expectedSubscriptions']);
+    }
+    let name = body.name;
+    if (name !== undefined && name.length > 60) {
+      const existing = await getScenarioById(c.env.DB, id);
+      if (!existing) return fail(c, 404, 'SCENARIO_NOT_FOUND');
+      if (existing.name !== name) {
+        return inputError(c, { success: false, error: 'シナリオ名は60文字以内で入力してください' }, 400, ['name']);
+      }
+      // 未変更の長いシナリオ名を送らず、同時編集による上書きを防ぐ。
+      name = undefined;
+    }
     if (body.reason !== undefined && (
       body.isActive !== false
       || typeof body.reason !== 'string'
@@ -381,7 +405,7 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
     }
 
     const updated = await updateScenario(c.env.DB, id, {
-      name: body.name,
+      name,
       description: body.description,
       trigger_type: body.triggerType,
       trigger_tag_id: body.triggerTagId,
@@ -394,9 +418,12 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
       on_complete_mode: body.onCompleteMode,
       on_complete_scenario_id:
         body.onCompleteScenarioId === undefined ? undefined : (body.onCompleteScenarioId || null),
-    }, body.isActive === false ? {
-      stop: { reason: body.reason?.trim() || null, staffId: c.get('staff')!.id },
-    } : undefined);
+    }, {
+      ...(body.isActive === false ? { stop: { reason: body.reason?.trim() || null, staffId: c.get('staff')!.id } } : {}),
+      expectedRevision: body.expectedContentRevision,
+      expectedSubscriptions: body.expectedSubscriptions,
+      accountScope: stopScope ? { accountIds: stopScope.allowedAccountIds, canSeeUnassigned: stopScope.canSeeUnassigned } : undefined,
+    });
 
     if (!updated) {
       return fail(c, 404, 'SCENARIO_NOT_FOUND');
@@ -404,6 +431,11 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
 
     return c.json({ success: true, data: serializeScenario(updated) });
   } catch (err) {
+    if (err instanceof Error && err.message === 'SCENARIO_CONFIRMATION_CONFLICT') {
+      const current = await getScenarioById(c.env.DB, c.req.param('id'));
+      if (!current) return fail(c, 404, 'SCENARIO_NOT_FOUND');
+      return c.json({ success: false, error: 'scenario_confirmation_conflict', data: serializeScenario(current) }, 409);
+    }
     throw err;
   }
 };
@@ -432,12 +464,31 @@ export const get__api_scenarios_id_move_referrers_8 = async (c: Context<Env, "/a
 export const delete__api_scenarios_id_9 = async (c: Context<Env, "/api/scenarios/:id">) => {
   try {
     const id = c.req.param('id');
-    await deleteScenario(c.env.DB, id);
+    const scope = await scenarioSubscriptionScope(c, id);
+    if (!scope) return c.json({ success: false, error: '関連する対象を確認できないため操作できません' }, 403);
+    const body = await c.req.json<{ expectedContentRevision?: unknown; expectedSubscriptions?: unknown; expectedActiveSubscriptions?: unknown; expectedReferrers?: unknown }>().catch(() => null);
+    const revision = body?.expectedContentRevision;
+    const subscriptions = body?.expectedSubscriptions;
+    const activeSubscriptions = body?.expectedActiveSubscriptions;
+    const referrers = body?.expectedReferrers;
+    if (revision !== undefined || subscriptions !== undefined || activeSubscriptions !== undefined || referrers !== undefined) {
+      if (!Number.isSafeInteger(revision) || Number(revision) < 1 || !validSubscriptionSummary(subscriptions) || !validSubscriptionSummary(activeSubscriptions)
+        || !Array.isArray(referrers) || referrers.some(item => !item || typeof item.id !== 'string' || !item.id || !Number.isSafeInteger(item.revision) || item.revision < 1)
+        || new Set(referrers.map(item => item.id)).size !== referrers.length)
+        return inputError(c, { success: false, error: 'invalid_confirmation' }, 400, ['expectedContentRevision', 'expectedSubscriptions', 'expectedActiveSubscriptions', 'expectedReferrers']);
+    }
+    await deleteScenario(c.env.DB, id, revision === undefined ? undefined : { expectedRevision: revision as number, expectedSubscriptions: subscriptions as { activeCount: number; rowIdSum: number; rowIdSquareSum: number }, expectedActiveSubscriptions: activeSubscriptions as { activeCount: number; rowIdSum: number; rowIdSquareSum: number } | undefined, expectedReferrers: referrers as Array<{id: string; revision: number}>, accountIds: scope.allowedAccountIds, canSeeUnassigned: scope.canSeeUnassigned });
     return c.json({ success: true, data: null });
   } catch (err) {
     const code = err instanceof Error ? err.message : '';
+    if (code === 'SCENARIO_CONFIRMATION_CONFLICT') {
+      const current = await getScenarioById(c.env.DB, c.req.param('id'));
+      if (!current) return fail(c, 404, 'SCENARIO_NOT_FOUND');
+      return c.json({ success: false, error: 'scenario_confirmation_conflict', data: serializeScenario(current) }, 409);
+    }
     if (code === 'SCENARIO_HAS_DEPENDENTS' || /FOREIGN KEY/i.test(code)) {
-      return c.json({ success: false, error: '他の機能から使われているため削除できません。先に連携を外してください。' }, 409);
+      const scenario = await getScenarioById(c.env.DB, c.req.param('id'));
+      return c.json({ success: false, error: '他の機能から使われているため削除できません。先に連携を外してください。', current: scenario ? serializeScenario(scenario) : null }, 409);
     }
     throw err;
   }
@@ -567,3 +618,9 @@ export const post__api_scenarios_id_steps_10 = async (c: Context<Env, "/api/scen
     throw err;
   }
 };
+
+function validSubscriptionSummary(value: unknown): value is { activeCount: number; rowIdSum: number; rowIdSquareSum: number } {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return Number.isSafeInteger(v.activeCount) && Number(v.activeCount) >= 0 && Number.isSafeInteger(v.rowIdSum) && Number(v.rowIdSum) >= 0 && Number.isSafeInteger(v.rowIdSquareSum) && Number(v.rowIdSquareSum) >= 0;
+}

@@ -65,6 +65,14 @@ function area(label: string | null, actionType: 'uri' | 'richmenuswitch' = 'uri'
 // ボタン名での検索
 // =============================================================================
 describe('438 検索: ボタン名（エリアラベル）でメニューが見つかる', () => {
+  it('画像を差し替えるたびに確認版が進む', async () => {
+    const db = setup();
+    const group = await createRichMenuGroup(db, { accountId: 'a1', name: '確認', chatBarText: 'menu', size: 'large', pages: [{ name: 'トップ', orderIndex: 0, areas: [] }] });
+    const before = await getRichMenuGroupWithPages(db, group.id);
+    await setRichMenuPageImage(db, before!.pages[0].id, 'new-image', 'image/png');
+    const after = await getRichMenuGroupWithPages(db, group.id);
+    expect(after!.confirmation_revision).toBe(before!.confirmation_revision! + 1);
+  });
   it('大小文字と空白（半角・全角）を揃えて比較する', () => {
     expect(normalizeRichMenuSearchText('  New Campaign　')).toBe('newcampaign');
     expect(normalizeRichMenuSearchText('予約　する')).toBe('予約する');

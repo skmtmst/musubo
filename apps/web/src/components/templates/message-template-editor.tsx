@@ -252,7 +252,7 @@ export function MessageTemplateEditor({
       </div>
       <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-96">
         <LinePreview
-          note={value.messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（山田 太郎さんの場合）'}
+          note={value.messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（見本 141さんの場合）'}
           accountName="LINE公式アカウント"
         >
           {/*
@@ -276,7 +276,7 @@ export function MessageTemplateEditor({
           ) : (
             <>
               <div className="bg-canvas-sunken rounded-card p-3"><TemplatePreviewMessage preview={preview} /></div>
-              <p className="text-ink mt-2 text-xs leading-relaxed">名前は山田 太郎さん、友だち情報は項目の既定値、共通情報は現在値で表示しています。</p>
+              <p className="text-ink mt-2 text-xs leading-relaxed">名前は見本 141さん、友だち情報は項目の既定値、共通情報は現在値で表示しています。</p>
               <p className="text-ink mt-1 text-xs">URLは短縮され、クリックが計測されます</p>
             </>
           )}

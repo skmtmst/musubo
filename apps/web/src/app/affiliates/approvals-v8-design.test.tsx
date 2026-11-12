@@ -13,15 +13,15 @@ const ago = (days: number) => new Date(Date.now() - days * 86_400_000).toISOStri
 
 const ITEMS = [
   {
-    eventId: 'e1', createdAt: ago(6.5), friendId: 'f1', friendName: '佐藤 美咲',
-    affiliateId: 'a1', affiliateName: '田中 明', offerId: 'o1', offerName: '定期便の初回',
+    eventId: 'e1', createdAt: ago(6.5), friendId: 'f1', friendName: '見本 121',
+    affiliateId: 'a1', affiliateName: '見本 168', offerId: 'o1', offerName: '定期便の初回',
     offerRewardMiles: null, conversionPointName: '定期便が確定', value: 2000,
     approvalStatus: 'pending', duplicateFlag: false, offerActionsIncomplete: false,
     lineAccountId: 'acc-1', lineAccountName: '本店', orderNumber: '1001',
     orderStatus: null, sameOrderDuplicate: false, rewardAmount: null,
   },
   {
-    eventId: 'e2', createdAt: ago(2), friendId: 'f2', friendName: '鈴木 健',
+    eventId: 'e2', createdAt: ago(2), friendId: 'f2', friendName: '見本 178',
     affiliateId: 'a2', affiliateName: 'ノース', offerId: 'o2', offerName: '夏の紹介',
     offerRewardMiles: null, conversionPointName: '商品を購入', value: 1280,
     approvalStatus: 'approved', duplicateFlag: false, offerActionsIncomplete: false,
@@ -29,8 +29,8 @@ const ITEMS = [
     orderStatus: null, sameOrderDuplicate: false, rewardAmount: 1280,
   },
   {
-    eventId: 'e3', createdAt: ago(1), friendId: 'f3', friendName: '高橋 まい',
-    affiliateId: 'a3', affiliateName: '山口 商店', offerId: 'o1', offerName: '定期便の初回',
+    eventId: 'e3', createdAt: ago(1), friendId: 'f3', friendName: '見本 13',
+    affiliateId: 'a3', affiliateName: '見本 135', offerId: 'o1', offerName: '定期便の初回',
     offerRewardMiles: null, conversionPointName: '定期便が確定', value: 1000,
     approvalStatus: 'rejected', duplicateFlag: false, offerActionsIncomplete: false,
     lineAccountId: 'acc-1', lineAccountName: '本店', orderNumber: '1003',

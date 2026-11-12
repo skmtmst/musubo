@@ -109,17 +109,22 @@ export async function listTenantsDueForPurge(
 ): Promise<TenantRetention[]> {
   const now = options.now ?? jstNow();
   const cutoff = retentionCutoff(now);
+  const retryCutoff = toJstString(new Date(new Date(now).getTime() - 24 * 60 * 60 * 1000));
   const result = await db
     .prepare(
       `SELECT ${RETENTION_COLUMNS}
          FROM tenants
         WHERE data_purged_at IS NULL
+          AND (plan_status = 'canceled' OR (plan_status = 'trialing' AND trial_ends_at IS NOT NULL AND trial_ends_at < ?))
           AND (purge_requested_at IS NOT NULL
                OR (retention_anchor_at IS NOT NULL AND retention_anchor_at < ?))
-        ORDER BY COALESCE(purge_requested_at, retention_anchor_at) ASC
+        ORDER BY CASE WHEN EXISTS (
+          SELECT 1 FROM audit_events ae WHERE ae.tenant_id = tenants.id
+            AND ae.action = 'tenant_data.purge_failed' AND ae.created_at >= ?
+        ) THEN 1 ELSE 0 END, COALESCE(purge_requested_at, retention_anchor_at) ASC, id ASC
         LIMIT ?`,
     )
-    .bind(cutoff, options.limit ?? 5)
+    .bind(now, cutoff, retryCutoff, options.limit ?? 5)
     .all<TenantRetention>();
   return result.results ?? [];
 }

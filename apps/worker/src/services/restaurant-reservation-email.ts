@@ -152,7 +152,7 @@ async function upsertReservation(
      cancel_reason, stay_minutes, media_store_code, table_label, inbound_email_id,
      parser_key, parser_version)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(store_id, source, external_id) DO UPDATE SET
+    ON CONFLICT(store_id, source, external_id) DO UPDATE SET confirmation_revision = rt_reservations.confirmation_revision + 1,
       customer_name = excluded.customer_name,
       customer_phone = excluded.customer_phone,
       guest_count = excluded.guest_count,

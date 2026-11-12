@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { addDays, hm, minutesOf, dayRange, monthRange, weekRange, sameDay, toYmd, dayTitle, mdWeek } from './format'
+import { addDays, hm, mdhm, minutesOf, dayRange, monthRange, weekRange, sameDay, toYmd, dayTitle, mdWeek } from './format'
 
 describe('予約盤と詳細・印刷の時刻', () => {
   it('同じ瞬間をUTCまたは日本時間で受け取っても19時としてそろえる', () => {
@@ -33,4 +33,9 @@ describe('予約盤と詳細・印刷の時刻', () => {
 it('予約詳細と予約台帳は同じ日の表示を揃える', () => {
   const day = new Date('2026-10-01T09:00:00Z')
   expect(mdWeek(day)).toBe(dayTitle(day))
+})
+
+it('同じ月日も年を含めて区別し、日本時間の日時を表示する', () => {
+  expect(mdhm('2026-10-01T09:00:00Z')).toBe('2026/10/01 18:00')
+  expect(mdhm('2027-10-01T09:00:00Z')).toBe('2027/10/01 18:00')
 })

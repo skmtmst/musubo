@@ -939,20 +939,34 @@ automations.post(
   inputJsonBoundary(), async (c) => {
     const accountId = await definitionAccountId(c);
     if (typeof accountId !== 'string') return accountId;
-    const body = await c.req.json<{ status?: unknown }>()
-      .catch((): { status?: unknown } => ({}));
+    const body = await c.req.json<{ status?: unknown; expectedConfirmationRevision?: unknown }>()
+      .catch((): { status?: unknown; expectedConfirmationRevision?: unknown } => ({}));
     const status = body.status;
+    if (body.expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(body.expectedConfirmationRevision) || (body.expectedConfirmationRevision as number) < 1)) {
+      return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedConfirmationRevision']);
+    }
     if (status !== 'active' && status !== 'stopped' && status !== 'archived') {
       return inputError(c, {
         success: false,
         error: 'status は active / stopped / archived のどれかで送ってください',
       }, 400, ["status"]);
     }
-    return definitionEndpoint(c, () => updateAutomationDefinitionStatus(c.env.DB, {
-      id: c.req.param('id'),
-      lineAccountId: accountId,
-      status,
-    }));
+    try {
+      return c.json({ success: true, data: await updateAutomationDefinitionStatus(c.env.DB, {
+        id: c.req.param('id'),
+        lineAccountId: accountId,
+        status,
+        expectedConfirmationRevision: body.expectedConfirmationRevision as number | undefined,
+      }) });
+    } catch (error) {
+      if (error instanceof AutomationDefinitionError && error.code === 'version_conflict') {
+        const current = await c.env.DB.prepare('SELECT id, status, confirmation_revision AS confirmationRevision FROM automation_definitions WHERE id = ? AND line_account_id = ?')
+          .bind(c.req.param('id'), accountId).first();
+        return c.json({ success: false, code: error.code, error: error.message, current }, 409);
+      }
+      if (error instanceof AutomationDefinitionError) return definitionErrorResponse(c, error);
+      throw error;
+    }
   },
 );
 

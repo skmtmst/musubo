@@ -29,7 +29,7 @@ export async function enrollFriendInScenario(
   friendId: string,
   scenarioId: string,
   sourceEnrollmentId?: string,
-  options: { replacingScenarioId?: string | null } = {},
+  options: { replacingScenarioId?: string | null; move?: { id: string; revision: number; status: string } } = {},
 ): Promise<FriendScenario | null> {
   const id = sourceEnrollmentId ?? crypto.randomUUID();
   if (sourceEnrollmentId) {
@@ -103,18 +103,36 @@ export async function enrollFriendInScenario(
       ))
   )`;
   const admissionBinds = [scenarioId, friendId, scenarioId, options.replacingScenarioId ?? null, options.replacingScenarioId ?? null];
+  const publishedGuard = options.move ? ' AND EXISTS (SELECT 1 FROM scenarios WHERE id=? AND current_published_version_id=?)' : '';
+  const publishedBinds = options.move ? [scenarioId,version.id] : [];
+  const save = async (insert: D1PreparedStatement): Promise<boolean> => {
+    if (!options.move) return Boolean((await insert.run()).meta.changes);
+    try {
+      const results = await db.batch([
+        db.prepare(`UPDATE friend_scenarios SET confirmation_revision=confirmation_revision+1,status='completed',next_delivery_at=NULL,pause_reason=NULL,updated_at=?
+          WHERE id=? AND friend_id=? AND confirmation_revision=? AND status=? AND status NOT IN ('completed','delivering')`)
+          .bind(now,options.move.id,friendId,options.move.revision,options.move.status),
+        db.prepare("SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'SCENARIO_MOVE_CONFLICT' END)"),
+        insert,
+        db.prepare("SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'SCENARIO_MOVE_CONFLICT' END)"),
+      ]);
+      return Boolean(results[2].meta.changes);
+    } catch (error) {
+      if (/malformed JSON|UNIQUE constraint/i.test(String(error))) return false;
+      throw error;
+    }
+  };
 
   // A scenario with no steps is immediately completed — no stuck active enrollment.
   if (!firstStep) {
-    const result = await db
+    const insert = db
       .prepare(
         `INSERT OR IGNORE INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, next_delivery_at, published_version_id, updated_at)
-         SELECT ?, ?, ?, 0, 'completed', ?, NULL, ?, ? WHERE ${admissionSql}`,
+         SELECT ?, ?, ?, 0, 'completed', ?, NULL, ?, ? WHERE ${admissionSql}${publishedGuard}`,
       )
-      .bind(id, friendId, scenarioId, now, version.id, now, ...admissionBinds)
-      .run();
+      .bind(id, friendId, scenarioId, now, version.id, now, ...admissionBinds, ...publishedBinds);
 
-    if (!result.meta.changes || result.meta.changes === 0) return null;
+    if (!await save(insert)) return null;
 
     return (await db
       .prepare(`SELECT * FROM friend_scenarios WHERE id = ?`)
@@ -138,15 +156,14 @@ export async function enrollFriendInScenario(
   // If we initialize to 0, scenarios that only have a step_order=0 step are
   // silently completed without delivering anything (because no step has
   // step_order > 0).
-  const result = await db
+  const insert = db
     .prepare(
       `INSERT OR IGNORE INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, next_delivery_at, published_version_id, updated_at)
-       SELECT ?, ?, ?, -1, 'active', ?, ?, ?, ? WHERE ${admissionSql}`,
+       SELECT ?, ?, ?, -1, 'active', ?, ?, ?, ? WHERE ${admissionSql}${publishedGuard}`,
     )
-    .bind(id, friendId, scenarioId, now, nextDeliveryAt, version.id, now, ...admissionBinds)
-    .run();
+    .bind(id, friendId, scenarioId, now, nextDeliveryAt, version.id, now, ...admissionBinds, ...publishedBinds);
 
-  if (!result.meta.changes || result.meta.changes === 0) return null;
+  if (!await save(insert)) return null;
 
   return (await db
     .prepare(`SELECT * FROM friend_scenarios WHERE id = ?`)
@@ -171,6 +188,7 @@ export async function moveFriendScenarioTo(
   db: D1Database,
   id: string,
   targetScenarioId: string,
+  expected?: { revision: number; status: string },
 ): Promise<FriendScenario | null> {
   const current = await getFriendScenarioById(db, id);
   if (!current) return null;
@@ -179,8 +197,8 @@ export async function moveFriendScenarioTo(
 
   // 移し先が受け付けないなら元は残す（null）。理由の区別は呼び出し側で
   // 移し先シナリオの状態を見て返す。
-  const moved = await enrollFriendInScenario(db, current.friend_id, targetScenarioId);
+  const moved = await enrollFriendInScenario(db, current.friend_id, targetScenarioId, undefined, expected ? { move: { id, ...expected } } : {});
   if (!moved) return null;
-  await completeFriendScenario(db, id);
+  if (!expected) await completeFriendScenario(db, id);
   return moved;
 }

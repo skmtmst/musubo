@@ -224,7 +224,7 @@ export const post__api_rich_menu_groups_import_2 = async (c: Context<Env, "/api/
   const newPage = created.pages[0];
 
   // 6. 画像を R2 に保存して page に紐付け
-  const r2Key = `rich-menus/${accountId}/${created.id}/${newPage.id}/${Date.now()}.${ext}`;
+  const r2Key = `rich-menus/${accountId}/${created.id}/${newPage.id}/${crypto.randomUUID()}.${ext}`;
   await c.env.IMAGES.put(r2Key, imageBytes, { httpMetadata: { contentType } });
   await setRichMenuPageImage(c.env.DB, newPage.id, r2Key, contentType);
 

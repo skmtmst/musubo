@@ -9,7 +9,7 @@ import { get__api_liff_webinars_slug_1, get__api_liff_webinars_slug_audience_2, 
 
 import { post__api_liff_webinars_slug_funnel_event_1, get__webinar_assets_token_slug__2, get__api_webinars_overview_3, get__api_webinars_4, post__api_webinars_5, get__api_webinars_id_6, get__api_webinars_id_editor_7, put__api_webinars_id_editor_8, post__api_webinars_id_public_page_test_9, get__api_webinars_id_publish_validation_10, post__api_webinars_id_publish_11, get__api_webinars_id_video_asset_12, post__api_webinars_id_video_asset_advance_13, get__api_webinars_id_sessions_startAt_14, put__api_webinars_id_sessions_startAt_15, post__api_webinars_id_pause_16, post__api_webinars_id_duplicate_17, get__api_webinars_id_notifications_18, put__api_webinars_id_notifications_19 } from './webinars-funnel-assets-handlers.js';
 import { requireVisibleWebinar } from './webinars-definition.js';
-import { post__api_webinars_id_notifications_test_1, put__api_webinars_id_2, get__api_webinars_id_actions_3, put__api_webinars_id_actions_4, get__api_webinars_id_comments_5, put__api_webinars_id_comments_6, get__api_webinars_id_ctas_7, put__api_webinars_id_ctas_8, get__api_webinars_id_analytics_9, get__api_webinars_id_participants_10, get__api_webinars_id_participants_csv_11, get__api_webinars_id_user_comments_12 } from './webinars-management-handlers.js';
+import { getWebinarTestRecipients, post__api_webinars_id_notifications_test_1, put__api_webinars_id_2, get__api_webinars_id_actions_3, put__api_webinars_id_actions_4, get__api_webinars_id_comments_5, put__api_webinars_id_comments_6, get__api_webinars_id_ctas_7, put__api_webinars_id_ctas_8, get__api_webinars_id_analytics_9, get__api_webinars_id_participants_10, get__api_webinars_id_participants_csv_11, get__api_webinars_id_user_comments_12 } from './webinars-management-handlers.js';
 import { archiveVisibleWebinar } from './webinars-definition.js';
 
 const webinarRoutes = new Hono<Env>();
@@ -83,10 +83,11 @@ webinarRoutes.put(
   inputJsonBoundary({"registrationEnabled":["boolean"],"dayBeforeEnabled":["boolean"],"dayBeforeTime":["string"],"hourBeforeEnabled":["boolean"],"hourBeforeMinutes":["number"],"startEnabled":["boolean"],"missedEnabled":["boolean"],"missedTime":["string"],"completedEnabled":["boolean"],"missedWindowDays":["number"]}), put__api_webinars_id_notifications_19,
 );
 
+webinarRoutes.get('/api/webinars/:id/notifications/test', requireDeliveryAccess('webinars'), getWebinarTestRecipients);
 webinarRoutes.post(
   '/api/webinars/:id/notifications/test',
   requireDeliveryAccess('webinars'),
-  inputJsonBoundary(), post__api_webinars_id_notifications_test_1,
+  inputJsonBoundary({"expectedRecipientToken":["string"],"confirmationId":["string"]}), post__api_webinars_id_notifications_test_1,
 );
 
 webinarRoutes.put('/api/webinars/:id', requireDeliveryAccess('webinars'), inputJsonBoundary({"accountId":["null","string"],"title":["string"],"slug":["string"],"status":["string"],"videoPrefix":["null","string"],"videoMediaId":["null","string"],"durationSeconds":["number"],"schedule":["array"],"cta":["null","object"],"tagOnAttend":["null","string"],"tagOnCtaClick":["null","string"],"folderId":["null","string"],"publicationStartsAt":["null","string"],"publicationEndsAt":["null","string"],"expectedVersion":["number"],"deliveryKind":["string"],"viewingCondition":["object"],"publicDescription":["string"],"registrationFormId":["null","string"]}), put__api_webinars_id_2);

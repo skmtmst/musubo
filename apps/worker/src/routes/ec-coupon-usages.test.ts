@@ -22,7 +22,7 @@ function seed(raw: Database.Database): void {
     VALUES ('account-nen', 'channel-nen', '然', 'token', 'secret'),
            ('account-other', 'channel-o', '別', 'token', 'secret');
     INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following, created_at, updated_at) VALUES
-      ('friend-a', 'U-a', '山田 太郎', 'account-nen', 1, '2026-09-01', '2026-09-01'),
+      ('friend-a', 'U-a', '見本 141', 'account-nen', 1, '2026-09-01', '2026-09-01'),
       ('friend-x', 'U-x', '別店', 'account-other', 1, '2026-09-01', '2026-09-01');
     INSERT INTO nen_pet_profiles (id, friend_id, name, animal_type, gender, birthday, created_at, updated_at) VALUES
       ('pet-1', 'friend-a', 'モモ', 'dog', 'female', '2020-03-15', '2026-09-01', '2026-09-01'),

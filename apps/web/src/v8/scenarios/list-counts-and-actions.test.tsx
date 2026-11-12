@@ -22,6 +22,7 @@ vi.hoisted(() => {
 
 const scenario = (id: string, name: string, folderId: string | null, isActive = true) => ({
   id,
+  contentRevision: 7,
   name,
   description: null,
   triggerType: 'friend_add',
@@ -52,6 +53,7 @@ const folderList = vi.hoisted(() => vi.fn())
 const folderUpdate = vi.hoisted(() => vi.fn())
 const statsGet = vi.hoisted(() => vi.fn())
 const update = vi.hoisted(() => vi.fn())
+const bulkStop = vi.hoisted(() => vi.fn())
 const create = vi.hoisted(() => vi.fn())
 const remove = vi.hoisted(() => vi.fn())
 const reorder = vi.hoisted(() => vi.fn())
@@ -122,7 +124,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...api,
-      scenarios: { ...api.scenarios, listPage, update, create, delete: remove, moveReferrers: vi.fn(async () => ({ success: true, data: { items: [] } })), reorder },
+      scenarios: { ...api.scenarios, confirmation: vi.fn(async () => ({ success: true, data: { contentRevision: 7, activeCount: 0, rowIdSum: 0, rowIdSquareSum: 0, totalCount: 0, totalRowIdSum: 0, totalRowIdSquareSum: 0, referrers: [] } })), listPage, update, bulkStop, create, delete: remove, moveReferrers: vi.fn(async () => ({ success: true, data: { items: [] } })), reorder },
       folders: { ...api.folders, list: folderList, update: folderUpdate },
       listStats: { get: statsGet },
     },
@@ -182,6 +184,7 @@ beforeEach(() => {
   }))
   statsGet.mockImplementation(async () => ({ success: true, data: state.stats }))
   update.mockResolvedValue({ success: true, data: {} })
+  bulkStop.mockReset().mockResolvedValue({ success: true, data: { stopped: 1 } })
   folderUpdate.mockResolvedValue({ success: true, data: {} })
   duplicate.mockResolvedValue('duplicate-result')
 })
@@ -194,6 +197,15 @@ afterEach(() => {
 })
 
 describe('読了率の母数', () => {
+  test.each(['owner', 'viewer'] as const)('一覧の説明は%sの操作に合う', async role => {
+    state.role = role
+    rememberStaffIdentity({ id: 'scenario-person', role, permissionKeys: [] } as unknown as StaffMember)
+    await mount()
+    fireEvent.click(screen.getByRole('button', { name: 'この画面の説明' }))
+    expect(screen.getByText(/きっかけ（友だち追加/)).toBeTruthy()
+    expect(Boolean(screen.queryByText(/まとめて止める・再開・フォルダへ移す/))).toBe(role === 'owner')
+    if (role === 'viewer') expect(screen.getByText(/配信結果を確認できます/)).toBeTruthy()
+  })
   test('いま途中と読み終えた人の合計を母数にし、購読中は重複を含むと書く', async () => {
     await mount()
     await waitFor(() => expect(kpi('最後まで配信した人').textContent).toContain('全7件の合計'))
@@ -340,14 +352,14 @@ describe('操作の失敗', () => {
   })
 
   test('まとめて停止に失敗したら日本語で知らせる', async () => {
-    update.mockRejectedValue(new Error('offline'))
+    bulkStop.mockRejectedValue(new Error('offline'))
     await mount()
     selectRow('新規登録7日間フォロー')
     fireEvent.click(await screen.findByRole('button', { name: '止める' }))
     const dialog = await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' })
-    fireEvent.click(within(dialog).getByRole('button', { name: '停止する' }))
-    await waitFor(() => expect(update).toHaveBeenCalledWith('s-filed', { isActive: false }))
-    expect(await screen.findByText(/全 1 件中 0 件の保存を確認しました。1 件目で止めました。未送信は 0 件です。理由：/)).toBeTruthy()
+    await waitFor(() => expect((within(dialog).getByRole('button', { name: '停止する' }) as HTMLButtonElement).disabled).toBe(false)); fireEvent.click(within(dialog).getByRole('button', { name: '停止する' }))
+    await waitFor(() => expect(bulkStop).toHaveBeenCalledWith([{ id: 's-filed', revision: 7, activeCount: 0, rowIdSum: 0, rowIdSquareSum: 0 }]))
+    expect(await screen.findByText('停止に失敗しました。時間をおいて、もう一度お試しください。')).toBeTruthy()
     expect(document.body.textContent).not.toContain('offline')
   })
 
@@ -530,6 +542,7 @@ describe('保持した書込操作の実行直前の判定', () => {
     view.rerender(<><ScenariosListV8 /><ToastHost /></>)
     await act(async () => { await stale() })
     expect(update).not.toHaveBeenCalled()
+    expect(bulkStop).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog', { name: '選んだシナリオを停止しますか？' })).toBeNull()
   })
   test('停止確認を閉じて開き直すと古い確定では送らない', async () => {
@@ -543,8 +556,19 @@ describe('保持した書込操作の実行直前の判定', () => {
     dialog = await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' })
     await act(async () => { await stale() })
     expect(update).not.toHaveBeenCalled()
-    fireEvent.click(within(dialog).getByRole('button', { name: '停止する' }))
-    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(bulkStop).not.toHaveBeenCalled()
+    await waitFor(() => expect((within(dialog).getByRole('button', { name: '停止する' }) as HTMLButtonElement).disabled).toBe(false)); fireEvent.click(within(dialog).getByRole('button', { name: '停止する' }))
+    await waitFor(() => expect(bulkStop).toHaveBeenCalledTimes(1))
+  })
+  test('停止の確認窓を開いた時の版を固定する', async () => {
+    const row = { ...rows[0] }
+    listPage.mockImplementation(async input => ({ success: true, data: { items: input.limit === 1 ? [] : [row], total: 1, limit: input.limit, sort: [] } }))
+    await mount(); selectRow('新規登録7日間フォロー')
+    fireEvent.click(await screen.findByRole('button', { name: '止める' }))
+    const dialog = await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' })
+    row.contentRevision = 8
+    await waitFor(() => expect((within(dialog).getByRole('button', { name: '停止する' }) as HTMLButtonElement).disabled).toBe(false)); fireEvent.click(within(dialog).getByRole('button', { name: '停止する' }))
+    await waitFor(() => expect(bulkStop).toHaveBeenCalledWith([{ id: 's-filed', revision: 7, activeCount: 0, rowIdSum: 0, rowIdSquareSum: 0 }]))
   })
   test.each(['viewer', 'unknown', 'read-proxy'] as const)('%sへ変わると、保持した削除確定もAPI0で窓と読取を残す', async change => {
     await mount()
@@ -567,13 +591,14 @@ describe('保持した書込操作の実行直前の判定', () => {
     fireEvent.click(stop)
     expect(screen.queryByRole('dialog', { name: '選んだシナリオを停止しますか？' })).toBeNull()
     expect(update).not.toHaveBeenCalled()
+    expect(bulkStop).not.toHaveBeenCalled()
     expect(screen.getByRole('tooltip').textContent).toContain('オーナーか管理者だけ')
     act(() => rememberStaffIdentity(person('admin')))
     fireEvent.click(await screen.findByRole('button', { name: '止める', exact: true }))
     const dialog = await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' })
-    fireEvent.click(within(dialog).getByRole('button', { name: '停止する', exact: true }))
-    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
-    expect(update).toHaveBeenCalledWith('s-filed', { isActive: false })
+    await waitFor(() => expect((within(dialog).getByRole('button', { name: '停止する', exact: true }) as HTMLButtonElement).disabled).toBe(false)); fireEvent.click(within(dialog).getByRole('button', { name: '停止する', exact: true }))
+    await waitFor(() => expect(bulkStop).toHaveBeenCalledTimes(1))
+    expect(bulkStop).toHaveBeenCalledWith([{ id: 's-filed', revision: 7, activeCount: 0, rowIdSum: 0, rowIdSquareSum: 0 }])
   })
   test('取り消し待ちの並べ替えは本人切替後にGETも書込も始めない', async () => {
     undo.hold = true; await mount()
@@ -598,20 +623,21 @@ describe('保持した書込操作の実行直前の判定', () => {
     await expect(commit).rejects.toThrow('本人・権限')
     expect(reorder).not.toHaveBeenCalled()
   })
-  test('一括停止は1件目の応答中の権限切替で未送信の2件目を止め、実数を出す', async () => {
+  test('一括停止の応答中に権限が変わっても追加の書込を始めない', async () => {
     const activeRows = rows.map(row => ({ ...row, isActive: true }))
     listPage.mockResolvedValue({ success: true, data: { items: activeRows, total: 2, limit: 20, sort: [] } })
     const first = pending<{ success: boolean; data: object }>()
-    update.mockReturnValueOnce(first.promise)
+    bulkStop.mockReturnValueOnce(first.promise)
     await mount(); selectRow('新規登録7日間フォロー'); selectRow('会員更新リマインド')
     fireEvent.click(await screen.findByRole('button', { name: '止める', exact: true }))
     const dialog = await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' })
-    fireEvent.click(within(dialog).getByRole('button', { name: '停止する', exact: true }))
-    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect((within(dialog).getByRole('button', { name: '停止する', exact: true }) as HTMLButtonElement).disabled).toBe(false)); fireEvent.click(within(dialog).getByRole('button', { name: '停止する', exact: true }))
+    await waitFor(() => expect(bulkStop).toHaveBeenCalledTimes(1))
     act(() => rememberStaffIdentity(person('viewer')))
     await act(async () => first.resolve({ success: true, data: {} }))
-    expect(await screen.findByText('2 件中 1 件を保存しました。残りは本人・権限・LINEアカウントが変わったため送っていません。')).toBeTruthy()
-    expect(update).toHaveBeenCalledTimes(1)
+    expect(bulkStop).toHaveBeenCalledWith([{ id: 's-filed', revision: 7, activeCount: 0, rowIdSum: 0, rowIdSquareSum: 0 }, { id: 's-unfiled', revision: 7, activeCount: 0, rowIdSum: 0, rowIdSquareSum: 0 }])
+    expect(bulkStop).toHaveBeenCalledTimes(1)
+    expect(update).not.toHaveBeenCalled()
   })
   test('フォルダ移動の取り消し待ちはread代理への切替で送らず、窓の確定を持ち越さない', async () => {
     undo.hold = true; await mount(); selectRow('新規登録7日間フォロー')
@@ -692,6 +718,7 @@ describe('保持した書込操作の実行直前の判定', () => {
     expect(screen.getByRole('alertdialog', { name: '「新規登録7日間フォロー」を削除しますか？', exact: true })).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: '削除する', exact: true }))
     await waitFor(() => expect(remove).toHaveBeenCalledTimes(1))
+    expect(remove).toHaveBeenCalledWith('s-filed', { contentRevision: 7, activeCount: 0, rowIdSum: 0, rowIdSquareSum: 0, totalCount: 0, totalRowIdSum: 0, totalRowIdSquareSum: 0, referrers: [] })
   })
   test('複製の待機中に画面を離れたら保持した許可も失効する', async () => {
     const response = pending<string>(); duplicate.mockReturnValueOnce(response.promise)
@@ -713,25 +740,32 @@ describe('保持した書込操作の実行直前の判定', () => {
     expect(await screen.findByText('1 件中 0 件を保存しました。残りは本人・権限・LINEアカウントが変わったため送っていません。')).toBeTruthy()
     expect(update).not.toHaveBeenCalled()
   })
-  test.each(['停止', '移動'] as const)('一括%sの2件目で失敗すると、1件保存確認・1件未送信を知らせて残りを送らない', async operation => {
+  test('一括停止の失敗は一括送信1回だけで、個別更新を始めない', async () => {
+    const values = [...rows.map(row => ({ ...row, isActive: true })), scenario('s-third', '三つ目', null, true)]
+    listPage.mockImplementation(async input => ({ success: true, data: { items: input.limit === 1 ? [] : values, total: 3, limit: input.limit, sort: [] } }))
+    bulkStop.mockRejectedValueOnce(new Error('offline'))
+    await mount(); selectRow('新規登録7日間フォロー'); selectRow('会員更新リマインド'); selectRow('三つ目')
+    fireEvent.click(screen.getByRole('button', { name: '止める', exact: true }))
+    const dialog = await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' })
+    await waitFor(() => expect((within(dialog).getByRole('button', { name: '停止する', exact: true }) as HTMLButtonElement).disabled).toBe(false)); fireEvent.click(within(dialog).getByRole('button', { name: '停止する', exact: true }))
+    await waitFor(() => expect(bulkStop).toHaveBeenCalledTimes(1))
+    expect(update).not.toHaveBeenCalled()
+    expect(values.every(row => row.isActive)).toBe(true)
+    expect(document.body.textContent).not.toContain('offline')
+  })
+  test('一括移動の2件目で失敗すると、1件保存確認・1件未送信を知らせて残りを送らない', async () => {
     const values = [...rows.map(row => ({ ...row, isActive: true })), scenario('s-third', '三つ目', null, true)]
     listPage.mockImplementation(async input => ({ success: true, data: { items: input.limit === 1 ? [] : values, total: 3, limit: input.limit, sort: [] } }))
     update.mockImplementation(async (id, patch) => { if (id === 's-filed') { Object.assign(values[0], patch); return { success: true, data: values[0] } } throw new Error('offline') })
     await mount(); selectRow('新規登録7日間フォロー'); selectRow('会員更新リマインド'); selectRow('三つ目')
-    if (operation === '停止') {
-      fireEvent.click(screen.getByRole('button', { name: '止める', exact: true }))
-      const dialog = await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' })
-      fireEvent.click(within(dialog).getByRole('button', { name: '停止する', exact: true }))
-    } else {
-      fireEvent.click(screen.getByRole('button', { name: 'フォルダへ移す', exact: true }))
-      const dialog = await screen.findByRole('dialog', { name: '3 件のシナリオのフォルダを移動' })
-      fireEvent.click(within(dialog).getByRole('button', { name: '移動する', exact: true }))
-    }
+    fireEvent.click(screen.getByRole('button', { name: 'フォルダへ移す', exact: true }))
+    const dialog = await screen.findByRole('dialog', { name: '3 件のシナリオのフォルダを移動' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '移動する', exact: true }))
     expect(await screen.findByText(/全 3 件中 1 件の保存を確認しました。2 件目で止めました。未送信は 1 件です。理由：/)).toBeTruthy()
     expect(update).toHaveBeenCalledTimes(2)
     expect(update.mock.calls.map(([id]) => id)).toEqual(['s-filed', 's-unfiled'])
     expect(document.body.textContent).not.toContain('offline')
-    expect(operation === '停止' ? values[0].isActive : values[0].folderId).toBe(operation === '停止' ? false : null)
+    expect(values[0].folderId).toBe(null)
   })
   test('削除の成功直後に閲覧へ替わっても成功を伝えて確認窓を閉じ、追加の書込は0', async () => {
     const response = pending<{ success: boolean }>(); remove.mockReturnValueOnce(response.promise)

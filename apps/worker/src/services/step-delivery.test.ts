@@ -440,10 +440,10 @@ describe('condition-false jump (next_step_on_false)', () => {
             return { results: [] };
           },
           run: async () => {
-            if (sql.includes("SET status = 'delivering'")) {
+            if (sql.includes("status = 'delivering'") && sql.includes("status = 'active'")) {
               return { meta: { changes: 1 } }; // 実行権の取得は成功させる。
             }
-            if (sql.includes('SET current_step_order')) {
+            if (sql.includes('current_step_order = ?') && sql.includes("status = 'active'")) {
               advances.push({
                 nextStepOrder: args[0] as number,
                 nextDeliveryAt: args[1] as string | null,
@@ -451,7 +451,7 @@ describe('condition-false jump (next_step_on_false)', () => {
               });
               return { meta: { changes: 1 } };
             }
-            if (sql.includes("SET status = 'completed'")) {
+            if (sql.includes("status = 'completed'")) {
               completes.push(args[1] as string);
               return { meta: { changes: 1 } };
             }
@@ -594,7 +594,7 @@ describe('processStepDeliveries crash recovery', () => {
     await processStepDeliveries(db, client);
 
     const recoveryIdx = executed.findIndex(
-      (sql) => sql.includes("SET status = 'active'") && sql.includes("status = 'delivering'"),
+      (sql) => sql.includes("status = 'active'") && sql.includes("status = 'delivering'"),
     );
     const dueQueryIdx = executed.findIndex((sql) => sql.includes('FROM friend_scenarios'));
     expect(recoveryIdx).toBeGreaterThanOrEqual(0); // 回復処理が実行されたことを確かめる。

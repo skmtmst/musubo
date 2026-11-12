@@ -28,6 +28,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
+import { moveHandoverFriend } from '../services/account-handover-move.js';
 
 /**
  * LINEアカウントの乗り換え（引き継ぎ）。設計 ★33-4（`nx3XW`）。台帳。
@@ -48,6 +49,7 @@ const accountHandovers = new Hono<Env>();
 function serialize(row: HandoverRow) {
   return {
     id: row.id,
+    confirmationRevision: row.confirmation_revision,
     fromAccountId: row.from_account_id,
     toAccountId: row.to_account_id,
     code: row.code,
@@ -317,6 +319,10 @@ accountHandovers.put('/api/account-handovers/:id/decisions', requireRole('owner'
       },
     });
   } catch (err) {
+    if (err instanceof Error && err.message === 'HANDOVER_STATE_CONFLICT') {
+      const current = await getHandoverById(c.env.DB,c.req.param('id'));
+      return c.json({ success: false, error: '引き継ぎが変わりました。読み直してください', current: current ? serialize(current) : null }, 409);
+    }
     throw err;
   }
 });
@@ -335,6 +341,9 @@ accountHandovers.post('/api/account-handovers/:id/execute', requireRole('owner',
     if (!await sensitiveStepUpSatisfied(c, 'account_handover.execute')) {
       return stepUpRequiredResponse(c, '引き継ぎの本実行には本人確認が必要です');
     }
+    const body = await c.req.json<{ expectedConfirmationRevision?: number }>().catch(() => ({} as { expectedConfirmationRevision?: number }));
+    if (body.expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(body.expectedConfirmationRevision) || body.expectedConfirmationRevision < 1)) return c.json({ success:false,error:'確認した版が正しくありません' },400);
+    if (body.expectedConfirmationRevision !== undefined && body.expectedConfirmationRevision !== handover.confirmation_revision) return c.json({success:false,error:'引き継ぎが変わりました。読み直してください',current:serialize(handover)},409);
     if (handover.source_friend_total === null) {
       return inputError(c, { success: false, error: '先に事前確認をしてください' }, 422, []);
     }
@@ -359,7 +368,10 @@ accountHandovers.post('/api/account-handovers/:id/execute', requireRole('owner',
     if (handover.status === 'completed' || handover.status === 'executing') {
       return c.json({ success: false, error: 'その引き継ぎはもう実行されています' }, 409);
     }
-    await markExecuting(c.env.DB, handover.id);
+    if (await markExecuting(c.env.DB, handover.id, body.expectedConfirmationRevision) === false) {
+      const current = await getHandoverById(c.env.DB,handover.id);
+      return c.json({success:false,error:'引き継ぎが変わりました。読み直してください',current:current ? serialize(current) : null},409);
+    }
 
     const decisions = await listDecisions(c.env.DB, handover.id);
     const moving = decisions.filter((d) => d.decision === 'link' || d.decision === 'new');
@@ -367,11 +379,8 @@ accountHandovers.post('/api/account-handovers/:id/execute', requireRole('owner',
     let failed = 0;
     for (const d of moving) {
       try {
-        const result = await c.env.DB.prepare(`UPDATE friends SET line_account_id = ? WHERE id = ? AND line_account_id = ?
-          AND (? IS NULL OR EXISTS(SELECT 1 FROM friends target WHERE target.id=? AND target.line_account_id=?))`)
-          .bind(handover.to_account_id, d.from_friend_id, handover.from_account_id, d.to_friend_id, d.to_friend_id, handover.to_account_id)
-          .run();
-        if (result.meta.changes === 1) moved += 1;
+        const result = await moveHandoverFriend(c.env.DB,{handoverId:handover.id,friendId:d.from_friend_id,fromAccountId:handover.from_account_id,toAccountId:handover.to_account_id!,targetFriendId:d.to_friend_id});
+        if (result) moved += 1;
         else failed += 1;
       } catch (err) {
         logger.error("account_handovers.by_id_execute_create_failed");
@@ -405,10 +414,16 @@ accountHandovers.post('/api/account-handovers/:id/cancel', requireRole('owner', 
   try {
     const handover = await loadAccessible(c.env.DB, c.get('staff'), c.req.param('id'));
     if (!handover) return c.json({ success: false, error: 'Not found' }, 404);
+    const body = await c.req.json<{ expectedConfirmationRevision?: number }>().catch(() => ({} as { expectedConfirmationRevision?: number }));
+    if (body.expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(body.expectedConfirmationRevision) || body.expectedConfirmationRevision < 1)) return c.json({success:false,error:'確認した版が正しくありません'},400);
+    if (body.expectedConfirmationRevision !== undefined && body.expectedConfirmationRevision !== handover.confirmation_revision) return c.json({success:false,error:'引き継ぎが変わりました。読み直してください',current:serialize(handover)},409);
     if (handover.status === 'completed') {
       return c.json({ success: false, error: '終わった引き継ぎはやめられません' }, 409);
     }
-    await cancelHandover(c.env.DB, handover.id);
+    if (await cancelHandover(c.env.DB, handover.id, body.expectedConfirmationRevision) === false) {
+      const current = await getHandoverById(c.env.DB,handover.id);
+      return c.json({success:false,error:'引き継ぎが変わりました。読み直してください',current:current ? serialize(current) : null},409);
+    }
     return c.json({ success: true, data: serialize((await getHandoverById(c.env.DB, handover.id))!) });
   } catch (err) {
     throw err;
@@ -428,13 +443,19 @@ accountHandovers.post('/api/account-handovers/:id/rollback', requireRole('owner'
       return stepUpRequiredResponse(c, '引き継ぎの切り戻しには本人確認が必要です');
     }
     const body = await c.req
-      .json<{ note?: string | null }>()
-      .catch(() => ({} as { note?: string | null }));
+      .json<{ note?: string | null; expectedConfirmationRevision?: number }>()
+      .catch(() => ({} as { note?: string | null; expectedConfirmationRevision?: number }));
+    if (body.expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(body.expectedConfirmationRevision) || body.expectedConfirmationRevision < 1)) return c.json({success:false,error:'確認した版が正しくありません'},400);
+    if (body.expectedConfirmationRevision !== undefined && body.expectedConfirmationRevision !== handover.confirmation_revision) return c.json({success:false,error:'引き継ぎが変わりました。読み直してください',current:serialize(handover)},409);
     const result = await rollbackHandover(c.env.DB, handover.id, {
       rolledBackBy: c.get('staff')?.id ?? null,
       note: typeof body.note === 'string' ? body.note : null,
+      expectedRevision: body.expectedConfirmationRevision,
     });
-    if (!result.ok) return inputError(c, { success: false, error: result.error }, 422, ["note"]);
+    if (!result.ok) {
+      if (result.conflict) { const current = await getHandoverById(c.env.DB,handover.id); return c.json({success:false,error:result.error,current:current ? serialize(current) : null},409); }
+      return inputError(c, { success: false, error: result.error }, 422, ["note"]);
+    }
     auditLog(c, 'account_handover.rollback', { id: handover.id, kind: 'account_handover' });
     return c.json({
       success: true,

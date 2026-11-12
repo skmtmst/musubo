@@ -94,7 +94,7 @@ export default function MessageTypeTabs({ value, onChange, children }: MessageTy
                   : disabled
                     ? 'text-ink-faint cursor-not-allowed opacity-50'
                     : 'text-ink-secondary hover:bg-canvas'
-              }`) + ' h-auto whitespace-normal'} key={kind.value} type="button" role="tab" aria-selected={active} disabled={disabled} title={kind.disabledReason}  onClick={() => !disabled && onChange(kind.value)}>
+              }`) + ' h-auto whitespace-normal'} key={kind.value} type="button" role="tab" aria-selected={active} lockedReason={kind.disabledReason} onClick={() => !disabled && onChange(kind.value)}>
               {kind.label}
             </Button>
           )

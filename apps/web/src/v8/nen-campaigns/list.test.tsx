@@ -59,7 +59,7 @@ const FLOWS = { flows: [
 const DELIVERIES = {
   summary: { pending: 1, processing: 0, sent: 5, skipped: 0, failed: 1, cancelled: 0 },
   deliveries: [
-    { id: 'd-1', campaignKey: 'review_request', label: '口コミのお願い', friendName: '大西 健一', lineAccountName: 'LINE 本店', scheduledAt: '2026-08-23T20:00:00+09:00', sentAt: '2026-08-23T20:00:04+09:00', status: 'sent', attempts: 1, unmetReason: null, unmetReasonCode: null, reaction: { value: null, state: 'unavailable', reason: '取れません' }, version: 1 },
+    { id: 'd-1', campaignKey: 'review_request', label: '口コミのお願い', friendName: '見本 19', lineAccountName: 'LINE 本店', scheduledAt: '2026-08-23T20:00:00+09:00', sentAt: '2026-08-23T20:00:04+09:00', status: 'sent', attempts: 1, unmetReason: null, unmetReasonCode: null, reaction: { value: null, state: 'unavailable', reason: '取れません' }, version: 1 },
   ],
   pagination: { total: 1, limit: 20, cursor: '0', nextCursor: null },
 } as unknown as NenDeliveryList
@@ -76,6 +76,7 @@ function baseProps(overrides: Partial<NenCampaignsListProps> = {}): NenCampaigns
     couponOpen: false, onCouponOpenChange: vi.fn(), onCouponChange: vi.fn(), onSaveCoupon: vi.fn(), savingCoupon: false,
     selectedColumnId: null, onSelectColumn: vi.fn(), audienceCount: null, plan: { when: 'now', scheduledAt: '2026-10-10T10:00' }, onPlanChange: vi.fn(),
     introDraft: '', onIntroChange: vi.fn(), onSaveIntro: vi.fn(), savingColumnId: null, onDeliverColumn: vi.fn(), onDuplicateColumn: vi.fn(),
+    onPreviewColumn: vi.fn(async (column: NenColumn) => ({ column, campaign: SETTINGS.find(item => item.campaignKey === 'column')!, recipientCount: 1, confirmationToken: 'a'.repeat(64), messages: [{ type: 'text' as const, text: '紹介文' }, { type: 'flex' as const, altText: 'コラム', contents: { type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [] } } }] })),
     duplicatingColumnId: null, onTestColumn: vi.fn(), onShowDelivery: vi.fn(), onRetryDelivery: vi.fn(), onChangeDeliveryView: vi.fn(),
     ...overrides,
   }

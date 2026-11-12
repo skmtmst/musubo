@@ -1,6 +1,7 @@
 import type { FriendScenarioStatus } from './scenarios/types/index.js';
 export interface FriendScenario {
   id: string;
+  confirmation_revision: number;
   friend_id: string;
   scenario_id: string;
   current_step_order: number;

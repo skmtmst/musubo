@@ -6,6 +6,7 @@ export type DeliveryMode = 'relative' | 'elapsed' | 'absolute_time';
 
 export interface Scenario {
   id: string;
+  content_revision: number;
   name: string;
   description: string | null;
   trigger_type: ScenarioTriggerType;

@@ -492,7 +492,7 @@ describe('processDueGoogleSheetsSyncs', () => {
     testDb.raw.prepare(
       `INSERT INTO google_sheets_integrations
          (id, line_account_id, google_account_email, refresh_token_enc, status)
-       VALUES ('int-2', 'acc-1', 'o@e.com', ?, 'pending_target')`,
+       VALUES ('int-2', 'acc-1', 'owner@example.com', ?, 'pending_target')`,
     ).run(enc);
     const result = await processDueGoogleSheetsSyncs(envFor(testDb), { now: NOW, fetch: (() => { throw new Error('should not fetch'); }) as never, sleep });
     expect(result.synced + result.failed).toBe(0);

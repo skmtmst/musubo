@@ -55,7 +55,7 @@ function deliveryRow(overrides: Row = {}): Row {
     queued_at: '2026-08-28T09:00:00+09:00', accepted_at: '2026-08-28T09:00:02+09:00',
     execution_mode: 'automatic', version: 1, source_event_type: 'ec.order.confirmed',
     source_event_id: 'external-a', source_metadata_json: '{"orderNumber":"NEN-1001"}',
-    definition_name: '注文完了', definition_version: 2, friend_name: '小林 彩', clicked_at: null,
+    definition_name: '注文完了', definition_version: 2, friend_name: '見本 48', clicked_at: null,
     ...overrides,
   };
 }

@@ -325,8 +325,8 @@ describe('Issue #684 イベント予約の実操作', () => {
       summary: { bookingCount: 0, waitingCount: 1, activeSeats: 1 },
       snapshotId: 'snapshot-1', snapshotExpiresAt: '2099-06-01T00:15:00.000Z',
       applicants: [
-        { source: 'waitlist', id: 'wait-offered', friendId: 'friend-offered', displayName: '案内 済子', pictureUrl: null, status: 'offered', partySize: 1, appliedAt: '2099-05-01T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: '2099-05-02T01:00:00.000Z', offerExpiresAt: '2099-05-03T01:00:00.000Z' },
-        { source: 'waitlist', id: 'wait-accepted', friendId: 'friend-accepted', displayName: '受諾 済子', pictureUrl: null, status: 'accepted', partySize: 1, appliedAt: '2099-05-01T02:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: '2099-05-02T02:00:00.000Z', offerExpiresAt: null },
+        { source: 'waitlist', id: 'wait-offered', friendId: 'friend-offered', displayName: '見本 04', pictureUrl: null, status: 'offered', partySize: 1, appliedAt: '2099-05-01T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: '2099-05-02T01:00:00.000Z', offerExpiresAt: '2099-05-03T01:00:00.000Z' },
+        { source: 'waitlist', id: 'wait-accepted', friendId: 'friend-accepted', displayName: '見本 05', pictureUrl: null, status: 'accepted', partySize: 1, appliedAt: '2099-05-01T02:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: '2099-05-02T02:00:00.000Z', offerExpiresAt: null },
         { source: 'waitlist', id: 'wait-waiting', friendId: 'friend-waiting', displayName: '待機 花子', pictureUrl: null, status: 'waiting', partySize: 1, appliedAt: '2099-05-01T03:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
       ],
     })
@@ -350,22 +350,22 @@ describe('Issue #684 イベント予約の実操作', () => {
       },
       waitlistHistory: [
         { id: 'wait-done', friendId: 'friend-done', displayName: '繰上 太郎', status: 'converted', partySize: 1, createdAt: '2099-05-01T01:00:00.000Z', offeredAt: '2099-05-02T01:00:00.000Z', offerExpiresAt: '2099-05-03T01:00:00.000Z', notifiedAt: '2099-05-02T01:00:00.000Z', updatedAt: '2099-05-02T02:00:00.000Z', convertedBookingId: 'event-waitlist:wait-done' },
-        { id: 'wait-lost', friendId: 'friend-lost', displayName: '期限 切子', status: 'expired', partySize: 1, createdAt: '2099-04-28T01:00:00.000Z', offeredAt: '2099-04-29T01:00:00.000Z', offerExpiresAt: '2099-04-30T01:00:00.000Z', notifiedAt: null, updatedAt: '2099-04-30T01:00:00.000Z', convertedBookingId: null },
+        { id: 'wait-lost', friendId: 'friend-lost', displayName: '見本 06', status: 'expired', partySize: 1, createdAt: '2099-04-28T01:00:00.000Z', offeredAt: '2099-04-29T01:00:00.000Z', offerExpiresAt: '2099-04-30T01:00:00.000Z', notifiedAt: null, updatedAt: '2099-04-30T01:00:00.000Z', convertedBookingId: null },
       ],
       attendance: {
         attendedSeats: 2,
         noShowSeats: 1,
         entries: [
-          { id: 'booking-att', friendId: 'friend-att', displayName: '参加 済子', status: 'attended', partySize: 2, markedAt: '2099-06-01T02:10:00.000Z' },
-          { id: 'booking-ns', friendId: 'friend-ns', displayName: '無断 欠子', status: 'no_show', partySize: 1, markedAt: '2099-06-01T02:20:00.000Z' },
+          { id: 'booking-att', friendId: 'friend-att', displayName: '見本 07', status: 'attended', partySize: 2, markedAt: '2099-06-01T02:10:00.000Z' },
+          { id: 'booking-ns', friendId: 'friend-ns', displayName: '見本 08', status: 'no_show', partySize: 1, markedAt: '2099-06-01T02:20:00.000Z' },
         ],
       },
       snapshotId: 'snapshot-1', snapshotExpiresAt: '2099-06-01T00:15:00.000Z',
       applicants: [
         { source: 'booking', id: 'booking-1', friendId: 'friend-booking', displayName: '申込 太郎', pictureUrl: null, status: 'confirmed', partySize: 1, appliedAt: '2099-05-01T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
-        { source: 'booking', id: 'booking-2', friendId: 'friend-requested', displayName: '申込 次郎', pictureUrl: null, status: 'requested', partySize: 2, appliedAt: '2099-05-01T02:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
+        { source: 'booking', id: 'booking-2', friendId: 'friend-requested', displayName: '見本 09', pictureUrl: null, status: 'requested', partySize: 2, appliedAt: '2099-05-01T02:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
         { source: 'waitlist', id: 'wait-1', friendId: 'friend-waiting', displayName: '待機 花子', pictureUrl: null, status: 'waiting', partySize: 3, appliedAt: '2099-05-02T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
-        { source: 'waitlist', id: 'wait-2', friendId: 'friend-offered', displayName: '案内 一郎', pictureUrl: null, status: 'offered', partySize: 2, appliedAt: '2099-05-02T02:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: '2099-05-03T01:00:00.000Z', offerExpiresAt: '2099-05-04T01:00:00.000Z' },
+        { source: 'waitlist', id: 'wait-2', friendId: 'friend-offered', displayName: '見本 10', pictureUrl: null, status: 'offered', partySize: 2, appliedAt: '2099-05-02T02:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: '2099-05-03T01:00:00.000Z', offerExpiresAt: '2099-05-04T01:00:00.000Z' },
       ],
     })
     const view = await mount(<EventBookingsPage />)
@@ -381,8 +381,8 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(attendance.textContent).toContain('参加済 2人')
     expect(attendance.textContent).toContain('無断欠席 1人')
     expect(attendance.textContent).toContain('受付前 1人')
-    expect(view.container.textContent).toContain('参加 済子')
-    expect(view.container.textContent).toContain('無断 欠子')
+    expect(view.container.textContent).toContain('見本 07')
+    expect(view.container.textContent).toContain('見本 08')
     // 繰上げ履歴: 予約化・期限切れを運用の言葉で出す。
     expect(view.container.querySelector('[aria-label="キャンセル待ち"]')).toBeTruthy()
     expect(view.container.textContent).toContain('予約に繰上げ')
@@ -444,8 +444,8 @@ describe('Issue #684 イベント予約の実操作', () => {
       summary: { bookingCount: 0, waitingCount: 2, activeSeats: 1 },
       snapshotId: 'snapshot-1', snapshotExpiresAt: '2099-06-01T00:15:00.000Z',
       applicants: [
-        { source: 'waitlist', id: 'wait-1', friendId: 'friend-1', displayName: '待機 一郎', pictureUrl: null, status: 'waiting', partySize: 1, appliedAt: '2099-05-01T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
-        { source: 'waitlist', id: 'wait-2', friendId: 'friend-2', displayName: '待機 二郎', pictureUrl: null, status: 'waiting', partySize: 1, appliedAt: '2099-05-02T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
+        { source: 'waitlist', id: 'wait-1', friendId: 'friend-1', displayName: '見本 11', pictureUrl: null, status: 'waiting', partySize: 1, appliedAt: '2099-05-01T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
+        { source: 'waitlist', id: 'wait-2', friendId: 'friend-2', displayName: '見本 12', pictureUrl: null, status: 'waiting', partySize: 1, appliedAt: '2099-05-02T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
       ],
     })
     apiMocks.reorderOccurrenceWaitlist.mockResolvedValue({ success: true, occurrence_version: 5, order: ['wait-2', 'wait-1'], log_id: 'log-2' })

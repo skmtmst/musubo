@@ -127,7 +127,7 @@ export async function overwriteResource(
       statements.push(
         db
           .prepare(
-            'UPDATE templates SET name=name WHERE id=? AND line_account_id=?',
+            'UPDATE templates SET confirmation_revision=confirmation_revision+1, name=name WHERE id=? AND line_account_id=?',
           )
           .bind(id, account),
         publishedVersionStatement(db, id, current.published_version, {}, now),
@@ -136,7 +136,7 @@ export async function overwriteResource(
     statements.push(
       db
         .prepare(
-          `UPDATE templates SET name=?,message_type='text',message_content=?,message_bubbles_json=NULL,carousel_actions_json=NULL,question_json=NULL,question_status='published',
+          `UPDATE templates SET confirmation_revision=confirmation_revision+1, name=?,message_type='text',message_content=?,message_bubbles_json=NULL,carousel_actions_json=NULL,question_json=NULL,question_status='published',
       draft_message_type=NULL,draft_message_content=NULL,draft_message_bubbles_json=NULL,draft_carousel_actions_json=NULL,draft_carousel_tap_limit_mode=NULL,draft_carousel_tap_limit_text=NULL,draft_question_json=NULL,draft_question_status=NULL,draft_revision=0,
       published_version=published_version+1,published_at=?,updated_at=? WHERE id=? AND line_account_id=?`,
         )
@@ -203,7 +203,7 @@ export async function overwriteResource(
         ),
       db
         .prepare(
-          `UPDATE automation_definitions SET name=?,status='draft',current_draft_version_id=?,updated_at=? WHERE id=? AND line_account_id=?`,
+          `UPDATE automation_definitions SET confirmation_revision = confirmation_revision + 1, name=?,status='draft',current_draft_version_id=?,updated_at=? WHERE id=? AND line_account_id=?`,
         )
         .bind(name, version, now, id, account),
     ];
@@ -212,7 +212,7 @@ export async function overwriteResource(
     const statements = [
       db
         .prepare(
-          `UPDATE rich_menu_groups SET name=?,status='draft',version=version+1,updated_at=? WHERE id=? AND account_id=?`,
+          `UPDATE rich_menu_groups SET name=?,status='draft',version=version+1,confirmation_revision=confirmation_revision+1,updated_at=? WHERE id=? AND account_id=?`,
         )
         .bind(name, now, id, account),
       db
@@ -241,7 +241,7 @@ export async function overwriteResource(
     return [
       db
         .prepare(
-          `UPDATE scenarios SET name=?,is_active=0,updated_at=? WHERE id=? AND line_account_id=?`,
+          `UPDATE scenarios SET content_revision = content_revision + 1, name=?,is_active=0,updated_at=? WHERE id=? AND line_account_id=?`,
         )
         .bind(name, now, id, account),
       db

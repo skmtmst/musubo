@@ -7,6 +7,12 @@ const entry:ReservationBoardEntry={id:'r',kind:'seats',version:4,scopeId:'s',sta
 const resources=[{id:'t1',label:'T1',capacity:2,active:true},{id:'t2',label:'T2',capacity:2,active:true}]
 afterEach(()=>{cleanup();vi.restoreAllMocks()})
 describe('共通盤の操作',()=>{
+ it('一覧に指定した日時形式を使い、年の異なる予約を区別する',()=>{
+  const older={...entry,id:'older',startsAt:'2026-02-01T09:00:00Z'}
+  render(<ReservationBoard axis="list" columns="dining" entries={[older,entry]} resources={resources} onOpen={()=>{}} formatListDateTime={value=>value.slice(0,10).replaceAll('-','/')}/>)
+  expect(screen.getByText('2026/02/01')).toBeTruthy()
+  expect(screen.getByText('2027/02/01')).toBeTruthy()
+ })
  it('飲食の一覧で名前から同じ予約を開き、注意事項は全文を読めて印刷にも残る',async()=>{
   const open=vi.fn(),allergy='そば・小麦・えび（予約時に確認した内容）'
   vi.spyOn(HTMLElement.prototype,'scrollWidth','get').mockReturnValue(300)

@@ -257,7 +257,6 @@ const D11 = { iso: T1, date: '2026-11-02', start: '10:00', end: '11:00' };
 const D12 = { iso: T2, date: '2026-11-02', start: '11:00', end: '12:00' };
 const D13 = { iso: T3, date: '2026-11-02', start: '12:00', end: '13:00' };
 const DSOON = { iso: T_SOON, date: '2026-10-20', start: '19:00', end: '20:00' };
-
 describe('F6 本人日時変更・取消（mock局所）', () => {
   let sqlite: Database.Database;
   let db: D1Database;
@@ -311,7 +310,6 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
         ('friend-b', 'U-b-1', '本人B', 'account-b', 1);
     `);
     db = asD1(sqlite);
-
     // 管理者 fixture 用は staff あり。本人リクエスト用は staff 無し。
     // staff 無しで本人操作が通ることが、公開認証経路（authMiddleware が
     // /api/liff/ を外す＋idToken 検証）の証拠になる。
@@ -324,7 +322,6 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     selfApp = new Hono<Env>();
     selfApp.route('/', booking);
     env = { DB: db };
-
     // LIFF の id_token 検証と Google provider だけ通す。ほかは落とす。
     mockFetch();
   });
@@ -1226,6 +1223,8 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
   test('貸出中の取消は409で何も変えず、送信後に再試行で取消せる', async () => {
     mockSlots([D11]);
     const id = await adminCreate('menu-ok', T1, 'cx-lease-restore');
+    sqlite.prepare("INSERT INTO booking_groups(id,line_account_id,friend_id,version,created_at,idempotency_key,request_json) VALUES('liff-group','account-ny','friend-self',1,'now','liff-group','{}')").run();
+    sqlite.prepare("UPDATE bookings SET group_id='liff-group' WHERE id=?").run(id);
     const decidedBefore = bookingRow(id).decided_at;
     sqlite.exec(`
       INSERT INTO reminders
@@ -1251,6 +1250,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(bookingRow(id).status).toBe('confirmed');
     expect(bookingRow(id).decided_at).toBe(decidedBefore);
     expect(bookingRow(id).cancel_claim_id).toBeNull();
+    expect(sqlite.prepare("SELECT version FROM booking_groups WHERE id='liff-group'").get()).toEqual({ version: 2 });
     const active = sqlite.prepare(
       "SELECT status FROM friend_reminders WHERE id = 'FR-bk'",
     ).get() as { status: string };

@@ -37,7 +37,7 @@ export const Q: Record<string, Question> = {
     ],
     where: '予約設定 › お支払い', manualHref: '/booking/menus?tab=payments', manualNote: 'お支払いの画面を開きます',
     info: `予約はLINEの予約と管理に対応します。カードの請求は${PREPARING_WORD}です。試験の支払いで本当の請求は起きません。`,
-    todo: { title: 'Stripe をつなぐ', note: 'オンライン先払いを使うときに必要です', action: 'つなぐ' },
+    todo: { title: 'オンライン決済を設定する', note: 'オンライン先払いを使うときに必要です', action: '設定する' },
     skipped: `カードの請求は${PREPARING_WORD}です。試験の支払いで本当の請求は起きません`,
     skippedTitle: 'お支払い（オンライン）',
   },
