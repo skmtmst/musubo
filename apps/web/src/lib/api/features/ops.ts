@@ -145,6 +145,10 @@ export const opsMethods = {
         fetchApi<ApiResponse<OpsSupportTemplateFolder>>('/api/ops/support/template-folders', { method: 'POST', body: JSON.stringify({ name }) }),
       createTemplate: (input: { folderId: string; title: string; body: string }) =>
         fetchApi<ApiResponse<OpsSupportReplyTemplate>>('/api/ops/support/templates', { method: 'POST', body: JSON.stringify(input) }),
+      updateTemplate: (id: string, input: { folderId: string; title: string; body: string; expectedUpdatedAt: string }) =>
+        fetchApi<ApiResponse<OpsSupportReplyTemplate>>(`/api/ops/support/templates/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }),
+      deleteTemplate: (id: string, expectedUpdatedAt: string) =>
+        fetchApi<ApiResponse<null>>(`/api/ops/support/templates/${encodeURIComponent(id)}`, { method: 'DELETE', body: JSON.stringify({ expectedUpdatedAt }) }),
       tickets: (params?: { stage?: OpsSupportStage | 'all'; priority?: OpsSupportPriority; q?: string; sort?: 'newest' | 'oldest' | 'priority'; limit?: number; offset?: number }) => {
         const query = new URLSearchParams()
         if (params?.stage) query.set('stage', params.stage)

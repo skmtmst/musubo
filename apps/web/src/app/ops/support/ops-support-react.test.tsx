@@ -50,6 +50,20 @@ function respond(url: string, init?: RequestInit) {
     templates.push(item)
     return json({ success: true, data: item }, 201)
   }
+  if (url.endsWith('/api/ops/support/templates/welcome') && method === 'PATCH') {
+    const current = templates.find((item) => item.id === 'welcome')!
+    if (body?.expectedUpdatedAt !== current.updatedAt) return json({ success: false, error: '別の担当者が先に変更しました' }, 409)
+    const updated = { ...current, folderId: String(body.folderId), title: String(body.title), body: String(body.body), updatedAt: '2026-11-12T12:00:01.000+09:00' }
+    templates = templates.map((item) => item.id === 'welcome' ? updated : item)
+    return json({ success: true, data: updated })
+  }
+  if (url.endsWith('/api/ops/support/templates/welcome') && method === 'DELETE') {
+    const current = templates.find((item) => item.id === 'welcome')
+    if (!current) return json({ success: false, error: '見つかりません' }, 404)
+    if (body?.expectedUpdatedAt !== current.updatedAt) return json({ success: false, error: '別の担当者が先に変更しました' }, 409)
+    templates = templates.filter((item) => item.id !== 'welcome')
+    return json({ success: true, data: null })
+  }
   if (url.endsWith('/api/ops/support/tickets/t1')) return json({ success: true, data: { ticket, tenant: {}, messages: [], draft } })
   if (url.endsWith('/reply')) return json({ success: true, data: { ticket, message: {}, mailSent: true, mailSkippedReason: null } }, 201)
   return json({ success: false, error: `unexpected ${method} ${url}` }, 404)
@@ -70,7 +84,7 @@ async function type(element: HTMLInputElement | HTMLTextAreaElement, value: stri
 
 beforeEach(() => {
   calls = []; draft = null; readonly = false; folders = [...defaults]
-  templates = [{ id: 'welcome', folderId: 'contracts', title: '解約のご案内', body: '解約手続きをご案内します。', createdAt: '', updatedAt: '' }]
+  templates = [{ id: 'welcome', folderId: 'contracts', title: '解約のご案内', body: '解約手続きをご案内します。', createdAt: '2026-11-12T12:00:00.000+09:00', updatedAt: '2026-11-12T12:00:00.000+09:00' }]
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => respond(String(input), init)))
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
@@ -116,6 +130,33 @@ describe('Penに合わせた問い合わせ', () => {
     expect(calls.find(call => call.url.endsWith('/templates') && call.method === 'POST')?.body).toMatchObject({ folderId: 'custom-6', title: 'クーポンの案内', body: 'クーポンはこちらです。' })
     await click('返信に引用する')
     expect((host.querySelector('textarea[aria-label="返信"]') as HTMLTextAreaElement).value).toBe('クーポンはこちらです。')
+  })
+
+  it('既存テンプレートを編集し、対象を確認して削除する', async () => {
+    await act(async () => root.render(<OpsSupportPage />)); await flush()
+    await click('テンプレート引用')
+    const actions = document.body.querySelector<HTMLButtonElement>('button[aria-label="解約のご案内の操作"]')!
+    await act(async () => actions.click()); await flush()
+    await click('編集する')
+    const title = document.body.querySelector<HTMLInputElement>('input[placeholder="例：解約手続きのご案内"]')!
+    const body = document.body.querySelector<HTMLTextAreaElement>('textarea[placeholder^="お問い合わせありがとうございます。"]')!
+    expect(title.value).toBe('解約のご案内')
+    expect(body.value).toBe('解約手続きをご案内します。')
+    await type(title, '解約手続きのご案内')
+    await type(body, '変更後の返信文です。')
+    await click('変更を保存する')
+    expect(calls.find((call) => call.url.endsWith('/templates/welcome') && call.method === 'PATCH')?.body).toMatchObject({ title: '解約手続きのご案内', body: '変更後の返信文です。', expectedUpdatedAt: '2026-11-12T12:00:00.000+09:00' })
+    expect(document.body.textContent).toContain('変更後の返信文です。')
+
+    const updatedActions = document.body.querySelector<HTMLButtonElement>('button[aria-label="解約手続きのご案内の操作"]')!
+    await act(async () => updatedActions.click()); await flush()
+    await click('削除する')
+    expect(document.body.querySelector('[role="alertdialog"]')?.textContent).toContain('「解約手続きのご案内」を削除しますか？')
+    expect(calls.some((call) => call.method === 'DELETE')).toBe(false)
+    const confirm = document.body.querySelector<HTMLElement>('[role="alertdialog"]')!
+    await act(async () => confirm.querySelector<HTMLButtonElement>('button:last-child')!.click()); await flush()
+    expect(calls.find((call) => call.url.endsWith('/templates/welcome') && call.method === 'DELETE')?.body).toEqual({ expectedUpdatedAt: '2026-11-12T12:00:01.000+09:00' })
+    expect(document.body.textContent).not.toContain('変更後の返信文です。')
   })
 
   it('閲覧のみでは作成・引用・返信できない', async () => {
