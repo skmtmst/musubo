@@ -71,17 +71,17 @@ jobs:
           node-version: '22.23.4'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Build dependencies for the large-data release gate
-        run: pnpm --filter @line-harness/sdk --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-crm/db build
-      - name: Require large-data APIs to respond within three seconds
-        env:
-          SCALE_RELEASE_GATE: '1'
-          SCALE_RUNS: '1'
-        run: pnpm --filter worker scale:benchmark
       - name: Verify approved main, production reviewers, and historical staging proof
         env:
           GH_TOKEN: ${{ github.token }}
         run: pnpm exec tsx scripts/deploy/production/run.ts preflight
+      - name: Build dependencies for the large-data release gate
+        run: pnpm --filter @line-harness/sdk --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-crm/db build
+      - name: Require nine APIs to respond within three seconds on local D1
+        env:
+          SCALE_RELEASE_GATE: '1'
+          SCALE_RUNS: '1'
+        run: pnpm --filter worker scale:benchmark
 
   database:
     needs: authorize
