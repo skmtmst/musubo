@@ -17,6 +17,12 @@ describe('全V8画面の保存失敗を欄へ返す見張り', () => {
     expect(auditFormSaveErrors(broken)).toHaveLength(1)
     expect(auditFormSaveErrors(broken.replace("setError('保存できませんでした')", "if (!errors.capture(e)) setError('保存できませんでした')"))).toEqual([])
   })
+  it('入力欄のないメニュー保管・再開は除き、名前などを伴う更新は見張る', () => {
+    const action = `function Screen() { try { await restaurantTestApi.updateMenu(account, id, { status: 'archived', expectedVersion: version }) } catch (e) { setError('失敗') } return <div /> }`
+    expect(auditFormSaveErrors(action)).toEqual([])
+    expect(auditFormSaveErrors(action.replace('expectedVersion: version', 'expectedVersion: version, name: editedName'))).toHaveLength(1)
+    expect(auditFormSaveErrors(action.replace("status: 'archived'", "status: 'draft'"))).toHaveLength(1)
+  })
   it('Promiseのcatchや別名の保存も見張り、読むAPIは対象にしない', () => {
     const broken = `function Editor() { const errors = useSaveFormErrors();
       api.tags.bulkCreate(payload).catch(e => setError('失敗'))

@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { DELIVERY_CONSENT_ALLOWED_SQL } from './friend-delivery-consents.js';
 
 /**
  * 一斉配信の送達台帳。
@@ -97,6 +98,7 @@ export interface MarkDispatchedInput {
   friendIds: string[];
   /** キュー処理が取得した版。復旧や停止後の古い処理は送信できない。 */
   expectedLockVersion?: number;
+  expectedRecipients?: Array<{ id: string; lineUserId: string }>;
   at?: string;
 }
 
@@ -126,6 +128,24 @@ export async function markBroadcastRecipientsDispatched(
         OR (state='failed' AND error_code IN ('line_http_429','stopped_before_dispatch') AND attempt_no=?))
       AND EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND status='sending' AND stopped_at IS NULL AND batch_offset=-1 AND lock_version=?)`)
       .bind(input.attemptNo,now,now,input.broadcastId,friendId,input.attemptNo,input.broadcastId,input.expectedLockVersion));
+    if (input.expectedRecipients) {
+      if (input.expectedRecipients.length !== input.friendIds.length || input.expectedRecipients.some((item,index) => item.id !== input.friendIds[index])) return [];
+      const guard=db.prepare(`SELECT CASE WHEN EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND status='sending' AND stopped_at IS NULL AND batch_offset=-1 AND lock_version=?)
+        AND NOT EXISTS(SELECT 1 FROM json_each(?) e WHERE NOT EXISTS(
+          SELECT 1 FROM friends f JOIN broadcast_send_claims c ON c.friend_id=f.id AND c.broadcast_id=?
+          WHERE f.id=json_extract(e.value,'$.id') AND f.line_user_id=json_extract(e.value,'$.lineUserId')
+            AND f.line_account_id IS ? AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND (${DELIVERY_CONSENT_ALLOWED_SQL})
+            AND ((c.state='claimed' AND c.dispatched_at IS NULL) OR (c.state='failed' AND c.error_code IN ('line_http_429','stopped_before_dispatch') AND c.attempt_no=?))))
+        THEN 1 ELSE json('HQ_RECIPIENT_CHANGED') END`)
+        .bind(input.broadcastId,input.expectedLockVersion,JSON.stringify(input.expectedRecipients),input.broadcastId,input.lineAccountId,input.attemptNo);
+      try {
+        const results=await db.batch([guard,...statements]);
+        return input.friendIds.filter((_,i)=>(results[i+1].meta.changes??0)>0);
+      } catch (error) {
+        if (error instanceof Error && /malformed json/i.test(error.message)) return [];
+        throw error;
+      }
+    }
     const results=await db.batch(statements);
     return input.friendIds.filter((_,i)=>(results[i].meta.changes??0)>0);
   }

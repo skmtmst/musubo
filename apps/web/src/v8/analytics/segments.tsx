@@ -122,7 +122,7 @@ export default function SegmentsV8({ accountId, canManage }: { accountId: string
       <div className={styles.card}>
         <div className={styles.cardHead}>
           <h3 className={styles.cardTitle}>RFM の表</h3>
-          <HelpTip label="RFM の表の説明">縦は最後に来店・購入した日、横は{measure === 'count' ? '来店・購入した回数' : '合計金額の順位'}です。直近 1 年を数えます。マスを押すと、その人たちを見て LINE を送れます。</HelpTip>
+          <HelpTip label="RFM の表の説明">縦は最後に来店・購入した日、横は{measure === 'count' ? '来店・購入した回数' : '合計金額の順位'}です。直近 1 年を数えます。マスを押すと、その人たちを見{canManage ? 'て LINE を送れます' : 'られます'}。</HelpTip>
           <span className={styles.cardNote}>濃いほど人が多い</span>
         </div>
         <HeatmapTable label="お客さまの分け方の表" columns={F_LABEL[measure]}

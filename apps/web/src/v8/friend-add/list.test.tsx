@@ -224,7 +224,48 @@ describe('友だち追加時の配信の一覧（V8）', () => {
     await act(async () => { accountState.id = 'account-b'; root.render(<FriendAddListV8 />) })
     await act(async () => { accountState.id = 'account-a'; root.render(<FriendAddListV8 />) })
     await act(async () => { await handler({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:button, target:button }) })
-    expect(requests.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+    expect(requests.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+  })
+
+  it('保管の確認を閉じると古い確定は送れず、新しい確定は版と状態を送る', async () => {
+    const existingFetch = globalThis.fetch
+    const requests = vi.fn((...args: Parameters<typeof fetch>) => existingFetch(...args))
+    vi.stubGlobal('fetch', requests)
+    await render(); await openMenu('店頭QRの初回案内')
+    await act(async () => { screen.getByRole('menuitem', { name: '保管する' }).click() })
+    const dialog = screen.getByRole('alertdialog')
+    const button = within(dialog).getByRole('button', { name: '保管する' })
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    await act(async () => { within(dialog).getByRole('button', { name: 'キャンセル' }).click() })
+    await openMenu('店頭QRの初回案内')
+    await act(async () => { screen.getByRole('menuitem', { name: '保管する' }).click() })
+    await act(async () => { await handler({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:button, target:button }) })
+    expect(requests.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+    await act(async () => { within(screen.getByRole('alertdialog')).getByRole('button', { name: '保管する' }).click() })
+    const request = requests.mock.calls.find(([, init]) => init?.method === 'DELETE')
+    expect(request).toBeTruthy()
+    const url = new URL(String(request![0]))
+    expect(url.searchParams.get('account_id')).toBe('account-a')
+    expect(url.searchParams.get('expected_version')).toBe('1')
+    expect(url.searchParams.get('expected_status')).toBe('published')
+  })
+
+  it('版が変わった保管は409を示し、読み直すまで再実行しない', async () => {
+    const original = globalThis.fetch
+    const requests = vi.fn((input: RequestInfo | URL, init?: RequestInit) => init?.method === 'DELETE'
+      ? Promise.resolve(new Response(JSON.stringify({ success:false, code:'VERSION_CONFLICT', error:'設定が変更されました' }), { status:409, headers:{ 'Content-Type':'application/json' } }))
+      : original(input, init))
+    vi.stubGlobal('fetch', requests)
+    await render(); await openMenu('店頭QRの初回案内')
+    await act(async () => { screen.getByRole('menuitem', { name:'保管する' }).click() })
+    const dialog = screen.getByRole('alertdialog')
+    await act(async () => { within(dialog).getByRole('button', { name:'保管する' }).click() })
+    expect(within(dialog).getByText('ほかの人が設定を変えました。読み直してから、もう一度選んでください。')).toBeTruthy()
+    expect((within(dialog).getByRole('button', { name:'保管する' }) as HTMLButtonElement).disabled).toBe(true)
+    await act(async () => { within(dialog).getByRole('button', { name:'読み直す' }).click() })
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(requests.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1)
   })
 
   it('81: 止められない案内の窓は［キャンセル］［受け皿の中身を編集する］の順', async () => {

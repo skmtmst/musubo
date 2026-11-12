@@ -71,7 +71,7 @@ function mergeDraft(id: string): IdentityCandidateDraft {
   const subject = (friendId: string, label: string) => ({
     kind: 'friend' as const, id: friendId, label, detail: '本店',
     lineAccountId: 'account-1', lineAccountName: '本店', shopKey: null,
-    attributes: [{ label: 'メール', valuePreview: 'ta***@example.jp', verified: true }],
+    attributes: [{ label: 'メール', valuePreview: 'ta***@example.com', verified: true }],
   });
   return {
     id,
@@ -83,7 +83,7 @@ function mergeDraft(id: string): IdentityCandidateDraft {
     right: subject('friend-fb', '本人B'),
     evidence: [{
       key: 'verified_email', label: '確認済みのメールアドレスが同じ',
-      strength: 'strong' as const, verified: true, valuePreview: 'ta***@example.jp',
+      strength: 'strong' as const, verified: true, valuePreview: 'ta***@example.com',
     }],
     impact: [],
     detectedAt: '2026-08-30T10:00:00.000Z',

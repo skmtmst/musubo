@@ -19,6 +19,8 @@ import { fetchAllPages } from './fetch-all-pages'
 import { moveDay, startOfWeek, type CalendarAvailability, type CalendarSlot } from './booking-calendar'
 import { STATUS_TABS, SOURCE_FILTERS, PAGE_SIZE, jstDay, LEDGER_QUERY_KEYS, LEDGER_STORAGE_KEY, LedgerSavedState, readLedgerState, matchesLedgerSource } from './ledger-model'
 
+type DecisionTarget = { id: string; accountId: string; action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete' }
+
 export function useBookingLedger() {
   usePageTitle('予約管理')
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -168,7 +170,15 @@ export function useBookingLedger() {
   useEffect(() => () => {
     if (copyTimer.current !== null) window.clearTimeout(copyTimer.current)
   }, [])
-  const [decideTarget, setDecideTarget] = useState<{ id: string; accountId: string; action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete' } | null>(null)
+  const [decideTarget, setDecideTargetState] = useState<DecisionTarget | null>(null)
+  const decisionScope = useRef({ accountId: selectedAccountId })
+  if (decisionScope.current.accountId !== selectedAccountId) decisionScope.current = { accountId: selectedAccountId }
+  const decisionRef = useRef<{ target: DecisionTarget; scope: typeof decisionScope.current } | null>(null)
+  const setDecideTarget = (target: DecisionTarget | null) => {
+    decisionRef.current = target ? { target, scope: decisionScope.current } : null
+    setDecideTargetState(target)
+  }
+  useEffect(() => () => { decisionRef.current = null }, [])
   const [deciding, setDeciding] = useState(false)
   const [decideError, setDecideError] = useState('')
   /* 台帳CSVの書出し中。失敗は一覧の error 帯へ出す（TECH-03）。 */
@@ -537,6 +547,8 @@ export function useBookingLedger() {
     // 操作が向かったアカウントを固定する(#963)。応答を待つ間に
     // 切り替わっていても、新しいアカウントの確認窓・失敗表示を触らない。
     const decideAccountId = selectedAccountId
+    const requestScope = decisionScope.current
+    const requestTarget = decisionRef.current
     setDeciding(true)
     setDecideError('')
     try {
@@ -547,8 +559,8 @@ export function useBookingLedger() {
        * 新しいアカウントの一覧を空にしたまま読み込み状態が残る。
        * 切替済みなら、切替の効果が新しいアカウントの取得を始めている。
        */
-      if (listAccountRef.current === decideAccountId) {
-        setDecideTarget(null)
+      if (listAccountRef.current === decideAccountId && decisionScope.current === requestScope) {
+        if (decisionRef.current === requestTarget) setDecideTarget(null)
         await load()
         // R89: 一覧だけでなく集計・カレンダー・空き枠も読み直す。
         // 集計の取り直しが届くと空き枠の取得も連動して走り直す。
@@ -556,7 +568,7 @@ export function useBookingLedger() {
         setCalendarSeq((n) => n + 1)
       }
     } catch (e) {
-      if (listAccountRef.current === decideAccountId) {
+      if (listAccountRef.current === decideAccountId && decisionScope.current === requestScope && decisionRef.current === requestTarget) {
         setDecideError(describeApiFailure(e, '予約の状態変更'))
       }
     } finally {
@@ -568,6 +580,17 @@ export function useBookingLedger() {
     if (!selectedAccountId || listAccountRef.current !== selectedAccountId) return
     setDecideError('')
     setDecideTarget({ id, action, accountId: selectedAccountId })
+  }
+
+  function confirmDecide(target: DecisionTarget | null) {
+    const current = decisionRef.current
+    if (!target || !current || current.target !== target || current.scope !== decisionScope.current) return
+    void runDecide(target.id, target.action)
+  }
+  function cancelDecide(target: DecisionTarget | null) {
+    if (decisionRef.current?.target !== target) return
+    setDecideTarget(null)
+    setDecideError('')
   }
 
   const kpi = {
@@ -804,6 +827,8 @@ export function useBookingLedger() {
     calendarStatus,
     runDecide,
     handleDecide,
+    confirmDecide,
+    cancelDecide,
     kpi,
     menuCounts,
     pageCount,

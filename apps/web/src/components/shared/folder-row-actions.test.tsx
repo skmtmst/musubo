@@ -5,7 +5,7 @@ import { expectLockedFolderMenu } from '@/test-utils/permission-locked-control'
  * V8 の言葉（名前を変える・色を変える・並べ替える・消す）、消す前の確認の窓、
  * 消すと共通のフォルダの口へ DELETE を送って読み直す。閲覧のみでも「…」を開け、変更項目は理由付きで拒否する。
  */
-import { within } from '@testing-library/react'
+import { renderHook, within } from '@testing-library/react'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -45,7 +45,7 @@ import { useFolderRowActions } from './folder-row-actions'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const folder = (id: string, name: string, order: number): Folder => ({
-  id, kind: 'rich_menu', name, parentId: null, displayOrder: order, color: '#2f6fdf', createdAt: '', updatedAt: '',
+  id, kind: 'rich_menu', name, parentId: null, displayOrder: order, color: '#2f6fdf', createdAt: '', updatedAt: '', revision: 7,
 })
 const FOLDERS = [folder('f-1', 'キャンペーン', 0), folder('f-2', 'EC・フォロー', 1)]
 
@@ -92,6 +92,56 @@ const menuItems = () => [...document.querySelectorAll('[role="menuitem"]')].map(
 const click = async (el: Element | null | undefined) => { await act(async () => { (el as HTMLElement).click() }) }
 
 describe('フォルダの「…」（共通）', () => {
+  it.each([
+    ['別の所属', 'owner-b', 'owner-b', undefined],
+    ['所属なし', null, '', '所属なし'],
+    ['未取得', undefined, '', undefined],
+  ])('%sのフォルダは選択中アカウントで所属を埋めない', (_label, owner, id, name) => {
+    const selected = { ...FOLDERS[0], accountId: owner }
+    const view = renderHook(() => useFolderRowActions({ kind: 'rich_menu', folders: [selected], accountId: 'acc-1', enabled: true, itemLabel: 'リッチメニュー', onChanged: () => {} }))
+    act(() => view.result.current.rowActions(selected, 0).onDelete?.())
+    const dialog = React.Children.toArray((view.result.current.dialogs as React.ReactElement<{ children: React.ReactNode }>).props.children).at(-1) as React.ReactElement<{ children: React.ReactElement<{ accounts: Array<{ id: string; name?: string; label: string }> }> }>
+    expect(dialog.props.children.props.accounts).toEqual([
+      { id, name, label: 'フォルダの所属先' },
+      { id: 'acc-1', label: '選択中のLINEアカウント' },
+    ])
+    view.unmount()
+  })
+  it('フォルダの版が確認できない場合は削除を止める', async () => {
+    const unversioned = { ...FOLDERS[0], revision: undefined }
+    const view = renderHook(() => useFolderRowActions({ kind: 'rich_menu', folders: [unversioned], accountId: 'acc-1', enabled: true, itemLabel: 'リッチメニュー', onChanged: () => {} }))
+    act(() => view.result.current.rowActions(unversioned, 0).onDelete?.())
+    const dialog = React.Children.toArray((view.result.current.dialogs as React.ReactElement<{ children: React.ReactNode }>).props.children).at(-1) as React.ReactElement<{ onConfirm: () => void; confirmDisabled: boolean; confirmDisabledReason?: string }>
+    expect(dialog.props.confirmDisabled).toBe(true)
+    expect(dialog.props.confirmDisabledReason).toContain('読み直')
+    await act(async () => dialog.props.onConfirm())
+    expect(remove).not.toHaveBeenCalled()
+    view.unmount()
+  })
+  it('同じフォルダを開き直しても閉じた削除確認は使えない', async () => {
+    const owned = FOLDERS.map(folder => ({ ...folder, accountId: 'acc-1' }))
+    const view = renderHook(() => useFolderRowActions({ kind: 'rich_menu', folders: owned, accountId: 'acc-1', enabled: true, itemLabel: 'リッチメニュー', onChanged: () => {} }))
+    const currentDialog = () => React.Children.toArray((view.result.current.dialogs as React.ReactElement<{ children: React.ReactNode }>).props.children).at(-1) as React.ReactElement<{ onConfirm: () => void; onCancel: () => void }>
+    act(() => view.result.current.rowActions(owned[0], 0).onDelete?.())
+    const old = currentDialog().props
+    act(() => old.onCancel())
+    act(() => view.result.current.rowActions(owned[0], 0).onDelete?.())
+    await act(async () => old.onConfirm())
+    expect(remove).not.toHaveBeenCalled()
+    await act(async () => currentDialog().props.onConfirm())
+    expect(remove).toHaveBeenCalledTimes(1)
+    view.unmount()
+  })
+  it('権限判定が省略された画面でもアカウント変更で削除確認を失効する', async () => {
+    const props = { enabled: true, onChanged: vi.fn(), onDeleted: vi.fn() }
+    await act(async () => root.render(<Screen {...props} accountId="acc-1" />))
+    await click(menuButton('キャンペーン'))
+    await click([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.trim() === '消す'))
+    expect(document.querySelector('[role="alertdialog"]')).not.toBeNull()
+    await act(async () => root.render(<Screen {...props} accountId="acc-2" />))
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(remove).not.toHaveBeenCalled()
+  })
   it('親画面の未保存確認が済むまでフォルダ編集を開かない', async () => {
     const stop = (event: Event) => event.preventDefault()
     window.addEventListener('musubo:request-unsaved-action', stop)
@@ -115,7 +165,7 @@ describe('フォルダの「…」（共通）', () => {
     await click([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.trim() === '消す'))
     await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('フォルダの所有店'))
     expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('環境')
-    expect(document.querySelector('[role="alertdialog"]')?.textContent).not.toContain('選択中の店')
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('選択中の店')
   })
 
   it('所有先と選択中のアカウントが異なるフォルダを削除しない', async () => {
@@ -132,9 +182,9 @@ describe('フォルダの「…」（共通）', () => {
     await act(async () => { root.render(<Screen enabled folders={folders} onChanged={() => {}} onDeleted={() => {}} />) })
     await click(menuButton('キャンペーン'))
     await click([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.trim() === '消す'))
-    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('共通（全アカウント）')
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('所属なし')
     await act(async () => { await capturedConfirm.current?.() })
-    expect(remove).toHaveBeenCalledWith('f-1', undefined)
+    expect(remove).toHaveBeenCalledWith('f-1', undefined, 7)
   })
 
   it('所有先を確認できないフォルダは削除しない', async () => {
@@ -211,9 +261,24 @@ describe('フォルダの「…」（共通）', () => {
     expect(document.body.textContent).toContain('中のリッチメニュー 2 件は消えずに「未分類」へ移ります。')
     expect(remove).not.toHaveBeenCalled()
     await click([...document.querySelectorAll('button')].find((el) => el.textContent === '削除する'))
-    expect(remove).toHaveBeenCalledWith('f-1', 'acc-1')
+    expect(remove).toHaveBeenCalledWith('f-1', 'acc-1', 7)
     expect(onDeleted).toHaveBeenCalledWith('f-1')
     expect(onChanged).toHaveBeenCalled()
+  })
+
+  it('確認後に別の人が変更したら、読み直して窓を開き直すまで削除できない', async () => {
+    remove.mockRejectedValueOnce(Object.assign(new Error('conflict'), { status: 409, code: 'VERSION_CONFLICT' }))
+    const onChanged = vi.fn(), onDeleted = vi.fn()
+    await act(async () => { root.render(<Screen enabled onChanged={onChanged} onDeleted={onDeleted} />) })
+    await click(menuButton('キャンペーン'))
+    await click([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.trim() === '消す'))
+    const dialog = within(document.querySelector('[role="alertdialog"]') as HTMLElement)
+    await click(dialog.getByRole('button', { name: '削除する' }))
+    expect(remove).toHaveBeenCalledWith('f-1', 'acc-1', 7)
+    expect(onChanged).toHaveBeenCalledOnce()
+    expect(onDeleted).not.toHaveBeenCalled()
+    expect(dialog.getByText(/窓を閉じて最新の内容を確認/)).toBeTruthy()
+    expect((dialog.getByRole('button', { name: '削除する' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('並べ替えは隣と入れ替える口を1回だけ送る', async () => {

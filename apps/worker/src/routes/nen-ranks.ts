@@ -27,7 +27,7 @@ import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { NenRankSyncError, buildNenRankSyncPayload, pushNenRankSettingsToEc } from '../services/nen-rank-sync.js';
 import { refreshAllNenTags } from '../services/nen-tag-sync.js';
-import { deleteNenRank, NenRankDeleteError } from '../services/nen-rank-delete.js';
+import { deleteNenRank, NenRankDeleteError, countRankMembers, rankDeleteMembers, type ConfirmedRankMember } from '../services/nen-rank-delete.js';
 import { getMemberRankSync, syncMemberRanks } from '../services/nen-member-rank-sync.js';
 import {
   ENERGY_FACTORS,
@@ -185,8 +185,18 @@ nenRanks.post('/api/nen/rank-settings/initialize', requireRole('owner', 'admin')
   return c.json({ success: true, data: await settingsResponse(c, accountId) });
 });
 
+nenRanks.get('/api/nen/rank-settings/:id/delete-preview', requireRole('owner','admin'), async c=>{
+  const accountId=accountIdFrom(c),denied=await requireAccount(c,accountId);
+  if(denied)return denied;
+  const [ranks,rules]=await Promise.all([getNenRankSettings(c.env.DB,accountId),getNenRankRules(c.env.DB,accountId)]);
+  const rank=ranks.find(item=>item.id===c.req.param('id'));
+  if(!rank||!rules)return c.json({success:false,error:'ランクが見つかりません'},404);
+  const members=await rankDeleteMembers(c.env.DB,accountId,rank.rank_key);
+  return c.json({success:true,data:{count:members.length,members,version:rules.version}});
+});
+
 nenRanks.delete('/api/nen/rank-settings/:id', requireRole('owner', 'admin'), async (c) => {
-  const body = await c.req.json<{ accountId?: string; replacementRankId?: unknown; expectedVersion?: unknown }>().catch(() => null);
+  const body = await c.req.json<{ accountId?: string; replacementRankId?: unknown; expectedVersion?: unknown; confirmedMembers?:unknown }>().catch(() => null);
   const accountId = accountIdFrom(c, body);
   const denied = await requireAccount(c, accountId);
   if (denied) return denied;
@@ -196,12 +206,18 @@ nenRanks.delete('/api/nen/rank-settings/:id', requireRole('owner', 'admin'), asy
   if (body.replacementRankId != null && (typeof body.replacementRankId !== 'string' || !body.replacementRankId.trim())) {
     return c.json({ success: false, error: '移す先のランクを選んでください' }, 400);
   }
+  if(body.confirmedMembers!==undefined&&(!Array.isArray(body.confirmedMembers)||body.confirmedMembers.some((item:unknown)=>!item||typeof item!=='object'||typeof (item as ConfirmedRankMember).friendId!=='string'||!((item as ConfirmedRankMember).customerId===null||typeof (item as ConfirmedRankMember).customerId==='string'))||new Set(body.confirmedMembers.map((item:ConfirmedRankMember)=>item.friendId)).size!==body.confirmedMembers.length))return c.json({success:false,error:'確認した会員を指定してください'},400);
   const actor = `musubo:${c.get('staff').id}`;
   if (actor.length > 128) return c.json({ success: false, error: '担当者IDが長すぎます' }, 400);
   try {
     const data = await deleteNenRank(c.env.DB, accountId, c.req.param('id'),
       typeof body.replacementRankId === 'string' ? body.replacementRankId : null, body.expectedVersion,
-      (ranks, now) => ensureRankTags(c.env.DB, ranks, now), actor);
+      async (ranks, now) => {
+        if(body.confirmedMembers===undefined)return ensureRankTags(c.env.DB,ranks,now);
+        const names=await tagNames(c.env.DB,ranks.map(rank=>rank.tag_id));
+        if(ranks.some(rank=>!rank.tag_id||!names.has(rank.tag_id)))throw new NenRankDeleteError('ランクのタグを保存してから再確認してください',409,await countRankMembers(c.env.DB,accountId,ranks[0].rank_key));
+        return ranks;
+      }, actor,body.confirmedMembers as ConfirmedRankMember[]|undefined);
     let ecSyncResult;
     try {
       ecSyncResult = await syncMemberRanks(c.env.DB, accountId, data.operationId, memberSyncConfig(c));
@@ -214,7 +230,7 @@ nenRanks.delete('/api/nen/rank-settings/:id', requireRole('owner', 'admin'), asy
       message: ecSyncResult.status === 'synced' ? '会員のランクをECへ反映しました'
         : ecSyncResult.status === 'failed' ? 'ECへの反映に失敗した会員がいます。結果を確認してやり直してください' : data.message } });
   } catch (error) {
-    if (error instanceof NenRankDeleteError) return inputError(c, { success: false, error: error.message }, error.status, []);
+    if (error instanceof NenRankDeleteError) return inputError(c, { success: false, error: error.message,...(error.currentCount===undefined?{}:{data:{count:error.currentCount}}) }, error.status, []);
     throw error;
   }
 });

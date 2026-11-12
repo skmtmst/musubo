@@ -64,15 +64,15 @@ export default function HqAccountList({
               <dl className="mt-2 grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-control bg-canvas-sunken px-2 py-2">
                   <dt className="text-nano text-ink-faint">友だち数</dt>
-                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.friendCount ?? 0))}</dd>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{formatNumber(account.stats?.friendCount)}</dd>
                 </div>
                 <div className="rounded-control bg-canvas-sunken px-2 py-2">
                   <dt className="text-nano text-ink-faint">今月の配信数</dt>
-                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.messagesThisMonth ?? 0))}</dd>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{formatNumber(account.stats?.messagesThisMonth)}</dd>
                 </div>
                 <div className="rounded-control bg-canvas-sunken px-2 py-2">
                   <dt className="text-nano text-ink-faint">担当者数</dt>
-                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.staffCount ?? 0))}人</dd>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{account.stats?.staffCount == null ? '—' : `${formatNumber(account.stats.staffCount)}人`}</dd>
                 </div>
               </dl>
             </details>
@@ -104,10 +104,10 @@ export default function HqAccountList({
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.friendCount ?? 0))}</td>
-                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.messagesThisMonth ?? 0))}</td>
+                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{formatNumber(account.stats?.friendCount)}</td>
+                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{formatNumber(account.stats?.messagesThisMonth)}</td>
                 <td className="px-4 py-2"><ConnectionStatus account={account} /></td>
-                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.staffCount ?? 0))}人</td>
+                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{account.stats?.staffCount == null ? '—' : `${formatNumber(account.stats.staffCount)}人`}</td>
                 <td className="px-4 py-2"><StatusBadge tone={account.isActive ? 'success' : 'neutral'} size="compact">{account.isActive ? '有効' : '停止中'}</StatusBadge></td>
                 <td className="px-5 py-2 text-right">
                   <div className="flex justify-end gap-2">

@@ -98,7 +98,7 @@ it('一括停止は選んだ各記録の所属先を示し、未取得を選択�
   await screen.findByText('お知らせ1')
   rows.forEach(row => fireEvent.click(within(screen.getByText(row.name).closest('tr')!).getByRole('checkbox')))
   fireEvent.click(screen.getByRole('button', { name: '止める', exact: true }))
-  const dialog = await screen.findByRole('dialog', { name: '2件のリマインダを停止しますか？' })
+  const dialog = await screen.findByRole('dialog', { name: '2 件のリマインダを停止しますか？' })
   expect(await within(dialog).findByText('二号店')).toBeTruthy()
   expect(within(dialog).getByText('不明')).toBeTruthy()
   expect(within(dialog).queryByText('本店')).toBeNull()
@@ -109,7 +109,7 @@ it('一括停止も切替後の古い確認では送れない', async () => {
   await screen.findByText('お知らせ1')
   rows.forEach(row => fireEvent.click(within(screen.getByText(row.name).closest('tr')!).getByRole('checkbox')))
   fireEvent.click(screen.getByRole('button', { name: '止める', exact: true }))
-  const dialog = await screen.findByRole('dialog', { name: '2件のリマインダを停止しますか？' })
+  const dialog = await screen.findByRole('dialog', { name: '2 件のリマインダを停止しますか？' })
   const button = within(dialog).getByRole('button', { name: '停止する' })
   const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
   const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
@@ -134,12 +134,23 @@ it('一件の停止確認を開いた後でアカウントを切り替えると�
   expect(net.update).not.toHaveBeenCalled()
 })
 
+it('一件停止の窓はアカウントを切り替えたら閉じる', async () => {
+  const view = render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  fireEvent.click(screen.getByRole('button', { name: 'リマインダ「お知らせ1」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '一時停止する' }))
+  expect(await screen.findByRole('dialog')).toBeTruthy()
+  net.account = 'account-b'; view.rerender(<RemindersList />)
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(net.update).not.toHaveBeenCalled()
+})
+
 it('一括停止の窓は操作先を示し、アカウント切替で閉じて古い対象を送らない', async () => {
   const view = render(<RemindersList />)
   await screen.findByText('お知らせ1')
   rows.forEach(row => fireEvent.click(within(screen.getByText(row.name).closest('tr')!).getByRole('checkbox')))
   fireEvent.click(screen.getByRole('button', { name: '止める', exact: true }))
-  const dialog = await screen.findByRole('dialog', { name: '2件のリマインダを停止しますか？' })
+  const dialog = await screen.findByRole('dialog', { name: '2 件のリマインダを停止しますか？' })
   await within(within(dialog).getByRole('region', { name: '操作の対象' })).findByText('本店')
   expect(net.update).not.toHaveBeenCalled()
   net.account = 'account-b'

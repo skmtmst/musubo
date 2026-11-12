@@ -56,7 +56,7 @@ import HqMembersV8 from './members'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const staffMember = {
-  id: 'stf-staff', name: '中川 由美', email: 'nakagawa@example.com', role: 'staff', isActive: true,
+  id: 'stf-staff', name: '見本 30', email: 'nakagawa@example.com', role: 'staff', isActive: true,
   inviteStatus: 'active', accountScope: 'accounts', scopedLineAccountIds: ['acc-1'], assignedLineAccountId: 'acc-1',
   permissionKeys: [], notificationPreferences: {}, lineLinked: true, twoFactorEnabled: false,
   canAccessDescendantAccounts: false, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
@@ -111,13 +111,13 @@ describe('V8 統括のメンバーの窓', () => {
     expect(dialog.textContent).toContain('担当者（業務を操作できる）')
     const name = screen.getByRole('textbox', { name: '名前' }) as HTMLInputElement
     const email = screen.getByRole('textbox', { name: 'メールアドレス' }) as HTMLInputElement
-    await act(async () => { fireEvent.change(name, { target: { value: '新井 一郎' } }) })
+    await act(async () => { fireEvent.change(name, { target: { value: '見本 146' } }) })
     await act(async () => { fireEvent.change(email, { target: { value: 'arai@example.com' } }) })
     await act(async () => { buttonByText('招待メールを送る')!.click() })
     await flush()
     expect(create).toHaveBeenCalledTimes(1)
     expect(create.mock.calls[0][0]).toEqual(expect.objectContaining({
-      name: '新井 一郎', email: 'arai@example.com', role: 'staff',
+      name: '見本 146', email: 'arai@example.com', role: 'staff',
       accountScope: 'all', scopedLineAccountIds: [], assignedLineAccountId: null,
     }))
   })
@@ -138,7 +138,7 @@ describe('V8 統括のメンバーの窓', () => {
   })
 
   it('確認の間は変更の窓を閉じ、やめたら入れた中身のまま戻り、役割を変えないときは役割を送らない', async () => {
-    await act(async () => { buttonByText('中川 由美のその他操作')!.click() })
+    await act(async () => { buttonByText('見本 30のその他操作')!.click() })
     await flush()
     await act(async () => { buttonByText('権限を変更する')!.click() })
     await flush()
@@ -149,7 +149,7 @@ describe('V8 統括のメンバーの窓', () => {
     await act(async () => { inactive.click() })
     await act(async () => { buttonByText('変更を保存する')!.click() })
     await flush()
-    expect(dialogTitles()).toEqual(['中川 由美 さんの権限を変えますか？'])
+    expect(dialogTitles()).toEqual(['見本 30 さんの権限を変えますか？'])
 
     await act(async () => { buttonByText('キャンセル')!.click() })
     await flush()

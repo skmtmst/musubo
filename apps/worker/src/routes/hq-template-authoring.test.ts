@@ -392,7 +392,7 @@ test('保存前にフォームと押した人のタグの同名参照・LIFFの�
 });
 
 test.each([
- ['tel','uri',{uri:'tel:0312345678'}],['datetime','postback',{mode:'date',initial:'2026-10-16'}],
+ ['tel','uri',{uri:'tel:0300005678'}],['datetime','postback',{mode:'date',initial:'2026-10-16'}],
  ['clipboard','postback',{text:'予約番号'}],['postback','postback',{data:'contact',displayText:'問い合わせ'}],
 ])('組5: %s の保存→配布→店の公開用組立に同じ動きを保持する',async(intent,actionType,actionData)=>{
  const image=await upload('rich_menu');
@@ -440,13 +440,13 @@ test('組5: 複数通を作成→版へ固定→配布→同じ順で配信素�
 
 test('組5: 電話番号の差し込みは各店の同じ名前の共通情報を使い、無効な値や変更後の配布を拒否する',async()=>{
  const image=await upload('rich_menu');
- for(const a of ['a','b','c'])sql.raw.prepare("INSERT INTO common_vars(id,name,var_key,type,value,line_account_id) VALUES (?,'店の電話','phone','text',?,?)").run('var-'+a,'031234000'+['a','b','c'].indexOf(a),a);
+ for(const a of ['a','b','c'])sql.raw.prepare("INSERT INTO common_vars(id,name,var_key,type,value,line_account_id) VALUES (?,'店の電話','phone','text',?,?)").run('var-'+a,'030000000'+['a','b','c'].indexOf(a),a);
  sql.raw.exec("UPDATE common_vars SET valid_from=strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 hour'),valid_until=strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 hour')");
- const d={schemaVersion:1,richMenu:{id:'menu',name:'電話',chatBarText:'メニュー',size:'large',defaultPageId:'page',pages:[{id:'page',name:'ページ',imageR2Key:image.body.data.r2Key,areas:[{id:'phone',label:'電話をかける',bounds:{x:0,y:0,width:100,height:100},actionType:'uri',intent:'tel',actionData:{uri:'tel:0312340000'},dataBindings:{uri:'店の電話'}}]}]}};
+ const d={schemaVersion:1,richMenu:{id:'menu',name:'電話',chatBarText:'メニュー',size:'large',defaultPageId:'page',pages:[{id:'page',name:'ページ',imageR2Key:image.body.data.r2Key,areas:[{id:'phone',label:'電話をかける',bounds:{x:0,y:0,width:100,height:100},actionType:'uri',intent:'tel',actionData:{uri:'tel:0300000000'},dataBindings:{uri:'店の電話'}}]}]}};
  const preview=await request('/rich-menu-preview','POST',{name:'電話',accountIds:['a','b','c'],definition:d});expect(preview.status,JSON.stringify(preview.body)).toBe(200);expect(preview.body.data.references[0]).toMatchObject({kind:'common_var',availableAccountCount:3});
  const id=await save('rich_menu',d);await distribute(id);
  const rows=sql.raw.prepare('SELECT g.account_id,a.action_data FROM rich_menu_areas a JOIN rich_menu_pages p ON p.id=a.page_id JOIN rich_menu_groups g ON g.id=p.group_id ORDER BY g.account_id').all() as Array<{account_id:string;action_data:string}>;
- expect(rows.map(r=>JSON.parse(r.action_data).uri)).toEqual(['tel:0312340000','tel:0312340001','tel:0312340002']);
+ expect(rows.map(r=>JSON.parse(r.action_data).uri)).toEqual(['tel:0300000000','tel:0300000001','tel:0300000002']);
  const p=await request(`/${id}/preflight`,'POST',{accountIds:['a']});expect(p.status).toBe(200);
  sql.raw.exec("UPDATE common_vars SET value='javascript:bad' WHERE id='var-a'");
  const r=await request(`/${id}/distribute`,'POST',{preflightId:p.body.data.preflightId,resolutions:p.body.data.stores.flatMap((s:{accountId:string;items:Array<{sourceId:string;duplicate:boolean}>})=>s.items.map((i:{sourceId:string;duplicate:boolean})=>({accountId:s.accountId,sourceId:i.sourceId,mode:i.duplicate?'overwrite':'create'})))});

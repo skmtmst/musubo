@@ -90,7 +90,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
   // 状態を変えたので 409 を返し、副作用（reminders 作成・通知）は走らせない。
   const updateStatement = c.env.DB
     .prepare(
-      `UPDATE bookings SET status = ?, decided_at = ?, cancellation_reason=COALESCE(?,cancellation_reason),
+      `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = ?, decided_at = ?, cancellation_reason=COALESCE(?,cancellation_reason),
                             updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
         WHERE id = ? AND status = ?`,
     )
@@ -143,14 +143,14 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         // 状態更新を巻き戻して 409 にする。貸出中の送信は確定ずみの予約への
         // 送信になるため正当で、再試行は巻き戻し後の状態から再開する。
         // 巻き戻しが 0 件 (同時更新あり) なら相手の処理に任せる。
-        await c.env.DB
-          .prepare(
-            `UPDATE bookings SET status = ?, decided_at = ?,
+        await c.env.DB.batch([
+          c.env.DB.prepare(
+            `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = ?, decided_at = ?,
                                   updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
               WHERE id = ? AND status = ?`,
-          )
-          .bind(row.status, row.decided_at, id, next)
-          .run();
+          ).bind(row.status, row.decided_at, id, next),
+          c.env.DB.prepare(`UPDATE booking_groups SET version=version+1 WHERE id=(SELECT group_id FROM bookings WHERE id=? AND line_account_id=?) AND line_account_id=? AND changes()=1`).bind(id, accountId, accountId),
+        ]);
         return c.json({ error: 'send_in_flight_retry' }, 409);
       }
       throw error;
@@ -183,14 +183,14 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     } catch (error) {
       if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
         // 状態更新を巻き戻して 409 にする (却下分岐と同趣旨)。
-        await c.env.DB
-          .prepare(
-            `UPDATE bookings SET status = ?, decided_at = ?,
+        await c.env.DB.batch([
+          c.env.DB.prepare(
+            `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = ?, decided_at = ?,
                                   updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
               WHERE id = ? AND status = ?`,
-          )
-          .bind(row.status, row.decided_at, id, next)
-          .run();
+          ).bind(row.status, row.decided_at, id, next),
+          c.env.DB.prepare(`UPDATE booking_groups SET version=version+1 WHERE id=(SELECT group_id FROM bookings WHERE id=? AND line_account_id=?) AND line_account_id=? AND changes()=1`).bind(id, accountId, accountId),
+        ]);
         return c.json({ error: 'send_in_flight_retry' }, 409);
       }
       throw error;

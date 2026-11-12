@@ -55,13 +55,13 @@ function accessUser(overrides: Record<string, unknown>) {
 const state = {
   members: [
     member({}),
-    member({ id: 'yamada', name: '山田 太郎', email: 'yamada@mail.test', role: 'staff' }),
-    member({ id: 'sato', name: '佐藤 花子', email: 'x-sato@mail.test', role: 'staff' }),
+    member({ id: 'yamada', name: '見本 141', email: 'yamada@mail.test', role: 'staff' }),
+    member({ id: 'sato', name: '見本 122', email: 'x-sato@mail.test', role: 'staff' }),
   ],
   users: [
     accessUser({}),
-    accessUser({ id: 'yamada', name: '山田 太郎', email: 'yamada@mail.test', roleBundle: 'operations', featureCount: 3 }),
-    accessUser({ id: 'sato', name: '佐藤 花子', email: 'x-sato@mail.test', roleBundle: 'view_only', featureCount: 2 }),
+    accessUser({ id: 'yamada', name: '見本 141', email: 'yamada@mail.test', roleBundle: 'operations', featureCount: 3 }),
+    accessUser({ id: 'sato', name: '見本 122', email: 'x-sato@mail.test', roleBundle: 'view_only', featureCount: 2 }),
   ],
 }
 
@@ -105,7 +105,7 @@ const EMPTY_MESSAGE = '条件に合うログインユーザーはいません。
 
 async function mount() {
   await act(async () => { render(<StaffPage />) })
-  await waitFor(() => expect(list().getByText('山田 太郎')).toBeTruthy())
+  await waitFor(() => expect(list().getByText('見本 141')).toBeTruthy())
 }
 
 const list = () => within(screen.getByRole('table', { name: 'ユーザーの一覧' }))
@@ -126,27 +126,27 @@ describe('ログインユーザー検索 (#620)', () => {
     typeQuery('存在しない語zzz')
     await waitFor(() => expect(screen.getByText(EMPTY_MESSAGE)).toBeTruthy())
     expect(screen.getByText('ユーザー 0 人中 0 人を表示')).toBeTruthy()
-    expect(list().queryByText('山田 太郎')).toBeNull()
-    expect(list().queryByText('佐藤 花子')).toBeNull()
+    expect(list().queryByText('見本 141')).toBeNull()
+    expect(list().queryByText('見本 122')).toBeNull()
   })
 
   it('名前・メールの部分一致は従来どおり効く', async () => {
     await mount()
-    typeQuery('山田')
+    typeQuery('141')
     await waitFor(() => expect(screen.getByText('ユーザー 1 人中 1 人を表示')).toBeTruthy())
-    expect(list().getByText('山田 太郎')).toBeTruthy()
-    expect(list().queryByText('佐藤 花子')).toBeNull()
+    expect(list().getByText('見本 141')).toBeTruthy()
+    expect(list().queryByText('見本 122')).toBeNull()
 
     typeQuery('x-sato@mail')
-    await waitFor(() => expect(list().getByText('佐藤 花子')).toBeTruthy())
-    expect(list().queryByText('山田 太郎')).toBeNull()
+    await waitFor(() => expect(list().getByText('見本 122')).toBeTruthy())
+    expect(list().queryByText('見本 141')).toBeNull()
   })
 
   it('名前とメールをまたいだ語では一致しない（フィールドごとに照合する）', async () => {
     await mount()
     // 旧実装は "名前 メール" を1本の文字列へ繋げて照合していたため、
-    // 「花子 x-sato」のような跨ぎ語でも行を返していた。
-    typeQuery('花子 x-sato')
+    // 「122 x-sato」のような跨ぎ語でも行を返していた。
+    typeQuery('122 x-sato')
     await waitFor(() => expect(screen.getByText(EMPTY_MESSAGE)).toBeTruthy())
     expect(screen.getByText('ユーザー 0 人中 0 人を表示')).toBeTruthy()
   })
@@ -171,8 +171,8 @@ describe('ログインユーザー検索 (#620)', () => {
     await waitFor(() => expect(screen.getByText(EMPTY_MESSAGE)).toBeTruthy())
     typeQuery('')
     await waitFor(() => expect(screen.getByText('ユーザー 3 人中 3 人を表示')).toBeTruthy())
-    expect(list().getByText('山田 太郎')).toBeTruthy()
-    expect(list().getByText('佐藤 花子')).toBeTruthy()
+    expect(list().getByText('見本 141')).toBeTruthy()
+    expect(list().getByText('見本 122')).toBeTruthy()
   })
 })
 

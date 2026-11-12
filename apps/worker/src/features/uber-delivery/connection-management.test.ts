@@ -93,6 +93,17 @@ beforeEach(() => {
 });
 
 describe('Uber connection management', () => {
+
+  it('refuses an older confirmed connection before contacting Uber', async () => {
+    await addMerchantToken();
+    const api = provider();
+    const result = await disconnectUberConnection({ db: database.db, storeId: 'store-1', accountId: 'account-1',
+      client, encryptionKey: KEY, fetcher: api.fetcher, nowMs: NOW, ...{ expectedVersion: 0 } });
+    expect(result).toMatchObject({ ok: false, status: 409, code: 'connection_changed' });
+    expect(api.calls).toEqual([]);
+    expect(row()).toMatchObject({ status: 'connected', version: 1 });
+  });
+
   it('checks the exact provider ownership with an eats.store application token', async () => {
     database.raw.prepare(`UPDATE rt_delivery_uber_connections
       SET status = 'pending_store', provisioned_at = NULL WHERE store_id = 'store-1'`).run();
@@ -125,7 +136,7 @@ describe('Uber connection management', () => {
       client, encryptionKey: KEY, fetcher: api.fetcher, nowMs: NOW });
     expect(result.ok).toBe(true);
     expect(row()).toMatchObject({ status: 'pending_store', provisioned_at: null,
-      last_error: 'store_menu_refresh_review_required' });
+      last_error: 'store_menu_refresh_review_required', version: 2 });
 
     database.raw.prepare(`UPDATE rt_delivery_uber_connections SET last_error = NULL WHERE store_id = 'store-1'`).run();
     const mismatch = provider({ pos: () => new Response(JSON.stringify({
@@ -135,7 +146,7 @@ describe('Uber connection management', () => {
     await checkUberConnection({ db: database.db, storeId: 'store-1', accountId: 'account-1',
       client, encryptionKey: KEY, fetcher: mismatch.fetcher, nowMs: NOW + 1 });
     expect(row()).toMatchObject({ status: 'pending_store', provisioned_at: null,
-      last_error: 'store_provision_review_required' });
+      last_error: 'store_provision_review_required', version: 3 });
   });
 
   it('turns a definite missing provider mapping into a fail-closed review state', async () => {
@@ -316,13 +327,22 @@ describe('Uber connection management', () => {
       client, encryptionKey: KEY, fetcher: api.fetcher, nowMs: NOW });
     expect(first).toEqual({ ok: false, status: 503, code: POS_DEACTIVATION_UNKNOWN });
     expect(row()).toMatchObject({ status: 'pending_store', last_error: POS_DEACTIVATION_UNKNOWN,
-      access_token_enc: expect.any(String), provisioned_at: null });
+      access_token_enc: expect.any(String), provisioned_at: null, version: 3 });
     const sent = api.calls.length;
 
     const second = await disconnectUberConnection({ db: database.db, storeId: 'store-1', accountId: 'account-1',
       client, encryptionKey: KEY, fetcher: api.fetcher, nowMs: NOW + 1 });
     expect(second).toEqual({ ok: false, status: 409, code: POS_DEACTIVATION_UNKNOWN });
     expect(api.calls).toHaveLength(sent);
+  });
+
+  it('advances the connection revision when the provider rejects disconnect authorization', async () => {
+    await addMerchantToken();
+    const api = provider({ remove: () => new Response(null, { status: 401 }) });
+    const result = await disconnectUberConnection({ db: database.db, storeId: 'store-1', accountId: 'account-1',
+      client, encryptionKey: KEY, fetcher: api.fetcher, nowMs: NOW });
+    expect(result).toMatchObject({ ok: false, status: 409, code: 'reauthorization_required' });
+    expect(row()).toMatchObject({ status: 'expired', last_error: 'uber_auth_expired', version: 3 });
   });
 
   it('treats DELETE 404 as unknown and never repeats it', async () => {

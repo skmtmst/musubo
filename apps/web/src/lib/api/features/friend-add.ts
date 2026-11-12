@@ -197,9 +197,9 @@ export const friendAddMethods = {
           body: JSON.stringify({ version }),
         },
       ),
-    archive: (accountId: string, ruleId: string) =>
+    archive: (accountId: string, ruleId: string, confirmed?: { version: number; status: 'draft' | 'published' | 'stopped' }) =>
       fetchApi<{ success: boolean }>(
-        `/api/friend-add-rules/${encodeURIComponent(ruleId)}?account_id=${encodeURIComponent(accountId)}`,
+        `/api/friend-add-rules/${encodeURIComponent(ruleId)}?account_id=${encodeURIComponent(accountId)}${confirmed ? `&expected_version=${encodeURIComponent(confirmed.version)}&expected_status=${encodeURIComponent(confirmed.status)}` : ''}`,
         { method: 'DELETE' },
       ),
     /**

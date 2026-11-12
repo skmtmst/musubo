@@ -18,7 +18,7 @@ import {
 
 describe('成果・アフィリエイトの言葉づかい', () => {
   it('名前が取れないときにIDの断片を出さない', () => {
-    expect(personNameText('山田 太郎')).toBe('山田 太郎')
+    expect(personNameText('見本 141')).toBe('見本 141')
     expect(personNameText(null)).toBe(NAME_UNAVAILABLE)
     expect(personNameText(undefined)).toBe(NAME_UNAVAILABLE)
     // 空白だけの名前は「取れた」ことにしない。
@@ -43,10 +43,10 @@ describe('成果・アフィリエイトの言葉づかい', () => {
 
   it('重複の札は読み込み済みの名前から引き、引けなければ作らない', () => {
     const people = [
-      { friendId: 'friend-4aaaaaaa', displayName: '山田 太郎' },
+      { friendId: 'friend-4aaaaaaa', displayName: '見本 141' },
       { friendId: 'friend-5bbbbbbb', displayName: null },
     ]
-    expect(duplicateFriendNameText('friend-4aaaaaaa', people)).toBe('山田 太郎')
+    expect(duplicateFriendNameText('friend-4aaaaaaa', people)).toBe('見本 141')
     expect(duplicateFriendNameText('friend-5bbbbbbb', people)).toBe(NAME_UNAVAILABLE)
     // まだ読み込んでいないページの友だち。IDを代わりに出さない。
     expect(duplicateFriendNameText('friend-9zzzzzzz', people)).toBe(NAME_UNAVAILABLE)

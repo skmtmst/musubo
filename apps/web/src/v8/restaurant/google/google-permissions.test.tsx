@@ -18,7 +18,7 @@ import { ChangeConfirmScreen } from './profile-confirm'
 const fixture = vi.hoisted(() => ({
   role: 'owner' as string | null,
   handlers: new Map<string, () => unknown>(),
-  posts: vi.fn(), syncPosts: vi.fn(), cancelPost: vi.fn(), removePost: vi.fn(), retryInstagram: vi.fn(),
+  connection: vi.fn(), posts: vi.fn(), syncPosts: vi.fn(), cancelPost: vi.fn(), removePost: vi.fn(), retryInstagram: vi.fn(),
   post: vi.fn(), publishPost: vi.fn(), createPost: vi.fn(), savePost: vi.fn(),
   listReviews: vi.fn(), syncReviews: vi.fn(), profile: vi.fn(), syncProfile: vi.fn(), proposeHours: vi.fn(),
   connectStart: vi.fn(), selectLocation: vi.fn(), disconnect: vi.fn(), change: vi.fn(), sendChange: vi.fn(), cancelChange: vi.fn(),
@@ -38,7 +38,7 @@ vi.mock('@/components/shared/button', async (original) => {
   } }
 })
 const connection = (status = 'connected') => ({
-  store: { id: 's', name: '合成店', lineAccountId: 'a' }, connection: { status, locationName: 'locations/a', locationTitle: '合成店' },
+  store: { id: 's', name: '合成店', lineAccountId: 'a' }, connection: { id: 'conn', confirmationRevision: 4, status, locationName: 'locations/a', locationTitle: '合成店' },
   candidates: [{ locationName: 'locations/b', locationTitle: '別の合成店' }],
   summary: { storedCount: 1, unrepliedCount: 1, attentionCount: 0, syncStale: true },
   permissions: { canManageConnection: true, canPublishReply: true }, oauthConfigured: true, writeEnabled: true,
@@ -184,6 +184,31 @@ it('Googleの接続先を変える前に元と移行先・LINE・店舗・環境
   expect(dialog.getByText('合成店', { exact: true })).toBeTruthy()
   expect(dialog.getByText('検証環境')).toBeTruthy()
   expect(fixture.selectLocation).not.toHaveBeenCalled()
+  fireEvent.click(dialog.getByRole('button', { name: '切り替える' }))
+  await waitFor(() => expect(fixture.selectLocation).toHaveBeenCalledWith('a', 'locations/b', true, { expectedConnectionId: 'conn', expectedConfirmationRevision: 4 }))
+})
+it('接続解除で確認した接続の版を送る', async () => {
+  render(<SettingsBoard accountId="a" data={connection()} onChanged={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: '接続を解除する' }))
+  const dialog = within(await screen.findByRole('alertdialog'))
+  fireEvent.click(dialog.getByRole('button', { name: '接続を解除する' }))
+  await waitFor(() => expect(fixture.disconnect).toHaveBeenCalledWith('a', { expectedConnectionId: 'conn', expectedConfirmationRevision: 4 }))
+})
+it('選択待ちの接続取消でも確認した接続の版を送る', async () => {
+  render(<SettingsBoard accountId="a" data={connection('pending_location')} onChanged={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: '接続を取り消す' }))
+  const dialog = within(await screen.findByRole('alertdialog'))
+  fireEvent.click(dialog.getByRole('button', { name: '取り消す' }))
+  await waitFor(() => expect(fixture.disconnect).toHaveBeenCalledWith('a', { expectedConnectionId: 'conn', expectedConfirmationRevision: 4 }))
+})
+it('店舗を切り替えて戻しても前の接続確認を使えない', async () => {
+  const view = render(<SettingsBoard accountId="a" data={connection()} onChanged={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: '接続を解除する' }))
+  await screen.findByRole('alertdialog')
+  view.rerender(<SettingsBoard accountId="b" data={connection()} onChanged={vi.fn()} />)
+  view.rerender(<SettingsBoard accountId="a" data={connection()} onChanged={vi.fn()} />)
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+  expect(fixture.disconnect).not.toHaveBeenCalled()
 })
 it('編集の鍵を持つ担当者だけが機能を変えられ、管理者専用の操作は許可しない', () => {
   role('staff')
@@ -268,8 +293,8 @@ it('閲覧のみでも送信済み投稿の中身とGoogleの表示先を読め�
 })
 
 it('Google投稿の削除確認に対象アカウントと環境を表示する', async () => {
- fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published' }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })
- render(<PostsBoard accountId="a" go={vi.fn()} store={{ id: 's', name: '合成店' }} googleLocation="Google 合成店" />)
+ fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published', confirmationRevision: 3 }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })
+ render(<PostsBoard accountId="a" go={vi.fn()} store={{ id: 's', name: '合成店' }} googleLocation="Google 合成店" connection={{ id: 'connection-1', confirmationRevision: 5 }} />)
  fireEvent.click(await screen.findByRole('button', { name: '投稿「合成の投稿」の操作' }))
  fireEvent.click(await screen.findByRole('menuitem', { name: 'Google から削除' }))
  const dialog = screen.getByRole('alertdialog')
@@ -277,6 +302,25 @@ it('Google投稿の削除確認に対象アカウントと環境を表示する'
  expect(within(dialog).getByText('合成店')).toBeTruthy()
  expect(within(dialog).getByText('Google 合成店')).toBeTruthy()
  expect(within(dialog).getByText('環境')).toBeTruthy()
+ fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
+ await waitFor(() => expect(fixture.removePost).toHaveBeenCalledWith('a', post.id, { expectedPostRevision: 3, expectedConnectionRevision: 5, expectedConnectionId: 'connection-1' }))
+})
+it('Google投稿の409後は投稿と接続の版を読み直す', async () => {
+ const { ApiError } = await import('@/lib/api')
+ fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published', confirmationRevision: 3 }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })
+ fixture.connection.mockResolvedValue({ ...connection(), connection: { ...connection().connection, id: 'connection-1', confirmationRevision: 6, locationTitle: '新しい店舗' } })
+ const onConnectionReloaded = vi.fn()
+ render(<PostsBoard accountId="a" go={vi.fn()} store={{ id: 's', name: '合成店' }} googleLocation="Google 合成店" connection={{ id: 'connection-1', confirmationRevision: 5 }} onConnectionReloaded={onConnectionReloaded} />)
+ fireEvent.click(await screen.findByRole('button', { name: '投稿「合成の投稿」の操作' }))
+ fireEvent.click(await screen.findByRole('menuitem', { name: 'Google から削除' }))
+ const dialog = screen.getByRole('alertdialog')
+ fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published', confirmationRevision: 4 }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })
+ fixture.removePost.mockRejectedValueOnce(new ApiError(409, 'changed'))
+ fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
+ await within(dialog).findByText('新しい店舗')
+ expect(onConnectionReloaded).toHaveBeenCalledWith(expect.objectContaining({ connection: expect.objectContaining({ confirmationRevision: 6 }) }))
+ fireEvent.click(within(dialog).getByRole('button', { name: 'もう一度' }))
+ await waitFor(() => expect(fixture.removePost).toHaveBeenLastCalledWith('a', post.id, { expectedPostRevision: 4, expectedConnectionRevision: 6, expectedConnectionId: 'connection-1' }))
 })
 it('Google投稿の古い削除確定はアカウントを切り替えて戻しても送らない', async () => {
  fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published' }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })
@@ -290,4 +334,44 @@ it('Google投稿の古い削除確定はアカウントを切り替えて戻し�
  view.rerender(<PostsBoard accountId="a" go={vi.fn()} />)
  await act(async () => { await oldConfirm({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:b, target:b }) })
  expect(fixture.removePost).not.toHaveBeenCalled()
+})
+
+it('Google投稿の削除窓を閉じた後の古い確定では送らない', async () => {
+ fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published' }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })
+ render(<PostsBoard accountId="a" go={vi.fn()} />)
+ fireEvent.click(await screen.findByRole('button', { name: '投稿「合成の投稿」の操作' }))
+ fireEvent.click(await screen.findByRole('menuitem', { name: 'Google から削除' }))
+ const dialog = within(screen.getByRole('alertdialog'))
+ const b = dialog.getByRole('button', { name: '削除する' })
+ const key = Object.keys(b).find(item => item.startsWith('__reactProps$'))!
+ const held = (b as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+ fireEvent.click(dialog.getByRole('button', { name: 'キャンセル' }))
+ await act(async () => { await held({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:b, target:b }) })
+ expect(fixture.removePost).not.toHaveBeenCalled()
+})
+
+it.each(['connected', 'pending_location'])('Google接続 %s の窓を開いた後に接続が変わると古い確認では解除しない', async status => {
+ const original = connection(status)
+ const view = render(<SettingsBoard accountId="a" data={original} onChanged={vi.fn()} />)
+ fireEvent.click(screen.getByRole('button', { name: status === 'connected' ? '接続を解除する' : '接続を取り消す' }))
+ const dialog = within(screen.getByRole('alertdialog'))
+ const b = dialog.getByRole('button', { name: status === 'connected' ? '接続を解除する' : '取り消す' })
+ const key = Object.keys(b).find(item => item.startsWith('__reactProps$'))!
+ const held = (b as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+ view.rerender(<SettingsBoard accountId="a" data={{...original, connection:{...original.connection, locationName:'locations/other', locationTitle:'別の店'}}} onChanged={vi.fn()} />)
+ view.rerender(<SettingsBoard accountId="a" data={original} onChanged={vi.fn()} />)
+ await act(async () => { await held({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:b, target:b }) })
+ expect(fixture.disconnect).not.toHaveBeenCalled()
+})
+
+it('Google接続解除の窓を閉じた後の古い確定では解除しない', async () => {
+ render(<SettingsBoard accountId="a" data={connection()} onChanged={vi.fn()} />)
+ fireEvent.click(screen.getByRole('button', { name:'接続を解除する' }))
+ const dialog = within(screen.getByRole('alertdialog'))
+ const b = dialog.getByRole('button', { name:'接続を解除する' })
+ const key = Object.keys(b).find(item => item.startsWith('__reactProps$'))!
+ const held = (b as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+ fireEvent.click(dialog.getByRole('button', { name:'キャンセル' }))
+ await act(async () => { await held({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:b, target:b }) })
+ expect(fixture.disconnect).not.toHaveBeenCalled()
 })

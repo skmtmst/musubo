@@ -1102,7 +1102,10 @@ analytics.put('/api/analytics/funnels/:id/status', requireRole('owner', 'admin')
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
-    const body = await c.req.json<{ status?: unknown; expectedStatus?: unknown }>();
+    const body = await c.req.json<{ status?: unknown; expectedStatus?: unknown; expectedRevision?: unknown }>();
+    if (body.expectedRevision !== undefined && (!Number.isSafeInteger(body.expectedRevision) || Number(body.expectedRevision) < 1)) {
+      return inputError(c, { success: false, error: 'analytics_funnel_revision_invalid' }, 422, ["expectedRevision"]);
+    }
     const next = String(body.status ?? '');
     const expected = String(body.expectedStatus ?? '');
     if (!['active', 'stopped', 'archived'].includes(next)
@@ -1114,6 +1117,7 @@ analytics.put('/api/analytics/funnels/:id/status', requireRole('owner', 'admin')
       funnelId: c.req.param('id'),
       status: next as 'active' | 'stopped' | 'archived',
       expectedStatus: expected as 'active' | 'stopped' | 'archived',
+      ...(body.expectedRevision === undefined ? {} : { expectedRevision: body.expectedRevision as number }),
     });
     return c.json({ success: true, data: serializeFunnel(funnel) });
   } catch (error) {

@@ -1,4 +1,6 @@
 'use client'
+
+import { isConflictResponse } from '@/components/shared/save-conflict'
 import Card from '@/components/shared/card'
 import LogEntryDetails, { type LogEntryFacts } from '@/components/shared/log-entry-details'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
@@ -184,7 +186,7 @@ export default function AutoReplyRunsV8() {
   const [search, setSearch] = useListUrlValue('q', '')
   const [actionMessage, setActionMessage] = useState('')
   const [stopOpen, setStopOpen] = useState(false)
-  const [stopAccount, setStopAccount] = useState<{ ruleId: string; accountId: string | null } | null>(null)
+  const [stopAccount, setStopAccount] = useState<{ ruleId: string; accountId: string | null; version: number } | null>(null)
   const [stopReason, setStopReason] = useState('')
   const [stopping, setStopping] = useState(false)
   const [retryingId, setRetryingId] = useState<string | null>(null)
@@ -248,8 +250,8 @@ export default function AutoReplyRunsV8() {
     let active = true
     setStopAccount(null)
     void api.autoReplies.get(ruleId).then(response => {
-      if (active && response.success && response.data.id === ruleId && (response.data.lineAccountId === null || typeof response.data.lineAccountId === 'string')) {
-        setStopAccount({ ruleId, accountId: response.data.lineAccountId })
+      if (active && response.success && response.data.id === ruleId && (response.data.lineAccountId === null || typeof response.data.lineAccountId === 'string') && Number.isSafeInteger(response.data.confirmationRevision) && response.data.confirmationRevision >= 1) {
+        setStopAccount({ ruleId, accountId: response.data.lineAccountId, version: response.data.confirmationRevision })
       }
     }).catch(() => {})
     return () => { active = false }
@@ -259,13 +261,13 @@ export default function AutoReplyRunsV8() {
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
 
   const stopRule = async () => {
-    if (!canManageRunsNow() || !data?.rule.id || stopping) return
+    if (!canManageRunsNow() || !data?.rule.id || stopping || !stopAccount || stopAccount.ruleId !== data.rule.id) return
     setStopping(true)
     setActionMessage('')
     try {
       const response = await api.autoReplies.stop(
         data.rule.id,
-        { reason: stopReason.trim() || null },
+        { reason: stopReason.trim() || null, expectedVersion: stopAccount.version },
         crypto.randomUUID(),
       )
       if (!response.success) throw new Error(response.error)
@@ -274,7 +276,17 @@ export default function AutoReplyRunsV8() {
       setActionMessage('自動応答を一時停止しました。')
       await load()
       return true
-    } catch {
+    } catch (caught) {
+      if (isConflictResponse(caught) && caught.code === 'auto_reply_confirmation_conflict') {
+        setStopAccount(null)
+        await load()
+        const latest = await api.autoReplies.get(data.rule.id).catch(() => null)
+        if (latest?.success && latest.data.id === data.rule.id && Number.isSafeInteger(latest.data.confirmationRevision) && latest.data.confirmationRevision >= 1) {
+          setStopAccount({ ruleId: data.rule.id, accountId: latest.data.lineAccountId, version: latest.data.confirmationRevision })
+          setActionMessage('内容が変わりました。読み直した内容を確認してください。')
+        } else setActionMessage('最新の内容を確認できませんでした。窓を閉じて読み直してください。')
+        return false
+      }
       setActionMessage('一時停止できませんでした。状態を読み直してからお試しください。')
       return false
     } finally {
@@ -626,6 +638,8 @@ export default function AutoReplyRunsV8() {
         confirmLabel="一時停止する"
         destructive
         busy={stopping}
+        confirmDisabled={!stopAccount || stopAccount.ruleId !== data?.rule.id}
+        confirmDisabledReason="確認する内容を読み込んでください。"
         designNode="i8F12"
         error={actionMessage || undefined} onSuccess={() => setStopOpen(false)} onConfirm={() => stopRule()}
         onCancel={() => { if (!stopping) { setStopOpen(false); setStopReason('') } }}

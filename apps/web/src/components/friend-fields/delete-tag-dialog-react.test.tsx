@@ -9,6 +9,15 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Tag } from '@line-crm/shared'
 
+const captured = vi.hoisted(() => ({ archiveClick: undefined as undefined | (() => void) }))
+vi.mock('@/components/shared/button', async original => {
+  const actual = await original<typeof import('@/components/shared/button')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (React.Children.toArray(props.children).some(child => typeof child === 'string' && child.includes('このタグを保管する'))) captured.archiveClick = props.onClick as () => void
+    return <actual.default {...props} />
+  } }
+})
+
 const net = vi.hoisted(() => ({ dependencies: vi.fn(), archive: vi.fn(), remove: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
@@ -48,6 +57,25 @@ afterEach(() => {
 })
 
 describe('タグの保管の窓', () => {
+  it('閉じた窓の確定では保管されない', async () => {
+    const onCancel = vi.fn()
+    const first = render(<DeleteTagDialog tag={tag} accountId="acc" onCancel={onCancel} onArchived={() => {}} />)
+    await waitFor(() => expect(rowValue('参照先')).toBe('なし'))
+    fireEvent.change(confirmInput(), { target: { value: 'VIP' } })
+    const oldClick = captured.archiveClick!
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    await act(async () => { oldClick(); await Promise.resolve() })
+    first.unmount()
+    render(<DeleteTagDialog tag={tag} accountId="acc" onCancel={onCancel} onArchived={() => {}} />)
+    await waitFor(() => expect(rowValue('参照先')).toBe('なし'))
+    await act(async () => { oldClick(); await Promise.resolve() })
+    expect(net.archive).not.toHaveBeenCalled()
+    fireEvent.change(confirmInput(), { target: { value: 'VIP' } })
+    fireEvent.click(archiveButton())
+    await waitFor(() => expect(net.archive).toHaveBeenCalledTimes(1))
+  })
+
   it('保管対象のアカウントと環境を表示する', async () => {
     render(<DeleteTagDialog tag={tag} accountId="acc" onCancel={() => {}} onArchived={() => {}} />)
     expect(screen.getByText('LINEアカウント')).toBeTruthy()

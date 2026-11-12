@@ -454,6 +454,66 @@ describe('成果の取消・取消の取消', () => {
     expect((await reverse()).status).toBe(200);
   });
 
+  it('確認時の取消履歴が変わったら、状態が元に戻っても古い確認を拒否する', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const eventId = await seedEvent(testDb);
+    const send = (kind: 'reverse' | 'restore', expectedReversalId: string | null) => req(app(staff('owner-1', 'tenant-1')), testDb, `/api/conversions/events/${eventId}/reversals`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind, reason: '確認した内容', expectedReversalId, expectedApprovalStatus: null, expectedCancelled: kind === 'restore' }),
+    });
+    const point = testDb.raw.prepare('SELECT conversion_point_id FROM conversion_events WHERE id = ?').get(eventId) as { conversion_point_id: string };
+    const events = () => req(app(staff('owner-1', 'tenant-1')), testDb, `/api/conversions/definitions/${point.conversion_point_id}/events`);
+    const before = await (await events()).json() as { data: { items: Array<{ id: string; latestReversalId: string | null; approvalRevision:number }> } };
+    expect(before.data.items.find(item => item.id === eventId)?.latestReversalId).toBeNull();
+    expect(before.data.items.find(item => item.id === eventId)?.approvalRevision).toBe(1);
+    const first = await send('reverse', null);
+    expect(first.status).toBe(200);
+    const firstBody = await first.json() as { data: { id: string } };
+    const after = await (await events()).json() as { data: { items: Array<{ id: string; latestReversalId: string | null }> } };
+    expect(after.data.items.find(item => item.id === eventId)?.latestReversalId).toBe(firstBody.data.id);
+    expect((await send('restore', firstBody.data.id)).status).toBe(200);
+    expect((await send('reverse', null)).status).toBe(409);
+    expect((testDb.raw.prepare('SELECT COUNT(*) AS n FROM conversion_event_reversals').get() as { n: number }).n).toBe(2);
+  });
+
+  it('確認後に成果の承認状態が変わったら取り消さない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const eventId = await seedEvent(testDb);
+    testDb.raw.prepare("UPDATE conversion_events SET approval_status = 'pending' WHERE id = ?").run(eventId);
+    const response = await req(app(staff('owner-1', 'tenant-1')), testDb, `/api/conversions/events/${eventId}/reversals`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'reverse', reason: '確認した内容', expectedReversalId: null, expectedApprovalStatus: null, expectedCancelled: false }),
+    });
+    expect(response.status).toBe(409);
+    expect((testDb.raw.prepare('SELECT COUNT(*) AS n FROM conversion_event_reversals').get() as { n: number }).n).toBe(0);
+  });
+
+  it('不正な版や確認情報を欠いた版付き取消は400で追記しない', async () => {
+    const testDb=createTestD1();seed(testDb);const eventId=await seedEvent(testDb);
+    for (const fields of [{expectedApprovalRevision:0},{expectedApprovalRevision:'1'},{expectedApprovalRevision:1}]) {
+      const response=await req(app(staff('owner-1','tenant-1')),testDb,`/api/conversions/events/${eventId}/reversals`,{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'reverse',reason:'確認済み',...fields}),
+      });expect(response.status).toBe(400);
+    }
+    expect(testDb.raw.prepare('SELECT COUNT(*) n FROM conversion_event_reversals').get()).toEqual({n:0});
+  });
+
+  it('確認後に成果報酬側で取消されたら、古い確認を拒否する', async () => {
+    const testDb = createTestD1({ foreignKeys: false });
+    seed(testDb);
+    const eventId = await seedEvent(testDb);
+    testDb.raw.prepare(`INSERT INTO affiliate_reward_entries (id, organization_id, line_account_id, affiliate_id, conversion_event_id, entry_type, amount_minor, status, idempotency_key) VALUES ('reward', 'tenant-1', 'a1', 'affiliate', ?, 'credit', 100, 'approved', 'reward-key')`).run(eventId);
+    testDb.raw.prepare(`INSERT INTO affiliate_adjustments (id, organization_id, line_account_id, affiliate_id, source_entry_id, amount_minor, reason_type, reason, actor_id, idempotency_key) VALUES ('adjustment', 'tenant-1', 'a1', 'affiliate', 'reward', -100, 'cancel', '取消', 'actor', 'adjustment-key')`).run();
+    const response = await req(app(staff('owner-1', 'tenant-1')), testDb, `/api/conversions/events/${eventId}/reversals`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'reverse', reason: '確認した内容', expectedReversalId: null, expectedApprovalStatus: null, expectedCancelled: false }),
+    });
+    expect(response.status).toBe(409);
+    expect((testDb.raw.prepare('SELECT COUNT(*) AS n FROM conversion_event_reversals').get() as { n: number }).n).toBe(0);
+  });
+
   it('staff は取り消せない・理由なしは400', async () => {
     const testDb = createTestD1();
     seed(testDb);

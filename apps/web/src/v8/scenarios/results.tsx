@@ -90,6 +90,7 @@ export default function ScenarioResultsV8() {
   if (accountScope.current.id !== id || accountScope.current.accountId !== selectedAccountId) accountScope.current = { id, accountId: selectedAccountId }
   const runsScope = useRef<typeof accountScope.current | null>(null)
   const moveScope = useRef<typeof accountScope.current | null>(null)
+  const moveTicket = useRef<object | null>(null)
   // 役割が読めるまでは出す（最後の守りはサーバー）。閲覧のみは購読を変える操作（…）を隠す。
   const featureAccess = useFeatureAccess('scenarios')
   const canEdit = featureAccess
@@ -111,7 +112,7 @@ export default function ScenarioResultsV8() {
   /* 友だち単位の操作（N-054）。busy は「購読ID:操作」で持ち、押した行だけを止める。 */
   const [opBusy, setOpBusy] = useState<string | null>(null)
   const [opError, setOpError] = useState('')
-  const [moveTarget, setMoveTarget] = useState<{ subscriptionId: string; friendName: string } | null>(null)
+  const [moveTarget, setMoveTarget] = useState<{ subscriptionId: string; friendName: string; revision: number | undefined; status: string; ticket: object } | null>(null)
   const [moveScenarioId, setMoveScenarioId] = useState('')
   const [moveOptions, setMoveOptions] = useState<Scenario[] | null>(null)
   const [moveOptionsError, setMoveOptionsError] = useState(false)
@@ -235,6 +236,7 @@ export default function ScenarioResultsV8() {
     setRunsMoreError('')
     setOpError('')
     setMoveTarget(null)
+    moveTicket.current = null
     setMoveOptions(null)
     setMoveOptionsError(false)
     void loadMain(seq)
@@ -327,29 +329,32 @@ export default function ScenarioResultsV8() {
     }
   }
 
-  const openMoveDialog = async (subscription: { id: string; friendName: string }) => {
+  const openMoveDialog = async (subscription: { id: string; friendName: string; confirmationRevision?: number; status: string }) => {
     if (!selectedAccountId || runsScope.current !== accountScope.current) return
     moveScope.current = accountScope.current
-    setMoveTarget({ subscriptionId: subscription.id, friendName: subscription.friendName })
+    const ticket = {}; moveTicket.current = ticket
+    setMoveTarget({ subscriptionId: subscription.id, friendName: subscription.friendName, revision: subscription.confirmationRevision, status: subscription.status, ticket })
     setMoveScenarioId('')
     setOpError('')
     if (moveOptions === null) await loadMoveOptions()
   }
 
   const confirmMove = async () => {
-    if (!moveTarget || !moveScenarioId || moveScope.current !== accountScope.current) return
+    if (!moveTarget || !moveScenarioId || moveScope.current !== accountScope.current || moveTarget.ticket !== moveTicket.current) return
+    if (!moveTarget.revision) { setOpError('移し替えを完了できませんでした。時間を置いてもう一度お試しください。'); return }
     const signature = `${moveTarget.subscriptionId}:move:${moveScenarioId}`
     const key = opKeys.current.get(signature)
     setOpBusy(signature)
     setOpError('')
     try {
-      const res = await api.scenarios.subscriptionOps.move(moveTarget.subscriptionId, moveScenarioId, key)
+      const res = await api.scenarios.subscriptionOps.move(moveTarget.subscriptionId, moveScenarioId, key, { revision: moveTarget.revision, status: moveTarget.status })
       if (!res.success) {
         setOpError(res.error)
         return
       }
       opKeys.current.clear(signature)
       setMoveTarget(null)
+      moveTicket.current = null
       reloadRuns()
     } catch {
       setOpError('移し替えを完了できませんでした。時間を置いてもう一度お試しください。')
@@ -361,6 +366,7 @@ export default function ScenarioResultsV8() {
   const closeMove = () => {
     if (opBusy) return
     setMoveTarget(null)
+    moveTicket.current = null
     setOpError('')
   }
 

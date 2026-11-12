@@ -67,7 +67,7 @@ export function useFileScan() {
   const [secretRef, setSecretRef] = useState('')
   const [configBusy, setConfigBusy] = useState(false)
   const [stopExternal, setStopExternal] = useState(false)
-  const [stopScope, setStopScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
+  const [stopScope, setStopScope] = useState<{ scope: typeof renderedScope; ticket: object; revision: number | undefined } | null>(null)
   const stopTicket = useRef<object | null>(null)
   const stopLock = useRef<object | null>(null)
   const configLock = useRef<object | null>(null)
@@ -140,11 +140,13 @@ export function useFileScan() {
       setTotal(list.data.total)
       /* 消す・戻すで今のページが空になったら1ページ目へ戻す（監査 R132）。 */
       if (list.data.items.length === 0 && page > 1) setPage(1)
+      const latestItems = list.data.items
       setConfig(configRes.data.config)
       setProvider(configRes.data.config?.externalProvider ?? '')
       setEndpoint(configRes.data.config?.externalEndpointUrl ?? '')
       setSecretRef(configRes.data.config?.externalSecretRef ?? '')
       setPhase('ready')
+      return latestItems
     } catch {
       if (current()) setPhase('error')
     }
@@ -168,11 +170,12 @@ export function useFileScan() {
       setReleaseError('理由を入力してください')
       return
     }
+    if (!releaseTarget.confirmationRevision) { setReleaseError('戻せませんでした。通信状態を確認して、もう一度お試しください。'); return }
     const current = () => mounted.current && canEditRef.current && releaseScope.scope === scope.current && releaseScope.ticket === releaseTicket.current
     releaseLock.current = true; setReleaseBusy(true)
     setReleaseError('')
     try {
-      const res = await api.fileScan.release(releaseTarget.id, selectedAccountId, releaseReason.trim())
+      const res = await api.fileScan.release(releaseTarget.id, selectedAccountId, releaseReason.trim(), releaseTarget.confirmationRevision)
       if (!current()) return
       if (!res.success) {
         setReleaseError('戻せませんでした。通信状態を確認して、もう一度お試しください。')
@@ -197,11 +200,12 @@ export function useFileScan() {
 
   async function remove() {
     if (!canEditRef.current || !selectedAccountId || !deleteTarget || !deleteScope || deleteScope.scope !== scope.current || deleteScope.ticket !== deleteTicket.current || loadedScope.current !== deleteScope.scope || !mounted.current || deleteLock.current) return
+    if (!deleteTarget.confirmationRevision) { setDeleteError('消せませんでした。通信状態を確認して、もう一度お試しください。'); return }
     const current = () => mounted.current && canEditRef.current && deleteScope.scope === scope.current && deleteScope.ticket === deleteTicket.current
     deleteLock.current = true; setDeleteBusy(true)
     setDeleteError('')
     try {
-      const res = await api.fileScan.remove(deleteTarget.id, selectedAccountId)
+      const res = await api.fileScan.remove(deleteTarget.id, selectedAccountId, deleteTarget.confirmationRevision)
       if (!current()) return
       if (!res.success) {
         setDeleteError('消せませんでした。通信状態を確認して、もう一度お試しください。')
@@ -214,8 +218,13 @@ export function useFileScan() {
       await load()
     } catch (caught) {
       if (!current()) return
+      if (caught instanceof ApiError && caught.status === 409) {
+        const latest = await load()
+        if (!current()) return
+        setDeleteTarget(latest?.find(item => item.id === deleteTarget.id) ?? null)
+      }
       setDeleteError(caught instanceof ApiError && caught.status === 409
-        ? 'しまった・使えないファイルだけ消せます。一覧を読み直してください。'
+        ? caught.code === 'file_scan_not_disposable' ? 'しまった・使えないファイルだけ消せます。一覧を読み直してください。' : '確認した内容が変わりました。一覧を読み直してください。'
         : '消せませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
       deleteLock.current = false
@@ -263,6 +272,7 @@ export function useFileScan() {
    */
   async function stopExternalConfig() {
     if (!canEditRef.current || !selectedAccountId || !stopScope || stopScope.scope !== scope.current || stopScope.ticket !== stopTicket.current || loadedScope.current !== stopScope.scope || !mounted.current || stopLock.current || configLock.current) return
+    if (!stopScope.revision) { setStopError('設定を消せませんでした。'); return }
     const current = () => mounted.current && canEditRef.current && stopScope.scope === scope.current && stopScope.ticket === stopTicket.current
     const lock = {}; stopLock.current = lock; configLock.current = lock; setConfigBusy(true)
     setStopError('')
@@ -271,6 +281,7 @@ export function useFileScan() {
         externalProvider: null,
         externalEndpointUrl: null,
         externalSecretRef: null,
+        expectedConfirmationRevision: stopScope.revision,
       })
       if (!current()) return
       if (!res.success) {
@@ -318,19 +329,19 @@ export function useFileScan() {
   const changeReleaseTarget = (item: FileScanItem | null) => {
     if (item) {
       if (!canOpen()) return
-      const ticket = {}; releaseTicket.current = ticket; setReleaseScope({ scope: renderedScope, ticket }); setReleaseTarget(item)
+      const ticket = {}; releaseTicket.current = ticket; setReleaseScope({ scope: renderedScope, ticket }); setReleaseTarget({ ...item })
     } else if (releaseScope?.ticket === releaseTicket.current) { releaseTicket.current = null; setReleaseTarget(null) }
   }
   const changeDeleteTarget = (item: FileScanItem | null) => {
     if (item) {
       if (!canOpen()) return
-      const ticket = {}; deleteTicket.current = ticket; setDeleteScope({ scope: renderedScope, ticket }); setDeleteTarget(item)
+      const ticket = {}; deleteTicket.current = ticket; setDeleteScope({ scope: renderedScope, ticket }); setDeleteTarget({ ...item })
     } else if (deleteScope?.ticket === deleteTicket.current) { deleteTicket.current = null; setDeleteTarget(null) }
   }
   const changeStopExternal = (open: boolean) => {
     if (open) {
       if (!canOpen()) return
-      const ticket = {}; stopTicket.current = ticket; setStopScope({ scope: renderedScope, ticket }); setStopExternal(true)
+      const ticket = {}; stopTicket.current = ticket; setStopScope({ scope: renderedScope, ticket, revision: config?.confirmationRevision }); setStopExternal(true)
     } else if (stopScope?.ticket === stopTicket.current) { stopTicket.current = null; setStopExternal(false) }
   }
 

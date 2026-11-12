@@ -38,13 +38,13 @@ const statsBody = (assigneeUnread: Stats) => json({ success: true, data: {
 
 function respond(url: URL): Promise<Response> | Response {
   if (url.pathname === '/api/chats/stats') { statsCalls.push(url); return stats(url) }
-  // 画面に見えている会話は佐々木さん担当の1件だけ。河野さんの未読はこのページに無い。
+  // 画面に見えている会話は佐々木さん担当の1件だけ。見本さんの未読はこのページに無い。
   if (url.pathname === '/api/chats') return json({ success: true, data: [{
     id: 'chat-1', friendId: 'friend-1', friendName: '見えている人', operatorId: 'op-m', status: 'unread', isUnread: true,
     lastMessageAt: '2026-10-01T00:00:00.000Z', lastMessageContent: 'こんにちは', lastMessageType: 'text', lastMessageDirection: 'incoming',
   }] })
   if (url.pathname === '/api/support/inbox') return json({ success: true, data: { items: [], summary: { total: 0 } } })
-  if (url.pathname === '/api/operators') return json({ success: true, data: [{ id: 'op-k', name: '河野' }, { id: 'op-m', name: '佐々木' }] })
+  if (url.pathname === '/api/operators') return json({ success: true, data: [{ id: 'op-k', name: '見本' }, { id: 'op-m', name: '佐々木' }] })
   if (url.pathname === '/api/inbox/saved-views') return json({ success: true, data: [] })
   return json({ success: true, data: [] })
 }
@@ -86,7 +86,7 @@ describe('担当者ごとの未読数の配線（YZaDK）', () => {
     expect(statsCalls.length).toBeGreaterThan(0)
     expect(statsCalls.every(call => call.searchParams.get('lineAccountId') === 'account-a')).toBe(true)
     const { names, pickerText } = await assigneeChoices()
-    expect(names).toEqual(expect.arrayContaining(['河野（3）', '佐々木（0）']))
+    expect(names).toEqual(expect.arrayContaining(['見本（3）', '佐々木（0）']))
     expect(pickerText).toContain('未読 2件')
   })
 
@@ -95,7 +95,7 @@ describe('担当者ごとの未読数の配線（YZaDK）', () => {
     await act(async () => root.render(<ChatsPage />))
     await settle()
     const { names } = await assigneeChoices()
-    expect(names).toEqual(expect.arrayContaining(['河野（—）', '佐々木（—）']))
+    expect(names).toEqual(expect.arrayContaining(['見本（—）', '佐々木（—）']))
     expect(names.some((name) => /（0）/.test(name))).toBe(false)
   })
 
@@ -104,7 +104,7 @@ describe('担当者ごとの未読数の配線（YZaDK）', () => {
     await act(async () => root.render(<ChatsPage />))
     await settle()
     const { names, pickerText } = await assigneeChoices()
-    expect(names).toEqual(expect.arrayContaining(['河野（—）', '佐々木（—）']))
+    expect(names).toEqual(expect.arrayContaining(['見本（—）', '佐々木（—）']))
     expect(pickerText).toContain('未読 —')
     expect(names.some((name) => /（0）/.test(name))).toBe(false)
   })
@@ -112,7 +112,7 @@ describe('担当者ごとの未読数の配線（YZaDK）', () => {
   it('アカウントを切り替えたら、新しい集計が届くまで前のアカウントの数を出さない', async () => {
     await act(async () => root.render(<ChatsPage />))
     await settle()
-    expect((await assigneeChoices()).names).toContain('河野（3）')
+    expect((await assigneeChoices()).names).toContain('見本（3）')
 
     let release!: () => void
     stats = () => new Promise<Response>((done) => { release = () => done(statsBody([{ operatorId: 'op-k', unread: 7 }])) })
@@ -122,10 +122,10 @@ describe('担当者ごとの未読数の配線（YZaDK）', () => {
     await settle()
     expect(statsCalls.length).toBeGreaterThan(before)
     expect(statsCalls.slice(before).every(call => call.searchParams.get('lineAccountId') === 'account-b')).toBe(true)
-    expect((await assigneeChoices()).names).toContain('河野（—）')
+    expect((await assigneeChoices()).names).toContain('見本（—）')
 
     await act(async () => { release(); await Promise.resolve() })
     await settle()
-    expect((await assigneeChoices()).names).toContain('河野（7）')
+    expect((await assigneeChoices()).names).toContain('見本（7）')
   })
 })

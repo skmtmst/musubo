@@ -63,6 +63,7 @@ function rowsFromLedger(rows: RestaurantReservation[]): Row[] {
 function saveMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.code === 'closure_overlap') return overlapMessage(conflictsOf(error.data))
+    if (error.code === 'confirmation_changed') return '予約が変わりました。閉じて最新の予約を確認してください。'
     if (error.code === 'version_conflict') return 'ほかの人が先に変えました。閉じて、読み直してからもう一度変えてください。'
     if (error.status === 403) return permissionDeniedMessage('store')
   }
@@ -94,7 +95,7 @@ export default function ClosureDialog({
   const [input, setInput] = useState<RestaurantClosureInput>(() => emptyInput(storeId, today))
   const [pickTables, setPickTables] = useState(false)
   const [google, setGoogle] = useState(true)
-  const [preview, setPreview] = useState<{ rows: Row[]; waitlist: number; contacted: number; overlap: string } | null>(null)
+  const [preview, setPreview] = useState<{ rows: Row[]; waitlist: number; contacted: number; overlap: string; snapshot?: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const seq = useRef(0)
@@ -123,7 +124,7 @@ export default function ClosureDialog({
    * 変える窓は自分自身を除く（excludeId）。口が読めないときは画面が読んだ予約から数える。
    */
   useEffect(() => {
-    if (!open || problem || !accountId) { setPreview(null); return }
+    if (!open || problem || !accountId) { seq.current += 1; setPreview(null); return }
     const id = ++seq.current
     const timer = setTimeout(() => {
       const fallback = () => rowsFromLedger(overlapping(input, reservations, timezone))
@@ -133,7 +134,7 @@ export default function ClosureDialog({
           const conflicts = res.data.conflicts ?? []
           setPreview({
             rows: rowsFromPreview(res.data, reservations), waitlist: res.data.waitlistCount, contacted: res.data.contactedCount ?? 0,
-            overlap: conflicts.length > 0 ? overlapMessage(conflicts) : '',
+            overlap: conflicts.length > 0 ? overlapMessage(conflicts) : '', snapshot: res.data.confirmationSnapshot,
           })
         })
         .catch((caught) => {
@@ -142,10 +143,10 @@ export default function ClosureDialog({
           setPreview({ rows: fallback(), waitlist: 0, contacted: 0, overlap })
         })
     }, 300)
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer); if (seq.current === id) seq.current += 1 }
   }, [open, problem, accountId, input, editing, reservations, timezone])
 
-  const set = (patch: Partial<RestaurantClosureInput>) => { setInput((current) => ({ ...current, ...patch })); setError(''); setFieldErrors({}) }
+  const set = (patch: Partial<RestaurantClosureInput>) => { seq.current += 1; setPreview(null); setInput((current) => ({ ...current, ...patch })); setError(''); setFieldErrors({}) }
 
   const save = async () => {
     const errors: typeof fieldErrors = {}
@@ -158,9 +159,10 @@ export default function ClosureDialog({
       requestAnimationFrame(() => { const field = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return
     }
+    if (!preview?.snapshot) { setError('予約を確認できませんでした。読み直してからもう一度お試しください。'); return }
     setBusy(true); setError('')
     try {
-      const body: RestaurantClosureInput = { ...input, tableIds: pickTables ? input.tableIds : [], memo: input.memo?.trim() || null, notifyMedia: input.notifyMedia !== false }
+      const body: RestaurantClosureInput = { ...input, tableIds: pickTables ? input.tableIds : [], memo: input.memo?.trim() || null, notifyMedia: input.notifyMedia !== false, expectedSnapshot: preview.snapshot }
       const res = editing
         ? await restaurantTestApi.updateClosure(accountId, editing.id, { ...body, expectedVersion: editing.version })
         : await restaurantTestApi.createClosure(accountId, body)

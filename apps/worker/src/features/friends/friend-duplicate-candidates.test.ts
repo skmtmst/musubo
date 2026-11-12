@@ -17,13 +17,13 @@ function seed() {
     `).run(id, `channel-${id}`, name, DEFAULT_TENANT_ID);
   }
   insertFriend(testDb.raw, 'friend-a', {
-    line_account_id: 'account-a', display_name: '田中 花子', picture_url: SHARED_PROFILE,
+    line_account_id: 'account-a', display_name: '見本 171', picture_url: SHARED_PROFILE,
   });
   insertFriend(testDb.raw, 'friend-b', {
-    line_account_id: 'account-b', display_name: '田中 はなこ', picture_url: SHARED_PROFILE,
+    line_account_id: 'account-b', display_name: '見本 161', picture_url: SHARED_PROFILE,
   });
   insertFriend(testDb.raw, 'friend-c', {
-    line_account_id: 'account-c', display_name: '山田 太郎',
+    line_account_id: 'account-c', display_name: '見本 141',
     picture_url: 'https://profile.line-scdn.net/0hDIFFERENT_PROFILE_TOKEN_ABCDEFGHIJKLMNOPQRSTUVWXYZ_012345/preview',
   });
   return testDb;

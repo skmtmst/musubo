@@ -14,7 +14,7 @@ function conditions(patch: Partial<InboxSavedViewConditions> = {}): InboxSavedVi
 /**
  * 設計 `ASsb3` は保存した検索の名前の下に「対応マーク：未対応／期限：超過」の
  * ように**何で絞ったか**を出す。名前だけだと、`未対応・期限超過` と
- * `河野担当の未対応` のどちらを押せばいいのかが名前の付け方頼みになる。
+ * `見本担当の未対応` のどちらを押せばいいのかが名前の付け方頼みになる。
  */
 describe('保存した検索の要約', () => {
   it('絞った軸だけを並べる', () => {
@@ -23,12 +23,12 @@ describe('保存した検索の要約', () => {
   })
 
   it('軸の並びは設計と同じ（担当者が対応状況より先）', () => {
-    /* 設計 `ASsb3` は「担当者：河野／対応マーク：未対応」。 */
+    /* 設計 `ASsb3` は「担当者：見本／対応マーク：未対応」。 */
     const summary = savedViewSummary(
       conditions({ statuses: ['unread'], assignees: ['op-1'] }),
-      new Map([['op-1', '河野']]),
+      new Map([['op-1', '見本']]),
     )
-    expect(summary).toBe('担当者：河野／対応状況：未対応')
+    expect(summary).toBe('担当者：見本／対応状況：未対応')
   })
 
   it('自分の未読は「未読のみ」と書く（「自分の」は担当者の軸が言う）', () => {
@@ -53,9 +53,9 @@ describe('保存した検索の要約', () => {
   })
 
   it('担当者は名前で出す', () => {
-    const names = new Map([['op-1', '河野'], ['op-2', '菅野']])
+    const names = new Map([['op-1', '見本'], ['op-2', '菅野']])
     expect(savedViewSummary(conditions({ assignees: ['op-1', 'op-2'] }), names))
-      .toBe('担当者：河野・菅野')
+      .toBe('担当者：見本・菅野')
   })
 
   it('名前が引けない担当者を、IDのまま出さない', () => {
@@ -63,7 +63,7 @@ describe('保存した検索の要約', () => {
       `operator-kenta` と書かれても、それが誰なのかは分からない。
       引けないときは人数で言う。
     */
-    const summary = savedViewSummary(conditions({ assignees: ['op-1', 'op-unknown'] }), new Map([['op-1', '河野']]))
+    const summary = savedViewSummary(conditions({ assignees: ['op-1', 'op-unknown'] }), new Map([['op-1', '見本']]))
     expect(summary).toBe('担当者：2人')
     expect(summary).not.toContain('op-unknown')
   })

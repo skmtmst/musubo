@@ -24,7 +24,7 @@ export function useScenarioStepActions({
   saveErrors, deliveryMode, stepFields, setStepSaving,
   templates, editingStepId, loadScenario, insertAfter,
   sortedSteps, stepDraft, reloadStats, duplicatingStepId,
-  setDuplicatingStepId, deleteStepTarget, deletingStepId, setDeletingStepId,
+  setDuplicatingStepId, deleteStepTarget, deleteStepRevision, deleteStepConfirmationValid, deletingStepId, setDeletingStepId,
   setDeleteStepError, setDeleteStepTarget, setError,
 }: {
   scenario: ScenarioWithSteps | null
@@ -53,6 +53,8 @@ export function useScenarioStepActions({
   duplicatingStepId: string | null
   setDuplicatingStepId: Dispatch<SetStateAction<string | null>>
   deleteStepTarget: ScenarioStep | null
+  deleteStepRevision: number | null
+  deleteStepConfirmationValid: () => boolean
   deletingStepId: string | null
   setDeletingStepId: Dispatch<SetStateAction<string | null>>
   setDeleteStepError: Dispatch<SetStateAction<string>>
@@ -423,13 +425,14 @@ export function useScenarioStepActions({
   }
 
   const handleDeleteStep = async () => {
-    if (!deleteStepTarget || deletingStepId || !checkWrite(setDeleteStepError)) return
+    if (!deleteStepTarget || deletingStepId || !deleteStepConfirmationValid() || !checkWrite(setDeleteStepError)) return
+    if (!Number.isSafeInteger(deleteStepRevision) || !deleteStepRevision || deleteStepRevision < 1) { setDeleteStepError('画面を読み直してから、もう一度お試しください。'); return }
     const stepId = deleteStepTarget.id
     setDeletingStepId(stepId)
     setDeleteStepError('')
     try {
-      if (!checkWrite(setDeleteStepError)) return
-      const result = await api.scenarios.deleteStep(id, stepId)
+      if (!deleteStepConfirmationValid() || !checkWrite(setDeleteStepError)) return
+      const result = await api.scenarios.deleteStep(id, stepId, deleteStepRevision)
       if (!checkWrite(setDeleteStepError)) return
       if (!result.success) throw new Error(result.error)
       if (editingStepId === stepId) closeStepForm()

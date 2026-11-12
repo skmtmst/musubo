@@ -69,7 +69,7 @@ function handler(url: URL) {
         friends: [
           {
             id: 'f-kenta',
-            displayName: 'Kenta Kawano',
+            displayName: 'Demo Person',
             trackedAt: new Date().toISOString(),
             currentStatus: '友だち',
             conversion: '購入 ¥4,800',
@@ -156,7 +156,7 @@ test('v8 の下では Pencil Q5le3 の詳細に切り替わる', async () => {
   // その後と友だちの表
   expect(host.textContent).toContain('その後（この経路から来た人）')
   expect(host.textContent).toContain('注文を見る')
-  expect(host.textContent).toContain('Kenta Kawano')
+  expect(host.textContent).toContain('Demo Person')
   expect(host.textContent).toContain('ブロック')
   // 下の2枚
   expect(host.textContent).toContain('この経路のつながる先')

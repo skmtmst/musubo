@@ -24,7 +24,7 @@ vi.mock('@/lib/api', () => ({ api: { friendAddRules: {
   runs: vi.fn(async () => ({ success: true, data: {
     items: [{
       id: 'run-1', receivedAt: '2026-09-16T09:00:00+09:00', processedAt: null,
-      friend: state.redacted ? { displayName: '顧客名は非表示', redacted: true } : { id: 'friend-1', displayName: '山田 太郎', redacted: false },
+      friend: state.redacted ? { displayName: '顧客名は非表示', redacted: true } : { id: 'friend-1', displayName: '見本 141', redacted: false },
       friendKind: 'first_time', attribution: { status: 'unavailable', routeId: null, routeName: null, reason: null },
       rule: null, scenario: null, actions: { total: 0, failed: 0 }, deliveryCount: 0, status: 'completed', errorCode: null,
     }],
@@ -70,7 +70,7 @@ describe('N-106 友だち追加時配信のstaff read model', () => {
   it('admin read modelは顧客名を表示し、その追加記録へ進める', async () => {
     state.redacted = false
     await render()
-    expect(host.textContent).toContain('山田 太郎')
+    expect(host.textContent).toContain('見本 141')
     expect(host.querySelector('a[href="/friend-add-settings/runs/detail?id=run-1"]')).not.toBeNull()
   })
 })

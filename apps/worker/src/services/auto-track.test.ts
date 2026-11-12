@@ -139,7 +139,7 @@ describe('autoTrackContent (flex)', () => {
       type: 'box',
       contents: [
         { type: 'button', action: { type: 'uri', uri: 'https://liff.line.me/123-abc' } },
-        { type: 'button', action: { type: 'uri', uri: 'tel:0312345678' } },
+        { type: 'button', action: { type: 'uri', uri: 'tel:0300005678' } },
         { type: 'button', action: { type: 'uri', uri: `${SHORT}/t/Existing1` } },
       ],
     });

@@ -228,17 +228,17 @@ describe('R391 保管状態の本人は詳細と履歴を開ける', () => {
       `).run(id, `channel-${id}`, name, DEFAULT_TENANT_ID);
     }
     insertFriend(raw, 'friend-a', {
-      line_account_id: 'account-a', display_name: '田中 花子', user_id: 'user-a',
+      line_account_id: 'account-a', display_name: '見本 171', user_id: 'user-a',
     });
     insertFriend(raw, 'friend-b', {
-      line_account_id: 'account-b', display_name: '田中 はなこ', user_id: 'user-a',
+      line_account_id: 'account-b', display_name: '見本 161', user_id: 'user-a',
     });
     // の被害形: 本人は統括を持たない行（移行・判定で作られる形）。
     raw.prepare(`
       INSERT INTO users (
         id, tenant_id, status, display_name, primary_display_name, revision,
         created_by, created_at, updated_at
-      ) VALUES ('user-a', NULL, 'active', '田中 花子', '田中 花子', 1,
+      ) VALUES ('user-a', NULL, 'active', '見本 171', '見本 171', 1,
         'owner-1', '2026-08-30T09:00:00.000Z', '2026-08-30T09:00:00.000Z')
     `).run();
     raw.prepare(`

@@ -272,7 +272,7 @@ export async function saveAutoReplyDraftVersion(
       ),
       db.prepare(
         `UPDATE auto_replies
-            SET current_draft_version_id = ?
+            SET confirmation_revision = confirmation_revision + 1, current_draft_version_id = ?
           WHERE id = ?`,
       ).bind(versionId, autoReplyId),
     ]);

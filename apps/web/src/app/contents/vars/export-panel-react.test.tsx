@@ -155,7 +155,8 @@ describe('共通情報CSVの監査付き出力パネル', () => {
       data: [job({ status: 'expired', downloadUrl: null })],
     })
     await render()
-    expect(text()).toContain('期限切れ')
+    expect(text()).toContain('ダウンロード期限が切れました')
+    expect(text()).not.toContain('期限切れ：ダウンロード期限が切れました')
     expect(Array.from(host.querySelectorAll('button')).some(button => button.textContent?.trim() === 'CSVをダウンロード')).toBe(false)
     await clickButton('もう一度書き出す')
     expect(api.regenerateExport).toHaveBeenCalledWith('job-1')

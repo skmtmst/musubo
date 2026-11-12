@@ -226,13 +226,10 @@ async function returnRecoveredAccountsToPools(db: D1Database): Promise<void> {
       .first<{ count: number }>();
     if ((normalCount?.count ?? 0) === 0) continue;
 
-    await db
-      .prepare(
-        `UPDATE pool_accounts SET is_active = 1
-          WHERE pool_id = ? AND line_account_id = ? AND is_active = 0`,
-      )
-      .bind(entry.pool_id, entry.line_account_id)
-      .run();
+    await db.batch([
+      db.prepare(`UPDATE pool_accounts SET is_active = 1 WHERE pool_id = ? AND line_account_id = ? AND is_active = 0`).bind(entry.pool_id, entry.line_account_id),
+      db.prepare('UPDATE traffic_pools SET confirmation_revision=confirmation_revision+1 WHERE id=? AND changes()>0').bind(entry.pool_id),
+    ]);
     await recordPoolSwitchEvent(db, {
       poolId: entry.pool_id,
       lineAccountId: entry.line_account_id,

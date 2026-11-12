@@ -17,6 +17,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -39,6 +40,7 @@ const calls = vi.hoisted(() => ({
   folders: vi.fn(),
   friends: vi.fn(),
   stats: vi.fn(),
+  confirmation: vi.fn(),
   scenario: vi.fn(),
 }))
 
@@ -49,6 +51,7 @@ const base = vi.hoisted(() => ({
   triggerType: 'friend_add',
   triggerTagId: null,
   isActive: true,
+  contentRevision: 1,
   allowConcurrent: true,
   folderId: null as string | null,
   deliveryMode: 'absolute_time',
@@ -83,9 +86,11 @@ vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {
     status: number
-    constructor(status: number, message?: string) {
+    code?: string
+    constructor(status: number, message?: string, code?: string) {
       super(message)
       this.status = status
+      this.code = code
     }
   },
   api: {
@@ -93,6 +98,7 @@ vi.mock('@/lib/api', () => ({
       create: calls.create,
       get: calls.get,
       update: calls.update,
+      confirmation: calls.confirmation,
       delete: calls.remove,
       reorderSteps: calls.reorderSteps,
       addStep: calls.addStep,
@@ -197,6 +203,7 @@ function stubScenario(patch: Partial<typeof base>) {
 }
 
 function stubStats(activeNow: number | undefined) {
+  calls.confirmation.mockResolvedValue(activeNow === undefined ? { success: false, error: 'offline' } : ok({ contentRevision: 1, activeCount: activeNow, rowIdSum: 0, rowIdSquareSum: 0, totalCount: 116, totalRowIdSum: 0, totalRowIdSquareSum: 0, referrers: [] }))
   calls.stats.mockResolvedValue(activeNow === undefined
     ? { success: false, error: 'offline' }
     : ok({ enrolledTotal: 40, activeNow, completed: 12, paused: 0, steps: [] }))
@@ -286,7 +293,7 @@ describe('シナリオ全体を削除する確認', () => {
   it('配信停止と通の削除に操作先と環境を示す', async () => {
     await render()
     fireEvent.click(screen.getByRole('button', { name: '一時停止する' }))
-    const stop = screen.getByRole('alertdialog', { name: '配信を止めますか' })
+    const stop = await screen.findByRole('alertdialog', { name: '配信を止めますか' })
     expect(within(stop).getByText('LINEアカウント')).toBeTruthy()
     expect(within(stop).getByText('環境')).toBeTruthy()
     fireEvent.click(within(stop).getByRole('button', { name: 'キャンセル' }))
@@ -312,8 +319,14 @@ describe('シナリオ全体を削除する確認', () => {
   })
 
   it('購読中の人数を、取れない・0人・N人で分けて、消えるものと残るものと一緒に読ませる', async () => {
+    stubStats(undefined)
+    await render()
+    fireEvent.click(screen.getByRole('button', { name: 'このシナリオのその他操作' }))
+    await chooseMenuItem('このシナリオを削除')
+    await waitFor(() => expect(host.textContent).toContain('確認できません'))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(calls.remove).not.toHaveBeenCalled()
     for (const [activeNow, sentence] of [
-      [undefined, '購読中の人数は確認できません。'],
       [0, '現在購読中の友だちは0人です。'],
       [116, '現在116 人が購読中です。途中の人は続きを受け取れません。'],
     ] as const) {
@@ -335,7 +348,7 @@ describe('シナリオ全体を削除する確認', () => {
     await render()
     const dialog = await openDeleteScenario()
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '削除する' })) })
-    await waitFor(() => expect(calls.remove).toHaveBeenCalledWith('sc-1'))
+    await waitFor(() => expect(calls.remove).toHaveBeenCalledWith('sc-1', { contentRevision: 1, activeCount: 116, rowIdSum: 0, rowIdSquareSum: 0, totalCount: 116, totalRowIdSum: 0, totalRowIdSquareSum: 0, referrers: [] }))
     await waitFor(() => expect(calls.push).toHaveBeenCalledWith(expect.stringMatching(/^\/scenarios(\?|$)/)))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   })
@@ -350,6 +363,21 @@ describe('シナリオ全体を削除する確認', () => {
     expect(screen.getByRole('alertdialog')).toBeTruthy()
     expect(calls.push).not.toHaveBeenCalled()
     expect(within(dialog).getByRole('button', { name: '削除する' }).hasAttribute('disabled')).toBe(false)
+  })
+
+  it('削除時の409は窓の人数を読み直し、もう一度の確認を求める', async () => {
+    calls.remove.mockRejectedValueOnce(new ApiError(409, 'changed', 'scenario_confirmation_conflict'))
+    await render()
+    const dialog = await openDeleteScenario()
+    expect(dialog.textContent).toContain('現在116 人が購読中です')
+    stubStats(0)
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '削除する' })) })
+    await waitFor(() => expect(screen.getByRole('alertdialog').textContent).toContain('現在購読中の友だちは0人です。'))
+    expect(screen.getByRole('alertdialog').textContent).toContain('確認した内容が変わりました。もう一度確認してください。')
+    expect(calls.remove).toHaveBeenCalledTimes(1)
+    expect(calls.push).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })) })
+    await waitFor(() => expect(calls.remove).toHaveBeenNthCalledWith(2, 'sc-1', expect.objectContaining({ activeCount: 0 })))
   })
 
   it('削除中に二度押しても口へは1回だけ送る', async () => {
@@ -514,6 +542,21 @@ describe('始めた直後の知らせ', () => {
     expect(link.getAttribute('title')).toBe('開始日時：10月2日 10:00')
   })
 
+  it('集計と試算が両方不明のときは0人と言わず、実際に0人なら0人と示す', async () => {
+    stubStats(undefined)
+    calls.simulate.mockResolvedValue({ success: false, error: 'offline' })
+    await render({ showStarted: true })
+    let band = screen.getAllByRole('status').find(el => el.textContent?.includes('配信を始めました'))!
+    expect(band.textContent).not.toContain('0 人へ')
+    expect(band.textContent).toContain('人数を確認できません')
+    act(() => root.unmount())
+    root = createRoot(host)
+    stubStats(0)
+    await render({ showStarted: true })
+    band = screen.getAllByRole('status').find(el => el.textContent?.includes('配信を始めました'))!
+    expect(band.textContent).toContain('予約中の 0 人へ')
+  })
+
   it('開始の記録が読めないときは、開始日時を作らず読み直しを案内する。始めていない時は帯を出さない', async () => {
     calls.runs.mockResolvedValue({ success: false, error: 'offline' })
     await render({ showStarted: true })
@@ -615,7 +658,12 @@ describe('保存・開始のきっかけ・配信の3つの段', () => {
 
   it('板の頭の「対象を絞る」でシナリオ全体の配信対象の窓を開く', async () => {
     await render()
+    expect(screen.queryByRole('button', { name: 'その他の操作' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'このシナリオのその他操作' }))
+    expect(screen.getByRole('menuitem', { name: 'まとめて下見' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'まとめてテストを送る' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'このシナリオを複製' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'このシナリオを削除' })).toBeTruthy()
     await chooseMenuItem('対象を絞る')
     const dialog = await screen.findByRole('dialog')
     expect(dialog.textContent).toContain('対象の絞り込み')

@@ -72,12 +72,12 @@ beforeEach(() => {
   dbMocks.getAffiliatePaymentSummaries.mockResolvedValue([{ affiliateId: 'affiliate-1' }]);
   dbMocks.getAffiliateById.mockResolvedValue({
     id: 'affiliate-1',
-    name: '田中 明',
+    name: '見本 168',
     line_account_id: 'account-1',
   });
   dbMocks.getAffiliateArchiveImpact.mockResolvedValue({
     affiliateId: 'affiliate-1',
-    affiliateName: '田中 明',
+    affiliateName: '見本 168',
     lifecycle: 'active',
     activeLinks: 3,
     unsettledConversions: 2,
@@ -88,7 +88,7 @@ beforeEach(() => {
   dbMocks.updateAffiliateLifecycle.mockResolvedValue(true);
   dbMocks.previewAffiliateSettlement.mockResolvedValue({
     affiliateId: 'affiliate-1',
-    affiliateName: '田中 明',
+    affiliateName: '見本 168',
     code: 'tanaka01',
     amount: 72000,
     conversionCount: 18,
@@ -191,7 +191,7 @@ describe('支払い確定', () => {
 
   it('0件・取得失敗・権限不足を通常データと区別する', async () => {
     dbMocks.previewAffiliateSettlement.mockResolvedValueOnce({
-      affiliateId: 'affiliate-1', affiliateName: '田中 明', code: 'tanaka01',
+      affiliateId: 'affiliate-1', affiliateName: '見本 168', code: 'tanaka01',
       amount: 0, conversionCount: 0, periodFrom: null, periodTo: '2026-09-06T00:00:00.000Z',
       closeDate: null, paymentDate: null, bankDestination: null, breakdown: [], entries: [],
     });

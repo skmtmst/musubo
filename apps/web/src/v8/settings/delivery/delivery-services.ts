@@ -37,6 +37,7 @@ export type DeliveryService = {
   storeName?: string
   connectedAt?: string
   checkedAt?: string
+  connectionVersion?: number
   appliedAt?: string
   /** 状態の下へ出す帯（`OIY4Z` の Notice）。接続エラー・申し込み受付中・ログイン直後に使う。 */
   stateNote?: string
@@ -177,6 +178,7 @@ export function uberConnectionPatch(connection: UberConnection, flash = ''): Par
   if (activationUnresolved || deactivationUnresolved || storeReviewRequired || disconnectReauthorizationPending) {
     return {
       ready: false,
+      connectionVersion: connection.version ?? undefined,
       status: 'error',
       connectionCheckBlocked: deactivationUnresolved,
       connectionDisconnectBlocked: true,
@@ -197,6 +199,7 @@ export function uberConnectionPatch(connection: UberConnection, flash = ''): Par
   }
   const note = uberReturnNote(flash) ?? UBER_STATE_NOTE[connection.status]
   return {
+    connectionVersion: connection.version ?? undefined,
     connectionCheckBlocked: false,
     connectionDisconnectBlocked: connection.status === 'expired',
     needsReauthorization: connection.status === 'expired',

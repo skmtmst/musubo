@@ -32,6 +32,7 @@ const scenario = vi.hoisted(() => ({
   description: '',
   triggerType: 'friend_add',
   isActive: true,
+  contentRevision: 1,
   allowConcurrent: true,
   folderId: null,
   deliveryMode: 'absolute_time',
@@ -69,6 +70,7 @@ vi.mock('@/lib/api', async importOriginal => ({
       create: createScenario,
       get: getScenario,
       update: updateScenario,
+      confirmation: vi.fn(async () => ({ success: true, data: { contentRevision: 1, activeCount: 116, rowIdSum: 0, rowIdSquareSum: 0, totalCount: 116, totalRowIdSum: 0, totalRowIdSquareSum: 0, referrers: [] } })),
       simulate: vi.fn(async () => ({ success: true, data: { audience: { newStartPlanned: 116 }, steps: [] } })),
       runs: vi.fn(async () => ({
         success: true,
@@ -203,7 +205,7 @@ describe('V8 シナリオ配信の編集', () => {
     await render()
     const preview = screen.getByRole('region', { name: 'LINEでの見え方' })
     expect(within(preview).getByText('選んだ通（1通目）の見え方')).toBeTruthy()
-    expect(within(preview).getByText('こんにちは、山田 花子さん。10月2日 18:00からです。')).toBeTruthy()
+    expect(within(preview).getByText('こんにちは、見本 143さん。10月2日 18:00からです。')).toBeTruthy()
     expect(document.querySelector('[data-preview-sample-note]')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'LINEでの見え方の説明' }))
     expect(screen.getByText('名前や日時は見本の値です。')).toBeTruthy()
@@ -400,7 +402,7 @@ describe('整理後も保存・開始・停止と通の状態を保つ', () => {
     const dialog = await screen.findByRole('alertdialog')
     expect(updateScenario).not.toHaveBeenCalled()
     fireEvent.click(within(dialog).getByRole('button', { name: '一時停止する', exact: true }))
-    await waitFor(() => expect(updateScenario).toHaveBeenCalledWith('sc-1', { isActive: false }))
+    await waitFor(() => expect(updateScenario).toHaveBeenCalledWith('sc-1', { isActive: false, expectedContentRevision: 1, expectedSubscriptions: { activeCount: 116, rowIdSum: 0, rowIdSquareSum: 0 } }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   })
 

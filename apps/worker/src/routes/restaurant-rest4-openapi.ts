@@ -17,6 +17,6 @@ export const restaurantRest4Paths={
   get:{summary:'読めるお店だけで構成された系列店の組を読む',parameters:[account],responses:result},
   post:{summary:'案内可のお店の組を作る（owner/admin、閲覧権限は広げない）',parameters:[account],requestBody:body({name:{type:'string',maxLength:100},members:{type:'array',minItems:2,maxItems:50,items:{type:'object',required:Object.keys(member),properties:member}}}),responses:result},
  },
- '/api/restaurant-test/store-groups/{id}/members/{storeId}':{patch:{summary:'案内参加と距離を変更（owner/admin）',parameters:[account,path('id'),path('storeId')],requestBody:body({referralEnabled:member.referralEnabled,maxDistance:member.maxDistance}),responses:result}},
+ '/api/restaurant-test/store-groups/{id}/members/{storeId}':{patch:{summary:'案内参加と距離を変更（owner/admin）。確認時の版を任意で指定できる',parameters:[account,path('id'),path('storeId')],requestBody:body({referralEnabled:member.referralEnabled,maxDistance:member.maxDistance,expectedVersion:{type:'integer',minimum:1}},['referralEnabled','maxDistance']),responses:result}},
  '/api/restaurant-test/stores/{id}/referral-location':{put:{summary:'確認済みの店舗の座標を登録（owner/admin）',parameters:[account,path('id')],requestBody:body({latitude:{type:'number',minimum:-90,maximum:90},longitude:{type:'number',minimum:-180,maximum:180},confirmed:{const:true}}),responses:result}},
 };

@@ -50,6 +50,22 @@ const net = vi.hoisted(() => ({
   failList: null as null | 'network',
 }))
 
+const heldDialogs = vi.hoisted(() => ({ execute: undefined as undefined | (() => void), rollback: undefined as undefined | (() => void) }))
+vi.mock('./migration-dialogs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./migration-dialogs')>()
+  return {
+    ...actual,
+    ExecuteConfirmDialog: (props: React.ComponentProps<typeof actual.ExecuteConfirmDialog>) => {
+      if (props.open) heldDialogs.execute = props.onConfirm
+      return <actual.ExecuteConfirmDialog {...props} />
+    },
+    RollbackConfirmDialog: (props: React.ComponentProps<typeof actual.RollbackConfirmDialog>) => {
+      if (props.open) heldDialogs.rollback = props.onConfirm
+      return <actual.RollbackConfirmDialog {...props} />
+    },
+  }
+})
+
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
@@ -282,6 +298,29 @@ describe('UID移行の詳細確認（FRIEND-14）', () => {
     fireEvent.click(openDialog().querySelector<HTMLButtonElement>('button[aria-label="閉じる"]')!)
     await flush()
     expect(writes()).toHaveLength(0)
+  })
+})
+
+describe('閉じた移行確認', () => {
+  it.each(['execute', 'rollback'] as const)('%s の古い確定は再度開いた確認に使えない', async (action) => {
+    if (action === 'rollback') net.runs = [runFixture({ status: 'completed', rollbackable: true })]
+    await render()
+    await flush()
+    const entry = action === 'execute' ? '本移行を実行' : 'この移行を切り戻す'
+    fireEvent.click(buttonByText(entry))
+    await flush()
+    const oldConfirm = heldDialogs[action]!
+    expect(oldConfirm).toBeTypeOf('function')
+    fireEvent.click(buttonByText('キャンセル', openDialog()))
+    await flush()
+    fireEvent.click(buttonByText(entry))
+    await flush()
+    await act(async () => { oldConfirm(); await Promise.resolve() })
+    await flush()
+    expect(net.calls.filter((call) => call.path.endsWith(`/${action}`) && call.method === 'POST')).toHaveLength(0)
+    fireEvent.click(buttonByText(action === 'execute' ? '本移行を実行' : '切り戻す', openDialog()))
+    await flush()
+    expect(net.calls.filter((call) => call.path.endsWith(`/${action}`) && call.method === 'POST')).toHaveLength(1)
   })
 })
 

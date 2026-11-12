@@ -116,9 +116,8 @@ export async function firstRunFunnel(
     db.prepare(
       `SELECT a.id, a.created_at, a.is_active,
               CASE WHEN COALESCE(a.channel_secret_encrypted, '') <> '' OR COALESCE(a.channel_secret, '') <> '' THEN 1 ELSE 0 END AS has_secret,
-              (SELECT s.selected_at FROM account_styles s
-                WHERE s.line_account_id = a.id AND s.selection_mode = 'configured') AS style_at,
-              (SELECT MIN(i.applied_at) FROM style_starter_items i WHERE i.line_account_id = a.id) AS starter_at,
+              (SELECT s.first_selected_at FROM account_styles s WHERE s.line_account_id = a.id) AS style_at,
+              (SELECT s.first_starter_at FROM account_styles s WHERE s.line_account_id = a.id) AS starter_at,
               (${FOLLOW_LIMIT}) AS follow_at,
               (${FIRST_MESSAGE_LIMIT}) AS first_message_at,
               (SELECT st.value FROM account_settings st

@@ -9,7 +9,7 @@ import { tenants } from './tenants.js';
 let sql: SqliteD1;
 const path = '/api/tenants/me/company-contact';
 const valid = { legalCompanyName: '正式な会社株式会社', postalCode: '150-0001', address: '東京都渋谷区神宮前1-2-3',
-  building: '', phone: '03-1234-5678', contactName: '山田 太郎', contactEmail: 'yamada@example.com', invoiceAddressee: null };
+  building: '', phone: '03-0000-5678', contactName: '見本 141', contactEmail: 'yamada@example.com', invoiceAddressee: null };
 const actor = (role: AuthenticatedStaff['role'] = 'owner'): AuthenticatedStaff => ({
   id: 'owner', name: '管理者', role, readOnly: false, tenantId: DEFAULT_TENANT_ID,
 });
@@ -35,10 +35,10 @@ describe('統括の会社と連絡先（実SQL）', () => {
   it.each(['owner','admin'] as const)('%sは8欄を自分の統括に保存し、再取得できる', async role => {
     const saved = await call('PATCH', {...valid,expectedRevision:0,tenantId:'other'}, actor(role));
     expect(saved.status).toBe(200);
-    expect(saved.body.data).toEqual({...valid,phone:'0312345678',postalCode:'1500001',building:null,revision:1});
+    expect(saved.body.data).toEqual({...valid,phone:'0300005678',postalCode:'1500001',building:null,revision:1});
     expect((await call()).body.data).toEqual(saved.body.data);
     expect(persisted()).toEqual({legal_company_name:valid.legalCompanyName,company_postal_code:'1500001',company_address:valid.address,
-      company_building:null,company_phone:'0312345678',contact_name:valid.contactName,contact_email:valid.contactEmail,
+      company_building:null,company_phone:'0300005678',contact_name:valid.contactName,contact_email:valid.contactEmail,
       invoice_addressee:null,company_settings_version:1});
     expect(sql.raw.prepare("SELECT name,legal_company_name FROM tenants WHERE id='other'").get()).toEqual({name:'他の統括',legal_company_name:null});
     expect(sql.raw.prepare('SELECT name FROM tenants WHERE id=?').get(DEFAULT_TENANT_ID)).toEqual({name:'既定の統括'});
@@ -112,9 +112,9 @@ describe('統括の会社と連絡先（実SQL）', () => {
 });
 
 it('全角の会社電話を正規化し、既存番号は読んでも書き換えない', async () => {
-  expect((await call('PATCH',{...valid,phone:'（０３）１２３４－５６７８',expectedRevision:0})).status).toBe(200);
-  expect(persisted()).toMatchObject({company_phone:'0312345678'});
-  sql.raw.prepare('UPDATE tenants SET company_phone=? WHERE id=?').run('０３－１２３４－５６７８',DEFAULT_TENANT_ID);
-  expect((await call()).body.data.phone).toBe('0312345678');
-  expect(persisted()).toMatchObject({company_phone:'０３－１２３４－５６７８'});
+  expect((await call('PATCH',{...valid,phone:'（０３）００００－５６７８',expectedRevision:0})).status).toBe(200);
+  expect(persisted()).toMatchObject({company_phone:'0300005678'});
+  sql.raw.prepare('UPDATE tenants SET company_phone=? WHERE id=?').run('０３－００００－５６７８',DEFAULT_TENANT_ID);
+  expect((await call()).body.data.phone).toBe('0300005678');
+  expect(persisted()).toMatchObject({company_phone:'０３－００００－５６７８'});
 });

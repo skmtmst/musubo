@@ -18,7 +18,7 @@ const list: SeriesOccurrence[] = [
   { index: 1, startsAt: '2026-12-04T05:00:00.000Z', available: false, staffId: null, reason: 'slot_unavailable', alternatives: ['2026-12-04T07:00:00.000Z'] },
   { index: 2, startsAt: '2026-12-25T05:00:00.000Z', available: false, staffId: null, reason: 'slot_unavailable', alternatives: [] },
 ]
-const summary = { customerName: '山田 花子', friendId: 'f1', menuId: 'bm-1', menuName: 'トリミング（小型犬）', durationMin: 105, staffId: 'bs-1', staffName: '佐々木', startsAt: day(20), endsAt: '2026-11-20T06:45:00.000Z' }
+const summary = { customerName: '見本 143', friendId: 'f1', menuId: 'bm-1', menuName: 'トリミング（小型犬）', durationMin: 105, staffId: 'bs-1', staffName: '佐々木', startsAt: day(20), endsAt: '2026-11-20T06:45:00.000Z' }
 
 beforeEach(() => { preview.mockResolvedValue({ success: true, data: { occurrences: list } }); create.mockResolvedValue({ success: true, data: { series: { id: 's1' }, bookings: [{}, {}], skipped: [{}] } }) })
 afterEach(() => { cleanup(); vi.clearAllMocks() })

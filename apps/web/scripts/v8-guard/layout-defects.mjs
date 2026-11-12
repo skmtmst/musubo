@@ -27,24 +27,51 @@ const GAP_ROUTES = JSON.parse(readFileSync(new URL('./layout-defects-routes.json
 
 export const DEFECT_ROUTES = { ...ROUTES, tags: '/tags', affiliates: '/affiliates', 'inflow-links': '/inflow-links', conversions: '/affiliates?tab=points', ...Object.fromEntries(GAP_ROUTES.map(route=>[route,route])) }
 /** A standalone scan still fails on every detected defect. */
-export const assess = findings => ({ failures: [...findings], allowed: [] })
+export const assess = findings => ({ failures: [...findings], allowed: [], existing: [], fixed: [], needsReview: [] })
+/* CSS module の生成ハッシュは組み立てのたびに変わるため、突き合わせでは潰す。 */
+const HASH_PATTERN = /__[0-9A-Za-z]{4,8}/g
+const fingerprint = ({ targetIdentity, target, ...detail }) =>
+  JSON.stringify([targetIdentity || target, detail]).replace(HASH_PATTERN, '__HASH')
+/* V8_GUARD_NEW_ONLY=0 で旧来の判定（全件失敗）に戻す。 */
 export function assessAgainstBase(findings, baseFindings) {
-  const fingerprint = ({ targetIdentity, target, ...detail }) => JSON.stringify([targetIdentity || target, detail])
+  if (process.env.V8_GUARD_NEW_ONLY === '0') {
+    return { ...assess(findings), existing: [], fixed: [], needsReview: [], baseFindings }
+  }
   const remainingBase = new Map()
   for (const finding of baseFindings) {
     const key = fingerprint(finding)
-    remainingBase.set(key, (remainingBase.get(key) || 0) + 1)
+    const group = remainingBase.get(key)
+    if (group) group.push(finding)
+    else remainingBase.set(key, [finding])
   }
   const failures = [], existing = []
   for (const finding of findings) {
     const key = fingerprint(finding)
-    const count = remainingBase.get(key) || 0
-    if (count) {
+    const group = remainingBase.get(key)
+    if (group?.length) {
       existing.push(finding)
-      remainingBase.set(key, count - 1)
+      group.shift()
     } else failures.push(finding)
   }
-  return { failures, allowed: [], existing, baseFindings }
+  const leftover = []
+  for (const group of remainingBase.values()) leftover.push(...group)
+  // 同じ種類の対は場所の移動か別物か人が見る。要確認にまとめ、本線側を添える。
+  const needsReview = []
+  const kept = []
+  for (const finding of failures) {
+    const at = leftover.findIndex(base => base.kind === finding.kind)
+    if (at < 0) {
+      kept.push(finding)
+      continue
+    }
+    const [base] = leftover.splice(at, 1)
+    needsReview.push({ ...finding, base })
+  }
+  return { failures: kept, allowed: [], existing, fixed: leftover, needsReview, baseFindings }
+}
+/* 新規・要確認・測定失敗のどれかがあればその区画は通さない。 */
+export function scopeFailed(result) {
+  return (result.failures?.length ?? 0) + (result.needsReview?.length ?? 0) > 0 || result.error != null
 }
 /** 番号を無視してよいのは、DOMで一つと確認した外枠だけ。子の番号は保つ。 */
 export function identifyStableTargets(findings) {
@@ -105,13 +132,26 @@ async function run() {
         const baseFindings = compareUrl ? await measureRoute(browser, compareUrl, route, width) : null
         const result = baseFindings ? assessAgainstBase(findings,baseFindings) : assess(findings)
         results[`${width} ${route}`] = result
-        bad += result.failures.length
-        console.log(`崩れ ${width} ${route}: 新規${result.failures.length}・許可${result.allowed.length}${baseFindings ? '・既存'+result.existing.length : ''}`)
-        for (const f of result.failures) console.log(`  ${f.kind} ${f.target} ${JSON.stringify(f.measure)} ${f.text}`)
+        bad += result.failures.length + result.needsReview.length
+        console.log(`崩れ ${width} ${route}: 新規${result.failures.length}・既存${result.existing.length}・解消${result.fixed.length}・要確認${result.needsReview.length}`)
+        for (const f of result.failures) console.log(`  新規 ${f.kind} ${f.target} ${JSON.stringify(f.measure)} ${f.text}`)
+        for (const f of result.needsReview) console.log(`  要確認 ${f.kind} ${f.target} ${JSON.stringify(f.measure)} ${f.text}（本線: ${f.base.target}）`)
       } catch (error) { bad++; results[`${width} ${route}`] = {error:error.message}; console.error('測定失敗',width,route,error.message) }
       finally { await page?.close() }
     }
   } finally { await browser.close() }
+  const totals = { added: 0, existing: 0, fixed: 0, review: 0, failedScopes: 0 }
+  for (const result of Object.values(results)) {
+    if (result.error != null) {
+      totals.failedScopes++
+      continue
+    }
+    totals.added += result.failures.length
+    totals.existing += result.existing.length
+    totals.fixed += result.fixed.length
+    totals.review += result.needsReview.length
+  }
+  console.log(`合計 新規${totals.added}・既存${totals.existing}・解消${totals.fixed}・要確認${totals.review}・測定失敗${totals.failedScopes}区画`)
   if (out) { mkdirSync(dirname(out),{recursive:true}); writeFileSync(out,JSON.stringify(results,null,2)+'\n') }
   if (bad) process.exitCode = 1
 }

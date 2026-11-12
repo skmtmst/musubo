@@ -15,7 +15,7 @@ let r2Store: Map<string, { bytes: Uint8Array; contentType: string }>;
 
 const staffOf = (overrides: Partial<AuthenticatedStaff> = {}): AuthenticatedStaff => ({
   id: 'staff-1',
-  name: '山田 太郎',
+  name: '見本 141',
   role: 'admin',
   readOnly: false,
   tenantId: DEFAULT_TENANT_ID,
@@ -65,7 +65,7 @@ beforeEach(() => {
   mail.send.mockReset();
   testDb.raw.prepare("INSERT INTO tenants (id, name) VALUES ('tenant-2', '別の統括')").run();
   testDb.raw.prepare(
-    `INSERT INTO staff_members (id, name, email, role, api_key, tenant_id) VALUES ('staff-1', '山田 太郎', 'masato@example.com', 'admin', 'key-1', ?)`,
+    `INSERT INTO staff_members (id, name, email, role, api_key, tenant_id) VALUES ('staff-1', '見本 141', 'masato@example.com', 'admin', 'key-1', ?)`,
   ).run(DEFAULT_TENANT_ID);
   testDb.raw.prepare(
     `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
@@ -206,7 +206,7 @@ describe('統括からのお問い合わせ', () => {
         accounts: [{ id: 'account-1', name: '然-NEN- TEST' }],
         sender: {
           tenantName: '株式会社サンプル',
-          name: '山田 太郎',
+          name: '見本 141',
           email: 'masato@example.com',
           planLabel: 'スタンダード',
         },
@@ -225,13 +225,13 @@ describe('お問い合わせの続き（★36-3-A）', () => {
 
   it('1 件のやり取りを読める。別の統括からは 404', async () => {
     const id = await seed();
-    testDb.raw.prepare(`INSERT INTO hq_support_messages (id, request_id, author_kind, author_staff_id, author_name, body, created_at) VALUES ('m1', ?, 'ops', 'master-1', '坂本 真人', '確認します。', '2026-09-15T09:05:00.000+09:00')`).run(id);
+    testDb.raw.prepare(`INSERT INTO hq_support_messages (id, request_id, author_kind, author_staff_id, author_name, body, created_at) VALUES ('m1', ?, 'ops', 'master-1', '見本 25', '確認します。', '2026-09-15T09:05:00.000+09:00')`).run(id);
     const res = await call('GET', `/api/hq/support/requests/${id}`);
     expect(res.status).toBe(200);
     const body = await res.json<{ data: { ticketLabel: string; stageLabel: string; messages: Array<{ authorKind: string; authorName: string }>; replies: unknown[] } }>();
     expect(body.data.ticketLabel).toBe('#MB-0001');
     expect(body.data.stageLabel).toBe('新規');
-    expect(body.data.messages).toEqual([expect.objectContaining({ authorKind: 'ops', authorName: 'musubo 運営 ／ 坂本 真人' })]);
+    expect(body.data.messages).toEqual([expect.objectContaining({ authorKind: 'ops', authorName: 'musubo 運営 ／ 見本 25' })]);
     expect(body.data.replies).toHaveLength(1);
     const other = await call('GET', `/api/hq/support/requests/${id}`, undefined, { staff: staffOf({ id: 'staff-9', tenantId: 'tenant-2' }) });
     expect(other.status).toBe(404);

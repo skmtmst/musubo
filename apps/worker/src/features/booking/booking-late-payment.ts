@@ -48,7 +48,7 @@ export async function reconcileLateBookingPayment(db: D1Database, paymentId: str
       if(available&&googleFree) {
         const store=await getStoreCapacitySnapshot(db,account,start,new Date(booking.block_ends_at));
         await db.batch([
-          db.prepare(`UPDATE bookings SET status=CASE WHEN COALESCE((SELECT approval_mode FROM booking_settings WHERE line_account_id=?),'automatic')='automatic'
+          db.prepare(`UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status=CASE WHEN COALESCE((SELECT approval_mode FROM booking_settings WHERE line_account_id=?),'automatic')='automatic'
               THEN 'confirmed' ELSE 'requested' END,lock_version=lock_version+1,decided_at=?,updated_at=?
             WHERE id=? AND line_account_id=? AND status='expired' AND lock_version=?
               AND EXISTS(SELECT 1 FROM booking_payments WHERE id=? AND line_account_id=? AND booking_id=bookings.id AND status='paid')

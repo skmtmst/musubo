@@ -33,7 +33,7 @@ function props() {
     scenario: { id: 'scenario-a', lineAccountId: 'account-a', steps: [step, second] }, id: 'scenario-a',
     stepForm: { ...emptyStepForm(1), messageContent: '残す本文', question: { ...question, choices: [...question.choices].reverse() } },
     kindState: emptyMessageKindState(), editingStepId: 'step-1', deliveryMode: 'absolute_time',
-    sortedSteps: [step, second], insertAfter: null, templates: [], duplicatingStepId: null, deletingStepId: null, deleteStepTarget: step,
+    sortedSteps: [step, second], insertAfter: null, templates: [], duplicatingStepId: null, deletingStepId: null, deleteStepTarget: step, deleteStepRevision: 1, deleteStepConfirmationValid: () => true,
     saveErrors: { capture: vi.fn() }, stepFields: { reset: vi.fn() }, stepDraft: { clear: vi.fn() },
     failStep: vi.fn(), loadScenario: vi.fn(async () => {}), reloadStats: vi.fn(),
     setStepForm: vi.fn(), setEditingStepId: vi.fn(), setShowStepForm: vi.fn(), setInsertAfter: vi.fn(), setStepError: vi.fn(), setStepFormNonce: vi.fn(), setKindState: vi.fn(), setStepSaving: vi.fn(), setDuplicatingStepId: vi.fn(), setDeletingStepId: vi.fn(), setDeleteStepError: vi.fn(), setDeleteStepTarget: vi.fn(), setError: vi.fn(),

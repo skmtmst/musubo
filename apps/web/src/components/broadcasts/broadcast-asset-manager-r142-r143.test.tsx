@@ -17,6 +17,14 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 const scope = vi.hoisted(() => ({ account: 'acc-1' }))
+const held = vi.hoisted(() => ({ confirm: null as null | (() => unknown), cancel: null as null | (() => void) }))
+vi.mock('@/components/shared/confirm-dialog', async original => {
+  const actual = await original<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.onConfirm) { held.confirm = props.onConfirm; held.cancel = props.onCancel }
+    return <actual.default {...props} />
+  } }
+})
 const { list, create, update, upload, remove } = vi.hoisted(() => ({
   list: vi.fn(),
   create: vi.fn(),
@@ -205,4 +213,127 @@ it('削除確認には素材のアカウントを示し、切替後の古い確�
   scope.account = 'acc-1'; renderKind('card_message'); await flush()
   await act(async () => oldConfirm({ preventDefault() {}, stopPropagation() {} }))
   expect(remove).not.toHaveBeenCalled()
+})
+
+it('閉じた削除確認の確定は、同じ素材を再度開いても使えない', async () => {
+  renderKind('card_message'); await flush(); clickText('削除する')
+  const oldConfirm = held.confirm!
+  const dialog = document.querySelector('[role="alertdialog"]')!
+  const cancel = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === 'キャンセル')!
+  act(() => cancel.click()); clickText('削除する')
+  await act(async () => { await oldConfirm() })
+  expect(remove).not.toHaveBeenCalled()
+  const current = document.querySelector('[role="alertdialog"]')!
+  const confirm = [...current.querySelectorAll('button')].find(button => button.textContent?.trim() === '削除する')!
+  await act(async () => { confirm.click() })
+  expect(remove).toHaveBeenCalledExactlyOnceWith('asset-card-1')
+})
+
+it('前の削除確認を閉じる操作で、新しい確認を閉じない', async () => {
+  renderKind('card_message'); await flush(); clickText('削除する')
+  const oldCancel = held.cancel!
+  expect(oldCancel).toBeTypeOf('function')
+  const dialog = document.querySelector('[role="alertdialog"]')!
+  const cancel = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === 'キャンセル')!
+  act(() => cancel.click()); clickText('削除する')
+  act(() => oldCancel())
+  expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('夏カルーセル')
+  expect(remove).not.toHaveBeenCalled()
+})
+
+it('素材の名前を変更して閉じると、破棄する前に確認する', async () => {
+  renderKind('card_message')
+  await flush()
+  clickText('編集')
+  const name = container.querySelector('input[placeholder="カルーセルの管理名"]') as HTMLInputElement
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  act(() => { setter.call(name, '変更した素材'); name.dispatchEvent(new Event('input', { bubbles: true })) })
+  clickText('キャンセル')
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  expect(document.body.textContent).toContain('素材への変更')
+  expect((container.querySelector('input[placeholder="カルーセルの管理名"]') as HTMLInputElement).value).toBe('変更した素材')
+  const discard = [...document.body.querySelectorAll('button')].find(b => b.textContent === '保存せずに移る')!
+  act(() => discard.click())
+  expect(container.querySelector('input[placeholder="カルーセルの管理名"]')).toBeNull()
+})
+
+it('画像を読み込み中に閉じても、選んだ画像を破棄する前に確認する', async () => {
+  let complete!: (v: unknown) => void
+  upload.mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
+  renderKind('card_message'); await flush(); clickText('編集')
+  const file = container.querySelector<HTMLInputElement>('input[type="file"]')!
+  Object.defineProperty(file, 'files', { value: [new File(['image'], 'a.png', { type: 'image/png' })] })
+  act(() => file.dispatchEvent(new Event('change', { bubbles: true })))
+  clickText('キャンセル')
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  await act(async () => complete({ success: true, data: { url: 'https://example.com/a.png' } }))
+})
+
+it('画像の同時選択で、後の選択を守る', async () => {
+  let oldComplete!: (v: unknown) => void
+  let newComplete!: (v: unknown) => void
+  upload.mockImplementationOnce(() => new Promise(resolve => { oldComplete = resolve }))
+    .mockImplementationOnce(() => new Promise(resolve => { newComplete = resolve }))
+  renderKind('card_message'); await flush(); clickText('編集')
+  const file = container.querySelector<HTMLInputElement>('input[type="file"]')!
+  Object.defineProperty(file, 'files', { configurable: true, value: [new File(['old'], 'old.png', { type: 'image/png' })] })
+  act(() => file.dispatchEvent(new Event('change', { bubbles: true })))
+  Object.defineProperty(file, 'files', { configurable: true, value: [new File(['new'], 'new.png', { type: 'image/png' })] })
+  act(() => file.dispatchEvent(new Event('change', { bubbles: true })))
+  await act(async () => oldComplete({ success: true, data: { url: 'https://example.com/old.png' } }))
+  clickText('キャンセル')
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  await act(async () => newComplete({ success: true, data: { url: 'https://example.com/new.png' } }))
+})
+
+it('素材編集中に別画面へ移ると、入力を残して確認する', async () => {
+  window.history.replaceState(null, '', '/templates')
+  renderKind('card_message')
+  await flush()
+  clickText('編集')
+  const name = container.querySelector('input[placeholder="カルーセルの管理名"]') as HTMLInputElement
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  act(() => { setter.call(name, '変更した素材'); name.dispatchEvent(new Event('input', { bubbles: true })) })
+  const link = document.createElement('a'); link.href = '/events'; document.body.appendChild(link)
+  act(() => link.click())
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  expect(name.value).toBe('変更した素材')
+  link.remove()
+})
+
+it.each(['種類', 'アカウント'] as const)('素材の未保存入力がある%s切替は確認してから進む', async target => {
+  const { requestUnsavedAction } = await import('@/lib/unsaved-action')
+  renderKind('card_message'); await flush(); clickText('編集')
+  const name = container.querySelector('input[placeholder="カルーセルの管理名"]') as HTMLInputElement
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  act(() => { setter.call(name, '変更した素材'); name.dispatchEvent(new Event('input', { bubbles: true })) })
+  const changed = vi.fn(() => { if (target === 'アカウント') scope.account = 'acc-2'; root.render(<BroadcastAssetManager kind={target === '種類' ? 'coupon' : 'card_message'} />) })
+  act(() => requestUnsavedAction(changed))
+  expect(changed).not.toHaveBeenCalled()
+  expect(document.body.textContent).toContain('素材への変更')
+  const keep = [...document.body.querySelectorAll('button')].find(b => b.textContent === '編集を続ける')!
+  act(() => keep.click())
+  expect(name.value).toBe('変更した素材')
+  act(() => requestUnsavedAction(changed))
+  const discard = [...document.body.querySelectorAll('button')].find(b => b.textContent === '保存せずに移る')!
+  act(() => discard.click())
+  expect(changed).toHaveBeenCalledOnce()
+  await flush()
+  expect(container.querySelector('input[placeholder="カルーセルの管理名"]')).toBeNull()
+})
+it('素材の種類を変える親の操作も編集内容の確認を通す', async () => {
+  let protect: ((action: () => void) => void) | null = null
+  await act(async () => { root.render(<BroadcastAssetManager kind="card_message" onScopeGuardChange={value => { protect = value }} />) })
+  await flush(); clickText('編集')
+  const name = container.querySelector('input[placeholder="カルーセルの管理名"]') as HTMLInputElement
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  act(() => { setter.call(name, '変更した素材'); name.dispatchEvent(new Event('input', { bubbles: true })) })
+  const switched = vi.fn()
+  expect(protect).not.toBeNull()
+  act(() => { protect!(switched) })
+  expect(switched).not.toHaveBeenCalled()
+  expect(document.body.textContent).toContain('素材への変更')
+  const discard = [...document.body.querySelectorAll('button')].find(b => b.textContent === '保存せずに移る')!
+  act(() => discard.click())
+  expect(switched).toHaveBeenCalledOnce()
 })

@@ -4,6 +4,7 @@ import type { Dispatch, SetStateAction } from 'react'
 import Button from '@/components/shared/button'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import EditorSurface from '@/components/shared/editor-surface'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
@@ -407,6 +408,7 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
 
 export interface ConversionReversalDialogProps {
   reversalTarget: ConversionDefinitionEvent | null
+  account: { id: string; name?: string | null }
   reversalKind: 'reverse' | 'restore'
   reversalBusy: boolean
   reversalError: string
@@ -420,6 +422,7 @@ export interface ConversionReversalDialogProps {
 export function ConversionReversalDialog(props: ConversionReversalDialogProps) {
   const {
     reversalTarget,
+    account,
     reversalKind,
     reversalBusy,
     reversalError,
@@ -449,11 +452,12 @@ export function ConversionReversalDialog(props: ConversionReversalDialogProps) {
       onConfirm={() => submitReversal()}
       onCancel={() => setReversalTarget(null)}
     >
-      <Field label="理由"><SaveErrorField names={["reversalReason","reversal_reason"]}><TextField
-          className="mt-1"
+      <OperationTargetSummary accounts={[account]} externalTarget={{ label: '友だち', name: reversalTarget?.friendName }} />
+      <Field label="理由" required><SaveErrorField names={["reversalReason","reversal_reason"]}><TextField
+          className="mt-1 w-full"
           value={reversalReason}
           maxLength={500}
-          placeholder="例：重複して届いた成果だったため"
+          placeholder="例：重複のため"
           onChange={(e) => setReversalReason(e.target.value)}
         /></SaveErrorField></Field>
     </Dialog>

@@ -51,7 +51,7 @@ const area = (id: string, label: string, x: number) => ({
 const GROUP = {
   id: 'rmg-x', accountId: 'acc-1', name: '通常メニュー', chatBarText: 'メニュー', size: 'large',
   isDefaultForAll: true, status: 'draft', targetingPriority: 1, targetingEnabled: false, targetingCondition: null,
-  folderId: null, displayOrder: 1, version: 1, defaultPageId: 'p-top',
+  folderId: null, displayOrder: 1, version: 1, publishingGeneration:0, defaultPageId: 'p-top',
   pages: [
     { id: 'p-top', orderIndex: 0, name: 'トップ', aliasId: 'a-top', lineRichmenuId: null, imageR2Key: null, imageContentType: null,
       areas: [area('a-1', '予約する', 0), area('a-2', '会員証', 833)] },
@@ -203,6 +203,18 @@ describe('リッチメニューを作る：面の動きの欄', () => {
     expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
   })
 
+  it('確認した画像と保存直後の版を公開APIへ渡す',async()=>{
+    groupBody={...GROUP,pages:[{...GROUP.pages[0],imageR2Key:'confirmed-image',imageContentType:'image/png'}]}
+    await open('?id=rmg-x&step=publish')
+    await act(async()=>{fireEvent.click(getPageAction({name:'公開する',exact:true}))})
+    const dialog=await screen.findByRole('dialog',{name:'公開の確認'})
+    await act(async()=>{fireEvent.click(within(dialog).getByRole('button',{name:'公開する',exact:true}))})
+    await settle()
+    const publish=vi.mocked(fetch).mock.calls.find(([url])=>String(url).includes('/api/rich-menu-groups/rmg-x/publish'))
+    expect(publish).toBeTruthy()
+    expect(JSON.parse(String(publish![1]?.body))).toEqual({expectedVersion:2,expectedPublishGeneration:0,expectedImages:[{orderIndex:0,imageR2Key:'confirmed-image',imageContentType:'image/png'}]})
+  })
+
   it('表示先を決めない公開確認では、友だちの画面に出ないと示す', async () => {
     groupBody = { ...GROUP, isDefaultForAll: false, targetingEnabled: false }
     await open('?id=rmg-x&step=publish')
@@ -222,6 +234,18 @@ describe('リッチメニューを作る：面の動きの欄', () => {
     await act(async () => { accountState.id = 'acc-1'; root.render(<RichMenuCreateV8 editGroupId="rmg-x" />) })
     await act(async () => { await handler({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:button, target:button }) })
     expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
+  })
+
+  it('確認窓を再び開いても、閉じた窓からは公開しない',async()=>{
+    await open('?id=rmg-x&step=publish')
+    await act(async()=>{fireEvent.click(getPageAction({name:'公開する',exact:true}))});await settle()
+    const dialog=screen.getByRole('dialog',{name:'公開の確認'}),button=within(dialog).getByRole('button',{name:'公開する'})
+    const key=Object.keys(button).find(item=>item.startsWith('__reactProps$'))!
+    const handler=(button as unknown as Record<string,{onClick:(event:unknown)=>unknown}>)[key].onClick
+    await act(async()=>{fireEvent.click(within(dialog).getByRole('button',{name:'キャンセル'}))})
+    await act(async()=>{fireEvent.click(getPageAction({name:'公開する',exact:true}))});await settle()
+    await act(async()=>{await handler({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button})})
+    expect(calls.filter(path=>/\/publish(?:\?|$)/.test(path))).toEqual([])
   })
 
   it.each([1, 2])('公開前に%d枚目の名前の空いた面を開いて欄の下に理由を出し、入力すると消す', async (pageNumber) => {

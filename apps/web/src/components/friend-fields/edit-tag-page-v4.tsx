@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import { api, describeSaveFailure, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -37,6 +37,10 @@ function sumRefCounts(counts: TagDeleteImpactReferences, keys: Array<keyof TagDe
 export function DeleteDialog({ tag, accountId, dependencies, dependenciesStatus, onCancel, onDelete, deleting, initialConfirmation = '' }: { tag: Tag; accountId?: string | null; dependencies: TagDependencies | null; dependenciesStatus: 'loading' | 'ready' | 'error'; onCancel: () => void; onDelete: () => void; deleting: boolean; initialConfirmation?: string }) {
   const [confirmation, setConfirmation] = useState(initialConfirmation)
   const confirmationId = useId()
+  const active = useRef(true)
+  useEffect(() => { active.current = true; return () => { active.current = false } }, [])
+  const close = () => { if (active.current && !deleting) { active.current = false; onCancel() } }
+  const remove = () => { if (active.current) onDelete() }
   /*
    * 参照件数は `load` で取った実値を出す。取れていないときは `—`。
    * 0件と書くと「消しても大丈夫」と読み違える。**取れていないあいだは
@@ -65,12 +69,12 @@ export function DeleteDialog({ tag, accountId, dependencies, dependenciesStatus,
       title={`「${tag.name}」を削除しますか？`}
       description="削除すると、このタグを使っている設定と友だちへの付与状態に影響します。"
       busy={deleting}
-      onCancel={onCancel}
+      onCancel={close}
       footer={(<DialogActions leadingAction={blockedReason || undefined}>
-          <Button onClick={onCancel} disabled={deleting}>キャンセル</Button>
+          <Button onClick={close} disabled={deleting}>キャンセル</Button>
           <Button
             variant="danger"
-            onClick={onDelete}
+            onClick={remove}
             disabled={deleting || blocked || confirmation !== tag.name} busy={deleting} busyLabel="削除中…">タグを削除する
           </Button>
         </DialogActions>)}

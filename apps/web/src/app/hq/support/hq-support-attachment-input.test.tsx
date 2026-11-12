@@ -14,7 +14,7 @@ const calls = vi.hoisted(() => ({
     data: {
       kinds: [{ key: 'billing', label: '料金・契約について' }],
       accounts: [{ id: 'line-1', name: '表参道店' }],
-      sender: { tenantName: '株式会社サンプル', name: '山田 太郎', email: 'owner@example.com', planLabel: 'スタンダード' },
+      sender: { tenantName: '株式会社サンプル', name: '見本 141', email: 'owner@example.com', planLabel: 'スタンダード' },
     },
   })),
   list: vi.fn(async () => ({ success: true, data: [] })),

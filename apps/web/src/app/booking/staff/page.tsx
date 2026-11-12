@@ -79,6 +79,8 @@ export default function BookingStaffPage() {
   /** m23m: 捕まえた読み込み失敗。403・429の1枚へ渡すためだけに持つ。 */
   const [loadError, setLoadError] = useState<unknown>(null)
   const [removeTarget, setRemoveTarget] = useState<{ staff: BookingStaff; scope: typeof scope.current } | null>(null)
+  const removeTicket = useRef<object | null>(null)
+  const renderedRemoveTicket = removeTicket.current
   const [deleting, setDeleting] = useState(false)
   const [removeError, setRemoveError] = useState('')
   // N-411: 予約スタッフの登録・変更・削除は 'booking.settings' の実効permission。
@@ -143,17 +145,19 @@ export default function BookingStaffPage() {
    */
   async function remove(id: string, targetScope: typeof scope.current) {
     if (!targetScope.accountId || targetScope !== scope.current || loadedScope.current !== targetScope || !permissionRef.current || !alive.current || deleteLock.current) return
+    const ticket = removeTicket.current
     deleteLock.current = true
     setDeleting(true)
     setRemoveError('')
     try {
       await bookingApi.deleteStaff(targetScope.accountId, id)
-      if (targetScope !== scope.current) return
+      if (targetScope !== scope.current || ticket !== removeTicket.current) return
+      removeTicket.current = null
       setRemoveTarget(null)
       await load()
     } catch {
       // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
-      if (targetScope === scope.current) setRemoveError('このスタッフを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      if (targetScope === scope.current && ticket === removeTicket.current) setRemoveError('このスタッフを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       deleteLock.current = false
       if (alive.current) setDeleting(false)
@@ -266,7 +270,7 @@ export default function BookingStaffPage() {
                         edit={{ onClick: () => { if (canManageStaff && !staffLock) setEditing(s) }, disabled: !canManageStaff, lockedReason: staffLock }}
                         destructiveItem={{
                           id: 'delete', label: '削除する', disabled: !canManageStaff, lockedReason: staffLock,
-                          onSelect: () => { if (canManageStaff && !staffLock && renderedScope === scope.current && loadedScope.current === renderedScope) { setRemoveError(''); setRemoveTarget({ staff: s, scope: renderedScope }) } },
+                          onSelect: () => { if (canManageStaff && !staffLock && renderedScope === scope.current && loadedScope.current === renderedScope) { removeTicket.current = {}; setRemoveError(''); setRemoveTarget({ staff: s, scope: renderedScope }) } },
                         }}
                       />
                     </ActionCell>
@@ -290,10 +294,12 @@ export default function BookingStaffPage() {
         error={removeError}
         onCancel={() => {
           if (deleting) return
+          if (renderedRemoveTicket !== removeTicket.current) return
+          removeTicket.current = null
           setRemoveTarget(null)
           setRemoveError('')
         }}
-        onConfirm={() => { if (removeTarget) void remove(removeTarget.staff.id, removeTarget.scope) }}
+        onConfirm={() => { if (removeTarget && renderedRemoveTicket && renderedRemoveTicket === removeTicket.current) void remove(removeTarget.staff.id, removeTarget.scope) }}
       >{removeTarget ? <OperationTargetSummary accounts={[{ id: removeTarget.scope.accountId ?? '' }]} /> : null}</ConfirmDialog>
     </PageFrame>
   )

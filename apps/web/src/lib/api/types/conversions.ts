@@ -136,12 +136,14 @@ export type ConversionDefinitionEvent = {
   friendName: string | null
   status: ConversionDefinitionEventStatus
   approvalStatus: 'pending' | 'approved' | 'rejected' | null
+  approvalRevision?: number | null
   cancelled: boolean
   /**
    * #819: 取消追記台帳でいま取り消しか。アフィリエイト調整の取消とは
    * 別に持ち、「取消を戻す」操作の対象はこの印が立つ行だけ。
    */
   reversed: boolean
+  latestReversalId?: string | null
   value: number | null
   source: string | null
   sourceEventId: string | null

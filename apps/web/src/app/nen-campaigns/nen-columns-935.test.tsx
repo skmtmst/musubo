@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
-import type { NenCampaignSetting, NenColumn } from '../../lib/api'
+import type { NenCampaignSetting, NenColumn, NenColumnDeliveryPreview } from '../../lib/api'
 import NenOverview from '@/v8/nen-campaigns/list'
 import { type ColumnDeliveryPlan, type NenTab } from '@/v8/nen-campaigns/display'
 
@@ -41,6 +41,7 @@ const columnSetting = (): NenCampaignSetting => ({
   dedupWindowDays: 0,
   excludeFormRespondents: false,
   afterActions: [],
+  updatedAt: '2026-08-01T00:00:00Z',
 })
 
 const column = (id: string, over: Partial<NenColumn> = {}): NenColumn => ({
@@ -72,6 +73,7 @@ function renderColumns(input: {
   selectedColumnId?: string | null
   plan?: ColumnDeliveryPlan
   onDeliverColumn?: (column: NenColumn, scheduledAt?: string) => void
+  onPreviewColumn?: (column: NenColumn) => Promise<NenColumnDeliveryPreview>
   onSelectColumn?: (id: string | null) => void
   introDraft?: string
 }) {
@@ -116,6 +118,7 @@ function renderColumns(input: {
         onIntroChange={noop}
         onSaveIntro={noop}
         savingColumnId={null}
+        onPreviewColumn={input.onPreviewColumn ?? (async (col) => ({ recipientCount: 12, confirmationToken: 'a'.repeat(64), column: col, campaign: { updatedAt: '2026-08-01T00:00:00Z', buttonLabel: 'コラムを読む' }, messages: [{ type: 'text', text: '紹介文c1' }, { type: 'flex', altText: '題', contents: { type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [] } } }] }))}
         onDeliverColumn={input.onDeliverColumn ?? noop}
         onDuplicateColumn={noop}
         onTestColumn={noop}
@@ -174,14 +177,75 @@ const bodyButton = (label: string): HTMLButtonElement => {
 }
 
 describe('配信確認の文言と実態の一致（#935 N-303）', () => {
-  it('「今すぐ」は「今すぐ配信しますか」と確認する', () => {
+  it('前の予約結果が遅れても別の確認窓を閉じない', async () => {
+    let finish!: (value: boolean) => void
+    const pending = new Promise<boolean>((resolve) => { finish = resolve })
+    const first=column('c1'),second=column('c2'),onDeliver=vi.fn(() => pending)
+    renderColumns({columns:[first,second],selectedColumnId:'c1',onDeliverColumn:onDeliver})
+    click(primaryButton('配信を予約する'));await act(async () => { await Promise.resolve() })
+    click(bodyButton('送る'))
+    renderColumns({columns:[first,second],selectedColumnId:'c2',introDraft:'紹介文c2',onDeliverColumn:onDeliver})
+    click(primaryButton('配信を予約する'));await act(async () => { await Promise.resolve() })
+    expect(bodyText()).toContain('「題名c2」を今すぐ配信しますか？')
+    await act(async () => { finish(true); await pending })
+    expect(bodyText()).toContain('「題名c2」を今すぐ配信しますか？')
+  })
+  it('確認前に配信設定の版が変わっていたら読み直しを求める', async () => {
+    const preview = async (col: NenColumn) => ({ recipientCount: 3, confirmationToken: 'b'.repeat(64), column: col, campaign: { updatedAt: '2026-08-02T00:00:00Z', buttonLabel: 'コラムを読む' }, messages: [{ type: 'text', text: '紹介文c1' }, { type: 'flex', altText: '題', contents: { type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [] } } }] })
+    renderColumns({columns:[column('c1')],selectedColumnId:'c1',onPreviewColumn:preview})
+    click(primaryButton('配信を予約する'))
+    await act(async () => { await Promise.resolve() })
+    expect(bodyText()).toContain('配信内容が変わりました')
+    expect(bodyText()).not.toContain('今すぐ配信しますか？')
+  })
+  it('確認の読込み中に別のコラムを選べば古い確認は開かない', async () => {
+    let finish!: (value: NenColumnDeliveryPreview) => void
+    const preview = vi.fn(() => new Promise<NenColumnDeliveryPreview>((resolve) => { finish = resolve }))
+    const first=column('c1'),second=column('c2')
+    renderColumns({columns:[first,second],selectedColumnId:'c1',onPreviewColumn:preview})
+    click(primaryButton('配信を予約する'))
+    renderColumns({columns:[first,second],selectedColumnId:'c2',introDraft:'紹介文c2',onPreviewColumn:preview})
+    await act(async () => { finish({recipientCount:3,confirmationToken:'b'.repeat(64),column:first,campaign:{updatedAt:'2026-08-01T00:00:00Z',buttonLabel:'コラムを読む'},messages:[{type:'text',text:'紹介文c1'},{type:'flex',altText:'題',contents:{type:'bubble',body:{type:'box',layout:'vertical',contents:[]}}}]}); await Promise.resolve() })
+    expect(bodyText()).not.toContain('「題名c1」を今すぐ配信しますか？')
+  })
+  it('確認時の人数を表示し、二度押しても1回だけ予約する', async () => {
+    let finish!: () => void
+    const pending = new Promise<void>((resolve) => { finish = resolve })
+    const onDeliver = vi.fn(async () => { await pending })
+    renderColumns({ columns: [column('c1')], selectedColumnId: 'c1', onDeliverColumn: onDeliver,
+      onPreviewColumn: async (col) => ({ recipientCount: 3, confirmationToken: 'b'.repeat(64), column: col, campaign: { updatedAt: '2026-08-01T00:00:00Z', buttonLabel: 'コラムを読む' }, messages: [{ type: 'text', text: '紹介文c1' }, { type: 'flex', altText: '題', contents: { type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [] } } }] }) })
+    click(primaryButton('配信を予約する'))
+    await act(async () => { await Promise.resolve() })
+    expect(bodyText()).toContain('3 人の友だちへ')
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('紹介文c1')
+    const send = bodyButton('送る')
+    act(() => { send.click(); send.click() })
+    expect(onDeliver).toHaveBeenCalledTimes(1)
+    expect(onDeliver).toHaveBeenCalledWith(expect.objectContaining({id:'c1'}), undefined, {recipientCount:3,confirmationToken:'b'.repeat(64)})
+    await act(async () => { finish(); await pending })
+  })
+  it('未保存の紹介文や更新された内容では確認へ進まない', async () => {
+    const preview = vi.fn(async (col: NenColumn) => ({ recipientCount: 3, confirmationToken: 'b'.repeat(64), column: { ...col, title: '変更後' }, campaign: { updatedAt: '2026-08-01T00:00:00Z', buttonLabel: 'コラムを読む' }, messages: [{ type: 'text', text: '紹介文c1' }, { type: 'flex', altText: '題', contents: { type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [] } } }] }))
+    renderColumns({columns:[column('c1')],selectedColumnId:'c1',introDraft:'未保存',onPreviewColumn:preview})
+    click(primaryButton('配信を予約する'))
+    expect(bodyText()).toContain('紹介文を保存してから確認してください')
+    expect(preview).not.toHaveBeenCalled()
+    await act(async () => { await Promise.resolve() })
+    renderColumns({columns:[column('c1')],selectedColumnId:'c1',onPreviewColumn:preview})
+    click(primaryButton('配信を予約する'))
+    await act(async () => { await Promise.resolve() })
+    expect(bodyText()).toContain('配信内容が変わりました')
+    expect(bodyText()).not.toContain('今すぐ配信しますか？')
+  })
+  it('「今すぐ」は「今すぐ配信しますか」と確認する', async () => {
     renderColumns({ columns: [column('c1')], selectedColumnId: 'c1', plan: { when: 'now', scheduledAt: '' } })
     click(primaryButton('配信を予約する'))
+    await act(async () => { await Promise.resolve() })
     expect(bodyText()).toContain('「題名c1」を今すぐ配信しますか？')
     expect(bodyText()).not.toContain('配信予約しますか？')
   })
 
-  it('「日時を予約」は「配信予約しますか」と確認し、確定で日本時間の予約日時を渡す', () => {
+  it('「日時を予約」は「配信予約しますか」と確認し、確定で日本時間の予約日時を渡す', async () => {
     const onDeliver = vi.fn()
     renderColumns({
       columns: [column('c1')],
@@ -190,9 +254,10 @@ describe('配信確認の文言と実態の一致（#935 N-303）', () => {
       onDeliverColumn: onDeliver,
     })
     click(primaryButton('配信を予約する'))
+    await act(async () => { await Promise.resolve() })
     expect(bodyText()).toContain('「題名c1」を配信予約しますか？')
     click(bodyButton('予約する'))
-    expect(onDeliver).toHaveBeenCalledWith(expect.objectContaining({ id: 'c1' }), '2099-05-01T10:30:00+09:00')
+    expect(onDeliver).toHaveBeenCalledWith(expect.objectContaining({ id: 'c1' }), '2099-05-01T10:30:00+09:00', { recipientCount: 12, confirmationToken: 'a'.repeat(64) })
   })
 })
 

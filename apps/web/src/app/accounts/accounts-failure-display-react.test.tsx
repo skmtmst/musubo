@@ -49,6 +49,7 @@ const ACCOUNTS = [
     createdAt: '', updatedAt: '', country: null, role: null, displayOrder: 0,
     ogSiteName: null, ogDefaultDescription: null, ogDefaultImageUrl: null,
     parentLineAccountId: null,
+    stats: { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0 },
     webhook: { expectedUrl: 'https://example.test/hook', actualUrl: null, active: null, status: 'unknown' },
   },
 ]

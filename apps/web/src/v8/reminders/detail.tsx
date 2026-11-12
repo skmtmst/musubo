@@ -195,6 +195,7 @@ function ReminderDetailV8() {
   const [reminder, setReminder] = useState<(Reminder & { steps?: ReminderStep[] }) | null>(null)
   const [planned, setPlanned] = useState<ReminderDeliveryRun[]>([])
   const [plannedTotal, setPlannedTotal] = useState(0)
+  const [plannedLoaded, setPlannedLoaded] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
@@ -269,12 +270,14 @@ function ReminderDetailV8() {
   useEffect(() => {
     setPlanned([])
     setPlannedTotal(0)
+    setPlannedLoaded(false)
     if (!reminderId) return
     let cancelled = false
     void api.reminders.runs(reminderId, { status: 'planned', limit: PLANNED_LIMIT }).then((res) => {
       if (cancelled || !res.success || res.data.reminder.id !== reminderId) return
       setPlanned(res.data.items)
       setPlannedTotal(res.data.pagination.total)
+      setPlannedLoaded(true)
     }).catch(() => undefined)
     return () => { cancelled = true }
   }, [reminderId, selectedAccountId])
@@ -599,11 +602,11 @@ function ReminderDetailV8() {
       </DetailColumns></PageContent>
 
       <SheetDialog
-        open={confirmPause}
+        open={confirmPause && openedPause?.generation === pauseContext.current.generation}
         designNode="RwVo5" designWidth={480}
         title={`「${data.reminder.name}」を一時停止する`}
         description="止めているあいだ、通知は送りません。止めているあいだに送る予定だった通知は、再開しても送りません（過去の日時になるため）。登録者と送った履歴は残ります。"
-        band={pauseImpact.truncated
+        band={!plannedLoaded ? '送る予定の通知の件数は確認できません。' : pauseImpact.truncated
           ? `送る予定の ${formatNumber(plannedTotal)} 通が送られなくなります（今後24時間の分は数え切れませんでした）。`
           : `今後24時間で送る予定の ${formatNumber(pauseImpact.count)} 通 が送られなくなります。`}
         busy={pausing}

@@ -3,7 +3,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), storeGroups: vi.fn(), updateMembership: vi.fn(), updateTable: vi.fn(), updateMenu: vi.fn(), loginMembers: vi.fn(), listIntakeAddresses: vi.fn() }))
+const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), storeGroups: vi.fn(), updateMembership: vi.fn(), updateTable: vi.fn(), stopTable: vi.fn(), updateMenu: vi.fn(), loginMembers: vi.fn(), listIntakeAddresses: vi.fn() }))
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/components/layout/header', () => ({ default: () => null }))
@@ -26,8 +26,8 @@ const store = { id: 'store-1', organization_id: 'org-1', name: '銀座店', code
 const data = {
   organization: { id: 'org-1', account_id: 'account-1', tenant_id: null, tenant_name: null, name: 'テスト組織', status: 'active' },
   stores: [store], memberships: [{ id: 'member-1', store_id: 'store-1', staff_name: '佐藤', email: null, role: 'staff', line_uid: null, google_email: null, status: 'active' }],
-  tables: [{ id: 'table-1', store_id: 'store-1', code: 'A1', label: '窓際', seat_type: 'table', min_capacity: 1, max_capacity: 4, floor_x: 0, floor_y: 0, join_group: null, is_active: 1 }],
-  menuItems: [{ id: 'menu-1', store_id: 'store-1', kind: 'course', name: 'ランチ', price: 1500, tax_mode: 'tax_included', allergens_json: '[]', service_periods_json: '["lunch"]', duration_minutes: null, status: 'active' }],
+  tables: [{ id: 'table-1', confirmation_revision: 1, store_id: 'store-1', code: 'A1', label: '窓際', seat_type: 'table', min_capacity: 1, max_capacity: 4, floor_x: 0, floor_y: 0, join_group: null, is_active: 1 }],
+  menuItems: [{ id: 'menu-1', confirmation_revision: 1, store_id: 'store-1', kind: 'course', name: 'ランチ', price: 1500, tax_mode: 'tax_included', allergens_json: '[]', service_periods_json: '["lunch"]', duration_minutes: null, status: 'active' }],
   reservations: [], reservationTotal: 0, inventory: [], approvals: [], connectors: [], reviews: [], posts: [], lineFlows: [],
 }
 
@@ -35,7 +35,7 @@ beforeEach(() => {
   fixture.storeGroups.mockResolvedValue({data:[]});fixture.snapshot.mockResolvedValue({ data })
   fixture.loginMembers.mockResolvedValue({data:[]})
   fixture.listIntakeAddresses.mockResolvedValue({data:[]})
-  for (const key of ['updateMembership', 'updateTable', 'updateMenu'] as const) fixture[key].mockResolvedValue({ success: true })
+  for (const key of ['updateMembership', 'updateTable', 'stopTable', 'updateMenu'] as const) fixture[key].mockResolvedValue({ success: true })
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
@@ -53,7 +53,8 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
     fireEvent.click(within(panel).getByRole('button', { name: /のその他操作$/ }))
     fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     fireEvent.click(screen.getByRole('button', { name: '止める' }))
-    await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 'table-1', { isActive: false }))
+    await waitFor(() => expect(fixture.stopTable).toHaveBeenCalledWith('account-1', 'table-1', expect.objectContaining({ storeId: 'store-1', expectedTableRevision: 1, reservations: [] })))
+    expect(fixture.updateTable).not.toHaveBeenCalledWith('account-1', 'table-1', { isActive: false })
   })
 
   it('メニューを編集し、保管の確認を経て変更APIへ渡す', async () => {
@@ -67,7 +68,7 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
     fireEvent.click(screen.getByRole('button',{name:'メニュー「ランチ」の操作'}))
     fireEvent.click(screen.getByRole('menuitem',{name:'停止'}))
     fireEvent.click(screen.getByRole('button', { name: '停止する' }))
-    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'menu-1', { status: 'archived' }))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'menu-1', { status: 'archived', expectedVersion: 1 }))
   })
 
   it.each([

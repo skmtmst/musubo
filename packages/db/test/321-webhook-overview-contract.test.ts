@@ -88,6 +88,7 @@ describe('migration 321 外部連携の接続別集計と受信口詳細', () =>
         ('outgoing-b', '別店舗', 'https://example.com/b', '["*"]', 1, 'account-b', '2026-09-01', '2026-09-01');
     `);
     sqlite.exec(migration);
+    sqlite.exec("ALTER TABLE incoming_webhooks ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1");
     sqlite.exec(`
       INSERT INTO webhook_interaction_logs
         (id, line_account_id, direction, webhook_id, webhook_name, event_type,
