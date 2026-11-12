@@ -98,6 +98,34 @@ describe('返信テンプレート', () => {
     expect((await app(master).request('/api/ops/support/template-folders', json({ name: '契約・解約' }))).status).toBe(409);
     expect((await app(master).request('/api/ops/support/templates', json({ folderId: 'missing', title: '案内', body: '本文' }))).status).toBe(400);
   });
+
+  it('既存テンプレートを編集・削除し、古い版での上書きと削除を拒否する', async () => {
+    const created = await app(master).request('/api/ops/support/templates', json({ folderId: 'contracts', title: '解約の案内', body: '元の本文' }));
+    const template = (await created.json() as { data: { id: string; updatedAt: string } }).data;
+    const url = `/api/ops/support/templates/${template.id}`;
+    const input = { folderId: 'billing', title: '請求の案内', body: '新しい本文', expectedUpdatedAt: template.updatedAt };
+
+    expect((await app(readOnlyMaster).request(url, json(input, 'PATCH'))).status).toBe(403);
+    expect((await app(master).request(url, json({ ...input, folderId: 'missing' }, 'PATCH'))).status).toBe(400);
+    const changed = await app(master).request(url, json(input, 'PATCH'));
+    expect(changed.status).toBe(200);
+    const saved = (await changed.json() as { data: { id: string; folderId: string; title: string; body: string; createdAt: string; updatedAt: string } }).data;
+    expect(saved).toMatchObject({ id: template.id, folderId: 'billing', title: '請求の案内', body: '新しい本文' });
+    expect(saved.createdAt).toBeTruthy();
+    const catalog = await (await app(master).request('/api/ops/support/templates')).json() as { data: { templates: Array<{ id: string; title: string }> } };
+    expect(catalog.data.templates).toContainEqual(expect.objectContaining({ id: template.id, title: '請求の案内' }));
+
+    expect((await app(master).request(url, json(input, 'PATCH'))).status).toBe(409);
+    expect((await app(master).request(url, json({ expectedUpdatedAt: template.updatedAt }, 'DELETE'))).status).toBe(409);
+    expect((await app(readOnlyMaster).request(url, json({ expectedUpdatedAt: saved.updatedAt }, 'DELETE'))).status).toBe(403);
+    expect((await app(master).request(url, json({ expectedUpdatedAt: saved.updatedAt }, 'DELETE'))).status).toBe(200);
+    expect((await app(master).request(url, json({ expectedUpdatedAt: saved.updatedAt }, 'DELETE'))).status).toBe(404);
+    const remaining = await (await app(master).request('/api/ops/support/templates')).json() as { data: { templates: Array<{ id: string }> } };
+    expect(remaining.data.templates.some((item) => item.id === template.id)).toBe(false);
+    const archived = testDb.raw.prepare('SELECT value FROM platform_settings WHERE key = ?')
+      .get(`ops.support.reply.template:${template.id}`) as { value: string };
+    expect(JSON.parse(archived.value)).toMatchObject({ id: template.id, title: '請求の案内', archivedAt: expect.any(String) });
+  });
 });
 
 describe('チケット番号と一覧', () => {
