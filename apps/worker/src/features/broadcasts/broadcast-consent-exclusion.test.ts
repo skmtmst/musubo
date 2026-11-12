@@ -173,6 +173,32 @@ describe('637: 停止者を外して一斉配信を続ける', () => {
     await stopHqBroadcast(f.db,await getHqBroadcastRun(f.db,tenant,run.id),'owner',false,2);release();await old;
     expect(f.raw.prepare('SELECT batch_offset,success_count FROM broadcasts WHERE id=?').get(child)).toEqual({batch_offset:3,success_count:3});
   });
+  it('停止の確定直後に再送しても新しい試行を締めない',async()=>{
+    const run=await prepareHqBroadcast(f.db,tenant,'owner',{requestId:'hq-stop-atomic-race',title:'配信',messageType:'text',messageContent:'お知らせ',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
+    const sent=await dispatchHqBroadcast(f.db,run,'owner',1),child=sent.targets[0].broadcastId!;
+    f.raw.prepare("UPDATE broadcasts SET status='sending' WHERE id=?").run(child);
+    f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state) VALUES(?,'allowed','shop',1,'claimed')").run(child);
+    const batch=f.db.batch.bind(f.db);let injected=false;
+    vi.spyOn(f.db,'batch').mockImplementation(async statements=>{
+      const result=await batch(statements);
+      if(!injected && statements.length>1){injected=true; f.raw.prepare("UPDATE broadcasts SET send_attempt_no=2,stopped_at=NULL WHERE id=?").run(child);f.raw.prepare("UPDATE broadcast_send_claims SET state='claimed',attempt_no=2 WHERE broadcast_id=?").run(child);}
+      return result;
+    });
+    await stopHqBroadcast(f.db,await getHqBroadcastRun(f.db,tenant,run.id),'owner',false,2);
+    expect(injected).toBe(true);
+    expect(f.raw.prepare('SELECT state,attempt_no FROM broadcast_send_claims WHERE broadcast_id=?').get(child)).toEqual({state:'claimed',attempt_no:2});
+  });
+  it('台帳を締める途中に失敗したら停止も台帳も取り消す',async()=>{
+    const run=await prepareHqBroadcast(f.db,tenant,'owner',{requestId:'hq-stop-atomic-fail',title:'配信',messageType:'text',messageContent:'お知らせ',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
+    const sent=await dispatchHqBroadcast(f.db,run,'owner',1),child=sent.targets[0].broadcastId!;
+    f.raw.prepare("UPDATE broadcasts SET status='sending' WHERE id=?").run(child);
+    f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state,dispatched_at) VALUES(?,'allowed','shop',1,'claimed',datetime('now'))").run(child);
+    f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state) VALUES(?,'stopped','shop',1,'claimed')").run(child);
+    f.raw.exec("CREATE TRIGGER fail_stop BEFORE UPDATE ON broadcast_send_claims WHEN NEW.error_code='stopped_before_dispatch' BEGIN SELECT RAISE(ABORT,'stop failed'); END");
+    await expect(stopHqBroadcast(f.db,await getHqBroadcastRun(f.db,tenant,run.id),'owner',false,2)).rejects.toThrow();
+    expect(f.raw.prepare('SELECT stopped_at FROM broadcasts WHERE id=?').get(child)).toEqual({stopped_at:null});
+    expect(f.raw.prepare("SELECT COUNT(*) n FROM broadcast_send_claims WHERE broadcast_id=? AND state='claimed'").get(child)).toEqual({n:2});
+  });
   it('送信前に停止した配信は確認時の宛先だけを再開後に送る',async()=>{
     const run=await prepareHqBroadcast(f.db,tenant,'owner',{requestId:'hq-frozen',title:'配信',messageType:'text',messageContent:'お知らせ',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
     await dispatchHqBroadcast(f.db,run,'owner',1);
