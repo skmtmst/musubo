@@ -177,6 +177,7 @@ function MobileTalkThread() {
 
   const draft = useInboxDraft({ selectedAccountId, selectedChatId })
   const { chatDetail, setChatDetail, messagesHasMore, loadingOlderMessages, loadChatDetail, loadOlderMessages, refreshChatDetailQuietly } = useInboxConversation({
+    sendLockRef,
     CHAT_MESSAGE_PAGE_SIZE: MESSAGE_BATCH,
     selectedChatIdRef, detailAccountRef, detailRequestIdRef, setError, deepLinkIdRef, setDeepLinkNotice,
     selectedChatId, selectedAccountId, setChats, chats,
