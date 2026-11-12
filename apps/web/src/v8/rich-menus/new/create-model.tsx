@@ -34,6 +34,7 @@ export function groupFromSeed(seed: HqRichMenuSeed): Group {
     folderId: seed.folderId,
     defaultOpen: seed.defaultOpen ?? true,
     version: 0,
+    publishingGeneration: 0,
     pages: seed.pages.map((page, index) => ({
       id: page.id, orderIndex: index, name: page.name, aliasId: '', lineRichmenuId: null,
       imageR2Key: page.imageR2Key, imageContentType: null, areas: page.areas,

@@ -169,9 +169,18 @@ export async function runSixHourlyHeavyJobs(
         const result = await processTenantDataPurge(env, {
           now: new Date(event.scheduledTime).toISOString(),
         });
+        if (result.failedTenants) throw new Error('tenant_data_purge_retry_required');
         if (result.anchoredTrials + result.tenants + result.deletedRows > 0) {
           logger.log("tenant_data_retention_purge");
         }
+      },
+    },
+    {
+      name: 'registration application retention',
+      run: async () => {
+        const { purgeExpiredRegistrationApplications } = await import('../services/registration-application-retention.js');
+        const deleted = await purgeExpiredRegistrationApplications(env.DB, new Date(event.scheduledTime));
+        if (deleted) logger.log('registration_application_retention');
       },
     },
     {

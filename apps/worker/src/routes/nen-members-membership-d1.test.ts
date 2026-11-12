@@ -31,8 +31,8 @@ beforeEach(async () => {
     INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
     VALUES ('account-nen', 'channel-nen', '然', 'token', 'secret');
     INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following, created_at, updated_at) VALUES
-      ('friend-a', 'U-a', '山田 太郎', 'account-nen', 1, '2026-09-01', '2026-09-01'),
-      ('friend-b', 'U-b', '鈴木 一郎', 'account-nen', 1, '2026-09-01', '2026-09-01'),
+      ('friend-a', 'U-a', '見本 141', 'account-nen', 1, '2026-09-01', '2026-09-01'),
+      ('friend-b', 'U-b', '見本 176', 'account-nen', 1, '2026-09-01', '2026-09-01'),
       ('friend-c', 'U-c', '新しい人', 'account-nen', 1, '2026-09-01', '2026-09-01');
     INSERT INTO nen_ec_member_snapshots (friend_id, customer_id, purchase_count, purchase_amount, point_balance, member_rank, synced_at,
       annual_miles_yen, lifetime_miles_yen, member_rank_key, mile_rate_percent, mile_balance, rank_valid_until) VALUES

@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import type { VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import { FieldError } from '@/components/shared/form-controls'
@@ -196,8 +197,8 @@ export function RankDialog({ open, settings, onClose, onSave }: {
 }
 
 /** 理由を書いて実行する窓（却下・取り消し）。理由は台帳に残るので必須。 */
-export function ReasonDialog({ open, title, description, confirmLabel, busy, error, onClose, onConfirm }: {
-  open: boolean; title: string; description: string; confirmLabel: string; busy: boolean; error?: string; onClose: () => void; onConfirm: (reason: string) => void
+export function ReasonDialog({ open, title, description, confirmLabel, busy, error, target, onClose, onConfirm }: {
+  open: boolean; title: string; description: string; confirmLabel: string; busy: boolean; error?: string; target?: { accountId: string | null; accountName?: string | null; friendName?: string | null }; onClose: () => void; onConfirm: (reason: string) => void
 }) {
   const [reason, setReason] = useState('')
   const fields = useFormErrors()
@@ -207,6 +208,7 @@ export function ReasonDialog({ open, title, description, confirmLabel, busy, err
   return (
     <Dialog open={open} title={title} description={description} confirmLabel={confirmLabel} tone="destructive" busy={busy} error={error} onCancel={onClose}
       onConfirm={() => { if (fields.submit().length === 0) onConfirm(reason.trim()) }}>
+      {target ? <OperationTargetSummary accounts={[{ id: target.accountId ?? '', name: target.accountId ? target.accountName : '不明' }]} externalTarget={{ label: '友だち', name: target.friendName }} /> : null}
       <CheckedField id="vs-reason" label="理由" fields={fields} name="reason"><SaveErrorField names={["reason"]}><TextField {...checkedProps(fields, 'reason', 'vs-reason')} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="例：写真の数と合わない" /></SaveErrorField></CheckedField>
     </Dialog>
   )

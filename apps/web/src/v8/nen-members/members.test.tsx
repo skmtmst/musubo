@@ -171,6 +171,7 @@ describe('V8 会員（src/v8/nen-members）', () => {
     notifySaved.mockReset()
     push.mockReset()
     fetchApi.mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/nen/rank-settings/r-sv/delete-preview')) return {success:true,data:{count:2,version:3,members:[{friendId:'a',customerId:'1'},{friendId:'b',customerId:null}]}}
       if (path.startsWith('/api/nen/rank-settings?')) return { success: true, data: SETTINGS }
       if (path.startsWith('/api/nen/members?')) return { success: true, data: { items: [], total: 0, page: 1, pageSize: 10, kpis: SETTINGS.kpis, ranks: [] } }
       return { success: true, data: {} }
@@ -211,8 +212,30 @@ describe('V8 会員（src/v8/nen-members）', () => {
     await click(byText('削除する'))
     const call = fetchApi.mock.calls.find(([path, options]) => String(path).startsWith('/api/nen/rank-settings/r-sv') && options?.method === 'DELETE')
     expect(call).toBeTruthy()
-    expect(JSON.parse(call![1].body)).toEqual({ accountId: 'acc-1', replacementRankId: 'r-bz', expectedVersion: 3 })
+    expect(JSON.parse(call![1].body)).toEqual({ accountId: 'acc-1', replacementRankId: 'r-bz', expectedVersion: 3,confirmedMembers:[{friendId:'a',customerId:'1'},{friendId:'b',customerId:null}] })
     expect(onRetry).toHaveBeenCalled()
+  })
+
+  it('ランク削除の窓を閉じた後は古い確定を受け付けない', async () => {
+    await render('ranks')
+    await click(byLabel('ランク「シルバー」のその他操作'))
+    await click(byText('ランクを削除する'))
+    const button = byText('削除する')!
+    const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+    const oldClick = (button as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+    await click([...document.querySelector('[role="alertdialog"]')!.querySelectorAll('button')].find(el => el.textContent?.trim() === 'キャンセル'))
+    await act(async () => { oldClick({ preventDefault() {}, stopPropagation() {} }) })
+    expect(fetchApi.mock.calls.some(([path, options]) => String(path).startsWith('/api/nen/rank-settings/r-sv') && options?.method === 'DELETE')).toBe(false)
+  })
+
+  it('確認中にランク設定の版が変わると窓を閉じる', async () => {
+    await render('ranks')
+    await click(byLabel('ランク「シルバー」のその他操作'))
+    await click(byText('ランクを削除する'))
+    await act(async () => { root.render(<MembersV8 accountId="acc-1" tab="ranks" status="ready" settings={{ ...SETTINGS, rules: { ...SETTINGS.rules!, version: 4 } }} onRetry={() => {}} onSaved={() => {}} onChangeTab={() => {}} />) })
+    await settle()
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(fetchApi.mock.calls.some(([path, options]) => String(path).startsWith('/api/nen/rank-settings/r-sv') && options?.method === 'DELETE')).toBe(false)
   })
 
   it('消すときに版が違う（409）と、タブの下に競合の帯が出る', async () => {
@@ -228,6 +251,17 @@ describe('V8 会員（src/v8/nen-members）', () => {
     expect(host.textContent).toContain('ほかの人が 14:02 にランク設定を保存しました')
     expect(byText('違いを比べる')).toBeTruthy()
     expect(byText('最新を読み込んで続ける')).toBeTruthy()
+  })
+
+  it('ランクの一覧人数と異なる場合も実際に移す全員の人数を確認する', async () => {
+    fetchApi.mockImplementation(async (path:string)=>{
+      if(path.includes('/r-sv/delete-preview'))return {success:true,data:{count:3,version:3,members:[{friendId:'a',customerId:'1'},{friendId:'b',customerId:null},{friendId:'c',customerId:'3'}]}}
+      return {success:true,data:SETTINGS}
+    })
+    await render('ranks')
+    await click(byLabel('ランク「シルバー」のその他操作'))
+    await click(byText('ランクを削除する'))
+    expect(document.body.textContent).toContain('このランクには会員が 3 人います。')
   })
 
   it('いちばん下のランクの削除は押せず、理由を出す', async () => {

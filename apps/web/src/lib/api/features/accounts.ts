@@ -245,8 +245,10 @@ export const accountsMethods = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    delete: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/traffic-pools/${id}`, { method: 'DELETE' }),
+    delete: (id: string, confirmation?: { revision: number; accountIds: string[] }) => {
+      const query = confirmation ? `?${new URLSearchParams({ expectedConfirmationRevision: String(confirmation.revision), expectedAccountIds: JSON.stringify(confirmation.accountIds) })}` : ''
+      return fetchApi<ApiResponse<null>>(`/api/traffic-pools/${id}${query}`, { method: 'DELETE' })
+    },
     accounts: {
       list: (poolId: string) =>
         fetchApi<ApiResponse<PoolAccount[]>>(`/api/traffic-pools/${poolId}/accounts`),

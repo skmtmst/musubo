@@ -45,19 +45,19 @@ beforeEach(() => {
   sqlite.exec(readFileSync(join(packageRoot, 'bootstrap.sql'), 'utf8'));
   db = asD1(sqlite);
   sqlite.prepare(
-    `INSERT INTO staff_members (id, name, role, api_key, is_active) VALUES ('staff-1', '山田 太郎', 'admin', 'key-1', 1)`,
+    `INSERT INTO staff_members (id, name, role, api_key, is_active) VALUES ('staff-1', '見本 141', 'admin', 'key-1', 1)`,
   ).run();
 });
 
 describe('getStaffNameMap（R35）', () => {
   it('内部IDから表示名を引く', async () => {
     const names = await getStaffNameMap(db, ['staff-1']);
-    expect(names.get('staff-1')).toBe('山田 太郎');
+    expect(names.get('staff-1')).toBe('見本 141');
   });
 
   it('退職・削除済みで引けないIDは載せない', async () => {
     const names = await getStaffNameMap(db, ['staff-1', 'gone-uuid']);
-    expect(names.get('staff-1')).toBe('山田 太郎');
+    expect(names.get('staff-1')).toBe('見本 141');
     expect(names.has('gone-uuid')).toBe(false);
   });
 

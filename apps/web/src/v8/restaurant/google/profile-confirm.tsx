@@ -192,8 +192,8 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
       {conflict !== null ? <Notice tone="warn" role="alert" action={<Button variant="text" onClick={() => go({ tab: 'profile' })}>最新の内容を確認する</Button>}>
         別の担当者が{isHours ? '営業時間' : 'この項目'}を変更しました。古い値で上書きしないため送信を止めました。Google側の現在の値：{isHours ? describeHours(conflict, change.kind) : describeProfileValue(field ?? '', conflict)}
       </Notice> : null}
-      {change.status === 'pending_confirm' && !sent ? <Notice tone="warn">前回の送信結果を確認できていません。「Googleに変更を送信する」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}
-      {change.status === 'failed' && !sent ? <Notice tone="danger">前回の送信は失敗しました{change.error ? `（${change.error}）` : ''}。内容を確認して、もう一度送信できます。</Notice> : null}
+      {change.status === 'pending_confirm' && !sent ? <Notice tone="warn">前回の送信結果を確認できていません。{canPublish && writeEnabled ? '「Googleに変更を送信する」を押すと、先にGoogle側の状態を照合してから送信します。' : 'Google側の状態を確認してください。'}</Notice> : null}
+      {change.status === 'failed' && !sent ? <Notice tone="danger">前回の送信は失敗しました{change.error ? `（${change.error}）` : ''}。{canPublish && writeEnabled ? '内容を確認して、もう一度送信できます。' : 'Google側の状態を確認してください。'}</Notice> : null}
       {change.status === 'cancelled' ? <Notice tone="warn">この変更は取り消されています。</Notice> : null}
       {!writeEnabled ? <Notice tone="warn">この環境ではGoogleへの送信が許可されていません。変更案の作成と確認まではできます。</Notice> : null}
       {writeEnabled && !canSend ? <Notice tone="warn">Googleへの送信は店舗管理者以上が行います。この変更案は保存されているので、管理者が「変更履歴」から確認して送信できます。</Notice> : null}

@@ -47,8 +47,8 @@ import { at, reservation, snapshotOf, store } from '../booking-kit/test-data'
 
 /* 今日：佐藤（LINE・T1）・山田（食べログ・承認待ち・T3・乳）・押さえ（T4）。 */
 const reservationsToday = () => [
-  reservation('r1', { customer_name: '佐藤 健', source: 'line', starts_at: at(0, 18), ends_at: at(0, 20), table_id: 't1' }),
-  reservation('r2', { customer_name: '山田 太郎', source: 'tabelog', status: 'pending', allergy_note: '乳', guest_count: 4, starts_at: at(0, 18, 30), ends_at: at(0, 20, 30), table_id: 't3', course_name: 'おまかせコース' }),
+  reservation('r1', { customer_name: '見本 114', source: 'line', starts_at: at(0, 18), ends_at: at(0, 20), table_id: 't1' }),
+  reservation('r2', { customer_name: '見本 141', source: 'tabelog', status: 'pending', allergy_note: '乳', guest_count: 4, starts_at: at(0, 18, 30), ends_at: at(0, 20, 30), table_id: 't3', course_name: 'おまかせコース' }),
   reservation('r3', { customer_name: '押さえ', source: 'phone', status: 'pending', hold_expires_at: at(0, 23), note: '電話のお客さま用', guest_count: 4, starts_at: at(0, 20), ends_at: at(0, 21, 30), table_id: 't4' }),
 ]
 
@@ -77,9 +77,9 @@ afterEach(() => { cleanup(); verifiedStaffRole(null); forgetSessionSnapshot(); v
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (reason: unknown) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
 async function openEdit() {
   const view = render(<TestPage />)
-  await screen.findByText('山田 太郎')
+  await screen.findByText('見本 141')
   fireEvent.click(screen.getByRole('button', { name: '一覧', exact: true }))
-  await changeTarget('佐藤 健')
+  await changeTarget('見本 114')
   fireEvent.change(screen.getByLabelText('人数'), { target: { value: '9' } })
   return view
 }
@@ -137,7 +137,7 @@ it.each(['成功', '入力失敗', '通信失敗'] as const)('古い%s応答は�
   view.rerender(<TestPage />)
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   // 外からのアカウント切替に伴う再取得を待ち、別の予約を開く。
-  await screen.findByRole('button', { name: '山田 太郎', exact: true })
+  await screen.findByRole('button', { name: '見本 141', exact: true })
   await act(async () => { list.edit!('r2') })
   const reopened = screen.getByRole('dialog')
   const reads = fixture.snapshot.mock.calls.length

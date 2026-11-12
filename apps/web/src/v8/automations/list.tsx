@@ -335,10 +335,11 @@ export default function AutomationListV8() {
     setWorking(true)
     setActionError('')
     try {
+      if (pending.kind !== 'restore' && !Number.isSafeInteger(pending.item.confirmationRevision)) throw new Error('確認した版がありません')
       const status = pending.kind === 'archive' ? 'archived' : pending.item.isActive ? 'stopped' : 'active'
       const res = pending.kind === 'restore'
         ? await api.automations.restore(pending.item.id, selectedAccountId)
-        : await api.automations.setStatus(pending.item.id, status)
+        : await api.automations.setStatus(pending.item.id, status, pending.item.confirmationRevision)
       if (!res.success) throw new Error(res.error)
       if (selectedAccountIdRef.current !== accountAtStart) return
       notifyToast(pending.kind === 'restore' ? 'ルールを保管から戻しました' : pending.kind === 'archive' ? 'ルールを保管しました' : 'ルールの状態を変えました')

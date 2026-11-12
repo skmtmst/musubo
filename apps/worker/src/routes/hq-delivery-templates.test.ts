@@ -35,6 +35,13 @@ test.each(['auto_reply','friend_add_rule','reminder'] as const)('%s: 保存・�
  expect(fixture.raw.prepare(`SELECT COUNT(*) n FROM ${table} WHERE line_account_id='a1'`).get()).toEqual({n:2});
  const row=fixture.raw.prepare(`SELECT * FROM ${table} WHERE name='案内'`).get() as any;expect(row.status??row.lifecycle_status).toBe('draft');
 });
+test('統括から自動応答の下書きを上書きすると確認版を進める', async () => {
+ const id=await create('auto_reply');
+ expect((await distribute(id,await preflight(id))).body.data.status).toBe('completed');
+ const before=fixture.raw.prepare('SELECT id, confirmation_revision FROM auto_replies').get() as {id:string;confirmation_revision:number};
+ expect((await distribute(id,await preflight(id),'overwrite')).body.data.stores[0].counts.overwritten).toBe(1);
+ expect(fixture.raw.prepare('SELECT confirmation_revision FROM auto_replies WHERE id=?').get(before.id)).toEqual({confirmation_revision:before.confirmation_revision+1});
+});
 test.each(['auto_reply','friend_add_rule','reminder'] as const)('%s: 稼働・登録・途中編集は上書きできず別統括へは配らない',async type=>{
  const id=await create(type);const p=await preflight(id);await distribute(id,p);
  const table={auto_reply:'auto_replies',friend_add_rule:'friend_add_rules',reminder:'reminders'}[type];

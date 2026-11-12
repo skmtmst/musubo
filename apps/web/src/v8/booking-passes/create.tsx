@@ -104,6 +104,16 @@ function PassCreateInner() {
     currentAttempt.current = { scope, key: crypto.randomUUID(), plan: null, signature: '' }
   }
   const attempt = currentAttempt.current
+  const formKey = JSON.stringify(form)
+  const formScope = useRef({ key: formKey })
+  if (formScope.current.key !== formKey) formScope.current = { key: formKey }
+  const authorityScope = useRef({ allowed: canEdit })
+  if (authorityScope.current.allowed !== canEdit) authorityScope.current = { allowed: canEdit }
+  const confirmTicket = useRef<{ attempt: typeof attempt; form: typeof formScope.current; authority: typeof authorityScope.current } | null>(null)
+  const renderedTicket = confirmTicket.current
+  const canEditRef = useRef(canEdit)
+  canEditRef.current = canEdit
+  const confirmChanged = confirmCreate && (!renderedTicket || renderedTicket.attempt !== attempt || renderedTicket.form !== formScope.current || renderedTicket.authority !== authorityScope.current)
   useEffect(() => {
     setConfirmCreate(false); setConfirmScope(''); setBusy(null); setNotice(''); setErrors({})
     setOriginal(null); setForm(EMPTY); setDirty(false)
@@ -220,7 +230,7 @@ function PassCreateInner() {
     <>
       <Button onClick={() => router.push(PASS_LIST_HREF)} disabled={busy !== null}>キャンセル</Button>
       <Button variant="secondary" onClick={() => void submit(false)} busy={busy === 'draft'} disabled={busy !== null}>下書き保存</Button>
-      <Button variant="primary" onClick={() => { if (body()) { setConfirmScope(scope); setConfirmCreate(true) } }} busy={busy === 'create'} disabled={busy !== null}>作る</Button>
+      <Button variant="primary" onClick={() => { if (body()) { confirmTicket.current = { attempt, form: formScope.current, authority: authorityScope.current }; setConfirmScope(scope); setConfirmCreate(true) } }} busy={busy === 'create'} disabled={busy !== null}>作る</Button>
     </>
   ) : null
 
@@ -336,9 +346,9 @@ function PassCreateInner() {
         description="始めると、種類・回数・値段・使える予約は変えられません。お客さまに券を付けられるようになります。まだ始めないときは、下書き保存を押してください。"
         confirmLabel="販売を始める"
         busy={busy === 'create'}
-        cancelLabel={validationBlocked ? "戻って直す" : "キャンセル"} confirmDisabled={validationBlocked} confirmDisabledReason="戻って入力を直してください。"
-        error={notice || undefined} onSuccess={() => setConfirmCreate(false)} onConfirm={() => submit(true)}
-        onCancel={() => setConfirmCreate(false)}
+        cancelLabel={validationBlocked ? "戻って直す" : "キャンセル"} confirmDisabled={validationBlocked || confirmChanged} confirmDisabledReason={confirmChanged ? '内容が変わりました。閉じて確認し直してください。' : '戻って入力を直してください。'}
+        error={notice || undefined} onSuccess={() => { confirmTicket.current = null; setConfirmCreate(false) }} onConfirm={() => { if (renderedTicket && renderedTicket === confirmTicket.current && renderedTicket.attempt === currentAttempt.current && renderedTicket.form === formScope.current && renderedTicket.authority === authorityScope.current && canEditRef.current) return submit(true) }}
+        onCancel={() => { confirmTicket.current = null; setConfirmCreate(false) }}
       ><OperationTargetSummary accounts={[{ id: accountId ?? '' }]} /></ConfirmDialog>
       {preparing.dialog}
     </SaveErrorScope>

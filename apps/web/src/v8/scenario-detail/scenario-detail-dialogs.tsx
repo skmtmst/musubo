@@ -40,7 +40,7 @@ export function ScenarioDetailDialogs({
   setStartError, startAccountLabel, triggerHeadline, simulation,
   sortedSteps, startCompleteSummary, setSimRetry, startChecks,
   setStartConfirmed, stopOpen, stopBusy, stopError,
-  setStopOpen, setStopError, stats, handleStop,
+  setStopOpen, setStopError, stats, stopConfirmationCount, deleteConfirmationCount, handleStop,
   duplicateOpen, duplicating, setDuplicateOpen, duplicateName,
   setDuplicateName, modeLabel, handleDuplicate, previewOpen,
   id, setPreviewOpen, deleteStepTarget, deletingStepId,
@@ -98,6 +98,8 @@ export function ScenarioDetailDialogs({
   setStopOpen: Dispatch<SetStateAction<boolean>>
   setStopError: Dispatch<SetStateAction<string>>
   stats: ScenarioStats | null
+  stopConfirmationCount?: number
+  deleteConfirmationCount?: number
   handleStop: () => Promise<void>
   duplicateOpen: boolean
   duplicating: boolean
@@ -392,9 +394,9 @@ export function ScenarioDetailDialogs({
           <dl className={styles.stopRow}>
             <dt>いま途中の人</dt>
             <dd>
-              {stats?.activeNow === undefined
+              {stopConfirmationCount === undefined
                 ? '確認できません'
-                : `${formatNumber(stats.activeNow)} 人（止まっているあいだ、新しい人は入りません）`}
+                : `${formatNumber(stopConfirmationCount)} 人（止まっているあいだ、新しい人は入りません）`}
             </dd>
           </dl>
           <div className={styles.stopFooter}>
@@ -486,11 +488,11 @@ export function ScenarioDetailDialogs({
         open={deleteScenarioOpen && scenario !== null}
         title={scenario ? `「${scenario.name}」を削除しますか？` : 'このシナリオを削除しますか？'}
         description={[
-          stats?.activeNow === undefined
+          deleteConfirmationCount === undefined
             ? '購読中の人数は確認できません。'
-            : stats.activeNow === 0
+            : deleteConfirmationCount === 0
               ? '現在購読中の友だちは0人です。'
-              : `現在${formatNumber(stats.activeNow)} 人が購読中です。途中の人は続きを受け取れません。`,
+              : `現在${formatNumber(deleteConfirmationCount)} 人が購読中です。途中の人は続きを受け取れません。`,
           'シナリオの設定と今後の配信が削除されます。',
           'これまでの配信履歴は監査記録として残ります。',
           'この操作は取り消せません。',

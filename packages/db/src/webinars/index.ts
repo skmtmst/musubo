@@ -63,6 +63,7 @@ export {
   getWebinarEditorSettings,
   saveWebinarEditorSettings,
   publishWebinarEditorVersion,
+  publishWebinarAndActivate,
 } from './editor.js';
 export {
   WEBINAR_HEARTBEAT_PLAYER_STATES,

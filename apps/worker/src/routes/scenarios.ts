@@ -3,14 +3,18 @@ import { Hono } from 'hono';
 
 import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess, requirePermission } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { bulkStopScenarios } from './scenarios-bulk-stop.js';
 
 import { get__api_scenarios_id_question_answers_1, post__api_scenarios_id_question_answers_executionId_resume_2, patch__api_scenarios_reorder_3, get__api_scenarios_4, get__api_scenarios_id_5, post__api_scenarios_6, put__api_scenarios_id_7, get__api_scenarios_id_move_referrers_8, delete__api_scenarios_id_9, post__api_scenarios_id_steps_10 } from './scenarios-drafts-handlers.js';
-import { requireVisibleScenario, scenarioPermission, requireScenarioEditBoundary } from './scenarios-definition.js';
+import { requireVisibleScenario, scenarioPermission, requireScenarioEditBoundary, scenarioSubscriptionScope } from './scenarios-definition.js';
 import { put__api_scenarios_id_steps_stepId_1, delete__api_scenarios_id_steps_stepId_2, post__api_scenarios_id_steps_reorder_3, get__api_scenarios_id_preview_4, get__api_scenarios_id_stats_5, post__api_scenarios_id_simulate_6, get__api_scenarios_id_runs_7, get__api_scenarios_id_friends_friendId_plan_8, put__api_scenarios_id_draft_9, post__api_scenarios_id_enroll_friendId_10 } from './scenarios-steps-handlers.js';
 
 import { post__api_scenarios_id_publish_1, get__api_scenarios_id_actions_2, post__api_scenarios_id_actions_3, put__api_scenarios_id_actions_actionId_4, delete__api_scenarios_id_actions_actionId_5, post__api_scenarios_id_test_send_6, post__api_scenarios_id_steps_stepId_test_send_7, get__api_scenarios_id_triggers_8, post__api_scenarios_id_triggers_9, get__api_scenarios_id_draft_10, delete__api_scenarios_id_triggers_triggerId_11, post__api_scenario_subscriptions_subscriptionId_pause_12, post__api_scenario_subscriptions_subscriptionId_resume_13, post__api_scenario_subscriptions_subscriptionId_retry_14, post__api_scenario_subscriptions_subscriptionId_move_15 } from './scenarios-publication-handlers.js';
 
 const scenarios = new Hono<Env>();
+
+scenarios.post('/api/scenarios/bulk-stop', requireDeliveryAccess('scenarios', 'publish'), inputJsonBoundary(), bulkStopScenarios);
 
 scenarios.get('/api/scenarios/:id/question-answers', requireDeliveryAccess('scenarios'), requireVisibleScenario, get__api_scenarios_id_question_answers_1);
 
@@ -33,6 +37,25 @@ scenarios.use('/api/scenarios/:id', requireVisibleScenario);
 scenarios.use('/api/scenarios/:id/*', requireVisibleScenario);
 
 scenarios.get('/api/scenarios/:id', scenarioPermission('view'), get__api_scenarios_id_5);
+
+scenarios.get('/api/scenarios/:id/confirmation', requireScenarioEditBoundary, async (c) => {
+  if (!await scenarioSubscriptionScope(c, c.req.param('id'))) return c.json({ success: false, error: '関連する対象を確認できないため操作できません' }, 403);
+  const row = await c.env.DB.prepare(`SELECT s.content_revision AS contentRevision,
+    (SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id=s.id AND status IN ('active','delivering')) AS activeCount,
+    (SELECT COALESCE(SUM(rowid),0) FROM friend_scenarios WHERE scenario_id=s.id AND status IN ('active','delivering')) AS rowIdSum,
+    (SELECT COALESCE(SUM((rowid % 104729) * (rowid % 104729)),0) FROM friend_scenarios WHERE scenario_id=s.id AND status IN ('active','delivering')) AS rowIdSquareSum,
+    (SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id=s.id) AS totalCount,
+    (SELECT COALESCE(SUM(rowid),0) FROM friend_scenarios WHERE scenario_id=s.id) AS totalRowIdSum,
+    (SELECT COALESCE(SUM((rowid % 104729) * (rowid % 104729)),0) FROM friend_scenarios WHERE scenario_id=s.id) AS totalRowIdSquareSum,
+    (SELECT json_group_array(json_object('id', id, 'revision', content_revision, 'accountId', line_account_id)) FROM
+      (SELECT id, content_revision, line_account_id FROM scenarios WHERE on_complete_scenario_id=s.id ORDER BY id)) AS referrers
+    FROM scenarios s WHERE s.id=?`).bind(c.req.param('id')).first<{ contentRevision: number; activeCount: number; rowIdSum: number; rowIdSquareSum: number; totalCount: number; totalRowIdSum: number; totalRowIdSquareSum: number; referrers: string }>();
+  if (!row) return c.json({ success: false, error: 'SCENARIO_NOT_FOUND' }, 404);
+  const referrers = c.req.query('purpose') === 'delete' ? JSON.parse(row.referrers) as Array<{ id: string; revision: number; accountId: string | null }> : [];
+  if (referrers.length && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), referrers.map(item => item.accountId)))
+    return c.json({ success: false, error: '関連する設定を確認できないため操作できません' }, 409);
+  return c.json({ success: true, data: { contentRevision: row.contentRevision, activeCount: row.activeCount, rowIdSum: row.rowIdSum, rowIdSquareSum: row.rowIdSquareSum, totalCount: row.totalCount, totalRowIdSum: row.totalRowIdSum, totalRowIdSquareSum: row.totalRowIdSquareSum, referrers: referrers.map(({ id, revision }) => ({ id, revision })) } });
+});
 
 // POST /api/scenarios - create
 scenarios.post('/api/scenarios', requireDeliveryAccess('scenarios'), inputJsonBoundary({"name":["string"],"description":["null","string"],"triggerType":["string"],"triggerTagId":["null","string"],"isActive":["boolean"],"lineAccountId":["null","string"],"deliveryMode":["string"],"allowConcurrent":["boolean"],"folderId":["null","string"]}), post__api_scenarios_6);

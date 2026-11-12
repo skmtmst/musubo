@@ -96,7 +96,7 @@ export default function RegisterPage() {
         </AuthField>
         <AuthField label="担当者名" htmlFor="register-contact" error={messages.contactName}>
           <TextField id="register-contact" value={contactName} onChange={(event) => setContactName(event.target.value)}
-            autoComplete="name" maxLength={80} placeholder="山田 太郎" invalid={Boolean(messages.contactName)} />
+            autoComplete="name" maxLength={80} placeholder="見本 141" invalid={Boolean(messages.contactName)} />
         </AuthField>
         <AuthField label="メールアドレス" htmlFor="register-email" error={messages.email}>
           <TextField
@@ -113,7 +113,7 @@ export default function RegisterPage() {
         </AuthField>
         <AuthField label="電話番号" htmlFor="register-phone" error={messages.phone}>
           <TextField id="register-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)}
-            autoComplete="tel" maxLength={24} placeholder="03-1234-5678" invalid={Boolean(messages.phone)} />
+            autoComplete="tel" maxLength={24} placeholder="03-0000-5678" invalid={Boolean(messages.phone)} />
         </AuthField>
         <AuthField label="musuboを知ったきっかけ" htmlFor="register-referral" error={messages.referralSource}>
           <Select id="register-referral" aria-label="musuboを知ったきっかけ" size="full" value={referralSource} onChange={setReferralSource}

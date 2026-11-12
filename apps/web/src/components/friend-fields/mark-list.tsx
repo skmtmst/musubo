@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
+
 import type { SupportMarkArchiveImpact, SupportMarkListItem } from '@/lib/api'
 import Dialog from '@/components/shared/dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
@@ -80,6 +82,10 @@ export function ArchiveMarkDialog({ mark, accountId, impact, replacementMarkId, 
    * 候補が空（共有は除外・自身も除外）になり保管実行を押せなかった。
    * 友だちがいるときに候補が無い・保管できないときは理由と次の操作を出す。
    */
+  const active = useRef(true)
+  useEffect(() => { active.current = true; return () => { active.current = false } }, [])
+  const close = () => { if (active.current && !saving) { active.current = false; onCancel() } }
+  const confirm = () => { if (active.current) onConfirm() }
   const friendCount = impact?.friendCount ?? 0
   const needsReplacement = friendCount > 0
   const noCandidates = needsReplacement && (impact?.replacementOptions.length ?? 0) === 0
@@ -98,7 +104,7 @@ export function ArchiveMarkDialog({ mark, accountId, impact, replacementMarkId, 
   return (
     <Dialog open confirmation role="alertdialog" designNode="fy5dz" title={`「${mark.name}」を保管しますか`}
       designWidth={560} designHeaderPadding="24px 24px 0" designContentPadding="12px 24px 12px" designFooterPadding="14px 24px 24px"
-      onCancel={onCancel} onConfirm={onConfirm} busy={saving} confirmDisabled={!canConfirm}
+      onCancel={close} onConfirm={confirm} busy={saving} confirmDisabled={!canConfirm}
       confirmLabel={needsReplacement ? '置き換えて保管する' : '保管する'} busyLabel="保管中…">
       <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
       {/* ★V8 fy5dz：説明は題の段ではなく本文の頭。説明・置き換え先・注意を 12 ずつ縦に並べる。 */}

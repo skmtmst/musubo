@@ -183,7 +183,7 @@ describe('#731 定期便の一覧と集計', () => {
   test('1件の契約の中身と集計は、直す前と同じに返す', async () => {
     sqlite.prepare(
       `INSERT INTO friends (id, line_user_id, display_name, line_account_id, created_at, updated_at)
-       VALUES ('friend-a', 'Ua', '高橋 直人', 'account-a', '2026-01-01', '2026-01-01')`,
+       VALUES ('friend-a', 'Ua', '見本 16', 'account-a', '2026-01-01', '2026-01-01')`,
     ).run();
     sqlite.prepare(
       `INSERT INTO nen_pet_profiles (id, friend_id, name, created_at, updated_at)
@@ -210,7 +210,7 @@ describe('#731 定期便の一覧と集計', () => {
     expect(body.data.items[0]).toMatchObject({
       contractNumber: 'SUB-100', status: 'at_risk', amount: 4280,
       items: '鹿肉フード × 2', riskReason: '定期便のお支払いを確認できませんでした',
-      ownerName: '高橋 直人', petName: 'もも', continuedCount: 4,
+      ownerName: '見本 16', petName: 'もも', continuedCount: 4,
     });
     expect(body.data.summary).toMatchObject({ total: 1, atRisk: 1, monthlyAmount: 4280 });
     expect(body.data.summary.startedThisMonth).toBe(0);

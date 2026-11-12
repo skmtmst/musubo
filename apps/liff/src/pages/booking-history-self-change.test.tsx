@@ -42,7 +42,7 @@ function item(over: Partial<BookingHistoryItem> = {}): BookingHistoryItem {
     starts_at: '2099-10-02T04:00:00.000Z',
     status: 'confirmed',
     menu_name: 'トリミング（小型犬）',
-    staff_name: '河野',
+    staff_name: '見本',
     profile_image_url: null,
     lock_version: 4,
     menu_id: 'menu-1',
@@ -122,7 +122,7 @@ describe('予約の履歴：本人の日時変更・キャンセル（F-6）', (
     availability.mockResolvedValue({
       by_staff: [{
         staff_id: 'staff-1',
-        display_name: '河野',
+        display_name: '見本',
         slots: [
           { date: '2099-10-05', start: '10:00', end: '11:00', remaining: 0 },
           { date: '2099-10-06', start: '14:00', end: '15:00', remaining: 2 },

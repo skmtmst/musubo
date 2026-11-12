@@ -33,7 +33,7 @@ const PREVIEW = {
     },
     {
       affiliateId: 'aff-2',
-      affiliateName: '木村 亮',
+      affiliateName: '見本 26',
       code: 'kimura',
       amount: 3000,
       grossAmount: 3000,

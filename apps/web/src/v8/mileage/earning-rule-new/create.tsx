@@ -352,7 +352,7 @@ function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onCont
             保存して続けて作る
           </Button>
           <Button variant="primary" onClick={() => void save(false)} disabled={saving} busy={saving} busyLabel="保存しています">
-            <Check size={16} aria-hidden="true" />{conflict ? '比べてから保存' : '保存して動かす'}
+            <Check size={16} aria-hidden="true" />{conflict ? '比べてから保存' : isActive ? '保存して動かす' : '停止して保存'}
           </Button>
         </>
       )} dirty={false}

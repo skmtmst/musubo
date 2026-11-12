@@ -12,7 +12,7 @@ const { default: SeriesScopeDialog } = await import('./series-scope-dialog')
 
 const b = (i: number, startsAt: string, status = 'confirmed') => ({ id: `b${i}`, series_index: i, starts_at: startsAt, status })
 const bookings = [b(2, '2026-12-04T05:00:00.000Z'), b(3, '2026-12-11T05:00:00.000Z'), b(4, '2026-12-18T05:00:00.000Z'), b(5, '2027-01-01T05:00:00.000Z', 'cancelled'), b(6, '2027-01-08T05:00:00.000Z')]
-const target = { seriesId: 's1', customerName: '山田 花子', ruleText: '毎週金曜 14:00', menuName: 'トリミング（小型犬）', index: 4, bookingId: 'b3', startsAt: '2026-12-11T05:00:00.000Z' }
+const target = { seriesId: 's1', customerName: '見本 143', ruleText: '毎週金曜 14:00', menuName: 'トリミング（小型犬）', index: 4, bookingId: 'b3', startsAt: '2026-12-11T05:00:00.000Z' }
 
 beforeEach(() => {
   impact.mockImplementation(async (_a, _id, input) => ({ success: true, data: { items: bookings.filter(b => b.status !== 'cancelled' && b.series_index >= 3).filter((_, i) => input.scope !== 'this' || i === 0).map(b => ({ bookingId: b.id, startsAt: b.starts_at, after: input.change?.startsAt ?? null, blocked: false, fee: null })) } }))

@@ -111,10 +111,10 @@ export const BOARD_STATE_PROFILES = {
   qwIZr: { url: '/restaurant-test/dashboard', transformApi: (rules) => rules.map(rule => {
     if (rule.match !== 'GET /api/restaurant-test/reservations/day') return rule
     const samples = [
-      { customer_name: '田中 明子', source: 'restaurant_board', status: 'visited', table_label: 'T3' },
-      { customer_name: '佐藤 健', source: 'line', status: 'confirmed', table_label: 'C1' },
-      { customer_name: '山田 太郎', source: 'tabelog', status: 'pending', table_label: 'T1' },
-      { customer_name: '鈴木 真理', source: 'hotpepper', status: 'confirmed', table_label: 'T4' },
+      { customer_name: '見本 169', source: 'restaurant_board', status: 'visited', table_label: 'T3' },
+      { customer_name: '見本 114', source: 'line', status: 'confirmed', table_label: 'C1' },
+      { customer_name: '見本 141', source: 'tabelog', status: 'pending', table_label: 'T1' },
+      { customer_name: '見本 182', source: 'hotpepper', status: 'confirmed', table_label: 'T4' },
       { customer_name: '押さえ', source: 'phone', status: 'pending', table_label: 'TR1', hold_expires_at: '@TODAY@T22:00:00+09:00' },
     ]
     return { ...rule, body: { ...rule.body, data: { ...rule.body.data,

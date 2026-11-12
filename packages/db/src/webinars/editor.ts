@@ -128,3 +128,31 @@ export async function publishWebinarEditorVersion(
   ]);
   return getWebinarEditorSettings(db, webinarId);
 }
+
+/** 公開版の確定と公開状態への変更を同一 batch で行う。 */
+export async function publishWebinarAndActivate(
+  db: D1Database,
+  webinarId: string,
+  expectedVersion: number,
+): Promise<boolean> {
+  const now = jstNow();
+  const result = await db.batch([
+    db.prepare(`UPDATE webinars SET status='active',updated_at=?
+      WHERE id=? AND status<>'archived' AND EXISTS (
+        SELECT 1 FROM webinar_editor_settings s JOIN webinar_versions v
+          ON v.webinar_id=s.webinar_id AND v.version=s.version
+        WHERE s.webinar_id=webinars.id AND s.version=?)`).bind(now, webinarId, expectedVersion),
+    db.prepare(`UPDATE webinar_editor_settings SET version=version+1,published_version=?,published_at=?,updated_at=?
+      WHERE webinar_id=? AND version=? AND changes()=1`).bind(expectedVersion, now, now, webinarId, expectedVersion),
+    db.prepare(`UPDATE webinar_versions SET
+        state=CASE WHEN version=? THEN 'published' ELSE 'superseded' END,
+        published_at=CASE WHEN version=? THEN ? ELSE published_at END
+      WHERE webinar_id=? AND (version=? OR state='published') AND changes()=1`)
+      .bind(expectedVersion, expectedVersion, now, webinarId, expectedVersion),
+    db.prepare(`INSERT INTO webinar_versions(id,webinar_id,version,state,snapshot_json,created_at)
+      SELECT ?,webinar_id,?,'draft',snapshot_json,? FROM webinar_versions
+      WHERE webinar_id=? AND version=? AND changes()>0`)
+      .bind(crypto.randomUUID(), expectedVersion + 1, now, webinarId, expectedVersion),
+  ]);
+  return Number(result[0].meta?.changes ?? 0) === 1;
+}

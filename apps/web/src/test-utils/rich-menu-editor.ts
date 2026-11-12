@@ -23,8 +23,6 @@ export async function pickDateTime(label: string, iso: string) {
   const [y, mo, d] = date.split('-').map(Number)
   const week = WEEK[new Date(y, mo - 1, d).getDay()]
   fireEvent.click(screen.getByLabelText(label))
-  const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  fireEvent.click(picker.querySelector('button[aria-label="日付"]')!)
   for (let i = 0; i < 24; i += 1) {
     const grid = document.querySelector('[role="grid"]')
     if (grid?.getAttribute('aria-label') === `${y}年${mo}月`) break
@@ -38,11 +36,10 @@ export async function pickDateTime(label: string, iso: string) {
   fireEvent.click([...document.querySelectorAll('button')].find((b) =>
     (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
   )!)
-  fireEvent.click(within(screen.getByRole('dialog', { name: '日付を選ぶ' })).getByRole('button', { name: '確定' }))
   const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   const timeInput = within(reopened as HTMLElement).getByRole('combobox', { name: '時刻' })
   await type(timeInput, `${hour}:${minute}`)
   fireEvent.blur(timeInput)
-  fireEvent.click([...reopened.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!)
+  fireEvent.click(within(reopened as HTMLElement).getByRole('button', { name: '確定' }))
   await flush()
 }

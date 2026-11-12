@@ -96,10 +96,10 @@ describe('validateFriendFieldValue', () => {
   });
 
   it('email・tel・urlは形を見て、メールは小文字へ直す', () => {
-    expect(validateFriendFieldValue(field('email'), 'Taro@Example.JP'))
-      .toEqual({ ok: true, value: 'taro@example.jp' });
+    expect(validateFriendFieldValue(field('email'), 'Taro@Example.COM'))
+      .toEqual({ ok: true, value: 'taro@example.com' });
     expect(validateFriendFieldValue(field('email'), 'not-an-email').ok).toBe(false);
-    expect(validateFriendFieldValue(field('tel'), '090-1234-5678')).toEqual({ ok: true, value: '090-1234-5678' });
+    expect(validateFriendFieldValue(field('tel'), '090-0000-5678')).toEqual({ ok: true, value: '090-0000-5678' });
     expect(validateFriendFieldValue(field('tel'), '123').ok).toBe(false);
     expect(validateFriendFieldValue(field('url'), 'https://example.jp/a')).toEqual({ ok: true, value: 'https://example.jp/a' });
     expect(validateFriendFieldValue(field('url'), 'ftp://example.jp').ok).toBe(false);

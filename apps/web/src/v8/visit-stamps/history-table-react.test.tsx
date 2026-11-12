@@ -6,7 +6,7 @@ import type { HistoryRow } from './display'
 
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => '/visit-stamps', useRouter: () => ({ replace: vi.fn() }) }))
 afterEach(cleanup)
-const entry: HistoryRow = { id: 'redeem-1', friendId: 'friend&1', at: '2026-10-14T10:00:00Z', count: '−10 個（特典）', why: 'デザート1品を使った', actor: '店員：中川 由美（暗証番号）', reversible: true, reversed: false }
+const entry: HistoryRow = { id: 'redeem-1', friendId: 'friend&1', at: '2026-10-14T10:00:00Z', count: '−10 個（特典）', why: 'デザート1品を使った', actor: '店員：見本 30（暗証番号）', reversible: true, reversed: false }
 
 it('記録の全文を省略部品のtitleに保ち、再読込の値で更新する', () => {
   const props = { rows: [entry], friendName: () => 'お客さまの名前', canManage: true, onOpenFriend: vi.fn(), onReverse: vi.fn() }

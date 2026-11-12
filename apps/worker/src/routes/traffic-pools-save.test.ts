@@ -44,9 +44,9 @@ beforeEach(() => {
   access.allowed = true; role = 'owner'; race = false;
   sqlite = new Database(':memory:');
   sqlite.exec(`CREATE TABLE line_accounts (id TEXT PRIMARY KEY, name TEXT, liff_id TEXT, login_channel_id TEXT, login_channel_secret TEXT, login_channel_secret_encrypted TEXT, channel_access_token TEXT, channel_access_token_encrypted TEXT, channel_id TEXT);
-    CREATE TABLE traffic_pools (id TEXT PRIMARY KEY, slug TEXT, name TEXT, active_account_id TEXT, is_active INTEGER, created_at TEXT, updated_at TEXT);
+    CREATE TABLE traffic_pools (id TEXT PRIMARY KEY, slug TEXT, name TEXT, active_account_id TEXT, is_active INTEGER, created_at TEXT, updated_at TEXT, confirmation_revision INTEGER NOT NULL DEFAULT 1);
     INSERT INTO line_accounts (id,name) VALUES ('a','試験の店');`);
-  sqlite.prepare('INSERT INTO traffic_pools VALUES (?,?,?,?,?,?,?)').run('p', 'main', '元の名前', 'a', 1, original, original);
+  sqlite.prepare('INSERT INTO traffic_pools (id,slug,name,active_account_id,is_active,created_at,updated_at) VALUES (?,?,?,?,?,?,?)').run('p', 'main', '元の名前', 'a', 1, original, original);
 });
 afterEach(() => { sqlite.close(); });
 it('読み直しに保存版を返し、版を送った名前の保存で必ず版が進む', async () => {

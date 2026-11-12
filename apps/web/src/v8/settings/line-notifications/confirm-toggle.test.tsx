@@ -74,3 +74,30 @@ test('一覧のスイッチは確認前と取消で送信0、失敗は窓を残�
     { path: '/api/line-notifications/customer-definitions/definition-1/stop', body: { lineAccountId: 'account-a', expectedVersion: 1 } },
   ])
 })
+
+test('テスト送信は窓に表示した宛先IDを固定して送る', async () => {
+  fx.account = 'account-a'
+  const writes: unknown[] = []
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input))
+    if (init?.method === 'POST' && url.pathname === '/api/ec-commerce/test-send') {
+      writes.push(JSON.parse(String(init.body)))
+      return json({ success: true, data: { sent: 1 } })
+    }
+    if (url.pathname === '/api/account-settings/test-recipients') return json({ success: true, confirmationRevision: 2, data: [{ id: 'friend-1', displayName: '受信者', pictureUrl: null }] })
+    if (url.pathname === '/api/ec-commerce/settings') return json({ success: true, data: [setting('注文')] })
+    if (url.pathname === '/api/line-notifications/customer-definitions') return json({ success: true, data: [] })
+    if (url.pathname === '/api/ec-commerce/overview') return json({ success: true, data: { total: 0, processed: 0, identityPending: 0, failed: 0, skipped: 0, last24h: 0, lastReceivedAt: null, byType: [], subscriptions: 0 } })
+    if (url.pathname.includes('/operator-rules')) return json({ success: true, data: { items: [], summary: { total: 0, published: 0, stopped: 0, missingRecipients: 0, recipients: 0, acceptedToday: 0, excludedToday: 0 } } })
+    return json({ success: true, data: [] })
+  })
+  render(<Screen />)
+  fireEvent.click(await screen.findByRole('button', { name: '注文の見出しの内容を編集' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'テスト受信者に送る' }))
+  const dialog = await screen.findByRole('dialog', { name: 'テスト受信者に送信しますか？' })
+  expect(await within(dialog).findByText(/受信者（1名）/)).toBeTruthy()
+  expect(writes).toHaveLength(0)
+  fireEvent.click(within(dialog).getByRole('button', { name: 'テスト受信者 1名へ送信' }))
+  await waitFor(() => expect(writes).toHaveLength(1))
+  expect(writes[0]).toMatchObject({ expectedRecipientIds: ['friend-1'], expectedConfirmationRevision: 2 })
+})

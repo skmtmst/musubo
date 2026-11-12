@@ -9,6 +9,7 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import type { AutoReply } from './list-model'
 import { toggleAutoReply } from './list-toggle-action'
 import { duplicateAutoReply } from './list-duplicate-action'
+import { ApiError } from '@/lib/api'
 
 const net = vi.hoisted(() => ({
   stop: vi.fn(), update: vi.fn(), create: vi.fn(),
@@ -22,7 +23,7 @@ vi.mock('@/lib/api', async original => {
 
 const row: AutoReply = {
   id: 'rule-one', keyword: '予約', matchType: 'contains', responseType: 'text', responseContent: '保存した文',
-  templateId: null, lineAccountId: 'account-a', isActive: true, activeFrom: null, activeUntil: null,
+  templateId: null, lineAccountId: 'account-a', isActive: true, confirmationRevision: 1, activeFrom: null, activeUntil: null,
   cooldownMinutes: null, skipWhenOperatorActive: false, priority: 1, messageKinds: null, receiveSources: ['line'],
   actions: null, responseWeekdays: null, responseHolidayRule: null, oncePerFriend: false, keywords: null,
   friendConditions: null, respondToAll: false, name: '予約受付', keywordMatchMode: 'any', folderId: null,
@@ -36,7 +37,7 @@ const restrict = (kind: string) => {
   else rememberStaffIdentity({ ...readStaffIdentity()!, role: kind === 'viewer' ? 'viewer' : 'staff', permissionKeys: [], ...(kind === 'readOnly' ? { readOnly: true } : kind === 'view_only' ? { roleBundle: 'view_only' as const } : {}) })
 }
 const toggleContext = (ids = [row.id], kind: 'stop' | 'resume' = 'stop'): Parameters<typeof toggleAutoReply>[0] => ({
-  listContextKey: 'account-a:list', load: vi.fn(async () => {}), pendingToggle: { ids, names: ids, kind, accountId: 'account-a' },
+  listContextKey: 'account-a:list', load: vi.fn(async () => {}), pendingToggle: { ids, names: ids, kind, accountId: 'account-a', versions: Object.fromEntries(ids.map(id => [id, 1])) },
   rules: [row, { ...row, id: 'rule-two' }], saveErrors: renderHook(useSaveFormErrors).result.current,
   selectedAccountId: 'account-a', selectedAccountIdRef: { current: 'account-a' },
   setOptimisticRows: vi.fn(), setPendingToggle: vi.fn(), setSelectedIds: vi.fn(), setToggleError: vi.fn(), setToggleReason: vi.fn(), toggleReason: '停止の理由',
@@ -116,4 +117,23 @@ it('まとめて停止の途中でアカウントが変わると、古いアカ�
   expect(net.stop).toHaveBeenCalledTimes(1)
   expect(context.load).not.toHaveBeenCalled()
   expect(net.toast).not.toHaveBeenCalled()
+})
+
+it('まとめて停止は確認した各版を送り、409なら読み直して再試行を出さない', async () => {
+  net.stop.mockResolvedValueOnce({ success: true, data: null }).mockRejectedValueOnce(new ApiError(409, 'changed', 'auto_reply_confirmation_conflict'))
+  const context = toggleContext([row.id, 'rule-two'])
+  context.pendingToggle!.versions!['rule-two'] = 3
+  toggleAutoReply(context)
+  await waitFor(() => expect(context.load).toHaveBeenCalledTimes(1))
+  expect(net.stop).toHaveBeenNthCalledWith(1, row.id, { reason: '停止の理由', expectedVersion: 1 }, expect.any(String))
+  expect(net.stop).toHaveBeenNthCalledWith(2, 'rule-two', { reason: '停止の理由', expectedVersion: 3 }, expect.any(String))
+  expect(net.toast).toHaveBeenCalledWith(expect.stringContaining('ほかの対象は停止した可能性'), { tone: 'error' })
+})
+
+it('1件の停止で版が違う場合は他の対象の停止を示さない', async () => {
+  net.stop.mockRejectedValueOnce(new ApiError(409, 'changed', 'auto_reply_confirmation_conflict'))
+  const context = toggleContext()
+  toggleAutoReply(context)
+  await waitFor(() => expect(context.load).toHaveBeenCalledTimes(1))
+  expect(net.toast).toHaveBeenCalledWith('内容が変わった自動応答は停止していません。一覧を読み直して確認してください。', { tone: 'error' })
 })

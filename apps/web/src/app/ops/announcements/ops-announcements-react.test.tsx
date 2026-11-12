@@ -61,6 +61,7 @@ let lineConfigured = true
 let readOnlyMe = false
 let announcements: unknown[] = []
 let previewReady: Promise<void> | null = null
+let listReady: Promise<void> | null = null
 /** M513: PUT の応答を差し替えて競合を起こす（null のときは通常応答）。 */
 let putOverride: { status: number; payload: unknown } | null = null
 /** 役割の応答を止めて「分からない」状態を作る（null のときはすぐ返す）。 */
@@ -75,6 +76,7 @@ beforeEach(() => {
   readOnlyMe = false
   announcements = [sent, draft]
   previewReady = null
+  listReady = null
   putOverride = null
   meReady = null
   releaseMe = null
@@ -104,7 +106,11 @@ beforeEach(() => {
       payload = { success: true, data: { tenants: 12, staff: 24, lineLinked: 21, withEmail: 24 } }
     }
     else if (url.endsWith('/api/ops/announcements') && method === 'POST') payload = { success: true, data: { ...sent, id: 'a3', recipientsTotal: 24, lineSent: 21, mailSent: 24 } }
-    else if (url.endsWith('/api/ops/announcements')) payload = { success: true, data: announcements, linked: { linked: 21, total: 24 }, noticeLineConfigured: lineConfigured }
+    else if (url.endsWith('/api/ops/announcements')) {
+      const data = announcements
+      if (listReady) await listReady
+      payload = { success: true, data, linked: { linked: 21, total: 24 }, noticeLineConfigured: lineConfigured }
+    }
     else if (url.endsWith('/api/ops/me')) {
       if (meReady) await meReady
       payload = { success: true, data: { readOnly: readOnlyMe } }
@@ -194,6 +200,9 @@ describe('一覧', () => {
     await act(async () => { items.find((el) => el.textContent?.includes('削除する'))!.click() })
     expect(document.body.textContent).toContain('「料金改定のご案内（下書き）」を削除しますか？')
     expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('環境')
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('LINEアカウント')
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('不明')
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('1件')
     await act(async () => { button('削除する')!.click() })
     await flush()
     expect(calls.some((c) => c.url.endsWith('/api/ops/announcements/a2') && c.method === 'DELETE')).toBe(true)
@@ -272,6 +281,22 @@ describe('作る画面', () => {
     expect(post.body).toMatchObject({ subject: 'メンテナンスのお知らせ', body: '本文です', audienceKind: 'all', channels: ['screen', 'line'], mode: 'send', publishAt: null })
     expect(notifySaved).toHaveBeenCalledWith('送りました（24人。LINE 21・メール 24）')
     expect(navigation.push).toHaveBeenCalledWith('/ops/announcements?highlight=a3')
+  })
+
+  it('確認を開いた後に入力が変わったら古い確認では送らない', async () => {
+    await act(async () => { root.render(<OpsAnnouncementNewPage />) })
+    await flush()
+    const subject = document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!
+    const body = document.querySelector<HTMLTextAreaElement>('textarea')!
+    await act(async () => { setValue(subject, '確認した件名'); setValue(body, '本文です') })
+    await act(async () => { button('今すぐ送る')!.click() })
+    const dialog = document.body.querySelector('[data-design-node="TJUUl"]')!
+    const confirm = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent?.trim() === '今すぐ送る')!
+    expect(confirm).toBeTruthy()
+    await act(async () => { setValue(subject, '変わった件名') })
+    await act(async () => { confirm.click() })
+    await flush()
+    expect(calls.some((c) => c.method === 'POST' && c.url.endsWith('/api/ops/announcements'))).toBe(false)
   })
 
   it('公開日時を入れると主ボタンが「配信を予約する」になり、mode=schedule で送る', async () => {
@@ -458,6 +483,55 @@ describe('作る画面', () => {
     expect(document.querySelector('input[placeholder^="例："]')).toBeNull()
   })
 
+  it('直す画面から送信済みの写しへ移ったら新規として送る', async () => {
+    search.value = 'id=a2'
+    await act(async () => { root.render(<OpsAnnouncementNewPage />) })
+    await flush()
+    search.value = 'copy=a1'
+    await act(async () => { root.render(<OpsAnnouncementNewPage />) })
+    await flush()
+    expect(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')?.value).toBe(sent.subject)
+    await act(async () => { button('今すぐ送る')!.click() })
+    const dialog = document.body.querySelector('[data-design-node="TJUUl"]')!
+    const confirm = Array.from(dialog.querySelectorAll('button')).find(b => b.textContent?.trim() === '今すぐ送る')!
+    await act(async () => { confirm.click() })
+    await flush()
+    expect(calls.some(c => c.method === 'POST' && c.url.endsWith('/api/ops/announcements'))).toBe(true)
+    expect(calls.some(c => c.method === 'PUT' && c.url.includes('/api/ops/announcements/a2'))).toBe(false)
+  })
+
+  it('前の URL の遅い応答で別のお知らせを表示しない', async () => {
+    let release!: () => void
+    listReady = new Promise<void>((resolve) => { release = resolve })
+    announcements = [draft, { ...draft, id: 'a3', subject: '新しいお知らせ' }]
+    search.value = 'id=a2'
+    await act(async () => { root.render(<OpsAnnouncementNewPage />) })
+    listReady = null
+    search.value = 'id=a3'
+    await act(async () => { root.render(<OpsAnnouncementNewPage />) })
+    await flush()
+    expect(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')?.value).toBe('新しいお知らせ')
+    await act(async () => { release() })
+    await flush()
+    expect(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')?.value).toBe('新しいお知らせ')
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(false)
+  })
+
+  it('URL が変わった後は古い削除確認から削除できない', async () => {
+    search.value = 'id=a2'
+    await act(async () => { root.render(<OpsAnnouncementNewPage />) })
+    await flush()
+    await act(async () => { button('削除する')!.click() })
+    const oldConfirm = Array.from(document.querySelectorAll('[role="alertdialog"] button')).find((b) => b.textContent?.trim() === '削除する')!
+    expect(oldConfirm).toBeTruthy()
+    search.value = 'id=missing'
+    await act(async () => { root.render(<OpsAnnouncementNewPage />) })
+    await flush()
+    await act(async () => { oldConfirm.click() })
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(false)
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+  })
+
   it('?id= の削除は確認の窓を挟み、実行したら一覧へ戻る', async () => {
     search.value = 'id=a2'
     await act(async () => { root.render(<OpsAnnouncementNewPage />) })
@@ -467,6 +541,9 @@ describe('作る画面', () => {
     const dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
     expect(dialog.textContent).toContain('「料金改定のご案内（下書き）」を削除しますか？')
     expect(dialog.textContent).toContain('環境')
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('不明')
+    expect(dialog.textContent).toContain('1件')
     const confirmRemove = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent?.trim() === '削除する')!
     await act(async () => { confirmRemove.click() })
     await flush()

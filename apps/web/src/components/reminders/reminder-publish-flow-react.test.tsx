@@ -135,10 +135,10 @@ describe('リマインダ公開フローの実データ表示', () => {
   })
 
   it('TestStage は本文の実差し込みだけを並べ、実装に無い変数名を出さない', () => {
-    render(<TestStage draft={DRAFT} recipientName="山田 花子" recipientKind="registered" recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '山田 花子', pictureUrl: null }, recipientKind: 'registered' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
+    render(<TestStage draft={DRAFT} recipientName="見本 143" recipientKind="registered" recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '見本 143', pictureUrl: null }, recipientKind: 'registered' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
     expect(screen.getByLabelText('送り先').title).toContain('{{name}}')
-    expect(screen.getByLabelText('送り先').title).toContain('山田 花子')
-    expect(screen.getByLabelText('送り先').textContent).toContain('山田 花子')
+    expect(screen.getByLabelText('送り先').title).toContain('見本 143')
+    expect(screen.getByLabelText('送り先').textContent).toContain('見本 143')
     expect(screen.queryByText(/meet_datetime/)).toBeNull()
     expect(screen.queryByText(/meet_url/)).toBeNull()
     expect(screen.queryByText(/meet\.google\.com/)).toBeNull()
@@ -148,17 +148,17 @@ describe('リマインダ公開フローの実データ表示', () => {
   })
 
   it('TestStage は送信前に設定済みの送信先を出す', () => {
-    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null }, recipientKind: 'registered' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
+    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '見本 167', pictureUrl: null }, recipientKind: 'registered' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
     // 送る前から実際の送信先が見える。「送ったあとに分かる」ではない。
-    expect(screen.getByLabelText('送り先').textContent).toContain('田中 太郎')
+    expect(screen.getByLabelText('送り先').textContent).toContain('見本 167')
     expect(screen.queryByText('テスト送信後に表示')).toBeNull()
   })
 
   // REMINDER-12: 登録済みテスト宛先は「自分のLINE」と名乗らない。
   it('TestStage は登録済みテスト宛先を自分のLINEと名乗らず、種別と実名を出す', () => {
-    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null }, recipientKind: 'registered' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
+    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '見本 167', pictureUrl: null }, recipientKind: 'registered' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
     // 要約カード・送信先メトリクス・履歴のどれにも実名つきの種別が出る。
-    expect(screen.getByLabelText('送り先').textContent).toContain('登録済みテスト宛先（田中 太郎）')
+    expect(screen.getByLabelText('送り先').textContent).toContain('登録済みテスト宛先（見本 167）')
     expect(screen.getAllByText(/登録済みのテスト送信先へ/).length).toBeGreaterThanOrEqual(1)
     // 本人以外へ「自分のLINEへ」と案内しない。
     expect(screen.queryByText(/自分のLINE/)).toBeNull()

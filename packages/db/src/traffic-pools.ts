@@ -6,6 +6,7 @@ import { resolveLineCredential } from './line-accounts.js';
 
 export interface TrafficPool {
   id: string;
+  confirmation_revision: number;
   slug: string;
   name: string;
   active_account_id: string;
@@ -145,7 +146,7 @@ export async function updateTrafficPool(
 
   values.push(existing.updated_at);
   const result = await db
-    .prepare(`UPDATE traffic_pools SET ${fields.join(', ')} WHERE id = ? AND updated_at = ?`)
+    .prepare(`UPDATE traffic_pools SET confirmation_revision=confirmation_revision+1, ${fields.join(', ')} WHERE id = ? AND updated_at = ?`)
     .bind(...values)
     .run();
   if (result.meta.changes !== 1) {
@@ -242,21 +243,23 @@ async function hydratePoolCredential<
 export async function addPoolAccount(db: D1Database, poolId: string, lineAccountId: string): Promise<PoolAccount> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  const result = await db
-    .prepare('INSERT INTO pool_accounts (id, pool_id, line_account_id, is_active, created_at) VALUES (?, ?, ?, 1, ?) RETURNING *')
-    .bind(id, poolId, lineAccountId, now)
-    .first<PoolAccount>();
-  return result!;
+  const [inserted] = await db.batch<PoolAccount>([
+    db.prepare('INSERT INTO pool_accounts (id, pool_id, line_account_id, is_active, created_at) VALUES (?, ?, ?, 1, ?) RETURNING *').bind(id,poolId,lineAccountId,now),
+    db.prepare('UPDATE traffic_pools SET confirmation_revision=confirmation_revision+1 WHERE id=? AND changes()=1').bind(poolId),
+  ]);
+  return inserted.results[0];
 }
 
 export async function removePoolAccount(db: D1Database, id: string): Promise<boolean> {
-  const result = await db.prepare('DELETE FROM pool_accounts WHERE id = ?').bind(id).run();
-  return result.meta.changes > 0;
+  const pool = await db.prepare('SELECT pool_id FROM pool_accounts WHERE id=?').bind(id).first<{pool_id:string}>();
+  if (!pool) return false;
+  const [result] = await db.batch([db.prepare('DELETE FROM pool_accounts WHERE id=? AND pool_id=?').bind(id,pool.pool_id), db.prepare('UPDATE traffic_pools SET confirmation_revision=confirmation_revision+1 WHERE id=? AND changes()=1').bind(pool.pool_id)]);
+  return Number(result.meta.changes) > 0;
 }
 
 export async function togglePoolAccount(db: D1Database, id: string, isActive: boolean): Promise<PoolAccount | null> {
-  return db
-    .prepare('UPDATE pool_accounts SET is_active = ? WHERE id = ? RETURNING *')
-    .bind(isActive ? 1 : 0, id)
-    .first<PoolAccount>();
+  const pool = await db.prepare('SELECT pool_id FROM pool_accounts WHERE id=?').bind(id).first<{pool_id:string}>();
+  if (!pool) return null;
+  const [result] = await db.batch<PoolAccount>([db.prepare('UPDATE pool_accounts SET is_active=? WHERE id=? AND pool_id=? RETURNING *').bind(isActive?1:0,id,pool.pool_id), db.prepare('UPDATE traffic_pools SET confirmation_revision=confirmation_revision+1 WHERE id=? AND changes()=1').bind(pool.pool_id)]);
+  return result.results[0] ?? null;
 }

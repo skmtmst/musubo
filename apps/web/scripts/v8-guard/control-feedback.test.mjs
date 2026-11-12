@@ -52,7 +52,7 @@ function Fixture(){const[value,setValue]=useState('graph');const[window,setWindo
 <Button onClick={()=>setWindow('editable-drawer')}>名前を直せる引き出しを開く</Button>
 <Dialog open={window==='dialog'} onCancel={()=>setWindow('')} title="作る窓" description="説明の行数が増えても、題の左の丸い印が最初の行の高さにそろうことを確かめます。説明は題から独立した本文です。"><p>本文</p></Dialog>
 <Drawer open={window==='drawer'} onClose={()=>setWindow('')} title="引き出し" description="説明の行数が増えても、題の左の丸い印が最初の行の高さにそろうことを確かめます。説明は題から独立した本文です。"><p>本文</p></Drawer>
-<Drawer open={window==='editable-drawer'} onClose={()=>setWindow('')} title="紹介者の詳細" layout="inset" heading={<InlineEdit value="田中 明" label="紹介者の名前を直す" onSave={async()=>{}}/>} description="説明が2行に増えても、名前を直す操作のある題に丸い印がそろうことを確かめます。"><p>本文</p></Drawer>
+<Drawer open={window==='editable-drawer'} onClose={()=>setWindow('')} title="紹介者の詳細" layout="inset" heading={<InlineEdit value="見本 168" label="紹介者の名前を直す" onSave={async()=>{}}/>} description="説明が2行に増えても、名前を直す操作のある題に丸い印がそろうことを確かめます。"><p>本文</p></Drawer>
 <Button onClick={()=>setWindow('settings')}>設定の間隔を見る</Button>
 {window==='settings'?<section data-measure-settings>{['accounts','wide-nav','narrow-nav','account-handover'].map(layout=><SettingsPage key={layout} layout={layout} title={layout} navigation={null}><div>最初の段</div><div>次の段</div></SettingsPage>)}</section>:null}
 </main>}

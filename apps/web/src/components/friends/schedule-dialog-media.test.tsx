@@ -83,3 +83,22 @@ test('通信結果が不明なら画像を保持して同じキーで再試行�
   await waitFor(() => expect(apiMock.schedule).toHaveBeenCalledTimes(2))
   expect(apiMock.schedule.mock.calls[0][2]).toBe(apiMock.schedule.mock.calls[1][2])
 })
+
+test('画像の予約中にアカウントが変わったら残りの本文を予約しない', async () => {
+  let resolve!: (value: { success: boolean }) => void
+  apiMock.list.mockResolvedValue({ success: true, data: [] })
+  apiMock.schedule.mockImplementationOnce(() => new Promise(done => { resolve = done }))
+  const onClose = vi.fn(), onReserved = vi.fn()
+  const props = { friendId: 'friend-1', friendName: 'ソラ', accountId: 'account-1', onClose, onReserved }
+  const view = render(<ScheduleDialog {...props} />)
+  fireEvent.change(screen.getByRole('textbox', { name: '送るもの' }), { target: { value: '明日のご案内' } })
+  await chooseImage()
+  fireEvent.click(reserve())
+  expect(apiMock.schedule).toHaveBeenCalledTimes(1)
+  view.rerender(<ScheduleDialog {...props} accountId="account-2" />)
+  resolve({ success: true })
+  await waitFor(() => expect(apiMock.schedule).toHaveBeenCalledTimes(1))
+  await new Promise(done => setTimeout(done, 0))
+  expect(apiMock.schedule).toHaveBeenCalledTimes(1)
+  expect(onReserved).not.toHaveBeenCalled()
+})

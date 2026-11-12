@@ -36,7 +36,7 @@ const TEAR_SHORT: Record<string, string> = { normal: 'なし', mild: '少し', c
 const STOOL_OK = new Set(['normal'])
 const APPETITE_OK = new Set(['normal', 'good'])
 
-/** 「こむぎ（犬・柴・4歳）・田中 明子さん・9/1〜9/30」。 */
+/** 「こむぎ（犬・柴・4歳）・見本 太郎さん・9/1〜9/30」。 */
 function petLine(summary: NenHealthSummaryData): string {
   const kind = petAnimalTypeLabel(summary.pet.animalType)
   const parts = [kind, summary.pet.breed, summary.pet.ageLabel === '—' ? '' : summary.pet.ageLabel].filter(Boolean).join('・')

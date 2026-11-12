@@ -56,7 +56,7 @@ import CommonActionsV8 from './common-actions'
 const automation = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
   id, name, description: null, eventType: 'message_received', triggerConfig: {}, conditions: {},
   actions: [{ type: 'notify_staff', params: {} }, { type: 'add_tag', params: {} }],
-  isActive: true, priority: 1, lineAccountId: 'account-a', status: 'active', versionId: `${id}-v`, version: 1,
+  isActive: true, priority: 1, lineAccountId: 'account-a', status: 'active', versionId: `${id}-v`, version: 1, confirmationRevision: 3,
   executionCount30d: 312, failureCount30d: 0, lastRunAt: null,
   createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-09-30T00:00:00.000Z', ...extra,
 })
@@ -220,7 +220,7 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
     expect(document.body.textContent).toContain('稼働を切り替えられませんでした')
     await act(async () => { confirm().click() })
     expect(status).toHaveBeenCalledTimes(2)
-    expect(status).toHaveBeenLastCalledWith('au-1', 'stopped')
+    expect(status).toHaveBeenLastCalledWith('au-1', 'stopped', 3)
   })
 
   it('変更中に店を切り替えると窓を閉じ、新しい店の確認を前の処理のロックで止めない', async () => {

@@ -29,7 +29,7 @@ const flush = () => act(async () => { await Promise.resolve() })
 
 const healthRow = {
   pet: { id: 'pet-1', name: 'こむぎ', callName: 'こむぎ', animalType: 'dog', breed: '柴', ageLabel: '4歳', imageUrl: null },
-  owner: { friendId: 'f1', name: '田中 明子', customerId: '10234' },
+  owner: { friendId: 'f1', name: '見本 169', customerId: '10234' },
   lastLoggedOn: '2026-09-30',
   lastLoggedLabel: '9/30 体重',
   daysSinceLast: 0,
@@ -54,7 +54,7 @@ const listData = {
 
 const summaryData = {
   pet: { id: 'pet-1', name: 'こむぎ', callName: 'こむぎ', animalType: 'dog', breed: '柴', ageLabel: '4歳', weightKg: 9.2 },
-  owner: { friendId: 'f1', name: '田中 明子' },
+  owner: { friendId: 'f1', name: '見本 169' },
   generatedAt: '2026-09-30T00:00:00Z',
   summary: {
     days: 30,

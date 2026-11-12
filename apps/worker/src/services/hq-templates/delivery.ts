@@ -218,7 +218,7 @@ export async function planDelivery(db:D1Database,accountId:string,def:HqDelivery
   const add=(sql:string,bindings:HqTemplateStatement['bindings'])=>statements.push({sql,bindings});
   if(type==='auto_reply') {
     const s=settings as AutoReplyDraftSettings;
-    if(selected.mode==='overwrite') add(`UPDATE auto_replies SET name=?,current_draft_version_id=? WHERE id=? AND line_account_id=?`,[name,versionId,id,accountId]);
+    if(selected.mode==='overwrite') add(`UPDATE auto_replies SET confirmation_revision = confirmation_revision + 1, name=?,current_draft_version_id=? WHERE id=? AND line_account_id=?`,[name,versionId,id,accountId]);
     else add(`INSERT INTO auto_replies(id,name,keyword,match_type,response_type,response_content,line_account_id,is_active,lifecycle_status,current_draft_version_id) VALUES (?,?,?,?,?,?,?,0,'draft',?)`,[id,name,s.keyword,s.matchType,s.responseType,s.responseContent,accountId,versionId]);
     if(existingDraft) add(`UPDATE auto_reply_versions SET definition_snapshot=?,last_test_status=NULL,last_tested_at=NULL,last_tested_by_staff_id=NULL,updated_at=? WHERE id=? AND auto_reply_id=? AND status='draft'`,[JSON.stringify(s),now,versionId,id]);
     else add(`INSERT INTO auto_reply_versions(id,auto_reply_id,version_number,line_account_id,definition_snapshot,status,created_at,updated_at) VALUES (?,?,(SELECT COALESCE(MAX(version_number),0)+1 FROM auto_reply_versions WHERE auto_reply_id=?),?,?,'draft',?,?)`,[versionId,id,id,accountId,JSON.stringify(s),now,now]);

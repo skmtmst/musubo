@@ -116,13 +116,38 @@ export type WebinarNotificationDeliveryOptions = {
   defaultAccessToken: string;
   defaultLiffId: string | null;
   proxyDispatch?: HarnessProxyDispatch;
+  expectedRecipientToken?: string;
+  confirmationId?: string;
 };
 
 type WebinarNotificationTestTarget = {
   id: string;
   line_user_id: string;
   is_following: number;
+  display_name: string | null;
 };
+
+export class WebinarTestRecipientsChanged extends Error {
+  readonly code = 'WEBINAR_TEST_RECIPIENT_CHANGED';
+  constructor(public current: {count:number|null;recipients:Array<{id:string;displayName:string|null}>}) {
+    super('テスト宛先が変わりました。もう一度確認してください');
+  }
+}
+
+export async function webinarTestRecipientPreview(db:D1Database, accountId:string) {
+  const setting=await db.prepare(`SELECT value FROM account_settings WHERE line_account_id=? AND key='test_recipients'`).bind(accountId).first<{value:string}>();
+  let ids:unknown;
+  try { ids=setting?JSON.parse(setting.value):[]; } catch { throw new Error('invalid_test_recipients'); }
+  if(!Array.isArray(ids)||ids.some(id=>typeof id!=='string')) throw new Error('invalid_test_recipients');
+  if(!ids.length) throw new Error('no_test_recipients');
+  const set=sqlIdSet(ids);
+  const targets=(await db.prepare(`SELECT id,line_user_id,is_following,display_name FROM friends WHERE line_account_id=? AND id IN (${set.sql})`).bind(accountId,...set.binds).all<WebinarNotificationTestTarget>()).results
+    .filter(target=>target.is_following).sort((a,b)=>a.id.localeCompare(b.id));
+  const bytes=new TextEncoder().encode(JSON.stringify([accountId,targets.map(target=>[target.id,target.line_user_id])]));
+  const digest=await crypto.subtle.digest('SHA-256',bytes);
+  const token=Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
+  return {targets,token,count:targets.length,recipients:targets.map(target=>({id:target.id,displayName:target.display_name}))};
+}
 
 function parseTime(value: string): number | null {
   const match = /^(\d{2}):(\d{2})$/.exec(value);
@@ -474,25 +499,15 @@ export async function sendWebinarNotificationTest(
   options: WebinarNotificationDeliveryOptions,
 ): Promise<{ sent: number; failed: number }> {
   if (!webinar.accountId) throw new Error('missing_line_account');
-  const setting = await db.prepare(
-    `SELECT value FROM account_settings
-      WHERE line_account_id=? AND key='test_recipients'`,
-  ).bind(webinar.accountId).first<{ value: string }>();
-  let friendIds: unknown = [];
-  try {
-    friendIds = setting ? JSON.parse(setting.value) as unknown : [];
-  } catch {
-    throw new Error('invalid_test_recipients');
-  }
-  if (!Array.isArray(friendIds) || friendIds.some((id) => typeof id !== 'string')) {
-    throw new Error('invalid_test_recipients');
-  }
-  if (friendIds.length === 0) throw new Error('no_test_recipients');
-  const placeholders = sqlIdSet(friendIds).sql;
-  const targets = await db.prepare(
-    `SELECT id, line_user_id, is_following FROM friends
-      WHERE line_account_id=? AND id IN (${placeholders})`,
-  ).bind(webinar.accountId, ...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<WebinarNotificationTestTarget>();
+  const readRecipients=async()=>{
+    try{return await webinarTestRecipientPreview(db,webinar.accountId!);}
+    catch(error){
+      if(options.expectedRecipientToken!==undefined&&error instanceof Error&&['invalid_test_recipients','no_test_recipients'].includes(error.message))throw new WebinarTestRecipientsChanged({count:null,recipients:[]});
+      throw error;
+    }
+  };
+  const targets = await readRecipients();
+  if(options.expectedRecipientToken!==undefined&&targets.token!==options.expectedRecipientToken)throw new WebinarTestRecipientsChanged(targets);
   const account = await db.prepare(
     `SELECT channel_access_token, channel_access_token_encrypted, liff_id, is_active
        FROM line_accounts WHERE id=?`,
@@ -512,7 +527,14 @@ export async function sendWebinarNotificationTest(
   );
   let sent = 0;
   let failed = 0;
-  for (const target of targets.results ?? []) {
+  const latest=options.expectedRecipientToken===undefined?targets:await readRecipients();
+  if(options.expectedRecipientToken!==undefined&&latest.token!==options.expectedRecipientToken)throw new WebinarTestRecipientsChanged(latest);
+  if(options.confirmationId!==undefined){
+    const claimed=await db.prepare(`INSERT OR IGNORE INTO operation_audit(id,target_kind,target_id,action) VALUES (?,'webinar',?,'notification_test_started')`)
+      .bind(`webinar-test:${webinar.id}:${options.confirmationId}`,webinar.id).run();
+    if(!claimed.meta.changes)throw new Error('webinar_test_already_started');
+  }
+  for (const target of latest.targets) {
     if (!target.is_following) continue;
     try {
       await pushViaHarnessProxy(

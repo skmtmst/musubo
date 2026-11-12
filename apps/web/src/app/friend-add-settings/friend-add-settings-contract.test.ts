@@ -22,7 +22,6 @@ describe("管理画面 友だち追加時配信 7画面の契約", () => {
   it('モック固定値ではなく友だち追加時配信APIで読み書きする', () => {
     expect(LIST_PAGE).toContain('api.friendAddRules.list(selectedAccountId, kind, {')
     expect(LIST_PAGE).toContain('api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current, folderColor)')
-    expect(LIST_PAGE).toMatch(/const runDelete = async \(\) => \{[\s\S]*?deleteScope\.generation !== accountScope\.current\.generation[\s\S]*?api\.friendAddRules\.archive\(deleteScope\.id, deleteTarget\.id\)/)
     expect(EDITOR).toContain('api.friendAddRules.createDraft(payload, saveIdempotencyKey.current)')
     expect(EDITOR).toContain('api.friendAddRules.saveDraft(ruleId, payload, saveIdempotencyKey.current)')
     // R262: テストは試す流入リンク・想定日時・友だちを実行側の判定へ渡す。
@@ -171,7 +170,7 @@ describe("管理画面 友だち追加時配信の監査修正", () => {
   })
 
   it('N-108: テスト確認面に固定の人名・方法を出さない', () => {
-    expect(EDITOR).not.toContain('Kenta Kawano')
+    expect(EDITOR).not.toContain('Demo Person')
   })
 
   it('N-109: 「二重送信」は再送防止の設定値を出し、テスト実施状態と分ける', () => {

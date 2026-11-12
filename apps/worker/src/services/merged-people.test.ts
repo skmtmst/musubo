@@ -31,10 +31,10 @@ function seed() {
     `).run(id, `channel-${id}`, name, DEFAULT_TENANT_ID);
   }
   insertFriend(raw, 'friend-a', {
-    line_account_id: 'account-a', display_name: '田中 花子', user_id: 'user-a',
+    line_account_id: 'account-a', display_name: '見本 171', user_id: 'user-a',
   });
   insertFriend(raw, 'friend-b', {
-    line_account_id: 'account-b', display_name: '田中 はなこ', user_id: 'user-a',
+    line_account_id: 'account-b', display_name: '見本 161', user_id: 'user-a',
   });
   insertFriend(raw, 'friend-c', {
     line_account_id: 'account-a', display_name: '別の人', user_id: null,
@@ -43,7 +43,7 @@ function seed() {
     INSERT INTO users (
       id, tenant_id, status, display_name, primary_display_name, revision,
       created_by, created_at, updated_at
-    ) VALUES ('user-a', ?, 'active', '田中 花子', '田中 花子', 1,
+    ) VALUES ('user-a', ?, 'active', '見本 171', '見本 171', 1,
       'owner-a', '2026-08-30T09:00:00.000Z', '2026-08-30T09:00:00.000Z')
   `).run(DEFAULT_TENANT_ID);
   raw.prepare(`
@@ -81,8 +81,8 @@ function seed() {
       source_type, source_id, source_label, source_friend_id, verified_at,
       selected_by, selected_by_name, selected_at, update_mode, is_active,
       created_at, updated_at
-    ) VALUES ('profile-a', ?, 'user-a', 'email', 'メール', '"tanaka@example.jp"',
-      'ta***@example.jp', 'form', 'form-a', '来店アンケート', 'friend-a',
+    ) VALUES ('profile-a', ?, 'user-a', 'email', 'メール', '"tanaka@example.com"',
+      'ta***@example.com', 'form', 'form-a', '来店アンケート', 'friend-a',
       '2026-08-29T12:00:00.000Z', 'owner-a', '担当者',
       '2026-08-30T09:20:00.000Z', 'fixed', 1,
       '2026-08-30T09:20:00.000Z', '2026-08-30T09:20:00.000Z')
@@ -105,14 +105,14 @@ describe('merged person detail contract', () => {
     const displayName = candidates.profileCandidates.find((field) => field.fieldKey === 'display_name');
     const option = displayName?.options.find((item) => item.sourceFriendId === 'friend-b');
     expect(option?.candidateId).toMatch(/^pc_[0-9a-f]{64}$/);
-    expect(JSON.stringify(candidates)).not.toContain('090-1234-5678');
+    expect(JSON.stringify(candidates)).not.toContain('090-0000-5678');
 
     const resolved = await resolveProfileCandidateSelections(db, ['friend-a', 'friend-b'], [{
       fieldKey: 'display_name', candidateId: option!.candidateId, updateMode: 'fixed',
     }]);
     expect(resolved).toMatchObject([{
-      fieldKey: 'display_name', value: '田中 はなこ', sourceFriendId: 'friend-b',
-      valuePreview: '田中 はなこ', updateMode: 'fixed',
+      fieldKey: 'display_name', value: '見本 161', sourceFriendId: 'friend-b',
+      valuePreview: '見本 161', updateMode: 'fixed',
     }]);
 
     raw.prepare('UPDATE friends SET display_name = ? WHERE id = ?').run('変更後の名前', 'friend-b');
@@ -125,18 +125,18 @@ describe('merged person detail contract', () => {
     const { db } = seed();
     const detail = await getMergedPerson(db, DEFAULT_TENANT_ID, 'user-a');
     expect(detail).toMatchObject({
-      id: 'user-a', status: 'active', revision: 1, primaryDisplayName: '田中 花子',
+      id: 'user-a', status: 'active', revision: 1, primaryDisplayName: '見本 171',
     });
     expect(detail.linkedFriends).toHaveLength(2);
     expect(detail.linkedFriends[0]).toMatchObject({ confidence: 92, candidateId: 'candidate-a' });
     expect(detail.profileValues[0]).toMatchObject({
-      fieldKey: 'email', valuePreview: 'ta***@example.jp', sourceLabel: '来店アンケート',
+      fieldKey: 'email', valuePreview: 'ta***@example.com', sourceLabel: '来店アンケート',
     });
     expect(detail.deliveryPriorities[0]).toMatchObject({
       purpose: 'broadcast', lineAccountName: '本店', priority: 1,
     });
     expect(detail.history[0]).toMatchObject({ eventType: 'link', actorName: '担当者' });
-    expect(JSON.stringify(detail)).not.toContain('tanaka@example.jp');
+    expect(JSON.stringify(detail)).not.toContain('tanaka@example.com');
   });
 
   it('derives legacy tenant scope from every linked LINE account and rejects cross-tenant users', async () => {
@@ -163,22 +163,22 @@ describe('merged person detail contract', () => {
     const { db, raw } = seed();
     const updated = await updateMergedPerson(db, actor, 'user-a', {
       expectedRevision: 1,
-      primaryDisplayName: '田中 はなこ',
+      primaryDisplayName: '見本 161',
       profileSelections: [{
-        fieldKey: 'phone', fieldLabel: '電話番号', value: '090-1234-5678',
+        fieldKey: 'phone', fieldLabel: '電話番号', value: '090-0000-5678',
         valuePreview: '090-****-5678', sourceType: 'friend_field', sourceId: 'field-phone',
         sourceLabel: '本店の友だち情報', sourceFriendId: 'friend-a',
         verifiedAt: '2026-08-30T09:40:00.000Z', updateMode: 'fixed',
       }],
     });
-    expect(updated).toMatchObject({ revision: 2, primaryDisplayName: '田中 はなこ' });
+    expect(updated).toMatchObject({ revision: 2, primaryDisplayName: '見本 161' });
     expect(updated.profileValues.find((item) => item.fieldKey === 'phone')).toMatchObject({
       valuePreview: '090-****-5678', sourceFriendId: 'friend-a',
     });
-    expect(JSON.stringify(updated)).not.toContain('090-1234-5678');
+    expect(JSON.stringify(updated)).not.toContain('090-0000-5678');
     expect(raw.prepare(
       "SELECT value_json FROM user_profile_values WHERE field_key='phone' AND is_active=1",
-    ).get()).toEqual({ value_json: '"090-1234-5678"' });
+    ).get()).toEqual({ value_json: '"090-0000-5678"' });
     await expect(updateMergedPerson(db, actor, 'user-a', {
       expectedRevision: 1, primaryDisplayName: '古い画面',
     })).rejects.toMatchObject({ code: 'STALE_PERSON', status: 409 });
@@ -189,8 +189,8 @@ describe('merged person detail contract', () => {
     await expect(updateMergedPerson(db, actor, 'user-a', {
       expectedRevision: 1,
       profileSelections: [{
-        fieldKey: 'email', fieldLabel: 'メール', value: 'tanaka@example.jp',
-        valuePreview: 'tanaka@example.jp', sourceType: 'form', sourceId: 'form-a',
+        fieldKey: 'email', fieldLabel: 'メール', value: 'tanaka@example.com',
+        valuePreview: 'tanaka@example.com', sourceType: 'form', sourceId: 'form-a',
         sourceLabel: '来店アンケート', sourceFriendId: 'friend-a',
         verifiedAt: null, updateMode: 'auto',
       }],

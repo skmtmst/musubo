@@ -108,6 +108,7 @@ export function ScenarioDetailBody({
   saveErrors: ReturnType<typeof useSaveFormErrors>
 }) {
   const tokenNames = useInsertTokenNames(scenario.lineAccountId)
+  const startedAudience = stats?.activeNow ?? simulation?.audience.newStartPlanned
   const displayOrder = (order: number) => { const index = sortedSteps.findIndex((step) => step.stepOrder === order); return index < 0 ? '—' : String(index + 1) }
   return (      <div className={styles.body} data-design="Body" data-template-region="body">
         <div className={styles.left}>
@@ -120,7 +121,7 @@ export function ScenarioDetailBody({
             <div className={styles.startedBand} role="status">
               <CircleCheck aria-hidden />
               <span className={styles.startedText}>
-                {`配信を始めました。予約中の ${formatNumber(stats?.activeNow ?? simulation?.audience.newStartPlanned ?? 0)} 人へ、条件を満たした人から順に送ります`}
+                {startedAudience == null ? '配信を始めました。人数を確認できません。' : `配信を始めました。予約中の ${formatNumber(startedAudience)} 人へ、条件を満たした人から順に送ります`}
               </span>
               <Link href={`/scenarios/results?id=${id}`} className={styles.startedLink}
                 title={startedAt ? `開始日時：${startedAt}` : '開始日時を読み込めませんでした。始めた記録を読み直してください。'}>

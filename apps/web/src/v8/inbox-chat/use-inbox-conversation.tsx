@@ -5,6 +5,7 @@ import { useCallback,useEffect,useRef,useState } from 'react';
 import { Chat,ChatDetail,DEEP_LINK_NOTICE } from './inbox-model';
 
 type Options = {
+  sendLockRef: RefObject<boolean>
   CHAT_MESSAGE_PAGE_SIZE: number
   selectedChatIdRef: RefObject<string | null>
   detailAccountRef: RefObject<string | null>
@@ -18,7 +19,7 @@ type Options = {
   chats: ChatListItem[]
 }
 
-export function useInboxConversation({ CHAT_MESSAGE_PAGE_SIZE, selectedChatIdRef, detailAccountRef, detailRequestIdRef, setError, deepLinkIdRef, setDeepLinkNotice, selectedChatId, selectedAccountId, setChats, chats }: Options) {
+export function useInboxConversation({ sendLockRef, CHAT_MESSAGE_PAGE_SIZE, selectedChatIdRef, detailAccountRef, detailRequestIdRef, setError, deepLinkIdRef, setDeepLinkNotice, selectedChatId, selectedAccountId, setChats, chats }: Options) {
 
   const [chatDetail, setChatDetail] = useState<ChatDetail | null>(null)
 
@@ -134,12 +135,12 @@ export function useInboxConversation({ CHAT_MESSAGE_PAGE_SIZE, selectedChatIdRef
 
   const refreshChatDetailQuietly = useCallback(async (): Promise<boolean> => {
     const chatId = selectedChatIdRef.current
-    if (!chatId) return true
+    if (!chatId || sendLockRef.current) return true
     const requestId = ++detailPollSeqRef.current
     const accountId = detailAccountRef.current
     try {
       const res = await api.chats.get(chatId, { limit: CHAT_MESSAGE_PAGE_SIZE })
-      if (requestId !== detailPollSeqRef.current) return true
+      if (requestId !== detailPollSeqRef.current || sendLockRef.current) return true
       if (selectedChatIdRef.current !== chatId || detailAccountRef.current !== accountId) return true
       if (!res.success) return false
       const detail = res.data
@@ -165,7 +166,7 @@ export function useInboxConversation({ CHAT_MESSAGE_PAGE_SIZE, selectedChatIdRef
     } catch {
       return false
     }
-  }, [detailAccountRef, selectedChatIdRef, CHAT_MESSAGE_PAGE_SIZE])
+  }, [detailAccountRef, selectedChatIdRef, sendLockRef, CHAT_MESSAGE_PAGE_SIZE])
 
   useEffect(() => {
     if (selectedChatId) {

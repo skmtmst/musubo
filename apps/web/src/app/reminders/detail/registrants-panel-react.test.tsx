@@ -53,7 +53,7 @@ vi.mock('@/lib/api', async (importOriginal) => ({
 }))
 
 const registrant = {
-  id: 'registration-1', friendId: 'friend-1', friendName: '田中 花子', targetDate: '2026-10-01T00:00:00.000Z',
+  id: 'registration-1', friendId: 'friend-1', friendName: '見本 171', targetDate: '2026-10-01T00:00:00.000Z',
   status: 'active', reminderVersionId: 'snapshot-1', sourceKind: 'manual', createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z', cancelledAt: null, lockVersion: 4,
 }
@@ -114,11 +114,6 @@ async function pickTargetDate(label: string, iso: string) {
     await Promise.resolve()
   })
   const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  await act(async () => {
-    picker.querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
-    await Promise.resolve()
-    await Promise.resolve()
-  })
   for (let i = 0; i < 24; i += 1) {
     const grid = document.querySelector('[role="grid"]')
     if (grid?.getAttribute('aria-label') === `${y}年${mo}月`) break
@@ -140,7 +135,6 @@ async function pickTargetDate(label: string, iso: string) {
     await Promise.resolve()
     await Promise.resolve()
   })
-  await act(async () => { Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!.click() })
   const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await act(async () => {
     const timeInput = reopened.querySelector('input') as HTMLInputElement
@@ -150,7 +144,7 @@ async function pickTargetDate(label: string, iso: string) {
     await Promise.resolve()
   })
   await act(async () => {
-    [...reopened.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!.click()
+    [...reopened.querySelectorAll('button')].find((b) => b.textContent?.trim() === '確定')!.click()
     await Promise.resolve()
     await Promise.resolve()
   })
@@ -167,8 +161,8 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
 
   it('直URLの登録者一覧から基準日を保存し、リマインダID・版番号を実APIへ渡す', async () => {
     await render()
-    expect(host.textContent).toContain('田中 花子')
-    await pickTargetDate('田中 花子の基準日', '2026-10-08T09:00')
+    expect(host.textContent).toContain('見本 171')
+    await pickTargetDate('見本 171の基準日', '2026-10-08T09:00')
     await click('基準日を保存')
     expect(apiMock.updateTargetDate).toHaveBeenCalledWith('reminder-1', 'registration-1', expect.stringMatching(/^2026-10-08T/), 4)
     expect(host.textContent).toContain('未送信分だけ新しい日程で組み直します。')
@@ -177,11 +171,11 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
   it('取消後は再開だけを表示し、再開には取消後の版番号を渡す', async () => {
     await render()
     // 行の操作は「…」1つの中。
-    await clickAria('田中 花子の操作')
+    await clickAria('見本 171の操作')
     await click('取り消す')
     expect(apiMock.cancel).toHaveBeenCalledWith('reminder-1', 'registration-1', 4)
     expect(host.textContent).toContain('取消済み')
-    await clickAria('田中 花子の操作')
+    await clickAria('見本 171の操作')
     await click('再開する')
     expect(apiMock.resume).toHaveBeenCalledWith('reminder-1', 'registration-1', 5)
     expect(host.textContent).toContain('未送信分だけを次の配信処理で組み直します。')
@@ -202,7 +196,7 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
   it('アカウント切替では前の登録者を残さず、対象を読み直す', async () => {
     apiMock.list.mockResolvedValueOnce({ success: true, data: [registrant] }).mockResolvedValueOnce({ success: true, data: [] })
     await render()
-    expect(host.textContent).toContain('田中 花子')
+    expect(host.textContent).toContain('見本 171')
     account.selectedAccountId = 'account-b'
     await act(async () => {
       root.render(<PageExplanationProvider pageKey="reminders:registrants"><RegistrantsTab canManage reminderId="reminder-1" /></PageExplanationProvider>)
@@ -211,17 +205,17 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
     })
     expect(apiMock.list).toHaveBeenCalledTimes(2)
     expect(host.textContent).toContain('登録者はいません')
-    expect(host.textContent).not.toContain('田中 花子')
+    expect(host.textContent).not.toContain('見本 171')
   })
 
   it('端末がJST以外でも、UTCの基準日をJSTで表示し選んだ瞬間を保存する', async () => {
     const jstRegistrant = { ...registrant, targetDate: '2026-09-16T01:00:00.000Z' }
     apiMock.list.mockResolvedValueOnce({ success: true, data: [jstRegistrant] })
     await render()
-    const trigger = document.querySelector('button[aria-label="田中 花子の基準日"]')
+    const trigger = document.querySelector('button[aria-label="見本 171の基準日"]')
     // 実行端末はUTC+7でも、01:00ZはJST 10:00として画面に出す（表の欄は「9/16（水）10:00」の短い形・）。
     expect(trigger?.textContent).toContain('9/16（水）10:00')
-    await pickTargetDate('田中 花子の基準日', '2026-09-16T10:30')
+    await pickTargetDate('見本 171の基準日', '2026-09-16T10:30')
     await click('基準日を保存')
     expect(apiMock.updateTargetDate).toHaveBeenCalledWith('reminder-1', 'registration-1', '2026-09-16T01:30:00.000Z', 4)
   })
@@ -232,13 +226,13 @@ describe('登録者一覧の器（監査A2）', () => {
     apiMock.list.mockResolvedValue({
       success: true,
       data: [
-        { ...registrant, id: 'reminder-enrollment-1', friendName: '高橋 直人' },
-        { ...registrant, id: 'reminder-enrollment-2', friendName: '前田 さくら' },
+        { ...registrant, id: 'reminder-enrollment-1', friendName: '見本 16' },
+        { ...registrant, id: 'reminder-enrollment-2', friendName: '見本 17' },
       ],
     })
     await render()
-    expect(host.textContent).toContain('高橋 直人')
-    expect(host.textContent).toContain('前田 さくら')
+    expect(host.textContent).toContain('見本 16')
+    expect(host.textContent).toContain('見本 17')
   })
 
   it('旧偽APIの器（配列でない）では読み込み失敗になる', async () => {

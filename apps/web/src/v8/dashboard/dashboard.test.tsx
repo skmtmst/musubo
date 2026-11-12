@@ -13,9 +13,9 @@ import { trendDay, trendRangeNote } from './trend'
  */
 describe('V8 ダッシュボードの言葉', () => {
   it('あいさつは日本時間の時間帯と名前の最初の語で作る', () => {
-    expect(greeting('Kenta Kawano', new Date('2026-01-13T00:30:00Z'))).toBe('おはようございます、Kenta さん')
-    expect(greeting('Kenta Kawano', new Date('2026-01-13T03:00:00Z'))).toBe('こんにちは、Kenta さん')
-    expect(greeting('Kenta Kawano', new Date('2026-01-13T12:00:00Z'))).toBe('こんばんは、Kenta さん')
+    expect(greeting('Demo Person', new Date('2026-01-13T00:30:00Z'))).toBe('おはようございます、Demo さん')
+    expect(greeting('Demo Person', new Date('2026-01-13T03:00:00Z'))).toBe('こんにちは、Demo さん')
+    expect(greeting('Demo Person', new Date('2026-01-13T12:00:00Z'))).toBe('こんばんは、Demo さん')
     expect(greeting(null, new Date('2026-01-13T00:30:00Z'))).toBe('おはようございます')
   })
 

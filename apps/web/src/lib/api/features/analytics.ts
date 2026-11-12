@@ -213,6 +213,7 @@ export const analyticsMethods = {
         windowDays: number
         createdAt: string
         status: 'active' | 'stopped' | 'archived'
+        confirmationRevision: number
         currentVersion: { id: string; versionNumber: number; createdAt: string } | null
         migrationState: 'ready' | 'needs_migration'
       }>>>(`/api/analytics/funnels?account_id=${encodeURIComponent(accountId)}${options?.includeInactive ? '&includeInactive=1' : ''}`),
@@ -267,6 +268,7 @@ export const analyticsMethods = {
       setStatus: (accountId: string, funnelId: string, data: {
         status: 'active' | 'stopped' | 'archived'
         expectedStatus: 'active' | 'stopped' | 'archived'
+        expectedRevision?: number
       }) => fetchApi<ApiResponse<{ id: string; status: 'active' | 'stopped' | 'archived' }>>(
         `/api/analytics/funnels/${funnelId}/status?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },

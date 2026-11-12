@@ -45,6 +45,7 @@
 .timeline{position:relative;margin-block-start:var(--polish-space-section);}
 .nowTrack{position:absolute;inset-block:var(--tpl-board-block-top) 0;inset-inline:var(--tpl-board-resource-w) 0;pointer-events:none;max-width:calc(820px - var(--tpl-board-resource-w));}
 .contentCols :is(th,td):not(:last-child){padding-inline-end:12px;}
+.contentCols :is(th,td):first-child{white-space:nowrap;}
 
 /* 予約盤の道具は表と同じ左端に置き、収まらない場合は段を折り返す。押せるもの同士の間は道具の段の共通の値。 */
 .board[data-kind='people'] > .toolbar { padding-inline: 0; gap: var(--tpl-toolbar-gap); }

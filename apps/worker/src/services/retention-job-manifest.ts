@@ -34,3 +34,10 @@ export const GOOGLE_CONTENT_RETENTION_JOB = {
       'Googleの利用者データポリシーで決まった保存期限の掃除で、機能をoffにした店舗の古いコピーが残り続けるほうが違反になる',
   },
 } as const satisfies FeatureJobMetadata;
+
+/** 利用申込は統括の所属前に作られるため、店舗の機能設定に関係なく期限を守る。 */
+export const REGISTRATION_APPLICATION_RETENTION_JOB = {
+  name: 'registration application retention',
+  classification: { kind: 'core', reason: '未成立・却下の利用申込の保存期限' },
+  enforcement: { mode: 'exempt', reason: '統括の所属前の申込であり、機能スイッチに依存しない' },
+} as const satisfies FeatureJobMetadata;

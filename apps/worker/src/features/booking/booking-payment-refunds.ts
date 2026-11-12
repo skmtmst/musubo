@@ -5,6 +5,7 @@ export interface RefundInput {
   reason: string;
   notifyLine: boolean;
   idempotencyKey: string;
+  expectedRevision?: number;
 }
 export interface PaymentRefund {
   id: string; amount: number; reason: string; actorLabel: string; createdAt: string;
@@ -25,9 +26,11 @@ export function parseRefundInput(body: unknown): RefundInput | null {
   if (typeof v.reason !== 'string' || !v.reason.trim() || v.reason.trim().length > 500
     || typeof v.idempotencyKey !== 'string' || !/^[A-Za-z0-9:_-]{1,200}$/.test(v.idempotencyKey)
     || (v.amount !== undefined && (!Number.isSafeInteger(v.amount) || Number(v.amount) <= 0))
-    || (v.notifyLine !== undefined && typeof v.notifyLine !== 'boolean')) return null;
+    || (v.notifyLine !== undefined && typeof v.notifyLine !== 'boolean')
+    || (v.expectedRevision !== undefined && (!Number.isSafeInteger(v.expectedRevision) || Number(v.expectedRevision) < 1))) return null;
   return { reason: v.reason.trim(), idempotencyKey: v.idempotencyKey, notifyLine: v.notifyLine === true,
-    ...(v.amount === undefined ? {} : { amount: v.amount as number }) };
+    ...(v.amount === undefined ? {} : { amount: v.amount as number }),
+    ...(v.expectedRevision === undefined ? {} : { expectedRevision: v.expectedRevision as number }) };
 }
 export function refundDto(row: RefundRow): PaymentRefund {
   return { id: row.id, amount: row.amount, reason: row.reason, actorLabel: row.actor_label,
@@ -73,14 +76,15 @@ export async function simulatePaymentRefund(db: D1Database, payment: BookingPaym
         FROM booking_payments p WHERE p.id=? AND p.line_account_id=? AND p.status='paid'
           AND p.provider='stripe' AND substr(p.provider_payment_id,1,8)='pi_test_'
           AND p.currency='JPY' AND p.amount-p.refunded_amount>0
+          AND (? IS NULL OR p.confirmation_revision=?)
           AND COALESCE(?,p.amount-p.refunded_amount)<=p.amount-p.refunded_amount
           AND NOT EXISTS(SELECT 1 FROM booking_payment_connections c WHERE c.line_account_id=p.line_account_id
             AND c.provider='stripe' AND c.disconnected_at IS NULL AND c.test_mode=0)
           AND NOT EXISTS(SELECT 1 FROM booking_payment_refunds r WHERE r.payment_id=p.id AND r.idempotency_key=?)`)
         .bind(id, input.idempotencyKey, input.amount ?? null, input.amount ?? null, input.reason, actor.id,
           actor.name, input.notifyLine ? 1 : 0, input.notifyLine ? 1 : 0, at, payment.id, account,
-          input.amount ?? null, input.idempotencyKey),
-      db.prepare(`UPDATE booking_payments SET refunded_amount=refunded_amount+(SELECT amount FROM booking_payment_refunds WHERE id=?),
+          input.expectedRevision ?? null, input.expectedRevision ?? null, input.amount ?? null, input.idempotencyKey),
+      db.prepare(`UPDATE booking_payments SET confirmation_revision=confirmation_revision+1, refunded_amount=refunded_amount+(SELECT amount FROM booking_payment_refunds WHERE id=?),
         status=CASE WHEN refunded_amount+(SELECT amount FROM booking_payment_refunds WHERE id=?)=amount THEN 'refunded' ELSE 'paid' END,
         refunded_at=?,updated_at=?,actor_label=?,action_reason=?
         WHERE id=? AND line_account_id=? AND EXISTS(SELECT 1 FROM booking_payment_refunds WHERE id=?)`)
@@ -88,7 +92,17 @@ export async function simulatePaymentRefund(db: D1Database, payment: BookingPaym
     ]);
   }
   const saved = await read();
-  if (!saved) throw new PaymentActionError('refund_not_available', 409);
+  if (!saved) {
+    const current = await db.prepare('SELECT confirmation_revision FROM booking_payments WHERE id=? AND line_account_id=?')
+      .bind(payment.id, account).first<{confirmation_revision:number}>();
+    if (input.expectedRevision !== undefined && current && current.confirmation_revision !== input.expectedRevision) {
+      throw new PaymentActionError('stale_confirmation', 409);
+    }
+    const liveConnection = await db.prepare(`SELECT 1 FROM booking_payment_connections WHERE line_account_id=?
+      AND provider='stripe' AND disconnected_at IS NULL AND test_mode=0`).bind(account).first();
+    if (liveConnection) throw new PaymentActionError('simulation_only', 409);
+    throw new PaymentActionError('refund_not_available', 409);
+  }
   validate(saved);
   const current = await db.prepare('SELECT * FROM booking_payments WHERE id=? AND line_account_id=?')
     .bind(payment.id, account).first<BookingPaymentRecord>();
@@ -113,7 +127,7 @@ export async function linkPaymentBooking(db: D1Database, payment: BookingPayment
       AND NOT EXISTS(SELECT 1 FROM booking_payment_choices ch WHERE ch.booking_id=? AND ch.mode='onsite')
       AND NOT EXISTS(SELECT 1 FROM booking_entitlement_uses u WHERE u.booking_id=?)`)
       .bind(id, bookingId, reason, actor.id, actor.name, at, payment.id, account, bookingId, bookingId, bookingId, bookingId),
-    db.prepare(`UPDATE booking_payments SET booking_id=?,actor_label=?,action_reason=?,updated_at=?
+    db.prepare(`UPDATE booking_payments SET confirmation_revision=confirmation_revision+1, booking_id=?,actor_label=?,action_reason=?,updated_at=?
       WHERE id=? AND line_account_id=? AND booking_id IS NULL
       AND EXISTS(SELECT 1 FROM booking_payment_booking_links WHERE id=?)`)
       .bind(bookingId, actor.name, reason, at, payment.id, account, id),

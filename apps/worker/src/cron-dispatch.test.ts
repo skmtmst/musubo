@@ -56,6 +56,7 @@ const processors = vi.hoisted(() => Object.fromEntries([
   "deleteExpiredRestaurantRawEmails",
   "processGoogleBusinessDailyMetrics",
   "processTenantDataPurge",
+  "purgeExpiredRegistrationApplications",
   "processDueReminders",
   "processDueEventReminders",
   "processDueMeetConsultationReminders",
@@ -172,6 +173,9 @@ vi.mock('./services/step-delivery.js',async original=>({
   ...await original<Record<string,unknown>>(),
   processStepDeliveries:processors.processStepDeliveries,
 }));
+vi.mock('./services/registration-application-retention.js', () => ({
+  purgeExpiredRegistrationApplications: processors.purgeExpiredRegistrationApplications,
+}));
 vi.mock('./services/tenant-data-purge.js',async original=>({
   ...await original<Record<string,unknown>>(),
   processTenantDataPurge:processors.processTenantDataPurge,
@@ -213,6 +217,7 @@ const processorCases = [
   ["restaurant raw mail retention", "deleteExpiredRestaurantRawEmails", "sixHourlyHeavy"],
   ["google business metrics", "processGoogleBusinessDailyMetrics", "sixHourlyHeavy"],
   ["tenant data retention purge", "processTenantDataPurge", "sixHourlyHeavy"],
+  ["registration application retention", "purgeExpiredRegistrationApplications", "sixHourlyHeavy"],
   ["booking reminders", "processDueReminders", "delivery"],
   ["event reminders", "processDueEventReminders", "delivery"],
   ["meet consultation reminders", "processDueMeetConsultationReminders", "delivery"],
@@ -249,6 +254,7 @@ async function invoke(cron: string, scheduledTime=Date.parse('2026-10-19T15:01:0
       const first=processors[name]!.mock.calls[0]?.[0];
       expect(first&&typeof first==='object'&&'DB' in first?first.DB:first,name).toBe(fixture.db);
     }
+    if (lane === 'sixHourlyHeavy') expect(processors.purgeExpiredRegistrationApplications).toHaveBeenCalledWith(fixture.db, new Date(scheduledTime));
     expect(network).not.toHaveBeenCalled();
     return { jobs:observed.jobs.map(job=>job.name), deliveries:[...observed.deliveries], scheduledTime };
   } finally { await Promise.allSettled(pending); fixture.raw.close(); }
@@ -260,7 +266,7 @@ test('設定済みのCron式は実際のレーンを呼び、通知は重いレ�
   expect(new Set(crons)).toEqual(new Set(Object.values(SCHEDULED_CRONS)));
   const expected = {
     frequentHeavy: ['friend bulk runs','analytics cross','mileage projection','ad conversion outbox retry','analytics url exposure projection','analytics projection','account health','broadcast insights','NEN rich menu jobs','support email sync','friend field reminders','google business resync'],
-    sixHourlyHeavy: ['NEN tag refresh','analytics retention purge','friend snapshot','media usage scan','following mileage','booking expirer','event booking expirer','billing invoice sync','restaurant raw mail retention','google business metrics','tenant data retention purge'],
+    sixHourlyHeavy: ['NEN tag refresh','analytics retention purge','friend snapshot','media usage scan','following mileage','booking expirer','event booking expirer','billing invoice sync','restaurant raw mail retention','google business metrics','tenant data retention purge','registration application retention'],
   };
   const classified=new Set(FEATURE_JOB_MANIFEST.map(job=>job.name));
   for (const lane of ['frequentHeavy','sixHourlyHeavy'] as const) {
@@ -284,6 +290,18 @@ test('設定済みのCron式は実際のレーンを呼び、通知は重いレ�
     expect(call).toHaveBeenCalledOnce();
     expect(call).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({now:new Date(result.scheduledTime).toISOString(),executors,limit:100}));
   }
+});
+
+test('統括の削除失敗を6時間ごとのジョブ失敗として知らせる', async () => {
+  const { runSixHourlyHeavyJobs } = await import('./cron/six-hourly.js');
+  const fixture = createTestD1();
+  try {
+    processors.processTenantDataPurge.mockResolvedValueOnce({ failedTenants: 1 });
+    await runSixHourlyHeavyJobs({ scheduledTime: Date.now() } as ScheduledEvent, { DB: fixture.db } as import('./index.js').Env['Bindings']);
+    const job = observed.jobs.find(item => item.name === 'tenant data retention purge');
+    expect(job).toBeDefined();
+    await expect(job!.run()).rejects.toThrow('tenant_data_purge_retry_required');
+  } finally { fixture.raw.close(); }
 });
 
 test('壊れた店の付与キューが失敗しても別の店の予約済み通知を届ける', async () => {

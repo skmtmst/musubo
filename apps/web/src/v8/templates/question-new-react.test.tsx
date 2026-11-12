@@ -15,7 +15,7 @@ vi.hoisted(() => {
 const notifySaved = vi.hoisted(() => vi.fn())
 vi.mock('@/components/shared/toast', async original => ({ ...await original<typeof import('@/components/shared/toast')>(), notifyToast: notifySaved }))
 const navigationPush = vi.hoisted(() => vi.fn())
-const templatesApi = vi.hoisted(() => ({ get: vi.fn(), create: vi.fn(), update: vi.fn() }))
+const templatesApi = vi.hoisted(() => ({ get: vi.fn(), create: vi.fn(), update: vi.fn(), publish: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   const api = (actual as unknown as { api: Record<string, object> }).api
@@ -230,4 +230,37 @@ it('E-20: 質問を保存した後は質問タブに戻り、成功を知らせ�
   expect(templatesApi.create).toHaveBeenCalled()
   expect(navigationPush).toHaveBeenCalledWith('/templates?tab=question')
   expect(notifySaved).toHaveBeenCalledWith('質問を保存しました', {tone:'success'})
+})
+
+
+it('保存して公開は下書きを作った後に同じ版を公開する', async () => {
+  templatesApi.create.mockResolvedValue({ success: true, data: { id: 'question-1', publishedVersion: 0, draftRevision: 1 } })
+  templatesApi.publish.mockResolvedValue({ success: true, data: { publishedVersion: 1, draftRevision: 0 } })
+  navigationPush.mockClear()
+  await act(async () => {
+    fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '質問' } })
+    fireEvent.change(screen.getByLabelText('質問文（160文字まで）'), { target: { value: '続けますか？' } })
+  })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存して公開' })) })
+  expect(templatesApi.publish).toHaveBeenCalledWith('question-1', { expectedVersion: 0, expectedDraftRevision: 1 })
+  expect(navigationPush).toHaveBeenCalledWith('/templates?tab=question')
+})
+
+it('公開に失敗しても作成済みの下書きを使い、二重作成せずに公開をやり直せる', async () => {
+  templatesApi.create.mockResolvedValue({ success: true, data: { id: 'question-1', publishedVersion: 0, draftRevision: 1 } })
+  templatesApi.update.mockResolvedValue({ success: true, data: { id: 'question-1', publishedVersion: 0, draftRevision: 2 } })
+  templatesApi.publish.mockResolvedValueOnce({ success: false, error: '公開できませんでした' }).mockResolvedValueOnce({ success: true, data: { publishedVersion: 1, draftRevision: 0 } })
+  navigationPush.mockClear()
+  await act(async () => {
+    fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '質問' } })
+    fireEvent.change(screen.getByLabelText('質問文（160文字まで）'), { target: { value: '続けますか？' } })
+  })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存して公開' })) })
+  expect(navigationPush).not.toHaveBeenCalled()
+  expect(screen.getByText(/公開できませんでした/)).toBeTruthy()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存して公開' })) })
+  expect(templatesApi.create).toHaveBeenCalledTimes(1)
+  expect(templatesApi.update).toHaveBeenCalledTimes(1)
+  expect(templatesApi.publish).toHaveBeenLastCalledWith('question-1', { expectedVersion: 0, expectedDraftRevision: 2 })
+  expect(navigationPush).toHaveBeenCalledWith('/templates?tab=question')
 })

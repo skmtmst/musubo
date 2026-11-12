@@ -94,7 +94,7 @@ const RETRY_OPTIONS = [
 const SAMPLES: Record<string, { when: string; lines: string[] }> = {
   friend_add: {
     when: '友だちになったとき',
-    lines: ['{', '  "できごと": "友だちになった",', '  "友だちID": "U4af…",', '  "名前": "Kenta Kawano",', '  "タグ": ["Instagram"],', '  "日時": "2026-09-30T10:12"', '}'],
+    lines: ['{', '  "できごと": "友だちになった",', '  "友だちID": "U4af…",', '  "名前": "Demo Person",', '  "タグ": ["Instagram"],', '  "日時": "2026-09-30T10:12"', '}'],
   },
   booking_created: {
     when: '予約が入ったとき',
@@ -102,7 +102,7 @@ const SAMPLES: Record<string, { when: string; lines: string[] }> = {
   },
   'ec.order.confirmed': {
     when: '注文が確定したとき',
-    lines: ['{', '  "できごと": "注文が確定した",', '  "注文番号": "ord_123…",', '  "金額": 4980,', '  "友だち": "菅野 亮"', '}'],
+    lines: ['{', '  "できごと": "注文が確定した",', '  "注文番号": "ord_123…",', '  "金額": 4980,', '  "友だち": "見本 15"', '}'],
   },
 }
 
@@ -227,7 +227,7 @@ function WebhooksCreateV8Inner() {
     setError(null)
     /*
      * WEB232：前の「下書きを保存」で作れたのに止められなかった送り先がある。もう一度作らず、
-     * 止めるところだけやり直す（作る口に「止めた状態で作る」は無い。Codex に依頼）。
+     * 止めるところだけやり直す。停止状態を返さない場合にも再試行できる。
      */
     const pendingStop = createdActiveRef.current
     if (next === 'active' && pendingStop && pendingStop.accountId === accountId) {
@@ -256,6 +256,7 @@ function WebhooksCreateV8Inner() {
     try {
       const payload = {
         lineAccountId: accountId,
+        isActive: next === 'active',
         name: name.trim(),
         url: url.trim(),
         eventTypes: sendAll
@@ -287,8 +288,8 @@ function WebhooksCreateV8Inner() {
         res = await create(token)
       }
       if (!res.success) throw new Error(res.error)
-      if (next === 'draft') {
-        // 作る口に止めた状態の指定が無いので、作ってから止める。
+      if (next === 'draft' && res.data.isActive !== false) {
+        // 停止状態を返さない古い API では、作成後に停止を確認する。
         // WEB232：止められなかったら一覧へ移らず、この画面で知らせて、止めるところだけやり直せるようにする。
         createdActiveRef.current = { id: res.data.id, accountId }
         let stopped = false

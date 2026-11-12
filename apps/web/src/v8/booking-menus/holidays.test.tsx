@@ -144,3 +144,9 @@ it('休業日削除の対象を示し、切替後の古い確定では削除し�
  act(() => oldConfirm({ preventDefault() {}, stopPropagation() {} }))
  expect(net.deleteException).not.toHaveBeenCalled()
 })
+
+it.each([true, false])('休業日の操作案内は編集可否 %s に合う', (canEdit) => {
+  render(<HolidaysTabV8 accountId="a" settings={{ exceptions: [] } as unknown as BookingSettings} status="ready" error={null} exceptions={[]} closedWeekdays={[]} bookingCountOnClosed={0} canEdit={canEdit} onSaved={() => {}} onReload={() => {}} />)
+  expect(Boolean(screen.queryByText(/日にちを押すと休みにできます/))).toBe(canEdit)
+  expect(screen.getByText(/定休日（毎週）は受付枠で決めます/)).toBeTruthy()
+})

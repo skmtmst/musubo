@@ -377,3 +377,19 @@ describe('S: 複数一致の届物の保留', () => {
     expect(count.n).toBe(1);
   });
 });
+it('受信口と送り先の鍵更新は確認した版で一度だけ通り、版なしも通る', async () => {
+  insertAccount(sqlite, 'acc-confirm-revision');
+  const incoming = await createIncomingWebhook(db, { name: '受信', secret: SECRET, lineAccountId: 'acc-confirm-revision' }, { current: KEY_A });
+  const outgoing = await createOutgoingWebhook(db, { name: '送信', url: 'https://example.com/hook', eventTypes: ['*'], secret: SECRET, lineAccountId: 'acc-confirm-revision' }, { current: KEY_A });
+  const rotated = `rotated-${'y'.repeat(32)}`;
+  expect(await updateIncomingWebhook(db, incoming.id, 'acc-confirm-revision', { secret: rotated }, { current: KEY_A }, undefined, 2)).toBe(false);
+  expect(await updateOutgoingWebhook(db, outgoing.id, 'acc-confirm-revision', { secret: rotated }, { current: KEY_A }, { expectedConfirmationRevision: 2 })).toBe(false);
+  expect(await resolveWebhookSecret((await getIncomingWebhookById(db, incoming.id, 'acc-confirm-revision'))!, { current: KEY_A })).toBe(SECRET);
+  expect(await resolveWebhookSecret((await getOutgoingWebhookById(db, outgoing.id, 'acc-confirm-revision'))!, { current: KEY_A })).toBe(SECRET);
+  expect(await updateIncomingWebhook(db, incoming.id, 'acc-confirm-revision', { secret: rotated }, { current: KEY_A }, undefined, 1)).toBe(true);
+  expect(await updateOutgoingWebhook(db, outgoing.id, 'acc-confirm-revision', { secret: rotated }, { current: KEY_A }, { expectedConfirmationRevision: 1 })).toBe(true);
+  expect(await updateIncomingWebhook(db, incoming.id, 'acc-confirm-revision', { secret: SECRET }, { current: KEY_A }, undefined, 1)).toBe(false);
+  expect(await updateOutgoingWebhook(db, outgoing.id, 'acc-confirm-revision', { secret: SECRET }, { current: KEY_A }, { expectedConfirmationRevision: 1 })).toBe(false);
+  expect(await updateIncomingWebhook(db, incoming.id, 'acc-confirm-revision', { secret: SECRET }, { current: KEY_A })).toBe(true);
+  expect(await updateOutgoingWebhook(db, outgoing.id, 'acc-confirm-revision', { secret: SECRET }, { current: KEY_A })).toBe(true);
+});

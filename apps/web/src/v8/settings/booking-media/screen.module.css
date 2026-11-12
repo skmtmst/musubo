@@ -87,7 +87,9 @@
 }
 
 .url {
-  display: block;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   color: var(--color-action);
   font-size: var(--text-label);
@@ -260,6 +262,7 @@
 }
 
 .dialogFields {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: var(--tpl-e49-gap-l);

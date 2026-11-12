@@ -44,7 +44,7 @@ const photo = {
   pet_name: 'こむぎ',
   pet_call_name: 'こむぎ',
   pet_gender: 'female',
-  owner_name: '田中 明子',
+  owner_name: '見本 169',
   customer_id: '10234',
   caption: '散歩のあと',
   created_at: '2026-09-30T10:00:00Z',
@@ -66,7 +66,7 @@ const metrics = {
 }
 
 const versions = [
-  { versionNumber: 3, policyKey: 'default', points: 100, summary: '', effectiveFrom: null, createdBy: '高田 誠', createdAt: '2026-09-20T10:00:00Z', status: 'in_use' },
+  { versionNumber: 3, policyKey: 'default', points: 100, summary: '', effectiveFrom: null, createdBy: '見本 18', createdAt: '2026-09-20T10:00:00Z', status: 'in_use' },
 ]
 
 const publication = {
@@ -174,11 +174,9 @@ describe('投稿 V8', () => {
     fireEvent.change(screen.getByLabelText('ひとこと（なぜ変えるか）'), { target: { value: '10月の報酬' } })
     fireEvent.click(screen.getByLabelText('使い始め（日本時間・空ならすぐ）'))
     const dateTime = await screen.findByRole('dialog', { name: '日時を選ぶ' })
-    fireEvent.click(within(dateTime).getByRole('button', { name: '日付' }))
     fireEvent.click(await screen.findByRole('button', { name: '2026年10月15日（木）' }))
-    fireEvent.click(screen.getByRole('button', { name: '確定' }))
     await setTimeControl(within(dateTime).getByRole('combobox', { name: '時刻' }), '00:00')
-    fireEvent.click(within(dateTime).getByRole('button', { name: '閉じる' }))
+    fireEvent.click(within(dateTime).getByRole('button', { name: '確定' }))
     fireEvent.click(screen.getByRole('button', { name: '版を予約する' }))
     await flush()
     expect(nenMembers.createPhotoRewardPolicyVersion).toHaveBeenCalledWith({ points: 120, publicationPoints: 0, summary: '10月の報酬', effectiveFrom: '2026-10-15T00:00:00+09:00', expectedVersion: 3 })

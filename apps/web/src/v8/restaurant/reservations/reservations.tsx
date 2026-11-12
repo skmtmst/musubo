@@ -13,9 +13,10 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
+import { describeApiFailure, isSaveConflict } from '@/components/shared/api-error-message'
 import { RowActions } from '@/components/shared/row-actions'
 import TextLink from '@/components/shared/text-link'
-import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
 import { restaurantTestApi,type ReservationQuery,type RestaurantClosure,type RestaurantReservation } from '@/lib/restaurant-test-api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -208,31 +209,46 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   const attendanceKey = JSON.stringify([accountId, storeId, view, detailId, detailReservation?.id, page, period, status, source, canWrite, !!phone])
   const attendanceScope = useRef({ key: attendanceKey })
   if (attendanceScope.current.key !== attendanceKey) attendanceScope.current = { key: attendanceKey }
+  const locationKey = JSON.stringify([accountId, storeId, view, page, period, status, source, canWrite, !!phone])
+  const closedDetailId = view === 'today' ? '' : 'closed'
+  const attendanceLocation = useRef({ key: locationKey, detailId, token: {} })
+  if (attendanceLocation.current.key !== locationKey || attendanceLocation.current.detailId !== detailId) {
+    const previous = attendanceLocation.current
+    const onlyClosed = previous.key === locationKey && detailId === closedDetailId && previous.detailId !== closedDetailId
+    attendanceLocation.current = { key: locationKey, detailId, token: onlyClosed ? previous.token : {} }
+  }
   const scope = attendanceScope.current
   const attendanceActive = useRef(true)
   const attendanceWorking = useRef(false)
   useEffect(() => { attendanceActive.current = true; return () => { attendanceActive.current = false } }, [])
   const attendance = async (id: string, action: 'visited' | 'depart' | 'undo_departure' | 'undo_visit' | 'no_show') => {
     const current = () => attendanceActive.current && attendanceScope.current === scope
+    const location = attendanceLocation.current
+    const closed = () => attendanceActive.current && attendanceLocation.current.token === location.token && attendanceLocation.current.key === locationKey && attendanceLocation.current.detailId === closedDetailId
     const row = rows.find(r => r.id === id) ?? data.reservations.find(r => r.id === id)
     if (!canWrite || busy || attendanceWorking.current || !current() || detailReservation?.id !== id || !row) return
     attendanceWorking.current = true
     let failure: { error: unknown } | undefined
+    let savedButUnread = false
+    let stampNotice: string | null = null
+    const success = action === 'visited' ? '来店にしました。' : action === 'depart' ? '退店にしました。卓が空きました。' : action === 'no_show' ? '無断にしました。' : '来店・退店の記録を訂正しました。'
     try {
       const ok = await mutate(async () => {
         try {
           if (!current()) throw new QuietError()
           const result = await restaurantTestApi.attendance(accountId, id, { action, expectedVersion: row.customer_version ?? 1, requestId: crypto.randomUUID() })
-          if (!current()) throw new QuietError()
-          if (action === 'visited') notifyToast(result.data.stamp.status === 'recorded' ? `来店スタンプ ${result.data.stamp.count} 個を確認しました。` : 'スタンプは会計待ち・停止中・未連携の場合には増えません。')
+          if (!current() && !closed()) throw new QuietError()
+          if (action === 'visited') stampNotice = result.data.stamp.status === 'recorded' ? `来店スタンプ ${result.data.stamp.count} 個を確認しました。` : 'スタンプは会計待ち・停止中・未連携の場合には増えません。'
           return result
         } catch (error) {
-          if (current() && !(error instanceof QuietError)) failure = { error }
+          if ((current() || closed()) && !(error instanceof QuietError)) failure = { error }
           throw new QuietError()
         }
-      }, action === 'visited' ? '来店にしました。' : action === 'depart' ? '退店にしました。卓が空きました。' : action === 'no_show' ? '無断にしました。' : '来店・退店の記録を訂正しました。')
+      }, success, { onRefreshFailure: () => { if (current() || closed()) savedButUnread = true }, suppressSuccessToast: true })
       if (!ok && current()) void reload()
-      return current() ? failure : undefined
+      if (!ok && closed() && failure) notifyToast(isSaveConflict(failure.error) ? 'ほかの操作で予約が変わりました。読み直してから、もう一度選んでください。' : describeApiFailure(failure.error, '来店・退店の記録'), { tone: 'error' })
+      if (ok && closed()) notifyToast([success, stampNotice, savedButUnread ? '最新の予約を読み込めませんでした。読み直してください。' : null].filter(Boolean).join(' '), savedButUnread ? { tone: 'error' } : undefined)
+      return current() ? (failure ?? (ok ? { savedButUnread, stampNotice: [success, stampNotice].filter(Boolean).join(' ') } : undefined)) : undefined
     } finally { attendanceWorking.current = false }
   }
 
@@ -289,7 +305,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           onDetail={id=>{const r=rows.find(r=>r.id===id);if(r?.hold_expires_at)setOpenId(id);else setDetailId(id)}}
         />
       ) : (
-        <ListView pageSize={pageSize} onPageSize={(next) => { onPageSize(next); onPage(1) }} selectedId={detailId==='closed'?undefined:(detailed??rows[0])?.id} onEdit={setOpenId} onView={onView} day={day} onDay={onDay} storeId={storeId} storeName={store?.name} detail={<ReservationDetailDialog operationScope={scope} onReload={() => { setDayRetry(n => n + 1); void reload() }} onAttendance={attendance} inline reservation={detailId==='closed'?null:detailed??rows[0]??null} accountId={accountId} tables={tables} courses={menuItems} busy={busy} canWrite={canWrite} onClose={()=>setDetailId('closed')} onEdit={setOpenId} onCancel={setCancelId} onRestore={id=>{void save(()=>restoreReservation(id),'予約を有効に戻しました。')}}/>}
+        <ListView accountStyle={accountStyle.stale ? null : accountStyle.data?.style ?? null} pageSize={pageSize} onPageSize={(next) => { onPageSize(next); onPage(1) }} selectedId={detailId==='closed'?undefined:(detailed??rows[0])?.id} onEdit={setOpenId} onView={onView} day={day} onDay={onDay} storeId={storeId} storeName={store?.name} detail={<ReservationDetailDialog operationScope={scope} onReload={() => { setDayRetry(n => n + 1); void reload() }} onAttendance={attendance} inline reservation={detailId==='closed'?null:detailed??rows[0]??null} accountId={accountId} tables={tables} courses={menuItems} busy={busy} canWrite={canWrite} onClose={()=>setDetailId('closed')} onEdit={setOpenId} onCancel={setCancelId} onRestore={id=>{void save(()=>restoreReservation(id),'予約を有効に戻しました。')}}/>}
           view={view}
           rows={rows}
           total={total}
