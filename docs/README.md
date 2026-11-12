@@ -1203,3 +1203,4 @@
 - [登録メディア一覧の操作をシンプルにする](release-log/unreleased/40-masato-media-list-simplify.md) — 選択枠の位置と一覧表示の整理。確認 2026-11-11。
 - [登録メディアの名前変更とフォルダ移動を直す](release-log/unreleased/43-masato-media-edit-cors.md) — 保存時の通信エラー修正履歴。確認 2026-11-11。
 - [受信箱のテンプレートの差し込みと二重表示を直す](release-log/unreleased/45-kenta-inbox-template-duplicate.md) — 予約の差し込み・スマホの二重表示・送るとこうなるの見本の修正履歴。確認 2026-11-12。
+- [成果の一覧を画面の崩れの見張りに入れる](release-log/unreleased/49-kenta-conversions-guard.md) — 成果の一覧を画面の崩れの見張りに入れるの履歴。確認 2026-11-13。
