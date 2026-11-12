@@ -33,7 +33,7 @@ const dateJst = (iso: string) => new Intl.DateTimeFormat('ja-JP', {
 export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCardRegistration,
   onRequestReissue, onOpenLatestQuote }: Props) {
   usePageTitle('お見積もりの確認')
-  usePageCrumbs([{ label: 'ホーム', href: '/hq' }, { label: '利用開始の準備', href: '/hq/onboarding' }])
+  usePageCrumbs([{ label: '利用開始の準備' }])
   const [agreed, setAgreed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')

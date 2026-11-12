@@ -34,7 +34,13 @@ for (const width of widths) for (const delay of delays) for (const style of styl
     window.homeHeadingFrames = []
     let styledFrameSeen = false
     const record = () => {
-      const scope = document.querySelector('[data-auth-pending]') ?? document.querySelector('main')
+      const authPending = document.querySelector('[data-auth-pending]')
+      if (authPending) {
+        window.homeHeadingFrames.push({ t: performance.now(), hasFrame: false, stage: 'auth', headings: [], x: null, y: null, height: null, hasSidebar: Boolean(document.querySelector('aside, [data-sidebar]')) })
+        requestAnimationFrame(record)
+        return
+      }
+      const scope = document.querySelector('main')
       const frame = scope?.querySelector('[data-page-template]')
       if (injectFault && document.head && !document.querySelector('[data-home-heading-fault]')) { const style = document.createElement('style'); style.setAttribute('data-home-heading-fault', ''); style.textContent = '[data-page-template]:has([data-page-pending]) h1 { visibility: hidden !important; }'; document.head.append(style) }
       // 外側の板とCSSが届いてから、認証前も含めて毎フレーム記録する。
@@ -70,11 +76,16 @@ for (const width of widths) for (const delay of delays) for (const style of styl
     assert.ok(frames.length > 2, '切り替え途中のフレームを記録した')
     assert.ok(frames.some(frame => frame.stage === 'ready'), '実画面まで到着した')
     if (delay) assert.ok(frames.some(frame => frame.stage === 'auth'), '認証前の待機も観察した')
-    for (const frame of frames) {
+    for (const frame of frames.filter(frame => frame.stage === 'auth')) {
+      assert.deepEqual(frame.headings, [], '認証中に通常画面の見出しを出さない')
+      assert.equal(frame.hasSidebar, false, '認証中に通常サイドバーを出さない')
+    }
+    const pageFrames = frames.filter(frame => frame.stage !== 'auth')
+    for (const frame of pageFrames) {
       assert.ok(frame.hasFrame, `待機の型が消えた: ${JSON.stringify(frame)}`)
       assert.deepEqual(frame.headings, ['ダッシュボード'], `見出しが途中から現れた: ${JSON.stringify(frame)}`)
     }
-    for (const axis of ['x', 'y', 'height']) assert.ok(Math.max(...frames.map(frame => frame[axis])) - Math.min(...frames.map(frame => frame[axis])) <= 8, `見出しの${axis}が動いた`)
+    for (const axis of ['x', 'y', 'height']) assert.ok(Math.max(...pageFrames.map(frame => frame[axis])) - Math.min(...pageFrames.map(frame => frame[axis])) <= 8, `見出しの${axis}が動いた`)
     assert.equal(new URL(page.url()).pathname, '/')
     assert.deepEqual(errors, [])
   } catch (error) { failure = error.stack ?? String(error); throw error }

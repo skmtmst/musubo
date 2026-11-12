@@ -21,11 +21,12 @@ export const AUTH_CHECK_MARKER_KEY = 'lh_auth_checked'
 export const AUTH_CHECK_MARKER_TTL_MS = 30 * 60_000
 
 interface StoredMarker {
-  v: 1
+  v: 2
   at: number
   fp: string
   tenantStatus: 'active'
   snapshot: SessionSnapshot | null
+  onboardingPath: string | null
 }
 
 /** 指紋の一方向の要約（cyrb53）。照合にだけ使う。元の値には戻せない。 */
@@ -47,13 +48,14 @@ export function rememberAuthCheck(
   fingerprint: string,
   tenantStatus: 'active' | 'suspended' | 'archived',
   snapshot: SessionSnapshot | null,
+  onboardingPath: string | null = null,
   now: number = Date.now(),
 ): void {
   if (tenantStatus !== 'active') {
     forgetAuthCheck()
     return
   }
-  const marker: StoredMarker = { v: 1, at: now, fp: authFingerprintTag(fingerprint), tenantStatus, snapshot }
+  const marker: StoredMarker = { v: 2, at: now, fp: authFingerprintTag(fingerprint), tenantStatus, snapshot, onboardingPath }
   try { sessionStorage.setItem(AUTH_CHECK_MARKER_KEY, JSON.stringify(marker)) } catch { /* storage なし：毎回確認する */ }
 }
 
@@ -66,22 +68,23 @@ export function forgetAuthCheck(): void {
  * 今の指紋で使ってよい印。使えなければ null（期限切れ・指紋ちがい・壊れた値は捨てる）。
  * 返すのは「代理ログイン中か」などの帯の答えだけ（権限は localStorage が持つ）。
  */
-export function readAuthCheck(fingerprint: string, now: number = Date.now()): { snapshot: SessionSnapshot | null } | null {
+export function readAuthCheck(fingerprint: string, now: number = Date.now()): { snapshot: SessionSnapshot | null; onboardingPath: string | null } | null {
   let raw: string | null = null
   try { raw = sessionStorage.getItem(AUTH_CHECK_MARKER_KEY) } catch { return null }
   if (!raw) return null
   let marker: Partial<StoredMarker> | null = null
   try { marker = JSON.parse(raw) as Partial<StoredMarker> } catch { marker = null }
   const usable = !!marker
-    && marker.v === 1
+    && marker.v === 2
     && typeof marker.at === 'number'
     && marker.at <= now
     && now - marker.at < AUTH_CHECK_MARKER_TTL_MS
     && marker.tenantStatus === 'active'
+    && (marker.onboardingPath === null || typeof marker.onboardingPath === 'string')
     && marker.fp === authFingerprintTag(fingerprint)
   if (!usable) {
     forgetAuthCheck()
     return null
   }
-  return { snapshot: marker?.snapshot ?? null }
+  return { snapshot: marker?.snapshot ?? null, onboardingPath: marker?.onboardingPath ?? null }
 }

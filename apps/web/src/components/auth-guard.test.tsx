@@ -15,9 +15,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 let currentPath = '/'
 const replaceMock = vi.fn()
+const routerMock = { replace: replaceMock }
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: replaceMock }),
+  useRouter: () => routerMock,
   usePathname: () => currentPath,
 }))
 
@@ -46,11 +47,13 @@ let root: Root
 let fetchSpy: ReturnType<typeof vi.fn>
 let storage: MemoryStorage
 
-function sessionOk(tenantStatus: 'active' | 'suspended' | 'archived' = 'active') {
+function sessionOk(tenantStatus: 'active' | 'suspended' | 'archived' = 'active', onboarding: {
+  status: 'awaiting_first_line'; quoteId: string | null; consentedAt: string | null
+} | null = null) {
   return new Response(
     JSON.stringify({
       success: true,
-      data: { name: 'テスト担当', role: 'admin', tenantStatus, permissionKeys: [], viewPermissionKeys: [] },
+      data: { name: 'テスト担当', role: 'admin', tenantStatus, onboarding, permissionKeys: [], viewPermissionKeys: [] },
       csrfToken: 'csrf-token-1',
     }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -101,6 +104,44 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     expect(urls.some((url) => url.includes('/api/auth/session'))).toBe(true)
     expect(urls.some((url) => url.includes('/api/line-accounts'))).toBe(true)
     expect(host.querySelector('[data-child]')).not.toBeNull()
+  })
+
+  it.each(['/', '/hq', '/friends'])('利用開始前に %s を開いても通常画面を描画せず料金確認へ進む', async (path) => {
+    currentPath = path
+    fetchSpy.mockImplementation(async () => sessionOk('active', {
+      status: 'awaiting_first_line', quoteId: null, consentedAt: null,
+    }))
+    await render()
+    expect(host.querySelector('[data-auth-pending]')).not.toBeNull()
+    expect(host.querySelector('[data-child]')).toBeNull()
+    expect(host.textContent).not.toContain('対応が必要なもの')
+    await settle()
+    expect(replaceMock).toHaveBeenCalledWith('/hq/onboarding/pricing')
+    expect(host.querySelector('[data-child]')).toBeNull()
+
+    currentPath = '/hq/onboarding/pricing'
+    await render()
+    await settle()
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+  })
+
+  it('初回LINEの有効化後は再確認し、通常画面へ進める', async () => {
+    currentPath = '/hq/onboarding/card'
+    let beforeFirstLine = true
+    fetchSpy.mockImplementation(async () => sessionOk('active', beforeFirstLine ? {
+      status: 'awaiting_first_line', quoteId: null, consentedAt: '2026-11-11',
+    } : null))
+    await render()
+    await settle()
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+
+    beforeFirstLine = false
+    currentPath = '/hq'
+    await render()
+    await settle()
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+    expect(replaceMock).not.toHaveBeenCalledWith('/hq/onboarding/card')
+    expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes('/api/auth/session'))).toHaveLength(2)
   })
 
   it('確認の応答を待たずに一覧を取り始める（並列）', async () => {
@@ -458,17 +499,8 @@ describe('R505 古い確認の応答は新しいログインを上書きしな�
   })
 })
 
-/*
- * 2026-10-08 オーナー：ページを切り替えると、ときどき灰色の地にくるくるだけになる。
- *
- * 画面が丸ごと読み直される移動ではタブ内の使い回しが消え、別サイトの確認が
- * 終わるまで全画面で待っていた。同じタブで確認が通っていれば、読み直した直後でも
- * 中身を先に出して裏で確かめ直す。印が無い・指紋が違うときは今までどおり待つ。
- *
- * 「読み直し」はモジュールを読み込み直して再現する（モジュールの記憶は消え、
- * sessionStorage は残る）。
- */
-describe('読み直した直後も確認済みの印があれば中身を先に出す', () => {
+/* 再読込はモジュールを読み込み直して再現する。sessionStorage は残る。 */
+describe('再読込時の認証と利用開始状態の確認', () => {
   let session: MemoryStorage
 
   beforeEach(() => {
@@ -514,7 +546,7 @@ describe('読み直した直後も確認済みの印があれば中身を先に�
     return (res: Response) => resolveSession?.(res)
   }
 
-  it('確認済みの印があれば、読み直した直後に骨組みを出さず中身を出し、裏の確認が失敗したらログインへ送る', async () => {
+  it('確認済みの印があっても認証が済むまで中身を出さず、失敗したらログインへ送る', async () => {
     await render()
     await settle()
     expect(host.querySelector('[data-child]')).not.toBeNull()
@@ -528,10 +560,8 @@ describe('読み直した直後も確認済みの印があれば中身を先に�
     await act(async () => { root.render(<FreshGuard><div data-child>中身</div></FreshGuard>) })
     await settle()
 
-    // 確認の返事を待たずに中身が出ている（全画面の待ちにしない）。
-    expect(host.querySelector('[data-child]')).not.toBeNull()
-    expect(host.querySelector('[data-auth-pending]')).toBeNull()
-    // 裏では確かめ直している。
+    expect(host.querySelector('[data-child]')).toBeNull()
+    expect(host.querySelector('[data-auth-pending]')).not.toBeNull()
     expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('/api/auth/session'))).toBe(true)
 
     await act(async () => { resolve(new Response(null, { status: 401 })) })
@@ -541,7 +571,26 @@ describe('読み直した直後も確認済みの印があれば中身を先に�
     expect(session.getItem('lh_auth_checked')).toBeNull()
   })
 
-  it('読み直した直後の裏の確認で停止中と分かれば停止の画面に変わる', async () => {
+  it('前回の認証印が通常利用でも、新たに利用開始前なら通常画面を表示しない', async () => {
+    await render()
+    await settle()
+    const FreshGuard = await reloadPage()
+    const resolve = holdSession()
+    currentPath = '/hq'
+    await act(async () => { root.render(<FreshGuard><div data-child>中身</div></FreshGuard>) })
+    await settle()
+    expect(host.querySelector('[data-child]')).toBeNull()
+    expect(host.querySelector('[data-auth-pending]')).not.toBeNull()
+
+    await act(async () => { resolve(sessionOk('active', {
+      status: 'awaiting_first_line', quoteId: null, consentedAt: null,
+    })) })
+    await settle()
+    expect(replaceMock).toHaveBeenCalledWith('/hq/onboarding/pricing')
+    expect(host.querySelector('[data-child]')).toBeNull()
+  })
+
+  it('再読込時に停止中と分かれば停止の画面に進む', async () => {
     await render()
     await settle()
 
@@ -550,7 +599,8 @@ describe('読み直した直後も確認済みの印があれば中身を先に�
     currentPath = '/friends'
     await act(async () => { root.render(<FreshGuard><div data-child>中身</div></FreshGuard>) })
     await settle()
-    expect(host.querySelector('[data-child]')).not.toBeNull()
+    expect(host.querySelector('[data-child]')).toBeNull()
+    expect(host.querySelector('[data-auth-pending]')).not.toBeNull()
 
     await act(async () => { resolve(sessionOk('suspended')) })
     await settle()

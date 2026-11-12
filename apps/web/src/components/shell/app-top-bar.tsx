@@ -18,6 +18,7 @@ import { logoutAndGoToLogin } from '@/lib/logout'
 import { useManualHref } from '@/lib/use-manual-href'
 import { defaultTitleForPath } from '@/lib/page-title'
 import { canReturnToHqFrom } from '@/lib/hq-return'
+import { useOnboardingAccess } from '@/components/auth-guard'
 
 /**
  * 共通トップバーを、いまの画面の値へつなぐ層。
@@ -112,6 +113,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function AppTopBar() {
   const pathname = usePathname() ?? '/'
+  const onboarding = useOnboardingAccess() || pathname.startsWith('/hq/onboarding/')
   const { title, crumbs: pageCrumbs } = usePageChrome()
   const router = useRouter()
   const { accounts, selectedAccountId, setSelectedAccountId, clearSelectedAccountId, loading, error, refreshing, refreshAccounts } = useAccount()
@@ -183,8 +185,10 @@ export default function AppTopBar() {
   const onlyHome = pageCrumbs === null || pageCrumbs.every((crumb) => crumb.label === 'ホーム')
   const parentCrumb = onlyHome ? parentCrumbForPath(pathname) : null
   // LINEアカウントの登録（/accounts/new）も統括の外側なので「設定」の段を足さない。
-  const crumbs = finishPageCrumbs(pathname, parentCrumb && parentCrumb.label !== shownTitle ? [parentCrumb] : pageCrumbs, shownTitle, isHqShellPath(pathname))
-  const titleHref = parentCrumb && parentCrumb.label === shownTitle ? parentCrumb.href : undefined
+  const crumbs = onboarding
+    ? (shownTitle === '利用開始の準備' ? null : [{ label: '利用開始の準備' }])
+    : finishPageCrumbs(pathname, parentCrumb && parentCrumb.label !== shownTitle ? [parentCrumb] : pageCrumbs, shownTitle, isHqShellPath(pathname))
+  const titleHref = onboarding ? undefined : parentCrumb && parentCrumb.label === shownTitle ? parentCrumb.href : undefined
   const [hqName, setHqName] = useState<string | null>(null)
   useEffect(() => {
     if (!hqShell) return
@@ -294,6 +298,8 @@ export default function AppTopBar() {
         <BellNotifications hqOrigin={hqShell} popover={popover} target={notificationTarget} accounts={options} onAccountChange={changeAccount} onUnreadChange={setNotificationUnread} />
       )}
       v8Chrome
+      showSidebarToggle={!onboarding}
+      showHomeBreadcrumb={!onboarding}
       chromeVariant="shell"
       crumbs={crumbs}
       titleHref={titleHref}

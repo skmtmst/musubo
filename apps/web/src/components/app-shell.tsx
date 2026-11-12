@@ -2,7 +2,7 @@
 import { usePathname } from 'next/navigation'
 import Sidebar from './layout/sidebar'
 import SettingsInnerNav, { isSettingsAreaPath } from './layout/settings-inner-nav'
-import AuthGuard from './auth-guard'
+import AuthGuard, { useOnboardingAccess } from './auth-guard'
 import HqAccessGate from './hq-access-gate'
 import { AccountProvider } from '@/contexts/account-context'
 import SessionLostNotice from './session-lost-notice'
@@ -38,7 +38,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function AppShellContent({ children, pathname }: { children: React.ReactNode; pathname: string }) {
-  const onboarding = pathname.startsWith('/hq/onboarding/')
   /*
    * LINEアカウントを登録（/accounts/new）。互換経路は外枠の無い専用の全画面。
    * ★V8 は絵（〜）どおり、ほかの画面と同じ外枠（左メニュー・上の帯）で出す（2026-10-07 司令塔）。
@@ -91,6 +90,14 @@ function AppShellContent({ children, pathname }: { children: React.ReactNode; pa
 
   return (
     <AuthGuard suspendedSupport={suspendedSupport}>
+      <AuthenticatedAppShell pathname={pathname}>{guardedContent}</AuthenticatedAppShell>
+    </AuthGuard>
+  )
+}
+
+function AuthenticatedAppShell({ children, pathname }: { children: React.ReactNode; pathname: string }) {
+  const onboarding = useOnboardingAccess() || pathname.startsWith('/hq/onboarding/')
+  return (
       <AccountProvider>
         <PageChromeProvider>
           {(
@@ -111,20 +118,19 @@ function AppShellContent({ children, pathname }: { children: React.ReactNode; pa
               <ImpersonationNotice />
               <div className={`${styles.workspace} ${onboarding ? styles.onboardingWorkspace : ''}`}>
                 {/* V8 の先読み（F①）。V8 のときだけ中の聞き耳が働く。 */}
-                <HoverPrefetch />
+                {!onboarding ? <HoverPrefetch /> : null}
                 <RowEntranceSettle />
                 {/* V8 の探す窓（F②）。⌘K・Ctrl+K で開く。帯には置かない。 */}
-                <CommandPalette />
+                {!onboarding ? <CommandPalette /> : null}
                 {onboarding ? <div className={styles.onboardingBrand}><MusuboLogo /></div> : <Sidebar />}
                 <Workspace>
-                  {guardedContent}
+                  {children}
                 </Workspace>
               </div>
             </div>
           )}
         </PageChromeProvider>
       </AccountProvider>
-    </AuthGuard>
   )
 }
 
@@ -185,6 +191,7 @@ function SuspendedSupportWorkspace({ children }: { children: React.ReactNode }) 
 export function Workspace({ children }: { children: React.ReactNode }) {
   const { fullWidth, settingsNavInline } = usePageChrome()
   const pathname = usePathname()
+  const onboarding = useOnboardingAccess() || pathname?.startsWith('/hq/onboarding/')
   /*
    * ★V8（夕41）：設定の画面は、白い板の中の左に「設定の中のメニュー」
    * （幅208）を付ける。互換経路では部品も枠組みも出さない（1画素も変えない）。
@@ -198,7 +205,7 @@ export function Workspace({ children }: { children: React.ReactNode }) {
   return (
     <div className={styles.side}>
       <AppTopBar />
-      <main id="main-content" tabIndex={-1} className={`${styles.main} ${pathname?.startsWith('/hq/onboarding/') ? styles.onboardingMain : ''}`}>
+      <main id="main-content" tabIndex={-1} className={`${styles.main} ${onboarding ? styles.onboardingMain : ''}`}>
         {/* V-2: いつもと違う端末・場所からのログイン。そのログイン中だけ、白いカードで出す。 */}
         <UnfamiliarLoginNotice className={styles.securityNotice} />
         {/* V6 共通メニュー J33xq と同じ256pxサイドバーを基準にする。 */}

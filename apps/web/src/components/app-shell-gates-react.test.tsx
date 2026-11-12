@@ -13,7 +13,7 @@ const { gate } = await vi.hoisted(async () => {
   const { createElement } = await import('react')
   return { gate: (name: string) => ({ default: ({ children }: { children: React.ReactNode }) => createElement('div', { 'data-gate': name }, children) }) }
 })
-vi.mock('./auth-guard', () => gate('auth'))
+vi.mock('./auth-guard', () => ({ ...gate('auth'), useOnboardingAccess: () => false }))
 vi.mock('./hq-access-gate', () => gate('hq-access'))
 vi.mock('./view-permission-gate', () => gate('view-permission'))
 vi.mock('./root-landing-gate', () => gate('root-landing'))
