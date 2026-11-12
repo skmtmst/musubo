@@ -6,7 +6,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Copy, FlaskConical, Smartphone, Upload } from 'lucide-react';
-import { liffActionUrl, emptyLayout, resolveCustomerFormTheme, formThemeContrastError, newBlockId, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared';
+import { liffActionUrl, emptyLayout, resolveCustomerFormTheme, formThemeContrastError, newBlockId, validateFormForPublish, parseFormReferences, type FormBlock, type FormLayout, type FormOptions, type FormSection, type PublicFormReference } from '@line-crm/shared';
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button';
 import Dialog from '@/components/shared/dialog';
@@ -138,6 +138,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
    * 読めないとき（未公開・受付停止・通信失敗）は、保存した下書きとの違いに戻す。
    */
   const [publishedSide, setPublishedSide] = useState<ConflictSide | null>(null)
+  const [publishedReferences, setPublishedReferences] = useState<Map<string, PublicFormReference> | null>(null)
   /*
    * ほかの人が先に保存していたとき（409）。入力は捨てない。
    * 帯・比べる窓・読み直しは共通の save-conflict（動きの点検 16 番）。
@@ -229,12 +230,13 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   useEffect(() => {
     if (!showPublish || !id || !publishedVersionId) {
       setPublishedSide(null)
+      setPublishedReferences(null)
       return
     }
     let alive = true
     void (async () => {
       try {
-        const res = await fetchApi<{ success: boolean; data?: { name?: string; description?: string | null; layout?: FormLayout } }>(
+        const res = await fetchApi<{ success: boolean; data?: { name?: string; description?: string | null; layout?: FormLayout; references?: PublicFormReference[] } }>(
           `/api/forms/${encodeURIComponent(id)}?view=published`,
           { suppressFeatureDisabledEvent: true },
         )
@@ -242,10 +244,16 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         setPublishedSide(res.success && res.data?.layout
           ? { name: res.data.name ?? '', description: res.data.description ?? '', layout: res.data.layout }
           : null)
+        setPublishedReferences(res.success && Array.isArray(res.data?.references)
+          ? new Map(res.data.references.flatMap((row) => (row && typeof row.blockId === 'string' ? [[row.blockId, row] as const] : [])))
+          : null)
       } catch (saveFailure) {
         saveErrors.capture(saveFailure);
 
-        if (alive) setPublishedSide(null)
+        if (alive) {
+          setPublishedSide(null)
+          setPublishedReferences(null)
+        }
       }
     })();
 
@@ -376,7 +384,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const blocks = useMemo(() => layout.sections[page]?.blocks ?? [], [layout, page])
   /* タブの札の赤い印。保存を押したあとだけ、そのタブの直す欄の数を出す。 */
   const tabErrors: Record<EditTab, number> = attempted ? {
-    content: (name.trim() ? 0 : 1) + layout.sections.reduce((n, s) => n + s.blocks.filter((b) => b.kind === 'input' && !b.label.trim()).length, 0),
+    content: (name.trim() ? 0 : 1) + layout.sections.reduce((n, s) => n + s.blocks.filter((b) => b.kind === 'input' && !b.label.trim()).length, 0) + (parseFormReferences(layout.references ?? []) === null ? 1 : 0),
     after: 0,
     appearance: (name.trim() ? 0 : 1) + (ogImageUrlError(ogImageUrl) ? 1 : 0) + (formThemeContrastError(resolveCustomerFormTheme(layout.options,customerLook.look ?? undefined)) ? 1 : 0),
   } : { content: 0, after: 0, appearance: 0 }
@@ -476,6 +484,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
   const removeBlock = (blockId: string) => {
     setBlocks(blocks.filter((b) => b.id !== blockId))
+    /* ブロックを消すときは参照も一緒に消す。残っていると公開時に 422 で止まる。 */
+    setLayout((prev) => (prev.references?.some((row) => row.blockId === blockId) ? { ...prev, references: prev.references.filter((row) => row.blockId !== blockId) } : prev))
     if (selectedBlockId === blockId) setSelectedBlockId(null)
   }
 
@@ -564,6 +574,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     if (dup) return { message: '回答キーが重なっています。複製した入力欄を確認してください' }
     const layoutError = validateFormLayoutForSave(layout)
     if (layoutError) return { message: layoutError }
+    if (parseFormReferences(layout.references ?? []) === null) return { message: '公開用の参照の形が正しくありません。中身のタブで対応付けを直してください', tab: 'content' }
     const routingProblem = routingError(routingOf(layout))
     if (routingProblem) return { message: routingProblem.message }
     const ogImageError = ogImageUrlError(ogImageUrl)
@@ -1022,6 +1033,9 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             onRemoveBlock={removeBlock}
             routing={routingOf(layout)}
             onChangeRouting={host ? undefined : patchRouting}
+            references={layout.references ?? []}
+            referenceStates={publishedReferences}
+            onChangeReferences={host ? () => {} : (next) => setLayout((prev) => ({ ...prev, references: next }))}
           />
         ) : editTab === 'after' ? (
           <AfterTab readOnly={!canEdit} options={layout.options} refs={refs} onSubmitTagId={onSubmitTagId} onChangeOptions={patchOptions} onChangeSubmitTag={setOnSubmitTagId} />
