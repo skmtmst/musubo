@@ -40,7 +40,7 @@ import { musuboBillingOverview } from '../services/musubo-billing-overview.js';
 import { acceptedMusuboLineResumption } from '../services/musubo-line-resumption-review.js';
 import { processMusuboBillingEvent } from '../services/musubo-billing-webhook.js';
 import { deliverBillingRecoveryNotice, deliverCurrentBillingFailureNotice } from '../services/billing-invoice-notifications.js';
-import { StripeApiError, stripeApi, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
+import { StripeApiError, stripeApi, type StripeCheckoutSession, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
 
 /**
@@ -79,6 +79,24 @@ function adminOrigin(c: Context<Env>): string | null {
 
 function stripeReady(c: Context<Env>): boolean {
   return Boolean(c.env.STRIPE_SECRET_KEY);
+}
+
+/** A completed Checkout URL is only a hint. Verify the tenant, customer and SetupIntent server-side. */
+async function confirmCardSetup(c: Context<Env>, tenantId: string, customerId: string,
+  session: StripeCheckoutSession): Promise<boolean> {
+  if (session.mode !== 'setup' || session.status !== 'complete'
+    || session.customer !== customerId || session.client_reference_id !== tenantId
+    || session.metadata?.purpose !== 'musubo_card_setup'
+    || session.metadata.tenant_id !== tenantId || !session.setup_intent) return false;
+  const intent = await stripeApi.retrieveSetupIntent(c.env, session.setup_intent);
+  if (intent.id !== session.setup_intent || intent.status !== 'succeeded'
+    || intent.customer !== customerId || !intent.payment_method) return false;
+  const customer = await stripeApi.retrieveCustomer(c.env, customerId);
+  if (customer.id !== customerId) return false;
+  if (!customer.invoice_settings?.default_payment_method) {
+    await stripeApi.setCustomerDefaultPaymentMethod(c.env, customerId, intent.payment_method);
+  }
+  return true;
 }
 
 /** Concurrent card/checkout requests must both use the customer that won the DB claim. */
@@ -374,13 +392,35 @@ hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inpu
       : `${origin}/hq/onboarding/card`;
     const session = await stripeApi.createCardSetupSession(c.env, {
       customerId, tenantId,
-      successUrl: `${cardReturn}?setup=success${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
+      successUrl: `${cardReturn}?setup=success&session_id={CHECKOUT_SESSION_ID}${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
       cancelUrl: `${cardReturn}?setup=cancel${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
+      logoUrl: `${origin}/brand/musubo-color.png`,
     });
     if (!session.url) return c.json({ success: false, error: 'カード登録画面のURLを作れませんでした' }, 502);
     return c.json({ success: true, data: { url: session.url } });
   } catch (error) {
     if (error instanceof StripeApiError) return c.json({ success: false, error: 'カード登録画面を開けませんでした。時間をおいてもう一度お試しください' }, 502);
+    throw error;
+  }
+});
+
+hqBilling.post('/api/hq/billing/card-confirm', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+  const body = await c.req.json<{ sessionId?: unknown } | null>().catch(() => null);
+  if (typeof body?.sessionId !== 'string' || !/^cs_(?:test_)?[A-Za-z0-9]{5,200}$/.test(body.sessionId)) {
+    return c.json({ success: false, error: 'クレジットカード登録を確認できませんでした' }, 400);
+  }
+  if (!stripeReady(c)) return c.json({ success: false, error: '決済の接続設定がまだありません' }, 503);
+  try {
+    const tenantId = tenantOf(c);
+    const billing = await getTenantBilling(c.env.DB, tenantId);
+    if (!billing?.stripe_customer_id) return c.json({ success: false, error: 'クレジットカード登録を確認できませんでした' }, 409);
+    const session = await stripeApi.retrieveCheckoutSession(c.env, body.sessionId);
+    const registered = await confirmCardSetup(c, tenantId, billing.stripe_customer_id, session);
+    return registered
+      ? c.json({ success: true, data: { registered: true } })
+      : c.json({ success: false, error: 'クレジットカード登録を確認できませんでした' }, 409);
+  } catch (error) {
+    if (error instanceof StripeApiError) return c.json({ success: false, error: 'クレジットカード登録を確認できませんでした' }, 502);
     throw error;
   }
 });
@@ -392,7 +432,16 @@ hqBilling.get('/api/hq/billing/card-status', requireRole('owner', 'admin'), asyn
     if (!billing.stripe_customer_id) return c.json({ success: true, data: { registered: false } });
     if (!stripeReady(c)) return c.json({ success: false, error: '決済の接続設定がまだありません' }, 503);
     const customer = await stripeApi.retrieveCustomer(c.env, billing.stripe_customer_id);
-    return c.json({ success: true, data: { registered: Boolean(customer.invoice_settings?.default_payment_method) } });
+    if (customer.id !== billing.stripe_customer_id) return c.json({ success: false, error: 'カード登録状況を確認できませんでした' }, 502);
+    if (customer.invoice_settings?.default_payment_method) return c.json({ success: true, data: { registered: true } });
+    // Recover a completed setup even if its webhook failed before recording the event.
+    const sessions = await stripeApi.listCustomerCheckoutSessions(c.env, billing.stripe_customer_id);
+    for (const session of sessions.data) {
+      if (await confirmCardSetup(c, tenantOf(c), billing.stripe_customer_id, session)) {
+        return c.json({ success: true, data: { registered: true } });
+      }
+    }
+    return c.json({ success: true, data: { registered: false } });
   } catch (error) {
     if (error instanceof StripeApiError) return c.json({ success: false, error: 'カード登録状況を確認できませんでした' }, 502);
     throw error;
