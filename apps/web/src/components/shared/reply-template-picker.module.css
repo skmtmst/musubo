@@ -32,8 +32,20 @@
 .templateList strong { overflow: hidden; font-size: var(--text-caption); text-overflow: ellipsis; white-space: nowrap; }
 .templateList span { overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
 .preview { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
-.previewCard { flex: 1; min-height: 220px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: var(--space-16); }
+.previewCard { position: relative; flex: 1; min-height: 220px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: var(--space-16); }
 .previewCard > strong { color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.desktopPreviewHeading { display: flex; align-items: center; justify-content: space-between; min-height: 16px; }
+.desktopPreviewHeading > strong { color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.templateAction { display: grid; place-items: center; width: 44px; height: 34px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); color: var(--color-ink-secondary); }
+.templateAction[aria-disabled='true'] { opacity: .45; cursor: not-allowed; }
+.templateAction svg { width: 18px; height: 18px; }
+.desktopPreviewHeading .templateAction { position: absolute; top: 7px; right: var(--space-16); }
+.desktopActionMenu { position: absolute; z-index: 2; top: 47px; right: var(--space-16); width: 176px; border: 1px solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-canvas); padding: var(--space-4) var(--space-12); box-shadow: var(--card-shadow); }
+.desktopActionMenu button { display: flex; align-items: center; gap: var(--space-12); width: 100%; min-height: 45px; border: 0; background: transparent; color: var(--color-ink); text-align: left; font-size: var(--text-caption); font-weight: 600; }
+.desktopActionMenu button + button { border-top: 1px solid var(--color-hairline); }
+.desktopActionMenu svg { width: 16px; height: 16px; }
+.desktopActionMenu .dangerAction, .mobileActionSheet .dangerAction { color: var(--color-status-danger); }
+.mobilePreviewHeading, .mobileActionBackdrop { display: none; }
 .previewCard h3 { margin: var(--space-12) 0; font-size: var(--text-caption); }
 .previewCard h3 { border-bottom: 1px solid var(--color-hairline); padding-bottom: var(--space-12); }
 .previewCard p { margin: var(--space-12) 0 0; font-size: var(--text-caption); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -59,6 +71,16 @@
 .folderChoices button[aria-current='true'] { border-color: var(--color-accent); background: var(--color-accent-soft); color: var(--color-accent-deep); font-weight: 700; }
 .folderChoices svg { width: 16px; height: 16px; flex: none; }
 .folderChoices svg:last-child:not(:first-child) { margin-left: auto; }
+.deleteLayer { position: fixed; z-index: 1; inset: 0; display: grid; place-items: center; background: var(--color-surface-pearl); }
+.deleteDialog { display: flex; flex-direction: column; width: min(560px, calc(100vw - 32px)); min-height: 336px; border-radius: var(--radius-panel); background: var(--color-canvas); padding: var(--space-28, 28px); box-shadow: var(--card-shadow); }
+.deleteDialog h2 { margin: 0; color: var(--color-ink); font-size: 20px; line-height: 28px; }
+.deleteDialog > p { margin: var(--space-16) 0 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: 1.5; }
+.deleteSubject { display: flex; flex-direction: column; gap: var(--space-4); min-height: 66px; margin-top: var(--space-24); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-surface-pearl); padding: var(--space-12) var(--space-16); }
+.deleteSubject strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); }
+.deleteSubject span { color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.deleteFooter { display: flex; justify-content: center; gap: var(--space-12); margin: auto calc(-1 * var(--space-28, 28px)) calc(-1 * var(--space-28, 28px)); border-top: 1px solid var(--color-hairline); padding: var(--space-24) var(--space-28, 28px); }
+.deleteFooter button { min-width: 118px; min-height: 43px; justify-content: center; }
+.deleteFooter button:last-child { min-width: 135px; }
 
 @media (max-width: 640px) {
   .overlay { padding: 0; }
@@ -84,15 +106,34 @@
   .mobileTemplates .templateList { margin-bottom: var(--space-24); overflow: visible; }
   .mobileTemplates .templateList button { min-height: 80px; }
   .mobileTemplates .preview { display: flex; }
+  .mobilePreviewHeading { display: flex; align-items: center; justify-content: space-between; min-height: 36px; }
   .mobilePreviewTitle { display: block; font-size: var(--text-caption); }
-  .desktopPreviewTitle { display: none; }
+  .desktopPreviewHeading { display: none; }
   .previewCard h3 { display: none; }
   .previewCard { min-height: 184px; }
+  .templateAction { width: 44px; height: 36px; }
+  .desktopActionMenu { display: none; }
+  .mobileActionBackdrop { position: fixed; z-index: 1; inset: 0; display: flex; align-items: flex-end; background: rgb(26 41 32 / 34%); }
+  .mobileActionSheet { display: flex; flex-direction: column; width: 100%; min-height: 285px; border-radius: var(--radius-panel) var(--radius-panel) 0 0; background: var(--color-canvas); padding: var(--space-20); }
+  .mobileActionSheet > strong { min-height: 44px; overflow: hidden; border-bottom: 1px solid var(--color-hairline); text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+  .mobileActionSheet > button { display: flex; align-items: center; gap: var(--space-12); width: 100%; min-height: 53px; border: 0; border-bottom: 1px solid var(--color-hairline); background: transparent; color: var(--color-ink); font-size: 16px; font-weight: 600; text-align: left; }
+  .mobileActionSheet svg { width: 19px; height: 19px; }
+  .mobileActionSheet .cancelAction { justify-content: center; min-height: 64px; border: 0; color: var(--color-ink-secondary); font-size: 15px; }
+  .deleteLayer { align-items: end; background: rgb(26 41 32 / 34%); }
+  .deleteDialog { width: 100%; min-height: 360px; border-radius: var(--radius-panel) var(--radius-panel) 0 0; padding: var(--space-24) var(--space-20) var(--space-28, 28px); }
+  .deleteDialog h2 { font-size: 17px; line-height: 24px; }
+  .deleteDialog > p { margin-top: var(--space-32); }
+  .deleteSubject { min-height: 58px; margin-top: calc(var(--space-24) * 2 + var(--space-8)); padding: var(--space-8) var(--space-12); }
+  .deleteFooter { gap: var(--space-16); margin: auto 0 0; border: 0; padding: 0; }
+  .deleteFooter button, .deleteFooter button:last-child { flex: 1; min-width: 0; min-height: 52px; }
   .footer { align-items: flex-start; min-height: 83px; background: var(--color-canvas); padding: var(--space-12) var(--space-18, 18px); }
   .footer > button { align-self: flex-start !important; width: 100% !important; min-height: 51px; }
   .field textarea { min-height: 40dvh; }
   .panelNewFolder .content { padding-top: 36px; }
-  .panelNewTemplate .field textarea { min-height: 40dvh !important; }
+  .panelNewTemplate .content { padding-top: var(--space-18, 18px); }
+  .panelNewTemplate .mobileTitle { margin-bottom: 36px; }
+  .panelNewTemplate .field { margin-bottom: 40px; }
+  .panelNewTemplate .field textarea { min-height: 42dvh !important; }
   .desktopHint { display: none; }
   .mobileHint { display: inline; }
   .insertHint { display: none; }
