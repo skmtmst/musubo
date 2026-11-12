@@ -1201,3 +1201,4 @@
 - [登録メディアの名前変更と操作メニュー](release-log/unreleased/35-masato-media-actions-fix.md) — 登録後の編集と操作表示の修正履歴。確認 2026-11-10。
 - [登録メディア一覧の操作をシンプルにする](release-log/unreleased/40-masato-media-list-simplify.md) — 選択枠の位置と一覧表示の整理。確認 2026-11-11。
 - [登録メディアの名前変更とフォルダ移動を直す](release-log/unreleased/43-masato-media-edit-cors.md) — 保存時の通信エラー修正履歴。確認 2026-11-11。
+- [本番直前の関門を2つ足す](release-log/unreleased/47-kenta-release-gates.md) — 5万人で3秒の速度の関門と、Next.js 更新時の全幅の崩れの見張りの履歴。確認 2026-11-12。
