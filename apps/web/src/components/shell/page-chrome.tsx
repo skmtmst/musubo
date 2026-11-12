@@ -8,7 +8,7 @@ import { DocumentTitleBoundary, useDocumentTitle, useDocumentTitleScope } from '
  * 画面の枠（トップバーと本文の幅）に、ページから値を渡すための口。
  *
  * **なぜ要るか。** ★管理画面 260枚を数えたところ、画面名はルートから機械的に
- * 決められなかった。約40枚が「Kenta Kawano(Obama)」「夏の定番セット.jpg」
+ * 決められなかった。約40枚が「Demo Person(Obama)」「夏の定番セット.jpg」
  * 「ももちゃん ／ トリミング」のようにデータの中身そのもので、約100枚が
  * 「タグを作る」「1通目を設定」のようにその画面固有の名前だった。
  * メニュー名で足りるのは約120枚しかない。

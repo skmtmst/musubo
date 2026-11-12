@@ -40,14 +40,14 @@ vi.mock('../features/friends/friend-profile-candidates.js', () => profileMocks);
 const { mergedPeople } = await import('./merged-people.js');
 
 const detail = {
-  id: 'user-a', status: 'active', revision: 1, primaryDisplayName: '田中 花子',
+  id: 'user-a', status: 'active', revision: 1, primaryDisplayName: '見本 171',
   linkedFriends: [{
-    friendId: 'friend-a', displayName: '田中 花子', lineAccountId: 'account-a',
+    friendId: 'friend-a', displayName: '見本 171', lineAccountId: 'account-a',
     lineAccountName: '本店', isFollowing: true, linkedAt: '2026-08-30',
     linkMethod: 'operator_review', confidence: 92, candidateId: 'candidate-a', candidateVersion: 2,
   }],
   profileValues: [{
-    fieldKey: 'email', fieldLabel: 'メール', valuePreview: 'ta***@example.jp',
+    fieldKey: 'email', fieldLabel: 'メール', valuePreview: 'ta***@example.com',
     sourceType: 'form', sourceLabel: '来店アンケート', sourceFriendId: 'friend-a',
     verifiedAt: null, selectedByName: '担当者', selectedAt: '2026-08-30', updateMode: 'fixed',
   }],
@@ -85,9 +85,9 @@ beforeEach(() => {
     profileCandidates: [], tagCandidates: [],
   });
   profileMocks.resolveProfileCandidateSelections.mockResolvedValue([{
-    fieldKey: 'display_name', fieldLabel: 'LINE表示名', value: '田中 花子',
-    valuePreview: '田中 花子', sourceType: 'friend', sourceId: 'friend-a',
-    sourceLabel: '田中 花子', sourceFriendId: 'friend-a', verifiedAt: null,
+    fieldKey: 'display_name', fieldLabel: 'LINE表示名', value: '見本 171',
+    valuePreview: '見本 171', sourceType: 'friend', sourceId: 'friend-a',
+    sourceLabel: '見本 171', sourceFriendId: 'friend-a', verifiedAt: null,
     updateMode: 'fixed',
   }]);
 });
@@ -119,7 +119,7 @@ describe('merged person HTTP contract', () => {
     expect(response.status).toBe(403);
     const body = JSON.stringify(await response.json());
     expect(body).not.toContain('田中');
-    expect(body).not.toContain('ta***@example.jp');
+    expect(body).not.toContain('ta***@example.com');
     expect(personMocks.getMergedPerson).not.toHaveBeenCalled();
   });
 

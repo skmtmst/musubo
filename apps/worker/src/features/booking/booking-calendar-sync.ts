@@ -135,7 +135,7 @@ export async function syncConfirmedBookingToGoogle(
       db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM bookings WHERE id=? AND line_account_id=?
         AND status='confirmed' AND lock_version=? AND (external_event_id IS NULL OR external_event_id=?))
         THEN 'true' ELSE 'booking_calendar_obsolete' END)`).bind(bookingId, row.line_account_id, row.lock_version, eventId),
-      db.prepare(`UPDATE bookings SET external_event_id=?,external_calendar_id=? WHERE id=? AND line_account_id=? AND lock_version=?`)
+      db.prepare(`UPDATE bookings SET confirmation_revision = confirmation_revision + 1, external_event_id=?,external_calendar_id=? WHERE id=? AND line_account_id=? AND lock_version=?`)
         .bind(eventId, row.calendar_id, bookingId, row.line_account_id, row.lock_version),
     ] : [],
   });
@@ -529,7 +529,7 @@ export async function runBookingGoogleSync(
         }
       }
       await db.prepare(
-        `UPDATE bookings SET external_event_id = NULL, external_calendar_id = NULL,
+        `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, external_event_id = NULL, external_calendar_id = NULL,
              updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
           WHERE id = ? AND line_account_id=? AND lock_version=? AND external_event_id IS ?`,
       ).bind(booking.id,input.lineAccountId,booking.lock_version,booking.external_event_id).run();
@@ -573,7 +573,7 @@ export async function runBookingGoogleSync(
         return 'retry_wait';
       }
       await db.prepare(
-        `UPDATE bookings SET external_event_id = NULL, external_calendar_id = NULL,
+        `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, external_event_id = NULL, external_calendar_id = NULL,
              updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
           WHERE id = ? AND line_account_id=? AND lock_version=? AND external_event_id IS ?`,
       ).bind(booking.id,input.lineAccountId,booking.lock_version,booking.external_event_id).run();

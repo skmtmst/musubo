@@ -270,7 +270,7 @@ const TEMPLATE_1_DETAIL = (template) => ({
   },
 })
 const TEMPLATE_1_VERSIONS = [
-  { versionNumber: 2, status: 'in_use', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日 {{date}} のご予約です。\nhttps://nen.example/booking', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-08-02T10:15:00+09:00' , createdByStaffId: 'visual-qa-owner', creatorName: 'Kenta Kawano', creatorNameSource: 'current_staff_profile' },
+  { versionNumber: 2, status: 'in_use', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日 {{date}} のご予約です。\nhttps://nen.example/booking', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-08-02T10:15:00+09:00' , createdByStaffId: 'visual-qa-owner', creatorName: 'Demo Person', creatorNameSource: 'current_staff_profile' },
   { versionNumber: 1, status: 'past', messageType: 'text', messageContent: '{{name}}さん、こんにちは。\n明日のご予約をお待ちしています。', carouselActions: null, carouselTapLimitMode: null, carouselTapLimitText: null, question: null, questionStatus: null, effectiveFrom: null, createdAt: '2026-07-14T09:40:00+09:00' , createdByStaffId: 'visual-qa-owner', creatorName: 'Masato', creatorNameSource: 'current_staff_profile' },
 ]
 
@@ -431,7 +431,7 @@ const LINE_ACCOUNT_CONNECT_HTN = {
 /** 画面を見るだけなので、いちばん権限のある人で固定する。実在しない名前。 */
 const STAFF = {
   id: 'visual-qa-owner',
-  name: 'Kenta Kawano',
+  name: 'Demo Person',
   role: 'owner',
   readOnly: false,
   permissionKeys: [],
@@ -538,19 +538,19 @@ const OPS_TENANTS = [
 const OPS_TENANT_SUMMARY = { active: 3, trialing: 1, suspended: 1, pastDue: 1 }
 const OPS_AUDIT = [
   {
-    id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '河野',
+    id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '見本',
     tenant_id: 'visual-tenant-1', tenant_name: '検証商事',
     action: 'impersonation.start', reason: '問い合わせの確認', detail: null,
     ip: null, visible_to_tenant: 1, created_at: '2026-10-01T15:20:00+09:00',
   },
   {
-    id: 'visual-audit-2', staff_id: 'visual-qa-ops', staff_name: '河野',
+    id: 'visual-audit-2', staff_id: 'visual-qa-ops', staff_name: '見本',
     tenant_id: 'visual-tenant-3', tenant_name: 'サンプル商店',
     action: 'tenant.status.change', reason: '検証用の記録', detail: '{"from":"active","to":"suspended"}',
     ip: null, visible_to_tenant: 1, created_at: '2026-09-30T09:12:00+09:00',
   },
   {
-    id: 'visual-audit-3', staff_id: 'visual-ops-member', staff_name: '河野',
+    id: 'visual-audit-3', staff_id: 'visual-ops-member', staff_name: '見本',
     tenant_id: 'visual-tenant-2', tenant_name: '見本物産',
     action: 'impersonation.write', reason: '初期設定の代行（本人の依頼）', detail: null,
     ip: null, visible_to_tenant: 1, created_at: '2026-09-28T18:40:00+09:00',
@@ -582,7 +582,7 @@ const OPS_MEMBERS = [
     lastLoginAt: '2026-10-01T22:40:00+09:00', createdAt: '2026-05-01T10:00:00+09:00',
   },
   {
-    staffId: 'visual-ops-invited', name: '山田 花子', email: null, isActive: true,
+    staffId: 'visual-ops-invited', name: '見本 143', email: null, isActive: true,
     totpEnabled: false, lineLinked: false, inviteStatus: 'sent', activationState: 'invited',
     invitedAt: '2026-09-06T10:00:00+09:00', approvedBy: '検証 太郎',
     lastLoginAt: null, createdAt: '2026-09-06T10:00:00+09:00',
@@ -754,14 +754,14 @@ const HQ_SUPPORT_REQUESTS = [
     id: 'visual-ticket-1', kind: 'bug', kindLabel: '不具合の報告',
     subject: 'LINE の Webhook が遅れる', body: '夕方の一斉配信のあと、友だちの返信が管理画面に出るまで 10 分ほどかかります。昨日から急に遅くなりました。',
     lineAccountId: 'visual-qa-account', attachments: [],
-    status: 'open', staffName: '高田 誠', notified: true,
+    status: 'open', staffName: '見本 18', notified: true,
     createdAt: '2026-09-29T18:20:00+09:00', ticketLabel: '#1042',
   },
   {
     id: 'visual-ticket-2', kind: 'billing', kindLabel: '料金・契約について',
     subject: '年払いへの切り替え', body: '年払いに切り替えるときの差額を教えてください。',
     lineAccountId: null, attachments: [],
-    status: 'closed', staffName: '高田 誠', notified: true,
+    status: 'closed', staffName: '見本 18', notified: true,
     createdAt: '2026-09-21T15:20:00+09:00', ticketLabel: '#1031',
   },
 ]
@@ -780,7 +780,7 @@ const HQ_SUPPORT_DETAIL = {
       createdAt: '2026-09-30T10:05:00+09:00',
     },
     {
-      id: 'visual-support-msg-2', authorKind: 'tenant', authorName: '高田 誠',
+      id: 'visual-support-msg-2', authorKind: 'tenant', authorName: '見本 18',
       body: '18:00〜18:30 の配信のあとです。画面の写しを添えます。', attachments: [],
       createdAt: '2026-09-30T11:00:00+09:00',
     },
@@ -1162,7 +1162,7 @@ const SUPPORT_EMAIL_ITEMS = [
   {
     id: 'email:mail-1',
     threadId: 'mail-1',
-    customerName: '坂本 真人',
+    customerName: '見本 25',
     customerIdentifier: 'sakamoto@example.com',
     subject: '発送について',
     preview: 'ご注文ありがとうございます。発送状況をご案内します。',
@@ -1249,11 +1249,11 @@ const FEATURES = {
 /** 設計 `bfB50` / `oHAN4` を確認するための固定ECデータ。秘密値そのものは置かない。 */
 const EC_SUBSCRIPTIONS = {
   items: [
-    { id: 'sub-1', manageUrl: 'https://stg.nen-petfood.com/mypage', friendId: 'friend-1', ownerName: '高橋 直人', petName: 'ももちゃん', contractNumber: 'SUB-12492', status: 'active', statusLabel: 'よく続いています', riskReason: null, nextShippingAt: '2026-09-08', cycle: 'フード定期便（毎月）', items: '鹿肉フード × 2', amount: 12800, continuedCount: 8, startedAt: '2025-11-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
-    { id: 'sub-3', manageUrl: 'https://stg.nen-petfood.com/mypage', friendId: 'friend-3', ownerName: '木村 亮', petName: 'こむぎちゃん', contractNumber: 'SUB-12511', status: 'at_risk', statusLabel: '決済の確認が必要です', riskReason: null, nextShippingAt: '2026-09-12', cycle: 'フード定期便（2か月に1回）', items: '鹿肉フード × 1', amount: 8600, continuedCount: 7, startedAt: '2025-08-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
-    { id: 'sub-4', friendId: 'friend-4', ownerName: '中村 彩', petName: 'ぷりんちゃん', contractNumber: 'SUB-12528', status: 'paused', statusLabel: '休止中です', riskReason: null, nextShippingAt: null, cycle: 'おやつ定期便（毎月）', items: '鹿肉クッキー × 2', amount: 3600, continuedCount: 4, startedAt: '2026-05-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
-    { id: 'sub-2', friendId: 'friend-2', ownerName: '前田 さくら', petName: 'そらくん', contractNumber: 'SUB-12503', status: 'active', statusLabel: 'よく続いています', riskReason: null, nextShippingAt: '2026-09-09', cycle: 'おやつ定期便（毎月）', items: '鹿肉ジャーキー × 1', amount: 4200, continuedCount: 8, startedAt: '2026-01-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
-    { id: 'sub-5', friendId: 'friend-5', ownerName: '大西 健一', petName: 'レオくん', contractNumber: 'SUB-12532', status: 'cancelled', statusLabel: '止まりました', riskReason: null, nextShippingAt: null, cycle: 'フード定期便（毎月）', items: '鹿肉フード × 1', amount: 9800, continuedCount: 3, startedAt: '2026-05-01', cancelledAt: '2026-09-01', cancellationReason: '使いきれない', syncedAt: '2026-09-06T09:58:00+09:00' },
+    { id: 'sub-1', manageUrl: 'https://stg.nen-petfood.com/mypage', friendId: 'friend-1', ownerName: '見本 16', petName: 'ももちゃん', contractNumber: 'SUB-12492', status: 'active', statusLabel: 'よく続いています', riskReason: null, nextShippingAt: '2026-09-08', cycle: 'フード定期便（毎月）', items: '鹿肉フード × 2', amount: 12800, continuedCount: 8, startedAt: '2025-11-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
+    { id: 'sub-3', manageUrl: 'https://stg.nen-petfood.com/mypage', friendId: 'friend-3', ownerName: '見本 26', petName: 'こむぎちゃん', contractNumber: 'SUB-12511', status: 'at_risk', statusLabel: '決済の確認が必要です', riskReason: null, nextShippingAt: '2026-09-12', cycle: 'フード定期便（2か月に1回）', items: '鹿肉フード × 1', amount: 8600, continuedCount: 7, startedAt: '2025-08-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
+    { id: 'sub-4', friendId: 'friend-4', ownerName: '見本 27', petName: 'ぷりんちゃん', contractNumber: 'SUB-12528', status: 'paused', statusLabel: '休止中です', riskReason: null, nextShippingAt: null, cycle: 'おやつ定期便（毎月）', items: '鹿肉クッキー × 2', amount: 3600, continuedCount: 4, startedAt: '2026-05-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
+    { id: 'sub-2', friendId: 'friend-2', ownerName: '見本 17', petName: 'そらくん', contractNumber: 'SUB-12503', status: 'active', statusLabel: 'よく続いています', riskReason: null, nextShippingAt: '2026-09-09', cycle: 'おやつ定期便（毎月）', items: '鹿肉ジャーキー × 1', amount: 4200, continuedCount: 8, startedAt: '2026-01-01', cancelledAt: null, cancellationReason: null, syncedAt: '2026-09-06T09:58:00+09:00' },
+    { id: 'sub-5', friendId: 'friend-5', ownerName: '見本 19', petName: 'レオくん', contractNumber: 'SUB-12532', status: 'cancelled', statusLabel: '止まりました', riskReason: null, nextShippingAt: null, cycle: 'フード定期便（毎月）', items: '鹿肉フード × 1', amount: 9800, continuedCount: 3, startedAt: '2026-05-01', cancelledAt: '2026-09-01', cancellationReason: '使いきれない', syncedAt: '2026-09-06T09:58:00+09:00' },
   ],
   summary: { total: 186, active: 172, paused: 5, atRisk: 14, cancelled: 8, monthlyAmount: 1482000, startedThisMonth: 12, cancelledThisMonth: 3, cancellationTopReason: '使いきれない', monthlyStats: [
     { month: '2026-06', count: 158, amount: 1248000 }, { month: '2026-07', count: 169, amount: 1324000 }, { month: '2026-08', count: 172, amount: 1482000 },
@@ -1321,19 +1321,19 @@ const RESTAURANT_MENU = [
  * 卓「T3」には先の予約が3件（板 eY9F3 卓を止める確認）。ほかの店舗の予約は数を見るために少し残す。
  */
 const RESTAURANT_RESERVATIONS = [
-  { id: 'rsv-1', store_id: 'store-sby', store_name: '然 渋谷店', source: 'tabelog', external_id: 'TB-11230', customer_name: '山田 太郎', customer_phone: '080-1234-5678', line_uid: null, guest_count: 2, starts_at: restaurantAt(18, 30), ends_at: restaurantAt(20, 30), table_id: 'tbl-1', table_label: '2人卓', course_id: 'menu-1', course_name: 'おまかせコース', status: 'pending', allergy_note: '乳', note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-2', store_id: 'store-sby', store_name: '然 渋谷店', source: 'line', external_id: null, customer_name: '佐藤 健', customer_phone: null, line_uid: 'U-demo-1', guest_count: 2, starts_at: restaurantAt(18, 0), ends_at: restaurantAt(20, 0), table_id: 'tbl-2', table_label: '2人卓', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-3', store_id: 'store-sby', store_name: '然 渋谷店', source: 'restaurant_board', external_id: 'RB-55210', customer_name: '田中 明子', customer_phone: '090-5555-1234', line_uid: null, guest_count: 4, starts_at: restaurantAt(18, 0), ends_at: restaurantAt(20, 0), table_id: 'tbl-3', table_label: '窓側4人卓', course_id: 'menu-6', course_name: '秋の鹿肉コース', status: 'confirmed', allergy_note: 'えび', note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-4', store_id: 'store-sby', store_name: '然 渋谷店', source: 'hotpepper', external_id: 'HP-88213', customer_name: '鈴木 真理', customer_phone: null, line_uid: null, guest_count: 4, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(21, 0), table_id: 'tbl-4', table_label: '4人卓', course_id: 'menu-6', course_name: '秋の鹿肉コース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-5', store_id: 'store-sby', store_name: '然 渋谷店', source: 'phone', external_id: null, customer_name: '小林 健太', customer_phone: '03-5555-6666', line_uid: null, guest_count: 1, starts_at: restaurantAt(18, 30), ends_at: restaurantAt(20, 0), table_id: 'tbl-6', table_label: 'カウンター', course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-6', store_id: 'store-sby', store_name: '然 渋谷店', source: 'line', external_id: null, customer_name: '加藤 舞', customer_phone: null, line_uid: 'U-demo-2', guest_count: 1, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(20, 30), table_id: 'tbl-7', table_label: 'カウンター', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-7', store_id: 'store-sby', store_name: '然 渋谷店', source: 'phone', external_id: null, customer_name: '坂本 真人', customer_phone: '03-1111-0000', line_uid: null, guest_count: 8, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(21, 30), table_id: 'tbl-8', table_label: '個室', course_id: 'menu-6', course_name: '秋の鹿肉コース', status: 'confirmed', allergy_note: 'そば・小麦', note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-1', store_id: 'store-sby', store_name: '然 渋谷店', source: 'tabelog', external_id: 'TB-11230', customer_name: '見本 141', customer_phone: '080-0000-5678', line_uid: null, guest_count: 2, starts_at: restaurantAt(18, 30), ends_at: restaurantAt(20, 30), table_id: 'tbl-1', table_label: '2人卓', course_id: 'menu-1', course_name: 'おまかせコース', status: 'pending', allergy_note: '乳', note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-2', store_id: 'store-sby', store_name: '然 渋谷店', source: 'line', external_id: null, customer_name: '見本 114', customer_phone: null, line_uid: 'U-demo-1', guest_count: 2, starts_at: restaurantAt(18, 0), ends_at: restaurantAt(20, 0), table_id: 'tbl-2', table_label: '2人卓', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-3', store_id: 'store-sby', store_name: '然 渋谷店', source: 'restaurant_board', external_id: 'RB-55210', customer_name: '見本 169', customer_phone: '090-0000-1234', line_uid: null, guest_count: 4, starts_at: restaurantAt(18, 0), ends_at: restaurantAt(20, 0), table_id: 'tbl-3', table_label: '窓側4人卓', course_id: 'menu-6', course_name: '秋の鹿肉コース', status: 'confirmed', allergy_note: 'えび', note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-4', store_id: 'store-sby', store_name: '然 渋谷店', source: 'hotpepper', external_id: 'HP-88213', customer_name: '見本 182', customer_phone: null, line_uid: null, guest_count: 4, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(21, 0), table_id: 'tbl-4', table_label: '4人卓', course_id: 'menu-6', course_name: '秋の鹿肉コース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-5', store_id: 'store-sby', store_name: '然 渋谷店', source: 'phone', external_id: null, customer_name: '見本 39', customer_phone: '03-0000-6666', line_uid: null, guest_count: 1, starts_at: restaurantAt(18, 30), ends_at: restaurantAt(20, 0), table_id: 'tbl-6', table_label: 'カウンター', course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-6', store_id: 'store-sby', store_name: '然 渋谷店', source: 'line', external_id: null, customer_name: '見本 14', customer_phone: null, line_uid: 'U-demo-2', guest_count: 1, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(20, 30), table_id: 'tbl-7', table_label: 'カウンター', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-7', store_id: 'store-sby', store_name: '然 渋谷店', source: 'phone', external_id: null, customer_name: '見本 25', customer_phone: '03-0000-0000', line_uid: null, guest_count: 8, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(21, 30), table_id: 'tbl-8', table_label: '個室', course_id: 'menu-6', course_name: '秋の鹿肉コース', status: 'confirmed', allergy_note: 'そば・小麦', note: null, sync_direction: 'inbound_only' },
   { id: 'rsv-8', store_id: 'store-sby', store_name: '然 渋谷店', source: 'phone', external_id: null, customer_name: '押さえ', customer_phone: null, line_uid: null, guest_count: 4, starts_at: restaurantAt(20, 0), ends_at: restaurantAt(21, 30), table_id: 'tbl-9', table_label: 'テラス', course_id: null, course_name: null, status: 'pending', allergy_note: '電話のお客さま用', note: '電話のお客さま用', hold_expires_at: restaurantAt(23, 30), sync_direction: 'inbound_only' },
-  { id: 'rsv-9', store_id: 'store-sby', store_name: '然 渋谷店', source: 'line', external_id: null, customer_name: '山田 花子', customer_phone: '090-1111-2222', line_uid: 'U-demo-3', guest_count: 4, starts_at: restaurantAt(19, 0, 1), ends_at: restaurantAt(21, 0, 1), table_id: 'tbl-3', table_label: '窓側4人卓', course_id: 'menu-6', course_name: '秋の鹿肉コース', status: 'confirmed', allergy_note: 'えび', note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-10', store_id: 'store-sby', store_name: '然 渋谷店', source: 'phone', external_id: null, customer_name: '佐藤 健', customer_phone: '090-3333-4444', line_uid: null, guest_count: 3, starts_at: restaurantAt(12, 0, 2), ends_at: restaurantAt(14, 0, 2), table_id: 'tbl-3', table_label: '窓側4人卓', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-11', store_id: 'store-sby', store_name: '然 渋谷店', source: 'restaurant_board', external_id: 'RB-55290', customer_name: '田中 明子', customer_phone: '090-5555-1234', line_uid: null, guest_count: 2, starts_at: restaurantAt(18, 30, 7), ends_at: restaurantAt(20, 30, 7), table_id: 'tbl-3', table_label: '窓側4人卓', course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-12', store_id: 'store-omt', store_name: '然 表参道店', source: 'hotpepper', external_id: 'HP-88400', customer_name: '小林 誠', customer_phone: null, line_uid: null, guest_count: 4, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(21, 0), table_id: null, table_label: null, course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-13', store_id: 'store-nkm', store_name: '然 中目黒店', source: 'manual', external_id: null, customer_name: '松本 大輔', customer_phone: '070-9999-0000', line_uid: null, guest_count: 5, starts_at: restaurantAt(18, 30, 1), ends_at: restaurantAt(20, 30, 1), table_id: null, table_label: null, course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-9', store_id: 'store-sby', store_name: '然 渋谷店', source: 'line', external_id: null, customer_name: '見本 143', customer_phone: '090-0000-2222', line_uid: 'U-demo-3', guest_count: 4, starts_at: restaurantAt(19, 0, 1), ends_at: restaurantAt(21, 0, 1), table_id: 'tbl-3', table_label: '窓側4人卓', course_id: 'menu-6', course_name: '秋の鹿肉コース', status: 'confirmed', allergy_note: 'えび', note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-10', store_id: 'store-sby', store_name: '然 渋谷店', source: 'phone', external_id: null, customer_name: '見本 114', customer_phone: '090-0000-4444', line_uid: null, guest_count: 3, starts_at: restaurantAt(12, 0, 2), ends_at: restaurantAt(14, 0, 2), table_id: 'tbl-3', table_label: '窓側4人卓', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-11', store_id: 'store-sby', store_name: '然 渋谷店', source: 'restaurant_board', external_id: 'RB-55290', customer_name: '見本 169', customer_phone: '090-0000-1234', line_uid: null, guest_count: 2, starts_at: restaurantAt(18, 30, 7), ends_at: restaurantAt(20, 30, 7), table_id: 'tbl-3', table_label: '窓側4人卓', course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-12', store_id: 'store-omt', store_name: '然 表参道店', source: 'hotpepper', external_id: 'HP-88400', customer_name: '見本 41', customer_phone: null, line_uid: null, guest_count: 4, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(21, 0), table_id: null, table_label: null, course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-13', store_id: 'store-nkm', store_name: '然 中目黒店', source: 'manual', external_id: null, customer_name: '見本 43', customer_phone: '070-0000-0000', line_uid: null, guest_count: 5, starts_at: restaurantAt(18, 30, 1), ends_at: restaurantAt(20, 30, 1), table_id: null, table_label: null, course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
 ]
 const RESTAURANT_SNAPSHOT = {
   environment: 'staging_test',
@@ -1341,19 +1341,19 @@ const RESTAURANT_SNAPSHOT = {
   organization: { id: 'org-nen', account_id: 'visual-qa-account', tenant_id: 'tenant-nen', tenant_name: '株式会社 然', name: '然フードホールディングス', status: 'active' },
   stores: RESTAURANT_STORES,
   memberships: [
-    { id: 'mem-1', store_id: null, staff_name: '高田 誠', email: 'takada@example.com', role: 'super_admin', line_uid: 'U-admin-1', google_email: 'takada@example.com', status: 'active' },
-    { id: 'mem-2', store_id: 'store-sby', staff_name: '中川 由美', email: 'nakagawa@example.com', role: 'store_manager', line_uid: 'U-mgr-1', google_email: 'nakagawa@example.com', status: 'active' },
-    { id: 'mem-3', store_id: 'store-omt', staff_name: '佐野 直人', email: 'sano@example.com', role: 'store_manager', line_uid: null, google_email: 'sano@example.com', status: 'active' },
-    { id: 'mem-4', store_id: 'store-sby', staff_name: '山田 花子', email: 'yamada@example.com', role: 'staff', line_uid: 'U-staff-1', google_email: null, status: 'active' },
-    { id: 'mem-5', store_id: 'store-nkm', staff_name: '林 直人', email: null, role: 'staff', line_uid: null, google_email: null, status: 'invited' },
-    { id: 'mem-6', store_id: 'store-omt', staff_name: '鈴木 一郎', email: 'suzuki@example.com', role: 'staff', line_uid: null, google_email: null, status: 'suspended' },
+    { id: 'mem-1', store_id: null, staff_name: '見本 18', email: 'takada@example.com', role: 'super_admin', line_uid: 'U-admin-1', google_email: 'takada@example.com', status: 'active' },
+    { id: 'mem-2', store_id: 'store-sby', staff_name: '見本 30', email: 'nakagawa@example.com', role: 'store_manager', line_uid: 'U-mgr-1', google_email: 'nakagawa@example.com', status: 'active' },
+    { id: 'mem-3', store_id: 'store-omt', staff_name: '見本 31', email: 'sano@example.com', role: 'store_manager', line_uid: null, google_email: 'sano@example.com', status: 'active' },
+    { id: 'mem-4', store_id: 'store-sby', staff_name: '見本 143', email: 'yamada@example.com', role: 'staff', line_uid: 'U-staff-1', google_email: null, status: 'active' },
+    { id: 'mem-5', store_id: 'store-nkm', staff_name: '見本 154', email: null, role: 'staff', line_uid: null, google_email: null, status: 'invited' },
+    { id: 'mem-6', store_id: 'store-omt', staff_name: '見本 176', email: 'suzuki@example.com', role: 'staff', line_uid: null, google_email: null, status: 'suspended' },
   ],
   /* 板 t8WgD8 の4枚：承認待ち2（Google投稿・メニュー改定）・差戻し1（LINE配信）・承認済1（Google投稿） */
   approvals: [
-    { id: 'apr-1', store_id: 'store-sby', kind: 'gbp_post', title: '秋の鹿肉コース はじまりました', status: 'pending', requested_by: '中川 由美', review_comment: null, created_at: restaurantAt(10, 12, -2), payload_json: JSON.stringify({ typeLabel: 'イベント', title: '秋の鹿肉コース', body: '10月1日から、信州の鹿肉を使った秋のコースをはじめます。ご予約は LINE から。' }) },
-    { id: 'apr-2', store_id: 'store-omt', kind: 'menu_change', title: 'ランチコースの価格改定', status: 'pending', requested_by: '佐野 直人', review_comment: null, created_at: restaurantAt(18, 40, -3), payload_json: JSON.stringify({ before: 'ランチコース ¥3,800', after: 'ランチコース ¥4,200' }) },
-    { id: 'apr-3', store_id: null, kind: 'line_message', title: '来店お礼メッセージ', status: 'returned', requested_by: '中川 由美', review_comment: 'クーポンの期限を書いてください（高田）', created_at: restaurantAt(15, 2, -5), payload_json: JSON.stringify({ title: 'ご来店ありがとうございました', body: 'またのお越しをお待ちしております。次回使えるクーポンをお送りします。' }) },
-    { id: 'apr-4', store_id: 'store-nkm', kind: 'gbp_post', title: '10月の定休日のお知らせ', status: 'approved', requested_by: '高田 誠', review_comment: null, created_at: restaurantAt(9, 30, -7), payload_json: JSON.stringify({ typeLabel: '通常の投稿', body: '10月は毎週火曜が定休日です。' }) },
+    { id: 'apr-1', store_id: 'store-sby', kind: 'gbp_post', title: '秋の鹿肉コース はじまりました', status: 'pending', requested_by: '見本 30', review_comment: null, created_at: restaurantAt(10, 12, -2), payload_json: JSON.stringify({ typeLabel: 'イベント', title: '秋の鹿肉コース', body: '10月1日から、信州の鹿肉を使った秋のコースをはじめます。ご予約は LINE から。' }) },
+    { id: 'apr-2', store_id: 'store-omt', kind: 'menu_change', title: 'ランチコースの価格改定', status: 'pending', requested_by: '見本 31', review_comment: null, created_at: restaurantAt(18, 40, -3), payload_json: JSON.stringify({ before: 'ランチコース ¥3,800', after: 'ランチコース ¥4,200' }) },
+    { id: 'apr-3', store_id: null, kind: 'line_message', title: '来店お礼メッセージ', status: 'returned', requested_by: '見本 30', review_comment: 'クーポンの期限を書いてください（高田）', created_at: restaurantAt(15, 2, -5), payload_json: JSON.stringify({ title: 'ご来店ありがとうございました', body: 'またのお越しをお待ちしております。次回使えるクーポンをお送りします。' }) },
+    { id: 'apr-4', store_id: 'store-nkm', kind: 'gbp_post', title: '10月の定休日のお知らせ', status: 'approved', requested_by: '見本 18', review_comment: null, created_at: restaurantAt(9, 30, -7), payload_json: JSON.stringify({ typeLabel: '通常の投稿', body: '10月は毎週火曜が定休日です。' }) },
   ],
   reservations: RESTAURANT_RESERVATIONS,
   reservationTotal: RESTAURANT_RESERVATIONS.length,
@@ -1363,7 +1363,7 @@ const RESTAURANT_SNAPSHOT = {
     total_capacity: 26, ota_capacity: 10, line_capacity: 10, walk_in_capacity: 6,
     reserved_count: h === 19 ? 20 : 8,
   }))),
-  menuItems: RESTAURANT_MENU,
+  menuItems: RESTAURANT_MENU.map((item) => ({...item, confirmation_revision: 1})),
   connectors: [
     { id: 'con-1', store_id: 'store-sby', provider: 'restaurant_board', mode: 'inbound_only', status: 'connected', last_synced_at: restaurantAt(8, 0), last_error: null },
     { id: 'con-2', store_id: 'store-omt', provider: 'restaurant_board', mode: 'inbound_only', status: 'connected', last_synced_at: restaurantAt(8, 0), last_error: null },
@@ -1399,7 +1399,7 @@ const RESTAURANT_INVENTORY_DAY = [
   id: `inv-${h}${m}`, store_id: 'store-sby', starts_at: restaurantAt(h, m), slot_minutes: 30, total_capacity: 26,
   ota_capacity: h === 19 && m === 0 ? 6 : 8, line_capacity: h === 19 && m === 0 ? 4 : 6, walk_in_capacity: h === 19 && m === 0 ? 4 : 6,
   reserved_count: seats, occupied_seats: seats, occupiedTableIds: tables, freeSeats: 26 - seats,
-  version: 3, updated_by: 'mem-2', updated_by_name: '中川 由美', updated_at: restaurantAt(14, 2),
+  version: 3, updated_by: 'mem-2', updated_by_name: '見本 30', updated_at: restaurantAt(14, 2),
 }))
 /* 開ける時間：月休み・火〜木 17:00〜22:00・金 〜23:00・土 昼夜・日 昼と 〜21:00（weekday は 0=日）。 */
 const RESTAURANT_OPENING_HOURS = {
@@ -1437,7 +1437,7 @@ const [closureYear, closureMonth] = RESTAURANT_CLOSURE_MONTH.split('-').map(Numb
 const RESTAURANT_CLOSURE_LAST = String(new Date(Date.UTC(closureYear, closureMonth, 0)).getUTCDate())
 const restaurantClosure = (id, day, over) => ({
   id, storeId: 'store-sby', startDate: `${RESTAURANT_CLOSURE_MONTH}-${day}`, endDate: `${RESTAURANT_CLOSURE_MONTH}-${day}`, allDay: true, startTime: null, endTime: null,
-  kind: 'temporary_closed', memo: null, tableIds: [], createdBy: 'mem-2', createdByName: '中川 由美', createdAt: restaurantAt(10, 0, -3), updatedAt: restaurantAt(10, 0, -3), version: 1, ...over,
+  kind: 'temporary_closed', memo: null, tableIds: [], createdBy: 'mem-2', createdByName: '見本 30', createdAt: restaurantAt(10, 0, -3), updatedAt: restaurantAt(10, 0, -3), version: 1, ...over,
 })
 const RESTAURANT_CLOSURES = [
   restaurantClosure('cl-1', '20', { memo: '設備点検のため' }),
@@ -1447,8 +1447,8 @@ const RESTAURANT_CLOSURES = [
 /* 臨時休業・貸切の窓の preview：この日の予約2件（LINE の友だち1件・ホットペッパー1件）。保存・送信はしない。 */
 const RESTAURANT_CLOSURE_PREVIEW = {
   reservations: [
-    { id: 'cl-r1', startsAt: restaurantAt(12, 0, 13), endsAt: restaurantAt(14, 0, 13), guestCount: 2, customerName: '山田 花子', customerPhone: null, contacted: false, source: 'line', tableId: 'tbl-1', friendId: 'friend-1', isLineFriend: true },
-    { id: 'cl-r2', startsAt: restaurantAt(19, 0, 13), endsAt: restaurantAt(21, 0, 13), guestCount: 4, customerName: '佐藤 美咲', customerPhone: '03-…', contacted: false, source: 'hotpepper', tableId: 'tbl-4', friendId: null, isLineFriend: false },
+    { id: 'cl-r1', startsAt: restaurantAt(12, 0, 13), endsAt: restaurantAt(14, 0, 13), guestCount: 2, customerName: '見本 143', customerPhone: null, contacted: false, source: 'line', tableId: 'tbl-1', friendId: 'friend-1', isLineFriend: true },
+    { id: 'cl-r2', startsAt: restaurantAt(19, 0, 13), endsAt: restaurantAt(21, 0, 13), guestCount: 4, customerName: '見本 121', customerPhone: '03-…', contacted: false, source: 'hotpepper', tableId: 'tbl-4', friendId: null, isLineFriend: false },
   ],
   contactedCount: 0,
   waitlistCount: 0,
@@ -1638,9 +1638,9 @@ const ANALYTICS_FUNNEL_RUN = {
 
 /* 保存した分析（絵 bglah の3件）。3件目は定義を変えたあとまだ集計していない（更新後未集計）。 */
 const ANALYTICS_SAVED = [
-  ['saved-1', '定期便 × 流入経路', 'cross', '高田 誠', 8, '2026-09-30T10:12:00+09:00', 2, false],
-  ['saved-2', '友だち追加から購入まで', 'funnel', '中川 由美', 4, '2026-09-28T18:40:00+09:00', 2, false],
-  ['saved-3', 'タグ × 年代', 'cross', '高田 誠', 2, '2026-09-12T09:05:00+09:00', 3, true],
+  ['saved-1', '定期便 × 流入経路', 'cross', '見本 18', 8, '2026-09-30T10:12:00+09:00', 2, false],
+  ['saved-2', '友だち追加から購入まで', 'funnel', '見本 30', 4, '2026-09-28T18:40:00+09:00', 2, false],
+  ['saved-3', 'タグ × 年代', 'cross', '見本 18', 2, '2026-09-12T09:05:00+09:00', 3, true],
 ].map(([id, name, kind, createdByName, snapshotCount, updatedAt, version, stale], index) => ({
   id, name, kind, status: 'active', currentVersionNumber: version,
   createdBy: `visual-owner-${index + 1}`, createdByName,
@@ -1659,11 +1659,11 @@ const ANALYTICS_SAVED = [
  */
 const PENDING_APPROVALS = [
   // 友だち, 紹介した人, 紹介人ID, アカウント, 案件, 成果地点, 成果額, 報酬, 成果日時, 要確認
-  ['佐藤 美咲', '田中 明', 'af-1', '然 本店', '定期便の初回', '定期便が確定', 4980, 2000, '2026-09-30T14:12:00+09:00', false],
-  ['鈴木 健', '合同会社ノース', 'af-2', '然 本店', '夏の紹介キャンペーン', '商品を買った', 12800, 1280, '2026-09-30T11:05:00+09:00', false],
-  ['高橋 まい', '山口 商店', 'af-5', '然 渋谷店', '定期便の初回', '定期便が確定', 4980, 1000, '2026-09-29T18:40:00+09:00', true],
-  ['伊藤 翔', '木村 亮', 'af-3', '然 本店', '定期便の初回', '定期便が確定', 4980, 1500, '2026-09-29T10:21:00+09:00', false],
-  ['渡辺 ゆか', '田中 明', 'af-1', '然 本店', '夏の紹介キャンペーン', '商品を買った', 6400, 2000, '2026-09-28T20:02:00+09:00', true],
+  ['見本 121', '見本 168', 'af-1', '然 本店', '定期便の初回', '定期便が確定', 4980, 2000, '2026-09-30T14:12:00+09:00', false],
+  ['見本 178', '合同会社ノース', 'af-2', '然 本店', '夏の紹介キャンペーン', '商品を買った', 12800, 1280, '2026-09-30T11:05:00+09:00', false],
+  ['見本 13', '見本 135', 'af-5', '然 渋谷店', '定期便の初回', '定期便が確定', 4980, 1000, '2026-09-29T18:40:00+09:00', true],
+  ['伊藤 翔', '見本 26', 'af-3', '然 本店', '定期便の初回', '定期便が確定', 4980, 1500, '2026-09-29T10:21:00+09:00', false],
+  ['渡辺 ゆか', '見本 168', 'af-1', '然 本店', '夏の紹介キャンペーン', '商品を買った', 6400, 2000, '2026-09-28T20:02:00+09:00', true],
 ].map(([friendName, affiliateName, affiliateId, lineAccountName, offerName, conversionPointName, value, rewardAmount, createdAt, duplicateFlag], index) => ({
   eventId: `cv-p-${index + 1}`,
   createdAt,
@@ -1719,7 +1719,7 @@ const APPROVED_APPROVALS = APPROVED_PLAN.flatMap(([affiliateId, offerId, offerNa
 
 /* 今月認めなかった数は V8 の板（`OylSV`）の 2 件にそろえる。 */
 const REJECTED_APPROVALS = [
-  ['テスト注文 花子', '田中 明', 'af-1', '2026-10-02T11:00:00+09:00'],
+  ['テスト注文 花子', '見本 168', 'af-1', '2026-10-02T11:00:00+09:00'],
   ['テスト注文 太郎', '合同会社ノース', 'af-2', '2026-10-01T15:00:00+09:00'],
 ].map(([friendName, affiliateName, affiliateId, createdAt], index) => ({
   eventId: `cv-r-${index + 1}`,
@@ -1770,11 +1770,11 @@ const SHAPES = {
   '/api/conversions/approvals': CONVERSION_APPROVALS,
   /* 支払いの集計。V8 の板（aINnz）の「認めてから 3日保留」。 */
   '/api/affiliate-payments': [
-    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka-a', holdDays: 3, payoutCycle: '毎月末', approvedConversions: 14, approvedReward: 30000, heldConversions: 0, heldReward: 0, holdStatusUnknown: 0, unsettledConversions: 14, unsettledReward: 28000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-1', affiliateName: '見本 168', code: 'tanaka-a', holdDays: 3, payoutCycle: '毎月末', approvedConversions: 14, approvedReward: 30000, heldConversions: 0, heldReward: 0, holdStatusUnknown: 0, unsettledConversions: 14, unsettledReward: 28000, settledConversions: 0, settledReward: 0 },
     { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', holdDays: 3, payoutCycle: '月末締め翌月末払い', approvedConversions: 9, approvedReward: 31400, heldConversions: 0, heldReward: 0, holdStatusUnknown: 0, unsettledConversions: 9, unsettledReward: 31400, settledConversions: 0, settledReward: 0 },
-    { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'kimura', holdDays: 3, payoutCycle: '月末締め翌月末払い', approvedConversions: 2, approvedReward: 3000, heldConversions: 0, heldReward: 0, holdStatusUnknown: 0, unsettledConversions: 2, unsettledReward: 3000, settledConversions: 0, settledReward: 0 },
-    { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'nakamura', holdDays: null, payoutCycle: null, approvedConversions: 5, approvedReward: 0, heldConversions: 0, heldReward: 0, holdStatusUnknown: 0, unsettledConversions: 0, unsettledReward: 0, settledConversions: 0, settledReward: 0 },
-    { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', holdDays: 3, payoutCycle: '四半期', approvedConversions: 8, approvedReward: 8000, heldConversions: 0, heldReward: 0, holdStatusUnknown: 0, unsettledConversions: 8, unsettledReward: 8000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-3', affiliateName: '見本 26', code: 'kimura', holdDays: 3, payoutCycle: '月末締め翌月末払い', approvedConversions: 2, approvedReward: 3000, heldConversions: 0, heldReward: 0, holdStatusUnknown: 0, unsettledConversions: 2, unsettledReward: 3000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-4', affiliateName: '見本 27', code: 'nakamura', holdDays: null, payoutCycle: null, approvedConversions: 5, approvedReward: 0, heldConversions: 0, heldReward: 0, holdStatusUnknown: 0, unsettledConversions: 0, unsettledReward: 0, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-5', affiliateName: '見本 135', code: 'yamaguchi', holdDays: 3, payoutCycle: '四半期', approvedConversions: 8, approvedReward: 8000, heldConversions: 0, heldReward: 0, holdStatusUnknown: 0, unsettledConversions: 8, unsettledReward: 8000, settledConversions: 0, settledReward: 0 },
   ],
 
   '/api/action-scores/rules': ACTION_SCORE_RULES,
@@ -1789,9 +1789,9 @@ const SHAPES = {
     items: [
       { friendId: 'friend-1', displayName: 'さかもとまさと', currentScore: 82, band: 'high', change30d: 4, lastReason: '配信URLクリック → 夏のご案内', lastChangedAt: '2026-08-24T20:53:00+09:00' },
       { friendId: 'friend-2', displayName: 'Kyohei Yamamoto', currentScore: 55, band: 'normal', change30d: 0, lastReason: '回答フォーム回答 → 食生活アンケート', lastChangedAt: '2026-08-19T09:12:00+09:00' },
-      { friendId: 'friend-3', displayName: '菅野 亮', currentScore: 31, band: 'normal', change30d: -6, lastReason: 'ブロック', lastChangedAt: '2026-08-13T20:52:00+09:00' },
-      { friendId: 'friend-4', displayName: '前田 さくら', currentScore: 47, band: 'normal', change30d: 3, lastReason: 'メッセージ返信 → 配送日のご相談', lastChangedAt: '2026-08-12T18:15:00+09:00' },
-      { friendId: 'friend-5', displayName: '大西 健一', currentScore: 22, band: 'low', change30d: 0, lastReason: '30日間反応なし', lastChangedAt: '2026-08-10T09:00:00+09:00' },
+      { friendId: 'friend-3', displayName: '見本 15', currentScore: 31, band: 'normal', change30d: -6, lastReason: 'ブロック', lastChangedAt: '2026-08-13T20:52:00+09:00' },
+      { friendId: 'friend-4', displayName: '見本 17', currentScore: 47, band: 'normal', change30d: 3, lastReason: 'メッセージ返信 → 配送日のご相談', lastChangedAt: '2026-08-12T18:15:00+09:00' },
+      { friendId: 'friend-5', displayName: '見本 19', currentScore: 22, band: 'low', change30d: 0, lastReason: '30日間反応なし', lastChangedAt: '2026-08-10T09:00:00+09:00' },
     ],
     pagination: { total: 5, limit: 20, offset: 0 },
   },
@@ -1926,7 +1926,7 @@ const SHAPES = {
           adCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), costPerFriend: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), costPerConversion: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), profitAfterAdCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'),
         },
         {
-          id: 'rt-4', refCode: 'ref-tanaka', name: '紹介リンク 田中 明',
+          id: 'rt-4', refCode: 'ref-tanaka', name: '紹介リンク 見本 168',
           clicks: METRIC(200), friendAdds: METRIC(12), currentFriends: METRIC(12), reactionPeople: METRIC(8),
           conversions: { approved: METRIC(3), pending: METRIC(0), rejected: METRIC(0), revenue: METRIC(33800) },
           adCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), costPerFriend: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), costPerConversion: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), profitAfterAdCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'),
@@ -1997,11 +1997,11 @@ const SHAPES = {
       ],
       recipients: [
         {
-          id: 'staff-owner', name: '佐々木 亮太', role: 'admin',
+          id: 'staff-owner', name: '見本 110', role: 'admin',
           email: 'sasaki@example.com', lineLinked: true,
         },
         {
-          id: 'staff-operator', name: '山本 京子', role: 'staff',
+          id: 'staff-operator', name: '見本 138', role: 'staff',
           email: 'yamamoto@example.com', lineLinked: true,
         },
       ],
@@ -2727,7 +2727,7 @@ const HQ_APPROVAL_NONE = {
   viewer: { isApprover: false, canApprove: false, isRequester: false },
 }
 
-/* 来店スタンプ（提案 E-7 w4SBbv）。カード1枚・紙の申請4件・佐藤 健二さん（vs-f-5）の台帳。日時は UTC（画面は日本時間で出す）。 */
+/* 来店スタンプ（提案 E-7 w4SBbv）。カード1枚・紙の申請4件・見本 115さん（vs-f-5）の台帳。日時は UTC（画面は日本時間で出す）。 */
 const VISIT_STAMP_CARD = {
   id: 'vs-card-1', name: '然 来店スタンプカード', accountIds: ['visual-qa-account'], active: true, version: 3, expectedVersion: 3,
   settings: {
@@ -2743,14 +2743,14 @@ const VISIT_STAMP_CARD = {
   },
 }
 const VISIT_STAMP_FRIENDS = {
-  'vs-f-1': { id: 'vs-f-1', displayName: 'みさき', metadata: { name: '鈴木 美咲' } },
-  'vs-f-2': { id: 'vs-f-2', displayName: 'けん', metadata: { name: '小林 健' } },
-  'vs-f-3': { id: 'vs-f-3', displayName: 'めぐ', metadata: { name: '加藤 恵' } },
-  'vs-f-4': { id: 'vs-f-4', displayName: 'つばさ', metadata: { name: '中村 翼' } },
-  'vs-f-5': { id: 'vs-f-5', displayName: 'けんじ', metadata: { name: '佐藤 健二' } },
-  'vs-f-6': { id: 'vs-f-6', displayName: 'さくら', metadata: { name: '高橋 さくら' } },
-  'vs-f-7': { id: 'vs-f-7', displayName: 'あや', metadata: { name: '山本 彩' } },
-  'vs-f-8': { id: 'vs-f-8', displayName: 'ゆき', metadata: { name: '伊藤 由紀' } },
+  'vs-f-1': { id: 'vs-f-1', displayName: 'みさき', metadata: { name: '見本 183' } },
+  'vs-f-2': { id: 'vs-f-2', displayName: 'けん', metadata: { name: '見本 131' } },
+  'vs-f-3': { id: 'vs-f-3', displayName: 'めぐ', metadata: { name: '見本 123' } },
+  'vs-f-4': { id: 'vs-f-4', displayName: 'つばさ', metadata: { name: '見本 103' } },
+  'vs-f-5': { id: 'vs-f-5', displayName: 'けんじ', metadata: { name: '見本 115' } },
+  'vs-f-6': { id: 'vs-f-6', displayName: 'さくら', metadata: { name: '見本 187' } },
+  'vs-f-7': { id: 'vs-f-7', displayName: 'あや', metadata: { name: '見本 140' } },
+  'vs-f-8': { id: 'vs-f-8', displayName: 'ゆき', metadata: { name: '見本 108' } },
 }
 const VISIT_STAMP_PAPER = [
   { id: 'vsp-1', card_id: 'vs-card-1', friend_id: 'vs-f-1', line_account_id: 'visual-qa-account', photo_url: '', stamps: 7, status: 'pending', created_at: '2026-01-12 11:14:00' },
@@ -2804,10 +2804,10 @@ const GAPUI_C_QA = [
   { id: 'qa-5', questions: ['返品のしかた'], answerText: '商品到着から 8 日以内にご連絡ください。', status: 'draft', source: 'import_pdf', useCount: 0, version: 1, updatedAt: '2026-10-15T01:00:00.000Z' },
 ]
 const GAPUI_C_LOGS = [
-  { id: 'ail-1', createdAt: '2026-10-15T12:04:00.000Z', chatId: 'chat-1', friendId: 'friend-1', friendName: '山田 花子', questionText: '発送はいつ？', action: 'answered', handoffReason: null, qaEntryId: 'qa-1', qaTitle: '発送の目安', qaVersion: 3 },
-  { id: 'ail-2', createdAt: '2026-10-15T11:51:00.000Z', chatId: 'chat-2', friendId: 'friend-2', friendName: '佐藤 健', questionText: '返品できますか', action: 'handed_off', handoffReason: 'low_confidence', qaEntryId: null, qaTitle: null, qaVersion: null },
-  { id: 'ail-3', createdAt: '2026-10-15T10:12:00.000Z', chatId: 'chat-3', friendId: 'friend-3', friendName: '田中 優子', questionText: '駐車場ある？', action: 'answered', handoffReason: null, qaEntryId: 'qa-3', qaTitle: '駐車場', qaVersion: 1 },
-  { id: 'ail-4', createdAt: '2026-10-15T09:40:00.000Z', chatId: 'chat-4', friendId: 'friend-4', friendName: '鈴木 亜美', questionText: 'ギフト包装は', action: 'handed_off', handoffReason: 'low_confidence', qaEntryId: null, qaTitle: null, qaVersion: null },
+  { id: 'ail-1', createdAt: '2026-10-15T12:04:00.000Z', chatId: 'chat-1', friendId: 'friend-1', friendName: '見本 143', questionText: '発送はいつ？', action: 'answered', handoffReason: null, qaEntryId: 'qa-1', qaTitle: '発送の目安', qaVersion: 3 },
+  { id: 'ail-2', createdAt: '2026-10-15T11:51:00.000Z', chatId: 'chat-2', friendId: 'friend-2', friendName: '見本 114', questionText: '返品できますか', action: 'handed_off', handoffReason: 'low_confidence', qaEntryId: null, qaTitle: null, qaVersion: null },
+  { id: 'ail-3', createdAt: '2026-10-15T10:12:00.000Z', chatId: 'chat-3', friendId: 'friend-3', friendName: '見本 165', questionText: '駐車場ある？', action: 'answered', handoffReason: null, qaEntryId: 'qa-3', qaTitle: '駐車場', qaVersion: 1 },
+  { id: 'ail-4', createdAt: '2026-10-15T09:40:00.000Z', chatId: 'chat-4', friendId: 'friend-4', friendName: '見本 177', questionText: 'ギフト包装は', action: 'handed_off', handoffReason: 'low_confidence', qaEntryId: null, qaTitle: null, qaVersion: null },
 ]
 const GAPUI_C_MCP = [
   { id: 'mcp-1', name: 'Claude（Kenta）', level: 'draft', accounts: [{ id: 'acc-1', name: '然-NEN-TEST' }], keyPrefix: 'mcp_', expiresAt: '2027-01-15T00:00:00.000Z', lastUsedAt: '2026-10-15T13:45:00.000Z', status: 'active', previousKeyExpiresAt: null, version: 1 },
@@ -2901,10 +2901,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/hq/broadcasts') return { success: true, data: [HQ_RUN_SENT, HQ_RUN_DRAFT] }
   /* API-18：統括の一括配信のフォルダ・承認・宛先・記録。 */
   if (method === 'GET' && pathname === '/api/hq/broadcasts/folders') return { success: true, data: HQ_BROADCAST_FOLDERS }
-  if (method === 'GET' && pathname === '/api/hq/broadcasts/approvals/candidates') return { success: true, data: [{ id: 'stf-1', name: 'Kenta Kawano', role: 'owner', canApprove: true }, { id: 'stf-2', name: '佐々木 亮太', role: 'admin', canApprove: true }] }
+  if (method === 'GET' && pathname === '/api/hq/broadcasts/approvals/candidates') return { success: true, data: [{ id: 'stf-1', name: 'Demo Person', role: 'owner', canApprove: true }, { id: 'stf-2', name: '見本 110', role: 'admin', canApprove: true }] }
   if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+\/approval$/.test(pathname)) return { success: true, data: HQ_APPROVAL_NONE }
   if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+\/activity$/.test(pathname)) return { success: true, data: { rows: [{ id: 'act-2', accountId: '', actorId: 'stf-1', action: 'scheduled', createdAt: '2026-01-14T09:00:00.000Z' }, { id: 'act-1', accountId: '', actorId: 'stf-1', action: 'target_fixed', createdAt: '2026-01-14T08:40:00.000Z' }], nextCursor: null } }
-  if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+\/targets\/[^/]+\/recipients$/.test(pathname)) return { success: true, data: { rows: [{ friendId: 'f-1', displayName: '山田 花子', state: 'sent', attemptNo: 1, sentAt: '2026-01-15T02:00:10.000Z', claimedAt: '2026-01-15T02:00:00.000Z', errorCode: null }, { friendId: 'f-2', displayName: '佐藤 健二', state: 'sent', attemptNo: 1, sentAt: '2026-01-15T02:00:11.000Z', claimedAt: '2026-01-15T02:00:00.000Z', errorCode: null }], total: 2, nextCursor: null } }
+  if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+\/targets\/[^/]+\/recipients$/.test(pathname)) return { success: true, data: { rows: [{ friendId: 'f-1', displayName: '見本 143', state: 'sent', attemptNo: 1, sentAt: '2026-01-15T02:00:10.000Z', claimedAt: '2026-01-15T02:00:00.000Z', errorCode: null }, { friendId: 'f-2', displayName: '見本 115', state: 'sent', attemptNo: 1, sentAt: '2026-01-15T02:00:11.000Z', claimedAt: '2026-01-15T02:00:00.000Z', errorCode: null }], total: 2, nextCursor: null } }
   if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+$/.test(pathname)) return { success: true, data: pathname.endsWith('/hq-visual-compose') ? HQ_VISUAL_COMPOSE_DRAFT : pathname.endsWith('/hq-visual-sent') ? HQ_VISUAL_SENT : pathname.endsWith('/hq-run-sent') ? HQ_RUN_SENT : HQ_RUN_DRAFT }
   /*
     友だちのマイル詳細（V8 R6kIG・手で増やす・減らす M8zhjL）は1人に絞って読む。
@@ -2914,13 +2914,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/mileage/friends' && query.get('friendId') === 'friend-1') {
     const base = MILEAGE_FRIENDS.items[0]
     return { success: true, data: { ...MILEAGE_FRIENDS, items: [{
-      ...base, displayName: 'Kenta Kawano', available: 1240, pending: 120, monthChange: 180,
+      ...base, displayName: 'Demo Person', available: 1240, pending: 120, monthChange: 180,
       expiringMiles30d: 200, nextExpiringAt: '2026-10-31T00:00:00+09:00',
     }], pagination: { total: 1, limit: 1, offset: 0 } } }
   }
   if (method === 'GET' && pathname === '/api/mileage/history' && query.get('friendId') === 'friend-1') {
     const row = (id, entryType, status, amount, reason, ruleName, mode, executedByStaffName, occurredAt, balanceAfter) => ({
-      id, primaryFriendId: 'friend-1', displayName: 'Kenta Kawano', pictureUrl: null, entryType, status, amount, reason,
+      id, primaryFriendId: 'friend-1', displayName: 'Demo Person', pictureUrl: null, entryType, status, amount, reason,
       source: mode === 'manual' ? 'manual' : 'rule', hasSourceEvent: false, sourceReferenceId: null, ruleName, mode,
       executedByStaffName, occurredAt, lineAccountName: '然 本店', balanceAfter,
     })
@@ -2928,8 +2928,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       row('mf-1', 'grant', 'available', 10, 'リンクをクリック', '秋の新商品のお知らせ', 'automatic', null, '2026-09-30T10:32:00+09:00', 1240),
       row('mf-2', 'spend', 'available', -500, '送料無料クーポンと交換', '使い道：送料無料クーポン', 'automatic', null, '2026-09-29T18:05:00+09:00', 1230),
       row('mf-3', 'grant', 'available', 48, '商品を買った', '購入 ¥4,800', 'automatic', null, '2026-09-28T21:40:00+09:00', 1730),
-      row('mf-4', 'adjustment', 'available', 100, 'おわびで付けた', '手で増やす', 'manual', '河野', '2026-09-27T12:10:00+09:00', 1682),
-      row('mf-5', 'reversal', 'available', -10, '付けすぎを取り消し', 'リンクをクリック（重複）', 'manual', '河野', '2026-09-20T09:00:00+09:00', 1582),
+      row('mf-4', 'adjustment', 'available', 100, 'おわびで付けた', '手で増やす', 'manual', '見本', '2026-09-27T12:10:00+09:00', 1682),
+      row('mf-5', 'reversal', 'available', -10, '付けすぎを取り消し', 'リンクをクリック（重複）', 'manual', '見本', '2026-09-20T09:00:00+09:00', 1582),
     ], pagination: { total: 5, limit: 100, offset: 0 } } }
   }
   if (method === 'GET' && pathname === '/api/hq/billing/summary') return { success: true, data: BILLING_SUMMARY }
@@ -2962,8 +2962,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         /* 絵 `b8xBtZ`・`OhguS` の送信者（2026-10-06 絵に合わせた）。 */
         sender: {
           tenantName: '然 -NEN- 本部',
-          name: '高田 誠',
-          email: 'takada@example.jp',
+          name: '見本 18',
+          email: 'takada@example.com',
           planLabel: 'スタンダード',
         },
       },
@@ -3010,7 +3010,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: { date, reservations: RESTAURANT_RESERVATIONS.filter((r) => r.store_id === storeId && sameDay(r.starts_at)), closures: RESTAURANT_CLOSURES.filter((c) => c.storeId === storeId && c.startDate <= date && c.endDate >= date) } }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/customers/search') {
-    return { success: true, data: [{ name: '山田 花子', phone: '090-1111-2222', lineUid: 'U-demo-3' }] }
+    return { success: true, data: [{ name: '見本 143', phone: '090-0000-2222', lineUid: 'U-demo-3' }] }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/customers/history') {
     return { success: true, data: { visitCount: 3, visits: [{ id: 'v-1', starts_at: '2026-08-14T10:00:00.000Z', guest_count: 4, table_label: '個室A', course_name: '秋の鹿肉コース', allergy_note: 'えび' }] } }
@@ -3264,7 +3264,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         rows: [
           {
             friendId: 'friend-inbox-1',
-            displayName: '佐藤 美咲',
+            displayName: '見本 121',
             pictureUrl: null,
             accountId: 'visual-qa-account',
             accountName: '画面確認アカウント',
@@ -3276,7 +3276,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
           },
           {
             friendId: 'friend-inbox-2',
-            displayName: '鈴木 健太',
+            displayName: '見本 179',
             pictureUrl: null,
             accountId: 'visual-qa-account',
             accountName: '画面確認アカウント',
@@ -3565,7 +3565,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     const row = HQ_TEMPLATES_HTN.find((item) => item.id === hqTemplateVersions[1])
     const current = row?.current_version ?? row?.revision ?? 1
     const versions = Array.from({ length: current }, (_, i) => current - i).map((version) => ({
-      id: `${hqTemplateVersions[1]}-v${version}`, version, created_by: 'stf-1', creator_name: version === current - 1 ? 'Masato' : 'Kenta Kawano',
+      id: `${hqTemplateVersions[1]}-v${version}`, version, created_by: 'stf-1', creator_name: version === current - 1 ? 'Masato' : 'Demo Person',
       created_at: version === current ? '2026-08-21T09:02:00.000Z' : version === current - 1 ? '2026-08-02T01:15:00.000Z' : '2026-07-14T00:40:00.000Z',
       is_draft: version === current && (row?.outdated_account_count ?? 0) > 0, is_current: version === current,
     }))
@@ -3783,7 +3783,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/tenants/me') return { success: true, data: { name: '然 -NEN- 本部' } }
   if (method === 'GET' && pathname === '/api/tenants/me/company-contact') return { success: true, data: {
     legalCompanyName: 'Shed Products株式会社', postalCode: '150-0001', address: '東京都渋谷区神宮前1-2-3',
-    building: null, phone: '03-1234-5678', contactName: '山田 太郎', contactEmail: 'yamada@shed.example', invoiceAddressee: null, revision: 0,
+    building: null, phone: '03-0000-5678', contactName: '見本 141', contactEmail: 'yamada@shed.example', invoiceAddressee: null, revision: 0,
   } }
   if (method === 'GET' && pathname === '/api/postal-code/search') return { success: true, data: {
     status: 'matched', candidates: [{postalCode: '1500001', prefecture: '東京都', city: '渋谷区', town: '神宮前'}], readiness: {fullDataset: true},
@@ -3812,7 +3812,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   // ★V8 L48eY：本移行と照合が終わった履歴（/friends/migrations?tab=uid&run=visual-uid-run-done）。
   if (pathname === '/api/friends/migrations/visual-uid-run-done') {
     return { success: true, data: { ...UID_MIGRATION_DONE, items: [
-      { id: 'uid-done-1', oldUid: 'old_uid_00018', newUid: 'new_uid_00018', candidateName: '高橋 直人', evidenceType: 'operator_csv', classification: 'auto', conflictReason: null, decision: 'link', result: 'applied', errorMessage: null },
+      { id: 'uid-done-1', oldUid: 'old_uid_00018', newUid: 'new_uid_00018', candidateName: '見本 16', evidenceType: 'operator_csv', classification: 'auto', conflictReason: null, decision: 'link', result: 'applied', errorMessage: null },
       { id: 'uid-done-2', oldUid: 'old_uid_00291', newUid: 'new_uid_00291', candidateName: 'Kyohei Yamamoto', evidenceType: 'operator_csv', classification: 'review', conflictReason: null, decision: 'link', result: 'applied', errorMessage: null },
     ], itemTotal: 2, decisionCounts: { pending: 0, link: 1844, create: 0, exclude: 3 } } }
   }
@@ -3826,7 +3826,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       reviewedAt: null, executedAt: null, completedAt: null, rolledBackAt: null, failureReason: null,
       items: [
         { id: 'uid-item-1', oldUid: 'old_uid_00291', newUid: 'new_uid_00291', candidateName: 'Kyohei Yamamoto', evidenceType: 'operator_csv', classification: 'review', conflictReason: '2アカウントに候補があります', decision: 'pending', result: 'pending', errorMessage: null },
-        { id: 'uid-item-2', oldUid: 'old_uid_00412', newUid: 'new_uid_00412', candidateName: '山田 太郎', evidenceType: 'operator_csv', classification: 'conflict', conflictReason: '新旧UIDが別の統合ユーザーに結び付いています', decision: 'pending', result: 'pending', errorMessage: null },
+        { id: 'uid-item-2', oldUid: 'old_uid_00412', newUid: 'new_uid_00412', candidateName: '見本 141', evidenceType: 'operator_csv', classification: 'conflict', conflictReason: '新旧UIDが別の統合ユーザーに結び付いています', decision: 'pending', result: 'pending', errorMessage: null },
         { id: 'uid-item-3', oldUid: 'old_uid_01180', newUid: null, candidateName: null, evidenceType: 'operator_csv', classification: 'unmatched', conflictReason: '移行先に一致する友だちがいません', decision: 'pending', result: 'pending', errorMessage: null },
       ],
     } }
@@ -3834,8 +3834,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/friends/migration-jobs') {
     // ★V8 T9gblG の履歴：確認までの取り込み・反映ずみの書き出し（期限切れでダウンロードの口は出ない）。
     return { success: true, data: [
-      { id: 'import-2', kind: 'import', line_account_id: ACCOUNT.id, total_count: 1843, update_count: 48, conflict_count: 2, status: 'previewed', created_by_name: 'Kenta Kawano', created_at: '2026-10-01T01:20:00.000Z' },
-      { id: 'export-1', kind: 'export', line_account_id: ACCOUNT.id, row_count: 1840, status: 'completed', created_by_name: 'Kenta Kawano', created_at: '2026-09-30T09:02:00.000Z', expires_at: '2026-10-01T09:02:00.000Z' },
+      { id: 'import-2', kind: 'import', line_account_id: ACCOUNT.id, total_count: 1843, update_count: 48, conflict_count: 2, status: 'previewed', created_by_name: 'Demo Person', created_at: '2026-10-01T01:20:00.000Z' },
+      { id: 'export-1', kind: 'export', line_account_id: ACCOUNT.id, row_count: 1840, status: 'completed', created_by_name: 'Demo Person', created_at: '2026-09-30T09:02:00.000Z', expires_at: '2026-10-01T09:02:00.000Z' },
     ] }
   }
   if (pathname === '/api/friend-add-rules') {
@@ -4005,7 +4005,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       ['birthday', '生年月日', 'date', '1988-04-12'],
       ['age', '年齢', 'number', '38'],
       ['email', 'メール', 'email', 'sample@example.test'],
-      ['tel', '電話', 'tel', '09012345678'],
+      ['tel', '電話', 'tel', '09000005678'],
       ['address', '住所', 'textarea', '東京都新宿区1-2'],
       // 基本の8つ目。値の中身は絵へ合わせず、複数の状態を見せる。
       ['allergy', 'アレルギー', 'checkbox', JSON.stringify(['小麦', 'えび', 'くるみ'])],
@@ -4051,12 +4051,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       friend_id: null, booking_customer_id: null, menu_id: 'bm-1', menu_name: menu, staff_id: staffId, staff_name: staffName, customer_name: customer, visit_mark: null,
     })
     const bookings = [
-      row('tb-1', 'bs-1', '佐々木 亮太', 'ぽん太 さん', 'トリミング（小型犬）', '09:00', '10:00'),
-      row('tb-2', 'bs-3', '高田 誠', 'ハナ さん', '爪切り', '11:00', '11:15'),
-      row('tb-3', 'bs-2', '中川 由美', 'レオ さん', '足裏ケア', '11:00', '11:30'),
-      row('tb-4', 'bs-1', '佐々木 亮太', 'マロン さん', 'トリミング（中型犬）', '13:00', '14:30'),
-      row('tb-5', 'bs-3', '高田 誠', 'ココ さん', 'シャンプーのみ', '10:00', '10:30', 'pending'),
-      row('tb-6', 'bs-2', '中川 由美', 'きなこ さん', '初回相談', '15:00', '15:30'),
+      row('tb-1', 'bs-1', '見本 110', 'ぽん太 さん', 'トリミング（小型犬）', '09:00', '10:00'),
+      row('tb-2', 'bs-3', '見本 18', 'ハナ さん', '爪切り', '11:00', '11:15'),
+      row('tb-3', 'bs-2', '見本 30', 'レオ さん', '足裏ケア', '11:00', '11:30'),
+      row('tb-4', 'bs-1', '見本 110', 'マロン さん', 'トリミング（中型犬）', '13:00', '14:30'),
+      row('tb-5', 'bs-3', '見本 18', 'ココ さん', 'シャンプーのみ', '10:00', '10:30', 'pending'),
+      row('tb-6', 'bs-2', '見本 30', '見本 50', '初回相談', '15:00', '15:30'),
     ]
     return { date: '2026-10-01', mode: 'staff', has_seat_stores: false, bookings, seats: [], timeline: bookings }
   }
@@ -4507,7 +4507,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/auto-replies/ar-new/draft') return { success: true, data: AUTO_REPLY_NEW_DRAFT }
   if (pathname === '/api/auto-replies/ar-new/conflicts') return { success: true, data: { conflicts: AUTO_REPLY_NEW_CONFLICTS, source: 'draft' } }
-  if (pathname === '/api/auto-replies/ar-new') return { success: true, data: AUTO_REPLY_NEW_LIVE }
+  if (pathname === '/api/auto-replies/ar-new') return { success: true, data: { ...AUTO_REPLY_NEW_LIVE, confirmationRevision: 1 } }
   if (/^\/api\/auto-replies\/[^/]+\/draft$/.test(pathname)) {
     return { success: true, data: AUTO_REPLY_PUBLISH_DRAFT }
   }
@@ -4519,7 +4519,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const autoReplyOne = /^\/api\/auto-replies\/([^/]+)$/.exec(pathname)
   if (autoReplyOne) {
     const found = AUTO_REPLIES.find((item) => item.id === autoReplyOne[1])
-    return found ? { success: true, data: found } : { success: false, error: 'Not found' }
+    return found ? { success: true, data: { ...found, confirmationRevision: 1 } } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/reminders') {
     const usesListContract = ['page', 'limit', 'q', 'folderId', 'status', 'sort'].some((key) => query.has(key))
@@ -4581,14 +4581,14 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /*
    * テスト送信先の状態。無いと既定の器が返って「未設定」の案内と
    * 「送信先を再確認」が出て、確認の段（ltAaq）が 84px 下へずれていた。
-   * 絵は「送り先：Kenta Kawano（自分）」。
+   * 絵は「送り先：Demo Person（自分）」。
    */
   if (/^\/api\/reminders\/[^/]+\/test-recipient$/.test(pathname)) {
     return {
       success: true,
       data: {
         state: 'ready',
-        recipient: { id: 'visual-staff-self', displayName: 'Kenta Kawano', pictureUrl: null },
+        recipient: { id: 'visual-staff-self', displayName: 'Demo Person', pictureUrl: null },
         recipientKind: 'self',
       },
     }
@@ -5233,11 +5233,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         refCode,
         name: (ENTRY_ROUTES.find((item) => item.refCode === refCode) ?? {}).name ?? null,
         friends: [
-          { id: 'friend-inflow-1', displayName: '石田 未来', trackedAt: '2026-08-25T09:12:00.000Z', currentStatus: '友だち中' },
-          { id: 'friend-inflow-2', displayName: '新田 遥', trackedAt: '2026-08-24T21:40:00.000Z', currentStatus: '友だち中' },
-          { id: 'friend-inflow-3', displayName: '松本 圭', trackedAt: '2026-08-22T12:05:00.000Z', currentStatus: 'ブロック済み' },
-          { id: 'friend-inflow-4', displayName: '林 里佳', trackedAt: '2026-08-20T18:22:00.000Z', currentStatus: '友だち中' },
-          { id: 'friend-inflow-5', displayName: '大村 真', trackedAt: '2026-08-18T10:44:00.000Z', currentStatus: '友だち中' },
+          { id: 'friend-inflow-1', displayName: '見本 28', trackedAt: '2026-08-25T09:12:00.000Z', currentStatus: '友だち中' },
+          { id: 'friend-inflow-2', displayName: '見本 44', trackedAt: '2026-08-24T21:40:00.000Z', currentStatus: '友だち中' },
+          { id: 'friend-inflow-3', displayName: '見本 45', trackedAt: '2026-08-22T12:05:00.000Z', currentStatus: 'ブロック済み' },
+          { id: 'friend-inflow-4', displayName: '見本 155', trackedAt: '2026-08-20T18:22:00.000Z', currentStatus: '友だち中' },
+          { id: 'friend-inflow-5', displayName: '見本 46', trackedAt: '2026-08-18T10:44:00.000Z', currentStatus: '友だち中' },
         ],
       },
     }
@@ -5404,7 +5404,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
             actions: [
               { id: `${id}-action-1`, type: 'add_tag', params: { tagId: 'tag-trial' }, onFailure: 'stop' },
               { id: `${id}-action-2`, type: 'send_message', params: { messageType: 'text', content: '予約の受付をはじめます。ご希望の日時を送ってください。' }, onFailure: 'stop' },
-              { id: `${id}-action-3`, type: 'notify_staff', params: { notificationRuleId: 'notification-rule-booking', message: '河野・坂本に LINE で' }, onFailure: 'stop' },
+              { id: `${id}-action-3`, type: 'notify_staff', params: { notificationRuleId: 'notification-rule-booking', message: '見本・坂本に LINE で' }, onFailure: 'stop' },
             ],
             commonActionRefs: [],
             commonActionVersions: {},
@@ -5755,9 +5755,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return {
       success: true,
       data: [{
-        id: 'maa-1', line_account_id: 'visual-qa-account', friend_id: 'friend-1', friend_display_name: 'Kenta Kawano',
+        id: 'maa-1', line_account_id: 'visual-qa-account', friend_id: 'friend-1', friend_display_name: 'Demo Person',
         direction: 'increase', amount: 5000, reason_category: 'campaign', reason: 'イベント運営のお礼',
-        status: 'pending', requested_by_staff_id: 'staff-2', requested_by_staff_name: '佐藤 直人',
+        status: 'pending', requested_by_staff_id: 'staff-2', requested_by_staff_name: '見本 120',
         decided_by_staff_name: null, decided_at: null, decision_reason: null, created_at: '2026-10-02T06:20:00.000Z',
       }],
     }
@@ -5848,13 +5848,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         success: true,
         data: {
           ...impact,
-          group: { ...impact.group, id: asked.id, name: asked.name, status: asked.status },
-          lineResources: { ...impact.lineResources, isDefaultForAll: Boolean(asked.isDefaultForAll) },
+          group: { ...impact.group, id: asked.id, name: asked.name, status: asked.status, accountId: process.env.VISUAL_QA_ACCOUNT_ID || impact.group.accountId, version: asked.version ?? 1, publishingGeneration: 0 },
+          lineResources: { ...impact.lineResources, isDefaultForAll: Boolean(asked.isDefaultForAll), pages: [{id:`${asked.id}-page`,orderIndex:0,lineRichMenuId:`line-${asked.id}`}] },
           blockers,
         },
       }
     }
-    return { success: true, data: impact }
+    return { success: true, data: { ...impact, group: { ...impact.group, accountId: process.env.VISUAL_QA_ACCOUNT_ID || impact.group.accountId, version: asked?.version ?? 1, publishingGeneration: 0 }, lineResources: { ...impact.lineResources, pages: [{id:`${impact.group.id}-page`,orderIndex:0,lineRichMenuId:impact.group.status === 'published' ? `line-${impact.group.id}` : null}] } } }
   }
   if (pathname === '/api/rich-menu-groups') {
     if (query.has('page') || query.has('limit')) {
@@ -6213,7 +6213,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         items: [
           {
             id: 'wi-1', direction: 'outgoing', webhookName: '顧客台帳（CRM）',
-            eventType: 'friend.added', triggerSummary: 'タグが付いた・Kenta Kawano',
+            eventType: 'friend.added', triggerSummary: 'タグが付いた・Demo Person',
             status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
             attemptCount: 1, durationMs: 400, failureReason: null, failureReasonCode: null, canRetry: false,
             retryBlockReason: null, autoRetryNextAt: null,
@@ -6229,7 +6229,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
           },
           {
             id: 'wi-3', direction: 'outgoing', webhookName: '在庫システム',
-            eventType: 'order.created', triggerSummary: '注文が確定・菅野 亮',
+            eventType: 'order.created', triggerSummary: '注文が確定・見本 15',
             status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
             attemptCount: 1, durationMs: 600, failureReason: null, failureReasonCode: null, canRetry: false,
             retryBlockReason: null, autoRetryNextAt: null,
@@ -6237,7 +6237,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
           },
           {
             id: 'wi-4', direction: 'incoming', webhookName: 'フォームの受け口',
-            eventType: 'incoming_webhook.survey', triggerSummary: '申込・山田 太郎',
+            eventType: 'incoming_webhook.survey', triggerSummary: '申込・見本 141',
             status: 'succeeded', responseLabel: '受け取った', responseStatus: 200,
             attemptCount: 1, durationMs: 200, failureReason: null, failureReasonCode: null, canRetry: false,
             retryBlockReason: null, autoRetryNextAt: null,
@@ -6245,7 +6245,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
           },
           {
             id: 'wi-5', direction: 'outgoing', webhookName: 'Slack への通知',
-            eventType: 'message_received', triggerSummary: '問い合わせ・坂本 真人',
+            eventType: 'message_received', triggerSummary: '問い合わせ・見本 25',
             status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
             attemptCount: 1, durationMs: 300, failureReason: null, failureReasonCode: null, canRetry: false,
             retryBlockReason: null, autoRetryNextAt: null,
@@ -6302,7 +6302,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         versions: [{
           id: 'cav-broadcast-delivered-tag-1', versionNumber: 1, status: 'published', draftRevision: 1,
           actions: [{ id: 'broadcast-delivered-tag-step', type: 'add_tag', params: { tagId: 'tag-broadcast-delivered' }, onFailure: 'stop' }],
-          createdBy: 'Kenta Kawano', createdAt: '2026-08-20T00:00:00.000Z', publishedAt: '2026-08-20T00:00:00.000Z',
+          createdBy: 'Demo Person', createdAt: '2026-08-20T00:00:00.000Z', publishedAt: '2026-08-20T00:00:00.000Z',
         }],
         bindings: [],
       },
@@ -6331,14 +6331,14 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         {
           id: 'sp-1', name: 'VIPかつ未契約', scope: 'friends', conditionFormat: 'segment_v1',
           conditions: { version: 1, condition: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-vip' }, { type: 'tag_not_exists', value: 'tag-trial' }], groups: [] } },
-          createdBy: '河野 健太', lineAccountId: 'visual-qa-account', isShared: true,
+          createdBy: '見本 太郎', lineAccountId: 'visual-qa-account', isShared: true,
           displayOrder: 1, createdAt: '2026-08-10T00:00:00.000Z',
           usedIn: [{ kind: 'broadcast', count: 2 }, { kind: 'automation', count: 1 }],
         },
         {
           id: 'sp-2', name: '誕生日30日前', scope: 'friends', conditionFormat: 'segment_v1',
           conditions: { version: 1, condition: { operator: 'AND', rules: [{ type: 'registered_at', value: { from: '2026-07-25', to: '' } }], groups: [] } },
-          createdBy: '河野 健太', lineAccountId: 'visual-qa-account', isShared: false,
+          createdBy: '見本 太郎', lineAccountId: 'visual-qa-account', isShared: false,
           displayOrder: 2, createdAt: '2026-08-18T00:00:00.000Z',
           usedIn: [{ kind: 'other', count: 1 }],
         },

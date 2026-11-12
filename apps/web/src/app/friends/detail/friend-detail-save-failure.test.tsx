@@ -48,7 +48,7 @@ function Support() {
 }
 
 function Picker() {
-  const picker = useScenarioPicker('friend-1', '山田 花子', 'account-a', done)
+  const picker = useScenarioPicker('friend-1', '見本 143', 'account-a', done)
   return <><button type="button" onClick={() => void picker.openPicker()}>シナリオを開く</button>{picker.dialog}</>
 }
 

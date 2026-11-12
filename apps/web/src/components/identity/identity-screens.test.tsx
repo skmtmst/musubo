@@ -34,20 +34,20 @@ const CANDIDATE: IdentityCandidateDetail = {
   version: 1,
   confidence: { score: 92, label: 'very_high' },
   left: {
-    kind: 'friend', id: 'friend-identity-left', label: '田中 はなこ', detail: '支店',
+    kind: 'friend', id: 'friend-identity-left', label: '見本 161', detail: '支店',
     lineAccountId: 'visual-qa-account', lineAccountName: '画面確認アカウント', shopKey: null,
     attributes: [
-      { label: 'メールアドレス', valuePreview: 'ta***@example.jp', verified: true },
+      { label: 'メールアドレス', valuePreview: 'ta***@example.com', verified: true },
       { label: '電話番号', valuePreview: null, verified: false },
     ],
   },
   right: {
-    kind: 'friend', id: 'friend-identity-right', label: '田中 花子', detail: '本店',
+    kind: 'friend', id: 'friend-identity-right', label: '見本 171', detail: '本店',
     lineAccountId: 'visual-qa-account', lineAccountName: '画面確認アカウント', shopKey: null,
-    attributes: [{ label: 'メールアドレス', valuePreview: 'ta***@example.jp', verified: true }],
+    attributes: [{ label: 'メールアドレス', valuePreview: 'ta***@example.com', verified: true }],
   },
   evidence: [
-    { key: 'verified_email', label: '確認済みのメールアドレスが同じ', strength: 'strong', verified: true, valuePreview: 'ta***@example.jp' },
+    { key: 'verified_email', label: '確認済みのメールアドレスが同じ', strength: 'strong', verified: true, valuePreview: 'ta***@example.com' },
     { key: 'similar_name', label: '表示名が似ている', strength: 'weak', verified: false, valuePreview: null },
   ],
   impact: [
@@ -69,8 +69,8 @@ const CANDIDATE_WITH_PROFILES: IdentityCandidateWithProfiles = {
     fieldKey: 'display_name',
     fieldLabel: 'LINE表示名',
     options: [
-      { sourceFriendId: CANDIDATE.left.id, sourceLabel: '候補A', valuePreview: '田中 はなこ', verified: false },
-      { sourceFriendId: CANDIDATE.right.id, sourceLabel: '候補B', valuePreview: '田中 花子', verified: false },
+      { sourceFriendId: CANDIDATE.left.id, sourceLabel: '候補A', valuePreview: '見本 161', verified: false },
+      { sourceFriendId: CANDIDATE.right.id, sourceLabel: '候補B', valuePreview: '見本 171', verified: false },
     ],
   }],
   tagCandidates: [{ id: 'tag-vip', name: 'VIP', color: null, sourceFriendIds: [CANDIDATE.left.id] }],
@@ -100,7 +100,7 @@ describe('本人照合の候補部品', () => {
 
   it('候補の値はマスク済みのまま出し、無い項目は「—（未取得）」にする', () => {
     const html = renderToStaticMarkup(<IdentitySubjectCard side="候補A" subject={CANDIDATE.left} />)
-    expect(html).toContain('ta***@example.jp')
+    expect(html).toContain('ta***@example.com')
     expect(html).toContain('—（未取得）')
     // 内部IDは操作に使うだけで、本文には出さない。
     expect(html).not.toContain('friend-identity-left')
@@ -169,7 +169,7 @@ describe('判定窓', () => {
       <IdentityDecisionDialog open candidate={CANDIDATE_WITH_PROFILES} busy={false} onCancel={() => {}} onSubmit={() => {}} />,
     )
     expect(html).toContain('統合プロフィールに採用する値')
-    expect(html).toContain('画面確認アカウント・田中 はなこ：田中 はなこ')
+    expect(html).toContain('画面確認アカウント・見本 161：見本 161')
     expect(html).toContain('利用目的と同意・規約の確認')
     expect(html.match(/type="checkbox"/g)).toHaveLength(3)
   })

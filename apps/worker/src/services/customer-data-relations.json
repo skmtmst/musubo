@@ -10,6 +10,7 @@
   "member_ranks": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "booking_page_views": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "lesson_memberships": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
+  "account_handover_moves": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[]},
   "account_handover_decisions": {"friendColumns":["from_friend_id","to_friend_id"],"lineUserColumn":false,"references":[]},
   "ad_conversion_event_accounts": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"conversion_events","columns":[{"column":"conversion_event_id","parentColumn":"id"}]}]},
   "ad_conversion_logs": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[]},

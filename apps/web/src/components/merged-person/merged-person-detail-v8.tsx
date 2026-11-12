@@ -14,6 +14,8 @@ import Button from '@/components/shared/button'
 import { RowNameLink, TableStateRow } from '@/components/shared/table'
 import { deliveryPriorityDetails, linkedFriendDetails, personDetails, profileValueDetails } from './merged-person-metadata'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+import { useAccount } from '@/contexts/account-context'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -40,9 +42,10 @@ export default function MergedPersonDetailViewV8({
   personId: string
   onClose: () => void
 }) {
-  const m = useMergedPerson(personId)
   const staffRole = useStaffRole()
   const canManage = canManageRole(staffRole)
+  const { selectedAccountId } = useAccount()
+  const m = useMergedPerson(personId, selectedAccountId, canManage)
 
   if (m.phase === 'loading') return <ListState kind="loading" />
   if (m.phase === 'forbidden') {
@@ -288,6 +291,7 @@ export default function MergedPersonDetailViewV8({
             <Button type="button" variant="danger" onClick={m.unlink} disabled={m.unlinking || !m.unlinkReason.trim()} busy={m.unlinking} busyLabel="解除中…">結び付けを解除</Button>
           </DialogActions>)}
       >
+        <OperationTargetSummary accounts={[{ id: m.unlinkTarget?.lineAccountId ?? '', name: m.unlinkTarget?.lineAccountId ? m.unlinkTarget.lineAccountName : '不明' }]} externalTarget={{ label: '友だち', name: m.unlinkTarget?.displayName }} />
         <p style={{ fontSize: 13, color: 'var(--color-ink-secondary)', margin: '0 0 8px' }}>
           解除する友だち：<strong>{m.unlinkTarget?.displayName}</strong>
         </p>

@@ -51,11 +51,14 @@ export const nenMembersPaths = {
       tags: ['NEN Members'], summary: 'ランクを削除し、会員を移し先へ変更する',
       parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
       requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'expectedVersion'],
-        properties: { accountId: { type: 'string' }, replacementRankId: { type: 'string', nullable: true }, expectedVersion: { type: 'integer', minimum: 1 } } } } } },
+        properties: { accountId: { type: 'string' }, replacementRankId: { type: 'string', nullable: true }, expectedVersion: { type: 'integer', minimum: 1 }, confirmedMembers:{type:'array',description:'確認した移動対象。省略時は従来どおり。',items:{type:'object',required:['friendId','customerId'],properties:{friendId:{type:'string'},customerId:{type:'string',nullable:true}}}} } } } } },
       responses: { '200': { description: '移し替え件数、操作ID、ECの成功・失敗・同期待ち件数と会員別の理由。未設定ならECへ送らずpending' },
         '400': { description: '入力不備' }, '403': { description: 'オーナーまたは管理者権限が必要' },
         '404': { description: 'ランクが見つからない' }, '409': { description: '版の競合または削除不可' } },
     },
+  },
+  '/api/nen/rank-settings/{id}/delete-preview': {
+    get:{tags:['NEN Members'],summary:'ランク削除で移す会員の集合と人数を確認する',parameters:[{name:'id',in:'path',required:true,schema:{type:'string'}},{name:'accountId',in:'query',required:true,schema:{type:'string'}}],responses:{'200':{description:'現在の会員、人数、設定の版'},'403':{description:'権限不足'},'404':{description:'ランクが見つからない'}}},
   },
   '/api/nen/rank-settings/member-sync/{operationId}': {
     get: {

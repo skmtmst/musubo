@@ -63,6 +63,8 @@ function setup() {
   `)
   sqlite.exec(migration)
   sqlite.exec(migration347)
+  const revisionMigration = readFileSync(join(import.meta.dirname, '..', 'migrations', '757_confirmation_revisions.sql'), 'utf8')
+  sqlite.exec(revisionMigration.split('\n').find(line => line.startsWith('ALTER TABLE templates '))!)
   sqlite.exec('ALTER TABLE templates ADD COLUMN deleted_at TEXT')
   return sqlite
 }

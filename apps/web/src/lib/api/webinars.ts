@@ -113,9 +113,10 @@ export const webinarApi = {
     method: 'PUT',
     body: JSON.stringify(input),
   }),
-  testNotifications: (id: string) => fetchApi<{
+  testNotificationRecipients: (id: string) => fetchApi<{data:{count:number;recipients:Array<{id:string;displayName:string|null}>;token:string;confirmationId:string}}>(`/api/webinars/${id}/notifications/test`),
+  testNotifications: (id: string, expectedRecipientToken?: string, confirmationId?: string) => fetchApi<{
     data: { sent: number; failed: number }
-  }>(`/api/webinars/${id}/notifications/test`, { method: 'POST' }),
+  }>(`/api/webinars/${id}/notifications/test`, { method: 'POST', ...(expectedRecipientToken === undefined ? {} : {body:JSON.stringify({expectedRecipientToken,confirmationId})}) }),
   comments: (id: string) =>
     fetchApi<{ data: WebinarSakuraComment[] }>(`/api/webinars/${id}/comments`),
   saveComments: (id: string, comments: WebinarSakuraComment[]) =>

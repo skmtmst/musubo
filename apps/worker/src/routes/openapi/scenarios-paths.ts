@@ -1,5 +1,20 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const scenariosPaths = {
+  '/api/scenarios/bulk-stop': {
+    post: {
+      tags: ['Scenarios'], summary: '確認したシナリオを一括停止',
+      description: '最大50件。確認時の版と配信対象の集計がすべて一致した場合だけまとめて停止する。',
+      requestBody: { required: true, content: { 'application/json': { schema: {
+        type: 'object', required: ['items'], properties: { items: { type: 'array', minItems: 1, maxItems: 50, items: {
+          type: 'object', required: ['id', 'revision', 'activeCount', 'rowIdSum', 'rowIdSquareSum'], properties: {
+            id: { type: 'string', minLength: 1 }, revision: { type: 'integer', minimum: 1 },
+            activeCount: { type: 'integer', minimum: 0 }, rowIdSum: { type: 'integer', minimum: 0 }, rowIdSquareSum: { type: 'integer', minimum: 0 },
+          },
+        } } },
+      } } } },
+      responses: { '200': { description: '停止件数を返す' }, '400': { description: '入力不正' }, '403': { description: '操作権限または対象の閲覧権限がない' }, '404': { description: '対象が担当範囲にない' }, '409': { description: '版または対象が変化した' } },
+    },
+  },
   // ── Scenarios ────────────────────────────────────────────────────────────
   '/api/scenarios': {
     get: {
@@ -70,6 +85,13 @@ export const scenariosPaths = {
       summary: 'シナリオ削除',
       parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
       responses: { '200': { description: 'Deleted' } },
+    },
+  },
+  '/api/scenarios/{id}/confirmation': {
+    get: {
+      tags: ['Scenarios'], summary: '停止・削除の確認対象と版を取得',
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+      responses: { '200': { description: 'Content revision, active count and subscription revisions' }, '403': { description: 'Scenario edit permission required' }, '404': { description: 'Not found in account scope' } },
     },
   },
   '/api/scenarios/{id}/preview': {

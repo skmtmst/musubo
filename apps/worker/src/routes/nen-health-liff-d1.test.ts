@@ -28,8 +28,8 @@ beforeEach(() => {
   sql.exec(`
     INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret) VALUES ('account-nen', 'channel-nen', '然', 'token', 'secret');
     INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following, created_at, updated_at) VALUES
-      ('friend-a', 'U-a', '山田 太郎', 'account-nen', 1, '2026-09-01', '2026-09-01'),
-      ('friend-b', 'U-b', '鈴木 一郎', 'account-nen', 1, '2026-09-01', '2026-09-01');
+      ('friend-a', 'U-a', '見本 141', 'account-nen', 1, '2026-09-01', '2026-09-01'),
+      ('friend-b', 'U-b', '見本 176', 'account-nen', 1, '2026-09-01', '2026-09-01');
     INSERT INTO nen_pet_profiles (id, friend_id, name, animal_type, gender, birthday, breed, weight_kg, concerns, recommended_daily_grams, recommended_daily_min_grams, recommended_daily_max_grams, venison_daily_grams, food_cycle_days, created_at, updated_at)
     VALUES ('pet-momo', 'friend-a', 'モモ', 'dog', 'female', '2022-04-01', '柴犬', 10, '[]', 250, 200, 300, 25, 4, '2026-09-01', '2026-09-01');
   `);
@@ -53,7 +53,7 @@ describe('GET /api/liff/nen/health-logs/summary', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as any;
     expect(body.data.pet).toMatchObject({ id: 'pet-momo', name: 'モモ', animalType: 'dog', breed: '柴犬', weightKg: 10 });
-    expect(body.data.owner).toEqual({ name: '山田 太郎' });
+    expect(body.data.owner).toEqual({ name: '見本 141' });
     expect(body.data.summary).toMatchObject({
       days: 30, records: 2, weight: { first: 10, last: 9.6, min: 9.6, max: 10 }, heartRateAvg: 118, respiratoryRateAvg: 26,
       stool: { normal: 1, soft: 1 }, appetite: { normal: 1, good: 1 }, notes: [{ loggedOn: day(0), note: '散歩のあとよく水を飲んだ' }],

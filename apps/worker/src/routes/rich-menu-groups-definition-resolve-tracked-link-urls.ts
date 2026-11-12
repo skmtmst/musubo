@@ -273,11 +273,22 @@ async function handleManualPublish(
   c: Context<Env>,
   groupId: string,
   idempotencyKey: string,
+  expected?:{version:number;generation:number;pages:Array<{orderIndex:number;imageR2Key:string|null;imageContentType:string|null}>},
 ) {
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
     return fail(c, 404, 'NOT_FOUND');
   }
+  const matches=(current:RichMenuGroupWithPages,leased=false)=>{
+    if(!expected)return true;
+    const pages=new Map(expected.pages.map(page=>[page.orderIndex,JSON.stringify([page.imageR2Key,page.imageContentType])]));
+    return current.version===expected.version&&(current.publishing_generation??0)===expected.generation+Number(leased)&&current.pages.length===pages.size&&current.pages.every(page=>pages.get(page.order_index)===JSON.stringify([page.image_r2_key,page.image_content_type]));
+  };
+  const conflict=async(partial=false)=>{
+    const current=await getRichMenuGroupWithPages(c.env.DB,groupId);
+    return c.json({success:false,code:partial?'RICH_MENU_PUBLISH_CHANGED_AFTER_START':'RICH_MENU_PUBLISH_CHANGED',error:partial?'公開内容が変わりました。公開処理の一部が進んだ可能性があります。最新の状態を確認してください':'公開内容が変わりました。最新の状態を確認してください',data:current?{version:current.version,publishingGeneration:current.publishing_generation??0,pages:current.pages.map(page=>({orderIndex:page.order_index,imageR2Key:page.image_r2_key,imageContentType:page.image_content_type}))}:null},409);
+  };
+  if(expected&&!matches(group))return conflict();
   const fingerprint = manualPublishFingerprint(group);
   const requestResult = await createRichMenuManualPublishRequestAtomic(c.env.DB, {
     id: crypto.randomUUID(),
@@ -313,8 +324,8 @@ async function handleManualPublish(
   if (!account) return fail(c, 500, 'LINE_ACCOUNT_NOT_FOUND');
 
   const publishOwner = `manual-${request.id}`;
-  const publishGeneration = await acquirePublishLease(c.env.DB, groupId, publishOwner, new Date().toISOString());
-  if (publishGeneration === null) return c.json({ success: false, error: 'failed to acquire publish lock' }, 409);
+  const publishGeneration = await acquirePublishLease(c.env.DB, groupId, publishOwner, new Date().toISOString(),undefined,undefined,expected);
+  if (publishGeneration === null) return expected?conflict():c.json({ success: false, error: 'failed to acquire publish lock' }, 409);
   const publishFence = { owner: publishOwner, generation: publishGeneration };
   const executionToken = crypto.randomUUID();
 
@@ -345,9 +356,10 @@ async function handleManualPublish(
     }
     // lease取得前後の下書き更新を必ず拒否する。古い版を作成・切替しない。
     const latestGroup = await getRichMenuGroupWithPages(c.env.DB, groupId);
-    if (!latestGroup || manualPublishFingerprint(latestGroup) !== fingerprint) {
+    if (!latestGroup || manualPublishFingerprint(latestGroup) !== fingerprint || !matches(latestGroup,true)) {
       await markRichMenuManualPublishFailed(c.env.DB, request.id, executionToken, 'manual publish target changed');
       await releasePublishLease(c.env.DB, groupId, publishFence);
+      if(expected)return conflict();
       return c.json({ success: false, error: '公開対象が更新されました。画面を更新してからもう一度お試しください。' }, 409);
     }
     // 公開する版を凍結し、実行行とページ行を確保する。
@@ -418,11 +430,13 @@ async function handleManualPublish(
       }, 409);
     }
     // 自前検査のあと、公開する形のまま LINE の検査 API に通す。
-    await validateRichMenuPagesWithLine(groupInput, line);
     const heartbeat = async () => {
       const alive = await renewPublishLease(c.env.DB, groupId, publishFence, new Date().toISOString());
       if (!alive) throw new PublishLeaseLostError();
+      if(expected){const latest=await getRichMenuGroupWithPages(c.env.DB,groupId);if(!latest||!matches(latest,true)||manualPublishFingerprint(latest)!==fingerprint)throw new PublishLeaseLostError();}
     };
+    await heartbeat();
+    await validateRichMenuPagesWithLine(groupInput, line);
 
     let shells = await getRichMenuManualPublishShells(c.env.DB, request.id);
     const oldByPage = new Map(latestGroup.pages.map((page) => [page.id, page.line_richmenu_id]));
@@ -565,6 +579,7 @@ async function handleManualPublish(
     }
     await releasePublishLease(c.env.DB, groupId, publishFence);
     if (e instanceof PublishLeaseLostError) {
+      if(expected)return conflict(true);
       return c.json({ success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' }, 409);
     }
     if (e instanceof RichMenuValidationError) return inputError(c, { success: false, error: message }, 400, ["pages"]);

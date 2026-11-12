@@ -1,5 +1,7 @@
 'use client'
 
+import { isConflictResponse } from '@/components/shared/save-conflict'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CalendarDays, Download, FileText, Info, RotateCcw, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -27,6 +29,7 @@ import { bookingPaymentAdminApi, isNotReadyError, type PaymentRecord, type Payme
 import { PAYMENT_STATUS, paymentBadge } from '@/components/shared/payment-status'
 import StatusBadge from '@/components/shared/status-badge'
 import TestModeNote from '@/components/shared/test-mode-note'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { RefundDialog, type RefundInput } from '@/components/shared/booking-confirm-dialogs'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 
@@ -68,6 +71,9 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
   const [load, setLoad] = useState<Load>({ state: 'loading' })
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [refundTarget, setRefundTarget] = useState<PaymentRecord | null>(null)
+  const refundScope = useRef({ accountId })
+  if (refundScope.current.accountId !== accountId) refundScope.current = { accountId }
+  const refundOpeningScope = useRef(refundScope.current)
   const refundAttempt = useRef<{ signature: string; key: string } | null>(null)
   const [testMode, setTestMode] = useState(false)
   const [refunding, setRefunding] = useState(false)
@@ -88,6 +94,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
     }
   }, [accountId, query, status, method, period])
 
+  useEffect(() => { setRefundTarget(null); setRefundError(null); setRefunding(false); refundAttempt.current = null }, [accountId])
   useEffect(() => { void reload() }, [reload])
   /* 試験モードの印（：お金の数が出る所すべて）。 */
   useEffect(() => {
@@ -105,7 +112,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
       ...(record.bookingId ? [{ id: 'open', label: '予約を開く', icon: <CalendarDays size={16} aria-hidden="true" />, href: `/booking/bookings?booking=${encodeURIComponent(record.bookingId)}` }] : []),
       ...(canEdit && record.status === 'pending' ? [{ id: 'link', label: '支払いのリンクを送る', icon: <Send size={16} aria-hidden="true" />, onSelect: () => void previewLink(record) }] : []),
       ...(record.receiptUrl ? [{ id: 'receipt', label: '領収書を見る', icon: <FileText size={16} aria-hidden="true" />, href: record.receiptUrl, external: true }] : []),
-      ...(canEdit && (record.status === 'paid' || record.status === 'partially_refunded') ? [{ id: 'refund', label: '返金する', tone: 'danger' as const, icon: <RotateCcw size={16} aria-hidden="true" />, onSelect: () => { setRefundError(null); setRefundTarget(record) } }] : []),
+      ...(canEdit && (record.status === 'paid' || record.status === 'partially_refunded') ? [{ id: 'refund', label: '返金する', tone: 'danger' as const, icon: <RotateCcw size={16} aria-hidden="true" />, onSelect: () => { refundOpeningScope.current = refundScope.current; setRefundError(null); setRefundTarget(record) } }] : []),
     ]
   }
 
@@ -136,24 +143,42 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
 
   // 同じ内容の再試行には同じキーを使い、返金を二重に記録しない。
   async function refund(input: RefundInput) {
-    if (!refundTarget) return
+    if (!refundTarget || refundOpeningScope.current !== refundScope.current) return
+    const operationScope = refundScope.current
     if (refunding || !canEdit) return
+    if (!Number.isSafeInteger(refundTarget.confirmationRevision) || (refundTarget.confirmationRevision ?? 0) < 1) {
+      setRefundError('支払いの情報を読み直してから、もう一度お試しください。')
+      return
+    }
     const signature = JSON.stringify([accountId, refundTarget.id, input.amount, input.reason, input.notify])
     if (refundAttempt.current?.signature !== signature) refundAttempt.current = { signature, key: crypto.randomUUID() }
     setRefunding(true)
     setRefundError(null)
     try {
       await bookingPaymentAdminApi.refund(refundTarget.id, {
-        amount: input.amount, reason: input.reason, notifyLine: input.notify, idempotencyKey: refundAttempt.current.key,
+        amount: input.amount, reason: input.reason, notifyLine: input.notify, idempotencyKey: refundAttempt.current.key, expectedRevision: refundTarget.confirmationRevision ?? undefined,
       })
     } catch (cause) {
-      setRefundError(cause instanceof ApiError && cause.status === 409 ? 'この支払いは返金できません（支払い済みのものだけ返金できます）。'
-        : cause instanceof ApiError && cause.status === 403 ? '返金する権限がありません。'
-          : '返金できませんでした。Stripe の管理画面で状態を確かめてください。')
+      if (operationScope !== refundScope.current) return
+      if (isConflictResponse(cause) && cause.code === 'stale_confirmation') {
+        setRefundTarget(null)
+        refundAttempt.current = null
+        void reload()
+        notifyToast('支払いの内容が変わりました。一覧を確認して、もう一度操作してください。', { tone: 'error' })
+        return
+      }
+      setRefundError(isConflictResponse(cause) && cause.code === 'simulation_only'
+        ? 'この支払いは模擬返金できません。Stripe の管理画面で状態を確認してください。'
+        : isConflictResponse(cause) && cause.code === 'refund_idempotency_conflict'
+          ? '前の操作と返金内容が異なります。窓を閉じて、もう一度操作してください。'
+          : cause instanceof ApiError && cause.status === 409 ? 'この支払いは返金できません。残額と状態を確認してください。'
+            : cause instanceof ApiError && cause.status === 403 ? '返金する権限がありません。'
+              : '返金できませんでした。Stripe の管理画面で状態を確かめてください。')
       return
     } finally {
-      setRefunding(false)
+      if (operationScope === refundScope.current) setRefunding(false)
     }
+    if (operationScope !== refundScope.current) return
     refundAttempt.current = null
     notifySaved(`${withHonorific(refundTarget.friendName ?? 'お客さま', 'さま')}の ${formatYen(input.amount)} の返金を模擬で記録しました。実際の返金・LINE送信はしていません`)
     setRefundTarget(null)
@@ -218,7 +243,8 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
         cancelLabel="閉じる" onCancel={() => setLinkPreview(null)}>
         {linkPreview?.url ? <CopyTextButton value={linkPreview.url} label="リンクをコピー" aria-label="支払いのリンクをコピー" /> : <p className={styles.minor}>リンクはまだ作られていません。</p>}
       </Dialog>
-      <RefundDialog open={refundTarget !== null} subtitle={`${withHonorific(refundTarget?.friendName ?? 'お客', 'さま')}・${refundTarget?.bookingLabel ?? ''}`}
+      <RefundDialog open={refundTarget !== null && refundOpeningScope.current === refundScope.current} subtitle={`${withHonorific(refundTarget?.friendName ?? 'お客', 'さま')}・${refundTarget?.bookingLabel ?? ''}`}
+        targetSummary={<OperationTargetSummary accounts={[{ id: refundOpeningScope.current.accountId }]} externalTarget={{ label: '返金する支払い', name: refundTarget?.friendName ? `${withHonorific(refundTarget.friendName, 'さま')}・${refundTarget.bookingLabel ?? '予約名を確認できません'}` : undefined }} />}
         paidAmount={Math.max(0, (refundTarget?.amount ?? 0) - (refundTarget?.refundedAmount ?? 0))} testMode={testMode} busy={refunding} error={refundError ?? undefined}
         facts={[{ label: '支払った額', value: `${formatYen(refundTarget?.amount)}（${refundTarget?.method === 'onsite' ? '店頭' : 'カード'}）` }, { label: 'これまでの返金', value: refundTarget?.refundedAmount ? formatYen(refundTarget.refundedAmount) : 'なし' }]}
         destination={refundTarget?.method === 'onsite' ? '店頭' : 'カード'}

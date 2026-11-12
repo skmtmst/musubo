@@ -12,6 +12,7 @@ const apiMocks = vi.hoisted(() => ({
   notifications: vi.fn(),
   saveNotifications: vi.fn(),
   testNotifications: vi.fn(),
+  testNotificationRecipients: vi.fn(async () => ({ data: { count: 1, recipients: [{ id: 'f1', displayName: '確認の人' }], token: 'token', confirmationId: 'confirmation' } })),
   actions: vi.fn(),
   editor: vi.fn(),
   saveEditor: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       notifications: apiMocks.notifications,
       saveNotifications: apiMocks.saveNotifications,
       testNotifications: apiMocks.testNotifications,
+      testNotificationRecipients: apiMocks.testNotificationRecipients,
       actions: apiMocks.actions,
       editor: apiMocks.editor,
       saveEditor: apiMocks.saveEditor,
@@ -74,6 +76,7 @@ function render(): HTMLElement {
 
   beforeEach(() => {
     Object.values(apiMocks).forEach(mock => mock.mockReset())
+    apiMocks.testNotificationRecipients.mockResolvedValue({ data: { count: 1, recipients: [{ id: 'f1', displayName: '確認の人' }], token: 'token', confirmationId: 'confirmation' } })
     apiMocks.notifications.mockResolvedValue({
       data: { settings: SETTINGS, overview: { total: 423, sent: 412, failed: 3, skipped: 8 } },
     })
@@ -143,9 +146,11 @@ it('送信済みの結果は後続GETの失敗で消さず、再試行はGETだ�
   const trigger = ([...host.querySelectorAll('button')].find(el => el.textContent?.trim() === 'テストを送る') ?? querySupplementaryPageAction('テストを送る'))!
   await act(async () => { trigger.click() })
   const dialog = document.querySelector('[role="dialog"]')!
+  expect(dialog.textContent).toContain('確認の人')
   const confirm = ([...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === 'テストを送る') ?? querySupplementaryPageAction('テストを送る'))!
   await act(async () => { confirm.click(); confirm.click() })
   expect(apiMocks.testNotifications).toHaveBeenCalledTimes(1)
+  expect(apiMocks.testNotifications).toHaveBeenCalledWith('webinar-1', 'token', 'confirmation')
   expect(host.textContent).toContain('テスト送信しました。成功 2 件・失敗 0 件')
   expect(host.textContent).not.toContain('テスト送信できませんでした')
   expect(trigger.disabled).toBe(true)

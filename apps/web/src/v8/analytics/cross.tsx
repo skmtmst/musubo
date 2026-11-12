@@ -408,7 +408,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
         : <div className={styles.routesSplit}>
           <section className={styles.funnelFlow} aria-labelledby="cross-table-title">
             <h2 id="cross-table-title" className={styles.hoursTitle}>{tableTitle}</h2>
-            <p className={styles.caption}>マスを押すと、その人たちを抽出できます</p>
+            <p className={styles.caption}>{canManage ? 'マスを押すと、その人たちを抽出できます' : 'マスを押すと、内訳を確認できます'}</p>
             <div className={styles.gridRow} data-head>
               <span className={styles.gridLabel} />
               {cols.map((col) => <span key={col.key} className={styles.gridHead} title={`${col.label}の合計 ${formatNumber(colTotals.get(col.key) ?? 0)}`}>{col.label}</span>)}

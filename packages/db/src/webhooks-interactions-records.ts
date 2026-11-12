@@ -106,7 +106,7 @@ export async function finishWebhookInteraction(
   await db.prepare(
     `UPDATE webhook_interaction_logs
         SET status=?, response_status=?, attempt_count=?, duration_ms=?,
-            failure_reason=?, completed_at=?
+            failure_reason=?, completed_at=?, confirmation_revision=confirmation_revision+1
       WHERE id=? AND line_account_id=? AND status='pending'`,
   ).bind(
     input.status,
@@ -136,7 +136,7 @@ export async function claimWebhookInteractionRetry(
   lineAccountId: string,
 ): Promise<boolean> {
   const result = await db.prepare(
-    `UPDATE webhook_interaction_logs SET status='retried'
+    `UPDATE webhook_interaction_logs SET status='retried', confirmation_revision=confirmation_revision+1
       WHERE id=? AND line_account_id=? AND direction='outgoing' AND status='failed'`,
   ).bind(id, lineAccountId).run();
   return (result.meta.changes ?? 0) > 0;
@@ -148,7 +148,7 @@ export async function restoreWebhookInteractionFailure(
   lineAccountId: string,
 ): Promise<void> {
   await db.prepare(
-    `UPDATE webhook_interaction_logs SET status='failed'
+    `UPDATE webhook_interaction_logs SET status='failed', confirmation_revision=confirmation_revision+1
       WHERE id=? AND line_account_id=? AND status='retried'`,
   ).bind(id, lineAccountId).run();
 }

@@ -199,6 +199,21 @@ describe('friend add rules', () => {
       .rejects.toThrow('FRIEND_ADD_RULE_NOT_ARCHIVED');
   });
 
+  test('保管は確認した版と状態が同じ時だけ許し、版なしの旧呼出も動く', async () => {
+    for (const mode of ['match', 'version', 'status', 'legacy'] as const) {
+      const item = await createFriendAddRuleDraft(db, { lineAccountId: 'account-1', friendKind: 'first_time', name: mode, priority: 1, definition });
+      const current = (await getFriendAddRule(db, { lineAccountId: 'account-1', ruleId: item.id }))!;
+      const input = { lineAccountId: 'account-1', ruleId: item.id, ...(mode === 'legacy' ? {} : { expectedVersion: current.lock_version + (mode === 'version' ? 1 : 0), expectedStatus: mode === 'status' ? 'published' : current.status }) };
+      if (mode === 'version' || mode === 'status') {
+        await expect(archiveFriendAddRule(db, input)).rejects.toThrow('FRIEND_ADD_RULE_VERSION_CONFLICT');
+        expect(await getFriendAddRule(db, { lineAccountId: 'account-1', ruleId: item.id })).not.toBeNull();
+      } else {
+        await archiveFriendAddRule(db, input);
+        expect(await getFriendAddRule(db, { lineAccountId: 'account-1', ruleId: item.id })).toBeNull();
+      }
+    }
+  });
+
   test('有効な同一アカウント・同一対象の受け皿がない停止を拒否する', async () => {
     insertPublishedRule(sqlite, { id: 'target' });
 

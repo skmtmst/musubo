@@ -149,7 +149,7 @@ export default function CompanyContactCard({ canEdit, draftRef, onDirtyChange, l
     const control = <TextField id={`${uid}-${key}`} value={values[key] ?? ''} maxLength={meta.max}
       type={key === 'contactEmail' ? 'email' : key === 'phone' ? 'tel' : 'text'}
       inputMode={key === 'postalCode' ? 'numeric' : undefined}
-      placeholder={key === 'postalCode' ? '例：123-4567' : key === 'phone' ? '例：03-1234-5678' : key === 'building' ? '例：〇〇ビル 5階' : key === 'invoiceAddressee' ? '例：Shed Products株式会社 経理部' : undefined}
+      placeholder={key === 'postalCode' ? '例：123-4567' : key === 'phone' ? '例：03-0000-5678' : key === 'building' ? '例：〇〇ビル 5階' : key === 'invoiceAddressee' ? '例：Shed Products株式会社 経理部' : undefined}
       disabled={loading || saving || locked} readOnly={!canEdit} onChange={event => change(key, event.target.value)} />
     return <Field key={key} label={meta.label} htmlFor={`${uid}-${key}`} required={meta.required} requiredAppearance="text" optional={!meta.required}
       error={fieldError?.key === key ? fieldError.message : undefined}>

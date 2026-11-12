@@ -11,7 +11,7 @@ describe('safeFlexAssetUrl', () => {
     'https://localhost/image.png',
     'https://127.0.0.1/image.png',
     'https://192.168.1.2/image.png',
-    'https://user:pass@example.jp/image.png',
+    'https://user:pass@example.com/image.png',
     'javascript:alert(1)',
   ])('内部・非HTTPS URLを画像として開かない: %s', (url) => {
     expect(safeFlexAssetUrl(url)).toBeNull()

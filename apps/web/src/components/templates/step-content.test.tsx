@@ -41,3 +41,11 @@ it('実際の動きを途中で閉じても、未処理の取消エラーを残�
   await Promise.resolve()
   expect(panel.getAnimations()).toHaveLength(0)
 })
+
+it('横移動しない指定では、段を変えても入力を横へはみ出させない', () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: false }))
+  const animate = vi.spyOn(HTMLElement.prototype, 'animate')
+  const { rerender } = render(<StepContent step={1} slide={false}>入力</StepContent>)
+  rerender(<StepContent step={2} slide={false}>入力</StepContent>)
+  expect(animate).toHaveBeenCalledWith([{ opacity: 0 }, { opacity: 1 }], expect.anything())
+})

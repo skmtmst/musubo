@@ -1,7 +1,8 @@
 import type { Scenario } from '@line-crm/shared'
 
 /** シナリオ停止時の入力。理由は任意・200字まで。 */
-export type ScenarioStopInput = { reason?: string }
+export type ScenarioConfirmation = { contentRevision: number; activeCount: number; rowIdSum: number; rowIdSquareSum: number; totalCount: number; totalRowIdSum: number; totalRowIdSquareSum: number; referrers: Array<{ id: string; revision: number }> }
+export type ScenarioStopInput = { reason?: string; expectedContentRevision?: number; expectedSubscriptions?: { activeCount: number; rowIdSum: number; rowIdSquareSum: number } }
 
 export type ScenarioUpdateInput = Partial<Omit<Scenario,
   'id' | 'createdAt' | 'updatedAt' | 'stoppedReason' | 'stoppedBy' | 'stoppedAt'
@@ -105,6 +106,7 @@ export type ScenarioRuns = {
   summary: { active: number; paused: number; completed: number; delivering: number }
   subscriptions: Array<{
     id: string
+    confirmationRevision?: number
     friendId: string
     friendName: string
     status: string

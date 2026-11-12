@@ -1,7 +1,7 @@
 import { emptyHoursWorkspace } from '../../packages/shared/dist/google-hours-workspace.js'
 export const GOOGLE_STORE = { id: 'store-sby', name: '然 渋谷店', lineAccountId: 'visual-qa-account' }
 export const GOOGLE_CONNECTION = {
-  status: 'connected', googleAccountEmail: 'nen.shibuya@gmail.com', locationName: 'locations/nen-shibuya', locationTitle: '然 渋谷店',
+  status: 'connected', googleAccountEmail: 'shop@example.com', locationName: 'locations/nen-shibuya', locationTitle: '然 渋谷店',
   locationMapsUrl: 'https://maps.google.com/?cid=nen-shibuya', connectedAt: '2026-09-12T10:20:00+09:00', disconnectedAt: null,
   lastSyncedAt: '2026-10-02T08:00:00+09:00', lastSyncError: null, averageRating: 4.2, totalReviewCount: 24,
 }
@@ -27,7 +27,7 @@ export const GOOGLE_CONNECTION_DATA = {
 }
 const googlePost = (id, kind, summary, title, publishedAt, status) => ({
   id, kind, origin: 'admin', summary, title, schedule: null, cta: null, offer: null, media: [], publishMode: 'now', status,
-  googleState: status === 'published' ? 'LIVE' : null, searchUrl: null, staffName: '中川 由美', error: null,
+  googleState: status === 'published' ? 'LIVE' : null, searchUrl: null, staffName: '見本 30', error: null,
   createdAt: publishedAt, sentAt: publishedAt, publishedAt, updatedAt: publishedAt,
 })
 export const GOOGLE_POSTS = [

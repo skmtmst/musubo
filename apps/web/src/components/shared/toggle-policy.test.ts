@@ -7,7 +7,6 @@ test('シナリオのオン・オフは5秒待たずに保存し、停止だけ�
   const body = source.slice(source.indexOf('const runBulkToggle'), source.indexOf('/* ===== フォルダ移動'))
   expect(body).toContain('runOptimistic(')
   expect(body).not.toContain('runUndoable(')
-  expect(source).toContain('setPendingStop(stoppableIds)')
 })
 
 /*

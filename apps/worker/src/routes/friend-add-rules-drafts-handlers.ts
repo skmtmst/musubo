@@ -493,6 +493,12 @@ export const delete__api_friend_add_rules_id_13 = async (c: Context<Env, "/api/f
   /*
    * 存在しない設定と共通あいさつ（受け皿）を分ける。無いときは 404。
    */
+  const versionParam = c.req.query('expected_version');
+  const expectedStatus = c.req.query('expected_status');
+  if ((versionParam === undefined) !== (expectedStatus === undefined)
+      || (versionParam !== undefined && (!/^[1-9]\d*$/.test(versionParam) || !Number.isSafeInteger(Number(versionParam)) || !['draft', 'published', 'stopped'].includes(expectedStatus ?? '')))) {
+    return c.json({ success: false, error: '確認した版と状態を指定してください' }, 400);
+  }
   const current = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
   if (!current) {
     return c.json({ success: false, error: '見つかりません（一覧を読み直してください）' }, 404);
@@ -501,9 +507,12 @@ export const delete__api_friend_add_rules_id_13 = async (c: Context<Env, "/api/f
     return c.json({ success: false, error: '経路が分からなかった人の設定は削除できません' }, 409);
   }
   try {
-    await archiveFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
+    await archiveFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id'), ...(versionParam === undefined ? {} : { expectedVersion: Number(versionParam), expectedStatus }) });
     return c.json({ success: true });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'FRIEND_ADD_RULE_VERSION_CONFLICT') {
+      return c.json({ success: false, code: 'VERSION_CONFLICT', error: '設定が変更されました。一覧を読み直してください' }, 409);
+    }
     // 先の確認と更新の間に消えたときは 404。残っているときは受け皿相当の 409。
     const gone = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
     if (!gone) {

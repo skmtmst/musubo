@@ -14,9 +14,9 @@ describe('extractContactFormReceipt', () => {
   it('extracts the customer and only the submitted inquiry from the legacy receipt', () => {
     const result = extractContactFormReceipt(`※本メールは自動配信メールです。
 
-山田 太郎 様
+見本 141 様
 
-お名前：山田 太郎 (ヤマダ タロウ) 様
+お名前：見本 141 (ヤマダ タロウ) 様
 メールアドレス：customer@example.com
 お問い合わせ内容：
 
@@ -25,13 +25,13 @@ ECサイトのお問い合わせフォームから送信しています。`);
 
     expect(result).toEqual({
       customerEmail: 'customer@example.com',
-      customerName: '山田 太郎',
+      customerName: '見本 141',
       inquiry: 'フォーム統合テスト\nECサイトのお問い合わせフォームから送信しています。',
     });
   });
 
   it('removes the footer from the current receipt', () => {
-    const result = extractContactFormReceipt(`お名前：山田 花子 様
+    const result = extractContactFormReceipt(`お名前：見本 143 様
 メールアドレス：hanako@example.com
 
 お問い合わせ内容：

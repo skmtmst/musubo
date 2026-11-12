@@ -17,8 +17,8 @@ function app(staff: AuthenticatedStaff) {
   return { request: (path: string, stripe = false) => instance.request(path, {}, { DB: testDb.db, ADMIN_PUBLIC_URL: 'https://admin.example.com', STRIPE_SECRET_KEY: stripe ? 'sk_test_x' : undefined } as Env['Bindings']) };
 }
 
-const master: AuthenticatedStaff = { id: 'master-1', name: '坂本 真人', role: 'owner', readOnly: false, tenantId: null };
-const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '山田 太郎', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
+const master: AuthenticatedStaff = { id: 'master-1', name: '見本 25', role: 'owner', readOnly: false, tenantId: null };
+const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '見本 141', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
 
 type Body = { data: {
   pricing: 'stripe_actual' | 'list_price';
@@ -58,10 +58,10 @@ beforeEach(() => {
     testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_key, plan_status, trial_ends_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
       .run(id, name, id === 'tenant-z' ? 'archived' : 'active', planKey, planStatus, trialEnds, createdAt);
   }
-  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES ('master-1', '坂本 真人', 'owner', 'k1', NULL)`).run();
+  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES ('master-1', '見本 25', 'owner', 'k1', NULL)`).run();
   testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active) VALUES ('master-1', 1)`).run();
-  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, line_user_id, notice_friend_id, email) VALUES ('owner-1', '山田 太郎', 'owner', 'k2', 'tenant-a', 'U1', 'notice-friend-1', 'a@example.com')`).run();
-  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, email) VALUES ('owner-2', '木下 花', 'owner', 'k3', 'tenant-b', 'b@example.com')`).run();
+  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, line_user_id, notice_friend_id, email) VALUES ('owner-1', '見本 141', 'owner', 'k2', 'tenant-a', 'U1', 'notice-friend-1', 'a@example.com')`).run();
+  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, email) VALUES ('owner-2', '見本 148', 'owner', 'k3', 'tenant-b', 'b@example.com')`).run();
   testDb.raw.prepare(`INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token, tenant_id, token_expires_at) VALUES ('la-1', '店舗1', 'c1', 's1', 't1', 'tenant-a', ?)`).run(iso(5));
   void now;
 });
@@ -102,7 +102,7 @@ describe('集計', () => {
   });
 
   it('要対応：決済失敗・トライアル期限3日以内・LINEトークン期限・未返信のお問い合わせ', async () => {
-    await createHqSupportRequest(testDb.db, { tenantId: 'tenant-a', staffId: 'owner-1', staffName: '山田 太郎', staffEmail: null, kind: 'bug', subject: 'x', body: 'y', lineAccountId: null, attachmentKeys: [] });
+    await createHqSupportRequest(testDb.db, { tenantId: 'tenant-a', staffId: 'owner-1', staffName: '見本 141', staffEmail: null, kind: 'bug', subject: 'x', body: 'y', lineAccountId: null, attachmentKeys: [] });
     const body = await (await app(master).request('/api/ops/dashboard')).json() as Body;
     expect(body.data.alerts).toEqual({ pastDue: 1, trialEndingSoon: 1, lineTokenExpiring: 1, unansweredTickets: 1 });
     expect(body.data.tickets.newCount).toBe(1);
@@ -150,7 +150,7 @@ describe('集計', () => {
     const body = await (await app(master).request('/api/ops/dashboard')).json() as Body;
     expect(body.data.lineRegistration).toEqual({ registered: 1, total: 2, unregisteredCount: 1 });
     const list = await (await app(master).request('/api/ops/dashboard/line-unregistered')).json() as { data: { people: Array<Record<string, unknown>> } };
-    expect(list.data.people).toEqual([{ staffId: 'owner-2', name: '木下 花', tenantName: 'カフェ ムスビ', hasEmail: true }]);
+    expect(list.data.people).toEqual([{ staffId: 'owner-2', name: '見本 148', tenantName: 'カフェ ムスビ', hasEmail: true }]);
     expect(JSON.stringify(list)).not.toContain('b@example.com');
   });
 

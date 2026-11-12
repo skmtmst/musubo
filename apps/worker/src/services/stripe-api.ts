@@ -51,13 +51,13 @@ export async function stripeRequest<T>(
   method: 'GET' | 'POST' | 'DELETE',
   path: string,
   body?: Record<string, FormValue>,
-  options: { idempotencyKey?: string; fetchImpl?: typeof fetch; signal?: AbortSignal } = {},
+  options: { idempotencyKey?: string; fetchImpl?: typeof fetch; signal?: AbortSignal; apiVersion?: string } = {},
 ): Promise<T> {
   if (!env.STRIPE_SECRET_KEY) throw new StripeApiError(503, 'Stripe の接続設定がまだありません', 'not_configured');
   const fetchImpl = options.fetchImpl ?? fetch;
   const headers: Record<string, string> = {
     Authorization: `Basic ${btoa(`${env.STRIPE_SECRET_KEY}:`)}`,
-    'Stripe-Version': '2024-06-20',
+    'Stripe-Version': options.apiVersion ?? '2024-06-20',
   };
   let url = `https://api.stripe.com${path}`;
   let payload: string | undefined;
@@ -108,6 +108,7 @@ export interface StripeCheckoutSession {
   subscription: string | null;
   setup_intent?: string | null;
   mode?: 'payment' | 'setup' | 'subscription';
+  status?: 'open' | 'complete' | 'expired';
   client_reference_id: string | null;
   metadata?: Record<string, string>;
 }
@@ -411,7 +412,7 @@ export const stripeApi = {
   /** Card collection without a charge or a subscription. The webhook must verify the SetupIntent. */
   createCardSetupSession: (
     env: StripeEnv,
-    input: { customerId: string; tenantId: string; successUrl: string; cancelUrl: string },
+    input: { customerId: string; tenantId: string; successUrl: string; cancelUrl: string; logoUrl: string },
     fetchImpl?: typeof fetch,
   ) => stripeRequest<StripeCheckoutSession>(env, 'POST', '/v1/checkout/sessions', {
     mode: 'setup',
@@ -422,8 +423,19 @@ export const stripeApi = {
     success_url: input.successUrl,
     cancel_url: input.cancelUrl,
     locale: 'ja',
+    branding_settings: {
+      display_name: 'musubo',
+      logo: { type: 'url', url: input.logoUrl },
+    },
     metadata: { tenant_id: input.tenantId, purpose: 'musubo_card_setup' },
-  }, { fetchImpl }),
+  }, { fetchImpl, apiVersion: '2025-10-29.clover' }),
+
+  retrieveCheckoutSession: (env: StripeEnv, sessionId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripeCheckoutSession>(env, 'GET', `/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, undefined, { fetchImpl }),
+
+  listCustomerCheckoutSessions: (env: StripeEnv, customerId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<{ data: StripeCheckoutSession[]; has_more: boolean }>(env, 'GET', '/v1/checkout/sessions',
+      { customer: customerId, limit: 10, status: 'complete' }, { fetchImpl }),
 
   retrieveSetupIntent: (env: StripeEnv, setupIntentId: string, fetchImpl?: typeof fetch) =>
     stripeRequest<StripeSetupIntent>(env, 'GET', `/v1/setup_intents/${encodeURIComponent(setupIntentId)}`, undefined, { fetchImpl }),

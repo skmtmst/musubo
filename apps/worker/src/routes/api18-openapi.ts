@@ -15,6 +15,7 @@ function op(summary:string,params:string[]=[],data:Schema={},body?:Schema,query:
    '400':{description:'入力を確認'},'403':{description:'統括の権限が不足'},'404':{description:'対象がない・別統括'},'409':{description:'編集・承認・宛先条件の競合'}}};
 }
 export const api18Paths={
+ '/api/webinars/{id}/notifications/test':{get:op('ウェビナー通知のテスト受信者と確認用情報を取得する',['id'],{type:'object',properties:{count:number,recipients:{type:'array'},token:string,confirmationId:string}})},
  ...hqAuthoringPaths,
  '/api/hq/templates/attribute-kind-counts':{get:op('友だち属性の種類別件数。情報欄・対応マークは所属未対応のためnull',[],{type:'object',properties:{tag:number,friend_field:{type:'null'},support_mark:{type:'null'}}})},
  '/api/hq/templates/{id}/versions':{get:op('ひな形の版履歴・作った人・日時・下書きか',['id'],{type:'array',items:version})},
@@ -33,7 +34,8 @@ export const api18Paths={
  '/api/hq/broadcasts/{id}/approve':{post:op('別人が人数を確認して承認。店と同じ本人再確認が必要',['id'],{type:'object'},revision)},
  '/api/hq/broadcasts/{id}/reject':{post:op('理由を付けて差し戻す',['id'],{type:'object'},{...revision,required:['expectedVersion','reason'],properties:{...revision.properties,reason:string}})},
  '/api/hq/broadcasts/{id}/approval-cancel':{post:op('依頼した人が承認を取り消す',['id'],{type:'object'},revision)},
- '/api/hq/broadcasts/{id}/test-send':{post:op('対象店の設定済みテスト宛先へ全吹き出しを送る。5人まで・10秒制限',['id'],{type:'object',properties:{sent:number,failed:number}},{type:'object',required:['accountId'],properties:{accountId:string}})},
+ '/api/hq/broadcasts/test-recipients':{get:op('統括のテスト送信で確認する宛先と照合情報',[],{type:'object',properties:{count:number,recipients:{type:'array',items:{type:'object',properties:{id:string,displayName:{type:['string','null']}}}},token:string}},undefined,{accountId:string})},
+ '/api/hq/broadcasts/{id}/test-send':{post:op('対象店の設定済みテスト宛先へ全吹き出しを送る。5人まで・10秒制限',['id'],{type:'object',properties:{sent:number,failed:number}},{type:'object',required:['accountId'],properties:{accountId:string,expectedRecipientToken:string}})},
  '/api/hq/broadcasts/{id}/targets/{accountId}/recipients':{get:op('店ごとの宛先台帳をページ送りで読む',['id','accountId'],{type:'object',properties:{rows:{type:'array',items:{type:'object'}},total:number,nextCursor:{type:['string','null']}}},undefined,{cursor:number,limit:{type:'integer',minimum:1,maximum:100}})},
  '/api/hq/broadcasts/{id}/activity':{get:op('統括配信の操作記録をページ送りで読む',['id'],{type:'object'},undefined,{cursor:number,limit:{type:'integer',minimum:1,maximum:100}})},
  '/api/hq/broadcasts/{id}/export.csv':{get:{...op('店別の送信・開封・クリック・反応人数をCSVで出す。未取得は空欄',['id']),responses:{'200':{description:'数式として実行されないUTF-8 BOM付きCSV',content:{'text/csv':{schema:{type:'string'}}}},'403':{description:'統括の閲覧権限が不足'},'404':{description:'対象が見つからない'}}}},

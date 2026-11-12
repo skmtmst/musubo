@@ -54,14 +54,14 @@ describe('実行詳細の actionRuns なし', () => {
       success: true,
       data: {
         id: 'run-1', receivedAt: '2026-09-07T01:32:00.000Z', processedAt: null,
-        friend: { id: 'f1', displayName: 'Kenta Kawano' }, friendKind: 'first_time',
+        friend: { id: 'f1', displayName: 'Demo Person' }, friendKind: 'first_time',
         attribution: { status: 'captured', routeId: 'route-shop', routeName: '店頭QR', reason: 'store-qr' },
         rule: { id: 'rule-shop', name: '店頭QRの初回案内', versionId: 'v1', versionNumber: 1 },
         status: 'completed', errorCode: null,
       },
     })
     await show()
-    expect(host.textContent).toContain('Kenta Kawano')
+    expect(host.textContent).toContain('Demo Person')
     expect(host.textContent).toContain('追加の処理はありません。')
   })
 })

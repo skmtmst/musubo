@@ -126,7 +126,7 @@ export async function publishAutoReplyDraftVersion(
     ).bind(now, input.staffId, input.idempotencyKey, now, draft.id, draft.definition_snapshot, ...stopGuardBinds),
     db.prepare(
       `UPDATE auto_replies
-          SET keyword = ?, match_type = ?, response_type = ?, response_content = ?,
+          SET confirmation_revision = confirmation_revision + 1, keyword = ?, match_type = ?, response_type = ?, response_content = ?,
               template_id = ?, line_account_id = ?, is_active = 1,
               active_from = ?, active_until = ?, cooldown_minutes = ?,
               skip_when_operator_active = ?, priority = ?, message_kinds_json = ?,

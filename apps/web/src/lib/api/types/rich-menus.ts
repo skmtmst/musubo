@@ -38,6 +38,7 @@ export type RichMenuGroupListItem = Partial<import('@line-crm/shared').StyleSamp
   defaultPageId: string | null
   isDefaultForAll: boolean
   status: 'draft' | 'published'
+  version?: number
   publishingAt: string | null
   targetingCondition: string | null
   targetingPriority: number

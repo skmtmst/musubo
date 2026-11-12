@@ -27,7 +27,7 @@ export async function runBookingPaymentStart(db: D1Database, record: BookingPaym
       && await featureJobCanRun(db, { accountId: record.line_account_id, featureId: 'booking', job: 'booking payment start' }),
     execute: async (_signal, saved) => ({ kind: 'success', value: await provider.startPayment(saved) }),
     statements: (next, value) => next.phase === 'succeeded' && value?.providerPaymentId ? [
-      db.prepare(`UPDATE booking_payments SET provider_payment_id=?,status='pending',updated_at=?
+      db.prepare(`UPDATE booking_payments SET confirmation_revision=confirmation_revision+1, provider_payment_id=?,status='pending',updated_at=?
         WHERE id=? AND line_account_id=? AND status='unpaid' AND amount=? AND currency=?`)
         .bind(value.providerPaymentId, new Date().toISOString(), record.id, record.line_account_id, record.amount, record.currency),
     ] : [],

@@ -127,7 +127,7 @@ describe('通知ステップの差し込みボタンと見本', () => {
     expect(area.value).toBe('{{name}}さん、こんにちは{{name}}')
     fireEvent.click(screen.getByRole('button', { name: /LINEでの見え方を見る/ }))
     const preview = await screen.findByRole('region', { name: 'LINEでの見え方' })
-    expect(await within(preview).findByText('山田 花子さん、こんにちは山田 花子')).toBeTruthy()
+    expect(await within(preview).findByText('見本 143さん、こんにちは見本 143')).toBeTruthy()
   })
 
   it('差し込みの無い本文では見本を出さない', async () => {

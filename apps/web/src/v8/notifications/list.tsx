@@ -275,7 +275,7 @@ export default function NotificationsV8() {
           <p className={styles.note}>
             {counts?.unread === 0 && !loading && !listFailed
               ? '未読の通知はありません。'
-              : '未読は青い点と太字。押すと既読になり、行の右から関係する画面へ移れます'}
+              : canMarkRead ? '未読は青い点と太字。押すと既読になり、行の右から関係する画面へ移れます' : '未読は青い点と太字。押すと関係する画面へ移れます'}
           </p>
           <TextLink href="/line-notifications?tab=operator">通知設定</TextLink>
         </div>

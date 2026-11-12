@@ -2,6 +2,7 @@
 import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterAll, afterEach, expect, it, vi } from 'vitest'
+import { PageChromeProvider, usePageChrome } from '@/components/shell/page-chrome'
 
 const historyEnvironment = vi.hoisted(() => {
   const previous = { apiUrl: process.env.NEXT_PUBLIC_API_URL, adminKey: process.env.NEXT_PUBLIC_ADMIN_API_KEY }
@@ -36,13 +37,21 @@ it('履歴のサーバーの失敗を英語で出さず、再試行を案内す�
   expect(document.body.textContent).not.toContain('構成されていないため')
 })
 
-it('統括から来た時だけ統括へ戻れる', () => {
+function BreadcrumbProbe() {
+  const { crumbs, title } = usePageChrome()
+  return <div data-testid="chrome">{JSON.stringify({ crumbs, title })}</div>
+}
+
+it('統括から来た時だけパンくずから統括へ戻れる', () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 401 })))
   window.history.replaceState({}, '', '/updates?from=hq')
-  const view=render(<UpdatesPage />)
-  expect(screen.getByRole('link', { name: '統括へ戻る' }).getAttribute('href')).toBe('/hq')
+  const view=render(<PageChromeProvider><UpdatesPage /><BreadcrumbProbe /></PageChromeProvider>)
+  expect(screen.getByTestId('chrome').textContent).toContain('"label":"統括","href":"/hq"')
+  expect(screen.getByTestId('chrome').textContent).toContain('"title":"更新履歴"')
+  expect(screen.queryByRole('link', { name: '統括へ戻る' })).toBeNull()
   view.unmount()
   window.history.replaceState({}, '', '/updates')
-  render(<UpdatesPage />)
+  render(<PageChromeProvider><UpdatesPage /><BreadcrumbProbe /></PageChromeProvider>)
+  expect(screen.getByTestId('chrome').textContent).toContain('"crumbs":null')
   expect(screen.queryByRole('link', { name: '統括へ戻る' })).toBeNull()
 })

@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { attentionFixture } from '@/test-utils/hq-attention-fixture'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
@@ -31,6 +32,15 @@ beforeEach(() => {
   }] } })
 })
 afterEach(cleanup)
+
+it('統括の表と同じ口の５種類をそのまま表示する', async () => {
+  fixture.attention.mockResolvedValue({ success: true, data: { items: [attentionFixture] } })
+  render(<AttentionPage />)
+  for (const [label, count] of [['未対応のトーク', 1], ['承認待ちの予約', 2], ['未払い', 3], ['接続の異常', 4], ['止まった配信', 5]] as const) {
+    expect(await screen.findByRole('button', { name: `本店の${label} ${count}件を開く` })).toBeTruthy()
+  }
+  expect(fixture.attention).toHaveBeenCalled()
+})
 
 it.each([
   ['本店の接続の異常 1件を開く', '/accounts/detail?id=account-a'],

@@ -21,6 +21,7 @@ const fixture = vi.hoisted(() => ({
   sendKeys: [] as string[],
   sendBodies: [] as string[],
   chatCalls: 0,
+  previewCalls: 0,
 }))
 
 vi.mock('next/link', () => ({
@@ -75,6 +76,10 @@ function responseFor(url: URL, init?: RequestInit): Response {
   if (url.pathname === '/api/chats') return json({ success: true, data: [chatRow] })
   if (url.pathname === '/api/support/inbox') return json({ success: true, data: { items: [], summary: { total: 0 } } })
   if (url.pathname === '/api/inbox/unanswered/count') return json({ success: true, data: { total: 3, byAccount: [] } })
+  if (url.pathname === '/api/chats/friend-a/render-preview') {
+    fixture.previewCalls += 1
+    return json({ success: true, data: { content: '山田さん {{var.guest_count}}', unresolved: ['var.guest_count'] } })
+  }
   if (url.pathname === '/api/chats/friend-a/send' && init?.method === 'POST') {
     fixture.sendKeys.push(new Headers(init.headers).get('Idempotency-Key') ?? '')
     fixture.sendBodies.push(String(init.body))
@@ -109,7 +114,7 @@ describe('電話の画面のトーク', () => {
   let root: Root
 
   beforeEach(() => {
-    Object.assign(fixture, { params: new URLSearchParams(), role: 'staff', canView: true, canEdit: true, friendAccount: 'account-a', sendStatus: [], sendKeys: [], sendBodies: [], chatCalls: 0 })
+    Object.assign(fixture, { params: new URLSearchParams(), role: 'staff', canView: true, canEdit: true, friendAccount: 'account-a', sendStatus: [], sendKeys: [], sendBodies: [], chatCalls: 0, previewCalls: 0 })
     vi.stubGlobal('localStorage', { getItem: () => null, setItem() {}, removeItem() {} })
     vi.stubGlobal('sessionStorage', { getItem: () => null, setItem() {}, removeItem() {} })
     vi.stubGlobal('fetch', async (input: string | URL, init?: RequestInit) => responseFor(new URL(String(input), 'http://localhost'), init))
@@ -158,6 +163,20 @@ describe('電話の画面のトーク', () => {
     expect(fixture.sendKeys).toHaveLength(1)
     expect(fixture.sendKeys[0]).not.toBe('')
     expect(JSON.parse(fixture.sendBodies[0])).toMatchObject({ content: '予約を承りました', revision: 1 })
+  })
+
+  it('スマホも予約の不足と送信見本を同じ1回の取得で表示する', async () => {
+    fixture.params = new URLSearchParams('friend=friend-a')
+    await show()
+    await eventually(() => expect(draft()).not.toBeNull())
+    await type('{{name}}さん {{var.guest_count}}')
+    await eventually(() => expect(host.textContent).toContain('送るとこうなります：'))
+    expect(host.textContent).toContain('山田さん {{var.guest_count}}')
+    expect(host.textContent).toContain('予約の値がないため')
+    expect(host.querySelector('[title="山田さん {{var.guest_count}}"]')).not.toBeNull()
+    expect(fixture.previewCalls).toBe(1)
+    await type('こんにちは')
+    expect(host.textContent).not.toContain('送るとこうなります：')
   })
 
   it('送れなかったら書いた文を残し、もう一度送ると同じ冪等キーで送る', async () => {

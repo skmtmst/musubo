@@ -14,6 +14,8 @@ import AdvancedSearchDialog from './advanced-search-dialog'
  *   ・入れ子の「条件を保存」が開いている間は、Escapeは入れ子だけを閉じる
  */
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return {

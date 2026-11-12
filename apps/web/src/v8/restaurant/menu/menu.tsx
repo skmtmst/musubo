@@ -1,7 +1,7 @@
 'use client'
 
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
 import { Plus } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -15,7 +15,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr, ActionCell, NameCell, RowNameButto
 import { useAccount } from '@/contexts/account-context'
 import { formatYen } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { fetchApi } from '@/lib/api'
+import { ApiError, fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-test-api'
 import { RestaurantShell, Panel, QuietError, StatRow, Status, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
 import { DialogNote, RowMore, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
@@ -47,7 +47,7 @@ export function periodLabel(periods: string[]): string {
 }
 
 function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
-  const { data, store, busy, mutate } = ctx
+  const { data, store, busy, mutate, reload } = ctx
   const { selectedAccountId } = useAccount()
   const loadedAccount = useRef({ data, id: selectedAccountId })
   if (loadedAccount.current.data !== data) loadedAccount.current = { data, id: selectedAccountId }
@@ -61,11 +61,27 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const [stopId, setStopId] = useState('')
   const [deleteId, setDeleteId] = useState('')
   const [deleteError, setDeleteError] = useState('')
+  const [confirmedRevision, setConfirmedRevision] = useState<number | null>(null)
+  const [refreshConfirmation, setRefreshConfirmation] = useState<{kind: 'stop' | 'delete'; id: string; scope: string; previous: typeof data} | null>(null)
+  const [confirmationError, setConfirmationError] = useState('')
   const [confirmationScope, setConfirmationScope] = useState('')
   const scopeKey = JSON.stringify([selectedAccountId, store?.id ?? null])
   const scopeVersion = useRef({ key: scopeKey, generation: 0 })
   if (scopeVersion.current.key !== scopeKey) scopeVersion.current = { key: scopeKey, generation: scopeVersion.current.generation + 1 }
   const currentScope = JSON.stringify([scopeKey, scopeVersion.current.generation])
+  useEffect(() => {
+    if (!refreshConfirmation) return
+    if (refreshConfirmation.scope !== currentScope) { setRefreshConfirmation(null); return }
+    if (refreshConfirmation.previous === data || !dataIsCurrent) return
+    const latest = data.menuItems.find(item => item.id === refreshConfirmation.id && item.store_id === store?.id)
+    if (latest && Number.isSafeInteger(latest.confirmation_revision) && latest.confirmation_revision > 0) {
+      setConfirmationScope(currentScope); setConfirmedRevision(latest.confirmation_revision)
+      setConfirmationError('内容が変わりました。最新の内容を確認してください。')
+      if (refreshConfirmation.kind === 'stop' && latest.status !== 'archived') setStopId(latest.id)
+      if (refreshConfirmation.kind === 'delete') setDeleteId(latest.id)
+    }
+    setRefreshConfirmation(null)
+  }, [refreshConfirmation, data, dataIsCurrent, currentScope, store?.id])
   const stopping = dataIsCurrent && confirmationScope === currentScope ? rows.find((row) => row.id === stopId) : undefined
   const deleting = dataIsCurrent && confirmationScope === currentScope ? rows.find((row) => row.id === deleteId) : undefined
   /* 追加・変更は 1 枚の編集ページ（mauOC）。前の窓は消した。 */
@@ -74,29 +90,32 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const openEdit = (item: RestaurantMenuItem) => router.push(`/restaurant-test/menu/edit?id=${encodeURIComponent(item.id)}`)
 
   const stop = (item: RestaurantMenuItem) => {
-    if (!selectedAccountId || !dataIsCurrent || confirmationScope !== JSON.stringify([scopeVersion.current.key, scopeVersion.current.generation])) return
+    if (!selectedAccountId || !dataIsCurrent || !confirmedRevision || confirmationScope !== JSON.stringify([scopeVersion.current.key, scopeVersion.current.generation])) return
     void mutate(
-      () => restaurantTestApi.updateMenu(selectedAccountId, item.id, { status: 'archived' }),
+      async () => {
+        try { await restaurantTestApi.updateMenu(selectedAccountId, item.id, { status: 'archived', expectedVersion: confirmedRevision }) }
+        catch (error) { if (error instanceof ApiError && error.code === 'menu_confirmation_conflict') { setStopId(''); setConfirmedRevision(null); setRefreshConfirmation({kind:'stop',id:item.id,scope:currentScope,previous:data}); await reload(); throw new QuietError() }; throw error }
+      },
       'メニューを保管しました。予約履歴の参照は残ります。',
-    ).then(() => setStopId(''))
+    ).then((ok) => { if (ok) setStopId('') })
   }
 
   /* 参照の有無は削除時にサーバで判定する。 */
   const remove = (item: RestaurantMenuItem) => {
-    if (!selectedAccountId || !dataIsCurrent || confirmationScope !== JSON.stringify([scopeVersion.current.key, scopeVersion.current.generation])) return
+    if (!selectedAccountId || !dataIsCurrent || !confirmedRevision || confirmationScope !== JSON.stringify([scopeVersion.current.key, scopeVersion.current.generation])) return
     void mutate(
       async () => {
-        try { await fetchApi(`/api/restaurant-test/menus/${encodeURIComponent(item.id)}?account_id=${encodeURIComponent(selectedAccountId)}`, { method: 'DELETE' }) }
-        catch (error) { setDeleteError(japaneseDetailOf(error) || '削除できませんでした。'); throw new QuietError() }
+        try { await fetchApi(`/api/restaurant-test/menus/${encodeURIComponent(item.id)}?account_id=${encodeURIComponent(selectedAccountId)}`, { method: 'DELETE', body: JSON.stringify({ expectedVersion: confirmedRevision }) }) }
+        catch (error) { if (error instanceof ApiError && error.code === 'menu_confirmation_conflict') { setDeleteId(''); setConfirmedRevision(null); setRefreshConfirmation({kind:'delete',id:item.id,scope:currentScope,previous:data}); await reload(); throw new QuietError() }; setDeleteError(japaneseDetailOf(error) || '削除できませんでした。'); throw new QuietError() }
       },
       'メニューを削除しました。',
     ).then((ok) => { if (ok) setDeleteId('') })
   }
 
   const resume = (item: RestaurantMenuItem) => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId || !Number.isSafeInteger(item.confirmation_revision) || item.confirmation_revision < 1) return
     void mutate(
-      () => restaurantTestApi.updateMenu(selectedAccountId, item.id, { status: 'active' }),
+      async () => { try { await restaurantTestApi.updateMenu(selectedAccountId, item.id, { status: 'active', expectedVersion: item.confirmation_revision }) } catch (error) { if (error instanceof ApiError && error.code === 'menu_confirmation_conflict') await reload(); throw error } },
       'メニューを再開しました。',
     )
   }
@@ -119,7 +138,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
           <Button variant="primary" onClick={openNew}><Plus size={16} aria-hidden="true" />メニューを作る</Button>
         ) : null}
         flush
-        help={<HelpTip label="メニュー一覧の説明">「…」から変更・停止・再開・削除ができます。参照中のメニューは削除できません。</HelpTip>}
+        help={<HelpTip label="メニュー一覧の説明">{canEdit ? '「…」から変更・停止・再開・削除ができます。参照中のメニューは削除できません。' : 'メニューの内容と価格を確認できます。'}</HelpTip>}
       >
         {legacyPending ? <Notice tone="warn">以前の価格変更申請が残っています。{canEdit ? <Button onClick={() => router.push('/restaurant-test/approvals')}>以前の申請を確認する</Button> : '管理者に確認を依頼してください。'}</Notice> : null}
         <DataTable columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--text-caption)' }}>
@@ -166,8 +185,8 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                             { id: 'edit', label: '変更', onSelect: () => openEdit(item) },
                             ...(archived
                               ? [{ id: 'resume', label: '再開', onSelect: () => resume(item) }]
-                              : draftItem ? [] : [{ id: 'stop', label: '停止', onSelect: () => { if (dataIsCurrent) { setConfirmationScope(currentScope); setStopId(item.id) } } }]),
-                            { id: 'delete', label: '削除', tone: 'danger' as const, dividerBefore: true, onSelect: () => { if (dataIsCurrent) { setConfirmationScope(currentScope); setDeleteError(''); setDeleteId(item.id) } } },
+                              : draftItem ? [] : [{ id: 'stop', label: '停止', onSelect: () => { if (dataIsCurrent) { setConfirmationScope(currentScope); setConfirmedRevision(item.confirmation_revision); setConfirmationError(''); setStopId(item.id) } } }]),
+                            { id: 'delete', label: '削除', tone: 'danger' as const, dividerBefore: true, onSelect: () => { if (dataIsCurrent) { setConfirmationScope(currentScope); setConfirmedRevision(item.confirmation_revision); setConfirmationError(''); setDeleteError(''); setDeleteId(item.id) } } },
                           ]}
                         />
                       </span>
@@ -197,6 +216,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <p className={styles.stopName}>{stopping?.name}</p>
         <OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} store={{ id: stopping?.store_id ?? '', name: data.stores.find((entry) => entry.id === stopping?.store_id)?.name }} />
         <DialogNote>メニューは保管され、予約履歴の参照は残ります。後で再開できます。</DialogNote>
+        {confirmationError ? <Notice tone="warn">{confirmationError}</Notice> : null}
       </RsDialog>
       <RsDialog
         open={Boolean(deleting)}
@@ -215,6 +235,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <p className={styles.stopName}>{deleting?.name}</p>
         <OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} store={{ id: deleting?.store_id ?? '', name: data.stores.find((entry) => entry.id === deleting?.store_id)?.name }} />
         <DialogNote>予約や設定で使われていないメニューだけ削除できます。元に戻せません。</DialogNote>
+        {confirmationError ? <Notice tone="warn">{confirmationError}</Notice> : null}
         {deleteError ? <Notice tone="danger">{deleteError}</Notice> : null}
       </RsDialog>
     </>

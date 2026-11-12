@@ -33,9 +33,9 @@ beforeEach(() => {
       VALUES('a','試験店','a','secret','token'),('b','別店','b','secret','token');
     INSERT INTO staff(id,line_account_id,name,display_name) VALUES('s','a','担当','佐野'),('s2','a','担当2','中川');
     INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES('m','a','トリミング',60,0),('m2','a','シャンプー',45,0);
-    INSERT INTO friends(id,line_user_id,display_name,line_account_id) VALUES('f','Utest','山田 花子','a'),('foreign-f','Uforeign','別店のお客さま','b');
+    INSERT INTO friends(id,line_user_id,display_name,line_account_id) VALUES('f','Utest','見本 143','a'),('foreign-f','Uforeign','別店のお客さま','b');
     INSERT INTO booking_customers(id,line_account_id,display_name,phone_normalized_hash,phone_encrypted,phone_last4)
-      VALUES('c','a','鈴木 健','hash','private-cipher','1234'),('foreign-c','b','別店の電話客','hash2','private-other','5678');
+      VALUES('c','a','見本 178','hash','private-cipher','1234'),('foreign-c','b','別店の電話客','hash2','private-other','5678');
     INSERT INTO bookings(id,line_account_id,friend_id,booking_customer_id,staff_id,menu_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at,source,lock_version)
       VALUES('b1','a','f',NULL,'s','m','2027-10-03T04:00:00Z','2027-10-03T05:00:00Z','2027-10-03T05:10:00Z','confirmed',0,'2027-10-01T00:00:00Z','liff',2),
         ('b2','a',NULL,'c','s','m2','2027-10-03T04:00:00Z','2027-10-03T04:45:00Z','2027-10-03T04:55:00Z','requested',0,'2027-10-01T00:00:00Z','phone',3);`);
@@ -48,8 +48,8 @@ describe('重なった予約の表示材料', () => {
     expect(pair).toMatchObject({ bookingId: 'b1', otherBookingId: 'b2', staffId: 's', staffName: '佐野',
       reasonCode: 'same_staff_time_overlap', reason: '同じ担当の予約時間が重なっています。', calendarConnected: false });
     expect(pair.bookings).toEqual([
-      { bookingId: 'b1', customerName: '山田 花子', menuName: 'トリミング', staffId: 's', staffName: '佐野', startsAt: '2027-10-03T04:00:00Z', endsAt: '2027-10-03T05:00:00Z', source: 'liff', sourceLabel: 'LINE（musubo）', version: 2 },
-      { bookingId: 'b2', customerName: '鈴木 健', menuName: 'シャンプー', staffId: 's', staffName: '佐野', startsAt: '2027-10-03T04:00:00Z', endsAt: '2027-10-03T04:45:00Z', source: 'phone', sourceLabel: '電話', version: 3 },
+      { bookingId: 'b1', customerName: '見本 143', menuName: 'トリミング', staffId: 's', staffName: '佐野', startsAt: '2027-10-03T04:00:00Z', endsAt: '2027-10-03T05:00:00Z', source: 'liff', sourceLabel: 'LINE（musubo）', version: 2 },
+      { bookingId: 'b2', customerName: '見本 178', menuName: 'シャンプー', staffId: 's', staffName: '佐野', startsAt: '2027-10-03T04:00:00Z', endsAt: '2027-10-03T04:45:00Z', source: 'phone', sourceLabel: '電話', version: 3 },
     ]);
     expect(pair.guidance).toContain('Googleカレンダー');
   });
@@ -81,7 +81,7 @@ describe('重なった予約の表示材料', () => {
   });
   it('空の友だち名は予約顧客名を使い、両方なければ名前未設定にする', async () => {
     db.raw.exec("UPDATE friends SET display_name='' WHERE id='f'; UPDATE bookings SET booking_customer_id='c' WHERE id='b1'");
-    expect((await conflicts())[0].bookings[0].customerName).toBe('鈴木 健');
+    expect((await conflicts())[0].bookings[0].customerName).toBe('見本 178');
     db.raw.exec("UPDATE bookings SET booking_customer_id=NULL WHERE id='b1'");
     expect((await conflicts())[0].bookings[0].customerName).toBe('名前未設定');
   });

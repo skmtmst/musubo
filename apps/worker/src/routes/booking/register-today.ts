@@ -175,7 +175,7 @@ booking.post('/api/booking/admin/bookings/:id/visit', requireRole('owner', 'admi
     }
     next = nextStatus(row.status, action);
     const updated = await c.env.DB
-      .prepare(`UPDATE bookings SET status = ?, decided_at = ?,
+      .prepare(`UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = ?, decided_at = ?, lock_version = lock_version + 1,
                     updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
         WHERE id = ? AND status = ?`)
       .bind(next, new Date().toISOString(), id, row.status)
@@ -252,7 +252,7 @@ booking.delete('/api/booking/admin/bookings/:id/visit', requireRole('owner', 'ad
   else if (mark.kind !== 'late') return c.json({ error: 'status_changed' }, 409);
   if (next !== row.status) {
     const updated = await c.env.DB
-      .prepare(`UPDATE bookings SET status = ?,
+      .prepare(`UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = ?, lock_version = lock_version + 1,
                     updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
         WHERE id = ? AND status = ?`)
       .bind(next, id, row.status)

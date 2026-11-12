@@ -54,7 +54,10 @@ test('店限定の担当者のスタイル選択でも、統括の承認済み�
   await set([await catalog('tag',tag())]);
   const saved=await initializeAccountStyle(sql.db,'a','t','admin','standard');
   expect(saved.catalogApplication?.items[0].state).toBe('succeeded');
+  const initialTime = (sql.raw.prepare("SELECT first_starter_at FROM account_styles WHERE line_account_id='a'").get() as {first_starter_at:string | null}).first_starter_at;
+  expect(initialTime).toBeTruthy();
   await applyCatalogStarter(sql.db,'t','a','admin','standard');
+  expect(sql.raw.prepare("SELECT first_starter_at FROM account_styles WHERE line_account_id='a'").get()).toEqual({first_starter_at:initialTime});
   expect(sql.raw.prepare("SELECT COUNT(*) n FROM tags WHERE line_account_id='a'").get()).toEqual({n:1});
   expect(sql.raw.prepare("SELECT initiated_by,approved_by,state FROM style_starter_catalog_items").get()).toEqual({initiated_by:'admin',approved_by:'owner',state:'succeeded'});
 });
@@ -320,3 +323,39 @@ test('通知を選ぶと編集した項目だけ保留し、未投入の別項�
  expect(repeated.items.find(item=>item.key===second.templateId)?.action).toBe('existing')
  expect(sql.raw.prepare('SELECT COUNT(*) n FROM notifications').get()).toEqual({n:1})
 })
+
+test('手動で別の見本を配っても、最初に初期セットが入った時刻を保つ', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  try {
+    const { starterDistributionPlan, distributeStarter } = await import('./style-starter-distribution.js');
+    vi.setSystemTime(new Date('2026-10-01T00:00:00Z'));
+    const choice = await catalog('tag', tag());
+    await set([choice]);
+    const first = await initializeAccountStyle(sql.db, 'a', 't', 'admin', 'standard');
+    expect(first.catalogApplication?.items[0].state).toBe('succeeded');
+    const getTimes = () => sql.raw.prepare(`SELECT s.first_starter_at, i.updated_at, i.distribution_run_id, i.state
+      FROM account_styles s JOIN style_starter_catalog_items i ON i.line_account_id=s.line_account_id
+      WHERE s.line_account_id='a' AND i.template_id=?`).get(choice.templateId) as {
+        first_starter_at: string; updated_at: string; distribution_run_id: string; state: string;
+      };
+    const before = getTimes();
+    expect(before).toMatchObject({ first_starter_at: '2026-10-01T00:00:00.000Z', updated_at: '2026-10-01T00:00:00.000Z', state: 'succeeded' });
+    expect(before.distribution_run_id).toBeTruthy();
+    sql.raw.exec("UPDATE tags SET description='店で編集',version=version+1 WHERE line_account_id='a'");
+    const saved = await saveTemplate(sql.db, authority, { name:'新版', definition:tag(), expectedRevision:revision(choice.templateId) }, choice.templateId);
+    await set([{...choice, versionId:saved.template.current_version_id!}], true, 1);
+    vi.setSystemTime(new Date('2026-10-02T00:00:00Z'));
+    const input = {expectedVersion:2, target:{accountIds:['a']}};
+    const plan = await starterDistributionPlan(sql.db, 't', 'standard', input);
+    expect(plan.editedCount).toBe(1);
+    const result = await distributeStarter(sql.db, 't', 'owner', 'standard', {...input, confirmed:true, token:plan.token, editedAction:'new_copy'});
+    expect(result.items).toEqual(expect.arrayContaining([expect.objectContaining({accountId:'a', key:choice.templateId, action:'created'})]));
+    const after = getTimes();
+    expect(after.state).toBe('succeeded');
+    expect(after.distribution_run_id).toBeTruthy();
+    expect(after.distribution_run_id).not.toBe(before.distribution_run_id);
+    expect(after.updated_at).toBe('2026-10-02T00:00:00.000Z');
+    expect(after.first_starter_at).toBe(before.first_starter_at);
+    expect(sql.raw.prepare("SELECT COUNT(*) n FROM tags WHERE line_account_id='a'").get()).toEqual({n:2});
+  } finally { vi.useRealTimers(); }
+});

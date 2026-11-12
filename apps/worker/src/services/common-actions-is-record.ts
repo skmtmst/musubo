@@ -88,6 +88,7 @@ export interface CommonActionVersion {
 
 export interface CommonActionBinding {
   id: string;
+  confirmationRevision: number;
   consumerType: string;
   consumerId: string;
   consumerPath: string;

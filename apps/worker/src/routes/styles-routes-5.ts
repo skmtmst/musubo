@@ -93,7 +93,7 @@ styles.patch(base + '/restaurant-reservations/:id', async (c) => {
   )
     throw new StyleError('staff_not_found', 404);
   const r = await c.env.DB.prepare(
-    `UPDATE rt_reservations SET staff_id=?,customer_version=customer_version+1,updated_at=? WHERE id=? AND customer_version=? AND store_id IN(SELECT id FROM rt_stores WHERE line_account_id=?)`,
+    `UPDATE rt_reservations SET confirmation_revision = confirmation_revision + 1, staff_id=?,customer_version=customer_version+1,updated_at=? WHERE id=? AND customer_version=? AND store_id IN(SELECT id FROM rt_stores WHERE line_account_id=?)`,
   )
     .bind(
       staffId,

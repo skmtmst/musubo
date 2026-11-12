@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import { activatePlatformAdminIfAwaitingTotp } from '@line-crm/db';
+import { activatePlatformAdminIfAwaitingTotp, revealPiiForImpersonation, switchImpersonationToWrite } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
@@ -44,8 +44,8 @@ function environment(): Env['Bindings'] {
   return { TOTP_ENCRYPTION_KEY: 'fixture-encryption-key-longer-than-thirty-two-characters', DB: testDb.db, ADMIN_ORIGIN: 'https://admin.example.com', ADMIN_PUBLIC_URL: 'https://admin.example.com', WORKER_URL: 'https://admin.example.com' } as Env['Bindings'];
 }
 
-const master: AuthenticatedStaff = { id: 'master-1', name: '坂本 真人', role: 'owner', readOnly: false, tenantId: null };
-const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '山田 太郎', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
+const master: AuthenticatedStaff = { id: 'master-1', name: '見本 25', role: 'owner', readOnly: false, tenantId: null };
+const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '見本 141', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
 const readOnlyMaster: AuthenticatedStaff = { ...master, id: 'master-ro', readOnly: true };
 
 it('契約先詳細の4枠は対象組織のアカウントと保存済み値だけを集計し、未取得を0にしない',async()=>{
@@ -65,10 +65,10 @@ beforeEach(async () => {
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status) VALUES (?, ?, 'active')`).run('tenant-a', '株式会社サンプル');
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status) VALUES (?, ?, 'archived')`).run('tenant-z', 'テスト法人');
   for (const [id, name, tenant] of [
-    ['master-1', '坂本 真人', null],
+    ['master-1', '見本 25', null],
     ['master-2', 'Kyohei Yamamoto', null],
     ['master-ro', '閲覧のみ', null],
-    ['owner-1', '山田 太郎', 'tenant-a'],
+    ['owner-1', '見本 141', 'tenant-a'],
   ] as const) {
     testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES (?, ?, 'owner', ?, ?)`)
       .run(id, name, `${id}-key`, tenant);
@@ -185,6 +185,27 @@ describe('契約先の機能パック（飲食店機能）', () => {
 });
 
 describe('代理ログイン', () => {
+  it('更新直前に終わった代理ログインは変更も個人情報の表示記録も作らない', async () => {
+    const first = await app(master).request('/api/ops/impersonation/start', json({ tenantId: 'tenant-a' }), environment());
+    const old = await first.json() as { data: { id: string } };
+    await app(master).request('/api/ops/impersonation/end', json({}), environment());
+    expect(await switchImpersonationToWrite(testDb.db, old.data.id, '問い合わせの確認')).toBe(false);
+    expect(await revealPiiForImpersonation(testDb.db, { impersonationSessionId: old.data.id, staffId: master.id, tenantId: 'tenant-a', reason: '問い合わせの確認' })).toBeNull();
+    expect((testDb.raw.prepare('SELECT COUNT(*) AS c FROM pii_reveal_logs').get() as { c: number }).c).toBe(0);
+  });
+  it.each(['/api/ops/impersonation/write', '/api/ops/impersonation/pii-reveal'])('%s は確認時と別の代理ログインを変更しない', async (path) => {
+    const first = await app(master).request('/api/ops/impersonation/start', json({ tenantId: 'tenant-a' }), environment());
+    const old = await first.json() as { data: { id: string } };
+    const second = await app(master).request('/api/ops/impersonation/start', json({ tenantId: 'tenant-a' }), environment());
+    const current = await second.json() as { data: { id: string } };
+    const conflict = await app(master).request(path, json({ reason: '確認のため調べます', expectedSessionId: old.data.id }), environment());
+    expect(conflict.status).toBe(409);
+    const row = testDb.raw.prepare('SELECT mode, pii_revealed FROM impersonation_sessions WHERE id = ?').get(current.data.id) as { mode: string; pii_revealed: number };
+    expect(row).toEqual({ mode: 'read', pii_revealed: 0 });
+    expect((testDb.raw.prepare('SELECT COUNT(*) AS c FROM pii_reveal_logs').get() as { c: number }).c).toBe(0);
+    const accepted = await app(master).request(path, json({ reason: '確認のため調べます', expectedSessionId: current.data.id }), environment());
+    expect(accepted.status).toBe(200);
+  });
   it('既定は閲覧のみで始まり、契約先側の履歴には出ない', async () => {
     const res = await app(master).request('/api/ops/impersonation/start', json({ tenantId: 'tenant-a' }), environment());
     expect(res.status).toBe(200);
@@ -257,13 +278,13 @@ describe('運営メンバー', () => {
   });
 
   it('新しいメールを招待すると、運営会社の権限者が作られ招待メールが届く。2要素認証が終わるまで運営マスターではない', async () => {
-    const invited = await app(master).request('/api/ops/members', json({ email: 'Hanako@Example.jp' }), environment());
+    const invited = await app(master).request('/api/ops/members', json({ email: 'Hanako@Example.com' }), environment());
     expect(invited.status).toBe(201);
     const body = await invited.json() as { data: { staffId: string; activationState: string } };
     expect(body.data.activationState).toBe('invited');
     expect(mail.sendPlainMail).toHaveBeenCalledTimes(1);
     const message = mail.sendPlainMail.mock.calls[0]![1] as { to: string; subject: string; body: string };
-    expect(message.to).toBe('hanako@example.jp');
+    expect(message.to).toBe('hanako@example.com');
     expect(message.subject).toBe('【musubo】運営コンソールへの招待');
     const token = message.body.match(/#invite=([^\s]+)/)?.[1] ?? '';
     expect(token.length).toBeGreaterThan(20);
@@ -286,8 +307,8 @@ describe('運営メンバー', () => {
     // 招待を受ける（名前とパスワードを設定）→ 2要素認証待ち
     const check = await publicApp().request(`/api/auth/ops-invite/check?token=${encodeURIComponent(token)}`, {}, environment());
     expect(check.status).toBe(200);
-    expect((await check.json() as { data: { needsPassword: boolean; email: string } }).data).toMatchObject({ needsPassword: true, email: 'hanako@example.jp' });
-    const accepted = await publicApp().request('/api/auth/ops-invite/accept', json({ token, name: '山田 花子', password: 'Str0ng-Passw0rd!' }), environment());
+    expect((await check.json() as { data: { needsPassword: boolean; email: string } }).data).toMatchObject({ needsPassword: true, email: 'hanako@example.com' });
+    const accepted = await publicApp().request('/api/auth/ops-invite/accept', json({ token, name: '見本 143', password: 'Str0ng-Passw0rd!' }), environment());
     expect(accepted.status, await accepted.clone().text()).toBe(200);
     const acceptance = await accepted.json() as { data: { next: string; challengeToken: string } };
     expect(acceptance.data.next).toBe('two-factor-setup');
@@ -305,7 +326,7 @@ describe('運営メンバー', () => {
   });
 
   it('招待中の人には招待メールを送り直せる。登録完了の人には送れない', async () => {
-    const invited = await app(master).request('/api/ops/members', json({ email: 'taro@example.jp' }), environment());
+    const invited = await app(master).request('/api/ops/members', json({ email: 'taro@example.com' }), environment());
     const { data } = await invited.json() as { data: { staffId: string } };
     const resent = await app(master).request(`/api/ops/members/${data.staffId}/resend-invite`, json({}), environment());
     expect(resent.status).toBe(200);
@@ -313,7 +334,7 @@ describe('運営メンバー', () => {
     const first = (mail.sendPlainMail.mock.calls[0]![1] as { body: string }).body.match(/#invite=([^\s]+)/)?.[1] ?? '';
     // 前のリンクは失効
     expect((await publicApp().request(`/api/auth/ops-invite/check?token=${encodeURIComponent(first)}`, {}, environment())).status).toBe(410);
-    testDb.raw.prepare(`UPDATE staff_members SET email = 'kyohei@example.jp' WHERE id = 'master-2'`).run();
+    testDb.raw.prepare(`UPDATE staff_members SET email = 'kyohei@example.com' WHERE id = 'master-2'`).run();
     const done = await app(master).request('/api/ops/members/master-2/resend-invite', json({}), environment());
     expect(done.status).toBe(400);
   });
@@ -349,7 +370,7 @@ describe('伏せ字と禁止操作', () => {
   it('氏名・連絡先・本文を伏せ、構造は変えない', () => {
     const masked = maskPiiDeep({
       success: true,
-      data: [{ id: 'friend-1041', display_name: '山田 太郎', picture_url: 'https://x/y.png', last_message: 'こんにちは', tags: [{ id: 't1', name: 'VIP' }] }],
+      data: [{ id: 'friend-1041', display_name: '見本 141', picture_url: 'https://x/y.png', last_message: 'こんにちは', tags: [{ id: 't1', name: 'VIP' }] }],
     }) as { data: Array<{ display_name: string; picture_url: string; last_message: string; tags: Array<{ name: string }> }> };
     expect(masked.data[0].display_name).toBe('友だち#1041');
     expect(masked.data[0].picture_url).toBe('');

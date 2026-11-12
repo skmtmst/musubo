@@ -76,7 +76,7 @@ async function industryRows(
     const meet = (
       await db
         .prepare(
-          `SELECT m.id,m.updated_at updatedAt,'meet' kind,m.friend_id friendId,m.friend_id personKey,f.display_name name,m.starts_at startsAt,m.ends_at endsAt,
+          `SELECT m.id,m.confirmation_revision version,m.updated_at updatedAt,'meet' kind,m.friend_id friendId,m.friend_id personKey,f.display_name name,m.starts_at startsAt,m.ends_at endsAt,
       m.created_at requestedAt,CASE WHEN m.attendance='no_show' THEN 'no_show' WHEN m.status='confirmed' THEN 'confirmed' ELSE m.status END status,
       m.staff_id staffId,(m.status='completed' OR m.attendance IN('visited','late')) visited,m.attendance,'online' meetingMode,m.meet_url meetingUrl,m.consultation_outcome outcome,f.ref_code refCode
       FROM meet_consultations m JOIN friends f ON f.id=m.friend_id WHERE f.line_account_id=?

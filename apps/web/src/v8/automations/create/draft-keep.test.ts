@@ -23,7 +23,7 @@ const detail = {
     {
       id: 'a2',
       type: 'notify_staff' as unknown as 'add_tag',
-      params: { notificationRuleId: 'rule-1', message: '河野・坂本に LINE で' },
+      params: { notificationRuleId: 'rule-1', message: '見本・坂本に LINE で' },
       onFailure: 'stop' as const,
     },
   ],
@@ -38,7 +38,7 @@ describe('下書きを仕上げる：担当へ知らせるを保つ', () => {
     expect(payload[1]).toEqual({
       id: 'a2',
       type: 'notify_staff',
-      params: { notificationRuleId: 'rule-1', message: '河野・坂本に LINE で' },
+      params: { notificationRuleId: 'rule-1', message: '見本・坂本に LINE で' },
       onFailure: 'stop',
     })
     expect(payload[0]).toMatchObject({ type: 'add_tag', params: { tagId: 'tag-1' } })

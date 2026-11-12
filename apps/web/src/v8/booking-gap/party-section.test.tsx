@@ -10,9 +10,9 @@ const cancelGroup = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api/helpers/booking-advanced', () => ({ bookingAdvancedApi: { cancelGroup } }))
 const { default: PartySection } = await import('./party-section')
 
-const party: BookingParty = { groupId: 'g1', ownerName: '山田 花子', version: 2, members: [
-  { bookingId: 'b1', label: 'チョコ', menuName: '爪切り', staffName: 'Kenta', startsAt: '2026-10-01T04:30:00.000Z', endsAt: '2026-10-01T04:45:00.000Z', status: 'confirmed' },
-  { bookingId: 'b2', label: 'マロン', menuName: 'トリミング（中型犬）', staffName: '佐々木', startsAt: '2026-10-01T04:00:00.000Z', endsAt: '2026-10-01T05:30:00.000Z', status: 'confirmed' },
+const party: BookingParty = { groupId: 'g1', ownerName: '見本 143', version: 2, members: [
+  { bookingId: 'b1', label: 'チョコ', menuName: '爪切り', staffName: 'Kenta', startsAt: '2026-10-01T04:30:00.000Z', endsAt: '2026-10-01T04:45:00.000Z', status: 'confirmed', version: 1 },
+  { bookingId: 'b2', label: 'マロン', menuName: 'トリミング（中型犬）', staffName: '佐々木', startsAt: '2026-10-01T04:00:00.000Z', endsAt: '2026-10-01T05:30:00.000Z', status: 'confirmed', version: 1 },
 ] }
 beforeEach(() => rememberStaffIdentity({ id: 'owner', role: 'owner' } as StaffMember))
 afterEach(() => { cleanup(); forgetStaffIdentity(); vi.clearAllMocks() })
@@ -52,7 +52,7 @@ test('実APIの組IDと版を使い、理由の確認後だけまとめて取り
   fireEvent.change(screen.getByRole('textbox', { name: '取り消す理由' }), { target: { value: '予定の変更' } })
   fireEvent.click(confirm)
   await waitFor(() => expect(changed).toHaveBeenCalledOnce())
-  expect(cancelGroup).toHaveBeenCalledWith('account-1', 'g1', '予定の変更', 2)
+  expect(cancelGroup).toHaveBeenCalledWith('account-1', 'g1', '予定の変更', 2, [{ bookingId: 'b1', version: 1, status: 'confirmed' }, { bookingId: 'b2', version: 1, status: 'confirmed' }])
 })
 
 test('確認中に対象アカウントや組が変われば古い取消を閉じる', () => {
@@ -142,7 +142,7 @@ test('版が変わると最新の対象を示し、理由を保って再確認�
   expect(cancelGroup).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: '最新の内容を確認しました' }))
   fireEvent.click(confirm)
-  await waitFor(() => expect(cancelGroup).toHaveBeenCalledWith('account-1', 'g1', '予定の変更', 3))
+  await waitFor(() => expect(cancelGroup).toHaveBeenCalledWith('account-1', 'g1', '予定の変更', 3, [{ bookingId: 'b1', version: 1, status: 'confirmed' }, { bookingId: 'b2', version: 1, status: 'confirmed' }]))
 })
 
 
@@ -164,5 +164,29 @@ test('版変更と権限喪失が重なれば再確認も取消もできない',
   rerender(<PartySection party={{ ...party, version: 3 }} canOperate={false} accountId="account-1" currentBookingId="b1" />)
   expect(screen.queryByRole('button', { name: '最新の内容を確認しました' })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'まとめて取り消す' }))
+  expect(cancelGroup).not.toHaveBeenCalled()
+})
+
+
+test('組の版が同じでも個別予約の版が変わると再確認まで送らない', () => {
+  const { rerender } = render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" />)
+  fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '取り消す理由' }), { target: { value: '予定の変更' } })
+  rerender(<PartySection party={{ ...party, members: [{ ...party.members[0], version: 2 }, party.members[1]] }} canOperate accountId="account-1" currentBookingId="b1" />)
+  expect((screen.getByRole('button', { name: 'まとめて取り消す' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.getByRole('alertdialog').textContent).toContain('最新の内容を確認してください')
+  expect(cancelGroup).not.toHaveBeenCalled()
+})
+
+test('閉じた組の取消確認を保持しても取り消さない', () => {
+  render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" />)
+  fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '取り消す理由' }), { target: { value: '予定の変更' } })
+  const button = screen.getByRole('button', { name: 'まとめて取り消す' })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const held = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  fireEvent.click(screen.getByRole('button', { name: '破棄する' }))
+  held()
   expect(cancelGroup).not.toHaveBeenCalled()
 })

@@ -1,6 +1,6 @@
 /** 動画指定は自由な R2 prefix を受け付けず、同じアカウントの kind=video の登録メディアからキーを解決する。実 route・認証・SQLite で検証し、R2 自体へは触れない。 */
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -111,6 +111,42 @@ beforeEach(async () => {
   ({ webinarRoutes } = await import('./webinars.js'));
 });
 
+describe('ウェビナー停止時の版競合', () => {
+  test('版確認後に設定が変わったら停止しない', async () => {
+    expect((await put(WEBINAR_A, KEY_OWNER, { title: '確認前' })).status).toBe(200);
+    sqlite.raw.prepare("UPDATE webinars SET status='active' WHERE id=?").run(WEBINAR_A);
+    const expected = (sqlite.raw.prepare('SELECT version FROM webinar_editor_settings WHERE webinar_id=?').get(WEBINAR_A) as {version:number}).version;
+    const prepare = sqlite.db.prepare.bind(sqlite.db);
+    let intercepted = false;
+    vi.spyOn(sqlite.db, 'prepare').mockImplementation(sql => {
+      if (!intercepted && sql.includes('UPDATE webinars SET account_id')) {
+        intercepted = true;
+        sqlite.raw.prepare('UPDATE webinar_editor_settings SET version=version+1 WHERE webinar_id=?').run(WEBINAR_A);
+      }
+      return prepare(sql);
+    });
+    const response = await app().request(`/api/webinars/${WEBINAR_A}/pause`, {
+      method: 'POST', headers: { Authorization: `Bearer ${KEY_OWNER}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: expected }),
+    }, env());
+    expect(intercepted).toBe(true);
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({ currentVersion: expected + 1, currentStatus: 'active' });
+    expect((sqlite.raw.prepare('SELECT status FROM webinars WHERE id=?').get(WEBINAR_A) as {status:string}).status).toBe('active');
+  });
+});
+
+test('停止の直前に保管されたウェビナーは下書きに戻さない', async () => {
+  expect((await put(WEBINAR_A, KEY_OWNER, { title: '確認前' })).status).toBe(200);
+  sqlite.raw.prepare("UPDATE webinars SET status='active' WHERE id=?").run(WEBINAR_A);
+  const version = (sqlite.raw.prepare('SELECT version FROM webinar_editor_settings WHERE webinar_id=?').get(WEBINAR_A) as {version:number}).version;
+  const prepare=sqlite.db.prepare.bind(sqlite.db);let intercepted=false;
+  vi.spyOn(sqlite.db,'prepare').mockImplementation(sql=>{if(!intercepted&&sql.includes('UPDATE webinars SET account_id')){intercepted=true;sqlite.raw.prepare("UPDATE webinars SET status='archived' WHERE id=?").run(WEBINAR_A)}return prepare(sql)});
+  const response=await app().request(`/api/webinars/${WEBINAR_A}/pause`,{method:'POST',headers:{Authorization:`Bearer ${KEY_OWNER}`,'Content-Type':'application/json'},body:JSON.stringify({expectedVersion:version})},env());
+  expect(intercepted).toBe(true);expect(response.status).toBe(409);
+  expect(sqlite.raw.prepare('SELECT status FROM webinars WHERE id=?').get(WEBINAR_A)).toEqual({status:'archived'});
+});
+
 describe('ウェビナー動画のメディア選択 (N-115)', () => {
   test('同じアカウントの動画メディアを選ぶと、保存値はそのr2_keyになる', async () => {
     const res = await put(WEBINAR_A, KEY_OWNER, { videoMediaId: MEDIA_VIDEO_A });
@@ -192,5 +228,37 @@ describe('ウェビナー動画のメディア選択 (N-115)', () => {
     const res = await put(WEBINAR_A, KEY_STAFF_B, { videoMediaId: MEDIA_VIDEO_B });
     expect(res.status).toBe(404);
     expect(savedPrefix(WEBINAR_A)).toBeNull();
+  });
+});
+
+describe('ウェビナー公開時の版競合', () => {
+  test('更新直前に版が変われば公開状態も公開版も変えない', async () => {
+    expect((await put(WEBINAR_A, KEY_OWNER, { title: '確認前' })).status).toBe(200);
+    const { publishWebinarAndActivate } = await import('@line-crm/db');
+    const version = (sqlite.raw.prepare('SELECT version FROM webinar_editor_settings WHERE webinar_id=?').get(WEBINAR_A) as {version:number}).version;
+    const batch = sqlite.db.batch.bind(sqlite.db); let intercepted = false;
+    vi.spyOn(sqlite.db, 'batch').mockImplementation(async statements => {
+      if (!intercepted) {
+        intercepted = true;
+        sqlite.raw.prepare('UPDATE webinar_editor_settings SET version=version+1 WHERE webinar_id=?').run(WEBINAR_A);
+        sqlite.raw.prepare("INSERT INTO webinar_versions(id,webinar_id,version,state,snapshot_json,created_at) SELECT 'race-snapshot',webinar_id,version+1,'draft',snapshot_json,created_at FROM webinar_versions WHERE webinar_id=? AND version=?").run(WEBINAR_A, version);
+      }
+      return batch(statements);
+    });
+    expect(await publishWebinarAndActivate(sqlite.db, WEBINAR_A, version)).toBe(false);
+    expect(intercepted).toBe(true);
+    expect(sqlite.raw.prepare('SELECT status FROM webinars WHERE id=?').get(WEBINAR_A)).toEqual({status:'draft'});
+    expect(sqlite.raw.prepare('SELECT published_version FROM webinar_editor_settings WHERE webinar_id=?').get(WEBINAR_A)).toEqual({published_version:null});
+    expect(sqlite.raw.prepare("SELECT COUNT(*) n FROM webinar_versions WHERE webinar_id=? AND state='published'").get(WEBINAR_A)).toEqual({n:0});
+  });
+  test('一致した公開だけ状態と公開版が同時に進み、同じ確認は再利用できない', async () => {
+    expect((await put(WEBINAR_A, KEY_OWNER, { title: '確認前' })).status).toBe(200);
+    const { publishWebinarAndActivate } = await import('@line-crm/db');
+    const version = (sqlite.raw.prepare('SELECT version FROM webinar_editor_settings WHERE webinar_id=?').get(WEBINAR_A) as {version:number}).version;
+    expect(await publishWebinarAndActivate(sqlite.db, WEBINAR_A, version)).toBe(true);
+    expect(sqlite.raw.prepare('SELECT status FROM webinars WHERE id=?').get(WEBINAR_A)).toEqual({status:'active'});
+    expect(sqlite.raw.prepare('SELECT version,published_version FROM webinar_editor_settings WHERE webinar_id=?').get(WEBINAR_A)).toEqual({version:version+1,published_version:version});
+    expect(sqlite.raw.prepare('SELECT version,state FROM webinar_versions WHERE webinar_id=? ORDER BY version').all(WEBINAR_A)).toEqual([{version,state:'published'},{version:version+1,state:'draft'}]);
+    expect(await publishWebinarAndActivate(sqlite.db, WEBINAR_A, version)).toBe(false);
   });
 });

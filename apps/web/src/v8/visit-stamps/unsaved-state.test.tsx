@@ -69,7 +69,7 @@ beforeEach(() => {
   fx.reviewPaper.mockResolvedValue({ success: true, data: { id: 'p1', status: 'approved' } })
   fx.wallet.mockResolvedValue({ success: true, data: { wallet: { cardId: 'card-1', friendId: 'f1', balance: 3, earnedTotal: 3, expiresAt: null }, entries: [] } })
   fx.grant.mockResolvedValue({ success: true, data: {} })
-  fx.friendsList.mockResolvedValue({ success: true, data: { items: [{ id: 'f1', displayName: 'みさき', metadata: { name: '鈴木 美咲' } }] } })
+  fx.friendsList.mockResolvedValue({ success: true, data: { items: [{ id: 'f1', displayName: 'みさき', metadata: { name: '見本 183' } }] } })
   fx.friendsGet.mockImplementation(async (id: string) => ({ success: true, data: { id, displayName: 'みさき' } }))
   fx.staffList.mockResolvedValue({ success: true, data: [{ id: 's1', name: '田村', role: 'staff' }] })
   fx.entries.mockResolvedValue({ success: true, data: { items: [

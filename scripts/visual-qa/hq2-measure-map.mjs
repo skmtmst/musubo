@@ -7,7 +7,7 @@ const map = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
 for (const id of ['B24oNg', 'I0w2e', 'UcBQ5', 'iMnph', 'rI5uh', 'zOpMG', 'p03ImY']) {
   delete map.boards[id].state.manual
 }
-map.boards.BHEl9.state.click = ['佐野 直人さんの権限を変更']
+map.boards.BHEl9.state.click = ['見本 31さんの権限を変更']
 map.boards.I0w2e.state.click = ['アーカイブ']
 map.boards.X4JcOf.state.click = ['テンプレート「秋の新商品のお知らせ」の操作', '編集']
 map.boards.meBRB.state.click = ['秋の新商品のお知らせを配る']

@@ -48,7 +48,7 @@ const BOOKING = {
   price_at_booking: 8800,
   menu_name: '秋の鹿肉コース',
   staff_name: '佐藤',
-  friend_name: '鈴木 真理',
+  friend_name: '見本 182',
   requested_at: '2026-10-01T10:00:00+09:00',
   decided_at: null,
   external_event_id: null,
@@ -98,7 +98,7 @@ describe('予約の詳細のV8（AjZhH）', () => {
     await act(async () => undefined)
     // 小窓は portal で body 直下へ移る。
     expect(document.querySelector('[data-design-node="AjZhH"]')).not.toBeNull()
-    expect(document.body.textContent).toContain('鈴木 真理さん')
+    expect(document.body.textContent).toContain('見本 182さん')
     expect(document.body.textContent).toContain('秋の鹿肉コース')
     expect(document.body.textContent).toContain('3回')
     expect(document.querySelector('[role="dialog"] button[aria-label="閉じる"]')).not.toBeNull()

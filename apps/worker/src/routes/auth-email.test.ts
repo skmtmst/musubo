@@ -99,7 +99,7 @@ beforeEach(() => {
   turnstile.result = { ok: true };
 });
 
-const validRequest = { email: 'Owner@Example.com', companyName: '株式会社サンプル', contactName: '山田 太郎', phone: '03-1234-5678', referralSource: 'インターネット検索', turnstileToken: 'tok', agreed: true };
+const validRequest = { email: 'Owner@Example.com', companyName: '株式会社サンプル', contactName: '見本 141', phone: '03-0000-5678', referralSource: 'インターネット検索', turnstileToken: 'tok', agreed: true };
 
 async function issueApprovedInvite(): Promise<string> {
   const application = testDb.raw.prepare('SELECT id FROM registration_applications WHERE email = ?').get('owner@example.com') as { id: string };
@@ -178,12 +178,12 @@ describe('会員登録（36-4）', () => {
 
     const check = await call('GET', `/api/auth/register/check?token=${encodeURIComponent(token)}`);
     expect(check.status).toBe(200);
-    expect((await json(check)).data).toEqual({ email: 'owner@example.com', trialDays: 30, companyName: '株式会社サンプル', contactName: '山田 太郎' });
+    expect((await json(check)).data).toEqual({ email: 'owner@example.com', trialDays: 30, companyName: '株式会社サンプル', contactName: '見本 141' });
 
     const completed = await call('POST', '/api/auth/register/complete', {
       token,
       tenantName: '株式会社サンプル',
-      name: '山田 太郎',
+      name: '見本 141',
       password: 'StrongPassword1!',
     });
     expect(completed.status).toBe(200);
@@ -302,7 +302,7 @@ describe('メール＋パスワードのログイン', () => {
   async function seedOwner(overrides: Record<string, unknown> = {}) {
     const hash = await hashPassword('Abcdefg1');
     testDb.raw
-      .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, password_hash, tenant_id) VALUES ('s1', '山田 太郎', 'owner@example.com', 'owner', 'key-1', ?, ?, ?)`)
+      .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, password_hash, tenant_id) VALUES ('s1', '見本 141', 'owner@example.com', 'owner', 'key-1', ?, ?, ?)`)
       .run((overrides.is_active as number) ?? 1, hash, (overrides.tenant_id as string | null) ?? null);
   }
 
@@ -429,7 +429,7 @@ describe('メール＋パスワードのログイン', () => {
 describe('パスワード再設定（36-6）', () => {
   it('メールの URL から新しいパスワードを設定でき、古いセッションは消える', async () => {
     const hash = await hashPassword('Abcdefg1');
-    testDb.raw.prepare(`INSERT INTO staff_members (id, name, email, role, api_key, password_hash) VALUES ('s1', '山田 太郎', 'owner@example.com', 'owner', 'key-1', ?)`).run(hash);
+    testDb.raw.prepare(`INSERT INTO staff_members (id, name, email, role, api_key, password_hash) VALUES ('s1', '見本 141', 'owner@example.com', 'owner', 'key-1', ?)`).run(hash);
     testDb.raw.prepare(`INSERT INTO admin_sessions (token_hash, staff_id, expires_at) VALUES ('old', 's1', '2099-01-01T00:00:00.000Z')`).run();
 
     const forgot = await call('POST', '/api/auth/password/forgot', { email: 'owner@example.com', turnstileToken: 'tok' });

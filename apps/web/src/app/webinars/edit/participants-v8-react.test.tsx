@@ -50,7 +50,7 @@ const ANALYTICS = {
 const ITEMS = [
   {
     friendId: 'friend-1',
-    friendName: 'Kenta Kawano',
+    friendName: 'Demo Person',
     pictureUrl: null,
     sessions: 2,
     firstJoinedAt: '2026-09-30T10:00:00+09:00',
@@ -68,7 +68,7 @@ const ITEMS = [
   },
   {
     friendId: 'friend-2',
-    friendName: '山田 太郎',
+    friendName: '見本 141',
     pictureUrl: null,
     sessions: 0,
     firstJoinedAt: null,
@@ -125,9 +125,9 @@ describe('参加者管理のV8（uNsEy）', () => {
     for (const label of ['申込', '視聴完了', '途中で離れた', '見ていない']) {
       expect(host.textContent).toContain(label)
     }
-    expect(host.textContent).toContain('Kenta Kawano')
+    expect(host.textContent).toContain('Demo Person')
     // 行の右端は「…」（決まり：ボタンを並べない）。開くと「チャットを見る」でトークへ行ける。
-    await act(async () => { (host.querySelector('button[aria-label="Kenta Kawanoの操作"]') as HTMLButtonElement).click() })
+    await act(async () => { (host.querySelector('button[aria-label="Demo Personの操作"]') as HTMLButtonElement).click() })
     const detail = document.querySelector('a[href="/chats?friend=friend-1"]')
     expect(detail).not.toBeNull()
     expect(detail!.textContent).toContain('チャットを見る')
@@ -155,9 +155,9 @@ describe('参加者管理のV8（uNsEy）', () => {
     await act(async () => { [...host.querySelectorAll('button')].find((el) => el.textContent === '続きを読み込む')!.click() })
     await act(async () => { [...host.querySelectorAll('button')].find((el) => el.textContent?.includes('視聴完了') && el.hasAttribute('aria-pressed'))!.click() })
     await act(async () => { resolveMore({ data: { items: [{ ...ITEMS[0], friendId: 'old', friendName: '古い条件の参加者' }], nextCursor: null } }) })
-    expect(host.textContent).toContain('山田 太郎')
+    expect(host.textContent).toContain('見本 141')
     expect(host.textContent).not.toContain('古い条件の参加者')
-    expect(host.textContent).not.toContain('Kenta Kawano')
+    expect(host.textContent).not.toContain('Demo Person')
   })
 
 })

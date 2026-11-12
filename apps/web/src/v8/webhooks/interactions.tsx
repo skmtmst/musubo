@@ -252,10 +252,11 @@ export default function WebhooksInteractionsV8() {
     const accountId = target?.accountId ?? selectedAccountId
     const scope = target?.scope ?? accountScopeRef.current
     if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId || accountScopeRef.current !== scope) return
+    if (!item.confirmationRevision || !item.webhookRevision) { setNotice('送り直しを受け付けられませんでした。状態を読み直してからお試しください。'); return false }
     setRetrying(item.id)
     setNotice('')
     try {
-      const response = await api.webhooks.interactions.retry(item.id, accountId, { confirmed })
+      const response = await api.webhooks.interactions.retry(item.id, accountId, { confirmed, interactionRevision: item.confirmationRevision, webhookRevision: item.webhookRevision })
       if (accountRef.current !== accountId || accountScopeRef.current !== scope) return
       if (!response.success) throw new Error(response.error)
       if (response.data.status === 'succeeded') notifyToast(`「${item.webhookName}」へもう一度送り、届いたことを確認しました。`)

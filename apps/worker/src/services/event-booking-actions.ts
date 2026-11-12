@@ -52,7 +52,7 @@ export async function executeEventBookingAction(context: AutomationActionContext
     if (!targets.results?.length) stop('event_booking_missing', '取り消す申し込みがありません')
     for (const target of targets.results) {
       if (target.status !== 'cancelled') {
-        const changed = await db.prepare(`UPDATE event_bookings SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'system', updated_at = ?,
+        const changed = await db.prepare(`UPDATE event_bookings SET confirmation_revision = confirmation_revision + 1, status = 'cancelled', cancelled_at = ?, cancelled_by = 'system', updated_at = ?,
           internal_note = COALESCE(internal_note || char(10), '') || ? WHERE id = ? AND status = ?`)
           .bind(now, now, marker, target.id, target.status).run()
         if (!changed.meta?.changes) stop('event_booking_changed', '申し込みが変更されたため取り消せません')
@@ -62,7 +62,7 @@ export async function executeEventBookingAction(context: AutomationActionContext
           friendId: friend.id, startsAtIso: target.starts_at, lineAccountId, cancelReason: marker, failOnSendInFlight: true })
       } catch (error) {
         if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT' && target.status !== 'cancelled') {
-          await db.prepare(`UPDATE event_bookings SET status = ?, cancelled_at = NULL, cancelled_by = NULL,
+          await db.prepare(`UPDATE event_bookings SET confirmation_revision = confirmation_revision + 1, status = ?, cancelled_at = NULL, cancelled_by = NULL,
             internal_note = replace(internal_note, ?, '') WHERE id = ? AND status = 'cancelled'`)
             .bind(target.status, marker, target.id).run()
         }

@@ -117,6 +117,16 @@ describe('現行V8の公開確認と専用API', () => {
     expect(fixture.publish).not.toHaveBeenCalled()
   })
 
+  it('公開前検査の版が編集画面の版と違う場合は公開しない', async () => {
+    fixture.validation.mockResolvedValue({ data: { version: 6, checks: [{ key: 'video_ready', label: '動画の準備', status: 'passed', detail: null }], blockers: [], warnings: [] } })
+    renderReview()
+    await screen.findByText('動画の準備')
+    const publish=screen.getByRole('button', { name: 'この版を公開' }) as HTMLButtonElement
+    expect(publish.disabled).toBe(true)
+    fireEvent.click(publish)
+    expect(fixture.publish).not.toHaveBeenCalled()
+  })
+
   it('公開前検査の取得失敗では公開せず、再読込から復帰できる', async () => {
     fixture.validation.mockRejectedValueOnce(new Error('unavailable'))
     renderReview()

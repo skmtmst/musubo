@@ -1,3 +1,4 @@
+import { enqueueConfirmedNenColumn, NenColumnConfirmationConflict, nenColumnConfirmation } from '../services/nen-column-confirmation.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { verifyNenWebhook } from '../lib/hmac.js';
@@ -404,7 +405,7 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireDeli
   if (typeof accountId !== 'string') return accountId;
   const key = c.req.param('campaignKey');
   if (!CAMPAIGN_KEYS.has(key)) return inputError(c, { success: false, error: 'Invalid campaign' }, 400, []);
-  const body = await c.req.json<{ isEnabled?: unknown }>().catch(() => null);
+  const body = await c.req.json<{ isEnabled?: unknown; expectedUpdatedAt?: unknown }>().catch(() => null);
   if (!body || typeof body.isEnabled !== 'boolean') {
     return inputError(c, { success: false, error: 'isEnabled is required' }, 400, ["isEnabled"]);
   }
@@ -423,13 +424,34 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireDeli
       }, 409);
     }
   }
-  await saveNenCampaignAccountSetting(c.env.DB, accountId, {
-    ...current,
-    is_enabled: body.isEnabled ? 1 : 0,
-    updated_at: jstNow(),
-  });
+  let writtenVersion: string | null = null;
+  if (body.expectedUpdatedAt !== undefined && (typeof body.expectedUpdatedAt !== 'string' || !body.expectedUpdatedAt)) {
+    return inputError(c, { success: false, error: 'Invalid expectedUpdatedAt' }, 400, ['expectedUpdatedAt']);
+  }
+  if (body.expectedUpdatedAt === undefined) {
+    await saveNenCampaignAccountSetting(c.env.DB, accountId, { ...current, is_enabled: body.isEnabled ? 1 : 0 });
+  } else {
+    const settingKey = `nen.campaign.${key}`;
+    const saved = await c.env.DB.prepare('SELECT value FROM account_settings WHERE line_account_id = ? AND key = ?')
+      .bind(accountId, settingKey).first<{ value: string }>();
+    const seen = readCampaignSettingUpdatedAt(saved?.value ?? null, current.updated_at ?? '');
+    const conflict = async () => {
+      const latest = await getNenCampaign(c.env.DB, key, accountId);
+      return c.json({ success: false, code: 'VERSION_CONFLICT', error: '設定が変わりました。最新の内容を確認してください。', data: { latest: latest ? toCampaignSettingPayload(latest) : null } }, 409);
+    };
+    if (seen !== body.expectedUpdatedAt || current.updated_at !== body.expectedUpdatedAt) return conflict();
+    const version = nextVersionToken(seen);
+    const value = JSON.stringify({ ...current, is_enabled: body.isEnabled ? 1 : 0, updated_at: version });
+    const result = saved
+      ? await c.env.DB.prepare('UPDATE account_settings SET value = ?, updated_at = ? WHERE line_account_id = ? AND key = ? AND value = ?')
+        .bind(value, version, accountId, settingKey, saved.value).run()
+      : await c.env.DB.prepare('INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(line_account_id, key) DO NOTHING')
+        .bind(crypto.randomUUID(), accountId, settingKey, value, version, version).run();
+    if ((result.meta?.changes ?? 0) !== 1) return conflict();
+    writtenVersion = version;
+  }
   auditLog(c, body.isEnabled ? 'nen.campaign.enable' : 'nen.campaign.stop', {kind:'nen_campaign', id:key}, {lineAccountId:accountId});
-  return c.json({ success: true });
+  return c.json({ success: true, data: { updatedAt: writtenVersion } });
 });
 
 type NenCampaignDraft = {
@@ -838,8 +860,24 @@ nenCampaigns.post('/api/nen-campaigns/deliveries/pending-now', requireDeliveryAc
   }
 });
 
-nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary({"accountId":["string"],"scheduledAt":["string"]}), async (c) => {
-  const body = await c.req.json<{ accountId?: string; scheduledAt?: string }>().catch(() => null);
+nenCampaigns.get('/api/nen-campaigns/columns/:id/send-preview', requireDeliveryAccess('nenCampaigns'), async (c) => {
+  const accountId = await requireAccount(c);
+  if (typeof accountId !== 'string') return accountId;
+  try {
+    const snapshot = await nenColumnConfirmation(c.env.DB, accountId, c.req.param('id'));
+    const col = snapshot.column;
+    if (snapshot.campaign.is_enabled !== 1) return c.json({ success: false, code: 'COLUMN_CONFIRMATION_CHANGED', error: 'コラム配信が停止しています。', data: { recipientCount: snapshot.recipientCount } }, 409);
+    return c.json({ success: true, data: {
+      recipientCount: snapshot.recipientCount, confirmationToken: snapshot.confirmationToken,
+      column: { id: col.id, title: col.title, excerpt: col.excerpt, introText: col.intro_text?.trim() ? col.intro_text : buildDefaultColumnIntro(col.title, col.excerpt), articleUrl: col.article_url, imageUrl: col.image_url, targetMode: col.target_mode, targetTagId: col.target_tag_id, updatedAt: col.updated_at },
+      campaign: { updatedAt: snapshot.campaign.updated_at, buttonLabel: snapshot.campaign.button_label },
+      messages: buildNenDeliveryMessages(snapshot.campaign, { article: col }),
+    } });
+  } catch (error) { return columnOperationError(c, error); }
+});
+
+nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary({"accountId":["string"],"scheduledAt":["string"],"recipientCount":["number"],"confirmationToken":["string"]}), async (c) => {
+  const body = await c.req.json<{ accountId?: string; scheduledAt?: string; recipientCount?: unknown; confirmationToken?: unknown }>().catch(() => null);
   if (!body?.accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
@@ -862,7 +900,18 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireDeliveryAcces
   } else {
     when = new Date().toISOString().slice(0, 19).replace('T', ' ');
   }
-  const queued = await queueColumnDelivery(c.env.DB, c.req.param('id'), body.accountId, when);
+  let queued: number;
+  const confirmed = body.recipientCount !== undefined || body.confirmationToken !== undefined;
+  if (confirmed && (!Number.isSafeInteger(body.recipientCount) || Number(body.recipientCount) < 0 || typeof body.confirmationToken !== 'string' || !/^[a-f0-9]{64}$/.test(body.confirmationToken))) return inputError(c, { success: false, error: '送る相手を確認し直してください' }, 400, ['recipientCount','confirmationToken']);
+  try {
+    queued = confirmed
+      ? await enqueueConfirmedNenColumn(c.env.DB, body.accountId, c.req.param('id'), when, { recipientCount: Number(body.recipientCount), confirmationToken: body.confirmationToken as string })
+      : await queueColumnDelivery(c.env.DB, c.req.param('id'), body.accountId, when);
+  } catch (error) {
+    if (error instanceof NenColumnConfirmationConflict) return c.json({ success: false, code: 'COLUMN_CONFIRMATION_CHANGED', error: error.message, data: { recipientCount: error.current?.recipientCount ?? null } }, 409);
+    if (error instanceof NenColumnOperationError) return columnOperationError(c, error);
+    throw error;
+  }
   auditLog(c, 'nen.column.schedule', {kind:'nen_column',id:c.req.param('id')}, {lineAccountId:body.accountId});
   return c.json({ success: true, data: { queued } });
 });

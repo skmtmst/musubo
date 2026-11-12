@@ -3,6 +3,7 @@ import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 // @vitest-environment happy-dom
 
 /**
@@ -66,7 +67,7 @@ const fixtures = vi.hoisted(() => ({
     isFollowing: true,
     tags: [],
     formSubmissions: [],
-    support: { status: 'in_progress' as const, operatorName: '佐藤 けん', notes: '折り返し予定' },
+    support: { status: 'in_progress' as const, operatorName: '見本 113', notes: '折り返し予定' },
   },
   chatDetail: {
     id: 'friend-1',
@@ -85,8 +86,8 @@ const fixtures = vi.hoisted(() => ({
     hasMoreMessages: false,
   },
   operators: [
-    { id: 'op-1', name: '佐藤 けん' },
-    { id: 'op-2', name: '田中 ゆい' },
+    { id: 'op-1', name: '見本 113' },
+    { id: 'op-2', name: '見本 163' },
   ],
 }))
 
@@ -217,6 +218,7 @@ function setRole(role: string | null, permissions: string[] = [], viewPermission
 }
 
 beforeEach(async () => {
+  clearToastsForTest()
   forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   net.calls.length = 0
@@ -242,6 +244,7 @@ afterEach(async () => {
     root.unmount()
   })
   host.remove()
+  clearToastsForTest()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -249,7 +252,7 @@ afterEach(async () => {
 async function render(tab = 'info') {
   routing.params = new URLSearchParams(`id=friend-1&tab=${tab}`)
   await act(async () => {
-    root.render(React.createElement(FriendDetailPage))
+    root.render(<><FriendDetailPage /><ToastHost /></>)
   })
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -348,7 +351,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     const [, personal] = inputs()
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
     await act(async () => {
-      setter.call(personal, '080-1111-2222')
+      setter.call(personal, '080-0000-2222')
       personal.dispatchEvent(new Event('input', { bubbles: true }))
     })
     await act(async () => {
@@ -358,7 +361,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
       const call = net.calls.find((c) => c.name === 'friendFields.saveForFriend')
       expect(call).toBeTruthy()
       expect(call!.args[0]).toBe('friend-1')
-      expect(call!.args[1]).toEqual({ 'field-personal': '080-1111-2222' })
+      expect(call!.args[1]).toEqual({ 'field-personal': '080-0000-2222' })
     })
   })
 
@@ -428,7 +431,7 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
     expect(statusSelect.value).toBe('in_progress')
     expect(operatorSelect.value).toBe('op-1')
     // 選択肢には未割り当てと担当者一覧がある
-    expect(Array.from(operatorSelect.options).map((o) => o.textContent)).toEqual(['未割り当て', '佐藤 けん', '田中 ゆい'])
+    expect(Array.from(operatorSelect.options).map((o) => o.textContent)).toEqual(['未割り当て', '見本 113', '見本 163'])
 
     await setSelectValue(statusSelect, 'resolved')
     await setSelectValue(operatorSelect, 'op-2')
@@ -443,6 +446,7 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
       expect(call!.args[1]).toEqual({ status: 'resolved', operatorId: 'op-2', notes: '折り返し予定', revision: 3 })
     })
     await eventually(() => expect(document.body.textContent).toContain('対応状況とメモを更新しました'))
+    expect(document.querySelectorAll('[data-toast]')).toHaveLength(1)
   })
 
   it('「未割り当て」を選ぶと operatorId=null で送る', async () => {
