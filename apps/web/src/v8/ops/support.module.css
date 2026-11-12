@@ -401,6 +401,6 @@ html:root .outlinedMore[data-row-menu]:not(:focus-visible) {
 
 /* 数の帯は題・道具の行と同じ内側の余白に収める（板の端にくっつけない）。下の注意帯とは間 4。 */
 .band {
-  margin-bottom: var(--tpl-op-support-negative-gap);
+  margin-bottom: var(--space-24);
 }
 .band :global([data-kpi-strip]) { border: 1px solid var(--color-hairline); box-shadow: none; }

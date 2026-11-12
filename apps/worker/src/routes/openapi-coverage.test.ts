@@ -1072,6 +1072,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/ops/support/tickets',
   'POST /api/ops/support/template-folders',
   'POST /api/ops/support/templates',
+  'PATCH /api/ops/support/templates/{id}',
+  'DELETE /api/ops/support/templates/{id}',
   'POST /api/ops/support/tickets/{id}/reply',
   'PUT /api/ops/announcements/{id}',
   'PUT /api/ops/notice-line-account',

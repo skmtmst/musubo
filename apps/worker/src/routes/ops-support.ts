@@ -11,6 +11,7 @@ import {
   createSupportReplyTemplate,
   createSupportTemplateFolder,
   createSupportTicketByOps,
+  deleteSupportReplyTemplate,
   deleteSupportReplyDraft,
   formatTicketNo,
   getSupportReplyDraft,
@@ -29,6 +30,7 @@ import {
   supportTenantContext,
   supportTicketKpis,
   updateSupportTicket,
+  updateSupportReplyTemplate,
   type HqSupportKind,
   type SupportMessage,
   type SupportPriority,
@@ -175,6 +177,33 @@ opsSupport.post('/api/ops/support/templates', requirePlatformAdminWrite(), input
   const template = await createSupportReplyTemplate(dbFor(c.env), { folderId, title, body: text }, c.get('staff').id);
   if (!template) return inputError(c, { success: false, error: '保存先のフォルダが見つかりません。読み直して選んでください' }, 400, ['folderId']);
   return c.json({ success: true, data: template }, 201);
+});
+
+opsSupport.patch('/api/ops/support/templates/:id', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
+  const body = await c.req.json<{ folderId?: unknown; title?: unknown; body?: unknown; expectedUpdatedAt?: unknown }>().catch(() => null);
+  const folderId = typeof body?.folderId === 'string' ? body.folderId : '';
+  const title = typeof body?.title === 'string' ? body.title.trim() : '';
+  const text = typeof body?.body === 'string' ? body.body.trim() : '';
+  const expectedUpdatedAt = typeof body?.expectedUpdatedAt === 'string' ? body.expectedUpdatedAt : '';
+  if (!folderId) return inputError(c, { success: false, error: '保存先フォルダを選んでください' }, 400, ['folderId']);
+  if (!title || title.length > 120) return inputError(c, { success: false, error: 'テンプレート名は1〜120文字で入力してください' }, 400, ['title']);
+  if (!text || text.length > 4000) return inputError(c, { success: false, error: '本文は1〜4,000文字で入力してください' }, 400, ['body']);
+  if (!expectedUpdatedAt) return inputError(c, { success: false, error: 'テンプレートを読み直してください' }, 400, ['expectedUpdatedAt']);
+  const result = await updateSupportReplyTemplate(dbFor(c.env), c.req.param('id'), { folderId, title, body: text, expectedUpdatedAt }, c.get('staff').id);
+  if (result.status === 'missing') return c.json({ success: false, error: 'テンプレートが見つかりません。読み直してください' }, 404);
+  if (result.status === 'conflict') return c.json({ success: false, error: '別の担当者が先に変更しました。テンプレートを読み直してください' }, 409);
+  if (result.status === 'folder_missing') return inputError(c, { success: false, error: '保存先のフォルダが見つかりません。読み直して選んでください' }, 400, ['folderId']);
+  return c.json({ success: true, data: result.template });
+});
+
+opsSupport.delete('/api/ops/support/templates/:id', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
+  const body = await c.req.json<{ expectedUpdatedAt?: unknown }>().catch(() => null);
+  const expectedUpdatedAt = typeof body?.expectedUpdatedAt === 'string' ? body.expectedUpdatedAt : '';
+  if (!expectedUpdatedAt) return inputError(c, { success: false, error: 'テンプレートを読み直してください' }, 400, ['expectedUpdatedAt']);
+  const result = await deleteSupportReplyTemplate(dbFor(c.env), c.req.param('id'), expectedUpdatedAt, c.get('staff').id);
+  if (result === 'missing') return c.json({ success: false, error: 'テンプレートが見つかりません。読み直してください' }, 404);
+  if (result === 'conflict') return c.json({ success: false, error: '別の担当者が先に変更しました。テンプレートを読み直してください' }, 409);
+  return c.json({ success: true, data: null });
 });
 
 opsSupport.get('/api/ops/support/tickets', async (c) => {
