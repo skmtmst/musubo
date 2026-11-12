@@ -6,7 +6,14 @@ import type { BookingRequest } from '@/lib/api'
 import type { BookingLedgerModel } from './use-booking-ledger'
 import Page from './page'
 
-const m = vi.hoisted(() => ({ latest: null as unknown as BookingLedgerModel, realView: false, style: 'standard' as 'standard' | 'consult' | 'lesson', account: 'A', liff: 'liff-a', query: 'view=list&status=confirmed', list: vi.fn(), summary: vi.fn(), menus: vi.fn(), staff: vi.fn(), me: vi.fn(), decide: vi.fn(), csv: vi.fn(), get: vi.fn(), replace: vi.fn() }))
+const m = vi.hoisted(() => ({ latest: null as unknown as BookingLedgerModel, realView: false, style: 'standard' as 'standard' | 'consult' | 'lesson', account: 'A', liff: 'liff-a', query: 'view=list&status=confirmed', confirmation: undefined as undefined | (() => void), list: vi.fn(), summary: vi.fn(), menus: vi.fn(), staff: vi.fn(), me: vi.fn(), decide: vi.fn(), csv: vi.fn(), get: vi.fn(), replace: vi.fn() }))
+vi.mock('@/components/shared/confirm-dialog', async original => {
+  const actual = await original<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && typeof props.title === 'string' && props.title.includes('この予約を')) m.confirmation = props.onConfirm as () => void
+    return <actual.default {...props} />
+  } }
+})
 vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: m.style }, error: null, reload: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: m.account, selectedAccount: { id: m.account, name: m.account, liffId: m.liff } }) }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useSearchParams: () => new URLSearchParams(m.query), useRouter: () => ({ replace: m.replace, push: vi.fn() }) }))
@@ -28,13 +35,23 @@ const counts = { total: 51, requested: 1, monthTotal: 1, monthConfirmed: 1, mont
 const row = (id: string): BookingRequest => ({ id, starts_at: '2026-10-18T01:00:00Z', ends_at: '2026-10-18T02:00:00Z', status: 'confirmed', friend_id: null, friend_name: id, booking_customer_id: null, menu_name: 'カット', staff_name: '担当', staff_id: 'staff', requested_at: '2026-10-17T00:00:00Z', decided_at: null, customer_note: null, internal_note: null, price_at_booking: 5000, external_event_id: null, source: 'phone' })
 const defer = <T,>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(r => { resolve = r }); return { promise, resolve } }
 beforeEach(() => {
-  vi.resetAllMocks(); m.realView = false; m.style = 'standard'; window.sessionStorage.clear(); window.history.replaceState(null, '', '/booking/bookings'); m.account = 'A'; m.liff = 'liff-a'; m.query = 'view=list&status=confirmed'
+  vi.resetAllMocks(); m.confirmation = undefined; m.realView = false; m.style = 'standard'; window.sessionStorage.clear(); window.history.replaceState(null, '', '/booking/bookings'); m.account = 'A'; m.liff = 'liff-a'; m.query = 'view=list&status=confirmed'
   m.me.mockResolvedValue({ success: true, data: { role: 'owner', permissionKeys: [] } })
   m.list.mockResolvedValue({ requests: [row('current')], total: 51 }); m.summary.mockResolvedValue(counts)
   m.menus.mockResolvedValue({ menus: [] }); m.staff.mockResolvedValue({ staff: [] }); m.csv.mockResolvedValue(undefined)
   m.get.mockResolvedValue({ booking: null }); m.decide.mockResolvedValue({})
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
+it('予約の取消確認では戻る操作と取消の確定を区別する', async () => {
+  m.realView = true
+  const h = mountController()
+  await waitFor(() => expect(h.result.current.loading).toBe(false))
+  act(() => h.result.current.handleDecide('current', 'cancel'))
+  const dialog = await screen.findByRole('alertdialog')
+  const labels = Array.from(dialog.querySelectorAll('button')).map(button => button.textContent?.trim())
+  expect(labels).toEqual(expect.arrayContaining(['戻る', 'キャンセル']))
+  expect(labels.filter(label => label === 'キャンセル')).toHaveLength(1)
+})
 it.each([['consult', '相談者'], ['lesson', '会員']] as const)('%sでは検索と予約詳細も同じ業種の人の呼び方を使う', async (style, person) => {
   m.realView = true; m.style = style
   render(<Page />)
@@ -88,6 +105,50 @@ it('Aの確定処理が切替後に戻ってもBを消さず、Aの再取得を�
   expect(m.list).toHaveBeenCalledTimes(reads)
   expect(h.result.current.items[0]?.id).toBe('current')
 })
+it('予約の確認を閉じて開き直すと古い確定は使えない', async () => {
+  m.realView = true
+  const h = mountController()
+  await waitFor(() => expect(h.result.current.loading).toBe(false))
+  act(() => h.result.current.handleDecide('current', 'cancel'))
+  await waitFor(() => expect(m.confirmation).toBeTypeOf('function'))
+  const oldConfirm = m.confirmation!
+  act(() => h.result.current.setDecideTarget(null))
+  act(() => h.result.current.handleDecide('current', 'cancel'))
+  await act(async () => { oldConfirm(); await Promise.resolve() })
+  expect(m.decide).not.toHaveBeenCalled()
+  await act(async () => { m.confirmation!(); await Promise.resolve() })
+  expect(m.decide).toHaveBeenCalledTimes(1)
+})
+
+it('アカウントを切り替えて戻しても以前の予約確認は使えない', async () => {
+  m.realView = true
+  const h = mountController()
+  await waitFor(() => expect(h.result.current.loading).toBe(false))
+  act(() => h.result.current.handleDecide('current', 'cancel'))
+  await waitFor(() => expect(m.confirmation).toBeTypeOf('function'))
+  const oldConfirm = m.confirmation!
+  m.account = 'B'; h.rerender()
+  m.account = 'A'; h.rerender()
+  await act(async () => { oldConfirm(); await Promise.resolve() })
+  expect(m.decide).not.toHaveBeenCalled()
+})
+
+it('操作中にアカウントを切り替えて戻しても古い応答で現在の確認を閉じない', async () => {
+  const done = defer<object>(); m.decide.mockReturnValue(done.promise)
+  const h = mountController()
+  await waitFor(() => expect(h.result.current.loading).toBe(false))
+  let pending!: Promise<void>
+  act(() => { pending = h.result.current.runDecide('old', 'cancel') })
+  m.account = 'B'; h.rerender()
+  m.account = 'A'; h.rerender()
+  await waitFor(() => expect(h.result.current.loading).toBe(false))
+  act(() => h.result.current.handleDecide('new', 'complete'))
+  const reads = m.list.mock.calls.length
+  await act(async () => { done.resolve({}); await pending })
+  expect(h.result.current.decideTarget?.id).toBe('new')
+  expect(m.list).toHaveBeenCalledTimes(reads)
+})
+
 it('権限を取得する前と閲覧のみには状態変更を出さず、未連携の行に会話を出さない', async () => {
   const role = defer<object>(); m.me.mockReturnValue(role.promise)
   const h = mountController()

@@ -104,7 +104,7 @@ export default function OpsAnnouncementsV8() {
   }, [rows, setUrlState, urlState.highlight])
 
   const remove = async () => {
-    if (!deleting) return
+    if (access !== 'writer' || !deleting || !rows.some(row => row.id === deleting.id && row.updatedAt === deleting.updatedAt)) return
     setBusy(true)
     const res = await opsCall(api.ops.announcements.remove(deleting.id))
     setBusy(false)
@@ -194,7 +194,7 @@ export default function OpsAnnouncementsV8() {
         error={actionError}
         onConfirm={() => remove()}
         onCancel={() => { if (!busy) setDeleting(null) }}
-      ><OperationTargetSummary accounts={[]} /></ConfirmDialog>
+      ><OperationTargetSummary accounts={[{ id: '', name: '不明' }]} externalTarget={{ label: 'お知らせ 1件', name: deleting?.subject }} /></ConfirmDialog>
     </div></SaveErrorScope>
   )
 }

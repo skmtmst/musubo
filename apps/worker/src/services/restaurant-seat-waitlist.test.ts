@@ -9,19 +9,19 @@ function promote(table = 't') { return promoteSeatWaitlist(test.db, { storeId: '
 function reserve(id: string, uid: string, waitlistId: string | null = null, table = 't') { test.raw.prepare(`INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,waitlist_entry_id) VALUES(?,'store','line','試験の組',?,2,?,?,?,'confirmed',?)`).run(id, uid, slot, new Date(Date.parse(slot) + 7200000).toISOString(), table, waitlistId); }
 describe('席のキャンセル待ち・先着順', () => {
   it('文字列で保存された待機が3件あっても、採番時に待機人数の上限を守る', async () => {
-    const phones=['090-1234-5678','０９０－１２３４－５６７８','090 1234 5678'];
+    const phones=['090-0000-5678','０９０－００００－５６７８','090 0000 5678'];
     for (const [index,phone] of phones.entries()) test.raw.prepare(`INSERT INTO rt_seat_waitlist(id,store_id,starts_at,guest_count,customer_name,customer_phone,identity_key) VALUES(?,'store',?,2,'電話の組',?,?)`).run(`old-${index}`,futureSlot(index+3),phone,`phone:${phone}`);
     const before=test.raw.prepare('SELECT * FROM rt_seat_waitlist ORDER BY id').all();
-    expect(await insertSeatWaitlistEntry(test.db,{storeId:'store',startsAt:slot,guestCount:2,customerName:'電話の組',customerPhone:'09012345678',lineUid:null})).toEqual({ok:false,error:'waitlist_limit'});
+    expect(await insertSeatWaitlistEntry(test.db,{storeId:'store',startsAt:slot,guestCount:2,customerName:'電話の組',customerPhone:'09000005678',lineUid:null})).toEqual({ok:false,error:'waitlist_limit'});
     expect(test.raw.prepare('SELECT * FROM rt_seat_waitlist ORDER BY id').all()).toEqual(before);
   });
   it('電話は数字だけ保存し、表記を替えた再登録と旧行への重複を拒否する', async () => {
-    const input={storeId:'store',startsAt:slot,guestCount:2,customerName:'電話の組',customerPhone:'０９０－１２３４－５６７８',lineUid:null};
+    const input={storeId:'store',startsAt:slot,guestCount:2,customerName:'電話の組',customerPhone:'０９０－００００－５６７８',lineUid:null};
     expect(await insertSeatWaitlistEntry(test.db,input)).toMatchObject({ok:true});
-    expect(test.raw.prepare('SELECT customer_phone,identity_key FROM rt_seat_waitlist').get()).toEqual({customer_phone:'09012345678',identity_key:'phone:09012345678'});
-    test.raw.exec("UPDATE rt_seat_waitlist SET customer_phone='０９０－１２３４－５６７８',identity_key='phone:０９０－１２３４－５６７８'");
-    expect(await insertSeatWaitlistEntry(test.db,{...input,customerPhone:'090 1234 5678'})).toEqual({ok:false,error:'already_waiting'});
-    expect(test.raw.prepare('SELECT customer_phone FROM rt_seat_waitlist').get()).toEqual({customer_phone:'０９０－１２３４－５６７８'});
+    expect(test.raw.prepare('SELECT customer_phone,identity_key FROM rt_seat_waitlist').get()).toEqual({customer_phone:'09000005678',identity_key:'phone:09000005678'});
+    test.raw.exec("UPDATE rt_seat_waitlist SET customer_phone='０９０－００００－５６７８',identity_key='phone:０９０－００００－５６７８'");
+    expect(await insertSeatWaitlistEntry(test.db,{...input,customerPhone:'090 0000 5678'})).toEqual({ok:false,error:'already_waiting'});
+    expect(test.raw.prepare('SELECT customer_phone FROM rt_seat_waitlist').get()).toEqual({customer_phone:'０９０－００００－５６７８'});
     expect(await insertSeatWaitlistEntry(test.db,{...input,customerPhone:'090abc12345678'})).toEqual({ok:false,error:'invalid_phone'});
     expect(test.raw.prepare('SELECT COUNT(*) n FROM rt_seat_waitlist').get()).toEqual({n:1});
   });

@@ -3,7 +3,7 @@
 /*
  * 一斉配信の「LINE の見え方」のテキストの吹き出し。
  * ★V8（絵 OVCot ②）：本物の LINE の吹き出し（LinePreviewMessage・文字に合わせて伸び縮み）。
- * 差し込みは見本の値（名前＝山田 太郎・配信日＝今日）で見せる。
+ * 差し込みは見本の値（名前＝見本 141・配信日＝今日）で見せる。
  * テーマ指定にかかわらず、現役のLINEの吹き出しを描く。
  */
 import type { BroadcastMessageButton } from '@/lib/api'

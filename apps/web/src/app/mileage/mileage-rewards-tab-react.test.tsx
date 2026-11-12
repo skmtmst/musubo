@@ -193,6 +193,15 @@ function rowsText(): string {
 }
 
 describe('使い道の表の中身', () => {
+  it.each([true, false])('使い道の操作説明は閲覧のみ %s に合う', async readonly => {
+    stubFetch({ rewardsByAccount: { 'account-1': [reward('r1', '交換品')] } })
+    await render('account-1', readonly)
+    const help = container.querySelector<HTMLButtonElement>('button[aria-label="この画面の説明"]')!
+    expect(help).toBeTruthy()
+    await act(async () => help.click())
+    expect(container.textContent).toContain(readonly ? '使い道と交換に必要なマイルを確認できます。' : '編集・自分で交換をテスト')
+    if (readonly) expect(container.textContent).not.toContain('編集・自分で交換をテスト')
+  })
   it('引換コードの残りは取れた数だけを出し、取れないときは 0 と書かない', async () => {
     stubFetch({
       rewardsByAccount: {

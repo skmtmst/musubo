@@ -17,7 +17,7 @@ vi.hoisted(() => {
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
 const folder = (id: string, name: string, order: number, color: string | null = '#3b82f6'): Folder => ({
-  id, kind: 'scenario', accountId: 'acc-1', name, parentId: null, displayOrder: order, color, createdAt: '', updatedAt: '', itemCount: order + 2,
+  id, kind: 'scenario', accountId: 'acc-1', name, parentId: null, displayOrder: order, color, createdAt: '', updatedAt: '', itemCount: order + 2, revision: 1,
 } as Folder)
 
 const list = vi.hoisted(() => vi.fn())
@@ -140,7 +140,7 @@ describe('一覧の左のフォルダの列（共通）', () => {
     expect(document.body.textContent).toContain('中のシナリオ 2 件は消えずに「未分類」へ移ります')
     list.mockClear()
     await click(buttonByText('削除する'))
-    expect(remove).toHaveBeenCalledWith('f-1', 'acc-1')
+    expect(remove).toHaveBeenCalledWith('f-1', 'acc-1', 1)
     expect(onSelect).toHaveBeenCalledWith('all')
     expect(list).toHaveBeenCalledTimes(1)
   })

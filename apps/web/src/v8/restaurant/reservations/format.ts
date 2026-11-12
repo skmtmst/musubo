@@ -77,12 +77,12 @@ export function dayShort(day: Date): string {
   return `${date.getUTCMonth() + 1}月${date.getUTCDate()}日`
 }
 
-/** 「10/2 18:00」 */
+/** 年をまたぐ予約も区別できる、日本時間の日時。 */
 export function mdhm(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
   const civil = civilDay(date)
-  return `${civil.getUTCMonth() + 1}/${civil.getUTCDate()} ${hm(date)}`
+  return `${civil.getUTCFullYear()}/${pad2(civil.getUTCMonth() + 1)}/${pad2(civil.getUTCDate())} ${hm(date)}`
 }
 
 /** 予約台帳と詳細で同じ日付表記を使う。 */

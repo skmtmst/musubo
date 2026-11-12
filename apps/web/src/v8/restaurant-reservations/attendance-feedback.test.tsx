@@ -1,8 +1,16 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: { customerHistory: vi.fn().mockResolvedValue({ data: { visitCount: 0, visits: [] } }) } }))
+const captured = vi.hoisted(() => ({ visit: null as null | (() => void) }))
+vi.mock('@/components/shared/button', async original => {
+  const actual = await original<typeof import('@/components/shared/button')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.children === '来店にする') captured.visit = props.onClick as () => void
+    return <actual.default {...props} />
+  } }
+})
 import ReservationDetailDialog from './detail-dialog'
 import { ApiError } from '@/lib/api'
 import { reservation, snapshotOf } from '../restaurant/booking-kit/test-data'
@@ -10,6 +18,37 @@ import type { RestaurantReservation } from '@/lib/restaurant-test-api'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 
 afterEach(() => { cleanup(); verifiedStaffRole(null); vi.clearAllMocks() })
+it('切替前の来店操作は呼び戻されても実行しない', async () => {
+  verifiedStaffRole('owner')
+  const data = snapshotOf()
+  const row = reservation('r1', { arrived_at: null, departed_at: null }) as RestaurantReservation
+  const attendance = vi.fn()
+  const props = { reservation: row, accountId: 'account-1', tables: data.tables, courses: data.menuItems, busy: false, canWrite: true, onClose: vi.fn(), onCancel: vi.fn(), onRestore: vi.fn(), onEdit: vi.fn(), onAttendance: attendance }
+  const view = render(<ReservationDetailDialog {...props} />)
+  const previous = captured.visit!
+  expect(previous).toBeTypeOf('function')
+  view.rerender(<ReservationDetailDialog {...props} reservation={{ ...row, id: 'r2' }} />)
+  await act(async () => previous())
+  expect(attendance).not.toHaveBeenCalled()
+})
+
+it('切替後に前の来店の失敗が届いても状態を更新しない', async () => {
+  verifiedStaffRole('owner')
+  const data = snapshotOf()
+  const row = reservation('r1', { arrived_at: null, departed_at: null }) as RestaurantReservation
+  let finish!: (value: { error: Error }) => void
+  const attendance = vi.fn(() => new Promise<{ error: Error }>(resolve => { finish = resolve }))
+  const props = { reservation: row, accountId: 'account-1', tables: data.tables, courses: data.menuItems, busy: false, canWrite: true, onClose: vi.fn(), onCancel: vi.fn(), onRestore: vi.fn(), onEdit: vi.fn(), onAttendance: attendance }
+  const onRender = vi.fn()
+  const view = render(<React.Profiler id="detail" onRender={onRender}><ReservationDetailDialog {...props} /></React.Profiler>)
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '来店にする', exact: true }))
+  view.rerender(<React.Profiler id="detail" onRender={onRender}><ReservationDetailDialog {...props} reservation={{ ...row, id: 'r2' }} /></React.Profiler>)
+  await act(async () => {})
+  onRender.mockClear()
+  await act(async () => finish({ error: new ApiError(409, '古い予約', 'version_conflict') }))
+  expect(onRender).not.toHaveBeenCalled()
+  expect(screen.queryByRole('alert')).toBeNull()
+})
 it('来店の失敗理由を予約の詳細の中に表示する', async () => {
   verifiedStaffRole('owner')
   const data = snapshotOf()

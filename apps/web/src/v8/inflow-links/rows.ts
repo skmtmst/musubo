@@ -169,9 +169,9 @@ export function isUnconfigured(row: RouteRow): boolean {
 export type RouteFilter = 'all' | 'has-friends' | 'no-friends' | 'unconfigured'
 export type RouteSort = 'friends-desc' | 'clicks-desc' | 'latest-desc' | 'name'
 
-export function matchesFilter(row: RouteRow, filter: RouteFilter): boolean {
-  if (filter === 'has-friends') return (row.stats?.friendCount ?? 0) > 0
-  if (filter === 'no-friends') return (row.stats?.friendCount ?? 0) === 0
+export function matchesFilter(row: RouteRow, filter: RouteFilter, summaryAvailable: boolean): boolean {
+  if (filter === 'has-friends') return summaryAvailable && (row.stats?.friendCount ?? 0) > 0
+  if (filter === 'no-friends') return summaryAvailable && (row.stats?.friendCount ?? 0) === 0
   if (filter === 'unconfigured') return isUnconfigured(row)
   return true
 }

@@ -1,3 +1,4 @@
+import { hqAudienceSnapshot, HqAudienceConflict, type HqConfirmedAudience } from '../features/hq-broadcasts/hq-audience-confirmation/index.js';
 export { getHqBroadcastRun, expandAccountName, mappedHqContent, preflightHqBroadcast } from '../features/hq-broadcasts/preflight/index.js';
 import { assertHqDeliveryOptions, getHqBroadcastRun, expandAccountName, mappedHqContent, preflightHqBroadcast } from '../features/hq-broadcasts/preflight/index.js';
 import type { RunRow, Target } from '../features/hq-broadcasts/preflight/index.js';
@@ -87,17 +88,37 @@ export async function excludeHqBroadcastTargets(db:D1Database,run:RunRow,actorId
     ops.push(db.prepare(`INSERT INTO hq_broadcast_audit(id,run_id,line_account_id,actor_id,action) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND dispatch_token=?)`).bind(crypto.randomUUID(),run.id,t.line_account_id,actorId,ids.includes(t.line_account_id)?'excluded':'included',run.id,token));}
   const r=await db.batch(ops);if(!r[0].meta.changes)throw new StampError('対象店が更新されました。読み直してください', 409, ["accountIds","accountTagIds"]);
 }
-export async function dispatchHqBroadcast(db:D1Database,run:RunRow,actorId:string,version:number, confirmedRecipientCount?:number, runtime?:HqMediaRuntime) {
-  if(run.status!=='prepared')return readHqBroadcastResult(db,run);
+export async function dispatchHqBroadcast(db:D1Database,run:RunRow,actorId:string,version:number, confirmedRecipientCount?:number, runtime?:HqMediaRuntime, confirmedAudiences?:HqConfirmedAudience[]) {
+  if(run.status!=='prepared'){
+    if(confirmedAudiences!==undefined){
+      try{
+        const input=JSON.parse(run.input_json) as HqBroadcastInput;
+        const targets=(await db.prepare('SELECT line_account_id FROM hq_broadcast_targets WHERE run_id=? AND excluded=0 ORDER BY line_account_id').bind(run.id).all<{line_account_id:string}>()).results;
+        const latest=await Promise.all(targets.map(item=>hqAudienceSnapshot(db,run.tenant_id,item.line_account_id,input)));
+        throw new HqAudienceConflict({count:latest.reduce((sum,item)=>sum+item.recipientCount,0),perAccount:latest.map(item=>({accountId:item.accountId,recipientCount:item.recipientCount}))});
+      }catch(error){if(error instanceof HqAudienceConflict)throw error;throw new HqAudienceConflict({count:null,perAccount:[]});}
+    }
+    return readHqBroadcastResult(db,run);
+  }
   const preflight=await preflightHqBroadcast(db,run,true,runtime),selected=preflight.filter(p=>!p.excluded);
+  const input=JSON.parse(run.input_json) as HqBroadcastInput;
+  const snapshots=confirmedAudiences===undefined?null:await Promise.all(selected.map(p=>hqAudienceSnapshot(db,run.tenant_id,p.accountId,input)));
+  const current=()=>({count:snapshots?.reduce((sum,p)=>sum+p.recipientCount,0)??0,perAccount:snapshots?.map(p=>({accountId:p.accountId,recipientCount:p.recipientCount}))??[]});
+  if(snapshots&&(run.version!==version||confirmedAudiences!.length!==snapshots.length||snapshots.some(snapshot=>{
+    const expected=confirmedAudiences!.find(item=>item.accountId===snapshot.accountId);
+    return !expected||expected.recipientCount!==snapshot.recipientCount||expected.recipientToken!==snapshot.recipientToken;
+  })))throw new HqAudienceConflict(current());
   if(!selected.length||selected.some(p=>p.blockedReasons.length))throw new StampError('送れない店舗を外して再確認してください',409);
-  if(confirmedRecipientCount!==undefined && confirmedRecipientCount!==selected.reduce((n,p)=>n+(p.audienceCount??0),0))throw new StampError('送る相手が変わりました。もう一度確かめてください',409);
+  if(confirmedRecipientCount!==undefined && confirmedRecipientCount!==selected.reduce((n,p)=>n+(p.audienceCount??0),0)){
+    if(snapshots)throw new HqAudienceConflict(current());
+    throw new StampError('送る相手が変わりました。もう一度確かめてください',409);
+  }
   const approval=await hqBroadcastApprovalState(db,run,actorId,preflight);
   if(approval.gate.required) {
     if(approval.gate.singleOperator&&confirmedRecipientCount!==approval.gate.recipientCount)throw new StampError('送る人数を入力して確認してください',409);
     if(!approval.gate.singleOperator&&(approval.approval.status!=='approved'||approval.approval.confirmedCount!==approval.gate.recipientCount))throw new StampError('別の担当者の承認が必要です。人数が変わった場合は再承認してください',409);
   }
-  const input=JSON.parse(run.input_json) as HqBroadcastInput,at=input.scheduledAt??new Date().toISOString(),token=crypto.randomUUID();
+  const at=input.scheduledAt??new Date().toISOString(),token=crypto.randomUUID();
   const ops=[db.prepare("UPDATE hq_broadcast_runs SET status='scheduled',version=version+1,dispatch_token=?,updated_at=datetime('now') WHERE id=? AND status='prepared' AND version=?").bind(token,run.id,version)];
   for(const p of selected){const broadcastId=crypto.randomUUID();
     const resolved=await resolveHqBroadcastAudience(db,run.tenant_id,p.accountId,input);
@@ -113,10 +134,45 @@ export async function dispatchHqBroadcast(db:D1Database,run:RunRow,actorId:strin
       .bind(broadcastId,input.title,input.messageType,content.messageContent,content.messageBubblesJson,at,p.accountId,content.altText,JSON.stringify(resolved),run.id,
         input.internalMemo??null,Number(input.trackLinks!==false),Number(input.measureOpens!==false),input.stealthSpreadMinutes??0,content.messageOptionsJson,after?.id??null,
         approval.gate.required?'approved':'none',approval.approval.requestedByStaffId,approval.approval.decidedByStaffId,p.audienceCount,run.id,token));
+    if(snapshots){
+      const snapshot=snapshots.find(item=>item.accountId===p.accountId)!;
+      const options=content.messageOptionsJson?JSON.parse(content.messageOptionsJson) as Record<string,unknown>:{};
+      ops.push(db.prepare(`UPDATE broadcasts SET message_options_json=?,total_count=?,status=CASE WHEN ?=0 THEN 'sent' ELSE status END,
+        scheduled_at=CASE WHEN ?=0 THEN NULL ELSE scheduled_at END,sent_at=CASE WHEN ?=0 THEN ? ELSE sent_at END WHERE id=? AND hq_run_id=?`)
+        .bind(JSON.stringify({...options,hqAudienceSnapshot:{count:snapshot.recipientCount,recipientToken:snapshot.recipientToken}}),snapshot.recipientCount,snapshot.recipientCount,snapshot.recipientCount,snapshot.recipientCount,at,broadcastId,run.id));
+      ops.push(db.prepare(`SELECT CASE WHEN (SELECT COUNT(*) FROM (${snapshot.query.sql}))=? THEN 1 ELSE json('HQ_AUDIENCE_CHANGED') END`)
+        .bind(...snapshot.query.bindings,snapshot.recipientCount));
+      for(let offset=0;offset<snapshot.rows.length;offset+=500){
+        const chunk=snapshot.rows.slice(offset,offset+500);
+        ops.push(db.prepare(`INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state)
+          SELECT ?,q.id,?,1,'claimed' FROM (${snapshot.query.sql}) q JOIN json_each(?) expected
+            ON q.id=json_extract(expected.value,'$.id') AND q.line_user_id=json_extract(expected.value,'$.line_user_id')
+          WHERE EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND hq_run_id=?)`)
+          .bind(broadcastId,p.accountId,...snapshot.query.bindings,JSON.stringify(chunk),broadcastId,run.id));
+        ops.push(db.prepare(`SELECT CASE WHEN changes()=? THEN 1 ELSE json('HQ_AUDIENCE_CHANGED') END`).bind(chunk.length));
+      }
+    }
     ops.push(db.prepare(`UPDATE hq_broadcast_targets SET broadcast_id=? WHERE run_id=? AND line_account_id=? AND EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND dispatch_token=?)`).bind(broadcastId,run.id,p.accountId,run.id,token));
     ops.push(db.prepare(`INSERT INTO hq_broadcast_audit(id,run_id,line_account_id,actor_id,action) SELECT ?,?,?,?,'scheduled' WHERE EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND dispatch_token=?)`).bind(crypto.randomUUID(),run.id,p.accountId,actorId,run.id,token));
   }
-  const result=await db.batch(ops);if(!result[0].meta.changes)throw new StampError('別の担当者が先に操作しました',409);
+  let result:D1Result[];
+  try { result=await db.batch(ops); }
+  catch(error) {
+    if(snapshots){
+      const latest=await Promise.all(selected.map(p=>hqAudienceSnapshot(db,run.tenant_id,p.accountId,input)));
+      const changed=latest.some((item,index)=>item.recipientCount!==snapshots[index].recipientCount||item.recipientToken!==snapshots[index].recipientToken);
+      const latestRun=await getHqBroadcastRun(db,run.tenant_id,run.id);
+      if(changed||latestRun.version!==version)throw new HqAudienceConflict({count:latest.reduce((sum,p)=>sum+p.recipientCount,0),perAccount:latest.map(p=>({accountId:p.accountId,recipientCount:p.recipientCount}))});
+    }
+    throw error;
+  }
+  if(!result[0].meta.changes){
+    if(snapshots){
+      const latest=await Promise.all(selected.map(p=>hqAudienceSnapshot(db,run.tenant_id,p.accountId,input)));
+      throw new HqAudienceConflict({count:latest.reduce((sum,p)=>sum+p.recipientCount,0),perAccount:latest.map(p=>({accountId:p.accountId,recipientCount:p.recipientCount}))});
+    }
+    throw new StampError('別の担当者が先に操作しました',409);
+  }
   return readHqBroadcastResult(db,await getHqBroadcastRun(db,run.tenant_id,run.id));
 }
 const retryableWhere = `((s.state='failed' AND s.error_code IN ('line_http_429','stopped_before_dispatch')) OR ((b.stopped_at IS NOT NULL OR b.status='sent') AND s.state='claimed' AND s.dispatched_at IS NULL))`;

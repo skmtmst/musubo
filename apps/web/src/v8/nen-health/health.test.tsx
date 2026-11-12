@@ -37,7 +37,7 @@ import HealthV8, { type HealthTabKey } from './health'
 
 const KOMUGI: NenHealthRow = {
   pet: { id: 'pet-komugi', name: 'こむぎ', callName: 'こむぎちゃん', animalType: 'dog', breed: '柴', ageLabel: '4歳', imageUrl: null },
-  owner: { friendId: 'friend-3', name: '田中 明子', customerId: '10234' },
+  owner: { friendId: 'friend-3', name: '見本 169', customerId: '10234' },
   lastLoggedOn: '2026-09-30', lastLoggedLabel: '7日前', daysSinceLast: 7, count30d: 28, totalRecords: 80,
   weightSeries: [9.8, 9.7, 9.6, 9.5, 9.4, 9.3, 9.2, 9.2], latestWeightKg: 9.2, weightChangePercent: -6,
   latestStool: '正常', latestAppetite: '普通', changes: [{ key: 'weight_drop', label: '体重 −6%（8週）', tone: 'warn' }], concerning: true,
@@ -53,7 +53,7 @@ const LIST: NenHealthListData = {
 }
 const SUMMARY: NenHealthSummaryData = {
   pet: { id: 'pet-komugi', name: 'こむぎ', callName: 'こむぎちゃん', animalType: 'dog', breed: '柴', ageLabel: '4歳', weightKg: 9.2 },
-  owner: { friendId: 'friend-3', name: '田中 明子' },
+  owner: { friendId: 'friend-3', name: '見本 169' },
   generatedAt: '2026-09-30T10:00:00+09:00',
   summary: {
     days: 30, records: 28, weight: { first: 9.8, last: 9.2, min: 9.2, max: 9.8 }, heartRateAvg: 96, respiratoryRateAvg: 24,

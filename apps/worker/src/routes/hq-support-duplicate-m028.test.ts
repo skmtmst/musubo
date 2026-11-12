@@ -14,7 +14,7 @@ let testDb: SqliteD1;
 
 const staffOf = (overrides: Partial<AuthenticatedStaff> = {}): AuthenticatedStaff => ({
   id: 'staff-1',
-  name: '山田 太郎',
+  name: '見本 141',
   role: 'admin',
   readOnly: false,
   tenantId: DEFAULT_TENANT_ID,
@@ -62,7 +62,7 @@ beforeEach(() => {
   mail.send.mockReset();
   testDb.raw.prepare("INSERT INTO tenants (id, name) VALUES ('tenant-2', '別の統括')").run();
   testDb.raw.prepare(
-    `INSERT INTO staff_members (id, name, email, role, api_key, tenant_id) VALUES ('staff-1', '山田 太郎', 'masato@example.com', 'admin', 'key-1', ?)`,
+    `INSERT INTO staff_members (id, name, email, role, api_key, tenant_id) VALUES ('staff-1', '見本 141', 'masato@example.com', 'admin', 'key-1', ?)`,
   ).run(DEFAULT_TENANT_ID);
 });
 

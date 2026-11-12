@@ -52,7 +52,7 @@ export async function runEventBookingExpirer(
     const upd = await db
       .prepare(
         `UPDATE event_bookings
-            SET status = 'expired', decided_at = ?, updated_at = ?
+            SET status = 'expired', decided_at = ?, updated_at = ?, confirmation_revision = confirmation_revision + 1
           WHERE id = ? AND status = 'requested'`,
       )
       .bind(params.now.toISOString(), params.now.toISOString(), row.id)

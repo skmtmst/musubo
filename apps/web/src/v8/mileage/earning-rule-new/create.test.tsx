@@ -204,3 +204,14 @@ it('追加保存が失敗したときは続けて作るでも入力を消さな�
   expect((screen.getByLabelText('マイル') as HTMLInputElement).value).toBe('10')
   expect(push).not.toHaveBeenCalled()
 })
+
+it('停止して保存する場合はボタンも停止を示し、停止状態で作る', async () => {
+  await mount()
+  type('名前', 'リンクをクリック')
+  type('マイル', '10')
+  await act(async () => { fireEvent.click(screen.getByText('詳しい設定（倍率・通知・取り消し・公開）')) })
+  await act(async () => { fireEvent.click(screen.getByRole('switch', { name: '作成したらすぐ動かす' })) })
+  expect(screen.queryByRole('button', { name: '保存して動かす' })).toBeNull()
+  await clickButton('停止して保存')
+  expect(calls.find((call) => call.method === 'POST' && call.path === '/api/mileage/rules')?.body).toMatchObject({ isActive: false })
+})

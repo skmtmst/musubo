@@ -277,7 +277,7 @@ export async function backfillWebhookSecrets(
           ? [stored, jstNow(), target.id]
           : [stored, jstNow(), target.id, options.lineAccountId];
         await db.prepare(
-          `UPDATE ${table} SET secret_encrypted = ?, secret = NULL, updated_at = ? WHERE ${updateWhere}`,
+          `UPDATE ${table} SET secret_encrypted = ?, secret = NULL, updated_at = ?, confirmation_revision = confirmation_revision + 1 WHERE ${updateWhere}`,
         ).bind(...updateBinds).run();
         report.migrated += 1;
       } catch {

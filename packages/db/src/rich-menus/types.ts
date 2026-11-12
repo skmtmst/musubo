@@ -15,6 +15,7 @@
 
 export interface RichMenuGroup {
   id: string;
+  confirmation_revision?: number;
   account_id: string;
   name: string;
   chat_bar_text: string;
@@ -25,6 +26,7 @@ export interface RichMenuGroup {
   publishing_at: string | null;
   /** 公開leaseの所有者(run ID等)。NULLは誰も持っていない。 */
   publishing_owner: string | null;
+  publishing_generation: number;
   /** 公開leaseの期限(UTCのISO8601)。過ぎたら別runが回収できる。 */
   publishing_expires_at: string | null;
   /** 出し分けの条件（SegmentCondition の JSON）。未設定なら null。 */
@@ -215,6 +217,8 @@ export interface RichMenuDeleteImpact {
     accountId: string;
     name: string;
     status: RichMenuGroup['status'];
+    version: number;
+    publishingGeneration: number;
   };
   currentAudience: {
     value: number;
@@ -233,6 +237,7 @@ export interface RichMenuDeleteImpact {
     pagesWithLineRichMenuId: number;
     isDefaultForAll: boolean;
     publishing: boolean;
+    pages:Array<{id:string;orderIndex:number;lineRichMenuId:string|null}>;
   };
   blockers: Array<
     | 'published'

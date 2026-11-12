@@ -259,6 +259,7 @@ export async function updateWebinar(
   id: string,
   patch: Partial<WebinarCreateInput>,
   expectedVersion?: number,
+  expectedStatus?: Webinar['status'],
 ): Promise<Webinar | null> {
   const existing = await getWebinarById(db, id);
   if (!existing) return null;
@@ -268,7 +269,7 @@ export async function updateWebinar(
          video_prefix = ?, duration_seconds = ?, schedule_json = ?, cta_json = ?,
          tag_on_attend = ?, tag_on_cta_click = ?, folder_id = ?,
          publication_starts_at = ?, publication_ends_at = ?, updated_at = ?
-       WHERE id = ?${expectedVersion === undefined ? '' : ' AND EXISTS (SELECT 1 FROM webinar_editor_settings s WHERE s.webinar_id = webinars.id AND s.version = ?)'}`,
+       WHERE id = ?${expectedVersion === undefined ? '' : ' AND EXISTS (SELECT 1 FROM webinar_editor_settings s WHERE s.webinar_id = webinars.id AND s.version = ?)'}${expectedStatus === undefined ? '' : ' AND status = ?'}`,
     )
     .bind(
       patch.accountId !== undefined ? patch.accountId : existing.account_id,
@@ -285,7 +286,7 @@ export async function updateWebinar(
       patch.publicationStartsAt !== undefined
         ? patch.publicationStartsAt : existing.publication_starts_at,
       patch.publicationEndsAt !== undefined ? patch.publicationEndsAt : existing.publication_ends_at,
-      jstNow(), id, ...(expectedVersion === undefined ? [] : [expectedVersion]),
+      jstNow(), id, ...(expectedVersion === undefined ? [] : [expectedVersion]), ...(expectedStatus === undefined ? [] : [expectedStatus]),
     );
   if (expectedVersion === undefined) await update.run();
   else {

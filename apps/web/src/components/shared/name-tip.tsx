@@ -25,12 +25,15 @@ export default function NameTipHost() {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const current = useRef<HTMLElement | null>(null)
   const savedTitle = useRef<string | null>(null)
+  const observer = useRef<MutationObserver | null>(null)
 
   const hide = useCallback(() => {
     if (timer.current) clearTimeout(timer.current)
+    observer.current?.disconnect()
+    observer.current = null
     const el = current.current
     if (el) {
-      if (savedTitle.current !== null) el.setAttribute('title', savedTitle.current)
+      if (savedTitle.current !== null && !el.hasAttribute('title') && isIconOnlyAction(el)) el.setAttribute('title', savedTitle.current)
       if (el.getAttribute('aria-describedby') === id) el.removeAttribute('aria-describedby')
     }
     current.current = null
@@ -40,7 +43,7 @@ export default function NameTipHost() {
 
   const show = useCallback((el: HTMLElement) => {
     const text = el.getAttribute('aria-label')?.trim()
-    if (!text || !el.isConnected) return
+    if (!text || !el.isConnected || !isIconOnlyAction(el)) return
     const rect = el.getBoundingClientRect()
     const css = getComputedStyle(document.documentElement)
     const edge = Number.parseFloat(css.getPropertyValue('--polish-space-row')) || 8
@@ -63,6 +66,13 @@ export default function NameTipHost() {
       if (current.current === el) return
       hide()
       current.current = el
+      const name = el.getAttribute('aria-label')?.trim()
+      observer.current = new MutationObserver(() => {
+        if (current.current === el && (!isIconOnlyAction(el) || el.getAttribute('aria-label')?.trim() !== name || el.matches(':disabled, [aria-disabled="true"]'))) hide()
+      })
+      for (let parent: HTMLElement | null = el; parent; parent = parent.parentElement) {
+        observer.current.observe(parent, { attributes: true, attributeFilter: ['data-no-name-tip', 'aria-label', 'aria-disabled', 'disabled'] })
+      }
       timer.current = setTimeout(() => show(el), delay)
     }
     const over = (event: PointerEvent) => {

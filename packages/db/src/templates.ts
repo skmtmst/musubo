@@ -259,7 +259,7 @@ export async function updateTemplate(
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);
-  const mutation = db.prepare(`UPDATE templates SET ${sets.join(', ')} WHERE id = ?`).bind(...values);
+  const mutation = db.prepare(`UPDATE templates SET confirmation_revision=confirmation_revision+1, ${sets.join(', ')} WHERE id = ?`).bind(...values);
   if (updates.messageContent !== undefined) {
     const current = await getTemplateById(db, id);
     if (!current) return;
@@ -277,7 +277,7 @@ export async function updateTemplate(
 
 export async function deleteTemplate(db: D1Database, id: string): Promise<void> {
   await db.batch([
-    db.prepare(`UPDATE templates SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`).bind(jstNow(), jstNow(), id),
+    db.prepare(`UPDATE templates SET confirmation_revision=confirmation_revision+1, deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`).bind(jstNow(), jstNow(), id),
     db.prepare(`DELETE FROM media_usages WHERE ref_kind = 'template' AND ref_id = ?`).bind(id),
   ]);
 }
@@ -291,7 +291,7 @@ export async function deleteCreatedTemplateDraft(db: D1Database, id: string, rev
         SELECT 1 FROM templates WHERE id = ? AND deleted_at IS NULL
           AND COALESCE(published_version, 0) = 0 AND COALESCE(draft_revision, 0) = ?
       )`).bind(id, revision),
-      db.prepare(`UPDATE templates SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`).bind(now, now, id),
+      db.prepare(`UPDATE templates SET confirmation_revision=confirmation_revision+1, deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`).bind(now, now, id),
       db.prepare(`DELETE FROM media_usages WHERE ref_kind = 'template' AND ref_id = ?`).bind(id),
     ]);
     return true;
@@ -372,7 +372,7 @@ export async function saveTemplateDraft(
   const savedAt = jstNow();
   const mutation = db.prepare(
     `UPDATE templates
-        SET ${metadata.length ? metadata.join(', ') + ',' : ''} draft_message_type = ?,
+        SET confirmation_revision=confirmation_revision+1, ${metadata.length ? metadata.join(', ') + ',' : ''} draft_message_type = ?,
             draft_message_content = ?,
             draft_carousel_actions_json = ?,
             draft_carousel_tap_limit_mode = ?,
@@ -544,7 +544,7 @@ export async function publishTemplate(
   const publishBatch = [
     db.prepare(
       `UPDATE templates
-          SET message_type = draft_message_type,
+          SET confirmation_revision=confirmation_revision+1, message_type = draft_message_type,
               message_content = draft_message_content,
               message_bubbles_json = draft_message_bubbles_json,
               draft_message_bubbles_json = NULL,

@@ -85,6 +85,20 @@ describe('対応マークの一覧', () => {
     expect(band.textContent).not.toContain('99')
   })
 
+  it('統括の一覧は取得中に0件とせず、取得した配列を反映してから件数を出す', async () => {
+    const items = [mark(), mark({ id: 'mk2', name: '対応中' })]
+    const host = { items: [] as typeof items, status: 'loading' as const, busy: false, reload: vi.fn(), onCreate: vi.fn(), onEdit: vi.fn(), onRemove: vi.fn(), onDistribute: vi.fn(), onOrder: vi.fn().mockResolvedValue(undefined) }
+    const view = render(<MarksTab accountId={null} canEdit host={host} />)
+    expect(screen.queryByText('0種類')).toBeNull()
+    expect(screen.queryByText('まだ対応マークはありません')).toBeNull()
+    view.rerender(<MarksTab accountId={null} canEdit host={{ ...host, items, status: 'ready' }} />)
+    await waitFor(() => expect(within(screen.getByRole('table')).getByText('要対応')).toBeTruthy())
+    expect(screen.getByRole('table')).toBeTruthy()
+    view.rerender(<MarksTab accountId={null} canEdit host={{ ...host, items: [], status: 'loading' }} />)
+    expect(screen.queryByText('0種類')).toBeNull()
+    expect(screen.queryByText('まだ対応マークはありません')).toBeNull()
+  })
+
   it('出す場所の列は設定からの参照だけを数え、人数を重ねない。未取得は「—」、取得できて0件は「なし」', async () => {
     render(<MarksTab accountId="acc" canEdit />)
     await screen.findByRole('table')

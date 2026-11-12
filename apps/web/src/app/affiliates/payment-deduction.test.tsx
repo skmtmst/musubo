@@ -101,7 +101,7 @@ describe('R288 支払い画面の差し引き表示', () => {
     await waitFor(() => {
       expect(screen.getByText('今回 払う額')).toBeTruthy()
     })
-    expect(within(screen.getByRole('row', { name: /田中/ })).getByText('¥700')).toBeTruthy()
+    expect(within(await screen.findByRole('row', { name: /田中/ })).getByText('¥700')).toBeTruthy()
     expect(screen.getByText(/元の報酬 ¥1,000 − 取消 ¥300/)).toBeTruthy()
     expect(screen.getByText(/締めたあとに取り消された分 ¥300 を差し引いています/)).toBeTruthy()
     expect(screen.getByText(/今回引ききれない ¥100 は次回へ繰り越し/)).toBeTruthy()

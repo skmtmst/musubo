@@ -30,7 +30,7 @@ function mount(onSave: (draft: SavedViewDraft) => Promise<SavedViewSaveResult> =
     <SavedViewDialog
       open
       initialValue={INITIAL}
-      operators={[{ id: 'op-k', name: '河野' }]}
+      operators={[{ id: 'op-k', name: '見本' }]}
       existingNames={['朝の未対応']}
       saving={false}
       emailInboxEnabled={emailInboxEnabled}
@@ -57,7 +57,7 @@ describe('保存した検索を作成の窓', () => {
 
   it('入力したあと空にしたときだけ赤い断りにする', () => {
     mount()
-    fireEvent.change(nameInput(), { target: { value: '河野の未対応' } })
+    fireEvent.change(nameInput(), { target: { value: '見本の未対応' } })
     expect(saveButton().disabled).toBe(false)
     expect(nameInput().getAttribute('aria-invalid')).toBe('false')
     fireEvent.change(nameInput(), { target: { value: '' } })
@@ -68,13 +68,13 @@ describe('保存した検索を作成の窓', () => {
 
   it('名前を入れた後も、保存されるのは条件だという注意を残す', () => {
     mount()
-    fireEvent.change(nameInput(), { target: { value: '河野の未対応' } })
+    fireEvent.change(nameInput(), { target: { value: '見本の未対応' } })
     expect(notice('保存されるのは検索条件です。受信件数は最新の状態に自動更新されます。')?.getAttribute('data-tone')).toBe('warn')
   })
 
   it('窓の中で変えた条件と「よく使う」を、そのまま保存へ渡す', async () => {
     const { onSave } = mount()
-    fireEvent.change(nameInput(), { target: { value: '  河野の未読メール  ' } })
+    fireEvent.change(nameInput(), { target: { value: '  見本の未読メール  ' } })
     choose('保存する対応状況', 'resolved')
     choose('保存する絞り込み', 'reply')
     choose('保存する未読条件', 'unread')
@@ -83,7 +83,7 @@ describe('保存した検索を作成の窓', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /よく使うに追加/ }))
     await act(async () => { fireEvent.click(saveButton()) })
     expect(onSave).toHaveBeenCalledExactlyOnceWith({
-      name: '河野の未読メール', status: 'resolved', quickFilter: 'reply', channel: 'email',
+      name: '見本の未読メール', status: 'resolved', quickFilter: 'reply', channel: 'email',
       assignee: 'op-k', unreadOnly: true, favorite: true,
     })
   })
@@ -99,7 +99,7 @@ describe('保存した検索を作成の窓', () => {
   it('保存先の成功を受け取ってからだけ「保存しました」へ進む', async () => {
     let finish!: (result: SavedViewSaveResult) => void
     mount(() => new Promise((done) => { finish = done }))
-    fireEvent.change(nameInput(), { target: { value: '河野の未対応' } })
+    fireEvent.change(nameInput(), { target: { value: '見本の未対応' } })
     await act(async () => { fireEvent.click(saveButton()) })
     expect(screen.queryByText('保存しました')).toBeNull()
     await act(async () => { finish({ success: true }) })
@@ -108,11 +108,11 @@ describe('保存した検索を作成の窓', () => {
 
   it('保存先が失敗を返したら、理由を窓の中に赤く出して入力を残す', async () => {
     mount(async () => ({ success: false, error: '保存できませんでした。時間を置いてもう一度お試しください。' }))
-    fireEvent.change(nameInput(), { target: { value: '河野の未対応' } })
+    fireEvent.change(nameInput(), { target: { value: '見本の未対応' } })
     await act(async () => { fireEvent.click(saveButton()) })
     expect(screen.queryByText('保存しました')).toBeNull()
     expect(notice('保存できませんでした。時間を置いてもう一度お試しください。')?.getAttribute('data-tone')).toBe('danger')
-    expect(nameInput().value).toBe('河野の未対応')
+    expect(nameInput().value).toBe('見本の未対応')
     expect(nameInput().getAttribute('aria-invalid')).toBe('true')
   })
 

@@ -32,6 +32,7 @@ export interface Funnel {
   window_days: number;
   created_at: string;
   status: FunnelStatus;
+  confirmation_revision: number;
 }
 
 export interface FunnelStep {

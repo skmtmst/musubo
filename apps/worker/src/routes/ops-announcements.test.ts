@@ -47,9 +47,9 @@ function json(body: unknown, method = 'POST') {
   return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
 }
 
-const master: AuthenticatedStaff = { id: 'master-1', name: '坂本 真人', role: 'owner', readOnly: false, tenantId: null };
-const ownerA: AuthenticatedStaff = { id: 'owner-a', name: '山田 太郎', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
-const staffB: AuthenticatedStaff = { id: 'staff-b', name: '木下 花', role: 'staff', readOnly: false, tenantId: 'tenant-b' };
+const master: AuthenticatedStaff = { id: 'master-1', name: '見本 25', role: 'owner', readOnly: false, tenantId: null };
+const ownerA: AuthenticatedStaff = { id: 'owner-a', name: '見本 141', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
+const staffB: AuthenticatedStaff = { id: 'staff-b', name: '見本 148', role: 'staff', readOnly: false, tenantId: 'tenant-b' };
 
 beforeEach(() => {
   testDb = createTestD1();
@@ -61,10 +61,10 @@ beforeEach(() => {
   botProfile.fetch.mockResolvedValue({});
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_key, plan_status) VALUES ('tenant-a', '株式会社サンプル', 'active', 'standard', 'active')`).run();
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_key, plan_status) VALUES ('tenant-b', 'カフェ ムスビ', 'active', 'light', 'trialing')`).run();
-  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES ('master-1', '坂本 真人', 'owner', 'k0', NULL)`).run();
+  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES ('master-1', '見本 25', 'owner', 'k0', NULL)`).run();
   testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active) VALUES ('master-1', 1)`).run();
-  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, email) VALUES ('owner-a', '山田 太郎', 'owner', 'k1', 'tenant-a', 'a@example.com')`).run();
-  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, email) VALUES ('staff-b', '木下 花', 'staff', 'k2', 'tenant-b', 'b@example.com')`).run();
+  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, email) VALUES ('owner-a', '見本 141', 'owner', 'k1', 'tenant-a', 'a@example.com')`).run();
+  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, email) VALUES ('staff-b', '見本 148', 'staff', 'k2', 'tenant-b', 'b@example.com')`).run();
   // 運営会社（既定の統括）のアカウント = 契約者専用LINE の候補
   testDb.raw.prepare(`INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token, line_basic_id) VALUES ('ops-oa', 'musubo 運営（契約者専用）', 'c-ops', 's-ops', 't-ops', '@musubo')`).run();
   testDb.raw.prepare(`INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token, tenant_id) VALUES ('la-a', '店舗A', 'c-a', 's-a', 't-a', 'tenant-a')`).run();

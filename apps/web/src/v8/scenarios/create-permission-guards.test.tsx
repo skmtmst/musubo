@@ -269,6 +269,9 @@ it('ownerの情報保存とfolder作成は通常どおり進む', async () => {
 it.each(['owner', 'staff'] as const)('%sの下書き接続は通常のGETと保存を維持する', async role => {
   person(role, role === 'staff' ? { permissionKeys: ['/scenarios', 'scenario.definition.edit'] } : {})
   await ready()
+  await waitFor(() => expect(calls.draftGet).toHaveBeenCalledWith('account-a', 'scenario:sc-1:info'))
+  // 下書きの初回取得と、その結果を反映する React の更新が終わってから時計を進める。
+  await act(async () => { await calls.draftGet.mock.results[0].value.catch(() => {}) })
   vi.useFakeTimers()
   fireEvent.change(name(), { target: { value: '書きかけ' } })
   await act(async () => { await vi.advanceTimersByTimeAsync(2200) })
@@ -280,6 +283,8 @@ it.each(['owner', 'staff'] as const)('%sの下書き接続は通常のGETと保�
 
 it('入力後タイマーの前にread代理へ変わると自動保存0。保存済みの読取と入力を残す', async () => {
   await ready()
+  await waitFor(() => expect(calls.draftGet).toHaveBeenCalledWith('account-a', 'scenario:sc-1:info'))
+  await act(async () => { await calls.draftGet.mock.results[0].value.catch(() => {}) })
   vi.useFakeTimers()
   fireEvent.change(name(), { target: { value: '書きかけを保持' } })
   act(() => proxy())

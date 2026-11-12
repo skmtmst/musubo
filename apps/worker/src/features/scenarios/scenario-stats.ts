@@ -51,7 +51,12 @@ export async function computeScenarioStats(
     .bind(scenarioId)
     .first<EnrollmentRow>();
 
-  const enrolledTotal = enrollRow?.total ?? 0;
+  // COUNT は対象が0件でも必ず1行を返す。行が無ければ0人ではなく取得失敗。
+  if (!enrollRow || [enrollRow.total, enrollRow.active_count, enrollRow.completed_count, enrollRow.paused_count]
+    .some((count) => !Number.isSafeInteger(count) || count < 0)) {
+    throw new Error('scenario_enrollment_count_unavailable');
+  }
+  const enrolledTotal = enrollRow.total;
 
   // 2) 各 step の到達ユニーク人数
   const stepsResult = await db
@@ -77,9 +82,9 @@ export async function computeScenarioStats(
 
   return {
     enrolledTotal,
-    activeNow: enrollRow?.active_count ?? 0,
-    completed: enrollRow?.completed_count ?? 0,
-    paused: enrollRow?.paused_count ?? 0,
+    activeNow: enrollRow.active_count,
+    completed: enrollRow.completed_count,
+    paused: enrollRow.paused_count,
     steps,
   };
 }

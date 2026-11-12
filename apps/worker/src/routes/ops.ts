@@ -300,12 +300,15 @@ ops.post('/api/ops/impersonation/start', requirePlatformAdminWrite(), inputJsonB
 ops.post('/api/ops/impersonation/write', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
-  const session = await getActiveImpersonation(db, staff.id, await adminSessionTokenHashFromRequest(c));
-  if (!session) return inputError(c, { success: false, error: '代理ログイン中ではありません' }, 400, []);
   const body = await c.req.json().catch(() => null);
+  const expected = body?.expectedSessionId;
+  if (expected !== undefined && (typeof expected !== 'string' || !expected)) return inputError(c, { success: false, error: '確認対象が不正です' }, 400, ['expectedSessionId']);
+  const session = await getActiveImpersonation(db, staff.id, await adminSessionTokenHashFromRequest(c));
+  if (expected !== undefined && session?.id !== expected) return c.json({ success: false, error: '代理ログインが変わりました。読み直してから、もう一度選んでください' }, 409);
+  if (!session) return inputError(c, { success: false, error: '代理ログイン中ではありません' }, 400, []);
   const reason = reasonFrom(body);
   if (!reason) return inputError(c, { success: false, error: '理由を4文字以上で入力してください' }, 400, ["reason"]);
-  await switchImpersonationToWrite(db, session.id, reason);
+  if (!await switchImpersonationToWrite(db, session.id, reason)) return c.json({ success: false, error: '代理ログインが変わりました。読み直してから、もう一度選んでください' }, 409);
   const tenant = await tenantById(c, session.tenant_id);
   // 書き込みに切り替えたら、契約先の画面にも履歴を残す（要件 §3 37-5）。
   await recordPlatformAudit(db, {
@@ -334,17 +337,21 @@ ops.post('/api/ops/impersonation/read', requirePlatformAdminWrite(), inputJsonBo
 ops.post('/api/ops/impersonation/pii-reveal', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const db = dbFor(c.env);
-  const session = await getActiveImpersonation(db, staff.id, await adminSessionTokenHashFromRequest(c));
-  if (!session) return inputError(c, { success: false, error: '代理ログイン中ではありません' }, 400, []);
   const body = await c.req.json().catch(() => null);
+  const expected = body?.expectedSessionId;
+  if (expected !== undefined && (typeof expected !== 'string' || !expected)) return inputError(c, { success: false, error: '確認対象が不正です' }, 400, ['expectedSessionId']);
+  const session = await getActiveImpersonation(db, staff.id, await adminSessionTokenHashFromRequest(c));
+  if (expected !== undefined && session?.id !== expected) return c.json({ success: false, error: '代理ログインが変わりました。読み直してから、もう一度選んでください' }, 409);
+  if (!session) return inputError(c, { success: false, error: '代理ログイン中ではありません' }, 400, []);
   const reason = reasonFrom(body);
   if (!reason) return inputError(c, { success: false, error: '理由を4文字以上で入力してください' }, 400, ["reason"]);
-  await revealPiiForImpersonation(db, {
+  const revealed = await revealPiiForImpersonation(db, {
     impersonationSessionId: session.id,
     staffId: staff.id,
     tenantId: session.tenant_id,
     reason,
   });
+  if (!revealed) return c.json({ success: false, error: '代理ログインが変わりました。読み直してから、もう一度選んでください' }, 409);
   const tenant = await tenantById(c, session.tenant_id);
   await recordPlatformAudit(db, {
     staffId: staff.id,

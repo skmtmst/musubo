@@ -467,6 +467,18 @@ describe('ファネルの運用状態（停止・保管・編集）', () => {
     expect(all.items.map((item) => item.status).sort()).toEqual(['active', 'archived', 'stopped']);
   });
 
+  it('確認版の一致・不一致と旧呼び出しを扱い、状態が戻っても古い確認を拒否する', async () => {
+    const { funnelId } = await makeFunnel();
+    const base = { lineAccountId: 'account-a', funnelId };
+    const initial = await getFunnelsWithCurrentVersions(db, 'account-a');
+    expect(initial.items[0]).toMatchObject({ confirmation_revision: 1 });
+    await setFunnelStatus(db, { ...base, status: 'stopped', expectedStatus: 'active', expectedRevision: 1 } as never);
+    await setFunnelStatus(db, { ...base, status: 'active', expectedStatus: 'stopped' });
+    await expect(setFunnelStatus(db, { ...base, status: 'stopped', expectedStatus: 'active', expectedRevision: 1 } as never)).rejects.toThrow('analytics_funnel_status_conflict');
+    const result = await setFunnelStatus(db, { ...base, status: 'stopped', expectedStatus: 'active', expectedRevision: 3 } as never);
+    expect(result).toMatchObject({ status: 'stopped', confirmation_revision: 4 });
+  });
+
   it('状態遷移は現在状態を要し、保管は終端、二重操作は競合になる', async () => {
     const { funnelId } = await makeFunnel();
 

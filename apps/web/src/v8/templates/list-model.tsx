@@ -26,6 +26,7 @@ export type ChipKey = 'single' | 'multiple' | 'variables' | 'unused'
 
 export interface Template {
   id: string
+  confirmationRevision?: number
   accountId?: string | null
   name: string
   category: string

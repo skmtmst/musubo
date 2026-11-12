@@ -114,7 +114,7 @@ export async function saveProfile(
   statements.push(
     db
       .prepare(
-        `INSERT INTO account_styles(line_account_id,style,answers_json,cards_json,settings_json,version,updated_at,updated_by,selected_at,selection_mode) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(line_account_id) DO UPDATE SET style=excluded.style,answers_json=excluded.answers_json,cards_json=excluded.cards_json,settings_json=excluded.settings_json,version=excluded.version,updated_at=excluded.updated_at,updated_by=excluded.updated_by,selected_at=excluded.selected_at,selection_mode=excluded.selection_mode`,
+        `INSERT INTO account_styles(line_account_id,style,answers_json,cards_json,settings_json,version,updated_at,updated_by,selected_at,selection_mode,first_selected_at) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(line_account_id) DO UPDATE SET style=excluded.style,answers_json=excluded.answers_json,cards_json=excluded.cards_json,settings_json=excluded.settings_json,version=excluded.version,updated_at=excluded.updated_at,updated_by=excluded.updated_by,selected_at=excluded.selected_at,selection_mode=excluded.selection_mode,first_selected_at=COALESCE(account_styles.first_selected_at,excluded.first_selected_at)`,
       )
       .bind(
         account,
@@ -127,6 +127,7 @@ export async function saveProfile(
         actor,
         selected ? now : null,
         styleMode,
+        selected ? now : null,
       ),
   );
   if (selected && style === 'restaurant') {

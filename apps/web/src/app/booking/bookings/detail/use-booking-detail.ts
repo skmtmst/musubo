@@ -56,9 +56,16 @@ export function useBookingDetail() {
   if (targetRef.current.accountId !== selectedAccountId || targetRef.current.bookingId !== id) targetGeneration.current += 1
   targetRef.current = { accountId: selectedAccountId, bookingId: id }
   const decideGeneration = useRef<number | null>(null)
+  const decisionTicket = useRef<object | null>(null)
+  const renderedDecisionTicket = decisionTicket.current
+  useEffect(() => () => { decisionTicket.current = null }, [])
   const setDecideTarget = (action: BookingAction | null) => {
+    decisionTicket.current = action === null ? null : {}
     decideGeneration.current = action === null ? null : targetGeneration.current
     setDecideTargetState(action)
+  }
+  const closeDecideTarget = () => {
+    if (renderedDecisionTicket && decisionTicket.current === renderedDecisionTicket) setDecideTarget(null)
   }
   const isCurrentTarget = useCallback(
     (target: { accountId: string; bookingId: string; generation?: number }) =>
@@ -321,14 +328,14 @@ export function useBookingDetail() {
   }
 
   const decide = async (action: BookingAction) => {
-    if (!selectedAccountId || decideGeneration.current !== targetGeneration.current) return
+    if (!selectedAccountId || !renderedDecisionTicket || decisionTicket.current !== renderedDecisionTicket || decideGeneration.current !== targetGeneration.current) return
     const actionTarget = { accountId: selectedAccountId, bookingId: id, generation: targetGeneration.current }
     setActing(true)
     setError('')
     try {
       await bookingApi.decideRequest(selectedAccountId, id, action)
       // R322: 承認中に別の予約へ移っていたら、今の画面を触らない。
-      if (!isCurrentTarget(actionTarget)) return
+      if (!isCurrentTarget(actionTarget) || decisionTicket.current !== renderedDecisionTicket) return
       notifyToast(
         action === 'approve' ? '予約を確定しました'
           : action === 'reject' ? '予約をお断りしました'
@@ -340,7 +347,7 @@ export function useBookingDetail() {
       return true
     } catch (e) {
       // R322: 前の予約の失敗で今の画面を汚さない。
-      if (!isCurrentTarget(actionTarget)) return
+      if (!isCurrentTarget(actionTarget) || decisionTicket.current !== renderedDecisionTicket) return
       setError(describeApiFailure(e, '予約の変更'))
       return false
     } finally {
@@ -593,6 +600,7 @@ export function useBookingDetail() {
     acting,
     decideTarget,
     setDecideTarget,
+    closeDecideTarget,
     error,
     setError,
     loadError,

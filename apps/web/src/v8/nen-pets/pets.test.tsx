@@ -47,7 +47,7 @@ const KOMUGI: NenPetRow = {
   weightKg: 9.2, neutered: 'yes', activityLevel: 'normal', activityLabel: 'ふつう', productName: 'ドライフード（成犬）',
   feeding: { dailyKcal: 560, dailyGrams: 128, factorLabel: '避妊・去勢済み', stageLabel: '成犬', venisonGrams: 12, venisonKcal: 56, treatName: null },
   imageUrl: null, updatedAt: '2026-09-28T10:00:00+09:00', weightUpdatedAt: '2026-09-28T10:00:00+09:00', weightStale: false,
-  owner: { friendId: 'friend-3', name: '田中 明子', pictureUrl: null, customerId: '10234' },
+  owner: { friendId: 'friend-3', name: '見本 169', pictureUrl: null, customerId: '10234' },
 }
 const HANA: NenPetRow = { ...KOMUGI, id: 'pet-hana', name: 'ハナ', callName: 'ハナちゃん', animalType: 'cat', breed: '雑種', weightStale: true, weightUpdatedAt: '2026-06-12T10:00:00+09:00', feeding: { ...KOMUGI.feeding!, venisonGrams: null, stageLabel: 'シニア' } }
 const LIST: NenPetListData = {
@@ -174,7 +174,7 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
     await render('pets')
     await click(byLabel('「こむぎ」の操作'))
     await click(byText('ペットの情報を編集する'))
-    expect(document.body.textContent).toContain('飼い主 田中 明子さん・EC-10234')
+    expect(document.body.textContent).toContain('飼い主 見本 169さん・EC-10234')
     const weight = document.querySelector<HTMLInputElement>('input[aria-label="体重"]')
     expect(weight?.value).toBe('9.2 kg')
     await act(async () => { fireEvent.change(weight!, { target: { value: '9.0 kg' } }) })

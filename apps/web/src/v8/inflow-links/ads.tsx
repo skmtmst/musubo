@@ -168,6 +168,7 @@ export default function AdsV8() {
   const [cancelReason, setCancelReason] = useState('')
   const [cancelBusy, setCancelBusy] = useState(false)
   const [cancelError, setCancelError] = useState('')
+  const [staleCancelNotice, setStaleCancelNotice] = useState('')
   const [cancelReasonError, setCancelReasonError] = useState('')
   const [manualOpen, setManualOpen] = useState(false)
   const [manualBusy, setManualBusy] = useState(false)
@@ -299,8 +300,12 @@ export default function AdsV8() {
     }
   }
 
-  const openCancel = (entry: ManualCostEntry) => {
-    if (loadedCostContext.current !== cancelContext.current.generation) return
+  const openCancel = (entry: ManualCostEntry, generation: number) => {
+    if (generation !== cancelContext.current.generation || loadedCostContext.current !== generation) {
+      setStaleCancelNotice('アカウントが変わりました。費用を選び直してください。')
+      return
+    }
+    setStaleCancelNotice('')
     cancelRef.current = { target: entry, generation: cancelContext.current.generation }
     setCancelTarget(entry)
     setCancelReason('')
@@ -388,6 +393,7 @@ export default function AdsV8() {
         {readonly ? (
           <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
+        {staleCancelNotice ? <Notice tone="warn">{staleCancelNotice}</Notice> : null}
         {loading && platforms.length === 0 ? (
           <ListState kind="loading" title="広告連携を読み込んでいます" />
         ) : failed ? (
@@ -518,6 +524,7 @@ export default function AdsV8() {
               <h2 className={styles.cardTitle} id="ads-manual">手で入れた費用</h2>
               <p className={styles.lead}>行の「…」から取り消すと、その日の費用は集計から外れます。</p>
               {manualEntries.map((entry) => {
+                const generation = cancelContext.current.generation
                 const cancelled = entry.cancelledAt != null
                 const route = entry.entryRouteId ? routeById.get(entry.entryRouteId) : undefined
                 return (
@@ -535,7 +542,7 @@ export default function AdsV8() {
                           label={`${shortDay(entry.day)} ${entry.sourceLabel}の操作`}
                           open={selectedEntryId === entry.id}
                           onOpenChange={(open) => setSelectedEntryId(open ? entry.id : null)}
-                          items={[{ id: 'cancel', label: '取り消す', icon: <XCircle size={16} aria-hidden />, onSelect: () => openCancel(entry) }]}
+                          items={[{ id: 'cancel', label: '取り消す', icon: <XCircle size={16} aria-hidden />, onSelect: () => openCancel(entry, generation) }]}
                         />
                       ) : null}
                     </span>

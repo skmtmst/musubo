@@ -18,7 +18,7 @@ export async function persistMeetGeneration(db: D1Database, input: RegisterMeetC
   const writes = [db.prepare(`INSERT INTO meet_consultations
     (id,external_event_id,friend_id,title,starts_at,ends_at,meet_url,status,booking_id,booking_version,cancel_claim_id,schedule_revision,created_at,updated_at)
     VALUES(?,?,?,?,?,?,?,'confirmed',?,?,NULL,?,?,?)
-    ON CONFLICT(external_event_id) DO UPDATE SET friend_id=excluded.friend_id,title=excluded.title,
+    ON CONFLICT(external_event_id) DO UPDATE SET confirmation_revision=meet_consultations.confirmation_revision+1, friend_id=excluded.friend_id,title=excluded.title,
       starts_at=excluded.starts_at,ends_at=excluded.ends_at,meet_url=excluded.meet_url,status='confirmed',
       booking_id=excluded.booking_id,booking_version=excluded.booking_version,cancel_claim_id=NULL,
       schedule_revision=excluded.schedule_revision,updated_at=excluded.updated_at

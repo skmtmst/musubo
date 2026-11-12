@@ -24,8 +24,8 @@ beforeEach(() => {
   db = created.db
   raw = created.raw
 
-  insertFriend(raw, 'a', { display_name: '田中 太郎', real_name: '田中太郎', created_at: '2026-01-10T10:00:00.000' })
-  insertFriend(raw, 'b', { display_name: '鈴木 花子', private_memo: 'VIP のお客様', created_at: '2026-02-10T10:00:00.000' })
+  insertFriend(raw, 'a', { display_name: '見本 167', real_name: '見本太郎', created_at: '2026-01-10T10:00:00.000' })
+  insertFriend(raw, 'b', { display_name: '見本 184', private_memo: 'VIP のお客様', created_at: '2026-02-10T10:00:00.000' })
   insertFriend(raw, 'c', { display_name: 'Carol', status_message: 'よろしく', created_at: '2026-03-10T10:00:00.000' })
 
   raw.prepare(`INSERT INTO tags (id, name, color) VALUES ('t1','犬','#000000'), ('t2','猫','#000000')`).run()
@@ -84,7 +84,7 @@ describe('名前', () => {
     expect(
       await idsMatching({
         operator: 'AND',
-        rules: [{ type: 'name', value: { text: '田中 鈴木', targets: ['display'] } }],
+        rules: [{ type: 'name', value: { text: '167 184', targets: ['display'] } }],
       }),
     ).toEqual(['a', 'b'])
   })
@@ -95,13 +95,13 @@ describe('名前', () => {
     expect(
       await idsMatching({
         operator: 'AND',
-        rules: [{ type: 'name', value: { text: '田中太郎', targets: ['real'] } }],
+        rules: [{ type: 'name', value: { text: '見本太郎', targets: ['real'] } }],
       }),
     ).toEqual(['a'])
     expect(
       await idsMatching({
         operator: 'AND',
-        rules: [{ type: 'name', value: { text: '田中太郎', targets: ['display'] } }],
+        rules: [{ type: 'name', value: { text: '見本太郎', targets: ['display'] } }],
       }),
     ).toEqual([])
   })
@@ -125,7 +125,7 @@ describe('名前', () => {
     expect(
       await idsMatching({
         operator: 'AND',
-        rules: [{ type: 'name', value: { text: '田中太郎' } }],
+        rules: [{ type: 'name', value: { text: '見本太郎' } }],
       }),
     ).toEqual(['a'])
   })
@@ -135,13 +135,13 @@ describe('名前', () => {
     expect(
       await idsMatching({
         operator: 'AND',
-        rules: [{ type: 'name', value: { text: '田中太郎', targets: ['display', 'real'] } }],
+        rules: [{ type: 'name', value: { text: '見本太郎', targets: ['display', 'real'] } }],
       }),
     ).toEqual(['a'])
     expect(
       await idsMatching({
         operator: 'AND',
-        rules: [{ type: 'name', value: { text: '田中太郎', targets: ['display', 'system'] } }],
+        rules: [{ type: 'name', value: { text: '見本太郎', targets: ['display', 'system'] } }],
       }),
     ).toEqual([])
   })
@@ -195,7 +195,7 @@ describe('and と or の入れ子', () => {
         {
           operator: 'OR',
           rules: [
-            { type: 'name', value: { text: '田中', targets: ['display'] } },
+            { type: 'name', value: { text: '167', targets: ['display'] } },
             { type: 'friend_field', value: { fieldId: 'f1', op: 'equals', text: '3' } },
           ],
         },

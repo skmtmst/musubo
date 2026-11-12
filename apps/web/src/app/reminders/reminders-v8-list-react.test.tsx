@@ -359,7 +359,7 @@ test('リマインダの全件選択はページ外の停止対象も確認す�
   expect(host.textContent).toContain('101件を選択中')
   const stop = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === '止める') as HTMLElement
   await act(async () => stop.click())
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('101件のリマインダを停止しますか？')
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('101 件のリマインダを停止しますか？')
 })
 
 test('初回読込では空と表示せず、失敗と成功0件を別の案内にする', async () => {

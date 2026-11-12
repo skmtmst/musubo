@@ -28,6 +28,7 @@ const scenario = vi.hoisted(() => ({
   description: '',
   triggerType: 'friend_add',
   isActive: true,
+  contentRevision: 1,
   allowConcurrent: true,
   folderId: null,
   deliveryMode: 'absolute_time',
@@ -227,6 +228,18 @@ describe('通を削除する確認', () => {
     expect(deleteStep).not.toHaveBeenCalled()
   })
 
+  it('閉じた確認の古い確定は新しい確認を開いても送らない', async () => {
+    await render()
+    const oldDialog = await openDeleteDialog(2)
+    const button = within(oldDialog).getByRole('button', { name: '削除する' })
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    fireEvent.click(within(oldDialog).getByRole('button', { name: 'キャンセル' }))
+    await openDeleteDialog(1)
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+    expect(deleteStep).not.toHaveBeenCalled()
+  })
+
   it('成功したときだけ窓を閉じ、シナリオと到達実績を読み直す', async () => {
     deleteStep.mockResolvedValue({ success: true, data: null })
     await render()
@@ -234,7 +247,7 @@ describe('通を削除する確認', () => {
     readStats.mockClear()
     const dialog = await openDeleteDialog(2)
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '削除する' })) })
-    expect(deleteStep).toHaveBeenCalledWith('sc-1', 'step-2')
+    expect(deleteStep).toHaveBeenCalledWith('sc-1', 'step-2', 1)
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
     expect(readScenario).toHaveBeenCalledWith('sc-1', true)
     expect(readStats).toHaveBeenCalledWith('sc-1', true)

@@ -17,6 +17,7 @@ import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
  * データの口・送る形は今の画面（app/restaurant-test/v8/tables.tsx）と同じ。動きは BEHAVIOR.md。
  */
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { ApiError } from '@/lib/api/transport/errors'
 import KpiCard from '@/components/shared/kpi-card'
 import { useEffect,useMemo, useRef, useState } from 'react'
 import { Grid2X2, Inbox, Plus, Settings2 } from 'lucide-react'
@@ -102,24 +103,37 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
   const [deleteError, setDeleteError] = useState('')
   const [stopId, setStopId] = useState('')
   const [deleteScope, setDeleteScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
-  const [stopScope, setStopScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
+  const [stopScope, setStopScope] = useState<{ scope: typeof renderedScope; ticket: object; table: RestaurantTable; reservations: RestaurantReservation[]; asOf: string } | null>(null)
   const deleteTicket = useRef<object | null>(null)
   const stopTicket = useRef<object | null>(null)
   const [stopError, setStopError] = useState('')
+  const [stopStale, setStopStale] = useState(false)
+  const [pendingStop, setPendingStop] = useState<{ id: string; scope: typeof renderedScope; before: typeof tableDefinition } | null>(null)
   const [stopProgress, setStopProgress] = useState('')
   const stopProgressRef = useRef(false)
   const [moveMode, setMoveMode] = useState<MoveMode>('move')
   const editing = editor && editor !== 'new' ? rows.find((row) => row.id === editor) ?? null : null
   const deleting = deleteScope?.scope === scope.current && deleteScope.ticket === deleteTicket.current ? rows.find((row) => row.id === deleteId) : undefined
-  const stopping = stopScope?.scope === scope.current && stopScope.ticket === stopTicket.current ? rows.find((row) => row.id === stopId) : undefined
-  const now = Date.now()
+  const stopping = stopScope?.scope === scope.current && stopScope.ticket === stopTicket.current && stopScope.table.id === stopId ? stopScope.table : undefined
+  const openStop = (table: RestaurantTable) => {
+    if (!selectedAccountId || !store || !snapshotCurrentRef.current || !canEditRef.current || renderedScope !== scope.current) return
+    const ticket = {}, asOf = new Date().toISOString()
+    const reservations = data.reservations.filter(item => seatBoardEntry(item as unknown as Record<string, unknown>).resourceIds.includes(table.id) && !['cancelled', 'no_show', 'completed', 'visited', 'seated'].includes(item.status) && !item.departed_at && new Date(item.ends_at).getTime() > Date.parse(asOf)).sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+    stopTicket.current = ticket
+    setStopScope({ scope: renderedScope, ticket, table, reservations, asOf })
+    setStopError(''); setStopStale(false); stopProgressRef.current = false; setStopProgress(''); setMoveMode('move'); setStopId(table.id)
+  }
+  useEffect(() => {
+    if (!pendingStop) return
+    if (pendingStop.scope !== scope.current || !canEditRef.current) { setPendingStop(null); return }
+    if (busy || !snapshotAccountCurrent || !tableDefinition || tableDefinition === pendingStop.before) return
+    const table = data.tables.find(item => item.id === pendingStop.id && item.store_id === scope.current.storeId && item.is_active)
+    setPendingStop(null)
+    if (table) openStop(table)
+  }, [pendingStop, busy, snapshotAccountCurrent, tableDefinition, data]) // eslint-disable-line react-hooks/exhaustive-deps
+
   /* この卓に入っている、これから先の予約（取消・無断キャンセル・来店済みは除く）。 */
-  const upcoming = useMemo(() => (stopping
-    ? data.reservations
-      .filter((item) => seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(stopping.id) && !['cancelled', 'no_show', 'completed', 'visited', 'seated'].includes(item.status) && !item.departed_at)
-      .filter((item) => new Date(item.ends_at).getTime() > now)
-      .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
-    : []), [data.reservations, stopping, now])
+  const upcoming = stopping ? stopScope!.reservations : []
 
   const openNew = (floorId?:string) => {
     setEditorError('')
@@ -204,6 +218,8 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
       ...(!editing?{isActive:draft.isActive}:{}),
       ...(editing&&draft.isActive&&!editing.is_active?{isActive:true}:{}),
     }
+    const saveScope = renderedScope
+    const beforeSave = tableDefinition
     let ok = false
     try {
       const options = { rethrow: () => true }
@@ -246,12 +262,12 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
     if (ok) {
       setEditor(null)
       if(editing&&editing.is_active&&!draft.isActive){
-        const ticket={};stopTicket.current=ticket;setStopScope({scope:renderedScope,ticket});setStopError('');stopProgressRef.current=false;setStopProgress('');setMoveMode('move');setStopId(editing.id)
+        if (saveScope === scope.current && canEditRef.current) setPendingStop({ id: editing.id, scope: saveScope, before: beforeSave })
       }
     }
   }
 
-  /* 先の予約を移して（または未配席に戻して）から卓を止める。1件ずつ送り、失敗したらそこで止める。 */
+  /* 確認した予約と卓の版を一括で照合し、移動と停止をまとめて行う。 */
   const stop = (table: RestaurantTable, reservations: RestaurantReservation[]) => {
     if (!alive.current || stopProgressRef.current || !selectedAccountId || !snapshotCurrentRef.current || !canEditRef.current || !stopScope || stopScope.scope !== scope.current || stopScope.ticket !== stopTicket.current) return
     const belongs = () => alive.current && canEditRef.current && stopScope.scope === scope.current && stopScope.ticket === stopTicket.current
@@ -263,20 +279,30 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
     void mutate(async () => {
       try {
         const taken: RestaurantReservation[] = data.reservations.filter((item) => item.table_id !== table.id)
+        const moves: Array<{ id: string; expectedRevision: number; targetTableId: string | null }> = []
         for (const item of reservations) {
           if (!current()) throw new QuietError()
-          const target = moveMode === 'move' ? pickMoveTarget(item, rows.filter((row) => row.id !== table.id), taken) : null
-          inFlight = true
-          await restaurantTestApi.updateReservation(selectedAccountId, item.id, { tableId: target?.id ?? null, expectedVersion: item.customer_version ?? 1 })
-          inFlight = false
-          if (target) { moved += 1; taken.push({ ...item, table_id: target.id }) } else { unassigned += 1 }
+          const target = moveMode === 'move' ? pickMoveTarget(item, rows.filter((row) => row.id !== table.id && row.id !== item.table_id), taken) : null
+          if (!item.confirmation_revision) throw new Error('予約を読み直してください')
+          moves.push({ id: item.id, expectedRevision: item.confirmation_revision, targetTableId: target?.id ?? null })
+          if (target) taken.push({ ...item, table_id: target.id })
         }
         if (!current()) throw new QuietError()
+        if (!table.confirmation_revision) throw new Error('卓を読み直してください')
         inFlight = true
-        await restaurantTestApi.updateTable(selectedAccountId, table.id, { isActive: false })
+        await restaurantTestApi.stopTable(selectedAccountId, table.id, { storeId: table.store_id, expectedTableRevision: table.confirmation_revision, asOf: stopScope.asOf, reservations: moves })
         inFlight = false
+        moved = moves.filter(move => move.targetTableId !== null).length
+        unassigned = moves.length - moved
+        if (!current()) throw new QuietError()
         return { moved, unassigned }
       } catch (error) {
+        if (error instanceof ApiError && error.status === 409) {
+          const detail = error.data && typeof error.data === 'object' && 'reason' in error.data ? error.data.reason : undefined
+          if (current()) setStopStale(true)
+          if (current()) setStopError(typeof detail === 'string' && /[ぁ-んァ-ヶ一-龠]/u.test(detail) ? detail : japaneseDetailOf(error) || '確認した内容が変わりました。読み直してください。')
+          throw new QuietError()
+        }
         const target = accounts.find(account => account.id === selectedAccountId)?.name || '名前を確認できないLINEアカウント'
         const progress = `${target}・${store?.name || '名前を確認できない店舗'}の卓「${table.code}」：予約${moved + unassigned}件の変更を確認しました（別の卓へ${moved}件、未配席${unassigned}件）。${inFlight ? '通信中の変更は結果を確認できません。' : ''}予約台帳と卓の状態を確認してください。`
         if (!current()) { notifyToast(progress, { tone: 'info', duration: 0 }); throw new QuietError() }
@@ -302,6 +328,11 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
     )
   }
 
+  const reloadStop = () => {
+    if (stopScope?.ticket !== stopTicket.current) return
+    stopTicket.current = null; setStopId(''); setStopStale(false); void ctx.reload()
+  }
+
   const closeStop = () => {
     if (stopScope?.ticket !== stopTicket.current) return
     stopTicket.current = null; setStopId('')
@@ -320,6 +351,12 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
         <KpiCard title="受付中の定員" value={activeRows.reduce((sum, item) => sum + item.max_capacity, 0)} unit="名" detail="最大人数の合計" icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="個室" value={rows.filter((item) => item.partition_type === 'private').length} unit="卓" detail="個室の卓数" icon={<Inbox size={16} aria-hidden />} presentation="band" />
       </StatRow>
+      {/* 卓の変更を保存したあと最新の状態を読めないと、止める確認を開けない。理由と読み直しを出し、読めたら確認を開く。 */}
+      {pendingStop && !busy && !tableDefinition ? (
+        <Notice tone="warn" role="alert" action={<Button variant="text" size="inline" onClick={() => void ctx.reload()}>もう一度読み込む</Button>}>
+          卓の変更は保存しました。最新の予約を読み込めなかったため、止める確認を開けていません。
+        </Notice>
+      ) : null}
       <DetailColumns variant="restaurant-tables" asideLabel="卓一覧を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title="卓一覧" titleActions={<Button presentation="restaurant" disabled={!selectedAccountId || !store || !snapshotAccountCurrent} onClick={() => setAutomationOpen(true)}><Settings2 size={15} aria-hidden="true" />自動配席の設定</Button>} headerActions={<RestaurantTableHeaderActions statusFilter={statusFilter} onStatusFilter={setStatusFilter}/>}>
           <ul className={styles.detailList}>
             {visibleRows.map((item) => (
@@ -331,7 +368,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
                 <span className={styles.detailStatus}><StatusBadge tone={item.is_active ? 'success' : 'neutral'} dot={false}>{item.is_active ? '受付中' : '停止中'}</StatusBadge></span>
                 <TableRowActions table={item} canEdit={canEdit} busy={busy} pendingAccount={!snapshotAccountCurrent} onEdit={openEdit} onDuplicate={table=>{setSelectedId(table.id);setDuplicateRequest(n=>n+1)}} onResume={resume}
                   onDelete={(table) => { if (!selectedAccountId || !store || !snapshotAccountCurrent || !canEditRef.current || renderedScope !== scope.current) return; const ticket = {}; deleteTicket.current = ticket; setDeleteScope({ scope: renderedScope, ticket }); setDeleteError(''); setDeleteId(table.id) }}
-                  onStop={(table) => { if (!selectedAccountId || !store || !snapshotAccountCurrent || !canEditRef.current || renderedScope !== scope.current) return; const ticket = {}; stopTicket.current = ticket; setStopScope({ scope: renderedScope, ticket }); setStopError(''); stopProgressRef.current = false; setStopProgress(''); setMoveMode('move'); setStopId(table.id) }} />
+                  onStop={openStop} />
               </li>
             ))}
           </ul>
@@ -394,7 +431,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
         actions={(
           <>
             <Button presentation="restaurant" onClick={closeStop} disabled={busy}>キャンセル</Button>
-            <Button presentation="restaurant" variant="danger" disabled={busy} lockedReason={stopProgress ? '予約台帳と卓の状態を確認してから、操作をやり直してください。' : undefined} onClick={() => { if (stopping) stop(stopping, upcoming) }}>
+            <Button presentation="restaurant" variant="danger" disabled={busy || stopStale} lockedReason={stopProgress ? '予約台帳と卓の状態を確認してから、操作をやり直してください。' : undefined} onClick={() => { if (stopping) stop(stopping, upcoming) }}>
               {upcoming.length === 0 ? '止める' : moveMode === 'move' ? '予約を移して止める' : '未配席に戻して止める'}
             </Button>
           </>
@@ -402,6 +439,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
       >
         {stopScope?.scope.accountId && store && <OperationTargetSummary accounts={[{ id: stopScope.scope.accountId, name: accounts.find(account => account.id === stopScope.scope.accountId)?.name }]} store={{ id: store.id, name: store.name }} />}
         {stopError ? <Notice tone="danger" role="alert" message={stopError} /> : null}
+        {stopStale ? <Button presentation="restaurant" onClick={reloadStop} disabled={busy}>読み直す</Button> : null}
         {stopProgress ? <Notice tone="info">{stopProgress}</Notice> : null}
         {upcoming.length === 0 ? (
           <>

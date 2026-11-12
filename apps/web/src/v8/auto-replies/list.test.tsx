@@ -100,7 +100,7 @@ beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
   listReplies.mockImplementation(async () => ({ success: true, data: [ruleA, ruleB] }))
   listTemplates.mockImplementation(async () => ({ success: true, data: [] }))
-  summary.mockImplementation(async () => ({ success: true, data: { conflictCount: 0 } }))
+  summary.mockImplementation(async () => ({ success: true, data: { conflictCount: 0, dispatchStopped: false } }))
   listFolders.mockImplementation(async () => ({ success: true, data: [], unfiledCount: 0 }))
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -322,6 +322,21 @@ it('確認できる自動応答の有効状態を一覧の上に示す', async (
   act(() => { root.render(<AutoRepliesListV8 />) })
   await flush()
   expect(host.textContent).toContain('確認できる自動応答に、有効なルールがあります。')
+})
+
+it('緊急停止中は有効ルールがあっても自動応答を送らないと示す', async () => {
+  summary.mockResolvedValue({ success: true, data: { conflictCount: 0, dispatchStopped: true } })
+  act(() => { root.render(<AutoRepliesListV8 />) })
+  await flush()
+  expect(host.textContent).toContain('停止中です。いま自動応答は送られません。')
+  expect(host.textContent).not.toContain('確認できる自動応答に、有効なルールがあります。')
+})
+
+it('送信状態が読めなければ不明と表示する', async () => {
+  summary.mockResolvedValue({ success: true, data: { conflictCount: 0, dispatchStopped: null } })
+  act(() => { root.render(<AutoRepliesListV8 />) })
+  await flush()
+  expect(host.textContent).toContain('自動応答全体の送信状態を確認できません。')
 })
 
 it('確認できる有効なルールがない時はその範囲を明示する', async () => {

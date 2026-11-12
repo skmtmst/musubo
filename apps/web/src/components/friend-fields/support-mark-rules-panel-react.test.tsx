@@ -203,6 +203,25 @@ describe('保存と停止', () => {
     expect(net.create).toHaveBeenLastCalledWith('mk1', 'acc', expect.objectContaining({ name: '新しいきまり' }), expect.any(String))
   })
 
+  it('停止の窓に操作するアカウントと環境を表示する', async () => {
+    render(<SupportMarkRulesPanel accountId="acc" markId="mk1" markName="対応中" />)
+    fireEvent.click(await screen.findByRole('button', { name: '停止する' }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
+    expect(dialog.textContent).toContain('対応中')
+  })
+
+  it('アカウントを変えて戻しても前の停止確認を復活させない', async () => {
+    const view = render(<SupportMarkRulesPanel accountId="acc" markId="mk1" markName="対応中" />)
+    fireEvent.click(await screen.findByRole('button', { name: '停止する' }))
+    await screen.findByRole('alertdialog')
+    view.rerender(<SupportMarkRulesPanel accountId="acc-2" markId="mk1" markName="対応中" />)
+    view.rerender(<SupportMarkRulesPanel accountId="acc" markId="mk1" markName="対応中" />)
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(net.archive).not.toHaveBeenCalled()
+  })
+
   it('停止の窓は履歴が残ると言い、確定で読んだ版つきの停止の口を呼ぶ', async () => {
     render(<SupportMarkRulesPanel accountId="acc" markId="mk1" markName="対応中" />)
     fireEvent.click(await screen.findByRole('button', { name: '停止する' }))
@@ -213,4 +232,39 @@ describe('保存と停止', () => {
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'このルールを停止' })) })
     expect(net.archive).toHaveBeenCalledWith('rule-1', 'acc', 3)
   })
+})
+
+it('自動変更ルールの入力後にキャンセルすると破棄を確認する', async () => {
+  render(<SupportMarkRulesPanel accountId="acc" markId="mk1" markName="対応中" />)
+  fireEvent.click(await screen.findByRole('button', { name: /ルールを作る/ }))
+  const field = screen.getByPlaceholderText('例：担当者が決まったら対応中へ') as HTMLInputElement
+  fireEvent.change(field, { target: { value: '作りかけのルール' } })
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('自動変更ルールへの変更')
+  expect(field.value).toBe('作りかけのルール')
+})
+
+it('ルールの窓を閉じるときも中の未保存入力を確認する', async () => {
+  render(<MarkEditor markId="mk1" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'きまりを作る' }))
+  const outer = await screen.findByRole('dialog', { name: '自動で変えるきまり' })
+  fireEvent.click(await within(outer).findByRole('button', { name: /ルールを作る/ }))
+  const field = within(outer).getByPlaceholderText('例：担当者が決まったら対応中へ') as HTMLInputElement
+  fireEvent.change(field, { target: { value: '作りかけのルール' } })
+  fireEvent.click(within(outer).getByRole('button', { name: '閉じる' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  expect(field.value).toBe('作りかけのルール')
+})
+
+it('親のマークだけを編集した状態では、未変更のルール窓を確認なしで閉じて親の入力を残す', async () => {
+  render(<MarkEditor markId="mk1" />)
+  const name = await screen.findByPlaceholderText('例：要確認') as HTMLInputElement
+  fireEvent.change(name, { target: { value: '親の編集中' } })
+  fireEvent.click(await screen.findByRole('button', { name: 'きまりを作る' }))
+  const outer = await screen.findByRole('dialog', { name: '自動で変えるきまり' })
+  fireEvent.click(within(outer).getByRole('button', { name: '閉じる' }))
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '自動で変えるきまり' })).toBeNull())
+  expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
+  expect(name.value).toBe('親の編集中')
 })

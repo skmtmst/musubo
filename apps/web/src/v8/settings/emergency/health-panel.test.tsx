@@ -212,6 +212,25 @@ describe('健全性チェックの表', () => {
     expect(await screen.findByRole('heading', { name: '開いている異常 2 件' })).toBeTruthy()
   })
 
+  it('開いている異常は重要度順、同じ重要度では新しい順に示す', async () => {
+    calls.healthResponse = () => Promise.resolve(snapshot([]))
+    const alert = (id: string, severity: string, minutes: number) => ({
+      id, lineAccountId: 'account-1', checkKey: 'webhook', status: 'open', severity,
+      summary: `異常-${id}`, sourceRunId: 'run-1', firstDetectedAt: minutesAgo(minutes), lastDetectedAt: minutesAgo(minutes),
+      acknowledgedAt: null, acknowledgedById: null, acknowledgementNote: null, resolvedAt: null, version: 1, reopenedCount: 0,
+      createdAt: minutesAgo(minutes), updatedAt: minutesAgo(minutes),
+      notification: { queued: 0, sending: 0, sent: 1, failed: 0, unconfigured: 0, total: 1 }, events: [],
+    })
+    calls.alertsResponse = () => Promise.resolve({ success: true, data: [alert('注意', 'warning', 1), alert('古いエラー', 'danger', 30), alert('新しいエラー', 'danger', 5)] })
+    render(<HealthPanelV8 canManage accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
+    const section = await screen.findByRole('region', { name: '開いている異常' })
+    const text = section.textContent ?? ''
+    for (const label of ['異常-新しいエラー', '異常-古いエラー', '異常-注意']) expect(text).toContain(label)
+    expect(text.indexOf('異常-新しいエラー')).toBeLessThan(text.indexOf('異常-古いエラー'))
+    expect(text.indexOf('異常-古いエラー')).toBeLessThan(text.indexOf('異常-注意'))
+    expect(text).not.toContain('古い異常')
+  })
+
   it('E33: 48時間より古い確認は日に直す（72時間前→3日前）', async () => {
     calls.healthResponse = () => Promise.resolve(snapshot([
       { checkKey: 'webhook', status: 'normal', summary: '受け取れています', observedAt: minutesAgo(3 * 24 * 60) },

@@ -8,7 +8,7 @@ import { Circle, CircleCheck, CircleX, GitBranch, Pencil, RefreshCw, ShieldCheck
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 
-import { api, ApiError, type RichMenuPublishRun, type RichMenuTargetPreview } from '@/lib/api';
+import { api, ApiError, type RichMenuPublishRun, type RichMenuTargetPreview, type RichMenuDeleteImpact } from '@/lib/api';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { PageFrame, PageHeading } from '@/components/templates/page-frame';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
@@ -38,9 +38,12 @@ type Group = {
   accountId: string
   name: string
   status: string
+  version?: number
   isDefaultForAll: boolean
   targetingEnabled: boolean
   updatedAt?: string
+  publicationGeneration?: number
+  confirmationRevision?: number
 }
 
 export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
@@ -59,8 +62,14 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   if (scope.current.id !== groupId) scope.current = { id: groupId, generation: scope.current.generation + 1 }
   const operationPermission = useRef(canOperate && canInspectOperations)
   operationPermission.current = canOperate && canInspectOperations
+  const confirmationContext = useRef({ groupId, permitted: operationPermission.current })
+  if (confirmationContext.current.groupId !== groupId || confirmationContext.current.permitted !== operationPermission.current) confirmationContext.current = { groupId, permitted: operationPermission.current }
+  const retryTicket = useRef<{ context: typeof confirmationContext.current } | null>(null)
+  const unpublishTicket = useRef<{ context: typeof confirmationContext.current } | null>(null)
+  const renderedRetryTicket = retryTicket.current
+  const renderedUnpublishTicket = unpublishTicket.current
   const alive = useRef(true)
-  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  useEffect(() => { alive.current = true; return () => { alive.current = false; retryTicket.current = null; unpublishTicket.current = null } }, [])
   const groupGeneration = useRef(-1)
   const runsGeneration = useRef(-1)
   const diffsGeneration = useRef(-1)
@@ -90,8 +99,10 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const [actionError, setActionError] = useState('')
   const [notice, setNotice] = useState('')
   const [unpublishOpen, setUnpublishOpen] = useState(false)
+  const unpublishRequest = useRef(0)
   const [unpublishScope, setUnpublishScope] = useState<{ groupId: string; accountId: string; generation: number } | null>(null)
   const [unpublishing, setUnpublishing] = useState(false)
+  const [unpublishImpact, setUnpublishImpact] = useState<RichMenuDeleteImpact | null>(null)
   const [duplicateOpen, setDuplicateOpen] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
   const [dialogError, setDialogError] = useState('')
@@ -248,7 +259,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       const res = await api.richMenuGroups.retryPublishRun(retryScope.groupId, retryTarget.id)
       if (!alive.current || generation !== scope.current.generation) return
       if (!res.success) throw new Error(res.error)
-      setRetryTarget(null)
+      retryTicket.current = null; setRetryTarget(null)
       setNotice('失敗した公開をやり直しました。最新の状態を確かめてください。')
       await reloadAll()
     } catch (caught) {
@@ -291,12 +302,12 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   }
 
   const unpublish = async () => {
-    if (!alive.current || !unpublishScope || unpublishScope.generation !== scope.current.generation || !operationPermission.current || unpublishing) return
+    if (!alive.current || !unpublishScope || unpublishScope.generation !== scope.current.generation || !operationPermission.current || unpublishing || !unpublishImpact || unpublishImpact.group.id !== unpublishScope.groupId || unpublishImpact.group.accountId !== unpublishScope.accountId || unpublishImpact.group.status !== 'published' || !Number.isSafeInteger(unpublishImpact.group.version) || !Number.isSafeInteger(unpublishImpact.group.publishingGeneration) || typeof unpublishImpact.lineResources.isDefaultForAll !== 'boolean' || !Array.isArray(unpublishImpact.lineResources.pages)) return
     const generation = unpublishScope.generation
     setUnpublishing(true)
     setDialogError('')
     try {
-      const res = await api.richMenuGroups.unpublish(unpublishScope.groupId)
+      const res = await api.richMenuGroups.unpublish(unpublishScope.groupId, {expectedVersion:unpublishImpact.group.version!,expectedPublishGeneration:unpublishImpact.group.publishingGeneration!,expectedIsDefaultForAll:unpublishImpact.lineResources.isDefaultForAll,expectedPages:unpublishImpact.lineResources.pages!})
       if (!alive.current || generation !== scope.current.generation) return
       if (!res.success) throw new Error(res.error)
       const warningTexts = [...new Set((res.data?.warnings ?? []).map(unpublishWarningText))]
@@ -304,14 +315,13 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         setDialogError(`LINE上のメニュー登録を取り下げました。ただし、${warningTexts.join(' / ')}。最新の状態を確認して、もう一度お試しください。`)
         return
       }
-      setUnpublishOpen(false)
+      unpublishTicket.current = null; setUnpublishOpen(false)
       router.push('/rich-menus')
     } catch (caught) {
       if (!alive.current || generation !== scope.current.generation) return
+      if (caught instanceof ApiError && caught.status === 409) { unpublishTicket.current = null; setUnpublishOpen(false); setUnpublishImpact(null); setNotice('公開内容が変わりました。最新の状態を確認してください。'); await loadGroup(); return }
       const fieldFailure = saveErrors.capture(caught)
-
-      { if (!fieldFailure)
-      setDialogError(richMenuError(caught, 'unpublish')) }
+      if (!fieldFailure) setDialogError(richMenuError(caught, 'unpublish'))
     } finally {
       if (alive.current && generation === scope.current.generation) setUnpublishing(false)
     }
@@ -356,7 +366,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const failed = progress?.failed === true
   const menuItems: ActionMenuItem[] = [
     { id: 'duplicate', label: '複製する', onSelect: () => { setDialogError(''); setDuplicateOpen(true) } },
-    { id: 'unpublish', label: 'LINEから取り下げる', onSelect: () => { if (!group.accountId || group.id !== groupId || groupGeneration.current !== scope.current.generation || !operationPermission.current) return; setDialogError(''); setUnpublishScope({ groupId, accountId: group.accountId, generation: scope.current.generation }); setUnpublishOpen(true) } },
+    { id: 'unpublish', label: 'LINEから取り下げる', onSelect: () => { if (!group.accountId || group.id !== groupId || groupGeneration.current !== scope.current.generation || !operationPermission.current) return; setDialogError(''); unpublishTicket.current = { context: confirmationContext.current }; setUnpublishImpact(null); const generation = scope.current.generation; const request = ++unpublishRequest.current; setUnpublishScope({ groupId, accountId: group.accountId, generation }); setUnpublishOpen(true); void api.richMenuGroups.deleteImpact(groupId).then(result => { if (!alive.current || generation !== scope.current.generation || request !== unpublishRequest.current) return; if (result.success && result.data.group.version !== group.version) { unpublishTicket.current = null; setUnpublishOpen(false); setNotice('公開内容が変わりました。最新の状態を確認してください。'); void loadGroup(); return }; if (result.success && result.data.group.id === groupId && result.data.group.accountId === group.accountId && result.data.group.status === 'published' && result.data.group.version === group.version && Number.isSafeInteger(result.data.group.version) && Number.isSafeInteger(result.data.group.publishingGeneration) && typeof result.data.lineResources.isDefaultForAll === 'boolean' && Array.isArray(result.data.lineResources.pages)) setUnpublishImpact(result.data); else setDialogError('公開内容を確認できません。閉じてもう一度お試しください。') }).catch(() => { if (alive.current && generation === scope.current.generation && request === unpublishRequest.current) setDialogError('公開内容を確認できません。閉じてもう一度お試しください。') }) } },
     { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, disabled: true, disabledReason: '公開中は消せません。先にLINEから取り下げてください', onSelect: () => {} },
   ]
 
@@ -455,7 +465,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                       <span className={styles.runText} title={`${run.version.name ? `「${run.version.name}」・` : ''}${run.version.pageCount !== null ? `${run.version.pageCount}ページ・` : ''}LINE ID ${run.pages?.length ?? 0}件${run.status === 'failed' && run.lastErrorCode ? `・失敗理由: ${run.lastErrorCode.slice(0, 80)}` : ''}`}>{`${runStamp(run.createdAt)} ${runAudienceText(run)}`}</span>
                       <span className={styles.runSpacer} />
                       {run.status === 'failed' && canOperate && run.id === latestRun?.id ? (
-                        <button type="button" className={styles.linkButton} onClick={() => { if (!group || group.id !== groupId || !group.accountId || groupGeneration.current !== scope.current.generation || runsGeneration.current !== scope.current.generation || !operationPermission.current) return; setDialogError(''); setRetryScope({ groupId, accountId: group.accountId, generation: scope.current.generation }); setRetryTarget(run) }}>失敗だけやり直す</button>
+                        <button type="button" className={styles.linkButton} onClick={() => { if (!group || group.id !== groupId || !group.accountId || groupGeneration.current !== scope.current.generation || runsGeneration.current !== scope.current.generation || !operationPermission.current) return; setDialogError(''); retryTicket.current = { context: confirmationContext.current }; setRetryScope({ groupId, accountId: group.accountId, generation: scope.current.generation }); setRetryTarget(run) }}>失敗だけやり直す</button>
                       ) : null}
                       <span className={run.status === 'succeeded' ? styles.stateOk : run.status === 'failed' ? styles.stateNg : styles.stateQuiet}>
                         {run.status === 'succeeded' ? '成功' : run.status === 'failed' ? '失敗' : '実行中'}
@@ -476,8 +486,8 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         confirmLabel="やり直す"
         busy={retrying}
         error={dialogError || undefined}
-        onConfirm={() => retry()}
-        onCancel={() => { if (!retrying) setRetryTarget(null) }}
+        onConfirm={() => renderedRetryTicket && retryTicket.current === renderedRetryTicket && renderedRetryTicket.context === confirmationContext.current ? retry() : undefined}
+        onCancel={() => { if (!retrying) { retryTicket.current = null; setRetryTarget(null) } }}
       >
         {retryScope ? <OperationTargetSummary accounts={[{ id: retryScope.accountId }]} /> : null}
       </ConfirmDialog>
@@ -501,9 +511,11 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         confirmLabel="LINEから取り下げる"
         destructive
         busy={unpublishing}
+        confirmDisabled={!unpublishImpact}
+        confirmDisabledReason="公開内容を確認してください。"
         error={dialogError || undefined}
-        onConfirm={() => unpublish()}
-        onCancel={() => { if (!unpublishing) setUnpublishOpen(false) }}
+        onConfirm={() => renderedUnpublishTicket && unpublishTicket.current === renderedUnpublishTicket && renderedUnpublishTicket.context === confirmationContext.current ? unpublish() : undefined}
+        onCancel={() => { if (!unpublishing) { unpublishTicket.current = null; unpublishRequest.current++; setUnpublishOpen(false) } }}
       >
         {unpublishScope ? <OperationTargetSummary accounts={[{ id: unpublishScope.accountId }]} /> : null}
       </ConfirmDialog>

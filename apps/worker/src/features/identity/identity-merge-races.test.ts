@@ -38,10 +38,10 @@ function seed(): SqliteD1 {
     `).run(id, `channel-${id}`, name, DEFAULT_TENANT_ID);
   }
   insertFriend(raw, 'friend-a', {
-    line_account_id: 'account-a', display_name: '田中 花子', user_id: 'user-a',
+    line_account_id: 'account-a', display_name: '見本 171', user_id: 'user-a',
   });
   insertFriend(raw, 'friend-b', {
-    line_account_id: 'account-b', display_name: '田中 はなこ', user_id: 'user-a',
+    line_account_id: 'account-b', display_name: '見本 161', user_id: 'user-a',
   });
   insertFriend(raw, 'friend-c', {
     line_account_id: 'account-a', display_name: '別の人', user_id: null,
@@ -55,7 +55,7 @@ function seed(): SqliteD1 {
       id, tenant_id, status, display_name, primary_display_name, revision,
       created_by, created_at, updated_at
     ) VALUES
-      ('user-a', NULL, 'active', '田中 花子', '田中 花子', 1,
+      ('user-a', NULL, 'active', '見本 171', '見本 171', 1,
         'owner-1', '2026-08-30T09:00:00.000Z', '2026-08-30T09:00:00.000Z'),
       ('user-u2', NULL, 'active', '別の本人', '別の本人', 1,
         'owner-1', '2026-08-30T09:00:00.000Z', '2026-08-30T09:00:00.000Z')
@@ -96,8 +96,8 @@ function seed(): SqliteD1 {
       selected_by, selected_by_name, selected_at, update_mode, is_active,
       created_at, updated_at
     ) VALUES
-      ('profile-a', ?, 'user-a', 'email', 'メール', '"tanaka@example.jp"',
-        'ta***@example.jp', 'form', 'form-a', '来店アンケート', 'friend-a',
+      ('profile-a', ?, 'user-a', 'email', 'メール', '"tanaka@example.com"',
+        'ta***@example.com', 'form', 'form-a', '来店アンケート', 'friend-a',
         '2026-08-29T12:00:00.000Z', 'owner-1', '担当者',
         '2026-08-30T09:20:00.000Z', 'fixed', 1,
         '2026-08-30T09:20:00.000Z', '2026-08-30T09:20:00.000Z'),

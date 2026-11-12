@@ -6,6 +6,7 @@ import { Check, Globe, Play, Send } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useTestRecipients } from './use-test-recipients'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Notice from '@/components/shared/notice'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
@@ -40,6 +41,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
   const [testing, setTesting] = useState<false | 'page' | 'notify'>(false)
   const [notice, setNotice] = useState('')
   const [notifyConfirm, setNotifyConfirm] = useState(false)
+  const testRecipients = useTestRecipients(webinar.id, notifyConfirm)
   const [notifyCount, setNotifyCount] = useState<{ on: number; missedOff: boolean } | null>(null)
   const requestId = useRef(0)
   const lock = useRef(false)
@@ -74,7 +76,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
   const checks = validation?.checks ?? []
   const failed = checks.filter((check) => check.status === 'failed')
   const passed = checks.filter((check) => check.status === 'passed').length
-  const canPublish = !readOnly && state === 'ready' && validation !== null && failed.length === 0 && !publishing && testing === false
+  const canPublish = !readOnly && state === 'ready' && validation !== null && validation.version === editor.version && failed.length === 0 && !publishing && testing === false
 
   const testPage = async () => {
     if (lock.current) return
@@ -98,12 +100,12 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
     }
   }
   const testNotify = async () => {
-    if (lock.current) return
+    if (lock.current || !notifyConfirm || !testRecipients.isCurrent() || !testRecipients.preview) return
     lock.current = true
     setTesting('notify')
     setNotice('')
     try {
-      const res = await webinarApi.testNotifications(webinar.id)
+      const res = await webinarApi.testNotifications(webinar.id, testRecipients.preview!.token, testRecipients.preview!.confirmationId)
       setNotifyConfirm(false)
       setNotice(`通知をテスト送信しました。成功 ${formatNumber(res.data.sent)} 件・失敗 ${formatNumber(res.data.failed)} 件`)
       // Delivery was acknowledged. A failed refresh must never resend it.
@@ -121,12 +123,13 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
     }
   }
   const publish = async () => {
-    if (!canPublish || lock.current) return
+    if (!canPublish || !validation || lock.current) return
+    const confirmedVersion = validation.version
     lock.current = true
     setPublishing(true)
     setPublishError('')
     try {
-      await webinarApi.publish(webinar.id, version.current)
+      await webinarApi.publish(webinar.id, confirmedVersion)
       ctx.onPublished()
       window.location.assign(`/webinars/published?id=${encodeURIComponent(webinar.id)}`)
     } catch (cause) {
@@ -211,7 +214,8 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
         </dl>
       </Card>
 
-      <ConfirmDialog open={notifyConfirm} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing === 'notify'} onCancel={() => { if (testing === false) setNotifyConfirm(false) }} error={notice || undefined} onSuccess={() => setNotifyConfirm(false)} onConfirm={() => testNotify()}><OperationTargetSummary accounts={[{ id: webinar.accountId ?? '' }]} /></ConfirmDialog>
+      <ConfirmDialog open={notifyConfirm} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" confirmDisabled={!testRecipients.preview || testRecipients.preview.count === 0} busy={testing === 'notify'} onCancel={() => { if (testing === false) setNotifyConfirm(false) }} error={notice || undefined} onSuccess={() => setNotifyConfirm(false)} onConfirm={() => testNotify()}><OperationTargetSummary accounts={[{ id: webinar.accountId ?? '' }]} />
+        <p>{testRecipients.preview ? `テスト受信者 ${testRecipients.preview.count} 人：${testRecipients.preview.recipients.map(person => person.displayName || '名前未設定').join('、')}` : testRecipients.error ? 'テスト受信者を確認できません。設定を確かめて開き直してください。' : 'テスト受信者を確認しています。'}</p></ConfirmDialog>
     </CreatePage></SaveErrorScope>
   )
 }

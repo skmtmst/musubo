@@ -69,11 +69,12 @@ export function orderAccounts<T extends LineAccount>(accounts: readonly T[]): T[
 }
 
 /** 数の4枚：つないでいる・稼働中・接続に問題・友だちの合計（アーカイブは数えない）。 */
-export function accountKpis(accounts: readonly AccountWithStats[]): { connected: number; active: number; problem: number; friends: number } {
+export function accountKpis(accounts: readonly AccountWithStats[]): { connected: number; active: number; problem: number; friends: number | null } {
+  const visible = accounts.filter((a) => !a.archivedAt)
   return {
     connected: accounts.filter((a) => !a.archivedAt).length,
     active: accounts.filter((a) => a.isActive && !a.archivedAt).length,
     problem: accounts.filter((a) => !a.archivedAt && hasConnectionProblem(a)).length,
-    friends: accounts.filter((a) => !a.archivedAt).reduce((sum, a) => sum + (a.stats?.friendCount ?? 0), 0),
+    friends: visible.some((a) => a.stats?.friendCount == null) ? null : visible.reduce((sum, a) => sum + (a.stats?.friendCount ?? 0), 0),
   }
 }

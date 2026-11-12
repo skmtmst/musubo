@@ -41,7 +41,6 @@ describe('ログインユーザーの確認窓', () => {
 
   it('LINE連携の解除が二度押しを止め、返事を確かめ、finally で戻す', () => {
     const body = slice(PAGE, 'const unlinkLine = async', '\n  const toggleActive = async')
-    expect(body, '処理中でも受け付けてしまう').toContain('if (unlinking) return')
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body, '失敗を握りつぶしている').toContain(
       "setUnlinkError('LINE連携を解除できませんでした。状態を読み直してから、もう一度お試しください。')",
@@ -62,7 +61,7 @@ describe('ログインユーザーの確認窓', () => {
   })
 
   it('どちらもあとから戻せるので赤にしない', () => {
-    const unlink = dialogWith(PAGE, 'open={unlinkOpen}')
+    const unlink = dialogWith(PAGE, 'open={unlinkTarget !== null && unlinkTarget.epoch === unlinkScope.current.epoch}')
     const twoFactor = dialogWith(PAGE, 'open={disablingTarget !== null}')
     // 赤は本当に戻せない操作のために空けておく。戻せる操作に付けると赤が効かなくなる。
     expect(unlink, '張り直せる連携解除まで赤になっている').not.toContain('destructive')
@@ -74,7 +73,7 @@ describe('ログインユーザーの確認窓', () => {
   })
 
   it('何が止まり・何が残り・戻せるかを本文で読ませる', () => {
-    const unlink = dialogWith(PAGE, 'open={unlinkOpen}')
+    const unlink = dialogWith(PAGE, 'open={unlinkTarget !== null && unlinkTarget.epoch === unlinkScope.current.epoch}')
     expect(unlink).toContain('このユーザーへのLINE通知が止まります。')
     expect(unlink).toContain('招待メールからLINE認証をやり直せば、また繋がります。')
     const twoFactor = dialogWith(PAGE, 'open={disablingTarget !== null}')

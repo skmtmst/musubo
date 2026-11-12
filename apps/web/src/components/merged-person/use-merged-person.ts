@@ -6,7 +6,7 @@
  * が同じ口を使う——版の扱い（expectedRevision）や 409 の読み直しは2か所で
  * ずれないようにここにだけ置く。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MergedPersonDeliveryPriority, MergedPersonLinkedFriend } from '@line-crm/shared'
 import { api, ApiError, type MergedPersonWithCandidates } from '@/lib/api'
 import { failureOf, type MergedPersonFailure } from './merged-person-view'
@@ -20,7 +20,9 @@ import { emptyProfileCandidateDraft } from './merged-profile-dialog'
  */
 export type MergedPersonPhase = 'loading' | 'ready' | 'error' | 'forbidden'
 
-export function useMergedPerson(personId: string) {
+export function useMergedPerson(personId: string, selectedAccountId: string | null, canManage: boolean) {
+  const scope = useRef({ personId, selectedAccountId, canManage, epoch: 0 })
+  if (scope.current.personId !== personId || scope.current.selectedAccountId !== selectedAccountId || scope.current.canManage !== canManage) scope.current = { personId, selectedAccountId, canManage, epoch: scope.current.epoch + 1 }
   const [phase, setPhase] = useState<MergedPersonPhase>('loading')
   const [person, setPerson] = useState<MergedPersonWithCandidates | null>(null)
   const [failure, setFailure] = useState<MergedPersonFailure | null>(null)
@@ -31,7 +33,13 @@ export function useMergedPerson(personId: string) {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
-  const [unlinkTarget, setUnlinkTarget] = useState<MergedPersonLinkedFriend | null>(null)
+  const [unlinkSnapshot, setUnlinkSnapshot] = useState<{ friend: MergedPersonLinkedFriend; personId: string; revision: number; epoch: number } | null>(null)
+  const unlinkTarget = unlinkSnapshot && unlinkSnapshot.epoch === scope.current.epoch && unlinkSnapshot.personId === personId && unlinkSnapshot.revision === person?.revision ? unlinkSnapshot.friend : null
+  const setUnlinkTarget = useCallback((friend: MergedPersonLinkedFriend | null) => {
+    if (!friend) { setUnlinkSnapshot(null); return }
+    if (!canManage || !person || person.id !== personId || !person.linkedFriends.some(item => item.friendId === friend.friendId)) return
+    setUnlinkSnapshot({ friend, personId, revision: person.revision, epoch: scope.current.epoch })
+  }, [canManage, person, personId])
   const [unlinkReason, setUnlinkReason] = useState('')
   const [unlinking, setUnlinking] = useState(false)
 
@@ -123,13 +131,14 @@ export function useMergedPerson(personId: string) {
   )
 
   const unlink = useCallback(() => {
-    if (!person || !unlinkTarget || !unlinkReason.trim()) return
+    if (!person || !unlinkSnapshot || !unlinkTarget || !canManage || unlinkSnapshot.epoch !== scope.current.epoch || person.id !== personId || !unlinkReason.trim()) return
     setUnlinking(true)
     setSaveError('')
-    api.mergedPeople.unlink(person.id, unlinkTarget.friendId, {
-      expectedRevision: person.revision,
+    api.mergedPeople.unlink(unlinkSnapshot.personId, unlinkSnapshot.friend.friendId, {
+      expectedRevision: unlinkSnapshot.revision,
       reason: unlinkReason.trim(),
     }).then((res) => {
+      if (scope.current.epoch !== unlinkSnapshot.epoch) return
       if (!res.success) {
         setSaveError(failureOf(null).description)
         return
@@ -138,6 +147,7 @@ export function useMergedPerson(personId: string) {
       setUnlinkReason('')
       setReloadKey((key) => key + 1)
     }).catch((error: unknown) => {
+      if (scope.current.epoch !== unlinkSnapshot.epoch) return
       const next = error instanceof ApiError
         ? failureOf({ status: error.status, code: error.code })
         : failureOf(null)
@@ -152,7 +162,7 @@ export function useMergedPerson(personId: string) {
         setReloadKey((key) => key + 1)
       }
     }).finally(() => setUnlinking(false))
-  }, [person, unlinkReason, unlinkTarget])
+  }, [person, personId, canManage, unlinkReason, unlinkTarget, unlinkSnapshot, setUnlinkTarget])
 
   const openProfileEditor = useCallback(() => {
     if (!person) return

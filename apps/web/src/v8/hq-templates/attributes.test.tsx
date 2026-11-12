@@ -31,6 +31,16 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 describe('統括の情報欄・対応マーク', () => {
+  it('一覧取得中は使っているマークを0種類と誤表示しない', async () => {
+    let resolve!: (rows: unknown[]) => void
+    mocks.list.mockReturnValue(new Promise((done) => { resolve = done }))
+    render(<HqAttributes type="mark" tab="marks" onTab={vi.fn()} />)
+    expect(document.body.textContent).not.toContain('使っている 0')
+    expect(document.body.textContent).not.toContain('まだ対応マークはありません')
+    mocks.get.mockResolvedValue(mark)
+    await act(async () => { resolve([{ ...mark.template, friend_count: 3 }]) })
+    expect(document.body.textContent).toContain('使っている 1')
+  })
   it('情報欄の操作説明を題から開閉し、単独の質問印を置かない', async () => {
     window.localStorage.clear()
     render(<HqAttributes type="friend_field" tab="fields" onTab={vi.fn()} />)

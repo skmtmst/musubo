@@ -221,7 +221,7 @@ describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
     const time = document.querySelector<HTMLInputElement>('[role="dialog"] input[aria-labelledby="webinar-period-start-time-label"]')!
     await act(async () => fireEvent.change(time, { target: { value: '11:00' } }))
     await act(async () => fireEvent.blur(time))
-    await act(async () => fireEvent.keyDown(document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!, { key: 'Escape' }))
+    await act(async () => { Array.from(document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!.querySelectorAll('button')).find(button => button.textContent?.trim() === '確定')!.click() })
     const save = ([...host.querySelectorAll('button')].find((button) => button.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
     await act(async () => save.click())
     expect(apiMocks.update).toHaveBeenCalledWith('webinar-1', expect.objectContaining({ publicationStartsAt: '2026-10-01T02:00:00.000Z', publicationEndsAt: null }))

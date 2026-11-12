@@ -5,7 +5,7 @@ import { matchStaffMember, scopeBundleToStaffRole, staffActionPolicy } from '@/v
 function member(overrides: Partial<StaffMember> = {}): StaffMember {
   return {
     id: 'user-1',
-    name: '山田 太郎',
+    name: '見本 141',
     email: null,
     role: 'staff',
     lineLinked: false,
@@ -57,8 +57,8 @@ describe('ログインユーザーの危険操作', () => {
 
 describe('アクセス表とスタッフ表の名寄せ(#530)', () => {
   const members = [
-    member({ id: 'stf-1', name: '佐々木 亮太', email: 'sasaki@example.com' }),
-    member({ id: 'stf-2', name: '佐々木 亮太', email: 'sasaki.2@example.com' }),
+    member({ id: 'stf-1', name: '見本 110', email: 'sasaki@example.com' }),
+    member({ id: 'stf-2', name: '見本 110', email: 'sasaki.2@example.com' }),
   ]
 
   it('IDが一致すれば名前もメールも見ない', () => {

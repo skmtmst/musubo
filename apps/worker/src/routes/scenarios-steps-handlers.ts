@@ -16,7 +16,7 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 import { getScenarioRuns, saveScenarioDraft, simulateFriendPlan, simulateScenario } from '../features/scenarios/scenario-contract/index.js';
 import { buildOffsetListResponse, listLimit } from '../lib/list-paging.js';
-import { validateStepCondition, validateStepSchedule, validateQuestionForStorage, serializeStep, WEEKDAY_JA, requireScenarioAccountScope, scenarioContractError, serializeFriendScenario } from './scenarios-definition.js';
+import { validateStepCondition, validateStepSchedule, validateQuestionForStorage, serializeScenario, serializeStep, WEEKDAY_JA, requireScenarioAccountScope, scenarioContractError, serializeFriendScenario } from './scenarios-definition.js';
 import type { Context } from 'hono';
 
 export const put__api_scenarios_id_steps_stepId_1 = async (c: Context<Env, "/api/scenarios/:id/steps/:stepId">) => {
@@ -244,9 +244,17 @@ export const put__api_scenarios_id_steps_stepId_1 = async (c: Context<Env, "/api
 export const delete__api_scenarios_id_steps_stepId_2 = async (c: Context<Env, "/api/scenarios/:id/steps/:stepId">) => {
   try {
     const stepId = c.req.param('stepId');
-    await deleteScenarioStep(c.env.DB, stepId);
+    const body = await c.req.json<{ expectedContentRevision?: unknown }>().catch(() => null);
+    const expected = body?.expectedContentRevision;
+    if (expected !== undefined && (!Number.isSafeInteger(expected) || Number(expected) < 1))
+      return inputError(c, { success: false, error: 'invalid_confirmation_revision' }, 400, ['expectedContentRevision']);
+    await deleteScenarioStep(c.env.DB, stepId, expected === undefined ? undefined : { scenarioId: c.req.param('id'), expectedRevision: expected as number });
     return c.json({ success: true, data: null });
   } catch (err) {
+    if (err instanceof Error && err.message === 'SCENARIO_CONFIRMATION_CONFLICT') {
+      const current = await getScenarioById(c.env.DB, c.req.param('id'));
+      return c.json({ success: false, error: 'scenario_confirmation_conflict', data: current ? serializeScenario(current) : null }, 409);
+    }
     throw err;
   }
 };
@@ -316,7 +324,7 @@ export const post__api_scenarios_id_steps_reorder_3 = async (c: Context<Env, "/a
         )
         .bind(newOrder, scenarioId, -1000 - i),
     );
-    await c.env.DB.batch([...phase1, ...phase2, ...phase3a, ...phase3b]);
+    await c.env.DB.batch([...phase1, ...phase2, ...phase3a, ...phase3b, c.env.DB.prepare('UPDATE scenarios SET content_revision=content_revision+1 WHERE id=?').bind(scenarioId)]);
 
     return c.json({ success: true });
   } catch (err) {

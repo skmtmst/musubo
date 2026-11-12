@@ -73,3 +73,37 @@ it('準備中の直接接続は転送手順でなく準備中の説明を出す'
  expect(screen.getByRole('dialog',{name:'直接接続はまだつなげません'})).toBeTruthy()
  expect(screen.queryByRole('dialog',{name:'転送の設定のしかた'})).toBeNull()
 })
+
+it('再発行の窓を閉じた後や店を変えた後は古い確定を使えない',async()=>{
+ calls.addresses.mockResolvedValue({data:[{address:'example@example.test'}]})
+ calls.fetch.mockImplementation(async(url:string)=>url.includes('inbound-emails')?{data:[],total:0}:{data:[]})
+ const view=render(<ChannelsBoard accountId="a" storeId="s" date="2026-10-20" canEdit />)
+ fireEvent.click(await screen.findByRole('button',{name:/発行し直す（旧は/}))
+ const dialog=screen.getByRole('dialog',{name:'取り込みアドレスを発行し直しますか？'})
+ const button=within(dialog).getByRole('button',{name:'発行し直す'})
+ const key=Object.keys(button).find(name=>name.startsWith('__reactProps$'))!
+ const oldClick=(button as unknown as Record<string,{onClick:(event:unknown)=>void}>)[key].onClick
+ view.rerender(<ChannelsBoard accountId="b" storeId="t" date="2026-10-20" canEdit />)
+ view.rerender(<ChannelsBoard accountId="a" storeId="s" date="2026-10-20" canEdit />)
+ oldClick({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button})
+ expect(calls.issue).not.toHaveBeenCalled()
+})
+
+it('再発行を閉じた後の古い確定を拒否し、新しい確認は実行できる',async()=>{
+ calls.addresses.mockResolvedValue({data:[{address:'example@example.test'}]})
+ calls.issue.mockResolvedValue({success:true})
+ calls.fetch.mockImplementation(async(url:string)=>url.includes('inbound-emails')?{data:[],total:0}:{data:[]})
+ render(<ChannelsBoard accountId="a" storeId="s" date="2026-10-20" canEdit />)
+ fireEvent.click(await screen.findByRole('button',{name:/発行し直す（旧は/}))
+ let dialog=screen.getByRole('dialog',{name:'取り込みアドレスを発行し直しますか？'})
+ const button=within(dialog).getByRole('button',{name:'発行し直す'})
+ const key=Object.keys(button).find(name=>name.startsWith('__reactProps$'))!
+ const oldClick=(button as unknown as Record<string,{onClick:(event:unknown)=>void}>)[key].onClick
+ fireEvent.click(within(dialog).getByRole('button',{name:'キャンセル'}))
+ fireEvent.click(screen.getByRole('button',{name:/発行し直す（旧は/}))
+ oldClick({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button})
+ expect(calls.issue).not.toHaveBeenCalled()
+ dialog=screen.getByRole('dialog',{name:'取り込みアドレスを発行し直しますか？'})
+ fireEvent.click(within(dialog).getByRole('button',{name:'発行し直す'}))
+ expect(calls.issue).toHaveBeenCalledExactlyOnceWith('a','s')
+})

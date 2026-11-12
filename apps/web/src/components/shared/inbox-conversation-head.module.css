@@ -21,7 +21,7 @@
   margin-top: var(--tpl-inbox-chead-gap);
 }
 .cheadSearch[aria-expanded='true'] { visibility: hidden; }
-.cheadWho { display: flex; min-width: var(--tpl-inbox-chead-who-min); flex: 1 1 0; align-items: center; gap: var(--tpl-inbox-chead-gap); }
+.cheadWho { display: flex; min-width: 0; flex: 1 1 0; align-items: center; gap: var(--tpl-inbox-chead-gap); }
 .cheadBack { flex: none; border: 0; background: none; color: var(--color-ink-faint); cursor: pointer; }
 .cheadText { display: flex; min-width: 0; flex-direction: column; }
 .cheadName {
@@ -46,6 +46,9 @@
 .cheadName[aria-expanded='true'] { height: auto; white-space: normal; word-break: break-all; }
 .cheadSub { overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-chead-sub-lh); text-overflow: ellipsis; white-space: nowrap; }
 .cheadTools { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--tpl-inbox-chead-gap); margin-left: auto; }
+@media (min-width: 1280px) {
+  .chead, .cheadTools { flex-wrap: nowrap; }
+}
 .cheadSquare {
   display: inline-flex;
   flex: none;

@@ -1,5 +1,6 @@
 'use client'
 import { invalidateApiReads } from '@/lib/api/transport/read-cache'
+import { ApiError } from '@/lib/api/transport/errors'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { type CancelReservationInput } from '@/components/shared/booking-confirm-dialogs'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
@@ -42,6 +43,8 @@ export function useStyleDashboard(style: IndustryStyle) {
   const accountId = selectedAccountId ?? ''
   const role = useStaffRole()
   const canWrite = canWriteRole(role)
+  const canWriteRef = useRef(canWrite)
+  canWriteRef.current = canWrite
   const [date, setDate] = useState(jstToday)
   const [staff, setStaff] = useState('all')
   const [compare, setCompare] = useState(COMPARE[0].value)
@@ -248,11 +251,24 @@ export function useStyleDashboard(style: IndustryStyle) {
     return run(row, () => restaurantTestApi.deleteSeatVisitMark(accountId, row.reservationId!, version(row), crypto.randomUUID()), '来店の印を取り消しました。', '取り消せませんでした。')
   }
   const [cancelTarget, setCancelTarget] = useState<{ row: StyleRow; generation: number } | null>(null)
-  const cancelScope = useRef({ accountId, generation: 0 })
-  if (cancelScope.current.accountId !== accountId) cancelScope.current = { accountId, generation: cancelScope.current.generation + 1 }
-  const cancelRow = cancelTarget?.generation === cancelScope.current.generation ? cancelTarget.row : null
-  const setCancelRow = (row: StyleRow | null) => setCancelTarget(row ? { row, generation: cancelScope.current.generation } : null)
-  useEffect(() => { setBusy(value => value === 'cancel' ? '' : value) }, [accountId])
+  const cancelTargetRef = useRef(cancelTarget)
+  if (!canWrite) cancelTargetRef.current = null
+  useEffect(() => () => { cancelTargetRef.current = null }, [])
+  const cancelStoreId = style === 'restaurant' ? store.store?.id ?? null : null
+  const cancelScope = useRef({ accountId, style, storeId: cancelStoreId, generation: 0 })
+  if (cancelScope.current.accountId !== accountId || cancelScope.current.style !== style || cancelScope.current.storeId !== cancelStoreId) {
+    cancelScope.current = { accountId, style, storeId: cancelStoreId, generation: cancelScope.current.generation + 1 }
+  }
+  const renderedCancelScope = cancelScope.current
+  const cancelRow = cancelTarget && cancelTarget === cancelTargetRef.current && cancelTarget.generation === cancelScope.current.generation ? cancelTarget.row : null
+  const setCancelRow = (row: StyleRow | null) => {
+    if (renderedCancelScope !== cancelScope.current) return
+    if (!row && cancelTarget !== cancelTargetRef.current) return
+    const target = row ? { row, generation: cancelScope.current.generation } : null
+    cancelTargetRef.current = target
+    setCancelTarget(target)
+  }
+  useEffect(() => { setBusy(value => value === 'cancel' ? '' : value) }, [accountId, style, cancelStoreId])
   const [refundRow, setRefundRow] = useState<StyleRow | null>(null)
   const [resultRow, setResultRow] = useState<StyleRow | null>(null)
   const [classRow, setClassRow] = useState<StyleRow | null>(null)
@@ -274,7 +290,8 @@ export function useStyleDashboard(style: IndustryStyle) {
   })
   /** 取り消す（h2lHCH）。理由は口の cancellationReason へ。返金は決済の口（組3）の一部返金・理由つきが要る。 */
   const confirmCancel = async (row: StyleRow, input: CancelReservationInput) => {
-    if (!cancelTarget || cancelTarget.row !== row || cancelTarget.generation !== cancelScope.current.generation || !accountId) return
+    if (!canWriteRef.current || !cancelTarget || cancelTarget !== cancelTargetRef.current || cancelTarget.row !== row || cancelTarget.generation !== cancelScope.current.generation || !accountId) return
+    if (style === 'restaurant' && (!cancelScope.current.storeId || (row.booking?.storeId && row.booking.storeId !== cancelScope.current.storeId))) return
     const generation = cancelTarget.generation
     let reasonSaved = false
     setBusy('cancel')
@@ -284,7 +301,7 @@ export function useStyleDashboard(style: IndustryStyle) {
         if (row.booking?.version != null) { await styleApi.saveBooking(accountId, bookingId(row), { expectedVersion: row.booking.version, cancellationReason: input.reason }); reasonSaved = true }
         await bookingApi.decideRequest(accountId, bookingId(row), 'cancel')
       }
-      if (cancelScope.current.generation !== generation) { notifyToast('切り替え前の予約を取り消しました。'); return }
+      if (cancelScope.current.generation !== generation || cancelTargetRef.current !== cancelTarget) { notifyToast('前に選んだ予約を取り消しました。'); return }
       setCancelRow(null)
       notifyToast('予約を取り消しました。')
       if (input.refund !== 'none' || input.notify) openPayment()
@@ -334,24 +351,22 @@ export function useStyleDashboard(style: IndustryStyle) {
   const saveClosure = async (input: StyleClosureInput) => {
     setBusy('closure')
     try {
+      if (!input.expectedSnapshot) throw new Error('confirmation_unavailable')
       if (style === 'restaurant' && store.store) {
-        const res = await restaurantTestApi.createClosure(accountId, { storeId: store.store.id, startDate: input.date, endDate: input.date, allDay: input.allDay, startTime: input.from ?? null, endTime: input.to ?? null, kind: KIND[input.reason] ?? 'other', memo: input.reason, tableIds: input.target === 'seat' ? input.ids : [] })
+        const res = await restaurantTestApi.createClosure(accountId, { storeId: store.store.id, startDate: input.date, endDate: input.date, allDay: input.allDay, startTime: input.from ?? null, endTime: input.to ?? null, kind: KIND[input.reason] ?? 'other', memo: input.reason, tableIds: input.target === 'seat' ? input.ids : [], expectedSnapshot: input.expectedSnapshot })
         notifyToast(res.data.reservations.length ? `休みを入れました。重なる予約が ${formatNumber(res.data.reservations.length)}件あります（取り消していません）。` : '休みを入れました。')
       } else {
-        // 人の口は担当 1 人ずつ。途中で失敗した人をまとめて成功にしない。
-        const ids = input.target === 'staff' ? input.ids : [null]
-        const failedNames: string[] = []
-        for (const id of ids) {
-          try { await styleApi.closeHours(accountId, { date: input.date, target: id ? 'staff' : 'store', ...(id ? { staffId: id } : {}), allDay: input.allDay, startTime: input.from, endTime: input.to, reason: input.reason }) } catch (caught) {
-            failedNames.push(id ? today?.staff.find((x) => x.id === id)?.name ?? id : '店全体'); if (ids.length === 1) throw caught
-          }
-        }
-        notifyToast(failedNames.length ? `休みを入れました。${failedNames.join('・')}は入れられませんでした。` : '休みを入れました。予約は取り消していません。', failedNames.length ? { tone: 'error' } : undefined)
+        await styleApi.closeHoursConfirmed(accountId, { date: input.date, target: input.target === 'store' ? 'store' : 'staff', staffIds: input.target === 'staff' ? input.ids : [], allDay: input.allDay, startTime: input.from, endTime: input.to, reason: input.reason, expectedSnapshot: input.expectedSnapshot })
+        notifyToast('休みを入れました。予約は取り消していません。')
       }
       setClosureOpen(false)
       void reload()
     } catch (caught) {
-      notifyToast(japaneseDetailOf(caught) || '休みを入れられませんでした。', { tone: 'error' })
+      if (caught instanceof ApiError && caught.status === 409 && (caught.code === 'confirmation_changed' || caught.message === 'confirmation_changed')) {
+        const count = (caught.data as { count?: unknown } | null)?.count
+        setClosureOpen(false); void reload()
+        notifyToast(`予約が変わりました。${typeof count === 'number' ? `現在 ${formatNumber(count)} 件です。` : ''}最新の状態を確認してください。`, { tone: 'error' })
+      } else notifyToast(japaneseDetailOf(caught) || '休みを入れられませんでした。', { tone: 'error' })
     } finally { setBusy('') }
   }
 

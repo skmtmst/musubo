@@ -4,6 +4,7 @@ import { Calendar, Clock, X } from 'lucide-react'
 import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import DateField, { formatLabel as formatDateLabel, parseDate } from './date-field'
 import MenuPortal from './menu-portal'
+import Button from './button'
 import TimeFieldV8, { type TimeFieldSize } from './time-field-v8'
 import { joinDescribedBy, useFieldContext } from './field-context'
 import dateStyles from './date-field.module.css'
@@ -90,6 +91,8 @@ export default function DateTimeField({
   const [inner, setInner] = useState(defaultValue)
   const current = value ?? inner
   const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState(current)
+  const openedValue = useRef(current)
   /** 日付より先に時刻だけ選んだときの置き場所。開くたびに今の値へ戻す。 */
   const [timeDraft, setTimeDraft] = useState<{ hours: number; minutes: number } | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -97,8 +100,12 @@ export default function DateTimeField({
   const popoverRef = useRef<HTMLDivElement>(null)
 
   const parsed = parseDateTime(current)
-  const datePart = parsed ? current.slice(0, 10) : ''
-  const shownTime = timeDraft ?? (parsed ? { hours: parsed.hours, minutes: parsed.minutes } : null)
+  const draftParsed = parseDateTime(draft)
+  const datePart = draftParsed ? draft.slice(0, 10) : ''
+  const shownTime = timeDraft ?? (draftParsed ? { hours: draftParsed.hours, minutes: draftParsed.minutes } : null)
+  const comparable = (dateTime: string) => dateTime.replace(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}):00$/, '$1')
+  const confirmReason = comparable(current) !== comparable(openedValue.current) ? 'ほかで日時が変わりました。開き直してください。'
+    : !datePart && (timeDraft || !clearable) ? '日付を選んでください。' : undefined
 
   const emit = (next: string) => {
     if (value === undefined) setInner(next)
@@ -110,6 +117,8 @@ export default function DateTimeField({
 
   const openDialog = () => {
     if (disabled) return
+    openedValue.current = current
+    setDraft(current)
     setTimeDraft(null)
     setOpen(true)
   }
@@ -122,16 +131,16 @@ export default function DateTimeField({
 
   const chooseDate = (date: string) => {
     if (!date) {
-      emit('')
+      setDraft('')
       return
     }
-    const time = timeDraft ?? (parsed ? { hours: parsed.hours, minutes: parsed.minutes } : { hours: 10, minutes: 0 })
-    emit(`${date}T${pad(time.hours)}:${pad(time.minutes)}`)
+    const time = timeDraft ?? (draftParsed ? { hours: draftParsed.hours, minutes: draftParsed.minutes } : { hours: 10, minutes: 0 })
+    setDraft(`${date}T${pad(time.hours)}:${pad(time.minutes)}`)
   }
 
   const chooseTime = (hours: number, minutes: number) => {
     setTimeDraft({ hours, minutes })
-    if (datePart) emit(`${datePart}T${pad(hours)}:${pad(minutes)}`)
+    if (datePart) setDraft(`${datePart}T${pad(hours)}:${pad(minutes)}`)
   }
 
   const onRootKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -219,7 +228,7 @@ export default function DateTimeField({
           align="start"
           getAnchor={() => triggerRef.current}
           onClose={() => { setOpen(false); setTimeDraft(null) }}
-          onReady={() => popoverRef.current?.querySelector<HTMLElement>('button, select')?.focus({ preventScroll: true })}
+          onReady={() => popoverRef.current?.querySelector<HTMLElement>('[role="grid"] button[tabindex="0"]')?.focus({ preventScroll: true })}
         >
         <div
           ref={popoverRef}
@@ -235,6 +244,7 @@ export default function DateTimeField({
         >
           <div className={styles.dateWrap}>
             <DateField
+              inline
               value={datePart}
               onChange={chooseDate}
               min={min?.slice(0, 10)}
@@ -254,7 +264,7 @@ export default function DateTimeField({
                 onChange={(next) => {
                   if (next === '') {
                     setTimeDraft(null)
-                    emit('')
+                    if (clearable) setDraft('')
                     return
                   }
                   const time = parseTime(next)
@@ -264,8 +274,9 @@ export default function DateTimeField({
             </div>
           )}
           <div className={styles.footer}>
-            <button type="button" className={styles.closeBtn} onClick={close}>閉じる</button>
-            <button type="button" className={styles.clearBtn} onClick={() => { emit(''); close() }}>消す</button>
+            {clearable ? <button type="button" className={styles.clearBtn} onClick={() => { setDraft(''); setTimeDraft(null) }}>消す</button> : null}
+            <button type="button" className={styles.closeBtn} onClick={close}>キャンセル</button>
+            <Button type="button" size="compact" variant="primary" disabled={Boolean(confirmReason)} disabledReason={confirmReason} onClick={() => { if (confirmReason) return; if (comparable(draft) !== comparable(current)) emit(draft); close() }}>確定</Button>
           </div>
         </div>
         </MenuPortal>

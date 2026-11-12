@@ -32,7 +32,7 @@ vi.mock('@/lib/auth-email', async (importOriginal) => {
     ...actual,
     authRequest: vi.fn(async (path: string) => {
       if (path.startsWith('/api/auth/register/check')) {
-        return { ok: true, data: { email: 'new@example.com', trialDays: 30, companyName: '株式会社テスト', contactName: '山田 太郎' } }
+        return { ok: true, data: { email: 'new@example.com', trialDays: 30, companyName: '株式会社テスト', contactName: '見本 141' } }
       }
       return fixture.completeResponse
     }),
@@ -88,7 +88,7 @@ async function fillAndSubmit() {
   const inputs = host.querySelectorAll('input')
   const passwords = [...inputs].filter((i) => i.type === 'password')
   expect(host.querySelector('#complete-tenant')?.textContent).toBe('株式会社テスト')
-  expect(host.querySelector('#complete-name')?.textContent).toBe('山田 太郎')
+  expect(host.querySelector('#complete-name')?.textContent).toBe('見本 141')
   await act(async () => {
     setValue(passwords[0], 'StrongPass123!')
     setValue(passwords[1], 'StrongPass123!')
