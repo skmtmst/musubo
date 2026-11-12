@@ -41,6 +41,7 @@ vi.mock('@/components/scenarios/scenario-reference-data', () => ({
 }))
 
 import ScenarioResultsV8 from './results'
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
 const scenario = {
   id: 'sc-1', name: '新規登録7日間フォロー', description: null, triggerType: 'friend_add', triggerTagId: null,
@@ -51,7 +52,7 @@ const scenario = {
 const stats = { enrolledTotal: 3, activeNow: 2, completed: 1, paused: 0, steps: [{ stepOrder: 1, reachedCount: 3, reachRate: 1 }] }
 const metric = (value: number | null) => ({ value, state: value === null ? 'unavailable' : 'available', reason: null })
 const sub = (id: string, friendName: string) => ({
-  id, friendId: `f-${id}`, friendName, status: 'active', currentStepOrder: 1, startedAt: '2026-09-01T00:00:00.000Z',
+  id, friendId: `f-${id}`, friendName, status: 'active', confirmationRevision: 4, currentStepOrder: 1, startedAt: '2026-09-01T00:00:00.000Z',
   nextDeliveryAt: '2026-10-04T01:00:00.000Z', pauseReason: null, updatedAt: '2026-09-01T00:00:00.000Z',
 })
 const runsBody = (subs: ReturnType<typeof sub>[], extra: { total?: number; nextCursor?: string | null } = {}) => ({
@@ -63,7 +64,7 @@ const runsBody = (subs: ReturnType<typeof sub>[], extra: { total?: number; nextC
   steps: [{ id: 'st-1', stepOrder: 1, delivered: 3, opened: metric(null), clicked: metric(null), failed: metric(0) }],
 })
 const plan = (overrides: Record<string, unknown> = {}) => ({
-  scenarioId: 'sc-1', lineAccountId: 'account-a', friendId: 'f-s1', friendName: '高橋 直人',
+  scenarioId: 'sc-1', lineAccountId: 'account-a', friendId: 'f-s1', friendName: '見本 16',
   computedAt: '2026-10-11T01:00:00Z', sideEffects: false, basis: 'published',
   subscription: { id: 's1', status: 'paused', currentStepOrder: 1, startedAt: '2026-10-01T01:00:00Z', nextDeliveryAt: '2026-10-12T11:00:00.000Z', pauseReason: 'after_send' },
   start: { state: 'blocked', reasons: ['ブロックされています'] },
@@ -77,7 +78,7 @@ let handler: Handler
 const requests: Array<{ method: string; path: string; search: URLSearchParams }> = []
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 function base(url: URL): Response {
-  if (url.pathname === '/api/scenarios/sc-1/runs') return json({ success: true, data: runsBody([sub('s1', '高橋 直人')]) })
+  if (url.pathname === '/api/scenarios/sc-1/runs') return json({ success: true, data: runsBody([sub('s1', '見本 16')]) })
   if (url.pathname === '/api/friends') return json({ success: true, data: { items: [{ id: 'f-s9', displayName: '検証 太郎' }], total: 1, hasMore: false, nextCursor: null } })
   if (url.pathname === '/api/scenarios/sc-1/friends/f-s1/plan') return json({ success: true, data: plan() })
   return json({ success: true, data: {} })
@@ -104,13 +105,30 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+test('移動する購読の確認版と状態を送る', async () => {
+  let sent: unknown
+  handler = (url, init) => {
+    if (url.pathname === '/api/scenarios') return json({success:true,data:{items:[scenario,{...scenario,id:'sc-2',name:'移動先'}]}})
+    if (url.pathname === '/api/folders') return json({success:true,data:[]})
+    if (url.pathname === '/api/scenario-subscriptions/s1/move') { sent=JSON.parse(String(init?.body)); return json({success:true,data:{}}) }
+    return base(url)
+  }
+  render(<ScenarioResultsV8 />)
+  await screen.findByText('見本 16')
+  fireEvent.click(screen.getByRole('button',{name:'見本 16のその他の操作'}))
+  fireEvent.click(screen.getByRole('menuitem',{name:'別のシナリオへ移す'}))
+  await pickEntity('移し先のシナリオ','移動先')
+  fireEvent.click(screen.getByRole('button',{name:'このシナリオへ移す'}))
+  await waitFor(()=>expect(sent).toEqual({targetScenarioId:'sc-2',expectedConfirmationRevision:4,expectedStatus:'active'}))
+})
+
 describe('読み込みの状態', () => {
   test('シナリオと集計の失敗は1枚にし、読み直すと出る', async () => {
     reference.scenario.mockRejectedValueOnce(new Error('offline'))
     render(<ScenarioResultsV8 />)
     await screen.findByText('配信結果を読み込めませんでした')
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
-    await screen.findByText('高橋 直人')
+    await screen.findByText('見本 16')
     expect(reference.scenario).toHaveBeenCalledTimes(2)
   })
 
@@ -130,7 +148,7 @@ describe('読み込みの状態', () => {
     expect(screen.queryByText('購読している友だちはまだいません')).toBeNull()
     fail = false
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
-    await screen.findByText('高橋 直人')
+    await screen.findByText('見本 16')
     expect(reference.scenario).toHaveBeenCalledTimes(1)
   })
 
@@ -153,17 +171,17 @@ describe('読み込みの状態', () => {
     handler = (url) => {
       if (url.pathname !== '/api/scenarios/sc-1/runs') return base(url)
       if (url.searchParams.get('lineAccountId') === 'account-a') return new Promise<Response>((resolve) => { lateA = resolve })
-      return json({ success: true, data: runsBody([sub('s2', '中村 彩')]) })
+      return json({ success: true, data: runsBody([sub('s2', '見本 27')]) })
     }
     const view = render(<ScenarioResultsV8 />)
     await waitFor(() => expect(runsCalls()).toHaveLength(1))
     account.id = 'account-b'
     view.rerender(<ScenarioResultsV8 />)
-    await screen.findByText('中村 彩')
-    lateA(json({ success: true, data: runsBody([sub('s1', '高橋 直人')]) }))
+    await screen.findByText('見本 27')
+    lateA(json({ success: true, data: runsBody([sub('s1', '見本 16')]) }))
     await new Promise((resolve) => setTimeout(resolve, 20))
-    expect(screen.queryByText('高橋 直人')).toBeNull()
-    expect(screen.getByText('中村 彩')).toBeTruthy()
+    expect(screen.queryByText('見本 16')).toBeNull()
+    expect(screen.getByText('見本 27')).toBeTruthy()
   })
 })
 
@@ -172,23 +190,23 @@ describe('購読一覧のページと絞り込み', () => {
     handler = (url) => {
       if (url.pathname !== '/api/scenarios/sc-1/runs') return base(url)
       return url.searchParams.get('cursor') === 'next-1'
-        ? json({ success: true, data: runsBody([sub('s2', '中村 彩')], { total: 2 }) })
-        : json({ success: true, data: runsBody([sub('s1', '高橋 直人')], { total: 2, nextCursor: 'next-1' }) })
+        ? json({ success: true, data: runsBody([sub('s2', '見本 27')], { total: 2 }) })
+        : json({ success: true, data: runsBody([sub('s1', '見本 16')], { total: 2, nextCursor: 'next-1' }) })
     }
     render(<ScenarioResultsV8 />)
-    await screen.findByText('高橋 直人')
+    await screen.findByText('見本 16')
     expect(runsCalls()[0].search.get('limit')).toBe('50')
     expect(screen.getByText('1 / 2 件（購読）')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'さらに読み込む' }))
-    await screen.findByText('中村 彩')
-    expect(screen.getByText('高橋 直人')).toBeTruthy()
+    await screen.findByText('見本 27')
+    expect(screen.getByText('見本 16')).toBeTruthy()
     expect(screen.getByText('2 / 2 件（購読）')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'さらに読み込む' })).toBeNull()
   })
 
   test('状態の絞り込みはサーバーへ渡す', async () => {
     render(<ScenarioResultsV8 />)
-    await screen.findByText('高橋 直人')
+    await screen.findByText('見本 16')
     fireEvent.click(screen.getByRole('button', { name: '購読の状態で絞り込む' }))
     fireEvent.click(within(await screen.findByRole('option', { name: '止まっている' })).getByRole('button'))
     await waitFor(() => expect(runsCalls().at(-1)?.search.get('status')).toBe('paused'))
@@ -198,7 +216,7 @@ describe('購読一覧のページと絞り込み', () => {
 describe('次の配信の日時', () => {
   test('一覧の「次に届く」は日本時間で出し、ISO の文字のまま出さない', async () => {
     render(<ScenarioResultsV8 />)
-    const row = (await screen.findByText('高橋 直人')).closest('[role="row"]') as HTMLElement
+    const row = (await screen.findByText('見本 16')).closest('[role="row"]') as HTMLElement
     expect(row.textContent).toContain('10:00')
     expect(row.textContent).not.toContain('2026-10-04T01:00')
   })
@@ -207,7 +225,7 @@ describe('次の配信の日時', () => {
 describe('友だち別の配信予定', () => {
   async function openPlanForRow() {
     render(<ScenarioResultsV8 />)
-    const row = (await screen.findByText('高橋 直人')).closest('[role="row"]') as HTMLElement
+    const row = (await screen.findByText('見本 16')).closest('[role="row"]') as HTMLElement
     fireEvent.click(within(row).getByRole('button', { name: '予定を見る' }))
     return screen.findByRole('dialog')
   }

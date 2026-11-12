@@ -13,9 +13,9 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},  use
 
 const detail = {
   id: 'r1', kind: 'bug', kindLabel: '不具合', subject: 'バナー生成で日本語の文字が崩れることがある', body: '2枚に1枚は誤字になります。',
-  lineAccountId: null, attachments: [], status: 'answered', staffName: '山田 太郎', notified: true, createdAt: '2026-09-15T08:40:00.000+09:00',
+  lineAccountId: null, attachments: [], status: 'answered', staffName: '見本 141', notified: true, createdAt: '2026-09-15T08:40:00.000+09:00',
   ticketLabel: '#MB-0312', replies: [], stageLabel: '待ち', canFollowUp: true,
-  messages: [{ id: 'm1', authorKind: 'ops', authorName: 'musubo 運営 ／ 坂本 真人', body: '再現を確認しました。', attachments: [], createdAt: '2026-09-15T09:05:00.000+09:00' }],
+  messages: [{ id: 'm1', authorKind: 'ops', authorName: 'musubo 運営 ／ 見本 25', body: '再現を確認しました。', attachments: [], createdAt: '2026-09-15T09:05:00.000+09:00' }],
 }
 
 let host: HTMLDivElement
@@ -31,12 +31,12 @@ beforeEach(() => {
     const json = (payload: unknown, status = 200) => new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json' } })
     if (url.endsWith('/api/hq/support/requests/r1/messages')) {
       posted = JSON.parse(String(init?.body)) as Record<string, unknown>
-      detail.messages.push({ id: 'm2', authorKind: 'tenant', authorName: '山田 太郎', body: String(posted.body), attachments: [], createdAt: '2026-09-15T09:30:00.000+09:00' })
+      detail.messages.push({ id: 'm2', authorKind: 'tenant', authorName: '見本 141', body: String(posted.body), attachments: [], createdAt: '2026-09-15T09:30:00.000+09:00' })
       return json({ success: true, data: { id: 'm2', stage: 'in_progress', status: 'open' } }, 201)
     }
     if (url.endsWith('/api/hq/support/requests/r1')) return json({ success: true, data: detail })
     if (url.endsWith('/api/hq/support/requests')) return json({ success: true, data: [detail] })
-    if (url.endsWith('/api/staff/me')) return json({ success: true, data: { id: 's1', name: '山田 太郎', role: 'staff', email: 'yamada@example.com' } })
+    if (url.endsWith('/api/staff/me')) return json({ success: true, data: { id: 's1', name: '見本 141', role: 'staff', email: 'yamada@example.com' } })
     if (url.endsWith('/api/tenants/me')) return json({ success: true, data: { name: '株式会社サンプル' } })
     return json({ success: false, error: `unexpected ${url}` }, 404)
   }))
@@ -62,8 +62,8 @@ describe('お問い合わせの続き', () => {
     const text = host.textContent ?? ''
     expect(text).toContain('#MB-0312')
     expect(text).toContain('バナー生成で日本語の文字が崩れることがある')
-    expect(text).toContain('山田 太郎')
-    expect(text).toContain('musubo 運営 ／ 坂本 真人')
+    expect(text).toContain('見本 141')
+    expect(text).toContain('musubo 運営 ／ 見本 25')
     expect(text).toContain('再現を確認しました。')
     expect(text).toContain('続きを送る')
     expect(text).toContain('これまでの問い合わせ')

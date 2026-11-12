@@ -1,9 +1,10 @@
 import { getRestaurantReservationForm,putRestaurantReservationForm } from './restaurant-reservation-form.js';
 import { restaurantTableAutomationResponse } from './restaurant-table-automation.js';
+import { stopRestaurantTable } from './restaurant-table-stop.js';
 import { registerRestaurantSetupProgressRoutes } from './restaurant-setup-progress.js';
 import { getRestaurantFollowupEngines,initializeRestaurantFollowupEngines,saveRestaurantFollowupEngine,testRestaurantFollowupEngineHandler,startRestaurantFollowupEngineHandler } from './restaurant-followup-engine.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
-import { validateClosure, publicClosure, closurePreview, type ClosureRow } from '../services/restaurant-closures.js';
+import { validateClosure, publicClosure, closurePreview, restaurantClosureSnapshotQuery, type ClosureRow } from '../services/restaurant-closures.js';
 
 import { readCloseNotificationSettings, saveCloseNotificationSettings } from '../services/restaurant-close-settings.js';
 import { StampError } from '../services/visit-stamps.js';
@@ -139,6 +140,7 @@ restaurantTest.post('/api/restaurant-test/memberships', requireRole('owner', 'ad
 restaurantTest.delete('/api/restaurant-test/tables/:id', requireRole('owner', 'admin'), delete__api_restaurant_test_tables_id);
 
 restaurantTest.patch('/api/restaurant-test/tables/:id', requireRole('owner', 'admin'), inputJsonBoundary({"code":["string"],"label":["string"],"seatType":["string"],"minCapacity":["number"],"maxCapacity":["number"],"isActive":["boolean"],"floorX":["number"],"floorY":["number"],"joinGroup":["null","string"]}), patch__api_restaurant_test_tables_id_4);
+restaurantTest.post('/api/restaurant-test/tables/:id/stop', requireRole('owner', 'admin'), inputJsonBoundary(), stopRestaurantTable);
 
 restaurantTest.patch('/api/restaurant-test/memberships/:id', requireRole('owner', 'admin'), inputJsonBoundary({"storeId":["null","string"],"staffName":["string"],"email":["null","string"],"role":["string"],"lineUid":["null","string"],"googleEmail":["null","string"],"status":["string"],"expectedPolicyVersion":["number"],"idempotencyKey":["string"]}), patch__api_restaurant_test_memberships_id_5);
 
@@ -284,16 +286,43 @@ for(const action of ['preview','create','patch'] as const) {
    }
    const preview=await closurePreview(db,input,periods,current?.id??excluded??null);
    if(preview.conflicts.length)return c.json({success:false,error:'休業・貸切が重なっています',code:'closure_overlap',data:preview},409);
-   if(action==='preview')return c.json({success:true,data:preview});
+   if(action==='preview') {
+    const rows=JSON.stringify(preview.reservations.map(r=>({id:r.id,revision:r.confirmationRevision})).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0));
+    return c.json({success:true,data:{...preview,confirmationSnapshot:JSON.stringify({input,periods,rows})}});
+   }
+   let expectedRows: string | undefined;
+   if(b.expectedSnapshot!==undefined){
+    if(typeof b.expectedSnapshot!=='string'||b.expectedSnapshot.length>90000)return inputError(c,{success:false,error:'invalid_confirmation'},400,['expectedSnapshot']);
+    let expected: { input: unknown; periods: unknown; rows: unknown };
+    try{expected=JSON.parse(b.expectedSnapshot);}catch{return inputError(c,{success:false,error:'invalid_confirmation'},400,['expectedSnapshot']);}
+    if(!expected||typeof expected.rows!=='string'||JSON.stringify(expected.input)!==JSON.stringify(input)||JSON.stringify(expected.periods)!==JSON.stringify(periods))
+      return c.json({success:false,error:'confirmation_changed',code:'confirmation_changed',data:{count:preview.reservations.length}},409);
+    expectedRows=expected.rows;
+   }
    const values=[input.startDate,input.endDate,Number(input.allDay),input.startTime,input.endTime,input.kind,input.memo,JSON.stringify(input.tableIds),JSON.stringify(periods),Number(input.notifyMedia)];
    try {
     if(action==='patch'){
-     const saved=await db.prepare(`UPDATE rt_closures SET start_date=?,end_date=?,all_day=?,start_time=?,end_time=?,kind=?,memo=?,table_ids_json=?,periods_json=?,notify_media=?,version=version+1,updated_at=datetime('now')
-     WHERE id=? AND store_id=? AND version=? AND archived_at IS NULL`).bind(...values,id,input.storeId,b.expectedVersion).run();
+     const write=db.prepare(`UPDATE rt_closures SET start_date=?,end_date=?,all_day=?,start_time=?,end_time=?,kind=?,memo=?,table_ids_json=?,periods_json=?,notify_media=?,version=version+1,updated_at=datetime('now')
+     WHERE id=? AND store_id=? AND version=? AND archived_at IS NULL`).bind(...values,id,input.storeId,b.expectedVersion);
+     let saved: D1Result;
+     if(expectedRows===undefined) saved=await write.run();
+     else {
+      const snapshot=restaurantClosureSnapshotQuery(input,periods);
+      const results=await db.batch([db.prepare(`SELECT json(CASE WHEN (${snapshot.sql})=? THEN '{}' ELSE 'CLOSURE_CONFIRMATION_CHANGED' END)`).bind(...snapshot.binds,expectedRows),write]);
+      saved=results[1];
+     }
      if(!saved.meta.changes)return c.json({success:false,error:'version_conflict'},409);
-    }else await db.prepare(`INSERT INTO rt_closures(start_date,end_date,all_day,start_time,end_time,kind,memo,table_ids_json,periods_json,notify_media,id,store_id,created_by,created_by_name) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .bind(...values,id,input.storeId,c.get('staff')?.id??null,c.get('staff')?.name??null).run();
-   }catch(error){if(String(error).includes('closure_overlap'))return c.json({success:false,error:'休業・貸切が重なっています',code:'closure_overlap',data:await closurePreview(db,input,periods,current?.id??excluded??null)},409);throw error;}
+    }else {
+     const write=db.prepare(`INSERT INTO rt_closures(start_date,end_date,all_day,start_time,end_time,kind,memo,table_ids_json,periods_json,notify_media,id,store_id,created_by,created_by_name) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .bind(...values,id,input.storeId,c.get('staff')?.id??null,c.get('staff')?.name??null);
+     if(expectedRows===undefined) await write.run();
+     else {
+      const snapshot=restaurantClosureSnapshotQuery(input,periods);
+      await db.batch([db.prepare(`SELECT json(CASE WHEN (${snapshot.sql})=? THEN '{}' ELSE 'CLOSURE_CONFIRMATION_CHANGED' END)`).bind(...snapshot.binds,expectedRows),write]);
+     }
+    }
+   }catch(error){if(String(error).includes('closure_overlap'))return c.json({success:false,error:'休業・貸切が重なっています',code:'closure_overlap',data:await closurePreview(db,input,periods,current?.id??excluded??null)},409);
+    if(expectedRows!==undefined&&String(error).includes('malformed JSON'))return c.json({success:false,error:'confirmation_changed',code:'confirmation_changed',data:{count:(await closurePreview(db,input,periods,current?.id??excluded??null)).reservations.length}},409);throw error;}
    const row=(await db.prepare('SELECT * FROM rt_closures WHERE id=?').bind(id).first<ClosureRow>())!;
    return c.json({success:true,data:{closure:publicClosure(row),...await closurePreview(db,input,periods,id)}},action==='create'?201:200);
   }finally {if(action!=='preview')await releaseLock(db,key,owner);}

@@ -229,10 +229,12 @@ async function withStoreLease(input: {
   storeId: string;
   accountId: string;
   nowMs: number;
+  expectedVersion?: number;
   work: (row: ManagedUberConnection, lockKey: string, owner: string, elapsedNowMs: () => number) => Promise<ConnectionMutationResult>;
 }): Promise<ConnectionMutationResult> {
   const before = await exactConnection(input.db, input.storeId, input.accountId);
   if (!before || before.status === 'disconnected') return { ok: false, status: 409, code: 'connection_not_active' };
+  if (input.expectedVersion !== undefined && before.version !== input.expectedVersion) return { ok: false, status: 409, code: 'connection_changed' };
   const owner = crypto.randomUUID();
   const lockKey = `${STORE_LOCK_PREFIX}${before.uber_store_id}`;
   const wallStartedAt = Date.now();
@@ -345,6 +347,7 @@ export async function disconnectUberConnection(input: {
   encryptionKey: string;
   fetcher: FetchLike;
   nowMs?: number;
+  expectedVersion?: number;
 }): Promise<ConnectionMutationResult> {
   const nowMs = input.nowMs ?? Date.now();
   return withStoreLease({ ...input, nowMs, work: async (row, lockKey, owner, elapsedNowMs) => {

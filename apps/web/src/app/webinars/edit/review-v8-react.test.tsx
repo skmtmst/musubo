@@ -121,7 +121,8 @@ describe('公開の前に確かめるのV8（XCUNf）', () => {
   })
 
   it('ページのテスト後は更新された保存版で公開し、二重クリックを一回にする', async () => {
-    apiMocks.publishValidation.mockResolvedValue({ data: { version: 4, blockers: [], warnings: [], checks: [{ key: 'page', label: '公開ページ', status: 'passed' }] } })
+    const checks = [{ key: 'page', label: '公開ページ', status: 'passed' }]
+    apiMocks.publishValidation.mockResolvedValueOnce({ data: { version: 4, blockers: [], warnings: [], checks } }).mockResolvedValue({ data: { version: 5, blockers: [], warnings: [], checks } })
     apiMocks.testPublicPage.mockResolvedValue({ data: { ...EDITOR, version: 5, publicPage: { test: { status: 'passed' } } } })
     let reject!: (error: Error) => void
     apiMocks.publish.mockReturnValue(new Promise((_resolve, rejectPromise) => { reject = rejectPromise }))
@@ -130,6 +131,7 @@ describe('公開の前に確かめるのV8（XCUNf）', () => {
     const button = (label: string) => [...host.querySelectorAll('button')].find((element) => element.textContent === label)!
     await act(async () => { button('ページをテスト').click() })
     expect(apiMocks.testPublicPage).toHaveBeenCalledWith('webinar-1', 4)
+    await act(async () => { mounted[mounted.length - 1].render(<ReviewPane ctx={webinarEditContext(WEBINAR, { ...EDITOR, version: 5 }, { ctaCount: 2 })} chromeFor={(primary) => ({ ...webinarWizardChrome, footerActions: primary })} />) })
     await act(async () => { button('この版を公開').click(); button('この版を公開').click() })
     expect(apiMocks.publish).toHaveBeenCalledTimes(1)
     expect(apiMocks.publish).toHaveBeenCalledWith('webinar-1', 5)

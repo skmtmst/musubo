@@ -262,7 +262,7 @@ describe('統括のテンプレートの詳細（pQ4fH）', () => {
 
 describe('統括のテンプレートの詳細の版（pQ4fH・API-18）', () => {
   it('配った先ごとの版と版の履歴を出し、前の版を比べる・この版に戻す', async () => {
-    const version = (n: number, draft: boolean, current: boolean) => ({ id: `v${n}`, version: n, created_by: 's', creator_name: n === 2 ? 'Masato' : 'Kenta Kawano', created_at: '2026-08-21T09:02:00Z', is_draft: draft, is_current: current })
+    const version = (n: number, draft: boolean, current: boolean) => ({ id: `v${n}`, version: n, created_by: 's', creator_name: n === 2 ? 'Masato' : 'Demo Person', created_at: '2026-08-21T09:02:00Z', is_draft: draft, is_current: current })
     calls.versions.mockResolvedValue([version(3, true, true), version(2, false, false), version(1, false, false)])
     calls.receivedVersions.mockResolvedValue([
       { accountId: 'a-1', accountName: '然 -NEN- 本店', receivedAt: null, targetVersion: { version: 2, latestVersion: 3, status: 'older', label: '版2' } },
@@ -805,17 +805,15 @@ it('クーポンの通常入力は再読込後も一時下書きから復元す�
   const endDay = new Date(); endDay.setDate(endDay.getDate() + 30)
   fireEvent.click(screen.getByLabelText('使える期間の開始'))
   const startDialog = within(await screen.findByRole('dialog', { name: '日時を選ぶ' }))
-  fireEvent.click(startDialog.getByRole('button', { name: '日付' }))
   fireEvent.click(await screen.findByRole('button', { name: '今日' }))
-  fireEvent.click(startDialog.getByRole('button', { name: '閉じる' }))
+  fireEvent.click(startDialog.getByRole('button', { name: '確定' }))
   fireEvent.click(screen.getByLabelText('使える期間の終了'))
   const endDialog = within(await screen.findByRole('dialog', { name: '日時を選ぶ' }))
-  fireEvent.click(endDialog.getByRole('button', { name: '日付' }))
   const endName = new RegExp(dayLabel(endDay))
-  const calendar = within((await screen.findByRole('dialog', { name: '日付を選ぶ' })))
+  const calendar = endDialog
   for (let i = 0; i < 2 && !calendar.queryByRole('button', { name: endName }); i += 1) fireEvent.click(calendar.getByRole('button', { name: '次の月' }))
   fireEvent.click(calendar.getByRole('button', { name: endName }))
-  fireEvent.click(endDialog.getByRole('button', { name: '閉じる' }))
+  fireEvent.click(endDialog.getByRole('button', { name: '確定' }))
   await waitFor(() => expect(window.sessionStorage.getItem('lh_hq_create_draft_v1:tenant-a:owner:template:coupon') ?? '').toContain('未保存クーポン'), { timeout: 5000 })
   unmount()
   cleanup()

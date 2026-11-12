@@ -21,7 +21,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       ...actual.api,
       pools: {
         ...actual.api.pools,
-        list: async () => ({ success: true, data: [{ id: 'p1', name: '既定', slug: 'main', isMain: true }, { id: 'p2', name: '渋谷', slug: 'shibuya' }] }),
+        list: async () => ({ success: true, data: [{ id: 'p1', name: '既定', slug: 'main', isMain: true, confirmationRevision: 1 }, { id: 'p2', name: '渋谷', slug: 'shibuya', confirmationRevision: 4 }] }),
         delete: deletePool,
         accounts: { list: poolAccounts, remove: removeAccount },
       },
@@ -127,7 +127,7 @@ it('所属が変わっていないプールは確認後に一度だけ削除す�
   const button = within(dialog).getByRole('button', { name: '削除する' })
   fireEvent.click(button); fireEvent.click(button)
   await waitFor(() => expect(deletePool).toHaveBeenCalledTimes(1))
-  expect(deletePool).toHaveBeenCalledWith('p2')
+  expect(deletePool).toHaveBeenCalledWith('p2', { revision: 4, accountIds: ['acc-1', 'acc-2'] })
 })
 
 it('プール削除の再表示では別の確定口を受け付けない', async () => {

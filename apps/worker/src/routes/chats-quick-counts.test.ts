@@ -117,16 +117,16 @@ describe('GET /api/chats/quick-counts (INBOX-09)', () => {
   });
 
   test('担当・検索・未読の条件を件数にも適用する', async () => {
-    seedLine('hit', { assignee: 'target', name: '河野' });
+    seedLine('hit', { assignee: 'target', name: '見本' });
     seedLine('other-assignee', { assignee: 'other' });
     seedLine('other-name', { assignee: 'target', name: '別人' });
-    seedEmail('mail-hit', { assignee: 'target', name: '河野' });
+    seedEmail('mail-hit', { assignee: 'target', name: '見本' });
 
     const byAssignee = await counts({ operatorId: 'target' });
     expect(byAssignee.body.data?.all).toBe(3);
-    const byQuery = await counts({ q: '河野' });
+    const byQuery = await counts({ q: '見本' });
     expect(byQuery.body.data?.all).toBe(2);
-    const combined = await counts({ operatorId: 'target', q: '河野' });
+    const combined = await counts({ operatorId: 'target', q: '見本' });
     expect(combined.body.data).toMatchObject({ all: 2, reply: 2 });
   });
 

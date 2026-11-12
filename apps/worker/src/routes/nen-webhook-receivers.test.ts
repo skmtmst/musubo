@@ -25,7 +25,7 @@ const routes = [
   { name: 'auto-line', path: '/api/ec/events', body: { eventId: 'e', type: 'cart_add', productId: 'p' }, limit: 65536, status: 202 },
   { name: 'columns', path: '/api/integrations/eccube/columns', body: { slug: 'test', title: '題', article_url: 'https://example.test/c' }, limit: 262144, status: 200 },
   { name: 'coupon-usage', path: '/api/integrations/eccube/coupon-usages', body: { code: 'test-code' }, limit: 262144, status: 200 },
-  { name: 'support', path: '/webhooks/xserver/support-email', body: { raw: btoa('From: Test <test@example.test>\r\nTo: contact-shed@nen-petfood.com\r\nSubject: Test\r\n\r\nHello') }, limit: null, status: 200 },
+  { name: 'support', path: '/webhooks/xserver/support-email', body: { raw: btoa('From: Test <test@example.test>\r\nTo: contact@example.com\r\nSubject: Test\r\n\r\nHello') }, limit: null, status: 200 },
 ];
 function app() {
   const a = new Hono<Env>();

@@ -137,6 +137,19 @@ describe('migration 313 共通情報の使用数・履歴・差し替え', () =>
       .toEqual({ replaced_usage_count: 2, status: 'completed' });
   });
 
+  it('差し替えたテンプレート・自動応答と対象設定だけ確認版を進める', async () => {
+    sqlite.exec(`INSERT INTO auto_replies(id,line_account_id,keyword,response_content,actions_json) VALUES('reply-1','account-1','受付','{{var.old_hours}}','[{"varKey":"old_hours"}]');
+      INSERT INTO account_settings(id,line_account_id,key,value) VALUES('setting-1','account-1','test_recipients','{{var.old_hours}}'),('setting-2','account-1','friend_add_routing','{{var.old_hours}}');`);
+    const source=(await getCommonVarById(db,'source','account-1'))!, replacement=(await getCommonVarById(db,'replacement','account-1'))!;
+    const plan=await getCommonVarReplacementPlan(db,source,replacement);
+    expect(plan.blockedTotal).toBe(0);
+    plan.targets.push({table:'account_settings',id:'setting-1',kind:'friend_add',columns:{value:'{{var.new_hours}}'},originalColumns:{value:'{{var.old_hours}}'},fingerprint:''});
+    await applyCommonVarReplacementPlan(db,plan,'staff-1','差し替え');
+    expect(sqlite.prepare("SELECT confirmation_revision FROM templates WHERE id='template-1'").get()).toEqual({confirmation_revision:2});
+    expect(sqlite.prepare("SELECT confirmation_revision FROM auto_replies WHERE id='reply-1'").get()).toEqual({confirmation_revision:2});
+    expect(sqlite.prepare("SELECT id,confirmation_revision FROM account_settings ORDER BY id").all()).toEqual([{id:'setting-1',confirmation_revision:2},{id:'setting-2',confirmation_revision:1}]);
+  });
+
   it('下書きから外しても現在の公開フォームが使う変数の差し替えを止める', async () => {
     sqlite.prepare(
       `INSERT INTO forms (id, name, on_submit_message_content, status)

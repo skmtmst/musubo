@@ -149,6 +149,7 @@ it('一括停止の窓は操作先を示し、アカウント切替で閉じて�
   fireEvent.click(screen.getByRole('button', { name: 'まとめて紹介を止める' }))
   const dialog = await screen.findByRole('alertdialog', { name: '2 人の紹介をまとめて止めますか？' })
   await within(within(dialog).getByRole('region', { name: '操作の対象' })).findByText('本店')
+  expect(within(dialog).getByText(/承認待ちの成果がある人は、行の「…」から個別に中身を確認して止めてください/)).toBeTruthy()
   expect(archiveAffiliate).not.toHaveBeenCalled()
   accountState.id = 'account-b'
   await render()

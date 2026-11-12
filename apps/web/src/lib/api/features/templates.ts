@@ -11,6 +11,7 @@ export const templatesMethods = {
       const suffix = query.size ? `?${query.toString()}` : ''
       return fetchApi<ApiResponse<Array<{
         id: string;
+        confirmationRevision: number;
         accountId: string | null;
         name: string;
         category: string;
@@ -212,6 +213,8 @@ export const templatesMethods = {
       ),
     delete: (id: string, expectedDraftRevision?: number) =>
       fetchApi<ApiResponse<null>>(`/api/templates/${id}${expectedDraftRevision === undefined ? '' : `?expectedDraftRevision=${expectedDraftRevision}`}`, { method: 'DELETE' }),
+    bulkDelete: (templates: Array<{ id: string; expectedRevision: number }>) =>
+      fetchApi<ApiResponse<null>>('/api/templates/bulk-delete', { method: 'POST', body: JSON.stringify({ templates }) }),
     usages: (id: string) =>
       fetchApi<ApiResponse<{
         autoReplies: Array<{ id: string; keyword: string; lineAccountId: string | null; templateVersion: number | null }>;

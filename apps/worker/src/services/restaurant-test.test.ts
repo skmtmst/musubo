@@ -41,6 +41,6 @@ describe('飲食店向け予約の受信専用境界', () => {
 
 it('受信する電話は国内番号を検査し数字だけにする', () => {
   const base={externalId:'x',customerName:'name',guestCount:2,startsAt:'2026-11-01T01:00:00Z',endsAt:'2026-11-01T03:00:00Z'};
-  expect(validateInboundReservation({...base,customerPhone:'０９０－１２３４－５６７８'})).toMatchObject({ok:true,value:{customerPhone:'09012345678'}});
+  expect(validateInboundReservation({...base,customerPhone:'０９０－００００－５６７８'})).toMatchObject({ok:true,value:{customerPhone:'09000005678'}});
   for (const customerPhone of ['090abc12345678','1234567890','090123456','090123456789',42]) expect(validateInboundReservation({...base,customerPhone})).toMatchObject({ok:false,field:'customerPhone'});
 });

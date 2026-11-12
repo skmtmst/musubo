@@ -21,7 +21,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   useSearchParams: () => new URLSearchParams('tab=points'),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
-  selectedAccountId: 'account-a', selectedAccount: null, loading: false,
+  selectedAccountId: 'account-a', selectedAccount: null, accounts: [{ id: 'account-a', name: '本店' }], loading: false,
 }) }))
 
 let staffRole = 'admin'
@@ -125,7 +125,7 @@ function base(url: URL, init?: RequestInit) {
     return response({
       success: true,
       data: {
-        definition: { version: 3 },
+        definition: { id: 'cv-buy', version: 3 },
         usages: [{ id: 'u-1', usageName: 'ファネル2' }],
         eventCount: 52,
         canDelete: false,

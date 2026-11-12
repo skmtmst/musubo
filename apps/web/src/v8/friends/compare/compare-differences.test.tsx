@@ -18,17 +18,17 @@ it('一致項目の非表示でも元の全選択を判定へ渡し、名前と�
   const subject = (id: string, label: string, lineAccountName: string) => ({ kind: 'friend' as const, id, label, detail: null, lineAccountId: id, lineAccountName, shopKey: null, attributes: [{ label: '会員区分', valuePreview: '一般', verified: true }] })
   fixture.detail = {
     id: 'one', kind: 'friend_duplicate', status: 'pending', version: 1, confidence: { score: 80, label: 'high' },
-    left: subject('left', '田中 花子', '本店'), right: subject('right', '田中 はなこ', '支店'),
+    left: subject('left', '見本 171', '本店'), right: subject('right', '見本 161', '支店'),
     evidence: [], impact: [], history: [], detectedAt: '2026-10-26T00:00:00Z', reviewedAt: null, canDecide: true, canUndo: false, undoNote: '',
     profileCandidates: [
-      { fieldKey: 'name', fieldLabel: '本名', options: ['田中 花子', '田中 はなこ'].map((valuePreview, i) => ({ candidateId: `n${i}`, sourceFriendId: i ? 'right' : 'left', sourceLabel: i ? 'B' : 'A', valuePreview, verified: true })) },
+      { fieldKey: 'name', fieldLabel: '本名', options: ['見本 171', '見本 161'].map((valuePreview, i) => ({ candidateId: `n${i}`, sourceFriendId: i ? 'right' : 'left', sourceLabel: i ? 'B' : 'A', valuePreview, verified: true })) },
       { fieldKey: 'plan', fieldLabel: '会員区分', options: ['一般', '一般'].map((valuePreview, i) => ({ candidateId: `p${i}`, sourceFriendId: i ? 'right' : 'left', sourceLabel: i ? 'B' : 'A', valuePreview, verified: true })) },
     ], tagCandidates: [],
   }
   render(<Compare />)
   expect(screen.queryByLabelText('会員区分に使う値')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: '本名に使う値' }))
-  fireEvent.click(screen.getByRole('option', { name: '支店・田中 はなこ：田中 はなこ' }).querySelector('button')!)
+  fireEvent.click(screen.getByRole('option', { name: '支店・見本 161：見本 161' }).querySelector('button')!)
   fireEvent.click(screen.getByRole('switch', { name: '違う項目だけ' }))
   expect(screen.getByLabelText('会員区分に使う値')).toBeTruthy()
   fireEvent.click(screen.getByRole('switch', { name: '違う項目だけ' }))

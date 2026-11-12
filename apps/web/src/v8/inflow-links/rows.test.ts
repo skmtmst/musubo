@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import type { EntryRoute } from '@line-crm/shared'
-import { becameLines, buildRows, isUnconfigured } from './rows'
+import { becameLines, buildRows, isUnconfigured, matchesFilter } from './rows'
 
 const route = (overrides: Partial<EntryRoute>): EntryRoute => ({
   id: 'er-1', refCode: 'r1', genre: null, name: '経路', tagId: null, scenarioId: null,
@@ -24,4 +24,21 @@ describe('流入経路の「動き」（WEB033）', () => {
     expect(isUnconfigured(row)).toBe(true)
     expect(becameLines(row, undefined, undefined)).toEqual(['—', '何も付けない'])
   })
+})
+
+it('集計を取得できたとき、記録のない経路は0人として絞り込む', () => {
+  const [zero] = buildRows([route({})], [], { routes: [], totalFriends: 0, friendsWithRef: 0, friendsWithoutRef: 0 })
+  expect(zero.stats).toBeUndefined()
+  expect(matchesFilter(zero, 'no-friends', true)).toBe(true)
+  expect(matchesFilter(zero, 'has-friends', true)).toBe(false)
+})
+
+it('集計を取得できない経路は追加ありにも追加なしにも含めない', () => {
+  const [unknown] = buildRows([route({})], [], null)
+  expect(matchesFilter(unknown, 'no-friends', false)).toBe(false)
+  expect(matchesFilter(unknown, 'has-friends', false)).toBe(false)
+  const stale = { ...unknown, stats: { refCode: 'r1', name: null, friendCount: 3, clickCount: 0, latestAt: null } }
+  expect(matchesFilter(stale, 'has-friends', false)).toBe(false)
+  expect(matchesFilter(stale, 'has-friends', true)).toBe(true)
+  expect(matchesFilter(stale, 'no-friends', true)).toBe(false)
 })

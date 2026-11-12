@@ -194,7 +194,7 @@ export default function MemberDialogV8({
         {!member ? (
           <div className={styles.pair}>
             <FormField label="名前" requirement={inviteRequirements.name} htmlFor={`${uid}-name`} error={fieldErrors.name}>
-              <SaveErrorField names={["name","value.name"]}><TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus invalid={Boolean(fieldErrors.name)} onChange={(e) => set('name', e.target.value)} className={styles.full} placeholder="例：山田 太郎" /></SaveErrorField>
+              <SaveErrorField names={["name","value.name"]}><TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus invalid={Boolean(fieldErrors.name)} onChange={(e) => set('name', e.target.value)} className={styles.full} placeholder="例：見本 141" /></SaveErrorField>
 
             </FormField>
             <FormField label="メールアドレス" requirement={inviteRequirements.email} htmlFor={`${uid}-email`} error={fieldErrors.email}>

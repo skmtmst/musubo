@@ -28,6 +28,7 @@ function clearInside(method: string) {
     fireEvent.change(time, { target: { value: '' } })
     fireEvent.keyDown(time, { key: 'Enter' })
   }
+  fireEvent.click(within(screen.getByRole('dialog', { name: '日時を選ぶ' })).getByRole('button', { name: '確定' }))
 }
 for (const controlled of [true, false]) {
   it.each(['消す', '空にしてEnter'])(`UI-TIME-CLEAR-1134: ${controlled ? 'value' : 'defaultValue'} / %s で表示・親・保存値が空、隣は保持`, (method) => {
@@ -39,9 +40,7 @@ for (const controlled of [true, false]) {
     const form = screen.getByRole('form') as HTMLFormElement
     expect(new FormData(form).get('start')).toBe('')
     expect(new FormData(form).get('end')).toBe('2026-10-01T22:00')
-    expect((screen.getByRole('combobox', { name: '時刻' }) as HTMLInputElement).value).toBe('')
     expect(screen.getByRole('button', { name: '開始' }).textContent).toContain('日時を選ぶ')
-    fireEvent.keyDown(screen.getByRole('dialog', { name: '日時を選ぶ' }), { key: 'Escape' })
     fireEvent.click(screen.getByRole('button', { name: '開始' }))
     expect((screen.getByRole('combobox', { name: '時刻' }) as HTMLInputElement).value).toBe('')
   })
@@ -67,6 +66,7 @@ it.each(['消す', '空にしてEnter'])('予約中時刻の%sは予約を変更
     fireEvent.change(time, { target: { value: '' } })
     fireEvent.keyDown(time, { key: 'Enter' })
   }
+  fireEvent.click(within(screen.getByRole('dialog', { name: '日時を選ぶ' })).getByRole('button', { name: '確定' }))
   expect(screen.getByRole('button', { name: '予約時刻を変更（日本時間）' }).textContent).toContain('日時を選ぶ')
   expect(onReschedule).not.toHaveBeenCalled()
   expect(onCancelRow).not.toHaveBeenCalled()

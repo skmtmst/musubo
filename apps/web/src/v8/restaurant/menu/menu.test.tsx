@@ -52,6 +52,14 @@ const openMenu = (name: string) => fireEvent.click(screen.getByRole('button', { 
 
 /* ★V8 メニュー管理（板 ・停止 ・追加と変更 ）の動き。 */
 describe('MJoJR メニュー管理', () => {
+  it('閲覧のみでは操作できると案内せずメニューの確認を案内する', async () => {
+    role.value = verifiedStaffRole('viewer')
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    fireEvent.click(screen.getByRole('button', { name: 'メニュー一覧の説明' }))
+    expect(await screen.findByText('メニューの内容と価格を確認できます。')).toBeTruthy()
+    expect(screen.queryByText(/「…」から変更・停止・再開・削除ができます/)).toBeNull()
+  })
   it('数5・一覧が出て、アーカイブだけ再開が出る（「…」の決まりは題の？へ）', async () => {
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')
@@ -85,7 +93,39 @@ describe('MJoJR メニュー管理', () => {
     expect(dialog.textContent).toContain('渋谷店')
     expect(dialog.textContent).toContain('環境')
     fireEvent.click(within(dialog).getByRole('button', { name: '停止する' }))
-    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'archived' }))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'archived', expectedVersion: 1 }))
+  })
+
+  it.each(['停止', '再開'] as const)('%s に失敗したら保存失敗を知らせる', async (operation) => {
+    fixture.updateMenu.mockRejectedValueOnce(new Error('network'))
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    if (operation === '停止') {
+      openMenu('秋の鹿肉コース')
+      fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
+      fireEvent.click(screen.getByRole('button', { name: '停止する' }))
+    } else {
+      fireEvent.click(screen.getByRole('button', { name: '再開', exact: true }))
+    }
+    expect((await screen.findAllByText('保存に失敗しました。時間をおいて、もう一度お試しください。')).length).toBeGreaterThan(0)
+    expect(fixture.updateMenu).toHaveBeenCalledTimes(1)
+  })
+
+  it('停止の競合後は最新の内容で確認窓を作り直す', async () => {
+    const latest = snapshotOf()
+    latest.menuItems = latest.menuItems.map(item => item.id === 'm1' ? {...item, name:'更新後のコース', confirmation_revision:2} : item)
+    fixture.snapshot.mockResolvedValueOnce({data:snapshotOf()}).mockResolvedValue({data:latest})
+    fixture.updateMenu.mockRejectedValueOnce(new ApiError(409, '変更されました', 'menu_confirmation_conflict')).mockResolvedValue({success:true})
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    openMenu('秋の鹿肉コース')
+    fireEvent.click(screen.getByRole('menuitem', {name:'停止'}))
+    fireEvent.click(screen.getByRole('button', {name:'停止する'}))
+    expect(await screen.findByText('内容が変わりました。最新の内容を確認してください。')).toBeTruthy()
+    const dialog = screen.getByRole('dialog', {name:'このメニューを停止しますか？'})
+    expect(dialog.textContent).toContain('更新後のコース')
+    fireEvent.click(within(dialog).getByRole('button', {name:'停止する'}))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenLastCalledWith('account-1', 'm1', {status:'archived',expectedVersion:2}))
   })
 
   it('アカウント切替後の取得中は前の一覧から削除を開けない', async () => {
@@ -115,7 +155,24 @@ describe('MJoJR メニュー管理', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
     expect(screen.getByRole('dialog', { name: 'このメニューを削除しますか？' }).textContent).toContain('環境')
     fireEvent.click(screen.getByRole('button', { name: '削除する' }))
-    await waitFor(() => expect(fetchApi).toHaveBeenCalledWith('/api/restaurant-test/menus/m4?account_id=account-1', { method: 'DELETE' }))
+    await waitFor(() => expect(fetchApi).toHaveBeenCalledWith('/api/restaurant-test/menus/m4?account_id=account-1', { method: 'DELETE', body: JSON.stringify({ expectedVersion: 1 }) }))
+  })
+
+  it('削除の競合後は最新の名前と版で確認窓を開き直す', async () => {
+    const latest = snapshotOf()
+    latest.menuItems = latest.menuItems.map(item => item.id === 'm4' ? {...item, name:'変更後の下書き', confirmation_revision:2} : item)
+    fixture.snapshot.mockResolvedValueOnce({data:snapshotOf()}).mockResolvedValue({data:latest})
+    fetchApi.mockRejectedValueOnce(new ApiError(409, '変更されました', 'menu_confirmation_conflict')).mockResolvedValue({success:true})
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    openMenu('春の下書きコース')
+    fireEvent.click(screen.getByRole('menuitem', {name:'削除'}))
+    fireEvent.click(screen.getByRole('button', {name:'削除する'}))
+    expect(await screen.findByText('内容が変わりました。最新の内容を確認してください。')).toBeTruthy()
+    const dialog = screen.getByRole('dialog', {name:'このメニューを削除しますか？'})
+    expect(dialog.textContent).toContain('変更後の下書き')
+    fireEvent.click(within(dialog).getByRole('button', {name:'削除する'}))
+    await waitFor(() => expect(fetchApi).toHaveBeenLastCalledWith('/api/restaurant-test/menus/m4?account_id=account-1', {method:'DELETE',body:JSON.stringify({expectedVersion:2})}))
   })
 
   it('参照中のメニューは確認窓に理由を出して残す', async () => {
@@ -236,6 +293,23 @@ describe('mauOC コースの編集ページ', () => {
     await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/restaurant-test/menu'))
   })
 
+  it('版が変わっても入力を残し、操作で最新を読み直す', async () => {
+    nav.params = new URLSearchParams('id=m1')
+    const latest = snapshotOf()
+    latest.menuItems = latest.menuItems.map(item => item.id === 'm1' ? {...item, name:'別の担当が変更', confirmation_revision:2} : item)
+    fixture.snapshot.mockResolvedValueOnce({data:snapshotOf()}).mockResolvedValue({data:latest})
+    fixture.updateMenu.mockRejectedValueOnce(new ApiError(409, '変更されました', 'menu_confirmation_conflict'))
+    render(<MenuEditPage />)
+    fireEvent.change(await screen.findByLabelText('メニュー名'), {target:{value:'確認した変更'}})
+    fireEvent.click(screen.getByRole('button', {name:/保存する/}))
+    expect(await screen.findByText(/ほかの人が変更しました。最新を読み込むと入力は消えます/)).toBeTruthy()
+    expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('確認した変更')
+    fireEvent.click(screen.getByRole('button', {name:'最新を読み込む'}))
+    await waitFor(() => expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('別の担当が変更'))
+    expect(fixture.updateMenu.mock.calls[0][2]).toEqual(expect.objectContaining({expectedVersion:1}))
+    expect(nav.push).not.toHaveBeenCalled()
+  })
+
   it('価格を変えると確認を経て、開始日時を添えて確定する', async () => {
     nav.params = new URLSearchParams('id=m1')
     render(<MenuEditPage />)
@@ -246,11 +320,9 @@ describe('mauOC コースの編集ページ', () => {
     const ymd = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-10`
     fireEvent.click(screen.getByLabelText('新しい価格の開始日時'))
     const picker = screen.getByRole('dialog', { name: '日時を選ぶ' })
-    fireEvent.click(within(picker).getByRole('button', { name: '日付' }))
     fireEvent.click(screen.getByRole('button', { name: '次の月' }))
     fireEvent.click(screen.getAllByRole('button').find((b) => (b.getAttribute('aria-label') ?? '').startsWith(`${next.getFullYear()}年${next.getMonth() + 1}月10日`))!)
     fireEvent.click(screen.getByRole('button',{name:'確定'}))
-    fireEvent.click(within(screen.getByRole('dialog', { name: '日時を選ぶ' })).getByRole('button', { name: '閉じる' }))
     fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
     expect(fixture.updateMenu).not.toHaveBeenCalled()
     expect(screen.getByText('価格変更を確定しますか？')).toBeTruthy()
@@ -292,7 +364,7 @@ describe('mauOC コースの編集ページ', () => {
     expect(screen.getByRole('alertdialog', { name: /削除しますか/ }).textContent).toContain('環境')
     const confirm = await screen.findAllByRole('button', { name: '削除する' })
     fireEvent.click(confirm[confirm.length - 1])
-    await waitFor(() => expect(fetchApi).toHaveBeenCalledWith('/api/restaurant-test/menus/m4?account_id=account-1', { method: 'DELETE' }))
+    await waitFor(() => expect(fetchApi).toHaveBeenCalledWith('/api/restaurant-test/menus/m4?account_id=account-1', { method: 'DELETE', body: JSON.stringify({ expectedVersion: 1 }) }))
   })
 
   it('閲覧のみでも提供時間と所要時間を読み、保存はできない', async () => {
@@ -394,12 +466,12 @@ describe('価格変更の開始待ちとメニューの停止状態', () => {
     openMenu('秋の鹿肉コース')
     fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     fireEvent.click(screen.getByRole('button', { name: '停止する' }))
-    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'archived' }))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'archived', expectedVersion: 1 }))
     await waitFor(() => expect(within(menuRow('秋の鹿肉コース')).getByText('停止中')).toBeTruthy())
     expect(scheduledCount()).toBe('0')
     fixture.snapshot.mockResolvedValue({ data })
     fireEvent.click(within(menuRow('秋の鹿肉コース')).getByRole('button', { name: '再開', exact: true }))
-    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'active' }))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'active', expectedVersion: 1 }))
     await waitFor(() => expect(within(menuRow('秋の鹿肉コース')).getByText('開始待ち')).toBeTruthy())
     expect(scheduledCount()).toBe('1')
   })

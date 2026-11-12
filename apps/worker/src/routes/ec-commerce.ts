@@ -1047,7 +1047,7 @@ ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'adm
 ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{
     eventType?: unknown; accountId?: unknown; title?: unknown; introText?: unknown; outroText?: unknown;
-    buttonLabel?: unknown; buttonUrl?: unknown; imageUrl?: unknown;
+    buttonLabel?: unknown; buttonUrl?: unknown; imageUrl?: unknown; expectedRecipientIds?: unknown; expectedConfirmationRevision?: unknown;
   }>().catch(() => null);
   if (!body || typeof body.eventType !== 'string' || !EVENT_TYPE_SET.has(body.eventType)) {
     return inputError(c, { success: false, error: 'Invalid eventType' }, 400, ["eventType"]);
@@ -1070,6 +1070,16 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), inp
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
+  const expectedRecipientIds = body.expectedRecipientIds;
+  if (expectedRecipientIds !== undefined && (!Array.isArray(expectedRecipientIds)
+    || expectedRecipientIds.length > 20 || expectedRecipientIds.some((id) => typeof id !== 'string' || !id)
+    || new Set(expectedRecipientIds).size !== expectedRecipientIds.length)) {
+    return inputError(c, { success: false, error: '確認した送信先が不正です' }, 400, ['expectedRecipientIds']);
+  }
+  const expectedRevision = body.expectedConfirmationRevision;
+  if (expectedRevision !== undefined && (!Number.isInteger(expectedRevision) || Number(expectedRevision) < 0)) {
+    return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedConfirmationRevision']);
+  }
   const cooldownKey = `${body.accountId}:${body.eventType}`;
   const lastSent = testSendAt.get(cooldownKey) ?? 0;
   const waitMs = lastSent + TEST_SEND_COOLDOWN_MS - Date.now();
@@ -1079,13 +1089,17 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), inp
       error: `テスト送信は${Math.ceil(waitMs / 1000)}秒待ってからもう一度お試しください`,
     }, 429);
   }
-  testSendAt.set(cooldownKey, Date.now());
+  const cooldownStartedAt = Date.now();
+  testSendAt.set(cooldownKey, cooldownStartedAt);
+  const releaseStaleCooldown = () => {
+    if (testSendAt.get(cooldownKey) === cooldownStartedAt) testSendAt.delete(cooldownKey);
+  };
   const account = await getLineAccountById(c.env.DB, body.accountId);
   if (!account?.channel_access_token) return inputError(c, { success: false, error: 'LINE account is not configured' }, 400, ["accountId"]);
 
   const recipientSetting = await c.env.DB.prepare(
-    `SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`,
-  ).bind(body.accountId).first<{ value: string }>();
+    `SELECT value, confirmation_revision FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`,
+  ).bind(body.accountId).first<{ value: string; confirmation_revision: number }>();
   let friendIds: string[] = [];
   try {
     const parsed = recipientSetting ? JSON.parse(recipientSetting.value) : [];
@@ -1093,12 +1107,28 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), inp
   } catch {
     friendIds = [];
   }
-  if (!friendIds.length) return inputError(c, { success: false, error: 'Test recipients are not configured' }, 400, []);
+  if (expectedRevision !== undefined && expectedRevision !== (recipientSetting?.confirmation_revision ?? 0)) {
+    releaseStaleCooldown();
+    return c.json({ success: false, code: 'recipients_changed', error: 'テスト送信先が変わりました。読み直してください。', data: { recipientIds: friendIds, confirmationRevision: recipientSetting?.confirmation_revision ?? 0 } }, 409);
+  }
+  if (!friendIds.length) {
+    if (Array.isArray(expectedRecipientIds) && expectedRecipientIds.length > 0) {
+      releaseStaleCooldown();
+      return c.json({ success: false, code: 'recipients_changed', error: 'テスト送信先が変わりました。読み直してください。', data: { recipientIds: [] } }, 409);
+    }
+    return inputError(c, { success: false, error: 'Test recipients are not configured' }, 400, []);
+  }
 
   const placeholders = sqlIdSet(friendIds).sql;
   const friends = await c.env.DB.prepare(
     `SELECT id, line_user_id FROM friends WHERE line_account_id = ? AND is_following = 1 AND id IN (${placeholders})`,
   ).bind(body.accountId, ...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<{ id: string; line_user_id: string }>();
+  const currentIds = friends.results.map((friend) => friend.id).sort();
+  const expectedIds = Array.isArray(expectedRecipientIds) ? [...expectedRecipientIds].sort() : null;
+  if (expectedIds && JSON.stringify(expectedIds) !== JSON.stringify(currentIds)) {
+    releaseStaleCooldown();
+    return c.json({ success: false, code: 'recipients_changed', error: 'テスト送信先が変わりました。読み直してください。', data: { recipientIds: currentIds } }, 409);
+  }
   if (!friends.results.length) return inputError(c, { success: false, error: 'No active test recipients' }, 400, ["accountId"]);
 
   // テスト送信の見出し・前後の文章にも {{var.*}} を書ける。
@@ -1120,6 +1150,31 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), inp
     imageUrl: body.imageUrl.trim(),
     test: true,
   });
+  // 送信準備中の宛先変更も、LINEへの操作前に拒否する。
+  if (expectedIds || expectedRevision !== undefined) {
+    const latestSetting = await c.env.DB.prepare(
+      `SELECT value, confirmation_revision FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`,
+    ).bind(body.accountId).first<{ value: string; confirmation_revision: number }>();
+    let latestIds: string[] = [];
+    try {
+      const value: unknown = JSON.parse(latestSetting?.value ?? '[]');
+      if (Array.isArray(value)) latestIds = value.filter((id): id is string => typeof id === 'string').slice(0, 20);
+    } catch { /* 壊れた設定は空として照合する。 */ }
+    if (expectedRevision !== undefined && expectedRevision !== (latestSetting?.confirmation_revision ?? 0)) {
+      releaseStaleCooldown();
+      return c.json({ success: false, code: 'recipients_changed', error: 'テスト送信先が変わりました。読み直してください。', data: { recipientIds: latestIds, confirmationRevision: latestSetting?.confirmation_revision ?? 0 } }, 409);
+    }
+    const latestSet = sqlIdSet(latestIds);
+    const latest = await c.env.DB.prepare(
+      `SELECT id, line_user_id FROM friends WHERE line_account_id = ? AND is_following = 1 AND id IN (${latestSet.sql})`,
+    ).bind(body.accountId, ...latestSet.binds).all<{ id: string; line_user_id: string }>();
+    const snapshot = (items: Array<{ id: string; line_user_id: string }>) =>
+      JSON.stringify(items.map((item) => [item.id, item.line_user_id]).sort((a, b) => a[0].localeCompare(b[0])));
+    if (snapshot(latest.results) !== snapshot(friends.results)) {
+      releaseStaleCooldown();
+      return c.json({ success: false, code: 'recipients_changed', error: 'テスト送信先が変わりました。読み直してください。', data: { recipientIds: latest.results.map((item) => item.id) } }, 409);
+    }
+  }
   const client = new LineClient(account.channel_access_token);
   let sent = 0;
   for (const friend of friends.results) {

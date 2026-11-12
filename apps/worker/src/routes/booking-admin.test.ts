@@ -82,7 +82,7 @@ describe('booking customers API', () => {
     id: 'customer-1',
     line_account_id: 'acc1',
     friend_id: null,
-    display_name: '山田 花子',
+    display_name: '見本 143',
     phone_last4: '5678',
     pet_name: 'ポチ',
     is_line_linked: false,
@@ -94,7 +94,7 @@ describe('booking customers API', () => {
     bookingCustomerMocks.searchBookingCustomers.mockResolvedValueOnce([summary]);
     const { app, env } = makeApp(emptyDb);
     const res = await app.request(
-      '/api/booking/admin/customers?account_id=acc1&q=090-1234-5678',
+      '/api/booking/admin/customers?account_id=acc1&q=090-0000-5678',
       {},
       env,
     );
@@ -102,7 +102,7 @@ describe('booking customers API', () => {
     await expect(res.json()).resolves.toEqual({ customers: [summary] });
     expect(bookingCustomerMocks.searchBookingCustomers).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ lineAccountId: 'acc1', query: '090-1234-5678' }),
+      expect.objectContaining({ lineAccountId: 'acc1', query: '090-0000-5678' }),
     );
   });
 
@@ -139,8 +139,8 @@ describe('booking customers API', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          display_name: '山田 花子',
-          phone: '090-1234-5678',
+          display_name: '見本 143',
+          phone: '090-0000-5678',
           pet_name: 'ポチ',
         }),
       },
@@ -157,7 +157,7 @@ describe('booking customers API', () => {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ display_name: '山田 花子', phone: 'abc' }),
+        body: JSON.stringify({ display_name: '見本 143', phone: 'abc' }),
       },
       env,
     );
@@ -604,7 +604,7 @@ describe('POST /api/booking/admin/bookings', () => {
         INSERT INTO booking_customers (
           id, line_account_id, display_name, phone_normalized_hash,
           phone_encrypted, phone_last4, pet_name
-        ) VALUES ('customer-1','acc1','山田 花子','hash','cipher','5678','ポチ');
+        ) VALUES ('customer-1','acc1','見本 143','hash','cipher','5678','ポチ');
       `);
       const { app, env } = makeApp(sqliteAsD1(sqlite));
       const created = await app.request(
@@ -635,7 +635,7 @@ describe('POST /api/booking/admin/bookings', () => {
         requests: [expect.objectContaining({
           booking_customer_id: 'customer-1',
           friend_id: null,
-          friend_name: '山田 花子',
+          friend_name: '見本 143',
           customer_phone_last4: '5678',
           customer_pet_name: 'ポチ',
           is_line_linked: 0,

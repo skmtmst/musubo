@@ -120,7 +120,7 @@ function seed(sqlite: SqliteD1['raw']) {
      VALUES ('admin-a', ?, '2026-09-01T00:00:00.000Z')`,
   ).run(ACC_A);
 
-  insertFriend(sqlite, FRIEND_A, { line_account_id: ACC_A, display_name: '田中 太郎' });
+  insertFriend(sqlite, FRIEND_A, { line_account_id: ACC_A, display_name: '見本 167' });
   insertFriend(sqlite, FRIEND_B, { line_account_id: ACC_B, display_name: '別アカウントの人' });
   insertFriend(sqlite, FRIEND_UNFOLLOWED, {
     line_account_id: ACC_A,
@@ -242,7 +242,7 @@ describe('テスト送信先の事前表示 (N-070)', () => {
       data: { state: string; recipient: { id: string; displayName: string }; recipientKind: string };
     };
     expect(body.data.state).toBe('ready');
-    expect(body.data.recipient).toMatchObject({ id: FRIEND_A, displayName: '田中 太郎' });
+    expect(body.data.recipient).toMatchObject({ id: FRIEND_A, displayName: '見本 167' });
     // owner は LINE未連携なので、届くのは「登録済みテスト宛先」。
     expect(body.data.recipientKind).toBe('registered');
   });
@@ -324,7 +324,7 @@ describe('テスト送信の失敗と回復 (N-070)', () => {
     expect(first.status).toBe(200);
     const firstBody = await first.json() as { data: { replayed: boolean; recipientName: string } };
     expect(firstBody.data.replayed).toBe(false);
-    expect(firstBody.data.recipientName).toBe('田中 太郎');
+    expect(firstBody.data.recipientName).toBe('見本 167');
     expect(line.pushMessageWithRequestId).toHaveBeenCalledTimes(1);
 
     // 同じ Idempotency-Key の再送は二重送信せず再生として返す。
@@ -399,7 +399,7 @@ describe('本人宛てと登録宛先の区別 (REMINDER-12)', () => {
       data: { recipientKind: string; recipient: { id: string; displayName: string } };
     };
     expect(body.data.recipientKind).toBe('registered');
-    expect(body.data.recipient).toMatchObject({ id: FRIEND_A, displayName: '田中 太郎' });
+    expect(body.data.recipient).toMatchObject({ id: FRIEND_A, displayName: '見本 167' });
   });
 
   test('本人連携がある操作者のテスト送信は本人のline_user_idへ届く', async () => {
@@ -428,7 +428,7 @@ describe('本人宛てと登録宛先の区別 (REMINDER-12)', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { data: { recipientName: string; recipientKind: string } };
     expect(body.data.recipientKind).toBe('registered');
-    expect(body.data.recipientName).toBe('田中 太郎');
+    expect(body.data.recipientName).toBe('見本 167');
     // 事前表示で返した友だちと同じ line_user_id にPushされた。
     expect(shown.recipient.id).toBe(FRIEND_A);
     expect(line.pushMessageWithRequestId.mock.calls[0][0]).toBe(`U${FRIEND_A}`);

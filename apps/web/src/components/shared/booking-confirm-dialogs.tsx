@@ -88,15 +88,16 @@ export function CancelReservationDialog({ open, title, subtitle, facts, fullAmou
 
 export type RefundInput = { amount: number; reason: string; notify: boolean }
 
-export function RefundDialog({ open, subtitle, facts, paidAmount, testMode, busy, error, destination, actorLabel, messageFor, onClose, onConfirm }: {
+export function RefundDialog({ open, subtitle, facts, paidAmount, testMode, busy, error, destination, actorLabel, messageFor, onClose, onConfirm, targetSummary }: {
   open: boolean
   subtitle: string
   facts: Fact[]
   paidAmount: number
+  targetSummary?: ReactNode
   testMode?: boolean
   /** 手順 2 の「返金先」（例「カード（•••• 4242）」）。 */
   destination?: string
-  /** 手順 2 の「記録」に残る名前（例「河野 健太（オーナー）」）。 */
+  /** 手順 2 の「記録」に残る名前（例「見本 太郎（オーナー）」）。 */
   actorLabel?: string
   /** 手順 2 に出す、お客さまに送る LINE の文（PpBzn・v6mT4f）。 */
   messageFor?: (input: RefundInput) => string
@@ -122,6 +123,7 @@ export function RefundDialog({ open, subtitle, facts, paidAmount, testMode, busy
       confirmDisabled={!amountOk || !reason.trim()} confirmDisabledReason={!amountOk ? `返金する額を ${yen(paidAmount)} までで入れてください` : '返金の理由を入れてください'}
       onCancel={() => (step === 2 ? setStep(1) : onClose())} onConfirm={() => (step === 1 ? setStep(2) : onConfirm({ amount, reason, notify }))}>
       <div className={styles.body}>
+        {targetSummary}
         {step === 1 ? <Facts facts={facts} testMode={testMode} testText="本当の返金は起きません" /> : null}
         {step === 1 ? (
           <>

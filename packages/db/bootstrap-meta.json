@@ -668,7 +668,13 @@
     "753_restaurant_table_pen_layout.sql",
     "754_instagram_shared_within_tenant.sql",
     "755_restaurant_floor_archive.sql",
-    "756_musubo_pricing_onboarding.sql"
+    "756_musubo_pricing_onboarding.sql",
+    "757_confirmation_revisions.sql",
+    "758_account_handover_moves.sql",
+    "759_first_onboarding_times.sql",
+    "760_tenant_purge_delete_guards.sql",
+    "761_conversion_approval_revision.sql",
+    "762_restaurant_store_group_member_version.sql"
   ],
-  "migrationCount": 669
+  "migrationCount": 675
 }

@@ -32,7 +32,7 @@ export function pickMoveTarget(
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
-/** 「10/3（土）19:00 山田 花子 4名」 */
+/** 「10/3（土）19:00 見本 143 4名」 */
 export function reservationLine(item: RestaurantReservation, timezone?: string): string {
   const date = polishFormatDate(item.starts_at, { style: 'detail', fallback: '', timeZone: timezone || 'Asia/Tokyo' })
   return `${date ? `${date} ` : ''}${item.customer_name} ${item.guest_count.toLocaleString('ja-JP')} 名`

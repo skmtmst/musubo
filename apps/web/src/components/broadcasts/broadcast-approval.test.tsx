@@ -104,7 +104,7 @@ describe('二者承認の見た目', () => {
       <ApprovalRequestFields
         recipientCount={1248}
         threshold={1000}
-        candidates={[{ id: 'a1', name: '佐藤 美咲', role: 'admin', canApprove: true }]}
+        candidates={[{ id: 'a1', name: '見本 121', role: 'admin', canApprove: true }]}
         candidatesState="ready"
         approverId=""
         onApproverChange={() => undefined}
@@ -113,7 +113,7 @@ describe('二者承認の見た目', () => {
       />,
     )
     expect(rendered.host.textContent).toContain('承認をお願いする人')
-    expect(rendered.host.textContent).toContain('佐藤 美咲')
+    expect(rendered.host.textContent).toContain('見本 121')
     expect(rendered.host.textContent).toContain('1,248人')
     cleanup(rendered)
   })
@@ -156,8 +156,8 @@ describe('二者承認の見た目', () => {
       <ApprovalStatusSection
         approval={state.approval}
         scheduledLabel="10月1日（水）10:00"
-        approverName="佐藤 美咲"
-        requesterName="川野 健太"
+        approverName="見本 121"
+        requesterName="見本 145"
         viewer={state.viewer}
         onCancel={() => undefined}
         onRemind={() => undefined}
@@ -165,8 +165,8 @@ describe('二者承認の見た目', () => {
         message={null}
       />,
     )
-    expect(rendered.host.textContent).toContain('佐藤 美咲さんの承認を待っています')
-    expect(rendered.host.textContent).toContain('依頼：川野 健太')
+    expect(rendered.host.textContent).toContain('見本 121さんの承認を待っています')
+    expect(rendered.host.textContent).toContain('依頼：見本 145')
     cleanup(rendered)
   })
 
@@ -176,8 +176,8 @@ describe('二者承認の見た目', () => {
       <ApprovalStatusSection
         approval={requesterState.approval}
         scheduledLabel="10月1日（水）10:00"
-        approverName="佐藤 美咲"
-        requesterName="川野 健太"
+        approverName="見本 121"
+        requesterName="見本 145"
         viewer={requesterState.viewer}
         onCancel={() => undefined}
         onRemind={() => undefined}
@@ -195,8 +195,8 @@ describe('二者承認の見た目', () => {
       <ApprovalStatusSection
         approval={approverState.approval}
         scheduledLabel="10月1日（水）10:00"
-        approverName="佐藤 美咲"
-        requesterName="川野 健太"
+        approverName="見本 121"
+        requesterName="見本 145"
         viewer={approverState.viewer}
         onCancel={() => undefined}
         onRemind={() => undefined}
@@ -251,7 +251,7 @@ describe('二者承認の見た目', () => {
       <ApproverSection
         approval={approverState.approval}
         viewer={approverState.viewer}
-        requesterName="川野 健太"
+        requesterName="見本 145"
         recipientCount={1248}
         scheduledLabel="10月1日（水）10:00"
         messageSummary="3通"
@@ -277,7 +277,7 @@ describe('二者承認の見た目', () => {
       <ApproverSection
         approval={requesterState.approval}
         viewer={requesterState.viewer}
-        requesterName="川野 健太"
+        requesterName="見本 145"
         recipientCount={1248}
         scheduledLabel="10月1日（水）10:00"
         messageSummary="3通"

@@ -35,7 +35,7 @@ import FriendListRow from './friend-list-row'
 const BASE: FriendListItem = {
   id: 'friend-1',
   lineUserId: 'U0000000000000000000000000000001',
-  displayName: 'Kenta Kawano(Obama)',
+  displayName: 'Demo Person(Obama)',
   pictureUrl: null,
   statusMessage: null,
   isFollowing: true,
@@ -111,7 +111,7 @@ describe('友だち行の行き先', () => {
   })
 
   function openMenu(): HTMLElement {
-    const trigger = host.querySelector('button[aria-label="Kenta Kawano(Obama)のその他操作"]')
+    const trigger = host.querySelector('button[aria-label="Demo Person(Obama)のその他操作"]')
     if (!trigger) throw new Error('操作メニューが見つかりません')
     act(() => trigger.dispatchEvent(new MouseEvent('click', { bubbles: true })))
     const menu = document.body.querySelector<HTMLElement>('[role="menu"]')
@@ -177,7 +177,7 @@ describe('友だち行の行き先', () => {
 
   it('名前は列の中で1行省略し、全文はtitleで読める', () => {
     render()
-    const name = host.querySelector('a[title="Kenta Kawano(Obama)"]')
+    const name = host.querySelector('a[title="Demo Person(Obama)"]')
     expect(name).not.toBeNull()
     expect(name?.className).toContain('truncate')
   })

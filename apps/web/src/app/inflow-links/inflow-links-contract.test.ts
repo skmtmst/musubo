@@ -57,7 +57,6 @@ describe("管理画面 流入経路一覧の契約", () => {
     expect(PAGE).toContain('accountAtRequest === latestAccountRef.current')
     expect(PAGE).toContain('setRoutes([])')
     expect(PAGE).toContain('const [summaryAvailable, setSummaryAvailable] = useState(false)')
-    expect(PAGE).toContain("summaryAvailable && r.stats ? (")
     expect(PAGE).toContain("summaryAvailable && r.stats ? formatNumber(r.stats.clickCount) : emptyValue('unknown')")
   })
 

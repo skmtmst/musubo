@@ -318,8 +318,6 @@ async function typeDatetime(text: string) {
   const trigger = document.querySelector<HTMLElement>('#schedule-at')
   if (!trigger) throw new Error('予約日時の入力が見つからない')
   if (!dialog()) await click(trigger)
-  const dateButton = dialog()?.querySelector('button[aria-label="日付"]')
-  if (dateButton) await click(dateButton)
   for (let i = 0; i < 36; i += 1) {
     const grid = document.querySelector('[role="grid"]')
     const label = grid?.getAttribute('aria-label')
@@ -339,8 +337,8 @@ async function typeDatetime(text: string) {
       (b.getAttribute('aria-label') ?? '').startsWith(`${year}年${month}月${day}日（${week}）`),
     ) ?? null,
   )
-  await click(Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!)
   await setTimeControl(dialog()?.querySelector('input[role="combobox"]') ?? null, `${match[4]}:${match[5]}`)
+  await click(Array.from(dialog()!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!)
 }
 import { setTimeControl } from '@/test-utils/time-control'
 

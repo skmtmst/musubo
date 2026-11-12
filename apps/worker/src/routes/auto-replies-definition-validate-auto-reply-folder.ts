@@ -155,6 +155,7 @@ export interface SerializedAutoReply {
   internalMemo: string | null;
   /** 'draft'（未公開）| 'published' | 'stopped'。一覧が再開の可否を分けるのに使う。 */
   lifecycleStatus: string;
+  confirmationRevision: number;
   /** 機能08 点検 最後に停止した日時・担当者・理由。止めたことが無ければ null。 */
   stoppedAt: string | null;
   stoppedByStaffId: string | null;

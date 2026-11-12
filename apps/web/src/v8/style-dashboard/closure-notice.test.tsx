@@ -32,3 +32,22 @@ it('確認の取得中にアカウントが変わったら前の休みを保存�
   await act(async () => { finish([]) })
   expect(save).not.toHaveBeenCalled()
 })
+
+it('確認した予約の版を固定して休業を登録する', async () => {
+  const save = vi.fn()
+  const preview = vi.fn(async () => ({ rows: [{ time: '19:00', name: 'お客さま', sub: '1名' }], snapshot: 'fixed-snapshot' }))
+  render(<ClosureDialog open date="2026-11-03" targets={{ staff: [{ id: 's1', name: '担当者' }], seats: [] }} seatNoun="担当者" busy={false} onClose={() => {}} onSave={save} preview={preview} />)
+  fireEvent.click(screen.getByRole('button', { name: '休みを入れる' }))
+  const dialog = await screen.findByRole('dialog', { name: /重なる予約が/ })
+  expect(save).not.toHaveBeenCalled()
+  fireEvent.click(within(dialog).getByRole('button', { name: '休みを入れる' }))
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ expectedSnapshot: 'fixed-snapshot', date: '2026-11-03', ids: ['s1'] }))
+})
+
+it('予約を確認できなければ休業を登録しない', async () => {
+  const save = vi.fn()
+  render(<ClosureDialog open date="2026-11-03" targets={{ staff: [{ id: 's1', name: '担当者' }], seats: [] }} seatNoun="担当者" busy={false} onClose={() => {}} onSave={save} preview={async () => { throw new Error('offline') }} />)
+  fireEvent.click(screen.getByRole('button', { name: '休みを入れる' }))
+  expect(await screen.findByText(/予約を確認できませんでした/)).toBeTruthy()
+  expect(save).not.toHaveBeenCalled()
+})

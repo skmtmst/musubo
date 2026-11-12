@@ -62,3 +62,12 @@ describe('紹介者・案件の所属と件数',()=>{
   expect(raw.prepare('SELECT line_account_id,folder_id FROM affiliate_offers').get()).toEqual({line_account_id:'a',folder_id:f.id});
  });
 });
+it('Webhook の親フォルダ削除は子まで両方の確認版を進める',async()=>{
+ const parent=await createFolder(db,{kind:'webhook',accountId:'a',name:'親'});
+ const child=await createFolder(db,{kind:'webhook',accountId:'a',name:'子',parentId:parent.id});
+ raw.prepare("INSERT INTO outgoing_webhooks(id,line_account_id,name,url,event_types,folder_id) VALUES('out','a','送信','https://example.test','[]',?)").run(parent.id);
+ raw.prepare("INSERT INTO incoming_webhooks(id,line_account_id,name,source_type,folder_id) VALUES('in','a','受信','custom',?)").run(child.id);
+ expect(await deleteFolder(db,parent.id)).toBe(true);
+ expect(raw.prepare("SELECT confirmation_revision,folder_id FROM outgoing_webhooks WHERE id='out'").get()).toEqual({confirmation_revision:2,folder_id:null});
+ expect(raw.prepare("SELECT confirmation_revision,folder_id FROM incoming_webhooks WHERE id='in'").get()).toEqual({confirmation_revision:2,folder_id:null});
+});

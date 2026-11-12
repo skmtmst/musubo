@@ -42,7 +42,7 @@ function interaction(overrides: Partial<WebhookInteraction> = {}): WebhookIntera
   return {
     id: 'wi-1', direction: 'outgoing', webhookName: '予約台帳', eventType: 'booking_created', triggerSummary: '予約が入った・Masato S.',
     status: 'failed', responseLabel: '500 エラー', responseStatus: 500, attemptCount: 1, durationMs: 1200,
-    failureReason: null, failureReasonCode: 'response_5xx', canRetry: true, retryBlockReason: null, autoRetryNextAt: null,
+    confirmationRevision: 2, webhookRevision: 3, failureReason: null, failureReasonCode: 'response_5xx', canRetry: true, retryBlockReason: null, autoRetryNextAt: null,
     startedAt: '2026-09-30T00:58:00.000Z', completedAt: null, retryOfId: null,
     ...overrides,
   }
@@ -178,7 +178,7 @@ describe('結果が分からない失敗を無条件に送り直さない', () =
     await vi.waitFor(() => expect(document.body.textContent).toContain('本店'))
     await act(async () => { confirm.click() })
     expect(retries().map((call) => [call.url, call.body])).toEqual([
-      [`${process.env.NEXT_PUBLIC_API_URL}/api/webhooks/interactions/wi-1/retry?lineAccountId=account-a`, { confirmed: true }],
+      [`${process.env.NEXT_PUBLIC_API_URL}/api/webhooks/interactions/wi-1/retry?lineAccountId=account-a`, { confirmed: true, interactionRevision: 2, webhookRevision: 3 }],
     ])
   })
 
@@ -189,7 +189,7 @@ describe('結果が分からない失敗を無条件に送り直さない', () =
     await render()
     await openContents()
     await act(async () => { buttonByText('届いたか確かめてから送り直す', designDialog()!)!.click() })
-    expect(retries().map((call) => call.body)).toEqual([{ confirmed: false }])
+    expect(retries().map((call) => call.body)).toEqual([{ confirmed: false, interactionRevision: 2, webhookRevision: 3 }])
     expect(buttonByText('確かめたので送り直す')).toBeTruthy()
   })
 

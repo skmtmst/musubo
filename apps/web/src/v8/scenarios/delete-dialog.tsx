@@ -12,6 +12,7 @@ type DeleteTarget = Scenario & { subscriberCount?: number | null; stepCount?: nu
 type Props = {
   target: DeleteTarget | null
   busy: boolean
+  summary: import('@/lib/api/types/scenarios').ScenarioConfirmation | null
   error: string
   disabled: boolean
   targetStillListed: boolean
@@ -23,7 +24,7 @@ type Props = {
 }
 
 /** 対象とアカウントを保持し、一覧変更後は古い確認から削除しない。 */
-export default function ScenarioDeleteDialog({ target, busy, error, disabled, targetStillListed, sameScope, lockedReason, countLabel, onConfirm, onCancel }: Props) {
+export default function ScenarioDeleteDialog({ target, busy, error, summary, disabled, targetStillListed, sameScope, lockedReason, countLabel, onConfirm, onCancel }: Props) {
   return <ConfirmDialog
     open={target !== null}
     title={target ? `「${target.name}」を削除しますか？` : ''}
@@ -41,7 +42,7 @@ export default function ScenarioDeleteDialog({ target, busy, error, disabled, ta
     {target && <div className={styles.deleteBody}>
       <OperationTargetSummary accounts={target.lineAccountId === null ? [] : [{ id: target.lineAccountId ?? '' }]} allAccounts={target.lineAccountId === null} />
       <MoveReferrersNotice scenarioId={target.id} />
-      <p>配信中 {countLabel(target.subscriberCount)} ／ 通数{' '}
+      <p>配信中 {countLabel(summary?.activeCount)} ／ 全状態 {countLabel(summary?.totalCount)} ／ 通数{' '}
         {target.stepCount === undefined ? '— 読み込めませんでした' : `${target.stepCount} 通`}
       </p>
       {target.lineAccountId === null && <p className={styles.deleteWarn}>全アカウント共通のシナリオです。すべてのアカウントから消えます。</p>}

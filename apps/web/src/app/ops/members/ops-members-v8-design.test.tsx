@@ -19,9 +19,9 @@ vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNod
 vi.mock('@/v8/settings/staff', () => ({ SelfSecurity: () => <section aria-label="自分の設定">パスキーを追加</section> }))
 
 const members = [
-  { staffId: 's1', name: 'Kenta Kawano', email: 'kenta@musubo.jp', isActive: true, totpEnabled: true, lineLinked: false, inviteStatus: '', activationState: 'active', invitedAt: null, approvedBy: null, lastLoginAt: '2026-10-02T07:10:00.000+09:00', createdAt: '2026-09-01T00:00:00.000+09:00' },
-  { staffId: 's2', name: '坂本 正人', email: 'sakamoto@musubo.jp', isActive: true, totpEnabled: true, lineLinked: false, inviteStatus: '', activationState: 'active', invitedAt: null, approvedBy: null, lastLoginAt: '2026-10-01T22:40:00.000+09:00', createdAt: '2026-09-01T00:00:00.000+09:00' },
-  { staffId: 's3', name: '山田 花子', email: 'yamada@musubo.jp', isActive: true, totpEnabled: false, lineLinked: false, inviteStatus: '', activationState: 'awaiting_totp', invitedAt: '2026-10-03T00:00:00.000+09:00', approvedBy: null, lastLoginAt: null, createdAt: '2026-10-03T00:00:00.000+09:00' },
+  { staffId: 's1', name: 'Demo Person', email: 'owner@example.com', isActive: true, totpEnabled: true, lineLinked: false, inviteStatus: '', activationState: 'active', invitedAt: null, approvedBy: null, lastLoginAt: '2026-10-02T07:10:00.000+09:00', createdAt: '2026-09-01T00:00:00.000+09:00' },
+  { staffId: 's2', name: '見本 次郎', email: 'staff@example.com', isActive: true, totpEnabled: true, lineLinked: false, inviteStatus: '', activationState: 'active', invitedAt: null, approvedBy: null, lastLoginAt: '2026-10-01T22:40:00.000+09:00', createdAt: '2026-09-01T00:00:00.000+09:00' },
+  { staffId: 's3', name: '見本 花子', email: 'guest@example.com', isActive: true, totpEnabled: false, lineLinked: false, inviteStatus: '', activationState: 'awaiting_totp', invitedAt: '2026-10-03T00:00:00.000+09:00', approvedBy: null, lastLoginAt: null, createdAt: '2026-10-03T00:00:00.000+09:00' },
 ]
 
 const summary = { members: 3, invited: 1, awaitingTotp: 1, totpEnabled: 2, impersonationsThisMonth: 1, writeImpersonationsThisMonth: 1, piiRevealsThisMonth: 0 }
@@ -71,7 +71,7 @@ describe('運営メンバー管理の承認済みデザイン', () => {
     expect(body).toContain('招待する')
     expect(body).toContain('運営メンバー')
     expect(host.querySelector('[aria-label="自分の設定"]')?.textContent).toContain('パスキーを追加')
-    expect(body).toContain('Kenta Kawano（自分）')
+    expect(body).toContain('Demo Person（自分）')
     expect(body).toContain('10/02 07:10')
     expect(body).toContain('二段階認証待ち')
     expect(body).toContain('招待中')

@@ -84,7 +84,7 @@ describe('R203 「URLを開く」の飛び先検査', () => {
     expect(isAreaActionConfigured(urlArea('a', 'https://example.com/apply'))).toBe(true)
     expect(isAreaActionConfigured(urlArea('a', '', 'link-1'))).toBe(true)
     // LINEのuriアクションが通す scheme（電話・メール）も設定済みとして扱う
-    expect(isAreaActionConfigured(urlArea('a', 'tel:0312345678'))).toBe(true)
+    expect(isAreaActionConfigured(urlArea('a', 'tel:0300005678'))).toBe(true)
     expect(isAreaActionConfigured(urlArea('a', 'mailto:info@example.com'))).toBe(true)
   })
 

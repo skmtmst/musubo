@@ -9,6 +9,7 @@ import type { BookingCancellationCharge, BookingCancellationQuote } from '@line-
 import Button from '@/components/shared/button'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import Dialog from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import TestModeNote from '@/components/shared/test-mode-note'
 import ListState from '@/components/shared/list-state'
@@ -64,6 +65,9 @@ function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel,
   const [cardLoading, setCardLoading] = useState(true)
   const cardRequest = useRef(0)
   const [dialog, setDialog] = useState<'charge' | 'waive' | 'refund' | null>(null)
+  const [waiveTarget, setWaiveTarget] = useState<{ accountId: string; chargeId: string; version: number; customerName: string; bookingLabel: string; epoch: number } | null>(null)
+  const scope = useRef({ canCharge, canRefund, epoch: 0 })
+  if (scope.current.canCharge !== canCharge || scope.current.canRefund !== canRefund) scope.current = { canCharge, canRefund, epoch: scope.current.epoch + 1 }
   const [refundStep, setRefundStep] = useState<1 | 2>(1)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
@@ -109,6 +113,7 @@ function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel,
       preparing.open(next === 'charge' ? 'カードの請求' : 'カードの返金')
       return
     }
+    if (next === 'waive') setWaiveTarget({ accountId, chargeId: charge.id, version: charge.version, customerName, bookingLabel, epoch: scope.current.epoch })
     setError(null); setReason(''); setRefundStep(1); key.current = uuid(); setDialog(next)
   }
   const close = () => { if (!busy) setDialog(null) }
@@ -163,9 +168,10 @@ function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel,
       </Dialog>
 
       {/* 請求しない：理由は必須。 */}
-      <Dialog open={dialog === 'waive'} title="キャンセル料を請求しませんか？" titleNote={`${withHonorific(customerName, 'さま', { space: true })}・${bookingLabel}`} size="small" contentLayout="form"
+      <Dialog open={dialog === 'waive' && canCharge && waiveTarget !== null && waiveTarget.epoch === scope.current.epoch} title="キャンセル料を請求しませんか？" titleNote={`${withHonorific(waiveTarget?.customerName ?? '', 'さま', { space: true })}・${waiveTarget?.bookingLabel ?? ''}`} size="small" contentLayout="form"
         busy={busy} error={error ?? undefined} cancelLabel="戻る" onCancel={close} confirmLabel="請求しない" confirmDisabled={!reason.trim()} confirmDisabledReason="理由を入れてください"
-        onConfirm={() => void run(() => bookingCancellationApi.waive(accountId, charge.id, reason.trim(), charge.version), '請求しないにしました')}>
+        onConfirm={() => { if (!waiveTarget || !canCharge || waiveTarget.epoch !== scope.current.epoch || waiveTarget.chargeId !== charge.id || waiveTarget.version !== charge.version) { setError('請求内容が変わりました。閉じて読み直し、もう一度選んでください。'); return } void run(() => bookingCancellationApi.waive(waiveTarget.accountId, waiveTarget.chargeId, reason.trim(), waiveTarget.version), '請求しないにしました') }}>
+        <OperationTargetSummary accounts={[{ id: waiveTarget?.accountId ?? '' }]} externalTarget={{ label: 'お客さま', name: waiveTarget?.customerName }} />
         <Field label="請求しない理由" required><TextField aria-label="請求しない理由" value={reason} maxLength={500} placeholder="例：初めての取り消しなので今回は請求しない" onChange={(event) => setReason(event.target.value)} /></Field>
         <p className={styles.minor}>理由は記録に残ります（だれが・いつ・理由）。</p>
       </Dialog>

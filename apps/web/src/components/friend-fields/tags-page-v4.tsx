@@ -297,6 +297,9 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
    * 読み込み中と失敗のあいだも押せなくする。失敗を「参照0件」と読み違えて
    * 使用中のタグを消させないため。
    */
+  const active = useRef(true)
+  useEffect(() => { active.current = true; return () => { active.current = false } }, [])
+  const close = () => { if (active.current && !saving) { active.current = false; onCancel() } }
   const [impact, setImpact] = useState<TagDependencies | null>(null)
   const [impactStatus, setImpactStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
@@ -333,7 +336,7 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
       : ''
 
   const archive = async () => {
-              if (blocked || text !== tag.name || !impact || !accountId || checkedGeneration !== scope.current.generation) return
+              if (!active.current || blocked || text !== tag.name || !impact || !accountId || checkedGeneration !== scope.current.generation) return
               const requestGeneration = scope.current.generation
               setSaving(true); setSaveError('')
               try {
@@ -341,10 +344,10 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
                   expectedVersion: impact.tag.version,
                   impactRevision: impact.revision,
                 }, crypto.randomUUID())
-                if (requestGeneration !== scope.current.generation) return
+                if (!active.current || requestGeneration !== scope.current.generation) return
                 onArchived(`「${tag.name}」を保管しました`)
               } catch (reason) {
-                if (requestGeneration !== scope.current.generation) return
+                if (!active.current || requestGeneration !== scope.current.generation) return
                 /*
                  * 「もう整理済み」は失敗ではない。着きたかった状態にはもう着いている
                  * ので、赤い失敗ではなく、成功と同じ通知で見せて一覧を読み直す。
@@ -361,10 +364,10 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
 
   }
   return <Dialog open size="large" tone="destructive" confirmation dirty={false}
-    busy={saving} onCancel={onCancel} title={`「${tag.name}」を保管しますか？`}
+    busy={saving} onCancel={close} title={`「${tag.name}」を保管しますか？`}
     titleIcon={<Trash2 aria-hidden="true" />} error={saveError || undefined}
     footer={<DialogActions leadingAction={blockedReason || undefined}>
-      <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
+      <Button onClick={close} disabled={saving}>キャンセル</Button>
       <Button variant="danger" disabled={blocked || text !== tag.name} busy={saving} onClick={() => void archive()}>このタグを保管する</Button>
     </DialogActions>}
   >

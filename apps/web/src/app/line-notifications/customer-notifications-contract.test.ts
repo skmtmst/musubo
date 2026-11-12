@@ -136,7 +136,7 @@ describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
     expect(CODE).toContain('定期便の決済に失敗したとき')
     // 見本は架空と明記し、実在の人物名を宛先のように見せない。
     expect(CODE).toContain('架空の注文による表示例')
-    expect(CODE).not.toContain('高橋 直人')
+    expect(CODE).not.toContain('見本 16')
   })
 
   it('#988 LAY-10拡張: つながる先はリンク色の p ではなく実リンク', () => {

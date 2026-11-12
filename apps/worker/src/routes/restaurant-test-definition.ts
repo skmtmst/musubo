@@ -415,7 +415,8 @@ export const updateRestaurantMenu = async (c: Context<Env>) => {
     .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
     .first<{ store_id: string; kind: string; name: string; price: number; allergens_json: string; service_periods_json: string; status: string; description: string | null; image_media_id: string | null }>();
   if (!current) return c.json({ success: false, error: 'メニューが見つかりません' }, 404);
-  const body = await c.req.json<{ kind?: string; name?: string; price?: number; allergens?: string[]; servicePeriods?: string[]; status?: string; effectiveAt?: string | null; description?: string | null; imageMediaId?: string | null }>();
+  const body = await c.req.json<{ kind?: string; name?: string; price?: number; allergens?: string[]; servicePeriods?: string[]; status?: string; effectiveAt?: string | null; description?: string | null; imageMediaId?: string | null; expectedVersion?: number }>();
+  if (body.expectedVersion !== undefined && (!Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1)) return inputError(c, { success: false, error: "確認した版が正しくありません" }, 400, ["expectedVersion"]);
   const kind = body.kind === undefined ? current.kind : body.kind;
   const name = body.name === undefined ? current.name : body.name;
   const price = body.price === undefined ? current.price : body.price;
@@ -437,8 +438,9 @@ export const updateRestaurantMenu = async (c: Context<Env>) => {
   const scheduledChange = approvalId ? await db.prepare(`SELECT id, approval_id FROM rt_menu_change_requests
     WHERE menu_id = ? AND store_id = ? AND status = 'approved' LIMIT 1`)
     .bind(c.req.param('id'), current.store_id).first<{ id: string; approval_id: string }>() : null;
-  const writes = [db.prepare(`UPDATE rt_menu_items SET kind = ?, name = ?, allergens_json = ?, service_periods_json = ?, status = ?, description = CASE WHEN ? THEN ? ELSE description END, image_media_id = CASE WHEN ? THEN ? ELSE image_media_id END, updated_at = datetime('now') WHERE id = ?`)
-    .bind(kind, name.trim(), body.allergens === undefined ? current.allergens_json : JSON.stringify(body.allergens), body.servicePeriods === undefined ? current.service_periods_json : JSON.stringify(body.servicePeriods), status, body.description !== undefined ? 1 : 0, body.description?.trim() || null, body.imageMediaId !== undefined ? 1 : 0, body.imageMediaId ?? null, c.req.param('id'))];
+  const writes = [db.prepare(`UPDATE rt_menu_items SET confirmation_revision = confirmation_revision + 1, kind = ?, name = ?, allergens_json = ?, service_periods_json = ?, status = ?, description = CASE WHEN ? THEN ? ELSE description END, image_media_id = CASE WHEN ? THEN ? ELSE image_media_id END, updated_at = datetime('now') WHERE id = ? AND store_id = ? AND (? IS NULL OR confirmation_revision = ?)` )
+    .bind(kind, name.trim(), body.allergens === undefined ? current.allergens_json : JSON.stringify(body.allergens), body.servicePeriods === undefined ? current.service_periods_json : JSON.stringify(body.servicePeriods), status, body.description !== undefined ? 1 : 0, body.description?.trim() || null, body.imageMediaId !== undefined ? 1 : 0, body.imageMediaId ?? null, c.req.param('id'), current.store_id, body.expectedVersion ?? null, body.expectedVersion ?? null)];
+  if (body.expectedVersion !== undefined) writes.push(db.prepare("SELECT json(CASE WHEN changes() = 1 THEN '{}' ELSE 'menu_confirmation_conflict' END)"));
   if (approvalId) {
     const requester = c.get('staff')?.id || '管理者';
     if (scheduledChange) {
@@ -459,6 +461,10 @@ export const updateRestaurantMenu = async (c: Context<Env>) => {
   try {
     await db.batch(writes);
   } catch (error) {
+    if (body.expectedVersion !== undefined && /malformed json/i.test(String(error))) {
+      const latest = await db.prepare('SELECT * FROM rt_menu_items WHERE id = ? AND store_id = ?').bind(c.req.param('id'), current.store_id).first();
+      return c.json({ success: false, code: 'menu_confirmation_conflict', error: 'メニューが変更されました。最新の内容を確認してください', data: latest }, 409);
+    }
     if (/unique constraint/i.test(String(error))) return c.json({ success: false, error: 'このメニューには以前の価格変更申請が残っています。メニュー一覧の申請中から確認してください' }, 409);
     throw error;
   }

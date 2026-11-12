@@ -261,7 +261,7 @@ developer.uber.com の該当ページには**メールアドレス・電話番�
 
 ### 検索では出るが Uber の公式ページで裏が取れなかったもの（使用前に要確認）
 
-`eats-partner-tech-support@uber.com` ／ `r.jp@uber.com` ／ `restaurants@uber.com`。
+`eats-partner-tech-support@uber.com` ／ `restaurants@uber.com`。
 いずれも第三者サイトや検索結果の要約にのみ現れ、Uber 自身のページでは確認できませんでした。
 **実在・現役である保証がないため、重要な依頼の唯一の宛先にはしません。**
 

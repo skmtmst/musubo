@@ -15,6 +15,7 @@ import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import DateField from '@/components/shared/date-field'
 import Dialog from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Drawer from '@/components/shared/drawer'
 import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
@@ -63,38 +64,46 @@ function uuid() {
 export default function EntitlementsCard({ accountId, friendId, friendName, canEdit }: { accountId: string | null; friendId: string; friendName: string; canEdit: boolean }) {
   const [state, setState] = useState<'loading' | 'ready' | 'not-ready' | 'error'>('loading')
   const [items, setItems] = useState<BookingEntitlementView[]>([])
-  const [dialog, setDialog] = useState<{ action: Action; id: string } | null>(null)
+  const [dialog, setDialog] = useState<{ action: Action; id: string; epoch: number } | null>(null)
   const [drawerId, setDrawerId] = useState<string | null>(null)
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const generation = useRef(0)
+  const scope = useRef({ accountId, friendId, canEdit, epoch: 0 })
+  if (scope.current.accountId !== accountId || scope.current.friendId !== friendId || scope.current.canEdit !== canEdit) scope.current = { accountId, friendId, canEdit, epoch: scope.current.epoch + 1 }
+  const [itemsEpoch, setItemsEpoch] = useState(-1)
+  const openDialog = (target: { action: Action; id: string }) => setDialog({ ...target, epoch: scope.current.epoch })
 
   const reload = useCallback(async () => {
     if (!accountId) return
     const mine = ++generation.current
+    const epoch = scope.current.epoch
     setState('loading')
     try {
       const response = await bookingEntitlementsApi.list(accountId, friendId)
-      if (mine !== generation.current) return
+      if (mine !== generation.current || epoch !== scope.current.epoch) return
+      setItemsEpoch(epoch)
       setItems(response.data.filter((item) => item.status === 'active'))
       setState('ready')
     } catch (cause) {
-      if (mine === generation.current) setState(isNotReadyError(cause) ? 'not-ready' : 'error')
+      if (mine === generation.current && epoch === scope.current.epoch) { setItemsEpoch(epoch); setState(isNotReadyError(cause) ? 'not-ready' : 'error') }
     }
-  }, [accountId, friendId])
+  }, [accountId, friendId, canEdit])
 
   useEffect(() => { void reload() }, [reload])
-  const drawerItem = items.find((item) => item.id === drawerId) ?? null
+  const visibleItems = itemsEpoch === scope.current.epoch ? items : []
+  const visibleState = itemsEpoch === scope.current.epoch ? state : 'loading'
+  const drawerItem = visibleItems.find((item) => item.id === drawerId) ?? null
 
   return (
     <Card variant="form" gap="normal">
-      <CardHeader size="stacked" title="回数券・月謝" action={canEdit && state === 'ready' ? <Button onClick={() => setDialog({ action: 'give', id: items[0]?.id ?? NEW_TICKET })}><Plus size={16} aria-hidden="true" />手で入れる</Button> : undefined} />
-      {state === 'not-ready' ? <Notice tone="info" icon={<Info size={16} aria-hidden="true" />}>回数券・月謝は、データの準備が済むと店が手で入れられます。</Notice>
-        : state === 'loading' ? <ListState kind="loading" title="回数券・月謝を読み込んでいます" />
-          : state === 'error' ? <ListState kind="error" title="回数券・月謝を表示できませんでした" onRetry={() => void reload()} />
-            : items.length === 0 ? <p className={styles.minor}>持っている回数券・月謝はありません。店頭で売ったときや紙の回数券を引き継ぐときは［手で入れる］から。</p>
+      <CardHeader size="stacked" title="回数券・月謝" action={canEdit && visibleState === 'ready' ? <Button onClick={() => openDialog({ action: 'give', id: visibleItems[0]?.id ?? NEW_TICKET })}><Plus size={16} aria-hidden="true" />手で入れる</Button> : undefined} />
+      {visibleState === 'not-ready' ? <Notice tone="info" icon={<Info size={16} aria-hidden="true" />}>回数券・月謝は、データの準備が済むと店が手で入れられます。</Notice>
+        : visibleState === 'loading' ? <ListState kind="loading" title="回数券・月謝を読み込んでいます" />
+          : visibleState === 'error' ? <ListState kind="error" title="回数券・月謝を表示できませんでした" onRetry={() => void reload()} />
+            : visibleItems.length === 0 ? <p className={styles.minor}>持っている回数券・月謝はありません。店頭で売ったときや紙の回数券を引き継ぐときは［手で入れる］から。</p>
               : (
                 <ul className={styles.list}>
-                  {items.map((item) => (
+                  {visibleItems.map((item) => (
                     <li key={item.id} className={styles.row}>
                       <Ticket size={16} aria-hidden="true" className={styles.rowIcon} />
                       <span className={styles.rowMain}>
@@ -103,19 +112,19 @@ export default function EntitlementsCard({ accountId, friendId, friendName, canE
                       </span>
                       {canEdit ? <RowMenu appearance="box" size="row" label={`${item.name}の操作`} open={openMenu === item.id} onOpenChange={(next) => setOpenMenu(next ? item.id : null)} items={[
                         { id: 'history', label: '履歴を見る', onSelect: () => setDrawerId(item.id) },
-                        { id: 'give', label: '回数を足す', onSelect: () => setDialog({ action: 'give', id: item.id }) },
-                        { id: 'adjust', label: '残りを直す', onSelect: () => setDialog({ action: 'adjust', id: item.id }) },
-                        { id: 'extend', label: '期限を延ばす', onSelect: () => setDialog({ action: 'extend', id: item.id }) },
-                        { id: 'revoke', label: '取り消す', tone: 'danger', onSelect: () => setDialog({ action: 'revoke', id: item.id }) },
+                        { id: 'give', label: '回数を足す', onSelect: () => openDialog({ action: 'give', id: item.id }) },
+                        { id: 'adjust', label: '残りを直す', onSelect: () => openDialog({ action: 'adjust', id: item.id }) },
+                        { id: 'extend', label: '期限を延ばす', onSelect: () => openDialog({ action: 'extend', id: item.id }) },
+                        { id: 'revoke', label: '取り消す', tone: 'danger', onSelect: () => openDialog({ action: 'revoke', id: item.id }) },
                       ]} /> : null}
                     </li>
                   ))}
                 </ul>
               )}
-      {accountId ? <EntitlementDialog open={dialog !== null} initial={dialog} accountId={accountId} friendId={friendId} friendName={friendName} items={items}
+      {accountId ? <EntitlementDialog open={dialog !== null && dialog.epoch === scope.current.epoch} initial={dialog} accountId={accountId} friendId={friendId} friendName={friendName} canEdit={canEdit} items={visibleItems}
         onClose={() => setDialog(null)} onDone={() => { setDialog(null); void reload() }} /> : null}
       {accountId ? <EntitlementDrawer item={drawerItem} accountId={accountId} friendName={friendName} canEdit={canEdit} onClose={() => setDrawerId(null)}
-        onAdd={(id) => { setDrawerId(null); setDialog({ action: 'give', id }) }} /> : null}
+        onAdd={(id) => { setDrawerId(null); openDialog({ action: 'give', id }) }} /> : null}
     </Card>
   )
 }
@@ -127,12 +136,13 @@ const ACTIONS: Array<{ value: Action; title: string; note: string; icon: ReactNo
   { value: 'revoke', title: '取り消す', note: 'この回数券を使えなくする', icon: <Ban size={16} aria-hidden="true" />, submit: '取り消す' },
 ]
 
-export function EntitlementDialog({ open, initial, accountId, friendId, friendName, items, onClose, onDone }: {
+export function EntitlementDialog({ open, initial, accountId, friendId, friendName, canEdit = true, items, onClose, onDone }: {
   open: boolean
   initial: { action: Action; id: string } | null
   accountId: string
   friendId: string
   friendName: string
+  canEdit?: boolean
   items: BookingEntitlementView[]
   onClose: () => void
   onDone: () => void
@@ -148,12 +158,20 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
   const [error, setError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
   const key = useRef(uuid())
+  const scope = useRef({ accountId, friendId, canEdit, open, epoch: 0 })
+  if (scope.current.accountId !== accountId || scope.current.friendId !== friendId || scope.current.canEdit !== canEdit || scope.current.open !== open) scope.current = { accountId, friendId, canEdit, open, epoch: scope.current.epoch + 1 }
+  const [openedEpoch, setOpenedEpoch] = useState(-1)
+  const selected = useRef<{ id: string; version: number } | null>(null)
+  const itemsRef = useRef(items)
+  itemsRef.current = items
+  const chooseTarget = useCallback((id: string) => { const item = itemsRef.current.find(row => row.id === id); selected.current = item ? { id: item.id, version: item.version } : null; setTargetId(id) }, [])
 
   useEffect(() => {
     if (!open || !initial) return
-    setAction(initial.action); setTargetId(initial.id); setCount(''); setExpiry(''); setName(''); setReason('')
+    setOpenedEpoch(scope.current.epoch)
+    setAction(initial.action); chooseTarget(initial.id); setCount(''); setExpiry(''); setName(''); setReason('')
     setError(null); setSubmitted(false); key.current = uuid()
-  }, [open, initial])
+  }, [open, initial, chooseTarget])
 
   const target = items.find((item) => item.id === targetId) ?? null
   const isNew = action === 'give' && target === null
@@ -172,7 +190,8 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
 
   async function submit() {
     setSubmitted(true)
-    if (!valid) return
+    if (!valid || !canEdit || openedEpoch !== scope.current.epoch) return
+    if (target && (selected.current?.id !== target.id || selected.current.version !== target.version)) { setError('回数券の内容が変わりました。閉じて読み直し、もう一度選んでください。'); return }
     setBusy(true); setError(null)
     try {
       const endOfDay = (day: string) => new Date(`${day}T23:59:59+09:00`).toISOString()
@@ -202,18 +221,19 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
   }
 
   return (<SaveErrorScope errors={saveErrors}>{(
-    <Dialog open={open} title="回数券を手で入れる" titleNote={`${withHonorific(friendName || 'この友だち', 'さん', { space: true })}・店頭で売った・紙の回数券の引き継ぎなど`} onCancel={onClose} size="medium" busy={busy}
+    <Dialog open={open && canEdit && openedEpoch === scope.current.epoch} title="回数券を手で入れる" titleNote={`${withHonorific(friendName || 'この友だち', 'さん', { space: true })}・店頭で売った・紙の回数券の引き継ぎなど`} onCancel={onClose} size="medium" busy={busy}
       cancelLabel="キャンセル" confirmLabel={submitLabel} onConfirm={() => void submit()}>
       <div className={styles.dialogBody}>
+        <OperationTargetSummary accounts={[{ id: accountId }]} externalTarget={{ label: '友だち', name: friendName }} />
         <RadioCardGroup legend="すること" legendVisible columns={2}>
           {ACTIONS.map((choice) => (
             <RadioCard key={choice.value} name="entitlement-action" value={choice.value} title={choice.title} note={choice.note} icon={choice.icon}
               checked={action === choice.value} disabled={choice.value !== 'give' && items.length === 0}
               disabledReason={choice.value !== 'give' && items.length === 0 ? '持っている回数券がありません' : undefined}
-              onChange={(value) => { setAction(value as Action); if (value !== 'give' && targetId === NEW_TICKET && items[0]) setTargetId(items[0].id) }} />
+              onChange={(value) => { setAction(value as Action); if (value !== 'give' && targetId === NEW_TICKET && items[0]) chooseTarget(items[0].id) }} />
           ))}
         </RadioCardGroup>
-        <div className={styles.fullSelect}><SaveErrorField names={['entitlementId', 'entitlement_id', 'targetId']}><EntitySelect aria-label="対象の回数券" noun="回数券" value={targetId} onChange={setTargetId} size="full"
+        <div className={styles.fullSelect}><SaveErrorField names={['entitlementId', 'entitlement_id', 'targetId']}><EntitySelect aria-label="対象の回数券" noun="回数券" value={targetId} onChange={chooseTarget} size="full"
           options={[...items.map((item) => ({ value: item.id, label: optionLabel(item) })), ...(action === 'give' ? [{ value: NEW_TICKET, label: '新しい回数券を付ける' }] : [])]} /></SaveErrorField></div>
         {isNew ? (
           <Field label="回数券の名前" required error={submitted && !name.trim() ? '名前を入れてください' : undefined}>

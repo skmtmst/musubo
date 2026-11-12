@@ -99,6 +99,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const { selectedAccountId } = useAccount()
+  const rulesCloseGuard = useRef<((action: () => void) => void) | null>(null)
+  const setRulesCloseGuard = useCallback((guard: ((action: () => void) => void) | null) => { rulesCloseGuard.current = guard }, [])
   const archiveScope = useRef({ accountId: selectedAccountId, markId, generation: 0 })
   if (archiveScope.current.accountId !== selectedAccountId || archiveScope.current.markId !== markId) archiveScope.current = { accountId: selectedAccountId, markId, generation: archiveScope.current.generation + 1 }
   const openArchiveGeneration = useRef(-1)
@@ -589,8 +591,11 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         />
       ) : null}
       {/* きまりを作る・直すは今の自動変更ルールの部品を窓で開く。閉じたら読み直す。 */}
-      <Dialog open={rulesOpen} size="large" title="自動で変えるきまり" onCancel={() => { setRulesOpen(false); void loadRules() }}>
-        {rulesOpen ? <SupportMarkRulesPanel accountId={selectedAccountId} markId={markId ?? null} markName={name} /> : null}
+      <Dialog open={rulesOpen} size="large" title="自動で変えるきまり" dirty={false} onCancel={() => {
+        const close = () => { setRulesOpen(false); void loadRules() }
+        if (rulesCloseGuard.current) rulesCloseGuard.current(close); else close()
+      }}>
+        {rulesOpen ? <SupportMarkRulesPanel accountId={selectedAccountId} markId={markId ?? null} markName={name} onCloseGuard={setRulesCloseGuard} /> : null}
       </Dialog>
       <ConfirmDialog
         open={stoppingRule !== null}

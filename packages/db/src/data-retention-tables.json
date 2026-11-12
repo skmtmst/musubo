@@ -47,6 +47,15 @@
       "parentColumn": "id"
     }
   },
+  "account_handover_moves": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "handover_id",
+      "parent": "account_handovers",
+      "parentColumn": "id"
+    }
+  },
   "account_handovers": {
     "category": "purge",
     "scope": {
@@ -2797,6 +2806,9 @@
       "column": "line_account_id"
     }
   },
+  "registration_applications": {
+    "category": "global"
+  },
   "reminder_delivery_runs": {
     "category": "purge",
     "scope": {
@@ -5135,6 +5147,7 @@
   "booking_monthly_rights": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
   "booking_monthly_event_applications": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
   "booking_monthly_operations": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
+  "tenant_purge_guard": {"category":"global"},
   "line_account_hq_admin_memberships": {"category":"purge","scope":{"by":"lineAccount","column":"line_account_id"}},
   "musubo_pricing_conditions": {"category":"global"},
   "musubo_individual_quotes": {"category":"retain","scope":{"by":"tenant","column":"tenant_id"}},

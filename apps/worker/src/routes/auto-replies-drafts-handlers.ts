@@ -1,5 +1,6 @@
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
+import { isOperationCapabilityStopped } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
 import { getAutoReplies, getAutoReplyById, getAutoReplyHitCounts, getAutoReplyHitCountSince, getFriendById, createAutoReplyWithDraftVersion, getAutoReplyDraftVersion, getAutoReplyPublishedVersion, parseAutoReplyVersionSettings, publishAutoReplyDraftVersion, recordAutoReplyDraftTest, saveAutoReplyDraftVersion, jstNow } from '@line-crm/db';
@@ -125,6 +126,12 @@ export const get__api_auto_replies_conflicts_2 = async (c: Context<Env, "/api/au
     const since = new Date(Date.now() - 28 * 24 * 60 * 60 * 1_000).toISOString();
     let receiveSourceCounts: Array<{ source: string; count: number }> | null = null;
     let matchedLast28Days: number | null = null;
+    let dispatchStopped: boolean | null = null;
+    try {
+      dispatchStopped = await isOperationCapabilityStopped(c.env.DB, accountId, 'auto_reply_dispatch');
+    } catch {
+      logger.error('auto_replies.dispatch_status_read_failed');
+    }
     try {
       const summary = await autoReplyReceiveSummary(c.env.DB, accountId, since);
       receiveSourceCounts = summary.receiveSourceCounts;
@@ -139,6 +146,7 @@ export const get__api_auto_replies_conflicts_2 = async (c: Context<Env, "/api/au
         conflictCount: conflicts.length,
         receiveSourceCounts,
         matchedLast28Days,
+        dispatchStopped,
       },
     });
   } catch (err) {

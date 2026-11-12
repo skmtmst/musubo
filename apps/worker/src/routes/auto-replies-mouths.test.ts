@@ -181,6 +181,25 @@ describe('自動応答の一覧・競合・下書き保存口', () => {
     });
   });
 
+  it.each(['account-1', '*'])('停止の対象が %s の場合も自動応答全体の停止を返す', async (scope) => {
+    testDb.raw.prepare(`INSERT INTO operation_control_sets (scope_key, line_account_id, states_json, updated_at)
+      VALUES (?, ?, ?, datetime('now'))`).run(scope, scope === '*' ? null : scope, JSON.stringify({ auto_reply_dispatch: 'stopped' }));
+    const target = app(testDb.db);
+    const response = await target.instance.request('/api/auto-replies/conflicts?accountId=account-1', {}, target.bindings);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ data: { dispatchStopped: true } });
+  });
+
+  it('停止情報がないときは稼働中、読めないときは不明を返す', async () => {
+    const target = app(testDb.db);
+    const url = '/api/auto-replies/conflicts?accountId=account-1';
+    const before = await target.instance.request(url, {}, target.bindings);
+    await expect(before.json()).resolves.toMatchObject({ data: { dispatchStopped: false } });
+    testDb.raw.exec('DROP TABLE operation_control_sets');
+    const after = await target.instance.request(url, {}, target.bindings);
+    await expect(after.json()).resolves.toMatchObject({ data: { dispatchStopped: null } });
+  });
+
   it('有効ルールも実測も無い場合は空配列と0件を返す', async () => {
     testDb.raw.prepare(`UPDATE auto_replies SET is_active = 0`).run();
     const target = app(testDb.db);

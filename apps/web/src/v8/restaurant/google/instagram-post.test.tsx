@@ -255,3 +255,30 @@ describe('公開前の確認の Instagram の行（★V8-B `U1X7T2`）', () => {
 })
 
 seedIdentity(() => { verifiedStaffRole('owner') })
+
+it.each([{ canPublish: false }, { writeEnabled: false }])('投稿の送信結果が未確認でも送れない時は押せない操作を案内しない %o', async restriction => {
+  fixture.post.mockResolvedValue({ post: post('p-1', { status: 'pending_confirm' }), store: { id: 'store', name: '然カフェ 本店' }, writeEnabled: true, canPublish: true, ...restriction })
+  render(<PostConfirm accountId="acc-1" id="p-1" go={go} />)
+  const notice = await screen.findByText(/前回の送信結果を確認できていません/)
+  expect(notice.textContent).toContain('Google側の状態を確認してください。')
+  expect(notice.textContent).not.toContain('を押すと')
+  expect(fixture.publishPost).not.toHaveBeenCalled()
+})
+
+it('Instagram失敗の確認を閲覧のみで開いても、押せない再送操作は案内しない', async () => {
+  fixture.post.mockResolvedValue({ post: post('p-1', { status: 'published', instagram: ig({ status: 'failed', error: '画像を読めませんでした' }) }), store: { id: 'store', name: '然カフェ 本店' }, writeEnabled: true, canPublish: false })
+  render(<PostConfirm accountId="acc-1" id="p-1" go={go} />)
+  const notice = await screen.findByText(/Google への公開はそのまま残っています/)
+  expect(notice.textContent).toContain('管理者に確認を依頼してください')
+  expect(notice.textContent).not.toContain('「Instagram へ再送」')
+  expect(fixture.retryInstagram).not.toHaveBeenCalled()
+})
+
+it('Googleの審査で公開されなかった投稿を閲覧のみで見た時は、作り直しを管理者に依頼する', async () => {
+  verifiedStaffRole('viewer')
+  fixture.post.mockResolvedValue({ post: post('p-1', { status: 'rejected' }), store: { id: 'store', name: '然カフェ 本店' }, writeEnabled: true, canPublish: true })
+  render(<PostConfirm accountId="acc-1" id="p-1" go={go} />)
+  const notice = await screen.findByText(/Googleの審査で公開されませんでした/)
+  expect(notice.textContent).toContain('管理者に内容の確認を依頼してください')
+  expect(fixture.publishPost).not.toHaveBeenCalled()
+})

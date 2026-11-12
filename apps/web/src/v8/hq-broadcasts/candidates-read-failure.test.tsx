@@ -14,7 +14,7 @@ const hq = vi.hoisted(() => ({
   folders: vi.fn(async () => ({ success: true, data: [] })),
   approvalCandidates: vi.fn(async () => ({ success: true, data: [] })),
   approval: vi.fn(async () => ({ success: true, data: { approval: { status: 'none', requestedByStaffId: null, requestedAt: null, approverStaffId: null, note: null, decidedByStaffId: null, decidedAt: null, rejectReason: null, confirmedCount: null }, gate: { required: false, recipientCount: 0, threshold: 1000, singleOperator: false, operatorCount: 2 }, viewer: { isApprover: false, canApprove: false, isRequester: false } } })),
-  testSend: vi.fn(),
+  testSend: vi.fn(), testRecipients: vi.fn(async () => ({ success: true, data: { count: 1, recipients: [{ id: 'f', displayName: '確認先' }], token: 'a'.repeat(64) } })),
 }))
 const accounts = vi.hoisted(() => vi.fn())
 const folders = vi.hoisted(() => vi.fn())

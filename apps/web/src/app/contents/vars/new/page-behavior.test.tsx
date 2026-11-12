@@ -147,7 +147,8 @@ async function pickCalendarDay(iso: string) {
     (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
   )!
   await click(day)
-  await click(Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!)
+  const calendarDialog = document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')
+  if (calendarDialog) await click(Array.from(calendarDialog.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!)
 }
 
 /** 日付の選択で YYYY-MM-DD を選ぶ。値は今までどおりの文字列。 */
@@ -161,7 +162,7 @@ async function setDateValue(id: string, iso: string) {
 async function closeDatePicker() {
   const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')
   if (!picker) return
-  const close = Array.from(picker.querySelectorAll('button')).find((b) => b.textContent?.trim() === '閉じる')!
+  const close = Array.from(picker.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!
   await click(close)
 }
 
@@ -171,7 +172,6 @@ async function setDateTimeValue(id: string, iso: string) {
   const [hour, minute] = time.split(':')
   await click(byId(id) as unknown as HTMLElement)
   const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  await click(picker.querySelector('button[aria-label="日付"]') as HTMLElement)
   await pickCalendarDay(date)
   const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await setTimeControl(reopened.querySelector('input[role="combobox"]'), `${hour}:${minute}`)

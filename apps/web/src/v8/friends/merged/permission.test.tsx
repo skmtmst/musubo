@@ -7,6 +7,7 @@ import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 const model = vi.hoisted(() => ({ role: 'viewer' as string | null, open: vi.fn(), edit: vi.fn(), unlink: vi.fn(), delivery: vi.fn() }))
 vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => model.role }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', loading: false }) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({push: vi.fn(), replace: vi.fn()}), usePathname: () => '/friends', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/components/merged-person/use-merged-person', () => ({ useMergedPerson: () => ({
   phase: 'ready', person: { id: 'p', revision: 1, status: 'active', primaryDisplayName: '花子', profileValues: [], profileCandidates: [], tagCandidates: [], history: [],

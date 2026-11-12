@@ -15,7 +15,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const scenario = (id: string, name: string, isActive = true) => ({
-  id, name, description: null, triggerType: 'friend_add', triggerTagId: null, isActive,
+  id, name, contentRevision: 3, description: null, triggerType: 'friend_add', triggerTagId: null, isActive,
   deliveryMode: 'relative', allowConcurrent: true, displayOrder: 0, folderId: null, lineAccountId: 'account-a',
   subscriberCount: 10, completedCount: 2, stepCount: 3,
   createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
@@ -25,6 +25,7 @@ const state = vi.hoisted(() => ({
   role: 'owner' as string,
   listPage: vi.fn(),
   update: vi.fn(),
+  bulkStop: vi.fn(),
   toast: vi.fn(),
 }))
 
@@ -80,7 +81,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...api,
-      scenarios: { ...api.scenarios, listPage: state.listPage, update: state.update },
+      scenarios: { ...api.scenarios, confirmation: vi.fn(async () => ({ success: true, data: { contentRevision: 3, activeCount: 0, rowIdSum: 0, rowIdSquareSum: 0, totalCount: 0, totalRowIdSum: 0, totalRowIdSquareSum: 0, referrers: [] } })), listPage: state.listPage, update: state.update, bulkStop: state.bulkStop },
       folders: {
         ...api.folders,
         list: () => Promise.resolve({
@@ -104,6 +105,7 @@ beforeEach(() => {
   state.role = 'owner'
   state.listPage.mockImplementation(async (input: { limit?: number }) => ({ success: true, data: { items: ROWS, total: ROWS.length, limit: input.limit ?? 20, sort: [] } }))
   state.update.mockResolvedValue({ success: true, data: {} })
+  state.bulkStop.mockResolvedValue({ success: true, data: { stopped: 1 } })
 })
 
 afterEach(() => {
@@ -191,9 +193,11 @@ describe('まとめての操作', () => {
     fireEvent.click(screen.getByRole('button', { name: /^止める$/ }))
     const dialog = (await screen.findByText('選んだシナリオを停止しますか？')).closest<HTMLElement>('[role="dialog"], [role="alertdialog"]')!
     expect(state.update).not.toHaveBeenCalled()
+    expect(state.bulkStop).not.toHaveBeenCalled()
     const before = state.listPage.mock.calls.length
+    await waitFor(() => expect((within(dialog).getByRole('button', { name: '停止する' }) as HTMLButtonElement).disabled).toBe(false))
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '停止する' })) })
-    await waitFor(() => expect(state.update).toHaveBeenCalledWith('s-1', { isActive: false }))
+    await waitFor(() => expect(state.bulkStop).toHaveBeenCalledWith([{ id: 's-1', revision: 3, activeCount: 0, rowIdSum: 0, rowIdSquareSum: 0 }]))
     await waitFor(() => expect(state.listPage.mock.calls.length).toBeGreaterThan(before))
   })
 })

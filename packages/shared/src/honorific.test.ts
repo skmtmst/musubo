@@ -5,7 +5,7 @@ describe('敬称を付ける共通の 1 か所', () => {
   it('名前に敬称を付ける', () => {
     expect(withHonorific('マロン')).toBe('マロンさん')
     expect(withHonorific('マロン', 'さん', { space: true })).toBe('マロン さん')
-    expect(withHonorific('山田 花子', 'さま')).toBe('山田 花子さま')
+    expect(withHonorific('見本 143', 'さま')).toBe('見本 143さま')
     expect(withHonorific('山田', '様', { space: true })).toBe('山田 様')
   })
 

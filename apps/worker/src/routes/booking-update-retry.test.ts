@@ -157,7 +157,7 @@ function seed(sqlite: Database.Database) {
     INSERT INTO booking_customers (
       id, line_account_id, display_name, phone_normalized_hash,
       phone_encrypted, phone_last4, pet_name
-    ) VALUES ('customer-1','acc1','山田 花子','hash','cipher','5678','ポチ');
+    ) VALUES ('customer-1','acc1','見本 143','hash','cipher','5678','ポチ');
   `);
 }
 
@@ -399,6 +399,13 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
       expect((await create('line-auto','optional')).status).toBe(201);
       expect(sqlite.prepare('SELECT COUNT(*) AS n FROM bookings').get()).toEqual({ n:1 });
     } finally { vi.unstubAllGlobals(); }
+  });
+
+  test('管理画面から予約を編集すると確認専用の版が1進む', async () => {
+    insertBooking(sqlite, { id: 'B1', friend: 'f1' });
+    const { app, env } = makeApp(db);
+    expect((await patchBooking(app, env, 'B1', { lock_version: 0, customer_note: '変更' })).status).toBe(200);
+    expect(sqlite.prepare("SELECT confirmation_revision FROM bookings WHERE id='B1'").get()).toEqual({ confirmation_revision: 2 });
   });
 
   test('lock_version 無しは400', async () => {

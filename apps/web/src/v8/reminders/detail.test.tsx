@@ -80,10 +80,10 @@ vi.mock('@/lib/api', () => {
             summary: { sent: 3, scheduled: 2, stopped: 0, errors: 2, targetCount: 186, nextScheduledAt: soon(), sentThisMonth: 386, scheduledNext7Days: 124 },
             steps: [{ id: 'st1', stepNumber: 1, offsetMinutes: -1440, messageType: 'text', messageContent: '明日のご案内です。', sent: 212, openRate: null, errors: 1 }],
             items: params?.status === 'planned'
-              ? [run('p1', 'planned', '佐藤 花子'), run('p2', 'planned', '高橋 美咲')]
+              ? [run('p1', 'planned', '見本 122'), run('p2', 'planned', '見本 29')]
               : state.onlyPlanned
                 ? [run('r3', 'planned', '予定の人')]
-                : [run('r1', 'succeeded', '佐藤 花子'), run('r2', 'permanent_failed', '鈴木 一郎'), run('r3', 'planned', '予定の人')],
+                : [run('r1', 'succeeded', '見本 122'), run('r2', 'permanent_failed', '見本 176'), run('r3', 'planned', '予定の人')],
             pagination: { total: params?.status === 'planned' ? state.plannedTotal : state.onlyPlanned ? 40 : 2, limit: 100, offset: 0 },
           },
         })),
@@ -98,8 +98,8 @@ vi.mock('@/lib/api', () => {
           list: vi.fn(async () => ({
             success: true,
             data: [
-              { id: 'e1', friendId: 'f1', friendName: '山田 太郎', targetDate: '2026-10-02T05:00:00Z', status: 'active', reminderVersionId: null, sourceKind: 'form', createdAt: '', updatedAt: '', cancelledAt: null, lockVersion: 1 },
-              { id: 'e2', friendId: 'f2', friendName: '鈴木 一郎', targetDate: '2026-10-03T01:00:00Z', status: 'cancelled', reminderVersionId: null, sourceKind: 'form', createdAt: '', updatedAt: '', cancelledAt: '', lockVersion: 1 },
+              { id: 'e1', friendId: 'f1', friendName: '見本 141', targetDate: '2026-10-02T05:00:00Z', status: 'active', reminderVersionId: null, sourceKind: 'form', createdAt: '', updatedAt: '', cancelledAt: null, lockVersion: 1 },
+              { id: 'e2', friendId: 'f2', friendName: '見本 176', targetDate: '2026-10-03T01:00:00Z', status: 'cancelled', reminderVersionId: null, sourceKind: 'form', createdAt: '', updatedAt: '', cancelledAt: '', lockVersion: 1 },
             ],
           })),
         },
@@ -312,8 +312,8 @@ describe('V8 リマインダの詳細', () => {
     await render()
     expect(host.querySelector('[data-design-node="rbAig"]')).toBeTruthy()
     const recent = host.querySelector('[aria-label="最近の実行"]')
-    expect(recent?.textContent).toContain('佐藤 花子')
-    expect(recent?.textContent).toContain('鈴木 一郎')
+    expect(recent?.textContent).toContain('見本 122')
+    expect(recent?.textContent).toContain('見本 176')
     expect(recent?.textContent).not.toContain('予定の人')
     expect(host.textContent).toContain('1日前 18:00')
   })
@@ -365,6 +365,30 @@ describe('V8 リマインダの詳細', () => {
     expect(state.updates).toEqual([])
   })
 
+  it('停止の窓はアカウントを切り替えたら閉じる', async () => {
+    await render()
+    await act(async () => { buttonByText('一時停止する')!.click() })
+    expect(document.querySelector('[data-design-node="RwVo5"]')).not.toBeNull()
+    state.accountId = 'account-b'; await act(async () => { root.render(<ReminderDetailV8Page />) })
+    expect(document.querySelector('[data-design-node="RwVo5"]')).toBeNull()
+    expect(state.updates).toEqual([])
+  })
+
+  it('停止の窓は URL を変えて別のリマインダを開いたら閉じる', async () => {
+    const runs = vi.mocked(api.reminders.runs), get = vi.mocked(api.reminders.get)
+    const originalRuns = runs.getMockImplementation()!, originalGet = get.getMockImplementation()!
+    runs.mockImplementation(async (id, params) => { const res = await originalRuns(id, params); return res.success ? { ...res, data: { ...res.data, reminder: { ...res.data.reminder, id } } } : res })
+    get.mockImplementation(async id => { const res = await originalGet(id); return res.success ? { ...res, data: { ...res.data, id } } : res })
+    try {
+      await render()
+      await act(async () => { buttonByText('一時停止する')!.click() })
+      expect(document.querySelector('[data-design-node="RwVo5"]')).not.toBeNull()
+      state.urlId = 'reminder-2'; await render()
+      expect(document.querySelector('[data-design-node="RwVo5"]')).toBeNull()
+      expect(state.updates).toEqual([])
+    } finally { runs.mockImplementation(originalRuns); get.mockImplementation(originalGet) }
+  })
+
   it('閲覧のみ：一時停止・編集・複製・削除を置かず、書き出しだけ残す', async () => {
     state.role = 'viewer'
     await render()
@@ -382,19 +406,19 @@ describe('V8 リマインダの詳細', () => {
     expect(host.querySelector('[data-design-node="loVfW"]')).toBeTruthy()
     // 行の操作は「…」1つの中。開くと取り消す・再開するが出る。
     const rowMenu = (name: string) => document.querySelector(`button[aria-label="${name}の操作"]`) as HTMLButtonElement | null
-    expect(rowMenu('山田 太郎')).toBeTruthy()
-    await act(async () => { rowMenu('山田 太郎')!.click() })
+    expect(rowMenu('見本 141')).toBeTruthy()
+    await act(async () => { rowMenu('見本 141')!.click() })
     expect(buttons()).toContain('取り消す')
-    await act(async () => { rowMenu('山田 太郎')!.click() })
-    await act(async () => { rowMenu('鈴木 一郎')!.click() })
+    await act(async () => { rowMenu('見本 141')!.click() })
+    await act(async () => { rowMenu('見本 176')!.click() })
     expect(buttons()).toContain('再開する')
     act(() => { root.unmount() })
     root = createRoot(host)
     state.role = 'viewer'
     await render()
-    expect(host.textContent).toContain('山田 太郎')
-    expect(document.querySelector('button[aria-label="山田 太郎の基準日"]')).toBeNull()
-    expect(document.querySelector('button[aria-label="山田 太郎の操作"]')).toBeNull()
+    expect(host.textContent).toContain('見本 141')
+    expect(document.querySelector('button[aria-label="見本 141の基準日"]')).toBeNull()
+    expect(document.querySelector('button[aria-label="見本 141の操作"]')).toBeNull()
     expect(buttons()).not.toContain('取り消す')
     expect(buttons()).not.toContain('再開する')
   })
@@ -403,19 +427,38 @@ describe('V8 リマインダの詳細', () => {
     state.tab = 'registrants'
     await render()
     const toggle = buttonByText('いまの状態と操作を開く')!
-    const date = host.querySelector('button[aria-label="山田 太郎の基準日"]')!
+    const date = host.querySelector('button[aria-label="見本 141の基準日"]')!
     const friend = host.querySelector('a[href="/friends/f1"]')!
-    expect(friend.textContent).toBe('山田 太郎')
-    expect(friend.querySelector('[title="山田 太郎"]')).toBeTruthy()
+    expect(friend.textContent).toBe('見本 141')
+    expect(friend.querySelector('[title="見本 141"]')).toBeTruthy()
     await act(async () => toggle.click())
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
     expect(toggle.textContent).toBe('いまの状態と操作を閉じる')
     expect(document.getElementById(toggle.getAttribute('aria-controls')!)?.getAttribute('data-expanded')).toBe('true')
     await act(async () => toggle.click())
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    expect(host.querySelector('button[aria-label="山田 太郎の基準日"]')).toBe(date)
+    expect(host.querySelector('button[aria-label="見本 141の基準日"]')).toBe(date)
     expect(host.querySelector('a[href="/friends/f1"]')).toBe(friend)
     expect(state.updates).toHaveLength(0)
+  })
+
+  it.each(['loading', 'failed'])('予定の取得が %s の時は0通と断定しない', async (status) => {
+    const runs = vi.mocked(api.reminders.runs)
+    const original = runs.getMockImplementation()!
+    runs.mockImplementation(async (id, params) => {
+      if (params?.status === 'planned') {
+        if (status === 'loading') return await new Promise<never>(() => {})
+        throw new Error('取得できませんでした')
+      }
+      return original(id, params)
+    })
+    try {
+      await render()
+      await act(async () => { buttonByText('一時停止する')!.click() })
+      const dialog = document.querySelector('[data-design-node="RwVo5"]')!
+      expect(dialog.textContent).toContain('送る予定の通知の件数は確認できません')
+      expect(dialog.textContent).not.toContain('予定の 0 通')
+    } finally { runs.mockImplementation(original) }
   })
 
   it('WEB084：予定を読み切れていないとき、一時停止の窓で今後24時間の数を言い切らない', async () => {

@@ -87,7 +87,7 @@ function baseLocation(): Record<string, unknown> {
     name: 'locations/222',
     title: 'こもれび食堂 渋谷店',
     storefrontAddress: { postalCode: '150-0001', administrativeArea: '東京都', locality: '渋谷区', addressLines: ['神宮前1-2-3'] },
-    phoneNumbers: { primaryPhone: '03-1234-5678' },
+    phoneNumbers: { primaryPhone: '03-0000-5678' },
     websiteUri: 'https://example.jp',
     profile: { description: '季節の定食' },
     openInfo: { status: 'OPEN' },

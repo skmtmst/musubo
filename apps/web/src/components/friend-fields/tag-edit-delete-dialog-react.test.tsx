@@ -10,6 +10,15 @@ import type { Tag } from '@line-crm/shared'
 import type { TagDeleteImpactReferences, TagDependencies } from '@/lib/api'
 import { DeleteDialog } from './edit-tag-page-v4'
 
+const captured = vi.hoisted(() => ({ deleteClick: undefined as undefined | (() => void) }))
+vi.mock('@/components/shared/button', async original => {
+  const actual = await original<typeof import('@/components/shared/button')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (React.Children.toArray(props.children).some(child => typeof child === 'string' && child.includes('タグを削除する'))) captured.deleteClick = props.onClick as () => void
+    return <actual.default {...props} />
+  } }
+})
+
 const tag = { id: 't1', name: '通常タグ', friendCount: 1 } as Tag
 const refs = {
   broadcasts: 2, forms: 0, templates: 0, richMenus: 0, webinars: 0, events: 0, bookingMenus: 0, entryRoutes: 0, trackedLinks: 0,
@@ -23,6 +32,23 @@ const confirmInput = () => screen.getByLabelText(/確認のため「通常タグ
 afterEach(cleanup)
 
 describe('タグ編集の削除の窓', () => {
+  it('閉じた窓の削除は再度開いた窓へ持ち越さない', () => {
+    const onDelete = vi.fn(), onCancel = vi.fn()
+    const first = render(<DeleteDialog tag={tag} dependencies={dependencies} dependenciesStatus="ready" deleting={false} initialConfirmation="通常タグ" onCancel={onCancel} onDelete={onDelete} />)
+    const oldClick = captured.deleteClick!
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    oldClick()
+    expect(onDelete).not.toHaveBeenCalled()
+    first.unmount()
+    render(<DeleteDialog tag={tag} dependencies={dependencies} dependenciesStatus="ready" deleting={false} onCancel={onCancel} onDelete={onDelete} />)
+    oldClick()
+    expect(onDelete).not.toHaveBeenCalled()
+    fireEvent.change(confirmInput(), { target: { value: '通常タグ' } })
+    fireEvent.click(deleteButton())
+    expect(onDelete).toHaveBeenCalledTimes(1)
+  })
+
   it.each([
     ['loading', '影響を確認しています'],
     ['error', '影響を確認できませんでした。開き直してください'],

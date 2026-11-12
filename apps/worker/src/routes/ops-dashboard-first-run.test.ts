@@ -21,9 +21,9 @@ function app(staff: AuthenticatedStaff) {
   };
 }
 
-const master: AuthenticatedStaff = { id: 'master-1', name: '坂本 真人', role: 'owner', readOnly: false, tenantId: null };
+const master: AuthenticatedStaff = { id: 'master-1', name: '見本 25', role: 'owner', readOnly: false, tenantId: null };
 const readOnlyMaster: AuthenticatedStaff = { ...master, readOnly: true };
-const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '山田 太郎', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
+const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '見本 141', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
 
 type Funnel = {
   accounts: number;
@@ -75,7 +75,7 @@ function allSteps(accountId: string) {
 beforeEach(() => {
   testDb = createTestD1();
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_status, created_at) VALUES ('tenant-a', '株式会社サンプル', 'active', 'trialing', ?)`).run(at(0));
-  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES ('master-1', '坂本 真人', 'owner', 'k1', NULL)`).run();
+  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES ('master-1', '見本 25', 'owner', 'k1', NULL)`).run();
   testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active) VALUES ('master-1', 1)`).run();
 });
 
@@ -88,7 +88,7 @@ describe('最初の10分のまとめ', () => {
   it('各段まで進んだ数・分の中央値と75%点・10分以内・6段の全部を数える', async () => {
     // 全部終えた店：4 分で最初の1通。
     account('la-1', at(0));
-    testDb.raw.prepare(`INSERT INTO account_styles (line_account_id, style, selected_at, updated_at) VALUES ('la-1', 'salon', ?, ?)`).run(at(1), at(1));
+    testDb.raw.prepare(`INSERT INTO account_styles (line_account_id, style, selected_at, updated_at, first_selected_at, first_starter_at) VALUES ('la-1', 'salon', ?, ?, ?, ?)`).run(at(1), at(1), at(1), at(1));
     testDb.raw.prepare(`INSERT INTO style_starter_items (line_account_id, style, item_key, kind, target_id, set_version, applied_at)
       VALUES ('la-1', 'salon', 'k1', 'automation', 'x', 1, ?)`).run(at(1));
     follow('la-1', at(3));
@@ -96,7 +96,7 @@ describe('最初の10分のまとめ', () => {
     allSteps('la-1');
     // 時刻が Z の形で保存された店：30 分で最初の1通。スタイルは選んだが初期セット・友だち追加は無い。
     account('la-2', atUtc(0));
-    testDb.raw.prepare(`INSERT INTO account_styles (line_account_id, style, selected_at, updated_at) VALUES ('la-2', 'restaurant', ?, ?)`).run(at(2), at(2));
+    testDb.raw.prepare(`INSERT INTO account_styles (line_account_id, style, selected_at, updated_at, first_selected_at) VALUES ('la-2', 'restaurant', ?, ?, ?)`).run(at(2), at(2), at(2));
     firstMessage('la-2', at(30));
     // 作っただけの店。「あとで」を選んだスタイルは数えない。
     account('la-3', at(0));
@@ -214,4 +214,19 @@ describe('見られる人', () => {
     testDb.raw.prepare(`UPDATE impersonation_sessions SET ended_at = ? WHERE id = 'imp-1'`).run(at(0));
     expect((await app(master).request('/api/ops/dashboard/first-run', headers)).status).toBe(200);
   });
+});
+
+it('uses first selection and starter timestamps for per-stage minutes after later changes', async () => {
+  account('la-first', at(0));
+  testDb.raw.prepare(`INSERT INTO account_styles (line_account_id,style,selected_at,first_selected_at,first_starter_at,updated_at)
+    VALUES ('la-first','salon',?,?,?,?)`).run(at(8),at(1),at(2),at(8));
+  testDb.raw.prepare(`INSERT INTO style_starter_items (line_account_id,style,item_key,kind,target_id,set_version,applied_at)
+    VALUES ('la-first','salon','k','automation','x',1,?)`).run(at(9));
+  follow('la-first', at(3));
+  firstMessage('la-first', at(4));
+  const {body} = await read();
+  expect(body?.stages).toMatchObject([
+    {key:'started'}, {key:'style',minutesFromPrevious:1}, {key:'starter',minutesFromPrevious:1},
+    {key:'follow',minutesFromPrevious:1}, {key:'firstMessage',minutesFromPrevious:1},
+  ]);
 });
