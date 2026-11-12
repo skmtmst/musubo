@@ -84,7 +84,7 @@ function previewBody(value: string): string {
     .replaceAll('{{pet_name}}', 'ももちゃん')
     .replaceAll('{{ペットの名前}}', 'もも')
     .replaceAll('{{商品名}}', 'フード')
-    .replaceAll('{{name}}', '高橋 直人')
+    .replaceAll('{{name}}', '見本 16')
 }
 
 function openFormUrl(liffId: string | null | undefined, formId: string): string | null {

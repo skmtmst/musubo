@@ -181,7 +181,7 @@ export function planTags(input: { accountId: string; actorId: string; definition
           statements.push(
             { sql: `INSERT INTO common_action_versions(id,common_action_id,version_number,status,action_config,created_by,created_at) SELECT ?,?,COALESCE(MAX(version_number),0)+1,'draft',?,?,? FROM common_action_versions WHERE common_action_id=?`, bindings: [versionId, actionId, JSON.stringify(def.tag.actions ?? []), input.actorId, now, actionId] },
             { sql: `UPDATE common_actions SET name=?,description=?,status='draft',current_draft_version_id=?,updated_at=? WHERE id=? AND line_account_id=?`, bindings: [`${name} が付いたとき`, `タグ「${name}」の連動アクション`, versionId, now, actionId, accountId] },
-            { sql: `UPDATE common_action_bindings SET common_action_version_id=?,updated_at=? WHERE line_account_id=? AND common_action_id=? AND consumer_type='tag' AND consumer_id=? AND consumer_path='tag.added'`, bindings: [versionId, now, accountId, actionId, id] },
+            { sql: `UPDATE common_action_bindings SET common_action_version_id=?,updated_at=?,confirmation_revision=confirmation_revision+1 WHERE line_account_id=? AND common_action_id=? AND consumer_type='tag' AND consumer_id=? AND consumer_path='tag.added'`, bindings: [versionId, now, accountId, actionId, id] },
           );
         } else {
           statements.push(

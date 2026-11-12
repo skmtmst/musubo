@@ -198,7 +198,9 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [urlOpen, setUrlOpen] = useState(false)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
-  const [publishCheck, setPublishCheck] = useState<{ id: string; usageCount: number; accountId: string; generation: number } | null>(null)
+  const [publishCheck, setPublishCheck] = useState<{ id: string; usageCount: number; accountId: string; generation: number; publishedVersion: number; draftRevision: number } | null>(null)
+  const publishTicket = useRef<object | null>(null)
+  const renderedPublishTicket = publishTicket.current
   const [publishError, setPublishError] = useState('')
   const canMutate = useFeatureAccess('templates')
   const canMutateRef = useRef(canMutate)
@@ -364,7 +366,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
       if (!detail.success || !detail.data) { setPublishError('いまの状態を読み込めませんでした。一覧の詳細から公開してください。'); return }
       const usedBy = detail.data.usedBy
       const usageCount = usedBy ? Object.values(usedBy).reduce((total, items) => total + (Array.isArray(items) ? items.length : 0), 0) : 0
-      if (usageCount > 0) { setPublishCheck({ id: templateId, usageCount, accountId: detail.data.accountId ?? '', generation }); return }
+      if (usageCount > 0) { publishTicket.current = {}; setPublishCheck({ id: templateId, usageCount, accountId: detail.data.accountId ?? '', generation, publishedVersion: detail.data.publishedVersion ?? 0, draftRevision: detail.data.draftRevision ?? 0 }); return }
       if (await publishNow(templateId, generation, detail.data) && alive.current && generation === accountScope.current.generation) { notifySaved('公開しました'); if (!id) { disarm(); router.push(createPageReturnHref('/templates', templateId)) } }
     } finally {
       setPublishing(false)
@@ -627,16 +629,16 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         error={publishError || undefined}
         designNode="cuR8I"
         onConfirm={async () => {
-          if (!publishCheck || !alive.current || !canMutateRef.current || publishCheck.generation !== accountScope.current.generation) return
+          if (!publishCheck || !renderedPublishTicket || renderedPublishTicket !== publishTicket.current || !alive.current || !canMutateRef.current || publishCheck.generation !== accountScope.current.generation) return
           setPublishing(true)
           setPublishError('')
           try {
-            if (await publishNow(publishCheck.id, publishCheck.generation) && alive.current && publishCheck.generation === accountScope.current.generation) { setPublishCheck(null); notifySaved('公開しました'); if (!id) { disarm(); router.push(createPageReturnHref('/templates', publishCheck.id)) } }
+            if (await publishNow(publishCheck.id, publishCheck.generation, publishCheck) && alive.current && publishCheck.generation === accountScope.current.generation) { publishTicket.current = null; setPublishCheck(null); notifySaved('公開しました'); if (!id) { disarm(); router.push(createPageReturnHref('/templates', publishCheck.id)) } }
           } finally {
             setPublishing(false)
           }
         }}
-        onCancel={() => setPublishCheck(null)}
+        onCancel={() => { publishTicket.current = null; setPublishCheck(null) }}
       >{publishCheck ? <OperationTargetSummary accounts={[{ id: publishCheck.accountId }]} /> : null}</ConfirmDialog>
       <MediaPickerDialog
         open={pickerOpen}

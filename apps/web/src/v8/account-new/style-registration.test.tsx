@@ -125,3 +125,13 @@ it('「あとで設定する」は保留を保存して次へ進み、次回の�
   expect(sessionStorage.getItem(REGISTRATION_STYLE_KEY)).toBeNull()
   expect(screen.getByRole('link', { name: '次へ' }).getAttribute('href')).toBe('/hq')
 })
+
+it('見本を切り替えただけでは未選択と示し、選ぶ操作を案内する', async () => {
+  render(<ResumeRegistrationStyle accountId="created-account" />)
+  const dialog = screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+  fireEvent.click(within(dialog).getByRole('button', { name: '飲食店' }))
+  const next = within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement
+  expect(next.disabled).toBe(true)
+  expect(next.getAttribute('aria-description')).toBe('「このスタイルにする」を押して選んでください')
+  expect(net.save).not.toHaveBeenCalled()
+})

@@ -13,7 +13,7 @@ vi.mock('@/lib/api/helpers/gap1', async (load) => {
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/booking/menus', useSearchParams: () => new URLSearchParams() }))
 
 const { StaffCalendarPanel } = await import('./staff-calendar')
-const person = { id: 'bs-1', name: '佐々木 亮太', display_name: '佐々木', role: 'トリマー' } as never
+const person = { id: 'bs-1', name: '見本 110', display_name: '佐々木', role: 'トリマー' } as never
 const SWITCH = { readEnabled: true, writeEnabled: true, version: 3, connected: true, futureEventCount: 12 }
 
 beforeEach(() => {

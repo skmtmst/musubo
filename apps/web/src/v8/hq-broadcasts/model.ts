@@ -59,7 +59,7 @@ export function previewText(body: string, storeName: string): string {
     .split('{店名}').join(storeName)
     .split('{店の電話番号}').join('03-0000-0000')
     .split('{予約ページ}').join('')
-    .split('{友だちの名前}').join('山田 太郎')
+    .split('{友だちの名前}').join('見本 141')
     .trim()
 }
 

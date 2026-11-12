@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fx = vi.hoisted(() => ({
@@ -68,7 +68,7 @@ beforeEach(() => {
   fx.reviewPaper.mockResolvedValue({ success: true, data: { id: 'p1', status: 'approved' } })
   fx.wallet.mockResolvedValue({ success: true, data: { wallet: { cardId: 'card-1', friendId: 'f1', balance: 3, earnedTotal: 3, expiresAt: null }, entries: [] } })
   fx.grant.mockResolvedValue({ success: true, data: {} })
-  fx.friendsList.mockResolvedValue({ success: true, data: { items: [{ id: 'f1', displayName: 'みさき', metadata: { name: '鈴木 美咲' } }] } })
+  fx.friendsList.mockResolvedValue({ success: true, data: { items: [{ id: 'f1', displayName: 'みさき', metadata: { name: '見本 183' } }] } })
   fx.friendsGet.mockImplementation(async (id: string) => ({ success: true, data: { id, displayName: 'みさき' } }))
   fx.staffList.mockResolvedValue({ success: true, data: [{ id: 's1', name: '田村', role: 'staff' }] })
   fx.entries.mockResolvedValue({ success: true, data: { items: [
@@ -149,7 +149,7 @@ describe('来店スタンプ（管理画面）', () => {
     ] }).mockResolvedValue({ success: true, data: [] })
     render(<VisitStampsV8 />)
     fireEvent.click(await screen.findByRole('tab', { name: /紙のカードの移行.*1/ }))
-    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7個を承認' }))
+    fireEvent.click(await screen.findByRole('button', { name: '見本 183さんの 7個を承認' }))
     expect(await screen.findByRole('tab', { name: /紙のカードの移行.*0/ })).toBeTruthy()
   })
 
@@ -162,9 +162,9 @@ describe('来店スタンプ（管理画面）', () => {
     await screen.findByRole('tab', { name: '紙のカードの移行' })
     fx.accountId = 'acc-2'
     rerender(<VisitStampsV8 />)
-    expect(await screen.findByRole('button', { name: '鈴木 美咲さんの 2個を承認' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '見本 183さんの 2個を承認' })).toBeTruthy()
     await act(async () => { finishOld({ success: true, data: [{ id: 'old-paper', friend_id: 'f1', photo_url: '', stamps: 9, status: 'pending' }] }) })
-    expect(screen.queryByRole('button', { name: '鈴木 美咲さんの 9個を承認' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '見本 183さんの 9個を承認' })).toBeNull()
     expect(screen.getByRole('tab', { name: /紙のカードの移行.*1/ })).toBeTruthy()
   })
 
@@ -222,7 +222,7 @@ describe('来店スタンプ（管理画面）', () => {
     expect(screen.queryByRole('button', { name: '記録の表示件数' })).toBeNull()
     // 承認後の再読込が古いリクエストを追い越す場面を再現する。
     fireEvent.click(screen.getByRole('tab', { name: /紙のカードの移行/ }))
-    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7個を承認' }))
+    fireEvent.click(await screen.findByRole('button', { name: '見本 183さんの 7個を承認' }))
     await waitFor(() => expect(fx.entries).toHaveBeenCalledTimes(3))
     await act(async () => { finishOld({ success: true, data: { items: [], total: 88, page: 2, pageSize: 20 } }) })
     fireEvent.click(screen.getByRole('tab', { name: '押した・使った記録' }))
@@ -326,7 +326,7 @@ describe('来店スタンプ（管理画面）', () => {
     render(<VisitStampsV8 />)
     await screen.findByRole('tab', { name: /紙のカードの移行/ })
     fireEvent.click(screen.getByRole('tab', { name: /紙のカードの移行/ }))
-    fireEvent.click(await screen.findByRole('button', { name: '鈴木 美咲さんの 7個を承認' }))
+    fireEvent.click(await screen.findByRole('button', { name: '見本 183さんの 7個を承認' }))
     await waitFor(() => expect(fx.reviewPaper).toHaveBeenCalledWith('p1', 'approve', expect.any(String)))
   })
 
@@ -345,7 +345,7 @@ describe('来店スタンプ（管理画面）', () => {
     render(<VisitStampsV8 />)
     await screen.findByRole('tab', { name: /紙のカードの移行/ })
     fireEvent.click(screen.getByRole('tab', { name: /紙のカードの移行/ }))
-    expect(await screen.findByRole('button', { name: '鈴木 美咲さんの 7個を承認' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '見本 183さんの 7個を承認' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
     expect(screen.queryByRole('button', { name: /店員の暗証番号/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /特典を足す/ })).toBeNull()
@@ -431,3 +431,27 @@ it('B24: 開いた直後もキャンセルは押せる（保存中・画像登�
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+it('紙の申請却下に対象の友だち・アカウント・環境を出す', async () => {
+  fx.paperRequests.mockResolvedValue({ success: true, data: [{ id: 'p1', friend_id: 'f1', line_account_id: 'acc-1', photo_url: '', stamps: 7, status: 'pending' }] })
+  window.history.replaceState(null, '', '/visit-stamps?tab=paper')
+  render(<VisitStampsV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: '却下' }))
+  const dialog = await screen.findByRole('alertdialog', { name: '申請を却下する' })
+  expect(dialog.textContent).toContain('銀座店')
+  expect(dialog.textContent).toContain('みさき')
+  expect(dialog.textContent).toContain('環境')
+})
+
+it('記録取消の確認中にアカウントを変えたら古い取消を送らない', async () => {
+  window.history.replaceState(null, '', '/visit-stamps?tab=history')
+  const view = render(<VisitStampsV8 />)
+  fireEvent.click((await screen.findAllByRole('button', { name: /記録のその他操作/ }))[0])
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'この記録を取り消す' }))
+  const dialog = await screen.findByRole('alertdialog', { name: '記録を取り消す' })
+  fireEvent.change(within(dialog).getByLabelText('理由'), { target: { value: '記録の誤り' } })
+  fx.accountId = 'acc-2'; view.rerender(<VisitStampsV8 />)
+  const old = screen.queryByRole('alertdialog', { name: '記録を取り消す' })
+  if (old) fireEvent.click(within(old).getByRole('button', { name: '取り消す' }))
+  expect(fx.reverse).not.toHaveBeenCalled()
+})

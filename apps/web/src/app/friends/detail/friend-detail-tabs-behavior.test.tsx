@@ -89,7 +89,7 @@ import FriendDetailPage from './page'
 const friend = (id: string) => ({
   id,
   lineUserId: 'U1',
-  displayName: '山田 花子',
+  displayName: '見本 143',
   pictureUrl: null,
   statusMessage: null,
   isFollowing: true,
@@ -273,7 +273,7 @@ describe('情報欄の分類（FRIEND-21）', () => {
       success: true,
       data: {
         items: [
-          field('fixed-name', '名前', '山田 花子', { fixedKey: 'name', isPersonal: true }),
+          field('fixed-name', '名前', '見本 143', { fixedKey: 'name', isPersonal: true }),
           field('f-dog', '犬の名前', 'こむぎ', { folderId: 'fd-1' }),
         ],
         hiddenPersonalCount: 0,

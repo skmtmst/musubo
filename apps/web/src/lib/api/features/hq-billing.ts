@@ -21,6 +21,9 @@ export const hqBillingMethods = {
     }),
     /** カード番号を返さず、Stripe の既定支払い方法があるかだけ確認する。 */
     cardStatus: (options?: FetchApiOptions) => fetchApi<ApiResponse<{ registered: boolean }>>('/api/hq/billing/card-status', options),
+    cardConfirm: (sessionId: string) => fetchApi<ApiResponse<{ registered: boolean }>>('/api/hq/billing/card-confirm', {
+      method: 'POST', body: JSON.stringify({ sessionId }),
+    }),
     /** 支払い方法・解約（Stripe のカスタマーポータル）の URL。 */
     portal: () => fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/portal', { method: 'POST', body: JSON.stringify({}) }),
     invoices: () => fetchApi<ApiResponse<BillingInvoice[]>>('/api/hq/billing/invoices'),

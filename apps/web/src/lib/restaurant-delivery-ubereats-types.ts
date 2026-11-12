@@ -17,6 +17,7 @@ export type UberConnectionStatus =
 
 export interface UberConnection {
   status: UberConnectionStatus
+  version?: number | null
   storeName: string | null
   connectedAt: string | null
   provisionedAt: string | null

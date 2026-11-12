@@ -65,26 +65,28 @@ export const accountMigrationsMethods = {
         { method: 'PUT', body: JSON.stringify({ decisions }) },
       ),
     /** 段5。本実行と照合。要確認がのこっていると 422 で止まる。本人確認（step-up）が要る。 */
-    execute: (id: string, stepUpToken?: string) =>
+    execute: (id: string, stepUpToken?: string, expectedConfirmationRevision?: number) =>
       fetchApi<ApiResponse<AccountHandover & { plannedCount: number }>>(
         `/api/account-handovers/${id}/execute`,
         {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+          body: JSON.stringify({ expectedConfirmationRevision }),
         },
       ),
-    cancel: (id: string) =>
+    cancel: (id: string, expectedConfirmationRevision?: number) =>
       fetchApi<ApiResponse<AccountHandover>>(`/api/account-handovers/${id}/cancel`, {
         method: 'POST',
+        body: JSON.stringify({ expectedConfirmationRevision }),
       }),
     /** 段6。切り戻し。本実行から7日間だけ。本人確認（step-up）が要る。 */
-    rollback: (id: string, note?: string, stepUpToken?: string) =>
+    rollback: (id: string, note?: string, stepUpToken?: string, expectedConfirmationRevision?: number) =>
       fetchApi<ApiResponse<AccountHandover & { restoredCount: number }>>(
         `/api/account-handovers/${id}/rollback`,
         {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
-          body: JSON.stringify({ note: note ?? null }),
+          body: JSON.stringify({ note: note ?? null, expectedConfirmationRevision }),
         },
       ),
   },

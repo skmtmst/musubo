@@ -23,7 +23,7 @@ afterEach(async()=>{await act(async()=>root.unmount());host.remove();forgetSessi
 describe('共通情報CSVの本人確認と失敗からのやり直し',()=>{
  it('本人確認後に同じ絞り込みと確認票で依頼する',async()=>{
   calls.create.mockRejectedValueOnce(new ApiError(401,'','STEP_UP_REQUIRED'));await render('account-a','folder-a');await click('CSVで書き出す');
-  expect(document.querySelector('[role=dialog]')?.textContent ?? '').toContain('パスワードで本人確認');expect(calls.create).toHaveBeenCalledTimes(1);
+  expect(document.querySelector('[role=dialog] h2')?.textContent).toBe('共通情報を書き出す：パスワードで本人確認');expect(calls.create).toHaveBeenCalledTimes(1);
   await approve();expect(calls.stepUp).toHaveBeenCalledWith({method:'password',value:'fixture-password',purpose:'data.export'});
   expect(calls.create).toHaveBeenLastCalledWith({accountId:'account-a',folderId:'folder-a',ungrouped:undefined},'fixture-grant');
   expect(host.textContent).toContain('完了');expect(host.textContent).not.toContain('失敗しました');
@@ -43,13 +43,13 @@ describe('共通情報CSVの本人確認と失敗からのやり直し',()=>{
  });
  it('ダウンロードは別の本人確認で行いAPIのURLを直接開かない',async()=>{
   calls.list.mockResolvedValue({success:true,data:[ready]});calls.download.mockRejectedValueOnce(new ApiError(401,'','STEP_UP_REQUIRED'));await render();
-  expect(host.querySelector('a[href*="/exports/"]')).toBeNull();await click('CSVをダウンロード');expect(document.querySelector('[role=dialog]')).not.toBeNull();await approve();
+  expect(host.querySelector('a[href*="/exports/"]')).toBeNull();await click('CSVをダウンロード');expect(document.querySelector('[role=dialog] h2')?.textContent).toBe('共通情報のCSVをダウンロードする：パスワードで本人確認');await approve();
   expect(calls.download).toHaveBeenNthCalledWith(1,ready.downloadUrl,'common-vars-job-new.csv',undefined);
   expect(calls.download).toHaveBeenNthCalledWith(2,ready.downloadUrl,'common-vars-job-new.csv',{stepUpToken:'fixture-grant'});
   expect(calls.create).not.toHaveBeenCalled();expect(calls.regenerate).not.toHaveBeenCalled();
  });
  it('履歴で選んだ書き出しを専用の本人確認で再生成する',async()=>{
-  calls.regenerate.mockRejectedValueOnce(new ApiError(401,'','STEP_UP_REQUIRED'));await render();await click('もう一度書き出す');await approve();
+  calls.regenerate.mockRejectedValueOnce(new ApiError(401,'','STEP_UP_REQUIRED'));await render();await click('もう一度書き出す');expect(document.querySelector('[role=dialog] h2')?.textContent).toBe('共通情報をもう一度書き出す：パスワードで本人確認');await approve();
   expect(calls.regenerate).toHaveBeenNthCalledWith(1,'job-old');expect(calls.regenerate).toHaveBeenNthCalledWith(2,'job-old','fixture-grant');expect(calls.create).not.toHaveBeenCalled();
  });
  it('結果が分からない依頼を自動再送せず履歴を読み直す',async()=>{

@@ -177,7 +177,7 @@ it('管理者は通常の送り先を明示操作で1回だけ作る', async () 
   await act(async () => { saveButton().click() }); await flush()
   expect(fixture.outgoingCreate.mock.calls).toEqual([[{
     lineAccountId: 'account-a', name: '管理者の連携', url: 'https://example.com/admin-hook',
-    eventTypes: ['*'], secret, maxRetries: 3,
+    eventTypes: ['*'], secret, maxRetries: 3, isActive: true,
   }, undefined]])
   expect(fixture.push).toHaveBeenCalledTimes(1)
   expect(fixture.push).toHaveBeenCalledWith('/webhooks?highlight=wh-admin-1')

@@ -16,6 +16,8 @@ import { formatDateTime } from '@/lib/format'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 import { ToggleField } from '@/components/shared/toggle'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 const LABELS: Record<BroadcastAssetKind, { title: string; description: string; singular: string }> = {
   rich_message: { title: 'リッチメッセージ', description: '画像とタップ領域を組み合わせたテンプレートを作成し、一斉配信から引用できます。', singular: 'リッチメッセージ' },
@@ -60,9 +62,10 @@ export interface BroadcastAssetListLayout {
   deleteDialog: ReactNode
 }
 
-export default function BroadcastAssetManager({ kind, onChanged, renderLayout }: {
+export default function BroadcastAssetManager({ kind, onChanged, renderLayout, onScopeGuardChange }: {
   kind: BroadcastAssetKind
   onChanged?: () => void
+  onScopeGuardChange?: (guard: ((action: () => void) => void) | null) => void
   renderLayout?: (state: BroadcastAssetListLayout) => ReactNode
 }) {
   const saveErrors = useSaveFormErrors()
@@ -98,7 +101,10 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
    */
   const [moreCard, setMoreCard] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [pendingUploads, setPendingUploads] = useState<Set<string>>(() => new Set())
   const [error, setError] = useState('')
+  const snapshot = JSON.stringify({ name, imageUrl, description, actionUrl, cards, moreCard })
+  const baseline = useRef(snapshot)
 
   /*
    * 削除の確認。**ブラウザの `confirm` は使わない。**
@@ -110,19 +116,22 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
    * 消し続けると、いま見えていない一覧のものを消すことになる。
    */
   const [deleteTarget, setDeleteTarget] = useState<{ item: BroadcastMessageAsset; accountId: string | null; generation: number } | null>(null)
+  const deleteTicket = useRef<object | null>(null)
+  const renderedDeleteTicket = deleteTicket.current
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const accountSwitched = deleteTarget !== null && (deleteTarget.accountId !== selectedAccountId || deleteTarget.generation !== scopeGeneration.current)
 
   const closeDelete = () => {
-    if (deleting) return
+    if (deleting || renderedDeleteTicket !== deleteTicket.current) return
+    deleteTicket.current = null
     setDeleteTarget(null)
     setDeleteError('')
   }
 
   const confirmDelete = async () => {
     // 二度押しを受け付けない。切り替わった後も走らせない。
-    if (!deleteTarget || deleting || deleteLock.current || !alive.current || accountSwitched || deleteTarget.generation !== scopeGeneration.current) return
+    if (!deleteTarget || !renderedDeleteTicket || renderedDeleteTicket !== deleteTicket.current || deleting || deleteLock.current || !alive.current || accountSwitched || deleteTarget.generation !== scopeGeneration.current) return
     deleteLock.current = true
     setDeleting(true)
     setDeleteError('')
@@ -131,12 +140,13 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
       // 失敗を握りつぶさない。返事を見ずに一覧を読み直すと、消えていないのに
       // 消えたように見える。
       if (!res.success) throw new Error(res.error)
-      if (deleteTarget.generation !== scopeGeneration.current) return
+      if (deleteTarget.generation !== scopeGeneration.current || renderedDeleteTicket !== deleteTicket.current) return
+      deleteTicket.current = null
       setDeleteTarget(null)
       await load()
       onChanged?.()
     } catch (saveFailure) {
-      if (!alive.current || deleteTarget.generation !== scopeGeneration.current) return
+      if (!alive.current || deleteTarget.generation !== scopeGeneration.current || renderedDeleteTicket !== deleteTicket.current) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       // 生のAPIエラーは出さない。運用者が次に何をすればよいかだけを書く。
@@ -166,20 +176,30 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
   }, [kind, selectedAccountId, scopeKey, saveErrors])
   useEffect(() => { void load(); return () => { loadGeneration.current++ } }, [load])
 
-  const reset = useCallback(() => { editorGeneration.current++; setEditing(null); setShowForm(false); setName(''); setImageUrl(''); setImageFile(null); setDescription(''); setActionUrl(''); setCards([newCard()]); setMoreCard(true); setError('') }, [])
+  const reset = useCallback(() => {
+    const blankCards = [newCard()]
+    baseline.current = JSON.stringify({ name: '', imageUrl: '', description: '', actionUrl: '', cards: blankCards, moreCard: true })
+    editorGeneration.current++; setPendingUploads(new Set()); setEditing(null); setShowForm(false); setName(''); setImageUrl(''); setImageFile(null); setDescription(''); setActionUrl(''); setCards(blankCards); setMoreCard(true); setError('')
+  }, [])
+  const guard = useUnsavedGuard({ dirty: showForm && (snapshot !== baseline.current || pendingUploads.size > 0), busy: saving, onDiscard: reset, subject: '素材への変更' })
+  useEffect(() => { onScopeGuardChange?.(guard.guarded); return () => onScopeGuardChange?.(null) }, [onScopeGuardChange, guard.guarded])
   /*
    * 種類・LINEアカウントが切り替わったら、編集中の対象を離す。
    * 離さないと、別種類の一覧の上で前の素材の編集欄が残り、保存が
    * 前の素材への更新要求になる（監査 R142）。
    */
   useEffect(() => { reset() }, [reset, kind, selectedAccountId])
-  const startEdit = (item: BroadcastMessageAsset) => {
+  const startEdit = (item: BroadcastMessageAsset) => guard.guarded(() => {
     if (kind === 'coupon') { router.push(`/templates/edit?kind=coupon&id=${encodeURIComponent(item.id)}`); return }
-    editorGeneration.current++;
-    setEditing(item); setShowForm(true); setName(item.name); setImageUrl(String(item.payload.imageUrl ?? '')); setImageFile(null); setDescription(String(item.payload.description ?? '')); setActionUrl(String(item.payload.actionUrl ?? ''))
-    if (kind === 'card_message' && Array.isArray(item.payload.cards)) setCards((item.payload.cards as CardDraft[]).map(card => ({...card, id: card.id || crypto.randomUUID()})))
-    if (kind === 'card_message') setMoreCard(item.payload.moreCard !== false)
-  }
+    const nextImageUrl = String(item.payload.imageUrl ?? '')
+    const nextDescription = String(item.payload.description ?? '')
+    const nextActionUrl = String(item.payload.actionUrl ?? '')
+    const nextCards = kind === 'card_message' && Array.isArray(item.payload.cards) ? (item.payload.cards as CardDraft[]).map(card => ({...card, id: card.id || crypto.randomUUID()})) : cards
+    const nextMoreCard = kind === 'card_message' ? item.payload.moreCard !== false : moreCard
+    baseline.current = JSON.stringify({ name: item.name, imageUrl: nextImageUrl, description: nextDescription, actionUrl: nextActionUrl, cards: nextCards, moreCard: nextMoreCard })
+    editorGeneration.current++
+    setEditing(item); setShowForm(true); setName(item.name); setImageUrl(nextImageUrl); setImageFile(null); setDescription(nextDescription); setActionUrl(nextActionUrl); setCards(nextCards); setMoreCard(nextMoreCard)
+  })
   const upload = async (file: File, cardIndex?: number) => {
     if (!['image/jpeg','image/png'].includes(file.type) || file.size > 10 * 1024 * 1024) { setError('JPEG・PNG（10MB以下）を選択してください'); return }
     const cardId = cardIndex === undefined ? null : cards[cardIndex]?.id
@@ -188,6 +208,9 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
     const target = cardId ?? 'main'
     const generation = (uploadGeneration.current.get(target) ?? 0) + 1
     uploadGeneration.current.set(target, generation)
+    const prefix = `${editor}:${target}:`
+    const token = `${prefix}${generation}`
+    setPendingUploads(previous => new Set([...previous].filter(item => !item.startsWith(prefix)).concat(token)))
     const current = () => scopeRef.current === key && editorGeneration.current === editor && uploadGeneration.current.get(target) === generation
     try {
       const res = await api.broadcastMessageAssets.upload(file)
@@ -199,6 +222,8 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
       const fieldFailure = saveErrors.capture(saveFailure)
 
       if (current()) { if (!fieldFailure) setError('画像をアップロードできませんでした。もう一度お試しください。') }
+    } finally {
+      setPendingUploads(previous => { const next = new Set(previous); next.delete(token); return next })
     }
   }
 
@@ -221,7 +246,7 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
         ? await api.broadcastMessageAssets.update(editing.id, { name: name.trim(), payload })
         : await api.broadcastMessageAssets.create({ lineAccountId: selectedAccountId || null, kind, name: name.trim(), payload })
       if (!res.success) { setError(res.error); return }
-      reset(); await load()
+      guard.disarm(); reset(); await load()
       onChanged?.()
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
@@ -230,7 +255,7 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
 
   const meta = LABELS[kind]
   const editor = showForm && <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface">
-      <div className="mb-5 flex items-center justify-between"><h3 className="font-bold">{editing ? '編集' : `新しい${meta.singular}`}</h3><button onClick={reset} className="text-sm text-ink-faint">閉じる</button></div>
+      <div className="mb-5 flex items-center justify-between"><h3 className="font-bold">{editing ? '編集' : `新しい${meta.singular}`}</h3><button onClick={() => guard.guarded(reset)} className="text-sm text-ink-faint">閉じる</button></div>
       <div className="space-y-4"><Field label="名前" htmlFor={nameId} required><SaveErrorField names={["name"]}><TextField id={nameId} value={name} onChange={(e) => setName(e.target.value)} placeholder={`${meta.singular}の管理名`} /></SaveErrorField></Field>
       {kind === 'rich_message' && <>
         {/*
@@ -252,7 +277,7 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
       </>}
       {kind === 'card_message' && <div className="space-y-3">{cards.map((card, index) => <div key={card.id} className="rounded-card border bg-surface-pearl p-4"><div className="mb-3 flex justify-between"><b className="text-sm">パネル {index + 1}</b><button disabled={cards.length === 1} onClick={() => setCards((all) => all.filter((_, i) => i !== index))} className="text-xs text-status-danger">削除する</button></div><div className="grid gap-3 md:grid-cols-2"><SaveErrorField names={[`cards.${index}.template`,"template","card.template","cards"]}><Select aria-label={`パネル ${index + 1} の種類`} value={card.template} onChange={(value) => setCards((all) => all.map((c,i) => i===index ? {...c,template:value}:c))} options={[{ value: 'product', label: 'プロダクト' }, { value: 'location', label: 'ロケーション' }, { value: 'person', label: '人物' }, { value: 'image', label: '画像' }]} size="full" /></SaveErrorField><SaveErrorField names={[`cards.${index}.imageUrl`,`cards.${index}.image_url`,"imageUrl","card.imageUrl","image_url","card.image_url"]}><MediaSlot size="compact" title="画像を追加" previewAlt={`パネル ${index + 1} の画像`} value={card.imageUrl || null} accept="image/jpeg,image/png" limitText="10MB 以内" onFile={(f) => void upload(f,index)} onRemove={() => setCards((all) => all.map((c,i) => i===index ? {...c,imageUrl:''}:c))} /></SaveErrorField><SaveErrorField names={[`cards.${index}.title`,"card.title","cards"]}><SharedTextField value={card.title} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,title:e.target.value}:c))} placeholder="タイトル" className="rounded-control border px-3 py-2 text-sm"/></SaveErrorField><SaveErrorField names={[`cards.${index}.description`,"description","card.description","cards"]}><SharedTextField value={card.description} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,description:e.target.value}:c))} placeholder="説明" className="rounded-control border px-3 py-2 text-sm"/></SaveErrorField><SaveErrorField names={[`cards.${index}.actionLabel`,`cards.${index}.action_label`,"actionLabel","card.actionLabel","cards","action_label","card.action_label"]}><SharedTextField value={card.actionLabel} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionLabel:e.target.value}:c))} placeholder="ボタン名" className="rounded-control border px-3 py-2 text-sm"/></SaveErrorField><SaveErrorField names={[`cards.${index}.actionUrl`,`cards.${index}.action_url`,"actionUrl","card.actionUrl","cards","action_url","card.action_url"]}><SharedTextField value={card.actionUrl} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionUrl:e.target.value}:c))} placeholder="アクションURL" className="rounded-control border px-3 py-2 text-sm"/></SaveErrorField></div></div>)}<button disabled={cards.length >= maxCards} onClick={() => setCards((all) => [...all,newCard()])} className="w-full rounded-card border border-dashed py-3 text-sm font-medium text-success">＋ パネルを追加する（{cards.length}/{MAX_PANELS}）</button><SaveErrorField names={["moreCard","more_card"]}><ToggleField checked={moreCard} onChange={setMoreCard}>末尾に「もっと見る」パネルを表示</ToggleField></SaveErrorField>{moreCard && <p className="text-xs text-ink-faint">「もっと見る」で1枠使うため、パネルは{MAX_PANELS - 1}枚までです。</p>}</div>}
       {(kind === 'coupon' || kind === 'research') && <><SaveErrorField names={["description"]}><SharedTextArea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={kind === 'coupon' ? '特典内容・利用条件' : 'アンケートの説明'} className="w-full rounded-card border p-3 text-sm" rows={3}/></SaveErrorField><SaveErrorField names={["actionUrl","action_url"]}><SharedTextField value={actionUrl} onChange={(e) => setActionUrl(e.target.value)} placeholder={kind === 'coupon' ? 'クーポンを開くURL' : '回答フォームURL'} className="w-full rounded-card border px-3 py-2.5 text-sm" /></SaveErrorField></>}
-      {error && <p className="text-sm text-status-danger">{error}</p>}<div className="flex justify-end gap-2"><button onClick={reset} className="rounded-control border px-4 py-2 text-sm">キャンセル</button><Button variant="primary" className="px-5 py-2 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving} onClick={() => save()} busy={saving} busyLabel="保存中…" widthReserve="idle">{'保存する'}</Button></div></div>
+      {error && <p className="text-sm text-status-danger">{error}</p>}<div className="flex justify-end gap-2"><button onClick={() => guard.guarded(reset)} className="rounded-control border px-4 py-2 text-sm">キャンセル</button><Button variant="primary" className="px-5 py-2 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving} onClick={() => save()} busy={saving} busyLabel="保存中…" widthReserve="idle">{'保存する'}</Button></div></div>
     </section>
   const deleteDialog = (    <ConfirmDialog
       open={deleteTarget !== null}
@@ -283,20 +308,22 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
         <li>・戻せません: 同じ{meta.singular}が必要になったときは、作り直してください。</li>
       </ul>
     </ConfirmDialog>)
+  const leaveDialog = <UnsavedLeaveDialog subject="素材への変更" open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
   if (renderLayout) return <SaveErrorScope errors={saveErrors}>{renderLayout({
     items, loadState, reload: load, onEdit: startEdit,
-    onDelete: item => { if (renderedGeneration !== scopeGeneration.current) return; setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId, generation: renderedGeneration }) },
+    onDelete: item => { if (renderedGeneration !== scopeGeneration.current) return; deleteTicket.current = {}; setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId, generation: renderedGeneration }) },
     editor, deleteDialog,
-  })}</SaveErrorScope>
+  })}{leaveDialog}</SaveErrorScope>
   return <SaveErrorScope errors={saveErrors}><div className="space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-3" data-design-node="FuBeQ"><div className="flex flex-wrap gap-2"><Button onClick={() => { reset(); setShowForm(true) }} variant="primary">{meta.singular}を作る</Button></div><Button href="/broadcasts/new?templatePicker=1">一斉配信で使う</Button></div>
+    <div className="flex flex-wrap items-center justify-between gap-3" data-design-node="FuBeQ"><div className="flex flex-wrap gap-2"><Button onClick={() => guard.guarded(() => { reset(); setShowForm(true) })} variant="primary">{meta.singular}を作る</Button></div><Button href="/broadcasts/new?templatePicker=1">一斉配信で使う</Button></div>
     {editor}
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => <article key={item.id} className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="rounded-pill bg-accent-soft px-2 py-1 text-micro font-bold text-success">{meta.title}</span><h3 className="mt-3 truncate font-bold text-ink">{item.name}</h3><p className="mt-1 text-xs text-ink-faint">更新 {formatDateTime(item.updatedAt)}</p></div></div><div className="mt-4 flex flex-wrap gap-2"><a href={`/broadcasts/new?contentTemplateId=${encodeURIComponent(item.id)}`} className="rounded-control border border-accent-border px-3 py-2 text-sm font-bold text-success">一斉配信で使う</a><button onClick={() => startEdit(item)} className="min-w-24 flex-1 rounded-control border px-3 py-2 text-sm font-bold">編集</button><button onClick={() => { if (renderedGeneration !== scopeGeneration.current) return; setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId, generation: renderedGeneration }) }} className="rounded-control border border-status-danger-border px-3 py-2 text-sm font-bold text-status-danger">削除する</button></div></article>)}{loadState === 'loading' && <p role="status">テンプレートを読み込んでいます…</p>}{loadState === 'error' && <div role="alert">テンプレートを読み込めませんでした。<Button onClick={() => load()}>再読み込み</Button></div>}{loadState === 'ready' && items.length === 0 && <div className="col-span-full rounded-card border border-dashed bg-canvas p-12 text-center text-sm text-ink-faint">まだ{meta.singular}テンプレートがありません。「{meta.singular}を作る」から追加してください。</div>}</div>
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => <article key={item.id} className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="rounded-pill bg-accent-soft px-2 py-1 text-micro font-bold text-success">{meta.title}</span><h3 className="mt-3 truncate font-bold text-ink">{item.name}</h3><p className="mt-1 text-xs text-ink-faint">更新 {formatDateTime(item.updatedAt)}</p></div></div><div className="mt-4 flex flex-wrap gap-2"><a href={`/broadcasts/new?contentTemplateId=${encodeURIComponent(item.id)}`} className="rounded-control border border-accent-border px-3 py-2 text-sm font-bold text-success">一斉配信で使う</a><button onClick={() => startEdit(item)} className="min-w-24 flex-1 rounded-control border px-3 py-2 text-sm font-bold">編集</button><button onClick={() => { if (renderedGeneration !== scopeGeneration.current) return; deleteTicket.current = {}; setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId, generation: renderedGeneration }) }} className="rounded-control border border-status-danger-border px-3 py-2 text-sm font-bold text-status-danger">削除する</button></div></article>)}{loadState === 'loading' && <p role="status">テンプレートを読み込んでいます…</p>}{loadState === 'error' && <div role="alert">テンプレートを読み込めませんでした。<Button onClick={() => load()}>再読み込み</Button></div>}{loadState === 'ready' && items.length === 0 && <div className="col-span-full rounded-card border border-dashed bg-canvas p-12 text-center text-sm text-ink-faint">まだ{meta.singular}テンプレートがありません。「{meta.singular}を作る」から追加してください。</div>}</div>
 
     {/*
       取り消せない操作なので `destructive` を付ける。消したテンプレートは
       戻せない（DBの行を消すだけで、控えは残らない）。
     */}
     {deleteDialog}
+    {leaveDialog}
   </div></SaveErrorScope>
 }

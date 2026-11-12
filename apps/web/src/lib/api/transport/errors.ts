@@ -239,9 +239,10 @@ export function extractApiErrorTrackingId(raw: string): string | undefined {
 export function extractApiErrorData(raw: string): unknown {
   if (!raw) return undefined
   try {
-    const body = JSON.parse(raw) as { data?: unknown; currentVersion?: unknown }
+    const body = JSON.parse(raw) as { data?: unknown; currentVersion?: unknown; reason?: unknown }
     if (!body || typeof body !== 'object') return undefined
     if (body.data !== undefined) return body.data
+    if (typeof body.reason === 'string') return { reason: body.reason }
     // 旧成果地点APIは互換性のため currentVersion を最上位で返す。
     // 409の機械データとして同じdata口へ正規化し、画面が再取得判断に使えるようにする。
     if (Number.isSafeInteger(body.currentVersion) && Number(body.currentVersion) >= 1) {

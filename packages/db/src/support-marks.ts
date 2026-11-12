@@ -505,7 +505,7 @@ export async function createSupportMarkWithAutomationRules(
         now,
       ),
       db.prepare(
-        'UPDATE automation_definitions SET current_published_version_id = ? WHERE id = ?',
+        'UPDATE automation_definitions SET confirmation_revision = confirmation_revision + 1, current_published_version_id = ? WHERE id = ?',
       ).bind(versionId, automationId),
     );
   }

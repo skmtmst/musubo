@@ -35,6 +35,16 @@ const flush = async () => {
   for (let i = 0; i < 4; i += 1) await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
 }
 
+it('定期レポートの取得中は内訳を0と表示せず、取得後は実数を表示する', async () => {
+  let resolve!: (value: unknown) => void
+  scheduleList.mockReturnValue(new Promise((done) => { resolve = done }))
+  render(<SavedV8 accountId="acc-1" canManage />)
+  expect(document.body.textContent).not.toContain('動いている 0')
+  await act(async () => { resolve({ success: true, data: { items: [], recentOneTime: [] } }) })
+  await flush()
+  expect(document.body.textContent).toContain('動いている 0')
+})
+
 it('StrictMode の下でも「もう一度確認」の結果を出し、「確認中」を解く', async () => {
   document.documentElement.dataset.theme = 'v8'
   scheduleList

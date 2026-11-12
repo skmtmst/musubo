@@ -26,6 +26,20 @@ async function revertOnce() {
 }
 
 describe('版を戻すときの競合（WEB051）', () => {
+  it('確認中にメニューやアカウントが変わったら古い確認では戻さない', async () => {
+    net.list.mockResolvedValue({ versions: [version(3, 'in_use'), version(1, 'past')] })
+    const props = { menuId: 'm1', menuName: 'カット', currentVersion: 3, accountId: 'acc', canRevert: true, onReverted: () => undefined, onClose: () => undefined }
+    const view = render(<MenuVersionHistory {...props} />)
+    await screen.findByText('第1版')
+    await act(async () => { screen.getByText('第1版').click() })
+    await act(async () => { screen.getAllByRole('button', { name: 'この版に戻す' })[0].click() })
+    const dialog = screen.getByRole('dialog', { name: '第1版に戻しますか？' })
+    view.rerender(<MenuVersionHistory {...props} menuId="m2" accountId="acc2" />)
+    const stillOpen = screen.queryByRole('dialog', { name: '第1版に戻しますか？' })
+    if (stillOpen) await act(async () => { within(stillOpen).getByRole('button', { name: '新しい版を作る' }).click() })
+    expect(net.revert).not.toHaveBeenCalled()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
+  })
   it('409 の知らせは残り、次は口が返した今の版で送る', async () => {
     net.list.mockResolvedValueOnce({ versions: [version(3, 'in_use'), version(2, 'past'), version(1, 'past')] })
     net.list.mockResolvedValue({ versions: [version(3, 'in_use'), version(2, 'past'), version(1, 'past')] })

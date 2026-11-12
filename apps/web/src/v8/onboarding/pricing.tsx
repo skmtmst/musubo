@@ -263,7 +263,7 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
       <div className={styles.footer}>
         <p>{quoteRequired
           ? 'お問い合わせ後に料金と利用開始の手順をご案内します。クレジットカード登録はこの段階では不要です。'
-          : 'カード情報はStripeが管理し、musuboには保存されません。クレジットカード登録だけでは無料体験も請求も始まりません。'}</p>
+          : 'カード情報は安全な決済画面で入力します。musuboにはカード番号やセキュリティコードを保存しません。クレジットカード登録だけでは無料体験も請求も始まりません。'}</p>
         <Button type="button" variant="primary" busy={busy} busyLabel="処理中…" disabled={!friendCountValid || (!quoteRequired && !consent)}
           onClick={() => void advance()}>{quoteRequired ? 'お問い合わせフォームへ' : '同意してクレジットカード登録へ'}</Button>
       </div>

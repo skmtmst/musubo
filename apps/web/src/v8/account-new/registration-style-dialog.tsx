@@ -55,7 +55,7 @@ export default function RegistrationStyleDialog({ open, accountId, accountName, 
       <StyleChooseAction primary viewing={viewing} chosen={choice || null} onChoose={onChoose} disabled={busy} />
       <Button onClick={() => { if (demoPage < 4) setDemoPage(demoPage + 1) }} aria-disabled={demoPage === 4} disabled={busy}>次のページ</Button>
     </DialogActions> : <DialogActions leadingAction={menuStep ? <Button onClick={()=>setMenuStep(false)} disabled={busy}>スタイルを選び直す</Button> : <Button type="button" variant="text" onClick={onSkip} disabled={busy || !ready}>あとで設定する</Button>}>
-      <Button type="button" variant="primary" onClick={()=>{if(menuStep)onSave();else setMenuStep(true)}} disabled={busy || !ready || !choice || (menuStep&&menu.value==='existing'&&!menu.resourceId)} busy={busy} busyLabel="保存しています…" disabledReason={!choice ? 'スタイルを選んでください' : null}>{menuStep?'このメニューで進む':'次へ'}<ArrowRight size={16} aria-hidden="true" /></Button>
+      <Button type="button" variant="primary" onClick={()=>{if(menuStep)onSave();else setMenuStep(true)}} disabled={busy || !ready || !choice || (menuStep&&menu.value==='existing'&&!menu.resourceId)} busy={busy} busyLabel="保存しています…" disabledReason={!choice ? '「このスタイルにする」を押して選んでください' : null}>{menuStep?'このメニューで進む':'次へ'}<ArrowRight size={16} aria-hidden="true" /></Button>
     </DialogActions>}
   >
     <div className={styles.body}>

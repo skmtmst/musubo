@@ -19,8 +19,8 @@ function seedBase(raw: SqliteD1['raw']): void {
        (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
      VALUES ('account-1', 'channel-1', '店舗1', '', '', 1, 'tenant-1')`,
   ).run();
-  insertFriend(raw, 'friend-10a', { line_account_id: 'account-1', display_name: '山田 太郎' });
-  insertFriend(raw, 'friend-10b', { line_account_id: 'account-1', display_name: '鈴木 次郎' });
+  insertFriend(raw, 'friend-10a', { line_account_id: 'account-1', display_name: '見本 141' });
+  insertFriend(raw, 'friend-10b', { line_account_id: 'account-1', display_name: '見本 181' });
   raw.prepare(
     `INSERT INTO meet_consultations
       (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url, status)

@@ -108,6 +108,7 @@ function dbWith(
   handlers: Array<{ match: string; first?: unknown; all?: unknown[] }>,
 ): D1Database {
   return {
+    batch: vi.fn(async (statements: Array<{ run: () => Promise<unknown> }>) => Promise.all(statements.map(statement => statement.run()))),
     prepare: vi.fn((sql: string) => ({
       bind: vi.fn(() => {
         const handler = handlers.find((h) => sql.includes(h.match));

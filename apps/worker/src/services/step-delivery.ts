@@ -123,7 +123,7 @@ export async function processStepDeliveries(
         }
         await db.prepare(
           `UPDATE friend_scenarios
-              SET status = 'paused', pause_reason = 'account_inactive',
+              SET confirmation_revision = confirmation_revision + 1, status = 'paused', pause_reason = 'account_inactive',
                   next_delivery_at = NULL, updated_at = ?
             WHERE id = ? AND status = 'active'`,
         ).bind(now, fs.id).run();
@@ -133,7 +133,7 @@ export async function processStepDeliveries(
         // 停止中の期限到達は一時停止し、復旧後に古い通知を自動送信しない。
         await db.prepare(
           `UPDATE friend_scenarios
-              SET status = 'paused', pause_reason = 'tenant_suspended',
+              SET confirmation_revision = confirmation_revision + 1, status = 'paused', pause_reason = 'tenant_suspended',
                   next_delivery_at = NULL, updated_at = ?
             WHERE id = ? AND status = 'active'`,
         ).bind(now, fs.id).run();
@@ -496,7 +496,7 @@ async function processSingleDelivery(
       db.prepare(`UPDATE outbound_send_requests SET status='unknown',failure_code='LINE_RETRY_KEY_EXPIRED',
         retryable=0,next_retry_at=NULL,last_failed_at=?,updated_at=?,lease_token=NULL,lease_expires_at=NULL
         WHERE idempotency_key=? AND status!='succeeded'`).bind(at,at,sendKey),
-      db.prepare(`UPDATE friend_scenarios SET status='paused',pause_reason='delivery_unconfirmed',updated_at=? WHERE id=? AND status='delivering'`).bind(jstNow(),fs.id),
+      db.prepare(`UPDATE friend_scenarios SET confirmation_revision = confirmation_revision + 1, status='paused',pause_reason='delivery_unconfirmed',updated_at=? WHERE id=? AND status='delivering'`).bind(jstNow(),fs.id),
     ]);
     return false;
   }
@@ -506,7 +506,7 @@ async function processSingleDelivery(
     retryInProgress:true,now:new Date().toISOString(),
   });
   if (reservation.kind === 'conflict' || reservation.kind === 'unknown' || reservation.kind === 'failed') {
-    await db.prepare(`UPDATE friend_scenarios SET status='paused',pause_reason='delivery_unconfirmed',updated_at=? WHERE id=? AND status='delivering'`).bind(jstNow(),fs.id).run();
+    await db.prepare(`UPDATE friend_scenarios SET confirmation_revision = confirmation_revision + 1, status='paused',pause_reason='delivery_unconfirmed',updated_at=? WHERE id=? AND status='delivering'`).bind(jstNow(),fs.id).run();
     return false;
   }
   if (reservation.kind === 'in_progress') return false;

@@ -11,7 +11,7 @@ export interface AdminPaymentRecord {
   bookingStartsAt: string | null; bookingLabel: string | null; bookingNote: string | null;
   amount: number; status: 'paid' | 'partially_refunded' | 'pending' | 'refunded' | 'expired' | 'onsite';
   method: string | null; createdAt: string; receiptUrl: string | null;
-  refundedAmount: number; actorLabel: string | null; reason: string | null;
+  refundedAmount: number; actorLabel: string | null; reason: string | null; confirmationRevision: number | null;
 }
 export function paymentRecordFilter(query: Record<string, string>): PaymentRecordFilter | null {
   const integer = (value: string | undefined, fallback: number, max: number) => value === undefined ? fallback
@@ -29,14 +29,14 @@ const recordsCte = `WITH records AS (
  SELECT p.id,p.booking_id AS bookingId,b.friend_id AS friendId,f.display_name AS friendName,
  b.starts_at AS bookingStartsAt,m.name AS bookingLabel,b.internal_note AS bookingNote,p.amount,
  CASE WHEN p.status IN ('unpaid','pending') THEN 'pending' WHEN p.status='paid' AND p.refunded_amount>0 THEN 'partially_refunded' ELSE p.status END AS status,
- 'online' AS method,p.created_at AS createdAt,p.receipt_url AS receiptUrl,p.refunded_amount AS refundedAmount,p.actor_label AS actorLabel,p.action_reason AS reason
+ 'online' AS method,p.created_at AS createdAt,p.receipt_url AS receiptUrl,p.refunded_amount AS refundedAmount,p.actor_label AS actorLabel,p.action_reason AS reason,p.confirmation_revision AS confirmationRevision
  FROM booking_payments p LEFT JOIN bookings b ON b.id=p.booking_id AND b.line_account_id=p.line_account_id
  LEFT JOIN friends f ON f.id=b.friend_id AND f.line_account_id=p.line_account_id
  LEFT JOIN menus m ON m.id=b.menu_id AND m.line_account_id=p.line_account_id
  WHERE p.line_account_id=? AND p.status IN ('unpaid','pending','paid','refunded','expired')
  UNION ALL
  SELECT 'onsite:'||b.id,b.id,b.friend_id,f.display_name,b.starts_at,m.name,b.internal_note,b.price_at_booking,
- 'onsite','onsite',b.requested_at,NULL,0,NULL,NULL
+ 'onsite','onsite',b.requested_at,NULL,0,NULL,NULL,NULL
  FROM booking_payment_choices ch JOIN bookings b ON b.id=ch.booking_id AND b.line_account_id=ch.line_account_id
  LEFT JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id
  LEFT JOIN menus m ON m.id=b.menu_id AND m.line_account_id=b.line_account_id

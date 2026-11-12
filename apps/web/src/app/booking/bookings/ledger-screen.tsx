@@ -150,10 +150,8 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
     setError,
     loadError,
     decideTarget,
-    setDecideTarget,
     deciding,
     decideError,
-    setDecideError,
     csvBusy,
     canOperate,
     setDetailId,
@@ -170,7 +168,8 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
     load,
     downloadLedgerCsv,
     calendarStatus,
-    runDecide,
+    confirmDecide,
+    cancelDecide,
     handleDecide,
     kpi,
     menuCounts,
@@ -238,11 +237,12 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             : `LINEと結びついていないため、${words.person}への自動連絡はありません。取り消すには、もう一度状態を変える必要があります。`
         }
         confirmLabel={decideTarget ? actionLabel[decideTarget.action] : '実行する'}
+        cancelLabel="戻る"
         destructive={decideTarget?.action === 'reject' || decideTarget?.action === 'cancel' || decideTarget?.action === 'no_show'}
         busy={deciding}
         error={decideError || undefined}
-        onCancel={() => { setDecideTarget(null); setDecideError('') }}
-        onConfirm={() => { if (decideTarget && decideTarget.accountId === selectedAccountId) void runDecide(decideTarget.id, decideTarget.action) }}
+        onCancel={() => cancelDecide(decideTarget)}
+        onConfirm={() => confirmDecide(decideTarget)}
       ><OperationTargetSummary accounts={[{ id: decideTarget?.accountId ?? '' }]} /></ConfirmDialog>
     </>
   )

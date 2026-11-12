@@ -13,7 +13,7 @@ vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'a
 vi.mock('@/lib/staff-role',()=>({useStaffRole:()=>mock.role,canManageRole:(role:string)=>['owner','admin'].includes(role)}))
 vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{},useHideSettingsNav:()=>{}}))
 vi.mock('@/components/layout/settings-inner-nav',()=>({default:()=>null}))
-vi.mock('@/components/templates/settings-page',()=>({SettingsPage:({children,preview,saveActions,saveStatus,notice}:Pick<ComponentProps<typeof import('@/components/templates/settings-page').SettingsPage>, 'children'|'preview'|'saveActions'|'saveStatus'|'notice'>)=><div>{notice}{children}{preview}{saveStatus}{saveActions}</div>}))
+vi.mock('@/components/templates/settings-page',()=>({SettingsPage:({children,preview,saveActions,saveStatus,notice,help}:Pick<ComponentProps<typeof import('@/components/templates/settings-page').SettingsPage>, 'children'|'preview'|'saveActions'|'saveStatus'|'notice'|'help'>)=><div>{help}{notice}{children}{preview}{saveStatus}{saveActions}</div>}))
 vi.mock('@/components/shared/customer-look-preview',()=>({default:({look}:{look:typeof DEFAULT_CUSTOMER_LOOK})=><p>見本：{look.preset}</p>}))
 vi.mock('@/components/shared/toast',()=>({notifyToast:()=>{}}))
 vi.mock('@/lib/use-unsaved-guard',()=>({useUnsavedGuard:()=>({guarded:(fn:()=>void)=>fn(),disarm:()=>{},leaveTarget:null})}))
@@ -134,4 +134,21 @@ test('閲覧者にも6枚の型と同じ色見本/明朝の欄を残し、native
  expect(screen.queryByRole('dialog')).toBeNull();expect(screen.queryByRole('listbox')).toBeNull()
  expect(screen.getByText('見本：custom')).toBeTruthy();expect(custom.checked).toBe(true)
  fireEvent.click(screen.getByRole('button',{name:'保存する'}));expect(mock.save).not.toHaveBeenCalled()
+})
+
+test.each(['viewer', null] as const)('編集できない%sには型を押す案内を出さない', async role => {
+ mock.role=verifiedStaffRole(role)
+ mock.get.mockResolvedValue({success:true,data:{look:DEFAULT_CUSTOMER_LOOK,version:3}})
+ render(<CustomerLookScreen/>);await screen.findByText('見本：line')
+ expect(screen.queryByText('型を押すと、右の見本がすぐ変わります')).toBeNull()
+ expect(screen.getByText('予約・回答フォームなどに使われるデザインです')).toBeTruthy()
+})
+
+
+test.each([true, false])('画面の説明も編集可否 %s に合う', async canEdit => {
+ mock.role=verifiedStaffRole(canEdit?'owner':'viewer')
+ mock.get.mockResolvedValue({success:true,data:{look:DEFAULT_CUSTOMER_LOOK,version:3}})
+ render(<CustomerLookScreen/>);await screen.findByText('見本：line')
+ expect(screen.getByText(/予約・回答フォーム・履歴・スタンプなど/)).toBeTruthy()
+ expect(Boolean(screen.queryByText(/保存するとお客さまの画面に反映されます/))).toBe(canEdit)
 })

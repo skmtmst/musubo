@@ -27,8 +27,8 @@ import { at, reservation, snapshotOf } from '../booking-kit/test-data'
 
 /* 今日：佐藤（LINE・T1）・山田（食べログ・承認待ち・T3・乳）・押さえ（T4）。 */
 const reservationsToday = () => [
-  reservation('r1', { customer_name: '佐藤 健', source: 'line', starts_at: at(0, 18), ends_at: at(0, 20), table_id: 't1' }),
-  reservation('r2', { customer_name: '山田 太郎', source: 'tabelog', status: 'pending', allergy_note: '乳', guest_count: 4, starts_at: at(0, 18, 30), ends_at: at(0, 20, 30), table_id: 't3', course_name: 'おまかせコース' }),
+  reservation('r1', { customer_name: '見本 114', source: 'line', starts_at: at(0, 18), ends_at: at(0, 20), table_id: 't1' }),
+  reservation('r2', { customer_name: '見本 141', source: 'tabelog', status: 'pending', allergy_note: '乳', guest_count: 4, starts_at: at(0, 18, 30), ends_at: at(0, 20, 30), table_id: 't3', course_name: 'おまかせコース' }),
   reservation('r3', { customer_name: '押さえ', source: 'phone', status: 'pending', hold_expires_at: at(0, 23), note: '電話のお客さま用', guest_count: 4, starts_at: at(0, 20), ends_at: at(0, 21, 30), table_id: 't4' }),
 ]
 
@@ -54,10 +54,10 @@ afterEach(() => { cleanup(); verifiedStaffRole(null); forgetSessionSnapshot(); v
 const reason = '人数・休業・卓の停止を確認してください'
 async function openEdit() {
   render(<TestPage />)
-  await screen.findByText('山田 太郎')
+  await screen.findByText('見本 141')
   fireEvent.click(screen.getByRole('button', { name: '一覧', exact: true }))
-  const row = (await screen.findByRole('button', { name: '佐藤 健', exact: true })).closest('tr')!
-  fireEvent.click(within(row).getByRole('button', { name: '佐藤 健のその他操作' }))
+  const row = (await screen.findByRole('button', { name: '見本 114', exact: true })).closest('tr')!
+  fireEvent.click(within(row).getByRole('button', { name: '見本 114のその他操作' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: '変更', exact: true }))
   const dialog = screen.getByRole('dialog')
   const input = within(dialog).getByLabelText('人数') as HTMLInputElement
@@ -143,8 +143,8 @@ it('閉じて同じ予約を開き直すと局所理由と入力は残らない'
   const discard = screen.getByRole('dialog', { name: '入力を破棄しますか？' })
   await act(async () => { fireEvent.click(within(discard).getByRole('button', { name: '破棄する' })) })
   expect(screen.queryByRole('dialog')).toBeNull()
-  const row = screen.getByRole('button', { name: '佐藤 健', exact: true }).closest('tr')!
-  fireEvent.click(within(row).getByRole('button', { name: '佐藤 健のその他操作' }))
+  const row = screen.getByRole('button', { name: '見本 114', exact: true }).closest('tr')!
+  fireEvent.click(within(row).getByRole('button', { name: '見本 114のその他操作' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: '変更', exact: true }))
   const reopened = screen.getByRole('dialog')
   expect((within(reopened).getByLabelText('人数') as HTMLInputElement).value).toBe('2')
@@ -156,7 +156,7 @@ it.each(['同じ版', '別の版'] as const)('今日の自動更新が%sでも�
   try {
     fixture.updateReservation.mockRejectedValueOnce(new ApiError(409, reason, 'availability_conflict'))
     render(<TestPage />)
-    fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
     fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
     const dialog = screen.getByRole('dialog')
     const input = within(dialog).getByLabelText('人数') as HTMLInputElement
@@ -165,9 +165,9 @@ it.each(['同じ版', '別の版'] as const)('今日の自動更新が%sでも�
     await waitFor(() => expect(within(dialog).getByText(reason, { exact: false })).toBeTruthy())
     const poll = interval.mock.calls.filter(([, ms]) => ms === 30_000).at(-1)?.[0]
     expect(typeof poll).toBe('function')
-    fixture.reservationsDay.mockResolvedValueOnce({ data: { date: '', reservations: today.map(row => ({ ...row, ...(row.id === 'r1' ? { customer_name: '佐藤 更新', ...(version === '別の版' ? { customer_version: 2, guest_count: 3 } : {}) } : {}) })) } })
+    fixture.reservationsDay.mockResolvedValueOnce({ data: { date: '', reservations: today.map(row => ({ ...row, ...(row.id === 'r1' ? { customer_name: '見本 117', ...(version === '別の版' ? { customer_version: 2, guest_count: 3 } : {}) } : {}) })) } })
     await act(async () => { (poll as () => void)(); await Promise.resolve() })
-    await waitFor(() => expect(dialog.textContent).toContain('佐藤 更新'))
+    await waitFor(() => expect(dialog.textContent).toContain('見本 117'))
     expect(input.value).toBe('9')
     const button = within(dialog).getByRole('button', { name: '保存する' }) as HTMLButtonElement
     if (version === '同じ版') {
@@ -207,7 +207,7 @@ it('今日の一覧から予約が消えても編集内容を保ち保存を止�
   const interval = vi.spyOn(globalThis, 'setInterval')
   try {
     render(<TestPage />)
-    fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
     fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
     const dialog = screen.getByRole('dialog')
     const input = within(dialog).getByLabelText('人数') as HTMLInputElement
@@ -224,7 +224,7 @@ it('今日の一覧から予約が消えても編集内容を保ち保存を止�
 
 it('今日の見方で版競合後に日別と全体が更新されても入力を残す', async () => {
   render(<TestPage />)
-  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
   fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
   const dialog = screen.getByRole('dialog')
   const input = within(dialog).getByLabelText('人数') as HTMLInputElement

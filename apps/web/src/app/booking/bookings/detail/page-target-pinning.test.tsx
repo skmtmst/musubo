@@ -14,8 +14,15 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ account: 'A', id: 'one', get: vi.fn(), update: vi.fn() }))
+const m = vi.hoisted(() => ({ account: 'A', id: 'one', get: vi.fn(), update: vi.fn(), decide: vi.fn(), confirmation: undefined as undefined | (() => void), cancel: undefined as undefined | (() => void) }))
 
+vi.mock('@/components/shared/confirm-dialog', async original => {
+  const actual = await original<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && typeof props.title === 'string' && props.title.includes('この予約を')) { m.confirmation = props.onConfirm as () => void; m.cancel = props.onCancel }
+    return <actual.default {...props} />
+  } }
+})
 vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: m.account }),
@@ -30,7 +37,7 @@ vi.mock('@/lib/api', async () => ({
   bookingApi: {
     ...(await import('@/test-utils/booking-visit-api-mock')).bookingVisitApiMock(),
     getBooking: m.get,
-    decideRequest: vi.fn(async () => ({ status: 'confirmed' })),
+    decideRequest: m.decide,
     listMenus: vi.fn(async () => ({ menus: [] })),
     listMenuStaff: vi.fn(async () => ({ staff: [] })),
     getAvailability: vi.fn(async () => ({ by_staff: [] })),
@@ -83,9 +90,36 @@ beforeEach(() => {
   vi.clearAllMocks()
   m.account = 'A'
   m.id = 'one'
+  m.confirmation = undefined
+  m.cancel = undefined
+  m.decide.mockResolvedValue({ status: 'confirmed' })
 })
 
+function withinDialogButton(dialog: HTMLElement, label: string): HTMLButtonElement {
+  const button = [...dialog.querySelectorAll('button')].find(item => item.textContent?.trim() === label)
+  if (!button) throw new Error(`button ${label} not found`)
+  return button
+}
+
 describe('DEEP-18: 詳細と操作対象の固定', () => {
+  it('閉じた予約確認の確定を再度開いた窓に使えない', async () => {
+    m.get.mockResolvedValue({ booking: booking('one') })
+    render(<Page />)
+    await screen.findByText('oneメニュー')
+    fireEvent.click(screen.getByRole('button', { name: '承認する' }))
+    await waitFor(() => expect(m.confirmation).toBeTypeOf('function'))
+    const oldConfirm = m.confirmation!, oldCancel = m.cancel!
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(withinDialogButton(dialog, '戻る'))
+    fireEvent.click(screen.getByRole('button', { name: '承認する' }))
+    act(() => { oldCancel() })
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    await act(async () => { oldConfirm(); await Promise.resolve() })
+    expect(m.decide).not.toHaveBeenCalled()
+    await act(async () => { m.confirmation!(); await Promise.resolve() })
+    expect(m.decide).toHaveBeenCalledTimes(1)
+  })
+
   it('別アカウントの取得に失敗したら、前の予約と承認ボタンを残さない', async () => {
     m.get
       .mockResolvedValueOnce({ booking: booking('A') })
@@ -214,6 +248,9 @@ describe('DEEP-20: 確認窓の説明を実処理に合わせる', () => {
     await flush()
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     await flush()
+    const cancelWindow = screen.getByRole('alertdialog')
+    expect(Array.from(cancelWindow.querySelectorAll('button')).map(button => button.textContent?.trim())).toEqual(expect.arrayContaining(['戻る', 'キャンセル']))
+    expect(Array.from(cancelWindow.querySelectorAll('button')).filter(button => button.textContent?.trim() === 'キャンセル')).toHaveLength(1)
     expect(screen.getByText(/キャンセルしてもお客様への自動連絡はありません/)).toBeTruthy()
     expect(screen.getByText('LINEアカウント')).toBeTruthy()
     expect(screen.getByText('環境')).toBeTruthy()

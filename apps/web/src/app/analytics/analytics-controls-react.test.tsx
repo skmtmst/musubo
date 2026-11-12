@@ -374,7 +374,7 @@ describe('分析の対象者種別・期間選択(#835)', () => {
 
 const FUNNEL_ACTIVE = {
   id: 'funnel-1', name: '申込導線', windowDays: 14, createdAt: '2026-01-01T00:00:00.000Z',
-  status: 'active',
+  status: 'active', confirmationRevision: 1,
   currentVersion: { id: 'version-1', versionNumber: 1, createdAt: '2026-01-01T00:00:00.000Z' },
   migrationState: 'ready',
 }
@@ -476,7 +476,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
     expect(request).toBeDefined()
     expect(request!.init?.method).toBe('PUT')
     expect(JSON.parse(String(request!.init?.body))).toEqual({
-      status: 'stopped', expectedStatus: 'active',
+      status: 'stopped', expectedStatus: 'active', expectedRevision: 1,
     })
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
     expect(host.textContent).toContain('停止中・保管したファネル')
@@ -503,7 +503,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
     await clickInDocument('再開する')
     const request = net.calls.find((call) => call.path.includes('/status?'))
     expect(JSON.parse(String(request!.init?.body))).toEqual({
-      status: 'active', expectedStatus: 'stopped',
+      status: 'active', expectedStatus: 'stopped', expectedRevision: 1,
     })
   })
 
@@ -518,7 +518,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
     await clickInDocument('削除する')
     const request = net.calls.find((call) => call.path.includes('/status?'))
     expect(JSON.parse(String(request!.init?.body))).toEqual({
-      status: 'archived', expectedStatus: 'active',
+      status: 'archived', expectedStatus: 'active', expectedRevision: 1,
     })
   })
 

@@ -78,6 +78,7 @@ vi.mock('@/lib/api', () => ({
     scenarios: {
       create: createScenario,
       update: updateScenario,
+      confirmation: vi.fn(async () => ({ success: true, data: { contentRevision: 1, activeCount: 0, rowIdSum: 0, rowIdSquareSum: 0, totalCount: 0, totalRowIdSum: 0, totalRowIdSquareSum: 0, referrers: [] } })),
       addStep,
       listPage,
       updateStep: vi.fn(async () => ({ success: true, data: { id: 'step-1' } })),
@@ -191,6 +192,7 @@ beforeEach(() => {
     name: '流れの型2',
     description: '',
     triggerType: 'friend_add',
+    contentRevision: 1,
     isActive: false,
     allowConcurrent: true,
     folderId: null,
@@ -326,7 +328,7 @@ describe('V8 シナリオの通し：配信を始める→止める', () => {
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog.textContent).toContain('配信を止めますか')
     fireEvent.click(within(dialog).getByRole('button', { name: '一時停止する' }))
-    await waitFor(() => expect(updateScenario).toHaveBeenCalledWith('sc-new', { isActive: false }))
+    await waitFor(() => expect(updateScenario).toHaveBeenCalledWith('sc-new', { isActive: false, expectedContentRevision: 1, expectedSubscriptions: { activeCount: 0, rowIdSum: 0, rowIdSquareSum: 0 } }))
     await screen.findByText('配信を一時停止しました')
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   })

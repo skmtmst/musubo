@@ -226,4 +226,9 @@ html:root .root .item[data-empty] .count { color: var(--color-ink-faint); }
 
 html:root .root[data-equal-width][data-segmented-fit='content'] { grid-auto-columns: minmax(max-content, 1fr); flex-shrink: 0; }
 
+@media (max-width: 480px) {
+  html:root .root[data-appearance='intake-stop'] { flex-wrap: wrap; max-width: 100%; }
+  html:root .root[data-appearance='intake-stop'] .thumb { display: none; }
+  html:root .root[data-appearance='intake-stop'][data-sliding] .selected { background: var(--color-selection-bg); outline-color: var(--color-selection-border); }
+}
 html:root .root[data-size='hours'] .item { font-size:13px; font-weight:600; }

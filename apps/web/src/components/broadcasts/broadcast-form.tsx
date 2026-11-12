@@ -74,6 +74,7 @@ import type { Folder,SendConfirmationPreview } from '@line-crm/shared'
 import { AlertTriangle,ArrowRight,CheckCircle2,Eye,Save } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
+import { useScopedDialog } from './use-scoped-dialog'
 import { broadcastSpreadMinutes, broadcastSendLabel, readBroadcastSchedule, type BroadcastSendChoice, type BroadcastSpreadStart } from './broadcast-schedule'
 import type { BroadcastFormProps } from './broadcast-form-props'
 import styles from './broadcast-form-v8.module.css'
@@ -284,11 +285,10 @@ export default function BroadcastForm({
     ここまでは、押した瞬間に `save` が走って 1,000人以上へ予約が入り、
     何人に何をいつ送るのかを読み合わせる場所が無かった。
   */
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const confirmationScope = useRef<{ accountId: string; generation: number } | null>(null)
+  const { open: confirmOpen, setOpen: setConfirmOpen, scope: confirmationScope, renderedScope: renderedConfirmationScope } = useScopedDialog()
   const [acknowledgementKey, setAcknowledgementKey] = useState<string | null>(null)
   const [preflightDialogOpen, setPreflightDialogOpen] = useState(false)
-  const [testDialogOpen, setTestDialogOpen] = useState(false)
+  const { open: testDialogOpen, setOpen: setTestDialogOpen, scope: testScope, renderedScope: renderedTestScope } = useScopedDialog()
   const [testResultOpen, setTestResultOpen] = useState(false)
   const [testRecipients, setTestRecipients] = useState<Array<{ id: string; displayName: string; pictureUrl: string | null }>>([])
   const [testRecipientState, setTestRecipientState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -1000,8 +1000,6 @@ export default function BroadcastForm({
    * 最初だけ下書きを作り、2回目以降と本番予約は同じ行を更新する。
    * 確かめた内容と本番で送る内容を同じ実体にし、テスト回数ぶん下書きを増やさない。
    */
-  const testScope = useRef<{ accountId: string; generation: number } | null>(null)
-  const renderedTestScope = testScope.current
   const testScopeCurrent = () => renderedTestScope !== null && renderedTestScope === testScope.current && renderedTestScope.generation === accountGenerationRef.current
   const handleTestSend = () => testScopeCurrent() ? testBroadcast({ isCurrent: testScopeCurrent, onDraftSaved, persistDraft, rejectValidation, saveErrors, setError, setTestHistory, setTestResult, setTestSending, setTestRetryBlocked, validate }) : Promise.resolve()
 
@@ -1261,7 +1259,6 @@ export default function BroadcastForm({
   const confirmationKey = JSON.stringify([selectedAccountId, formFingerprint, preflightChecks.map(({ key, value, done }) => ({ key, value, done })), sendPreview.data, previewSeq])
   const confirmationBlocked = pendingChecks.length > 0 && acknowledgementKey !== confirmationKey
   const confirmedDeliveryLimit = currentStep && !needsApprovalSingle ? sendPreview.data?.deliveryLimit : preflight?.deliveryLimit
-  const renderedConfirmationScope = confirmationScope.current
   const confirmationCurrent = renderedConfirmationScope !== null && renderedConfirmationScope.generation === accountGenerationRef.current && renderedConfirmationScope.accountId === selectedAccountId
   const visibleConfirmOpen = confirmOpen && confirmationCurrent
   const confirmationFields = <>{confirmationScope.current && <OperationTargetSummary accounts={[{ id: confirmationScope.current.accountId }]} />}{confirmedDeliveryLimit && <Notice tone="info">配信できる候補{formatNumber(confirmedDeliveryLimit.candidateCount)}人から、無作為に最大{formatNumber(confirmedDeliveryLimit.recipientCount)}人へ送ります。確認後に人数を増やしません。</Notice>}<BroadcastCheckAcknowledgement issues={pendingChecks.map(check => `${check.label}：${check.value}`)} checked={acknowledgementKey === confirmationKey} onCheckedChange={checked => setAcknowledgementKey(checked ? confirmationKey : null)} disabled={saving} /></>
@@ -1349,7 +1346,7 @@ export default function BroadcastForm({
       </p>
     ) : null}
     <CreateColumns>
-      <StepContent step={currentStep ? currentStepIndex : null} className={`${styles.input} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
+      <StepContent step={currentStep ? currentStepIndex : null} slide={false} className={`${styles.input} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (
           <section className="broadcast-preflight-page space-y-3">
             <section className="rounded-card border content-card bg-canvas p-5">

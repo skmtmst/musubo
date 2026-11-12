@@ -55,7 +55,7 @@ describe('V8 権限なし（O5tUeE）の板', () => {
       featureName: 'シナリオ配信',
       roleLabel: '受付',
       requiredRoleLabel: '運用',
-      adminName: 'Kenta Kawano',
+      adminName: 'Demo Person',
       capabilitiesHref: '/staff',
     })
     expect(host?.querySelector('[data-design-node="O5tUeE"]')).not.toBeNull()
@@ -66,7 +66,7 @@ describe('V8 権限なし（O5tUeE）の板', () => {
     expect(host?.textContent).toContain('いまの役割は「受付」です。')
     expect(host?.textContent).toContain('シナリオ配信は「運用」以上の役割で使えます。')
     expect(host?.textContent).toContain('オーナーか管理者に頼んでください。')
-    expect(host?.textContent).toContain('管理者：Kenta Kawano')
+    expect(host?.textContent).toContain('管理者：Demo Person')
     expect(host?.textContent).toContain('役割でできることを見る')
     expect(host?.textContent).toContain('ダッシュボードへ戻る')
   })

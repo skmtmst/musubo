@@ -267,7 +267,7 @@ describe('oauth/callback', () => {
     googleBusiness.exchangeAuthorizationCode.mockResolvedValue({
       accessToken: 'at-1', refreshToken: null, expiresAtMs: Date.now() + 3600_000,
     });
-    googleBusiness.fetchAccountEmail.mockResolvedValue('o@e.com');
+    googleBusiness.fetchAccountEmail.mockResolvedValue('owner@example.com');
     const response = await appFor().fetch(
       new Request('https://worker.example.com/api/integrations/google-sheets/oauth/callback?state=s1&code=authcode'),
       env,

@@ -77,8 +77,9 @@ function asD1(sqlite: Database.Database): D1Database {
       };
     },
     batch: async (stmts: unknown[]) => {
-      for (const stmt of stmts as Array<{ run: () => Promise<unknown> }>) await stmt.run();
-      return [];
+      const results = [];
+      for (const stmt of stmts as Array<{ run: () => Promise<unknown> }>) results.push(await stmt.run());
+      return results;
     },
   } as unknown as D1Database;
 }

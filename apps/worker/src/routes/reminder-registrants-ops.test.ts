@@ -41,7 +41,7 @@ function seed() {
     sqlite.raw.prepare(`INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at) VALUES (?, ?, '2026-09-15T00:00:00.000Z')`)
       .run(id, accountId);
   }
-  insertFriend(sqlite.raw, FRIEND_A, { line_account_id: ACC_A, display_name: '田中 花子' });
+  insertFriend(sqlite.raw, FRIEND_A, { line_account_id: ACC_A, display_name: '見本 171' });
   insertFriend(sqlite.raw, FRIEND_B, { line_account_id: ACC_B, display_name: '別店舗 太郎' });
   for (const [id, accountId] of [[REMINDER_A, ACC_A], [REMINDER_B, ACC_B]] as const) {
     sqlite.raw.prepare(`INSERT INTO reminders (id, name, line_account_id, trigger_type, lifecycle_status) VALUES (?, ?, ?, 'manual', 'published')`)
@@ -98,7 +98,7 @@ describe('リマインダ登録者の変更・取消・再開 (N-064)', () => {
     const listed = await request(`/api/reminders/${REMINDER_A}/registrants`, STAFF_A_KEY);
     expect(listed.status).toBe(200);
     expect((await listed.json() as { data: Array<{ friendName: string; lockVersion: number }> }).data).toEqual([
-      expect.objectContaining({ friendName: '田中 花子', lockVersion: 0 }),
+      expect.objectContaining({ friendName: '見本 171', lockVersion: 0 }),
     ]);
     const moved = await request(`/api/reminders/${REMINDER_A}/registrants/${ENROLLMENT_A}`, STAFF_A_KEY, 'PATCH', {
       targetDate: '2026-10-05T10:00:00+09:00', expectedLockVersion: 0,

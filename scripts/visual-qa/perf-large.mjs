@@ -506,7 +506,7 @@ const DOC_SCROLLER = () => {
 }
 
 async function scenarioFriends(browser) {
-  const { context, r } = await simplePage(browser, '/friends', () => document.body.innerText.includes('山田 花子 0'), DOC_SCROLLER)
+  const { context, r } = await simplePage(browser, '/friends', () => document.body.innerText.includes('見本 143 0'), DOC_SCROLLER)
   await context.close()
   return r
 }
@@ -520,7 +520,7 @@ async function scenarioTags(browser) {
   }
   {
     // 友だち一覧の「タグ：すべて」（2,000 個のタグから1つ選ぶ欄）を開く。
-    const { page, cdp, context, r } = await simplePage(browser, '/friends', () => document.body.innerText.includes('山田 花子 0'), null)
+    const { page, cdp, context, r } = await simplePage(browser, '/friends', () => document.body.innerText.includes('見本 143 0'), null)
     const before = await domCount(page)
     const t0 = Date.now()
     await page.locator('main button', { hasText: 'タグ：すべて' }).first().click()

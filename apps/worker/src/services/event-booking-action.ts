@@ -63,7 +63,7 @@ export async function runEventBookingAction(db: D1Database, config: EventBooking
     for (const id of ids) {
       const row = await db.prepare('SELECT s.starts_at FROM event_bookings b JOIN event_slots s ON s.id=b.slot_id WHERE b.id=?').bind(id).first<{starts_at:string}>();
       await cancelByTrigger(db,{triggerType:'event',friendId,sourceId:id,sourceEventId:id,lineAccountId:friend.line_account_id,startsAtIso:row!.starts_at,cancelReason:`event_action:${id}`,failOnSendInFlight:true});
-      writes.push(db.prepare(`UPDATE event_bookings SET status='cancelled',cancelled_at=?,cancelled_by='system',updated_at=?
+      writes.push(db.prepare(`UPDATE event_bookings SET confirmation_revision = confirmation_revision + 1, status='cancelled',cancelled_at=?,cancelled_by='system',updated_at=?
         WHERE id=? AND friend_id=? AND line_account_id=? AND status IN ('requested','confirmed')`).bind(now,now,id,friendId,friend.line_account_id));
     }
   } else {

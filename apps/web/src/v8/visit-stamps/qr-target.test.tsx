@@ -32,3 +32,18 @@ it('アカウントが切り替わると以前の再発行確認は使えない'
   expect(screen.queryByRole('alertdialog')).toBeNull()
   expect(api.issueStorefrontQr).not.toHaveBeenCalled()
 })
+
+it('閉じた再発行確認を開き直しても古い確定を使えない', async () => {
+  api.storefrontQr.mockResolvedValue({ data: { id: 'qr1', status: 'active', url: 'https://example.test/qr', issuedAt: '2026-10-01T00:00:00Z' } })
+  const card = { id: 'card1', name: '来店カード', version: 1, settings: {} } as VisitStampCard
+  render(<StorefrontQr card={card} accountId="account-a" shop="本店" canManage />)
+  fireEvent.click(await screen.findByRole('button', { name: '作り直す' }))
+  const dialog = screen.getByRole('alertdialog')
+  const button = within(dialog).getByRole('button', { name: '作り直す' })
+  const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+  const oldClick = (button as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+  fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+  fireEvent.click(screen.getByRole('button', { name: '作り直す' }))
+  oldClick({ preventDefault() {}, stopPropagation() {} })
+  expect(api.issueStorefrontQr).not.toHaveBeenCalled()
+})

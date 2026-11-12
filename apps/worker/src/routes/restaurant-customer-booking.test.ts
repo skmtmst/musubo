@@ -364,32 +364,32 @@ it('停止したアカウントは本人確認と予約へ進めない', async (
 });
 
 it('電話と200文字の要望を仮押さえ・確定・履歴・台帳用の予約に残す',async()=>{
-  const details={note:'🍽'.repeat(200),customerPhone:'090-1234-5678'};
+  const details={note:'🍽'.repeat(200),customerPhone:'090-0000-5678'};
   const input={storeId:'store',startsAt:start,guestCount:2,requestId:'request_details',...details};
   const h=await request('/api/liff/restaurant/holds',input);
   expect(h.status).toBe(201);
   const {data}=await read(h);
-  expect(data).toMatchObject({...details,customerPhone:'09012345678',seatType:'table'});
+  expect(data).toMatchObject({...details,customerPhone:'09000005678',seatType:'table'});
   expect((await request('/api/liff/restaurant/holds',input)).status).toBe(200);
   expect((await request('/api/liff/restaurant/holds',{...input,note:'違う'})).status).toBe(409);
-  const confirmed=await request(`/api/liff/restaurant/reservations/${data.id}/confirm`,{expectedVersion:1,note:'窓際を希望',customerPhone:'0312345678'});
+  const confirmed=await request(`/api/liff/restaurant/reservations/${data.id}/confirm`,{expectedVersion:1,note:'窓際を希望',customerPhone:'0300005678'});
   expect(confirmed.status).toBe(200);
-  expect((await read(confirmed)).data).toMatchObject({status:'confirmed',note:'窓際を希望',customerPhone:'0312345678',seatType:'table'});
-  expect(db.raw.prepare('SELECT note,customer_phone FROM rt_reservations WHERE id=?').get(data.id)).toEqual({note:'窓際を希望',customer_phone:'0312345678'});
+  expect((await read(confirmed)).data).toMatchObject({status:'confirmed',note:'窓際を希望',customerPhone:'0300005678',seatType:'table'});
+  expect(db.raw.prepare('SELECT note,customer_phone FROM rt_reservations WHERE id=?').get(data.id)).toEqual({note:'窓際を希望',customer_phone:'0300005678'});
   const history=await (await request('/api/liff/restaurant/reservations?storeId=store')).json() as any;
-  expect(history.data[0]).toMatchObject({note:'窓際を希望',customerPhone:'0312345678',seatType:'table'});
+  expect(history.data[0]).toMatchObject({note:'窓際を希望',customerPhone:'0300005678',seatType:'table'});
   expect((await request(`/api/liff/restaurant/reservations/${data.id}/confirm`,{expectedVersion:1,note:'再送で違う内容'})).status).toBe(409);
 });
 it('任意欄の省略で維持し、空欄で消す。201文字・型違い・不正電話は保存しない',async()=>{
   for (const details of [{note:'あ'.repeat(201)},{note:123},{customerPhone:{}},{customerPhone:'x'.repeat(51)},{customerPhone:'abc'},{customerPhone:'1234567890'},{customerPhone:'090123456'},{customerPhone:'090123456789'},{customerPhone:'+819012345678'}]) {
     expect((await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,requestId:'request_bad',...details})).status).toBe(400);
   }
-  const {data}=await read(await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,requestId:'request_optional',note:'希望',customerPhone:'090-1234-5678'}));
+  const {data}=await read(await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,requestId:'request_optional',note:'希望',customerPhone:'090-0000-5678'}));
   expect((await request(`/api/liff/restaurant/reservations/${data.id}/confirm`,{expectedVersion:1,note:'あ'.repeat(201)})).status).toBe(400);
   expect((await request(`/api/liff/restaurant/reservations/${data.id}/confirm`,{expectedVersion:1,customerPhone:4})).status).toBe(400);
-  expect((await read(await request(`/api/liff/restaurant/reservations/${data.id}/confirm`,{expectedVersion:1}))).data).toMatchObject({note:'希望',customerPhone:'09012345678'});
+  expect((await read(await request(`/api/liff/restaurant/reservations/${data.id}/confirm`,{expectedVersion:1}))).data).toMatchObject({note:'希望',customerPhone:'09000005678'});
   await request(`/api/liff/restaurant/reservations/${data.id}/cancel`,{expectedVersion:2});
-  const {data:other}=await read(await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,requestId:'request_empty',note:'希望',customerPhone:'090-1234-5678'}));
+  const {data:other}=await read(await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,requestId:'request_empty',note:'希望',customerPhone:'090-0000-5678'}));
   expect((await read(await request(`/api/liff/restaurant/reservations/${other.id}/confirm`,{expectedVersion:1,note:' ',customerPhone:null}))).data).toMatchObject({note:null,customerPhone:null});
 });
 it('空きは卓の種類と設定した店だけの遅刻案内を返す',async()=>{
@@ -577,15 +577,15 @@ describe('飲食4：コース・フォーム・系列店',()=>{
 });
 
 it('全角・区切りを数字だけで保存し、旧行は読み取り時だけ整える', async () => {
-  const input={storeId:'store',startsAt:start,guestCount:2,requestId:'normalized-phone',customerPhone:'　０９０－１２３４－５６７８ '};
+  const input={storeId:'store',startsAt:start,guestCount:2,requestId:'normalized-phone',customerPhone:'　０９０－００００－５６７８ '};
   const held=await read(await request('/api/liff/restaurant/holds',input));
-  expect(held.data.customerPhone).toBe('09012345678');
-  expect(db.raw.prepare('SELECT customer_phone FROM rt_reservations WHERE id=?').get(held.data.id)).toEqual({customer_phone:'09012345678'});
-  db.raw.prepare('UPDATE rt_reservations SET customer_phone=? WHERE id=?').run('０９０－１２３４－５６７８',held.data.id);
+  expect(held.data.customerPhone).toBe('09000005678');
+  expect(db.raw.prepare('SELECT customer_phone FROM rt_reservations WHERE id=?').get(held.data.id)).toEqual({customer_phone:'09000005678'});
+  db.raw.prepare('UPDATE rt_reservations SET customer_phone=? WHERE id=?').run('０９０－００００－５６７８',held.data.id);
   const history=await (await request('/api/liff/restaurant/reservations?storeId=store')).json() as {data:Array<{customerPhone:string|null}>};
-  expect(history.data[0].customerPhone).toBe('09012345678');
-  expect((await request('/api/liff/restaurant/holds',{...input,customerPhone:'090 1234 5678'})).status).toBe(200);
-  expect(db.raw.prepare('SELECT customer_phone FROM rt_reservations WHERE id=?').get(held.data.id)).toEqual({customer_phone:'０９０－１２３４－５６７８'});
+  expect(history.data[0].customerPhone).toBe('09000005678');
+  expect((await request('/api/liff/restaurant/holds',{...input,customerPhone:'090 0000 5678'})).status).toBe(200);
+  expect(db.raw.prepare('SELECT customer_phone FROM rt_reservations WHERE id=?').get(held.data.id)).toEqual({customer_phone:'０９０－００００－５６７８'});
 });
 
 describe('専用の予約フォームの設定と確定',()=>{
@@ -619,7 +619,7 @@ describe('専用の予約フォームの設定と確定',()=>{
   const url=`/api/liff/restaurant/reservations/${h.id}/confirm`;
   expect((await request(url,{expectedVersion:h.version})).status).toBe(409);
   expect((await request(url,{expectedVersion:h.version,expectedFormVersion:1})).status).toBe(400);
-  const details={expectedVersion:h.version,expectedFormVersion:1,customerName:'予約した方',customerPhone:'09012345678',allergyNote:'乳製品',note:'窓側希望'};
+  const details={expectedVersion:h.version,expectedFormVersion:1,customerName:'予約した方',customerPhone:'09000005678',allergyNote:'乳製品',note:'窓側希望'};
   const confirmed=await request(url,details);expect(confirmed.status).toBe(200);
   expect((await read(confirmed)).data).toMatchObject({customerName:'予約した方',allergyNote:'乳製品'});
   const saved=db.raw.prepare('SELECT customer_name,allergy_note,dining_snapshot_json FROM rt_reservations WHERE id=?').get(h.id) as {customer_name:string;allergy_note:string;dining_snapshot_json:string};

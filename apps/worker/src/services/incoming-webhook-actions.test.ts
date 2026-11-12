@@ -131,24 +131,24 @@ describe('N-377: 検証済みメアド・電話の照合には検証の裏付け
   });
 
   it('確認済みの電話番号は表記揺れ（+81/0始まり）を揃えて結び付く', async () => {
-    addUser(testDb, 'user-1', { phone: '09012345678' });
+    addUser(testDb, 'user-1', { phone: '09000005678' });
     insertFriend(testDb.raw, 'friend-1', { line_account_id: ACCOUNT, user_id: 'user-1' });
     addProfileValue(testDb, {
-      userId: 'user-1', fieldKey: 'phone', value: '+81-90-1234-5678', verifiedAt: NOW,
+      userId: 'user-1', fieldKey: 'phone', value: '+81-90-0000-5678', verifiedAt: NOW,
     });
 
     const result = await resolveViaWebhook(
-      testDb, 'verified_phone', '$.tel', { tel: '090-1234-5678' },
+      testDb, 'verified_phone', '$.tel', { tel: '090-0000-5678' },
     );
     expect(result.matchedFriendId).toBe('friend-1');
   });
 
   it('users.phone だけ一致しても裏付けが無ければ結び付けない', async () => {
-    addUser(testDb, 'user-1', { phone: '09012345678' });
+    addUser(testDb, 'user-1', { phone: '09000005678' });
     insertFriend(testDb.raw, 'friend-1', { line_account_id: ACCOUNT, user_id: 'user-1' });
 
     const result = await resolveViaWebhook(
-      testDb, 'verified_phone', '$.tel', { tel: '09012345678' },
+      testDb, 'verified_phone', '$.tel', { tel: '09000005678' },
     );
     expect(result.matchedFriendId).toBeNull();
   });

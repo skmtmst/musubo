@@ -9,7 +9,7 @@ const account = vi.hoisted(() => ({ selectedAccountId: 'account-1', accounts: []
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => account }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/restaurant-test/reservations', useSearchParams: () => new URLSearchParams() }))
-const person = { name: '予約の本人', phone: '09012345678', lineUid: 'U-one' }
+const person = { name: '予約の本人', phone: '09000005678', lineUid: 'U-one' }
 const props = { storeId: 'store-1', storeName: 'お店', tables, menuItems: [], busy: false, preset: { date: new Date('2026-11-02T00:00:00+09:00'), time: '19:00' }, onBack: vi.fn(), onSave: vi.fn() }
 const notice = () => screen.getByRole('checkbox', { name: /予約を受け付けたことを、いますぐ LINE に送る/ }) as HTMLInputElement
 async function choose(name = person.name) {
@@ -47,7 +47,7 @@ it('顧客へのLINEは未連携の電話番号では出さず、送信もfalse�
   render(<PhoneReservation accountStyle="restaurant" staffRole="owner" {...props} />)
   fireEvent.click(screen.getByRole('button', { name: 'LINE 未連携の電話番号' }))
   fireEvent.change(screen.getByLabelText('お名前'), { target: { value: '電話の本人' } })
-  fireEvent.change(screen.getByLabelText('電話番号'), { target: { value: '09012345678' } })
+  fireEvent.change(screen.getByLabelText('電話番号'), { target: { value: '09000005678' } })
   expect(screen.queryByRole('checkbox')).toBeNull(); await save()
   expect(props.onSave).toHaveBeenCalledWith(expect.objectContaining({ lineUid: null, notifyLine: false }))
 })

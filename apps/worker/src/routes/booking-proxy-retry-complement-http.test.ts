@@ -110,7 +110,7 @@ describe('R560 予約後の履歴不足は再送で補完する', () => {
     // 電話客の台帳を実POSTで作る。
     const customerRes = await app.request('/api/booking/admin/customers?account_id=account-a', {
       method: 'POST', headers: JSON_HEADERS,
-      body: JSON.stringify({ display_name: '山田 花子', phone: '090-1234-5678' }),
+      body: JSON.stringify({ display_name: '見本 143', phone: '090-0000-5678' }),
     }, env);
     expect(customerRes.status).toBe(201);
     const customerId = ((await customerRes.json()) as { customer: { id: string } }).customer.id;
@@ -169,7 +169,7 @@ describe('R560 予約後の履歴不足は再送で補完する', () => {
     const { app, env } = makeApp(db, bookingRoute);
     const customerRes = await app.request('/api/booking/admin/customers?account_id=account-a', {
       method: 'POST', headers: JSON_HEADERS,
-      body: JSON.stringify({ display_name: '山田 花子', phone: '090-1234-5678' }),
+      body: JSON.stringify({ display_name: '見本 143', phone: '090-0000-5678' }),
     }, env);
     expect(customerRes.status).toBe(201);
     const customerId = ((await customerRes.json()) as { customer: { id: string } }).customer.id;
@@ -228,7 +228,7 @@ describe('R560 予約後の履歴不足は再送で補完する', () => {
     const { app, env } = makeApp(db, bookingRoute);
     const customerRes = await app.request('/api/booking/admin/customers?account_id=account-a', {
       method: 'POST', headers: JSON_HEADERS,
-      body: JSON.stringify({ display_name: '山田 花子', phone: '090-1234-5678' }),
+      body: JSON.stringify({ display_name: '見本 143', phone: '090-0000-5678' }),
     }, env);
     const customerId = ((await customerRes.json()) as { customer: { id: string } }).customer.id;
     await reserveIdempotencyResponse(db, {

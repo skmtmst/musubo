@@ -70,8 +70,8 @@ beforeEach(() => {
     INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
     VALUES ('${ACCOUNT}', 'channel-nen', '然', 'token', 'secret'), ('account-other', 'channel-o', '別', 'token', 'secret');
     INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following, created_at, updated_at) VALUES
-      ('friend-a', 'U-a', '山田 太郎', '${ACCOUNT}', 1, '${NOW}', '${NOW}'),
-      ('friend-b', 'U-b', '鈴木 一郎', '${ACCOUNT}', 1, '${NOW}', '${NOW}'),
+      ('friend-a', 'U-a', '見本 141', '${ACCOUNT}', 1, '${NOW}', '${NOW}'),
+      ('friend-b', 'U-b', '見本 176', '${ACCOUNT}', 1, '${NOW}', '${NOW}'),
       ('friend-c', 'U-c', '別店の人', 'account-other', 1, '${NOW}', '${NOW}'),
       ('friend-d', 'U-d', 'ブロック中', '${ACCOUNT}', 0, '${NOW}', '${NOW}');
     INSERT INTO nen_ec_member_snapshots (friend_id, customer_id, purchase_count, purchase_amount, point_balance, member_rank, synced_at,
@@ -287,7 +287,7 @@ describe('listNenMembers / getNenMemberKpis', () => {
   it('ランク・ペットの有無・検索で絞り込める', async () => {
     expect((await listNenMembers(db, { accountIds: [ACCOUNT], rankKey: 'gold' })).items.map((i) => i.friend_id)).toEqual(['friend-b']);
     expect((await listNenMembers(db, { accountIds: [ACCOUNT], query: '10231' })).items.map((i) => i.friend_id)).toEqual(['friend-a']);
-    expect((await listNenMembers(db, { accountIds: [ACCOUNT], query: '鈴木' })).items.map((i) => i.friend_id)).toEqual(['friend-b']);
+    expect((await listNenMembers(db, { accountIds: [ACCOUNT], query: '176' })).items.map((i) => i.friend_id)).toEqual(['friend-b']);
     expect((await listNenMembers(db, { accountIds: [], })).total).toBe(0);
   });
 

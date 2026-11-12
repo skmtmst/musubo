@@ -53,7 +53,8 @@ const bind = vi.fn((..._values: unknown[]) => ({
 // 引数の型を書いておく。書かないと `prepare.mock.calls[n][0]` が
 // 長さ0のタプル扱いになり、CI の型検査だけが落ちる。
 const prepare = vi.fn((_sql: string) => ({ bind }));
-const env = { DB: { prepare } as unknown as D1Database };
+const batch = vi.fn(async (statements: Array<{ run: () => Promise<unknown> }>) => [await statements[0].run()]);
+const env = { DB: { prepare, batch } as unknown as D1Database };
 
 function makeApp(role: 'owner' | 'staff' = 'owner') {
   const app = new Hono<Env>();
@@ -508,4 +509,13 @@ it('F13: execution counts a stale/moved source as failure and never claims a mov
   expect(res.status).toBe(200);
   expect(db.completeHandover).toHaveBeenCalledWith(expect.anything(), 'ho-1', expect.objectContaining({ movedCount: 0, failedCount: 1 }));
   expect(prepare.mock.calls.some(([sql]) => sql.includes('AND line_account_id = ?'))).toBe(true);
+});
+
+it('確認した版が古い本実行・取消は現在の版を返して止める', async () => {
+  db.getHandoverById.mockResolvedValue({ ...HANDOVER, confirmation_revision: 4, source_friend_total: 0, review_count: 0 });
+  const execute = await makeApp().fetch(stepUpPost('/api/account-handovers/ho-1/execute', { expectedConfirmationRevision: 3 }), env);
+  expect(execute.status).toBe(409); expect(await execute.json()).toMatchObject({current:{confirmationRevision:4}});
+  expect(db.markExecuting).not.toHaveBeenCalled();
+  const cancel = await makeApp().fetch(post('/api/account-handovers/ho-1/cancel', { expectedConfirmationRevision: 3 }), env);
+  expect(cancel.status).toBe(409); expect(db.cancelHandover).not.toHaveBeenCalled();
 });

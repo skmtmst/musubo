@@ -1,4 +1,5 @@
 import { Miniflare } from 'miniflare';
+import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { normalizePhone } from '@line-crm/shared';
 import { insertSeatWaitlistEntry } from '../routes/restaurant-test-definition.js';
@@ -15,20 +16,22 @@ it('実D1の深さ制限内でも旧番号の同時3件上限と別アカウン�
       db.prepare('CREATE TABLE rt_closures (id TEXT, store_id TEXT, archived_at TEXT, periods_json TEXT, start_date TEXT, start_time TEXT)'),
       db.prepare("INSERT INTO rt_stores VALUES ('a','account-a'),('b','account-b')"),
     ]);
-    for (const input of ['０９０－１２３４－５６７８', '（０９０）１２３４ー５６７８', '090\u00a01234\u20095678', '⓪⑨⓪①②③④⑤⑥⑦⑧']) {
+    const revisionMigration = readFileSync(new URL('../../../../packages/db/migrations/757_confirmation_revisions.sql', import.meta.url), 'utf8');
+    await db.prepare(revisionMigration.split('\n').find(line => line.startsWith('ALTER TABLE rt_seat_waitlist '))!).run();
+    for (const input of ['０９０－００００－５６７８', '（０９０）００００ー５６７８', '090\u00a00000\u20095678', '⓪⑨⓪⓪⓪⓪⓪⑤⑥⑦⑧']) {
       expect(await db.prepare(`SELECT ${normalizedPhoneSql} AS phone FROM (SELECT ? AS customer_phone)`).bind(input).first()).toEqual({ phone: normalizePhone(input) });
     }
     const startsAt = new Date(Date.now() + 2 * 86400_000).toISOString();
-    const phones = ['０９０－１２３４－５６７８', '(090) 1234 5678', '090\u00a01234\u20095678'];
+    const phones = ['０９０－００００－５６７８', '(090) 0000 5678', '090\u00a00000\u20095678'];
     await db.batch(phones.map((phone, index) => db.prepare('INSERT INTO rt_seat_waitlist (id,store_id,starts_at,customer_phone,identity_key) VALUES (?,\'a\',?,?,?)')
       .bind(`old-${index}`, new Date(Date.parse(startsAt) + (index + 1) * 86400_000).toISOString(), phone, `phone:${phone}`)));
     const before = (await db.prepare('SELECT * FROM rt_seat_waitlist ORDER BY id').all()).results;
-    const input = { storeId: 'a', startsAt, guestCount: 2, customerName: '試験の組', customerPhone: '０９０－１２３４－５６７８', lineUid: null };
+    const input = { storeId: 'a', startsAt, guestCount: 2, customerName: '試験の組', customerPhone: '０９０－００００－５６７８', lineUid: null };
     expect(await insertSeatWaitlistEntry(db, input)).toEqual({ ok: false, error: 'waitlist_limit' });
     expect((await db.prepare('SELECT * FROM rt_seat_waitlist ORDER BY id').all()).results).toEqual(before);
     expect(await insertSeatWaitlistEntry(db, { ...input, storeId: 'b' })).toMatchObject({ ok: true });
-    expect(await db.prepare("SELECT customer_phone,identity_key FROM rt_seat_waitlist WHERE store_id='b'").first()).toEqual({ customer_phone: '09012345678', identity_key: 'phone:09012345678' });
-    expect(await insertSeatWaitlistEntry(db, { ...input, storeId: 'b', customerPhone: '090 1234 5678' })).toEqual({ ok: false, error: 'already_waiting' });
+    expect(await db.prepare("SELECT customer_phone,identity_key FROM rt_seat_waitlist WHERE store_id='b'").first()).toEqual({ customer_phone: '09000005678', identity_key: 'phone:09000005678' });
+    expect(await insertSeatWaitlistEntry(db, { ...input, storeId: 'b', customerPhone: '090 0000 5678' })).toEqual({ ok: false, error: 'already_waiting' });
   } finally {
     await mf.dispose();
   }

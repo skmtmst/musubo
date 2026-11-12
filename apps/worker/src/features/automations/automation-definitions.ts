@@ -41,6 +41,7 @@ interface DefinitionListRow {
   last_run_at: string | null;
   created_at: string;
   updated_at: string;
+  confirmation_revision: number;
 }
 
 export interface AutomationDefinitionSummary {
@@ -58,6 +59,7 @@ export interface AutomationDefinitionSummary {
   lineAccountId: string;
   versionId: string;
   version: number;
+  confirmationRevision: number;
   executionCount30d: number;
   failureCount30d: number;
   lastRunAt: string | null;
@@ -128,7 +130,7 @@ export async function listAutomationDefinitions(
   const offset = paging?.offset === undefined ? 0
     : Math.max(0, Math.floor(paging.offset));
   const result = await db.prepare(
-    `SELECT d.id, d.folder_id, d.line_account_id, d.name, d.description, d.status, d.priority,
+    `SELECT d.id, d.folder_id, d.line_account_id, d.name, d.description, d.status, d.priority, d.confirmation_revision,
             v.id AS version_id, v.version_number, v.trigger_type, v.trigger_config,
             v.condition_config, v.action_config,
             (SELECT COUNT(*) FROM automation_runs r
@@ -168,6 +170,7 @@ export async function listAutomationDefinitions(
     lineAccountId: row.line_account_id,
     versionId: row.version_id,
     version: Number(row.version_number),
+    confirmationRevision: row.confirmation_revision,
     executionCount30d: Number(row.execution_count_30d),
     failureCount30d: Number(row.failure_count_30d),
     lastRunAt: row.last_run_at,
@@ -571,19 +574,24 @@ export async function updateAutomationDefinitionStatus(
     id: string;
     lineAccountId: string;
     status: 'active' | 'stopped' | 'archived';
+    expectedConfirmationRevision?: number;
   },
 ): Promise<{ id: string; status: 'active' | 'stopped' | 'archived' }> {
   const definition = await db.prepare(
-    `SELECT id, status, current_published_version_id
+    `SELECT id, status, current_published_version_id, confirmation_revision
        FROM automation_definitions
       WHERE id = ? AND line_account_id = ?`,
   ).bind(input.id, input.lineAccountId).first<{
     id: string;
     status: 'draft' | 'active' | 'stopped' | 'archived';
     current_published_version_id: string | null;
+    confirmation_revision: number;
   }>();
   if (!definition) {
     throw new AutomationDefinitionError('not_found', 'オートメーションが見つかりません');
+  }
+  if (input.expectedConfirmationRevision !== undefined && input.expectedConfirmationRevision !== definition.confirmation_revision) {
+    throw new AutomationDefinitionError('version_conflict', '状態が変わりました。再読み込みしてください');
   }
   // すでにその状態なら何もしない（何度押しても同じ結果）。
   if (definition.status === input.status) {
@@ -600,11 +608,13 @@ export async function updateAutomationDefinitionStatus(
     );
   }
   const updated = await db.prepare(
-    `UPDATE automation_definitions SET status = ?, updated_at = ?
-      WHERE id = ? AND line_account_id = ? AND status = ?`,
+    `UPDATE automation_definitions SET status = ?, updated_at = ?, confirmation_revision = confirmation_revision + 1
+      WHERE id = ? AND line_account_id = ? AND status = ?
+        AND (? IS NULL OR confirmation_revision = ?)`,
   ).bind(
     input.status, new Date().toISOString(),
     definition.id, input.lineAccountId, definition.status,
+    input.expectedConfirmationRevision ?? null, input.expectedConfirmationRevision ?? null,
   ).run();
   if ((updated.meta?.changes ?? 0) !== 1) {
     throw new AutomationDefinitionError('version_conflict', '状態が変わりました。再読み込みしてください');
@@ -620,7 +630,7 @@ export async function restoreAutomationDefinition(db: D1Database, input: { id: s
   if (!definition) throw new AutomationDefinitionError('not_found', 'ルールが見つかりません');
   if (definition.status !== 'archived') return { id: input.id, status: definition.status };
   const status = definition.current_published_version_id ? 'stopped' : 'draft';
-  const updated = await db.prepare(`UPDATE automation_definitions SET status = ?, archived_at = NULL, updated_at = ?
+  const updated = await db.prepare(`UPDATE automation_definitions SET confirmation_revision = confirmation_revision + 1, status = ?, archived_at = NULL, updated_at = ?
     WHERE id = ? AND line_account_id = ? AND status = 'archived'
       AND current_published_version_id IS ?`)
     .bind(status, new Date().toISOString(), input.id, input.lineAccountId, definition.current_published_version_id).run();

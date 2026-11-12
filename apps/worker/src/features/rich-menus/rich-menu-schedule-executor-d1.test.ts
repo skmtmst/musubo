@@ -121,6 +121,7 @@ function setupSqlite() {
       size TEXT NOT NULL DEFAULT 'large',
       chat_bar_text TEXT NOT NULL DEFAULT '',
       is_default_for_all INTEGER NOT NULL DEFAULT 0,
+      confirmation_revision INTEGER NOT NULL DEFAULT 1,
       publishing_at TEXT,
       updated_at TEXT NOT NULL DEFAULT '2026-09-06T00:00:00+09:00'
     );
@@ -188,8 +189,9 @@ function asD1(sqlite: Database.Database): D1Database {
       }
     },
     batch: async (stmts: unknown[]) => {
-      for (const stmt of stmts as Array<{ run: () => Promise<unknown> }>) await stmt.run()
-      return []
+      const results = []
+      for (const stmt of stmts as Array<{ run: () => Promise<unknown> }>) results.push(await stmt.run())
+      return results
     },
   } as unknown as D1Database
 }

@@ -191,6 +191,20 @@ describe('GET /api/account-settings/test-recipient-login-users', () => {
 });
 
 describe('PUT /api/account-settings/test-recipients', () => {
+  test('テスト送信先の保存を重ねると版が進み、読み出しにも含まれる', async () => {
+    const d = createTestD1();
+    try {
+      const save = () => app.request('/api/account-settings/test-recipients', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: 'line-account-1', friendIds: [] }),
+      }, { DB: d.db });
+      expect((await save()).status).toBe(200);
+      expect((await save()).status).toBe(200);
+      const res = await app.request('/api/account-settings/test-recipients?accountId=line-account-1', {}, { DB: d.db });
+      expect(await res.json()).toMatchObject({ success: true, confirmationRevision: 2 });
+    } finally { d.raw.close(); }
+  });
+
   test.each(['owner', 'admin'] as const)('%sは同じアカウントの友だちを保存できる', async (role) => {
     const testDb = createTestD1();
     try {

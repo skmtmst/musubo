@@ -23,8 +23,8 @@ describe('管理画面 機能3 UID・CSV移行', () => {
   })
 
   it('Harnessの書き出しCSVを取り込める', () => {
-    expect(parseFriendCsv('LINEユーザーID,LINE表示名,本名,システム表示名\nU1,山田,山田 太郎,たろう')).toEqual([
-      { lineUid: 'U1', displayName: '山田', realName: '山田 太郎', systemDisplayName: 'たろう' },
+    expect(parseFriendCsv('LINEユーザーID,LINE表示名,本名,システム表示名\nU1,山田,見本 141,たろう')).toEqual([
+      { lineUid: 'U1', displayName: '山田', realName: '見本 141', systemDisplayName: 'たろう' },
     ])
   })
 
@@ -35,9 +35,9 @@ describe('管理画面 機能3 UID・CSV移行', () => {
   })
 
   it('R113 引用符内の改行を含む名前は1行に保つ', () => {
-    expect(parseFriendCsv('LINEユーザーID,LINE表示名,本名,システム表示名\r\nU1,"山田\n太郎",たろう,タロウ\r\nU2,鈴木,鈴木 次郎,ジロウ\r\n')).toEqual([
+    expect(parseFriendCsv('LINEユーザーID,LINE表示名,本名,システム表示名\r\nU1,"山田\n太郎",たろう,タロウ\r\nU2,鈴木,見本 181,ジロウ\r\n')).toEqual([
       { lineUid: 'U1', displayName: '山田\n太郎', realName: 'たろう', systemDisplayName: 'タロウ' },
-      { lineUid: 'U2', displayName: '鈴木', realName: '鈴木 次郎', systemDisplayName: 'ジロウ' },
+      { lineUid: 'U2', displayName: '鈴木', realName: '見本 181', systemDisplayName: 'ジロウ' },
     ])
   })
 

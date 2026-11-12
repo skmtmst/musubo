@@ -33,3 +33,12 @@ it('集計中に期間を変えても結果の保存欄は完了まで開かな�
   await act(async () => finish({ success: true, data: { ...result, runId: 'run-2' } }))
   expect(await screen.findByText('この結果を保存する')).toBeTruthy()
 })
+
+it.each([true, false])('古い定義の結果の更新案内は編集可否 %s に合う', async canManage => {
+  net.latestRun.mockResolvedValue({ success: true, data: { ...result, versionNumber: 2 } })
+  render(<FunnelV8 accountId="a" canManage={canManage} />)
+  const notice = await screen.findByText(/この結果は定義版2で集計したものです/)
+  expect(notice.textContent).toContain('いまの定義は版1です。')
+  expect(notice.textContent).toContain(canManage ? '再集計' : '管理者に再集計を依頼してください')
+  if (!canManage) expect(notice.textContent).not.toContain('この30日を再集計')
+})

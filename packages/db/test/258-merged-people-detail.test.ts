@@ -50,7 +50,7 @@ describe('migration 258 merged person detail', () => {
         source_type, source_label, selected_by_name, selected_at, update_mode,
         is_active, created_at, updated_at
       ) VALUES (?, 'tenant-a', 'user-legacy', 'email', 'メール', '"masked"',
-        'ta***@example.jp', 'manual', '担当者確認', '担当者', '2026-08-30',
+        'ta***@example.com', 'manual', '担当者確認', '担当者', '2026-08-30',
         'fixed', ?, '2026-08-30', '2026-08-30')
     `)
     insert.run('value-old', 0)

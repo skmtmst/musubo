@@ -350,7 +350,7 @@ export const post__api_rich_menu_groups_8 = async (c: Context<Env, "/api/rich-me
         ?? created.pages[0];
       const contentType = media.mime_type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
       const ext = contentType === 'image/png' ? 'png' : 'jpg';
-      const key = `rich-menus/${parsed.value.accountId}/${created.id}/${defaultPage.id}/${Date.now()}.${ext}`;
+      const key = `rich-menus/${parsed.value.accountId}/${created.id}/${defaultPage.id}/${crypto.randomUUID()}.${ext}`;
       await c.env.IMAGES.put(key, buf, { httpMetadata: { contentType } });
       try {
         await setRichMenuPageImage(c.env.DB, defaultPage.id, key, contentType);
@@ -510,7 +510,7 @@ export const post__api_rich_menu_groups_reorder_priorities_10 = async (c: Contex
         c.env.DB
           .prepare(
             `UPDATE rich_menu_groups
-                SET targeting_priority = ?, display_order = ?, updated_at = ?
+                SET targeting_priority = ?, display_order = ?, confirmation_revision = confirmation_revision + 1, updated_at = ?
               WHERE id = ? AND account_id = ?`,
           )
           .bind(index, index, now, id, r.accountId),

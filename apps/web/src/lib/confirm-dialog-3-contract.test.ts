@@ -116,7 +116,7 @@ describe('リッチメニュー編集の確認窓', () => {
 
   it('LINE取り下げは二度押しを止め、失敗を握りつぶさない', () => {
     const body = fnBody(code(detail), 'const unpublish = async')
-    expect(body, '二度押しを止めていない').toMatch(/if\s*\([^\n]*\bunpublishing\) return/)
+    expect(body, '二度押しを止めていない').toMatch(/if\s*\([^\n]*\bunpublishing\b[^\n]*\) return/)
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error')
     expect(body, '同じ対象の処理中の印を戻していない').toMatch(/finally\s*\{\s*if \(alive\.current && generation === scope\.current\.generation\) setUnpublishing\(false\)/)
     expect(body, 'alert へ戻っている').not.toContain('alert(')
@@ -219,7 +219,7 @@ describe('一斉配信の素材テンプレートの削除', () => {
   it('二度押しを止め、失敗を握りつぶさない', () => {
     const body = fnBody(code(src), 'const confirmDelete')
     expect(body, '二度押し・切替後を止めていない').toContain(
-      'if (!deleteTarget || deleting || deleteLock.current || !alive.current || accountSwitched || deleteTarget.generation !== scopeGeneration.current) return',
+      'if (!deleteTarget || !renderedDeleteTicket || renderedDeleteTicket !== deleteTicket.current || deleting || deleteLock.current || !alive.current || accountSwitched || deleteTarget.generation !== scopeGeneration.current) return',
     )
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body, '処理中の印を戻していない').toMatch(/finally\s*\{\s*deleteLock\.current = false\s*if \(alive\.current\) setDeleting\(false\)/)

@@ -7,7 +7,7 @@ import { reservation } from '../booking-kit/test-data'
 
 const fixture = vi.hoisted(() => ({
   allPages: vi.fn(),
-  board: null as null | { loadPrintEntries: () => Promise<Array<{ status: string }>>; printContext: string },
+  board: null as null | { loadPrintEntries: () => Promise<Array<{ status: string }>>; printContext: string; formatListDateTime: (value: string) => string; renderBody: (body: React.ReactNode) => React.ReactNode },
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account' }) }))
 vi.mock('@/lib/api/helpers/reservation-board', () => ({
@@ -16,7 +16,7 @@ vi.mock('@/lib/api/helpers/reservation-board', () => ({
 }))
 vi.mock('@/components/shared/reservation-board', () => ({ default: (props: NonNullable<typeof fixture.board>) => {
   fixture.board = props
-  return <div />
+  return <>{props.renderBody(<div />)}</>
 } }))
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -67,4 +67,14 @@ it('予約記録には取消を含み、来店人数は表示中の有効な予�
  const cards = [...container.querySelectorAll('[data-kpi-presentation]')]
  expect(cards.find(card => card.textContent?.includes('予約記録'))?.textContent).toContain('取消・押さえを含む')
  expect(cards.find(card => card.textContent?.includes('ご来店人数'))?.textContent).toContain('表示中の有効な予約')
+})
+
+it('予約の一覧と顧客カルテは同じ年付き日時を使う', () => {
+ const startsAt = '2026-10-01T09:00:00Z'
+ const rows = [reservation('one', { status: 'confirmed', starts_at: startsAt })]
+ render(<ListView view="list" rows={rows as never} total={1} tables={[]} page={1} period="all" status="all"
+   busy={false} canWrite={false} canImport={false} day={new Date()} onDay={vi.fn()} storeId="store" onView={vi.fn()}
+   onPeriod={vi.fn()} onStatus={vi.fn()} onPage={vi.fn()} onImport={vi.fn()} onCreate={vi.fn()} onEdit={vi.fn()} onOpen={vi.fn()} onCancel={vi.fn()} onRestore={vi.fn()} />)
+ expect(fixture.board?.formatListDateTime(startsAt)).toBe('2026/10/01 18:00')
+ expect(screen.getByText('直近：2026/10/01 18:00 / 2名')).toBeTruthy()
 })

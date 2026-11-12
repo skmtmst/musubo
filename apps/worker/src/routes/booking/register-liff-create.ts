@@ -372,7 +372,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     insertResult = await insertBookingWithResourceSnapshot(c.env.DB, {
       bookingInsert, bookingId, lineAccountId: accountId, menuId: body.menu_id,
       additionalStatements: [
-        c.env.DB.prepare("UPDATE bookings SET booking_payment_method_id=(SELECT id FROM booking_payment_methods WHERE setup_id=? AND friend_id=? AND line_account_id=? AND status='ready' AND test_mode=1) WHERE id=?").bind(body.setupIntentId??null,friendId,accountId,bookingId),
+        c.env.DB.prepare("UPDATE bookings SET confirmation_revision = confirmation_revision + 1, booking_payment_method_id=(SELECT id FROM booking_payment_methods WHERE setup_id=? AND friend_id=? AND line_account_id=? AND status='ready' AND test_mode=1) WHERE id=?").bind(body.setupIntentId??null,friendId,accountId,bookingId),
         ...addons.map(addon=>c.env.DB.prepare('INSERT INTO booking_addons(booking_id,addon_menu_id,duration_min,price_at_booking) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM bookings WHERE id=?)').bind(bookingId,addon.id,addon.duration_minutes,addon.base_price,bookingId)),
         ...(body.entitlement_id ? [entitlementUseStatement(c.env.DB,bookingId,body.entitlement_id,startsAt.toISOString(),await getAccountTimeZone(c.env.DB,accountId))] : []),
         ...(!body.entitlement_id && paymentConfig.mode !== 'none' ? [c.env.DB.prepare(`INSERT INTO booking_payment_choices(booking_id,line_account_id,mode,provider,hold_minutes)

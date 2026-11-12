@@ -30,7 +30,7 @@ export function choiceActionIcon(choice: QuestionChoice): LucideIcon {
 
 export function displayText(value: string): string {
   return value
-    .replaceAll('{{name}}', '山田 太郎')
+    .replaceAll('{{name}}', '見本 141')
     .replace(/\{\{field\.[^}]+\}\}/g, '登録済みの情報')
     .replace(/\{\{var\.[^}]+\}\}/g, '共通情報')
 }

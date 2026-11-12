@@ -2,7 +2,7 @@
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 import CopyTextButton from '@/components/shared/copy-text-button'
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Play, RotateCcw } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
@@ -84,6 +84,7 @@ export default function AccountHandoverV8() {
   const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle')
   const [refreshing, setRefreshing] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [executeConfirmation, setExecuteConfirmation] = useState<{ id: string; revision: number | undefined } | null>(null)
   const [executing, setExecuting] = useState(false)
   const [executeError, setExecuteError] = useState('')
   /** 本人確認の窓（X-3: 本実行・切り戻しで使う）。 */
@@ -96,6 +97,7 @@ export default function AccountHandoverV8() {
   /** 申告の数の欄。絵に無いので、事前確認の結果の右上から開く。 */
   const [declaredOpen, setDeclaredOpen] = useState(false)
   const [rollbackOpen, setRollbackOpen] = useState(false)
+  const [rollbackConfirmation, setRollbackConfirmation] = useState<{ id: string; revision: number | undefined } | null>(null)
   const [rollingBack, setRollingBack] = useState(false)
   const [rollbackError, setRollbackError] = useState('')
   /** 人が書き換えた判断（保存するまで下書き）。 */
@@ -103,6 +105,16 @@ export default function AccountHandoverV8() {
   const [savingDecisions, setSavingDecisions] = useState(false)
   const [decisionError, setDecisionError] = useState('')
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelConfirmation, setCancelConfirmation] = useState<{ id: string; revision: number | undefined } | null>(null)
+  const confirmationState = useRef({ key: '', execute: null as object | null, cancel: null as object | null, rollback: null as object | null })
+  const currentKey = JSON.stringify([id, canManage, handover])
+  if (confirmationState.current.key !== currentKey) {
+    confirmationState.current = { key: currentKey, execute: null, cancel: null, rollback: null }
+  }
+  const openConfirmation = (kind: 'execute' | 'cancel' | 'rollback') => {
+    confirmationState.current[kind] = {}
+  }
+
   const [cancelling, setCancelling] = useState(false)
   /*
    * 段4で書き換えた判断は「判断を保存する」まで端末にしか無い（下の帯が「まだ保存していません」と出す）。
@@ -281,14 +293,17 @@ export default function AccountHandoverV8() {
   }
 
   /** 段6。切り戻し。本実行から7日間だけ。 */
-  const runRollback = async () => {
-    if (!handover || rollingBack) return
+  const runRollback = async (ticket: object | null) => {
+    if (!handover || rollingBack || !ticket || confirmationState.current.rollback !== ticket || !rollbackOpen || !rollbackConfirmation || rollbackConfirmation.id !== handover.id) return
+    if (!rollbackConfirmation.revision) { setRollbackError('切り戻せませんでした。期限（7日間）を過ぎていないか確かめてください。'); return }
+
     setRollingBack(true)
     setRollbackError('')
     try {
       const token = await stepUpGate('account_handover.execute', '引き継ぎの切り戻し')
-      if (token === null) { setRollingBack(false); return }
-      const res = await api.accountHandovers.rollback(handover.id, undefined, token)
+      if (token === null || confirmationState.current.rollback !== ticket) { setRollingBack(false); return }
+      const res = await api.accountHandovers.rollback(rollbackConfirmation.id, undefined, token, rollbackConfirmation.revision)
+
       if (!res.success) throw new Error(res.error)
       setRollbackOpen(false)
       const detail = await api.accountHandovers.get(handover.id)
@@ -305,11 +320,13 @@ export default function AccountHandoverV8() {
   }
 
   /** 進行中の引き継ぎを取り消す。終わった引き継ぎは消せない。 */
-  const runCancel = async () => {
-    if (!handover || cancelling) return
+  const runCancel = async (ticket: object | null) => {
+    if (!handover || cancelling || !ticket || confirmationState.current.cancel !== ticket || !cancelOpen || !cancelConfirmation || cancelConfirmation.id !== handover.id) return false
+    if (!cancelConfirmation.revision) { setExecuteError('取り消せませんでした。しばらくおいてから、もう一度お試しください。'); return false }
+
     setCancelling(true)
     try {
-      const res = await api.accountHandovers.cancel(handover.id)
+      const res = await api.accountHandovers.cancel(cancelConfirmation.id, cancelConfirmation.revision)
       if (!res.success) throw new Error(res.error)
       setCancelOpen(false)
       await load()
@@ -326,14 +343,17 @@ export default function AccountHandoverV8() {
   }
 
   /** 段5。本実行。確認の窓と本人確認を済ませてから進める（X-3）。 */
-  const executeHandover = async () => {
-    if (!handover || executing) return
+  const executeHandover = async (ticket: object | null) => {
+    if (!handover || executing || !ticket || confirmationState.current.execute !== ticket || !confirmOpen || !executeConfirmation || executeConfirmation.id !== handover.id) return
+    if (!executeConfirmation.revision) { setExecuteError('本実行できませんでした。しばらくおいてから、もう一度お試しください。'); return }
+
     setExecuting(true)
     setExecuteError('')
     try {
       const token = await stepUpGate('account_handover.execute', '友だちの引き継ぎを本実行する')
-      if (token === null) { setExecuting(false); return }
-      const result = await api.accountHandovers.execute(handover.id, token)
+      if (token === null || confirmationState.current.execute !== ticket) { setExecuting(false); return }
+      const result = await api.accountHandovers.execute(executeConfirmation.id, token, executeConfirmation.revision)
+
       if (!result.success) {
         setExecuteError(result.error)
         return
@@ -442,6 +462,9 @@ export default function AccountHandoverV8() {
     && handover.declaredFriendTotal !== handover.counts.sourceTotal
   const executeDisabled = unresolved > 0 || handover.status === 'completed' || editCount > 0 || declaredMismatch
   const destinationName = destination?.name ?? '受け取り先'
+  const executeTicket = confirmationState.current.execute
+  const cancelTicket = confirmationState.current.cancel
+  const rollbackTicket = confirmationState.current.rollback
   const handoverTargets = [
     { id: handover.fromAccountId ?? '', name: handover.fromAccountId === account.id ? account.name : undefined, label: '移し元のLINEアカウント' },
     { id: handover.toAccountId ?? '', name: destination?.name, label: '移し先のLINEアカウント' },
@@ -589,10 +612,11 @@ export default function AccountHandoverV8() {
         </p>} actions={<>
         {/* 取り消しは進行中だけ。変更なので見るだけの人には出さない。 */}
         {canManage && handover.status !== 'completed' && handover.status !== 'failed' && handover.status !== 'cancelled' ? (
-          <Button type="button" onClick={() => { setExecuteError(''); setCancelOpen(true) }}>引き継ぎをやめる</Button>
+          <Button type="button" onClick={() => { setExecuteError(''); openConfirmation('cancel'); setCancelConfirmation({ id: handover.id, revision: handover.confirmationRevision }); setCancelOpen(true) }}>引き継ぎをやめる</Button>
         ) : null}
         {canManage && handover.status !== 'completed' ? (
-          <Button type="button" variant="primary" disabled={executeDisabled} title={executeDisabled ? unresolved > 0 ? '全員の判断を決めてください' : executing ? '実行しています' : '事前確認と判断の状態を確かめてください' : undefined} busy={executing} busyLabel="実行中…" onClick={() => { setExecuteError(''); setConfirmOpen(true) }}>
+          <Button type="button" variant="primary" disabled={executeDisabled} title={executeDisabled ? unresolved > 0 ? '全員の判断を決めてください' : executing ? '実行しています' : '事前確認と判断の状態を確かめてください' : undefined} busy={executing} busyLabel="実行中…" onClick={() => { setExecuteError(''); openConfirmation('execute'); setExecuteConfirmation({ id: handover.id, revision: handover.confirmationRevision }); setConfirmOpen(true) }}>
+
             <Play size={16} aria-hidden="true" />本実行する{unresolved > 0 ? `（あと ${unresolved} 人）` : ''}
           </Button>
         ) : null}
@@ -604,7 +628,8 @@ export default function AccountHandoverV8() {
           <Card surface="standard" layout="vertical" contentPadding="var(--polish-space-card)" gap="var(--tpl-acd-ho-list-gap)" className={styles.card}>
             <h3 className={styles.cardTitle}>移した友だちを元へ戻す</h3>
             <p className={styles.list}>{formatDateTime(handover.rollbackDeadline)} まで切り戻せます。動かした友だちだけを元のアカウントへ戻します。</p>
-            <span><Button type="button" variant="danger" onClick={() => { setRollbackError(''); setRollbackOpen(true) }}>切り戻す</Button></span>
+            <span><Button type="button" variant="danger" onClick={() => { setRollbackError(''); openConfirmation('rollback'); setRollbackConfirmation({ id: handover.id, revision: handover.confirmationRevision }); setRollbackOpen(true) }}>切り戻す</Button></span>
+
           </Card>
         ) : null}
       {handover.rolledBackAt ? (
@@ -613,35 +638,35 @@ export default function AccountHandoverV8() {
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="保存していない判断の書き換え" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <ConfirmDialog
-        open={confirmOpen}
+        open={confirmOpen && confirmationState.current.execute !== null}
         title="本実行しますか？"
-        description={`要確認はすべて決めました。本実行すると、決めた内容で友だちが「${destinationName}」へ移ります。元のアカウントの友だち・履歴・配信は消しません。`}
+        description={`要確認はすべて決めました。本実行すると、決めた内容で友だちが「${destinationName}」へ移ります。元のアカウントの友だち・履歴・配信は消しません。約 ${formatNumber(handover.decisions.filter(decision => decision.decision === 'link' || decision.decision === 'new').length)} 人を移します。`}
         confirmLabel="本実行する" busyLabel="実行中…"
         busy={executing}
         error={executeError}
-        onConfirm={() => executeHandover()}
-        onCancel={() => { if (!executing) { setConfirmOpen(false); setExecuteError('') } }}
+        onConfirm={() => executeHandover(executeTicket)}
+        onCancel={() => { if (!executing) { confirmationState.current.execute = null; setConfirmOpen(false); setExecuteError('') } }}
       ><OperationTargetSummary accounts={handoverTargets} /></ConfirmDialog>
       <ConfirmDialog
-        open={cancelOpen}
+        open={cancelOpen && confirmationState.current.cancel !== null}
         title="この引き継ぎを取り消しますか？"
         description="進行中の引き継ぎをやめます。コードは使えなくなり、決めた内容は破棄されます。元のアカウントの友だちは変わりません。"
         confirmLabel="引き継ぎを取り消す" busyLabel="取り消し中…"
         destructive
         busy={cancelling}
-        error={executeError || undefined} onSuccess={() => setCancelOpen(false)} onConfirm={() => runCancel()}
-        onCancel={() => { if (!cancelling) setCancelOpen(false) }}
+        error={executeError || undefined} onSuccess={() => setCancelOpen(false)} onConfirm={() => runCancel(cancelTicket)}
+        onCancel={() => { if (!cancelling) { confirmationState.current.cancel = null; setCancelOpen(false) } }}
       ><OperationTargetSummary accounts={handoverTargets} /></ConfirmDialog>
       <ConfirmDialog
-        open={rollbackOpen}
+        open={rollbackOpen && confirmationState.current.rollback !== null}
         title="移した友だちを元へ戻しますか？"
-        description={`本実行で「${destinationName}」へ移した友だちを、元の「${account.name}」へ戻します。移したあとで人が動かした人は戻しません。`}
+        description={`本実行で「${destinationName}」へ移した友だちを、元の「${account.name}」へ戻します。移したあとで人が動かした人は戻しません。人数は戻す時に決まります。`}
         confirmLabel="切り戻す" busyLabel="戻し中…"
         destructive
         busy={rollingBack}
         error={rollbackError}
-        onConfirm={() => runRollback()}
-        onCancel={() => { if (!rollingBack) { setRollbackOpen(false); setRollbackError('') } }}
+        onConfirm={() => runRollback(rollbackTicket)}
+        onCancel={() => { if (!rollingBack) { confirmationState.current.rollback = null; setRollbackOpen(false); setRollbackError('') } }}
       ><OperationTargetSummary accounts={handoverTargets} /></ConfirmDialog>
     </>
   ))}</SaveErrorScope>

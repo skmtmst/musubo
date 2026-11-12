@@ -39,6 +39,7 @@ function serialize(pool: TrafficPoolWithAccount) {
     accountName: pool.account_name,
     liffId: pool.liff_id,
     isActive: Boolean(pool.is_active),
+    confirmationRevision: pool.confirmation_revision,
     createdAt: pool.created_at,
     updatedAt: pool.updated_at,
   };
@@ -230,7 +231,22 @@ trafficPools.delete('/api/traffic-pools/:id', requireRole('owner'), async (c) =>
     if (existing.slug === 'main') {
       return c.json({ success: false, error: 'main pool cannot be deleted' }, 400);
     }
-    await deleteTrafficPool(c.env.DB, id);
+    const rawRevision = c.req.query('expectedConfirmationRevision');
+    const rawAccounts = c.req.query('expectedAccountIds');
+    if ((rawRevision === undefined) !== (rawAccounts === undefined)) return c.json({ success: false, error: '確認した版と所属を指定してください' }, 400);
+    if (rawRevision !== undefined) {
+      let accounts: unknown;
+      try { accounts = JSON.parse(rawAccounts!); } catch { return c.json({ success: false, error: '所属が正しくありません' }, 400); }
+      if (!/^[1-9]\d*$/.test(rawRevision) || !Number.isSafeInteger(Number(rawRevision)) || !Array.isArray(accounts) || accounts.length > 200 || accounts.some(a => typeof a !== 'string' || !a) || new Set(accounts).size !== accounts.length) return c.json({ success: false, error: '確認した版と所属が正しくありません' }, 400);
+      const changed = await c.env.DB.prepare(`DELETE FROM traffic_pools WHERE id=? AND confirmation_revision=?
+        AND (SELECT COUNT(*) FROM pool_accounts WHERE pool_id=traffic_pools.id)=json_array_length(?)
+        AND NOT EXISTS(SELECT 1 FROM pool_accounts a WHERE a.pool_id=traffic_pools.id AND a.line_account_id NOT IN (SELECT value FROM json_each(?)))`).bind(id,Number(rawRevision),JSON.stringify(accounts),JSON.stringify(accounts)).run();
+      if (!changed.meta.changes) {
+        const current = await getTrafficPoolById(c.env.DB,id);
+        const members = await getPoolAccounts(c.env.DB,id);
+        return c.json({ success: false, error: 'プールまたは所属が変わりました。読み直してください', current: { pool: current ? serialize(current) : null, accountIds: members.map(m => m.line_account_id).sort() } }, 409);
+      }
+    } else await deleteTrafficPool(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
     throw err;

@@ -411,8 +411,8 @@ export async function switchImpersonationToWrite(
   db: D1Database,
   id: string,
   reason: string,
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const result = await db
     .prepare(
       `UPDATE impersonation_sessions
        SET mode = 'write', write_reason = ?, write_started_at = ?
@@ -420,6 +420,7 @@ export async function switchImpersonationToWrite(
     )
     .bind(reason, jstNow(), id)
     .run();
+  return (result.meta.changes ?? 0) > 0;
 }
 
 export async function switchImpersonationToRead(db: D1Database, id: string): Promise<void> {
@@ -439,21 +440,22 @@ export async function endImpersonation(db: D1Database, id: string): Promise<void
 export async function revealPiiForImpersonation(
   db: D1Database,
   input: { impersonationSessionId: string; staffId: string; tenantId: string; reason: string },
-): Promise<string> {
+): Promise<string | null> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db.batch([
+  const results = await db.batch([
     db
-      .prepare('UPDATE impersonation_sessions SET pii_revealed = 1 WHERE id = ? AND ended_at IS NULL')
-      .bind(input.impersonationSessionId),
+      .prepare('UPDATE impersonation_sessions SET pii_revealed = 1 WHERE id = ? AND staff_id = ? AND tenant_id = ? AND ended_at IS NULL')
+      .bind(input.impersonationSessionId, input.staffId, input.tenantId),
     db
       .prepare(
         `INSERT INTO pii_reveal_logs (id, impersonation_session_id, staff_id, tenant_id, reason, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+         SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS
+         (SELECT 1 FROM impersonation_sessions WHERE id = ? AND staff_id = ? AND tenant_id = ? AND ended_at IS NULL)`,
       )
-      .bind(id, input.impersonationSessionId, input.staffId, input.tenantId, input.reason, now),
+      .bind(id, input.impersonationSessionId, input.staffId, input.tenantId, input.reason, now, input.impersonationSessionId, input.staffId, input.tenantId),
   ]);
-  return id;
+  return (results[0]?.meta.changes ?? 0) > 0 ? id : null;
 }
 
 export async function countImpersonationsSince(

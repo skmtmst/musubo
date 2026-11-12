@@ -61,13 +61,13 @@ accountSettings.get('/api/account-settings/test-recipients', async (c) => {
   if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
 
   const row = await c.env.DB.prepare(
-    `SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`
-  ).bind(accountId).first<{ value: string }>();
+    `SELECT value, confirmation_revision FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`
+  ).bind(accountId).first<{ value: string; confirmation_revision: number }>();
 
   const friendIds: string[] = row ? JSON.parse(row.value) : [];
 
   if (friendIds.length === 0) {
-    return c.json({ success: true, data: [] });
+    return c.json({ success: true, data: [], confirmationRevision: row?.confirmation_revision ?? 0 });
   }
   const placeholders = sqlIdSet(friendIds).sql;
   const friends = await c.env.DB.prepare(
@@ -76,6 +76,7 @@ accountSettings.get('/api/account-settings/test-recipients', async (c) => {
 
   return c.json({
     success: true,
+    confirmationRevision: row?.confirmation_revision ?? 0,
     data: friends.results.map(f => ({
       id: f.id,
       displayName: f.display_name,
@@ -188,7 +189,7 @@ accountSettings.put('/api/account-settings/test-recipients', requireRole('owner'
   await c.env.DB.prepare(
     `INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
      VALUES (?, ?, 'test_recipients', ?, ?, ?)
-     ON CONFLICT (line_account_id, key) DO UPDATE SET value = ?, updated_at = ?`
+     ON CONFLICT (line_account_id, key) DO UPDATE SET value = ?, updated_at = ?, confirmation_revision = confirmation_revision + 1`
   ).bind(
     id, body.accountId, JSON.stringify(body.friendIds), now, now,
     JSON.stringify(body.friendIds), now,

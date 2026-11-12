@@ -157,3 +157,12 @@ describe('V8 通知', () => {
     expect((screen.getByRole('button', { name: /すべて既読にする/ }) as HTMLButtonElement).disabled).toBe(true)
   })
 })
+
+test.each(['owner', 'viewer', null])('未読の案内は権限 %s で実際の操作に合う', async role => {
+  fx.role = role
+  render(<NotificationsV8 />)
+  await screen.findByText('Webhook の遅れ')
+  expect(screen.getByText(/未読は青い点と太字/)).toBeTruthy()
+  expect(Boolean(screen.queryByText(/押すと既読になり/))).toBe(role === 'owner')
+  if (role !== 'owner') expect(screen.getByText(/押すと関係する画面へ移れます/)).toBeTruthy()
+})

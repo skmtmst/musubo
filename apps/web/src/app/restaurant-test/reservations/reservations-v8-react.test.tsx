@@ -39,7 +39,7 @@ const snapshot = {
   reservations: [
     {
       id: 'rsv-1', store_id: 'store-1', store_name: '然 渋谷店', source: 'line', external_id: null,
-      customer_name: '佐藤 花子', customer_phone: '090-1111-2222', line_uid: 'U-1', guest_count: 2,
+      customer_name: '見本 122', customer_phone: '090-0000-2222', line_uid: 'U-1', guest_count: 2,
       starts_at: hoursFromNow(2), ends_at: hoursFromNow(4), table_id: 'tbl-1', table_label: 'T1・窓側2名卓',
       course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null,
       sync_direction: 'inbound_only',
@@ -114,7 +114,7 @@ test('v8 の一覧に切り替えると予約タイムラインと顧客カル�
   click('一覧')
   await act(async () => {})
   expect(host.querySelector('[data-reservation-board][data-axis="list"]')).not.toBeNull()
-  expect(text()).toContain('佐藤 花子')
+  expect(text()).toContain('見本 122')
   expect(text()).toContain('顧客カルテ')
   expect(host.querySelector('[data-design-node="Z3FoM"]')).not.toBeNull()
 })

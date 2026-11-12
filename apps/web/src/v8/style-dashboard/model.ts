@@ -168,4 +168,5 @@ export interface StyleClosureInput {
   target: 'store' | 'staff' | 'seat'
   ids: string[]
   reason: string
+  expectedSnapshot?: string
 }

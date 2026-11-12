@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { api, type OpsImpersonation } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import NoteBar from '@/components/shared/note-bar'
 import { TextArea } from '@/components/shared/text-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
@@ -37,7 +38,7 @@ export default function ImpersonationBar({
 }) {
   const router = useRouter()
   const [state, setState] = useState<OpsImpersonation>(initial)
-  const [dialog, setDialog] = useState<'write' | 'pii' | null>(null)
+  const [dialog, setDialog] = useState<{ kind: 'write' | 'pii'; target: OpsImpersonation } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -91,13 +92,17 @@ export default function ImpersonationBar({
 
   const submitReason = async (reason: string) => {
     if (!dialog) return
+    if (dialog.target.id !== state.id || dialog.target.id !== initial.id || dialog.target.tenantId !== state.tenantId || dialog.target.tenantId !== initial.tenantId) {
+      setError('代理ログインが変わりました。読み直してから、もう一度選んでください。')
+      return
+    }
     setBusy(true)
     setError('')
-    const res = dialog === 'write'
-      ? await opsCall(api.ops.impersonation.write(reason))
-      : await opsCall(api.ops.impersonation.revealPii(reason))
+    const res = dialog.kind === 'write'
+      ? await opsCall(api.ops.impersonation.write(reason, dialog.target.id))
+      : await opsCall(api.ops.impersonation.revealPii(reason, dialog.target.id))
     if (!res.success) { setBusy(false); setError(res.error || '切り替えできませんでした。時間をおいて、もう一度お試しください。'); return }
-    await update({ ...state, ...res.data, tenantName: state.tenantName })
+    await update({ ...dialog.target, ...res.data, tenantName: dialog.target.tenantName })
     setBusy(false)
     setDialog(null)
     router.refresh()
@@ -116,16 +121,17 @@ export default function ImpersonationBar({
           ? <>{name} として書き込み中{state.piiRevealed ? '・個人情報を表示中' : ''}</>
           : `代理ログイン中：${name}（閲覧のみ）${state.piiRevealed ? '・個人情報を表示中' : ''}`}
         action={<>
-          {!state.piiRevealed ? <Button type="button" onClick={() => setDialog('pii')} disabled={busy}>個人情報を表示する</Button> : null}
+          {!state.piiRevealed ? <Button type="button" onClick={() => setDialog({ kind: 'pii', target: state })} disabled={busy}>個人情報を表示する</Button> : null}
           {writing
             ? <Button type="button" onClick={() => void toRead()} disabled={busy}>閲覧のみに戻す</Button>
-            : <Button type="button" onClick={() => setDialog('write')} disabled={busy}>書き込みに切り替える</Button>}
+            : <Button type="button" onClick={() => setDialog({ kind: 'write', target: state })} disabled={busy}>書き込みに切り替える</Button>}
           <Button type="button" variant="primary" onClick={() => void end()} disabled={busy}>代理ログインを終える</Button>
         </>}
       >{!dialog && error ? error : !writing && started ? `${started}〜` : null}</Notice>
       {dialog ? (
         <ReasonDialog
-          kind={dialog}
+          kind={dialog.kind}
+          target={dialog.target}
           busy={busy}
           error={error}
           onClose={() => { setDialog(null); setError('') }}
@@ -139,12 +145,14 @@ export default function ImpersonationBar({
 /** 理由の入力（37-5-A `Ve2FS` / 37-5-B `oVhwg`）。共通の確認ダイアログに入力欄を載せる。 */
 function ReasonDialog({
   kind,
+  target,
   busy,
   error,
   onClose,
   onSubmit,
 }: {
   kind: 'write' | 'pii'
+  target: OpsImpersonation
   busy: boolean
   error: string
   onClose: () => void
@@ -162,13 +170,16 @@ function ReasonDialog({
         ? 'ここから先の操作は、契約先のデータを実際に書き換えます。書き込みをすると、契約先の画面にも履歴が残ります。'
         : '友だちの氏名や会話の中身が見えるようになります。代理ログインを終えると、もとの伏せた表示に戻ります。'}
       confirmLabel={write ? '書き込みに切り替える' : '表示する'}
+      confirmIcon={false}
       destructive
       busy={busy}
       error={error}
-      onConfirm={ready ? () => void onSubmit(reason.trim()) : undefined}
+      confirmDisabled={!ready}
+      onConfirm={() => { if (ready) void onSubmit(reason.trim()) }}
       onCancel={() => { if (!busy) onClose() }}
     >
       <div className="flex flex-col gap-3">
+        <OperationTargetSummary accounts={[]} externalTarget={{ label: '契約先', name: target.tenantName?.trim() || '不明' }} />
         <label className="block">
           <span className="mb-1.5 block text-caption font-medium text-ink">理由<RequiredBadge /><span className="font-medium text-ink-faint">（4文字以上）</span></span>
           <TextArea

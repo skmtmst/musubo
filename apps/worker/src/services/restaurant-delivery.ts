@@ -246,6 +246,7 @@ const ACTION_PATHS: Record<DeliveryAction, string> = {
 
 export interface DeliveryEnv extends DeliveryWebhookEnv, UberHostEnv {
   RT_DELIVERY_SEND_ENABLED?: string;
+  LINE_CREDENTIAL_ENCRYPTION_KEY?: string;
   RT_DELIVERY_UBEREATS_API_BASE_URL?: string;
   RT_DELIVERY_UBEREATS_API_TOKEN?: string;
   RT_DELIVERY_DEMAECAN_API_BASE_URL?: string;
@@ -321,6 +322,17 @@ function apiConfigFor(
   if (!baseUrl || !token) return null;
   if (!baseUrl.startsWith('https://')) return null;
   return { baseUrl: baseUrl.replace(/\/+$/, ''), token };
+}
+
+/** 外部の接続先を画面へ秘匿したまま、確認後の変更を検出する。 */
+export async function deliveryTargetFingerprint(env: DeliveryEnv, service: DeliveryService): Promise<string | null> {
+  const secret = env.LINE_CREDENTIAL_ENCRYPTION_KEY?.trim();
+  if (!secret) return null;
+  const config = apiConfigFor(env, service);
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const input = JSON.stringify([service, config?.baseUrl ?? '', config?.token ?? '']);
+  const digest = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /** 画面に出す安全な失敗理由。サービスの本文は入れない。 */

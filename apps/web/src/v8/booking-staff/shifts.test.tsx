@@ -38,7 +38,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => stableRouter, useSearchPara
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId, selectedAccount: null }) }))
 
-const STAFF = { id: 'bs-1', name: '佐々木 亮太', display_name: '佐々木', role: 'トリマー', profile_image_url: null, bio: null, sort_order: 1, is_designation_optional: 0, is_active: 1 }
+const STAFF = { id: 'bs-1', name: '見本 110', display_name: '佐々木', role: 'トリマー', profile_image_url: null, bio: null, sort_order: 1, is_designation_optional: 0, is_active: 1 }
 
 vi.mock('@/lib/api', () => {
   class ApiError extends Error {
@@ -183,7 +183,7 @@ describe('役割はサーバーで決める', () => {
     fixture.role = 'staff'
     fixture.myStaff = [STAFF]
     render(<StaffShiftsV8 staffId="bs-1" />)
-    expect(await screen.findByText('佐々木 亮太（トリマー）としてひも付いています。ひも付けを変えるときはオーナーか管理者に頼んでください。')).toBeTruthy()
+    expect(await screen.findByText('見本 110（トリマー）としてひも付いています。ひも付けを変えるときはオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.getByRole('heading', { name: '自分の勤務' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: '← 担当スタッフへ' })).toBeNull()
   })
@@ -210,7 +210,7 @@ describe('勤務とシフト（管理者）', () => {
     const dialog = screen.getByRole('alertdialog')
     expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
     expect(within(dialog).getByText('環境')).toBeTruthy()
-    expect(within(dialog).getByText('佐々木 亮太')).toBeTruthy()
+    expect(within(dialog).getByText('見本 110')).toBeTruthy()
     fixture.accountId = 'account-b'
     view.rerender(<StaffShiftsV8 staffId="bs-1" />)
     await screen.findByRole('button', { name: '外す' })

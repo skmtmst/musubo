@@ -252,7 +252,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
     <SaveErrorScope errors={saveErrors}>
     <div className={styles.tabStack} data-design="Table">
       <ConfirmDialog open={deleteTarget !== null && deleteTarget.generation === scope.current.generation} title={`「${deleteTarget?.menu.name ?? ''}」を削除しますか？`} description="予約が付いているメニューは削除できません。" confirmLabel="削除する" destructive busy={deleting} error={deleteError} onConfirm={() => deleteMenu()} onCancel={() => { if (!deleting) setDeleteTarget(null) }}>{deleteTarget ? <OperationTargetSummary accounts={[{ id: deleteTarget.accountId }]} /> : null}</ConfirmDialog>
-      <Band tone="hint">上から並んだ順に、お客さまの画面に出ます。つまみで並べ替えます。</Band>
+      <Band tone="hint">上から並んだ順に、お客さまの画面に出ます。{canEdit ? 'つまみで並べ替えます。' : null}</Band>
 
       <div className={styles.toolbar}>
         <div className={styles.searchBox}>

@@ -1427,7 +1427,6 @@ describe('Webhookやり取り記録', () => {
     started_at: '2026-08-29T10:00:00.000+09:00', completed_at: '2026-08-29T10:00:00.820+09:00',
     created_at: '2026-08-29T10:00:00.000+09:00',
   };
-
   test('一覧はアカウントを検査し、本文・配送ID・Webhook IDを返さない', async () => {
     vi.mocked(listWebhookInteractions).mockResolvedValue({
       items: [failedRow], total: 1, page: 1, limit: 20,
@@ -1453,7 +1452,6 @@ describe('Webhookやり取り記録', () => {
     expect(body.data.items[0]).not.toHaveProperty('idempotency_key');
     expect(body.data.items[0]).not.toHaveProperty('webhook_id');
   });
-
   test('権限外のアカウントは一覧を読めない', async () => {
     vi.mocked(canAccessAllLineAccounts).mockResolvedValue(false);
     const res = await receiveAndDrain(setupApp(),
@@ -1464,7 +1462,6 @@ describe('Webhookやり取り記録', () => {
     expect(res.status).toBe(403);
     expect(listWebhookInteractions).not.toHaveBeenCalled();
   });
-
   test('失敗した送信だけを同じアカウントの中でやり直す', async () => {
     vi.mocked(getWebhookInteractionById).mockResolvedValue(failedRow);
     vi.mocked(retryWebhookInteraction).mockResolvedValue({ ...failedRow, id: 'retry-a', status: 'succeeded' });
@@ -1477,7 +1474,11 @@ describe('Webhookやり取り記録', () => {
     expect(getWebhookInteractionById).toHaveBeenCalledWith(baseEnv.DB, 'run-a', ACCOUNT_ID);
     expect(retryWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, failedRow, { current: undefined, previous: undefined });
   });
-
+  test('古い版の送り直しは 409 と現在の記録を返す', async () => {
+    vi.mocked(getWebhookInteractionById).mockResolvedValue({ ...failedRow, confirmation_revision: 4 });
+    const res = await receiveAndDrain(setupApp(), `/api/webhooks/interactions/run-a/retry?lineAccountId=${ACCOUNT_ID}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmed: true, interactionRevision: 2, webhookRevision: 3 }) }, baseEnv);
+    expect(res.status).toBe(409); expect(await res.json()).toMatchObject({ error: 'confirmation_conflict', current: { id: 'run-a', confirmationRevision: 4 } }); expect(retryWebhookInteraction).not.toHaveBeenCalled();
+  });
   test('provider待機中の手動再送は409で理由を返す', async () => {
     vi.mocked(getWebhookInteractionById).mockResolvedValue(failedRow);
     vi.mocked(retryWebhookInteraction).mockRejectedValueOnce(new Error('retry_after_pending'));
@@ -1486,7 +1487,6 @@ describe('Webhookやり取り記録', () => {
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({error:expect.stringContaining('待機期限')});
   });
-
   test('secretを読めない送り直しは503にし、秘密値を出さない(#650)', async () => {
     vi.mocked(getWebhookInteractionById).mockResolvedValue(failedRow);
     vi.mocked(retryWebhookInteraction).mockRejectedValueOnce(new Error('webhook_secret_unavailable'));
