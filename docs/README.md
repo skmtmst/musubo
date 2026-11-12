@@ -466,6 +466,7 @@
 ## 反映履歴
 
 - [運営コンソールの問い合わせ画面をPenと照合して修正](release-log/unreleased/41-masato-ops-support-pen-parity.md) — スマートフォンの返信欄とテンプレート引用画面、確認 2026-11-11。
+- [運営の返信テンプレート編集・削除と検索欄の余白修正](release-log/unreleased/44-masato-ops-support-template-edit.md) — 問い合わせ画面の修正履歴、確認 2026-11-12。
 - [運営コンソールのお問い合わせをPen確定案に合わせて刷新](release-log/unreleased/37-masato-ops-support-pen.md) — 返信テンプレートとスマートフォン操作、確認 2026-11-10。
 - [登録メディアの写真確認とアップロード修正](release-log/unreleased/30-masato-media-upload.md) — 反映履歴、確認 2026-11-10。
 - [登録メディアの検証R2設定更新](release-log/unreleased/33-masato-media-upload-cors-token.md) — 反映履歴、確認 2026-11-10。
