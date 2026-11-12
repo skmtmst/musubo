@@ -20,7 +20,7 @@ const { pass } = await vi.hoisted(async () => {
   const { createElement } = await import('react')
   return { pass: (name: string) => ({ default: ({ children }: { children: React.ReactNode }) => createElement('div', { 'data-delegated': name }, children) }) }
 })
-vi.mock('./auth-guard', () => pass('session'))
+vi.mock('./auth-guard', () => ({ ...pass('session'), useOnboardingAccess: () => false }))
 vi.mock('./root-landing-gate', () => pass('landing'))
 vi.mock('./store-selection-gate', () => pass('store'))
 vi.mock('./feature-disabled-gate', () => pass('feature'))

@@ -63,7 +63,8 @@ it.each([
   ['/api/tags', 4],
   ['/api/staff/me', 2],
   ['/api/tenants/me', 3],
-  ['/api/auth/session', 4],
+  // 利用開始前の行き先を認証応答で確定するため、料金状態を1往復で確認する。
+  ['/api/auth/session', 5],
   ['/api/line-accounts', 8],
   ['/api/hq/style-attention', 6],
   ['/api/inbox/unanswered/count', 4],
@@ -108,7 +109,7 @@ async function registerMfa() {
 
 it.each([
   ['/api/auto-replies', 13], ['/api/scenarios', 10], ['/api/templates', 13], ['/api/tags', 6],
-  ['/api/staff/me', 4], ['/api/tenants/me', 5], ['/api/auth/session', 6],
+  ['/api/staff/me', 4], ['/api/tenants/me', 5], ['/api/auth/session', 7],
   ['/api/line-accounts', 10], ['/api/hq/style-attention', 8],
   ['/api/inbox/unanswered/count', 6], ['/api/accounts/health-summary', 6],
   ['/api/notifications/center?lineAccountId=store&limit=1', 7],

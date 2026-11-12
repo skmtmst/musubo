@@ -182,9 +182,9 @@ async function openMediaMenu(page) {
   return page.getByRole('menu', { name: `${MEDIA_NAME}の操作`, exact: true })
 }
 
-async function openUsage(page) {
+async function openDeleteImpact(page) {
   const menu = await openMediaMenu(page)
-  await menu.getByRole('menuitem', { name: '使用箇所を見る', exact: true }).click()
+  await menu.getByRole('menuitem', { name: '削除する', exact: true }).click()
 }
 
 function permissionNote(page) {
@@ -194,7 +194,7 @@ function permissionNote(page) {
 async function expectManagementHidden(page, { canRegister = false } = {}) {
   const menu = await openMediaMenu(page)
   await expect(menu).toBeVisible()
-  for (const name of ['使用箇所を見る', '名前を変える', 'フォルダへ移す', 'アーカイブ', '削除する', '別のメディアに差し替える']) {
+  for (const name of ['名前を変える', 'フォルダへ移す', 'アーカイブ', '削除する']) {
     /* 無効な項目に理由が付いて読み上げ名が長くなっても、隠す契約の違反として検出する。 */
     await expect(menu.getByRole('menuitem', { name })).toHaveCount(0)
   }
@@ -209,7 +209,7 @@ async function expectManagementHidden(page, { canRegister = false } = {}) {
   else await expect(register).toHaveCount(0)
 }
 
-/** 使用箇所の照会に加え、編集・削除等の書き込み要求も実際に監視する。 */
+/** 削除時の使用箇所照会に加え、編集・削除等の書き込み要求も実際に監視する。 */
 function managementRequestLog() {
   const requests = []
   return {
@@ -229,7 +229,7 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
     await signIn(page)
   })
 
-  test('権限取得中は管理操作を止め、ownerの応答後に詳細を開いてAPIを読む', async ({ page }) => {
+  test('権限取得中は管理操作を止め、ownerの応答後に削除確認で使用先を読む', async ({ page }) => {
     let releaseRole
     const roleReady = new Promise((resolve) => { releaseRole = resolve })
     const management = managementRequestLog()
@@ -251,13 +251,12 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
     await expect(page.getByText(MEDIA_NAME, { exact: true }).first()).toBeVisible()
     await expect(permissionNote(page)).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'メディアを登録する', exact: true }).first()).toBeVisible()
-    await openUsage(page)
+    await openDeleteImpact(page)
     await expect.poll(() => management.requests).toEqual(['GET /api/media/media-delete-target/delete-impact'])
-    await expect(page.getByRole('heading', { name: MEDIA_NAME, exact: true })).toBeVisible()
     await expect(page.getByRole('listitem').filter({ hasText: '夏の定番5点' })).toBeVisible()
   })
 
-  test('adminは使用箇所を開ける', async ({ page }) => {
+  test('adminは削除確認で使用箇所を確認できる', async ({ page }) => {
     let impactRequests = 0
     await stubApi(page, {
       role: 'admin',
@@ -267,12 +266,12 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
     })
 
     await openContents(page)
-    await openUsage(page)
+    await openDeleteImpact(page)
     await expect.poll(() => impactRequests).toBe(1)
-    await expect(page.getByRole('heading', { name: MEDIA_NAME, exact: true })).toBeVisible()
+    await expect(page.getByRole('listitem').filter({ hasText: '夏の定番5点' })).toBeVisible()
   })
 
-  test('staffは理由付きで使用箇所を開けず、編集・削除APIも呼ばない', async ({ page }) => {
+  test('staffは管理操作を開けず、編集・削除APIも呼ばない', async ({ page }) => {
     const management = managementRequestLog()
     await stubApi(page, {
       role: 'staff',
@@ -344,7 +343,7 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
     })
 
     await openContents(page)
-    await openUsage(page)
+    await page.goto(`${BASE}/contents?id=media-delete-target&mediaAccountId=visual-qa-account`, { waitUntil: 'networkidle' })
     await expect(page.getByRole('heading', { name: MEDIA_NAME, exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: 'アカウントを切り替える', exact: true }).click()

@@ -57,6 +57,18 @@ export function musuboOnboardingResumePath(state: {
   return state.consentedAt ? '/hq/onboarding/card' : '/hq/onboarding/pricing'
 }
 
+/** 初回LINEの有効化前に開いてよい導線。通常メニューの住所はここへ入れない。 */
+export function isOnboardingContinuationPath(pathname: string, resumePath: string): boolean {
+  if (pathname.startsWith('/hq/onboarding/')) return true
+  // 個別見積もりの再発行は既存のお問い合わせ画面から受け付ける。
+  if (pathname === '/hq/support' || pathname.startsWith('/hq/support/')) return true
+  // カード登録後は既存のLINE接続ウィザードを使う。接続可否はサーバーでも判定する。
+  if (pathname === '/accounts/new' || pathname.startsWith('/accounts/new/')) {
+    return resumePath !== '/hq/onboarding/pricing'
+  }
+  return false
+}
+
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
 /**

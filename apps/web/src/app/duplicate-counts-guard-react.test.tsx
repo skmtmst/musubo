@@ -112,11 +112,6 @@ vi.mock('@/components/shell/page-chrome', async (importOriginal: () => Promise<t
   return { ...actual, usePageTitle: () => {} }
 })
 
-vi.mock('@/components/ops/knowledge-ticket', () => ({
-  KnowledgeReferences: () => null,
-  TicketKnowledge: () => null,
-}))
-
 import {
   AUTO_REPLIES,
   AUTO_REPLY_FOLDERS,
@@ -388,7 +383,7 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     })
     await renderPage(React.createElement(OpsSupportPage))
     expectNoDuplicateCounts()
-    expect(host.querySelector('[title*="これまで2のうち未解決1件"]')).not.toBeNull()
+    expect(host.querySelector('[title*="これまで2のうち未解決1件"]')).toBeNull()
   })
 
   it('affiliates/new は「1件あたり」を注記と欄名で重ねない', async () => {

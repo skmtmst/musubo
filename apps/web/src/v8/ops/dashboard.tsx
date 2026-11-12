@@ -3,7 +3,7 @@
 import { ValueBarChart } from '@/components/shared/charts'
 
 import Link from '@/components/shared/list-navigation'
-import { Banknote, Hourglass, Sparkles, Wallet } from 'lucide-react'
+import { Banknote, Hourglass, Wallet } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsDashboard, type OpsDashboardPeriod, type OpsLineUnregistered } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -127,7 +127,6 @@ export default function OpsDashboardV8() {
             <KpiCard presentation="cell" icon={<Wallet size={16} aria-hidden="true" />} title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k && data ? <span title={contractDetail(k.active, k.byPlan, k.filledByListPriceCount)}>{`契約中 ${k.active}・決済失敗 ${data.alerts.pastDue}（トライアルは入れない）`}</span> : emptyValue('unknown')} loading={loading} />
             <KpiCard presentation="cell" icon={<Banknote size={16} aria-hidden="true" />} title="今月の売上" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={data && k ? <span title={revenueDetail(k.revenueDelta, k.refundsThisMonth)}>{`決済失敗 ${data.alerts.pastDue} 社`}</span> : emptyValue('unknown')} description={k ? `今月の売上（入金済み）・${revenueDetail(k.revenueDelta, k.refundsThisMonth)}` : '今月に入金済みの売上です。'} loading={loading} />
             <KpiCard presentation="cell" icon={<Hourglass size={16} aria-hidden="true" />} title="トライアル中" value={k ? k.trialing : null} unit="社" detail={data && k ? <span title={`新規 ${k.newInPeriod}件・新規トライアル ${k.newTrialsInPeriod}件・解約 ${k.churnInPeriod}件・解約率 ${k.churnRate.toFixed(1)}%`}>{`期限 3日以内 ${data.alerts.trialEndingSoon}`}</span> : emptyValue('unknown')} loading={loading} />
-            <KpiCard presentation="cell" icon={<Sparkles size={16} aria-hidden="true" />} title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="枚" detail={data?.ai ? 'バナー生成・下書き' : emptyValue('unknown')} loading={loading} />
           </KpiBand>
 
           <DashboardColumns layout="cards" cardHeight="natural">{[

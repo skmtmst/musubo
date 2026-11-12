@@ -1,13 +1,14 @@
 // @vitest-environment happy-dom
 /* Googleビジネスは画面右上の共通LINEアカウント選択を使い、独自の店舗選択を出さない。 */
 import React from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const connectionFn = vi.hoisted(() => vi.fn())
+const location = vi.hoisted(() => ({ search: 'tab=settings', replace: vi.fn() }))
 
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('tab=settings') }))
-vi.mock('@/lib/use-same-page-url', () => ({ useSamePageUrl: () => ({ replace: vi.fn(), push: vi.fn() }) }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(location.search), usePathname: () => '/restaurant-test/google' }))
+vi.mock('@/lib/use-same-page-url', () => ({ useSamePageUrl: () => ({ replace: location.replace, push: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'a', setSelectedAccountId: vi.fn(), accounts: [], loading: false }),
 }))
@@ -32,6 +33,7 @@ function connection(stores: Array<{ id: string; name: string; line_account_id: s
 }
 
 afterEach(cleanup)
+beforeEach(() => { location.search = 'tab=settings'; location.replace.mockClear() })
 
 describe('Googleビジネス：共通アカウントの選択を使う', () => {
   it('複数店舗が返っても画面内の店舗選択を出さず、選択中のアカウントを読み込む', async () => {
@@ -53,5 +55,12 @@ describe('Googleビジネス：共通アカウントの選択を使う', () => {
     expect(await screen.findByRole('heading', { name: 'Googleビジネス' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '店舗' })).toBeNull()
     expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
+  })
+
+  it('営業時間を開いた時に未接続ならGoogle接続画面へ進む', async () => {
+    location.search = 'tab=hours'
+    connectionFn.mockResolvedValue({ ...connection([]), connection: { status: 'disconnected', locationTitle: null, locationMapsUrl: null } })
+    render(<GoogleV8 />)
+    await waitFor(() => expect(location.replace).toHaveBeenCalledWith('/settings/sns?source=hours'))
   })
 })

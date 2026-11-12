@@ -42,7 +42,7 @@ export function Steps({
   currentKey?: string
   connectorSize?: 'short'
   /** 窓の左で、回答済み・現在・未回答の質問へ移る列。 */
-  layout?: 'horizontal' | 'sidebar'
+  layout?: 'horizontal' | 'sidebar' | 'guidance'
   /** 済んだ入力の要約。値を持つ画面だけが渡す。 */
   summaries?: Readonly<Record<string, string>>
   summaryLayout?: 'default' | 'aligned'
@@ -110,6 +110,15 @@ export function Steps({
 
     </nav>
   )
+
+  if (layout === 'guidance') return <nav aria-label={label} data-part="steps" data-layout="guidance" className={styles.root}>
+    <ol className={styles.guidanceList}>
+      {items.map((step) => <li key={step.key} className={styles.guidanceItem}>
+        <span className={styles.guidanceNumber} aria-hidden="true">{step.order}</span>
+        <span className={styles.guidanceCopy}><strong>{step.label}</strong>{step.description && <small>{step.description}</small>}</span>
+      </li>)}
+    </ol>
+  </nav>
 
   return (
     <nav ref={rootRef} aria-label={label} data-part="steps" data-connector-size={connectorSize} data-variant={variant === 'auth' ? 'auth' : undefined} className={styles.root}>

@@ -1,50 +1,14 @@
 'use client'
 
-import { Skeleton } from './shared/skeleton'
-import { PageFrame } from './templates/page-frame'
-import PagePending, { usePagePendingTitle, usePagePendingVariant } from './templates/page-pending'
-import shell from './app-shell.module.css'
-import sidebar from './layout/sidebar.module.css'
+import MusuboLogo from './shared/musubo-logo'
 import styles from './auth-pending-shell.module.css'
 
-const NAV_WIDTHS = ['72%', '58%', '66%', '50%', '62%', '70%', '54%', '64%']
-const ROW_WIDTHS = ['40%', '92%', '86%', '90%', '78%', '88%']
-
-/**
- * ログインの確認を初めて待つあいだ（開いた直後・ログイン直後）の外枠。
- *
- * 左メニュー・上の帯・白い板の骨組みで待ち、確認が済んだら本物と入れ替える。
- * 書き出した HTML にもこの形が入るので、読み込み中の最初の一瞬も同じ見え方になる。
- * 中身は出さない（確認が済むまで画面の情報・権限は見せない）。
- */
+/** 認証と利用開始状況が確定するまで、通常画面のメニューを一切描画しない。 */
 export default function AuthPendingShell() {
-  const dashboard = usePagePendingVariant() === 'dashboard'
-  const title = usePagePendingTitle()
   return (
-    <div className={shell.shell} data-auth-pending="" role="status" aria-busy="true" aria-label="読み込み中">
-      <div className={shell.workspace}>
-        <div className={sidebar.desktop} aria-hidden="true">
-          <div className={styles.brand}>
-            <Skeleton width={36} height={36} />
-            <Skeleton width={120} height={14} />
-          </div>
-          <div className={styles.nav}>
-            {NAV_WIDTHS.map((width, index) => <Skeleton key={index} width={width} height={14} />)}
-          </div>
-        </div>
-        <div className={shell.side}>
-          <div className={styles.topBar} aria-hidden="true" />
-          <div className={shell.main}>
-            <div className={shell.content}>
-              {dashboard || title ? <PagePending stage="auth" /> : <PageFrame kind="pending">
-                <div className={styles.rows} aria-hidden="true">
-                  {ROW_WIDTHS.map((width, index) => <Skeleton key={index} width={width} height={index === 0 ? 22 : 16} />)}
-                </div>
-              </PageFrame>}
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className={styles.pending} data-auth-pending="" role="status" aria-busy="true" aria-label="利用状況を確認しています">
+      <div className={styles.brand}><MusuboLogo /></div>
+      <div className={styles.progress} aria-hidden="true" />
     </div>
   )
 }

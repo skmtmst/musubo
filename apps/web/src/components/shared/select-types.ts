@@ -4,6 +4,8 @@ import type { StatusBadgeTone } from './status-badge'
 export interface SelectOption {
   value: string
   label: string
+  /** 一覧の行の右端に添える短い補足（料金など）。閉じた欄には表示しない。 */
+  trailing?: string
   disabled?: boolean
   /** ★V8 の開いた中身で行の先頭に出す印（対応状況の色の点など）。互換経路では出さない。 */
   leading?: ReactNode
@@ -94,4 +96,6 @@ export interface SelectProps {
   menuHeading?: string
   /** 列の右端の操作は、開く板も右端へそろえる。 */
   menuAlign?: 'start' | 'end'
+  /** 長い候補を入力欄の下に見せる画面では、開く前に欄を画面内へ移す。 */
+  menuPlacement?: 'down'
 }

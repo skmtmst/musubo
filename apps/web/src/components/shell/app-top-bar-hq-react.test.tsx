@@ -17,6 +17,7 @@ import { api } from '@/lib/api'
 
 const fixture = vi.hoisted(() => ({
   pathname: '/hq',
+  onboarding: false,
   theme: 'v8' as 'v8' | 'v7',
   push: vi.fn(),
   setSelectedAccountId: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock('next/navigation', () => {
   const router = { push: fixture.push, replace: vi.fn() }
   return { usePathname: () => fixture.pathname, useRouter: () => router }
 })
+vi.mock('@/components/auth-guard', () => ({ useOnboardingAccess: () => fixture.onboarding }))
 vi.mock('next/link', async () => {
   const React = await import('react')
   return { default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => React.createElement('a', { href, ...props }, children) }
@@ -81,6 +83,7 @@ describe('★V8 統括の上の帯', () => {
     fixture.restoreApi = () => { list.mockRestore(); tenants.mockRestore(); importState.mockRestore() }
     forgetStaffIdentity()
     fixture.pathname = '/hq'
+    fixture.onboarding = false
     fixture.theme = 'v8'
     fixture.push.mockReset()
     fixture.setSelectedAccountId.mockReset()
@@ -397,6 +400,25 @@ describe('アカウント未選択の共通の呼び名', () => {
     expect(label.getAttribute('title')).toBe('LINE公式アカウントを選んでください')
     expect(view.container.textContent).not.toContain('店舗を選択')
     expect(view.getByRole('button', { name: 'アカウントを切り替える' })).toBeTruthy()
+  })
+
+  it('利用開始中はホームとサイドバー切替を表示せず、現在地だけを残す', () => {
+    const view = render(<TopBar title="利用開始の準備" accounts={[]} selectedAccountId=""
+      onAccountChange={vi.fn()} roleLabel="統括" userName="確認担当" onLogout={vi.fn()}
+      v8Chrome showHomeBreadcrumb={false} showSidebarToggle={false} showIdentity={false} />)
+    expect(view.queryByRole('link', { name: 'ホーム' })).toBeNull()
+    expect(view.queryByRole('button', { name: 'メニューを畳む・広げる' })).toBeNull()
+    expect(view.getByText('利用開始の準備')).toBeTruthy()
+  })
+
+  it('初回LINEの接続中はパンくずを現在の手順だけにする', () => {
+    fixture.pathname = '/accounts/new'
+    fixture.onboarding = true
+    const view = render(<AppTopBar />)
+    expect(view.queryByRole('link', { name: 'ホーム' })).toBeNull()
+    expect(view.queryByRole('link', { name: 'アカウント' })).toBeNull()
+    expect(view.getByText('利用開始の準備')).toBeTruthy()
+    expect(view.queryByRole('button', { name: 'メニューを畳む・広げる' })).toBeNull()
   })
 
   it('個別画面は公式アカウントの案内にそろえ、元の画面へ戻る行き先を保つ', async () => {

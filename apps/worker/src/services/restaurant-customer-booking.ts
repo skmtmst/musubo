@@ -12,6 +12,7 @@ import {
   validRestaurantDate,
 } from './restaurant-booking.js';
 import { tzDateStr } from './availability.js';
+import { connectedGoogleProfile, googleOpeningDay } from './restaurant-google-hours-source.js';
 import { sendAutomaticBookingLine } from '../features/booking/booking-automatic-line/index.js';
 export type CustomerReservationRow = {
   id: string;
@@ -95,6 +96,10 @@ export async function customerAvailability(
     weekday: number;
     periods: Array<{ opensAt: string; closesAt: string }>;
   }>;
+  const googleConnection = await db.prepare('SELECT status FROM rt_google_connections WHERE store_id=?')
+    .bind(store.id).first<{ status: string }>();
+  const googleProfile = googleConnection ? await connectedGoogleProfile(db, store.id) : null;
+  if (googleConnection && !googleProfile) return null;
   const minute = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
   const slots: RestaurantCustomerAvailability['slots'] = [];
   let hasOperatingSlot = false;
@@ -115,9 +120,10 @@ export async function customerAvailability(
     const civilDate = new Date(Date.parse(date) + dayOffset * 86400000)
       .toISOString()
       .slice(0, 10);
-    for (const period of parsed.find(
-      (d) => d.weekday === new Date(civilDate).getUTCDay(),
-    )?.periods ?? []) {
+    const dayPeriods = googleProfile ? googleOpeningDay(googleProfile, civilDate)
+      : parsed.find((d) => d.weekday === new Date(civilDate).getUTCDay())?.periods;
+    if (dayPeriods === null) return null;
+    for (const period of dayPeriods ?? []) {
       const start = minute(period.opensAt),
         end =
           minute(period.closesAt) +

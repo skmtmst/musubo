@@ -12,7 +12,6 @@ const fixture = vi.hoisted(() => ({
   canReplace: false,
   createdVersions: [] as Array<Record<string, unknown>>,
   usageCount: 0,
-  openedReplacement: [] as string[],
   versionMessages: [] as string[],
 }))
 
@@ -126,7 +125,6 @@ async function renderDialog() {
         folderName=""
         canManage
         onClose={() => undefined}
-        onOpenReplacement={(item) => { fixture.openedReplacement.push(item.id) }}
         onVersionCreated={(message) => { fixture.versionMessages.push(message) }}
       />,
     )
@@ -167,7 +165,6 @@ beforeEach(() => {
   fixture.previewBlockers = ['incompatible_dimensions']
   fixture.canReplace = false
   fixture.usageCount = 0
-  fixture.openedReplacement.length = 0
   fixture.versionMessages.length = 0
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   host = document.createElement('div')
@@ -187,7 +184,7 @@ afterEach(async () => {
 })
 
 describe('使用中のメディアの詳細（voJtX）', () => {
-  it('使っている数を添えて、版を足しても固定版は変わらない・使っているあいだは消せないと言い、使用先の差し替えへ進める', async () => {
+  it('使っている数を添えて、版を足しても固定版は変わらない・使っているあいだは消せないと言う', async () => {
     fixture.usageCount = 2
     await renderDialog()
     const detail = document.querySelector('[data-design-node="voJtX"]')
@@ -197,9 +194,7 @@ describe('使用中のメディアの詳細（voJtX）', () => {
     expect(text).toContain('名前と管理用URLを保ったまま新しい版を追加します。')
     expect(text).toContain('現在このメディアを使っている2か所の固定版は変わりません')
     expect(text).toContain('使われているあいだは削除できません。先にこの2か所から外してください。')
-    const replace = [...(detail?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '使用先を差し替える')
-    await act(async () => { replace?.click(); await settle() })
-    expect(fixture.openedReplacement).toEqual(['media-a'])
+    expect(text).not.toContain('使用先を差し替える')
   })
 
   it('使っていなければ「使用先を差し替える」と消せない理由を出さない', async () => {

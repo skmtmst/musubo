@@ -49,7 +49,7 @@ async function submitViaSupport(subject: string, body: string): Promise<string> 
 
 export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted, submit = submitViaSupport }: Props) {
   usePageTitle('お見積もりのお問い合わせ')
-  usePageCrumbs([{ label: 'ホーム', href: '/hq' }, { label: '利用開始の準備', href: '/hq/onboarding' }])
+  usePageCrumbs([{ label: '利用開始の準備' }])
   const [exactLineCount, setExactLineCount] = useState('')
   const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
@@ -89,13 +89,12 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
       { key: 'plan', label: 'ご利用予定を確認', state: 'done' },
       { key: 'inquiry', label: 'お問い合わせ', state: 'current' },
       { key: 'quote', label: '料金をご案内', state: 'todo' },
-    ]} />}
-    help="ご利用予定を送信すると、担当者から個別料金をご案内します。">
+    ]} />}>
     <PageContent>
       {ticketId ? <section className={styles.receipt} aria-label="お問い合わせ受付の結果">
         <Notice tone="success" heading="お問い合わせを受け付けました">
           <p>担当者がご利用予定を確認し、料金と利用開始の手順をご案内します。受付内容はお問い合わせから確認できます。</p>
-          <p>料金への同意後にカード登録へ進みます。この時点では請求は始まりません。</p>
+          <p>料金への同意後にクレジットカード登録へ進みます。この時点では請求は始まりません。</p>
         </Notice>
         <Button variant="primary" href={`/hq/support/detail?id=${encodeURIComponent(ticketId)}`}>お問い合わせ内容を確認する</Button>
       </section> : <>
@@ -107,7 +106,7 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
               <Field label="連携するLINEアカウント数" optional={false}><TextField value={countLabel(selection.lineCount)} readOnly /></Field>
               {!linked && <Field label="具体的な予定数" optional htmlFor="exact-line-count"
                 error={!exactCountValid ? '11以上の整数で入力してください。' : undefined}>
-                <TextField id="exact-line-count" inputMode="numeric" value={exactLineCount} placeholder="例：12個"
+                <TextField id="exact-line-count" inputMode="numeric" value={exactLineCount} placeholder="例：12"
                   onChange={(event) => setExactLineCount(event.target.value)} />
               </Field>}
               <Field label="既存のLINEアカウントの合計（ブロック除く）" optional={false}>
@@ -137,7 +136,7 @@ export default function IndividualQuoteInquiry({ selection, onBack, onSubmitted,
               </> : <div><dt>連携先の予定</dt><dd>{notes.trim() ? '入力内容を共有' : '未入力'}</dd></div>}
             </dl>
             <Notice tone="info" heading="この時点で請求は始まりません">
-              料金のご案内後、内容に同意してからカード登録とLINE接続へ進みます。</Notice>
+              料金のご案内後、内容に同意してからクレジットカード登録とLINE接続へ進みます。</Notice>
           </section>
         </div>
         <div className={styles.footer}>

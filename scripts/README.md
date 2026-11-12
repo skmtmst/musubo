@@ -28,7 +28,7 @@
 
 品質の後戻りは `pnpm quality:check --base <PRのbase SHA>`、違反を減らした後の実測更新は `pnpm quality:update --base <同じSHA>`、故障対照は `pnpm quality:test`。新しい入口は `pnpm new:screen <name> --title <title> --board <ID>`・`pnpm new:route <name> --method get` で生成します。先に `--dry-run` で保存先を確かめます。詳細は構成の正本を参照してください。
 
-ホームの初回待機は `node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/home-pending-heading.test.mjs` で、認証前から到着までの見出しを毎フレーム確かめます。`V8_GUARD_BASE` に本番形式の出力の配信先、`V8_GUARD_ARTIFACT_DIR` に保存先、`V8_GUARD_VIDEO=1` で動画を指定します。既定は6スタイル・1152/1440・API遅延0/600msです。`V8_GUARD_HOME_HEADING_FAULT=1 HOME_STYLES=standard HOME_DELAYS=600` は待機の見出しをCSSで隠す故障の対照で、赤になることを確認してから旗を外して再実行します。
+ホームの初回待機は `node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/home-pending-heading.test.mjs` で、認証中は通常メニューと画面の見出しを出さず、認証後の待機から到着までは見出しを毎フレーム確かめます。`V8_GUARD_BASE` に本番形式の出力の配信先、`V8_GUARD_ARTIFACT_DIR` に保存先、`V8_GUARD_VIDEO=1` で動画を指定します。既定は6スタイル・1152/1440・API遅延0/600msです。`V8_GUARD_HOME_HEADING_FAULT=1 HOME_STYLES=standard HOME_DELAYS=600` は待機の見出しをCSSで隠す故障の対照で、赤になることを確認してから旗を外して再実行します。
 
 窓の下の帯は `pnpm test:scripts scripts/visual-qa/dialog-footer-contract.test.ts` が全画面の自前帯と参照だけの閉じる帯を検査します。実窓は `node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/dialog-footer.test.mjs`、題と札・失敗の重複・設定ナビ・手順の焦点・状態セルは同じ入口の `patrol-layout.test.mjs` です。上と同じ配信先・保存先・動画の環境変数を使い、各検査は故障を入れて赤になることと復元後の緑も必須で確認します。設定ナビは1024/1152/1440、窓などは1152/1440を測ります。
 
@@ -43,7 +43,7 @@
 
 入口の空の待機は `pnpm test:scripts scripts/visual-qa/route-pending-contract.test.ts` が全appを検査します。fallback省略・null・undefined・false・空文字・空fragmentは赤、認証のカードと共通PagePendingは可です。外枠と入口の題と型は `apps/web/src/lib/route-pending.ts` で共有し、固定の題は実画面到着後にも一致を確かめます。
 
-入口の待機と題は `node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/route-pending.test.mjs` で共有表の全入口を2幅・API遅延600msで開き、認証・ゲート・入口の全待機フレームの題と、固定の題の到着後の一致を確かめます。`V8_GUARD_ROUTE_PENDING_FAULT=1 ROUTE_PENDING_PATHS=/friends` は題をCSSで隠す故障で赤、旗を外すと緑です。
+入口の待機と題は `node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/route-pending.test.mjs` で共有表の全入口を2幅・API遅延600msで開き、認証中の通常メニュー非表示、認証後の待機フレームの題、固定の題の到着後の一致を確かめます。`V8_GUARD_ROUTE_PENDING_FAULT=1 ROUTE_PENDING_PATHS=/friends` は題をCSSで隠す故障で赤、旗を外すと緑です。
 
 スタイル切り替えの固定は同じ入口の `style-switcher.test.mjs` が、登録とはじめの設定を1152/1440/390で操作します。本文の上・下で切り替えが題の下に残り、見るだけでは保存せず、次の問から戻っても窓内に焦点が残ることを確かめます。本文へ移す故障で赤、元の帯へ戻して緑も必須です。390はオーナーが指定した狭い幅の範囲です。
 

@@ -10,6 +10,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('./auth-guard', () => ({
   default: ({ suspendedSupport }: { suspendedSupport?: React.ReactNode }) => <>{suspendedSupport}</>,
+  useOnboardingAccess: () => false,
 }))
 
 vi.mock('./hq/platform-notices', () => ({

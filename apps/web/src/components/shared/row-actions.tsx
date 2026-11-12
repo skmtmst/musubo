@@ -103,6 +103,8 @@ export type RowMenuProps = {
   lockedReason?: string
   /** 「…」の中の項目。危ない操作（tone: 'danger'）は部品が最後・区切りの下へ回す。 */
   items: ActionMenuItem[]
+  /** 操作数が少ない一覧では自動の分類見出しを省く。区切りと危険色は残す。 */
+  showGroupHeadings?: boolean
   /** 「…」ボタンの読み上げ名（例：「春のセールの操作」）。 */
   label: string
   /** メニューの読み上げ名。省略時は label。 */
@@ -119,7 +121,7 @@ export type RowMenuProps = {
    * 見た目。'plain' は一覧の標準操作、'box' は行内の小さい印ボタン。
    * 通常は線なし、乗せたときだけ薄い灰を見せる。
    */
-  appearance?: 'box' | 'plain'
+  appearance?: 'box' | 'plain' | 'outlined'
   /**
    * 「…」の大きさ（'box' のときだけ）。'row' は 28角（★V8  など、行の「その他の操作」が 28 の板）。
    * 省略時は KspUx の 36角（友だち一覧  など 36 の板）。板ごとに絵の大きさを選ぶ。
@@ -145,6 +147,7 @@ export type RowMenuProps = {
 export function RowMenu({
   lockedReason,
   items,
+  showGroupHeadings = true,
   label,
   menuLabel,
   note,
@@ -182,7 +185,7 @@ export function RowMenu({
       {appearance === 'plain' ? (
         <MoreAction {...common} label={label} buttonRef={triggerRef} className={className} data-size={size} data-row-menu="" />
       ) : (
-        <IconButton {...common} ref={triggerRef} aria-label={label} title={lockedReason ? undefined : title ?? label} className={className} size={size} variant="plain" data-row-menu="">
+        <IconButton {...common} ref={triggerRef} aria-label={label} title={lockedReason ? undefined : title ?? label} className={className} size={size} variant={appearance === 'outlined' ? undefined : 'plain'} data-row-menu="">
           <MoreHorizontal size={size === 'row' ? 14 : 16} aria-hidden="true" />
         </IconButton>
       )}
@@ -192,6 +195,7 @@ export function RowMenu({
         ariaLabel={menuLabel ?? label}
         onClose={() => setOpen(false)}
         items={orderRowMenuItems(items)}
+        showGroupHeadings={showGroupHeadings}
         note={note ?? (items.length ? undefined : 'この行に使える操作はありません')}
         anchorRef={triggerRef}
       />

@@ -57,14 +57,14 @@ describe('業種に合う初期設定の実測', () => {
     expect(stepsForStyle(input, 'ec', progress)[0]).toMatchObject({ state: 'forbidden', action: null, next: input[0].next, blockedReason: input[0].blockedReason })
   })
 
-  it('標準とスタイル未確定では既存の状態・到達条件・操作を保つ', () => {
+  it('標準にもGoogle営業時間を追加し、スタイル未確定では既存の状態を保つ', () => {
     const steps = buildSteps({ accounts: [], featureSet: null, tagCount: 1, friendFieldCount: 0, friendAdd: null, friendAddDraft: null, scenarios: [], role: null })
-    expect(stepsForStyle(steps, 'standard')).toEqual(steps)
+    expect(stepsForStyle(steps, 'standard').find(step => step.key === 'hours')).toMatchObject({ state: 'unknown', action: { href: '/settings/google-hours' } })
     expect(stepsForStyle(steps, null)).toEqual(steps)
     expect(steps.find(step => step.key === 'attributes')?.state).toBe('done')
     expect(steps.find(step => step.key === 'attributes')?.condition).toContain('タグか友だち情報欄')
     const progress: StyleSetupProgress = { style: 'ec', steps: { attributes: { complete: false } } }
-    expect(stepsForStyle(steps, 'standard', progress)).toEqual(steps)
+    expect(stepsForStyle(steps, 'standard', progress).find(step => step.key === 'hours')?.state).toBe('unknown')
     expect(stepsForStyle(steps, null, progress)).toEqual(steps)
   })
 

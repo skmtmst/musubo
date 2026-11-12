@@ -491,8 +491,9 @@ export const googleAccessGuard: MiddlewareHandler<Env> = async (c, next) => {
   if (c.get('staff')?.credential === 'api-key') {
     return fail(c, 403, 'Googleビジネスの操作は管理画面にログインしてから行ってください');
   }
-  // restaurant-test.ts と同じ統括ゲート。パック無しは環境無効と同じ404。
-  if (!(await tenantHasFeaturePack(dbFor(c.env), staffTenantId(c), 'restaurant'))) {
+  // 接続・営業時間は全業種共通。口コミ・投稿・分析の既存パック制限は維持する。
+  if (/^\/api\/restaurant-test\/google\/(?:reviews|posts|performance)(?:\/|$)/.test(c.req.path)
+    && !(await tenantHasFeaturePack(dbFor(c.env), staffTenantId(c), 'restaurant'))) {
     return fail(c, 404, 'Not found');
   }
   const requestedTenant = c.req.query('tenant_id');

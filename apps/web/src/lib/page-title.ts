@@ -62,7 +62,6 @@ const DOCUMENT_ONLY_LABELS = [
   ['/ops/tenants', '契約先アカウント（運営）'],
   ['/ops/support', 'お問い合わせ（運営）'],
   ['/ops/announcements', 'お知らせ（運営）'],
-  ['/ops/knowledge', 'ナレッジ（運営）'],
   ['/ops/audit', '監査ログ（運営）'],
   ['/ops/members', 'メンバー管理（運営）'],
   ['/ops/invite', 'メンバーの招待（運営）'],

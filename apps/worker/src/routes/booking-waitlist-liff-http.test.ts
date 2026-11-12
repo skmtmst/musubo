@@ -73,11 +73,13 @@ function makeApp(db: D1Database, route: Hono<Env>) {
 }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
-// Keep the slot within the 365-day booking window as the test suite ages.
-const slotDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-slotDate.setUTCHours(5, 0, 0, 0);
-const SLOT = slotDate.toISOString();
-const SLOT_END = new Date(slotDate.getTime() + 60 * 60 * 1000).toISOString();
+// Keep the waitlist slot in the future so the registration tests do not expire.
+const SLOT = (() => {
+  const date = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  date.setUTCHours(5, 0, 0, 0);
+  return date.toISOString();
+})();
+const SLOT_END = new Date(Date.parse(SLOT) + 60 * 60 * 1000).toISOString();
 
 let sqlite: Database.Database;
 let db: D1Database;
@@ -108,7 +110,7 @@ beforeEach(async () => {
     VALUES ('menu-a', 'account-a', 'カット', 60, 5000, 1)`).run();
   sqlite.exec(`INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES('staff-a','menu-a',1);INSERT INTO booking_settings(id,line_account_id,business_hours_configured,cutoff_minutes_before,booking_window_days) VALUES('settings-a','account-a',1,0,365);`);
   for(let i=0;i<7;i++)sqlite.prepare(`INSERT INTO booking_business_hours(id,booking_settings_id,weekday,start_time,end_time,capacity) VALUES(?,'settings-a',?,'00:00','23:59',10)`).run('h'+i,i);
-  sqlite.exec(`INSERT INTO bookings(id,line_account_id,friend_id,staff_id,menu_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at) VALUES('full','account-a','friend-b','staff-a','menu-a','${SLOT}','${SLOT_END}','${SLOT_END}','confirmed',0,'${SLOT}');`);
+  sqlite.prepare(`INSERT INTO bookings(id,line_account_id,friend_id,staff_id,menu_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at) VALUES('full','account-a','friend-b','staff-a','menu-a',?,?,?,'confirmed',0,?)`).run(SLOT, SLOT_END, SLOT_END, SLOT);
   for(let i=0;i<7;i++)sqlite.prepare(`INSERT INTO staff_availability_rules(id,staff_id,weekday,start_time,end_time) VALUES(?,'staff-a',?,'00:00','23:59')`).run('staff-h'+i,i);
   db = asD1(sqlite);
   ({ default: bookingRoute } = await import('./booking.js'));
@@ -176,8 +178,8 @@ describe('待ちのお客さま側の口', () => {
     // キャンセルで空いた枠を1番目へ案内。
     sqlite.exec("DELETE FROM bookings WHERE id='full'");
     sqlite.prepare(`UPDATE booking_waitlist SET status = 'invited',
-      ends_at='${SLOT_END}',block_ends_at='${SLOT_END}',invited_at = '2026-10-04T00:00:00.000Z',
-      hold_expires_at = '2099-01-01T00:00:00.000Z' WHERE id = ?`).run(firstId);
+      ends_at=?,block_ends_at=?,invited_at = '2026-10-04T00:00:00.000Z',
+      hold_expires_at = '2099-01-01T00:00:00.000Z' WHERE id = ?`).run(SLOT_END, SLOT_END, firstId);
 
     const declined = await app.request(selfUrl(`/api/liff/booking/waitlist/${firstId}`), {
       method: 'DELETE', headers: selfHeaders(),

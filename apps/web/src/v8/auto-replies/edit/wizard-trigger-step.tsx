@@ -316,7 +316,7 @@ export function WizardTriggerStep({ disabled = false, lockedReason, effectiveKey
                       onClick={() => patch({ timeMode: 'custom', activeFrom: '21:00', activeUntil: '09:00' })}
                       title="夜21時から朝9時まで。時刻はあとから変えられます"
                     >
-                      営業時間外だけ
+                      夜21時〜朝9時
                     </button>
                     <button disabled={disabled}
                       type="button"

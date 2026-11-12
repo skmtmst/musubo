@@ -1,6 +1,5 @@
 import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
-import { queueKnowledgeStatement } from './platform-knowledge.js';
 import type { HqSupportKind, HqSupportRequest, HqSupportStatus } from './hq-support-types.js';
 
 /**
@@ -220,7 +219,6 @@ export async function addSupportReply(
     authorStaffId: string;
     authorName: string;
     body: string;
-    aiAssisted: boolean;
     deliveredVia: string[];
     /** 返信と同時に進める stage。省略時は waiting（相手の返事待ち）。 */
     nextStage?: SupportStage;
@@ -233,10 +231,10 @@ export async function addSupportReply(
     db.prepare(`INSERT INTO hq_support_messages
                   (id, request_id, author_kind, author_staff_id, author_name, body, attachment_keys, ai_assisted, delivered_via, created_at)
                 VALUES (?, ?, 'ops', ?, ?, ?, '[]', ?, ?, ?)`)
-      .bind(id, input.requestId, input.authorStaffId, input.authorName, input.body, input.aiAssisted ? 1 : 0, JSON.stringify(input.deliveredVia), now),
+      .bind(id, input.requestId, input.authorStaffId, input.authorName, input.body, 0, JSON.stringify(input.deliveredVia), now),
     db.prepare(`UPDATE hq_support_requests
                    SET first_replied_at = COALESCE(first_replied_at, ?),
-                       last_message_at = ?, knowledge_revision = knowledge_revision + 1,
+                       last_message_at = ?,
                        stage = ?,
                        status = ?,
                        resolved_at = CASE WHEN ? IN ('resolved', 'closed') THEN COALESCE(resolved_at, ?) ELSE resolved_at END,
@@ -245,7 +243,6 @@ export async function addSupportReply(
                  WHERE id = ?`)
       .bind(now, now, stage, statusForStage(stage, true), stage, now, stage, now, now, input.requestId),
     db.prepare(`DELETE FROM hq_support_reply_drafts WHERE request_id = ?`).bind(input.requestId),
-    queueKnowledgeStatement(db, input.requestId),
   ]);
   return (await db.prepare('SELECT * FROM hq_support_messages WHERE id = ?').bind(id).first<SupportMessage>())!;
 }
@@ -263,7 +260,7 @@ export async function addSupportTenantMessage(
                 VALUES (?, ?, 'tenant', ?, ?, ?, ?, ?)`)
       .bind(id, input.requestId, input.staffId, input.staffName, input.body, JSON.stringify(input.attachmentKeys), now),
     db.prepare(`UPDATE hq_support_requests
-                   SET last_message_at = ?, knowledge_revision = knowledge_revision + 1,
+                   SET last_message_at = ?,
                        stage = CASE WHEN stage IN ('waiting', 'resolved', 'closed') THEN 'in_progress' ELSE stage END,
                        status = 'open', resolved_at = NULL, closed_at = NULL, updated_at = ?
                  WHERE id = ?`)
@@ -283,11 +280,6 @@ export async function updateSupportTicket(
   const sets: string[] = ['updated_at = ?'];
   const binds: unknown[] = [now];
   if (patch.stage) {
-    // Evaluate against the row at write time, not the earlier read: simultaneous
-    // resolution requests must share one revision/job. Closing preserves evidence.
-    sets.push(`knowledge_revision = knowledge_revision + CASE
-      WHEN stage = ? OR (stage = 'resolved' AND ? = 'closed') THEN 0 ELSE 1 END`);
-    binds.push(patch.stage, patch.stage);
     sets.push('stage = ?', 'status = ?');
     binds.push(patch.stage, statusForStage(patch.stage, current.first_replied_at !== null));
     if (patch.stage === 'resolved' || patch.stage === 'closed') { sets.push('resolved_at = COALESCE(resolved_at, ?)'); binds.push(now); }
@@ -299,10 +291,7 @@ export async function updateSupportTicket(
   if (patch.priority) { sets.push('priority = ?'); binds.push(patch.priority); }
   if (patch.assigneeStaffId !== undefined) { sets.push('assignee_staff_id = ?'); binds.push(patch.assigneeStaffId); }
   binds.push(id);
-  await db.batch([
-    db.prepare(`UPDATE hq_support_requests SET ${sets.join(', ')} WHERE id = ?`).bind(...binds),
-    queueKnowledgeStatement(db, id),
-  ]);
+  await db.prepare(`UPDATE hq_support_requests SET ${sets.join(', ')} WHERE id = ?`).bind(...binds).run();
   return getSupportTicket(db, id);
 }
 
@@ -344,7 +333,7 @@ export async function getSupportReplyDraft(db: D1Database, requestId: string): P
 
 export async function saveSupportReplyDraft(
   db: D1Database,
-  input: { requestId: string; body: string; aiGenerated: boolean; authorStaffId: string; knowledgeReferences?: { id: string; version: number; title: string }[] },
+  input: { requestId: string; body: string; authorStaffId: string },
 ): Promise<SupportReplyDraft> {
   const now = jstNow();
   await db
@@ -354,7 +343,7 @@ export async function saveSupportReplyDraft(
                 body = excluded.body, ai_generated = excluded.ai_generated,
                 generated_at = excluded.generated_at, author_staff_id = excluded.author_staff_id, updated_at = excluded.updated_at,
                 knowledge_references = excluded.knowledge_references`)
-    .bind(input.requestId, input.body, input.aiGenerated ? 1 : 0, input.aiGenerated ? now : null, input.authorStaffId, now, JSON.stringify(input.knowledgeReferences ?? []))
+    .bind(input.requestId, input.body, 0, null, input.authorStaffId, now, '[]')
     .run();
   return (await getSupportReplyDraft(db, input.requestId))!;
 }

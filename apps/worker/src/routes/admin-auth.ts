@@ -50,6 +50,8 @@ import {
   getActiveImpersonation,
   getPlatformAdminRecord,
   getPlatformAdminByStaffId,
+  getMusuboTenantBilling,
+  getLatestTenantMusuboIndividualQuote,
   getTwoFactorChallenge,
   reserveStepUpAttempt,
   stepUpAttemptRetryAfterSeconds,
@@ -835,6 +837,23 @@ adminAuth.get('/api/auth/session', async (c) => {
   const stepUpMethod = staffRecord?.totp_enabled_at && staffRecord.totp_secret_enc
     ? 'totp'
     : staffRecord?.password_hash ? 'password' : 'none';
+  // 利用開始前かどうかは、通常画面を描画する前の認証応答で確定する。
+  // 運営・代理ログインや店舗担当者の画面を新規契約の導線へ移さない。
+  const onboardingBilling = !platformAdmin && !impersonation && !staff.readOnly
+    && (staff.role === 'owner' || staff.role === 'admin')
+    ? await getMusuboTenantBilling(c.env.DB, staff.tenantId ?? DEFAULT_TENANT_ID)
+    : null;
+  const latestQuote = onboardingBilling?.status === 'awaiting_first_line'
+    ? await getLatestTenantMusuboIndividualQuote(c.env.DB, staff.tenantId ?? DEFAULT_TENANT_ID)
+    : null;
+  const onboarding = onboardingBilling?.status === 'awaiting_first_line'
+    ? {
+      status: onboardingBilling.status,
+      consentedAt: onboardingBilling.pricing_consented_at,
+      quoteId: latestQuote && (latestQuote.status === 'sent' || latestQuote.status === 'accepted')
+        ? latestQuote.id : onboardingBilling.quote_id,
+    }
+    : null;
   return c.json({
     success: true,
     data: {
@@ -845,6 +864,7 @@ adminAuth.get('/api/auth/session', async (c) => {
       impersonation,
       unfamiliarAt: currentSession?.unfamiliar_at ?? null,
       stepUpMethod,
+      onboarding,
     },
     csrfToken,
   });

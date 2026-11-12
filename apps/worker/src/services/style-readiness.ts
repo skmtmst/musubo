@@ -9,6 +9,8 @@ import {
   questionsForStyle,
 } from './style-setup-core.js';
 import { profile, profileAnswers } from './style-profile.js';
+import { connectedGoogleProfile, googleOpeningWeek } from './restaurant-google-hours-source.js';
+import { accountOpeningHours, openingWeek } from './account-opening-hours.js';
 export async function featureReadiness(
   db: D1Database,
   account: string,
@@ -24,13 +26,33 @@ export async function featureReadiness(
     answers[feature]?.value !== false;
   if (feature === 'booking') {
     const selectedStyle = styleOverride ?? p?.style;
+    if (selectedStyle === 'restaurant') {
+      const stores = (await db.prepare(`SELECT DISTINCT s.id,h.hours_json FROM rt_stores s
+        JOIN rt_tables t ON t.store_id=s.id LEFT JOIN rt_opening_hours_settings h ON h.store_id=s.id
+        WHERE s.line_account_id=? AND s.status='active' AND t.is_active=1`)
+        .bind(account).all<{ id: string; hours_json: string | null }>()).results;
+      configured = false;
+      for (const store of stores) {
+        const connection = await db.prepare('SELECT status FROM rt_google_connections WHERE store_id=?')
+          .bind(store.id).first<{ status: string }>();
+        const googleProfile = connection ? await connectedGoogleProfile(db, store.id) : null;
+        const week: unknown = connection ? googleProfile && googleOpeningWeek(googleProfile)
+          : store.hours_json ? JSON.parse(store.hours_json) : null;
+        if (Array.isArray(week) && week.some(day => day && Array.isArray(day.periods) && day.periods.length > 0)) {
+          configured = true;
+          break;
+        }
+      }
+    } else {
+    const hoursSource = await accountOpeningHours(db, account);
+    const googleWeek = openingWeek(hoursSource);
+    const googleReady = hoursSource.source === 'manual' || !!googleWeek?.some(day => day.intervals.length > 0);
     const sql =
-      selectedStyle === 'restaurant'
-        ? `SELECT 1 FROM rt_stores s JOIN rt_tables t ON t.store_id=s.id JOIN rt_opening_hours_settings h ON h.store_id=s.id WHERE s.line_account_id=? AND s.status='active' AND t.is_active=1 AND json_array_length(h.hours_json)>0 LIMIT 1`
-        : selectedStyle === 'lesson'
+      selectedStyle === 'lesson'
           ? `SELECT 1 FROM events e JOIN event_slots s ON s.event_id=e.id WHERE e.line_account_id=? AND e.is_published=1 AND e.deleted_at IS NULL AND s.deleted_at IS NULL AND s.is_active=1 LIMIT 1`
-          : `SELECT 1 FROM menus m JOIN booking_settings b ON b.line_account_id=m.line_account_id JOIN staff_menus sm ON sm.menu_id=m.id AND sm.is_offered=1 JOIN staff s ON s.id=sm.staff_id AND s.line_account_id=m.line_account_id WHERE m.line_account_id=? AND m.is_active=1 AND m.deleted_at IS NULL AND s.is_active=1 AND s.deleted_at IS NULL AND b.business_hours_configured=1 LIMIT 1`;
-    configured = !!(await db.prepare(sql).bind(account).first());
+          : `SELECT 1 FROM menus m JOIN booking_settings b ON b.line_account_id=m.line_account_id JOIN staff_menus sm ON sm.menu_id=m.id AND sm.is_offered=1 JOIN staff s ON s.id=sm.staff_id AND s.line_account_id=m.line_account_id WHERE m.line_account_id=? AND m.is_active=1 AND m.deleted_at IS NULL AND s.is_active=1 AND s.deleted_at IS NULL ${hoursSource.source === 'manual' ? 'AND b.business_hours_configured=1' : ''} LIMIT 1`;
+    configured = googleReady && !!(await db.prepare(sql).bind(account).first());
+    }
   }
   if(feature==='tickets')configured=!!await db.prepare("SELECT 1 FROM booking_pass_plans WHERE line_account_id=? AND status='on_sale' LIMIT 1").bind(account).first();
   if (feature === 'stamps') {

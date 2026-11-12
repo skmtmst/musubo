@@ -34,6 +34,7 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { isSaveConflict } from '@/components/shared/save-conflict'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import { notifyToast } from '@/components/shared/toast'
@@ -56,7 +57,6 @@ import { blockedReason,canDelete as canDeleteMedia,checkedAtText,dialogTitle,ref
 import MediaDetailDialog from './media-detail-dialog'
 import MediaPreviewOverlay from './media-preview-overlay'
 import { MediaQuotaGuidance } from './media-quota-guidance'
-import MediaReplacementDialog from './media-replacement-dialog'
 import MediaUploadDialog from './media-upload-dialog'
 import { formatMediaSize } from './media-usage-display'
 import { TextField as SharedTextField } from '@/components/shared/text-field'
@@ -150,10 +150,11 @@ export default function MediaLibraryListV8() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   /** 名前を直している札。null なら誰も直していない。 */
-  const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null)
+  const [renaming, setRenaming] = useState<{ id: string; value: string; revision?: number } | null>(null)
   // 名前変更の多重押し防ぎと、札のそばに出す失敗文。一覧全体の欄には出さない。
   const [renamingBusy, setRenamingBusy] = useState(false)
   const [renameError, setRenameError] = useState('')
+  const [renameConflict, setRenameConflict] = useState(false)
   const depth = useContext(OverlayDepthContext)
   const renameOriginal = renaming ? items.find(item => item.id === renaming.id)?.filename : undefined
   const editBusy = renamingBusy || (archiveTarget !== null && archiveBusy) || (moveTarget !== null && moveBusy)
@@ -181,7 +182,6 @@ export default function MediaLibraryListV8() {
   const [detailRetry, setDetailRetry] = useState(0)
   const detailRequestRef = useRef(0)
   const detailAccountRef = useRef<string | null | undefined>(undefined)
-  const [replacementFor, setReplacementFor] = useState<MediaItem | null>(null)
   /*
     1件ずつの削除確認（設計 `YfTfJ`）。**窓を開けてから読む。**
     一覧を出すたびに全件ぶん読むと、消さない人にも7種類の走査が走る。
@@ -428,7 +428,6 @@ export default function MediaLibraryListV8() {
     if (accountLoading) return
     setSelected(new Set())
     setDetailsFor(null)
-    setReplacementFor(null)
     setPreview(null)
     setPage(1)
     // m26m: 別アカウントの総数を残さない。読み直すまで「すべて」は未知。
@@ -468,23 +467,57 @@ export default function MediaLibraryListV8() {
     if (!renaming || !selectedAccountId || renamingBusy) return
     const accountAtRequest = selectedAccountId
     const filename = renaming.value.trim()
-    if (!filename) return
+    if (!filename) {
+      setRenameError('ファイル名を入力してください。')
+      return
+    }
+    if (!renaming.revision) {
+      setRenameError('現在の版を確認できません。最新の名前を読み直してください。')
+      setRenameConflict(true)
+      return
+    }
     setRenamingBusy(true)
     setRenameError('')
     try {
-      const res = await api.media.update(renaming.id, accountAtRequest, { filename })
+      const res = await api.media.update(renaming.id, accountAtRequest, { filename, expectedRevision: renaming.revision })
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
         setRenameError(`「${renaming.value}」に変更できませんでした。${res.error}`)
         return
       }
       setRenaming(null)
+      notifyToast(`「${res.data.filename}」に名前を変更しました。`, { tone: 'success' })
       void load()
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
+      if (isSaveConflict(saveFailure)) {
+        setRenameError('')
+        setRenameConflict(true)
+      } else if (!fieldFailure) {
+        setRenameError(describeApiFailure(saveFailure, '名前の変更'))
+      }
+    } finally {
+      setRenamingBusy(false)
+    }
+  }
 
-      { if (!fieldFailure)
-      setRenameError('名前の変更に失敗しました。もう一度お試しください。') }
+  const reloadRename = async () => {
+    if (!renaming || !selectedAccountId || renamingBusy) return
+    const accountAtRequest = selectedAccountId
+    setRenamingBusy(true)
+    try {
+      const response = await api.media.detail(renaming.id, accountAtRequest)
+      if (accountAtRequest !== latestAccountRef.current) return
+      if (!response.success || !response.data.item.revision) {
+        setRenameError('最新の名前を読み込めませんでした。もう一度お試しください。')
+        return
+      }
+      setRenaming({ id: renaming.id, value: response.data.item.filename, revision: response.data.item.revision })
+      setItems((current) => current.map((item) => item.id === renaming.id ? response.data.item : item))
+      setRenameConflict(false)
+      setRenameError('')
+    } catch (failure) {
+      setRenameError(describeApiFailure(failure, '最新の名前の読み込み'))
     } finally {
       setRenamingBusy(false)
     }
@@ -643,12 +676,17 @@ export default function MediaLibraryListV8() {
    */
   async function confirmMove() {
     if (!moveTarget || !selectedAccountId || moveBusy) return
+    if (!moveTarget.revision) {
+      setMoveError('現在の版を確認できません。一覧を読み直してから選び直してください。')
+      return
+    }
     const accountAtRequest = selectedAccountId
     const { id, filename } = moveTarget
     setMoveBusy(true)
     setMoveError('')
     try {
       const res = await api.media.update(id, accountAtRequest, {
+        expectedRevision: moveTarget.revision,
         folderId: moveFolderId || null,
       })
       if (accountAtRequest !== latestAccountRef.current) return
@@ -664,8 +702,9 @@ export default function MediaLibraryListV8() {
       const fieldFailure = saveErrors.capture(e);
 
       if (e instanceof ApiError && e.status === 409) {
-        { if (!fieldFailure)
-        setMoveError('直前に誰かが変えたため、移動できませんでした。一覧を読み直しました。') }
+        if (!fieldFailure) setMoveError('直前に誰かが変えました。一覧を読み直してから選び直してください。')
+        setMoveTarget(null)
+        notifyToast('直前に誰かが変えたため移動できませんでした。一覧を読み直して選び直してください。', { tone: 'error' })
         void load();
 
         return
@@ -831,10 +870,6 @@ export default function MediaLibraryListV8() {
         folderName={detailsFor.folderId ? detailFolderName ?? '—（未取得）' : '未分類'}
         canManage={canManageMedia}
         onClose={() => setDetailUrl(null)}
-        onOpenReplacement={(item) => {
-          setDetailUrl(null)
-          setReplacementFor(item)
-        }}
         onVersionCreated={(message) => {
           setDetailUrl(null)
           notifyToast(message)
@@ -1065,9 +1100,6 @@ export default function MediaLibraryListV8() {
       )}
       pagination={(
         <div className={styles.footBlock}>
-          <p className={styles.helpNote}>
-            「…」から プレビュー・使用箇所を見る・名前を変える・フォルダへ移す・ダウンロード・アーカイブ・削除（使っているものは消せません）。
-          </p>
           {listKnown && !loadFailed ? (
             <ListPager>
                 <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />
@@ -1125,23 +1157,11 @@ export default function MediaLibraryListV8() {
           closeDeleteDialog()
         }}
         footer={deleting && impact && (impact.usageCount > 0 || canDeleteMedia({ impact, busy: false })) ? (
-          <DialogActions leadingAction={impact && impact.verified !== false && !impact.canDelete ? '使用先から外して削除' : undefined}>
+          <DialogActions leadingAction={impact && impact.verified !== false && !impact.canDelete ? '使用先から外すと削除できます' : undefined}>
             <>
               <Button type="button" onClick={closeDeleteDialog} disabled={deleteBusy}>
                 キャンセル
               </Button>
-              {deleting && impact && impact.usageCount > 0 ? (<Button
-                  type="button"
-                  variant="primary"
-                  disabled={deleteBusy}
-                  onClick={() => {
-                    const source = deleting
-                    closeDeleteDialog()
-                    setReplacementFor(source)
-                  }}
-                >
-                  別のメディアに差し替える
-                </Button>) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
               {canDeleteMedia({ impact, busy: deleteBusy }) ? (<Button type="button" variant="primary" onClick={() => void confirmDeleteOne()} busy={deleteBusy} busyLabel="処理中…">削除する
                 </Button>) : null}
@@ -1194,7 +1214,7 @@ export default function MediaLibraryListV8() {
             ) : null}
 
             <p>
-              {impact.verified !== false && impact.usageCount > 0 ? <>使われている場所から外すと削除できます。別のメディアを選ぶと、使用先をまとめて差し替えられます。<br /></> : null}
+              {impact.verified !== false && impact.usageCount > 0 ? <>使われている場所から外すと削除できます。<br /></> : null}
               {checkedAtText(impact.checkedAt)} 時点で、{impact.verified === false ? '確認できなかった場所があります。' : '登録メディアの使用先を確認しました。'}
             </p>
           </div>
@@ -1338,18 +1358,6 @@ export default function MediaLibraryListV8() {
         }}
       />
 
-      <MediaReplacementDialog
-        source={replacementFor}
-        accountId={selectedAccountId}
-        onClose={() => setReplacementFor(null)}
-        onComplete={(message) => {
-          setReplacementFor(null)
-          notifyToast(message)
-          void load()
-        }}
-      />
-
-
       {preview && (
         <MediaPreviewOverlay
           filename={preview.filename}
@@ -1411,6 +1419,7 @@ export default function MediaLibraryListV8() {
                   menuOpen={openMenuId === item.id}
                   renaming={renaming?.id === item.id ? renaming : null}
                   renamingBusy={renamingBusy}
+                  renameConflict={renameConflict}
                   renameError={renameError}
                   onToggleSelect={() =>
                     setSelected((prev) => {
@@ -1423,19 +1432,15 @@ export default function MediaLibraryListV8() {
                   onPreview={() => setPreview(item)}
                   onToggleMenu={() => setOpenMenuId((currentId) => (currentId === item.id ? null : item.id))}
                   onCloseMenu={() => setOpenMenuId(null)}
-                  onDetail={() => guard.guarded(() => setDetailUrl(item.id))}
                   onDownload={() => { void downloadItem(item) }}
-                  onRenameStart={() => guard.guarded(() => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) })}
+                  onRenameStart={() => guard.guarded(() => { setRenameError(''); setRenameConflict(false); setRenaming({ id: item.id, value: item.filename, revision: item.revision }) })}
                   onRenameCancel={() => guard.guarded(() => setRenaming(null))}
-                  onRenameChange={(value) => setRenaming({ id: item.id, value })}
+                  onRenameChange={(value) => setRenaming((current) => current?.id === item.id ? { ...current, value } : current)}
                   onRenameConfirm={() => { void rename() }}
+                  onRenameReload={() => { void reloadRename() }}
                   onMoveStart={() => guard.guarded(() => { setMoveError(''); setMoveFolderId(item.folderId ?? ''); setMoveTarget(item) })}
                   onArchiveStart={() => guard.guarded(() => { setArchiveError(''); setArchiveReason(''); setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' }) })}
                   onDeleteStart={() => guard.guarded(() => { void openDelete(item) })}
-                  onReplaceStart={() => guard.guarded(() => {
-                    closeDeleteDialog()
-                    setReplacementFor(item)
-                  })}
                 />
               ))}
             </ListPageCards>

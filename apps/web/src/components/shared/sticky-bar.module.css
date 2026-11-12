@@ -168,6 +168,17 @@
 }
 
 .inlineBar[data-presentation='distribution'] { justify-content: center; gap: var(--tpl-wh-check-gap); padding: var(--tpl-htn-footer-pad); background: var(--color-canvas); box-shadow: var(--tpl-htn-line-top); }
+.inlineBar[data-presentation='support-reply'] { position: sticky; bottom: 0; z-index: 2; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-12); background: var(--color-board-tint); }
+.inlineBar[data-presentation='support-reply'] > :first-child { margin-right: auto; }
+.inlineBar[data-presentation='support-reply'] :global([data-choice-field][aria-label='送信後の状態']) { min-height: 32px; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+.inlineBar[data-presentation='support-reply'] > :last-child { min-width: 146px; height: var(--support-send-height, var(--tpl-button-h)); justify-content: center; box-shadow: none; }
+@media (min-width: 1024px) and (max-width: 1250px) {
+  .inlineBar[data-presentation='support-reply'] > :last-child { width: 100%; }
+}
+@media (max-width: 640px) {
+  .inlineBar[data-presentation='support-reply'] { position: fixed; right: 0; left: 0; gap: 6px; background: var(--color-canvas); margin: 0; padding: var(--space-8) var(--space-18, 18px) calc(30px + env(safe-area-inset-bottom, 0px)); }
+  .inlineBar[data-presentation='support-reply'] > :last-child { width: 100%; height: 48px; }
+}
 
 .region { position: sticky; bottom: 0; z-index: 2; margin-top: auto; display: flex; flex-direction: column; gap: var(--sticky-region-gap); }
 

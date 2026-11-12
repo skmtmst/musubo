@@ -143,7 +143,7 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigu
               <span aria-hidden="true">{step.ordinal ?? index + 1}. </span><span>{step.label}</span>
               <span className="sr-only">{step.done ? '（済み）' : step.state === 'unknown' ? '（未確認）' : step.state === 'forbidden' ? '（権限がありません）' : '（まだ）'}</span>
             </SetupStepLabel>
-            {!step.done && (readOnly || step.state === 'forbidden') ? <><Button size="compact" lockedReason={lockUnless(false, 'manager')}>開く</Button></> : !step.done && !step.href ? <span className={styles.count}>未確認</span> : step.done ? null : (
+            {(!step.done || step.key === 'hours') && (readOnly || step.state === 'forbidden') ? <><Button size="compact" lockedReason={lockUnless(false, 'manager')}>開く</Button></> : !step.done && !step.href ? <span className={styles.count}>未確認</span> : step.done && step.key !== 'hours' ? null : (
               <>
                 <TextLink tone="action" href={step.href!} className={styles.link} aria-label={`${step.label}（${step.link.replace(' →', '')}）`}>{step.link.replace(' →', '')}</TextLink>
               </>

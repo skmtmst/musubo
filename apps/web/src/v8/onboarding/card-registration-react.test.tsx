@@ -26,7 +26,7 @@ afterEach(() => {
   host.remove()
 })
 
-describe('Stripeカード登録からLINE接続へ', () => {
+describe('Stripeクレジットカード登録からLINE接続へ', () => {
   it('Stripe以外やHTTPの転送先を開かない', () => {
     expect(isStripeCardSetupUrl('https://checkout.stripe.com/c/setup/abc')).toBe(true)
     expect(isStripeCardSetupUrl('http://checkout.stripe.com/c/setup/abc')).toBe(false)
@@ -39,10 +39,10 @@ describe('Stripeカード登録からLINE接続へ', () => {
     calls.cardSetup.mockResolvedValue({ success: true, data: { url: 'https://checkout.stripe.com/c/setup/test' } })
     const open = vi.fn()
     await act(async () => { root.render(<CardRegistration onOpenStripe={open} />) })
-    expect(host.textContent).toContain('カードを登録してください')
+    expect(host.textContent).toContain('クレジットカードを登録してください')
     expect(host.textContent).toContain('musuboにカード番号やセキュリティコードは保存されません')
     expect(host.querySelector('input')).toBeNull()
-    const button = [...host.querySelectorAll('button')].find((element) => element.textContent?.includes('Stripeでカードを登録する'))!
+    const button = [...host.querySelectorAll('button')].find((element) => element.textContent?.includes('Stripeでクレジットカードを登録する'))!
     await act(async () => { button.click() })
     expect(calls.cardSetup).toHaveBeenCalledOnce()
     expect(open).toHaveBeenCalledWith('https://checkout.stripe.com/c/setup/test')
@@ -77,10 +77,16 @@ describe('Stripeカード登録からLINE接続へ', () => {
 
   it('登録が中断されたら料金を保ったまま再開を案内する', async () => {
     calls.cardStatus.mockResolvedValue({ success: true, data: { registered: false } })
-    await act(async () => { root.render(<CardRegistration returnState="cancel" />) })
-    expect(host.textContent).toContain('カード登録はまだ完了していません')
-    expect(host.textContent).toContain('料金の確認内容を保ったまま')
-    expect(host.textContent).toContain('カードを登録し直す')
+    const back = vi.fn()
+    await act(async () => { root.render(<CardRegistration returnState="cancel" onBackToPricing={back} />) })
+    expect(host.textContent).toContain('クレジットカード登録はまだ完了していません')
+    expect(host.textContent).toContain('料金の確認内容は保存されています')
+    expect(host.textContent).toContain('クレジットカードを登録できませんでした')
+    expect(host.textContent).toContain('クレジットカード未登録・LINE未接続・本日の請求 ¥0')
+    expect(host.textContent).toContain('クレジットカードを登録し直す')
+    const backButton = [...host.querySelectorAll('button')].find(element => element.textContent?.includes('料金確認に戻る'))!
+    await act(async () => { backButton.click() })
+    expect(back).toHaveBeenCalledOnce()
     expect(host.textContent).not.toContain('LINEアカウントの接続へ')
   })
 })

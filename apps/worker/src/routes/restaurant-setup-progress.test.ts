@@ -31,16 +31,30 @@ async function progress(store?: string) {
 }
 function hours(store = 'store-ginza') {
   database.raw.prepare('INSERT INTO rt_opening_hours_settings(store_id,hours_json,updated_by) VALUES(?,?,?)')
-    .run(store, JSON.stringify([{ day: 1, periods: [{ opensAt: '09:00', closesAt: '18:00' }] }]), 'owner');
+    .run(store, JSON.stringify([{ weekday: 1, periods: [{ opensAt: '09:00', closesAt: '18:00' }] }]), 'owner');
+}
+function googleHours(store = 'store-ginza') {
+  const location = `accounts/111/locations/${store}`;
+  const weekly = Object.fromEntries(['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
+    .map(day => [day, day === 'MONDAY' ? [{ open: '09:00', close: '18:00' }] : []]));
+  database.raw.prepare(`INSERT INTO rt_google_connections
+    (id,store_id,line_account_id,location_name,refresh_token_enc,status) VALUES(?,?,?,?,?,?)`)
+    .run(`connection-${store}`, store, 'account-2', location, 'encrypted', 'connected');
+  database.raw.prepare(`INSERT INTO rt_google_profiles
+    (store_id,location_name,profile_json,fingerprint,fetched_at,updated_at) VALUES(?,?,?,?,?,?)`)
+    .run(store, location, JSON.stringify({ profile: { name: `locations/${store}`, openStatus: 'OPEN', regularHours: weekly, specialHours: [] } }), 'fingerprint', '2026-11-10T00:00:00Z', '2026-11-10T00:00:00Z');
 }
 it('卓が無くても営業時間を独立に判定し、他店のメニューを混ぜない', async () => {
   database.raw.exec("UPDATE rt_tables SET is_active=0 WHERE store_id='store-ginza'; UPDATE rt_menu_items SET status='archived' WHERE store_id='store-ginza'");
   hours();
+  expect(await progress()).toMatchObject({ hours: false, reception: false });
+  googleHours();
   expect(await progress()).toMatchObject({ tables: false, hours: true, menus: false, reception: false, followup: false });
   expect(await progress('store-yokohama')).toMatchObject({ tables: false, hours: false, menus: false });
 });
 it('過去300件の後ろにある未来の設定も数え、満席の自動停止を未設定にしない', async () => {
   hours();
+  googleHours();
   const insert = database.raw.prepare('INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity,line_capacity) VALUES(?,?,?,?,?)');
   for (let index = 0; index < 301; index++) insert.run(`old-${index}`, 'store-ginza', new Date(Date.UTC(2020, 0, 1, index)).toISOString(), 4, 4);
   insert.run('future', 'store-ginza', '2099-01-01T00:00:00Z', 4, 4);

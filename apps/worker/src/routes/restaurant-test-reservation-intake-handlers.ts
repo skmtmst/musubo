@@ -112,7 +112,7 @@ export const post__api_restaurant_test_reservations_manual_3 = async (c: Context
   const checked = validateInboundReservation({ ...body, externalId: `manual-${crypto.randomUUID()}` });
   if (!checked.ok) return inputError(c, { success: false, error: checked.error, field: checked.field }, 400, []);
   if (body.source === 'phone') {
-    const failure = await phoneIntakeFailure(dbFor(c.env, storeId), storeId, checked.value.startsAt);
+    const failure = await phoneIntakeFailure(dbFor(c.env, storeId), storeId, checked.value.startsAt, checked.value.endsAt);
     if (failure) return c.json({ success: false, code: failure, error: failure }, 409);
   }
   await expireRestaurantHolds(dbFor(c.env, storeId), undefined, storeId);

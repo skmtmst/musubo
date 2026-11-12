@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import { createHqSupportRequest, addSupportTenantMessage, statusForStage } from '@line-crm/db';
+import { createHqSupportRequest, statusForStage } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -10,7 +10,7 @@ const mail = vi.hoisted(() => ({
 }));
 vi.mock('../services/plain-mail.js', () => ({ sendPlainMail: mail.sendPlainMail }));
 
-const { opsSupport, buildDraftPrompt } = await import('./ops-support.js');
+const { opsSupport } = await import('./ops-support.js');
 const { hqSupport } = await import('./hq-support.js');
 
 /**
@@ -20,7 +20,7 @@ const { hqSupport } = await import('./hq-support.js');
 
 let testDb: SqliteD1;
 
-function app(staff: AuthenticatedStaff, ai?: { run: (model: string, input: unknown) => Promise<unknown> }) {
+function app(staff: AuthenticatedStaff) {
   const instance = new Hono<Env>();
   instance.use('*', async (c, next) => {
     c.set('staff', staff);
@@ -28,22 +28,21 @@ function app(staff: AuthenticatedStaff, ai?: { run: (model: string, input: unkno
   });
   instance.route('/', opsSupport);
   instance.route('/', hqSupport);
-  return { request: (path: string, init?: RequestInit) => instance.request(path, init, environment(ai)) };
+  return { request: (path: string, init?: RequestInit) => instance.request(path, init, environment()) };
 }
 
-function environment(ai?: { run: (model: string, input: unknown) => Promise<unknown> }): Env['Bindings'] {
+function environment(): Env['Bindings'] {
   return {
     DB: testDb.db,
     ADMIN_ORIGIN: 'https://admin.example.com',
     ADMIN_PUBLIC_URL: 'https://admin.example.com',
     WORKER_URL: 'https://api.example.com',
-    AI: ai as unknown as Ai,
   } as Env['Bindings'];
 }
 
-const master: AuthenticatedStaff = { id: 'master-1', name: '見本 25', role: 'owner', readOnly: false, tenantId: null };
+const master: AuthenticatedStaff = { id: 'master-1', name: '坂本 真人', role: 'owner', readOnly: false, tenantId: null };
 const readOnlyMaster: AuthenticatedStaff = { ...master, id: 'master-ro', readOnly: true };
-const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '見本 141', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
+const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '山田 太郎', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
 
 function json(body: unknown, method = 'POST') {
   return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
@@ -51,7 +50,7 @@ function json(body: unknown, method = 'POST') {
 
 async function seedTicket(subject = '回答フォームからタグが付かない') {
   return createHqSupportRequest(testDb.db, {
-    tenantId: 'tenant-a', staffId: 'owner-1', staffName: '見本 141', staffEmail: 'yamada@example.com',
+    tenantId: 'tenant-a', staffId: 'owner-1', staffName: '山田 太郎', staffEmail: 'yamada@example.com',
     kind: 'bug', subject, body: '設定したタグが友だちに付きません。', lineAccountId: null, attachmentKeys: [],
   });
 }
@@ -61,9 +60,9 @@ beforeEach(() => {
   mail.sendPlainMail.mockClear();
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_key, plan_status) VALUES ('tenant-a', '株式会社サンプル', 'active', 'standard', 'active')`).run();
   for (const [id, name, tenant, email] of [
-    ['master-1', '見本 25', null, null],
+    ['master-1', '坂本 真人', null, null],
     ['master-ro', '閲覧のみ', null, null],
-    ['owner-1', '見本 141', 'tenant-a', 'yamada@example.com'],
+    ['owner-1', '山田 太郎', 'tenant-a', 'yamada@example.com'],
   ] as const) {
     testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, email) VALUES (?, ?, 'owner', ?, ?, ?)`)
       .run(id, name, `${id}-key`, tenant, email);
@@ -71,6 +70,62 @@ beforeEach(() => {
   for (const id of ['master-1', 'master-ro']) {
     testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active) VALUES (?, 1)`).run(id);
   }
+});
+
+describe('返信テンプレート', () => {
+  it('初期フォルダを表示し、作ったフォルダとテンプレートを読み直して引用できる', async () => {
+    const initial = await app(master).request('/api/ops/support/templates');
+    expect(initial.status).toBe(200);
+    const initialBody = await initial.json() as { data: { folders: Array<{ id: string; name: string }>; templates: unknown[] } };
+    expect(initialBody.data.folders.map((folder) => folder.name)).toEqual([
+      '契約・解約', '使い方・操作', '請求・支払い', 'LINE連携・配信', '不具合・障害', 'その他',
+    ]);
+    expect(initialBody.data.templates).toEqual([]);
+
+    const createdFolder = await app(master).request('/api/ops/support/template-folders', json({ name: 'キャンペーン対応' }));
+    expect(createdFolder.status).toBe(201);
+    const folder = (await createdFolder.json() as { data: { id: string } }).data;
+    const createdTemplate = await app(master).request('/api/ops/support/templates', json({ folderId: folder.id, title: '確認のご案内', body: 'お問い合わせありがとうございます。' }));
+    expect(createdTemplate.status).toBe(201);
+    const reopened = await app(master).request('/api/ops/support/templates');
+    const catalog = await reopened.json() as { data: { folders: Array<{ id: string }>; templates: Array<{ folderId: string; title: string; body: string }> } };
+    expect(catalog.data.folders.some((item) => item.id === folder.id)).toBe(true);
+    expect(catalog.data.templates).toContainEqual(expect.objectContaining({ folderId: folder.id, title: '確認のご案内', body: 'お問い合わせありがとうございます。' }));
+  });
+
+  it('閲覧のみは作成できず、重複フォルダと不明な保存先を拒否する', async () => {
+    expect((await app(readOnlyMaster).request('/api/ops/support/template-folders', json({ name: '追加' }))).status).toBe(403);
+    expect((await app(master).request('/api/ops/support/template-folders', json({ name: '契約・解約' }))).status).toBe(409);
+    expect((await app(master).request('/api/ops/support/templates', json({ folderId: 'missing', title: '案内', body: '本文' }))).status).toBe(400);
+  });
+
+  it('既存テンプレートを編集・削除し、古い版での上書きと削除を拒否する', async () => {
+    const created = await app(master).request('/api/ops/support/templates', json({ folderId: 'contracts', title: '解約の案内', body: '元の本文' }));
+    const template = (await created.json() as { data: { id: string; updatedAt: string } }).data;
+    const url = `/api/ops/support/templates/${template.id}`;
+    const input = { folderId: 'billing', title: '請求の案内', body: '新しい本文', expectedUpdatedAt: template.updatedAt };
+
+    expect((await app(readOnlyMaster).request(url, json(input, 'PATCH'))).status).toBe(403);
+    expect((await app(master).request(url, json({ ...input, folderId: 'missing' }, 'PATCH'))).status).toBe(400);
+    const changed = await app(master).request(url, json(input, 'PATCH'));
+    expect(changed.status).toBe(200);
+    const saved = (await changed.json() as { data: { id: string; folderId: string; title: string; body: string; createdAt: string; updatedAt: string } }).data;
+    expect(saved).toMatchObject({ id: template.id, folderId: 'billing', title: '請求の案内', body: '新しい本文' });
+    expect(saved.createdAt).toBeTruthy();
+    const catalog = await (await app(master).request('/api/ops/support/templates')).json() as { data: { templates: Array<{ id: string; title: string }> } };
+    expect(catalog.data.templates).toContainEqual(expect.objectContaining({ id: template.id, title: '請求の案内' }));
+
+    expect((await app(master).request(url, json(input, 'PATCH'))).status).toBe(409);
+    expect((await app(master).request(url, json({ expectedUpdatedAt: template.updatedAt }, 'DELETE'))).status).toBe(409);
+    expect((await app(readOnlyMaster).request(url, json({ expectedUpdatedAt: saved.updatedAt }, 'DELETE'))).status).toBe(403);
+    expect((await app(master).request(url, json({ expectedUpdatedAt: saved.updatedAt }, 'DELETE'))).status).toBe(200);
+    expect((await app(master).request(url, json({ expectedUpdatedAt: saved.updatedAt }, 'DELETE'))).status).toBe(404);
+    const remaining = await (await app(master).request('/api/ops/support/templates')).json() as { data: { templates: Array<{ id: string }> } };
+    expect(remaining.data.templates.some((item) => item.id === template.id)).toBe(false);
+    const archived = testDb.raw.prepare('SELECT value FROM platform_settings WHERE key = ?')
+      .get(`ops.support.reply.template:${template.id}`) as { value: string };
+    expect(JSON.parse(archived.value)).toMatchObject({ id: template.id, title: '請求の案内', archivedAt: expect.any(String) });
+  });
 });
 
 describe('チケット番号と一覧', () => {
@@ -84,7 +139,7 @@ describe('チケット番号と一覧', () => {
     const body = await res.json() as { data: Array<{ ticketLabel: string; stage: string; tenantName: string; staffName: string }>; total: number };
     expect(body.total).toBe(2);
     expect(body.data[0].ticketLabel).toBe('#MB-0002');
-    expect(body.data[0]).toMatchObject({ stage: 'new', tenantName: '株式会社サンプル', staffName: '見本 141' });
+    expect(body.data[0]).toMatchObject({ stage: 'new', tenantName: '株式会社サンプル', staffName: '山田 太郎' });
     const summary = await app(master).request('/api/ops/support/summary');
     const s = await summary.json() as { data: { byStage: Record<string, number>; kpis: { untouched: number } } };
     expect(s.data.byStage.new).toBe(2);
@@ -138,7 +193,7 @@ describe('詳細・状態・優先度', () => {
     expect(body.data.ticket.staffEmailRegistered).toBe(true);
     expect(body.data.tenant).toMatchObject({ staffCount: 1, staffWithLine: 0, pastTickets: 0 });
     expect(body.data.messages).toEqual([]);
-    expect(body.data.ai.available).toBe(false);
+    expect(body.data.ai).toBeUndefined();
     const audit = testDb.raw.prepare(`SELECT action, visible_to_tenant FROM platform_audit_logs WHERE tenant_id = 'tenant-a'`).all() as Array<{ action: string; visible_to_tenant: number }>;
     expect(audit).toEqual([{ action: 'ticket.view', visible_to_tenant: 0 }]);
   });
@@ -150,6 +205,10 @@ describe('詳細・状態・優先度', () => {
     let row = testDb.raw.prepare('SELECT stage, status, resolved_at, closed_at FROM hq_support_requests WHERE id = ?').get(t.id) as Record<string, unknown>;
     expect(row).toMatchObject({ stage: 'resolved', status: 'closed' });
     expect(row.resolved_at).toBeTruthy();
+    const knowledgeJobs = testDb.raw.prepare('SELECT COUNT(*) AS n FROM platform_knowledge_jobs').get() as { n: number };
+    expect(knowledgeJobs.n).toBe(0);
+    const revision = testDb.raw.prepare('SELECT knowledge_revision AS n FROM hq_support_requests WHERE id = ?').get(t.id) as { n: number };
+    expect(revision.n).toBe(0);
     expect(row.closed_at).toBeNull();
     await app(master).request(`/api/ops/support/tickets/${t.id}`, json({ stage: 'closed' }, 'PATCH'));
     row = testDb.raw.prepare('SELECT stage, status, closed_at FROM hq_support_requests WHERE id = ?').get(t.id) as Record<string, unknown>;
@@ -187,7 +246,7 @@ describe('詳細・状態・優先度', () => {
 describe('返信', () => {
   it('返信すると登録メールへ送り、統括の履歴に載り、待ちになる', async () => {
     const t = await seedTicket();
-    const res = await app(master).request(`/api/ops/support/tickets/${t.id}/reply`, json({ body: 'ご連絡ありがとうございます。確認します。', aiAssisted: false }));
+    const res = await app(master).request(`/api/ops/support/tickets/${t.id}/reply`, json({ body: 'ご連絡ありがとうございます。確認します。' }));
     expect(res.status).toBe(201);
     const body = await res.json() as { data: { ticket: { stage: string; replyCount: number; firstRepliedAt: string | null }; message: { authorKind: string; deliveredVia: string[] }; mailSent: boolean } };
     expect(body.data.ticket.stage).toBe('waiting');
@@ -210,7 +269,7 @@ describe('返信', () => {
     expect(list.data[0].ticketLabel).toBe('#MB-0001');
     expect(list.data[0].status).toBe('answered');
     expect(list.data[0].replies).toHaveLength(1);
-    expect(list.data[0].replies[0].authorName).toBe('見本 25');
+    expect(list.data[0].replies[0].authorName).toBe('坂本 真人');
     const audit = testDb.raw.prepare(`SELECT action, visible_to_tenant FROM platform_audit_logs WHERE action = 'ticket.reply'`).get() as { action: string; visible_to_tenant: number };
     expect(audit.visible_to_tenant).toBe(1);
   });
@@ -240,13 +299,13 @@ describe('返信', () => {
   });
 });
 
-describe('下書きと AI', () => {
+describe('下書き', () => {
   it('下書きは保存・上書き・削除でき、返信すると消える', async () => {
     const t = await seedTicket();
     const saved = await app(master).request(`/api/ops/support/tickets/${t.id}/draft`, json({ body: '書きかけ' }, 'PUT'));
     expect(saved.status).toBe(200);
-    let detail = await (await app(master).request(`/api/ops/support/tickets/${t.id}`)).json() as { data: { draft: { body: string; aiGenerated: boolean } | null } };
-    expect(detail.data.draft).toMatchObject({ body: '書きかけ', aiGenerated: false });
+    let detail = await (await app(master).request(`/api/ops/support/tickets/${t.id}`)).json() as { data: { draft: { body: string } | null } };
+    expect(detail.data.draft).toMatchObject({ body: '書きかけ' });
     await app(master).request(`/api/ops/support/tickets/${t.id}/draft`, json({ body: '' }, 'PUT'));
     detail = await (await app(master).request(`/api/ops/support/tickets/${t.id}`)).json() as { data: { draft: null } };
     expect(detail.data.draft).toBeNull();
@@ -256,93 +315,12 @@ describe('下書きと AI', () => {
     expect(row.n).toBe(0);
   });
 
-  it('AI が未設定なら 503。設定済みなら Workers AI の結果が下書きに入る', async () => {
-    const t = await seedTicket();
-    const none = await app(master).request(`/api/ops/support/tickets/${t.id}/draft/ai`, json({}));
-    expect(none.status).toBe(503);
-    const run = vi.fn(async (_model: string, _input: unknown) => ({ response: '見本さま\nご連絡ありがとうございます。' }));
-    const res = await app(master, { run }).request(`/api/ops/support/tickets/${t.id}/draft/ai`, json({}));
-    expect(res.status).toBe(201);
-    const body = await res.json() as { data: { body: string; aiGenerated: boolean; generatedAt: string | null } };
-    expect(body.data.aiGenerated).toBe(true);
-    expect(body.data.body).toContain('[匿名]さま');
-    expect(body.data.generatedAt).toBeTruthy();
-    expect(run).toHaveBeenCalledWith('@cf/meta/llama-3.3-70b-instruct-fp8-fast', expect.objectContaining({ messages: expect.any(Array), max_tokens: 900 }));
-    const input = run.mock.calls[0][1] as { messages: Array<{ role: string; content: string }> };
-    // 個人のメールアドレスは AI に渡さない
-    expect(input.messages.map((m) => m.content).join('\n')).not.toContain('yamada@example.com');
-    expect(input.messages.map((m) => m.content).join('\n')).not.toContain('見本');
-    expect(input.messages.map((m) => m.content).join('\n')).not.toContain('株式会社サンプル');
+  it('AI 下書き API を公開せず、手動返信だけを受け付ける', async () => {
+    const ticket = await seedTicket();
+    const response = await app(master).request(`/api/ops/support/tickets/${ticket.id}/draft/ai`, json({}));
+    expect(response.status).toBe(404);
   });
 
-  it('AI が時間内に返らなければ 504 で、下書きは作られない', async () => {
-    vi.useFakeTimers();
-    try {
-      const t = await seedTicket();
-      const run = vi.fn(() => new Promise<unknown>(() => {}));
-      const pending = app(master, { run }).request(`/api/ops/support/tickets/${t.id}/draft/ai`, json({}));
-      await vi.advanceTimersByTimeAsync(46_000);
-      const res = await pending;
-      expect(res.status).toBe(504);
-      expect((await res.json() as { error: string }).error).toContain('45 秒');
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-  it('最新の追加説明から根拠を探し、個別回答を生成する。除外しても記事は他の問い合わせに残る', async () => {
-    const source = await seedTicket('過去に解決した請求書の問い合わせ');
-    testDb.raw.prepare("UPDATE hq_support_requests SET stage = 'resolved' WHERE id = ?").run(source.id);
-    const exampleSource = await seedTicket('過去の回答例');
-    testDb.raw.prepare("UPDATE hq_support_requests SET stage = 'resolved' WHERE id = ?").run(exampleSource.id);
-    testDb.raw.prepare(`INSERT INTO platform_knowledge_articles (id,source_request_id,source_revision,title,question,answer,kind,article_kind,review_state,status,created_at,updated_at)
-      VALUES ('billing-evidence',?,0,'請求書の再発行','請求書','承認済みの対応根拠','billing','verified','approved','active','2026-09-21','2026-09-21')`).run(source.id);
-    testDb.raw.prepare(`INSERT INTO platform_knowledge_articles (id,source_request_id,source_revision,title,question,answer,kind,article_kind,review_state,status,created_at,updated_at)
-      VALUES ('billing-example',?,0,'請求書の再発行','請求書','未確認の回答例','billing','answer_example','approved','active','2026-09-21','2026-09-21')`).run(exampleSource.id);
-    const t = await seedTicket('画面がうまく使えない');
-    await addSupportTenantMessage(testDb.db, { requestId: t.id, staffId: 'owner-1', staffName: '見本 141', body: '説明を訂正します。請求書の再発行です。再ログインは実施済みです。', attachmentKeys: [] });
-    const run = vi.fn(async () => ({ response: '状況を確認するため追加の情報をお願いします。' }));
-    const res = await app(master, { run }).request(`/api/ops/support/tickets/${t.id}/draft/ai`, json({}));
-    expect(res.status).toBe(201);
-    expect((await res.json() as { data: { references: { id: string; articleKind: string }[] } }).data.references).toEqual([
-      expect.objectContaining({ id: 'billing-evidence', articleKind: 'verified' }),
-      expect.objectContaining({ id: 'billing-example', articleKind: 'answer_example' }),
-    ]);
-    const call = run.mock.calls[0] as unknown as [string, { messages: { role: string; content: string }[] }];
-    expect(call[1].messages[1].content).toContain('再ログインは実施済み');
-    expect(call[1].messages[1].content).toContain('承認済みの対応根拠');
-    expect(call[1].messages[0].content).toContain('記事の回答文を転用せず');
-    expect(call[1].messages[0].content).toContain('実施済みの操作を理由なく繰り返し勧めない');
-    expect(call[1].messages[0].content).toContain('使える根拠がない場合');
-    expect(call[1].messages[0].content).toContain('回答例は運営の回答内容の参考であり、解決の実績ではない');
-    expect(call[1].messages[1].content).toContain('解決確認済み');
-    expect(call[1].messages[1].content).toContain('回答例（お客様の確認なし）');
-    const excluded = await app(master, { run }).request(`/api/ops/support/tickets/${t.id}/draft/ai`, json({ excludeArticleIds: ['billing-evidence'] }));
-    expect((await excluded.json() as { data: { references: { id: string }[] } }).data.references)
-      .toEqual([expect.objectContaining({ id: 'billing-example' })]);
-    expect(JSON.stringify(run.mock.calls[1])).not.toContain('承認済みの対応根拠');
-    expect(testDb.raw.prepare('SELECT status FROM platform_knowledge_articles WHERE id = ?').get('billing-evidence')).toEqual({ status: 'active' });
-    expect(mail.sendPlainMail).not.toHaveBeenCalled();
-  });
-
-  it('AI が失敗したら 502 で、下書きは作られない', async () => {
-    const t = await seedTicket();
-    const run = vi.fn(async () => { throw new Error('model unavailable'); });
-    const res = await app(master, { run }).request(`/api/ops/support/tickets/${t.id}/draft/ai`, json({}));
-    expect(res.status).toBe(502);
-    const row = testDb.raw.prepare('SELECT COUNT(*) AS n FROM hq_support_reply_drafts').get() as { n: number };
-    expect(row.n).toBe(0);
-  });
-
-  it('AI へ渡す材料にはやり取りと担当者名が入り、署名の指示がある', () => {
-    const prompt = buildDraftPrompt({
-      ticket: { ticketLabel: '#MB-0312', subject: '件名', body: '本文', kindLabel: '不具合', staffName: '見本 141', staffRole: 'オーナー', tenantName: '株式会社サンプル', planLabel: 'スタンダード' },
-      messages: [{ authorKind: 'ops', authorName: '見本 25', body: '確認します。' }],
-      opsName: '見本 25',
-    });
-    expect(prompt.user).toContain('#MB-0312');
-    expect(prompt.user).toContain('musubo 運営 ／ 見本 25');
-    expect(prompt.system).toContain('署名');
-  });
 });
 
 describe('運営が起票する', () => {
@@ -352,7 +330,7 @@ describe('運営が起票する', () => {
     const res = await app(master).request('/api/ops/support/tickets', json({ tenantId: 'tenant-a', subject: '電話で受けた相談', body: '配信が届かないとのこと', priority: 'high', staffId: 'owner-1' }));
     expect(res.status).toBe(201);
     const body = await res.json() as { data: { ticketLabel: string; channel: string; priority: string; stage: string; staffName: string } };
-    expect(body.data).toMatchObject({ ticketLabel: '#MB-0001', channel: 'ops', priority: 'high', stage: 'new', staffName: '見本 141' });
+    expect(body.data).toMatchObject({ ticketLabel: '#MB-0001', channel: 'ops', priority: 'high', stage: 'new', staffName: '山田 太郎' });
     const audit = testDb.raw.prepare(`SELECT COUNT(*) AS n FROM platform_audit_logs WHERE action = 'ticket.create'`).get() as { n: number };
     expect(audit.n).toBe(1);
   });

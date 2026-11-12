@@ -230,11 +230,6 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: { mode: 'exempt', reason: '運営が契約先の権限者へ送るお知らせで、アカウント機能に属さない' },
   },
   {
-    name: 'platform knowledge',
-    classification: { kind: 'core', reason: '運営専用の解決済み問い合わせナレッジ' },
-    enforcement: { mode: 'exempt', reason: '運営専用でアカウント機能に属さない' },
-  },
-  {
     name: 'billing invoice sync',
     classification: { kind: 'core', reason: '運営ダッシュボードのStripe入金実績' },
     enforcement: { mode: 'exempt', reason: '契約先の課金台帳同期で、アカウント機能に属さない' },
@@ -371,11 +366,10 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   },
   {
     name: 'google business resync',
-    classification: { kind: 'feature', featureId: 'restaurant_test' },
+    classification: { kind: 'core', reason: 'Google営業時間の定期更新は全業種共通。口コミ・投稿だけ飲食店機能で制限する' },
     enforcement: {
-      mode: 'gated',
-      sources: ['apps/worker/src/services/google-business-resync.ts'],
-      markers: ["'restaurant_test', 'google business resync'"],
+      mode: 'exempt',
+      reason: '接続済みのGoogle営業時間を全業種で更新するため、ジョブ全体を飲食店機能で止めない',
     },
   },
   {

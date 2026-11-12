@@ -6,6 +6,7 @@ import {
   clearSelectionAfterAuthentication,
   decideRootLanding,
   hqOpenHref,
+  isOnboardingContinuationPath,
   musuboOnboardingResumePath,
   resolveHqOpenTarget,
   resolveStoreReturnPath,
@@ -53,6 +54,17 @@ describe('登録途中の再開先', () => {
       .toBe('/hq/onboarding/quotes?id=quote-1')
     expect(musuboOnboardingResumePath({ status: 'trialing', quoteId: null, consentedAt: '2026-11-09' }))
       .toBeNull()
+  })
+
+  it('利用開始中は通常画面を閉じ、必要な再開画面だけを開ける', () => {
+    expect(isOnboardingContinuationPath('/hq/onboarding/pricing', '/hq/onboarding/pricing')).toBe(true)
+    expect(isOnboardingContinuationPath('/hq/onboarding/card', '/hq/onboarding/card')).toBe(true)
+    expect(isOnboardingContinuationPath('/hq/support', '/hq/onboarding/quotes?id=q1')).toBe(true)
+    expect(isOnboardingContinuationPath('/accounts/new', '/hq/onboarding/pricing')).toBe(false)
+    expect(isOnboardingContinuationPath('/accounts/new', '/hq/onboarding/card')).toBe(true)
+    for (const path of ['/', '/hq', '/friends', '/notifications']) {
+      expect(isOnboardingContinuationPath(path, '/hq/onboarding/card')).toBe(false)
+    }
   })
 })
 

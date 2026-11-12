@@ -1,9 +1,9 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { useRouter, usePathname } from 'next/navigation'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
-import { clearSelectionAfterAuthentication } from '@/lib/hq-navigation'
+import { clearSelectionAfterAuthentication, isOnboardingContinuationPath, musuboOnboardingResumePath } from '@/lib/hq-navigation'
 import { isPublicAuthPath } from '@/lib/auth-email'
 import { MOBILE_LOGIN_NEXT, isMobileShellPath } from '@/lib/mobile-shell'
 import { SESSION_LOST_EVENT, type OpsImpersonation } from '@/lib/api'
@@ -29,7 +29,13 @@ import { TenantAccessProvider, type TenantStatus } from './tenant-access-context
  *   書き換え（storageイベント）で即座に捨てる
  */
 const SESSION_REUSE_MS = 30_000
-let lastSessionCheck: { at: number; fingerprint: string; tenantStatus: TenantStatus } | null = null
+let lastSessionCheck: { at: number; fingerprint: string; tenantStatus: TenantStatus; onboardingPath: string | null } | null = null
+const OnboardingAccessContext = createContext<string | null>(null)
+
+/** 初回LINE有効化前は、接続ウィザードも含めて通常のサイドバーを描画しない。 */
+export function useOnboardingAccess(): boolean {
+  return useContext(OnboardingAccessContext) !== null
+}
 /*
  * R505: 確認の要求世代。確認を始めるたびに1ずつ進む。
  *
@@ -60,6 +66,7 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
   const pathname = usePathname()
   const [checked, setChecked] = useState(false)
   const [tenantStatus, setTenantStatus] = useState<TenantStatus>('active')
+  const [onboardingPath, setOnboardingPath] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -93,8 +100,10 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
       && lastSessionCheck.tenantStatus === 'active'
       && lastSessionCheck.fingerprint === fingerprint
       && Date.now() - lastSessionCheck.at < SESSION_REUSE_MS
+      && (!lastSessionCheck.onboardingPath || isOnboardingContinuationPath(pathname, lastSessionCheck.onboardingPath))
     ) {
       setTenantStatus(lastSessionCheck.tenantStatus)
+      setOnboardingPath(lastSessionCheck.onboardingPath)
       setChecked(true)
       return () => {
         cancelled = true
@@ -103,17 +112,11 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
       }
     }
 
-    /*
-     * 読み直した直後（タブ内の使い回しが消えた）でも、同じタブで確認が通っていれば
-     * 中身を先に出し、下の確認は裏で走らせる（lib/auth-check-marker.ts）。
-     * 失敗したらいつもどおりログインへ送り、停止中なら停止の画面に変わる。
-     */
+    // 再読込時の印は画面を先出しする根拠にしない。契約状態が別タブや運営側で
+    // 変わっていても、最新の利用開始状態を取得するまで通常メニューを描画しない。
     const verified = readAuthCheck(fingerprint)
-    if (verified) {
-      if (verified.snapshot) rememberSessionSnapshot(verified.snapshot)
-      setTenantStatus('active')
-      setChecked(true)
-    }
+    if (verified?.snapshot) rememberSessionSnapshot(verified.snapshot)
+    setChecked(false)
 
     // Verify the session via the HttpOnly cookie. /api/auth/session returns the
     // staff identity and refreshes the CSRF token if it was lost (e.g. reload).
@@ -155,7 +158,11 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
         const nextTenantStatus: TenantStatus = data.data.tenantStatus === 'suspended' || data.data.tenantStatus === 'archived'
           ? data.data.tenantStatus
           : 'active'
+        const nextOnboardingPath = data.data.onboarding
+          ? musuboOnboardingResumePath(data.data.onboarding)
+          : null
         setTenantStatus(nextTenantStatus)
+        setOnboardingPath(nextOnboardingPath)
         localStorage.setItem('lh_staff_permissions', JSON.stringify(data.data.permissionKeys ?? []))
         // N-424: 「見えるだけ」のキーは別枠で持つ。メニュー表示には両方を使う。
         localStorage.setItem('lh_staff_view_permissions', JSON.stringify(data.data.viewPermissionKeys ?? []))
@@ -175,10 +182,13 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
         clearSelectionAfterAuthentication(localStorage, sessionStorage)
         // 確認した時点の指紋で記憶する（CSRF更新を受けたなら新しい値で）。
         const confirmedFingerprint = sessionFingerprint(handoffToken)
-        lastSessionCheck = { at: Date.now(), fingerprint: confirmedFingerprint, tenantStatus: nextTenantStatus }
+        lastSessionCheck = { at: Date.now(), fingerprint: confirmedFingerprint, tenantStatus: nextTenantStatus, onboardingPath: nextOnboardingPath }
         // 読み直しても中身を先に出せるよう、このタブに印を残す（停止中は残さない）。
-        rememberAuthCheck(confirmedFingerprint, nextTenantStatus, snapshot)
-        if (!cancelled) setChecked(true)
+        rememberAuthCheck(confirmedFingerprint, nextTenantStatus, snapshot, nextOnboardingPath)
+        if (nextOnboardingPath && !isOnboardingContinuationPath(pathname, nextOnboardingPath)) {
+          setChecked(false)
+          router.replace(nextOnboardingPath)
+        } else if (!cancelled) setChecked(true)
       } catch {
         // 古い確認の失敗で新しいログインの状態を消さない。送りもしない。
         if (cancelled || mySeq !== authSessionCheckSeq) return
@@ -202,9 +212,10 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
     }
   }, [pathname, router])
 
-  // 初めての確認（開いた直後・ログイン直後）だけ。くるくるではなく外枠の骨組みで待つ。
-  // 電話の画面では PC の左メニューの骨組みを出さない（確認が済むまで中身も出さない）。
-  if (!checked) return isMobileShellPath(pathname) ? <div role="status" aria-busy="true" aria-label="読み込み中" /> : <AuthPendingShell />
+  // 認証と利用開始状態の確認中は、通常画面の外枠を描画しない。
+  if (!checked || (onboardingPath && !isOnboardingContinuationPath(pathname, onboardingPath))) {
+    return isMobileShellPath(pathname) ? <div role="status" aria-busy="true" aria-label="読み込み中" /> : <AuthPendingShell />
+  }
 
   if ((tenantStatus === 'suspended' || tenantStatus === 'archived') && !pathname.startsWith('/hq/support')) {
     return <TenantAccessProvider status={tenantStatus}><TenantSuspended /></TenantAccessProvider>
@@ -214,5 +225,5 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
     return <TenantAccessProvider status={tenantStatus}>{suspendedSupport}</TenantAccessProvider>
   }
 
-  return <TenantAccessProvider status={tenantStatus}>{children}</TenantAccessProvider>
+  return <TenantAccessProvider status={tenantStatus}><OnboardingAccessContext.Provider value={onboardingPath}>{children}</OnboardingAccessContext.Provider></TenantAccessProvider>
 }

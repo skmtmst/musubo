@@ -297,11 +297,13 @@ describe('Googleビジネス：APIキーによる間接利用の遮断（受入�
 });
 
 describe('Googleビジネス：設定（接続）', () => {
-  it('統括に飲食店機能パックが無いと、環境が有効でも404にする', async () => {
+  it('飲食店以外の統括もGoogleビジネスの接続画面を使える', async () => {
     testDb.raw.prepare(`UPDATE tenants SET feature_packs = '[]' WHERE id = ?`).run(TENANT);
     seedStore();
     const response = await call('/api/restaurant-test/google/connection?account_id=account-2');
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(200);
+    const reviews = await call('/api/restaurant-test/google/reviews?account_id=account-2');
+    expect(reviews.status).toBe(404);
   });
 
   it('店舗未登録のLINEアカウントは1店舗として初期化し、接続画面を表示できる', async () => {

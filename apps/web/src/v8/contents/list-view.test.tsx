@@ -30,18 +30,19 @@ const base = {
   createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-02T00:00:00.000Z',
 }
 const PHOTO = { ...base, id: 'm-photo', folderId: 'mf-photo', filename: '秋の新商品.jpg', kind: 'image', mimeType: 'image/jpeg', sizeBytes: 1200000, width: 1200, height: 800, durationMs: null, usageCount: 2, url: 'https://example.test/p.jpg' }
-const MOVIE = { ...base, id: 'm-movie', folderId: null, filename: '使い方ガイド.mp4', kind: 'video', mimeType: 'video/mp4', sizeBytes: 38000000, width: null, height: null, durationMs: 60000, usageCount: 0, url: 'https://example.test/m.mp4' }
+const MOVIE = { ...base, id: 'm-movie', revision: 3, folderId: null, filename: '使い方ガイド.mp4', kind: 'video', mimeType: 'video/mp4', sizeBytes: 38000000, width: null, height: null, durationMs: 60000, usageCount: 0, url: 'https://example.test/m.mp4' }
 const UNKNOWN = { ...base, id: 'm-doc', folderId: null, filename: 'メニュー表.pdf', kind: 'file', mimeType: 'application/pdf', sizeBytes: 2100000, width: null, height: null, durationMs: null, url: 'https://example.test/d.pdf' }
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 
-type Call = { method: string; path: string; params: URLSearchParams }
+type Call = { method: string; path: string; params: URLSearchParams; ifMatch: string | null }
 let calls: Call[] = []
 let media: Array<Record<string, unknown>> = []
 /** 一覧の口が返す総数。ページ送りを試すときだけ件数より大きくする。 */
 let listTotal: number | null = null
 /** 一覧本体の返事を止めておく口。読み込み中の表示を見るときだけ使う。 */
 let listGate: Promise<void> | null = null
+let conflictRename = false
 let root: Root
 let host: HTMLDivElement
 
@@ -51,6 +52,7 @@ beforeEach(() => {
   media = [PHOTO, MOVIE, UNKNOWN]
   listTotal = null
   listGate = null
+  conflictRename = false
   document.documentElement.dataset.theme = 'v8'
   window.history.replaceState(null, '', '/contents')
   host = document.createElement('div')
@@ -59,7 +61,8 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), 'http://worker.test')
     const method = (init?.method ?? 'GET').toUpperCase()
-    calls.push({ method, path: url.pathname, params: url.searchParams })
+    const ifMatch = new Headers(init?.headers).get('If-Match')
+    calls.push({ method, path: url.pathname, params: url.searchParams, ifMatch })
     if (url.pathname === '/api/staff/me') return json({ success: true, data: { id: 'staff-1', role: fixture.role } })
     if (url.pathname === '/api/media/counts') return json({ success: true, data: { total: 3, byKind: { image: 1, video: 1, audio: 0, file: 1 }, unused: 1, archived: 0 } })
     if (url.pathname === '/api/media/quota') {
@@ -77,6 +80,16 @@ beforeEach(() => {
       const rows = filtered && params.get('limit') !== '1' ? [] : media
       return json({ success: true, data: { items: rows, total: filtered ? 0 : listTotal ?? rows.length, limit: Number(params.get('limit') ?? 20), offset: Number(params.get('offset') ?? 0) } })
     }
+    if (url.pathname === '/api/media/m-movie/delete-impact') return json({ success: true, data: { media: { id: 'm-movie', filename: MOVIE.filename, kind: 'video' }, usageCount: 0, references: [], checkedAt: '2026-11-10T00:00:00Z', lastScannedAt: null, verified: true, canDelete: true, recommendedAction: 'delete', versions: [] } })
+    if (url.pathname === '/api/media/m-movie' && method === 'PATCH') {
+      if (conflictRename) return json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に保存しました' }, 409)
+      if (ifMatch !== '3') return json({ success: false, code: 'EXPECTED_VERSION_REQUIRED', error: 'If-Match に確認した版が必要です' }, 400)
+      const changes = JSON.parse(String(init?.body)) as { filename?: string; folderId?: string | null; usageExpiresAt?: string | null; usageConsentNote?: string | null }
+      const updated = { ...MOVIE, ...changes, revision: 4 }
+      media = media.map((item) => item.id === 'm-movie' ? updated : item)
+      return json({ success: true, data: updated })
+    }
+    if (url.pathname === '/api/media/m-movie' && method === 'GET') return json({ success: true, data: { item: conflictRename ? { ...MOVIE, filename: '別の人の名前.mp4', revision: 4 } : MOVIE, folderName: null } })
     return json({ success: false, error: 'not mocked' }, 404)
   }))
 })
@@ -221,19 +234,23 @@ describe('数の帯と札', () => {
     expect(calls.some((call) => call.path === '/api/media/quota' && call.params.get('accountId') === 'account-a')).toBe(true)
   })
 
-  it('札は種別と容量・使用先を出し、未取得の使用数を0件に見せない', async () => {
+  it('札は写真・名前・種別と容量だけを出し、選択は写真の右上に置く', async () => {
     await render()
-    const cardOf = (name: string) => host.querySelector(`button[aria-label="${name}のプレビューを見る"]`)!.parentElement!
+    const cardOf = (name: string) => host.querySelector(`button[aria-label="${name}のプレビューを見る"]`)!.closest('[data-design-part="card"]')!
     const photo = cardOf('秋の新商品.jpg')
-    expect(photo.textContent).toContain('使用先：2 か所')
+    expect(photo.textContent).not.toContain('使用先：')
     expect(photo.querySelector('p[title]')?.getAttribute('title')).toBe('JPG ／ 1200×800 ／ 1.1 MB')
     const movie = cardOf('使い方ガイド.mp4')
-    expect(movie.textContent).toContain('使用先：どこでも使っていない')
+    expect(movie.textContent).not.toContain('使用先：')
     expect(movie.querySelector('p[title]')?.getAttribute('title')).toBe('MP4 ／ 60秒 ／ 36.2 MB')
     const doc = cardOf('メニュー表.pdf')
-    expect(doc.textContent).toContain('使用先：確かめられません')
-    expect(doc.textContent).not.toContain('どこでも使っていない')
+    expect(doc.textContent).not.toContain('使用先：')
     expect(doc.querySelector('p[title]')?.getAttribute('title')).toBe('PDF ／ 2.0 MB')
+    for (const name of ['秋の新商品.jpg', '使い方ガイド.mp4', 'メニュー表.pdf']) {
+      const preview = host.querySelector(`button[aria-label="${name}のプレビューを見る"]`)!
+      const select = host.querySelector(`input[aria-label="${name}を選ぶ"]`)!
+      expect(select.closest('[class*="selectCorner"]')?.parentElement).toBe(preview.parentElement)
+    }
   })
 
   it('使っている・使用先が分からない札は選べず、理由を添える。使っていない札だけ選べて一括の帯が出る', async () => {
@@ -252,9 +269,83 @@ describe('数の帯と札', () => {
   it('管理者の「…」は全部の操作を出し、削除は危ない操作として区切りの下に置く', async () => {
     await render()
     await click(host.querySelector('button[aria-label="使い方ガイド.mp4のその他操作"]'))
-    expect(menuItems()).toEqual(['プレビュー', '使用箇所を見る', 'ダウンロード', '名前を変える', 'フォルダへ移す', 'アーカイブ', '別のメディアに差し替える', '削除する'])
+    expect(menuItems()).toEqual(['プレビュー', 'ダウンロード', '名前を変える', 'フォルダへ移す', 'アーカイブ', '削除する'])
+    expect(document.querySelector('[role="menu"]')?.textContent).not.toContain('変える・整理する')
     const deleteItem = [...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === '削除する')
     expect(deleteItem?.closest('[data-menu-group]')?.getAttribute('data-menu-group')).toBe('destructive')
+    for (const [label, icon] of [['プレビュー', 'eye'], ['ダウンロード', 'download'], ['名前を変える', 'pencil'], ['フォルダへ移す', 'folder-input'], ['アーカイブ', 'archive'], ['削除する', 'trash-2']]) {
+      const row = [...document.querySelectorAll('[role="menuitem"]')].find((candidate) => candidate.textContent?.trim() === label)
+      expect(row?.querySelector(`svg.lucide-${icon}`), `${label} の印`).not.toBeNull()
+    }
+  })
+
+  it('名前変更は一覧で読んだ版を送って保存し、新しい名前を表示する', async () => {
+    await render()
+    await click(host.querySelector('button[aria-label="使い方ガイド.mp4のその他操作"]'))
+    await click([...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === '名前を変える'))
+    const field = host.querySelector<HTMLInputElement>('input[aria-label="ファイル名"]')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '新しいガイド.mp4')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(button('保存する', host))
+    expect(calls.find((call) => call.method === 'PATCH' && call.path === '/api/media/m-movie')?.ifMatch).toBe('3')
+    expect(host.textContent).toContain('新しいガイド.mp4')
+  })
+
+  it('フォルダ移動も一覧で読んだ版を送る', async () => {
+    await render()
+    await click(host.querySelector('button[aria-label="使い方ガイド.mp4のその他操作"]'))
+    await click([...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === 'フォルダへ移す'))
+    await click(button('移す', document))
+    expect(calls.find((call) => call.method === 'PATCH' && call.path === '/api/media/m-movie')?.ifMatch).toBe('3')
+  })
+
+  it('名前変更が競合したら入力を残し、最新を読み直してから再編集できる', async () => {
+    conflictRename = true
+    await render()
+    await click(host.querySelector('button[aria-label="使い方ガイド.mp4のその他操作"]'))
+    await click([...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === '名前を変える'))
+    await click(button('保存する', host))
+    expect(host.textContent).toContain('ほかの人が先に名前を変更しました')
+    expect((host.querySelector('input[aria-label="ファイル名"]') as HTMLInputElement).value).toBe('使い方ガイド.mp4')
+    expect(button('保存する', host)?.disabled).toBe(true)
+    await click(button('最新を読み込んで続ける', host))
+    expect((host.querySelector('input[aria-label="ファイル名"]') as HTMLInputElement).value).toBe('別の人の名前.mp4')
+    expect(button('保存する', host)?.disabled).toBe(false)
+  })
+
+  it('詳細の利用期限・同意の保存も詳細で読んだ版を送る', async () => {
+    window.history.replaceState(null, '', '/contents?id=m-movie')
+    await render()
+    await click(button('記録する', host))
+    const field = host.querySelector<HTMLInputElement>('input[placeholder^="例：出演者"]')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '利用許諾を確認済み')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(button('保存する', host))
+    expect(calls.find((call) => call.method === 'PATCH' && call.path === '/api/media/m-movie')?.ifMatch).toBe('3')
+    expect(host.textContent).toContain('利用許諾を確認済み')
+  })
+
+  it('詳細の保存が競合したら入力を残し、最新を読み込んで再編集できる', async () => {
+    conflictRename = true
+    window.history.replaceState(null, '', '/contents?id=m-movie')
+    await render()
+    await click(button('記録する', host))
+    const field = host.querySelector<HTMLInputElement>('input[placeholder^="例：出演者"]')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '入力中の記録')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(button('保存する', host))
+    expect(host.textContent).toContain('ほかの人が先に利用の期限・同意を変更しました')
+    expect(field.value).toBe('入力中の記録')
+    expect(button('保存する', host)?.disabled).toBe(true)
+    await click(button('最新を読み込んで続ける', host))
+    expect(field.value).toBe('')
+    expect(button('保存する', host)?.disabled).toBe(false)
   })
 
   it('閲覧のみの「…」はプレビューとダウンロードだけで、選ぶ札も出さない', async () => {

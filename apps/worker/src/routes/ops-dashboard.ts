@@ -14,7 +14,6 @@ import {
   getPlatformSetting,
   latestPaidBillingInvoices,
   listContractTenants,
-  knowledgeMetrics,
   type TenantPlanRow,
 } from '@line-crm/db';
 
@@ -94,7 +93,7 @@ opsDashboard.get('/api/ops/dashboard', async (c) => {
   const nextMonthStart = jstMonthStart(y, m + 1);
   const nowIso = jstIso(now);
 
-  const [tenants, canceled, alerts, tickets, line, usage, events, ai, invoiceCount, lastSyncedAt] = await Promise.all([
+  const [tenants, canceled, alerts, tickets, line, usage, events, invoiceCount, lastSyncedAt] = await Promise.all([
     listContractTenants(db, DEFAULT_TENANT_ID),
     canceledAtByTenant(db),
     dashboardAlerts(db, {
@@ -106,7 +105,6 @@ opsDashboard.get('/api/ops/dashboard', async (c) => {
     dashboardLineRegistration(db, DEFAULT_TENANT_ID),
     dashboardUsage(db, { excludeTenantId: DEFAULT_TENANT_ID, from: thisMonthStart, to: nextMonthStart }),
     countBillingEventsByType(db, { from: range.from, to: range.to, types: ['customer.subscription.deleted', 'invoice.payment_failed'] }),
-    knowledgeMetrics(db, thisMonthStart, nextMonthStart),
     countBillingInvoices(db, DEFAULT_TENANT_ID),
     getPlatformSetting(db, BILLING_INVOICES_LAST_SYNCED_KEY),
   ]);
@@ -246,7 +244,6 @@ opsDashboard.get('/api/ops/dashboard', async (c) => {
       lineRegistration: { registered: line.registered, total: line.total, unregisteredCount: line.unregistered.length },
       usage: usageRows,
       generatedAt: nowIso,
-      ai,
     },
   });
 });

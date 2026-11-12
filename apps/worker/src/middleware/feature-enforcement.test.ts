@@ -49,6 +49,8 @@ function testApp(handler = vi.fn((c) => c.json({ success: true }))) {
   app.get('/api/instagram/messages', handler);
   app.get('/api/restaurant-test/google/connection', handler);
   app.post('/api/restaurant-test/google/connect/start', handler);
+  app.get('/api/restaurant-test/google/profile', handler);
+  app.get('/api/restaurant-test/google/hours/workspace', handler);
   app.get('/api/restaurant-test/google/reviews', handler);
   app.get('/api/not-in-manifest', handler);
   app.post('/api/nen/rank-settings/initialize', handler);
@@ -88,6 +90,8 @@ describe('featureEnforcementMiddleware', () => {
     ['DELETE', '/api/instagram/connection'],
     ['GET', '/api/restaurant-test/google/connection'],
     ['POST', '/api/restaurant-test/google/connect/start'],
+    ['GET', '/api/restaurant-test/google/profile'],
+    ['GET', '/api/restaurant-test/google/hours/workspace'],
   ])('%s %s は機能オフでもSNS接続設定を開ける', async (method, path) => {
     mocks.getAccountSetting.mockResolvedValue(JSON.stringify({ enabled: false }));
     const { app, handler } = testApp();

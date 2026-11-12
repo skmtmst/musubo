@@ -105,7 +105,7 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
   const legacy = Boolean(accountStyle && accountStyle !== 'restaurant')
   const canConfigure = staffRole === 'owner' || staffRole === 'admin'
   const canWrite = canConfigure || staffRole === 'staff'
-  const hoursHref = `/restaurant-test/inventory?storeId=${encodeURIComponent(storeId)}#rs-hours-title`
+  const hoursHref = '/restaurant-test/google?tab=hours'
   const legacyHref = accountStyle === 'salon' || accountStyle === 'consult' ? '/booking/bookings/new' : accountStyle === 'lesson' ? '/events' : null
   const todayInput = toYmd(new Date())
   const [kind, setKind] = useState(preset.hold ? 'hold' : 'customer')
@@ -135,7 +135,7 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
   const [dayAttempt, setDayAttempt] = useState(0)
   const [hoursFailure, setHoursFailure] = useState('')
   const [dayFailure, setDayFailure] = useState('')
-  const scopeKey = JSON.stringify([selectedAccountId, storeId])
+  const scopeKey = JSON.stringify([selectedAccountId, storeId, date])
   const dayKey = JSON.stringify([selectedAccountId, storeId, date])
   const [dayData, setDayData] = useState<{ key: string; rows: RestaurantReservation[] } | null>(null)
   const dayReady = Boolean(selectedAccountId && storeId && dayData?.key === dayKey)
@@ -180,8 +180,8 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
     let current = true
     setHoursData(null)
     setHoursFailure('')
-    if (!selectedAccountId || !storeId) return
-    void restaurantTestApi.openingHours(selectedAccountId, storeId).then((res) => { if (current) { if (res.data.hours === undefined) setHoursFailure(scopeKey); else setHoursData({ key: scopeKey, hours: res.data.hours }) } }).catch(() => { if (current) setHoursFailure(scopeKey) })
+    if (!selectedAccountId || !storeId || !date) return
+    void restaurantTestApi.openingHours(selectedAccountId, storeId, date).then((res) => { if (current) { if (res.data.hours === undefined) setHoursFailure(scopeKey); else setHoursData({ key: scopeKey, hours: res.data.hours }) } }).catch(() => { if (current) setHoursFailure(scopeKey) })
     return () => { current = false }
   }, [selectedAccountId, storeId, scopeKey, hoursAttempt])
 

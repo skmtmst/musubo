@@ -291,7 +291,7 @@ async function renderEditor(viewOnly = false) {
   const availabilityCallsBeforeRender = fixture.getAvailability.mock.calls.length
   render(<><StaffShiftsPage /><ToastHost /></>)
   // N-411: 閲覧のみの人には保存ボタンを出さない。代わりに閲覧注記を待つ。
-  await screen.findByText(viewOnly ? 'この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。' : fixture.tab === 'holidays' ? '臨時休業を足す' : '開ける時間')
+  await screen.findByText(viewOnly ? 'この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。' : fixture.tab === 'holidays' ? '臨時休業を足す' : '営業時間')
   await waitFor(() => expect(fixture.getAvailability.mock.calls.length).toBeGreaterThan(availabilityCallsBeforeRender))
   await act(async () => { await Promise.resolve() })
 }
@@ -386,7 +386,7 @@ describe('店舗営業時間の編集', () => {
 
     switchAccount('account-b')
     await waitFor(() => expect(fixture.getSettings).toHaveBeenCalledWith('account-b'))
-    await screen.findByText('開ける時間')
+    await screen.findByText('営業時間')
     await act(async () => {
       resolveSave({ success: true, data: settings('account-a', { version: 1, businessHoursConfigured: true }) })
       await Promise.resolve()

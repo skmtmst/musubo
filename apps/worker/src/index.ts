@@ -211,7 +211,6 @@ import { hqBilling } from './routes/hq-billing.js';
 import { authEmail } from './routes/auth-email.js';
 import { opsInvite } from './routes/ops-invite.js';
 import { opsSupport } from './routes/ops-support.js';
-import { opsKnowledge } from './routes/ops-knowledge.js';
 import { opsDashboard } from './routes/ops-dashboard.js';
 import { opsBilling } from './routes/ops-billing.js';
 import { opsAnnouncements } from './routes/ops-announcements.js';
@@ -250,6 +249,8 @@ export const app = new Hono<Env>();
 export const ADMIN_REQUEST_HEADERS = [
   'Content-Type',
   'Authorization',
+  'If-Match',
+  'If-None-Match',
   'X-CSRF-Token',
   'X-Line-Account-Id',
   'x-admin-api-key',
@@ -516,7 +517,6 @@ app.route('/', hqBilling);
 app.route('/', authEmail);
 app.route('/', opsInvite);
 app.route('/', opsSupport);
-app.route('/', opsKnowledge);
 app.route('/', opsDashboard);
 app.route('/', opsBilling);
 app.route('/', opsAnnouncements);

@@ -3,10 +3,9 @@
 import Link from '@/components/shared/list-navigation'
 import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import {
-  BookOpen,
   Building2,
+  MessagesSquare,
   LayoutDashboard,
-  LifeBuoy,
   Megaphone,
   Menu,
   ScrollText,
@@ -43,9 +42,8 @@ export const OPS_MENU: Array<{ href: string; label: string; icon: typeof LayoutD
   { href: '/ops/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
   { href: '/ops/applications', label: '申込アカウント', icon: Building2 },
   { href: '/ops/tenants', label: '契約先アカウント', icon: Building2 },
-  { href: '/ops/support', label: 'お問い合わせ', icon: LifeBuoy },
+  { href: '/ops/support', label: 'お問い合わせ', icon: MessagesSquare },
   { href: '/ops/announcements', label: 'お知らせ', icon: Megaphone },
-  { href: '/ops/knowledge', label: 'ナレッジ', icon: BookOpen },
   { href: '/ops/audit', label: '監査ログ', icon: ScrollText },
 ]
 

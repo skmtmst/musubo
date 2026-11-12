@@ -13,7 +13,7 @@ const { gate } = await vi.hoisted(async () => {
   const { createElement } = await import('react')
   return { gate: (name: string) => ({ default: ({ children }: { children: React.ReactNode }) => createElement('div', { 'data-gate': name }, children) }) }
 })
-vi.mock('./auth-guard', () => gate('auth'))
+vi.mock('./auth-guard', () => ({ ...gate('auth'), useOnboardingAccess: () => false }))
 vi.mock('./hq-access-gate', () => gate('hq-access'))
 vi.mock('./view-permission-gate', () => gate('view-permission'))
 vi.mock('./root-landing-gate', () => gate('root-landing'))
@@ -52,5 +52,14 @@ describe('外枠の門', () => {
     expect(chain(page)).toEqual(['feature-disabled', 'store-selection', 'root-landing', 'view-permission', 'hq-access', 'auth'])
     expect(view.container.querySelector('[data-top-bar]')).not.toBeNull()
     expect(view.container.querySelector('[data-sidebar]')).not.toBeNull()
+  })
+
+  it.each(['/hq/onboarding/pricing', '/hq/onboarding/card', '/hq/onboarding/quotes'])('%s では接続前の左メニューを表示しない', (pathname) => {
+    fixture.pathname = pathname
+    const view = render(<AppShell><p data-page="">本文</p></AppShell>)
+    expect(view.container.querySelector('[data-sidebar]')).toBeNull()
+    expect(view.container.querySelector('img[alt="musubo"]')).not.toBeNull()
+    expect(view.container.querySelector('[data-top-bar]')).not.toBeNull()
+    expect(chain(view.container.querySelector('[data-page]')!)).toEqual(['feature-disabled', 'store-selection', 'root-landing', 'view-permission', 'hq-access', 'auth'])
   })
 })

@@ -116,30 +116,6 @@ export const opsSupportPaths = {
     get: { tags: ['Ops Console'], summary: 'お知らせの一覧（下書き・予約・配信済み）', responses: { '200': { description: 'Announcements' } } },
     post: { tags: ['Ops Console'], summary: 'お知らせを作る（下書き／予約／今すぐ送る）', parameters: [{ name: 'Idempotency-Key', in: 'header', required: false, schema: { type: 'string' }, description: '二重押し止めの再実行キー（UUID）。同じキー・同じ内容の再送は保存済みを返し、別内容は409。' }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['subject', 'body', 'channels'], properties: { subject: { type: 'string' }, body: { type: 'string' }, audienceKind: { type: 'string', enum: ['all', 'plan', 'tenants'] }, audiencePlans: { type: 'array', items: { type: 'string' } }, audienceTenantIds: { type: 'array', items: { type: 'string' } }, channels: { type: 'array', items: { type: 'string', enum: ['line', 'screen', 'email'] } }, publishAt: { type: 'string' }, mode: { type: 'string', enum: ['draft', 'schedule', 'send'] } } } } } }, responses: { '200': { description: 'Idempotent replay of the saved announcement' }, '201': { description: 'Created' }, '400': { description: 'Validation error' }, '409': { description: 'Notice LINE account missing or idempotency-key reuse with different content' } } },
   },
-  '/api/ops/knowledge': {
-    get: { tags: ['Ops Console'], summary: '運営専用ナレッジ一覧（検索・種別・承認状態・ページ送り）', responses: { '200': { description: 'Articles and total' }, '403': { description: 'Platform admin required' } } },
-  },
-  '/api/ops/knowledge/{id}': {
-    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-    get: { tags: ['Ops Console'], summary: 'ナレッジ記事と解決根拠', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Article' }, '404': { description: 'Not found' } } },
-    put: { tags: ['Ops Console'], summary: 'ナレッジ記事を編集（承認失効・版照合）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Updated' }, '409': { description: 'Version conflict' } } },
-  },
-  '/api/ops/knowledge/{id}/review': {
-    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-    post: { tags: ['Ops Console'], summary: '根拠確認後の承認・見送り・無効化（版照合）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Reviewed' }, '400': { description: 'Confirmation required' }, '409': { description: 'Source or version changed' } } },
-  },
-  '/api/ops/knowledge/{id}/feedback': {
-    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-    post: { tags: ['Ops Console'], summary: '参照した記事の評価', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Feedback recorded' }, '409': { description: 'Usage not found or changed' } } },
-  },
-  '/api/ops/knowledge/tickets/{id}/process': {
-    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-    post: { tags: ['Ops Console'], summary: '対象の解決済み問い合わせのナレッジ生成予約を実行（運営書込権限必須・二重実行防止）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Current knowledge and job state' }, '403': { description: 'Forbidden' }, '404': { description: 'Ticket not found' }, '503': { description: 'AI unavailable' } } },
-  },
-  '/api/ops/knowledge/tickets/{id}/retry': {
-    parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-    post: { tags: ['Ops Console'], summary: '失敗した記事生成の再試行を予約', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '202': { description: 'Queued' }, '409': { description: 'Not retryable' } } },
-  },
   '/api/ops/announcements/preview': {
     post: { tags: ['Ops Console'], summary: '宛先の見積もり（契約先数・権限者数・LINE登録済み数）', responses: { '200': { description: 'Audience preview' } } },
   },
@@ -168,6 +144,17 @@ export const opsSupportPaths = {
   '/api/ops/support/summary': {
     get: { tags: ['Ops Console'], summary: 'お問い合わせの状態別件数と数値カード（未対応・初回返信・解決率・解決時間）', responses: { '200': { description: 'Counts by stage and KPIs' } } },
   },
+  '/api/ops/support/templates': {
+    get: { tags: ['Ops Console'], summary: '返信テンプレートとフォルダの一覧', responses: { '200': { description: 'Default and custom folders with saved reply templates' } } },
+    post: { tags: ['Ops Console'], summary: '返信テンプレートを保存', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['folderId', 'title', 'body'], properties: { folderId: { type: 'string' }, title: { type: 'string', maxLength: 120 }, body: { type: 'string', maxLength: 4000 } } } } } }, responses: { '201': { description: 'Template created' }, '400': { description: 'Invalid input or missing folder' }, '403': { description: 'Write permission required' } } },
+  },
+  '/api/ops/support/templates/{id}': {
+    patch: { tags: ['Ops Console'], summary: '返信テンプレートを編集', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['folderId', 'title', 'body', 'expectedUpdatedAt'], properties: { folderId: { type: 'string' }, title: { type: 'string', maxLength: 120 }, body: { type: 'string', maxLength: 4000 }, expectedUpdatedAt: { type: 'string' } } } } } }, responses: { '200': { description: 'Template updated' }, '400': { description: 'Invalid input or missing folder' }, '403': { description: 'Write permission required' }, '404': { description: 'Template not found' }, '409': { description: 'Template changed by another staff member' } } },
+    delete: { tags: ['Ops Console'], summary: '返信テンプレートを削除', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedUpdatedAt'], properties: { expectedUpdatedAt: { type: 'string' } } } } } }, responses: { '200': { description: 'Template deleted' }, '400': { description: 'Invalid input' }, '403': { description: 'Write permission required' }, '404': { description: 'Template not found' }, '409': { description: 'Template changed by another staff member' } } },
+  },
+  '/api/ops/support/template-folders': {
+    post: { tags: ['Ops Console'], summary: '返信テンプレートのフォルダを作成', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['name'], properties: { name: { type: 'string', maxLength: 60 } } } } } }, responses: { '201': { description: 'Folder created' }, '400': { description: 'Invalid name' }, '403': { description: 'Write permission required' }, '409': { description: 'Folder already exists' } } },
+  },
   '/api/ops/support/tickets': {
     get: { tags: ['Ops Console'], summary: 'チケット一覧（状態・優先度・検索・並び替え）', parameters: [
       { name: 'stage', in: 'query', required: false, schema: { type: 'string', enum: ['all', 'new', 'in_progress', 'waiting', 'resolved', 'closed'] } },
@@ -177,21 +164,18 @@ export const opsSupportPaths = {
       { name: 'limit', in: 'query', required: false, schema: { type: 'integer' } },
       { name: 'offset', in: 'query', required: false, schema: { type: 'integer' } },
     ], responses: { '200': { description: 'Tickets with total' } } },
-    post: { tags: ['Ops Console'], summary: '運営が代わりに起票する', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['tenantId', 'subject', 'body'], properties: { tenantId: { type: 'string' }, subject: { type: 'string' }, body: { type: 'string' }, kind: { type: 'string' }, priority: { type: 'string', enum: ['low', 'medium', 'high'] }, channel: { type: 'string', enum: ['ops', 'line'] }, staffId: { type: 'string' } } } } } }, responses: { '201': { description: 'Created' }, '400': { description: 'Validation error' }, '404': { description: 'Staff not found' } } },
+    post: { tags: ['Ops Console'], summary: '運営がチケットを作成', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['tenantId', 'subject', 'body'], properties: { tenantId: { type: 'string' }, subject: { type: 'string' }, body: { type: 'string' }, kind: { type: 'string' }, priority: { type: 'string', enum: ['low', 'medium', 'high'] }, channel: { type: 'string', enum: ['ops', 'line'] }, staffId: { type: 'string' } } } } } }, responses: { '201': { description: 'Created' }, '400': { description: 'Validation error' }, '404': { description: 'Staff not found' } } },
   },
   '/api/ops/support/tickets/{id}': {
     get: { tags: ['Ops Console'], summary: 'チケットの内容・やり取り・下書き・契約先の状況（閲覧を監査に記録）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Ticket detail' }, '404': { description: 'Not found' } } },
     patch: { tags: ['Ops Console'], summary: '状態・優先度を変える', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { stage: { type: 'string', enum: ['new', 'in_progress', 'waiting', 'resolved', 'closed'] }, priority: { type: 'string', enum: ['low', 'medium', 'high'] } } } } } }, responses: { '200': { description: 'Updated' }, '400': { description: 'Validation error' }, '404': { description: 'Not found' } } },
   },
   '/api/ops/support/tickets/{id}/reply': {
-    post: { tags: ['Ops Console'], summary: '返信する（登録メールへ送り、統括の履歴に載せる）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['body'], properties: { body: { type: 'string' }, nextStage: { type: 'string' }, aiAssisted: { type: 'boolean' } } } } } }, responses: { '201': { description: 'Replied' }, '400': { description: 'Validation error' }, '404': { description: 'Not found' }, '409': { description: 'Closed ticket' } } },
+    post: { tags: ['Ops Console'], summary: '返信する（登録メールへ送り、統括の履歴に載せる）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['body'], properties: { body: { type: 'string' }, nextStage: { type: 'string' } } } } } }, responses: { '201': { description: 'Replied' }, '400': { description: 'Validation error' }, '404': { description: 'Not found' }, '409': { description: 'Closed ticket' } } },
   },
   '/api/ops/support/tickets/{id}/draft': {
     put: { tags: ['Ops Console'], summary: '返信の下書きを保存する（空なら削除）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { body: { type: 'string' } } } } } }, responses: { '200': { description: 'Saved' }, '404': { description: 'Not found' } } },
     delete: { tags: ['Ops Console'], summary: '返信の下書きを消す', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Deleted' }, '404': { description: 'Not found' } } },
-  },
-  '/api/ops/support/tickets/{id}/draft/ai': {
-    post: { tags: ['Ops Console'], summary: 'AI（Workers AI）で返信の下書きを作る', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '201': { description: 'Draft generated' }, '404': { description: 'Not found' }, '502': { description: 'AI failed' }, '503': { description: 'AI not configured' } } },
   },
   '/api/hq/operator-history': {
     get: { tags: ['HQ Support'], summary: '契約先から見える運営の操作履歴（書き込みを伴ったものだけ）', responses: { '200': { description: 'Visible operator actions for the caller tenant' } } },

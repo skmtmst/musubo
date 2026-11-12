@@ -102,7 +102,7 @@ export const mediaMethods = {
       { method: 'POST', body: JSON.stringify(data) },
     ),
     update: (id: string, accountId: string, data: {
-      expectedRevision?: number
+      expectedRevision: number
       filename?: string
       folderId?: string | null
       /** 既知の利用期限（YYYY-MM-DD）。null で記録を消して「不明」へ戻す。 */
@@ -112,7 +112,7 @@ export const mediaMethods = {
     }) =>
       fetchApi<ApiResponse<MediaItem>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
-        headers: data.expectedRevision === undefined ? undefined : { 'If-Match': String(data.expectedRevision) },
+        headers: { 'If-Match': String(data.expectedRevision) },
         body: JSON.stringify(data),
       }),
     /** 削除確認を開くたびに、現在の使用先と削除可否を読み直す。 */

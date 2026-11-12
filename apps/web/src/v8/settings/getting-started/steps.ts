@@ -94,7 +94,8 @@ export type StyleSetupProgress = {
 
 /** 業種の3〜5段は、その設定の実測だけで済みを決める。標準の配信判定は流用しない。 */
 export function stepsForStyle(steps: ReadonlyArray<StepResult>, style: AccountStyle | null, progress?: StyleSetupProgress): StepResult[] {
-  if (!style || style === 'standard') return [...steps]
+  if (!style || steps.length === 0) return [...steps]
+  if (style === 'standard') return appendGoogleHoursStep([...steps], style, progress).map((step, index) => ({ ...step, ordinal: String(index + 1) }))
   const copy = steps.filter(step => style !== 'restaurant' || !['hours', 'followup'].includes(step.key)).map((step): StepResult => ['attributes', 'friendAdd', 'scenario'].includes(step.key) && step.state !== 'forbidden'
     ? { ...step, state: 'unknown', blockedReason: null, next: '業種の設定状況を確認できませんでした。' }
     : { ...step })
@@ -130,7 +131,7 @@ export function stepsForStyle(steps: ReadonlyArray<StepResult>, style: AccountSt
           const before = key === 'hours' ? copy.findIndex(item => item.key === 'friendAdd') : copy.findIndex(item => item.key === 'firstMessage')
           copy.splice(before < 0 ? copy.length : before, 0, step)
         }
-        add('hours', '営業時間を設定する', '/restaurant-test/inventory#rs-hours-title', '予約を受け付ける曜日と営業時間が設定されている')
+        add('hours', '営業時間を設定する', '/restaurant-test/google?tab=hours', 'Googleビジネスの店舗と営業時間が設定されている')
         add('followup', 'LINE来店フォローを確認する', '/restaurant-test/line-followup', '選んだ来店フォローの設定を確認している')
       }
       break
@@ -157,7 +158,24 @@ export function stepsForStyle(steps: ReadonlyArray<StepResult>, style: AccountSt
     default:
       style satisfies never
   }
-  return copy.map((step, index) => ({ ...step, ordinal: String(index + 1) }))
+  return appendGoogleHoursStep(copy, style, progress).map((step, index) => ({ ...step, ordinal: String(index + 1) }))
+}
+
+function appendGoogleHoursStep(copy: StepResult[], style: AccountStyle, progress?: StyleSetupProgress): StepResult[] {
+  if (copy.some(step => step.key === 'hours')) return copy
+  const result = progress?.style === style ? progress.steps.hours : undefined
+  const forbidden = copy.find(step => step.key === 'attributes')?.state === 'forbidden'
+  const step: StepResult = {
+    key: 'hours', ordinal: String(copy.length + 1), title: '営業時間を設定する', sub: 'Googleビジネスの営業時間を基準にする',
+    condition: 'Googleビジネスの店舗と営業時間が設定されている',
+    state: forbidden ? 'forbidden' : result?.complete === true ? 'done' : result?.complete === false ? 'todo' : 'unknown',
+    next: result?.complete === true ? '終わっています。設定を見直せます。' : result?.reason || 'Googleビジネスの営業時間を確認できませんでした。',
+    action: forbidden ? null : { label: '営業時間の設定を開く', href: '/settings/google-hours' },
+    blockedReason: forbidden ? '管理者に頼んでください' : null,
+  }
+  const before = copy.findIndex(item => item.key === 'friendAdd')
+  copy.splice(before < 0 ? copy.length : before, 0, step)
+  return copy
 }
 
 /**

@@ -318,7 +318,7 @@ function InputFields({ block, refs, patch, accountId, portable = false }: { bloc
       </Labeled>
       {['text', 'textarea', 'address', 'date'].includes(block.type) ? (
         <Labeled label="参考の文字（入力欄の中に薄く出る）" htmlFor={`${labelId}-placeholder`}>
-          <SaveErrorField names={["placeholder","block.placeholder"]}><TextField id={`${labelId}-placeholder`} value={block.placeholder ?? ''} placeholder="例：見本 141" onChange={(e) => set({ placeholder: e.target.value })} /></SaveErrorField>
+          <SaveErrorField names={["placeholder","block.placeholder"]}><TextField id={`${labelId}-placeholder`} value={block.placeholder ?? ''} placeholder="例：山田 太郎" onChange={(e) => set({ placeholder: e.target.value })} /></SaveErrorField>
         </Labeled>
       ) : null}
       {block.type === 'file' ? <FormFileSettings block={block} onChange={set} /> : null}
@@ -525,7 +525,7 @@ function BookingFields({ block, refs, set, portable = false }: { block: FormInpu
       </p>
       <div className={styles.bookingInfo}>
         <CalendarCheck size={16} aria-hidden="true" className={styles.bookingInfoIcon} />
-        <p className={styles.bookingInfoText}>空いている枠は「予約」の営業時間と担当の予定から出します。入った予約は予約の一覧に入り、リマインダも動きます。</p>
+        <p className={styles.bookingInfoText}>空いている枠はGoogleビジネスの営業時間と担当の予定から出します。入った予約は予約の一覧に入り、リマインダも動きます。</p>
         <TextLink external href="/booking/menus" className={styles.bookingLink}>
 
           予約メニューへ

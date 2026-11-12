@@ -1119,6 +1119,10 @@ export type {
   SupportTicketRow,
 } from './ops-support';
 export {
+  DEFAULT_SUPPORT_TEMPLATE_FOLDERS, createSupportReplyTemplate, createSupportTemplateFolder, deleteSupportReplyTemplate, listSupportTemplateCatalog, updateSupportReplyTemplate,
+} from './ops-support-templates';
+export type { SupportReplyTemplate, SupportTemplateFolder, SupportTemplateMutation } from './ops-support-templates';
+export {
   canceledAtByTenant, countBillingEventsByType, dashboardAlerts, dashboardLineRegistration, dashboardTickets, dashboardUsage,
   listContractTenants,
 } from './ops-dashboard';
@@ -1238,14 +1242,6 @@ export type {
   NenLifetimeMilestone, NenMemberKpis, NenMemberListOptions, NenMemberListRow, NenMilestoneInput, NenRankInput,
   NenRankRules, NenRankSetting,
 } from './nen-member-ranks';
-export {
-  claimKnowledgeJob, editKnowledgeArticle, failKnowledgeJob, finishKnowledgeJob, getKnowledgeArticle, knowledgeFeedback,
-  knowledgeForTicket, knowledgeMetrics, listKnowledgeArticles, queueKnowledgeStatement, recordKnowledgeUsage, recordPlatformAiCall,
-  retryKnowledgeJob, reviewKnowledgeArticle, searchKnowledge,
-} from './platform-knowledge.js';
-export type {
-  KnowledgeArticle, KnowledgeArticleInput, KnowledgeArticleKind, KnowledgeEvidence, KnowledgeJob, KnowledgeReviewState,
-} from './platform-knowledge.js';
 export {
   INTEGRATION_API_SCOPES, INTEGRATION_API_TOKEN_PREFIX, createIntegrationApiToken, generateIntegrationApiToken, getIntegrationApiTokenById, hashIntegrationApiToken,
   listIntegrationApiTokens, reactivateIntegrationApiToken, resolveIntegrationApiToken, revokeIntegrationApiToken, rotateIntegrationApiToken, tokenHasScope,

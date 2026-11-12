@@ -37,7 +37,8 @@ for (const width of [1152, 1440]) test(`route pending and fixed headings ${width
       if (broken && document.head && !document.querySelector('[data-route-pending-fault]')) { const style = document.createElement('style'); style.dataset.routePendingFault = ''; style.textContent = '[data-page-template]:has([data-page-pending]) h1 { visibility:hidden!important }'; document.head.append(style) }
       const scope = document.querySelector('[data-auth-pending]') ?? document.querySelector('main') ?? document.body
       const headings = [...(scope?.querySelectorAll('h1') ?? [])].filter(node => node.getBoundingClientRect().width > 0 && getComputedStyle(node).visibility !== 'hidden').map(node => node.textContent.trim())
-      window.routePendingFrames.push({ t: performance.now(), path: location.pathname, stage: scope?.querySelector('[data-page-pending]')?.getAttribute('data-page-pending') ?? null, headings })
+      const authPending = scope?.hasAttribute('data-auth-pending')
+      window.routePendingFrames.push({ t: performance.now(), path: location.pathname, stage: authPending ? 'auth' : scope?.querySelector('[data-page-pending]')?.getAttribute('data-page-pending') ?? null, headings, hasSidebar: authPending ? Boolean(document.querySelector('aside, [data-sidebar]')) : null })
       requestAnimationFrame(record)
     }
     requestAnimationFrame(record)
@@ -70,8 +71,12 @@ for (const width of [1152, 1440]) test(`route pending and fixed headings ${width
         const frames = await page.evaluate(() => window.routePendingFrames)
         if (!recipe.publicAuth) {
           const authFrames = frames.filter(frame => frame.stage === 'auth')
-          assert.ok(authFrames.length > 0, '題付きの認証前の待機を観察した')
-          for (const frame of frames.filter(frame => frame.stage !== null)) {
+          assert.ok(authFrames.length > 0, '認証前の待機を観察した')
+          for (const frame of authFrames) {
+            assert.deepEqual(frame.headings, [], '認証中に通常画面の題を出さない')
+            assert.equal(frame.hasSidebar, false, '認証中に通常サイドバーを出さない')
+          }
+          for (const frame of frames.filter(frame => frame.stage !== null && frame.stage !== 'auth')) {
             const expected = ROUTE_PENDING_LAYOUTS[frame.path]?.title
             assert.ok(expected, `待機中の道の題を定義した: ${frame.path}`)
             assert.deepEqual(frame.headings, [expected], `全ての待機段で題が欠けない: ${frame.path} ${frame.stage}`)

@@ -24,6 +24,7 @@ import { hasStaffPermission } from '../middleware/role-guard.js';
 import { StyleError, profile } from '../services/style-setup.js';
 
 import { validRestaurantDate } from '../services/restaurant-booking.js';
+import { accountOpeningHours, openingDay } from '../services/account-opening-hours.js';
 import { base, account, json, edit, text, oneOf } from './styles-common.js';
 export const styles = new Hono<Env>();
 
@@ -66,15 +67,16 @@ styles.post(base + '/closures', async (c) => {
   let open: Array<{ start: string; end: string }> = [];
   if (!allDay) {
     const weekday = new Date(date + 'T00:00:00Z').getUTCDay();
-    if (target === 'store')
-      open = (
+    if (target === 'store') {
+      const google = openingDay(await accountOpeningHours(c.env.DB, a), date);
+      open = google ?? (
         await c.env.DB.prepare(
           `SELECT h.start_time start,h.end_time end FROM booking_business_hours h JOIN booking_settings s ON s.id=h.booking_settings_id WHERE s.line_account_id=? AND h.weekday=?`,
         )
           .bind(a, weekday)
           .all<{ start: string; end: string }>()
       ).results;
-    else {
+    } else {
       const shifts = (
         await c.env.DB.prepare(
           `SELECT sh.start_time start,sh.end_time end FROM staff_shifts sh JOIN staff s ON s.id=sh.staff_id WHERE s.line_account_id=? AND s.id=? AND sh.work_date=?`,

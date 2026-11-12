@@ -716,9 +716,12 @@ describe('統括の保存結果と離脱', () => {
   })
 
   it('通常の保存が確定した内容は未保存扱いにせず、キャンセルでそのまま移れる', async () => {
-    const onSave = vi.fn(async () => true)
+    let finish!: (ok: boolean) => void
+    const onSave = vi.fn(() => new Promise<boolean>(resolve => { finish = resolve }))
     await openHost(onSave)
     fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
+    await act(async () => finish(true))
     await waitFor(() => expect((getPageAction({ name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(false))
     fireEvent.click(getPageAction({ name: 'キャンセル' }))
     await waitFor(() => expect(onCancel).toHaveBeenCalledOnce())

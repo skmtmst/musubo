@@ -467,12 +467,18 @@
 ## 反映履歴
 
 - [予約・友だち情報・配信の操作と安全性を改善](release-log/unreleased/36-masato-legacy-port.md) — 反映履歴、確認 2026-11-10。
+- [運営コンソールの問い合わせ画面をPenと照合して修正](release-log/unreleased/41-masato-ops-support-pen-parity.md) — スマートフォンの返信欄とテンプレート引用画面、確認 2026-11-11。
+- [運営の返信テンプレート編集・削除と検索欄の余白修正](release-log/unreleased/44-masato-ops-support-template-edit.md) — 問い合わせ画面の修正履歴、確認 2026-11-12。
+- [運営コンソールのお問い合わせをPen確定案に合わせて刷新](release-log/unreleased/37-masato-ops-support-pen.md) — 返信テンプレートとスマートフォン操作、確認 2026-11-10。
 - [登録メディアの写真確認とアップロード修正](release-log/unreleased/30-masato-media-upload.md) — 反映履歴、確認 2026-11-10。
 - [登録メディアの検証R2設定更新](release-log/unreleased/33-masato-media-upload-cors-token.md) — 反映履歴、確認 2026-11-10。
 - [メンバー招待メールのデザイン更新](release-log/unreleased/25-masato-staff-invite-email.md) — 反映履歴、確認 2026-11-08。
 - [自動配席の設定を簡素化](release-log/unreleased/26-masato-simple-table-assignment.md) — 反映履歴、確認 2026-11-08。
 - [統括メンバーの3役割](release-log/unreleased/27-masato-hq-three-roles.md) — 管理者・担当者・閲覧のみの画面と権限制御、確認 2026-11-08。
 - [階・エリア追加の入力を簡素化](release-log/unreleased/28-masato-simple-floor-area.md) — 反映履歴、確認 2026-11-08。
+- [個別見積もりの料金確認画面](release-log/unreleased/32-masato-individual-quote-review.md) — 契約枠と初回請求の表示、確認 2026-11-10。
+- [利用料金の個数プルダウン表示修正](release-log/unreleased/38-masato-pricing-dropdown.md) — 反映履歴、確認 2026-11-11。
+- [利用開始前のログイン直後の表示を統一](release-log/unreleased/42-masato-onboarding-entry.md) — サイドバーとホーム導線の制御、確認 2026-11-11。
 - [新リポジトリへの検証配備切り替え前の安全確認](release-log/unreleased/9-masato-staging-cutover-gate.md) — 反映履歴、確認 2026-11-06。
 - [DB復旧workflowの安全条件を確かめる試験](release-log/unreleased/10-masato-recovery-workflow-test.md) — 反映履歴、確認 2026-11-06。
 - [予約と友だち情報の表示・操作の改善](release-log/unreleased/2097-kenta-train-1102r.md)
@@ -1195,3 +1201,8 @@
 - [旧配備経路の停止確認](release-log/unreleased/20-masato-staging-cutover-gate.md) — 検証配備の切り替え前に行う確認の反映履歴。確認 2026-11-07。
 - [公開中の検証版の履歴を新リポジトリへ取り込む](release-log/unreleased/22-masato-published-history-sync.md) — 検証配備の巻き戻しを防ぐための履歴取り込み。確認 2026-11-07。
 - [musuboの新料金・申込フロー](release-log/unreleased/29-masato-musubo-pricing.md) — 料金、申込、請求の反映履歴。確認 2026-11-10。
+- [Googleビジネスの営業時間を予約全体の基準にする](release-log/unreleased/34-masato-google-hours.md) — 接続案内、予約・受付・在庫の営業時間統一。確認 2026-11-10。
+- [Googleビジネスの営業時間を全業種の基準にする](release-log/unreleased/39-masato-google-hours-all-styles.md) — 共通の接続案内、予約・通知・受信箱・差し込みの統一。確認 2026-11-11。
+- [登録メディアの名前変更と操作メニュー](release-log/unreleased/35-masato-media-actions-fix.md) — 登録後の編集と操作表示の修正履歴。確認 2026-11-10。
+- [登録メディア一覧の操作をシンプルにする](release-log/unreleased/40-masato-media-list-simplify.md) — 選択枠の位置と一覧表示の整理。確認 2026-11-11。
+- [登録メディアの名前変更とフォルダ移動を直す](release-log/unreleased/43-masato-media-edit-cors.md) — 保存時の通信エラー修正履歴。確認 2026-11-11。

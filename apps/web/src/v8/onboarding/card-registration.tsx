@@ -35,8 +35,8 @@ export function isStripeCardSetupUrl(value: string): boolean {
 }
 
 export default function CardRegistration({ returnState = null, quoteId, onContinue, onBackToPricing, onOpenStripe }: Props) {
-  usePageTitle('お支払い情報')
-  usePageCrumbs([{ label: 'ホーム', href: '/hq' }, { label: '利用開始の準備' }])
+  usePageTitle(returnState === 'cancel' ? 'クレジットカード登録を続ける' : 'お支払い情報')
+  usePageCrumbs([{ label: '利用開始の準備' }])
   const [state, setState] = useState<CardState>('checking')
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
@@ -88,7 +88,7 @@ export default function CardRegistration({ returnState = null, quoteId, onContin
       if (onOpenStripe) onOpenStripe(result.data.url)
       else window.location.assign(result.data.url)
     } catch {
-      setActionError('カード登録画面を開けませんでした。通信状態を確認して、もう一度お試しください。')
+      setActionError('クレジットカード登録画面を開けませんでした。通信状態を確認して、もう一度お試しください。')
       setBusy(false)
     }
   }
@@ -98,9 +98,35 @@ export default function CardRegistration({ returnState = null, quoteId, onContin
     else window.location.assign('/accounts/new')
   }
 
-  return <ListPage heightMode="viewport" title="お支払い情報" help="カード登録後、LINE公式アカウントを接続します。"
+  if (returnState === 'cancel' && state === 'unregistered') {
+    return <ListPage heightMode="viewport" title="クレジットカード登録を続ける"
+      subtitle="クレジットカード登録はまだ完了していません。料金の確認内容は保存されています。">
+      <PageContent>
+        <section className={`${styles.card} ${styles.retryCard}`} aria-labelledby="card-state-title">
+          <div className={styles.stateHeading}>
+            <span className={styles.cardIcon} aria-hidden="true">!</span>
+            <h2 id="card-state-title">クレジットカードを登録できませんでした</h2>
+          </div>
+          <p className={styles.retryReason}>入力が中断されたか、カードを確認できませんでした。もう一度登録画面を開いてください。</p>
+          <div className={styles.statusBox}>
+            <strong>現在の状態</strong>
+            <p>✓ 料金条件を確認済み</p>
+            <p>○ クレジットカード未登録・LINE未接続・本日の請求 ¥0</p>
+          </div>
+          <p className={styles.note}>後で再開する場合は、ログイン後の「利用開始の準備」から続けられます。</p>
+          {actionError && <Notice tone="danger" role="alert">{actionError}</Notice>}
+        </section>
+        <div className={styles.retryFooter}>
+          {onBackToPricing && <Button type="button" variant="text" onClick={onBackToPricing}>料金確認に戻る</Button>}
+          <Button type="button" variant="primary" onClick={() => void openCardForm()} busy={busy} busyLabel="画面を開いています…">クレジットカードを登録し直す</Button>
+        </div>
+      </PageContent>
+    </ListPage>
+  }
+
+  return <ListPage heightMode="viewport" title="お支払い情報"
     steps={<Steps label="利用開始の手順" steps={[{ key: 'price', label: '料金を確認', state: 'done' },
-      { key: 'card', label: 'カードを登録', state: 'current' }, { key: 'line', label: 'LINEを接続', state: 'todo' }]} />}>
+      { key: 'card', label: 'クレジットカードを登録', state: 'current' }, { key: 'line', label: 'LINEを接続', state: 'todo' }]} />}>
     <PageContent>
       <Notice tone="info">カード情報はStripeの安全な画面で入力します。musuboにカード番号やセキュリティコードは保存されません。</Notice>
       <section className={styles.card} aria-labelledby="card-state-title">
@@ -109,12 +135,12 @@ export default function CardRegistration({ returnState = null, quoteId, onContin
             {state === 'registered' ? '✓' : state === 'checking' ? '…' : '!'}
           </span>
           <div>
-            <h2 id="card-state-title">{state === 'registered' ? 'カードの登録が完了しました'
-              : state === 'checking' ? 'カードの登録状況を確認しています'
-                : state === 'error' ? 'カードの登録状況を確認できません'
-                  : returnState === 'cancel' ? 'カード登録はまだ完了していません'
+            <h2 id="card-state-title">{state === 'registered' ? 'クレジットカードの登録が完了しました'
+              : state === 'checking' ? 'クレジットカードの登録状況を確認しています'
+                : state === 'error' ? 'クレジットカードの登録状況を確認できません'
+                  : returnState === 'cancel' ? 'クレジットカード登録はまだ完了していません'
                     : returnState === 'success' ? 'Stripeの完了通知を確認できませんでした'
-                      : 'カードを登録してください'}</h2>
+                      : 'クレジットカードを登録してください'}</h2>
             <p>{state === 'registered' ? '次はLINE公式アカウントを接続します。'
               : state === 'checking' ? 'Stripeの完了通知が届くまで、少し時間がかかる場合があります。'
                 : state === 'error' ? '通信状態を確認し、もう一度読み込んでください。'
@@ -126,10 +152,10 @@ export default function CardRegistration({ returnState = null, quoteId, onContin
         <div className={styles.statusBox}>
           <strong>現在の状態</strong>
           <p>✓ 料金条件を確認済み</p>
-          <p>{state === 'registered' ? '✓ カード登録済み・LINE未接続' : '○ カード未登録・LINE未接続'}</p>
-          <p>カード登録時の請求：¥0</p>
+          <p>{state === 'registered' ? '✓ クレジットカード登録済み・LINE未接続' : '○ クレジットカード未登録・LINE未接続'}</p>
+          <p>クレジットカード登録時の請求：¥0</p>
         </div>
-        <p className={styles.note}>カードを登録するだけでは請求は始まりません。無料期間と初回請求日は、最初のLINEを有効化した後に確認できます。</p>
+        <p className={styles.note}>クレジットカードを登録するだけでは請求は始まりません。無料期間と初回請求日は、最初のLINEを有効化した後に確認できます。</p>
         {actionError && <Notice tone="danger" role="alert">{actionError}</Notice>}
         <div className={styles.actions}>
           {state === 'registered'
@@ -138,7 +164,7 @@ export default function CardRegistration({ returnState = null, quoteId, onContin
               ? <Button type="button" variant="primary" disabled>確認中…</Button>
               : <>
                 <Button type="button" variant="primary" onClick={() => void openCardForm()} busy={busy} busyLabel="画面を開いています…">
-                  {returnState === 'cancel' ? 'カードを登録し直す' : 'Stripeでカードを登録する'}
+                  {returnState === 'cancel' ? 'クレジットカードを登録し直す' : 'Stripeでクレジットカードを登録する'}
                 </Button>
                 {(state === 'error' || returnState === 'success') && <Button type="button" variant="secondary" onClick={() => void refresh()}>登録状況を再確認</Button>}
               </>}
