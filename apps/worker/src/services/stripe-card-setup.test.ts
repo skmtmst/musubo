@@ -5,9 +5,11 @@ describe('Stripeのカード登録専用セッション', () => {
   it('請求なしのsetupモードを使い、カード情報をmusuboへ送らない', async () => {
     let requestUrl = '';
     let requestBody = '';
+    let requestVersion = '';
     const fakeFetch = async (url: string | URL | Request, init?: RequestInit) => {
       requestUrl = String(url);
       requestBody = String(init?.body ?? '');
+      requestVersion = new Headers(init?.headers).get('Stripe-Version') ?? '';
       return new Response(JSON.stringify({ id: 'cs_setup_1', mode: 'setup', url: 'https://checkout.stripe.com/c/setup/cs_setup_1' }), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       });
@@ -16,6 +18,7 @@ describe('Stripeのカード登録専用セッション', () => {
       customerId: 'cus_1', tenantId: 'tenant_1',
       successUrl: 'https://admin.example.com/hq/onboarding/card?setup=success',
       cancelUrl: 'https://admin.example.com/hq/onboarding/card?setup=cancel',
+      logoUrl: 'https://admin.example.com/brand/musubo-color.png',
     }, fakeFetch as typeof fetch);
     const form = new URLSearchParams(requestBody);
     expect(requestUrl).toBe('https://api.stripe.com/v1/checkout/sessions');
@@ -23,6 +26,10 @@ describe('Stripeのカード登録専用セッション', () => {
     expect(form.get('payment_method_types[0]')).toBe('card');
     expect(form.get('currency')).toBe('jpy');
     expect(form.get('metadata[purpose]')).toBe('musubo_card_setup');
+    expect(requestVersion).toBe('2025-10-29.clover');
+    expect(form.get('branding_settings[display_name]')).toBe('musubo');
+    expect(form.get('branding_settings[logo][type]')).toBe('url');
+    expect(form.get('branding_settings[logo][url]')).toBe('https://admin.example.com/brand/musubo-color.png');
     expect(form.has('line_items[0][price]')).toBe(false);
     expect(form.has('subscription_data[metadata][tenant_id]')).toBe(false);
     expect(session.url).toContain('checkout.stripe.com');
