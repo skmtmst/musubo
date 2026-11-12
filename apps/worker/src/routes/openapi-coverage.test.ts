@@ -1031,6 +1031,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/hq/banners/projects/{id}/duplicate',
   'POST /api/hq/banners/projects/{id}/generations',
   'POST /api/hq/banners/projects/{id}/uploads',
+  'POST /api/hq/billing/card-confirm',
   'POST /api/hq/billing/checkout',
   'POST /api/hq/billing/card-setup',
   'POST /api/hq/billing/portal',

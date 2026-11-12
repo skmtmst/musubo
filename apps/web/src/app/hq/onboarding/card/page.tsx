@@ -9,6 +9,7 @@ import CardRegistration from '@/v8/onboarding/card-registration'
 function CardRegistrationReturn() {
   const router = useRouter()
   const setup = useSearchParams().get('setup')
+  const sessionId = useSearchParams().get('session_id')
   const quoteId = useSearchParams().get('quote')
   const [entry, setEntry] = useState<'checking' | 'ready' | 'error'>('checking')
   useEffect(() => {
@@ -43,12 +44,13 @@ function CardRegistrationReturn() {
   if (entry === 'checking') return <ListState kind="loading" title="料金の確認状況を読み込んでいます" />
   if (entry === 'error') return <ListState kind="error" title="料金の確認状況を表示できませんでした" />
   return <CardRegistration returnState={setup === 'success' || setup === 'cancel' ? setup : null}
-    quoteId={quoteId} onBackToPricing={() => router.push(quoteId
+    sessionId={sessionId} quoteId={quoteId} onContinue={() => router.replace('/accounts/new')}
+    onBackToPricing={() => router.replace(quoteId
       ? `/hq/onboarding/quotes?id=${encodeURIComponent(quoteId)}`
       : '/hq/onboarding/pricing')} />
 }
 
-/** Stripe Checkout returns here; the page verifies card status with the server. */
+/** Hosted card setup returns here; a verified completion immediately opens LINE connection. */
 export default function CardRegistrationPage() {
   return <Suspense fallback={<ListState kind="loading" title="カード登録状況を確認しています" />}>
     <CardRegistrationReturn />
