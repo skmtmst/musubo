@@ -62,6 +62,14 @@ it('共通の選択肢のボタン名も20文字の入力上限を持ち、読�
   expect(label.value).toBe(long)
 })
 
+it('長い選択肢の見出しは全文を確認できる', async () => {
+  for (const fn of [scope.tags, scope.fields, scope.scenarios]) fn.mockResolvedValue({ success: true, data: [] })
+  const label = 'あ'.repeat(25)
+  render(<QuestionEditor value={{ ...question, choices: [{ ...question.choices[0], label }] }} onChange={() => {}} />)
+  const heading = screen.getByRole('button', { name: `選択肢1 ${label}` })
+  expect(within(heading).getByText(label).getAttribute('title')).toBe(label)
+})
+
 it('閉じた選択肢でも超過値の欄を開いて理由を出し、訂正すると消す', async () => {
   for (const fn of [scope.tags, scope.fields, scope.scenarios]) fn.mockResolvedValue({ success: true, data: [] })
   const long = { ...question, choices: [question.choices[0], { ...question.choices[1], label: 'あ'.repeat(25) }] }

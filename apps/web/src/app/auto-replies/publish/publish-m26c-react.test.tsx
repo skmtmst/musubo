@@ -232,7 +232,7 @@ beforeEach(() => {
   verifiedStaffRole('owner')
   currentQuery = 'id=r1&step=priority'
   mocks.get.mockResolvedValue({ success: true, data: { isActive: false, lifecycleStatus: 'draft' } })
-  mocks.list.mockResolvedValue({ success: true, data: [{ ...draftSettings(), id: 'r1', isActive: true, lifecycleStatus: 'published', priority: 10, createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z' }] })
+  mocks.list.mockResolvedValue({ success: true, data: [{ ...draftSettings(), id: 'r1', isActive: true, confirmationRevision: 1, lifecycleStatus: 'published', priority: 10, createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z' }] })
   mocks.create.mockResolvedValue({ success: true, data: { id: 'r-copy' } })
   mocks.getDraft.mockResolvedValue(draftVersion())
   mocks.conflicts.mockResolvedValue({ success: true, data: { conflicts: [] } })

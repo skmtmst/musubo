@@ -11,6 +11,12 @@ vi.mock('./staff-calendar', () => ({ StaffCalendarPanel: () => null }))
 import { StaffTabV8 } from './tabs/staff-tab'
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 const person = { id:'s1', name:'佐藤', display_name:'佐藤', is_active:1, sort_order:1 } as BookingStaff
+it.each([true, false])('担当スタッフの操作説明は編集権限 %s に合う', (canEdit) => {
+ render(<StaffTabV8 staff={[person]} status="ready" error={null} matrices={{}} extras={{}} members={[]} canEdit={canEdit} onReload={vi.fn()} accountId="a" />)
+ fireEvent.click(screen.getByRole('button', { name: '担当スタッフの操作の説明' }))
+ expect(screen.getByText(/名前を押すと勤務とシフトが開きます/)).toBeTruthy()
+ expect(Boolean(screen.queryByText(/編集・止める/))).toBe(canEdit)
+})
 it.each(['止める', '削除する'])('%sの対象を示し切替前の確定を拒む', (action) => {
  const props = { staff:[person], status:'ready' as const, error:null, matrices:{}, extras:{}, members:[], canEdit:true, onReload:vi.fn() }
  const view=render(<StaffTabV8 {...props} accountId="a" />)

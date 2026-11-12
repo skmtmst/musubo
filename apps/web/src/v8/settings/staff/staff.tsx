@@ -25,6 +25,7 @@ import { TextField } from '@/components/shared/text-field';
 import { Tabs } from '@/components/shared/tabs';
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import Notice from '@/components/shared/notice'
@@ -593,7 +594,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
   </div></SaveErrorScope>
 }
 
-function EditModal({ member, administrator, currentUserId, activeAdministratorCount, onClose, onSaved, surface }: { surface?: 'page' | 'dialog'; member: StaffMember; administrator: boolean; currentUserId: string | null; activeAdministratorCount: number; onClose: () => void; onSaved: () => Promise<void> }) {
+function EditModal({ member, administrator, currentUserId, activeAdministratorCount, selectedAccountId, onClose, onSaved, surface }: { selectedAccountId: string | null; surface?: 'page' | 'dialog'; member: StaffMember; administrator: boolean; currentUserId: string | null; activeAdministratorCount: number; onClose: () => void; onSaved: () => Promise<void> }) {
   const saveErrors = useSaveFormErrors()
 
   const [name, setName] = useState(member.name), [email, setEmail] = useState(member.email ?? '')
@@ -625,7 +626,12 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
    * 画像比較にも写らない。連携を外すと何が届かなくなるのかを本文で読ませたい
    * ので、共通の `ConfirmDialog` へ移した。
    */
-  const [unlinkOpen, setUnlinkOpen] = useState(false), [unlinking, setUnlinking] = useState(false), [unlinkError, setUnlinkError] = useState('')
+  const [unlinkTarget, setUnlinkTarget] = useState<{ id: string; name: string; version: number | undefined; epoch: number } | null>(null), [unlinking, setUnlinking] = useState(false), [unlinkError, setUnlinkError] = useState('')
+  const unlinkScope = useRef({ selectedAccountId, memberId: member.id, version: member.policyVersion, linked: member.lineLinked, administrator, epoch: 0 })
+  if (unlinkScope.current.selectedAccountId !== selectedAccountId || unlinkScope.current.memberId !== member.id || unlinkScope.current.version !== member.policyVersion || unlinkScope.current.linked !== member.lineLinked || unlinkScope.current.administrator !== administrator) unlinkScope.current = { selectedAccountId, memberId: member.id, version: member.policyVersion, linked: member.lineLinked, administrator, epoch: unlinkScope.current.epoch + 1 }
+  const unlinkTargetRef = useRef(unlinkTarget)
+  unlinkTargetRef.current = unlinkTarget
+  useEffect(() => () => { unlinkScope.current.epoch++ }, [])
   /* 権限・利用状態・LINE連携の変更は 428 で止まる。止まったら本人確認の窓を立てて、grant を付けて同じ操作をやり直す。 */
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   /* N-433: 本人のメール変更は確認メールを経て確定する。保存直後に旧アドレスのまま閉じると「変わった」ように見えるので、確認待ちを画面に残す。 */
@@ -659,9 +665,22 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
    * 失敗は握りつぶさず、窓の中に運用者の言葉で出す。生のAPIエラーだと
    * 次に何をすればよいか読み取れない。
    */
-  const unlinkLine = async (stepUpToken?: string) => { if (unlinking) return; setUnlinking(true); setUnlinkError(''); try { const res = await api.staff.update(member.id, { lineLinked: false }, stepUpToken); if (!res.success) throw new Error(res.error); setUnlinkOpen(false); await onSaved(); onClose() } catch (caught) {
-    const fieldFailure = saveErrors.capture(caught);
- if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', action: '権限を変更する', retry: unlinkLine }); return } { if (!fieldFailure) setUnlinkError('LINE連携を解除できませんでした。状態を読み直してから、もう一度お試しください。') } } finally { setUnlinking(false) } }
+  const unlinkLine = async (confirmation: NonNullable<typeof unlinkTarget>, stepUpToken?: string): Promise<void> => {
+    if (unlinking || unlinkTargetRef.current !== confirmation || confirmation.epoch !== unlinkScope.current.epoch) return
+    if (confirmation.version === undefined) { setUnlinkError('対象の版を確認できません。読み直してから、もう一度お試しください。'); return }
+    setUnlinking(true); setUnlinkError('')
+    try {
+      const res = await api.staff.update(confirmation.id, { lineLinked: false, expectedPolicyVersion: confirmation.version }, stepUpToken)
+      if (confirmation.epoch !== unlinkScope.current.epoch || unlinkTargetRef.current !== confirmation) return
+      if (!res.success) throw new Error(res.error)
+      setUnlinkTarget(null); await onSaved(); onClose()
+    } catch (caught) {
+      if (confirmation.epoch !== unlinkScope.current.epoch || unlinkTargetRef.current !== confirmation) return
+      const fieldFailure = saveErrors.capture(caught)
+      if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', action: '権限を変更する', retry: (token) => unlinkLine(confirmation, token) }); return }
+      if (!fieldFailure) setUnlinkError('LINE連携を解除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally { setUnlinking(false) }
+  }
   // R500: 無効化・再有効化の後は行が絞り込みから出し入れされるので、行き先を知らせる。
   const toggleActive = async (stepUpToken?: string) => { if (policy.statusBlockedReason) return; setStatusSaving(true); setError(''); try { await api.staff.update(member.id, { isActive: !member.isActive }, stepUpToken); await onSaved(); notifyToast(member.isActive ? '無効にしました。「利用状態」で「無効のみ」を選ぶと、この人を一覧に戻せます。' : '有効にしました。対象者はもう一度ログインが必要です。'); onClose() } catch (caught) {
     const fieldFailure = saveErrors.capture(caught);
@@ -674,19 +693,20 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
     <div className="mt-5 grid gap-4 sm:grid-cols-2">{administrator && <Field label="名前" required htmlFor="staff-edit-name" error={fieldErrors.name}><SaveErrorField names={["name"]}><TextField ref={nameRef} id="staff-edit-name" value={name} onChange={(e) => { setName(e.target.value); setFieldErrors((current) => ({ ...current, name: undefined })) }} /></SaveErrorField></Field>}<Field label="メールアドレス" required htmlFor="staff-edit-email" error={fieldErrors.email}><SaveErrorField names={["email"]}><TextField ref={emailRef} id="staff-edit-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setFieldErrors((current) => ({ ...current, email: undefined })) }} /></SaveErrorField></Field></div>
     {administrator && <div className="mt-5"><p className="text-sm font-semibold text-ink">役割</p><div className="mt-2 grid grid-cols-3 gap-2">{(['admin', 'staff', 'viewer'] as const).map((value) => <Button variant="secondary" className={(`cursor-pointer rounded-control border px-3 py-3 text-sm ${role === value ? 'border-accent bg-accent-soft font-medium text-accent-deep' : 'border-hairline text-ink-secondary'}`) + ' h-auto whitespace-normal'} key={value} onClick={() => setRole(value)}>{ROLE_LABEL[value]}</Button>)}</div></div>}
     {administrator && role === 'staff' && <div className="mt-5"><p className="text-sm font-semibold text-ink">スタッフに表示する機能</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{PERMISSIONS.map(([key, label]) => <SaveErrorField names={["key","permissions"]} key={key}><ToggleField key={key} checked={permissions.includes(key)} onChange={() => setPermissions((current) => toggleStaffPermissionKey(current, key))}>{label}</ToggleField></SaveErrorField>)}</div><p className="mt-3 text-sm font-medium text-ink">成果の操作権限</p><p className="mt-1 text-xs text-ink-faint">選ぶと「成果とアフィリエイト」の表示も組で付きます。表示を外すと操作権限も外れます。</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><SaveErrorField names={["CONVERSION_APPROVAL_EDIT_KEY","permissions","_c_o_n_v_e_r_s_i_o_n__a_p_p_r_o_v_a_l__e_d_i_t__k_e_y"]}><ToggleField checked={permissions.includes(CONVERSION_APPROVAL_EDIT_KEY)} onChange={() => setPermissions((current) => toggleStaffPermissionKey(current, CONVERSION_APPROVAL_EDIT_KEY))} aria-label="成果を承認・却下する">{PERMISSION_LABELS[CONVERSION_APPROVAL_EDIT_KEY]}</ToggleField></SaveErrorField></div></div>}
-    <div className="mt-5"><p className="text-sm font-semibold text-ink">LINE連携</p><div className={`mt-2 flex items-center justify-between rounded-control border p-3 ${member.lineLinked ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><div><p className={`text-sm font-semibold ${member.lineLinked ? 'text-success' : 'text-ink-secondary'}`}>{member.lineLinked ? '連携済み' : '未連携'}</p><p className="text-xs text-ink-faint">{member.lineLinked ? `LINE：${member.name}` : '招待メールからLINE認証を行います'}</p></div>{member.lineLinked && <Button variant="secondary" className="px-3 py-1.5 text-xs h-auto whitespace-normal" onClick={() => { setUnlinkError(''); setUnlinkOpen(true) }}>連携解除</Button>}</div></div>
+    <div className="mt-5"><p className="text-sm font-semibold text-ink">LINE連携</p><div className={`mt-2 flex items-center justify-between rounded-control border p-3 ${member.lineLinked ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><div><p className={`text-sm font-semibold ${member.lineLinked ? 'text-success' : 'text-ink-secondary'}`}>{member.lineLinked ? '連携済み' : '未連携'}</p><p className="text-xs text-ink-faint">{member.lineLinked ? `LINE：${member.name}` : '招待メールからLINE認証を行います'}</p></div>{member.lineLinked && <Button variant="secondary" className="px-3 py-1.5 text-xs h-auto whitespace-normal" onClick={() => { setUnlinkError(''); setUnlinkTarget({ id: member.id, name: member.name, version: member.policyVersion, epoch: unlinkScope.current.epoch }) }}>連携解除</Button>}</div></div>
     <div className="mt-5"><p className="text-sm font-semibold text-ink">通知設定</p><div className="mt-2 divide-y divide-hairline overflow-hidden rounded-card border border-hairline">{NOTIFICATIONS.map(([key, label, note]) => <div key={key} className={`${styles.notifyRow} items-center gap-4 p-3`}><div><p className="text-sm text-ink">{label}</p><p className="text-xs text-ink-faint">{note}</p></div><div className="flex items-center gap-2 text-xs">メール<NotificationSwitch checked={notifications[key].email} onChange={() => toggleNotification(key, 'email')} label={`${label}メール`} /></div><div className="flex items-center gap-2 text-xs">LINE<NotificationSwitch checked={notifications[key].line} onChange={() => toggleNotification(key, 'line')} label={`${label}LINE`} /></div></div>)}</div></div>
     {/* 連携はあとから張り直せる。赤は本当に戻せない操作に取っておく。 */}
     <ConfirmDialog
-      open={unlinkOpen}
-      title={`${member.name} のLINE連携を解除しますか？`}
+      open={unlinkTarget !== null && unlinkTarget.epoch === unlinkScope.current.epoch}
+      title={`${unlinkTarget?.name ?? ''} のLINE連携を解除しますか？`}
       description="このユーザーへのLINE通知が止まります。ログインや権限はそのままで、招待メールからLINE認証をやり直せば、また繋がります。"
       confirmLabel="解除する"
       busy={unlinking}
       error={unlinkError}
-      onConfirm={() => unlinkLine()}
-      onCancel={() => { if (unlinking) return; setUnlinkOpen(false); setUnlinkError('') }}
+      onConfirm={() => unlinkTarget ? unlinkLine(unlinkTarget) : undefined}
+      onCancel={() => { if (unlinking) return; setUnlinkTarget(null); setUnlinkError('') }}
     >
+      <OperationTargetSummary accounts={[{ id: '', name: '不明' }]} externalTarget={{ label: 'ユーザー', name: unlinkTarget?.name }} />
       <p className="text-ink-secondary text-sm">通知設定でLINEを選んでいるお知らせは、解除したあと届かなくなります。メールを選んでいるぶんはそのまま届きます。</p>
     </ConfirmDialog>
     {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
@@ -1084,7 +1104,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     const member = members.find((member) => member.id === editId)
     if (loading) return <ListState kind="loading" />
     if (!member || !canEdit(member)) return <ListState kind="error" title="このユーザーを編集できません" description="権限とユーザーを確認してください。" />
-    return <EditModal surface="page" member={member} administrator={Boolean(administrator)} currentUserId={me?.id ?? null} activeAdministratorCount={activeAdministratorCount} onClose={() => router.push('/staff')} onSaved={load} />
+    return <EditModal surface="page" selectedAccountId={selectedAccountId} member={member} administrator={Boolean(administrator)} currentUserId={me?.id ?? null} activeAdministratorCount={activeAdministratorCount} onClose={() => router.push('/staff')} onSaved={load} />
   }
   return (
     <SaveErrorScope errors={saveErrors}><PageFrame kind="settings" boardId={administrator ? 'nku0f' : 'A35Gh'}>
@@ -1165,7 +1185,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
           </aside>
         ) : null}
       </div>
-      {editing && <EditModal member={editing} administrator={Boolean(administrator)} currentUserId={me?.id ?? null} activeAdministratorCount={activeAdministratorCount} onClose={() => setEditing(null)} onSaved={load} />}
+      {editing && <EditModal selectedAccountId={selectedAccountId} member={editing} administrator={Boolean(administrator)} currentUserId={me?.id ?? null} activeAdministratorCount={activeAdministratorCount} onClose={() => setEditing(null)} onSaved={load} />}
       {settingTwoFactor && <TwoFactorModal member={settingTwoFactor} onClose={() => setSettingTwoFactor(null)} />}
       <Dialog
         open={suspendTarget !== null}

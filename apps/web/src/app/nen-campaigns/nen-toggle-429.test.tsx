@@ -19,6 +19,7 @@ vi.mock('@/lib/staff-role', async (importOriginal) => ({
 const net = vi.hoisted(() => ({
   /** 停止・再開の結果。'rateLimited' は429。 */
   toggleResult: 'rateLimited' as 'rateLimited' | 'serverError',
+  calls: vi.fn(),
 }))
 
 const SETTING = {
@@ -90,7 +91,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
             updatedAt: '2026-09-01T00:00:00+09:00',
           },
         }),
-        setEnabled: async () => {
+        setEnabled: async (...args: unknown[]) => {
+          net.calls(...args)
           if (net.toggleResult === 'rateLimited') {
             throw new actual.ApiError(429, 'API error: 429')
           }
@@ -148,6 +150,7 @@ function openRowMenu(): HTMLButtonElement {
 
 beforeEach(() => {
   net.toggleResult = 'rateLimited'
+  net.calls.mockClear()
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -182,6 +185,7 @@ describe('M501 停止・再開の混雑時の案内', () => {
     await act(async () => { confirm!.click() })
     await flush()
 
+    expect(net.calls).toHaveBeenCalledWith('account-1', 'birthday', false, SETTING.updatedAt)
     // 待って再試行する案内。汎用の「切り替えられませんでした」だけではない。
     expect(container.textContent).toContain('少し待ってから')
     expect(container.textContent).toContain('もう一度お試しください')

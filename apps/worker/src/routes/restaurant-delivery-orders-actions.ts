@@ -48,10 +48,13 @@ export function registerDeliveryOrderActions(restaurantDelivery: Hono<Env>): voi
   ) {
     const store = await deliveryStore(c);
     if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
+    const body = await c.req.json<{ expectedVersion?: unknown }>().catch(() => ({} as { expectedVersion?: unknown }));
+    if (body.expectedVersion !== undefined && (!Number.isSafeInteger(body.expectedVersion) || Number(body.expectedVersion) < 1)) return fail(c, 400, '注文の版を確認してください');
     const orderId = c.req.param('id');
     const order = orderId ? await orderFor(c, store, orderId) : null;
     if (!order) return fail(c, 404, 'この注文は見つかりません');
     const target = { id: order.id, kind: 'rt_delivery_order' };
+    if (body.expectedVersion !== undefined && body.expectedVersion !== order.version) return fail(c, 409, '注文が変わりました。画面を開き直してください', { code: 'STALE_ORDER', order: { id: order.id, status: order.status, version: order.version } });
     if (!canTransitionOrder(order.status, input.to)) {
       auditLog(c, input.audit, target, { result: 'denied', lineAccountId: order.account_id });
       return fail(
@@ -89,11 +92,16 @@ export function registerDeliveryOrderActions(restaurantDelivery: Hono<Env>): voi
       targetKind: 'order',
       targetId: order.id,
       externalId: order.external_order_id,
+      expectedOrderVersion: body.expectedVersion === undefined ? undefined : order.version,
       body: input.cancel ? { reason_code: input.cancel.reasonCode } : undefined,
       now,
     });
     if (!result.ok) {
       auditLog(c, input.audit, target, { result: 'failed', lineAccountId: order.account_id });
+      if (body.expectedVersion !== undefined && result.error.code === 'delivery_order_conflict') {
+        const latest = await orderFor(c, store, order.id);
+        return fail(c, 409, '注文が変わりました。画面を開き直してください', { code: 'STALE_ORDER', order: latest ? { id: latest.id, status: latest.status, version: latest.version } : null });
+      }
       return dispatchFailure(c, result);
     }
 

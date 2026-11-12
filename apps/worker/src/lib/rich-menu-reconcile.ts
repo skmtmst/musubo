@@ -194,7 +194,7 @@ export async function applyRichMenuDiffs(
     } else {
       // 既定へ張るべき実体が無い。フラグだけ下ろす。
       await db
-        .prepare(`UPDATE rich_menu_groups SET is_default_for_all = 0, updated_at = ? WHERE id = ?`)
+        .prepare(`UPDATE rich_menu_groups SET is_default_for_all = 0, confirmation_revision = confirmation_revision + 1, updated_at = ? WHERE id = ?`)
         .bind(now, groupId)
         .run();
       applied.push(defaultDiff);
@@ -205,7 +205,7 @@ export async function applyRichMenuDiffs(
   if (statusDiff) {
     await db
       .prepare(
-        `UPDATE rich_menu_groups SET status = 'draft', is_default_for_all = 0, updated_at = ? WHERE id = ?`,
+        `UPDATE rich_menu_groups SET status = 'draft', is_default_for_all = 0, confirmation_revision = confirmation_revision + 1, updated_at = ? WHERE id = ?`,
       )
       .bind(now, groupId)
       .run();
@@ -213,10 +213,10 @@ export async function applyRichMenuDiffs(
   }
 
   for (const pageId of computed.stalePageIds) {
-    await db
-      .prepare(`UPDATE rich_menu_pages SET line_richmenu_id = NULL, updated_at = ? WHERE id = ?`)
-      .bind(now, pageId)
-      .run();
+    await db.batch([
+      db.prepare(`UPDATE rich_menu_pages SET line_richmenu_id = NULL, updated_at = ? WHERE id = ?`).bind(now, pageId),
+      db.prepare(`UPDATE rich_menu_groups SET confirmation_revision = confirmation_revision + 1 WHERE id = (SELECT group_id FROM rich_menu_pages WHERE id = ?)`).bind(pageId),
+    ]);
   }
   applied.push(...diffs.filter((d) => d.kind === 'stale_page_richmenu_id'));
 

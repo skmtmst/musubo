@@ -101,7 +101,7 @@ export async function updateRichMenuGroupMeta(
   if (!built) return;
   const now = jstNow();
   await db
-    .prepare(`UPDATE rich_menu_groups SET ${built.sets.join(', ')}, updated_at = ? WHERE id = ?`)
+    .prepare(`UPDATE rich_menu_groups SET ${built.sets.join(', ')}, confirmation_revision = confirmation_revision + 1, updated_at = ? WHERE id = ?`)
     .bind(...built.vals, now, id)
     .run();
 }

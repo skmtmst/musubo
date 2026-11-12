@@ -14,7 +14,7 @@ export async function expireRestaurantHolds(
     AND (? IS NULL OR store_id IN (SELECT id FROM rt_stores WHERE organization_id = ?))`;
   const scopeArgs = [storeId ?? null, storeId ?? null, organizationId ?? null, organizationId ?? null];
   const results = await db.batch([
-    db.prepare(`UPDATE rt_reservations SET status = 'cancelled', updated_at = ?
+    db.prepare(`UPDATE rt_reservations SET confirmation_revision = confirmation_revision + 1, status = 'cancelled', updated_at = ?
       WHERE status = 'pending' AND hold_expires_at IS NOT NULL
         AND datetime(hold_expires_at) <= datetime(?) AND ${scope}`)
       .bind(now, now, ...scopeArgs),

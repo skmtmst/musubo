@@ -1,3 +1,4 @@
+import { CHAT_RESERVATION_KEYS, chatReservationVariables } from './chat-reservation-variables.js';
 import { listInterpolations } from '@line-crm/shared';
 import {
   renderBroadcastMessageContent,
@@ -64,13 +65,15 @@ export async function renderChatMessageContent(
   }
   // liff_id は account 参照が必要なので、本文で使うときだけ呼び出し側から受け取る。
   if (liffId !== undefined) context.liffId = liffId;
+  const reservationKeys = CHAT_RESERVATION_KEYS.filter((key) => new RegExp(`\\{\\{\\s*var\\.${key}\\s*\\}\\}`).test(content));
+  const commonContent = content.replace(/\{\{\s*var\.(reservation_datetime|course_name|guest_count)\s*\}\}/g, '');
   if (source) {
     // 送信経路: 共通情報は厳格resolverへ任せ、ここでは情報欄だけを引く。
     context.fields = contentNeedsFriendFields(content)
       ? await getFriendFieldMap(db, friend.id)
       : undefined;
     try {
-      context.vars = await resolveSendCommonVars(db, friend.line_account_id, content, source);
+      context.vars = await resolveSendCommonVars(db, friend.line_account_id, commonContent, source);
     } catch (error) {
       if (error instanceof CommonVarResolutionFailedError) {
         // 変数名は定義上の名前なので運用者へ見せてよい。値や本文は含めない。
@@ -82,9 +85,15 @@ export async function renderChatMessageContent(
       throw error;
     }
   } else {
-    const extra = await resolveInterpolationExtra(db, friend.id, content);
+    const extra = await resolveInterpolationExtra(db, friend.id, commonContent);
     context.fields = extra.fields;
     context.vars = extra.vars;
+  }
+
+  if (reservationKeys.length) {
+    const values = await chatReservationVariables(db, friend.id, friend.line_account_id);
+    context.vars = { ...context.vars };
+    for (const key of reservationKeys) context.vars[key] = values[key] ?? `{{var.${key}}}`;
   }
 
   let rendered = content;

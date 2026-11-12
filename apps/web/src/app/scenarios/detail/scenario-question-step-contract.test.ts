@@ -97,7 +97,7 @@ describe('R214: 行き先の形が正しくない選択肢は保存しない', (
       validateChoiceUris({
         ...base,
         choices: [
-          { label: '電話', behavior: 'tel', tel: '03-1234-5678' },
+          { label: '電話', behavior: 'tel', tel: '03-0000-5678' },
           { label: 'メール', behavior: 'mail', email: 'a@example.com' },
         ],
       }),

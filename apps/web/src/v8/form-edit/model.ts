@@ -215,7 +215,7 @@ export const ADD_GROUPS: { title: string; cards: AddCard[] }[] = [
     { key: 'textarea', label: '自由に書く', hint: '長い文を書く', make: input('textarea') },
     // メールと電話は分ける（オーナー 2026-10-08：「メールアドレスと電話番号を分けよう」）。
     { key: 'contact', label: 'メール', hint: 'メールの形をチェック', make: input('text', { label: 'メールアドレス', fixedField: 'email', placeholder: '例：sample@example.com', limit: { format: 'email' } }) },
-    { key: 'tel', label: '電話', hint: '番号の形をチェック', make: input('text', { label: '電話番号', fixedField: 'tel', placeholder: '例：090-1234-5678', limit: { format: 'tel' } }) },
+    { key: 'tel', label: '電話', hint: '番号の形をチェック', make: input('text', { label: '電話番号', fixedField: 'tel', placeholder: '例：090-0000-5678', limit: { format: 'tel' } }) },
     { key: 'address', label: '住所', hint: '郵便番号から自動で', make: input('address', { label: '住所', fixedField: 'address' }) },
     ...FIXED_FRIEND_FIELDS.filter(f => ['name', 'kana', 'birthday', 'age'].includes(f.key)).map(f => ({
       key: f.key, label: f.label, hint: '友だちの決まった欄に入る',

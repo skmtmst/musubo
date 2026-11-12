@@ -288,6 +288,8 @@ describe('日時の欄の時刻の部分も同じ部品', () => {
     fireEvent.focus(time)
     fireEvent.change(time, { target: { value: '1430' } })
     fireEvent.keyDown(time, { key: 'Enter' })
+    expect(screen.getByTestId('value').textContent).toBe('2026-10-01T10:00')
+    fireEvent.click(within(dialog).getByRole('button', { name: '確定' }))
     expect(screen.getByTestId('value').textContent).toBe('2026-10-01T14:30')
   })
 })

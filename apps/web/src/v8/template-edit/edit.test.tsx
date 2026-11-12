@@ -613,7 +613,7 @@ describe('V8 メッセージを作る：フォルダ・読み込めないとき�
     expect(tracking.disabled).toBe(true)
     expect(tracking.parentElement?.textContent).toContain('短縮して数える（いつもオン・変更できません）')
     const preview = host.querySelector('[data-template-region="preview"]')!
-    expect(preview.textContent).toContain('山田 太郎さん、ご予約はこちら')
+    expect(preview.textContent).toContain('見本 141さん、ご予約はこちら')
     expect(preview.textContent).toContain('値を確認できない差し込みがあります：{{field.unknown_key}}')
   })
 })
@@ -907,4 +907,31 @@ it.each(['rich_message', 'research'])('%s の公開失敗後は同じ下書き�
   expect(assetsPublish).toHaveBeenCalledTimes(2)
   expect(assetsPublish.mock.calls[1]).toEqual(assetsPublish.mock.calls[0])
   expect(push).toHaveBeenCalledWith('/templates?highlight=asset-1')
+})
+
+it('利用中メッセージは確認後に版が変わっても確認時の版で公開する', async () => {
+  const usedBy = { autoReplies: [], automations: [], scenarioSteps: [{ stepId:'s', scenarioId:'scenario', scenarioName:'ご案内', stepOrder:1 }], reminderSteps: [], richMenuAreas: [], trackedLinks: [] }
+  templatesApi.get.mockReset().mockResolvedValueOnce(detail()).mockResolvedValueOnce(detail({ publishedVersion:3, draftRevision:3, usedBy })).mockResolvedValue(detail({ publishedVersion:4, draftRevision:5, usedBy }))
+  templatesApi.update.mockResolvedValue({ success:true, data:{ id:'template-1', publishedVersion:3, draftRevision:3 } })
+  templatesApi.publish.mockResolvedValue({ success:true, data:{} })
+  await mount('id=template-1')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name:'保存して公開' })) })
+  await flush()
+  await act(async () => { fireEvent.click(within(screen.getByRole('dialog', { name:'この内容を公開しますか？' })).getByRole('button',{name:'公開する'})) })
+  expect(templatesApi.publish).toHaveBeenCalledWith('template-1',{expectedVersion:3,expectedDraftRevision:3})
+})
+
+it('メッセージ公開の窓を閉じた後は古い確定から公開しない', async () => {
+  templatesApi.get.mockResolvedValue(detail({ usedBy:{ autoReplies:[], automations:[], scenarioSteps:[{ stepId:'s', scenarioId:'scenario', scenarioName:'ご案内', stepOrder:1 }], reminderSteps:[], richMenuAreas:[], trackedLinks:[] } }))
+  templatesApi.update.mockResolvedValue({ success:true, data:{ id:'template-1', publishedVersion:3, draftRevision:3 } })
+  await mount('id=template-1')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name:'保存して公開' })) })
+  await flush()
+  const dialog = within(screen.getByRole('dialog',{name:'この内容を公開しますか？'}))
+  const button = dialog.getByRole('button',{name:'公開する'})
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const held = (button as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+  await act(async () => { fireEvent.click(dialog.getByRole('button',{name:'キャンセル'})) })
+  await act(async () => { await held({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button}) })
+  expect(templatesApi.publish).not.toHaveBeenCalled()
 })

@@ -40,13 +40,13 @@ test('AI-09/17/19: 公開QAそのままを模擬・二重再送しない・古�
  expect(d.raw.prepare('SELECT use_count FROM qa_entries').get()).toEqual({use_count:0});expect(d.raw.prepare('SELECT count(*) n FROM messages_log').get()).toEqual({n:0});
 });
 test('AI-10/11/12/13/14: 危険な質問は一致QAがあっても人へ。電話・名前は記録で伏せる',async()=>{
- for(const [question,reason] of [['返金してください','money'],['明日の予約を変えたい','booking_change'],['090-1234-5678 に連絡','pii'],['住所はどこ','pii'],['知らない質問','low_confidence']]){
+ for(const [question,reason] of [['返金してください','money'],['明日の予約を変えたい','booking_change'],['090-0000-5678 に連絡','pii'],['住所はどこ','pii'],['知らない質問','low_confidence']]){
   if(reason!=='low_confidence')d.raw.prepare("UPDATE qa_entries SET questions_json=?").run(JSON.stringify([question]));
   expect(await evaluateQa(d.db,'a',question)).toMatchObject({action:'handed_off',handoffReason:reason,qa:null});
  }
  const complaints=['最悪です','対応が悪い','苦情です','ひどい','酷い扱い','怒っています','ふざけるな','詐欺だ','許せない','クレームです','不満です','失礼ですね','納得できない','二度と使わない','責任を取れ','謝罪して','訴えます','馬鹿にするな','ムカつく','あり得ない'];
  for(const q of complaints)expect(await evaluateQa(d.db,'a',q)).toMatchObject({handoffReason:'complaint'});
- expect(await simulate('pii','お客さま 090-1234-5678')).toMatchObject({handoffReason:'pii'});expect(JSON.stringify(d.raw.prepare('SELECT * FROM ai_answer_logs').all())).not.toContain('090-1234');
+ expect(await simulate('pii','お客さま 090-0000-5678')).toMatchObject({handoffReason:'pii'});expect(JSON.stringify(d.raw.prepare('SELECT * FROM ai_answer_logs').all())).not.toContain('090-1234');
 });
 test('AI-15/16/30/31/33: 入力の借用・30分3回・24時間の人希望・月の上限は並行実行でも守る',async()=>{
  d.raw.exec("INSERT INTO inbox_reply_leases(channel,conversation_id,staff_id,acquired_at,expires_at,conversation_revision) VALUES('line','chat','s','2026-10-16T01:59:30Z','2026-10-16T02:00:30Z',1)");

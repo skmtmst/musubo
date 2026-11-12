@@ -41,6 +41,8 @@ export const get__api_webhooks_incoming_1 = async (c: Context<Env, "/api/webhook
         sourceType: w.source_type,
         hasSecret: hasWebhookSecret(w),
         isActive: Boolean(w.is_active),
+        version: w.version ?? 1,
+        confirmationRevision: w.confirmation_revision,
         createdAt: w.created_at,
         updatedAt: w.updated_at,
       })),
@@ -93,6 +95,7 @@ export const get__api_webhooks_incoming_id_2 = async (c: Context<Env, "/api/webh
         previousSecretUsableUntil: previousSecretUsableUntil(item),
         isActive: Boolean(item.is_active),
         version: Number(item.version ?? 1),
+        confirmationRevision: item.confirmation_revision,
         identityMatching,
         actions: namedActions,
         pendingUnmatched,
@@ -216,9 +219,14 @@ export const put__api_webhooks_incoming_id_5 = async (c: Context<Env, "/api/webh
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
+    const body = await c.req.json<{ name?: string; sourceType?: string; secret?: string; isActive?: boolean; folderId?: unknown; expectedVersion?: unknown; expectedConfirmationRevision?: unknown }>();
     const existing = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
-    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    const body = await c.req.json<{ name?: string; sourceType?: string; secret?: string; isActive?: boolean; folderId?: unknown }>();
+    if (!existing) return body.expectedConfirmationRevision === undefined ? c.json({ success: false, error: 'Not found' }, 404) : c.json({ success: false, code: 'VERSION_CONFLICT', error: '対象が変わりました。読み直してください。', data: null }, 409);
+    if (body.expectedVersion !== undefined && (!Number.isSafeInteger(body.expectedVersion) || (body.expectedVersion as number) < 1)) {
+      return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedVersion']);
+    }
+    if (body.expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(body.expectedConfirmationRevision) || (body.expectedConfirmationRevision as number) < 1)) return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedConfirmationRevision']);
+    if (body.expectedConfirmationRevision !== undefined && body.expectedConfirmationRevision !== existing.confirmation_revision) return c.json({ success: false, code: 'VERSION_CONFLICT', error: '受信口が変わりました。読み直してください。', data: { currentVersion: existing.version, confirmationRevision: existing.confirmation_revision } }, 409);
     // 秘密値の入れ替えを伴う更新は鍵・トークンの操作（V）。
     if (body.secret !== undefined && !await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
       return stepUpRequiredResponse(c, '秘密の値の変更には本人確認が必要です');
@@ -256,9 +264,14 @@ export const put__api_webhooks_incoming_id_5 = async (c: Context<Env, "/api/webh
           }, 400, ["secret"]);
       }
     }
-    await updateIncomingWebhook(c.env.DB, id, lineAccountId, body, webhookKeysOf(c));
+    const saved = body.expectedConfirmationRevision !== undefined
+      ? await updateIncomingWebhook(c.env.DB, id, lineAccountId, body, webhookKeysOf(c), body.expectedVersion as number | undefined, body.expectedConfirmationRevision as number)
+      : body.expectedVersion === undefined
+        ? await updateIncomingWebhook(c.env.DB, id, lineAccountId, body, webhookKeysOf(c))
+        : await updateIncomingWebhook(c.env.DB, id, lineAccountId, body, webhookKeysOf(c), body.expectedVersion as number);
     const updated = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
-    if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
+    if (!updated) return body.expectedConfirmationRevision === undefined ? c.json({ success: false, error: 'Not found' }, 404) : c.json({ success: false, code: 'VERSION_CONFLICT', error: '対象が変わりました。読み直してください。', data: null }, 409);
+    if ((body.expectedVersion !== undefined || body.expectedConfirmationRevision !== undefined) && !saved) return c.json({ success: false, code: 'VERSION_CONFLICT', error: '受信口が変わりました。読み直してください。', data: { currentVersion: updated.version, confirmationRevision: updated.confirmation_revision } }, 409);
     //  動かす/止める・合言葉の入れ直し・その他の変更を分けて記録する。
     if (body.isActive !== undefined) {
       auditLog(c, body.isActive ? 'webhook.incoming.activate' : 'webhook.incoming.deactivate',
@@ -281,6 +294,8 @@ export const put__api_webhooks_incoming_id_5 = async (c: Context<Env, "/api/webh
         ...(body.secret !== undefined ? { secret: body.secret } : {}),
         previousSecretUsableUntil: previousSecretUsableUntil(updated),
         isActive: Boolean(updated.is_active),
+        version: updated.version ?? 1,
+        confirmationRevision: updated.confirmation_revision,
       },
     });
   } catch (err) {
@@ -300,9 +315,19 @@ export const delete__api_webhooks_incoming_id_6 = async (c: Context<Env, "/api/w
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
+    const rawVersion = c.req.query('expectedVersion');
+    const rawConfirmationRevision = c.req.query('expectedConfirmationRevision');
     const existing = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
-    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    await deleteIncomingWebhook(c.env.DB, id, lineAccountId, c.get('staff')?.id);
+    if (!existing) return rawConfirmationRevision === undefined ? c.json({ success: false, error: 'Not found' }, 404) : c.json({ success: false, code: 'VERSION_CONFLICT', error: '対象が変わりました。読み直してください。', data: null }, 409);
+    if (rawConfirmationRevision !== undefined && (!/^[1-9]\d*$/.test(rawConfirmationRevision) || !Number.isSafeInteger(Number(rawConfirmationRevision)))) return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedConfirmationRevision']);
+    if (rawVersion !== undefined && (!/^[1-9]\d*$/.test(rawVersion) || !Number.isSafeInteger(Number(rawVersion)))) {
+      return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedVersion']);
+    }
+    const deleted = await deleteIncomingWebhook(c.env.DB, id, lineAccountId, c.get('staff')?.id, rawVersion === undefined ? undefined : Number(rawVersion), rawConfirmationRevision === undefined ? undefined : Number(rawConfirmationRevision));
+    if ((rawVersion !== undefined || rawConfirmationRevision !== undefined) && !deleted) {
+      const current = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
+      return c.json({ success: false, code: 'VERSION_CONFLICT', error: '受信口が変わりました。読み直してください。', data: current ? { currentVersion: current.version, confirmationRevision: current.confirmation_revision } : null }, 409);
+    }
     auditLog(c, 'webhook.incoming.delete', { kind: 'incoming_webhook', id }, { lineAccountId });
     return c.json({ success: true, data: null });
   } catch (err) {
@@ -591,6 +616,7 @@ export const get__api_webhooks_outgoing_11 = async (c: Context<Env, "/api/webhoo
           createdAt: w.created_at,
           updatedAt: w.updated_at,
           version: w.version ?? 1,
+          confirmationRevision: w.confirmation_revision,
           updatedBy: w.updated_by_staff_id ?? null,
         };
       }),

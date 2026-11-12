@@ -51,7 +51,7 @@ const petRow = {
   updatedAt: 'v1',
   weightUpdatedAt: '2026-09-28T00:00:00Z',
   weightStale: false,
-  owner: { friendId: 'f1', name: '田中 明子', pictureUrl: null, customerId: '10234' },
+  owner: { friendId: 'f1', name: '見本 169', pictureUrl: null, customerId: '10234' },
 }
 
 const listData = {
@@ -76,7 +76,7 @@ describe('マイペット V8', () => {
     for (const head of ['ペット', '飼い主', '年齢', '体重', '今日の目安', '避妊去勢', '運動量', '主食', '体重の更新']) {
       expect(screen.getByText(head)).toBeTruthy()
     }
-    expect(screen.getByText('田中 明子')).toBeTruthy()
+    expect(screen.getByText('見本 169')).toBeTruthy()
     expect(await screen.findByText('マイページで更新を促す', { exact: false, selector: 'p' })).toBeTruthy()
   })
 

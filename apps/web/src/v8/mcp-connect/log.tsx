@@ -8,7 +8,7 @@ import { PAGE_SIZES, pageSizeOptions } from '@/components/shared/page-size-optio
  * したこと・期間・件数。表：日時・接続・したこと（読んだ／下書きを作った／送る依頼〔承認待ち〕／断った）・対象。
  * 送る依頼の行は「…」に［承認へ進む］、下書きの行は［下書きを開く］。範囲外の依頼は「断った」で残る。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { History } from 'lucide-react'
 import Button from '@/components/shared/button'
 import LogEntryDetails, { type LogEntryFacts } from '@/components/shared/log-entry-details'
@@ -17,7 +17,7 @@ import EmptyList from '@/components/shared/empty-list'
 import ListState from '@/components/shared/list-state'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { ListToolbarEnd, ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
-import { useListUrlState } from '@/components/shared/list-url-state'
+import { readListUrlParam, useListUrlState } from '@/components/shared/list-url-state'
 import Pagination from '@/components/shared/pagination'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -54,34 +54,46 @@ export default function McpLogV8() {
   const days = Number(url.days) || 7
   const [load, setLoad] = useState<Load>({ kind: 'loading' })
   const [menuId, setMenuId] = useState<string | null>(null)
-  const [stopOpen, setStopOpen] = useState(false)
+  const [stopTarget, setStopTarget] = useState<{ connection: McpConnection; selectedConnection: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [entry, setEntry] = useState<LogEntryFacts | null>(null)
+  const loadSequence = useRef(0)
 
   const fetchLogs = useCallback(async () => {
+    const sequence = ++loadSequence.current
     setEntry(null)
     setLoad({ kind: 'loading' })
     const resultFilter = url.what === 'refused' || url.what === 'error' ? url.what : ''
     const kindFilter = resultFilter ? '' : url.what
     try {
       const res = await mcpApi.logs({ connectionId: url.connection || undefined, result: resultFilter, kind: kindFilter, days, page, limit: size })
+      if (sequence !== loadSequence.current) return
       setLoad({ kind: 'ready', ...res.data })
     } catch (caught) {
+      if (sequence !== loadSequence.current) return
       setLoad({ kind: 'error', error: caught })
     }
   }, [url.connection, url.what, days, page, size])
-  useEffect(() => { if (permissions.see) void fetchLogs() }, [fetchLogs, permissions.see])
+  useEffect(() => { if (permissions.see) void fetchLogs(); return () => { loadSequence.current += 1 } }, [fetchLogs, permissions.see])
+  useEffect(() => { setStopTarget(null) }, [url.connection])
+  useEffect(() => {
+    if (stopTarget && load.kind === 'ready' && (load.connection?.id !== stopTarget.connection.id || load.connection.version !== stopTarget.connection.version || load.connection.status !== 'active')) setStopTarget(null)
+  }, [load, stopTarget])
 
   const connection = load.kind === 'ready' ? load.connection : null
   const stop = async () => {
-    if (!connection) return
+    if (!stopTarget || !permissions.stop || readListUrlParam('connection') !== stopTarget.selectedConnection || !connection || connection.id !== stopTarget.connection.id || connection.version !== stopTarget.connection.version || connection.status !== 'active') {
+      setError('接続が変わりました。読み直してから、もう一度選んでください。')
+      return
+    }
+    const target = stopTarget.connection
     setBusy(true)
     setError('')
     try {
-      await mcpApi.stop(connection.id, connection.version)
-      notifyToast(`「${connection.name}」を止めました。次の呼び出しから使えません`)
-      setStopOpen(false)
+      await mcpApi.stop(target.id, target.version)
+      notifyToast(`「${target.name}」を止めました。次の呼び出しから使えません`)
+      setStopTarget(null)
       void fetchLogs()
     } catch (caught) {
       setError(describeApiFailure(caught, '止める操作'))
@@ -110,7 +122,7 @@ export default function McpLogV8() {
       help="AI との接続が読んだ・下書きを作った・送る依頼を出した・断ったことを、全部ここに残します。送る依頼は、人が承認するまで送りません。"
       subtitle={connection ? `${connection.name}・${LEVEL_LABEL[connection.level]}` : undefined}
       actions={connection && connection.status === 'active' && permissions.stop
-        ? <Button variant="danger" onClick={() => { setError(''); setStopOpen(true) }}>この接続を止める</Button>
+        ? <Button variant="danger" onClick={() => { setError(''); setStopTarget({ connection, selectedConnection: url.connection }) }}>この接続を止める</Button>
         : undefined}
       stats={permissions.viewer ? <ReadOnlyNotice role="status" /> : undefined}
       toolbar={<ListToolbarFrame><ListToolbarRow>
@@ -122,8 +134,8 @@ export default function McpLogV8() {
       </ListToolbarRow></ListToolbarFrame>}
       pagination={load.kind === 'ready' && total > size ? <Pagination page={page} pageCount={Math.max(1, Math.ceil(total / size))} onPageChange={(next) => setUrl({ page: String(next) })} range={{ total, first: (page - 1) * size + 1, last: Math.min(total, page * size) }} /> : undefined}
       overlays={<><LogEntryDetails canCopy={permissions.see && !permissions.viewer} entry={entry} onClose={() => setEntry(null)} /><ConfirmDialog
-        open={stopOpen}
-        title={`「${connection?.name ?? ''}」を止めますか？`}
+        open={stopTarget !== null}
+        title={`「${stopTarget?.connection.name ?? ''}」を止めますか？`}
         description="すぐ使えなくなり、次の呼び出しから断ります。止めた人は記録に残ります。もう一度使うときは、接続を作り直します。"
         confirmLabel="止める"
         confirmIcon={false}
@@ -131,8 +143,8 @@ export default function McpLogV8() {
         busy={busy}
         error={error || undefined}
         onConfirm={() => void stop()}
-        onCancel={() => { if (!busy) setStopOpen(false) }}
-      ><OperationTargetSummary accounts={connection?.accounts?.length ? connection.accounts : [{ id: '' }]} compactAccounts /></ConfirmDialog></>}
+        onCancel={() => { if (!busy) setStopTarget(null) }}
+      ><OperationTargetSummary accounts={stopTarget?.connection.accounts?.length ? stopTarget.connection.accounts : [{ id: '' }]} compactAccounts /></ConfirmDialog></>}
     >
       {load.kind === 'loading' ? <ListState kind="loading" /> : null}
       {failure ? <ListState kind="error" title={failure.title} description={failure.description} onRetry={failure.retryable ? () => void fetchLogs() : undefined} /> : null}

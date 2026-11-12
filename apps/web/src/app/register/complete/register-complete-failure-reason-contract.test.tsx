@@ -33,7 +33,7 @@ vi.mock('@/lib/auth-email', async (importOriginal) => {
     ...actual,
     authRequest: vi.fn(async (path: string) => {
       if (path.startsWith('/api/auth/register/check')) {
-        return { ok: true, status: 200, data: { email: 'new@example.com', trialDays: 30, companyName: 'テスト統括', contactName: '山田 太郎' } }
+        return { ok: true, status: 200, data: { email: 'new@example.com', trialDays: 30, companyName: 'テスト統括', contactName: '見本 141' } }
       }
       return fixture.completeResponse
     }),
@@ -77,7 +77,7 @@ describe('本登録の失敗理由案内（M045）', () => {
     await act(async () => { root.render(<RegisterCompletePage />) })
     await act(async () => { await Promise.resolve() })
     expect(host.querySelector('#complete-tenant')?.textContent).toBe('テスト統括')
-    expect(host.querySelector('#complete-name')?.textContent).toBe('山田 太郎')
+    expect(host.querySelector('#complete-name')?.textContent).toBe('見本 141')
     expect(host.querySelectorAll('#complete-tenant input, #complete-name input')).toHaveLength(0)
     setInput('#complete-password', 'StrongPass123!')
     setInput('#complete-confirm', 'StrongPass123!')

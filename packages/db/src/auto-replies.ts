@@ -335,7 +335,7 @@ export async function updateAutoReply(
   await db.batch([
     db.prepare(
       `UPDATE auto_replies
-       SET keyword = ?,
+       SET confirmation_revision = confirmation_revision + 1, keyword = ?,
            match_type = ?,
            response_type = ?,
            response_content = ?,
@@ -410,6 +410,7 @@ export async function stopAutoReply(
     staffId: string | null;
     reason: string | null;
     idempotencyKey: string;
+    expectedVersion?: number;
   },
 ): Promise<AutoReply | null> {
   const replay = await db
@@ -419,12 +420,15 @@ export async function stopAutoReply(
     )
     .bind(input.id, input.idempotencyKey)
     .first<AutoReply>();
-  if (replay) return replay;
+  if (replay) {
+    if (input.expectedVersion !== undefined && replay.confirmation_revision !== input.expectedVersion + 1) throw new Error('AUTO_REPLY_CONFIRMATION_CONFLICT');
+    return replay;
+  }
   const now = jstNow();
-  await db
+  const updated = await db
     .prepare(
       `UPDATE auto_replies
-          SET is_active = 0,
+          SET confirmation_revision = confirmation_revision + 1, is_active = 0,
               lifecycle_status = CASE
                 WHEN lifecycle_status = 'published' THEN 'stopped'
                 ELSE lifecycle_status
@@ -433,10 +437,11 @@ export async function stopAutoReply(
               stopped_by_staff_id = ?,
               stop_reason = ?,
               stop_idempotency_key = ?
-        WHERE id = ? AND deleted_at IS NULL`,
+        WHERE id = ? AND deleted_at IS NULL AND (? IS NULL OR confirmation_revision = ?)`,
     )
-    .bind(now, input.staffId, input.reason, input.idempotencyKey, input.id)
+    .bind(now, input.staffId, input.reason, input.idempotencyKey, input.id, input.expectedVersion ?? null, input.expectedVersion ?? null)
     .run();
+  if (!updated.meta.changes && input.expectedVersion !== undefined && await getAutoReplyById(db, input.id)) throw new Error('AUTO_REPLY_CONFIRMATION_CONFLICT');
   return getAutoReplyById(db, input.id);
 }
 
@@ -455,7 +460,7 @@ export async function deleteAutoReply(
   await db
     .prepare(
       `UPDATE auto_replies
-          SET deleted_at = ?, deleted_by_staff_id = ?, is_active = 0,
+          SET confirmation_revision = confirmation_revision + 1, deleted_at = ?, deleted_by_staff_id = ?, is_active = 0,
               lifecycle_status = CASE
                 WHEN lifecycle_status = 'published' THEN 'stopped'
                 ELSE lifecycle_status
@@ -482,7 +487,7 @@ export async function restoreAutoReply(
   const result = await db
     .prepare(
       `UPDATE auto_replies
-          SET deleted_at = NULL, deleted_by_staff_id = NULL, is_active = 0
+          SET confirmation_revision = confirmation_revision + 1, deleted_at = NULL, deleted_by_staff_id = NULL, is_active = 0
         WHERE id = ? AND deleted_at IS NOT NULL`,
     )
     .bind(id)

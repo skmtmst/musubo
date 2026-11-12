@@ -1,4 +1,6 @@
 'use client'
+import { useInboxPreview } from './use-reservation-warning'
+import TruncatedText from '@/components/shared/truncated-text'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -177,6 +179,7 @@ function MobileTalkThread() {
 
   const draft = useInboxDraft({ selectedAccountId, selectedChatId })
   const { chatDetail, setChatDetail, messagesHasMore, loadingOlderMessages, loadChatDetail, loadOlderMessages, refreshChatDetailQuietly } = useInboxConversation({
+    sendLockRef,
     CHAT_MESSAGE_PAGE_SIZE: MESSAGE_BATCH,
     selectedChatIdRef, detailAccountRef, detailRequestIdRef, setError, deepLinkIdRef, setDeepLinkNotice,
     selectedChatId, selectedAccountId, setChats, chats,
@@ -215,8 +218,10 @@ function MobileTalkThread() {
   const hasContent = Boolean(draft.messageContent.trim() || draft.pendingImage || draft.pendingAttachment?.status === 'ready')
   const ready = Boolean(chatDetail) && !deepLinkNotice
 
+  const { preview, warning: reservationWarning } = useInboxPreview(selectedChatId, draft.messageContent)
   const composer = canReply && ready ? (
     <div className={styles.composer}>
+      {reservationWarning ? <Notice tone="warn" message={reservationWarning} /> : null}
       {sendError ? (
         <Notice tone="danger" message={sendError} action={<Button size="compact" onClick={() => void handleSendMessage()} busy={sending} busyLabel="送っています…">もう一度送る</Button>} />
       ) : null}
@@ -244,6 +249,7 @@ function MobileTalkThread() {
         aria-label="メッセージを入力"
         aria-invalid={overLimit}
       />
+      {preview !== null ? <Notice tone="info" heading="送るとこうなります："><TruncatedText value={preview} /></Notice> : null}
       <div className={styles.composerRow}>
         <AttachMenu disabled={sending} onPick={(file, slot) => void draft.handlePickAttachment(file, slot)} />
         <span className={styles.count} data-over={overLimit || undefined} title={ATTACH_NOTE}>

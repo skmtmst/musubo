@@ -66,7 +66,7 @@ beforeEach(() => {
   retried = 0
   detail = {
     id: 'run-4', receivedAt: '2026-09-07T01:14:01.000Z', processedAt: '2026-09-07T01:14:02.000Z',
-    friend: { id: 'friend-4', displayName: '山田 太郎', redacted: false }, friendKind: 'first_time',
+    friend: { id: 'friend-4', displayName: '見本 141', redacted: false }, friendKind: 'first_time',
     attribution: { status: 'unavailable', routeId: null, routeName: null, reason: null },
     rule: { id: 'rule-fallback', name: '経路が分からなかった人', versionId: 'v1', versionNumber: 1 },
     configuredActions: configured,
@@ -130,7 +130,7 @@ describe('実行の詳細の画面（N43uVX）', () => {
   it('失敗の帯は何つ目で止まったかを出し、行ったことを順に並べる', async () => {
     await render()
     expect(host.querySelector('[data-design-node="N43uVX"]')).toBeTruthy()
-    expect(host.textContent).toContain('山田 太郎さんの友だち追加')
+    expect(host.textContent).toContain('見本 141さんの友だち追加')
     await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
     expect(host.textContent).toContain('9月7日（月）10:14 に追加・はじめて')
     expect(host.textContent).toContain('3つ目の処理を完了できませんでした')
@@ -171,7 +171,7 @@ describe('実行の詳細の画面（N43uVX）', () => {
     const text = host.querySelector('pre')?.textContent ?? ''
     expect(text).toContain('"id": "run-4"')
     expect(text).toContain('"errorCode": "action_failed"')
-    for (const leak of ['山田 太郎', 'friend-4', '共通のあいさつ']) expect(text).not.toContain(leak)
+    for (const leak of ['見本 141', 'friend-4', '共通のあいさつ']) expect(text).not.toContain(leak)
     await act(async () => { buttonByText('JSON をコピー')!.click() })
     expect(writeText).toHaveBeenLastCalledWith(text)
   })

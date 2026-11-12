@@ -42,7 +42,7 @@ it('名前の文字数は入力中または上限が近い時だけ残し、郵�
   view.rerender(<Field label="郵便番号"><TextInput defaultValue="1234567" maxLength={7}/></Field>)
   fireEvent.focus(screen.getByRole('textbox',{name:'郵便番号'}))
   expect(view.container.querySelector('[data-field-count]')).toBeNull()
-  view.rerender(<Field label="連絡先"><TextInput type="tel" defaultValue="09012345678" maxLength={11}/></Field>)
+  view.rerender(<Field label="連絡先"><TextInput type="tel" defaultValue="09000005678" maxLength={11}/></Field>)
   fireEvent.focus(screen.getByRole('textbox',{name:'連絡先'}))
   expect(view.container.querySelector('[data-field-count]')).toBeNull()
 })

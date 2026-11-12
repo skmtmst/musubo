@@ -82,7 +82,7 @@ export function MonthCalendar({ month, onMove, onDay }: { month: StyleMonth; onM
   )
 }
 
-export function DayList({ month, href }: { month: StyleMonth; href: string }) {
+export function DayList({ month, href, canWrite }: { month: StyleMonth; href: string; canWrite: boolean }) {
   const s = month.selected
   return (
     <div className={styles.dayList}>
@@ -98,7 +98,7 @@ export function DayList({ month, href }: { month: StyleMonth; href: string }) {
         ))}
       </div>
       <a className={styles.sideMore} href={href}>{s.moreLabel}</a>
-      <p className={styles.dayHint}><Info size={16} aria-hidden="true" />日を押すと、その日の予約がここに出ます。休みは［休みを入れる］から。</p>
+      <p className={styles.dayHint}><Info size={16} aria-hidden="true" />日を押すと、その日の予約がここに出ます。{canWrite ? '休みは［休みを入れる］から。' : null}</p>
     </div>
   )
 }

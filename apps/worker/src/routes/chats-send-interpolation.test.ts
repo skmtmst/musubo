@@ -280,3 +280,54 @@ describe('送信予約の差し込み(N-026)', () => {
     expect(scheduledRows()[0].content).toBe('あとで');
   });
 });
+
+test('友だちのこれからの飲食予約をプレビューと送信に差し込む', async () => {
+  sqlite.raw.exec(`INSERT INTO rt_organizations(id,account_id,name) VALUES('org','acc-1','組織');
+    INSERT INTO rt_stores(id,organization_id,name,code,line_account_id,timezone) VALUES('store','org','食堂','S','acc-1','Asia/Tokyo');
+    INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,status) VALUES
+    ('later','store','line','利用者1','U-1',5,'2099-11-02T10:00:00Z','2099-11-02T12:00:00Z','confirmed'),
+    ('near','store','line','利用者1','U-1',2,'2099-11-01T09:00:00Z','2099-11-01T11:00:00Z','confirmed');`);
+  const content = '{{name}} {{account.name}} {{var.reservation_datetime}} {{var.guest_count}}';
+  const preview = await postPreview({ content });
+  const result = await preview.json() as { data: { content: string; unresolved: string[] } };
+  expect(result.data.unresolved).toEqual([]);
+  expect(result.data.content).toContain('利用者1 acc-1');
+  expect(result.data.content).toContain('18:00');
+  expect(result.data.content.endsWith(' 2')).toBe(true);
+  const sent = await postSend({ content, revision: 0 }, KEY1);
+  expect(sent.status).toBe(200);
+  expect((pushMessage.mock.calls[0] as [string, Array<{ text: string }>])[1][0].text).toBe(result.data.content);
+});
+
+test('予約がないと予約変数を未解決としてプレビューで示し、送信しない', async () => {
+  const content = '{{name}} {{var.reservation_datetime}} {{var.guest_count}}';
+  const preview = await postPreview({ content });
+  const result = await preview.json() as { data: { content: string; unresolved: string[] } };
+  expect(result.data.content).toContain('利用者1');
+  expect(result.data.unresolved).toEqual(['var.reservation_datetime', 'var.guest_count']);
+  const sent = await postSend({ content, revision: 0 }, KEY2);
+  expect(sent.status).toBe(400);
+  expect(pushMessage).not.toHaveBeenCalled();
+});
+
+test('飲食の予約を優先し、取消・過去・別人を除く。飲食がなければ最も近い通常予約を使う', async () => {
+  sqlite.raw.exec(`INSERT INTO staff(id,line_account_id,name,display_name) VALUES('s','acc-1','担当','担当');
+    INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES('m','acc-1','相談',60,0);
+    INSERT INTO bookings(id,line_account_id,friend_id,staff_id,menu_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at)
+    VALUES('b','acc-1','fr-1','s','m','2099-01-01T09:00:00Z','2099-01-01T10:00:00Z','2099-01-01T10:00:00Z','confirmed',0,'2026-01-01T00:00:00Z');
+    INSERT INTO rt_organizations(id,account_id,name) VALUES('org','acc-1','組織');
+    INSERT INTO rt_stores(id,organization_id,name,code,line_account_id,timezone) VALUES('store','org','食堂','S','acc-1','Asia/Tokyo');
+    INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,status) VALUES
+    ('cancelled','store','line','利用者1','U-1',9,'2098-01-01T09:00:00Z','2098-01-01T11:00:00Z','cancelled'),
+    ('other','store','line','別人','U-2',8,'2098-01-01T09:00:00Z','2098-01-01T11:00:00Z','confirmed'),
+    ('valid','store','line','利用者1','U-1',2,'2099-11-01T09:00:00Z','2099-11-01T11:00:00Z','confirmed');`);
+  const content = '{{var.reservation_datetime}} {{var.course_name}}';
+  const read = async () => ((await (await postPreview({ content })).json()) as { data: { content: string } }).data.content;
+  expect(await read()).toContain('席のみ');
+  sqlite.raw.exec("UPDATE rt_reservations SET status='cancelled' WHERE id='valid'");
+  sqlite.raw.exec("INSERT INTO booking_settings(id,line_account_id,timezone) VALUES('bs','acc-1','America/New_York') ON CONFLICT(line_account_id) DO UPDATE SET timezone=excluded.timezone");
+  const fallback = await read();
+  expect(fallback).toContain('04:00');
+  expect(fallback).toContain('相談');
+  expect(fallback).toContain('2099-01-01');
+});

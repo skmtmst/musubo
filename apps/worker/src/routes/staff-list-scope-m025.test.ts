@@ -13,7 +13,7 @@ let testDb: SqliteD1;
 
 const member = (overrides: Partial<AuthenticatedStaff> = {}): AuthenticatedStaff => ({
   id: 'staff-1',
-  name: '山田 太郎',
+  name: '見本 141',
   role: 'admin',
   readOnly: false,
   tenantId: DEFAULT_TENANT_ID,
@@ -38,7 +38,7 @@ beforeEach(() => {
   testDb = createTestD1();
   testDb.raw.prepare(
     `INSERT INTO staff_members (id, name, email, role, api_key, tenant_id, account_scope)
-     VALUES ('staff-1', '山田 太郎', 'masato@example.com', 'admin', 'key-1', ?, 'all')`,
+     VALUES ('staff-1', '見本 141', 'masato@example.com', 'admin', 'key-1', ?, 'all')`,
   ).run(DEFAULT_TENANT_ID);
   testDb.raw.prepare(
     `INSERT INTO staff_members (id, name, email, role, api_key, tenant_id, account_scope)

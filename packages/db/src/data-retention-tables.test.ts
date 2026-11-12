@@ -43,6 +43,37 @@ function columnsOf(table: string): Set<string> {
 }
 
 describe('保存期限の分類表', () => {
+  it('店舗の統括管理者の所属は担当者への依存が深くなっても先に消す', () => {
+    const original = RETENTION_TABLES.staff_members;
+    RETENTION_TABLES.test_retention_parent = { category: 'purge', scope: { by: 'tenant', column: 'tenant_id' } };
+    RETENTION_TABLES.test_retention_middle = { category: 'purge', scope: { by: 'parent', column: 'parent_id', parent: 'test_retention_parent', parentColumn: 'id' } };
+    RETENTION_TABLES.staff_members = { category: 'purge', scope: { by: 'parent', column: 'parent_id', parent: 'test_retention_middle', parentColumn: 'id' } };
+    try {
+      const order = purgeTablesChildFirst();
+      expect(order.indexOf('line_account_hq_admin_memberships')).toBeLessThan(order.indexOf('staff_members'));
+      expect(order.indexOf('line_account_hq_admin_memberships')).toBeLessThan(order.indexOf('line_accounts'));
+    } finally {
+      RETENTION_TABLES.staff_members = original;
+      delete RETENTION_TABLES.test_retention_parent;
+      delete RETENTION_TABLES.test_retention_middle;
+    }
+  });
+  it('パスキーと統括管理者の所属を分類し、参照する親より先に消す', () => {
+    const expected = {
+      staff_passkeys: { category: 'purge', scope: { by: 'parent', column: 'staff_id', parent: 'staff_members', parentColumn: 'id' } },
+      staff_passkey_challenges: { category: 'purge', scope: { by: 'parent', column: 'staff_id', parent: 'staff_members', parentColumn: 'id' } },
+      line_account_hq_admin_memberships: { category: 'purge', scope: { by: 'lineAccount', column: 'line_account_id' } },
+    };
+    const missing = [...schemaTables].filter(name => !RETENTION_TABLES[name]);
+    const order = purgeTablesChildFirst();
+    for (const [table, entry] of Object.entries(expected)) {
+      expect(RETENTION_TABLES[table]).toEqual(entry);
+      expect(missing).not.toContain(table);
+      expect(order.indexOf(table)).toBeGreaterThanOrEqual(0);
+      expect(order.indexOf(table)).toBeLessThan(order.indexOf('staff_members'));
+    }
+    expect(order.indexOf('line_account_hq_admin_memberships')).toBeLessThan(order.indexOf('line_accounts'));
+  });
   it('統括のテスト票と保存した検索は参照先を消す前に消す', () => {
     const order = purgeTablesChildFirst();
     expect(order.indexOf('hq_form_test_tokens')).toBeLessThan(order.indexOf('hq_template_versions'));

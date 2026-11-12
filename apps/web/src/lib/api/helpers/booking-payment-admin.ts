@@ -48,6 +48,7 @@ export interface PaymentRecord {
   createdAt: string;
   receiptUrl: string | null;
   refundedAmount: number;
+  confirmationRevision?: number | null;
   actorLabel: string | null;
   reason: string | null;
 }
@@ -82,7 +83,7 @@ export interface PaymentEvent {
   result: PaymentEventResult;
 }
 
-export interface RefundPaymentInput { amount?: number; reason: string; notifyLine?: boolean; idempotencyKey: string }
+export interface RefundPaymentInput { expectedRevision?: number; amount?: number; reason: string; notifyLine?: boolean; idempotencyKey: string }
 export interface PaymentRefund extends SimulatedPaymentResult {
   id: string; amount: number; reason: string; actorLabel: string; createdAt: string;
   notifyLine: boolean; notificationStatus: 'not_requested' | 'simulated' | 'unavailable';

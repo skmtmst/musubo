@@ -42,6 +42,7 @@ vi.mock('./use-merged-person', () => ({
     setUnlinkReason: vi.fn(), unlink: vi.fn(), reload: vi.fn(), setDeliveryActive: vi.fn(),
   }),
 }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/friends' }))
@@ -56,16 +57,16 @@ afterEach(() => vi.unstubAllGlobals())
  * 同じ形。別の形で書くと、試験は通るのに画面は落ちる。型を通して固定する。
  */
 const PERSON: MergedPersonDetail = {
-  id: 'merged-person-1', status: 'active', revision: 4, primaryDisplayName: '田中 花子',
+  id: 'merged-person-1', status: 'active', revision: 4, primaryDisplayName: '見本 171',
   linkedFriends: [
     {
-      friendId: 'friend-identity-right', displayName: '田中 花子',
+      friendId: 'friend-identity-right', displayName: '見本 171',
       lineAccountId: 'visual-qa-account', lineAccountName: '本店', isFollowing: true,
       linkedAt: '2026-08-28T10:00:00.000Z', linkMethod: 'operator_review', confidence: 92,
       candidateId: 'identity-friend-1', candidateVersion: 2,
     },
     {
-      friendId: 'friend-identity-left', displayName: '田中 はなこ',
+      friendId: 'friend-identity-left', displayName: '見本 161',
       lineAccountId: 'visual-qa-account-sub', lineAccountName: '支店', isFollowing: true,
       linkedAt: '2026-08-28T10:00:00.000Z', linkMethod: 'migration', confidence: null,
       candidateId: null, candidateVersion: null,
@@ -73,7 +74,7 @@ const PERSON: MergedPersonDetail = {
   ],
   profileValues: [
     {
-      fieldKey: 'email', fieldLabel: 'メールアドレス', valuePreview: 'ta***@example.jp',
+      fieldKey: 'email', fieldLabel: 'メールアドレス', valuePreview: 'ta***@example.com',
       sourceType: 'form', sourceLabel: '来店アンケート', sourceFriendId: 'friend-identity-right',
       verifiedAt: '2026-08-28T09:00:00.000Z', selectedByName: '画面確認',
       selectedAt: '2026-08-28T10:10:00.000Z', updateMode: 'fixed',
@@ -129,10 +130,10 @@ describe('統合ユーザー詳細の中身', () => {
 
   it('メール・電話はマスク済みの値だけを出す', () => {
     const html = ALL()
-    expect(html).toContain('ta***@example.jp')
+    expect(html).toContain('ta***@example.com')
     expect(html).toContain('090-****-0001')
-    expect(html).not.toContain('tanaka@example.jp')
-    expect(html).not.toContain('090-1234-0001')
+    expect(html).not.toContain('tanaka@example.com')
+    expect(html).not.toContain('090-0000-0001')
   })
 
   it('未取得と取得できた値を見分けられる', () => {
@@ -232,14 +233,14 @@ describe('プロフィールの採用値を変える窓', () => {
         candidateId: `pc_${'a'.repeat(64)}`,
         sourceFriendId: 'friend-identity-left',
         sourceLabel: '支店の友だち情報',
-        valuePreview: '田中 はなこ',
+        valuePreview: '見本 161',
         verified: false,
       },
       {
         candidateId: `pc_${'b'.repeat(64)}`,
         sourceFriendId: 'friend-identity-right',
         sourceLabel: '本店の友だち情報',
-        valuePreview: '田中 花子',
+        valuePreview: '見本 171',
         verified: false,
       },
     ],
@@ -262,7 +263,7 @@ describe('プロフィールの採用値を変える窓', () => {
       />,
     )
     expect(html).toContain('統合プロフィールを編集')
-    expect(html).toContain('支店の友だち情報：田中 はなこ')
+    expect(html).toContain('支店の友だち情報：見本 161')
     expect(html).toContain('読み込んだのは第4版です')
     expect(html).toMatch(/<button[^>]*disabled[^>]*>選んだ0項目を保存</)
     expect(html).not.toContain(`pc_${'a'.repeat(64)}`)

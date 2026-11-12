@@ -42,7 +42,9 @@ export const get__api_friend_add_runs_1 = async (c: Context<Env, "/api/friend-ad
     if (kind) { clauses.push('e.friend_kind = ?'); bindings.push(kind); }
     if (attribution) { clauses.push('e.attribution_status = ?'); bindings.push(attribution); }
     const total = await c.env.DB.prepare(
-      `SELECT COUNT(*) AS count FROM friend_add_events e WHERE ${clauses.join(' AND ')}`,
+      `SELECT COUNT(*) AS count FROM friend_add_events e
+       JOIN friends f ON f.id = e.friend_id AND f.line_account_id = e.line_account_id
+       WHERE ${clauses.join(' AND ')}`,
     ).bind(...bindings).first<{ count: number }>();
     // 上部の集計も同じ絞り込みの中だけを数える。絞り込み中に
     // アカウント全体の数が出ると、対象範囲が読み手に伝わらない。
@@ -109,6 +111,7 @@ export const get__api_friend_add_runs_1 = async (c: Context<Env, "/api/friend-ad
                 SUM(CASE WHEN e.scenario_enrollment_id IS NOT NULL THEN 1 ELSE 0 END) AS scenario_starts,
                 MAX(e.first_delivery_sent_at) AS last_delivery_at
            FROM friend_add_events e
+           JOIN friends f ON f.id = e.friend_id AND f.line_account_id = e.line_account_id
           WHERE ${clauses.join(' AND ')}`,
       ).bind(...bindings).first<{
         captured_friends: number; returning_runs: number; period_friends: number; period_events: number;
@@ -117,6 +120,7 @@ export const get__api_friend_add_runs_1 = async (c: Context<Env, "/api/friend-ad
         last_delivery_at: string | null;
       }>(),
       c.env.DB.prepare(`SELECT e.error_code, COUNT(*) AS count FROM friend_add_events e
+        JOIN friends f ON f.id = e.friend_id AND f.line_account_id = e.line_account_id
         WHERE ${clauses.join(' AND ')} AND e.routing_status IN ('failed', 'partial_failed') GROUP BY e.error_code`)
         .bind(...bindings).all<{ error_code: string | null; count: number }>(),
     ]);

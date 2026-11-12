@@ -17,10 +17,22 @@ const mime = { '.html': 'text/html', '.js': 'application/javascript', '.css': 't
 async function fixture(method, path, screen) {
   if (method === 'OPTIONS') return {status: 204, body: ''}
   if (!['GET','HEAD'].includes(method)) throw new Error(`詳細の見張りで書き込みはしない: ${method} ${path}`)
+  const pathname = path.split('?')[0]
+  if (screen === 'restaurant-line-followup' && method === 'GET') {
+    const match = pathname.match(/^\/api\/restaurant-test\/followups\/([^/]+)(\/engines|\/reservation-form)?$/)
+    if (match?.[2] === '/engines') {
+      const page = JSON.parse((await mockFetch(method, `/api/restaurant-test/followups/${match[1]}`)).body).data
+      const legacyContents = page.rows.map(row => ({trigger:row.trigger,content:{timing:{mode:'countdown',offsetMinutes:row.default_offset_minutes},messageParts:[{messageType:'text',messageContent:row.initial_message}]}}))
+      return {status:200,headers:{'content-type':'application/json'},body:JSON.stringify({success:true,data:{engines:[],legacyContents,testRecipient:{state:'ready',recipientKind:'self',recipient:{id:'self',displayName:'本人',pictureUrl:null}}}})}
+    }
+    if (match?.[2] === '/reservation-form') {
+      const fields = [['name','お名前'],['dateTime','日にち・時間'],['guestCount','人数'],['phone','電話番号'],['allergy','アレルギー'],['note','ご要望']].map(([id,label],index)=>({id,label,enabled:true,required:index<3}))
+      return {status:200,headers:{'content-type':'application/json'},body:JSON.stringify({success:true,data:{version:0,definition:{title:'ご予約',completionMessage:'ご予約を受け付けました。',fields}}})}
+    }
+  }
   const answer = await mockFetch(method,path)
   if (!answer.body?.trim().startsWith('{')) return answer
   const data = JSON.parse(answer.body)
-  const pathname = path.split('?')[0]
   if (['/api/staff/me','/api/auth/session'].includes(pathname)) data.data = {...data.data,id:'detail-owner',name:'画面確認のオーナー',tenantId:'visual-tenant-1',role:'owner',readOnly:false,accountScope:'all',impersonation:null,permissionKeys:[],permissionViewKeys:[],viewPermissionKeys:[]}
   if (/^\/api\/automation-runs\/run-[0-9]+$/.test(pathname)) {
     const row = AUTOMATION_RUNS.items.find(row => row.id === pathname.split('/').pop()) ?? AUTOMATION_RUNS.items[0]
@@ -32,7 +44,102 @@ async function fixture(method, path, screen) {
   return {...answer,body:JSON.stringify(data)}
 }
 
+// 編集窓の LINE 見本は詳細本文ではないため、実際の見本と窓の境界を測る。
+function scanFollowupPreview() {
+  const dialog = [...document.querySelectorAll('[role="dialog"]')].find(el => el.querySelector('aside[aria-label="届き方"]'))
+  const aside = dialog?.querySelector('aside[aria-label="届き方"]')
+  const phone = aside?.querySelector('[data-line-preview-part="phone"]')
+  const frame = phone?.querySelector('[data-line-preview-part="device-frame"]')
+  const talk = phone?.querySelector('[data-line-preview-part="talk"]')
+  const footer = dialog?.querySelector('[data-window-actions]')
+  const errors = []
+  if (!dialog || !aside || !phone || !frame || !talk) return ['missing']
+  const box = frame.getBoundingClientRect(), talkBox = talk.getBoundingClientRect(), area = aside.getBoundingClientRect(), windowBox = dialog.getBoundingClientRect()
+  if (!box.width || !box.height || !talkBox.width || !talkBox.height || getComputedStyle(frame).visibility !== 'visible' || getComputedStyle(talk).visibility !== 'visible' || !talk.innerText.includes('ご予約ありがとうございます。')) errors.push('missing')
+  if (box.left < area.left - 1 || box.right > area.right + 1 || box.left < windowBox.left - 1 || box.right > windowBox.right + 1 || box.bottom > area.bottom + 1) errors.push('overflow')
+  if (!footer) errors.push('missing-footer')
+  else {
+    const bar = footer.getBoundingClientRect()
+    if (box.right > bar.left && box.left < bar.right && box.bottom > bar.top + 1 && box.top < bar.bottom) errors.push('footer-overlap')
+  }
+  return errors
+}
+async function checkFollowupPreview(page, width) {
+  const dialog = page.getByRole('dialog', {name:'予約したときを変える'})
+  const aside = dialog.locator('aside[aria-label="届き方"]')
+  await aside.waitFor({state:'attached'})
+  const id = await aside.getAttribute('id')
+  if (!(await aside.isVisible())) await dialog.locator(`button[aria-controls="${id}"]`).click()
+  await aside.waitFor({state:'visible'})
+  const phone = aside.locator('[data-line-preview-part="phone"]')
+  await phone.waitFor({state:'visible'})
+  await page.waitForFunction(()=>document.getAnimations().filter(a=>a.effect?.getTiming().iterations!==Infinity).every(a=>a.playState!=='running'))
+  assert.equal(await page.evaluate(()=>localStorage.getItem('lh_staff_role')),'owner')
+  assert.deepEqual(await page.evaluate(scanDetailSurfaces), [], `共通詳細の見張り ${width}`)
+  const frame = phone.locator('[data-line-preview-part="device-frame"]')
+  const talk = phone.locator('[data-line-preview-part="talk"]')
+  const footer = dialog.locator('[data-window-actions]')
+  const check = () => page.evaluate(scanFollowupPreview)
+  assert.deepEqual(await check(), [], `見本 ${width}`)
+  const measureTalk = () => talk.evaluate(el => el.scrollWidth > el.clientWidth + 1)
+  assert.equal(await measureTalk(), false, `本文のはみ出しなし ${width}`)
+  const wide = await talk.evaluateHandle(el=>{const child=document.createElement('div');child.style.width='3000px';child.textContent='はみ出す故障';el.append(child);return child})
+  assert.equal(await measureTalk(), true, `本文のはみ出し故障 ${width}`)
+  await wide.evaluate(el=>el.remove())
+  assert.equal(await measureTalk(), false, `本文の幅を復元 ${width}`)
+
+  await talk.evaluate(el => { for (const child of [...el.children].slice(1)) { child.dataset.guardOldDisplay=child.style.display;child.style.display='none' } })
+  assert.ok((await check()).includes('missing'), `見本が消えた故障 ${width}`)
+  await talk.evaluate(el => { for (const child of [...el.children].slice(1)) { child.style.display=child.dataset.guardOldDisplay;delete child.dataset.guardOldDisplay } })
+  assert.deepEqual(await check(), [], `見本を復元 ${width}`)
+  await frame.evaluate(el => { el.dataset.guardOldStyle=el.getAttribute('style')??'';el.style.setProperty('transition','none','important');el.style.setProperty('transform','translateX(1000px)','important') })
+  assert.ok((await check()).includes('overflow'), `見本のはみ出し ${width}`)
+  await frame.evaluate(el => { const old=el.dataset.guardOldStyle;el.setAttribute('style',old);el.style.setProperty('transition','none','important');el.dataset.guardOldStyle=old })
+  assert.deepEqual(await check(), [], `幅を復元 ${width}`)
+  await frame.evaluate(el => { el.setAttribute('style',el.dataset.guardOldStyle);delete el.dataset.guardOldStyle })
+  const bounds = await frame.boundingBox()
+  await footer.evaluate((el,box) => { el.dataset.guardOldStyle=el.getAttribute('style')??'';el.style.setProperty('transition','none','important');el.style.setProperty('transform',`translateY(${box.y + 10 - el.getBoundingClientRect().top}px)`,'important') }, bounds)
+  assert.ok((await check()).includes('footer-overlap'), `操作帯に隠れる故障 ${width}`)
+  await footer.evaluate(el => { el.setAttribute('style',el.dataset.guardOldStyle);el.style.setProperty('transition','none','important');delete el.dataset.guardOldStyle })
+  assert.deepEqual(await check(), [], `操作帯を復元 ${width}`)
+  await page.setViewportSize({width,height:720})
+  await page.waitForFunction(()=>document.getAnimations().filter(a=>a.effect?.getTiming().iterations!==Infinity).every(a=>a.playState!=='running'))
+  const body = dialog.locator('[data-window-body]')
+  const lowCheck = () => page.evaluate(() => {
+    const dialog = [...document.querySelectorAll('[role="dialog"]')].find(el=>el.querySelector('aside[aria-label="届き方"]'))
+    const body=dialog.querySelector('[data-window-body]'), frame=dialog.querySelector('aside[aria-label="届き方"] [data-line-preview-part="device-frame"]'), bar=dialog.querySelector('[data-window-actions]')
+    const b=body.getBoundingClientRect(), f=frame.getBoundingClientRect(), a=bar.getBoundingClientRect(), d=dialog.getBoundingClientRect()
+    const errors=[]
+    if (!['auto','scroll'].includes(getComputedStyle(body).overflowY) || body.scrollHeight <= body.clientHeight || body.scrollTop < body.scrollHeight-body.clientHeight-1) errors.push('scroll')
+    if (!a.width || !a.height || a.top < d.top-1 || a.bottom > d.bottom+1 || a.bottom > innerHeight+1 || d.top < -1) errors.push('footer')
+    if (f.bottom > b.bottom+1 || f.bottom > a.top+1 || f.bottom < b.top || !frame.contains(document.elementFromPoint((f.left+f.right)/2,f.bottom-5))) errors.push('preview-clipped')
+    return errors
+  })
+  await body.evaluate(el=>{el.style.scrollBehavior='auto';el.scrollTop=el.scrollHeight})
+  assert.deepEqual(await lowCheck(), [], `低い画面で下まで見える ${width}`)
+  await body.evaluate(el=>{el.dataset.guardOldOverflow=el.style.overflowY;el.style.overflowY='hidden'})
+  assert.ok((await lowCheck()).includes('scroll'), `スクロールできない故障 ${width}`)
+  await body.evaluate(el=>{el.style.overflowY=el.dataset.guardOldOverflow;delete el.dataset.guardOldOverflow;el.scrollTop=el.scrollHeight})
+  assert.deepEqual(await lowCheck(), [], `スクロール復元 ${width}`)
+  await footer.evaluate(el=>{el.dataset.guardOldStyle=el.getAttribute('style')??'';el.style.setProperty('transition','none','important');el.style.setProperty('transform',`translateY(${innerHeight-el.getBoundingClientRect().top+10}px)`,'important')})
+  assert.ok((await lowCheck()).includes('footer'), `操作帯が画面外の故障 ${width}`)
+  await footer.evaluate(el=>{el.setAttribute('style',el.dataset.guardOldStyle);el.style.setProperty('transition','none','important');delete el.dataset.guardOldStyle})
+  assert.deepEqual(await lowCheck(), [], `画面内の操作帯を復元 ${width}`)
+  const frameBottom = (await frame.boundingBox()).y + (await frame.boundingBox()).height
+  await footer.evaluate((el,bottom)=>{el.dataset.guardOldStyle=el.getAttribute('style')??'';el.style.setProperty('transition','none','important');el.style.setProperty('transform',`translateY(${bottom-10-el.getBoundingClientRect().top}px)`,'important')},frameBottom)
+  assert.ok((await lowCheck()).includes('preview-clipped'), `操作帯が見本に重なる故障 ${width}`)
+  await footer.evaluate(el=>{el.setAttribute('style',el.dataset.guardOldStyle);el.style.setProperty('transition','none','important');delete el.dataset.guardOldStyle})
+  assert.deepEqual(await lowCheck(), [], `見本と操作帯を復元 ${width}`)
+  await aside.evaluate(el=>{el.dataset.guardOldStyle=el.getAttribute('style')??'';el.style.maxHeight='300px';el.style.overflow='hidden'})
+  assert.ok((await lowCheck()).includes('preview-clipped'), `見本が途中で切れる故障 ${width}`)
+  await aside.evaluate(el=>{el.setAttribute('style',el.dataset.guardOldStyle);el.style.setProperty('transition','none','important');delete el.dataset.guardOldStyle})
+  await body.evaluate(el=>{el.scrollTop=el.scrollHeight})
+  assert.deepEqual(await lowCheck(), [], `見本の切れを復元 ${width}`)
+  await page.setViewportSize({width,height:1100})
+}
+
 for (const width of [1152,1440]) test(`実際の詳細面と届き方プレビューを測る ${width}`, async () => {
+
   assert.ok(existsSync(join(root,'version.json')), 'AIと飲食店の検査用フラグを有効にした本番形式buildが必要')
   const server = createServer((req,res) => {
     const path = resolve(root, `.${new URL(req.url,'http://localhost').pathname}`)
@@ -57,6 +164,11 @@ for (const width of [1152,1440]) test(`実際の詳細面と届き方プレビ�
         const ready = async () => { await page.waitForFunction(()=>window.__detailPending===0 && document.fonts.status==='loaded' && document.querySelector('main')) }
         await ready()
         for (const action of item.actions??[]) {await (typeof action === 'string' ? page.locator(action) : page.getByRole(action.role,{name:action.name,exact:true})).click();await ready()}
+        if (item.kind === 'MessagePreview') {
+          await checkFollowupPreview(page, width)
+          console.log(`detail surface ${item.key} ${width}: preview healthy / missing, overflow and footer overlap rejected / restored`)
+          continue
+        }
         const selector = item.selector??'[data-design-part="detail-panel"],[data-design-part="drawer"]'
         const panel=page.locator(selector).first();await panel.waitFor({state:'attached'})
         await ready()
@@ -65,21 +177,6 @@ for (const width of [1152,1440]) test(`実際の詳細面と届き方プレビ�
         await panel.waitFor({state:'visible'})
         await page.waitForFunction(()=>document.getAnimations().filter(a=>a.effect?.getTiming().iterations!==Infinity).every(a=>a.playState!=='running'))
         assert.equal(await page.evaluate(()=>localStorage.getItem('lh_staff_role')),'owner',item.key)
-        if (item.kind === 'MessagePreview') {
-          const phone=panel.locator('[data-line-preview-part="phone"]');await phone.waitFor({state:'visible'})
-          const measure=()=>panel.evaluate(aside=>{
-            const phone=aside.querySelector('[data-line-preview-part="phone"]'),talk=phone?.querySelector('[data-line-preview-part="talk"]')
-            if(!phone||!talk)throw new Error('届き方のプレビューがありません')
-            const a=aside.getBoundingClientRect(),p=phone.getBoundingClientRect()
-            return {outside:p.left<a.left-1||p.right>a.right+1,overflow:talk.scrollWidth>talk.clientWidth+1}
-          })
-          assert.deepEqual(await measure(),{outside:false,overflow:false},`${item.key} ${width}`)
-          const fault=await phone.locator('[data-line-preview-part="talk"]').evaluateHandle(talk=>{const child=document.createElement('div');child.style.width='3000px';child.textContent='はみ出す故障';talk.append(child);return child})
-          assert.equal((await measure()).overflow,true,`${item.key} はみ出す本文の故障`)
-          await fault.evaluate(el=>el.remove());assert.deepEqual(await measure(),{outside:false,overflow:false},`${item.key} 復元`)
-          console.log(`message preview ${item.key} ${width}: healthy / overflow rejected / restored`)
-          continue
-        }
         assert.deepEqual(await page.evaluate(scanDetailSurfaces),[],`${item.key} ${width}`)
         if (item.key==='staff-calendar') {
           await panel.getByRole('textbox',{name:'固定の会議の URL'}).fill('https://meet.example.invalid/changed')

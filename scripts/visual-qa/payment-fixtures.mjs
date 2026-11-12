@@ -22,21 +22,21 @@ export const PAYMENT_RECORDS = {
   summary: { paidAmount: 128400, paidCount: 42, refundedAmount: 8800, refundedCount: 2, expiredCount: 3, pendingCount: 2, holdMinutes: 10 },
   total: 5,
   items: [
-    paymentRecord({ id: 'pay-1', bookingId: 'bk-1', friendId: 'friend-yamada', friendName: '山田 花子', bookingStartsAt: '2026-10-18T09:00:00.000Z', bookingLabel: '10/18 18:00 ディナー 2名', bookingNote: 'コース先払い', amount: 8800, status: 'paid', method: 'online', createdAt: '2026-10-15T12:52:00.000Z', receiptUrl: 'https://pay.stripe.com/receipts/test' }),
-    paymentRecord({ id: 'pay-2', bookingId: 'bk-2', friendId: 'friend-takahashi', friendName: '高橋 美咲', bookingStartsAt: '2026-10-16T03:00:00.000Z', bookingLabel: '10/16 12:00 ランチ 3名', bookingNote: null, amount: 6600, status: 'pending', method: null, createdAt: '2026-10-15T11:31:00.000Z', receiptUrl: null }),
-    paymentRecord({ id: 'pay-3', bookingId: 'bk-3', friendId: 'friend-sato', friendName: '佐藤 健', bookingStartsAt: '2026-10-16T10:00:00.000Z', bookingLabel: '10/16 19:00 ディナー 1名', bookingNote: null, amount: 4400, status: 'refunded', refundedAmount: 4400, method: 'online', createdAt: '2026-10-15T10:10:00.000Z', receiptUrl: 'https://pay.stripe.com/receipts/test', actorLabel: '自動・10 分を過ぎた' }),
-    paymentRecord({ id: 'pay-4', bookingId: 'bk-4', friendId: 'friend-suzuki', friendName: '鈴木 一郎', bookingStartsAt: '2026-10-16T09:30:00.000Z', bookingLabel: '10/16 18:30 ディナー 2名', bookingNote: null, amount: 8800, status: 'expired', method: null, createdAt: '2026-10-15T09:02:00.000Z', receiptUrl: null }),
-    paymentRecord({ id: 'pay-5', bookingId: 'bk-5', friendId: 'friend-ito', friendName: '伊藤 さくら', bookingStartsAt: '2026-10-14T03:30:00.000Z', bookingLabel: '10/14 12:30 ランチ 2名', bookingNote: null, amount: 3960, status: 'onsite', method: 'onsite', createdAt: '2026-10-14T03:15:00.000Z', receiptUrl: null }),
+    paymentRecord({ id: 'pay-1', bookingId: 'bk-1', friendId: 'friend-yamada', friendName: '見本 143', bookingStartsAt: '2026-10-18T09:00:00.000Z', bookingLabel: '10/18 18:00 ディナー 2名', bookingNote: 'コース先払い', amount: 8800, status: 'paid', method: 'online', createdAt: '2026-10-15T12:52:00.000Z', receiptUrl: 'https://pay.stripe.com/receipts/test' }),
+    paymentRecord({ id: 'pay-2', bookingId: 'bk-2', friendId: 'friend-takahashi', friendName: '見本 29', bookingStartsAt: '2026-10-16T03:00:00.000Z', bookingLabel: '10/16 12:00 ランチ 3名', bookingNote: null, amount: 6600, status: 'pending', method: null, createdAt: '2026-10-15T11:31:00.000Z', receiptUrl: null }),
+    paymentRecord({ id: 'pay-3', bookingId: 'bk-3', friendId: 'friend-sato', friendName: '見本 114', bookingStartsAt: '2026-10-16T10:00:00.000Z', bookingLabel: '10/16 19:00 ディナー 1名', bookingNote: null, amount: 4400, status: 'refunded', refundedAmount: 4400, method: 'online', createdAt: '2026-10-15T10:10:00.000Z', receiptUrl: 'https://pay.stripe.com/receipts/test', actorLabel: '自動・10 分を過ぎた' }),
+    paymentRecord({ id: 'pay-4', bookingId: 'bk-4', friendId: 'friend-suzuki', friendName: '見本 176', bookingStartsAt: '2026-10-16T09:30:00.000Z', bookingLabel: '10/16 18:30 ディナー 2名', bookingNote: null, amount: 8800, status: 'expired', method: null, createdAt: '2026-10-15T09:02:00.000Z', receiptUrl: null }),
+    paymentRecord({ id: 'pay-5', bookingId: 'bk-5', friendId: 'friend-ito', friendName: '見本 33', bookingStartsAt: '2026-10-14T03:30:00.000Z', bookingLabel: '10/14 12:30 ランチ 2名', bookingNote: null, amount: 3960, status: 'onsite', method: 'onsite', createdAt: '2026-10-14T03:15:00.000Z', receiptUrl: null }),
   ],
 }
 
 export const PAYMENT_EVENTS = {
   total: 5,
   items: [
-    { id: 'pe-1', receivedAt: '2026-10-15T12:52:00.000Z', kind: 'paid', amount: 8800, repeat: false, bookingId: 'bk-1', bookingLabel: '10/18 山田 花子', note: null, result: 'applied' },
-    { id: 'pe-2', receivedAt: '2026-10-15T12:52:00.000Z', kind: 'paid', amount: null, repeat: true, bookingId: 'bk-1', bookingLabel: '10/18 山田 花子', note: '同じ知らせが届いた', result: 'duplicate' },
-    { id: 'pe-3', receivedAt: '2026-10-15T10:10:00.000Z', kind: 'refunded', amount: 4400, repeat: false, bookingId: 'bk-3', bookingLabel: '10/16 佐藤 健', note: null, result: 'applied' },
-    { id: 'pe-4', receivedAt: '2026-10-15T09:02:00.000Z', kind: 'expired', amount: null, repeat: false, bookingId: 'bk-4', bookingLabel: '10/16 鈴木 一郎', note: null, result: 'applied' },
+    { id: 'pe-1', receivedAt: '2026-10-15T12:52:00.000Z', kind: 'paid', amount: 8800, repeat: false, bookingId: 'bk-1', bookingLabel: '10/18 見本 143', note: null, result: 'applied' },
+    { id: 'pe-2', receivedAt: '2026-10-15T12:52:00.000Z', kind: 'paid', amount: null, repeat: true, bookingId: 'bk-1', bookingLabel: '10/18 見本 143', note: '同じ知らせが届いた', result: 'duplicate' },
+    { id: 'pe-3', receivedAt: '2026-10-15T10:10:00.000Z', kind: 'refunded', amount: 4400, repeat: false, bookingId: 'bk-3', bookingLabel: '10/16 見本 114', note: null, result: 'applied' },
+    { id: 'pe-4', receivedAt: '2026-10-15T09:02:00.000Z', kind: 'expired', amount: null, repeat: false, bookingId: 'bk-4', bookingLabel: '10/16 見本 176', note: null, result: 'applied' },
     { id: 'pe-5', receivedAt: '2026-10-14T02:30:00.000Z', kind: 'paid', amount: null, repeat: false, bookingId: null, bookingLabel: null, note: '予約が見つからない', result: 'failed' },
   ],
 }
@@ -97,14 +97,14 @@ export function paymentGet(pathname, query, { restaurantTables = [] } = {}) {
     return { success: true, data: { testMode: true, quote, charges } }
   }
   if (/^\/api\/booking\/admin\/bookings\/[^/]+\/payment-method$/.test(pathname)) return { success: true, data: { brand: 'Visa', last4: '4242', registeredAt: '2026-11-02T01:00:00.000Z' } }
-  if (/^\/api\/booking\/admin\/bookings\/[^/]+\/group$/.test(pathname)) return pathname.split('/')[5] !== 'bk-3' ? { success: true, data: null } : { success: true, data: { ownerName: '山田 花子', members: [
+  if (/^\/api\/booking\/admin\/bookings\/[^/]+\/group$/.test(pathname)) return pathname.split('/')[5] !== 'bk-3' ? { success: true, data: null } : { success: true, data: { ownerName: '見本 143', members: [
     { bookingId: 'bk-g1', personName: 'チョコ', menuName: '爪切り', staffName: 'Kenta', startsAt: '2026-10-01T04:30:00.000Z', endsAt: '2026-10-01T04:45:00.000Z', status: 'confirmed' },
     { bookingId: 'bk-g2', personName: 'マロン', menuName: 'トリミング（中型犬）', staffName: '佐々木', startsAt: '2026-10-01T04:00:00.000Z', endsAt: '2026-10-01T05:30:00.000Z', status: 'confirmed' },
   ] } }
   if (pathname === '/api/booking/admin/calendar-sync' || /^\/api\/booking\/admin\/staff\/[^/]+\/calendar-sync$/.test(pathname)) return { success: true, data: CALENDAR_SWITCH }
   if (/^\/api\/booking\/admin\/(staff|menus)\/[^/]+\/meeting-url$/.test(pathname)) return { success: true, data: { url: pathname.includes('/staff/') ? 'https://meet.google.com/abc-defg-hij' : 'https://zoom.us/j/81234567890', version: 1 } }
   if (pathname === '/api/booking/admin/payment-config') return { success: true, data: PAYMENT_CONFIG }
-  if (pathname === '/api/booking/admin/payments/export') return { __csv: '\uFEFF記録ID,予約ID,お客さま,予約日時,メニュー,金額,状態,方法,作成日時\npay-1,bk-1,山田 花子,2026-10-18 18:00,ディナー,8800,paid,online,2026-10-15 21:52\n' }
+  if (pathname === '/api/booking/admin/payments/export') return { __csv: '\uFEFF記録ID,予約ID,お客さま,予約日時,メニュー,金額,状態,方法,作成日時\npay-1,bk-1,見本 143,2026-10-18 18:00,ディナー,8800,paid,online,2026-10-15 21:52\n' }
   if (pathname === '/api/booking/admin/payment-connection') return { success: true, data: PAYMENT_CONNECTION }
   if (pathname === '/api/booking/admin/menu-payments') return { success: true, data: MENU_PAYMENT_OVERRIDES }
   if (pathname === '/api/booking/admin/payments') return { success: true, data: PAYMENT_RECORDS }

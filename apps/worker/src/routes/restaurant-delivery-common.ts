@@ -9,7 +9,7 @@ import { dbFor } from '../services/db-router.js';
 import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import { accountId, fail, staffTenantId, storeFor } from './restaurant-google.js';
 import type { StoreContext } from './restaurant-google.js';
-import { DELIVERY_SERVICES, dispatchToDeliveryService } from '../services/restaurant-delivery.js';
+import { DELIVERY_SERVICES, dispatchToDeliveryService, deliveryTargetFingerprint } from '../services/restaurant-delivery.js';
 import type { DeliveryAction, DeliveryDispatchResult, DeliveryOrderStatus } from '../services/restaurant-delivery.js';
 import type { DeliveryService } from '../services/delivery-service-types.js';
 
@@ -137,7 +137,7 @@ export async function serviceStates(
         stop_until: null,
         stop_requested_at: null,
         resumed_at: null,
-        version: 1,
+        version: 0,
       },
   );
 }
@@ -246,6 +246,16 @@ export async function openDispatch(
   return id;
 }
 
+/** 商品の外部IDと接続先を直接見せず、確認した送り先を固定する。 */
+export async function menuTargetFingerprint(env: Env['Bindings'], externalIds: string | null): Promise<string | null> {
+  const secret = env.LINE_CREDENTIAL_ENCRYPTION_KEY?.trim();
+  if (!secret) return null;
+  const targets = await Promise.all(DELIVERY_SERVICES.map((service) => deliveryTargetFingerprint(env, service)));
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const digest = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(JSON.stringify([externalIds, targets])));
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 /** 送信結果で台帳を閉じる。失敗は分類済みの符号だけを残す。 */
 export async function closeDispatch(
   c: Context<Env>,
@@ -292,11 +302,42 @@ export async function sendWithLedger(
     targetKind: 'order' | 'menu_item' | 'service';
     targetId: string | null;
     externalId?: string | null;
+    expectedOrderVersion?: number;
+    expectedIntake?: { service: DeliveryService; version: number; target: string };
+    expectedMenu?: { id: string; version: number; target: string };
     body?: Record<string, unknown>;
     now: number;
   },
 ): Promise<DeliveryDispatchResult> {
   const dispatchId = await openDispatch(c, store, input);
+  if (input.expectedMenu) {
+    const item = await dbFor(c.env, store.id).prepare('SELECT version, external_item_ids_json FROM rt_delivery_menu_items WHERE id = ? AND store_id = ?')
+      .bind(input.expectedMenu.id, store.id).first<{ version: number; external_item_ids_json: string | null }>();
+    const target = item ? await menuTargetFingerprint(c.env, item.external_item_ids_json) : null;
+    if (!item || item.version !== input.expectedMenu.version || target !== input.expectedMenu.target) {
+      const conflict: DeliveryDispatchResult = { ok: false, error: { code: 'delivery_menu_conflict', message: '商品の状態が変わりました。', retryable: false }, nextAttemptAt: null };
+      await closeDispatch(c, store, dispatchId, conflict, input.now);
+      return conflict;
+    }
+  }
+  if (input.expectedIntake) {
+    const current = (await serviceStates(c, store)).find((state) => state.service === input.service);
+    const target = await deliveryTargetFingerprint(c.env, input.service);
+    if (!current || current.version !== input.expectedIntake.version || target !== input.expectedIntake.target) {
+      const conflict: DeliveryDispatchResult = { ok: false, error: { code: 'delivery_intake_conflict', message: '受付状態が変わりました。', retryable: false }, nextAttemptAt: null };
+      await closeDispatch(c, store, dispatchId, conflict, input.now);
+      return conflict;
+    }
+  }
+  if (input.expectedOrderVersion !== undefined && input.targetKind === 'order') {
+    const current = await dbFor(c.env, store.id).prepare('SELECT version FROM rt_delivery_orders WHERE id = ? AND store_id = ?')
+      .bind(input.targetId, store.id).first<{ version: number }>();
+    if (current?.version !== input.expectedOrderVersion) {
+      const conflict: DeliveryDispatchResult = { ok: false, error: { code: 'delivery_order_conflict', message: '注文が変わりました。画面を開き直してください。', retryable: false }, nextAttemptAt: null };
+      await closeDispatch(c, store, dispatchId, conflict, input.now);
+      return conflict;
+    }
+  }
   const result = await dispatchToDeliveryService(
     c.env,
     {
@@ -353,10 +394,22 @@ export async function upsertIntake(
   store: StoreContext,
   service: DeliveryService,
   input:
-    | { intake: 'stopped'; stopUntil: number; requestedBy: string; now: number }
+    | { intake: 'stopped'; stopUntil: number; requestedBy: string; now: number; expectedVersion?: number }
     | { intake: 'open'; now: number },
-): Promise<void> {
+): Promise<boolean | void> {
   const db = dbFor(c.env, store.id);
+  if (input.intake === 'stopped' && input.expectedVersion !== undefined) {
+    const result = await db.prepare(`INSERT INTO rt_delivery_service_states
+      (account_id, store_id, service, intake_status, stop_until, stop_requested_at, stop_requested_by, created_at, updated_at)
+      SELECT ?, ?, ?, 'stopped', ?, ?, ?, ?, ? WHERE ? = 0 OR EXISTS
+      (SELECT 1 FROM rt_delivery_service_states WHERE store_id = ? AND service = ? AND version = ?)
+      ON CONFLICT(store_id, service) DO UPDATE SET intake_status = 'stopped', stop_until = excluded.stop_until,
+        stop_requested_at = excluded.stop_requested_at, stop_requested_by = excluded.stop_requested_by,
+        version = rt_delivery_service_states.version + 1, updated_at = excluded.updated_at
+      WHERE rt_delivery_service_states.version = ?`)
+      .bind(store.lineAccountId, store.id, service, input.stopUntil, input.now, input.requestedBy, input.now, input.now, input.expectedVersion, store.id, service, input.expectedVersion, input.expectedVersion).run();
+    return (result.meta?.changes ?? 0) === 1;
+  }
   if (input.intake === 'stopped') {
     await db
       .prepare(

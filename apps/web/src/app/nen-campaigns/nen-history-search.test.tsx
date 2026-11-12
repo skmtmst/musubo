@@ -27,7 +27,7 @@ const delivery = (over: Partial<NenDelivery> = {}): NenDelivery => ({
   campaignKey: 'arrival_check',
   label: '到着確認',
   friendId: 'friend-1',
-  friendName: '山田 太郎',
+  friendName: '見本 141',
   lineAccountName: '然',
   scheduledAt: '2026-09-10 10:00:00',
   sentAt: '2026-09-10 10:00:01',

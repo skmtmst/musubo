@@ -67,6 +67,7 @@ export async function listWebhookInteractions(
     db.prepare(
       `SELECT l.*,
               ow.is_active AS linked_webhook_active,
+              ow.confirmation_revision AS linked_webhook_revision,
               d.status AS delivery_status,
               d.next_retry_at AS delivery_next_retry_at
          FROM ${joinedTables}

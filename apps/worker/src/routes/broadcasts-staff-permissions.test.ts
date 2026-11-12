@@ -133,6 +133,15 @@ describe('一斉配信の staff 個別権限キー', () => {
     expect(denied.status).toBe(403);
   });
 
+  it('版が古くても配信取消の権限を先に確認する', async () => {
+    mocks.getBroadcastById.mockResolvedValue(row({ status: 'scheduled', scheduled_at: '2099-01-01T00:00:00Z', lock_version: 3 }));
+    const denied = await app(staffWith('/broadcasts')).request('/api/broadcasts/broadcast-1/cancel', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'expectedVersion=2',
+    });
+    expect(denied.status).toBe(403);
+    expect(mocks.getBroadcastById).not.toHaveBeenCalled();
+  });
+
   it('送信の鍵を持つ staff は予約を取り消せる（鍵なし staff は403）', async () => {
     mocks.getBroadcastById.mockResolvedValue(row({ status: 'scheduled', scheduled_at: '2026-09-26T10:00:00+09:00' }));
 

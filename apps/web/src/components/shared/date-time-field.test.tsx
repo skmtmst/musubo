@@ -38,6 +38,22 @@ function TimeHarness({ initial = '10:00' }: { initial?: string }) {
 }
 
 describe('日時の選択（V8）', () => {
+  it('親が秒0を整えても同じ日時なら確定でき、変更なしでは通知しない', () => {
+    const onChange = vi.fn()
+    const view = render(<DateTimeField value="2026-10-01T10:00:00" onChange={onChange} aria-label="送る日時" />)
+    fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
+    view.rerender(<DateTimeField value="2026-10-01T10:00" onChange={onChange} aria-label="送る日時" />)
+    const confirm = screen.getByRole('button', { name: '確定' }) as HTMLButtonElement
+    expect(confirm.disabled).toBe(false)
+    fireEvent.click(confirm)
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('日時の窓の中の日付選択には名前付きのグループがある', () => {
+    render(<DateTimeHarness />)
+    fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
+    expect(screen.getByRole('group', { name: '日付を選ぶ' })).toBeTruthy()
+  })
   it('表示は「2026年10月1日（木）10:00」、値は YYYY-MM-DDTHH:mm のまま', () => {
     render(<DateTimeHarness />)
     expect(screen.getByRole('button', { name: '送る日時' }).textContent).toContain('2026年10月1日（木）10:00')
@@ -70,7 +86,6 @@ describe('日時の選択（V8）', () => {
     render(<DateTimeHarness initial="" />)
     fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
     expect(screen.getByRole('dialog', { name: '日時を選ぶ' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '日付' }))
     const ymd = '2026-10-10'
     fireEvent.click(screen.getByRole('button', { name: '今日' }))
     fireEvent.click(screen.getByRole('button', { name: '確定' }))
@@ -79,17 +94,19 @@ describe('日時の選択（V8）', () => {
     expect(screen.getByRole('button', { name: '送る日時' }).textContent).toContain(expected)
   })
 
-  it('時・分を変えると値が替わる。箱は開いたまま', () => {
+  it('時・分は確定まで仮の値で、確定すると反映する', () => {
     render(<DateTimeHarness />)
     fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
     const time = screen.getByRole('combobox', { name: '時刻' })
     fireEvent.change(time, { target: { value: '0900' } })
     fireEvent.keyDown(time, { key: 'Enter' })
-    expect(screen.getByTestId('value').textContent).toBe('2026-10-01T09:00')
+    expect(screen.getByTestId('value').textContent).toBe('2026-10-01T10:00')
     fireEvent.change(time, { target: { value: '0930' } })
     fireEvent.keyDown(time, { key: 'Enter' })
-    expect(screen.getByTestId('value').textContent).toBe('2026-10-01T09:30')
+    expect(screen.getByTestId('value').textContent).toBe('2026-10-01T10:00')
     expect(screen.getByRole('dialog', { name: '日時を選ぶ' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '確定' }))
+    expect(screen.getByTestId('value').textContent).toBe('2026-10-01T09:30')
   })
 
   it('↓で開く。Escで閉じて欄へ戻る。×で空にできる', () => {
@@ -112,6 +129,8 @@ describe('日時の選択（V8）', () => {
     const time = screen.getByRole('combobox', { name: '時刻' })
     fireEvent.change(time, { target: { value: '1800' } })
     fireEvent.keyDown(time, { key: 'Enter' })
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '確定' }))
     expect(onChange).toHaveBeenCalledWith('2026-10-01T18:00')
     expect(screen.getByRole('button', { name: '送る日時' }).textContent).toContain('2026年10月1日（木）18:00')
   })
@@ -144,12 +163,11 @@ describe('時刻の選択（V8）', () => {
 it('日時内の日付選択は確定まで反映せず、キャンセルで元に戻る', () => {
   render(<DateTimeHarness />)
   fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
-  fireEvent.click(screen.getByRole('button', { name: '日付' }))
   fireEvent.click(screen.getByRole('button', { name: '2026年10月2日（金）' }))
   expect(screen.getByTestId('value').textContent).toBe('2026-10-01T10:00')
   fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
   expect(screen.getByTestId('value').textContent).toBe('2026-10-01T10:00')
-  fireEvent.click(screen.getByRole('button', { name: '日付' }))
+  fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
   fireEvent.click(screen.getByRole('button', { name: '2026年10月2日（金）' }))
   fireEvent.click(screen.getByRole('button', { name: '確定' }))
   expect(screen.getByTestId('value').textContent).toBe('2026-10-02T10:00')
@@ -158,23 +176,22 @@ it('日時内の日付選択は確定まで反映せず、キャンセルで元�
 it('日時の暦の仮選択はEscや外へのクリックで反映されない', () => {
   render(<DateTimeHarness />)
   fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
-  fireEvent.click(screen.getByRole('button', { name: '日付' }))
   fireEvent.click(screen.getByRole('button', { name: '2026年10月2日（金）' }))
   fireEvent.keyDown(screen.getByRole('grid'), { key: 'Escape' })
   expect(screen.getByTestId('value').textContent).toBe('2026-10-01T10:00')
   if (!screen.queryByRole('dialog', { name:'日時を選ぶ' })) fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
-  fireEvent.click(screen.getByRole('button', { name: '日付' }))
   fireEvent.click(screen.getByRole('button', { name: '2026年10月2日（金）' }))
   fireEvent.pointerDown(document.body)
   expect(screen.getByTestId('value').textContent).toBe('2026-10-01T10:00')
 })
 
-it('日時の窓へ戻るクリックは暦の仮選択を捨てる', () => {
+it('同じ窓の時刻欄へ移っても仮の日付を保持し、確定するまで反映しない', () => {
   render(<DateTimeHarness />)
   fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
-  fireEvent.click(screen.getByRole('button', { name: '日付' }))
   fireEvent.click(screen.getByRole('button', { name: '2026年10月2日（金）' }))
   fireEvent.pointerDown(screen.getByRole('combobox', { name: '時刻' }))
   expect(screen.queryByRole('dialog', { name:'日付を選ぶ' })).toBeNull()
   expect(screen.getByTestId('value').textContent).toBe('2026-10-01T10:00')
+  fireEvent.click(screen.getByRole('button', { name: '確定' }))
+  expect(screen.getByTestId('value').textContent).toBe('2026-10-02T10:00')
 })

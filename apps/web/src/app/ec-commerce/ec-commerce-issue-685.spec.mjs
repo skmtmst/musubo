@@ -33,7 +33,7 @@ function record(index, eventType = 'ec.order.confirmed') {
     version: 1,
     receivedAt: '2026-09-09T00:00:30.000Z',
     orderNumber: `NEN-${suffix}`,
-    customerName: '田中 花子',
+    customerName: '見本 171',
     friendId: 'friend-a',
     retryAvailable: false,
     order: {
@@ -43,7 +43,7 @@ function record(index, eventType = 'ec.order.confirmed') {
       orderNumber: `NEN-${suffix}`,
       customerId: `customer-${suffix}`,
       friendId: 'friend-a',
-      customerName: '田中 花子',
+      customerName: '見本 171',
       status: 'current',
       providerStatus: 'paid',
       currency: 'JPY',

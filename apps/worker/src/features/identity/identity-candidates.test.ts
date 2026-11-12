@@ -23,9 +23,9 @@ function seed() {
       id, channel_id, name, channel_access_token, channel_secret, tenant_id
     ) VALUES (?, ?, ?, 'token', 'secret', ?)
   `).run('account-b', 'channel-b', '支店', DEFAULT_TENANT_ID);
-  insertFriend(testDb.raw, 'friend-a', { line_account_id: 'account-a', display_name: '田中 花子' });
-  insertFriend(testDb.raw, 'friend-b', { line_account_id: 'account-b', display_name: '田中 はなこ' });
-  insertFriend(testDb.raw, 'friend-c', { line_account_id: 'account-a', display_name: '田中 花子' });
+  insertFriend(testDb.raw, 'friend-a', { line_account_id: 'account-a', display_name: '見本 171' });
+  insertFriend(testDb.raw, 'friend-b', { line_account_id: 'account-b', display_name: '見本 161' });
+  insertFriend(testDb.raw, 'friend-c', { line_account_id: 'account-a', display_name: '見本 171' });
   testDb.raw.prepare(`
     INSERT INTO ec_events (
       id, source, external_event_id, event_type, line_account_id, customer_id, line_user_id,
@@ -39,7 +39,7 @@ function seed() {
 const evidence = [
   {
     key: 'verified_email', label: '確認済みのメールアドレスが同じ',
-    strength: 'strong' as const, verified: true, valuePreview: 'ta***@example.jp',
+    strength: 'strong' as const, verified: true, valuePreview: 'ta***@example.com',
   },
   {
     key: 'similar_name', label: '表示名が似ている',
@@ -55,14 +55,14 @@ function friendDraft(id = 'candidate-friend'): IdentityCandidateDraft {
     confidenceScore: 92,
     detectorVersion: 'friends-v1',
     left: {
-      kind: 'friend', id: 'friend-b', label: '田中 はなこ', detail: '支店',
+      kind: 'friend', id: 'friend-b', label: '見本 161', detail: '支店',
       lineAccountId: 'account-b', lineAccountName: '支店', shopKey: null,
-      attributes: [{ label: 'メール', valuePreview: 'ta***@example.jp', verified: true }],
+      attributes: [{ label: 'メール', valuePreview: 'ta***@example.com', verified: true }],
     },
     right: {
-      kind: 'friend', id: 'friend-a', label: '田中 花子', detail: '本店',
+      kind: 'friend', id: 'friend-a', label: '見本 171', detail: '本店',
       lineAccountId: 'account-a', lineAccountName: '本店', shopKey: null,
-      attributes: [{ label: 'メール', valuePreview: 'ta***@example.jp', verified: true }],
+      attributes: [{ label: 'メール', valuePreview: 'ta***@example.com', verified: true }],
     },
     evidence,
     impact: [
@@ -88,7 +88,7 @@ function ecDraft(id = 'candidate-ec'): IdentityCandidateDraft {
       attributes: [{ label: '電話番号', valuePreview: '090-****-0001', verified: true }],
     },
     right: {
-      kind: 'friend', id: 'friend-c', label: '田中 花子', detail: '本店',
+      kind: 'friend', id: 'friend-c', label: '見本 171', detail: '本店',
       lineAccountId: 'account-a', lineAccountName: '本店', shopKey: 'shop-a',
       attributes: [{ label: '電話番号', valuePreview: '090-****-0001', verified: true }],
     },
@@ -117,25 +117,25 @@ describe('identity candidate contract', () => {
     expect(friend.impact[1].value).toBeNull();
     expect(ec.impact[1].value).toBe(0);
     expect(friend).not.toHaveProperty('evidenceSummary');
-    expect(JSON.stringify([friend, ec])).not.toContain('tanaka@example.jp');
+    expect(JSON.stringify([friend, ec])).not.toContain('tanaka@example.com');
   });
 
   it('rejects raw email addresses and phone numbers before saving a candidate', async () => {
     const { db } = seed();
     const rawEmail = friendDraft();
-    rawEmail.left.attributes[0].valuePreview = 'tanaka@example.jp';
+    rawEmail.left.attributes[0].valuePreview = 'tanaka@example.com';
     await expect(upsertIdentityCandidate(db, rawEmail)).rejects.toMatchObject({
       code: 'UNMASKED_IDENTITY_VALUE', status: 422,
     });
 
     const rawPhone = ecDraft();
-    rawPhone.left.attributes[0].valuePreview = '090-1234-5678';
+    rawPhone.left.attributes[0].valuePreview = '090-0000-5678';
     await expect(upsertIdentityCandidate(db, rawPhone)).rejects.toMatchObject({
       code: 'UNMASKED_IDENTITY_VALUE', status: 422,
     });
 
     const rawPhoneInDetail = ecDraft();
-    rawPhoneInDetail.left.detail = '連絡先 090-1234-5678';
+    rawPhoneInDetail.left.detail = '連絡先 090-0000-5678';
     await expect(upsertIdentityCandidate(db, rawPhoneInDetail)).rejects.toMatchObject({
       code: 'UNMASKED_IDENTITY_VALUE', status: 422,
     });
@@ -206,7 +206,7 @@ describe('identity candidate contract', () => {
 
   it('stores the selected friend value and its source in the same link decision', async () => {
     const { db, raw } = seed();
-    raw.prepare("UPDATE friends SET real_name = '田中 花子' WHERE id = 'friend-a'").run();
+    raw.prepare("UPDATE friends SET real_name = '見本 171' WHERE id = 'friend-a'").run();
     await upsertIdentityCandidate(db, friendDraft());
     await decideIdentityCandidate(db, actor, 'candidate-friend', {
       expectedVersion: 1,
@@ -220,7 +220,7 @@ describe('identity candidate contract', () => {
       `SELECT field_key, value_json, source_friend_id, update_mode
          FROM user_profile_values WHERE is_active = 1`,
     ).get()).toEqual({
-      field_key: 'real_name', value_json: '"田中 花子"',
+      field_key: 'real_name', value_json: '"見本 171"',
       source_friend_id: 'friend-a', update_mode: 'fixed',
     });
     expect(raw.prepare(

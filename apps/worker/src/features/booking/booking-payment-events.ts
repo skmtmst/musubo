@@ -110,21 +110,21 @@ export async function processPaymentEvent(db: D1Database, account: string, id: s
           AND NOT EXISTS(SELECT 1 FROM booking_payment_refunds r WHERE r.id=?)`)
         .bind('event:'+id,'event:'+id,at,id,token,'event:'+id));
       writes.push(db.prepare(`UPDATE booking_payments SET
-        status=CASE WHEN ?=amount THEN 'refunded' ELSE 'paid' END,refunded_amount=?,refunded_at=?,updated_at=?,
+        confirmation_revision=confirmation_revision+1, status=CASE WHEN ?=amount THEN 'refunded' ELSE 'paid' END,refunded_amount=?,refunded_at=?,updated_at=?,
         receipt_url=COALESCE(?,receipt_url),actor_label='Stripe',action_reason='provider_refund'
         WHERE id=? AND status='paid' AND refunded_amount<? AND (${eventGate})`)
         .bind(event.refunded_amount ?? event.amount,event.refunded_amount ?? event.amount,at,at,event.receipt_url,payment.id,
           event.refunded_amount ?? event.amount,id,token));
     }
     else if (payment) {
-      writes.push(db.prepare(`UPDATE booking_payments SET status=?,updated_at=?,
+      writes.push(db.prepare(`UPDATE booking_payments SET confirmation_revision=confirmation_revision+1, status=?,updated_at=?,
         refunded_at=CASE WHEN ?='refunded' THEN COALESCE(refunded_at,?) ELSE refunded_at END,
         receipt_url=COALESCE(?,receipt_url)
         WHERE id=? AND (${eventGate}) AND
         ((?='refunded' AND status='paid') OR (? IN ('failed','expired') AND status IN ('unpaid','pending')))`)
         .bind(event.outcome, at, event.outcome, at, event.receipt_url, payment.id, id, token, event.outcome, event.outcome));
       if (event.outcome === 'expired') {
-        writes.push(db.prepare(`UPDATE bookings SET status='expired',decided_at=?,updated_at=? WHERE id=? AND line_account_id=?
+        writes.push(db.prepare(`UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status='expired',decided_at=?,updated_at=? WHERE id=? AND line_account_id=?
           AND status='requested' AND (${eventGate}) AND EXISTS(SELECT 1 FROM booking_payments WHERE id=? AND status='expired')`)
           .bind(at, at, payment.booking_id, account, id, token, payment.id));
         writes.push(db.prepare(`INSERT INTO booking_audit_logs(id,booking_id,line_account_id,action,after_json,reason,actor_type,occurred_at)
@@ -132,7 +132,7 @@ export async function processPaymentEvent(db: D1Database, account: string, id: s
           .bind(crypto.randomUUID(), payment.booking_id, account, at));
       }
     }
-    if (payment && event.receipt_url) writes.push(db.prepare(`UPDATE booking_payments SET receipt_url=?
+    if (payment && event.receipt_url) writes.push(db.prepare(`UPDATE booking_payments SET confirmation_revision=confirmation_revision+1, receipt_url=?
       WHERE id=? AND (${eventGate})`).bind(event.receipt_url,payment.id,id,token));
     writes.push(db.prepare(`UPDATE booking_payment_events SET applied_at=CASE WHEN result='applied' THEN COALESCE(applied_at,?) ELSE applied_at END,
       error_code=CASE WHEN result='failed' THEN 'payment_state_mismatch' WHEN outcome='failed' THEN 'payment_failed' ELSE NULL END

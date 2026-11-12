@@ -445,6 +445,7 @@ export function serializeAutoReply(
     folderId: row.folder_id,
     internalMemo,
     lifecycleStatus: row.lifecycle_status ?? 'published',
+    confirmationRevision: Number(row.confirmation_revision ?? 1),
     stoppedAt: row.stopped_at ?? null,
     stoppedByStaffId: row.stopped_by_staff_id ?? null,
     stoppedByStaffName: null,

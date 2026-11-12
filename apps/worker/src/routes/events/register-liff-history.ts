@@ -223,7 +223,7 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
   const upd = await c.env.DB
     .prepare(
       `UPDATE event_bookings
-          SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend', updated_at = ?
+          SET confirmation_revision = confirmation_revision + 1, status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend', updated_at = ?
         WHERE id = ? AND status IN ('requested', 'confirmed') AND lock_version=?`,
     )
     .bind(nowIso, nowIso, row.id,row.lock_version)
@@ -249,7 +249,7 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
       await c.env.DB
         .prepare(
           `UPDATE event_bookings
-              SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
+              SET confirmation_revision = confirmation_revision + 1, status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
             WHERE id = ? AND status = 'cancelled' AND lock_version=? AND NOT EXISTS(SELECT 1 FROM event_booking_transition_runs t WHERE t.booking_id=event_bookings.id AND t.booking_version=event_bookings.lock_version AND t.status='complete') AND NOT EXISTS(SELECT 1 FROM event_booking_entitlement_uses u WHERE u.event_booking_id=event_bookings.id AND u.returned_at IS NOT NULL)`,
         )
         .bind(priorStatus, nowIso, row.id,row.lock_version+1)

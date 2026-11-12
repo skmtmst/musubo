@@ -8,8 +8,8 @@ export const gap1Paths:Record<string,Record<string,ReturnType<typeof operation>>
 (gap1Paths["/api/booking/admin/menus/{id}/meeting-url"]??={}).get=operation("GET","/api/booking/admin/menus/{id}/meeting-url","会議URLの手入力・固定URLの反映。外部の会議は作成しない。");
 (gap1Paths["/api/booking/admin/staff/{id}/calendar-sync"]??={}).get=operation("GET","/api/booking/admin/staff/{id}/calendar-sync","店と担当のGoogle予定の読取/書込スイッチ・既存同期の再試行。");
 (gap1Paths["/api/booking/admin/staff/{id}/meeting-url"]??={}).get=operation("GET","/api/booking/admin/staff/{id}/meeting-url","会議URLの手入力・固定URLの反映。外部の会議は作成しない。");
-(gap1Paths["/api/broadcasts/{id}/send-preview"]??={}).get=operation("GET","/api/broadcasts/{id}/send-preview","送信前の対象人数・同意・時間帯の見本。送信しない。");
-(gap1Paths["/api/hq/broadcasts/{id}/send-preview"]??={}).get=operation("GET","/api/hq/broadcasts/{id}/send-preview","送信前の対象人数・同意・時間帯の見本。送信しない。");
+(gap1Paths["/api/broadcasts/{id}/send-preview"]??={}).get=operation("GET","/api/broadcasts/{id}/send-preview","送信前の対象人数・同意・時間帯・店舗別の宛先照合情報。送信しない。");
+(gap1Paths["/api/hq/broadcasts/{id}/send-preview"]??={}).get=operation("GET","/api/hq/broadcasts/{id}/send-preview","送信前の対象人数・同意・時間帯・店舗別の宛先照合情報。送信しない。");
 (gap1Paths["/api/inbox/routing-settings"]??={}).get=operation("GET","/api/inbox/routing-settings","受信箱の自動担当割当の設定。");
 (gap1Paths["/api/liff/booking/cancellation-quote"]??={}).get=operation("GET","/api/liff/booking/cancellation-quote","本人の予約の取消規則と取消料の見積り。booking_idを指定し、feeNow・freeUntil・cancelDeadlineAt・canCancel・lockVersionを返す。");
 (gap1Paths["/api/line-accounts/{id}/senders"]??={}).get=operation("GET","/api/line-accounts/{id}/senders","送信者名・画像の登録、編集、保管。実送信なし。");

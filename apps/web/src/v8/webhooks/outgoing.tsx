@@ -141,11 +141,11 @@ export default function WebhooksOutgoingV8() {
   const [testingId, setTestingId] = useState<string | null>(null)
   const [testNotice, setTestNotice] = useState<string | null>(null)
 
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; accountId: string; scope: object } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; confirmationRevision?: number; accountId: string; scope: object } | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  const [rotateTarget, setRotateTarget] = useState<{ id: string; name: string; activate: boolean; accountId: string; scope: object } | null>(null)
+  const [rotateTarget, setRotateTarget] = useState<{ id: string; name: string; confirmationRevision?: number; activate: boolean; accountId: string; scope: object } | null>(null)
   const [rotateSecret, setRotateSecret] = useState('')
   const [rotateError, setRotateError] = useState('')
   const [rotating, setRotating] = useState(false)
@@ -278,11 +278,12 @@ export default function WebhooksOutgoingV8() {
 
   /* ===== 試しに送る ===== */
   const runTest = async (item: OutgoingWebhookOverview, accountId: string, scope: object) => {
-    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId || accountScopeRef.current !== scope || testingId !== null) return
+    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId || accountScopeRef.current !== scope || testingId !== null || !Number.isSafeInteger(item.version) || (item.version ?? 0) < 1) return
+    if (!Number.isSafeInteger(item.confirmationRevision) || (item.confirmationRevision ?? 0) < 1) { setTestNotice(`「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`); return false }
     setTestingId(item.id)
     setTestNotice(null)
     try {
-      const response = await api.webhooks.outgoing.test(item.id, accountId)
+      const response = await api.webhooks.outgoing.test(item.id, accountId, item.version!, item.confirmationRevision!)
       if (accountRef.current !== accountId || accountScopeRef.current !== scope) return
       if (!response.success) throw new Error(response.error)
       if (response.data.delivered) {
@@ -313,11 +314,12 @@ export default function WebhooksOutgoingV8() {
       return
     }
     setDeleteError('')
-    setDeleteTarget({ id: item.id, name: item.name, accountId, scope: accountScopeRef.current })
+    setDeleteTarget({ id: item.id, name: item.name, confirmationRevision: item.confirmationRevision, accountId, scope: accountScopeRef.current })
   }
   const runDelete = async () => {
     if (!canManageWebhooksNow(true)) { setDeleteError(ownership.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
     if (!deleteTarget || deleting) return
+    if (!deleteTarget.confirmationRevision) { setDeleteError('この送り先を削除できませんでした。状態を読み直してから、もう一度お試しください。'); return }
     const accountId = deleteTarget.accountId
     if (accountId !== selectedAccountId || loadedAccountId !== accountId || deleteTarget.scope !== accountScopeRef.current) {
       setDeleteError('LINEアカウントが切り替わりました。削除する送り先を選び直してください。')
@@ -326,7 +328,7 @@ export default function WebhooksOutgoingV8() {
     setDeleting(true)
     setDeleteError('')
     try {
-      const res = await api.webhooks.outgoing.delete(deleteTarget.id, accountId)
+      const res = await api.webhooks.outgoing.delete(deleteTarget.id, accountId, deleteTarget.confirmationRevision)
       if (!res.success) throw new Error(res.error)
       if (accountRef.current !== accountId || accountScopeRef.current !== deleteTarget.scope) return
       setDeleteTarget(null)
@@ -353,6 +355,7 @@ export default function WebhooksOutgoingV8() {
     setRotateError('')
     const accountId = selectedAccountId
     if (!rotateTarget) return
+    if (!rotateTarget.confirmationRevision) { setRotateError('LINEアカウントの一覧を読み直してください'); return }
     if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId || rotateTarget.accountId !== accountId || rotateTarget.scope !== accountScopeRef.current) {
       setRotateTarget(null)
       setRotateSecret('')
@@ -367,7 +370,7 @@ export default function WebhooksOutgoingV8() {
     try {
       const res = await api.webhooks.outgoing.update(
         rotateTarget.id, accountId,
-        { secret: rotateSecret, isActive: rotateTarget.activate || undefined },
+        { secret: rotateSecret, isActive: rotateTarget.activate || undefined, expectedConfirmationRevision: rotateTarget.confirmationRevision },
         stepUpToken,
       )
       if (accountRef.current !== accountId || accountScopeRef.current !== rotateTarget.scope) return
@@ -426,7 +429,7 @@ export default function WebhooksOutgoingV8() {
           setMenuId(null)
           setRotateError('')
           setRotateSecret('')
-          setRotateTarget({ id: item.id, name: item.name, activate: isHttpsUrl(item.url) && !item.hasSecret, accountId: selectedAccountId ?? '', scope: accountScopeRef.current })
+          setRotateTarget({ id: item.id, name: item.name, confirmationRevision: item.confirmationRevision, activate: isHttpsUrl(item.url) && !item.hasSecret, accountId: selectedAccountId ?? '', scope: accountScopeRef.current })
         },
       })
     }

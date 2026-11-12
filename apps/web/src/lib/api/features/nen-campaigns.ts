@@ -8,6 +8,7 @@ import type {
   NenCampaignSetting,
   NenColumn,
   NenColumnCreateInput,
+  NenColumnDeliveryPreview,
   NenPetProfile,
 } from '../types/nen-campaigns'
 import { fetchApi } from '../transport/request'
@@ -78,9 +79,9 @@ export const nenCampaignsMethods = {
         method: 'PUT', body: JSON.stringify(data),
       }),
     /** 一覧の停止・再開だけを切り替える。本文の長さに関わらず必ず実行できる（#659）。 */
-    setEnabled: (accountId: string, campaignKey: string, isEnabled: boolean) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}/enabled?lineAccountId=${encodeURIComponent(accountId)}`, {
-        method: 'PUT', body: JSON.stringify({ isEnabled }),
+    setEnabled: (accountId: string, campaignKey: string, isEnabled: boolean, expectedUpdatedAt?: string) =>
+      fetchApi<{ success: boolean; data?: { updatedAt: string | null } }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}/enabled?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'PUT', body: JSON.stringify({ isEnabled, expectedUpdatedAt }),
       }),
     testSend: (data: {
       campaignKey: string; accountId: string; friendId: string
@@ -142,7 +143,9 @@ export const nenCampaignsMethods = {
       '/api/nen-campaigns/deliveries/pending-now',
       { method: 'POST', body: JSON.stringify({ accountId, expectedCount }) },
     ),
-    deliverColumn: (id: string, data: { accountId: string; scheduledAt?: string }) =>
+    previewColumnDelivery: (accountId: string, id: string) =>
+      fetchApi<ApiResponse<NenColumnDeliveryPreview>>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/send-preview?lineAccountId=${encodeURIComponent(accountId)}`),
+    deliverColumn: (id: string, data: { accountId: string; scheduledAt?: string; recipientCount?: number; confirmationToken?: string }) =>
       fetchApi<ApiResponse<{ queued: number }>>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/deliver`, {
         method: 'POST', body: JSON.stringify(data),
       }),

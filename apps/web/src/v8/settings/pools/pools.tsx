@@ -169,7 +169,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   const [copyError, setCopyError] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [deleteContext, setDeleteContext] = useState<{ ticket: object; poolId: string; updatedAt: string; accounts: string[] | null } | null>(null)
+  const [deleteContext, setDeleteContext] = useState<{ ticket: object; poolId: string; updatedAt: string; revision: number | undefined; accounts: string[] | null } | null>(null)
   const [accountsLoading, setAccountsLoading] = useState(false)
   const deleteTicket = useRef<object | null>(null)
   const deleteLock = useRef(false)
@@ -218,12 +218,12 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
     const ticket = {}; deleteTicket.current = ticket
     const current = () => alive.current && canManageRef.current && poolRef.current.id === pool.id && poolRef.current.updatedAt === pool.updatedAt && deleteTicket.current === ticket
     setDeleteError(''); setConfirmOpen(true); setAccountsLoading(true)
-    setDeleteContext({ ticket, poolId: pool.id, updatedAt: pool.updatedAt, accounts: null })
+    setDeleteContext({ ticket, poolId: pool.id, updatedAt: pool.updatedAt, revision: pool.confirmationRevision, accounts: null })
     try {
       const result = await api.pools.accounts.list(pool.id)
       if (!current()) return
       if (!result.success || result.data.some(member => typeof member.lineAccountId !== 'string' || !member.lineAccountId.trim())) throw new Error('accounts_unavailable')
-      setDeleteContext({ ticket, poolId: pool.id, updatedAt: pool.updatedAt, accounts: [...new Set(result.data.map(member => member.lineAccountId))].sort() })
+      setDeleteContext({ ticket, poolId: pool.id, updatedAt: pool.updatedAt, revision: pool.confirmationRevision, accounts: [...new Set(result.data.map(member => member.lineAccountId))].sort() })
     } catch {
       if (current()) setDeleteError('所属アカウントを確認できませんでした。閉じてから、もう一度お試しください。')
     } finally {
@@ -253,7 +253,8 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
         setDeleteContext({ ...deleteContext, accounts: null })
         return
       }
-      const res = await api.pools.delete(pool.id)
+      if (!deleteContext.revision) throw new Error('missing_confirmation_revision')
+      const res = await api.pools.delete(pool.id, { revision: deleteContext.revision, accountIds: deleteContext.accounts })
       if (!current()) return
       if (!res.success) throw new Error(res.error)
       deleteTicket.current = null

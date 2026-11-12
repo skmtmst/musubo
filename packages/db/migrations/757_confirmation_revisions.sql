@@ -1,0 +1,31 @@
+-- Confirmation revisions only; existing business data is unchanged.
+ALTER TABLE funnels ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rt_menu_items ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE auto_replies ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE automation_definitions ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE common_action_bindings ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rt_google_posts ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rt_google_connections ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rt_seat_waitlist ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rt_tables ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE templates ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE traffic_pools ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE account_handovers ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE friend_scenarios ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE scenarios ADD COLUMN content_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE media_file_scans ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE file_scan_configs ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE webhook_interaction_logs ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE booking_payments ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE meet_consultations ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rich_menu_groups ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE outgoing_webhooks ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE incoming_webhooks ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE bookings ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE event_bookings ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rt_reservations ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+CREATE INDEX IF NOT EXISTS idx_friend_scenarios_scenario_status ON friend_scenarios(scenario_id, status);
+ALTER TABLE account_settings ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+
+DROP TRIGGER IF EXISTS rt_menu_change_apply;
+CREATE TRIGGER rt_menu_change_apply AFTER UPDATE OF status ON rt_menu_change_requests WHEN OLD.status IN ('pending','approved') AND NEW.status='approved' AND (NEW.effective_at IS NULL OR datetime(NEW.effective_at)<=datetime('now')) BEGIN UPDATE rt_menu_items SET price=NEW.after_price,updated_at=datetime('now'),confirmation_revision=confirmation_revision+1 WHERE id=NEW.menu_id AND store_id=NEW.store_id AND price=NEW.before_price; UPDATE rt_menu_change_requests SET status=CASE WHEN changes()=1 THEN 'applied' ELSE 'failed' END,failure_reason=CASE WHEN changes()=1 THEN NULL ELSE 'メニューが変更または削除されています。再申請してください' END,updated_at=datetime('now') WHERE id=NEW.id; END;

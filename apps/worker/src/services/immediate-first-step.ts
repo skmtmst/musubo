@@ -455,7 +455,7 @@ export async function pushImmediateFirstStep(
 async function releaseClaimById(db: D1Database, enrollmentId: string): Promise<void> {
   await db
     .prepare(
-      `UPDATE friend_scenarios SET status = 'active', updated_at = ?
+      `UPDATE friend_scenarios SET confirmation_revision = confirmation_revision + 1, status = 'active', updated_at = ?
        WHERE id = ? AND status = 'delivering'`,
     )
     .bind(jstNow(), enrollmentId)

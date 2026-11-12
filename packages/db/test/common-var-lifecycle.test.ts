@@ -208,7 +208,7 @@ describe('共通情報の状態と理由（Q）', () => {
       for (const normal of [
         '営業時間 10:00-19:00',
         'https://example.com/shop/notice?campaign=autumn2026',
-        '03-1234-5678',
+        '03-0000-5678',
         '2026-10-01',
         '株式会社サンプル',
         '本日は臨時休業です',

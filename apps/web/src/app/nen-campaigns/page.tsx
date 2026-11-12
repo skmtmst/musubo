@@ -263,8 +263,8 @@ export default function NenCampaignsPage() {
     const nextEnabled = !setting.isEnabled
     setSaving(setting.campaignKey); setNotice(null)
     try {
-      await api.nenCampaigns.setEnabled(selectedAccountId, setting.campaignKey, nextEnabled)
-      updateDraft(setting.campaignKey, { isEnabled: nextEnabled })
+      const result = await api.nenCampaigns.setEnabled(selectedAccountId, setting.campaignKey, nextEnabled, setting.updatedAt)
+      updateDraft(setting.campaignKey, { isEnabled: nextEnabled, ...(result.data?.updatedAt ? { updatedAt: result.data.updatedAt } : {}) })
       setNotice({ tone: 'success', text: `${setting.label}を${nextEnabled ? '動かしました' : '止めました'}。` })
       return true
     } catch (caught) {
@@ -289,11 +289,11 @@ export default function NenCampaignsPage() {
     try { await api.nenCampaigns.testSend({ campaignKey: setting.campaignKey, accountId: selectedAccountId, friendId: testFriendId }); setNotice({ tone: 'success', text: `${setting.label}をテスト送信しました。LINEを確認してください。` }) }
     catch (caught) { setNotice({ tone: 'error', text: testSendFailureText(caught, 'テスト送信できませんでした。') }) } finally { setTesting(null) }
   }
-  const deliverColumn = async (column: NenColumn, scheduledAt?: string) => {
+  const deliverColumn = async (column: NenColumn, scheduledAt: string | undefined, confirmation: { recipientCount: number; confirmationToken: string }) => {
     if (!selectedAccountId) return
     setNotice(null)
     try {
-      const result = await api.nenCampaigns.deliverColumn(column.id, { accountId: selectedAccountId, scheduledAt })
+      const result = await api.nenCampaigns.deliverColumn(column.id, { accountId: selectedAccountId, scheduledAt, ...confirmation })
       if (!result.success) throw new Error(result.error)
       // #935 N-303: 同じ相手へ二度は入らない。0人なら「入れた」と言わず実態を伝える。
       setNotice({ tone: 'success', text: result.data.queued === 0
@@ -302,9 +302,12 @@ export default function NenCampaignsPage() {
       void loadTab('columns')
       return true
     } catch (caught) {
+      const currentCount = caught instanceof ApiError && caught.data && typeof caught.data === 'object' && 'recipientCount' in caught.data ? (caught.data as { recipientCount?: unknown }).recipientCount : null
       setNotice({ tone: 'error', text: caught instanceof ApiError && caught.code === 'past_datetime'
         ? '予約日時が過去になっています。いまより先の日時を選び直してください。'
-        : 'コラムを配信予約できませんでした。コラムの配信が停止中でないか確認してください。' })
+        : caught instanceof ApiError && caught.status === 409
+          ? `配信内容または対象が変わりました。${typeof currentCount === 'number' && Number.isSafeInteger(currentCount) && currentCount >= 0 ? `現在の対象は${currentCount.toLocaleString('ja-JP')}人です。` : ''}画面を読み直して確認してください。`
+          : 'コラムを配信予約できませんでした。コラムの配信が停止中でないか確認してください。' })
       return false
     }
   }
@@ -521,7 +524,8 @@ export default function NenCampaignsPage() {
         onLoadMoreColumns={loadMoreColumns}
         plan={plan} onPlanChange={setPlan}
         introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
-        onDeliverColumn={(column, scheduledAt) => deliverColumn(column, scheduledAt)}
+        onPreviewColumn={(column) => api.nenCampaigns.previewColumnDelivery(selectedAccountId!, column.id).then(result => { if (!result.success) throw new Error(result.error); return result.data })}
+        onDeliverColumn={(column, scheduledAt, confirmation) => deliverColumn(column, scheduledAt, confirmation)}
         onDuplicateColumn={(column) => void duplicateColumn(column)} duplicatingColumnId={duplicatingColumnId} onTestColumn={(column) => void testColumn(column)}
         onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
         onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}

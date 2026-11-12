@@ -86,6 +86,15 @@ test('初期セットのフォームは現役の編集画面を開く', async ()
 });
 
 describe('③分け方のタグ・⑤シナリオの見本', () => {
+  test('初期セットは長い見本名も付けてシナリオを作る', async () => {
+    const name = '長い見本'.repeat(16);
+    const initial = standardStarter('salon');
+    const definition = { ...initial, items: initial.items.map(item => item.kind === 'scenario' ? { ...item, name } : item) };
+    expect((await request(hqPath('salon'), 'PUT', { expectedVersion: 0, name: '本部', autoInsert: true, definition })).status).toBe(200);
+    expect((await request(base + '?account_id=a', 'PUT', { expectedVersion: 0, style: 'salon', answers: allAnswers })).status).toBe(200);
+    const scenario = row('friend-add-scenario')!;
+    expect(sql.raw.prepare('SELECT name FROM scenarios WHERE id=?').get(scenario.target_id)).toEqual({ name: '【見本】' + name });
+  });
   test.each(ACCOUNT_STYLES)('%s の初期セットはタグの見本とシナリオの見本を 1 つずつ持つ', (style) => {
     const items = standardStarter(style).items;
     expect(items.filter((i) => i.kind === 'tag_set')).toHaveLength(1);

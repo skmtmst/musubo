@@ -117,3 +117,24 @@ test('欄から離れた時点で、触った欄だけ理由を出し、直す�
   expect(name.getAttribute('aria-invalid')).not.toBe('true')
   expect(sent).toEqual([])
 })
+
+test('下書きは最初から停止した送り先として作られ、途中で動作しない', async () => {
+  const writes: Array<{ method: string; body: Record<string, unknown> }> = []
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const method = init?.method ?? 'GET'
+    if (method !== 'GET' && String(input).includes('/api/webhooks/outgoing')) {
+      writes.push({ method, body: JSON.parse(String(init?.body)) })
+      return json({ success: true, data: { id: 'wh-draft', isActive: false } })
+    }
+    if (String(input).includes('/api/staff/me')) return json({ success: true, data: { role: 'owner' } })
+    return json({ success: true, data: [] })
+  })
+  render(<WebhooksCreateV8 />)
+  fireEvent.change(document.querySelector('#wh-new-name')!, { target: { value: '予約台帳' } })
+  fireEvent.change(document.querySelector('#wh-new-url')!, { target: { value: 'https://example.com/hook' } })
+  fireEvent.click(document.querySelector('input[name="wh-new-mode"][value="all"]')!)
+  await act(async () => { getPageAction({ name: '下書きを保存' }).click() })
+  await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/webhooks?highlight=wh-draft'))
+  expect(writes).toHaveLength(1)
+  expect(writes[0]).toMatchObject({ method: 'POST', body: { isActive: false } })
+})

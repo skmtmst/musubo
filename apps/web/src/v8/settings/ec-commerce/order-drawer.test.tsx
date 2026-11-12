@@ -17,10 +17,10 @@ import OrderDrawer from './order-drawer'
 const action = (status: string, retryAvailable: boolean) => ({
   id: `action-${status}`, eventId: 'e', eventType: 'ec.order.confirmed', actionType: 'line_notification', ruleVersion: 'v', status,
   attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: status === 'succeeded' ? null : 'LINEが送信を受け付けませんでした', lastAttemptedAt: null,
-  nextRetryAt: null, version: 1, receivedAt: '2026-10-01T12:02:00.000Z', orderNumber: 'A-1', customerName: '高橋 直人', retryAvailable, failureKind: null, attempts: [],
+  nextRetryAt: null, version: 1, receivedAt: '2026-10-01T12:02:00.000Z', orderNumber: 'A-1', customerName: '見本 16', retryAvailable, failureKind: null, attempts: [],
 })
 const detail = (failed: boolean) => ({
-  order: { id: 'order-1', lineAccountId: 'account-1', externalOrderId: 'x', orderNumber: 'A-1', customerId: 'c', friendId: 'friend-1', customerName: '高橋 直人', status: 'current', providerStatus: 'confirmed', currency: 'JPY', totalAmount: 7540, refundedAmount: 0, orderedAt: '2026-10-01T12:02:00.000Z', detailUrl: null, version: 1, orderLines: [{ id: 'l', productId: 'p', productName: '鹿肉ドライ 1kg', quantity: 1, unitAmount: 7540, lineAmount: 7540, productUrl: null }] },
+  order: { id: 'order-1', lineAccountId: 'account-1', externalOrderId: 'x', orderNumber: 'A-1', customerId: 'c', friendId: 'friend-1', customerName: '見本 16', status: 'current', providerStatus: 'confirmed', currency: 'JPY', totalAmount: 7540, refundedAmount: 0, orderedAt: '2026-10-01T12:02:00.000Z', detailUrl: null, version: 1, orderLines: [{ id: 'l', productId: 'p', productName: '鹿肉ドライ 1kg', quantity: 1, unitAmount: 7540, lineAmount: 7540, productUrl: null }] },
   events: [{ id: 'e', externalEventId: 'x', eventType: 'ec.order.confirmed', status: failed ? 'failed' : 'processed', failureKind: null, receivedAt: '2026-10-01T12:02:00.000Z', processedAt: null, actions: [action(failed ? 'retryable_failed' : 'succeeded', failed)], dispatches: [], deliveries: [] }],
   followUps: [{ id: 'f', campaignKey: 'k', campaignLabel: '口コミのお願い', scheduledAt: '2026-10-12T01:00:00.000Z', status: 'pending', attempts: 0, sentAt: null, reason: null, failureKind: null }],
   outcomes: { conversions: [], mileage: [{ id: 'm', entryType: 'earn', amount: 75, status: 'confirmed', reason: '商品を買った', occurredAt: '2026-10-01T12:03:00.000Z' }], scores: [] },

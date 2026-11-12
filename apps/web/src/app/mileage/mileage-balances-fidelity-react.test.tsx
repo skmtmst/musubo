@@ -2,7 +2,7 @@
 /*
  * 友だちの残高（板 ）。絵の骨組み（`design/v8/html/.html`）にそろえる。
  * 頭の CSV の空け・数の帯の空け（直近30日 増えた・直近30日 減った）・申請の行
- * （申請 佐藤 直人（10/02 15:20））・申請した人の言い方をここで留める。
+ * （申請 見本 120（10/02 15:20））・申請した人の言い方をここで留める。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -30,14 +30,14 @@ function stubFetch() {
           id: 'approval-1',
           line_account_id: 'account-1',
           friend_id: 'friend-1',
-          friend_display_name: 'Kenta Kawano',
+          friend_display_name: 'Demo Person',
           direction: 'increase',
           amount: 5000,
           reason_category: 'other',
           reason: 'イベント運営のお礼',
           status: 'pending',
           requested_by_staff_id: 'staff-2',
-          requested_by_staff_name: '佐藤 直人',
+          requested_by_staff_name: '見本 120',
           decided_by_staff_name: null,
           decided_at: null,
           decision_reason: null,
@@ -69,7 +69,7 @@ function stubFetch() {
           balanceSource: source, ecKnownCount: source === 'ec' ? 1 : undefined,
           items: [{
             friendId: 'friend-1',
-            displayName: 'Kenta Kawano',
+            displayName: 'Demo Person',
             pictureUrl: null,
             rank: source === 'ec' ? 'プラチナ' : 'gold',
             rankReason: '',
@@ -221,7 +221,7 @@ describe('残高の絵合わせ（板 `CJlf4`）', () => {
     await waitForRows()
     const body = container.textContent ?? ''
     expect(body).toContain('承認待ちのマイル変更 1 件')
-    expect(body).toContain('申請 佐藤 直人（10/02 15:20）')
+    expect(body).toContain('申請 見本 120（10/02 15:20）')
     expect(body).toContain('申請した人とは別のオーナー')
   })
 

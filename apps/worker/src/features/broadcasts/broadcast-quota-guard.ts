@@ -154,7 +154,7 @@ export async function tryReserveQuotaSlot(
   planned: number,
   used: number,
   limit: number,
-  options?: { replaceOwn?: boolean },
+  options?: { replaceOwn?: boolean; expectedLockVersion?: number },
 ): Promise<boolean> {
   const now = Date.now();
   for (let attempt = 0; attempt < QUOTA_RESERVATION_RETRIES; attempt++) {
@@ -173,17 +173,19 @@ export async function tryReserveQuotaSlot(
     const encoded = JSON.stringify(next);
     if (!row) {
       try {
-        await db.prepare(
-          `INSERT INTO account_settings (id, line_account_id, key, value) VALUES (?, ?, ?, ?)`,
-        ).bind(`quota-reservations-${accountId}`, accountId, QUOTA_RESERVATION_KEY, encoded).run();
-        return true;
+        const inserted = await db.prepare(
+          `INSERT INTO account_settings (id, line_account_id, key, value)
+           SELECT ?, ?, ?, ? WHERE ? IS NULL OR EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND lock_version=?)`,
+        ).bind(`quota-reservations-${accountId}`, accountId, QUOTA_RESERVATION_KEY, encoded, options?.expectedLockVersion ?? null, broadcastId, options?.expectedLockVersion ?? null).run();
+        return (inserted.meta?.changes ?? 0) > 0;
       } catch {
         continue;
       }
     }
     const updated = await db.prepare(
-      `UPDATE account_settings SET value = ?, updated_at = ? WHERE line_account_id = ? AND key = ? AND value = ?`,
-    ).bind(encoded, new Date(now).toISOString(), accountId, QUOTA_RESERVATION_KEY, row.value).run();
+      `UPDATE account_settings SET value = ?, updated_at = ? WHERE line_account_id = ? AND key = ? AND value = ?
+       AND (? IS NULL OR EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND lock_version=?))`,
+    ).bind(encoded, new Date(now).toISOString(), accountId, QUOTA_RESERVATION_KEY, row.value, options?.expectedLockVersion ?? null, broadcastId, options?.expectedLockVersion ?? null).run();
     if ((updated.meta.changes ?? 0) > 0) return true;
   }
   return false;
@@ -194,6 +196,7 @@ export async function releaseQuotaSlot(
   db: D1Database,
   accountId: string,
   broadcastId: string,
+  options?: { expectedLockVersion: number },
 ): Promise<void> {
   try {
     const now = Date.now();
@@ -207,8 +210,9 @@ export async function releaseQuotaSlot(
       );
       const encoded = JSON.stringify(next);
       const updated = await db.prepare(
-        `UPDATE account_settings SET value = ?, updated_at = ? WHERE line_account_id = ? AND key = ? AND value = ?`,
-      ).bind(encoded, new Date(now).toISOString(), accountId, QUOTA_RESERVATION_KEY, row.value).run();
+        `UPDATE account_settings SET value = ?, updated_at = ? WHERE line_account_id = ? AND key = ? AND value = ?
+           AND (? IS NULL OR EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND lock_version=?))`,
+      ).bind(encoded, new Date(now).toISOString(), accountId, QUOTA_RESERVATION_KEY, row.value, options?.expectedLockVersion ?? null, broadcastId, options?.expectedLockVersion ?? null).run();
       if ((updated.meta.changes ?? 0) > 0) return;
     }
   } catch {

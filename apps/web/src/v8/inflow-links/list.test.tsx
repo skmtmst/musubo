@@ -112,6 +112,36 @@ const buttonByLabel = (label: string) =>
 const rowOf = (refCode: string) => host.querySelector(`[data-row-id="${ROUTES.find(row => row.refCode === refCode)?.id ?? refCode}"]`)
 
 describe('V8 流入と計測の一覧', () => {
+  it('集計に記録がない経路は追加なしの件数と一覧に含まれる', async () => {
+    await render()
+    const presets = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('よく使う絞り込み'))!
+    await act(async () => { presets.click() })
+    const dialog = host.querySelector('[role="dialog"][aria-label="よく使う絞り込みと並び順"]')!
+    const zero = [...dialog.querySelectorAll('button')].find(button => button.textContent?.includes('友だち追加なし'))!
+    expect(zero.textContent).toMatch(/友だち追加なし\s*2/)
+    await act(async () => { zero.click() })
+    expect(rowOf('flyer-26s')).toBeTruthy()
+    expect(rowOf('ad-summer')).toBeTruthy()
+    expect(rowOf('ad-summer')?.querySelector('[class*="colFriends"]')?.textContent).toContain('0 人')
+    expect(rowOf('summer-ig')).toBeNull()
+  })
+
+  it('集計を読めない場合は友だちの数を不明と表示する', async () => {
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (new URL(String(input)).pathname === '/api/analytics/ref-summary') return json({ success: false, error: 'offline' })
+      return originalFetch(input, init)
+    })
+    await render()
+    expect(rowOf('ad-summer')?.querySelector('[class*="colFriends"]')?.textContent).toBe('—')
+    const presets = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('よく使う絞り込み'))!
+    await act(async () => { presets.click() })
+    const dialog = host.querySelector('[role="dialog"][aria-label="よく使う絞り込みと並び順"]')!
+    const buttons = [...dialog.querySelectorAll('button')]
+    expect(buttons.find(button => button.textContent?.includes('友だち追加あり'))?.textContent?.trim()).toBe('友だち追加あり')
+    expect(buttons.find(button => button.textContent?.includes('友だち追加なし'))?.textContent?.trim()).toBe('友だち追加なし')
+  })
+
   it('アカウントを切り替えて戻しても古い停止確認は実行しない', async () => {
     const originalFetch = globalThis.fetch
     const updates: string[] = []

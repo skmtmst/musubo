@@ -72,6 +72,23 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot() })
 
+it('停止確認は実際に止める全アカウントと環境を示す', async () => {
+  render(<EmergencyPage />); await loaded(); await fillStop()
+  const dialog = screen.getByRole('alertdialog', { name: '緊急停止を確認' })
+  expect(within(dialog).getByText('すべてのLINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('環境', { exact: true })).toBeTruthy()
+})
+
+it('復旧確認は実際の対象アカウントと環境を示す', async () => {
+  identity('admin', { permissionKeys: ['operations.control.execute'] })
+  f.activeIncidentId = 'incident'; render(<EmergencyPage />)
+  fireEvent.click(await screen.findByRole('button', { name: '復旧する' }))
+  const dialog = await screen.findByRole('dialog', { name: '止める前の状態に戻しますか？' })
+  expect(within(dialog).getByText('LINEアカウント', { exact: true })).toBeTruthy()
+  expect(within(dialog).getByText('A', { exact: true })).toBeTruthy()
+  expect(within(dialog).getByText('環境', { exact: true })).toBeTruthy()
+})
+
 it.each([
   { role: 'viewer' as const }, { role: 'staff' as const, permissionKeys: ['operations.control.execute'] },
   { role: 'admin' as const }, { role: 'owner' as const, readOnly: true },
@@ -170,6 +187,15 @@ it('開いた停止の確認もread切替で灰色・入力disabledになり、�
   fireEvent.click(currentSubmit)
   expect((screen.getByRole('textbox', { name: '止める理由' }) as HTMLInputElement).disabled).toBe(true)
   expect(f.stepUp).not.toHaveBeenCalled(); expect(f.stop).not.toHaveBeenCalled()
+})
+
+it('停止確認中に権限が一度外れて戻ったら古い確認を使わない', async () => {
+  render(<EmergencyPage />); await loaded(); await fillStop()
+  session('read'); session(null)
+  const dialog = screen.queryByRole('alertdialog', { name: '緊急停止を確認' })
+  if (dialog) fireEvent.click(within(dialog).getByRole('button', { name: '緊急停止する' }))
+  expect(f.stepUp).not.toHaveBeenCalled()
+  expect(f.stop).not.toHaveBeenCalled()
 })
 
 it('許可のある復旧はincident・版・要求鍵を保ち1回実行する', async () => {

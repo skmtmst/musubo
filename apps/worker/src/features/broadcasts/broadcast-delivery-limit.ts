@@ -136,10 +136,10 @@ export async function holdLimitedBroadcast(db: D1Database, broadcast: Broadcast,
   const { createNotification } = await import('@line-crm/db');
   const dispatched = await db.prepare('SELECT 1 FROM broadcast_send_claims WHERE broadcast_id=? AND dispatched_at IS NOT NULL LIMIT 1').bind(broadcast.id).first();
   const result = dispatched
-    ? await db.prepare(`UPDATE broadcasts SET stopped_at=?,batch_lock_at=NULL,batch_offset=0 WHERE id=? AND status='sending' AND stopped_at IS NULL`).bind(jstNow(),broadcast.id).run()
-    : await db.prepare(`UPDATE broadcasts SET status='draft',scheduled_at=NULL,batch_lock_at=NULL WHERE id=? AND status IN ('scheduled','sending')`).bind(broadcast.id).run();
-  if (broadcast.line_account_id) await releaseQuotaSlot(db,broadcast.line_account_id,broadcast.id);
+    ? await db.prepare(`UPDATE broadcasts SET stopped_at=?,batch_lock_at=NULL,batch_offset=0 WHERE id=? AND status='sending' AND stopped_at IS NULL AND lock_version=?`).bind(jstNow(),broadcast.id,broadcast.lock_version ?? 1).run()
+    : await db.prepare(`UPDATE broadcasts SET status='draft',scheduled_at=NULL,batch_lock_at=NULL WHERE id=? AND status IN ('scheduled','sending') AND lock_version=?`).bind(broadcast.id,broadcast.lock_version ?? 1).run();
   if (!result.meta.changes) return;
+  if (broadcast.line_account_id) await releaseQuotaSlot(db,broadcast.line_account_id,broadcast.id,{ expectedLockVersion: broadcast.lock_version ?? 1 });
   await createNotification(db, { eventType: 'broadcast.quota_short', title: `「${broadcast.title}」を送れませんでした`,
     body: reason, channel: 'dashboard', category: 'error', lineAccountId: broadcast.line_account_id,
     metadata: JSON.stringify({ broadcastId: broadcast.id, reason: 'limited_delivery_unavailable', at: jstNow() }) });
@@ -155,7 +155,7 @@ export async function renewLimitedReservation(db: D1Database, broadcast: Broadca
   const quota = await fetchQuotaDetails(account.channel_access_token);
   if (quota.unlimited) return;
   if (quota.limit === null || quota.used === null) throw new LimitedBroadcastError(quota.reason ?? '送信枠を確認できません。');
-  if (!await tryReserveQuotaSlot(db, broadcast.line_account_id, broadcast.id, pending, quota.used, quota.limit, {replaceOwn:true})) {
+  if (!await tryReserveQuotaSlot(db, broadcast.line_account_id, broadcast.id, pending, quota.used, quota.limit, {replaceOwn:true,expectedLockVersion:broadcast.lock_version ?? 1})) {
     throw new LimitedBroadcastError('残りの送信枠を確保できないため、未送信の分を止めました。送信枠を確かめてから再開してください。');
   }
 }

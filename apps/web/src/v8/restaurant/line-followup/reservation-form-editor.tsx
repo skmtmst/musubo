@@ -14,7 +14,7 @@ import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import styles from './board.module.css'
-const values={name:'山田 花子',phone:'090-1234-5678',dateTime:'11月1日 19:00',guestCount:'2名',allergy:'乳製品',note:'窓側の席を希望'}
+const values={name:'見本 花子',phone:'090-0000-5678',dateTime:'11月1日 19:00',guestCount:'2名',allergy:'乳製品',note:'窓側の席を希望'}
 /** 実LIFFと同じ定義で、確認の手順の項目と必須を表示する。 */
 export function ReservationFormSample({definition,storeName,compact=false}:{definition:RestaurantReservationForm;storeName:string;compact?:boolean}){
  return <LiffPhoneFrame title={definition.title} accountName={storeName} scaleToFit={compact} compact={compact} step={2} steps={['人数・日時・コース','確認']} label="予約の回答フォームの見本">

@@ -535,7 +535,7 @@ describe('差し込み後の見え方', () => {
       new Date('2026-09-09T03:00:00.000Z'),
     )
 
-    expect(preview.content).toBe('山田 太郎さん ココ 10時〜18時 {{field.b_plan}}')
+    expect(preview.content).toBe('見本 141さん ココ 10時〜18時 {{field.b_plan}}')
     // B の項目は A のテンプレートでは置き換わらない。そのまま相手へ届く。
     expect(preview.unresolved).toEqual(['field.b_plan'])
   })

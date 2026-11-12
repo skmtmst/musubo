@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { buildOperatorRows } from './inbox-dropdown'
 
 const OPERATORS = [
-  { id: 'operator-1', name: '河野 健太' },
-  { id: 'operator-2', name: '佐々木 花子' },
+  { id: 'operator-1', name: '見本 太郎' },
+  { id: 'operator-2', name: '見本 112' },
 ]
 
 describe('受信箱の担当者候補', () => {
@@ -12,8 +12,8 @@ describe('受信箱の担当者候補', () => {
     expect(buildOperatorRows(OPERATORS, true).map((row) => row.id)).toEqual([
       'all',
       'unassigned',
-      'operator-1',
       'operator-2',
+      'operator-1',
     ])
   })
 
@@ -29,8 +29,8 @@ describe('受信箱の担当者候補', () => {
     expect(buildOperatorRows(reversed, true).map((row) => row.name)).toEqual([
       'すべて',
       '未割り当て',
-      '河野 健太',
-      '佐々木 花子',
+      '見本 112',
+      '見本 太郎',
     ])
   })
 

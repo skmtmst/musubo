@@ -126,9 +126,16 @@ export default function OpsAnnouncementEditV8() {
   const params = useSearchParams()
   const editId = params.get('id')
   const copyId = params.get('copy')
+  const routeKey = JSON.stringify([editId, copyId])
+  const routeContext = useRef({ key: routeKey, generation: 0 })
+  if (routeContext.current.key !== routeKey) routeContext.current = { key: routeKey, generation: routeContext.current.generation + 1 }
+  const sendContext = useRef<{ generation: number; form: string; id: string | null } | null>(null)
+  const deleteContext = useRef<{ generation: number; id: string } | null>(null)
+  useEffect(() => { setConfirmSend(false); setDeleting(false) }, [routeKey])
 
   const [source, setSource] = useState<OpsAnnouncement | null>(null)
   const [sourceLoaded, setSourceLoaded] = useState(false)
+  const [loadedRouteKey, setLoadedRouteKey] = useState<string | null>(null)
   const [sourceError, setSourceError] = useState<unknown>(null)
   const [sourceMissing, setSourceMissing] = useState(false)
   const [lineConfigured, setLineConfigured] = useState(true)
@@ -152,12 +159,15 @@ export default function OpsAnnouncementEditV8() {
 
   const loadSource = useCallback(async () => {
     const wanted = editId ?? copyId
-    if (!wanted) { setSourceLoaded(true); return }
+    const generation = routeContext.current.generation
+    if (!wanted) { setSource(null); setEditingId(null); setEditingUpdatedAt(null); setForm(EMPTY); setBaseline(EMPTY); setNotice(''); setSourceMissing(false); setSourceError(null); setLoadedRouteKey(routeKey); setSourceLoaded(true); return }
     setSourceError(null)
+    setSourceMissing(false)
     setSourceLoaded(false)
     let switched = false
     try {
       const res = await api.ops.announcements.list()
+      if (routeContext.current.generation !== generation) return
       if (!res.success) { setSourceError(new Error(res.error || '読み込めませんでした')); return }
       setLineConfigured(res.noticeLineConfigured)
       const found = res.data.find((row) => row.id === wanted) ?? null
@@ -177,18 +187,21 @@ export default function OpsAnnouncementEditV8() {
         setBaseline(next)
         setForm(next)
       } else {
+        setEditingId(null)
+        setEditingUpdatedAt(null)
         setNotice('送ったお知らせの中身を写しました。直して送ると、新しいお知らせになります')
         setBaseline(EMPTY)
         setForm({ ...next, publishAt: '' })
       }
     } catch (caught) {
+      if (routeContext.current.generation !== generation) return
       const fieldFailure = saveErrors.capture(caught)
       { if (!fieldFailure)
       setSourceError(caught) }
     } finally {
-      if (!switched) setSourceLoaded(true)
+      if (!switched && routeContext.current.generation === generation) { setLoadedRouteKey(routeKey); setSourceLoaded(true) }
     }
-  }, [editId, copyId, saveErrors])
+  }, [editId, copyId, routeKey, saveErrors])
 
   useEffect(() => { void loadSource() }, [loadSource])
 
@@ -260,6 +273,8 @@ export default function OpsAnnouncementEditV8() {
   })
 
   const submit = async (mode: OpsAnnouncementInput['mode']) => {
+    if (readOnly) return
+    if (mode !== 'draft' && (!sendContext.current || sendContext.current.generation !== routeContext.current.generation || sendContext.current.form !== JSON.stringify(form) || sendContext.current.id !== editingId || (editId !== null && editId !== editingId))) return
     if (fields.submit().length > 0) { setFormError(''); setConfirmSend(false); return }
     if (validation) { setFormError(validation); setConfirmSend(false); return }
     setBusy(true)
@@ -318,7 +333,7 @@ export default function OpsAnnouncementEditV8() {
   }
 
   const remove = async () => {
-    if (!editingId) return
+    if (readOnly || !editingId || !deleteContext.current || deleteContext.current.generation !== routeContext.current.generation || deleteContext.current.id !== editingId || editId !== editingId) return
     setBusy(true)
     const res = await opsCall(api.ops.announcements.remove(editingId))
     setBusy(false)
@@ -332,7 +347,7 @@ export default function OpsAnnouncementEditV8() {
   const deletable = editingId !== null && (source?.status === 'draft' || source?.status === 'scheduled')
   const lock = access === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined
 
-  if (!sourceLoaded) return <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />
+  if (!sourceLoaded || loadedRouteKey !== routeKey) return <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />
   if (sourceMissing) {
     return (
       <ListState permissionScope="hq" kind="error"
@@ -351,6 +366,8 @@ export default function OpsAnnouncementEditV8() {
     )
   }
 
+  if ((editId || copyId) && source?.id !== (editId ?? copyId)) return <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />
+
   return (
     <SaveErrorScope errors={saveErrors}>
       <CreatePage
@@ -363,11 +380,11 @@ export default function OpsAnnouncementEditV8() {
         footerActions={<>
           <Button href="/ops/announcements">キャンセル</Button>
           <Button variant="secondary" lockedReason={lock} disabled={busy || unknown} busy={Boolean(busy)} busyLabel="処理中…" onClick={() => void submit('draft')}>下書きを保存する</Button>
-          <Button variant="primary" lockedReason={lock} disabled={busy || unknown} onClick={() => { setFormError(''); if (fields.submit().length === 0) setConfirmSend(true) }}>
+          <Button variant="primary" lockedReason={lock} disabled={busy || unknown} onClick={() => { setFormError(''); if (fields.submit().length === 0) { sendContext.current = { generation: routeContext.current.generation, form: JSON.stringify(form), id: editingId }; setConfirmSend(true) } }}>
             <Send aria-hidden="true" />{scheduled ? '配信を予約する' : '今すぐ送る'}
           </Button>
         </>}
-        destructive={deletable ? <Button variant="danger" lockedReason={lock} disabled={busy || unknown} onClick={() => setDeleting(true)}>削除する</Button> : null}
+        destructive={deletable ? <Button variant="danger" lockedReason={lock} disabled={busy || unknown} onClick={() => { if (editingId && editId === editingId) { deleteContext.current = { generation: routeContext.current.generation, id: editingId }; setDeleting(true) } }}>削除する</Button> : null}
       >
         <div className={styles.formPage}>
           {notice ? <p role="status" className={`${parts.status} ${styles.notice}`}>{notice}</p> : null}
@@ -447,7 +464,7 @@ export default function OpsAnnouncementEditV8() {
         onCancel={() => { if (!busy) setConfirmSend(false) }}
       >
         <div className={parts.dialogBody}>
-          <OperationTargetSummary accounts={[]} />
+          <OperationTargetSummary accounts={[{ id: '', name: '不明' }]} externalTarget={{ label: 'お知らせ 1件', name: form.subject.trim() || null }} />
           <dl className={styles.facts}>
             <div className={styles.fact}><dt>宛先</dt><dd>{confirmAudience(form, preview)}</dd></div>
             <div className={styles.fact}><dt>届く方法</dt><dd>{confirmChannels(form, preview)}</dd></div>
@@ -470,7 +487,7 @@ export default function OpsAnnouncementEditV8() {
         error={formError}
         onConfirm={() => remove()}
         onCancel={() => { if (!busy) setDeleting(false) }}
-      ><OperationTargetSummary accounts={[]} /></ConfirmDialog>
+      ><OperationTargetSummary accounts={[{ id: '', name: '不明' }]} externalTarget={{ label: 'お知らせ 1件', name: source?.subject }} /></ConfirmDialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </SaveErrorScope>
   )

@@ -34,7 +34,7 @@ beforeEach(() => {
     }
     // 履歴の口が配列ではなく頁の器で返る（偽APIの既定）。
     if (url.endsWith('/api/hq/support/requests')) return json({ success: true, data: { items: [], total: 0, page: 1, limit: 20 } })
-    if (url.endsWith('/api/staff/me')) return json({ success: true, data: { id: 's1', name: '山田 太郎', role: 'staff', email: 'yamada@example.com' } })
+    if (url.endsWith('/api/staff/me')) return json({ success: true, data: { id: 's1', name: '見本 141', role: 'staff', email: 'yamada@example.com' } })
     if (url.endsWith('/api/tenants/me')) return json({ success: true, data: { name: '株式会社サンプル' } })
     return json({ success: false, error: `unexpected ${url}` }, 404)
   }))

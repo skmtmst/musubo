@@ -48,7 +48,7 @@ type PendingStepUp = { purpose: StepUpPurpose; action: string; resolve: (token: 
  * Promise で待つ。戻り値は発行された grant token（閉じられたら null）。
  * フォームシェルが onSave を呼ぶ形でも、その場で待ってやり直せる。
  */
-export function useStepUpGate(): {
+export function useStepUpGate({ showActionInTitle = false, fullWidthPassword = false }: { showActionInTitle?: boolean; fullWidthPassword?: boolean } = {}): {
   gate: (purpose: StepUpPurpose, action: string) => Promise<string | null>
   prompt: React.ReactNode
   /**
@@ -69,6 +69,8 @@ export function useStepUpGate(): {
   }, [])
   const prompt = pending ? (
     <StepUpPrompt
+      showActionInTitle={showActionInTitle}
+      fullWidthPassword={fullWidthPassword}
       request={{
         purpose: pending.purpose,
         action: pending.action,
@@ -89,10 +91,14 @@ export function useStepUpGate(): {
  */
 export default function StepUpPrompt({
   request,
+  showActionInTitle = false,
+  fullWidthPassword = false,
   onDone,
   onClose,
 }: {
   request: StepUpRequest
+  showActionInTitle?: boolean
+  fullWidthPassword?: boolean
   onDone: () => void
   onClose: () => void
 }) {
@@ -123,6 +129,8 @@ export default function StepUpPrompt({
     <SaveErrorScope errors={saveErrors}><StepUpDialog
       open
       action={request.action}
+      showActionInTitle={showActionInTitle}
+      fullWidthPassword={fullWidthPassword}
       presentation={request.purpose === 'auth.mfa.policy' ? 'mfa-off' : undefined}
       method={method}
       busy={busy}
