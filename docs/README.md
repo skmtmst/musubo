@@ -476,6 +476,7 @@
 - [個別見積もりの料金確認画面](release-log/unreleased/32-masato-individual-quote-review.md) — 契約枠と初回請求の表示、確認 2026-11-10。
 - [利用料金の個数プルダウン表示修正](release-log/unreleased/38-masato-pricing-dropdown.md) — 反映履歴、確認 2026-11-11。
 - [利用開始前のログイン直後の表示を統一](release-log/unreleased/42-masato-onboarding-entry.md) — サイドバーとホーム導線の制御、確認 2026-11-11。
+- [クレジットカード登録からLINE接続への案内を修正](release-log/unreleased/46-masato-card-setup-flow.md) — 登録結果の確認と画面遷移の反映履歴、確認 2026-11-12。
 - [新リポジトリへの検証配備切り替え前の安全確認](release-log/unreleased/9-masato-staging-cutover-gate.md) — 反映履歴、確認 2026-11-06。
 - [DB復旧workflowの安全条件を確かめる試験](release-log/unreleased/10-masato-recovery-workflow-test.md) — 反映履歴、確認 2026-11-06。
 - [座席図の卓プレビュー・タブ並び替え・拡大移動の修正](release-log/unreleased/2099-masato-seat-map-ux.md)
