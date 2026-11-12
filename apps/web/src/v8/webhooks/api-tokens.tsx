@@ -262,8 +262,9 @@ export default function WebhooksApiTokensV8() {
               <DataTable aria-label="API 接続の鍵" columnSizing="content">
                 <thead>
                   <TableHeadRow>
-                  <Th grow>名前</Th>
-                  <Th>できること</Th>
+                  {/* 名前とできることで残りの幅を分け合う（MCP の表と同じ考え方）。日付と状態は中身の幅のまま。 */}
+                  <Th grow weight={2}>名前</Th>
+                  <Th grow weight={1}>できること</Th>
                   <Th>作った日</Th>
                   <Th>最後に使った</Th>
                   <Th>状態</Th>
@@ -275,8 +276,8 @@ export default function WebhooksApiTokensV8() {
                   const scopeText = token.scopes.map(scopeLabel).join('・')
                   return (
                     <Tr data-row-id={token.id} key={token.id} data-ctx-row={token.id}>
-                      <Td grow title={token.name}><FolderDotName>{token.name}</FolderDotName></Td>
-                      <Td title={scopeText}><TruncatedText value={scopeText} /></Td>
+                      <Td grow weight={2} title={token.name}><FolderDotName>{token.name}</FolderDotName></Td>
+                      <Td grow weight={1} title={scopeText}><TruncatedText value={scopeText} /></Td>
                       <Td>{tokenDate(token.createdAt)}</Td>
                       <Td>{tokenUsedAt(token.lastUsedAt)}</Td>
                       <Td>
