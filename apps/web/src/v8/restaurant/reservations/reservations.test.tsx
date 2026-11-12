@@ -337,7 +337,7 @@ describe('予約台帳の初期状態', () => {
     const title = await screen.findByText('卓がまだ設定されていません')
     expect(title.closest('[data-reservation-board]')).toBeTruthy()
     expect(screen.getByRole('link',{name:'座席・卓を設定する'}).getAttribute('href')).toBe('/restaurant-test/tables')
-    expect(screen.getByText(/先に座席・卓を登録してください/)).toBeTruthy()
+    expect(screen.getByText(/先に座席・卓管理で卓を登録してください/)).toBeTruthy()
     expect(document.querySelector('[data-booking-add]')).toBeNull()
   })
   it.each(['viewer','staff'])('%s は卓の設定操作を残し、権限理由を出して移動を止める', async value => {

@@ -234,7 +234,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
                 saveErrors.capture(cause)
                 let rollbackFailed=false
                 for(const id of created.reverse())try{await restaurantTestApi.deleteTable(selectedAccountId,id)}catch{rollbackFailed=true}
-                if(rollbackFailed)throw new Error('一部の卓が残りました。卓一覧と座席図を確認してください。')
+                if(rollbackFailed)throw new Error('一部の卓が残りました。卓一覧と座席表を確認してください。')
                 throw cause
               }
             }, createCount===1?'卓を作りました。':`${createCount}卓を作りました。`, options)

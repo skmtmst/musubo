@@ -19,7 +19,7 @@ vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
 vi.mock('@/lib/api', async (load) => ({ ...(await load<typeof import('@/lib/api')>()), fetchApi: vi.fn(async () => ({ success: true, data: [] })) }))
 
 const missingHours = '開ける時間を設定して保存してください。'
-const noTables = '有効な卓がありません。座席・卓で卓を有効にしてください。'
+const noTables = '有効な卓がありません。座席・卓管理で卓を有効にしてください。'
 const week = () => Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: [] }))
 const hours = (version = 0) => ({ data: { storeId: 'store-1', hours: version ? week() : null, version } })
 const pending = <T,>() => { let resolve!: (value: T) => void; let reject!: (reason: Error) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
