@@ -153,6 +153,13 @@ it('オーナーは接続を作れ、鍵は 1 回だけ出て、閉じる前に�
   expect(screen.getByText(/鍵はもう見られません/)).toBeTruthy()
 })
 
+it('鍵の作り直し中は古い鍵の期限を目に見える文字で出す', async () => {
+  apiMock.list.mockResolvedValueOnce({ success: true, data: [{ ...CONNECTION, previousKeyExpiresAt: '2026-11-07T00:00:00.000Z' }] })
+  await open()
+  expect(screen.getByText('鍵の作り直し中')).toBeTruthy()
+  expect(screen.getByText((_, element) => (element?.textContent?.startsWith('古い鍵は ') ?? false) && (element?.textContent?.endsWith(' まで') ?? false))).toBeTruthy()
+})
+
 it('管理者には作るボタンを灰色とオーナーの理由で残し、止めるはできる', async () => {
   role.value = verifiedStaffRole('admin')
   await open()
