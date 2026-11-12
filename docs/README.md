@@ -479,6 +479,7 @@
 - [個別見積もりの料金確認画面](release-log/unreleased/32-masato-individual-quote-review.md) — 契約枠と初回請求の表示、確認 2026-11-10。
 - [利用料金の個数プルダウン表示修正](release-log/unreleased/38-masato-pricing-dropdown.md) — 反映履歴、確認 2026-11-11。
 - [利用開始前のログイン直後の表示を統一](release-log/unreleased/42-masato-onboarding-entry.md) — サイドバーとホーム導線の制御、確認 2026-11-11。
+- [クレジットカード登録からLINE接続への案内を修正](release-log/unreleased/46-masato-card-setup-flow.md) — 登録結果の確認と画面遷移の反映履歴、確認 2026-11-12。
 - [新リポジトリへの検証配備切り替え前の安全確認](release-log/unreleased/9-masato-staging-cutover-gate.md) — 反映履歴、確認 2026-11-06。
 - [DB復旧workflowの安全条件を確かめる試験](release-log/unreleased/10-masato-recovery-workflow-test.md) — 反映履歴、確認 2026-11-06。
 - [予約と友だち情報の表示・操作の改善](release-log/unreleased/2097-kenta-train-1102r.md)
@@ -1206,3 +1207,4 @@
 - [登録メディアの名前変更と操作メニュー](release-log/unreleased/35-masato-media-actions-fix.md) — 登録後の編集と操作表示の修正履歴。確認 2026-11-10。
 - [登録メディア一覧の操作をシンプルにする](release-log/unreleased/40-masato-media-list-simplify.md) — 選択枠の位置と一覧表示の整理。確認 2026-11-11。
 - [登録メディアの名前変更とフォルダ移動を直す](release-log/unreleased/43-masato-media-edit-cors.md) — 保存時の通信エラー修正履歴。確認 2026-11-11。
+- [受信箱のテンプレートの差し込みと二重表示を直す](release-log/unreleased/45-kenta-inbox-template-duplicate.md) — 予約の差し込み・スマホの二重表示・送るとこうなるの見本の修正履歴。確認 2026-11-12。

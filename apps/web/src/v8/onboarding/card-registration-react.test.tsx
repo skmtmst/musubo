@@ -3,20 +3,18 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const calls = vi.hoisted(() => ({ cardStatus: vi.fn(), cardSetup: vi.fn() }))
+const calls = vi.hoisted(() => ({ cardStatus: vi.fn(), cardSetup: vi.fn(), cardConfirm: vi.fn() }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api, hqBilling: { ...actual.api.hqBilling, ...calls } } }
 })
-vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 
 import CardRegistration, { isStripeCardSetupUrl } from './card-registration'
 
 let host: HTMLDivElement
 let root: Root
 beforeEach(() => {
-  calls.cardStatus.mockReset()
-  calls.cardSetup.mockReset()
+  for (const fn of Object.values(calls)) fn.mockReset()
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -26,67 +24,67 @@ afterEach(() => {
   host.remove()
 })
 
-describe('Stripeクレジットカード登録からLINE接続へ', () => {
-  it('Stripe以外やHTTPの転送先を開かない', () => {
+const props = () => ({ onContinue: vi.fn(), onBackToPricing: vi.fn(), onOpenCheckout: vi.fn() })
+
+describe('料金確認からクレジットカード登録を経てLINE接続へ', () => {
+  it('決済サービス以外やHTTPの転送先を開かない', () => {
     expect(isStripeCardSetupUrl('https://checkout.stripe.com/c/setup/abc')).toBe(true)
     expect(isStripeCardSetupUrl('http://checkout.stripe.com/c/setup/abc')).toBe(false)
     expect(isStripeCardSetupUrl('https://checkout.stripe.com.evil.example/c/setup/abc')).toBe(false)
     expect(isStripeCardSetupUrl('/accounts/new')).toBe(false)
   })
 
-  it('未登録のときはStripeの登録画面を開き、カード情報をmusuboの入力欄に持たない', async () => {
+  it('未登録なら途中の案内画面を出さずにカード登録へ進む', async () => {
     calls.cardStatus.mockResolvedValue({ success: true, data: { registered: false } })
     calls.cardSetup.mockResolvedValue({ success: true, data: { url: 'https://checkout.stripe.com/c/setup/test' } })
-    const open = vi.fn()
-    await act(async () => { root.render(<CardRegistration onOpenStripe={open} />) })
-    expect(host.textContent).toContain('クレジットカードを登録してください')
-    expect(host.textContent).toContain('musuboにカード番号やセキュリティコードは保存されません')
-    expect(host.querySelector('input')).toBeNull()
-    const button = [...host.querySelectorAll('button')].find((element) => element.textContent?.includes('Stripeでクレジットカードを登録する'))!
-    await act(async () => { button.click() })
+    const action = props()
+    await act(async () => { root.render(<CardRegistration {...action} />) })
     expect(calls.cardSetup).toHaveBeenCalledOnce()
-    expect(open).toHaveBeenCalledWith('https://checkout.stripe.com/c/setup/test')
+    expect(action.onOpenCheckout).toHaveBeenCalledWith('https://checkout.stripe.com/c/setup/test')
+    expect(host.textContent).not.toContain('クレジットカードを登録してください')
+    expect(host.querySelector('input')).toBeNull()
   })
 
-  it('戻りURLだけで成功にせず、サーバーで登録済みを確認してからLINEへ進める', async () => {
-    calls.cardStatus.mockResolvedValue({ success: true, data: { registered: true } })
-    const next = vi.fn()
-    await act(async () => { root.render(<CardRegistration returnState="success" onContinue={next} />) })
-    expect(calls.cardStatus).toHaveBeenCalledOnce()
-    expect(calls.cardStatus).toHaveBeenCalledWith({ cache: 'reload' })
-    expect(host.textContent).toContain('カードの登録が完了しました')
-    const button = [...host.querySelectorAll('button')].find((element) => element.textContent?.includes('LINEアカウントの接続へ'))!
-    await act(async () => { button.click() })
-    expect(next).toHaveBeenCalledOnce()
-  })
-
-  it('Stripeから戻った直後にWebhookが未反映でも、再照会して登録完了を表示する', async () => {
-    vi.useFakeTimers()
-    try {
-      calls.cardStatus
-        .mockResolvedValueOnce({ success: true, data: { registered: false } })
-        .mockResolvedValueOnce({ success: true, data: { registered: true } })
-      await act(async () => { root.render(<CardRegistration returnState="success" />) })
-      expect(host.textContent).toContain('カードの登録状況を確認しています')
-      await act(async () => { await vi.advanceTimersByTimeAsync(2_000) })
-      expect(calls.cardStatus).toHaveBeenCalledTimes(2)
-      expect(calls.cardStatus).toHaveBeenNthCalledWith(2, { cache: 'reload' })
-      expect(host.textContent).toContain('カードの登録が完了しました')
-    } finally { vi.useRealTimers() }
-  })
-
-  it('登録が中断されたら料金を保ったまま再開を案内する', async () => {
+  it('親画面の再描画でカード登録セッションを重複作成しない', async () => {
     calls.cardStatus.mockResolvedValue({ success: true, data: { registered: false } })
-    const back = vi.fn()
-    await act(async () => { root.render(<CardRegistration returnState="cancel" onBackToPricing={back} />) })
-    expect(host.textContent).toContain('クレジットカード登録はまだ完了していません')
-    expect(host.textContent).toContain('料金の確認内容は保存されています')
-    expect(host.textContent).toContain('クレジットカードを登録できませんでした')
-    expect(host.textContent).toContain('クレジットカード未登録・LINE未接続・本日の請求 ¥0')
-    expect(host.textContent).toContain('クレジットカードを登録し直す')
-    const backButton = [...host.querySelectorAll('button')].find(element => element.textContent?.includes('料金確認に戻る'))!
-    await act(async () => { backButton.click() })
-    expect(back).toHaveBeenCalledOnce()
-    expect(host.textContent).not.toContain('LINEアカウントの接続へ')
+    calls.cardSetup.mockResolvedValue({ success: true, data: { url: 'https://checkout.stripe.com/c/setup/test' } })
+    const action = props()
+    await act(async () => { root.render(<CardRegistration {...action} />) })
+    await act(async () => { root.render(<CardRegistration {...action} onContinue={vi.fn()} />) })
+    expect(calls.cardSetup).toHaveBeenCalledOnce()
+    expect(action.onOpenCheckout).toHaveBeenCalledOnce()
+  })
+
+  it('完了したセッションをサーバーで照合し、別の結果画面なしでLINEへ進む', async () => {
+    calls.cardConfirm.mockResolvedValue({ success: true, data: { registered: true } })
+    const action = props()
+    await act(async () => { root.render(<CardRegistration {...action} returnState="success" sessionId="cs_test_123456" />) })
+    expect(calls.cardConfirm).toHaveBeenCalledWith('cs_test_123456')
+    expect(action.onContinue).toHaveBeenCalledOnce()
+    expect(calls.cardSetup).not.toHaveBeenCalled()
+  })
+
+  it('戻り先URLだけでは完了と扱わない', async () => {
+    calls.cardConfirm.mockResolvedValue({ success: false, error: 'invalid' })
+    const action = props()
+    await act(async () => { root.render(<CardRegistration {...action} returnState="success" sessionId="cs_test_123456" />) })
+    expect(action.onContinue).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('クレジットカード登録を確認できませんでした')
+  })
+
+  it('既存の成功URLはサーバーの登録状態を照合して復帰する', async () => {
+    calls.cardStatus.mockResolvedValue({ success: true, data: { registered: true } })
+    const action = props()
+    await act(async () => { root.render(<CardRegistration {...action} returnState="success" />) })
+    expect(action.onContinue).toHaveBeenCalledOnce()
+    expect(calls.cardConfirm).not.toHaveBeenCalled()
+  })
+
+  it('中断時は料金確認へ戻し、新しいカード登録を自動作成しない', async () => {
+    calls.cardStatus.mockResolvedValue({ success: true, data: { registered: false } })
+    const action = props()
+    await act(async () => { root.render(<CardRegistration {...action} returnState="cancel" />) })
+    expect(action.onBackToPricing).toHaveBeenCalledOnce()
+    expect(calls.cardSetup).not.toHaveBeenCalled()
   })
 })

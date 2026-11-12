@@ -45,6 +45,7 @@ export function refreshChatListAfterSend<T extends SendListRow>(
  * 口が付けない項目は `null` で埋める。
  */
 export function buildOutgoingMessage(input: {
+  id?: string
   messageType: string
   content: string
   sentByStaffName: string
@@ -53,7 +54,7 @@ export function buildOutgoingMessage(input: {
   quoted?: ChatDetailMessage['quoted']
 }): ChatDetailMessage {
   return {
-    id: crypto.randomUUID(),
+    id: input.id ?? crypto.randomUUID(),
     direction: 'outgoing',
     messageType: input.messageType,
     content: input.content,
@@ -66,4 +67,10 @@ export function buildOutgoingMessage(input: {
     quoted: input.quoted ?? null,
     createdAt: input.sentAt,
   }
+}
+
+/** サーバーの再読込が先に届いたときは、保存済みの行を優先する。 */
+export function appendSentMessages(current: ChatDetailMessage[], sent: ChatDetailMessage[]): ChatDetailMessage[] {
+  const existing = new Set(current.map((message) => message.id))
+  return [...current, ...sent.filter((message) => !existing.has(message.id))]
 }

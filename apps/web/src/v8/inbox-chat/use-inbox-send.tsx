@@ -9,7 +9,7 @@ import { useState, type Dispatch, type RefObject, type SetStateAction } from 're
 import type { PendingAttachment } from './inbox-model';
 import { MESSAGE_MAX_LENGTH, StatusFilter, draftKeyOf } from './inbox-model';
 import { describeSendFailure } from './send-failure';
-import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic';
+import { appendSentMessages, buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic';
 
 type Options = {
   selectedChatId: string | null
@@ -127,15 +127,15 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
         }
         const staffName = sendResult.success ? sendResult.data.sentByStaffName : '自分'
         const combinedMessages = [
-          buildOutgoingMessage({ messageType: 'image', content: imgPayload, sentByStaffName: staffName, sentAt: now }),
-          buildOutgoingMessage({ messageType: 'text', content, sentByStaffName: staffName, sentAt: now }),
+          buildOutgoingMessage({ id: sendResult.data.messageIds?.[0] ?? `${sendResult.data.messageId}:0`, messageType: 'image', content: imgPayload, sentByStaffName: staffName, sentAt: now }),
+          buildOutgoingMessage({ id: sendResult.data.messageIds?.[1] ?? `${sendResult.data.messageId}:1`, messageType: 'text', content, sentByStaffName: staffName, sentAt: now }),
         ]
         setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
           ...prev,
           lastMessageAt: now,
           status: 'in_progress',
           revision: sendResult.success ? sendResult.data.revision : prev.revision,
-          messages: [...(prev.messages ?? []), ...combinedMessages],
+          messages: appendSentMessages(prev.messages ?? [], combinedMessages),
         } : prev)
         setChats((prev) => {
           const exists = prev.some((c) => c.id === sendingChatId)
@@ -174,6 +174,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
         }
         // Optimistic update for image
         const imageMessage = buildOutgoingMessage({
+          id: sendResult.data.messageId,
           messageType: 'image',
           content: imgPayload,
           sentByStaffName: sendResult.success ? sendResult.data.sentByStaffName : '自分',
@@ -184,7 +185,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
           lastMessageAt: now,
           status: 'in_progress',
           revision: sendResult.success ? sendResult.data.revision : prev.revision,
-          messages: [...(prev.messages ?? []), imageMessage],
+          messages: appendSentMessages(prev.messages ?? [], [imageMessage]),
         } : prev)
         setChats((prev) => {
           const exists = prev.some((c) => c.id === sendingChatId)
@@ -217,6 +218,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
           ? JSON.stringify({ attachmentId: sendingAttachment.attachment.id, ...sendingAttachment.attachment })
           : input.content
         const attachmentMessage = buildOutgoingMessage({
+          id: sendResult.data.messageId,
           messageType: sendingAttachment.kind,
           content: savedContent,
           sentByStaffName: sendResult.success ? sendResult.data.sentByStaffName : '自分',
@@ -227,7 +229,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
           lastMessageAt: now,
           status: 'in_progress',
           revision: sendResult.success ? sendResult.data.revision : prev.revision,
-          messages: [...(prev.messages ?? []), attachmentMessage],
+          messages: appendSentMessages(prev.messages ?? [], [attachmentMessage]),
         } : prev)
         setChats((prev) => {
           if (!prev.some((c) => c.id === sendingChatId)) return prev
@@ -265,6 +267,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
         // Only mutate chatDetail if it still corresponds to the chat we just sent to
         setCorrectingId(null)
         const textMessage = buildOutgoingMessage({
+          id: sendResult.data.messageId,
           messageType: 'text',
           content,
           sentByStaffName: sendResult.success ? sendResult.data.sentByStaffName : '自分',
@@ -275,7 +278,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
           lastMessageAt: now,
           status: 'in_progress',
           revision: sendResult.success ? sendResult.data.revision : prev.revision,
-          messages: [...(prev.messages ?? []), textMessage],
+          messages: appendSentMessages(prev.messages ?? [], [textMessage]),
         } : prev)
         setChats((prev) => {
           // Skip reconciliation if the list no longer contains this chat (e.g. tab changed mid-send)
@@ -345,15 +348,15 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
       acknowledged = true
       sendKeysRef.current.clear(signature)
       const staffName = sendResult.data.sentByStaffName
-      const packMessages = texts.map((content) =>
-        buildOutgoingMessage({ messageType: 'text', content, sentByStaffName: staffName, sentAt: now }),
+      const packMessages = texts.map((content, index) =>
+        buildOutgoingMessage({ id: sendResult.data.messageIds?.[index] ?? `${sendResult.data.messageId}:${index}`, messageType: 'text', content, sentByStaffName: staffName, sentAt: now }),
       )
       setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
         ...prev,
         lastMessageAt: now,
         status: 'in_progress',
         revision: sendResult.data.revision,
-        messages: [...(prev.messages ?? []), ...packMessages],
+        messages: appendSentMessages(prev.messages ?? [], packMessages),
       } : prev)
       setChats((prev) => {
         const exists = prev.some((c) => c.id === sendingChatId)
