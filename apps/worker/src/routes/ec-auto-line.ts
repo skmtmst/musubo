@@ -9,7 +9,7 @@ import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapVersion,gapWrite,gapKey} from '../services/gap-common.js';
 import {autoKinds,autoLineRules,ingestBehavior,processAutoLineMock} from '../features/ec-commerce/ec-auto-line/index.js';
 import {getConnectorSecret} from './ec-connector-secret.js';
-import {resolveUnknownAutoLineSimulationCap} from '../features/ec-commerce/ec-auto-line-cap.js';
+import {resolveUnknownAutoLineSimulationCap} from '../features/ec-commerce/ec-auto-line-cap/index.js';
 export const ecAutoLine=new Hono<Env>();
 ecAutoLine.use('/api/ec/auto-line/*',requirePermission('/ec-commerce'));
 ecAutoLine.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'auto_line_unavailable'},e instanceof GapError?e.status:503));
