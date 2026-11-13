@@ -1209,3 +1209,4 @@
 - [登録メディアの名前変更とフォルダ移動を直す](release-log/unreleased/43-masato-media-edit-cors.md) — 保存時の通信エラー修正履歴。確認 2026-11-11。
 - [受信箱のテンプレートの差し込みと二重表示を直す](release-log/unreleased/45-kenta-inbox-template-duplicate.md) — 予約の差し込み・スマホの二重表示・送るとこうなるの見本の修正履歴。確認 2026-11-12。
 - [営業時間のカードの見出しを途中で割らない](release-log/unreleased/48-kenta-hours-heading.md) — 1152px の営業時間の見出しの折り返しの修正履歴。確認 2026-11-12。
+- [時々落ちるカレンダーの試験を安定させる](release-log/unreleased/57-kenta-d15-flaky-tests.md) — 自動の確認の安定化の履歴。確認 2026-11-13。
