@@ -4359,6 +4359,15 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* 公開中の版（実口は account_id が無いと公開中の版を返す。編集画面は `?view=published` を付けて読む）。 */
   if (pathname === `/api/forms/${FORM_DETAIL.id}` && query.get('view') === 'published') return { success: true, data: FORM_DETAIL_PUBLISHED }
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
+  /*
+   * 一覧にあるほかのフォームも開けるように、form-1 の中身をひな形に ID と名前だけ差し替える。
+   * 無いと詳細・集まった回答が「画面を表示できませんでした」になり、点検（A14）で不具合に見えた。
+   */
+  const listedForm = /^\/api\/forms\/([^/]+)$/.exec(pathname)
+  if (method === 'GET' && listedForm) {
+    const row = FORM_LIST.items.find((item) => item.id === listedForm[1])
+    if (row) return { success: true, data: { ...FORM_DETAIL, id: row.id, name: row.name, description: row.description ?? FORM_DETAIL.description } }
+  }
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
     /*
@@ -5791,6 +5800,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === `/api/common-vars/${COMMON_VAR_DETAIL.id}`) return { success: true, data: COMMON_VAR_DETAIL }
   /* 板 `AYc6O`・`C67dE`・`piWhz`：営業時間の編集（使っている8か所・予定1件・履歴2件）。 */
   if (pathname === `/api/common-vars/${COMMON_VAR_HOURS_DETAIL.id}`) return { success: true, data: COMMON_VAR_HOURS_DETAIL }
+  /* 一覧にあるほかの共通情報も編集画面を開けるように、決まった1件をひな形に一覧の値を重ねる（A14）。 */
+  const listedCommonVar = /^\/api\/common-vars\/([^/]+)$/.exec(pathname)
+  if (method === 'GET' && listedCommonVar) {
+    const row = COMMON_VARS.find((item) => item.id === listedCommonVar[1])
+    if (row) return { success: true, data: { ...COMMON_VAR_DETAIL, ...row } }
+  }
   const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
   if (commonVarDeleteImpact) {
     const impact = commonVarDeleteImpact[1] === COMMON_VAR_DELETE_IMPACT_EMPTY.variable.id
