@@ -272,9 +272,12 @@ jobs:
           fi
 
           apply_count=$(wc -l < "$apply_file" | tr -d ' ')
-          if [ "$TARGET_MIGRATION" != '' ] && [ "$pending_count" -gt "$apply_count" ]; then
-            echo "::error::指定外の未適用マイグレーションがあります。適用順序を確認してください。"
-            exit 1
+          if [ -n "$TARGET_MIGRATION" ]; then
+            first_pending=$(head -n 1 "$all_pending_file")
+            if [ "$target_path" != "$first_pending" ]; then
+              echo "::error::最初の未適用マイグレーションだけを指定してください: $first_pending"
+              exit 1
+            fi
           fi
           echo "count=$apply_count" >> "$GITHUB_OUTPUT"
           echo "total_count=$pending_count" >> "$GITHUB_OUTPUT"
@@ -345,6 +348,12 @@ jobs:
             echo "メッセージ・予約も一緒に消えます。"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Recheck latest source and published ancestry immediately before DB write
+        if: inputs.mode == 'apply' && steps.pending.outputs.count != '0'
+        env:
+          DELIVERY_TARGET: all
+        run: node scripts/deploy/verify-staging-forward.mjs
+
       - name: Apply the pending migrations
         id: apply
         if: inputs.mode == 'apply' && steps.pending.outputs.count != '0'
@@ -361,9 +370,20 @@ jobs:
         if: inputs.mode == 'apply' && steps.pending.outputs.count != '0' && steps.apply.outcome == 'success'
         env:
           DB_NAME: ${{ steps.db.outputs.name }}
+          TARGET_MIGRATION: ${{ inputs.migration }}
         run: |
           node scripts/deploy/d1-pending-readonly.mjs "$DB_NAME" > "$RUNNER_TEMP/d1-after.json"
-          node -e 'const status = require(process.argv[1]); if (status.count !== 0) process.exit(1)' "$RUNNER_TEMP/d1-after.json"
+          node -e '
+            const before = require(process.argv[1]);
+            const after = require(process.argv[2]);
+            const target = process.argv[3];
+            if (before.pending[0] !== target ||
+                after.count !== before.count - 1 ||
+                JSON.stringify(after.pending) !== JSON.stringify(before.pending.slice(1))) {
+              console.error(`Expected only ${target} to be applied`);
+              process.exit(1);
+            }
+          ' "$RUNNER_TEMP/d1-status.json" "$RUNNER_TEMP/d1-after.json" "$TARGET_MIGRATION"
 
       - name: Say what happened
         if: always()
