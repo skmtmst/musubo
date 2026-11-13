@@ -20,7 +20,7 @@ import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
-import type { MediaUsageImpact } from '../contents/media-usage-references'
+import type { MediaUsageImpact } from '../contents'
 
 /*
  * 公開用の参照（layout.references）の編集とプレビュー。
