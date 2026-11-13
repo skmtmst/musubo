@@ -575,9 +575,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 16px;
+  gap: var(--space-16);
 }
-.scopeGrid > :first-child { flex: 999 1 480px; min-width: 0; }
+.scopeGrid > :first-child { flex: 999 1 var(--tpl-sa-scope-main-min); min-width: 0; }
 .scopeGrid > :last-child { flex: 1 1 var(--tpl-sa-scope-side-w); min-width: 0; }
 
 .notifyRow {

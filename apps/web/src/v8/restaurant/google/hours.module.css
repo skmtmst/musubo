@@ -46,7 +46,7 @@
 
 /* 2列はカレンダーに 420px が取れる時だけ（7日分の「通常営業」が重ならない幅）。画面全体の幅で決めると 1152px で約235pxになった（A14）。 */
 .calendarColumns{display:flex;flex-wrap:wrap;gap:var(--space-20);align-items:flex-start;font-size:var(--polish-text-body);}
-.calendarColumns > :first-child{flex:999 1 420px;min-width:0;}
+.calendarColumns > :first-child{flex:999 1 var(--hours-calendar-main-min);min-width:0;}
 .calendarColumns > :nth-child(2){flex:1 1 var(--hours-calendar-detail-width);min-width:0;}
 
 .rangeSummary{font-size:var(--polish-text-body);font-weight:600;}
