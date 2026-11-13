@@ -3,6 +3,7 @@ import {Hono,type Context} from 'hono';
 import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapKey,gapWrite,gapVersion} from '../services/gap-common.js';
 import {abSettings,abAudience,abStats,splitAb,startAbMock,finishMockRemainder} from '../features/broadcasts/broadcast-ab/index.js';
+import {startAbLive,createAbLiveTransmit} from '../features/broadcasts/broadcast-ab-live.js';
 import {assertChanged,clearAssertions} from '../features/booking/booking-series/index.js';
 import {requirePermission,requireIrreversibleConfirmation,hasStaffPermission} from '../middleware/role-guard.js';
 import {BROADCAST_DEFINITION_EDIT_KEY,BROADCAST_DEFINITION_PUBLISH_KEY} from '@line-crm/shared';
@@ -43,10 +44,32 @@ broadcastAb.post('/api/broadcasts/:id/ab-test/choose',requirePermission(BROADCAS
  return c.json({success:true,data:{variant:b.variant,scheduledAt:shift,testMode:true}});
 });
 /** 通常の承認と権限検査を通した後でだけ呼ぶ。 */
-export async function maybeStartAb(c:Context<Env>,id:string,b:{testMode?:unknown;expectedVersion?:unknown;confirmedRecipientCount?:unknown}|null){
+export async function maybeStartAb(c:Context<Env>,id:string,b:{testMode?:unknown;liveMode?:unknown;expectedVersion?:unknown;confirmedRecipientCount?:unknown}|null){
  if(!await c.env.DB.prepare('SELECT broadcast_id FROM broadcast_ab_tests WHERE broadcast_id=?').bind(id).first())return null;
- gapWrite(c);if(!hasStaffPermission(c,BROADCAST_DEFINITION_PUBLISH_KEY))throw new GapError('forbidden',403);if(b?.testMode!==true)throw new GapError('test_mode_required',409);
+ gapWrite(c);if(!hasStaffPermission(c,BROADCAST_DEFINITION_PUBLISH_KEY))throw new GapError('forbidden',403);
+ if(b?.liveMode===true)return c.json({success:true,data:await startAbLiveRequest(c,id,b)},202);
+ if(b?.testMode!==true)throw new GapError('test_mode_required',409);
  return c.json({success:true,data:await startAbMock(c.env.DB,id,gapVersion(b.expectedVersion),Number(b.confirmedRecipientCount),gapKey(c))},202);
+}
+/** 本送信の開始。通常の即時送信と同じ停止・課金・枠の判定を通し、実績は769の表だけに書く。旗がなければ始めない。 */
+async function startAbLiveRequest(c:Context<Env>,id:string,b:{expectedVersion?:unknown;confirmedRecipientCount?:unknown}){
+ if(c.env.AB_LIVE_DELIVERY_ENABLED!=='true')throw new GapError('live_delivery_disabled',409);
+ const broadcast=await c.env.DB.prepare('SELECT * FROM broadcasts WHERE id=?').bind(id).first<Record<string,unknown>&{line_account_id:string|null}>();
+ if(!broadcast)throw new GapError('not_found',404);
+ const accountId=broadcast.line_account_id;
+ const {getSendPermissionForAccount}=await import('../services/send-entitlements.js');
+ if(!(await getSendPermissionForAccount(c.env.DB,accountId)).allowed)throw new GapError('配信が止まっています',409);
+ const {isOperationCapabilityStopped}=await import('@line-crm/db');
+ if(await isOperationCapabilityStopped(c.env.DB,accountId,'broadcast_dispatch'))throw new GapError('緊急停止中のため送信できません',409);
+ const {guardScheduledBroadcastQuota}=await import('../features/broadcasts/broadcast/index.js');
+ const quota=await guardScheduledBroadcastQuota(c.env.DB,broadcast as never,accountId,{reserveBroadcastId:id});
+ if(quota.blocked)throw new GapError(quota.message??'送信枠が足りないため送れません',409);
+ const {getLineAccountById}=await import('@line-crm/db');
+ const account=accountId?await getLineAccountById(c.env.DB,accountId):null;
+ const {resolveLineToken}=await import('../services/line-token.js');
+ const {LineClient}=await import('@line-crm/line-sdk');
+ const lineClient=new LineClient(resolveLineToken({accountToken:account?.channel_access_token??null,defaultToken:c.env.LINE_CHANNEL_ACCESS_TOKEN,accountId,context:'broadcasts.ab-live-send'}));
+ return startAbLive(c.env.DB,id,gapVersion(b.expectedVersion),Number(b.confirmedRecipientCount),gapKey(c),{transmit:createAbLiveTransmit(lineClient),liveDeliveryEnabled:true});
 }
 /** 許可済みの開始操作の再送だけを扱い、新しい開始や送信は行わない。 */
 export async function maybeReplayAbStart(c:Context<Env>,id:string,b:{testMode?:unknown;expectedVersion?:unknown;confirmedRecipientCount?:unknown}|null){
