@@ -11,7 +11,8 @@ import {  } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { GitCompare, Link2, Upload } from 'lucide-react'
-import { validateFlexContent, type Folder } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
+import { countTemplateTextCharacters, TEMPLATE_TEXT_MAX_CHARACTERS, validateFlexContent, type Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
@@ -133,8 +134,11 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る。 */
   const fields = useFormErrors()
   fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'), { required: true })
+  /* 本文の文字数は Worker と同じ数え方（コードポイント。絵文字 🌿 は1文字）。v6-11 本文上限の契約。 */
+  const textCount = countTemplateTextCharacters(messageContent)
   fields.define('content', messageType === 'text' ? '本文' : 'メッセージ内容', () => {
     if (!messageContent.trim()) return '本文を入力してください。'
+    if (messageType === 'text' && textCount > TEMPLATE_TEXT_MAX_CHARACTERS) return `本文は${formatNumber(TEMPLATE_TEXT_MAX_CHARACTERS)}文字までです。いまは${formatNumber(textCount)}文字です。`
     if (messageType === 'flex' && validateFlexContent('flex', messageContent)) return 'カードの形を直してから保存してください。'
     return null
   }, { required: true })
@@ -648,7 +652,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   tokenNames={tokenNames}
                   placeholder={messageType === 'flex' ? '{"type":"bubble", …}' : '例：いつもご利用ありがとうございます。今月のおすすめをお知らせします。'}
                 /></SaveErrorField>
-                <InsertRow accountId={editorAccountId} state={referenceState} references={references} length={messageContent.length} onInsert={insert} />
+                <InsertRow accountId={editorAccountId} state={referenceState} references={references} length={textCount} onInsert={insert} />
               </MessageBody></div>
               <FieldError id="te-content-error">{fields.error('content')}</FieldError>
               {messageType === 'flex' && flexError && messageContent.trim() && !fields.invalid('content') ? (
@@ -658,7 +662,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                 {messageType === 'flex'
                   ? <>バブルかカルーセルの形のJSONで書きます。カルーセルは <Link href="/templates/carousel">カルーセルの編集</Link> で作れます。</>
                   : '名前と友だち情報は受け取る人ごと、共通情報と配信日は送る時点の値に置き換わります。回答フォームの答えは、答えを保存した友だち情報から差し込みます。'}
-                {messageContent.length > 4500 ? ' 約4,500文字を超えると複数のメッセージに分かれて届きます。' : ''}
+                {textCount > 4500 ? ' 約4,500文字を超えると複数のメッセージに分かれて届きます。' : ''}
               </p>
               {referenceState === 'failed' ? <Notice tone="danger" >差し込み項目を読み込めませんでした。画面を再読み込みしてください。</Notice> : null}
               {messageType === 'text' ? <p className={styles.hint}>文字数は差し込み記号を含みます。実際の文字数は受け取る人ごとに変わります。</p> : null}
