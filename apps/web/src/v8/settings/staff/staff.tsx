@@ -18,6 +18,7 @@ import Link from '@/components/shared/list-navigation'
 import { useMergedTab } from '@/components/layout/merged-tabs';
 import LoginAudit from '@/components/staff/login-audit'
 import Button from '@/components/shared/button'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table';
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
@@ -804,6 +805,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   // 閲覧専用（代理ログインの見るだけ等）のオーナー・管理者は、変える操作を出さず閲覧のみの形にする。
   const staffRole = useStaffRole()
   const administrator = canManageRole(staffRole)
+  const inviteLockReason = usePermissionLockReason(administrator, 'manager')
   usePageTitle(permissionTarget ? `${permissionTarget.name}さんに見せる範囲` : 'ユーザー管理')
   const load = useCallback(async () => {
     const version = ++membersLoadVersion.current
@@ -1146,8 +1148,8 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                 trailing={administrator ? (
                   <Button href="/staff/new" variant="primary"><UserPlus size={16} aria-hidden="true" />招待する</Button>
                 ) : (
-                  /* 閲覧のみには押せないボタンを置かない。場所だけ空ける（下の物を詰めない）。 */
-                  <span className={styles.inviteSpace} aria-hidden="true" />
+                  /* 閲覧のみでも隠さず、灰色＋理由の吹き出し（2026-10-26 オーナー・全画面）。 */
+                  <Button variant="primary" lockedReason={inviteLockReason} disabled={!inviteLockReason}><UserPlus size={16} aria-hidden="true" />招待する</Button>
                 )}
               />
               {resendError ? <Notice tone="danger" message={resendError} /> : null}

@@ -145,10 +145,6 @@
   flex: 1;
 }
 
-.inviteSpace {
-  flex: 0 0 var(--tpl-sa-staff-invite-w);
-  height: var(--tpl-sa-control-h);
-}
 
 /* 一覧の段：枠1本・角丸 12・余白 20・間 12。 */
 .card {
