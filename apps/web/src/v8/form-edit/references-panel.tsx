@@ -47,7 +47,7 @@ function referenceSummary(reference: FormReferenceDefinition): string {
   return names.length ? names.join('・') : '項目なし'
 }
 
-function referenceStateBadge(state: PublicFormReference['state'] | null): { label: string; tone: 'neutral' | 'info' | 'warning' | 'caution' | 'success' | 'danger' } {
+function referenceStatePresentation(state: PublicFormReference['state'] | null): { label: string; tone: 'neutral' | 'info' | 'warning' | 'caution' | 'success' | 'danger' } {
   if (state === null) return { label: '公開後に状態が出ます', tone: 'neutral' }
   switch (state) {
     case 'ready': return { label: '使える', tone: 'success' }
@@ -104,7 +104,7 @@ export default function ReferencesPanel({ readOnly, accountId, layout, reference
       {rows.length === 0 ? <p>対応付けられる表示ブロック（画像・見出し・本文・ボタン）がありません。</p> : null}
       <ul>
         {rows.map(({ block, label, reference, state }) => {
-          const badge = referenceStateBadge(state?.state ?? null)
+          const badge = referenceStatePresentation(state?.state ?? null)
           return (
             <li key={block.id}>
               <div>
