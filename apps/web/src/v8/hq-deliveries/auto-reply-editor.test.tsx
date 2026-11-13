@@ -55,7 +55,7 @@ it.each([true, false])('無言の後処理がある定義を「なし」とし�
   expect(summary('返すもの')).toBe('返信しない')
   expect(summary('後の処理')).toBe('2つ')
   expect(screen.queryByRole('textbox', { name: '返信内容' })).toBeNull()
-  if (!canEdit) expect(screen.queryByRole('button', { name: '下書きとして保存' })).toBeNull()
+  if (!canEdit) for (const el of screen.queryAllByRole('button', { name: '下書きとして保存' })) expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(el)).toBe(true)
 })
 
 it('通常テキストは既存の編集口を保ち、後処理未取得を0件へ置き換えない', () => {

@@ -284,14 +284,16 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
     expect(internal?.querySelector('[data-external-icon]')).toBeNull()
   })
 
-  it('鍵の無い運用担当（閲覧のみ）は帯が出て、変える操作を置かない', async () => {
+  it('鍵の無い運用担当（閲覧のみ）は帯が出て、変える操作は灰色＋理由で押せない', async () => {
     role.current = verifiedStaffRole('staff')
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
-    expect(links('編集する')).toHaveLength(0)
-    expect(links('＋ 追加')).toHaveLength(0)
-    expect(links('変更する')).toHaveLength(0)
-    expect(host.textContent).not.toContain('シナリオに登録する')
+    // 2026-10-26 オーナー：隠さず灰色＋理由の吹き出し（全画面）。出ているものは全部押せない。
+    for (const name of ['編集する', '＋ 追加', '変更する', 'シナリオに登録する']) {
+      for (const el of links(name)) expect(el.getAttribute('aria-disabled'), name).toBe('true')
+    }
+    expect(links('編集する').length).toBeGreaterThan(0)
+    expect(links('シナリオに登録する')).toHaveLength(1)
   })
 
   it("'/chats' の鍵を持つ運用担当は対応・タグ・メモを編集でき、帯は出ない", async () => {
@@ -300,9 +302,9 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
     rememberStaffIdentity({ role: 'staff', permissionKeys: ['/chats'] } as StaffMember)
     await render()
     expect(host.textContent).not.toContain('閲覧のみで見ています')
-    expect(links('編集する').length).toBeGreaterThanOrEqual(3)
-    // シナリオ登録はオーナー・管理者だけ。
-    expect(host.textContent).not.toContain('シナリオに登録する')
+    expect(links('編集する').filter((el) => el.getAttribute('aria-disabled') !== 'true').length).toBeGreaterThanOrEqual(3)
+    // シナリオ登録はオーナー・管理者だけ。運用担当には灰色＋理由で押せない。
+    expect(links('シナリオに登録する').every((el) => el.getAttribute('aria-disabled') === 'true')).toBe(true)
   })
 
   it('履歴タブ：受信だけに絞れて、さらに読み込むは続きの印を渡す', async () => {

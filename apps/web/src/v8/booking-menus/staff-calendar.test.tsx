@@ -43,7 +43,8 @@ it('閲覧のみは切り替え・つなぐ・URL の入力を置かず、文字
   render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit={false} onClose={() => undefined} />)
   expect(await screen.findByText('https://meet.google.com/abc')).toBeTruthy()
   expect(screen.queryByRole('switch')).toBeNull()
-  expect(screen.queryByRole('button', { name: 'つなぐ' })).toBeNull()
+  // 2026-10-26 オーナー：隠さず灰色＋理由。出ているなら押せない。
+  for (const el of screen.queryAllByRole('button', { name: 'つなぐ' })) expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(el)).toBe(true)
   expect(screen.queryByRole('textbox')).toBeNull()
 })
 

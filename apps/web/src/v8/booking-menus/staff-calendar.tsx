@@ -17,6 +17,7 @@ import Notice from '@/components/shared/notice'
 import { useCallback, useEffect, useState } from 'react'
 import { CalendarCheck, CalendarX2, Link2, Unplug, Wand2 } from 'lucide-react'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Drawer from '@/components/shared/drawer'
 import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
@@ -144,7 +145,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
               <Tr>
                 <Td><strong>Outlook</strong><span className={styles.minor}>まだつないでいません</span></Td>
                 <Td><StatusBadge tone="neutral" size="compact">つないでいない</StatusBadge></Td>
-                <Td>{canEdit ? <Button size="compact" onClick={() => preparing.open('Outlook をつなぐ')}>つなぐ</Button> : null}</Td>
+                <Td>{<PermissionGatedButton allowed={canEdit} size="compact" onClick={() => preparing.open('Outlook をつなぐ')}>つなぐ</PermissionGatedButton>}</Td>
               </Tr>
             </tbody></DataTable>
             <p className={styles.minor}>初めはどちらもオフです。オフにしても予約はそのまま残ります。</p>
@@ -180,7 +181,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
 
           {!connected ? (
               <Notice tone="danger" role="status" icon={<Unplug size={20} aria-hidden="true" />} action={<>
-                {canEdit ? <Button size="compact" onClick={() => preparing.open('カレンダーのつなぎ直し')}>つなぎ直す</Button> : null}
+                {<PermissionGatedButton allowed={canEdit} size="compact" onClick={() => preparing.open('カレンダーのつなぎ直し')}>つなぎ直す</PermissionGatedButton>}
               </>}>
                 <span><strong>この人の空きは閉じています</strong><span className={styles.minor}>Google の接続が切れました。つなぎ直すまで、この人の枠は予約できません。</span></span>
               </Notice>

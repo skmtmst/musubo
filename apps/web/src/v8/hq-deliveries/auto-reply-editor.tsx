@@ -17,6 +17,7 @@ import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Card, { CardHeader } from '@/components/shared/card'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
@@ -101,7 +102,7 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
     footerActions={<>
       {/* ページ内に戻るは置かない（決まり）。前の段へは上の手順の段から戻る。 */}
       <Button disabled={busy} onClick={onCancel}>キャンセル</Button>
-      {canEdit ? <Button disabled={busy || !name.trim()} title={!name.trim() ? '統括での名前を入力してください。' : undefined} onClick={onSave} busy={busy} busyLabel="保存中…">下書きとして保存</Button> : null}
+      {<PermissionGatedButton allowed={canEdit} disabled={busy || !name.trim()} title={!name.trim() ? '統括での名前を入力してください。' : undefined} onClick={onSave} busy={busy} busyLabel="保存中…">下書きとして保存</PermissionGatedButton>}
       {next ? <Button variant="primary" disabled={busy || !done(step)} onClick={() => setStep(next)}>{`次へ：${STEP_LABELS[next]}`}<ArrowRight size={16} aria-hidden="true" /></Button> : null}
     </>}>
     {step === 'basic' ? <Card variant="form" gap="normal">
