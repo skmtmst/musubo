@@ -348,6 +348,12 @@ jobs:
             echo "メッセージ・予約も一緒に消えます。"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Recheck latest source and published ancestry immediately before DB write
+        if: inputs.mode == 'apply' && steps.pending.outputs.count != '0'
+        env:
+          DELIVERY_TARGET: all
+        run: node scripts/deploy/verify-staging-forward.mjs
+
       - name: Apply the pending migrations
         id: apply
         if: inputs.mode == 'apply' && steps.pending.outputs.count != '0'
