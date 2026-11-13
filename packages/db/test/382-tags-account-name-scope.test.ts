@@ -16,7 +16,9 @@ const legacy = bootstrap.replace(/CREATE TABLE (?:"tags"|tags) \([\s\S]*?\);/, t
   // 617 の分類先の追加は 382 より後。382 の時点の表の形で番兵を試す。
   .replace(/CREATE TABLE affiliate_offers [\s\S]*?;/, table => table.replace(/, folder_id TEXT REFERENCES folders\(id\) ON DELETE SET NULL/, ''))
   .replace(/CREATE INDEX idx_affiliate_offers_folder[^;]+;/, '')
-  .replace(/CREATE TRIGGER affiliate_offers_folder_(?:insert|update)[\s\S]*?END;/g, '');
+  .replace(/CREATE TRIGGER affiliate_offers_folder_(?:insert|update)[\s\S]*?END;/g, '')
+  // 765 も分類先の列を参照するため、617 より前の姿には存在しない。
+  .replace(/CREATE TRIGGER folder_membership_affiliate_offers_(?:insert|update|delete)[\s\S]*?END;/g, '');
 const referenceColumns = [
   ['affiliate_offers', 'tag_id', 'NO ACTION'],
   ['broadcasts', 'target_tag_id', 'SET NULL'],
