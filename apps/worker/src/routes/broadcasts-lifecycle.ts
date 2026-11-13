@@ -81,7 +81,10 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
       && !BROADCAST_DRAFT_STEPS.has(body.draftStep)) {
     return inputError(c, { success: false, error: 'draftStep is invalid' }, 400, ["draftStep"]);
   }
-  if (body.scheduledAt != null && (!Number.isFinite(Date.parse(body.scheduledAt)) || Date.parse(body.scheduledAt) <= Date.now())) {
+  // 日時を省略しても予約状態が残る更新では、保存後の日時を検査する。
+  const scheduleToValidate = body.scheduledAt === undefined && !body.saveAsDraft && existing.status === 'scheduled'
+    ? existing.scheduled_at : body.scheduledAt;
+  if (scheduleToValidate != null && (!Number.isFinite(Date.parse(scheduleToValidate)) || Date.parse(scheduleToValidate) <= Date.now())) {
     return inputError(c, { success: false, error: '予約には未来の日時を指定してください', code: 'SCHEDULE_MUST_BE_FUTURE' }, 400, ['scheduledAt']);
   }
   const messageOptionsError = validateMessageOptions(body.messageOptions);
