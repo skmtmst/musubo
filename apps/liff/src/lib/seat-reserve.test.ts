@@ -82,8 +82,8 @@ describe('席の予約の計算 (E-11)', () => {
     expect(noteProblem('あ'.repeat(201))).toContain('200字');
     expect(phoneProblem('')).toBe('');
     expect(phoneProblem('090－1111－2222')).toBe('');
-    expect(normalizePhone(' ０９０ー１１１１ー２２２２ ')).toBe('09011112222');
-    expect(phoneProblem('03 1234 5678')).toBe('');
+    expect(normalizePhone(' ０９０ー００００ー２２２２ ')).toBe('09000002222');
+    expect(phoneProblem('03 0000 5678')).toBe('');
     for (const invalid of ['1234567890', '090123456', '090123456789', '+819012345678', '090abcd12345678']) {
       expect(phoneProblem(invalid)).not.toBe('');
     }

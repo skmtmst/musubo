@@ -10,7 +10,7 @@ vi.mock('@/lib/api', () => ({ api: { analytics: { v6Funnels: net } } }))
 vi.mock('./parts', () => ({ RANGES: [{days:30,label:'過去30日'}], downloadCsv: vi.fn(), formatAnalyticsDate: vi.fn(), formatAnalyticsDateTime: vi.fn(), rangeFor: vi.fn(), useRegisterExport: vi.fn() }))
 import FunnelV8 from './funnel'
 
-const funnel = { id: 'flow', name: '購入まで', status: 'active', windowDays: 30, migrationState: 'ready', currentVersion: { id: 'v1', versionNumber: 1 } }
+const funnel = { id: 'flow', name: '購入まで', status: 'active', confirmationRevision: 1, windowDays: 30, migrationState: 'ready', currentVersion: { id: 'v1', versionNumber: 1 } }
 beforeEach(() => {
   net.list.mockReset().mockResolvedValue({ success: true, data: [funnel] })
   net.latestRun.mockReset().mockResolvedValue({ success: false, error: 'Not found' })
@@ -29,7 +29,7 @@ it('削除は確認後に保管し、過去の結果を残して選ぶ一覧か�
   expect(dialog.textContent).toContain('過去の結果は残ります')
   net.list.mockResolvedValue({ success: true, data: [{ ...funnel, status: 'archived' }] })
   fireEvent.click(within(dialog).getByRole('button', { name: '削除する', exact: true }))
-  await waitFor(() => expect(net.setStatus).toHaveBeenCalledWith('a', 'flow', { status: 'archived', expectedStatus: 'active' }))
+  await waitFor(() => expect(net.setStatus).toHaveBeenCalledWith('a', 'flow', { status: 'archived', expectedStatus: 'active', expectedRevision: 1 }))
   await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   expect(screen.getByRole('button', { name: '結果を見る' })).toBeTruthy()
 })

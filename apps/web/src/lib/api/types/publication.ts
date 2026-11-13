@@ -39,6 +39,8 @@ export type RichMenuDeleteImpact = {
     accountId: string
     name: string
     status: 'draft' | 'published'
+    version?: number
+    publishingGeneration?: number
   }
   currentAudience: {
     value: number | null
@@ -76,6 +78,7 @@ export type RichMenuDeleteImpact = {
     pagesWithLineRichMenuId: number
     isDefaultForAll: boolean
     publishing: boolean
+    pages?: Array<{id:string;orderIndex:number;lineRichMenuId:string|null}>
   }
   blockers: Array<
     | 'published'

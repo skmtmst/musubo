@@ -6,6 +6,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { validateTapExtraReferences } from '../services/tap-extras.js';
 import { tapExtrasError } from '@line-crm/shared';
 import { Hono } from 'hono';
+import { bulkDeleteTemplates } from './templates-bulk-delete.js';
 import { prepareRichVideoTemplate } from '../services/rich-video-template.js';
 import { getTemplatesWithUsageCount, getTemplateSendCounts, getTemplateFolderCounts, getTemplateById, getTemplateUsage, createTemplate, updateTemplate, saveTemplateDraft, publishTemplate, hasTemplateDraft, deleteTemplate, deleteCreatedTemplateDraft, getCarouselTapTotals, getFolderById, listTemplateVersions, revertTemplateToVersion, listBroadcastReferences, listTemplateReferences, getBroadcastDeleteBlockers, getPinnedReminderDeleteBlockers, MediaReferenceAccountError } from '@line-crm/db';
 import type { TemplateRow } from '@line-crm/db';
@@ -275,6 +276,7 @@ templates.get('/api/templates', async (c) => {
      */
     const serialized = items.map((t) => ({
       id: t.id,
+      confirmationRevision: t.confirmation_revision,
       accountId: t.line_account_id,
       name: t.name,
       category: t.category,
@@ -930,6 +932,8 @@ templates.post('/api/templates/:id/revert', requireDeliveryAccess('templates'), 
     throw err;
   }
 });
+
+templates.post('/api/templates/bulk-delete', requireDeliveryAccess('templates'), inputJsonBoundary(), bulkDeleteTemplates);
 
 templates.delete('/api/templates/:id', requireDeliveryAccess('templates'), async (c) => {
   try {

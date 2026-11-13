@@ -305,10 +305,10 @@ describe('R262 確認段のテストは経路・日時・友だちを指定で�
     await act(async () => { fireEvent.click(route); fireEvent.click(within(route.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '選ぶ' })); fireEvent.change(getByRole(document.body, 'textbox', { name: '想定日時' }), { target: { value: '2026-09-28T10:00' } }) })
     api.friends.list.mockResolvedValue({
       success: true,
-      data: { items: [{ id: 'friend-1', displayName: '山田 太郎' }], total: 1 },
+      data: { items: [{ id: 'friend-1', displayName: '見本 141' }], total: 1 },
     })
     await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: '試す友だち：選ぶ' })) })
-    const result = await findByRole(document.body, 'radio', { name: '山田 太郎' })
+    const result = await findByRole(document.body, 'radio', { name: '見本 141' })
     await act(async () => { fireEvent.click(result); fireEvent.click(within(result.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '選ぶ' })) })
     await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: 'この条件でテストする' })); await Promise.resolve() })
     expect(api.test).toHaveBeenCalledWith('account-a', 'rule-1', {

@@ -15,6 +15,15 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const capturedTest = vi.hoisted(() => ({ send: undefined as undefined | (() => Promise<boolean | void>), close: undefined as undefined | ((value: boolean) => void) }))
+vi.mock('./broadcast-editor-dialogs', async original => {
+  const actual = await original<typeof import('./broadcast-editor-dialogs')>()
+  return { ...actual, renderBroadcastEditorDialogs: (props: Parameters<typeof actual.renderBroadcastEditorDialogs>[0]) => {
+    if (props.testDialogOpen) { capturedTest.send = props.handleTestSend; capturedTest.close = props.setTestDialogOpen }
+    return actual.renderBroadcastEditorDialogs(props)
+  } }
+})
+
 const sendApi = vi.hoisted(() => vi.fn())
 const createApi = vi.hoisted(() => vi.fn())
 const recipientsApi = vi.hoisted(() => vi.fn())
@@ -176,6 +185,25 @@ afterEach(() => {
 })
 
 describe('一斉配信のテスト送信（#986）', () => {
+  it('確認窓ごとにテスト送信の操作を限定する', async () => {
+    sendApi.mockResolvedValue({ success: true, sent: 2, failed: 0 })
+    await openTestDialog()
+    const oldSend = capturedTest.send!, oldClose = capturedTest.close!
+    expect(oldSend).toBeTypeOf('function')
+    const cancel = [...dialog().querySelectorAll('button')].find(b => b.textContent?.trim() === 'キャンセル')!
+    await act(async () => { cancel.click() }); await flush()
+    await act(async () => { await oldSend() }); await flush()
+    expect(sendApi).not.toHaveBeenCalled()
+    const reopen = [...container.querySelectorAll('button')].find(b => b.textContent?.trim() === 'テストを送る')!
+    await act(async () => { reopen.click() }); await flush()
+    act(() => oldClose(false))
+    expect(dialog()).toBeTruthy()
+    await act(async () => { await oldSend() }); await flush()
+    expect(sendApi).not.toHaveBeenCalled()
+    await confirmTestSend()
+    expect(sendApi).toHaveBeenCalledTimes(1)
+  })
+
   it('テスト送信の確認にLINEアカウントと環境を出す', async () => {
     await openTestDialog()
     expect(dialog().textContent).toContain('LINEアカウント')

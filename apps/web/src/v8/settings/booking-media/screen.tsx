@@ -8,7 +8,7 @@ import { FolderDotName } from '@/components/shared/folder-dot'
 import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Copy, MessageCircle, Plus } from 'lucide-react'
+import { Check, Copy, Link2, MessageCircle, Plus } from 'lucide-react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { PageFooter } from '@/components/templates/page-footer'
 import Card from '@/components/shared/card'
@@ -142,7 +142,7 @@ export function withSavedVersion(list: MediaRow[], code: string, version: number
 function UrlCell({ url }: { url: string | null }) {
   if (!url) return <EmptyCell />
   return (
-    <TextLink external className={styles.url} href={url}   title={url}>
+    <TextLink external truncate className={styles.url} href={url} title={url}>
       {`${shortUrl(url)}`}
     </TextLink>
   )
@@ -647,6 +647,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
       <Dialog
         open={!!editing}
         title={editing ? `${editing.name}の URL` : 'URL'}
+        headerIcon={<Link2 />}
         description="https:// で始まる URL を入れます。空にすると消えます。保存は画面の下の［保存する］で行います。"
         confirmLabel="変える"
         onConfirm={applyEdit}

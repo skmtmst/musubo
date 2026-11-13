@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, act } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Webinar, WebinarEditor } from '@/lib/api'
 
-const mocks = vi.hoisted(() => ({ folders: vi.fn(), update: vi.fn(), saveEditor: vi.fn(), testNotifications: vi.fn(), role: 'admin' }))
+const mocks = vi.hoisted(() => ({ folders: vi.fn(), update: vi.fn(), saveEditor: vi.fn(), testNotifications: vi.fn(), testNotificationRecipients: vi.fn(), role: 'admin' }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => mocks.role, canManageRole: (role: string) => role === 'admin' || role === 'owner' }))
 vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), webinarApi: mocks }))
 vi.mock('@/components/shared/select', () => ({ default: ({ value, onChange, options, ...props }: { value: string; onChange: (v: string) => void; options: Array<{ value: string; label: string }> } & React.ComponentProps<'select'>) => <select {...props} value={value} onChange={(event) => onChange(event.target.value)}>{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select> }))
@@ -40,6 +40,7 @@ beforeEach(() => {
   mocks.update.mockImplementation(async (_id, patch) => ({ data: { ...webinar, ...patch } }))
   mocks.saveEditor.mockImplementation(async (_id, patch) => ({ data: { ...editor, ...patch, version: 4 } }))
   mocks.testNotifications.mockResolvedValue({ data: { sent: 2, failed: 0 } })
+  mocks.testNotificationRecipients.mockResolvedValue({ data: { count: 1, recipients: [{ id: 'f1', displayName: '確認の人' }], token: 'token', confirmationId: 'confirmation' } })
 })
 afterEach(cleanup)
 
@@ -105,8 +106,9 @@ describe('V8 基本設定の編集と保存', () => {
     fireEvent.click(screen.getByRole('button', { name: 'テストを送る' }))
     expect(mocks.testNotifications).not.toHaveBeenCalled()
     const dialog = screen.getByRole('dialog')
+    await screen.findByText('テスト受信者 1 人：確認の人')
     fireEvent.click([...dialog.querySelectorAll('button')].find((button) => button.textContent === 'テストを送る')!)
-    await waitFor(() => expect(mocks.testNotifications).toHaveBeenCalledWith('w1'))
+    await waitFor(() => expect(mocks.testNotifications).toHaveBeenCalledWith('w1', 'token', 'confirmation'))
     expect(mocks.saveEditor.mock.invocationCallOrder[0]).toBeLessThan(mocks.testNotifications.mock.invocationCallOrder[0])
   })
 })

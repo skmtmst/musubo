@@ -54,10 +54,10 @@ test('late calendar data refreshes flex column widths and keeps every row aligne
       await page.setViewportSize({ width, height: 900 })
       await page.setContent(`<style>${read('../../src/app/globals.css')}${css('../../src/components/shared/data-table.module.css')}${css('../../src/components/shared/table.module.css')}
         *{box-sizing:border-box}.frame{width:calc(100vw - 280px)}.table tr{display:flex}.table tr>th,.table tr>td{flex:0 1 auto;white-space:nowrap}.calendar{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        </style><main><div class="frame" data-column-layout data-column-sizing="content" style="--table-column-gap:12px;--table-column-padding:0 24px;--table-head-padding:0 24px;--table-head-height:40px;--table-row-height:56px"><table class="table"><thead><tr data-table-layout="columns"><th data-cell-grow>スタッフ</th><th>カレンダー</th><th>状態</th></tr></thead><tbody>${['高田 誠', '中川 由美'].map(name => `<tr data-table-layout="columns"><td data-cell-grow>${name}</td><td><span class="calendar">—</span></td><td>つながっている</td></tr>`).join('')}</tbody></table></div></main>`)
+        </style><main><div class="frame" data-column-layout data-column-sizing="content" style="--table-column-gap:12px;--table-column-padding:0 24px;--table-head-padding:0 24px;--table-head-height:40px;--table-row-height:56px"><table class="table"><thead><tr data-table-layout="columns"><th data-cell-grow>スタッフ</th><th>カレンダー</th><th>状態</th></tr></thead><tbody>${['見本 18', '見本 30'].map(name => `<tr data-table-layout="columns"><td data-cell-grow>${name}</td><td><span class="calendar">—</span></td><td>つながっている</td></tr>`).join('')}</tbody></table></div></main>`)
       await page.locator('.frame').evaluate(fitListColumns)
       const before = await page.locator('tbody tr').first().locator('td').nth(1).evaluate(cell => cell.getBoundingClientRect().width)
-      await page.locator('tbody .calendar').evaluateAll(nodes => nodes.forEach(node => { node.textContent = 'takada@nen-salon.jp' }))
+      await page.locator('tbody .calendar').evaluateAll(nodes => nodes.forEach(node => { node.textContent = 'staff@example.com' }))
       await page.locator('.frame').evaluate(fitListColumns)
       const after = await page.locator('tbody tr').first().locator('td').nth(1).evaluate(cell => cell.getBoundingClientRect().width)
       assert.ok(after > before, `late value must grow its column: ${before} -> ${after}`)

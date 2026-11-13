@@ -27,24 +27,24 @@ const lastMonth = '2026-08-28T12:00:00+09:00'
 
 const ITEMS = [
   {
-    eventId: 'e1', createdAt: thisMonth, friendId: 'f1', friendName: '佐藤 美咲',
-    affiliateId: 'a1', affiliateName: '田中 明', offerId: 'o1', offerName: '定期便の初回',
+    eventId: 'e1', createdAt: thisMonth, friendId: 'f1', friendName: '見本 121',
+    affiliateId: 'a1', affiliateName: '見本 168', offerId: 'o1', offerName: '定期便の初回',
     value: 412000, approvalStatus: 'approved', rewardAmount: 28000,
   },
   {
-    eventId: 'e2', createdAt: thisMonth, friendId: 'f2', friendName: '鈴木 健',
+    eventId: 'e2', createdAt: thisMonth, friendId: 'f2', friendName: '見本 178',
     affiliateId: 'a2', affiliateName: '合同会社ノース', offerId: 'o2', offerName: '夏の紹介キャンペーン',
     value: 314000, approvalStatus: 'approved', rewardAmount: 31400,
   },
   {
-    eventId: 'e3', createdAt: lastMonth, friendId: 'f3', friendName: '高橋 まい',
-    affiliateId: 'a1', affiliateName: '田中 明', offerId: 'o1', offerName: '定期便の初回',
+    eventId: 'e3', createdAt: lastMonth, friendId: 'f3', friendName: '見本 13',
+    affiliateId: 'a1', affiliateName: '見本 168', offerId: 'o1', offerName: '定期便の初回',
     value: 200000, approvalStatus: 'approved', rewardAmount: 24000,
   },
 ]
 
 const AFFILIATES = [
-  { id: 'a1', name: '田中 明', code: 'tanaka-a', commissionRate: 10, isActive: true, createdAt: thisMonth, friendId: null },
+  { id: 'a1', name: '見本 168', code: 'tanaka-a', commissionRate: 10, isActive: true, createdAt: thisMonth, friendId: null },
   { id: 'a2', name: '合同会社ノース', code: 'north', commissionRate: 10, isActive: true, createdAt: thisMonth, friendId: null },
   { id: 'a3', name: '旧パートナーA', code: 'old-a', commissionRate: 0, isActive: false, createdAt: thisMonth, friendId: null },
 ]
@@ -91,23 +91,23 @@ describe.each(['2026-10-11T15:09:00Z', '2026-10-11T23:59:00Z'])('Eo56k レポー
     fixture.failed = true
     renderTab()
     await waitFor(() => expect(screen.getAllByText('紹介者を読み込めませんでした。集計は出していません。').length).toBeGreaterThan(0))
-    expect(screen.queryByText('田中 明')).toBeNull()
+    expect(screen.queryByText('見本 168')).toBeNull()
     fixture.failed = false
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
-    await waitFor(() => expect(screen.getByText('田中 明')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('見本 168')).toBeTruthy())
   })
 
   test('全件を取れないときに部分合計を確定値として表示しない', async () => {
     fixture.truncated = true
     renderTab()
     await waitFor(() => expect(screen.getAllByText(/成果が取得の上限を超えています/).length).toBeGreaterThan(0))
-    expect(screen.queryByText('田中 明')).toBeNull()
+    expect(screen.queryByText('見本 168')).toBeNull()
   })
 
   test('報酬が未確定なら売上を報酬として代用しない', async () => {
     fixture.missingReward = true
     renderTab()
-    await waitFor(() => expect(screen.getByText('田中 明')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('見本 168')).toBeTruthy())
     expect(screen.getAllByText('未確定の報酬があります')).toHaveLength(2)
     expect(screen.queryByText('売上の 100.0%')).toBeNull()
     // 画面の説明は題の横の「？」1つの中（洗い出し 74）。
@@ -144,7 +144,7 @@ describe.each(['2026-10-11T15:09:00Z', '2026-10-11T23:59:00Z'])('Eo56k レポー
   test('行に差分と操作の見出しなしが出る', async () => {
     renderTab()
     await waitFor(() => {
-      expect(screen.getByText('田中 明')).toBeTruthy()
+      expect(screen.getByText('見本 168')).toBeTruthy()
     })
     // a1：今月 28,000 − 先月 24,000
     expect(screen.getByText('¥28,000（+¥4,000）')).toBeTruthy()

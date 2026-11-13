@@ -39,7 +39,7 @@ export async function setRestaurantAttendance(db:D1Database,id:string,storeId:st
   sql.push(db.prepare(`UPDATE rt_reservation_departures SET undone_at=?,undone_by=?,undone_request_id=?,result_version=? WHERE reservation_id=? AND undone_at IS NULL
   AND EXISTS(SELECT 1 FROM rt_reservations WHERE id=? AND customer_version=?)`).bind(at,actorId,input.requestId,input.expectedVersion+1,id,id,input.expectedVersion));
  } else throw new StampError('操作を確認してください',400,['action']);
- sql.push(db.prepare(`UPDATE rt_reservations SET status=?,departed_at=?,customer_version=customer_version+1,updated_at=?
+ sql.push(db.prepare(`UPDATE rt_reservations SET confirmation_revision = confirmation_revision + 1, status=?,departed_at=?,customer_version=customer_version+1,updated_at=?
  WHERE id=? AND customer_version=? AND changes()=1`).bind(next,input.action==='depart'?at:input.action==='undo_departure'?null:current.departed_at,at,id,input.expectedVersion));
  const results=await db.batch(sql);
  if(!results[1].meta.changes)throw new StampError('version_conflict',409);

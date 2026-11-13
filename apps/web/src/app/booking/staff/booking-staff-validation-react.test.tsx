@@ -103,7 +103,7 @@ async function openCreateModal() {
 }
 
 function fillRequired() {
-  fireEvent.change(screen.getByLabelText(/内部名/), { target: { value: '  田中 美咲  ' } })
+  fireEvent.change(screen.getByLabelText(/内部名/), { target: { value: '  見本 170  ' } })
   fireEvent.change(screen.getByLabelText(/表示名/), { target: { value: '  みさき  ' } })
 }
 
@@ -169,7 +169,7 @@ describe('予約スタッフ保存前検証（実React）', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
 
     await waitFor(() => expect(fixture.createStaff).toHaveBeenCalledWith('account-a', expect.objectContaining({
-      name: '田中 美咲', display_name: 'みさき', role: '店長',
+      name: '見本 170', display_name: 'みさき', role: '店長',
       bio: '小型犬が得意です。', profile_image_url: 'https://example.test/staff.png',
     })))
     await waitFor(() => expect(fixture.listStaff).toHaveBeenCalledTimes(2))

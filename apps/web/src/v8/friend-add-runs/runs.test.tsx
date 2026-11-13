@@ -46,7 +46,7 @@ type RunItem = FriendAddRunList['items'][number]
 function run(overrides: Partial<RunItem> = {}): RunItem {
   return {
     id: 'run-ok', receivedAt: '2026-09-07T01:32:00.000Z', processedAt: '2026-09-07T01:32:00.800Z',
-    friend: { id: 'friend-1', displayName: '山田 太郎', redacted: false }, friendKind: 'first_time',
+    friend: { id: 'friend-1', displayName: '見本 141', redacted: false }, friendKind: 'first_time',
     attribution: { status: 'captured', routeId: 'route-shop', routeName: '店頭QR', reason: null },
     rule: { id: 'rule-shop', name: '店頭QRの初回案内', versionId: 'v1', versionNumber: 1 },
     scenario: { id: 'scenario-1', name: '7日間フォロー', enrollmentId: 'en-1', started: true },
@@ -76,8 +76,8 @@ beforeEach(() => {
   nav.replace.mockClear()
   items = [
     run(),
-    failedRun('run-f1', '佐藤 花子'),
-    failedRun('run-f2', '鈴木 一郎'),
+    failedRun('run-f1', '見本 122'),
+    failedRun('run-f2', '見本 176'),
     run({ id: 'run-hidden', friend: { id: '', displayName: '顧客名は非表示', redacted: true } as RunItem['friend'] }),
   ]
   document.documentElement.dataset.theme = 'v8'
@@ -149,7 +149,7 @@ describe('実行結果の画面（REIxB）', () => {
     await render()
     expect(host.querySelector('[data-design-node="REIxB"]')).toBeTruthy()
     expect(host.textContent).toContain('失敗した処理が 2 件あります')
-    expect(host.textContent).toContain('山田 太郎')
+    expect(host.textContent).toContain('見本 141')
     expect(host.textContent).toContain('経路ごとの内訳')
     expect(host.textContent).toContain('二重送信を防ぐ・知らせ')
     const timestamp = host.querySelector('time[datetime="2026-09-07T01:32:00.000Z"] [data-list-date-time]')
@@ -212,7 +212,7 @@ describe('実行結果の画面（REIxB）', () => {
     expect(document.body.textContent).toContain('実行の詳細を開く')
     expect(document.body.textContent).not.toContain('トークを開く')
     await act(async () => { menuOf('顧客名は非表示')?.click() })
-    await act(async () => { menuOf('山田 太郎')?.click() })
+    await act(async () => { menuOf('見本 141')?.click() })
     expect(document.body.textContent).toContain('トークを開く')
   })
 })

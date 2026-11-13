@@ -28,7 +28,7 @@ const orphanedOnlineBookingSql = `price_at_booking > 0
 /** 申込時の支払い期限が残っている孤児だけを解放する。判断できない予約は保つ。 */
 export async function recoverOrphanedOnlineBookings(db: D1Database, now: Date): Promise<void> {
   await db.batch([
-    db.prepare(`UPDATE bookings SET status = 'expired', decided_at = ?, updated_at = ?
+    db.prepare(`UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = 'expired', decided_at = ?, updated_at = ?
       WHERE status = 'requested' AND ${orphanedOnlineBookingSql}`)
       .bind(now.toISOString(), now.toISOString(), now.toISOString()),
     db.prepare(`INSERT INTO booking_audit_logs
@@ -82,12 +82,12 @@ export function paidBookingPaymentStatements(
   const statements: D1PreparedStatement[] = [];
   if (applyPaid) {
     statements.push(db.prepare(`UPDATE booking_payments
-      SET status = 'paid', paid_at = COALESCE(paid_at, ?), updated_at = ?
+      SET confirmation_revision=confirmation_revision+1, status = 'paid', paid_at = COALESCE(paid_at, ?), updated_at = ?
       WHERE id = ? AND status IN ('unpaid', 'pending', 'expired') AND (${gate.sql})`).bind(nowIso, nowIso, row.id, ...gate.args));
   }
   if (row.booking_id !== null) {
     statements.push(db.prepare(`UPDATE bookings
-      SET status = 'confirmed', decided_at = ?, updated_at = ?
+      SET confirmation_revision = confirmation_revision + 1, status = 'confirmed', decided_at = ?, updated_at = ?
       WHERE id = ? AND line_account_id = ? AND status = 'requested' AND (${gate.sql})
         AND EXISTS (SELECT 1 FROM booking_payments p WHERE p.id = ? AND p.status = 'paid'
           AND p.booking_id = bookings.id AND p.line_account_id = bookings.line_account_id)
@@ -134,10 +134,10 @@ export async function reconcileExpiredBookingPayment(
 ): Promise<void> {
   const nowIso = now.toISOString();
   await db.batch([
-    db.prepare(`UPDATE booking_payments SET status = 'expired', updated_at = ?
+    db.prepare(`UPDATE booking_payments SET confirmation_revision=confirmation_revision+1, status = 'expired', updated_at = ?
       WHERE id = ? AND status IN ('unpaid', 'pending') AND hold_until <= ?`)
       .bind(nowIso, paymentId, nowIso),
-    db.prepare(`UPDATE bookings SET status = 'expired', decided_at = ?, updated_at = ?
+    db.prepare(`UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = 'expired', decided_at = ?, updated_at = ?
       WHERE status = 'requested' AND EXISTS (
         SELECT 1 FROM booking_payments p WHERE p.id = ? AND p.status = 'expired'
           AND p.booking_id = bookings.id AND p.line_account_id = bookings.line_account_id)`)

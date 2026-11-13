@@ -94,14 +94,14 @@ describe('対象の友だちの複数選択（R22）', () => {
   it('選んだ人は札と人数の見出しに出し、×で外せる', async () => {
     const onChange = vi.fn()
     const el = await mount(
-      <FriendMultiSelect accountId="account-1" selectedIds={['a', 'b']} names={{ a: '山田 花子', b: '佐藤 美咲' }} onChange={onChange} />,
+      <FriendMultiSelect accountId="account-1" selectedIds={['a', 'b']} names={{ a: '見本 143', b: '見本 121' }} onChange={onChange} />,
     )
     expect(el.textContent).toContain('対象の友だち（2 人）')
-    expect(el.textContent).toContain('山田 花子')
-    const remove = el.querySelector('button[aria-label="山田 花子を外す"]')
+    expect(el.textContent).toContain('見本 143')
+    const remove = el.querySelector('button[aria-label="見本 143を外す"]')
     if (!remove) throw new Error('外すボタンが見つかりません')
     await click(remove)
-    expect(onChange).toHaveBeenCalledWith(['b'], { a: '山田 花子', b: '佐藤 美咲' })
+    expect(onChange).toHaveBeenCalledWith(['b'], { a: '見本 143', b: '見本 121' })
   })
 
   it('名前で探して候補から足せる（読み込み中・正常）', async () => {
@@ -126,15 +126,15 @@ describe('対象の友だちの複数選択（R22）', () => {
     // まだ返事が無いので読み込み中のまま。
     expect(document.body.textContent).toContain('友だちを探しています…')
     await act(async () => {
-      resolveList({ success: true, data: { items: [{ id: 'friend-1', displayName: '山田 花子' }], total: 1 } })
+      resolveList({ success: true, data: { items: [{ id: 'friend-1', displayName: '見本 143' }], total: 1 } })
     })
-    expect(document.body.textContent).toContain('山田 花子')
-    await click(document.querySelector('input[type="checkbox"][aria-label="山田 花子"]')!)
+    expect(document.body.textContent).toContain('見本 143')
+    await click(document.querySelector('input[type="checkbox"][aria-label="見本 143"]')!)
     expect(onChange).not.toHaveBeenCalled()
     const add = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === '選ぶ（1件）')
     if (!add) throw new Error('追加ボタンが見つかりません')
     await click(add)
-    expect(onChange).toHaveBeenCalledWith(['friend-1'], { 'friend-1': '山田 花子' })
+    expect(onChange).toHaveBeenCalledWith(['friend-1'], { 'friend-1': '見本 143' })
     expect(mockList).toHaveBeenCalledWith({ accountId: 'account-1', search: 'やま', limit: 20, offset: '0', includeTags: false })
   })
 
@@ -153,7 +153,7 @@ describe('対象の友だちの複数選択（R22）', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(300) })
     vi.useRealTimers()
     expect(document.body.textContent).toContain('友だちを読み込めませんでした。')
-    expect(document.querySelector('input[type="checkbox"][aria-label="山田 花子"]')).toBeNull()
+    expect(document.querySelector('input[type="checkbox"][aria-label="見本 143"]')).toBeNull()
     expect(onChange).not.toHaveBeenCalled()
   })
 

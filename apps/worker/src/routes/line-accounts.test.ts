@@ -1375,6 +1375,8 @@ describe('GET /api/line-accounts', () => {
         staffCount: 2,
         connection: { status: 'ok', checkedAt: '2026-09-15T10:00:00.000Z' },
       },
+      'acc-2': {friendCount:0,activeScenarios:0,messagesThisMonth:0,staffCount:0,connection:{status:'unknown',checkedAt:null}},
+      'acc-4': {friendCount:12,activeScenarios:0,messagesThisMonth:undefined,staffCount:0,connection:{status:'unknown',checkedAt:null}},
     });
 
     const res = await setupApp('owner').request('/api/line-accounts');
@@ -1383,13 +1385,12 @@ describe('GET /api/line-accounts', () => {
     expect(dbMocks.getLineAccountListStats).toHaveBeenCalledTimes(1);
     expect(dbMocks.getLineAccountListStats).toHaveBeenCalledWith(expect.anything(), accounts.map((item) => item.id));
     expect(fetch).not.toHaveBeenCalled();
-    const body = (await res.json()) as { data: Array<{ stats: { friendCount: number; staffCount: number }; connection: { status: string } }> };
+    const body = (await res.json()) as { data: Array<{ stats?: { friendCount: number; staffCount: number }; connection: { status: string } }> };
     expect(body.data).toHaveLength(40);
-    expect(body.data[0].stats.friendCount).toBe(12);
-    expect(body.data[0].stats.staffCount).toBe(2);
+    expect(body.data[0].stats).toMatchObject({friendCount:12,staffCount:2});
     expect(body.data[0].connection.status).toBe('ok');
-    expect(body.data[1].stats.friendCount).toBe(0);
-    expect(body.data[1].connection.status).toBe('unknown');
+    expect(body.data[1]).toMatchObject({stats:{friendCount:0},connection:{status:'unknown'}});
+    expect(body.data.slice(2,4).map(account=>account.stats)).toEqual([undefined,undefined]);
   });
 
   test('通常一覧はDBのLINE公式プロフィールと接続状態3分岐を返す', async () => {

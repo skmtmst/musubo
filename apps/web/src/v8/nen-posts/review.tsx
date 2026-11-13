@@ -47,6 +47,20 @@ import { DetailColumns } from '@/components/templates/detail-columns';
 import { safePhotoSrc } from './src';
 import { formatPhotoReceivedAt } from './time';
 
+/** 確認を閉じた後やアカウント・権限が変わった後の確定を無効にする。 */
+function usePhotoConfirmWindow(accountId: string | null, canEdit: boolean) {
+  const scope = useRef({ accountId, canEdit })
+  if (scope.current.accountId !== accountId || scope.current.canEdit !== canEdit) scope.current = { accountId, canEdit }
+  const ticket = useRef<{ scope: typeof scope.current } | null>(null)
+  const rendered = ticket.current
+  useEffect(() => () => { ticket.current = null }, [])
+  return {
+    open: () => { ticket.current = { scope: scope.current } },
+    close: () => { ticket.current = null },
+    valid: () => Boolean(rendered && ticket.current === rendered && rendered.scope === scope.current && scope.current.canEdit),
+  }
+}
+
 function isThisMonth(value: string): boolean {
   const time = Date.parse(value)
   if (!Number.isFinite(time)) return false
@@ -245,6 +259,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
     ? REVIEW_REASONS.find((reason) => reason.value === reasonCounts[0][0])?.label ?? '理由未記録'
     : emptyValue('unknown')
 
+  const publicationWindow = usePhotoConfirmWindow(accountId, canEdit)
   const [publicationCandidate, setPublicationCandidate] = useState<{id: string; version: number; key: string} | null>(null)
   const preparePublication = async (id: string) => {
     if (!accountId || !canEdit || reviewing) return
@@ -255,6 +270,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       const detail = await api.nenMembers.photo(id, accountId)
       if (generation !== accountGeneration.current) return
       if (!detail.success) throw new Error(detail.error)
+      publicationWindow.open()
       setPublicationCandidate({ id, version: Number(detail.data.publication?.version ?? 0), key: crypto.randomUUID() })
     } catch (error) {
       const fieldFailure = saveErrors.capture(error);
@@ -270,7 +286,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       const response = await api.nenMembers.publishPhoto(publicationCandidate.id, { accountId, expectedVersion: publicationCandidate.version }, publicationCandidate.key)
       if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
-      setPublicationCandidate(null)
+      publicationWindow.close(); setPublicationCandidate(null)
       notifySaved('公式サイトへの掲載を保存しました。追加報酬の手続き状況は掲載一覧で確認できます。')
       await load()
     } catch (error) {
@@ -328,7 +344,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       notifySaved(nextStatus === 'adopted'
         ? `写真を採用しました。${adoptedNote}公開は本人の同意がある場合だけ行います。${notification}`
         : `見送り理由を保存しました。${notification}`)
-      setRejectingPhotoId(null)
+      rejectWindow.close(); setRejectingPhotoId(null)
       await load()
     } catch (error) {
       const fieldFailure = saveErrors.capture(error);
@@ -347,6 +363,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
     } finally { setReviewing(null) }
   }
 
+  const rejectWindow = usePhotoConfirmWindow(accountId, canEdit)
   const [rejectingPhotoId, setRejectingPhotoId] = useState<string | null>(null)
   const [rejectingPhoto, setRejectingPhoto] = useState<Record<string, unknown> | null>(null)
   const [bulkApproveOpen, setBulkApproveOpen] = useState(false)
@@ -360,6 +377,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   const [watchSubmitter, setWatchSubmitter] = useState(false)
 
   const openRejectDialog = (id: string) => {
+    rejectWindow.open()
     setRejectingPhotoId(id)
     setRejectingPhoto(photos.find((photo) => text(photo.id) === id) ?? null)
     if (accountId && !photos.some((photo) => text(photo.id) === id)) {
@@ -409,6 +427,16 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
   const pendingPhotos = photos.filter((photo) => text(photo.status) === 'pending')
   const selectedPendingPhotos = pendingPhotos.filter((photo) => selectedPhotoIds.includes(text(photo.id)))
+  const bulkScope = useRef({ accountId, canEdit })
+  if (bulkScope.current.accountId !== accountId || bulkScope.current.canEdit !== canEdit) bulkScope.current = { accountId, canEdit }
+  const bulkTicket = useRef<{ kind: 'approve' | 'return'; scope: typeof bulkScope.current; signature: string } | null>(null)
+  const bulkBusy = useRef(false)
+  const bulkSignature = JSON.stringify(selectedPendingPhotos.map(photo => [text(photo.id), reviewVersionOf(photo)]))
+  const bulkLive = useRef({ accountId, signature: bulkSignature, canEdit })
+  bulkLive.current = { accountId, signature: bulkSignature, canEdit }
+  const renderedBulkTicket = bulkTicket.current
+  const validBulkTicket = (kind: 'approve' | 'return') => Boolean(renderedBulkTicket && bulkTicket.current === renderedBulkTicket && renderedBulkTicket.kind === kind && renderedBulkTicket.scope === bulkScope.current && renderedBulkTicket.signature === bulkLive.current.signature && bulkLive.current.canEdit && !bulkBusy.current)
+  useEffect(() => () => { bulkTicket.current = null }, [])
   const selectedPhotosAreLowRisk = selectedPendingPhotos.length > 0
     && selectedPendingPhotos.every((photo) => ['safe', 'none', 'low'].includes(text(photo.latest_risk_flag)))
 
@@ -422,7 +450,8 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
     decision: 'approve' | 'return',
     rejection?: { reasonCode: ReviewReasonCode; reasonNote: string },
   ) => {
-    if (!accountId || selectedPendingPhotos.length === 0) return
+    if (!accountId || selectedPendingPhotos.length === 0 || bulkBusy.current) return
+    bulkBusy.current = true
     const generation = accountGeneration.current
     setBulkReviewing(true)
     try {
@@ -454,6 +483,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         setNotice(`${formatNumber(count)} 枚の審査結果は保存済みです。${formatNumber(failedPhotos.length)} 枚のLINE通知は送れませんでした（通知だけ再送できます）。`)
       }
       setSelectedPhotoIds([])
+      bulkTicket.current = null
       setBulkApproveOpen(false)
       setBulkReturnOpen(false)
       setReasonCode('quality')
@@ -471,6 +501,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         if (decision === 'return') { if (!fieldFailure) setReasonError(message) }
       }
     } finally {
+      bulkBusy.current = false
       setBulkReviewing(false)
     }
   }
@@ -578,15 +609,16 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
               onReasonNote={(next) => { setReasonNote(next); setReasonFieldError('') }}
               onResubmitInvite={setResubmitInvite}
               onWatchSubmitter={setWatchSubmitter}
-              onClose={() => { setRejectingPhotoId(null); setReasonError(''); setReasonFieldError('') }}
+              onClose={() => { rejectWindow.close(); setRejectingPhotoId(null); setReasonError(''); setReasonFieldError('') }}
               onConfirm={() => {
+                if (!rejectWindow.valid()) return
                 if (reasonCode === 'other' && !reasonNote.trim()) { setReasonFieldError('そのほかの理由を入力してください'); focusFormField('photo-reject-note'); return }
                 return review(rejectingPhotoId, 'rejected', { reasonCode, reasonNote: reasonNote.trim(), resubmitInvite, watchSubmitter })
               }}
             />
           ) : null}
 
-          <Dialog open={bulkApproveOpen} title={`${formatNumber(selectedPendingPhotos.length)}枚をまとめて採用`} description="選択した写真の件数、マイル、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて採用" cancelLabel="審査へ戻る" onCancel={() => setBulkApproveOpen(false)} onConfirm={() => bulkReview('approve')}>
+          <Dialog open={bulkApproveOpen} title={`${formatNumber(selectedPendingPhotos.length)}枚をまとめて採用`} description="選択した写真の件数、マイル、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて採用" cancelLabel="審査へ戻る" onCancel={() => { bulkTicket.current = null; setBulkApproveOpen(false) }} onConfirm={() => validBulkTicket('approve') ? bulkReview('approve') : undefined}>
             <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
             <dl className={styles.bulkSummary}>
               <div><dt>写真</dt><dd>{formatNumber(selectedPendingPhotos.length)}枚</dd></div>
@@ -595,7 +627,8 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
             </dl>
             <p className={styles.railNote}>写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載画面で公開先を選びます。</p>
           </Dialog>
-          <Dialog open={bulkReturnOpen} title={`${formatNumber(selectedPendingPhotos.length)} 枚をまとめて見送り`} description="選んだ理由と補足は、選択した写真すべてに記録され、投稿者へLINEで届きます。" tone="destructive" busy={bulkReviewing} error={reasonError} confirmLabel="この理由でまとめて見送り" cancelLabel="審査へ戻る" onCancel={() => { setBulkReturnOpen(false); setReasonError(''); setReasonFieldError('') }} onConfirm={() => {
+          <Dialog open={bulkReturnOpen} title={`${formatNumber(selectedPendingPhotos.length)} 枚をまとめて見送り`} description="選んだ理由と補足は、選択した写真すべてに記録され、投稿者へLINEで届きます。" tone="destructive" busy={bulkReviewing} error={reasonError} confirmLabel="この理由でまとめて見送り" cancelLabel="審査へ戻る" onCancel={() => { bulkTicket.current = null; setBulkReturnOpen(false); setReasonError(''); setReasonFieldError('') }} onConfirm={() => {
+            if (!validBulkTicket('return')) return
             if (reasonCode === 'other' && !reasonNote.trim()) { setReasonFieldError('そのほかの理由を入力してください'); focusFormField('photo-reject-note'); return }
             return bulkReview('return', { reasonCode, reasonNote: reasonNote.trim() })
           }}>
@@ -611,8 +644,8 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
           <Dialog open={Boolean(publicationCandidate)} title="公式サイトに掲載しますか？"
             description="公開の同意と採用状態を確認して、公開用画像を掲載します。追加報酬は初回掲載の版で写真ごとに一度だけ手続きします。"
-            confirmLabel="公式サイトに掲載する" error={notice} busy={Boolean(reviewing)} onConfirm={() => confirmPublication()}
-            onCancel={() => { if (!reviewing) setPublicationCandidate(null) }}>
+            confirmLabel="公式サイトに掲載する" error={notice} busy={Boolean(reviewing)} onConfirm={() => publicationWindow.valid() ? confirmPublication() : undefined}
+            onCancel={() => { if (!reviewing) { publicationWindow.close(); setPublicationCandidate(null) } }}>
             <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
           </Dialog>
           <PhotoPolicyHistoryV8 canEdit={canEdit}
@@ -694,8 +727,8 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           onPublish={(id) => void preparePublication(id)}
           onLoadMore={() => void loadMore()}
           onRetryLoad={() => void load()}
-          onBulkApprove={() => setBulkApproveOpen(true)}
-          onBulkReturn={() => setBulkReturnOpen(true)}
+          onBulkApprove={() => { bulkTicket.current = { kind: 'approve', scope: bulkScope.current, signature: bulkSignature }; setBulkApproveOpen(true) }}
+          onBulkReturn={() => { bulkTicket.current = { kind: 'return', scope: bulkScope.current, signature: bulkSignature }; setBulkReturnOpen(true) }}
         />
       )}
     </ListPage></SaveErrorScope>
@@ -735,6 +768,8 @@ function PublicationsV8({
   const saveErrors = useSaveFormErrors()
 
   const [rulesOpen, setRulesOpen] = useState(false)
+  const withdrawWindow = usePhotoConfirmWindow(accountId, canEdit)
+  const placementWindow = usePhotoConfirmWindow(accountId, canEdit)
   const [withdrawTarget, setWithdrawTarget] = useState<PublicationItem | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
   const [items, setItems] = useState<PublicationItem[]>([])
@@ -750,7 +785,7 @@ function PublicationsV8({
   const loadSequence = useRef(0)
   const placementChoices = [{ type: 'site', label: 'サイト' }, { type: 'column', label: 'NENコラム' }, { type: 'rich_menu', label: 'リッチメニュー' }, { type: 'form', label: '回答フォーム' }] as const
   const openPlacements = (item: PublicationItem) => {
-    setEditing(item); setNotice('')
+    placementWindow.open(); setEditing(item); setNotice('')
     setSelectedPlacements((item.placements ?? []).filter((placement) => Number(placement.active ?? 1) === 1).map((placement) => text(placement.placement_type)))
   }
   const savePlacements = async () => {
@@ -763,7 +798,7 @@ function PublicationsV8({
       }, crypto.randomUUID())
       if (accountGeneration !== generation.current) return
       if (!response.success) throw new Error(response.error)
-      setEditing(null); await load(); onChanged()
+      placementWindow.close(); setEditing(null); await load(); onChanged()
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure);
  if (accountGeneration === generation.current) { if (!fieldFailure) setNotice('使う場所を保存できませんでした。最新の状態を読み直してください。') } }
@@ -811,7 +846,7 @@ function PublicationsV8({
       }, crypto.randomUUID())
       if (accountGeneration !== generation.current) return
       if (!response.success) throw new Error(response.error)
-      setWithdrawTarget(null)
+      withdrawWindow.close(); setWithdrawTarget(null)
       notifyToast('写真をすべての掲載先から外しました。審査と同意の履歴、付与済みのマイルは残ります。')
       await load()
       onChanged()
@@ -874,8 +909,8 @@ function PublicationsV8({
       <ConfirmDialog open={withdrawTarget !== null} title="この写真を掲載先から外しますか？"
         description="すべての掲載先から外します。審査と公開同意の履歴、付与済みのマイルは残ります。"
         confirmLabel="掲載先から外す" busy={Boolean(busyId)} error={notice || undefined}
-        onCancel={() => { if (!busyId) { setWithdrawTarget(null); setNotice('') } }}
-        onConfirm={() => { if (withdrawTarget) void withdraw(withdrawTarget) }}>
+        onCancel={() => { if (!busyId) { withdrawWindow.close(); setWithdrawTarget(null); setNotice('') } }}
+        onConfirm={() => { if (withdrawTarget && withdrawWindow.valid()) void withdraw(withdrawTarget) }}>
         <OperationTargetSummary accounts={[{ id: accountId }]} />
       </ConfirmDialog>
       <Dialog open={orderItems !== null} title="掲載順を変える" description="上から順に公式サイトへ表示します。全件と確認した版をまとめて保存します。"
@@ -939,7 +974,7 @@ function PublicationsV8({
                         <Td><StatusBadge tone={consented ? 'success' : 'neutral'} size="compact">{consented ? '同意あり' : '未取得'}</StatusBadge></Td>
                         <ActionCell>
                           {canEdit ? <RowActions subjectName={name}
-                            detail={{ label: busyId === text(item.id) ? '外しています…' : '掲載先から外す', disabled: busyId === text(item.id), onClick: () => { setNotice(''); setWithdrawTarget(item) } }}
+                            detail={{ label: busyId === text(item.id) ? '外しています…' : '掲載先から外す', disabled: busyId === text(item.id), onClick: () => { setNotice(''); withdrawWindow.open(); setWithdrawTarget(item) } }}
                             menuItems={[{ id: 'placements', label: '使う場所', onSelect: () => openPlacements(item) }]} /> : null}
                         </ActionCell>
                       </Tr>
@@ -950,13 +985,13 @@ function PublicationsV8({
             </div>
             <p className={styles.listHint}>{`公式サイト掲載中 ${publishedCount ?? emptyValue('unknown')}枚のうち ${formatNumber(items.length)}枚を表示（使っている場所で絞る：サイト・NENコラム・リッチメニュー・回答フォーム・登録メディア）`}</p>
             <Disclosure className={styles.publicationHistory} appearance="inset" size="compact" title={`掲載の整理と外した履歴（${pendingWithdrawals.length + withdrawnItems.length}件）`}>
-              {pendingWithdrawals.map((item) => <div className={styles.publicationHistoryItem} key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>{text(item.publication_withdrawn_at) ? 'ご本人が公開の同意を撤回しました' : '公開の同意と採用状態を確認してください'}</p><p>まだ残っている掲載先：{placementLabels(item)}</p>{canEdit ? <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => { setNotice(''); setWithdrawTarget(item) }} busy={Boolean(busyId)} busyLabel="処理中…">掲載先から外す</Button> : null}</div>)}
+              {pendingWithdrawals.map((item) => <div className={styles.publicationHistoryItem} key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>{text(item.publication_withdrawn_at) ? 'ご本人が公開の同意を撤回しました' : '公開の同意と採用状態を確認してください'}</p><p>まだ残っている掲載先：{placementLabels(item)}</p>{canEdit ? <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => { setNotice(''); withdrawWindow.open(); setWithdrawTarget(item) }} busy={Boolean(busyId)} busyLabel="処理中…">掲載先から外す</Button> : null}</div>)}
               {withdrawnItems.map((item) => <div className={styles.publicationHistoryItem} key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>外した日時：{formatPhotoReceivedAt(item.withdrawn_at)}・{text(item.withdrawn_by_name) || '—'}</p>{(item.placements ?? []).map((placement) => <p key={text(placement.id)}>{text(placement.placement_label)}・{text(placement.removed_at) ? `${formatPhotoReceivedAt(placement.removed_at)}に外しました` : '記録あり'}</p>)}</div>)}
             </Disclosure>
           </section>
         </DetailColumns>
       )}
-      <Dialog open={Boolean(editing)} title="使う場所" description="同意のある写真の掲載先を選びます。原本は公開しません。" busy={Boolean(busyId)} error={notice} confirmLabel="保存する" onCancel={() => { if (!busyId) setEditing(null) }} onConfirm={() => savePlacements()}>
+      <Dialog open={Boolean(editing)} title="使う場所" description="同意のある写真の掲載先を選びます。原本は公開しません。" busy={Boolean(busyId)} error={notice} confirmLabel="保存する" onCancel={() => { if (!busyId) { placementWindow.close(); setEditing(null) } }} onConfirm={() => placementWindow.valid() ? savePlacements() : undefined}>
         <OperationTargetSummary accounts={[{ id: accountId }]} />
         {placementChoices.map((choice, saveFieldIndex) => <SaveErrorField names={[`placementChoices.${saveFieldIndex}.type`,"type","choice.type","selectedPlacements","selected_placements"]} key={choice.type}><Checkbox key={choice.type} checked={selectedPlacements.includes(choice.type)} onCheckedChange={(checked) => setSelectedPlacements((current) => checked ? [...current, choice.type] : current.filter((type) => type !== choice.type))}>{choice.label}</Checkbox></SaveErrorField>)}
       </Dialog>

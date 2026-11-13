@@ -881,7 +881,7 @@ export default function RewardsTab() {
 
   return (
     <SaveErrorScope errors={saveErrors}><MileageFrame
-      help="行の「…」から 編集・自分で交換をテスト・出すのを止める・フォルダへ移す・複製。"
+      help={readonly ? '使い道と交換に必要なマイルを確認できます。' : '行の「…」から 編集・自分で交換をテスト・出すのを止める・フォルダへ移す・複製。'}
       /* 案内は「この画面の説明」の帯（題の右の口で開け閉めする。・）。 */
       explanation="交換は、お客さまの LINE（マイルの画面）から。渡せなかったときは、決めておいた方法（マイルを戻す など）で処理します"
       actions={

@@ -12,6 +12,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { useCustomerDeletion } from '@/lib/use-customer-deletion'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
@@ -108,14 +109,13 @@ function FriendDetailV8Inner() {
 
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
-  const [supportNotice, setSupportNotice] = useState('')
   const [supportAlert, setSupportAlert] = useState('')
   const [scenarioNotice, setScenarioNotice] = useState('')
 
   const support = useSupportEditor(
     friendId,
-    (notice) => { setSupportAlert(''); setSupportNotice(notice); void data.loadFriend() },
-    (message) => { setSupportNotice(''); setSupportAlert(message); void data.loadFriend() },
+    (notice) => { setSupportAlert(''); notifyToast(notice, { tone: 'success' }); void data.loadFriend() },
+    (message) => { setSupportAlert(message); void data.loadFriend() },
     selectedAccountId,
   )
   const scenario = useScenarioPicker(friendId, friend?.displayName ?? '', selectedAccountId, (notice) => {
@@ -222,9 +222,9 @@ function FriendDetailV8Inner() {
       {data.error && friend ? (
         <div className={styles.notice}><Notice tone="danger" message={data.error} onClose={() => data.setError('')} /></div>
       ) : null}
-      {supportNotice || supportAlert ? (
+      {supportAlert ? (
         <div className={styles.notice}>
-          <Notice tone={supportAlert ? 'warn' : 'success'} message={supportAlert || supportNotice} onClose={() => { setSupportNotice(''); setSupportAlert('') }} />
+          <Notice tone="warn" message={supportAlert} onClose={() => setSupportAlert('')} />
         </div>
       ) : null}
 

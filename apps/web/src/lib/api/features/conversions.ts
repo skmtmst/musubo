@@ -160,7 +160,7 @@ export const conversionsMethods = {
         `/api/conversions/events/${encodeURIComponent(eventId)}/reversals`,
       ),
     /** #819: 取消・取消の取消を理由付きで追記。元の成果行は消えない。 */
-    appendReversal: (eventId: string, data: { kind: 'reverse' | 'restore'; reason: string }) =>
+    appendReversal: (eventId: string, data: { kind: 'reverse' | 'restore'; reason: string; expectedReversalId?: string | null; expectedApprovalStatus?: 'pending' | 'approved' | 'rejected' | null; expectedCancelled?: boolean; expectedApprovalRevision?: number }) =>
       fetchApi<ApiResponse<{ id: string; kind: 'reverse' | 'restore'; createdAt: string }>>(
         `/api/conversions/events/${encodeURIComponent(eventId)}/reversals`,
         { method: 'POST', body: JSON.stringify(data) },

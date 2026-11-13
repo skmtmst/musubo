@@ -125,7 +125,7 @@ function seed(sqlite: Database.Database) {
     INSERT INTO booking_customers (
       id, line_account_id, display_name, phone_normalized_hash,
       phone_encrypted, phone_last4, pet_name
-    ) VALUES ('customer-1','acc1','山田 花子','hash','cipher','5678','ポチ');
+    ) VALUES ('customer-1','acc1','見本 143','hash','cipher','5678','ポチ');
   `);
 }
 

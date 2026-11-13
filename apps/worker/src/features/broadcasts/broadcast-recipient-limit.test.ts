@@ -8,7 +8,7 @@ vi.mock('@line-crm/line-sdk', () => ({ LineClient: class {
 } }));
 vi.mock('../../services/stealth.js', async original => ({ ...await original<Record<string,unknown>>(), sleep: async () => {}, calculateStaggerDelay: () => 0 }));
 const { processBroadcastSend, processQueuedBroadcasts, processScheduledBroadcasts, guardScheduledBroadcastQuota } = await import('./broadcast.js');
-const { renewLimitedReservation, freezeLimitedAudience } = await import('./broadcast-delivery-limit.js');
+const { renewLimitedReservation, freezeLimitedAudience, holdLimitedBroadcast } = await import('./broadcast-delivery-limit.js');
 const { getBroadcastById, requestBroadcastStop, resumeBroadcastSending, beginBroadcastRetryAttempt, reopenFailedClaims, recoverStalledBroadcasts } = await import('@line-crm/db');
 const { tryReserveQuotaSlot } = await import('./broadcast-quota-guard.js');
 const { LineClient } = await import('@line-crm/line-sdk');
@@ -20,6 +20,46 @@ function seed(store: SqliteD1, deliveryLimit: unknown) {
 beforeEach(() => { line.batches=[];line.broadcastCalls=0;vi.stubGlobal('fetch',vi.fn(async input => new Response(JSON.stringify(String(input).endsWith('/consumption')?{totalUsage:8}:{type:'limited',value:10}),{status:200}))); });
 afterEach(() => { vi.unstubAllGlobals();vi.restoreAllMocks(); });
 describe('配信先の上限と残り通数', () => {
+  it('送信済みを含む場合も古い処理は新世代を停止しない', async () => {
+    const store=createTestD1();try {
+      seed(store,{upToRemainingQuota:true});
+      store.raw.exec("UPDATE broadcasts SET status='sending',batch_offset=-1 WHERE id='limited'");
+      store.raw.exec("INSERT INTO broadcast_send_claims (broadcast_id,friend_id,line_account_id,attempt_no,state,dispatched_at) VALUES ('limited','a','own',1,'claimed','2026-01-01')");
+      const old=(await getBroadcastById(store.db,'limited'))!;
+      store.raw.exec("UPDATE broadcasts SET lock_version=lock_version+1 WHERE id='limited'");
+      await holdLimitedBroadcast(store.db,old,'古い処理');
+      expect((await getBroadcastById(store.db,'limited'))!.stopped_at).toBeNull();
+    }finally{store.raw.close();}
+  });
+  it('復旧前の処理は新しい世代の送信枠を更新しない', async () => {
+    const store=createTestD1();try {
+      seed(store,{upToRemainingQuota:true});
+      store.raw.exec("UPDATE broadcasts SET status='sending',batch_offset=-1 WHERE id='limited'");
+      const old=(await getBroadcastById(store.db,'limited'))!;
+      expect(await tryReserveQuotaSlot(store.db,'own','limited',2,0,10)).toBe(true);
+      store.raw.exec("UPDATE broadcasts SET lock_version=lock_version+1 WHERE id='limited'");
+      await expect(renewLimitedReservation(store.db,old,1)).rejects.toThrow();
+      const row=store.raw.prepare("SELECT value FROM account_settings WHERE line_account_id='own' AND key='broadcast_quota_reservations'").get() as {value:string};
+      expect(JSON.parse(row.value)).toEqual(expect.arrayContaining([expect.objectContaining({broadcastId:'limited',planned:2})]));
+    }finally{store.raw.close();}
+  });
+  it('停止を記録した直後に新しい世代が確保した送信枠は解除しない', async () => {
+    const store=createTestD1();try {
+      seed(store,{upToRemainingQuota:true});
+      store.raw.exec("UPDATE broadcasts SET status='sending',batch_offset=-1 WHERE id='limited'");
+      const old=(await getBroadcastById(store.db,'limited'))!;
+      expect(await tryReserveQuotaSlot(store.db,'own','limited',2,0,10)).toBe(true);
+      const original=store.db.prepare.bind(store.db);let advanced=false;
+      const spy=vi.spyOn(store.db,'prepare').mockImplementation(sql=>{
+        if(!advanced && sql.includes('SELECT value FROM account_settings')){advanced=true;store.raw.exec("UPDATE broadcasts SET status='sending',lock_version=lock_version+1 WHERE id='limited'");}
+        return original(sql);
+      });
+      try{await holdLimitedBroadcast(store.db,old,'古い処理');}finally{spy.mockRestore();}
+      expect(advanced).toBe(true);
+      const row=store.raw.prepare("SELECT value FROM account_settings WHERE line_account_id='own' AND key='broadcast_quota_reservations'").get() as {value:string};
+      expect(JSON.parse(row.value)).toEqual(expect.arrayContaining([expect.objectContaining({broadcastId:'limited'})]));
+    }finally{store.raw.close();}
+  });
   it.each([false,true])('上限を確認した配信が自動復旧しても確認印を保ち送り切る（差し込み=%s）',async personalized=>{
     const store=createTestD1();try {
       seed(store,{upToRemainingQuota:true});
@@ -33,6 +73,19 @@ describe('配信先の上限と残り通数', () => {
       await processQueuedBroadcasts(store.db,client);
       expect(line.batches.flat()).toHaveLength(2);
       expect((await getBroadcastById(store.db,'limited'))!.status).toBe('sent');
+    }finally{store.raw.close();}
+  });
+  it('復旧前の処理は新しい世代の送信枠を解除しない', async () => {
+    const store=createTestD1();try {
+      seed(store,{upToRemainingQuota:true});
+      store.raw.exec("UPDATE broadcasts SET status='sending',batch_offset=-1 WHERE id='limited'");
+      const old=(await getBroadcastById(store.db,'limited'))!;
+      expect(await tryReserveQuotaSlot(store.db,'own','limited',2,0,10)).toBe(true);
+      store.raw.exec("UPDATE broadcasts SET lock_version=lock_version+1 WHERE id='limited'");
+      await holdLimitedBroadcast(store.db,old,'古い処理');
+      expect((await getBroadcastById(store.db,'limited'))!.status).toBe('sending');
+      const reservation=store.raw.prepare("SELECT value FROM account_settings WHERE line_account_id='own' AND key='broadcast_quota_reservations'").get() as {value:string};
+      expect(JSON.parse(reservation.value)).toEqual(expect.arrayContaining([expect.objectContaining({broadcastId:'limited'})]));
     }finally{store.raw.close();}
   });
   it('サーバーの確認の印が無ければ、直接呼ばれても送らない', async () => {

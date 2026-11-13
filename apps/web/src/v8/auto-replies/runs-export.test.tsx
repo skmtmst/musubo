@@ -4,14 +4,14 @@
  * 上限 5,000 件で止めて分ける案内を出す・読み込み中の件数を出す・途中で止められる・書き出した件数を出す。
  */
 import React, { act } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ runs: vi.fn(), get: vi.fn() }))
+const mocks = vi.hoisted(() => ({ runs: vi.fn(), get: vi.fn(), stop: vi.fn() }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
-  return { ...actual, api: { ...actual.api, autoReplies: { ...actual.api.autoReplies, runs: mocks.runs, get: mocks.get } } }
+  return { ...actual, api: { ...actual.api, autoReplies: { ...actual.api.autoReplies, runs: mocks.runs, get: mocks.get, stop: mocks.stop } } }
 })
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => ({
   ...(await importOriginal()),
@@ -75,6 +75,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
   mocks.runs.mockReset()
   mocks.get.mockReset()
+  mocks.stop.mockReset()
 })
 
 /** 画面の最初の読み込み（offset 0・件数少なめ）と、書き出しの読み込み（limit 100）を分けて返す。 */
@@ -99,11 +100,30 @@ const exportCalls = () => mocks.runs.mock.calls.filter(([query]) => query.limit 
 
 it('一時停止の確認にはルールの実際のLINEアカウントを示す', async () => {
   serve(1)
-  mocks.get.mockResolvedValue({ success: true, data: { id: 'rule-1', lineAccountId: null } })
+  mocks.get.mockResolvedValue({ success: true, data: { id: 'rule-1', lineAccountId: null, confirmationRevision: 1 } })
   render(<AutoReplyRunsPage />)
   fireEvent.click(await screen.findByRole('button', { name: '一時停止する' }))
   expect(await screen.findByText('すべてのLINEアカウント')).toBeTruthy()
   expect(mocks.get).toHaveBeenCalledWith('rule-1')
+})
+
+it('確認した版を送り、競合後は最新の版を読み直して再確認する', async () => {
+  serve(1)
+  const { ApiError } = await import('@/lib/api')
+  mocks.get.mockResolvedValueOnce({ success: true, data: {id:'rule-1',lineAccountId:'acc-1',confirmationRevision:2} })
+    .mockResolvedValue({ success: true, data: {id:'rule-1',lineAccountId:'acc-1',confirmationRevision:3} })
+  mocks.stop.mockRejectedValueOnce(new ApiError(409, '変更されました', 'auto_reply_confirmation_conflict')).mockResolvedValue({success:true})
+  render(<AutoReplyRunsPage />)
+  fireEvent.click(await screen.findByRole('button', {name:'一時停止する'}))
+  await screen.findByText('この自動応答を止めますか？')
+  let dialog = screen.getByRole('alertdialog', {name:'この自動応答を止めますか？'})
+  await waitFor(() => expect((within(dialog).getByRole('button', {name:'一時停止する'}) as HTMLButtonElement).disabled).toBe(false))
+  fireEvent.click(within(dialog).getByRole('button', {name:'一時停止する'}))
+  await screen.findAllByText('内容が変わりました。読み直した内容を確認してください。')
+  expect(mocks.stop.mock.calls[0][1]).toEqual({reason:null,expectedVersion:2})
+  dialog = screen.getByRole('alertdialog', {name:'この自動応答を止めますか？'})
+  fireEvent.click(within(dialog).getByRole('button', {name:'もう一度'}))
+  await waitFor(() => expect(mocks.stop.mock.calls[1][1]).toEqual({reason:null,expectedVersion:3}))
 })
 
 it('対象ルールを取得できなければアカウントを不明として示す', async () => {
@@ -117,7 +137,7 @@ it('対象ルールを取得できなければアカウントを不明として�
 
 it('特定アカウントのルールはその名前を示す', async () => {
   serve(1)
-  mocks.get.mockResolvedValue({ success: true, data: { id: 'rule-1', lineAccountId: 'acc-1' } })
+  mocks.get.mockResolvedValue({ success: true, data: { id: 'rule-1', lineAccountId: 'acc-1', confirmationRevision: 1 } })
   render(<AutoReplyRunsPage />)
   fireEvent.click(await screen.findByRole('button', { name: '一時停止する' }))
   expect(await screen.findByText('本店', { selector: 'dd span' })).toBeTruthy()

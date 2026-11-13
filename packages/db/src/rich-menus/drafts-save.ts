@@ -60,14 +60,14 @@ export async function saveRichMenuGroupDraft(
     stmts.push(
       db
         .prepare(
-          `UPDATE rich_menu_groups SET ${metaBuilt.sets.join(', ')}, version = version + 1, updated_at = ? WHERE id = ?`,
+          `UPDATE rich_menu_groups SET ${metaBuilt.sets.join(', ')}, version = version + 1, confirmation_revision = confirmation_revision + 1, updated_at = ? WHERE id = ?`,
         )
         .bind(...metaBuilt.vals, now, groupId),
     );
   } else {
     stmts.push(
       db
-        .prepare(`UPDATE rich_menu_groups SET version = version + 1, updated_at = ? WHERE id = ?`)
+        .prepare(`UPDATE rich_menu_groups SET version = version + 1, confirmation_revision = confirmation_revision + 1, updated_at = ? WHERE id = ?`)
         .bind(now, groupId),
     );
   }
@@ -108,13 +108,16 @@ export async function setRichMenuPageImage(
   pageId: string,
   imageR2Key: string,
   imageContentType: string,
+  expectedGeneration?:number,
 ): Promise<void> {
-  await db
-    .prepare(
-      `UPDATE rich_menu_pages SET image_r2_key = ?, image_content_type = ?, updated_at = ? WHERE id = ?`,
-    )
-    .bind(imageR2Key, imageContentType, jstNow(), pageId)
-    .run();
+  const now=jstNow();
+  try{
+    await db.batch([
+      db.prepare(`SELECT json('__RICH_MENU_IMAGE_CONFLICT__') WHERE NOT EXISTS(SELECT 1 FROM rich_menu_pages p JOIN rich_menu_groups g ON g.id=p.group_id WHERE p.id=? AND g.status='draft' AND (g.publishing_owner IS NULL OR g.publishing_expires_at IS NULL OR g.publishing_expires_at<=?) AND (? IS NULL OR g.publishing_generation=?))`).bind(pageId,new Date().toISOString(),expectedGeneration??null,expectedGeneration??null),
+      db.prepare(`UPDATE rich_menu_groups SET publishing_generation=publishing_generation+1, confirmation_revision=confirmation_revision+1 WHERE id=(SELECT group_id FROM rich_menu_pages WHERE id=?)`).bind(pageId),
+      db.prepare(`UPDATE rich_menu_pages SET image_r2_key=?,image_content_type=?,updated_at=? WHERE id=?`).bind(imageR2Key,imageContentType,now,pageId),
+    ]);
+  }catch(error){if(isVersionGuardTrip(error))throw new Error('rich_menu_image_conflict');throw error;}
 }
 
 export async function pageBelongsToGroup(

@@ -12,7 +12,7 @@ const ROW = {
   line_account_id: 'account-a',
   request_body_json: JSON.stringify({
     name: '田中明',
-    phone: '090-1234-5678',
+    phone: '090-0000-5678',
     email: 'tanaka@example.com',
     event: 'order_created',
   }),

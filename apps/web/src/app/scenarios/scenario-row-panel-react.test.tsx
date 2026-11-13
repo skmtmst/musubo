@@ -41,6 +41,7 @@ const row = (id: string, name: string) => ({
 const puts: Array<{ url: string; body: unknown }> = []
 const deletes: string[] = []
 function handler(url: URL, init?: RequestInit) {
+  if (url.pathname === '/api/scenarios/s1/confirmation') return response({ success: true, data: { contentRevision: 1, activeCount: 1, rowIdSum: 1, rowIdSquareSum: 1, totalCount: 1, totalRowIdSum: 1, totalRowIdSquareSum: 1, referrers: [] } })
   if (init?.method === 'DELETE' && url.pathname.startsWith('/api/scenarios/')) {
     deletes.push(url.pathname)
     return response({ success: false, error: 'Internal Server Error' }, 500)
@@ -169,6 +170,7 @@ test('削除に失敗したら確認窓を閉じず、窓の中に失敗を出�
   await eventually(() => { if (!dialog()) throw new Error('confirm not open') })
   const confirm = [...dialog()!.querySelectorAll('button')].find((b) => b.textContent === '削除する')
   if (!confirm) throw new Error('no confirm button')
+  await eventually(() => { if (confirm.disabled) throw new Error('confirmation loading') })
   await act(async () => { confirm.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
   await eventually(() => {
     if (!dialog()?.textContent?.includes('このシナリオを削除できませんでした。')) throw new Error('error not shown')

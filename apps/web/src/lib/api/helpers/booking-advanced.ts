@@ -57,10 +57,10 @@ export const bookingAdvancedApi = {
     } | null>>(account(`/api/booking/admin/bookings/${e(id)}/payment-method`, a)),
     group: (a: string, id: string) => fetchApi<Result<BookingGroupView | null>>(account(`/api/booking/admin/bookings/${e(id)}/group`, a)),
     series: (a: string, id: string) => fetchApi<Result<unknown>>(account(`/api/booking/admin/bookings/${e(id)}/series`, a)),
-    cancelGroup: (a: string, id: string, reason: string, expectedVersion: number) => fetchApi<Result<{
+    cancelGroup: (a: string, id: string, reason: string, expectedVersion: number, expectedMembers?: Array<{ bookingId: string; version: number; status: string }>) => fetchApi<Result<{
         cancelled: number;
         version: number;
-    }>>(account(`/api/booking/admin/groups/${e(id)}/cancel`, a), json('POST', { reason, expectedVersion })),
+    }>>(account(`/api/booking/admin/groups/${e(id)}/cancel`, a), json('POST', { reason, expectedVersion, expectedMembers })),
     impact: (a: string, id: string, b: {
         scope: 'this' | 'following';
         fromBookingId: string;

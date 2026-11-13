@@ -86,7 +86,7 @@ const baseProps: NenOverviewProps = {
     deliveries: [
       {
         id: 'd1', campaignKey: 'review_request', label: '口コミのお願い',
-        friendId: 'f1', friendName: '田中 明子', lineAccountName: 'ACC',
+        friendId: 'f1', friendName: '見本 169', lineAccountName: 'ACC',
         scheduledAt: '2026-09-30T10:00:00+09:00', sentAt: null, status: 'failed',
         attempts: 5, unmetReason: '通信の混雑', unmetReasonCode: null,
         reaction: { value: null, state: 'unavailable', reason: '取得不可' },
@@ -166,7 +166,7 @@ describe('NEN配信 V8', () => {
     for (const head of ['いつ・だれに', '配信', '状態', 'きっかけ', '開封']) {
       expect(heads).toContain(head)
     }
-    expect(screen.getByText('田中 明子', { exact: false })).toBeTruthy()
+    expect(screen.getByText('見本 169', { exact: false })).toBeTruthy()
   })
 })
 

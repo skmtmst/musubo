@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
-import Button from '@/components/shared/button'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatDateTime } from '@/lib/format'
@@ -47,6 +47,8 @@ async function fetchHistory(adminKey: string): Promise<Row[]> {
 export default function UpdatesPage() {
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
   const [fromHq, setFromHq] = useState(false)
+  usePageTitle('更新履歴')
+  usePageCrumbs(fromHq ? [{ label: '統括', href: '/hq' }] : null)
 
   useEffect(() => {
     setFromHq(new URLSearchParams(window.location.search).get('from') === 'hq')
@@ -71,7 +73,6 @@ export default function UpdatesPage() {
     <div className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <PageTitle as="h1" className="text-ink text-xl font-semibold">アップデート履歴</PageTitle>
-      {fromHq ? <div><Button href="/hq">統括へ戻る</Button></div> : null}
       {state.kind === 'unconfigured' && (
         <>
           <div><NoteBar>この環境では自動アップデートが構成されていないため、履歴はありません。</NoteBar></div>

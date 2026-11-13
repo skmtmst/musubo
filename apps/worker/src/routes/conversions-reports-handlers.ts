@@ -461,7 +461,17 @@ export const post__api_conversions_events_id_reversals_10 = async (c: Context<En
         return fail(c, 404, 'EVENT_NOT_FOUND');
       }
 
-      const body = await c.req.json<{ kind?: unknown; reason?: unknown }>();
+      const body = await c.req.json<{ kind?: unknown; reason?: unknown; expectedReversalId?: unknown; expectedApprovalStatus?: unknown; expectedCancelled?: unknown; expectedApprovalRevision?: unknown }>();
+      if (body.expectedApprovalRevision !== undefined && (!Number.isSafeInteger(body.expectedApprovalRevision) || (body.expectedApprovalRevision as number) < 1 || body.expectedReversalId === undefined)) {
+        return inputError(c, { success: false, error: '確認情報が正しくありません' }, 400, ['expectedApprovalRevision']);
+      }
+      if (body.expectedReversalId !== undefined && body.expectedReversalId !== null && (typeof body.expectedReversalId !== 'string' || !body.expectedReversalId)) {
+        return inputError(c, { success: false, error: '確認情報が正しくありません' }, 400, ['expectedReversalId']);
+      }
+      if (body.expectedReversalId !== undefined &&
+        (!(body.expectedApprovalStatus === null || body.expectedApprovalStatus === 'pending' || body.expectedApprovalStatus === 'approved' || body.expectedApprovalStatus === 'rejected') || typeof body.expectedCancelled !== 'boolean')) {
+        return inputError(c, { success: false, error: '確認情報が正しくありません' }, 400, ['expectedApprovalStatus', 'expectedCancelled']);
+      }
       const kind = body.kind === 'restore' ? 'restore' : body.kind === 'reverse' ? 'reverse' : null;
       if (!kind) {
         return inputError(c, { success: false, error: 'kind は reverse か restore で指定してください' }, 400, ["kind"]);
@@ -478,6 +488,10 @@ export const post__api_conversions_events_id_reversals_10 = async (c: Context<En
           reason,
           actorId: staff?.id ?? null,
           actorName: staff?.name ?? null,
+          expectedReversalId: body.expectedReversalId as string | null | undefined,
+          expectedApprovalStatus: body.expectedApprovalStatus as 'pending' | 'approved' | 'rejected' | null | undefined,
+          expectedApprovalRevision: body.expectedApprovalRevision as number | undefined,
+          expectedCancelled: body.expectedCancelled as boolean | undefined,
         });
         auditLog(
           c,
@@ -491,6 +505,9 @@ export const post__api_conversions_events_id_reversals_10 = async (c: Context<En
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : '';
+        if (message === 'conversion_event_stale') {
+          return c.json({ success: false, error: '成果の取消状態が変わりました。読み直してください' }, 409);
+        }
         if (message === 'conversion_event_already_reversed') {
           return c.json({ success: false, error: 'この成果はすでに取り消されています' }, 409);
         }

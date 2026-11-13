@@ -10,7 +10,7 @@ describe('簡易CSV書き出しの数式インジェクション対策(#496-4)',
   )
 
   it('ふつうの名前はそのまま引用符で包むだけ', () => {
-    expect(csvExportCell('山田 太郎')).toBe('"山田 太郎"')
+    expect(csvExportCell('見本 141')).toBe('"見本 141"')
     expect(csvExportCell(null)).toBe('""')
   })
 

@@ -42,7 +42,7 @@ describe('mailFromName', () => {
 
 describe('sendPlainMail の差出人名', () => {
   const env = {
-    CONTACT_EMAIL: 'contact-shed@nen-petfood.com',
+    CONTACT_EMAIL: 'contact@example.com',
     XSERVER_RELAY_URL: 'https://example.test/_system/support-mail-relay.php',
     XSERVER_RELAY_SECRET: 'x'.repeat(48),
   } as unknown as Env['Bindings'];
@@ -77,11 +77,11 @@ describe('sendPlainMail の差出人名', () => {
   });
 
   it('中継が無い環境では SMTP にも同じ表示名を渡す', async () => {
-    const smtpEnv = { CONTACT_EMAIL: 'contact-shed@nen-petfood.com' } as unknown as Env['Bindings'];
+    const smtpEnv = { CONTACT_EMAIL: 'contact@example.com' } as unknown as Env['Bindings'];
     await sendPlainMail(smtpEnv, { to: 'user@example.test', subject: '【musubo】メールアドレスの確認と本登録', body: '本文' });
     expect(sendViaXServerRelay).not.toHaveBeenCalled();
     expect(sendXServerMail.mock.calls[0]?.[1]).toMatchObject({
-      from: 'contact-shed@nen-petfood.com',
+      from: 'contact@example.com',
       fromName: MUSUBO_FROM_NAME,
     });
   });

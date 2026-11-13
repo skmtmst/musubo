@@ -37,7 +37,7 @@ import AutoRepliesList from './list'
 import { clearToastsForTest } from '@/components/shared/toast'
 
 const row: AutoReply = {
-  id: 'rule-a', name: '営業時間', keyword: '営業時間', matchType: 'contains', keywords: null, respondToAll: false,
+  id: 'rule-a', confirmationRevision: 1, name: '営業時間', keyword: '営業時間', matchType: 'contains', keywords: null, respondToAll: false,
   responseType: 'text', responseContent: '10時からです', templateId: null, lineAccountId: 'account-a', isActive: true,
   activeFrom: null, activeUntil: null, cooldownMinutes: null, skipWhenOperatorActive: false, priority: 0, messageKinds: null,
   receiveSources: ['line'], actions: null, responseWeekdays: null, responseHolidayRule: null, oncePerFriend: false,
@@ -156,4 +156,15 @@ it('移動の確認前に店が変わると元の店のルールへ送らず、�
   expect(confirm.disabled).toBe(true); fireEvent.click(confirm)
   expect(writes()).toBe(0); expect(delayed).toHaveLength(0)
   expect((screen.getByRole('checkbox', { name: '営業時間を選択' }) as HTMLInputElement).checked).toBe(false)
+})
+
+it.each(['owner', 'viewer'])('自動応答一覧の説明は %s が使える操作に合う', async role => {
+  await mount()
+  if (role === 'viewer') { restrict('viewer'); await flush() }
+  fireEvent.click(screen.getByRole('button', { name: 'この画面の説明' }))
+  const note = screen.getAllByRole('note').find(element => element.textContent?.includes('最初に当たった1つだけが動きます'))!
+  expect(note).toBeTruthy()
+  expect(note.textContent?.includes('行を押すと編集')).toBe(role === 'owner')
+  expect(note.textContent?.includes('順番は行の左のつまみで入れ替えます')).toBe(role === 'owner')
+  if (role === 'viewer') expect(note.textContent).toContain('実行結果を確認できます')
 })

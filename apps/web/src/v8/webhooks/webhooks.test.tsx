@@ -663,3 +663,14 @@ it('受け取り口を切り替える前に名前と行うことの両方を確�
   await vi.waitFor(() => expect(within(document.body).queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull())
   await vi.waitFor(() => expect(within(host).getByRole('switch', { name: '二つ目の窓口を動かす' })).toBeTruthy())
 })
+
+it('受け取り口の名前に未保存の変更がある間は合言葉の窓を開く前に確認する', async () => {
+  window.history.replaceState(null, '', '/webhooks?tab=incoming')
+  await render(<WebhooksIncomingV8 />)
+  const edit = await vi.waitFor(() => within(host).getByRole('button', { name: '受け取り口の名前を変更する' }))
+  await act(async () => { edit.click() })
+  await act(async () => { fireEvent.change(within(host).getByRole('textbox', { name: '受け取り口の名前' }), { target: { value: '変更中' } }) })
+  await act(async () => { within(host).getByRole('button', { name: '合言葉を更新する' }).click() })
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  expect(within(document.body).queryByLabelText('新しい合言葉')).toBeNull()
+})

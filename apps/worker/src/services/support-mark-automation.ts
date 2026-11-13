@@ -312,7 +312,7 @@ export async function createSupportMarkAutomationRuleIdempotent(
         now,
         now,
       ),
-      db.prepare('UPDATE automation_definitions SET current_published_version_id = ? WHERE id = ?')
+      db.prepare('UPDATE automation_definitions SET confirmation_revision = confirmation_revision + 1, current_published_version_id = ? WHERE id = ?')
         .bind(versionId, id),
       db.prepare(
         `INSERT INTO support_mark_rule_create_requests
@@ -389,7 +389,7 @@ export async function createSupportMarkAutomationRule(
       now,
       now,
     ),
-    db.prepare('UPDATE automation_definitions SET current_published_version_id = ? WHERE id = ?')
+    db.prepare('UPDATE automation_definitions SET confirmation_revision = confirmation_revision + 1, current_published_version_id = ? WHERE id = ?')
       .bind(versionId, id),
   ]);
   return (await rowsForAccount(db, scope.lineAccountId)).map(parseRule)
@@ -446,7 +446,7 @@ export async function updateSupportMarkAutomationRule(
     ),
     db.prepare(
       `UPDATE automation_definitions
-          SET name = ?, status = ?, priority = ?, current_published_version_id = ?, updated_at = ?
+          SET confirmation_revision = confirmation_revision + 1, name = ?, status = ?, priority = ?, current_published_version_id = ?, updated_at = ?
         WHERE id = ? AND line_account_id = ?
           AND EXISTS (SELECT 1 FROM automation_versions WHERE id = ? AND automation_id = ?)`,
     ).bind(
@@ -478,7 +478,7 @@ export async function archiveSupportMarkAutomationRule(
   if (current.version !== expectedVersion) return 'conflict';
   const now = jstNow();
   const result = await db.prepare(
-    `UPDATE automation_definitions SET status = 'archived', archived_at = ?, updated_at = ?
+    `UPDATE automation_definitions SET confirmation_revision = confirmation_revision + 1, status = 'archived', archived_at = ?, updated_at = ?
       WHERE id = ? AND line_account_id = ? AND current_published_version_id =
         (SELECT id FROM automation_versions WHERE automation_id = ? AND version_number = ?)`,
   ).bind(now, now, ruleId, scope.lineAccountId, ruleId, expectedVersion).run();

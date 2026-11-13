@@ -81,10 +81,17 @@ export default function RankSettingsV8({
   const [comparing, setComparing] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<number | null>(null)
   const [replacement, setReplacement] = useState('')
+  const [removePreview,setRemovePreview]=useState<{rankId:string;count:number;version:number;members:Array<{friendId:string;customerId:string|null}>}|null>(null)
+  const [removePreviewError,setRemovePreviewError]=useState(false)
+  const removeGeneration=useRef(0)
   const [draftAccountId, setDraftAccountId] = useState(accountId)
   const activeAccount = useRef({ id: accountId })
   if (activeAccount.current.id !== accountId) activeAccount.current = { id: accountId }
   const removeAccount = useRef<typeof activeAccount.current | null>(null)
+  const removeContext = useRef<{ key: string; ticket: object; rowId: string; version: number } | null>(null)
+  const currentRemoveKey = JSON.stringify([accountId, readonly, settings?.rules?.version, drafts])
+  if (removeContext.current && removeContext.current.key !== currentRemoveKey) removeContext.current = null
+  const removeTicket = removeContext.current?.ticket ?? null
 
   const fields = useFieldValidation(drafts.flatMap((row, index) => [
     ...(!row.name.trim() ? [{ id: `rank-name-${index}`, message: 'ランク名を入れるか、行を消してください。' }] : []),
@@ -106,6 +113,8 @@ export default function RankSettingsV8({
     setConflict(null)
     setComparing(false)
     setRemoveTarget(null)
+    removeGeneration.current += 1
+    setRemovePreview(null)
     setReplacement('')
     cancelLeave()
     setNotice(hadUnsaved ? 'LINEアカウントを切り替えたため、保存していない変更は破棄しました。' : '')
@@ -217,26 +226,38 @@ export default function RankSettingsV8({
     /* 移す先は、ひとつ下のランクを先に選んでおく（いちばん多い選び方）。 */
     const below = drafts.slice(index + 1).find((candidate) => candidate.id)
       ?? [...drafts.slice(0, index)].reverse().find((candidate) => candidate.id)
+    if (!settings?.rules || readonly) return
     removeAccount.current = activeAccount.current
+    removeContext.current = { key: currentRemoveKey, ticket: {}, rowId: row.id, version: settings.rules.version }
     setReplacement(below?.id ?? '')
     setRemoveTarget(index)
+    setRemovePreview(null)
+    setRemovePreviewError(false)
+    const scope=removeAccount.current,generation=++removeGeneration.current,rankId=row.id
+    void nenRanksApi.rankDeletePreview(accountId,rankId).then(result=>{
+      if(removeAccount.current===scope&&activeAccount.current===scope&&removeGeneration.current===generation&&result.success)setRemovePreview({rankId,...result.data})
+      else if(removeAccount.current===scope&&removeGeneration.current===generation)setRemovePreviewError(true)
+    }).catch(()=>{if(removeAccount.current===scope&&removeGeneration.current===generation)setRemovePreviewError(true)})
   }
 
   /** ランクの削除は版つきの DELETE（移す先を選んで会員を反映する）。 */
-  const removeRank = async () => {
+  const removeRank = async (ticket: object | null) => {
     const target = activeAccount.current
-    if (removeTarget === null || removeAccount.current !== activeAccount.current || draftAccountId !== accountId || !settings?.rules) return
+    const context = removeContext.current
+    if (!ticket || !context || context.ticket !== ticket || removeTarget === null || removeAccount.current !== activeAccount.current || draftAccountId !== accountId || !settings?.rules || !removePreview || removePreview.version !== settings.rules.version || context.version !== removePreview.version) return
     const row = drafts[removeTarget]
-    if (!row?.id) return
+    if (!row?.id || row.id !== context.rowId || row.id !== removePreview.rankId) return
     setBusy(true)
     setError('')
     try {
       const res = await nenRanksApi.deleteRank(accountId, row.id, {
-        replacementRankId: row.memberCount > 0 ? replacement || null : null,
-        expectedVersion: settings.rules.version,
+        replacementRankId: removePreview.count > 0 ? replacement || null : null,
+        expectedVersion: context.version,
+        confirmedMembers: removePreview.members,
       })
       if (activeAccount.current !== target) return
       if (!res.success) throw new Error(res.error)
+      removeContext.current = null
       setRemoveTarget(null)
       setReplacement('')
       setNotice(res.data.ecSync === 'synced' ? 'ランクを削除し、会員を移し先へ反映しました。' : `ランクを削除しました。${res.data.message ?? ''}`)
@@ -342,7 +363,7 @@ export default function RankSettingsV8({
   const removeRow = removeTarget !== null ? drafts[removeTarget] : null
   const removeCandidates = removeRow ? drafts.filter((row) => row.id && row.id !== removeRow.id) : []
   const removeName = removeRow?.name.trim() || `ランク ${(removeTarget ?? 0) + 1}`
-  const moving = removeRow ? removeRow.memberCount : 0
+  const moving = removePreview?.count ?? 0
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.rankBody}>
@@ -466,7 +487,7 @@ export default function RankSettingsV8({
 
       {/* dEv6G：会員がいるランクは移す先が必須（API の決まりと同じ）。 */}
       <Dialog
-        open={removeTarget !== null && removeAccount.current === activeAccount.current && removeRow !== null && removeRow.id !== null}
+        open={removeTicket !== null && removeTarget !== null && removeAccount.current === activeAccount.current && removeRow !== null && removeRow.id !== null}
         designNode="dEv6G"
         size="medium"
         designTop={300}
@@ -477,14 +498,14 @@ export default function RankSettingsV8({
         busy={busy}
         actionWidthReserve="idle" confirmLabel={moving > 0 ? `${formatNumber(moving)} 人を移して消す` : '消す'}
         cancelLabel="キャンセル"
-        onConfirm={moving > 0 && !replacement ? undefined : () => removeRank()}
-        onCancel={() => setRemoveTarget(null)}
+        onConfirm={!removePreview || removePreview.version !== settings.rules?.version || moving > 0 && !replacement ? undefined : () => removeRank(removeTicket)}
+        onCancel={() => { removeContext.current = null; removeGeneration.current += 1; setRemovePreview(null); setRemoveTarget(null) }}
       >
         <OperationTargetSummary accounts={[{ id: accountId }]} />
         <div className={styles.removeBody}>
           {/* 説明は題の行（×と並ぶ）ではなく、窓の幅いっぱいに置く（dEv6G）。 */}
           <p className={styles.removeDesc}>
-            {moving > 0
+            {!removePreview ? removePreviewError ? '会員を確認できません。閉じてもう一度お試しください。' : '対象の会員を確認しています。' : removePreview.version!==settings.rules?.version ? 'ランク設定が変わりました。閉じて最新の状態を確認してください。' : moving > 0
               ? `このランクには会員が ${formatNumber(moving)} 人います。消す前に、移す先のランクを決めてください。`
               : 'このランクに会員はいません。消すと、ランクの一覧から外れます。'}
           </p>
@@ -494,7 +515,7 @@ export default function RankSettingsV8({
                 aria-label="移す先のランク（必須）"
                 size="full"
                 value={replacement}
-                onChange={setReplacement}
+                onChange={value => { if (value !== replacement && removeContext.current) removeContext.current.ticket = {}; setReplacement(value) }}
                 options={[
                   { value: '', label: '移す先のランクを選ぶ' },
                   ...removeCandidates.map((row) => ({ ...entityOptionMetadata(row), value: row.id ?? '', label: row.name.trim() || '（名前なし）' })),

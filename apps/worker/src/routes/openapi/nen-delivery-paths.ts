@@ -69,6 +69,31 @@ export const nenDeliveryPaths = {
       responses: { '200': { description: 'Delivery detail' }, '404': { description: 'Not found in account scope' } },
     },
   },
+  '/api/nen-campaigns/columns/{id}/send-preview': {
+    get: {
+      tags: ['NEN delivery'],
+      summary: 'コラムの配信内容と予約対象を確認',
+      description: '送信待ちに入っていない、配信可能な対象の人数と照合用の印を返す。個々のLINE宛先は返さない。',
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      responses: { '200': { description: '人数、照合用の印と現在の配信内容' }, '403': { description: '配信権限なし' }, '404': { description: '対象が見つからない' }, '409': { description: '配信が停止中' } },
+    },
+  },
+  '/api/nen-campaigns/columns/{id}/deliver': {
+    post: {
+      tags: ['NEN delivery'],
+      summary: '確認したコラムを配信待ちへ入れる',
+      description: '確認した人数と印を両方指定すると、内容・対象の変更時は409を返して予約しない。どちらも省略した旧呼び出しは従来どおり。',
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId'], properties: {
+        accountId: { type: 'string' }, scheduledAt: { type: 'string', format: 'date-time' },
+        recipientCount: { type: 'integer', minimum: 0 }, confirmationToken: { type: 'string', pattern: '^[a-f0-9]{64}$' },
+      } } } } },
+      responses: { '200': { description: '予約した人数' }, '400': { description: '入力が不正' }, '403': { description: '配信権限なし' }, '409': { description: '確認後に内容または対象が変化' } },
+    },
+  },
   '/api/nen-campaigns/columns/import': {
     post: {
       tags: ['NEN delivery'],

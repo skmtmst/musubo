@@ -6,7 +6,7 @@ import Toggle from '@/components/shared/toggle'
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Bookmark, Check, CircleHelp, Copy, Download, History, PenLine, Send, Undo2 } from 'lucide-react';
-import type { NenCampaignSetting, NenColumn, NenColumnMetrics, NenDeliveryDetail, NenDeliveryList, NenFlowMetrics } from '@/lib/api';
+import type { NenCampaignSetting, NenColumn, NenColumnDeliveryPreview, NenColumnMetrics, NenDeliveryDetail, NenDeliveryList, NenFlowMetrics } from '@/lib/api';
 import { useListItemHref } from '@/components/shared/list-navigation';
 
 
@@ -25,6 +25,7 @@ import Card from '@/components/shared/card'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import LinePreview, { LinePreviewFlex, LinePreviewMessage } from '@/components/shared/line-preview'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Drawer from '@/components/shared/drawer'
 import Dialog from '@/components/shared/dialog'
@@ -117,7 +118,8 @@ export type NenCampaignsListProps = {
   onIntroChange: (text: string) => void
   onSaveIntro: (column: NenColumn) => void
   savingColumnId: string | null
-  onDeliverColumn: (column: NenColumn, scheduledAt?: string) => Promise<boolean | void>
+  onPreviewColumn: (column: NenColumn) => Promise<NenColumnDeliveryPreview>
+  onDeliverColumn: (column: NenColumn, scheduledAt: string | undefined, confirmation: { recipientCount: number; confirmationToken: string }) => Promise<boolean | void>
   onDuplicateColumn: (column: NenColumn) => void
   duplicatingColumnId?: string | null
   onTestColumn: (column: NenColumn) => void
@@ -819,8 +821,18 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
   canEditRef.current = canEdit
   const alive = useRef(false)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
-  const [confirm, setConfirm] = useState<{ column: NenColumn; scheduledAt?: string; accountId: string; generation: number } | null>(null)
+  const columnSetting = props.settings.find((setting) => setting.campaignKey === 'column')
+  const viewKey = JSON.stringify([props.accountId, selected, introDraft, columnSetting])
+  const viewScope = useRef({ key: viewKey })
+  if (viewScope.current.key !== viewKey) viewScope.current = { key: viewKey }
+  const [confirm, setConfirm] = useState<{ column: NenColumn; scheduledAt?: string; accountId: string; generation: number; view: object; dialog: object; preview: NenColumnDeliveryPreview } | null>(null)
   const [deliverTried, setDeliverTried] = useState(false)
+  const dialogScope = useRef<object>({})
+  const deliveryLock = useRef(false)
+  const [delivering, setDelivering] = useState(false)
+  const [previewBusy, setPreviewBusy] = useState(false)
+  const previewLock = useRef(false)
+  const [previewError, setPreviewError] = useState('')
   if (!selected) return null
   const scheduledIso = plan.when === 'schedule' ? publishedAtIso(plan.scheduledAt) : null
   const schedulePast = plan.when === 'schedule' && isPastScheduledAt(plan.scheduledAt)
@@ -870,19 +882,33 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
         <div className={styles.selectFoot}>
           <TestRecipientPicker friends={props.friends} value={props.testFriendId} onChange={props.onTestFriendChange} accountId={props.accountId} />
           <Button type="button" disabled={!props.testFriendId || props.testing !== null} busy={props.testing === selected.id} busyLabel="送信中…" onClick={() => props.onTestColumn(selected)}><Send size={16} aria-hidden="true" />自分にテストを送る</Button>
-          <Button type="button" variant="primary" disabled={!columnEnabled || scheduleInvalid || props.currentAccountData === false} disabledReason={props.currentAccountData === false ? '選択中のLINEアカウントの情報を読み直してください。' : undefined} onClick={() => { if (!props.accountId || !canEditRef.current || props.currentAccountData === false) return; setDeliverTried(false); setConfirm({ column: selected, scheduledAt: scheduledIso ?? undefined, accountId: props.accountId, generation: scope.current.generation }) }}>配信を予約する</Button>
+          <Button type="button" variant="primary" disabled={!columnEnabled || scheduleInvalid || props.currentAccountData === false || previewBusy} disabledReason={props.currentAccountData === false ? '選択中のLINEアカウントの情報を読み直してください。' : undefined} onClick={async () => {
+            if (!props.accountId || !canEditRef.current || props.currentAccountData === false || previewLock.current) return
+            if (introDraft !== selected.introText) { setPreviewError('紹介文を保存してから確認してください。'); return }
+            const view = viewScope.current, generation = scope.current.generation, accountId = props.accountId
+            previewLock.current = true; setPreviewBusy(true); setPreviewError('')
+            try {
+              const preview = await props.onPreviewColumn(selected)
+              if (!alive.current || !canEditRef.current || viewScope.current !== view || scope.current.generation !== generation) return
+              const col = preview.column
+              if (!Number.isSafeInteger(preview.recipientCount) || preview.recipientCount < 0 || !/^[a-f0-9]{64}$/.test(preview.confirmationToken) || !Array.isArray(preview.messages) || preview.messages.length !== 2 || preview.messages[0]?.type !== 'text' || typeof preview.messages[0].text !== 'string' || preview.messages[1]?.type !== 'flex' || !preview.messages[1].contents || !col || !columnSetting || col.id !== selected.id || col.title !== selected.title || col.excerpt !== selected.excerpt || col.introText !== selected.introText || col.articleUrl !== selected.articleUrl || col.imageUrl !== selected.imageUrl || col.targetMode !== selected.targetMode || col.targetTagId !== selected.targetTagId || col.updatedAt !== selected.updatedAt || preview.campaign?.updatedAt !== columnSetting.updatedAt || preview.campaign?.buttonLabel !== columnSetting.buttonLabel) { setPreviewError('配信内容が変わりました。画面を読み直してください。'); return }
+              dialogScope.current = {}; setDeliverTried(false); setConfirm({ column: { ...selected }, scheduledAt: scheduledIso ?? undefined, accountId, generation, view, dialog: dialogScope.current, preview })
+            } catch { if (alive.current && viewScope.current === view) setPreviewError('配信内容と対象を確認できませんでした。読み直してください。') }
+            finally { previewLock.current = false; if (alive.current) setPreviewBusy(false) }
+          }}>配信を予約する</Button>
         </div>
       ) : null}
+      <FieldError id="campaign-preview-error">{previewError}</FieldError>
       <ConfirmDialog
-        open={confirm !== null && confirm.generation === scope.current.generation}
+        open={confirm !== null && confirm.generation === scope.current.generation && confirm.view === viewScope.current}
         title={confirm?.scheduledAt ? `「${confirm.column.title}」を配信予約しますか？` : `「${confirm?.column.title ?? ''}」を今すぐ配信しますか？`}
         description={confirm?.scheduledAt
-          ? `${jstDateTime(confirm.scheduledAt)}（日本時間）に、${audienceCount == null ? '対象' : `約${num(audienceCount)} 人`}の友だちへ送ります。`
-          : `すぐに配信待ちに入り、${audienceCount == null ? '対象' : `約${num(audienceCount)} 人`}の友だちへ送られます。`}
+          ? `${jstDateTime(confirm.scheduledAt)}（日本時間）に、${num(confirm.preview.recipientCount)} 人の友だちへ送ります。`
+          : `すぐに配信待ちに入り、${num(confirm?.preview.recipientCount ?? 0)} 人の友だちへ送られます。`}
         confirmLabel={confirm?.scheduledAt ? '予約する' : '送る'}
-        error={deliverTried && props.notice?.tone === 'error' ? props.notice.text : undefined} onSuccess={() => setConfirm(null)} onConfirm={() => { if (!confirm || !alive.current || !canEditRef.current || confirm.generation !== scope.current.generation) return; setDeliverTried(true); return props.onDeliverColumn(confirm.column, confirm.scheduledAt) }}
-        onCancel={() => setConfirm(null)}
-      >{confirm ? <OperationTargetSummary accounts={[{ id: confirm.accountId }]} /> : null}</ConfirmDialog>
+        busy={delivering} error={deliverTried && props.notice?.tone === 'error' ? props.notice.text : undefined} onSuccess={() => { if (confirm?.dialog === dialogScope.current) { dialogScope.current = {}; setConfirm(null) } }} onConfirm={async () => { if (!confirm || !alive.current || !canEditRef.current || deliveryLock.current || confirm.generation !== scope.current.generation || confirm.view !== viewScope.current || confirm.dialog !== dialogScope.current) return false; deliveryLock.current = true; setDelivering(true); setDeliverTried(true); try { return await props.onDeliverColumn(confirm.column, confirm.scheduledAt, { recipientCount: confirm.preview.recipientCount, confirmationToken: confirm.preview.confirmationToken }) } finally { deliveryLock.current = false; if (alive.current) setDelivering(false) } }}
+        onCancel={() => { if (confirm?.dialog === dialogScope.current) { dialogScope.current = {}; setConfirm(null) } }}
+      >{confirm ? <><OperationTargetSummary accounts={[{ id: confirm.accountId }]} /><LinePreview fit>{confirm.preview.messages.map((message, index) => message.type === 'text' ? <LinePreviewMessage key={index} accountName="NEN" avatar={null} time="">{message.text}</LinePreviewMessage> : <LinePreviewFlex key={index} content={JSON.stringify(message.contents)} />)}</LinePreview></> : null}</ConfirmDialog>
     </Card>
   )
 }

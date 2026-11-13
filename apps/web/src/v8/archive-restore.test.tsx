@@ -37,7 +37,7 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/tags')
   flushListUrlState()
   state.marks = [{ id: 'old', name: '保管したマーク', color: '#94a3b8', archivedAt: '2026-10-09', version: 2, friendCount: 0, automationRules: [], isDefault: false, isInherited: false }]
-  state.rules = [{ id: 'old', name: '保管したルール', status: 'archived', isActive: false, eventType: 'message_received', triggerConfig: {}, conditions: {}, actions: [], executionCount30d: 0, failureCount30d: 0, updatedAt: '2026-10-09' }]
+  state.rules = [{ id: 'old', name: '保管したルール', status: 'archived', isActive: false, confirmationRevision: 2, eventType: 'message_received', triggerConfig: {}, conditions: {}, actions: [], executionCount30d: 0, failureCount30d: 0, updatedAt: '2026-10-09' }]
   for (const call of Object.values(calls)) { call.mockReset(); call.mockResolvedValue({ success: true, data: { restored: true, version: 3, status: 'stopped' } }) }
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ success: false, error: '未取得' }), { headers: { 'Content-Type': 'application/json' } })))
 })
@@ -64,7 +64,7 @@ describe('一覧の保管から戻す操作', () => {
     expect(dialog.textContent).toContain('通常の一覧から外します。動いた記録と設定は残り、「保管したもの」の絞り込みから戻せます。')
     expect(calls.status).not.toHaveBeenCalled()
     fireEvent.click(within(dialog).getByRole('button', { name: '保管する' }))
-    await waitFor(() => expect(calls.status).toHaveBeenCalledWith('old', 'archived'))
+    await waitFor(() => expect(calls.status).toHaveBeenCalledWith('old', 'archived', 2))
   })
   for (const entry of cases) {
     it(`${entry.name}を保管の札で探し、確認後だけ戻すAPIを呼ぶ`, async () => {

@@ -70,7 +70,7 @@ const ruleItem = {
 
 const friendItem = {
   friendId: 'friend-1',
-  displayName: '山田 太郎',
+  displayName: '見本 141',
   pictureUrl: null,
   rank: 'gold',
   rankReason: '今月の購入で到達',
@@ -93,7 +93,7 @@ const friendItem = {
 const historyItem = {
   id: 'history-1',
   primaryFriendId: 'friend-1',
-  displayName: '山田 太郎',
+  displayName: '見本 141',
   lineAccountName: '然-NEN-本店',
   occurredAt: '2026-09-30T10:00:00+09:00',
   amount: 100,
@@ -136,7 +136,7 @@ const rewardItem = {
 
 const scoreItem = {
   friendId: 'friend-1',
-  displayName: '山田 太郎',
+  displayName: '見本 141',
   pictureUrl: null,
   currentScore: 82,
   band: 'high',
@@ -335,7 +335,7 @@ test('v8 のタブごとに板 ID が替わる（S35pO・CJlf4・oRbJi・IRPw8�
   document.documentElement.dataset.theme = 'v8'
   for (const [tab, node, word] of [
     ['rewards', 'S35pO', '送料無料クーポン'],
-    ['balances', 'CJlf4', '山田 太郎'],
+    ['balances', 'CJlf4', '見本 141'],
     ['history', 'oRbJi', '商品を買った'],
     ['score', 'IRPw8', '点が高い'],
   ] as const) {

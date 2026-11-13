@@ -36,6 +36,15 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
+it('媒体の URL は全文を確認でき、外部リンクの矢印と同じ行に収める', async () => {
+  render(<BookingMedia />)
+  const link = await screen.findByRole('link', { name: 'fixture.invalid/page' })
+  expect(link.getAttribute('href')).toBe('https://fixture.invalid/page')
+  expect(link.getAttribute('title')).toBe('https://fixture.invalid/page')
+  expect(link.getAttribute('data-truncate')).toBe('true')
+  expect(link.querySelector('[data-external-icon]')).toBeTruthy()
+})
+
 it('店舗の取得が終わるまで媒体も予約URLも読まず、現在のアカウントの店だけを使う', async () => {
   const pending = deferred<Awaited<ReturnType<typeof net.context>>>()
   net.context.mockReturnValueOnce(pending.promise)

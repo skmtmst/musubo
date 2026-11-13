@@ -97,10 +97,10 @@ export default function HelpTip({
     const onPointer = (event: PointerEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpenSource(null)
     }
-    document.addEventListener('keydown', onKey)
+    document.addEventListener('keydown', onKey, true)
     document.addEventListener('pointerdown', onPointer)
     return () => {
-      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('keydown', onKey, true)
       document.removeEventListener('pointerdown', onPointer)
     }
   }, [open ])
@@ -119,11 +119,11 @@ export default function HelpTip({
       data-help-reserving={reserveSpace && open ? '' : undefined}
       style={reserveSpace && open ? { marginBottom: reservedHeight, alignSelf: 'flex-start' } : undefined}
       onMouseEnter={hover ? () => { window.dispatchEvent(new CustomEvent(CLOSE_OTHERS_EVENT, { detail: tipId })); setOpenSource(current => current ?? 'automatic') } : undefined}
-      onPointerLeave={hover ? event => { if (event.pointerType !== 'touch') setOpenSource(null) } : undefined}
+      onPointerLeave={hover ? event => { if (event.pointerType !== 'touch') setOpenSource(current => current === 'automatic' ? null : current) } : undefined}
       onFocus={hover ? () => { if (restoringFocus.current) return; window.dispatchEvent(new CustomEvent(CLOSE_OTHERS_EVENT, { detail: tipId })); setOpenSource(current => current ?? 'automatic') } : undefined}
       className={[styles.wrap, className].filter(Boolean).join(' ')}
       onBlur={(event) => {
-        if (!wrapRef.current?.contains(event.relatedTarget as Node)) setOpenSource(null)
+        if (!wrapRef.current?.contains(event.relatedTarget as Node)) setOpenSource(current => current === 'automatic' ? null : current)
       }}
     >
       <button

@@ -35,8 +35,18 @@ describe('統括のアカウントを選ぶ一覧', () => {
     expect(row('銀座店').textContent).toContain('@ginza')
     expect(row('銀座店').querySelector('img')?.getAttribute('src')).toBe('https://line.example/ginza.png')
     const umeda = [...row('梅田店').querySelectorAll('td')].map((td) => td.textContent?.trim())
-    expect(umeda.slice(1, 6)).toEqual(['0', '0', '停止中', '0人', '停止中'])
+    expect(umeda.slice(1, 6)).toEqual(['—', '—', '停止中', '—', '停止中'])
     expect(row('梅田店').textContent).toContain('LINE ID未取得')
+  })
+
+  it('未取得と本当に0の数を、PCとスマホで区別する', () => {
+    const zero = account({ id: 'z', name: 'ゼロ店', stats: { friendCount: 0, messagesThisMonth: 0, activeScenarios: 0, staffCount: 0 } })
+    render(<HqAccountList accounts={[accounts[1], zero]} onSelect={vi.fn()} />)
+    expect([...row('梅田店').querySelectorAll('td')].map(td => td.textContent?.trim()).slice(1, 5)).toEqual(['—', '—', '停止中', '—'])
+    expect([...row('ゼロ店').querySelectorAll('td')].map(td => td.textContent?.trim()).slice(1, 5)).toEqual(['0', '0', '未確認', '0人'])
+    const cards = [...document.querySelectorAll('li')]
+    expect([...cards[0].querySelectorAll('dd')].map(dd => dd.textContent)).toEqual(['—', '—', '—'])
+    expect([...cards[1].querySelectorAll('dd')].map(dd => dd.textContent)).toEqual(['0', '0', '0人'])
   })
 
   it('「設定」と選ぶボタンは、その行のアカウントを渡す', () => {

@@ -184,3 +184,35 @@ it('項目の理由を確認の窓にも出し、入力を直すまで再送せ�
   const corrected = await screen.findByRole('dialog')
   expect(within(corrected).getByRole('button', { name: '販売を始める' })).toHaveProperty('disabled', false)
 })
+
+it('回数券の販売確認を閉じた後は古い確定から販売しない', async () => {
+  render(<PassCreateV8 />)
+  await screen.findByLabelText('名前')
+  fill('ヨガ 10 回券', '15000')
+  fireEvent.click(screen.getByRole('button', { name:'作る' }))
+  const dialog = within(await screen.findByRole('dialog'))
+  const button = dialog.getByRole('button',{name:'販売を始める'})
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const held = (button as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+  fireEvent.click(dialog.getByRole('button',{name:'キャンセル'}))
+  await act(async () => { await held({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button}) })
+  expect(api.create).not.toHaveBeenCalled()
+  expect(api.start).not.toHaveBeenCalled()
+})
+
+it('回数券の内容を変えて戻しても古い販売確認を使わない', async () => {
+  render(<PassCreateV8 />)
+  await screen.findByLabelText('名前')
+  fill('ヨガ 10 回券', '15000')
+  const price = screen.getByLabelText('値段')
+  fireEvent.click(screen.getByRole('button', { name:'作る' }))
+  const dialog = within(await screen.findByRole('dialog'))
+  const button = dialog.getByRole('button',{name:'販売を始める'})
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const held = (button as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+  fireEvent.change(price,{target:{value:'16000'}})
+  fireEvent.change(price,{target:{value:'15000'}})
+  await act(async () => { await held({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button}) })
+  expect(api.create).not.toHaveBeenCalled()
+  expect(api.start).not.toHaveBeenCalled()
+})

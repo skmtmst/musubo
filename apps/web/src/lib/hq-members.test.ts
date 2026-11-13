@@ -3,7 +3,7 @@ import type { StaffMember } from '@line-crm/shared'
 import { canResendInvite, lastLoginLabel, lastLoginShort, memberKpis, memberStatus, scopeLabel, sortMembers, sortMembersByRole } from './hq-members'
 
 const base: StaffMember = {
-  id: 's1', name: '山田 太郎', email: 'm@example.com', role: 'admin', lineLinked: true, twoFactorEnabled: false,
+  id: 's1', name: '見本 141', email: 'm@example.com', role: 'admin', lineLinked: true, twoFactorEnabled: false,
   isActive: true, permissionKeys: [], notificationPreferences: {}, inviteStatus: 'active', createdAt: '', updatedAt: '',
   assignedLineAccountId: null, canAccessDescendantAccounts: true, accountScope: 'all', scopedLineAccountIds: [],
 }
@@ -51,11 +51,11 @@ describe('メンバー管理の計算', () => {
   })
 
   it('★V8 の並びは状態→役割→名前（絵 r4ARpV の順）', () => {
-    const owner: StaffMember = { ...base, id: 'o', name: '高田 誠', role: 'owner' }
-    const admin: StaffMember = { ...base, id: 'a', name: '中川 由美', role: 'admin' }
-    const viewer: StaffMember = { ...base, id: 'v', name: '佐野 直人', role: 'viewer' }
+    const owner: StaffMember = { ...base, id: 'o', name: '見本 18', role: 'owner' }
+    const admin: StaffMember = { ...base, id: 'a', name: '見本 30', role: 'admin' }
+    const viewer: StaffMember = { ...base, id: 'v', name: '見本 31', role: 'viewer' }
     const invited: StaffMember = { ...base, id: 'i', name: '外部デザイン', role: 'viewer', isActive: false, inviteStatus: 'pending_line' }
-    const stopped: StaffMember = { ...base, id: 's', name: '森 涼太', role: 'viewer', isActive: false, inviteStatus: 'disabled' as StaffMember['inviteStatus'] }
+    const stopped: StaffMember = { ...base, id: 's', name: '見本 157', role: 'viewer', isActive: false, inviteStatus: 'disabled' as StaffMember['inviteStatus'] }
     expect(sortMembersByRole([stopped, viewer, invited, admin, owner]).map((m) => m.id)).toEqual(['o', 'a', 'v', 'i', 's'])
   })
 })

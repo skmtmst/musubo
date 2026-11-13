@@ -62,18 +62,17 @@ lineAccounts.get('/api/line-accounts', async (c) => {
     );
     const serializeWithStats = (item: DbLineAccount) => {
       const overview = statsByAccount[item.id];
+      const stats = overview && [overview.friendCount,overview.activeScenarios,overview.messagesThisMonth,overview.staffCount]
+        .every(count => Number.isSafeInteger(count) && count >= 0)
+        ? {friendCount:overview.friendCount,activeScenarios:overview.activeScenarios,messagesThisMonth:overview.messagesThisMonth,staffCount:overview.staffCount}
+        : undefined;
       return {
         ...serializeLineAccount(item),
         emailInboxEnabled: emailInboxAccountIds.has(item.id),
         tags: tagsByAccount[item.id] ?? [],
         folderId: foldersByAccount[item.id]?.id ?? null,
         folder: foldersByAccount[item.id] ?? null,
-        stats: {
-          friendCount: overview?.friendCount ?? 0,
-          activeScenarios: overview?.activeScenarios ?? 0,
-          messagesThisMonth: overview?.messagesThisMonth ?? 0,
-          staffCount: overview?.staffCount ?? 0,
-        },
+        stats,
         connection: overview?.connection ?? { status: 'unknown' as const, checkedAt: null, tokenExpired: false, issues: [] },
       };
     };

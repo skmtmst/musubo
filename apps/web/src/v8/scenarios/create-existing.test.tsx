@@ -279,11 +279,20 @@ describe('新規（id なし）は確定したときに初めて作る', () => {
   })
 })
 
-test('シナリオ名は一覧の名前変更と同じ80文字までで、文字数を表示する', async () => {
+test('シナリオ名は一覧の名前変更と同じ60文字までで、文字数を表示する', async () => {
   render(<ScenarioCreateV8 />)
   await waitFor(() => expect(nameField().value).toBe('春のフォロー'))
-  expect(nameField().maxLength).toBe(80)
+  expect(nameField().maxLength).toBe(60)
   fireEvent.focus(nameField())
   fireEvent.change(nameField(), { target: { value: '新しい名前' } })
-  await waitFor(() => expect(document.body.textContent).toContain('5/80'))
+  await waitFor(() => expect(document.body.textContent).toContain('5/60'))
+})
+
+test('既存の長い名前を変えない方式保存では、その名前を勝手に整形しない', async () => {
+  const name = ` ${'長い名前'.repeat(18)} `
+  readScenario.mockResolvedValue({ success: true, data: { ...scenario, name } })
+  render(<ScenarioCreateV8 />)
+  await waitFor(() => expect(nameField().value).toBe(name))
+  fireEvent.click(saveButton())
+  await waitFor(() => expect(update).toHaveBeenCalledWith('sc-1', expect.objectContaining({ name })))
 })

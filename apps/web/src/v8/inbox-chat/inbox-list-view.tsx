@@ -187,7 +187,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                       {/*
                         **名前の下に、何で絞ったかを出す。**
                         設計 `ASsb3` は「対応マーク：未対応／期限：超過」のように書く。
-                        名前だけだと、`未対応・期限超過` と `河野担当の未対応` の
+                        名前だけだと、`未対応・期限超過` と `見本担当の未対応` の
                         どちらを押せばいいのかが、名前の付け方頼みになる。
                       */}
                       <span className="text-ink-faint mt-0.5 block truncate text-micro font-medium">

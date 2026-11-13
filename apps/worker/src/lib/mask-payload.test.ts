@@ -9,7 +9,7 @@ describe('maskInteractionPayload', () => {
   it('名前・電話・メール・住所・トークンを伏せる', () => {
     const raw = JSON.stringify({
       name: '田中明',
-      phone: '090-1234-5678',
+      phone: '090-0000-5678',
       email: 'tanaka@example.com',
       address: '東京都港区1-2-3',
       accessToken: 'secret-abc',
@@ -33,8 +33,8 @@ describe('maskInteractionPayload', () => {
 
   it('入れ子と配列の中も伏せる', () => {
     const masked = maskInteractionPayload(JSON.stringify({
-      customer: { 氏名: '佐藤', 電話番号: '08011112222' },
-      items: [{ email: 'a@b.co' }, { note: 'ふつうのメモ' }],
+      customer: { 氏名: '佐藤', 電話番号: '08000002222' },
+      items: [{ email: 'a@example.com' }, { note: 'ふつうのメモ' }],
     }));
     expect(masked.body).toEqual({
       customer: { 氏名: '***', 電話番号: '***' },
@@ -44,8 +44,8 @@ describe('maskInteractionPayload', () => {
 
   it('鍵によらず値の形でも伏せる', () => {
     const masked = maskInteractionPayload(JSON.stringify({
-      contact: 'yamada@example.jp',
-      memo: '折り返し 03-1234-5678 まで',
+      contact: 'yamada@example.com',
+      memo: '折り返し 03-0000-5678 まで',
     }));
     const body = masked.body as Record<string, string>;
     expect(body.contact).toBe('***');
@@ -70,12 +70,12 @@ describe('maskInteractionPayload', () => {
 
   it('文の途中のメール・電話番号を置き換える', () => {
     const masked = maskInteractionPayload(JSON.stringify({
-      memo: '連絡先 tanaka@example.com か 090-1234-5678 まで',
+      memo: '連絡先 tanaka@example.com か 090-0000-5678 まで',
     }));
     const body = masked.body as Record<string, string>;
     expect(body.memo).toBe('連絡先 *** か *** まで');
     expect(body.memo).not.toContain('tanaka@example.com');
-    expect(body.memo).not.toContain('090-1234-5678');
+    expect(body.memo).not.toContain('090-0000-5678');
   });
 
   it('LINE の userId・IP アドレス・生年月日の鍵を伏せる', () => {

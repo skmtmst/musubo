@@ -32,8 +32,8 @@ beforeEach(() => {
     INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
     VALUES ('account-nen', 'channel-nen', '然', 'token', 'secret');
     INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following, created_at, updated_at) VALUES
-      ('friend-a', 'U-a', '山田 太郎', 'account-nen', 1, '2026-09-01', '2026-09-01'),
-      ('friend-b', 'U-b', '鈴木 一郎', 'account-nen', 1, '2026-09-01', '2026-09-01');
+      ('friend-a', 'U-a', '見本 141', 'account-nen', 1, '2026-09-01', '2026-09-01'),
+      ('friend-b', 'U-b', '見本 176', 'account-nen', 1, '2026-09-01', '2026-09-01');
     INSERT INTO nen_pet_profiles (id, friend_id, name, animal_type, gender, birthday, breed, weight_kg, concerns,
       recommended_daily_grams, recommended_daily_min_grams, recommended_daily_max_grams, venison_daily_grams, food_cycle_days, created_at, updated_at)
     VALUES ('pet-old', 'friend-a', 'モモ', 'dog', 'female', '2022-04-01', '柴犬', 10, '[]', 250, 200, 300, 25, 4, '2026-09-01', '2026-09-01');

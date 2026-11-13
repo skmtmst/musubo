@@ -18,6 +18,7 @@ it.each(['execute', 'rollback'] as const)('UIDの%sは実行履歴の2アカウ�
   expect(target.getByText('移行先のLINE')).toBeTruthy()
   await target.findByText('検証環境')
   expect(target.queryByText('店舗')).toBeNull()
+  expect(screen.getByText(/実行権限：オーナーのみ/)).toBeTruthy()
   expect(confirm).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: kind === 'execute' ? '本移行を実行' : '切り戻す', exact: true }))
   expect(confirm).toHaveBeenCalledTimes(1)

@@ -14,7 +14,7 @@ describe('storedRedirectTarget', () => {
 
   it('allows non-dangerous app/deep-link schemes (funnels must not break)', () => {
     expect(storedRedirectTarget('line://ti/p/@abc')).toBe('line://ti/p/@abc');
-    expect(storedRedirectTarget('tel:08012345678')).toBe('tel:08012345678');
+    expect(storedRedirectTarget('tel:08000005678')).toBe('tel:08000005678');
     expect(storedRedirectTarget('mailto:hi@example.com')).toBe('mailto:hi@example.com');
     expect(storedRedirectTarget('myapp://open/path')).toBe('myapp://open/path');
   });

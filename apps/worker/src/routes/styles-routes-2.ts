@@ -62,7 +62,7 @@ styles.patch(base + '/bookings/:id', async (c) => {
         : oneOf(b.outcome, ['considering', 'won', 'lost'], true),
     now = new Date().toISOString();
   const update = c.env.DB.prepare(
-    `UPDATE bookings SET meeting_mode=?,meeting_url=?,meeting_location=?,consultation_outcome=?,outcome_recorded_at=?,outcome_recorded_by=?,cancellation_reason=?,designation=?,entry_point=?,lock_version=lock_version+1,updated_at=? WHERE id=? AND line_account_id=? AND lock_version=?`,
+    `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, meeting_mode=?,meeting_url=?,meeting_location=?,consultation_outcome=?,outcome_recorded_at=?,outcome_recorded_by=?,cancellation_reason=?,designation=?,entry_point=?,lock_version=lock_version+1,updated_at=? WHERE id=? AND line_account_id=? AND lock_version=?`,
   ).bind(
     mode,
     url,
@@ -88,7 +88,7 @@ styles.patch(base + '/bookings/:id', async (c) => {
     ).bind(id, a, r.lock_version),
     update,
     c.env.DB.prepare(
-      'UPDATE meet_consultations SET booking_version=? WHERE booking_id=? AND booking_version=?',
+      'UPDATE meet_consultations SET confirmation_revision = confirmation_revision + 1, booking_version=? WHERE booking_id=? AND booking_version=?',
     ).bind(Number(r.lock_version) + 1, id, r.lock_version),
     c.env.DB.prepare(
       'INSERT INTO style_change_logs(id,line_account_id,actor_id,action,before_json,after_json,created_at) VALUES(?,?,?,?,?,?,?)',
@@ -203,7 +203,7 @@ styles.patch(base + '/event-bookings/:id', async (c) => {
     b = await json(c),
     mode = oneOf(b.participationMode, ['classroom', 'online']);
   const r = await c.env.DB.prepare(
-    'UPDATE event_bookings SET participation_mode=? WHERE id=? AND line_account_id=?',
+    'UPDATE event_bookings SET confirmation_revision = confirmation_revision + 1, participation_mode=? WHERE id=? AND line_account_id=?',
   )
     .bind(mode, c.req.param('id'), a)
     .run();

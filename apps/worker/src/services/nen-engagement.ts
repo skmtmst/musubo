@@ -1,4 +1,5 @@
 import { formatYen, jstCalendar as japanCalendar } from '@line-crm/shared';
+import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
 import { logger } from '@line-crm/shared/server';
 import { currentOrderState, orderNumberFromPayload } from './nen-order-state.js';
 import { EXTERNAL_DELIVERY_MAX_ATTEMPTS as MAX_DELIVERY_ATTEMPTS } from './external-delivery-retry.js';
@@ -9,6 +10,7 @@ import {
   getLineAccountById,
   isOperationCapabilityStopped,
   jstNow,
+  nextVersionToken,
 } from '@line-crm/db';
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH, effectiveAnniversaryMonthDay, type LeapYearPolicy } from '@line-crm/shared';
@@ -612,12 +614,25 @@ export async function saveNenCampaignAccountSetting(
   lineAccountId: string,
   campaign: CampaignRow,
 ): Promise<void> {
-  await writeAccountSetting(
-    db,
-    lineAccountId,
-    campaignAccountSettingKey(campaign.campaign_key),
-    JSON.stringify({ ...campaign, updated_at: jstNow() }),
-  );
+  const key = campaignAccountSettingKey(campaign.campaign_key);
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const previous = await readAccountSetting(db, lineAccountId, key);
+    let previousVersion = campaign.updated_at;
+    if (previous) {
+      try { previousVersion = (JSON.parse(previous) as { updated_at?: string }).updated_at ?? previousVersion; } catch { /* use the base token */ }
+    }
+    const version = nextVersionToken(previousVersion);
+    const value = JSON.stringify({ ...campaign, updated_at: version });
+    const result = previous === null
+      ? await db.prepare(`INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(line_account_id, key) DO NOTHING`)
+          .bind(crypto.randomUUID(), lineAccountId, key, value, version, version).run()
+      : await db.prepare(`UPDATE account_settings SET value = ?, updated_at = ?
+          WHERE line_account_id = ? AND key = ? AND value = ?`)
+          .bind(value, version, lineAccountId, key, previous).run();
+    if ((result.meta?.changes ?? 0) === 1) return;
+  }
+  throw new Error('campaign_setting_contention');
 }
 
 export async function getNenBirthdayCouponSetting(
@@ -1226,13 +1241,29 @@ export async function processNenDeliveries(
       }
       const accessToken = account.channel_access_token;
       const payload = JSON.parse(job.payload) as Record<string, unknown>;
+      let recipientLineUserId = friend.line_user_id;
+      if (typeof payload.expectedLineUserId === 'string') {
+        const current = await db.prepare(`SELECT f.line_user_id,f.line_account_id,f.is_following,COALESCE(f.is_hidden,0) AS is_hidden,
+          CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL}) THEN 1 ELSE 0 END AS consent_allowed
+          FROM friends f JOIN nen_delivery_jobs j ON j.friend_id=f.id
+          WHERE j.id=? AND j.status='processing' AND j.claim_token=?`)
+          .bind(job.id, claimToken).first<{ line_user_id: string; line_account_id: string | null; is_following: number; is_hidden: number; consent_allowed: number }>();
+        if (!current || current.line_user_id !== payload.expectedLineUserId || current.line_account_id !== job.line_account_id || current.is_following !== 1 || current.is_hidden !== 0 || current.consent_allowed !== 1) {
+          const reason = current && current.line_user_id !== payload.expectedLineUserId ? 'recipient_changed' : 'friend_unavailable';
+          const changed = await db.prepare(`UPDATE nen_delivery_jobs SET status='skipped',last_error=?,updated_at=? WHERE id=? AND status='processing' AND claim_token=?`)
+            .bind(reason, jstNow(), job.id, claimToken).run();
+          if (changed.meta.changes) skipped++;
+          continue;
+        }
+        recipientLineUserId = current.line_user_id;
+      }
       const messages = buildNenDeliveryMessages(campaign, payload);
       const retryGeneration = Number(job.retry_generation ?? 0);
       const idempotencyKey = retryGeneration > 0
         ? `${job.id}:manual:${retryGeneration}`
         : job.id;
       await pushViaHarnessProxy(
-        options.proxyBaseUrl, accessToken, friend.line_user_id, messages, idempotencyKey, options.proxyDispatch,
+        options.proxyBaseUrl, accessToken, recipientLineUserId, messages, idempotencyKey, options.proxyDispatch,
       );
       await db.prepare(
         `UPDATE nen_delivery_jobs SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ? AND claim_token = ?`,

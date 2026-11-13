@@ -69,7 +69,7 @@ export async function uploadFormDocument(c: Context<Env>, block: FormInputBlock,
       }
     } catch { await markFileScanPendingRetry(c.env.DB, scan.id, scan.attempts, FORM_FILE_SCAN_MAX_ATTEMPTS); status = 'pending'; }
   }
-  if (status === 'clean') await markFileScanClean(c.env.DB, scan.id);
+  if (status === 'clean' && !await markFileScanClean(c.env.DB, scan.id)) status = 'pending';
   if (status === 'quarantined') await purgeUnsafeFormDocuments(c.env.DB, c.env.IMAGES, scan.id);
   if (status === 'quarantined') return c.json({ success: false, code: 'file_scan_blocked', error: '安全を確認できませんでした。別のファイルを選んでください' }, 422);
   const row = await c.env.DB.prepare('SELECT * FROM form_submission_files WHERE id = ?').bind(id).first<FormDocumentRow>();

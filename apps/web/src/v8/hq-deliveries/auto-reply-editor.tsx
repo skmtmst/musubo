@@ -38,7 +38,7 @@ const ORDER: StepKey[] = ['basic', 'trigger', 'reply', 'priority', 'confirm']
 const NEXT: Partial<Record<StepKey, StepKey>> = { basic: 'trigger', trigger: 'reply', reply: 'confirm' }
 
 const DELAYS = [{ value: '0', label: 'すぐ返す' }, { value: '30', label: '30秒あける' }, { value: '60', label: '1分あける' }, { value: '300', label: '5分あける' }]
-const SAMPLE_TOKENS: Record<string, string> = { '{{name}}': 'Kenta', '{{account.name}}': 'musubo', '{{var.store_phone}}': '03-1234-5678', '{{var.reservation_url}}': 'https://example.com/booking' }
+const SAMPLE_TOKENS: Record<string, string> = { '{{name}}': 'Kenta', '{{account.name}}': 'musubo', '{{var.store_phone}}': '03-0000-5678', '{{var.reservation_url}}': 'https://example.com/booking' }
 const sample = (text: string) => text.replace(/\{\{[^}]+\}\}/g, (token) => SAMPLE_TOKENS[token] ?? '（友だち情報）')
 
 export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, name, description, settings, references, onName, onDescription, onSetting, onActions, onCancel, onSave }: {

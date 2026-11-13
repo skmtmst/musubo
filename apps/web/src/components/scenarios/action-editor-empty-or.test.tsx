@@ -9,6 +9,8 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ActionEditor from './action-editor'
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 const net = vi.hoisted(() => ({
   updates: [] as Array<{ scenarioId: string; actionId: string; patch: unknown }>,
 }))
@@ -124,6 +126,26 @@ async function saveCondition() {
 }
 
 describe('S4-OR 動作の条件は空のかたまりを黙って保存しない', () => {
+  it('条件を編集して戻るとき、未保存の条件を破棄する前に確認する', async () => {
+    await renderEditor()
+    await openCondition()
+    fireEvent.click(orAddButton())
+    fireEvent.click(screen.getByRole('button', { name: '戻る' }))
+    expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('動作の条件への変更')
+    expect(screen.getByRole('button', { name: '条件を保存する' })).toBeTruthy()
+  })
+
+  it('条件を編集して別画面へ移るとき、入力を残して確認する', async () => {
+    window.history.replaceState(null, '', '/scenarios')
+    await renderEditor(); await openCondition()
+    fireEvent.click(orAddButton())
+    const link = document.createElement('a'); link.href = '/events'; document.body.appendChild(link)
+    fireEvent.click(link)
+    expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '条件を保存する' })).toBeTruthy()
+    link.remove()
+  })
   it('空の or だけ足して保存しても口は呼ばれず、不足の案内が出る', async () => {
     await renderEditor()
     await openCondition()
@@ -165,6 +187,8 @@ describe('S4-OR 動作の条件は空のかたまりを黙って保存しない'
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '戻る' }))
     })
+    const confirmation = await screen.findByRole('dialog', { name: '保存していない変更があります' })
+    fireEvent.click(within(confirmation).getByRole('button', { name: '保存せずに移る' }))
 
     expect(net.updates).toHaveLength(0)
     // 開き直すと空のかたまりは残っていない（動作の保存値は null のまま）。

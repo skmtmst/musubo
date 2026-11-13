@@ -147,7 +147,7 @@ beforeEach(() => {
            ('mv-b1','menu-b',1,'施術B',60,0,1000,'fixed',0,1,'{}');
     INSERT INTO booking_customers
       (id, line_account_id, display_name, phone_normalized_hash, phone_encrypted, phone_last4)
-    VALUES ('customer-1','account-a','山田 花子','hash','cipher','5678');
+    VALUES ('customer-1','account-a','見本 143','hash','cipher','5678');
   `);
   d1 = sqliteAsD1(sqlite);
   access.canAccessAllLineAccounts.mockClear();

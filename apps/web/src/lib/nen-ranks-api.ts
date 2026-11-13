@@ -171,14 +171,16 @@ export const nenRanksApi = {
     if (params.pageSize) search.set('pageSize', String(params.pageSize))
     return fetchApi<ApiResponse<NenMemberListData>>(`/api/nen/members?${search.toString()}`)
   },
+  rankDeletePreview: (accountId:string, rankId:string) => fetchApi<ApiResponse<{count:number;version:number;members:Array<{friendId:string;customerId:string|null}>}>>(`/api/nen/rank-settings/${encodeURIComponent(rankId)}/delete-preview?${new URLSearchParams({accountId})}`),
   /** ランクの削除。会員がいるときは移す先が必須。版が合わないときは 409。 */
-  deleteRank: (accountId: string, rankId: string, options: { replacementRankId?: string | null; expectedVersion: number }) =>
+  deleteRank: (accountId: string, rankId: string, options: { replacementRankId?: string | null; expectedVersion: number; confirmedMembers?:Array<{friendId:string;customerId:string|null}> }) =>
     fetchApi<ApiResponse<NenRankDeleteResult>>(`/api/nen/rank-settings/${encodeURIComponent(rankId)}`, {
       method: 'DELETE',
       body: JSON.stringify({
         accountId,
         replacementRankId: options.replacementRankId ?? null,
         expectedVersion: options.expectedVersion,
+        ...(options.confirmedMembers===undefined?{}:{confirmedMembers:options.confirmedMembers}),
       }),
     }),
 }

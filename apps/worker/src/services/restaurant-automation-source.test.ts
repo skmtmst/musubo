@@ -1,13 +1,12 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { futureSlot } from '../test-utils/waitlist-fixture.js';
 import { readRestaurantAutomationSource } from './restaurant-automation-source.js';
 import type { RestaurantEvent } from './restaurant-event-types.js';
 
 let t:SqliteD1;
 const now='2026-11-03T00:00:00Z';
 beforeEach(()=>{
-  t=createTestD1();
+  t=createTestD1({ now: () => new Date(now) });
   t.raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','a','店舗','t','s');
     INSERT INTO friends(id,line_account_id,line_user_id,display_name) VALUES('f','a','UID','友だち'),('g','a','OTHER','別の人');
     INSERT INTO rt_organizations(id,account_id,name) VALUES('org','a','組織');
@@ -55,7 +54,7 @@ it('飲食以外の出来事には予約の条件を付けない',async()=>{
   expect(await readRestaurantAutomationSource(t.db,{...input(),eventType:'friend_add',eventId:'ordinary'})).toEqual({restaurant:false,allowed:true});
 });
 it('キャンセル待ちは同じ招待・本人・有効期限だけを通す',async()=>{
-  const startsAt=futureSlot();
+  const startsAt=new Date(Date.parse(now)+2*24*60*60*1000).toISOString();
   const endsAt=new Date(Date.parse(startsAt)+60*60*1000).toISOString();
   t.raw.prepare(`INSERT INTO rt_seat_waitlist(id,store_id,starts_at,ends_at,guest_count,customer_name,line_uid,identity_key,status)
     VALUES('w','store',?,?,2,'友だち','UID','uid','waiting')`).run(startsAt,endsAt);
