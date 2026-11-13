@@ -138,8 +138,9 @@
 .cardsAdopted {
   grid-template-columns: repeat(auto-fill, var(--tpl-nm-card-adopted-w));
 }
+/* カードは列の幅いっぱい。flex だとカードが中身の幅で止まり、列の右が空く（2列の 1152px で約180px）。 */
 .cardItem {
-  display: flex;
+  display: grid;
   min-width: 0;
 }
 .card,
