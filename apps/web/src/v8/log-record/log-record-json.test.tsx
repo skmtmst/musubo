@@ -34,7 +34,7 @@ const SECRET_RECORD = {
   headers: { Authorization: 'Bearer abc.def.ghi', 'X-Line-Signature': 'sig-value', 'content-type': 'application/json' },
   webhookSecret: 'whsec_123',
   accessToken: 'token-value',
-  friend: { displayName: '山田 花子', email: 'hanako@example.com', phone: '090-0000-0000', lineUserId: 'U0123' },
+  friend: { displayName: '見本 143', email: 'hanako@example.com', phone: '090-0000-0000', lineUserId: 'U0123' },
   targetUrl: 'https://example.com/hook',
   note: 'see https://example.com/cb?token=leak#frag',
   raw: 'Bearer zzz',
@@ -45,7 +45,7 @@ const SECRET_RECORD = {
 describe('記録の伏せ方', () => {
   it('秘密値・個人情報の項目と鍵の形の値を伏せ、元の値は変えない', () => {
     const text = formatLogRecord(SECRET_RECORD)
-    for (const leak of ['abc.def.ghi', 'sig-value', 'whsec_123', 'token-value', '山田 花子', 'hanako@example.com', '090-0000-0000', 'U0123', 'https://example.com/hook', 'token=leak', 'zzz', 'SflKxwRJSMeKKF2Q', '"pw"']) {
+    for (const leak of ['abc.def.ghi', 'sig-value', 'whsec_123', 'token-value', '見本 143', 'hanako@example.com', '090-0000-0000', 'U0123', 'https://example.com/hook', 'token=leak', 'zzz', 'SflKxwRJSMeKKF2Q', '"pw"']) {
       expect(text).not.toContain(leak)
     }
     expect(text).toContain('"status": "failed"')
@@ -82,7 +82,7 @@ describe('記録の JSON を開いて写す', () => {
     const copied = writeText.mock.calls[0]![0]
     expect(copied).toBe(pre?.textContent)
     expect(copied).not.toContain('Bearer')
-    expect(copied).not.toContain('山田 花子')
+    expect(copied).not.toContain('見本 143')
   })
 
   it('閲覧のみの人には写す操作を出さない（開いて読むのはできる）', () => {

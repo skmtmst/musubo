@@ -59,7 +59,7 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
   ungrouped?: boolean
 }) {
   const saveErrors = useSaveFormErrors()
-  const stepUp = useStepUpGate()
+  const stepUp = useStepUpGate({ showActionInTitle: true, fullWidthPassword: true })
   const operationRef = useRef<symbol | null>(null)
   const operationContext = useRef(0)
   useEffect(() => {
@@ -216,6 +216,7 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
     <Button
       type="button"
       variant="secondary"
+      widthReserve="idle"
       onClick={() => void start()}
       disabled={!accountId || requesting || running} busy={requesting && !active} busyLabel="書き出しを依頼しています…"><Download size={16} aria-hidden="true" />CSVで書き出す
     </Button>
@@ -238,7 +239,7 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
             ) : null}
           </>}
         >
-          {statusLabel(active.status)}{'：'}
+          {active.status !== 'expired' ? <>{statusLabel(active.status)}{'：'}</> : null}
           {running ? <>{formatNumber(active.processedCount)} / {active.totalCount == null ? '…' : formatNumber(active.totalCount)}件</> : null}
           {active.status === 'completed' ? <>{formatNumber(active.rowCount ?? 0)} 件（{formatJstDateTime(active.expiresAt)}まで）</> : null}
           {active.status === 'failed' ? active.failureReason ?? '書き出せませんでした' : null}

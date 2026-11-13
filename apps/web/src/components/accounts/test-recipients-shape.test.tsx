@@ -42,7 +42,7 @@ afterEach(cleanup)
 
 describe('テスト送信先の形違い応答', () => {
   it('候補が配列でなくても落ちず読み込み失敗を出す', async () => {
-    apiMocks.getTestRecipients.mockReturnValue(ok([{ id: 'f1', displayName: '田中 太郎', pictureUrl: null }]))
+    apiMocks.getTestRecipients.mockReturnValue(ok([{ id: 'f1', displayName: '見本 167', pictureUrl: null }]))
     // 旧偽APIの形（配列でない）。本物は配列を返す。
     apiMocks.getTestRecipientLoginUsers.mockReturnValue(ok({ items: [], total: 0, page: 1, limit: 20 }))
     render(<TestRecipientsSetting accountId="acc-a" />)

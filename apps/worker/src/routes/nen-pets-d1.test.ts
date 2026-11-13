@@ -31,8 +31,8 @@ function seed(raw: Database.Database): void {
     VALUES ('${ACCOUNT}', 'channel-nen', '然', 'token', 'secret', NULL),
            ('account-other', 'channel-o', '別', 'token', 'secret', 'tenant-other');
     INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following, created_at, updated_at) VALUES
-      ('friend-a', 'U-a', '山田 太郎', '${ACCOUNT}', 1, '2026-09-01', '2026-09-01'),
-      ('friend-b', 'U-b', '鈴木 一郎', '${ACCOUNT}', 1, '2026-09-01', '2026-09-01'),
+      ('friend-a', 'U-a', '見本 141', '${ACCOUNT}', 1, '2026-09-01', '2026-09-01'),
+      ('friend-b', 'U-b', '見本 176', '${ACCOUNT}', 1, '2026-09-01', '2026-09-01'),
       ('friend-c', 'U-c', '別店', 'account-other', 1, '2026-09-01', '2026-09-01');
     INSERT INTO nen_ec_member_snapshots (friend_id, customer_id, purchase_count, purchase_amount, point_balance, member_rank, synced_at)
     VALUES ('friend-a', '10231', 12, 412300, 2840, 'プラチナ', '2026-09-16');
@@ -104,7 +104,7 @@ describe('GET /api/nen/pets（★37-3 マイペット）', () => {
     expect(momo).toMatchObject({
       animalType: 'dog', breed: '柴犬', weightKg: 10, neutered: 'yes', activityLevel: 'normal', activityLabel: 'ふつう',
       productName: '鹿肉ミンチ', weightStale: false, ageLabel: expect.stringMatching(/^(3歳11か月|4歳0か月)$/),
-      owner: { friendId: 'friend-a', name: '山田 太郎', pictureUrl: null, customerId: '10231' },
+      owner: { friendId: 'friend-a', name: '見本 141', pictureUrl: null, customerId: '10231' },
     });
     expect(momo.feeding).toMatchObject({ dailyKcal: 630, dailyGrams: 525, factorLabel: '成犬・避妊去勢済み' });
 
@@ -136,7 +136,7 @@ describe('GET /api/nen/pets（★37-3 マイペット）', () => {
     const byAge = await get(`/api/nen/pets?accountId=${ACCOUNT}&sort=age_desc`);
     expect(byAge.body.data.items.map((p: any) => p.name)).toEqual(['モモ', 'ハナ', 'タロウ']);
 
-    const search = await get(`/api/nen/pets?accountId=${ACCOUNT}&q=鈴木`);
+    const search = await get(`/api/nen/pets?accountId=${ACCOUNT}&q=176`);
     expect(search.body.data.items.map((p: any) => p.name).sort()).toEqual(['タロウ', 'ハナ']);
     const byCustomer = await get(`/api/nen/pets?accountId=${ACCOUNT}&q=10231`);
     expect(byCustomer.body.data.items.map((p: any) => p.name)).toEqual(['モモ']);
@@ -216,7 +216,7 @@ describe('GET /api/nen/health（★37-4 健康日記）', () => {
 
     const momo = body.data.items.find((r: any) => r.pet.name === 'モモ');
     expect(momo).toMatchObject({
-      owner: { friendId: 'friend-a', name: '山田 太郎', customerId: '10231' },
+      owner: { friendId: 'friend-a', name: '見本 141', customerId: '10231' },
       lastLoggedLabel: '今日', daysSinceLast: 0, count30d: 4, totalRecords: 6, latestWeightKg: 9.6,
       latestStool: '正常', latestAppetite: '普通', concerning: true,
     });
@@ -247,7 +247,7 @@ describe('GET /api/nen/health（★37-4 健康日記）', () => {
     expect(week.body.data.items.map((r: any) => r.pet.name).sort()).toEqual(['ハナ', 'モモ']);
     const records = await get(`/api/nen/health?accountId=${ACCOUNT}&sort=records_desc`);
     expect(records.body.data.items.map((r: any) => r.pet.name)).toEqual(['モモ', 'ハナ', 'タロウ']);
-    const q = await get(`/api/nen/health?accountId=${ACCOUNT}&q=山田`);
+    const q = await get(`/api/nen/health?accountId=${ACCOUNT}&q=141`);
     expect(q.body.data.items.map((r: any) => r.pet.name)).toEqual(['モモ']);
   });
 
@@ -255,7 +255,7 @@ describe('GET /api/nen/health（★37-4 健康日記）', () => {
     const { status, body } = await get(`/api/nen/health/pet-momo/summary?accountId=${ACCOUNT}`);
     expect(status).toBe(200);
     expect(body.data.pet).toMatchObject({ id: 'pet-momo', name: 'モモ', animalType: 'dog', breed: '柴犬', weightKg: 10 });
-    expect(body.data.owner).toEqual({ friendId: 'friend-a', name: '山田 太郎' });
+    expect(body.data.owner).toEqual({ friendId: 'friend-a', name: '見本 141' });
     expect(body.data.summary).toMatchObject({
       days: 30, records: 4,
       weight: { first: 10.4, last: 9.6, min: 9.6, max: 10.4 },

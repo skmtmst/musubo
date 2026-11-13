@@ -17,7 +17,7 @@ import CompanyContactCard from './company-contact'
 import HqSettingsV8 from './settings'
 
 const values = {legalCompanyName:'株式会社テスト',postalCode:'1500001',address:'東京都渋谷区神宮前1-2-3',building:null,
-  phone:'03-1234-5678',contactName:'山田 太郎',contactEmail:'yamada@example.com',invoiceAddressee:null}
+  phone:'03-0000-5678',contactName:'見本 141',contactEmail:'yamada@example.com',invoiceAddressee:null}
 const field = (label: string) => screen.getByLabelText(new RegExp(`^${label.replace(/[（ ）]/g,'\\$&')}`)) as HTMLInputElement
 const submit = () => fireEvent.submit(screen.getByRole('form',{name:'会社と連絡先'}))
 const loaded = () => waitFor(()=>expect(field('会社名（正式）').value).toBe(values.legalCompanyName))
@@ -46,7 +46,7 @@ describe('会社と連絡先の画面の動き',()=>{
   it('郵便番号と電話は文字数でなく入力形式の見本で案内する',async()=>{
     await renderCard()
     expect(field('郵便番号').placeholder).toBe('例：123-4567')
-    expect(field('電話番号').placeholder).toBe('例：03-1234-5678')
+    expect(field('電話番号').placeholder).toBe('例：03-0000-5678')
   })
 
   it('編集した8欄と読み込んだ版を保存し、返された値と新しい版を次の保存に使う',async()=>{
@@ -57,19 +57,19 @@ describe('会社と連絡先の画面の動き',()=>{
     mocks.save.mockResolvedValueOnce({success:true,data:{...values,legalCompanyName:'新しい正式名',building:'ビル5階',invoiceAddressee:'経理部',revision:5}})
     submit()
     await waitFor(()=>expect(screen.getByRole('status').textContent).toContain('会社と連絡先を保存しました。'))
-    expect(mocks.save).toHaveBeenCalledWith({...values,phone:'0312345678',legalCompanyName:'新しい正式名',building:'ビル5階',invoiceAddressee:'経理部',expectedRevision:4})
+    expect(mocks.save).toHaveBeenCalledWith({...values,phone:'0300005678',legalCompanyName:'新しい正式名',building:'ビル5階',invoiceAddressee:'経理部',expectedRevision:4})
     expect(field('会社名（正式）').value).toBe('新しい正式名')
     fireEvent.change(field('担当者名'),{target:{value:'次の担当者'}})
     submit()
     await waitFor(()=>expect(mocks.save).toHaveBeenCalledTimes(2))
     expect(mocks.save.mock.calls[1][0].expectedRevision).toBe(5)
   })
-  it.each(['０９０－１２３４－５６７８','090 1234 5678'])('電話の入力%sは数字だけで保存する',async phone=>{
+  it.each(['０９０－００００－５６７８','090 0000 5678'])('電話の入力%sは数字だけで保存する',async phone=>{
     await renderCard()
     fireEvent.change(field('電話番号'),{target:{value:phone}})
     submit()
     await waitFor(()=>expect(mocks.save).toHaveBeenCalledTimes(1))
-    expect(mocks.save).toHaveBeenCalledWith({...values,phone:'09012345678',expectedRevision:4})
+    expect(mocks.save).toHaveBeenCalledWith({...values,phone:'09000005678',expectedRevision:4})
   })
   it('国内番号にならない電話は入力を残し、保存しない',async()=>{
     await renderCard()

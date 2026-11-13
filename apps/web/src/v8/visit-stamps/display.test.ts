@@ -65,7 +65,7 @@ describe('来店スタンプの見せ方', () => {
   it('手入力の理由とメモ・友だちの名前', () => {
     expect(manualReasonText('paper', ' レシートを確認済み ')).toBe('紙のカードから移す：レシートを確認済み')
     expect(manualReasonText('forgot', '')).toBe('押し忘れ')
-    expect(friendLabel({ displayName: 'けんじ', metadata: { name: '佐藤 健二' } })).toBe('佐藤 健二（LINE：けんじ）')
+    expect(friendLabel({ displayName: 'けんじ', metadata: { name: '見本 115' } })).toBe('見本 115（LINE：けんじ）')
     expect(friendLabel({ displayName: 'けんじ' })).toBe('けんじ')
   })
 

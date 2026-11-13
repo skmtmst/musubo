@@ -81,7 +81,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
   const decision = await c.env.DB.batch([c.env.DB
     .prepare(
       `UPDATE event_bookings
-          SET status = ?, decided_at = ?, decided_by_staff_id = ?, updated_at = ?
+          SET confirmation_revision = confirmation_revision + 1, status = ?, decided_at = ?, decided_by_staff_id = ?, updated_at = ?
         WHERE id = ? AND status = ? AND decided_at IS NULL AND lock_version=?`,
     )
     .bind(next, nowIso, staff?.id ?? null, nowIso, booking.id, booking.status,booking.lock_version),...plans]).catch(error=>{if(error instanceof Error&&error.message.includes('entitlement_unavailable'))return null;throw error;});
@@ -124,7 +124,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
     await c.env.DB
       .prepare(
         `UPDATE event_bookings
-            SET internal_note = COALESCE(internal_note || char(10), '') || ?,
+            SET confirmation_revision = confirmation_revision + 1, internal_note = COALESCE(internal_note || char(10), '') || ?,
                 updated_at = ?
           WHERE id = ?`,
       )
@@ -188,7 +188,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         await c.env.DB
           .prepare(
             `UPDATE event_bookings
-                SET status = 'requested', decided_at = NULL,
+                SET confirmation_revision = confirmation_revision + 1, status = 'requested', decided_at = NULL,
                     decided_by_staff_id = NULL, updated_at = ?
               WHERE id = ? AND status = 'rejected' AND lock_version=?`,
           )
@@ -265,7 +265,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
   const upd = await c.env.DB
     .prepare(
       `UPDATE event_bookings
-          SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'admin', updated_at = ?
+          SET confirmation_revision = confirmation_revision + 1, status = 'cancelled', cancelled_at = ?, cancelled_by = 'admin', updated_at = ?
         WHERE id = ? AND status = ? AND lock_version=?`,
     )
     .bind(nowIso, nowIso, booking.id, booking.status,booking.lock_version)
@@ -294,7 +294,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
       await c.env.DB
         .prepare(
           `UPDATE event_bookings
-              SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
+              SET confirmation_revision = confirmation_revision + 1, status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
             WHERE id = ? AND status = 'cancelled' AND lock_version=? AND NOT EXISTS(SELECT 1 FROM event_booking_transition_runs t WHERE t.booking_id=event_bookings.id AND t.booking_version=event_bookings.lock_version AND t.status='complete') AND NOT EXISTS(SELECT 1 FROM event_booking_entitlement_uses u WHERE u.event_booking_id=event_bookings.id AND u.returned_at IS NOT NULL)`,
         )
         .bind(booking.status, nowIso, booking.id,booking.lock_version+1)
@@ -351,7 +351,7 @@ events.put('/api/events/admin/events/:id/bookings/:bookingId', requireRole('owne
   setValues.push(booking.id, booking.status);
   // 承認・取消と同じく、id と状態を更新条件に含めて競合を防ぐ。
   const upd = await c.env.DB
-    .prepare(`UPDATE event_bookings SET ${setClauses.join(', ')} WHERE id = ? AND status = ?`)
+    .prepare(`UPDATE event_bookings SET confirmation_revision = confirmation_revision + 1, ${setClauses.join(', ')} WHERE id = ? AND status = ?`)
     .bind(...setValues)
     .run();
   if ((upd.meta?.changes ?? 0) === 0) return bad(c, 'invalid_state', 409);

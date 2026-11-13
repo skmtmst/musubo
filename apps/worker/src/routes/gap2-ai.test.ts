@@ -5,7 +5,7 @@ import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
 let d:SqliteD1;const setting='/api/ai-settings?account_id=a';
 const app=(who=gapOwner,im=false)=>{const a=gapApp(d,[aiDrafts],who,im);a.use('*',async()=>{});return a;};
-beforeEach(()=>{d=gapFixture();d.raw.exec("INSERT INTO chats(id,friend_id,created_at,updated_at) VALUES('chat','f',datetime('now'),datetime('now'));INSERT INTO messages_log(id,friend_id,line_account_id,direction,message_type,content) VALUES('msg','f','a','incoming','text','お客さま 090-1234-5678 test@example.com 東京都千代田区1-2-3')");vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));});
+beforeEach(()=>{d=gapFixture();d.raw.exec("INSERT INTO chats(id,friend_id,created_at,updated_at) VALUES('chat','f',datetime('now'),datetime('now'));INSERT INTO messages_log(id,friend_id,line_account_id,direction,message_type,content) VALUES('msg','f','a','incoming','text','お客さま 090-0000-5678 test@example.com 東京都千代田区1-2-3')");vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));});
 afterEach(()=>{d.raw.close();vi.unstubAllGlobals();});
 test('AI-01 AI-02 AI-08 AI-22 Q-01: 初期off・確認・古い版・代理オン禁止、自動応答は未実装で閉じる',async()=>{
  expect((await (await gapCall(app(),setting)).json() as any).data.mode).toBe('off');expect((await gapCall(app(),setting,'PUT',{mode:'draft_only',expectedVersion:0})).status).toBe(400);
@@ -22,7 +22,7 @@ test('AI-21 AI-27: staffは下書きまで・公開は管理者・古い版409�
  expect((await gapCall(app(),`/api/qa-entries/${id}?account_id=a`,'DELETE',{expectedVersion:2})).status).toBe(200);expect(d.raw.prepare('SELECT status FROM qa_entries').get()).toEqual({status:'stopped'});
 });
 test('AI-03 AI-13 AI-20: 要約は伏せた形・返信案は閲覧と代理を拒否',async()=>{
- expect(maskAiText('佐藤 090-1234-5678 x@y.com 東京都千代田区1-2-3',['佐藤'])).not.toMatch(/佐藤|090|@|千代田/);
+ expect(maskAiText('佐藤 090-0000-5678 x@example.com 東京都千代田区1-2-3',['佐藤'])).not.toMatch(/佐藤|090|@|千代田/);
  for(const [who,im] of [[{...gapOwner,readOnly:true},false],[gapOwner,true]] as const)expect((await gapCall(app(who,im),'/api/chats/chat/ai/draft','POST',{})).status).toBe(403);
  expect((await gapCall(app(),'/api/chats/chat/ai/summary','POST',{})).status).toBe(409);expect(fetch).not.toHaveBeenCalled();
 });

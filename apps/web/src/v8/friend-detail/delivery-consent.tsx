@@ -7,6 +7,7 @@ import Card from '@/components/shared/card'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Drawer from '@/components/shared/drawer'
 import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
@@ -46,21 +47,25 @@ const stateOf = (side: FriendDeliveryConsentEvent['before']) => (side ? STATE_LA
 const bySelf = (row: FriendDeliveryConsent | undefined) => Boolean(row && row.source !== 'manual')
 
 export function useDeliveryConsents(friendId: string) {
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [rows, setRows] = useState<FriendDeliveryConsent[]>([])
+  const scope = useRef({ friendId, epoch: 0 })
+  if (scope.current.friendId !== friendId) scope.current = { friendId, epoch: scope.current.epoch + 1 }
+  const request = useRef(0)
+  const [data, setData] = useState<{ epoch: number; status: 'loading' | 'ready' | 'error'; rows: FriendDeliveryConsent[] }>({ epoch: 0, status: 'loading', rows: [] })
   const load = useCallback(async () => {
-    setStatus('loading')
+    const epoch = scope.current.epoch
+    const seq = ++request.current
+    setData(current => ({ epoch, status: 'loading', rows: current.epoch === epoch ? current.rows : [] }))
     try {
       const response = await friendDeliveryConsentsApi.list(friendId)
+      if (request.current !== seq || scope.current.epoch !== epoch) return
       if (!response.success) throw new Error('consents_failed')
-      setRows(Array.isArray(response.data) ? response.data : [])
-      setStatus('ready')
+      setData({ epoch, status: 'ready', rows: Array.isArray(response.data) ? response.data : [] })
     } catch {
-      setStatus('error')
+      if (request.current === seq && scope.current.epoch === epoch) setData({ epoch, status: 'error', rows: [] })
     }
   }, [friendId])
-  useEffect(() => { void load() }, [load])
-  return { status, rows, reload: load }
+  useEffect(() => { void load(); return () => { request.current++ } }, [load])
+  return { status: data.epoch === scope.current.epoch ? data.status : 'loading' as const, rows: data.epoch === scope.current.epoch ? data.rows : [], reload: load }
 }
 
 /** 左の要点の1段：宣伝の受け取りを1行で。 */
@@ -71,10 +76,12 @@ export function DeliveryConsentSummary({ status, rows }: { status: 'loading' | '
   return <p className={styles.summary}>{`キャンペーン・宣伝：${STATE_LABEL[marketing?.state ?? 'unknown']}`}</p>
 }
 
-export default function DeliveryConsentDrawer({ open, friendId, friendName, rows, canEdit, onClose, onSaved }: {
+export default function DeliveryConsentDrawer({ open, friendId, friendName, friendAccountId = null, selectedAccountId = null, rows, canEdit, onClose, onSaved }: {
   open: boolean
   friendId: string
   friendName: string
+  friendAccountId?: string | null
+  selectedAccountId?: string | null
   rows: FriendDeliveryConsent[]
   canEdit: boolean
   onClose: () => void
@@ -84,7 +91,9 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
   const [next, setNext] = useState<FriendDeliveryConsent['state']>('granted')
   const [reason, setReason] = useState('')
   const [reasonError, setReasonError] = useState('')
-  const [warn, setWarn] = useState(false)
+  const [warn, setWarn] = useState<{ epoch: number; friendId: string; friendName: string; accountId: string | null; purpose: string; state: FriendDeliveryConsent['state']; reason: string; version: number } | null>(null)
+  const scope = useRef({ friendId, friendAccountId, selectedAccountId, canEdit, open, epoch: 0 })
+  if (scope.current.friendId !== friendId || scope.current.friendAccountId !== friendAccountId || scope.current.selectedAccountId !== selectedAccountId || scope.current.canEdit !== canEdit || scope.current.open !== open) scope.current = { friendId, friendAccountId, selectedAccountId, canEdit, open, epoch: scope.current.epoch + 1 }
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const errors = useSaveFormErrors()
@@ -109,20 +118,26 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
     setReviewRequired(false); setEditing(key); setNext(rowOf(key)?.state ?? 'unknown'); setReason(''); setReasonError(''); setError('')
   }
 
-  const commit = async () => {
-    if (!editing || reviewRequired || commitLock.current || busy || !canEdit) return
+  const commit = async (confirmation?: NonNullable<typeof warn>) => {
+    if (!editing || reviewRequired || commitLock.current || busy || !canEdit || !open) return
+    if (confirmation && (confirmation.epoch !== scope.current.epoch || confirmation.friendId !== friendId || confirmation.purpose !== editing || confirmation.state !== next || confirmation.reason !== reason.trim() || confirmation.version !== (rowOf(editing)?.version ?? 0))) {
+      setReviewRequired(true); setError('対象や受け取り設定が変わりました。閉じて読み直し、もう一度選んでください。'); return false
+    }
+    const epoch = scope.current.epoch
     commitLock.current = true
     setBusy(true); setError('')
     try {
       const current = rowOf(editing)
-      const response = await friendDeliveryConsentsApi.save(friendId, editing, { state: next, reason: reason.trim(), expectedVersion: current?.version ?? 0 })
+      const response = await friendDeliveryConsentsApi.save(confirmation?.friendId ?? friendId, confirmation?.purpose ?? editing, { state: confirmation?.state ?? next, reason: confirmation?.reason ?? reason.trim(), expectedVersion: confirmation?.version ?? current?.version ?? 0 })
+      if (scope.current.epoch !== epoch) return false
       if (!response.success) throw new Error('save_failed')
       notifySaved('配信の受け取りを保存しました。')
-      setWarn(false); setEditing(null)
+      setWarn(null); setEditing(null)
       await onSaved()
       await loadHistory()
       return true
     } catch (reason) {
+      if (scope.current.epoch !== epoch) return false
       errors.capture(reason)
       const needsReview = !(reason instanceof ApiError) || reason.status === 409 || reason.status >= 500
       setReviewRequired(needsReview)
@@ -140,7 +155,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
     if (!reason.trim()) { setReasonError('理由を入れてください。'); return }
     const current = editing ? rowOf(editing) : undefined
     /* 本人が止めた宣伝を、店が受け取るへ戻すときだけ注意の窓。 */
-    if (editing === 'marketing' && current?.state === 'revoked' && next === 'granted' && bySelf(current)) { setWarn(true); return }
+    if (editing === 'marketing' && current?.state === 'revoked' && next === 'granted' && bySelf(current)) { setWarn({ epoch: scope.current.epoch, friendId, friendName, accountId: friendAccountId, purpose: editing, state: next, reason: reason.trim(), version: current.version }); return }
     void commit()
   }
 
@@ -214,7 +229,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
         </section>
       </div>
       <ConfirmDialog
-        open={warn}
+        open={warn !== null && warn.epoch === scope.current.epoch}
         title="本人が止めた宣伝を、受け取るに戻しますか？"
         description="この方は、ご自分で宣伝を止めています。店の判断で戻すと、お客さまの意思に反して宣伝が届くことがあります。電話や来店で、本人から了承を得たときだけ戻してください。理由は記録に残ります。"
         confirmLabel="受け取るに戻す"
@@ -222,9 +237,9 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
         busy={busy}
         confirmDisabled={reviewRequired}
         confirmDisabledReason="閉じて、本人の受け取り設定と理由を確かめてください。"
-        error={error || undefined} onSuccess={() => setWarn(false)} onConfirm={() => commit()}
-        onCancel={() => { setWarn(false); setReviewRequired(false); setError('') }}
-      />
+        error={error || undefined} onSuccess={() => setWarn(null)} onConfirm={() => warn ? commit(warn) : undefined}
+        onCancel={() => { setWarn(null); setReviewRequired(false); setError('') }}
+      ><OperationTargetSummary accounts={[{ id: warn?.accountId ?? '', name: warn?.accountId ? undefined : '不明' }]} externalTarget={{ label: '友だち', name: warn?.friendName }} /></ConfirmDialog>
     </Drawer></SaveErrorScope>
   )
 }

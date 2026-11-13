@@ -108,7 +108,7 @@ function makeApp(
 }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
-const CUSTOMER_BODY = { display_name: '山田 花子', phone: '090-1234-5678', pet_name: 'ポチ' };
+const CUSTOMER_BODY = { display_name: '見本 143', phone: '090-0000-5678', pet_name: 'ポチ' };
 
 let sqlite: Database.Database;
 let db: D1Database;

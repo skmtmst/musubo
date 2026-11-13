@@ -20,13 +20,14 @@ export interface IntakeAccess {
   accountId: string | null
   canManage: boolean
   roleKnown: boolean
+  roleFailed?: boolean
   ready: boolean
   services: DeliveryServiceState[]
 }
 
 /** 窓全体の操作可否。選択の不足や各サービスの状態で他の行を塞がない。 */
 export function intakeContextReason(current: IntakeAccess, scope: object): string | undefined {
-  if (!current.roleKnown) return '担当者の確認が終わるまでお待ちください。'
+  if (!current.roleKnown) return current.roleFailed ? '担当者を確認できませんでした。画面を読み直してください。' : '担当者の確認が終わるまでお待ちください。'
   if (current.scope !== scope) return '店舗や権限が変わったため、受付の操作を中止しました。窓を開き直してください。'
   if (!current.accountId || !current.ready) return '注文の状態を読み直してから操作してください。'
   if (!current.canManage) return '受付を変更する権限がありません。'

@@ -37,6 +37,21 @@ function eventBooking(account: string) {
     .run('booking-' + account, account, 'event-' + account, 'slot-' + account);
 }
 
+test('同じ予約でも承認と未払いは別のやることとして数え、表と詳細を揃える', async () => {
+  seedGapBooking(d, 'requested-overlap', 'requested');
+  seedGapBooking(d, 'confirmed-unpaid', 'confirmed');
+  d.raw.exec(`INSERT INTO booking_payments(id,line_account_id,booking_id,amount,status,provider,idempotency_key,created_at,updated_at) VALUES
+    ('overlap','a','requested-overlap',100,'unpaid','test','overlap','now','now'),
+    ('other','a','confirmed-unpaid',100,'unpaid','test','other','now','now')`);
+  const summary = await readAccountAttention(d.db, 'a', false);
+  const details = await readAccountAttention(d.db, 'a', true);
+  expect(summary.counts.pendingBookings).toBe(1);
+  expect(summary.counts.unpaid).toBe(2);
+  expect(details.counts).toEqual(summary.counts);
+  expect(details.details.unpaid).toEqual(expect.arrayContaining([{ id: 'overlap' }, { id: 'other' }]));
+  expect(summary.targets.unpaid).toEqual([{ href: '/booking/menus?tab=payments&view=records', count: 2 }]);
+});
+
 test('複数アカウントの名前・スタイル・件数と先頭の行き先を保ち、他の統括は返さない', async () => {
   d.raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('a2','ch-a2','二号店','token','secret','t');
     INSERT INTO account_styles(line_account_id,style,selection_mode,updated_at) VALUES('a','salon','configured','now');

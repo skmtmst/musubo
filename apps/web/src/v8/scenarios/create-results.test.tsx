@@ -57,9 +57,9 @@ const sub = (id: string, friendName: string, status: string, currentStepOrder: n
 const runs = {
   summary: { active: 2, paused: 2, completed: 5, delivering: 0 },
   subscriptions: [
-    sub('s1', '高橋 直人', 'active', 3),
-    sub('s2', '中村 彩', 'paused', 2, 'delivery_failed'),
-    sub('s3', '山田 花子', 'paused', 1, 'manual'),
+    sub('s1', '見本 16', 'active', 3),
+    sub('s2', '見本 27', 'paused', 2, 'delivery_failed'),
+    sub('s3', '見本 143', 'paused', 1, 'manual'),
     sub('s4', 'Kyohei Yamamoto', 'completed', 4),
   ],
   pagination: { total: 4, limit: 50, cursor: '', nextCursor: null },
@@ -331,9 +331,9 @@ describe('配信結果（X4STXS）', () => {
     runs.subscriptions[1].currentStepOrder = 3
     try {
       search = 'id=sc-1'; render(<ScenarioResultsV8 />)
-      await screen.findByText('中村 彩')
+      await screen.findByText('見本 27')
       expect(screen.getByRole('progressbar', { name: '2 通目の届いた率' })).toBeTruthy()
-      expect(within(screen.getByText('中村 彩').closest('[role="row"]')!).getByText('2 通目まで')).toBeTruthy()
+      expect(within(screen.getByText('見本 27').closest('[role="row"]')!).getByText('2 通目まで')).toBeTruthy()
     } finally { scenario.steps[1].stepOrder = oldOrder; runs.subscriptions[1].currentStepOrder = oldCurrent }
   })
   test('公開版に固定された購読にはAPIからの表示順を使う', async () => {
@@ -341,15 +341,15 @@ describe('配信結果（X4STXS）', () => {
     runs.subscriptions[1] = { ...previous, currentStepOrder: 3, currentDisplayOrder: 2 } as typeof previous
     try {
       search = 'id=sc-1'; render(<ScenarioResultsV8 />)
-      await screen.findByText('中村 彩')
-      expect(within(screen.getByText('中村 彩').closest('[role="row"]')!).getByText('2 通目まで')).toBeTruthy()
+      await screen.findByText('見本 27')
+      expect(within(screen.getByText('見本 27').closest('[role="row"]')!).getByText('2 通目まで')).toBeTruthy()
     } finally { runs.subscriptions[1] = previous }
   })
   test('再参加の古い完了と新しい途中を人数から引かず、購読件数と未取得を分ける', async () => {
     const previous = { total: stats.enrolledTotal, summary: { ...runs.summary } }
     stats.enrolledTotal = 1; runs.summary = { active: 1, paused: 0, completed: 2, delivering: 0 }
     try {
-      search = 'id=sc-1'; render(<ScenarioResultsV8 />); await screen.findByText('高橋 直人')
+      search = 'id=sc-1'; render(<ScenarioResultsV8 />); await screen.findByText('見本 16')
       const metric = (name: string) => screen.getByText(name, { selector: '[data-kpi-label] span' }).closest('[data-kpi-presentation]')!
       expect(metric('始まった').querySelector('[data-kpi-number]')?.textContent).toBe('1')
       expect(metric('読み終えた').querySelector('[data-kpi-number]')?.textContent).toBe('2')
@@ -386,11 +386,11 @@ describe('配信結果（X4STXS）', () => {
   test('状態の札・何通目まで・次に届く', async () => {
     search = 'id=sc-1'
     render(<ScenarioResultsV8 />)
-    await screen.findByText('高橋 直人')
+    await screen.findByText('見本 16')
     expect(screen.getByText('送れずに止まった')).toBeTruthy()
     expect(screen.getByText('止まっている')).toBeTruthy()
     expect(screen.getAllByText('読み終えた').length).toBeGreaterThan(0)
-    expect(within(screen.getByText('高橋 直人').closest('[role="row"]')!).getByText('—')).toBeTruthy()
+    expect(within(screen.getByText('見本 16').closest('[role="row"]')!).getByText('—')).toBeTruthy()
     expect(screen.getAllByText('—（止めている）').length).toBe(2)
     expect(screen.getByText('届いた率 100.0%・開いた —・押した 4人')).toBeTruthy()
   })
@@ -398,12 +398,12 @@ describe('配信結果（X4STXS）', () => {
   test('「…」は配信中・止まっている行だけ。配信失敗の行だけ「失敗を再送」', async () => {
     search = 'id=sc-1'
     render(<ScenarioResultsV8 />)
-    await screen.findByText('高橋 直人')
-    expect(screen.getByRole('button', { name: '高橋 直人のその他の操作' })).toBeTruthy()
+    await screen.findByText('見本 16')
+    expect(screen.getByRole('button', { name: '見本 16のその他の操作' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Kyohei Yamamotoのその他の操作' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '中村 彩のその他の操作' }))
+    fireEvent.click(screen.getByRole('button', { name: '見本 27のその他の操作' }))
     expect(await screen.findByRole('menuitem', { name: '失敗を再送' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '山田 花子のその他の操作' }))
+    fireEvent.click(screen.getByRole('button', { name: '見本 143のその他の操作' }))
     await waitFor(() => expect(screen.queryByRole('menuitem', { name: '失敗を再送' })).toBeNull())
   })
 
@@ -411,7 +411,7 @@ describe('配信結果（X4STXS）', () => {
     role = verifiedStaffRole('staff')
     search = 'id=sc-1'
     render(<ScenarioResultsV8 />)
-    await screen.findByText('高橋 直人')
+    await screen.findByText('見本 16')
     expect(screen.queryByRole('button', { name: /のその他の操作$/ })).toBeNull()
     expect(screen.getAllByRole('button', { name: /予定を見る/ }).length).toBeGreaterThan(0)
   })

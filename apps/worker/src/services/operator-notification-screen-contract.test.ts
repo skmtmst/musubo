@@ -1,8 +1,9 @@
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { listOperatorEventTypes } from './operator-notification-registry.js';
 
 // 実際の選択肢を実行して比べる。別アプリ全体をWorkerの型検査へ含めない。
-const optionsPath = new URL('../../../web/src/v8/line-notifications/operator-event-options.ts', import.meta.url).pathname;
+const optionsPath = fileURLToPath(new URL('../../../web/src/v8/line-notifications/operator-event-options.ts', import.meta.url));
 const { OPERATOR_EVENT_OPTIONS } = await import(optionsPath) as {
   OPERATOR_EVENT_OPTIONS: ReadonlyArray<{ value: string; label: string }>;
 };

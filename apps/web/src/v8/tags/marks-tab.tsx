@@ -357,7 +357,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
     }))
 
   /* 帯は4つ。マークの数は一覧そのものから、人数は受信箱の集計から。 */
-  const listReady = loaded && (status === 'ready' || status === 'loading')
+  const listReady = host ? host.status === 'ready' && status === 'ready' && items === host.items : loaded && (status === 'ready' || status === 'loading')
   const inUseCount = items.filter(isUsed).length
   const statsReason = statsStatus === 'loading' ? STATE_TEXT.loading
     : statsStatus === 'forbidden' ? STATE_TEXT.forbiddenView

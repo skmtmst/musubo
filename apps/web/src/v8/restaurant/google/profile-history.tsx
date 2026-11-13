@@ -129,7 +129,7 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
       {data && data.total > 0 ? <>
         {pageCount <= 1 ? <p className={styles.muted}>1–{formatNumber(data.total)} / {formatNumber(data.total)}件</p> : null}
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${(page - 1) * data.perPage + 1}–${Math.min(page * data.perPage, data.total)} / ${formatNumber(data.total)}件`} spacing="restaurant" />
-        <p className={styles.muted}>記録は削除できません。各行を押すと、変更前後の内容とGoogleからの応答を確認できます。失敗した変更は、その画面からやり直せます。</p>
+        <p className={styles.muted}>記録は削除できません。各行を押すと、変更前後の内容とGoogleからの応答を確認できます。失敗した変更は、その画面で内容を確認できます。</p>
       </> : null}
     </>
   )

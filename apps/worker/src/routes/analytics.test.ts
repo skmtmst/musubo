@@ -876,6 +876,19 @@ describe('ファネルAPI', () => {
     expect(conflict.status).toBe(409);
   });
 
+  it('確認版をDBに渡し、不一致は409、無効な版は拒否する', async () => {
+    mocks.setFunnelStatus.mockResolvedValueOnce({ ...FUNNEL, status: 'stopped', confirmation_revision: 2 });
+    const ok = await req(`/api/analytics/funnels/fn-1/status?${ACCOUNT}`, 'PUT', { status: 'stopped', expectedStatus: 'active', expectedRevision: 1 });
+    expect(ok.status).toBe(200);
+    expect(mocks.setFunnelStatus).toHaveBeenCalledWith(env.DB, expect.objectContaining({ expectedRevision: 1 }));
+    expect((await ok.json() as { data: { confirmationRevision: number } }).data.confirmationRevision).toBe(2);
+    mocks.setFunnelStatus.mockRejectedValueOnce(new Error('analytics_funnel_status_conflict'));
+    const stale = await req(`/api/analytics/funnels/fn-1/status?${ACCOUNT}`, 'PUT', { status: 'stopped', expectedStatus: 'active', expectedRevision: 1 });
+    expect(stale.status).toBe(409);
+    const invalid = await req(`/api/analytics/funnels/fn-1/status?${ACCOUNT}`, 'PUT', { status: 'stopped', expectedStatus: 'active', expectedRevision: '1' });
+    expect(invalid.status).toBe(422);
+  });
+
   it('停止・再開・保管は現在状態を要し、競合409・不正遷移422・staffは403(N-273)', async () => {
     mocks.setFunnelStatus.mockResolvedValueOnce({ ...FUNNEL, status: 'stopped' });
     const stopped = await req(`/api/analytics/funnels/fn-1/status?${ACCOUNT}`, 'PUT', {

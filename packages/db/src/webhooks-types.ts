@@ -2,6 +2,7 @@ import type { WebhookInteractionFailureReason } from './webhook-failure-types.js
 
 
 export interface IncomingWebhookRow {
+  confirmation_revision?: number;
   folder_id?: string | null;
   id: string;
   name: string;
@@ -45,6 +46,7 @@ export interface OutgoingWebhookDeliverySummaryRow {
 }
 
 export interface OutgoingWebhookRow {
+  confirmation_revision?: number;
   version?: number;
   updated_by_staff_id?: string | null;
   folder_id?: string | null;
@@ -80,6 +82,7 @@ export type WebhookInteractionDirection = 'outgoing' | 'incoming';
 export type WebhookInteractionStatus = 'pending' | 'succeeded' | 'failed' | 'retried';
 
 export interface WebhookInteractionRow {
+  confirmation_revision?: number;
   id: string;
   line_account_id: string;
   direction: WebhookInteractionDirection;
@@ -134,6 +137,7 @@ export type OutgoingDeliveryStatus = 'pending' | 'sending' | 'retry_wait' | 'del
  * 現状を添えたもの。個別取得(getWebhookInteractionById)では付かない。
  */
 export interface WebhookInteractionListRow extends WebhookInteractionRow {
+  linked_webhook_revision?: number | null;
   /**
    * 送り先の有効印。削除印のある・存在しない送り先では NULL。
    * webhook_id 自体が NULL の記録（連携先が消えたもの）でも NULL。

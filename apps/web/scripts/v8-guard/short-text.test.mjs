@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { shortTextFindings } from './short-text-browser.mjs'
 
 test('short names, times, counts and dates fail if clipped, even when a title exists', () => {
-  const records = ['09 : 00', '10月1日', '有効 5', '佐々木 亮太', '対象外 12 回'].map(text => ({text, clipped:true, lines:1, title:text}))
+  const records = ['09 : 00', '10月1日', '有効 5', '見本 110', '対象外 12 回'].map(text => ({text, clipped:true, lines:1, title:text}))
   assert.equal(shortTextFindings(records).length,records.length)
   assert.ok(shortTextFindings(records).every(item=>item.kind==='short-text-clipped'))
 })

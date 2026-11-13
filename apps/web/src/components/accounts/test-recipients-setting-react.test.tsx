@@ -51,11 +51,11 @@ afterEach(cleanup)
 
 describe('テスト送信先の設定欄 (N-070)', () => {
   it('設定済みの送信先を表示する', async () => {
-    apiMocks.getTestRecipients.mockReturnValue(ok([{ id: 'f1', displayName: '田中 太郎', pictureUrl: null }]))
+    apiMocks.getTestRecipients.mockReturnValue(ok([{ id: 'f1', displayName: '見本 167', pictureUrl: null }]))
     apiMocks.getTestRecipientLoginUsers.mockReturnValue(ok([]))
     render(<TestRecipientsSetting accountId="acc-a" />)
     await flush()
-    expect(screen.getByText('田中 太郎')).toBeTruthy()
+    expect(screen.getByText('見本 167')).toBeTruthy()
     expect(apiMocks.getTestRecipients).toHaveBeenCalledWith('acc-a')
   })
 
@@ -68,10 +68,10 @@ describe('テスト送信先の設定欄 (N-070)', () => {
     // 失敗を空一覧で取り繕わない（検索欄を出さない）。
     expect(screen.queryByPlaceholderText('友だちを検索して追加…')).toBeNull()
 
-    apiMocks.getTestRecipients.mockReturnValue(ok([{ id: 'f1', displayName: '田中 太郎', pictureUrl: null }]))
+    apiMocks.getTestRecipients.mockReturnValue(ok([{ id: 'f1', displayName: '見本 167', pictureUrl: null }]))
     fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
     await flush()
-    expect(screen.getByText('田中 太郎')).toBeTruthy()
+    expect(screen.getByText('見本 167')).toBeTruthy()
   })
 
   it('アカウント切替後に届いた前アカウントの応答で上書きしない', async () => {
@@ -101,9 +101,9 @@ describe('テスト送信先の設定欄 (N-070)', () => {
   })
 
   it('保存済みの人はログインユーザー候補から外し、候補を押すと同じアカウントの送信先へ足して保存する', async () => {
-    apiMocks.getTestRecipients.mockReturnValue(ok([{ id: 'f1', displayName: '田中 太郎', pictureUrl: null }]))
+    apiMocks.getTestRecipients.mockReturnValue(ok([{ id: 'f1', displayName: '見本 167', pictureUrl: null }]))
     apiMocks.getTestRecipientLoginUsers.mockReturnValue(ok([
-      { id: 'f1', displayName: '田中 太郎', pictureUrl: null, staffName: '田中 太郎', sameAccount: true },
+      { id: 'f1', displayName: '見本 167', pictureUrl: null, staffName: '見本 167', sameAccount: true },
       { id: 'f2', displayName: '候補 花子', pictureUrl: null, staffName: '候補 花子', sameAccount: true },
     ]))
     apiMocks.updateTestRecipients.mockReturnValue(ok(null))
@@ -111,7 +111,7 @@ describe('テスト送信先の設定欄 (N-070)', () => {
     await flush()
     expect(apiMocks.getTestRecipientLoginUsers).toHaveBeenCalledWith('acc-a')
     expect(screen.getByText('ログインユーザーから追加')).toBeTruthy()
-    expect(screen.queryByTitle('田中 太郎をテスト送信先に追加')).toBeNull()
+    expect(screen.queryByTitle('見本 167をテスト送信先に追加')).toBeNull()
     fireEvent.click(screen.getByTitle('候補 花子をテスト送信先に追加'))
     await flush()
     expect(apiMocks.updateTestRecipients).toHaveBeenCalledWith('acc-a', ['f1', 'f2'])

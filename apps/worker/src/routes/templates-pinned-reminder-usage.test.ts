@@ -93,6 +93,41 @@ beforeEach(() => {
   sqlite = createTestD1();
 });
 
+describe('テンプレートの一括削除', () => {
+  async function setup() {
+    await exec("INSERT INTO templates (id,name,message_type,message_content) VALUES ('bulk-a','A','text','A'),('bulk-b','B','text','B')");
+    return { templates: [{ id: 'bulk-a', expectedRevision: 1 }, { id: 'bulk-b', expectedRevision: 1 }] };
+  }
+  const submit = (body: unknown) => app().request('/api/templates/bulk-delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const state = () => sqlite.raw.prepare("SELECT id,deleted_at,confirmation_revision FROM templates WHERE id LIKE 'bulk-%' ORDER BY id").all();
+  test('古い版は全件を残して409', async () => {
+    const body = await setup(); body.templates[1].expectedRevision = 2; const before = state();
+    const response = await submit(body); expect(response.status).toBe(409); expect(state()).toEqual(before);
+  });
+  test('途中で失敗すると全件を巻き戻す', async () => {
+    const body = await setup(), before = state();
+    sqlite.raw.exec("CREATE TRIGGER bulk_test_failure BEFORE UPDATE ON templates WHEN OLD.id='bulk-b' BEGIN SELECT RAISE(ABORT,'CHECK constraint failed: fixture'); END");
+    const response = await submit(body); expect(response.status).toBe(409); expect(state()).toEqual(before);
+  });
+  test('同時の二重実行は一度だけ成功する', async () => {
+    const body = await setup(); const responses = await Promise.all([submit(body), submit(body)]);
+    expect(responses.map(r => r.status).sort()).toEqual([200, 409]);
+    expect(state().every((row: any) => row.deleted_at && row.confirmation_revision === 2)).toBe(true);
+  });
+  test('旧版を使う通知が残っていれば他の対象も消さない', async () => {
+    await seedSwitchedRule(); await seedEnrollment('bulk-enrollment', 'active');
+    const body = await setup(); body.templates[1].id = 'tpl-a';
+    const response = await submit(body);
+    expect(response.status).toBe(409);
+    expect(sqlite.raw.prepare("SELECT id,deleted_at FROM templates WHERE id IN ('bulk-a','tpl-a') ORDER BY id").all()).toEqual([{ id: 'bulk-a', deleted_at: null }, { id: 'tpl-a', deleted_at: null }]);
+  });
+  test('51件以上は実行せず400を返す', async () => {
+    const body = await setup(), before = state();
+    body.templates = Array.from({ length: 51 }, (_, i) => ({ id: `template-${i}`, expectedRevision: 1 }));
+    const response = await submit(body); expect(response.status).toBe(400); expect(state()).toEqual(before);
+  });
+});
+
 describe('R347 旧版に固定された送信待ちの登録', () => {
   test('使用先に登録・件数・版が出る', async () => {
     await seedSwitchedRule();

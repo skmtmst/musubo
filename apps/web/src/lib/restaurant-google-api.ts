@@ -8,6 +8,8 @@ export type GoogleConnectionStatus = 'pending_location' | 'connected' | 'expired
 export type GoogleReplyStatus = 'unreplied' | 'draft' | 'pending_confirm' | 'replied' | 'published'
 
 export type GoogleConnection = {
+  id?: string
+  confirmationRevision?: number
   status: GoogleConnectionStatus
   googleAccountEmail?: string | null
   locationName?: string | null
@@ -202,6 +204,7 @@ export type GooglePostInstagram = {
 
 export type GooglePost = {
   id: string
+  confirmationRevision?: number
   kind: GooglePostKind
   origin: GooglePostOrigin
   summary: string
@@ -279,13 +282,13 @@ export const restaurantGoogleApi = {
     fetchApi<{ success: true; mode: 'connect' | 'reconnect'; authorizeUrl: string }>(withAccount(`${base}/connect/start`, accountId), { method: 'POST', body: '{}' }),
   // confirmSwitch は「前につないでいた店舗とは別の店舗に切り替える」確認を取れたときだけ true。
   // 付けずに別店舗を送ると、サーバーが code: 'switch_confirmation_required' で止める。
-  selectLocation: (accountId: string, locationName: string, confirmSwitch?: boolean) =>
+  selectLocation: (accountId: string, locationName: string, confirmSwitch?: boolean, expected?: { expectedConnectionId: string; expectedConfirmationRevision: number }) =>
     fetchApi<{ success: true; connection: GoogleConnection }>(withAccount(`${base}/connect/select-location`, accountId), {
       method: 'POST',
-      body: JSON.stringify(confirmSwitch ? { locationName, confirmSwitch: true } : { locationName }),
+      body: JSON.stringify(confirmSwitch ? { locationName, confirmSwitch: true, ...expected } : { locationName }),
     }),
-  disconnect: (accountId: string) =>
-    fetchApi<{ success: true; revoked: boolean; connection: GoogleConnection }>(withAccount(`${base}/disconnect`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
+  disconnect: (accountId: string, expected?: { expectedConnectionId: string; expectedConfirmationRevision: number }) =>
+    fetchApi<{ success: true; revoked: boolean; connection: GoogleConnection }>(withAccount(`${base}/disconnect`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true, ...expected }) }),
   syncReviews: (accountId: string) =>
     fetchApi<{ success: true; fetched: number; complete: boolean; averageRating: number | null; totalReviewCount: number | null; syncedAt: string }>(
       withAccount(`${base}/reviews/sync`, accountId),
@@ -342,8 +345,8 @@ export const restaurantGoogleApi = {
     fetchApi<{ success: true; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/cancel`, accountId), { method: 'POST', body: '{}' }),
   publishPost: (accountId: string, id: string) =>
     fetchApi<{ success: true; alreadyPublished: boolean; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/publish`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
-  removePost: (accountId: string, id: string) =>
-    fetchApi<{ success: true; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/remove`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
+  removePost: (accountId: string, id: string, expected?: { expectedPostRevision: number; expectedConnectionRevision: number; expectedConnectionId: string }) =>
+    fetchApi<{ success: true; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/remove`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true, ...expected }) }),
   /** Instagram だけをもう一度送る（Google の公開はそのまま・★V8-B `HEEN9`／2026-10-07 承認）。 */
   retryInstagram: (accountId: string, id: string) =>
     fetchApi<{ success: true; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/instagram/retry`, accountId), { method: 'POST', body: '{}' }),

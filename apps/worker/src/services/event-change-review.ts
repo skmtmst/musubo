@@ -503,6 +503,7 @@ export async function applyEventChange(
     if (change.capacity !== undefined) { sets.push('capacity = ?'); values.push(change.capacity); }
     if (change.is_active !== undefined) { sets.push('is_active = ?'); values.push(change.is_active); }
     if (sets.length > 0) {
+      sets.push('version = version + 1');
       sets.push(`updated_at = ?`);
       values.push(nowIso, change.slot_id);
       writes.push(db.prepare(`UPDATE event_slots SET ${sets.join(', ')} WHERE id = ?`).bind(...values));

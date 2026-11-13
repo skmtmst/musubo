@@ -789,7 +789,7 @@ export async function recordDeliveryOutcome(
     await db
       .prepare(
         `UPDATE outgoing_webhooks
-            SET consecutive_failures = 0, last_failed_at = NULL
+            SET consecutive_failures = 0, last_failed_at = NULL, confirmation_revision = confirmation_revision + 1
           WHERE id = ? AND consecutive_failures != 0 AND deleted_at IS NULL`,
       )
       .bind(webhookId)
@@ -802,7 +802,7 @@ export async function recordDeliveryOutcome(
   await db
     .prepare(
       `UPDATE outgoing_webhooks
-          SET consecutive_failures = CASE
+          SET confirmation_revision = confirmation_revision + 1, consecutive_failures = CASE
             WHEN EXISTS (
               SELECT 1 FROM webhook_interaction_logs l
                WHERE l.webhook_id = outgoing_webhooks.id AND l.direction = 'outgoing'
@@ -826,7 +826,7 @@ export async function recordDeliveryOutcome(
   const stopped = await db
     .prepare(
       `UPDATE outgoing_webhooks
-          SET is_active = 0,
+          SET is_active = 0, confirmation_revision = confirmation_revision + 1,
               auto_stopped_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
         WHERE id = ? AND is_active = 1
           AND consecutive_failures >= ?`,

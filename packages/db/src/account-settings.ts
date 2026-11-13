@@ -72,7 +72,8 @@ export async function setAccountSetting(
     .prepare(
       `INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT (line_account_id, key) DO UPDATE SET value = ?, updated_at = ?`,
+       ON CONFLICT (line_account_id, key) DO UPDATE SET value = ?, updated_at = ?,
+         confirmation_revision = confirmation_revision + CASE WHEN key = 'test_recipients' THEN 1 ELSE 0 END`,
     )
     .bind(id, accountId, key, value, now, now, value, now)
     .run();
@@ -119,7 +120,8 @@ export async function saveVersionedAccountSetting<T>(
   if (current) {
     const updated = await db.prepare(
       `UPDATE account_settings
-          SET value = ?, updated_at = ?
+          SET value = ?, updated_at = ?,
+              confirmation_revision = confirmation_revision + CASE WHEN key = 'test_recipients' THEN 1 ELSE 0 END
         WHERE line_account_id = ? AND key = ?
           AND json_valid(value)
           AND CAST(json_extract(value, '$.version') AS INTEGER) = ?`,

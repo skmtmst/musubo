@@ -207,7 +207,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
           current.answer_snapshot_json, event.current_published_version_id, bookingSnapshotJson,
           current.id,current.lock_version, target.capacity, target.id, target.id, current.party_size, target.capacity),
       c.env.DB.prepare(`UPDATE event_bookings
-            SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend', updated_at = ?
+            SET confirmation_revision = confirmation_revision + 1, status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend', updated_at = ?
           WHERE id = ? AND status IN ('requested', 'confirmed') AND lock_version=?
             AND EXISTS (SELECT 1 FROM event_bookings WHERE id = ?)`)
         .bind(nowIso, nowIso, current.id,current.lock_version, newId),
@@ -240,7 +240,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
           c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId),
           c.env.DB.prepare(
             `UPDATE event_bookings
-                SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
+                SET confirmation_revision = confirmation_revision + 1, status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
               WHERE id = ? AND status = 'cancelled' AND lock_version=?`,
           )
           .bind(current.status, nowIso, current.id,current.lock_version+1),

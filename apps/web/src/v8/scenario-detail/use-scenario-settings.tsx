@@ -8,6 +8,7 @@ import type { ScenarioTriggerType } from '@line-crm/shared'
 import type { Dispatch, SetStateAction } from 'react'
 import { useEffect } from 'react'
 import { ScenarioWithSteps } from './detail-model'
+import type { ScenarioConfirmation } from '@/lib/api/types/scenarios'
 
 export function useScenarioSettings({
   editForm, setSaving, id, setEditing,
@@ -15,7 +16,7 @@ export function useScenarioSettings({
   saveErrors, setConflict, setConflictLatest, setCompareOpen,
   scenario, conflictLatest, startBusy, startConfirmed,
   setStartBusy, setStartError, setStartOpen, setJustStarted,
-  reloadStats, stopBusy, setStopBusy, setStopError,
+  reloadStats, stopBusy, setStopBusy, setStopError, stopConfirmation, stopConfirmationValid,
   setStopOpen, setDuplicateName, setDuplicateOpen, setEditForm,
 }: {
   editForm: { name: string; description: string; triggerType: ScenarioTriggerType; isActive: boolean; allowConcurrent: boolean; folderId: string; }
@@ -40,6 +41,8 @@ export function useScenarioSettings({
   setJustStarted: Dispatch<SetStateAction<boolean>>
   reloadStats: () => void
   stopBusy: boolean
+  stopConfirmation: ScenarioConfirmation | null
+  stopConfirmationValid: () => boolean
   setStopBusy: Dispatch<SetStateAction<boolean>>
   setStopError: Dispatch<SetStateAction<string>>
   setStopOpen: Dispatch<SetStateAction<boolean>>
@@ -154,11 +157,12 @@ export function useScenarioSettings({
    * （design/v8/DEVIN-QUESTIONS.md 参照）。
    */
   const handleStop = async () => {
-    if (!scenario || stopBusy) return
+    if (!scenario || stopBusy || !stopConfirmation || !stopConfirmationValid()) return
     setStopBusy(true)
     setStopError('')
     try {
-      const res = await api.scenarios.update(id, { isActive: false })
+      if (!stopConfirmationValid()) return
+      const res = await api.scenarios.update(id, { isActive: false, expectedContentRevision: stopConfirmation.contentRevision, expectedSubscriptions: { activeCount: stopConfirmation.activeCount, rowIdSum: stopConfirmation.rowIdSum, rowIdSquareSum: stopConfirmation.rowIdSquareSum } })
       if (!res.success) {
         setStopError(res.error)
         return

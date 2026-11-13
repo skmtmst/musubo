@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import V8EarningRulesTab from '@/v8/mileage/earning-rules'
+import { MileageShell } from '@/v8/mileage/frame'
 import type { MileageEarningRuleV6 } from '@/lib/api'
 
 const calls = vi.hoisted(() => ({ earningRulesV6: vi.fn(), history: vi.fn(), friendsV6: vi.fn() }))
@@ -60,6 +61,16 @@ const overview = (items: MileageEarningRuleV6[]) => ({
 afterEach(cleanup)
 
 describe('V8 たまる決めごとの「止めているのみ」', () => {
+  it.each([true, false])('操作の説明は閲覧のみ %s に合う', async (readonly) => {
+    calls.earningRulesV6.mockResolvedValue({ success: true, data: overview([rule('r1', '決めごと', 'published')]) })
+    calls.history.mockResolvedValue({ success: true, data: { summary: { byType: [] } } })
+    calls.friendsV6.mockResolvedValue({ success: true, data: { balanceSource: 'musubo', items: [], summary: { available: 0, totalMembers: 0, withBalanceCount: 0, pending: 0, monthChange: 0, rankCounts: [], expiringMiles30d: null, nextExpiringAt: null }, pagination: { total: 0, limit: 1, offset: 0 }, measuredAt: '2026-09-01T00:00:00+09:00' } })
+    render(<MileageShell.Provider value={{ tab: 'earning-rules', readonly, narrow: false, counts: {}, setCount: () => {} }}><V8EarningRulesTab /></MileageShell.Provider>)
+    await screen.findByText('決めごと')
+    fireEvent.click(screen.getByRole('button', { name: 'この画面の説明' }))
+    expect(screen.getByText(/この決めごとの履歴を見る/)).toBeTruthy()
+    expect(Boolean(screen.queryByText(/編集・止める・複製/))).toBe(!readonly)
+  })
   it('止めている決めごとだけ出す', async () => {
     const items = [rule('r1', '動いている決めごと', 'published'), rule('r2', '止めている決めごと', 'stopped')]
     calls.earningRulesV6.mockResolvedValue({ success: true, data: overview(items) })

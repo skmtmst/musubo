@@ -7,7 +7,7 @@ import { sameKnownValues } from '@/components/shared/differences-filter'
 import type { FriendProfileCandidate } from '@/lib/api'
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 const candidates: FriendProfileCandidate[] = [
-  { fieldKey: 'name', fieldLabel: '本名', options: ['田中 花子', '田中 はなこ'].map((valuePreview, i) => ({ candidateId: `n${i}`, sourceFriendId: `f${i}`, sourceLabel: `候補${i}`, valuePreview, verified: true })) },
+  { fieldKey: 'name', fieldLabel: '本名', options: ['見本 171', '見本 161'].map((valuePreview, i) => ({ candidateId: `n${i}`, sourceFriendId: `f${i}`, sourceLabel: `候補${i}`, valuePreview, verified: true })) },
   { fieldKey: 'plan', fieldLabel: '会員区分', options: ['一般', '一般'].map((valuePreview, i) => ({ candidateId: `p${i}`, sourceFriendId: `f${i}`, sourceLabel: `候補${i}`, valuePreview, verified: true })) },
 ]
 afterEach(cleanup)
@@ -19,14 +19,14 @@ it('一致項目を必要なときに開き、選択を残したまま同じ保�
   const saved = vi.fn()
   function View() {
     const [draft, setDraft] = useState(emptyProfileCandidateDraft(candidates))
-    return <MergedProfileDialog open candidates={candidates} sourceLabels={{ f0: '本店・田中 花子', f1: '支店・田中 はなこ' }} draft={draft} revision={1} busy={false} onChange={setDraft} onCancel={() => {}} onSave={() => saved(draft)} />
+    return <MergedProfileDialog open candidates={candidates} sourceLabels={{ f0: '本店・見本 171', f1: '支店・見本 161' }} draft={draft} revision={1} busy={false} onChange={setDraft} onCancel={() => {}} onSave={() => saved(draft)} />
   }
   render(<View />)
   expect(screen.getByRole('switch', { name: '違う項目だけ' }).getAttribute('aria-checked')).toBe('true')
   expect(screen.queryByLabelText('会員区分の採用値')).toBeNull()
   fireEvent.click(screen.getByRole('switch', { name: '違う項目だけ' }))
   fireEvent.click(screen.getByRole('button', { name: '会員区分の採用値' }))
-  fireEvent.click(screen.getByRole('option', { name: '支店・田中 はなこ：一般' }).querySelector('button')!)
+  fireEvent.click(screen.getByRole('option', { name: '支店・見本 161：一般' }).querySelector('button')!)
   fireEvent.click(screen.getByRole('switch', { name: '違う項目だけ' }))
   expect(screen.queryByLabelText('会員区分の採用値')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: '選んだ1項目を保存' }))

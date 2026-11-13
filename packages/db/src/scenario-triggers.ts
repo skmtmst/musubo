@@ -110,13 +110,14 @@ export async function addScenarioTrigger(
   kind: ScenarioTriggerKind,
   tagId: string | null,
 ): Promise<void> {
-  await db
-    .prepare(
+  await db.batch([
+    db.prepare(
       `INSERT OR IGNORE INTO scenario_triggers (id, scenario_id, kind, tag_id)
        VALUES (?, ?, ?, ?)`,
     )
-    .bind(crypto.randomUUID(), scenarioId, kind, kind === 'tag_added' ? tagId : null)
-    .run();
+    .bind(crypto.randomUUID(), scenarioId, kind, kind === 'tag_added' ? tagId : null),
+    db.prepare('UPDATE scenarios SET content_revision = content_revision + 1 WHERE id = ? AND changes() > 0').bind(scenarioId),
+  ]);
 }
 
 export async function removeScenarioTrigger(
@@ -124,8 +125,8 @@ export async function removeScenarioTrigger(
   scenarioId: string,
   triggerId: string,
 ): Promise<void> {
-  await db
-    .prepare(`DELETE FROM scenario_triggers WHERE id = ? AND scenario_id = ?`)
-    .bind(triggerId, scenarioId)
-    .run();
+  await db.batch([
+    db.prepare(`DELETE FROM scenario_triggers WHERE id = ? AND scenario_id = ?`).bind(triggerId, scenarioId),
+    db.prepare('UPDATE scenarios SET content_revision = content_revision + 1 WHERE id = ? AND changes() > 0').bind(scenarioId),
+  ]);
 }

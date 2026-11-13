@@ -1,5 +1,17 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const templatesPhotoPolicyPaths = {
+  '/api/templates/bulk-delete': {
+    post: {
+      tags: ['Templates'], summary: '確認したテンプレートを一括削除',
+      description: '最大50件。確認時の版と使用状況がすべて一致した場合だけまとめて削除する。',
+      requestBody: { required: true, content: { 'application/json': { schema: {
+        type: 'object', required: ['templates'], properties: { templates: { type: 'array', minItems: 1, maxItems: 50, items: {
+          type: 'object', required: ['id', 'expectedRevision'], properties: { id: { type: 'string', minLength: 1 }, expectedRevision: { type: 'integer', minimum: 1 } },
+        } } },
+      } } } },
+      responses: { '200': { description: '削除完了' }, '400': { description: '入力不正' }, '403': { description: '操作権限がない' }, '404': { description: '対象が担当範囲にない' }, '409': { description: '版または使用状況が変化した' } },
+    },
+  },
   // ── Templates ( 公開版固定) ─────────────────────────────────────────
   '/api/templates/{id}/versions': {
     get: {

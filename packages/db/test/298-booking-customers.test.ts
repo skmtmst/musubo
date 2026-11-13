@@ -58,8 +58,8 @@ describe('298 booking customers', () => {
     await createBookingCustomer(db, {
       id: 'customer-a',
       lineAccountId: 'account-a',
-      displayName: '山田 花子',
-      phone: '090-1234-5678',
+      displayName: '見本 143',
+      phone: '090-0000-5678',
       petName: 'ポチ',
       email: 'hanako@example.test',
       encryptionKey: KEY,
@@ -67,27 +67,27 @@ describe('298 booking customers', () => {
     await createBookingCustomer(db, {
       id: 'customer-b',
       lineAccountId: 'account-b',
-      displayName: '山田 花子',
-      phone: '090-9999-0000',
+      displayName: '見本 143',
+      phone: '090-0000-0000',
       encryptionKey: KEY,
     });
 
     const stored = sqlite.prepare(
       `SELECT phone_encrypted, email_encrypted FROM booking_customers WHERE id = 'customer-a'`,
     ).get() as { phone_encrypted: string; email_encrypted: string };
-    expect(stored.phone_encrypted).not.toContain('09012345678');
+    expect(stored.phone_encrypted).not.toContain('09000005678');
     expect(stored.email_encrypted).not.toContain('hanako@example.test');
 
     await expect(searchBookingCustomers(db, {
       lineAccountId: 'account-a',
-      query: '090-1234-5678',
+      query: '090-0000-5678',
       encryptionKey: KEY,
     })).resolves.toEqual([
       expect.objectContaining({ id: 'customer-a', phone_last4: '5678', is_line_linked: false }),
     ]);
     await expect(searchBookingCustomers(db, {
       lineAccountId: 'account-a',
-      query: '山田',
+      query: '143',
       encryptionKey: KEY,
     })).resolves.toHaveLength(1);
   });
@@ -96,14 +96,14 @@ describe('298 booking customers', () => {
     await createBookingCustomer(db, {
       id: 'customer-a',
       lineAccountId: 'account-a',
-      displayName: '山田 花子',
-      phone: '090-1234-5678',
+      displayName: '見本 143',
+      phone: '090-0000-5678',
       email: 'hanako@example.test',
       encryptionKey: KEY,
     });
 
     await expect(getBookingCustomer(db, 'customer-a', 'account-a', KEY)).resolves.toMatchObject({
-      phone: '09012345678',
+      phone: '09000005678',
       email: 'hanako@example.test',
     });
     await expect(getBookingCustomer(db, 'customer-a', 'account-b', KEY)).resolves.toBeNull();
@@ -118,7 +118,7 @@ describe('298 booking customers', () => {
       INSERT INTO booking_customers (
         id, line_account_id, display_name, phone_normalized_hash,
         phone_encrypted, phone_last4
-      ) VALUES ('customer-a','account-a','山田 花子','hash','cipher','5678');
+      ) VALUES ('customer-a','account-a','見本 143','hash','cipher','5678');
       INSERT INTO bookings (
         id, line_account_id, friend_id, booking_customer_id, staff_id, menu_id,
         starts_at, ends_at, block_ends_at, status, price_at_booking,
@@ -185,8 +185,8 @@ describe('298 booking customers', () => {
 
 describe('予約顧客の国内電話の境界', () => {
   it('全角と区切りを数字だけにそろえる', () => {
-    expect(normalizeBookingCustomerPhone('（０９０）１２３４－５６７８')).toBe('09012345678');
-    expect(normalizeBookingCustomerPhone('03 1234 5678')).toBe('0312345678');
+    expect(normalizeBookingCustomerPhone('（０９０）００００－５６７８')).toBe('09000005678');
+    expect(normalizeBookingCustomerPhone('03 0000 5678')).toBe('0300005678');
   });
   it.each(['1234567890','090123456','090123456789','+819012345678','090abc12345678',''])('不正な番号%sを保存しない', phone => {
     expect(() => normalizeBookingCustomerPhone(phone)).toThrow('booking_customer_phone_invalid');

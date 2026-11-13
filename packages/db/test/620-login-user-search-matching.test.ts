@@ -78,8 +78,8 @@ const listInput = {
 
 describe('ログインユーザー検索の照合範囲 (#620)', () => {
   beforeEach(() => {
-    addStaff({ id: 'staff-yamada', name: '山田 太郎', email: 'yamada@mail.test', accountId: 'account-a' });
-    addStaff({ id: 'staff-sato', name: '佐藤 花子', email: 'sato@mail.test', accountId: 'account-a' });
+    addStaff({ id: 'staff-yamada', name: '見本 141', email: 'yamada@mail.test', accountId: 'account-a' });
+    addStaff({ id: 'staff-sato', name: '見本 122', email: 'sato@mail.test', accountId: 'account-a' });
     addStaff({ id: 'staff-owner', name: '管理者の人', email: 'owner@mail.test', role: 'owner', accountId: 'account-a' });
     addStaff({ id: 'staff-readonly', name: '閲覧の人', email: 'readonly@mail.test', accessLevel: 'read_only', accountId: 'account-a' });
   });
@@ -91,7 +91,7 @@ describe('ログインユーザー検索の照合範囲 (#620)', () => {
   });
 
   it('名前・メールの部分一致は従来どおり効く', async () => {
-    const byName = await listAccessUsers(db, { ...listInput, query: '山田' });
+    const byName = await listAccessUsers(db, { ...listInput, query: '141' });
     expect(byName.items.map((item) => item.id)).toEqual(['staff-yamada']);
 
     const byEmail = await listAccessUsers(db, { ...listInput, query: 'sato@mail', includeEmailInSearch: true });

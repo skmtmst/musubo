@@ -348,7 +348,7 @@ export default function StaffNewV8() {
                     if (fieldErrors.name !== undefined) setFieldErrors({ name: nameFieldError(e.target.value) ?? undefined })
                   }}
                   onBlur={() => setFieldErrors({ name: nameFieldError(name) ?? undefined })}
-                  maxLength={BOOKING_STAFF_LIMITS.name} placeholder="例：田中 美咲" />
+                  maxLength={BOOKING_STAFF_LIMITS.name} placeholder="例：見本 170" />
                 </SaveErrorField>
               </Field>
               <Field label="お客さま向けの表示名（空欄なら上の名前）" htmlFor="bs-display" optional

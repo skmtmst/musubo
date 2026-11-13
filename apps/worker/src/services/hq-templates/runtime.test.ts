@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../../test-utils/d1-sqlite.js';
 import { inspectFormTemplate, inspectFormTemplateReferences } from './form.js';
 import { buildFormRuntimePlan, createFormReferenceResolver, executeFormStore, executeHqAtomicStore } from './runtime.js';
+import { parseScenarioDefinition, planScenario, scenarioSnapshot } from './scenario.js';
 import type { HqTemplateAdapterContext, HqTemplateAuthority } from './contract.js';
 let fixture: SqliteD1;
 const authority: HqTemplateAuthority = { tenantId: 'tenant', actorId: 'owner', role: 'owner', readOnly: false, accountScoped: false };
@@ -27,6 +28,14 @@ beforeEach(() => {
   fixture.raw.exec("UPDATE hq_templates SET current_version_id='version' WHERE id='template'");
 });
 afterEach(() => fixture.raw.close());
+test('統括配布は既存の長いシナリオ名をそのまま各店に作る', async () => {
+  const name = '長いシナリオ'.repeat(12);
+  const definition = parseScenarioDefinition({ schemaVersion: 1, scenario: { name, description: null }, steps: [{ id: 'step', delayMinutes: 0, messageType: 'text', messageContent: '見本' }] });
+  const snapshot = await scenarioSnapshot(fixture.db, 'a');
+  const plan = planScenario('a', definition, snapshot, [{ sourceId: 'scenario', itemKind: 'scenario', mode: 'create' }]);
+  await fixture.db.batch(plan.statements.map(statement => fixture.db.prepare(statement.sql).bind(...statement.bindings)));
+  expect(fixture.raw.prepare("SELECT name FROM scenarios WHERE line_account_id='a'").get()).toEqual({ name });
+});
 describe('form runtime and atomic store execution', () => {
   test('three stores receive private forms and local tags with one audit per store', async () => {
     for(const a of ['a','b','c']) expect(await executeFormStore(options(await preflight(a)))).toEqual({status:'succeeded',reused:false});

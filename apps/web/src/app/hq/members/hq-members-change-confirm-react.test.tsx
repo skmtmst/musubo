@@ -83,7 +83,7 @@ const me = {
 }
 
 const member = {
-  ...me, id: 's-1', name: '佐藤 直人', email: 'sato@example.com', role: 'admin',
+  ...me, id: 's-1', name: '見本 120', email: 'sato@example.com', role: 'admin',
   accountScope: 'all', scopedLineAccountIds: [],
 }
 
@@ -136,7 +136,7 @@ describe('権限を変える確認（板 M4jS9）', () => {
   it('変える前に変更前→変更後を見せてから保存口へ送る', async () => {
     await act(async () => { root.render(<HqMembersPage />) })
     await flush()
-    const change = host.querySelector('button[aria-label="佐藤 直人のその他操作"]')
+    const change = host.querySelector('button[aria-label="見本 120のその他操作"]')
     expect(change, '権限を変更ボタンがない').not.toBeNull()
     await act(async () => { (change as HTMLButtonElement).click() })
     await flush()
@@ -158,7 +158,7 @@ describe('権限を変える確認（板 M4jS9）', () => {
     expect(mocks.update).not.toHaveBeenCalled()
     const confirm = document.body.querySelector('[data-design-node="M4jS9"]')
     expect(confirm, '確認の小窓が出ない').not.toBeNull()
-    for (const row of ['佐藤 直人さんの権限を変えますか？', '役割', '管理者 → 閲覧のみ', '変わる']) {
+    for (const row of ['見本 120さんの権限を変えますか？', '役割', '管理者 → 閲覧のみ', '変わる']) {
       expect((confirm?.textContent ?? '').replace(/\s/g, ''), `「${row}」がない`).toContain(row.replace(/\s/g, ''))
     }
     const go = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => (b.textContent ?? '').trim().endsWith('変える'))
@@ -171,7 +171,7 @@ describe('権限を変える確認（板 M4jS9）', () => {
   it('変更の窓は担当範囲を示し、初期表示のアカウント欄を出さず保存する', async () => {
     await act(async () => { root.render(<HqMembersPage />) })
     await flush()
-    const change = host.querySelector('button[aria-label="佐藤 直人のその他操作"]')
+    const change = host.querySelector('button[aria-label="見本 120のその他操作"]')
     await act(async () => { (change as HTMLButtonElement).click() })
     await flush()
     const editAction = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(item => item.textContent?.trim() === '権限を変更する')!

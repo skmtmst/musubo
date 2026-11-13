@@ -284,7 +284,7 @@ export async function insertStyleStarterItems(
       statements.push(
         db
           .prepare(
-            'UPDATE automation_definitions SET current_draft_version_id=? WHERE id=?',
+            'UPDATE automation_definitions SET confirmation_revision = confirmation_revision + 1, current_draft_version_id=? WHERE id=?',
           )
           .bind(draftId, id),
       );
@@ -485,5 +485,6 @@ export async function insertStyleStarterItems(
         item.kind === 'rich_menu',
     });
   }
+  if (inserted.length) statements.push(db.prepare("UPDATE account_styles SET first_starter_at=COALESCE(first_starter_at,?) WHERE line_account_id=?").bind(now, account));
   return { set, inserted, updated, skipped, existing };
 }

@@ -37,6 +37,8 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import InlineSettings from '@/components/shared/inline-settings'
 import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 import { ToggleField } from '@/components/shared/toggle'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 /*
  * シナリオのアクションを編集する窓（設計 `管理画面 5 hz9ti 送信後のアクションを設定`）。
@@ -328,7 +330,6 @@ export default function ActionEditor({
   const [pendingCount, setPendingCount] = useState(0)
   const errorRef = useRef('')
   const retryRef = useRef<(() => Promise<void>) | null>(null)
-  const closeWhenSaved = () => { if (!pendingRef.current && !errorRef.current) onClose() }
   // 任意機能の動作種は、そのaccountで機能がオフなら追加口ごと出さない。
   const actionFeatureVisibility = useFeatureVisibility(selectedAccountId)
   const [actions, setActions] = useState<ScenarioAction[]>([])
@@ -356,6 +357,14 @@ export default function ActionEditor({
   const [conditionDraft, setConditionDraft] = useState<SegmentCondition | null>(null)
   const [conditionError, setConditionError] = useState('')
   const [conditionSaving, setConditionSaving] = useState(false)
+  const conditionBaseline = useRef('null')
+  const conditionGuard = useUnsavedGuard({
+    dirty: conditionFor !== null && JSON.stringify(conditionDraft) !== conditionBaseline.current,
+    busy: conditionSaving,
+    subject: '動作の条件',
+    onDiscard: () => { setConditionFor(null); setConditionDraft(null) },
+  })
+  const closeWhenSaved = () => { if (!pendingRef.current && !errorRef.current) conditionGuard.guarded(onClose) }
   /*
    * R244: 内容編集の開閉は画面側で持つ。保存のたびに作り直して閉じない。
    * R242: キャンセルは開く前の値に戻すための、開いたときの写し。
@@ -662,6 +671,7 @@ export default function ActionEditor({
   /* R243: 条件の窓を開くとき、下書きに写して持つ。入力のたびに保存しない。 */
   const openCondition = (action: ScenarioAction) => {
     setConditionError('')
+    conditionBaseline.current = JSON.stringify(action.condition ?? null)
     setConditionDraft((action.condition as SegmentCondition | null) ?? null)
     setConditionFor(action.id)
   }
@@ -692,6 +702,7 @@ export default function ActionEditor({
         const fresh = await refresh()
         if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
         onChanged?.()
+        conditionGuard.disarm()
         setConditionFor(null)
       } finally {
         setConditionSaving(false)
@@ -813,7 +824,7 @@ export default function ActionEditor({
                 {actions.indexOf(editing) + 1}. [{KIND_LABEL[editing.actionType]}] の条件設定
               </p>
               <div className="flex shrink-0 items-center gap-2">
-                <Button variant="secondary" className="text-ink-secondary h-9 px-4 whitespace-normal" type="button" onClick={() => setConditionFor(null)}>
+                <Button variant="secondary" className="text-ink-secondary h-9 px-4 whitespace-normal" type="button" onClick={() => conditionGuard.guarded(() => setConditionFor(null))}>
                   戻る
                 </Button>
                 <Button variant="primary" onClick={saveCondition} disabled={conditionSaving} busy={conditionSaving}>条件を保存する
@@ -918,6 +929,7 @@ export default function ActionEditor({
         {/* R242: キャンセルは開く前の値に戻して閉じる。反映は今の内容のまま閉じる。 */}
         {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling} busy={cancelling} busyLabel="戻しています…">キャンセル</Button><Button variant="primary" disabled={pendingCount > 0 || Boolean(error) || loading || !draftReady} onClick={closeWhenSaved}>このアクションを反映</Button></div>}
       </div>
+      <UnsavedLeaveDialog subject="動作の条件への変更" open={conditionGuard.leaveTarget !== null} busy={conditionSaving} onConfirm={conditionGuard.confirmLeave} onCancel={conditionGuard.cancelLeave} />
     </InlineSettings>
   )
 }

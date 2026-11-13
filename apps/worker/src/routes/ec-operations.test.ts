@@ -73,7 +73,7 @@ beforeEach(() => {
   dbMocks.listEcIdentityCandidates.mockResolvedValue({
     items: [{
       id: 'candidate-1', version: 1,
-      left: { attributes: [{ label: 'メール', valuePreview: 'ta***@example.jp' }] },
+      left: { attributes: [{ label: 'メール', valuePreview: 'ta***@example.com' }] },
       right: { attributes: [{ label: '電話', valuePreview: '***1234' }] },
       impact: [{ key: 'orders', value: 6, unit: '件' }],
     }],
@@ -134,9 +134,9 @@ describe('EC identity candidates and retry', () => {
     expect(response.status).toBe(200);
     const text = await response.text();
     expect(text).toContain('potentialRevenue');
-    expect(text).toContain('ta***@example.jp');
-    expect(text).not.toContain('tanaka@example.jp');
-    expect(text).not.toContain('09012341234');
+    expect(text).toContain('ta***@example.com');
+    expect(text).not.toContain('tanaka@example.com');
+    expect(text).not.toContain('09000001234');
   });
 
   it('retry可能な失敗だけを版・冪等キー付きで待ち行列へ戻す', async () => {

@@ -49,9 +49,9 @@ vi.mock('@/lib/api', async (original) => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); resultFixture.account = 'account-a' })
 
 const SUBSCRIPTIONS = [
-  { id: 'sub-active', friendId: 'f-1', friendName: '進行 一郎', status: 'active', pauseReason: null, currentStepOrder: 1, startedAt: '2026-10-01T01:00:00Z', nextDeliveryAt: null },
-  { id: 'sub-paused', friendId: 'f-2', friendName: '停止 二郎', status: 'paused', pauseReason: 'manual', currentStepOrder: 1, startedAt: '2026-10-01T01:00:00Z', nextDeliveryAt: null },
-  { id: 'sub-failed', friendId: 'f-3', friendName: '失敗 三郎', status: 'paused', pauseReason: 'delivery_failed', currentStepOrder: 1, startedAt: '2026-10-01T01:00:00Z', nextDeliveryAt: null },
+  { id: 'sub-active', friendId: 'f-1', friendName: '見本 01', status: 'active', confirmationRevision: 4, pauseReason: null, currentStepOrder: 1, startedAt: '2026-10-01T01:00:00Z', nextDeliveryAt: null },
+  { id: 'sub-paused', friendId: 'f-2', friendName: '見本 02', status: 'paused', pauseReason: 'manual', currentStepOrder: 1, startedAt: '2026-10-01T01:00:00Z', nextDeliveryAt: null },
+  { id: 'sub-failed', friendId: 'f-3', friendName: '見本 03', status: 'paused', pauseReason: 'delivery_failed', currentStepOrder: 1, startedAt: '2026-10-01T01:00:00Z', nextDeliveryAt: null },
 ]
 
 function runsData(subscriptions: unknown[] = [], nextCursor: string | null = null) {
@@ -101,20 +101,20 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
   it('止める・再開・失敗を再送は、購読ごとの口を確認キー付きで呼び、終わったら一覧を読み直す', async () => {
     for (const fn of Object.values(resultFixture.ops)) fn.mockResolvedValue({ success: true, data: {} })
     await renderResults(SUBSCRIPTIONS)
-    await screen.findByText('進行 一郎')
+    await screen.findByText('見本 01')
     const before = resultFixture.runs.mock.calls.length
-    await chooseRowOp('進行 一郎', '止める')
+    await chooseRowOp('見本 01', '止める')
     await waitFor(() => expect(resultFixture.ops.pause).toHaveBeenCalledWith('sub-active', expect.stringMatching(/^[0-9a-f-]{36}$/)))
     await waitFor(() => expect(resultFixture.runs.mock.calls.length).toBeGreaterThan(before))
-    await chooseRowOp('停止 二郎', '再開する')
+    await chooseRowOp('見本 02', '再開する')
     await waitFor(() => expect(resultFixture.ops.resume).toHaveBeenCalledWith('sub-paused', expect.any(String)))
-    await chooseRowOp('失敗 三郎', '失敗を再送')
+    await chooseRowOp('見本 03', '失敗を再送')
     await waitFor(() => expect(resultFixture.ops.retry).toHaveBeenCalledWith('sub-failed', expect.any(String)))
   })
 
   it('止まり方で出し分ける：手で止めた購読に「失敗を再送」を出さない', async () => {
     await renderResults(SUBSCRIPTIONS)
-    fireEvent.click(await screen.findByRole('button', { name: '停止 二郎のその他の操作' }))
+    fireEvent.click(await screen.findByRole('button', { name: '見本 02のその他の操作' }))
     expect(await screen.findByRole('menuitem', { name: '再開する' })).toBeTruthy()
     expect(screen.queryByRole('menuitem', { name: '失敗を再送' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: '止める' })).toBeNull()
@@ -125,11 +125,11 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
       .mockResolvedValueOnce({ success: false, error: '時間を置いてください' })
       .mockResolvedValue({ success: true, data: {} })
     await renderResults(SUBSCRIPTIONS)
-    await chooseRowOp('進行 一郎', '止める')
-    await screen.findByText('進行 一郎 への操作を完了できませんでした。時間を置いてください')
-    await chooseRowOp('進行 一郎', '止める')
+    await chooseRowOp('見本 01', '止める')
+    await screen.findByText('見本 01 への操作を完了できませんでした。時間を置いてください')
+    await chooseRowOp('見本 01', '止める')
     await waitFor(() => expect(resultFixture.ops.pause).toHaveBeenCalledTimes(2))
-    await chooseRowOp('進行 一郎', '止める')
+    await chooseRowOp('見本 01', '止める')
     await waitFor(() => expect(resultFixture.ops.pause).toHaveBeenCalledTimes(3))
     const keys = resultFixture.ops.pause.mock.calls.map((call) => call[1])
     expect(keys[1]).toBe(keys[0])
@@ -144,8 +144,8 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
     ] })
     resultFixture.ops.move.mockResolvedValue({ success: true, data: {} })
     await renderResults(SUBSCRIPTIONS)
-    await chooseRowOp('進行 一郎', '別のシナリオへ移す')
-    const dialog = await screen.findByRole('dialog', { name: '進行 一郎 を別のシナリオへ移す' })
+    await chooseRowOp('見本 01', '別のシナリオへ移す')
+    const dialog = await screen.findByRole('dialog', { name: '見本 01 を別のシナリオへ移す' })
     expect(dialog.textContent).toContain('LINEアカウント')
     expect(dialog.textContent).toContain('環境')
     expect(resultFixture.list).toHaveBeenCalledWith({ accountId: 'account-a' })
@@ -159,8 +159,8 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
     fireEvent.click(within(picker).getByRole('button', { name: '選ぶ' }))
     await waitFor(() => expect(screen.queryAllByRole('dialog').includes(picker)).toBe(false))
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'このシナリオへ移す' })) })
-    await waitFor(() => expect(resultFixture.ops.move).toHaveBeenCalledWith('sub-active', 'sc-2', expect.stringMatching(/^[0-9a-f-]{36}$/)))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: '進行 一郎 を別のシナリオへ移す' })).toBeNull())
+    await waitFor(() => expect(resultFixture.ops.move).toHaveBeenCalledWith('sub-active', 'sc-2', expect.stringMatching(/^[0-9a-f-]{36}$/), { revision: 4, status: 'active' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '見本 01 を別のシナリオへ移す' })).toBeNull())
   })
 
   it('アカウントを切り替えた後に古い移動先を復活させない', async () => {
@@ -168,11 +168,11 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
     resultFixture.list.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
       .mockResolvedValueOnce({ success: true, data: [{ id: 'fresh', name: '新しい候補', isActive: true }] })
     const view = await renderResults(SUBSCRIPTIONS)
-    await chooseRowOp('進行 一郎', '別のシナリオへ移す')
+    await chooseRowOp('見本 01', '別のシナリオへ移す')
     resultFixture.account = 'account-b'; view.rerender(React.createElement(ScenarioResultsV8))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: '進行 一郎 を別のシナリオへ移す' })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '見本 01 を別のシナリオへ移す' })).toBeNull())
     await act(async () => { finish({ success: true, data: [{ id: 'old', name: '古い候補', isActive: true }] }) })
-    await chooseRowOp('進行 一郎', '別のシナリオへ移す')
+    await chooseRowOp('見本 01', '別のシナリオへ移す')
     fireEvent.click(await screen.findByRole('button', { name: /^移し先のシナリオ(?::|：)?(選ぶ|変える)?$/ }))
     const picker = await findPickerDialog()
     expect(within(picker).queryByRole('radio', { name: '古い候補' })).toBeNull()
@@ -190,7 +190,7 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
     expect(screen.queryByText('購読している友だちはまだいません')).toBeNull()
     resultFixture.runs.mockResolvedValue(runsData(SUBSCRIPTIONS))
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
-    await screen.findByText('進行 一郎')
+    await screen.findByText('見本 01')
     cleanup()
     resultFixture.account = null
     resultFixture.runs.mockClear()
@@ -204,13 +204,13 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
     await renderResults(SUBSCRIPTIONS, 'next-1')
     expect(screen.getByRole('heading', { name: '通ごとの反応' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '参加中の友だち' })).toBeTruthy()
-    await screen.findByText('進行 一郎')
+    await screen.findByText('見本 01')
     expect(screen.getAllByRole('button', { name: '予定を見る' }).length).toBe(SUBSCRIPTIONS.length)
     resultFixture.runs.mockResolvedValue(runsData([{ ...SUBSCRIPTIONS[0], id: 'sub-next', friendName: '続き 四郎' }]))
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'さらに読み込む' })) })
     await waitFor(() => expect(resultFixture.runs).toHaveBeenLastCalledWith('sc-1', 'account-a', expect.objectContaining({ cursor: 'next-1' })))
     await screen.findByText('続き 四郎')
-    expect(screen.getByText('進行 一郎')).toBeTruthy()
+    expect(screen.getByText('見本 01')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'さらに読み込む' })).toBeNull()
   })
 

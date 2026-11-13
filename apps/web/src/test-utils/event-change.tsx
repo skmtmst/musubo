@@ -7,7 +7,7 @@ export async function changeEventStart(time: string) {
   const input = document.querySelector<HTMLInputElement>('[role="dialog"] input[aria-labelledby="ev-cr-start-time-label"]')!
   await act(async () => { fireEvent.change(input, { target: { value: time } }) })
   await act(async () => { fireEvent.blur(input) })
-  await act(async () => { fireEvent.keyDown(document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!, { key: 'Escape' }) })
+  await act(async () => { (Array.from(document.querySelectorAll('[role="dialog"][aria-label="日時を選ぶ"] button')).find((button) => button.textContent?.trim() === '確定') as HTMLButtonElement).click() })
   await waitEventPreview()
 }
 

@@ -280,7 +280,7 @@ test('salon keeps existing KPI slots and forwards real staff, time and booking i
   expect(url.searchParams.get('time')).toBe('15:00')
   expect(url.searchParams.get('date')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   await page.goto('/')
-  await board.getByRole('button', { name: /青木 真理さん/ }).click()
+  await board.getByRole('button', { name: /見本 186さん/ }).click()
   await page.getByRole('menuitem', { name: '詳細を開く' }).click()
   await expect(page).toHaveURL((url) => url.pathname === '/booking/bookings' && url.searchParams.getAll('booking').length === 1 && url.searchParams.get('booking') === 'e1')
 
@@ -293,7 +293,7 @@ test('salon keeps existing KPI slots and forwards real staff, time and booking i
   expect(url.searchParams.get('time')).toMatch(/^\d{2}:\d{2}$/)
   expect(url.searchParams.has('staffId')).toBe(false)
   await page.goto('/?view=calendar&range=week')
-  await week.getByRole('button', { name: '10:00〜11:30 カット 山田 花子', exact: true }).click()
+  await week.getByRole('button', { name: '10:00〜11:30 カット 見本 143', exact: true }).click()
   await expect(page).toHaveURL((url) => url.pathname === '/booking/bookings' && url.searchParams.getAll('booking').length === 1 && url.searchParams.get('booking') === 'w1')
 })
 
@@ -309,7 +309,7 @@ test('consult forwards board and weekly booking identity, date, time and staff',
   expect(url.searchParams.get('time')).toBe('13:30')
   expect(url.searchParams.get('date')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   await page.goto('/?view=board')
-  await board.getByRole('button', { name: /原田 修さん/ }).click()
+  await board.getByRole('button', { name: /見本 125さん/ }).click()
   await page.getByRole('menuitem', { name: '詳細を開く' }).click()
   await expect(page).toHaveURL((url) => url.pathname === '/booking/bookings' && url.searchParams.getAll('booking').length === 1 && url.searchParams.get('booking') === 'm1')
   await page.goto('/?view=calendar&range=week')
@@ -321,14 +321,14 @@ test('consult forwards board and weekly booking identity, date, time and staff',
   expect(url.searchParams.get('time')).toMatch(/^\d{2}:\d{2}$/)
   expect(url.searchParams.has('staffId')).toBe(false)
   await page.goto('/?view=calendar&range=week')
-  await week.getByRole('button', { name: '10:00〜11:00 転職の初回面談 原田 修', exact: true }).click()
+  await week.getByRole('button', { name: '10:00〜11:00 転職の初回面談 見本 125', exact: true }).click()
   await expect(page).toHaveURL((url) => url.pathname === '/booking/bookings' && url.searchParams.getAll('booking').length === 1 && url.searchParams.get('booking') === 'm1')
 })
 
 test('legacy Meet consult opens the related friend without treating its ID as a booking', async ({ page }) => {
   await useIndustryFixture(page, 'consult', true)
   await page.goto('/?view=board')
-  await page.getByRole('region', { name: '台帳の盤' }).getByRole('button', { name: /原田 修さん/ }).click()
+  await page.getByRole('region', { name: '台帳の盤' }).getByRole('button', { name: /見本 125さん/ }).click()
   await page.getByRole('menuitem', { name: '詳細を開く' }).click()
   await expect(page).toHaveURL(/\/friends\/detail\?id=friend-1$/)
 })

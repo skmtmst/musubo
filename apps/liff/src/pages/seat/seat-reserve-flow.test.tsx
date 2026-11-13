@@ -13,7 +13,7 @@ import { defaultRestaurantReservationForm,type RestaurantCustomerBooking,type Re
  */
 
 vi.mock('@line/liff', () => ({
-  default: { getProfile: vi.fn().mockResolvedValue({ displayName: '山田 花子' }), closeWindow: vi.fn() },
+  default: { getProfile: vi.fn().mockResolvedValue({ displayName: '見本 143' }), closeWindow: vi.fn() },
 }));
 vi.mock('../../lib/api.js', () => ({
   api: { customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:"line"}}}),
@@ -114,11 +114,11 @@ describe('席の予約の流れ', () => {
     const body = vi.mocked(seat.hold).mock.calls[0]![0];
     expect(body).toMatchObject({ storeId: 'st', startsAt: new Date('2026-10-07T19:00:00+09:00').toISOString(), guestCount: 2 });
     expect(body.requestId).toMatch(/^[a-zA-Z0-9_-]{8,128}$/);
-    expect(screen.getByRole('textbox',{name:/お名前/})).toHaveProperty('value','山田 花子');
+    expect(screen.getByRole('textbox',{name:/お名前/})).toHaveProperty('value','見本 143');
     expect(screen.getByRole('timer').textContent).toContain('10分 お取りしています');
     fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
     await screen.findByText('ご予約を受け付けました');
-    expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: null, customerPhone: null,customerName:'山田 花子',allergyNote:null,expectedFormVersion:0 });
+    expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: null, customerPhone: null,customerName:'見本 143',allergyNote:null,expectedFormVersion:0 });
     expect(screen.getByText('確定')).toBeTruthy();
     expect(screen.getByText('2名')).toBeTruthy();
     expect(screen.getByText('然 - NEN - 本店')).toBeTruthy();
@@ -144,14 +144,14 @@ describe('席の予約の流れ', () => {
     expect(screen.getByText('テーブル席（お店で決めます）')).toBeTruthy();
     expect(screen.getByText('・15分を過ぎてご連絡がない場合は、取り消しになることがあります')).toBeTruthy();
     fireEvent.change(screen.getByLabelText(/ご要望/), { target: { value: '記念日です' } });
-    fireEvent.change(screen.getByLabelText('電話番号'), { target: { value: '090ー1111ー2222' } });
+    fireEvent.change(screen.getByLabelText('電話番号'), { target: { value: '090ー0000ー2222' } });
     expect(screen.getAllByText('任意')).toHaveLength(3);
     expect(screen.queryByText('ご要望（任意）')).toBeNull();
     expect(screen.getByText('5/200文字')).toBeTruthy();
     expect(screen.getByText('13/50文字')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
     await screen.findByText('ご予約を受け付けました');
-    expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: '記念日です', customerPhone: '09011112222',customerName:'山田 花子',allergyNote:null,expectedFormVersion:0 });
+    expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: '記念日です', customerPhone: '09000002222',customerName:'見本 143',allergyNote:null,expectedFormVersion:0 });
     expect(screen.getByText('記念日のコース')).toBeTruthy();
     expect(screen.queryByText('お席')).toBeNull();
   });
@@ -221,7 +221,7 @@ describe('席の予約の流れ', () => {
     expect(screen.getAllByText(/19:00/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
     await screen.findByText('ご予約を受け付けました');
-    expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: null, customerPhone: null,customerName:'山田 花子',allergyNote:null,expectedFormVersion:0 });
+    expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: null, customerPhone: null,customerName:'見本 143',allergyNote:null,expectedFormVersion:0 });
   });
 });
 
@@ -330,7 +330,7 @@ it.each([
   expect(seat.hold).toHaveBeenCalledWith(expect.objectContaining({ storeId: store.id, startsAt: '2026-10-07T10:00:00.000Z', guestCount: 2 }));
   fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
   await screen.findByText('ご予約を受け付けました');
-  expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: null, customerPhone: null, customerName: '山田 花子', allergyNote: null, expectedFormVersion: 7, ...(store.referralId ? { referralId: store.referralId } : {}) });
+  expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: null, customerPhone: null, customerName: '見本 143', allergyNote: null, expectedFormVersion: 7, ...(store.referralId ? { referralId: store.referralId } : {}) });
 });
 
 it('変更予約もリンクの店名を折り畳み外に出し、仮押さえなしで同じ予約と版を送る', async () => {

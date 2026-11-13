@@ -8,6 +8,7 @@ export function serializeFunnel(f: Funnel) {
     windowDays: f.window_days,
     createdAt: f.created_at,
     status: f.status,
+    confirmationRevision: f.confirmation_revision,
   };
 }
 

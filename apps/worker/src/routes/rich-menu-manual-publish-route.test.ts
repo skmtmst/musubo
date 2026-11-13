@@ -33,7 +33,7 @@ const { richMenuGroups } = await import('./rich-menu-groups.js');
 const group = {
   id: 'g1', account_id: 'a1', name: 'menu', chat_bar_text: 'menu', size: 'large', default_page_id: null,
   is_default_for_all: 0, status: 'draft', targeting_condition: null, targeting_priority: 0, targeting_enabled: 0,
-  folder_id: null, display_order: 0, created_at: '', updated_at: '', pages: [{
+  folder_id: null, display_order: 0, version:2, created_at: '', updated_at: '', pages: [{
     id: 'p1', order_index: 0, name: 'page', alias_id: 'alias', line_richmenu_id: 'old', image_r2_key: 'image', image_content_type: 'image/png', areas: [{
       id: 'area-1', bounds_x: 0, bounds_y: 0, bounds_width: 2500, bounds_height: 1686,
       action_type: 'uri', actionData: { uri: 'https://example.com' }, intent: 'url', label: 'サイトを開く',
@@ -77,6 +77,25 @@ describe('手動公開のroute冪等性', () => {
       throw new Error(`unexpected fetch ${url}`);
     }));
     access.canAccessAllLineAccounts.mockResolvedValue(true);
+  });
+
+  it('公開前に保存版が変わっていればLINEへ進まず409を返す',async()=>{
+    const response=await app().request('/api/rich-menu-groups/g1/publish',{method:'POST',headers:{'Idempotency-Key':'key-stale','content-type':'application/json'},body:JSON.stringify({expectedVersion:1,expectedPublishGeneration:0,expectedImages:[{orderIndex:0,imageR2Key:'image',imageContentType:'image/png'}]})});
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({data:{version:2}});
+    expect(db.createRichMenuManualPublishRequestAtomic).not.toHaveBeenCalled();
+    expect(publisher.createRichMenuShells).not.toHaveBeenCalled();expect(publisher.switchRichMenuLive).not.toHaveBeenCalled();
+  });
+  it('版が同じでも確認後に画像が変われば公開しない',async()=>{
+    const response=await app().request('/api/rich-menu-groups/g1/publish',{method:'POST',headers:{'Idempotency-Key':'key-stale-image','content-type':'application/json'},body:JSON.stringify({expectedVersion:2,expectedPublishGeneration:0,expectedImages:[{orderIndex:0,imageR2Key:'other-image',imageContentType:'image/png'}]})});
+    expect(response.status).toBe(409);expect(publisher.createRichMenuShells).not.toHaveBeenCalled();expect(publisher.switchRichMenuLive).not.toHaveBeenCalled();
+  });
+  it('公開処理の途中で版が変わったら次のLINE操作をしない',async()=>{
+    db.acquirePublishLease.mockImplementationOnce(async()=>{db.getRichMenuGroupWithPages.mockResolvedValue({...group,publishing_generation:1});return 1});
+    publisher.validateRichMenuPagesWithLine.mockImplementationOnce(async()=>{db.getRichMenuGroupWithPages.mockResolvedValue({...group,version:3,publishing_generation:1})});
+    publisher.createRichMenuShells.mockImplementationOnce(async (_group:unknown,_line:unknown,_r2:unknown,heartbeat:()=>Promise<void>)=>{await heartbeat();return {shells:[]}});
+    const response=await app().request('/api/rich-menu-groups/g1/publish',{method:'POST',headers:{'Idempotency-Key':'key-mid-change','content-type':'application/json'},body:JSON.stringify({expectedVersion:2,expectedPublishGeneration:0,expectedImages:[{orderIndex:0,imageR2Key:'image',imageContentType:'image/png'}]})});
+    expect(response.status).toBe(409);expect(publisher.switchRichMenuLive).not.toHaveBeenCalled();
   });
 
   it('同key同内容の同時要求は2本目を409にし、完了後の再試行はLINEを再実行せず再生する', async () => {

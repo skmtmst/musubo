@@ -25,6 +25,7 @@ vi.mock('@/components/shared/confirm-dialog', async original => {
   } }
 })
 const removeTemplate = vi.hoisted(() => vi.fn())
+const removeTemplates = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const account = vi.hoisted(() => ({ id: 'account-1' }))
 const push = vi.hoisted(() => vi.fn())
@@ -59,7 +60,7 @@ vi.mock('@/lib/api', () => ({
   },
   fetchApi,
   api: {
-    templates: { list: listTemplates, usages, delete: removeTemplate },
+    templates: { list: listTemplates, usages, delete: removeTemplate, bulkDelete: removeTemplates },
     friendFields: { list: () => Promise.resolve({ success: true, data: [{ fieldKey: 'pet_name', name: 'ペットの名前' }] }) },
     commonVars: { list: () => Promise.resolve({ success: true, data: [{ varKey: 'business_hours', name: '営業時間' }] }) },
     broadcastMessageAssets: { counts: () => Promise.resolve({ success: true, data: { card_message: 4 } }), list: () => Promise.resolve({ success: true, data: [] }), folders: { list: () => Promise.resolve({ success: true, data: [] }) } },
@@ -73,6 +74,7 @@ import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const base = {
+  confirmationRevision: 3,
   category: '',
   messageType: 'text',
   folderId: null,
@@ -118,6 +120,7 @@ beforeEach(() => {
     },
   })
   removeTemplate.mockResolvedValue({ success: true })
+  removeTemplates.mockResolvedValue({ success: true })
 })
 
 afterEach(() => {
@@ -265,7 +268,8 @@ describe('V8 テンプレートの一覧', () => {
 
   it.each(['単体', 'まとめて'])('%s削除の通信中に切り替えても新しいアカウントで削除できる', async (mode) => {
     let finishOld!: (value: unknown) => void
-    removeTemplate.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve })).mockImplementation(() => new Promise(() => {}))
+    const remove = mode === '単体' ? removeTemplate : removeTemplates
+    remove.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve })).mockImplementation(() => new Promise(() => {}))
     const view = render(<TemplatesListV8 />)
     await act(async () => { await Promise.resolve() })
     const open = () => {
@@ -274,17 +278,17 @@ describe('V8 テンプレートの一覧', () => {
     }
     open()
     await act(async () => { fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })) })
-    expect(removeTemplate).toHaveBeenCalledTimes(1)
+    expect(remove).toHaveBeenCalledTimes(1)
     account.id = 'account-2'
     await act(async () => { view.rerender(<TemplatesListV8 />); await Promise.resolve() })
     open()
     const dialog = screen.getByRole('alertdialog')
     expect((within(dialog).getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(false)
     fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
-    expect(removeTemplate).toHaveBeenCalledTimes(2)
+    expect(remove).toHaveBeenCalledTimes(2)
     await act(async () => { finishOld({ success: true }); await Promise.resolve() })
     expect((within(dialog).getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(true)
-    expect(removeTemplate).toHaveBeenCalledTimes(2)
+    expect(remove).toHaveBeenCalledTimes(2)
   })
 
   it('まとめて削除の窓を再表示すると古い確定は受け付けない', async () => {
@@ -297,9 +301,9 @@ describe('V8 テンプレートの一覧', () => {
     fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'キャンセル' }))
     fireEvent.click(screen.getByRole('button', { name: 'まとめて削除' }))
     await act(async () => { oldClick() })
-    expect(removeTemplate).not.toHaveBeenCalled()
+    expect(removeTemplates).not.toHaveBeenCalled()
     await act(async () => { fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })) })
-    expect(removeTemplate).toHaveBeenCalledTimes(1)
+    expect(removeTemplates).toHaveBeenCalledExactlyOnceWith([{ id: 't-unused', expectedRevision: 3 }])
   })
 
   it('決まり2：確認をキャンセルしたら削除しない', async () => {

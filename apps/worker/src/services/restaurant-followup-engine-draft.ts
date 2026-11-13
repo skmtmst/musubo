@@ -75,7 +75,7 @@ async function saveEngineDraft(db:D1Database,storeId:string,trigger:RestaurantFo
   }
   if(!id&&target)statements.push(db.prepare("UPDATE rt_store_followup_targets SET enabled=0,sending_status='stopped',approval_id=NULL,approved_version_id=NULL,approved_content_hash=NULL,version=version+1 WHERE store_id=? AND trigger=?").bind(storeId,trigger));
   if(target?.reminder_id)statements.push(db.prepare("UPDATE reminders SET is_active=0,lifecycle_status=CASE WHEN current_published_version_id IS NULL THEN 'draft' ELSE 'stopped' END WHERE id=?").bind(target.reminder_id));
-  if(target?.automation_id)statements.push(db.prepare("UPDATE automation_definitions SET status=CASE WHEN current_published_version_id IS NULL THEN 'draft' ELSE 'stopped' END WHERE id=?").bind(target.automation_id));
+  if(target?.automation_id)statements.push(db.prepare("UPDATE automation_definitions SET confirmation_revision = confirmation_revision + 1, status=CASE WHEN current_published_version_id IS NULL THEN 'draft' ELSE 'stopped' END WHERE id=?").bind(target.automation_id));
   statements.push(db.prepare('UPDATE rt_store_followup_rows SET version=version+1 WHERE store_id=? AND trigger=?').bind(storeId,trigger));
   return statements;
  };

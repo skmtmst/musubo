@@ -632,13 +632,13 @@ describe('参考の文字の保存と読み直し', () => {
       return { success: true, data: { id: stored.id, contentRevision: 8 } }
     })
     await render('id=form-1')
-    fireEvent.change(screen.getByLabelText(hintLabel), { target: { value: '例：山田 太郎' } })
+    fireEvent.change(screen.getByLabelText(hintLabel), { target: { value: '例：見本 141' } })
     fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(formsUpdate).toHaveBeenCalled())
     restart()
     await render('id=form-1')
-    expect((screen.getByLabelText(hintLabel) as HTMLInputElement).value).toBe('例：山田 太郎')
-    expect(within(screen.getByLabelText('お客さまに見える形')).getByPlaceholderText('例：山田 太郎')).toBeTruthy()
+    expect((screen.getByLabelText(hintLabel) as HTMLInputElement).value).toBe('例：見本 141')
+    expect(within(screen.getByLabelText('お客さまに見える形')).getByPlaceholderText('例：見本 141')).toBeTruthy()
     expect(formsPublish).not.toHaveBeenCalled()
     fireEvent.change(screen.getByLabelText(hintLabel), { target: { value: '' } })
     formsUpdate.mockClear()
@@ -647,7 +647,7 @@ describe('参考の文字の保存と読み直し', () => {
     restart()
     await render('id=form-1')
     expect((screen.getByLabelText(hintLabel) as HTMLInputElement).value).toBe('')
-    expect(within(screen.getByLabelText('お客さまに見える形')).queryByPlaceholderText('例：山田 太郎')).toBeNull()
+    expect(within(screen.getByLabelText('お客さまに見える形')).queryByPlaceholderText('例：見本 141')).toBeNull()
   })
 
   it('統括も同じ欄で設定し、ひな形を保存→読み直すと残る。店の保存APIは呼ばない', async () => {

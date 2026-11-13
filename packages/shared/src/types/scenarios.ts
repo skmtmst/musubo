@@ -19,6 +19,8 @@ export type DeliveryMode = "relative" | "elapsed" | "absolute_time";
 export interface Scenario {
   /** 主キー (UUIDv4) */
   id: string;
+  /** 危ない操作の確認に使う内容の版。 */
+  contentRevision?: number;
   /** シナリオ名 */
   name: string;
   /** 説明文 */

@@ -601,7 +601,7 @@ export async function runScenarioOp(
     const targetId = c.scenarioId || currentScenarioId
     await db
       .prepare(
-        `UPDATE friend_scenarios SET status = 'paused', updated_at = ?
+        `UPDATE friend_scenarios SET confirmation_revision = confirmation_revision + 1, status = 'paused', updated_at = ?
           WHERE friend_id = ? AND scenario_id = ? AND status IN ('active','delivering')`,
       )
       .bind(now, friendId, targetId)
@@ -632,7 +632,7 @@ export async function runScenarioOp(
 
   // 元の購読を止めるのは、移動先への登録が成功した後だけ。
   const pausePrevious = previousScenarioId ? [db.prepare(
-    `UPDATE friend_scenarios SET status='paused', updated_at=?
+    `UPDATE friend_scenarios SET confirmation_revision = confirmation_revision + 1, status='paused', updated_at=?
       WHERE friend_id=? AND scenario_id=? AND status IN ('active','delivering')`,
   ).bind(now, friendId, previousScenarioId)] : []
 
@@ -657,7 +657,7 @@ export async function runScenarioOp(
         .bind(c.scenarioId).first()
       if (!available) throw new Error('移動先のシナリオを開始できませんでした。元のシナリオは継続しています')
       await db.batch([
-        db.prepare(`UPDATE friend_scenarios SET status='active', previous_scenario_id=COALESCE(?,previous_scenario_id), updated_at=?
+        db.prepare(`UPDATE friend_scenarios SET confirmation_revision = confirmation_revision + 1, status='active', previous_scenario_id=COALESCE(?,previous_scenario_id), updated_at=?
           WHERE id=? AND status='paused' AND EXISTS(SELECT 1 FROM scenarios WHERE id=? AND is_active=1 AND current_published_version_id IS NOT NULL)`)
           .bind(previousScenarioId, now, paused.id, c.scenarioId),
         // 読み取り後に先が変わっていたらbatch全体を戻し、元の停止へ進まない。
@@ -678,7 +678,7 @@ export async function runScenarioOp(
     throw new Error('移動先のシナリオを開始できませんでした。元のシナリオは継続しています')
   }
   if (previousScenarioId) await db.batch([
-    db.prepare(`UPDATE friend_scenarios SET previous_scenario_id=COALESCE(?,previous_scenario_id)
+    db.prepare(`UPDATE friend_scenarios SET confirmation_revision = confirmation_revision + 1, previous_scenario_id=COALESCE(?,previous_scenario_id)
       WHERE id=? AND status IN ('active','delivering') AND EXISTS(SELECT 1 FROM scenarios WHERE id=? AND is_active=1 AND current_published_version_id IS NOT NULL)`)
       .bind(previousScenarioId, enrolled.id, c.scenarioId),
     db.prepare(`SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'SCENARIO_NOT_STARTED' END)`),
@@ -710,7 +710,7 @@ export async function resumePreviousScenario(
 
   const updated = await db
     .prepare(
-      `UPDATE friend_scenarios SET status = 'active', updated_at = ?
+      `UPDATE friend_scenarios SET confirmation_revision = confirmation_revision + 1, status = 'active', updated_at = ?
         WHERE friend_id = ? AND scenario_id = ? AND status = 'paused'`,
     )
     .bind(jstNow(), friendId, previousId)

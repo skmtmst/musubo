@@ -76,13 +76,13 @@ export async function getRichMenuDeleteImpact(
   const [pagesResult, incomingResult, candidatesResult, referencesResult, currentAudience] = await Promise.all([
     db
       .prepare(
-        `SELECT id, name, line_richmenu_id
+        `SELECT id, name, order_index, line_richmenu_id
            FROM rich_menu_pages
           WHERE group_id = ?
           ORDER BY order_index ASC`,
       )
       .bind(groupId)
-      .all<{ id: string; name: string; line_richmenu_id: string | null }>(),
+      .all<{ id: string; name: string; order_index:number; line_richmenu_id: string | null }>(),
     db
       .prepare(
         `SELECT source_group.id   AS source_group_id,
@@ -248,6 +248,8 @@ export async function getRichMenuDeleteImpact(
       accountId: group.account_id,
       name: group.name,
       status: group.status,
+      version: group.version ?? 1,
+      publishingGeneration: group.publishing_generation ?? 0,
     },
     currentAudience: {
       value: currentAudience,
@@ -272,6 +274,7 @@ export async function getRichMenuDeleteImpact(
       pagesWithLineRichMenuId,
       isDefaultForAll: group.is_default_for_all === 1,
       publishing: group.publishing_at !== null,
+      pages:pages.map(page=>({id:page.id,orderIndex:page.order_index,lineRichMenuId:page.line_richmenu_id})),
     },
     blockers,
     canDelete: blockers.length === 0,

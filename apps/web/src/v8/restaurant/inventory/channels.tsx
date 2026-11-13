@@ -103,10 +103,18 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
   const [reissueOpen, setReissueOpen] = useState(false)
   const scope = JSON.stringify([accountId, storeId])
   const [reissueScope, setReissueScope] = useState('')
-  useEffect(() => { setReissueOpen(false); setReissueScope('') }, [scope])
+  const scopeIdentity = useRef({ key: scope })
+  if (scopeIdentity.current.key !== scope) scopeIdentity.current = { key: scope }
+  const reissueTicket = useRef<object | null>(null)
+  const renderedScope = scopeIdentity.current
+  const renderedTicket = reissueTicket.current
+  useEffect(() => { setReissueOpen(false); setReissueScope(''); reissueTicket.current = null }, [scope])
+  useEffect(() => () => { reissueTicket.current = null }, [])
   const role = useStaffRole()
   const lockedReason = usePermissionLockReason(allowedByRole)
   const canEdit = allowedByRole && !lockedReason
+  const canEditRef = useRef(canEdit)
+  canEditRef.current = canEdit
   const router = useRouter()
   const [detail, setDetail] = useState<InboundEmail | null>(null)
   const [importing, setImporting] = useState<InboundEmail | null>(null)
@@ -212,7 +220,7 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
             <Button onClick={() => setHowToOpen(true)}><CircleHelp size={16} aria-hidden="true" />転送の設定のしかた</Button>
             <Button href="/restaurant-test/reservations"><FlaskConical size={16} aria-hidden="true" />試しに受け取る（予約台帳へ）</Button>
             {address
-              ? <Button lockedReason={lockedReason} onClick={() => { setReissueScope(scope); setReissueOpen(true) }} disabled={!canEdit || busy}><RefreshCw size={16} aria-hidden="true" />発行し直す（旧は 90 日で失効）</Button>
+              ? <Button lockedReason={lockedReason} onClick={() => { reissueTicket.current = {}; setReissueScope(scope); setReissueOpen(true) }} disabled={!canEdit || busy}><RefreshCw size={16} aria-hidden="true" />発行し直す（旧は 90 日で失効）</Button>
               : <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy} onClick={issue} busy={Boolean(busy)} busyLabel="処理中…">発行する</Button>}
           </div>
         </Card>
@@ -275,11 +283,11 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
         width={480}
         top={220}
         busy={busy}
-        onCancel={() => setReissueOpen(false)}
+        onCancel={() => { reissueTicket.current = null; setReissueOpen(false) }}
         actions={(
           <>
-            <Button type="button" onClick={() => setReissueOpen(false)} disabled={busy}>キャンセル</Button>
-            <Button lockedReason={lockedReason} type="button" variant="primary" disabled={!canEdit || busy} busy={busy} busyLabel="処理中…" onClick={() => { if (reissueScope !== scope) return; setReissueOpen(false); issue() }}>発行し直す</Button>
+            <Button type="button" onClick={() => { reissueTicket.current = null; setReissueOpen(false) }} disabled={busy}>キャンセル</Button>
+            <Button lockedReason={lockedReason} type="button" variant="primary" disabled={!canEdit || busy} busy={busy} busyLabel="処理中…" onClick={() => { if (!renderedTicket || renderedTicket !== reissueTicket.current || renderedScope !== scopeIdentity.current || !canEditRef.current || reissueScope !== scope) return; reissueTicket.current = null; setReissueOpen(false); issue() }}>発行し直す</Button>
           </>
         )}
       >

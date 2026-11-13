@@ -185,3 +185,13 @@ it('一覧を読めないときは読み直しの押し口を出し、押すと�
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+it.each(['owner', 'viewer'])('Q&Aの説明は %s が使える操作に合う', async currentRole => {
+  role.value = verifiedStaffRole(currentRole)
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: '自動応答の説明' }))
+  const note = screen.getAllByRole('note').find(element => element.textContent?.includes('公開した Q&A は返信案の元'))!
+  expect(note).toBeTruthy()
+  expect(Boolean(note.textContent?.includes('行を押すと編集'))).toBe(currentRole === 'owner')
+  expect(Boolean(note.textContent?.includes('公開・止める・削除'))).toBe(currentRole === 'owner')
+})

@@ -25,8 +25,8 @@ vi.mock('@/lib/api', async () => {
 })
 const subject = (label: string, detail: string | null) => ({ kind: 'ec_event', id: label, label, detail, lineAccountId: null, lineAccountName: null, shopKey: null, attributes: [] })
 const items = [
-  { id: 'c-1', kind: 'ec_member', status: 'pending', version: 1, confidence: { score: 94, label: 'high' }, left: subject('高橋 直人', 'EC-10422'), right: subject('高橋 なおと', '友だち追加 9/12'), evidenceSummary: ['姓', '郵便番号'], detectedAt: '2026-10-01T00:00:00Z', reviewedAt: null },
-  { id: 'c-2', kind: 'ec_member', status: 'pending', version: 1, confidence: { score: 0, label: 'low' }, left: subject('中村 彩', 'EC-10377'), right: subject('', null), evidenceSummary: [], detectedAt: '2026-10-01T00:00:00Z', reviewedAt: null },
+  { id: 'c-1', kind: 'ec_member', status: 'pending', version: 1, confidence: { score: 94, label: 'high' }, left: subject('見本 16', 'EC-10422'), right: subject('高橋 なおと', '友だち追加 9/12'), evidenceSummary: ['姓', '郵便番号'], detectedAt: '2026-10-01T00:00:00Z', reviewedAt: null },
+  { id: 'c-2', kind: 'ec_member', status: 'pending', version: 1, confidence: { score: 0, label: 'low' }, left: subject('見本 27', 'EC-10377'), right: subject('', null), evidenceSummary: [], detectedAt: '2026-10-01T00:00:00Z', reviewedAt: null },
 ]
 vi.mock('@/components/identity/identity-review', () => ({
   useIdentityReview: () => ({ state: 'ready', items, detail: null, failure: null, decideError: '', deciding: false, loadingMore: false, hasMore: false, selectedId: null, dialogOpen: false, select: fixture.select, openDialog: fixture.openDialog, closeDialog: vi.fn(), reload: vi.fn(), loadMore: vi.fn(), decide: vi.fn() }),
@@ -57,7 +57,7 @@ it('候補の行は「…」の中に「候補を見る」「決める」、候�
   fireEvent.click(within(rows[2]).getByRole('button', { name: /の候補の操作/ }))
   expect(screen.queryByRole('menuitem', { name: '決める' })).toBeNull()
   fireEvent.click(await screen.findByRole('menuitem', { name: '友だちを探す' }))
-  expect(routerPush).toHaveBeenCalledWith('/friends?q=%E4%B8%AD%E6%9D%91%20%E5%BD%A9')
+  expect(routerPush).toHaveBeenCalledWith('/friends?q=%E8%A6%8B%E6%9C%AC%2027')
   await waitFor(() => expect(within(rows[1]).getByText(/EC-10422・注文 3/)).toBeTruthy())
 })
 

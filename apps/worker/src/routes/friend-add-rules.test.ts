@@ -427,7 +427,25 @@ describe('friend add rules API', () => {
         method: 'DELETE',
       }, makeEnv());
       expect(response.status).toBe(200);
-      expect(db.archiveFriendAddRule).toHaveBeenCalled();
+      expect(db.archiveFriendAddRule).toHaveBeenCalledWith(expect.anything(), { lineAccountId: 'account-1', ruleId: 'rule-1' });
+    });
+
+    test('確認した版と状態を条件付き保管に渡す', async () => {
+      db.archiveFriendAddRule.mockResolvedValue(undefined);
+      const response = await app.request('/api/friend-add-rules/rule-1?account_id=account-1&expected_version=1&expected_status=draft', { method: 'DELETE' }, makeEnv());
+      expect(response.status).toBe(200);
+      expect(db.archiveFriendAddRule).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ expectedVersion: 1, expectedStatus: 'draft' }));
+    });
+    test('保管の版が食い違う時は409にする', async () => {
+      db.archiveFriendAddRule.mockRejectedValue(new Error('FRIEND_ADD_RULE_VERSION_CONFLICT'));
+      const response = await app.request('/api/friend-add-rules/rule-1?account_id=account-1&expected_version=1&expected_status=draft', { method: 'DELETE' }, makeEnv());
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ success: false, code: 'VERSION_CONFLICT' });
+    });
+    test('版だけの不完全な指定は保管しない', async () => {
+      const response = await app.request('/api/friend-add-rules/rule-1?account_id=account-1&expected_version=1', { method: 'DELETE' }, makeEnv());
+      expect(response.status).toBe(400);
+      expect(db.archiveFriendAddRule).not.toHaveBeenCalled();
     });
 
     test('M008: 存在しない設定の公開は404（500にしない）', async () => {

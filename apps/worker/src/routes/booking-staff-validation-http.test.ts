@@ -42,7 +42,7 @@ function appFor(target: D1Database) {
 }
 
 const validStaff = {
-  name: '  田中 美咲  ',
+  name: '  見本 170  ',
   display_name: '  みさき  ',
   role: '  トリミング担当  ',
   profile_image_url: '  https://example.test/staff.png  ',
@@ -121,7 +121,7 @@ describe('予約スタッフ入力 HTTP（実D1）', () => {
     );
     const rows = (await listed.json() as { staff: Array<Record<string, unknown>> }).staff;
     expect(rows.find((row) => row.id === id)).toMatchObject({
-      name: '田中 美咲', display_name: 'みさき', role: 'トリミング担当',
+      name: '見本 170', display_name: 'みさき', role: 'トリミング担当',
       profile_image_url: 'https://example.test/staff.png', bio: '小型犬が得意です。', sort_order: 12,
       is_designation_optional: 0, is_active: 1,
     });

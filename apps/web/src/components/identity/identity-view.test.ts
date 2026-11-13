@@ -28,7 +28,7 @@ describe('本人照合の言い換え', () => {
 
   it('マスクされていない値は来ない前提で、無い項目を「—（未取得）」にする', () => {
     expect(maskedText(null)).toBe(NOT_AVAILABLE)
-    expect(maskedText('ta***@example.jp')).toBe('ta***@example.jp')
+    expect(maskedText('ta***@example.com')).toBe('ta***@example.com')
   })
 
   it('確からしさと根拠の強さを日本語で言う', () => {

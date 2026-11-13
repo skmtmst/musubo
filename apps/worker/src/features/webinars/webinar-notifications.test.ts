@@ -10,6 +10,7 @@ import {
   registerWebinarSession,
   saveWebinarNotificationSettings,
   sendWebinarNotificationTest,
+  webinarTestRecipientPreview,
   type WebinarNotificationSettingsInput,
 } from './webinar-notifications.js';
 
@@ -849,6 +850,58 @@ describe('webinar notification jobs', () => {
       { code: null, label: '理由の記録なし', count: 1 },
       { code: 'already_viewed', label: 'すでに視聴済み', count: 1 },
     ]);
+  });
+
+  test('確認したテスト宛先が変わったら誰にも送らない', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    raw.prepare(`INSERT INTO account_settings (id,line_account_id,key,value) VALUES ('test-recipients','account-1','test_recipients','["friend-1"]')`).run();
+    const dispatch = vi.fn(async (_request: Request) => new Response('{}', { status: 200 }));
+    await expect(sendWebinarNotificationTest(db,
+      { id: 'webinar-1', accountId: 'account-1', title: '商品説明会', slug: 'product-live' }, SESSION,
+      { now: NOW, proxyBaseUrl: 'https://worker.example.com', defaultAccessToken: 'fallback', defaultLiffId: null, proxyDispatch: dispatch, expectedRecipientToken: '0'.repeat(64) },
+    )).rejects.toMatchObject({ code: 'WEBINAR_TEST_RECIPIENT_CHANGED' });
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  test('同じ人数でもLINE宛先が変われば確認後に送らない', async () => {
+    const {db,raw}=createTestD1(); seedBase(raw);
+    raw.prepare(`INSERT INTO account_settings(id,line_account_id,key,value) VALUES ('test-recipients','account-1','test_recipients','["friend-1"]')`).run();
+    const preview=await webinarTestRecipientPreview(db,'account-1');
+    raw.prepare("UPDATE friends SET line_user_id='U-new' WHERE id='friend-1'").run();
+    const dispatch=vi.fn(async (_request:Request)=>new Response('{}'));
+    await expect(sendWebinarNotificationTest(db,{id:'webinar-1',accountId:'account-1',title:'商品説明会',slug:'product-live'},SESSION,
+      {now:NOW,proxyBaseUrl:'https://worker.example.com',defaultAccessToken:'fallback',defaultLiffId:null,proxyDispatch:dispatch,expectedRecipientToken:preview.token})).rejects.toMatchObject({code:'WEBINAR_TEST_RECIPIENT_CHANGED'});
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  test('送信準備中にLINE宛先が変わっても新旧とも送らない', async () => {
+    const {db,raw}=createTestD1(); seedBase(raw);
+    raw.prepare(`INSERT INTO account_settings(id,line_account_id,key,value) VALUES ('test-recipients','account-1','test_recipients','["friend-1"]')`).run();
+    const preview=await webinarTestRecipientPreview(db,'account-1');
+    const prepare=db.prepare.bind(db); let reads=0;
+    const spy=vi.spyOn(db,'prepare').mockImplementation(sql=>{
+      if(sql.includes("key='test_recipients'") && ++reads===2)raw.prepare("UPDATE friends SET line_user_id='U-late' WHERE id='friend-1'").run();
+      return prepare(sql);
+    });
+    const dispatch=vi.fn(async (_request:Request)=>new Response('{}'));
+    try{
+      await expect(sendWebinarNotificationTest(db,{id:'webinar-1',accountId:'account-1',title:'商品説明会',slug:'product-live'},SESSION,
+        {now:NOW,proxyBaseUrl:'https://worker.example.com',defaultAccessToken:'fallback',defaultLiffId:null,proxyDispatch:dispatch,expectedRecipientToken:preview.token})).rejects.toMatchObject({code:'WEBINAR_TEST_RECIPIENT_CHANGED'});
+      expect(reads).toBe(2);expect(dispatch).not.toHaveBeenCalled();
+    }finally{spy.mockRestore();}
+  });
+
+  test('同じ確認で同時にテストを送っても一度だけ送る', async () => {
+    const {db,raw}=createTestD1(); seedBase(raw);
+    raw.prepare(`INSERT INTO account_settings(id,line_account_id,key,value) VALUES ('test-recipients','account-1','test_recipients','["friend-1"]')`).run();
+    const preview=await webinarTestRecipientPreview(db,'account-1');
+    const dispatch=vi.fn(async (_request:Request)=>new Response('{}'));
+    const send=()=>sendWebinarNotificationTest(db,{id:'webinar-1',accountId:'account-1',title:'商品説明会',slug:'product-live'},SESSION,
+      {now:NOW,proxyBaseUrl:'https://worker.example.com',defaultAccessToken:'fallback',defaultLiffId:null,proxyDispatch:dispatch,expectedRecipientToken:preview.token,confirmationId:'test-confirmation'});
+    const results=await Promise.allSettled([send(),send()]);
+    expect(results.filter(result=>result.status==='fulfilled')).toHaveLength(1);
+    expect(dispatch).toHaveBeenCalledTimes(1);
   });
 
   test('テスト送信先だけへ自動送信として通知イメージを送る', async () => {

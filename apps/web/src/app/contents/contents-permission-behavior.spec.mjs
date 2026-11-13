@@ -48,7 +48,7 @@ function mediaItems(accountId) {
       id: 'media-delete-target', lineAccountId: accountId, folderId: 'media-product',
       kind: 'image', filename: MEDIA_NAME, mimeType: 'image/jpeg',
       sizeBytes: 348160, width: 1024, height: 678, durationMs: null,
-      url: '', uploadedBy: '川野 健太', createdAt: '2026-08-18T09:00:00.000Z', usageCount: 3,
+      url: '', uploadedBy: '見本 145', createdAt: '2026-08-18T09:00:00.000Z', usageCount: 3,
     },
     {
       id: 'media-delete-safe', lineAccountId: accountId, folderId: null,

@@ -114,7 +114,7 @@ describe('運営メンバーの招待V8（tVaUh）', () => {
   it('パスワードがある人には再設定を強制しない', async () => {
     net.check = {
       status: 200,
-      body: { success: true, data: { email: 'yamada@musubo.jp', name: '山田 花子', needsPassword: false } },
+      body: { success: true, data: { email: 'guest@example.com', name: '見本 花子', needsPassword: false } },
     }
     await render()
     expect(host.querySelector('#ops-invite-email')).not.toBeNull()
@@ -126,7 +126,7 @@ describe('運営メンバーの招待V8（tVaUh）', () => {
   it('パスワードがない人は名前と8文字以上の確認つきで進む', async () => {
     net.check = {
       status: 200,
-      body: { success: true, data: { email: 'yamada@musubo.jp', name: '', needsPassword: true } },
+      body: { success: true, data: { email: 'guest@example.com', name: '', needsPassword: true } },
     }
     await render()
     expect(host.querySelector('#ops-invite-password')).not.toBeNull()

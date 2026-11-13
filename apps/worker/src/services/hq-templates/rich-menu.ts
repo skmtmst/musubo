@@ -300,7 +300,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
         add('DELETE FROM rich_menu_pages WHERE group_id=?', groupId);
         add("UPDATE rich_menu_groups SET name=?, chat_bar_text=?, size=?, default_page_id=?, status='draft', is_default_for_all=0, targeting_enabled=0, targeting_condition=NULL, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND account_id=?", name, g.chatBarText, g.size, resolve(g.defaultPageId), groupId, c.targetAccountId);
       } else add('INSERT INTO rich_menu_groups (id,account_id,name,chat_bar_text,size,default_page_id,status) VALUES (?,?,?,?,?,?,\'draft\')', groupId, c.targetAccountId, name, g.chatBarText, g.size, resolve(g.defaultPageId));
-      add('UPDATE rich_menu_groups SET default_open=? WHERE id=? AND account_id=?', g.defaultOpen === true ? 1 : 0, groupId, c.targetAccountId);
+      add('UPDATE rich_menu_groups SET default_open=?, confirmation_revision=confirmation_revision+1 WHERE id=? AND account_id=?', g.defaultOpen === true ? 1 : 0, groupId, c.targetAccountId);
       if (g.displayAudience === 'tag') add('UPDATE rich_menu_groups SET targeting_enabled=1,targeting_condition=? WHERE id=? AND account_id=?', JSON.stringify({operator:'AND',rules:[{type:'tag_exists',value:s.audienceTagId}]}), groupId, c.targetAccountId);
       if(g.displayOrder!==undefined)add('UPDATE rich_menu_groups SET display_order=? WHERE id=? AND account_id=?',g.displayOrder,groupId,c.targetAccountId);
       // 下書きを配るだけで公開はしない。全員向けの指定も、店での公開を経て反映する。

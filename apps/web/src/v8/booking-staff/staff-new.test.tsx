@@ -60,7 +60,7 @@ beforeEach(() => {
   fixture.update.mockReset().mockResolvedValue({ ok: true })
   fixture.assign.mockReset()
   fixture.staff = [
-    { id: 'bs-1', name: '佐々木 亮太', display_name: '佐々木', role: 'トリマー', sort_order: 1, is_designation_optional: 0, is_active: 1 },
+    { id: 'bs-1', name: '見本 110', display_name: '佐々木', role: 'トリマー', sort_order: 1, is_designation_optional: 0, is_active: 1 },
   ]
 })
 afterEach(() => {
@@ -87,7 +87,7 @@ describe('予約スタッフを登録（V8）', () => {
   })
 
   test('登録済みの担当に指名なしの人がいれば、最初から「指名なし」を出す', async () => {
-    fixture.staff = [...fixture.staff, { id: 'bs-2', name: '中川 由美', display_name: '中川', role: '受付', sort_order: 2, is_designation_optional: 1, is_active: 1 }]
+    fixture.staff = [...fixture.staff, { id: 'bs-2', name: '見本 30', display_name: '中川', role: '受付', sort_order: 2, is_designation_optional: 1, is_active: 1 }]
     render(<StaffNewV8 />)
     const phone = await screen.findByRole('region', { name: 'お客さまの予約画面の見本' })
     expect(await within(phone).findByText('指名なし')).toBeTruthy()
@@ -102,11 +102,11 @@ describe('予約スタッフを登録（V8）', () => {
     await pickEntities('予約を受けられるメニュー', [ 'カット'])
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' })) })
     await screen.findByRole('button', { name: '割当をやり直す' })
-    fireEvent.change(screen.getByLabelText('スタッフ名（管理画面での呼び名）'), { target: { value: '田中 美咲' } })
+    fireEvent.change(screen.getByLabelText('スタッフ名（管理画面での呼び名）'), { target: { value: '見本 170' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '割当をやり直す' })) })
     await waitFor(() => expect(fixture.assign).toHaveBeenCalledTimes(2))
     expect(fixture.create).toHaveBeenCalledTimes(1)
-    expect(fixture.update).toHaveBeenCalledWith('account-a', 'created', expect.objectContaining({ name: '田中 美咲' }))
+    expect(fixture.update).toHaveBeenCalledWith('account-a', 'created', expect.objectContaining({ name: '見本 170' }))
  })
 
 test('REM3-06 new staff can choose registered media and save its public URL',async()=>{

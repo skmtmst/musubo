@@ -126,9 +126,9 @@ export function ClosureDialog({ open, date, targets, seatNoun, busy, error, affe
   error?: string
   affectedNote?: string | null
   onClose: () => void
-  onSave: (input: StyleClosureInput) => void
+  onSave: (input: StyleClosureInput) => void | Promise<void>
   /** 重なる予約を読む（飲食は既存の口の preview、ほかは画面の予約から）。重なりがあれば 2 段目（s8BwT8）。 */
-  preview?: (input: StyleClosureInput) => Promise<OverlapRow[]>
+  preview?: (input: StyleClosureInput) => Promise<OverlapRow[] | { rows: OverlapRow[]; snapshot: string }>
   mediaNote?: string | null
   accountId?: string | null
   store?: { id: string; name?: string | null }
@@ -136,6 +136,9 @@ export function ClosureDialog({ open, date, targets, seatNoun, busy, error, affe
   const [step, setStep] = useState<1 | 2>(1)
   const [overlap, setOverlap] = useState<OverlapRow[]>([])
   const [checking, setChecking] = useState(false)
+  const [previewError, setPreviewError] = useState('')
+  const [confirmedInput, setConfirmedInput] = useState<StyleClosureInput | null>(null)
+  const savingRef = useRef(false)
   const previewGeneration = useRef(0)
   const [day, setDay] = useState(date)
   const [allDay, setAllDay] = useState<'all' | 'time'>('time')
@@ -144,24 +147,35 @@ export function ClosureDialog({ open, date, targets, seatNoun, busy, error, affe
   const [target, setTarget] = useState<StyleClosureInput['target']>(seatNoun === '卓' ? 'seat' : 'staff')
   const [ids, setIds] = useState<string[]>([])
   const [reason, setReason] = useState('貸切')
-  useEffect(() => { previewGeneration.current += 1; if (open) { setDay(date); setStep(1); setOverlap([]) }; return () => { previewGeneration.current += 1 } }, [open, date])
+  useEffect(() => { previewGeneration.current += 1; if (open) { setDay(date); setStep(1); setOverlap([]); setPreviewError(''); setConfirmedInput(null) }; return () => { previewGeneration.current += 1 } }, [open, date])
   const choices = target === 'seat' ? targets.seats : target === 'staff' ? targets.staff : []
   const current = (): StyleClosureInput => ({ date: day, allDay: allDay === 'all', from: allDay === 'time' ? from : undefined, to: allDay === 'time' ? to : undefined, target, ids: target === 'store' ? [] : ids, reason })
+  const currentRef = useRef(current())
+  currentRef.current = current()
   const confirmClosure = async () => {
     const input = current()
-    if (step === 2) { onSave(input); return }
-    if (!preview) { onSave(input); return }
+    const save = async (value: StyleClosureInput) => {
+      if (savingRef.current) return
+      savingRef.current = true
+      try { await onSave(value) } finally { savingRef.current = false }
+    }
+    if (step === 2) { if (confirmedInput) await save(confirmedInput); return }
+    if (!preview) { await save(input); return }
     const generation = ++previewGeneration.current
-    setChecking(true)
-    // 重なる予約を読むだけ。読めなかったときは、重なりなしとして保存へ進む（保存の失敗は呼び出し側が欄へ返す）。
-    let rows: OverlapRow[] = []
-    try { rows = await preview(input) } catch { /* 読めなければ重なりなしとして保存へ進む */ } finally { if (generation === previewGeneration.current) setChecking(false) }
-    if (generation !== previewGeneration.current) return
-    if (rows.length) { setOverlap(rows); setStep(2) } else onSave(input)
+    setChecking(true); setPreviewError('')
+    try {
+      const result = await preview(input)
+      if (generation !== previewGeneration.current || JSON.stringify(currentRef.current) !== JSON.stringify(input)) return
+      const rows = Array.isArray(result) ? result : result.rows
+      if (!Array.isArray(result) && (typeof result.snapshot !== 'string' || !result.snapshot)) throw new Error('invalid_confirmation')
+      const fixed = Array.isArray(result) ? input : { ...input, expectedSnapshot: result.snapshot }
+      if (rows.length) { setOverlap(rows); setConfirmedInput(fixed); setStep(2) } else await save(fixed)
+    } catch { if (generation === previewGeneration.current) setPreviewError('予約を確認できませんでした。読み直してから、もう一度お試しください。') }
+    finally { if (generation === previewGeneration.current) setChecking(false) }
   }
   useEffect(() => { if (open) setIds(choices[0] ? [choices[0].id] : []) }, [open, target]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <Dialog open={open} designWidth={step === 2 ? 540 : 480} titleHelp={<HelpTip label="休みを入れるの説明">臨時休業・貸切・急な休みを入れます。入れた時間は予約を受け付けません。</HelpTip>} busy={busy || checking} error={error} confirmLabel="休みを入れる" confirmIcon={<CalendarX2 size={16} aria-hidden="true" />} busyLabel="入れています" onCancel={() => (step === 2 ? setStep(1) : onClose())} cancelLabel={step === 2 ? '戻る' : 'キャンセル'} footerAlign="center"
+    <Dialog open={open} designWidth={step === 2 ? 540 : 480} titleHelp={<HelpTip label="休みを入れるの説明">臨時休業・貸切・急な休みを入れます。入れた時間は予約を受け付けません。</HelpTip>} busy={busy || checking} error={error || previewError} confirmLabel="休みを入れる" confirmIcon={<CalendarX2 size={16} aria-hidden="true" />} busyLabel="入れています" onCancel={() => (step === 2 ? setStep(1) : onClose())} cancelLabel={step === 2 ? '戻る' : 'キャンセル'} footerAlign="center"
       title={step === 2 ? `重なる予約が ${formatNumber(overlap.length)}件あります` : '休みを入れる'} description={step === 2 ? `${day} を休みにします` : undefined}
       confirmDisabled={target !== 'store' && ids.length === 0} confirmDisabledReason="対象を選んでください" dirty={false}
       onConfirm={() => void confirmClosure()}

@@ -2,6 +2,7 @@
 
 export interface TemplateRow {
   id: string;
+  confirmation_revision: number;
   name: string;
   category: string;
   message_type: string;

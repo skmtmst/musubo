@@ -3,7 +3,7 @@ import { DetailContent, DetailSectionTitle } from '@/components/shared/detail-co
 
 import { useActionError } from '@/lib/use-action-error'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Drawer from '@/components/shared/drawer'
 import Button from '@/components/shared/button'
 import { useStaffRole } from '@/lib/staff-role'
@@ -12,6 +12,7 @@ import ListState from '@/components/shared/list-state'
 import VersionCompare from '@/components/shared/version-compare'
 import VersionHistory, { type HistoryVersion } from '@/components/shared/version-history'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { notifyToast } from '@/components/shared/toast'
 import { ApiError, bookingApi, type BookingMenuVersion } from '@/lib/api'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
@@ -43,9 +44,10 @@ export default function MenuVersionHistory({
   const [versions, setVersions] = useState<BookingMenuVersion[]>([])
   const [selected, setSelected] = useState<number | null>(null)
   const [comparing, setComparing] = useState(false)
-  const [confirming, setConfirming] = useState(false)
+  const [confirming, setConfirming] = useState<{ accountId: string; menuId: string; menuName: string; selected: number; expectedVersion: number } | null>(null)
   const [reverting, setReverting] = useState(false)
   const [reviewRequired, setReviewRequired] = useState(false)
+  const loadSequence = useRef(0)
   const { error: revertError, setError: setRevertError } = useActionError(`${accountId}:${menuId}`)
 
   /*
@@ -56,10 +58,12 @@ export default function MenuVersionHistory({
   useEffect(() => { setExpectedVersion(currentVersion) }, [currentVersion])
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current
     setLoadState('loading')
     // WEB051：競合の知らせは読み直しで消さない。
     try {
       const response = await bookingApi.listMenuVersions(accountId, menuId)
+      if (sequence !== loadSequence.current) return
       const list = Array.isArray(response.versions) ? response.versions : []
       setVersions(list)
       const latest = list.find((v) => v.status === 'in_use')?.version_number
@@ -72,12 +76,14 @@ export default function MenuVersionHistory({
       })
       setLoadState('ready')
     } catch {
+      if (sequence !== loadSequence.current) return
       setLoadState('error')
     }
   }, [accountId, menuId])
 
   useEffect(() => {
     void load()
+    return () => { loadSequence.current += 1 }
   }, [load])
 
   const history: HistoryVersion[] = versions.map((version) => ({
@@ -94,14 +100,24 @@ export default function MenuVersionHistory({
     ?? versions.find((v) => v.status === 'in_use') ?? null
 
   const currentKnown = versions.some(version => version.version_number === expectedVersion)
+  const openConfirm = () => {
+    if (!canRevert || !currentKnown || selected == null) return
+    setRevertError('')
+    setReviewRequired(false)
+    setConfirming({ accountId, menuId, menuName, selected, expectedVersion })
+  }
   const doRevert = async () => {
-    if (selected == null || reviewRequired || !currentKnown) return
+    if (!confirming || reviewRequired || !currentKnown || !canRevert) return false
+    if (confirming.accountId !== accountId || confirming.menuId !== menuId || confirming.selected !== selected || confirming.expectedVersion !== expectedVersion) {
+      setRevertError('対象が変わりました。閉じて内容を確かめ、もう一度選んでください。')
+      return false
+    }
     setReverting(true)
     setRevertError('')
     try {
-      const response = await bookingApi.revertMenuVersion(accountId, menuId, selected, expectedVersion)
-      setConfirming(false)
-      notifyToast(`第${selected}版の中身で新しい版（第${response.version}版）を作りました。`)
+      const response = await bookingApi.revertMenuVersion(confirming.accountId, confirming.menuId, confirming.selected, confirming.expectedVersion)
+      setConfirming(null)
+      notifyToast(`第${confirming.selected}版の中身で新しい版（第${response.version}版）を作りました。`)
       onReverted(response.version)
       await load()
       return true
@@ -134,7 +150,7 @@ export default function MenuVersionHistory({
       onClose={onClose}
       actions={loadState === 'ready' && versions.length > 0 ? {
         secondary: <Button variant="secondary" disabled={!selectedVersion || reverting} onClick={() => setComparing(true)}>いまと比べる</Button>,
-        primary: <Button variant="primary" disabled={!selectedVersion || !canRevert || reverting || !currentKnown} lockedReason={role === null ? undefined : lockReason(canRevert)} onClick={() => { if (canRevert && currentKnown) { setRevertError(''); setReviewRequired(false); setConfirming(true) } }}>この版に戻す</Button>,
+        primary: <Button variant="primary" disabled={!selectedVersion || !canRevert || reverting || !currentKnown} lockedReason={role === null ? undefined : lockReason(canRevert)} onClick={openConfirm}>この版に戻す</Button>,
       } : undefined}
     >
 <DetailContent>
@@ -163,7 +179,7 @@ export default function MenuVersionHistory({
             compareLabel="いまと比べる"
             onCompare={() => setComparing(true)}
             revertLabel="この版に戻す"
-            onRevert={() => { if (!currentKnown) return; setRevertError(''); setReviewRequired(false); setConfirming(true) }}
+            onRevert={openConfirm}
             canRevert={canRevert && currentKnown}
             revertDisabledReason={canRevert ? undefined : '版を戻す権限がありません。'}
             busy={reverting}
@@ -184,17 +200,17 @@ export default function MenuVersionHistory({
         </div>
       )}
       <ConfirmDialog
-        open={confirming}
-        title={`第${selected}版に戻しますか？`}
+        open={confirming !== null}
+        title={`第${confirming?.selected ?? ''}版に戻しますか？`}
         description="いまの版は残ります。この版の中身で新しい版を作ります。"
         confirmLabel="新しい版を作る"
         cancelLabel="キャンセル"
         busy={reverting}
         confirmDisabled={reviewRequired}
         confirmDisabledReason="閉じて最新の版と比べ、戻す内容を確認してください。"
-        onCancel={() => { setConfirming(false); if (reviewRequired) void load() }}
-        error={revertError || undefined} onSuccess={() => setConfirming(false)} onConfirm={() => doRevert()}
-      />
+        onCancel={() => { setConfirming(null); if (reviewRequired) void load() }}
+        error={revertError || undefined} onSuccess={() => setConfirming(null)} onConfirm={() => doRevert()}
+      ><OperationTargetSummary accounts={[{ id: confirming?.accountId ?? '' }]} externalTarget={{ label: '予約メニュー', name: confirming?.menuName }} /></ConfirmDialog>
 
 </DetailContent>
 </Drawer>
