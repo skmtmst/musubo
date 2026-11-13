@@ -133,7 +133,7 @@ booking.post('/api/liff/booking/seat-waitlist',inputJsonBoundary({"store_id":["s
 booking.delete('/api/liff/booking/seat-waitlist/:id',async(c)=>{
  const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return liffBookingInputError(c, {error:caller.error}, caller.status, []);
  if(!restaurantTestEnabled(c.env))return liffBookingJson(c, {error:'not_found'},404);
- const result=await c.env.DB.prepare(`UPDATE rt_seat_waitlist SET status='cancelled',updated_at=? WHERE id=? AND line_uid=? AND store_id IN (SELECT id FROM rt_stores WHERE line_account_id=?) AND status IN ('waiting','invited')`).bind(new Date().toISOString(),c.req.param('id'),caller.lineUserId,caller.accountId).run();
+ const result=await c.env.DB.prepare(`UPDATE rt_seat_waitlist SET confirmation_revision=confirmation_revision+1, status='cancelled',updated_at=? WHERE id=? AND line_uid=? AND store_id IN (SELECT id FROM rt_stores WHERE line_account_id=?) AND status IN ('waiting','invited')`).bind(new Date().toISOString(),c.req.param('id'),caller.lineUserId,caller.accountId).run();
  return result.meta.changes?liffBookingJson(c, {status:'cancelled'}):liffBookingJson(c, {error:'not_found'},404);
 });
 

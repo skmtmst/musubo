@@ -279,9 +279,6 @@ describe('N-025 引用返信と送信予約', () => {
     // 日時の選択（★管理画面）で 2027-09-17 09:00 を選ぶ。値は今までどおり日本時間の文字列。
     await act(async () => { document.querySelector<HTMLElement>('#schedule-at')!.click() })
     const dialog = () => document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-    await act(async () => {
-      dialog().querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
-    })
     for (let i = 0; i < 36; i += 1) {
       const grid = document.querySelector('[role="grid"]')
       if (grid?.getAttribute('aria-label') === '2027年9月') break
@@ -292,8 +289,8 @@ describe('N-025 引用返信と送信予約', () => {
     await act(async () => {
       Array.from(document.querySelectorAll('button')).find((b) => (b.getAttribute('aria-label') ?? '').startsWith('2027年9月17日（金）'))!.click()
     })
-    await act(async () => { Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!.click() })
     await setTimeControl(dialog().querySelector('input[role="combobox"]'), '09:00')
+    await act(async () => { Array.from(dialog().querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!.click() })
 
     const scheduleButton = Array.from(document.querySelectorAll('button'))
       .find((b) => /に予約$/.test(b.textContent ?? ''))!

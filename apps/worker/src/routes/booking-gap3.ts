@@ -44,7 +44,7 @@ bookingGap3.get('/api/booking/admin/bookings/:id/payment-method',async c=>{
 export async function groupView(db:D1Database,a:string,id:string){
  const g=await db.prepare('SELECT g.*,f.display_name FROM booking_groups g JOIN friends f ON f.id=g.friend_id AND f.line_account_id=g.line_account_id WHERE g.id=? AND g.line_account_id=?').bind(id,a).first<{id:string;display_name:string;version:number}>();if(!g)throw new GapError('not_found',404);
  const rows=(await db.prepare('SELECT b.*,m.name menu_name,s.name staff_name FROM bookings b JOIN menus m ON m.id=b.menu_id LEFT JOIN staff s ON s.id=b.staff_id WHERE b.group_id=? AND b.line_account_id=? ORDER BY b.group_index,b.id').bind(id,a).all<Record<string,unknown>>()).results;
- return {groupId:g.id,ownerName:g.display_name,version:g.version,members:rows.map(b=>({bookingId:b.id,personName:b.person_label,label:b.person_label,menuName:b.menu_name,staffName:b.staff_name,startsAt:b.starts_at,endsAt:b.ends_at,status:b.status}))};
+ return {groupId:g.id,ownerName:g.display_name,version:g.version,members:rows.map(b=>({bookingId:b.id,personName:b.person_label,label:b.person_label,menuName:b.menu_name,staffName:b.staff_name,startsAt:b.starts_at,endsAt:b.ends_at,status:b.status,version:b.lock_version}))};
 }
 bookingGap3.get('/api/booking/admin/bookings/:id/group',async c=>{const a=await gapAccount(c),b=await book(c,a);return c.json({success:true,data:b.group_id?await groupView(c.env.DB,a,String(b.group_id)):null});});
 bookingGap3.get('/api/booking/admin/bookings/:id/series',async c=>{
@@ -54,9 +54,14 @@ async function cancelGroup(c:Context<Env>,id?:string){
  gapWrite(c);const a=await gapAccount(c),b=await gapBody(c);if(typeof b.reason!=='string'||!b.reason.trim()||b.reason.length>500)throw new GapError('reason_required');
  const gid=id??String((await book(c,a)).group_id??'');if(!gid)throw new GapError('not_found',404);
  const g=await groupView(c.env.DB,a,gid),v=b.expectedVersion===undefined?g.version:gapVersion(b.expectedVersion);
+ const expected=b.expectedMembers;
+ if(expected!==undefined&&(!Array.isArray(expected)||expected.length>100||expected.some(m=>!m||typeof m!=='object'||typeof m.bookingId!=='string'||!m.bookingId||!Number.isSafeInteger(m.version)||m.version<0||typeof m.status!=='string')||new Set(expected.map(m=>m.bookingId)).size!==expected.length))throw new GapError('invalid_expected_members');
  const pending=g.members.filter(m=>['requested','confirmed'].includes(String(m.status)));
  const fees=await Promise.all(pending.map(async m=>({bookingId:m.bookingId,...await bookingCancellationQuote(c.env.DB,String(m.bookingId),a)})));
- try{await c.env.DB.batch([c.env.DB.prepare('UPDATE booking_groups SET version=version+1 WHERE id=? AND line_account_id=? AND version=?').bind(gid,a,v),assertChanged(c.env.DB),c.env.DB.prepare("UPDATE bookings SET status='cancelled',cancellation_reason=?,lock_version=lock_version+1,decided_at=? WHERE group_id=? AND line_account_id=? AND status IN('confirmed','requested')").bind(b.reason,new Date().toISOString(),gid,a),clearAssertions(c.env.DB)]);}catch(e){if(/CHECK constraint/.test(String(e)))throw new GapError('version_conflict',409);throw e;}
+ const memberGuard=expected===undefined?'':` AND (SELECT COUNT(*) FROM bookings WHERE group_id=? AND line_account_id=?)=json_array_length(?)
+   AND NOT EXISTS (SELECT 1 FROM json_each(?) e WHERE NOT EXISTS (SELECT 1 FROM bookings b WHERE b.group_id=? AND b.line_account_id=? AND b.id=json_extract(e.value,'$.bookingId') AND b.lock_version=json_extract(e.value,'$.version') AND b.status=json_extract(e.value,'$.status')))`;
+ const encoded=JSON.stringify(expected??[]);
+ try{await c.env.DB.batch([c.env.DB.prepare(`UPDATE booking_groups SET version=version+1 WHERE id=? AND line_account_id=? AND version=?${memberGuard}`).bind(gid,a,v,...(expected===undefined?[]:[gid,a,encoded,encoded,gid,a])),assertChanged(c.env.DB),c.env.DB.prepare("UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status='cancelled',cancellation_reason=?,lock_version=lock_version+1,decided_at=? WHERE group_id=? AND line_account_id=? AND status IN('confirmed','requested')").bind(b.reason,new Date().toISOString(),gid,a),clearAssertions(c.env.DB)]);}catch(e){if(/CHECK constraint/.test(String(e))){let current;try{current=await groupView(c.env.DB,a,gid);}catch(err){if(!(err instanceof GapError)||err.status!==404)throw err;current=null;}return c.json({success:false,error:'version_conflict',data:current},409);}throw e;}
  return c.json({success:true,data:{cancelled:pending.length,fees,version:v+1}});
 }
 bookingGap3.post('/api/booking/admin/bookings/:id/group/cancel',c=>cancelGroup(c));

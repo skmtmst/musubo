@@ -50,7 +50,7 @@ const chatDetail = {
     { id: 'm-in', direction: 'incoming', messageType: 'text', content: '届きましたか', isUnsent: false, source: 'user',
       originKind: null, sentByStaffId: null, sentByStaffName: null, scenarioName: null, quoted: null, createdAt: at },
     { id: 'm-out', direction: 'outgoing', messageType: 'text', content: '届いています', isUnsent: false, source: 'manual',
-      originKind: null, sentByStaffId: 'staff-1', sentByStaffName: '河野', scenarioName: null, quoted: null, createdAt: at },
+      originKind: null, sentByStaffId: 'staff-1', sentByStaffName: '見本', scenarioName: null, quoted: null, createdAt: at },
   ],
   hasMoreMessages: false,
 }
@@ -65,7 +65,7 @@ function respond(method: string, url: URL, body: unknown): Response | Promise<Re
   if (path === '/api/chats') return json({ success: true, data: [chatRow] })
   if (path === '/api/chats/stats') return json({ success: true, data: { total: 1, unread: 1, inProgress: 0, onHold: 0, resolved: 0, oldestUnansweredMinutes: null, assigneeUnread: [] } })
   if (path === '/api/support/inbox') return json({ success: true, data: { items: [emailItem], summary: { total: 1 } } })
-  if (path === '/api/operators') return json({ success: true, data: [{ id: 'op-k', name: '河野' }, { id: 'op-m', name: '佐々木' }] })
+  if (path === '/api/operators') return json({ success: true, data: [{ id: 'op-k', name: '見本' }, { id: 'op-m', name: '佐々木' }] })
   if (path === '/api/inbox/saved-views') return json({ success: true, data: [] })
   if (path === '/api/chats/chat-1' && method === 'PUT') {
     return json({ success: true, data: { ...chatDetail, ...(body as object), revision: 5 } })
@@ -162,7 +162,7 @@ describe('受信箱V4で既存機能を失わない', () => {
     await openLineChat()
     expect(host.textContent).toContain('山本 恭平・LINE')
     expect(host.querySelector('img[src="https://img.example.test/face.png"]')).toBeTruthy()
-    expect(host.textContent).toContain('河野 が送信')
+    expect(host.textContent).toContain('見本 が送信')
   })
 
   it('頭の担当で「未割り当て」を選ぶと担当なしで保存する。候補に「すべて」は無い', async () => {

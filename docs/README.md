@@ -417,6 +417,7 @@
 - [Lステップで確認できなかった箇所と、置いた想定](lstep-unverified-assumptions.md)
 - [musubo マニュアルサイトのCloudflare Pages初回設定](manual-site-pages-setup.md)
 - [D1 マイグレーション手順書](migration-runbook.md)
+- [テナント削除の保護と設計](tenant-purge-trigger-760-design.md)
 - [musubo サービスサイト（Xserver）](musubo-service-site.md)
 - [ランク削除時の会員別EC送信](nen-member-rank-sync.md)
 - [受信処理の再開と入力不足時の停止](operations/inbound-recovery.md)
@@ -465,6 +466,7 @@
 
 ## 反映履歴
 
+- [予約・友だち情報・配信の操作と安全性を改善](release-log/unreleased/36-masato-legacy-port.md) — 反映履歴、確認 2026-11-10。
 - [運営コンソールの問い合わせ画面をPenと照合して修正](release-log/unreleased/41-masato-ops-support-pen-parity.md) — スマートフォンの返信欄とテンプレート引用画面、確認 2026-11-11。
 - [運営の返信テンプレート編集・削除と検索欄の余白修正](release-log/unreleased/44-masato-ops-support-template-edit.md) — 問い合わせ画面の修正履歴、確認 2026-11-12。
 - [運営コンソールのお問い合わせをPen確定案に合わせて刷新](release-log/unreleased/37-masato-ops-support-pen.md) — 返信テンプレートとスマートフォン操作、確認 2026-11-10。
@@ -480,6 +482,8 @@
 - [クレジットカード登録からLINE接続への案内を修正](release-log/unreleased/46-masato-card-setup-flow.md) — 登録結果の確認と画面遷移の反映履歴、確認 2026-11-12。
 - [新リポジトリへの検証配備切り替え前の安全確認](release-log/unreleased/9-masato-staging-cutover-gate.md) — 反映履歴、確認 2026-11-06。
 - [DB復旧workflowの安全条件を確かめる試験](release-log/unreleased/10-masato-recovery-workflow-test.md) — 反映履歴、確認 2026-11-06。
+- [予約と友だち情報の表示・操作の改善](release-log/unreleased/2097-kenta-train-1102r.md)
+- [配信の取り消しとテナント削除の安全性](release-log/unreleased/2094-kenta-train-1102q.md)
 - [座席図の卓プレビュー・タブ並び替え・拡大移動の修正](release-log/unreleased/2099-masato-seat-map-ux.md)
 - [Instagramの同一統括内での複数アカウント接続](release-log/unreleased/2080-masato-instagram-shared-accounts.md)
 - [座席・卓管理のPenデザイン反映](release-log/unreleased/2074-masato-table-pen.md)
@@ -1180,6 +1184,7 @@
 - [編集内容の保護と操作確認の改善](release-log/unreleased/2067-kenta-edit-confirmation.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [保存と操作確認の改善](release-log/unreleased/2068-kenta-operation-improvements.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [Googleビジネスの店舗選択](release-log/unreleased/2076-masato-google-store-selector.md) — 反映履歴、確認 2026-11-04。
+- [操作確認の改善](release-log/unreleased/2079-kenta-train-1102P.md) — 運用者向けの変更記録（確認日：2026-11-04）。
 
 - [営業時間のPen照合と操作確認](testing/google-hours-pen-qa.md) — 承認済み18画面と営業時間タブの検査。
 

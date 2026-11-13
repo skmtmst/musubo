@@ -124,7 +124,10 @@ export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, o
   if (scope.current.key !== scopeKey) scope.current = { key: scopeKey }
   const openedScope = useRef(scope.current)
   const requestSequence = useRef(0)
-  const isCurrent = () => openedScope.current === scope.current
+  const active = useRef(true)
+  useEffect(() => { active.current = true; return () => { active.current = false } }, [])
+  const isCurrent = () => active.current && openedScope.current === scope.current
+  const close = () => { if (isCurrent()) { active.current = false; onCancel() } }
   const [accepted, setAccepted] = useState(referenceState)
   const [preview, setPreview] = useState<TagRetroactivePreview | null>(null)
   const [previewError, setPreviewError] = useState('')
@@ -155,12 +158,12 @@ export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, o
   const rewardTotal = preview ? preview.selfMiles : selfTargets * values.rewardMiles
   const referralTotal = preview ? preview.referralMiles : referralTargets * values.referralRewardMiles
   return <Dialog open={isCurrent()} size="large" tone="destructive" confirmation dirty={false}
-    onCancel={onCancel} title={`${selfTargets + referralTargets}人にさかのぼってマイルを積みますか？`}
+    onCancel={close} title={`${selfTargets + referralTargets}人にさかのぼってマイルを積みますか？`}
     titleIcon={<Coins aria-hidden="true" />}
     footer={<DialogActions>
 
-          <Button variant="secondary" type="button" onClick={() => { if (isCurrent()) onSaveWithoutApplying() }}>反映しないで保存する</Button>
-          <Button variant="primary" type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => { if (isCurrent() && accepted && !loading && !previewError) onSave(preview?.previewToken ?? '') }}>{loading ? '対象を計算中…' : 'さかのぼって反映して保存する'}</Button>
+          <Button variant="secondary" type="button" onClick={() => { if (isCurrent()) { active.current = false; onSaveWithoutApplying() } }}>反映しないで保存する</Button>
+          <Button variant="primary" type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => { if (isCurrent() && accepted && !loading && !previewError) { active.current = false; onSave(preview?.previewToken ?? '') } }}>{loading ? '対象を計算中…' : 'さかのぼって反映して保存する'}</Button>
             </DialogActions>}
   >
         <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />

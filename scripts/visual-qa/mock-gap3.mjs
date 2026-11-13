@@ -20,10 +20,10 @@ const SEGMENT_COUNTS = [
   [210, 95, 22, 11, 6],
 ]
 const SEGMENT_FRIENDS = [
-  { id: 'f1', display_name: '佐藤 健', activity_count: 1, amount: 8400, last_activity_at: '2026-08-02T01:00:00.000Z' },
-  { id: 'f2', display_name: '田中 優子', activity_count: 1, amount: 4200, last_activity_at: '2026-07-28T01:00:00.000Z' },
-  { id: 'f3', display_name: '鈴木 亜美', activity_count: 1, amount: 12600, last_activity_at: '2026-07-20T01:00:00.000Z' },
-  { id: 'f4', display_name: '高橋 誠', activity_count: 1, amount: 8400, last_activity_at: '2026-07-18T01:00:00.000Z' },
+  { id: 'f1', display_name: '見本 114', activity_count: 1, amount: 8400, last_activity_at: '2026-08-02T01:00:00.000Z' },
+  { id: 'f2', display_name: '見本 165', activity_count: 1, amount: 4200, last_activity_at: '2026-07-28T01:00:00.000Z' },
+  { id: 'f3', display_name: '見本 177', activity_count: 1, amount: 12600, last_activity_at: '2026-07-20T01:00:00.000Z' },
+  { id: 'f4', display_name: '見本 47', activity_count: 1, amount: 8400, last_activity_at: '2026-07-18T01:00:00.000Z' },
 ]
 
 const STORES = [

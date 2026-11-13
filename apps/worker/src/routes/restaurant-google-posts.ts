@@ -79,6 +79,7 @@ type PostFilter = 'all' | 'draft' | 'published' | 'attention' | 'scheduled';
 
 interface PostRow {
   id: string;
+  confirmation_revision: number;
   store_id: string;
   kind: LocalPostKind | 'alert';
   origin: 'admin' | 'google';
@@ -207,6 +208,7 @@ function publicPost(row: PostRow) {
   const storedMedia = parseMediaStorage(row.media_json);
   return {
     id: row.id,
+    confirmationRevision: row.confirmation_revision,
     kind: row.kind,
     origin: row.origin,
     summary: row.summary,
@@ -349,7 +351,7 @@ async function updateDraft(c: Context<Env>, store: StoreContext, id: string, inp
   await dbFor(c.env, store.id)
     .prepare(
       `UPDATE rt_google_posts SET
-         kind = ?, summary = ?, title = ?, event_start_date = ?, event_start_time = ?, event_end_date = ?, event_end_time = ?,
+         confirmation_revision = confirmation_revision + 1, kind = ?, summary = ?, title = ?, event_start_date = ?, event_start_time = ?, event_end_date = ?, event_end_time = ?,
          cta_type = ?, cta_url = ?, coupon_code = ?, redeem_online_url = ?, terms_conditions = ?, media_json = ?,
          instagram_enabled = ?, instagram_caption = ?, instagram_media_id = ?, updated_at = ?
        WHERE id = ? AND store_id = ?`,
@@ -404,15 +406,18 @@ async function setStatusForEnv(env: Env['Bindings'], storeId: string, id: string
     instagram_error: patch.instagramError,
     instagram_published_at: patch.instagramPublishedAt,
   };
+  const visible = new Set(['status', 'error', 'sent_at', 'published_at', 'deleted_at', 'google_post_name', 'google_state', 'search_url', 'origin', 'media_json', 'instagram_status', 'instagram_permalink', 'instagram_error', 'instagram_published_at']);
+  const comparisons: string[] = [], comparisonValues: unknown[] = [];
   for (const [column, value] of Object.entries(columns)) {
     if (value === undefined) continue;
+    if (visible.has(column)) { comparisons.push(`${column} IS NOT ?`); comparisonValues.push(value); }
     sets.push(`${column} = ?`);
     values.push(value);
   }
   values.push(id, storeId);
   await dbFor(env, storeId)
-    .prepare(`UPDATE rt_google_posts SET ${sets.join(', ')} WHERE id = ? AND store_id = ?`)
-    .bind(...values)
+    .prepare(`UPDATE rt_google_posts SET confirmation_revision = confirmation_revision + CASE WHEN ${comparisons.length ? comparisons.join(' OR ') : '0'} THEN 1 ELSE 0 END, ${sets.join(', ')} WHERE id = ? AND store_id = ?`)
+    .bind(...comparisonValues, ...values)
     .run();
 }
 
@@ -875,16 +880,54 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/remove', requi
   const { store, connection } = ctx;
   const row = await postFor(c, store.id, c.req.param('id'));
   if (!row) return fail(c, 404, '投稿が見つかりません');
-  const body = await c.req.json<{ confirmed?: boolean }>().catch(() => ({}) as { confirmed?: boolean });
+  const body = await c.req.json<{ confirmed?: boolean; expectedPostRevision?: unknown; expectedConnectionRevision?: unknown; expectedConnectionId?: unknown }>().catch(() => ({} as { confirmed?: boolean; expectedPostRevision?: unknown; expectedConnectionRevision?: unknown; expectedConnectionId?: unknown }));
   if (body.confirmed !== true) return fail(c, 400, '削除の確認が必要です', { code: 'confirmation_required' }, ["confirmed"]);
   if (!writeEnabled(c.env)) return fail(c, 403, 'この環境ではGoogleを操作できません', { code: 'write_disabled' });
   if (!row.google_post_name) return fail(c, 409, 'まだGoogleへ公開されていません', { code: 'not_published' });
+  for (const value of [body.expectedPostRevision, body.expectedConnectionRevision]) {
+    if (value !== undefined && (!Number.isSafeInteger(value) || (value as number) < 1)) return fail(c, 400, '確認した版が不正です');
+  }
+  if (body.expectedConnectionId !== undefined && (typeof body.expectedConnectionId !== 'string' || !body.expectedConnectionId)) return fail(c, 400, '確認した接続先が不正です');
+  const guarded = body.expectedPostRevision !== undefined || body.expectedConnectionRevision !== undefined || body.expectedConnectionId !== undefined;
+  if (guarded && (body.expectedPostRevision === undefined || body.expectedConnectionRevision === undefined || body.expectedConnectionId === undefined)) return fail(c, 400, '確認した投稿と接続先の版が必要です');
 
+  const db = dbFor(c.env, store.id);
+  const current = async () => {
+    const [post, selected] = await Promise.all([
+      postFor(c, store.id, row.id),
+      db.prepare('SELECT id, confirmation_revision AS confirmationRevision, location_title AS locationTitle FROM rt_google_connections WHERE store_id = ?').bind(store.id).first(),
+    ]);
+    return { post: post ? publicPost(post) : null, connection: selected };
+  };
+  if (guarded) {
+    if ((body.expectedPostRevision !== undefined && body.expectedPostRevision !== row.confirmation_revision)
+      || (body.expectedConnectionId !== undefined && body.expectedConnectionId !== connection.id)
+      || (body.expectedConnectionRevision !== undefined && body.expectedConnectionRevision !== connection.confirmation_revision)) {
+      return c.json({ success: false, error: '対象が変わりました。読み直してください', current: await current() }, 409);
+    }
+  }
   let options: RequestOptions;
   try {
     options = { fetch, accessToken: await accessTokenFor(c, connection) };
   } catch (error) {
     return googleErrorResponse(c, error);
+  }
+  if (guarded) {
+    const claimed = await db.prepare(`UPDATE rt_google_posts SET confirmation_revision = confirmation_revision + 1
+    WHERE id = ? AND store_id = ? AND (? IS NULL OR confirmation_revision = ?)
+      AND EXISTS (SELECT 1 FROM rt_google_connections WHERE store_id = ? AND (? IS NULL OR id = ?)
+        AND (? IS NULL OR confirmation_revision = ?) AND status = 'connected')`)
+    .bind(row.id, store.id, body.expectedPostRevision ?? null, body.expectedPostRevision ?? null, store.id,
+      body.expectedConnectionId ?? null, body.expectedConnectionId ?? null,
+      body.expectedConnectionRevision ?? null, body.expectedConnectionRevision ?? null).run();
+    if ((claimed.meta?.changes ?? 0) !== 1) return c.json({ success: false, error: '対象が変わりました。読み直してください', current: await current() }, 409);
+    const state = await current();
+    const selected = state.connection as { id?: string; confirmationRevision?: number } | null;
+    if ((body.expectedPostRevision !== undefined && state.post?.confirmationRevision !== (body.expectedPostRevision as number) + 1)
+      || (body.expectedConnectionId !== undefined && selected?.id !== body.expectedConnectionId)
+      || (body.expectedConnectionRevision !== undefined && selected?.confirmationRevision !== body.expectedConnectionRevision)) {
+      return c.json({ success: false, error: '対象が変わりました。読み直してください', current: state }, 409);
+    }
   }
   try {
     await deleteLocalPost(options, row.google_post_name);

@@ -1,3 +1,4 @@
+import { hasConversionApprovalRevision } from './conversion-approval-revision.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from './id-queries.js';
@@ -348,10 +349,11 @@ export async function setConversionApproval(
       if (flipBasis === null) return false;
     }
   }
+  const hasRevision = await hasConversionApprovalRevision(db);
   const result = await db
     .prepare(
       `UPDATE conversion_events
-          SET approval_status = ?, approved_at = ?
+          SET approval_status = ?, approved_at = ?${hasRevision ? ', approval_revision = approval_revision + 1' : ''}
         WHERE id = ? AND affiliate_id IS NOT NULL
           AND (approval_status IS NULL OR approval_status != ?)`,
     )
@@ -650,10 +652,11 @@ export async function decideConversionApproval(
       ? `(approval_status IS NULL OR approval_status = 'pending')`
       : `approval_status = ?`;
     const expectedBinds = expectedStatus === 'pending' ? [] : [expectedStatus];
+    const hasRevision = await hasConversionApprovalRevision(db);
     const result = await db
       .prepare(
         `UPDATE conversion_events
-            SET approval_status = ?, approved_at = ?
+            SET approval_status = ?, approved_at = ?${hasRevision ? ', approval_revision = approval_revision + 1' : ''}
           WHERE id = ? AND affiliate_id IS NOT NULL AND ${expectedSql}`,
       )
       .bind(status, now, eventId, ...expectedBinds)

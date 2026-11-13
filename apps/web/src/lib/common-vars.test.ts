@@ -88,7 +88,7 @@ describe('isSecretLikeVarValue（秘密値の見立て・Q）', () => {
     for (const normal of [
       '営業時間 10:00-19:00',
       'https://example.com/shop/notice?campaign=autumn2026',
-      '03-1234-5678',
+      '03-0000-5678',
       '株式会社サンプル',
       '利用規約を更新しました。'.repeat(40),
     ]) {

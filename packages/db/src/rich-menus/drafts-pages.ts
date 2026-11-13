@@ -20,7 +20,7 @@ export async function replaceRichMenuPages(
   const now = jstNow();
   const keep = await loadPageKeepMeta(db, groupId);
   const stmts = buildPageReplaceStatements(db, groupId, pages, keep, now);
-  await db.batch(stmts);
+  await db.batch([db.prepare(`UPDATE rich_menu_groups SET confirmation_revision = confirmation_revision + 1 WHERE id = ?`).bind(groupId), ...stmts]);
 }
 
 /**

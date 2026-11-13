@@ -6,6 +6,7 @@ import { ACCOUNT_STYLES, DEFAULT_TENANT_ID, type SetupAnswer } from '@line-crm/s
 import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { initializeAccountStyle, profile, saveProfile, standardStarter, readDefinition } from '../services/style-setup.js';
+import { firstRunTimes } from '../services/getting-started-first-run.js';
 import type { StarterItem } from '../services/style-starter-definition.js';
 import { styleMenuButtons } from '../services/style-menu-buttons.js';
 import { restaurantMenuButtons } from '../services/style-restaurant-buttons.js';
@@ -163,4 +164,19 @@ test('S03 normalizes new EC failures and preserves the same server request ID wi
  expect(body.error).toMatchObject({code:'not_found',requestId:response.headers.get('X-Request-ID'),fieldErrors:[]});
  expect(body.error.requestId).toMatch(/^[0-9a-f-]{36}$/);
  expect(JSON.stringify(body)).not.toMatch(/secret-token|answers_json|settings_json/);
+});
+
+test('first selection and first starter times survive later saves and item replacement', async () => {
+  vi.useFakeTimers();
+  try {
+    vi.setSystemTime(new Date('2026-10-01T00:00:00Z'));
+    await initializeAccountStyle(f.db, 'a', DEFAULT_TENANT_ID, 'owner', 'standard');
+    const first = f.raw.prepare('SELECT first_selected_at,first_starter_at FROM account_styles WHERE line_account_id=?').get('a');
+    expect(first).toEqual({ first_selected_at: '2026-10-01T00:00:00.000Z', first_starter_at: '2026-10-01T00:00:00.000Z' });
+    f.raw.prepare('DELETE FROM style_starter_items WHERE line_account_id=?').run('a');
+    vi.setSystemTime(new Date('2026-10-02T00:00:00Z'));
+    await saveProfile(f.db, 'a', DEFAULT_TENANT_ID, 'owner', { expectedVersion: 1, style: 'standard' });
+    expect(f.raw.prepare('SELECT first_selected_at,first_starter_at FROM account_styles WHERE line_account_id=?').get('a')).toEqual(first);
+    expect(await firstRunTimes(f.db, 'a')).toMatchObject({ styleAt: '2026-10-01T09:00:00.000+09:00', starterAt: '2026-10-01T09:00:00.000+09:00' });
+  } finally { vi.useRealTimers(); }
 });

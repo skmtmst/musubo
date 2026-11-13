@@ -99,7 +99,7 @@ describe('無断→有効に戻す→来店→訂正', () => {
       method: 'POST',
       headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        storeId: store.id, customerName: '無断 客', guestCount: 2,
+        storeId: store.id, customerName: '見本 21', guestCount: 2,
         startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z',
       }),
     }, env);
@@ -147,7 +147,7 @@ describe('無断→有効に戻す→来店→訂正', () => {
     const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
     const created = await app().request('/api/restaurant-test/reservations/manual?account_id=account-1', {
       method: 'POST', headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ storeId: store.id, customerName: '人工 客', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z' }),
+      body: JSON.stringify({ storeId: store.id, customerName: '見本 22', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z' }),
     }, env);
     const { data: { id } } = await created.json() as { data: { id: string } };
     expect((await patch(id, { status: 'pending' })).status).toBe(200);
@@ -166,7 +166,7 @@ describe('無断→有効に戻す→来店→訂正', () => {
     const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
     const created = await app().request('/api/restaurant-test/reservations/manual?account_id=account-1', {
       method: 'POST', headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ storeId: store.id, customerName: '人工 客', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z' }),
+      body: JSON.stringify({ storeId: store.id, customerName: '見本 22', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z' }),
     }, env);
     const { data: { id } } = await created.json() as { data: { id: string } };
     expect((await attend(id, 'visited')).status).toBe(200);
@@ -183,7 +183,7 @@ describe('無断→有効に戻す→来店→訂正', () => {
     const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
     const created = await app().request('/api/restaurant-test/reservations/manual?account_id=account-1', {
       method: 'POST', headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ storeId: store.id, customerName: '人工 客', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z' }),
+      body: JSON.stringify({ storeId: store.id, customerName: '見本 22', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z' }),
     }, env);
     const { data: { id } } = await created.json() as { data: { id: string } };
     expect((await attend(id, 'visited')).status).toBe(200);
@@ -201,7 +201,7 @@ describe('無断→有効に戻す→来店→訂正', () => {
       method: 'POST',
       headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        storeId: store.id, customerName: '無断 客', guestCount: 2,
+        storeId: store.id, customerName: '見本 21', guestCount: 2,
         startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z',
       }),
     }, env);
@@ -237,7 +237,7 @@ describe('無断→有効に戻す→来店→訂正', () => {
       method: 'POST',
       headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        storeId: store.id, customerName: '無断 客', guestCount: 2,
+        storeId: store.id, customerName: '見本 21', guestCount: 2,
         startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z',
       }),
     }, env);
@@ -275,7 +275,7 @@ describe('無断→有効に戻す→来店→訂正', () => {
       method: 'POST',
       headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        storeId: store.id, customerName: '無断 客', guestCount: 2,
+        storeId: store.id, customerName: '見本 21', guestCount: 2,
         startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z',
       }),
     }, env);

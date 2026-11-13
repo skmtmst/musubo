@@ -218,7 +218,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
       <Card layout="vertical" padding="roomy" gap="normal">
         <div className={styles.sectionHead}>
           <h2 className={styles.sectionTitle}>{monthLabel}</h2>
-          <p className={styles.sectionDesc}>日にちを押すと休みにできます。定休日（毎週）は受付枠で決めます</p>
+          <p className={styles.sectionDesc}>{canEdit ? '日にちを押すと休みにできます。' : ''}定休日（毎週）は受付枠で決めます</p>
         </div>
         <div className={styles.calNav}>
           <button type="button" className={styles.calNavButton} aria-label="前の月" onClick={() => setMonth(shiftMonth(month, -1))}><ChevronLeft size={16} aria-hidden="true" /></button>

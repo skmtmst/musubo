@@ -12,6 +12,11 @@ import { createRichMenuShells, linkRichMenuBulkChunked, RichMenuValidationError,
 import { isJsonRecord, createLineClient, serializeGroupWithPages, maskLineUserId, serializeTestApply, resolveTrackedLinkUrls } from './rich-menu-groups-definition.js';
 import type { Context } from 'hono';
 
+async function destinationToken(lineUserId: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(lineUserId));
+  return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
 export const post__api_rich_menu_groups_groupId_apply_to_tag_1 = async (c: Context<Env, "/api/rich-menu-groups/:groupId/apply-to-tag">) => {
   const groupId = c.req.param('groupId');
   let body: unknown;
@@ -60,13 +65,13 @@ export const post__api_rich_menu_groups_groupId_apply_to_tag_1 = async (c: Conte
       await c.env.DB.batch([
         c.env.DB
           .prepare(
-            `UPDATE rich_menu_groups SET is_default_for_all = 0, updated_at = ?
-              WHERE account_id = ? AND id != ?`,
+            `UPDATE rich_menu_groups SET is_default_for_all = 0, version = version + 1, confirmation_revision = confirmation_revision + 1, updated_at = ?
+              WHERE account_id = ? AND id != ? AND is_default_for_all <> 0`,
           )
           .bind(now, group.account_id, groupId),
         c.env.DB
           .prepare(
-            `UPDATE rich_menu_groups SET is_default_for_all = 1, updated_at = ? WHERE id = ?`,
+            `UPDATE rich_menu_groups SET is_default_for_all = 1, version = version + 1, confirmation_revision = confirmation_revision + 1, updated_at = ? WHERE id = ? AND is_default_for_all <> 1`,
           )
           .bind(now, groupId),
       ]);
@@ -308,6 +313,8 @@ export const get__api_rich_menu_groups_groupId_test_apply_4 = async (c: Context<
     success: true,
     data: {
       linked: Boolean(lineUserId),
+      confirmationRevision: group.confirmation_revision,
+      destinationToken: lineUserId ? await destinationToken(lineUserId) : null,
       // 連携方法の案内。未連携のとき画面はこの案内を出して適用ボタンを止める。
       linkGuidance: lineUserId
         ? null
@@ -337,9 +344,9 @@ export const post__api_rich_menu_groups_groupId_test_apply_5 = async (c: Context
     if (!idempotencyKey) {
       return inputError(c, { success: false, error: 'Idempotency-Key header required' }, 400, []);
     }
-    let body: { confirm?: unknown } = {};
+    let body: { confirm?: unknown; expectedConfirmationRevision?: unknown; expectedDestinationToken?: unknown } = {};
     try {
-      body = await c.req.json<{ confirm?: unknown }>();
+      body = await c.req.json<{ confirm?: unknown; expectedConfirmationRevision?: unknown; expectedDestinationToken?: unknown }>();
     } catch {
       return inputError(c, { success: false, error: 'invalid JSON body' }, 400, []);
     }
@@ -352,11 +359,32 @@ export const post__api_rich_menu_groups_groupId_test_apply_5 = async (c: Context
     const member = await getStaffById(c.env.DB, staff.id);
     const lineUserId = member?.line_user_id ?? null;
     if (!lineUserId) {
+      if (body.expectedDestinationToken !== undefined) {
+        return c.json({ success: false, error: '対象が変わりました。読み直してください', current: { confirmationRevision: group.confirmation_revision, destinationToken: null } }, 409);
+      }
       return inputError(c, {
           success: false,
           code: 'line_not_linked',
           error: 'あなたのLINEアカウントが連携されていません。スタッフ設定からLINE連携を行ってください。',
         }, 400, []);
+    }
+
+    if (body.expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(body.expectedConfirmationRevision) || (body.expectedConfirmationRevision as number) < 1)) {
+      return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedConfirmationRevision']);
+    }
+    if (body.expectedDestinationToken !== undefined && (typeof body.expectedDestinationToken !== 'string' || !/^[a-f0-9]{64}$/.test(body.expectedDestinationToken))) {
+      return inputError(c, { success: false, error: '確認した宛先が不正です' }, 400, ['expectedDestinationToken']);
+    }
+    const changed = async () => {
+      const [currentGroup, currentMember] = await Promise.all([getRichMenuGroupById(c.env.DB, group.id), getStaffById(c.env.DB, staff.id)]);
+      const token = currentMember?.line_user_id ? await destinationToken(currentMember.line_user_id) : null;
+      return { conflict: (body.expectedConfirmationRevision !== undefined && currentGroup?.confirmation_revision !== body.expectedConfirmationRevision)
+        || (body.expectedDestinationToken !== undefined && token !== body.expectedDestinationToken),
+      current: { confirmationRevision: currentGroup?.confirmation_revision ?? null, destinationToken: token } };
+    };
+    if ((body.expectedConfirmationRevision !== undefined && group.confirmation_revision !== body.expectedConfirmationRevision)
+      || (body.expectedDestinationToken !== undefined && await destinationToken(lineUserId) !== body.expectedDestinationToken)) {
+      return c.json({ success: false, error: '対象が変わりました。読み直してください', current: { confirmationRevision: group.confirmation_revision, destinationToken: await destinationToken(lineUserId) } }, 409);
     }
 
     const applyResult = await createRichMenuTestApplyAtomic(c.env.DB, {
@@ -409,6 +437,13 @@ export const post__api_rich_menu_groups_groupId_test_apply_5 = async (c: Context
     }
 
     try {
+      if (body.expectedConfirmationRevision !== undefined || body.expectedDestinationToken !== undefined) {
+        const current = await changed();
+        if (current.conflict) {
+          await markRichMenuTestApplyFailed(c.env.DB, apply.id, 'confirmation changed');
+          return c.json({ success: false, error: '対象が変わりました。読み直してください', current: current.current }, 409);
+        }
+      }
       // 1) 適用前の表示を一度だけ記録する。これが無いと戻せない。
       if (apply.previous_captured !== 1) {
         const previous = await line.getRichMenuIdOfUser(lineUserId);
@@ -479,6 +514,13 @@ export const post__api_rich_menu_groups_groupId_test_apply_5 = async (c: Context
           },
         });
         // 切替ボタンが参照する lhx- alias をテストメニューへ張る。
+        if (body.expectedConfirmationRevision !== undefined || body.expectedDestinationToken !== undefined) {
+          const current = await changed();
+          if (current.conflict) {
+            await markRichMenuTestApplyFailed(c.env.DB, apply.id, 'confirmation changed');
+            return c.json({ success: false, error: '対象が変わりました。読み直してください', current: current.current }, 409);
+          }
+        }
         for (const shell of shells) {
           await line.upsertRichMenuAlias(buildAliasId(group.id, shell.orderIndex), shell.newRichMenuId);
         }
@@ -489,6 +531,13 @@ export const post__api_rich_menu_groups_groupId_test_apply_5 = async (c: Context
       }
 
       // 3) 本人へリンク。ここが最後の外側操作。
+      if (body.expectedConfirmationRevision !== undefined || body.expectedDestinationToken !== undefined) {
+        const current = await changed();
+        if (current.conflict) {
+          await markRichMenuTestApplyFailed(c.env.DB, apply.id, 'confirmation changed');
+          return c.json({ success: false, error: '対象が変わりました。読み直してください', current: current.current }, 409);
+        }
+      }
       await line.linkRichMenuToUser(lineUserId, appliedRichMenuId);
       await markRichMenuTestApplyApplied(c.env.DB, apply.id, appliedRichMenuId);
 

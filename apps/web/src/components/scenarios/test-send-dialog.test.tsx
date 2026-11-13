@@ -125,7 +125,7 @@ describe('NEXT-01: 実際の送信先を正直に説明する', () => {
 
   it('「自分のLINE」「本番の友だちへは届きません」等の虚偽を出さない', async () => {
     await openConfirm()
-    for (const lie of ['自分のLINE', '本番の友だちへは届きません', 'Kenta Kawano']) {
+    for (const lie of ['自分のLINE', '本番の友だちへは届きません', 'Demo Person']) {
       expect(document.body.textContent).not.toContain(lie)
     }
   })

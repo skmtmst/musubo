@@ -18,6 +18,8 @@ export async function claimWebhookInteractionRetryAndInsert(
   original: Pick<WebhookInteractionRow, 'id' | 'line_account_id'>,
   input: {
     id?: string;
+    expectedInteractionRevision?: number;
+    expectedWebhookRevision?: number;
     webhookId: string;
     webhookName: string;
     eventType: string;
@@ -30,9 +32,11 @@ export async function claimWebhookInteractionRetryAndInsert(
   const now = jstNow();
   const [claim, insert] = await db.batch([
     db.prepare(
-      `UPDATE webhook_interaction_logs SET status='retried'
-        WHERE id=? AND line_account_id=? AND direction='outgoing' AND status='failed'`,
-    ).bind(original.id, original.line_account_id),
+      `UPDATE webhook_interaction_logs SET status='retried', confirmation_revision=confirmation_revision+1
+        WHERE id=? AND line_account_id=? AND direction='outgoing' AND status='failed'
+          AND (? IS NULL OR confirmation_revision=?)
+          AND (? IS NULL OR EXISTS (SELECT 1 FROM outgoing_webhooks w WHERE w.id=webhook_interaction_logs.webhook_id AND w.line_account_id=webhook_interaction_logs.line_account_id AND w.deleted_at IS NULL AND w.is_active=1 AND w.confirmation_revision=?))`,
+    ).bind(original.id, original.line_account_id, input.expectedInteractionRevision ?? null, input.expectedInteractionRevision ?? null, input.expectedWebhookRevision ?? null, input.expectedWebhookRevision ?? null),
     db.prepare(
       `INSERT INTO webhook_interaction_logs
          (id, line_account_id, direction, webhook_id, webhook_name, event_type,
@@ -40,7 +44,7 @@ export async function claimWebhookInteractionRetryAndInsert(
           attempt_count, duration_ms, failure_reason, idempotency_key,
           retry_of_id, started_at, completed_at, created_at)
        SELECT ?, ?, 'outgoing', ?, ?, ?, ?, 'pending', ?, NULL, 0, NULL, NULL, ?, ?, ?, NULL, ?
-        WHERE EXISTS (
+        WHERE changes()=1 AND EXISTS (
           SELECT 1 FROM webhook_interaction_logs WHERE id = ? AND status = 'retried'
         )
         AND NOT EXISTS (
@@ -96,7 +100,7 @@ export async function markStalePendingWebhookInteractions(
   const cutoff = toJstString(new Date(Date.now() - staleBeforeMs));
   const result = await db.prepare(
     `UPDATE webhook_interaction_logs
-        SET status='failed', failure_reason='unknown', completed_at=?
+        SET status='failed', failure_reason='unknown', completed_at=?, confirmation_revision=confirmation_revision+1
       WHERE line_account_id=? AND status='pending' AND started_at < ?`,
   ).bind(jstNow(), lineAccountId, cutoff).run();
   return Number(result.meta?.changes ?? 0);
@@ -114,7 +118,7 @@ export async function markFailedInteractionsRetried(
   idempotencyKey: string,
 ): Promise<void> {
   await db.prepare(
-    `UPDATE webhook_interaction_logs SET status='retried'
+    `UPDATE webhook_interaction_logs SET status='retried', confirmation_revision=confirmation_revision+1
       WHERE line_account_id=? AND webhook_id=? AND idempotency_key=?
         AND direction='outgoing' AND status='failed'`,
   ).bind(lineAccountId, webhookId, idempotencyKey).run();

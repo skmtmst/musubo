@@ -969,7 +969,7 @@ export async function updateAutomationDraft(
       // ここも当ててはいけない。**無い版を指しにいってしまう。**
       // 新しい版が本当にできたときだけ差し替える。
       `UPDATE automation_definitions
-          SET name = ?, updated_at = ?, current_draft_version_id = ?,
+          SET confirmation_revision = confirmation_revision + 1, name = ?, updated_at = ?, current_draft_version_id = ?,
               folder_id = CASE WHEN ? THEN ? ELSE folder_id END
         WHERE id = ? AND line_account_id = ?
           AND status IN ('draft', 'active', 'stopped')
@@ -1111,7 +1111,7 @@ export async function publishAutomationDraft(
     ),
     db.prepare(
       `UPDATE automation_definitions
-          SET status = ?, current_published_version_id = ?, current_draft_version_id = NULL, updated_at = ?
+          SET confirmation_revision = confirmation_revision + 1, status = ?, current_published_version_id = ?, current_draft_version_id = NULL, updated_at = ?
         WHERE id = ? AND line_account_id = ?
           AND status IN ('draft', 'active', 'stopped')
           ${expectedStatus === null ? '' : 'AND status = ?'}
@@ -1221,7 +1221,7 @@ export async function createAutomationDraftFromDefinition(
     ),
     db.prepare(
       // 先に下書きがぶら下がった側を守る。指し替えは1回だけ。
-      `UPDATE automation_definitions AS d SET current_draft_version_id = ?, updated_at = ?
+      `UPDATE automation_definitions AS d SET confirmation_revision = confirmation_revision + 1, current_draft_version_id = ?, updated_at = ?
         WHERE d.id = ? AND d.line_account_id = ? AND d.status IN ('draft', 'active', 'stopped')
           AND ${noLiveDraft}
           AND EXISTS (SELECT 1 FROM automation_versions WHERE id = ? AND automation_id = ?)`,
@@ -1303,7 +1303,7 @@ export async function duplicateAutomationDefinition(
     ).bind(nextVersionId, newId, source.trigger_type, source.trigger_config,
       source.condition_config, source.action_config, input.createdBy ?? null, now),
     db.prepare(
-      `UPDATE automation_definitions SET current_draft_version_id = ?, updated_at = ?
+      `UPDATE automation_definitions SET confirmation_revision = confirmation_revision + 1, current_draft_version_id = ?, updated_at = ?
         WHERE id = ? AND status = 'draft'
           AND EXISTS (SELECT 1 FROM automation_versions WHERE id = ? AND automation_id = ?)`,
     ).bind(nextVersionId, now, newId, nextVersionId, newId),

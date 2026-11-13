@@ -68,7 +68,7 @@ function seed(sqlite: SqliteD1['raw']) {
   }
 
   insertFriend(sqlite, FRIEND_A, { line_account_id: ACC_A, display_name: FRIEND_NAME_A });
-  insertFriend(sqlite, FRIEND_B, { line_account_id: ACC_B, display_name: '参加者 乙' });
+  insertFriend(sqlite, FRIEND_B, { line_account_id: ACC_B, display_name: '見本 49' });
 
   // 視聴履歴: 個人を特定できる行（名前・視聴秒数・CTA まで出る）。
   sqlite.prepare(

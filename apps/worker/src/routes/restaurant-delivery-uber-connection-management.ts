@@ -22,6 +22,7 @@ export interface UberConnectionManagementDeps {
 function publicConnection(row: ManagedUberConnection, isoFromMs: UberConnectionManagementDeps['isoFromMs']) {
   return {
     status: row.status,
+    version: row.version,
     storeName: row.uber_store_name,
     connectedAt: isoFromMs(row.connected_at),
     provisionedAt: isoFromMs(row.provisioned_at),
@@ -81,17 +82,27 @@ export function registerUberConnectionManagementRoutes(
   });
 
   app.delete('/api/restaurant-test/delivery/ubereats/connection', requireRole('owner', 'admin'), async (c) => {
-    const body = await c.req.json<{ confirmed?: unknown }>().catch(() => null);
+    const body = await c.req.json<{ confirmed?: unknown; expectedVersion?: unknown }>().catch(() => null);
     if (body?.confirmed !== true) {
       return fail(c, 400, '確認画面から連携解除を実行してください', { code: 'confirmation_required' });
+    }
+    if (body.expectedVersion !== undefined && (!Number.isSafeInteger(body.expectedVersion) || (body.expectedVersion as number) < 1)) {
+      return fail(c, 400, '確認した接続の版が不正です', { code: 'invalid_version' });
     }
     const resolved = await settings(c);
     if (resolved instanceof Response) return resolved;
     const result = await disconnectUberConnection({
       db: dbFor(c.env, resolved.store.id), storeId: resolved.store.id,
       accountId: resolved.store.lineAccountId!, client: resolved.client, encryptionKey: resolved.encryptionKey,
+      expectedVersion: body.expectedVersion as number | undefined,
       fetcher: (url, init) => tracedFetch(url, init),
     });
+    if (!result.ok && result.code === 'connection_changed') {
+      const current = await dbFor(c.env, resolved.store.id).prepare(
+        'SELECT * FROM rt_delivery_uber_connections WHERE store_id = ? AND account_id = ?',
+      ).bind(resolved.store.id, resolved.store.lineAccountId).first<ManagedUberConnection>();
+      return c.json({ success: false, code: result.code, error: '接続情報が変わりました。画面を読み直してください', connection: current ? publicConnection(current, deps.isoFromMs) : null }, 409);
+    }
     if (!result.ok) return failure(c, result);
     auditLog(c, 'restaurant.delivery.ubereats.connection.disconnect', { id: resolved.store.id, kind: 'rt_store' });
     return c.json({ success: true, connection: publicConnection(result.connection, deps.isoFromMs) });

@@ -35,7 +35,7 @@ beforeEach(async () => {
   mail.sendPlainMail.mockClear();
   database.raw.prepare("INSERT INTO staff_members (id, name, role, api_key) VALUES ('ops-master', '運営担当', 'owner', 'fixture-key')").run();
   database.raw.prepare("INSERT INTO platform_admins (staff_id, is_active) VALUES ('ops-master', 1)").run();
-  await createRegistrationApplication(database.db, { companyName: '申込会社', contactName: '山田', email: 'applicant@example.com', phone: '03-1234-5678', referralSource: 'SNS', ipHash: 'ip', deviceMarker: null });
+  await createRegistrationApplication(database.db, { companyName: '申込会社', contactName: '山田', email: 'applicant@example.com', phone: '03-0000-5678', referralSource: 'SNS', ipHash: 'ip', deviceMarker: null });
 });
 
 describe('申込承認の運営 API', () => {

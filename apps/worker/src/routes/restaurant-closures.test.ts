@@ -212,7 +212,10 @@ describe('日付で席予約を閉じる',()=>{
   const p=await post(closurePath+'/preview',closureInput);expect(p.status).toBe(200);const preview=(await p.json() as any).data;
   expect(testDb.raw.prepare('SELECT COUNT(*) n FROM rt_closures').get()).toEqual({n:0});
   const saved=await create();expect(saved.status).toBe(201);
-  const {closure,...impact}=saved.body.data;expect(impact).toEqual(preview);expect(impact.waitlistCount).toBe(1);
+  const {confirmationSnapshot,...previewImpact}=preview;
+  expect(typeof confirmationSnapshot).toBe('string');
+  expect(saved.body.data).not.toHaveProperty('confirmationSnapshot');
+  const {closure,...impact}=saved.body.data;expect(impact).toEqual(previewImpact);expect(impact.waitlistCount).toBe(1);
   expect(impact.reservations).toEqual([expect.objectContaining({id:'r-existing',startsAt:SLOT,guestCount:2,customerName:'予約客',source:'manual',friendId:'friend',isLineFriend:true})]);
   expect(testDb.raw.prepare("SELECT status FROM rt_reservations WHERE id='r-existing'").get()).toEqual({status:'confirmed'});
   expect((await patch('/api/restaurant-test/reservations/r-existing',{note:'連絡済み'})).status).toBe(200);
@@ -343,8 +346,8 @@ test('変更のpreviewは自分だけを除外し、他店や存在しないID�
  expect((await post(closurePath+'/preview',{...closureInput,excludeId:'other-id'})).status).toBe(404);
 });
 test('重なり409のdataに相手の名前と日付が入り、previewに電話・LINE友だちを返す',async()=>{
- seedReservation('with-phone');testDb.raw.exec("UPDATE rt_reservations SET customer_phone='09012345678' WHERE id='with-phone'");
- const preview=await post(closurePath+'/preview',closureInput);expect((await preview.json() as any).data.reservations[0]).toMatchObject({customerPhone:'09012345678',friendId:null,isLineFriend:false});
+ seedReservation('with-phone');testDb.raw.exec("UPDATE rt_reservations SET customer_phone='09000005678' WHERE id='with-phone'");
+ const preview=await post(closurePath+'/preview',closureInput);expect((await preview.json() as any).data.reservations[0]).toMatchObject({customerPhone:'09000005678',friendId:null,isLineFriend:false});
  await create({...closureInput,memo:'設備の交換'});const res=await create();expect(res.body).toMatchObject({code:'closure_overlap',data:{conflicts:[expect.objectContaining({name:'設備の交換',startDate:SLOT_DATE,endDate:SLOT_DATE})]}});
 });
 test('連絡済みは作成後に担当者が手動送信した重なる予約だけを数え、同じ予約は一度',async()=>{

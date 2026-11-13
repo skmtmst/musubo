@@ -45,6 +45,7 @@ const ignoredColumns:Record<string,Record<string,string>> = {
     '楽観ロックと作成・配備の実行記録は内容ではない': 'revision',
   },
   templates: {
+    '確認用の版は内容ではない': 'confirmation_revision',
     '所有範囲は取得条件で限定する': 'line_account_id',
     '更新・作成・公開の日時と担当者は内容ではない': 'created_at,updated_at,published_at',
     '楽観ロックと作成・配備の実行記録は内容ではない': 'created_from_recipe_id,recipe_clone_run_id,publish_idempotency_key,draft_revision',
@@ -64,6 +65,7 @@ const ignoredColumns:Record<string,Record<string,string>> = {
     '自動スキャンと試験の実行結果は店の編集ではない': 'scan_status,scan_result,scanned_at',
   },
   auto_replies: {
+    '確認用の版は内容ではない': 'confirmation_revision',
     '所有範囲は取得条件で限定する': 'line_account_id',
     '更新・作成・公開の日時と担当者は内容ではない': 'created_at,deleted_by_staff_id',
     '楽観ロックと作成・配備の実行記録は内容ではない': 'created_from_recipe_id,recipe_clone_run_id',
@@ -76,6 +78,7 @@ const ignoredColumns:Record<string,Record<string,string>> = {
     '自動スキャンと試験の実行結果は店の編集ではない': 'last_test_status,last_tested_at,last_tested_by_staff_id',
   },
   scenarios: {
+    '確認用の版は内容ではない': 'content_revision',
     '所有範囲は取得条件で限定する': 'line_account_id',
     '更新・作成・公開の日時と担当者は内容ではない': 'created_at,updated_at',
     '楽観ロックと作成・配備の実行記録は内容ではない': 'created_from_recipe_id,recipe_clone_run_id',
@@ -93,6 +96,7 @@ const ignoredColumns:Record<string,Record<string,string>> = {
     '更新・作成・公開の日時と担当者は内容ではない': 'created_at',
   },
   rich_menu_groups: {
+    '確認用の版は内容ではない': 'confirmation_revision',
     '所有範囲は取得条件で限定する': 'account_id',
     '更新・作成・公開の日時と担当者は内容ではない': 'created_at,updated_at',
     '楽観ロックと作成・配備の実行記録は内容ではない': 'version',
@@ -111,6 +115,7 @@ const ignoredColumns:Record<string,Record<string,string>> = {
     '楽観ロックと作成・配備の実行記録は内容ではない': 'draft_revision',
   },
   common_action_bindings: {
+    '確認用の版は内容ではない': 'confirmation_revision',
     '所有範囲は取得条件で限定する': 'line_account_id',
     '更新・作成・公開の日時と担当者は内容ではない': 'created_by,created_at,updated_at',
   },

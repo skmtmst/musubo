@@ -765,6 +765,19 @@ describe('POST /api/automations/:id/draft・duplicate・status（#942 N-352）',
     expect(new Set(bindings.map((row) => row.id)).size).toBe(2);
   });
 
+  test('古い確認版は409と現在の状態を返し、一致版と旧呼び出しは通る', async () => {
+    const db = realAutomationDb();
+    const app = setupApp(db.db);
+    const change = (status: string, expectedConfirmationRevision?: number) => app.request('/api/automations/auto-1/status', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, expectedConfirmationRevision }),
+    });
+    const stale = await change('stopped', 2);
+    expect(stale.status).toBe(409);
+    await expect(stale.json()).resolves.toMatchObject({ current: { status: 'active', confirmationRevision: 1 } });
+    expect((await change('stopped', 1)).status).toBe(200);
+    expect((await change('archived')).status).toBe(200);
+  });
+
   test('「保管」は一方通行。戻す依頼は422、変な状態名は400', async () => {
     const testDb = realAutomationDb();
     const app = setupApp(testDb.db);

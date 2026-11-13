@@ -54,7 +54,7 @@ describe('未取得と取得できた値を分ける', () => {
 
   it('マスク済みの値が無ければ「—」にする', () => {
     expect(previewText(null)).toBe(NOT_AVAILABLE)
-    expect(previewText('ta***@example.jp')).toBe('ta***@example.jp')
+    expect(previewText('ta***@example.com')).toBe('ta***@example.com')
   })
 
   it('日時が読めなければ「—」にする', () => {

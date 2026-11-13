@@ -51,12 +51,12 @@ const candidate = {
   left: {
     kind: 'friend' as const, id: 'friend-a', label: '\u7530\u4e2d \u82b1\u5b50', detail: '\u672c\u5e97',
     lineAccountId: 'account-a', lineAccountName: '\u672c\u5e97', shopKey: null,
-    attributes: [{ label: '\u30e1\u30fc\u30eb', valuePreview: 'ta***@example.jp', verified: true }],
+    attributes: [{ label: '\u30e1\u30fc\u30eb', valuePreview: 'ta***@example.com', verified: true }],
   },
   right: {
     kind: 'friend' as const, id: 'friend-b', label: '\u7530\u4e2d \u306f\u306a\u3053', detail: '\u652f\u5e97',
     lineAccountId: 'account-b', lineAccountName: '\u652f\u5e97', shopKey: null,
-    attributes: [{ label: '\u30e1\u30fc\u30eb', valuePreview: 'ta***@example.jp', verified: true }],
+    attributes: [{ label: '\u30e1\u30fc\u30eb', valuePreview: 'ta***@example.com', verified: true }],
   },
   evidence: [],
   impact: [],
@@ -178,7 +178,7 @@ describe('identity candidate HTTP contract', () => {
     const response = await harness({ role: 'staff', permissions: ['/friends'] })
       .request('/api/identity-candidates/candidate-a');
     expect(response.status).toBe(403);
-    expect(JSON.stringify(await response.json())).not.toContain('ta***@example.jp');
+    expect(JSON.stringify(await response.json())).not.toContain('ta***@example.com');
     expect(identityMocks.candidateAccountIds).not.toHaveBeenCalled();
   });
 
@@ -188,7 +188,7 @@ describe('identity candidate HTTP contract', () => {
     expect(response.status).toBe(404);
     const body = JSON.stringify(await response.json());
     expect(body).not.toContain('\u7530\u4e2d');
-    expect(body).not.toContain('ta***@example.jp');
+    expect(body).not.toContain('ta***@example.com');
   });
 
   it('does not let staff mutate identity decisions', async () => {

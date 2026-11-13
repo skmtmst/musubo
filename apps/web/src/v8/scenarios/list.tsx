@@ -194,6 +194,8 @@ export default function ScenariosListV8() {
 
   /* 削除の確認窓。 */
   const [deleteTarget, setDeleteTarget] = useState<ScenarioRow | null>(null)
+  const [deleteSnapshot, setDeleteSnapshot] = useState<import('@/lib/api/types/scenarios').ScenarioConfirmation | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
@@ -463,10 +465,11 @@ export default function ScenariosListV8() {
     })
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (target: ScenarioRow) => {
     if (!requireWrite()) throw new Error(stoppedMessage())
+    if (!deleteSnapshot) throw new Error('シナリオの対象を確認できません。')
     try {
-      const res = await api.scenarios.delete(id)
+      const res = await api.scenarios.delete(target.id, deleteSnapshot)
       if (!res.success) throw new Error(res.error)
       if (!currentScope()) return
       void loadScenarios()
@@ -479,7 +482,17 @@ export default function ScenariosListV8() {
   }
 
   /* 削除は、利用状況にかかわらず確認してから実行する。 */
-  const requestDelete = (s: ScenarioRow) => { if (!requireWrite()) return; deleteWindow.current = {}; deleteWindowScope.current = renderedScope; setDeleteError(''); setDeleteTarget(s) }
+  const requestDelete = async (s: ScenarioRow) => {
+    if (!requireWrite()) return
+    const ticket = {}; deleteWindow.current = ticket; deleteWindowScope.current = renderedScope
+    setDeleteError(''); setDeleteSnapshot(null); setDeleteLoading(true); setDeleteTarget(s)
+    try {
+      const result = await api.scenarios.confirmation(s.id, 'delete')
+      if (!result.success || !result.data || !Array.isArray(result.data.referrers) || ![result.data.contentRevision, result.data.activeCount, result.data.rowIdSum, result.data.rowIdSquareSum, result.data.totalCount, result.data.totalRowIdSum, result.data.totalRowIdSquareSum].every(Number.isSafeInteger)) throw new Error('確認できません')
+      if (deleteWindow.current === ticket && currentScope()) setDeleteSnapshot(result.data)
+    } catch { if (deleteWindow.current === ticket && currentScope()) setDeleteError('削除対象を確認できません。閉じてもう一度お試しください。') }
+    finally { if (deleteWindow.current === ticket && currentScope()) setDeleteLoading(false) }
+  }
 
   /* ===== まとめて「止める／再開」 ===== */
 
@@ -566,33 +579,47 @@ export default function ScenariosListV8() {
 
   /* ===== フォルダ移動の窓 ===== */
 
-  const confirmedStops = useRef<{ ids: string[] | null; done: Set<string> }>({ ids: null, done: new Set() })
+  const confirmedStops = useRef<Array<{ id: string; revision: number; activeCount: number; rowIdSum: number; rowIdSquareSum: number }> | null>(null)
+  const [stopLoading, setStopLoading] = useState(false)
+  const [stopPeople, setStopPeople] = useState<number | null>(null)
   const [stopBusy, setStopBusy] = useState(false)
   const [stopError, setStopError] = useState('')
   useEffect(() => { setStopError('') }, [pendingStop])
+  const openConfirmedStop = async (ids: string[], rows: ScenarioRow[]) => {
+    const ticket = {}; stopWindow.current = ticket; stopWindowScope.current = renderedScope
+    confirmedStops.current = null; setStopPeople(null); setStopLoading(true); setStopError('')
+    setStopAccountTargets(scenarioAccountTargets(ids, rows)); setPendingStop(ids)
+    try {
+      const snapshots = await Promise.all(ids.map(async id => {
+        const response = await api.scenarios.confirmation(id, 'stop')
+        if (!response.success || !response.data) throw new Error('確認できませんでした')
+        const { contentRevision, activeCount, rowIdSum, rowIdSquareSum } = response.data
+        if (![contentRevision, activeCount, rowIdSum, rowIdSquareSum].every(Number.isSafeInteger)) throw new Error('確認できませんでした')
+        return { id, revision: contentRevision, activeCount, rowIdSum, rowIdSquareSum }
+      }))
+      if (stopWindow.current !== ticket || stopWindowScope.current !== renderedScope || !currentScope()) return
+      confirmedStops.current = snapshots; setStopPeople(snapshots.reduce((sum, item) => sum + item.activeCount, 0))
+    } catch {
+      if (stopWindow.current === ticket && currentScope()) setStopError('停止する対象を確認できません。閉じてもう一度お試しください。')
+    } finally { if (stopWindow.current === ticket && currentScope()) setStopLoading(false) }
+  }
   const runConfirmedStop = async () => {
     const ids = pendingStop
     if (!ids?.length || stopWindow.current !== renderedStopWindow || stopWindowScope.current !== renderedScope || !requireWrite('publish') || toggleBusyRef.current) return
-    if (confirmedStops.current.ids !== ids) confirmedStops.current = { ids, done: new Set() }
     const attempt = confirmedStops.current
+    if (!attempt || attempt.length !== ids.length) { setStopError('停止できませんでした。'); return false }
     const current = () => currentScope() && stopWindow.current === renderedStopWindow && confirmedStops.current === attempt
     toggleBusyRef.current = true; setStopBusy(true); setStopError('')
     try {
-      for (const id of ids) {
-        if (attempt.done.has(id)) continue
-        if (!current()) return
-        if (!canWriteHere('publish')) { setStopError(stoppedMessage(attempt.done.size, ids.length)); return false }
-        try {
-          const response = await api.scenarios.update(id, { isActive: false })
-          if (!response.success) throw new Error(response.error)
-          attempt.done.add(id)
-        } catch (failure) {
-          if (!current()) return
-          saveErrors.capture(failure)
-          const saved = attempt.done.size
-          setStopError(`全 ${formatNumber(ids.length)} 件中 ${formatNumber(saved)} 件の保存を確認しました。${formatNumber(saved + 1)} 件目で止めました。未送信は ${formatNumber(ids.length - saved - 1)} 件です。理由：${describeApiFailure(failure, '停止')}`)
-          return false
-        }
+      if (!canWriteHere('publish')) { setStopError(stoppedMessage(0, ids.length)); return false }
+      try {
+        const response = await api.scenarios.bulkStop(attempt)
+        if (!response.success) throw new Error(response.error)
+      } catch (failure) {
+        if (!current()) return false
+        saveErrors.capture(failure)
+        setStopError(describeApiFailure(failure, '停止'))
+        return false
       }
       if (!current()) return
       setSelectedIds(new Set()); setOptimisticRows(null)
@@ -692,7 +719,7 @@ export default function ScenariosListV8() {
     setDeleting(true)
     setDeleteError('')
     try {
-      await handleDelete(deleteTarget.id)
+      await handleDelete(deleteTarget)
       if (!currentScope() || deleteRun.current !== ticket) return
       setDeleteTarget(null)
       if (!canWriteHere()) notifyToast('削除しました。変更後の権限で一覧を確認してください。', { tone: 'success' })
@@ -1178,7 +1205,7 @@ export default function ScenariosListV8() {
               disabled={!publishAccess.allowed || !scenarioList.loaded || stoppableIds.length === 0}
               lockedReason={publishAccess.reason}
               disabledReason={publishAccess.allowed && stoppableIds.length === 0 ? '有効のシナリオが選ばれていません' : undefined}
-              onClick={() => { if (requireWrite('publish')) { stopWindow.current = {}; stopWindowScope.current = renderedScope; setStopAccountTargets(scenarioAccountTargets(stoppableIds, [...selectionRows, ...scenarios])); setPendingStop(stoppableIds) } }}
+              onClick={() => { if (requireWrite('publish')) void openConfirmedStop(stoppableIds, [...scenarios, ...selectionRows]) }}
             >
               <Square size={16} aria-hidden="true" />
               止める
@@ -1324,7 +1351,7 @@ export default function ScenariosListV8() {
       explanationKey="scenarios"
       explanation="作っただけでは送られません。「開始のきっかけ」を決めて、テストを送ってから配信を始めます。"
 
-      help={<>{"きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"}{"左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"}</>}
+      help={<>{"きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"}{canEdit ? "左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。" : "行を押すと詳細、「…」から配信結果を確認できます。"}</>}
       stats={<>
         {/* 板 `X0QrW0`：閲覧のみの帯。数の帯の上。 */}
         {editAccess.reason ? (
@@ -1394,7 +1421,7 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
                 value={panelRow.name}
                 label="シナリオ名"
                 onSave={(next) => renameScenario(panelRow.id, next)}
-                maxLength={80}
+                maxLength={60}
                 disabled={editDisabled}
                 lockedReason={editAccess.reason}
                 canSaveNow={canWriteHere}
@@ -1424,20 +1451,21 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
           target={deleteTarget}
           busy={deleting}
           error={deleteError}
-          disabled={editDisabled}
+          disabled={editDisabled || deleteLoading || !deleteSnapshot}
+          summary={deleteSnapshot}
           targetStillListed={targetStillListed}
           sameScope={deleteWindowScope.current === renderedScope}
           lockedReason={editAccess.reason}
           countLabel={scenarioCountLabel}
           onConfirm={() => { void runDelete() }}
-          onCancel={() => { if (!deleting) { setDeleteTarget(null); setDeleteError('') } }}
+          onCancel={() => { if (!deleting) { deleteWindow.current = {}; setDeleteTarget(null); setDeleteSnapshot(null); setDeleteError('') } }}
         />
 
         {/* 複製の窓（★V8 `Al4Ek`：新しい名前・引き継ぐもの・引き継がないもの・停止中で作られる）。題の左に印は置かない（絵どおり）。 */}
         <></>
       </>}
       folders={<>
-        <ConfirmDialog open={pendingStop !== null && stopWindowScope.current === renderedScope} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" confirmDisabled={!publishAccess.allowed || !scenarioList.loaded} confirmLockedReason={publishAccess.reason} onCancel={() => { stopWindow.current = {}; setPendingStop(null) }} busy={stopBusy} error={stopError || undefined} onSuccess={() => { stopWindow.current = {}; setPendingStop(null) }} onConfirm={() => runConfirmedStop()} ><OperationTargetSummary accounts={stopAccountTargets.accounts} allAccounts={stopAccountTargets.allAccounts} /></ConfirmDialog>
+        <ConfirmDialog open={pendingStop !== null && stopWindowScope.current === renderedScope} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" confirmDisabled={!publishAccess.allowed || !scenarioList.loaded || stopLoading || stopPeople === null} confirmLockedReason={publishAccess.reason} onCancel={() => { stopWindow.current = {}; setPendingStop(null) }} busy={stopBusy} error={stopError || undefined} onSuccess={() => { stopWindow.current = {}; setPendingStop(null) }} onConfirm={() => runConfirmedStop()} ><OperationTargetSummary accounts={stopAccountTargets.accounts} allAccounts={stopAccountTargets.allAccounts} /><p>{stopLoading ? '対象を確認しています。' : stopPeople === null ? '対象を確認できません。' : `配信中・配信処理中の購読 ${formatNumber(stopPeople)} 件`}</p></ConfirmDialog>
         {folderPanel}
       </>}
       collapsedFolders={<>{createButton(false)}{folderSelect}</>}

@@ -13,7 +13,7 @@ const calls = vi.hoisted(() => ({
     data: {
       kinds: [{ key: 'trouble', label: '不具合' }],
       accounts: [{ id: 'line-1', name: '本店' }],
-      sender: { tenantName: '統括テスト', name: '山田 太郎', email: 'owner@example.com', planLabel: 'スタンダード' },
+      sender: { tenantName: '統括テスト', name: '見本 141', email: 'owner@example.com', planLabel: 'スタンダード' },
     },
   })),
   list: vi.fn(async () => ({
@@ -59,7 +59,7 @@ describe('b8xBtZ お問い合わせの並び', () => {
     await act(async () => { root.render(<HqSupportPage />) })
     await settle()
     const text = host.textContent ?? ''
-    for (const word of ['種類', '関係する店舗', '件名', '本文', '画像を添える', '送信者：山田 太郎', '内容をクリア', '送信']) {
+    for (const word of ['種類', '関係する店舗', '件名', '本文', '画像を添える', '送信者：見本 141', '内容をクリア', '送信']) {
       expect(text).toContain(word)
     }
   })

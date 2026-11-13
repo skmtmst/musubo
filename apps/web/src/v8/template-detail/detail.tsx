@@ -70,6 +70,8 @@ export default function TemplateDetailV8() {
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
 
   const [template, setTemplate] = useState<TemplateDetailData | null>(null)
+  const currentTemplate = useRef(template)
+  currentTemplate.current = template
   const [versions, setVersions] = useState<TemplateVersionItem[] | null>(null)
   const [versionsError, setVersionsError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -83,6 +85,8 @@ export default function TemplateDetailV8() {
   const [compareTarget, setCompareTarget] = useState<'draft' | number | null>(null)
   const [publishOpen, setPublishOpen] = useState(false)
   const [publishScope, setPublishScope] = useState<typeof renderedScope | null>(null)
+  const [publishVersion, setPublishVersion] = useState<{ ticket: object; publishedVersion: number; draftRevision: number } | null>(null)
+  const publishTicket = useRef<object | null>(null)
   const [publishing, setPublishing] = useState(false)
   const [publishError, setPublishError] = useState('')
   const [revertTarget, setRevertTarget] = useState<number | null>(null)
@@ -203,17 +207,18 @@ export default function TemplateDetailV8() {
   const nextVersionNumber = (template?.publishedVersion ?? 0) + 1
 
   const doPublish = useCallback(async () => {
-    if (publishing || !template || !mounted.current || !canMutateRef.current || publishScope !== scope.current || loadedScope.current !== publishScope || template.id !== id) return
+    if (publishing || !template || !publishVersion || publishVersion.ticket !== publishTicket.current || !mounted.current || !canMutateRef.current || publishScope !== scope.current || loadedScope.current !== publishScope || template.id !== id || currentTemplate.current?.id !== id || (currentTemplate.current.publishedVersion ?? 0) !== publishVersion.publishedVersion || (currentTemplate.current.draftRevision ?? 0) !== publishVersion.draftRevision) return
     const current = () => mounted.current && publishScope === scope.current
     setPublishing(true)
     setPublishError('')
     try {
       const res = await api.templates.publish(id, {
-        expectedVersion: template.publishedVersion ?? 0,
-        expectedDraftRevision: template.draftRevision ?? 0,
+        expectedVersion: publishVersion.publishedVersion,
+        expectedDraftRevision: publishVersion.draftRevision,
       })
       if (!current()) return
       if (!res.success) throw new Error(res.error)
+      publishTicket.current = null
       setPublishOpen(false)
       await reload()
     } catch (caught) {
@@ -231,7 +236,7 @@ export default function TemplateDetailV8() {
     } finally {
       if (current()) setPublishing(false)
     }
-  }, [id, publishing, template, reload, saveErrors, publishScope])
+  }, [id, publishing, template, reload, saveErrors, publishScope, publishVersion])
 
   const doRevert = useCallback(async () => {
     if (reverting || revertTarget === null || !template) return
@@ -445,7 +450,7 @@ export default function TemplateDetailV8() {
         {template.hasDraft ? (
           <Notice tone="warn" role="status" heading={template.publishedVersion > 0 ? '未公開の変更があります' : 'まだ公開していません'} icon={<CircleAlert size={16} aria-hidden="true" />} action={canMutate ? <>
             {inUseVersion ? <Button variant="secondary" onClick={() => setCompareTarget((current) => current === 'draft' ? null : 'draft')} aria-pressed={compareTarget === 'draft'} icon={<GitCompare aria-hidden="true" />}>比べる</Button> : null}
-            <Button variant="primary" onClick={() => { if (loadedScope.current !== scope.current || template.id !== id) return; setPublishScope(scope.current); setPublishError(''); setPublishOpen(true) }} icon={<Upload aria-hidden="true" />}>公開する</Button>
+            <Button variant="primary" onClick={() => { if (loadedScope.current !== scope.current || template.id !== id) return; const ticket = {}; publishTicket.current = ticket; setPublishVersion({ ticket, publishedVersion: template.publishedVersion ?? 0, draftRevision: template.draftRevision ?? 0 }); setPublishScope(scope.current); setPublishError(''); setPublishOpen(true) }} icon={<Upload aria-hidden="true" />}>公開する</Button>
           </> : undefined}>{publishDraftText}</Notice>
         ) : null}
         {compareTarget === 'draft' ? compareBox : null}
@@ -535,12 +540,13 @@ export default function TemplateDetailV8() {
         error={publishError}
         onCancel={() => {
           if (publishing) return
+          publishTicket.current = null
           setPublishOpen(false)
           setPublishError('')
         }}
         footer={(<DialogActions>
-            <Button variant="secondary" onClick={() => { setPublishOpen(false); setPublishError('') }} disabled={publishing}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void doPublish()} busy={publishing} busyLabel="公開しています…">
+            <Button variant="secondary" onClick={() => { publishTicket.current = null; setPublishOpen(false); setPublishError('') }} disabled={publishing}>キャンセル</Button>
+            <Button variant="primary" onClick={() => void doPublish()} busy={publishing} busyLabel="公開しています…" disabled={!publishVersion || (template.publishedVersion ?? 0) !== publishVersion.publishedVersion || (template.draftRevision ?? 0) !== publishVersion.draftRevision} disabledReason="内容が変わりました。閉じて確認し直してください。">
               <Upload size={16} aria-hidden="true" />
               {latestCount > 0 ? `公開する（${latestCount} か所に反映）` : '公開する'}
             </Button>

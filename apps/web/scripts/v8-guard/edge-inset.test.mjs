@@ -10,6 +10,7 @@ const board = body => `<main style="font:16px/20px sans-serif"><div data-page-te
   <header data-template-region="heading" style="padding:16px 24px;box-shadow:0 1px 0 #0001"><h1 data-page-title>タグ</h1></header>
   ${body}
 </div></main>`
+// Keep the fixture above the detector's 24px height threshold on every OS.
 const band = style => `<div id="target" data-kpi-strip style="min-height:40px;display:grid;grid-auto-flow:column;border-block:1px solid #0001;${style}"><div>未使用 63件</div><div>付けている友だち 5人</div></div>`
 const card = style => `<section id="target" style="border-radius:12px;box-shadow:0 0 0 1px #0001;height:80px;${style}">中身</section>`
 const notice = style => `<div id="target" role="status" style="background:#fff7ed;height:40px;${style}">お知らせ</div>`

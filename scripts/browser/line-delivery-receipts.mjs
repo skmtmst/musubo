@@ -53,6 +53,7 @@ try {
         assert.equal(overflow, 0)
         assert.deepEqual(errors, [])
         assert.deepEqual(compared.failures, [])
+        assert.deepEqual(compared.needsReview ?? [], [])
         if (scenario === 'safe') {
           await region.getByRole('button', { name: 'やり直す', exact: true }).click()
           await region.waitFor({ state: 'detached' })

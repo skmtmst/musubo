@@ -37,7 +37,11 @@ export function metricValue(m?: StyleMetric): { value: number | null; valueText?
   if (!m) return { value: null, unit: '', reason: '口から返っていません' }
   const reason = m.value === null ? STATUS_TEXT[m.status] || '取れませんでした' : ''
   if (m.value === null) return { value: null, unit: isRate(m) ? '%' : isYen(m) ? '' : m.unit, reason }
-  if (isRate(m)) return { value: Math.round(m.value * 1000) / 10, unit: '%', reason }
+  if (isRate(m)) {
+    const rounded = Math.round(m.value * 1000) / 10
+    if (m.value > 0 && rounded === 0) return { value: m.value * 100, valueText: '0.1%未満', unit: '%', reason }
+    return { value: rounded, unit: '%', reason }
+  }
   if (isYen(m)) return { value: m.value, valueText: yen(m.value), unit: '', reason }
   return { value: m.value, unit: m.unit || '件', reason }
 }
@@ -106,7 +110,7 @@ export function kpisFor(style: IndustryStyle, s: StyleSnapshot, range: Dashboard
   return [
     kpi({ id: 'classes', key: 'classes', title: `${r}のクラス`, unit: '回', detail: (x) => `定員 ${num(x, 'capacity') ?? '—'}・上限なし ${num(x, 'unlimitedClasses') ?? '—'}`, link: { label: '一覧', href: '/events' }, help: '期間に始まる有効な回の数です。' }, s),
     kpi({ id: 'attendance', key: 'attendancePending', title: '出欠待ち', unit: '回', detail: () => '出席の印がまだの回', link: { label: '名簿', href: '/events' }, help: '終わった回のうち、出席の印をまだ付けていない回の数です。' }, s),
-    kpi({ id: 'fill', key: 'classroomOccupancy', title: `${r}の埋まり`, detail: (x) => { const o = metricValue(x.metrics.onlineOccupancy); return `オンラインは ${o.value === null ? '—' : `${o.value}%`}` }, link: { label: '一覧', href: '/events' }, help: '教室の予約 ÷ 定員です。教室とオンラインは別に数えます。' }, s),
+    kpi({ id: 'fill', key: 'classroomOccupancy', title: `${r}の埋まり`, detail: (x) => { const o = metricValue(x.metrics.onlineOccupancy); return `オンラインは ${o.value === null ? '—' : o.valueText ?? `${o.value}%`}` }, link: { label: '一覧', href: '/events' }, help: '教室の予約 ÷ 定員です。教室とオンラインは別に数えます。' }, s),
     paymentKpi(range),
     newKpi(s, '/events', range),
   ]
@@ -235,7 +239,7 @@ function weekOf(sch: StyleSchedule, now: Date): StyleWeek {
 function monthOf(sch: StyleSchedule, selected: string, now: Date, rows: StyleRow[]): StyleMonth {
   const tz = sch.timeZone
   const today = parts(now.toISOString(), tz).date
-  const start = new Date(`${sch.from.slice(0, 10)}T00:00:00Z`)
+  const start = new Date(`${parts(sch.from, tz).date}T00:00:00Z`)
   const month = start.getUTCMonth()
   const lead = (start.getUTCDay() + 6) % 7
   const cells: StyleMonthDay[] = []

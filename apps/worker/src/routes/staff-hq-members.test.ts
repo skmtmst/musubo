@@ -15,7 +15,7 @@ let testDb: SqliteD1;
 
 const admin = (overrides: Partial<AuthenticatedStaff> = {}): AuthenticatedStaff => ({
   id: 'staff-1',
-  name: '山田 太郎',
+  name: '見本 141',
   role: 'admin',
   readOnly: false,
   tenantId: DEFAULT_TENANT_ID,
@@ -44,7 +44,7 @@ beforeEach(() => {
   testDb = createTestD1();
   invite.send.mockReset();
   testDb.raw.prepare(
-    `INSERT INTO staff_members (id, name, email, role, api_key, tenant_id) VALUES ('staff-1', '山田 太郎', 'masato@example.com', 'admin', 'key-1', ?)`,
+    `INSERT INTO staff_members (id, name, email, role, api_key, tenant_id) VALUES ('staff-1', '見本 141', 'masato@example.com', 'admin', 'key-1', ?)`,
   ).run(DEFAULT_TENANT_ID);
   testDb.raw.prepare(
     `INSERT INTO staff_members (id, name, email, role, api_key, is_active, invite_status, invite_token_hash, invite_expires_at, tenant_id)

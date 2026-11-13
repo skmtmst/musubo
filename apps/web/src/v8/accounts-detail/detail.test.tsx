@@ -84,7 +84,7 @@ beforeEach(() => {
     if (method !== 'GET') sent.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : null, stepUp: new Headers(init?.headers).get('X-Step-Up-Token') })
     if (url.includes('/staff/me')) return json({ success: true, data: { role } })
     if (url.includes('/auth/step-up')) return json({ success: true, data: { token: 'grant-1', purpose: 'line_account.archive', expiresAt: '2026-10-07T00:00:00.000Z' } })
-    if (url.includes('/test-recipients')) return json({ success: true, data: [{ id: 'f-1', displayName: '高田 誠', pictureUrl: null }] })
+    if (url.includes('/test-recipients')) return json({ success: true, data: [{ id: 'f-1', displayName: '見本 18', pictureUrl: null }] })
     if (url.includes('/skipped-deliveries')) return json({ success: true, data: [] })
     if (url.includes('/api/line-accounts/acc-1/handovers')) return json({ success: true, data: [{ id: 'h-1' }] })
     if (url.includes('/api/account-handovers/h-1')) {
@@ -93,7 +93,7 @@ beforeEach(() => {
         providerMatch: 'different', counts: { sourceTotal: 4, auto: 2, review: 2, unmatched: 0, lookalike: 0 }, movedCount: 0, failedCount: 0, failureReason: null,
         createdAt: '2026-10-01T00:00:00.000Z', linkedAt: null, previewedAt: null, resolvedAt: null, executedAt: null,
         unresolvedReviews: 1,
-        decisions: [{ id: 'd-1', handover_id: 'h-1', from_friend_id: 'f-a', to_friend_id: 'f-b', decision: 'link', bucket: 'review', note: null, decided_by: null, decided_at: '2026-10-01T00:00:00.000Z', sourceName: '高橋 直人', candidateName: '高橋 なおと', evidenceLabel: '電話番号が同じ' }],
+        decisions: [{ id: 'd-1', handover_id: 'h-1', from_friend_id: 'f-a', to_friend_id: 'f-b', decision: 'link', bucket: 'review', note: null, decided_by: null, decided_at: '2026-10-01T00:00:00.000Z', sourceName: '見本 16', candidateName: '高橋 なおと', evidenceLabel: '電話番号が同じ' }],
       } })
     }
     if (/\/api\/line-accounts\/acc-1$/.test(url) && method === 'GET') {
@@ -158,7 +158,7 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     expect(archive.title).toContain('先に送受信を止めてください')
     expect(document.getElementById(archive.getAttribute('aria-describedby')!)?.textContent).toContain('先に送受信を止めてください')
     expect(document.body.textContent).toContain('先に送受信を止めてください')
-    expect(document.body.textContent).toContain('高田 誠')
+    expect(document.body.textContent).toContain('見本 18')
   })
 
   it('閲覧のみには変える操作を置かず、閲覧のみの帯を出す', async () => {
@@ -388,7 +388,7 @@ describe('LINEアカウントの乗り換え（V8 x2dSNv）', () => {
     expect(document.body.textContent).toContain('乗り換え（然-NEN-TEST → 然-NEN-本店）')
     expect(document.body.textContent).toContain('未判断が 1 人残っています（要確認 2 人のうち 1 人を決めた）')
     expect(document.body.textContent).not.toContain('書き換えをまだ保存していません')
-    await click(document.querySelector('[aria-label="高橋 直人の判断"]') as HTMLElement)
+    await click(document.querySelector('[aria-label="見本 16の判断"]') as HTMLElement)
     await click(buttons('新しく作る')[0])
     expect(document.body.textContent).toContain('1 件の書き換えをまだ保存していません')
     const run = buttons('本実行する（あと 1 人）')[0] as HTMLButtonElement
@@ -401,7 +401,7 @@ describe('LINEアカウントの乗り換え（V8 x2dSNv）', () => {
     role = verifiedStaffRole('staff')
     await act(async () => root.render(<AccountHandoverV8 />))
     await settle()
-    expect(document.querySelector('[aria-label="高橋 直人の判断"]')).toBeNull()
+    expect(document.querySelector('[aria-label="見本 16の判断"]')).toBeNull()
     expect(buttons('引き継ぎをやめる')).toHaveLength(0)
     expect(buttons('本実行する（あと 1 人）')).toHaveLength(0)
     expect(document.body.textContent).toContain('閲覧のみで見ています')

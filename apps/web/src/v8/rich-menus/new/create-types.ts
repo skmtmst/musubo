@@ -36,6 +36,7 @@ export type Group = {
   folderId: string | null
   defaultOpen: boolean
   version: number
+  publishingGeneration: number
   pages: Page[]
 }
 

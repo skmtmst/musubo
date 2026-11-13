@@ -60,7 +60,7 @@ describe('ログインユーザーを追加する：欄を離れたときの検�
     expect(nameField().getAttribute('aria-invalid')).toBe('true')
     // 触っていない欄は黙っている。
     expect(screen.queryByText('メールアドレスを入力してください')).toBeNull()
-    fireEvent.change(nameField(), { target: { value: '山田 花子' } })
+    fireEvent.change(nameField(), { target: { value: '見本 143' } })
     expect(screen.queryByText('名前を入力してください')).toBeNull()
   })
 
@@ -85,7 +85,7 @@ describe('ログインユーザーを追加する：欄を離れたときの検�
     expect(screen.queryByText('最初に表示するLINEアカウント')).toBeNull()
     expect(screen.queryByText('この店舗より下のアカウントにも権限を付ける')).toBeNull()
     expect(screen.getByText('担当範囲は本店のみです。')).toBeTruthy()
-    fireEvent.change(nameField(), { target: { value: '山田 花子' } })
+    fireEvent.change(nameField(), { target: { value: '見本 143' } })
     fireEvent.change(document.getElementById('staff-email')!, { target: { value: 'hanako@example.test' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '招待メールを送る' })) })
     expect(createStaff).toHaveBeenCalledWith(expect.objectContaining({

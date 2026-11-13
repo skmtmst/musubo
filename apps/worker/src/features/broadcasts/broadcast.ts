@@ -5,7 +5,7 @@ import { logger } from '@line-crm/shared/server';
 import {processBroadcastSimulation} from './broadcast-simulation.js';
 import { broadcastWideContext } from './broadcast-wide-context.js';
 import { DELIVERY_CONSENT_ALLOWED_SQL, recordSuppressedBroadcastRecipients, suppressedFriendIds, hasSuppressedDeliveryRecipients } from '@line-crm/db/src/friend-delivery-consents.js';
-import { holdMissingBroadcastAudience } from './broadcast-audience-snapshot.js';
+import { holdMissingBroadcastAudience, confirmedHqAudience, broadcastAudienceToken } from './broadcast-audience-snapshot.js';
 import { buildBroadcastAudienceQuery as buildSegmentQuery } from './broadcast-audience-query.js';
 import { buildMessage } from '../../services/line-message.js';
 import {
@@ -126,6 +126,24 @@ export async function processBroadcastSend(
     if (hasRecipientVariablesInParts(storedParts)) await assertLimitedAudienceNames(db, plan!.query);
     await freezeLimitedAudience(db, broadcast, Math.min(plan!.recipientCount, delivery?.recipientLimitCount ?? plan!.recipientCount));
     return (await getBroadcastById(db, broadcastId))!;
+  }
+
+  let fixedHqAudience: ReturnType<typeof confirmedHqAudience>;
+  try { fixedHqAudience=confirmedHqAudience(broadcast); }
+  catch { await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:1,known:0,started:true,expectedLockVersion});return (await getBroadcastById(db,broadcastId))!; }
+  if(fixedHqAudience){
+    const stored=typeof broadcast.segment_conditions==='string'?JSON.parse(broadcast.segment_conditions):null;
+    if(!stored||!Array.isArray(stored.rules))throw new BroadcastAudienceError('audience_missing');
+    await assertAnalyticsAudiencesUsable(db,stored,broadcast.line_account_id??null);
+    const known=await db.prepare('SELECT COUNT(*) n FROM broadcast_send_claims WHERE broadcast_id=?').bind(broadcast.id).first<{n:number}>();
+    if(await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:fixedHqAudience.count,known:Number(known?.n??0),started:true,expectedLockVersion}))return (await getBroadcastById(db,broadcastId))!;
+    if(hasRecipientVariablesInParts(storedParts)){
+      const missing=await db.prepare(`SELECT COUNT(*) n FROM broadcast_send_claims c JOIN friends f ON f.id=c.friend_id
+        WHERE c.broadcast_id=? AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND (${DELIVERY_CONSENT_ALLOWED_SQL}) AND (f.display_name IS NULL OR trim(f.display_name)='')`).bind(broadcast.id).first<{n:number}>();
+      if(Number(missing?.n??0)>0)throw new Error('Cannot personalize broadcast: recipient has no display name');
+    }
+    await db.prepare("UPDATE broadcasts SET status='sending',batch_offset=0 WHERE id=?").bind(broadcast.id).run();
+    return (await getBroadcastById(db,broadcastId))!;
   }
 
   // LINE broadcast は一部の友だちを除外できないため、同意条件がある場合は all 設定を保ったまま、再開可能な宛先台帳の経路へ切り替える。
@@ -1004,8 +1022,8 @@ async function processQueuedBroadcastBatches(
   if (!broadcast.message_bubbles_json && batchOffset === 0 && !isDedupContinuation) {
     const tracked = finalParts[0];
     if (tracked.messageType !== broadcast.message_type || tracked.messageContent !== broadcast.message_content) {
-      await db.prepare('UPDATE broadcasts SET message_type = ?, message_content = ? WHERE id = ?')
-        .bind(tracked.messageType, tracked.messageContent, broadcast.id).run();
+      await db.prepare('UPDATE broadcasts SET message_type = ?, message_content = ? WHERE id = ? AND lock_version=? AND batch_offset=-1 AND stopped_at IS NULL')
+        .bind(tracked.messageType, tracked.messageContent, broadcast.id,lockVersion).run();
     }
   }
 
@@ -1053,12 +1071,15 @@ async function processQueuedBroadcastBatches(
   // 宛先は最初の送信前に、既存の台帳へ一括で固定する。
   // 再開・失敗分再送で条件を評価し直さない。offset は表示用だけ。
   const accountId = raw.line_account_id as string | null;
+  let fixedHqAudience: ReturnType<typeof confirmedHqAudience>;
+  try { fixedHqAudience=confirmedHqAudience(broadcast); }
+  catch { await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:1,known:0,started:true,expectedLockVersion:lockVersion,requireBatchLock:true});return; }
   const hasAudience = await db.prepare('SELECT 1 FROM broadcast_send_claims WHERE broadcast_id = ? LIMIT 1')
     .bind(broadcast.id).first();
   const previousAudience = await db.prepare('SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id=?')
     .bind(broadcast.id).first<{n:number}>();
   if (await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:Number(raw.total_count ?? 0),
-    known:Number(previousAudience?.n ?? 0),started:!!hasAudience || Number(raw.success_count ?? 0)>0 || batchOffset>0 || Number(raw.send_attempt_no ?? 1)>1})) return;
+    known:Number(previousAudience?.n ?? 0),started:!!fixedHqAudience || !!hasAudience || Number(raw.success_count ?? 0)>0 || batchOffset>0 || Number(raw.send_attempt_no ?? 1)>1,expectedLockVersion:lockVersion,requireBatchLock:true})) return;
   if (!hasAudience && storedDeliveryLimit(broadcast)) {
     await holdLimitedBroadcast(db, broadcast, '固定した宛先を確認できません。選び直さず送信を止めました。');
     return;
@@ -1106,25 +1127,29 @@ async function processQueuedBroadcastBatches(
       AND EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND lock_version=? AND batch_offset=-1 AND stopped_at IS NULL)`).bind(broadcast.id,broadcast.id,lockVersion).run();
   // 固定済みの宛先も、現在の所属・表示状態だけは送信直前に確認する。元の条件は再評価しない。
   const currentRecipients = await scopeStoredBroadcastSegmentQuery(db, {
-    sql: 'SELECT f.id, f.line_user_id, f.display_name FROM friends f WHERE f.is_following = 1 AND COALESCE(f.is_hidden,0)=0',
+    sql: `SELECT f.id, f.line_user_id, f.display_name FROM friends f WHERE f.is_following = 1 AND COALESCE(f.is_hidden,0)=0${fixedHqAudience ? ` AND (${DELIVERY_CONSENT_ALLOWED_SQL})` : ''}`,
     bindings: [],
   }, accountId);
-  await db.prepare(`UPDATE broadcast_send_claims SET state='failed',error_code='recipient_unavailable'
+  const unavailable=await db.prepare(`UPDATE broadcast_send_claims SET state='failed',error_code='recipient_unavailable'
     WHERE broadcast_id=? AND (
       (state='claimed' AND dispatched_at IS NULL)
       OR (state='failed' AND error_code IN ('line_http_429','stopped_before_dispatch') AND attempt_no=?))
       AND NOT EXISTS (SELECT 1 FROM (${currentRecipients.sql}) f WHERE f.id=friend_id)
       AND EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND lock_version=? AND batch_offset=-1 AND stopped_at IS NULL)`)
     .bind(broadcast.id,Number(raw.send_attempt_no ?? 1),...currentRecipients.bindings,broadcast.id,lockVersion).run();
-  const pending = await db.prepare(`SELECT f.id,f.line_user_id,f.display_name
+  if(fixedHqAudience&&Number(unavailable.meta?.changes??0)>0){await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:fixedHqAudience.count,known:0,started:true,expectedLockVersion:lockVersion,requireBatchLock:true});return;}
+  const pending = await db.prepare(`SELECT f.id,f.line_user_id,f.display_name,c.state,c.attempt_no,c.dispatched_at,c.error_code
     FROM broadcast_send_claims c JOIN (${currentRecipients.sql}) f ON f.id=c.friend_id
-    WHERE c.broadcast_id=? AND (
+    WHERE c.broadcast_id=? ${fixedHqAudience?'':`AND (
       (c.state='claimed' AND c.dispatched_at IS NULL)
-      OR (c.state='failed' AND c.error_code IN ('line_http_429','stopped_before_dispatch') AND c.attempt_no=?))
-    ORDER BY c.friend_id`).bind(...currentRecipients.bindings,broadcast.id,Number(raw.send_attempt_no ?? 1)).all<{
-      id:string; line_user_id:string; display_name:string|null;
+      OR (c.state='failed' AND c.error_code IN ('line_http_429','stopped_before_dispatch') AND c.attempt_no=?))`}
+    ORDER BY c.friend_id`).bind(...currentRecipients.bindings,broadcast.id,...(fixedHqAudience?[]:[Number(raw.send_attempt_no ?? 1)])).all<{
+      id:string; line_user_id:string; display_name:string|null;state:string;attempt_no:number;dispatched_at:string|null;error_code:string|null;
     }>();
-  const friends = pending.results;
+  if(fixedHqAudience&&(!accountId||pending.results.length!==fixedHqAudience.count||await broadcastAudienceToken(accountId,pending.results)!==fixedHqAudience.recipientToken)){
+    await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:fixedHqAudience.count,known:0,started:true,expectedLockVersion:lockVersion,requireBatchLock:true});return;
+  }
+  const friends = fixedHqAudience?pending.results.filter(row=>(row.state==='claimed'&&row.dispatched_at===null)||(row.state==='failed'&&['line_http_429','stopped_before_dispatch'].includes(row.error_code??'')&&row.attempt_no===Number(raw.send_attempt_no??1))):pending.results;
   const audienceCount = await db.prepare('SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id=?')
     .bind(broadcast.id).first<{n:number}>();
   const progressBase = Number(audienceCount?.n ?? 0) - friends.length;
@@ -1243,8 +1268,9 @@ async function processQueuedBroadcastBatches(
             lineAccountId: accountId,
             friendIds: [friend.id],
             expectedLockVersion: lockVersion,
+            expectedRecipients: fixedHqAudience ? [{id:friend.id,lineUserId:friend.line_user_id}] : undefined,
           });
-          if(dispatched.length!==1){await releaseProgress(progressBase+currentOffset);return;}
+          if(dispatched.length!==1){if(fixedHqAudience)await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:fixedHqAudience.count,known:0,started:true,expectedLockVersion:lockVersion,requireBatchLock:true});else await releaseProgress(progressBase+currentOffset);return;}
           const { requestId: pushRequestId } = await lineClient.pushMessageWithRequestId(friend.line_user_id, personalizedMessages, retryKey, aggregationUnits(unit));
 
           await db.batch([
@@ -1358,7 +1384,9 @@ async function processQueuedBroadcastBatches(
       lineAccountId: accountId,
       friendIds: sendableIds,
       expectedLockVersion: lockVersion,
+      expectedRecipients: fixedHqAudience ? sendable.map(friend=>({id:friend.id,lineUserId:friend.line_user_id})) : undefined,
     });
+    if(dispatched.length!==sendableIds.length && fixedHqAudience){await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:fixedHqAudience.count,known:0,started:true,expectedLockVersion:lockVersion,requireBatchLock:true});return;}
     if(!dispatched.length){await releaseProgress(progressBase+currentOffset);return;}
     const dispatchedSet=new Set(dispatched);
     sendable=sendable.filter(friend=>dispatchedSet.has(friend.id));
@@ -1450,7 +1478,7 @@ async function processQueuedBroadcastBatches(
   await updateBroadcastLineRequestId(db, broadcast.id, null, unit);
   if (storedDeliveryLimit(broadcast) && broadcast.line_account_id) {
     const { releaseQuotaSlot } = await import('./broadcast-quota-guard.js');
-    await releaseQuotaSlot(db,broadcast.line_account_id,broadcast.id);
+    await releaseQuotaSlot(db,broadcast.line_account_id,broadcast.id,{ expectedLockVersion: lockVersion });
   }
   await createBroadcastInsight(db, broadcast.id);
   const finished=await db.prepare(`UPDATE broadcasts SET status='sent',sent_at=?,batch_lock_at=NULL,batch_offset=?

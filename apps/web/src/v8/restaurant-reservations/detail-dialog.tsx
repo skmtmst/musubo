@@ -92,8 +92,8 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const [history, setHistory] = useState<History>({ state: 'loading' })
   const id = reservation?.id ?? ''
   const storeId = reservation?.store_id ?? ''
-  const confirmationScope = useRef({ accountId, id, storeId, canWrite, status: reservation?.status })
-  if (confirmationScope.current.accountId !== accountId || confirmationScope.current.id !== id || confirmationScope.current.storeId !== storeId || confirmationScope.current.canWrite !== canWrite || confirmationScope.current.status !== reservation?.status) { confirmationScope.current = { accountId, id, storeId, canWrite, status: reservation?.status }; noShowTicket.current = null }
+  const confirmationScope = useRef({ accountId, id, storeId, canWrite, status: reservation?.status, operationScope })
+  if (confirmationScope.current.accountId !== accountId || confirmationScope.current.id !== id || confirmationScope.current.storeId !== storeId || confirmationScope.current.canWrite !== canWrite || confirmationScope.current.status !== reservation?.status || confirmationScope.current.operationScope !== operationScope) { confirmationScope.current = { accountId, id, storeId, canWrite, status: reservation?.status, operationScope }; noShowTicket.current = null }
   const renderedScope = confirmationScope.current
   const phone = reservation?.customer_phone ?? ''
   const lineUid = reservation?.line_uid ?? ''
@@ -102,25 +102,34 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   if (currentScope.current.id !== id || currentScope.current.accountId !== accountId || currentScope.current.storeId !== storeId || currentScope.current.operationScope !== operationScope) currentScope.current = { id, accountId, storeId, operationScope }
   const scope = currentScope.current
   const [failure, setFailure] = useState<{ scope: object; error: unknown } | null>(null)
+  const [unread, setUnread] = useState<{ scope: object; version: number } | null>(null)
+  const [stampNotice, setStampNotice] = useState<{ scope: object; message: string } | null>(null)
+  const waitingForReload = unread?.scope === scope && unread.version === (reservation?.customer_version ?? 1)
   const attempt = useRef(0)
   const working = useRef(false)
   const active = useRef(true)
   useEffect(() => { active.current = true; return () => { active.current = false } }, [])
   const performAttendance = async (action: 'visited' | 'depart' | 'undo_departure' | 'undo_visit' | 'no_show') => {
-    if (!onAttendance || !canWrite || busy || working.current || !active.current || currentScope.current !== scope) return
+    if (!onAttendance || !canWrite || busy || waitingForReload || working.current || !active.current || currentScope.current !== scope) return
     const sequence = ++attempt.current
     const current = () => active.current && currentScope.current === scope && attempt.current === sequence
     working.current = true
     setFailure(null)
+    setStampNotice(null)
     try {
       const result = await onAttendance(id, action)
       if (current() && result && typeof result === 'object' && 'error' in result) setFailure({ scope, error: result.error })
+      if (current() && result && typeof result === 'object' && 'savedButUnread' in result && result.savedButUnread === true) setUnread({ scope, version: reservation?.customer_version ?? 1 })
+      if (current() && result && typeof result === 'object' && 'stampNotice' in result && typeof result.stampNotice === 'string') setStampNotice({ scope, message: result.stampNotice })
     } catch (error) {
       if (current()) setFailure({ scope, error })
     } finally { working.current = false }
   }
   const conflict = failure?.scope === scope && failure.error instanceof ApiError && failure.error.status === 409
   const failureNotice = failure?.scope === scope ? <Notice tone="danger" role="alert" message={conflict ? 'ほかの操作で予約が変わりました。読み直してから、もう一度選んでください。' : describeApiFailure(failure.error, '来店・退店の記録')} action={onReload ? <Button type="button" variant="secondary" size="compact" onClick={onReload}>読み直す</Button> : undefined} /> : null
+  const unreadNotice = waitingForReload ? <Notice tone="warn" role="alert" message="保存しましたが、最新の予約を読み込めませんでした。読み直してから続けてください。" action={onReload ? <Button type="button" variant="secondary" size="compact" onClick={onReload}>読み直す</Button> : undefined} /> : null
+  const stampStatus = stampNotice?.scope === scope ? <Notice tone="info" role="status" message={stampNotice.message} /> : null
+  const workingStatus = busy ? <Notice tone="info" role="status" message="予約を反映しています。完了するまでお待ちください。" /> : null
 
   /* これまでの来店（来店済みの数と前回）。連絡先が無い予約は数えない。遅い応答は捨てる。 */
   useEffect(() => {
@@ -156,11 +165,11 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const quickAttendance=attendanceItems.filter((item)=>item.id==='visit'||item.id==='depart'||item.id==='no-show')
   const undoAttendance=attendanceItems.filter((item)=>item.id==='undo-depart'||item.id==='undo-visit')
   const noShowReason = reservation.status === 'pending' ? '承認してから無断にしてください。' : undefined
-  const buttonFor = (item: typeof attendanceItems[number]) => <Button key={item.id} type="button" disabled={busy || !canWrite} lockedReason={permissionReason ?? (item.id === 'no-show' ? noShowReason : undefined)} onClick={item.onSelect}>{item.label}</Button>
+  const buttonFor = (item: typeof attendanceItems[number]) => <Button key={item.id} type="button" disabled={busy || waitingForReload || !canWrite} lockedReason={permissionReason ?? (item.id === 'no-show' ? noShowReason : undefined)} onClick={item.onSelect}>{item.label}</Button>
   const quickButton = quickAttendance.find(item => item.id === 'visit' || item.id === 'depart')
   const modalMenu = [
-    ...attendanceItems.filter(item => item !== quickButton).map(item => ({ ...item, lockedReason: permissionReason ?? (item.id === 'no-show' ? noShowReason : undefined), disabled: busy || !canWrite, ...(item.id === 'no-show' ? { tone: 'danger' as const } : {}) })),
-    ...(inactive ? [] : [{ id: 'cancel-reservation', label: '取り消す', tone: 'danger' as const, disabled: busy || !canWrite, lockedReason: permissionReason, onSelect: () => { if (canWrite) onCancel(reservation.id) } }]),
+    ...attendanceItems.filter(item => item !== quickButton).map(item => ({ ...item, lockedReason: permissionReason ?? (item.id === 'no-show' ? noShowReason : undefined), disabled: busy || waitingForReload || !canWrite, ...(item.id === 'no-show' ? { tone: 'danger' as const } : {}) })),
+    ...(inactive ? [] : [{ id: 'cancel-reservation', label: '取り消す', tone: 'danger' as const, disabled: busy || waitingForReload || !canWrite, lockedReason: permissionReason, onSelect: () => { if (canWrite) onCancel(reservation.id) } }]),
   ]
   const dining=<ReservationDining title="お客さまの食事情報" entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)} />
   const confirmation = <ConfirmDialog open={canWrite && reservation.status === 'confirmed' && confirmNoShow?.id === reservation.id && confirmNoShow.scope === renderedScope && confirmNoShow.ticket === noShowTicket.current} title="無断にしますか？" description={`${withHonorific(reservation.customer_name)}・${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}。卓が空いていれば予約を有効に戻せます。送信済みの連絡は取り消せません。`} destructive titleIcon={<TriangleAlert size={20} />} confirmIcon={<UserRoundX size={16} />} confirmVariant="danger" confirmLabel="無断にする" onConfirm={() => { if (renderedScope !== confirmationScope.current || !confirmNoShow || confirmNoShow.ticket !== noShowTicket.current) return; noShowTicket.current = null; if (canWrite && reservation.status === 'confirmed') void performAttendance('no_show'); setConfirmNoShow(null) }} onCancel={() => { if (renderedScope === confirmationScope.current && confirmNoShow?.ticket === noShowTicket.current) { noShowTicket.current = null; setConfirmNoShow(null) } }}><OperationTargetSummary accounts={[{ id: accountId }]} store={{ id: reservation.store_id, name: reservation.store_name }} /></ConfirmDialog>
@@ -170,9 +179,8 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
     actions={{
       primary: quickAttendance[0] ? buttonFor(quickAttendance[0]) : null,
       secondary: quickAttendance[1] ? buttonFor(quickAttendance[1]) : null,
-      menuItems: [...undoAttendance.map(item => ({...item, allowed: canWrite})), {id: 'edit-reservation', label: '内容を変える', allowed: canWrite, disabled: busy, onSelect: () => { if (canWrite) onEdit(reservation.id) }}, ...(!inactive ? [{id: 'change-table', label: '卓を変える', allowed: canWrite, disabled: busy, onSelect: () => { if (canWrite) onEdit(reservation.id) }}] : []), {id: 'cancel-reservation', label: inactive ? '予約を有効に戻す' : '取り消す', tone: inactive ? 'default' : 'danger', allowed: canWrite, disabled: busy, onSelect: () => { if (!canWrite) return; if (inactive) onRestore(reservation.id); else onCancel(reservation.id) }}],
+      menuItems: [...undoAttendance.map(item => ({...item, allowed: canWrite})), {id: 'edit-reservation', label: '内容を変える', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (canWrite) onEdit(reservation.id) }}, ...(!inactive ? [{id: 'change-table', label: '卓を変える', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (canWrite) onEdit(reservation.id) }}] : []), {id: 'cancel-reservation', label: inactive ? '予約を有効に戻す' : '取り消す', tone: inactive ? 'default' : 'danger', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (!canWrite) return; if (inactive) onRestore(reservation.id); else onCancel(reservation.id) }}],
     }}>
-    {failureNotice}
     <DetailField label="状態">{currentStatus}</DetailField>
     <DetailField label="お客さま">{withHonorific(reservation.customer_name, 'さま', { space: true })}</DetailField>
     <DetailField label="予約元"><ReservationSource value={reservation.source} note={reservation.note} /></DetailField>
@@ -180,6 +188,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
     <DetailField label="電話">{maskPhone(reservation.customer_phone) || '電話未登録'}</DetailField>
     <ReservationDining dense presentation="detail" title="お客さまの食事情報" entry={seatBoardEntry(reservation as unknown as Record<string, unknown>)} />
     <DetailField label="来店"><span title={historyText(history)}>{history.state === 'ready' ? `${polishFormatNumber(history.count)}回` : '—'}</span></DetailField>
+    {failureNotice}{unreadNotice}{stampStatus}{workingStatus}
   </DetailPreview>{confirmation}</>
 
   return (
@@ -196,16 +205,15 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
           {modalMenu.length ? <RowActions subjectName={reservation.customer_name} menuItems={modalMenu} /> : null}
           {quickButton ? buttonFor(quickButton) : null}
           {inactive ? (
-            <Button type="button" variant="primary" disabled={busy || !canWrite} lockedReason={permissionReason} onClick={() => { if (canWrite) onRestore(reservation.id) }}>予約を有効に戻す</Button>
+            <Button type="button" variant="primary" disabled={busy || waitingForReload || !canWrite} lockedReason={permissionReason} onClick={() => { if (canWrite) onRestore(reservation.id) }}>予約を有効に戻す</Button>
           ) : (
-            <Button type="button" variant="primary" disabled={busy || !canWrite} lockedReason={permissionReason} onClick={() => { if (canWrite) onEdit(reservation.id) }}>
+            <Button type="button" variant="primary" disabled={busy || waitingForReload || !canWrite} lockedReason={permissionReason} onClick={() => { if (canWrite) onEdit(reservation.id) }}>
               <Pencil size={16} aria-hidden="true" />内容を変える
             </Button>
           )}
         </>
       )}
     >
-      {failureNotice}
       <DetailField label="状態">{currentStatus}</DetailField>
       {dining}
       <div className={styles.facts}>
@@ -216,6 +224,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
         <p className={styles.fact}>{historyText(history)}</p>
         {inactive ? <p className={styles.fact}>{reservation.status === 'no_show' ? '無断で来なかった予約です' : '取り消した予約です'}</p> : null}
       </div>
+      {failureNotice}{unreadNotice}{stampStatus}{workingStatus}
     </RsDialog>{confirmation}</>
   )
 }

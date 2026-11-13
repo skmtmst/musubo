@@ -20,7 +20,7 @@ const { opsAnnouncements } = await import('./ops-announcements.js');
 
 let testDb: SqliteD1;
 
-const master: AuthenticatedStaff = { id: 'master-1', name: '坂本 真人', role: 'owner', readOnly: false, tenantId: null };
+const master: AuthenticatedStaff = { id: 'master-1', name: '見本 25', role: 'owner', readOnly: false, tenantId: null };
 
 function app() {
   const instance = new Hono<any>();
@@ -64,7 +64,7 @@ function announcementCount(): number {
 
 beforeEach(() => {
   testDb = createTestD1();
-  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES ('master-1', '坂本 真人', 'owner', 'k0', NULL)`).run();
+  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES ('master-1', '見本 25', 'owner', 'k0', NULL)`).run();
   testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active) VALUES ('master-1', 1)`).run();
   mail.send.mockReset();
 });

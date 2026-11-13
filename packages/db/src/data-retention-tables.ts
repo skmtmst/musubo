@@ -62,6 +62,7 @@ export function purgeTablesChildFirst(): string[] {
     // 第2弾の参照を残したまま親の組・申込を先に消さない。
     if (name === 'bookings') return ['booking_series','booking_groups'];
     if (name === 'hq_store_comparison_export_jobs') return ['staff_members'];
+    if (name === 'line_account_hq_admin_memberships') return ['line_accounts', 'staff_members'];
     if (name === 'member_rank_notices') return ['member_rank_tiers','friends'];
     if (name === 'ec_auto_line_attribution_events') return ['ec_auto_line_sends','friends'];
     if (name === 'booking_entitlement_notices') return ['booking_pass_plans','booking_entitlements','friends'];

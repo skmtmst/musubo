@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import HelpTip from './help-tip'
+import Dialog from './dialog'
 
 const DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -169,11 +170,11 @@ it('乗せた・焦点で出た説明は初回クリック後も残り、次の�
   fireEvent.click(button)
   expect(view.getByRole('note')).toBeTruthy()
   fireEvent.pointerLeave(button.parentElement!, { pointerType: 'mouse' })
-  expect(view.queryByRole('note')).toBeNull()
-  fireEvent.mouseEnter(button.parentElement!)
-  fireEvent.click(button)
   expect(view.getByRole('note')).toBeTruthy()
   fireEvent.click(button)
+  expect(view.queryByRole('note')).toBeNull()
+  fireEvent.mouseEnter(button.parentElement!)
+  fireEvent.pointerLeave(button.parentElement!, { pointerType: 'mouse' })
   expect(view.queryByRole('note')).toBeNull()
 })
 
@@ -208,6 +209,30 @@ it('touchの離脱では操作表示を閉じず、次の操作で閉じる', ()
   fireEvent.click(button)
   expect(view.queryByRole('note')).toBeNull()
   expect(button.getAttribute('aria-expanded')).toBe('false')
+})
+
+it('押して開いた補足は焦点が外れても残り、外を押すと閉じる', () => {
+  const view = render(<><HelpTip hover label="担当の説明">受付1人ずつ</HelpTip><button>外側</button></>)
+  const trigger = view.getByRole('button', { name: '担当の説明' })
+  act(() => trigger.focus())
+  fireEvent.click(trigger)
+  const outside = view.getByRole('button', { name: '外側' })
+  act(() => outside.focus())
+  expect(view.getByRole('note')).toBeTruthy()
+  fireEvent.pointerDown(outside)
+  expect(view.queryByRole('note')).toBeNull()
+})
+
+it('窓内の補足をEscで閉じる時、親の窓は閉じない', () => {
+  const onClose = vi.fn()
+  const view = render(<Dialog open title="設定" onCancel={onClose}><HelpTip label="人数の説明">送る相手の数。</HelpTip></Dialog>)
+  fireEvent.click(view.getByRole('button', { name: '人数の説明' }))
+  expect(view.getByRole('note')).toBeTruthy()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(view.queryByRole('note')).toBeNull()
+  expect(onClose).not.toHaveBeenCalled()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(onClose).toHaveBeenCalledOnce()
 })
 
 it('説明が本文を覆わないよう、開いた間だけ実寸の余白を確保する', () => {

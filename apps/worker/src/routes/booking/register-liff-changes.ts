@@ -108,7 +108,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
     const claimId = crypto.randomUUID();
     const claim = await c.env.DB
       .prepare(
-        `UPDATE bookings SET decided_at = COALESCE(decided_at, ?), cancel_claim_id = ?,
+        `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, decided_at = COALESCE(decided_at, ?), cancel_claim_id = ?,
                               updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
           WHERE id = ? AND line_account_id = ?
             AND status IN ('cancelled','expired')
@@ -173,7 +173,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
   const claimId = crypto.randomUUID();
   const updateResult = await c.env.DB
     .prepare(
-      `UPDATE bookings SET status = 'cancelled', decided_at = ?, cancel_claim_id = ?,
+      `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = 'cancelled', decided_at = ?, cancel_claim_id = ?,
                             updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
         WHERE id = ? AND line_account_id = ?
           AND lock_version = ? AND status IN ('requested','confirmed')`,
@@ -204,17 +204,17 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
       // 送信中の 409 では確定を取り消して再試行させる (取消確定後の送信を起こさない)。
       // 自分の claim_id と一致するときだけ戻す。後発の再送が主張を上書き
       // ずみなら 0 件になり、後発の成功予約は cancelled のまま残る。
-      await c.env.DB
-        .prepare(
-          `UPDATE bookings SET status = ?, decided_at = ?, cancel_claim_id = NULL,
+      await c.env.DB.batch([
+        c.env.DB.prepare(
+          `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = ?, decided_at = ?, cancel_claim_id = NULL,
                                 updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
             WHERE id = ? AND line_account_id = ? AND status = ?
               AND decided_at = ? AND lock_version = ? AND friend_id = ?
               AND cancel_claim_id = ?`,
-        )
-        .bind(row.status, row.decided_at, bookingId, accountId, 'cancelled',
-          decidedAt, expectedVersion, caller.friendId, claimId)
-        .run();
+        ).bind(row.status, row.decided_at, bookingId, accountId, 'cancelled',
+          decidedAt, expectedVersion, caller.friendId, claimId),
+        c.env.DB.prepare(`UPDATE booking_groups SET version=version+1 WHERE id=(SELECT group_id FROM bookings WHERE id=? AND line_account_id=?) AND line_account_id=? AND changes()=1`).bind(bookingId, accountId, accountId),
+      ]);
       return liffBookingJson(c, { error: 'send_in_flight_retry' }, 409);
     }
     throw error;

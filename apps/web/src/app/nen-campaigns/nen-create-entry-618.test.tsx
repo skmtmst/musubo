@@ -256,7 +256,6 @@ describe('NEN新規作成入口（#618）', () => {
     // 日時の選択箱は最上層（MenuPortal→document.body）に出る。器の中にはいない。
     const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')
     if (!picker) throw new Error('日時の選択箱が開きません')
-    await click(picker.querySelector('button[aria-label="日付"]') as HTMLElement)
     for (let i = 0; i < 12; i += 1) {
       const grid = document.querySelector('[role="grid"]')
       if (grid?.getAttribute('aria-label') === `${future.y}年${future.mo}月`) break
@@ -269,7 +268,6 @@ describe('NEN新規作成入口（#618）', () => {
     )
     if (!day) throw new Error('未来の日が見つかりません')
     await click(day as HTMLElement)
-    await click(Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!)
     // 時刻は文字を入れ、blurで確定する。
     await act(async () => {
       const time = picker.querySelector<HTMLInputElement>('input[type="text"]')!
@@ -279,6 +277,7 @@ describe('NEN新規作成入口（#618）', () => {
       time.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
     })
     await settle()
+    await click(Array.from(picker.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!)
 
     const save = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === '下書きを保存')
     if (!save) throw new Error('下書きに保存ボタンが見つかりません')

@@ -73,7 +73,7 @@ type RunItem = FriendAddRunList['items'][number]
 function run(overrides: Partial<RunItem> = {}): RunItem {
   return {
     id: 'run-ok', receivedAt: '2026-09-07T01:32:00.000Z', processedAt: '2026-09-07T01:32:00.800Z',
-    friend: { id: 'friend-1', displayName: '山田 太郎', redacted: false }, friendKind: 'first_time',
+    friend: { id: 'friend-1', displayName: '見本 141', redacted: false }, friendKind: 'first_time',
     attribution: { status: 'captured', routeId: 'route-shop', routeName: '店頭QR', reason: null },
     rule: { id: 'rule-shop', name: '店頭QRの初回案内', versionId: 'v1', versionNumber: 1 },
     scenario: null,
@@ -173,7 +173,7 @@ describe('実行結果の読み込みと行き先', () => {
     expect(params.get('attribution')).toBe('captured')
     expect(params.get('rule_id')).toBe('rule-shop')
     expect(params.get('cursor')).toBe('c1')
-    const detail = new URL(linkByText('山田 太郎')!.getAttribute('href')!, 'http://localhost')
+    const detail = new URL(linkByText('見本 141')!.getAttribute('href')!, 'http://localhost')
     expect(detail.pathname).toBe('/friend-add-settings/runs/detail')
     expect(Object.fromEntries(detail.searchParams)).toEqual({
       id: 'run-ok', kind: 'returning', attribution: 'captured', status: 'failed', rule_id: 'rule-shop', pages: 'c1',
@@ -257,7 +257,7 @@ describe('実行結果の数と状態', () => {
       items: [run({ status: 'partial_failed', errorCode: 'delivery_unknown', deliveryCount: 0 })], total: 1, nextCursor: null, summary: SUMMARY,
     } })
     await render()
-    const row = linkByText('山田 太郎')!.closest('tr')!
+    const row = linkByText('見本 141')!.closest('tr')!
     expect(row.textContent).toContain('送達不明')
     expect(row.textContent).not.toContain('再送待ち')
     expect(row.textContent).toContain('自動では送り直しません')

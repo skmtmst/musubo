@@ -1,5 +1,7 @@
 'use client'
 
+import { isConflictResponse } from '@/components/shared/save-conflict'
+
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { notifyToast } from '@/components/shared/toast'
@@ -32,15 +34,14 @@ export function toggleAutoReply({ listContextKey, isCurrent = () => true, load, 
       setToggleError('アカウントが切り替わりました。操作する自動応答を選び直してください。')
       return
     }
+    if (target.kind === 'stop' && target.ids.some(id => !Number.isSafeInteger(target.versions?.[id]) || (target.versions?.[id] ?? 0) < 1)) {
+      setToggleError('確認する内容を読み直してください。'); void load(); return
+    }
     const requestAccountId = target.accountId
     const ids = target.ids
     const kind = target.kind
     const reason = toggleReason.trim() === '' ? null : toggleReason.trim()
     const key = listContextKey
-    // 逆操作のために、変える前の止めた理由を覚えておく。
-    const beforeStopReason = new Map(
-      rules.filter((r) => ids.includes(r.id)).map((r) => [r.id, r.stopReason ?? null] as const),
-    )
     const applyOptimistic = (active: boolean, stopReasonOf: (id: string) => string | null) => {
       setOptimisticRows({
         key,
@@ -74,6 +75,7 @@ export function toggleAutoReply({ listContextKey, isCurrent = () => true, load, 
       void (async () => {
         let failed = 0
         let forbidden = false
+        let changed = false
         for (const id of ids) {
           if (!isCurrent()) return
           if (!canEditAutoReplyListNow() || selectedAccountIdRef.current !== requestAccountId) {
@@ -84,7 +86,7 @@ export function toggleAutoReply({ listContextKey, isCurrent = () => true, load, 
           try {
             if (!requestKeys.has(id)) requestKeys.set(id, crypto.randomUUID())
             const result = targetKind === 'stop'
-              ? await api.autoReplies.stop(id, { reason: targetReasonOf(id) }, requestKeys.get(id)!)
+              ? await api.autoReplies.stop(id, { reason: targetReasonOf(id), expectedVersion: target.versions![id] }, requestKeys.get(id)!)
               : await api.autoReplies.update(id, { isActive: true })
             if (!isCurrent()) return
             if (!result.success) failed += 1
@@ -93,12 +95,14 @@ export function toggleAutoReply({ listContextKey, isCurrent = () => true, load, 
             saveErrors.capture(error);
 
             if (error instanceof ApiError && error.status === 403) forbidden = true
+            if (isConflictResponse(error) && error.code === 'auto_reply_confirmation_conflict') changed = true
             failed += 1
           }
         }
         if (failed > 0) {
           setOptimisticRows(null)
           reloadIfSameAccount()
+          if (changed) { notifyToast(target.ids.length === 1 ? '内容が変わった自動応答は停止していません。一覧を読み直して確認してください。' : '内容が変わった自動応答は停止していません。ほかの対象は停止した可能性があります。一覧を読み直して確認してください。', {tone:'error'}); return }
           notifyToast(failedMessage(targetKind, forbidden), {
             tone: 'error',
             actionLabel: 'もう一度',

@@ -30,6 +30,7 @@ export interface AutoReply {
   templateId: string | null
   lineAccountId: string | null
   isActive: boolean
+  confirmationRevision: number
   activeFrom: string | null
   activeUntil: string | null
   cooldownMinutes: number | null
@@ -85,6 +86,7 @@ export interface PendingToggle {
   generation?: number
   allAccounts?: boolean
   targetAccountIds?: string[]
+  versions?: Record<string, number>
 }
 
 /**

@@ -29,8 +29,8 @@ const compiled = await build({
 
     function Fixture(){const [value,setValue]=useState('one');
       if(window.comparisonFixture)return <main id="comparison-fixture"><DataTable><colgroup><col className={compareStyles.colItem}/><col/><col/><col className={compareStyles.colUse}/></colgroup><thead><TableHeadRow presentation="embedded">{['項目','候補A','候補B','使う値'].map(label=><Th key={label}>{label}</Th>)}</TableHeadRow></thead><tbody>{[
-        ['LINE表示名','田中 はなこ','田中 花子','画面確認アカウント・田中 はなこ：田中 はなこ'],
-        ['メール','ta***@example.jp','ta***@example.jp','画面確認アカウント・田中 はなこ：ta***@example.jp'],
+        ['LINE表示名','見本 161','見本 171','画面確認アカウント・見本 161：見本 161'],
+        ['メール','ta***@example.com','ta***@example.com','画面確認アカウント・見本 161：ta***@example.com'],
         ['ステータスメッセージ','予約受付中','受付中','A：予約受付中'],
         ['last_purchase_date','2026-10-01','2026-10-02','A：2026-10-01'],
         ['a'.repeat(100),'登録済み','登録なし','A：登録済み'],

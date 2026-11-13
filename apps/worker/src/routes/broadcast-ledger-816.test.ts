@@ -390,7 +390,7 @@ describe('操作の記録（#816）', () => {
       VALUES ('account-1', 'channel-1', '店舗1', 'token-1', 'secret-1', 1, 'tenant-1')
     `).run();
     testDb.raw.prepare(
-      `INSERT INTO staff_members (id, name, email, role, api_key) VALUES ('owner-1', '川野健太', 'owner@example.com', 'owner', 'key-1')`,
+      `INSERT INTO staff_members (id, name, email, role, api_key) VALUES ('owner-1', '見本太郎', 'owner@example.com', 'owner', 'key-1')`,
     ).run();
     for (const id of ['f1', 'f2']) insertFriend(testDb.raw, id, { line_account_id: 'account-1' });
   });
@@ -408,7 +408,7 @@ describe('操作の記録（#816）', () => {
       data: Array<{ kind: string; action: string; label: string; actorName: string }>;
     };
     expect(body.data).toHaveLength(1);
-    expect(body.data[0]).toMatchObject({ kind: 'lifecycle', action: 'stopped', label: '送信を止めた', actorName: '川野健太' });
+    expect(body.data[0]).toMatchObject({ kind: 'lifecycle', action: 'stopped', label: '送信を止めた', actorName: '見本太郎' });
   });
 
   it('承認の記録と混ぜて返す', async () => {
@@ -424,7 +424,7 @@ describe('操作の記録（#816）', () => {
     const res = await app(testDb.db).request('/api/broadcasts/b1/activity');
     const body = await res.json() as { data: Array<{ label: string; actorName: string }> };
     expect(body.data.map((entry) => entry.label)).toEqual(['送信を始めた', '承認を依頼した']);
-    expect(body.data[0].actorName).toBe('川野健太');
+    expect(body.data[0].actorName).toBe('見本太郎');
   });
 
   it('担当者のいない自動の記録は「自動」と出す', async () => {

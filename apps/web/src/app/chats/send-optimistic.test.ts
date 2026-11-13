@@ -73,14 +73,14 @@ describe('送った文面の楽観表示', () => {
     const message = buildOutgoingMessage({
       messageType: 'text',
       content: 'こんにちは',
-      sentByStaffName: '河野',
+      sentByStaffName: '見本',
       sentAt: '2026-09-08T10:00:00.000Z',
     })
     expect(message).toMatchObject({
       direction: 'outgoing',
       messageType: 'text',
       content: 'こんにちは',
-      sentByStaffName: '河野',
+      sentByStaffName: '見本',
       createdAt: '2026-09-08T10:00:00.000Z',
     })
     expect(message).not.toHaveProperty('senderType')
@@ -90,10 +90,10 @@ describe('送った文面の楽観表示', () => {
 
   it('作るたびに別の仮IDを振る', () => {
     const first = buildOutgoingMessage({
-      messageType: 'text', content: 'a', sentByStaffName: '河野', sentAt: '2026-09-08T10:00:00.000Z',
+      messageType: 'text', content: 'a', sentByStaffName: '見本', sentAt: '2026-09-08T10:00:00.000Z',
     })
     const second = buildOutgoingMessage({
-      messageType: 'text', content: 'a', sentByStaffName: '河野', sentAt: '2026-09-08T10:00:00.000Z',
+      messageType: 'text', content: 'a', sentByStaffName: '見本', sentAt: '2026-09-08T10:00:00.000Z',
     })
     expect(first.id).not.toBe(second.id)
   })

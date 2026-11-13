@@ -44,7 +44,7 @@ const petList = {
       breed: 'トイ・プードル', birthday: '2022-09-02', ageLabel: '4歳', weightKg: 3.2,
       neutered: 'yes', activityLevel: 'normal', activityLabel: 'ふつう', productName: '鹿肉ミンチ',
       feeding: null, imageUrl: null, updatedAt: '2026-09-06T10:00:00+09:00', weightUpdatedAt: '2026-09-06T10:00:00+09:00', weightStale: false,
-      owner: { friendId: 'friend-1', name: '高橋 直人', pictureUrl: null, customerId: 'customer-1' },
+      owner: { friendId: 'friend-1', name: '見本 16', pictureUrl: null, customerId: 'customer-1' },
     },
   ],
   total: 1,

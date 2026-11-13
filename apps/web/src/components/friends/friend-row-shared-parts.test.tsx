@@ -17,7 +17,7 @@ vi.mock('next/navigation', () => ({
 const BASE: FriendListItem = {
   id: 'friend-1',
   lineUserId: 'U0000000000000000000000000000001',
-  displayName: '田中 はなこ',
+  displayName: '見本 161',
   pictureUrl: null,
   statusMessage: null,
   isFollowing: true,
@@ -41,10 +41,10 @@ const render = (friend: FriendListItem) =>
 
 describe('友だち行の担当者とアバター（描画）', () => {
   it('担当者がいるときは頭文字の丸アイコンを描く', () => {
-    const html = render({ ...BASE, operator: { id: 'op-1', name: '佐藤 けん' } })
+    const html = render({ ...BASE, operator: { id: 'op-1', name: '見本 113' } })
     expect(html).toContain('data-operator-avatar="assigned"')
-    expect(html).toContain('>佐</span>')
-    expect(html).toContain('担当：佐藤 けん')
+    expect(html).toContain('>見</span>')
+    expect(html).toContain('担当：見本 113')
   })
 
   it('未割り当ては空欄にせず全角ハイフンで埋める', () => {

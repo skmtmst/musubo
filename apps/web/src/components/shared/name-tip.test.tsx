@@ -49,3 +49,38 @@ describe('アイコンだけのボタンの名前の吹き出し', () => {
     expect(isIconOnlyAction(inner)).toBe(false)
   })
 })
+
+it('表示中に権限が変われば、古い名前の吹き出しを閉じる', async () => {
+  const renderButton = (lockedReason?: string) => <><NameTipHost /><IconButton aria-label="印の操作" lockedReason={lockedReason}><svg aria-hidden="true" /></IconButton></>
+  const view = render(renderButton())
+  const button = screen.getByRole('button', { name: '印の操作' })
+  fireEvent.pointerOver(button, { pointerType: 'mouse' })
+  act(() => { vi.advanceTimersByTime(400) })
+  expect(screen.getByRole('tooltip').textContent).toBe('印の操作')
+  await act(async () => { view.rerender(renderButton('閲覧のみのため変更できません')); await Promise.resolve() })
+  expect(screen.queryByRole('tooltip')).toBeNull()
+  fireEvent.pointerEnter(button, { pointerType: 'mouse' })
+  expect(screen.getByRole('tooltip').textContent).toBe('閲覧のみのため変更できません')
+})
+
+it('表示待ちの間に権限が変われば、古い名前を後から出さない', async () => {
+  const renderButton = (lockedReason?: string) => <><NameTipHost /><IconButton aria-label="印の操作" lockedReason={lockedReason}><svg aria-hidden="true" /></IconButton></>
+  const view = render(renderButton())
+  fireEvent.pointerOver(screen.getByRole('button', { name: '印の操作' }), { pointerType: 'mouse' })
+  await act(async () => { view.rerender(renderButton('閲覧のみのため変更できません')); await Promise.resolve() })
+  act(() => { vi.advanceTimersByTime(400) })
+  expect(screen.queryByRole('tooltip')).toBeNull()
+})
+
+it('権限切替時は名前の title を戻さず権限理由と重複させない', async () => {
+  const renderButton = (lockedReason?: string) => <><NameTipHost /><IconButton aria-label="印の操作" title="印の操作" lockedReason={lockedReason}><svg aria-hidden="true" /></IconButton></>
+  const view = render(renderButton())
+  const button = screen.getByRole('button', { name: '印の操作' })
+  fireEvent.pointerOver(button, { pointerType: 'mouse' })
+  act(() => { vi.advanceTimersByTime(400) })
+  expect(button.hasAttribute('title')).toBe(false)
+  await act(async () => { view.rerender(renderButton('閲覧のみのため変更できません')); await Promise.resolve() })
+  expect(button.hasAttribute('title')).toBe(false)
+  fireEvent.pointerEnter(button, { pointerType: 'mouse' })
+  expect(screen.getByRole('tooltip').textContent).toBe('閲覧のみのため変更できません')
+})

@@ -39,7 +39,7 @@ vi.mock('./confirm-dialog', async original => {
 
 const folders: Folder[] = ['a', 'b'].map((id, index) => ({
   id, kind: 'scenario', name: `フォルダ${id}`, parentId: null, color: null,
-  displayOrder: index, createdAt: '', updatedAt: '', itemCount: 2, accountId: 'account-a',
+  displayOrder: index, createdAt: '', updatedAt: '', itemCount: 2, accountId: 'account-a', revision: 1,
 }))
 const reason = '閲覧のみのため、フォルダは変えられません。'
 const onChanged = vi.fn(), onDeleted = vi.fn(), onSelect = vi.fn()
@@ -164,7 +164,7 @@ it.each([false, true])('保持した削除は描画ごとに異なる最新callb
   rerender(<Rows canWriteNow={() => allowed} />)
   await act(async () => held())
   expect(api.folders.delete).toHaveBeenCalledTimes(allowed ? 1 : 0)
-  if (allowed) expect(api.folders.delete).toHaveBeenCalledWith('a', 'account-a')
+  if (allowed) expect(api.folders.delete).toHaveBeenCalledWith('a', 'account-a', 1)
 })
 
 it.each([false, true])('保持した並べ替えは最新callback=%sを読む', async allowed => {
@@ -232,7 +232,7 @@ it('権限復帰だけでは書かず、明示的な再確認で削除は1回', 
   rerender(<Rows canWriteNow={() => true} />)
   expect(api.folders.delete).not.toHaveBeenCalled()
   await click(screen.getByRole('button', { name: '削除する' }))
-  expect(api.folders.delete).toHaveBeenCalledExactlyOnceWith('a', 'account-a')
+  expect(api.folders.delete).toHaveBeenCalledExactlyOnceWith('a', 'account-a', 1)
   expect(onDeleted).toHaveBeenCalledExactlyOnceWith('a')
   expect(onChanged).toHaveBeenCalledOnce()
 })

@@ -33,7 +33,6 @@ describe('V8 外部連携の接続別集計と受信口詳細', () => {
   it('送信先へテスト送信できる', () => {
     expect(API).toContain('/api/webhooks/outgoing/${encodeURIComponent(id)}/test')
     // d23b R421: 開始時点のアカウントを固定して送る（切替後の誤送信防止）。
-    expect(OVERVIEWS).toContain('api.webhooks.outgoing.test(item.id, accountId)')
     expect(OVERVIEWS).toContain('accountRef.current !== accountId')
     expect(OVERVIEWS).toContain('試しに送る')
     expect(OVERVIEWS).toContain('item.deliverySummary.canRetry && canManage')

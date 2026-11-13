@@ -9,7 +9,6 @@ import {
   type DeliveryOrderCreatedOverrides,
 } from '../test-utils/delivery-webhook-fixtures.js';
 import { stubUberStoresApi, type UberStoresApiOptions } from '../test-utils/uber-stores-api.js';
-
 type MockStaff = {
   id: string;
   name: string;
@@ -20,7 +19,6 @@ type MockStaff = {
   can_access_descendant_accounts: number;
   tenant_id?: string | null;
 };
-
 /* 管理セッションは生のトークンではなくハッシュで引き当てるので、登録した順に照合して返す。 */
 const authMocks = vi.hoisted(() => {
   const sessions = new Map<string, unknown>();
@@ -40,7 +38,6 @@ const authMocks = vi.hoisted(() => {
     lineAccounts: [] as Array<Record<string, unknown>>,
   };
 });
-
 /** 管理画面にログインしたオーナー。既定のテスト利用者。 */
 const OWNER_SESSION: MockStaff = {
   id: 'owner-1',
@@ -51,7 +48,6 @@ const OWNER_SESSION: MockStaff = {
   assigned_line_account_id: null,
   can_access_descendant_accounts: 1,
 };
-
 vi.mock('@line-crm/db', async () => {
   const actual = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
   return {
@@ -62,14 +58,12 @@ vi.mock('@line-crm/db', async () => {
     getLineAccountScopeEntries: vi.fn(async () => authMocks.lineAccounts),
   };
 });
-
 const { authMiddleware, ADMIN_SESSION_BEARER_PREFIX } = await import('../middleware/auth.js');
 const { restaurantDelivery } = await import('./restaurant-delivery.js');
 const { signSupportRelay } = await import('../services/support-relay.js');
 const { UBER_PROBE_LAST_RUN_KEY } = await import('../services/ubereats-token-probe.js');
 const { MAX_WEBHOOK_BODY_BYTES } = await import('../services/delivery-webhook-payload.js');
 type Env = import('../index.js').Env;
-
 const TENANT = '00000000-0000-4000-8000-000000000001';
 const ENC_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 /** 2026-10-09（金）12:00 JST。 */
@@ -82,10 +76,8 @@ const DEMAECAN_WEBHOOK_SECRET = 'demaecan-webhook-secret-0123456789ab';
 const UBEREATS_CLIENT_SECRET = 'test-client-secret';
 const CANCEL_CONFIRM_TOKEN = 'delivery-order-cancel';
 const INTAKE_STOP_CONFIRM_TOKEN = 'delivery-intake-stop';
-
 /** サービスが返してくる自由文。台帳にも画面にも出てはいけない。 */
 const PROVIDER_FREE_TEXT = 'merchant token expired for partner store 99812';
-
 let testDb: SqliteD1;
 let env: Env['Bindings'];
 let deliveryCalls: Array<{ url: string; init?: RequestInit }>;
@@ -93,7 +85,6 @@ let deliveryCalls: Array<{ url: string; init?: RequestInit }>;
 let sendFailStatus: number | null;
 let logSpy: ReturnType<typeof vi.spyOn>;
 let errorSpy: ReturnType<typeof vi.spyOn>;
-
 function seedStore(): void {
   for (const [id, name] of [
     ['account-1', '統括'],
@@ -115,7 +106,6 @@ function seedStore(): void {
     )
     .run('store-shibuya', 'org-1', 'こもれび食堂 渋谷店', 'SHIBUYA', '東京', 20, 'account-2');
 }
-
 /** D-1の表に出る注文を1件置く。状態と版を指定して、版での絞り込みも確かめられるようにする。 */
 function seedOrder(
   overrides: {
@@ -150,14 +140,12 @@ function seedOrder(
     );
   return id;
 }
-
 function app() {
   const instance = new Hono<Env>();
   instance.use('*', authMiddleware);
   instance.route('/', restaurantDelivery);
   return instance;
 }
-
 /** 管理セッションで呼ぶ。token は useStaffRole / OWNER_SESSION で登録したセッショントークン。 */
 function call(
   path: string,
@@ -178,7 +166,6 @@ function call(
     env,
   );
 }
-
 function useStaffRole(role: 'admin' | 'staff'): void {
   testDb.raw
     .prepare(
@@ -196,9 +183,7 @@ function useStaffRole(role: 'admin' | 'staff'): void {
     can_access_descendant_accounts: 1,
   });
 }
-
 /* ------------------------------ 受信口の署名 ------------------------------ */
-
 /** HMAC-SHA256 の小文字16進。受信口が求める形をそのまま作る。 */
 async function hmacHex(secret: string, message: string) {
   const key = await crypto.subtle.importKey(
@@ -213,12 +198,10 @@ async function hmacHex(secret: string, message: string) {
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
 }
-
 /** 自社方式（出前館・ロケットナウ）の署名。材料は本番と同じ `${timestamp}.${rawBody}`。 */
 async function signWebhook(timestamp: number, rawBody: string, secret = DEMAECAN_WEBHOOK_SECRET) {
   return hmacHex(secret, `${timestamp}.${rawBody}`);
 }
-
 /**
  * Uber Eats の方式。公式仕様どおり**本文だけ**の署名で、鍵は同じアプリの Secret。
  * Uber は時刻の見出しを送らないので、ここでも作らない。
@@ -226,13 +209,11 @@ async function signWebhook(timestamp: number, rawBody: string, secret = DEMAECAN
 async function signUberWebhook(rawBody: string, secret = UBEREATS_CLIENT_SECRET) {
   return hmacHex(secret, rawBody);
 }
-
 function orderCreatedPayload(
   overrides: DeliveryOrderCreatedOverrides = {},
 ) {
   return deliveryOrderCreatedPayload(NOW_SEC, overrides);
 }
-
 /** 署名付きで受信口を叩く。既定は正しい署名・正しい時刻。 */
 async function postWebhook(
   payload: unknown,
@@ -267,27 +248,22 @@ async function postWebhook(
     env,
   );
 }
-
 /* ------------------------------ 台帳の読み出し ------------------------------ */
-
 function dispatchRows(): Array<Record<string, unknown>> {
   return testDb.raw
     .prepare('SELECT * FROM rt_delivery_dispatches ORDER BY created_at, id')
     .all() as Array<Record<string, unknown>>;
 }
-
 function eventRows(): Array<Record<string, unknown>> {
   return testDb.raw.prepare('SELECT * FROM rt_delivery_events ORDER BY received_at, id').all() as Array<
     Record<string, unknown>
   >;
 }
-
 function orderRow(id = 'order-1'): Record<string, unknown> | undefined {
   return testDb.raw.prepare('SELECT * FROM rt_delivery_orders WHERE id = ?').get(id) as
     | Record<string, unknown>
     | undefined;
 }
-
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
@@ -303,7 +279,6 @@ beforeEach(() => {
   ];
   testDb = createTestD1({ loginPolicy: 'off' });
   testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`).run(TENANT);
-
   deliveryCalls = [];
   sendFailStatus = null;
   vi.stubGlobal(
@@ -324,7 +299,6 @@ beforeEach(() => {
       });
     }),
   );
-
   env = {
     DB: testDb.db,
     API_KEY: 'owner-key',
@@ -355,31 +329,62 @@ beforeEach(() => {
   } as unknown as Env['Bindings'];
   seedStore();
 });
-
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   logSpy.mockRestore();
   errorSpy.mockRestore();
 });
-
 /* ============================== 受入条件2 ============================== */
-
 describe('送信台帳（受入条件2）', () => {
+  it('外部操作の直前に注文が変わっても送らない', async () => {
+    seedOrder({ status: 'new', version: 1 });
+    const original = testDb.db.prepare.bind(testDb.db);
+    let changed = false;
+    const spy = vi.spyOn(testDb.db, 'prepare').mockImplementation((sql: string) => {
+      if (!changed && sql.startsWith('SELECT version FROM rt_delivery_orders')) {
+        changed = true;
+        testDb.raw.prepare("UPDATE rt_delivery_orders SET version = 2 WHERE id = 'order-1'").run();
+      }
+      return original(sql);
+    });
+    try {
+      const response = await call('/api/restaurant-test/delivery/orders/order-1/accept', { body: { expectedVersion: 1 } });
+      expect(changed).toBe(true);
+      expect(response.status).toBe(409);
+      expect(deliveryCalls).toHaveLength(0);
+      expect(orderRow()).toMatchObject({ status: 'new', version: 2 });
+    } finally { spy.mockRestore(); }
+  });
+  it('確認した版が一致する注文取消は送れる', async () => {
+    seedOrder({ status: 'cooking', version: 1 });
+    const response = await call('/api/restaurant-test/delivery/orders/order-1/cancel', {
+      body: { reason_code: 'out_of_stock', expectedVersion: 1 }, confirm: CANCEL_CONFIRM_TOKEN,
+    });
+    expect(response.status).toBe(200);
+    expect(deliveryCalls).toHaveLength(1);
+    expect(orderRow()?.status).toBe('canceled');
+  });
+  it('確認後に注文版が変わったら外部操作を開始しない', async () => {
+    seedOrder({ status: 'new', version: 2 });
+    const response = await call('/api/restaurant-test/delivery/orders/order-1/accept', { body: { expectedVersion: 1 } });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'STALE_ORDER', order: { id: 'order-1', status: 'new', version: 2 } });
+    expect(deliveryCalls).toHaveLength(0);
+    expect(dispatchRows()).toHaveLength(0);
+    expect(orderRow()).toMatchObject({ status: 'new', version: 2 });
+  });
   it('送信が成功したときだけD1の状態を進め、台帳に成功として残す', async () => {
     seedOrder({ status: 'new' });
-
     const response = await call('/api/restaurant-test/delivery/orders/order-1/accept', { body: {} });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       success: true,
       order: { id: 'order-1', status: 'cooking' },
     });
-
     // 外へ出たのは1回だけ。宛先は各サービスの店舗向け窓口（受注一元化サービスは経由しない）。
     expect(deliveryCalls).toHaveLength(1);
     expect(deliveryCalls[0]?.url).toBe('https://demaecan.example.test/orders/accept');
-
     const rows = dispatchRows();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -391,17 +396,14 @@ describe('送信台帳（受入条件2）', () => {
       error_code: null,
     });
     expect(rows[0]?.completed_at).toBe(NOW_SEC);
-
     const order = orderRow();
     expect(order?.status).toBe('cooking');
     expect(order?.accepted_at).toBe(NOW_SEC);
     expect(order?.version).toBe(2);
   });
-
   it('送信が一時的に失敗したら状態は進めず、台帳には分類済み符号だけを残す', async () => {
     seedOrder({ status: 'new' });
     sendFailStatus = 500;
-
     const response = await call('/api/restaurant-test/delivery/orders/order-1/accept', { body: {} });
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
@@ -409,13 +411,11 @@ describe('送信台帳（受入条件2）', () => {
       code: 'delivery_temporary_failure',
       retryable: true,
     });
-
     const rows = dispatchRows();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ status: 'retryable_failed', error_code: 'delivery_temporary_failure' });
     // サービスから返った自由文は台帳のどこにも入れない。
     expect(JSON.stringify(rows[0])).not.toContain(PROVIDER_FREE_TEXT);
-
     // D1の状態は動かさない。再送は台帳の next_attempt_at から行う。
     const order = orderRow();
     expect(order?.status).toBe('new');
@@ -423,11 +423,9 @@ describe('送信台帳（受入条件2）', () => {
     expect(order?.version).toBe(1);
     expect(rows[0]?.next_attempt_at).not.toBeNull();
   });
-
   it('認証が通らない失敗は再試行しない符号で残し、502を返す', async () => {
     seedOrder({ status: 'cooking' });
     sendFailStatus = 401;
-
     const response = await call('/api/restaurant-test/delivery/orders/order-1/ready', { body: {} });
     expect(response.status).toBe(502);
     await expect(response.json()).resolves.toMatchObject({
@@ -435,7 +433,6 @@ describe('送信台帳（受入条件2）', () => {
       code: 'delivery_authentication_failed',
       retryable: false,
     });
-
     const rows = dispatchRows();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -446,15 +443,12 @@ describe('送信台帳（受入条件2）', () => {
     expect(orderRow()?.status).toBe('cooking');
     expect(orderRow()?.ready_at).toBeNull();
   });
-
   it('送信が止められている設定でも台帳には記録し、状態は進めない', async () => {
     seedOrder({ status: 'new' });
     env = { ...env, RT_DELIVERY_SEND_ENABLED: 'false' } as Env['Bindings'];
-
     const response = await call('/api/restaurant-test/delivery/orders/order-1/accept', { body: {} });
     expect(response.status).toBe(502);
     await expect(response.json()).resolves.toMatchObject({ code: 'delivery_send_disabled' });
-
     // 外へは一歩も出ない。
     expect(deliveryCalls).toHaveLength(0);
     const rows = dispatchRows();
@@ -462,10 +456,8 @@ describe('送信台帳（受入条件2）', () => {
     expect(rows[0]).toMatchObject({ status: 'failed', error_code: 'delivery_send_disabled' });
     expect(orderRow()?.status).toBe('new');
   });
-
   it('進められない状態の注文は送信もせず409で返す', async () => {
     seedOrder({ status: 'handed_over' });
-
     const response = await call('/api/restaurant-test/delivery/orders/order-1/accept', { body: {} });
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toMatchObject({ code: 'INVALID_STATUS', status: 'handed_over' });
@@ -473,15 +465,12 @@ describe('送信台帳（受入条件2）', () => {
     expect(dispatchRows()).toHaveLength(0);
   });
 });
-
 /* ============================== 受入条件3 ============================== */
-
 describe('受信口（受入条件3）', () => {
   it('署名が正しい通知を取り込み、受信台帳へ残す', async () => {
     const response = await postWebhook(orderCreatedPayload());
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true, result: 'created' });
-
     const events = eventRows();
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
@@ -492,7 +481,6 @@ describe('受信口（受入条件3）', () => {
       status: 'processed',
       error_code: null,
     });
-
     const orders = testDb.raw
       .prepare('SELECT * FROM rt_delivery_orders WHERE external_order_id = ?')
       .all('DM-9001') as Array<Record<string, unknown>>;
@@ -503,25 +491,21 @@ describe('受信口（受入条件3）', () => {
       .all(orders[0]?.id) as Array<Record<string, unknown>>;
     expect(items.map((item) => item.name)).toEqual(['鶏の唐揚げ弁当', '味噌汁']);
   });
-
   it('署名が違う通知は401で断り、何も取り込まない', async () => {
     const response = await postWebhook(orderCreatedPayload(), { signature: 'f'.repeat(64) });
     expect(response.status).toBe(401);
     expect(eventRows()).toHaveLength(0);
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_delivery_orders').get()).toMatchObject({ n: 0 });
   });
-
   it('本文を書き換えた通知は署名が合わず401になる', async () => {
     const payload = uberIgnoredNotification();
     const signed = JSON.stringify(payload);
     const tampered = JSON.stringify({ ...payload, event_type: 'orders.other_future_notification' });
     const signature = await signUberWebhook(signed);
-
     const response = await postWebhook(null, { service: 'ubereats', rawBody: tampered, signature });
     expect(response.status).toBe(401);
     expect(eventRows()).toHaveLength(0);
   });
-
   // Uber は公式仕様で時刻の見出しを送らないため、Uber の受信口では時刻を見ない。
   // 見ると本物の通知を落としてしまうので、ここでそのことを固定する。
   it('Uber からの通知は時刻の見出しが無くても受け付ける', async () => {
@@ -543,7 +527,6 @@ describe('受信口（受入条件3）', () => {
     expect(eventRows()).toHaveLength(0);
     expect(deliveryCalls).toHaveLength(0);
   });
-
   it('Uber の受信口に自社方式の見出しだけで送っても401になる', async () => {
     const rawBody = JSON.stringify(uberIgnoredNotification());
     const response = await app().request(
@@ -563,7 +546,6 @@ describe('受信口（受入条件3）', () => {
     await expect(response.json()).resolves.toMatchObject({ error: 'Invalid signature' });
     expect(eventRows()).toHaveLength(0);
   });
-
   it('Uber の受信口は静的なトークン用の合言葉では通らない', async () => {
     const response = await postWebhook(uberIgnoredNotification(), {
       service: 'ubereats',
@@ -572,7 +554,6 @@ describe('受信口（受入条件3）', () => {
     expect(response.status).toBe(401);
     expect(eventRows()).toHaveLength(0);
   });
-
   it('自社方式のサービスで5分より古い通知は401で断る', async () => {
     const response = await postWebhook(orderCreatedPayload(), {
       service: 'demaecan',
@@ -582,7 +563,6 @@ describe('受信口（受入条件3）', () => {
     await expect(response.json()).resolves.toMatchObject({ error: 'Expired request' });
     expect(eventRows()).toHaveLength(0);
   });
-
   it('自社方式のサービスで5分より先の時刻の通知も401で断る', async () => {
     const response = await postWebhook(orderCreatedPayload(), {
       service: 'demaecan',
@@ -591,7 +571,6 @@ describe('受信口（受入条件3）', () => {
     expect(response.status).toBe(401);
     expect(eventRows()).toHaveLength(0);
   });
-
   it('自社方式のサービスで5分以内のずれは受け付ける', async () => {
     const response = await postWebhook(orderCreatedPayload(), {
       service: 'demaecan',
@@ -600,23 +579,19 @@ describe('受信口（受入条件3）', () => {
     expect(response.status).toBe(200);
     expect(eventRows()).toHaveLength(1);
   });
-
   it('同じ通知が二度届いても二重処理しない', async () => {
     const payload = orderCreatedPayload();
     const first = await postWebhook(payload);
     expect(first.status).toBe(200);
     await expect(first.json()).resolves.toEqual({ success: true, result: 'created' });
-
     const second = await postWebhook(payload);
     expect(second.status).toBe(200);
     // 再送でも同じ200を返して相手の再試行を止める。
     await expect(second.json()).resolves.toEqual({ success: true, duplicate: true });
-
     expect(eventRows()).toHaveLength(1);
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_delivery_orders').get()).toMatchObject({ n: 1 });
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_delivery_order_items').get()).toMatchObject({ n: 2 });
   });
-
   it('通知IDが違えば別の注文として取り込む', async () => {
     await postWebhook(orderCreatedPayload());
     const response = await postWebhook(
@@ -626,7 +601,6 @@ describe('受信口（受入条件3）', () => {
     expect(eventRows()).toHaveLength(2);
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_delivery_orders').get()).toMatchObject({ n: 2 });
   });
-
   it('同じ注文IDの別通知は注文を増やさず duplicate として返す', async () => {
     await postWebhook(orderCreatedPayload());
     const response = await postWebhook(orderCreatedPayload({ eventId: 'evt-3' }));
@@ -634,13 +608,11 @@ describe('受信口（受入条件3）', () => {
     await expect(response.json()).resolves.toEqual({ success: true, result: 'duplicate' });
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_delivery_orders').get()).toMatchObject({ n: 1 });
   });
-
   it('知らないサービスの受信口は404', async () => {
     const response = await postWebhook(orderCreatedPayload(), { service: 'menu' });
     expect(response.status).toBe(404);
     expect(eventRows()).toHaveLength(0);
   });
-
   // Uber の受信口の鍵は同じアプリの Secret なので、欠けを見るのもそちら。
   it('Uber の鍵が設定されていなければ503で断り、署名の判定へ進まない', async () => {
     env = { ...env, RT_DELIVERY_UBEREATS_CLIENT_SECRET: undefined } as Env['Bindings'];
@@ -648,7 +620,6 @@ describe('受信口（受入条件3）', () => {
     expect(response.status).toBe(503);
     expect(eventRows()).toHaveLength(0);
   });
-
   it('お客様からのキャンセル通知で注文を終わらせる', async () => {
     seedOrder({ status: 'cooking', externalOrderId: 'DM-7001' });
     const response = await postWebhook({
@@ -659,7 +630,6 @@ describe('受信口（受入条件3）', () => {
     });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true, result: 'canceled' });
-
     const order = orderRow();
     expect(order?.status).toBe('canceled');
     expect(order?.canceled_by).toBe('customer');
@@ -668,9 +638,7 @@ describe('受信口（受入条件3）', () => {
     expect(dispatchRows()).toHaveLength(0);
   });
 });
-
 /* ====================== 受信口の送信元IPの制限（出前館QA#7） ====================== */
-
 describe('受信口の送信元IPの制限（出前館QA#7）', () => {
   it('許可リストが未設定なら、いまと同じようにIPを見ずに受け取る', async () => {
     const response = await postWebhook(orderCreatedPayload(), {
@@ -679,7 +647,6 @@ describe('受信口の送信元IPの制限（出前館QA#7）', () => {
     expect(response.status).toBe(200);
     expect(eventRows()).toHaveLength(1);
   });
-
   it('許可リストにあるIPからの通知はそのまま取り込む', async () => {
     env = { ...env, RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.5' } as Env['Bindings'];
     const response = await postWebhook(orderCreatedPayload(), {
@@ -688,7 +655,6 @@ describe('受信口の送信元IPの制限（出前館QA#7）', () => {
     expect(response.status).toBe(200);
     expect(eventRows()).toHaveLength(1);
   });
-
   it('許可リストにないIPは403で断り、本文も受信台帳も残さない', async () => {
     env = { ...env, RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.5' } as Env['Bindings'];
     const response = await postWebhook(orderCreatedPayload(), {
@@ -699,48 +665,41 @@ describe('受信口の送信元IPの制限（出前館QA#7）', () => {
     expect(eventRows()).toHaveLength(0);
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_delivery_orders').get()).toMatchObject({ n: 0 });
   });
-
   it('送信元が分からない通知も、許可リストがあるときは403で断る', async () => {
     env = { ...env, RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.5' } as Env['Bindings'];
     const response = await postWebhook(orderCreatedPayload());
     expect(response.status).toBe(403);
     expect(eventRows()).toHaveLength(0);
   });
-
   it('まとまりでの指定（203.0.113.0/24）は範囲の中なら通す', async () => {
     env = { ...env, RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.0/24' } as Env['Bindings'];
     const inside = await postWebhook(orderCreatedPayload(), {
       headers: { 'cf-connecting-ip': '203.0.113.240' },
     });
     expect(inside.status).toBe(200);
-
     const outside = await postWebhook(orderCreatedPayload({ eventId: 'evt-outside' }), {
       headers: { 'cf-connecting-ip': '203.0.114.1' },
     });
     expect(outside.status).toBe(403);
     expect(eventRows()).toHaveLength(1);
   });
-
   it('サービスごとの指定は共通の指定より先に効く', async () => {
     env = {
       ...env,
       RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '192.0.2.1',
       RT_DELIVERY_DEMAECAN_WEBHOOK_IP_ALLOWLIST: '198.51.100.7',
     } as Env['Bindings'];
-
     // 共通側のIPはこのサービスでは通らない。
     const common = await postWebhook(orderCreatedPayload(), {
       headers: { 'cf-connecting-ip': '192.0.2.1' },
     });
     expect(common.status).toBe(403);
-
     const perService = await postWebhook(orderCreatedPayload(), {
       headers: { 'cf-connecting-ip': '198.51.100.7' },
     });
     expect(perService.status).toBe(200);
     expect(eventRows()).toHaveLength(1);
   });
-
   it('IPの確認は鍵と署名より先。許可外なら署名が正しくても403', async () => {
     env = {
       ...env,
@@ -753,7 +712,6 @@ describe('受信口の送信元IPの制限（出前館QA#7）', () => {
     });
     expect(response.status).toBe(403);
   });
-
   it('cf-connecting-ip が無い配備では x-forwarded-for の先頭を見る', async () => {
     env = { ...env, RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.5' } as Env['Bindings'];
     const response = await postWebhook(orderCreatedPayload(), {
@@ -763,9 +721,7 @@ describe('受信口の送信元IPの制限（出前館QA#7）', () => {
     expect(eventRows()).toHaveLength(1);
   });
 });
-
 /* ====================== 受信口の本文の大きさの上限（413） ====================== */
-
 describe('受信口の本文の大きさの上限（413）', () => {
   it('申告された大きさが上限を超えていれば、本文を読まずに413で断る', async () => {
     const response = await postWebhook(orderCreatedPayload(), {
@@ -775,7 +731,6 @@ describe('受信口の本文の大きさの上限（413）', () => {
     await expect(response.json()).resolves.toMatchObject({ success: false, error: 'Payload too large' });
     expect(eventRows()).toHaveLength(0);
   });
-
   it('申告が無くても実測が上限を超えた本文は413で断り、受信台帳に残さない', async () => {
     const response = await postWebhook(null, {
       rawBody: JSON.stringify({ event_id: 'evt-big', pad: 'x'.repeat(MAX_WEBHOOK_BODY_BYTES) }),
@@ -783,7 +738,6 @@ describe('受信口の本文の大きさの上限（413）', () => {
     expect(response.status).toBe(413);
     expect(eventRows()).toHaveLength(0);
   });
-
   it('上限ちょうどまでの本文は大きさでは断らない', async () => {
     const response = await postWebhook(orderCreatedPayload(), {
       headers: { 'content-length': String(MAX_WEBHOOK_BODY_BYTES) },
@@ -791,7 +745,6 @@ describe('受信口の本文の大きさの上限（413）', () => {
     expect(response.status).toBe(200);
     expect(eventRows()).toHaveLength(1);
   });
-
   it('大きさの確認は署名より先。署名が違っても大きすぎれば413', async () => {
     const response = await postWebhook(orderCreatedPayload(), {
       signature: 'broken',
@@ -800,7 +753,6 @@ describe('受信口の本文の大きさの上限（413）', () => {
     expect(response.status).toBe(413);
     expect(eventRows()).toHaveLength(0);
   });
-
   it('鍵が無いときは大きさより先に503。設定不足の方を先に伝える', async () => {
     env = { ...env, RT_DELIVERY_DEMAECAN_WEBHOOK_SECRET: undefined } as Env['Bindings'];
     const response = await postWebhook(orderCreatedPayload(), {
@@ -810,13 +762,10 @@ describe('受信口の本文の大きさの上限（413）', () => {
     expect(eventRows()).toHaveLength(0);
   });
 });
-
 /* ============================== 受入条件4 ============================== */
-
 describe('取り消せない操作（受入条件4）', () => {
   it('注文キャンセルは確認手順がないと428で止まる', async () => {
     seedOrder({ status: 'cooking' });
-
     const response = await call('/api/restaurant-test/delivery/orders/order-1/cancel', {
       body: { reason_code: 'out_of_stock' },
     });
@@ -826,7 +775,6 @@ describe('取り消せない操作（受入条件4）', () => {
     expect(dispatchRows()).toHaveLength(0);
     expect(orderRow()?.status).toBe('cooking');
   });
-
   it('確認のしるしが違っても428で止まる', async () => {
     seedOrder({ status: 'cooking' });
     const response = await call('/api/restaurant-test/delivery/orders/order-1/cancel', {
@@ -836,7 +784,6 @@ describe('取り消せない操作（受入条件4）', () => {
     expect(response.status).toBe(428);
     expect(orderRow()?.status).toBe('cooking');
   });
-
   it('確認手順を経た注文キャンセルは理由を残して通る', async () => {
     seedOrder({ status: 'cooking' });
     const response = await call('/api/restaurant-test/delivery/orders/order-1/cancel', {
@@ -845,14 +792,12 @@ describe('取り消せない操作（受入条件4）', () => {
     });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ order: { status: 'canceled' } });
-
     const order = orderRow();
     expect(order?.cancel_reason_code).toBe('out_of_stock');
     expect(order?.canceled_by).toBe('store');
     expect(order?.canceled_at).toBe(NOW_SEC);
     expect(dispatchRows()[0]).toMatchObject({ action: 'cancel', status: 'succeeded' });
   });
-
   it('理由を選んでいないキャンセルは400で返す', async () => {
     seedOrder({ status: 'cooking' });
     const response = await call('/api/restaurant-test/delivery/orders/order-1/cancel', {
@@ -863,7 +808,6 @@ describe('取り消せない操作（受入条件4）', () => {
     await expect(response.json()).resolves.toMatchObject({ code: 'REASON_REQUIRED' });
     expect(orderRow()?.status).toBe('cooking');
   });
-
   it('担当者（staff）は注文キャンセルできない', async () => {
     seedOrder({ status: 'cooking' });
     useStaffRole('staff');
@@ -875,7 +819,6 @@ describe('取り消せない操作（受入条件4）', () => {
     expect(response.status).toBe(403);
     expect(orderRow()?.status).toBe('cooking');
   });
-
   it('受付一括停止は確認手順がないと428で止まる', async () => {
     const response = await call('/api/restaurant-test/delivery/intake/stop', {
       body: { preset: '30m' },
@@ -885,7 +828,6 @@ describe('取り消せない操作（受入条件4）', () => {
     expect(deliveryCalls).toHaveLength(0);
     expect(dispatchRows()).toHaveLength(0);
   });
-
   it('担当者（staff）は受付一括停止できない', async () => {
     useStaffRole('staff');
     const response = await call('/api/restaurant-test/delivery/intake/stop', {
@@ -896,7 +838,135 @@ describe('取り消せない操作（受入条件4）', () => {
     expect(response.status).toBe(403);
     expect(dispatchRows()).toHaveLength(0);
   });
-
+  it('一覧で確認した受付の版と接続先なら停止できる', async () => {
+    const preview = await call('/api/restaurant-test/delivery/orders');
+    const data = await preview.json() as { services: Array<{ service: string; version: number; target: string }> };
+    const state = data.services.find((item) => item.service === 'demaecan')!;
+    const response = await call('/api/restaurant-test/delivery/intake/stop', { body: { preset: '30m', services: ['demaecan'], expectedStoreId: 'store-shibuya', expectedStates: [state] }, confirm: INTAKE_STOP_CONFIRM_TOKEN });
+    expect(response.status).toBe(200);
+    expect(deliveryCalls).toHaveLength(1);
+  });
+  it('接続先の認証が別のものに変われば停止しない', async () => {
+    const preview = await call('/api/restaurant-test/delivery/orders');
+    const data = await preview.json() as { services: Array<{ service: string; version: number; target: string }> };
+    const state = data.services.find((item) => item.service === 'demaecan')!;
+    env.RT_DELIVERY_DEMAECAN_API_TOKEN = 'different-token';
+    const response = await call('/api/restaurant-test/delivery/intake/stop', { body: { preset: '30m', services: ['demaecan'], expectedStoreId: 'store-shibuya', expectedStates: [state] }, confirm: INTAKE_STOP_CONFIRM_TOKEN });
+    expect(response.status).toBe(409);
+    expect(deliveryCalls).toHaveLength(0);
+  });
+  it('途中で別の受付が変われば、済んだサービスを返して残りを送らない', async () => {
+    env.RT_DELIVERY_ROCKETNOW_API_BASE_URL = 'https://rocket.example.test';
+    env.RT_DELIVERY_ROCKETNOW_API_TOKEN = 'fake-rocket-token';
+    const preview = await call('/api/restaurant-test/delivery/orders');
+    const data = await preview.json() as { services: Array<{ service: string; version: number; target: string }> };
+    const selected = data.services.filter((item) => ['demaecan', 'rocketnow'].includes(item.service));
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      deliveryCalls.push({ url: String(input), init });
+      testDb.raw.prepare(`INSERT INTO rt_delivery_service_states (account_id, store_id, service, connection_status, intake_status, created_at, updated_at) VALUES ('account-2', 'store-shibuya', 'rocketnow', 'connected', 'open', 1, 1)`).run();
+      return new Response('{}', { status: 200 });
+    }));
+    const response = await call('/api/restaurant-test/delivery/intake/stop', { body: { preset: '30m', services: ['demaecan', 'rocketnow'], expectedStoreId: 'store-shibuya', expectedStates: selected }, confirm: INTAKE_STOP_CONFIRM_TOKEN });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'STALE_INTAKE', stopped: ['demaecan'] });
+    expect(deliveryCalls).toHaveLength(1);
+  });
+  it('既存の受付状態も一致する版なら停止できる', async () => {
+    testDb.raw.prepare(`INSERT INTO rt_delivery_service_states (account_id, store_id, service, connection_status, intake_status, version, created_at, updated_at) VALUES ('account-2', 'store-shibuya', 'demaecan', 'connected', 'open', 3, 1, 1)`).run();
+    const preview = await call('/api/restaurant-test/delivery/orders');
+    const data = await preview.json() as { services: Array<{ service: string; version: number; target: string }> };
+    const state = data.services.find((item) => item.service === 'demaecan')!;
+    const response = await call('/api/restaurant-test/delivery/intake/stop', { body: { preset: '30m', services: ['demaecan'], expectedStoreId: 'store-shibuya', expectedStates: [state] }, confirm: INTAKE_STOP_CONFIRM_TOKEN });
+    expect(response.status).toBe(200);
+    expect(testDb.raw.prepare("SELECT version, intake_status FROM rt_delivery_service_states WHERE store_id = 'store-shibuya' AND service = 'demaecan'").get()).toMatchObject({ version: 4, intake_status: 'stopped' });
+  });
+  it('受付送信中に変わった状態を上書きせず、停止の可能性を知らせる', async () => {
+    const preview = await call('/api/restaurant-test/delivery/orders');
+    const data = await preview.json() as { services: Array<{ service: string; version: number; target: string }> };
+    const state = data.services.find((item) => item.service === 'demaecan')!;
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      deliveryCalls.push({ url: String(input), init });
+      testDb.raw.prepare(`INSERT INTO rt_delivery_service_states (account_id, store_id, service, connection_status, intake_status, created_at, updated_at) VALUES ('account-2', 'store-shibuya', 'demaecan', 'connected', 'open', 1, 1)`).run();
+      return new Response('{}', { status: 200 });
+    }));
+    const response = await call('/api/restaurant-test/delivery/intake/stop', { body: { preset: '30m', services: ['demaecan'], expectedStoreId: 'store-shibuya', expectedStates: [state] }, confirm: INTAKE_STOP_CONFIRM_TOKEN });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'STALE_INTAKE', states: [{ service: 'demaecan', version: 1, intakeStatus: 'open' }] });
+    expect(deliveryCalls).toHaveLength(1);
+  });
+  it('受付送信の直前に版が変わったら外部へ送らない', async () => {
+    const preview = await call('/api/restaurant-test/delivery/orders');
+    const data = await preview.json() as { services: Array<{ service: string; version: number; target: string }> };
+    const state = data.services.find((item) => item.service === 'demaecan')!;
+    const original = testDb.db.prepare.bind(testDb.db);
+    let reads = 0;
+    const spy = vi.spyOn(testDb.db, 'prepare').mockImplementation((sql: string) => {
+      if (sql.includes('FROM rt_delivery_service_states WHERE store_id = ?') && ++reads === 2) {
+        testDb.raw.prepare(`INSERT INTO rt_delivery_service_states (account_id, store_id, service, connection_status, intake_status, created_at, updated_at) VALUES ('account-2', 'store-shibuya', 'demaecan', 'connected', 'open', 1, 1)`).run();
+      }
+      return original(sql);
+    });
+    try {
+      const response = await call('/api/restaurant-test/delivery/intake/stop', { body: { preset: '30m', services: ['demaecan'], expectedStoreId: 'store-shibuya', expectedStates: [state] }, confirm: INTAKE_STOP_CONFIRM_TOKEN });
+      expect(reads).toBeGreaterThanOrEqual(2);
+      expect(response.status).toBe(409);
+      expect(deliveryCalls).toHaveLength(0);
+    } finally { spy.mockRestore(); }
+  });
+  it('確認した商品と接続先が一致すれば品切れを送れる', async () => {
+    testDb.raw.prepare(`INSERT INTO rt_delivery_menu_items (id, account_id, store_id, name, external_item_ids_json, version, created_at, updated_at) VALUES ('item-1', 'account-2', 'store-shibuya', '商品', '{"demaecan":"remote-1"}', 1, 1, 1)`).run();
+    const preview = await call('/api/restaurant-test/delivery/menu-items');
+    const data = await preview.json() as { items: Array<{ id: string; version: number; target: string }> };
+    const response = await call('/api/restaurant-test/delivery/menu-items/bulk-sold-out', { body: { item_ids: ['item-1'], sold_out: true, expectedStoreId: 'store-shibuya', expectedItems: data.items } });
+    expect(response.status).toBe(200);
+    expect(deliveryCalls).toHaveLength(1);
+  });
+  it('商品送信中の変更を後から上書きせず、反映の可能性を知らせる', async () => {
+    testDb.raw.prepare(`INSERT INTO rt_delivery_menu_items (id, account_id, store_id, name, external_item_ids_json, version, created_at, updated_at) VALUES ('item-1', 'account-2', 'store-shibuya', '商品', '{"demaecan":"remote-1"}', 1, 1, 1)`).run();
+    const preview = await call('/api/restaurant-test/delivery/menu-items');
+    const data = await preview.json() as { items: Array<{ id: string; version: number; target: string }> };
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      deliveryCalls.push({ url: String(input), init });
+      testDb.raw.prepare("UPDATE rt_delivery_menu_items SET name = '変更済み', version = version + 1 WHERE id = 'item-1'").run();
+      return new Response('{}', { status: 200 });
+    }));
+    const response = await call('/api/restaurant-test/delivery/menu-items/bulk-sold-out', { body: { item_ids: ['item-1'], sold_out: true, expectedStoreId: 'store-shibuya', expectedItems: data.items } });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'STALE_MENU', items: [{ id: 'item-1', name: '変更済み', soldOut: false }] });
+    expect(deliveryCalls).toHaveLength(1);
+  });
+  it('商品送信の直前に宛先が変われば外部へ送らない', async () => {
+    testDb.raw.prepare(`INSERT INTO rt_delivery_menu_items (id, account_id, store_id, name, external_item_ids_json, version, created_at, updated_at) VALUES ('item-1', 'account-2', 'store-shibuya', '商品', '{"demaecan":"remote-1"}', 1, 1, 1)`).run();
+    const preview = await call('/api/restaurant-test/delivery/menu-items');
+    const data = await preview.json() as { items: Array<{ id: string; version: number; target: string }> };
+    const original = testDb.db.prepare.bind(testDb.db);
+    const spy = vi.spyOn(testDb.db, 'prepare').mockImplementation((sql: string) => {
+      if (sql.startsWith('SELECT version, external_item_ids_json FROM rt_delivery_menu_items')) testDb.raw.prepare(`UPDATE rt_delivery_menu_items SET external_item_ids_json = '{"demaecan":"remote-2"}' WHERE id = 'item-1'`).run();
+      return original(sql);
+    });
+    try {
+      const response = await call('/api/restaurant-test/delivery/menu-items/bulk-sold-out', { body: { item_ids: ['item-1'], sold_out: true, expectedStoreId: 'store-shibuya', expectedItems: data.items } });
+      expect(response.status).toBe(409);
+      expect(deliveryCalls).toHaveLength(0);
+    } finally { spy.mockRestore(); }
+  });
+  it('確認後に商品が変われば品切れを外部へ送らない', async () => {
+    testDb.raw.prepare(`INSERT INTO rt_delivery_menu_items (id, account_id, store_id, name, external_item_ids_json, version, created_at, updated_at) VALUES ('item-1', 'account-2', 'store-shibuya', '商品', '{"demaecan":"remote-1"}', 2, 1, 1)`).run();
+    const response = await call('/api/restaurant-test/delivery/menu-items/bulk-sold-out', { body: { item_ids: ['item-1'], sold_out: true, expectedStoreId: 'store-shibuya', expectedItems: [{ id: 'item-1', version: 1, target: 'old' }] } });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ items: [{ id: 'item-1', version: 2, soldOut: false }] });
+    expect(deliveryCalls).toHaveLength(0);
+    expect(dispatchRows()).toHaveLength(0);
+  });
+  it('確認後に受付の版が変われば外部へ停止を送らない', async () => {
+    const response = await call('/api/restaurant-test/delivery/intake/stop', {
+      body: { preset: '30m', services: ['demaecan'], expectedStoreId: 'store-shibuya', expectedStates: [{ service: 'demaecan', version: 5, target: 'old' }] }, confirm: INTAKE_STOP_CONFIRM_TOKEN,
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ states: [{ service: 'demaecan', version: 0, intakeStatus: 'open' }] });
+    expect(deliveryCalls).toHaveLength(0);
+    expect(dispatchRows()).toHaveLength(0);
+  });
   it('確認手順を経た受付一括停止は送れたサービスだけ停止にする', async () => {
     const response = await call('/api/restaurant-test/delivery/intake/stop', {
       body: { preset: '30m', services: ['demaecan'] },
@@ -909,7 +979,6 @@ describe('取り消せない操作（受入条件4）', () => {
       stopped: ['demaecan'],
       failed: [],
     });
-
     expect(dispatchRows()[0]).toMatchObject({
       action: 'intake_stop',
       target_kind: 'service',
@@ -922,7 +991,6 @@ describe('取り消せない操作（受入条件4）', () => {
     expect(state).toMatchObject({ intake_status: 'stopped' });
     expect(state?.stop_until).toBe(NOW_SEC + 30 * 60);
   });
-
   it('停止する長さを選んでいないときは400で返す', async () => {
     const response = await call('/api/restaurant-test/delivery/intake/stop', {
       body: { services: ['demaecan'] },
@@ -931,7 +999,6 @@ describe('取り消せない操作（受入条件4）', () => {
     expect(response.status).toBe(400);
     expect(dispatchRows()).toHaveLength(0);
   });
-
   it('送信が全部失敗したら受付状態は変えない', async () => {
     sendFailStatus = 429;
     const response = await call('/api/restaurant-test/delivery/intake/stop', {
@@ -940,20 +1007,17 @@ describe('取り消せない操作（受入条件4）', () => {
     });
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({ code: 'delivery_rate_limited', retryable: true });
-
     expect(dispatchRows()[0]).toMatchObject({ status: 'retryable_failed', error_code: 'delivery_rate_limited' });
     expect(
       testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_delivery_service_states').get(),
     ).toMatchObject({ n: 0 });
   });
-
   it('受付の再開は確認手順を求めない（元に戻す操作なので）', async () => {
     const stopped = await call('/api/restaurant-test/delivery/intake/stop', {
       body: { preset: '30m', services: ['demaecan'] },
       confirm: INTAKE_STOP_CONFIRM_TOKEN,
     });
     expect(stopped.status).toBe(200);
-
     const response = await call('/api/restaurant-test/delivery/intake/resume', {
       body: { services: ['demaecan'] },
     });
@@ -964,7 +1028,6 @@ describe('取り消せない操作（受入条件4）', () => {
       .get('store-shibuya', 'demaecan') as Record<string, unknown> | undefined;
     expect(state).toMatchObject({ intake_status: 'open', stop_until: null });
   });
-
   it('担当者（staff）は受付の再開もできない', async () => {
     useStaffRole('staff');
     const response = await call('/api/restaurant-test/delivery/intake/resume', {
@@ -974,7 +1037,6 @@ describe('取り消せない操作（受入条件4）', () => {
     expect(response.status).toBe(403);
   });
 });
-
 describe('書き込みは店舗管理者以上だけ（受入条件1）', () => {
   it('担当者（staff）は注文を受け付けられない', async () => {
     seedOrder();
@@ -988,7 +1050,6 @@ describe('書き込みは店舗管理者以上だけ（受入条件1）', () => 
     expect(deliveryCalls).toHaveLength(0);
     expect(dispatchRows()).toHaveLength(0);
   });
-
   it('担当者（staff）は準備完了にできない', async () => {
     seedOrder({ status: 'cooking' });
     useStaffRole('staff');
@@ -1000,7 +1061,6 @@ describe('書き込みは店舗管理者以上だけ（受入条件1）', () => 
     expect(orderRow()?.status).toBe('cooking');
     expect(deliveryCalls).toHaveLength(0);
   });
-
   it('担当者（staff）は受け渡し済みにできない', async () => {
     seedOrder({ status: 'cooking' });
     useStaffRole('staff');
@@ -1012,7 +1072,6 @@ describe('書き込みは店舗管理者以上だけ（受入条件1）', () => 
     expect(orderRow()?.status).toBe('cooking');
     expect(deliveryCalls).toHaveLength(0);
   });
-
   it('担当者（staff）は注文を拒否できない', async () => {
     seedOrder();
     useStaffRole('staff');
@@ -1023,7 +1082,6 @@ describe('書き込みは店舗管理者以上だけ（受入条件1）', () => 
     expect(response.status).toBe(403);
     expect(orderRow()?.status).toBe('new');
   });
-
   it('担当者（staff）は品切れをまとめて切り替えられない', async () => {
     useStaffRole('staff');
     const response = await call('/api/restaurant-test/delivery/menu-items/bulk-sold-out', {
@@ -1034,7 +1092,6 @@ describe('書き込みは店舗管理者以上だけ（受入条件1）', () => 
     expect(deliveryCalls).toHaveLength(0);
     expect(dispatchRows()).toHaveLength(0);
   });
-
   it('見るだけの一覧・履歴・CSV・商品一覧は担当者（staff）でも使える', async () => {
     seedOrder();
     useStaffRole('staff');
@@ -1050,7 +1107,6 @@ describe('書き込みは店舗管理者以上だけ（受入条件1）', () => 
     }
   });
 });
-
 describe('期限が過ぎた受付停止の自動再開（受入条件2）', () => {
   /** 30分の停止をかける。D-6の窓から送られる形と同じ。 */
   async function stopFor30m() {
@@ -1062,13 +1118,11 @@ describe('期限が過ぎた受付停止の自動再開（受入条件2）', () 
     deliveryCalls = [];
     return response;
   }
-
   function stateRow(service = 'demaecan'): Record<string, unknown> | undefined {
     return testDb.raw
       .prepare('SELECT * FROM rt_delivery_service_states WHERE store_id = ? AND service = ?')
       .get('store-shibuya', service) as Record<string, unknown> | undefined;
   }
-
   async function servicesFromOrders(): Promise<
     Array<{ service: string; intakeStatus: string; stopUntil: string | null }>
   > {
@@ -1079,11 +1133,9 @@ describe('期限が過ぎた受付停止の自動再開（受入条件2）', () 
     };
     return data.services;
   }
-
   it('期限が過ぎたら一覧を読んだ時点で受付中へ戻り、再開も送られる', async () => {
     await stopFor30m();
     vi.setSystemTime(new Date(NOW.getTime() + 31 * 60 * 1000));
-
     const services = await servicesFromOrders();
     expect(services.find((state) => state.service === 'demaecan')).toMatchObject({
       intakeStatus: 'open',
@@ -1098,33 +1150,27 @@ describe('期限が過ぎた受付停止の自動再開（受入条件2）', () 
       status: 'succeeded',
     });
   });
-
   it('期限内はそのまま停止で残り、再開は送らない', async () => {
     await stopFor30m();
     vi.setSystemTime(new Date(NOW.getTime() + 29 * 60 * 1000));
-
     const services = await servicesFromOrders();
     expect(services.find((state) => state.service === 'demaecan')?.intakeStatus).toBe('stopped');
     expect(deliveryCalls).toHaveLength(0);
     expect(stateRow()).toMatchObject({ intake_status: 'stopped' });
   });
-
   it('再開を送れなかったサービスは停止のまま残り、次に読んだ時にもう一度試す', async () => {
     await stopFor30m();
     vi.setSystemTime(new Date(NOW.getTime() + 31 * 60 * 1000));
-
     sendFailStatus = 429;
     const failed = await servicesFromOrders();
     expect(failed.find((state) => state.service === 'demaecan')?.intakeStatus).toBe('stopped');
     expect(stateRow()).toMatchObject({ intake_status: 'stopped' });
     expect(dispatchRows().at(-1)).toMatchObject({ action: 'intake_resume', status: 'retryable_failed' });
-
     sendFailStatus = null;
     const retried = await servicesFromOrders();
     expect(retried.find((state) => state.service === 'demaecan')?.intakeStatus).toBe('open');
     expect(stateRow()).toMatchObject({ intake_status: 'open', stop_until: null });
   });
-
   it('手で再開した後は自動再開を重ねて送らない', async () => {
     await stopFor30m();
     const resumed = await call('/api/restaurant-test/delivery/intake/resume', {
@@ -1132,32 +1178,27 @@ describe('期限が過ぎた受付停止の自動再開（受入条件2）', () 
     });
     expect(resumed.status).toBe(200);
     deliveryCalls = [];
-
     vi.setSystemTime(new Date(NOW.getTime() + 31 * 60 * 1000));
     const services = await servicesFromOrders();
     expect(services.find((state) => state.service === 'demaecan')?.intakeStatus).toBe('open');
     expect(deliveryCalls).toHaveLength(0);
   });
 });
-
 describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', () => {
   const START_PATH = '/api/restaurant-test/delivery/ubereats/connect/start';
   const CALLBACK_PATH = '/api/restaurant-test/delivery/ubereats/oauth/callback';
   /** 認可画面から戻ってきた作り物の応答。本物のトークンではない。 */
   const FAKE_ACCESS_TOKEN = 'fake-user-access-token';
-
   function stateRows(): Array<Record<string, unknown>> {
     return testDb.raw
       .prepare('SELECT * FROM rt_delivery_uber_oauth_states ORDER BY created_at, state')
       .all() as Array<Record<string, unknown>>;
   }
-
   function connectionRows(): Array<Record<string, unknown>> {
     return testDb.raw.prepare('SELECT * FROM rt_delivery_uber_connections ORDER BY store_id').all() as Array<
       Record<string, unknown>
     >;
   }
-
   function seedState(overrides: Record<string, unknown> = {}): string {
     const row = {
       state: 'state-1',
@@ -1188,7 +1229,6 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       );
     return row.state as string;
   }
-
   function seedConnection(overrides: Record<string, unknown> = {}): void {
     const row = {
       store_id: 'store-shibuya',
@@ -1219,7 +1259,6 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
         row.updated_at,
       );
   }
-
   /**
    * 戻り先の受け口は統括の指定を付けずに呼ぶ。
    * call は必ず account_id を足してしまうので、ここでは直接組み立てる。
@@ -1235,14 +1274,12 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     const search = new URLSearchParams(query).toString();
     return await app().request(`${CALLBACK_PATH}?${search}`, { method: 'GET', headers }, env);
   }
-
   /** 戻り先URLの ubereats= に入った符号。 */
   function resultCodeOf(response: Response): string | null {
     const location = response.headers.get('location');
     expect(location).not.toBeNull();
     return new URL(location!).searchParams.get('ubereats');
   }
-
   /** 認可の符号をトークンに替える口の作り物。許された権限まで含めて返す。 */
   function stubTokenEndpoint(
     payload: Record<string, unknown> = {
@@ -1266,23 +1303,19 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     );
     return calls;
   }
-
   it('IDとSecretが無い環境では認可の入口を開けない（受入条件5）', async () => {
     delete (env as Record<string, unknown>).RT_DELIVERY_UBEREATS_CLIENT_ID;
     delete (env as Record<string, unknown>).RT_DELIVERY_UBEREATS_CLIENT_SECRET;
-
     const res = await call(START_PATH, { body: {} });
     expect(res.status).toBe(503);
     expect(await res.json()).toMatchObject({ success: false, code: 'oauth_not_configured' });
     expect(stateRows()).toHaveLength(0);
   });
-
   it('認可の入口は配備の設定から戻り先を組み立て、1回使い切りのstateを10分だけ残す（受入条件2・3）', async () => {
     const res = await call(START_PATH, { body: {} });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { mode: string; authorizeUrl: string };
     expect(body.mode).toBe('connect');
-
     const authorize = new URL(body.authorizeUrl);
     expect(authorize.origin + authorize.pathname).toBe('https://auth.uber.com/oauth/v2/authorize');
     expect(authorize.searchParams.get('client_id')).toBe('test-client-id');
@@ -1292,7 +1325,6 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     expect(authorize.searchParams.get('redirect_uri')).toBe(
       'https://worker.example.test/api/restaurant-test/delivery/ubereats/oauth/callback',
     );
-
     const rows = stateRows();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -1305,7 +1337,6 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       used_at: null,
     });
     expect(String(rows[0].state).length).toBeGreaterThanOrEqual(32);
-
     const cookie = res.headers.get('set-cookie') ?? '';
     expect(cookie).toContain('lh_uber_state=');
     expect(cookie).toContain('HttpOnly');
@@ -1313,7 +1344,6 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     expect(cookie).toContain('SameSite=Lax');
     expect(cookie).toContain('Max-Age=600');
   });
-
   it('つながっている店舗からの開始は「つなぎ直し」になる（受入条件3）', async () => {
     seedConnection({ status: 'connected' });
     const res = await call(START_PATH, { body: {} });
@@ -1321,14 +1351,12 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     expect(await res.json()).toMatchObject({ mode: 'reconnect' });
     expect(stateRows()[0]).toMatchObject({ mode: 'reconnect' });
   });
-
   it('担当者の権限では認可の入口を開けない（受入条件3）', async () => {
     useStaffRole('staff');
     const res = await call(START_PATH, { body: {}, token: 'staff-session' });
     expect(res.status).toBe(403);
     expect(stateRows()).toHaveLength(0);
   });
-
   it('知らないstateでは接続せず、接続情報も作らない（受入条件4）', async () => {
     const calls = stubTokenEndpoint();
     const res = await callback({ state: 'unknown-state', code: 'auth-code' });
@@ -1338,28 +1366,23 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     // 符号の交換そのものを試さない。
     expect(calls).toHaveLength(0);
   });
-
   it('10分を過ぎたstateでは接続しない（受入条件2・4）', async () => {
     const state = seedState();
     vi.setSystemTime(new Date(NOW.getTime() + 11 * 60 * 1000));
     const calls = stubTokenEndpoint();
-
     const res = await callback({ state, code: 'auth-code' });
     expect(resultCodeOf(res)).toBe('error:invalid_state');
     expect(connectionRows()).toHaveLength(0);
     expect(calls).toHaveLength(0);
   });
-
   it('一度使ったstateは二度目では接続しない（受入条件2・4）', async () => {
     const state = seedState({ used_at: NOW.getTime() });
     const calls = stubTokenEndpoint();
-
     const res = await callback({ state, code: 'auth-code' });
     expect(resultCodeOf(res)).toBe('error:invalid_state');
     expect(connectionRows()).toHaveLength(0);
     expect(calls).toHaveLength(0);
   });
-
   /**
    * 「読んだ時はまだ未使用、更新しようとしたら既に使われていた」並びを作る。
    * 同じstateのcallbackが2つ同時に来たときの、負けた側の経路そのもの。
@@ -1391,16 +1414,13 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       },
     } as unknown as D1Database;
   }
-
   it('同じstateのcallbackが同時に二度来ても、接続は1件・符号の交換も1回だけ（受入条件3）', async () => {
     const state = seedState();
     const calls = stubTokenEndpoint();
-
     const [first, second] = await Promise.all([
       callback({ state, code: 'auth-code' }, { cookie: state }),
       callback({ state, code: 'auth-code' }, { cookie: state }),
     ]);
-
     // どちらが先に着くかは決まらないが、通るのは必ず片方だけ。
     expect([resultCodeOf(first), resultCodeOf(second)].sort()).toEqual([
       'error:invalid_state',
@@ -1409,39 +1429,32 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     expect(connectionRows()).toHaveLength(1);
     expect(calls).toHaveLength(1);
   });
-
   it('読み取った後に別のcallbackが使い切ったstateでは、符号の交換へ進まない（受入条件3）', async () => {
     const state = seedState();
     const calls = stubTokenEndpoint();
     markUsedByOtherCallbackRightAfterRead();
-
     const res = await callback({ state, code: 'auth-code' }, { cookie: state });
     expect(resultCodeOf(res)).toBe('error:invalid_state');
     expect(connectionRows()).toHaveLength(0);
     expect(calls).toHaveLength(0);
   });
-
   it('別の担当者が始めたstateでは接続しない（受入条件4）', async () => {
     useStaffRole('admin');
     const state = seedState({ staff_id: 'admin-1' });
     const calls = stubTokenEndpoint();
-
     const res = await callback({ state, code: 'auth-code' });
     expect(resultCodeOf(res)).toBe('error:invalid_state');
     expect(connectionRows()).toHaveLength(0);
     expect(calls).toHaveLength(0);
   });
-
   it('Cookieのstateが食い違うときは接続しない（受入条件4）', async () => {
     const state = seedState();
     const calls = stubTokenEndpoint();
-
     const res = await callback({ state, code: 'auth-code' }, { cookie: 'state-other' });
     expect(resultCodeOf(res)).toBe('error:invalid_state');
     expect(connectionRows()).toHaveLength(0);
     expect(calls).toHaveLength(0);
   });
-
   it('店舗が許可しなかったときは使い切ったstateを残し、接続情報は作らない（受入条件4）', async () => {
     const state = seedState();
     const res = await callback({ state, error: 'access_denied' });
@@ -1449,22 +1462,18 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     expect(connectionRows()).toHaveLength(0);
     expect(stateRows()[0].used_at).toBe(NOW.getTime());
   });
-
   it('認可が通るとトークンを暗号化して1件だけ保存する（受入条件1）', async () => {
     const state = seedState();
     const calls = stubTokenEndpoint();
-
     const res = await callback({ state, code: 'auth-code' }, { cookie: state });
     expect(res.status).toBe(302);
     expect(resultCodeOf(res)).toBe('pending_store');
-
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe('https://auth.uber.com/oauth/v2/token');
     expect(calls[0].body).toContain('grant_type=authorization_code');
     expect(calls[0].body).toContain(
       'redirect_uri=https%3A%2F%2Fworker.example.test%2Fapi%2Frestaurant-test%2Fdelivery%2Fubereats%2Foauth%2Fcallback',
     );
-
     const rows = connectionRows();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -1485,48 +1494,39 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     // 使い切ったstateは二度使えない。
     expect(stateRows()[0].used_at).toBe(NOW.getTime());
   });
-
   it('つなぎ直しは行を増やさず、同じ店舗の1件を書き換える（受入条件1）', async () => {
     seedConnection({ status: 'expired' });
     const state = seedState({ mode: 'reconnect' });
     stubTokenEndpoint();
-
     const res = await callback({ state, code: 'auth-code' }, { cookie: state });
     expect(resultCodeOf(res)).toBe('reauthorized');
-
     const rows = connectionRows();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ status: 'pending_store', uber_store_id: 'uber-store-1',
       last_error: 'pos_disconnect_reauthorization_pending', version: 2 });
   });
-
   it('権限が足りないときは接続情報を作らず、符号だけを残す（受入条件4）', async () => {
     const state = seedState();
     stubTokenEndpoint({ access_token: FAKE_ACCESS_TOKEN, scope: 'eats.store', expires_in: 2_592_000 });
-
     const res = await callback({ state, code: 'auth-code' }, { cookie: state });
     expect(resultCodeOf(res)).toBe('error:no_permission');
     expect(connectionRows()).toHaveLength(0);
     // サービスからの自由文は台帳にも記録にも出さない。
     expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(FAKE_ACCESS_TOKEN);
   });
-
   it('交換に失敗したときは既にある接続に理由だけを残す（受入条件4）', async () => {
     seedConnection({ status: 'connected' });
     const state = seedState({ mode: 'reconnect' });
     stubTokenEndpoint({ error: 'invalid_grant', message: PROVIDER_FREE_TEXT }, 400);
-
     const res = await callback({ state, code: 'auth-code' }, { cookie: state });
     expect(resultCodeOf(res)).toBe('error:auth_expired');
-
     const rows = connectionRows();
     expect(rows).toHaveLength(1);
     // 状態は勝手に変えず、理由の符号だけを足す。
-    expect(rows[0]).toMatchObject({ status: 'connected', last_error: 'auth_expired' });
+    expect(rows[0]).toMatchObject({ status: 'connected', last_error: 'auth_expired', version: 2 });
     expect(JSON.stringify(rows[0])).not.toContain(PROVIDER_FREE_TEXT);
     expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(PROVIDER_FREE_TEXT);
   });
-
   /* ---------------------- いまの接続の状態を読む口 ---------------------- */
 
   describe('接続状態の読み取り（受入条件4）', () => {
@@ -1751,29 +1751,24 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       expect(res.status).toBe(409);
       expect(await res.json()).toMatchObject({ code: 'auth_expired' });
       expect(calls).toHaveLength(0);
-
       const rows = connectionRows();
       expect(rows[0]).toMatchObject({ status: 'expired', last_error: 'auth_expired', version: 2 });
     });
-
     it('鍵が無い環境では、復号できないことだけを伝える', async () => {
       await seedLoggedIn();
       // 置いたあとで鍵を外す。鍵が変わった場合も同じ道を通る。
       delete (env as Record<string, unknown>).LINE_CREDENTIAL_ENCRYPTION_KEY;
       const calls = stubUberApi();
-
       const res = await call(STORES_PATH);
       expect(res.status).toBe(409);
       expect(await res.json()).toMatchObject({ code: 'encryption_key_missing' });
       expect(calls).toHaveLength(0);
       expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(ENC_KEY);
     });
-
     it('一覧が取れないときは分類済みの符号だけを残す', async () => {
       await seedLoggedIn({ status: 'connected' });
       // 401は再試行しない相手の拒否。権限切れとして扱う。
       stubUberApi({ listStatus: 401 });
-
       const { res, trace } = await withInvocation('http', async () => ({
         res: await call(STORES_PATH), trace: currentInvocation()!,
       }));
@@ -1785,13 +1780,18 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       const body = (await res.json()) as Record<string, unknown>;
       expect(body).toMatchObject({ code: 'auth_expired' });
       expect(JSON.stringify(body)).not.toContain(PROVIDER_FREE_TEXT);
-
       const rows = connectionRows();
       expect(rows[0]).toMatchObject({ status: 'expired', last_error: 'auth_expired' });
       expect(JSON.stringify(rows)).not.toContain(PROVIDER_FREE_TEXT);
       expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(PROVIDER_FREE_TEXT);
       // 取れなかったときに古い候補を消したままにしない（画面が空にならないこと）。
       expect(candidateRows()).toHaveLength(0);
+    });
+    it('一覧取得の一時的な失敗も接続の版を進める', async () => {
+      await seedLoggedIn({ status: 'connected' });
+      stubUberApi({ listStatus: 500 });
+      expect((await call(STORES_PATH)).status).toBe(502);
+      expect(connectionRows()[0]).toMatchObject({ status: 'connected', version: 2 });
     });
 
     it('IDとSecretが無い環境では一覧も確定も止める', async () => {
@@ -1903,7 +1903,7 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       expect(rows[0]).toMatchObject({
         status: 'pending_store',
         provisioned_at: null,
-        last_error: 'pos_activation_unknown',
+        last_error: 'pos_activation_unknown', version: 3,
       });
       expect(JSON.stringify(rows)).not.toContain(PROVIDER_FREE_TEXT);
       expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(PROVIDER_FREE_TEXT);

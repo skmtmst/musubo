@@ -82,6 +82,7 @@ export function canRetryDelivery(delivery: { status: string; attempts: number; u
 
 export const skippedNoRetryNote: Record<string, string> = {
   friend_unavailable: '友だち側の事情のため、この記録は再送できません。',
+  recipient_changed: '確認したLINE宛先が変わったため、この記録は再送できません。',
   campaign_snapshot_missing: '予約内容が残っていないため、この記録は再送できません。',
   line_account_mismatch: 'アカウントが一致しないため、この記録は再送できません。',
   campaign_form_already_submitted: 'すでに回答済みのため、この記録は再送しません。',

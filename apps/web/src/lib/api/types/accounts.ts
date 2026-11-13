@@ -61,6 +61,7 @@ export type HandoverMatchCounts = Record<HandoverMatchBucket, number>
 
 export interface AccountHandover {
   id: string
+  confirmationRevision?: number
   fromAccountId: string
   /** 受け取り先。コードが読まれるまでは null。 */
   toAccountId: string | null

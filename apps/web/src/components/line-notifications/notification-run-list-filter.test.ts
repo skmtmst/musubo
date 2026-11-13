@@ -11,7 +11,7 @@ function run(overrides: Partial<EcNotificationRun> & Pick<EcNotificationRun, 'id
     source: 'EC連携',
     sourceEventId: `event-${overrides.id}`,
     friendId: `friend-${overrides.id}`,
-    friendName: '山田 花子',
+    friendName: '見本 143',
     orderNumber: `NEN-${overrides.id}`,
     channel: 'line',
     status: 'failed',

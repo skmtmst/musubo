@@ -149,7 +149,7 @@ describe('broadcast data contracts', () => {
 
   it('通常: 対象3人・除外理由・送信枠・同時刻配信・21条件軸を実データで返す', async () => {
     insertFriend(testDb.raw, 'friend-ready', {
-      line_account_id: 'account-1', display_name: '山田 太郎', updated_at: '2026-09-07T10:00:00.000Z',
+      line_account_id: 'account-1', display_name: '見本 141', updated_at: '2026-09-07T10:00:00.000Z',
     });
     insertFriend(testDb.raw, 'friend-hidden', {
       line_account_id: 'account-1', display_name: '非表示', is_hidden: 1, updated_at: '2026-09-07T09:00:00.000Z',
@@ -412,7 +412,7 @@ describe('broadcast data contracts', () => {
   });
 
   it('配信に紐づくURLだけのクリック内訳とLINE開封母数を返す', async () => {
-    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', display_name: '山田 太郎' });
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', display_name: '見本 141' });
     seedBroadcast(testDb, 'broadcast-1');
     testDb.raw.prepare(`
       INSERT INTO tracked_links

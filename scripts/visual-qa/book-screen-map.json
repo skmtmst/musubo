@@ -14,7 +14,7 @@
               "conflicts": [
                 {
                   "staffId": "bs-ch-3",
-                  "staffName": "佐野 直人",
+                  "staffName": "見本 31",
                   "bookingId": "visual-conflict-1",
                   "otherBookingId": "visual-conflict-2",
                   "startsAt": "2026-10-03T04:00:00Z",
@@ -30,10 +30,10 @@
                   "bookings": [
                     {
                       "bookingId": "visual-conflict-1",
-                      "customerName": "山田 花子",
+                      "customerName": "見本 143",
                       "menuName": "トリミング",
                       "staffId": "bs-ch-3",
-                      "staffName": "佐野 直人",
+                      "staffName": "見本 31",
                       "startsAt": "2026-10-03T04:00:00Z",
                       "endsAt": "2026-10-03T05:00:00Z",
                       "source": "liff",
@@ -42,10 +42,10 @@
                     },
                     {
                       "bookingId": "visual-conflict-2",
-                      "customerName": "鈴木 健",
+                      "customerName": "見本 178",
                       "menuName": "シャンプー",
                       "staffId": "bs-ch-3",
-                      "staffName": "佐野 直人",
+                      "staffName": "見本 31",
                       "startsAt": "2026-10-03T04:00:00Z",
                       "endsAt": "2026-10-03T04:45:00Z",
                       "source": "import",

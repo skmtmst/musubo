@@ -10,6 +10,7 @@ import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent } from '@testing-library/react'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -19,6 +20,8 @@ const getFriend = vi.hoisted(() => vi.fn())
 const fetchApi = vi.hoisted(() => vi.fn())
 const forFriend = vi.hoisted(() => vi.fn())
 const saveForFriend = vi.hoisted(() => vi.fn())
+const chatGet = vi.hoisted(() => vi.fn())
+const chatUpdate = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ current: 'owner' as string | null }))
 const account = vi.hoisted(() => ({ current: 'account-a' }))
 const capturedDeleteConfirm = vi.hoisted(() => ({ current: null as null | (() => unknown) }))
@@ -56,6 +59,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         formSubmissions: async () => ({ success: true, data: { items: [], total: 0, nextCursor: null } }),
       },
       friendFields: { ...actual.api.friendFields, forFriend, saveForFriend },
+      chats: { ...actual.api.chats, get: chatGet, update: chatUpdate },
       folders: { ...actual.api.folders, list: async () => ({ success: true, data: [] }) },
       staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: role.current } }) },
     },
@@ -79,6 +83,7 @@ vi.mock('@/lib/line-accounts-cache', async (importOriginal: () => Promise<typeof
   ...await importOriginal(),
   loadLineAccounts: async () => ({ success: true, data: [{ id: 'account-b', name: '別のLINEアカウント' }] }),
 }))
+vi.mock('@/lib/operators-cache', () => ({ loadOperators: async () => ({ success: true, data: [{ id: 'op-1', name: '確認担当' }] }) }))
 vi.mock('@/components/shared/confirm-dialog', async (importOriginal: () => Promise<typeof import('@/components/shared/confirm-dialog')>) => {
   const actual = await importOriginal()
   return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
@@ -103,6 +108,7 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 
 import { ApiError } from '@/lib/api'
 import FriendDetailV8 from './detail'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -120,7 +126,7 @@ Object.defineProperty(window, 'localStorage', {
 const friend = {
   id: 'friend-1',
   lineUserId: 'U1',
-  displayName: '山田 花子',
+  displayName: '見本 143',
   pictureUrl: null,
   statusMessage: null,
   isFollowing: true,
@@ -148,6 +154,9 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  clearToastsForTest()
+  chatGet.mockReset().mockResolvedValue({ success: true, data: { id: 'friend-1', friendId: 'friend-1', status: 'resolved', operatorId: 'op-1', notes: '変更前のメモ', revision: 7 } })
+  chatUpdate.mockReset().mockResolvedValue({ success: true, data: {} })
   account.current = 'account-a'
   capturedDeleteConfirm.current = null
   fetchApi.mockClear()
@@ -161,7 +170,7 @@ beforeEach(() => {
     success: true,
     data: { items: path.includes('cursor=') ? [] : timeline, nextCursor: path.includes('cursor=') ? null : 'next-1' },
   }))
-  forFriend.mockImplementation(async () => ({ success: true, data: { items: [field('f-name', '本名', '山田 花子', true), field('f-dog', '犬の名前', 'こむぎ')], hiddenPersonalCount: 0 } }))
+  forFriend.mockImplementation(async () => ({ success: true, data: { items: [field('f-name', '本名', '見本 143', true), field('f-dog', '犬の名前', 'こむぎ')], hiddenPersonalCount: 0 } }))
   saveForFriend.mockImplementation(async () => ({ success: true, data: { updated: 1 } }))
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -170,6 +179,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root.unmount())
+  clearToastsForTest()
   host.remove()
   delete document.documentElement.dataset.theme
 })
@@ -181,17 +191,75 @@ async function flush() {
 }
 
 async function render() {
-  act(() => { root.render(<FriendDetailV8 />) })
+  act(() => { root.render(<><FriendDetailV8 /><ToastHost /></>) })
   await flush()
 }
 
 const links = (text: string) => [...host.querySelectorAll('a, button')].filter((el) => el.textContent?.trim() === text)
 
+async function editMemo() {
+  await render()
+  const edit = [...host.querySelectorAll('section[aria-label="メモ"] button')].find(el => el.textContent?.trim() === '編集する') as HTMLButtonElement
+  expect(edit).toBeTruthy()
+  await act(async () => edit.click())
+  await flush()
+  const input = document.querySelector('[data-support-editor] textarea') as HTMLTextAreaElement
+  expect(input.value).toBe('変更前のメモ')
+  fireEvent.change(input, { target: { value: '確認用の保存後メモ' } })
+}
+
+async function saveMemo() {
+  const dialog = document.querySelector('[data-support-editor]')!.closest('[role="dialog"]')!
+  const save = [...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === '保存する')!
+  await act(async () => save.click())
+  await flush()
+}
+
+describe('対応とメモの保存結果', () => {
+  it('再取得したメモを保ち、成功の知らせを1件出す', async () => {
+    chatUpdate.mockImplementation(async () => {
+      getFriend.mockResolvedValue({ success: true, data: { ...friend, support: { ...friend.support, notes: '確認用の保存後メモ' } } })
+      return { success: true, data: {} }
+    })
+    await editMemo(); await saveMemo()
+    expect(chatUpdate).toHaveBeenCalledExactlyOnceWith('friend-1', { status: 'resolved', operatorId: 'op-1', notes: '確認用の保存後メモ', revision: 7 })
+    expect(host.querySelector('section[aria-label="メモ"]')?.textContent).toContain('確認用の保存後メモ')
+    expect(document.querySelector('[data-support-editor]')).toBeNull()
+    const toasts = host.querySelectorAll('[data-toast]')
+    expect(toasts).toHaveLength(1)
+    expect(toasts[0].textContent).toContain('対応状況とメモを更新しました')
+    expect([...host.querySelectorAll('[data-design-part="notice"]')].filter(el => el.textContent?.includes('対応状況とメモを更新しました'))).toHaveLength(0)
+  })
+  it.each(['failure', 'conflict'])('%sでは入力と理由を残し、成功の知らせを出さない', async outcome => {
+    if (outcome === 'conflict') chatUpdate.mockRejectedValue(new ApiError(409, 'conflict'))
+    else chatUpdate.mockResolvedValue({ success: false, error: '保存できませんでした。もう一度お試しください。' })
+    await editMemo(); await saveMemo()
+    expect(chatUpdate).toHaveBeenCalledTimes(1)
+    expect((document.querySelector('[data-support-editor] textarea') as HTMLTextAreaElement).value).toBe('確認用の保存後メモ')
+    expect(document.querySelectorAll('[data-toast]')).toHaveLength(0)
+    const dialog = document.querySelector('[data-support-editor]')!.closest('[role="dialog"]')!
+    expect(dialog.querySelector('[role="alert"]')?.textContent).toContain(outcome === 'conflict' ? '入力を残して最新の内容を読み直しました' : '保存できませんでした')
+  })
+  it.each(['account', 'friend'])('%s切替後の旧成功では通知を出さない', async scope => {
+    let release!: (value: unknown) => void
+    chatUpdate.mockReturnValue(new Promise(resolve => { release = resolve }))
+    await editMemo(); await saveMemo()
+    if (scope === 'account') account.current = 'account-b'
+    else params.current = new URLSearchParams('id=friend-2')
+    await render()
+    await act(async () => release({ success: true, data: {} }))
+    await flush()
+    expect(chatUpdate).toHaveBeenCalledTimes(1)
+    expect(document.querySelectorAll('[data-toast]')).toHaveLength(0)
+    expect(document.querySelector('[data-support-editor]')).toBeNull()
+  })
+})
+
 describe('V8 友だち詳細（src/v8）の動き', () => {
   it('概要に名前・札・本名・タグ・マイル・次の配信・最近の履歴が出る', async () => {
     await render()
     const text = host.textContent ?? ''
-    expect(text).toContain('山田 花子')
+    expect(text).toContain('見本 143')
     expect(text).toContain('対応済み')
     expect(text).toContain('VIP')
     expect(text).toContain('2,450')
@@ -282,22 +350,22 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
 
 it('本名の固定欄とシステム表示名を、LINE登録名や通常の情報欄と分けて表示する', async () => {
   getFriend.mockResolvedValue({ success: true, data: { ...friend, realName: '以前の本名', systemDisplayName: '社内の呼び名' } })
-  forFriend.mockResolvedValue({ success: true, data: { items: [{ ...field('fixed-name', '名前', '本名の値', true), fixedKey: 'name' }, field('other-name', '本名', '山田 花子')], hiddenPersonalCount: 0 } })
+  forFriend.mockResolvedValue({ success: true, data: { items: [{ ...field('fixed-name', '名前', '本名の値', true), fixedKey: 'name' }, field('other-name', '本名', '見本 143')], hiddenPersonalCount: 0 } })
   await render()
   const basic = host.querySelector('[aria-label="基本"]')!
   expect(basic.textContent).toContain('本名の値')
   expect(basic.textContent).not.toContain('以前の本名')
-  expect(basic.textContent).not.toContain('山田 花子')
+  expect(basic.textContent).not.toContain('見本 143')
   act(() => { (links('顧客情報をすべて表示')[0] as HTMLButtonElement).click() })
   await flush()
   expect(host.querySelector('[aria-label="友だち情報"]')!.textContent).toContain('社内の呼び名')
 })
 it('本名の固定欄が未設定でも、同じ名前の通常情報欄を代わりに表示しない', async () => {
   getFriend.mockResolvedValue({ success: true, data: { ...friend, realName: null, systemDisplayName: null } })
-  forFriend.mockResolvedValue({ success: true, data: { items: [{ ...field('fixed-name', '名前', '', true), fixedKey: 'name', value: null }, field('other-name', '本名', '山田 花子')], hiddenPersonalCount: 0 } })
+  forFriend.mockResolvedValue({ success: true, data: { items: [{ ...field('fixed-name', '名前', '', true), fixedKey: 'name', value: null }, field('other-name', '本名', '見本 143')], hiddenPersonalCount: 0 } })
   await render()
   const basic = host.querySelector('[aria-label="基本"]')!
-  expect(basic.textContent).not.toContain('山田 花子')
+  expect(basic.textContent).not.toContain('見本 143')
   expect(basic.textContent).toContain('未設定')
 })
 
@@ -326,7 +394,7 @@ it('友だち削除の確認には対象アカウントが不明な場合も明�
   act(() => bodyButtons().find(button => button.textContent === '友だちのデータを削除する')!.click()); await flush()
   const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
   expect(dialog.textContent).toContain('LINEアカウント')
-  expect(dialog.textContent).toContain('山田 花子')
+  expect(dialog.textContent).toContain('見本 143')
   expect(dialog.textContent).toContain('名前を確認できません')
   expect(dialog.textContent).toContain('環境')
 })

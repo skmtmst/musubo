@@ -193,7 +193,12 @@ export async function reorderTags(db: D1Database, ids: string[], scope?: { allow
 }
 
 export async function deleteTag(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM tags WHERE id = ?`).bind(id).run();
+  await db.batch([
+    db.prepare(`UPDATE scenarios SET content_revision=content_revision+1 WHERE trigger_tag_id=?
+      OR id IN (SELECT scenario_id FROM scenario_steps WHERE on_reach_tag_id=?)
+      OR id IN (SELECT scenario_id FROM scenario_triggers WHERE tag_id=?)`).bind(id, id, id),
+    db.prepare(`DELETE FROM tags WHERE id = ?`).bind(id),
+  ]);
 }
 
 // --- タグの親分類 -----------------------------------------------------------

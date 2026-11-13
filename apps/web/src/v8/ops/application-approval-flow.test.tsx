@@ -24,7 +24,7 @@ import OpsApplicationDetail from './application-detail'
 
 const initial = {
   id: 'application-1', company_name: '申込会社', contact_name: '担当者',
-  email: 'applicant@example.com', phone: '03-1234-5678', referral_source: 'SNS',
+  email: 'applicant@example.com', phone: '03-0000-5678', referral_source: 'SNS',
   status: 'pending', contact_note: null, contacted_at: null, approved_at: null,
   invite_sent_at: null, tenant_id: null, created_at: '2026-10-29T01:40:00.000Z',
 } as OpsApplication

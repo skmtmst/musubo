@@ -30,6 +30,10 @@ export async function acquirePublishLease(
   owner: string,
   nowIso: string,
   ttlMs = PUBLISH_LEASE_MS,
+  expected?:{version:number;generation:number;isDefaultForAll:boolean;pages:Array<{id:string;orderIndex:number;lineRichMenuId:string|null}>},
+  expectedDraft?:{version:number;generation:number;pages:Array<{orderIndex:number;imageR2Key:string|null;imageContentType:string|null}>},
+  expectedGeneration?: number,
+  expectedConfirmationRevision?: number,
 ): Promise<number | null> {
   // 取得と世代の採番を1文にする。別々にすると、間に割り込んだ取得の世代を
   // 自分のものと取り違える。
@@ -42,9 +46,18 @@ export async function acquirePublishLease(
          AND (publishing_owner IS NULL
            OR publishing_expires_at IS NULL
            OR publishing_expires_at <= ?)
+         AND (? IS NULL OR publishing_generation = ?)
+         AND (? IS NULL OR confirmation_revision = ?)
+         ${expected ? `AND version=? AND publishing_generation=? AND status='published' AND is_default_for_all=?
+           AND (SELECT COUNT(*) FROM rich_menu_pages WHERE group_id=rich_menu_groups.id)=json_array_length(?)
+           AND NOT EXISTS(SELECT 1 FROM rich_menu_pages p WHERE p.group_id=rich_menu_groups.id AND NOT EXISTS
+             (SELECT 1 FROM json_each(?) e WHERE json_extract(e.value,'$.id')=p.id AND json_extract(e.value,'$.orderIndex')=p.order_index AND json_extract(e.value,'$.lineRichMenuId') IS p.line_richmenu_id))` : ''}
+         ${expectedDraft ? `AND version=? AND publishing_generation=? AND (SELECT COUNT(*) FROM rich_menu_pages WHERE group_id=rich_menu_groups.id)=json_array_length(?)
+           AND NOT EXISTS(SELECT 1 FROM rich_menu_pages p WHERE p.group_id=rich_menu_groups.id AND NOT EXISTS
+             (SELECT 1 FROM json_each(?) e WHERE json_extract(e.value,'$.orderIndex')=p.order_index AND json_extract(e.value,'$.imageR2Key') IS p.image_r2_key AND json_extract(e.value,'$.imageContentType') IS p.image_content_type))` : ''}
        RETURNING publishing_generation`,
     )
-    .bind(jstNow(), owner, publishLeaseExpiresAt(nowIso, ttlMs), groupId, nowIso)
+    .bind(jstNow(), owner, publishLeaseExpiresAt(nowIso, ttlMs), groupId, nowIso, expectedGeneration ?? null, expectedGeneration ?? null, expectedConfirmationRevision ?? null, expectedConfirmationRevision ?? null,...(expected?[expected.version,expected.generation,Number(expected.isDefaultForAll),JSON.stringify(expected.pages),JSON.stringify(expected.pages)]:[]),...(expectedDraft?[expectedDraft.version,expectedDraft.generation,JSON.stringify(expectedDraft.pages),JSON.stringify(expectedDraft.pages)]:[]))
     .first<{ publishing_generation: number }>();
   return row ? row.publishing_generation : null;
 }
@@ -63,14 +76,15 @@ export async function renewPublishLease(
   fence: PublishLeaseFence,
   nowIso: string,
   ttlMs = PUBLISH_LEASE_MS,
+  expectedConfirmationRevision?: number,
 ): Promise<boolean> {
   const result = await db
     .prepare(
       `UPDATE rich_menu_groups
          SET publishing_at = ?, publishing_expires_at = ?
-       WHERE id = ? AND publishing_owner = ? AND publishing_generation = ?`,
+       WHERE id = ? AND publishing_owner = ? AND publishing_generation = ? AND (? IS NULL OR confirmation_revision = ?)`,
     )
-    .bind(jstNow(), publishLeaseExpiresAt(nowIso, ttlMs), groupId, fence.owner, fence.generation)
+    .bind(jstNow(), publishLeaseExpiresAt(nowIso, ttlMs), groupId, fence.owner, fence.generation, expectedConfirmationRevision ?? null, expectedConfirmationRevision ?? null)
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }
@@ -140,14 +154,17 @@ export async function setPageRichMenuId(
   // 札があるときは「まだ自分が lease を持っている」ことを同じ1文の条件にする。
   // 先に確認してから書くと、確認と書込みの間に回収された旧holderが
   // 新しい所有者の反映を古いIDで上書きできてしまう。
-  const result = await db
-    .prepare(
+  const results = await db.batch([
+    db.prepare(
       `UPDATE rich_menu_pages SET line_richmenu_id = ?, updated_at = ?
         WHERE id = ?${fenceClause(fence, 'rich_menu_pages.group_id')}`,
     )
-    .bind(lineRichMenuId, jstNow(), pageId, ...fenceBinds(fence))
-    .run();
-  return (result.meta?.changes ?? 0) > 0;
+    .bind(lineRichMenuId, jstNow(), pageId, ...fenceBinds(fence)),
+    db.prepare(`UPDATE rich_menu_groups SET confirmation_revision = confirmation_revision + 1
+      WHERE id = (SELECT group_id FROM rich_menu_pages WHERE id = ? AND line_richmenu_id = ?)${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`)
+      .bind(pageId, lineRichMenuId, ...fenceBinds(fence)),
+  ]);
+  return (results[0].meta?.changes ?? 0) > 0;
 }
 
 /**
@@ -166,7 +183,7 @@ export async function markRichMenuGroupPublished(
   const result = await db
     .prepare(
       `UPDATE rich_menu_groups
-         SET status = 'published', updated_at = ?
+         SET status = 'published', confirmation_revision = confirmation_revision + 1, updated_at = ?
        WHERE id = ?${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`,
     )
     .bind(jstNow(), groupId, ...fenceBinds(fence))
@@ -198,7 +215,7 @@ export async function markRichMenuGroupUnpublished(
   const decided = await db
     .prepare(
       `UPDATE rich_menu_groups
-          SET status = 'draft', is_default_for_all = 0, updated_at = ?
+          SET status = 'draft', is_default_for_all = 0, confirmation_revision = confirmation_revision + 1, updated_at = ?
         WHERE id = ?${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`,
     )
     .bind(now, groupId, ...fenceBinds(fence))

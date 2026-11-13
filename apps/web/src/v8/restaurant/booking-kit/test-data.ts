@@ -16,10 +16,10 @@ export const tables = [
 ]
 
 export const menuItems = [
-  { id: 'm1', store_id: 'store-1', kind: 'course', name: '秋の鹿肉コース', price: 8800, tax_mode: 'included', allergens_json: '["小麦","乳"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'active' },
-  { id: 'm2', store_id: 'store-1', kind: 'a_la_carte', name: '鹿肉のロースト', price: 2400, tax_mode: 'included', allergens_json: '[]', service_periods_json: '["lunch","dinner"]', duration_minutes: null, status: 'active' },
-  { id: 'm3', store_id: 'store-1', kind: 'course', name: '夏の冷製コース', price: 6600, tax_mode: 'included', allergens_json: '["小麦"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'archived' },
-  { id: 'm4', store_id: 'store-1', kind: 'course', name: '春の下書きコース', price: 5000, tax_mode: 'included', allergens_json: '[]', service_periods_json: '["dinner"]', duration_minutes: 90, status: 'draft' },
+  { id: 'm1', confirmation_revision: 1, store_id: 'store-1', kind: 'course', name: '秋の鹿肉コース', price: 8800, tax_mode: 'included', allergens_json: '["小麦","乳"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'active' },
+  { id: 'm2', confirmation_revision: 1, store_id: 'store-1', kind: 'a_la_carte', name: '鹿肉のロースト', price: 2400, tax_mode: 'included', allergens_json: '[]', service_periods_json: '["lunch","dinner"]', duration_minutes: null, status: 'active' },
+  { id: 'm3', confirmation_revision: 1, store_id: 'store-1', kind: 'course', name: '夏の冷製コース', price: 6600, tax_mode: 'included', allergens_json: '["小麦"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'archived' },
+  { id: 'm4', confirmation_revision: 1, store_id: 'store-1', kind: 'course', name: '春の下書きコース', price: 5000, tax_mode: 'included', allergens_json: '[]', service_periods_json: '["dinner"]', duration_minutes: 90, status: 'draft' },
 ]
 
 const at = (dayOffset: number, hour: number, minute = 0) => {
@@ -30,7 +30,7 @@ const at = (dayOffset: number, hour: number, minute = 0) => {
 }
 
 export function reservation(id: string, over: Record<string, unknown>) {
-  return { id, store_id: 'store-1', store_name: '渋谷店', source: 'line', external_id: null, customer_name: '佐藤 健', customer_phone: null, line_uid: null, guest_count: 2, starts_at: at(1, 18), ends_at: at(1, 20), table_id: 't1', table_label: '2人卓', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only', ...over }
+  return { id, store_id: 'store-1', store_name: '渋谷店', source: 'line', external_id: null, customer_name: '見本 114', customer_phone: null, line_uid: null, guest_count: 2, starts_at: at(1, 18), ends_at: at(1, 20), table_id: 't1', table_label: '2人卓', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only', ...over }
 }
 
 export { at }
@@ -39,7 +39,7 @@ export function snapshotOf(over: Record<string, unknown> = {}) {
   return {
     environment: 'staging_test', integrationPolicy: 'inbound_only',
     organization: { id: 'org-1', account_id: 'account-1', tenant_id: null, tenant_name: null, name: 'テスト組織', status: 'active' },
-    stores: [store], memberships: [{ id: 'mem-2', store_id: 'store-1', staff_name: '中川 由美', email: null, role: 'store_manager', line_uid: null, google_email: null, status: 'active' }],
+    stores: [store], memberships: [{ id: 'mem-2', store_id: 'store-1', staff_name: '見本 30', email: null, role: 'store_manager', line_uid: null, google_email: null, status: 'active' }],
     tables, menuItems, reservations: [], reservationTotal: 0, inventory: [],
     approvals: [{ id: 'a1', store_id: 'store-1', kind: 'menu_change', title: '価格改定', status: 'pending', requested_by: null, review_comment: null, payload_json: null }],
     connectors: [], reviews: [], posts: [], lineFlows: [],

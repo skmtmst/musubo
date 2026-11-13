@@ -1120,6 +1120,7 @@ export async function unpublishRichMenuGroup(
     }
     // richmenu 削除
     if (page.lineRichMenuId) {
+      await heartbeat?.();
       try {
         await line.deleteRichMenu(page.lineRichMenuId);
       } catch (e) {
@@ -1141,10 +1142,12 @@ export async function unpublishRichMenuGroup(
         if (p.lineRichMenuId) ownIds.add(p.lineRichMenuId);
       }
       if (ownIds.has(currentDefault)) {
+        await heartbeat?.();
         await line.clearDefaultRichMenu();
       }
     }
   } catch (e) {
+    if (e instanceof PublishLeaseLostError) throw e;
     warnings.push(
       `default lookup/clear failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`,
     );
