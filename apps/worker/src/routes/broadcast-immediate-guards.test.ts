@@ -241,6 +241,20 @@ describe('N-062 即時送信の直前再確認', () => {
 
 
 describe('過去日時からの確認なし送信を防ぐ', () => {
+  test.each([
+    { saveAsDraft: true },
+    { scheduledAt: null },
+  ])('期限切れの予約は %s で下書きに戻せる', async (change) => {
+    const db = createTestD1(); seedBase(db.raw);
+    db.raw.prepare("UPDATE broadcasts SET status = 'scheduled', scheduled_at = '2000-01-01T00:00:00Z' WHERE id = 'bc-1'").run();
+    const response = await setupApp(db).request('/api/broadcasts/bc-1', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Test-Step-Up': 'verified' },
+      body: JSON.stringify({ ...change, expectedVersion: 1 }),
+    });
+    expect(response.status).toBe(200);
+    expect(rowOf(db.raw)).toEqual({ status: 'draft' });
+    db.raw.close();
+  });
   test.each([null, '2099-01-01T00:00:00Z'])('日時 %s は作成・更新できる', async (scheduledAt) => {
     const db = createTestD1(); seedBase(db.raw);
     const app = setupApp(db);
