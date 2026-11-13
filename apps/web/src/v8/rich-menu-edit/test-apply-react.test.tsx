@@ -9,7 +9,7 @@ import type { RichMenuTestApplyItem } from '@/lib/api'
 
 const net = vi.hoisted(() => ({
   role: 'owner', account: { id: 'account-1', name: '店A' },
-  state: { linked: true, linkGuidance: null as string | null,
+  state: { linked: true, confirmationRevision: 4, destinationToken: 'a'.repeat(64), linkGuidance: null as string | null,
     destination: { staffName: '担当者A', lineUserIdMasked: 'U***1234' },
     active: null as RichMenuTestApplyItem | null, recent: [] as RichMenuTestApplyItem[] },
   apply: vi.fn(), revert: vi.fn(), readState: vi.fn(),
@@ -70,7 +70,7 @@ async function confirmApply() {
 beforeEach(() => {
   net.role = 'owner'
   net.account = { id: 'account-1', name: '店A' }
-  net.state = { linked: true, linkGuidance: null, destination: { staffName: '担当者A', lineUserIdMasked: 'U***1234' }, active: null, recent: [] }
+  net.state = { linked: true, confirmationRevision: 4, destinationToken: 'a'.repeat(64), linkGuidance: null, destination: { staffName: '担当者A', lineUserIdMasked: 'U***1234' }, active: null, recent: [] }
   net.readState.mockReset().mockImplementation(async () => ({ success: true, data: { ...net.state } }))
   net.apply.mockReset().mockImplementation(async () => { net.state.active = item('applied'); return { success: true, data: { id: 'apply-1', status: 'applied' } } })
   net.revert.mockReset().mockImplementation(async () => { net.state.active = item('reverted'); return { success: true, data: { ...net.state.active, userMenuAction: 'restored' } } })
@@ -106,9 +106,20 @@ describe('現役V8の本人LINEでのテスト', () => {
     expect(net.apply).toHaveBeenCalledTimes(2)
     expect(net.apply.mock.calls[0][0]).toBe('g1')
     expect(net.apply.mock.calls[0][1]).toEqual(expect.any(String))
+    expect(net.apply.mock.calls[0][2]).toEqual({ expectedConfirmationRevision: 4, expectedDestinationToken: 'a'.repeat(64) })
     expect(net.apply.mock.calls[1][1]).toBe(net.apply.mock.calls[0][1])
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '自分のLINEにこのメニューを出しますか？' })).toBeNull())
     expect(screen.getByRole('button', { name: '元のメニューに戻す' })).toBeTruthy()
+  })
+  it('409の後は新しい宛先と版を読み直す', async () => {
+    const { ApiError } = await import('@/lib/api')
+    const dialog = await confirmApply()
+    net.state = { ...net.state, confirmationRevision: 5, destinationToken: 'b'.repeat(64), destination: { staffName: '担当者B', lineUserIdMasked: 'U***9999' } }
+    net.apply.mockRejectedValueOnce(new ApiError(409, 'changed'))
+    fireEvent.click(within(dialog).getByRole('button', { name: '自分のLINEに適用する' }))
+    await within(dialog).findByText(/担当者BのLINE/)
+    fireEvent.click(within(dialog).getByRole('button', { name: '自分のLINEに適用する' }))
+    await waitFor(() => expect(net.apply).toHaveBeenLastCalledWith('g1', expect.any(String), { expectedConfirmationRevision: 5, expectedDestinationToken: 'b'.repeat(64) }))
   })
   it('実行中の二重押下では適用要求を増やさない', async () => {
     let resolve!: (value: unknown) => void
@@ -136,7 +147,7 @@ describe('現役V8の本人LINEでのテスト', () => {
     expect(net.revert).not.toHaveBeenCalled()
     fireEvent.click(within(dialog).getByRole('button', { name: '元のメニューに戻す' }))
     await screen.findByText(message)
-    expect(net.revert).toHaveBeenCalledExactlyOnceWith('g1', expect.any(String))
+    expect(net.revert).toHaveBeenCalledExactlyOnceWith('g1', expect.any(String), 'apply-1')
   })
   it.each([true, false])('失敗後の復元は以前の表示を記録できた場合だけ出す（%s）', async captured => {
     net.state.active = item('failed', captured)
@@ -177,4 +188,22 @@ describe('現役V8の本人LINEでのテスト', () => {
     await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
     expect(net.apply).not.toHaveBeenCalled()
   })
+})
+
+it.each(['apply', 'revert'] as const)('閉じたテスト確認の古い確定から%sを実行しない', async kind => {
+  let dialog: HTMLElement
+  if (kind === 'apply') dialog = await confirmApply()
+  else {
+    net.state.active = item('applied')
+    const panel = await openTest()
+    fireEvent.click(within(panel).getByRole('button', { name: '元のメニューに戻す' }))
+    dialog = await screen.findByRole('dialog', { name: 'テスト適用を取り消しますか？' })
+  }
+  const label = kind === 'apply' ? '自分のLINEに適用する' : '元のメニューに戻す'
+  const button = within(dialog).getByRole('button', { name: label })
+  const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+  const oldClick = (button as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+  fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+  await act(async () => { await oldClick({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button}) })
+  expect(kind === 'apply' ? net.apply : net.revert).not.toHaveBeenCalled()
 })

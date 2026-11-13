@@ -31,7 +31,7 @@ import { at, reservation, snapshotOf } from '../restaurant/booking-kit/test-data
 
 /* 鈴木（Hot Pepper・T4・秋の鹿肉コース・電話あり）と、押さえ（T1）。 */
 const reservationsToday = () => [
-  reservation('r1', { customer_name: '鈴木 真理', source: 'hotpepper', guest_count: 4, customer_phone: '090-1234-5678', starts_at: at(0, 19), ends_at: at(0, 21), table_id: 't4', course_id: 'm1', course_name: '秋の鹿肉コース' }),
+  reservation('r1', { customer_name: '見本 182', source: 'hotpepper', guest_count: 4, customer_phone: '090-0000-5678', starts_at: at(0, 19), ends_at: at(0, 21), table_id: 't4', course_id: 'm1', course_name: '秋の鹿肉コース' }),
   reservation('r2', { customer_name: '押さえ', source: 'phone', status: 'pending', hold_expires_at: at(0, 23), note: '電話のお客さま用', guest_count: 2, starts_at: at(0, 20), ends_at: at(0, 21, 30), table_id: 't1' }),
 ]
 let today: ReturnType<typeof reservationsToday>
@@ -55,8 +55,8 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
 const openDetail = async () => {
   render(<ReservationsPage />)
-  fireEvent.click(await screen.findByRole('button', { name: /^鈴木 真理 4名/ }))
-  return screen.findByRole('dialog', { name: '鈴木 真理さん・4名' })
+  fireEvent.click(await screen.findByRole('button', { name: /^見本 182 4名/ }))
+  return screen.findByRole('dialog', { name: '見本 182さん・4名' })
 }
 
 describe('AjZhH 予約台帳 予約の詳細', () => {
@@ -64,7 +64,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })
     render(<ReservationDetailDialog reservation={{ ...today[0], allergy_note: allergy }} accountId="account-1" tables={data.tables} courses={data.menuItems}
       busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} />)
-    const dialog = screen.getByRole('dialog', { name: '鈴木 真理さん・4名' })
+    const dialog = screen.getByRole('dialog', { name: '見本 182さん・4名' })
     const allergyLine = within(dialog).getByText(`アレルギー：${label}`)
     expect(allergyLine.className.includes('allergy')).toBe(warning)
     expect(dialog.textContent).toContain('電話：090-****-5678')
@@ -80,11 +80,39 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     expect(panel.querySelector('header [data-row-menu]')).toBeNull()
     expect(panel.querySelectorAll('footer [data-row-menu]').length).toBe(1)
     const customer = within(panel).getByText('お客さま').parentElement!
-    expect(customer.textContent).toContain('鈴木 真理 さま')
+    expect(customer.textContent).toContain('見本 182 さま')
     expect(customer.querySelector('[data-source]')).toBeNull()
     expect(within(panel).getByText('予約元').parentElement?.textContent).toContain('ホットペッパー')
     fireEvent.click(within(panel).getByRole('button', { name: '来店にする' }))
     expect(attendance).toHaveBeenCalledWith('r1', 'visited')
+  })
+  it('埋込の来店結果は操作の直前で知らせる', async () => {
+    const attendance = vi.fn().mockResolvedValue({ savedButUnread: true })
+    const data = snapshotOf({ reservations: today, reservationTotal: 2 })
+    render(<ReservationDetailDialog inline reservation={today[0]} accountId="account-1" tables={data.tables} courses={data.menuItems}
+      busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} onReload={() => {}} />)
+    const panel = await screen.findByRole('region', { name: '予約の詳細' })
+    fireEvent.click(within(panel).getByRole('button', { name: '来店にする' }))
+    const alert = await within(panel).findByRole('alert')
+    const footer = panel.querySelector('footer')!
+    expect(alert.textContent).toContain('保存しましたが、最新の予約を読み込めませんでした')
+    expect(alert.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(alert.compareDocumentPosition(within(panel).getByText('来店')) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
+  })
+  it('来店の保存後に再読込できなければ窓内に案内し、再操作を止める', async () => {
+    const attendance = vi.fn().mockResolvedValue({ savedButUnread: true })
+    const reload = vi.fn()
+    const data = snapshotOf({ reservations: today, reservationTotal: 2 })
+    const props = { reservation: today[0], accountId: 'account-1', tables: data.tables, courses: data.menuItems, busy: false, canWrite: true, onClose: () => {}, onCancel: () => {}, onRestore: () => {}, onEdit: () => {}, onAttendance: attendance, onReload: reload }
+    const view = render(<ReservationDetailDialog {...props} />)
+    const dialog = screen.getByRole('dialog', { name: '見本 182さん・4名' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '来店にする' }))
+    expect(await within(dialog).findByText('保存しましたが、最新の予約を読み込めませんでした。読み直してから続けてください。')).toBeTruthy()
+    expect((within(dialog).getByRole('button', { name: '来店にする' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(within(dialog).getByRole('button', { name: '読み直す' }))
+    expect(reload).toHaveBeenCalledOnce()
+    view.rerender(<ReservationDetailDialog {...props} reservation={{ ...today[0], customer_version: (today[0].customer_version ?? 1) + 1 }} />)
+    expect(within(dialog).queryByText('保存しましたが、最新の予約を読み込めませんでした。読み直してから続けてください。')).toBeNull()
   })
   it('予約の箱で開き、日時と卓・コースと予約元・アレルギー・これまでの来店が出る', async () => {
     const dialog = await openDetail()
@@ -93,20 +121,20 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     expect(text()).toContain('秋の鹿肉コース ¥8,800・Hot Pepper から')
     expect(text()).toContain('アレルギー：なし')
     await waitFor(() => expect(text()).toContain('これまでの来店 3 回・前回 08/14'))
-    expect(fixture.customerHistory).toHaveBeenCalledWith('account-1', 'store-1', { phone: '090-1234-5678', lineUid: undefined })
+    expect(fixture.customerHistory).toHaveBeenCalledWith('account-1', 'store-1', { phone: '090-0000-5678', lineUid: undefined })
     expect(within(dialog).getByRole('button', { name: '内容を変える' })).not.toBeNull()
   })
 
   it('「次の予約」の「詳細を見る」でも開く', async () => {
     render(<ReservationsPage />)
-    await screen.findByRole('button', { name: /^鈴木 真理 4名/ })
+    await screen.findByRole('button', { name: /^見本 182 4名/ })
     fireEvent.click(screen.getByRole('button', { name: '詳細を見る' }))
-    expect(await screen.findByRole('dialog', { name: '鈴木 真理さん・4名' })).not.toBeNull()
+    expect(await screen.findByRole('dialog', { name: '見本 182さん・4名' })).not.toBeNull()
   })
 
   it('取り消すは確かめの窓を通してから今の口へ取消を送る', async () => {
     const dialog = await openDetail()
-    fireEvent.click(within(dialog).getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '見本 182のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '取り消す' }))
     expect(fixture.updateReservation).not.toHaveBeenCalled()
     const confirm = await screen.findByRole('dialog', { name: 'この予約を取り消しますか？' })
@@ -117,8 +145,8 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
   it('内容を変えるで今の変更の窓へ移る', async () => {
     const dialog = await openDetail()
     fireEvent.click(within(dialog).getByRole('button', { name: '内容を変える' }))
-    expect(await screen.findByRole('dialog', { name: '鈴木 真理さんの予約を変更' })).not.toBeNull()
-    expect(screen.queryByRole('dialog', { name: '鈴木 真理さん・4名' })).toBeNull()
+    expect(await screen.findByRole('dialog', { name: '見本 182さんの予約を変更' })).not.toBeNull()
+    expect(screen.queryByRole('dialog', { name: '見本 182さん・4名' })).toBeNull()
   })
 
   it('押さえの箱は詳細ではなく押さえの窓を開く', async () => {
@@ -132,7 +160,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     role.value = 'viewer'
     const dialog = await openDetail()
     expect(within(dialog).getAllByRole('button', { name: '閉じる' }).length).toBe(1)
-    fireEvent.click(within(dialog).getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '見本 182のその他操作' }))
     expect(screen.getByRole('menuitem', { name: '取り消す' }).getAttribute('aria-disabled')).toBe('true')
     expect(within(dialog).getByRole('button', { name: '内容を変える' }).getAttribute('aria-disabled')).toBe('true')
     expect(screen.queryByRole('button', { name: '卓を変える' })).toBeNull()
@@ -146,7 +174,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })
     render(<ReservationDetailDialog inline={inline} reservation={today[0]} accountId="account-1" tables={data.tables} courses={data.menuItems}
       busy={false} canWrite={false} onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} />)
-    const area = inline ? screen.getByRole('region', { name: '予約の詳細' }) : screen.getByRole('dialog', { name: '鈴木 真理さん・4名' })
+    const area = inline ? screen.getByRole('region', { name: '予約の詳細' }) : screen.getByRole('dialog', { name: '見本 182さん・4名' })
     for (const name of (inline ? ['来店にする', '無断にする'] : ['来店にする'])) {
       const button = within(area).getByRole('button', { name })
       expect(button.getAttribute('aria-disabled')).toBe('true')
@@ -160,7 +188,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })
     render(<ReservationDetailDialog reservation={{...today[0], status: 'pending'}} accountId="account-1" tables={data.tables} courses={data.menuItems}
       busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={() => {}} />)
-    fireEvent.click(screen.getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(screen.getByRole('button', { name: '見本 182のその他操作' }))
     const button = screen.getByRole('menuitem', { name: '無断にする' })
     expect(button.getAttribute('aria-disabled')).toBe('true')
     expect(document.body.textContent).toContain('承認してから')
@@ -171,12 +199,12 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })
     render(<ReservationDetailDialog reservation={today[0]} accountId="account-1" tables={data.tables} courses={data.menuItems}
       busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} />)
-    const dialog = await screen.findByRole('dialog', { name: '鈴木 真理さん・4名' })
-    fireEvent.click(within(dialog).getByRole('button', { name: '鈴木 真理のその他操作' }))
+    const dialog = await screen.findByRole('dialog', { name: '見本 182さん・4名' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '見本 182のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '無断にする' }))
     expect(attendance).not.toHaveBeenCalled()
     const confirm = await screen.findByRole('alertdialog', { name: '無断にしますか？' })
-    expect(confirm.textContent).toContain('鈴木 真理さん')
+    expect(confirm.textContent).toContain('見本 182さん')
     expect(confirm.textContent).toContain('19:00')
     expect(confirm.textContent).toContain('LINEアカウント')
     expect(confirm.textContent).toContain('渋谷店')
@@ -185,7 +213,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     expect(within(confirm).getByRole('button', { name: '無断にする' }).getAttribute('data-variant')).toBe('danger')
     fireEvent.click(within(confirm).getByRole('button', { name: 'キャンセル' }))
     expect(attendance).not.toHaveBeenCalled()
-    fireEvent.click(within(dialog).getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '見本 182のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '無断にする' }))
     fireEvent.click(within(await screen.findByRole('alertdialog', { name: '無断にしますか？' })).getByRole('button', { name: '無断にする' }))
     expect(attendance).toHaveBeenCalledWith('r1', 'no_show')
@@ -198,7 +226,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })
     const props = { reservation: today[0], tables: data.tables, courses: data.menuItems, busy: false, canWrite: true, onClose: () => {}, onCancel: () => {}, onRestore: () => {}, onEdit: () => {}, onAttendance: attendance }
     const view = render(<ReservationDetailDialog {...props} accountId="account-1" />)
-    fireEvent.click(screen.getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(screen.getByRole('button', { name: '見本 182のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '無断にする' }))
     expect(screen.getByRole('alertdialog', { name: '無断にしますか？' })).toBeTruthy()
     const oldConfirm = held.confirm!
@@ -214,11 +242,11 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })
     render(<ReservationDetailDialog reservation={today[0]} accountId="account-1" tables={data.tables} courses={data.menuItems}
       busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} />)
-    fireEvent.click(screen.getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(screen.getByRole('button', { name: '見本 182のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '無断にする' }))
     const oldConfirm = held.confirm!
     fireEvent.click(within(screen.getByRole('alertdialog', { name: '無断にしますか？' })).getByRole('button', { name: 'キャンセル' }))
-    fireEvent.click(screen.getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(screen.getByRole('button', { name: '見本 182のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '無断にする' }))
     oldConfirm()
     expect(attendance).not.toHaveBeenCalled()
@@ -229,7 +257,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })
     const props = { reservation: today[0], accountId: 'account-1', tables: data.tables, courses: data.menuItems, busy: false, canWrite: true, onClose: () => {}, onCancel: () => {}, onRestore: () => {}, onEdit: () => {}, onAttendance: attendance }
     const view = render(<ReservationDetailDialog {...props} />)
-    fireEvent.click(screen.getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(screen.getByRole('button', { name: '見本 182のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '無断にする' }))
     const oldConfirm = held.confirm!
     view.rerender(<ReservationDetailDialog {...props} canWrite={false} />)
@@ -237,7 +265,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     oldConfirm()
     expect(screen.queryByRole('alertdialog', { name: '無断にしますか？' })).toBeNull()
     expect(attendance).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(screen.getByRole('button', { name: '見本 182のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '無断にする' }))
     const oldStatusConfirm = held.confirm!
     view.rerender(<ReservationDetailDialog {...props} reservation={{ ...today[0], status: 'pending' }} />)
@@ -259,11 +287,11 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
   })
   it('来店済みは退店にするを直接置き、無断は置かない', async () => {
     const attendance = vi.fn()
-    const visited = reservation('r3', { customer_name: '佐藤 健', status: 'visited', guest_count: 2 })
+    const visited = reservation('r3', { customer_name: '見本 114', status: 'visited', guest_count: 2 })
     const data = snapshotOf({ reservations: [visited], reservationTotal: 1 })
     render(<ReservationDetailDialog reservation={visited} accountId="account-1" tables={data.tables} courses={data.menuItems}
       busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} />)
-    const dialog = await screen.findByRole('dialog', { name: '佐藤 健さん・2名' })
+    const dialog = await screen.findByRole('dialog', { name: '見本 114さん・2名' })
     fireEvent.click(within(dialog).getByRole('button', { name: '退店にする' }))
     expect(attendance).toHaveBeenCalledWith('r3', 'depart')
     expect(within(dialog).queryByRole('button', { name: '無断にする' })).toBeNull()

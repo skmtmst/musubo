@@ -102,7 +102,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const [compareOpen, setCompareOpen] = useState(false)
   const [compareBusy, setCompareBusy] = useState(false)
   const [compareError, setCompareError] = useState('')
-  const [publishCheck, setPublishCheck] = useState<{ id: string; entries: ReturnType<typeof templateUsageEntries>; accountId: string; generation: number } | null>(null)
+  const [publishCheck, setPublishCheck] = useState<{ id: string; entries: ReturnType<typeof templateUsageEntries>; accountId: string; generation: number; publishedVersion: number; draftRevision: number } | null>(null)
+  const publishTicket = useRef<object | null>(null)
+  const renderedPublishTicket = publishTicket.current
   const [reloadKey, setReloadKey] = useState(0)
   /*
    * 新しく作る画面で自動保存が先に作ったテンプレート（一斉配信と同じく、
@@ -380,17 +382,22 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     if (!id) { disarm(); router.push(createPageReturnHref('/templates', savedId)) }
   }
 
-  const publishNow = async (templateId: string, generation: number): Promise<boolean> => {
-    const got = await api.templates.get(templateId)
-    if (!alive.current || !canMutateRef.current || generation !== scope.current.generation) return false
-    if (!got.success || !isTemplateDetailData(got.data)) {
-      setError('いまの状態を読み込めませんでした。もう一度お試しください。')
-      return false
+  const publishNow = async (templateId: string, generation: number, confirmed?: { publishedVersion: number; draftRevision: number }): Promise<boolean> => {
+    let version = confirmed
+    if (!version) {
+      const got = await api.templates.get(templateId)
+      if (!alive.current || !canMutateRef.current || generation !== scope.current.generation) return false
+      if (!got.success || !isTemplateDetailData(got.data)) {
+        setError('いまの状態を読み込めませんでした。もう一度お試しください。')
+        return false
+      }
+      version = { publishedVersion: got.data.publishedVersion ?? 0, draftRevision: got.data.draftRevision ?? 0 }
     }
+    if (!alive.current || !canMutateRef.current || generation !== scope.current.generation) return false
     try {
       const res = await api.templates.publish(templateId, {
-        expectedVersion: got.data.publishedVersion ?? 0,
-        expectedDraftRevision: got.data.draftRevision ?? 0,
+        expectedVersion: version.publishedVersion ?? 0,
+        expectedDraftRevision: version.draftRevision ?? 0,
       })
       if (!res.success) {
         setError(res.error || '公開できませんでした。もう一度お試しください。')
@@ -443,7 +450,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       }
       const entries = detail.data.usedBy ? templateUsageEntries(detail.data.usedBy) : []
       if (entries.length > 0) {
-        setPublishCheck({ id: savedId, entries, accountId: detail.data.accountId ?? '', generation })
+        publishTicket.current = {}
+        setPublishCheck({ id: savedId, entries, accountId: detail.data.accountId ?? '', generation, publishedVersion: detail.data.publishedVersion ?? 0, draftRevision: detail.data.draftRevision ?? 0 })
         return
       }
       if (await publishNow(savedId, generation) && alive.current && generation === scope.current.generation) {
@@ -518,7 +526,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const phone = (
     <LinePreview
       title={null}
-      note={messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（山田 太郎さんの場合）'}
+      note={messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（見本 141さんの場合）'}
       accountName={sendName}
       caption="配信日 10:00"
     >
@@ -706,11 +714,12 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         error={error || undefined}
         designNode="cuR8I"
         onConfirm={async () => {
-          if (!publishCheck || !alive.current || !canMutateRef.current || publishCheck.generation !== scope.current.generation) return
+          if (!publishCheck || !renderedPublishTicket || renderedPublishTicket !== publishTicket.current || !alive.current || !canMutateRef.current || publishCheck.generation !== scope.current.generation) return
           setPublishing(true)
           setError('')
           try {
-            if (await publishNow(publishCheck.id, publishCheck.generation) && alive.current && publishCheck.generation === scope.current.generation) {
+            if (await publishNow(publishCheck.id, publishCheck.generation, publishCheck) && alive.current && publishCheck.generation === scope.current.generation) {
+              publishTicket.current = null
               setPublishCheck(null)
               notifyToast('公開しました')
               leave(publishCheck.id)
@@ -719,7 +728,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             setPublishing(false)
           }
         }}
-        onCancel={() => setPublishCheck(null)}
+        onCancel={() => { publishTicket.current = null; setPublishCheck(null) }}
       >
         {publishCheck ? <OperationTargetSummary accounts={[{ id: publishCheck.accountId }]} /> : null}
         <ul className={styles.sideList}>

@@ -6,7 +6,7 @@ import { useRunningVersion } from '@/lib/use-running-version'
 import { formatMonthDay, stopMinutes } from './control-time'
 import { useEmergencyControlAccess } from './use-control-access'
 
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { GitBranch, OctagonPause, ShieldCheck, Timer } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError, type OperationCapability, type OperationControl, type OperationHistoryEntry, type OperationImpactPreview, type OperationRestoreDrift } from '@/lib/api'
@@ -22,6 +22,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { DialogFormRow } from '@/components/shared/dialog-form-row'
 import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
@@ -152,6 +153,7 @@ const EmergencyControlV8 = (
 
   /* 確認の窓（停止／復旧の言葉）→ 本人確認の窓（6桁かパスワード）の順に進む。 */
   const [confirmMode, setConfirmMode] = useState<'stop' | 'restore' | null>(null)
+  const [confirmed, setConfirmed] = useState<{ accountId: string | null; name?: string; version: number; incidentId: string | null; capabilities: OperationCapability[]; isCurrent: () => boolean } | null>(null)
   const [confirmWord, setConfirmWord] = useState('')
   const [stepUpMode, setStepUpMode] = useState<'stop' | 'restore' | null>(null)
   const [stepUpError, setStepUpError] = useState('')
@@ -318,12 +320,9 @@ const EmergencyControlV8 = (
     { minutes: 0, entry: null },
   )
 
-  const selectedTargets = (Object.keys(targets) as StopTarget[]).filter((key) => targets[key])
-  const selectedCapabilities = selectedTargets.flatMap((key) => TARGET_CAPABILITIES[key])
+  const selectedTargets = useMemo(() => (Object.keys(targets) as StopTarget[]).filter((key) => targets[key]), [targets])
+  const selectedCapabilities = useMemo(() => selectedTargets.flatMap((key) => TARGET_CAPABILITIES[key]), [selectedTargets])
   const isStopped = Boolean(control?.activeIncidentId)
-  const accountName = targetAccountId === 'all'
-    ? 'すべてのアカウント'
-    : accounts.find((account) => account.id === targetAccountId)?.name ?? '選択したアカウント'
   const previewSettled = impact !== null || impactFailed
 
   const targetLabels: Record<StopTarget, { label: string; note: string }> = {
@@ -360,8 +359,9 @@ const EmergencyControlV8 = (
     setConfirmWord('')
     setStepUpError('')
     setRequestKey(crypto.randomUUID())
+    setConfirmed({ accountId: targetAccountId === 'all' ? null : targetAccountId, name: accounts.find(account => account.id === targetAccountId)?.name, version: control.version, incidentId: control.activeIncidentId, capabilities: selectedCapabilities, isCurrent: access.capture() })
     setConfirmMode('stop')
-  }, [access.canRun, canControl, control, impact, impactFailed, mutationLocked, selectedTargets.length])
+  }, [access.canRun, access.capture, accounts, canControl, control, impact, impactFailed, mutationLocked, selectedCapabilities, selectedTargets.length, targetAccountId])
 
   useImperativeHandle(ref, () => ({ openStop: () => openStopConfirm() }), [openStopConfirm])
 
@@ -382,12 +382,15 @@ const EmergencyControlV8 = (
     setConfirmWord('')
     setStepUpError('')
     setRequestKey(crypto.randomUUID())
+    setConfirmed({ accountId: control.lineAccountId, name: accounts.find(account => account.id === control.lineAccountId)?.name, version: control.version, incidentId: control.activeIncidentId, capabilities: selectedCapabilities, isCurrent: access.capture() })
     setConfirmMode('restore')
   }
 
+  const confirmationCurrent = () => Boolean(confirmed && confirmed.isCurrent() && control && confirmed.version === control.version && confirmed.incidentId === control.activeIncidentId && confirmed.accountId === (targetAccountId === 'all' ? null : targetAccountId) && JSON.stringify(confirmed.capabilities) === JSON.stringify(selectedCapabilities))
+
   /** 確認の言葉が合ったら本人確認へ進む。二重押しは実行中ロックで止める。 */
   const proceedToStepUp = () => {
-    if (!access.canRun() || mutationLocked || !confirmMode) return
+    if (!access.canRun() || mutationLocked || !confirmMode || !confirmationCurrent()) return
     if (confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')) return
     setStepUpMode(confirmMode)
     setConfirmMode(null)
@@ -409,6 +412,7 @@ const EmergencyControlV8 = (
   const closeConfirm = () => {
     if (mutationLocked || running) return
     setConfirmMode(null)
+    setConfirmed(null)
     setConfirmWord('')
     setStopCode('')
     setStopPassword('')
@@ -420,7 +424,7 @@ const EmergencyControlV8 = (
   )
 
   const runStop = async (code: string) => {
-    if (!access.canRun() || mutationLock.current || mutationLocked || !control || !requestKey || stepUpMethod === 'none') return
+    if (!access.canRun() || mutationLock.current || mutationLocked || !control || !confirmed || !requestKey || stepUpMethod === 'none' || !confirmationCurrent()) return
     const isCurrent = access.capture()
     mutationLock.current = true
     setRunning(true)
@@ -431,13 +435,13 @@ const EmergencyControlV8 = (
       if (!isCurrent()) return
       if (!grant.success) throw new Error(grant.error)
       const response = await api.operations.stop({
-        lineAccountId: targetAccountId === 'all' ? null : targetAccountId,
-        capabilities: selectedCapabilities,
+        lineAccountId: confirmed.accountId,
+        capabilities: confirmed.capabilities,
         reason: reason.trim(),
         // WEB313：入力欄の補足をそのまま送る（空なら null）。
         detail: reasonDetail.trim() || null,
         confirmation: '停止',
-        expectedVersion: control.version,
+        expectedVersion: confirmed.version,
       }, grant.data.token, requestKey)
       if (!isCurrent()) return
       if (!response.success) throw new Error(response.error)
@@ -471,7 +475,7 @@ const EmergencyControlV8 = (
   }
 
   const runRestore = async (code: string) => {
-    if (!access.canRun() || mutationLock.current || mutationLocked || !control?.activeIncidentId || !requestKey || stepUpMethod === 'none') return
+    if (!access.canRun() || mutationLock.current || mutationLocked || !control?.activeIncidentId || !confirmed?.incidentId || !requestKey || stepUpMethod === 'none' || !confirmationCurrent()) return
     const isCurrent = access.capture()
     mutationLock.current = true
     setRunning(true)
@@ -481,9 +485,9 @@ const EmergencyControlV8 = (
       const grant = await api.operations.stepUp({ method: stepUpMethod === 'password' ? 'password' : 'totp', value: code })
       if (!isCurrent()) return
       if (!grant.success) throw new Error(grant.error)
-      const response = await api.operations.restore(control.activeIncidentId, {
+      const response = await api.operations.restore(confirmed.incidentId, {
         confirmation: '復旧',
-        expectedVersion: control.version,
+        expectedVersion: confirmed.version,
       }, grant.data.token, requestKey)
       if (!isCurrent()) return
       if (!response.success) throw new Error(response.error)
@@ -788,7 +792,7 @@ const EmergencyControlV8 = (
         busy={mutationLocked}
         designNode={confirmMode === 'stop' ? 'EA8rM' : 'OHwbU-confirm'}
         tone="default" role={confirmMode === 'stop' ? 'alertdialog' : 'dialog'} contentLayout="form" confirmation
-        designTop={confirmMode === 'stop' ? 150 : undefined} fitViewport
+        designTop={confirmMode === 'stop' ? 24 : undefined} fitViewport
         title={confirmMode === 'stop' ? '緊急停止を確認' : '止める前の状態に戻しますか？'}
         description={confirmMode === 'stop'
           ? '止める前に、何と何人に関わるかを実測で確かめました。'
@@ -826,12 +830,12 @@ const EmergencyControlV8 = (
           </ConfirmActions>
         )}
       >
+        {confirmed ? <OperationTargetSummary accounts={confirmed.accountId === null ? [] : [{ id: confirmed.accountId, name: confirmed.name }]} allAccounts={confirmed.accountId === null} /> : null}
         <div>
           {confirmMode === 'stop' ? (
             <>
               <Card surface="muted" corner="control" contentPadding="var(--polish-space-field)" gap="tight">
-                <p className={styles.dialogLabel}>止める対象：{accountName}</p>
-                <p>{selectedTargets.map((key) => `${targetLabels[key].label} ${impactText(key)}`).join('・')}</p>
+                <p>止める対象：{selectedTargets.map((key) => `${targetLabels[key].label} ${impactText(key)}`).join('・')}</p>
               </Card>
               <DialogFormRow><Field label="止める理由" htmlFor="emergency-reason-v8" required><SaveErrorField names={["reason"]}><TextField
                 id="emergency-reason-v8"
@@ -857,7 +861,6 @@ const EmergencyControlV8 = (
             </>
           ) : (
             <>
-              <p className={styles.confirmReason}>{accountName}</p>
               {restoreDrift && describeRestoreDrift(restoreDrift).length > 0 ? (
                   <Notice tone="warn">
                     <p className={styles.dialogLabel}>停止しているあいだに変わったものがあります</p>

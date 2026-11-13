@@ -43,7 +43,7 @@ const runsData = {
       id: 'run-ok',
       receivedAt: '2026-09-07T10:14:01',
       processedAt: '2026-09-07T10:14:02',
-      friend: { id: 'friend-1', displayName: '山田 太郎', redacted: false },
+      friend: { id: 'friend-1', displayName: '見本 141', redacted: false },
       friendKind: 'first_time',
       attribution: { status: 'unavailable', routeId: null, routeName: null, reason: null },
       rule: { id: 'rule-fallback', name: '経路が分からなかった人', versionId: 'v1', versionNumber: 1 },
@@ -57,7 +57,7 @@ const runsData = {
       id: 'run-failed',
       receivedAt: '2026-09-07T10:14:01',
       processedAt: '2026-09-07T10:14:03',
-      friend: { id: 'friend-2', displayName: '佐藤 花子', redacted: false },
+      friend: { id: 'friend-2', displayName: '見本 122', redacted: false },
       friendKind: 'first_time',
       attribution: { status: 'unavailable', routeId: null, routeName: null, reason: null },
       rule: { id: 'rule-fallback', name: '経路が分からなかった人', versionId: 'v1', versionNumber: 1 },
@@ -136,7 +136,7 @@ test('v8 の実行結果は板 REIxB・数の帯・失敗の帯・表・下の2�
   })
   expect(host.textContent).toContain('実行結果：友だち追加時の配信')
   expect(host.textContent).toContain('失敗した処理が')
-  expect(host.textContent).toContain('山田 太郎')
+  expect(host.textContent).toContain('見本 141')
   expect(host.textContent).toContain('経路ごとの内訳')
   expect(host.textContent).toContain('二重送信を防ぐ・知らせ')
   const help = host.querySelector('button[aria-label="実行結果：友だち追加時の配信の説明"]')

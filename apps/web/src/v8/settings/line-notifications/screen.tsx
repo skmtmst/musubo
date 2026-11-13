@@ -372,17 +372,19 @@ async function sendCustomerTestNotification(args: {
   api: { testSend: typeof api.ecCommerce.testSend }
   setting: EcNotificationSetting
   accountId: string
+  expectedRecipientIds: string[]
+  expectedConfirmationRevision: number
   guard: CustomerMutationGuard
 }): Promise<
   | { kind: 'applied'; tone: 'success' | 'error'; message: string }
   | { kind: 'stale' }
 > {
-  const { setting, accountId, guard } = args
+  const { setting, accountId, expectedRecipientIds, expectedConfirmationRevision, guard } = args
   try {
     const result = await args.api.testSend({
       eventType: setting.eventType, accountId, title: setting.title || '',
       introText: setting.introText, outroText: setting.outroText, buttonLabel: setting.buttonLabel,
-      buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl,
+      buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl, expectedRecipientIds, expectedConfirmationRevision,
     })
     if (!result.success) throw new Error(result.error)
     // 別アカウントへ切り替わった後の応答は、いまの画面へ出さない。
@@ -760,6 +762,7 @@ function LineNotificationsPage() {
   const [testRecipients, setTestRecipients] = useState<{
     state: 'loading' | 'ready' | 'error'
     items: Array<{ id: string; displayName: string; pictureUrl: string | null }>
+    confirmationRevision?: number
   }>({ state: 'loading', items: [] })
   const testRecipientGeneration = useRef(0)
   useEffect(() => {
@@ -1197,7 +1200,7 @@ function LineNotificationsPage() {
     api.accountSettings.getTestRecipients(accountId).then((result) => {
       // 閉じた・開き直した・アカウント切替のあとに返った古い応答は捨てる。
       if (generation !== testRecipientGeneration.current || accountId !== selectedAccountRef.current || scope !== testAccountScope.current) return
-      if (result.success) setTestRecipients({ state: 'ready', items: result.data })
+      if (result.success) setTestRecipients({ state: 'ready', items: result.data, confirmationRevision: result.confirmationRevision })
       else setTestRecipients({ state: 'error', items: [] })
     }).catch(() => {
       if (generation !== testRecipientGeneration.current || accountId !== selectedAccountRef.current || scope !== testAccountScope.current) return
@@ -1210,10 +1213,10 @@ function LineNotificationsPage() {
   }
   const confirmTestSend = () => {
     const target = testSendDraft
-    return canChangeRef.current && target && target.scope === testAccountScope.current && target.generation === testRecipientGeneration.current && target.accountId === selectedAccountRef.current ? testSend(target.setting) : undefined
+    return canChangeRef.current && target && target.scope === testAccountScope.current && target.generation === testRecipientGeneration.current && target.accountId === selectedAccountRef.current && testRecipients.state === 'ready' && testRecipients.items.length > 0 && testRecipients.confirmationRevision !== undefined ? testSend(target.setting, testRecipients.items.map((item) => item.id), testRecipients.confirmationRevision) : undefined
   }
 
-  const testSend = async (setting: EcNotificationSetting) => {
+  const testSend = async (setting: EcNotificationSetting, expectedRecipientIds: string[], expectedConfirmationRevision: number) => {
     if (!canChange) return
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
     const accountId = selectedAccountId
@@ -1225,6 +1228,8 @@ function LineNotificationsPage() {
       api: { testSend: api.ecCommerce.testSend },
       setting,
       accountId,
+      expectedRecipientIds,
+      expectedConfirmationRevision,
       guard,
     })
     if (outcome.kind === 'stale') return

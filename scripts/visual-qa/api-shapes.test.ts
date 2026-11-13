@@ -304,8 +304,8 @@ describe('本人照合候補の画面確認データ', () => {
       IDENTITY_CANDIDATE_FRIEND,
       IDENTITY_CANDIDATE_EC,
     ]);
-    expect(serialized).not.toContain('tanaka@example.jp');
-    expect(serialized).not.toContain('090-1234-5678');
+    expect(serialized).not.toContain('tanaka@example.com');
+    expect(serialized).not.toContain('090-0000-5678');
     expect(serialized).toContain('***');
   });
 });
@@ -323,8 +323,8 @@ describe('統合ユーザー詳細の画面確認データ', () => {
   it('0件を未取得へ変えず、平文のメールと電話を置かない', () => {
     expect(MERGED_PERSON_EMPTY.profileValues).toEqual([]);
     const serialized = JSON.stringify([MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY]);
-    expect(serialized).not.toContain('tanaka@example.jp');
-    expect(serialized).not.toContain('090-1234-5678');
+    expect(serialized).not.toContain('tanaka@example.com');
+    expect(serialized).not.toContain('090-0000-5678');
     expect(serialized).toContain('***');
   });
 });
@@ -346,8 +346,8 @@ describe('統合ユーザー一覧と重複集計の画面確認データ', () =
 
   it('平文のメールと電話を固定データへ置かない', () => {
     const serialized = JSON.stringify(USERS_GROUPED);
-    expect(serialized).not.toContain('tanaka@example.jp');
-    expect(serialized).not.toContain('090-1234-5678');
+    expect(serialized).not.toContain('tanaka@example.com');
+    expect(serialized).not.toContain('090-0000-5678');
     expect(serialized).toContain('***');
   });
 });

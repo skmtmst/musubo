@@ -120,7 +120,7 @@ export default function MemberDialog({
         {!member ? (
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="名前" htmlFor={`${uid}-name`}>
-              <TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus onChange={(e) => set('name', e.target.value)} className="w-full" placeholder="例: 山田 太郎" />
+              <TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus onChange={(e) => set('name', e.target.value)} className="w-full" placeholder="例: 見本 141" />
             </Field>
             <Field label="メールアドレス" htmlFor={`${uid}-email`}>
               <TextField id={`${uid}-email`} type="email" value={value.email} disabled={busy} onChange={(e) => set('email', e.target.value)} className="w-full" placeholder="例: staff@example.com" />

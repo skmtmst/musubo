@@ -21,7 +21,7 @@ function mount(extra: Partial<React.ComponentProps<typeof ConversationHead>> = {
   const onStatus = vi.fn()
   render(
     <ConversationHead
-      name="坂本 真人"
+      name="見本 25"
       sub="メール・発送について"
       operator={{ value: 'op-k', operators, onChange: onOperator }}
       status={{ value: 'unread', onChange: onStatus }}

@@ -815,6 +815,81 @@ describe('Instagram 同時投稿', () => {
 });
 
 describe('削除', () => {
+  it('確認後に投稿の版が変わったらGoogleへ削除を送らず409を返す', async () => {
+    const draft = await createDraft();
+    const id = draft.json.post!.id;
+    await publish(id);
+    const current = testDb.raw.prepare('SELECT confirmation_revision AS revision FROM rt_google_posts WHERE id=?').get(id) as { revision: number };
+    const connection = testDb.raw.prepare("SELECT id, confirmation_revision AS revision FROM rt_google_connections WHERE store_id='store-shibuya'").get() as { id: string; revision: number };
+    testDb.raw.prepare('UPDATE rt_google_posts SET confirmation_revision=confirmation_revision+1 WHERE id=?').run(id);
+    const response = await call(`/api/restaurant-test/google/posts/${id}/remove`, { body: { confirmed: true, expectedPostRevision: current.revision, expectedConnectionRevision: connection.revision, expectedConnectionId: connection.id } });
+    expect(response.status).toBe(409);
+    expect(googleCalls.some((entry) => entry.init?.method === 'DELETE')).toBe(false);
+  });
+  it('確認後に接続先が変わったらGoogleへ削除を送らない', async () => {
+    const draft = await createDraft();
+    const id = draft.json.post!.id;
+    await publish(id);
+    const post = testDb.raw.prepare('SELECT confirmation_revision AS revision FROM rt_google_posts WHERE id=?').get(id) as { revision: number };
+    const connection = testDb.raw.prepare("SELECT id, confirmation_revision AS revision FROM rt_google_connections WHERE store_id='store-shibuya'").get() as { id: string; revision: number };
+    testDb.raw.prepare("UPDATE rt_google_connections SET confirmation_revision=confirmation_revision+1 WHERE id=?").run(connection.id);
+    const response = await call(`/api/restaurant-test/google/posts/${id}/remove`, { body: { confirmed: true, expectedPostRevision: post.revision, expectedConnectionRevision: connection.revision, expectedConnectionId: connection.id } });
+    expect(response.status).toBe(409);
+    expect(googleCalls.some((entry) => entry.init?.method === 'DELETE')).toBe(false);
+  });
+  it('古い確認は期限切れのトークン更新より前に断る', async () => {
+    const draft = await createDraft(); const id = draft.json.post!.id; await publish(id);
+    const post = testDb.raw.prepare('SELECT confirmation_revision AS revision FROM rt_google_posts WHERE id=?').get(id) as { revision: number };
+    const connection = testDb.raw.prepare("SELECT id, confirmation_revision AS revision FROM rt_google_connections WHERE store_id='store-shibuya'").get() as { id: string; revision: number };
+    testDb.raw.prepare("UPDATE rt_google_connections SET access_token_expires_at='2000-01-01', confirmation_revision=confirmation_revision+1 WHERE id=?").run(connection.id);
+    const callsBefore = googleCalls.length;
+    const response = await call(`/api/restaurant-test/google/posts/${id}/remove`, { body: { confirmed: true, expectedPostRevision: post.revision, expectedConnectionRevision: connection.revision, expectedConnectionId: connection.id } });
+    expect(response.status).toBe(409);
+    expect(googleCalls).toHaveLength(callsBefore);
+  });
+  it('期限切れでも確認した接続ならトークン更新後に削除できる', async () => {
+    const draft = await createDraft(); const id = draft.json.post!.id; await publish(id);
+    const post = testDb.raw.prepare('SELECT confirmation_revision AS revision FROM rt_google_posts WHERE id=?').get(id) as { revision: number };
+    const connection = testDb.raw.prepare("SELECT id, confirmation_revision AS revision FROM rt_google_connections WHERE store_id='store-shibuya'").get() as { id: string; revision: number };
+    testDb.raw.prepare("UPDATE rt_google_connections SET access_token_expires_at='2000-01-01' WHERE id=?").run(connection.id);
+    const original = fetch;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => String(input).includes('oauth2.googleapis.com/token')
+      ? jsonResponse({ access_token: 'refreshed', expires_in: 3600, scope: 'https://www.googleapis.com/auth/business.manage' })
+      : original(input, init)));
+    const response = await call(`/api/restaurant-test/google/posts/${id}/remove`, { body: { confirmed: true, expectedPostRevision: post.revision, expectedConnectionRevision: connection.revision, expectedConnectionId: connection.id } });
+    expect(response.status).toBe(200);
+    expect(googleCalls.filter((entry) => entry.init?.method === 'DELETE')).toHaveLength(1);
+    expect(testDb.raw.prepare("SELECT confirmation_revision FROM rt_google_connections WHERE id=?").get(connection.id)).toEqual({ confirmation_revision: connection.revision });
+  });
+  it('削除の読み取り後に投稿が変わると確保できずGoogleへ送らない', async () => {
+    const draft = await createDraft(); const id = draft.json.post!.id; await publish(id);
+    const post = testDb.raw.prepare('SELECT confirmation_revision AS revision FROM rt_google_posts WHERE id=?').get(id) as { revision: number };
+    const connection = testDb.raw.prepare("SELECT id, confirmation_revision AS revision FROM rt_google_connections WHERE store_id='store-shibuya'").get() as { id: string; revision: number };
+    const original = testDb.db.prepare.bind(testDb.db);
+    const spy = vi.spyOn(testDb.db, 'prepare').mockImplementation(sql => {
+      if (sql.includes('UPDATE rt_google_posts SET confirmation_revision = confirmation_revision + 1') && sql.includes('EXISTS (SELECT 1 FROM rt_google_connections')) {
+        testDb.raw.prepare('UPDATE rt_google_posts SET confirmation_revision=confirmation_revision+1 WHERE id=?').run(id);
+      }
+      return original(sql);
+    });
+    try {
+      const response = await call(`/api/restaurant-test/google/posts/${id}/remove`, { body: { confirmed:true, expectedPostRevision:post.revision, expectedConnectionRevision:connection.revision, expectedConnectionId:connection.id } });
+      expect(response.status).toBe(409);
+      expect(googleCalls.some(entry => entry.init?.method === 'DELETE')).toBe(false);
+      expect(testDb.raw.prepare('SELECT confirmation_revision AS revision FROM rt_google_posts WHERE id=?').get(id)).toEqual({ revision: post.revision + 1 });
+    } finally { spy.mockRestore(); }
+  });
+  it('一致する確認は一度だけ削除できる', async () => {
+    const draft = await createDraft();
+    const id = draft.json.post!.id;
+    await publish(id);
+    const post = testDb.raw.prepare('SELECT confirmation_revision AS revision FROM rt_google_posts WHERE id=?').get(id) as { revision: number };
+    const connection = testDb.raw.prepare("SELECT id, confirmation_revision AS revision FROM rt_google_connections WHERE store_id='store-shibuya'").get() as { id: string; revision: number };
+    const body = { confirmed: true, expectedPostRevision: post.revision, expectedConnectionRevision: connection.revision, expectedConnectionId: connection.id };
+    expect((await call(`/api/restaurant-test/google/posts/${id}/remove`, { body })).status).toBe(200);
+    expect((await call(`/api/restaurant-test/google/posts/${id}/remove`, { body })).status).toBe(409);
+    expect(googleCalls.filter((entry) => entry.init?.method === 'DELETE')).toHaveLength(1);
+  });
   it('公開済みを削除するとGoogleへDELETEし、statusがdeletedになる', async () => {
     const draft = await createDraft();
     await publish(draft.json.post!.id);

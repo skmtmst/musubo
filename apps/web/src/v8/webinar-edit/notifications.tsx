@@ -10,6 +10,7 @@ import { Plus, Send } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useTestRecipients } from './use-test-recipients'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
@@ -258,6 +259,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
 
   /* ===== テスト送信 ===== */
   const [testOpen, setTestOpen] = useState(false)
+  const testRecipients = useTestRecipients(webinarId, testOpen)
   const [testing, setTesting] = useState(false)
   const testLock = useRef(false)
   const [testResult, setTestResult] = useState('')
@@ -277,13 +279,14 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
     finally { testLock.current = false; setTesting(false) }
   }
   const runTest = async () => {
-    if (testLock.current || testRefreshError || readOnly || !settings) return
+    if (testLock.current || testRefreshError || readOnly || !settings || !testOpen || !testRecipients.preview) return
     testLock.current = true
     setTesting(true)
     setTestResult('')
     try {
       if (dirty && !(await saveRef.current())) return
-      const res = await webinarApi.testNotifications(webinarId)
+      if (!testRecipients.isCurrent() || !testRecipients.preview) return
+      const res = await webinarApi.testNotifications(webinarId, testRecipients.preview.token, testRecipients.preview.confirmationId)
       setTestResult(`テスト送信しました。成功 ${formatNumber(res.data.sent)} 件・失敗 ${formatNumber(res.data.failed)} 件`)
       setTestOpen(false)
       void refreshTestResult()
@@ -438,8 +441,9 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       {testRefreshError ? <Notice tone="info" action={readOnly ? undefined : <Button onClick={() => void retryTestResult()} disabled={testing} busy={testing}>送信結果を読み直す</Button>}>テスト送信の結果は受け取りましたが、確認状態を読み込めませんでした。再送せずに結果を読み直してください。</Notice> : null}
       {testResult ? <p role="status" className={form.previewNote}>{testResult}</p> : null}
 
-      <ConfirmDialog open={testOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing} onCancel={() => { if (!testing) setTestOpen(false) }} error={testResult || undefined} onSuccess={() => setTestOpen(false)} onConfirm={() => runTest()}>
+      <ConfirmDialog open={testOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" confirmDisabled={!testRecipients.preview || testRecipients.preview.count === 0} busy={testing} onCancel={() => { if (!testing) setTestOpen(false) }} error={testResult || undefined} onSuccess={() => setTestOpen(false)} onConfirm={() => runTest()}>
         <OperationTargetSummary accounts={[{ id: webinar.accountId ?? '' }]} />
+        <p>{testRecipients.preview ? `テスト受信者 ${testRecipients.preview.count} 人：${testRecipients.preview.recipients.map(person => person.displayName || '名前未設定').join('、')}` : testRecipients.error ? 'テスト受信者を確認できません。設定を確かめて開き直してください。' : 'テスト受信者を確認しています。'}</p>
         <p className={form.cardNote}>{dirty ? '保存していない設定を保存してから送ります。' : ''}{`対象：「${webinar.title}」の入っている通知。本文は設定済みのものを送ります。`}</p>
       </ConfirmDialog>
     </CreatePage></SaveErrorScope>

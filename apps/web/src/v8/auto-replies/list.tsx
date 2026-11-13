@@ -15,7 +15,7 @@ import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import FolderSelect from '@/components/shared/folder-select'
 import ListToolbar,{ ListToolbarOptional,ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
 import { useStaffRole } from '@/lib/staff-role'
-import { Ban,Bookmark,ChevronDown,CircleCheck,CircleHelp,Layers,MessageCircle,Pause,Plus,TriangleAlert,Zap } from 'lucide-react'
+import { Ban,Bookmark,ChevronDown,CircleCheck,CircleHelp,CirclePlay,Layers,MessageCircle,Pause,Plus,TriangleAlert,Zap } from 'lucide-react'
 import { SORT_OPTIONS,type SortKey } from './list-options'
 import { autoReplyMatchesQuery,isCurrentAutoReplyLoad,LOAD_STATE_WORDS,NO_WRITE_PERMISSION,visibleAutoReplyLoadState,type LoadState } from './words'
 
@@ -119,6 +119,7 @@ export default function AutoRepliesListV8() {
   const [templates, setTemplates] = useState<TemplateLite[]>([])
   const [templateListAvailable, setTemplateListAvailable] = useState(true)
   const [conflictCount, setConflictCount] = useState<number | null>(null)
+  const [dispatchStopped, setDispatchStopped] = useState<boolean | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [loadError, setLoadError] = useState<unknown>(null)
   const { folders, reload: loadFolders } = useManagedFolders('auto_reply', selectedAccountId)
@@ -186,6 +187,7 @@ export default function AutoRepliesListV8() {
     setLoadState('loading')
     setLoadError(null)
     setConflictCount(null)
+    setDispatchStopped(null)
     try {
       const [arRes, tplRes, summaryRes] = await Promise.all([
         api.autoReplies.list({ accountId: selectedAccountId || undefined }),
@@ -209,6 +211,7 @@ export default function AutoRepliesListV8() {
       loadedScope.current = requestScope
       setItems(arRes.data as AutoReply[])
       setConflictCount(summaryRes?.success ? summaryRes.data.conflictCount : null)
+      setDispatchStopped(summaryRes?.success ? summaryRes.data.dispatchStopped ?? null : null)
       setTemplateListAvailable(tplRes.success)
       setTemplates(tplRes.success
         ? tplRes.data.map((t) => ({
@@ -262,7 +265,7 @@ export default function AutoRepliesListV8() {
   const openPendingToggle = (target: PendingToggle) => {
     if (!canRunList()) return
     const targets = target.ids.map(id => rules.find(rule => rule.id === id)?.lineAccountId)
-    const next: PendingToggle = { ...target, generation: renderedScope.generation, allAccounts: targets.some(id => id === null), targetAccountIds: [...new Set(targets.filter(id => id !== null).map(id => id ?? ''))] }
+    const next: PendingToggle = { ...target, versions: Object.fromEntries(target.ids.flatMap(id => { const version = rules.find(rule => rule.id === id)?.confirmationRevision; return Number.isSafeInteger(version) && Number(version) > 0 ? [[id, Number(version)]] : [] })), generation: renderedScope.generation, allAccounts: targets.some(id => id === null), targetAccountIds: [...new Set(targets.filter(id => id !== null).map(id => id ?? ''))] }
     pendingToggleRef.current = next
     setPendingToggle(next)
   }
@@ -914,14 +917,17 @@ export default function AutoRepliesListV8() {
         自動応答
       </>} help={<>{<>
         届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。
-      </>}{"□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の印は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。"}{kpis.map((kpi) => kpi.help).filter(Boolean).join(" ")}</>}
-      explanation="上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。"
+      </>}{canEdit ? '□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。' : 'ルールの内容と実行結果を確認できます。'}{'「重なり」の印は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。'}{kpis.map((kpi) => kpi.help).filter(Boolean).join(" ")}</>}
+      explanation={canEdit ? '上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。' : '上のルールから順に見て、最初に当たった1つだけが動きます。'}
       stats={<>
         {/* 見るだけの人への帯（`Q5lOCc`）。数の帯の上。 */}
         {lockedReason && (
           <div className={styles.viewerBand}><ReadOnlyNotice need="feature" role="status" data-design-node="Q5lOCc"></ReadOnlyNotice></div>
         )}
-        {ready ? <Notice tone="info" role="status" message={rules.some((rule) => rule.isActive)
+        {ready ? <Notice tone={dispatchStopped ? 'warn' : 'info'} role="status" message={dispatchStopped === true
+          ? '停止中です。いま自動応答は送られません。'
+          : selectedAccountId && dispatchStopped === null ? '自動応答全体の送信状態を確認できません。'
+          : rules.some((rule) => rule.isActive)
           ? '確認できる自動応答に、有効なルールがあります。'
           : '確認できる自動応答に、有効なルールはありません。'} /> : null}
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
@@ -966,7 +972,7 @@ export default function AutoRepliesListV8() {
         designWidth={480}
         designTop={280}
         footerAlign="center"
-        titleIcon={false}
+        headerIcon={pendingToggle?.kind === 'resume' ? <CirclePlay /> : <Pause />}
         error={toggleError}
         onCancel={() => {
           setToggleError('')

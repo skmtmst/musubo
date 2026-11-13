@@ -71,14 +71,14 @@ describe('operator/new の受け取る人', () => {
       success: true,
       data: {
         items: [
-          { id: 'staff-owner', name: '高橋 直人', lineLinked: true, emailVerified: true, channels: { line: true, email: false, dashboard: true }, canReceive: true },
+          { id: 'staff-owner', name: '見本 16', lineLinked: true, emailVerified: true, channels: { line: true, email: false, dashboard: true }, canReceive: true },
         ],
         summary: { staff: 1, canReceive: 1, line: 1, email: 0, dashboard: 1, unavailable: 0 },
       },
     })
     render(<Page />)
     await flush()
-    expect(await screen.findByText('高橋 直人')).toBeTruthy()
+    expect(await screen.findByText('見本 16')).toBeTruthy()
     expect(screen.queryByText('受け取る人を読み込めませんでした。')).toBeNull()
   })
 })

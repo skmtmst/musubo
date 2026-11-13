@@ -531,6 +531,64 @@ describe('test-apply', () => {
     created_at: 't', updated_at: 't',
   };
 
+  test('古いメニューの確認は本人への操作を始めず409にする', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({ ...GROUP_WITH_PAGES, confirmation_revision: 2 });
+    dbMocks.getStaffById.mockResolvedValue({ id: 'staff-1', line_user_id: 'U-self' });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const res = await setupApp().request('/api/rich-menu-groups/g1/test-apply', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'stale' },
+      body: JSON.stringify({ confirm: true, expectedConfirmationRevision: 1 }),
+    });
+    expect(res.status).toBe(409);
+    expect(dbMocks.createRichMenuTestApplyAtomic).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  test('宛先が送信直前に変わったら本人へのリンクを送らない', async () => {
+    const group = { ...GROUP_WITH_PAGES, confirmation_revision: 1 };
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue(group);
+    dbMocks.getRichMenuGroupById.mockResolvedValue(group);
+    dbMocks.getStaffById.mockResolvedValueOnce({ id: 'staff-1', line_user_id: 'U-self' })
+      .mockResolvedValueOnce({ id: 'staff-1', line_user_id: 'U-self' })
+      .mockResolvedValue({ id: 'staff-1', line_user_id: 'U-changed' });
+    dbMocks.createRichMenuTestApplyAtomic.mockResolvedValue({ outcome: 'created', apply: { ...APPLY, status: 'running', previous_captured: 1 } });
+    dbMocks.getActiveRichMenuTestApply.mockResolvedValue(null);
+    dbMocks.getLineAccountById.mockResolvedValue(ACCOUNT);
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('U-self'));
+    const token = Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 200 }));
+    const res = await setupApp().request('/api/rich-menu-groups/g1/test-apply', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'destination-change' },
+      body: JSON.stringify({ confirm: true, expectedConfirmationRevision: 1, expectedDestinationToken: token }),
+    });
+    expect(res.status).toBe(409);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(dbMocks.markRichMenuTestApplyFailed).toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  test('確認したメニューと宛先が一致すれば本人へ適用する', async () => {
+    const group = { ...GROUP_WITH_PAGES, confirmation_revision: 1 };
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue(group);
+    dbMocks.getRichMenuGroupById.mockResolvedValue(group);
+    dbMocks.getStaffById.mockResolvedValue({ id: 'staff-1', line_user_id: 'U-self' });
+    dbMocks.createRichMenuTestApplyAtomic.mockResolvedValue({ outcome: 'created', apply: { ...APPLY, status: 'running', previous_captured: 1 } });
+    dbMocks.getActiveRichMenuTestApply.mockResolvedValue(null);
+    dbMocks.getLineAccountById.mockResolvedValue(ACCOUNT);
+    dbMocks.getRichMenuTestApplyById.mockResolvedValue(APPLY);
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('U-self'));
+    const token = Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 200 }));
+    const res = await setupApp().request('/api/rich-menu-groups/g1/test-apply', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'matching' },
+      body: JSON.stringify({ confirm: true, expectedConfirmationRevision: 1, expectedDestinationToken: token }),
+    });
+    expect(res.status).toBe(200);
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    fetchSpy.mockRestore();
+  });
+
   test('GET: 未連携の担当者には案内を返し適用を始めさせない', async () => {
     dbMocks.getRichMenuGroupById.mockResolvedValue(GROUP);
     dbMocks.getStaffById.mockResolvedValue({ id: 'staff-1', line_user_id: null });

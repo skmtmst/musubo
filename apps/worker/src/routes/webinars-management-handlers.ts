@@ -1,11 +1,12 @@
 import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { applyVideoMediaSelection } from './webinar-video-selection.js';
-import { inputError } from '../lib/input-errors.js';
+import { inputError, validatedInputBody } from '../lib/input-errors.js';
 
 import { getWebinarById, getWebinarBySlug, updateWebinar, getWebinarComments, getWebinarCtas, replaceWebinarCtas, replaceWebinarComments, getWebinarRetention, countWebinarStartedViewers, countWebinarHeartbeatRejects, getWebinarUserComments, getWebinarSessionStats, getWebinarDropoff, getWebinarParticipantStats, getWebinarAnalyticsSummary, getWebinarDailyStats, getWebinarFormFunnelStats, getWebinarEditorSettings, saveWebinarEditorSettings, getWebinarViewSegmentCoverage, getWebinarParticipantOperations, classifyWebinarParticipant, getWebinarActions, replaceWebinarActions, countInvalidWebinarActionReferences, getFormById, formBelongsToLineAccount, getFolderById, type WebinarParticipantClassification, type WebinarParticipantStat } from '@line-crm/db';
 
 import { parseScheduleRules, upcomingSessions } from '../features/webinars/webinar-schedule/index.js';
 import { sendWebinarNotificationTest } from '../features/webinars/webinar-notifications/index.js';
+import { webinarTestRecipientPreview, WebinarTestRecipientsChanged } from '../features/webinars/webinar-notifications/index.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import type { Env } from '../worker-env.js';
 
@@ -14,10 +15,26 @@ import { auditLog } from '../lib/audit-log.js';
 import { nowEpoch, WebinarBody, validateWebinarBody, webinarErrorFields, serializeWebinarWithVideoMedia, serializeWebinarAction, parseWebinarActions, SAKURA_COMMENTS_MAX, COMMENT_MIN_AT_SECONDS, COMMENT_MAX, WEBINAR_PARTICIPANT_FILTERS, webinarParticipantMeasurement, WEBINAR_CLASSIFICATION_LABELS, csvCell } from './webinars-definition.js';
 import type { Context } from 'hono';
 
+export const getWebinarTestRecipients = async (c: Context<Env, '/api/webinars/:id/notifications/test'>) => {
+  const webinar=await getWebinarById(c.env.DB,c.req.param('id'));
+  if(!webinar)return c.json({success:false,error:'Not found'},404);
+  if(!webinar.account_id)return inputError(c,{success:false,error:'missing_line_account'},400,[]);
+  try {
+    const {count,recipients,token}=await webinarTestRecipientPreview(c.env.DB,webinar.account_id);
+    return c.json({success:true,data:{count,recipients,token,confirmationId:crypto.randomUUID()}});
+  } catch(error) {
+    if(error instanceof Error && ['no_test_recipients','invalid_test_recipients'].includes(error.message))return inputError(c,{success:false,error:error.message},400,[]);
+    throw error;
+  }
+};
+
 export const post__api_webinars_id_notifications_test_1 = async (c: Context<Env, "/api/webinars/:id/notifications/test">) => {
     try {
       const webinar = await getWebinarById(c.env.DB, c.req.param('id'));
       if (!webinar) return c.json({ success: false, error: 'Not found' }, 404);
+      const body=(validatedInputBody(c)??{}) as {expectedRecipientToken?:string;confirmationId?:string};
+      if(body.expectedRecipientToken!==undefined&&!/^[a-f0-9]{64}$/.test(body.expectedRecipientToken))return inputError(c,{success:false,error:'invalid_recipient_token'},400,[]);
+      if((body.expectedRecipientToken===undefined)!==(body.confirmationId===undefined)||body.confirmationId!==undefined&&!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(body.confirmationId))return inputError(c,{success:false,error:'invalid_confirmation'},400,[]);
       const nextSession = upcomingSessions(
         parseScheduleRules(webinar.schedule_json),
         webinar.duration_seconds,
@@ -40,6 +57,8 @@ export const post__api_webinars_id_notifications_test_1 = async (c: Context<Env,
           defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
           defaultLiffId: liffMatch?.[1] ?? null,
           proxyDispatch: (request) => dispatchLineProxyLocally(request, c.env, c.executionCtx),
+          expectedRecipientToken: body.expectedRecipientToken,
+          confirmationId: body.confirmationId,
         },
       );
       const editor = await getWebinarEditorSettings(c.env.DB, webinar.id);
@@ -55,7 +74,9 @@ export const post__api_webinars_id_notifications_test_1 = async (c: Context<Env,
       }
       return c.json({ success: true, data: result });
     } catch (err) {
+      if(err instanceof WebinarTestRecipientsChanged)return c.json({success:false,code:err.code,error:err.message,data:err.current},409);
       const code = err instanceof Error ? err.message : 'test_send_failed';
+      if(code==='webinar_test_already_started')return c.json({success:false,code,error:'この確認からのテスト送信は既に始まっています。結果を確認してください'},409);
       if ([
         'missing_line_account',
         'invalid_test_recipients',

@@ -1,3 +1,4 @@
+import { registerRestaurantMenuConfirmationTests } from '../test-utils/restaurant-menu-confirmation.js';
 import { seedRestaurantFixture as seedRestaurantData } from '../test-utils/restaurant-fixture.js';
 import { publishScenarioVersion } from '@line-crm/db';
 import { checkRestaurantMenuMedia, checkRestaurantMenuPrice } from '../test-utils/restaurant-menu-media.js';
@@ -97,7 +98,6 @@ async function createAdminSession(token = 'restaurant-session'): Promise<string>
 }
 
 const ADMIN_SESSION_PREFIX = 'lh_session:';
-
 beforeEach(() => {
   authMocks.getStaffByApiKey.mockReset();
   authMocks.getStaffByApiKey.mockResolvedValue(null);
@@ -875,7 +875,7 @@ describe('飲食店向けテストAPI', () => {
     const first = await request('/api/restaurant-test/reservations/manual?account_id=account-1', body);
     expect(first.status).toBe(201);
     const second = await request('/api/restaurant-test/reservations/manual?account_id=account-1', {
-      ...body, customerName: '重複 次郎', tableId: 'table-2seat',
+      ...body, customerName: '見本 23', tableId: 'table-2seat',
     });
     expect(second.status).toBe(409);
     const count = testDb.raw.prepare(
@@ -1033,7 +1033,7 @@ describe('飲食店向けテストAPI', () => {
     const second = await request('/api/restaurant-test/inbound/reservations?account_id=account-1', {
       storeId: store.id, provider: 'restaurant_board', eventId: 'event-seat-b',
       reservation: {
-        externalId: 'RB-SEAT-B', customerName: '後客 次郎', guestCount: 2,
+        externalId: 'RB-SEAT-B', customerName: '見本 24', guestCount: 2,
         startsAt: '2026-10-20T10:00:00.000Z', endsAt: '2026-10-20T12:00:00.000Z',
       },
     });
@@ -1207,8 +1207,8 @@ describe('V8-B 卓から出す予約枠と週の営業時間', () => {
 describe('R2-18 飲食メニューの説明と登録画像', () => {
   it('登録済み画像と説明を保存し、読み直せる', () => checkRestaurantMenuMedia({ testDb, seedRestaurantFixture, request, requestWithMethod }));
 });
-describe('V8-B メニューの価格確定', () => {
-  const menuPath = '/api/restaurant-test/menus/menu-ginza?account_id=account-1';
+describe('V8-B メニューの価格確定', () => { const menuPath = '/api/restaurant-test/menus/menu-ginza?account_id=account-1';
+  registerRestaurantMenuConfirmationTests({testDb:()=>testDb,env:()=>env,seedRestaurantFixture,request,requestWithMethod,rawDelete:(path,body)=>app().request(path,{method:'DELETE',headers:{Authorization:'Bearer owner-key','Content-Type':'text/plain'},body},env)});
   it('価格の上限は作成と更新の両方で守る', () => checkRestaurantMenuPrice({ testDb, seedRestaurantFixture, request, requestWithMethod }));
   it('権限者の保存で価格を即時確定し、二重承認を受け付けない', async () => {
     seedRestaurantFixture();
@@ -1253,7 +1253,7 @@ describe('V8-B メニューの価格確定', () => {
     const token = await createAdminSession();
     expect((await requestAs('/api/restaurant-test/stores/store-yokohama/select?account_id=account-1', token, {})).status).toBe(200);
     expect((await requestWithMethod(menuPath, 'PATCH', { price: 9999 }, token)).status).toBe(404);
-    expect((await requestWithMethod(menuPath, 'DELETE', undefined, token)).status).toBe(404);
+    expect((await requestWithMethod(menuPath, 'DELETE', undefined, token)).status).toBe(404); expect((await requestWithMethod(menuPath, 'PATCH', { status:'archived', expectedVersion:999 }, token)).status).toBe(404); expect((await requestWithMethod(menuPath, 'DELETE', { expectedVersion:999 }, token)).status).toBe(404);
   });
 });
 
@@ -1840,14 +1840,14 @@ it('API-01 飲食台帳の暦日も日本の00:30を含めて翌日00:30を除�
 
 it('電話の全角・区切りを検索で整え、他店を混ぜず旧行も更新しない', async () => {
   seedRestaurantFixture();
-  testDb.raw.exec("UPDATE rt_reservations SET customer_phone='０９０－１２３４－５６７８',status='visited' WHERE id='reservation-ginza'");
+  testDb.raw.exec("UPDATE rt_reservations SET customer_phone='０９０－００００－５６７８',status='visited' WHERE id='reservation-ginza'");
   const path='/api/restaurant-test/customers/search?account_id=account-1&storeId=store-ginza&q=';
-  const rows=(await (await request(path+encodeURIComponent('090 1234 5678'))).json() as {data:Array<{phone:string|null}>}).data;
-  expect(rows).toHaveLength(1);expect(rows[0].phone).toBe('09012345678');
+  const rows=(await (await request(path+encodeURIComponent('090 0000 5678'))).json() as {data:Array<{phone:string|null}>}).data;
+  expect(rows).toHaveLength(1);expect(rows[0].phone).toBe('09000005678');
   const history='/api/restaurant-test/customers/history?account_id=account-1&storeId=store-ginza&phone=';
-  expect((await (await request(history+encodeURIComponent('０９０－１２３４－５６７８'))).json() as {data:{visitCount:number}}).data.visitCount).toBe(1);
-  expect((await (await request(path.replace('store-ginza','store-yokohama')+'09012345678')).json() as {data:unknown[]}).data).toEqual([]);
-  expect(testDb.raw.prepare("SELECT customer_phone FROM rt_reservations WHERE id='reservation-ginza'").get()).toEqual({customer_phone:'０９０－１２３４－５６７８'});
+  expect((await (await request(history+encodeURIComponent('０９０－００００－５６７８'))).json() as {data:{visitCount:number}}).data.visitCount).toBe(1);
+  expect((await (await request(path.replace('store-ginza','store-yokohama')+'09000005678')).json() as {data:unknown[]}).data).toEqual([]);
+  expect(testDb.raw.prepare("SELECT customer_phone FROM rt_reservations WHERE id='reservation-ginza'").get()).toEqual({customer_phone:'０９０－００００－５６７８'});
 });
 
 describe('電話予約と押さえの受付条件', () => {

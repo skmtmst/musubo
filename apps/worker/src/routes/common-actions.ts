@@ -304,19 +304,29 @@ commonActions.post(
   inputJsonBoundary(), async (c) => {
     const id = await requireAccount(c);
     if (typeof id !== 'string') return id;
-    const body = await c.req.json<{ versionId?: unknown; expectedVersionId?: unknown }>()
-      .catch(() => ({} as { versionId?: unknown; expectedVersionId?: unknown }));
-    return endpoint(c, async () => {
+    const body = await c.req.json<{ versionId?: unknown; expectedVersionId?: unknown; expectedConfirmationRevision?: unknown }>()
+      .catch(() => ({} as { versionId?: unknown; expectedVersionId?: unknown; expectedConfirmationRevision?: unknown }));
+    try {
       await updateCommonActionBindingVersion(c.env.DB, {
         id: c.req.param('id'),
         bindingId: c.req.param('bindingId'),
         lineAccountId: id,
         versionId: body.versionId,
         expectedVersionId: body.expectedVersionId,
+        expectedConfirmationRevision: body.expectedConfirmationRevision,
         actorId: c.get('staff')?.id,
       });
-      return { updated: true };
-    });
+      return c.json({ success: true, data: { updated: true } });
+    } catch (error) {
+      if (error instanceof CommonActionValidationError && error.code === 'version_conflict') {
+        const current = await c.env.DB.prepare(`SELECT id, common_action_version_id AS versionId, confirmation_revision AS confirmationRevision
+          FROM common_action_bindings WHERE id = ? AND common_action_id = ? AND line_account_id = ?`)
+          .bind(c.req.param('bindingId'), c.req.param('id'), id).first();
+        return c.json({ success: false, error: error.message, code: error.code, current }, 409);
+      }
+      if (error instanceof CommonActionValidationError) return validationResponse(c, error);
+      throw error;
+    }
   },
 );
 

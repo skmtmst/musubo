@@ -56,8 +56,8 @@ const member = (over: Record<string, unknown>) => ({
   lineLinked: false, twoFactorEnabled: false, canAccessDescendantAccounts: false, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
   ...over,
 })
-const owner = member({ id: 'owner', name: '川野 健太', email: 'owner@example.com', role: 'owner' })
-const staff = member({ id: 'stf-staff', name: '中川 由美', email: 'nakagawa@example.com', role: 'staff', accountScope: 'accounts', scopedLineAccountIds: ['acc-1'], assignedLineAccountId: 'acc-1' })
+const owner = member({ id: 'owner', name: '見本 145', email: 'owner@example.com', role: 'owner' })
+const staff = member({ id: 'stf-staff', name: '見本 30', email: 'nakagawa@example.com', role: 'staff', accountScope: 'accounts', scopedLineAccountIds: ['acc-1'], assignedLineAccountId: 'acc-1' })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -72,7 +72,7 @@ beforeEach(() => {
   mocks.contact.mockResolvedValue({ success: true, data: null })
   mocks.supportContext.mockResolvedValue({ success: true, data: {
     kinds: [{ key: 'trouble', label: '不具合' }], accounts: [{ id: 'line-1', name: '本店' }],
-    sender: { tenantName: '統括テスト', name: '山田 太郎', email: 'owner@example.com', planLabel: 'スタンダード' },
+    sender: { tenantName: '統括テスト', name: '見本 141', email: 'owner@example.com', planLabel: 'スタンダード' },
   } })
   mocks.supportList.mockResolvedValue({ success: true, data: [] })
   mocks.supportCreate.mockResolvedValue({ success: true, data: { id: 'req-9', ticketLabel: '#1099', subject: '文字が崩れる', status: 'open', notified: true } })
@@ -99,9 +99,9 @@ describe('メンバー（36-5）', () => {
     render(<HqMembersV8 />)
     const table = await screen.findByRole('table', { name: '権限者の一覧' })
     await waitFor(() => expect(mocks.lastLogins).toHaveBeenCalledTimes(1))
-    const self = within(table).getByText('川野 健太（あなた）').closest('[role="row"]')!
+    const self = within(table).getByText('見本 145（あなた）').closest('[role="row"]')!
     await waitFor(() => expect(self.textContent).toContain(lastLoginShort('2026-10-20T09:15:00+09:00')))
-    expect(within(table).queryByText('中川 由美（あなた）')).toBeNull()
+    expect(within(table).queryByText('見本 30（あなた）')).toBeNull()
     expect(mocks.title).toHaveBeenCalledWith('メンバー')
     expect(document.querySelectorAll('h1')).toHaveLength(0)
   })
@@ -112,17 +112,17 @@ describe('メンバー（36-5）', () => {
     const dialog = await screen.findByRole('dialog', { name: '権限者を招待' })
     expect(optionNames('役割')).toEqual(['管理者（メンバーと決済も管理できる）', '担当者（業務を操作できる）', '閲覧のみ（見るだけ）'])
     expect(within(dialog).getByText('予約・配信などの業務を操作できます。メンバーの追加や決済の変更はできません。')).toBeTruthy()
-    fireEvent.change(within(dialog).getByRole('textbox', { name: '名前' }), { target: { value: '山田 太郎' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '名前' }), { target: { value: '見本 141' } })
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'メールアドレス' }), { target: { value: 'yamada@example.com' } })
     await choose('役割', '管理者（メンバーと決済も管理できる）')
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '招待メールを送る' })) })
     await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
-    expect(mocks.create.mock.calls[0][0]).toMatchObject({ name: '山田 太郎', email: 'yamada@example.com', role: 'admin', managementContext: 'hq' })
+    expect(mocks.create.mock.calls[0][0]).toMatchObject({ name: '見本 141', email: 'yamada@example.com', role: 'admin', managementContext: 'hq' })
   })
 
   it('担当者の役割を残して選べ、役割を変えなければ役割を送らない', async () => {
     render(<HqMembersV8 />)
-    fireEvent.click(await screen.findByRole('button', { name: '中川 由美のその他操作' }))
+    fireEvent.click(await screen.findByRole('button', { name: '見本 30のその他操作' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: '権限を変更する' }))
     await screen.findByRole('dialog')
     expect(optionNames('役割')).toEqual(['管理者（メンバーと決済も管理できる）', '担当者（業務を操作できる）', '閲覧のみ（見るだけ）'])
@@ -153,7 +153,7 @@ describe('統括の情報', () => {
 describe('お問い合わせ（36-3）', () => {
   const open = async () => {
     render(<HqSupportV8 />)
-    await screen.findByText(/送信者：山田 太郎/)
+    await screen.findByText(/送信者：見本 141/)
   }
 
   it('問い合わせのタブは設定メニューと並ぶ内容の中に置く', async () => {

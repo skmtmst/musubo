@@ -1,4 +1,5 @@
 'use client'
+import { useEffect, useRef } from 'react'
 import { uidAccountHint } from '@/lib/uid-migration-input'
 
 import CsvTemplateDownload from '@/components/shared/csv-template-download'
@@ -108,6 +109,15 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
     onFilterChange,
     onPageChange,
   } = m
+  const executeTicket = useRef<object | null>(null)
+  const rollbackTicket = useRef<object | null>(null)
+  const renderedExecuteTicket = executeTicket.current
+  const renderedRollbackTicket = rollbackTicket.current
+  useEffect(() => () => { executeTicket.current = null; rollbackTicket.current = null }, [])
+  useEffect(() => { if (!confirmExecute) executeTicket.current = null }, [confirmExecute])
+  useEffect(() => { if (!confirmRollback) rollbackTicket.current = null }, [confirmRollback])
+  const openExecute = () => { executeTicket.current = {}; setExecuteError(null); setConfirmExecute(true) }
+  const openRollback = () => { rollbackTicket.current = {}; setRollbackError(null); setRollbackConflicts([]); setConfirmRollback(true) }
   const purposeLock = usePermissionLockTip<HTMLDivElement>(m.managerLockReason)
   const { disabled: _purposeDisabled, ...purposeHandlers } = purposeLock.handlers ?? {}
 
@@ -237,15 +247,15 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
           executeBlockedReason={executeBlockedReason}
           onShowDetail={(item) => { setDetailError(null); setDetailItem(item) }}
           onDecide={(item, decision) => void decide(item, decision)}
-          onRequestExecute={() => { setExecuteError(null); setConfirmExecute(true) }}
-          onRequestRollback={() => { setRollbackError(null); setRollbackConflicts([]); setConfirmRollback(true) }}
+          onRequestExecute={openExecute}
+          onRequestRollback={openRollback}
           onFilterChange={(nextClassification, nextPendingOnly) => onFilterChange(active.id, nextClassification, nextPendingOnly)}
           onPageChange={(nextPage) => onPageChange(active.id, nextPage)}
         />
       )}
 
       {active && !showDecisionBoard && (
-        <MigrationResultBoard active={active} ownerLockReason={ownerLockReason} canRunRollback={canRunRollback} busy={busy} detailBusy={detailBusy} onRequestRollback={() => { setRollbackError(null); setRollbackConflicts([]); setConfirmRollback(true) }} />
+        <MigrationResultBoard active={active} ownerLockReason={ownerLockReason} canRunRollback={canRunRollback} busy={busy} detailBusy={detailBusy} onRequestRollback={openRollback} />
       )}
 
       {!active && (
@@ -288,7 +298,7 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
                     lockedReason={ownerLockReason}
                     busy={busy || detailBusy}
                     onRollback={run.rollbackable
-                      ? () => { selectRun(run.id); setRollbackError(null); setRollbackConflicts([]); setConfirmRollback(true) }
+                      ? () => { selectRun(run.id); openRollback() }
                       : null}
                   />
                 ))}
@@ -317,8 +327,8 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
         open={confirmExecute}
         error={executeError}
         canRun={canRunExecute}
-        onConfirm={() => void execute()}
-        onCancel={() => { if (!busy) setConfirmExecute(false) }}
+        onConfirm={() => { if (renderedExecuteTicket && executeTicket.current === renderedExecuteTicket) void execute() }}
+        onCancel={() => { if (!busy && executeTicket.current === renderedExecuteTicket) { executeTicket.current = null; setConfirmExecute(false) } }}
       />
       <RollbackConfirmDialog
         active={active}
@@ -330,8 +340,8 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
         error={rollbackError}
         conflicts={rollbackConflicts}
         canRun={canRunRollback}
-        onConfirm={() => void rollback()}
-        onCancel={() => { if (!busy) { setConfirmRollback(false); setRollbackConflicts([]) } }}
+        onConfirm={() => { if (renderedRollbackTicket && rollbackTicket.current === renderedRollbackTicket) void rollback() }}
+        onCancel={() => { if (!busy && rollbackTicket.current === renderedRollbackTicket) { rollbackTicket.current = null; setConfirmRollback(false); setRollbackConflicts([]) } }}
       />
     </div>
   )

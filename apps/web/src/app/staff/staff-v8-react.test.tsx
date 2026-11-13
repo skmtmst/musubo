@@ -29,7 +29,7 @@ vi.mock('@/lib/api', async importOriginal => {
         list: async () => ({ success: true, data: [] }),
         me: async () => ({
           success: true,
-          data: { id: 'me', name: '自分', email: 'me@example.jp', role: net.role, permissionKeys: [], policyVersion: 1 },
+          data: { id: 'me', name: '自分', email: 'me@example.com', role: net.role, permissionKeys: [], policyVersion: 1 },
         }),
       },
       lineAccounts: { ...actual.api.lineAccounts, list: async () => ({ success: true, data: [] }) },

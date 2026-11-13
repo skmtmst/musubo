@@ -4,8 +4,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NenRankSettingsData } from '@/lib/nen-ranks-api'
 import RankSettingsTab from '@/v8/nen-members/ranks'
-const m = vi.hoisted(() => ({ deleteRank: vi.fn(), retry: vi.fn() }))
-vi.mock('@/lib/nen-ranks-api', () => ({ nenRanksApi: { deleteRank: m.deleteRank } }))
+const m = vi.hoisted(() => ({ deleteRank: vi.fn(), rankDeletePreview: vi.fn(), retry: vi.fn() }))
+vi.mock('@/lib/nen-ranks-api', () => ({ nenRanksApi: { deleteRank: m.deleteRank, rankDeletePreview: m.rankDeletePreview } }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 const SETTINGS: NenRankSettingsData = {
  ranks: [
@@ -20,7 +20,7 @@ function renderTab(settings = SETTINGS) {
  return render(<RankSettingsTab accountId="acc-1" status="ready" settings={settings} readonly={false} onTopBand={vi.fn()} onSaved={vi.fn()} onRetry={m.retry}/>)
 }
 afterEach(cleanup)
-beforeEach(() => { vi.clearAllMocks(); m.deleteRank.mockResolvedValue({ success:true, data:{ ecSync:'synced' } }) })
+beforeEach(() => { vi.clearAllMocks(); m.deleteRank.mockResolvedValue({ success:true, data:{ ecSync:'synced' } }); m.rankDeletePreview.mockResolvedValue({ success: true, data: { count: 2, version: 4, members: [{ friendId: 'f1', customerId: 'c1' }, { friendId: 'f2', customerId: 'c2' }] } }) })
 describe('V8 ランクの幅と行の操作', () => {
  it('区画いっぱいに広がり、操作列は右端にある', () => {
  const { container } = renderTab()
@@ -47,12 +47,13 @@ describe('V8 ランクの幅と行の操作', () => {
  fireEvent.click(screen.getByRole('button', { name:'ランク「ゴールド」のその他操作' }))
  fireEvent.click(screen.getByRole('menuitem', { name:'ランクを削除する' }))
  expect(screen.getByRole('alertdialog').textContent).toContain('ゴールド')
+ await screen.findByText(/このランクには会員が 2 人います/)
  expect(screen.getByRole('alertdialog').querySelector('[data-required-badge]')?.textContent).toBe('必須')
  expect(screen.getByLabelText('ランク名 1')).toHaveProperty('value','ゴールド')
  expect(m.deleteRank).not.toHaveBeenCalled()
  fireEvent.click(screen.getByRole('button', { name:'削除する' }))
  await waitFor(() => expect(m.retry).toHaveBeenCalledTimes(1))
- expect(m.deleteRank).toHaveBeenCalledWith('acc-1','r1',{replacementRankId:'r0',expectedVersion:4})
+ expect(m.deleteRank).toHaveBeenCalledWith('acc-1','r1',{replacementRankId:'r0',expectedVersion:4,confirmedMembers:[{friendId:'f1',customerId:'c1'},{friendId:'f2',customerId:'c2'}]})
  view.rerender(<RankSettingsTab accountId="acc-1" status="ready" settings={{...SETTINGS,ranks:SETTINGS.ranks.slice(1)}} readonly={false} onTopBand={vi.fn()} onSaved={vi.fn()} onRetry={m.retry}/>)
  await waitFor(() => expect(screen.getByLabelText('ランク名 1')).toHaveProperty('value','レギュラー'))
  expect(screen.queryByRole('button',{name:'ランク「ゴールド」のその他操作'})).toBeNull()

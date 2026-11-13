@@ -5,8 +5,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { StyleSchedule, StyleSnapshot } from '@line-crm/shared'
 
 const state = vi.hoisted(() => ({ account: 'a', role: 'admin', search: '', replace: vi.fn(), push: vi.fn(), get: vi.fn(), save: vi.fn(), reset: vi.fn(), summary: vi.fn(), schedule: vi.fn(), warnings: vi.fn(), items: vi.fn() }))
-const firstRun = vi.hoisted(() => ({ steps: [] as unknown[], watch: vi.fn(), notices: undefined as {message:string;href:string}[]|undefined }))
-vi.mock('@/v8/onboarding/public/use-first-run/index', () => ({ useFirstRun: (_account: string, _enabled: boolean, watch: boolean) => { firstRun.watch(watch); return { status: 'ready', steps: firstRun.steps, firstRun: null, starter: null, error: null, reload: vi.fn(), watchExpired: false, rewatch: vi.fn() } } }))
+const firstRun = vi.hoisted(() => ({ status: 'ready' as 'ready' | 'loading', steps: [] as unknown[], watch: vi.fn(), notices: undefined as {message:string;href:string}[]|undefined }))
+vi.mock('@/v8/onboarding/public/use-first-run/index', () => ({ useFirstRun: (_account: string, _enabled: boolean, watch: boolean) => { firstRun.watch(watch); return { status: firstRun.status, steps: firstRun.steps, firstRun: null, starter: null, error: null, reload: vi.fn(), watchExpired: false, rewatch: vi.fn() } } }))
 vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: (_id: string, style: string) => ({ progress: { style, steps: {}, notices: firstRun.notices }, reload: vi.fn() }) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: state.push, replace: state.replace }), usePathname: () => '/', useSearchParams: () => new URLSearchParams(state.search) }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
@@ -32,6 +32,7 @@ beforeEach(() => {
   state.role = 'admin'
   state.search = ''
   firstRun.notices = undefined
+  firstRun.status = 'ready'
   firstRun.steps = buildStepsFromApi(['accounts', 'featureSet', 'attributes', 'friendAdd', 'scenario', 'firstMessage'].map(key => ({ key, state: 'todo', href: '/getting-started', reason: null })) as Parameters<typeof buildStepsFromApi>[0])
   state.account = 'a'
   state.get.mockResolvedValue({ success: true, data: { style: 'restaurant', styleSelected: true, answers: { image: { mode: 'configured', value: 'simple' } }, cards: [], version: 2, metricIds: ['bookings', 'attention', 'freeTables', 'noShowRate', 'newBookings'] } })
@@ -59,6 +60,35 @@ it('数の帯の対応待ちの補足は1行に収まる短さにする', async 
   render(<StyleDashboard style="restaurant" />)
   expect(await screen.findByText('未配席 1・枠閉じ 2')).toBeTruthy()
   expect(screen.queryByText(/枠を閉じる/)).toBeNull()
+})
+
+it('飲食は初期設定の取得中に数字を先に見せず、案内と一緒に出す', async () => {
+  let release!: (value: unknown) => void
+  state.items.mockReturnValue(new Promise(resolve => { release = resolve }))
+  const view = render(<StyleDashboard style="restaurant" />)
+  await waitFor(() => expect(state.summary).toHaveBeenCalled())
+  await waitFor(() => expect(state.items).toHaveBeenCalled())
+  const kpi = await screen.findByText('未配席 1・枠閉じ 2')
+  expect(kpi.closest('[data-pending="true"][aria-hidden="true"][inert]')).not.toBeNull()
+  expect(screen.queryByRole('heading', { name: 'はじめにやること' })).toBeNull()
+  await act(async () => { release({ success: true, data: { items: [] } }) })
+  expect(await screen.findByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
+  expect(await screen.findByText('未配席 1・枠閉じ 2')).toBeTruthy()
+  expect(view.container.querySelector('[data-pending="true"]')).toBeNull()
+})
+
+it('飲食は最初の案内の取得中に数字を先に見せず、案内と一緒に出す', async () => {
+  firstRun.status = 'loading'
+  const view = render(<StyleDashboard style="restaurant" />)
+  await waitFor(() => expect(state.summary).toHaveBeenCalled())
+  const kpi = await screen.findByText('未配席 1・枠閉じ 2')
+  expect(kpi.closest('[data-pending="true"][aria-hidden="true"][inert]')).not.toBeNull()
+  expect(screen.queryByRole('heading', { name: 'はじめにやること' })).toBeNull()
+  firstRun.status = 'ready'
+  view.rerender(<StyleDashboard style="restaurant" />)
+  expect(await screen.findByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
+  expect(await screen.findByText('未配席 1・枠閉じ 2')).toBeTruthy()
+  expect(view.container.querySelector('[data-pending="true"]')).toBeNull()
 })
 
 it('サロンの対応待ちの補足も1行に収まる短さにする', async () => {
@@ -139,15 +169,16 @@ it('設定の取得失敗を未設定にせず、同じ口を読み直せる', a
   await waitFor(() => expect(state.warnings).toHaveBeenCalledTimes(2))
 })
 
-it('選んだ機能の設定が遅れても数の帯を先に出して下へ動かさない', async () => {
+it('選んだ機能の設定が遅れたときは案内と数字を一緒に出す', async () => {
   let resolve!: (value: unknown) => void
   state.warnings.mockImplementationOnce(() => new Promise(done => { resolve = done }))
   const view = render(<StyleDashboard style="restaurant" />)
   await waitFor(() => expect(state.warnings).toHaveBeenCalled())
-  expect(view.container.querySelector('[data-pending="true"]')).not.toBeNull()
+  await waitFor(() => expect(view.container.querySelector('[data-pending="true"]')).not.toBeNull())
   await act(async () => resolve({ success: true, data: { items: [] } }))
   await waitFor(() => expect(view.container.querySelector('[data-pending="true"]')).toBeNull())
   expect(await screen.findByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
+  expect(await screen.findByText('未配席 1・枠閉じ 2')).toBeTruthy()
 })
 
 it.each(['restaurant', 'salon', 'consult', 'lesson'].flatMap(style => ['0', 'summary'].map(step => [style, step])))('%sはsetup=%sを同じ専用画面で開き、閉じても期間を残す', async (style, step) => {

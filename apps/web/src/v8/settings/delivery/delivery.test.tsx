@@ -73,6 +73,7 @@ function connection(next: Partial<{ status: string; storeName: string | null; co
     oauthConfigured,
     connection: {
       status: 'disconnected',
+      version: 5,
       storeName: null,
       connectedAt: null,
       provisionedAt: null,
@@ -420,7 +421,7 @@ describe('設定 › デリバリー連携', () => {
     expect(fixture.disconnect).not.toHaveBeenCalled()
 
     fireEvent.click(button('解除する'))
-    expect(fixture.disconnect).toHaveBeenCalledWith('acc-1')
+    expect(fixture.disconnect).toHaveBeenCalledWith('acc-1', 5)
     expect(fixture.disconnect).toHaveBeenCalledTimes(1)
     expect(button('解除しています…').disabled).toBe(true)
     fireEvent.click(button('解除しています…'))

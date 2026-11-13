@@ -7,6 +7,8 @@ import type { StaffMember } from '@line-crm/shared'
 
 const fixture = vi.hoisted(() => ({
   updateStaff: vi.fn(),
+  accountId: 'account-a',
+  retry: undefined as undefined | ((token: string) => Promise<void>),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -14,12 +16,13 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/staff',
   useSearchParams: () => new URLSearchParams('tab=members&id=target'),
 }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId }) }))
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: ({ tabs }: { tabs: Array<{ key: string; label: string }> }) => <nav aria-label="ログインユーザーのタブ">{tabs.map((tab) => <span key={tab.key}>{tab.label}</span>)}</nav>,
   useMergedTab: () => 'members',
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, useSettingsNavInline: () => undefined }))
+vi.mock('@/components/step-up-prompt', () => ({ default: ({ request }: { request: { retry: (token: string) => Promise<void> } }) => { fixture.retry = request.retry; return <div>本人確認</div> }, isStepUpRequired: (error: unknown) => (error as { code?: string })?.code === 'STEP_UP_REQUIRED' }))
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -134,4 +137,94 @@ it('保存口が失敗を返したら成功扱いで閉じず、変更した入�
   expect(fixture.updateStaff).toHaveBeenCalledOnce()
   expect(name.value).toBe('未保存の名前')
   expect(screen.getByRole('button', { name: '保存する' })).toBeTruthy()
+})
+
+it('LINE連携解除は確認した相手の版を送り、対象と環境を出す', async () => {
+  state.members[0] = member({ lineLinked: true, policyVersion: 7 })
+  fixture.updateStaff.mockReset().mockResolvedValue({ success: true, data: state.members[0] })
+  try {
+    render(<StaffEditV8 />)
+    fireEvent.click(await screen.findByRole('button', { name: '連携解除' }))
+    const dialog = await screen.findByRole('dialog', { name: /LINE連携を解除しますか/ })
+    expect(dialog.textContent).toContain('環境')
+    expect(dialog.textContent).toContain('LINEアカウント')
+    fireEvent.click(within(dialog).getByRole('button', { name: '解除する' }))
+    await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledWith('target', { lineLinked: false, expectedPolicyVersion: 7 }, undefined))
+  } finally { state.members[0] = member({}) }
+})
+
+it('LINE連携解除は開いたときの版を Worker に送る', async () => {
+  state.members[0] = member({ lineLinked: true, policyVersion: 7 })
+  fixture.updateStaff.mockReset().mockResolvedValue({ success: true, data: state.members[0] })
+  try {
+    render(<StaffEditV8 />)
+    fireEvent.click(await screen.findByRole('button', { name: '連携解除' }))
+    const dialog = await screen.findByRole('dialog', { name: /LINE連携を解除しますか/ })
+    fireEvent.click(within(dialog).getByRole('button', { name: '解除する' }))
+    await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledWith('target', { lineLinked: false, expectedPolicyVersion: 7 }, undefined))
+  } finally { state.members[0] = member({}) }
+})
+
+it('LINE連携解除の応答待ちには二度目を送らない', async () => {
+  state.members[0] = member({ lineLinked: true, policyVersion: 7 })
+  let finish!: (value: { success: boolean; data: StaffMember }) => void
+  fixture.updateStaff.mockReset().mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  try {
+    render(<StaffEditV8 />)
+    fireEvent.click(await screen.findByRole('button', { name: '連携解除' }))
+    const dialog = await screen.findByRole('dialog', { name: /LINE連携を解除しますか/ })
+    const confirm = within(dialog).getByRole('button', { name: '解除する' })
+    fireEvent.click(confirm)
+    await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledTimes(1))
+    fireEvent.click(confirm)
+    expect(fixture.updateStaff).toHaveBeenCalledTimes(1)
+    finish({ success: true, data: state.members[0] })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /LINE連携を解除しますか/ })).toBeNull())
+  } finally { state.members[0] = member({}) }
+})
+
+it('版が確認できないLINE連携は解除を送らない', async () => {
+  state.members[0] = member({ lineLinked: true })
+  fixture.updateStaff.mockReset()
+  try {
+    render(<StaffEditV8 />)
+    fireEvent.click(await screen.findByRole('button', { name: '連携解除' }))
+    const dialog = await screen.findByRole('dialog', { name: /LINE連携を解除しますか/ })
+    fireEvent.click(within(dialog).getByRole('button', { name: '解除する' }))
+    expect(await within(dialog).findByText(/対象の版を確認できません/)).toBeTruthy()
+    expect(fixture.updateStaff).not.toHaveBeenCalled()
+  } finally { state.members[0] = member({}) }
+})
+
+it('選択アカウントを切り替えたら古いLINE連携解除は送らない', async () => {
+  state.members[0] = member({ lineLinked: true, policyVersion: 7 })
+  fixture.accountId = 'account-a'
+  fixture.updateStaff.mockReset()
+  try {
+    const view = render(<StaffEditV8 />)
+    fireEvent.click(await screen.findByRole('button', { name: '連携解除' }))
+    await screen.findByRole('dialog', { name: /LINE連携を解除しますか/ })
+    fixture.accountId = 'account-b'
+    view.rerender(<StaffEditV8 />)
+    const stale = screen.queryByRole('dialog', { name: /LINE連携を解除しますか/ })
+    if (stale) fireEvent.click(within(stale).getByRole('button', { name: '解除する' }))
+    expect(fixture.updateStaff).not.toHaveBeenCalled()
+  } finally { fixture.accountId = 'account-a'; state.members[0] = member({}) }
+})
+
+it('本人確認の途中でアカウントを変えた古いLINE連携解除は再試行しない', async () => {
+  state.members[0] = member({ lineLinked: true, policyVersion: 7 })
+  fixture.accountId = 'account-a'; fixture.retry = undefined
+  fixture.updateStaff.mockReset().mockRejectedValueOnce({ code: 'STEP_UP_REQUIRED' })
+  try {
+    const view = render(<StaffEditV8 />)
+    fireEvent.click(await screen.findByRole('button', { name: '連携解除' }))
+    const dialog = await screen.findByRole('dialog', { name: /LINE連携を解除しますか/ })
+    fireEvent.click(within(dialog).getByRole('button', { name: '解除する' }))
+    await waitFor(() => expect(fixture.retry).toBeTypeOf('function'))
+    const retry = fixture.retry!
+    fixture.accountId = 'account-b'; view.rerender(<StaffEditV8 />)
+    await retry('old-proof')
+    expect(fixture.updateStaff).toHaveBeenCalledTimes(1)
+  } finally { fixture.accountId = 'account-a'; fixture.retry = undefined; state.members[0] = member({}) }
 })

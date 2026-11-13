@@ -21,7 +21,7 @@ export async function pauseFriendScenario(
   await db
     .prepare(
       `UPDATE friend_scenarios
-       SET status = 'paused',
+       SET confirmation_revision = confirmation_revision + 1, status = 'paused',
            pause_reason = 'after_send',
            current_step_order = ?,
            next_delivery_at = NULL,
@@ -99,7 +99,7 @@ export async function resumeExistingFriendScenario(
   await db
     .prepare(
       `UPDATE friend_scenarios
-          SET status = 'active', next_delivery_at = ?, pause_reason = NULL, updated_at = ?
+          SET confirmation_revision = confirmation_revision + 1, status = 'active', next_delivery_at = ?, pause_reason = NULL, updated_at = ?
         WHERE id = ?`,
     )
     .bind(nextDeliveryAt, now, existing.id)
@@ -128,7 +128,7 @@ export async function pauseFriendScenarioManual(
   const result = await db
     .prepare(
       `UPDATE friend_scenarios
-          SET status = 'paused',
+          SET confirmation_revision = confirmation_revision + 1, status = 'paused',
               pause_reason = 'manual',
               next_delivery_at = NULL,
               updated_at = ?
@@ -172,7 +172,7 @@ export async function retryFailedFriendScenario(
   const result = await db
     .prepare(
       `UPDATE friend_scenarios
-          SET status = 'active',
+          SET confirmation_revision = confirmation_revision + 1, status = 'active',
               next_delivery_at = ?,
               pause_reason = NULL,
               updated_at = ?

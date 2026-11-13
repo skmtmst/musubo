@@ -34,3 +34,77 @@ test('B2-03/B5-14: 券が必須の組は未選択を400で伝え、予約を一�
  d.raw.exec(`INSERT INTO booking_pass_plans(id,line_account_id,kind,name,price,count,valid_days,target_scope_json,allow_without_pass,status,created_by,created_at,idempotency_key,request_json) VALUES('plan','a','ticket','券',1000,5,180,'["menu"]',0,'on_sale','o','now','plan','{}')`);
  const r=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input);expect(r.status).toBe(400);expect(await r.json()).toMatchObject({error:'pass_required'});expect(d.raw.prepare('SELECT count(*) n FROM bookings').get()).toEqual({n:0});
 });
+
+test('確認した組の予約集合と各版が変わったら一件も取り消さない',async()=>{
+ const created=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'group-check');
+ const data=(await created.json() as any).data;expect(created.status).toBe(201);
+ const viewResponse=await gapCall(app(),`/api/booking/admin/bookings/${data.bookings[0].id}/group?account_id=a`);
+ const view=(await viewResponse.json() as any).data;
+ const expectedMembers=view.members.map((m:any)=>({bookingId:m.bookingId,version:m.version,status:m.status}));
+ expect(expectedMembers).toHaveLength(2);expect(expectedMembers.every((m:any)=>Number.isInteger(m.version))).toBe(true);
+ d.raw.prepare('UPDATE bookings SET lock_version=lock_version+1 WHERE id=?').run(expectedMembers[1].bookingId);
+ const cancel=await gapCall(app(),`/api/booking/admin/groups/${view.groupId}/cancel?account_id=a`,'POST',{reason:'確認済み',expectedVersion:view.version,expectedMembers});
+ expect(cancel.status).toBe(409);
+ expect((await cancel.json() as any).data.members[1].version).toBe(expectedMembers[1].version+1);
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM bookings WHERE status='cancelled'").get()).toEqual({n:0});
+ expect(d.raw.prepare('SELECT version FROM booking_groups WHERE id=?').get(view.groupId)).toEqual({version:view.version});
+ expect(fetch).not.toHaveBeenCalled();
+});
+
+test('確認後に来店を記録して解除した予約も古い確認では組取消しない',async()=>{
+ const created=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'group-aba');
+ const data=(await created.json() as any).data;expect(created.status).toBe(201);
+ const bookingId=data.bookings[0].id;
+ const view=(await (await gapCall(app(),`/api/booking/admin/bookings/${bookingId}/group?account_id=a`)).json() as any).data;
+ const expectedMembers=view.members.map((m:any)=>({bookingId:m.bookingId,version:m.version,status:m.status}));
+ expect((await gapCall(app(),`/api/booking/admin/bookings/${bookingId}/visit?account_id=a`,'POST',{kind:'visited'})).status).toBe(200);
+ expect((await gapCall(app(),`/api/booking/admin/bookings/${bookingId}/visit?account_id=a`,'DELETE')).status).toBe(200);
+ const response=await gapCall(app(),`/api/booking/admin/groups/${view.groupId}/cancel?account_id=a`,'POST',{reason:'確認済み',expectedVersion:view.version,expectedMembers});
+ expect(response.status).toBe(409);
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM bookings WHERE status='cancelled'").get()).toEqual({n:0});
+ expect(fetch).not.toHaveBeenCalled();
+});
+
+test('組取消の書込み直前に予約の版が変わっても一件も取り消さない',async()=>{
+ const created=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'group-race');
+ const data=(await created.json() as any).data;expect(created.status).toBe(201);
+ const view=(await (await gapCall(app(),`/api/booking/admin/bookings/${data.bookings[0].id}/group?account_id=a`)).json() as any).data;
+ const expectedMembers=view.members.map((m:any)=>({bookingId:m.bookingId,version:m.version,status:m.status}));
+ const batch=d.db.batch.bind(d.db);let raced=false;
+ vi.spyOn(d.db,'batch').mockImplementation(async statements=>{
+  if(!raced){raced=true;d.raw.prepare('UPDATE bookings SET lock_version=lock_version+1 WHERE id=?').run(expectedMembers[0].bookingId);}
+  return batch(statements);
+ });
+ const res=await gapCall(app(),`/api/booking/admin/groups/${view.groupId}/cancel?account_id=a`,'POST',{reason:'確認済み',expectedVersion:view.version,expectedMembers});
+ expect(raced).toBe(true);expect(res.status).toBe(409);
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM bookings WHERE status='cancelled'").get()).toEqual({n:0});expect(fetch).not.toHaveBeenCalled();
+});
+
+test('予約の集合が異なれば拒み、版情報なしの従来の呼び出しは受け付ける',async()=>{
+ const created=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'group-old');
+ const data=(await created.json() as any).data;const view=(await (await gapCall(app(),`/api/booking/admin/bookings/${data.bookings[0].id}/group?account_id=a`)).json() as any).data;
+ const path=`/api/booking/admin/groups/${view.groupId}/cancel?account_id=a`;
+ const partial=view.members.slice(0,1).map((m:any)=>({bookingId:m.bookingId,version:m.version,status:m.status}));
+ expect((await gapCall(app(),path,'POST',{reason:'確認済み',expectedVersion:view.version,expectedMembers:partial})).status).toBe(409);
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM bookings WHERE status='cancelled'").get()).toEqual({n:0});
+ expect((await gapCall(app(),path,'POST',{reason:'確認済み',expectedVersion:view.version})).status).toBe(200);
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM bookings WHERE status='cancelled'").get()).toEqual({n:2});expect(fetch).not.toHaveBeenCalled();
+});
+
+test('確認した予約集合と各版が一致すれば全件を取り消す',async()=>{
+ const created=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'group-matching');
+ const data=(await created.json() as any).data;const view=(await (await gapCall(app(),`/api/booking/admin/bookings/${data.bookings[0].id}/group?account_id=a`)).json() as any).data;
+ const expectedMembers=view.members.map((m:any)=>({bookingId:m.bookingId,version:m.version,status:m.status}));
+ const response=await gapCall(app(),`/api/booking/admin/groups/${view.groupId}/cancel?account_id=a`,'POST',{reason:'確認済み',expectedVersion:view.version,expectedMembers});
+ expect(response.status).toBe(200);expect((await response.json() as any).data.cancelled).toBe(2);
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM bookings WHERE status='cancelled'").get()).toEqual({n:2});expect(fetch).not.toHaveBeenCalled();
+});
+
+test('個別予約の状態だけが変わった場合も組を取り消さない',async()=>{
+ const created=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'group-status');
+ const data=(await created.json() as any).data;const view=(await (await gapCall(app(),`/api/booking/admin/bookings/${data.bookings[0].id}/group?account_id=a`)).json() as any).data;
+ const expectedMembers=view.members.map((m:any)=>({bookingId:m.bookingId,version:m.version,status:m.status}));
+ d.raw.prepare("UPDATE bookings SET status='completed' WHERE id=?").run(expectedMembers[0].bookingId);
+ const response=await gapCall(app(),`/api/booking/admin/groups/${view.groupId}/cancel?account_id=a`,'POST',{reason:'確認済み',expectedVersion:view.version,expectedMembers});
+ expect(response.status).toBe(409);expect(d.raw.prepare("SELECT COUNT(*) n FROM bookings WHERE status='cancelled'").get()).toEqual({n:0});expect(fetch).not.toHaveBeenCalled();
+});

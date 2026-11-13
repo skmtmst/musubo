@@ -233,9 +233,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
   const accountId = selectedAccount?.id ?? null
   const publishScopeKey = JSON.stringify([accountId, group?.id])
-  const publishScope = useRef({ key: publishScopeKey })
+  const publishScope = useRef({ key: publishScopeKey }), publishDialogScope=useRef<object>({})
   if (publishScope.current.key !== publishScopeKey) publishScope.current = { key: publishScopeKey }
-  const [publishTarget, setPublishTarget] = useState<{ accountId: string; name: string | null; scope: object } | null>(null)
+  const [publishTarget, setPublishTarget] = useState<{ accountId: string; name: string | null; scope: object;dialogScope:object;version:number;generation:number;signature:string;images:Array<{orderIndex:number;imageR2Key:string|null;imageContentType:string|null}> } | null>(null)
   const publishAlive = useRef(true)
   useEffect(() => { publishAlive.current = true; return () => { publishAlive.current = false } }, [])
   useEffect(() => { setPublishConfirmOpen(false); setPublishTarget(null); setPriorityOpen(false) }, [accountId, group?.id])
@@ -709,17 +709,13 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       `${referrers.map((p) => `「${p.name}」`).join('、')}のタブ切替ボタンが、消えるタブを行き先にしています。先に手順②で行き先を変えてください。`,
     ]
   }
-
   /** 画像か、決めた動きがあるページ（消すときに確かめる）。 */
   function pageHasSettings(page: Page): boolean {
     return Boolean(page.imageR2Key) || page.areas.some(isAreaActionConfigured)
   }
-
   /** ①の切替タブの数（0＝なし・1＝2つ・2＝3つ）を変える。消えるタブに設定があれば確かめの窓を出す。 */
   function requestTabCount(next: number) { return requestMenuTabCount({ applyTabCount, group, pageHasSettings, pages, pendingImages, removePageBlockers, setPendingTabCount, tabCount }, next) }
-
   function applyTabCount(next: number) { return applyMenuTabCount({ activePageId, group, host, pages, removePageBlockers, setActivePageId, setPages, setPendingImages, setPendingTabCount, setSelectedAreaId, setTabCount, setTabNames, templateKey }, next) }
-
   /* ---------- 画像 ---------- */
 
   async function uploadPageImage(pageId: string, file: File) {
@@ -740,7 +736,10 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       return
     }
     try {
-      const res = await api.richMenuGroups.uploadImage(group.id, pageId, file)
+      if(!Number.isSafeInteger(group.publishingGeneration))throw new Error('画像の版を確認できません。読み直してください。')
+      const res = await api.richMenuGroups.uploadImage(group.id, pageId, file,group.publishingGeneration)
+      if(res.data.publishingGeneration!==group.publishingGeneration+1)throw new Error('画像の版を確認できません。読み直してください。')
+      setGroup(current=>current&&current.id===group.id&&current.publishingGeneration===group.publishingGeneration?{...current,publishingGeneration:res.data.publishingGeneration!}:current)
       updatePage(pageId, {
         imageR2Key: res.data.imageR2Key,
         imageContentType: res.data.imageContentType,
@@ -1017,7 +1016,10 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     publishLabelErrors.fail('label', 'ボタン名（読み上げラベル）を入力してください')
     return false
   }
-  function handlePublish() { if (validatePublishLabels()) return publishMenuNow({ audience, group, loadChecks, persistDraft, publishAttempt, publishing, reloadGroup, saveErrors, saving, setDone, setError, setNotice, setPublishing }) }
+  function handlePublish() {
+    if(!publishTarget||!group||group.version!==publishTarget.version||group.publishingGeneration!==publishTarget.generation||draftSignature()!==publishTarget.signature||JSON.stringify(pages.map((page,index)=>({orderIndex:index,imageR2Key:page.imageR2Key,imageContentType:page.imageContentType})))!==JSON.stringify(publishTarget.images)){setError('公開内容が変わりました。閉じてもう一度確認してください。');return}
+    if (validatePublishLabels()) return publishMenuNow({ audience, group, confirmedImages:publishTarget.images, loadChecks, persistDraft, publishAttempt, publishing, reloadGroup, saveErrors, saving, setDone, setError, setNotice, setPublishing })
+  }
 
   /** 「公開する」/「予約する」。時刻を決めた公開は予約口へ。 */
   async function handlePublishSubmit() {
@@ -1045,7 +1047,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       return
     }
     if (!group || !accountId || group.accountId !== accountId || !canOperateRef.current) return
-    setError(null); setPublishTarget({ accountId: group.accountId, name: selectedAccount?.id === group.accountId ? selectedAccount.name : null, scope: publishScope.current }); setPublishConfirmOpen(true)
+    if(!Number.isSafeInteger(group.publishingGeneration)){setError('公開内容の版を確認できません。読み直してください。');return}
+    publishDialogScope.current={};setError(null); setPublishTarget({ accountId: group.accountId, name: selectedAccount?.id === group.accountId ? selectedAccount.name : null, scope: publishScope.current,dialogScope:publishDialogScope.current,version:group.version,generation:group.publishingGeneration,signature:draftSignature(),images:pages.map((page,index)=>({orderIndex:index,imageR2Key:page.imageR2Key,imageContentType:page.imageContentType})) }); setPublishConfirmOpen(true)
   }
 
   /* ---------- 派生値 ---------- */
@@ -1425,8 +1428,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         description={publishConfirmNote}
         confirmLabel="公開する"
         busy={publishing || saving}
-        error={error || undefined} onSuccess={() => setPublishConfirmOpen(false)} onConfirm={() => { if (publishAlive.current && publishTarget?.scope === publishScope.current && canOperateRef.current) return handlePublish() }}
-        onCancel={() => setPublishConfirmOpen(false)}
+        error={error || undefined} onSuccess={() => {publishDialogScope.current={};setPublishConfirmOpen(false)}} onConfirm={() => { if (publishAlive.current && publishTarget?.scope === publishScope.current && publishTarget.dialogScope===publishDialogScope.current && canOperateRef.current) return handlePublish() }}
+        onCancel={() => {publishDialogScope.current={};setPublishConfirmOpen(false)}}
       >
         {publishTarget ? <OperationTargetSummary accounts={[{ id: publishTarget.accountId, name: publishTarget.name }]} /> : null}
       </ConfirmDialog>

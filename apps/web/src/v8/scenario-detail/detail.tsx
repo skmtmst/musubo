@@ -21,6 +21,7 @@ import { DetailLoading } from '@/components/templates/detail-page'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { useAccount } from '@/contexts/account-context'
 import { api, type ScenarioRuns, type ScenarioTriggerItem } from '@/lib/api'
+import type { ScenarioConfirmation } from '@/lib/api/types/scenarios'
 import { formatNumber } from '@/lib/format'
 import { useStaffRole } from '@/lib/staff-role'
 import { useFeatureAccess } from '@/lib/use-feature-access'
@@ -187,11 +188,49 @@ export default function ScenarioDetailV8({
   /* ★V8: 行の「プレビュー」は右の欄のスマホに出すので、行内の展開は持たない。 */
   const [duplicatingStepId, setDuplicatingStepId] = useState<string | null>(null)
   const [deleteStepTarget, setDeleteStepTarget] = useState<ScenarioStep | null>(null)
+  const [deleteStepRevision, setDeleteStepRevision] = useState<number | null>(null)
+  const [deleteStepOpenedGeneration, setDeleteStepOpenedGeneration] = useState(0)
+  const deleteStepGeneration = useRef(0)
+  const setScopedDeleteStepTarget: typeof setDeleteStepTarget = (next) => {
+    deleteStepGeneration.current += 1
+    if (next && typeof next !== 'function') {
+      setDeleteStepRevision(scenario?.contentRevision ?? null)
+      setDeleteStepOpenedGeneration(deleteStepGeneration.current)
+    }
+    setDeleteStepTarget(next)
+  }
+  const deleteStepConfirmationValid = () => !!deleteStepTarget && deleteStepOpenedGeneration === deleteStepGeneration.current
+
   const [deletingStepId, setDeletingStepId] = useState<string | null>(null)
   const [deleteStepError, setDeleteStepError] = useState('')
   const [deleteScenarioOpen, setDeleteScenarioOpen] = useState(false)
   const [deletingScenario, setDeletingScenario] = useState(false)
   const [deleteScenarioError, setDeleteScenarioError] = useState('')
+  const [stopConfirmation, setStopConfirmation] = useState<{ scope: string; serial: number; value: ScenarioConfirmation } | null>(null)
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ scope: string; serial: number; value: ScenarioConfirmation } | null>(null)
+  const confirmationScope = JSON.stringify([id, selectedAccountId, scenario?.lineAccountId, canEdit])
+  const confirmationGeneration = useRef({ scope: confirmationScope, serial: 0 })
+  if (confirmationGeneration.current.scope !== confirmationScope) confirmationGeneration.current = { scope: confirmationScope, serial: confirmationGeneration.current.serial + 1 }
+  const prepareConfirmation = async (kind: 'stop' | 'delete') => {
+    if (!scenario || !canEdit || !Number.isSafeInteger(scenario.contentRevision) || !scenario.contentRevision) { setError('画面を読み直してから、もう一度お試しください。'); return }
+    const scope = confirmationScope, serial = ++confirmationGeneration.current.serial
+    try {
+      const result = await api.scenarios.confirmation(id, kind)
+      if (confirmationGeneration.current.scope !== scope || confirmationGeneration.current.serial !== serial) return
+      if (!result.success || result.data.contentRevision !== scenario.contentRevision || !Number.isSafeInteger(result.data.activeCount) || result.data.activeCount < 0 || !Number.isSafeInteger(result.data.rowIdSum) || result.data.rowIdSum < 0 || !Number.isSafeInteger(result.data.rowIdSquareSum) || result.data.rowIdSquareSum < 0 || !Number.isSafeInteger(result.data.totalCount) || result.data.totalCount < 0 || !Number.isSafeInteger(result.data.totalRowIdSum) || result.data.totalRowIdSum < 0 || !Number.isSafeInteger(result.data.totalRowIdSquareSum) || result.data.totalRowIdSquareSum < 0 || !Array.isArray(result.data.referrers)) { setError('シナリオが変わったか確認できません。画面を読み直してください。'); return }
+      const value = { scope, serial, value: result.data }
+      if (kind === 'stop') { setStopConfirmation(value); setStopOpen(true) }
+      else { setDeleteConfirmation(value); setDeleteScenarioOpen(true) }
+    } catch { if (confirmationGeneration.current.scope === scope && confirmationGeneration.current.serial === serial) setError('確認できませんでした。画面を読み直してください。') }
+  }
+  const currentStopConfirmation = stopConfirmation?.scope === confirmationScope && stopConfirmation.serial === confirmationGeneration.current.serial && stopConfirmation.value.contentRevision === scenario?.contentRevision ? stopConfirmation.value : null
+  const currentDeleteConfirmation = deleteConfirmation?.scope === confirmationScope && deleteConfirmation.serial === confirmationGeneration.current.serial && deleteConfirmation.value.contentRevision === scenario?.contentRevision ? deleteConfirmation.value : null
+  const stopConfirmationValid = () => !!currentStopConfirmation && stopConfirmation?.serial === confirmationGeneration.current.serial && stopConfirmation.scope === confirmationGeneration.current.scope
+  const deleteConfirmationValid = () => !!currentDeleteConfirmation && deleteConfirmation?.serial === confirmationGeneration.current.serial && deleteConfirmation.scope === confirmationGeneration.current.scope
+  const closeStopConfirmation = (next: boolean | ((previous: boolean) => boolean)) => { if (next === false) confirmationGeneration.current.serial += 1; setStopOpen(next) }
+  const closeDeleteConfirmation = (next: boolean | ((previous: boolean) => boolean)) => { if (next === false) confirmationGeneration.current.serial += 1; setDeleteScenarioOpen(next) }
+
+
   const [showStepForm, setShowStepForm] = useState(false)
   /** 何通目のあとに差し込むか。末尾に足すときは null。 */
   const [insertAfter, setInsertAfter] = useState<number | null>(null)
@@ -284,8 +323,9 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
     sortedSteps, deliveryMode, id,
     setDuplicateRemainder, setDuplicateOpen, discardingDuplicate,
     setDiscardingDuplicate, setDiscardDuplicateError, setDiscardDuplicateOpen,
-    deletingScenario, setDeletingScenario, setDeleteScenarioError,
-    setDeleteScenarioOpen, router,
+    deletingScenario, setDeletingScenario, setDeleteScenarioError, deleteConfirmation: currentDeleteConfirmation, deleteConfirmationValid,
+    refreshDeleteConfirmation: () => prepareConfirmation('delete'),
+    setDeleteScenarioOpen: closeDeleteConfirmation, router,
   })
   const {
   saveErrors: settingsSaveErrors, editDirty, openRenameDialog, openDuplicateDialog, acceptLatestAndContinue,
@@ -299,8 +339,8 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
     scenario, conflictLatest, startBusy,
     startConfirmed, setStartBusy, setStartError,
     setStartOpen, setJustStarted, reloadStats,
-    stopBusy, setStopBusy, setStopError,
-    setStopOpen, setDuplicateName, setDuplicateOpen,
+    stopBusy, setStopBusy, setStopError, stopConfirmation: currentStopConfirmation, stopConfirmationValid,
+    setStopOpen: closeStopConfirmation, setDuplicateName, setDuplicateOpen,
     setEditForm,
   })
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: editDirty, busy: saving })
@@ -365,8 +405,8 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
     setStepSaving, templates, editingStepId,
     loadScenario, insertAfter, sortedSteps,
     stepDraft, reloadStats, duplicatingStepId,
-    setDuplicatingStepId, deleteStepTarget, deletingStepId,
-    setDeletingStepId, setDeleteStepError, setDeleteStepTarget,
+    setDuplicatingStepId, deleteStepTarget, deleteStepRevision, deleteStepConfirmationValid, deletingStepId,
+    setDeletingStepId, setDeleteStepError, setDeleteStepTarget: setScopedDeleteStepTarget,
     setError,
   })
   const restoreStepDraft = () => {
@@ -599,8 +639,7 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
               まとめてテストを送る
             </Button>
           ) : null}{canEdit ? (
-            <span className={styles.menuBox}>
-              <RowMenu
+            <RowMenu
                 appearance="plain"
                 label="このシナリオのその他操作"
                 menuLabel="このシナリオの操作"
@@ -626,12 +665,11 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
                     dividerBefore: true,
                     onSelect: () => {
                       setDeleteScenarioError('')
-                      setDeleteScenarioOpen(true)
+                      void prepareConfirmation('delete')
                     },
                   },
                 ]}
-              />
-            </span>
+            />
           ) : null}</>} />
 
       {/* 競合（kz2B6）：ほかの人の保存と食い違った。板の頭のすぐ下に、幅いっぱいで出す。 */}
@@ -665,7 +703,7 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
         audienceConditionLabel={audienceConditionLabel}
         setTriggerOpen={setTriggerOpen}
         setStopError={setStopError}
-        setStopOpen={setStopOpen}
+        setStopOpen={(next) => { if (next === true) void prepareConfirmation('stop'); else closeStopConfirmation(next) }}
         setStartError={setStartError}
         setStartConfirmed={setStartConfirmed}
         setStartOpen={setStartOpen}
@@ -691,7 +729,7 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
         duplicatingStepId={duplicatingStepId}
         handleDuplicateStep={handleDuplicateStep}
         setDeleteStepError={setDeleteStepError}
-        setDeleteStepTarget={setDeleteStepTarget}
+        setDeleteStepTarget={setScopedDeleteStepTarget}
         renderStepForm={renderStepForm}
         showStepForm={showStepForm}
         tags={tags}
@@ -714,7 +752,7 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
                 label="このシナリオを削除する"
                 onClick={() => {
                   setDeleteScenarioError('')
-                  setDeleteScenarioOpen(true)
+                  void prepareConfirmation('delete')
                 }}
               />
             ) : undefined
@@ -790,10 +828,12 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
         setSimRetry={setSimRetry}
         startChecks={startChecks}
         setStartConfirmed={setStartConfirmed}
-        stopOpen={stopOpen}
+        stopOpen={stopOpen && currentStopConfirmation !== null}
         stopBusy={stopBusy}
         stopError={stopError}
-        setStopOpen={setStopOpen}
+        stopConfirmationCount={currentStopConfirmation?.activeCount}
+        deleteConfirmationCount={currentDeleteConfirmation?.activeCount}
+        setStopOpen={closeStopConfirmation}
         setStopError={setStopError}
         stats={stats}
         handleStop={handleStop}
@@ -811,13 +851,13 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
         deletingStepId={deletingStepId}
         deleteStepError={deleteStepError}
         handleDeleteStep={handleDeleteStep}
-        setDeleteStepTarget={setDeleteStepTarget}
+        setDeleteStepTarget={setScopedDeleteStepTarget}
         setDeleteStepError={setDeleteStepError}
-        deleteScenarioOpen={deleteScenarioOpen}
+        deleteScenarioOpen={deleteScenarioOpen && currentDeleteConfirmation !== null}
         deletingScenario={deletingScenario}
         deleteScenarioError={deleteScenarioError}
         handleDeleteScenario={handleDeleteScenario}
-        setDeleteScenarioOpen={setDeleteScenarioOpen}
+        setDeleteScenarioOpen={closeDeleteConfirmation}
         setDeleteScenarioError={setDeleteScenarioError}
         discardDuplicateOpen={discardDuplicateOpen}
         duplicateRemainder={duplicateRemainder}

@@ -127,14 +127,14 @@ describe('/api/users authorization boundaries', () => {
     db.getUserByPhoneForAccess.mockResolvedValue(null);
     const response = await app().request(
       '/api/users/match',
-      request('POST', { email: 'secret@example.com', phone: '09099999999' }),
+      request('POST', { email: 'secret@example.com', phone: '09000009999' }),
     );
     expect(response.status).toBe(404);
     expect(db.getUserByEmailForAccess).toHaveBeenCalledWith(
       {}, 'secret@example.com', expect.objectContaining({ allowedAccountIds: ['account-own'] }),
     );
     expect(db.getUserByPhoneForAccess).toHaveBeenCalledWith(
-      {}, '09099999999', expect.objectContaining({ allowedAccountIds: ['account-own'] }),
+      {}, '09000009999', expect.objectContaining({ allowedAccountIds: ['account-own'] }),
     );
   });
 

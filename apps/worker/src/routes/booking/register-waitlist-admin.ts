@@ -74,7 +74,7 @@ booking.delete('/api/booking/admin/waitlist/:id', requireRole('owner', 'admin', 
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const id = c.req.param('id');
   if(c.req.query('kind')==='seat'){
-   const result=await c.env.DB.prepare(`UPDATE rt_seat_waitlist SET status='cancelled',updated_at=? WHERE id=? AND status IN ('waiting','invited') AND store_id IN (SELECT id FROM rt_stores WHERE line_account_id=?)`).bind(new Date().toISOString(),id,accountId).run();
+   const result=await c.env.DB.prepare(`UPDATE rt_seat_waitlist SET confirmation_revision=confirmation_revision+1, status='cancelled',updated_at=? WHERE id=? AND status IN ('waiting','invited') AND store_id IN (SELECT id FROM rt_stores WHERE line_account_id=?)`).bind(new Date().toISOString(),id,accountId).run();
    return result.meta.changes?c.json({status:'cancelled'}):c.json({error:'not_found'},404);
   }
 

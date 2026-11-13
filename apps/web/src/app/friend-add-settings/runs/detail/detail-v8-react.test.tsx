@@ -37,7 +37,7 @@ const runDetail = {
   id: 'fa-7f3a11111111c21',
   receivedAt: '2026-09-07T10:14:01',
   processedAt: '2026-09-07T10:14:02',
-  friend: { id: 'friend-1', displayName: '山田 太郎', redacted: false },
+  friend: { id: 'friend-1', displayName: '見本 141', redacted: false },
   friendKind: 'first_time',
   attribution: { status: 'unavailable', routeId: null, routeName: null, reason: null },
   rule: {
@@ -129,7 +129,7 @@ test('v8 の実行の詳細は板 N43uVX・失敗の帯・行ったこと・右�
   await eventually(() => {
     expect(host.querySelector('[data-design-node="N43uVX"]')).toBeTruthy()
   })
-  expect(host.textContent).toContain('山田 太郎さんの友だち追加')
+  expect(host.textContent).toContain('見本 141さんの友だち追加')
   expect(host.textContent).toContain('つ目の処理を完了できませんでした')
   expect(host.textContent).toContain('失敗した処理をもう一度')
   expect(host.textContent).toContain('行ったこと')

@@ -45,11 +45,12 @@ type MusuboSite = {
 
 /** 公開サイト（sites/musubo）の組み立て関数。別アプリなので Worker の型検査には含めない。 */
 async function loadMusuboSite(): Promise<MusuboSite> {
+  const { fileURLToPath } = await import('node:url');
   const root = new URL('../../../../sites/musubo/', import.meta.url);
   const [{ default: config }, { legalBody }, { home }] = await Promise.all([
-    import(new URL('site.config.mjs', root).pathname),
-    import(new URL('src/legal.mjs', root).pathname),
-    import(new URL('src/home.mjs', root).pathname),
+    import(fileURLToPath(new URL('site.config.mjs', root))),
+    import(fileURLToPath(new URL('src/legal.mjs', root))),
+    import(fileURLToPath(new URL('src/home.mjs', root))),
   ]);
   return { config, legalBody, home };
 }

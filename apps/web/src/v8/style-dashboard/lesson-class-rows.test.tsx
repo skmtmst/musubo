@@ -63,6 +63,21 @@ it.each(['today', 'week', 'month'] as const)('%sの一覧・盤・カレンダ�
   expect(schedule).toEqual(original)
 })
 
+it.each(['2026-10-31T15:00:00.000Z', '2026-11-01T00:00:00+09:00'])('月初の %s を店の日時で11月として表示する', from => {
+  const schedule = { ...fixture(), from, range: 'month' as const, calendarView: 'month' as const }
+  const month = toToday('lesson', snapshot, schedule, date, 'month').month!
+  expect(month.title).toBe('2026年11月')
+  expect(month.days.find(day => day.date === '2026-11-01')?.inMonth).toBe(true)
+  expect(month.days.find(day => day.date === '2026-10-31')?.inMonth).toBe(false)
+})
+
+it('年をまたぐ月初も店の日時で年と月を表示する', () => {
+  const schedule = { ...fixture(), from: '2026-12-31T15:00:00Z', range: 'month' as const, calendarView: 'month' as const }
+  const month = toToday('lesson', snapshot, schedule, '2027-01-01', 'month').month!
+  expect(month.title).toBe('2027年1月')
+  expect(month.days.find(day => day.date === '2027-01-01')?.inMonth).toBe(true)
+})
+
 it.each([0, 10, null] as const)('満席・予約なし・上限なしの回も残す（残り%s）', remaining => {
   const schedule = fixture()
   schedule.entries = schedule.entries.filter(entry => entry.kind === 'class')

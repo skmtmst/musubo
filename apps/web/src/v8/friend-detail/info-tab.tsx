@@ -1,6 +1,7 @@
 'use client'
 import TextLink from '@/components/shared/text-link'
 import FilterLink from '@/components/shared/filter-link'
+import HelpTip from '@/components/shared/help-tip'
 import Link from '@/components/shared/list-navigation'
 import { ArrowUpRight, Lock } from 'lucide-react'
 import { BASIC_FRIEND_FIELDS, ageFromBirthday, type FriendField } from '@line-crm/shared'
@@ -33,6 +34,8 @@ import { formatNumber } from '@/lib/format'
 /** 種類の名前は絵では出さない。ラベルの title で読めるようにする。 */
 export const BASIC_GROUP = 'basic'
 export const ALL_GROUP = 'all'
+export const DINING_GROUP = '__dining__'
+export const UNFILED_GROUP = '__unfiled__'
 
 function FieldInput({ field, value, onChange, disabled, computed = false, id }: {
   field: FriendField
@@ -116,35 +119,42 @@ export default function InfoTab({ friendId, group, data, perms }: {
   const isBasic = (field: FriendField) => BASIC_FRIEND_FIELDS.some(spec => spec.key === field.fixedKey)
   const basic = BASIC_FRIEND_FIELDS.flatMap(spec => fields.filter(field => field.fixedKey === spec.key))
   const others = fields.filter(field => !isBasic(field))
-  const inGroup = group === ALL_GROUP ? [...basic,...others] : group === BASIC_GROUP ? basic : others.filter(field => field.folderId === group)
+  const isDining = (field: FriendField) => !isBasic(field) && !!field.fixedKey
+  const inGroup = group === ALL_GROUP ? [...basic,...others] : group === BASIC_GROUP ? basic : group === DINING_GROUP ? others.filter(isDining) : others.filter(field => !isDining(field) && (group === UNFILED_GROUP ? !field.folderId : field.folderId === group))
   const ordered = inGroup.filter(field => field.status !== 'archived')
-  const groups = [...new Set(ordered.map(field => isBasic(field) ? 'basic' : field.fixedKey ? 'dining' : field.folderId ?? 'unfiled'))]
+  const groups = [...new Set(ordered.map(field => isBasic(field) ? 'basic' : field.fixedKey ? 'dining' : field.folderId || 'unfiled'))]
   const groupName = (key: string) => key === 'basic' ? '基本（決まった欄）' : key === 'dining' ? '飲食の情報' : key === 'unfiled' ? '未分類' : fieldFolders.find(folder => folder.id === key)?.name ?? '分類'
   /* 読み上げ名（区切りの名前）は今までどおり。 */
   const groupAria = (key: string) => key === 'basic' ? '基本' : key === 'dining' ? '飲食の情報' : `お店が作った項目（${groupName(key)}）`
   /* ：題の横の補足。決まった欄は回答フォームの答え、ほかはお店が作った項目。 */
-  const groupNote = (key: string) => key === 'basic' ? '回答フォームの答えが入ります' : key === 'dining' ? '飲食を使うアカウントの決まった欄' : 'お店が作った項目・分類ごとに出ます'
+  const groupNote = (key: string) => key === 'basic' ? '名前や連絡先などの基本情報' : key === 'dining' ? '飲食を使うアカウントの決まった欄' : 'お店が作った項目・分類ごとに出ます'
   const firstShopGroup = groups.find(key => key !== 'basic' && key !== 'dining')
   // 「情報欄を管理」はお店が作った分類の頭に出す。お店の分類が無いときは最初の分類の頭に出す。
   const manageGroup = firstShopGroup ?? groups[0]
-  const groupOf = (field: FriendField) => isBasic(field) ? 'basic' : field.fixedKey ? 'dining' : field.folderId ?? 'unfiled'
+  const groupOf = (field: FriendField) => isBasic(field) ? 'basic' : field.fixedKey ? 'dining' : field.folderId || 'unfiled'
 
   const folderCount = new Map<string, number>()
-  let unfiled = 0
-  for (const f of fields) {
-    if (isBasic(f)) unfiled += 1
-    else if (!f.folderId) continue
+  let basicCount = 0
+  let diningCount = 0
+  let unfiledCount = 0
+  const visibleFields = fields.filter(field => field.status !== 'archived')
+  for (const f of visibleFields) {
+    if (isBasic(f)) basicCount += 1
+    else if (isDining(f)) diningCount += 1
+    else if (!f.folderId) unfiledCount += 1
     else folderCount.set(f.folderId, (folderCount.get(f.folderId) ?? 0) + 1)
   }
   const folderIds = new Set(fieldFolders.map((f) => f.id))
   const orphan = [...folderCount.keys()].filter((id) => !folderIds.has(id))
   const chips = [
-    { id: ALL_GROUP, label: 'すべて', count: fields.length },
-    { id: BASIC_GROUP, label: '基本', count: unfiled },
+    { id: ALL_GROUP, label: 'すべて', count: visibleFields.length },
+    { id: BASIC_GROUP, label: '基本', count: basicCount },
+    ...(diningCount ? [{ id: DINING_GROUP, label: '飲食', count: diningCount }] : []),
+    ...(unfiledCount ? [{ id: UNFILED_GROUP, label: '未分類', count: unfiledCount }] : []),
     ...fieldFolders.map((f) => ({ id: f.id, label: f.name, count: folderCount.get(f.id) ?? 0 })),
     ...orphan.map((id) => ({ id, label: '分類', count: folderCount.get(id) ?? 0 })),
   ]
-  const groupKnown = group === BASIC_GROUP || group === ALL_GROUP || folderIds.has(group) || folderCount.has(group) || fieldFoldersStatus !== 'ready'
+  const groupKnown = group === BASIC_GROUP || group === ALL_GROUP || group === DINING_GROUP || group === UNFILED_GROUP || folderIds.has(group) || folderCount.has(group) || fieldFoldersStatus !== 'ready'
   const base = `/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`
 
   return (
@@ -178,13 +188,16 @@ export default function InfoTab({ friendId, group, data, perms }: {
         </div>
       ) : (
         <>
-          {groups.map(groupKey => <section key={groupKey} className={styles.infoGroup} aria-label={groupAria(groupKey)}>
+          {groups.map(groupKey => {
+          const groupFields = ordered.filter(field => groupOf(field) === groupKey)
+          const hasPersonal = groupFields.some(field => field.isPersonal)
+          return <section key={groupKey} className={styles.infoGroup} aria-label={groupAria(groupKey)}>
           <div className={styles.infoGroupHead}>
-            <h3 className={styles.infoGroupTitle}>{groupName(groupKey)}<span className={styles.infoGroupNote}>{groupNote(groupKey)}</span></h3>
+            <h3 className={styles.infoGroupTitle}>{groupName(groupKey)}<HelpTip label={`${groupName(groupKey)}の説明`}>{groupNote(groupKey)}</HelpTip>{hasPersonal ? <span className={styles.faint}>個人情報を含む</span> : null}</h3>
             {groupKey === manageGroup ? <Link className={styles.manageLink} href="/tags?tab=fields">情報欄を管理<ArrowUpRight size={16} aria-hidden="true" /></Link> : null}
           </div>
           <div className={styles.fieldGrid}>
-            {ordered.filter(field => groupOf(field) === groupKey).map((field) => {
+            {groupFields.map((field) => {
               const id = `ff-${field.id}`
               const fixed = field.fixedKey ? fixedFieldValue(fields.map(f => ({ ...f, value: values[f.id] ?? f.value, valueSource: (values[f.id] ?? '') === (f.value ?? '') ? f.valueSource : null })), field.fixedKey) : null
               const spec = BASIC_FRIEND_FIELDS.find(spec => spec.key === field.fixedKey)
@@ -196,7 +209,6 @@ export default function InfoTab({ friendId, group, data, perms }: {
                   <label htmlFor={id} id={`${id}-label`} className={styles.fieldLabel} title={`${label}（${FIELD_TYPE_LABELS[field.type] ?? field.type}）`}>
                     {field.isStarred ? <span aria-label="★つき">★</span> : null}
                     <span className={styles.fieldLabelText}>{label}</span>
-                    {field.isPersonal ? <span className={styles.faint}>個人情報</span> : null}
                     {/* 値の出どころ（手で入れた・回答フォーム…）は題の横に1行で（vX3wQ）。全文は title。 */}
                     {fixed?.label ? <span className={styles.fieldSource} title={fixed.source ?? undefined}>{fixed.label}</span> : null}
                   </label>
@@ -213,7 +225,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
                 </div>
               )
             })}
-          </div></section>)}
+          </div></section>})}
 
           {hiddenPersonalCount > 0 ? <p className={styles.hiddenNote}>個人情報の項目が {formatNumber(hiddenPersonalCount)} 件あります。表示には個人情報の閲覧権限が要ります。</p> : null}
               {data.warnings.length > 0 ? <Notice tone="warn">

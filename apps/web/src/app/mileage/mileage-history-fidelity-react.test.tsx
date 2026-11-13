@@ -28,7 +28,7 @@ function stubFetch() {
           items: [{
             id: 'entry-1',
             primaryFriendId: 'friend-1',
-            displayName: 'Kenta Kawano',
+            displayName: 'Demo Person',
             pictureUrl: null,
             entryType: 'grant',
             status: 'available',
@@ -132,7 +132,7 @@ async function waitForRows(): Promise<void> {
 describe('履歴の絵合わせ（板 `oRbJi`）', () => {
   it('名前と記録日時を別の列で確認できる（日本時間）', async () => {
     await waitForRows()
-    expect(container.querySelector('tbody span[title]')?.getAttribute('title')).toBe('Kenta Kawano')
+    expect(container.querySelector('tbody span[title]')?.getAttribute('title')).toBe('Demo Person')
     expect(container.querySelector('tbody time')?.textContent).toBe('09/30 14:12')
     expect(container.querySelector('tbody time')?.closest('td')).not.toBe(container.querySelector('tbody span[title]')?.closest('td'))
   })

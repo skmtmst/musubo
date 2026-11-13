@@ -27,6 +27,7 @@ export type ProviderMatch = 'same' | 'different' | 'unknown';
 
 export interface HandoverRow {
   id: string;
+  confirmation_revision: number;
   from_account_id: string;
   to_account_id: string | null;
   code: string;
@@ -168,7 +169,7 @@ export async function linkHandover(
   const result = await db
     .prepare(
       `UPDATE account_handovers
-          SET to_account_id = ?, provider_match = ?, status = 'linked', linked_at = ?
+          SET confirmation_revision=confirmation_revision+1, to_account_id = ?, provider_match = ?, status = 'linked', linked_at = ?
         WHERE id = ? AND status = 'code_issued' AND julianday(code_expires_at) > julianday(?)`,
     )
     .bind(input.toAccountId, input.providerMatch, now, handover.id, now)
@@ -195,13 +196,13 @@ export async function savePreview(
   if (!countsAddUp(input.counts, input.sourceFriendTotal)) {
     return { ok: false, error: '区分の合計が元の友だち数と合いません' };
   }
-  await db
+  const changed = await db
     .prepare(
       `UPDATE account_handovers
-          SET source_friend_total = ?, auto_count = ?, review_count = ?,
+          SET confirmation_revision=confirmation_revision+1, source_friend_total = ?, auto_count = ?, review_count = ?,
               unmatched_count = ?, lookalike_count = ?, declared_friend_total = ?,
               status = 'previewed', previewed_at = ?
-        WHERE id = ?`,
+        WHERE id = ? AND status NOT IN ('executing','completed','cancelled')`,
     )
     .bind(
       input.sourceFriendTotal,
@@ -214,7 +215,7 @@ export async function savePreview(
       id,
     )
     .run();
-  return { ok: true };
+  return changed.meta.changes ? { ok: true } : { ok: false, error: '引き継ぎの状態が変わりました。読み直してください' };
 }
 
 /** 切り戻しできるのは本実行から7日間だけ（-33 §12-2、X の確定値）。 */
@@ -237,10 +238,11 @@ export function rollbackDeadlineOf(handover: HandoverRow): string | null {
 export async function rollbackHandover(
   db: D1Database,
   id: string,
-  input: { rolledBackBy?: string | null; note?: string | null },
-): Promise<{ ok: true; restoredCount: number } | { ok: false; error: string }> {
+  input: { rolledBackBy?: string | null; note?: string | null; expectedRevision?: number },
+): Promise<{ ok: true; restoredCount: number } | { ok: false; error: string; conflict?: boolean }> {
   const handover = await getHandoverById(db, id);
   if (!handover) return { ok: false, error: 'その引き継ぎはありません' };
+  if (input.expectedRevision !== undefined && input.expectedRevision !== handover.confirmation_revision) return { ok: false, conflict: true, error: '引き継ぎが変わりました。読み直してください' };
   if (handover.status !== 'completed') {
     return { ok: false, error: '本実行が終わっていない引き継ぎは戻せません' };
   }
@@ -255,29 +257,28 @@ export async function rollbackHandover(
     return { ok: false, error: '受け取り先が分からないため戻せません' };
   }
 
-  const decisions = await listDecisions(db, id);
-  const moved = decisions.filter((d) => d.decision === 'link' || d.decision === 'new');
-  let restored = 0;
-  for (const d of moved) {
-    const result = await db
-      .prepare(
-        `UPDATE friends SET line_account_id = ?
-          WHERE id = ? AND line_account_id = ?`,
-      )
-      .bind(handover.from_account_id, d.from_friend_id, handover.to_account_id)
-      .run();
-    restored += result.meta.changes ?? 0;
+  const records = await db.prepare('SELECT COUNT(*) n FROM account_handover_moves WHERE handover_id=?').bind(id).first<{n:number}>();
+  if (!records?.n) return { ok: false, error: '移動の記録がないため戻せません' };
+  try {
+    const result = await db.batch([
+      db.prepare(`UPDATE account_handovers SET rolled_back_at=?,rolled_back_by=?,rollback_note=?,confirmation_revision=confirmation_revision+1
+        WHERE id=? AND status='completed' AND rolled_back_at IS NULL AND julianday(completed_at)>julianday('now','-7 days') AND (? IS NULL OR confirmation_revision=?)
+        AND EXISTS(SELECT 1 FROM line_accounts a JOIN account_handover_moves m ON m.handover_id=account_handovers.id
+          WHERE a.id=account_handovers.from_account_id AND m.from_account_id=account_handovers.from_account_id AND m.to_account_id=account_handovers.to_account_id
+            AND m.tenant_id=COALESCE(a.tenant_id,'00000000-0000-4000-8000-000000000001'))
+        AND NOT EXISTS(SELECT 1 FROM line_accounts a JOIN account_handover_moves m ON m.handover_id=account_handovers.id
+          WHERE a.id=account_handovers.from_account_id AND (m.from_account_id<>account_handovers.from_account_id OR m.to_account_id<>account_handovers.to_account_id OR m.tenant_id<>COALESCE(a.tenant_id,'00000000-0000-4000-8000-000000000001')))`)
+        .bind(jstNow(),input.rolledBackBy??null,input.note??null,id,input.expectedRevision??null,input.expectedRevision??null),
+      db.prepare("SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'HANDOVER_CONFLICT' END)"),
+      db.prepare(`UPDATE friends SET line_account_id=? WHERE line_account_id=? AND id IN
+        (SELECT m.friend_id FROM account_handover_moves m JOIN line_accounts a ON a.id=m.from_account_id WHERE m.handover_id=? AND m.from_account_id=? AND m.to_account_id=? AND m.tenant_id=COALESCE(a.tenant_id,'00000000-0000-4000-8000-000000000001'))`)
+        .bind(handover.from_account_id,handover.to_account_id,id,handover.from_account_id,handover.to_account_id),
+    ]);
+    return { ok: true, restoredCount: Number(result[2].meta.changes ?? 0) };
+  } catch (error) {
+    if (/malformed JSON/i.test(String(error))) return { ok:false, conflict:true, error:'引き継ぎまたは記録が変わりました。読み直してください' };
+    throw error;
   }
-
-  await db
-    .prepare(
-      `UPDATE account_handovers
-          SET rolled_back_at = ?, rolled_back_by = ?, rollback_note = ?
-        WHERE id = ?`,
-    )
-    .bind(jstNow(), input.rolledBackBy ?? null, input.note ?? null, id)
-    .run();
-  return { ok: true, restoredCount: restored };
 }
 
 /** 段4。競合の判断を1件保存する。同じ人を2回決めたら上書きする。 */
@@ -294,11 +295,12 @@ export async function saveDecision(
   },
 ): Promise<void> {
   const now = jstNow();
-  await db
-    .prepare(
+  const result = await db.batch([
+    db.prepare("UPDATE account_handovers SET confirmation_revision=confirmation_revision+1 WHERE id=? AND status NOT IN ('executing','completed','cancelled')").bind(input.handoverId),
+    db.prepare(
       `INSERT INTO account_handover_decisions
          (id, handover_id, from_friend_id, to_friend_id, decision, bucket, note, decided_by, decided_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE changes()=1
        ON CONFLICT (handover_id, from_friend_id) DO UPDATE SET
          to_friend_id = excluded.to_friend_id,
          decision = excluded.decision,
@@ -317,8 +319,9 @@ export async function saveDecision(
       input.note ?? null,
       input.decidedBy ?? null,
       now,
-    )
-    .run();
+    ),
+  ]);
+  if (!result[0].meta.changes) throw new Error('HANDOVER_STATE_CONFLICT');
 }
 
 export async function listDecisions(
@@ -353,17 +356,18 @@ export async function unresolvedReviewCount(db: D1Database, id: string): Promise
 
 export async function markResolved(db: D1Database, id: string): Promise<void> {
   await db
-    .prepare(`UPDATE account_handovers SET status = 'resolved', resolved_at = ? WHERE id = ?`)
+    .prepare(`UPDATE account_handovers SET confirmation_revision=confirmation_revision+1, status = 'resolved', resolved_at = ? WHERE id = ? AND status NOT IN ('executing','completed','cancelled')`)
     .bind(jstNow(), id)
     .run();
 }
 
 /** 段5。本実行の始まり。 */
-export async function markExecuting(db: D1Database, id: string): Promise<void> {
-  await db
-    .prepare(`UPDATE account_handovers SET status = 'executing', executed_at = ? WHERE id = ?`)
-    .bind(jstNow(), id)
+export async function markExecuting(db: D1Database, id: string, expectedRevision?: number): Promise<boolean> {
+  const result = await db
+    .prepare(`UPDATE account_handovers SET confirmation_revision=confirmation_revision+1, status = 'executing', executed_at = ? WHERE id = ? AND status NOT IN ('executing','completed','cancelled') AND (? IS NULL OR confirmation_revision=?)`)
+    .bind(jstNow(), id, expectedRevision??null, expectedRevision??null)
     .run();
+  return Number(result.meta.changes) === 1;
 }
 
 /** 段5。本実行の終わりと照合。 */
@@ -376,18 +380,19 @@ export async function completeHandover(
   await db
     .prepare(
       `UPDATE account_handovers
-          SET moved_count = ?, failed_count = ?, failure_reason = ?, status = ?, completed_at = ?
-        WHERE id = ?`,
+          SET confirmation_revision=confirmation_revision+1, moved_count = ?, failed_count = ?, failure_reason = ?, status = ?, completed_at = ?
+        WHERE id = ? AND status='executing'`,
     )
     .bind(result.movedCount, result.failedCount, result.failureReason ?? null, status, jstNow(), id)
     .run();
 }
 
-export async function cancelHandover(db: D1Database, id: string): Promise<void> {
-  await db
-    .prepare(`UPDATE account_handovers SET status = 'cancelled' WHERE id = ?`)
-    .bind(id)
+export async function cancelHandover(db: D1Database, id: string, expectedRevision?: number): Promise<boolean> {
+  const result = await db
+    .prepare(`UPDATE account_handovers SET confirmation_revision=confirmation_revision+1, status = 'cancelled' WHERE id = ? AND status NOT IN ('executing','completed','cancelled') AND (? IS NULL OR confirmation_revision=?)`)
+    .bind(id, expectedRevision??null, expectedRevision??null)
     .run();
+  return Number(result.meta.changes) === 1;
 }
 
 export async function listHandoversForAccount(

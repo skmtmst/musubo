@@ -925,7 +925,7 @@ export default function EarningRulesTab() {
 
   return (
     <SaveErrorScope errors={saveErrors}><MileageFrame
-      help="行の「…」から 編集・止める・複製・この決めごとの履歴を見る。"
+      help={readonly ? '行の「…」から この決めごとの履歴を見る。' : '行の「…」から 編集・止める・複製・この決めごとの履歴を見る。'}
       explanation="決めごとを変えると、変えたあとの行動から新しい数で付きます。前に付いたマイルは変わりません。"
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting || rules.length === 0}>

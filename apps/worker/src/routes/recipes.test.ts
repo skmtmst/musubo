@@ -242,6 +242,14 @@ describe('複製', () => {
     expect(sql).toContain('is_active');
   });
 
+  it('レシピ由来の長いシナリオ名をそのまま作る', async () => {
+    const name = '長い案内'.repeat(18);
+    db.getRecipeById.mockResolvedValue({ ...RECIPE, item_count: 1, items_json: JSON.stringify([{ kind: 'シナリオ', name, note: '見本' }]) });
+    const response = await makeApp().fetch(clone({ accountId: 'acc-1' }), env);
+    expect(response.status).toBe(202);
+    expect(bind.mock.calls.some(args => args.includes(name))).toBe(true);
+  });
+
   it('見えないアカウントには作らない', async () => {
     accountAccess.canAccessAllLineAccounts.mockResolvedValue(false);
     const res = await makeApp().fetch(clone({ accountId: 'acc-他' }), env);

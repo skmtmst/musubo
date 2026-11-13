@@ -223,11 +223,11 @@ describe('computeUsersGrouped', () => {
       forms: [
         {
           friend_id: 'f1',
-          data: JSON.stringify({ email: 'a@example.com', phone: '090-1111-2222' }),
+          data: JSON.stringify({ email: 'a@example.com', phone: '090-0000-2222' }),
         },
         {
           friend_id: 'f1',
-          data: JSON.stringify({ email: 'a@example.com', tel: '090-3333-4444' }),
+          data: JSON.stringify({ email: 'a@example.com', tel: '090-0000-4444' }),
         },
         {
           friend_id: 'f1',
@@ -239,7 +239,7 @@ describe('computeUsersGrouped', () => {
     const result = await computeUsersGrouped(db);
     const row = result.rows[0];
     expect(row.emails.sort()).toEqual(['a@example.com', 'b@example.com']);
-    expect(row.phones.sort()).toEqual(['090-1111-2222', '090-3333-4444', '090-5555']);
+    expect(row.phones.sort()).toEqual(['090-0000-2222', '090-0000-4444', '090-5555']);
   });
 
   test('metadata.x_username が抽出される（最初の非空を採用）', async () => {
@@ -473,14 +473,14 @@ describe('computeUsersGrouped', () => {
           line_user_id: 'Uspecial',
         },
       ],
-      forms: [{ friend_id: 'f1_0', data: JSON.stringify({ email: 'taro@x.com' }) }],
+      forms: [{ friend_id: 'f1_0', data: JSON.stringify({ email: 'user@example.com' }) }],
     });
 
     expect((await computeUsersGrouped(db, { q: '山田' })).total).toBe(1);
     expect((await computeUsersGrouped(db, { q: 'YAMADA' })).total).toBe(1);
     // 先頭の @ は剥がして xUsername と突き合わせる（`@yamada` でも当たる）
     expect((await computeUsersGrouped(db, { q: '@yamada' })).total).toBe(1);
-    expect((await computeUsersGrouped(db, { q: 'taro@' })).total).toBe(1);
+    expect((await computeUsersGrouped(db, { q: 'user@' })).total).toBe(1);
     expect((await computeUsersGrouped(db, { q: 'special' })).total).toBe(1);
     expect((await computeUsersGrouped(db, { q: 'kabc' })).total).toBe(1);
     expect((await computeUsersGrouped(db, { q: 'no-hit' })).total).toBe(0);

@@ -261,3 +261,60 @@ describe('M507/M511 一覧のペットにも版を返す', () => {
     expect(body.data.find((row) => row.id === 'pet-a')?.updatedAt).toBe('2026-09-01T00:00:00.000+09:00');
   });
 });
+
+describe('配信設定の停止確認', () => {
+  it('確認した版から設定が変わったら停止を拒む', async () => {
+    const changed = await put('/api/nen-campaigns/settings/review_request?lineAccountId=account-a', settingBody('変更後', '2026-09-01'));
+    expect(changed.status).toBe(200);
+    const stopped = await put('/api/nen-campaigns/settings/review_request/enabled?lineAccountId=account-a', { isEnabled: false, expectedUpdatedAt: '2026-09-01' });
+    expect(stopped.status).toBe(409);
+    const body = await stopped.json() as { data: { latest: { isEnabled: boolean; title: string } } };
+    expect(body.data.latest).toMatchObject({ isEnabled: true, title: '変更後' });
+  });
+  it('一致なら停止し、版なしの呼び出しも通る', async () => {
+    const path = '/api/nen-campaigns/settings/review_request/enabled?lineAccountId=account-a';
+    const first = await put(path, { isEnabled: false, expectedUpdatedAt: '2026-09-01' });
+    expect(first.status).toBe(200);
+    const version = accountSettingUpdatedAt();
+    expect(version).not.toBe('2026-09-01');
+    const legacy = await put(path, { isEnabled: false });
+    expect(legacy.status).toBe(200);
+    expect(accountSettingUpdatedAt()).not.toBe(version);
+  });
+  it('同じ時刻に停止して再開しても古い版を拒む', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-04T00:00:00Z'));
+    try {
+      const path = '/api/nen-campaigns/settings/review_request/enabled?lineAccountId=account-a';
+      expect((await put('/api/nen-campaigns/settings/review_request?lineAccountId=account-a', settingBody('見出し'))).status).toBe(200);
+      expect((await put(path, { isEnabled: false })).status).toBe(200);
+      const seen = accountSettingUpdatedAt();
+      expect((await put(path, { isEnabled: true })).status).toBe(200);
+      expect((await put(path, { isEnabled: false })).status).toBe(200);
+      expect(accountSettingUpdatedAt()).not.toBe(seen);
+      expect((await put(path, { isEnabled: true, expectedUpdatedAt: seen })).status).toBe(409);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('照合から書き込みの間の変更も拒む', async () => {
+    const path = '/api/nen-campaigns/settings/review_request/enabled?lineAccountId=account-a';
+    expect((await put(path, { isEnabled: false })).status).toBe(200);
+    const seen = accountSettingUpdatedAt();
+    const originalPrepare = testDb.db.prepare.bind(testDb.db);
+    let interrupted = false;
+    const spy = vi.spyOn(testDb.db, 'prepare').mockImplementation((sql: string) => {
+      if (!interrupted && sql.startsWith('UPDATE account_settings SET value = ?')) {
+        interrupted = true;
+        testDb.raw.prepare(`UPDATE account_settings SET value = json_set(value, '$.updated_at', '2026-12-01T00:00:00.000+09:00', '$.title', '割り込み') WHERE line_account_id = ? AND key = ?`).run(ACCOUNT, 'nen.campaign.review_request');
+      }
+      return originalPrepare(sql);
+    });
+    try {
+      const response = await put(path, { isEnabled: false, expectedUpdatedAt: seen });
+      expect(interrupted).toBe(true);
+      expect(response.status).toBe(409);
+      const body = await response.json() as { data: { latest: { title: string } } };
+      expect(body.data.latest.title).toBe('割り込み');
+    } finally { spy.mockRestore(); }
+  });
+
+});

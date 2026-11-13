@@ -17,6 +17,8 @@ import type { FriendSavedView } from '@/lib/api'
 
 const fx = vi.hoisted(() => ({ list: vi.fn(), savedList: vi.fn() }))
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 vi.mock('@/components/shared/select', () => ({
   default: ({ options, value, onChange, 'aria-label': label, disabled }: { options: { value: string; label: string }[]; value: string; onChange: (value: string) => void; 'aria-label'?: string; disabled?: boolean }) => (
     <select aria-label={label} value={value} disabled={disabled} onChange={event => onChange(event.target.value)}>

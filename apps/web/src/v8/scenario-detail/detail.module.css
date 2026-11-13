@@ -106,13 +106,6 @@
   height: var(--tpl-sd-icon);
 }
 
-/* 行の「…」のメニューの目印が行の中で段を取らないよう、横並びの箱で包む。 */
-.menuBox {
-  display: inline-flex;
-  position: relative;
-  align-items: center;
-}
-
 /* ── 競合の帯 ─────────────────────── */
 .conflictWrap {
   flex-shrink: 0;

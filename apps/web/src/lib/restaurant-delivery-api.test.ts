@@ -35,6 +35,14 @@ describe('restaurant delivery Uber connection transport', () => {
     )
   })
 
+  it('確認した接続の版を解除時に送る', async () => {
+    await Reflect.apply(restaurantDeliveryApi.ubereatsDisconnect, null, ['account/1', 5])
+    expect(transport.fetchApi).toHaveBeenCalledWith(
+      '/api/restaurant-test/delivery/ubereats/connection?account_id=account%2F1',
+      { method: 'DELETE', body: JSON.stringify({ confirmed: true, expectedVersion: 5 }) },
+    )
+  })
+
   it('接続変更の成功応答は状態と全ての日時がそろった形だけを受け入れる', () => {
     const complete = {
       success: true,

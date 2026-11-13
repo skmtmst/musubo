@@ -65,14 +65,15 @@ try {
   }
   for (const kind of ['network', 'conflict409']) {
     const page = await open(1440)
-    let reads = 0, deletes = 0
+    let reads = 0, deletes = 0, revision = null
     await page.route('**/api/restaurant-test/seat-waitlist**', async r => {
       if (r.request().method() === 'DELETE') {
         deletes++
+        revision = new URL(r.request().url()).searchParams.get('expectedConfirmationRevision')
         return kind === 'network' ? r.abort('failed') : r.fulfill({ status: 409, json: { success: false, error: '状態が変わりました' } })
       }
       reads++
-      await r.fulfill({ json: { success: true, data: { waitlist: [{ id: 'fixture-wait', customer_name: '検証用', status: 'waiting', starts_at: '2026-10-20T01:00:00Z', guest_count: 2 }] } } })
+      await r.fulfill({ json: { success: true, data: { waitlist: [{ id: 'fixture-wait', confirmation_revision: 1, customer_name: '検証用', status: 'waiting', starts_at: '2026-10-20T01:00:00Z', guest_count: 2 }] } } })
     })
     await page.goto(new URL('/restaurant-test/reservations', base).href, { waitUntil: 'networkidle' })
     await page.getByRole('button', { name: '予約台帳のその他操作', exact: true }).click()
@@ -86,6 +87,7 @@ try {
       await expect(dialog).toBeVisible()
       await expect(dialog.getByRole('alert')).toContainText(kind === 'network' ? '通信' : '状態が変わった')
       assert.equal(deletes, 1)
+      assert.equal(revision, '1')
     } catch (caught) { error = caught.message }
     results.push({ kind: `waitlist-${kind}`, reads, deletes, error })
     await page.screenshot({ path: join(out, `waitlist-${kind}.png`) })

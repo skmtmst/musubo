@@ -193,7 +193,7 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
           <Chevron className={styles.chevron} aria-hidden="true" />
         </button>
         <h2 className={styles.groupTitle}>{group.label}</h2>
-        {total === 0 && <span className={styles.groupMeta}>{groupSummary(group, features)}</span>}
+        {total === 0 && <span className={styles.groupMeta}>{canManage ? groupSummary(group, features) : '消せません'}</span>}
         <span className={styles.spacer} />
         {total > 0 && (
           <ToggleGroupActions total={total} enabled={enabled} label={group.label} disabled={busy || !canManage} lockedReason={lockedReason}
@@ -388,7 +388,7 @@ export default function FeatureSettingsScreen() {
       notice={conflictBand || (staffRole !== null && !canManage) ? <>{conflictBand}{!canManage && <ReadOnlyNotice role="status" need="manager" />}</> : undefined}
       title={TITLE}
       help={DESCRIPTION}
-      explanation={`公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。${accountStyle.data?.style === 'restaurant' ? '星を選ぶと左メニューのお気に入りに表示します。' : ''}`}
+      explanation={canManage ? `公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。${accountStyle.data?.style === 'restaurant' ? '星を選ぶと左メニューのお気に入りに表示します。' : ''}` : '機能ごとの設定を確認できます。'}
       saveActions={ready && (dirty || saving) ? (
         <>
           <Button

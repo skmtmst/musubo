@@ -46,7 +46,7 @@ describe('絞り込みなし・写せない条件', () => {
   })
 
   it('スペースを含む検索語は blocked（name ルールへ完全一致で写せない）', () => {
-    expect(buildBroadcastHandoff({ ...EMPTY_INPUT, searchSubmitted: '田中 太郎' })).toEqual({ kind: 'blocked' })
+    expect(buildBroadcastHandoff({ ...EMPTY_INPUT, searchSubmitted: '見本 167' })).toEqual({ kind: 'blocked' })
   })
 
   it('LIKEの特殊文字を含む検索語は blocked', () => {

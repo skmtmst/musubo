@@ -36,7 +36,7 @@ function stubFetch() {
         data: {
           summary: { scoredFriends: 2, high: 1, normal: 0, low: 1, decreased30d: 0, highMin: 30, normalMin: 10 },
           items: [{
-            friendId: 'friend-1', displayName: '高橋 花子', pictureUrl: null, currentScore: 5, band: 'low',
+            friendId: 'friend-1', displayName: '見本 189', pictureUrl: null, currentScore: 5, band: 'low',
             change30d: 0, lastReason: null, lastChangedAt: null,
           }],
           pagination: { total: 1, limit: 20, offset: 0 },

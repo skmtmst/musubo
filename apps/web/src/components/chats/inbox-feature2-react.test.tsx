@@ -21,7 +21,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 describe('H3lAOB トーク見出しの顧客情報ボタン', () => {
   const head = (open: boolean, onToggle = vi.fn()) => (
     <ConversationHead
-      name="坂本 真人"
+      name="見本 25"
       operator={{ value: 'op-k', operators: [{ id: 'op-k', name: 'Kenta' }], onChange: vi.fn() }}
       status={{ value: 'unread', onChange: vi.fn() }}
       panel={{ open, onToggle }}

@@ -97,6 +97,13 @@ describe('private data deletion', () => {
     expect((await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env())).status).toBe(200);
     expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
   });
+  it('顧客データ削除で引き継ぎの移動記録も対象者だけ消す', async () => {
+    sqlite.raw.exec(`INSERT INTO account_handovers(id,from_account_id,to_account_id,code,code_expires_at,status,created_at) VALUES('move','a','b','move-code','2030-01-01','completed','now');
+      INSERT INTO account_handover_moves(handover_id,friend_id,from_account_id,to_account_id,tenant_id,moved_at) VALUES('move','u','a','b','t','now'),('move','v','a','b','t','now')`);
+    const res = await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env());
+    expect(res.status).toBe(200);
+    expect(sqlite.raw.prepare('SELECT friend_id FROM account_handover_moves ORDER BY friend_id').all()).toEqual([{ friend_id: 'v' }]);
+  });
   it('purges merged restaurant events and consumed QR data while retaining other friends and stamp history', async () => {
     sqlite.raw.exec(`INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES ('org','a','Restaurant','t');
       INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES ('store','org','Store','S','a');

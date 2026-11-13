@@ -114,6 +114,31 @@ describe('Webhookの安全な送り直し', () => {
     vi.mocked(finishOutgoingDelivery).mockResolvedValue('delivered');
   });
 
+  it('確認した送り先の版が古ければ送らない', async () => {
+    const originalWithRevision = { ...original, confirmation_revision: 1 };
+    const target = await vi.mocked(getOutgoingWebhookById)({} as D1Database, 'wh-1', 'account-a');
+    vi.mocked(getOutgoingWebhookById).mockResolvedValue({ ...target!, confirmation_revision: 2 });
+    await expect(retryWebhookInteraction({} as D1Database, originalWithRevision, undefined, { interactionRevision: 1, webhookRevision: 1 })).rejects.toThrow('confirmation_conflict');
+    expect(deliverOnce).not.toHaveBeenCalled();
+  });
+
+  it('確保の後に送り先が変わった場合も送らず元の記録に戻す', async () => {
+    const target = await vi.mocked(getOutgoingWebhookById)({} as D1Database, 'wh-1', 'account-a');
+    vi.mocked(getOutgoingWebhookById).mockResolvedValueOnce({ ...target!, confirmation_revision: 1 }).mockResolvedValueOnce({ ...target!, confirmation_revision: 2 });
+    await expect(retryWebhookInteraction({} as D1Database, { ...original, confirmation_revision: 1 }, undefined, { interactionRevision: 1, webhookRevision: 1 })).rejects.toThrow('confirmation_conflict');
+    expect(deliverOnce).not.toHaveBeenCalled();
+    expect(restoreWebhookInteractionFailure).toHaveBeenCalled();
+  });
+
+  it('両方の版が一致すれば確認した宛先へ同じ配送番号で送る', async () => {
+    const target = await vi.mocked(getOutgoingWebhookById)({} as D1Database, 'wh-1', 'account-a');
+    vi.mocked(getOutgoingWebhookById).mockResolvedValue({ ...target!, confirmation_revision: 2 });
+    vi.mocked(deliverOnce).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 });
+    await retryWebhookInteraction({} as D1Database, { ...original, confirmation_revision: 3 }, undefined, { interactionRevision: 3, webhookRevision: 2 });
+    expect(claimWebhookInteractionRetryAndInsert).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ expectedInteractionRevision: 3, expectedWebhookRevision: 2 }));
+    expect(deliverOnce).toHaveBeenCalledOnce();
+  });
+
   it.each(['future', 'legacy_missing_deadline'])('blocks manual sends while the provider wait is unresolved: %s', async mode => {
     vi.mocked(findOutgoingDeliveryByKey).mockResolvedValue(deliveryRow({
       status:'failed',error_code:'retry_after_exceeds_budget',

@@ -27,7 +27,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice, { type NoticeTone } from '@/components/shared/notice'
 import { PREPARING_WORD, usePreparingDialog } from '@/components/shared/preparing-dialog'
 import EntitySelect from '@/components/shared/entity-select'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { canManageRole, useStaffIdentityLoad, useStaffRole } from '@/lib/staff-role'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { restaurantTestApi, type RestaurantStore } from '@/lib/restaurant-test-api'
 import {
@@ -43,6 +43,7 @@ import {
   type DeliveryOrderTab,
   type DeliveryOrdersData,
   type DeliveryService,
+  type DeliveryServiceState,
 } from '@/lib/restaurant-delivery-api'
 import { BoundaryBanner, RestaurantPage } from '@/v8/restaurant/common-a/public/frame/index'
 import OrdersBoard from './orders'
@@ -97,6 +98,7 @@ function DeliveryInner() {
   const samePageUrl = useSamePageUrl()
   const { selectedAccountId, setSelectedAccountId, loading: accountLoading } = useAccount()
   const role = useStaffRole()
+  const { failed: roleFailed } = useStaffIdentityLoad()
   const preparing = usePreparingDialog({ note: 'Uber Eats の個別注文操作は、一覧で利用可能と確認できた店舗で使えます。営業状態の変更・メニュー同期・一括受付はまだ利用できません。' })
   /* 閲覧のみの人には送るボタンを置かず、閲覧のみの帯を出す（Worker側の 403 が最後の守り）。役割を読み込む前も置かない。 */
   const canManage = role !== null && canManageRole(role)
@@ -115,6 +117,8 @@ function DeliveryInner() {
   const cancelScope = useRef({ key: cancelKey })
   if (cancelScope.current.key !== cancelKey) cancelScope.current = { key: cancelKey }
   const openedCancelScope = useRef<typeof cancelScope.current | null>(null)
+  const cancelTicket = useRef<object | null>(null)
+  const renderedCancelTicket = cancelTicket.current
 
   const meta = PAGE_META[view]
   usePageTitle(meta.title)
@@ -136,7 +140,22 @@ function DeliveryInner() {
   const [perPage, setPerPage] = useState(DEFAULT_PAGE_SIZE)
   const [selected, setSelected] = useState<string[]>([])
   const [busyOrderId, setBusyOrderId] = useState<string | null>(null)
-  const [busyService, setBusyService] = useState<DeliveryService | null>(null)
+  const intakeBusy = useRef(new Map<string, { kind: 'stop' | 'resume'; service?: DeliveryService }>())
+  const [intakeJobs, setIntakeJobs] = useState(() => new Map<string, { kind: 'stop' | 'resume'; service?: DeliveryService }>())
+  const intakeStoreId = dataAccountId === selectedAccountId ? data?.store.id ?? null : null
+  const currentIntakeJob = intakeStoreId ? intakeJobs.get(intakeStoreId) : undefined
+  const busyService = currentIntakeJob?.kind === 'resume' ? currentIntakeJob.service ?? null : null
+  const claimIntake = useCallback((storeId: string, job: { kind: 'stop' | 'resume'; service?: DeliveryService }) => {
+    if (intakeBusy.current.has(storeId)) return false
+    intakeBusy.current.set(storeId, job)
+    setIntakeJobs(new Map(intakeBusy.current))
+    return true
+  }, [])
+  const releaseIntake = useCallback((storeId: string, job: { kind: 'stop' | 'resume'; service?: DeliveryService }) => {
+    if (intakeBusy.current.get(storeId) !== job) return
+    intakeBusy.current.delete(storeId)
+    setIntakeJobs(new Map(intakeBusy.current))
+  }, [])
   const [bulkBusy, setBulkBusy] = useState(false)
 
   /* ── 注文の詳細（hjdqV）とキャンセル（dgeTy） ─────────────── */
@@ -147,6 +166,7 @@ function DeliveryInner() {
   const [detailError, setDetailError] = useState<string | null>(null)
   const [detailBusy, setDetailBusy] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelTarget, setCancelTarget] = useState<DeliveryOrderDetailData['order'] | null>(null)
   const [cancelReason, setCancelReason] = useState<DeliveryCancelReasonCode>('out_of_stock')
   const [cancelBusy, setCancelBusy] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
@@ -165,6 +185,7 @@ function DeliveryInner() {
 
   /* ── 品切れ一括設定（h7OeT） ─────────────────────────────── */
   const [items, setItems] = useState<DeliveryMenuItem[] | null>(null)
+  const [itemsStore, setItemsStore] = useState<{ accountId: string; storeId: string } | null>(null)
   const [itemsLoading, setItemsLoading] = useState(false)
   const [itemsError, setItemsError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -177,31 +198,36 @@ function DeliveryInner() {
 
   /* ── 受付の一括停止（XCVGd） ─────────────────────────────── */
   const [stopOpen, setStopOpen] = useState(false)
+  const [stopSnapshot, setStopSnapshot] = useState<{ storeId: string; services: DeliveryServiceState[] } | null>(null)
   const [stopSelected, setStopSelected] = useState<DeliveryService[]>([])
   const [stopPreset, setStopPreset] = useState<DeliveryIntakeStopPreset | ''>('')
-  const [stopBusy, setStopBusy] = useState(false)
+  const stopBusy = currentIntakeJob?.kind === 'stop'
   const [stopError, setStopError] = useState<string | null>(null)
 
   const intakeScope = useMemo(() => ({ selectedAccountId, canManage }), [selectedAccountId, canManage])
   const intakeReady = !accountLoading && !loading && !error && dataAccountId === selectedAccountId
-  const intakeAccess: IntakeAccess = { scope: intakeScope, accountId: selectedAccountId, canManage, roleKnown: role !== null, ready: intakeReady, services: data?.services ?? [] }
+  const intakeAccess: IntakeAccess & { storeId: string | null } = { scope: intakeScope, accountId: selectedAccountId, storeId: intakeStoreId, canManage, roleKnown: role !== null, roleFailed, ready: intakeReady && Boolean(intakeStoreId), services: data?.services ?? [] }
   const currentIntake = useRef(intakeAccess)
+  const intakeMounted = useRef(false)
   useLayoutEffect(() => {
+    intakeMounted.current = true
     currentIntake.current = intakeAccess
-    return () => { currentIntake.current = { ...currentIntake.current, ready: false } }
+    return () => { intakeMounted.current = false; currentIntake.current = { ...currentIntake.current, ready: false } }
   })
   const [stopScope, setStopScope] = useState<object | null>(null)
   const openedStopScope = useRef<typeof intakeScope | null>(null)
+  const stopTicket = useRef<object | null>(null)
+  const renderedStopTicket = stopTicket.current
   useEffect(() => {
-    if (!openedStopScope.current || openedStopScope.current.selectedAccountId === selectedAccountId) return
+    if (!openedStopScope.current || (openedStopScope.current.selectedAccountId === selectedAccountId && (role === null || canManage))) return
     openedStopScope.current = null
+    stopTicket.current = null
     setStopScope(null)
     setStopOpen(false)
     setStopSelected([])
     setStopPreset('')
     setStopError(null)
-  }, [selectedAccountId])
-  const intakeBusy = useRef(false)
+  }, [selectedAccountId, role, canManage])
   const intakeDisabledReason = intakeReady ? undefined : '注文の状態を読み直してから操作してください。'
   const stoppable = (data?.services ?? []).filter(state => !intakeActionReason(state, 'stop'))
   const bulkStopReason = intakeDisabledReason ?? (stoppable.length ? undefined : '接続済みで受付中のサービスがありません。')
@@ -308,6 +334,7 @@ function DeliveryInner() {
       setDetailAccountId(null)
       setDetailError(null)
       setCancelOpen(false)
+      cancelTicket.current = null
       return
     }
     void loadDetail(orderId)
@@ -346,14 +373,17 @@ function DeliveryInner() {
     setItemsError(null)
     try {
       const next = await restaurantDeliveryApi.menuItems(selectedAccountId)
+      if (currentIntake.current.scope !== intakeScope) return
       setItems(next.items)
+      setItemsStore({ accountId: selectedAccountId, storeId: next.store.id })
     } catch (err) {
+      if (currentIntake.current.scope !== intakeScope) return
       setItems(null)
       setItemsError(errorMessage(err, '商品を読み込めませんでした。'))
     } finally {
-      setItemsLoading(false)
+      if (currentIntake.current.scope === intakeScope) setItemsLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, intakeScope])
 
   useEffect(() => {
     if (view !== 'sold-out') return
@@ -387,13 +417,14 @@ function DeliveryInner() {
 
   /* ── 送信（一覧と詳細のどちらからでも同じ道を通る） ─────────── */
   const runOrderAction = useCallback(async (
-    id: string,
-    action: (accountId: string, orderId: string) => Promise<DeliveryOrderMutationData>,
+    order: DeliveryOrderSummary | DeliveryOrderDetailData['order'],
+    action: (accountId: string, orderId: string, expectedVersion?: number) => Promise<DeliveryOrderMutationData>,
     successText: string,
     fallback: string,
   ) => {
-    const order = data?.orders.find((item) => item.id === id)
-      ?? (currentDetail?.order.id === id ? currentDetail.order : null)
+    const id = order.id
+    if (currentIntake.current.scope !== intakeScope || !currentIntake.current.canManage) return
+    if (!Number.isSafeInteger(order.version)) { setNotice({ tone: 'danger', text: '注文を読み直してから操作してください。' }); return }
     if (
       !canManage
       || !selectedAccountId
@@ -404,7 +435,7 @@ function DeliveryInner() {
     setDetailBusy(true)
     setNotice(null)
     try {
-      await action(selectedAccountId, id)
+      await action(selectedAccountId, id, order.version)
       setNotice({ tone: 'success', text: successText })
       await loadOrders(true)
       if (orderId === id) await loadDetail(id, true)
@@ -414,38 +445,38 @@ function DeliveryInner() {
       setBusyOrderId(null)
       setDetailBusy(false)
     }
-  }, [canManage, data, currentDetail, selectedAccountId, uberOrderActionsEnabled, loadOrders, loadDetail, orderId])
+  }, [canManage, intakeScope, selectedAccountId, uberOrderActionsEnabled, loadOrders, loadDetail, orderId])
 
-  const acceptOrder = useCallback((order: DeliveryOrderSummary | { id: string }) => {
+  const acceptOrder = useCallback((order: DeliveryOrderSummary | DeliveryOrderDetailData['order']) => {
     void runOrderAction(
-      order.id,
+      order,
       restaurantDeliveryApi.accept,
       '注文を受け付けました。',
       '注文を受け付けられませんでした。',
     )
   }, [runOrderAction])
 
-  const rejectOrder = useCallback((order: DeliveryOrderSummary | { id: string }) => {
+  const rejectOrder = useCallback((order: DeliveryOrderSummary | DeliveryOrderDetailData['order']) => {
     void runOrderAction(
-      order.id,
+      order,
       restaurantDeliveryApi.reject,
       '注文を拒否しました。',
       '注文を拒否できませんでした。',
     )
   }, [runOrderAction])
 
-  const readyOrder = useCallback((order: DeliveryOrderSummary | { id: string }) => {
+  const readyOrder = useCallback((order: DeliveryOrderSummary | DeliveryOrderDetailData['order']) => {
     void runOrderAction(
-      order.id,
+      order,
       restaurantDeliveryApi.ready,
       '準備完了にしました。',
       '準備完了にできませんでした。',
     )
   }, [runOrderAction])
 
-  const handOverOrder = useCallback((order: DeliveryOrderSummary | { id: string }) => {
+  const handOverOrder = useCallback((order: DeliveryOrderSummary | DeliveryOrderDetailData['order']) => {
     void runOrderAction(
-      order.id,
+      order,
       restaurantDeliveryApi.handOver,
       '受け渡し済みにしました。',
       '受け渡し済みにできませんでした。',
@@ -468,7 +499,8 @@ function DeliveryInner() {
     let failed = 0
     for (const order of targets) {
       try {
-        await restaurantDeliveryApi.accept(selectedAccountId, order.id)
+        if (!Number.isSafeInteger(order.version)) throw new Error('注文の版を読み直してください')
+        await restaurantDeliveryApi.accept(selectedAccountId, order.id, order.version)
         done += 1
       } catch {
         failed += 1
@@ -488,7 +520,7 @@ function DeliveryInner() {
   }, [canManage, selectedAccountId, selected, data, loadOrders])
 
   const submitCancel = useCallback(async () => {
-    const order = currentDetail?.order
+    const order = cancelTarget
     if (
       !canManage
       || !selectedAccountId
@@ -500,8 +532,9 @@ function DeliveryInner() {
     setCancelBusy(true)
     setCancelError(null)
     try {
-      await restaurantDeliveryApi.cancel(selectedAccountId, order.id, cancelReason)
+      await restaurantDeliveryApi.cancel(selectedAccountId, order.id, cancelReason, order.version)
       if (requestScope !== cancelScope.current) return
+      cancelTicket.current = null
       setCancelOpen(false)
       setNotice({ tone: 'success', text: '注文をキャンセルしました。' })
       await loadOrders(true)
@@ -512,7 +545,7 @@ function DeliveryInner() {
     } finally {
       if (requestScope === cancelScope.current) setCancelBusy(false)
     }
-  }, [canManage, selectedAccountId, currentDetail, cancelReason, uberOrderActionsEnabled, loadOrders, closeDetail])
+  }, [canManage, selectedAccountId, cancelTarget, cancelReason, uberOrderActionsEnabled, loadOrders, closeDetail])
 
   /* ── 受付の停止・再開 ───────────────────────────────────── */
   const openStop = useCallback((service?: DeliveryService) => {
@@ -520,84 +553,98 @@ function DeliveryInner() {
     const reason = service
       ? intakeOperationReason(current, intakeScope, [service], 'stop')
       : intakeContextReason(current, intakeScope)
-    if (reason || intakeBusy.current) { setNotice({ tone: 'warn', text: reason ?? '受付の変更が終わるまでお待ちください。' }); return }
+    if (reason || (current.storeId && intakeBusy.current.has(current.storeId))) { setNotice({ tone: 'warn', text: reason ?? '受付の変更が終わるまでお待ちください。' }); return }
+    if (!data?.store.id || dataAccountId !== selectedAccountId) { setNotice({ tone: 'warn', text: '店舗の状態を読み直してください。' }); return }
+    setStopSnapshot({ storeId: data.store.id, services: current.services.map((state) => ({ ...state })) })
     openedStopScope.current = intakeScope
+    stopTicket.current = {}
     setStopScope(intakeScope)
     setStopSelected(service ? [service] : [])
     setStopPreset('')
     setStopError(null)
     setStopOpen(true)
-  }, [intakeScope])
+  }, [intakeScope, data, dataAccountId, selectedAccountId])
 
   const stopServices = intakeReady ? data?.services ?? [] : []
-  const stopInput = useRef({ open: stopOpen, openedScope: openedStopScope.current, selection: intakeStopSelection(stopServices, stopSelected, stopPreset), reload: loadOrders })
-  stopInput.current = { open: stopOpen, openedScope: openedStopScope.current, selection: intakeStopSelection(stopServices, stopSelected, stopPreset), reload: loadOrders }
+  const stopInput = useRef({ open: stopOpen, openedScope: openedStopScope.current, selection: intakeStopSelection(stopServices, stopSelected, stopPreset), snapshot: stopSnapshot, reload: loadOrders })
+  stopInput.current = { open: stopOpen, openedScope: openedStopScope.current, selection: intakeStopSelection(stopServices, stopSelected, stopPreset), snapshot: stopSnapshot, reload: loadOrders }
   const submitStop = useCallback(async () => {
     const current = currentIntake.current
-    const { open, openedScope, selection, reload } = stopInput.current
+    const { open, openedScope, selection, snapshot, reload } = stopInput.current
     if (current.scope !== intakeScope) return
     if (!openedScope || openedScope.selectedAccountId !== current.accountId) {
       setStopOpen(false)
+      stopTicket.current = null
       setStopSelected([])
       setStopPreset('')
       return
     }
-    if (!open || selection.problem || !selection.preset || intakeBusy.current) return
+    if (!open || snapshot !== stopSnapshot || selection.problem || !selection.preset || (current.storeId && intakeBusy.current.has(current.storeId))) return
     const reason = intakeOperationReason(current, openedScope, selection.services, 'stop')
     if (reason) { setStopError(reason); return }
     const accountId = current.accountId!
-    intakeBusy.current = true
-    setStopBusy(true)
+    const storeId = current.storeId!
+    const expectedStates = selection.services.map((service) => stopSnapshot?.services.find((state) => state.service === service))
+    if (!stopSnapshot || stopSnapshot.storeId !== storeId || expectedStates.some((state) => !state || !Number.isSafeInteger(state.version) || typeof state.target !== 'string')) { setStopError('送り先を確認できません。接続設定とサービスの状態を確認してください。'); return }
+    const confirmation = { expectedStoreId: stopSnapshot.storeId, expectedStates: expectedStates.map((state) => ({ service: state!.service, version: state!.version!, target: state!.target! })) }
+    const job = { kind: 'stop' as const }
+    if (!claimIntake(storeId, job)) return
     setStopError(null)
     try {
-      const result = await restaurantDeliveryApi.stopIntake(accountId, selection.services, selection.preset)
-      if (currentIntake.current.scope !== intakeScope) return
+      const result = await restaurantDeliveryApi.stopIntake(accountId, selection.services, selection.preset, confirmation)
+      if (!intakeMounted.current || currentIntake.current.scope !== intakeScope) return
+      stopTicket.current = null
       setStopOpen(false)
       await reload(true)
-      if (currentIntake.current.scope !== intakeScope) return
+      if (!intakeMounted.current || currentIntake.current.scope !== intakeScope) return
       if (result.failed.length === 0) {
         setNotice({ tone: 'success', text: `${formatNumber(result.stopped.length)}件のサービスの受付を停止しました。` })
       } else {
         setNotice({ tone: 'warn', text: `${formatNumber(result.stopped.length)}件を停止しました。${formatNumber(result.failed.length)}件は停止できませんでした。もう一度お試しください。` })
       }
     } catch (err) {
-      if (currentIntake.current.scope === intakeScope) setStopError(errorMessage(err, '受付を停止できませんでした。'))
+      if (intakeMounted.current && currentIntake.current.scope === intakeScope) setStopError(errorMessage(err, '受付を停止できませんでした。'))
     } finally {
-      intakeBusy.current = false
-      setStopBusy(false)
+      releaseIntake(storeId, job)
     }
-  }, [intakeScope])
+  }, [intakeScope, stopSnapshot, claimIntake, releaseIntake])
 
   const resumeService = useCallback(async (service: DeliveryService) => {
     const current = currentIntake.current
     const reason = intakeOperationReason(current, intakeScope, [service], 'resume')
-    if (reason || intakeBusy.current) { setNotice({ tone: 'warn', text: reason ?? '受付の変更が終わるまでお待ちください。' }); return }
-    intakeBusy.current = true
-    setBusyService(service)
+    if (reason || (current.storeId && intakeBusy.current.has(current.storeId))) { setNotice({ tone: 'warn', text: reason ?? '受付の変更が終わるまでお待ちください。' }); return }
+    const accountId = current.accountId!
+    const storeId = current.storeId!
+    const job = { kind: 'resume' as const, service }
+    if (!claimIntake(storeId, job)) return
     setNotice(null)
     try {
-      const result = await restaurantDeliveryApi.resumeIntake(current.accountId!, [service])
-      if (currentIntake.current.scope !== intakeScope) return
+      const result = await restaurantDeliveryApi.resumeIntake(accountId, [service])
+      if (!intakeMounted.current || currentIntake.current.scope !== intakeScope) return
       await loadOrders(true)
-      if (currentIntake.current.scope !== intakeScope) return
+      if (!intakeMounted.current || currentIntake.current.scope !== intakeScope) return
       setNotice(result.failed.length === 0
         ? { tone: 'success', text: `${DELIVERY_SERVICE_LABELS[service]}の受付を再開しました。` }
         : { tone: 'warn', text: `${DELIVERY_SERVICE_LABELS[service]}の受付を再開できませんでした。もう一度お試しください。` })
     } catch (err) {
-      if (currentIntake.current.scope === intakeScope) setNotice({ tone: 'danger', text: errorMessage(err, '受付を再開できませんでした。') })
+      if (intakeMounted.current && currentIntake.current.scope === intakeScope) setNotice({ tone: 'danger', text: errorMessage(err, '受付を再開できませんでした。') })
     } finally {
-      intakeBusy.current = false
-      setBusyService(null)
+      releaseIntake(storeId, job)
     }
-  }, [intakeScope, loadOrders])
+  }, [intakeScope, loadOrders, claimIntake, releaseIntake])
 
   /* ── 品切れの送信 ───────────────────────────────────────── */
   const submitSoldOut = useCallback(async (soldOut: boolean) => {
+    if (currentIntake.current.scope !== intakeScope || !currentIntake.current.canManage) return
     if (!canManage || !selectedAccountId || selectedItems.length === 0 || selectedItems.some((id) => !items?.some((item) => item.id === id && !item.services.some(({ service }) => service === 'ubereats')))) return
+    const selectedRows = selectedItems.map((id) => items?.find((item) => item.id === id))
+    if (itemsStore?.accountId !== selectedAccountId || selectedRows.some((item) => !item || !Number.isSafeInteger(item.version) || typeof item.target !== 'string')) { setNotice({ tone: 'danger', text: '送り先を確認できません。接続設定と商品を確認してください。' }); return }
+    const confirmation = { expectedStoreId: itemsStore.storeId, expectedItems: selectedRows.map((item) => ({ id: item!.id, version: item!.version!, target: item!.target! })) }
     setSoldOutBusy(true)
     setNotice(null)
     try {
-      const result = await restaurantDeliveryApi.bulkSoldOut(selectedAccountId, selectedItems, soldOut)
+      const result = await restaurantDeliveryApi.bulkSoldOut(selectedAccountId, selectedItems, soldOut, confirmation)
+      if (currentIntake.current.scope !== intakeScope) return
       setSelectedItems([])
       await loadItems()
       const done = result.updated.length
@@ -606,28 +653,33 @@ function DeliveryInner() {
         ? { tone: 'success', text: `${done}品を${word}。` }
         : { tone: 'warn', text: `${done}品を${word}。${result.failed.length}品は変更できませんでした。もう一度お試しください。` })
     } catch (err) {
-      setNotice({ tone: 'danger', text: errorMessage(err, '品切れの設定を変更できませんでした。') })
+      if (currentIntake.current.scope === intakeScope) setNotice({ tone: 'danger', text: errorMessage(err, '品切れの設定を変更できませんでした。') })
     } finally {
       setSoldOutBusy(false)
     }
-  }, [canManage, items, selectedAccountId, selectedItems, loadItems])
+  }, [canManage, items, itemsStore, selectedAccountId, selectedItems, loadItems, intakeScope])
 
   const toggleOneSoldOut = useCallback(async (id: string, soldOut: boolean) => {
+    if (currentIntake.current.scope !== intakeScope || !currentIntake.current.canManage) return
     if (!canManage || !selectedAccountId || !items?.some((item) => item.id === id && !item.services.some(({ service }) => service === 'ubereats'))) return
+    const item = items?.find((entry) => entry.id === id)
+    if (itemsStore?.accountId !== selectedAccountId || !item || !Number.isSafeInteger(item.version) || typeof item.target !== 'string') { setNotice({ tone: 'danger', text: '送り先を確認できません。接続設定と商品を確認してください。' }); return }
+    const confirmation = { expectedStoreId: itemsStore.storeId, expectedItems: [{ id, version: item.version!, target: item.target }] }
     setBusyItemId(id)
     setNotice(null)
     try {
-      const result = await restaurantDeliveryApi.bulkSoldOut(selectedAccountId, [id], soldOut)
+      const result = await restaurantDeliveryApi.bulkSoldOut(selectedAccountId, [id], soldOut, confirmation)
+      if (currentIntake.current.scope !== intakeScope) return
       await loadItems()
       if (result.failed.length > 0) {
         setNotice({ tone: 'warn', text: '商品の状態を変更できませんでした。もう一度お試しください。' })
       }
     } catch (err) {
-      setNotice({ tone: 'danger', text: errorMessage(err, '商品の状態を変更できませんでした。') })
+      if (currentIntake.current.scope === intakeScope) setNotice({ tone: 'danger', text: errorMessage(err, '商品の状態を変更できませんでした。') })
     } finally {
       setBusyItemId(null)
     }
-  }, [canManage, items, selectedAccountId, loadItems])
+  }, [canManage, items, itemsStore, selectedAccountId, loadItems, intakeScope])
 
   /* ── CSVで保存 ─────────────────────────────────────────── */
   const saveCsv = useCallback(async () => {
@@ -883,7 +935,10 @@ function DeliveryInner() {
         onReady={() => { if (detailOrder) readyOrder(detailOrder) }}
         onHandOver={() => { if (detailOrder) handOverOrder(detailOrder) }}
         onCancelOrder={() => {
+          if (!detailOrder || !Number.isSafeInteger(detailOrder.version)) { setNotice({ tone: 'danger', text: '注文を読み直してから操作してください。' }); return }
           openedCancelScope.current = cancelScope.current
+          setCancelTarget({ ...detailOrder })
+          cancelTicket.current = {}
           setCancelReason('out_of_stock')
           setCancelError(null)
           setCancelOpen(true)
@@ -893,18 +948,18 @@ function DeliveryInner() {
       <CancelOrderDialog
         open={cancelOpen && openedCancelScope.current === cancelScope.current}
         accountId={detailAccountId}
-        store={dataAccountId === selectedAccountId && data?.orders.some(order => order.id === detailOrder?.id) ? data.store : undefined}
-        orderNumber={detailOrder?.orderNumber ?? ''}
-        serviceLabel={detailOrder
-          ? detailOrder.serviceLabel || DELIVERY_SERVICE_LABELS[detailOrder.service]
+        store={dataAccountId === selectedAccountId && data?.orders.some(order => order.id === cancelTarget?.id) ? data.store : undefined}
+        orderNumber={cancelTarget?.orderNumber ?? ''}
+        serviceLabel={cancelTarget
+          ? cancelTarget.serviceLabel || DELIVERY_SERVICE_LABELS[cancelTarget.service]
           : DASH}
-        totalAmount={detailOrder?.totalAmount ?? null}
+        totalAmount={cancelTarget?.totalAmount ?? null}
         reasonCode={cancelReason}
         busy={cancelBusy}
         error={cancelError}
         onReasonChange={setCancelReason}
-        onClose={() => setCancelOpen(false)}
-        onSubmit={() => { void submitCancel() }}
+        onClose={() => { cancelTicket.current = null; openedCancelScope.current = null; setCancelOpen(false) }}
+        onSubmit={() => { if (renderedCancelTicket && renderedCancelTicket === cancelTicket.current) void submitCancel() }}
       />
 
       <IntakeStopDialog
@@ -923,8 +978,8 @@ function DeliveryInner() {
           setStopError(null)
         }}
         onPresetChange={setStopPreset}
-        onClose={() => setStopOpen(false)}
-        onSubmit={() => { void submitStop() }}
+        onClose={() => { stopTicket.current = null; setStopOpen(false) }}
+        onSubmit={() => { if (renderedStopTicket && renderedStopTicket === stopTicket.current) void submitStop() }}
       />
     </RestaurantPage>
   )

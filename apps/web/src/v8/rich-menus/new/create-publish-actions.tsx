@@ -7,9 +7,7 @@ clearPublishPlanDraft
 } from '@/v8/rich-menus/edit/publish-plan-draft'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { notifyToast } from '@/components/shared/toast'
-import {
-api
-} from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { type Group } from './create-types'
 
@@ -17,6 +15,7 @@ import { type Group } from './create-types'
 type PublishMenuNowContext = {
   audience: "all" | "tag" | "none" | "targeted"
   group: Group | null
+  confirmedImages: Array<{orderIndex:number;imageR2Key:string|null;imageContentType:string|null}>
   loadChecks: () => Promise<void>
   persistDraft: () => Promise<void>
   publishAttempt: RefObject<ManualPublishAttempt>
@@ -30,7 +29,7 @@ type PublishMenuNowContext = {
   setPublishing: Dispatch<SetStateAction<boolean>>
 }
 
-export async function publishMenuNow({ audience, group, loadChecks, persistDraft, publishAttempt, publishing, reloadGroup, saveErrors, saving, setDone, setError, setNotice, setPublishing }: PublishMenuNowContext) {
+export async function publishMenuNow({ audience, group, confirmedImages, loadChecks, persistDraft, publishAttempt, publishing, reloadGroup, saveErrors, saving, setDone, setError, setNotice, setPublishing }: PublishMenuNowContext) {
     if (!group || publishing || saving) return
     const idempotencyKey = publishAttempt.current.begin()
     if (!idempotencyKey) return
@@ -44,7 +43,7 @@ export async function publishMenuNow({ audience, group, loadChecks, persistDraft
       // 保存で内容が変わると実機確認の fingerprint が変わる。保存し直した状態で再確認する。
       await loadChecks()
       await reloadGroup(group.id)
-      const res = await api.richMenuGroups.publish(group.id, idempotencyKey)
+      const res = await api.richMenuGroups.publish(group.id, idempotencyKey,{expectedVersion:group.version+1,expectedPublishGeneration:group.publishingGeneration,expectedImages:confirmedImages})
       if (!res.success) throw new Error(res.error ?? 'publish failed')
       publishAttempt.current.succeed()
       setDone('published')
@@ -64,6 +63,7 @@ export async function publishMenuNow({ audience, group, loadChecks, persistDraft
       void reloadGroup(group.id).catch(cause => setError(describeApiFailure(cause, '読み込み')))
       return true
     } catch (e) {
+      if(e instanceof ApiError&&e.code==='RICH_MENU_PUBLISH_CHANGED')publishAttempt.current.succeed()
       const fieldFailure = saveErrors.capture(e);
 
       const targetingPriorityInvalid = e instanceof Error && /targetingPriority/.test(e.message)

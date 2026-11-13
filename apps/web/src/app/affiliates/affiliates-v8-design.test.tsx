@@ -13,7 +13,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 const AFFILIATES = [
   {
-    id: 'a1', name: '田中 明', code: 'tanaka-a', commissionRate: 10,
+    id: 'a1', name: '見本 168', code: 'tanaka-a', commissionRate: 10,
     isActive: true, createdAt: '2026-08-01T00:00:00.000Z',
     friendId: null, email: null, holdDays: null, payoutCycle: null, notifyOnConversion: false,
   },
@@ -23,7 +23,7 @@ const AFFILIATES = [
     friendId: null, email: null, holdDays: null, payoutCycle: null, notifyOnConversion: false,
   },
   {
-    id: 'a3', name: '中村 彩', code: 'nakamura', commissionRate: 0,
+    id: 'a3', name: '見本 27', code: 'nakamura', commissionRate: 0,
     isActive: true, createdAt: '2026-08-15T00:00:00.000Z',
     friendId: null, email: null, holdDays: null, payoutCycle: null, notifyOnConversion: false,
   },
@@ -129,7 +129,7 @@ describe('KdFRI アフィリエイタータブの実入口の集計・権限・�
     expect(document.querySelector('[data-list-name]')?.textContent).not.toContain('報酬なし（計測のみ）')
     expect(screen.getAllByText('計測中').length).toBeGreaterThan(0)
     expect(screen.getByText('停止中')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '田中 明の操作' }))
+    fireEvent.click(screen.getByRole('button', { name: '見本 168の操作' }))
     expect(screen.getByRole('menuitem', { name: '紹介を止める' })).toBeTruthy()
   })
 })

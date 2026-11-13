@@ -135,8 +135,8 @@ describe('LINE通知の手動操作（再送・テスト・単体・枠）', () 
         (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
       VALUES ('account-2', 'channel-2', '店舗2', 'token-2', 'secret-2', 1, 'tenant-2')
     `).run();
-    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', display_name: '山田 太郎' });
-    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '佐藤 花子' });
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', display_name: '見本 141' });
+    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '見本 122' });
   });
 
   afterEach(() => {
@@ -154,7 +154,7 @@ describe('LINE通知の手動操作（再送・テスト・単体・枠）', () 
     expect(body.data).toMatchObject({
       id: 'delivery-one',
       status: 'failed',
-      friendName: '山田 太郎',
+      friendName: '見本 141',
       orderNumber: 'NEN-1001',
       retryAvailable: true,
       attemptHistory: [],

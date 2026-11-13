@@ -58,6 +58,11 @@ import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { type StatusFilter, type View, UNFILED, ALL, STATUS_FILTERS, SORT_OPTIONS, PAGE_SIZES, isArchived, matchesStatus, statusOf, accountMeta } from "./home-gap-parts"
+function accountFriendCount(account: AccountWithStats) {
+  const count = account.stats?.friendCount
+  return typeof count !== 'number' || (isArchived(account) && count === 0) ? emptyValue('unknown') : formatNumber(count)
+}
+
 export default function HqHomeV8() {
   const saveErrors = useSaveFormErrors()
   // 左のメニューと同じ名前を見出しにする（バナー生成・課金プランなどと同じ書き方）。
@@ -94,6 +99,7 @@ export default function HqHomeV8() {
   const [loadError, setLoadError] = useState<unknown>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const [attentionCounts, setAttentionCounts] = useState<Record<string, number> | null>(null)
+  const [attentionTotals, setAttentionTotals] = useState<Record<string, number> | null>(null)
   const [attentionKey, setAttentionKey] = useState(0)
   const [attentionError, setAttentionError] = useState<unknown>(null)
   const [attentionRefreshing, setAttentionRefreshing] = useState(false)
@@ -163,16 +169,21 @@ export default function HqHomeV8() {
     let cancelled = false
     const epoch = attentionEpoch.current
     setAttentionCounts(null)
+    setAttentionTotals(null)
     setAttentionError(null)
     void import('@/lib/api/helpers/styles').then(({ hqStyleApi }) => hqStyleApi.attention(attentionKey || reloadKey ? { cache: 'reload' } : undefined)).then((result) => {
       if (cancelled || epoch !== attentionEpoch.current) return
       if (!result.success) { setAttentionError(new Error('attention failed')); return }
       const counts: Record<string, number> = {}
+      const totals: Record<string, number> = {}
       for (const item of result.data.items) {
         const value = item.counts.connections
         if (typeof value === 'number' && Number.isFinite(value) && value >= 0) counts[item.accountId] = value
+        const parts = [item.counts.unhandledChats, item.counts.pendingBookings, item.counts.unpaid, item.counts.connections, item.counts.stoppedDeliveries]
+        if (parts.every(part => typeof part === 'number' && Number.isFinite(part) && part >= 0)) totals[item.accountId] = parts.reduce((sum, part) => sum + part, 0)
       }
       setAttentionCounts(counts)
+      setAttentionTotals(totals)
     }).catch((error: unknown) => { if (!cancelled && epoch === attentionEpoch.current) setAttentionError(error ?? new Error('attention failed')) })
     return () => { cancelled = true }
   }, [reloadKey, attentionKey])
@@ -195,6 +206,7 @@ export default function HqHomeV8() {
     setReloadFailed(false)
     attentionEpoch.current += 1
     setAttentionCounts(null)
+    setAttentionTotals(null)
     setAttentionError(null)
     setAttentionRefreshing(true)
     try {
@@ -214,6 +226,7 @@ export default function HqHomeV8() {
     setCheckingConnections(true)
     attentionEpoch.current += 1
     setAttentionCounts(null)
+    setAttentionTotals(null)
     setAttentionError(null)
     setAttentionRefreshing(true)
     try {
@@ -237,6 +250,7 @@ export default function HqHomeV8() {
     setCheckingConnections(true)
     attentionEpoch.current += 1
     setAttentionCounts(null)
+    setAttentionTotals(null)
     setAttentionError(null)
     setAttentionRefreshing(true)
     setConnectionResult(null)
@@ -620,7 +634,6 @@ export default function HqHomeV8() {
   ) : (
     <>
       {view === 'table' && attentionError ? <Notice tone="danger" message={`対応件数：${loadFailureNotice(attentionError, '対応件数', 'hq')}`} action={classifyApiFailure(attentionError) === 'forbidden' ? undefined : <Button type="button" disabled={attentionRefreshing} onClick={() => setAttentionKey(key => key + 1)}>もう一度読み込む</Button>} /> : null}
-      {view === 'table' ? <p className={styles.progress}>対応件数は接続の問題の数です。</p> : null}
       {connectionProgress ? <p className={styles.progress} role="status">{connectionProgress}</p> : null}
       {connectionResult ? <Notice tone={connectionResult.tone} message={connectionResult.message}
         action={connectionResult.needsReload ? <Button type="button" onClick={() => void reloadConnections()} disabled={checkingConnections}>もう一度読み込む</Button> : undefined}
@@ -672,7 +685,7 @@ export default function HqHomeV8() {
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
                     <dt>友だち</dt>
-                    <dd>{typeof account.stats?.friendCount !== 'number' || (isArchived(account) && !account.stats.friendCount) ? emptyValue('unknown') : formatNumber(account.stats.friendCount)}</dd>
+                    <dd>{accountFriendCount(account)}</dd>
                   </div>
                   <div className={styles.stat}>
                     <dt>今月の配信</dt>
@@ -695,7 +708,7 @@ export default function HqHomeV8() {
             <Th>アカウント</Th>
             <Th>LINE接続</Th>
             <Th>お支払い</Th>
-            <Th>接続の問題</Th>
+            <Th>対応が要る</Th>
             <Th>友だち</Th>
             <Th>今月の配信</Th>
             <Th className="sr-only">操作</Th>
@@ -724,8 +737,8 @@ export default function HqHomeV8() {
                   if (!pay || pay === 'unknown') return emptyValue('unknown')
                   return <StatusBadge tone={pay === 'live' ? 'success' : pay === 'test' ? 'warning' : 'neutral'}>{pay === 'live' ? 'つながっている' : pay === 'test' ? '試験モード' : 'つなぐ前'}</StatusBadge>
                 })()}</Td>
-                <Td>{attentionCounts?.[account.id] !== undefined ? `${formatNumber(attentionCounts[account.id])} 件` : emptyValue('unknown')}</Td>
-                <Td>{typeof account.stats?.friendCount === 'number' ? formatNumber(account.stats.friendCount) : emptyValue('unknown')}</Td>
+                <Td>{attentionTotals?.[account.id] !== undefined ? `${formatNumber(attentionTotals[account.id])} 件` : emptyValue('unknown')}</Td>
+                <Td>{accountFriendCount(account)}</Td>
                 <Td>{typeof account.stats?.messagesThisMonth === 'number' ? formatNumber(account.stats.messagesThisMonth) : emptyValue('unknown')}</Td>
                 <Td>{tableMenu(account)}</Td>
               </Tr>

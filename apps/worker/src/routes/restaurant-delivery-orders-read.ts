@@ -8,7 +8,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { dbFor } from '../services/db-router.js';
 import { fail } from './restaurant-google.js';
 
-import { DELIVERY_SERVICE_LABELS, deliverySendEnabled, isDeliveryService, judgeUrgency, nowSec, summarizeOrderItems, tokyoDateText, tokyoDayRange, uberOAuthClient } from '../services/restaurant-delivery.js';
+import { DELIVERY_SERVICE_LABELS, deliverySendEnabled, deliveryTargetFingerprint, isDeliveryService, judgeUrgency, nowSec, summarizeOrderItems, tokyoDateText, tokyoDayRange, uberOAuthClient } from '../services/restaurant-delivery.js';
 import type { DeliveryOrderStatus } from '../services/restaurant-delivery.js';
 import type { DeliveryService } from '../services/delivery-service-types.js';
 import { ORDER_STATUS_LABELS, isoOrNull, deliveryStore, serviceStates, resumeExpiredIntake, cookingCountFor, itemsForOrders } from './restaurant-delivery-common.js';
@@ -242,10 +242,12 @@ export function registerDeliveryOrderReads(restaurantDelivery: Hono<Env>): void 
         success: true,
         store: { id: store.id, name: store.name },
         // D-1上段のサービスカード。接続と受付の状況、本日の件数を出す。
-        services: states.map((state) => ({
+        services: await Promise.all(states.map(async (state) => ({
           service: state.service,
           label: DELIVERY_SERVICE_LABELS[state.service],
           connectionStatus: state.connection_status,
+          version: state.version,
+          target: await deliveryTargetFingerprint(c.env, state.service),
           ...(state.service === 'ubereats' ? {
             orderActionsEnabled: state.connection_status === 'connected'
               && deliverySendEnabled(c.env) && uberOAuthClient(c.env) !== null
@@ -255,7 +257,7 @@ export function registerDeliveryOrderReads(restaurantDelivery: Hono<Env>): void 
           stopUntil: isoOrNull(state.stop_until),
           todayCount: todaySummary.byService.get(state.service)?.count ?? 0,
           todayAmount: todaySummary.byService.get(state.service)?.amount ?? 0,
-        })),
+        }))),
         /**
          * D-1のKPI4枚。「本日の注文」「本日の売上」「急ぎ対応」「平均準備時間」。
          * 前日と比べられないとき（前日が0件、平均が取れない）は数を作らず null を返し、
@@ -289,6 +291,7 @@ export function registerDeliveryOrderReads(restaurantDelivery: Hono<Env>): void 
           });
           return {
             id: row.id,
+            version: row.version,
             service: row.service,
             serviceLabel: DELIVERY_SERVICE_LABELS[row.service],
             orderNumber: row.order_number,
@@ -335,6 +338,7 @@ export function registerDeliveryOrderReads(restaurantDelivery: Hono<Env>): void 
         success: true,
         order: {
           id: order.id,
+          version: order.version,
           service: order.service,
           serviceLabel: DELIVERY_SERVICE_LABELS[order.service],
           orderNumber: order.order_number,

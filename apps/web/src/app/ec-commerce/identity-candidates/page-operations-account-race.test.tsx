@@ -71,9 +71,9 @@ const REVIEW_ITEM = {
   version: 1,
   confidence: { score: 82, label: 'high' },
   left: {
-    kind: 'ec_event', id: 'ec-left-1', label: '山田 太郎', detail: '注文 #1001',
+    kind: 'ec_event', id: 'ec-left-1', label: '見本 141', detail: '注文 #1001',
     lineAccountId: 'acc-1', lineAccountName: 'テスト店', shopKey: null,
-    attributes: [{ label: 'メールアドレス', valuePreview: 'ya***@example.jp', verified: true }],
+    attributes: [{ label: 'メールアドレス', valuePreview: 'ya***@example.com', verified: true }],
   },
   right: {
     kind: 'friend', id: 'friend-right-1', label: '山田 たろう', detail: null,

@@ -24,7 +24,7 @@ events.delete('/api/events/admin/events/:id/slots/:slotId', requireRole('owner',
   if (usedSeats > 0) return bad(c, 'slot_has_bookings', 409);
   const now = new Date().toISOString();
   await c.env.DB
-    .prepare(`UPDATE event_slots SET deleted_at = ?, updated_at = ? WHERE id = ?`)
+    .prepare(`UPDATE event_slots SET version = version + 1, deleted_at = ?, updated_at = ? WHERE id = ?`)
     .bind(now, now, slot_id)
     .run();
   return new Response(null, { status: 204 });

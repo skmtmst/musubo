@@ -103,6 +103,9 @@ function EditInner() {
   const [duplicating, setDuplicating] = useState(false)
   const [duplicateError, setDuplicateError] = useState('')
   const [pauseVersion, setPauseVersion] = useState<number | null>(null)
+  const pauseScope = useRef<{ id: string; version: number } | null>(null)
+  const pauseLock = useRef(false)
+  if (pauseScope.current && pauseScope.current.id !== id) pauseScope.current = null
   const [pausing, setPausing] = useState(false)
   const [pauseError, setPauseError] = useState('')
   const loadRequestId = useRef(0)
@@ -355,15 +358,18 @@ function EditInner() {
     goStep(next)
   }
 
-  const pause = async () => {
-    if (!id || pauseVersion === null || pausing || readOnly) return
+  const renderedPauseScope = pauseScope.current
+  const pause = async (scope: typeof renderedPauseScope) => {
+    if (!scope || pauseScope.current !== scope || scope.id !== id || pausing || pauseLock.current || readOnly) return
+    pauseLock.current = true
     setPausing(true); setPauseError('')
     try {
-      const response = await webinarApi.pause(id, pauseVersion)
-      setLoaded(current => current?.id === id ? { ...current, webinar: response.data } : current)
-      setPauseVersion(null); setReloadKey(value => value + 1)
-    } catch (error) { setPauseError(japaneseDetailOf(error) || '停止できませんでした。もう一度お試しください。') }
-    finally { setPausing(false) }
+      const response = await webinarApi.pause(scope.id, scope.version)
+      if (pauseScope.current !== scope) return
+      setLoaded(current => current?.id === scope.id ? { ...current, webinar: response.data } : current)
+      pauseScope.current = null; setPauseVersion(null); setReloadKey(value => value + 1)
+    } catch (error) { if (pauseScope.current === scope) setPauseError(japaneseDetailOf(error) || '停止できませんでした。もう一度お試しください。') }
+    finally { pauseLock.current = false; setPausing(false) }
   }
   const duplicateSaved = async () => {
     if (!id || !editor || duplicating || readOnly) return
@@ -381,7 +387,7 @@ function EditInner() {
     { id: 'comments', label: 'コメント演出を開く', onSelect: () => goStep('comments') },
     ...(!readOnly ? [
       { id: 'duplicate', label: '複製する', onSelect: () => requestUnsavedAction(() => void duplicateSaved()) },
-      ...(webinar.status === 'active' ? [{ id: 'pause', label: '停止', onSelect: () => { setPauseError(''); setPauseVersion(editor.version) } }] : []),
+      ...(webinar.status === 'active' ? [{ id: 'pause', label: '停止', onSelect: () => { if (!id) return; pauseScope.current = { id, version: editor.version }; setPauseError(''); setPauseVersion(editor.version) } }] : []),
     ] : []),
   ]} />{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}</>
 
@@ -438,7 +444,7 @@ function EditInner() {
       {pane === 'analytics' ? <AnalyticsPane ctx={ctx} chrome={detailChrome} /> : null}
       {keep('comments', <CommentsPane ctx={ctx} chrome={detailChrome} onDirtyChange={dirtyReporterFor('comments')} registerSave={saveRegistrarFor('comments')} />)}
       {leaveDialog}
-      <Dialog open={pauseVersion !== null} title={`「${webinar.title}」を停止しますか？`} description={`公開中の版 ${pauseVersion ?? editor.version} を止めます。公開ページでの申し込みと視聴ができなくなります。あとで公開し直せます。`} tone="destructive" confirmation confirmLabel="停止する" busy={pausing} error={pauseError || undefined} onConfirm={() => void pause()} onCancel={() => { if (!pausing) setPauseVersion(null) }}><OperationTargetSummary accounts={[{ id: webinar.accountId ?? '', name: account?.name }]} /></Dialog>
+      <Dialog open={pauseVersion !== null && renderedPauseScope !== null} title={`「${webinar.title}」を停止しますか？`} description={`公開中の版 ${pauseVersion ?? editor.version} を止めます。公開ページでの申し込みと視聴ができなくなります。あとで公開し直せます。`} tone="destructive" confirmation confirmLabel="停止する" busy={pausing} error={pauseError || undefined} onConfirm={() => void pause(renderedPauseScope)} onCancel={() => { if (!pausing) { pauseScope.current = null; setPauseVersion(null) } }}><OperationTargetSummary accounts={[{ id: webinar.accountId ?? '', name: account?.name }]} /></Dialog>
     </StepContent></SaveErrorScope>
   )
 }

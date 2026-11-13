@@ -33,7 +33,7 @@ export function formatTime(value: string | null | undefined, timezone?: string):
   return polishFormatDate(value, { style: 'time', fallback: '', timeZone: timezone || 'Asia/Tokyo' })
 }
 
-/** 「中川 由美」→「中川さん」 */
+/** 「見本 30」→「見本さん」 */
 export function sanName(name: string | null | undefined): string {
   if (!name) return 'ほかの担当者'
   return `${name.split(/\s+/)[0]}さん`

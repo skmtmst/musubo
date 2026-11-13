@@ -121,9 +121,10 @@ for (const width of [1152,1440]) test(`予約と窓の文字が切れず、状�
     })
     await paint(page)
     assert.equal(await metaOverlap(),true,JSON.stringify(await page.locator('button[data-placement="timeline"]').first().evaluate(card=>{const m=card.lastElementChild.lastElementChild;return {message:'札をメニューへ重ねる故障を検知する',display:getComputedStyle(m).display,transform:getComputedStyle(m).transform,menu:card.lastElementChild.firstElementChild.getBoundingClientRect().toJSON(),meta:m.getBoundingClientRect().toJSON()}})))
-    await page.locator('button[data-placement="timeline"]').first().evaluate(card=>{const style=card.lastElementChild.lastElementChild.style;style.removeProperty('transform');style.removeProperty('transition')})
+    await page.locator('button[data-placement="timeline"]').first().evaluate(card=>{card.lastElementChild.lastElementChild.style.removeProperty('transform')})
     await paint(page)
-    assert.equal(await metaOverlap(),false,'配置を戻すと重なりも解消する')
+    assert.equal(await metaOverlap(),false,JSON.stringify(await page.locator('button[data-placement="timeline"]').first().evaluate(card=>{const menu=card.lastElementChild.firstElementChild,m=card.lastElementChild.lastElementChild;return {message:'配置を戻すと重なりも解消する',transform:getComputedStyle(m).transform,style:m.getAttribute('style'),metaAnimations:m.getAnimations().length,cardAnimations:card.getAnimations().length,menu:menu.getBoundingClientRect().toJSON(),meta:m.getBoundingClientRect().toJSON()}})))
+    await page.locator('button[data-placement="timeline"]').first().evaluate(card=>{card.lastElementChild.lastElementChild.style.removeProperty('transition')})
     for(const tick of metrics.ticks) assert.ok(metrics.label.bottom<=tick.y || metrics.label.y>=tick.bottom || metrics.label.right<=tick.x || metrics.label.x>=tick.right,'今の時刻と時刻の見出しが重ならない')
     // 色の見本は表に出ている状態だけ。重なりの無い日は「重なり」を出さず、全部は「印の見方」で読む。
     assert.deepEqual(metrics.legend,['確定','仮押さえ','要対応（承認待ち）','無断キャンセル'])
