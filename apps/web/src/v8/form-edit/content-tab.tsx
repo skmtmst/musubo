@@ -77,6 +77,7 @@ type Props = {
   /** 公開用の参照（F2）。保存は layout ごと送るため、一覧だけを編集画面へ返す。 */
   references?: FormReferenceDefinition[]
   referenceStates?: Map<string, PublicFormReference> | null
+  hasPublishedVersion?: boolean
   onChangeReferences?: (next: FormReferenceDefinition[]) => void
 }
 
@@ -167,6 +168,7 @@ export function ContentTab(props: Props) {
         layout={layout}
         references={props.references ?? layout.references ?? []}
         states={props.referenceStates ?? null}
+        hasPublishedVersion={props.hasPublishedVersion}
         onChangeReferences={props.onChangeReferences}
       />
 

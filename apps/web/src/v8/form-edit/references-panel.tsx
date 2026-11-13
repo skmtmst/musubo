@@ -48,8 +48,8 @@ function referenceSummary(reference: FormReferenceDefinition): string {
   return names.length ? names.join('・') : '項目なし'
 }
 
-function referenceStatePresentation(state: PublicFormReference['state'] | null): { label: string; tone: 'neutral' | 'info' | 'warning' | 'caution' | 'success' | 'danger' } {
-  if (state === null) return { label: '公開後に状態が出ます', tone: 'neutral' }
+function referenceStatePresentation(state: PublicFormReference['state'] | null, hasPublishedVersion: boolean): { label: string; tone: 'neutral' | 'info' | 'warning' | 'caution' | 'success' | 'danger' } {
+  if (state === null) return { label: hasPublishedVersion ? '公開中の状態は未確認' : '公開後に状態が出ます', tone: 'neutral' }
   switch (state) {
     case 'ready': return { label: '使える', tone: 'success' }
     case 'empty': return { label: '中身が空です', tone: 'warning' }
@@ -76,11 +76,12 @@ type Props = {
   references: FormReferenceDefinition[]
   /** 公開中の版の参照状態（blockId 引き）。未公開・未取得は null。 */
   states: Map<string, PublicFormReference> | null
+  hasPublishedVersion?: boolean
   /** 無いときは一覧だけ見せる（変える操作は出さない）。 */
   onChangeReferences?: (next: FormReferenceDefinition[]) => void
 }
 
-export default function ReferencesPanel({ readOnly, accountId, layout, references, states, onChangeReferences }: Props) {
+export default function ReferencesPanel({ readOnly, accountId, layout, references, states, hasPublishedVersion = false, onChangeReferences }: Props) {
   const canEdit = !readOnly && onChangeReferences !== undefined
   const rows = useMemo(() => {
     const byBlock = new Map(references.map((reference) => [reference.blockId, reference]))
@@ -105,7 +106,7 @@ export default function ReferencesPanel({ readOnly, accountId, layout, reference
       {rows.length === 0 ? <ListEmptyMessage>対応付けられる表示ブロック（画像・見出し・本文・ボタン）がありません。</ListEmptyMessage> : null}
       <ul className={styles.list}>
         {rows.map(({ block, label, reference, state }) => {
-          const badge = referenceStatePresentation(state?.state ?? null)
+          const badge = referenceStatePresentation(state?.state ?? null, hasPublishedVersion)
           return (
             <li key={block.id} className={styles.row}>
               <div className={styles.rowText}>

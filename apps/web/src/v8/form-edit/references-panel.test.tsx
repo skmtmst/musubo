@@ -47,13 +47,13 @@ const layout: FormLayout = {
 
 let root: Root | null = null
 let container: HTMLDivElement | null = null
-async function renderPanel(props?: { readOnly?: boolean; references?: { blockId: string; kind: 'image' | 'store_information'; mediaId?: string; versionNo?: number; alt?: string; fields?: Record<string, { varKey: string }> }[] }) {
+async function renderPanel(props?: { readOnly?: boolean; published?: boolean; references?: { blockId: string; kind: 'image' | 'store_information'; mediaId?: string; versionNo?: number; alt?: string; fields?: Record<string, { varKey: string }> }[] }) {
   const onChange = vi.fn()
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
   await act(async () => {
-    root!.render(<ReferencesPanel accountId="acc-1" layout={layout} references={(props?.references ?? []) as never} states={null} onChangeReferences={onChange} readOnly={props?.readOnly} />)
+    root!.render(<ReferencesPanel accountId="acc-1" layout={layout} references={(props?.references ?? []) as never} states={null} hasPublishedVersion={props?.published} onChangeReferences={onChange} readOnly={props?.readOnly} />)
   })
   return { onChange }
 }
@@ -107,6 +107,12 @@ describe('references-panel', () => {
     await renderPanel({ readOnly: true })
     expect(screen.queryByRole('button', { name: '固定版を選ぶ' })).toBeNull()
     expect(screen.queryByRole('button', { name: '共通情報を選ぶ' })).toBeNull()
+  })
+
+  it('公開済みで状態をまだ読めないときは、未公開とは区別して伝える', async () => {
+    await renderPanel({ published: true })
+    expect(screen.getAllByText('公開中の状態は未確認').length).toBe(2)
+    expect(screen.queryByText('公開後に状態が出ます')).toBeNull()
   })
 
   it('公開中の状態は行に札で出す', async () => {

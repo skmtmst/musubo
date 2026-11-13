@@ -226,14 +226,15 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     }
   }
 
-  /* 公開の確かめを開いたら、公開中の版を読む（`?view=published` は印だけ。API は account_id が無いと公開中の版を返す）。 */
+  /* 中身の参照状態と公開の確かめでは公開中の版を読む（account_id が無いと公開中の版を返す）。 */
   useEffect(() => {
-    if (!showPublish || !id || !publishedVersionId) {
+    if ((!showPublish && editTab !== 'content') || !id || !publishedVersionId) {
       setPublishedSide(null)
       setPublishedReferences(null)
       return
     }
     let alive = true
+    setPublishedReferences(null)
     void (async () => {
       try {
         const res = await fetchApi<{ success: boolean; data?: { name?: string; description?: string | null; layout?: FormLayout; references?: PublicFormReference[] } }>(
@@ -248,7 +249,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           ? new Map(res.data.references.flatMap((row) => (row && typeof row.blockId === 'string' ? [[row.blockId, row] as const] : [])))
           : null)
       } catch (saveFailure) {
-        saveErrors.capture(saveFailure);
+        if (showPublish) saveErrors.capture(saveFailure);
 
         if (alive) {
           setPublishedSide(null)
@@ -258,7 +259,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     })();
 
     return () => { alive = false }
-  }, [showPublish, id, publishedVersionId, contentRevision, saveErrors])
+  }, [showPublish, editTab, id, publishedVersionId, contentRevision, saveErrors])
 
   useEffect(() => {
     setFormLoadFailed(null)
@@ -1035,6 +1036,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             onChangeRouting={host ? undefined : patchRouting}
             references={layout.references ?? []}
             referenceStates={publishedReferences}
+            hasPublishedVersion={Boolean(publishedVersionId)}
             onChangeReferences={host ? () => {} : (next) => setLayout((prev) => ({ ...prev, references: next }))}
           />
         ) : editTab === 'after' ? (
