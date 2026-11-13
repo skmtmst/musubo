@@ -20,7 +20,7 @@ import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
-import type { MediaUsageImpact } from '../contents/media-usage-references'
+import type { MediaUsageImpact } from '../contents'
 import styles from './references-panel.module.css'
 
 /*
