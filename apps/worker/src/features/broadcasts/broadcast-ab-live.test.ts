@@ -44,6 +44,18 @@ test('R4a-03: 同じ鍵の再送は同じ結果で二重送信しない',async()
  await expect(startAbLive(d.db,'br',4,2400,'live-2',opts)).rejects.toThrow('ab_already_started');
 });
 
+test('2つ目の送信単位が不明なら、成功分と未着手分を分けて残す',async()=>{
+ await configure();
+ d.raw.prepare("UPDATE broadcast_ab_tests SET test_ratio_pct=50 WHERE broadcast_id='br'").run();
+ const send=vi.fn(async(input:AbLiveTransmitInput)=>{if(input.variantKey==='A'&&input.retryKey.endsWith(':1'))throw new Error('response_lost');});
+ await startAbLive(d.db,'br',4,2400,'live-1',{transmit:send,liveDeliveryEnabled:true});
+ expect(send.mock.calls.map(c=>[c[0].variantKey,c[0].to.length])).toEqual([['A',500],['A',500],['B',500],['B',500],['B',200]]);
+ expect(d.raw.prepare("SELECT variant_key,state,count(*) n FROM broadcast_ab_live_recipients GROUP BY variant_key,state ORDER BY variant_key,state").all()).toEqual([
+  {variant_key:'A',state:'pending',n:200},{variant_key:'A',state:'sent',n:500},{variant_key:'A',state:'unknown',n:500},
+  {variant_key:'B',state:'sent',n:1200},
+ ]);
+});
+
 test('R4a-04: 人数の確かめが変われば始めない',async()=>{
  await configure();
  await expect(startAbLive(d.db,'br',4,2401,'live-1',{transmit:transmit(),liveDeliveryEnabled:true})).rejects.toThrow('SEND_PREVIEW_CHANGED');
@@ -95,5 +107,6 @@ test('R4a-08: 試しは500人ずつに分けて送り、鍵を分ける',async()
  expect(multicast.mock.calls[0][0]).toHaveLength(500);
  expect(multicast.mock.calls[2][0]).toHaveLength(200);
  expect(new Set(multicast.mock.calls.map(c=>c[3])).size).toBe(3);
+ expect(multicast.mock.calls.every(c=>/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(c[3]??''))).toBe(true);
  expect(fetch).not.toHaveBeenCalled();
 });

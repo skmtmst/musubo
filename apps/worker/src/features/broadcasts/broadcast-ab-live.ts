@@ -5,13 +5,14 @@ import {abAudience,splitAb} from './broadcast-ab.js';
 import {broadcastWideContext} from './broadcast-wide-context.js';
 import {CommonVarResolutionFailedError,resolveSendCommonVars} from '../../services/interpolation-context.js';
 import {assertNoUnresolvedBroadcastVariables,hasRecipientVariables,renderMessageContent} from '../../services/render-message.js';
+import {createBroadcastRetryKey} from './broadcast-retry-key.js';
 
 export interface AbLiveTransmitInput{broadcastId:string;variantKey:'A'|'B';to:string[];messages:Message[];retryKey:string}
 export type AbLiveTransmit=(input:AbLiveTransmitInput)=>Promise<unknown>;
 
 /**
  * A/B の本送信を始める。710 の試験用表は読むだけで変えない。送達の実績は
- * 769 の表だけに書く。通常の送信（broadcasts の sending）には流さない。
+ * 764 の表だけに書く。通常の送信（broadcasts の sending）には流さない。
  * 旗がなければ始めない。試し（A/B）を送り、残り（R）は判定（R4b）まで待つ。
  */
 export async function startAbLive(db:D1Database,id:string,expectedVersion:number,count:number,key:string,opts:{transmit:AbLiveTransmit;liveDeliveryEnabled:boolean;now?:Date}){
@@ -46,12 +47,22 @@ export async function startAbLive(db:D1Database,id:string,expectedVersion:number
  try{await db.batch(statements);}catch(e){if(/CHECK constraint|UNIQUE constraint/.test(String(e)))throw new GapError('version_conflict',409);throw e;}
  const lineUsers=new Map((await db.prepare(`SELECT id,line_user_id FROM friends WHERE line_account_id=(SELECT line_account_id FROM broadcasts WHERE id=?) AND id IN (SELECT friend_id FROM broadcast_ab_live_recipients WHERE broadcast_id=?)`).bind(id,id).all<{id:string;line_user_id:string|null}>()).results.map(r=>[r.id,r.line_user_id]));
  for(const variantKey of ['A','B'] as const){
-  const targets=rows.filter(x=>x.key===variantKey),to=targets.map(x=>lineUsers.get(x.id)).filter((v):v is string=>!!v);
+  const targets=rows.filter(x=>x.key===variantKey);
+  const unavailable=targets.filter(x=>!lineUsers.get(x.id)).map(x=>x.id);
+  if(unavailable.length)await markLive(db,id,variantKey,unavailable,'failed',at);
+  const sendable=targets.flatMap(x=>{const lineUserId=lineUsers.get(x.id);return lineUserId?[{friendId:x.id,lineUserId}]:[];});
   const messages=resolvedByVariant.get(variantKey)!;
-  try{
-   await opts.transmit({broadcastId:id,variantKey,to,messages,retryKey:crypto.randomUUID()});
-   await markLive(db,id,variantKey,'sent',at);
-  }catch{await markLive(db,id,variantKey,'failed',at);}
+  for(let i=0;i<sendable.length;i+=500){
+   const chunk=sendable.slice(i,i+500),friendIds=chunk.map(x=>x.friendId);
+   try{
+    await opts.transmit({broadcastId:id,variantKey,to:chunk.map(x=>x.lineUserId),messages,retryKey:`${key}:${variantKey}:${i/500}`});
+   }catch{
+    // LINE が受け付けた直後に応答だけ失った可能性があるため、失敗と断定しない。
+    await markLive(db,id,variantKey,friendIds,'unknown',at);
+    break;
+   }
+   await markLive(db,id,variantKey,friendIds,'sent',at);
+  }
  }
  return result;
 }
@@ -74,8 +85,10 @@ async function resolveLiveVariantMessages(db:D1Database,accountId:string|null,id
  return out;
 }
 
-async function markLive(db:D1Database,id:string,variantKey:'A'|'B',state:'sent'|'failed',at:string){
- await db.prepare("UPDATE broadcast_ab_live_recipients SET state=?,sent_at=CASE WHEN ?='sent' THEN ? ELSE NULL END,attempt_count=attempt_count+1 WHERE broadcast_id=? AND variant_key=? AND state='pending'").bind(state,state,at,id,variantKey).run();
+async function markLive(db:D1Database,id:string,variantKey:'A'|'B',friendIds:string[],state:'sent'|'failed'|'unknown',at:string){
+ for(let i=0;i<friendIds.length;i+=500){
+  await db.prepare("UPDATE broadcast_ab_live_recipients SET state=?,sent_at=CASE WHEN ?='sent' THEN ? ELSE NULL END,attempt_count=attempt_count+1 WHERE broadcast_id=? AND variant_key=? AND state='pending' AND friend_id IN (SELECT value FROM json_each(?))").bind(state,state,at,id,variantKey,JSON.stringify(friendIds.slice(i,i+500))).run();
+ }
 }
 
 /** 通常の送信と同じ multicast（500人ずつ）で試しを送る。 */
@@ -83,7 +96,8 @@ export function createAbLiveTransmit(lineClient:{multicast:(to:string[],messages
  return async input=>{
   for(let i=0;i<input.to.length;i+=500){
    const chunk=input.to.slice(i,i+500);
-   await lineClient.multicast(chunk,input.messages,undefined,`${input.retryKey}:${Math.floor(i/500)}`);
+   const retryKey=await createBroadcastRetryKey(input.broadcastId,'ab-live',input.variantKey,input.retryKey,String(i/500),...chunk,JSON.stringify(input.messages));
+   await lineClient.multicast(chunk,input.messages,undefined,retryKey);
   }
  };
 }

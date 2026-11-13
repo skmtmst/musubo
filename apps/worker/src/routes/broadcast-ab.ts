@@ -50,7 +50,7 @@ export async function maybeStartAb(c:Context<Env>,id:string,b:{testMode?:unknown
  if(b?.testMode!==true)throw new GapError('test_mode_required',409);
  return c.json({success:true,data:await startAbMock(c.env.DB,id,gapVersion(b.expectedVersion),Number(b.confirmedRecipientCount),gapKey(c))},202);
 }
-/** 本送信の開始。通常の即時送信と同じ停止・課金・枠の判定を通し、実績は769の表だけに書く。旗がなければ始めない。 */
+/** 本送信の開始。通常の即時送信と同じ停止・課金・枠の判定を通し、実績は764の表だけに書く。旗がなければ始めない。 */
 async function startAbLiveRequest(c:Context<Env>,id:string,b:{expectedVersion?:unknown;confirmedRecipientCount?:unknown}){
  if(c.env.AB_LIVE_DELIVERY_ENABLED!=='true')throw new GapError('live_delivery_disabled',409);
  const broadcast=await c.env.DB.prepare('SELECT * FROM broadcasts WHERE id=?').bind(id).first<Record<string,unknown>&{line_account_id:string|null}>();
