@@ -184,9 +184,10 @@
 }
 }
 
-/* 正本 f6zwfs：影なし、枠なし、上下6、行間18。 */
+/* 正本 f6zwfs：影なし、枠なし、上下6、行間18。
+ * 中身は文と <br /> の並び。flex にすると文・太字・改行が横一列の細い列になる（A14・投稿の説明）。 */
 :root .tip {
-  display: flex; align-items: flex-start; gap: 0; padding: 6px 10px;
+  display: block; padding: 6px 10px;
   border: 0; border-radius: var(--polish-radius-small); box-shadow: none;
   font-family: var(--font-sans);
   font-size: 12px; line-height: 18px; font-weight: var(--font-weight-ui);
