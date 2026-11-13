@@ -2235,6 +2235,40 @@ CREATE TABLE "bookings" (
   CHECK (friend_id IS NOT NULL OR booking_customer_id IS NOT NULL)
 );
 
+CREATE TABLE broadcast_ab_live_recipients(
+  broadcast_id TEXT NOT NULL REFERENCES broadcasts(id),
+  friend_id TEXT NOT NULL REFERENCES friends(id),
+  variant_key TEXT NOT NULL CHECK(variant_key IN('A','B','R')),
+  state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN('pending','sent','failed','unknown')),
+  sent_at TEXT,
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK(attempt_count>=0),
+  PRIMARY KEY(broadcast_id,friend_id)
+);
+
+CREATE TABLE broadcast_ab_live_tests(
+  broadcast_id TEXT PRIMARY KEY REFERENCES broadcasts(id),
+  test_ratio_pct INTEGER NOT NULL CHECK(test_ratio_pct IN(10,20,30,50)),
+  metric TEXT NOT NULL DEFAULT 'click' CHECK(metric='click'),
+  decide_after_minutes INTEGER NOT NULL CHECK(decide_after_minutes IN(60,120,240,480,1440)),
+  undecided_policy TEXT NOT NULL DEFAULT 'stop' CHECK(undecided_policy IN('stop','send_a')),
+  status TEXT NOT NULL DEFAULT 'live_testing' CHECK(status IN('live_testing','live_decided','live_undecided','live_finished','live_expired','live_stopped')),
+  winner TEXT CHECK(winner IN('A','B')),
+  started_at TEXT,
+  decide_at TEXT,
+  decided_at TEXT,
+  decided_by TEXT,
+  remainder_scheduled_at TEXT,
+  remainder_sent_at TEXT,
+  stats_json TEXT CHECK(stats_json IS NULL OR json_valid(stats_json)),
+  version INTEGER NOT NULL DEFAULT 1,
+  start_key TEXT,
+  start_request_json TEXT CHECK(start_request_json IS NULL OR json_valid(start_request_json)),
+  start_result_json TEXT CHECK(start_result_json IS NULL OR json_valid(start_result_json)),
+  choice_key TEXT,
+  choice_value TEXT,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE broadcast_ab_recipients(broadcast_id TEXT NOT NULL REFERENCES broadcasts(id),friend_id TEXT NOT NULL REFERENCES friends(id),variant_key TEXT NOT NULL CHECK(variant_key IN('A','B','R')),state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN('pending','sent','failed','unknown')),sent_at TEXT,test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),PRIMARY KEY(broadcast_id,friend_id));
 
 CREATE TABLE broadcast_ab_tests(broadcast_id TEXT PRIMARY KEY REFERENCES broadcasts(id),test_ratio_pct INTEGER NOT NULL CHECK(test_ratio_pct IN(10,20,30,50)),metric TEXT NOT NULL DEFAULT 'click' CHECK(metric='click'),decide_after_minutes INTEGER NOT NULL CHECK(decide_after_minutes IN(60,120,240,480,1440)),undecided_policy TEXT NOT NULL DEFAULT 'stop' CHECK(undecided_policy IN('stop','send_a')),status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN('draft','testing','decided','undecided','finished','expired','stopped')),winner TEXT CHECK(winner IN('A','B')),decided_at TEXT,decided_by TEXT,remainder_scheduled_at TEXT,remainder_sent_at TEXT,stats_json TEXT,started_at TEXT,decide_at TEXT,version INTEGER NOT NULL DEFAULT 1,test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),choice_key TEXT,choice_value TEXT, start_key TEXT, start_request_json TEXT CHECK(start_request_json IS NULL OR json_valid(start_request_json)), start_result_json TEXT CHECK(start_result_json IS NULL OR json_valid(start_result_json)));
@@ -2869,6 +2903,38 @@ CREATE TABLE ec_auto_line_attribution_events (
  kind TEXT NOT NULL CHECK(kind IN('click','purchase')),external_event_id TEXT NOT NULL,order_id TEXT,amount INTEGER CHECK(amount>=0),occurred_at TEXT NOT NULL,
  test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),request_json TEXT NOT NULL,
  UNIQUE(account_id,external_event_id)
+);
+
+CREATE TABLE ec_auto_line_cap_reservations (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  friend_id TEXT NOT NULL REFERENCES friends(id),
+  candidate_id TEXT NOT NULL REFERENCES ec_auto_line_sends(id),
+  mode TEXT NOT NULL CHECK (mode IN ('simulation', 'live')),
+  canonical_product_id TEXT NOT NULL,
+  source_product_id TEXT NOT NULL,
+  day_jst TEXT NOT NULL,
+  reserved_at TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('reserved', 'started', 'accepted', 'unknown', 'released')),
+  release_actor TEXT,
+  release_reason TEXT,
+  released_at TEXT,
+  UNIQUE (tenant_id, mode, candidate_id),
+  CHECK ((state = 'released' AND release_actor IS NOT NULL AND release_reason IS NOT NULL AND released_at IS NOT NULL)
+      OR (state != 'released' AND release_actor IS NULL AND release_reason IS NULL AND released_at IS NULL))
+);
+
+CREATE TABLE ec_auto_line_product_identities (
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  product_id TEXT NOT NULL,
+  canonical_product_id TEXT NOT NULL,
+  evidence_ref TEXT NOT NULL,
+  verified_at TEXT NOT NULL,
+  revoked_at TEXT,
+  PRIMARY KEY (tenant_id, account_id, product_id)
 );
 
 CREATE TABLE ec_auto_line_rule_events (
@@ -9756,6 +9822,12 @@ CREATE UNIQUE INDEX ec_auto_line_attribution_order ON ec_auto_line_attribution_e
 
 CREATE INDEX ec_auto_line_attribution_send ON ec_auto_line_attribution_events(send_id,kind,occurred_at);
 
+CREATE UNIQUE INDEX ec_auto_line_cap_one_per_day
+  ON ec_auto_line_cap_reservations(tenant_id, user_id, mode, day_jst) WHERE state != 'released';
+
+CREATE INDEX ec_auto_line_cap_rolling
+  ON ec_auto_line_cap_reservations(tenant_id, user_id, mode, reserved_at, canonical_product_id) WHERE state != 'released';
+
 CREATE INDEX ec_auto_line_sends_caps ON ec_auto_line_sends(account_id,friend_id,sent_at,product_id);
 
 CREATE INDEX ec_auto_line_sends_due ON ec_auto_line_sends(status,scheduled_at);
@@ -10211,6 +10283,9 @@ CREATE INDEX idx_bookings_v298_friend_starts
 
 CREATE INDEX idx_bookings_v298_staff_overlap
   ON bookings(staff_id, status, starts_at, block_ends_at);
+
+CREATE INDEX idx_broadcast_ab_live_recipients_pending
+  ON broadcast_ab_live_recipients(broadcast_id,variant_key,state);
 
 CREATE INDEX idx_broadcast_after_action_runs_due
   ON broadcast_after_action_runs (status, updated_at);
@@ -12552,6 +12627,150 @@ CREATE TRIGGER fixed_name_value_update AFTER UPDATE OF value ON friend_field_val
 WHEN NEW.field_id = 'fixed-name'
 BEGIN   UPDATE friends SET real_name = NEW.value, updated_at = NEW.updated_at
   WHERE id = NEW.friend_id AND real_name IS NOT NEW.value; END;
+
+CREATE TRIGGER folder_child_delete AFTER DELETE ON folders WHEN OLD.parent_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.parent_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_child_insert AFTER INSERT ON folders WHEN NEW.parent_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.parent_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_child_update AFTER UPDATE OF parent_id,account_id,kind ON folders WHEN OLD.parent_id IS NOT NEW.parent_id OR OLD.account_id IS NOT NEW.account_id OR OLD.kind IS NOT NEW.kind BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.parent_id OR id=NEW.parent_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_affiliate_offers_delete AFTER DELETE ON affiliate_offers WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_affiliate_offers_insert AFTER INSERT ON affiliate_offers WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_affiliate_offers_update AFTER UPDATE OF folder_id,line_account_id ON affiliate_offers WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_affiliates_delete AFTER DELETE ON affiliates WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_affiliates_insert AFTER INSERT ON affiliates WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_affiliates_update AFTER UPDATE OF folder_id,line_account_id ON affiliates WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_auto_replies_delete AFTER DELETE ON auto_replies WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_auto_replies_insert AFTER INSERT ON auto_replies WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_auto_replies_update AFTER UPDATE OF folder_id,line_account_id,deleted_at ON auto_replies WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id OR (OLD.deleted_at IS NULL) IS NOT (NEW.deleted_at IS NULL) BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_automation_definitions_delete AFTER DELETE ON automation_definitions WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_automation_definitions_insert AFTER INSERT ON automation_definitions WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_automation_definitions_update AFTER UPDATE OF folder_id,line_account_id,status ON automation_definitions WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id OR (OLD.status <> 'archived') IS NOT (NEW.status <> 'archived') BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_broadcasts_delete AFTER DELETE ON broadcasts WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_broadcasts_insert AFTER INSERT ON broadcasts WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_broadcasts_update AFTER UPDATE OF folder_id,line_account_id ON broadcasts WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_common_actions_delete AFTER DELETE ON common_actions WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_common_actions_insert AFTER INSERT ON common_actions WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_common_actions_update AFTER UPDATE OF folder_id,line_account_id,status ON common_actions WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id OR (OLD.status <> 'archived') IS NOT (NEW.status <> 'archived') BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_common_vars_delete AFTER DELETE ON common_vars WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_common_vars_insert AFTER INSERT ON common_vars WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_common_vars_update AFTER UPDATE OF folder_id,line_account_id,archived_at ON common_vars WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id OR (OLD.archived_at IS NULL) IS NOT (NEW.archived_at IS NULL) BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_conversion_points_delete AFTER DELETE ON conversion_points WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_conversion_points_insert AFTER INSERT ON conversion_points WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_conversion_points_update AFTER UPDATE OF folder_id,line_account_id ON conversion_points WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_forms_delete AFTER DELETE ON forms WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_forms_insert AFTER INSERT ON forms WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_forms_update AFTER UPDATE OF folder_id,archived_at ON forms WHEN OLD.folder_id IS NOT NEW.folder_id OR (OLD.archived_at IS NULL) IS NOT (NEW.archived_at IS NULL) BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_friend_add_rules_delete AFTER DELETE ON friend_add_rules WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_friend_add_rules_insert AFTER INSERT ON friend_add_rules WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_friend_add_rules_update AFTER UPDATE OF folder_id,line_account_id,archived_at ON friend_add_rules WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id OR (OLD.archived_at IS NULL) IS NOT (NEW.archived_at IS NULL) BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_friend_fields_delete AFTER DELETE ON friend_fields WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_friend_fields_insert AFTER INSERT ON friend_fields WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_friend_fields_update AFTER UPDATE OF folder_id ON friend_fields WHEN OLD.folder_id IS NOT NEW.folder_id BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_incoming_webhooks_delete AFTER DELETE ON incoming_webhooks WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_incoming_webhooks_insert AFTER INSERT ON incoming_webhooks WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_incoming_webhooks_update AFTER UPDATE OF folder_id,line_account_id,deleted_at ON incoming_webhooks WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id OR (OLD.deleted_at IS NULL) IS NOT (NEW.deleted_at IS NULL) BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_media_delete AFTER DELETE ON media WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_media_insert AFTER INSERT ON media WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_media_update AFTER UPDATE OF folder_id,line_account_id ON media WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_mileage_rewards_delete AFTER DELETE ON mileage_rewards WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_mileage_rewards_insert AFTER INSERT ON mileage_rewards WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_mileage_rewards_update AFTER UPDATE OF folder_id,line_account_id,status ON mileage_rewards WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id OR (OLD.status <> 'archived') IS NOT (NEW.status <> 'archived') BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_outgoing_webhooks_delete AFTER DELETE ON outgoing_webhooks WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_outgoing_webhooks_insert AFTER INSERT ON outgoing_webhooks WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_outgoing_webhooks_update AFTER UPDATE OF folder_id,line_account_id,deleted_at ON outgoing_webhooks WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id OR (OLD.deleted_at IS NULL) IS NOT (NEW.deleted_at IS NULL) BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_reminders_delete AFTER DELETE ON reminders WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_reminders_insert AFTER INSERT ON reminders WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_reminders_update AFTER UPDATE OF folder_id,line_account_id,deleted_at ON reminders WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id OR (OLD.deleted_at IS NULL) IS NOT (NEW.deleted_at IS NULL) BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_rich_menu_groups_delete AFTER DELETE ON rich_menu_groups WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_rich_menu_groups_insert AFTER INSERT ON rich_menu_groups WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_rich_menu_groups_update AFTER UPDATE OF folder_id,account_id ON rich_menu_groups WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.account_id IS NOT NEW.account_id BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_scenarios_delete AFTER DELETE ON scenarios WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_scenarios_insert AFTER INSERT ON scenarios WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_scenarios_update AFTER UPDATE OF folder_id,line_account_id ON scenarios WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_tags_delete AFTER DELETE ON tags WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_tags_insert AFTER INSERT ON tags WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_tags_update AFTER UPDATE OF folder_id,line_account_id ON tags WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_templates_delete AFTER DELETE ON templates WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_templates_insert AFTER INSERT ON templates WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_templates_update AFTER UPDATE OF folder_id,line_account_id,deleted_at ON templates WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.line_account_id IS NOT NEW.line_account_id OR (OLD.deleted_at IS NULL) IS NOT (NEW.deleted_at IS NULL) BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_webinars_delete AFTER DELETE ON webinars WHEN OLD.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_webinars_insert AFTER INSERT ON webinars WHEN NEW.folder_id IS NOT NULL BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_membership_webinars_update AFTER UPDATE OF folder_id,account_id,status ON webinars WHEN OLD.folder_id IS NOT NEW.folder_id OR OLD.account_id IS NOT NEW.account_id OR (OLD.status <> 'archived') IS NOT (NEW.status <> 'archived') BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=OLD.folder_id OR id=NEW.folder_id UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_scope_field_delete AFTER DELETE ON friend_field_scopes BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=(SELECT folder_id FROM friend_fields WHERE id=OLD.field_id) UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_scope_field_insert AFTER INSERT ON friend_field_scopes BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=(SELECT folder_id FROM friend_fields WHERE id=NEW.field_id) UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_scope_field_update AFTER UPDATE OF field_id,line_account_id,tenant_id ON friend_field_scopes WHEN OLD.field_id IS NOT NEW.field_id OR OLD.line_account_id IS NOT NEW.line_account_id OR OLD.tenant_id IS NOT NEW.tenant_id BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id IN (SELECT folder_id FROM friend_fields WHERE id=OLD.field_id OR id=NEW.field_id) UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_scope_form_delete AFTER DELETE ON form_accounts BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=(SELECT folder_id FROM forms WHERE id=OLD.form_id) UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_scope_form_insert AFTER INSERT ON form_accounts BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id=(SELECT folder_id FROM forms WHERE id=NEW.form_id) UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
+
+CREATE TRIGGER folder_scope_form_update AFTER UPDATE OF form_id,line_account_id ON form_accounts WHEN OLD.form_id IS NOT NEW.form_id OR OLD.line_account_id IS NOT NEW.line_account_id BEGIN UPDATE folders SET revision=revision+1 WHERE id IN (WITH RECURSIVE ancestors(id,parent_id) AS (SELECT id,parent_id FROM folders WHERE id IN (SELECT folder_id FROM forms WHERE id=OLD.form_id OR id=NEW.form_id) UNION SELECT f.id,f.parent_id FROM folders f JOIN ancestors a ON f.id=a.parent_id) SELECT id FROM ancestors); END;
 
 CREATE TRIGGER folders_friend_add_rename AFTER UPDATE OF name ON folders WHEN NEW.kind='friend_add_rule' AND NEW.name IS NOT OLD.name BEGIN UPDATE friend_add_rules SET folder_name=NEW.name,lock_version=lock_version+1,updated_at=NEW.updated_at WHERE folder_id=NEW.id AND line_account_id=NEW.account_id; END;
 
