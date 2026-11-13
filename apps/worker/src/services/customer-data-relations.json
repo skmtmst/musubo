@@ -3,6 +3,7 @@
   "ai_answer_logs": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[]},
   "booking_groups": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "customer_activity_daily": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
+  "ec_auto_line_cap_reservations": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"ec_auto_line_sends","columns":[{"column":"candidate_id","parentColumn":"id"}]},{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "ec_auto_line_sends": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"ec_behavior_events","columns":[{"column":"trigger_event_id","parentColumn":"id"}]},{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "ec_behavior_events": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "inbox_assignment_logs": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"chats","columns":[{"column":"chat_id","parentColumn":"id"}]}]},
