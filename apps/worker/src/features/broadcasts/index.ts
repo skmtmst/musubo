@@ -4,6 +4,7 @@ export { fetchQuota, releaseQuotaSlot, tryReserveQuotaSlot } from './broadcast-q
 export { MAX_BROADCAST_MESSAGES, addTestLabel, assertMessagePartsResolved, autoTrackMessageParts, buildMessages, combinedMessageContent, hasRecipientVariablesInParts, parseBroadcastMessageParts, renderMessageParts, unsupportedMessageVariables, varyTextMessages } from './broadcast-message-set.js';
 export type { BroadcastMessagePart } from './broadcast-message-set.js';
 export { abAudience, abSettings, abStats, decideAbTests, finishMockRemainder, splitAb, startAbMock } from './broadcast-ab.js';
+export { createAbLiveTransmit, startAbLive } from './broadcast-ab-live.js';
 export { buildMessage, guardScheduledBroadcastQuota, processBroadcastSend, processQueuedBroadcasts, processScheduledBroadcasts } from './broadcast.js';
 export { createBroadcastRetryKey } from './broadcast-retry-key.js';
 export { BROADCAST_DEFINITION_GUARD_SQL, broadcastDefinitionGuardArgs } from './broadcast-definition-guard.js';

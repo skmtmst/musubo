@@ -883,6 +883,24 @@
       "column": "line_account_id"
     }
   },
+  "broadcast_ab_live_recipients": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "broadcast_id",
+      "parent": "broadcasts",
+      "parentColumn": "id"
+    }
+  },
+  "broadcast_ab_live_tests": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "broadcast_id",
+      "parent": "broadcasts",
+      "parentColumn": "id"
+    }
+  },
   "broadcast_after_action_runs": {
     "category": "purge",
     "scope": {
