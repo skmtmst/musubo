@@ -9,6 +9,7 @@ import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapVersion,gapWrite,gapKey} from '../services/gap-common.js';
 import {autoKinds,autoLineRules,ingestBehavior,processAutoLineMock} from '../features/ec-commerce/ec-auto-line/index.js';
 import {getConnectorSecret} from './ec-connector-secret.js';
+import {resolveUnknownAutoLineSimulationCap} from '../features/ec-commerce/ec-auto-line-cap/index.js';
 export const ecAutoLine=new Hono<Env>();
 ecAutoLine.use('/api/ec/auto-line/*',requirePermission('/ec-commerce'));
 ecAutoLine.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'auto_line_unavailable'},e instanceof GapError?e.status:503));
@@ -55,6 +56,22 @@ ecAutoLine.get('/api/ec/auto-line/stats',async c=>{
  const a=await gapAccount(c),r=await c.env.DB.prepare("SELECT count(*) total,count(CASE WHEN status='simulated' THEN 1 END) simulated,count(CASE WHEN status LIKE 'skipped_%' THEN 1 END) skipped FROM ec_auto_line_sends WHERE account_id=?").bind(a).first();return c.json({success:true,data:{...r,sent:0,clicks:null,purchases:null,simulatedResults:await simulationResults(c.env.DB,a),testMode:true}});
 });
 ecAutoLine.post('/api/ec/auto-line/rules/:kind/test',async c=>{gapWrite(c,{admin:true});const a=await gapAccount(c),kind=c.req.param('kind');if(!autoKinds.includes(kind as typeof autoKinds[number]))throw new GapError('invalid_kind');return c.json({success:true,data:{preview:(await autoLineRules(c.env.DB,a)).find(r=>r.kind===kind),sent:false,testMode:true}});});
+
+// Only a verified store administrator can inspect or resolve simulated unknown outcomes.
+ecAutoLine.get('/api/ec/auto-line/cap/unknown',async c=>{
+ gapWrite(c,{admin:true});const a=await gapAccount(c);
+ const items=(await c.env.DB.prepare("SELECT r.id,r.candidate_id candidateId,r.reserved_at reservedAt FROM ec_auto_line_cap_reservations r JOIN line_accounts a ON a.id=r.account_id AND a.tenant_id=r.tenant_id WHERE r.account_id=? AND r.mode='simulation' AND r.state='unknown' ORDER BY r.reserved_at,r.id LIMIT 100").bind(a).all()).results;
+ return c.json({success:true,data:{items,testMode:true}});
+});
+ecAutoLine.post('/api/ec/auto-line/cap/unknown/:id/release',async c=>{
+ gapWrite(c,{admin:true});const a=await gapAccount(c),b=await gapBody(c);
+ if(b.testMode!==true||b.confirmedNotSent!==true||typeof b.reason!=='string'||!b.reason.trim()||b.reason.length>500)throw new GapError('confirmation_required');
+ const account=await c.env.DB.prepare('SELECT tenant_id FROM line_accounts WHERE id=? AND tenant_id IS NOT NULL').bind(a).first<{tenant_id:string}>();
+ if(!account)throw new GapError('not_found',404);
+ const released=await resolveUnknownAutoLineSimulationCap(c.env.DB,account.tenant_id,a,c.req.param('id'),c.get('staff').id,b.reason.trim());
+ if(!released)throw new GapError('not_found',404);
+ return c.json({success:true,data:{released:true,testMode:true}});
+});
 
 ecAutoLine.post('/api/ec/auto-line/simulate',async c=>{
  gapWrite(c,{admin:true});const a=await gapAccount(c),b=await gapBody(c);

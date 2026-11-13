@@ -33,6 +33,8 @@ export type WorkerBindings = {
     DEPLOY_ENV?: string;
     /** 検証環境で明示したときだけランク通知を実送信する。 */
     RANK_NOTICE_STAGING_DELIVERY_ENABLED?: string;
+    /** 明示したときだけ A/B の本送信を始める。既定では止める。 */
+    AB_LIVE_DELIVERY_ENABLED?: string;
     /** 検証環境専用とし、外部送信の停止と対象の識別を必須にする。 */
     STAGING_QA_ENABLED?: string;
     STAGING_QA_OUTBOUND_DISABLED?: string;

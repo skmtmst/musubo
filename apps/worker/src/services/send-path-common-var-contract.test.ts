@@ -48,6 +48,7 @@ const SEND_PATHS: Array<{ file: string; mustCall: string; label: string }> = [
   { file: 'features/ec-commerce/ec-event-processing.ts', mustCall: 'expandSendCommonVars', label: 'ECイベント通知' },
   { file: 'routes/ec-commerce.ts', mustCall: 'expandSendCommonVars', label: 'EC通知のテスト送信' },
   { file: 'services/operator-notification-dispatch.ts', mustCall: 'expandSendCommonVars', label: '運用者向けLINE通知' },
+  { file: 'features/broadcasts/broadcast-ab-live.ts', mustCall: 'resolveSendCommonVars', label: 'A/B本送信の試し' },
 ];
 
 /*

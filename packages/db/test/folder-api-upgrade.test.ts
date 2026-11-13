@@ -71,3 +71,28 @@ it('Webhook の親フォルダ削除は子まで両方の確認版を進める',
  expect(raw.prepare("SELECT confirmation_revision,folder_id FROM outgoing_webhooks WHERE id='out'").get()).toEqual({confirmation_revision:2,folder_id:null});
  expect(raw.prepare("SELECT confirmation_revision,folder_id FROM incoming_webhooks WHERE id='in'").get()).toEqual({confirmation_revision:2,folder_id:null});
 });
+it('フォルダの中身が増減し元に戻っても、古い削除確認は通らない',async()=>{
+ const folder=await createFolder(db,{kind:'affiliate',accountId:'a',name:'確認するフォルダ'});
+ const confirmed=(await getFolderById(db,folder.id))!.revision;
+ const item=await createAffiliateWithRandomCode(db,{tenantId:tenant,lineAccountId:'a',name:'追加',folderId:folder.id});
+ await updateAffiliate(db,item.id,{folder_id:null});
+ expect((await getFolderById(db,folder.id))!.revision).toBeGreaterThan(confirmed);
+ await expect(deleteFolder(db,folder.id,confirmed)).rejects.toThrow('FOLDER_CONFLICT');
+ expect(await getFolderById(db,folder.id)).not.toBeNull();
+});
+it('子フォルダの増減でも古い親フォルダの削除確認は通らない',async()=>{
+ const parent=await createFolder(db,{kind:'affiliate',accountId:'a',name:'親'});
+ const confirmed=(await getFolderById(db,parent.id))!.revision;
+ const child=await createFolder(db,{kind:'affiliate',accountId:'a',name:'子',parentId:parent.id});
+ await deleteFolder(db,child.id);
+ expect((await getFolderById(db,parent.id))!.revision).toBeGreaterThan(confirmed);
+ await expect(deleteFolder(db,parent.id,confirmed)).rejects.toThrow('FOLDER_CONFLICT');
+});
+it('孫フォルダ内の追加は祖先の削除確認も失効させる',async()=>{
+ const parent=await createFolder(db,{kind:'affiliate',accountId:'a',name:'親'});
+ const child=await createFolder(db,{kind:'affiliate',accountId:'a',name:'子',parentId:parent.id});
+ const confirmed=(await getFolderById(db,parent.id))!.revision;
+ await createAffiliateWithRandomCode(db,{tenantId:tenant,lineAccountId:'a',name:'対象',folderId:child.id});
+ expect((await getFolderById(db,parent.id))!.revision).toBeGreaterThan(confirmed);
+ await expect(deleteFolder(db,parent.id,confirmed)).rejects.toThrow('FOLDER_CONFLICT');
+});
