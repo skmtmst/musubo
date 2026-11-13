@@ -3,6 +3,9 @@
 .tabs{padding:var(--space-24) var(--space-24) 0;}
 .content{display:flex;flex-direction:column;min-width:0;gap:var(--space-16);padding:var(--space-24);}
 .heading,.splitRow{display:flex;align-items:center;justify-content:space-between;gap:var(--space-12);min-width:0;}
+/* 見出しは途中で割らない（1152 で「毎週の／営業時間」と割れた）。入りきらない時は右の操作を下の行へ回し、それでも狭ければ末尾を省略する。 */
+.splitRow:has(> h2){flex-wrap:wrap;}
+.splitRow > h2{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .title{margin:0;font-size:var(--text-heading);font-weight:700;line-height:1.5;}
 .content h2,.content h3,.stackLarge h3{margin:0;font-size:var(--hours-card-title-size);font-weight:600;line-height:1.55;}
 .content h2.serviceTitle{font-size:var(--hours-service-title-size);}
