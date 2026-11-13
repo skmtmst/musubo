@@ -5006,16 +5006,6 @@ export const STAFF_MEMBERS = [
   入った記録。設計 `jwVlo` は「気になるもの 1」を札で持つので、
   **失敗した記録を1件混ぜる**。全部成功にすると、その札が撮れない。
 */
-/*
-  本人のパスキー一覧。実口（`apps/worker/src/routes/admin-passkeys-self.ts`）と
-  同じく `{id,createdAt,lastUsedAt}` の配列。既定の頁の器では製品の
-  `Array.isArray` に落ちて「パスキー一覧を読み込めませんでした」になる。
-*/
-export const VISUAL_QA_PASSKEYS = [
-  { id: 'pk-1', createdAt: '2026-08-20T01:02:03.000Z', lastUsedAt: '2026-09-30T10:02:00.000Z' },
-  { id: 'pk-2', createdAt: '2026-09-01T04:05:06.000Z', lastUsedAt: null },
-]
-
 export const LOGIN_AUDIT = [
   { id: 'la-1', adminUserId: 'stf-1', userName: '見本 110', role: 'admin', lineLinked: true, isActive: true, action: 'login', screen: null, ip: '203.0.113.10', connectionSource: '社内', result: 'success', createdAt: '2026-08-25T00:02:00.000Z' },
   { id: 'la-2', adminUserId: 'stf-2', userName: '見本 138', role: 'admin', lineLinked: true, isActive: true, action: 'settings_changed', screen: '機能設定', ip: '203.0.113.11', connectionSource: '社内', result: 'success', createdAt: '2026-08-24T23:41:00.000Z' },

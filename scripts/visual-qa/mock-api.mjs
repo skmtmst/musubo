@@ -37,6 +37,7 @@ import { mockFingerprint } from './mock-fingerprint.mjs'
 import { gap3Respond } from './mock-gap3.mjs'
 import { gap2Respond } from './mock-gap2.mjs'
 import { eventBookingsPage } from './event-bookings-mock.mjs'
+import { VISUAL_QA_PASSKEYS, conversionReportForPeriod } from './mock-small-responses.mjs'
 /** fixtures・補助処理・API形の入力も含む、起動時の指紋。 */
 const FINGERPRINT = mockFingerprint()
 import { readArrayGetPaths } from './api-shapes.mjs'
@@ -108,7 +109,7 @@ import {
   OUTGOING_WEBHOOKS, OUTGOING_WEBHOOK_TEST_RESULT, INCOMING_WEBHOOKS, INCOMING_WEBHOOK_DETAILS, INCOMING_WEBHOOK_UNMATCHED, ENTRY_ROUTES, INFLOW_SUMMARY,
   SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, MEASUREMENT_SITES, AD_PLATFORMS, AD_CONVERSION_LOGS, AD_CONVERSION_LOG_SUMMARY, AD_EVENT_MAPPINGS, TRACKED_LINKS,
   AD_COST_ROWS, AD_COST_PLATFORMS, AD_COST_MANUAL_ENTRIES, AD_CONVERSION_COST,
-  STAFF_MEMBERS, LOGIN_AUDIT, VISUAL_QA_PASSKEYS,
+  STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_OFFER_FOLDERS, MILEAGE_REWARD_FOLDERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
   AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
   OFFER_VERSIONS, OFFER_CAP_STATUS, ATTRIBUTION_DECISION,
@@ -3137,10 +3138,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/restaurant-test/delivery/menu-items') {
     return { success: true, store: DELIVERY_STORE, items: DELIVERY_MENU_ITEMS }
   }
-
   if (method === 'GET' && pathname === '/api/auth/two-factor/policy') return { success: true, data: { required: true, canEdit: true, configured: true, notice: null, registered: 4, total: 6 } }
   if (method === 'GET' && pathname === '/api/auth/two-factor/self') return { success: true, data: { staffId: 'visual-qa-owner', enabledAt: '2026-10-12T03:00:00Z', remaining: 8, total: 8, canEdit: true, configured: true, notice: null } }
-  /* 本人のパスキー一覧。実口と同じ配列で返す。頁の器では製品が読めない。 */
   if (method === 'GET' && pathname === '/api/auth/passkeys/self') return { success: true, data: VISUAL_QA_PASSKEYS }
   if (pathname === '/api/auth/session') {
     /*
@@ -4853,9 +4852,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       return { ...chat, slaDueAt: new Date(Date.now() + minutes[index] * 60000).toISOString(), slaState: minutes[index] < 0 ? 'overdue' : 'soon', assignedBy: index < 2 ? 'auto' : index === 2 ? 'manual' : null }
     })
     let rows = withSla
-    /* 実口（`chats-threads-handlers.ts`）と同じく `status` で絞る。件数の口と行数を合わせるため。 */
-    const chatStatus = query.get('status')
-    if (chatStatus) rows = rows.filter((chat) => chat.status === chatStatus)
+    if (query.get('status')) rows = rows.filter((chat) => chat.status === query.get('status'))
     if (query.get('slaState') === 'overdue') rows = rows.filter((chat) => chat.slaState === 'overdue')
     if (query.get('sort') === 'sla_due') rows = [...rows].sort((a, b) => (a.slaDueAt ? Date.parse(a.slaDueAt) : Infinity) - (b.slaDueAt ? Date.parse(b.slaDueAt) : Infinity)); else if (query.get('sort') === 'latest') rows = [...rows].sort((a, b) => String(b.lastMessageAt ?? '').localeCompare(String(a.lastMessageAt ?? ''))) // latest は未読を先にしない新しい順
     const limit = Number(query.get('limit') ?? 0)
@@ -5783,19 +5780,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
   if (pathname === '/api/conversions/report') {
-    if (query.has('from') || query.has('to')) {
-      /* 実口と同じく、求められた期間をそのまま range に返す（製品が期間照合する）。日ごとも期間内だけにする。 */
-      const from = query.get('from') ?? ''
-      const to = query.get('to') ?? ''
-      return {
-        success: true,
-        data: {
-          ...CONVERSION_DEFINITION_REPORT,
-          range: { from: `${from} 00:00:00`, to: `${to} 23:59:59`, timeZone: 'Asia/Tokyo' },
-          daily: CONVERSION_DEFINITION_REPORT.daily.filter((item) => item.day >= from && item.day <= to),
-        },
-      }
-    }
+    if (query.has('from') || query.has('to')) return conversionReportForPeriod(query, CONVERSION_DEFINITION_REPORT)
     const startDate = query.get('startDate') ?? ''
     const data = startDate >= '2026-08-01'
       ? CONVERSION_REPORT_CURRENT
