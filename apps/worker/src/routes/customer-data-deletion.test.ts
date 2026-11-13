@@ -97,6 +97,14 @@ describe('private data deletion', () => {
     expect((await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env())).status).toBe(200);
     expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
   });
+  it('removes only the selected friend from live broadcast recipients', async () => {
+    sqlite.raw.exec(`INSERT INTO broadcasts(id,title,message_type,message_content,target_type,line_account_id) VALUES('br','Test','text','A','all','a');
+      INSERT INTO broadcast_ab_live_recipients(broadcast_id,friend_id,variant_key) VALUES('br','u','A'),('br','v','B');`);
+    const response = await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env());
+    expect(response.status).toBe(200);
+    expect(sqlite.raw.prepare('SELECT friend_id FROM broadcast_ab_live_recipients').all()).toEqual([{ friend_id: 'v' }]);
+    expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
+  });
   it('顧客データ削除で引き継ぎの移動記録も対象者だけ消す', async () => {
     sqlite.raw.exec(`INSERT INTO account_handovers(id,from_account_id,to_account_id,code,code_expires_at,status,created_at) VALUES('move','a','b','move-code','2030-01-01','completed','now');
       INSERT INTO account_handover_moves(handover_id,friend_id,from_account_id,to_account_id,tenant_id,moved_at) VALUES('move','u','a','b','t','now'),('move','v','a','b','t','now')`);
