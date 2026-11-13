@@ -1210,3 +1210,4 @@
 - [受信箱のテンプレートの差し込みと二重表示を直す](release-log/unreleased/45-kenta-inbox-template-duplicate.md) — 予約の差し込み・スマホの二重表示・送るとこうなるの見本の修正履歴。確認 2026-11-12。
 - [営業時間のカードの見出しを途中で割らない](release-log/unreleased/48-kenta-hours-heading.md) — 1152px の営業時間の見出しの折り返しの修正履歴。確認 2026-11-12。
 - [フォルダの削除確認・A/B の本番記録・EC 自動通知の上限](release-log/unreleased/52-kenta-migrations-port.md) — 旧リポジトリから移した migration 3本の履歴。確認 2026-11-13。
+- [閲覧のみで隠れていた操作を灰色＋理由にそろえる](release-log/unreleased/60-kenta-viewer-gray-buttons.md) — 権限の無い人への見せ方をそろえた履歴。確認 2026-11-14。
