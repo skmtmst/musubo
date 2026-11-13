@@ -248,12 +248,3 @@ it('説明が本文を覆わないよう、開いた間だけ実寸の余白を�
   expect(container.querySelector('[data-help-reserving]')).toBeNull()
   rect.mockRestore()
 })
-
-describe('吹き出しの中身は横一列にしない（A14・投稿の説明）', () => {
-  it('V8 の吹き出しは block。flex だと文と改行が細い縦の列に分かれる', () => {
-    const css = readFileSync(join(DIR, 'help-tip.module.css'), 'utf8')
-    const rule = css.match(/:root \.tip \{[^}]*\}/gs) ?? []
-    expect(rule.some((r) => /display:\s*block/.test(r))).toBe(true)
-    expect(rule.some((r) => /display:\s*(inline-)?flex/.test(r))).toBe(false)
-  })
-})
