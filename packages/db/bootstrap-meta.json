@@ -674,7 +674,8 @@
     "759_first_onboarding_times.sql",
     "760_tenant_purge_delete_guards.sql",
     "761_conversion_approval_revision.sql",
-    "762_restaurant_store_group_member_version.sql"
+    "762_restaurant_store_group_member_version.sql",
+    "765_ec_auto_line_cap.sql"
   ],
-  "migrationCount": 675
+  "migrationCount": 676
 }

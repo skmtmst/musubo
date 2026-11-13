@@ -5010,6 +5010,20 @@
       "column": "account_id"
     }
   },
+  "ec_auto_line_cap_reservations": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "ec_auto_line_product_identities": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
   "ec_auto_line_rule_events": {
     "category": "retain",
     "scope": {
