@@ -97,12 +97,33 @@ describe('private data deletion', () => {
     expect((await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env())).status).toBe(200);
     expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
   });
+  it('removes only the selected friend from live broadcast recipients', async () => {
+    sqlite.raw.exec(`INSERT INTO broadcasts(id,title,message_type,message_content,target_type,line_account_id) VALUES('br','Test','text','A','all','a');
+      INSERT INTO broadcast_ab_live_recipients(broadcast_id,friend_id,variant_key) VALUES('br','u','A'),('br','v','B');`);
+    const response = await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env());
+    expect(response.status).toBe(200);
+    expect(sqlite.raw.prepare('SELECT friend_id FROM broadcast_ab_live_recipients').all()).toEqual([{ friend_id: 'v' }]);
+    expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
+  });
   it('顧客データ削除で引き継ぎの移動記録も対象者だけ消す', async () => {
     sqlite.raw.exec(`INSERT INTO account_handovers(id,from_account_id,to_account_id,code,code_expires_at,status,created_at) VALUES('move','a','b','move-code','2030-01-01','completed','now');
       INSERT INTO account_handover_moves(handover_id,friend_id,from_account_id,to_account_id,tenant_id,moved_at) VALUES('move','u','a','b','t','now'),('move','v','a','b','t','now')`);
     const res = await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env());
     expect(res.status).toBe(200);
     expect(sqlite.raw.prepare('SELECT friend_id FROM account_handover_moves ORDER BY friend_id').all()).toEqual([{ friend_id: 'v' }]);
+  });
+  it('removes the selected friend’s simulated cap reservations before their sends and preserves the other friend', async () => {
+    sqlite.raw.exec("INSERT INTO users(id,tenant_id) VALUES('cap-u','t'),('cap-v','t')");
+    for (const friend of ['u','v']) {
+      sqlite.raw.prepare("INSERT INTO ec_behavior_events(id,account_id,friend_id,type,product_id,product_snapshot_json,occurred_at,received_at,dedupe_key) VALUES(?,'a',?,'cart_add','p','{}','2026-10-16','2026-10-16',?)").run(`ev-${friend}`,friend,`key-${friend}`);
+      sqlite.raw.prepare("INSERT INTO ec_auto_line_sends(id,account_id,rule_kind,friend_id,product_id,trigger_event_id,scheduled_at,original_due_at,messages_snapshot_json) VALUES(?,'a','cart',?,'p',?,'2026-10-16','2026-10-16','[]')").run(`send-${friend}`,friend,`ev-${friend}`);
+      sqlite.raw.prepare("INSERT INTO ec_auto_line_cap_reservations(id,tenant_id,user_id,account_id,friend_id,candidate_id,mode,canonical_product_id,source_product_id,day_jst,reserved_at,state) VALUES(?,'t',?,'a',?,?,'simulation','p','p','2026-10-16','2026-10-16','accepted')").run(`cap-${friend}`,`cap-${friend}`,friend,`send-${friend}`);
+    }
+    const response = await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env());
+    expect(response.status).toBe(200);
+    expect(sqlite.raw.prepare('SELECT id FROM ec_auto_line_cap_reservations').all()).toEqual([{id:'cap-v'}]);
+    expect(sqlite.raw.prepare('SELECT id FROM ec_auto_line_sends').all()).toEqual([{id:'send-v'}]);
+    expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
   });
   it('purges merged restaurant events and consumed QR data while retaining other friends and stamp history', async () => {
     sqlite.raw.exec(`INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES ('org','a','Restaurant','t');
