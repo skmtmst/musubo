@@ -1,0 +1,12 @@
+.head { display: flex; flex-direction: column; gap: var(--tpl-fe-head-gap); min-width: 0; }
+.title { margin: 0; font-size: var(--tpl-fe-title-size); font-weight: 700; line-height: var(--tpl-fe-title-lh); color: var(--color-ink); }
+.note { margin: 0; font-size: var(--tpl-fe-note-size); line-height: var(--tpl-fe-note-lh); color: var(--color-ink-faint); }
+.list { display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap); margin: 0; padding: 0; list-style: none; }
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--tpl-fe-row-gap); min-width: 0; padding: var(--tpl-fe-row-pad); border-radius: var(--radius-control); box-shadow: var(--tpl-fe-ring); background: var(--color-surface-pearl); }
+.rowText { display: flex; flex: 1 1 220px; flex-direction: column; gap: var(--tpl-fe-head-gap); min-width: 0; }
+.rowLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-fe-body-size); font-weight: 600; color: var(--color-ink); }
+.rowDetail { overflow-wrap: anywhere; font-size: var(--tpl-fe-note-size); color: var(--color-ink-secondary); }
+.controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--tpl-fe-row-gap); min-width: 0; }
+.dialogBody { display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap); min-width: 0; }
+.field { display: flex; flex-direction: column; gap: var(--tpl-fe-field-gap); min-width: 0; }
+.fieldLabel { font-size: var(--tpl-fe-body-size); font-weight: 600; color: var(--color-ink); }

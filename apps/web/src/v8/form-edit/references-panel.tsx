@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
-import ListState from '@/components/shared/list-state'
+import ListState, { ListEmptyMessage } from '@/components/shared/list-state'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -21,6 +21,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
 import type { MediaUsageImpact } from '../contents/media-usage-references'
+import styles from './references-panel.module.css'
 
 /*
  * 公開用の参照（layout.references）の編集とプレビュー。
@@ -95,23 +96,23 @@ export default function ReferencesPanel({ readOnly, accountId, layout, reference
   const [storeFlow, setStoreFlow] = useState<{ blockId: string; fields: Record<string, string> } | null>(null)
 
   return (
-    <Card layout="vertical" aria-labelledby="fe-references-title">
-      <div>
-        <h2 id="fe-references-title">公開用の参照</h2>
-        <p>画像には登録メディアの固定版を、本文・見出しには採用した共通情報の項目を対応付けます。公開時にこの版で固定されます。</p>
+    <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-references-title">
+      <div className={styles.head}>
+        <h2 id="fe-references-title" className={styles.title}>公開用の参照</h2>
+        <p className={styles.note}>画像には登録メディアの固定版を、本文・見出しには採用した共通情報の項目を対応付けます。公開時にこの版で固定されます。</p>
       </div>
       {invalid ? <Notice tone="danger">参照の形が正しくありません。保存する前に対応付けを直してください。</Notice> : null}
-      {rows.length === 0 ? <p>対応付けられる表示ブロック（画像・見出し・本文・ボタン）がありません。</p> : null}
-      <ul>
+      {rows.length === 0 ? <ListEmptyMessage>対応付けられる表示ブロック（画像・見出し・本文・ボタン）がありません。</ListEmptyMessage> : null}
+      <ul className={styles.list}>
         {rows.map(({ block, label, reference, state }) => {
           const badge = referenceStatePresentation(state?.state ?? null)
           return (
-            <li key={block.id}>
-              <div>
-                <span>{label}</span>
-                {reference ? <span>{referenceKindText(reference.kind)}：{referenceSummary(reference)}</span> : <span>未設定</span>}
+            <li key={block.id} className={styles.row}>
+              <div className={styles.rowText}>
+                <span className={styles.rowLabel} title={label}>{label}</span>
+                {reference ? <span className={styles.rowDetail}>{referenceKindText(reference.kind)}：{referenceSummary(reference)}</span> : <span className={styles.rowDetail}>未設定</span>}
               </div>
-              <div>
+              <div className={styles.controls}>
                 <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
                 {canEdit ? (reference ? (
                   <Button type="button" onClick={() => onChangeReferences?.(references.filter((row) => row.blockId !== block.id))}>外す</Button>
@@ -193,10 +194,16 @@ function ImageReferenceDialog({ accountId, initialAlt, onClose, onConfirm }: { a
       {versionsError ? <ListState kind="error" title="版を読み込めませんでした" onRetry={() => void loadVersions(picked)} /> : null}
       {!versionsError && !versions ? <p>版を読み込んでいます…</p> : null}
       {versions ? (
-        <>
-          <Select aria-label="固定する版" value={versionNo == null ? '' : String(versionNo)} onChange={(value) => setVersionNo(Number(value))} options={versions.map((version) => ({ value: String(version.versionNo), label: `第${version.versionNo}版${version.isCurrent ? '（最新）' : ''}` }))} />
-          <TextField aria-label="代替テキスト" value={alt} onChange={(event) => setAlt(event.target.value)} />
-        </>
+        <div className={styles.dialogBody}>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>固定する版</span>
+            <Select aria-label="固定する版" value={versionNo == null ? '' : String(versionNo)} onChange={(value) => setVersionNo(Number(value))} options={versions.map((version) => ({ value: String(version.versionNo), label: `第${version.versionNo}版${version.isCurrent ? '（最新）' : ''}` }))} />
+          </div>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>代替テキスト</span>
+            <TextField aria-label="代替テキスト" value={alt} onChange={(event) => setAlt(event.target.value)} />
+          </div>
+        </div>
       ) : null}
     </Dialog>
   )
@@ -244,12 +251,12 @@ function StoreReferenceDialog({ accountId, initial, onClose, onConfirm }: { acco
     >
       {failed ? <ListState kind="error" title="共通情報を読み込めませんでした" onRetry={() => setReloadKey((value) => value + 1)} /> : null}
       {!failed && !variables ? <p>読み込んでいます…</p> : null}
-      {variables ? STORE_INFORMATION_FIELDS.map((field) => (
-        <div key={field}>
-          <span>{FIELD_LABEL[field]}</span>
+      {variables ? <div className={styles.dialogBody}>{STORE_INFORMATION_FIELDS.map((field) => (
+        <div key={field} className={styles.field}>
+          <span className={styles.fieldLabel}>{FIELD_LABEL[field]}</span>
           <Select aria-label={FIELD_LABEL[field]} value={fields[field] ?? ''} onChange={(value) => setFields((previous) => ({ ...previous, [field]: value }))} options={[{ value: '', label: '使わない' }, ...variables.map((row) => ({ value: row.varKey, label: `${row.name}（${row.varKey}）` }))]} />
         </div>
-      )) : null}
+      ))}</div> : null}
     </Dialog>
   )
 }
