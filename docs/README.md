@@ -1209,4 +1209,5 @@
 - [登録メディアの名前変更とフォルダ移動を直す](release-log/unreleased/43-masato-media-edit-cors.md) — 保存時の通信エラー修正履歴。確認 2026-11-11。
 - [受信箱のテンプレートの差し込みと二重表示を直す](release-log/unreleased/45-kenta-inbox-template-duplicate.md) — 予約の差し込み・スマホの二重表示・送るとこうなるの見本の修正履歴。確認 2026-11-12。
 - [営業時間のカードの見出しを途中で割らない](release-log/unreleased/48-kenta-hours-heading.md) — 1152px の営業時間の見出しの折り返しの修正履歴。確認 2026-11-12。
+- [フォルダの削除確認・A/B の本番記録・EC 自動通知の上限](release-log/unreleased/52-kenta-migrations-port.md) — 旧リポジトリから移した migration 3本の履歴。確認 2026-11-13。
 - [予約の取り消しで確認時の版を照らす](release-log/unreleased/53-kenta-booking-cancel-version.md) — 古い確認のまま取り消さない修正履歴。確認 2026-11-13。
