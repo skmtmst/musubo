@@ -261,7 +261,7 @@ export type {
   HqBannerFolder,
 } from './types/hq-content.js';
 export type {
-  GettingStartedStep,
+  GettingStartedStep, GettingStartedFirstRun,
   DashboardActivityItem,
 } from './types/dashboard.js';
 export type {
