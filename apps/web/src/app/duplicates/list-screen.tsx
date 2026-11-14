@@ -81,18 +81,18 @@ export default function DuplicatesV8() {
 
       {/* 数の帯：4つのマス。取れない数は「—」と短い理由（SXCb3）。1152 は `G9C4Uw`。 */}
       <KpiBand data-design-node="G9C4Uw">
-        <KpiCard presentation="band" icon={null} title="重複候補" value={null}
-          valueText={d.duplicateTotalText.replace(/組$/u, '')} valueTextWithUnit unit="組" detail={kpiCandidateDetail} />
-        <KpiCard presentation="band" icon={null} title="確認済み" value={d.statusCounts !== null ? d.statusCounts.linked ?? 0 : null} unit="組"
+        <KpiCard presentation="band" icon={null} loading={d.loading} title="重複候補" value={null}
+          valueText={d.duplicateTotalText.replace(/組$/u, '')} valueTextWithUnit unit="組" detail={d.loading && d.statusCounts === null ? '' : kpiCandidateDetail} />
+        <KpiCard presentation="band" icon={null} loading={d.loading} title="確認済み" value={d.statusCounts !== null ? d.statusCounts.linked ?? 0 : null} unit="組"
           help="統合ユーザーに紐付け済みの組数です" helpDisplay="question"
-          detail={d.statusCounts !== null ? '統合ユーザーに紐付け済みの組数です' : '読み込めませんでした'} />
-        <KpiCard presentation="band" icon={null} title="重複配信の削減" value={null} unit=""
+          detail={d.statusCounts !== null ? '統合ユーザーに紐付け済みの組数です' : d.loading ? '' : '読み込めませんでした'} />
+        <KpiCard presentation="band" icon={null} loading={d.loading} title="重複配信の削減" value={null} unit=""
           help="配信前プレビューの実績を接続したあと、重複分を除いた削減の見込みをここに表示します。" helpDisplay="question"
           detail="配信実績の接続を待っています" />
-        <KpiCard presentation="band" icon={null} title="1配信あたりの無駄" value={null}
+        <KpiCard presentation="band" icon={null} loading={d.loading} title="1配信あたりの無駄" value={null}
           valueText={d.data ? `¥${formatNumber(d.data.wastedPerBroadcastYen)}` : '—'} unit=""
           help="重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。" helpDisplay="question"
-          detail={d.data ? `¥${formatNumber(d.data.msgUnitYen)}/通の見積り` : '読み込めませんでした'} />
+          detail={d.data ? `¥${formatNumber(d.data.msgUnitYen)}/通の見積り` : d.loading ? '' : '読み込めませんでした'} />
       </KpiBand>
 
       {/* 集計だけ落ちたときは候補一覧を残し、失敗はこの1行で伝える（R598）。 */}

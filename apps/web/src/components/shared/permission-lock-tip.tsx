@@ -10,6 +10,7 @@ export function usePermissionLockTip<T extends HTMLElement>(reason: string | nul
   const ref = useRef<T | null>(null)
   const frame = useRef(0)
   const [tip, setTip] = useState<{ left: number; top: number; below: boolean } | null>(null)
+  const previousReason = useRef(reason)
   const show = useCallback(() => {
     const element = ref.current
     if (!element || !reason) return
@@ -21,7 +22,12 @@ export function usePermissionLockTip<T extends HTMLElement>(reason: string | nul
     setTip({ left: Math.max(edge, Math.min(rect.left, window.innerWidth - width - edge)), top: below ? rect.bottom + gap : rect.top - gap, below })
   }, [reason])
   const hide = useCallback(() => setTip(null), [])
-  useEffect(() => { cancelAnimationFrame(frame.current); hide() }, [reason, hide])
+  useEffect(() => {
+    if (previousReason.current === reason) return
+    previousReason.current = reason
+    cancelAnimationFrame(frame.current)
+    hide()
+  }, [reason, hide])
   useEffect(() => {
     if (!reason) return
     const escape = (event: globalThis.KeyboardEvent) => { if (event.key === 'Escape') { cancelAnimationFrame(frame.current); hide() } }

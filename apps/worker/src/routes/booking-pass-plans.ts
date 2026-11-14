@@ -8,8 +8,9 @@ export const bookingPassPlans=new Hono<Env>();
 bookingPassPlans.use('/api/booking/admin/pass-plans*',requirePermission('/booking/bookings'));
 bookingPassPlans.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'pass_plans_unavailable'},e instanceof GapError?e.status:503));
 bookingPassPlans.get('/api/booking/admin/pass-plans',async c=>{
- const a=await gapAccount(c),q=c.req.query('q')??'',status=c.req.query('status')??'',offset=parseOffsetPaging({ offset: c.req.query('offset') }, { offsetPolicy: {} }).offset,limit=parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, limitPolicy: {} }).limit;if(!Number.isSafeInteger(offset)||offset<0||![10,20,50].includes(limit)||q.length>100)throw new GapError('invalid_pagination');
- const where="line_account_id=? AND (?='' OR status=?) AND instr(lower(name),lower(?))>0",binds=[a,status,status,q];
+ const a=await gapAccount(c),q=c.req.query('q')??'',status=c.req.query('status')??'',kind=c.req.query('kind')??'',offset=parseOffsetPaging({ offset: c.req.query('offset') }, { offsetPolicy: {} }).offset,limit=parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, limitPolicy: {} }).limit;if(!Number.isSafeInteger(offset)||offset<0||![10,20,50].includes(limit)||q.length>100)throw new GapError('invalid_pagination');
+ if(kind!==''&&kind!=='ticket'&&kind!=='monthly')throw new GapError('invalid_kind');
+ const where="line_account_id=? AND (?='' OR status=?) AND (?='' OR kind=?) AND instr(lower(name),lower(?))>0",binds=[a,status,status,kind,kind,q];
  const total=await c.env.DB.prepare(`SELECT count(*) n FROM booking_pass_plans WHERE ${where}`).bind(...binds).first<{n:number}>(),rows=(await c.env.DB.prepare(`SELECT * FROM booking_pass_plans WHERE ${where} ORDER BY created_at DESC,id LIMIT ? OFFSET ?`).bind(...binds,limit,offset).all<Record<string,unknown>>()).results;
  const summary=await c.env.DB.prepare(`SELECT (SELECT count(*) FROM booking_pass_plans WHERE line_account_id=? AND status='on_sale') onSale,count(DISTINCT CASE WHEN status='active' THEN friend_id END) holders,count(CASE WHEN status='active' AND julianday(expires_at)>=julianday('now') AND julianday(expires_at)<=julianday('now','+30 days') THEN 1 END) expiringIn30d FROM booking_entitlements WHERE line_account_id=?`).bind(a,a).first();
  // この購入経路はDB制約も test_mode=1。実課金の失敗は未接続で、0件と断定しない。

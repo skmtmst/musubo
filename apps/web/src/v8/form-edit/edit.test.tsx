@@ -539,6 +539,19 @@ describe('回答フォームの編集（V8）', () => {
     expect(vi.mocked(fetchApi).mock.calls.some(([path]) => String(path).startsWith('/api/forms/form-1?view=published'))).toBe(true)
   })
 
+  it('公開中の参照状態は、公開の窓を開かなくても中身のタブに出る', async () => {
+    const { fetchApi } = await import('@/lib/api')
+    vi.mocked(fetchApi).mockImplementation((async (path: string) => (
+      path.startsWith('/api/forms/form-1?view=published')
+        ? { success: true, data: { id: 'form-1', name: '来店アンケート', layout, references: [{ blockId: 'h1', state: 'ready' }] } }
+        : { success: true, data: [] }
+    )) as typeof fetchApi)
+    await render('id=form-1')
+    const panel = await screen.findByText('公開用の参照')
+    expect(await within(panel.closest('section')!).findByText('使える')).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'この版を公開する' })).toBeNull()
+  })
+
   it('ブロックを足すと、その設定が開いて並びの最後に入る', async () => {
     await render('id=form-1')
     await screen.findByText('ページ1 のブロック')
