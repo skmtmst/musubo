@@ -1257,3 +1257,10 @@ test('閲覧のみは明示保存の印があっても初期メニューの保�
  const response=await app().request('/api/dashboard/style',{method:'PUT',headers:{Authorization:'Bearer viewer-key','Content-Type':'application/json'},body:JSON.stringify({expectedVersion:1,confirmInitialMenu:true,answers:{image:{mode:'configured',value:'simple'}}})},crossSiteEnv());
  expect(response.status).toBe(403);
 });
+
+test('最初の1通の表示記録は閲覧のみでは更新できない', async () => {
+  const response = await app().request('/api/getting-started/first-run-done-seen?account_id=a', {
+    headers: { Authorization: 'Bearer viewer-key' }, method: 'POST',
+  }, crossSiteEnv());
+  expect(response.status).toBe(403);
+});

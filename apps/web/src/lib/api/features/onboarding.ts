@@ -19,6 +19,11 @@ export const onboardingMethods = {
         /** 進捗帯を閉じたか（本人単位）。**完了判定には使わない。** */
         dismissed: boolean
       }>>(`/api/getting-started?${new URLSearchParams({ ...(accountId ? { account_id: accountId } : {}), ...(version ? { version } : {}) })}`),
+    markFirstRunDoneSeen: (accountId: string) =>
+      fetchApi<ApiResponse<{ doneSeenAt: string | null; tracked: boolean }>>(
+        `/api/getting-started/first-run-done-seen?${new URLSearchParams({ account_id: accountId })}`,
+        { method: 'POST' },
+      ),
     /** 進捗帯を閉じる。**閉じた日時は帯を出さないためだけの記憶。** */
     dismiss: () =>
       fetchApi<ApiResponse<{ dismissed: boolean }>>('/api/getting-started/dismiss', {

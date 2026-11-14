@@ -7,7 +7,7 @@ import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { starterApplication } from '../services/style-starter-ensure.js';
-import { firstRunTimes } from '../services/getting-started-first-run.js';
+import { firstRunTimes, jst } from '../services/getting-started-first-run.js';
 import { scenarioIdsStartedBy } from '../services/first-run-funnel.js';
 
 /**
@@ -220,6 +220,21 @@ gettingStarted.post('/api/getting-started/dismiss', requireRole('owner', 'admin'
   } catch (err) {
     throw err;
   }
+});
+
+gettingStarted.post('/api/getting-started/first-run-done-seen', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const staff = c.get('staff');
+  if (!staff?.id) return c.json({ success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401);
+  const accountId = c.req.query('account_id') ?? c.req.query('accountId');
+  if (!accountId) return c.json({ success: false, error: 'Account is required' }, 400);
+  const scope = await getVisibleLineAccountScope(c.env.DB, staff);
+  if (!scope.allowedAccountIds.includes(accountId)) return c.json({ success: false, error: 'Not found' }, 404);
+  await c.env.DB.prepare(`UPDATE account_styles
+    SET first_run_done_seen_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+    WHERE line_account_id = ? AND first_run_done_seen_at IS NULL`).bind(accountId).run();
+  const row = await c.env.DB.prepare('SELECT first_run_done_seen_at AS seen_at FROM account_styles WHERE line_account_id = ?')
+    .bind(accountId).first<{ seen_at: string | null }>();
+  return c.json({ success: true, data: { doneSeenAt: jst(row?.seen_at), tracked: row !== null } });
 });
 
 export { gettingStarted };

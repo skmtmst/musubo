@@ -245,7 +245,7 @@ CREATE TABLE account_styles (
  selected_at TEXT,
 settings_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(settings_json)),
  version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL, updated_by TEXT
-, selection_mode TEXT NOT NULL DEFAULT 'configured' CHECK(selection_mode IN ('configured','later','manual')), metrics_json TEXT CHECK(metrics_json IS NULL OR json_valid(metrics_json)), first_selected_at TEXT, first_starter_at TEXT);
+, selection_mode TEXT NOT NULL DEFAULT 'configured' CHECK(selection_mode IN ('configured','later','manual')), metrics_json TEXT CHECK(metrics_json IS NULL OR json_valid(metrics_json)), first_selected_at TEXT, first_starter_at TEXT, first_run_done_seen_at TEXT);
 
 CREATE TABLE action_score_rule_sets (
   id                           TEXT PRIMARY KEY,
