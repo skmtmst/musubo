@@ -93,6 +93,14 @@
   font-size: var(--text-caption);
 }
 
+/*
+ * 見出しの右に置いた期間の部品で「期間を指定」を選ぶと、日付の入力欄2つが増える。
+ * 縮まない右の口のままだと見出しを押しのけて板の外へ出た（A14・分析の日ごとの増減）。
+ * その時だけ見出しを折り返し、操作を次の行の幅いっぱいに回す。
+ */
+.header:has(> .action [data-period-range]) { flex-wrap: wrap; row-gap: var(--space-3); }
+.action:has([data-period-range]) { flex: 1 1 100%; white-space: normal; }
+
 /* カード頭の行き先リンク（「〇〇へ →」）は文字のリンクの緑。色の口は1つだけ。 */
 .action {
   display: flex;

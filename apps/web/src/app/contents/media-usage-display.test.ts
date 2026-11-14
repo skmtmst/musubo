@@ -19,6 +19,10 @@ describe('登録メディアの使用箇所の言葉づかい', () => {
     expect(mediaUsageKindText('research')).toBe('リサーチ')
   })
 
+  it('回答フォームの使用は種類を判別できないと出さない', () => {
+    expect(mediaUsageKindText('form')).toBe('回答フォーム')
+  })
+
   it('表に無い種別を内部の記号のまま出さない', () => {
     expect(mediaUsageKindText('some_future_kind')).toBe(UNKNOWN_USAGE_KIND)
     expect(mediaUsageKindText('some_future_kind')).not.toContain('some_future_kind')
