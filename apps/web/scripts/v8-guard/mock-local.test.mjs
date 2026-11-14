@@ -19,6 +19,17 @@ test('style summary and existing GET routes still complete', async () => {
   }
 })
 
+test('成果の一覧と集計に必要な模擬データがある', async () => {
+  const range = 'from=2026-09-01&to=2026-10-01&lineAccountId=visual-qa-account'
+  const list = JSON.parse((await mockFetch('GET', `/api/conversions/definitions?${range}&limit=100`)).body)
+  const report = JSON.parse((await mockFetch('GET', `/api/conversions/report?${range}`)).body)
+  assert.equal(list.success, true)
+  assert.ok(list.data.items.length > 0)
+  assert.equal(list.data.pagination.nextCursor, null)
+  assert.equal(report.success, true)
+  assert.ok(Array.isArray(report.data.byDefinition))
+})
+
 
 test('来店フォローの現在の読取応答は編集可能な本文と予約フォームを持つ',async()=>{
  const base='/api/restaurant-test/followups/visual-store?account_id=visual-qa-account'

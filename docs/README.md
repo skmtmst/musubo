@@ -1223,3 +1223,4 @@
 - [トークン期限切れの内訳](release-log/unreleased/64-kenta-token-expiry-breakdown.md) — 接続の問題の内訳を出した履歴。確認 2026-11-14。
 - [選んだ候補の状態を区別して出す](release-log/unreleased/65-kenta-picker-selected-state.md) — 候補を出せない理由を分けた履歴。確認 2026-11-14。
 - [列車 1114](release-log/unreleased/66-kenta-train-1114.md) — 8件をまとめて入れた履歴。確認 2026-11-14。
+- [成果の一覧を画面の崩れの見張りに入れる](release-log/unreleased/49-kenta-conversions-guard.md) — 成果の一覧を画面の崩れの見張りに入れるの履歴。確認 2026-11-13。

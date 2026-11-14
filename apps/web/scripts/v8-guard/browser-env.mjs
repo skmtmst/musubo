@@ -19,6 +19,7 @@ export const ROUTES = {
   'broadcast-schedule': '/broadcasts/new?step=schedule',
   'broadcast-confirm': '/broadcasts/new?step=confirm',
   booking: '/booking/bookings',
+  conversions: '/affiliates?tab=points',
   login: '/login',
   'hq-attention': '/hq/attention',
 }
