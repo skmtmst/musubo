@@ -14,5 +14,7 @@ export function bookingWords(style?: AccountStyle | null) {
     mark: changed ? `${styleTerm(key, 'V16')}の印` : '来店の印',
     planned: changed ? `${styleTerm(key, 'V05')}の予定` : '来店予定',
     history: changed ? `${styleTerm(key, 'V05')}の履歴` : '来店履歴',
+    /* 予約を入れるボタン（TM-V20）。面談・教室は言い換え、ほかは電話で受けた予約を入れる今の言葉。 */
+    create: changed ? styleTerm(key, 'V20') : '電話の予約を入れる',
   }
 }
