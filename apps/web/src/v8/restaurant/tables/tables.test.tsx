@@ -29,6 +29,7 @@ import { ApiError } from '@/lib/api/transport/errors'
 import { at, reservation, snapshotOf as rawSnapshotOf, store, tables } from '../booking-kit/test-data'
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 
 function snapshotOf(over: Record<string, unknown> = {}) {
   const snapshot = rawSnapshotOf(over)
@@ -586,12 +587,20 @@ describe('BERxg 座席・卓管理', () => {
     expect(document.querySelector('[data-design-node="eY9F3"]')).not.toBeNull()
   })
 
-  it('閲覧のみ（staff）には追加・変更・停止を置かない', async () => {
+  it('閲覧のみ（staff）には変更・停止を灰色で出し、押しても編集が開かない', async () => {
     role.value = 'staff'
+    verifiedStaffRole('staff')
     render(<TablesPage />)
     await screen.findByText('卓一覧')
+    // 卓を作るは配置の編集部品の持ち物（今は隠す作りのまま）。
     expect(screen.queryByRole('button', { name: /卓を作る/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /のその他操作$/ })).toBeNull()
+    // 2026-10-26 オーナー：行の操作は隠さず灰色＋理由。
+    fireEvent.click(screen.getByRole('button', { name: 'T1・2人卓のその他操作' }))
+    const items = screen.getAllByRole('menuitem')
+    expect(items.map((item) => item.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('停止')]))
+    for (const item of items) expect(item.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(items[0])
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('移す先は人数が入り重ならない卓のうち、余る席がいちばん少ない卓', () => {
