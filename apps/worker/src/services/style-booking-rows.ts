@@ -6,6 +6,7 @@ function normalized(r: Row): StyleBooking {
   return {
     id: String(r.id),
     version: r.version == null ? null : Number(r.version),
+    ...(r.kind === 'booking' ? { confirmationRevision: r.confirmationRevision == null ? null : Number(r.confirmationRevision) } : {}),
     updatedAt: (r.updatedAt ?? null) as string | null,
     kind: String(r.kind) as StyleBooking['kind'],
     friendId: (r.friendId ?? null) as string | null,
@@ -60,7 +61,7 @@ async function industryRows(
     FROM event_bookings b JOIN event_slots s ON s.id=b.slot_id JOIN events e ON e.id=b.event_id
     JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id WHERE b.line_account_id=?`;
   else
-    sql = `SELECT b.id,b.lock_version version,b.updated_at updatedAt,'booking' kind,b.friend_id friendId,COALESCE(b.friend_id,'customer:'||b.booking_customer_id) personKey,
+    sql = `SELECT b.id,b.lock_version version,b.confirmation_revision confirmationRevision,b.updated_at updatedAt,'booking' kind,b.friend_id friendId,COALESCE(b.friend_id,'customer:'||b.booking_customer_id) personKey,
     COALESCE(f.display_name,c.display_name,'') name,b.starts_at startsAt,b.ends_at endsAt,b.requested_at requestedAt,b.status,b.staff_id staffId,b.menu_id menuId,m.name menuName,
     1 partySize,COALESCE(b.price_at_booking,0) price,
     (b.status='completed' OR EXISTS(SELECT 1 FROM booking_visit_marks v WHERE v.booking_id=b.id AND v.kind IN('visited','late'))) visited,

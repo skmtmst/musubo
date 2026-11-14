@@ -22,11 +22,12 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   const id = c.req.param('id');
-  const b = await c.req.json<{ action: BookingAction; cancellationReason?:'store'|'customer' }>();
+  const b = await c.req.json<{ action: BookingAction; cancellationReason?:'store'|'customer'; expectedConfirmationRevision?: number }>();
+  if (b.expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(b.expectedConfirmationRevision) || b.expectedConfirmationRevision < 1)) return c.json({ error: 'invalid_revision' }, 400);
   if(b.cancellationReason!==undefined&&!['store','customer'].includes(b.cancellationReason))return c.json({error:'invalid_cancellation_reason'},400);
   const row = await c.env.DB
     .prepare(
-      `SELECT id, status, starts_at, friend_id, menu_id, staff_id, decided_at
+      `SELECT id, status, starts_at, friend_id, menu_id, staff_id, decided_at, confirmation_revision
          FROM bookings WHERE id = ? AND line_account_id = ?`,
     )
     .bind(id, accountId)
@@ -38,8 +39,10 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       menu_id: string;
       staff_id: string;
       decided_at: string | null;
+      confirmation_revision: number;
     }>();
   if (!row) return c.json({ error: 'not_found' }, 404);
+  if (b.expectedConfirmationRevision !== undefined && row.confirmation_revision !== b.expectedConfirmationRevision) return c.json({ error: 'version_conflict', reason: '確認した予約が変更されました。読み直してください。', current: { status: row.status, confirmationRevision: row.confirmation_revision } }, 409);
   // 再試行の受付: 取消が投げた直後の再送は、業務が済みでも だけ直す (409 にしない)。
   // Calendar 削除も同じ鍵の台帳で再試行する (ずみなら触らず、一時失敗なら再実行)。
   // 却下ずみの再送も受け付ける (却下は終端のため通常遷移では 409 になる)。
@@ -92,9 +95,9 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     .prepare(
       `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = ?, decided_at = ?, cancellation_reason=COALESCE(?,cancellation_reason),
                             updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE id = ? AND status = ?`,
+        WHERE id = ? AND line_account_id = ? AND status = ? AND (? IS NULL OR confirmation_revision = ?)`,
     )
-    .bind(next, new Date().toISOString(), next==='cancelled'?b.cancellationReason??null:null, id, row.status);
+    .bind(next, new Date().toISOString(), next==='cancelled'?b.cancellationReason??null:null, id, accountId, row.status, b.expectedConfirmationRevision ?? null, b.expectedConfirmationRevision ?? null);
   let updateResult: D1Result;
   try { [updateResult] = await c.env.DB.batch([
     updateStatement, ...(next === 'confirmed' ? [confirmationWorkflowStatement(c.env.DB, id, true)] : []),
@@ -103,6 +106,10 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     throw error;
   }
   if ((updateResult.meta?.changes ?? 0) === 0) {
+    if (b.expectedConfirmationRevision !== undefined) {
+      const current = await c.env.DB.prepare('SELECT status, confirmation_revision AS confirmationRevision FROM bookings WHERE id=? AND line_account_id=?').bind(id, accountId).first();
+      return c.json({ error: 'version_conflict', reason: '確認した予約が変更されました。読み直してください。', current }, 409);
+    }
     return c.json({ error: 'concurrent_update' }, 409);
   }
 

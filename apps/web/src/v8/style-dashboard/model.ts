@@ -50,7 +50,7 @@ export interface StyleRow {
   /** 取り消せる（取消・無断・期限切れでない）予約か。 */
   live?: boolean
   /** 口の予約（版・種類・料金。変える操作に渡す）。 */
-  booking?: { id: string; friendId?: string | null; storeId?: string | null; kind: string; version: number | null; updatedAt: string | null; price: number; partySize: number; startsAt: string; meetingUrl?: string | null }
+  booking?: { id: string; friendId?: string | null; storeId?: string | null; kind: string; version: number | null; confirmationRevision?: number | null; updatedAt: string | null; price: number; partySize: number; startsAt: string; meetingUrl?: string | null }
   actionHref?: string
   /** 教室：予約／定員・待ち・空き。 */
   booked?: number

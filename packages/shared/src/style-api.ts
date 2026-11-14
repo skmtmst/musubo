@@ -50,6 +50,7 @@ export type StyleMetric = {
 export type StyleBooking = {
   id: string;
   version: number | null;
+  confirmationRevision?: number | null;
   updatedAt: string | null;
   kind: 'booking' | 'restaurant' | 'meet' | 'event';
   friendId: string | null;

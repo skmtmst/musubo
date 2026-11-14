@@ -1,6 +1,6 @@
 'use client'
 
-import { tokenExpiryNotice, tokenExpirySummary } from '@/lib/line-account-state'
+import { tokenExpiryNotice, tokenExpirySummary, tokenExpiryBreakdown, tokenExpiryBreakdownText } from '@/lib/line-account-state'
 
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -112,6 +112,7 @@ export default function AccountsV8() {
   const ready = status === 'ready'
   // 未取得（読み込み中・取得失敗）を 0 と出さない。成功した空一覧だけ 0。
   const kpis = ready ? accountKpis(accounts) : null
+  const expiredInProblem = ready ? tokenExpiryBreakdown(accounts).inProblem : 0
   const filterCount = (value: AccountFilter) => (ready ? accounts.filter((a) => matchesFilter(a, value)).length : undefined)
 
   /** このアカウントの接続を、新しく確かめ直す。一覧全体を最新で取り直す。 */
@@ -203,7 +204,7 @@ export default function AccountsV8() {
         <KpiBand data-design="KPIs">
           <KpiCard title="つないでいる" icon={<Cable size={16} aria-hidden="true" />} value={kpis?.connected} unit="アカウント" detail={null} />
           <KpiCard title="有効" icon={<CircleCheck size={16} aria-hidden="true" />} value={kpis?.active} unit="件" detail={null} />
-          <KpiCard title="接続に問題" icon={<TriangleAlert size={16} aria-hidden="true" />} value={kpis?.problem} unit="件" detail={null} valueTone={(kpis?.problem ?? 0) > 0 ? 'warning' : 'default'} />
+          <KpiCard title="接続に問題" icon={<TriangleAlert size={16} aria-hidden="true" />} value={kpis?.problem} unit="件" detail={expiredInProblem > 0 ? `うちトークン期限切れ ${expiredInProblem} 件` : null} valueTone={(kpis?.problem ?? 0) > 0 ? 'warning' : 'default'} />
           <KpiCard title="友だちの合計" icon={<Users size={16} aria-hidden="true" />} value={kpis?.friends} unit="人" detail={null} />
         </KpiBand>
 
@@ -227,7 +228,7 @@ export default function AccountsV8() {
           />
         </div>
 
-        {ready && tokenExpirySummary(accounts) ? <TruncatedText value={tokenExpirySummary(accounts)!} /> : null}
+        {ready && (tokenExpirySummary(accounts) || tokenExpiryBreakdownText(accounts)) ? <Notice tone="warn" compact message={[tokenExpirySummary(accounts), tokenExpiryBreakdownText(accounts)].filter(Boolean).join('・')} /> : null}
         {status === 'loading' ? (
           <ListState kind="loading" />
         ) : status === 'error' ? (

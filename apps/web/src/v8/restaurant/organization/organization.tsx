@@ -2,6 +2,7 @@
 
 
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -162,7 +163,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
           <Panel
             title="店舗管理"
             description="1店舗につき1つのLINE公式アカウントを割り当てます。"
-            aside={readOnly ? null : <Button onClick={() => { setShowStoreForm(true); setEditingStoreId('') }}><Plus aria-hidden className={styles.buttonIcon} />店舗を作る</Button>}
+            aside={<PermissionGatedButton allowed={!readOnly} onClick={() => { setShowStoreForm(true); setEditingStoreId('') }}><Plus aria-hidden className={styles.buttonIcon} />店舗を作る</PermissionGatedButton>}
             flush
           >
             {/* 3行の中身に合わせて伸びる行にし（区切り線は同じ1px）、次の店に重ねない。上下に4pxの空きを付ける。 */}
@@ -214,7 +215,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
           <Panel
             title="アカウント一覧"
             description="この一覧は名簿です。ここでの役割・担当店舗の登録だけではログイン権限は変わりません。"
-            aside={readOnly ? null : <Button variant="primary" onClick={() => { setShowMemberForm(true); setEditingMemberId('') }}><Plus aria-hidden className={styles.buttonIcon} />ユーザーを追加する</Button>}
+            aside={<PermissionGatedButton allowed={!readOnly} variant="primary" onClick={() => { setShowMemberForm(true); setEditingMemberId('') }}><Plus aria-hidden className={styles.buttonIcon} />ユーザーを追加する</PermissionGatedButton>}
             flush
           >
             <GridTable label="アカウント一覧" framed={false} design={{ ...tableDesign, columns: 'minmax(0, 2fr) var(--tpl-rt-col-100) minmax(0, 1fr) minmax(0, 1.5fr) var(--tpl-rt-col-80) var(--tpl-rt-col-130)' }}>

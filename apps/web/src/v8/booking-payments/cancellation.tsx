@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, Plug, Plus } from 'lucide-react'
 import type { BookingCancellationPolicy } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
@@ -197,7 +198,7 @@ export function CancellationSection({ state, connected, testMode, canEdit }: { s
               </Tr>
             </tbody></DataTable>
             <p className={styles.minor}>物差しは「予約の開始の何時間前か」1 つだけです。段の間に空き・重なりがあると保存できません。100% を超える値は入れられません。</p>
-            {canEdit && tiers.length < 3 ? <Button variant="text" textTone="ink" onClick={() => setEditing('new')}><Plus size={16} aria-hidden="true" />段を足す</Button> : null}
+            {tiers.length < 3 ? <PermissionGatedButton allowed={canEdit} variant="text" textTone="ink" onClick={() => setEditing('new')}><Plus size={16} aria-hidden="true" />段を足す</PermissionGatedButton> : null}
           </>
         )}
       <h3 className={styles.subTitle}>カードを登録してもらう条件</h3>
@@ -319,7 +320,7 @@ export function ConnectionCard({ connected, testMode, checkedAt, accountIdTail, 
       </div>
       {connected ? <div className={styles.links}>
         <Button href={dashboardUrl ?? (testMode ? 'https://dashboard.stripe.com/test/payments' : 'https://dashboard.stripe.com/payments')} external>Stripe の管理画面を開く</Button>
-        {canEdit && onReconnect ? <Button onClick={onReconnect}>つなぎ直す</Button> : null}
+        {onReconnect ? <PermissionGatedButton allowed={canEdit} onClick={onReconnect}>つなぎ直す</PermissionGatedButton> : null}
       </div> : null}
       {/* 記録・届いた知らせへの入口（絵 FcGmv に無い。前の右の欄 T91bV から移した＝絵を直す）。 */}
       {connected ? <p className={styles.links}><TextLink href="/booking/menus?tab=payments&view=records">お支払いの記録へ</TextLink><TextLink href="/booking/menus?tab=payments&view=events">Stripe から届いた知らせへ</TextLink></p> : null}

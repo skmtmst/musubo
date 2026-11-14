@@ -24,6 +24,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Notice from '@/components/shared/notice'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
@@ -170,7 +171,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
     const shown = rows.filter(row => (folderFilter === 'all' || (row.folder_id ?? 'none') === folderFilter) && `${row.name} ${row.content_summary ?? ''}`.includes(query.trim()))
     return <SaveErrorScope errors={saveErrors}><ListPage boardId="LRc93" title={`${titleOf(type)}を配る`} help="設定のひな形を保存して各アカウントへ下書きとして配ります。" stats={stats}
       tabs={<Tabs label="配る設定の種類" items={[{id:'template',label:'メッセージなど',onClick:()=>router.push('/hq/templates')},...TYPES.map(item=>({id:item.id,label:item.label,current:item.id===type,onClick:()=>router.push(`/hq/templates?type=${item.id}`)}))]} />}
-      folders={<>{canEdit && <Button variant="primary" className="v8-folder-create w-full" disabled={busy} onClick={create}><Plus size={16} />ひな形を作る</Button>}<FolderPanel rows={folderRows} activeId={folderFilter} onSelect={setFolderFilter} /></>}
+      folders={<><PermissionGatedButton allowed={canEdit} variant="primary" className="v8-folder-create w-full" disabled={busy} onClick={create}><Plus size={16} />ひな形を作る</PermissionGatedButton><FolderPanel rows={folderRows} activeId={folderFilter} onSelect={setFolderFilter} /></>}
       folderNav={{rows:folderRows,activeId:folderFilter,onSelect:setFolderFilter,createAction:canEdit ? <Button variant="primary" onClick={create}>ひな形を作る</Button> : undefined}}
       toolbar={<SearchField aria-label="ひな形を検索" placeholder="ひな形を探す" value={query} onChange={setQuery} />}>
       {notices}
@@ -186,7 +187,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
     onActions={(actions, resources) => { if (canEdit && !busy) setSelected(previous => previous ? { ...previous, definition: replaceHqAutoReplyActions(previous.definition, actions, resources) } : previous) }}
     onSetting={updateSetting} onCancel={back} onSave={() => void save()} /></SaveErrorScope>
   if (view === 'edit' && selected) return <SaveErrorScope errors={saveErrors}><CreatePage dirty={false} busy={busy} boardId="X4JcOf" title={`${titleOf(type)}のひな形を${selected.template.id ? '編集する' : '作る'}`} help="保存した設定は、配布先で下書きとして受け取れます。" notice={notices}
-    footerActions={<><Button disabled={busy} onClick={back}>キャンセル</Button>{canEdit && <Button variant="primary" disabled={busy || !selected.template.name.trim()} title={!selected.template.name.trim() ? '統括での名前を入力してください。' : undefined} onClick={()=>void save()} busy={busy} busyLabel="保存中…">下書きを保存する</Button>}</>}>
+    footerActions={<><Button disabled={busy} onClick={back}>キャンセル</Button><PermissionGatedButton allowed={canEdit} variant="primary" disabled={busy || !selected.template.name.trim()} title={!selected.template.name.trim() ? '統括での名前を入力してください。' : undefined} onClick={()=>void save()} busy={busy} busyLabel="保存中…">下書きを保存する</PermissionGatedButton></>}>
       <div className={styles.fields}>
         <label className={styles.field}>{req('統括での名前', true)}<SaveErrorField names={["name"]}>{canEdit ? <TextField value={selected.template.name} onChange={(event) => setSelected({ ...selected, template: { ...selected.template, name: event.target.value } })} /> : <span>{String(selected.template.name)}</span>}</SaveErrorField></label>
         <label className={styles.field}>{req('説明', false)}<SaveErrorField names={["description"]}>{canEdit ? <TextField value={selected.template.description ?? ''} onChange={(event) => setSelected({ ...selected, template: { ...selected.template, description: event.target.value } })} /> : <span>{String(selected.template.description ?? '')}</span>}</SaveErrorField></label>
@@ -202,7 +203,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
           <label className={styles.field}><span>配信方式</span>{canEdit ? <Select aria-label="配信方式" value={String(settings?.deliveryMode ?? 'time')} options={[{ value: 'time', label: '日時で送る' }, { value: 'countdown', label: '予定日から数えて送る' }]} onChange={(value) => updateSetting('deliveryMode', value)} /> : <span>{settings?.deliveryMode === 'countdown' ? '予定日から数えて送る' : '日時で送る'}</span>}</label>
           {field('sendAtTime', '送る時刻')}
           {(Array.isArray(settings?.steps)?settings.steps:[]).map((raw,index)=>{const step=raw as Record<string,unknown>;return <HqMessageBody key={String(step.stableStepId??index)} label={`${index+1}通目の本文`} value={String(step.messageContent??'')} readOnly={!canEdit} disabled={busy} onChange={messageContent=>updateSetting('steps',(settings?.steps as unknown[]).map((entry,i)=>i===index?{...step,messageContent}:entry))}/>})}
-          {canEdit && <Button disabled={busy} onClick={()=>updateSetting('steps',[...(Array.isArray(settings?.steps)?settings.steps:[]),{stableStepId:crypto.randomUUID(),messageType:'text',messageContent:'',offsetMinutes:-60,offsetDays:null,sendAtTime:null}])}>通知を足す</Button>}</>}
+          <PermissionGatedButton allowed={canEdit} disabled={busy} onClick={()=>updateSetting('steps',[...(Array.isArray(settings?.steps)?settings.steps:[]),{stableStepId:crypto.randomUUID(),messageType:'text',messageContent:'',offsetMinutes:-60,offsetDays:null,sendAtTime:null}])}>通知を足す</PermissionGatedButton></>}
       </div>
   </CreatePage></SaveErrorScope>
   const shownAccounts = accountsInFolder(accounts, accountFolder, accountFolders.membership).filter(account=>account.name.includes(query.trim()))

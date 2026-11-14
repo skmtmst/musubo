@@ -298,14 +298,24 @@ export function useStyleDashboard(style: IndustryStyle) {
     try {
       if (style === 'restaurant' && row.reservationId) await restaurantTestApi.updateReservation(accountId, row.reservationId, { status: 'cancelled', expectedVersion: version(row), cancellationReason: input.reason })
       else {
-        if (row.booking?.version != null) { await styleApi.saveBooking(accountId, bookingId(row), { expectedVersion: row.booking.version, cancellationReason: input.reason }); reasonSaved = true }
-        await bookingApi.decideRequest(accountId, bookingId(row), 'cancel')
+        if (row.booking?.kind === 'booking') {
+          const revision = row.booking.confirmationRevision
+          if (!Number.isSafeInteger(revision) || revision == null || row.booking.version == null) throw new ApiError(409, '予約の版を確認できません。一覧を読み直してください。', 'confirmation_missing')
+          const saved = await styleApi.saveBooking(accountId, bookingId(row), { expectedVersion: row.booking.version, expectedConfirmationRevision: revision, cancellationReason: input.reason })
+          reasonSaved = true
+          const nextRevision = saved.data?.confirmationRevision
+          if (!Number.isSafeInteger(nextRevision) || nextRevision !== revision + 1) throw new ApiError(409, '予約の版を確認できません。一覧を読み直してください。', 'confirmation_missing')
+          await bookingApi.decideRequest(accountId, bookingId(row), 'cancel', nextRevision)
+        } else {
+          if (row.booking?.version != null) { await styleApi.saveBooking(accountId, bookingId(row), { expectedVersion: row.booking.version, cancellationReason: input.reason }); reasonSaved = true }
+          await bookingApi.decideRequest(accountId, bookingId(row), 'cancel')
+        }
       }
       if (cancelScope.current.generation !== generation || cancelTargetRef.current !== cancelTarget) { notifyToast('前に選んだ予約を取り消しました。'); return }
       setCancelRow(null)
       notifyToast('予約を取り消しました。')
       if (input.refund !== 'none' || input.notify) openPayment()
-    } catch (caught) { notifyToast(reasonSaved ? '理由は保存されましたが、取消の結果を確認できません。元のアカウントで予約を確認してください。' : (japaneseDetailOf(caught) || '取り消せませんでした。'), { tone: 'error' }) } finally { if (cancelScope.current.generation === generation) { setBusy(''); void reload() } }
+    } catch (caught) { if (caught instanceof ApiError && caught.status === 409 && cancelScope.current.generation === generation && cancelTargetRef.current === cancelTarget) setCancelRow(null); notifyToast(caught instanceof ApiError && caught.code === 'confirmation_missing' ? '予約の版を確認できません。最新の予約を確認してください。' : caught instanceof ApiError && caught.status === 409 ? (reasonSaved ? '理由の保存後に予約が変更されたため、取消しませんでした。最新の予約を確認してください。' : '確認した予約が変更されました。最新の予約を確認してください。') : reasonSaved ? '理由は保存されましたが、取消の結果を確認できません。元のアカウントで予約を確認してください。' : (japaneseDetailOf(caught) || '取り消せませんでした。'), { tone: 'error' }) } finally { if (cancelScope.current.generation === generation) { setBusy(''); void reload() } }
   }
   /** 面談の結果（検討中・成約・見送り）。予約ごとに持つ（ 追記 4 ⑤）。 */
   const saveResult = async (row: StyleRow, outcome: 'considering' | 'won' | 'lost') => {

@@ -19,6 +19,7 @@ import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd } from '@/components/s
 import KpiBand from '@/components/shared/kpi-band';
 import KpiCard from '@/components/shared/kpi-card';
 import Button, { AccountActionButton } from '@/components/shared/button';
+import PermissionGatedButton from '@/components/shared/permission-gated-button';
 import Avatar from '@/components/shared/avatar';
 import { RowMenu } from '@/components/shared/row-actions';
 import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
@@ -592,7 +593,7 @@ export default function HqHomeV8() {
             options={STATUS_FILTERS.map((item) => ({ value: item.value, label: item.label, count: statusCount(item.value) }))}
           />
           <ListToolbarEnd>
-          {canManage ? <Button type="button" variant="text" onClick={() => void refreshConnectionInfo()} disabled={checkingConnections || accounts.every(isArchived)}>全部を更新</Button> : null}
+          {<PermissionGatedButton allowed={canManage} type="button" variant="text" onClick={() => void refreshConnectionInfo()} disabled={checkingConnections || accounts.every(isArchived)}>全部を更新</PermissionGatedButton>}
           <SaveErrorField names={["view"]}><SegmentedControl<View>
             aria-label="表示の切り替え"
             value={view}

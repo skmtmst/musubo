@@ -22,6 +22,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Card from '@/components/shared/card'
 import { Field } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Pagination from '@/components/shared/pagination'
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import {RowActions} from '@/components/shared/row-actions'
@@ -138,8 +139,8 @@ export default function ListView({ accountStyle = 'standard', view, rows, total,
         ) : null}
 </>} trailingToolbar={<>        <span className={styles.dateSpacer} />
         {view === 'list' && onPageSize ? <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => onPageSize(Number(value))} options={PAGE_SIZE_SELECT_OPTIONS} /> : null}
-        {canImport ? <Button presentation="restaurant" disabled={busy} onClick={onImport}><Inbox size={16} aria-hidden="true" />受信データを試す</Button> : null}
-        {canWrite ? <Button presentation="restaurant" aria-label="手動で予約を作る" disabled={busy} onClick={onCreate}><Plus size={16} aria-hidden="true" />手動予約</Button> : null}
+        {<PermissionGatedButton allowed={canImport} presentation="restaurant" disabled={busy} onClick={onImport}><Inbox size={16} aria-hidden="true" />受信データを試す</PermissionGatedButton>}
+        {<PermissionGatedButton allowed={canWrite} presentation="restaurant" aria-label="手動で予約を作る" disabled={busy} onClick={onCreate}><Plus size={16} aria-hidden="true" />手動予約</PermissionGatedButton>}
       </>} renderBody={body=><DetailColumns asideLayout="detail" variant="restaurant-ledger" asideLabel="予約の詳細を見る" expanded={detailExpanded} onExpandedChange={setDetailExpanded} aside={detail}>
         {tables.length===0 ? <LedgerEmpty noTables canWrite={canWrite} busy={busy} onCreate={onCreate}/> : rows.length===0 ? <LedgerEmpty noTables={false} filtered={status!=='all'||view==='list'&&period!=='all'} canWrite={canWrite} busy={busy} onCreate={onCreate}/> : null}
         {(rows.length===0 && axis!=='month') || axis==='floor' && floorError ? null : body}
