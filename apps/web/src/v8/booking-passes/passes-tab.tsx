@@ -70,27 +70,29 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
   const [holdersOf, setHoldersOf] = useState<BookingPassPlan | null>(null)
   const [noticeOf, setNoticeOf] = useState<BookingPassPlan | null>(null)
   const current = useRef(accountId)
+  const requestSequence = useRef(0)
   const errors = useSaveFormErrors()
   current.current = accountId
 
   const load = useCallback(async () => {
+    const requestId = ++requestSequence.current
     setStatus('loading')
     try {
-      const response = await bookingPassPlansApi.list(accountId, query.trim(), (page - 1) * pageSize, pageSize)
+      const response = await bookingPassPlansApi.list(accountId, query.trim(), (page - 1) * pageSize, pageSize, kind || undefined)
       if (!response.success) throw new Error('plans_failed')
-      if (current.current !== accountId) return
-      const items = response.data.items.filter((plan) => !kind || plan.kind === kind)
+      if (current.current !== accountId || requestSequence.current !== requestId) return
+      const items = response.data.items
       setPlans(items)
       setTotal(response.data.total)
       setSummary(response.data.summary)
       setStatus('ready')
       const counts = await Promise.allSettled(items.map((plan) => bookingPassPlansApi.holders(accountId, plan.id, 0, 10)))
-      if (current.current !== accountId) return
+      if (current.current !== accountId || requestSequence.current !== requestId) return
       const next: Record<string, number> = {}
       counts.forEach((item, index) => { if (item.status === 'fulfilled' && item.value.success) next[items[index].id] = item.value.data.total })
       setHoldersCount(next)
     } catch (reason) {
-      if (current.current !== accountId) return
+      if (current.current !== accountId || requestSequence.current !== requestId) return
       setError(reason)
       setStatus('error')
     }

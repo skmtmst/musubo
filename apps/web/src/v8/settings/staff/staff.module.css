@@ -570,11 +570,15 @@
   max-height: var(--tpl-sa-modal-max-h);
 }
 
-@media (min-width: 1024px) {
-  .scopeGrid {
-    grid-template-columns: minmax(0, 1fr) var(--tpl-sa-scope-side-w);
-  }
+/* 2列は白い板の中に左 480px が取れる時だけ。画面全体の幅で決めると、設定の列がある 1152px で左が約220px になり、かたまりの4択が縦に折り返した（A14）。 */
+.scopeGrid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-16);
 }
+.scopeGrid > :first-child { flex: 999 1 var(--tpl-sa-scope-main-min); min-width: 0; }
+.scopeGrid > :last-child { flex: 1 1 var(--tpl-sa-scope-side-w); min-width: 0; }
 
 .notifyRow {
   display: grid;

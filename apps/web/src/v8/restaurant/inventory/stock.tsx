@@ -179,7 +179,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   const confirmedTables = ctx.tableDefinition && ctx.tableDefinition.accountId === selectedAccountId && ctx.tableDefinition.snapshot === data
     && data.organization && storeId && data.stores.some(item => item.id === storeId)
   const noActiveTablesReason = canEdit && !busy && confirmedTables && activeTables.length === 0
-    ? '有効な卓がありません。座席・卓で卓を有効にしてください。' : undefined
+    ? '有効な卓がありません。座席・卓管理で卓を有効にしてください。' : undefined
 
 
   /* 埋まっている卓：サーバが出した卓（occupiedTableIds）を優先し、無ければ予約台帳の予約から出す。 */

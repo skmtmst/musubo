@@ -5,7 +5,7 @@ import { ListPageStats } from '@/components/templates/list-page'
 
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from '@/components/shared/list-navigation'
+import TextLink from '@/components/shared/text-link'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Grid2x2, HelpCircle, Send, Square, Users } from 'lucide-react'
 import type { FriendField } from '@line-crm/shared'
@@ -403,7 +403,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
           <p>「結果をもう一度確認」を押すと同じ集計の続きを確認できます。もう一度集計を送り直す必要はありません。</p>
           <span><Button onClick={() => recheckCross()} variant="primary">結果をもう一度確認</Button></span>
         </div>
-        : !crossResult ? <div className={styles.waitBox}><p>{fields.length === 0 && (rowAxis.startsWith('field:') || columnAxis.startsWith('field:')) ? '友だち情報欄の項目がまだありません。' : 'たて・よこの軸と期間を選び、集計を始めてください。'}{fields.length === 0 ? <Link href="/tags/fields/new" className={styles.textLink}>友だち情報の項目を追加</Link> : null}</p></div>
+        : !crossResult ? <div className={styles.waitBox}><p>{fields.length === 0 && (rowAxis.startsWith('field:') || columnAxis.startsWith('field:')) ? '友だち情報欄の項目がまだありません。' : 'たて・よこの軸と期間を選び、集計を始めてください。'}{fields.length === 0 ? <TextLink href="/tags/fields/new" inline>友だち情報の項目を追加</TextLink> : null}</p></div>
         : cells.length === 0 ? <div className={styles.waitBox}><p>{crossResult.state === 'unavailable' ? crossResult.stateReason || '未取得' : 'この条件に該当する人はいません。'}</p></div>
         : <div className={styles.routesSplit}>
           <section className={styles.funnelFlow} aria-labelledby="cross-table-title">
