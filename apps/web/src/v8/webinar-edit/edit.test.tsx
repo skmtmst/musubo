@@ -1,4 +1,5 @@
 import { getPageAction, querySupplementaryPageAction } from '@/test-utils/page-action'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React, { act } from 'react'
@@ -279,8 +280,10 @@ describe('V8 ウェビナーの編集', () => {
     expect(puts.filter(item => item.path.endsWith('/actions'))).toHaveLength(2)
   })
 
-  it('閲覧のみ（staff）には、押せないボタンを置かない（通知・CTA・コメント演出）', async () => {
+  it('閲覧のみ（staff）には、変える操作を理由なしで押せない形にせず、灰色＋理由で出す（通知・CTA・コメント演出）', async () => {
     roleState.role = 'staff'
+    // 理由の吹き出しは本人の情報から作る。本物の画面と同じく本人の役割も読めるようにする。
+    verifiedStaffRole('staff')
     for (const pane of ['notifications', 'cta', 'comments', 'basic', 'video', 'review']) {
       nav.search = `id=webinar-1&pane=${pane}`
       act(() => { root.unmount() })
@@ -289,7 +292,8 @@ describe('V8 ウェビナーの編集', () => {
       const disabled = buttons().filter((button) => button.disabled && host.contains(button))
       expect(disabled.map((button) => `${pane}:${button.textContent?.trim() || button.getAttribute('aria-label')}`)).toEqual([])
       expect(buttonText('下書きを保存')).toBeUndefined()
-      expect(buttons().some((button) => /テストを送る|条件を足す|保存する|コメントを足す|案内ボタンのカードを足す|この版を公開/.test(button.textContent ?? ''))).toBe(false)
+      // 2026-10-26 オーナー：隠さず灰色＋理由。出ているなら押せない（aria-disabled）。
+      expect(buttons().filter((button) => /テストを送る|条件を足す|保存する|コメントを足す|案内ボタンのカードを足す|この版を公開/.test(button.textContent ?? '')).every((button) => button.getAttribute('aria-disabled') === 'true')).toBe(true)
     }
   })
 

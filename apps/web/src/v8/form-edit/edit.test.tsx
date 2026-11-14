@@ -356,7 +356,8 @@ describe('回答フォームの編集（V8）', () => {
     staffMe.mockResolvedValue({ success: true, data: { role: 'staff' } })
     await render('id=form-1')
     expect(within(host.querySelector('[data-fe-root]') as HTMLElement).getByText('今日のご来店の目的は？')).toBeTruthy()
-    for (const name of ['ページを足す', '公開前に試す（試しのURLを作る）']) expect(screen.queryByRole('button', { name })).toBeNull()
+    // 2026-10-26 オーナー：隠さず灰色＋理由。出ているなら押せない。
+    for (const name of ['ページを足す', '公開前に試す（試しのURLを作る）']) for (const el of screen.queryAllByRole('button', { name })) expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(el)).toBe(true)
     expect(host.querySelector('[data-fe-root] input, [data-fe-root] textarea')).toBeNull()
     fireEvent.click(screen.getByRole('tab', { name: '答え終わったあと' }))
     expect(screen.getByText('「ご回答ありがとうございます」')).toBeTruthy()
