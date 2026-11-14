@@ -752,11 +752,13 @@ export default function Sidebar({
           小さい1行で伝える。全文の「もう一度読み込む」は一覧本体の
           失敗の1枚が使う言葉なので、ここは短い「もう一度」にして
           1画面に同じ読み直しボタンを2つ出さない。
+          帯の箱はメニューの項目と同じ幅にする。左右の余白は nav の
+          padding が持つので、呼び出し側で mx- の余白を足さない。
+          上下の余白は共通の Notice が持つので、mb- も足さない。
         */}
         {(visibilityStatus === 'error' || accountStyle.error) && selectedAccountId && (
           <Notice
             tone="warn"
-            className="mx-3 mb-2"
             action={(
               <SharedButton variant="text" size="inline" data-notice-inline-action
                 type="button"
@@ -770,7 +772,7 @@ export default function Sidebar({
           </Notice>
         )}
         {/* 前に読めたスタイルで出している時の 1 行。本文が同じ 1 行を出す画面（ホーム・予約台帳など）では出さない。 */}
-        {accountStyle.stale && selectedAccountId ? <ShellStaleStyleNotice className="mx-3 mb-2" onRetry={accountStyle.reload} /> : null}
+        {accountStyle.stale && selectedAccountId ? <ShellStaleStyleNotice onRetry={accountStyle.reload} /> : null}
         {/* B-261: 設定の入口は下の歯車。定義と現在地の判定は残す。 */}
         {visibleSections.filter((section) => isHq || section.id !== 'settings').map((section) => {
           /*
