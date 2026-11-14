@@ -8,8 +8,8 @@ vi.mock('../lib/api.js', () => ({ api: { makeupOptions: vi.fn(), useMakeup: vi.f
 const clock = Date.parse('2026-10-20T00:00:00Z');
 const credit = { id: 'mine', status: 'open', expires_at: '2026-11-20T00:00:00Z' } as MakeupCredit;
 const option = { slot_id: 'future', event_id: 'e', name: '人工クラス', starts_at: '2026-10-21T01:00:00Z', ends_at: '2026-10-21T02:00:00Z', full: false, remaining: 1 };
-beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(clock); vi.mocked(api.makeupOptions).mockResolvedValue({ options: [option] }); });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.resetAllMocks(); });
+beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(clock); vi.mocked(api.makeupOptions).mockResolvedValue({ options: [option] }); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.resetAllMocks(); vi.useRealTimers(); });
 
 it.each(['2026-10-19T00:00:00Z', 'invalid'])('期限切れ・不明 (%s) を使える振替として出さない', async (expires_at) => {
   render(<MakeupPicker credit={{ ...credit, expires_at }} onUsed={() => {}} />);
@@ -42,7 +42,7 @@ it('過去・期限外・満席を除き、同じ券の有効な開催回だけ�
 it('表示後に期限を越えたら、古い押し口でも送らない', async () => {
   render(<MakeupPicker credit={credit} onUsed={() => {}} />);
   const submit = await screen.findByRole('button', { name: /に振り替える/ });
-  vi.mocked(Date.now).mockReturnValue(Date.parse(credit.expires_at) + 1);
+  vi.setSystemTime(Date.parse(credit.expires_at) + 1);
   fireEvent.click(submit);
   expect(api.useMakeup).not.toHaveBeenCalled();
 });
@@ -103,4 +103,20 @@ it('空きのない週に、別の週の候補を混ぜない', async () => {
   expect(vi.mocked(api.makeupOptions).mock.calls.length).toBeGreaterThan(calls);
   expect(screen.queryByText('人工クラス')).toBeNull();
   expect(screen.getByRole('button', { name: '振替先を選んでください' }).hasAttribute('disabled')).toBe(true);
+});
+
+it('満席後に選んだ別週の回が再読込時に消えても、別の回を勝手に選ばない', async () => {
+  const selected = { ...option, slot_id: 'selected', name: '選んだ回', starts_at: '2026-11-02T01:00:00Z' };
+  const replacement = { ...option, slot_id: 'replacement', name: '別の回', starts_at: '2026-11-03T01:00:00Z' };
+  vi.mocked(api.makeupOptions).mockResolvedValueOnce({ options: [option] }).mockResolvedValueOnce({ options: [selected] }).mockResolvedValue({ options: [replacement] });
+  vi.mocked(api.useMakeup).mockRejectedValueOnce({ status: 409, body: { error: 'makeup_slot_unavailable' } });
+  const used = vi.fn();
+  render(<MakeupPicker credit={credit} onUsed={used} />);
+  fireEvent.click(await screen.findByRole('button', { name: /に振り替える/ }));
+  const nearby = await screen.findByRole('group', { name: '近い振替先' });
+  fireEvent.click(within(nearby).getByRole('button', { name: /選んだ回/ }));
+  expect(await screen.findByText('別の回')).toBeTruthy();
+  expect(screen.getByRole('button', { name: '振替先を選んでください' }).hasAttribute('disabled')).toBe(true);
+  expect(api.useMakeup).toHaveBeenCalledTimes(1);
+  expect(used).not.toHaveBeenCalled();
 });

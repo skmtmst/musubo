@@ -33,6 +33,24 @@ test('ページを送っても全体件数・順序・店の境界と既存の�
  expect((await gapCall(app(),'/api/booking/admin/pass-plans?account_id=a&limit=7')).status).toBe(400);
  expect(fetch).not.toHaveBeenCalled();
 });
+test('種類で全件を絞ってからページと件数を返し、店の境界と入力を守る',async()=>{
+ const insert=d.raw.prepare(`INSERT INTO booking_pass_plans
+   (id,line_account_id,kind,name,price,count,valid_days,created_by,created_at,idempotency_key,request_json)
+   VALUES (?,?,?,?,20000,CASE WHEN ?='ticket' THEN 5 ELSE NULL END,180,'o','2026-10-23T00:00:00Z',?,'{}')`);
+ for(let i=0;i<24;i++){const id=`plan-${String(i).padStart(2,'0')}`;const kind=i%2?'monthly':'ticket';insert.run(id,'a',kind,'対象の券',kind,id);}
+ insert.run('foreign','b','monthly','対象の券','monthly','foreign');
+ const base='/api/booking/admin/pass-plans?account_id=a&q=対象&kind=monthly&limit=10';
+ const first=await ok(base),second=await ok(`${base}&offset=10`);
+ expect(first.total).toBe(12);expect(second.total).toBe(12);
+ expect(first.items.map((x:{id:string})=>x.id)).toEqual(Array.from({length:10},(_,i)=>`plan-${String(i*2+1).padStart(2,'0')}`));
+ expect(second.items.map((x:{id:string})=>x.id)).toEqual(['plan-21','plan-23']);
+ expect((await ok(`${base}&status=on_sale`)).total).toBe(0);
+ expect((await ok('/api/booking/admin/pass-plans?account_id=a&kind=ticket&limit=10')).total).toBe(12);
+ expect((await ok('/api/booking/admin/pass-plans?account_id=a&limit=10')).total).toBe(24);
+ expect((await gapCall(app(),'/api/booking/admin/pass-plans?account_id=a&kind=other')).status).toBe(400);
+ expect((await gapCall(app(),'/api/booking/admin/pass-plans?account_id=b&kind=monthly')).status).toBe(404);
+ expect(fetch).not.toHaveBeenCalled();
+});
 async function ok(path:string,method='GET',b?:unknown,key='same'){const r=await gapCall(app(),path,method,b,key);const body=await r.json() as any;expect(r.status,JSON.stringify(body)).toBeLessThan(300);return body.data;}
 async function issue(kind='ticket'){
  const p=await ok('/api/booking/admin/pass-plans?account_id=a','POST',kind==='ticket'?plan:{...plan,kind:'monthly',count:null,monthlyLimit:2});
