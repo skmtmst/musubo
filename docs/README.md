@@ -1222,3 +1222,4 @@
 - [予約を入れるボタンの言葉](release-log/unreleased/63-kenta-booking-create-words.md) — 面談・教室の言い換えの履歴。確認 2026-11-14。
 - [トークン期限切れの内訳](release-log/unreleased/64-kenta-token-expiry-breakdown.md) — 接続の問題の内訳を出した履歴。確認 2026-11-14。
 - [選んだ候補の状態を区別して出す](release-log/unreleased/65-kenta-picker-selected-state.md) — 候補を出せない理由を分けた履歴。確認 2026-11-14。
+- [列車 1114](release-log/unreleased/66-kenta-train-1114.md) — 8件をまとめて入れた履歴。確認 2026-11-14。
