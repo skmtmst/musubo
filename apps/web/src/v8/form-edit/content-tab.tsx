@@ -11,6 +11,7 @@ import type { FormRefs } from '@/components/forms/form-refs';
 import type { FormReferenceDefinition, PublicFormReference } from '@line-crm/shared';
 import ReferencesPanel from './references-panel';
 import Button from '@/components/shared/button';
+import PermissionGatedButton from '@/components/shared/permission-gated-button';
 import Toggle from '@/components/shared/toggle';
 import Dialog from '@/components/shared/dialog';
 import { EntityKindField } from '@/components/shared/entity-picker-sources';
@@ -127,10 +128,10 @@ export function ContentTab(props: Props) {
               {index + 1} {s.name}
             </button>
           ))}
-          {props.readOnly ? null : <Button variant="text" onClick={props.onAddPage}>
+          {<PermissionGatedButton allowed={!props.readOnly} variant="text" onClick={props.onAddPage}>
             <Plus size={16} aria-hidden="true" />
             ページを足す
-          </Button>}
+          </PermissionGatedButton>}
         </div>
       </Card>
 

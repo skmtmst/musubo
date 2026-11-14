@@ -1,4 +1,5 @@
 import { getPageAction } from '@/test-utils/page-action'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 // @vitest-environment happy-dom
 /*
  * 運用状態の外側（板 Y4LkX1・I2V65v・OHwbU）を描いて見る。
@@ -31,7 +32,8 @@ const state = vi.hoisted(() => ({
 
 vi.mock('@/contexts/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
-vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner', useStaffIdentity: () => ({ role: 'owner', readOnly: false }) }))
+const roleState = vi.hoisted(() => ({ role: 'owner' as 'owner' | 'viewer' }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => roleState.role, useStaffIdentity: () => ({ role: roleState.role, readOnly: false }) }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => '/emergency',
@@ -153,6 +155,20 @@ describe('運用状態の外側', () => {
     expect(screen.getByRole('button', { name: 'いますぐ確かめる' })).toBeTruthy()
     await openHelp()
     expect(screen.getByText(/9 つの項目を5分ごとに自動で確かめます。/)).toBeTruthy()
+  })
+
+  it('閲覧のみには［いますぐ確かめる］を灰色＋理由で出し、押しても確かめ直さない', async () => {
+    roleState.role = 'viewer'
+    verifiedStaffRole('viewer')
+    try {
+      await renderScreen('health')
+      const run = screen.getByRole('button', { name: 'いますぐ確かめる' })
+      expect(run.getAttribute('aria-disabled')).toBe('true')
+      fireEvent.click(run)
+      expect(screen.queryByText('確認中…')).toBeNull()
+    } finally {
+      roleState.role = 'owner'
+    }
   })
 
   it('緊急コントロールは板 OHwbU。説明は止め方で、オーナーには緊急停止の主ボタンを出す', async () => {

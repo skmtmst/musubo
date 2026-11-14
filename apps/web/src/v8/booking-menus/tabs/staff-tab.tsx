@@ -9,6 +9,7 @@ import { ListChecks, Plus } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Pagination from '@/components/shared/pagination'
@@ -186,7 +187,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         <h2 className={styles.staffHeadTitle}>{`担当スタッフ ${formatNumber(staff.length)} 人`} <HelpTip label="担当スタッフの操作の説明">行の「…」から 勤務とシフト{canEdit ? '・編集・止める' : ''}。名前を押すと勤務とシフトが開きます。カレンダーにつないでいないスタッフは、ほかの予約サービスの予約で枠が埋まらないので、つなぐのをおすすめします。</HelpTip></h2>
         <div className={styles.staffHeadActions}>
           <Button href="/booking/menus/staff"><ListChecks size={16} aria-hidden="true" />担当メニューをまとめて決める</Button>
-          {canEdit ? <Button variant="primary" onClick={() => setEditing(EMPTY_STAFF)}><Plus size={16} aria-hidden="true" />スタッフを登録</Button> : null}
+          {<PermissionGatedButton allowed={canEdit} variant="primary" onClick={() => setEditing(EMPTY_STAFF)}><Plus size={16} aria-hidden="true" />スタッフを登録</PermissionGatedButton>}
         </div>
       </div>
 

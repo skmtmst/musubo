@@ -108,9 +108,9 @@ test('アカウントを替えたら古い返事と通知を新しい画面へ�
   expect(screen.queryByRole('button', { name: '取り消す' })).toBeNull()
 })
 
-test('閲覧のみでは操作と来店印の読み口を出さない', () => {
+test('閲覧のみでは来店印を読みに行かず、操作は灰色で押せない', () => {
   render(<Harness canMark={false} />)
-  expect(screen.queryByRole('button', { name: '来店した' })).toBeNull()
+  for (const el of screen.queryAllByRole('button', { name: '来店した' })) expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(el)).toBe(true)
   expect(screen.queryByRole('button', { name: 'その他の操作' })).toBeNull()
   expect(fixture.getToday).not.toHaveBeenCalled()
 })

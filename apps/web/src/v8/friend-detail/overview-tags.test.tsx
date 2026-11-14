@@ -69,7 +69,7 @@ describe('タグ編集の権限と保存後の対象', () => {
     fireEvent.click(save)
     await act(async () => { pendingConfirm?.() })
     expect(screen.queryByRole('dialog', { name: 'タグを編集' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '＋ 追加' })).toBeNull()
+    for (const el of screen.queryAllByRole('button', { name: '＋ 追加' })) expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(el)).toBe(true)
     expect(fixture.add).not.toHaveBeenCalled()
     expect(fixture.remove).not.toHaveBeenCalled()
   })

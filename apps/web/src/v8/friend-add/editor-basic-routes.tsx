@@ -3,6 +3,7 @@
 import { parseFriendConditionJson } from './editor-model';
 
 import Button from '@/components/shared/button';
+import PermissionGatedButton from '@/components/shared/permission-gated-button';
 import Card,{ CardHeader } from '@/components/shared/card';
 import CheckCard from '@/components/shared/check-card';
 import ConditionBuilder from '@/components/shared/condition-builder';
@@ -86,7 +87,7 @@ export function BasicStep({ rule, setRule, definition, setDefinition, options, c
               <ReadOnlyText id="fa-folder" label="フォルダ" value={rule.folderName || '未分類'} />
             )}</Field></div>
         </SettingsFormRow>
-        {canEdit ? <Button type="button" variant="text" onClick={() => setMemoOpen(true)}>社内メモ</Button> : null}
+        {<PermissionGatedButton allowed={canEdit} type="button" variant="text" onClick={() => setMemoOpen(true)}>社内メモ</PermissionGatedButton>}
       </Card>
       <Dialog open={memoOpen && canEdit} title="社内メモ" dirty={false} onCancel={() => setMemoOpen(false)} >
         <Field label="社内メモ" htmlFor="fa-internal-memo" note="配信の条件には使いません">
@@ -181,7 +182,7 @@ export function RoutesStep({ rule, definition, setDefinition, options, routeUses
         <Notice tone="warn" role="alert">以前の形式の条件が入っているため、今は配信を止めています。下の条件を作り直してください。</Notice>
       ) : null}
       <div className={styles.conditionRow}>
-        {canEdit ? <Button type="button" onClick={() => setConditionOpen(true)}>条件を足す</Button> : null}
+        {<PermissionGatedButton allowed={canEdit} type="button" onClick={() => setConditionOpen(true)}>条件を足す</PermissionGatedButton>}
         {/* 選んだ後の欄（B-175）：欄全体を押すと条件の組み立てを開閉する。右に「変える ›」。 */}
         {canEdit ? (
           <div className={styles.conditionField}>

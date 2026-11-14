@@ -161,15 +161,21 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     expect(document.body.textContent).toContain('見本 18')
   })
 
-  it('閲覧のみには変える操作を置かず、閲覧のみの帯を出す', async () => {
+  it('閲覧のみには変える操作を灰色＋理由で出し、押しても開かない。閲覧のみの帯を出す', async () => {
     role = verifiedStaffRole('staff')
     await act(async () => root.render(<AccountDetailV8 />))
     await settle()
-    expect(buttons('編集する')).toHaveLength(0)
-    expect(buttons('差し替える')).toHaveLength(0)
-    expect(buttons('送受信を止める')).toHaveLength(0)
-    expect(buttons('アーカイブする')).toHaveLength(0)
-    expect(buttons('変える')).toHaveLength(0)
+    // 隠さず灰色＋理由の吹き出し（全画面）。
+    for (const name of ['編集する', '差し替える', '送受信を止める', 'アーカイブする', '変える']) {
+      const found = buttons(name)
+      expect(found.length, name).toBeGreaterThan(0)
+      for (const el of found) expect(el.getAttribute('aria-disabled'), name).toBe('true')
+    }
+    const before = sent.length
+    await click(buttons('送受信を止める')[0])
+    await click(buttons('編集する')[0])
+    expect(sent.length).toBe(before)
+    expect(document.body.textContent).not.toContain('理由を入れてください')
     expect(document.body.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
     // 乗り換えは見るための入口なので残す。
     expect(buttons('乗り換え')).toHaveLength(1)

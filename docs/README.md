@@ -1216,3 +1216,4 @@
 - [予約の取り消しで確認時の版を照らす](release-log/unreleased/53-kenta-booking-cancel-version.md) — 古い確認のまま取り消さない修正履歴。確認 2026-11-13。
 - [時々落ちるカレンダーの試験を安定させる](release-log/unreleased/57-kenta-d15-flaky-tests.md) — 自動の確認の安定化の履歴。確認 2026-11-13。
 - [A/B の結果の取得失敗を知らせる](release-log/unreleased/58-kenta-r4c-ab-result-load.md) — A/B の結果を読めない時の知らせ方の修正履歴。確認 2026-11-14。
+- [閲覧のみで隠れていた操作を灰色＋理由にそろえる](release-log/unreleased/60-kenta-viewer-gray-buttons.md) — 権限の無い人への見せ方をそろえた履歴。確認 2026-11-14。
