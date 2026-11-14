@@ -9,6 +9,7 @@ import type { ReactNode } from 'react'
 import { Plus, Send } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useTestRecipients } from './use-test-recipients'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
@@ -385,7 +386,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
             : <p className={styles.previewEmpty}>{`「${previewRow?.label ?? '通知'}」の本文はまだありません。送るときに決まった文面を使います。`}</p>}
         </LinePreview>
         <div className={form.previewActions}>
-          {readOnly ? null : <Button onClick={() => { setTestResult(''); setTestOpen(true) }} disabled={testRefreshError || testing || saving || testDone || !settings} title={testRefreshError ? '送信済みの結果を読み直してください' : testDone ? 'テスト済みです' : saving ? '保存しています' : !settings ? '通知の設定を読み込んでください' : undefined} busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : 'テストを送る'}</Button>}
+          {<PermissionGatedButton allowed={!readOnly} onClick={() => { setTestResult(''); setTestOpen(true) }} disabled={testRefreshError || testing || saving || testDone || !settings} title={testRefreshError ? '送信済みの結果を読み直してください' : testDone ? 'テスト済みです' : saving ? '保存しています' : !settings ? '通知の設定を読み込んでください' : undefined} busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : 'テストを送る'}</PermissionGatedButton>}
           {ctx.canOpenPublicPage && ctx.publicUrl ? <Button external href={ctx.publicUrl}  >公開ページを見る</Button> : null}
         </div>
         {!ctx.canOpenPublicPage && ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}

@@ -67,9 +67,9 @@ export const broadcastAbApi = {
   saveVariant: (broadcastId: string, key: 'A' | 'B', messages: BroadcastBubble[], expectedVersion: number) =>
     gap2.saveVariant(broadcastId, key, variantText(messages), expectedVersion),
   startMock: gap2.startMock,
-  result: async (broadcastId: string): Promise<Result<AbResult | null>> => {
-    const res = await gap2.result(broadcastId) as Result<Record<string, unknown> | null>
-    if (!res.success || !res.data) return { success: true, data: null }
+  result: async (broadcastId: string): Promise<Result<AbResult>> => {
+    const res = await gap2.result(broadcastId) as { success: boolean; data?: Record<string, unknown> | null }
+    if (res.success !== true || !res.data) throw new Error('ab result failed')
     const raw = res.data as AbApiResult
     const variants = raw.variants ?? []
     return {

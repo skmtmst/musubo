@@ -11,6 +11,7 @@ import { ArrowDownRight, CalendarClock, Flag, LogIn, Plus, RefreshCw, Send, User
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { notifyToast } from '@/components/shared/toast'
@@ -355,7 +356,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
             {canManage ? <Field label="何日以内の通過で数えるか"><SaveErrorField names={["windowDays","selectedFunnel?.windowDays","window_days","selected_funnel?.window_days"]}>{/* 何日以内はファネルの定義。ほかの日数を選ぶと、その日数を入れた「定義を編集」を開き、保存すると新しい版になる。 */}<Select aria-label="何日以内の通過で数えるか" disabled={!selectedFunnel || selectedFunnel.status !== 'active' || !selectedFunnel.currentVersion || editLoading} size="full" onChange={(value) => { if (value !== String(selectedFunnel?.windowDays ?? '')) requestUnsavedAction(() => void startEdit(value)) }} value={String(selectedFunnel?.windowDays ?? '')} options={selectedFunnel ? [...((PERIOD_DAYS as readonly number[]).includes(selectedFunnel.windowDays) ? [] : [{ value: String(selectedFunnel.windowDays), label: `${selectedFunnel.windowDays}日以内` }]), ...PERIOD_DAYS.map((days) => ({ value: String(days), label: `${days}日以内` }))] : [{ value: '', label: '未取得' }]} /></SaveErrorField></Field> : <Field label="何日以内の通過で数えるか"><span>{selectedFunnel ? `${selectedFunnel.windowDays}日以内` : '—'}</span></Field>}
             {run ? <Field label="比較する条件"><SaveErrorField names={["groupKey","group_key"]}><Select id="funnel-group" value={groupKey} onChange={(value) => { setGroupKey(value); setPicked(null) }} aria-label="比較する条件" size="full" options={run.groups.map((group) => ({ value: group.key, label: `${group.label}（入口 ${formatNumber(group.entrants)}人）` }))} /></SaveErrorField></Field> : null}
             <span className={styles.spacer} />
-            {canManage ? <Button variant="secondary" onClick={() => requestUnsavedAction(() => setCreating(true))}><Plus size={16} aria-hidden="true" />ファネルを作る</Button> : null}
+            {<PermissionGatedButton allowed={canManage} variant="secondary" onClick={() => requestUnsavedAction(() => setCreating(true))}><Plus size={16} aria-hidden="true" />ファネルを作る</PermissionGatedButton>}
             <Button variant="secondary" disabled={running} onClick={() => requestUnsavedAction(() => setRunReload((n) => n + 1))}><RefreshCw size={16} aria-hidden="true" />最新の結果をもう一度読む</Button>
           </div>
           <AggregationStatus state={running ? { kind: 'running', startedAt } : runError || run?.state === 'failed' ? { kind: 'failed', reason: runError || run?.stateReason || '集計できませんでした' } : run ? { kind: 'complete', dataAt: run.dataCutoffAt } : { kind: 'empty' }} onRun={() => requestUnsavedAction(() => void runNow())} canRun={canManage} disabled={selectedFunnel?.status !== 'active'} />

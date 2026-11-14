@@ -13,6 +13,21 @@ vi.mock('@/contexts/account-context', () => ({ useOptionalAccount: () => null })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 const forms = (id: string, name: string) => ({ success: true, data: [{ id, name }] })
 
+test('取得済み0件と取得失敗を区別し、別アカウントに持ち越さない', async () => {
+  calls.forms.mockResolvedValueOnce({ success: true, data: [] }).mockRejectedValueOnce(new Error('failure'))
+  const change = vi.fn()
+  const view = render(<EntityRemoteField kind="form" label="回答フォーム" accountId="account-a" value="missing" onChange={change} />)
+  fireEvent.click(screen.getByRole('button', { name: '回答フォーム：変える' }))
+  expect(await screen.findByText('回答フォームは今は選べません')).toBeTruthy()
+  expect(screen.getByText('選び直してください。')).toBeTruthy()
+  view.rerender(<EntityRemoteField kind="form" label="回答フォーム" accountId="account-b" value="missing" onChange={change} />)
+  expect(screen.queryByText('回答フォームは今は選べません')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '回答フォーム：変える' }))
+  expect(await screen.findByText('回答フォームを読み込めませんでした')).toBeTruthy()
+  expect(screen.queryByText('回答フォームは今は選べません')).toBeNull()
+  expect(change).not.toHaveBeenCalled()
+})
+
 test('読み込み失敗では確定できず、再試行後に名前で選んだ同じIDを返す', async () => {
   calls.forms.mockRejectedValueOnce(new Error('読み込み失敗')).mockResolvedValueOnce(forms('form-a', '相談フォーム'))
   const change = vi.fn()

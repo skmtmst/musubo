@@ -6,6 +6,7 @@ import Link from '@/components/shared/list-navigation'
 import { ArrowUpRight, Lock } from 'lucide-react'
 import { BASIC_FRIEND_FIELDS, ageFromBirthday, type FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Checkbox from '@/components/shared/checkbox'
 import DateField, { formatLabel as formatDateLabel } from '@/components/shared/date-field'
 import Select from '@/components/shared/select'
@@ -184,7 +185,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
               ? '情報欄の項目がまだありません。'
               : group === BASIC_GROUP || group === ALL_GROUP ? '表示できる項目がありません。' : 'この分類の項目はまだありません。'}
           </p>
-          {perms.manage && hiddenPersonalCount === 0 ? <Button href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}>項目を作る</Button> : null}
+          {hiddenPersonalCount === 0 ? <PermissionGatedButton allowed={perms.manage} href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}>項目を作る</PermissionGatedButton> : null}
         </div>
       ) : (
         <>

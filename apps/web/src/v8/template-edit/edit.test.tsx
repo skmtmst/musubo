@@ -266,6 +266,33 @@ describe('V8 メッセージを作る・編集', () => {
     expect(screen.getByText('文字数は差し込み記号を含みます。実際の文字数は受け取る人ごとに変わります。')).toBeTruthy()
   })
 
+  it('本文の文字数は絵文字を1文字と数える（Worker と同じ数え方）', async () => {
+    await mount()
+    type(screen.getByLabelText('本文'), '🌿🌿🌿')
+    await flush()
+    expect(screen.getByText('3 / 5,000')).toBeTruthy()
+  })
+
+  it('本文が5,001文字なら保存せず、本文の欄に上限と今の文字数を出す', async () => {
+    await mount()
+    type(screen.getByLabelText('テンプレート名'), '長い本文')
+    type(screen.getByLabelText('本文'), 'あ'.repeat(5001))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await flush()
+    expect(templatesApi.create).not.toHaveBeenCalled()
+    expect(document.getElementById('te-content-error')?.textContent).toBe('本文は5,000文字までです。いまは5,001文字です。')
+  })
+
+  it('絵文字だけで5,000文字ちょうどなら保存できる', async () => {
+    templatesApi.create.mockResolvedValue({ success: true, data: { id: 'template-new' } })
+    await mount()
+    type(screen.getByLabelText('テンプレート名'), '絵文字の本文')
+    type(screen.getByLabelText('本文'), '🌿'.repeat(5000))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await flush()
+    expect(templatesApi.create).toHaveBeenCalledTimes(1)
+  })
+
   it('読んだ版で保存し、成功後の版を次の保存に使う', async () => {
     templatesApi.update
       .mockResolvedValueOnce({ success: true, data: { id: 'template-1', publishedVersion: 3, draftRevision: 3 } })

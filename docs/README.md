@@ -1214,3 +1214,12 @@
 - [見せる範囲とカレンダーのつぶれ](release-log/unreleased/55-kenta-a14-layout.md) — 1152px で左の列がつぶれていた修正の履歴。確認 2026-11-13。
 - [説明の吹き出しと投稿カードの空き](release-log/unreleased/54-kenta-posts-tip-cards.md) — 吹き出しの縦の列と、カードの右の空きの修正履歴。確認 2026-11-13。
 - [予約の取り消しで確認時の版を照らす](release-log/unreleased/53-kenta-booking-cancel-version.md) — 古い確認のまま取り消さない修正履歴。確認 2026-11-13。
+- [時々落ちるカレンダーの試験を安定させる](release-log/unreleased/57-kenta-d15-flaky-tests.md) — 自動の確認の安定化の履歴。確認 2026-11-13。
+- [A/B の結果の取得失敗を知らせる](release-log/unreleased/58-kenta-r4c-ab-result-load.md) — A/B の結果を読めない時の知らせ方の修正履歴。確認 2026-11-14。
+- [閲覧のみで隠れていた操作を灰色＋理由にそろえる](release-log/unreleased/60-kenta-viewer-gray-buttons.md) — 権限の無い人への見せ方をそろえた履歴。確認 2026-11-14。
+- [テンプレートの本文の文字数](release-log/unreleased/61-kenta-template-text-count.md) — 絵文字の数え方と上限超えの修正履歴。確認 2026-11-14。
+- [文書：閲覧のみの操作の読み替え](release-log/unreleased/62-kenta-docs-gray.md) — 決まりの文書の食い違いを直した履歴。確認 2026-11-14。
+- [予約を入れるボタンの言葉](release-log/unreleased/63-kenta-booking-create-words.md) — 面談・教室の言い換えの履歴。確認 2026-11-14。
+- [トークン期限切れの内訳](release-log/unreleased/64-kenta-token-expiry-breakdown.md) — 接続の問題の内訳を出した履歴。確認 2026-11-14。
+- [選んだ候補の状態を区別して出す](release-log/unreleased/65-kenta-picker-selected-state.md) — 候補を出せない理由を分けた履歴。確認 2026-11-14。
+- [列車 1114](release-log/unreleased/66-kenta-train-1114.md) — 8件をまとめて入れた履歴。確認 2026-11-14。

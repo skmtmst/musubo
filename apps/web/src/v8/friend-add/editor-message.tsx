@@ -2,6 +2,7 @@
 
 import type { InsertTokenNames } from '@/components/shared/insert-tokens'
 import Button from '@/components/shared/button';
+import PermissionGatedButton from '@/components/shared/permission-gated-button';
 import Card,{ CardHeader } from '@/components/shared/card';
 import Toggle from '@/components/shared/toggle';
 import { TimeField } from '@/components/shared/date-time-field';
@@ -289,7 +290,7 @@ export function ReturningMessage({ definition, setDefinition, scenarios, canEdit
             )}
           </div>
         ) : null}
-        {mode === 'other' && canEdit ? <Button type="button" variant="text" onClick={() => setMessageOpen(true)}>初回メッセージを確認・変更</Button> : null}
+        {mode === 'other' ? <PermissionGatedButton allowed={canEdit} type="button" variant="text" onClick={() => setMessageOpen(true)}>初回メッセージを確認・変更</PermissionGatedButton> : null}
       </Card>
       {mode !== 'none' ? <Card variant="form" gap="normal" className={styles.card} aria-label="どこから始めるか">
         <CardHeader size="stacked" title={<>どこから始めるか</>} />
