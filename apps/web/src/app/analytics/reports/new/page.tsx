@@ -8,6 +8,7 @@ import EntitySelect from '@/components/shared/entity-select'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Card, { CardHeader } from '@/components/shared/card'
 import { CreatePage } from '@/components/templates'
 import Checkbox from '@/components/shared/checkbox'
@@ -1146,9 +1147,9 @@ function AnalyticsReportFormPage() {
         </>}
         footerActions={<>
         <Button href="/analytics">キャンセル</Button>
-        {/* 閲覧のみには押せない送る・作るボタンを置かない（オーナー決定 2026-10-06）。 */}
-        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { const built = buildReportPayload(options); if (!built.ok) { showValidation(built); return }; if (!selectedAccountId) return; sendOnceScope.current = { accountId: selectedAccountId, generation: scope.current.generation }; setError(''); setSendOnceOpen(true) }}>今すぐ1回だけ送る</Button>}
-        {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={16} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
+        {/* 閲覧のみには隠さず灰色＋理由で出す。 */}
+        {!editing && <PermissionGatedButton allowed={canManage} variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { const built = buildReportPayload(options); if (!built.ok) { showValidation(built); return }; if (!selectedAccountId) return; sendOnceScope.current = { accountId: selectedAccountId, generation: scope.current.generation }; setError(''); setSendOnceOpen(true) }}>今すぐ1回だけ送る</PermissionGatedButton>}
+        {<PermissionGatedButton allowed={canManage} variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={16} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</PermissionGatedButton>}
       </>}
       >
       {!canManage && <Notice tone="info" message="運用担当は内容を確認できます。作成は統括または管理者が行います。" />}

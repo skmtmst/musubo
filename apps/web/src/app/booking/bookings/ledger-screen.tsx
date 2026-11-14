@@ -40,6 +40,7 @@ import { BookingGapSections } from '@/v8/booking-gap/public/booking-gap-sections
 import { SeriesHost } from '@/v8/booking-gap/public/series-host/index'
 
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 
 import ListToolbar from '@/components/shared/list-toolbar'
 
@@ -203,7 +204,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
           { value: 'list', label: '一覧' },
         ]}
       />
-      {canOperate ? <Button variant="primary" size="booking" href="/booking/bookings/new">{words.create === '電話の予約を入れる' ? <Phone size={16} aria-hidden="true" /> : <CalendarPlus size={16} aria-hidden="true" />}{words.create}</Button> : null}
+      {<PermissionGatedButton allowed={canOperate} variant="primary" size="booking" href="/booking/bookings/new">{words.create === '電話の予約を入れる' ? <Phone size={16} aria-hidden="true" /> : <CalendarPlus size={16} aria-hidden="true" />}{words.create}</PermissionGatedButton>}
     </>
   )
   const pageHead = <PageHeading title="予約管理" help={view === 'month' ? '予約を探して、行から詳細を見られます。CSVは今の絞り込みで書き出します。' : undefined} actions={headingActions} />
@@ -477,7 +478,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                   kind="empty"
                   title="まだ予約はありません"
                   description={`予約が入ると、ここに日時と${words.person}が並びます。`}
-                  action={canOperate ? <Button variant="primary" size="booking" href="/booking/bookings/new">{words.create}</Button> : undefined}
+                  action={<PermissionGatedButton allowed={canOperate} variant="primary" size="booking" href="/booking/bookings/new">{words.create}</PermissionGatedButton>}
                 />
               )}
             </div>
