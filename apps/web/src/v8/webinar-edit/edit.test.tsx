@@ -292,7 +292,7 @@ describe('V8 ウェビナーの編集', () => {
       const disabled = buttons().filter((button) => button.disabled && host.contains(button))
       expect(disabled.map((button) => `${pane}:${button.textContent?.trim() || button.getAttribute('aria-label')}`)).toEqual([])
       expect(buttonText('下書きを保存')).toBeUndefined()
-      // 2026-10-26 オーナー：隠さず灰色＋理由。出ているなら押せない（aria-disabled）。
+      // 隠さず灰色＋理由。出ているなら押せない（aria-disabled）。
       expect(buttons().filter((button) => /テストを送る|条件を足す|保存する|コメントを足す|案内ボタンのカードを足す|この版を公開/.test(button.textContent ?? '')).every((button) => button.getAttribute('aria-disabled') === 'true')).toBe(true)
     }
   })

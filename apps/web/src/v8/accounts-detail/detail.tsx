@@ -228,7 +228,7 @@ export default function AccountDetailV8() {
 
   const headActions = (
     <div className={styles.headActions}>
-      {/* 閲覧のみでも隠さず、灰色＋理由の吹き出し（2026-10-26 オーナー・全画面）。押しても Button が止める。 */}
+      {/* 閲覧のみでも隠さず、灰色＋理由の吹き出し。押しても Button が止める。 */}
       <Button type="button" lockedReason={canManage ? undefined : manageLockReason} disabled={!canManage && !manageLockReason} onClick={() => setEditing(true)}>
         <Pencil size={16} aria-hidden="true" />編集する
       </Button>

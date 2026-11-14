@@ -288,7 +288,7 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
     role.current = verifiedStaffRole('staff')
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
-    // 2026-10-26 オーナー：隠さず灰色＋理由の吹き出し（全画面）。出ているものは全部押せない。
+    // 隠さず灰色＋理由の吹き出し（全画面）。出ているものは全部押せない。
     for (const name of ['編集する', '＋ 追加', '変更する', 'シナリオに登録する']) {
       for (const el of links(name)) expect(el.getAttribute('aria-disabled'), name).toBe('true')
     }

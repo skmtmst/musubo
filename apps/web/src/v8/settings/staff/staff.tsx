@@ -1148,7 +1148,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                 trailing={administrator ? (
                   <Button href="/staff/new" variant="primary"><UserPlus size={16} aria-hidden="true" />招待する</Button>
                 ) : (
-                  /* 閲覧のみでも隠さず、灰色＋理由の吹き出し（2026-10-26 オーナー・全画面）。 */
+                  /* 閲覧のみでも隠さず、灰色＋理由の吹き出し。 */
                   <Button variant="primary" lockedReason={inviteLockReason} disabled={!inviteLockReason}><UserPlus size={16} aria-hidden="true" />招待する</Button>
                 )}
               />

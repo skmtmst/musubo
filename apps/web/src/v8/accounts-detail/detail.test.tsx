@@ -165,7 +165,7 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     role = verifiedStaffRole('staff')
     await act(async () => root.render(<AccountDetailV8 />))
     await settle()
-    // 2026-10-26 オーナー：隠さず灰色＋理由の吹き出し（全画面）。
+    // 隠さず灰色＋理由の吹き出し（全画面）。
     for (const name of ['編集する', '差し替える', '送受信を止める', 'アーカイブする', '変える']) {
       const found = buttons(name)
       expect(found.length, name).toBeGreaterThan(0)

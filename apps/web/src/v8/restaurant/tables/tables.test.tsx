@@ -594,7 +594,7 @@ describe('BERxg 座席・卓管理', () => {
     await screen.findByText('卓一覧')
     // 卓を作るは配置の編集部品の持ち物（今は隠す作りのまま）。
     expect(screen.queryByRole('button', { name: /卓を作る/ })).toBeNull()
-    // 2026-10-26 オーナー：行の操作は隠さず灰色＋理由。
+    // 行の操作は隠さず灰色＋理由。
     fireEvent.click(screen.getByRole('button', { name: 'T1・2人卓のその他操作' }))
     const items = screen.getAllByRole('menuitem')
     expect(items.map((item) => item.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('停止')]))

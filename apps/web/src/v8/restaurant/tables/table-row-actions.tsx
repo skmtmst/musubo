@@ -14,7 +14,7 @@ export default function TableRowActions({ table, canEdit, busy, pendingAccount, 
   onResume: (table: RestaurantTable) => void
   onDelete: (table: RestaurantTable) => void
 }) {
-  /* 権限が無い人にも隠さず、灰色＋理由（2026-10-26 オーナー・全画面）。役割が読めるまでは押せないだけ。 */
+  /* 権限が無い人にも隠さず、灰色＋理由。役割が読めるまでは押せないだけ。 */
   const permissionReason = usePermissionLockReason(canEdit)
   const disabledReason = pendingAccount ? '選んだアカウントの一覧を確認してください' : busy ? 'ほかの変更を反映しています' : undefined
   const locked = !canEdit ? permissionReason : pendingAccount ? disabledReason : undefined

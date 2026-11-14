@@ -24,7 +24,7 @@ export default function PeopleVisitActions({ mark, ready, busy, canMark, onMark,
   const [lateOpen, setLateOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const words = bookingWords(usageStyle)
-  /* 権限が無い人にも印（データ）は見せ、操作は隠さず灰色＋理由（2026-10-26 オーナー・全画面）。 */
+  /* 権限が無い人にも印（データ）は見せ、操作は隠さず灰色＋理由。 */
   if (!canMark) return <span className="inline-flex items-center gap-2">
     {mark?.kind === 'visited' || mark?.kind === 'no_show'
       ? <><StatusBadge tone={mark.kind === 'visited' ? 'success' : 'neutral'}>{mark.kind === 'visited' ? words.completed : words.absent}</StatusBadge><PermissionGatedButton allowed={false} variant="text" size="inline">取り消す</PermissionGatedButton></>
