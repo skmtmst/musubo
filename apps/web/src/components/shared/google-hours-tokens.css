@@ -16,6 +16,7 @@
   --hours-weekday-width: 76px;
   --hours-update-background: #f2f5f3;
   --hours-calendar-detail-width: 320px;
+  --hours-calendar-main-min: 420px;
   --hours-service-label-min: 110px;
   --hours-service-hours-min: 150px;
   --hours-time-column-min: 120px;

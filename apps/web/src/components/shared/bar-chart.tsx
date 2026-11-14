@@ -153,6 +153,8 @@ export function BarChart({
   const fraction = (value: number) => (value / scale) / span * 100
   const chartTicks = distribution ? [...barChartTicks(addedTop), ...barChartTicks(removedTop).filter(value => value > 0 && value <= removedTop).map(value => -value)] : ticks
   const step = layout === 'dashboard' && items.length <= 8 ? 1 : labelStep(items.length)
+  // 両端の日付は吹き出しを内側へ寄せる。真ん中そろえのままだと板の外へはみ出す（A14・分析の9月27日）。
+  const tipEdgeCount = Math.max(1, Math.ceil(items.length * 0.15))
   return (
     <div className={styles.chart} data-layout={layout} data-chart-distribution={distribution} style={distribution ? ({ '--chart-zero': `${fraction(removedTop)}%` } as React.CSSProperties) : undefined}>
       {showLegend ? <BarChartLegend items={legend} layout={layout} /> : null}
@@ -179,6 +181,7 @@ export function BarChart({
                 <button
                   type="button"
                   className={styles.dayButton}
+                  data-tip-edge={index < tipEdgeCount ? 'start' : index >= items.length - tipEdgeCount ? 'end' : undefined}
                   aria-pressed={selected}
                   aria-label={name}
                   title={name}
