@@ -153,8 +153,8 @@ export type SummaryCardProps = KpiCardProps
  * 現在のV8の数のカード。画面ごとの形はpresentationとdensityで指定する。
  *
  * 取れないときの出し方（★管理画面 `x63W5x`）。**0 とは別物。**
- * - 読み込み中：`loading` を渡す。数値は骨組み、3段目（`detail`）に
- *   「読み込んでいます」と書く。
+ * - 読み込み中：`loading` を渡す。数値は骨組み、3段目（`detail`）は部品が
+ *   数字を含む補足を出さない（まだ確かでない「0件」を見せない）。言葉は画面が渡す。
  * - 取得失敗：`value`（または `valueText`）を `null` にして「—」を出し、
  *   3段目に「読み込めませんでした」と書く。やり直せるときは `onRetry` も渡す。
  */
@@ -169,7 +169,7 @@ export default function KpiCard({
   unit,
   unitSpacing = 'normal',
   signed = false,
-  detail,
+  detail: detailProp,
   detailLayout,
   description,
   descriptionLabel,
@@ -197,6 +197,9 @@ export default function KpiCard({
   sparkline,
   ...cardProps
 }: KpiCardProps) {
+  // 読み込み中は、数字を含む補足（「0件」など、まだ確かでない数）を出さない。数字の無い補足はそのまま出す
+  // （読み込み中に文字を足さず骨組みだけにする画面があるため、決まった一言には置き換えない）。
+  const detail: ReactNode = loading && /[0-9０-９]/u.test(detailText(detailProp)) ? '' : detailProp
   const valueRef = React.useRef<HTMLButtonElement>(null)
   const classes = [styles.card, className].filter(Boolean).join(' ')
 

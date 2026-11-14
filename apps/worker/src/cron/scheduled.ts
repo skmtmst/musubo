@@ -72,7 +72,7 @@ export async function scheduled(
       {name:'pass notice simulations',run:async()=>{const {processPassNotices}=await import('../features/booking/booking-pass-notices/index.js');await processPassNotices(env.DB,new Date(event.scheduledTime));}},
       {name:'pass billing grace',run:async()=>{const {expirePassGrace}=await import('../features/booking/booking-pass-billing/index.js');await expirePassGrace(env.DB,new Date(event.scheduledTime));}},
       {name:'comparison CSV jobs',run:async()=>{const {processComparisonExports}=await import('../services/store-comparison-export.js');await processComparisonExports(env.DB,new Date(event.scheduledTime));}},
-      {name:'rank notice simulations',run:async()=>{const {processRankNotices}=await import('../services/member-ranks.js');await processRankNotices(env.DB,new Date(event.scheduledTime));}},
+      {name:'rank notice simulations',run:async()=>{if(env.DEPLOY_ENV==='staging'&&env.RANK_NOTICE_STAGING_DELIVERY_ENABLED==='true'){const {processStagingRankNotices}=await import('../services/member-rank-live-notices.js');await processStagingRankNotices(env,new Date());}else{const {processRankNotices}=await import('../services/member-ranks.js');await processRankNotices(env.DB,new Date(event.scheduledTime));}}},
       {name:'EC automatic LINE simulation',run:async()=>{
         const {processAutoLineMock}=await import('../features/ec-commerce/ec-auto-line/index.js');
         await processAutoLineMock(env.DB,new Date(event.scheduledTime));

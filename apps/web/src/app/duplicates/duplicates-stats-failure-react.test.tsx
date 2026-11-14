@@ -233,3 +233,14 @@ describe('集計失敗でも候補一覧を残す（R598）', () => {
 })
 
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
+describe('読み込み中の数の帯', () => {
+  it('集計を読み込んでいる間は「読み込めませんでした」と言わず、4つのマスを読み込み中にする', async () => {
+    fixture.stats.mockReturnValue(new Promise(() => {}))
+    fixture.list.mockReturnValue(new Promise(() => {}))
+    await act(async () => { root.render(<DuplicatesPage />) })
+    const band = host.querySelector('[data-design-node="G9C4Uw"]')!
+    expect(band.textContent).not.toContain('読み込めませんでした')
+    expect(band.querySelectorAll('[aria-busy="true"]').length).toBe(4)
+  })
+})

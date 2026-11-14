@@ -44,8 +44,10 @@
 @media(max-width:1152px){.columns{grid-template-columns:minmax(0,1.8fr) minmax(var(--hours-service-detail-min),1fr);gap:var(--space-16);}.weekRow{grid-template-columns:var(--hours-history-date-width) minmax(0,1fr) auto;gap:var(--space-8);}.serviceRow{grid-template-columns:minmax(var(--hours-history-label-min),1fr) minmax(var(--hours-time-column-min),1.2fr) auto;}.serviceRow>div:nth-child(3){grid-column:1 / 3;}}
 @media(max-width:900px){.columns{grid-template-columns:minmax(0,1fr);}.content{padding:var(--space-16);}.tabs{padding:var(--space-16) var(--space-16) 0;}.context{padding-inline:var(--space-16);}.heading{flex-wrap:wrap;}.updateBar{flex-wrap:wrap;}.compareHead,.compareRow{grid-template-columns:minmax(var(--hours-review-date-min),1fr) minmax(0,1fr) auto minmax(0,1fr);gap:var(--space-8);padding-inline:0;}.todayLine{align-items:flex-start;}.twoFields{gap:var(--space-8);}}
 
-.calendarColumns{display:grid;grid-template-columns:minmax(0,1fr) var(--hours-calendar-detail-width);gap:var(--space-20);align-items:start;font-size:var(--polish-text-body);}
-@media(max-width:1100px){.calendarColumns{grid-template-columns:minmax(0,1fr);}}
+/* 2列はカレンダーに 420px が取れる時だけ（7日分の「通常営業」が重ならない幅）。画面全体の幅で決めると 1152px で約235pxになった（A14）。 */
+.calendarColumns{display:flex;flex-wrap:wrap;gap:var(--space-20);align-items:flex-start;font-size:var(--polish-text-body);}
+.calendarColumns > :first-child{flex:999 1 var(--hours-calendar-main-min);min-width:0;}
+.calendarColumns > :nth-child(2){flex:1 1 var(--hours-calendar-detail-width);min-width:0;}
 
 .rangeSummary{font-size:var(--polish-text-body);font-weight:600;}
 
