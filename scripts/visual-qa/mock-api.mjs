@@ -37,6 +37,7 @@ import { mockFingerprint } from './mock-fingerprint.mjs'
 import { gap3Respond } from './mock-gap3.mjs'
 import { gap2Respond } from './mock-gap2.mjs'
 import { eventBookingsPage } from './event-bookings-mock.mjs'
+import { listedFormResponse, listedCommonVarResponse } from './mock-listed-details.mjs'
 /** fixtures・補助処理・API形の入力も含む、起動時の指紋。 */
 const FINGERPRINT = mockFingerprint()
 import { readArrayGetPaths } from './api-shapes.mjs'
@@ -4302,12 +4303,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 画面が器に `.replace` して白画面になっていた。
    * 本物は文字列か null を返す（`account-settings.ts`）。
    */
-  if (pathname === '/api/account-settings/link-base-url') {
-    return { success: true, data: null }
-  }
-  if (pathname === '/api/account-settings/tracked-link-base-url') {
-    return { success: true, data: null }
-  }
+  if (pathname === '/api/account-settings/link-base-url' || pathname === '/api/account-settings/tracked-link-base-url') return { success: true, data: null }
   // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
   if (method === 'POST' && pathname === '/api/forms/drafts') {
     return { success: true, data: { id: 'form-draft-qa', isActive: false } }
@@ -4359,6 +4355,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* 公開中の版（実口は account_id が無いと公開中の版を返す。編集画面は `?view=published` を付けて読む）。 */
   if (pathname === `/api/forms/${FORM_DETAIL.id}` && query.get('view') === 'published') return { success: true, data: FORM_DETAIL_PUBLISHED }
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
+  const listedForm = listedFormResponse(method, pathname, FORM_LIST.items, FORM_DETAIL); if (listedForm) return listedForm
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
     /*
@@ -5791,6 +5788,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === `/api/common-vars/${COMMON_VAR_DETAIL.id}`) return { success: true, data: COMMON_VAR_DETAIL }
   /* 板 `AYc6O`・`C67dE`・`piWhz`：営業時間の編集（使っている8か所・予定1件・履歴2件）。 */
   if (pathname === `/api/common-vars/${COMMON_VAR_HOURS_DETAIL.id}`) return { success: true, data: COMMON_VAR_HOURS_DETAIL }
+  const listedCommonVar = listedCommonVarResponse(method, pathname, COMMON_VARS, COMMON_VAR_DETAIL); if (listedCommonVar) return listedCommonVar
   const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
   if (commonVarDeleteImpact) {
     const impact = commonVarDeleteImpact[1] === COMMON_VAR_DELETE_IMPACT_EMPTY.variable.id
