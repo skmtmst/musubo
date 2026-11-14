@@ -28,6 +28,8 @@ const transport = vi.hoisted(() => ({
 }))
 const netCalls = vi.hoisted(() => ({ count: 0 }))
 
+// 題の言葉のためのスタイル読み込みは、この試験（メニューの読み直し）の対象外。本物の通信を数えないよう固定する。
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ status: 'ready', data: { style: 'standard' }, error: null, reload: () => {}, stale: false }) }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push, replace }),
   useSearchParams: () => new URLSearchParams(''),

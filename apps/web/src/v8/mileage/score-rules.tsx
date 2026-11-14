@@ -11,6 +11,7 @@ import { Ban, CalendarCheck, Clock3, ClipboardList, EyeOff, MailX, MessageCircle
 import { EC_EVENT_LABELS, EC_EVENT_TYPES } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
@@ -570,7 +571,7 @@ export default function ActionScoreRulesPage() {
                   ))}
                 </div>
               )}
-              {canEdit ? <Button className="mt-3" onClick={addRule}><Plus className="h-4 w-4" aria-hidden="true" />できごとを足す</Button> : null}
+              {<PermissionGatedButton allowed={canEdit} className="mt-3" onClick={addRule}><Plus className="h-4 w-4" aria-hidden="true" />できごとを足す</PermissionGatedButton>}
             </Card>
 
             <Card spacing="normal">
@@ -582,7 +583,7 @@ export default function ActionScoreRulesPage() {
                 <Field label="点の上限" htmlFor="score-max"><SaveErrorField names={["max","bands.max"]}><TextInput id="score-max" type="number" value={bundle.bands.max} readOnly={!canEdit} onChange={(event) => updateBands({ max: Number(event.target.value) })} /></SaveErrorField></Field>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                {canEdit ? <Button onClick={() => void previewBands()} disabled={bandPreviewBusy} busy={bandPreviewBusy} busyLabel="数えています">この分けかただと何人入るか見る</Button> : null}
+                {<PermissionGatedButton allowed={canEdit} onClick={() => void previewBands()} disabled={bandPreviewBusy} busy={bandPreviewBusy} busyLabel="数えています">この分けかただと何人入るか見る</PermissionGatedButton>}
                 {bandPreview ? (
                   <p className="text-xs text-ink-secondary" role="status">
                     高い {formatNumber(bandPreview.counts.high)}人・ふつう {formatNumber(bandPreview.counts.normal)}人・低い {formatNumber(bandPreview.counts.low)}人

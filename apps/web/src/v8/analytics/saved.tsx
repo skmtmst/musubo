@@ -11,6 +11,7 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -325,7 +326,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
         <span className={styles.caption}>決まった曜日や日に、集計結果をメールやLINEへ届けられます。</span>
         <span className={styles.spacer} />
         {schedulesLoading ? <span className={styles.caption}>確認中</span> : null}
-        {canManage ? <Button href="/analytics/reports/new" variant="secondary"><Plus size={16} aria-hidden="true" />定期レポートを作る</Button> : null}
+        {<PermissionGatedButton allowed={canManage} href="/analytics/reports/new" variant="secondary"><Plus size={16} aria-hidden="true" />定期レポートを作る</PermissionGatedButton>}
       </div>
       {schedulesError ? <Notice tone="danger" ><span>{schedulesError}</span>{/* 版ずれの通知は reloadSchedules で消さない。消すのは手でやり直したこの入口だけ。 */}<Button variant="secondary" disabled={schedulesLoading} onClick={() => { setSchedulesError(''); reloadSchedules() }}>もう一度確認</Button></Notice> : null}
       {schedulesLoading ? null : schedules.length === 0 ? (schedulesError ? null : <ListState kind="empty" title="定期レポートはまだありません" description="決まった曜日や日に、集計結果をメールやLINEへ届けられます。" />)

@@ -6,6 +6,7 @@ import Card from '@/components/shared/card'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Drawer from '@/components/shared/drawer'
@@ -189,7 +190,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, frie
                   <span className={styles.rowNote}>{purpose.note}</span>
                 </div>
                 <StatusBadge tone={STATE_TONE[state]}><span>{STATE_LABEL[state]}</span></StatusBadge>
-                {canEdit ? <Button variant="secondary" onClick={() => begin(purpose.key)} disabled={busy}>変える</Button> : null}
+                {<PermissionGatedButton allowed={canEdit} variant="secondary" onClick={() => begin(purpose.key)} disabled={busy}>変える</PermissionGatedButton>}
               </div>
             )
           })}
