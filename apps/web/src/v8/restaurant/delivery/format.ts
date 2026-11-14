@@ -1,5 +1,6 @@
 import { formatYen } from '@line-crm/shared';
 import { formatDurationMinutes } from '@/lib/format-duration'
+import { formatDateTime } from '@/lib/format'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import type { DeliveryService, DeliveryUrgency } from '@/lib/restaurant-delivery-api'
@@ -65,18 +66,13 @@ export function formatClock(value: string | null | undefined): string {
   return p ? `${p.hh}:${p.mm}` : DASH
 }
 
-/** 「10/9 12:02」 */
-export function formatShortStamp(value: string | null | undefined): string {
-  const p = parts(value)
-  return p ? `${p.m}/${p.d} ${p.hh}:${p.mm}` : DASH
-}
-
-/** 「2026/10/09 12:02」 */
-export function formatStampFull(value: string | null | undefined): string {
-  const p = parts(value)
-  if (!p) return DASH
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${p.y}/${pad(p.m)}/${pad(p.d)} ${p.hh}:${p.mm}`
+/**
+ * 詳細の日時（受付・準備完了など）。管理画面共通の書き方に合わせる：
+ * 今年は「10月9日 12:02」、別の年は「2025年10月9日 12:02」。
+ */
+export function formatDetailStamp(value: string | null | undefined, now?: string | number | Date): string {
+  if (!value) return DASH
+  return formatDateTime(value, DASH, now, STORE_TIME_ZONE)
 }
 
 /**

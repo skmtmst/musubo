@@ -568,16 +568,6 @@
 }
 
 /* 経路と成果：左に全体の流れ（300）、右に表と注。 */
-.textLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-an-link-gap);
-  color: var(--color-action);
-  font-size: var(--text-caption);
-  font-weight: 500;
-  line-height: var(--tpl-an-link-lh);
-  white-space: nowrap;
-}
 .routesSplit {
   display: flex;
   align-items: flex-start;

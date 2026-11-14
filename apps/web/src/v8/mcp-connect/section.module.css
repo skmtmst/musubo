@@ -16,6 +16,19 @@
   font-size: var(--text-caption);
 }
 
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.stateSub {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  white-space: nowrap;
+}
+
 .note,
 .ownerOnly {
   font-size: var(--text-micro);

@@ -549,7 +549,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
       説明欄（390px）と横に並べるのは、設定欄に十分な幅が残る1024px以上だけ。
       それ未満では説明欄は設定の下へ回り込む。
     */}
-    <div className={`grid grid-cols-1 items-start gap-4 ${styles.scopeGrid}`}>
+    <div className={styles.scopeGrid}>
       <div className="flex flex-col gap-4">
         <section className="rounded-card border content-card bg-canvas p-4"><h2 className="text-base font-bold text-ink">いまの権限</h2><p className="mt-1 text-xs text-ink-secondary">{user.name}さんはいま「{ACCESS_ROLE_LABEL[user.roleBundle]}」です。{isCustom ? (savedBase ? (partialUntouchedRows.length > 0 ? '下の表には保存されている内容を出しています。一部だけ許可の行は3つの選択肢に当てはまらないため、行の下に内訳を出しています。' : '下の表には保存されている内容をそのまま出しています。') : '項目ごとの内訳は取得できていません（未確認）。') : ''}{targetIsAdministrator ? '' : '保存すると、対象者はもう一度ログインが必要です。'}</p>{/* IDEA-30: 閲覧・編集・実行とあわせて対象アカウントの権限もこの画面で確認できるようにする。 */}<p className="mt-2 text-xs text-ink-secondary">対象のLINEアカウント：{accessScopeLabel(user, accountNames)}{user.accountScope.type === 'accounts' && user.accountScope.includesDescendants ? '（配下のアカウントも含みます）' : ''}</p>{targetIsAdministrator ? <p className="mt-2 text-xs font-semibold text-ink-secondary">管理者はすべての機能を使えます。この画面では権限の確認だけでき、ここからは変更できません。役割を変えるときは一覧の「変更する」から行います。</p> : null}</section>
         <section className="rounded-card border content-card bg-canvas p-4"><h2 className="text-base font-bold text-ink">かたまりから選ぶ</h2><p className="mt-1 text-xs text-ink-faint">よく使う組み合わせを用意しています。選んでから、下で細かく直せます。かたまりを選ぶとすべての行がその内容に置き換わり、一部だけ許可の細かい設定は残りません。</p><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">{bundles.map(([value, label, note]) => <button key={value} type="button" disabled={!writable} onClick={() => {

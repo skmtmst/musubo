@@ -8,6 +8,8 @@ import Card from '@/components/shared/card';
 import BlockEditor from '@/components/forms/block-editor';
 import { formJumpsInto } from '@/components/forms/form-definition-operations';
 import type { FormRefs } from '@/components/forms/form-refs';
+import type { FormReferenceDefinition, PublicFormReference } from '@line-crm/shared';
+import ReferencesPanel from './references-panel';
 import Button from '@/components/shared/button';
 import PermissionGatedButton from '@/components/shared/permission-gated-button';
 import Toggle from '@/components/shared/toggle';
@@ -73,6 +75,11 @@ type Props = {
   /** 答えで予約の行き先を分ける（B6）。決まりは回答フォームの版に含める。 */
   routing?: FormRouting
   onChangeRouting?: (next: FormRouting) => void
+  /** 公開用の参照（F2）。保存は layout ごと送るため、一覧だけを編集画面へ返す。 */
+  references?: FormReferenceDefinition[]
+  referenceStates?: Map<string, PublicFormReference> | null
+  hasPublishedVersion?: boolean
+  onChangeReferences?: (next: FormReferenceDefinition[]) => void
 }
 
 export function ContentTab(props: Props) {
@@ -155,6 +162,16 @@ export function ContentTab(props: Props) {
         )}
         {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
       </Card>
+
+      <ReferencesPanel
+        readOnly={props.readOnly}
+        accountId={props.accountId}
+        layout={layout}
+        references={props.references ?? layout.references ?? []}
+        states={props.referenceStates ?? null}
+        hasPublishedVersion={props.hasPublishedVersion}
+        onChangeReferences={props.onChangeReferences}
+      />
 
       <RenameDialog
         value={props.readOnly ? null : renaming}

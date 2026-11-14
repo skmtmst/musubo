@@ -37,6 +37,8 @@ import { mockFingerprint } from './mock-fingerprint.mjs'
 import { gap3Respond } from './mock-gap3.mjs'
 import { gap2Respond } from './mock-gap2.mjs'
 import { eventBookingsPage } from './event-bookings-mock.mjs'
+import { VISUAL_QA_PASSKEYS, conversionReportForPeriod } from './mock-small-responses.mjs'
+import { listedFormResponse, listedCommonVarResponse } from './mock-listed-details.mjs'
 /** fixtures・補助処理・API形の入力も含む、起動時の指紋。 */
 const FINGERPRINT = mockFingerprint()
 import { readArrayGetPaths } from './api-shapes.mjs'
@@ -3137,9 +3139,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/restaurant-test/delivery/menu-items') {
     return { success: true, store: DELIVERY_STORE, items: DELIVERY_MENU_ITEMS }
   }
-
   if (method === 'GET' && pathname === '/api/auth/two-factor/policy') return { success: true, data: { required: true, canEdit: true, configured: true, notice: null, registered: 4, total: 6 } }
   if (method === 'GET' && pathname === '/api/auth/two-factor/self') return { success: true, data: { staffId: 'visual-qa-owner', enabledAt: '2026-10-12T03:00:00Z', remaining: 8, total: 8, canEdit: true, configured: true, notice: null } }
+  if (method === 'GET' && pathname === '/api/auth/passkeys/self') return { success: true, data: VISUAL_QA_PASSKEYS }
   if (pathname === '/api/auth/session') {
     /*
      * 運営コンソールの外枠（`OpsShell`）は `platformAdmin` を見る。
@@ -4302,12 +4304,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 画面が器に `.replace` して白画面になっていた。
    * 本物は文字列か null を返す（`account-settings.ts`）。
    */
-  if (pathname === '/api/account-settings/link-base-url') {
-    return { success: true, data: null }
-  }
-  if (pathname === '/api/account-settings/tracked-link-base-url') {
-    return { success: true, data: null }
-  }
+  if (pathname === '/api/account-settings/link-base-url' || pathname === '/api/account-settings/tracked-link-base-url') return { success: true, data: null }
   // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
   if (method === 'POST' && pathname === '/api/forms/drafts') {
     return { success: true, data: { id: 'form-draft-qa', isActive: false } }
@@ -4359,6 +4356,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* 公開中の版（実口は account_id が無いと公開中の版を返す。編集画面は `?view=published` を付けて読む）。 */
   if (pathname === `/api/forms/${FORM_DETAIL.id}` && query.get('view') === 'published') return { success: true, data: FORM_DETAIL_PUBLISHED }
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
+  const listedForm = listedFormResponse(method, pathname, FORM_LIST.items, FORM_DETAIL); if (listedForm) return listedForm
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
     /*
@@ -4851,6 +4849,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       return { ...chat, slaDueAt: new Date(Date.now() + minutes[index] * 60000).toISOString(), slaState: minutes[index] < 0 ? 'overdue' : 'soon', assignedBy: index < 2 ? 'auto' : index === 2 ? 'manual' : null }
     })
     let rows = withSla
+    if (query.get('status')) rows = rows.filter((chat) => chat.status === query.get('status'))
     if (query.get('slaState') === 'overdue') rows = rows.filter((chat) => chat.slaState === 'overdue')
     if (query.get('sort') === 'sla_due') rows = [...rows].sort((a, b) => (a.slaDueAt ? Date.parse(a.slaDueAt) : Infinity) - (b.slaDueAt ? Date.parse(b.slaDueAt) : Infinity)); else if (query.get('sort') === 'latest') rows = [...rows].sort((a, b) => String(b.lastMessageAt ?? '').localeCompare(String(a.lastMessageAt ?? ''))) // latest は未読を先にしない新しい順
     const limit = Number(query.get('limit') ?? 0)
@@ -5778,9 +5777,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
   if (pathname === '/api/conversions/report') {
-    if (query.has('from') || query.has('to')) {
-      return { success: true, data: CONVERSION_DEFINITION_REPORT }
-    }
+    if (query.has('from') || query.has('to')) return conversionReportForPeriod(query, CONVERSION_DEFINITION_REPORT)
     const startDate = query.get('startDate') ?? ''
     const data = startDate >= '2026-08-01'
       ? CONVERSION_REPORT_CURRENT
@@ -5791,6 +5788,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === `/api/common-vars/${COMMON_VAR_DETAIL.id}`) return { success: true, data: COMMON_VAR_DETAIL }
   /* 板 `AYc6O`・`C67dE`・`piWhz`：営業時間の編集（使っている8か所・予定1件・履歴2件）。 */
   if (pathname === `/api/common-vars/${COMMON_VAR_HOURS_DETAIL.id}`) return { success: true, data: COMMON_VAR_HOURS_DETAIL }
+  const listedCommonVar = listedCommonVarResponse(method, pathname, COMMON_VARS, COMMON_VAR_DETAIL); if (listedCommonVar) return listedCommonVar
   const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
   if (commonVarDeleteImpact) {
     const impact = commonVarDeleteImpact[1] === COMMON_VAR_DELETE_IMPACT_EMPTY.variable.id
