@@ -1214,3 +1214,4 @@
 - [見せる範囲とカレンダーのつぶれ](release-log/unreleased/55-kenta-a14-layout.md) — 1152px で左の列がつぶれていた修正の履歴。確認 2026-11-13。
 - [説明の吹き出しと投稿カードの空き](release-log/unreleased/54-kenta-posts-tip-cards.md) — 吹き出しの縦の列と、カードの右の空きの修正履歴。確認 2026-11-13。
 - [予約の取り消しで確認時の版を照らす](release-log/unreleased/53-kenta-booking-cancel-version.md) — 古い確認のまま取り消さない修正履歴。確認 2026-11-13。
+- [文書：古いボタンの言葉をそろえる](release-log/unreleased/67-kenta-docs-words.md) — 受け入れ表の言葉を画面に合わせた履歴。確認 2026-11-14。
