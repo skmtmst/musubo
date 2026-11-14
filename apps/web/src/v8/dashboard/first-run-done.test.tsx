@@ -2,8 +2,8 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-const net = vi.hoisted(() => ({ progress: vi.fn(), dismiss: vi.fn(), starterSet: vi.fn(), starterItems: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { gettingStarted: { get: net.progress, dismiss: net.dismiss } } }))
+const net = vi.hoisted(() => ({ progress: vi.fn(), dismiss: vi.fn(), mark: vi.fn(), starterSet: vi.fn(), starterItems: vi.fn() }))
+vi.mock('@/lib/api', () => ({ api: { gettingStarted: { get: net.progress, dismiss: net.dismiss, markFirstRunDoneSeen: net.mark } } }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { starterSet: net.starterSet, starterItems: net.starterItems } }))
 vi.mock('@/components/shared/list-navigation', async importOriginal => ({
   ...await importOriginal<typeof import('@/components/shared/list-navigation')>(),
@@ -41,6 +41,26 @@ describe('最初の1通が届いた時の窓', () => {
     expect(result.current.arrived).toBe(false)
   })
 
+  it('見ていない間に済んでいて、まだ知らせていないアカウントは、開いた時に1回だけ出す', () => {
+    const missed = { doneSeenAt: null, doneSeenTracked: true }
+    const { result } = renderHook(() => useFirstMessageArrived('a', steps({ firstMessage: 'done' }), true, missed))
+    expect(result.current.arrived).toBe(true)
+    act(() => result.current.dismiss())
+    expect(result.current.arrived).toBe(false)
+  })
+
+  it('もう知らせたアカウント・記録できないアカウント・まだ届いていないアカウントには、開いた時に出さない', () => {
+    for (const [list, run] of [
+      [steps({ firstMessage: 'done' }), { doneSeenAt: '2026-11-14T10:00:00.000', doneSeenTracked: true }],
+      [steps({ firstMessage: 'done' }), { doneSeenAt: null, doneSeenTracked: false }],
+      [steps({ firstMessage: 'todo' }), { doneSeenAt: null, doneSeenTracked: true }],
+    ] as const) {
+      const { result, unmount } = renderHook(() => useFirstMessageArrived('a', list, true, run))
+      expect(result.current.arrived).toBe(false)
+      unmount()
+    }
+  })
+
   it('別のアカウントへ移った時の「まだ→済み」は数えない', () => {
     const { result, rerender } = renderHook(({ list, id }) => useFirstMessageArrived(id, list, true), { initialProps: { list: steps({ firstMessage: 'todo' }), id: 'a' } })
     rerender({ list: steps({ firstMessage: 'done' }), id: 'b' })
@@ -62,6 +82,24 @@ describe('最初の1通が届いた時の窓', () => {
     expect(timer.mock.calls.filter(([, delay]) => delay === 10_000)).toHaveLength(0)
     timer.mockRestore()
     expect(result.current.arrived).toBe(false)
+  })
+
+  it('見ていない間に済んだオーナーには開いた時に窓を出し、出し済みを1回だけ記録する。閲覧のみには出さない', async () => {
+    const missed = { startedAt: null, styleAt: null, starterAt: null, followAt: null, firstMessageAt: '2026-11-14T10:00:00.000', doneSeenAt: null, doneSeenTracked: true, minutes: 8 }
+    net.progress.mockResolvedValue({ success: true, data: { steps: KEYS.map(key => ({ key, state: 'done', href: '/getting-started', reason: null })), firstRun: missed, starter: null } })
+    net.mark.mockResolvedValue({ success: true, data: { doneSeenAt: '2026-11-14T10:05:00.000', tracked: true } })
+    const owner = renderHook(() => useFirstSteps('a', 'owner'))
+    await waitFor(() => expect(owner.result.current.arrived).toBe(true))
+    await waitFor(() => expect(net.mark).toHaveBeenCalledTimes(1))
+    expect(net.mark).toHaveBeenCalledWith('a')
+    owner.rerender()
+    expect(net.mark).toHaveBeenCalledTimes(1)
+    owner.unmount()
+    net.mark.mockClear()
+    const viewer = renderHook(() => useFirstSteps('a', 'viewer'))
+    await waitFor(() => expect(viewer.result.current.summary).not.toBeNull())
+    expect(viewer.result.current.arrived).toBe(false)
+    expect(net.mark).not.toHaveBeenCalled()
   })
 
   it('入った物は種類ごとに 1 行で、動いている・止めている・入れなかったを分ける', () => {
