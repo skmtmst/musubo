@@ -100,7 +100,7 @@ jobs:
       STAGING_API_URL: https://stg-api.musubo.jp
       STAGING_PAGES_PROJECT: nen-line-stg-admin-git
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Require retired legacy staging paths before this run
         run: node scripts/deploy/verify-legacy-staging-retired.mjs
