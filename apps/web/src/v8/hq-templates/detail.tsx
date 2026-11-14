@@ -13,6 +13,7 @@ import { ArrowLeft, ChevronDown, CircleAlert, Copy, GitCompare, LogIn, Pencil, R
 import type { HqTemplateReceivedVersion, HqTemplateVersionComparison, HqTemplateVersionDisplay, MessageTemplateDefinition } from '@line-crm/shared'
 import { templateKind } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -151,19 +152,19 @@ export default function HqTemplateDetail({
 
   const side = (
     <div className={styles.side}>
-      {canEdit ? (
+      {(
         <div className={styles.sideActions}>
-          <Button variant="secondary" href="/hq/broadcasts/new">
+          <PermissionGatedButton allowed={canEdit} need="tenantWide" variant="secondary" href="/hq/broadcasts/new">
             <Send size={16} aria-hidden="true" />
             一括配信で使う
-          </Button>
-          <Button variant="secondary" onClick={onDuplicate} disabled={busy}>
+          </PermissionGatedButton>
+          <PermissionGatedButton allowed={canEdit} need="tenantWide" variant="secondary" onClick={onDuplicate} disabled={busy}>
             <Copy size={16} aria-hidden="true" />
             複製する
-          </Button>
-          {onRemove ? <RowMenu appearance="box" label="そのほかの操作" menuLabel={`ひな形「${detail.template.name}」の操作`} items={[{ id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: onRemove }]} /> : null}
+          </PermissionGatedButton>
+          {onRemove && canEdit ? <RowMenu appearance="box" label="そのほかの操作" menuLabel={`ひな形「${detail.template.name}」の操作`} items={[{ id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: onRemove }]} /> : null}
         </div>
-      ) : null}
+      )}
       <Card layout="vertical" contentPadding="var(--tpl-eds-about-pad)" gap="var(--tpl-eds-about-gap)" aria-label="このテンプレートについて">
         <CardHeader size="content" title="このテンプレートについて" />
         <dl className={styles.aboutList}>
@@ -275,11 +276,9 @@ export default function HqTemplateDetail({
               {more > 0 ? <div className={styles.moreRow}><ListEmptyMessage as="span">{`ほか ${more} アカウント`}</ListEmptyMessage></div> : null}
             </>
           ) : <ListEmptyMessage>まだ配っていません</ListEmptyMessage>}
-          {canEdit ? (
-            <div className={styles.moreRow}>
-              <Button variant="text" onClick={onDistribute} disabled={busy}><ChevronDown size={16} aria-hidden="true" />配る先を変える</Button>
-            </div>
-          ) : null}
+          <div className={styles.moreRow}>
+            <PermissionGatedButton allowed={canEdit} need="tenantWide" variant="text" onClick={onDistribute} disabled={busy}><ChevronDown size={16} aria-hidden="true" />配る先を変える</PermissionGatedButton>
+          </div>
         </Card>
 
         <Card layout="vertical" contentPadding="var(--tpl-eds-card-pad)" gap="var(--tpl-eds-card-gap)" aria-label="版の履歴">
@@ -312,9 +311,7 @@ export default function HqTemplateDetail({
                     ) : !isInUse ? (
                       <div className={styles.versionActions}>
                         {current ? <Button variant="secondary" onClick={() => openCompare(version.version, current.version)}><GitCompare size={16} aria-hidden="true" />比べる</Button> : null}
-                        {canEdit ? (
-                          <Button variant="secondary" disabled={busy} onClick={() => { setRestoreError(''); setRestoreTarget(version.version) }}><RotateCcw size={16} aria-hidden="true" />この版に戻す</Button>
-                        ) : null}
+                        <PermissionGatedButton allowed={canEdit} need="tenantWide" variant="secondary" disabled={busy} onClick={() => { setRestoreError(''); setRestoreTarget(version.version) }}><RotateCcw size={16} aria-hidden="true" />この版に戻す</PermissionGatedButton>
                       </div>
                     ) : null}
                   </div>

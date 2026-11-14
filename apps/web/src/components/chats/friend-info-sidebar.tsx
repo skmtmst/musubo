@@ -7,6 +7,7 @@ import { type ChatStatusInfo,type Props } from './friend-info-types'
 
 import { PrepayBadgeV8 } from '@/v8/booking/index'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import CustomerInfoMileage from '@/components/shared/customer-info-mileage'
@@ -456,7 +457,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   hiddenPersonalCount={friendFields.kind === 'data' ? friendFields.hiddenPersonalCount : 0}
                   sections={[
                     {
-                      key: 'support', label: '対応', action: canEditChat ? <Button variant="text" size="inline" aria-label="対応を編集" aria-expanded={editingSupport} onClick={() => setEditingSupport(value => !value)}>{editingSupport ? '閉じる' : '編集'}</Button> : null, content: <>
+                      key: 'support', label: '対応', action: <PermissionGatedButton allowed={canEditChat} variant="text" size="inline" aria-label="対応を編集" aria-expanded={editingSupport} onClick={() => setEditingSupport(value => !value)}>{editingSupport ? '閉じる' : '編集'}</PermissionGatedButton>, content: <>
                         {editingSupport ? sectionBody(renderSupport(friend)).filter(child => !(isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo'])) : <>
                           {/* 絵 eovoG：次回予約・次の自動配信も 状況・担当 と同じ行の形（見出し＋値）で続ける。 */}
                           <CustomerInfoRows
@@ -470,7 +471,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                       </>
                     },
                     {
-                      key: 'tags', label: 'タグ', action: canEditFriend ? <Button variant="text" size="inline" aria-expanded={tagPickerOpen} aria-controls="inbox-panel-tag-picker" onClick={() => setTagPickerOpen(value => !value)}>{tagPickerOpen ? '閉じる' : '編集'}</Button> : null, content: <>
+                      key: 'tags', label: 'タグ', action: <PermissionGatedButton allowed={canEditFriend} variant="text" size="inline" aria-expanded={tagPickerOpen} aria-controls="inbox-panel-tag-picker" onClick={() => setTagPickerOpen(value => !value)}>{tagPickerOpen ? '閉じる' : '編集'}</PermissionGatedButton>, content: <>
                         <TagOverflow maxVisible={2}>{(effectiveTags ?? []).map(tag => <TagPill
                                                                                         key={tag.id}
                                                                                         name={tag.name}
@@ -484,7 +485,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                     },
                     { key: 'mileage', label: 'マイル', action: mileage.kind === 'data' && isOwnerOrAdmin(staffRole) ? <Button href={`/mileage/friends/detail?id=${encodeURIComponent(friend.id)}`} variant="text" size="inline">編集</Button> : null, content: <CustomerInfoMileage state={mileage} onRetry={() => setMileageRetry(key => key + 1)} /> },
                     { key: 'richMenu', label: 'リッチメニュー', action: canEditFeature('/rich-menus', staffRole) ? <Button href="/rich-menus" variant="text" size="inline">編集</Button> : null, content: sectionBody(renderRichMenu()) },
-                    { key: 'memo', label: 'メモ', action: canEditChat ? <Button variant="text" size="inline" aria-label="メモを編集" aria-expanded={editingMemo} onClick={() => setEditingMemo(value => !value)}>{editingMemo ? '閉じる' : '編集'}</Button> : null, content: editingMemo ? sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo']) : effectiveNotes || '未設定' },
+                    { key: 'memo', label: 'メモ', action: <PermissionGatedButton allowed={canEditChat} variant="text" size="inline" aria-label="メモを編集" aria-expanded={editingMemo} onClick={() => setEditingMemo(value => !value)}>{editingMemo ? '閉じる' : '編集'}</PermissionGatedButton>, content: editingMemo ? sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo']) : effectiveNotes || '未設定' },
                   ]}
                   extraSections={Children.toArray(renderDetailSections(friend).props.children).flatMap(child => {
                     if (!isValidElement<{ 'data-customer-section'?: string; children?: React.ReactNode }>(child)) return []

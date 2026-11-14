@@ -99,9 +99,10 @@ test('既存の並びを保ち、上下キーの変更を保存する。顧客�
   expect(saved).not.toContain('山田花子');
 });
 
-test('閲覧のみでは基本の編集と表示項目の変更を出さない',()=>{
+test('閲覧のみでは基本の編集と表示項目の変更を灰色で出し、押しても開かない',()=>{
  render(<CustomerInfoPanel friendId="f" fields={fields} state="ready" canEdit={false} sections={[]}/>);
- expect(screen.queryByRole('button',{name:'編集'})).toBeNull();expect(screen.queryByRole('button',{name:'表示項目を編集'})).toBeNull();
+ for (const name of ['編集','表示項目を編集']) { const el=screen.getByRole('button',{name}); expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(el)).toBe(true); fireEvent.click(el) }
+ expect(screen.queryByRole('textbox')).toBeNull();
 })
 
 test('生年月日が未登録なら回答年齢を表示して編集でき、年齢だけの表示設定も保存できる', async () => {
@@ -135,7 +136,7 @@ test('飲食の要点は基本の後に同じ順で並び、空の値とアレ�
   expect(labels.filter(label => label === 'アレルギー')).toHaveLength(1)
   expect(screen.getByText('2026年10月10日')).toBeTruthy()
   expect(screen.getByText('席の好み').parentElement?.querySelector('dd')?.textContent).toBe('未設定')
-  expect(screen.queryByRole('button', { name: '編集' })).toBeNull()
+  for (const el of screen.queryAllByRole('button', { name: '編集' })) expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(el)).toBe(true)
 })
 
 test('標準の要点は飲食の値が残っていても基本だけで、飲食への切替と戻しを分ける', () => {
