@@ -78,7 +78,7 @@
 
 | 道 | 入力 | 出力 | 権限 |
 |---|---|---|---|
-| GET `/api/booking/admin/pass-plans` | account_id・status・q・limit・offset | `{items, total, summary:{onSale, holders, expiringIn30d, billingFailed}}` | owner/admin/staff |
+| GET `/api/booking/admin/pass-plans` | account_id・status・q・kind（ticket／monthly、省略可）・limit・offset | `{items, total, summary:{onSale, holders, expiringIn30d, billingFailed}}` | owner/admin/staff |
 | POST/PUT `/api/booking/admin/pass-plans(/:id)` | 本文＋`expectedVersion`、POST は Idempotency-Key | 種類 | owner/admin |
 | POST `/api/booking/admin/pass-plans/:id/stop` | `{}` | 状態 stopped（持っている人には影響しない） | owner/admin |
 | GET `/api/booking/admin/pass-plans/:id/holders` | limit・offset | 持っている人の一覧（友だち・残り・期限） | owner/admin/staff |

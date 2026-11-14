@@ -40,3 +40,8 @@ test('GAP3-CLIENT-04: 後続APIも店・本人・試験指定・同じキーと�
  const conditions={all:[{kind:'visit_count' as const,op:'between',value:{min:5}}]};await memberActivityFriendsApi.list('a',conditions);
  expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/friends?lineAccountId=a&conditions='+encodeURIComponent(JSON.stringify(conditions)));
  });
+
+test('回数券の種類とページを API に渡し、省略時は全種類を取得する',async()=>{
+ await bookingPassPlansApi.list('a','ヨガ',20,20,'monthly');expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/booking/admin/pass-plans?account_id=a&q=%E3%83%A8%E3%82%AC&offset=20&limit=20&kind=monthly');
+ await bookingPassPlansApi.list('a');expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/booking/admin/pass-plans?account_id=a&q=&offset=0&limit=20');
+});
