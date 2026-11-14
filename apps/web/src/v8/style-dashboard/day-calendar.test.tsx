@@ -14,6 +14,9 @@ import StyleDashboard from './style-dashboard'
 import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 
 const state = vi.hoisted(() => ({ search: 'view=calendar', role: 'admin' as string | null, directGuardProbe: false, unsafeAddNew: vi.fn(), buttons: [] as ButtonProps[], push: vi.fn(), replace: vi.fn(), summary: vi.fn(), schedule: vi.fn(), bookings: vi.fn<typeof eventsApi.listBookings>() }))
+// カレンダーの試験では初期設定の取得を扱わない。実通信の完了待ちで本文が隠れ続けないよう固定する。
+vi.mock('@/v8/onboarding/public/use-first-run/index', () => ({ useFirstRun: () => ({ status: 'ready', steps: [], firstRun: null, starter: null, error: null, reload: vi.fn(), watchExpired: false, rewatch: vi.fn() }) }))
+vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: (_id: string, style: string) => ({ status: 'ready', progress: { style, steps: {} }, reload: vi.fn() }) }))
 vi.mock('@/components/shared/button', async importOriginal => {
   const actual = await importOriginal<typeof import('@/components/shared/button')>()
   return { ...actual, default: (props: ButtonProps) => {

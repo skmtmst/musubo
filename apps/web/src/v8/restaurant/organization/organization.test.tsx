@@ -127,13 +127,13 @@ it('連携メンバーの停止は本人確認が必要なら確認後に同じ�
   expect(fixture.updateMembership.mock.calls[0][2].idempotencyKey).toBe(fixture.updateMembership.mock.calls[1][2].idempotencyKey)
 })
 
-it('閲覧のみには作る・編集・変更・停止・発行のボタンを置かない', async () => {
+it('閲覧のみには作る・編集・変更・停止・発行のボタンを灰色で出し、押せない', async () => {
   fixture.role = verifiedStaffRole('staff')
   render(<OrganizationV8 />)
   expect(await screen.findByText('試験担当')).toBeTruthy()
   expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
   for (const name of ['店舗を作る', '編集する', 'ユーザーを追加する', '変更', '停止', 'アドレスを発行', '試験担当のその他操作']) {
-    expect(screen.queryByRole('button', { name })).toBeNull()
+    for (const el of screen.queryAllByRole('button', { name })) expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(el)).toBe(true)
   }
 })
 

@@ -103,11 +103,11 @@ describe('統括の配信設定を共通の一覧と配布画面で扱う', () =
     render(<HqDeliveryConsole type="friend_add_rule" />)
     const name = await screen.findByRole('button', { name: '追加のお礼', exact: true })
     expect(screen.queryByRole('button', { name: '「追加のお礼」の操作' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'ひな形を作る', exact: true })).toBeNull()
+    for (const el of screen.queryAllByRole('button', { name: 'ひな形を作る', exact: true })) expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(el)).toBe(true)
     fireEvent.click(name)
     expect(await screen.findByText('最初の本文')).toBeTruthy()
     expect(screen.queryByRole('textbox')).toBeNull()
-    expect(screen.queryByRole('button', { name: '下書きを保存する' })).toBeNull()
+    for (const el of screen.queryAllByRole('button', { name: '下書きを保存する' })) expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(el)).toBe(true)
   })
 
   it('選んだアカウントと確認番号を使って配り、成功を表示する', async () => {

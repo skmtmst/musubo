@@ -12,6 +12,7 @@ import { useSearchParams } from 'next/navigation'
 import { OctagonPause, RefreshCw } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { Tabs } from '@/components/shared/tabs'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import { useAccount } from '@/contexts/account-context'
@@ -67,6 +68,7 @@ export default function EmergencyScreen({
   const { selectedAccountId } = useAccount()
   const staffRole = effectiveStaffRole(identity)
   const canManage = canManageRole(staffRole)
+  const manualLockReason = usePermissionLockReason(canManage, 'manager')
   const session = useSyncExternalStore(subscribeSession, readSessionSnapshot, unknownSession)
   const canReviewSecurity = canManage && session !== null && !session.impersonation
   const [, setSeverity] = useState<OperationSeverity>('unknown')
@@ -101,7 +103,8 @@ export default function EmergencyScreen({
   const [controlAccess, setControlAccess] = useState<EmergencyControlAccess>({ allowed: null, stopDisabled: true })
 
   const actions = tab === 'health'
-    ? <Button variant="secondary" type="button" onClick={requestManualRun} disabled={!selectedAccountId || manualBusy} busy={manualBusy} busyLabel="確認中…">
+    // 確かめ直しはオーナー・管理者だけ（Worker も owner/admin）。閲覧のみ等には灰色＋理由で出す。
+    ? <Button variant="secondary" type="button" onClick={requestManualRun} lockedReason={canManage ? undefined : manualLockReason} disabled={!selectedAccountId || manualBusy || (!canManage && !manualLockReason)} busy={manualBusy} busyLabel="確認中…">
         <RefreshCw className={styles.btnIcon} aria-hidden="true" />いますぐ確かめる
       </Button>
     : tab === 'control'

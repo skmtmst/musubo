@@ -22,10 +22,14 @@ it('接続済みでも決済管理画面とつなぎ直しを使え、接続先�
   expect(reconnect).toHaveBeenCalledTimes(1)
 })
 
-it('閲覧のみでも決済管理画面を開けるが、つなぎ直す操作は出さない', () => {
-  render(<ConnectionCard {...connection} canEdit={false} onConnect={vi.fn()} onReconnect={vi.fn()} />)
+it('閲覧のみでも決済管理画面を開けるが、つなぎ直す操作は灰色で押せない', () => {
+  const reconnect = vi.fn()
+  render(<ConnectionCard {...connection} canEdit={false} onConnect={vi.fn()} onReconnect={reconnect} />)
   expect(screen.getByRole('link', { name: 'Stripe の管理画面を開く' })).toBeTruthy()
-  expect(screen.queryByRole('button', { name: 'つなぎ直す' })).toBeNull()
+  const button = screen.getByRole('button', { name: 'つなぎ直す' })
+  expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(button)).toBe(true)
+  fireEvent.click(button)
+  expect(reconnect).not.toHaveBeenCalled()
 })
 
 it('未接続では管理画面を出さず、決済をつなぐ操作を保つ', () => {

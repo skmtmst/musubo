@@ -5,6 +5,7 @@ import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { EC_EVENT_LABELS, type EcEventType } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import { PageFooter } from '@/components/templates/page-footer'
 import Checkbox from '@/components/shared/checkbox'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
@@ -271,7 +272,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
             ) : (
               <div className={styles.keyRow}>
                 <span className={styles.keyMask} id="ec-connector-secret" title={connector?.secretUpdatedAt ? `${when(connector.secretUpdatedAt)} に更新` : undefined}>{connector?.secretConfigured ? `●●●●●●●●●●●●  ${connector.secretLastFour ?? '----'}` : emptyValue('unconfigured')}</span>
-                {canEdit ? <Button type="button" onClick={() => setReplacingSecret(true)}>差し替える</Button> : null}
+                {<PermissionGatedButton allowed={canEdit} type="button" onClick={() => setReplacingSecret(true)}>差し替える</PermissionGatedButton>}
               </div>
             )}
           </Field>

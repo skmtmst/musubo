@@ -8,6 +8,7 @@ import { BookingPage, BookingSidebarLinks, BookingSidebarNotes, BookingSidebarSe
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Card from '@/components/shared/card'
 import Avatar from '@/components/shared/avatar'
 import ListState from '@/components/shared/list-state'
@@ -78,7 +79,7 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
           </ul>
           <div className={styles.actions}>
             <Button variant="primary" onClick={() => onOpen(next.id)}>詳細を見る</Button>
-            {canWrite ? <Button href={`/booking/bookings/detail?id=${encodeURIComponent(next.id)}`}>日時を変える</Button> : null}
+            {<PermissionGatedButton allowed={canWrite} href={`/booking/bookings/detail?id=${encodeURIComponent(next.id)}`}>日時を変える</PermissionGatedButton>}
           </div>
         </div>
       </Card> : <ListState kind="empty" title={ready ? '次の予約はありません' : '予約を読み込んでいます'} />}

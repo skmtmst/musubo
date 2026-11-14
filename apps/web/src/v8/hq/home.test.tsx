@@ -444,7 +444,8 @@ describe('統括のアカウント', () => {
     await act(async () => { update.click(); update.focus() })
     expect(checkConnection).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('閲覧のみ')
-    expect([...container.querySelectorAll('button')].some((button) => button.textContent === '全部を更新')).toBe(false)
+    const all = [...container.querySelectorAll('button')].find((button) => button.textContent === '全部を更新')!
+    expect(all.getAttribute('aria-disabled')).toBe('true')
   })
   it.each(['owner', 'admin', 'viewer'])('アカウントの用途文から権限を推測せず、現在の人%sで設定の入口を決める', async viewerRole => {
     role.value = viewerRole

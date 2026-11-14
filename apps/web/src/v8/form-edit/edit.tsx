@@ -118,7 +118,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   usePageTitle(host ? '回答フォーム' : title)
   const [formLoadFailed, setFormLoadFailed] = useState<'missing' | 'forbidden' | 'error' | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
-  const [bookingStaffError,setBookingStaffError]=useState(false)
+  const [bookingStaffErrors,setBookingStaffErrors]=useState<Record<string, boolean>>({})
+  const bookingStaffAccount = useRef(selectedAccountId)
   const [referencesError,setReferencesError]=useState(false)
   const savedSnapshot = useRef<string | null>(null)
   /** 読み込んだ時点の編集の版(#723)。読み込みと保存成功のときだけ入れ替える。 */
@@ -351,34 +352,42 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, reloadKey, selectedAccountId, saveErrors])
 
+  useEffect(() => {
+    if (bookingStaffAccount.current !== selectedAccountId) {
+      bookingStaffAccount.current = selectedAccountId
+      setBookingStaffErrors({})
+    }
+  }, [selectedAccountId])
+
   // 「予約を入れる」欄の担当選び。欄のメニューが決まったものだけ読む。
   useEffect(() => {
-    if (hostRef.current || !selectedAccountId || bookingStaffError) return
+    if (hostRef.current || !selectedAccountId) return
     const menuIds = new Set<string>()
     for (const section of layout.sections) {
       for (const b of section.blocks) {
         if (b.kind === 'input' && b.type === 'booking' && b.booking?.menuId) menuIds.add(b.booking.menuId)
       }
     }
-    const missing = [...menuIds].filter((menuId) => refs.bookingMenuStaff?.[menuId] === undefined)
+    const missing = [...menuIds].filter((menuId) => refs.bookingMenuStaff?.[menuId] === undefined && !bookingStaffErrors[menuId])
     if (missing.length === 0) return
     let cancelled = false
     void (async () => {
-      try {
-        const entries = await Promise.all(missing.map(async(menuId)=>{
+      const results = await Promise.all(missing.map(async(menuId)=>{
+        try {
           const res=await bookingApi.listMenuStaff(selectedAccountId,menuId)
-          return [menuId,res.staff.map(s=>({id:s.id,name:s.display_name}))] as const
-        }))
-        if(cancelled)return
-        setRefs(prev=>({...prev,bookingMenuStaff:{...(prev.bookingMenuStaff??{}),...Object.fromEntries(entries)}}))
-      }catch{
-        if(!cancelled)setBookingStaffError(true)
-      }
+          return { menuId, staff: res.staff.map(s=>({id:s.id,name:s.display_name})) }
+        } catch { return { menuId, staff: null } }
+      }))
+      if(cancelled)return
+      const entries = results.flatMap(({ menuId, staff }) => staff === null ? [] : [[menuId, staff] as const])
+      const failed = results.filter((result) => result.staff === null)
+      if(entries.length) setRefs(prev=>({...prev,bookingMenuStaff:{...(prev.bookingMenuStaff??{}),...Object.fromEntries(entries)}}))
+      if(failed.length) setBookingStaffErrors(prev=>({...prev,...Object.fromEntries(failed.map(({menuId})=>[menuId,true]))}))
     })()
     return () => {
       cancelled = true
     }
-  }, [selectedAccountId, layout, refs.bookingMenuStaff,bookingStaffError])
+  }, [selectedAccountId, layout, refs.bookingMenuStaff,bookingStaffErrors])
 
   /* ---------------- ページとブロック ---------------- */
 
@@ -1003,7 +1012,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       <div className={styles.root} data-fe-root>
         {host?.notice}
         {referencesError?<ListState kind="error" title="候補を読み込めませんでした" onRetry={()=>{setReferencesError(false);setError('');setReloadKey(value=>value+1)}}/>:null}
-        {bookingStaffError?<ListState kind="error" title="予約の担当を読み込めませんでした" onRetry={()=>setBookingStaffError(false)}/>:null}
+        {Object.keys(bookingStaffErrors).length > 0 ? <ListState kind="error" title="予約の担当を読み込めませんでした" onRetry={()=>setBookingStaffErrors({})}/>:null}
         {!conflict && error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
         {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
         {loading || !formLoaded ? (
@@ -1016,6 +1025,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             page={page}
             blocks={blocks}
             refs={refs}
+            bookingStaffErrors={bookingStaffErrors}
+            onRetryBookingStaff={(menuId) => setBookingStaffErrors((prev) => { const next = { ...prev }; delete next[menuId]; return next })}
             selectedBlockId={selectedBlockId}
             inputCount={inputCount}
             accountId={host ? null : selectedAccountId}

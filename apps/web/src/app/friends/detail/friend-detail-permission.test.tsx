@@ -472,11 +472,14 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
     expect(supportEditButtons()).toHaveLength(1)
   })
 
-  it('chats編集キーの無いstaffには編集口を出さない（受信箱への案内だけ）', async () => {
+  it('chats編集キーの無いstaffには編集口を押せない形で出し、受信箱への案内を残す', async () => {
     setRole('staff', ['/friends'])
     await render('timeline')
-    // 「編集」はボタンではなく受信箱へのリンクのまま
-    expect(supportEditButtons()).toHaveLength(0)
+    // 編集は灰色＋理由で押せない。押しても編集の窓は開かない。
+    for (const button of supportEditButtons()) {
+      expect(button.getAttribute('aria-disabled') === 'true' || button.disabled).toBe(true)
+      button.click()
+    }
     expect(linksByText('受信箱で開く').length).toBeGreaterThan(0)
     expect(document.querySelector('[role="dialog"]')).toBeNull()
   })

@@ -95,11 +95,13 @@ it('追加に失敗した時は名前と窓を残し、既存の権限の入口�
   expect(net.add).toHaveBeenCalledTimes(1)
 })
 
-it('閲覧のみの追加入口は今回の変更で開放しない', async () => {
+it('閲覧のみの追加入口は灰色で出し、押しても開かない', async () => {
   net.role = 'viewer'
   render(<BookingMedia />)
   await screen.findByText('人工媒体')
-  expect(screen.queryByRole('button', { name: '媒体を足す', exact: true })).toBeNull()
+  const add = screen.getByRole('button', { name: '媒体を足す', exact: true })
+  expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(add)).toBe(true)
+  fireEvent.click(add)
   expect(net.add).not.toHaveBeenCalled()
 })
 

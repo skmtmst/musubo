@@ -13,6 +13,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { PageFooter } from '@/components/templates/page-footer'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -513,7 +514,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
           actions={(
             <span className={styles.headActions}>
               {storePicker}
-              {canManage ? <Button onClick={() => { setAdding(true); setAddName(''); setAddError(''); setAddNameError('') }}><Plus size={16} aria-hidden="true" />媒体を足す</Button> : null}
+              {<PermissionGatedButton allowed={canManage} onClick={() => { setAdding(true); setAddName(''); setAddError(''); setAddNameError('') }}><Plus size={16} aria-hidden="true" />媒体を足す</PermissionGatedButton>}
             </span>
           )}
         />

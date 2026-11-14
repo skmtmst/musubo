@@ -21,6 +21,8 @@ import { describeApiFailure, isForbidden, isForbiddenOrRateLimited, loadFailureN
 import { formatDateTime, formatDay, formatTime } from '@/lib/format';
 import { Card, NotificationToggle, RelatedLinks } from "./page-gap-parts"
 import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
+import { useAccountStyle } from '@/hooks/use-account-style'
+import { bookingWords } from '@/v8/booking-bookings/words'
 type Step = 'input' | 'confirm' | 'done' | 'conflict'
 
 /**
@@ -132,8 +134,11 @@ function operationStatusLabel(status: string): string {
 
 export default function NewProxyBookingPage() {
   const { selectedAccountId } = useAccount()
+  /* 題は予約管理のボタンと同じ言葉（TM-V20：面談・教室は言い換え）。 */
+  const accountStyle = useAccountStyle(selectedAccountId)
+  const createTitle = bookingWords(accountStyle.status === 'ready' ? accountStyle.data?.style : null).create
   /* パンくずは上の帯だけ（板の中の2つ目のパンくずは置かない）。 */
-  usePageTitle('電話の予約を入れる')
+  usePageTitle(createTitle)
   usePageCrumbs([{ label: '予約管理', href: '/booking/bookings' }])
   const [step, setStep] = useState<Step>('input')
   const [menus, setMenus] = useState<BookingMenu[]>([])
@@ -764,7 +769,7 @@ export default function NewProxyBookingPage() {
 
   return (
     <div data-design-node={`${NODE_BY_STEP[step]} If9Mh`} className="space-y-4 pb-24">
-      <div><PageHeading title="電話の予約を入れる" /></div>
+      <div><PageHeading title={createTitle} /></div>
 
       {error && step !== 'conflict' && (
         <Notice

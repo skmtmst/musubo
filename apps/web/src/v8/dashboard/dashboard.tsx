@@ -5,6 +5,7 @@ import { partialFailureLabels,partialFailuresWithoutCard } from '@/components/da
 import ShipmentPanel from '@/components/dashboard/shipment-panel'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { emptyValue } from '@/components/shared/empty-value'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -75,6 +76,8 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
   /* 役割が読めるまでは出し、閲覧のみと分かったら隠す（サーバの 403 が最後の守り）。 */
   const canManage = canManageRole(role)
   const canEditLayout = canEditDashboardLayout(role)
+  const manageLockReason = usePermissionLockReason(canManage)
+  const layoutLockReason = usePermissionLockReason(canEditLayout)
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。QR の窓の間は最初の1通を待って読み直す。 */
   /* 〜：はじめの質問の答え・警告の帯・はじめにやること（スタイルの口が読めたときだけ）。 */
   const setup = useStyleSetup(d.selectedAccountId, role)
@@ -399,8 +402,9 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       help={headline(data?.asOf, d.displayedHealthRisk)}
       actions={<>
         <PeriodPicker days={d.period === 'today' ? 1 : d.period === 'last7' ? 7 : 30} supportedDays={[1,7,30]} choices={PERIODS.map((item) => ({ days: item.key === 'today' ? 1 : item.key === 'last7' ? 7 : 30, label: item.label }))} onChange={(value) => d.selectPeriod(value === 1 ? 'today' : value === 7 ? 'last7' : 'last30')} />
-        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button> : null}
-        {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={16} aria-hidden="true" />配信を作る</Button> : null}
+        {/* 閲覧のみでも隠さず、灰色＋理由の吹き出し。 */}
+        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button> : <Button type="button" lockedReason={layoutLockReason} disabled={!layoutLockReason}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button>}
+        {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={16} aria-hidden="true" />配信を作る</Button> : <Button variant="primary" lockedReason={manageLockReason} disabled={!manageLockReason}><Plus size={16} aria-hidden="true" />配信を作る</Button>}
       </>}
       notice={notice}
       overlays={d.editorOpen && canEditLayout ? <DashboardEditor

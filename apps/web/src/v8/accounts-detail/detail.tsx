@@ -20,6 +20,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { SettingsPage } from '@/components/templates';
 import SettingsInnerNav from '@/components/layout/settings-inner-nav';
 import Button from '@/components/shared/button';
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason';
 import SendersCard from './senders-card';
 import Card, { CardHeader } from '@/components/shared/card';
 import TruncatedText from '@/components/shared/truncated-text';
@@ -51,6 +52,7 @@ export default function AccountDetailV8() {
   const role = useStaffRole()
   // 変える操作はオーナー・管理者だけ。役割が分かるまでは出さない（今の画面と同じ）。
   const canManage = role !== null && canManageRole(role)
+  const manageLockReason = usePermissionLockReason(canManage, 'manager')
   const viewer = role !== null && !canManage
 
   const [account, setAccount] = useState<AccountDetailView | null>(null)
@@ -226,11 +228,10 @@ export default function AccountDetailV8() {
 
   const headActions = (
     <div className={styles.headActions}>
-      {canManage ? (
-        <Button type="button" onClick={() => setEditing(true)}>
-          <Pencil size={16} aria-hidden="true" />編集する
-        </Button>
-      ) : null}
+      {/* 閲覧のみでも隠さず、灰色＋理由の吹き出し。押しても Button が止める。 */}
+      <Button type="button" lockedReason={canManage ? undefined : manageLockReason} disabled={!canManage && !manageLockReason} onClick={() => setEditing(true)}>
+        <Pencil size={16} aria-hidden="true" />編集する
+      </Button>
       <Button href={`/accounts/handover?id=${account.id}`}>
         <ArrowLeftRight size={16} aria-hidden="true" />乗り換え
       </Button>
@@ -265,7 +266,7 @@ export default function AccountDetailV8() {
               </Row>
               <Row label="タイムゾーン">{account.timezone ?? 'Asia/Tokyo'}</Row>
               <Row label="テスト送信先">
-                <ActionValue value={recipientValue} action={canManage ? <Button type="button" variant="text" presentation="account-inline" onClick={() => setRecipientsOpen(true)}>変える</Button> : null} />
+                <ActionValue value={recipientValue} action={canManage ? <Button type="button" variant="text" presentation="account-inline" onClick={() => setRecipientsOpen(true)}>変える</Button> : <Button type="button" variant="text" presentation="account-inline" lockedReason={manageLockReason} disabled={!manageLockReason}>変える</Button>} />
               </Row>
               {/* 登録の内容は1枚のカードにまとめる（つづきで割らない）。 */}
               <Row label="友だち数"><span title={capacityDetails(account)}>{friendsLine(account)}</span></Row>
@@ -280,13 +281,13 @@ export default function AccountDetailV8() {
               <Row label="チャネルシークレット">
                 <ActionValue
                   value={credentialLine({ configured: account.channelSecretConfigured, last4: account.channelSecretLast4, updatedAt: null, checkedAt: account.connection?.lastTestAt ?? null })}
-                  action={canManage ? <Button type="button" onClick={() => setCredentials('messaging')}>差し替える</Button> : null}
+                  action={canManage ? <Button type="button" onClick={() => setCredentials('messaging')}>差し替える</Button> : <Button type="button" lockedReason={manageLockReason} disabled={!manageLockReason}>差し替える</Button>}
                 />
               </Row>
               <Row label="Loginチャネルシークレット">
                 <ActionValue
                   value={credentialLine({ configured: account.loginChannelSecretConfigured, last4: account.loginChannelSecretLast4, updatedAt: account.loginChannelSecretUpdatedAt })}
-                  action={canManage ? <Button type="button" onClick={() => setCredentials('login')}>差し替える</Button> : null}
+                  action={canManage ? <Button type="button" onClick={() => setCredentials('login')}>差し替える</Button> : <Button type="button" lockedReason={manageLockReason} disabled={!manageLockReason}>差し替える</Button>}
                 />
               </Row>
               <div className={styles.wide}>
@@ -294,7 +295,7 @@ export default function AccountDetailV8() {
                 <span className={styles.wideValue}>
                   {credentialLine({ configured: account.channelAccessTokenConfigured, last4: account.channelAccessTokenLast4, updatedAt: account.channelAccessTokenUpdatedAt })}
                 </span>
-                {canManage ? <Button type="button" onClick={() => setCredentials('messaging')}>差し替える</Button> : null}
+                {canManage ? <Button type="button" onClick={() => setCredentials('messaging')}>差し替える</Button> : <Button type="button" lockedReason={manageLockReason} disabled={!manageLockReason}>差し替える</Button>}
               </div>
               <Row label="Webhookの利用" id="acd-webhook">
                 <span className={styles.inline}>
@@ -362,26 +363,24 @@ export default function AccountDetailV8() {
                 ))}
               </p>
             </Card>
-            {canManage ? (
-              <div className={styles.actions}>
-                {account.archivedAt ? (
-                  <Button type="button" onClick={() => setRestoreTarget(account)}>
-                    <ArchiveRestore size={16} aria-hidden="true" />アーカイブから戻す
+            <div className={styles.actions}>
+              {account.archivedAt ? (
+                <Button type="button" lockedReason={canManage ? undefined : manageLockReason} disabled={!canManage && !manageLockReason} onClick={() => setRestoreTarget(account)}>
+                  <ArchiveRestore size={16} aria-hidden="true" />アーカイブから戻す
+                </Button>
+              ) : (
+                <>
+                  <Button type="button" lockedReason={canManage ? undefined : manageLockReason} disabled={!canManage && !manageLockReason} onClick={() => setStopTarget(account)}>
+                    {account.isActive ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
+                    {account.isActive ? '送受信を止める' : '送受信を再開する'}
                   </Button>
-                ) : (
-                  <>
-                    <Button type="button" onClick={() => setStopTarget(account)}>
-                      {account.isActive ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
-                      {account.isActive ? '送受信を止める' : '送受信を再開する'}
-                    </Button>
-                    <Button type="button" variant="danger" disabled={blocked !== null} title={blocked ?? undefined} aria-describedby={blocked ? archiveReasonId : undefined} onClick={() => setArchiveTarget(account)}>
-                      アーカイブする
-                    </Button>
-                    {blocked ? <p id={archiveReasonId} className={styles.note}>{blocked}</p> : null}
-                  </>
-                )}
-              </div>
-            ) : null}
+                  <Button type="button" variant="danger" lockedReason={canManage ? undefined : manageLockReason} disabled={blocked !== null || (!canManage && !manageLockReason)} title={blocked ?? undefined} aria-describedby={blocked ? archiveReasonId : undefined} onClick={() => setArchiveTarget(account)}>
+                    アーカイブする
+                  </Button>
+                  {blocked ? <p id={archiveReasonId} className={styles.note}>{blocked}</p> : null}
+                </>
+              )}
+            </div>
           </aside>
         </div>
       </SettingsPage>
