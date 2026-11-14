@@ -112,6 +112,7 @@ export default function EntityRemoteField({ kind, label, value, onChange, accoun
   const state = !current || current.status === 'loading' ? <ListState kind="loading" />
     : current.status === 'error' ? <ListState kind="error" error={current.error} onRetry={load} /> : undefined
   return <EntityPickerField key={key} label={label} noun={def.noun} id={id} value={value} onChange={onChange}
+    candidatesStatus={current?.status}
     createHref={def.createHref} createLabel={def.createLabel}
     items={emptyLabel ? [{ id: '', name: emptyLabel }, ...rows] : rows} folders={folders} foldersFailed={failed}
     disabled={disabled || !accountId} onOpen={load} state={state} placeholder={emptyLabel} />

@@ -46,8 +46,6 @@ export function useAbResult(broadcastId: string | null) {
     try {
       const res = await broadcastAbApi.result(broadcastId)
       if (!res.success) throw new Error('ab result failed')
-      /* A/B を使っていない配信は区画を出さない（口は 404 か data:null）。 */
-      if (!res.data) { setResult(null); setState('none'); return }
       setResult(res.data)
       setState('ready')
     } catch (caught) {

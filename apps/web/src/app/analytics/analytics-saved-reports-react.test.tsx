@@ -244,7 +244,7 @@ describe('管理画面 保存タブの定期レポート', () => {
     expect(host.textContent).not.toContain('定期レポート 0件')
   })
 
-  it('運用担当には一覧は見せるが変更操作は出さない', async () => {
+  it('運用担当には一覧は見せ、変更操作は押せない形で出す', async () => {
     fixture.role = 'staff'
     await render()
     expect(host.textContent).toContain('週次まとめ')
@@ -252,7 +252,11 @@ describe('管理画面 保存タブの定期レポート', () => {
     expect(edit.getAttribute('aria-disabled') === 'true' || edit.hasAttribute('disabled')).toBe(true)
     expect(host.querySelector('a[title="条件を変えるときは、元の分析で集計し直してから保存します"]')).toBeNull()
     for (const label of ['止める', 'また送る', 'しまう', '定期レポートを作る']) {
-      expect(Array.from(host.querySelectorAll('button, a')).some((item) => item.textContent?.trim() === label)).toBe(false)
+      // 出ているなら押せない（灰色＋理由）。リンクとして行き先を持たない。
+      for (const item of Array.from(host.querySelectorAll<HTMLElement>('button, a')).filter((el) => el.textContent?.trim() === label)) {
+        expect(item.tagName, label).toBe('BUTTON')
+        expect(item.getAttribute('aria-disabled') === 'true' || item.hasAttribute('disabled'), label).toBe(true)
+      }
     }
   })
 })

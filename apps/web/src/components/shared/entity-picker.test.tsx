@@ -25,6 +25,14 @@ const items: EntityPickerItem[] = [
   { id: 'd', name: '分類なし', folderId: null },
 ]
 
+it('取得中の窓は既存値を未選択と表示しない', () => {
+  const view = render(<EntityPickerDialog title="担当者を選ぶ" items={[]} initialId="saved" state={<p>取得中</p>} onCancel={() => {}} onConfirm={() => {}} />)
+  expect(screen.getByText('選択済みの候補を確認できません')).toBeTruthy()
+  expect(screen.queryByText('まだ選んでいません')).toBeNull()
+  view.rerender(<EntityPickerDialog title="担当者を選ぶ" items={[]} initialId="saved" state={<p>取得失敗</p>} onCancel={() => {}} onConfirm={() => {}} />)
+  expect(screen.getByText('選択済みの候補を確認できません')).toBeTruthy()
+})
+
 function Single({ initial = '', readOnly = false, onChange = vi.fn() }: { initial?: string; readOnly?: boolean; onChange?: (id: string) => void }) {
   const [value, setValue] = useState(initial)
   return <EntityPickerField label="回答フォーム" noun="回答フォーム" items={items} folders={folders} value={value} readOnly={readOnly}
@@ -33,6 +41,28 @@ function Single({ initial = '', readOnly = false, onChange = vi.fn() }: { initia
 }
 
 describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
+  it('候補の状態を指定しない欄は従来の欠落文言を保つ', () => {
+    const view = render(<EntityPickerField label="回答フォーム" noun="回答フォーム" items={[{ id: 'other', name: '別のフォーム' }]} value="gone" onChange={() => {}} />)
+    expect(screen.getByText('現在は選べません')).toBeTruthy()
+    expect(screen.getByText('選び直してください。')).toBeTruthy()
+    view.rerender(<EntityPickerField label="担当者" noun="担当者" items={[{ id: 'other', name: '別の担当者' }]} value="gone" onChange={() => {}} />)
+    expect(screen.getByText('現在は選べません')).toBeTruthy()
+  })
+  it('候補の取得状態に応じて、0件と未取得を区別する', () => {
+    const props = { label: '担当者', noun: '担当者', items: [], value: 'gone', onChange: vi.fn() }
+    const view = render(<EntityPickerField {...props} candidatesStatus="loading" />)
+    expect(screen.getByText('読み込み中…')).toBeTruthy()
+    view.rerender(<EntityPickerField {...props} items={[{ id: 'gone', name: '古い名前' }]} candidatesStatus="loading" />)
+    expect(screen.getByText('読み込み中…')).toBeTruthy()
+    expect(screen.queryByText('古い名前')).toBeNull()
+    view.rerender(<EntityPickerField {...props} candidatesStatus="error" />)
+    expect(screen.getByText('担当者を読み込めませんでした')).toBeTruthy()
+    expect(screen.queryByText('担当者は今は選べません')).toBeNull()
+    view.rerender(<EntityPickerField {...props} candidatesStatus="ready" />)
+    expect(screen.getByText('担当者は今は選べません')).toBeTruthy()
+    expect(screen.getByText('選び直してください。')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '担当者：変える' }).getAttribute('aria-invalid')).toBe('true')
+  })
   it('項目名を欄に残しても窓の候補名と確定するIDは変えない', async () => {
     const onChange = vi.fn()
     render(<EntityPickerField label="担当者" noun="担当者" items={items} value="a" valuePrefix="担当者：" onChange={onChange} />)
@@ -109,6 +139,24 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
 })
 
 describe('まとめて選ぶ窓', () => {
+  it('複数選択の未取得・失敗・確定した欠落を区別し、値を勝手に外さない', () => {
+    const onChange = vi.fn()
+    const props = { label: '担当者', noun: '担当者', items: [], value: ['gone'], onChange, multiple: true as const }
+    const view = render(<EntityPickerField {...props} candidatesStatus="loading" />)
+    expect(screen.getByText('読み込み中…')).toBeTruthy()
+    view.rerender(<EntityPickerField {...props} items={[{ id: 'gone', name: '古い名前' }]} candidatesStatus="loading" />)
+    expect(screen.getByText('古い名前')).toBeTruthy()
+    view.rerender(<EntityPickerField {...props} items={[{ id: 'gone', name: '古い名前' }]} candidatesStatus="error" />)
+    expect(screen.getByText('古い名前')).toBeTruthy()
+    view.rerender(<EntityPickerField {...props} candidatesStatus="error" />)
+    expect(screen.getByText('担当者を読み込めませんでした')).toBeTruthy()
+    expect(screen.queryByText('担当者は今は選べません')).toBeNull()
+    view.rerender(<EntityPickerField {...props} candidatesStatus="ready" />)
+    expect(screen.getByText('担当者は今は選べません')).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '担当者は今は選べませんを外す' }))
+    expect(onChange).toHaveBeenCalledWith([])
+  })
   it('フォルダの横のチェックでフォルダごと選び、一部だけなら「－」。選んだものだけ見て、確定で返す', async () => {
     const onConfirm = vi.fn()
     render(<EntityMultiPickerDialog title="配るアカウントを選ぶ" unit="アカウント" items={items} folders={folders} initialIds={['b']} onConfirm={onConfirm} onCancel={() => {}} />)

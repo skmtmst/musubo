@@ -80,7 +80,7 @@
 3. エラー文面の対応表（§9）はサーバーに 49 行入っていて、画面側の引き方（lib/error-messages.ts）もあるが、どの画面もそれを読んでいない（試験だけが読む）。根拠：apps/web/src/lib/error-messages.ts を読み込むのは apps/web/src/lib/error-messages.test.ts だけ、packages/db/migrations/463_error_messages_and_getting_started_dismiss.sql:27-。
 4. マニュアルの置き場：要件 §8-1 はトップの帯の 1 か所。V8 の帯ではマニュアルを描かない（V8 の決まり B-158「マニュアルのボタンは置かない」）。根拠：apps/web/src/components/shared/top-bar.tsx:246-250（`!v8Chrome` の時だけ）、apps/web/src/components/shell/app-top-bar.tsx:310、docs/v8-design-rules.md:208。
 5. ダッシュボードの「はじめにやること」6 項目（つなぐ・あいさつ・リッチメニュー・一斉配信・シナリオ・招待）は、はじめの設定の段（アカウント・初期セット・友だちの分け方・友だち追加時の配信・シナリオ・最初の 1 通）と別の物を数えている。要件 §6-2 は同じ順路の進み（「2 / 5 が完了」）。根拠：apps/web/src/v8/dashboard/first-steps.tsx:26-33、apps/worker/src/routes/getting-started.ts:22-29。
-6. 段の数：要件は 4 段＋最終確認の 5 つ。V8 の画面は「使う機能の初期セット」を足して 6 つ。根拠：apps/worker/src/routes/getting-started.ts:219-222、apps/web/src/v8/settings/getting-started/steps.ts。
+6. 段の数：要件は 4 段＋最終確認の 5 つ。V8 の画面は「使う機能の初期セット」を足して 6 つ。 → 解決（SPEC-11・2026-11-14 オーナー「おすすめで」）：要件を実装の 6 つ（飲食店は 8 つ）に合わせて直した。根拠：apps/worker/src/routes/getting-started.ts:219-222、apps/web/src/v8/settings/getting-started/steps.ts。
 7. 段 1 の完了条件は 2026-10-31 の利用者指示で登録済みアカウント 1 件以上に変更した。接続の健康状態は別の運用表示で確認する。
 8. 段 1 は LINE への問い合わせを行わず、接続確認の失敗で完了状態を変えない。
 9. 段の行き先：段 1 は `/accounts`、最終確認は受信箱（`/chats`）。根拠：apps/worker/src/routes/getting-started.ts、apps/web/src/v8/settings/getting-started/steps.ts の buildStepsFromApi。

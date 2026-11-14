@@ -821,6 +821,31 @@ describe('industry metrics', () => {
   });
 });
 describe('classes, closure, and HQ attention', () => {
+  test('取消理由の保存は確認時の版が古ければ拒み、正しい版なら進める', async () => {
+    booking('person', '2026-10-15T01:00:00Z');
+    raw.exec("UPDATE bookings SET confirmation_revision=2 WHERE id='person'");
+    const input = { expectedVersion: 0, expectedConfirmationRevision: 1, cancellationReason: '予定変更' };
+    const stale = await write('/bookings/person', input, 'PATCH');
+    expect(stale.status).toBe(409);
+    expect(await value(stale)).toMatchObject({ code: 'version_conflict', current: { status: 'confirmed', confirmationRevision: 2, version: 0 } });
+    expect(raw.prepare("SELECT lock_version,confirmation_revision,cancellation_reason FROM bookings WHERE id='person'").get()).toMatchObject({ lock_version: 0, confirmation_revision: 2, cancellation_reason: null });
+    expect((await write('/bookings/person', { ...input, expectedConfirmationRevision: 2 }, 'PATCH')).status).toBe(200);
+    expect(raw.prepare("SELECT lock_version,confirmation_revision,cancellation_reason FROM bookings WHERE id='person'").get()).toMatchObject({ lock_version: 1, confirmation_revision: 3, cancellation_reason: '予定変更' });
+  });
+
+  test('確認と取消理由の保存の間に別の変更が入れば保存しない', async () => {
+    booking('person', '2026-10-15T01:00:00Z');
+    const originalBatch = db.batch.bind(db);
+    let changed = false;
+    db.batch = async (statements) => {
+      if (!changed) { changed = true; raw.exec("UPDATE bookings SET confirmation_revision=confirmation_revision+1 WHERE id='person'"); }
+      return originalBatch(statements);
+    };
+    const response = await write('/bookings/person', { expectedVersion: 0, expectedConfirmationRevision: 1, cancellationReason: '予定変更' }, 'PATCH');
+    expect(response.status).toBe(409);
+    expect(raw.prepare("SELECT lock_version,confirmation_revision,cancellation_reason FROM bookings WHERE id='person'").get()).toMatchObject({ lock_version: 0, confirmation_revision: 2, cancellation_reason: null });
+  });
+
   test('人の予約とレッスン予約の編集は確認専用の版を進める', async () => {
     booking('person', '2026-10-15T01:00:00Z');
     expect((await write('/bookings/person', { expectedVersion: 0, outcome: 'won' }, 'PATCH')).status).toBe(200);

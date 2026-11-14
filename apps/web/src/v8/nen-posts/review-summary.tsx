@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { ArrowUpDown } from 'lucide-react'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 
 export function PhotoReviewHelp({ pending, adopted, rejected }: { pending: string; adopted: string; rejected: string }) {
@@ -22,6 +23,6 @@ const PUBLICATION_RULES: readonly ReactNode[] = [
 
 export function PublicationRules({ canEdit, busy, onOrder }: { canEdit: boolean; busy: boolean; onOrder: () => void }) {
   return <CreateSummaryCard title="出すときの決めごと" rows={[]} descriptionItems={PUBLICATION_RULES}>
-    {canEdit ? <Button variant="secondary" disabled={busy} onClick={onOrder} busy={busy} busyLabel="処理中…"><ArrowUpDown size={16} aria-hidden="true" />並び順を変える</Button> : null}
+    {<PermissionGatedButton allowed={canEdit} variant="secondary" disabled={busy} onClick={onOrder} busy={busy} busyLabel="処理中…"><ArrowUpDown size={16} aria-hidden="true" />並び順を変える</PermissionGatedButton>}
   </CreateSummaryCard>
 }

@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import ActionMenu from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import StatusBadge from '@/components/shared/status-badge'
 import type { BookingVisitMark } from '@/lib/api'
 import type { AccountStyle } from '@line-crm/shared'
@@ -23,7 +24,12 @@ export default function PeopleVisitActions({ mark, ready, busy, canMark, onMark,
   const [lateOpen, setLateOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const words = bookingWords(usageStyle)
-  if (!canMark) return null
+  /* 権限が無い人にも印（データ）は見せ、操作は隠さず灰色＋理由。 */
+  if (!canMark) return <span className="inline-flex items-center gap-2">
+    {mark?.kind === 'visited' || mark?.kind === 'no_show'
+      ? <><StatusBadge tone={mark.kind === 'visited' ? 'success' : 'neutral'}>{mark.kind === 'visited' ? words.completed : words.absent}</StatusBadge><PermissionGatedButton allowed={false} variant="text" size="inline">取り消す</PermissionGatedButton></>
+      : <>{mark?.kind === 'late' ? <StatusBadge tone="warning">{mark.late_minutes}分遅れる</StatusBadge> : null}<PermissionGatedButton allowed={false} variant="primary" size="booking">{words.completeAction}</PermissionGatedButton></>}
+  </span>
   if (mark?.kind === 'visited' || mark?.kind === 'no_show') return <span className="inline-flex items-center gap-2">
     <StatusBadge tone={mark.kind === 'visited' ? 'success' : 'neutral'}>{mark.kind === 'visited' ? words.completed : words.absent}</StatusBadge>
     <Button variant="text" size="inline" disabled={busy || !ready} onClick={onUnmark}>取り消す</Button>
