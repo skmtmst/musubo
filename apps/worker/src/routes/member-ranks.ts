@@ -52,7 +52,10 @@ for(const action of ['activate','stop']as const)memberRanks.post(`/api/member-ra
 memberRanks.get('/api/friends/:id/member-rank',requirePermission('/mileage'),async c=>{
  const a=await gapAccount(c),id=c.req.param('id');if(!await c.env.DB.prepare('SELECT id FROM friends WHERE id=? AND line_account_id=?').bind(id,a).first())throw new GapError('not_found',404);
  const current=await c.env.DB.prepare('SELECT r.*,t.name,t.threshold,t.mile_multiplier FROM member_ranks r JOIN member_rank_tiers t ON t.id=r.tier_id WHERE r.account_id=? AND r.friend_id=?').bind(a,id).first();
- const history=(await c.env.DB.prepare('SELECT * FROM member_rank_history WHERE account_id=? AND friend_id=? ORDER BY at DESC LIMIT 20').bind(a,id).all()).results;
+ const history=(await c.env.DB.prepare(`SELECT h.id,h.account_id,h.friend_id,h.from_tier_id,h.to_tier_id,h.reason,
+ CASE WHEN EXISTS(SELECT 1 FROM member_rank_notices n JOIN outbound_send_requests o ON o.resource_id='rank-notice:'||n.id AND o.line_account_id=n.account_id AND o.channel='line' AND o.status='succeeded'
+ WHERE n.account_id=h.account_id AND n.friend_id=h.friend_id AND n.kind='upgrade' AND n.change_key=h.at||':'||h.to_tier_id) THEN 1 ELSE h.notified END notified,h.at
+ FROM member_rank_history h WHERE h.account_id=? AND h.friend_id=? ORDER BY h.at DESC LIMIT 20`).bind(a,id).all()).results;
  return c.json({success:true,data:{current,history}});
 });
 
@@ -67,5 +70,10 @@ memberRanks.get('/api/liff/member-card',async c=>{
  return c.json({success:true,data:{memberNumber:identity!.member_number,name:row.name,benefits,benefitDetails,since:row.since,downgradeDueAt:row.downgrade_due_at,next:next?{name:next.name,remaining:Math.max(0,next.threshold-(decision?.score??0)),metric:p.metric,progress:Math.max(0,Math.min(1,((decision?.score??0)-row.threshold)/(next.threshold-row.threshold)))}:null}});
 });
 
-memberRanks.get('/api/member-ranks/notices',async c=>{const a=await gapAccount(c);const items=(await c.env.DB.prepare('SELECT id,kind,purpose,scheduled_at scheduledAt,status,processed_at processedAt,test_mode testMode FROM member_rank_notices WHERE account_id=? ORDER BY scheduled_at DESC,id LIMIT 100').bind(a).all()).results;return c.json({success:true,data:{items}});});
+memberRanks.get('/api/member-ranks/notices',async c=>{const a=await gapAccount(c);const items=(await c.env.DB.prepare(`SELECT n.id,n.kind,n.purpose,n.scheduled_at scheduledAt,
+ CASE WHEN o.status='succeeded' THEN 'sent' WHEN o.status='unknown' THEN 'delivery_unknown'
+ WHEN o.status='failed' AND o.failure_code='NOTIFICATION_PRECONDITION_CHANGED' THEN 'delivery_blocked' WHEN o.status='failed' THEN 'delivery_failed' WHEN o.status='in_progress' AND o.lease_expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now') THEN 'delivery_unknown' WHEN o.status='in_progress' THEN 'sending' ELSE n.status END status,
+ COALESCE(o.completed_at,n.processed_at) processedAt,CASE WHEN o.idempotency_key IS NULL THEN n.test_mode ELSE 0 END testMode
+ FROM member_rank_notices n LEFT JOIN outbound_send_requests o ON o.resource_id='rank-notice:'||n.id AND o.line_account_id=n.account_id AND o.channel='line'
+ WHERE n.account_id=? ORDER BY n.scheduled_at DESC,n.id LIMIT 100`).bind(a).all()).results;return c.json({success:true,data:{items}});});
 memberRanks.post('/api/member-ranks/notices/simulate',async c=>{gapWrite(c,{admin:true});const a=await gapAccount(c),b=await gapBody(c);if(b.testMode!==true)throw new GapError('test_mode_required');return c.json({success:true,data:await processRankNotices(c.env.DB,new Date(),a)});});
