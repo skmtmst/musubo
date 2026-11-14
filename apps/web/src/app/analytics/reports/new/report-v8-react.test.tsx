@@ -217,6 +217,15 @@ afterEach(async () => {
 })
 
 describe('V8 レポート作成（H5UoIu）', () => {
+  it('保存済みの担当者が取得済み候補にいなくても、外さずに案内する', async () => {
+    fixture.editId = 'report-1'
+    net.noStaff = true
+    await mount()
+    await settle()
+    expect(container.textContent).toContain('担当者は今は選べません')
+    expect(container.textContent).toContain('このまま保存すると宛先から外れます')
+    expect(net.puts).toHaveLength(0)
+  })
   it('宛先が未選択なら理由を伝えて送信せず、選んだ後に同じ操作が使える', async () => {
     await mount()
     await settle()
