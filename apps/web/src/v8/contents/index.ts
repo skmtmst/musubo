@@ -2,3 +2,4 @@
 export { default as MediaLibraryListV8 } from './list'
 export { extractMediaMetadata, putMediaFile, validateMediaFile } from './media-direct-upload'
 export { default as MediaPickerDialog } from './media-picker-dialog'
+export type { MediaUsageImpact } from './media-usage-references'

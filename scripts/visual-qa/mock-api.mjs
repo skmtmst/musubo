@@ -37,6 +37,7 @@ import { mockFingerprint } from './mock-fingerprint.mjs'
 import { gap3Respond } from './mock-gap3.mjs'
 import { gap2Respond } from './mock-gap2.mjs'
 import { eventBookingsPage } from './event-bookings-mock.mjs'
+import { VISUAL_QA_PASSKEYS, conversionReportForPeriod } from './mock-small-responses.mjs'
 import { listedFormResponse, listedCommonVarResponse } from './mock-listed-details.mjs'
 /** fixtures・補助処理・API形の入力も含む、起動時の指紋。 */
 const FINGERPRINT = mockFingerprint()
@@ -3138,9 +3139,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/restaurant-test/delivery/menu-items') {
     return { success: true, store: DELIVERY_STORE, items: DELIVERY_MENU_ITEMS }
   }
-
   if (method === 'GET' && pathname === '/api/auth/two-factor/policy') return { success: true, data: { required: true, canEdit: true, configured: true, notice: null, registered: 4, total: 6 } }
   if (method === 'GET' && pathname === '/api/auth/two-factor/self') return { success: true, data: { staffId: 'visual-qa-owner', enabledAt: '2026-10-12T03:00:00Z', remaining: 8, total: 8, canEdit: true, configured: true, notice: null } }
+  if (method === 'GET' && pathname === '/api/auth/passkeys/self') return { success: true, data: VISUAL_QA_PASSKEYS }
   if (pathname === '/api/auth/session') {
     /*
      * 運営コンソールの外枠（`OpsShell`）は `platformAdmin` を見る。
@@ -4848,6 +4849,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       return { ...chat, slaDueAt: new Date(Date.now() + minutes[index] * 60000).toISOString(), slaState: minutes[index] < 0 ? 'overdue' : 'soon', assignedBy: index < 2 ? 'auto' : index === 2 ? 'manual' : null }
     })
     let rows = withSla
+    if (query.get('status')) rows = rows.filter((chat) => chat.status === query.get('status'))
     if (query.get('slaState') === 'overdue') rows = rows.filter((chat) => chat.slaState === 'overdue')
     if (query.get('sort') === 'sla_due') rows = [...rows].sort((a, b) => (a.slaDueAt ? Date.parse(a.slaDueAt) : Infinity) - (b.slaDueAt ? Date.parse(b.slaDueAt) : Infinity)); else if (query.get('sort') === 'latest') rows = [...rows].sort((a, b) => String(b.lastMessageAt ?? '').localeCompare(String(a.lastMessageAt ?? ''))) // latest は未読を先にしない新しい順
     const limit = Number(query.get('limit') ?? 0)
@@ -5775,9 +5777,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
   if (pathname === '/api/conversions/report') {
-    if (query.has('from') || query.has('to')) {
-      return { success: true, data: CONVERSION_DEFINITION_REPORT }
-    }
+    if (query.has('from') || query.has('to')) return conversionReportForPeriod(query, CONVERSION_DEFINITION_REPORT)
     const startDate = query.get('startDate') ?? ''
     const data = startDate >= '2026-08-01'
       ? CONVERSION_REPORT_CURRENT
