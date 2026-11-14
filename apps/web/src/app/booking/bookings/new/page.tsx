@@ -22,7 +22,7 @@ import { formatDateTime, formatDay, formatTime } from '@/lib/format';
 import { Card, NotificationToggle, RelatedLinks } from "./page-gap-parts"
 import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 import { useAccountStyle } from '@/hooks/use-account-style'
-import { bookingWords } from '@/v8/booking-bookings/public/words/index'
+import { bookingWords } from '@/v8/booking-bookings/words'
 type Step = 'input' | 'confirm' | 'done' | 'conflict'
 
 /**
