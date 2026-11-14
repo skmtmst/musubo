@@ -81,6 +81,19 @@ describe('成果引き出しは共通の窓の動きをする', () => {
     fireEvent.change(rate, { target: { value: '0' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '取り決めを保存する' })) })
     expect(update).toHaveBeenCalledWith('a1', expect.objectContaining({ commissionRate: 0 }))
+    // 開いた時の値を一緒に送り、ほかの人が先に保存していたら Worker が止められるようにする。
+    expect(update).toHaveBeenCalledWith('a1', expect.objectContaining({
+      expected: { name: '山田', rewardMode: 'rate', commissionRate: 10, isActive: true, email: null, holdDays: null, payoutCycle: null, notifyOnConversion: false },
+    }))
+  })
+
+  test('名前を直して保存する時も、開いた時の値を一緒に送る', async () => {
+    update.mockClear()
+    render(<AffiliateDrawerV8 affiliate={{ ...row, rewardMode: 'fixed', commissionRate: 0 }} accountId="acc-1" readonly={false} startInEdit={false} linkBaseUrl="https://example.invalid" onClose={() => {}} onChanged={() => {}} onStopRequest={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: '紹介者の名前を直すを変更する' }))
+    fireEvent.change(screen.getByRole('textbox', { name: '紹介者の名前を直す' }), { target: { value: '山田商店' } })
+    await act(async () => { fireEvent.keyDown(screen.getByRole('textbox', { name: '紹介者の名前を直す' }), { key: 'Enter' }) })
+    expect(update).toHaveBeenCalledWith('a1', { name: '山田商店', expected: expect.objectContaining({ name: '山田', commissionRate: 0, isActive: true }) })
   })
 
   test('Escapeで閉じる', async () => {
