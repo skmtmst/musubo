@@ -4,6 +4,7 @@ import type { BroadcastBubble } from '@line-crm/shared'
 import HelpTip from '@/components/shared/help-tip'
 import SegmentedControl from '@/components/shared/segmented'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import { RowMenu } from '@/components/shared/row-actions'
 import Card from '@/components/shared/card'
 import type { BroadcastAb } from './use-ab'
@@ -22,7 +23,7 @@ export default function BroadcastAbTabs({ ab, aBubbles, canEdit, locked }: { ab:
       ) : <span className={styles.onlyA}>A 案</span>}
       <HelpTip label="A/B の案の説明">本文を 2 つ作り、一部の人に試して、クリック・予約・購入が多かった方を残りの人へ送ります。試し方は ④ 送信設定で決めます。送り手は A・B で同じです。</HelpTip>
       <span className={styles.spacer} />
-      {canEdit && !locked && !ab.hasB ? <Button size="compact" onClick={() => ab.addB(aBubbles)}>B 案を追加</Button> : null}
+      {!locked && !ab.hasB ? <PermissionGatedButton allowed={canEdit} size="compact" onClick={() => ab.addB(aBubbles)}>B 案を追加</PermissionGatedButton> : null}
       {canEdit && !locked && ab.hasB ? <RowMenu appearance="box" size="row" label="A/B の案の操作" items={[{ id: 'remove-b', label: 'B 案を消す', tone: 'danger', onSelect: ab.removeB }]} /> : null}
       {locked ? <span className={styles.note}>試し中は本文を直せません</span> : null}
     </Card>

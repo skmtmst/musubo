@@ -341,6 +341,7 @@ function ConditionControls({
               kind="staff"
               label="担当"
               value={rawValue}
+              candidatesStatus={referenceErrors.operators ? 'error' : 'ready'}
               disabled={referenceErrors.operators}
               placeholder={referenceErrors.operators ? '（担当者を読み込めませんでした）' : operators.length ? '（担当者を選ぶ）' : '（担当者がいません）'}
               onChange={(value) => onChange({ ...condition, value })}

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import type { FriendField, Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Dialog from '@/components/shared/dialog'
 import Checkbox from '@/components/shared/checkbox'
 import TextLink from '@/components/shared/text-link'
@@ -205,16 +206,16 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
       actionWording
       hiddenPersonalCount={data.hiddenPersonalCount}
       sections={[
-        { key: 'support', label: '対応', action: perms.editSupport ? <Button variant="text" size="inline" actionWording onClick={onEditSupport}>編集</Button> : null, content: <><dl className={styles.kvList}>
+        { key: 'support', label: '対応', action: <PermissionGatedButton allowed={perms.editSupport} variant="text" size="inline" actionWording onClick={onEditSupport}>編集</PermissionGatedButton>, content: <><dl className={styles.kvList}>
         <Kv label="状況">{support ? <StatusPill tone={SUPPORT_TONES[support.status]}>{SUPPORT_LABELS[support.status]}</StatusPill> : <span className={styles.faint}>やり取りなし</span>}</Kv>
         <Kv label="担当">{support?.operatorName ?? <span className={styles.faint}>未割り当て</span>}</Kv>
         <Kv label="最後の連絡">{data.historyStatus === 'ready' ? lastContactText(data.historyItems) : emptyValue('unknown')}</Kv>
       </dl></> },
-        { key: 'tags', label: 'タグ', action: perms.editSupport ? <Button variant="text" size="inline" actionWording onClick={() => void openTagEditor()}>編集</Button> : null, content: <><div className={styles.tags}>
+        { key: 'tags', label: 'タグ', action: <PermissionGatedButton allowed={perms.editSupport} variant="text" size="inline" actionWording onClick={() => void openTagEditor()}>編集</PermissionGatedButton>, content: <><div className={styles.tags}>
         {friend.tags?.length
           ? <TagOverflow maxVisible={2}>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />)}</TagOverflow>
           : <span className={`${styles.memo} ${styles.faint}`}>タグはありません</span>}
-        {perms.editSupport ? <Button variant="text" size="inline" actionWording onClick={() => void openTagEditor()}>＋ 追加</Button> : null}
+        {<PermissionGatedButton allowed={perms.editSupport} variant="text" size="inline" actionWording onClick={() => void openTagEditor()}>＋ 追加</PermissionGatedButton>}
       </div></> },
         { key: 'mileage', label: 'マイル', action: <TextLink inline href={`/mileage/friends/detail?id=${encodeURIComponent(friendId)}`}>詳細を見る</TextLink>, content: <>{mileageStatus === 'error' ? (
         <p className={`${styles.memo} ${styles.faint}`}>
@@ -242,7 +243,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
             : emptyValue('unknown')}
         </p>
       )}</> },
-        { key: 'memo', label: 'メモ', action: perms.editSupport ? <Button variant="text" size="inline" actionWording onClick={onEditSupport}>編集</Button> : null, content: <><p className={`${styles.memo} ${support?.notes ? '' : styles.faint}`}>{support?.notes || 'メモはありません'}</p></> }]}
+        { key: 'memo', label: 'メモ', action: <PermissionGatedButton allowed={perms.editSupport} variant="text" size="inline" actionWording onClick={onEditSupport}>編集</PermissionGatedButton>, content: <><p className={`${styles.memo} ${support?.notes ? '' : styles.faint}`}>{support?.notes || 'メモはありません'}</p></> }]}
       more={<div className={styles.more}>
         {starred.length > 0 ? (
           <section className={styles.group} aria-label="★つき友だち情報">
@@ -445,7 +446,7 @@ export default function OverviewTab({
         <div className={styles.ops}>
           <p className={styles.opsTitle}>この友だちに行う操作</p>
           {/* POST /api/scenarios/:id/enroll/:friendId はオーナー・管理者専用。権限が無い人には置かない。 */}
-          {perms.manage ? <Button onClick={onEnrollScenario}><Workflow aria-hidden />シナリオに登録する</Button> : null}
+          {<PermissionGatedButton allowed={perms.manage} onClick={onEnrollScenario}><Workflow aria-hidden />シナリオに登録する</PermissionGatedButton>}
           <span className={styles.opsNote}>テンプレートは受信箱で選んで送る</span>
         </div>
         {scenarioNotice ? <p className={styles.success} role="status">{scenarioNotice}</p> : null}

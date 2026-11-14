@@ -9,6 +9,7 @@ import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
@@ -401,7 +402,7 @@ function FriendAddPublish() {
               <dt>{row.label}</dt>
               <dd title={row.value}>{row.value}</dd>
               <dd className={styles.rowAction}>
-                {canEdit ? <Button href={row.href} variant="text">変える</Button> : null}
+                {<PermissionGatedButton allowed={canEdit} href={row.href} variant="text">変える</PermissionGatedButton>}
               </dd>
             </div>
           ))}

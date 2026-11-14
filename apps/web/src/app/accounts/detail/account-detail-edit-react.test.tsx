@@ -131,12 +131,16 @@ describe('R73 編集・差替えの入口', () => {
     expect(document.body.textContent).toContain('資格情報を差し替える')
   })
 
-  it('運用担当には入力の入口を見せない', async () => {
+  it('運用担当には入力の入口を灰色＋理由で出し、押しても開かない', async () => {
     fixture.role = 'staff'
     await renderPage()
-    const labels = [...host.querySelectorAll('button')].map((el) => el.textContent)
-    expect(labels).not.toContain('編集する')
-    expect(labels).not.toContain('差し替える')
+    const locked = (label: string) => [...host.querySelectorAll('button')].filter((el) => el.textContent?.includes(label))
+    for (const label of ['編集する', '差し替える']) {
+      expect(locked(label).length, label).toBeGreaterThan(0)
+      for (const el of locked(label)) expect(el.getAttribute('aria-disabled'), label).toBe('true')
+    }
+    clickButton('差し替える')
+    expect(document.body.textContent).not.toContain('資格情報を差し替える')
   })
 
   it('資格情報タブにも保存の入口がある', async () => {

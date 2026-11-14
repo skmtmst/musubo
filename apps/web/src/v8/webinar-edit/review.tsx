@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { Check, Globe, Play, Send } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useTestRecipients } from './use-test-recipients'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
@@ -171,7 +172,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
         </div>
         <div className={form.previewActions}>
           {ctx.canOpenPublicPage && ctx.publicUrl ? <Button external href={ctx.publicUrl}  >公開ページを見る</Button> : null}
-          {readOnly ? null : <Button disabled={testing !== false || publishing} onClick={() => { setNotice(''); setNotifyConfirm(true) }}><Send size={16} aria-hidden="true" />テストを送る</Button>}
+          {<PermissionGatedButton allowed={!readOnly} disabled={testing !== false || publishing} onClick={() => { setNotice(''); setNotifyConfirm(true) }}><Send size={16} aria-hidden="true" />テストを送る</PermissionGatedButton>}
         </div>
         {!ctx.canOpenPublicPage && ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
         {ctx.analytics ? <p className={form.previewNote}>{`申込 ${formatNumber(ctx.analytics.summary.reservations)} 人`}</p> : null}
