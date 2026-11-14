@@ -3,7 +3,10 @@ import type { Affiliate } from '@line-crm/shared'
 export type AffiliateEditValues = Required<Pick<Affiliate,
   'name' | 'rewardMode' | 'commissionRate' | 'isActive' | 'email' | 'holdDays' | 'payoutCycle' | 'notifyOnConversion'>>
 
-export function affiliateEditValues(affiliate: Affiliate): AffiliateEditValues {
+/** 保存の時に Worker が今の値と比べる、開いた時の値。一覧の行（集計つき）からも作れる。 */
+export type AffiliateEditSource = Pick<Affiliate, 'name' | 'commissionRate' | 'isActive'> & Partial<Pick<Affiliate, 'rewardMode' | 'email' | 'holdDays' | 'payoutCycle' | 'notifyOnConversion'>>
+
+export function affiliateEditValues(affiliate: AffiliateEditSource): AffiliateEditValues {
   return {
     name: affiliate.name,
     rewardMode: affiliate.rewardMode ?? (affiliate.commissionRate > 0 ? 'rate' : 'fixed'),
