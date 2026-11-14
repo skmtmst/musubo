@@ -124,11 +124,13 @@ describe('現役V8の公開予約の確認と取消', () => {
     const dialog = await openSchedules()
     expect(await within(dialog).findByText('まだ公開予約はありません。日時を決めて予約するとここに出ます。')).toBeTruthy()
   })
-  it('閲覧のみでは取消の口を出さない', async () => {
+  it('閲覧のみでは取消の口を灰色で出し、押しても取り消さない', async () => {
     net.role = 'viewer'
     const dialog = await openSchedules()
     await within(dialog).findByText('予約中')
-    expect(within(dialog).queryByRole('button', { name: '予約を取り消す' })).toBeNull()
+    const cancel = within(dialog).getByRole('button', { name: '予約を取り消す' })
+    expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(cancel)).toBe(true)
+    fireEvent.click(cancel)
     expect(net.cancel).not.toHaveBeenCalled()
   })
   it('店切替では前の一覧と取消の口を破棄する', async () => {

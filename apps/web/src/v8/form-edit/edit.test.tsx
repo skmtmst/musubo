@@ -41,7 +41,7 @@ const formsGet = vi.hoisted(() => vi.fn())
 const formsUpdate = vi.hoisted(() => vi.fn())
 const formsCreateDraft = vi.hoisted(() => vi.fn())
 const formsPublish = vi.hoisted(() => vi.fn())
-const menuStaff = vi.hoisted(()=>vi.fn(async()=>({staff:[]})))
+const menuStaff = vi.hoisted(()=>vi.fn(async (_accountId: string, _menuId: string): Promise<{ staff: Array<{ id: string; display_name: string }> }> => ({staff:[]})))
 const emptyList = vi.hoisted(() => async () => ({ success: true, data: [] as never[] }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -356,7 +356,8 @@ describe('回答フォームの編集（V8）', () => {
     staffMe.mockResolvedValue({ success: true, data: { role: 'staff' } })
     await render('id=form-1')
     expect(within(host.querySelector('[data-fe-root]') as HTMLElement).getByText('今日のご来店の目的は？')).toBeTruthy()
-    for (const name of ['ページを足す', '公開前に試す（試しのURLを作る）']) expect(screen.queryByRole('button', { name })).toBeNull()
+    // 隠さず灰色＋理由。出ているなら押せない。
+    for (const name of ['ページを足す', '公開前に試す（試しのURLを作る）']) for (const el of screen.queryAllByRole('button', { name })) expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(el)).toBe(true)
     expect(host.querySelector('[data-fe-root] input, [data-fe-root] textarea')).toBeNull()
     fireEvent.click(screen.getByRole('tab', { name: '答え終わったあと' }))
     expect(screen.getByText('「ご回答ありがとうございます」')).toBeTruthy()
@@ -763,6 +764,104 @@ it('予約の担当候補が読めないとき、空にせず入力を保持し�
  await waitFor(()=>expect(screen.queryByText('予約の担当を読み込めませんでした')).toBeNull())
  expect(menuStaff).toHaveBeenCalledTimes(2)
  expect(screen.getByDisplayValue('今日のご来店の目的は？')).toBeTruthy()
+})
+
+it('予約担当は読込中・失敗・取得済み0件を区別する', async () => {
+  const data = structuredClone(formData)
+  const block = data.layout.sections[1].blocks[0]
+  if (block.kind !== 'input') throw new Error('fixture')
+  block.booking = { menuId: 'bm-1', staffId: 'missing', daysAhead: 14 }
+  formsGet.mockResolvedValue({ success: true, data })
+  let reject!: (error: Error) => void
+  menuStaff.mockImplementationOnce(() => new Promise((_, fail) => { reject = fail })).mockResolvedValueOnce({ staff: [] })
+  await render('id=form-1&page=2')
+  expect(screen.getByText('読み込み中…')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '担当：変える' }))
+  let dialog = screen.getByRole('dialog', { name: 'スタッフを選ぶ' })
+  expect(dialog.querySelector('[data-list-state="loading"]')).toBeTruthy()
+  expect(within(dialog).queryByText('当てはまる候補がありません。')).toBeNull()
+  expect(within(dialog).queryByText(/スタッフを登録する/)).toBeNull()
+  await act(async () => reject(new Error('fixture failure')))
+  dialog = screen.getByRole('dialog', { name: 'スタッフを選ぶ' })
+  expect(within(dialog).getByText('スタッフを読み込めませんでした')).toBeTruthy()
+  expect(within(dialog).queryByText('当てはまる候補がありません。')).toBeNull()
+  expect(within(dialog).queryByText(/スタッフを登録する/)).toBeNull()
+  fireEvent.click(within(dialog).getByRole('button', { name: /もう一度/ }))
+  expect(await screen.findByText('スタッフは今は選べません')).toBeTruthy()
+  expect(screen.getByText('選び直してください。')).toBeTruthy()
+  expect(formsUpdate).not.toHaveBeenCalled()
+})
+
+it('予約担当のアカウント切替後は前の応答を使わない', async () => {
+  const data = structuredClone(formData)
+  const block = data.layout.sections[1].blocks[0]
+  if (block.kind !== 'input') throw new Error('fixture')
+  block.booking = { menuId: 'bm-1', staffId: 'same', daysAhead: 14 }
+  formsGet.mockResolvedValue({ success: true, data })
+  let resolveOld!: (value: { staff: Array<{ id: string; display_name: string }> }) => void
+  menuStaff.mockImplementationOnce(() => new Promise((done) => { resolveOld = done }))
+    .mockResolvedValueOnce({ staff: [{ id: 'same', display_name: '新しい店の担当' }] })
+  await render('id=form-1&page=2')
+  account.id = 'acc-2'
+  await render('id=form-1&page=2')
+  expect(await screen.findByText('新しい店の担当')).toBeTruthy()
+  await act(async () => resolveOld({ staff: [] }))
+  expect(screen.getByText('新しい店の担当')).toBeTruthy()
+  expect(screen.queryByText('スタッフは今は選べません')).toBeNull()
+})
+
+it('複数メニューのうち1つが失敗しても、成功した担当候補を保つ', async () => {
+  const data = structuredClone(formData)
+  const block = data.layout.sections[1].blocks[0]
+  if (block.kind !== 'input') throw new Error('fixture')
+  block.booking = { menuId: 'bm-1', staffId: 'missing', daysAhead: 14 }
+  data.layout.sections[1].blocks.push({ ...structuredClone(block), id: 'q3', label: '別メニュー', booking: { menuId: 'bm-2', staffId: 'staff-2', daysAhead: 14 } })
+  formsGet.mockResolvedValue({ success: true, data })
+  menuStaff.mockImplementation(async (_accountId, menuId) => {
+    if (menuId === 'bm-1') throw new Error('fixture failure')
+    return { staff: [{ id: 'staff-2', display_name: '別メニューの担当' }] }
+  })
+  await render('id=form-1&page=2')
+  expect(await screen.findByText('スタッフを読み込めませんでした')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '「別メニュー」の設定を開く' }))
+  expect(await screen.findByText('別メニューの担当')).toBeTruthy()
+  expect(screen.queryByText('スタッフは今は選べません')).toBeNull()
+  expect(formsUpdate).not.toHaveBeenCalled()
+})
+
+it('窓の再試行は対象メニューだけを読み直す', async () => {
+  const data = structuredClone(formData)
+  const block = data.layout.sections[1].blocks[0]
+  if (block.kind !== 'input') throw new Error('fixture')
+  block.booking = { menuId: 'bm-1', staffId: 'staff-1', daysAhead: 14 }
+  data.layout.sections[1].blocks.push({ ...structuredClone(block), id: 'q3', label: '別メニュー', booking: { menuId: 'bm-2', staffId: 'staff-2', daysAhead: 14 } })
+  formsGet.mockResolvedValue({ success: true, data })
+  menuStaff.mockRejectedValue(new Error('fixture failure'))
+  await render('id=form-1&page=2')
+  expect(await screen.findByText('スタッフを読み込めませんでした')).toBeTruthy()
+  menuStaff.mockClear().mockResolvedValue({ staff: [{ id: 'staff-1', display_name: '担当1' }] })
+  fireEvent.click(screen.getByRole('button', { name: '担当：変える' }))
+  const dialog = screen.getByRole('dialog', { name: 'スタッフを選ぶ' })
+  fireEvent.click(within(dialog).getByRole('button', { name: /もう一度/ }))
+  expect(await within(dialog).findByRole('radio', { name: '担当1' })).toBeTruthy()
+  expect(menuStaff.mock.calls.map((call) => call[1])).toEqual(['bm-1'])
+  expect(screen.getByText('予約の担当を読み込めませんでした')).toBeTruthy()
+})
+
+it('担当候補の失敗後にアカウントを切り替えると、新しい対象を読み直す', async () => {
+  const data = structuredClone(formData)
+  const block = data.layout.sections[1].blocks[0]
+  if (block.kind !== 'input') throw new Error('fixture')
+  block.booking = { menuId: 'bm-1', staffId: 'same', daysAhead: 14 }
+  formsGet.mockResolvedValue({ success: true, data })
+  menuStaff.mockRejectedValueOnce(new Error('fixture failure'))
+    .mockResolvedValue({ staff: [{ id: 'same', display_name: '別の店の担当' }] })
+  await render('id=form-1&page=2')
+  expect(await screen.findByText('スタッフを読み込めませんでした')).toBeTruthy()
+  account.id = 'acc-2'
+  await render('id=form-1&page=2')
+  expect(await screen.findByText('別の店の担当')).toBeTruthy()
+  expect(menuStaff).toHaveBeenCalledWith('acc-2', 'bm-1')
 })
 
 it('参照候補success:falseは空の候補で編集を進めない',async()=>{

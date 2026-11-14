@@ -114,10 +114,14 @@ describe('配信の受け取り', () => {
     expect(api.save).not.toHaveBeenCalled()
   })
 
-  it('閲覧のみの人には、［変える］を置かない', async () => {
+  it('閲覧のみの人には、［変える］を灰色で出し押せない', async () => {
     open(false)
     await screen.findAllByText('予約の連絡')
-    expect(screen.queryByRole('button', { name: '変える' })).toBeNull()
+    const change = screen.queryAllByRole('button', { name: '変える' })
+    expect(change.length).toBeGreaterThan(0)
+    for (const el of change) { expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(el)).toBe(true); fireEvent.click(el) }
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(api.save).not.toHaveBeenCalled()
   })
 })
 

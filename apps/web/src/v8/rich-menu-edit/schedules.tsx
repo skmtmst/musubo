@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
@@ -92,7 +93,7 @@ export default function RichMenuSchedules({ groupId, canOperate, restoreMenus }:
                   <Td><p title={item.status === 'failed' ? item.lastErrorCode?.slice(0, 40) : undefined}>{STATUS[item.status] ?? '状態を確認しています'}</p>
                     {restoreText(item) ? <p className={styles.cardNote}>{restoreText(item)}</p> : null}
                     {item.nextRetryAt ? <p className={styles.cardNote}>次回 {formatDateTime(item.nextRetryAt)}</p> : null}</Td>
-                  <Td>{canOperate && item.status === 'scheduled' ? <Button type="button" size="compact" disabled={cancellingId !== null} busy={cancellingId === item.id} busyLabel="取消中…" onClick={() => void cancelSchedule(item.id)}>予約を取り消す</Button> : null}</Td>
+                  <Td>{item.status === 'scheduled' ? <PermissionGatedButton allowed={canOperate} type="button" size="compact" disabled={cancellingId !== null} busy={cancellingId === item.id} busyLabel="取消中…" onClick={() => void cancelSchedule(item.id)}>予約を取り消す</PermissionGatedButton> : null}</Td>
                 </Tr>)}</tbody>
               </DataTable>}
       </div>
