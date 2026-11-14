@@ -11,6 +11,31 @@ export function hasLineConnectionProblem(account: ConnectionAccount): boolean {
 
 type TokenAccount = Pick<LineAccount, 'tokenExpiry'> & { archivedAt?: string | null }
 
+/** 接続の要確認と期限切れは別の判定なので、共通部分だけを内訳にする。 */
+export function tokenExpiryBreakdown(accounts: readonly (ConnectionAccount & TokenAccount)[]) {
+  const result = { inProblem: 0, outsideProblem: 0, unknown: 0 }
+  for (const account of accounts) {
+    if (account.archivedAt) continue
+    if (!account.tokenExpiry || account.tokenExpiry.status === 'unknown') result.unknown++
+    else if (account.tokenExpiry.status === 'expired') {
+      if (hasLineConnectionProblem(account)) result.inProblem++
+      else result.outsideProblem++
+    }
+  }
+  return result
+}
+
+export function tokenExpiryBreakdownText(accounts: readonly (ConnectionAccount & TokenAccount)[]): string | null {
+  const { inProblem, outsideProblem, unknown } = tokenExpiryBreakdown(accounts)
+  if (!inProblem && !outsideProblem) return null
+  const parts = [
+    inProblem ? `接続に問題のうちトークン期限切れ ${inProblem} 件` : null,
+    outsideProblem ? `接続に問題以外のトークン期限切れ ${outsideProblem} 件` : null,
+    unknown ? `トークン期限未確認 ${unknown} 件` : null,
+  ].filter(Boolean)
+  return parts.length ? parts.join('・') : null
+}
+
 /** 一覧の行・カードにトークンの期限を出すのは、切れた・近い時だけ（アーカイブは除く）。 */
 export function tokenExpiryNotice(account: TokenAccount): string | null {
   const expiry = account.tokenExpiry
