@@ -34,11 +34,12 @@ export const methods2 = {
       location?: string | null;
       outcome?: 'considering' | 'won' | 'lost' | null;
       cancellationReason?: string | null;
+      expectedConfirmationRevision?: number;
       designation?: 'designated' | 'any' | 'unspecified';
       entryPoint?: string | null;
     },
   ) =>
-    fetchApi<Result<{ id: string; version: number }>>(
+    fetchApi<Result<{ id: string; version: number; confirmationRevision: number }>>(
       url(root + '/bookings/' + encodeURIComponent(id), accountId),
       write('PATCH', body),
     ),

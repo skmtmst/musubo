@@ -20,6 +20,7 @@ import { CalendarPlus, Check, Monitor, Play, Plus, Smartphone, Upload } from 'lu
 import { CreatePage } from '@/components/templates'
 import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import IconButton from '@/components/shared/icon-button'
@@ -307,7 +308,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
           <span className={styles.videoText}>
             <VideoMetadata webinar={webinar} />
           </span>
-          {readOnly ? null : <Button onClick={() => setReplaceOpen(true)}><Upload size={16} aria-hidden="true" />{hasVideo ? '差し替える' : '動画を選ぶ'}</Button>}
+          {<PermissionGatedButton allowed={!readOnly} onClick={() => setReplaceOpen(true)}><Upload size={16} aria-hidden="true" />{hasVideo ? '差し替える' : '動画を選ぶ'}</PermissionGatedButton>}
         </div>
         {showStages && asset ? <>
           <ol className={styles.stages} aria-label="動画の準備の段">

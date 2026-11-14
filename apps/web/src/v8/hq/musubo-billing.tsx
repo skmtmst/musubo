@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Notice from '@/components/shared/notice'
 import TextLink from '@/components/shared/text-link'
 import KpiBand from '@/components/shared/kpi-band'
@@ -94,7 +95,7 @@ export default function MusuboBilling({ pricing, invoices, invoiceFailed, onRetr
           <p className={styles.muted}>申込時の友だち数による概算です。確定額は接続後に確認できます。</p>
         </> : <p className={styles.muted}>接続するLINEと料金条件が確定すると表示されます。</p>}
         {pricing.firstChargeDate ? <p className={styles.date}>初回請求予定日：{shortDate(pricing.firstChargeDate)}</p> : null}
-        {portalAvailable && canManagePayment ? <Button type="button" variant="text" onClick={onPortal}>カード情報を確認・変更 →</Button> : null}
+        {portalAvailable ? <PermissionGatedButton allowed={canManagePayment} type="button" variant="text" onClick={onPortal}>カード情報を確認・変更 →</PermissionGatedButton> : null}
       </Card>
     </div>
     <section className={styles.history}>

@@ -2,6 +2,7 @@
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -198,12 +199,12 @@ export function PhotoReviewDetail({
            * 通したあと元の向きへ戻ってしまう。保存するまで元の向き。
            */}
           {/* 閲覧のみには押せない保存・作り直しを置かない。 */}
-          {canEdit ? <Button
+          {<PermissionGatedButton allowed={canEdit}
             disabled={rotation === savedRotation || rotationSaving}
             onClick={() => onSaveRotation(rotation)}
-            title={rotation === savedRotation ? '回したあとに保存できます' : '回した向きをこの写真へ保存します'} busy={rotationSaving} busyLabel="保存中…">向きを保存する</Button> : null}
+            title={rotation === savedRotation ? '回したあとに保存できます' : '回した向きをこの写真へ保存します'} busy={rotationSaving} busyLabel="保存中…">向きを保存する</PermissionGatedButton>}
           <Button disabled title="切り取りは派生画像の生成口を接続後に使えます">切り取る</Button>
-          {canEdit ? <Button disabled={assetProcessing} onClick={onProcessReviewAsset} busy={assetProcessing} busyLabel="作成中…">審査用画像を作り直す</Button> : null}
+          {<PermissionGatedButton allowed={canEdit} disabled={assetProcessing} onClick={onProcessReviewAsset} busy={assetProcessing} busyLabel="作成中…">審査用画像を作り直す</PermissionGatedButton>}
           <Button onClick={() => { setDownloadOpen(true); setDownloadCode(''); setDownloadError('') }}>もとの画像を保存する</Button>
         </div>
         <p className="px-4 pb-4 pt-1 text-xs text-ink-faint">{numberOrDash(reviewDerivative?.width ?? photo.image_width)} × {numberOrDash(reviewDerivative?.height ?? photo.image_height)} ／ {(reviewDerivative?.byteSize ?? photo.image_byte_size) == null ? '—（未取得）' : `${(Number(reviewDerivative?.byteSize ?? photo.image_byte_size) / 1024 / 1024).toFixed(1)}MB`} ／ {text(photo.captured_device) || '—（未取得）'}　派生画像：{reviewDerivative ? `審査用 第${reviewDerivative.sourceVersion}版` : latestAssetJob ? `${assetStatusLabel(latestAssetJob.status)}（第${latestAssetJob.requestedVersion}版）` : '未取得'}</p>

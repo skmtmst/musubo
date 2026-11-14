@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CreditCard, MessageCircle, RotateCcw } from 'lucide-react'
 import type { BookingCancellationCharge, BookingCancellationQuote } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import Dialog from '@/components/shared/dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
@@ -146,7 +147,7 @@ function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel,
       <p className={styles.minor}>{`予約のときの決まりで計算（${load.quote.text}）`}</p>
       <div className={styles.actions}>
         {canCharge && charge.status === 'pending' ? <><Button onClick={() => open('waive')}>請求しない（理由を書く）</Button><Button variant="primary" disabled={cardLoading || Boolean(cardFailure)} onClick={() => open('charge')}><CreditCard size={16} aria-hidden="true" />キャンセル料を請求する</Button></> : null}
-        {canRefund && charge.status === 'succeeded' ? <Button onClick={() => open('refund')}>返金する</Button> : null}
+        {charge.status === 'succeeded' ? <PermissionGatedButton allowed={canRefund} onClick={() => open('refund')}>返金する</PermissionGatedButton> : null}
       </div>
 
       {preparing.dialog}
