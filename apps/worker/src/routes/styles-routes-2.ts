@@ -28,6 +28,10 @@ styles.patch(base + '/bookings/:id', async (c) => {
       .first();
     if (!own) throw new StyleError('forbidden', 403);
   }
+  if (b.expectedConfirmationRevision !== undefined) {
+    if (!Number.isSafeInteger(b.expectedConfirmationRevision) || Number(b.expectedConfirmationRevision) < 1) throw new StyleError('invalid_revision', 400);
+    if (b.expectedConfirmationRevision !== Number(r.confirmation_revision)) return c.json({ success: false, code: 'version_conflict', reason: '確認した予約が変更されました。読み直してください。', current: { status: r.status, confirmationRevision: r.confirmation_revision, version: r.lock_version } }, 409);
+  }
   const mode =
       b.meetingMode === undefined
         ? r.meeting_mode
@@ -62,7 +66,7 @@ styles.patch(base + '/bookings/:id', async (c) => {
         : oneOf(b.outcome, ['considering', 'won', 'lost'], true),
     now = new Date().toISOString();
   const update = c.env.DB.prepare(
-    `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, meeting_mode=?,meeting_url=?,meeting_location=?,consultation_outcome=?,outcome_recorded_at=?,outcome_recorded_by=?,cancellation_reason=?,designation=?,entry_point=?,lock_version=lock_version+1,updated_at=? WHERE id=? AND line_account_id=? AND lock_version=?`,
+    `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, meeting_mode=?,meeting_url=?,meeting_location=?,consultation_outcome=?,outcome_recorded_at=?,outcome_recorded_by=?,cancellation_reason=?,designation=?,entry_point=?,lock_version=lock_version+1,updated_at=? WHERE id=? AND line_account_id=? AND lock_version=? AND (? IS NULL OR confirmation_revision=?)`,
   ).bind(
     mode,
     url,
@@ -81,11 +85,13 @@ styles.patch(base + '/bookings/:id', async (c) => {
     id,
     a,
     r.lock_version,
+    b.expectedConfirmationRevision ?? null,
+    b.expectedConfirmationRevision ?? null,
   );
-  await c.env.DB.batch([
+  try { await c.env.DB.batch([
     c.env.DB.prepare(
-      `SELECT json(CASE WHEN EXISTS(SELECT 1 FROM bookings WHERE id=? AND line_account_id=? AND lock_version=?) THEN '{}' ELSE 'STYLE_VERSION_CONFLICT' END)`,
-    ).bind(id, a, r.lock_version),
+      `SELECT json(CASE WHEN EXISTS(SELECT 1 FROM bookings WHERE id=? AND line_account_id=? AND lock_version=? AND (? IS NULL OR confirmation_revision=?)) THEN '{}' ELSE 'STYLE_VERSION_CONFLICT' END)`,
+    ).bind(id, a, r.lock_version, b.expectedConfirmationRevision ?? null, b.expectedConfirmationRevision ?? null),
     update,
     c.env.DB.prepare(
       'UPDATE meet_consultations SET confirmation_revision = confirmation_revision + 1, booking_version=? WHERE booking_id=? AND booking_version=?',
@@ -105,10 +111,16 @@ styles.patch(base + '/bookings/:id', async (c) => {
       JSON.stringify({ id, outcome, fields: Object.keys(b) }),
       now,
     ),
-  ]);
+  ]); } catch (error) {
+    if (b.expectedConfirmationRevision !== undefined && /STYLE_VERSION_CONFLICT|malformed JSON/i.test(String(error))) {
+      const current = await c.env.DB.prepare('SELECT status,confirmation_revision AS confirmationRevision,lock_version AS version FROM bookings WHERE id=? AND line_account_id=?').bind(id, a).first();
+      return c.json({ success: false, code: 'version_conflict', reason: '確認した予約が変更されました。読み直してください。', current }, 409);
+    }
+    throw error;
+  }
   return c.json({
     success: true,
-    data: { id, version: Number(r.lock_version) + 1 },
+    data: { id, version: Number(r.lock_version) + 1, confirmationRevision: Number(r.confirmation_revision) + 1 },
   });
 });
 

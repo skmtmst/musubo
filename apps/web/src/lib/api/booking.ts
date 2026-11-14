@@ -659,10 +659,11 @@ export const bookingApi = {
     accountId: string,
     id: string,
     action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete',
+    expectedConfirmationRevision?: number,
   ) =>
     fetchApi<{ status: string }>(
       withAccount(`/api/booking/admin/requests/${id}`, accountId),
-      { method: 'PATCH', body: JSON.stringify({ action }) },
+      { method: 'PATCH', body: JSON.stringify({ action, ...(expectedConfirmationRevision === undefined ? {} : { expectedConfirmationRevision }) }) },
     ),
   pendingCount: (accountId: string) =>
     fetchApi<{ count: number }>(withAccount('/api/booking/admin/pending-count', accountId)),

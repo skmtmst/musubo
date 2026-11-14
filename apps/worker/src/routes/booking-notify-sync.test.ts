@@ -209,6 +209,40 @@ describe('通知の再試行 (R323・R324)', () => {
 
   afterEach(() => sqlite.close());
 
+  test('確認時の版が違う予約は取消せず、正しい版なら取消せる', async () => {
+    insertBooking(sqlite, { id: 'B1', friend: 'f1' });
+    sqlite.prepare("UPDATE bookings SET confirmation_revision=2 WHERE id='B1'").run();
+    const { app, env } = makeApp(db);
+    const send = (expectedConfirmationRevision: number) => api(app, env, '/api/booking/admin/requests/B1?account_id=acc1', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'cancel', expectedConfirmationRevision }),
+    });
+    const stale = await send(1);
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ error: 'version_conflict', current: { status: 'confirmed', confirmationRevision: 2 } });
+    expect(sqlite.prepare("SELECT status,confirmation_revision FROM bookings WHERE id='B1'").get()).toMatchObject({ status: 'confirmed', confirmation_revision: 2 });
+    expect((await send(2)).status).toBe(200);
+    expect(sqlite.prepare("SELECT status,confirmation_revision FROM bookings WHERE id='B1'").get()).toMatchObject({ status: 'cancelled', confirmation_revision: 3 });
+  });
+
+  test('確認した後に別の変更が割り込むと取消の更新は通らない', async () => {
+    insertBooking(sqlite, { id: 'B1', friend: 'f1' });
+    const originalBatch = db.batch.bind(db);
+    let changed = false;
+    db.batch = async (statements) => {
+      if (!changed) { changed = true; sqlite.prepare("UPDATE bookings SET confirmation_revision=confirmation_revision+1 WHERE id='B1'").run(); }
+      return originalBatch(statements);
+    };
+    const { app, env } = makeApp(db);
+    const result = await api(app, env, '/api/booking/admin/requests/B1?account_id=acc1', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'cancel', expectedConfirmationRevision: 1 }),
+    });
+    expect(result.status).toBe(409);
+    expect(await result.json()).toMatchObject({ error: 'version_conflict', current: { status: 'confirmed', confirmationRevision: 2 } });
+    expect(sqlite.prepare("SELECT status,confirmation_revision FROM bookings WHERE id='B1'").get()).toMatchObject({ status: 'confirmed', confirmation_revision: 2 });
+  });
+
   test('R323: 送信中の再試行は 409 で送らない。期限切れの貸出は取り直せる', async () => {
     insertBooking(sqlite, { id: 'B1', friend: 'f1' });
     // 送信中の貸出 (opened_at が新しい)。
