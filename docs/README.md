@@ -1220,3 +1220,4 @@
 - [テンプレートの本文の文字数](release-log/unreleased/61-kenta-template-text-count.md) — 絵文字の数え方と上限超えの修正履歴。確認 2026-11-14。
 - [文書：閲覧のみの操作の読み替え](release-log/unreleased/62-kenta-docs-gray.md) — 決まりの文書の食い違いを直した履歴。確認 2026-11-14。
 - [予約を入れるボタンの言葉](release-log/unreleased/63-kenta-booking-create-words.md) — 面談・教室の言い換えの履歴。確認 2026-11-14。
+- [トークン期限切れの内訳](release-log/unreleased/64-kenta-token-expiry-breakdown.md) — 接続の問題の内訳を出した履歴。確認 2026-11-14。
