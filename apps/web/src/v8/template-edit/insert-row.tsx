@@ -6,6 +6,7 @@
  * 差し込む文字（{{name}}・{{field.x}}・{{var.x}}・{{date…}}・{{days_until:…}}）は
  * 今の画面（TemplateInsertControls）と同じ。
  */
+import { TEMPLATE_TEXT_MAX_CHARACTERS } from '@line-crm/shared'
 import { useRef, useState, type RefObject } from 'react'
 import Button from '@/components/shared/button'
 import ActionMenu from '@/components/shared/action-menu'
@@ -110,10 +111,9 @@ export default function InsertRow({
   ) : null
   const dateChip = <Chip label="配信日" buttonRef={dateRef} expanded={menu === 'date'} disabled={disabled} onClick={() => toggle('date')} />
   const otherChip = <Chip label="その他" more buttonRef={otherRef} expanded={menu === 'other'} disabled={disabled} title="その他の差し込みを選ぶ" onClick={() => toggle('other')} />
-  const over = length > 5000
 
   return (
-    <MessageInsertRow count={`${formatNumber(length)} / 5,000`} more={<>{varChip}{dateChip}{otherChip}</>}>
+    <MessageInsertRow count={`${formatNumber(length)} / ${formatNumber(TEMPLATE_TEXT_MAX_CHARACTERS)}`} more={<>{varChip}{dateChip}{otherChip}</>}>
       {nameChip}{fieldChip}
 
       <ActionMenu
