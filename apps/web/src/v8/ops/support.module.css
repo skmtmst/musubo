@@ -183,7 +183,7 @@ html:root .outlinedMore[data-row-menu]:not(:focus-visible) {
 .statusButton[data-stage='in_progress'] { background: var(--color-info-bg); }
 .statusButton[data-stage='waiting'] { background: var(--color-warning-bg); }
 .statusButton[data-stage='closed'] { background: var(--color-surface-pearl); }
-.statusButton:disabled { opacity: .45; }
+.statusButton:disabled { opacity: var(--polish-disabled-opacity); }
 .actionMenu { position: absolute; z-index: 10; top: 100%; right: 0; display: flex; min-width: var(--support-menu-width); flex-direction: column; gap: var(--space-4); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: var(--space-8); box-shadow: var(--card-shadow); }
 
 .prioritySelect {

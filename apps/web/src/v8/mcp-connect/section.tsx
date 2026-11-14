@@ -156,7 +156,12 @@ export default function McpConnectionsSection() {
                   <Td>{day(connection.expiresAt)}</Td>
                   <Td>{used(connection.lastUsedAt)}</Td>
                   <Td title={connection.previousKeyExpiresAt ? `古い鍵は ${used(connection.previousKeyExpiresAt)} まで` : undefined}>
-                    <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
+                    <span className={styles.state}>
+                      <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
+                      {connection.previousKeyExpiresAt ? (
+                        <span className={styles.stateSub}>古い鍵は {used(connection.previousKeyExpiresAt)} まで</span>
+                      ) : null}
+                    </span>
                   </Td>
                   <ActionCell>
                     <RowMenu

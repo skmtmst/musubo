@@ -145,15 +145,14 @@ export default function MakeupPicker({ credit, source, onUsed, onLater, onBusyCh
       {nearby.length > 0 ? <div role="group" aria-label="近い振替先" className="space-y-2">
         <h3 className="text-sm font-bold text-ink">近い振替先</h3>
         {nearby.map(option => <Button key={option.slot_id} variant="option" onClick={() => {
-          requireChoice.current = false; setShowNearby(false); setWeek(mondayOf(jstDate(option.starts_at))); setDay(jstDate(option.starts_at)); setPicked(option.slot_id); setError(null);
+          requireChoice.current = true; setShowNearby(false); setWeek(mondayOf(jstDate(option.starts_at))); setDay(jstDate(option.starts_at)); setPicked(option.slot_id); setError(null);
         }}>{mdHm(option.starts_at)} {option.name}</Button>)}
       </div> : null}
       {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
-      <div className="pb-40" aria-hidden="true" />
-      <BottomBar>
+      <div className="relative z-10"><BottomBar>
         <Button variant="primary" disabled={!chosen || busy} onClick={() => void use()}>{chosen ? `${mdHm(chosen.starts_at)} に振り替える` : '振替先を選んでください'}</Button>
         {onLater ? <Button variant="text" onClick={onLater}>振替先はあとで選ぶ</Button> : null}
-      </BottomBar>
+      </BottomBar></div>
     </section>
   );
 }

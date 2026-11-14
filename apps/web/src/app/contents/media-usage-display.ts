@@ -27,6 +27,7 @@ const USAGE_KIND_LABELS: Record<string, string> = {
   restaurant_menu: '飲食メニューの画像',
   booking_staff: '予約スタッフの写真',
   booking_settings: 'お店の写真',
+  form: '回答フォーム',
   // 一斉配信から引用する素材。言い方は作る画面（一斉配信）に合わせる。
   rich_message: 'リッチメッセージ',
   card_message: 'カードタイプ',
