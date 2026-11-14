@@ -1219,3 +1219,4 @@
 - [閲覧のみで隠れていた操作を灰色＋理由にそろえる](release-log/unreleased/60-kenta-viewer-gray-buttons.md) — 権限の無い人への見せ方をそろえた履歴。確認 2026-11-14。
 - [テンプレートの本文の文字数](release-log/unreleased/61-kenta-template-text-count.md) — 絵文字の数え方と上限超えの修正履歴。確認 2026-11-14。
 - [文書：閲覧のみの操作の読み替え](release-log/unreleased/62-kenta-docs-gray.md) — 決まりの文書の食い違いを直した履歴。確認 2026-11-14。
+- [予約を入れるボタンの言葉](release-log/unreleased/63-kenta-booking-create-words.md) — 面談・教室の言い換えの履歴。確認 2026-11-14。
