@@ -20,6 +20,7 @@ const fixture = vi.hoisted(() => ({
   mediaBehavior: 'ok' as 'ok' | 'fail503' | 'failFalse' | 'empty' | 'twoItems',
   countsFailed: false,
   countsShape: 'ok' as 'ok' | 'array',
+  quotaGate: null as Promise<void> | null,
   listCalls: [] as Array<{ kind?: string; unusedOnly?: boolean; archived?: string; limit?: number }>,
   foldersBehavior: 'ok' as 'ok' | 'fail503',
   detailBehavior: 'ok' as 'ok' | 'fail503' | 'fail404' | 'fail403' | 'failFalse',
@@ -137,7 +138,7 @@ vi.mock('@/lib/api', () => {
             data: { items: [MEDIA_A], total: 1, limit: 20, offset: 0 },
           })
         },
-        quota: () => Promise.resolve({
+        quota: async () => { await fixture.quotaGate; return {
           success: true,
           data: {
             usageBytes: 1200,
@@ -147,7 +148,7 @@ vi.mock('@/lib/api', () => {
             usageRate: 0.12,
             state: 'normal',
           },
-        }),
+        } },
         detail: (id: string, accountId: string) => {
           fixture.detailCalls.push({ id, accountId })
           if (fixture.detailBehavior === 'fail503') {
@@ -223,6 +224,7 @@ beforeEach(() => {
   fixture.mediaBehavior = 'ok'
   fixture.countsFailed = false
   fixture.countsShape = 'ok'
+  fixture.quotaGate = null
   fixture.listCalls.length = 0
   fixture.foldersBehavior = 'ok'
   fixture.detailBehavior = 'ok'
@@ -472,8 +474,11 @@ describe('m26m 初回503の偽ゼロを出さない', () => {
   it('一括件数だけ失敗したら、表示できた行の数を総数として代用しない', async () => {
     fixture.mediaBehavior = 'twoItems'
     fixture.countsFailed = true
+    let releaseQuota!: () => void
+    fixture.quotaGate = new Promise<void>(resolve => { releaseQuota = resolve })
     await renderPage()
     await waitForText(MEDIA_B.filename)
+    await act(async () => { releaseQuota(); await settle() })
     expect(folderRowButton('すべて').textContent).toBe('すべて')
     const registered = [...host.querySelectorAll('[data-kpi-presentation]')]
       .find(element => element.textContent?.startsWith('登録メディア'))!
