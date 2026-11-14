@@ -6,6 +6,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import { Plus } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Notice from '@/components/shared/notice'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
@@ -134,9 +135,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
       <Panel
         title="メニュー一覧"
         description="予約台帳・Google投稿・LINEカードで同じマスターを参照します。価格変更は保存時に確定し、指定した開始日時から新価格になります。"
-        aside={canEdit ? (
-          <Button variant="primary" onClick={openNew}><Plus size={16} aria-hidden="true" />メニューを作る</Button>
-        ) : null}
+        aside={<PermissionGatedButton allowed={canEdit} variant="primary" onClick={openNew}><Plus size={16} aria-hidden="true" />メニューを作る</PermissionGatedButton>}
         flush
         help={<HelpTip label="メニュー一覧の説明">{canEdit ? '「…」から変更・停止・再開・削除ができます。参照中のメニューは削除できません。' : 'メニューの内容と価格を確認できます。'}</HelpTip>}
       >
