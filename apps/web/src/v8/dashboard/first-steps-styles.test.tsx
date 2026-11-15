@@ -13,13 +13,13 @@ it.each(ACCOUNT_STYLES)('%sも同じカードの段・数・直接リンクを�
   const summary = summarizeFirstSteps(base(), style, style === 'restaurant' ? restaurant : undefined)
   render(<FirstStepsCard summary={summary} folded={false} onToggle={() => {}} />)
   const list = screen.getByRole('list')
-  expect(within(list).getAllByRole('listitem')).toHaveLength(style === 'restaurant' ? 8 : 7)
+  expect(within(list).getAllByRole('listitem')).toHaveLength(style === 'restaurant' ? 9 : 7)
   const progress = screen.getByRole('progressbar')
   expect(progress.getAttribute('aria-valuemax')).toBe(String(summary.total))
   expect(progress.getAttribute('aria-valuenow')).toBe(String(summary.done))
   expect(within(list).getAllByRole('link').map(link => link.getAttribute('href'))).toEqual(summary.steps.filter(step => !step.done && step.href).map(step => step.href))
   if (style === 'restaurant') {
-    expect(screen.getByText('3 / 8 済み')).toBeTruthy()
+    expect(screen.getByText('3 / 9 済み')).toBeTruthy()
     expect(screen.getByRole('link', { name: '営業時間を設定する（開く）' }).getAttribute('href')).toBe('/restaurant-test/google?tab=hours')
     expect(stepsForStyle(stepsForStyle(base(), style, restaurant), style, restaurant)).toEqual(stepsForStyle(base(), style, restaurant))
   }

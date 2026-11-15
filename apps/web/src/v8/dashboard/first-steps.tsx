@@ -18,6 +18,7 @@ import { ProgressBar, StepMark } from '@/components/shared/progress'
 import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
 import { doneCount, stepsForStyle, type StepResult, type StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
 import { useStyleSetupProgress } from '@/v8/onboarding/public/style-setup-progress/index'
+import { useGuideEngine, type GuideAnchor, type GuideEnginePhase } from '@/v8/onboarding/public/guide-engine/index'
 import type { AccountStyle } from '@line-crm/shared'
 
 export type FirstStepsSummary = {
@@ -91,6 +92,7 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
   const visibleWaiting = canManageRole(role) && state.status === 'ready' && !folded && waitingForFirstMessage(state.steps)
   useEffect(() => { setWaiting(visibleWaiting) }, [visibleWaiting])
   const done = useFirstMessageArrived(accountId, state.steps, state.status === 'ready')
+  const guide = useGuideEngine(accountId, canManageRole(role) ? summary : null)
   useEffect(() => { setFolded(readFirstStepsFolded(accountId)) }, [accountId])
   const toggle = useCallback(() => {
     setFolded((current) => {
@@ -105,7 +107,7 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
     status: !enabled ? 'idle' as const : state.status === 'loading' || progress.status === 'loading' ? 'loading' as const : state.status,
     summary: shouldShowFirstSteps(role, summary) ? summary : null, folded, toggle, error: state.error, reload: () => { state.reload(); progress.reload() },
     steps: displaySteps, progress: progress.progress, firstRun: state.firstRun, starter: state.starter, watchExpired: state.watchExpired, rewatch: state.rewatch,
-    arrived: canManageRole(role) && done.arrived, dismissArrived: done.dismiss,
+    arrived: canManageRole(role) && done.arrived, dismissArrived: done.dismiss, guide,
   }
 }
 
@@ -114,9 +116,46 @@ export function nextFirstStepKey(summary: FirstStepsSummary): string | null {
   return summary.steps.find((step) => !step.done && step.href)?.key ?? null
 }
 
-export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigure, onRetry, setupTasks, feedback, readOnly = false, configureAllowed = !readOnly }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onConfigure?: () => void; onRetry?: () => void; setupTasks?: ReactNode; feedback?: ReactNode; readOnly?: boolean; configureAllowed?: boolean }) {
+/** ガイドの操作だけを受け取る。完了判定は持たず、はじめにやることの実測に従う。 */
+export type FirstStepsGuide = {
+  phase: GuideEnginePhase
+  anchor: GuideAnchor | null
+  pausedAnchor: GuideAnchor | null
+  start: () => void
+  pause: () => void
+  resume: () => void
+  reset: () => void
+}
+
+/**
+ * 08b の再開導線。行き先が実在する段だけを案内し、止めた所から続けられる。
+ * チェックは設定の実測で付くので、ガイドの進み具合とは分けて書く。
+ */
+export function FirstStepsGuideBand({ guide }: { guide: FirstStepsGuide }) {
+  const anchor = guide.anchor ?? guide.pausedAnchor
+  if (!anchor || guide.phase === 'done') return null
+  const restart = () => { guide.reset(); guide.start() }
+  return (
+    <Notice tone="info" compact action={<>
+      {guide.phase === 'active'
+        ? <TextLink tone="action" href={anchor.href} aria-label={`${anchor.label}をガイドで開く`}>ガイドで開く</TextLink>
+        : <Button size="compact" variant="primary" onClick={guide.phase === 'paused' ? guide.resume : guide.start}>続きからガイドで進める</Button>}
+      <Button size="compact" onClick={guide.phase === 'active' ? guide.pause : restart}>{guide.phase === 'active' ? '一時停止' : 'ガイドを最初から開始'}</Button>
+    </>}>
+      次は「{anchor.label}」です
+    </Notice>
+  )
+}
+
+/** 08b の注記。狭い幅でも切れないよう、帯の中ではなくカードの下に置く。 */
+export function FirstStepsGuideNote() {
+  return <p className={styles.note}>チェックは設定の実データで自動判定。ガイドを使わなくても付きます</p>
+}
+
+export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigure, onRetry, setupTasks, feedback, guide, readOnly = false, configureAllowed = !readOnly }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onConfigure?: () => void; onRetry?: () => void; setupTasks?: ReactNode; feedback?: ReactNode; guide?: FirstStepsGuide; readOnly?: boolean; configureAllowed?: boolean }) {
   const complete = Boolean(summary && summary.total > 0 && summary.done === summary.total && !setupTasks)
   const nextKey = summary ? nextFirstStepKey(summary) : null
+  const guideVisible = Boolean(guide && summary && !complete && !readOnly)
   return (
     <Card as="section" layout="vertical" contentPadding="var(--space-16) var(--space-20)" gap="var(--tpl-d23-ob-gap)" aria-labelledby="first-steps-title" data-design-node="r3X34" actions={onConfigure ? <Button variant="primary" onClick={onConfigure} lockedReason={lockUnless(!readOnly && configureAllowed, 'manager')}>使い方の設定を開く</Button> : undefined}>
       <div className={styles.head}>
@@ -134,6 +173,7 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigu
         </button> : null}
       </div>
       {feedback}
+      {guideVisible ? <FirstStepsGuideBand guide={guide!} /> : null}
       {setupTasks}
       {summary && !complete ? <SetupStepList id="first-steps-list" columns={3} hidden={folded}>
         {summary.steps.map((step, index) => (
@@ -151,6 +191,7 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigu
           </SetupStepRow>
         ))}
       </SetupStepList> : null}
+      {guideVisible && !folded ? <FirstStepsGuideNote /> : null}
     </Card>
   )
 }

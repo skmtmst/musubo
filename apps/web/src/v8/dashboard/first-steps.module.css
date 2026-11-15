@@ -28,6 +28,14 @@
   white-space: nowrap;
 }
 
+/* 08b の注記。手順の下に小さく置き、狭い幅では折り返して全文を読めるようにする。 */
+.note {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-d23-ob-text);
+  line-height: var(--tpl-d23-ob-text-lh);
+}
+
 .spacer {
   flex: 1 1 auto;
   min-width: 0;
