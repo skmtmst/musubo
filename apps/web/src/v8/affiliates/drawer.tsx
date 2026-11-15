@@ -44,6 +44,7 @@ import styles from './affiliate-drawer.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { affiliateEditValues, type AffiliateEditSource } from './create-conflict'
 
 /*
  * ★V8 アフィリエイターの詳細の引き出し（板 。右から出る 620px）。
@@ -497,7 +498,7 @@ export default function AffiliateDrawer({
 <DetailContent>
 <DetailField label="紹介者の名前"><DetailInlineEdit allowed={!(readonly)} value={affiliate.name} label="紹介者の名前を直す" maxLength={100} preserveDirtyOnBlur onDirtyChange={setNameDirty} onSavingChange={setNameSaving} resetToken={nameReset} onSave={async (next) => {
           if (!next.trim()) throw new Error('名前を入力してください')
-          const response = await api.affiliates.update(affiliate.id, { name: next.trim() })
+          const response = await api.affiliates.update(affiliate.id, { name: next.trim(), expected: affiliateEditValues(affiliate) })
           if (!response.success) throw new Error('名前を保存できませんでした。もう一度お試しください。')
           notifyToast('名前を保存しました'); onChanged()
         }} /></DetailField>
@@ -534,7 +535,7 @@ function SettlementEditor({
   formId: string
   onDirtyChange: (dirty: boolean) => void
   onBusyChange: (busy: boolean) => void
-  affiliate: { id: string; rewardMode?: 'none' | 'fixed' | 'rate'; commissionRate: number; email?: string | null; holdDays?: number | null; payoutCycle?: string | null; notifyOnConversion?: boolean }
+  affiliate: AffiliateEditSource & { id: string }
   onSaved: () => void
 }) {
   const saveErrors = useSaveFormErrors()
@@ -585,6 +586,7 @@ function SettlementEditor({
         holdDays: holdDays.trim() === '' ? null : Number(holdDays),
         payoutCycle: payoutCycle.trim() || null,
         notifyOnConversion: notify,
+        expected: affiliateEditValues(affiliate),
       })
       if (!res.success) {
         setError(res.error)
