@@ -6,6 +6,7 @@
 
 }
 
+:root .dialogDates { gap: var(--space-12); }
 :root .root[data-period-range] { min-width: 0; flex: 1 1 100%; width: 100%; }
-:root .dates { min-width: 0; flex: 1 1 496px; }
+:root .root .dates { min-width: 0; flex: 1 1 496px; }
 :root .dates > * { min-width: min(248px, 100%); flex: 1 1 248px; }

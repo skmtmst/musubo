@@ -51,7 +51,7 @@ export default function PeriodPicker({ days, onChange, customRange, onRangeChang
       else { setCustomOpen(false); onChange(Number(option.value)) }
     } }))} />
     <Dialog open={customOpen} title="期間を指定" onCancel={() => setCustomOpen(false)} onConfirm={() => { onRangeChange?.(draft); setCustomOpen(false) }} confirmLabel="適用する" confirmDisabled={!allowed(draft)}>
-      <div className={styles.dates}>
+      <div className={`${styles.dates} ${styles.dialogDates}`}>
         <Field label="期間の始まり" required><DateField aria-label="期間の始まり" value={draft.from} max={draft.to || undefined} onChange={(from) => setDraft({ ...draft, from })} /></Field>
         <Field label="期間の終わり" required error={allowed(draft) ? undefined : maxDays ? `今日までの${maxDays}日以内で指定してください。` : '終わりは始まり以降の日付にしてください。'}><DateField aria-label="期間の終わり" value={draft.to} min={draft.from || undefined} max={maxDate} onChange={(to) => setDraft({ ...draft, to })} /></Field>
       </div>
