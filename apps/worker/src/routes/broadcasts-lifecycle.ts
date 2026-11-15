@@ -62,6 +62,15 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
     confirmedRecipientCount?: unknown;
   }>();
 
+  if (existing.correction_of_broadcast_id && (
+    (body.targetType !== undefined && body.targetType !== existing.target_type)
+    || (body.targetTagId !== undefined && body.targetTagId !== existing.target_tag_id)
+    || (body.lineAccountId !== undefined && body.lineAccountId !== existing.line_account_id)
+    || body.accountIds !== undefined
+    || (body.messageOptions !== undefined && !!deliveryLimitFromOptions(body.messageOptions))
+    || (body.segmentConditions !== undefined && !sameJsonMeaning(existing.segment_conditions, body.segmentConditions))
+  )) return c.json({ success: false, error: '訂正の宛先は変更できません' }, 409);
+
   // 版を必須化する。認可・境界・存在の判定は上で済ませてあるため、
   // 他アカウントIDは従来どおり404のまま、ここへは来ない。
   if (body.expectedVersion === undefined) {

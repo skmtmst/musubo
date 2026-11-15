@@ -367,7 +367,10 @@ export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/
   let count = 0;
   let perAccount: Array<{ accountId: string; sendCount: number }> | undefined;
 
-  if (broadcast.target_type === 'multi-account-dedup') {
+  if (broadcast.correction_of_broadcast_id) {
+    const preview = await broadcastSendPreview(c.env.DB, broadcast);
+    count = preview.recipients;
+  } else if (broadcast.target_type === 'multi-account-dedup') {
     const accountIds = parseJsonArray(raw.account_ids);
     const dedupPriority = raw.dedup_priority == null ? [] : parseJsonArray(raw.dedup_priority);
     if (!accountIds || !dedupPriority || [...accountIds,...dedupPriority].some(id => typeof id !== 'string' || !id.trim())) {

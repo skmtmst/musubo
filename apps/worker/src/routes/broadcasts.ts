@@ -1,3 +1,4 @@
+import { createBroadcastCorrection } from './broadcasts-correction.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
 
 import { Hono } from 'hono';
@@ -43,6 +44,8 @@ broadcasts.get('/api/broadcasts/saved-views', requireRole('owner', 'admin', 'sta
 broadcasts.post('/api/broadcasts/saved-views', requireRole('owner', 'admin'), inputJsonBoundary(), post__api_broadcasts_saved_views_7);
 
 broadcasts.get('/api/broadcasts/:id', get__api_broadcasts_id_8);
+
+broadcasts.post('/api/broadcasts/:id/correction', createBroadcastCorrection);
 
 broadcasts.get('/api/broadcasts/:id/recipients', get__api_broadcasts_id_recipients_9);
 

@@ -994,6 +994,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/broadcasts/{id}/approval-remind',
   'POST /api/broadcasts/{id}/approval-request',
   'POST /api/broadcasts/{id}/cancel',
+  'POST /api/broadcasts/{id}/correction',
   'POST /api/broadcasts/{id}/resume',
   'POST /api/broadcasts/{id}/retry-failed',
   'POST /api/broadcasts/{id}/send',

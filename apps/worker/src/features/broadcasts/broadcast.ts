@@ -1079,7 +1079,7 @@ async function processQueuedBroadcastBatches(
   const previousAudience = await db.prepare('SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id=?')
     .bind(broadcast.id).first<{n:number}>();
   if (await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:Number(raw.total_count ?? 0),
-    known:Number(previousAudience?.n ?? 0),started:!!fixedHqAudience || !!hasAudience || Number(raw.success_count ?? 0)>0 || batchOffset>0 || Number(raw.send_attempt_no ?? 1)>1,expectedLockVersion:lockVersion,requireBatchLock:true})) return;
+    known:Number(previousAudience?.n ?? 0),started:!!broadcast.correction_of_broadcast_id || !!fixedHqAudience || !!hasAudience || Number(raw.success_count ?? 0)>0 || batchOffset>0 || Number(raw.send_attempt_no ?? 1)>1,expectedLockVersion:lockVersion,requireBatchLock:true})) return;
   if (!hasAudience && storedDeliveryLimit(broadcast)) {
     await holdLimitedBroadcast(db, broadcast, '固定した宛先を確認できません。選び直さず送信を止めました。');
     return;
