@@ -279,6 +279,18 @@ export const post__api_friend_add_rules_id_test_7 = async (c: Context<Env, "/api
   });
 };
 
+export const getFriendAddTestRecipient = async (c: Context<Env, "/api/friend-add-rules/:id/test-recipient">) => {
+  const accountId = accountIdFrom(c);
+  if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+  if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+  const rule = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
+  if (!rule) return c.json({ success: false, error: '設定が見つかりません' }, 404);
+  const staff = await c.env.DB.prepare('SELECT line_user_id FROM staff_members WHERE id = ? AND is_active = 1')
+    .bind(c.get('staff').id).first<{ line_user_id: string | null }>();
+  const friend = staff?.line_user_id ? await getFriendByLineUserIdForAccount(c.env.DB, staff.line_user_id, accountId) : null;
+  return c.json({ success: true, data: { available: !!friend && friend.line_account_id === accountId && !!friend.is_following } });
+};
+
 export const post__api_friend_add_rules_id_test_send_8 = async (c: Context<Env, "/api/friend-add-rules/:id/test-send">) => {
   const accountId = accountIdFrom(c);
   if (!accountId) return inputError(c, { success: false, error: 'account_id が必要です' }, 400, ["accountId"]);

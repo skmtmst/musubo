@@ -55,6 +55,13 @@
   gap: var(--tpl-rule-row-gap);
 }
 
+.testRow .cardDesc {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* 有効にする前の確認：印・題と説明・見直す。行は余白10・下に線。 */
 .checkList {
   display: flex;

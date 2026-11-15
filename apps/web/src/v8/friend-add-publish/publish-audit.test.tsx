@@ -2,14 +2,14 @@
 import React from 'react'
 import {act,cleanup,render,screen} from '@testing-library/react'
 import {afterEach,beforeEach,expect,it,vi} from 'vitest'
-const net=vi.hoisted(()=>({role:'owner' as string | null,account:'a',query:'id=r&done=1',test:vi.fn(),validate:vi.fn(),conflicts:vi.fn()}))
+const net=vi.hoisted(()=>({role:'owner' as string | null,account:'a',query:'id=r&done=1',test:vi.fn(),testRecipient:vi.fn(),testSend:vi.fn(),validate:vi.fn(),conflicts:vi.fn()}))
 vi.mock('next/navigation',()=>({useRouter:()=>({replace:vi.fn(),push:vi.fn()}),useSearchParams:()=>new URLSearchParams(net.query)}))
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:net.account,accounts:[]})}))
 vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{}}))
 vi.mock('@/lib/staff-role',async importOriginal=>({...await importOriginal<typeof import('@/lib/staff-role')>(),useStaffRole:()=> net.role,canManageRole:(role:string|null)=>role==='owner'||role==='admin'}))
-vi.mock('@/lib/api',async importOriginal=> {const actual=await importOriginal<typeof import('@/lib/api')>();return {...actual,api:{staff:{me:async()=>({success:true,data:{id:'self',role:net.role??'viewer',name:'担当'}})},friendAddRules:{get:async()=>({success:true,data:{rule:{id:'r',name:'案内',status:'stopped',friendKind:'first_time',priority:1,routeNames:[],definition:{routeIds:[],actions:[],messageType:'text',messageText:'案内'}},options:{routes:[],scenarios:[],tags:[]}}}),validate:net.validate,conflicts:net.conflicts,test:net.test}}}})
+vi.mock('@/lib/api',async importOriginal=> {const actual=await importOriginal<typeof import('@/lib/api')>();return {...actual,api:{staff:{me:async()=>({success:true,data:{id:'self',role:net.role??'viewer',name:'担当'}})},friendAddRules:{get:async()=>({success:true,data:{rule:{id:'r',name:'案内',status:'stopped',friendKind:'first_time',priority:1,routeNames:[],definition:{routeIds:[],actions:[],messageType:'text',messageText:'案内'}},options:{routes:[],scenarios:[],tags:[]}}}),validate:net.validate,conflicts:net.conflicts,test:net.test,testRecipient:net.testRecipient,testSend:net.testSend}}}})
 import Page from './publish'
-beforeEach(()=>{net.role='owner';net.account='a';net.query='id=r&done=1';net.test.mockReset();net.validate.mockReset().mockResolvedValue({success:true,data:{canPublish:true,checks:[],estimatedAudienceCount:1}});net.conflicts.mockReset().mockResolvedValue({success:true,data:{rules:[],conflicts:[]}})})
+beforeEach(()=>{net.role='owner';net.account='a';net.query='id=r&done=1';net.test.mockReset();net.testRecipient.mockReset().mockResolvedValue({success:true,data:{available:true}});net.testSend.mockReset();net.validate.mockReset().mockResolvedValue({success:true,data:{canPublish:true,checks:[],estimatedAudienceCount:1}});net.conflicts.mockReset().mockResolvedValue({success:true,data:{rules:[],conflicts:[]}})})
 afterEach(cleanup)
 it('WEB154: doneのURLでも停止中を有効化完了と表示しない',async()=>{
  const view=render(<Page/>);await act(async()=>{})
@@ -60,4 +60,22 @@ it('固定の自己宛先は文字で表示し、選ぶ操作を置かず明示�
  expect(net.test).not.toHaveBeenCalled()
  await act(async()=>screen.getByRole('button',{name:'テストする（送らずに判定）',exact:true}).click())
  expect(net.test).toHaveBeenCalledWith('a','r',{routeId:null,expectedAt:null,friendId:null})
+})
+
+it('自分への送信は連続押しでも一度だけ呼ぶ',async()=>{
+ net.query='id=r';let resolve!: (value:unknown)=>void
+ net.testSend.mockImplementation(()=>new Promise(done=>{resolve=done}))
+ render(<Page/>);await act(async()=>{})
+ const button=screen.getByRole<HTMLButtonElement>('button',{name:'自分にテスト送信'})
+ await act(async()=>{button.click();button.click()})
+ expect(net.testSend).toHaveBeenCalledTimes(1)
+ expect(button.disabled).toBe(true)
+ await act(async()=>resolve({success:true,data:{sent:1}}))
+})
+it('宛先が無いと送信できない',async()=>{
+ net.query='id=r';net.testRecipient.mockResolvedValue({success:true,data:{available:false}})
+ render(<Page/>);await act(async()=>{})
+ const button=screen.getByRole<HTMLButtonElement>('button',{name:'自分にテスト送信'})
+ expect(button.disabled).toBe(true)
+ button.click();expect(net.testSend).not.toHaveBeenCalled()
 })

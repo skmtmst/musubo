@@ -36,7 +36,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
  * 同じ口を同じ順に呼ぶ：設定を読む → 確認（validate）と重なり（conflicts）を読む →
  * 「有効にする」で公開（publish・二重公開を防ぐ鍵つき）→ 完了の面へ差し替える。
  * 画面を開くだけではテストを走らせない（走らせると記録だけ付いて「テスト済み」になる）。
- * テストは「テストする（送らずに判定）」を押したときだけ。
+ * 判定と自分へのテスト送信は、それぞれのボタンを押したときだけ行う。
  *
  * 2つの面（確認・完了）は同じ流れの前後なので1つのファイル。完了は読み直さず、
  * 公開したときの数をそのまま出す。`?done=1` は作る⑤（編集画面）から有効にして来たとき。
@@ -85,6 +85,9 @@ function FriendAddPublish() {
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [sending, setSending] = useState(false)
+  const sendingRef = useRef(false)
+  const [recipient, setRecipient] = useState<boolean | null>(null)
   const [testNote, setTestNote] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   /*
@@ -134,6 +137,7 @@ function FriendAddPublish() {
     setPhase('loading')
     setBusy(false)
     setTesting(false)
+    setRecipient(null)
     setFailure(null)
     // アカウント固有の結果を先に捨てる。残すと、別のアカウントの数を見ながら公開することになる。
     setDetail(null)
@@ -154,6 +158,13 @@ function FriendAddPublish() {
         }
         const loaded: RuleDetail = { rule: res.data.rule, staffNotification: res.data.staffNotification }
         setDetail(loaded)
+        if (canEdit) {
+          try {
+            const recipientResult = await api.friendAddRules.testRecipient(selectedAccountId, ruleId)
+            if (!isCurrent()) return
+            setRecipient(recipientResult.success && recipientResult.data.available)
+          } catch { if (isCurrent()) setRecipient(null) }
+        }
         if (canEdit) await readChecks(selectedAccountId, loaded.rule, isCurrent)
         if (!isCurrent()) return
         setPhase('ready')
@@ -175,6 +186,23 @@ function FriendAddPublish() {
     })()
     return () => { alive = false }
   }, [ruleId, selectedAccountId, reloadKey, readChecks, saveErrors, canEdit])
+
+  const sendTest = async () => {
+    if (!canEdit || !recipient || !selectedAccountId || !detail || sendingRef.current) return
+    sendingRef.current = true
+    setSending(true)
+    const at = { accountId: selectedAccountId, generation: requestRef.current.generation }
+    const stillHere = () => requestRef.current.accountId === at.accountId && requestRef.current.generation === at.generation
+    try {
+      const result = await api.friendAddRules.testSend(at.accountId, detail.rule.id, crypto.randomUUID())
+      if (stillHere()) notifyToast(result.success ? '自分にテスト送信しました。' : result.error, result.success ? undefined : { tone: 'error' })
+    } catch (error) {
+      if (stillHere()) notifyToast(error instanceof ApiError ? error.message : 'テスト送信できませんでした。もう一度お試しください。', { tone: 'error' })
+    } finally {
+      sendingRef.current = false
+      setSending(false)
+    }
+  }
 
   /** テストする（送らずに判定）。本番の登録・タグ・マイルは変えない。終わったら確認を読み直す。 */
   const runTest = async () => {
@@ -412,12 +440,15 @@ function FriendAddPublish() {
       <Card variant="form" gap="normal" className={styles.card} aria-label="テストする（送らずに判定）">
         <CardHeader size="stacked" title={<>テストする（送らずに判定）</>} meta={<>本番の登録・タグ・マイルは変えません</>} />
         <div className={styles.testRow}>
-          <p className={styles.cardDesc}>送り先：{me ?? 'あなた'}（自分）</p>
+          <p className={styles.cardDesc} title={`送り先：${me ?? 'あなた'}（自分）`}>送り先：{me ?? 'あなた'}（自分）</p>
           {canEdit ? (
             <Button type="button" disabled={testing} busy={testing} busyLabel="判定中…" onClick={() => void runTest()}>
               <Send size={16} aria-hidden="true" />テストする（送らずに判定）
             </Button>
           ) : null}
+          <PermissionGatedButton allowed={canEdit} type="button" variant="secondary" disabled={sending || recipient !== true}
+            disabledReason={recipient === false ? 'テストの宛先を設定し、このアカウントを友だち追加してください' : recipient === null ? 'テストの宛先を確認できません' : undefined}
+            busy={sending} busyLabel="送信中…" onClick={() => void sendTest()}>自分にテスト送信</PermissionGatedButton>
         </div>
         <p className={styles.cardDesc} role="status">
           {testNote ?? (rule.lastTestStatus === 'succeeded'
