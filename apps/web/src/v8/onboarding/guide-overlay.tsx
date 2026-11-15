@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import { balloonPlacement, dimPanels, isOffScreen, spotlightRing, type Rect } from './guide-overlay-geometry'
 import { guideProcedure, guideProcedureTotal } from './guide-script'
 import styles from './guide-overlay.module.css'
@@ -78,7 +79,7 @@ export function GuideOverlay({
     if (!active || !anchorName || !target || !viewport) return
     if (!isOffScreen(target, viewport)) return
     document.querySelector(`[data-guide-anchor="${anchorName}"]`)
-      ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      ?.scrollIntoView({ block: 'center', behavior: scrollMotion() })
   }, [active, anchorName, target, viewport])
 
   /*
