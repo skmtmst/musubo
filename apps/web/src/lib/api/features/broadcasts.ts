@@ -71,6 +71,8 @@ export const broadcastsMethods = {
         pagination?: { total: number; limit: number; cursor: number; nextCursor: string | null }
       }>(`/api/broadcasts${qs ? `?${qs}` : ''}`)
     },
+    createCorrection: (id: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(`/api/broadcasts/${encodeURIComponent(id)}/correction`, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } }),
     get: (id: string) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`),
     create: (data: import('@line-crm/shared').BroadcastDefinitionInput, options?: { idempotencyKey?: string }) =>
@@ -87,6 +89,7 @@ export const broadcastsMethods = {
      */
     preflight: (data: {
       targetType: string
+      correctionDraftId?: string
       targetTagId?: string | null
       lineAccountId?: string | null
       accountIds?: string[]

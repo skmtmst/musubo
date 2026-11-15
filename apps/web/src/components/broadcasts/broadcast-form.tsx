@@ -462,7 +462,9 @@ export default function BroadcastForm({
       const userCondition: SegmentCondition | null = stored
         ? { ...stored, rules: (stored.rules ?? []).filter((rule) => rule.type !== 'is_following') }
         : null
-      if (draft.targetType === 'tag' && !draft.targetTagId && draft.draftPayload?.draftTargetMode === 'unselected') {
+      if (draft.correctionOfBroadcastId) {
+        setTargetMode('all')
+      } else if (draft.targetType === 'tag' && !draft.targetTagId && draft.draftPayload?.draftTargetMode === 'unselected') {
         // 相手をまだ選んでいない下書き。全員へ置き換えない。
         setTargetMode('unselected')
       } else if (draft.targetType === 'tag') {
@@ -711,6 +713,7 @@ export default function BroadcastForm({
    * 送信の経路が別（キューに載せずにその場で送る）で、少人数のときに速い。
    */
   const targetPayload = useCallback(() => {
+    if (editingDraft?.correctionOfBroadcastId && editingDraft.segmentConditions) return { targetType: 'segment' as const, targetTagId: null, segmentConditions: editingDraft.segmentConditions }
     if (!audience) return { targetType: 'tag' as const, targetTagId: '', segmentConditions: undefined }
     if (targetMode === 'tag' && tagId && !excludeTagId) {
       return { targetType: 'tag' as const, targetTagId: tagId, segmentConditions: undefined }
@@ -720,7 +723,7 @@ export default function BroadcastForm({
       targetTagId: null,
       segmentConditions: audience,
     }
-  }, [audience, tagId, targetMode, excludeTagId])
+  }, [audience, tagId, targetMode, excludeTagId, editingDraft])
   /*
    * 宛先か本文が変わったら、少し待ってから自動で確かめる。
    *
@@ -856,6 +859,7 @@ export default function BroadcastForm({
     const target = targetPayload()
     return {
       targetType: target.targetType,
+      ...(editingDraft?.correctionOfBroadcastId ? { correctionDraftId: editingDraft.id } : {}),
       targetTagId: target.targetTagId,
       // 条件を渡さないと、絞り込みを無視した人数（＝全員）が返る。
       segmentConditions: target.segmentConditions ?? null,
@@ -925,13 +929,14 @@ export default function BroadcastForm({
   const currentPreflightKey = JSON.stringify(preflightRequestBody())
   const preflight = preflightResult !== null && preflightKey === currentPreflightKey ? preflightResult : null
   const {
-    audienceCount, audienceDisplayCount, confirmAudienceLabel, exclusionNote,
+    audienceCount, audienceDisplayCount, confirmAudienceLabel: summaryAudienceLabel, exclusionNote,
     quota, quotaInsufficient, quotaNote, evaluatedAtLabel, concurrentBroadcasts,
     scheduledLabel, sendWhenLabel,
   } = broadcastPreflightSummary({
     preflight, targetMode, tags, tagId, scenarios, scenariosStatus, audience,
     excludeTagId, sendMode, scheduledDate, scheduledTime, spreadMinutes: effectiveSpreadMinutes,
   })
+  const confirmAudienceLabel = editingDraft?.correctionOfBroadcastId ? '元の配信を送れた人' : summaryAudienceLabel
   const stepProblems = () => broadcastStepProblems({
     ...stepCheckInput(),
     lengthProblem: lengthNotice.tone === 'error' ? lengthNotice.description : null,
@@ -1369,7 +1374,7 @@ export default function BroadcastForm({
           </section>
         ) : null}
         <BroadcastBasicStep {...{ canCreateFolder, createFolder, deliveryMethod, duplicateRecent, folderId, folders, goToStep, internalMemo, recentBroadcasts, recentState, retryRecent, setComposerTemplateIndex, setComposerTemplateKind, setDeliveryMethod, setFolderId, setInternalMemo, setShowTemplatePicker, setTitle, shows, title }} />
-        <BroadcastAudienceStep {...{ audienceDisplayCount, audienceNotice, condition, excludeTagId, exclusionNote, onRetryTags, openConditionDialog, preflight, preflightStatus, runPreflight, scenarioId, scenarios, scenariosStatus, selectedAccountId, setCondition, setExcludeTagId, setScenarioId, setTagId, setTargetMode, shows, tagId, tags, tagsStatus, targetMode }} />
+        {editingDraft?.correctionOfBroadcastId ? (shows('audience') ? <Notice tone="info">訂正は元の配信を送れた人に送ります。宛先は変更できません。</Notice> : null) : <BroadcastAudienceStep {...{ audienceDisplayCount, audienceNotice, condition, excludeTagId, exclusionNote, onRetryTags, openConditionDialog, preflight, preflightStatus, runPreflight, scenarioId, scenarios, scenariosStatus, selectedAccountId, setCondition, setExcludeTagId, setScenarioId, setTagId, setTargetMode, shows, tagId, tags, tagsStatus, targetMode }} />}
         <div className={shows('message') ? 'contents' : 'hidden'}>{messageVisited && <>
         <BroadcastMessageStep {...{ ab, assets, bubbles, composerBusy, fields, moveBubble, selectedAccountId, selectedAccountIdRef, setBubbles, setComposerBusy, setComposerTemplateIndex, setComposerTemplateKind, setInlineComposer, setShowTemplatePicker, setTemplateSaveCreatedId, setTemplateSaveError, setTemplateSaveIndex, setTemplateSaveName, targetMode, title, updateBubble }} />
         {showTemplatePicker && (

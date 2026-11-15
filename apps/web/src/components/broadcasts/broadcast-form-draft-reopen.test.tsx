@@ -233,3 +233,15 @@ it.each([
     }
   } finally { unmount() }
 })
+
+it('訂正の本文を保存しても元の宛先を保つ', async () => {
+  const conditions = { operator: 'AND', rules: [{ type: 'is_following', value: true }] }
+  getApi.mockResolvedValue({ success: true, data: draftRow({ correctionOfBroadcastId: 'source', targetType: 'segment', segmentConditions: conditions }) })
+  updateApi.mockResolvedValue({ success: true, data: { id: 'draft-1', version: 8 } })
+  await renderForm()
+  try {
+    await act(async () => saveButton()!.click())
+    await flush()
+    expect(updateApi).toHaveBeenCalledWith('draft-1', expect.objectContaining({ targetType: 'segment', segmentConditions: conditions, expectedVersion: 7 }))
+  } finally { unmount() }
+})

@@ -1,4 +1,4 @@
-import { querySupplementaryPageAction } from '@/test-utils/page-action'
+import { queryPageAction, querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * ★V8 （詳細の下書きの頭出し）。
@@ -108,5 +108,30 @@ describe('詳細の下書きのテスト送信（Q28Gb）', () => {
     expect(
       (Array.from(host.querySelectorAll('button')).find((el) => el.textContent === 'テストを送る') ?? querySupplementaryPageAction('テストを送る')),
     ).toBeUndefined()
+  })
+})
+
+describe('配信の訂正', () => {
+  it('詳細を開いている間の再試行には同じキーを使う', async () => {
+    const create = vi.spyOn(api.broadcasts, 'createCorrection').mockResolvedValue({ success: false, error: '再試行してください' })
+    act(() => root.render(<BroadcastDetailV8 {...baseProps} broadcast={{ ...draft, status: 'sent' }} />))
+    for (let i = 0; i < 2; i++) {
+      const item = queryPageAction({ name: '訂正を送る' })
+      expect(item).toBeTruthy()
+      await act(async () => { item!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    }
+    expect(create).toHaveBeenCalledTimes(2)
+    expect(create.mock.calls[0][1]).toBe(create.mock.calls[1][1])
+  })
+  it('元の配信に訂正の下書きへのリンクを表示する', () => {
+    act(() => root.render(<BroadcastDetailV8 {...baseProps} broadcast={{ ...draft, status: 'sent', correction: { id: 'correction-1', status: 'draft' } }} />))
+    expect(host.textContent).toContain('訂正あり')
+    expect(host.querySelector('a[href="/broadcasts/new?draft=correction-1"]')).not.toBeNull()
+  })
+  it('閲覧のみでは訂正を押せず、下書きには操作がない', () => {
+    act(() => root.render(<BroadcastDetailV8 {...baseProps} canEdit={false} broadcast={{ ...draft, status: 'sent' }} />))
+    expect((queryPageAction({ name: '訂正を送る' }) as HTMLButtonElement).disabled).toBe(true)
+    act(() => root.render(<BroadcastDetailV8 {...baseProps} broadcast={draft} />))
+    expect(queryPageAction({ name: '訂正を送る' })).toBeNull()
   })
 })

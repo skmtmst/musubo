@@ -196,6 +196,23 @@ export default function BroadcastDetail({
   const cancelTicket = useRef<symbol | null>(null)
   const renderedCancelTicket = cancelTicket.current
   const [testing, setTesting] = useState(false)
+  const correctionRequest = useRef<{ id: string; key: string; busy: boolean } | null>(null)
+  const createCorrection = async () => {
+    if (!canEdit) return
+    if (!correctionRequest.current || correctionRequest.current.id !== broadcast.id) correctionRequest.current = { id: broadcast.id, key: crypto.randomUUID(), busy: false }
+    const request = correctionRequest.current
+    const scopeGeneration = broadcastScope.current.generation
+    if (request.busy) return
+    request.busy = true
+    try {
+      const result = await api.broadcasts.createCorrection(broadcast.id, request.key)
+      if (correctionRequest.current !== request || broadcastScope.current.generation !== scopeGeneration) return
+      if (!result.success) { notifyToast(result.error, { tone: 'error' }); return }
+      router.push(`/broadcasts/new?draft=${encodeURIComponent(result.data.id)}`)
+    } catch {
+      if (correctionRequest.current === request && broadcastScope.current.generation === scopeGeneration) notifyToast('訂正の下書きを作れませんでした。時間をおいてもう一度お試しください。', { tone: 'error' })
+    } finally { request.busy = false }
+  }
 
   const collision = useSaveConflict<ApiBroadcast>({
     contextKey: broadcast.id,
@@ -273,6 +290,7 @@ export default function BroadcastDetail({
       href: duplicateHref, onSelect: () => router.push(duplicateHref),
     },
   ]
+  if (isSent) menuItems.unshift({ id: 'correction', label: '訂正を送る', disabled: !canEdit, onSelect: () => void createCorrection() })
   if (isScheduled) {
     menuItems.push({
       id: 'cancel-reservation',
@@ -303,11 +321,11 @@ export default function BroadcastDetail({
             ? <DraftStepRail broadcastId={broadcast.id} draftStep={broadcast.draftStep} canEdit={canEdit} />
             : <DeliveryRail broadcast={broadcast} approvalInvolved={approvalInvolved(broadcast, approval.state)} abWaiting={abResult.result?.status === 'undecided' || abResult.result?.status === 'testing'} />}</>}
         titleAccessory={<StatusBadge tone={badgeTone ?? 'neutral'}>{statusLabel}</StatusBadge>}
-        actions={<>{canEdit ? (
+        actions={<>{(canEdit || isSent) ? (
             <>
               <RowMenu
                 label={`配信「${broadcast.title}」の操作`}
-                items={menuItems}
+                items={canEdit ? menuItems : menuItems.filter(item => item.id === 'correction')}
               />
             </>
           ) : null}
@@ -338,6 +356,7 @@ export default function BroadcastDetail({
             </Button>
           ) : null}</>} />
 
+      {broadcast.correction ? <Notice tone="info">訂正あり　<TextLink href={broadcast.correction.status === 'draft' ? `/broadcasts/new?draft=${encodeURIComponent(broadcast.correction.id)}` : `/broadcasts/detail?id=${encodeURIComponent(broadcast.correction.id)}`}>訂正を開く</TextLink></Notice> : null}
       {conflict ? (
         <div className={styles.conflictWrap} data-design-node="Q28Gb">
           <SaveConflictBand title={`ほかの人が配信「${broadcast.title}」を更新しました`}
