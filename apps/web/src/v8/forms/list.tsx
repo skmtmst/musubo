@@ -114,6 +114,8 @@ export default function FormsListV8() {
   /** 消す箱に入っているフォーム数。`null` はまだ数えていない。 */
   const [deletingFolderCount, setDeletingFolderCount] = useState<number | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
+  const folderReorder = useRef<object | null>(null)
+  const [folderReordering, setFolderReordering] = useState(false)
   /** 箱の読み込み・操作の失敗。箱の場所に小さく出す。一覧は普通に出す。 */
   const [folderError, setFolderError] = useState('')
   const [moveTarget, setMoveTarget] = useState<Form | null>(null)
@@ -189,6 +191,8 @@ export default function FormsListV8() {
   useEffect(() => {
     activeAccountRef.current = selectedAccountId
     // フォルダはアカウント単位。切り替えたら前の帯・窓・選択を残さない。
+    folderReorder.current = null
+    setFolderReordering(false)
     setFolders([])
     setUnfiledCount(null)
     setActiveFolderId('all')
@@ -212,13 +216,16 @@ export default function FormsListV8() {
 
   const clearList = () => {
     setForms([])
-    setFolders([])
+    if (!folderReorder.current) setFolders([])
     setUnfiledCount(null)
     setFormTotal(0)
     setFolderTotal(0)
   }
 
-  const loadForms = useCallback(() => loadFormsPage({ activeFolderId, clearList, fetchQuery, formFilter, formRequest, formSort, page, pageSize, reviewMode, saveErrors, selectedAccountId, setFolderError, setFolders, setFolderTotal, setForms: (value) => { if (renderedScope !== accountScope.current) return; loadedScope.current = renderedScope; setForms(value) }, setFormTotal, setLoadError, setLoadFailure, setLoading, setReviewForbidden, setUnfiledCount }), [reviewMode, selectedAccountId, activeFolderId, page, pageSize, formFilter, formSort, fetchQuery, saveErrors])
+  const loadForms = useCallback(() => loadFormsPage({ activeFolderId, clearList, fetchQuery, formFilter, formRequest, formSort, page, pageSize, reviewMode, saveErrors, selectedAccountId, setFolderError, setFolders: (value) => { if (renderedScope === accountScope.current && !folderReorder.current) setFolders(value) }, setFolderTotal, setForms: (value) => { if (renderedScope !== accountScope.current) return; loadedScope.current = renderedScope; setForms(value) }, setFormTotal, setLoadError, setLoadFailure, setLoading, setReviewForbidden, setUnfiledCount }), [reviewMode, selectedAccountId, activeFolderId, page, pageSize, formFilter, formSort, fetchQuery, saveErrors])
+
+  const loadFormsRef = useRef(loadForms)
+  loadFormsRef.current = loadForms
 
   useEffect(() => {
     void loadForms()
@@ -631,11 +638,15 @@ export default function FormsListV8() {
     }
   }
 
-  /* フォルダの並べ替えは押した瞬間に画面を変え、裏で保存する（5秒は「元に戻す」）。 */
+  /* フォルダは先に並べ替え、保存と読み直しの間もその並びを保つ。 */
   const moveFolder = (index: number, direction: -1 | 1) => {
     const target = folders[index]
     const neighbor = folders[index + direction]
-    if (!target || !neighbor || folderBusy || !selectedAccountId) return
+    if (!target || !neighbor || folderBusy || folderReorder.current || !selectedAccountId) return
+    const ticket = {}
+    const scope = accountScope.current
+    folderReorder.current = ticket
+    setFolderReordering(true)
     const before = folders
     const swapped = [...folders]
     swapped[index] = neighbor
@@ -648,9 +659,18 @@ export default function FormsListV8() {
         const result = await api.folders.swapOrder(target.id, neighbor.id, selectedAccountId)
         if (!result.success) return { success: false, error: result.error }
       },
-      undo: () => setFolders(before),
-      onCommitted: () => {
-        void loadForms()
+      undo: () => {
+        if (folderReorder.current !== ticket || scope !== accountScope.current) return
+        folderReorder.current = null
+        setFolderReordering(false)
+        setFolders(before)
+        void loadFormsRef.current()
+      },
+      onCommitted: async () => {
+        if (folderReorder.current !== ticket || scope !== accountScope.current) return
+        folderReorder.current = null
+        try { await loadFormsRef.current() }
+        finally { if (scope === accountScope.current) setFolderReordering(false) }
       },
       failureMessage: '並び順を変えられませんでした。',
     })
@@ -874,8 +894,8 @@ export default function FormsListV8() {
       count: folder.itemCount ?? null,
       color: folder.color,
       onEdit: canManageFolders ? () => detailGuard.protect(() => { closeDetail(); setEditingFolder(folder) }) : undefined,
-      onMoveUp: canManageFolders && index > 0 ? () => detailGuard.protect(() => { void moveFolder(index, -1) }) : undefined,
-      onMoveDown: canManageFolders && index < folders.length - 1 ? () => detailGuard.protect(() => { void moveFolder(index, 1) }) : undefined,
+      onMoveUp: canManageFolders && !folderReordering && index > 0 ? () => detailGuard.protect(() => { void moveFolder(index, -1) }) : undefined,
+      onMoveDown: canManageFolders && !folderReordering && index < folders.length - 1 ? () => detailGuard.protect(() => { void moveFolder(index, 1) }) : undefined,
       onDelete: canManageFolders ? () => detailGuard.protect(() => { if (renderedScope === accountScope.current) void openFolderDelete(folder) }) : undefined,
       deleteNote: '削除しても、中のフォームは未分類に残ります。',
     })),
