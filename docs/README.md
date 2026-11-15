@@ -1230,4 +1230,5 @@
 - [文書：A15 の判断を言葉とスタイルの表へ](release-log/unreleased/72-kenta-a15-docs.md) — 来なかった・LINE通知の入口の履歴。確認 2026-11-15。
 - [文書：登録メディアの受け入れ表](release-log/unreleased/74-kenta-media-docs.md) — 一度に10件・使用先の出し方の履歴。確認 2026-11-15。
 - [文書：手動テストの要件の整理](release-log/unreleased/79-kenta-a15-req.md) — 画面と決定に合わせた要件の変更履歴。確認 2026-11-15。
+- [EC連携を止めている間の案内](release-log/unreleased/78-kenta-words-behavior.md) — 画面の案内を実際の動きに合わせた修正履歴。確認 2026-11-15。
 - [閲覧のみの作るボタン・行の操作を灰色に](release-log/unreleased/73-kenta-train-viewer.md) — 閲覧のみの人への表示をそろえた履歴。確認 2026-11-15。
