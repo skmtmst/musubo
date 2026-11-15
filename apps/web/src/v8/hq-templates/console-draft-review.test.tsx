@@ -69,8 +69,13 @@ const dk = (type: string, kind: string) => `lh_hq_create_draft_v1:tenant-a:owner
 const scope = { tenantId: 'tenant-a', actorId: 'owner' }
 const openCreate = async (tab?: RegExp) => {
   if (tab) fireEvent.click(await screen.findByRole('tab', { name: tab }))
-  fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
-  return screen.findByLabelText('テンプレート名')
+  const createButton = await waitFor(() => {
+    const button = screen.getAllByRole('button', { name: /テンプレートを作る/ })[0]
+    expect(button.hasAttribute('disabled')).toBe(false)
+    return button
+  }, { timeout: 3000 })
+  fireEvent.click(createButton)
+  return screen.findByLabelText('テンプレート名', {}, { timeout: 3000 })
 }
 const atCreate = () => window.history.replaceState(null, '', '/hq/templates?mode=create')
 const seedFromMount = async (tab: RegExp, kind: string) => {
@@ -83,6 +88,17 @@ const seedFromMount = async (tab: RegExp, kind: string) => {
 }
 
 describe('R1 通知', () => {
+  it('一覧の読み込みが終わってから作成画面を開く', async () => {
+    let releaseContext!: (value: typeof scope) => void
+    calls.context.mockReturnValue(new Promise(resolve => { releaseContext = resolve }))
+    render(<HqTemplatesV8 type="template" />)
+    const button = (await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0]
+    expect(button.hasAttribute('disabled')).toBe(true)
+    const opening = openCreate()
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { releaseContext(scope) })
+    expect(await opening).toBeTruthy()
+  })
   it('R1a template は保存失敗を画面に出す', async () => {
     render(<HqTemplatesV8 type="template" />)
     const name = await openCreate()
