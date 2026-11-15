@@ -39,7 +39,7 @@ it('重なり取得のsuccess:falseを重なりなしとして公開確認に進
 for (const role of [null, 'viewer']) it(`権限${role}では有効化・テスト・宛先を選ぶ操作を隠し、戻る道を残す`,async()=>{
  net.role=role;net.query='id=r';net.validate.mockRejectedValue(new Error('403 validation forbidden'));net.conflicts.mockRejectedValue(new Error('403 conflicts forbidden'));render(<Page/>);await act(async()=>{})
  expect(screen.getByRole('link',{name:'一覧へ戻る'})).toBeTruthy()
- for (const name of ['有効にする','テストする（送らずに判定）','テストの送り先']) expect(screen.queryByRole('button',{name,exact:true})).toBeNull()
+ for (const name of ['有効にする','テストする（送らずに判定）','テストの送り先','自分にテスト送信']) expect(screen.queryByRole('button',{name,exact:true})).toBeNull()
  expect(net.test).not.toHaveBeenCalled()
  expect(net.validate).not.toHaveBeenCalled()
  expect(net.conflicts).not.toHaveBeenCalled()
@@ -77,5 +77,6 @@ it('宛先が無いと送信できない',async()=>{
  render(<Page/>);await act(async()=>{})
  const button=screen.getByRole<HTMLButtonElement>('button',{name:'自分にテスト送信'})
  expect(button.disabled).toBe(true)
+ expect(button.getAttribute('aria-description')).toContain('テストの宛先を設定')
  button.click();expect(net.testSend).not.toHaveBeenCalled()
 })

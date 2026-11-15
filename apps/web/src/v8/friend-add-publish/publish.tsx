@@ -24,7 +24,7 @@ import { resendSuppressionText } from '@/v8/friend-add/public/text/index'
 import { actionSummaryText, blockedReason, canPublish, firstSendText, idempotencyKeyFor, PUBLISH_STEPS, editStepHref } from './flow'
 import FriendAddDoneV8 from './done'
 import styles from './publish.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { japaneseDetailOf, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -195,9 +195,9 @@ function FriendAddPublish() {
     const stillHere = () => requestRef.current.accountId === at.accountId && requestRef.current.generation === at.generation
     try {
       const result = await api.friendAddRules.testSend(at.accountId, detail.rule.id, crypto.randomUUID())
-      if (stillHere()) notifyToast(result.success ? '自分にテスト送信しました。' : result.error, result.success ? undefined : { tone: 'error' })
+      if (stillHere()) notifyToast(result.success ? '自分にテスト送信しました。' : 'テスト送信できませんでした。もう一度お試しください。', result.success ? undefined : { tone: 'error' })
     } catch (error) {
-      if (stillHere()) notifyToast(error instanceof ApiError ? error.message : 'テスト送信できませんでした。もう一度お試しください。', { tone: 'error' })
+      if (stillHere()) notifyToast(error instanceof ApiError && error.status === 403 ? permissionDeniedMessage('store') : japaneseDetailOf(error) || 'テスト送信できませんでした。もう一度お試しください。', { tone: 'error' })
     } finally {
       sendingRef.current = false
       setSending(false)
@@ -446,9 +446,9 @@ function FriendAddPublish() {
               <Send size={16} aria-hidden="true" />テストする（送らずに判定）
             </Button>
           ) : null}
-          <PermissionGatedButton allowed={canEdit} type="button" variant="secondary" disabled={sending || recipient !== true}
+          {canEdit ? <PermissionGatedButton allowed={canEdit} type="button" variant="secondary" disabled={sending || recipient !== true}
             disabledReason={recipient === false ? 'テストの宛先を設定し、このアカウントを友だち追加してください' : recipient === null ? 'テストの宛先を確認できません' : undefined}
-            busy={sending} busyLabel="送信中…" onClick={() => void sendTest()}>自分にテスト送信</PermissionGatedButton>
+            busy={sending} busyLabel="送信中…" onClick={() => void sendTest()}>自分にテスト送信</PermissionGatedButton> : null}
         </div>
         <p className={styles.cardDesc} role="status">
           {testNote ?? (rule.lastTestStatus === 'succeeded'
