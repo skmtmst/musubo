@@ -1,4 +1,6 @@
 'use client'
+
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import { DetailContent, DetailFields } from '@/components/shared/detail-content'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 import { useListSnapshot } from '@/lib/use-list-snapshot'
@@ -615,9 +617,8 @@ export default function TagsTab({
   const filterActive = Boolean(query || folder || usageFilter !== 'all' || sourceFilter !== 'all' || quick.length || onlyArchived)
   const clearFilters = () => { setView({ q: '', folder: '', usage: 'all', source: 'all', quick: '', archived: '', page: '1' }) }
 
-  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
-  const createButton = (wide: boolean) => status === 'forbidden' || !canEdit ? null : (
-    <Button href="/tags/new" variant="primary" className={wide ? styles.createWide : undefined}><Plus size={16} aria-hidden="true" />タグを作る</Button>
+  const createButton = (wide: boolean) => status === 'forbidden' ? null : (
+    <PermissionGatedButton allowed={canEdit} href="/tags/new" variant="primary" className={wide ? styles.createWide : undefined}><Plus size={16} aria-hidden="true" />タグを作る</PermissionGatedButton>
   )
 
   const search = (

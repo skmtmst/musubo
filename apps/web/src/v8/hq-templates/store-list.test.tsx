@@ -4,6 +4,8 @@
  * 6種類のタブで種類を替える・配布先の列・全種類の行の［配る］（「…」の左。オーナー 2026-10-08）・閲覧のみには配る／作る口を置かない・フォルダで絞る。
  */
 import { waitFor } from '@testing-library/react'
+vi.mock('@/components/shared/use-permission-lock-reason', () => ({ usePermissionLockReason: (allowed: boolean) => allowed ? undefined : '統括の管理権限が必要です' }))
+
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -114,8 +116,9 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
       await act(async () => create!.click())
       expect(h.onCreate).toHaveBeenCalledOnce()
     } else {
-      expect(create).toBeNull()
-      expect(panel.querySelectorAll(':scope > div[aria-hidden="true"]')).toHaveLength(1)
+      expect(create?.getAttribute('aria-disabled')).toBe('true')
+      await act(async () => create!.click())
+      expect(h.onCreate).not.toHaveBeenCalled()
     }
   })
 
@@ -288,7 +291,11 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
   for (const type of ['template', 'tag', 'rich_menu', 'form'] as const) {
     it(`閲覧のみには作る・配る口を置かない（${type}）`, async () => {
       await render({ type, kind: type === 'template' ? 'message' : undefined, canEdit: false })
-      expect(buttons().some((b) => b.textContent?.includes('を作る'))).toBe(false)
+      const create = buttons().filter((b) => b.textContent?.includes('を作る'))
+      expect(create.length).toBeGreaterThan(0)
+      expect(create.every((b) => b.getAttribute('aria-disabled') === 'true')).toBe(true)
+      await act(async () => create[0].click())
+      expect(document.querySelector('[role="dialog"]')).toBeNull()
       expect(buttons().some((b) => b.getAttribute('aria-label')?.endsWith('を配る'))).toBe(false)
       expect(buttons().some((b) => b.textContent?.trim() === '配る')).toBe(false)
       expect(document.querySelector('th[aria-label="配る"]')).toBeNull()

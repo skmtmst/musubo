@@ -1,5 +1,7 @@
 'use client'
 
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
+
 import { renderFormDialogs } from './list-dialogs'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -887,16 +889,16 @@ export default function FormsListV8() {
     updateListState({ page: 1 })
   }
 
-  const createButton = (full: boolean) => canEditForms ? (
-    <Button
+  const createButton = (full: boolean) => (
+    <PermissionGatedButton allowed={canEditForms}
       type="button"
       variant="primary"
       className={full ? 'v8-folder-create w-full' : undefined}
       onClick={() => detailGuard.protect(createDraft)}
     >
       <Plus size={16} aria-hidden="true" />フォームを作る
-    </Button>
-  ) : null
+    </PermissionGatedButton>
+  )
 
   const folderPanel = (
     <FolderPanel

@@ -1,5 +1,7 @@
 'use client'
 
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
+
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 
 import StatusBadge from '@/components/shared/status-badge'
@@ -1297,9 +1299,9 @@ export default function RemindersListV8() {
         </KpiBand> : null}
         folders={<>
           <ManagedFolderPanel
-            createAction={canEdit ? <Button href="/reminders/new" variant="primary" className="v8-folder-create w-full">
+            createAction={<PermissionGatedButton allowed={canEdit} href="/reminders/new" variant="primary" className="v8-folder-create w-full">
               ＋ リマインダを作る
-            </Button> : undefined}
+            </PermissionGatedButton>}
             kind="reminder"
             accountId={selectedAccountId}
             folders={folders}
