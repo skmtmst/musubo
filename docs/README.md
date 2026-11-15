@@ -1234,3 +1234,4 @@
 - [操作後のお知らせと保管確認](release-log/unreleased/81-kenta-archive-undo.md) — お知らせと保管時の操作の変更履歴。確認 2026-11-15。
 - [EC連携を止めている間の案内](release-log/unreleased/78-kenta-words-behavior.md) — 画面の案内を実際の動きに合わせた修正履歴。確認 2026-11-15。
 - [閲覧のみの作るボタン・行の操作を灰色に](release-log/unreleased/73-kenta-train-viewer.md) — 閲覧のみの人への表示をそろえた履歴。確認 2026-11-15。
+- [列車 1116](release-log/unreleased/83-kenta-train-1116.md) — まとめて入れた直しの履歴。確認 2026-11-16。
