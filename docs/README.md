@@ -1229,4 +1229,4 @@
 - [閲覧のみの操作を灰色に（残り）](release-log/unreleased/71-kenta-viewer-gray-app.md) — #60 の続きの履歴。確認 2026-11-15。
 - [文書：A15 の判断を言葉とスタイルの表へ](release-log/unreleased/72-kenta-a15-docs.md) — 来なかった・LINE通知の入口の履歴。確認 2026-11-15。
 
-- [友だち追加時のテスト送信](release-log/unreleased/PR-kenta-fadd-test.md) — 自分にテスト送信する機能の履歴。確認 2026-11-15。
+- [友だち追加時のテスト送信](release-log/unreleased/75-kenta-fadd-test.md) — 自分にテスト送信する機能の履歴。確認 2026-11-15。
