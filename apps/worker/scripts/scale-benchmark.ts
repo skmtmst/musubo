@@ -262,7 +262,9 @@ const PROBES: Probe[] = [
   { key: 'inbox-counts', label: '受信箱の件数（すべて・要返信）', screen: '受信箱', path: `/api/chats/quick-counts?lineAccountId=${ACCOUNT_ID}&channel=line` },
   { key: 'tags', label: 'タグの一覧（人数つき）', screen: 'タグ', path: `/api/tags?withCounts=1&lineAccountId=${ACCOUNT_ID}`, slow: true },
   { key: 'broadcasts', label: '一斉配信の一覧', screen: '一斉配信', path: `/api/broadcasts?lineAccountId=${ACCOUNT_ID}&limit=20` },
-  { key: 'dashboard', label: 'ダッシュボードの数', screen: 'ダッシュボード', path: `/api/dashboard/overview?period=30d&account_id=${ACCOUNT_ID}` },
+  { key: 'dashboard', label: 'ダッシュボードの数（30日）', screen: 'ダッシュボード', path: `/api/dashboard/overview?period=last30&account_id=${ACCOUNT_ID}` },
+  { key: 'dashboard-90', label: 'ダッシュボードの数（90日）', screen: 'ダッシュボード', path: `/api/dashboard/overview?period=last90&account_id=${ACCOUNT_ID}` },
+  { key: 'dashboard-custom', label: 'ダッシュボードの数（366日）', screen: 'ダッシュボード', path: `/api/dashboard/overview?period=custom&from=2025-10-25&to=2026-10-25&account_id=${ACCOUNT_ID}` },
 ];
 
 /** 対照用の重い SQL。数秒かかる数え上げで、読んだ行と走査の欄にも対照の跡が出る。 */
@@ -333,7 +335,7 @@ async function measure(db: D1Database, app: Hono<Env>, probe: Probe): Promise<Pr
   const sink: Recorded[] = [];
   await app.request(probe.path, {}, { DB: recordingDb(db, sink) } as unknown as Env['Bindings']);
   const medianMs = median(runsMs);
-  const overThreshold = medianMs > options.thresholdMs || status >= 500;
+  const overThreshold = medianMs > options.thresholdMs || status >= 400;
   // 索引の候補は全部の口で拾っておく（表に出すのは超えた口だけ。JSON には全部残す）。
   const scans = await scansFor(db, sink.filter(entry => /^\s*(SELECT|WITH)/i.test(entry.sql)));
   const rowsRead = sink.reduce((total, entry) => total + entry.rowsRead, 0);

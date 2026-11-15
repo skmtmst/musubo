@@ -271,15 +271,17 @@ export async function conversionSummary(
   db: D1Database,
   period: DashboardPeriod,
   scope: AccountStatsScope,
+  range?: { from: string; to: string },
 ): Promise<DashboardOverview['conversions']> {
-  const start = periodStart(period);
+  const start = range?.from ?? periodStart(period);
+  const end = nextDate(range?.to ?? jstDate());
   const account = accountScopeSql(scope, 'f.line_account_id');
   const total = await count(
     db,
     `SELECT COUNT(*) AS n FROM conversion_events ce
       JOIN friends f ON f.id = ce.friend_id
-     WHERE ce.created_at >= ? AND ${account.sql}`,
-    start, ...account.binds,
+     WHERE ce.created_at >= ? AND ce.created_at < ? AND ${account.sql}`,
+    start, end, ...account.binds,
   );
   const byPoint = await db
     .prepare(
@@ -287,12 +289,12 @@ export async function conversionSummary(
          FROM conversion_events c
          JOIN conversion_points cp ON cp.id = c.conversion_point_id
          JOIN friends f ON f.id = c.friend_id
-        WHERE c.created_at >= ? AND ${account.sql}
+        WHERE c.created_at >= ? AND c.created_at < ? AND ${account.sql}
         GROUP BY cp.id
         ORDER BY count DESC
         LIMIT 5`,
     )
-    .bind(start, ...account.binds)
+    .bind(start, end, ...account.binds)
     .all<{ name: string; count: number }>();
   return { total, byPoint: byPoint.results };
 }

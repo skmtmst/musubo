@@ -96,7 +96,7 @@ export function nextMonth(month: string): string {
 export function periodStart(period: DashboardPeriod): string {
   if (period === 'today') return jstDate(0);
   if (period === 'last7') return jstDate(-6);
-  return jstDate(period === 'last30' ? -29 : -27);
+  return jstDate(period === 'last90' ? -89 : period === 'last30' ? -29 : -27);
 }
 
 /** 今月の始まり（JSTの日付）。「今月の配信」は選んだ期間に関わらず今月1日から数える。 */
@@ -108,5 +108,5 @@ export function monthStart(): string {
 export function periodDays(period: DashboardPeriod): number {
   if (period === 'today') return 1;
   if (period === 'last7') return 7;
-  return period === 'last30' ? 30 : 28;
+  return period === 'last90' ? 90 : period === 'last30' ? 30 : 28;
 }

@@ -127,7 +127,7 @@ describe('dashboard organization account policy', () => {
       allowedAccountIds: ['account-2'], includeUnassigned: false,
     }, {
       allowedAccountIds: ['account-2'], includeUnassigned: true,
-    });
+    }, undefined);
   });
 
   test('30日の要求を今日へ戻さず、同じアカウント範囲で集計する', async () => {
@@ -136,7 +136,21 @@ describe('dashboard organization account policy', () => {
     expect(response.status).toBe(200);
     expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'last30', {
       allowedAccountIds: ['account-2'], includeUnassigned: false,
-    }, { allowedAccountIds: ['account-2'], includeUnassigned: true });
+    }, { allowedAccountIds: ['account-2'], includeUnassigned: true }, undefined);
+  });
+
+  test('期間の入力を検査し、不正な値を今日に置き換えない', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-14T15:00:00Z'));
+    try {
+      for (const query of ['period=30d', 'period=custom', 'period=custom&from=2026-02-30&to=2026-03-01', 'period=custom&from=2026-11-16&to=2026-11-16', 'period=custom&from=2025-11-14&to=2026-11-15', 'period=custom&from=2026-11-15&to=2026-11-14']) {
+        expect((await app().request(`/api/dashboard/overview?accountId=account-1&${query}`, {}, env())).status).toBe(400);
+      }
+      dbMocks.getDashboardOverview.mockResolvedValue(overview());
+      const response = await app().request('/api/dashboard/overview?accountId=account-1&period=custom&from=2025-11-15&to=2026-11-15', {}, env());
+      expect(response.status).toBe(200);
+      expect(dbMocks.getDashboardOverview.mock.calls.at(-1)?.at(-1)).toEqual({ from: '2025-11-15', to: '2026-11-15' });
+    } finally { vi.useRealTimers(); }
   });
 
   test('account-scoped staff cannot select an unassigned account', async () => {
@@ -189,7 +203,7 @@ describe('dashboard organization account policy', () => {
     }, {
       // tenant-b の担当者は未割り当て（MAIL）が見えない範囲のため、受信箱も LINE だけ。
       allowedAccountIds: ['account-1'], includeUnassigned: false,
-    });
+    }, undefined);
     const body = await response.json() as { data: { delivery: Record<string, unknown> } };
     expect(body.data.delivery).toMatchObject({
       sent: 12, broadcasts: 3, quotaLimit: null, quotaUsed: null,
@@ -442,6 +456,6 @@ describe('dashboard organization account policy', () => {
       allowedAccountIds: ['account-1'], includeUnassigned: false,
     }, {
       allowedAccountIds: ['account-1'], includeUnassigned: false,
-    });
+    }, undefined);
   });
 });

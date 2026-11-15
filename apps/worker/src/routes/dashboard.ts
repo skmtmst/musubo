@@ -1,5 +1,5 @@
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
-import { jstDate as japanDate } from '@line-crm/shared';
+import { jstDate as japanDate, validHoursDate } from '@line-crm/shared';
 import { fetchQuota } from '../services/dashboard-quota.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -56,7 +56,7 @@ dashboard.get('/api/dashboard/activity', requireRole('owner', 'admin', 'staff'),
   }
 });
 
-const PERIODS: DashboardPeriod[] = ['today', 'last7', 'last28', 'last30'];
+const PERIODS: DashboardPeriod[] = ['today', 'last7', 'last28', 'last30', 'last90', 'custom'];
 
 /*
  * 概要応答の中で送信枠の取得に使える時間（DASH-14）。
@@ -65,8 +65,13 @@ const PERIODS: DashboardPeriod[] = ['today', 'last7', 'last28', 'last30'];
  */
 const QUOTA_OVERVIEW_BUDGET_MS = 3_500;
 
-function readPeriod(raw: string | undefined): DashboardPeriod {
-  return PERIODS.includes(raw as DashboardPeriod) ? (raw as DashboardPeriod) : 'today';
+function readPeriod(raw: string | undefined, from?: string, to?: string): { period: DashboardPeriod; range?: { from: string; to: string } } | null {
+  const period = raw ?? 'today';
+  if (!PERIODS.includes(period as DashboardPeriod)) return null;
+  if (period !== 'custom') return from === undefined && to === undefined ? { period: period as DashboardPeriod } : null;
+  if (!from || !to || !validHoursDate(from) || !validHoursDate(to) || from > to || to > japanDate()
+      || Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`) > 365 * 86_400_000) return null;
+  return { period: 'custom', range: { from, to } };
 }
 
 /*
@@ -170,7 +175,9 @@ async function mapWithConcurrency<T, R>(
 
 dashboard.get('/api/dashboard/overview', async (c) => {
   try {
-    const period = readPeriod(c.req.query('period'));
+    const selectedPeriod = readPeriod(c.req.query('period'), c.req.query('from'), c.req.query('to'));
+    if (!selectedPeriod) return c.json({ success: false, error: '期間を確認してください' }, 400);
+    const { period, range } = selectedPeriod;
     const access = await requireVisibleAccount(c);
     if ('response' in access) return access.response;
     const { accountId } = access;
@@ -198,7 +205,7 @@ dashboard.get('/api/dashboard/overview', async (c) => {
      * 友だち数などの成功分は使える状態にする。
      */
     const [overview, quota] = await Promise.all([
-      getDashboardOverview(c.env.DB, period, statsScope, inboxScope),
+      getDashboardOverview(c.env.DB, period, statsScope, inboxScope, range),
       fetchQuota(quotaToken, QUOTA_OVERVIEW_BUDGET_MS),
     ]);
     if (quota.failed) {
@@ -251,7 +258,9 @@ dashboard.get('/api/dashboard/overview', async (c) => {
 /** 統括全体の運用情報は、明示的にオーナーだけへ許可する。 */
 dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), async (c) => {
   try {
-    const period = readPeriod(c.req.query('period'));
+    const selectedPeriod = readPeriod(c.req.query('period'), c.req.query('from'), c.req.query('to'));
+    if (!selectedPeriod) return c.json({ success: false, error: '期間を確認してください' }, 400);
+    const { period, range } = selectedPeriod;
     const visibleScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const overview = await getDashboardOverview(c.env.DB, period, {
       allowedAccountIds: visibleScope.allowedAccountIds,
@@ -259,7 +268,7 @@ dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), asyn
     }, {
       allowedAccountIds: visibleScope.allowedAccountIds,
       includeUnassigned: visibleScope.canSeeUnassigned,
-    });
+    }, range);
     const credentialAccounts = await getLineAccountsByIds(
       c.env.DB,
       visibleScope.allowedAccountIds,
