@@ -260,6 +260,7 @@ export function serializeBroadcast(row: DbBroadcast) {
   const r = row as unknown as Record<string, unknown>;
   return {
     id: row.id,
+    correctionOfBroadcastId: row.correction_of_broadcast_id ?? null,
     title: row.title,
     messageType: row.message_type,
     messageContent: row.message_content,

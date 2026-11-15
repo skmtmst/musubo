@@ -4,6 +4,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { broadcasts } from './broadcasts.js';
+import { previewAudience } from '../features/broadcasts/broadcast-preflight.js';
 let db: SqliteD1;
 const owner: AuthenticatedStaff = { id: 'owner', name: '管理者', role: 'owner', readOnly: false, tenantId: 't' };
 const key = 'c4522a8a-a40e-43eb-860a-38238f24f131';
@@ -54,4 +55,14 @@ test('訂正を送る前に確認が必要で、条件を指定する送信口�
  const segment = await app().request(`/api/broadcasts/${key}/send-segment`, { method: 'POST', headers, body: JSON.stringify({ conditions: { operator: 'AND', rules: [{ type: 'is_following', value: true }] } }) });
  expect(segment.status).toBe(409);
  expect(db.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(key)).toEqual({ status: 'draft' });
+});
+
+test('元の詳細から訂正を開け、事前確認も固定した人だけ数える', async () => {
+ expect((await request()).status).toBe(201);
+ const detail = await app().request('/api/broadcasts/source');
+ expect(detail.status).toBe(200);
+ expect(await detail.json()).toMatchObject({ data: { correction: { id: key, status: 'draft' } } });
+ const preview = await previewAudience(db.db, { targetType: 'segment', lineAccountId: 'a', fixedBroadcastId: key });
+ expect(preview.sendable).toBe(1);
+ expect(preview.representatives.map(row => row.friendId)).toEqual(['ok']);
 });

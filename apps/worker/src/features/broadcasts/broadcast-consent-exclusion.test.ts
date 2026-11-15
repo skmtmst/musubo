@@ -371,3 +371,17 @@ it('確認済み統括配信の同時処理は同じ宛先に二重送信しな�
  expect(queuedReads).toBe(2);expect(dispatchBatches).toBe(1);
  expect(sentIds().sort()).toEqual(before.rows.map(row=>row.line_user_id).sort());expect(new Set(sentIds()).size).toBe(sentIds().length);
 });
+
+it('訂正は固定された成功先だけへ送り、失敗先には送らない', async () => {
+  f.raw.exec(`INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id,total_count,success_count,track_links)
+    VALUES('original-correction-test','元','text','元の文','segment','sent','shop',2,1,0);
+    INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,state)
+    VALUES('original-correction-test','allowed','shop','sent'),('original-correction-test','stopped','shop','failed');
+    INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id,total_count,track_links,segment_conditions,correction_of_broadcast_id)
+    VALUES('correction-test','訂正','text','正しい文','segment','sending','shop',1,0,'{"operator":"AND","rules":[{"type":"is_following","value":true}]}','original-correction-test');
+    INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,state)
+    VALUES('correction-test','allowed','shop','claimed');`);
+  await processQueuedBroadcasts(f.db, calls as never);
+  expect(sentIds()).toEqual(['U-allowed']);
+  expect(calls.broadcast).not.toHaveBeenCalled();
+});

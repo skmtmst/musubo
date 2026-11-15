@@ -213,10 +213,12 @@ export const get__api_broadcasts_id_8 = async (c: Context<Env, "/api/broadcasts/
   }
 
   const view = await broadcastStatusView(c.env.DB, broadcast as unknown as Record<string, unknown>);
+  const correction = await c.env.DB.prepare("SELECT id, status FROM broadcasts WHERE correction_of_broadcast_id=? ORDER BY created_at DESC, id DESC LIMIT 1").bind(id).first<{ id: string; status: string }>();
   return c.json({
     success: true,
     data: {
       ...serializeBroadcast(broadcast),
+      correction: correction ?? null,
       displayStatus: view.displayStatus,
       displayStatusLabel: view.displayStatusLabel,
       ledger: view.ledger,
