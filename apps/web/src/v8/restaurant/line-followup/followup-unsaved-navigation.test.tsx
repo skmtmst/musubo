@@ -272,6 +272,7 @@ describe('編集窓とページの未保存変更', () => {
     await waitFor(() => expect(f.read).toHaveBeenCalledWith(f.account, f.store))
     act(() => oldConfirm())
     expect(f.push).not.toHaveBeenCalled()
+    await screen.findByRole('article', { name: '予約したとき' })
     await open()
     expect(screen.getByRole('textbox', { name: '本文' }).textContent).toBe('予約したときの本文')
     expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()

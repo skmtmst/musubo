@@ -319,14 +319,19 @@ describe('V8 レポート作成（H5UoIu）', () => {
 
   it.each([
     { role: 'staff' as const }, { role: 'viewer' as const }, { role: 'admin' as const, readOnly: true }, { role: 'owner' as const, roleBundle: 'view_only' },
-  ])('閲覧のみ：作る・送る・宛先を足す・選ぶ・札の × を置かない: %j', async identity => {
+  ])('閲覧のみ：作る・送るは灰色で押せず、宛先を足す・選ぶ・札の × は置かない: %j', async identity => {
     Object.assign(net, identity)
     try {
       await mount()
       await settle()
       const text = container.textContent ?? ''
       expect(text).toContain('運用担当は内容を確認できます')
-      for (const label of ['つくって動かす', '今すぐ1回だけ送る', '＋ 宛先を足す', '＋ 保存した分析を選ぶ']) {
+      for (const label of ['つくって動かす', '今すぐ1回だけ送る']) {
+        for (const item of [...container.querySelectorAll<HTMLElement>('button, a')].filter((el) => el.textContent?.trim() === label)) {
+          expect(item.getAttribute('aria-disabled') === 'true' || item.hasAttribute('disabled'), label).toBe(true)
+        }
+      }
+      for (const label of ['＋ 宛先を足す', '＋ 保存した分析を選ぶ']) {
         expect([...container.querySelectorAll('button, a')].some((item) => item.textContent?.trim() === label)).toBe(false)
       }
       expect(container.querySelector('.report-v8-chipRemove')).toBeNull()

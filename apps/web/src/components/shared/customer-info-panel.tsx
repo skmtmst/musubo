@@ -8,6 +8,7 @@ import HelpTip from './help-tip'
 import Avatar from './avatar'
 import { FIXED_FRIEND_FIELDS as ALL_FIXED_FRIEND_FIELDS, type FriendField } from '@line-crm/shared'
 import Button from './button'
+import PermissionGatedButton from './permission-gated-button'
 import Dialog from './dialog'
 import DisplayItemsDialog from './display-items-dialog'
 import { fixedFieldValue, FIXED_FRIEND_FIELDS } from './fixed-friend-field-values'
@@ -106,7 +107,7 @@ export default function CustomerInfoPanel({
     }}>
       <div className={styles.head}>
         <h3>基本</h3>
-        {canEdit && state === 'ready' && !editing ? <Button ref={editButtonRef} variant="text" size="inline" actionWording={actionWording} onClick={() => { const values = Object.fromEntries(shownFields.map(field => [field.id, field.value ?? ''])); editBaseline.current = values; setDraft(values); setSaveError(''); setEditing(true) }}>編集</Button> : null}
+        {state === 'ready' && !editing ? (canEdit ? <Button ref={editButtonRef} variant="text" size="inline" actionWording={actionWording} onClick={() => { const values = Object.fromEntries(shownFields.map(field => [field.id, field.value ?? ''])); editBaseline.current = values; setDraft(values); setSaveError(''); setEditing(true) }}>編集</Button> : <PermissionGatedButton allowed={false} variant="text" size="inline" actionWording={actionWording}>編集</PermissionGatedButton>) : null}
       </div>
       {state === 'loading' ? <p className={styles.note}>情報欄を読み込んでいます…</p>
         : state === 'error' ? <p className={styles.note} role="alert">情報欄を読み込めませんでした <Button variant="text" onClick={onRetry}>もう一度読み込む</Button></p>
@@ -153,7 +154,7 @@ export default function CustomerInfoPanel({
       </section>)}
       {more}
     </div> : null}
-    {canEdit ? <Button variant="text" onClick={() => setSettings(true)}><Settings2 aria-hidden="true" />表示項目を編集</Button> : null}
+    <PermissionGatedButton allowed={canEdit} variant="text" onClick={() => setSettings(true)}><Settings2 aria-hidden="true" />表示項目を編集</PermissionGatedButton>
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="基本情報の変更" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     {settings && canEdit ? <DisplayItemsDialog title="表示項目" items={[
       ...choices.map(choice => ({...choice, group:'顧客情報の段'})),

@@ -1223,4 +1223,8 @@
 - [トークン期限切れの内訳](release-log/unreleased/64-kenta-token-expiry-breakdown.md) — 接続の問題の内訳を出した履歴。確認 2026-11-14。
 - [選んだ候補の状態を区別して出す](release-log/unreleased/65-kenta-picker-selected-state.md) — 候補を出せない理由を分けた履歴。確認 2026-11-14。
 - [列車 1114](release-log/unreleased/66-kenta-train-1114.md) — 8件をまとめて入れた履歴。確認 2026-11-14。
+- [文書：古いボタンの言葉をそろえる](release-log/unreleased/67-kenta-docs-words.md) — 受け入れ表の言葉を画面に合わせた履歴。確認 2026-11-14。
+- [アフィリエイトの上書き防止](release-log/unreleased/68-kenta-affiliate-expected.md) — 右パネルの保存の競合防止の履歴。確認 2026-11-14。
+- [列車 1114b](release-log/unreleased/70-kenta-train-1114b.md) — まとめて入れた直しの履歴。確認 2026-11-15。
+- [閲覧のみの操作を灰色に（残り）](release-log/unreleased/71-kenta-viewer-gray-app.md) — #60 の続きの履歴。確認 2026-11-15。
 - [成果の一覧を画面の崩れの見張りに入れる](release-log/unreleased/49-kenta-conversions-guard.md) — 成果の一覧を画面の崩れの見張りに入れるの履歴。確認 2026-11-13。
