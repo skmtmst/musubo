@@ -2464,7 +2464,7 @@ CREATE TABLE "broadcasts" (
   CHECK (message_options_json IS NULL OR json_valid(message_options_json)), after_action_version_id TEXT
   REFERENCES common_action_versions(id) ON DELETE RESTRICT, lock_version INTEGER NOT NULL DEFAULT 1
   CHECK (lock_version > 0), stopped_at TEXT, stopped_by TEXT, send_attempt_no INTEGER NOT NULL DEFAULT 1, common_var_snapshot TEXT
-  CHECK (common_var_snapshot IS NULL OR json_valid(common_var_snapshot)), common_var_snapshot_at TEXT, approval_status TEXT NOT NULL DEFAULT 'none', approval_requested_by_staff_id TEXT, approval_requested_at TEXT, approval_approver_staff_id TEXT, approval_note TEXT, approval_decided_by_staff_id TEXT, approval_decided_at TEXT, approval_reject_reason TEXT, approval_confirmed_count INTEGER, hq_run_id TEXT REFERENCES hq_broadcast_runs(id), correction_of_broadcast_id TEXT REFERENCES broadcasts(id) ON DELETE SET NULL);
+  CHECK (common_var_snapshot IS NULL OR json_valid(common_var_snapshot)), common_var_snapshot_at TEXT, approval_status TEXT NOT NULL DEFAULT 'none', approval_requested_by_staff_id TEXT, approval_requested_at TEXT, approval_approver_staff_id TEXT, approval_note TEXT, approval_decided_by_staff_id TEXT, approval_decided_at TEXT, approval_reject_reason TEXT, approval_confirmed_count INTEGER, hq_run_id TEXT REFERENCES hq_broadcast_runs(id), correction_of_broadcast_id TEXT);
 
 CREATE TABLE calendar_bookings (
   id             TEXT PRIMARY KEY,

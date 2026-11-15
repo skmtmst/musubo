@@ -279,7 +279,7 @@ export async function processBroadcastSend(
     const frozen = await db.prepare('SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id=?').bind(broadcast.id).first<{n:number}>();
     await db
       .prepare(`UPDATE broadcasts SET status = 'sending', batch_offset = 0, total_count = ? WHERE id = ? AND lock_version=? AND stopped_at IS NULL AND status='sending'`)
-      .bind(Number(frozen?.n || row?.cnt || 0), broadcast.id,broadcast.lock_version ?? 1)
+      .bind(Number(broadcast.correction_of_broadcast_id ? frozen?.n ?? 0 : frozen?.n || row?.cnt || 0), broadcast.id,broadcast.lock_version ?? 1)
       .run();
     return (await getBroadcastById(db, broadcastId))!;
   }

@@ -98,3 +98,40 @@ test('予約時刻の再確認と送信は訂正台帳の相手だけを見る',
   expect(JSON.parse(String(sends[0][1]?.body))).toMatchObject({ to: 'Uok' });
  } finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
 });
+
+test.each([false,true])('元の配信削除後も固定した宛先だけを扱う（台帳空=%s）', async (empty) => {
+ const { vi } = await import('vitest');
+ vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-16T01:00:00Z'));
+ const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response('{}', {status:200}));
+ vi.stubGlobal('fetch', fetchMock);
+ try {
+  expect((await request()).status).toBe(201);
+  db.raw.pragma('foreign_keys = ON');
+  db.raw.prepare("DELETE FROM broadcast_send_claims WHERE broadcast_id='source'").run();
+  db.raw.prepare("DELETE FROM broadcasts WHERE id='source'").run();
+  expect(db.raw.prepare('SELECT correction_of_broadcast_id FROM broadcasts WHERE id=?').get(key)).toEqual({correction_of_broadcast_id:'source'});
+  if (empty) db.raw.prepare('DELETE FROM broadcast_send_claims WHERE broadcast_id=?').run(key);
+  const preview=await app().request(`/api/broadcasts/${key}/send-preview`);
+  expect(await preview.json()).toMatchObject({data:{recipients:empty?0:1}});
+  const response=await app().request(`/api/broadcasts/${key}/send`,{method:'POST',headers:{'Content-Type':'application/json','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({expectedVersion:1,confirmedRecipientCount:empty?0:1})});
+  if(empty) {
+   expect(response.status).toBe(409);
+   db.raw.prepare("UPDATE broadcasts SET status='scheduled',scheduled_at='2026-11-16T00:00:00Z' WHERE id=?").run(key);
+   const {processScheduledBroadcasts,processQueuedBroadcasts}=await import('../features/broadcasts/broadcast.js');
+   await processScheduledBroadcasts(db.db,{} as never);
+   await processQueuedBroadcasts(db.db,{} as never);
+   expect(fetchMock.mock.calls.filter(([url])=>String(url).includes('/message/'))).toHaveLength(0);
+   expect(db.raw.prepare('SELECT status,stopped_at,total_count FROM broadcasts WHERE id=?').get(key)).toMatchObject({status:'sending',stopped_at:expect.any(String),total_count:0});
+  }
+  else {
+   expect(response.status).toBe(202);
+   const {processQueuedBroadcasts}=await import('../features/broadcasts/broadcast.js');
+   await processQueuedBroadcasts(db.db,{} as never);
+   expect(db.raw.prepare('SELECT friend_id,state FROM broadcast_send_claims WHERE broadcast_id=?').all(key)).toEqual([{friend_id:'ok',state:'sent'}]);
+   const calls=fetchMock.mock.calls.filter(([url])=>String(url).includes('/message/'));
+   expect(calls).toHaveLength(1);
+   const payload=JSON.parse(String(calls[0][1]?.body));
+   expect(payload.to === 'Uok' || (Array.isArray(payload.to) && payload.to.length === 1 && payload.to[0] === 'Uok')).toBe(true);
+  }
+ } finally {vi.useRealTimers();vi.unstubAllGlobals();}
+});
