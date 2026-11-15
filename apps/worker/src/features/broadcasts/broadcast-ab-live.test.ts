@@ -110,3 +110,18 @@ test('R4a-08: 試しは500人ずつに分けて送り、鍵を分ける',async()
  expect(multicast.mock.calls.every(c=>/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(c[3]??''))).toBe(true);
  expect(fetch).not.toHaveBeenCalled();
 });
+
+
+test('訂正配信はA/B設定と本送信を始めず台帳外へ送らない',async()=>{
+ d.raw.exec("INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id) VALUES('source','元配信','text','本文','tag','sent','a'); UPDATE broadcasts SET correction_of_broadcast_id='source' WHERE id='br'");
+ const response=await gapCall(gapApp(d,[broadcastAb]),p,'PUT',{testRatioPct:20,metric:'click',decideAfterMinutes:60,undecidedPolicy:'stop',expectedVersion:1});
+ expect(response.status).toBe(409);
+ expect(await response.json()).toMatchObject({error:'訂正配信ではA/Bテストを使えません'});
+ d.raw.exec("UPDATE broadcasts SET correction_of_broadcast_id=NULL WHERE id='br'");
+ await configure();
+ d.raw.exec("UPDATE broadcasts SET correction_of_broadcast_id='source' WHERE id='br'");
+ const send=transmit();
+ await expect(startAbMock(d.db,'br',4,2400,'mock-correction')).rejects.toThrow('訂正配信ではA/Bテストを使えません');
+ await expect(startAbLive(d.db,'br',4,2400,'live-correction',{transmit:send,liveDeliveryEnabled:true})).rejects.toThrow('訂正配信ではA/Bテストを使えません');
+ expect(send).not.toHaveBeenCalled();
+});
