@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest'
 import { saveBroadcast } from './broadcast-send-actions'
+import { api } from '@/lib/api'
 
 describe('実際に送る処理の入口', () => {
   const context = () => ({
@@ -46,4 +47,15 @@ describe('実際に送る処理の入口', () => {
     await retained()
     expect(ctx.persistDraft).toHaveBeenCalledTimes(1)
   })
+  it('1人運用の訂正を送るとき、確認した人数と保存後の版を渡す', async () => {
+    const saved = { id: 'correction', correctionOfBroadcastId: 'source', version: 3 } as never
+    const send = vi.spyOn(api.broadcasts, 'send').mockResolvedValue({ success: true, data: saved })
+    const ctx = { ...context(), approvalCountInput: '10', needsApproval: true, needsApprovalSingle: true,
+      persistDraft: vi.fn().mockResolvedValue(saved), ab: { enabled: false, persist: vi.fn().mockResolvedValue(3) } as never }
+    try {
+      await saveBroadcast(ctx)
+      expect(send).toHaveBeenCalledWith('correction', { expectedVersion: 3, confirmedRecipientCount: 10 })
+    } finally { send.mockRestore() }
+  })
+
 })

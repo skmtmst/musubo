@@ -96,7 +96,7 @@ export async function saveBroadcast({ ab, approvalConfigState, approvalCountInpu
           onSuccess(saved)
           return
         }
-        const sent = await api.broadcasts.send(saved.id, deliveryLimited ? { expectedVersion:abVersion, confirmedRecipientCount:audienceCount! } : needsApprovalSingle ? { confirmedRecipientCount: Number(approvalCountInput) } : undefined)
+        const sent = await api.broadcasts.send(saved.id, (deliveryLimited || saved.correctionOfBroadcastId) ? { expectedVersion:abVersion, confirmedRecipientCount: needsApprovalSingle ? Number(approvalCountInput) : audienceCount! } : needsApprovalSingle ? { confirmedRecipientCount: Number(approvalCountInput) } : undefined)
         if ((selectedAccountIdRef.current || null) !== requestAccountId) return
         if (!sent.success) { setError(sent.error); return }
         setConfirmOpen(false)
