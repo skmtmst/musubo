@@ -401,7 +401,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       title={usageStyle ? 'ダッシュボード' : greeting(d.staffName)}
       help={headline(data?.asOf, d.displayedHealthRisk)}
       actions={<>
-        <PeriodPicker days={d.period === 'last90' ? 90 : d.period === 'last30' ? 30 : 7} customRange={d.customRange} onRangeChange={d.selectRange} applyOnOpen maxDays={366} maxDate={jstDay(new Date())} onChange={(value) => d.selectPeriod(value === 90 ? 'last90' : value === 30 ? 'last30' : 'last7')} />
+        <PeriodPicker display="select" days={d.period === 'last90' ? 90 : d.period === 'last30' ? 30 : 7} customRange={d.customRange} onRangeChange={d.selectRange} maxDays={366} maxDate={jstDay(new Date())} onChange={(value) => d.selectPeriod(value === 90 ? 'last90' : value === 30 ? 'last30' : 'last7')} />
         {/* 閲覧のみでも隠さず、灰色＋理由の吹き出し。 */}
         {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button> : <Button type="button" lockedReason={layoutLockReason} disabled={!layoutLockReason}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button>}
         {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={16} aria-hidden="true" />配信を作る</Button> : <Button variant="primary" lockedReason={manageLockReason} disabled={!manageLockReason}><Plus size={16} aria-hidden="true" />配信を作る</Button>}

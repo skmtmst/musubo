@@ -1,9 +1,13 @@
 'use client'
 
 import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useListUrlValue, useListUrlJsonValue } from './list-url-state'
 import SegmentedControl from './segmented'
+import ActionMenu from './action-menu'
+import Button from './button'
+import { ChevronDown } from 'lucide-react'
+import Dialog from './dialog'
 import DateField from './date-field'
 import { Field } from './form-controls'
 import styles from './period-picker.module.css'
@@ -24,11 +28,13 @@ export function useReportPeriod(initialDays = 30) {
   return { days, setDays, range, customRange, setRange }
 }
 /** 集計期間の言葉・日付欄を一か所で管理する。API制限のある口は supportedDays を渡す。 */
-export default function PeriodPicker({ days, onChange, customRange, onRangeChange, supportedDays = PERIOD_DAYS, size = 'medium', choices, maxDays, maxDate, applyOnOpen = false }: {
+export default function PeriodPicker({ days, onChange, customRange, onRangeChange, supportedDays = PERIOD_DAYS, size = 'medium', choices, maxDays, maxDate, applyOnOpen = false, display = 'segmented' }: {
   days: number; onChange: (days: number) => void; customRange?: PeriodRange | null; onRangeChange?: (range: PeriodRange) => void
-  choices?: { days: number; label: string }[]; supportedDays?: readonly number[]; size?: 'small' | 'medium'; maxDays?: number; maxDate?: string; applyOnOpen?: boolean
+  choices?: { days: number; label: string }[]; supportedDays?: readonly number[]; size?: 'small' | 'medium'; maxDays?: number; maxDate?: string; applyOnOpen?: boolean; display?: 'segmented' | 'select'
 }) {
   const [customOpen, setCustomOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuAnchor = useRef<HTMLButtonElement>(null)
   const [draft, setDraft] = useState<PeriodRange>(() => customRange ?? pastPeriod(days))
   useEffect(() => { if (customRange) setDraft(customRange); else setCustomOpen(false) }, [customRange?.from, customRange?.to])
   const custom = Boolean(customRange) || customOpen
@@ -36,6 +42,21 @@ export default function PeriodPicker({ days, onChange, customRange, onRangeChang
   if (onRangeChange) options.push({ value: 'custom', label: '期間を指定' })
   const allowed = (range: PeriodRange) => validPeriod(range) && (!maxDate || range.to <= maxDate) && (!maxDays || Date.parse(range.to) - Date.parse(range.from) < maxDays * 86_400_000)
   const update = (next: PeriodRange) => { setDraft(next); if (allowed(next)) onRangeChange?.(next) }
+  if (display === 'select') return <>
+    <Button ref={menuAnchor} type="button" aria-label="集計期間" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>
+      {options.find((option) => option.value === (customRange ? 'custom' : String(days)))?.label}<ChevronDown size={16} aria-hidden="true" />
+    </Button>
+    <ActionMenu open={menuOpen} anchorRef={menuAnchor} onClose={() => setMenuOpen(false)} ariaLabel="集計期間" items={options.map((option) => ({ id: option.value, label: option.label, icon: null, onSelect: () => {
+      if (option.value === 'custom') { setDraft(customRange ?? pastPeriod(days)); setCustomOpen(true) }
+      else { setCustomOpen(false); onChange(Number(option.value)) }
+    } }))} />
+    <Dialog open={customOpen} title="期間を指定" onCancel={() => setCustomOpen(false)} onConfirm={() => { onRangeChange?.(draft); setCustomOpen(false) }} confirmLabel="適用する" confirmDisabled={!allowed(draft)}>
+      <div className={styles.dates}>
+        <Field label="期間の始まり" required><DateField aria-label="期間の始まり" value={draft.from} max={draft.to || undefined} onChange={(from) => setDraft({ ...draft, from })} /></Field>
+        <Field label="期間の終わり" required error={allowed(draft) ? undefined : maxDays ? `今日までの${maxDays}日以内で指定してください。` : '終わりは始まり以降の日付にしてください。'}><DateField aria-label="期間の終わり" value={draft.to} min={draft.from || undefined} max={maxDate} onChange={(to) => setDraft({ ...draft, to })} /></Field>
+      </div>
+    </Dialog>
+  </>
   return <div className={styles.root} data-period-range={custom || undefined}>
     <SegmentedControl aria-label="集計期間" size={size} options={options} value={custom ? 'custom' : String(days)} onChange={(value) => {
       if (value === 'custom') { const next = customRange ?? pastPeriod(days); setDraft(next); setCustomOpen(true); if (applyOnOpen && allowed(next)) onRangeChange?.(next) }
