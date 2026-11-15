@@ -204,12 +204,15 @@ describe('MJoJR メニュー管理', () => {
     expect(nav.push).toHaveBeenCalledWith('/restaurant-test/approvals')
   })
 
-  it('閲覧のみ（staff）には追加・「…」・再開を置かない', async () => {
+  it('閲覧のみ（staff）にはメニューを作るを灰色で出して押せず、「…」・再開は置かない', async () => {
     role.value = verifiedStaffRole('staff')
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')
     expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /メニューを作る/ })).toBeNull()
+    const create = screen.getByRole('button', { name: /メニューを作る/ })
+    expect(create.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(create)
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByRole('button', { name: /の操作$/ })).toBeNull()
     expect(screen.queryByRole('button', { name: '再開' })).toBeNull()
   })
