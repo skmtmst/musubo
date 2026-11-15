@@ -25,7 +25,7 @@ import { collectListRows } from '@/components/shared/collect-list-rows';
 import { ListPageBody } from '@/components/templates';
 import SearchField from '@/components/shared/search-field'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame';
-import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useListScrollMemory, useListUrlParam, useListUrlValue } from '@/components/shared/list-url-state';
 import { Activity, AlertCircle, ArrowRight, Bell, CalendarClock, Copy, Folder as FolderIcon, FolderInput, Pause, Pencil, Play, Send, Square, Trash2, TriangleAlert, Users } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
@@ -304,6 +304,10 @@ export default function RemindersListV8() {
    * ページ・絞り込みが変わったら重ねは捨てる（違う一覧に貼らない）。
    */
   const [optimisticRows, setOptimisticRows] = useState<{ key: string; rows: ReminderRow[] } | null>(null)
+  const [reorderOverlay, setReorderOverlay] = useState<{ key: string; ids: string[]; refreshed: boolean } | null>(null)
+  const reorderTicket = useRef<object | null>(null)
+  const [reorderBusy, setReorderBusy] = useState(false)
+  useEffect(() => { reorderTicket.current = null; setReorderBusy(false); setReorderOverlay(null) }, [selectedAccountId])
   const listContextKey = JSON.stringify({
     friendId,
     account: selectedAccountId ?? '',
@@ -317,7 +321,14 @@ export default function RemindersListV8() {
   const currentListContext = useRef(listContextKey)
   currentListContext.current = listContextKey
   const listedReminders = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : reminderList.items
-  const reminders = listedReminders
+  const reminders = useMemo(() => {
+    if (!reorderOverlay || reorderOverlay.key !== listContextKey) return listedReminders
+    const position = new Map(reorderOverlay.ids.map((id, index) => [id, index]))
+    return [...listedReminders].sort((a, b) => (position.get(a.id) ?? Infinity) - (position.get(b.id) ?? Infinity))
+  }, [listedReminders, reorderOverlay, listContextKey])
+  useEffect(() => {
+    if (!optimisticRows && reorderOverlay?.refreshed) setReorderOverlay(current => current === reorderOverlay ? null : current)
+  }, [optimisticRows, reorderOverlay])
   const detailHref = (id: string) => `/reminders/detail?id=${encodeURIComponent(id)}`
   const filterActive = Boolean(friendId || nameQuery.trim() || folderFilter || statusFilter)
 
@@ -634,7 +645,13 @@ export default function RemindersListV8() {
       reminderList.retry()
       return
     }
-    setOptimisticRows({ key, rows: nextRows })
+    if (reorderTicket.current) return
+    const ticket = {}
+    reorderTicket.current = ticket
+    setReorderBusy(true)
+    const before = reorderOverlay?.key === key ? reorderOverlay : { key, ids: reminders.map(row => row.id), refreshed: false }
+    const optimistic = { key, ids: nextRows.map(row => row.id), refreshed: false }
+    setReorderOverlay(optimistic)
     runUndoable({
       message: '並び順を変えました',
       commit: async () => {
@@ -642,11 +659,18 @@ export default function RemindersListV8() {
         const res = await api.reminders.reorder(fullOrder)
         if (!res.success) throw new Error(res.error)
       },
-      undo: () => setOptimisticRows(null),
+      undo: () => {
+        if (reorderTicket.current === ticket) { reorderTicket.current = null; setReorderBusy(false) }
+        setReorderOverlay(current => current === optimistic ? before : current)
+        if (before) void reminderList.retryAndWait().then(refreshed => {
+          if (refreshed) setReorderOverlay(current => current === before ? { ...current, refreshed: true } : current)
+        })
+      },
       failureMessage: '並び替えを保存できませんでした。',
-      onCommitted: () => {
-        setOptimisticRows(null)
-        reminderList.retry()
+      onCommitted: async () => {
+        if (reorderTicket.current === ticket) { reorderTicket.current = null; setReorderBusy(false) }
+        const refreshed = await reminderList.retryAndWait()
+        if (refreshed) setReorderOverlay(current => current === optimistic ? { ...current, refreshed: true } : current)
       },
     })
   }
@@ -656,7 +680,7 @@ export default function RemindersListV8() {
    * （リッチメニュー・自動応答と同じ決まり）。保存は渡した行に 0 からの番号を振り直すため、
    * 別の順・一部の行のまま保存すると、読み直したときに並べた順が崩れる。全順位を読んで送り、ページ外の位置を保つ。
    */
-  const reorderDisabledReason = !canEdit
+  const reorderDisabledReason = reorderBusy ? '並び順を保存しています' : !canEdit
     ? '閲覧のみのため並び替えできません'
     : sort !== 'order'
       ? '並びを「自分で並べた順」にすると動かせます'
