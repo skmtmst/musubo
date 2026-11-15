@@ -133,7 +133,7 @@ V6の「動画20分まで」はLINE APIの制約ではないため、ハード�
 
 ### 6-2. アップロードセッション
 
-- 1回最大20件
+- 1回最大20件（V8 では一度に10件。2026-11-10 決定、`docs/v8-requirements/behavior/15-media-library.md` ML-09）
 - 各ファイルに`uploadId`、期限、対象アカウント、予定キー、最大容量、許可Content-Typeを持つ
 - presigned URLは短い期限、1ファイル・1操作・1キーに限定する
 - URLは秘密値としてログ・Slack・画面履歴へ残さない
