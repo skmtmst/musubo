@@ -14,9 +14,11 @@ afterEach(cleanup)
 
 const guide = (overrides: Partial<FirstStepsGuide> = {}): FirstStepsGuide => ({
   phase: 'idle',
+  stepKey: null,
+  procedureIndex: 1,
   anchor: { key: 'attributes', label: '卓と席を登録する', href: '/restaurant-test/tables' },
   pausedAnchor: null,
-  start: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(),
+  start: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(), advanceProcedure: vi.fn(),
   ...overrides,
 })
 

@@ -122,7 +122,8 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
         {(
           <div className={styles.buttonRow}>
-            <Button lockedReason={lockedReason} variant="primary" onClick={() => void startConnect()} disabled={!canManage || busy || !data.oauthConfigured} busy={Boolean(busy)} busyLabel="処理中…"><Link2 aria-hidden className={styles.icon16} />接続する</Button>
+            {/* 開店準備ガイド⑤の手順1/2（枠14 Nm43L）の光らせる先。 */}
+            <Button data-guide-anchor="hours.googleConnect" lockedReason={lockedReason} variant="primary" onClick={() => void startConnect()} disabled={!canManage || busy || !data.oauthConfigured} busy={Boolean(busy)} busyLabel="処理中…"><Link2 aria-hidden className={styles.icon16} />接続する</Button>
           </div>
         )}
         <p className={styles.grayNote}>初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。接続後は、このLINEアカウントの店舗だけを表示します。</p>

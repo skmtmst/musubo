@@ -2,8 +2,12 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-const net = vi.hoisted(() => ({ progress: vi.fn(), dismiss: vi.fn(), starterSet: vi.fn(), starterItems: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { gettingStarted: { get: net.progress, dismiss: net.dismiss } } }))
+const net = vi.hoisted(() => ({
+  progress: vi.fn(), dismiss: vi.fn(), starterSet: vi.fn(), starterItems: vi.fn(),
+  /* ガイドの進み具合はサーバーが正本。この窓の試験では読み書きさせない。 */
+  guideGet: vi.fn(() => Promise.resolve({ data: null })), guidePut: vi.fn(() => Promise.resolve({ data: null })),
+}))
+vi.mock('@/lib/api', () => ({ api: { gettingStarted: { get: net.progress, dismiss: net.dismiss, guide: { get: net.guideGet, put: net.guidePut } } } }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { starterSet: net.starterSet, starterItems: net.starterItems } }))
 vi.mock('@/components/shared/list-navigation', async importOriginal => ({
   ...await importOriginal<typeof import('@/components/shared/list-navigation')>(),

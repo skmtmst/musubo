@@ -19,6 +19,7 @@ import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
 import { doneCount, stepsForStyle, type StepResult, type StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
 import { useStyleSetupProgress } from '@/v8/onboarding/public/style-setup-progress/index'
 import { useGuideEngine, type GuideAnchor, type GuideEnginePhase } from '@/v8/onboarding/public/guide-engine/index'
+import { useSharedGuide } from '@/v8/onboarding/public/guide-overlay/index'
 import type { AccountStyle } from '@line-crm/shared'
 
 export type FirstStepsSummary = {
@@ -92,7 +93,13 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
   const visibleWaiting = canManageRole(role) && state.status === 'ready' && !folded && waitingForFirstMessage(state.steps)
   useEffect(() => { setWaiting(visibleWaiting) }, [visibleWaiting])
   const done = useFirstMessageArrived(accountId, state.steps, state.status === 'ready')
-  const guide = useGuideEngine(accountId, canManageRole(role) ? summary : null)
+  /*
+    ガイドの持ち主は全画面で1つ（GuideHost）。貸してもらえる時はそれを使い、
+    同じ状態を2つの持ち主がサーバーへ書かないように自前の持ち主は動かさない。
+  */
+  const shared = useSharedGuide()
+  const ownGuide = useGuideEngine(shared ? null : accountId, canManageRole(role) ? summary : null)
+  const guide = shared?.guide ?? ownGuide
   useEffect(() => { setFolded(readFirstStepsFolded(accountId)) }, [accountId])
   const toggle = useCallback(() => {
     setFolded((current) => {
@@ -119,12 +126,18 @@ export function nextFirstStepKey(summary: FirstStepsSummary): string | null {
 /** ガイドの操作だけを受け取る。完了判定は持たず、はじめにやることの実測に従う。 */
 export type FirstStepsGuide = {
   phase: GuideEnginePhase
+  /** 今案内している段。サーバーが正本（枠14 L3lP08 の「現在ステップ」）。 */
+  stepKey: string | null
+  /** 今案内している手順の番号（1から）。同 L3lP08 の「現在手順」。 */
+  procedureIndex: number
   anchor: GuideAnchor | null
   pausedAnchor: GuideAnchor | null
   start: () => void
   pause: () => void
   resume: () => void
   reset: () => void
+  /** 同じ段の次の手順へ（1/3→2/3→3/3）。 */
+  advanceProcedure: () => void
 }
 
 /**

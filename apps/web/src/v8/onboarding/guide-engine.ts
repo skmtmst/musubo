@@ -46,9 +46,15 @@ export function readGuideEngineState(accountId: string | null): GuideEngineState
   } catch { return initialState }
 }
 
+/** 控えが変わった合図。全画面に1つ置く案内の入れ物が、案内中かどうかを知るために聞く。 */
+export const GUIDE_ENGINE_EVENT = 'lh:v8:guide-engine'
+
 export function writeGuideEngineState(accountId: string, state: GuideEngineState): void {
   if (typeof window === 'undefined') return
   try { window.localStorage.setItem(guideEngineStorageKey(accountId), JSON.stringify(state)) } catch { /* 覚えられなくても今の操作は続ける */ }
+  try {
+    window.dispatchEvent(new CustomEvent(GUIDE_ENGINE_EVENT, { detail: { accountId, state } }))
+  } catch { /* 合図が出せなくても案内そのものは続ける */ }
 }
 
 /**
