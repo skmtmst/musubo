@@ -75,7 +75,7 @@ test.each(['下書きを保存する', '顧客へのお知らせを公開'])('%s
     return json({ success: true, data: [] })
   })
   render(<Screen />)
-  fireEvent.click(await screen.findByRole('button', { name: '注文の見出しの内容を編集' }))
+  fireEvent.click(await screen.findByRole('button', { name: '注文が確定したときの内容を編集' }))
   const title = screen.getByLabelText('通知の見出し') as HTMLInputElement
   fireEvent.change(title, { target: { value: '' } })
   fireEvent.click(screen.getByRole('button', { name: actionLabel, exact: true }))

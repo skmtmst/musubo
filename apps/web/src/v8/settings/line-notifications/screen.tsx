@@ -1422,8 +1422,10 @@ function LineNotificationsPage() {
               const status = statusOf(setting)
               const sent = sendCountsFailed ? null : sent30dOf(setting.eventType)
               const name = setting.title?.trim() || setting.label
+              /* 見出しはきっかけの文そのまま。題名と読み上げ名も同じ文にする（違う名前にすると切れた文の全文がどこにも無い）。 */
+              const trigger = deliveryWords(setting).trigger || name
               return <Tr key={setting.eventType}>
-                <Td>{canChange ? <RowNameButton title={name} aria-label={`${name}の内容を編集`} onClick={() => setExpanded(setting.eventType)}>{deliveryWords(setting).trigger || name}</RowNameButton> : <TruncatedText value={deliveryWords(setting).trigger || name} />}</Td>
+                <Td>{canChange ? <RowNameButton title={trigger} aria-label={`${trigger}の内容を編集`} onClick={() => setExpanded(setting.eventType)}>{trigger}</RowNameButton> : <TruncatedText value={trigger} />}</Td>
                 <Td><TruncatedText value={timingLabel(setting)} /></Td>
                 <Td><TruncatedText value={audienceLabel(setting)} /></Td>
                 <Td><span className={`${styles.num} ${sent ? styles.numStrong : styles.numFaint}`} title={sendCountsFailed ? '送信件数を読み込めませんでした' : undefined}>{sendCountsFailed ? '取得失敗' : sent ? formatNumber(sent) : emptyValue('unknown')}</span></Td>
