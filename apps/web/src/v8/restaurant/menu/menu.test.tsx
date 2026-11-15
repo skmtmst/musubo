@@ -204,7 +204,7 @@ describe('MJoJR メニュー管理', () => {
     expect(nav.push).toHaveBeenCalledWith('/restaurant-test/approvals')
   })
 
-  it('閲覧のみ（staff）にはメニューを作るを灰色で出して押せず、「…」・再開は置かない', async () => {
+  it('閲覧のみ（staff）にはメニューを作る・行の「…」・再開を灰色で出して押せない', async () => {
     role.value = verifiedStaffRole('staff')
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')
@@ -213,8 +213,18 @@ describe('MJoJR メニュー管理', () => {
     expect(create.getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(create)
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.queryByRole('button', { name: /の操作$/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: '再開' })).toBeNull()
+    const menus = screen.getAllByRole('button', { name: /の操作$/ })
+    expect(menus.length).toBeGreaterThan(0)
+    for (const menu of menus) {
+      expect(menu.getAttribute('aria-disabled')).toBe('true')
+      fireEvent.click(menu)
+    }
+    expect(screen.queryByRole('menu')).toBeNull()
+    for (const resume of screen.queryAllByRole('button', { name: '再開' })) {
+      expect(resume.getAttribute('aria-disabled')).toBe('true')
+      fireEvent.click(resume)
+    }
+    expect(fixture.updateMenu).not.toHaveBeenCalled()
   })
 })
 

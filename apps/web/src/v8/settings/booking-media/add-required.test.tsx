@@ -105,6 +105,18 @@ it('閲覧のみの追加入口は灰色で出し、押しても開かない', a
   expect(net.add).not.toHaveBeenCalled()
 })
 
+it('閲覧のみの行の「…」は灰色で出し、押しても開かずURLの操作を見せない', async () => {
+  net.role = 'viewer'
+  render(<BookingMedia />)
+  await screen.findByText('人工媒体')
+  const more = screen.getByRole('button', { name: '人工媒体のその他操作' })
+  expect(more.getAttribute('aria-disabled') === 'true' || (more as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(more)
+  expect(screen.queryByRole('menu')).toBeNull()
+  expect(screen.queryByText('店舗ページを開く')).toBeNull()
+  expect(net.save).not.toHaveBeenCalled()
+})
+
 it('追加窓で予約サイトが現れる方法を案内する', async () => {
   const { dialog } = await openAdd()
   expect(dialog.textContent).toContain('予約サイトは、予約メールを取り込むと自動で現れます')
