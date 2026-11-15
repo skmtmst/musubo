@@ -54,7 +54,7 @@ describe('タグ作成の名前検査の契約', () => {
     expect(ROUTE).toContain('<Screen />')
     expect(ROUTE).not.toContain('LegacyNewTagPage')
     expect(ROUTE).toContain('<CreatePage')
-    expect(LIST).toContain('<Button href="/tags/new" variant="primary"')
+    expect(LIST).toContain('<PermissionGatedButton allowed={canEdit} href="/tags/new" variant="primary"')
     const { action, save, remove } = renderCopyAction()
     expect(action.getAttribute('href')).toBe('/tags/new?copy=copy-source')
     expect(save).not.toHaveBeenCalled()
