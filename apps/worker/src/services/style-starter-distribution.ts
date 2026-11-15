@@ -89,7 +89,7 @@ async function legacyStarterDistributionPlan(
     ).results;
     const items = [];
     for (const item of set.definition.items) {
-      const binding = bindings.find((b) => b.item_key === item.key);
+      const binding = bindings.find((b) => b.item_key === item.key && b.style === style) ?? bindings.find((b) => b.item_key === item.key);
       const snapshot = binding
         ? await resourceSnapshot(db, accountId, binding.kind, binding.target_id)
         : null;
@@ -258,9 +258,9 @@ export async function distributeStarter(
         statements.push(
           db
             .prepare(
-              "UPDATE style_starter_items SET item_key=item_key||':previous:'||target_id,pending_update=NULL WHERE line_account_id=? AND item_key=?",
+              "UPDATE style_starter_items SET item_key=item_key||':previous:'||target_id,pending_update=NULL WHERE line_account_id=? AND style=? AND item_key=?",
             )
-            .bind(a.accountId, item.key),
+            .bind(a.accountId, b.style, item.key),
         );
       const { inserted } = await insertStyleStarterItems(
         db,

@@ -171,7 +171,7 @@ export async function saveProfile(
     answers,
     statements,
     now,
-    {set:preparedSet},
+    {set:preparedSet,preservePreviousStyles:selected && !!current && !current.first_selected_at},
   );
   statements.push(
     db

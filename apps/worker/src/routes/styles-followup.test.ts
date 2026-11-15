@@ -239,14 +239,14 @@ describe('safety regressions', () => {
       sql.raw.prepare('SELECT COUNT(*) n FROM messages_log').get(),
     ).toEqual({ n: 0 });
   });
-  test('cross-style samples do not multiply and explicit foreign reuse still fails', async () => {
+  test('first deferred selection keeps standard samples and explicit foreign reuse still fails', async () => {
     const before = sql.raw
       .prepare('SELECT COUNT(*) n FROM templates')
       .get() as { n: number };
     await setup({ expectedVersion: 1, style: 'restaurant' });
     await setup({ expectedVersion: 2, style: 'salon' });
     expect(sql.raw.prepare('SELECT COUNT(*) n FROM templates').get()).toEqual({
-      n: before.n + 16,
+      n: before.n + 21,
     });
     expect(
       sql.raw
@@ -254,7 +254,7 @@ describe('safety regressions', () => {
           "SELECT COUNT(*) n FROM style_starter_items WHERE item_key='welcome'",
         )
         .get(),
-    ).toEqual({ n: 1 });
+    ).toEqual({ n: 2 });
     sql.raw.exec(
       "INSERT INTO templates(id,line_account_id,name,message_type,message_content) VALUES('foreign','b','他店','text','{}')",
     );
@@ -334,6 +334,20 @@ describe('safety regressions', () => {
 });
 
 describe('HQ distribution and provenance', () => {
+  test('同じキーの標準とサロンがある時、統括の配布はサロンだけを更新する', async () => {
+    const item = { ...template('サロン初版'), key: 'welcome' };
+    await setDefinition([item]);
+    const standard = sql.raw.prepare("SELECT target_id FROM style_starter_items WHERE line_account_id='a' AND style='standard' AND item_key='welcome'").get() as { target_id: string };
+    const original = sql.raw.prepare('SELECT * FROM templates WHERE id=?').get(standard.target_id);
+    expect((await setup({ expectedVersion: 1, style: 'salon' })).status).toBe(200);
+    const salon = sql.raw.prepare("SELECT target_id FROM style_starter_items WHERE line_account_id='a' AND style='salon' AND item_key='welcome'").get() as { target_id: string };
+    expect(salon.target_id).not.toBe(standard.target_id);
+    await setDefinition([{ ...item, text: 'サロン新版' }], 1);
+    const plan = await preflight(2);
+    expect((await request(hqPath + '/distribute', 'POST', { expectedVersion: 2, target: { accountIds: ['a'] }, token: plan.token, confirmed: true })).status).toBe(200);
+    expect(sql.raw.prepare('SELECT * FROM templates WHERE id=?').get(standard.target_id)).toEqual(original);
+    expect(sql.raw.prepare('SELECT message_content FROM templates WHERE id=?').get(salon.target_id)).toEqual({ message_content: 'サロン新版' });
+  });
   test('preflight detects local edits, untouched resources update, edits wait for shop consent', async () => {
     restaurant();
     sql.raw.exec(`INSERT INTO rt_store_feature_flags(store_id,feature,enabled,version,created_at,updated_at)

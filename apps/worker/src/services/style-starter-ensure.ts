@@ -41,9 +41,10 @@ export async function starterApplication(db: D1Database, account: string, tenant
     const count = selections.filter(selection => rows.some(row => row.template_id === selection.templateId && row.template_version_id === selection.versionId && row.state === 'succeeded')).length;
     return { applied: count === selections.length, count, missing: set.autoInsert && p.selection_mode==='configured' ? selections.length - count : 0 };
   }
+  const keys = set.definition.items.map(item => item.key);
   const count = (await db
-    .prepare('SELECT COUNT(*) AS n FROM style_starter_items WHERE line_account_id=?')
-    .bind(account)
+    .prepare('SELECT COUNT(DISTINCT item_key) AS n FROM style_starter_items WHERE line_account_id=? AND item_key IN (SELECT value FROM json_each(?))')
+    .bind(account, JSON.stringify(keys))
     .first<{ n: number }>())?.n ?? 0;
   let missing: number | null;
   try {

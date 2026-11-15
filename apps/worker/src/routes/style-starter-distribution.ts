@@ -110,9 +110,9 @@ styleStarterDistribution.post(
       key = c.req.param('key') ?? '';
     if (b.confirmed !== true) throw new StyleError('confirmation_required');
     const binding = await c.env.DB.prepare(
-      'SELECT * FROM style_starter_items WHERE line_account_id=? AND item_key=? AND pending_update IS NOT NULL',
+      'SELECT * FROM style_starter_items WHERE line_account_id=? AND item_key=? AND pending_update IS NOT NULL ORDER BY style=(SELECT style FROM account_styles WHERE line_account_id=?) DESC LIMIT 1',
     )
-      .bind(a, key)
+      .bind(a, key, a)
       .first<{
         style: string;
         kind: string;
@@ -149,8 +149,8 @@ styleStarterDistribution.post(
       ...profileChanges,
       snapshotGuard(c.env.DB, a, binding.kind, binding.target_id, snapshot),
       c.env.DB.prepare(
-        `SELECT json(CASE WHEN EXISTS(SELECT 1 FROM style_starter_items WHERE line_account_id=? AND item_key=? AND pending_update=?) THEN '{}' ELSE 'STYLE_VERSION_CONFLICT' END)`,
-      ).bind(a, key, binding.pending_update),
+        `SELECT json(CASE WHEN EXISTS(SELECT 1 FROM style_starter_items WHERE line_account_id=? AND style=? AND item_key=? AND pending_update=?) THEN '{}' ELSE 'STYLE_VERSION_CONFLICT' END)`,
+      ).bind(a, binding.style, key, binding.pending_update),
       ...(await overwriteResource(
         c.env.DB,
         a,
@@ -162,8 +162,8 @@ styleStarterDistribution.post(
         plannedForms,
       )),
       c.env.DB.prepare(
-        'UPDATE style_starter_items SET set_id=?,set_version=?,pending_update=NULL WHERE line_account_id=? AND item_key=?',
-      ).bind(pending.setId, pending.setVersion, a, key),
+        'UPDATE style_starter_items SET set_id=?,set_version=?,pending_update=NULL WHERE line_account_id=? AND style=? AND item_key=?',
+      ).bind(pending.setId, pending.setVersion, a, binding.style, key),
       recordSnapshot(
         c.env.DB,
         a,
