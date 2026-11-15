@@ -186,8 +186,8 @@ export async function processBroadcastSend(
       const scoped = await scopeStoredBroadcastSegmentQuery(db, { sql, bindings }, accountId);
       const segmentAudience = await db.prepare(`SELECT COUNT(*) AS total,
         SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
-        FROM (${scoped.sql}) q`)
-        .bind(...scoped.bindings)
+        FROM (${scoped.sql}) q ${broadcast.correction_of_broadcast_id ? 'WHERE EXISTS (SELECT 1 FROM broadcast_send_claims c WHERE c.broadcast_id=? AND c.friend_id=q.id)' : ''}`)
+        .bind(...scoped.bindings, ...(broadcast.correction_of_broadcast_id ? [broadcast.id] : []))
         .first<{ total: number; missing_name: number | null }>();
       if (Number(segmentAudience?.missing_name ?? 0) > 0) {
         throw new Error(`Cannot personalize broadcast: ${segmentAudience!.missing_name} recipient(s) have no display name`);
@@ -197,7 +197,7 @@ export async function processBroadcastSend(
         `UPDATE broadcasts
             SET status = 'sending', batch_offset = 0, total_count = ?
           WHERE id = ? AND lock_version=? AND stopped_at IS NULL AND status='sending'`,
-      ).bind(Number(frozen?.n || segmentAudience?.total || 0), broadcast.id,broadcast.lock_version ?? 1).run();
+      ).bind(Number(broadcast.correction_of_broadcast_id ? frozen?.n ?? 0 : frozen?.n || segmentAudience?.total || 0), broadcast.id,broadcast.lock_version ?? 1).run();
       return (await getBroadcastById(db, broadcastId))!;
     }
 
@@ -623,6 +623,7 @@ async function countScheduledRecipients(
   accountId: string,
 ): Promise<number | null> {
   try {
+    if (broadcast.correction_of_broadcast_id) return await (await import('./broadcast-approval.js')).countApprovalRecipients(db, broadcast);
     const stored = broadcast.segment_conditions;
     if (stored) {
       const conditions = parseStoredConditions(stored);

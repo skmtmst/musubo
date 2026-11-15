@@ -66,3 +66,35 @@ test('元の詳細から訂正を開け、事前確認も固定した人だけ�
  expect(preview.sendable).toBe(1);
  expect(preview.representatives.map(row => row.friendId)).toEqual(['ok']);
 });
+
+test('予約時刻の再確認と送信は訂正台帳の相手だけを見る', async () => {
+ const { vi } = await import('vitest');
+ vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));
+ const fetchMock = vi.fn(async (input: string | URL | Request, _init?: RequestInit) => {
+  const url = String(input);
+  if (url.endsWith('/quota')) return new Response(JSON.stringify({ type: 'limited', value: 1 }), { status: 200 });
+  if (url.endsWith('/quota/consumption')) return new Response(JSON.stringify({ totalUsage: 0 }), { status: 200 });
+  return new Response('{}', { status: 200 });
+ });
+ vi.stubGlobal('fetch', fetchMock);
+ try {
+  db.raw.exec("UPDATE friends SET display_name=CASE WHEN id='ok' THEN '対象者' ELSE NULL END; INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES('owner','管理者','owner','test','t')");
+  expect((await request()).status).toBe(201);
+  const { setBroadcastApprovalThreshold } = await import('../features/broadcasts/broadcast-approval.js');
+  expect(await setBroadcastApprovalThreshold(db.db, 'a', 1)).toMatchObject({ ok: true });
+  db.raw.prepare("UPDATE broadcasts SET message_content='{{name}} さん' WHERE id=?").run(key);
+  const response = await app().request(`/api/broadcasts/${key}/send`, { method:'POST', headers:{'Content-Type':'application/json','X-Confirm-Irreversible':'broadcast-send'}, body:JSON.stringify({expectedVersion:1,confirmedRecipientCount:1,scheduledAt:'2026-11-16T01:00:00Z'}) });
+  expect(response.status).toBe(200);
+  expect(db.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(key)).toEqual({status:'scheduled'});
+  db.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id,display_name) VALUES('later','Ulater','a',NULL)");
+  vi.setSystemTime(new Date('2026-11-16T01:01:00Z'));
+  const { processScheduledBroadcasts, processQueuedBroadcasts } = await import('../features/broadcasts/broadcast.js');
+  await processScheduledBroadcasts(db.db, {} as never);
+  expect(db.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(key)).toEqual({status:'sending'});
+  await processQueuedBroadcasts(db.db, {} as never);
+  expect(db.raw.prepare('SELECT friend_id,state FROM broadcast_send_claims WHERE broadcast_id=?').all(key)).toEqual([{friend_id:'ok',state:'sent'}]);
+  const sends=fetchMock.mock.calls.filter(([input])=>String(input).includes('/message/push'));
+  expect(sends).toHaveLength(1);
+  expect(JSON.parse(String(sends[0][1]?.body))).toMatchObject({ to: 'Uok' });
+ } finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
+});

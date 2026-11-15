@@ -63,7 +63,7 @@ import styles from './detail.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import StatusBadge from '@/components/shared/status-badge'
 
 
@@ -196,6 +196,7 @@ export default function BroadcastDetail({
   const cancelTicket = useRef<symbol | null>(null)
   const renderedCancelTicket = cancelTicket.current
   const [testing, setTesting] = useState(false)
+  const correctionErrors = useSaveFormErrors()
   const correctionRequest = useRef<{ id: string; key: string; busy: boolean } | null>(null)
   const createCorrection = async () => {
     if (!canEdit) return
@@ -209,8 +210,8 @@ export default function BroadcastDetail({
       if (correctionRequest.current !== request || broadcastScope.current.generation !== scopeGeneration) return
       if (!result.success) { notifyToast(result.error, { tone: 'error' }); return }
       router.push(`/broadcasts/new?draft=${encodeURIComponent(result.data.id)}`)
-    } catch {
-      if (correctionRequest.current === request && broadcastScope.current.generation === scopeGeneration) notifyToast('訂正の下書きを作れませんでした。時間をおいてもう一度お試しください。', { tone: 'error' })
+    } catch (error) {
+      if (correctionRequest.current === request && broadcastScope.current.generation === scopeGeneration && !correctionErrors.capture(error)) notifyToast('訂正の下書きを作れませんでした。時間をおいてもう一度お試しください。', { tone: 'error' })
     } finally { request.busy = false }
   }
 
@@ -314,7 +315,7 @@ export default function BroadcastDetail({
   const approvalStatus = approval.state?.approval.status ?? null
 
   return (
-    <PageFrame kind="detail" boardId="cgiGB pNiUk F3X1Mo Q28Gb dK1aE wfHIE tPm3e">
+    <SaveErrorScope errors={correctionErrors}><PageFrame kind="detail" boardId="cgiGB pNiUk F3X1Mo Q28Gb dK1aE wfHIE tPm3e">
       <PageHeading title={broadcast.title}
         crumbs={<><p className={styles.meta}>{metaLine(broadcast, audienceLabel)}</p></>}
         steps={<>{isDraft
@@ -466,7 +467,7 @@ export default function BroadcastDetail({
         onConfirm={() => { if (renderedCancelTicket && renderedCancelTicket === cancelTicket.current && cancelGeneration === broadcastScope.current.generation && canEdit) void cancelReservation() }}
         onClose={() => { if (!cancelling) { cancelTicket.current = null; setCancelOpen(false); if (cancelConflict) { setCancelConflict(false); onReload() } } }}
       />
-    </PageFrame>
+    </PageFrame></SaveErrorScope>
   )
 }
 
