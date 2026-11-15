@@ -145,6 +145,10 @@ describe('配信の訂正', () => {
     expect(host.textContent).toContain('訂正あり')
     expect(host.querySelector('a[href="/broadcasts/new?draft=correction-1"]')).not.toBeNull()
   })
+  it('訂正結果には作成時の人数と成功数の差を表示する', () => {
+    act(() => root.render(<BroadcastDetailV8 {...baseProps} broadcast={{ ...draft, status: 'sent', correctionOfBroadcastId: 'source', totalCount: 3, successCount: 2 }} />))
+    expect(host.textContent).toContain('送れなかった（友だちから外れた）：1人')
+  })
   it('閲覧のみでは訂正を押せず、下書きには操作がない', () => {
     act(() => root.render(<BroadcastDetailV8 {...baseProps} canEdit={false} broadcast={{ ...draft, status: 'sent' }} />))
     expect((queryPageAction({ name: '訂正を送る' }) as HTMLButtonElement).disabled).toBe(true)

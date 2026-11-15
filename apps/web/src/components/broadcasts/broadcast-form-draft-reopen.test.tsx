@@ -245,3 +245,10 @@ it('訂正の本文を保存しても元の宛先を保つ', async () => {
     expect(updateApi).toHaveBeenCalledWith('draft-1', expect.objectContaining({ targetType: 'segment', segmentConditions: conditions, expectedVersion: 7 }))
   } finally { unmount() }
 })
+
+it('訂正の作成時に外れた人数を下書きで知らせる', async () => {
+ const conditions={operator:'AND',rules:[{type:'is_following',value:true}]}
+ getApi.mockResolvedValue({success:true,data:draftRow({correctionOfBroadcastId:'source',correctionExcludedAtCreation:2,targetType:'segment',segmentConditions:conditions})})
+ await renderForm()
+ try { expect(container.textContent).toContain('2人は友だちから外れたため除きました') } finally { unmount() }
+})

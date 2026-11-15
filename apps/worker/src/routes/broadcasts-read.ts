@@ -214,11 +214,13 @@ export const get__api_broadcasts_id_8 = async (c: Context<Env, "/api/broadcasts/
 
   const view = await broadcastStatusView(c.env.DB, broadcast as unknown as Record<string, unknown>);
   const correction = await c.env.DB.prepare("SELECT id, status FROM broadcasts WHERE correction_of_broadcast_id=? ORDER BY created_at DESC, id DESC LIMIT 1").bind(id).first<{ id: string; status: string }>();
+  const correctionCreation = broadcast.correction_of_broadcast_id ? await c.env.DB.prepare("SELECT json_extract(detail_json, '$.correctionExcludedAtCreation') n FROM broadcast_lifecycle_events WHERE broadcast_id=? AND action='created' AND CASE WHEN json_valid(detail_json) THEN json_type(detail_json, '$.correctionExcludedAtCreation')='integer' ELSE 0 END ORDER BY created_at,id LIMIT 1").bind(id).first<{n:number}>() : null;
   return c.json({
     success: true,
     data: {
       ...serializeBroadcast(broadcast),
       correction: correction ?? null,
+      correctionExcludedAtCreation: correctionCreation?.n ?? 0,
       displayStatus: view.displayStatus,
       displayStatusLabel: view.displayStatusLabel,
       ledger: view.ledger,

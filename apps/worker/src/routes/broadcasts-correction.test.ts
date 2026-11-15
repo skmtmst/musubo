@@ -29,7 +29,7 @@ test('未送信、権限なし、別アカウントは拒否', async () => {
  expect((await request('draft')).status).toBe(409); expect((await request('source', { ...owner, readOnly: true })).status).toBe(403); expect((await request('source', { ...owner, role: 'staff', permissionKeys: [] })).status).toBe(403); expect((await request('foreign')).status).toBe(404);
 });
 test('台帳と実績が食い違う場合は下書きを作らない', async () => {
- db.raw.exec("DELETE FROM broadcast_send_claims WHERE friend_id='bad'"); expect((await request()).status).toBe(409); expect(db.raw.prepare('SELECT COUNT(*) n FROM broadcasts WHERE id=?').get(key)).toEqual({ n: 0 });
+ db.raw.exec("UPDATE broadcasts SET success_count=0 WHERE id='source'"); expect((await request()).status).toBe(409); expect(db.raw.prepare('SELECT COUNT(*) n FROM broadcasts WHERE id=?').get(key)).toEqual({ n: 0 });
 });
 
 test('本文を編集できるが固定された宛先は変更できない', async () => {
@@ -121,7 +121,7 @@ test.each([false,true])('元の配信削除後も固定した宛先だけを扱�
    await processScheduledBroadcasts(db.db,{} as never);
    await processQueuedBroadcasts(db.db,{} as never);
    expect(fetchMock.mock.calls.filter(([url])=>String(url).includes('/message/'))).toHaveLength(0);
-   expect(db.raw.prepare('SELECT status,stopped_at,total_count FROM broadcasts WHERE id=?').get(key)).toMatchObject({status:'sending',stopped_at:expect.any(String),total_count:0});
+   expect(db.raw.prepare('SELECT status,stopped_at,total_count FROM broadcasts WHERE id=?').get(key)).toMatchObject({status:'sending',stopped_at:expect.any(String),total_count:1});
   }
   else {
    expect(response.status).toBe(202);
@@ -207,4 +207,104 @@ test.each([false,true])('元配信の成功先が全員削除されていれば�
  expect(result.status).toBe(409);
  expect(await result.json()).toMatchObject({success:false,code:'CORRECTION_NO_RECIPIENTS',error:'送れる相手がいません'});
  expect(db.raw.prepare('SELECT COUNT(*) n FROM broadcasts WHERE id=?').get(key)).toEqual({n:0});
+});
+
+
+test('作成前に友だちが一部削除されたら残った成功先だけを写し、除いた人数を保存する', async () => {
+ db.raw.exec("UPDATE broadcasts SET success_count=2 WHERE id='source'; UPDATE broadcast_send_claims SET state='sent' WHERE broadcast_id='source' AND friend_id='bad'");
+ db.raw.pragma('foreign_keys = ON'); db.raw.exec("DELETE FROM friends WHERE id='bad'");
+ const made=await request(); expect(made.status).toBe(201);
+ expect(db.raw.prepare('SELECT friend_id FROM broadcast_send_claims WHERE broadcast_id=?').all(key)).toEqual([{friend_id:'ok'}]);
+ const detail=await app().request(`/api/broadcasts/${key}`);
+ expect(await detail.json()).toMatchObject({data:{totalCount:1,correctionExcludedAtCreation:1}});
+});
+
+test('作成後に一部削除されても残りだけに送り、作成時の総数と送信数を残す', async () => {
+ const {vi}=await import('vitest'); vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-16T01:00:00Z'));
+ const fetchMock=vi.fn(async (_input:string|URL|Request,_init?:RequestInit)=>new Response('{}',{status:200})); vi.stubGlobal('fetch',fetchMock);
+ try {
+  db.raw.exec("UPDATE broadcasts SET success_count=2 WHERE id='source'; UPDATE broadcast_send_claims SET state='sent' WHERE broadcast_id='source' AND friend_id='bad'");
+  expect((await request()).status).toBe(201);
+  db.raw.pragma('foreign_keys = ON');db.raw.exec("DELETE FROM friends WHERE id='bad'");
+  const response=await app().request(`/api/broadcasts/${key}/send`,{method:'POST',headers:{'Content-Type':'application/json','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({expectedVersion:1,confirmedRecipientCount:1})});
+  expect(response.status).toBe(202);
+  const {processQueuedBroadcasts}=await import('../features/broadcasts/broadcast.js'); await processQueuedBroadcasts(db.db,{} as never);
+  expect(db.raw.prepare('SELECT status,total_count,success_count FROM broadcasts WHERE id=?').get(key)).toEqual({status:'sent',total_count:2,success_count:1});
+  expect(db.raw.prepare('SELECT friend_id,state FROM broadcast_send_claims WHERE broadcast_id=?').all(key)).toEqual([{friend_id:'ok',state:'sent'}]);
+  const sends=fetchMock.mock.calls.filter(([url])=>String(url).includes('/message/'));expect(sends).toHaveLength(1);
+ } finally {vi.useRealTimers();vi.unstubAllGlobals();}
+});
+
+test('1人運用で予約した後に一部削除されても、残りの人に送って結果を残す', async () => {
+ const {vi}=await import('vitest');vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response('{}',{status:200})));
+ try {
+  db.raw.exec("UPDATE broadcasts SET success_count=2 WHERE id='source'; UPDATE broadcast_send_claims SET state='sent' WHERE broadcast_id='source' AND friend_id='bad'; INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES('owner','管理者','owner','test','t')");
+  expect((await request()).status).toBe(201);
+  const {setBroadcastApprovalThreshold}=await import('../features/broadcasts/broadcast-approval.js');await setBroadcastApprovalThreshold(db.db,'a',1);
+  const send=await app().request(`/api/broadcasts/${key}/send`,{method:'POST',headers:{'Content-Type':'application/json','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({expectedVersion:1,confirmedRecipientCount:2,scheduledAt:'2026-11-16T01:00:00Z'})});
+  expect(send.status).toBe(200);
+  db.raw.pragma('foreign_keys = ON');db.raw.exec("DELETE FROM friends WHERE id='bad'");
+  vi.setSystemTime(new Date('2026-11-16T01:01:00Z'));
+  const {processScheduledBroadcasts,processQueuedBroadcasts}=await import('../features/broadcasts/broadcast.js');
+  await processScheduledBroadcasts(db.db,{} as never);await processQueuedBroadcasts(db.db,{} as never);
+  expect(db.raw.prepare('SELECT status,total_count,success_count FROM broadcasts WHERE id=?').get(key)).toEqual({status:'sent',total_count:2,success_count:1});
+  expect(db.raw.prepare('SELECT friend_id,state FROM broadcast_send_claims WHERE broadcast_id=?').all(key)).toEqual([{friend_id:'ok',state:'sent'}]);
+ } finally {vi.useRealTimers();vi.unstubAllGlobals();}
+});
+
+test('LINEが受け付けた直後に友だちが削除されても成功数を保ち、残りに送る', async () => {
+ const {vi}=await import('vitest');vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-16T01:00:00Z'));
+ let removed=false;const fetchMock=vi.fn(async (input:string|URL|Request,init?:RequestInit)=>{
+  if(String(input).includes('/message/push') && !removed) { expect(JSON.parse(String(init?.body)).to).toBe('Ubad'); removed=true;db.raw.exec("DELETE FROM friends WHERE id='bad'"); }
+  return new Response('{}',{status:200});
+ }); vi.stubGlobal('fetch',fetchMock);
+ try {
+  db.raw.exec("UPDATE friends SET display_name=id; UPDATE broadcasts SET success_count=2 WHERE id='source'; UPDATE broadcast_send_claims SET state='sent' WHERE broadcast_id='source' AND friend_id='bad'");
+  expect((await request()).status).toBe(201);db.raw.prepare("UPDATE broadcasts SET message_content='{{name}} さん' WHERE id=?").run(key);
+  const sent=await app().request(`/api/broadcasts/${key}/send`,{method:'POST',headers:{'Content-Type':'application/json','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({expectedVersion:1,confirmedRecipientCount:2})});expect(sent.status).toBe(202);
+  db.raw.pragma('foreign_keys = ON');const {processQueuedBroadcasts}=await import('../features/broadcasts/broadcast.js');
+  await processQueuedBroadcasts(db.db,{} as never);await processQueuedBroadcasts(db.db,{} as never);
+  expect(removed).toBe(true);
+  expect(db.raw.prepare('SELECT status,total_count,success_count FROM broadcasts WHERE id=?').get(key)).toEqual({status:'sent',total_count:2,success_count:2});
+  expect(fetchMock.mock.calls.filter(([url])=>String(url).includes('/message/push'))).toHaveLength(2);
+ } finally {vi.useRealTimers();vi.unstubAllGlobals();}
+});
+
+test('最後の送信が受け付けられた直後にその友だちが削除されても完了できる', async () => {
+ const {vi}=await import('vitest');vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-16T01:00:00Z'));
+ let removed=false;vi.stubGlobal('fetch',vi.fn(async (input:string|URL|Request)=>{
+  if(String(input).includes('/message/push')&&!removed) {removed=true;db.raw.exec("DELETE FROM friends WHERE id='ok'");}
+  return new Response('{}',{status:200});
+ }));
+ try {
+  db.raw.exec("UPDATE friends SET display_name=id");expect((await request()).status).toBe(201);
+  db.raw.prepare("UPDATE broadcasts SET message_content='{{name}} さん' WHERE id=?").run(key);
+  const sent=await app().request(`/api/broadcasts/${key}/send`,{method:'POST',headers:{'Content-Type':'application/json','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({expectedVersion:1,confirmedRecipientCount:1})});expect(sent.status).toBe(202);
+  db.raw.pragma('foreign_keys = ON');const {processQueuedBroadcasts}=await import('../features/broadcasts/broadcast.js');
+  await processQueuedBroadcasts(db.db,{} as never);await processQueuedBroadcasts(db.db,{} as never);
+  expect(removed).toBe(true);expect(db.raw.prepare('SELECT status,total_count,success_count FROM broadcasts WHERE id=?').get(key)).toEqual({status:'sent',total_count:1,success_count:1});
+ } finally {vi.useRealTimers();vi.unstubAllGlobals();}
+});
+
+test('元配信の失敗した友だちが削除されても、送信成功先を除いたとは数えない', async () => {
+ db.raw.pragma('foreign_keys = ON');db.raw.exec("DELETE FROM friends WHERE id='bad'");
+ const made=await request();expect(made.status).toBe(201);
+ const detail=await app().request(`/api/broadcasts/${key}`);
+ expect(await detail.json()).toMatchObject({data:{totalCount:1,correctionExcludedAtCreation:0}});
+});
+
+test('LINE受理と停止・友だち削除が重なっても成功数を消さない', async () => {
+ const {vi}=await import('vitest');vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-16T01:00:00Z'));
+ let stopped=false;vi.stubGlobal('fetch',vi.fn(async (input:string|URL|Request)=>{
+  if(String(input).includes('/message/push')&&!stopped) {stopped=true;db.raw.exec("DELETE FROM friends WHERE id='ok'");db.raw.prepare("UPDATE broadcasts SET stopped_at='now',lock_version=lock_version+1 WHERE id=?").run(key);}
+  return new Response('{}',{status:200});
+ }));
+ try {
+  db.raw.exec('UPDATE friends SET display_name=id');expect((await request()).status).toBe(201);
+  db.raw.prepare("UPDATE broadcasts SET message_content='{{name}} さん' WHERE id=?").run(key);
+  const sent=await app().request(`/api/broadcasts/${key}/send`,{method:'POST',headers:{'Content-Type':'application/json','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({expectedVersion:1,confirmedRecipientCount:1})});expect(sent.status).toBe(202);
+  db.raw.pragma('foreign_keys = ON');const {processQueuedBroadcasts}=await import('../features/broadcasts/broadcast.js');await processQueuedBroadcasts(db.db,{} as never);
+  expect(stopped).toBe(true);expect(db.raw.prepare('SELECT status,success_count,stopped_at,batch_offset FROM broadcasts WHERE id=?').get(key)).toMatchObject({status:'sending',success_count:1,stopped_at:'now',batch_offset:0});
+ } finally {vi.useRealTimers();vi.unstubAllGlobals();}
 });

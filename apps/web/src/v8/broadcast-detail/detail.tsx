@@ -738,6 +738,7 @@ function Overview({
 
       {broadcast.status !== 'draft' ? <>
       <h3 className={styles.secTitle}>{isSent ? '配信結果' : '送信の進み具合'}</h3>
+      {isSent && broadcast.correctionOfBroadcastId && total > broadcast.successCount ? <Notice tone="info">送れなかった（友だちから外れた）：{formatNumber(total - broadcast.successCount)}人</Notice> : null}
       {broadcast.status === 'sending' ? (
         <Progress
           state="active"

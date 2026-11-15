@@ -89,7 +89,6 @@ export async function processBroadcastSend(
   expectedLockVersion?: number,
 ): Promise<Broadcast> {
   if(await processBroadcastSimulation(db,broadcastId))return (await getBroadcastById(db,broadcastId))!;
-
   if(expectedLockVersion!==undefined) {
     const active=await db.prepare("UPDATE broadcasts SET status='sending' WHERE id=? AND status='sending' AND stopped_at IS NULL AND lock_version=?")
       .bind(broadcastId,expectedLockVersion).run();
@@ -100,7 +99,6 @@ export async function processBroadcastSend(
   if (!broadcast) {
     throw new Error(`Broadcast ${broadcastId} not found`);
   }
-
   const storedParts = parseBroadcastMessageParts({
     messageType: broadcast.message_type,
     messageContent: broadcast.message_content,
@@ -197,7 +195,7 @@ export async function processBroadcastSend(
         `UPDATE broadcasts
             SET status = 'sending', batch_offset = 0, total_count = ?
           WHERE id = ? AND lock_version=? AND stopped_at IS NULL AND status='sending'`,
-      ).bind(Number(broadcast.correction_of_broadcast_id ? frozen?.n ?? 0 : frozen?.n || segmentAudience?.total || 0), broadcast.id,broadcast.lock_version ?? 1).run();
+      ).bind(Number(broadcast.correction_of_broadcast_id ? broadcast.total_count ?? 0 : frozen?.n || segmentAudience?.total || 0), broadcast.id,broadcast.lock_version ?? 1).run();
       return (await getBroadcastById(db, broadcastId))!;
     }
 
@@ -279,7 +277,7 @@ export async function processBroadcastSend(
     const frozen = await db.prepare('SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id=?').bind(broadcast.id).first<{n:number}>();
     await db
       .prepare(`UPDATE broadcasts SET status = 'sending', batch_offset = 0, total_count = ? WHERE id = ? AND lock_version=? AND stopped_at IS NULL AND status='sending'`)
-      .bind(Number(broadcast.correction_of_broadcast_id ? frozen?.n ?? 0 : frozen?.n || row?.cnt || 0), broadcast.id,broadcast.lock_version ?? 1)
+      .bind(Number(broadcast.correction_of_broadcast_id ? broadcast.total_count ?? 0 : frozen?.n || row?.cnt || 0), broadcast.id,broadcast.lock_version ?? 1)
       .run();
     return (await getBroadcastById(db, broadcastId))!;
   }
@@ -1079,7 +1077,8 @@ async function processQueuedBroadcastBatches(
     .bind(broadcast.id).first();
   const previousAudience = await db.prepare('SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id=?')
     .bind(broadcast.id).first<{n:number}>();
-  if (await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:Number(raw.total_count ?? 0),
+  if (!hasAudience && broadcast.correction_of_broadcast_id && Number(raw.success_count ?? 0)>0) { const done=await db.prepare("UPDATE broadcasts SET status='sent',sent_at=?,batch_lock_at=NULL,batch_offset=0 WHERE id=? AND lock_version=? AND batch_offset=-1 AND stopped_at IS NULL").bind(jstNow(),broadcast.id,lockVersion).run(); if(done.meta.changes)await createBroadcastInsight(db,broadcast.id);else await releaseStopped(0);return; }
+  if (await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:broadcast.correction_of_broadcast_id ? Number(previousAudience?.n ?? 0) : Number(raw.total_count ?? 0),
     known:Number(previousAudience?.n ?? 0),started:!!broadcast.correction_of_broadcast_id || !!fixedHqAudience || !!hasAudience || Number(raw.success_count ?? 0)>0 || batchOffset>0 || Number(raw.send_attempt_no ?? 1)>1,expectedLockVersion:lockVersion,requireBatchLock:true})) return;
   if (!hasAudience && storedDeliveryLimit(broadcast)) {
     await holdLimitedBroadcast(db, broadcast, '固定した宛先を確認できません。選び直さず送信を止めました。');
@@ -1273,6 +1272,7 @@ async function processQueuedBroadcastBatches(
           });
           if(dispatched.length!==1){if(fixedHqAudience)await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:fixedHqAudience.count,known:0,started:true,expectedLockVersion:lockVersion,requireBatchLock:true});else await releaseProgress(progressBase+currentOffset);return;}
           const { requestId: pushRequestId } = await lineClient.pushMessageWithRequestId(friend.line_user_id, personalizedMessages, retryKey, aggregationUnits(unit));
+          if (broadcast.correction_of_broadcast_id) await db.prepare("UPDATE broadcasts SET success_count=success_count+1 WHERE id=? AND correction_of_broadcast_id IS NOT NULL").bind(broadcast.id).run();
 
           await db.batch([
             ...renderedParts.map((part) => db.prepare(
@@ -1320,11 +1320,11 @@ async function processQueuedBroadcastBatches(
           const released=await db.prepare(
             `UPDATE broadcasts
                 SET batch_offset = ?, batch_lock_at = NULL,
-                    success_count = (
+                    success_count = CASE WHEN correction_of_broadcast_id IS NOT NULL THEN success_count ELSE (
                       SELECT COUNT(DISTINCT friend_id) FROM messages_log
                        WHERE broadcast_id = ? AND direction = 'outgoing'
                          AND COALESCE(delivery_type, '') != 'test'
-                    )
+                    ) END
               WHERE id = ? AND lock_version = ? AND batch_offset = -1`,
           ).bind(progressBase + currentOffset, broadcast.id, broadcast.id,lockVersion).run();
           if(!released.meta.changes)await releaseStopped(progressBase+currentOffset);
@@ -1334,11 +1334,11 @@ async function processQueuedBroadcastBatches(
 
       const progressUpdate=await db.prepare(
         `UPDATE broadcasts
-            SET success_count = (
+            SET success_count = CASE WHEN correction_of_broadcast_id IS NOT NULL THEN success_count ELSE (
                   SELECT COUNT(DISTINCT friend_id) FROM messages_log
                    WHERE broadcast_id = ? AND direction = 'outgoing'
                      AND COALESCE(delivery_type, '') != 'test'
-                )
+                ) END
           WHERE id = ? AND lock_version = ? AND batch_offset = -1`,
       ).bind(broadcast.id, broadcast.id,lockVersion).run();
       if(!progressUpdate.meta.changes){await releaseStopped(progressBase+currentOffset);return;}
@@ -1463,7 +1463,7 @@ async function processQueuedBroadcastBatches(
     currentOffset += batch.length;
     // 処理中に別実行が取得しないよう、成功数を更新しても batch_offset=-1 のロックは保つ。
     const progressUpdate=await db.prepare(
-      `UPDATE broadcasts SET success_count = success_count + ? WHERE id = ? AND lock_version = ? AND batch_offset = -1`,
+      `UPDATE broadcasts SET success_count = success_count + ? WHERE id = ? AND (correction_of_broadcast_id IS NOT NULL OR (lock_version = ? AND batch_offset = -1))`,
     ).bind(sendable.length, broadcast.id,lockVersion).run();
     if(!progressUpdate.meta.changes){await releaseStopped(progressBase+currentOffset);return;}
   }
@@ -1482,7 +1482,7 @@ async function processQueuedBroadcastBatches(
     await releaseQuotaSlot(db,broadcast.line_account_id,broadcast.id,{ expectedLockVersion: lockVersion });
   }
   await createBroadcastInsight(db, broadcast.id);
-  const finished=await db.prepare(`UPDATE broadcasts SET status='sent',sent_at=?,batch_lock_at=NULL,batch_offset=?
+  const finished=await db.prepare(`UPDATE broadcasts SET status='sent',sent_at=?,batch_lock_at=NULL,batch_offset=?, success_count=CASE WHEN correction_of_broadcast_id IS NOT NULL THEN MAX(success_count,(SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id=broadcasts.id AND state='sent')) ELSE success_count END
     WHERE id=? AND lock_version=? AND batch_offset=-1 AND stopped_at IS NULL`)
     .bind(jstNow(),progressBase+currentOffset,broadcast.id,lockVersion).run();
   if(!finished.meta.changes)await releaseStopped(progressBase+currentOffset);

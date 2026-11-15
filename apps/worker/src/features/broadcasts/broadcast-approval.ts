@@ -373,7 +373,7 @@ export async function checkScheduledBroadcastApproval(
   const status = (fresh?.approval_status ?? 'none') as ReturnType<typeof readApprovalStatus>;
   if (gate.singleOperator) {
     const limited = await limitedDeliveryPlan(db,broadcast);
-    if (limited ? limited.recipientCount <= Number(fresh.approval_confirmed_count) : Number(fresh.approval_confirmed_count) === gate.recipientCount) return { sendable: true };
+    if (limited ? limited.recipientCount <= Number(fresh.approval_confirmed_count) : broadcast.correction_of_broadcast_id ? gate.recipientCount > 0 && gate.recipientCount <= Number(fresh.approval_confirmed_count) : Number(fresh.approval_confirmed_count) === gate.recipientCount) return { sendable: true };
     // 人数が変わったまま時刻が来た。送らず期限切れにし、依頼主に知らせる。
     const claimed = await db.prepare(
       `UPDATE broadcasts SET approval_status = 'expired'

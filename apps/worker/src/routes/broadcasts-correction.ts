@@ -31,20 +31,21 @@ export async function createBroadcastCorrection(c: Context<Env, '/api/broadcasts
   if (!source.line_account_id || !['segment', 'tag'].includes(source.target_type) || source.hq_run_id) return c.json({ success: false, error: 'audience_unavailable' }, 409);
   const sendable = await c.env.DB.prepare("SELECT COUNT(*) n FROM broadcast_send_claims c JOIN friends f ON f.id=c.friend_id WHERE c.broadcast_id=? AND c.state='sent'").bind(source.id).first<{n:number}>();
   if (!sendable?.n) return c.json({ success: false, code: 'CORRECTION_NO_RECIPIENTS', error: '送れる相手がいません' }, 409);
-  const counts = await c.env.DB.prepare("SELECT COUNT(*) AS total, SUM(state='sent') AS sent FROM broadcast_send_claims WHERE broadcast_id=?").bind(source.id).first<{ total: number; sent: number }>();
-  if (!counts || !counts.sent || counts.sent !== source.success_count || counts.total !== source.total_count) return c.json({ success: false, error: 'audience_unavailable' }, 409);
+  if (sendable.n > source.success_count) return c.json({ success: false, error: 'audience_unavailable' }, 409);
+  const excluded = source.success_count - sendable.n;
   try {
     await c.env.DB.batch([
       c.env.DB.prepare(`INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id,segment_conditions,total_count,correction_of_broadcast_id,draft_step)
         SELECT ?,?,'text',?,'segment','draft',line_account_id,?,?,id,'message' FROM broadcasts
         WHERE id=? AND status='sent' AND total_count=? AND success_count=?
         AND NOT EXISTS (SELECT 1 FROM broadcasts existing WHERE existing.correction_of_broadcast_id=broadcasts.id AND existing.status IN ('draft','scheduled','sending'))
-        AND (SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id=broadcasts.id)=?
-        AND (SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id=broadcasts.id AND state='sent')=?`).bind(key, `訂正：${source.title}`, SAMPLE, CONDITIONS, counts.sent, source.id, counts.total, counts.sent, counts.total, counts.sent),
+        AND (SELECT COUNT(*) FROM broadcast_send_claims c JOIN friends f ON f.id=c.friend_id WHERE c.broadcast_id=broadcasts.id AND c.state='sent')=?`).bind(key, `訂正：${source.title}`, SAMPLE, CONDITIONS, sendable.n, source.id, source.total_count, source.success_count, sendable.n),
       c.env.DB.prepare(`INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state)
-        SELECT ?,friend_id,line_account_id,1,'claimed' FROM broadcast_send_claims
-        WHERE broadcast_id=? AND state='sent' AND EXISTS (SELECT 1 FROM broadcasts WHERE id=? AND correction_of_broadcast_id=?)`)
+        SELECT ?,c.friend_id,c.line_account_id,1,'claimed' FROM broadcast_send_claims c JOIN friends f ON f.id=c.friend_id
+        WHERE c.broadcast_id=? AND c.state='sent' AND EXISTS (SELECT 1 FROM broadcasts WHERE id=? AND correction_of_broadcast_id=?)`)
         .bind(key, source.id, key, source.id),
+      c.env.DB.prepare(`INSERT INTO broadcast_lifecycle_events(id,broadcast_id,action,detail_json) SELECT ?,?,'created',? WHERE EXISTS (SELECT 1 FROM broadcasts WHERE id=? AND correction_of_broadcast_id=?)`)
+        .bind(crypto.randomUUID(), key, JSON.stringify({ correctionExcludedAtCreation: excluded }), key, source.id),
     ]);
   } catch (error) {
     const existing = await replay();

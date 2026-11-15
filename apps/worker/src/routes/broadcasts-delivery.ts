@@ -226,7 +226,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       }, 400, ["name"]);
     }
 
-    const total = Number(audience?.total ?? 0);
+    const total = existing.correction_of_broadcast_id ? Number(existing.total_count ?? 0) : Number(audience?.total ?? 0);
     const lockResult = await c.env.DB.prepare(
       `UPDATE broadcasts
             SET status = 'sending', batch_offset = 0, total_count = ?

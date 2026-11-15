@@ -5,6 +5,7 @@ import type { SegmentCondition } from '../../segment-condition'
 export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   targetType: BroadcastTargetType;
   correctionOfBroadcastId?: string | null;
+  correctionExcludedAtCreation?: number;
   correction?: { id: string; status: string } | null;
   /** Worker が返す配信元LINEアカウント。旧データは null。 */
   lineAccountId: string | null;

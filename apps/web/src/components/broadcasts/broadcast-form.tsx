@@ -1312,6 +1312,7 @@ export default function BroadcastForm({
   }
 
   return <SaveErrorScope errors={saveErrors}><MessageComposerPage active={currentStep !== null}><div className={styles.root} data-design-node="FU2aU" data-step={currentStep ?? 'all'}>
+    {editingDraft?.correctionExcludedAtCreation ? <Notice tone="info">{formatNumber(editingDraft.correctionExcludedAtCreation)}人は友だちから外れたため除きました</Notice> : null}
     <header className={styles.header} data-steps-below={true}>
       <div className={styles.heading}>
         <h2>一斉配信を作る</h2>
