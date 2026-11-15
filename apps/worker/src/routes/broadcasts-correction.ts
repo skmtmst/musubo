@@ -20,10 +20,13 @@ export async function createBroadcastCorrection(c: Context<Env, '/api/broadcasts
     if (!existing) return null;
     if (existing.correction_of_broadcast_id !== source.id) return c.json({ success: false, error: 'idempotency_key_conflict' }, 409);
     c.header('Idempotency-Replayed', 'true');
-    return c.json({ success: true, data: { id: existing.id } }, 200);
+    return c.json({ success: true, data: { id: existing.id, status: existing.status } }, 200);
   };
   const previous = await replay();
   if (previous) return previous;
+  const activeCorrection = async () => c.env.DB.prepare("SELECT id,status FROM broadcasts WHERE correction_of_broadcast_id=? AND status IN ('draft','scheduled','sending') ORDER BY created_at,id LIMIT 1").bind(source.id).first<{id:string;status:string}>();
+  const active = await activeCorrection();
+  if (active) return c.json({ success: true, data: { id: active.id, status: active.status } }, 200);
   if (source.status !== 'sent') return c.json({ success: false, error: 'broadcast_not_sent' }, 409);
   if (!source.line_account_id || !['segment', 'tag'].includes(source.target_type) || source.hq_run_id) return c.json({ success: false, error: 'audience_unavailable' }, 409);
   const counts = await c.env.DB.prepare("SELECT COUNT(*) AS total, SUM(state='sent') AS sent FROM broadcast_send_claims WHERE broadcast_id=?").bind(source.id).first<{ total: number; sent: number }>();
@@ -33,6 +36,7 @@ export async function createBroadcastCorrection(c: Context<Env, '/api/broadcasts
       c.env.DB.prepare(`INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id,segment_conditions,total_count,correction_of_broadcast_id,draft_step)
         SELECT ?,?,'text',?,'segment','draft',line_account_id,?,?,id,'message' FROM broadcasts
         WHERE id=? AND status='sent' AND total_count=? AND success_count=?
+        AND NOT EXISTS (SELECT 1 FROM broadcasts existing WHERE existing.correction_of_broadcast_id=broadcasts.id AND existing.status IN ('draft','scheduled','sending'))
         AND (SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id=broadcasts.id)=?
         AND (SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id=broadcasts.id AND state='sent')=?`).bind(key, `訂正：${source.title}`, SAMPLE, CONDITIONS, counts.sent, source.id, counts.total, counts.sent, counts.total, counts.sent),
       c.env.DB.prepare(`INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state)
@@ -46,6 +50,10 @@ export async function createBroadcastCorrection(c: Context<Env, '/api/broadcasts
     throw error;
   }
   const created = await getBroadcastById(c.env.DB, key);
-  if (!created) return c.json({ success: false, error: 'audience_changed' }, 409);
-  return c.json({ success: true, data: { id: created.id } }, 201);
+  if (!created) {
+    const concurrent = await activeCorrection();
+    if (concurrent) return c.json({ success: true, data: { id: concurrent.id, status: concurrent.status } }, 200);
+    return c.json({ success: false, error: 'audience_changed' }, 409);
+  }
+  return c.json({ success: true, data: { id: created.id, status: created.status } }, 201);
 }

@@ -1,3 +1,4 @@
+import { broadcastSendPreview } from '../services/gap-send-preview.js';
 import { releaseQuotaSlot } from '../features/broadcasts/broadcast-quota-guard/index.js';
 import { storedDeliveryLimit, deliveryLimitFromOptions, limitedDeliveryPlan, optionsWithDeliveryConfirmation } from '../features/broadcasts/broadcast-delivery-limit/index.js';
 import { logger } from '@line-crm/shared/server';
@@ -13,7 +14,7 @@ import { MAX_BROADCAST_MESSAGES, parseBroadcastMessageParts } from '../features/
 import type { SegmentCondition } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 
-import { BROADCAST_DEFINITION_EDIT_KEY } from '@line-crm/shared';
+import { BROADCAST_DEFINITION_EDIT_KEY, BROADCAST_DEFINITION_PUBLISH_KEY } from '@line-crm/shared';
 import { canAccessBroadcast, BROADCAST_DRAFT_STEPS, validateMessageOptions, broadcastWriteBoundary, ACCOUNT_ACCESS_ERROR, unsupportedVariablesError, parseStoredSegmentConditions, rejectIfAudienceUnusable, recordLifecycle, serializeBroadcast, broadcastLedgerSummary, parseExpectedVersion, recordBroadcastControlAudit, queueMarkerFor, kickQueueProcessing } from './broadcasts-definition.js';
 import type { Context } from 'hono';
 
@@ -113,6 +114,16 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
   const resultingTagId = body.targetTagId !== undefined ? body.targetTagId : existing.target_tag_id;
   const reservesBroadcast = body.saveAsDraft !== true
     && (body.scheduledAt !== undefined ? Boolean(body.scheduledAt) : existing.status === 'scheduled');
+  if (existing.correction_of_broadcast_id && reservesBroadcast) {
+    if (c.get('impersonation')) return c.json({success:false,code:'IMPERSONATION_SEND_BLOCKED',error:'代理ログイン中は送れません'},403);
+    if (c.req.header('x-confirm-irreversible') !== 'broadcast-send') return c.json({success:false,error:'この操作は取り消せません。画面の確認手順を経てから実行してください。',code:'CONFIRMATION_REQUIRED'},428);
+    const sendBoundary = await broadcastWriteBoundary(c, requestedAccountIds, { operationKey: BROADCAST_DEFINITION_PUBLISH_KEY });
+    if (!sendBoundary.allowed) return c.json({success:false,error:'この機能を操作する権限がありません'},403);
+    const keys = Object.keys(body).filter(key => !['scheduledAt','expectedVersion','confirmedRecipientCount'].includes(key));
+    if (keys.length || body.scheduledAt === undefined) return c.json({success:false,error:'訂正の予約は送る前の確認から行ってください'},409);
+    const preview = await broadcastSendPreview(c.env.DB, existing);
+    if (body.expectedVersion !== preview.expectedVersion || body.confirmedRecipientCount !== preview.recipients || preview.recipients === 0) return c.json({success:false,code:'SEND_PREVIEW_CHANGED',error:'送る相手が変わりました。もう一度確かめてください'},409);
+  }
   // 書きかけの保存は許可し、予約として確定するときだけ宛先を必須にする。
   if (reservesBroadcast && resultingTargetType === 'tag' && !resultingTagId) {
     return inputError(c, { success: false, error: '送る相手を選んでください' }, 400, ["targetTagId"]);

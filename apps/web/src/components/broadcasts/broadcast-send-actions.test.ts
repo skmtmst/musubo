@@ -58,4 +58,27 @@ describe('実際に送る処理の入口', () => {
     } finally { send.mockRestore() }
   })
 
+  it.each([false, true])('訂正の予約は確認画面の版と人数を使い、内容を保存し直さない（1人運用=%s）', async single => {
+    const saved = { id: 'correction', correctionOfBroadcastId: 'source', version: 4 } as never
+    const update = vi.spyOn(api.broadcasts, 'update').mockResolvedValue({ success: true, data: saved })
+    const request = vi.spyOn(api.broadcasts.approval, 'request').mockResolvedValue({ success: true, data: {} } as never)
+    const ctx = { ...context(), sendMode: 'scheduled' as const, scheduledAtIso: () => '2099-01-01T01:00:00Z',
+      needsApproval: true, needsApprovalSingle: single, approvalCountInput: '10', approverId: 'approver',
+      correctionPreview: { data: { expectedVersion: 3, recipients: 10 } as never, broadcast: saved },
+      persistDraft: vi.fn(), ab: { enabled: false, persist: vi.fn().mockResolvedValue(4) } as never }
+    try {
+      await saveBroadcast(ctx)
+      expect(ctx.persistDraft).not.toHaveBeenCalled()
+      expect(update).toHaveBeenCalledWith('correction', { scheduledAt: '2099-01-01T01:00:00Z', expectedVersion: 3, confirmedRecipientCount: 10 }, true)
+      expect(request).toHaveBeenCalledTimes(single ? 0 : 1)
+    } finally { update.mockRestore(); request.mockRestore() }
+  })
+  it('訂正の予約は確認した人数が変わったら予約しない', async () => {
+    const update = vi.spyOn(api.broadcasts, 'update')
+    const ctx = { ...context(), sendMode: 'scheduled' as const, scheduledAtIso: () => '2099-01-01T01:00:00Z',
+      correctionPreview: { data: { expectedVersion: 3, recipients: 9 } as never, broadcast: {id:'correction'} as never } }
+    try { await saveBroadcast(ctx); expect(update).not.toHaveBeenCalled(); expect(ctx.setError).toHaveBeenCalledWith('送る人数をもう一度確認してください') }
+    finally { update.mockRestore() }
+  })
+
 })

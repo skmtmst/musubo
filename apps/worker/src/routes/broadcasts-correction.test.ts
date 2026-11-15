@@ -8,7 +8,7 @@ import { previewAudience } from '../features/broadcasts/broadcast-preflight.js';
 let db: SqliteD1;
 const owner: AuthenticatedStaff = { id: 'owner', name: '管理者', role: 'owner', readOnly: false, tenantId: 't' };
 const key = 'c4522a8a-a40e-43eb-860a-38238f24f131';
-function app(staff = owner) { const a = new Hono<Env>(); a.use('*', async (c, next) => { c.env = { DB: db.db } as Env['Bindings']; c.set('staff', staff); await next(); }); a.route('/', broadcasts); return a; }
+function app(staff = owner, impersonating = false) { const a = new Hono<Env>(); a.use('*', async (c, next) => { c.env = { DB: db.db } as Env['Bindings']; c.set('staff', staff); if (impersonating) c.set('impersonation', {} as never); await next(); }); a.route('/', broadcasts); return a; }
 function request(id = 'source', staff = owner, k = key) { return app(staff).request(`/api/broadcasts/${id}/correction`, { method: 'POST', headers: { 'Idempotency-Key': k } }); }
 beforeEach(() => {
  db = createTestD1(); db.raw.exec(`INSERT INTO tenants(id,name) VALUES('t','店'),('other','別');
@@ -134,4 +134,67 @@ test.each([false,true])('元の配信削除後も固定した宛先だけを扱�
    expect(payload.to === 'Uok' || (Array.isArray(payload.to) && payload.to.length === 1 && payload.to[0] === 'Uok')).toBe(true);
   }
  } finally {vi.useRealTimers();vi.unstubAllGlobals();}
+});
+
+test('別の鍵で同時に作っても未送信の訂正は一つ、送信後は次を作れる', async () => {
+ const key2='d4522a8a-a40e-43eb-860a-38238f24f132';
+ const [a,b]=await Promise.all([request(),request('source',owner,key2)]);
+ expect([a.status,b.status].sort()).toEqual([200,201]);
+ const one=await a.json() as {data:{id:string}},two=await b.json() as {data:{id:string}};
+ expect(one.data.id).toBe(two.data.id);
+ expect(db.raw.prepare("SELECT COUNT(*) n FROM broadcasts WHERE correction_of_broadcast_id='source'").get()).toEqual({n:1});
+ for (const status of ['scheduled','sending']) {
+  db.raw.prepare('UPDATE broadcasts SET status=? WHERE id=?').run(status,one.data.id);
+  const resumed=await request('source',owner,one.data.id===key ? key2 : key);
+  expect(resumed.status).toBe(200);
+  expect(await resumed.json()).toMatchObject({data:{id:one.data.id,status}});
+ }
+ db.raw.prepare("UPDATE broadcasts SET status='sent' WHERE id=?").run(one.data.id);
+ const next=await request('source',owner,one.data.id===key ? key2 : key);
+ expect(next.status).toBe(201);
+ expect((await next.json() as {data:{id:string}}).data.id).not.toBe(one.data.id);
+});
+
+test('元配信の失敗先を再送しても既存の訂正宛先は増えず、送信後の新しい訂正には追加される', async () => {
+ const {vi}=await import('vitest');
+ vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-16T01:00:00Z'));
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response('{}',{status:200})));
+ try {
+  db.raw.exec("UPDATE broadcasts SET segment_conditions='{\"operator\":\"AND\",\"rules\":[{\"type\":\"is_following\",\"value\":true}]}' WHERE id='source'; UPDATE broadcast_send_claims SET error_code='line_http_429' WHERE broadcast_id='source' AND friend_id='bad'");
+  expect((await request()).status).toBe(201);
+  const retry=await app().request('/api/broadcasts/source/retry-failed',{method:'POST',headers:{'Content-Type':'application/json','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({expectedVersion:1})});
+  expect(retry.status).toBe(202);
+  const {processQueuedBroadcasts}=await import('../features/broadcasts/broadcast.js');
+  await processQueuedBroadcasts(db.db,{} as never);
+  expect(db.raw.prepare("SELECT friend_id,state FROM broadcast_send_claims WHERE broadcast_id='source' ORDER BY friend_id").all()).toEqual([{friend_id:'bad',state:'sent'},{friend_id:'ok',state:'sent'}]);
+  expect(db.raw.prepare('SELECT correction_of_broadcast_id FROM broadcasts WHERE id=?').get(key)).toEqual({correction_of_broadcast_id:'source'});
+  expect(db.raw.prepare('SELECT friend_id FROM broadcast_send_claims WHERE broadcast_id=?').all(key)).toEqual([{friend_id:'ok'}]);
+  const existing=await request('source',owner,'d4522a8a-a40e-43eb-860a-38238f24f132');
+  expect(await existing.json()).toMatchObject({data:{id:key}});
+  const sendCorrection=await app().request(`/api/broadcasts/${key}/send`,{method:'POST',headers:{'Content-Type':'application/json','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({expectedVersion:1,confirmedRecipientCount:1})});
+  expect(sendCorrection.status).toBe(202);
+  await processQueuedBroadcasts(db.db,{} as never);
+  expect(db.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(key)).toEqual({status:'sent'});
+  const next=await request('source',owner,'d4522a8a-a40e-43eb-860a-38238f24f132');
+  expect(next.status).toBe(201);
+  expect(db.raw.prepare('SELECT friend_id FROM broadcast_send_claims WHERE broadcast_id=? ORDER BY friend_id').all('d4522a8a-a40e-43eb-860a-38238f24f132')).toEqual([{friend_id:'bad'},{friend_id:'ok'}]);
+ } finally {vi.useRealTimers();vi.unstubAllGlobals();}
+});
+
+test('訂正の予約は表示した版と台帳人数だけで確定し、同時の本文変更を拒否する', async () => {
+ expect((await request()).status).toBe(201);
+ const update=(body:object,confirmed=true)=>app().request(`/api/broadcasts/${key}`,{method:'PUT',headers:{'Content-Type':'application/json',...(confirmed?{'X-Confirm-Irreversible':'broadcast-send'}:{})},body:JSON.stringify(body)});
+ const at='2099-11-16T01:00:00Z';
+ const impersonated=await app(owner,true).request(`/api/broadcasts/${key}`,{method:'PUT',headers:{'Content-Type':'application/json','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({expectedVersion:1,confirmedRecipientCount:1,scheduledAt:at})});
+ expect(impersonated.status).toBe(403);
+ expect((await update({expectedVersion:1,confirmedRecipientCount:1,scheduledAt:at},false)).status).toBe(428);
+ expect((await update({expectedVersion:1,scheduledAt:at})).status).toBe(409);
+ expect((await update({expectedVersion:1,confirmedRecipientCount:2,scheduledAt:at})).status).toBe(409);
+ expect((await update({expectedVersion:99,confirmedRecipientCount:1,scheduledAt:at})).status).toBe(409);
+ expect((await update({expectedVersion:1,confirmedRecipientCount:1,scheduledAt:at,messageContent:'確認後の変更'})).status).toBe(409);
+ const preview=await app().request(`/api/broadcasts/${key}/send-preview`);
+ expect(await preview.json()).toMatchObject({data:{recipients:1,expectedVersion:1}});
+ const scheduled=await update({expectedVersion:1,confirmedRecipientCount:1,scheduledAt:at});
+ expect(scheduled.status).toBe(200);
+ expect(db.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(key)).toEqual({status:'scheduled'});
 });

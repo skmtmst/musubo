@@ -72,7 +72,7 @@ export const broadcastsMethods = {
       }>(`/api/broadcasts${qs ? `?${qs}` : ''}`)
     },
     createCorrection: (id: string, idempotencyKey: string) =>
-      fetchApi<ApiResponse<{ id: string }>>(`/api/broadcasts/${encodeURIComponent(id)}/correction`, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } }),
+      fetchApi<ApiResponse<{ id: string; status?: 'draft' | 'scheduled' | 'sending' | 'sent' }>>(`/api/broadcasts/${encodeURIComponent(id)}/correction`, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } }),
     get: (id: string) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`),
     create: (data: import('@line-crm/shared').BroadcastDefinitionInput, options?: { idempotencyKey?: string }) =>
@@ -129,10 +129,12 @@ export const broadcastsMethods = {
         confirmedRecipientCount?: number
         // #772: 版なしの更新は 400 で拒否される。
         expectedVersion: number
-      }
+      },
+      confirmedSend = false,
     ) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}`, {
         method: 'PUT',
+        ...(confirmedSend ? { headers: IRREVERSIBLE_BROADCAST_HEADERS } : {}),
         body: JSON.stringify(data),
       }),
     delete: (id: string) =>

@@ -26,6 +26,7 @@ const TemplateRichVideoEditor = dynamic(() => import('../../v8/template-edit/ric
 const CarouselV8 = dynamic(() => import('../../v8/templates/carousel/index'))
 
 type RenderBroadcastEditorDialogsContext = {
+  correction: boolean
   confirmationBlocked: boolean
   confirmationFields: ReactNode
   ab: ReturnType<typeof useBroadcastAb>
@@ -79,10 +80,10 @@ type RenderBroadcastEditorDialogsContext = {
   trackLinks: boolean
 }
 
-export function renderBroadcastEditorDialogs({ confirmationBlocked, confirmationFields, ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, testTargetAccountId, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, testRetryBlocked, testResultOpen, setTestResultOpen, title, trackLinks }: RenderBroadcastEditorDialogsContext) {
+export function renderBroadcastEditorDialogs({ correction, confirmationBlocked, confirmationFields, ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, testTargetAccountId, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, testRetryBlocked, testResultOpen, setTestResultOpen, title, trackLinks }: RenderBroadcastEditorDialogsContext) {
   return (<><div data-design-node="FpgxH">
       <ConfirmDialog
-        open={confirmOpen && needsApprovalSingle}
+        open={confirmOpen && needsApprovalSingle && !correction}
         title={sendMode === 'scheduled' ? 'この内容で予約しますか？' : 'この内容で送りますか？'}
         description={
           needsApproval && !needsApprovalSingle

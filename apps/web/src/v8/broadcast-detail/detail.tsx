@@ -209,7 +209,9 @@ export default function BroadcastDetail({
       const result = await api.broadcasts.createCorrection(broadcast.id, request.key)
       if (correctionRequest.current !== request || broadcastScope.current.generation !== scopeGeneration) return
       if (!result.success) { notifyToast(result.error, { tone: 'error' }); return }
-      router.push(`/broadcasts/new?draft=${encodeURIComponent(result.data.id)}`)
+      router.push(result.data.status && result.data.status !== 'draft'
+        ? `/broadcasts/detail?id=${encodeURIComponent(result.data.id)}`
+        : `/broadcasts/new?draft=${encodeURIComponent(result.data.id)}`)
     } catch (error) {
       if (correctionRequest.current === request && broadcastScope.current.generation === scopeGeneration && !correctionErrors.capture(error)) notifyToast('訂正の下書きを作れませんでした。時間をおいてもう一度お試しください。', { tone: 'error' })
     } finally { request.busy = false }

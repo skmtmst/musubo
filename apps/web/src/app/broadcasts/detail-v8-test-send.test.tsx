@@ -21,9 +21,10 @@ vi.mock('@/lib/api', async importOriginal => {
   return { ...actual }
 })
 vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
+const navigation = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('next/navigation', async () => ({
   ...(await import('@/test-utils/navigation-mock')).navigationMock(),
-  useRouter: () => ({ push: () => {} }),
+  useRouter: () => ({ push: navigation.push }),
 }))
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
 
@@ -75,6 +76,7 @@ const baseProps = {
 let host: HTMLDivElement
 let root: Root
 beforeEach(() => {
+  navigation.push.mockClear()
   rememberStaffIdentity({ role: 'owner', permissionKeys: [] } as unknown as StaffMember)
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -122,6 +124,13 @@ describe('配信の訂正', () => {
     }
     expect(create).toHaveBeenCalledTimes(2)
     expect(create.mock.calls[0][1]).toBe(create.mock.calls[1][1])
+  })
+  it.each(['scheduled','sending'] as const)('既存の%s訂正は詳細を開く', async status => {
+    vi.spyOn(api.broadcasts, 'createCorrection').mockResolvedValue({ success: true, data: { id: 'correction-1', status } })
+    act(() => root.render(<BroadcastDetailV8 {...baseProps} broadcast={{ ...draft, status: 'sent' }} />))
+    const item = queryPageAction({ name: '訂正を送る' })
+    await act(async () => { item!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(navigation.push).toHaveBeenCalledWith('/broadcasts/detail?id=correction-1')
   })
   it('元の配信に訂正の下書きへのリンクを表示する', () => {
     act(() => root.render(<BroadcastDetailV8 {...baseProps} broadcast={{ ...draft, status: 'sent', correction: { id: 'correction-1', status: 'draft' } }} />))
