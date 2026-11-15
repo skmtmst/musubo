@@ -70,6 +70,8 @@ export function dashboardPeriodLabel(
     case 'last7': return '過去7日'
     case 'last28': return '過去28日'
     case 'last30': return '過去30日'
+    case 'last90': return '過去90日'
+    case 'custom': return '指定した期間'
     case 'latest': return '現在'
     case 'last7-fixed': return '直近7日'
     case 'this-month': return '今月'

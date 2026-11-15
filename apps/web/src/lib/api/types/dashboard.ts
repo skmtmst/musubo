@@ -4,7 +4,7 @@ export type DashboardMetric<T> = {
   state: 'available' | 'empty' | 'unavailable' | 'estimated' | 'partial' | 'stale'
   reason: 'source_failed' | 'fetch_failed' | 'not_connected' | 'not_loaded' | 'not_applicable' | null
   asOf: string | null
-  period: 'today' | 'last7' | 'last28' | 'last30' | 'latest' | 'last7-fixed' | 'this-month'
+  period: 'today' | 'last7' | 'last28' | 'last30' | 'last90' | 'custom' | 'latest' | 'last7-fixed' | 'this-month'
 }
 
 export type DashboardFriendTrendPoint = {
@@ -20,7 +20,7 @@ export type DashboardFriendTrendPoint = {
 
 /** ダッシュボードが1回で読む数（設計 `管理画面 1-1 ダッシュボード`）。 */
 export type DashboardOverview = {
-  period: 'today' | 'last7' | 'last28' | 'last30'
+  period: 'today' | 'last7' | 'last28' | 'last30' | 'last90' | 'custom'
   /** 集計した時刻。カードごとの基準がずれていないことの手がかり。 */
   generatedAt: string
   /** 取得に成功した元データのうち最も古い時刻。 */
@@ -83,7 +83,7 @@ export type DashboardOverview = {
       asOf: string | null
       freshness?: 'fresh' | 'delayed' | 'stale' | 'unavailable' | 'partial'
       reason?: 'source_failed' | 'fetch_failed' | 'not_connected' | 'not_loaded' | 'not_applicable' | null
-      period: 'today' | 'last7' | 'last28' | 'last30' | 'latest' | 'last7-fixed' | 'this-month'
+      period: 'today' | 'last7' | 'last28' | 'last30' | 'last90' | 'custom' | 'latest' | 'last7-fixed' | 'this-month'
     }
   >
   /** 管理画面指標。段階配備中の旧Workerでは未返却。 */

@@ -8,7 +8,7 @@ import { jstDate, jstDayStartIso } from '@/lib/jst-datetime'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
+import { validHoursDate, type NotificationCenterData, type NotificationCenterItem } from '@line-crm/shared'
 import { ApiError, api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
@@ -38,12 +38,12 @@ import {
  */
 
 export const PERIODS = [
-  { key: 'today', label: '今日' },
   { key: 'last7', label: '過去7日' },
   { key: 'last30', label: '過去30日' },
+  { key: 'last90', label: '過去90日' },
 ] as const
 
-export type PeriodKey = (typeof PERIODS)[number]['key']
+export type PeriodKey = (typeof PERIODS)[number]['key'] | 'custom'
 export type HealthRisk = 'normal' | 'warning' | 'danger' | null
 
 /** 配置の手元の写し。管理画面 と同じ名前（切り替えの日に持ち越す）。 */
@@ -68,16 +68,14 @@ export function useDashboard(usageStyle?: 'standard' | 'ec') {
   const params = useSearchParams()
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
 
-  /* 期間・編集中は URL に残す。旧28日のURLも、現在の30日集計で開く。 */
-  const periodParam = params.get('period') === 'last28' ? 'last30' : params.get('period')
+  const rawPeriod = params.get('period') === 'last28' ? 'last30' : params.get('period')
+  const from = params.get('from') ?? ''
+  const to = params.get('to') ?? ''
+  const validRange = validHoursDate(from) && validHoursDate(to) && from <= to && to <= jstDate() && Date.parse(to) - Date.parse(from) <= 365 * 86_400_000
+  const period: PeriodKey = rawPeriod === 'custom' && validRange ? 'custom' : PERIODS.some(item => item.key === rawPeriod) ? rawPeriod as PeriodKey : 'last7'
+  const customRange = period === 'custom' ? { from, to } : null
   const editParam = params.get('edit')
-  const [period, setPeriodState] = useState<PeriodKey>(() => (
-    PERIODS.some((item) => item.key === periodParam) ? (periodParam as PeriodKey) : 'today'
-  ))
   const [editorOpen, setEditorOpen] = useState(() => editParam === '1')
-  useEffect(() => {
-    setPeriodState(PERIODS.some((item) => item.key === periodParam) ? (periodParam as PeriodKey) : 'today')
-  }, [periodParam])
   useEffect(() => { setEditorOpen(editParam === '1') }, [editParam])
   const updateQuery = useCallback((mutate: (query: URLSearchParams) => void) => {
     const next = new URLSearchParams(params.toString())
@@ -86,11 +84,13 @@ export function useDashboard(usageStyle?: 'standard' | 'ec') {
     samePageUrl.replace(text ? `/?${text}` : '/')
   }, [params, samePageUrl])
   const selectPeriod = useCallback((key: PeriodKey) => {
-    setPeriodState(key)
-    updateQuery((query) => { if (key === 'today') query.delete('period'); else query.set('period', key) })
+    updateQuery((query) => { query.set('period', key); query.delete('from'); query.delete('to') })
+  }, [updateQuery])
+  const selectRange = useCallback((range: { from: string; to: string }) => {
+    updateQuery((query) => { query.set('period', 'custom'); query.set('from', range.from); query.set('to', range.to) })
   }, [updateQuery])
 
-  const [overview, setOverview] = useState<{ accountId: string; period: PeriodKey; value: DashboardOverview } | null>(null)
+  const [overview, setOverview] = useState<{ accountId: string; period: PeriodKey; rangeKey: string; value: DashboardOverview } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [preferences, setPreferences] = useState<DashboardPreferences>(() => defaultDashboardPreferences(V8_DASHBOARD_DEFAULT_VISIBILITY))
@@ -153,8 +153,9 @@ export function useDashboard(usageStyle?: 'standard' | 'ec') {
   const data = overview && overview.accountId === selectedAccountId
     ? overview.value
     : null
+  const rangeKey = period === 'custom' ? `${from}/${to}` : ''
   const displayedPeriod = data ? overview!.period : period
-  const previousPeriod = data !== null && displayedPeriod !== period
+  const previousPeriod = data !== null && (displayedPeriod !== period || overview!.rangeKey !== rangeKey)
   const periodNotice = previousPeriod
     ? error ? `前の期間を表示しています。選んだ期間のデータを${STATE_TEXT.error}` : '前の期間を表示・更新中'
     : ''
@@ -308,16 +309,33 @@ export function useDashboard(usageStyle?: 'standard' | 'ec') {
     setLoading(true)
     setError('')
     try {
-      const response = await api.dashboard.overview({ period: periodKey, accountId })
+      const response = await api.dashboard.overview({ period: periodKey, accountId, ...(periodKey === 'custom' ? { from, to } : {}) })
       if (requestId !== loadRequestId.current) return
-      if (response.success) setOverview({ accountId, period: periodKey, value: response.data })
+      if (response.success) setOverview(previous => {
+        const nextRangeKey = periodKey === 'custom' ? `${from}/${to}` : ''
+        const old = previous?.accountId === accountId && (previous.period !== periodKey || previous.rangeKey !== nextRangeKey) ? previous.value : null
+        const incoming = response.data
+        const value = old ? {
+          ...incoming, generatedAt: old.generatedAt, friends: old.friends, inbox: old.inbox,
+          delivery: old.delivery, trend: old.trend, metrics: old.metrics,
+          sections: incoming.sections && old.sections ? {
+            ...incoming.sections, friends: old.sections.friends, inbox: old.sections.inbox,
+            delivery: old.sections.delivery, quota: old.sections.quota, trend: old.sections.trend,
+          } : incoming.sections,
+          operations: incoming.operations && old.operations ? {
+            ...incoming.operations, scenarios: old.operations.scenarios,
+            migrations: old.operations.migrations, bookings: old.operations.bookings,
+          } : incoming.operations,
+        } : incoming
+        return { accountId, period: periodKey, rangeKey: nextRangeKey, value }
+      })
       else setError(response.error)
     } catch {
       if (requestId === loadRequestId.current) setError(`データを${STATE_TEXT.error}`)
     } finally {
       if (requestId === loadRequestId.current) setLoading(false)
     }
-  }, [accountLoading, period, selectedAccountId])
+  }, [accountLoading, period, from, to, selectedAccountId])
 
   useEffect(() => { void load() }, [load])
 
@@ -547,6 +565,8 @@ export function useDashboard(usageStyle?: 'standard' | 'ec') {
     selectedAccount,
     period,
     selectPeriod,
+    customRange,
+    selectRange,
     editorOpen,
     openEditor,
     closeEditor,

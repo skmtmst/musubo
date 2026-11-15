@@ -20,7 +20,7 @@ function shippingDay(value: string | null | undefined): string {
 }
 
 /** 既存ECの読取りだけを使う。模擬の自動LINEは実績へ混ぜない。 */
-export default function EcSummary({ accountId, period = 'today' }: { accountId: string; period?: 'today' | 'last7' | 'last30' }) {
+export default function EcSummary({ accountId, period = 'today', customRange }: { accountId: string; period?: 'today' | 'last7' | 'last30' | 'last90' | 'custom'; customRange?: { from: string; to: string } | null }) {
   type Snapshot = { accountId: string; overview: EcCommerceOverview | null; orders: EcOrderList | null; shipments: EcShipmentList | null; subscriptions: EcSubscriptionList | null; ordersAvailable: boolean; ordersSynced: boolean; configured: boolean; failed: string[]; at: string }
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [tick, setTick] = useState(0)
@@ -71,6 +71,6 @@ export default function EcSummary({ accountId, period = 'today' }: { accountId: 
       <KpiCard loading={!data} presentation="band" title="定期便の次回" value={null} valueText={nextShipping} unit="" detail={subscriptionsComplete && nextShipping !== '—' ? '取り込み済みの次回発送日' : data ? '次回発送日を確認できていません' : '読み込んでいます'} action={{ label: '定期便を見る', href: '/ec-commerce?tab=subscriptions' }} />
       <KpiCard loading={!data} presentation="band" title="つき合わせ待ち" value={values?.overview?.identityPending ?? null} unit="件" detail="友だちとのつき合わせ" action={{ label: 'つき合わせを確認する', href: '/ec-commerce/identity-candidates' }} />
     </KpiBand>
-    <EcPeriodSummary accountId={accountId} period={period} showStatusNotice={!data?.failed.length} />
+    <EcPeriodSummary accountId={accountId} period={period} customRange={customRange} showStatusNotice={!data?.failed.length} />
   </DashboardRow>
 }

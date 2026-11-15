@@ -9,16 +9,20 @@ export const dashboardMethods = {
       fetchApi<ApiResponse<{ items: DashboardActivityItem[] }>>(
         `/api/dashboard/activity?account_id=${encodeURIComponent(accountId)}&limit=${encodeURIComponent(String(limit))}`,
       ),
-    overview: (params: { period?: 'today' | 'last7' | 'last28' | 'last30'; accountId: string }) => {
+    overview: (params: { period?: 'today' | 'last7' | 'last28' | 'last30' | 'last90' | 'custom'; accountId: string; from?: string; to?: string }) => {
       const query = new URLSearchParams()
       if (params?.period) query.set('period', params.period)
+      if (params.from) query.set('from', params.from)
+      if (params.to) query.set('to', params.to)
       query.set('account_id', params.accountId)
       const suffix = query.size ? `?${query}` : ''
       return fetchApi<ApiResponse<DashboardOverview>>(`/api/dashboard/overview${suffix}`)
     },
-    organizationOverview: (params?: { period?: 'today' | 'last7' | 'last28' | 'last30' }) => {
+    organizationOverview: (params?: { period?: 'today' | 'last7' | 'last28' | 'last30' | 'last90' | 'custom'; from?: string; to?: string }) => {
       const query = new URLSearchParams()
       if (params?.period) query.set('period', params.period)
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
       const suffix = query.size ? `?${query}` : ''
       return fetchApi<ApiResponse<DashboardOverview>>(`/api/dashboard/organization-overview${suffix}`)
     },
