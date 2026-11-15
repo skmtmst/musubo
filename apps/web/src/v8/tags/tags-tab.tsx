@@ -249,7 +249,6 @@ export default function TagsTab({
   const [restoring, setRestoring] = useState(false)
   const [restoreError, setRestoreError] = useState('')
   const { leavingId, leave } = useRowLeaving()
-  // 使っている所が0のタグは窓なしで保管し、5秒は「元に戻す」で取り消せる（動きの点検 17 番・旧い一覧と同じ）。
   const [manageFoldersOpen, setManageFoldersOpen] = useState(false)
   const [folderDialog, setFolderDialog] = useState<'new' | TagGroup | null>(null)
   const [deletingGroup, setDeletingGroup] = useState<TagGroup | null>(null)
@@ -323,7 +322,6 @@ export default function TagsTab({
   useListScrollMemory(status === 'ready')
 
   const filtered = useMemo(() => items.filter((tag) => {
-    // 保管して「元に戻す」を待っている行は出さない。
     if ((tag.status === 'archived') !== onlyArchived) return false
     if (query && !tag.name.toLowerCase().includes(query.toLowerCase())) return false
     if (folder === UNGROUPED && tag.groupId) return false
@@ -426,10 +424,7 @@ export default function TagsTab({
       const res = await api.tags.setGroup(tag.id, groupId)
       if (!res.success) throw new Error(res.error)
       const groupName = groupId === null ? '未分類' : groups.find((group) => group.id === groupId)?.name ?? 'フォルダ'
-      notifyToast(`「${tag.name}」を${groupName}へ移しました`, {
-        actionLabel: '元に戻す',
-        onAction: () => { void moveTagToGroup({ ...tag, groupId }, previous) },
-      })
+      notifyToast(`「${tag.name}」を${groupName}へ移しました`)
     } catch (reason) {
       const fieldFailure = saveErrors.capture(reason)
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, groupId: previous } : item));
