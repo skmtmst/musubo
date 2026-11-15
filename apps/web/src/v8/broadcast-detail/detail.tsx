@@ -213,7 +213,7 @@ export default function BroadcastDetail({
         ? `/broadcasts/detail?id=${encodeURIComponent(result.data.id)}`
         : `/broadcasts/new?draft=${encodeURIComponent(result.data.id)}`)
     } catch (error) {
-      if (correctionRequest.current === request && broadcastScope.current.generation === scopeGeneration && !correctionErrors.capture(error)) notifyToast('訂正の下書きを作れませんでした。時間をおいてもう一度お試しください。', { tone: 'error' })
+      if (correctionRequest.current === request && broadcastScope.current.generation === scopeGeneration && !correctionErrors.capture(error)) notifyToast(error instanceof ApiError && error.code === 'CORRECTION_NO_RECIPIENTS' ? '送れる相手がいません' : '訂正の下書きを作れませんでした。時間をおいてもう一度お試しください。', { tone: 'error' })
     } finally { request.busy = false }
   }
 

@@ -29,6 +29,8 @@ export async function createBroadcastCorrection(c: Context<Env, '/api/broadcasts
   if (active) return c.json({ success: true, data: { id: active.id, status: active.status } }, 200);
   if (source.status !== 'sent') return c.json({ success: false, error: 'broadcast_not_sent' }, 409);
   if (!source.line_account_id || !['segment', 'tag'].includes(source.target_type) || source.hq_run_id) return c.json({ success: false, error: 'audience_unavailable' }, 409);
+  const sendable = await c.env.DB.prepare("SELECT COUNT(*) n FROM broadcast_send_claims c JOIN friends f ON f.id=c.friend_id WHERE c.broadcast_id=? AND c.state='sent'").bind(source.id).first<{n:number}>();
+  if (!sendable?.n) return c.json({ success: false, code: 'CORRECTION_NO_RECIPIENTS', error: '送れる相手がいません' }, 409);
   const counts = await c.env.DB.prepare("SELECT COUNT(*) AS total, SUM(state='sent') AS sent FROM broadcast_send_claims WHERE broadcast_id=?").bind(source.id).first<{ total: number; sent: number }>();
   if (!counts || !counts.sent || counts.sent !== source.success_count || counts.total !== source.total_count) return c.json({ success: false, error: 'audience_unavailable' }, 409);
   try {

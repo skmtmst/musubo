@@ -10,7 +10,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import BroadcastDetailV8 from '@/v8/broadcast-detail/detail'
-import { api, type ApiBroadcast } from '@/lib/api'
+import { api, ApiError, type ApiBroadcast } from '@/lib/api'
+import { notifyToast } from '@/components/shared/toast'
 import type { StaffMember } from '@line-crm/shared'
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 
@@ -131,6 +132,13 @@ describe('配信の訂正', () => {
     const item = queryPageAction({ name: '訂正を送る' })
     await act(async () => { item!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
     expect(navigation.push).toHaveBeenCalledWith('/broadcasts/detail?id=correction-1')
+  })
+  it('送れる相手がいないときは理由を知らせる', async () => {
+    vi.spyOn(api.broadcasts, 'createCorrection').mockRejectedValue(new ApiError(409, '送れる相手がいません', 'CORRECTION_NO_RECIPIENTS'))
+    act(() => root.render(<BroadcastDetailV8 {...baseProps} broadcast={{ ...draft, status: 'sent' }} />))
+    const item = queryPageAction({ name: '訂正を送る' })
+    await act(async () => { item!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(notifyToast).toHaveBeenCalledWith('送れる相手がいません', { tone: 'error' })
   })
   it('元の配信に訂正の下書きへのリンクを表示する', () => {
     act(() => root.render(<BroadcastDetailV8 {...baseProps} broadcast={{ ...draft, status: 'sent', correction: { id: 'correction-1', status: 'draft' } }} />))

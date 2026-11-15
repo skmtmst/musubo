@@ -198,3 +198,13 @@ test('訂正の予約は表示した版と台帳人数だけで確定し、同�
  expect(scheduled.status).toBe(200);
  expect(db.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(key)).toEqual({status:'scheduled'});
 });
+
+
+test.each([false,true])('元配信の成功先が全員削除されていれば下書きを作らず理由を返す（外部キー=%s）', async (foreignKeys) => {
+ db.raw.pragma(`foreign_keys = ${foreignKeys ? 'ON' : 'OFF'}`);
+ db.raw.exec("DELETE FROM friends WHERE id='ok'");
+ const result=await request();
+ expect(result.status).toBe(409);
+ expect(await result.json()).toMatchObject({success:false,code:'CORRECTION_NO_RECIPIENTS',error:'送れる相手がいません'});
+ expect(db.raw.prepare('SELECT COUNT(*) n FROM broadcasts WHERE id=?').get(key)).toEqual({n:0});
+});
