@@ -28,6 +28,18 @@
   white-space: nowrap;
 }
 
+/*
+ * 08b の再開導線。9項目の一覧の下に「続きからガイドで進める」「ガイドを最初から開始」を並べ、
+ * その下に注記を置く（Pen 枠 Bnkcl の SuTRi と同じ順）。狭い幅では縦に折り返す。
+ */
+.guideFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-d23-ob-head-gap);
+  min-width: 0;
+}
+
 /* 08b の注記。手順の下に小さく置き、狭い幅では折り返して全文を読めるようにする。 */
 .note {
   margin: 0;

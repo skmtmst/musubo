@@ -128,22 +128,20 @@ export type FirstStepsGuide = {
 }
 
 /**
- * 08b の再開導線。行き先が実在する段だけを案内し、止めた所から続けられる。
- * チェックは設定の実測で付くので、ガイドの進み具合とは分けて書く。
+ * 08b の再開導線（Pen 枠 Bnkcl の SuTRi）。9項目の一覧の下に、
+ * 「続きからガイドで進める」「ガイドを最初から開始」と注記をこの順で置く。
+ * 一時停止はガイドバー側（Pen 枠 orKSi の共通ルール）なので、ここには出さない。
  */
-export function FirstStepsGuideBand({ guide }: { guide: FirstStepsGuide }) {
+export function FirstStepsGuideFooter({ guide }: { guide: FirstStepsGuide }) {
   const anchor = guide.anchor ?? guide.pausedAnchor
   if (!anchor || guide.phase === 'done') return null
   const restart = () => { guide.reset(); guide.start() }
   return (
-    <Notice tone="info" compact action={<>
-      {guide.phase === 'active'
-        ? <TextLink tone="action" href={anchor.href} aria-label={`${anchor.label}をガイドで開く`}>ガイドで開く</TextLink>
-        : <Button size="compact" variant="primary" onClick={guide.phase === 'paused' ? guide.resume : guide.start}>続きからガイドで進める</Button>}
-      <Button size="compact" onClick={guide.phase === 'active' ? guide.pause : restart}>{guide.phase === 'active' ? '一時停止' : 'ガイドを最初から開始'}</Button>
-    </>}>
-      次は「{anchor.label}」です
-    </Notice>
+    <div className={styles.guideFooter}>
+      <Button size="compact" variant="primary" onClick={guide.phase === 'paused' ? guide.resume : guide.start}>続きからガイドで進める</Button>
+      <Button size="compact" onClick={restart}>ガイドを最初から開始</Button>
+      <FirstStepsGuideNote />
+    </div>
   )
 }
 
@@ -173,7 +171,6 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigu
         </button> : null}
       </div>
       {feedback}
-      {guideVisible ? <FirstStepsGuideBand guide={guide!} /> : null}
       {setupTasks}
       {summary && !complete ? <SetupStepList id="first-steps-list" columns={3} hidden={folded}>
         {summary.steps.map((step, index) => (
@@ -185,13 +182,16 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigu
             </SetupStepLabel>
             {(!step.done || step.key === 'hours') && (readOnly || step.state === 'forbidden') ? <><Button size="compact" lockedReason={lockUnless(false, 'manager')}>開く</Button></> : !step.done && !step.href ? <span className={styles.count}>未確認</span> : step.done && step.key !== 'hours' ? null : (
               <>
-                <TextLink tone="action" href={step.href!} className={styles.link} aria-label={`${step.label}（${step.link.replace(' →', '')}）`}>{step.link.replace(' →', '')}</TextLink>
+                {/* 08b: 次の未完了の段だけは、この行からガイドを開く導線にする。 */}
+                {guideVisible && step.key === nextKey
+                  ? <TextLink tone="action" href={step.href!} className={styles.link} aria-label={`${step.label}をガイドで開く`}>ガイドで開く</TextLink>
+                  : <TextLink tone="action" href={step.href!} className={styles.link} aria-label={`${step.label}（${step.link.replace(' →', '')}）`}>{step.link.replace(' →', '')}</TextLink>}
               </>
             )}
           </SetupStepRow>
         ))}
       </SetupStepList> : null}
-      {guideVisible && !folded ? <FirstStepsGuideNote /> : null}
+      {guideVisible && !folded ? <FirstStepsGuideFooter guide={guide!} /> : null}
     </Card>
   )
 }

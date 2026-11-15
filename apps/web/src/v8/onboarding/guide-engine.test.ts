@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from 'vitest'
-import { guideAnchor, guideEngineStorageKey, nextGuideEngineState, readGuideEngineState, writeGuideEngineState, type GuideSummary } from './guide-engine'
+import { guideAnchor, guideEngineStorageKey, guideStateFromServer, nextGuideEngineState, readGuideEngineState, writeGuideEngineState, type GuideSummary } from './guide-engine'
 
 const summary = (overrides: Partial<GuideSummary> = {}): GuideSummary => ({
   steps: [
@@ -10,6 +10,8 @@ const summary = (overrides: Partial<GuideSummary> = {}): GuideSummary => ({
   ],
   done: 1, total: 3, ...overrides,
 })
+
+const idle = { phase: 'idle' as const, stepKey: null, procedureIndex: 1 }
 
 beforeEach(() => { window.localStorage.clear() })
 
@@ -27,41 +29,62 @@ describe('ガイドの行き先', () => {
 })
 
 describe('ガイドの状態遷移', () => {
-  it('開始・一時停止・再開で止めた段から続けられる', () => {
-    const started = nextGuideEngineState({ phase: 'idle', stepKey: null }, 'start', 'richMenu')
-    expect(started).toEqual({ phase: 'active', stepKey: 'richMenu' })
-    const paused = nextGuideEngineState(started, 'pause')
-    expect(paused).toEqual({ phase: 'paused', stepKey: 'richMenu' })
-    expect(nextGuideEngineState(paused, 'resume')).toEqual({ phase: 'active', stepKey: 'richMenu' })
-    expect(nextGuideEngineState(paused, 'resume', 'attributes')).toEqual({ phase: 'active', stepKey: 'attributes' })
+  it('開始・一時停止・再開で止めた段と手順から続けられる', () => {
+    const started = nextGuideEngineState(idle, 'start', 'richMenu')
+    expect(started).toEqual({ phase: 'active', stepKey: 'richMenu', procedureIndex: 1 })
+    const atTwo = nextGuideEngineState(started, 'advanceProcedure')
+    expect(atTwo).toEqual({ phase: 'active', stepKey: 'richMenu', procedureIndex: 2 })
+    const paused = nextGuideEngineState(atTwo, 'pause')
+    expect(paused).toEqual({ phase: 'paused', stepKey: 'richMenu', procedureIndex: 2 })
+    // 止めた段へ戻るなら手順も止めた所から。別の段へ移るなら手順1から。
+    expect(nextGuideEngineState(paused, 'resume')).toEqual({ phase: 'active', stepKey: 'richMenu', procedureIndex: 2 })
+    expect(nextGuideEngineState(paused, 'resume', 'attributes')).toEqual({ phase: 'active', stepKey: 'attributes', procedureIndex: 1 })
   })
 
-  it('一時停止中は次の段へ進めず、できない遷移では状態を変えない', () => {
-    const paused = { phase: 'paused' as const, stepKey: 'richMenu' }
+  it('段が進むと手順は1に戻る（1/3→2/3の数え直し）', () => {
+    const atThree = { phase: 'active' as const, stepKey: 'richMenu', procedureIndex: 3 }
+    expect(nextGuideEngineState(atThree, 'advance', 'attributes')).toEqual({ phase: 'active', stepKey: 'attributes', procedureIndex: 1 })
+  })
+
+  it('一時停止中は次の段・次の手順へ進めず、できない遷移では状態を変えない', () => {
+    const paused = { phase: 'paused' as const, stepKey: 'richMenu', procedureIndex: 2 }
     expect(nextGuideEngineState(paused, 'advance', 'attributes')).toBe(paused)
-    const idle = { phase: 'idle' as const, stepKey: null }
+    expect(nextGuideEngineState(paused, 'advanceProcedure')).toBe(paused)
     expect(nextGuideEngineState(idle, 'pause')).toBe(idle)
     expect(nextGuideEngineState(idle, 'resume')).toBe(idle)
   })
 
   it('9項目が済んだら終わりにし、やり直しで最初に戻す', () => {
-    expect(nextGuideEngineState({ phase: 'active', stepKey: 'richMenu' }, 'complete')).toEqual({ phase: 'done', stepKey: null })
-    expect(nextGuideEngineState({ phase: 'done', stepKey: null }, 'reset')).toEqual({ phase: 'idle', stepKey: null })
+    expect(nextGuideEngineState({ phase: 'active', stepKey: 'richMenu', procedureIndex: 2 }, 'complete'))
+      .toEqual({ phase: 'done', stepKey: null, procedureIndex: 1 })
+    expect(nextGuideEngineState({ phase: 'done', stepKey: null, procedureIndex: 1 }, 'reset')).toEqual(idle)
   })
 })
 
 describe('ガイドの状態保存', () => {
   it('アカウントごとに覚え、別のアカウントの続きを混ぜない', () => {
-    writeGuideEngineState('account-1', { phase: 'paused', stepKey: 'richMenu' })
-    expect(readGuideEngineState('account-1')).toEqual({ phase: 'paused', stepKey: 'richMenu' })
-    expect(readGuideEngineState('account-2')).toEqual({ phase: 'idle', stepKey: null })
-    expect(readGuideEngineState(null)).toEqual({ phase: 'idle', stepKey: null })
+    writeGuideEngineState('account-1', { phase: 'paused', stepKey: 'richMenu', procedureIndex: 2 })
+    expect(readGuideEngineState('account-1')).toEqual({ phase: 'paused', stepKey: 'richMenu', procedureIndex: 2 })
+    expect(readGuideEngineState('account-2')).toEqual(idle)
+    expect(readGuideEngineState(null)).toEqual(idle)
   })
 
   it('壊れた記録は案内を始めていない状態として扱う', () => {
     window.localStorage.setItem(guideEngineStorageKey('account-1'), '{壊れた')
-    expect(readGuideEngineState('account-1')).toEqual({ phase: 'idle', stepKey: null })
-    window.localStorage.setItem(guideEngineStorageKey('account-1'), JSON.stringify({ phase: 'なにか', stepKey: 7 }))
-    expect(readGuideEngineState('account-1')).toEqual({ phase: 'idle', stepKey: null })
+    expect(readGuideEngineState('account-1')).toEqual(idle)
+    window.localStorage.setItem(guideEngineStorageKey('account-1'), JSON.stringify({ phase: 'なにか', stepKey: 7, procedureIndex: 0 }))
+    expect(readGuideEngineState('account-1')).toEqual(idle)
+  })
+
+  /*
+    承認済み Pen 枠 14 (orKSi) の L3lP08 は、進行状態をユーザー×アカウントで
+    サーバー保存にする。壊れた返事で案内を勝手に始めないことを見張る。
+  */
+  it('サーバーの返事を状態に直し、足りない値は既定に寄せる', () => {
+    expect(guideStateFromServer({ phase: 'paused', stepKey: 'hours', procedureIndex: 2 }))
+      .toEqual({ phase: 'paused', stepKey: 'hours', procedureIndex: 2 })
+    expect(guideStateFromServer({ phase: 'idle', stepKey: null, procedureIndex: 1 })).toEqual(idle)
+    expect(guideStateFromServer({ phase: 'なにか', stepKey: 7, procedureIndex: 0 })).toEqual(idle)
+    expect(guideStateFromServer(null)).toEqual(idle)
   })
 })

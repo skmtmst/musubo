@@ -1,12 +1,14 @@
 // @vitest-environment happy-dom
 /*
  * 08b の再開導線（承認済み Pen /Users/masatosakamoto/Documents/musubo-course-media-upload-20261110.pen 枠 Bnkcl）。
+ * Pen の SuTRi どおり「続きからガイドで進める」「ガイドを最初から開始」と注記がこの順で並ぶこと・
  * 止めた所から続けられること・行き先が実在する段だけを案内すること・
  * チェックは実データで付くという注記が狭い幅でも出ることを見張る。
+ * 一時停止はガイドバー側（枠 orKSi の共通ルール）なので、ここには出さない。
  */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { FirstStepsGuideBand, type FirstStepsGuide } from './first-steps'
+import { FirstStepsGuideFooter, type FirstStepsGuide } from './first-steps'
 
 afterEach(cleanup)
 
@@ -19,37 +21,36 @@ const guide = (overrides: Partial<FirstStepsGuide> = {}): FirstStepsGuide => ({
 })
 
 describe('はじめにやることの再開導線', () => {
-  it('始める前は次の段を示し、続きからと最初からを出す', () => {
+  it('Pen の順で2つの操作と注記を出す', () => {
     const value = guide()
-    render(<FirstStepsGuideBand guide={value} />)
-    expect(screen.getByText('次は「卓と席を登録する」です')).toBeTruthy()
+    render(<FirstStepsGuideFooter guide={value} />)
+    const texts = Array.from(document.body.querySelectorAll('button, p')).map(node => node.textContent)
+    expect(texts).toEqual(['続きからガイドで進める', 'ガイドを最初から開始', 'チェックは設定の実データで自動判定。ガイドを使わなくても付きます'])
     fireEvent.click(screen.getByRole('button', { name: '続きからガイドで進める' }))
     expect(value.start).toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'ガイドを最初から開始' }))
     expect(value.reset).toHaveBeenCalled()
   })
 
-  it('案内中は実在する行き先へのリンクと一時停止を出す', () => {
+  it('案内中も操作は同じで、一時停止はここに出さない', () => {
     const value = guide({ phase: 'active' })
-    render(<FirstStepsGuideBand guide={value} />)
-    expect(screen.getByRole('link', { name: '卓と席を登録するをガイドで開く' }).getAttribute('href')).toBe('/restaurant-test/tables')
-    fireEvent.click(screen.getByRole('button', { name: '一時停止' }))
-    expect(value.pause).toHaveBeenCalled()
+    render(<FirstStepsGuideFooter guide={value} />)
+    expect(screen.getByRole('button', { name: '続きからガイドで進める' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '一時停止' })).toBeNull()
   })
 
   it('一時停止は止めた段から再開する', () => {
     const value = guide({ phase: 'paused', anchor: null, pausedAnchor: { key: 'hours', label: '営業時間を設定する', href: '/settings/hours' } })
-    render(<FirstStepsGuideBand guide={value} />)
-    expect(screen.getByText('次は「営業時間を設定する」です')).toBeTruthy()
+    render(<FirstStepsGuideFooter guide={value} />)
     fireEvent.click(screen.getByRole('button', { name: '続きからガイドで進める' }))
     expect(value.resume).toHaveBeenCalled()
   })
 
   it('行き先が無い時と9項目が済んだ時は案内しない', () => {
-    const { container } = render(<FirstStepsGuideBand guide={guide({ anchor: null })} />)
+    const { container } = render(<FirstStepsGuideFooter guide={guide({ anchor: null })} />)
     expect(container.textContent).toBe('')
     cleanup()
-    const done = render(<FirstStepsGuideBand guide={guide({ phase: 'done' })} />)
+    const done = render(<FirstStepsGuideFooter guide={guide({ phase: 'done' })} />)
     expect(done.container.textContent).toBe('')
   })
 })
