@@ -1227,4 +1227,5 @@
 - [アフィリエイトの上書き防止](release-log/unreleased/68-kenta-affiliate-expected.md) — 右パネルの保存の競合防止の履歴。確認 2026-11-14。
 - [列車 1114b](release-log/unreleased/70-kenta-train-1114b.md) — まとめて入れた直しの履歴。確認 2026-11-15。
 - [閲覧のみの操作を灰色に（残り）](release-log/unreleased/71-kenta-viewer-gray-app.md) — #60 の続きの履歴。確認 2026-11-15。
+- [文書：A15 の判断を言葉とスタイルの表へ](release-log/unreleased/72-kenta-a15-docs.md) — 来なかった・LINE通知の入口の履歴。確認 2026-11-15。
 - [フォルダ列の作るボタンを灰色に](release-log/unreleased/PR-kenta-folder-create-gray.md) — 閲覧のみの人への表示をそろえた履歴。確認 2026-11-15。
