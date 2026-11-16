@@ -32,6 +32,14 @@ test('B4-06: この回から後ぜんぶ変更、変更できない回は元の�
  const r=await gapCall(app(),`/api/booking/admin/series/${data.series.id}?account_id=a`,'PATCH',{scope:'following',fromBookingId:data.bookings[1].id,expectedVersion:1,change:{startsAt:'2026-11-27T06:00:00.000Z'}});
  expect(r.status).toBe(200);expect((await r.json() as any).data.changed).toHaveLength(2);expect(d.raw.prepare('SELECT starts_at FROM bookings ORDER BY series_index').all()).toEqual([{starts_at:body.startsAt},{starts_at:'2026-11-27T06:00:00.000Z'},{starts_at:'2026-12-04T06:00:00.000Z'}]);
 });
+test('B4-06: 埋まっている回は変更せず競合として返す',async()=>{
+ const data=(await (await gapCall(app(),url,'POST',body)).json() as any).data;
+ seedGapBooking(d,'busy','confirmed','2026-12-04T06:00:00.000Z');
+ const r=await gapCall(app(),`/api/booking/admin/series/${data.series.id}?account_id=a`,'PATCH',{scope:'following',fromBookingId:data.bookings[1].id,expectedVersion:1,change:{startsAt:'2026-11-27T06:00:00.000Z'}});
+ const result=(await r.json() as any).data;
+ expect(r.status).toBe(200);expect(result.changed).toEqual([data.bookings[1].id]);expect(result.conflicts).toEqual([data.bookings[2].id]);
+ expect(d.raw.prepare('SELECT starts_at FROM bookings WHERE series_id=? ORDER BY series_index').all(data.series.id)).toEqual([{starts_at:body.startsAt},{starts_at:'2026-11-27T06:00:00.000Z'},{starts_at:'2026-12-04T05:00:00.000Z'}]);
+});
 test('B4-17 Q-01: 閲覧のみは一覧だけ、代理も作らない、店をまたげない',async()=>{
  for(const [who,im] of [[{...gapOwner,readOnly:true},false],[gapOwner,true]] as const)expect((await gapCall(gapApp(d,[bookingSeries],who,im),url,'POST',body)).status).toBe(403);
  expect((await gapCall(app(),url.replace('=a','=b'),'POST',body)).status).toBe(404);
