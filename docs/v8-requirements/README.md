@@ -16,6 +16,7 @@
 | [styles.md](styles.md)・[styles-gaps.md](styles-gaps.md) | 6つのスタイルの登録・初期セット・ダッシュボード・メニュー・LIFFと文面・ボタンの行き先・受け入れ、不足と既存API/DBへの接続（B-391） |
 | [cleanup-stage2-contract.md](cleanup-stage2-contract.md) | B-353→B-361→B-366 の順序と入口、B-358 の店舗設定・署名、B-365 の再試行・結果不明・サガ・cache の共通契約 |
 | [form-file-attachments.md](form-file-attachments.md) | 回答フォームの書類の添付（写真・PDF・本人確認書類、B-176）の決まり・検査・保存期限・権限 |
+| [multi-sns-connections.md](multi-sns-connections.md) | Googleビジネス・Instagram の複数接続と複数宛先への同時投稿（追加連携枠の課金接続・3段階の実装・2026-11-16 決定） |
 
 ## 共通の決まり
 - 自動で送る LINE（知らせ・案内）には `X-Line-Harness-Source: manual` を付けない。担当者の1対1返信だけに付ける。検証環境の送信止めに従う。
