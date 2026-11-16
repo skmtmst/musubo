@@ -3,7 +3,8 @@
 .list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--tpl-d23-ob-grid-gap);
+  /* 縦の間だけ画面ごとに変えられるようにする（既定は横と同じ）。 */
+  gap: var(--step-list-row-gap, var(--tpl-d23-ob-grid-gap)) var(--tpl-d23-ob-grid-gap);
   margin: 0;
   padding: 0;
   list-style: none;

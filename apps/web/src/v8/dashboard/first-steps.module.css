@@ -5,6 +5,23 @@
  * 手順：3列×2行（間8）。済みは緑の丸に白い ✓・薄い文字・ごく薄い灰の地、まだは白い丸、次の 1 つは緑の枠。
  */
 
+/*
+ * 枠08b v01r（nvQmI / ahwHx）に合わせた、このカードだけの色と間。
+ * 共通トークンの正本（globals.css）は他の約300画面が使うため書き換えず、
+ * カードの中だけで上書きする。
+ */
+.card {
+  --color-step-done-bg: #f4faf6;
+  --color-step-next-bg: #fff;
+  --color-step-note-ink: #9ca3af;
+  --step-title-size: 20px;
+  --step-title-lh: 28px;
+  --step-action-h: 46px;
+  --step-action-pad: 20.5px;
+  --step-action-text: 15px;
+  --step-action-text-lh: 22px;
+}
+
 .head {
   display: flex;
   align-items: center;
@@ -15,10 +32,17 @@
 .title {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--tpl-d23-ob-title);
+  /* 枠08b v01r の見出しは 20/28（nvQmI 実測）。 */
+  font-size: var(--step-title-size);
   font-weight: 700;
-  line-height: var(--tpl-d23-ob-title-lh);
+  line-height: var(--step-title-lh);
   white-space: nowrap;
+}
+
+/* 進捗ピップ。SP では正本（ahwHx）どおり出さない。 */
+.pips {
+  display: inline-flex;
+  min-width: 0;
 }
 
 .count {
@@ -40,12 +64,47 @@
   min-width: 0;
 }
 
-/* 08b の注記。手順の下に小さく置き、狭い幅では折り返して全文を読めるようにする。 */
+/*
+ * 08b の注記。手順の下に小さく置き、狭い幅では折り返して全文を読めるようにする。
+ * PC は正本どおり下段の右端へ寄せ、SP は左端から折り返す。
+ */
 .note {
   margin: 0;
-  color: var(--color-ink-secondary);
+  margin-inline-start: auto;
+  color: var(--color-step-note-ink);
   font-size: var(--tpl-d23-ob-text);
   line-height: var(--tpl-d23-ob-text-lh);
+}
+
+/*
+ * 下段の2操作は正本の寸法（主 206×46・副 191×46・文字 15）。
+ * 共通ボタン側の文字14は `:root .button:is(.primary, .secondary)…` という
+ * 層の外の強い指定なので、こちらも `html:root` と `[class]` の重ねで
+ * 強さを上げ、枠08b の中だけで勝つようにする（共通CSSは触らない）。
+ */
+html:root .guideFooter button[class][class][class] {
+  height: var(--step-action-h);
+  /* 左右の余白は正本の幅（主206・副191）に合わせた値。 */
+  padding-inline: var(--step-action-pad);
+  font-size: var(--step-action-text);
+  line-height: var(--step-action-text-lh);
+}
+
+/* SP390（ahwHx）: ピップを出さず「畳む」を画面内に収め、2操作は縦積みの全幅。 */
+@container v8-page (width < 640px) {
+  .pips { display: none; }
+  .guideFooter {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .card { --step-action-h: 48px; }
+  html:root .guideFooter button[class][class][class] { width: 100%; }
+  .note { margin-inline-start: 0; }
+}
+
+/* PC（nvQmI）: 段の縦の間は12。横の間は共通のまま。 */
+@container v8-page (width >= 640px) {
+  .card { --step-list-row-gap: 12px; }
 }
 
 .spacer {
