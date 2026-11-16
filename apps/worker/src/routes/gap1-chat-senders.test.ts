@@ -133,3 +133,14 @@ test('SND-20: アイコンの保管後はアカウントの送り手で送る',a
  expect((await (await call('/api/line-accounts/a/senders')).json() as any).data[0].iconMissing).toBe(true);
  expect((await call('/api/chats/c/send','POST',{content:'顔なし',senderId:b.data.id})).status).toBe(200);expect(push.mock.calls[0][1][0]).not.toHaveProperty('sender');
 });
+
+test('UNS-17: 配信の閲覧権限だけの担当は送信を開始できない',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));
+ try{
+  d.raw.exec("INSERT INTO broadcasts(id,title,message_type,message_content,target_type,line_account_id,status) VALUES('limited','配信','text','本文','all','a','draft')");
+  const {broadcasts}=await import('./broadcasts.js');
+  const a=new Hono<Env>();a.use('*',async(c,next)=>{c.env={DB:d.db} as Env['Bindings'];c.set('staff',{...staff,permissionKeys:['/broadcasts']});await next();});a.route('/',broadcasts);
+  const r=await a.request('/api/broadcasts/limited/send',{method:'POST',headers:{'Content-Type':'application/json','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({expectedVersion:1,confirmedRecipientCount:1})});
+  expect(r.status).toBe(403);expect(push).not.toHaveBeenCalled();expect(d.raw.prepare("SELECT status FROM broadcasts WHERE id='limited'").get()).toEqual({status:'draft'});
+ }finally{vi.useRealTimers();}
+});
