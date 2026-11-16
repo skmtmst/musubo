@@ -20,13 +20,14 @@ it.each(ACCOUNT_STYLES)('%sも同じカードの段・数・直接リンクを�
   expect(within(list).getAllByRole('link').map(link => link.getAttribute('href'))).toEqual(summary.steps.filter(step => !step.done && step.href).map(step => step.href))
   if (style === 'restaurant') {
     expect(screen.getByText('3 / 9 済み')).toBeTruthy()
-    expect(screen.getByRole('link', { name: '営業時間を設定する（開く）' }).getAttribute('href')).toBe('/restaurant-test/google?tab=hours')
+    expect(screen.getByRole('link', { name: '営業時間を設定するをガイドで開く' }).getAttribute('href')).toBe('/restaurant-test/google?tab=hours')
     expect(stepsForStyle(stepsForStyle(base(), style, restaurant), style, restaurant)).toEqual(stepsForStyle(base(), style, restaurant))
   }
 })
 it('Googleの営業時間が設定済みでも営業時間を開ける', () => {
   const completed = { ...restaurant, steps: { ...restaurant.steps, hours: { complete: true } } }
   render(<FirstStepsCard summary={summarizeFirstSteps(base(), 'restaurant', completed)} folded={false} onToggle={() => {}} />)
+  /* 済みの段はガイドが無いので、確かめ直すための「開く」だけ残す。 */
   expect(screen.getByRole('link', { name: '営業時間を設定する（開く）' }).getAttribute('href')).toBe('/restaurant-test/google?tab=hours')
 })
 it('全て済めば同じ頭の1行だけにし、未確認の段があれば済みにしない', () => {
@@ -42,7 +43,7 @@ it('閲覧のみでも段を見せ、編集のリンクを灰色の理由付き�
   const toggle = vi.fn()
   render(<FirstStepsCard summary={summarizeFirstSteps(base(), 'restaurant', restaurant)} folded={false} onToggle={toggle} readOnly />)
   expect(screen.queryAllByRole('link')).toHaveLength(0)
-  const buttons = screen.getAllByRole('button', { name: '開く', exact: true })
+  const buttons = screen.getAllByRole('button', { name: 'ガイドで開く', exact: true })
   expect(buttons.length).toBeGreaterThan(0)
   for (const button of buttons) { expect(button.getAttribute('aria-disabled')).toBe('true'); expect(button.getAttribute('aria-describedby')).toBeTruthy(); fireEvent.click(button) }
   expect(toggle).not.toHaveBeenCalled()

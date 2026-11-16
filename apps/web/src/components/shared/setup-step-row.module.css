@@ -32,15 +32,18 @@
 .text { display: flex; flex: 1; min-width: 0; flex-direction: column; }
 .help { display: inline-flex; flex-shrink: 0; }
 .titleLine { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
+/*
+ * 題は Pen どおり全文を出す。1 行に収まる段は 1 行のまま、収まらない段（「？」が付く未確認の段や
+ * 1 列になる狭い幅）だけ折り返す。段の高さは 60px の最小値があるので見た目はほぼ変わらない。
+ * 途中で「…」に切らない（Pen の枠 08b は全文表示）。
+ */
 .title {
   min-width: 0;
-  overflow: hidden;
   color: var(--color-ink);
   font-size: var(--tpl-d23-ob-text);
   font-weight: 600;
   line-height: var(--tpl-d23-ob-text-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
 }
 .row[data-done] .title { color: var(--color-step-done-ink); font-weight: var(--font-weight-ui); }
 .note {

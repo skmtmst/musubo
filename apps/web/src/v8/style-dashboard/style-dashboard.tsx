@@ -1,7 +1,7 @@
 'use client'
 import { FirstStepsCard, FirstStepsFeedback, useFirstSteps, FirstRunDoneDialog, FirstRunPopup, useFirstRunPopup } from '@/v8/dashboard/public/first-steps/index'
 import { canManageRole } from '@/lib/staff-role'
-import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
+import { SetupWarningBands, ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
 import { useSetupWizard } from '@/v8/onboarding/public/setup-wizard/index'
 import { FriendAddLink } from '@/v8/dashboard/public/friend-add/index'
@@ -110,7 +110,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const setup = useStyleSetup(accountId || null, role)
   const setupRest = setupSummary(setup.data, !canManageRole(role))
   const wizard = useSetupWizard(accountId || null, setup.data?.state, role, setup.reload)
-  const { openStep: openSetupStep, qrRequested } = wizard
+  const { qrRequested } = wizard
   const start = useFirstSteps(accountId || null, role, { style, qrOpen: qrRequested })
   /* 初回ポップアップ（枠 02 ＝ PC / 枠 02b ＝ スマホ下部固定）と、上の帯の「開店準備 N/9」の札。 */
   const firstRunPopup = useFirstRunPopup({
@@ -253,8 +253,6 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         <ReservationFormRepairNotices notices={start.progress?.notices} role={role}/>
         {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'} guide={start.guide}
           onRecheck={start.watchExpired ? start.rewatch : undefined}
-          onConfigure={setupRest ? () => openSetupStep(setupRest.nextStep) : !canManageRole(role) ? () => openSetupStep('style') : undefined} configureAllowed={canManageRole(role)}
-          setupTasks={setupRest ? <SetupTasks heading summary={setupRest} onOpenStep={openSetupStep} configureAllowed={canManageRole(role)} role={role} /> : role !== null && !canManageRole(role) ? <SetupTasksUnavailable error={setup.error} onRetry={setup.reload} /> : undefined}
           feedback={<>{start.error ? <FirstStepsFeedback error={start.error} onRetry={start.reload} /> : null}
             {setup.error && canManageRole(role) ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : null}</>} /> : null}
         {metricSelectionFallback ? <Notice tone="info" action={<Button onClick={reloadPresentation}>表示設定を読み直す</Button>}>保存した表示設定を確認できないため、業種の初期表示にしています。</Notice> : null}

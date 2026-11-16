@@ -11,8 +11,6 @@ import { FirstStepsCard, firstStepsLegacyDismissedKey, firstStepsStorageKey, rea
 import { buildStepsFromApi } from '@/v8/settings/getting-started/steps'
 import type { StepResult } from '@/v8/settings/public/getting-started-steps/index'
 import ListState from '@/components/shared/list-state'
-import { SetupTasks } from '@/v8/onboarding/public/setup-card/index'
-import type { SetupSummary } from '@/v8/onboarding/model'
 const summary = summarizeFirstSteps(buildStepsFromApi([
   { key: 'accounts', state: 'done', href: '/accounts', reason: null },
   { key: 'featureSet', state: 'done', href: '/settings', reason: null },
@@ -97,73 +95,70 @@ describe('はじめにやることを畳む', () => {
   })
 })
 
-it('使い方の質問も同じ手順カードの操作から開き、進捗の数を増やさない', async () => {
-  const configure = vi.fn()
-  await act(async () => { render(<FirstStepsCard summary={summary} folded={false} onToggle={() => {}} onConfigure={configure} />) })
+/* 枠08b v01（利用者承認 2026-11-16）: カードは9項目と再開導線だけ。前の付属物は置かない。 */
+it('「選んだ機能の設定」ブロックと「使い方の設定を開く」はカードに出さない', async () => {
+  await act(async () => { render(<FirstStepsCard summary={summary} folded={false} onToggle={() => {}} />) })
   expect(screen.getAllByRole('progressbar')).toHaveLength(1)
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '使い方の設定を開く' })) })
-  expect(configure).toHaveBeenCalledTimes(1)
+  expect(screen.queryByRole('heading', { name: '選んだ機能の設定' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '設定を確認する' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '使い方の設定を開く' })).toBeNull()
 })
 
-const deferredSetup: SetupSummary = {
-  style: 'restaurant', done: 1, total: 3, doneNames: ['使い方'], nextStep: 1,
-  rows: [{ key: 'image', title: '見た目を決める', note: 'あとで決める設定です', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '決める', step: 'image' } }],
-}
-
-it('基本の手順が未取得でも、既知の設定の行と操作・再試行を残す', async () => {
-  const retry = vi.fn(), openStep = vi.fn(), configure = vi.fn()
-  await act(async () => { render(<FirstStepsCard summary={null} folded={false} onToggle={() => {}} onConfigure={configure}
-    setupTasks={<SetupTasks heading summary={deferredSetup} onOpenStep={openStep} />}
+it('基本の手順が未取得でも、頭の1行と再試行だけは残す', async () => {
+  const retry = vi.fn()
+  await act(async () => { render(<FirstStepsCard summary={null} folded={false} onToggle={() => {}}
     feedback={<ListState kind="error" title="はじめの設定の状態を確認できませんでした" error={new Error('unavailable')} onRetry={retry} />} />) })
   expect(screen.queryByRole('progressbar', { name: 'はじめにやることの進み' })).toBeNull()
   expect(screen.queryByRole('progressbar')).toBeNull()
-  expect(screen.getByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
+  expect(screen.queryByRole('heading', { name: '選んだ機能の設定' })).toBeNull()
   expect(screen.queryByRole('button', { name: '畳む', exact: true })).toBeNull()
-  expect(screen.getByText('見た目を決める')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: '決める', exact: true }))
-  expect(openStep).toHaveBeenCalledWith('image')
-  fireEvent.click(screen.getByRole('button', { name: '使い方の設定を開く', exact: true }))
-  expect(configure).toHaveBeenCalledTimes(1)
+  expect(screen.getByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む', exact: true }))
   expect(retry).toHaveBeenCalledTimes(1)
 })
 
-it('基本の進みだけを示し、畳んでも設定行と入口を残す', async () => {
+it('全部済んだら一覧を出さず、進みの1本だけを残す', async () => {
   const allDone = { ...summary, done: summary.total, steps: summary.steps.map(step => ({ ...step, done: true, state: 'done' as const })) }
-  function SetupHost() {
-    const [folded, setFolded] = useState(false)
-    return <FirstStepsCard summary={allDone} folded={folded} onToggle={() => setFolded(value => !value)} onConfigure={() => {}}
-      setupTasks={<SetupTasks heading summary={deferredSetup} onOpenStep={() => {}} />} />
-  }
-  await act(async () => { render(<SetupHost />) })
+  await act(async () => { render(<FirstStepsCard summary={allDone} folded={false} onToggle={() => {}} />) })
   expect(screen.getAllByRole('progressbar')).toHaveLength(1)
-  expect(screen.getByRole('button', { name: '決める', exact: true })).toBeTruthy()
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '畳む', exact: true })) })
-  expect(screen.getByRole('button', { name: '決める', exact: true })).toBeTruthy()
-  expect(screen.getByRole('button', { name: '使い方の設定を開く', exact: true })).toBeTruthy()
-  expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(true)
-  expect(screen.getAllByRole('progressbar')).toHaveLength(1)
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '開く', exact: true })) })
-  expect(screen.getByRole('button', { name: '決める', exact: true })).toBeTruthy()
+  expect(document.getElementById('first-steps-list')).toBeNull()
+  expect(screen.queryByRole('button', { name: '畳む', exact: true })).toBeNull()
 })
 
 
-it('権限のない段の入口も灰色のボタンで残す', () => {
+it('権限のない段の入口も灰色の「ガイドで開く」で残す', () => {
   const forbidden = summarizeFirstSteps(buildStepsFromApi([{ key: 'attributes', state: 'forbidden', href: null, reason: '管理者に頼んでください' }]))
   render(<FirstStepsCard summary={forbidden} folded={false} onToggle={() => {}} />)
-  const button = screen.getByRole('button', { name: '開く', exact: true })
+  const button = screen.getByRole('button', { name: 'ガイドで開く', exact: true })
   expect(button.getAttribute('aria-disabled')).toBe('true')
   expect(button.hasAttribute('disabled')).toBe(false)
   expect(button.hasAttribute('href')).toBe(false)
   fireEvent.click(button)
 })
 
-it('設定の許可が渡されても閲覧のみでは質問の入口を押せず理由を残す', () => {
-  const configure = vi.fn()
-  render(<FirstStepsCard summary={summary} folded={false} onToggle={() => {}} readOnly configureAllowed onConfigure={configure} />)
-  const button = screen.getByRole('button', { name: '使い方の設定を開く' })
+/* 枠08b v01: 未完了の行はすべて「ガイドで開く」で、押すとその段のガイドが始まり画面へ移る。 */
+it('未完了の行は「ガイドで開く」だけにし、押すとその段のガイドが始まる', () => {
+  const startAt = vi.fn()
+  render(<FirstStepsCard summary={summary} folded={false} onToggle={() => {}}
+    guide={{ phase: 'idle', stepKey: null, procedureIndex: 1, anchor: null, pausedAnchor: null, start: () => {}, resume: () => {}, pause: () => {}, reset: () => {}, advanceProcedure: () => {}, startAt }} />)
+  const todo = summary.steps.filter(step => !step.done && step.href)
+  const links = screen.getAllByRole('link')
+  expect(links).toHaveLength(todo.length)
+  for (const link of links) expect(link.textContent).toBe('ガイドで開く')
+  expect(screen.queryByRole('link', { name: /（開く）/ })).toBeNull()
+  const first = screen.getByRole('link', { name: `${todo[0].label}をガイドで開く` })
+  expect(first.getAttribute('href')).toBe(todo[0].href)
+  fireEvent.click(first)
+  expect(startAt).toHaveBeenCalledWith(todo[0].key)
+})
+
+it('閲覧のみの人は行の「ガイドで開く」を押せず理由を残す', () => {
+  const startAt = vi.fn()
+  render(<FirstStepsCard summary={summary} folded={false} onToggle={() => {}} readOnly
+    guide={{ phase: 'idle', stepKey: null, procedureIndex: 1, anchor: null, pausedAnchor: null, start: () => {}, resume: () => {}, pause: () => {}, reset: () => {}, advanceProcedure: () => {}, startAt }} />)
+  const button = screen.getAllByRole('button', { name: 'ガイドで開く' })[0]
   expect(button.getAttribute('aria-disabled')).toBe('true')
   fireEvent.click(button)
-  expect(configure).not.toHaveBeenCalled()
+  expect(startAt).not.toHaveBeenCalled()
   expect(document.getElementById(button.getAttribute('aria-describedby')!)?.textContent).toContain('管理者')
 })

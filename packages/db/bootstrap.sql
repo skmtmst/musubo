@@ -6366,13 +6366,13 @@ CREATE TABLE notifications (
 );
 
 CREATE TABLE onboarding_guide_progress (
-  staff_id        TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  staff_id TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
-  phase           TEXT NOT NULL CHECK (phase IN ('idle', 'active', 'paused', 'done')),
-  step_key        TEXT,
+  phase TEXT NOT NULL CHECK (phase IN ('idle', 'active', 'paused', 'done')),
+  step_key TEXT,
   procedure_index INTEGER NOT NULL DEFAULT 1 CHECK (procedure_index >= 1),
-  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   PRIMARY KEY (staff_id, line_account_id)
 );
 

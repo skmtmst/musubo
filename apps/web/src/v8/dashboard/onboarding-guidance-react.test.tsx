@@ -56,7 +56,16 @@ const basic = (done = false) => ok({ steps: keys.map(key => ({ key, state: done 
 const style = (deferred = true) => ok({ style: 'standard', styleSelected: true, styleMode: 'configured', version: 7, answers: deferred ? { image: { mode: 'later' } } : {} })
 const guide = () => screen.getByRole('region', { name: 'はじめにやること' })
 const retry = (title: string) => within(screen.getByText(title).closest('[data-list-state="error"]') as HTMLElement).getByRole('button', { name: 'もう一度読み込む', exact: true })
-const pendingSetup = () => screen.findByRole('button', { name: '使い方の設定を開く', exact: true })
+/*
+  前は「使い方の設定を開く」ボタンの出現で使い方GETの完了を見ていた。
+  枠08b v01（利用者承認 2026-11-16）でその入口と「選んだ機能の設定」ブロックを
+  カードから外したので、取得が終わったことは呼び出しの落ち着きで見る。
+*/
+async function pendingSetup() {
+  await waitFor(() => { expect(net.style).toHaveBeenCalled(); expect(net.warnings).toHaveBeenCalled(); expect(net.items).toHaveBeenCalled() })
+  await act(async () => { await Promise.resolve(); await Promise.resolve() })
+  return true
+}
 
 beforeAll(async () => { await import('@/v8/onboarding/wizard') })
 
@@ -98,7 +107,7 @@ it.each([
   ['lh:v8:first-steps-dismissed:A', true],
   ['lh:v8:first-steps-folded:A', false],
   ['lh:v8:first-steps-dismissed:A', false],
-] as const)('保存済みの畳む状態（%s・基本完了%s）でも残りの設定と入口を残す', async (key, complete) => {
+] as const)('保存済みの畳む状態（%s・基本完了%s）でも頭の1行と進みを残す', async (key, complete) => {
   window.localStorage.setItem(key, '1')
   net.progress.mockResolvedValue(basic(complete))
   render(<DashboardV8 />)
@@ -106,15 +115,13 @@ it.each([
   expect(basicProgress.getAttribute('aria-valuenow')).toBe(complete ? '6' : '5')
   expect(within(guide()).getByRole('button', { name: '開く', exact: true }).getAttribute('aria-expanded')).toBe('false')
   expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(true)
-  const configure = await pendingSetup()
-  expect(within(guide()).getByText('リッチメニューなどの見た目を決める').closest('[hidden]')).toBeNull()
-  expect(within(guide()).getByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
-  fireEvent.click(configure)
-  expect(await screen.findByRole('dialog', { name: '最初のリッチメニューを選ぶ' })).toBeTruthy()
+  await pendingSetup()
+  expect(within(guide()).queryByRole('heading', { name: '選んだ機能の設定' })).toBeNull()
+  expect(screen.queryByRole('dialog')).toBeNull()
   expect(net.save).not.toHaveBeenCalled(); expect(net.activate).not.toHaveBeenCalled()
 })
 
-it('カードの進みは基本6段の1つだけにし、選んだ機能の設定と操作を残す', async () => {
+it('カードの進みは基本6段の1つだけにし、選んだ機能の設定と入口は置かない', async () => {
   net.progress.mockResolvedValue(basic(true))
   render(<DashboardV8 />)
   await pendingSetup()
@@ -122,15 +129,15 @@ it('カードの進みは基本6段の1つだけにし、選んだ機能の設�
   expect(within(guide()).getAllByRole('progressbar')).toHaveLength(1)
   expect(within(guide()).queryByRole('progressbar', { name: '使い方の設定の進み' })).toBeNull()
   expect(guide().textContent).not.toMatch(/質問 \d|済み \d+件/)
-  expect(within(guide()).getByText('リッチメニューなどの見た目を決める')).toBeTruthy()
-  expect(within(guide()).getByRole('button', { name: '設定を確認する' })).toBeTruthy()
+  expect(within(guide()).queryByText('リッチメニューなどの見た目を決める')).toBeNull()
+  expect(within(guide()).queryByRole('button', { name: '設定を確認する' })).toBeNull()
+  expect(within(guide()).queryByRole('button', { name: '使い方の設定を開く' })).toBeNull()
 })
 
-it('基本GETだけ失敗しても取得済みの設定入口と独立した再試行を残す', async () => {
+it('基本GETだけ失敗しても独立した再試行を残す', async () => {
   net.progress.mockRejectedValueOnce(new Error('progress unavailable'))
   render(<DashboardV8 />)
   expect(await pendingSetup()).toBeTruthy()
-  expect(screen.getByText('リッチメニューなどの見た目を決める')).toBeTruthy()
   expect(screen.queryByRole('progressbar', { name: 'はじめにやることの進み' })).toBeNull()
   const styleReads = net.style.mock.calls.length
   fireEvent.click(retry('はじめの設定の状態を確認できませんでした'))
@@ -141,7 +148,7 @@ it('基本GETだけ失敗しても取得済みの設定入口と独立した再�
   expect(net.save).not.toHaveBeenCalled(); expect(net.activate).not.toHaveBeenCalled()
 })
 
-it('基本GETが保留でstepsが空でも、取得済みの設定を隠さず0/0を作らない', async () => {
+it('基本GETが保留でstepsが空でも、0/0を作らない', async () => {
   let resolve!: (value: unknown) => void
   net.progress.mockImplementationOnce(() => new Promise(value => { resolve = value }))
   render(<DashboardV8 />)
@@ -149,7 +156,7 @@ it('基本GETが保留でstepsが空でも、取得済みの設定を隠さず0/
   expect(document.querySelector('[data-design="TodayTasks"]')?.closest('[inert][aria-hidden="true"]')).toBeTruthy()
   expect(screen.queryByRole('progressbar', { name: 'はじめにやることの進み' })).toBeNull()
   expect(screen.queryByRole('progressbar', { name: '使い方の設定の進み' })).toBeNull()
-  expect(screen.getByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
+  expect(screen.queryByRole('heading', { name: '選んだ機能の設定' })).toBeNull()
   expect(guide().textContent).not.toContain('0 / 0')
   await act(async () => { resolve(basic()) })
   expect(await screen.findByRole('progressbar', { name: 'はじめにやることの進み' })).toBeTruthy()
@@ -166,8 +173,7 @@ it.each(['style', 'warnings', 'items'] as const)('%s GETだけ失敗しても既
   expect(screen.queryByRole('button', { name: '使い方の設定を開く', exact: true })).toBeNull()
   expect(screen.queryByRole('dialog')).toBeNull()
   fireEvent.click(retry('使い方の設定を確認できませんでした'))
-  expect(await pendingSetup()).toBeTruthy()
-  expect(net.style).toHaveBeenCalledTimes(2); expect(net.warnings).toHaveBeenCalledTimes(2); expect(net.items).toHaveBeenCalledTimes(2)
+  await waitFor(() => { expect(net.style).toHaveBeenCalledTimes(2); expect(net.warnings).toHaveBeenCalledTimes(2); expect(net.items).toHaveBeenCalledTimes(2) })
   expect(net.progress).toHaveBeenCalledTimes(1)
   expect(net.save).not.toHaveBeenCalled()
 })
@@ -183,21 +189,19 @@ it('両GETが失敗したときは各再試行が対応する取得だけをや�
   await screen.findByRole('progressbar', { name: 'はじめにやることの進み' })
   expect(net.progress).toHaveBeenCalledTimes(2); expect(net.style).toHaveBeenCalledTimes(1)
   fireEvent.click(retry('使い方の設定を確認できませんでした'))
-  expect(await pendingSetup()).toBeTruthy()
-  expect(net.progress).toHaveBeenCalledTimes(2); expect(net.style).toHaveBeenCalledTimes(2)
+  await waitFor(() => { expect(net.progress).toHaveBeenCalledTimes(2); expect(net.style).toHaveBeenCalledTimes(2) })
 })
 
-it('基本6段の進みだけを示し、畳んでも後回しの設定操作を残す', async () => {
+it('基本6段の進みだけを示し、畳む・開くで一覧だけが切り替わる', async () => {
   net.progress.mockResolvedValue(basic(true))
   render(<DashboardV8 />)
   await pendingSetup()
   expect(screen.getAllByRole('progressbar')).toHaveLength(1)
   expect(within(guide()).getByText('6 / 7 済み')).toBeTruthy()
-  expect(within(guide()).getByText('リッチメニューなどの見た目を決める')).toBeTruthy()
   fireEvent.click(within(guide()).getByRole('button', { name: '畳む', exact: true }))
-  expect(screen.getByRole('button', { name: '使い方の設定を開く', exact: true })).toBeTruthy()
+  expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(true)
   fireEvent.click(within(guide()).getByRole('button', { name: '開く', exact: true }))
-  expect(await pendingSetup()).toBeTruthy()
+  expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(false)
   expect(window.localStorage.getItem('lh:v8:first-steps-folded:A')).toBe('0')
 })
 
@@ -224,23 +228,25 @@ it.each(['viewer', 'staff', null])('役割%sは許可された状態だけ読み
     expect(await screen.findByRole('heading', { name: 'はじめにやること', exact: true })).toBeTruthy()
     expect(net.progress).toHaveBeenCalledTimes(1)
     if (role === 'viewer') expect(within(guide()).queryAllByRole('link')).toHaveLength(0)
-    const configure = screen.getByRole('button', { name: '使い方の設定を開く', exact: true })
-    expect(configure.getAttribute('aria-disabled')).toBe('true')
-    expect(document.getElementById(configure.getAttribute('aria-describedby')!)?.textContent).toContain('管理者')
-    fireEvent.click(configure)
+    /* 枠08b v01: 使い方の設定の入口はカードから外した。役割にかかわらず出ない。 */
+    expect(screen.queryByRole('button', { name: '使い方の設定を開く', exact: true })).toBeNull()
     expect(screen.queryByRole('dialog')).toBeNull()
   }
-  if (role === null) expect(screen.queryByRole('button', { name: '使い方の設定を開く', exact: true })).toBeNull()
   if (role === null) {
+    expect(screen.queryByRole('button', { name: '使い方の設定を開く', exact: true })).toBeNull()
     expect(net.style).not.toHaveBeenCalled()
     expect(net.warnings).not.toHaveBeenCalled(); expect(net.items).not.toHaveBeenCalled()
   } else {
-    expect(await screen.findByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
-    expect(net.style).toHaveBeenCalledWith('A')
+    await waitFor(() => { expect(net.style).toHaveBeenCalledWith('A') })
     expect(net.warnings).toHaveBeenCalledWith('A'); expect(net.items).toHaveBeenCalledWith('A')
-    const change = within(guide()).getByRole('button', { name: '決める' })
-    expect(change.getAttribute('aria-disabled')).toBe('true')
-    fireEvent.click(change)
+    expect(screen.queryByRole('heading', { name: '選んだ機能の設定' })).toBeNull()
+    if (role === 'viewer') {
+      /* 閲覧のみは行の入口も灰色の「ガイドで開く」になる。 */
+      const locked = within(guide()).getAllByRole('button', { name: 'ガイドで開く' })
+      expect(locked.length).toBeGreaterThan(0)
+      for (const button of locked) expect(button.getAttribute('aria-disabled')).toBe('true')
+      fireEvent.click(locked[0])
+    }
     expect(screen.queryByRole('dialog')).toBeNull()
   }
   expect(net.save).not.toHaveBeenCalled()
@@ -256,15 +262,11 @@ it('APIの空stepsは正規化された未確認を表示し、全完了や0/0�
   expect(net.features).toHaveBeenCalledWith('A')
 })
 
-it('既知の質問入口から実wizardを開き、戻ると閉じるで保存を始めない', async () => {
+/* 枠08b v01: 使い方の設定の入口を外したので、カードから勝手に質問が開かず保存も始めない。 */
+it('カードからは質問が開かず、保存も始めない', async () => {
   render(<DashboardV8 />)
-  fireEvent.click(await pendingSetup())
-  const dialog = await screen.findByRole('dialog', { name: '最初のリッチメニューを選ぶ' })
-  fireEvent.click(within(dialog).getByRole('button', { name: 'スタイルを選び直す', exact: true }))
-  const first = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
-  fireEvent.click(within(first).getByRole('button', { name: '閉じる', exact: true }))
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(await pendingSetup()).toBeTruthy()
+  expect(screen.queryByRole('dialog')).toBeNull()
   expect(net.save).not.toHaveBeenCalled(); expect(net.activate).not.toHaveBeenCalled()
 })
 

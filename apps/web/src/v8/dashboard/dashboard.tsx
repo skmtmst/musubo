@@ -19,7 +19,7 @@ import { useAccount } from '@/contexts/account-context'
 import { formatNumber,formatTime } from '@/lib/format'
 import { formatWaitRough } from '@/lib/format-duration'
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
-import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
+import { SetupWarningBands, ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import ListState from '@/components/shared/list-state'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
 import { useSetupWizard } from '@/v8/onboarding/public/setup-wizard/index'
@@ -83,7 +83,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
   /* 〜：はじめの質問の答え・警告の帯・はじめにやること（スタイルの口が読めたときだけ）。 */
   const setup = useStyleSetup(d.selectedAccountId, role)
   const wizard = useSetupWizard(d.selectedAccountId, setup.data?.state, role, setup.reload)
-  const { openStep: openSetupStep, qrRequested } = wizard
+  const { qrRequested } = wizard
   const start = useFirstSteps(d.selectedAccountId, role, { qrOpen: qrRequested, style: setup.data?.state.style ?? accountStyle })
   const starterResult = useStarterRetryResult(d.selectedAccountId)
   const setupRest = setupSummary(setup.data, !canManage)
@@ -373,8 +373,6 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       {showOnboarding ? <FirstStepsCard
         onRetry={start.reload} summary={onboardingSummary} readOnly={role === 'viewer'} folded={start.folded} onToggle={start.toggle}
         onRecheck={start.watchExpired ? start.rewatch : undefined}
-        onConfigure={setupRest ? () => openSetupStep(setupRest.nextStep) : role !== null && !canManage ? () => openSetupStep('style') : undefined} configureAllowed={canManage}
-        setupTasks={setupRest ? <SetupTasks heading summary={setupRest} onOpenStep={openSetupStep} configureAllowed={canManage} role={role} /> : role !== null && !canManage ? <SetupTasksUnavailable error={setup.error} onRetry={setup.reload} /> : undefined}
         feedback={<>
           {start.error ? <FirstStepsFeedback error={start.error} onRetry={start.reload} /> : null}
           {setup.error && canManage ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : null}
