@@ -469,6 +469,9 @@
 
 - [自動確認を画面の操作と予定の計算で確認](release-log/unreleased/96-kenta-q02b-b2.md) — 反映履歴、確認 2026-11-16。
 
+- [自動確認を実際の動きで確認](release-log/unreleased/94-kenta-q02b.md) — 反映履歴、確認 2026-11-16。
+
+- [通知の試験を時間帯に左右されないよう修正](release-log/unreleased/97-kenta-worker-fix.md) — 反映履歴、確認 2026-11-16。
 - [初期設定・比較の確認を追加](release-log/unreleased/91-kenta-backend-small.md) — 反映履歴、確認 2026-11-16。
 - [通知端末の扱いを確認](release-log/unreleased/92-kenta-gap-msg.md) — 反映履歴、確認 2026-11-16。
 
