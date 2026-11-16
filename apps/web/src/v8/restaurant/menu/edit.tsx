@@ -45,11 +45,11 @@ import styles from './edit.module.css'
  * 前の「追加・変更の窓」は消し、一覧の［変更］［メニューを追加する］はここへ来る。
  * 受け付ける指定：?id=<品目>（変更）・?store=<店舗>（追加）。
  * 送る形は前の窓と同じ（createMenu／updateMenu。価格変更は確認後に確定）。お支払いはコースだけ。
- * 「受ける人数」は今のデータに無いので置かない（口待ち）。所要時間は読むだけ。
+ * 「受ける人数」は今のデータに無いので置かない（口待ち）。所要時間を保存する。
  */
 
 type Period = 'lunch' | 'dinner' | 'both'
-type Draft = { kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string; description: string; imageMediaId: string | null; status: 'draft' | 'active' }
+type Draft = { duration: string; kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string; description: string; imageMediaId: string | null; status: 'draft' | 'active' }
 const LIST_HREF = '/restaurant-test/menu'
 
 
@@ -57,10 +57,10 @@ function periodLabel(periods: string[]): string {
   return periods.map((period) => (period === 'lunch' ? 'ランチ' : 'ディナー')).join('・') || emptyValue('unknown')
 }
 function draftOf(item: RestaurantMenuItem | null): Draft {
-  if (!item) return { kind: 'course', name: '', price: '', period: 'dinner', effectiveAt: '', allergens: '', description: '', imageMediaId: null, status: 'draft' }
+  if (!item) return { duration: '120', kind: 'course', name: '', price: '', period: 'dinner', effectiveAt: '', allergens: '', description: '', imageMediaId: null, status: 'draft' }
   const periods = storedStringList(item.service_periods_json)
   return {
-    kind: item.kind, name: item.name, price: String(item.price),
+    duration: item.duration_minutes == null ? '' : String(item.duration_minutes), kind: item.kind, name: item.name, price: String(item.price),
     period: periods.length > 1 ? 'both' : periods[0] === 'lunch' ? 'lunch' : 'dinner',
     effectiveAt: '', allergens: storedStringList(item.allergens_json).join(', '), description: item.description ?? '', imageMediaId: item.image_media_id ?? null, status: item.status === 'draft' ? 'draft' : 'active',
   }
@@ -88,6 +88,7 @@ function MenuEditBody() {
   const [imageError, setImageError] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft>(draftOf(null))
   const [saved, setSaved] = useState<Draft>(draftOf(null))
+  const [durationAttempted, setDurationAttempted] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [menuConflict, setMenuConflict] = useState(false)
@@ -139,6 +140,7 @@ function MenuEditBody() {
   usePageCrumbs([{ label: 'メニュー管理', href: LIST_HREF }])
   const exceedsPriceLimit = (!editing || priceChanged) && Number(draft.price) > 1_000_000
   const valid = draft.name.trim() !== '' && draft.price !== '' && Number.isInteger(Number(draft.price)) && Number(draft.price) >= 0 && !exceedsPriceLimit
+  const durationError = !course ? undefined : draft.duration === '' ? '所要時間を入力してください。' : !Number.isInteger(Number(draft.duration)) || Number(draft.duration) < 15 || Number(draft.duration) > 600 ? '所要時間は15〜600分の整数で入力してください。' : undefined
   const priceError = draft.price === '' ? undefined : Number(draft.price) < 0 ? '値段は0円以上で入れてください。' : exceedsPriceLimit ? '値段は1,000,000円以下で入れてください。' : !Number.isInteger(Number(draft.price)) ? '値段は整数で入れてください。' : undefined
 
   const [confirmationScope, setConfirmationScope] = useState('')
@@ -151,6 +153,7 @@ function MenuEditBody() {
   useEffect(() => { setBusy(false); setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setMenuConflict(false); setError(null) }, [contextKey])
 
   async function save(version = confirmedRevision) {
+    if (durationError) { setDurationAttempted(true); return }
     if (!canEdit || !selectedAccountId || !valid || menuConflict) return
     if (editing && (!dirty || !Number.isSafeInteger(version) || !version)) return
     const isCurrent = captureResource()
@@ -159,7 +162,7 @@ function MenuEditBody() {
     const stillHere = () => isCurrent() && mutationContext.current === attempt
     setBusy(true); setError(null); setImageError(null)
     const body = {
-      kind: draft.kind, name: draft.name, price: Number(draft.price),
+      kind: draft.kind, name: draft.name, price: Number(draft.price), durationMinutes: course ? Number(draft.duration) : null,
       description: draft.description.trim() || null, ...(editing && draft.imageMediaId === (editing.image_media_id ?? null) ? {} : { imageMediaId: draft.imageMediaId }),
       effectiveAt: draft.effectiveAt ? datetimeLocalJstToUtcIso(draft.effectiveAt) : null,
       allergens: draft.allergens.split(',').map((part) => part.trim()).filter(Boolean),
@@ -261,7 +264,7 @@ function MenuEditBody() {
         destructive={canEdit && editing ? <Button variant="text" textTone="danger" onClick={() => { setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing.confirmation_revision); setError(null); setDeleting(true) }} disabled={busy || menuConflict}>削除する</Button> : undefined}
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
-          {canEdit ? <Button variant="primary" busy={busy} disabled={menuConflict || !valid || (Boolean(editing) && !dirty)} disabledReason={!valid ? priceError ? '値段を確認してください。' : '名前と値段を入力してください。' : editing && !dirty ? '変更していません' : undefined} onClick={() => { setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing?.confirmation_revision ?? null); setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save(editing?.confirmation_revision ?? null) }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
+          {canEdit ? <Button variant="primary" busy={busy} disabled={menuConflict || !valid || (Boolean(editing) && !dirty)} disabledReason={!valid ? priceError ? '値段を確認してください。' : '名前と値段を入力してください。' : editing && !dirty ? '変更していません' : undefined} onClick={() => { if (durationError) { setDurationAttempted(true); return }; setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing?.confirmation_revision ?? null); setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save(editing?.confirmation_revision ?? null) }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
         </>}
       >
         {error ? <Notice tone="danger" role="alert">{error}{menuConflict ? <Button onClick={() => { void load() }}>最新を読み込む</Button> : null}</Notice> : null}
@@ -278,9 +281,9 @@ function MenuEditBody() {
               <Field label={course ? '1名の値段' : '値段'} htmlFor="rs-menu-price" required error={priceError}>
                 <SaveErrorField names={['price', 'draft.price']}><NumberInput id="rs-menu-price" aria-label="価格（税込）" unit="円" type="number" min={0} required value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} /></SaveErrorField>
               </Field>
-              <Field label="所要時間（変更不可）" htmlFor="rs-menu-duration" optional={false}>
-                <TextField id="rs-menu-duration" aria-label="時間" disabled value={editing?.duration_minutes ? `${editing.duration_minutes} 分` : emptyValue('unknown')} />
-              </Field>
+              {course ? <Field label="所要時間" htmlFor="rs-menu-duration" required error={durationAttempted ? durationError : undefined}>
+                <NumberInput id="rs-menu-duration" aria-label="所要時間" unit="分" min={15} max={600} required value={draft.duration} onChange={(event) => setDraft({ ...draft, duration: event.target.value })} />
+              </Field> : null}
             </SettingsFormRow>
             <SettingsFormRow layout="columns" columns={3}>
               <Field label="種類">

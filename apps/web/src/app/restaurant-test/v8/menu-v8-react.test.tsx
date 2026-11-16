@@ -83,6 +83,34 @@ describe('MJoJR メニュー管理のV8', () => {
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ name: '冬の鹿肉コース', expectedVersion: 1 })))
   })
 
+  it('コースの所要時間を編集して保存する', async () => {
+    render(<MenuEditV8 />)
+    const duration = await screen.findByLabelText('所要時間')
+    expect((duration as HTMLInputElement).value).toBe('120')
+    fireEvent.change(duration, { target: { value: '90' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ durationMinutes: 90 })))
+  })
+
+  it('追加は120分から始まり、空欄を示し、変更した値を送る', async () => {
+    nav.params = new URLSearchParams('store=store-1')
+    try {
+      render(<MenuEditV8 />)
+      const duration = await screen.findByLabelText('所要時間')
+      expect((duration as HTMLInputElement).value).toBe('120')
+      fireEvent.change(screen.getByLabelText('メニュー名'), { target: { value: '新コース' } })
+      fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '5000' } })
+      fireEvent.change(duration, { target: { value: '' } })
+      fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
+      expect(screen.getByText('所要時間を入力してください。')).toBeTruthy()
+      expect(fixture.createMenu).not.toHaveBeenCalled()
+      expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('新コース')
+      fireEvent.change(duration, { target: { value: '150' } })
+      fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
+      await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({ durationMinutes: 150 })))
+    } finally { nav.params = new URLSearchParams('id=m1') }
+  })
+
   it('説明と店舗の登録画像を選び、保存時に送る', async () => {
     vi.spyOn(api.media, 'list').mockResolvedValue({ success:true, data:{ items:[{id:'media-test',filename:'架空.png',lineAccountId:'account-1',kind:'image'}], total:1, limit:20, offset:0 } } as never)
     render(<MenuEditV8 />)
