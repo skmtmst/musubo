@@ -467,6 +467,8 @@
 
 ## 反映履歴
 
+- [欠席と振替の動きを確認](release-log/unreleased/101-kenta-gaptest-b1.md) — 反映履歴、確認 2026-11-16。
+
 - [絞り込みや分析の自動確認を改善](release-log/unreleased/100-kenta-q02b-b4.md) — 反映履歴、確認 2026-11-17。
 
 - [一覧や返信の自動確認を改善](release-log/unreleased/99-kenta-q02b-b3.md) — 反映履歴、確認 2026-11-17。
