@@ -169,7 +169,8 @@ export function FirstRunPopup({ summary, onStartGuide, onClose }: FirstRunPopupP
           </div>
         </div>
 
-        <div className={styles.rows}>
+        {/* 枠 02b の「最終行の直下に『あとで』」を実測で見張るための目印（差し戻し R3）。 */}
+        <div className={styles.rows} data-first-run-rows={summary.steps.length}>
           {summary.steps.map((step, index) => {
             const current = !step.done && step.key === currentKey
             const mark = step.done

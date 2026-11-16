@@ -55,10 +55,11 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
   /*
     開店準備ガイド⑤時間の手順1/2（枠14 Nm43L）は、押した時ではなく
     Googleとつながった時に2/2へ進める（差し戻し R4）。
-    認可画面から戻って状態が「未接続」でなくなった＝つながった、が成功の合図。
-    失敗・中断で戻った時は「未接続」のままなので合図を出さず、1/2に留まる。
+    認可画面から戻って「接続済み」になり、取り込む対象の店舗が決まった時だけが成功の合図。
+    店舗の選択待ち・期限切れ・権限なしは営業時間を取り込めないので合図を出さず、1/2に留まる
+    （Worker の requireConnectedStore も同じ条件で断る: 差し戻し R4 の再修正）。
   */
-  const googleLinked = connection.status !== 'disconnected'
+  const googleLinked = connection.status === 'connected' && Boolean(connection.locationName)
   useEffect(() => {
     if (googleLinked) emitGuideSignal('hours.googleConnect')
   }, [googleLinked])

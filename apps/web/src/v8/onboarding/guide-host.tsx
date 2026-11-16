@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useOptionalAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
 import { useStaffRole } from '@/lib/staff-role'
@@ -66,6 +67,25 @@ function GuideHostActive({ accountId, children }: { accountId: string; children:
   const procedure = guideProcedure(guide.stepKey, guide.procedureIndex)
   const advance = useCallback(() => { guide.advanceProcedure() }, [guide])
   const pause = useCallback(() => { guide.pause() }, [guide])
+
+  /*
+    段が変わったら、その段の画面へ実際に移る（差し戻し R1）。
+    移らないと重ね表示の対象がその画面に無く、案内が消えて先へ進めない。
+    最初の段（前が無い状態）では移らない。枠02/02b のとおり行の「ガイドで開く」で入る。
+  */
+  const router = useRouter()
+  const pathname = usePathname()
+  const previousStepKey = useRef<string | null>(null)
+  const stepHref = step?.href ?? null
+  useEffect(() => {
+    /* 行き先がまだ分からない間（実測の読み込み中）は前の段を覚えたままにして、判定を先送りする。 */
+    if (guide.phase !== 'active' || !guide.stepKey || !stepHref) return
+    const previous = previousStepKey.current
+    previousStepKey.current = guide.stepKey
+    if (!previous || previous === guide.stepKey) return
+    if (pathname === stepHref.split('?')[0]) return
+    router.push(stepHref)
+  }, [guide.phase, guide.stepKey, stepHref, pathname, router])
 
   /* 保存できた時・入力がそろった時に進む手順は、画面側の合図で進める。 */
   useGuideSignal(

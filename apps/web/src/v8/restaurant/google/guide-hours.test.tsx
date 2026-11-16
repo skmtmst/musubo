@@ -21,12 +21,12 @@ vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail
 vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'a', name: '対象LINE' }] })) }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
-function data(status: string): GoogleConnectionData {
+function data(status: string, withLocation = status !== 'disconnected' && status !== 'pending_location'): GoogleConnectionData {
   return {
     store: { id: 's', name: '合成店', lineAccountId: 'a' },
-    connection: status === 'disconnected'
-      ? { id: null, confirmationRevision: 0, status, locationName: null, locationTitle: null }
-      : { id: 'conn', confirmationRevision: 4, status, locationName: 'locations/a', locationTitle: '合成店' },
+    connection: withLocation
+      ? { id: 'conn', confirmationRevision: 4, status, locationName: 'locations/a', locationTitle: '合成店' }
+      : { id: status === 'disconnected' ? null : 'conn', confirmationRevision: status === 'disconnected' ? 0 : 4, status, locationName: null, locationTitle: null },
     candidates: [{ locationName: 'locations/a', locationTitle: '合成店' }],
     summary: { storedCount: 0, unrepliedCount: 0, attentionCount: 0, syncStale: false },
     permissions: { canManageConnection: true, canPublishReply: true }, oauthConfigured: true, writeEnabled: true,
@@ -66,12 +66,31 @@ describe('⑤営業時間 手順1/2 の進み方（R4）', () => {
     expect(signals).not.toContain('hours.googleConnect')
   })
 
-  it('つながって戻ってきた時に1度だけ進む合図を出す', () => {
+  /*
+    取り込む対象の店舗が決まっていない・期限切れ・権限なしは営業時間を取り込めないので
+    進む合図を出さない（Worker の requireConnectedStore も同じ条件で断る: 差し戻し R4）。
+  */
+  it('店舗の選択待ちでは進む合図を出さない', () => {
     render(<SettingsBoard accountId="acc" data={data('pending_location')} onChanged={vi.fn()} />)
-    expect(signals.filter(anchor => anchor === 'hours.googleConnect').length).toBe(1)
+    expect(signals).not.toContain('hours.googleConnect')
   })
 
-  it('接続済みで開き直した時も進む合図を出す', () => {
+  it('期限切れでは進む合図を出さない', () => {
+    render(<SettingsBoard accountId="acc" data={data('expired')} onChanged={vi.fn()} />)
+    expect(signals).not.toContain('hours.googleConnect')
+  })
+
+  it('権限なしでは進む合図を出さない', () => {
+    render(<SettingsBoard accountId="acc" data={data('no_permission')} onChanged={vi.fn()} />)
+    expect(signals).not.toContain('hours.googleConnect')
+  })
+
+  it('接続済みでも対象店舗が決まっていなければ進む合図を出さない', () => {
+    render(<SettingsBoard accountId="acc" data={data('connected', false)} onChanged={vi.fn()} />)
+    expect(signals).not.toContain('hours.googleConnect')
+  })
+
+  it('つながって対象店舗が決まった時に1度だけ進む合図を出す', () => {
     render(<SettingsBoard accountId="acc" data={data('connected')} onChanged={vi.fn()} />)
     expect(signals.filter(anchor => anchor === 'hours.googleConnect').length).toBe(1)
   })

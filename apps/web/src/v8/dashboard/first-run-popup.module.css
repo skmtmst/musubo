@@ -290,7 +290,12 @@
   /* nU2Eh: 縦 gap2 / vMdb9 17/700 / gEPIi 12/500 行の高さ1.5 */
   .headerText { gap: var(--tpl-fr02-gap-2); }
 
-  .title { font-size: var(--tpl-fr02-title-sp); font-weight: 700; }
+  /* vMdb9: 17px の1行で高さ21。見出しの塊を41に収めて isJJM の44（輪 K4fHC）に合わせる。 */
+  .title {
+    font-size: var(--tpl-fr02-title-sp);
+    font-weight: 700;
+    line-height: var(--tpl-fr02-tight);
+  }
 
   .lead { font-size: var(--tpl-fr02-text-12); line-height: 1.5; }
 
@@ -302,13 +307,42 @@
   /* SYPr1: 縦 gap3 / 行 padding 10 12 */
   .rows {
     gap: var(--tpl-fr02-gap-3);
-    /* 見出しと足は動かさず、9項目だけシートの中で動かす。 */
-    flex: 1;
+    /*
+      見出しと足は動かさず、9項目だけシートの中で動かす。
+      ただし余白を吸って伸ばさない（伸ばすと足が画面下端へ押し下がり、
+      枠 02b の「最終行の直下に『あとで』」と合わない: 差し戻し R3）。
+      入り切らない時だけ縮んで、9項目の側が動く。
+    */
+    flex: 0 1 auto;
     min-height: 0;
     overflow-y: auto;
   }
 
-  .row { padding: var(--tpl-fr02-row-pad-sp); }
+  /*
+    hurXo: 行 h46（上下 padding10 ＋ 印 IHxIG 26）。現在の行 FsFGi は h54。
+    枠では線を枠の内側に描くので、線で高さを増やさない（増やすと9項目が46+2ずつ伸び、
+    足が下へずれて「あとで」が枠 02b の位置に来ない: 差し戻し R3）。
+  */
+  .row {
+    padding: var(--tpl-fr02-row-pad-sp);
+    border-width: 0;
+  }
+
+  .rowCurrent { box-shadow: inset 0 0 0 1px var(--tpl-fr02-brand-line); }
+
+  /* WjTss: 13px 1行（h16）。bf6E7: h21。どちらも印26を超えない。 */
+  .label {
+    font-size: var(--polish-text-body);
+    line-height: var(--tpl-fr02-tight);
+  }
+
+  .badge { line-height: var(--tpl-fr02-tight); }
+
+  /* ZcmBy: padding 9 16 ＋ 文字 JDSIg h16 → h34。現在の行を54に収める。 */
+  .rowAction {
+    padding: var(--tpl-fr02-rowaction-pad-sp);
+    line-height: var(--tpl-fr02-tight);
+  }
 
   .rowActionPc { display: none; }
 
@@ -324,11 +358,13 @@
 
   .note { display: none; }
 
-  /* VJR0w: #6b7682 相当の弱い色 12/600 */
+  /* VJR0w: #6b7682 相当の弱い色 12/600。1行（h15）で足 UanUf を19に収める。 */
   .later {
     color: var(--tpl-fr02-ink-muted);
     font-size: var(--tpl-fr02-text-12);
     font-weight: 600;
+    line-height: var(--tpl-fr02-tight);
+    min-height: 0;
   }
 
   .laterPc { display: none; }

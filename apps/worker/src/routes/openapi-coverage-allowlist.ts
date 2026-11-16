@@ -879,12 +879,9 @@ export const ALLOWLIST = new Set<string>([
   // public：回答前に表示する公開フォーム（OpenAPI未記載・順次記載）（1件）
   'GET /api/forms/{id}',
 
-  // core：初期設定（OpenAPI未記載・順次記載）（4件）
+  // core：初期設定（OpenAPI未記載・順次記載）（2件）
   'GET /api/getting-started',
   'POST /api/getting-started/dismiss',
-  // 開店準備ガイドの進み具合（利用者×店で持つ控え）。既存の初期設定と同じ扱い。
-  'GET /api/getting-started/guide',
-  'PUT /api/getting-started/guide',
 
   // core：失敗文面の対応表（OpenAPI未記載・順次記載）（1件）
   'GET /api/error-messages',
