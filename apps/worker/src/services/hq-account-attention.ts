@@ -1,4 +1,5 @@
 import type { HqAttentionCounts, HqAttentionKind } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
 import { inboxSlaSettings, refreshInboxSla } from './inbox-sla.js';
 
 /** 呼び出し元で、このアカウントが現在の可視範囲に属することを検証する。 */
@@ -75,6 +76,7 @@ export async function readAccountAttention(
       else targets.overdueChats = rows.results as Array<{ href: string; count: number }>;
     }
   } catch {
+    logger.warn('hq_attention.overdue_unavailable');
     // null は取得失敗であり、0件ではない。
     if (includeDetails) details.overdueChats = [];
   }
