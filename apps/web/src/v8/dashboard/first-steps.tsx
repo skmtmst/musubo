@@ -175,7 +175,7 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
   const nextKey = summary ? nextFirstStepKey(summary) : null
   const guideVisible = Boolean(guide && summary && !complete && !readOnly)
   return (
-    <Card as="section" className={styles.card} layout="vertical" contentPadding="var(--space-16) var(--space-20)" gap="var(--tpl-d23-ob-gap)" aria-labelledby="first-steps-title" data-design-node="r3X34">
+    <Card as="section" className={styles.card} layout="vertical" contentPadding="var(--step-card-pad)" gap="var(--step-card-gap)" aria-labelledby="first-steps-title" data-design-node="r3X34">
       <div className={styles.head}>
         <h2 id="first-steps-title" className={styles.title}>はじめにやること</h2>
         {summary ? <>

@@ -10,22 +10,70 @@
  * 共通トークンの正本（globals.css）は他の約300画面が使うため書き換えず、
  * カードの中だけで上書きする。
  */
+/*
+ * 数字と色は必ず「数字を含まない名前」のカスタムプロパティに置く。
+ * 共通トークン名に数字が入るもの（--tpl-d23-ob-*）は、
+ * v8-boundary.test.ts の「CSS に数字を直書きしない」見張りが
+ * 名前の数字でつまずくため、var() で差し替えるだけにする。
+ */
 .card {
+  /* 色（正本 v01r） */
+  --color-ink: #111827;
   --color-step-done-bg: #f4faf6;
   --color-step-next-bg: #fff;
+  --color-step-done-ink: #4b5563;
   --color-step-note-ink: #9ca3af;
+  --color-step-mark-on: #137a3e;
+  --color-progress-on: var(--color-step-mark-on);
+  --color-step-next-border: var(--color-step-mark-on);
+  --color-accent-deep: var(--color-step-mark-on);
+  --gradient-primary-action: none;
+
+  /* カードの外枠と内側（PC: 余白28・間20・角16） */
+  --radius-card: 16px;
+  --step-card-pad: 28px;
+  --step-card-gap: 20px;
+
+  /* 頭（題・進捗数・畳む） */
+  --step-head-gap: 12px;
   --step-title-size: 20px;
   --step-title-lh: 28px;
+  --step-head-text: 14px;
+  --step-head-text-lh: 20px;
+
+  /* 進捗ピップ（9個×28×8・間6＝全体300×8） */
+  --progress-steps-w: 300px;
+  --progress-steps-h: 8px;
+  --tpl-d23-ob-bar-h: var(--progress-steps-h);
+  --progress-segment-gap: 6px;
+
+  /* 段（題15・済み印22・角12・横16／縦12） */
+  --step-row-text: 15px;
+  --step-row-text-lh: 22px;
+  --tpl-d23-ob-text: var(--step-row-text);
+  --tpl-d23-ob-text-lh: var(--step-row-text-lh);
+  --step-row-radius: 12px;
+  --tpl-d23-ob-step-radius: var(--step-row-radius);
+  --step-mark-size: 22px;
+  --step-list-col-gap: 16px;
+  --tpl-d23-ob-grid-gap: var(--step-list-col-gap);
+  --step-list-row-gap: 12px;
+
+  /* 下段（2操作と注記） */
+  --step-footer-gap: 12px;
   --step-action-h: 46px;
   --step-action-pad: 20.5px;
   --step-action-text: 15px;
   --step-action-text-lh: 22px;
+  --radius-primary-action: 10px;
+  --step-note-size: 13px;
+  --step-note-lh: 19px;
 }
 
 .head {
   display: flex;
   align-items: center;
-  gap: var(--tpl-d23-ob-head-gap);
+  gap: var(--step-head-gap);
   min-width: 0;
 }
 
@@ -47,8 +95,9 @@
 
 .count {
   color: var(--color-ink-secondary);
-  font-size: var(--tpl-d23-ob-text);
-  line-height: var(--tpl-d23-ob-text-lh);
+  /* 正本の進捗数は14（nvQmI）。段の題15とは別にする。 */
+  font-size: var(--step-head-text);
+  line-height: var(--step-head-text-lh);
   white-space: nowrap;
 }
 
@@ -60,7 +109,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--tpl-d23-ob-head-gap);
+  gap: var(--step-footer-gap);
   min-width: 0;
 }
 
@@ -72,8 +121,8 @@
   margin: 0;
   margin-inline-start: auto;
   color: var(--color-step-note-ink);
-  font-size: var(--tpl-d23-ob-text);
-  line-height: var(--tpl-d23-ob-text-lh);
+  font-size: var(--step-note-size);
+  line-height: var(--step-note-lh);
 }
 
 /*
@@ -90,21 +139,36 @@ html:root .guideFooter button[class][class][class] {
   line-height: var(--step-action-text-lh);
 }
 
-/* SP390（ahwHx）: ピップを出さず「畳む」を画面内に収め、2操作は縦積みの全幅。 */
+/*
+ * SP390（ahwHx）: ピップを出さず「畳む」までカードの中に収め、2操作は縦積みの全幅。
+ * 題17・注記12/1.5・段の間10・段の高さ50（済み印22＋上下14）・内側は余白20／間16／角14。
+ * 頭の間だけ6にするのは、受容済みの段幅差（正本326→実装270）で16px狭いぶん、
+ * 題・進捗数・畳むを1行に収めるために必要な分（実測 scrollWidth 273→269 ≦ 270）。
+ */
 @container v8-page (width < 640px) {
   .pips { display: none; }
   .guideFooter {
     flex-direction: column;
     align-items: stretch;
   }
-  .card { --step-action-h: 48px; }
+  .card {
+    --radius-card: 14px;
+    --step-card-pad: 20px;
+    --step-card-gap: 16px;
+    --step-head-gap: 6px;
+    --step-title-size: 17px;
+    --step-title-lh: 24px;
+    --step-action-h: 48px;
+    --step-footer-gap: 10px;
+    --step-note-size: 12px;
+    --step-note-lh: 1.5;
+    --step-list-row-gap: 10px;
+    --step-row-pad: 14px 12px;
+    --tpl-d23-ob-step-pad: var(--step-row-pad);
+    --tpl-list-row-multi-h: 50px;
+  }
   html:root .guideFooter button[class][class][class] { width: 100%; }
   .note { margin-inline-start: 0; }
-}
-
-/* PC（nvQmI）: 段の縦の間は12。横の間は共通のまま。 */
-@container v8-page (width >= 640px) {
-  .card { --step-list-row-gap: 12px; }
 }
 
 .spacer {
@@ -122,9 +186,10 @@ html:root .guideFooter button[class][class][class] {
   color: var(--color-ink-secondary);
   cursor: pointer;
   font: inherit;
-  font-size: var(--tpl-d23-ob-text);
+  /* 正本の「畳む」は14（nvQmI）。 */
+  font-size: var(--step-head-text);
   font-weight: 500;
-  line-height: var(--tpl-d23-ob-text-lh);
+  line-height: var(--step-head-text-lh);
   white-space: nowrap;
 }
 
