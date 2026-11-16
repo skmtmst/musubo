@@ -330,9 +330,10 @@ it('DM返信を模擬送信し、同じキーを再送しても一度だけ送�
   const send = vi.fn(async () => Response.json({ message_id: 'sent-1' }));
   vi.stubGlobal('fetch', send);
   const options = { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': '123e4567-e89b-12d3-a456-426614174000' }, body: JSON.stringify({ text: '返信' }) };
-  const first = await app().request('/api/instagram/messages/m1/reply?lineAccountId=a1', options);
+  const staging = app(admin, true, { DEPLOY_ENV: 'staging', INSTAGRAM_STAGING_SEND_ENABLED: 'true' });
+  const first = await staging.request('/api/instagram/messages/m1/reply?lineAccountId=a1', options);
   expect(first.status).toBe(200);
-  const second = await app().request('/api/instagram/messages/m1/reply?lineAccountId=a1', options);
+  const second = await staging.request('/api/instagram/messages/m1/reply?lineAccountId=a1', options);
   expect(second.status).toBe(200);
   expect(send).toHaveBeenCalledTimes(1);
   expect(db.raw.prepare("SELECT status,staff_id FROM instagram_outbound_messages").get()).toEqual({ status: 'sent', staff_id: 'staff' });
@@ -367,6 +368,10 @@ it('検証環境で送信を有効にしていなければ外部へ送らない'
     method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': '123e4567-e89b-12d3-a456-426614174000' }, body: JSON.stringify({ text: '返信' }),
   });
   expect(response.status).toBe(403);
+  const qa = await app(admin, true, { DEPLOY_ENV: 'staging', INSTAGRAM_STAGING_SEND_ENABLED: 'true', STAGING_QA_ENABLED: 'true' }).request('/api/instagram/messages/m1/reply?lineAccountId=a1', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': '123e4567-e89b-12d3-a456-426614174000' }, body: JSON.stringify({ text: '返信' }),
+  });
+  expect(qa.status).toBe(403);
   expect(send).not.toHaveBeenCalled();
 });
 /** 折り返しを1回通し、画面へ戻すURLを読む。 */

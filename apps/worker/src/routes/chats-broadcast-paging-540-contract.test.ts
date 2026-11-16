@@ -129,6 +129,8 @@ describe('#540 機能2: 受信箱一覧の上限とページ送り', () => {
     const only = await chatsApp(testDb.db).request('/api/chats?channel=instagram');
     const onlyBody = await only.json() as { data: Array<{ channel: string }> };
     expect(onlyBody.data.map((row) => row.channel)).toEqual(['instagram']);
+    const lineOnly = await chatsApp(testDb.db).request('/api/chats?channel=line');
+    expect(((await lineOnly.json()) as { data: Array<{ channel: string }> }).data.map(row => row.channel)).toEqual(['line', 'line', 'line']);
     testDb.raw.prepare(`INSERT INTO instagram_inbox_reads(staff_id,line_account_id,sender_id,last_read_at)
       VALUES('owner-1','account-1','customer','2026-09-02T12:00:00.000Z')`).run();
     const unread = await chatsApp(testDb.db).request('/api/chats?channel=instagram&unreadOnly=1');
