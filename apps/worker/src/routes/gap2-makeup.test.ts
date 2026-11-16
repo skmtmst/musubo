@@ -1,6 +1,7 @@
 import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import {bookingMakeup} from './booking-makeup.js';
+import events from './events.js';
 import {absence,makeupOptions,useMakeup,expireMakeup} from '../features/booking/booking-makeup.js';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
@@ -95,10 +96,13 @@ test('B3-13: 期限切れの券は履歴に残り選択や使用はできない'
  await expect(makeupOptions(d.db,'a','f',credit.id)).rejects.toThrow('credit_unavailable');
 });
 
-test.each(['admin','system'] as const)('B3-16: 店側の取消（%s）で使用済み振替を元の期限で戻す',async cancelledBy=>{
+test.each(['admin','system'] as const)('振替先の個別取消（%s）で使用済み券を元の期限で戻す',async cancelledBy=>{
  const credit=(await absence(d.db,'a','f','eb','customer')).makeupCredit as any;
  const used=await useMakeup(d.db,'a','f',credit.id,'dst',`cancel-${cancelledBy}`);
  vi.setSystemTime(new Date('2026-11-27T04:00:00Z'));
- d.raw.prepare("UPDATE event_bookings SET status='cancelled',cancelled_by=? WHERE id=?").run(cancelledBy,used.bookingId);
+ if(cancelledBy==='admin'){
+  const response=await gapCall(gapApp(d,[events]),`/api/events/admin/events/lesson/bookings/${used.bookingId}/cancel?account_id=a`,'POST',{});
+  expect(response.status,await response.clone().text()).toBe(200);
+ }else d.raw.prepare("UPDATE event_bookings SET status='cancelled',cancelled_by=? WHERE id=?").run(cancelledBy,used.bookingId);
  expect(d.raw.prepare('SELECT status,expires_at,used_event_booking_id FROM booking_makeup_credits WHERE id=?').get(credit.id)).toEqual({status:'open',expires_at:credit.expires_at,used_event_booking_id:null});
 });
