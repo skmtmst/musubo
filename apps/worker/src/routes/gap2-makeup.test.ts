@@ -94,3 +94,11 @@ test('B3-13: 期限切れの券は履歴に残り選択や使用はできない'
  expect(d.raw.prepare('SELECT id,status,expires_at FROM booking_makeup_credits').get()).toEqual({id:credit.id,status:'expired',expires_at:credit.expires_at});
  await expect(makeupOptions(d.db,'a','f',credit.id)).rejects.toThrow('credit_unavailable');
 });
+
+test.each(['admin','system'] as const)('B3-16: 店側の取消（%s）で使用済み振替を元の期限で戻す',async cancelledBy=>{
+ const credit=(await absence(d.db,'a','f','eb','customer')).makeupCredit as any;
+ const used=await useMakeup(d.db,'a','f',credit.id,'dst',`cancel-${cancelledBy}`);
+ vi.setSystemTime(new Date('2026-11-27T04:00:00Z'));
+ d.raw.prepare("UPDATE event_bookings SET status='cancelled',cancelled_by=? WHERE id=?").run(cancelledBy,used.bookingId);
+ expect(d.raw.prepare('SELECT status,expires_at,used_event_booking_id FROM booking_makeup_credits WHERE id=?').get(credit.id)).toEqual({status:'open',expires_at:credit.expires_at,used_event_booking_id:null});
+});

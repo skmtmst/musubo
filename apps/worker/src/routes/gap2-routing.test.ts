@@ -83,3 +83,19 @@ test('B6-13: 51行の直接保存を拒み前のフォームを残す',async()=>
  const r=await saveRouting(l);expect(r.status).toBe(400);
  expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
 });
+
+test('B6-07: 担当の組を指定した振り分けは一致した組を返す',async()=>{
+ d.raw.exec("INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES('bs2','menu',1)");
+ const group=await gapCall(gapApp(d,[formRouting]),'/api/booking/admin/routing-staff-groups/group?account_id=a','PUT',{name:'相談担当',staffIds:['bs','bs2'],expectedVersion:0});expect(group.status).toBe(200);
+ const l=layout();(l.sections[0].blocks[1] as any).booking.routing.rules[0].target={menuId:'menu',staffGroupId:'group'};
+ await expect(validateLayoutRouting(d.db,'a',l)).resolves.toBeUndefined();
+ expect(await resolveRouting(d.db,'a',l,{subject:'転職'})).toMatchObject({matchedIndex:0,target:{menuId:'menu',staffGroupId:'group'}});
+});
+test('B6-07: 担当組の振り分けトークンは組外の担当では使えない',async()=>{
+ d.raw.exec("INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES('bs2','menu',1); INSERT INTO booking_routing_staff_groups(id,line_account_id,name,staff_ids_json) VALUES('group','a','相談担当','[\"bs\"]')");
+ const {publishFormVersion}=await import('@line-crm/db');await publishFormVersion(d.db,'form',1);
+ const version=(d.raw.prepare("SELECT current_published_version_id id FROM forms WHERE id='form'").get() as any).id;
+ const token=await issueRoutingToken(d.db,{account:'a',friend:'f',formId:'form',versionId:version,blockId:'book',target:{menuId:'menu',staffGroupId:'group'},matchedIndex:0,exp:Date.now()+60000});
+ await expect(verifyRoutingToken(d.db,'a','f',token,'menu','bs')).resolves.toMatchObject({matchedIndex:0});
+ await expect(verifyRoutingToken(d.db,'a','f',token,'menu','bs2')).rejects.toThrow('routing_token_invalid');
+});

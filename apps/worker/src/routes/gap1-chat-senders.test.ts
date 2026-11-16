@@ -144,3 +144,12 @@ test('UNS-17: 配信の閲覧権限だけの担当は送信を開始できない
   expect(r.status).toBe(403);expect(push).not.toHaveBeenCalled();expect(d.raw.prepare("SELECT status FROM broadcasts WHERE id='limited'").get()).toEqual({status:'draft'});
  }finally{vi.useRealTimers();}
 });
+
+test('G4-16: 担当者の個別返信をmanualとして履歴へ保存する',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));
+ try{
+  const r=await call('/api/chats/c/send','POST',{content:'担当からの返事'},staff);
+  expect(r.status).toBe(200);expect(push).toHaveBeenCalledTimes(1);
+  expect(d.raw.prepare("SELECT direction,source FROM messages_log WHERE content='担当からの返事'").get()).toEqual({direction:'outgoing',source:'manual'});
+ }finally{vi.useRealTimers();}
+});
