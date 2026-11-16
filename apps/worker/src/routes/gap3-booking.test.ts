@@ -109,3 +109,13 @@ test('個別予約の状態だけが変わった場合も組を取り消さな�
  const response=await gapCall(app(),`/api/booking/admin/groups/${view.groupId}/cancel?account_id=a`,'POST',{reason:'確認済み',expectedVersion:view.version,expectedMembers});
  expect(response.status).toBe(409);expect(d.raw.prepare("SELECT COUNT(*) n FROM bookings WHERE status='cancelled'").get()).toEqual({n:0});expect(fetch).not.toHaveBeenCalled();
 });
+
+test('B5-04: 同時の組では片方の担当が埋まった時刻を候補にしない',async()=>{
+ const {partyInput,previewParty}=await import('../features/booking/booking-bulk.js');
+ const members=await partyInput(d.db,'a','f',[{menuId:'menu'},{menuId:'menu'}]);
+ const before=await previewParty(d.db,'a',members,'parallel','2026-11-20','2026-11-20',{});
+ expect(before.slots.some(s=>Date.parse(s.startsAt)===Date.parse('2026-11-20T05:00:00Z'))).toBe(true);
+ d.raw.exec("INSERT INTO bookings(id,line_account_id,friend_id,staff_id,menu_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at) VALUES('busy','a','f2','bs2','menu','2026-11-20T05:00:00.000Z','2026-11-20T06:00:00.000Z','2026-11-20T06:00:00.000Z','confirmed',8400,'2026-11-16T00:00:00Z')");
+ const result=await previewParty(d.db,'a',members,'parallel','2026-11-20','2026-11-20',{});
+ expect(result.slots.some(s=>Date.parse(s.startsAt)===Date.parse('2026-11-20T05:00:00Z'))).toBe(false);
+});

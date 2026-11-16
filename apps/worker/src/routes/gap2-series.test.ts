@@ -63,3 +63,27 @@ test('B4-01 B5-15: 統括の削除順で追加分と予約を消してから組�
  for(const table of purgeTablesChildFirst().filter(t=>tables.has(t)))d.raw.prepare(`DELETE FROM ${table} WHERE ${tenantScopeCondition(table)}`).run('t');
  for(const table of tables)expect(d.raw.prepare(`SELECT COUNT(*) n FROM ${table}`).get()).toEqual({n:0});
 });
+
+function seedEightWeeks(){
+ for(const date of ['2026-12-18','2026-12-25','2027-01-01','2027-01-08','2027-01-15'])d.raw.prepare("INSERT INTO staff_shifts(id,staff_id,work_date,start_time,end_time) VALUES(?,'bs',?,'09:00','18:00')").run(date,date);
+ seedGapBooking(d,'busy1','confirmed','2026-11-27T05:00:00.000Z');
+ seedGapBooking(d,'busy2','confirmed','2026-12-04T05:00:00.000Z');
+}
+test('B4-01: 8回の候補のうち埋まっている2回を明示する',async()=>{
+ seedEightWeeks();
+ const r=await gapCall(app(),'/api/booking/admin/series/preview?account_id=a','POST',{...body,rule:{freq:'weekly',count:8}});
+ expect(r.status).toBe(200);
+ const occurrences=(await r.json() as any).data.occurrences;
+ expect(occurrences).toHaveLength(8);
+ expect(occurrences.filter((x:any)=>!x.available).map((x:any)=>x.index)).toEqual([1,2]);
+ expect(occurrences.filter((x:any)=>!x.available).every((x:any)=>x.reason==='slot_unavailable')).toBe(true);
+});
+test('B4-02: 8回のうち1回を別時刻にし1回を飛ばすと7件と1組',async()=>{
+ seedEightWeeks();
+ const r=await gapCall(app(),url,'POST',{...body,rule:{freq:'weekly',count:8},choices:[{index:1,action:'keep',alternativeStartsAt:'2026-11-27T06:00:00.000Z'},{index:2,action:'skip'}]});
+ expect(r.status,await r.clone().text()).toBe(201);
+ const data=(await r.json() as any).data;
+ expect(data.bookings).toHaveLength(7);expect(data.skipped.map((x:any)=>x.index)).toEqual([2]);
+ expect(data.bookings.find((x:any)=>x.series_index===1).starts_at).toBe('2026-11-27T06:00:00.000Z');
+ expect(d.raw.prepare('SELECT count(*) n FROM booking_series').get()).toEqual({n:1});
+});
