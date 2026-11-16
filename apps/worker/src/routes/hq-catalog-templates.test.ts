@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import { publishMileageReward } from '@line-crm/db';
+import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 import { beforeEach,afterEach,expect,test,vi } from 'vitest';
 import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { hqTemplates } from './hq-templates.js';
@@ -13,7 +15,8 @@ async function create(type:HqCatalogTemplateType,definition:unknown=defs[type]){
 async function check(id:string,accountIds=['a']){const r=await call<Preflight>(`/${id}/preflight`,'POST',{accountIds});expect(r.status,JSON.stringify(r.body)).toBe(200);return r.body.data;}
 const run=(id:string,p:Preflight,mode='create')=>call<{status:string;stores:Array<{status:string;createdName:string;counts:Record<string,number>}>}>(`/${id}/distribute`,'POST',{preflightId:p.preflightId,resolutions:p.stores.flatMap(s=>s.items.map(i=>({accountId:s.accountId,sourceId:i.sourceId,mode:i.operation==='reuse'?'overwrite':mode})))});
 beforeEach(()=>{
- f=createTestD1({foreignKeys:true});
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));
+ f=createTestD1({foreignKeys:true});useSqliteClock(f.raw,()=>new Date());
 
  f.raw.exec("INSERT INTO mileage_programs(id,code,name,status,created_at,updated_at) VALUES('default','default','マイル','active','2026-10-15','2026-10-15')");
  f.raw.exec("INSERT INTO tenants(id,name) VALUES('t','HQ'),('other','Other'); INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES('owner','Owner','owner','unused','t'); INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id) VALUES('a','Store','a','x','x','t'),('b','Store2','b','x','x','t'),('other','Hidden','other','x','x','other')");
@@ -21,7 +24,7 @@ beforeEach(()=>{
  app=new Hono<Env>();app.use('*',async(c,next)=>{c.set('staff',staff);await next();});app.route('/',hqTemplates);
  vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('No external requests');}));
 });
-afterEach(()=>{f.raw.close();vi.unstubAllGlobals();});
+afterEach(()=>{f.raw.close();vi.useRealTimers();vi.unstubAllGlobals();});
 test.each(['booking_menu','mileage_reward'] as const)('%s: 共通の保存・配布・再試行・上書き・別名・保管を保持する',async type=>{
  const id=await create(type),p=await check(id),sent=await run(id,p);
  expect(sent.body.data.status,JSON.stringify(sent.body)).toBe('completed');
@@ -104,4 +107,27 @@ test('HQT-01 HQT-02 HQT-07 HQT-16: 同名を守り停止で配る、支払い未
 test('HQT-03 HQT-14: 予約を使わない店は配らない、代理も配れない',async()=>{
  const id=await create('booking_menu');f.raw.exec("INSERT INTO account_styles(line_account_id,style,updated_at) VALUES('a','ec',datetime('now'))");const p=await check(id);expect((p.stores[0] as any).warnings).toContain('booking_not_used');expect((await run(id,p)).body.data.status).toBe('failed');expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
  const im=new Hono<Env>();im.use('*',async(c,next)=>{c.set('staff',staff);c.set('impersonation',{id:'im',tenantId:'t',mode:'write',piiRevealed:true,startedAt:'2026-10-16'});await next();});im.route('/',hqTemplates);const r=await im.request(`/api/hq/templates/${id}/preflight`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountIds:['a']})},{DB:f.db} as Env['Bindings']);expect(r.status).toBe(403);
+});
+
+test('HQT-09: 配られたクーポン景品はコードがなければ公開できない',async()=>{
+ const id=await create('mileage_reward');expect((await run(id,await check(id))).body.data.status).toBe('completed');
+ const row=f.raw.prepare('SELECT id,status FROM mileage_rewards').get() as {id:string;status:string};expect(row.status).toBe('draft');
+ await expect(publishMileageReward(f.db,{id:row.id,lineAccountId:'a'})).rejects.toMatchObject({code:'coupon_inventory_empty'});
+ expect(f.raw.prepare('SELECT status,current_published_version_id FROM mileage_rewards WHERE id=?').get(row.id)).toEqual({status:'draft',current_published_version_id:null});
+});
+test('HQT-14: 代理ログインは確認済みの配布も直接実行できない',async()=>{
+ const id=await create('booking_menu'),p=await check(id);
+ const im=new Hono<Env>();im.use('*',async(c,next)=>{c.set('staff',staff);c.set('impersonation',{id:'im',tenantId:'t',mode:'write',piiRevealed:true,startedAt:'2026-10-16'});await next();});im.route('/',hqTemplates);
+ const r=await im.request(`/api/hq/templates/${id}/distribute`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preflightId:p.preflightId,resolutions:p.stores.flatMap(s=>s.items.map(i=>({accountId:s.accountId,sourceId:i.sourceId,mode:'create'})))})},{DB:f.db} as Env['Bindings']);
+ expect(r.status).toBe(403);expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
+});
+test.each(['booking_menu','mileage_reward'] as const)('HQT-15: %s の同じ配布確認の再送は1回だけ作る',async type=>{
+ const id=await create(type),p=await check(id),first=await run(id,p),second=await run(id,p);
+ expect(first.body.data.status).toBe('completed');expect(second.body).toEqual(first.body);
+ const table=type==='booking_menu'?'menus':'mileage_rewards';
+ expect(f.raw.prepare(`SELECT COUNT(*) n FROM ${table} WHERE line_account_id='a'`).get()).toEqual({n:1});
+});
+test('HQT-20: 配布先が0店なら確認を受け付けず配布記録を作らない',async()=>{
+ const id=await create('booking_menu');const r=await call(`/${id}/preflight`,'POST',{accountIds:[]});
+ expect(r.status).toBe(400);expect(f.raw.prepare('SELECT COUNT(*) n FROM hq_template_preflights').get()).toEqual({n:0});
 });
