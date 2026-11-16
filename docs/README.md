@@ -457,6 +457,7 @@
 - [鍵が漏れたときの入れ替えと練習（B-351/13）](security/KEY-ROTATION.md)
 - [ログイン不要の入口（B-351/4）](security/PUBLIC-ENTRYPOINTS.md)
 - [ローンチ前の安全確認（B-265・B-332・B-343・B-351）](security/README.md)
+- [本番前にオーナーがやること1枚（D6）](security/OWNER-HANDOFF-1116.md)
 - [公開前の安全点検表](security/SECURITY-CHECKLIST.md)
 - [安全監視：画面とAPIの契約（B-343）](security/SECURITY-MONITOR-CONTRACT.md)
 - [添付・支払明細の取得と取り直し（B-351/4）](security/SIGNED-DOWNLOADS.md)
@@ -1231,3 +1232,5 @@
 - [文書：登録メディアの受け入れ表](release-log/unreleased/74-kenta-media-docs.md) — 一度に10件・使用先の出し方の履歴。確認 2026-11-15。
 - [文書：手動テストの要件の整理](release-log/unreleased/79-kenta-a15-req.md) — 画面と決定に合わせた要件の変更履歴。確認 2026-11-15。
 - [全画面の確かめA14の直し](release-log/unreleased/82-kenta-a14-fix.md) — フォルダの「…」・面談の表などの履歴。確認 2026-11-15。
+- [文書：本番前の点検3資料の見直しとオーナー1枚](release-log/unreleased/85-kenta-d6-handoff.md) — 点検表・二段階認証・事故手順の履歴。確認 2026-11-16。
+- [フォルダ操作と警告文の自動確認](release-log/unreleased/84-kenta-guards-ci.md) — 自動確認の追加履歴。確認 2026-11-16。
