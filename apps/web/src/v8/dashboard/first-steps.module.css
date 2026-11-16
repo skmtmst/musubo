@@ -40,8 +40,10 @@
   /* 通常の段の線は #E5E7EB、次の 1 つは緑の 2px 内枠（EpOyl / TBmgK）。 */
   --color-hairline: #e5e7eb;
   --step-mark-ring: 2px;
-  /* 主操作の字は 700（HQg7M / QQIQM）。済みの段の題は太さ指定なし。 */
+  /* 主操作の字は 700（HQg7M）、副操作は 600（QQIQM）。済みの段の題は太さ指定なし。 */
   --tpl-button-weight: 700;
+  --step-action-weight: 700;
+  --step-action-weight-sub: 600;
   --font-weight-ui: var(--font-weight-reading);
 
   /* カードの外枠と内側（PC: 余白28・間20・角16） */
@@ -90,6 +92,19 @@
   --radius-primary-action: 10px;
   --step-note-size: 13px;
   --step-note-lh: 19px;
+}
+
+/*
+ * カード外周は正本（yG81W / X1paMZ）の stroke #E5E7EB・1px・内側そろえ。
+ * 共通カードは縁を影（--card-shadow）で出す作りで、ここでは影を消しているため枠が無くなる。
+ * border だと中身が 2px 狭まるので、段と同じ「内側の輪郭」で描いて寸法を変えない。
+ * 共通カードは既定の見た目で `outline-color: transparent` を当てる強い口
+ * （`html:root .card[data-card-variant='default']:not(…)×4`）を持つため、
+ * `[class]` を重ねて強さを上回らせる。押したときの focus-visible の輪郭は共通側に残す。
+ */
+html:root .card[class][class][class][class][class][class]:not(:focus-visible) {
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
 }
 
 .head {
@@ -162,9 +177,18 @@ html:root .guideFooter button[class][class][class] {
   padding-inline: var(--step-action-pad);
   font-size: var(--step-action-text);
   /* 共通側は `:root .button:is(.primary,.secondary):is(…)` が 600 を直書きするので、
-     正本（HQg7M / QQIQM）の 700 もこの強い口で上書きする。 */
-  font-weight: 700;
+     正本（HQg7M）の 700 もこの強い口で上書きする。副操作は下で 600 に戻す。 */
+  font-weight: var(--step-action-weight);
   line-height: var(--step-action-text-lh);
+}
+
+/*
+ * 主操作は正本（m1CCF / QCgSL）に stroke が無い。
+ * 共通側 `:root .primary` が `outline: 1px solid var(--color-primary-border)` を載せるので、
+ * 枠08b の中だけで消す（押したときの focus-visible の輪郭は残す）。
+ */
+html:root .guideFooter button[data-variant='primary'][class][class][class]:not(:focus-visible) {
+  outline: none;
 }
 
 /*
@@ -177,6 +201,8 @@ html:root .guideFooter button[data-variant='secondary'][class][class][class] {
   border: 1px solid var(--color-field-border);
   box-shadow: none;
   color: var(--color-step-action-ink);
+  /* 正本（nRUtn / I4ipmc）の副操作の字は 600。上の強い口の 700 をここで戻す。 */
+  font-weight: var(--step-action-weight-sub);
 }
 
 /*
