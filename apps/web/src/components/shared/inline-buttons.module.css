@@ -1,1 +1,4 @@
-.buttons { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); }
+@layer properties, theme, base, components, utilities;
+@layer components {
+  .buttons { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); }
+}

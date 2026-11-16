@@ -109,3 +109,12 @@ it('保存中に名前を変えても卓の重複を知らせる', async () => {
   expect(screen.getByRole('dialog').textContent).toContain('この時間に別の予約があります')
   lookup.mockRestore()
 })
+it('空き照会の応答が不正なら候補の読み込み失敗を知らせる', async () => {
+  const { restaurantTestApi } = await import('@/lib/restaurant-test-api')
+  const lookup = vi.spyOn(restaurantTestApi, 'seatAvailability').mockResolvedValue({ success: true } as never)
+  const save = vi.fn().mockRejectedValue(new ApiError(409, '重複', 'table_conflict'))
+  render(<EditReservationDialog {...props(save)} />)
+  await act(async () => { await callbacks.submit!() })
+  expect(screen.getByText('空いている卓を読み込めませんでした。もう一度保存してください。')).toBeTruthy()
+  lookup.mockRestore()
+})

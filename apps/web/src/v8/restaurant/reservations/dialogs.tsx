@@ -26,8 +26,8 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import EntitySelect from '@/components/shared/entity-select'
 import { withHonorific } from '@line-crm/shared'
 import type { ReservationEditSaveResult } from './edit-save-result'
-import { ApiError } from '@/lib/api'
 import { InlineButtons } from '@/components/shared/inline-buttons'
+import { isRestaurantTableConflict } from '@/lib/restaurant-errors'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 
 /*
@@ -49,6 +49,11 @@ function monthDayWeek(iso: string): string {
 }
 
 export type ReservationPatch = Record<string, unknown>
+
+async function availableTables(accountId: string, query: Parameters<typeof restaurantTestApi.seatAvailability>[1]) {
+  try { return (await restaurantTestApi.seatAvailability(accountId, query)).data.tables }
+  catch { return null }
+}
 
 /** 閲覧のみ：選ぶ部品は置かず、選んでいる値を読み取りだけの欄で見せる（2026-10-06 オーナー決定）。 */
 function ReadOnlyChoice({ label, value, options }: { label: string; value: string; options: Array<{ value: string; label: string }> }) {
@@ -139,13 +144,14 @@ export function EditReservationDialog({ reservation, accountId, storeId, tables,
       })
       if (ticket === attempt.current && result?.inputError !== undefined && !fields.capture(result.inputError)) setSaveError(result.inputError)
     } catch (error) {
-      if (ticket === attempt.current && sameSlot() && error instanceof ApiError && error.status === 409 && error.code === 'table_conflict') {
+      if (ticket === attempt.current && sameSlot() && isRestaurantTableConflict(error)) {
         setConflict(true)
-        try {
-          const result = await restaurantTestApi.seatAvailability(accountId, { storeId, startsAt: datetimeLocalJstToUtcIso(input.startsAt), endsAt: datetimeLocalJstToUtcIso(input.endsAt), guestCount: Number(input.guestCount), excludeReservationId: reservation.id })
-          if (ticket === attempt.current && sameSlot()) setAvailable(result.data.tables)
-        } catch { if (ticket === attempt.current && sameSlot()) setAvailabilityFailed(true) }
-      } else if (ticket === attempt.current && !(error instanceof ApiError && error.code === 'table_conflict') && !fields.capture(error)) setSaveError(error)
+        const result = await availableTables(accountId, { storeId, startsAt: datetimeLocalJstToUtcIso(input.startsAt), endsAt: datetimeLocalJstToUtcIso(input.endsAt), guestCount: Number(input.guestCount), excludeReservationId: reservation.id })
+        if (ticket === attempt.current && sameSlot()) {
+          if (result) setAvailable(result)
+          else setAvailabilityFailed(true)
+        }
+      } else if (ticket === attempt.current && !isRestaurantTableConflict(error) && !fields.capture(error)) setSaveError(error)
     } finally {
       if (ticket === attempt.current) saving.current = false
     }
