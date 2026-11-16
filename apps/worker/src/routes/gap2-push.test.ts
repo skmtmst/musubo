@@ -78,3 +78,14 @@ test.each(['immediate','quiet','retry'])('担当が閲覧のみになったら%s
  if(mode==='retry') await retryOperatorPush(d.db,{},new Date(Date.now()+120000),send);
  expect(send).not.toHaveBeenCalled();
 });
+test('G4-11: 消えた端末だけを外し、他の端末には送る',async()=>{
+ await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',body);
+ await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',{...body,endpoint:body.endpoint+'-second'});
+ const send=vi.fn(async(s:{endpoint:string})=>s.endpoint.endsWith('-second')?{ok:true,status:201}:{ok:false,status:410});
+ const result=await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'new_inquiry',refId:'two-devices',chatId:'chat'},send);
+ expect(result).toEqual({sent:1,failed:1});
+ expect(send).toHaveBeenCalledTimes(2);
+ const rows=d.raw.prepare('SELECT endpoint,revoked_at FROM operator_push_subscriptions ORDER BY endpoint').all() as {endpoint:string;revoked_at:string|null}[];
+ expect(rows.find(r=>r.endpoint===body.endpoint)?.revoked_at).toBeTruthy();
+ expect(rows.find(r=>r.endpoint.endsWith('-second'))?.revoked_at).toBeNull();
+});
