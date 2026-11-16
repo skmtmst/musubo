@@ -467,7 +467,7 @@
 
 ## 反映履歴
 
-- [通知の試験を時間帯に左右されないよう修正](release-log/unreleased/PR-kenta-worker-fix.md) — 反映履歴、確認 2026-11-16。
+- [通知の試験を時間帯に左右されないよう修正](release-log/unreleased/97-kenta-worker-fix.md) — 反映履歴、確認 2026-11-16。
 - [初期設定・比較の確認を追加](release-log/unreleased/91-kenta-backend-small.md) — 反映履歴、確認 2026-11-16。
 - [通知端末の扱いを確認](release-log/unreleased/92-kenta-gap-msg.md) — 反映履歴、確認 2026-11-16。
 
