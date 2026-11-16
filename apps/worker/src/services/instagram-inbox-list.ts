@@ -8,21 +8,28 @@ export async function instagramInboxList(db: Env['Bindings']['DB'], options: {
 }) {
   if (!options.accounts.length) return [];
   const rows = await db.prepare(`
-    WITH ranked AS (
+    WITH all_messages AS (
+      SELECT id,line_account_id,sender_id,content,received_at,'incoming' AS direction FROM instagram_messages
+      UNION ALL
+      SELECT idempotency_key,line_account_id,sender_id,content,sent_at AS received_at,'outgoing' AS direction
+        FROM instagram_outbound_messages WHERE status='sent'
+    ), ranked AS (
       SELECT m.*, ROW_NUMBER() OVER (
         PARTITION BY m.line_account_id, m.sender_id
         ORDER BY m.received_at DESC, m.id DESC
       ) AS rank
-      FROM instagram_messages m
+      FROM all_messages m
       WHERE m.line_account_id IN (SELECT value FROM json_each(?))
     ), conversations AS (
       SELECT 'ig:' || hex(m.line_account_id) || ':' || hex(m.sender_id) AS id,
-        m.line_account_id, m.sender_id, m.content, m.received_at,
-        CASE WHEN r.last_read_at IS NULL OR m.received_at > r.last_read_at THEN 1 ELSE 0 END AS unread
+        m.line_account_id, m.sender_id, m.content, m.received_at, m.direction,
+        CASE WHEN EXISTS (SELECT 1 FROM instagram_messages incoming
+          WHERE incoming.line_account_id=m.line_account_id AND incoming.sender_id=m.sender_id
+            AND (r.last_read_at IS NULL OR incoming.received_at > r.last_read_at)) THEN 1 ELSE 0 END AS unread
       FROM ranked m LEFT JOIN instagram_inbox_reads r
         ON r.line_account_id=m.line_account_id AND r.sender_id=m.sender_id AND r.staff_id=?
       WHERE m.rank=1
-        AND (?='' OR EXISTS (SELECT 1 FROM instagram_messages search
+        AND (?='' OR EXISTS (SELECT 1 FROM all_messages search
           WHERE search.line_account_id=m.line_account_id AND search.sender_id=m.sender_id
             AND instr(lower(search.content), lower(?)) > 0) OR instr(lower(m.sender_id), lower(?)) > 0)
     )
@@ -42,7 +49,7 @@ export async function instagramInboxList(db: Env['Bindings']['DB'], options: {
     friendId: row.sender_id, friendName: 'Instagramユーザー', friendPictureUrl: null,
     lineAccountId: row.line_account_id, isAttention: false, operatorId: null, operatorName: null,
     status: row.unread ? 'unread' : 'resolved', revision: 0, notes: null, lastMessageAt: String(row.received_at),
-    lastMessageContent: row.content, lastMessageDirection: 'incoming', lastMessageType: 'text',
+    lastMessageContent: row.content, lastMessageDirection: row.direction, lastMessageType: 'text',
     isUnread: Boolean(row.unread), createdAt: row.received_at, updatedAt: row.received_at,
   }));
 }

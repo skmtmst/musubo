@@ -4753,6 +4753,19 @@ CREATE TABLE instagram_oauth_states (
  candidates_encrypted TEXT, expires_at TEXT NOT NULL, created_at TEXT NOT NULL
 );
 
+CREATE TABLE instagram_outbound_messages (
+  idempotency_key TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  instagram_id TEXT NOT NULL,
+  sender_id TEXT NOT NULL,
+  staff_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('pending','sent','unknown')),
+  meta_message_id TEXT,
+  created_at TEXT NOT NULL,
+  sent_at TEXT
+);
+
 CREATE TABLE integration_api_tokens (
   id              TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
@@ -10964,6 +10977,9 @@ CREATE INDEX idx_instagram_messages_account_time_754 ON instagram_messages(line_
 
 CREATE INDEX idx_instagram_messages_conversation_768
   ON instagram_messages(line_account_id, sender_id, received_at DESC, id DESC);
+
+CREATE UNIQUE INDEX idx_instagram_outbound_pending_768
+  ON instagram_outbound_messages(instagram_id, sender_id) WHERE status IN ('pending','unknown');
 
 CREATE INDEX idx_integration_api_tokens_account
   ON integration_api_tokens (line_account_id, revoked_at);

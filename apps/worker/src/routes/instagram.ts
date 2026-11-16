@@ -17,6 +17,8 @@ import {
   denyReadOnly,
 } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
+import { qaOutboundStopped } from '../services/staging-qa-safety.js';
 import {
   InstagramError,
   instagramConfig,
@@ -90,6 +92,8 @@ instagram.use(
   '/api/instagram/*',
   async (c, next) => {
     if (c.req.path === '/api/instagram/webhook') return next();
+    if (c.req.path.startsWith('/api/instagram/conversations/') || /^\/api\/instagram\/messages\/[^/]+\/reply$/.test(c.req.path))
+      return requireRole('owner', 'admin', 'staff')(c, next);
     return requirePermission('/webhooks')(c, next);
   },
   async (c, next) => {
@@ -593,12 +597,76 @@ instagram.get('/api/instagram/messages', async (c) => {
       total: total!.n, items: responseItems, paging: { limit }, sort: [{ field: 'receivedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
   });
 });
+instagram.get('/api/instagram/conversations/:senderId', async (c) => {
+  const id = await account(c), sender = c.req.param('senderId');
+  const rows = await c.env.DB.prepare(`SELECT id,content,received_at AS createdAt,'incoming' AS direction FROM instagram_messages
+      WHERE line_account_id=? AND sender_id=?
+    UNION ALL SELECT meta_message_id AS id,content,sent_at AS createdAt,'outgoing' AS direction FROM instagram_outbound_messages
+      WHERE line_account_id=? AND sender_id=? AND status='sent'
+    ORDER BY createdAt DESC,id DESC LIMIT 200`).bind(id, sender, id, sender).all();
+  return c.json({ success: true, data: { messages: rows.results.reverse() } });
+});
+instagram.post('/api/instagram/conversations/:senderId/read', async (c) => {
+  const id = await account(c), sender = c.req.param('senderId');
+  const last = await c.env.DB.prepare('SELECT MAX(received_at) AS last FROM instagram_messages WHERE line_account_id=? AND sender_id=?')
+    .bind(id, sender).first<{ last: string | null }>();
+  if (!last?.last) return c.json({ success: false, error: '会話が見つかりません' }, 404);
+  await c.env.DB.prepare(`INSERT INTO instagram_inbox_reads(staff_id,line_account_id,sender_id,last_read_at) VALUES(?,?,?,?)
+    ON CONFLICT(staff_id,line_account_id,sender_id) DO UPDATE SET last_read_at=MAX(last_read_at,excluded.last_read_at)`)
+    .bind(c.get('staff').id, id, sender, last.last).run();
+  return c.json({ success: true });
+});
 instagram.post('/api/instagram/messages/:id/reply', inputJsonBoundary(), async (c) => {
-  await account(c);
-  return c.json(
-    { success: false, error: 'meta_review_required', enabled: false },
-    403,
-  );
+  if (c.get('impersonation')) return c.json({ success: false, error: '代理ログイン中は送れません' }, 403);
+  const id = await account(c);
+  const key = c.req.header('Idempotency-Key')?.trim();
+  if (!isValidIdempotencyKey(key)) return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+  const body = await c.req.json<{ text?: unknown }>();
+  if (typeof body.text !== 'string' || !body.text.trim() || body.text.length > 1000)
+    return c.json({ success: false, error: '返信文を入力してください（1000文字以内）' }, 400);
+  const message = await c.env.DB.prepare('SELECT sender_id FROM instagram_messages WHERE line_account_id=? AND id=?')
+    .bind(id, c.req.param('id')).first<{ sender_id: string }>();
+  if (!message) return c.json({ success: false, error: '会話が見つかりません' }, 404);
+  const existing = await c.env.DB.prepare('SELECT line_account_id,sender_id,content,status,meta_message_id FROM instagram_outbound_messages WHERE idempotency_key=?')
+    .bind(key).first<{ line_account_id: string; sender_id: string; content: string; status: string; meta_message_id: string | null }>();
+  if (existing) {
+    if (existing.line_account_id !== id || existing.sender_id !== message.sender_id || existing.content !== body.text)
+      return c.json({ success: false, error: '送信キーが別の返信に使われています' }, 409);
+    if (existing.status === 'sent') return c.json({ success: true, data: { messageId: existing.meta_message_id, replayed: true } });
+    return c.json({ success: false, error: '送信結果を確認してください。重複防止のため再送できません' }, 409);
+  }
+  if (c.env.DEPLOY_ENV === 'staging' && (c.env.INSTAGRAM_STAGING_SEND_ENABLED !== 'true' || qaOutboundStopped(c.env)))
+    return c.json({ success: false, error: '検証環境ではInstagramへの送信が無効です' }, 403);
+  const cfg = ready(c), row = await connection(c, id);
+  if (expired(row)) return c.json({ success: false, error: '接続が切れているため返信できません。Instagramの接続を確認してください。' }, 409);
+  if (!instagramCanMessage(row.scopes ?? '')) return c.json({ success: false, error: 'DMの権限がありません。Instagramをつなぎ直してください。' }, 409);
+  const latest = await c.env.DB.prepare('SELECT MAX(received_at) AS latest FROM instagram_messages WHERE line_account_id=? AND sender_id=?')
+    .bind(id, message.sender_id).first<{ latest: string | null }>();
+  const lastAt = Date.parse(latest?.latest ?? '');
+  if (!Number.isFinite(lastAt) || lastAt > Date.now() || Date.now() - lastAt >= 24 * 60 * 60 * 1000)
+    return c.json({ success: false, error: '最後のお客さまのメッセージから24時間を過ぎたため返信できません' }, 409);
+  const token = await decryptInstagramCredential(row.user_token_encrypted, cfg.encryptionKey);
+  const now = new Date().toISOString();
+  const reservation = await c.env.DB.prepare(`INSERT OR IGNORE INTO instagram_outbound_messages
+    (idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at) VALUES (?,?,?,?,?,?,'pending',?)`)
+    .bind(key, id, row.instagram_id, message.sender_id, c.get('staff').id, body.text, now).run();
+  if (!reservation.meta.changes) return c.json({ success: false, error: 'この会話の送信結果を確認してください' }, 409);
+  try {
+    const response = await fetch(`https://graph.instagram.com/${cfg.version}/${row.instagram_id}/messages`, {
+      method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(15000),
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipient: { id: message.sender_id }, message: { text: body.text } }),
+    });
+    if (!response.ok) throw new Error('send_failed');
+    const sent = await response.json() as { message_id?: unknown };
+    if (typeof sent.message_id !== 'string' || !sent.message_id) throw new Error('invalid_response');
+    await c.env.DB.prepare("UPDATE instagram_outbound_messages SET status='sent',meta_message_id=?,sent_at=? WHERE idempotency_key=? AND status='pending'")
+      .bind(sent.message_id, new Date().toISOString(), key).run();
+    return c.json({ success: true, data: { messageId: sent.message_id, replayed: false } });
+  } catch {
+    await c.env.DB.prepare("UPDATE instagram_outbound_messages SET status='unknown' WHERE idempotency_key=? AND status='pending'").bind(key).run();
+    return c.json({ success: false, error: '送信結果を確認できません。Instagramで確認してください' }, 502);
+  }
 });
 instagram.get('/api/instagram/webhook', async (c) => {
   const token = c.env.META_WEBHOOK_VERIFY_TOKEN,
