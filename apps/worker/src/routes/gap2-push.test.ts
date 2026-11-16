@@ -113,3 +113,15 @@ test.each(['logout','disabled','role'] as const)('G4-13: %s で本人の全端�
  expect(rows.filter(r=>r.staff_id==='o')).toHaveLength(2);expect(rows.filter(r=>r.staff_id==='o').every(r=>r.revoked_at!==null)).toBe(true);
  expect(rows.find(r=>r.staff_id==='s')?.revoked_at).toBeNull();
 });
+
+test('G4-01: 登録した端末を一覧しテスト通知を一度送る',async()=>{
+ const pair=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']) as CryptoKeyPair;
+ const jwk=await crypto.subtle.exportKey('jwk',pair.privateKey) as JsonWebKey;
+ const pub=b64(new Uint8Array(await crypto.subtle.exportKey('raw',pair.publicKey) as ArrayBuffer));
+ const a=gapApp(d,[operatorPush],gapOwner,false,{OPERATOR_PUSH_VAPID_PUBLIC_KEY:pub,OPERATOR_PUSH_VAPID_PRIVATE_KEY:jwk.d!,OPERATOR_PUSH_VAPID_SUBJECT:'mailto:operator@example.test'});
+ expect((await gapCall(a,'/api/me/push/subscriptions','POST',body)).status).toBe(201);
+ const listed=await gapCall(a,'/api/me/push');expect(listed.status).toBe(200);expect((await listed.json() as any).data.subscriptions).toHaveLength(1);
+ const send=vi.fn(async()=>new Response(null,{status:201}));vi.stubGlobal('fetch',send);
+ const r=await gapCall(a,'/api/me/push/test','POST',{});expect(r.status).toBe(200);expect(await r.json()).toMatchObject({data:{sent:1,failed:0}});
+ expect(send).toHaveBeenCalledTimes(1);expect(d.raw.prepare("SELECT status FROM operator_push_deliveries WHERE kind='test'").get()).toEqual({status:'sent'});
+});
