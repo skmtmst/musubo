@@ -15,6 +15,11 @@ test('B6-01 B6-02 B6-03 B6-13: fallback必須・自由記述不可・51行拒否
  const l=layout(),blocks=l.sections[0].blocks as any[],r=blocks[1].booking.routing;delete r.fallback;await expect(validateLayoutRouting(d.db,'a',l)).rejects.toThrow('routing_invalid');r.fallback=target;
  blocks[0].type='text';await expect(validateLayoutRouting(d.db,'a',l)).rejects.toThrow('routing_question_invalid');blocks[0].type='radio';r.rules=Array.from({length:51},()=>r.rules[0]);await expect(validateLayoutRouting(d.db,'a',l)).rejects.toThrow('routing_invalid');
 });
+test('B6-13: 振り分け条件は50行まで検証を通る',async()=>{
+ const l=layout(),r=(l.sections[0].blocks[1] as any).booking.routing;
+ r.rules=Array.from({length:50},()=>structuredClone(r.rules[0]));
+ await expect(validateLayoutRouting(d.db,'a',l)).resolves.toBeUndefined();
+});
 test('B6-04 B6-05 B6-08 B6-14: 上から当て、停止した先はfallback、閲覧のみの試しは保存しない',async()=>{
  const l=layout();expect(await resolveRouting(d.db,'a',l,{subject:'転職'})).toMatchObject({matchedIndex:0,target});expect(await resolveRouting(d.db,'a',l,{subject:'その他'})).toMatchObject({matchedIndex:-1});
  const old=d.raw.prepare("SELECT layout FROM forms WHERE id='form'").get();const a=gapApp(d,[formRouting],{...gapOwner,readOnly:true});const r=await gapCall(a,'/api/forms/form/routing/preview?account_id=a','POST',{answers:{subject:'転職'}});expect(r.status).toBe(200);expect(d.raw.prepare("SELECT layout FROM forms WHERE id='form'").get()).toEqual(old);
