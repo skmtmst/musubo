@@ -26,7 +26,7 @@ const COLUMNS: Record<IndustryStyle, Column[]> = {
     { key: 'peopleSeat', label: '人数・卓', width: 'var(--tpl-sd-col-people-seat)' },
     { key: 'course', label: 'コース', width: 'var(--tpl-sd-col-course)' },
     { key: 'pay', label: '支払', width: 'var(--tpl-sd-col-pay-short)' },
-    { key: 'state', label: '状態', width: 'var(--tpl-sd-col-state)' },
+    { key: 'state', label: '状態', width: 'var(--tpl-sd-col-restaurant-state)' },
     { key: 'action', label: '来店', width: 'var(--tpl-sd-col-action)' },
   ],
   salon: [
