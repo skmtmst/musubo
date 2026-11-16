@@ -28,14 +28,29 @@
   --color-step-next-border: var(--color-step-mark-on);
   --color-accent-deep: var(--color-step-mark-on);
   --gradient-primary-action: none;
+  /* 正本（v01r）は単色で影なし。副は白地に #D1D5DB の細い枠だけ。 */
+  --gradient-raised-control: none;
+  --card-shadow: none;
+  --shadow-primary-action: none;
+  --control-shadow: none;
+  --color-field-border: #d1d5db;
+  --color-step-count-ink: #6b7280;
+  --color-step-fold-ink: #4b5563;
+  --color-step-action-ink: #1f2937;
+  /* 通常の段の線は #E5E7EB、次の 1 つは緑の 2px 内枠（EpOyl / TBmgK）。 */
+  --color-hairline: #e5e7eb;
+  --step-mark-ring: 2px;
+  /* 主操作の字は 700（HQg7M / QQIQM）。済みの段の題は太さ指定なし。 */
+  --tpl-button-weight: 700;
+  --font-weight-ui: var(--font-weight-reading);
 
   /* カードの外枠と内側（PC: 余白28・間20・角16） */
   --radius-card: 16px;
   --step-card-pad: 28px;
   --step-card-gap: 20px;
 
-  /* 頭（題・進捗数・畳む） */
-  --step-head-gap: 12px;
+  /* 頭（題・進捗数・畳む）。間は正本 o6eJAO の 16。 */
+  --step-head-gap: 16px;
   --step-title-size: 20px;
   --step-title-lh: 28px;
   --step-head-text: 14px;
@@ -47,9 +62,9 @@
   --tpl-d23-ob-bar-h: var(--progress-steps-h);
   --progress-segment-gap: 6px;
 
-  /* 段（題15・済み印22・角12・横16／縦12） */
+  /* 段（題15／行送り15×1.4=21・済み印22・角12・横16／縦12） */
   --step-row-text: 15px;
-  --step-row-text-lh: 22px;
+  --step-row-text-lh: 21px;
   --tpl-d23-ob-text: var(--step-row-text);
   --tpl-d23-ob-text-lh: var(--step-row-text-lh);
   --step-row-radius: 12px;
@@ -58,6 +73,13 @@
   --step-list-col-gap: 16px;
   --tpl-d23-ob-grid-gap: var(--step-list-col-gap);
   --step-list-row-gap: 12px;
+  /* 段の内側は正本 DckDv の padding[0,16]・gap12。 */
+  --step-row-pad: 0 16px;
+  --tpl-d23-ob-step-pad: var(--step-row-pad);
+  --step-row-gap: 12px;
+  --tpl-d23-ob-step-gap: var(--step-row-gap);
+  /* 行の操作リンク（ガイドで開く）は PC14／SP13・700。 */
+  --step-link-text: 14px;
 
   /* 下段（2操作と注記） */
   --step-footer-gap: 12px;
@@ -94,9 +116,10 @@
 }
 
 .count {
-  color: var(--color-ink-secondary);
-  /* 正本の進捗数は14（nvQmI）。段の題15とは別にする。 */
+  /* 正本の進捗数は 14（SPは13）・#6B7280・太さ指定なし（nvQmI / bKSTk）。 */
+  color: var(--color-step-count-ink);
   font-size: var(--step-head-text);
+  font-weight: var(--font-weight-reading);
   line-height: var(--step-head-text-lh);
   white-space: nowrap;
 }
@@ -122,6 +145,8 @@
   margin-inline-start: auto;
   color: var(--color-step-note-ink);
   font-size: var(--step-note-size);
+  /* 正本（c1R5Jx）の注記は太さ指定なし。 */
+  font-weight: var(--font-weight-reading);
   line-height: var(--step-note-lh);
 }
 
@@ -136,14 +161,39 @@ html:root .guideFooter button[class][class][class] {
   /* 左右の余白は正本の幅（主206・副191）に合わせた値。 */
   padding-inline: var(--step-action-pad);
   font-size: var(--step-action-text);
+  /* 共通側は `:root .button:is(.primary,.secondary):is(…)` が 600 を直書きするので、
+     正本（HQg7M / QQIQM）の 700 もこの強い口で上書きする。 */
+  font-weight: 700;
   line-height: var(--step-action-text-lh);
+}
+
+/*
+ * 副操作は正本（QQIQM）どおり白地・#D1D5DB の細い枠・影なし・文字 #1F2937。
+ * 共通側は同じところで「線ではなく影で浮かせる」ため影を載せるので、ここで消して枠に戻す。
+ */
+html:root .guideFooter button[data-variant='secondary'][class][class][class] {
+  /* 枠の 1px ぶんだけ左右の余白を詰めて、正本の幅 191 を保つ。 */
+  padding-inline: calc(var(--step-action-pad) - 1px);
+  border: 1px solid var(--color-field-border);
+  box-shadow: none;
+  color: var(--color-step-action-ink);
+}
+
+/*
+ * 段の「ガイドで開く」。文字を描く子は共通 TextLink の `.label` で、
+ * そちらは層の外の `:root .label` で 12/500 を指定している。
+ * 共通CSSは触らず、`html:root .link span` で強さを上げて正本の 14（SP13）/700 にする。
+ */
+html:root .link span {
+  font-size: var(--step-link-text);
+  font-weight: 700;
 }
 
 /*
  * SP390（ahwHx）: ピップを出さず「畳む」までカードの中に収め、2操作は縦積みの全幅。
  * 題17・注記12/1.5・段の間10・段の高さ50（済み印22＋上下14）・内側は余白20／間16／角14。
- * 頭の間だけ6にするのは、受容済みの段幅差（正本326→実装270）で16px狭いぶん、
- * 題・進捗数・畳むを1行に収めるために必要な分（実測 scrollWidth 273→269 ≦ 270）。
+ * 頭の間は正本 LF21H の 10、進捗数と「畳む」は正本 bKSTk / J9nX41 の 13。
+ * 段幅は受容済みの差（正本326→実装270）があるため、頭が270pxに収まるか毎回実測する。
  */
 @container v8-page (width < 640px) {
   .pips { display: none; }
@@ -155,18 +205,30 @@ html:root .guideFooter button[class][class][class] {
     --radius-card: 14px;
     --step-card-pad: 20px;
     --step-card-gap: 16px;
-    --step-head-gap: 6px;
+    --step-head-gap: 10px;
     --step-title-size: 17px;
     --step-title-lh: 24px;
+    --step-head-text: 13px;
+    --step-link-text: 13px;
     --step-action-h: 48px;
     --step-footer-gap: 10px;
     --step-note-size: 12px;
     --step-note-lh: 1.5;
     --step-list-row-gap: 10px;
-    --step-row-pad: 14px 12px;
+    /* SP は正本 mmQ8z の padding14（四辺）・gap10。 */
+    --step-row-pad: 14px;
     --tpl-d23-ob-step-pad: var(--step-row-pad);
+    --step-row-gap: 10px;
+    --tpl-d23-ob-step-gap: var(--step-row-gap);
     --tpl-list-row-multi-h: 50px;
   }
+  /*
+   * 正本（LF21H）の頭は「題＋進捗数」と「畳む」の2かたまりで、間に伸び縮みの箱はない。
+   * 実装の `.spacer` を SP で外し、「畳む」を右端寄せにする。
+   * これで間は正本どおり 10 のまま、余分な1つ分（10px）が消えて 270px に収まる。
+   */
+  .spacer { display: none; }
+  .fold { margin-inline-start: auto; }
   html:root .guideFooter button[class][class][class] { width: 100%; }
   .note { margin-inline-start: 0; }
 }
@@ -183,12 +245,12 @@ html:root .guideFooter button[class][class][class] {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--color-ink-secondary);
+  color: var(--color-step-fold-ink);
   cursor: pointer;
   font: inherit;
-  /* 正本の「畳む」は14（nvQmI）。 */
+  /* 正本の「畳む」は 14（SPは13）・#4B5563・太さ指定なし（nvQmI / J9nX41）。 */
   font-size: var(--step-head-text);
-  font-weight: 500;
+  font-weight: var(--font-weight-reading);
   line-height: var(--step-head-text-lh);
   white-space: nowrap;
 }
