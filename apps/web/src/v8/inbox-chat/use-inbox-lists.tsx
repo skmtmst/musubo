@@ -20,12 +20,13 @@ type Options = {
   assigneeFilter: string
   unreadOnly: boolean
   quickFilter: "all" | "reply" | "overdue"
+  socialChannel?: 'all' | 'line' | 'instagram'
   /** 並び。期限を使う店は期限が近い順で並べるので、口へは送らない。 */
   sort?: InboxSort
   setError: Dispatch<SetStateAction<string>>
 }
 
-export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, selectedAccountId, emailInboxEnabled, statusFilter, assigneeFilter, unreadOnly, quickFilter, sort = 'unread_first', setError }: Options) {
+export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, selectedAccountId, emailInboxEnabled, statusFilter, assigneeFilter, unreadOnly, quickFilter, socialChannel = 'all', sort = 'unread_first', setError }: Options) {
 
   /*
    * メール一覧だけの失敗表示。LINE側の `error` とは別にする。
@@ -92,11 +93,12 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
 
   const buildListParams = useCallback((cursor: ListCursor | null) => {
     const params: {
-      status?: string; accountId?: string; q?: string;
+      channel?: 'all' | 'line' | 'instagram'; status?: string; accountId?: string; q?: string;
       operatorId?: string; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue';
       sort?: 'latest';
       limit?: number; beforeUnread?: 0 | 1; beforeAt?: string; beforeId?: string;
     } = {}
+    params.channel = socialChannel
     const latest = sort === 'latest' && !slaEnabled
     if (statusFilter !== 'all') params.status = statusFilter
     if (selectedAccountId) params.accountId = selectedAccountId
@@ -115,10 +117,10 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
       params.beforeId = cursor.id
     }
     return params
-  }, [statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort, CHAT_PAGE_SIZE])
+  }, [statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort, CHAT_PAGE_SIZE, socialChannel])
 
   // Compare at render time too: an old request can finish before the next effect runs.
-  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, emailInboxEnabled, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort])
+  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, emailInboxEnabled, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort, socialChannel])
 
   const { value: chats, setValue: setChats } = useListSnapshot<Chat[]>(listFilterKey, [])
   const { value: emailItems, setValue: setEmailItems } = useListSnapshot<EmailInboxItem[]>(listFilterKey, [])

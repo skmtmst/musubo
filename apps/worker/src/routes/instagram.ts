@@ -599,12 +599,14 @@ instagram.get('/api/instagram/messages', async (c) => {
 });
 instagram.get('/api/instagram/conversations/:senderId', async (c) => {
   const id = await account(c), sender = c.req.param('senderId');
+  const row = await c.env.DB.prepare('SELECT * FROM instagram_connections WHERE line_account_id=?').bind(id).first<Connection>();
+  const replyState = !instagramConfig(c.env) || !row || expired(row) ? 'disconnected' : !instagramCanMessage(row.scopes ?? '') ? 'permission_required' : 'ready';
   const rows = await c.env.DB.prepare(`SELECT id,content,received_at AS createdAt,'incoming' AS direction FROM instagram_messages
       WHERE line_account_id=? AND sender_id=?
     UNION ALL SELECT meta_message_id AS id,content,sent_at AS createdAt,'outgoing' AS direction FROM instagram_outbound_messages
       WHERE line_account_id=? AND sender_id=? AND status='sent'
     ORDER BY createdAt DESC,id DESC LIMIT 200`).bind(id, sender, id, sender).all();
-  return c.json({ success: true, data: { messages: rows.results.reverse() } });
+  return c.json({ success: true, data: { messages: rows.results.reverse(), replyState } });
 });
 instagram.post('/api/instagram/conversations/:senderId/read', async (c) => {
   const id = await account(c), sender = c.req.param('senderId');

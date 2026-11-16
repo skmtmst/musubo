@@ -78,7 +78,7 @@ export type InboxSavedView = {
   matchCount?: number | null
 }
 
-export function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
+export function ChannelBadge({ channel }: { channel: 'line' | 'email' | 'instagram' }) {
   return channel === 'line' ? (
     <span className={`bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-mini px-1.5 text-micro font-medium ${styles.channelBadge}`}>
       LINE
@@ -87,7 +87,7 @@ export function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
     <span
       className={`bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-mini border px-1.5 text-micro font-medium ${styles.channelBadge}`}
     >
-      メール
+      {channel === 'instagram' ? 'Instagram' : 'メール'}
     </span>
   )
 }
