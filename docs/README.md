@@ -467,7 +467,7 @@
 
 ## 反映履歴
 
-- [通知端末の扱いを確認](release-log/unreleased/PR-kenta-gap-msg.md) — 反映履歴、確認 2026-11-16。
+- [通知端末の扱いを確認](release-log/unreleased/92-kenta-gap-msg.md) — 反映履歴、確認 2026-11-16。
 
 - [予約・友だち情報・配信の操作と安全性を改善](release-log/unreleased/36-masato-legacy-port.md) — 反映履歴、確認 2026-11-10。
 - [運営コンソールの問い合わせ画面をPenと照合して修正](release-log/unreleased/41-masato-ops-support-pen-parity.md) — スマートフォンの返信欄とテンプレート引用画面、確認 2026-11-11。
