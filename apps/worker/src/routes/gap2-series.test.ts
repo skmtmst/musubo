@@ -97,3 +97,11 @@ test('B4-08: 4回目から取消の見込みは期限後の回だけ料金を出
  expect(r.status).toBe(200);const items=(await r.json() as any).data.items;
  expect(items.map((item:any)=>item.fee.amount)).toEqual([4200,0]);expect(items.map((item:any)=>item.bookingId)).toEqual(data.bookings.slice(3).map((b:any)=>b.id));
 });
+
+test('B4-17: 閲覧のみの担当は繰り返しの一覧を読み取消できない',async()=>{
+ const made=await gapCall(app(),url,'POST',body);expect(made.status).toBe(201);const data=(await made.json() as any).data;
+ const viewer={...gapOwner,id:'s',role:'staff' as const,readOnly:true,permissionKeys:[],viewPermissionKeys:['/booking/bookings']};const a=gapApp(d,[bookingSeries],viewer);
+ const detail=await gapCall(a,`/api/booking/admin/series/${data.series.id}?account_id=a`);expect(detail.status).toBe(200);expect((await detail.json() as any).data.bookings).toHaveLength(3);
+ const cancel=await gapCall(a,`/api/booking/admin/series/${data.series.id}/cancel?account_id=a`,'POST',{scope:'this',fromBookingId:data.bookings[0].id,expectedVersion:1});
+ expect(cancel.status).toBe(403);expect(d.raw.prepare("SELECT COUNT(*) n FROM bookings WHERE status='cancelled'").get()).toEqual({n:0});
+});

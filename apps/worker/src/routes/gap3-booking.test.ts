@@ -180,3 +180,25 @@ test('G4-19: 来店を2回押しても印と状態の変更は一度だけ',asyn
  expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_visit_marks WHERE booking_id=?').get(bookingId)).toEqual({n:1});
  expect(d.raw.prepare('SELECT status,lock_version FROM bookings WHERE id=?').get(bookingId)).toEqual({status:'completed',lock_version:initial.lock_version+1});
 });
+
+test('B5-03: 人数を許さない2人目のメニューで組を作らない',async()=>{
+ d.raw.exec("INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price,max_party_size) VALUES('single','a','1人用',60,5000,1); INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES('bs2','single',1)");
+ const r=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...input,members:[{menuId:'menu',staffId:'bs'},{menuId:'single',staffId:'bs2'}]});
+ expect(r.status).toBe(400);expect(await r.json()).toMatchObject({error:'party_size_not_allowed'});
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_groups').get()).toEqual({n:0});expect(d.raw.prepare('SELECT COUNT(*) n FROM bookings').get()).toEqual({n:0});
+});
+test('B5-14: 組の来店は人ごとに記録し、残りの人を変更しない',async()=>{
+ const r=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'individual-visit');expect(r.status).toBe(201);
+ const rows=(await r.json() as any).data.bookings;expect(rows).toHaveLength(2);
+ expect((await gapCall(app(),`/api/booking/admin/bookings/${rows[0].id}/visit?account_id=a`,'POST',{kind:'visited'})).status).toBe(200);
+ const view=await gapCall(app(),`/api/booking/admin/bookings/${rows[0].id}/group?account_id=a`);expect(view.status).toBe(200);
+ expect((await view.json() as any).data.members.map((m:any)=>[m.bookingId,m.staffName,m.status])).toEqual([[rows[0].id,'担当','completed'],[rows[1].id,'別担当','confirmed']]);
+});
+
+test('B5-15: 閲覧のみは組の詳細を読めるが取消できない',async()=>{
+ const made=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'readonly-group');expect(made.status).toBe(201);
+ const data=(await made.json() as any).data;const a=gapApp(d,[booking,bookingGap3],{...gapOwner,readOnly:true});
+ expect((await gapCall(a,`/api/booking/admin/bookings/${data.bookings[0].id}/group?account_id=a`)).status).toBe(200);
+ const cancel=await gapCall(a,`/api/booking/admin/groups/${data.groupId}/cancel?account_id=a`,'POST',{reason:'取消',expectedVersion:1});
+ expect(cancel.status).toBe(403);expect(d.raw.prepare("SELECT COUNT(*) n FROM bookings WHERE status='cancelled'").get()).toEqual({n:0});
+});

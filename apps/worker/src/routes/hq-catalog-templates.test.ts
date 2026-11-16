@@ -139,3 +139,10 @@ test('HQT-19: 一店の書込み失敗を記録し他店の配布は残す',asyn
  expect(r.body.data.stores.map((s:any)=>[s.accountId,s.status])).toEqual([['a','succeeded'],['b','failed']]);
  expect(f.raw.prepare('SELECT line_account_id FROM menus').all()).toEqual([{line_account_id:'a'}]);
 });
+
+test('HQT-12: 閲覧のみはひな形を読めるが保存と配布を開始できない',async()=>{
+ const id=await create('booking_menu'),p=await check(id);staff={...staff,readOnly:true};
+ expect((await call(`/${id}`)).status).toBe(200);
+ expect((await call(`/${id}`,'PATCH',{name:'変更',definition:defs.booking_menu,expectedRevision:1})).status).toBe(403);
+ expect((await run(id,p)).status).toBe(403);expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
+});
