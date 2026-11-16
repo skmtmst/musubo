@@ -105,3 +105,9 @@ test('HQT-03 HQT-14: 予約を使わない店は配らない、代理も配れ�
  const id=await create('booking_menu');f.raw.exec("INSERT INTO account_styles(line_account_id,style,updated_at) VALUES('a','ec',datetime('now'))");const p=await check(id);expect((p.stores[0] as any).warnings).toContain('booking_not_used');expect((await run(id,p)).body.data.status).toBe('failed');expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
  const im=new Hono<Env>();im.use('*',async(c,next)=>{c.set('staff',staff);c.set('impersonation',{id:'im',tenantId:'t',mode:'write',piiRevealed:true,startedAt:'2026-10-16'});await next();});im.route('/',hqTemplates);const r=await im.request(`/api/hq/templates/${id}/preflight`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountIds:['a']})},{DB:f.db} as Env['Bindings']);expect(r.status).toBe(403);
 });
+test.each(['booking_menu','mileage_reward'] as const)('HQT-18: %s の配布前確認は30分有効',async type=>{
+ const id=await create(type),before=Date.now();
+ const result=await call<Preflight & {expiresAt:string}>(`/${id}/preflight`,'POST',{accountIds:['a']});
+ const after=Date.now(),expires=Date.parse(result.body.data.expiresAt);
+ expect(result.status).toBe(200);expect(expires).toBeGreaterThanOrEqual(before+30*60_000);expect(expires).toBeLessThanOrEqual(after+30*60_000);
+});
