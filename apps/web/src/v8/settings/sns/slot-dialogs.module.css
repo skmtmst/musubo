@@ -1,0 +1,125 @@
+/* SNS 連携 複数接続 第1段の料金・解除の窓（承認 v7 の F3 q9hcp9・F4 uB88I・F5 R4dYE・F6 JvuLH）。寸法は globals.css の --tpl-e1-sns-slot-* と --text-* だけを使う。 */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-sns-slot-dlg-gap);
+  min-width: 0;
+}
+
+/* 窓の最初の説明文。承認デザインどおり2行で折り返す。 */
+.desc {
+  margin: var(--polish-space-none);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  line-height: var(--tpl-e1-sns-slot-desc-lh);
+}
+
+/* 金額の箱。沈んだ地（F3・F4・F5・F6 の灰色）。 */
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-sns-slot-box-gap);
+  padding: var(--tpl-e1-sns-slot-box-pad);
+  border-radius: var(--tpl-e1-sns-slot-box-radius);
+  background: var(--color-canvas-sunken);
+  min-width: 0;
+}
+
+/* 枠線だけの箱（F3「今回の追加分」・F4「今回のお支払い」・F6「次回の月次請求から」）。 */
+.boxOutlined {
+  composes: box;
+  border: 1px solid var(--color-hairline);
+  background: none;
+}
+
+.boxLabel {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-sns-slot-label-lh);
+}
+
+/* 大きい金額（＋¥3,300 / 月・追加料金 ¥0）。 */
+.boxAmount {
+  color: var(--color-ink);
+  font-size: var(--text-display);
+  font-weight: 700;
+  line-height: var(--tpl-e1-sns-slot-amount-lh);
+}
+
+/* 一段小さい金額（F6 の減額）。 */
+.boxAmountSmall {
+  color: var(--color-ink);
+  font-size: var(--tpl-e1-sns-slot-amount-sm-size);
+  font-weight: 700;
+  line-height: var(--tpl-e1-sns-slot-amount-sm-lh);
+}
+
+/* 箱の中の太字の1行（決済成功時のお支払い・いまの連携数）。 */
+.boxStrong {
+  color: var(--color-ink);
+  font-size: var(--text-callout);
+  font-weight: 700;
+  line-height: var(--tpl-e1-sns-slot-strong-lh);
+}
+
+/* 箱の中の細かい内訳。折り返す。 */
+.boxDetail {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-sns-slot-detail-lh);
+}
+
+/* 箱の外の合計行（label ……… 金額）。 */
+.totalRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tpl-e1-sns-slot-row-gap);
+  justify-content: space-between;
+  min-width: 0;
+}
+.totalLabel {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  line-height: var(--tpl-e1-sns-slot-value-lh);
+}
+.totalValue {
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 700;
+  line-height: var(--tpl-e1-sns-slot-total-lh);
+}
+
+/* F6「解除の内容」の5行（label ……… 値）。 */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-sns-slot-rows-gap);
+  padding: var(--tpl-e1-sns-slot-box-pad);
+  border-radius: var(--tpl-e1-sns-slot-box-radius);
+  background: var(--color-canvas-sunken);
+  margin: var(--polish-space-none);
+  min-width: 0;
+}
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tpl-e1-sns-slot-row-gap);
+  justify-content: space-between;
+  min-width: 0;
+}
+.rowLabel {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-sns-slot-label-lh);
+  flex: none;
+}
+.rowValue {
+  margin: var(--polish-space-none);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--tpl-e1-sns-slot-value-lh);
+  text-align: right;
+  min-width: 0;
+}

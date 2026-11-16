@@ -117,7 +117,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
     return (
       <SaveErrorScope errors={saveErrors}><div className={styles.connectionPanel}>
         <SectionHeader size="small" title={<span id="google-connect-title">Googleアカウントを接続</span>} />
-        <p className={styles.preText}>{'店舗を管理しているGoogleアカウントでログインしてください。\n接続する店舗は、1つのLINEアカウントにつき1店舗です。'}</p>
+        <p className={styles.preText}>{'店舗を管理しているGoogleアカウントでログインしてください。'}</p>
         {!data.oauthConfigured ? <Notice tone="warn">この環境にはGoogle接続の設定がありません。運営に連絡してください。</Notice> : null}
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
         {(
