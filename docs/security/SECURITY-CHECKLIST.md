@@ -1,4 +1,4 @@
-> 文書：公開前の安全点検表｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：公開前の安全点検表｜区分：今の説明｜最終確認：2026-11-16（日本時間）
 
 # 公開前の安全点検表
 
@@ -83,7 +83,7 @@ Webhookは、外部サービスから届く通知の入口。署名は「正し�
 | S34 | 本番と検証の資源を分ける・高 | 2本のwrangler設定でWorker・D1・画像保存先・公開先・環境名を比較する | 済：設定上は別の資源を指定。実際の配備先や秘密の分離はS17・S35 | `apps/worker/wrangler.toml`、`apps/worker/wrangler.staging.toml`、`docs/DEPLOY-GATE.md` |
 | S35 | 実際の接続先・顧客データ・外部サービスの分離・高 | Cloudflare、LINE Developers、Stripeの本番／sandbox、Googleのプロジェクト・カレンダー・通知先を管理画面で照合。検証に本番の個人情報がないことも確認 | 分からない：実設定を未取得。設定ファイルが別でも、同じ鍵・通知先・データを使っていない証明にはならない | `apps/worker/wrangler.toml`、`apps/worker/wrangler.staging.toml`、`.github/workflows/deploy-cloudflare-staging.yml` |
 | S36 | 本番でテスト用機能を閉じる・高 | 本番設定の `RESTAURANT_TEST_ENABLED` と実効値を担当者が確認。オーナーの方針と照合して修正・再検証する | 済：2026-10-16 kenta。コードでDEPLOY_ENV=productionならtrueでも無効化。管理API・外部通知・sandbox用内部入口をD1へ触る前に404へ（`restaurant-production.security.test.ts`、`environment-features.test.ts`）。cron・受信メールも同じ判定を使い、環境名の欠落・未知の値でも無効。本番設定ファイルのtrueは指示により変更せず、実配備確認と設定整理はオーナー作業 | `apps/worker/wrangler.toml`、`docs/brain/Memory.md`、`apps/worker/src/middleware/feature-enforcement.ts` |
-| S37 | 公開リポジトリの扱い・高 | `gh repo view skmtmst/line-harness-oss --json visibility`。オーナー側で Settings → General → Danger Zone の非公開化を確認する | 未：修正時も`gh repo view`でPUBLIC。非公開化は設定変更なので実施せず、[オーナーがやること](#オーナーがやること)のS37へ。過去のコピーは非公開化では消えない | `AGENTS.md`、この文書の調査記録 |
+| S37 | 公開リポジトリの扱い・高 | `gh repo view skmtmst/musubo --json visibility`。オーナー側で Settings → General → Danger Zone の非公開化を確認する | 未：リポジトリ名は現在の `skmtmst/musubo` に直した（2026-11-16 kenta、origin の参照先で確認）。非公開化は設定変更なので実施せず、[オーナーがやること](#オーナーがやること)のS37へ。過去のコピーは非公開化では消えない | `AGENTS.md`、この文書の調査記録 |
 | S38 | 公開する文書・画像・履歴に個人情報を残さない・高 | オーナーと担当者が現行・過去の顧客資料、スクリーンショット、添付、公開成果物を確認。削除の前に記録保全と必要な連絡を検討する | 未：文書・画像・添付・公開成果物の全履歴点検は未実施。[オーナーがやること](#オーナーがやること)のS38で公開面ごとの担当・保全・確認を指定 | `docs/`、`.github/workflows/`、`.gitignore` |
 | S39 | 事故対応を2人で練習する・高 | [事故の手順](INCIDENT-RUNBOOK.md)で、管理画面に入れない場合・誤配信・DB破損を机上練習。緊急停止の対象外も確認する | 未：2人の参加と停止操作の承認が必要で未実施。[オーナーがやること](#オーナーがやること)のS39で机上練習・使い捨て環境での故障・復旧確認を指定 | `apps/worker/src/routes/operations.ts`、`apps/worker/src/services/operation-send-paths.ts`、`docs/DEPLOY-GATE.md` |
 | S40 | ドメインを取り返せる管理体制・高 | 登録会社とDNS管理会社を請求・契約画面で確認し、二段階認証・更新期限・回復方法・権限を2人で照合 | 分からない：CloudflareでDNSを使っていても、登録会社が同じとは断定できない | `apps/worker/wrangler.toml`、`docs/security/TWO-FACTOR-SETUP.md` |
@@ -145,8 +145,8 @@ S07・S15・S22・S24・S28の「試験が本当の故障を見付けるか」�
 | S21 | 環境ごとに別の32バイト鍵を安全な端末で生成し、Worker secret `GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY` へ標準入力またはCloudflareの秘密設定画面で登録（通常変数・引数・履歴・ログへ置かない）。承認・控えを整え、既存平文はGoogleで失効後に暗号化対応した接続口から再登録し、旧接続と控えの扱いを確認。既存予約のconnection_id参照の付替えは別途承認済み移行手順を用意し、先に削除しない | 新規3種の暗号化と旧平文件数0を値なしの件数で確認。検証用接続で鍵欠落・改ざん時に保存/Google呼出しが止まることを確認。既存接続はこの修正後500で停止するため、secret設定と移行準備なしで配備しない。手順の詳細は修正記録 |
 | S26 | 開発依存の大きい更新は司令塔が承認し、Vitest 4.1.11への更新でCriticalは0。bracesの上流修正版を確認し、公開後に更新。現行のlintではnext.rootDirを未指定のまま保ち、外部入力からパターンを作らない | 現在Critical 0 / High 1。旧Vitest・危険なtinypoolを混ぜる試験と、globの解析経路を再開すると落ちる試験で再発を防ぐ。Highは未解消として公開判断に残す |
 | S32 | マサトさんが使い捨てDBと操作役を承認。本番データを使わず架空の友だち・予約・配信状態を作り、控え/復元点を取得。件数と状態を控え、故障（予約の変更・削除）を入れ、復元して同じ確認を繰り返す。送信は無効のまま | 故障後の確認は失敗し、復元後は件数・予約・配信状態が一致。開始/終了/所要時間と担当を記録。戻せない場合は未。復元点の実値とDBの中身は非公開保管 |
-| S36 | コード反映時にDEPLOY_ENV=productionを値の種類だけで確認し、承認後に本番設定のRESTAURANT_TEST_ENABLEDをfalseへ整理。検証はstaging＋true。本番の設定や配備は今回は変更していない | 配備後に管理API・通知入口・内部sandbox入口が404、飲食店cron/予約メールも停止。架空の検証でstagingだけ動く。単に設定ファイルを直しただけでは実配備確認に数えない |
-| S37 | オーナー/マサトさんがGitHub Settings → General → Danger Zone → Change repository visibilityで非公開化を実施し、共同開発者・Actions・Pagesへの影響を確認 | `gh repo view skmtmst/line-harness-oss --json visibility` がPRIVATE。未ログインの別ブラウザでソースが読めない。Pages等の公開は別に確認。過去のコピーや漏れた鍵は回収できないためS19/S38も続ける |
+| S36 | コード反映時にDEPLOY_ENV=productionを値の種類だけで確認する。設定ファイルは本番false・検証trueの分離済み（wrangler.toml:47,52とwrangler.staging.toml:67,73で確認、2026-11-16 kenta）。本番の設定や配備は今回は変更していない | 配備後に管理API・通知入口・内部sandbox入口が404、飲食店cron/予約メールも停止。架空の検証でstagingだけ動く。単に設定ファイルを直しただけでは実配備確認に数えない |
+| S37 | オーナー/マサトさんがGitHub Settings → General → Danger Zone → Change repository visibilityで非公開化を実施し、共同開発者・Actions・Pagesへの影響を確認 | `gh repo view skmtmst/musubo --json visibility` がPRIVATE。未ログインの別ブラウザでソースが読めない。Pages等の公開は別に確認。過去のコピーや漏れた鍵は回収できないためS19/S38も続ける |
 | S38 | 現在の枝・公開していた枝/tag・削除済み文書・画像・添付に加え、Releases/Actions artifacts/Pagesの公開物を一覧化し、文字は検査、画像/動画は目視。顧客資料は担当者が非公開環境で照合。記録保全と必要な連絡を決めてから公開停止・削除を実施 | 別の架空画像・架空顧客文書を混ぜた検査対象で、文字/目視の両方が見付けることを先に確認。対象件数・担当・確認結果だけ記録。履歴の書換え・forceは禁止のまま、既存履歴の扱いは司令塔へ |
 | S39 | 2人で「全員ログインできない」「誤配信」「秘密漏えい」「DB破損」を各15分の机上練習。[気づく仕組みの反映](#気づく仕組みの反映上の49項目とは別)の時間割と案内の型も使い、1時間/24時間/72時間の担当を確認。連絡網、手動返信など停止対象外、承認先、戻す版とDBの互換性を確認。承認した使い捨て環境で停止/復元を試す | 故障中は確認失敗、停止後は新しい自動送信0、復元後の予約/配信状態が一致。連絡不能の代替手段と実測時間を記録。実客への送信や本番停止を練習に使わない |
 | S43 | Cloudflareで本番のWeb・LIFF・APIの対象ホストを確認し、SecurityのWAF/ボット対策/回数制限の利用可能範囲と現在の設定を記録。LINE/Stripe等の正規通知を誤って遮らない条件を先に決める。Notifications/Billingで利用量・費用急増の通知条件、受信先、代理担当を確認。変更と試験はオーナー承認後 | 検証の架空アクセスで遮断/通知、正規の通知を想定した試験が通る。請求通知の試し送信を受領し、日付・対象・条件・担当だけ記録。プラン上できない監視は代わりの確認時刻を決める。今回は設定を変更しない |
