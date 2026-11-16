@@ -14,7 +14,9 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   useSearchParams: () => new URLSearchParams(),
 }))
 
-const net = vi.hoisted(() => ({ list: vi.fn(), groups: vi.fn(), restore: vi.fn() }))
+const net = vi.hoisted(() => ({ list: vi.fn(), groups: vi.fn(), restore: vi.fn(), stats: vi.fn() }))
+const viewport = vi.hoisted(() => ({ narrow: false }))
+vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => viewport.narrow }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return {
@@ -23,7 +25,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       ...actual.api,
       tags: { ...actual.api.tags, list: net.list, restore: net.restore },
       tagGroups: { ...actual.api.tagGroups, list: net.groups },
-      listStats: { ...actual.api.listStats, get: vi.fn(async () => ({ success: false as const, error: 'unused' })) },
+      listStats: { ...actual.api.listStats, get: net.stats },
       featureSettings: { ...actual.api.featureSettings, visibility: vi.fn(async () => ({ success: true as const, data: { features: { friend_fields: true, support_marks: true, saved_searches: true } } })) },
     },
   }
@@ -53,6 +55,8 @@ const kpi = (title: string) => within(document.querySelector<HTMLElement>('[data
 beforeEach(() => {
   window.history.replaceState(null, '', '/tags')
   flushListUrlState()
+  viewport.narrow = false
+  net.stats.mockResolvedValue({ success: false, error: 'unused' })
   net.list.mockResolvedValue({ success: true, data: ITEMS })
   net.groups.mockResolvedValue({ success: true, data: GROUPS })
 })
@@ -98,6 +102,14 @@ describe('タグ一覧の値', () => {
     render(<TagsList accountId="account-a" />)
     await screen.findAllByText('手で付ける')
     expect(net.list).toHaveBeenCalledWith({ withCounts: true, accountId: 'account-a' })
+    expect(net.stats).toHaveBeenCalledWith('account-a')
+  })
+
+  it('サーバーの総数は数の帯に出さない', async () => {
+    net.stats.mockResolvedValue({ success: true, data: { tags: { total: 99, taggedFriends: 3, assignedThisMonth: 5 } } })
+    render(<TagsList accountId="account-a" />)
+    await waitFor(() => expect(kpi('付けている友だち')).toContain('3人'))
+    expect(document.querySelector('[data-design="KPIs"]')!.textContent).not.toContain('99件')
   })
 
   it('付け方が分からないタグを「手動」と埋めず「—」、使用先が無ければ「なし」、連動の他は0件を出さない', () => {
@@ -113,6 +125,7 @@ describe('タグ一覧の値', () => {
   it('未使用と整理の候補はサーバーの理由だけを数え、両方に当たっても1つと数える', () => {
     render(<TagsList accountId="account-a" fixture={{ items: ITEMS, groups: GROUPS }} />)
     expect(kpi('未使用')).toContain('2件')
+    expect(kpi('未使用')).not.toContain('4件')
     expect(kpi('整理の候補')).toContain('3件')
   })
 
@@ -168,5 +181,16 @@ describe('件数とページ送り・並び替え', () => {
     const labels = [...document.querySelectorAll('[data-folder-select]')].map(el => el.textContent?.replace(/\s/g, ''))
     expect(labels).toEqual(onlyArchived ? ['すべて2', '店頭1', '未分類1'] : ['すべて4', '店頭1', '未分類3'])
     expect(rowIds()).toEqual(onlyArchived ? ['stored-g', 'stored-none'] : ['manual', 'unknown', 'auto', 'unused'])
+    expect(document.querySelector('[data-pagination-summary]')?.textContent?.trim()).toMatch(onlyArchived ? /^2件中/ : /^4件中/)
   })
+})
+
+
+it('狭い幅のフォルダの選択欄に件数を重ねない', () => {
+  viewport.narrow = true
+  try {
+    render(<TagsList accountId="account-a" fixture={{ items: ITEMS, groups: GROUPS }} />)
+    expect(screen.getByRole('button', { name: 'フォルダ' }).textContent).toContain('フォルダ：すべて')
+    expect(screen.getByRole('button', { name: 'フォルダ' }).textContent).not.toMatch(/\d+件/)
+  } finally { viewport.narrow = false }
 })
