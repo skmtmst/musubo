@@ -1,3 +1,4 @@
+import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import booking from './booking.js';
 import {gapFixture,gapApp,gapCall,gapOwner,seedGapBooking} from '../test-utils/gap1.js';
@@ -6,8 +7,8 @@ import type {SqliteD1} from '../test-utils/d1-sqlite.js';
 let d:SqliteD1;
 const body={name:'相談',duration_minutes:60,base_price:5500,expectedVersion:1,audienceMode:'include_tags',audienceTagIds:['tag']};
 const url='/api/booking/admin/menus/menu?account_id=a';
-beforeEach(()=>{d=gapFixture();d.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES('tag','会員','a'); INSERT INTO friend_tags(friend_id,tag_id) VALUES('f','tag')");vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({sub:'Uf2'}))));});
-afterEach(()=>{d.raw.close();vi.unstubAllGlobals();});
+beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));d=gapFixture();useSqliteClock(d.raw,()=>new Date());d.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES('tag','会員','a'); INSERT INTO friend_tags(friend_id,tag_id) VALUES('f','tag')");vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({sub:'Uf2'}))));});
+afterEach(()=>{d.raw.close();vi.useRealTimers();vi.unstubAllGlobals();});
 test('B9-01 B9-02 B9-03 B9-16: 保存・この人で見る・タグ一致・古い版409',async()=>{
  const a=gapApp(d,[booking]);expect((await gapCall(a,url,'PUT',body)).status).toBe(200);expect((await gapCall(a,url,'PUT',body)).status).toBe(409);
  expect(await menuAudience(d.db,'a','menu','f')).toEqual({visible:true,reason:null});
