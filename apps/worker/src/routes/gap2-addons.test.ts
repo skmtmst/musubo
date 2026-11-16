@@ -1,14 +1,15 @@
+import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import booking from './booking.js';
 import {bookingAddons} from '../features/booking/booking-addons.js';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
 let d:SqliteD1;
-beforeEach(()=>{d=gapFixture();d.raw.exec(`INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price,addon_only) VALUES('addon','a','追加',15,1500,1);
+beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));d=gapFixture();useSqliteClock(d.raw,()=>new Date());d.raw.exec(`INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price,addon_only) VALUES('addon','a','追加',15,1500,1);
  UPDATE menus SET addon_menu_ids_json='["addon"]' WHERE id='menu';
  INSERT INTO staff_shifts(id,staff_id,work_date,start_time,end_time) VALUES('shift','bs','2026-11-20','09:00','18:00');
  UPDATE booking_settings SET approval_mode='automatic',cutoff_minutes_before=0,booking_window_days=60;`);vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({sub:'Uf'}))));});
-afterEach(()=>{d.raw.close();vi.unstubAllGlobals();});
+afterEach(()=>{d.raw.close();vi.useRealTimers();vi.unstubAllGlobals();});
 test('B5-02: 追加1つで料金と時間を足し、予約に額を保存する',async()=>{
  const addons=await bookingAddons(d.db,'a','menu',['addon'],'f');expect(addons[0]).toMatchObject({duration_minutes:15,base_price:1500});
  const app=gapApp(d,[booking]);const r=await app.request('/api/liff/booking/requests?liffId=liff-a',{method:'POST',headers:{Authorization:'Bearer token','Idempotency-Key':'addon-book','Content-Type':'application/json'},body:JSON.stringify({menu_id:'menu',staff_id:'bs',starts_at:'2026-11-20T05:00:00Z',addonIds:['addon']})},undefined,{waitUntil:()=>{},passThroughOnException:()=>{}} as any);

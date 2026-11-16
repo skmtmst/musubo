@@ -1,3 +1,4 @@
+import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import {bookingSeries} from './booking-series.js';
 import {gapFixture,gapApp,gapCall,gapOwner,seedGapBooking} from '../test-utils/gap1.js';
@@ -7,8 +8,8 @@ import {deleteCustomerData} from '../services/customer-data-deletion.js';
 import {purgeTablesChildFirst,tenantScopeCondition} from '@line-crm/db';
 let d:SqliteD1;const url='/api/booking/admin/series?account_id=a';
 const body={friendId:'f',menuId:'menu',staffId:'bs',startsAt:'2026-11-20T05:00:00.000Z',rule:{freq:'weekly',count:3}};
-beforeEach(()=>{d=gapFixture();d.raw.exec("UPDATE booking_settings SET max_active_bookings_per_friend=52");for(const date of ['2026-11-20','2026-11-27','2026-12-04','2026-12-11'])d.raw.prepare('INSERT INTO staff_shifts(id,staff_id,work_date,start_time,end_time) VALUES(?,\'bs\',?,\'09:00\',\'18:00\')').run(date,date);vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));});
-afterEach(()=>{d.raw.close();vi.unstubAllGlobals();});
+beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));d=gapFixture();useSqliteClock(d.raw,()=>new Date());d.raw.exec("UPDATE booking_settings SET max_active_bookings_per_friend=52");for(const date of ['2026-11-20','2026-11-27','2026-12-04','2026-12-11'])d.raw.prepare('INSERT INTO staff_shifts(id,staff_id,work_date,start_time,end_time) VALUES(?,\'bs\',?,\'09:00\',\'18:00\')').run(date,date);vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));});
+afterEach(()=>{d.raw.close();vi.useRealTimers();vi.unstubAllGlobals();});
 const app=()=>gapApp(d,[bookingSeries]);
 test('B4-01 B4-02 B4-04: 3回のpreviewと飛ばす1回、二重押しでも2予約1組',async()=>{
  const preview=await gapCall(app(),'/api/booking/admin/series/preview?account_id=a','POST',body);expect(preview.status).toBe(200);expect((await preview.json() as any).data.occurrences.map((x:any)=>x.available)).toEqual([true,true,true]);
