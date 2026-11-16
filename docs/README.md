@@ -467,6 +467,8 @@
 
 ## 反映履歴
 
+- [自動確認を実際の動きで確認](release-log/unreleased/PR-kenta-q02b.md) — 反映履歴、確認 2026-11-16。
+
 - [通知端末の扱いを確認](release-log/unreleased/92-kenta-gap-msg.md) — 反映履歴、確認 2026-11-16。
 
 - [予約・友だち情報・配信の操作と安全性を改善](release-log/unreleased/36-masato-legacy-port.md) — 反映履歴、確認 2026-11-10。
