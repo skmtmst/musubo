@@ -372,7 +372,6 @@
 ## 運用と配備
 
 - [musubo 新リポジトリへの共有検証配備の切り替え準備](deploy/musubo-staging-cutover.md) — 旧経路の停止措置と残る切り替え手順、確認 2026-11-07。
-
 - [開発ガイド](development.md)
 - [PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md)
 - [GitHub 設定の運用メモ](../.github/README.md)
@@ -1093,16 +1092,13 @@
 - [お気に入りのショートカットと予告表示](release-log/unreleased/1995-masato-sidebar-favorite-shortcuts.md) — 反映履歴、確認 2026-10-31。
 - [店舗の担当者メニュー](release-log/unreleased/1999-masato-store-member-menu.md) — 反映履歴、確認 2026-10-31。
 - [LINEアカウント登録後の初期設定完了](release-log/unreleased/2000-masato-onboarding-account-complete.md) — 反映履歴、確認 2026-10-31。
-
 - [予約の案内と比較の並び](release-log/unreleased/2001-kenta-rival-small-fixes.md) — 反映履歴、確認 2026-10-31。
 - [保存先の固定とフォームの公開参照](release-log/unreleased/2001-kenta-train-1029x.md) — 反映履歴、確認 2026-10-31。
 - [文字の操作を見分ける表示](release-log/unreleased/2005-kenta-text-button-actions.md) — 反映履歴、確認 2026-10-31。
-
 - [繰り返し設定の読み戻し](release-log/unreleased/2003-kenta-recurring-menu-readback.md) — 反映履歴、確認 2026-10-31
 - [一括予約の処理設計](release-log/unreleased/2003-kenta-bulk-booking-design.md) — 反映履歴、確認 2026-10-31
 
 - [今月の成果の流れの窓](release-log/unreleased/2003-kenta-monthly-flow.md) — 反映履歴、確認 2026-10-31。
-
 - [初期設定の案内と閲覧権限](release-log/unreleased/2004-kenta-setup-guidance.md) — 反映履歴、確認 2026-10-31。
 - [月謝の台帳と閲覧API](release-log/unreleased/2004-kenta-monthly-ledger.md) — 反映履歴、確認 2026-10-31。
 - [クラスの振替の決まり](release-log/unreleased/2005-kenta-class-makeup-rule.md) — 反映履歴、確認 2026-10-31
@@ -1125,17 +1121,12 @@
 - [設定の入口からお客さまのデザインを開く](release-log/unreleased/2014-masato-settings-entry-customer-look.md) — 反映履歴、確認2026-10-31。
 
 - [受信箱の選択アカウント別バッジ](release-log/unreleased/2016-masato-inbox-account-badge.md) — 反映履歴。確認 2026-10-31。
-
 - [検証環境の自動配備手順の反映履歴](release-log/unreleased/2017-masato-cf-staging-deploy-doc.md) — 反映履歴、確認 2026-10-31。
-
 - [反映履歴：フォームの下書き・配信前確認・設定の表示](release-log/unreleased/2019-kenta-train-1031e.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
 
 - [検証配備で未適用のDB変更だけを確認する](release-log/unreleased/2018-masato-cf-staging-deploy-pending.md) — 反映履歴、確認 2026-11-01。
-
 - [検証管理画面のPages Git連携の手順](release-log/unreleased/2020-masato-cf-pages-doc.md) — 反映履歴、確認 2026-11-01。
-
 - [検証配備でCloudflare混雑時に待って再試行する](release-log/unreleased/2021-masato-cf-staging-deploy-retry.md) — 反映履歴、確認 2026-11-01。
-
 - [操作する対象の確認](v8-requirements/confirmation-targets.md) — 危険な操作の直前に出す対象と環境の正本、確認2026-11-01。
 
 - [反映履歴：LINE来店フォロー・配信イメージ・閲覧と入力の守り](release-log/unreleased/2022-kenta-train-1031f.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
@@ -1147,24 +1138,17 @@
 - [反映履歴：送る相手・操作先・登録案内・一覧の数字と会員の入口](release-log/unreleased/2025-kenta-train-1031i.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
 
 - [列車1031Jの修正](release-log/unreleased/2026-kenta-train-1031j.md) — 反映履歴、確認 2026-11-01。
-
 - [列車1031Qの変更](release-log/unreleased/2033-kenta-train-1031q.md)
 - [列車1031K：フォーム・タグ・率と登録結果](release-log/unreleased/2027-kenta-train-1031k.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
 
 - [列車1031L：CSV・受付停止とお客さまの予約画面](release-log/unreleased/2028-kenta-train-1031l.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
 
 - [電話予約・残席・見本の表示改善](release-log/unreleased/2029-kenta-train-1031m.md) — 反映履歴、確認 2026-11-01。
-
 - [価格・削除確認・卓とフォームの表示改善](release-log/unreleased/2030-kenta-train-1031n.md) — 反映履歴、確認 2026-11-01。
-
 - [予約操作・取込と入力案内の改善](release-log/unreleased/2031-kenta-train-1031o.md) — 反映履歴、確認 2026-11-01。
-
 - [予約操作・読込中と配信前の案内](release-log/unreleased/2032-kenta-train-1031p.md) — 反映履歴、確認 2026-11-01。
-
 - [振替券・空き待ちと入力表示の改善](release-log/unreleased/2034-kenta-train-1031r.md) — 反映履歴、確認 2026-11-01。
-
 - [予約案内・クーポンと入力理由の改善](release-log/unreleased/2035-kenta-train-1031s.md) — 反映履歴、確認 2026-11-01。
-
 - [電話予約・卓とメニューの削除・下書き保存](release-log/unreleased/2059-kenta-telephone-delete-draft.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 
 - [飲食の卓・メニューの参照](engineering/restaurant-resource-references.md) — 削除時の参照確認（説明、確認日：2026-11-03）。
@@ -1232,4 +1216,5 @@
 - [文書：登録メディアの受け入れ表](release-log/unreleased/74-kenta-media-docs.md) — 一度に10件・使用先の出し方の履歴。確認 2026-11-15。
 - [文書：手動テストの要件の整理](release-log/unreleased/79-kenta-a15-req.md) — 画面と決定に合わせた要件の変更履歴。確認 2026-11-15。
 - [文書：本番前の点検3資料の見直しとオーナー1枚](release-log/unreleased/85-kenta-d6-handoff.md) — 点検表・二段階認証・事故手順の履歴。確認 2026-11-16。
+- [日付に左右される自動確認の修正](release-log/unreleased/90-kenta-worker-date.md) — 予約の自動確認の変更履歴。確認 2026-11-16。
 - [予約変更時の卓の重複案内](release-log/unreleased/87-kenta-table-dup.md) — 卓の重複理由と空き卓の案内の履歴。確認 2026-11-16。
