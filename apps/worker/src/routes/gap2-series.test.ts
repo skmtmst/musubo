@@ -16,6 +16,12 @@ test('B4-01 B4-02 B4-04: 3回のpreviewと飛ばす1回、二重押しでも2予
  const b={...body,choices:[{index:1,action:'skip'}]};const r=await gapCall(app(),url,'POST',b,'same-key');expect(r.status).toBe(201);
  const replay=await gapCall(app(),url,'POST',b,'same-key');expect(replay.status).toBe(201);expect(d.raw.prepare('SELECT count(*) n FROM bookings').get()).toEqual({n:2});expect(d.raw.prepare('SELECT count(*) n FROM booking_series').get()).toEqual({n:1});expect(fetch).not.toHaveBeenCalled();
 });
+test('B4-01: 予約済みの回を空きなしとして返す',async()=>{
+ seedGapBooking(d,'busy','confirmed','2026-11-27T05:00:00.000Z');
+ const r=await gapCall(app(),'/api/booking/admin/series/preview?account_id=a','POST',body);
+ expect(r.status).toBe(200);
+ expect((await r.json() as any).data.occurrences.map((o:any)=>o.available)).toEqual([true,false,true]);
+});
 test('B4-03: 保存直前の競合は全部か無し。batch途中の競合もrollback',async()=>{
  seedGapBooking(d,'busy','confirmed','2026-11-27T05:00:00.000Z');expect((await gapCall(app(),url,'POST',body)).status).toBe(409);expect(d.raw.prepare('SELECT count(*) n FROM booking_series').get()).toEqual({n:0});
  d.raw.exec("DELETE FROM bookings; CREATE TRIGGER force_conflict BEFORE INSERT ON bookings WHEN NEW.series_index=1 BEGIN SELECT RAISE(ABORT,'CHECK constraint failed: concurrent'); END");
