@@ -31,6 +31,7 @@ const fixture = vi.hoisted(() => ({
   igConnection: vi.fn(),
   igStart: vi.fn(),
   igDisconnect: vi.fn(),
+  igRefresh: vi.fn(),
   replace: vi.fn(),
   role: { value: 'owner' as string | null },
   style: { value: 'restaurant' as string },
@@ -49,6 +50,7 @@ vi.mock('@/lib/api', () => ({
       connection: fixture.igConnection,
       start: fixture.igStart,
       disconnect: fixture.igDisconnect,
+      refresh: fixture.igRefresh,
     },
   },
   ApiError: class ApiError extends Error {},
@@ -169,12 +171,36 @@ describe('Instagram のカード（★v7 F1・F2・F7・F8）', () => {
     expect(card().getByText('できること')).toBeTruthy()
     // 接続済みでもログインの但し書きは残す（v7 F1）。
     expect(card().getByText(/個人のアカウントは接続できません/)).toBeTruthy()
+    // 前からある［接続を確かめる］は残す（理由は BEHAVIOR.md）。
+    expect(card().getByRole('button', { name: '接続を確かめる' })).toBeTruthy()
 
     await openIgMenu()
     expect(screen.getAllByRole('menuitem', { name: 'つなぎ直す' }).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('menuitem', { name: '解除する' }).length).toBeGreaterThan(0)
     // 主連携を切り替える口がまだ無いので項目を出さない。
     expect(screen.queryByRole('menuitem', { name: '主連携にする' })).toBeNull()
+  })
+
+  it('［接続を確かめる］は認可をやり直さず、いまの接続をサーバーに確かめ直す', async () => {
+    fixture.igRefresh.mockResolvedValue({ success: true })
+    setup('connected', CONNECTED)
+
+    fireEvent.click(await igCard().findByRole('button', { name: '接続を確かめる' }))
+
+    await waitFor(() => expect(fixture.igRefresh).toHaveBeenCalledWith('acc-1'))
+    // 認可画面には行かない（つなぎ直しとは別の操作）。
+    expect(fixture.igStart).not.toHaveBeenCalled()
+    // 確かめ終わったら状態を読み直す。
+    await waitFor(() => expect(fixture.igConnection.mock.calls.length).toBeGreaterThan(1))
+  })
+
+  it('確かめられなかったときは画面に理由を出す', async () => {
+    fixture.igRefresh.mockRejectedValue(new Error('network'))
+    setup('connected', CONNECTED)
+
+    fireEvent.click(await igCard().findByRole('button', { name: '接続を確かめる' }))
+
+    expect(await screen.findByText('接続を確かめられませんでした。もう一度お試しください。')).toBeTruthy()
   })
 
   it('認可が切れているときも行として出し、行の中の［つなぎ直す］でつなぎ直せる', async () => {
@@ -209,6 +235,12 @@ describe('Instagram のカード（★v7 F1・F2・F7・F8）', () => {
     expect(add.length).toBeGreaterThan(0)
     expect(add[0].getAttribute('aria-disabled')).toBe('true')
     expect(igCard().getAllByText(LOCKED_REASON).length).toBeGreaterThan(0)
+
+    // ［接続を確かめる］も消さず、押せない状態にして理由を添える。
+    const check = igCard().getByRole('button', { name: '接続を確かめる' })
+    expect(check.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(check)
+    expect(fixture.igRefresh).not.toHaveBeenCalled()
 
     // 行の操作も残すが、押しても開かない。
     const menu = igCard().getByRole('button', { name: '@nen_cafeの操作' })
@@ -364,7 +396,7 @@ describe('Google のカード（★v7 F1・F7）', () => {
     fireEvent.click(googleCard().getByRole('button', { name: 'Google アカウントを接続する' }))
     await waitFor(() => expect(fixture.googleConnectStart).toHaveBeenCalledWith('acc-1'))
     expect(await screen.findByText('Google の許可画面を開けませんでした。もう一度お試しください。')).toBeTruthy()
-    // 口コミ・投稿・プロフィールへの移動は F1 に無いので出さない。
+    // 口コミ・投稿・プロフィールへの移動は接続していないときは出さない。
     expect(googleCard().queryByRole('link', { name: '口コミへ' })).toBeNull()
     expect(googleCard().queryByRole('link', { name: '投稿へ' })).toBeNull()
     expect(googleCard().queryByRole('link', { name: 'プロフィールへ' })).toBeNull()
@@ -388,6 +420,40 @@ describe('Google のカード（★v7 F1・F7）', () => {
     expect(fixture.googleDisconnect).not.toHaveBeenCalled()
     fireEvent.click(dialog.getByRole('button', { name: '解除する' }))
     await waitFor(() => expect(fixture.googleDisconnect).toHaveBeenCalledWith('acc-1', undefined))
+  })
+
+  it('接続済みなら前からある口コミ・投稿の件数と、口コミ・投稿・プロフィールへの移動を残す', async () => {
+    fixture.googleConnection.mockResolvedValue({
+      ...googleData(),
+      connection: { status: 'connected', locationName: 'locations/1', locationTitle: '然カフェ 本店' },
+      summary: { unrepliedCount: 2, draftCount: 0, attentionCount: 0, newCount: 0, storedCount: 12, postsAttentionCount: 1, syncStale: false },
+    })
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    render(<SnsSettingsPage />)
+
+    expect(await googleCard().findByText('接続済み')).toBeTruthy()
+    expect(googleCard().getByText('12件・未返信 2件')).toBeTruthy()
+    expect(googleCard().getByText('要対応 1件')).toBeTruthy()
+    expect(googleCard().getByRole('link', { name: '口コミへ' }).getAttribute('href')).toBe('/restaurant-test/google?tab=reviews')
+    expect(googleCard().getByRole('link', { name: '投稿へ' }).getAttribute('href')).toBe('/restaurant-test/google?tab=posts')
+    expect(googleCard().getByRole('link', { name: 'プロフィールへ' }).getAttribute('href')).toBe('/restaurant-test/google?tab=profile')
+  })
+
+  it('飲食店の作りでないLINEアカウントには口コミ・投稿の段を出さない', async () => {
+    fixture.style.value = 'general'
+    fixture.googleConnection.mockResolvedValue({
+      ...googleData(),
+      connection: { status: 'connected', locationName: 'locations/1', locationTitle: '然カフェ 本店' },
+      summary: { unrepliedCount: 2, draftCount: 0, attentionCount: 0, newCount: 0, storedCount: 12, postsAttentionCount: 1, syncStale: false },
+    })
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    render(<SnsSettingsPage />)
+
+    expect(await googleCard().findByText('接続済み')).toBeTruthy()
+    expect(googleCard().queryByRole('link', { name: '口コミへ' })).toBeNull()
+    expect(googleCard().queryByText('12件・未返信 2件')).toBeNull()
+    // 営業時間への移動は作りに関わらず残す。
+    expect(googleCard().getByRole('link', { name: '営業時間へ' })).toBeTruthy()
   })
 
   it('店舗の選択待ちなら候補を選んで接続できる', async () => {

@@ -1,12 +1,14 @@
 'use client'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Check, Plus } from 'lucide-react'
+import { ArrowRight, Check, Plus, RefreshCw } from 'lucide-react'
 import type { InstagramConnectionStatus } from '@line-crm/shared'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
+import { CustomerInfoRows } from '@/components/shared/customer-info-rows'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -14,6 +16,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { GOOGLE_CONNECTION_STATUS, INSTAGRAM_CONNECTION_STATUS } from '@/lib/status-labels'
 import { usePageTitle, usePageCrumbs } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import { useAccountStyle } from '@/hooks/use-account-style'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
 import { GoogleConnectionSettings } from '@/v8/restaurant/google'
 import { api } from '@/lib/api'
@@ -126,6 +129,9 @@ export default function SnsSettingsPage() {
   const returnedAccountId = searchParams.get('account_id')
   const accountId = returnedAccountId && accounts.some((account) => account.id === returnedAccountId) ? returnedAccountId : selectedAccountId
   const accountName = accounts.find((account) => account.id === accountId)?.name ?? ''
+  /* 飲食店の作りのときだけ、Google カードから口コミ・投稿・プロフィールの画面へ行ける（前からある機能）。 */
+  const accountStyle = useAccountStyle(accountId)
+  const restaurantStyle = accountStyle.status === 'ready' && accountStyle.data?.style === 'restaurant'
   const accountScope = useRef({ id: accountId })
   if (accountScope.current.id !== accountId) accountScope.current = { id: accountId }
   const renderedAccountScope = accountScope.current
@@ -213,6 +219,25 @@ export default function SnsSettingsPage() {
           ? 'Google の許可画面を開けませんでした。もう一度お試しください。'
           : 'Instagram のログイン画面を開けませんでした。もう一度お試しください。')
       }
+    }
+  }
+
+  /**
+   * Instagram の接続を確かめ直す（前からある機能・`POST /api/instagram/refresh`）。
+   * 認可はやり直さず、今の接続がまだ生きているかをサーバーに確かめて表示を更新する。
+   */
+  const checkInstagram = async () => {
+    if (!accountId) return
+    setBusy(true)
+    setActionError('')
+    try {
+      await api.instagram.refresh(accountId)
+      await load()
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+      if (!fieldFailure) setActionError('接続を確かめられませんでした。もう一度お試しください。')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -390,6 +415,22 @@ export default function SnsSettingsPage() {
                 rowLink={(connection) => connection.state === 'connected' && visibleGoogle.connection.locationName ? { href: '/settings/google-hours', label: '営業時間へ' } : null}
               />
               {addNarrow('googleBusiness')}
+              {restaurantStyle ? (
+                <>
+                  {/* 前からある件数の表と移動。店舗名と取り込んだ日時は行の中に出るので、ここでは繰り返さない。 */}
+                  <CustomerInfoRows
+                    rows={[
+                      { label: '口コミ', value: visibleGoogle.summary.storedCount > 0 ? `${formatNumber(visibleGoogle.summary.storedCount)}件・未返信 ${formatNumber(visibleGoogle.summary.unrepliedCount)}件` : '—' },
+                      { label: '投稿', value: visibleGoogle.summary.postsAttentionCount > 0 ? `要対応 ${formatNumber(visibleGoogle.summary.postsAttentionCount)}件` : '—' },
+                    ]}
+                  />
+                  <div className={styles.btnRow}>
+                    <Link className={styles.link} href="/restaurant-test/google?tab=reviews">口コミへ<ArrowRight size={16} aria-hidden /></Link>
+                    <Link className={styles.link} href="/restaurant-test/google?tab=posts">投稿へ<ArrowRight size={16} aria-hidden /></Link>
+                    <Link className={styles.link} href="/restaurant-test/google?tab=profile">プロフィールへ<ArrowRight size={16} aria-hidden /></Link>
+                  </div>
+                </>
+              ) : null}
               <p className={styles.foot}>主連携は、営業時間や店舗情報の正本となる接続です。予約枠や営業中の判定にはこの接続の情報を使います。「主連携にする」でいつでも切り替えられます。</p>
               {capabilities('googleBusiness', true)}
             </>
@@ -434,6 +475,22 @@ export default function SnsSettingsPage() {
                 onDisconnect={(connection) => askDisconnect('instagram', connection)}
               />
               {addNarrow('instagram')}
+              {igState === 'connected' ? (
+                /* 前からある［接続を確かめる］。閲覧しかできない人にも消さず、理由を添えて置く（F8）。 */
+                <div className={styles.actions}>
+                  <Button
+                    variant="secondary"
+                    onClick={() => void checkInstagram()}
+                    disabled={busy}
+                    busy={Boolean(busy)}
+                    busyLabel="処理中…"
+                    lockedReason={canManage ? undefined : LOCKED_REASON}
+                  >
+                    <RefreshCw size={16} aria-hidden />
+                    接続を確かめる
+                  </Button>
+                </div>
+              ) : null}
               {capabilities('instagram', true)}
               <p className={styles.foot}>Instagram のビジネスアカウント（またはクリエイターアカウント）でログインしてください。個人のアカウントは接続できません。</p>
             </>
