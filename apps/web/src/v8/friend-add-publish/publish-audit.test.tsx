@@ -6,6 +6,7 @@ const net=vi.hoisted(()=>({role:'owner' as string | null,account:'a',query:'id=r
 vi.mock('next/navigation',()=>({useRouter:()=>({replace:vi.fn(),push:vi.fn()}),useSearchParams:()=>new URLSearchParams(net.query)}))
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:net.account,accounts:[]})}))
 vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{}}))
+vi.mock('@/components/shared/use-permission-lock-reason',()=>({usePermissionLockReason:(allowed:boolean)=>!allowed && net.role === 'viewer' ? 'この操作は管理者だけができます' : undefined}))
 vi.mock('@/lib/staff-role',async importOriginal=>({...await importOriginal<typeof import('@/lib/staff-role')>(),useStaffRole:()=> net.role,canManageRole:(role:string|null)=>role==='owner'||role==='admin'}))
 vi.mock('@/lib/api',async importOriginal=> {const actual=await importOriginal<typeof import('@/lib/api')>();return {...actual,api:{staff:{me:async()=>({success:true,data:{id:'self',role:net.role??'viewer',name:'担当'}})},friendAddRules:{get:async()=>({success:true,data:{rule:{id:'r',name:'案内',status:'stopped',friendKind:'first_time',priority:1,routeNames:[],definition:{routeIds:[],actions:[],messageType:'text',messageText:'案内'}},options:{routes:[],scenarios:[],tags:[]}}}),validate:net.validate,conflicts:net.conflicts,test:net.test,testRecipient:net.testRecipient,testSend:net.testSend}}}})
 import Page from './publish'
@@ -36,10 +37,20 @@ it('重なり取得のsuccess:falseを重なりなしとして公開確認に進
  expect(screen.queryByRole('button',{name:'テストする（送らずに判定）'})).toBeNull()
 })
 
-for (const role of [null, 'viewer']) it(`権限${role}では有効化・テスト・宛先を選ぶ操作を隠し、戻る道を残す`,async()=>{
+for (const role of [null, 'viewer']) it(`権限${role}ではテスト操作を無効にし、戻る道を残す`,async()=>{
  net.role=role;net.query='id=r';net.validate.mockRejectedValue(new Error('403 validation forbidden'));net.conflicts.mockRejectedValue(new Error('403 conflicts forbidden'));render(<Page/>);await act(async()=>{})
  expect(screen.getByRole('link',{name:'一覧へ戻る'})).toBeTruthy()
- for (const name of ['有効にする','テストする（送らずに判定）','テストの送り先','自分にテスト送信']) expect(screen.queryByRole('button',{name,exact:true})).toBeNull()
+ for (const name of ['テストする（送らずに判定）','自分にテスト送信']) {
+  const button=screen.getByRole('button',{name,exact:true})
+  if (role === 'viewer') {
+   expect(button.getAttribute('aria-disabled')).toBe('true')
+   expect(document.getElementById(button.getAttribute('aria-describedby')!)?.textContent).toBe('この操作は管理者だけができます')
+  }
+  else expect((button as HTMLButtonElement).disabled).toBe(true)
+  await act(async()=>button.click())
+ }
+ expect(net.testSend).not.toHaveBeenCalled()
+ for (const name of ['有効にする','テストの送り先']) expect(screen.queryByRole('button',{name,exact:true})).toBeNull()
  expect(net.test).not.toHaveBeenCalled()
  expect(net.validate).not.toHaveBeenCalled()
  expect(net.conflicts).not.toHaveBeenCalled()

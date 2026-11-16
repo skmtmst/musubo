@@ -441,14 +441,12 @@ function FriendAddPublish() {
         <CardHeader size="stacked" title={<>テストする（送らずに判定）</>} meta={<>本番の登録・タグ・マイルは変えません</>} />
         <div className={styles.testRow}>
           <p className={styles.cardDesc} title={`送り先：${me ?? 'あなた'}（自分）`}>送り先：{me ?? 'あなた'}（自分）</p>
-          {canEdit ? (
-            <Button type="button" disabled={testing} busy={testing} busyLabel="判定中…" onClick={() => void runTest()}>
-              <Send size={16} aria-hidden="true" />テストする（送らずに判定）
-            </Button>
-          ) : null}
-          {canEdit ? <PermissionGatedButton allowed={canEdit} type="button" variant="secondary" disabled={sending || recipient !== true}
+          <PermissionGatedButton allowed={canEdit} type="button" disabled={testing} busy={testing} busyLabel="判定中…" onClick={() => void runTest()}>
+            <Send size={16} aria-hidden="true" />テストする（送らずに判定）
+          </PermissionGatedButton>
+          <PermissionGatedButton allowed={canEdit} type="button" variant="secondary" disabled={sending || recipient !== true}
             disabledReason={recipient === false ? 'テストの宛先を設定し、このアカウントを友だち追加してください' : recipient === null ? 'テストの宛先を確認できません' : undefined}
-            busy={sending} busyLabel="送信中…" onClick={() => void sendTest()}>自分にテスト送信</PermissionGatedButton> : null}
+            busy={sending} busyLabel="送信中…" onClick={() => void sendTest()}>自分にテスト送信</PermissionGatedButton>
         </div>
         <p className={styles.cardDesc} role="status">
           {testNote ?? (rule.lastTestStatus === 'succeeded'
