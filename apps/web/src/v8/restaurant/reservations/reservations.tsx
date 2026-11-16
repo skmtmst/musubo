@@ -346,6 +346,8 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
       <EditReservationDialog
         key={editTarget?.sequence ?? 0}
         reservation={opened}
+        accountId={accountId}
+        storeId={storeId}
         missing={missing}
         tables={tables}
         courses={menuItems}

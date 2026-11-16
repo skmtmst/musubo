@@ -6,7 +6,7 @@ import {reservation} from '../booking-kit/test-data'
 afterEach(cleanup)
 it('OP-R05 日時を変えず保存しても端末の時間帯で予約を動かさない', async()=>{
  const onSave=vi.fn()
- render(<EditReservationDialog reservation={reservation('synthetic',{customer_name:'人工のお客さま',starts_at:'2026-10-20T09:00:00.000Z',ends_at:'2026-10-20T11:00:00.000Z'})} tables={[]} courses={[]} busy={false} canWrite onClose={()=>{}} onSave={onSave} onCancelReservation={()=>{}} onRestore={()=>{}}/>)
+ render(<EditReservationDialog accountId="account-1" storeId="store" reservation={reservation('synthetic',{customer_name:'人工のお客さま',starts_at:'2026-10-20T09:00:00.000Z',ends_at:'2026-10-20T11:00:00.000Z'})} tables={[]} courses={[]} busy={false} canWrite onClose={()=>{}} onSave={onSave} onCancelReservation={()=>{}} onRestore={()=>{}}/>)
  const save=screen.getByRole('button',{name:'保存する'})
  expect(save.querySelectorAll('svg.lucide-check')).toHaveLength(1)
  fireEvent.click(save)

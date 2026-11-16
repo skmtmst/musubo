@@ -358,13 +358,17 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
   const changesSlot=next.table_id!==current.table_id||next.guest_count!==current.guest_count||next.starts_at!==current.starts_at||next.ends_at!==current.ends_at||(!reservationSlotActive(current.status)&&reservationSlotActive(next.status));
   if(changesSlot && next.table_id && reservationSlotActive(next.status)) {
     const candidates=await openSeatTables(dbFor(c.env,current.store_id),current.store_id,next.starts_at,next.ends_at,next.guest_count,false,current.id);
-    if(!candidates.some(t=>t.id===next.table_id||t.tableIds?.includes(next.table_id!)))return c.json({success:false,code:'availability_conflict',error:'人数・休業・卓の停止を確認してください'},409);
+    if(!candidates.some(t=>t.id===next.table_id||t.tableIds?.includes(next.table_id!))) {
+      const eligible = await openSeatTables(dbFor(c.env,current.store_id),current.store_id,next.starts_at,next.ends_at,next.guest_count,true,current.id);
+      if (eligible.some(t=>t.id===next.table_id||t.tableIds?.includes(next.table_id!))) return c.json({success:false,code:'table_conflict',data:{tableId:next.table_id},error:'同じ卓に重なる時間の予約があります'},409);
+      return c.json({success:false,code:'availability_conflict',error:'人数・休業・卓の停止を確認してください'},409);
+    }
   }
   if (next.table_id && reservationSlotActive(next.status)
     && await overlappingReservationExists(
       dbFor(c.env, current.store_id), current.store_id, next.table_id, next.starts_at, next.ends_at, current.id, c.env,
     )) {
-    return c.json({ success: false, error: '同じ卓に重なる時間の予約があるため変更できません' }, 409);
+    return c.json({ success: false, code: 'table_conflict', data: { tableId: next.table_id }, error: '同じ卓に重なる時間の予約があるため変更できません' }, 409);
   }
   const db = dbFor(c.env, current.store_id);
   const capacity = changesSlot && reservationSlotActive(next.status) ? await restaurantSeatCapacity(db,current.store_id,next.starts_at,next.ends_at,current.id) : null;

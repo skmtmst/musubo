@@ -6,13 +6,13 @@ import { datetimeLocalJstToUtcIso, jstDateTimeLocal, jstCalendar } from '@/lib/j
 
 import { useEffect, useRef, useState } from 'react'
 import { Check, Download } from 'lucide-react'
-import { Field } from '@/components/shared/form-controls'
+import { Field, FieldError } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import DateTimeField from '@/components/shared/date-time-field'
-import type { RestaurantMenuItem, RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
+import { restaurantTestApi, type RestaurantMenuItem, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
 import { DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import { INACTIVE_STATUSES, hm, isHold, pad2 } from './format'
 import styles from './reservations.module.css'
@@ -26,6 +26,8 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import EntitySelect from '@/components/shared/entity-select'
 import { withHonorific } from '@line-crm/shared'
 import type { ReservationEditSaveResult } from './edit-save-result'
+import { ApiError } from '@/lib/api'
+import { InlineButtons } from '@/components/shared/inline-buttons'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 
 /*
@@ -54,8 +56,10 @@ function ReadOnlyChoice({ label, value, options }: { label: string; value: strin
   return <SaveErrorField names={["shown"]}><TextField aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} /></SaveErrorField>
 }
 
-export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, onClose, onSave, onCancelReservation, onRestore, missing = false }: {
+export function EditReservationDialog({ reservation, accountId, storeId, tables, courses, busy, canWrite, onClose, onSave, onCancelReservation, onRestore, missing = false }: {
   reservation: RestaurantReservation | null
+  accountId: string
+  storeId: string
   missing?: boolean
   tables: RestaurantTable[]
   courses: RestaurantMenuItem[]
@@ -86,9 +90,13 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
     })
   }, [reservation?.id])
   const fields = useSaveFormErrors()
+  const [conflict, setConflict] = useState(false)
+  const [available, setAvailable] = useState<Array<{id: string; label: string; tableIds?: string[]}> | null>(null)
+  const [availabilityFailed, setAvailabilityFailed] = useState(false)
   const [saveError, setSaveError] = useState<unknown>(null)
   const saving = useRef(false)
   const attempt = useRef(0)
+  useEffect(() => { setConflict(false); setAvailable(null); setAvailabilityFailed(false) }, [draft.tableId, draft.startsAt, draft.endsAt, draft.guestCount])
   const currentInput = useRef({ draft, canWrite, busy, changedElsewhere, onSave })
   currentInput.current = { draft, canWrite, busy, changedElsewhere, onSave }
   useEffect(() => () => { attempt.current += 1 }, [])
@@ -110,9 +118,13 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       })
       return
     }
+    const sameSlot = () => { const now = currentInput.current.draft; return now.tableId === input.tableId && now.startsAt === input.startsAt && now.endsAt === input.endsAt && now.guestCount === input.guestCount }
     const ticket = ++attempt.current
     saving.current = true
     setSaveError(null)
+    setConflict(false)
+    setAvailable(null)
+    setAvailabilityFailed(false)
     try {
       const result = await commit({
         expectedVersion: initialReservation.current?.version ?? 1,
@@ -127,7 +139,13 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       })
       if (ticket === attempt.current && result?.inputError !== undefined && !fields.capture(result.inputError)) setSaveError(result.inputError)
     } catch (error) {
-      if (ticket === attempt.current && !fields.capture(error)) setSaveError(error)
+      if (ticket === attempt.current && sameSlot() && error instanceof ApiError && error.status === 409 && error.code === 'table_conflict') {
+        setConflict(true)
+        try {
+          const result = await restaurantTestApi.seatAvailability(accountId, { storeId, startsAt: datetimeLocalJstToUtcIso(input.startsAt), endsAt: datetimeLocalJstToUtcIso(input.endsAt), guestCount: Number(input.guestCount), excludeReservationId: reservation.id })
+          if (ticket === attempt.current && sameSlot()) setAvailable(result.data.tables)
+        } catch { if (ticket === attempt.current && sameSlot()) setAvailabilityFailed(true) }
+      } else if (ticket === attempt.current && !(error instanceof ApiError && error.code === 'table_conflict') && !fields.capture(error)) setSaveError(error)
     } finally {
       if (ticket === attempt.current) saving.current = false
     }
@@ -186,8 +204,11 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
             </Field>
             <Field labelSize="compact" label="卓">
               {canWrite ? (
-                <SaveErrorField names={["tableId","draft.tableId","table_id","draft.table_id"]}><EntitySelect aria-label="卓" size="full" value={draft.tableId} onChange={(value) => setDraft({ ...draft, tableId: value })} options={tableOptions} /></SaveErrorField>
+                <SaveErrorField names={["tableId","draft.tableId","table_id","draft.table_id"]}><EntitySelect aria-label="卓" invalid={conflict} size="full" value={draft.tableId} onChange={(value) => { setConflict(false); setDraft({ ...draft, tableId: value }) }} options={tableOptions} /></SaveErrorField>
               ) : <ReadOnlyChoice label="卓" value={draft.tableId} options={tableOptions} />}
+              <FieldError id="rs-table-conflict">{conflict ? `${tables.find(t => t.id === draft.tableId)?.code ?? "選択した卓"} はこの時間に別の予約があります` : null}</FieldError>
+              {conflict && available !== null ? <>空いている卓 {available.length ? <InlineButtons>{available.map(t => <Button key={t.id} type="button" variant="secondary" onClick={() => { setDraft({ ...draft, tableId: t.id }); setConflict(false) }}>{t.tableIds?.length ? t.label : tables.find(table => table.id === t.id)?.code ?? t.label}</Button>)}</InlineButtons> : 'この時間に空いている卓はありません'}</> : null}
+              {conflict && availabilityFailed ? <DialogNote>空いている卓を読み込めませんでした。もう一度保存してください。</DialogNote> : null}
             </Field>
           </div>
           <div className={styles.pair}>

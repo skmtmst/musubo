@@ -15,7 +15,7 @@ import { EditReservationDialog } from './dialogs'
 afterEach(cleanup)
 const row = reservation('synthetic', { starts_at: '2026-11-02T09:00:00.000Z', ends_at: '2026-11-02T11:00:00.000Z' })
 function props(onSave: (patch: Record<string, unknown>) => Promise<ReservationEditSaveResult>) {
-  return { reservation: row, tables: [], courses: [], busy: false, canWrite: true, onClose() {}, onSave, onCancelReservation() {}, onRestore() {} }
+  return { reservation: row, accountId: 'account-1', storeId: 'store', tables: [], courses: [], busy: false, canWrite: true, onClose() {}, onSave, onCancelReservation() {}, onRestore() {} }
 }
 it('同じ描画の二度の確定でも保存は1回だけ', async () => {
   let release!: (value: ReservationEditSaveResult) => void
@@ -69,4 +69,43 @@ it('別の版を受け取った後は古い確定口でも上書きしない', a
   expect(screen.getByText(/別の操作で予約が変更されたか/)).toBeTruthy()
   await act(async () => { await old() })
   expect(save).not.toHaveBeenCalled()
+})
+it('卓の重複を欄に示し空いている卓を選べる', async () => {
+  const { restaurantTestApi } = await import('@/lib/restaurant-test-api')
+  const { tables } = await import('../booking-kit/test-data')
+  const lookup = vi.spyOn(restaurantTestApi, 'seatAvailability').mockResolvedValue({ success: true, data: { storeId: 'store', startsAt: row.starts_at, endsAt: row.ends_at, guestCount: 2, tables: [{ id: tables[1].id, label: tables[1].label, minCapacity: 1, maxCapacity: 4 }] } })
+  const save = vi.fn().mockRejectedValueOnce(new ApiError(409, '重複', 'table_conflict')).mockResolvedValue({ saved: true })
+  render(<EditReservationDialog {...props(save)} reservation={{ ...row, table_id: tables[0].id }} tables={tables} />)
+  await act(async () => { await callbacks.submit!() })
+  expect(screen.getByText(`${tables[0].code} はこの時間に別の予約があります`)).toBeTruthy()
+  expect(screen.getByLabelText('卓').getAttribute('aria-invalid')).toBe('true')
+  fireEvent.click(screen.getByRole('button', { name: tables[1].code }))
+  await act(async () => { await callbacks.submit!() })
+  expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ tableId: tables[1].id }))
+  lookup.mockRestore()
+})
+it('空き卓がないときは案内し、人数を変えると古い案内を消す', async () => {
+  const { restaurantTestApi } = await import('@/lib/restaurant-test-api')
+  const lookup = vi.spyOn(restaurantTestApi, 'seatAvailability').mockResolvedValue({ success: true, data: { storeId: 'store', startsAt: row.starts_at, endsAt: row.ends_at, guestCount: 2, tables: [] } })
+  const save = vi.fn().mockRejectedValue(new ApiError(409, '重複', 'table_conflict'))
+  render(<EditReservationDialog {...props(save)} />)
+  await act(async () => { await callbacks.submit!() })
+  expect(screen.getByRole('dialog').textContent).toContain('この時間に空いている卓はありません')
+  fireEvent.change(screen.getByLabelText('人数'), { target: { value: '3' } })
+  expect(screen.getByRole('dialog').textContent).not.toContain('この時間に空いている卓はありません')
+  lookup.mockRestore()
+})
+
+it('保存中に名前を変えても卓の重複を知らせる', async () => {
+  const { restaurantTestApi } = await import('@/lib/restaurant-test-api')
+  const lookup = vi.spyOn(restaurantTestApi, 'seatAvailability').mockResolvedValue({ success: true, data: { storeId: 'store', startsAt: row.starts_at, endsAt: row.ends_at, guestCount: 2, tables: [] } })
+  let reject!: (reason: unknown) => void
+  const save = vi.fn(() => new Promise<ReservationEditSaveResult>((_, fail) => { reject = fail }))
+  render(<EditReservationDialog {...props(save)} />)
+  let pending: unknown
+  await act(async () => { pending = callbacks.submit!() })
+  fireEvent.change(screen.getByLabelText('お客様名'), { target: { value: '別の名前' } })
+  await act(async () => { reject(new ApiError(409, '重複', 'table_conflict')); await pending })
+  expect(screen.getByRole('dialog').textContent).toContain('この時間に別の予約があります')
+  lookup.mockRestore()
 })
