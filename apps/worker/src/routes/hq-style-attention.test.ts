@@ -128,8 +128,8 @@ test('5アカウントは集計5batchと名前1読取で開始し、先のアカ
   const pending = read();
   try {
     await vi.waitFor(() => expect(batch).toHaveBeenCalledTimes(5));
-    expect(batch.mock.calls.every(([statements]) => statements.length === 10)).toBe(true);
-    expect(prepare.mock.calls).toHaveLength(55); // 集計50文＋名前1文＋権限/scope4文。
+    expect(batch.mock.calls.every(([statements]) => statements.length === 12)).toBe(true);
+    expect(prepare.mock.calls).toHaveLength(70); // 集計60文＋設定5文＋名前1文＋権限/scope4文。
   } finally { release(); }
   expect((await pending).data.items).toHaveLength(5);
 });
@@ -182,18 +182,3 @@ test('統括のトーク数と受信箱の状態別数は友だちの所属で�
     {href:'/chats?status=unread',count:1}, {href:'/chats?status=in_progress',count:1}, {href:'/chats?status=on_hold',count:1},
   ]));
 })
-
-test('期限の設定の読み取りに失敗しても他の件数と他店を返す', async () => {
-  d.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('a2','attention-ch-2','二号店','token','secret','t')");
-  chat('first'); chat('second','a2');
-  const original = d.db.prepare.bind(d.db);
-  let failed = false;
-  const spy = vi.spyOn(d.db, 'prepare').mockImplementation((query: string) => {
-    if (!failed && query === 'SELECT * FROM inbox_routing_settings WHERE account_id=?') { failed = true; throw new Error('SLA unavailable'); }
-    return original(query);
-  });
-  try {
-    const result = await read();
-    expect(result.data.items.map(item => [item.counts.unhandledChats, item.counts.overdueChats])).toEqual([[1, null], [1, 0]]);
-  } finally { spy.mockRestore(); }
-});

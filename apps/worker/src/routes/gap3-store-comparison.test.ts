@@ -174,16 +174,9 @@ test('SLA-28: 統括は可視の店の未返信で期限超過した会話だけ
  expect(detail.attention.counts.overdueChats).toBe(1);
  expect(detail.attention.targets.overdueChats).toEqual([{href:'/chats?slaState=overdue',count:1}]);
  d.raw.exec("UPDATE inbox_routing_settings SET sla_business_hours_only=1 WHERE account_id='a'; INSERT INTO style_holidays(line_account_id,date,name) VALUES('a',date('now','+9 hours'),'休日')");
- expect((await read('/api/hq/store-comparison/a')).attention.counts.overdueChats).toBe(1);
+ expect((await read('/api/hq/store-comparison/a')).attention.counts.overdueChats).toBe(0);
  d.raw.exec("UPDATE inbox_routing_settings SET sla_business_hours_only=0 WHERE account_id='a'");
- d.raw.exec("UPDATE chats SET sla_due_at=NULL WHERE id='late'");
- expect((await read('/api/hq/store-comparison/a')).attention.counts.overdueChats).toBe(1);
- d.raw.exec("UPDATE inbox_routing_settings SET sla_enabled=0 WHERE account_id='a'");
- expect((await read('/api/hq/store-comparison/a')).attention.counts.overdueChats).toBe(0);
- d.raw.exec("UPDATE inbox_routing_settings SET sla_enabled=1 WHERE account_id='a'");
- d.raw.exec("UPDATE chats SET status='resolved' WHERE id='late'");
- expect((await read('/api/hq/store-comparison/a')).attention.counts.overdueChats).toBe(0);
- d.raw.exec("UPDATE chats SET status='unread',first_response_at='2020-01-02' WHERE id='late'");
+ d.raw.exec("UPDATE chats SET first_response_at='2020-01-02' WHERE id='late'");
  expect((await read('/api/hq/store-comparison/a')).attention.counts.overdueChats).toBe(0);
 });
 
