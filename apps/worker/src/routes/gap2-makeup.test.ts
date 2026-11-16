@@ -58,3 +58,39 @@ test('B3-05 B3-07: 統括の削除順は使用済み券を消してから元の�
  for(const table of purgeTablesChildFirst().filter(t=>tables.has(t)))d.raw.prepare(`DELETE FROM ${table} WHERE ${tenantScopeCondition(table)}`).run('t');
  for(const table of tables)expect(d.raw.prepare(`SELECT COUNT(*) n FROM ${table}`).get()).toEqual({n:0});
 });
+
+test('B3-01: 欠席した席のキャンセル待ち繰上げを一度だけ予約する',async()=>{
+ await absence(d.db,'a','f','eb','customer');
+ await absence(d.db,'a','f','eb','customer');
+ expect(d.raw.prepare('SELECT event_id,slot_id,source_key,status FROM event_waitlist_promotion_jobs').all()).toEqual([{event_id:'lesson',slot_id:'src',source_key:'absence:eb',status:'pending'}]);
+});
+
+test('B3-02: 締め後の欠席を保存し振替券を発行しない',async()=>{
+ d.raw.prepare("UPDATE event_slots SET starts_at=? WHERE id='src'").run(new Date(Date.now()+3600000).toISOString());
+ const result=await absence(d.db,'a','f','eb','customer');
+ expect(result.reasonIfNone).toBe('cutoff_passed');
+ expect(d.raw.prepare("SELECT status,absence_reported_at FROM event_bookings WHERE id='eb'").get()).toEqual({status:'cancelled',absence_reported_at:'2026-11-16T00:00:00.000Z'});
+ expect(d.raw.prepare('SELECT count(*) n FROM booking_makeup_credits').get()).toEqual({n:0});
+});
+
+test('B3-03: 同一の教室以外の空き回は振替先に含めない',async()=>{
+ d.raw.exec("INSERT INTO events(id,line_account_id,name,is_published,lifecycle_status) VALUES('other','a','別教室',1,'published'); INSERT INTO event_slots(id,event_id,starts_at,ends_at,capacity) VALUES('other-slot','other','2026-11-27T05:00:00Z','2026-11-27T06:00:00Z',1)");
+ const credit=(await absence(d.db,'a','f','eb','customer')).makeupCredit as any;
+ const ids=(await makeupOptions(d.db,'a','f',credit.id)).map(x=>x.id);
+ expect(ids).toContain('dst');expect(ids).not.toContain('other-slot');
+});
+
+test('B3-09: 締め後の手動付与は理由を記録する',async()=>{
+ d.raw.prepare("UPDATE event_slots SET starts_at=? WHERE id='src'").run(new Date(Date.now()+3600000).toISOString());
+ const result=await absence(d.db,'a','f','eb','staff',true,'休講の補填');
+ expect(result.makeupCredit).toMatchObject({status:'open',reason:'休講の補填',granted_by:'staff'});
+ expect(d.raw.prepare("SELECT status FROM event_bookings WHERE id='eb'").get()).toEqual({status:'cancelled'});
+});
+
+test('B3-13: 期限切れの券は履歴に残り選択や使用はできない',async()=>{
+ const credit=(await absence(d.db,'a','f','eb','customer')).makeupCredit as any;
+ vi.setSystemTime(new Date('2027-01-01T00:00:00Z'));
+ await expireMakeup(d.db,new Date());
+ expect(d.raw.prepare('SELECT id,status,expires_at FROM booking_makeup_credits').get()).toEqual({id:credit.id,status:'expired',expires_at:credit.expires_at});
+ await expect(makeupOptions(d.db,'a','f',credit.id)).rejects.toThrow('credit_unavailable');
+});
