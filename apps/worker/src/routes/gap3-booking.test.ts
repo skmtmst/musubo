@@ -119,3 +119,51 @@ test('B5-04: 同時の組では片方の担当が埋まった時刻を候補に�
  const result=await previewParty(d.db,'a',members,'parallel','2026-11-20','2026-11-20',{});
  expect(result.slots.some(s=>Date.parse(s.startsAt)===Date.parse('2026-11-20T05:00:00Z'))).toBe(false);
 });
+
+function seedGroupAddon(){
+ d.raw.exec(`UPDATE menus SET base_price=5000,addon_menu_ids_json='["spa"]' WHERE id='menu';
+ INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price,addon_only) VALUES('spa','a','ヘッドスパ',15,2500,1)`);
+}
+test('B5-02: 2人分と1人目の追加メニューの料金を合算する',async()=>{
+ seedGroupAddon();
+ const members=[{menuId:'menu',staffId:'bs',addonIds:['spa']},{menuId:'menu',staffId:'bs2'}];
+ const r=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...input,members});
+ expect(r.status,await r.clone().text()).toBe(201);
+ const data=(await r.json() as any).data;expect(data.total).toBe(12500);
+ expect(data.bookings.map((b:any)=>b.price_at_booking)).toEqual([7500,5000]);
+});
+test('B5-05: 追加15分を含む同じ担当の75分と60分を続ける',async()=>{
+ seedGroupAddon();
+ const members=[{menuId:'menu',staffId:'bs',addonIds:['spa']},{menuId:'menu',staffId:'bs'}];
+ const r=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...input,members,startMode:'sequential'});
+ expect(r.status,await r.clone().text()).toBe(201);
+ const rows=(await r.json() as any).data.bookings;
+ expect(rows.map((b:any)=>b.staff_id)).toEqual(['bs','bs']);
+ expect(rows.map((b:any)=>[new Date(b.starts_at).toISOString(),new Date(b.ends_at).toISOString()])).toEqual([['2026-11-20T05:00:00.000Z','2026-11-20T06:15:00.000Z'],['2026-11-20T06:15:00.000Z','2026-11-20T07:15:00.000Z']]);
+});
+test('B5-06: 指名なしの2人には重ならない別々の担当を割り当てる',async()=>{
+ const members=[{menuId:'menu'},{menuId:'menu'}];
+ const r=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...input,members});
+ expect(r.status,await r.clone().text()).toBe(201);
+ const rows=(await r.json() as any).data.bookings;
+ expect(rows).toHaveLength(2);expect(new Set(rows.map((b:any)=>b.staff_id))).toEqual(new Set(['bs','bs2']));
+ expect(rows.map((b:any)=>new Date(b.starts_at).toISOString())).toEqual([input.starts_at,input.starts_at]);
+});
+test('B5-08: 同じキーでの組予約再送は同じ組と2人を返す',async()=>{
+ const first=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'retry-group');
+ const second=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'retry-group');
+ expect(first.status).toBe(201);expect(second.status).toBe(201);
+ const a=(await first.json() as any).data,b=(await second.json() as any).data;
+ expect(b.groupId).toBe(a.groupId);expect(b.replayed).toBe(true);
+ expect(d.raw.prepare('SELECT count(*) n FROM booking_groups').get()).toEqual({n:1});
+ expect(d.raw.prepare('SELECT count(*) n FROM bookings').get()).toEqual({n:2});
+});
+test('B5-16: 人数上限を1に下げても既存の組は残り新しい組は拒否する',async()=>{
+ const first=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'old-group');expect(first.status).toBe(201);
+ const groupId=(await first.json() as any).data.groupId;
+ d.raw.exec("UPDATE menus SET max_party_size=1 WHERE id='menu'");
+ const next=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...input,starts_at:'2026-11-27T05:00:00.000Z'},'new-group');
+ expect(next.status).toBe(400);expect(await next.json()).toMatchObject({error:'party_size_not_allowed'});
+ expect(d.raw.prepare('SELECT count(*) n FROM booking_groups WHERE id=?').get(groupId)).toEqual({n:1});
+ expect(d.raw.prepare('SELECT count(*) n FROM bookings WHERE group_id=? AND status=\'confirmed\'').get(groupId)).toEqual({n:2});
+});
