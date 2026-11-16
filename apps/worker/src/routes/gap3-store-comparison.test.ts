@@ -179,3 +179,13 @@ test('SLA-28: 統括は可視の店の未返信で期限超過した会話だけ
  d.raw.exec("UPDATE chats SET first_response_at='2020-01-02' WHERE id='late'");
  expect((await read('/api/hq/store-comparison/a')).attention.counts.overdueChats).toBe(0);
 });
+
+test('クリックした人を特定できない記録は、比較用のクリック率を0としない',async()=>{
+ d.raw.exec(`INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id,status,sent_at,success_count) VALUES('b1','配信','text','本文','a','sent','2026-10-15T01:00:00Z',20);
+ INSERT INTO tracked_links(id,name,original_url,line_account_id) VALUES('l1','リンク','https://example.com','a');
+ INSERT INTO broadcast_tracked_links(broadcast_id,tracked_link_id,label,created_at) VALUES('b1','l1','リンク','2026-10-15');
+ INSERT INTO link_clicks(id,tracked_link_id,friend_id,clicked_at) VALUES('anonymous','l1',NULL,'2026-10-15T02:00:00Z');`);
+ await snapshotStoreMetrics(d.db,'a','2026-10-15');
+ const n=await storeNumbers(d.db,'a',comparisonPeriod('2026-10-15','2026-10-15'));
+ expect(n.values.clickRate).toBeNull();
+});
