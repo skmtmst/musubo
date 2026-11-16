@@ -620,3 +620,20 @@ describe('ファネルの編集・停止・保管(#841)', () => {
     ).toBe(false)
   })
 })
+
+it('ファネルの案内は作成画面で選べる全種類を表示する', async () => {
+  const { FUNNEL_STEP_KINDS } = await import('@/v8/analytics/funnel-form')
+  fixture.tab = 'funnel'
+  net.handler = async path => {
+    if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'admin' } }
+    if (path.startsWith('/api/analytics/funnels?')) return { success: true, data: [{ id: 'funnel-1', name: '申込導線', windowDays: 14, createdAt: '2026-01-01T00:00:00.000Z', status: 'active', currentVersion: { id: 'version-1', versionNumber: 1, createdAt: '2026-01-01T00:00:00.000Z' }, migrationState: 'ready' }] }
+    if (path.includes('/runs/latest?')) return { success: true, data: funnelRun() }
+    return { success: true, data: [] }
+  }
+  await render()
+  await act(async () => { for (let i = 0; i < 8; i++) await Promise.resolve() })
+  const disclosure = [...host.querySelectorAll('summary, button')].find(node => node.textContent?.includes('段の作り方')) as HTMLElement
+  expect(disclosure).toBeTruthy()
+  await act(async () => { disclosure.click() })
+  expect(host.textContent).toContain(`段には ${FUNNEL_STEP_KINDS.map(item => item.label).join('・')} を置けます`)
+})

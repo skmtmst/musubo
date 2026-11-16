@@ -24,7 +24,7 @@ export default function AnalyticsPage() {
  */
 /* 新しい分析（V8）へ渡す今の部品：ファネルの作る・編集フォームと、結果の保存欄。 */
 // 段に置ける種類の選択肢。正本は packages/db/src/analytics-funnels.ts の
-// V6_FUNNEL_STEP_KINDS（この並びと同じ種類・同じ順を保つ。契約試験が照合する）。
+// V6_FUNNEL_STEP_KINDS（この並びと同じ種類・同じ順を保つ。funnel-form-react.test.tsx が照合する）。
 // 「段の作り方」の案内もこの一覧から作るので、選べる種類と説明がずれない。
 const FUNNEL_STEP_KIND_OPTIONS = [
   { key: 'friend_add', label: '友だち追加', hint: '' },

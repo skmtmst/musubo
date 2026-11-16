@@ -467,6 +467,8 @@
 
 ## 反映履歴
 
+- [絞り込みや分析の自動確認を改善](release-log/unreleased/100-kenta-q02b-b4.md) — 反映履歴、確認 2026-11-17。
+
 - [一覧や返信の自動確認を改善](release-log/unreleased/99-kenta-q02b-b3.md) — 反映履歴、確認 2026-11-17。
 
 - [自動確認を画面の操作と予定の計算で確認](release-log/unreleased/96-kenta-q02b-b2.md) — 反映履歴、確認 2026-11-16。
