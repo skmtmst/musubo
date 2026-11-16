@@ -1,0 +1,15 @@
+/* 枠 02 (C5i3rw) の IJocF / XzDt5 の実値をそのまま写す。 */
+.chip {
+  flex: 0 0 auto;
+  background: #e9f7ee;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: #00833f;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip:hover { background: #dcf0e4; }

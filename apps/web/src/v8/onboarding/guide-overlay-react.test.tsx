@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GuideOverlay } from './guide-overlay'
 
@@ -92,8 +92,20 @@ describe('手順別ガイドの重ね表示', () => {
   it('ガイド対象外の画面（対象が無い）では自動で一時停止する', () => {
     vi.useFakeTimers()
     const props = renderOverlay()
-    act(() => { vi.advanceTimersByTime(700) })
+    /* 画面の移り変わりの猶予（MISSING_ANCHOR_WAIT_MS 1500ms）を過ぎてから止まる。 */
+    act(() => { vi.advanceTimersByTime(1600) })
     expect(props.onPause).toHaveBeenCalled()
+  })
+
+  it('画面を移って対象が遅れて現れたら、一時停止せずそこを光らせる', async () => {
+    const props = renderOverlay()
+    expect(document.querySelector('[data-guide-spotlight="tables.create"]')).toBeNull()
+    /* 画面遷移の後に対象が描かれる状況。見張っていて現れたら測り直す。 */
+    mountTarget('tables.create')
+    await waitFor(() => {
+      expect(document.querySelector('[data-guide-spotlight="tables.create"]')).not.toBeNull()
+    })
+    expect(props.onPause).not.toHaveBeenCalled()
   })
 
   it('台本の無い段（①②③⑨）では何も出さない', () => {

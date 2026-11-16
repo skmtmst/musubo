@@ -16,6 +16,9 @@ import styles from './guide-overlay.module.css'
 
 const ORDER_MARKS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'] as const
 
+/** 対象が見つからない時に待つ長さ。画面の移り変わりの間に一時停止させないための猶予。 */
+const MISSING_ANCHOR_WAIT_MS = 1500
+
 export type GuideOverlayProps = {
   /** 案内中だけ出す。一時停止・未開始・完了では何も出さない。 */
   active: boolean
@@ -89,11 +92,22 @@ export function GuideOverlay({
   useEffect(() => {
     if (!active || !anchorName || target) return
     if (missingSince.current === null) missingSince.current = 1
+    /*
+      画面を移った直後は対象がまだ描かれていない。
+      描き足されるのを見張って、現れたらその場で測る（ここで測り直さないと光らないままになる）。
+    */
+    const observer = new MutationObserver(() => {
+      if (document.querySelector(`[data-guide-anchor="${anchorName}"]`)) measure()
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
     const timer = window.setTimeout(() => {
       if (document.querySelector(`[data-guide-anchor="${anchorName}"]`)) { measure(); return }
       onPause()
-    }, 600)
-    return () => window.clearTimeout(timer)
+    }, MISSING_ANCHOR_WAIT_MS)
+    return () => {
+      observer.disconnect()
+      window.clearTimeout(timer)
+    }
   }, [active, anchorName, target, measure, onPause])
 
   /* ESCで一時停止（枠14 izsr5）。 */
@@ -145,7 +159,11 @@ export function GuideOverlay({
         />
       ))}
       {ring ? (
-        <div className={styles.ring} style={{ left: ring.left, top: ring.top, width: ring.width, height: ring.height }} />
+        <div
+          className={styles.ring}
+          data-guide-spotlight={anchorName ?? ''}
+          style={{ left: ring.left, top: ring.top, width: ring.width, height: ring.height }}
+        />
       ) : null}
 
       {/* 読み上げに乗せる（枠14 izsr5「吹き出しはaria-liveで読み上げ」）。 */}
@@ -167,7 +185,7 @@ export function GuideOverlay({
         </div>
       </div>
 
-      <div className={styles.bar} style={{ left: 264, top: Math.max(16, viewport.height - 84) }}>
+      <div className={styles.bar} data-guide-bar="" style={{ left: 264, top: Math.max(16, viewport.height - 84) }}>
         <div className={styles.barHeader}>
           <span className={styles.barTitle}>開店準備ガイド</span>
           <button type="button" className={styles.barPause} onClick={onPause}>一時停止</button>

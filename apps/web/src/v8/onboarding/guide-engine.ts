@@ -144,14 +144,14 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
   }, [accountId])
 
   const commit = useCallback((action: GuideEngineAction, stepKey: string | null = null) => {
-    let previous = state
-    let next = state
-    setState(current => {
-      previous = current
-      next = nextGuideEngineState(current, action, stepKey)
-      return next
-    })
+    /*
+      遷移はこの場で決める。setState の関数は描画の時まで走らないことがあり、
+      中で決めた値を使うと「変わっていない」と誤判定して案内が始まらない。
+    */
+    const previous = state
+    const next = nextGuideEngineState(previous, action, stepKey)
     if (next === previous) return
+    setState(next)
     void persist(next).then(saved => {
       if (saved || !BLOCK_ON_SAVE_FAILURE.has(action)) return
       // 保存できなかった進行は取り消す。見た目だけ進んで記録が残らない状態を作らない。

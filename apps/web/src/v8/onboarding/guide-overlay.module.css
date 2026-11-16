@@ -157,28 +157,33 @@
   光の輪だけ対象を追い、吹き出しと帯は画面の下に固定して読む所を動かさない。
 */
 @media (max-width: 480px) {
+  /*
+    帯は画面のいちばん下。吹き出しはその上に積む。
+    重ねると説明が帯で隠れて読めないので、帯の高さ(実測 約92px)分だけ上へ置く。
+  */
   .balloon {
     left: 8px !important;
     right: 8px;
     top: auto !important;
-    bottom: 8px;
+    bottom: 96px;
     width: auto;
     border-radius: 14px 14px 0 0;
   }
 
   .bar {
-    left: 8px !important;
-    right: 8px;
+    left: 0 !important;
+    right: 0;
     top: auto !important;
     bottom: 0;
     width: auto;
+    box-sizing: border-box;
     box-shadow: none;
     border-radius: 0;
   }
 
   /* 簡易表示。長い説明で画面を埋めない。 */
   .body {
-    max-height: 7.5em;
+    max-height: 6em;
     overflow-y: auto;
   }
 }

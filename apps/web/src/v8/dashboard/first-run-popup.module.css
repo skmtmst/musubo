@@ -1,0 +1,324 @@
+/*
+  初回ポップアップ。承認済み Pen
+  /Users/masatosakamoto/Documents/musubo-course-media-upload-20261110.pen
+  枠 02 (C5i3rw) ＝ PC、枠 02b (nt3Po) ＝ スマホ（ボトムシート）。
+  数値は枠の実値をそのまま写す。
+*/
+
+/* 枠 02 の覆い lyjdu #0f172a59 */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: #0f172a59;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* 枠 02 のカード G8vBl: 620 / #ffffff / r16 / 影 0 12 32 #10182833 / 縦 gap14 / padding28 */
+.card {
+  width: 620px;
+  max-width: 100%;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 12px 32px #10182833;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+}
+
+/* スマホの掴み手 iNVoW / hUSUR（PCでは出さない） */
+.grabber { display: none; }
+
+/* 枠 02 の見出し VliWA: gap16 / 中央そろえ */
+.header {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+/* 輪 cohVt: 52x52 / r999 / 線 #00833f 3px */
+.ring {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 3px solid #00833f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* hvJuA: #00833f 14/700 */
+.ringText {
+  color: #00833f;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* c570F: 縦 gap4 */
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* i1Tyj: #1d1d1f 20/800 */
+.title {
+  margin: 0;
+  color: #1d1d1f;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+/* fX8qY: #4a5565 13/500 / 行の高さ1.6 */
+.lead {
+  margin: 0;
+  color: #4a5565;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+/* 一言はPCの言い方を既定にして、スマホ幅だけ枠02bの短い言い方へ差し替える。 */
+.leadSp { display: none; }
+
+/* 一覧 LcMa3: 縦 gap4 */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 行の共通: r10 / gap12 / padding 10 14 / 中央そろえ */
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid transparent;
+  text-align: left;
+}
+
+/* 済みの行 bnJsJ */
+.rowDone { background: #ffffff; }
+
+/* 現在の行 v4LA6: #e9f7ee / 線 #00833f33 1px */
+.rowCurrent {
+  background: #e9f7ee;
+  border-color: #00833f33;
+}
+
+/* 印の共通: 26x26 / r999 */
+.mark {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* NXvTP: #00833f の丸に白い✓ */
+.markDone {
+  background: #00833f;
+  color: #ffffff;
+}
+
+/* tICdq: 白丸＋線 #00833f 1.5 / 数字 #00833f */
+.markCurrent {
+  background: #ffffff;
+  border: 1.5px solid #00833f;
+  color: #00833f;
+}
+
+/* l92Tzv: 白丸＋線 #d6dade 1.5 / 数字 #6b7682 */
+.markTodo {
+  background: #ffffff;
+  border: 1.5px solid #d6dade;
+  color: #6b7682;
+}
+
+/* Bp8mT / sSZ60: 14px。現在の行だけ 700 */
+.label {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #1d1d1f;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.labelCurrent { font-weight: 700; }
+
+/* r7xHZ0: #e9f7ee / r999 / padding 3 8 / 文字 #00833f 12/600 */
+.badge {
+  flex: 0 0 auto;
+  background: #e9f7ee;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #00833f;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* pdn85: #00833f / r10 / gap6 / padding 9 14 / 文字 白 13/600 */
+.rowAction {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #00833f;
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 14px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rowAction:hover { background: #006e35; }
+
+/* 文面は枠ごとに違う（枠02「ガイドで進める」／枠02b「進める」）。 */
+.rowActionPc { display: inline; }
+
+.rowActionMobile { display: none; }
+
+/* ykRGy: 「›」 #b6bcc4 15/500 */
+.chevron {
+  flex: 0 0 auto;
+  color: #b6bcc4;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* 枠 02 の足 TTZx2: gap12 / 中央そろえ */
+.footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* 「あとで」 #4a5565 13/600 */
+.later {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #4a5565;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.later:hover { text-decoration: underline; }
+
+/* 文面は枠ごとに違う（枠02「あとで」／枠02b「あとで（下にスワイプで閉じる）」）。 */
+.laterPc { display: inline; }
+
+.laterMobile { display: none; }
+
+/* XJJjl: 伸びる隙間 */
+.footerSpacer { flex: 1 1 auto; }
+
+/* 注記: #9aa3af 12/500 */
+.note {
+  color: #9aa3af;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/*
+  枠 02b (nt3Po) スマホ：画面下部固定の簡易表示（本人回答どおり）。
+  シート noXJA: r20 / padding 12 16 24 16 / 縦 gap12。
+*/
+@media (max-width: 480px) {
+  .scrim {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .card {
+    width: 100%;
+    max-width: none;
+    max-height: 87vh;
+    border-radius: 20px 20px 0 0;
+    gap: 12px;
+    padding: 12px 16px 24px;
+  }
+
+  /* iNVoW: 中央そろえ / hUSUR: 36x4 #d1d5db r999 */
+  .grabber {
+    display: flex;
+    justify-content: center;
+  }
+
+  .grabberBar {
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: #d1d5db;
+  }
+
+  /* isJJM: gap12 / 輪 K4fHC 44x44 / 文字 12 */
+  .header { gap: 12px; }
+
+  .ring {
+    width: 44px;
+    height: 44px;
+  }
+
+  .ringText { font-size: 12px; }
+
+  /* nU2Eh: 縦 gap2 / vMdb9 17/700 / gEPIi 12/500 行の高さ1.5 */
+  .headerText { gap: 2px; }
+
+  .title { font-size: 17px; font-weight: 700; }
+
+  .lead { font-size: 12px; line-height: 1.5; }
+
+  /* gEPIi「順番に進めるとLINE予約を受け付けられます」。1行に収める。 */
+  .leadPc { display: none; }
+
+  .leadSp { display: inline; }
+
+  /* SYPr1: 縦 gap3 / 行 padding 10 12 */
+  .rows { gap: 3px; }
+
+  .row { padding: 10px 12px; }
+
+  .rowActionPc { display: none; }
+
+  .rowActionMobile { display: inline; }
+
+  /* UanUf: 上 padding4 / 中央そろえ。注記は出さない（枠 02b の足は1行） */
+  .footer {
+    padding-top: 4px;
+    justify-content: center;
+  }
+
+  .footerSpacer { display: none; }
+
+  .note { display: none; }
+
+  /* VJR0w: #6b7682 相当の弱い色 12/600 */
+  .later {
+    color: #6b7682;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .laterPc { display: none; }
+
+  .laterMobile { display: inline; }
+}

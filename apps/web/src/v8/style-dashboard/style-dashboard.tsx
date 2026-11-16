@@ -1,5 +1,5 @@
 'use client'
-import { FirstStepsCard, FirstStepsFeedback, useFirstSteps, FirstRunDoneDialog } from '@/v8/dashboard/public/first-steps/index'
+import { FirstStepsCard, FirstStepsFeedback, useFirstSteps, FirstRunDoneDialog, FirstRunPopup, useFirstRunPopup } from '@/v8/dashboard/public/first-steps/index'
 import { canManageRole } from '@/lib/staff-role'
 import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
@@ -112,6 +112,10 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const wizard = useSetupWizard(accountId || null, setup.data?.state, role, setup.reload)
   const { openStep: openSetupStep, qrRequested } = wizard
   const start = useFirstSteps(accountId || null, role, { style, qrOpen: qrRequested })
+  /* 初回ポップアップ（枠 02 ＝ PC / 枠 02b ＝ スマホ下部固定）と、上の帯の「開店準備 N/9」の札。 */
+  const firstRunPopup = useFirstRunPopup({
+    accountId: accountId || null, canManage: canManageRole(role), summary: start.summary, guidePhase: start.guide.phase,
+  })
   const emptyBookingState = today ? bookingEmptyState(style, today) : null
   const hasEmptyBookingAction = tab === 'main' && range === 'today' && today && !search && (emptyBookingState === 'no-bookings' || emptyBookingState === 'no-classes')
   const writeLock = role === null ? undefined : lockUnless(canWrite)
@@ -298,6 +302,14 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
           return { snapshot: res.data.snapshot, rows: res.data.reservations.map((r) => ({ time: formatDate(r.startsAt, { style: 'time' }), name: `${withHonorific(r.name, 'さま')}`, sub: `${formatNumber(r.partySize)}名`, pay: null })) }
         }}
         mediaNote={style === 'restaurant' ? '他の予約サイトの同じ時間の枠は、それぞれの管理画面で閉じてください。' : null} />
+      {/* 「開店準備を始めましょう」（承認済み Pen 枠 02 / 02b）。 */}
+      {firstRunPopup.open && start.summary ? (
+        <FirstRunPopup
+          summary={start.summary}
+          onStartGuide={() => { firstRunPopup.close(); start.guide.start() }}
+          onClose={firstRunPopup.close}
+        />
+      ) : null}
       {start.arrived && accountId && canManageRole(role) ? <FirstRunDoneDialog accountId={accountId} style={style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} progress={start.progress} onClose={start.dismissArrived} /> : null}
       {preparing.dialog}
       {cancelRow ? (

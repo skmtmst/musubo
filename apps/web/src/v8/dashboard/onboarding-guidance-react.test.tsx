@@ -47,6 +47,7 @@ vi.mock('./use-dashboard', async original => ({
 vi.mock('@/components/dashboard/qr-dialog', () => ({ default: ({ open }: { open: boolean }) => open ? <div role="dialog" aria-label="友だち追加のQRコード" /> : null }))
 
 import DashboardV8 from './dashboard'
+import { firstRunPopupDismissedKey } from './first-run-popup'
 import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 
 const ok = (data: unknown) => ({ success: true, data })
@@ -64,6 +65,11 @@ beforeEach(() => {
   net.role = 'owner'; net.search = ''; net.googleHoursComplete = false
   net.routes.mockReset().mockResolvedValue(ok([]))
   window.localStorage.clear(); window.sessionStorage.clear(); window.history.replaceState(null, '', '/')
+  /*
+    ここは案内の読み込み失敗の見え方を見張る所。初回ポップアップ（枠02）は
+    別のテストで見ているので、一度閉じた人として出さない（dialog の数え方を濁さないため）。
+  */
+  window.localStorage.setItem(firstRunPopupDismissedKey('A'), '1')
   setTestReducedMotion(true)
   net.progress.mockReset().mockResolvedValue(basic())
   net.style.mockReset().mockResolvedValue(style())

@@ -31,6 +31,7 @@ import { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 import styles from './dashboard.module.css'
 import { FirstStepsCard,FirstStepsFeedback,summarizeFirstSteps,useFirstSteps } from './first-steps'
 import { FirstRunDoneDialog } from './first-run-done'
+import { FirstRunPopup, useFirstRunPopup } from './first-run-popup'
 import { StarterRetryNotice, starterRetryVisible, useStarterRetryResult } from './starter-retry'
 import { FriendAddLink } from './friend-add'
 import SectionHeader from './head'
@@ -358,6 +359,10 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
   ) : null
   const onboardingSummary = start.summary ?? (canManage && setupRest && start.steps.length > 0 ? summarizeFirstSteps(start.steps) : null)
   const showOnboarding = role !== null && Boolean(onboardingSummary || setupRest || start.error || setup.error || !canManage)
+  /* 初回ポップアップ（枠 02 / 02b）と、上の帯の「開店準備 N/9」の札。 */
+  const firstRunPopup = useFirstRunPopup({
+    accountId: d.selectedAccountId, canManage, summary: onboardingSummary, guidePhase: start.guide.phase,
+  })
   const notice = start.error || setup.error || start.progress?.notices?.length || start.summary || starterRetry || setupRest || setup.data?.warnings.length || viewer || d.error || d.periodNotice || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
@@ -439,6 +444,14 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       {/* はじめの質問の窓（B-313）。`?setup=0〜|summary` かスタイル未選択の最初の訪問で開く。 */}
       {/* 最初の1通が、この画面で見ている間に届いた時だけ（SPEC-11 ③）。 */}
       {start.arrived && setup.data && d.selectedAccountId && canManage ? <FirstRunDoneDialog accountId={d.selectedAccountId} style={setup.data.state.style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} progress={start.progress} onClose={start.dismissArrived} /> : null}
+      {/* 「開店準備を始めましょう」（枠 02 ＝ PC / 枠 02b ＝ スマホ下部固定）。 */}
+      {firstRunPopup.open && onboardingSummary ? (
+        <FirstRunPopup
+          summary={onboardingSummary}
+          onStartGuide={() => { firstRunPopup.close(); start.guide.start() }}
+          onClose={firstRunPopup.close}
+        />
+      ) : null}
       {wizard.dialog}
       {qrRequested && !d.preferences.main.some(item => item.id === 'friend-add' && item.visible) ? <FriendAddLink dialogOnly officialProfileUrl={data?.metrics?.officialProfileUrl.value} visualQa={data?.visualQa} canManage={canManage} /> : null}
     </DashboardPage>
