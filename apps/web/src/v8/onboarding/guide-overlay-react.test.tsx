@@ -113,6 +113,15 @@ describe('手順別ガイドの重ね表示', () => {
     expect(document.querySelector('[data-guide-balloon]')).toBeNull()
   })
 
+  /* 差し戻し R1: 台本外の手順番号（古い保存値）でも案内を消さない。 */
+  it('台本に無い手順番号でも案内を消さず、最後の手順として見せる', () => {
+    mountTarget('tables.create')
+    renderOverlay({ procedureIndex: 4 })
+    expect(document.querySelector('[data-guide-balloon]')?.getAttribute('data-guide-balloon')).toBe('attributes:3')
+    expect(screen.getByText('手順 3/3')).toBeTruthy()
+    expect(document.querySelector('[data-guide-bar]')).not.toBeNull()
+  })
+
   it('一時停止中・未開始では出さない', () => {
     mountTarget('tables.create')
     renderOverlay({ active: false })

@@ -67,7 +67,7 @@ describe('はじめにやることを畳む', () => {
     expect(screen.queryByRole('button', { name: '閉じる' })).toBeNull()
     const fold = screen.getByRole('button', { name: '畳む' })
     expect(fold.getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByText('LINE アカウントをつなぐ')).toBeTruthy()
+    expect(screen.getByText('LINEアカウントをつなぐ')).toBeTruthy()
     const actions = summary.steps.filter(step => !step.done && step.href)
     expect(screen.getAllByRole('link').map(link => link.getAttribute('href'))).toEqual(actions.map(step => step.href))
     expect(screen.getByRole('button', { name: '友だちの分け方を決めるの未確認の理由' })).toBeTruthy()

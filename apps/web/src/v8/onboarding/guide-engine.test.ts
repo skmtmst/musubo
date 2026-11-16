@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from 'vitest'
-import { guideAnchor, guideEngineStorageKey, guideStateFromServer, nextGuideEngineState, readGuideEngineState, writeGuideEngineState, type GuideSummary } from './guide-engine'
+import { clampProcedureIndex, guideAnchor, guideEngineStorageKey, guideStateFromServer, nextGuideEngineState, nextGuidedStepKey, readGuideEngineState, writeGuideEngineState, type GuideSummary } from './guide-engine'
 
 const summary = (overrides: Partial<GuideSummary> = {}): GuideSummary => ({
   steps: [
@@ -58,6 +58,48 @@ describe('ガイドの状態遷移', () => {
     expect(nextGuideEngineState({ phase: 'active', stepKey: 'richMenu', procedureIndex: 2 }, 'complete'))
       .toEqual({ phase: 'done', stepKey: null, procedureIndex: 1 })
     expect(nextGuideEngineState({ phase: 'done', stepKey: null, procedureIndex: 1 }, 'reset')).toEqual(idle)
+  })
+})
+
+/*
+  差し戻し R1（枠 14 orKSi の共通ルール「スキップ→次の手順へ」）。
+  最後の手順でスキップしても台本に無い手順へ進めず、完了も偽らない。
+*/
+describe('最後の手順のスキップ', () => {
+  it('台本の範囲に収める（台本を持たない段は数を変えない）', () => {
+    expect(clampProcedureIndex('attributes', 4)).toBe(3)
+    expect(clampProcedureIndex('attributes', 0)).toBe(1)
+    expect(clampProcedureIndex('attributes', 2)).toBe(2)
+    expect(clampProcedureIndex('richMenu', 4)).toBe(4)
+    expect(clampProcedureIndex(null, 4)).toBe(4)
+  })
+
+  it('最後の手順では手順番号を足さない（吹き出しが消えないように）', () => {
+    const atLast = { phase: 'active' as const, stepKey: 'attributes', procedureIndex: 3 }
+    // 同じ状態を返す（保存もしない）ので、存在しない手順4は保存されない。
+    expect(nextGuideEngineState(atLast, 'advanceProcedure')).toBe(atLast)
+    expect(nextGuideEngineState({ phase: 'active', stepKey: 'attributes', procedureIndex: 1 }, 'advanceProcedure'))
+      .toEqual({ phase: 'active', stepKey: 'attributes', procedureIndex: 2 })
+  })
+
+  it('残っていた台本外の手順番号は読み込みで直す（案内が消えた状態から戻す）', () => {
+    window.localStorage.setItem(guideEngineStorageKey('account-1'), JSON.stringify({ phase: 'active', stepKey: 'attributes', procedureIndex: 4 }))
+    expect(readGuideEngineState('account-1')).toEqual({ phase: 'active', stepKey: 'attributes', procedureIndex: 3 })
+    expect(guideStateFromServer({ phase: 'active', stepKey: 'attributes', procedureIndex: 4 }))
+      .toEqual({ phase: 'active', stepKey: 'attributes', procedureIndex: 3 })
+  })
+
+  it('段をまたぐ次の行き先は後ろを先に探し、無ければ前に戻る', () => {
+    expect(nextGuidedStepKey(summary(), 'richMenu')).toBe('attributes')
+    // 最後の段から見送ると、まだ残っている前の段へ戻す（済みにはしない）。
+    expect(nextGuidedStepKey(summary(), 'attributes')).toBe('richMenu')
+    expect(nextGuidedStepKey(summary(), 'attributes', new Set(['attributes', 'richMenu']))).toBeNull()
+    expect(nextGuidedStepKey(null, 'attributes')).toBeNull()
+  })
+
+  it('見送った段は次の行き先に選ばない（同じ所へ戻らない）', () => {
+    expect(guideAnchor(summary(), new Set(['richMenu']))?.key).toBe('attributes')
+    expect(guideAnchor(summary(), new Set(['richMenu', 'attributes']))).toBeNull()
   })
 })
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/lib/api'
+import { guideProcedureTotal } from './guide-script'
 
 /** はじめにやることの実測のうち、ガイドが見る分だけ（画面側の型を取り込まない）。 */
 export type GuideSummary = { steps: ReadonlyArray<{ key: string; label: string; href: string | null; done: boolean }>; done: number; total: number }
@@ -29,6 +30,18 @@ export function guideEngineStorageKey(accountId: string): string {
   return `lh:v8:guide-engine:${accountId}`
 }
 
+/**
+ * 手順番号を台本の範囲に収める。
+ * 台本に無い番号（控えやサーバーに残った古い値）をそのまま使うと、
+ * 吹き出しもガイド帯も出ない「案内が消えた」状態になる。
+ * 段が分からない時は数を変えず、台本が読めてから収める。
+ */
+export function clampProcedureIndex(stepKey: string | null, procedureIndex: number): number {
+  const index = Number.isInteger(procedureIndex) && procedureIndex >= 1 ? procedureIndex : 1
+  const total = guideProcedureTotal(stepKey)
+  return total > 0 ? Math.min(index, total) : index
+}
+
 /** 控えの状態。壊れた値・読めない時は「まだ始めていない」に戻す（勝手に案内を出さない）。 */
 export function readGuideEngineState(accountId: string | null): GuideEngineState {
   if (!accountId || typeof window === 'undefined') return initialState
@@ -38,10 +51,11 @@ export function readGuideEngineState(accountId: string | null): GuideEngineState
     const parsed = JSON.parse(raw) as Partial<GuideEngineState> | null
     const phase = parsed?.phase
     const procedureIndex = parsed?.procedureIndex
+    const stepKey = typeof parsed?.stepKey === 'string' ? parsed.stepKey : null
     return {
       phase: phase === 'active' || phase === 'paused' || phase === 'done' ? phase : 'idle',
-      stepKey: typeof parsed?.stepKey === 'string' ? parsed.stepKey : null,
-      procedureIndex: Number.isInteger(procedureIndex) && (procedureIndex as number) >= 1 ? procedureIndex as number : 1,
+      stepKey,
+      procedureIndex: clampProcedureIndex(stepKey, Number.isInteger(procedureIndex) ? procedureIndex as number : 1),
     }
   } catch { return initialState }
 }
@@ -72,7 +86,16 @@ export function nextGuideEngineState(current: GuideEngineState, action: GuideEng
       return { phase: 'active', stepKey: next, procedureIndex: next === current.stepKey ? current.procedureIndex : 1 }
     }
     case 'advance': return current.phase === 'active' ? { phase: 'active', stepKey, procedureIndex: 1 } : current
-    case 'advanceProcedure': return current.phase === 'active' ? { ...current, procedureIndex: current.procedureIndex + 1 } : current
+    case 'advanceProcedure': {
+      if (current.phase !== 'active') return current
+      /*
+        台本の最後の手順では数を足さない。足すと台本に無い手順になり、
+        吹き出しもガイド帯も出ない「案内が消えた」状態になる（枠14 の差し戻し）。
+        最後の手順から先へは、段をまたぐ advance で進める。
+      */
+      const next = clampProcedureIndex(current.stepKey, current.procedureIndex + 1)
+      return next === current.procedureIndex ? current : { ...current, procedureIndex: next }
+    }
     case 'complete': return current.phase === 'done' ? current : { phase: 'done', stepKey: null, procedureIndex: 1 }
     case 'reset': return initialState
   }
@@ -80,20 +103,42 @@ export function nextGuideEngineState(current: GuideEngineState, action: GuideEng
 
 export type GuideAnchor = { key: string; label: string; href: string }
 
+/** 見送った段（この案内の間だけ覚える）。済みにはしないので、設定画面のチェックは付かない。 */
+const EMPTY_SKIPPED: ReadonlySet<string> = new Set<string>()
+
+/** 案内できる段か。まだで、行き先が実在して、この案内で見送っていない段だけ。 */
+function guidable(item: { key: string; href: string | null; done: boolean }, skipped: ReadonlySet<string>): boolean {
+  return !item.done && Boolean(item.href) && !skipped.has(item.key)
+}
+
 /** 次に案内する段。行き先が実在する（href がある）まだの段だけを返し、無い段は案内しない。 */
-export function guideAnchor(summary: GuideSummary | null): GuideAnchor | null {
-  const step = summary?.steps.find(item => !item.done && item.href)
+export function guideAnchor(summary: GuideSummary | null, skipped: ReadonlySet<string> = EMPTY_SKIPPED): GuideAnchor | null {
+  const step = summary?.steps.find(item => guidable(item, skipped))
   return step?.href ? { key: step.key, label: step.label, href: step.href } : null
+}
+
+/**
+ * 段をまたいだ次の行き先。今の段より後ろを先に見て、無ければ前に戻って探す。
+ * 済み判定は変えない（見送りは skipped で覚えるだけ）。案内できる段が無ければ null。
+ */
+export function nextGuidedStepKey(summary: GuideSummary | null, currentKey: string | null, skipped: ReadonlySet<string> = EMPTY_SKIPPED): string | null {
+  const steps = summary?.steps ?? []
+  const at = currentKey ? steps.findIndex(item => item.key === currentKey) : -1
+  const after = steps.slice(at + 1).find(item => guidable(item, skipped))
+  if (after) return after.key
+  const before = steps.slice(0, Math.max(at, 0)).find(item => guidable(item, skipped))
+  return before?.key ?? null
 }
 
 /** サーバーの返事を状態に直す。足りない値は既定に寄せ、案内を勝手に始めない。 */
 export function guideStateFromServer(data: { phase?: unknown; stepKey?: unknown; procedureIndex?: unknown } | null | undefined): GuideEngineState {
   const phase = data?.phase
   const procedureIndex = data?.procedureIndex
+  const stepKey = typeof data?.stepKey === 'string' ? data.stepKey : null
   return {
     phase: phase === 'active' || phase === 'paused' || phase === 'done' ? phase : 'idle',
-    stepKey: typeof data?.stepKey === 'string' ? data.stepKey : null,
-    procedureIndex: Number.isInteger(procedureIndex) && (procedureIndex as number) >= 1 ? procedureIndex as number : 1,
+    stepKey,
+    procedureIndex: clampProcedureIndex(stepKey, Number.isInteger(procedureIndex) ? procedureIndex as number : 1),
   }
 }
 
@@ -109,6 +154,11 @@ const BLOCK_ON_SAVE_FAILURE: ReadonlySet<GuideEngineAction> = new Set(['advance'
  */
 export function useGuideEngine(accountId: string | null, summary: GuideSummary | null) {
   const [state, setState] = useState<GuideEngineState>(initialState)
+  /**
+   * この案内の間だけ見送った段。済みにはしない（完了判定は実データ計測のまま）。
+   * 覚えないと、見送った段がまた「次の案内」として選ばれて同じ所に戻ってしまう。
+   */
+  const [skipped, setSkipped] = useState<ReadonlySet<string>>(EMPTY_SKIPPED)
   /** サーバーの値を受け取るまでは、控えの値で進む操作を保存しない（古い値で上書きしない）。 */
   const loaded = useRef(false)
 
@@ -160,7 +210,7 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
     })
   }, [state, persist, accountId])
 
-  const anchor = useMemo(() => guideAnchor(summary), [summary])
+  const anchor = useMemo(() => guideAnchor(summary, skipped), [summary, skipped])
   const finished = Boolean(summary && summary.total > 0 && summary.done === summary.total)
 
   /* 9項目が済んだら案内を閉じる。まだ始めていない人の記録は作らない。 */
@@ -174,11 +224,36 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
     })
   }, [finished, persist])
 
-  /* 済んだ段から次の段へ進める。一時停止の間は動かさない。 */
+  /*
+    済んだ段から次の段へ進める。一時停止の間は動かさない。
+    今の段がまだ案内できるなら動かさない（手順の途中で別の段へ飛ばさないため）。
+  */
   useEffect(() => {
     if (state.phase !== 'active' || !anchor || anchor.key === state.stepKey) return
-    commit('advance', anchor.key)
-  }, [state.phase, state.stepKey, anchor, commit])
+    const current = summary?.steps.find(item => item.key === state.stepKey)
+    if (current && guidable(current, skipped)) return
+    commit('advance', nextGuidedStepKey(summary, state.stepKey, skipped) ?? anchor.key)
+  }, [state.phase, state.stepKey, anchor, summary, skipped, commit])
+
+  /** 手順を見送って次の段へ移る。済みにはせず、存在する次の案内へ渡す（枠14 共通ルール）。 */
+  const advanceProcedure = useCallback(() => {
+    if (state.phase !== 'active') return
+    const total = guideProcedureTotal(state.stepKey)
+    if (!(total > 0 && state.procedureIndex >= total)) {
+      commit('advanceProcedure')
+      return
+    }
+    const current = state.stepKey
+    const nextSkipped = current ? new Set([...skipped, current]) : skipped
+    const nextKey = nextGuidedStepKey(summary, current, nextSkipped)
+    if (!nextKey) {
+      // 案内できる段がもう無い。完了を偽らず、再開できる形で止める。
+      commit('pause')
+      return
+    }
+    if (current) setSkipped(nextSkipped)
+    commit('advance', nextKey)
+  }, [state, summary, skipped, commit])
 
   return {
     phase: state.phase,
@@ -186,11 +261,13 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
     procedureIndex: state.procedureIndex,
     anchor: state.phase === 'done' ? null : anchor,
     pausedAnchor: state.phase === 'paused' ? anchor : null,
-    start: useCallback(() => commit('start', guideAnchor(summary)?.key ?? null), [commit, summary]),
+    /** 最初から始める時は見送りの記憶も消す（また1段目から案内する）。 */
+    start: useCallback(() => { setSkipped(EMPTY_SKIPPED); commit('start', guideAnchor(summary)?.key ?? null) }, [commit, summary]),
     pause: useCallback(() => commit('pause'), [commit]),
-    resume: useCallback(() => commit('resume', guideAnchor(summary)?.key ?? null), [commit, summary]),
-    reset: useCallback(() => commit('reset'), [commit]),
-    /** 同じ段の次の手順へ。1/3→2/3→3/3（枠14 の台本）。 */
-    advanceProcedure: useCallback(() => commit('advanceProcedure'), [commit]),
+    /** 続きから再開する時は見送った段を飛ばしたまま戻る。 */
+    resume: useCallback(() => commit('resume', guideAnchor(summary, skipped)?.key ?? null), [commit, summary, skipped]),
+    reset: useCallback(() => { setSkipped(EMPTY_SKIPPED); commit('reset') }, [commit]),
+    /** 同じ段の次の手順へ。1/3→2/3→3/3。最後の手順では段をまたいで次の案内へ（枠14 の台本）。 */
+    advanceProcedure,
   }
 }

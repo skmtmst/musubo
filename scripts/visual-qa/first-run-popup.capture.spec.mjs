@@ -110,16 +110,53 @@ for (const width of PC_WIDTHS) {
   })
 }
 
+/* 枠 02b (nt3Po) は 390x900。シート noXJA の位置・大きさもここで測る。 */
+const MOBILE_HEIGHT = 900
+
 test(`${MOBILE_WIDTH}px 枠02b ボトムシート`, async ({ page }) => {
-  await openDashboard(page, MOBILE_WIDTH, 844)
+  await openDashboard(page, MOBILE_WIDTH, MOBILE_HEIGHT)
   const popup = page.locator('[data-first-run-popup="open"]')
   await expect(popup, 'スマホで初回シートが出ない').toBeVisible({ timeout: 15000 })
   await expect(page.getByText('あとで（下にスワイプで閉じる）')).toBeVisible()
+
+  /* 差し戻し R3: 承認Pen noXJA (x0,y118,w390,h782) と上端・高さを合わせる。 */
+  const sheet = await popup.locator('[role="dialog"]').boundingBox()
+  expect(Math.round(sheet.x), 'シートの左端がPenと違う').toBe(0)
+  expect(Math.round(sheet.width), 'シートの幅がPenと違う').toBe(MOBILE_WIDTH)
+  expect(Math.round(sheet.y), 'シートの上端がPen noXJA の y118 と違う').toBe(118)
+  expect(Math.round(sheet.height), 'シートの高さがPen noXJA の h782 と違う').toBe(782)
   await page.screenshot({ path: `${OUT}/${MOBILE_WIDTH}-02b-sheet.png`, fullPage: false })
 
   await popup.getByRole('button', { name: /あとで/ }).click()
   await expect(popup).toHaveCount(0)
   await page.screenshot({ path: `${OUT}/${MOBILE_WIDTH}-02b-closed.png`, fullPage: false })
+})
+
+/* 差し戻し R2: 足の文言どおり、掴み手を下に引いたら閉じる。指の動きで確かめる。 */
+test.describe('枠02b 下スワイプで閉じる', () => {
+  test.use({ hasTouch: true, isMobile: true })
+
+  test(`${MOBILE_WIDTH}px 掴み手を下に引くとシートが閉じる`, async ({ page }) => {
+    await openDashboard(page, MOBILE_WIDTH, MOBILE_HEIGHT)
+    const popup = page.locator('[data-first-run-popup="open"]')
+    await expect(popup, 'スマホで初回シートが出ない').toBeVisible({ timeout: 15000 })
+
+    const sheet = await popup.locator('[role="dialog"]').boundingBox()
+    const x = Math.round(sheet.x + sheet.width / 2)
+    const from = Math.round(sheet.y + 10)
+    const cdp = await page.context().newCDPSession(page)
+    const touch = (type, y) => cdp.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: type === 'touchEnd' ? [] : [{ x, y, radiusX: 8, radiusY: 8, force: 1 }],
+    })
+    await touch('touchStart', from)
+    for (const step of [40, 90, 140, 180]) await touch('touchMove', from + step)
+    await page.screenshot({ path: `${OUT}/${MOBILE_WIDTH}-02b-swipe-drag.png`, fullPage: false })
+    await touch('touchEnd', from + 180)
+
+    await expect(popup, '下スワイプでシートが閉じない').toHaveCount(0, { timeout: 5000 })
+    await page.screenshot({ path: `${OUT}/${MOBILE_WIDTH}-02b-swipe-closed.png`, fullPage: false })
+  })
 })
 
 test(`${MOBILE_WIDTH}px 枠14 吹き出しは画面下部固定`, async ({ page }) => {

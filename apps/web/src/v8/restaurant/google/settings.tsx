@@ -1,7 +1,7 @@
 'use client'
 import { useGooglePermission } from './use-google-permission'
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link2, RefreshCw } from 'lucide-react'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
@@ -14,6 +14,7 @@ import { errorMessage, formatYmd } from './format'
 import styles from './google.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { emitGuideSignal } from '@/v8/onboarding/guide-signal'
 
 
 /*
@@ -50,6 +51,17 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
   // 店舗の選択待ちなのに前の店舗名が残っている＝別の店舗へ切り替えようとしている状態。
   const previousTitle = connection.status === 'pending_location' ? connection.locationTitle : null
   const switchingLocation = Boolean(connection.locationName) && selectedLocation !== '' && selectedLocation !== connection.locationName
+
+  /*
+    開店準備ガイド⑤時間の手順1/2（枠14 Nm43L）は、押した時ではなく
+    Googleとつながった時に2/2へ進める（差し戻し R4）。
+    認可画面から戻って状態が「未接続」でなくなった＝つながった、が成功の合図。
+    失敗・中断で戻った時は「未接続」のままなので合図を出さず、1/2に留まる。
+  */
+  const googleLinked = connection.status !== 'disconnected'
+  useEffect(() => {
+    if (googleLinked) emitGuideSignal('hours.googleConnect')
+  }, [googleLinked])
 
   const startConnect = async () => {
     if (!canManage || busy || !data.oauthConfigured) return

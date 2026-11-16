@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from 'react'
 import { publishSetupChip, useSetupChipReopen } from '@/v8/onboarding/setup-chip'
 import { nextFirstStepKey, type FirstStepsSummary } from './first-steps'
 import styles from './first-run-popup.module.css'
@@ -90,9 +90,43 @@ export type FirstRunPopupProps = {
   onClose: () => void
 }
 
+/** 掴み手を下に引いて閉じる距離（枠 02b の足「あとで（下にスワイプで閉じる）」）。 */
+const SWIPE_CLOSE_PX = 80
+
 export function FirstRunPopup({ summary, onStartGuide, onClose }: FirstRunPopupProps) {
   const titleId = useId()
   const currentKey = useMemo(() => nextFirstStepKey(summary), [summary])
+
+  /*
+    スマホのボトムシートを指で下に引いて閉じる。
+    足の文言で閉じられると書いているので、ふるまいを合わせる（差し戻し R2）。
+    PCは指で触らないので、この処理は何もしない。
+  */
+  const dragStart = useRef<number | null>(null)
+  const [dragY, setDragY] = useState(0)
+
+  const onTouchStart = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0]
+    if (!touch) return
+    /* 一覧を読んでいる途中（下までスクロール済み）は引っ張りと取り違えない。 */
+    const scroller = (event.target as HTMLElement | null)?.closest(`.${styles.rows}`)
+    if (scroller && scroller.scrollTop > 0) { dragStart.current = null; return }
+    dragStart.current = touch.clientY
+    setDragY(0)
+  }, [])
+
+  const onTouchMove = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0]
+    if (dragStart.current === null || !touch) return
+    setDragY(Math.max(0, touch.clientY - dragStart.current))
+  }, [])
+
+  const onTouchEnd = useCallback(() => {
+    const moved = dragY
+    dragStart.current = null
+    setDragY(0)
+    if (moved >= SWIPE_CLOSE_PX) onClose()
+  }, [dragY, onClose])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
@@ -111,6 +145,11 @@ export function FirstRunPopup({ summary, onStartGuide, onClose }: FirstRunPopupP
         aria-modal="true"
         aria-labelledby={titleId}
         onClick={event => event.stopPropagation()}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
+        style={dragY ? { transform: `translateY(${dragY}px)` } : undefined}
       >
         {/* 枠 02b の掴み手。PCでは出さない。 */}
         <div className={styles.grabber}><span className={styles.grabberBar} /></div>

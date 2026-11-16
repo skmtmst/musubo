@@ -15,60 +15,60 @@
 /* 暗幕 4枚。Pen 04-1 z8qKxY/AmAKC/Lt7PG/v8doAa と同じ色。 */
 .dim {
   position: fixed;
-  background: #0f172a73;
+  background: var(--tpl-fr14-dim);
   pointer-events: auto;
 }
 
 /* 光の輪。Pen 04-1 IzuXL。 */
 .ring {
   position: fixed;
-  border: 3px solid #00833f;
-  border-radius: 14px;
-  box-shadow: 0 0 18px #00833f66;
+  border: var(--tpl-fr14-ring-border);
+  border-radius: var(--tpl-fr14-radius);
+  box-shadow: var(--tpl-fr14-ring-shadow);
   pointer-events: none;
 }
 
 /* 吹き出し。Pen 04-1 mkzrI。 */
 .balloon {
   position: fixed;
-  width: 340px;
+  width: var(--tpl-fr14-balloon-w);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px 18px;
-  background: #ffffff;
-  border-radius: 14px;
-  box-shadow: 0 10px 28px #10182840;
+  gap: var(--tpl-fr14-gap-10);
+  padding: var(--tpl-fr14-balloon-pad);
+  background: var(--color-canvas);
+  border-radius: var(--tpl-fr14-radius);
+  box-shadow: var(--tpl-fr14-balloon-shadow);
   pointer-events: auto;
 }
 
 .balloonHeader {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--tpl-fr14-gap-8);
 }
 
 /* 手順の札。Pen 04-1 YV9DQ / srvEW。 */
 .pill {
   flex: none;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: #e9f7ee;
-  color: #00833f;
-  font-size: 12px;
+  padding: var(--tpl-fr14-pill-pad);
+  border-radius: var(--polish-radius-pill);
+  background: var(--tpl-fr14-pill-bg);
+  color: var(--tpl-fr02-brand);
+  font-size: var(--tpl-fr14-text-12);
   font-weight: 600;
 }
 
 .title {
   flex: 1;
-  color: #1d1d1f;
-  font-size: 14.5px;
+  color: var(--color-ink);
+  font-size: var(--tpl-fr14-title);
   font-weight: 700;
 }
 
 .body {
-  color: #4a5565;
-  font-size: 12.5px;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-fr14-body);
   font-weight: 500;
   line-height: 1.65;
 }
@@ -82,8 +82,8 @@
   padding: 0;
   border: 0;
   background: none;
-  color: #4a5565;
-  font-size: 12px;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-fr14-text-12);
   font-weight: 600;
   cursor: pointer;
 }
@@ -93,14 +93,14 @@
 /* ガイド帯。Pen 04-1 dkVoV。 */
 .bar {
   position: fixed;
-  width: 300px;
+  width: var(--tpl-fr14-bar-w);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 16px;
-  background: #1d1d1f;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px #10182859;
+  gap: var(--tpl-fr14-gap-8);
+  padding: var(--tpl-fr14-bar-pad);
+  background: var(--color-ink);
+  border-radius: var(--polish-radius-card);
+  box-shadow: var(--tpl-fr14-bar-shadow);
   pointer-events: auto;
 }
 
@@ -108,12 +108,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--tpl-fr14-gap-8);
 }
 
 .barTitle {
-  color: #ffffff;
-  font-size: 12px;
+  color: var(--color-canvas);
+  font-size: var(--tpl-fr14-text-12);
   font-weight: 700;
 }
 
@@ -121,8 +121,9 @@
   padding: 0;
   border: 0;
   background: none;
-  color: #9aa3af;
-  font-size: 11px;
+  color: var(--tpl-fr14-bar-pause-color);
+  /* 11px は使わない（★V8境界規約）。既存の最小サイズに合わせる。 */
+  font-size: var(--polish-text-note);
   font-weight: 600;
   cursor: pointer;
 }
@@ -132,22 +133,22 @@
 /* 進み線 9本。Pen 04-1 DjaHp。 */
 .progress {
   display: flex;
-  gap: 4px;
+  gap: var(--tpl-fr14-gap-4);
   width: 100%;
 }
 
 .segment {
   flex: 1;
-  height: 3px;
-  border-radius: 999px;
-  background: #3f3f46;
+  height: var(--tpl-fr14-segment-h);
+  border-radius: var(--polish-radius-pill);
+  background: var(--tpl-fr14-segment-bg);
 }
 
-.segmentDone { background: #00833f; }
+.segmentDone { background: var(--tpl-fr02-brand); }
 
 .caption {
-  color: #d1d5db;
-  font-size: 11.5px;
+  color: var(--tpl-fr14-caption-color);
+  font-size: var(--tpl-fr14-caption);
   font-weight: 500;
 }
 
@@ -162,12 +163,12 @@
     重ねると説明が帯で隠れて読めないので、帯の高さ(実測 約92px)分だけ上へ置く。
   */
   .balloon {
-    left: 8px !important;
-    right: 8px;
+    left: var(--tpl-fr14-balloon-offset) !important;
+    right: var(--tpl-fr14-balloon-offset);
     top: auto !important;
-    bottom: 96px;
+    bottom: var(--tpl-fr14-balloon-bottom);
     width: auto;
-    border-radius: 14px 14px 0 0;
+    border-radius: var(--tpl-fr14-balloon-radius-sp);
   }
 
   .bar {
@@ -183,7 +184,7 @@
 
   /* 簡易表示。長い説明で画面を埋めない。 */
   .body {
-    max-height: 6em;
+    max-height: var(--tpl-fr14-body-max-h);
     overflow-y: auto;
   }
 }

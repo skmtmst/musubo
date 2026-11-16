@@ -43,8 +43,13 @@ function readRect(element: Element): Rect {
 export function GuideOverlay({
   active, stepKey, stepLabel, stepOrder, procedureIndex, segments, onAdvanceProcedure, onPause,
 }: GuideOverlayProps) {
-  const procedure = guideProcedure(stepKey, procedureIndex)
   const total = guideProcedureTotal(stepKey)
+  /*
+    台本に無い手順番号（古い保存値など）でも案内を消さない。
+    台本が分かっている段なら最後の手順に寄せて見せる。段そのものが分からない時だけ何も出さない。
+  */
+  const safeIndex = total > 0 ? Math.min(Math.max(procedureIndex, 1), total) : procedureIndex
+  const procedure = guideProcedure(stepKey, safeIndex)
   const anchorName = procedure?.anchor ?? null
 
   const [target, setTarget] = useState<Rect | null>(null)
@@ -146,8 +151,8 @@ export function GuideOverlay({
     : { left: Math.max(16, viewport.width - 340 - 24), top: Math.max(16, viewport.height - balloonHeight - 120), side: 'below' as const }
 
   const caption = stepLabel && stepOrder
-    ? `${ORDER_MARKS[stepOrder - 1] ?? ''} ${stepLabel}（手順 ${procedureIndex}/${total}）`
-    : `手順 ${procedureIndex}/${total}`
+    ? `${ORDER_MARKS[stepOrder - 1] ?? ''} ${stepLabel}（手順 ${safeIndex}/${total}）`
+    : `手順 ${safeIndex}/${total}`
 
   return (
     <div className={styles.root}>
@@ -173,10 +178,10 @@ export function GuideOverlay({
         style={{ left: placement.left, top: placement.top }}
         role="status"
         aria-live="polite"
-        data-guide-balloon={`${stepKey ?? ''}:${procedureIndex}`}
+        data-guide-balloon={`${stepKey ?? ''}:${safeIndex}`}
       >
         <div className={styles.balloonHeader}>
-          <span className={styles.pill}>{`手順 ${procedureIndex}/${total}`}</span>
+          <span className={styles.pill}>{`手順 ${safeIndex}/${total}`}</span>
           <span className={styles.title}>{procedure.title}</span>
         </div>
         <p className={styles.body}>{procedure.body}</p>

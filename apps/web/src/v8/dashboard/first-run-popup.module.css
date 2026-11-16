@@ -10,26 +10,26 @@
   position: fixed;
   inset: 0;
   z-index: 70;
-  background: #0f172a59;
+  background: var(--tpl-fr02-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: var(--tpl-fr02-scrim-pad);
 }
 
 /* 枠 02 のカード G8vBl: 620 / #ffffff / r16 / 影 0 12 32 #10182833 / 縦 gap14 / padding28 */
 .card {
-  width: 620px;
+  width: var(--tpl-fr02-card-w);
   max-width: 100%;
-  max-height: calc(100vh - 48px);
+  max-height: calc(100vh - var(--tpl-fr02-card-gap-pc));
   overflow-y: auto;
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 12px 32px #10182833;
+  background: var(--color-canvas);
+  border-radius: var(--polish-radius-dialog);
+  box-shadow: var(--tpl-fr02-card-shadow);
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 28px;
+  gap: var(--tpl-fr02-card-gap);
+  padding: var(--tpl-fr02-card-pad);
 }
 
 /* スマホの掴み手 iNVoW / hUSUR（PCでは出さない） */
@@ -38,17 +38,17 @@
 /* 枠 02 の見出し VliWA: gap16 / 中央そろえ */
 .header {
   display: flex;
-  gap: 16px;
+  gap: var(--tpl-fr02-header-gap);
   align-items: center;
 }
 
 /* 輪 cohVt: 52x52 / r999 / 線 #00833f 3px */
 .ring {
-  width: 52px;
-  height: 52px;
+  width: var(--tpl-fr02-ring);
+  height: var(--tpl-fr02-ring);
   flex: 0 0 auto;
-  border-radius: 999px;
-  border: 3px solid #00833f;
+  border-radius: var(--polish-radius-pill);
+  border: var(--tpl-fr02-ring-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -56,8 +56,8 @@
 
 /* hvJuA: #00833f 14/700 */
 .ringText {
-  color: #00833f;
-  font-size: 14px;
+  color: var(--tpl-fr02-brand);
+  font-size: var(--tpl-fr02-text-14);
   font-weight: 700;
 }
 
@@ -65,23 +65,23 @@
 .headerText {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--tpl-fr02-gap-4);
   min-width: 0;
 }
 
 /* i1Tyj: #1d1d1f 20/800 */
 .title {
   margin: 0;
-  color: #1d1d1f;
-  font-size: 20px;
+  color: var(--color-ink);
+  font-size: var(--text-title);
   font-weight: 800;
 }
 
 /* fX8qY: #4a5565 13/500 / 行の高さ1.6 */
 .lead {
   margin: 0;
-  color: #4a5565;
-  font-size: 13px;
+  color: var(--color-ink-secondary);
+  font-size: var(--polish-text-body);
   font-weight: 500;
   line-height: 1.6;
 }
@@ -93,69 +93,69 @@
 .rows {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--tpl-fr02-gap-4);
 }
 
 /* 行の共通: r10 / gap12 / padding 10 14 / 中央そろえ */
 .row {
   display: flex;
-  gap: 12px;
+  gap: var(--tpl-fr02-gap-12);
   align-items: center;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: #ffffff;
+  padding: var(--tpl-fr02-row-pad);
+  border-radius: var(--polish-radius-control);
+  background: var(--color-canvas);
   border: 1px solid transparent;
   text-align: left;
 }
 
 /* 済みの行 bnJsJ */
-.rowDone { background: #ffffff; }
+.rowDone { background: var(--color-canvas); }
 
 /* 現在の行 v4LA6: #e9f7ee / 線 #00833f33 1px */
 .rowCurrent {
-  background: #e9f7ee;
-  border-color: #00833f33;
+  background: var(--tpl-fr02-brand-bg);
+  border-color: var(--tpl-fr02-brand-line);
 }
 
 /* 印の共通: 26x26 / r999 */
 .mark {
-  width: 26px;
-  height: 26px;
+  width: var(--tpl-fr02-mark);
+  height: var(--tpl-fr02-mark);
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: var(--polish-radius-pill);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--tpl-fr02-text-12);
   font-weight: 700;
 }
 
 /* NXvTP: #00833f の丸に白い✓ */
 .markDone {
-  background: #00833f;
-  color: #ffffff;
+  background: var(--tpl-fr02-brand);
+  color: var(--color-canvas);
 }
 
 /* tICdq: 白丸＋線 #00833f 1.5 / 数字 #00833f */
 .markCurrent {
-  background: #ffffff;
-  border: 1.5px solid #00833f;
-  color: #00833f;
+  background: var(--color-canvas);
+  border: var(--tpl-fr02-ring-thin);
+  color: var(--tpl-fr02-brand);
 }
 
 /* l92Tzv: 白丸＋線 #d6dade 1.5 / 数字 #6b7682 */
 .markTodo {
-  background: #ffffff;
-  border: 1.5px solid #d6dade;
-  color: #6b7682;
+  background: var(--color-canvas);
+  border: var(--tpl-fr02-ring-thin-muted);
+  color: var(--tpl-fr02-ink-muted);
 }
 
 /* Bp8mT / sSZ60: 14px。現在の行だけ 700 */
 .label {
   flex: 1 1 auto;
   min-width: 0;
-  color: #1d1d1f;
-  font-size: 14px;
+  color: var(--color-ink);
+  font-size: var(--tpl-fr02-text-14);
   font-weight: 500;
 }
 
@@ -164,11 +164,11 @@
 /* r7xHZ0: #e9f7ee / r999 / padding 3 8 / 文字 #00833f 12/600 */
 .badge {
   flex: 0 0 auto;
-  background: #e9f7ee;
-  border-radius: 999px;
-  padding: 3px 8px;
-  color: #00833f;
-  font-size: 12px;
+  background: var(--tpl-fr02-brand-bg);
+  border-radius: var(--polish-radius-pill);
+  padding: var(--tpl-fr02-badge-pad);
+  color: var(--tpl-fr02-brand);
+  font-size: var(--tpl-fr02-text-12);
   font-weight: 600;
 }
 
@@ -177,18 +177,18 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  background: #00833f;
+  gap: var(--tpl-fr02-gap-6);
+  background: var(--tpl-fr02-brand);
   border: 0;
-  border-radius: 10px;
-  padding: 9px 14px;
-  color: #ffffff;
-  font-size: 13px;
+  border-radius: var(--polish-radius-control);
+  padding: var(--tpl-fr02-rowaction-pad);
+  color: var(--color-canvas);
+  font-size: var(--polish-text-body);
   font-weight: 600;
   cursor: pointer;
 }
 
-.rowAction:hover { background: #006e35; }
+.rowAction:hover { background: var(--tpl-fr02-brand-hover); }
 
 /* 文面は枠ごとに違う（枠02「ガイドで進める」／枠02b「進める」）。 */
 .rowActionPc { display: inline; }
@@ -198,15 +198,15 @@
 /* ykRGy: 「›」 #b6bcc4 15/500 */
 .chevron {
   flex: 0 0 auto;
-  color: #b6bcc4;
-  font-size: 15px;
+  color: var(--tpl-fr02-chevron-color);
+  font-size: var(--text-lead);
   font-weight: 500;
 }
 
 /* 枠 02 の足 TTZx2: gap12 / 中央そろえ */
 .footer {
   display: flex;
-  gap: 12px;
+  gap: var(--tpl-fr02-gap-12);
   align-items: center;
 }
 
@@ -215,8 +215,8 @@
   background: none;
   border: 0;
   padding: 0;
-  color: #4a5565;
-  font-size: 13px;
+  color: var(--color-ink-secondary);
+  font-size: var(--polish-text-body);
   font-weight: 600;
   cursor: pointer;
 }
@@ -233,8 +233,8 @@
 
 /* 注記: #9aa3af 12/500 */
 .note {
-  color: #9aa3af;
-  font-size: 12px;
+  color: var(--tpl-fr02-ink-faint);
+  font-size: var(--tpl-fr02-text-12);
   font-weight: 500;
 }
 
@@ -251,10 +251,17 @@
   .card {
     width: 100%;
     max-width: none;
-    max-height: 87vh;
-    border-radius: 20px 20px 0 0;
-    gap: 12px;
-    padding: 12px 16px 24px;
+    /*
+      枠 02b のシート noXJA: x0 y118 w390 h782（390x900）。
+      上端を画面の上から118pxの所に置くので、高さは残り全部にする。
+      中身の長さで縮めない（差し戻し R3）。
+    */
+    height: calc(100vh - var(--tpl-fr02-card-gap-sp));
+    max-height: none;
+    overflow: hidden;
+    border-radius: var(--tpl-fr02-radius-sheet);
+    gap: var(--tpl-fr02-gap-12);
+    padding: var(--tpl-fr02-card-pad-sp);
   }
 
   /* iNVoW: 中央そろえ / hUSUR: 36x4 #d1d5db r999 */
@@ -264,28 +271,28 @@
   }
 
   .grabberBar {
-    width: 36px;
-    height: 4px;
-    border-radius: 999px;
-    background: #d1d5db;
+    width: var(--tpl-fr02-grabber-w);
+    height: var(--tpl-fr02-grabber-h);
+    border-radius: var(--polish-radius-pill);
+    background: var(--tpl-fr02-line-grabber);
   }
 
   /* isJJM: gap12 / 輪 K4fHC 44x44 / 文字 12 */
-  .header { gap: 12px; }
+  .header { gap: var(--tpl-fr02-gap-12); }
 
   .ring {
-    width: 44px;
-    height: 44px;
+    width: var(--tpl-fr02-ring-sp);
+    height: var(--tpl-fr02-ring-sp);
   }
 
-  .ringText { font-size: 12px; }
+  .ringText { font-size: var(--tpl-fr02-text-12); }
 
   /* nU2Eh: 縦 gap2 / vMdb9 17/700 / gEPIi 12/500 行の高さ1.5 */
-  .headerText { gap: 2px; }
+  .headerText { gap: var(--tpl-fr02-gap-2); }
 
-  .title { font-size: 17px; font-weight: 700; }
+  .title { font-size: var(--tpl-fr02-title-sp); font-weight: 700; }
 
-  .lead { font-size: 12px; line-height: 1.5; }
+  .lead { font-size: var(--tpl-fr02-text-12); line-height: 1.5; }
 
   /* gEPIi「順番に進めるとLINE予約を受け付けられます」。1行に収める。 */
   .leadPc { display: none; }
@@ -293,9 +300,15 @@
   .leadSp { display: inline; }
 
   /* SYPr1: 縦 gap3 / 行 padding 10 12 */
-  .rows { gap: 3px; }
+  .rows {
+    gap: var(--tpl-fr02-gap-3);
+    /* 見出しと足は動かさず、9項目だけシートの中で動かす。 */
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
 
-  .row { padding: 10px 12px; }
+  .row { padding: var(--tpl-fr02-row-pad-sp); }
 
   .rowActionPc { display: none; }
 
@@ -303,7 +316,7 @@
 
   /* UanUf: 上 padding4 / 中央そろえ。注記は出さない（枠 02b の足は1行） */
   .footer {
-    padding-top: 4px;
+    padding-top: var(--tpl-fr02-gap-4);
     justify-content: center;
   }
 
@@ -313,8 +326,8 @@
 
   /* VJR0w: #6b7682 相当の弱い色 12/600 */
   .later {
-    color: #6b7682;
-    font-size: 12px;
+    color: var(--tpl-fr02-ink-muted);
+    font-size: var(--tpl-fr02-text-12);
     font-weight: 600;
   }
 

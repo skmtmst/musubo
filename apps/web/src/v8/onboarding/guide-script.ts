@@ -71,7 +71,11 @@ const SCRIPT: readonly GuideStepScript[] = [
         title: 'Googleアカウントとつなぎましょう',
         body: 'お店のGoogleアカウントでログインして許可するだけ。戻ってくると営業時間が取り込まれ、ガイドが自動で再開します。',
         anchor: 'hours.googleConnect',
-        trigger: 'click',
+        /*
+          押した時ではなく、認可画面から戻ってつながった時に進める（差し戻し R4）。
+          失敗・中断で戻った時は 1/2 に留まる。合図は設定 › SNS連携の画面が出す。
+        */
+        trigger: 'event',
       },
       {
         index: 2,
