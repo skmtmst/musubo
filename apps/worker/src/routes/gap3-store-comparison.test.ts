@@ -166,3 +166,13 @@ test('CMP-01/17: 返事の速さは、そろった日の返事だけで真ん中
  // 10/13 は失敗の日なので 100 分は入れない。10/14 23:30Z は日本時間 10/15 の返事。
  const n=await storeNumbers(d.db,'a',comparisonPeriod('2026-10-13','2026-10-15'));expect(n).toMatchObject({coveredDays:2,periodDays:3});expect(n.values.responseMinutes).toBe(5);
 });
+
+test('クリックした人を特定できない記録は、比較用のクリック率を0としない',async()=>{
+ d.raw.exec(`INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id,status,sent_at,success_count) VALUES('b1','配信','text','本文','a','sent','2026-10-15T01:00:00Z',20);
+ INSERT INTO tracked_links(id,name,original_url,line_account_id) VALUES('l1','リンク','https://example.com','a');
+ INSERT INTO broadcast_tracked_links(broadcast_id,tracked_link_id,label,created_at) VALUES('b1','l1','リンク','2026-10-15');
+ INSERT INTO link_clicks(id,tracked_link_id,friend_id,clicked_at) VALUES('anonymous','l1',NULL,'2026-10-15T02:00:00Z');`);
+ await snapshotStoreMetrics(d.db,'a','2026-10-15');
+ const n=await storeNumbers(d.db,'a',comparisonPeriod('2026-10-15','2026-10-15'));
+ expect(n.values.clickRate).toBeNull();
+});
