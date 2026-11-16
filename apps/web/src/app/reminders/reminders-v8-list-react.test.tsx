@@ -377,3 +377,16 @@ test('初回読込では空と表示せず、失敗と成功0件を別の案内�
   await eventually(() => expect(host.querySelector('[data-empty-list]')).not.toBeNull())
   expect(host.textContent).not.toContain('リマインダを読み込めませんでした')
 })
+
+test.each([false, true])('リマインダの一覧行に未分類の丸を出す（狭幅 %s）', async (narrow) => {
+  const media = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({ matches: narrow, media: query, onchange: null, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(() => true) }))
+  try {
+    document.documentElement.dataset.theme = 'v8'
+    await act(async () => root.render(<RemindersPage />))
+    await eventually(() => expect(host.textContent).toContain('契約終了の前に知らせる'))
+    const row = [...host.querySelectorAll('tr')].find(item => item.textContent?.includes('契約終了の前に知らせる'))!
+    expect(row.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
+    expect(row.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
+    if (narrow) expect(document.querySelector('[data-design-node="Iffil"]')).not.toBeNull()
+  } finally { media.mockRestore() }
+})

@@ -467,6 +467,8 @@
 
 ## 反映履歴
 
+- [一覧や返信の自動確認を改善](release-log/unreleased/PR-kenta-q02b-b3.md) — 反映履歴、確認 2026-11-17。
+
 - [自動確認を実際の動きで確認](release-log/unreleased/94-kenta-q02b.md) — 反映履歴、確認 2026-11-16。
 
 - [通知の試験を時間帯に左右されないよう修正](release-log/unreleased/97-kenta-worker-fix.md) — 反映履歴、確認 2026-11-16。
