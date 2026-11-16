@@ -487,11 +487,12 @@ export async function instagramRefreshToken(
  *
  * Instagram直接ログイン方式の権限名で、Facebook ページ向けの `pages_*` は使わない。
  * 用途に入っていない権限を混ぜると認可画面そのものが断られるため、
- * 同時投稿に必要な2つだけを要求する。
+ * 同時投稿と DM に必要な権限を要求する。
  */
 export const INSTAGRAM_SCOPES = [
   'instagram_business_basic',
   'instagram_business_content_publish',
+  'instagram_business_manage_messages',
 ] as const;
 /**
  * 戻り先URLへ載せてよい権限名の許可一覧。
@@ -500,13 +501,15 @@ export const INSTAGRAM_SCOPES = [
  */
 export const INSTAGRAM_KNOWN_SCOPES = [
   ...INSTAGRAM_SCOPES,
-  'instagram_business_manage_messages',
   'instagram_business_manage_comments',
 ] as const;
 /** 同時投稿に必要な許可。足りない接続は画面で「認可が切れています」にして再接続へ誘導する。 */
 export const INSTAGRAM_PUBLISH_SCOPE = 'instagram_business_content_publish';
 export function instagramCanPublish(scopes: string): boolean {
   return scopes.split(',').includes(INSTAGRAM_PUBLISH_SCOPE);
+}
+export function instagramCanMessage(scopes: string): boolean {
+  return scopes.split(',').includes('instagram_business_manage_messages');
 }
 /**
  * 写真つき投稿を Instagram へ出す（GB-4 の同時投稿）。

@@ -62,6 +62,7 @@ type Payload = {
   data: {
     url: string;
     state: string;
+    dmReconnectRequired: boolean;
     connection: { version: number };
     version: number;
     connected: boolean;
@@ -128,6 +129,7 @@ async function connect() {
   expect(url.searchParams.get('scope')).toContain(
     'instagram_business_content_publish',
   );
+  expect(url.searchParams.get('scope')).toContain('instagram_business_manage_messages');
   // 前につないだことのあるアカウントだと、Instagram は許可の一覧を出さず短い確認だけで
   // 戻すことがある。そのとき後から足した許可は渡されず接続が必ず失敗するため、
   // 毎回ログインと許可の一覧からやり直させる。
@@ -312,6 +314,12 @@ it('同時投稿の許可が無い古い接続は認可切れにして取り直�
   );
   // 期限内でも投稿できないので、更新ではなく接続のやり直しへ回す。
   expect((await req('/api/instagram/refresh', {})).status).toBe(409);
+});
+it('DM の許可がない接続には再接続が必要と返す', async () => {
+  await connect();
+  expect((await read(await req('/api/instagram/connection'))).data.dmReconnectRequired).toBe(true);
+  db.raw.exec("UPDATE instagram_connections SET scopes=scopes || ',instagram_business_manage_messages'");
+  expect((await read(await req('/api/instagram/connection'))).data.dmReconnectRequired).toBe(false);
 });
 /** 折り返しを1回通し、画面へ戻すURLを読む。 */
 async function callback(query: Record<string, string>) {

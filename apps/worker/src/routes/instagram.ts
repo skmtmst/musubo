@@ -26,6 +26,7 @@ import {
   instagramLongToken,
   instagramRefreshToken,
   instagramCanPublish,
+  instagramCanMessage,
   instagramUrlCode,
   instagramUrlDetail,
   instagramUrlScopes,
@@ -123,6 +124,7 @@ instagram.get('/api/instagram/connection', async (c) => {
       ? {
           state: expired(row) ? 'expired' : 'connected',
           replyEnabled: false,
+          dmReconnectRequired: !instagramCanMessage(row.scopes ?? ''),
           connection: {
             pageId: row.page_id,
             instagramId: row.instagram_id,
