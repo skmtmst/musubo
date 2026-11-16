@@ -677,7 +677,8 @@
     "762_restaurant_store_group_member_version.sql",
     "763_folder_membership_revisions.sql",
     "764_broadcast_ab_live.sql",
-    "765_ec_auto_line_cap.sql"
+    "765_ec_auto_line_cap.sql",
+    "768_instagram_inbox.sql"
   ],
-  "migrationCount": 678
+  "migrationCount": 679
 }

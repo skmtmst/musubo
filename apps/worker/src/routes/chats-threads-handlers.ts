@@ -11,8 +11,15 @@ import { buildCursorListResponse, listLimit, listQueryNumber } from '../lib/list
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveOrCreateChat } from './chats-definition.js';
 import type { Context } from 'hono';
+import { instagramInboxList } from '../services/instagram-inbox-list.js';
+
+// オフセットのない旧データは日本時間として扱う。
+const inboxTimeSql = (column: string) => `julianday(CASE WHEN substr(${column},-1) IN ('Z','z') OR substr(${column},-6,1) IN ('+','-') OR substr(${column},-5,1) IN ('+','-') THEN ${column} ELSE ${column}||'+09:00' END)`;
 
 export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
+  const channel = c.req.query('channel') ?? 'all';
+  if (!['all', 'line', 'instagram'].includes(channel)) return c.json({ success: false, error: 'invalid_channel' }, 400);
+  if (channel === 'instagram' && (c.req.query('sort') === 'sla_due' || c.req.query('slaState') || ['true', '1'].includes(c.req.query('unansweredOnly') ?? '') || c.req.query('status') || c.req.query('operatorId') || c.req.query('quickFilter'))) return c.json({ success: false, error: 'incompatible_filters' }, 400);
   if(c.req.query('sort')==='sla_due'||['overdue','soon'].includes(c.req.query('slaState')??'')) return slaChatList(c);
   try {
     const staff = c.get('staff');
@@ -137,7 +144,9 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
     // friend_id は同時刻 (broadcast 一斉配信等) のタイブレーク。
     // beforeUnread が無い古い渡し方は、時刻だけの従来条件に倒す。
     // sort=latest のカーソルは (last_message_at, friend_id) だけで、beforeUnread は見ない。
-    const beforeAt = c.req.query('beforeAt') || undefined;
+    const rawBeforeAt = c.req.query('beforeAt') || undefined;
+    const parsedBeforeAt = rawBeforeAt && new Date(/[zZ]$|[+-]\d{2}:?\d{2}$/.test(rawBeforeAt) ? rawBeforeAt : `${rawBeforeAt.replace(' ', 'T')}+09:00`);
+    const beforeAt = parsedBeforeAt && Number.isFinite(parsedBeforeAt.getTime()) ? parsedBeforeAt.toISOString() : rawBeforeAt;
     const beforeId = c.req.query('beforeId') || undefined;
     const beforeUnreadRaw = c.req.query('beforeUnread');
     const beforeUnread = !unreadFirst ? null : beforeUnreadRaw === '1' || beforeUnreadRaw === 'true'
@@ -224,7 +233,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
     const sql = `
       WITH last_any AS MATERIALIZED (
         SELECT friend_id,
-          MAX(COALESCE(line_event_at, created_at)) AS last_message_at,
+          MAX(strftime('%Y-%m-%dT%H:%M:%fZ', ${inboxTimeSql('COALESCE(line_event_at, created_at)')})) AS last_message_at,
           MAX(CASE WHEN direction = 'incoming' THEN created_at END) AS last_incoming_at
         FROM messages_log
         WHERE (delivery_type IS NULL OR delivery_type != 'test')
@@ -235,7 +244,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
         SELECT friend_id, MAX(last_message_at) AS last_message_at FROM (
           SELECT friend_id, last_message_at FROM last_any
           UNION ALL
-          SELECT friend_id, last_message_at FROM chats WHERE ${accountFilterSql}
+          SELECT friend_id, strftime('%Y-%m-%dT%H:%M:%fZ', ${inboxTimeSql('last_message_at')}) AS last_message_at FROM chats WHERE ${accountFilterSql}
         ) GROUP BY friend_id
       ),
       page AS MATERIALIZED (
@@ -313,7 +322,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
         COALESCE(c.status, 'resolved') AS status,
         COALESCE(c.revision, 0) AS revision,
         c.notes,
-        COALESCE(rm.preview_at, d.last_message_at) AS last_message_at,
+        d.last_message_at AS last_message_at,
         rm.content AS last_message_content,
         rm.direction AS last_message_direction,
         rm.message_type AS last_message_type,
@@ -374,7 +383,17 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       updatedAt: ch.updated_at,
     }));
 
-    const responseItems = await enrichSlaChats(c.env.DB,data);
+    const lineItems = await enrichSlaChats(c.env.DB,data);
+    const includeInstagram = channel !== 'line' && !status && !operatorId && !quickFilter;
+    const instagramItems = includeInstagram ? await instagramInboxList(c.env.DB, {
+      accounts: lineAccountId ? [lineAccountId] : visibleScope.allowedAccountIds,
+      staffId: staff.id, query, unreadOnly, beforeAt, beforeId, beforeUnread, unreadFirst, limit,
+    }) : [];
+    const responseItems = [...(channel === 'instagram' ? [] : lineItems.map(item => ({ ...item, channel: 'line' as const }))), ...instagramItems]
+      .sort((a, b) => (unreadFirst ? Number(b.isUnread) - Number(a.isUnread) : 0)
+        || (String(a.lastMessageAt) < String(b.lastMessageAt) ? 1 : String(a.lastMessageAt) > String(b.lastMessageAt) ? -1 : 0)
+        || (String(a.id) < String(b.id) ? 1 : String(a.id) > String(b.id) ? -1 : 0))
+      .slice(0, limit);
     return c.json(buildCursorListResponse({ success: true, data: responseItems, items: responseItems, paging: { limit }, sort: [] }));
   } catch (err) {
     throw err;

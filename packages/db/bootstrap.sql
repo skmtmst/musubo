@@ -4732,6 +4732,14 @@ CREATE TABLE "instagram_connections" (
  version INTEGER NOT NULL DEFAULT 1, scopes TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE instagram_inbox_reads (
+  staff_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  sender_id TEXT NOT NULL,
+  last_read_at TEXT NOT NULL,
+  PRIMARY KEY (staff_id, line_account_id, sender_id)
+);
+
 CREATE TABLE "instagram_messages" (
  id TEXT NOT NULL, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
  instagram_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL,
@@ -10953,6 +10961,9 @@ CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_accou
 CREATE INDEX idx_instagram_connections_instagram_id ON instagram_connections(instagram_id);
 
 CREATE INDEX idx_instagram_messages_account_time_754 ON instagram_messages(line_account_id,received_at,id);
+
+CREATE INDEX idx_instagram_messages_conversation_768
+  ON instagram_messages(line_account_id, sender_id, received_at DESC, id DESC);
 
 CREATE INDEX idx_integration_api_tokens_account
   ON integration_api_tokens (line_account_id, revoked_at);
