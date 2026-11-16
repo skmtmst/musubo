@@ -467,7 +467,7 @@
 
 ## 反映履歴
 
-- [絞り込みや分析の自動確認を改善](release-log/unreleased/PR-kenta-q02b-b4.md) — 反映履歴、確認 2026-11-17。
+- [絞り込みや分析の自動確認を改善](release-log/unreleased/100-kenta-q02b-b4.md) — 反映履歴、確認 2026-11-17。
 
 - [自動確認を実際の動きで確認](release-log/unreleased/94-kenta-q02b.md) — 反映履歴、確認 2026-11-16。
 
