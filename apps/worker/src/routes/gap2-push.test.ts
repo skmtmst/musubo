@@ -78,3 +78,24 @@ test.each(['immediate','quiet','retry'])('担当が閲覧のみになったら%s
  if(mode==='retry') await retryOperatorPush(d.db,{},new Date(Date.now()+120000),send);
  expect(send).not.toHaveBeenCalled();
 });
+test('G4-11: 消えた端末だけを外し、他の端末には送る',async()=>{
+ await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',body);
+ await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',{...body,endpoint:body.endpoint+'-second'});
+ const send=vi.fn(async(s:{endpoint:string})=>s.endpoint.endsWith('-second')?{ok:true,status:201}:{ok:false,status:410});
+ const result=await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'new_inquiry',refId:'two-devices',chatId:'chat'},send);
+ expect(result).toEqual({sent:1,failed:1});
+ expect(send).toHaveBeenCalledTimes(2);
+ const rows=d.raw.prepare('SELECT endpoint,revoked_at FROM operator_push_subscriptions ORDER BY endpoint').all() as {endpoint:string;revoked_at:string|null}[];
+ expect(rows.find(r=>r.endpoint===body.endpoint)?.revoked_at).toBeTruthy();
+ expect(rows.find(r=>r.endpoint.endsWith('-second'))?.revoked_at).toBeNull();
+});
+test('G4-12: 5xxが続いた通知は3回まで再試行し、失敗を残す',async()=>{
+ const {retryOperatorPush}=await import('../services/operator-push.js');
+ await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',body);
+ d.raw.exec("INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES('always-fails','f','incoming','text','秘密の本文','a')");
+ const send=vi.fn(async()=>({ok:false,status:503}));
+ await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'new_inquiry',refId:'always-fails',chatId:'chat'},send);
+ for(const minutes of [2,10,45,90]) await retryOperatorPush(d.db,{},new Date(Date.now()+minutes*60_000),send);
+ expect(send).toHaveBeenCalledTimes(4);
+ expect(d.raw.prepare('SELECT status,attempts,next_attempt_at FROM operator_push_deliveries').get()).toEqual({status:'failed',attempts:4,next_attempt_at:null});
+});
