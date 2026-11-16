@@ -467,6 +467,8 @@
 
 ## 反映履歴
 
+- [Google口コミの返信を下書き保存](release-log/unreleased/PR-kenta-review-draft.md) — 反映履歴、確認 2026-11-16。
+
 - [予約・友だち情報・配信の操作と安全性を改善](release-log/unreleased/36-masato-legacy-port.md) — 反映履歴、確認 2026-11-10。
 - [運営コンソールの問い合わせ画面をPenと照合して修正](release-log/unreleased/41-masato-ops-support-pen-parity.md) — スマートフォンの返信欄とテンプレート引用画面、確認 2026-11-11。
 - [運営の返信テンプレート編集・削除と検索欄の余白修正](release-log/unreleased/44-masato-ops-support-template-edit.md) — 問い合わせ画面の修正履歴、確認 2026-11-12。

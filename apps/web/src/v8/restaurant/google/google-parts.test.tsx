@@ -61,37 +61,40 @@ describe('Googleビジネスの表示の道具', () => {
   })
 })
 
-describe('返信を作る：送れない設定のときは送信へ進むボタンを出さない', () => {
+describe('返信を作る：送れない設定でも確認できるが送信しない', () => {
   it('AI下書きは設定操作や初回確認なしにボタンだけで生成する', async () => {
     fixture.generateDraft.mockResolvedValue({ draft: 'ご来店ありがとうございます。' })
     render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(false, true)} go={vi.fn()} onPublished={vi.fn()} />)
     fireEvent.click(await screen.findByRole('button', { name: 'AIで下書きを作る' }))
     await waitFor(() => expect(fixture.generateDraft).toHaveBeenCalledWith('a', 'rv-2'))
     expect((screen.getByRole('textbox', { name: '返信文' }) as HTMLTextAreaElement).value).toBe('ご来店ありがとうございます。')
-    expect(screen.queryByText(/口コミの評価・本文と店舗名をAIの提供会社に送ります/)).toBeNull()
+    expect(screen.getByText(/口コミの評価・本文と店舗名をAIの提供会社に送ります/)).toBeTruthy()
     expect(fixture.publishReply).not.toHaveBeenCalled()
   })
-  it('検証環境（writeEnabled=false）では「返信内容を確認する」を置かず、下書きの保存はできる', async () => {
+  it('検証環境では確認できるが送信できない', async () => {
     render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(false, true)} go={vi.fn()} onPublished={vi.fn()} />)
-    expect(await screen.findByRole('button', { name: '下書きを保存する' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '返信内容を確認する' })).toBeNull()
-    expect(screen.getByText('検証環境では Google へは送りません。下書きと承認まで。')).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '下書きを保存' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '返信する' }))
+    expect(screen.getByText('この返信をGoogleに公開しますか？')).toBeTruthy()
+    fireEvent.click(screen.getByRole('checkbox', { name: '返信先・内容・個人情報の有無を確認しました' }))
+    expect(screen.getByRole('button', { name: 'この内容で返信する' }).getAttribute('aria-disabled')).toBe('true')
+    expect(fixture.publishReply).not.toHaveBeenCalled()
   })
-  it('送れる設定で公開の権限があれば「返信内容を確認する」を出す', async () => {
+  it('送れる設定で公開の権限があれば「返信する」を出す', async () => {
     render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={vi.fn()} />)
-    expect(await screen.findByRole('button', { name: '返信内容を確認する' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '返信する' })).toBeTruthy()
   })
   it.each([true, false])('返信済みの競合は再送せず、返信文の有無にかかわらず最新を確認できる（返信文あり=%s）', async (withExistingReply) => {
     const existingReply = '別の担当者による返信です。'.repeat(15)
     fixture.publishReply.mockRejectedValue(new ApiError(409, '返信済み', 'already_replied', withExistingReply ? { existingReply } : undefined))
     const onPublished = vi.fn()
     render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={onPublished} />)
-    fireEvent.click(await screen.findByRole('button', { name: '返信内容を確認する' }))
+    fireEvent.click(await screen.findByRole('button', { name: '返信する' }))
     fireEvent.click(screen.getByRole('checkbox', { name: '返信先・内容・個人情報の有無を確認しました' }))
     fireEvent.click(screen.getByRole('button', { name: 'この内容で返信する' }))
     expect(await screen.findByText('別の担当者がすでに返信しています。')).toBeTruthy()
     expect(screen.getByText(withExistingReply ? new RegExp(existingReply) : /返信文を読み込めませんでした/)).toBeTruthy()
-    const confirm = screen.getByRole('button', { name: '返信内容を確認する' }) as HTMLButtonElement
+    const confirm = screen.getByRole('button', { name: '返信する' }) as HTMLButtonElement
     expect(confirm.disabled).toBe(true)
     fireEvent.click(confirm)
     expect(fixture.publishReply).toHaveBeenCalledTimes(1)
@@ -103,7 +106,7 @@ describe('返信を作る：送れない設定のときは送信へ進むボタ�
     fireEvent.click(screen.getByRole('button', { name: /もう一度/ }))
     expect(await screen.findByText(`公開済みの返信：${existingReply}`)).toBeTruthy()
     expect(screen.queryByText('別の担当者がすでに返信しています。')).toBeNull()
-    expect(screen.queryByRole('button', { name: '返信内容を確認する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '返信する' })).toBeNull()
     expect(fixture.publishReply).toHaveBeenCalledTimes(1)
     expect(onPublished).not.toHaveBeenCalled()
   })
@@ -187,7 +190,7 @@ it.each(['viewer', null])('下書きのURLを直接開いても変更権限が�
   expect(screen.getByText('AIが作った返信の下書き', { exact: true })).toBeTruthy()
   expect(document.querySelector('[data-read-only-notice]')).toBeNull() // 親が帯を持つ。
   expect(screen.getByRole('textbox', { name: '返信文' })).toHaveProperty('readOnly', true)
-  for (const name of ['下書きを保存する', 'AIで下書きを作る', '返信内容を確認する']) {
+  for (const name of ['下書きを保存', 'AIで下書きを作る', '返信する']) {
     const button = screen.getByRole('button', { name }) as HTMLButtonElement
     expect(role === null ? button.disabled : button.getAttribute('aria-disabled') === 'true').toBe(true)
     fireEvent.click(button)
@@ -204,9 +207,9 @@ it('編集を任された担当者は口コミの下書きを作り、保存で�
   fixture.saveDraft.mockResolvedValue({ review: { ...review, replyDraft: '直した返信' } })
   render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, false)} go={vi.fn()} onPublished={vi.fn()} />)
   fireEvent.change(await screen.findByRole('textbox', { name: '返信文' }), { target: { value: '直した返信' } })
-  fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
+  fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
   await waitFor(() => expect(fixture.saveDraft).toHaveBeenCalledWith('a', 'rv-2', '直した返信'))
-  expect(screen.getByRole('button', { name: '返信内容を確認する' }).getAttribute('aria-disabled')).toBe('true')
+  expect(screen.getByRole('button', { name: '返信する' }).getAttribute('aria-disabled')).toBe('true')
 })
 
 
@@ -222,7 +225,7 @@ it('閲覧のみでも保存済みの下書きは開いて読むことができ�
 
 it('公開の確認中に閲覧のみに変わっても、送信へ進めない', async () => {
   const view = render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={vi.fn()} />)
-  fireEvent.click(await screen.findByRole('button', { name: '返信内容を確認する' }))
+  fireEvent.click(await screen.findByRole('button', { name: '返信する' }))
   await screen.findByText('この返信をGoogleに公開しますか？')
   fixture.role = verifiedStaffRole('viewer')
   view.rerender(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={vi.fn()} />)
@@ -253,7 +256,7 @@ it('送信中に閲覧のみへ変わっても結果不明の案内を残し、�
   fixture.publishReply.mockImplementation(() => new Promise((_resolve, reject) => { rejectPublish = reject }))
   const props = { accountId: 'a', reviewId: 'rv-2', data: connection(true, true), go: vi.fn(), onPublished: vi.fn() }
   const view = render(<ReviewDraft {...props} />)
-  fireEvent.click(await screen.findByRole('button', { name: '返信内容を確認する' }))
+  fireEvent.click(await screen.findByRole('button', { name: '返信する' }))
   fireEvent.click(screen.getByRole('checkbox'))
   fireEvent.click(screen.getByRole('button', { name: 'この内容で返信する' }))
   fixture.role = verifiedStaffRole('viewer')
@@ -261,7 +264,7 @@ it('送信中に閲覧のみへ変わっても結果不明の案内を残し、�
   await act(async () => { rejectPublish(new ApiError(502, '送信結果を確認できません', 'upstream_error')) })
   expect(await screen.findByText(/Googleへの送信結果を確認できませんでした/)).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'この内容で返信する' })).toBeNull()
-  expect(screen.getByRole('button', { name: '返信内容を確認する' }).getAttribute('aria-disabled')).toBe('true')
+  expect(screen.getByRole('button', { name: '返信する' }).getAttribute('aria-disabled')).toBe('true')
   expect(fixture.publishReply).toHaveBeenCalledTimes(1)
   expect(props.onPublished).not.toHaveBeenCalled()
 })
@@ -269,3 +272,22 @@ it('送信中に閲覧のみへ変わっても結果不明の案内を残し、�
 afterEach(() => { verifiedStaffRole(null) })
 
 seedIdentity(() => { verifiedStaffRole('owner') })
+
+it('保存した口コミの下書きを開き直して確認画面に進める', async () => {
+  let stored = { ...review, replyDraft: '' }
+  fixture.review.mockImplementation(async () => ({ review: stored }))
+  fixture.saveDraft.mockImplementation(async (_account: string, _id: string, text: string) => {
+    stored = { ...stored, replyDraft: text }
+    return { review: stored }
+  })
+  const props = { accountId: 'a', reviewId: 'rv-2', data: connection(false, true), go: vi.fn(), onPublished: vi.fn() }
+  const view = render(<ReviewDraft {...props} />)
+  fireEvent.change(await screen.findByRole('textbox', { name: '返信文' }), { target: { value: '保存した返信' } })
+  fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+  await waitFor(() => expect(fixture.saveDraft).toHaveBeenCalledWith('a', 'rv-2', '保存した返信'))
+  view.unmount()
+  render(<ReviewDraft {...props} />)
+  expect(await screen.findByDisplayValue('保存した返信')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '返信する' }))
+  expect(screen.getByText('この返信をGoogleに公開しますか？')).toBeTruthy()
+})
