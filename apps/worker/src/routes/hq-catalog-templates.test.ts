@@ -146,3 +146,17 @@ test('HQT-12: 閲覧のみはひな形を読めるが保存と配布を開始で
  expect((await call(`/${id}`,'PATCH',{name:'変更',definition:defs.booking_menu,expectedRevision:1})).status).toBe(403);
  expect((await run(id,p)).status).toBe(403);expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
 });
+
+test('HQT-03: EC専用店を除き予約を使う店だけへ配る',async()=>{
+ const id=await create('booking_menu');f.raw.exec("INSERT INTO account_styles(line_account_id,style,updated_at) VALUES('a','ec',datetime('now'))");
+ const p=await check(id,['a','b']);expect((p.stores.find(s=>s.accountId==='a') as any).warnings).toContain('booking_not_used');
+ const r=await run(id,p);expect(r.body.data.status).toBe('partial');expect(f.raw.prepare('SELECT line_account_id FROM menus').all()).toEqual([{line_account_id:'b'}]);
+});
+test('HQT-18: 予約メニューの確認は29分後でも有効',async()=>{
+ const id=await create('booking_menu'),p=await check(id);vi.setSystemTime(new Date('2026-11-16T00:29:00Z'));
+ expect((await run(id,p)).body.data.status).toBe('completed');expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:1});
+});
+test('HQT-18: 予約メニューの確認は30分後に期限切れ',async()=>{
+ const id=await create('booking_menu'),p=await check(id);vi.setSystemTime(new Date('2026-11-16T00:30:00Z'));
+ const r=await run(id,p);expect(r.body.data.stores[0].status).toBe('version_conflict');expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
+});

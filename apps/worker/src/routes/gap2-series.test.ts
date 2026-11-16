@@ -105,3 +105,18 @@ test('B4-17: 閲覧のみの担当は繰り返しの一覧を読み取消でき�
  const cancel=await gapCall(a,`/api/booking/admin/series/${data.series.id}/cancel?account_id=a`,'POST',{scope:'this',fromBookingId:data.bookings[0].id,expectedVersion:1});
  expect(cancel.status).toBe(403);expect(d.raw.prepare("SELECT COUNT(*) n FROM bookings WHERE status='cancelled'").get()).toEqual({n:0});
 });
+
+test('B4-19: 52回の見本は空き情報を一括取得する',async()=>{
+ const start=Date.parse('2026-11-20T05:00:00Z');
+ for(let i=4;i<52;i++){
+  const date=new Date(start+i*7*86400000).toISOString().slice(0,10);
+  d.raw.prepare("INSERT INTO staff_shifts(id,staff_id,work_date,start_time,end_time) VALUES(?,'bs',?,'09:00','18:00')").run(`week-${i}`,date);
+ }
+ const prepare=d.db.prepare.bind(d.db);let shiftReads=0;
+ const spy=vi.spyOn(d.db,'prepare').mockImplementation(sql=>{if(/FROM staff_shifts/i.test(sql))shiftReads++;return prepare(sql);});
+ try{
+  const r=await gapCall(app(),'/api/booking/admin/series/preview?account_id=a','POST',{...body,rule:{freq:'weekly',count:52}});
+  expect(r.status,await r.clone().text()).toBe(200);expect((await r.json() as any).data.occurrences).toHaveLength(52);
+  expect(shiftReads).toBe(1);
+ }finally{spy.mockRestore();}
+});

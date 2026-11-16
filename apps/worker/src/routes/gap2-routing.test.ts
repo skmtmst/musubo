@@ -99,3 +99,12 @@ test('B6-07: 担当組の振り分けトークンは組外の担当では使え�
  await expect(verifyRoutingToken(d.db,'a','f',token,'menu','bs')).resolves.toMatchObject({matchedIndex:0});
  await expect(verifyRoutingToken(d.db,'a','f',token,'menu','bs2')).rejects.toThrow('routing_token_invalid');
 });
+
+test('B6-04: 試しは一致行とfallbackを区別し保存しない',async()=>{
+ const before=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get();const a=gapApp(d,[formRouting]);
+ for(const [answer,index] of [['転職',0],['ほか',-1]] as const){
+  const r=await gapCall(a,'/api/forms/form/routing/preview?account_id=a','POST',{answers:{subject:answer}});
+  expect(r.status).toBe(200);expect((await r.json() as any).data.matchedIndex).toBe(index);
+ }
+ expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
+});
