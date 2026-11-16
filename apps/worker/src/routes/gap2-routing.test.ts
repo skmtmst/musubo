@@ -1,5 +1,6 @@
 import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import {formRouting} from './form-routing.js';
+import {forms} from './forms.js';
 import {loadRoutingLayout,validateLayoutRouting,resolveRouting,issueRoutingToken,verifyRoutingToken} from '../features/forms/form-routing.js';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
@@ -8,8 +9,8 @@ import {normalizeLayout,type FormLayout} from '@line-crm/shared';
 let d:SqliteD1;
 const target={menuId:'menu',staffId:'bs'};
 const layout=()=>normalizeLayout({sections:[{id:'s1',name:'相談',blocks:[{id:'q',kind:'input',type:'radio',name:'subject',label:'内容',choices:[{id:'job',label:'転職'}]},{id:'book',kind:'input',type:'booking',name:'book',label:'予約',booking:{menuId:'menu',routing:{enabled:true,rules:[{conditions:[{questionId:'q',op:'is',value:'転職'}],target}],fallback:{menuId:'menu'}}}}]}]})!;
-beforeEach(()=>{d=gapFixture();const l=JSON.stringify(layout());d.raw.prepare("INSERT INTO forms(id,name,fields,layout) VALUES('form','相談','[]',?)").run(l);d.raw.exec("INSERT INTO form_accounts(form_id,line_account_id) VALUES('form','a')");vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({sub:'Uf'}))));});
-afterEach(()=>{d.raw.close();vi.unstubAllGlobals();});
+beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));d=gapFixture();const l=JSON.stringify(layout());d.raw.prepare("INSERT INTO forms(id,name,fields,layout) VALUES('form','相談','[]',?)").run(l);d.raw.exec("INSERT INTO form_accounts(form_id,line_account_id) VALUES('form','a')");vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({sub:'Uf'}))));});
+afterEach(()=>{d.raw.close();vi.useRealTimers();vi.unstubAllGlobals();});
 test('B6-01 B6-02 B6-03 B6-13: fallback必須・自由記述不可・51行拒否',async()=>{
  await expect(validateLayoutRouting(d.db,'a',layout())).resolves.toBeUndefined();
  const l=layout(),blocks=l.sections[0].blocks as any[],r=blocks[1].booking.routing;delete r.fallback;await expect(validateLayoutRouting(d.db,'a',l)).rejects.toThrow('routing_invalid');r.fallback=target;
@@ -32,4 +33,38 @@ test('B6-06: 公開の版を読んで下書きの変更を混ぜない',async()=
  const {publishFormVersion}=await import('@line-crm/db');await publishFormVersion(d.db,'form',1);const l=layout();(l.sections[0].blocks[1] as any).booking.routing.rules=[];d.raw.prepare("UPDATE forms SET layout=? WHERE id='form'").run(JSON.stringify(l));
  expect((await resolveRouting(d.db,'a',(await loadRoutingLayout(d.db,'form','a',true)).layout,{subject:'転職'})).matchedIndex).toBe(0);
  expect((await resolveRouting(d.db,'a',(await loadRoutingLayout(d.db,'form','a',false)).layout,{subject:'転職'})).matchedIndex).toBe(-1);
+});
+
+const saveRouting=async(l:FormLayout,revision=1)=>gapCall(gapApp(d,[forms]),'/api/forms/form?account_id=a','PUT',{layout:l,expectedContentRevision:revision});
+test('B6-01: 行き先がない場合はフォームを保存しない',async()=>{
+ const l=layout();const routing=(l.sections[0].blocks[1] as any).booking.routing;routing.rules=[];delete routing.fallback;
+ const before=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get();
+ const r=await saveRouting(l);expect(r.status).toBe(400);
+ expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
+});
+test('B6-02: 選択肢と行き先が有効なルールを保存できる',async()=>{
+ const l=layout();const r=await saveRouting(l);expect(r.status,await r.clone().text()).toBe(200);
+ const row=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get() as any;
+ expect(row.content_revision).toBe(2);expect(JSON.parse(row.layout).sections[0].blocks[1].booking.routing).toMatchObject({enabled:true,rules:[{target}],fallback:{menuId:'menu'}});
+});
+test('B6-03: 自由記述を条件にしたフォームの直接保存を400で拒否する',async()=>{
+ const l=layout();(l.sections[0].blocks[0] as any).type='text';
+ const before=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get();
+ const r=await saveRouting(l);expect(r.status).toBe(400);expect(await r.json()).toMatchObject({error:'routing_question_invalid:0'});
+ expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
+});
+test('B6-12: 古い版の保存を409で拒否し先の変更を残す',async()=>{
+ const first=layout();(first.sections[0].blocks[0] as any).label='先の変更';
+ expect((await saveRouting(first)).status).toBe(200);
+ const second=layout();(second.sections[0].blocks[0] as any).label='古い変更';
+ expect((await saveRouting(second)).status).toBe(409);
+ const row=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get() as any;
+ expect(row.content_revision).toBe(2);expect(JSON.parse(row.layout).sections[0].blocks[0].label).toBe('先の変更');
+});
+test('B6-08: 停止した担当への分岐は代替先を返しフォームを書き換えない',async()=>{
+ d.raw.exec("UPDATE staff SET is_active=0 WHERE id='bs'; INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES('bs2','menu',1)");
+ const before=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get();
+ const r=await gapCall(gapApp(d,[formRouting]),'/api/forms/form/routing/preview?account_id=a','POST',{answers:{subject:'転職'}});
+ expect(r.status).toBe(200);expect(await r.json()).toMatchObject({data:{matchedIndex:-1,target:{menuId:'menu'},fellBack:true}});
+ expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
 });

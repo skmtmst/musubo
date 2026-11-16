@@ -161,7 +161,8 @@ test('B5-08: 同じキーでの組予約再送は同じ組と2人を返す',asyn
 test('B5-16: 人数上限を1に下げても既存の組は残り新しい組は拒否する',async()=>{
  const first=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'old-group');expect(first.status).toBe(201);
  const groupId=(await first.json() as any).data.groupId;
- d.raw.exec("UPDATE menus SET max_party_size=1 WHERE id='menu'");
+ const saved=await gapCall(app(),'/api/booking/admin/menus/menu?account_id=a','PUT',{name:'相談',duration_minutes:60,base_price:8400,expectedVersion:1,maxPartySize:1});
+ expect(saved.status,await saved.clone().text()).toBe(200);
  const next=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...input,starts_at:'2026-11-27T05:00:00.000Z'},'new-group');
  expect(next.status).toBe(400);expect(await next.json()).toMatchObject({error:'party_size_not_allowed'});
  expect(d.raw.prepare('SELECT count(*) n FROM booking_groups WHERE id=?').get(groupId)).toEqual({n:1});
