@@ -1,4 +1,4 @@
-> 文書：事故が起きたときの手順｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：事故が起きたときの手順｜区分：今の説明｜最終確認：2026-11-16（日本時間）
 
 # 事故が起きたときの手順
 
@@ -77,7 +77,7 @@ pnpm exec wrangler rollback <確認したVersion-ID> --config <対象設定>
 
 Cloudflare画面では Workers & Pages → 対象Worker → Deploymentsから正常版を選べる。実行後は新しい配備が100%になったこと、版・health・ログイン・必要な読取が回復したことを確認する。**Workerの巻き戻しではDBやR2は戻らない。** secretの復旧も個別に扱う。使えない古い版しかなければ、停止を維持して修正版を準備する。
 
-[Cloudflare公式の巻き戻し](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)、[CLIの引数](https://developers.cloudflare.com/workers/wrangler/commands/workers/)。承認・排他は[DEPLOY-GATE](../DEPLOY-GATE.md)、現在の司令塔運用は[AGENTS.md](../../AGENTS.md)に従う。
+[Cloudflare公式の巻き戻し](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)、[CLIの引数](https://developers.cloudflare.com/workers/wrangler/commands/workers/)。承認・排他は[DEPLOY-GATE](../DEPLOY-GATE.md)、現在の司令塔運用は[AGENTS.md](../../AGENTS.md)に従う。巻き戻しも配備の一種なので、共通Actions・順番待ち・ロック・SHA一致の確認が要る。検証への直接のwrangler適用は止めているため（2026-11-05〜）、緊急時も司令塔が使う経路を確かめてから行う。
 
 ### 鍵を作り直す
 
