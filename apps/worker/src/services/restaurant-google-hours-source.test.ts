@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { GoogleProfile, Weekday } from './google-business-profile.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { seedRestaurantFixture } from '../test-utils/restaurant-fixture.js';
@@ -17,8 +17,18 @@ function profile(): GoogleProfile {
   };
 }
 let database: SqliteD1;
-beforeEach(() => { database = createTestD1(); seedRestaurantFixture(database); });
-afterEach(() => database.raw.close());
+/*
+  この検査は 2026-11-16（月）の時間帯を使う。電話受付は過去の時刻を断るので、
+  実時間がその日を過ぎると結果が変わってしまう。時計をその前の金曜に固定して、
+  いつ走らせても同じ結果にする。
+*/
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.setSystemTime(new Date('2026-11-13T00:00:00Z'));
+  database = createTestD1();
+  seedRestaurantFixture(database);
+});
+afterEach(() => { database.raw.close(); vi.useRealTimers(); });
 
 function connection(status = 'connected', selectedLocation = location) {
   database.raw.prepare(`INSERT INTO rt_google_connections
