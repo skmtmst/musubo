@@ -202,3 +202,28 @@ test('B5-15: 閲覧のみは組の詳細を読めるが取消できない',async
  const cancel=await gapCall(a,`/api/booking/admin/groups/${data.groupId}/cancel?account_id=a`,'POST',{reason:'取消',expectedVersion:1});
  expect(cancel.status).toBe(403);expect(d.raw.prepare("SELECT COUNT(*) n FROM bookings WHERE status='cancelled'").get()).toEqual({n:0});
 });
+
+function seedPartyPass(remaining:number){
+ d.raw.exec(`INSERT INTO booking_pass_plans(id,line_account_id,kind,name,price,count,valid_days,target_scope_json,allow_without_pass,status,created_by,created_at,idempotency_key,request_json) VALUES('plan','a','ticket','券',1000,5,180,'["menu"]',1,'on_sale','o','2026-11-01','plan','{}');
+ INSERT INTO booking_entitlements(id,line_account_id,friend_id,kind,name,remaining,valid_from,expires_at,created_at,updated_at,plan_id) VALUES('pass','a','f','ticket','券',${remaining},'2026-11-01T00:00:00Z','2026-12-31T00:00:00Z','2026-11-01','2026-11-01','plan')`);
+}
+test('B5-12: 1人目だけ券を使い2人目は店頭払いの組を作る',async()=>{
+ seedPartyPass(2);
+ const r=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...input,entitlement_id:'pass'});expect(r.status,await r.clone().text()).toBe(201);
+ const rows=(await r.json() as any).data.bookings;expect(rows).toHaveLength(2);
+ expect(d.raw.prepare('SELECT booking_id FROM booking_entitlement_uses').all()).toEqual([{booking_id:rows[0].id}]);
+ expect(d.raw.prepare("SELECT remaining FROM booking_entitlements WHERE id='pass'").get()).toEqual({remaining:1});
+ expect(rows[1].price_at_booking).toBe(8400);
+});
+test('B5-12: 使い切った券で組を作らず2人目も残さない',async()=>{
+ seedPartyPass(0);
+ const r=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...input,entitlement_id:'pass'});
+ expect(r.status).toBe(409);expect(await r.json()).toMatchObject({error:'entitlement_unavailable'});expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_groups').get()).toEqual({n:0});expect(d.raw.prepare('SELECT COUNT(*) n FROM bookings').get()).toEqual({n:0});
+});
+test('G4-21: 今日の予約は指定した担当だけを返す',async()=>{
+ const made=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'my-today');expect(made.status).toBe(201);
+ const rows=(await made.json() as any).data.bookings;
+ vi.setSystemTime(new Date('2026-11-20T00:00:00Z'));
+ const r=await gapCall(app(),'/api/booking/admin/today?account_id=a&staff_id=bs');expect(r.status).toBe(200);
+ expect((await r.json() as any).bookings.map((b:any)=>b.id)).toEqual([rows[0].id]);
+});

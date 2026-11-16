@@ -106,3 +106,14 @@ test.each(['admin','system'] as const)('振替先の個別取消（%s）で使�
  }else d.raw.prepare("UPDATE event_bookings SET status='cancelled',cancelled_by=? WHERE id=?").run(cancelledBy,used.bookingId);
  expect(d.raw.prepare('SELECT status,expires_at,used_event_booking_id FROM booking_makeup_credits WHERE id=?').get(credit.id)).toEqual({status:'open',expires_at:credit.expires_at,used_event_booking_id:null});
 });
+
+test.each(['sequential','concurrent'] as const)('欠席を2回送っても振替券は1件（%s）',async mode=>{
+ d.raw.exec("UPDATE line_accounts SET login_channel_id='login' WHERE id='a'");
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({sub:'Uf'}),{status:200})));
+ const a=gapApp(d,[bookingMakeup]);
+ const request=()=>a.request('/api/liff/events/bookings/eb/absence?liffId=liff-a',{method:'POST',headers:{Authorization:'Bearer fixture','Idempotency-Key':'same-absence','Content-Type':'application/json'},body:'{}'});
+ const responses=mode==='sequential'?[await request(),await request()]:await Promise.all([request(),request()]);
+ expect(responses.map(r=>r.status)).toEqual([200,200]);
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_makeup_credits').get()).toEqual({n:1});
+ expect(d.raw.prepare("SELECT absence_reported_at IS NOT NULL AS absent FROM event_bookings WHERE id='eb'").get()).toEqual({absent:1});
+});
