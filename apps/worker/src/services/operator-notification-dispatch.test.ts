@@ -81,19 +81,26 @@ describe('運用者通知の自動発火と登録簿', () => {
     seedBase(testDb);
   });
 
-  it('G4-12: Push に失敗しても通知センターに残る', async () => {
-    testDb.raw.exec(`
-      INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES ('owner-1','account-1','2026');
-      INSERT INTO friends(id,line_user_id,line_account_id) VALUES ('push-f','U-push','account-1');
-      INSERT INTO chats(id,friend_id,created_at,updated_at) VALUES ('push-c','push-f','2026','2026');
-      INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES ('push-m','push-f','incoming','text','秘密','account-1');
-      INSERT INTO operator_push_subscriptions(id,staff_id,endpoint,p256dh,auth,user_agent_label,created_at) VALUES ('push-sub','owner-1','https://fcm.googleapis.com/fcm/send/test','key','auth','端末','2026');
-    `);
-    const rule = await createNotificationRule(testDb.db, {lineAccountId:'account-1',name:'問い合わせ',eventType:'inbox_new_inquiry',conditions:{recipientIds:['owner-1'],message:'新しい問い合わせ'},channels:['push']});
-    await updateNotificationRule(testDb.db, rule.id, 'account-1', {isActive:true});
-    await dispatchOperatorEvent(testDb.db, env, {lineAccountId:'account-1',eventType:'inbox_new_inquiry',sourceEventId:'push-m',executionMode:'automatic'});
-    expect(testDb.raw.prepare('SELECT status,error_code FROM operator_push_deliveries').get()).toEqual({status:'failed',error_code:'push_unavailable'});
-    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM notifications').get()).toEqual({count:1});
+  it.each([
+    ['通知する時間', '2026-11-19T08:00:00+09:00', 'failed', 'push_unavailable'],
+    ['通知を控える時間', '2026-11-19T22:00:00+09:00', 'suppressed_quiet', null],
+  ])('G4-12: %s でも通知センターに残る', async (_label, now, status, errorCode) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(now));
+    try {
+      testDb.raw.exec(`
+        INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES ('owner-1','account-1','2026');
+        INSERT INTO friends(id,line_user_id,line_account_id) VALUES ('push-f','U-push','account-1');
+        INSERT INTO chats(id,friend_id,created_at,updated_at) VALUES ('push-c','push-f','2026','2026');
+        INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES ('push-m','push-f','incoming','text','秘密','account-1');
+        INSERT INTO operator_push_subscriptions(id,staff_id,endpoint,p256dh,auth,user_agent_label,created_at) VALUES ('push-sub','owner-1','https://fcm.googleapis.com/fcm/send/test','key','auth','端末','2026');
+      `);
+      const rule = await createNotificationRule(testDb.db, {lineAccountId:'account-1',name:'問い合わせ',eventType:'inbox_new_inquiry',conditions:{recipientIds:['owner-1'],message:'新しい問い合わせ'},channels:['push']});
+      await updateNotificationRule(testDb.db, rule.id, 'account-1', {isActive:true});
+      await dispatchOperatorEvent(testDb.db, env, {lineAccountId:'account-1',eventType:'inbox_new_inquiry',sourceEventId:'push-m',executionMode:'automatic'});
+      expect(testDb.raw.prepare('SELECT status,error_code FROM operator_push_deliveries').get()).toEqual({ status, error_code: errorCode });
+      expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM notifications').get()).toEqual({count:1});
+    } finally { vi.useRealTimers(); }
   });
 
   it('G4-05: 登録簿の9件が見え、いずれも実producerへ接続済みと分かる', () => {
