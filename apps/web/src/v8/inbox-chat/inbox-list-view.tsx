@@ -287,13 +287,13 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
         options={[
           { key: 'all' as const, label: 'すべて' },
           { key: 'reply' as const, label: '要返信' },
-          slaEnabled
+          (slaEnabled || socialChannel === 'instagram')
             ? { key: 'overdue' as const, label: '期限超過' }
             : { key: 'overdue' as const, label: '1時間以上待ち' },
         ].map((filter) => ({
           value: filter.key,
           label: filter.label,
-          count: slaEnabled && filter.key === 'overdue'
+          count: socialChannel === 'instagram' && filter.key === 'overdue' ? 0 : slaEnabled && filter.key === 'overdue'
             ? overdueTotal ?? undefined
             : quickCountsNow?.[filter.key],
         }))}
@@ -425,7 +425,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                   残したまま、混ぜ方だけそろえる。
                 */}
         {(() => {
-          const mailRows = (channel === 'line' || socialChannel !== 'all' ? [] : emailItems)
+          const mailRows = (channel === 'line' || socialChannel !== 'all' || (quickFilter === 'overdue' && channel !== 'email') ? [] : emailItems)
             .filter((item) =>
               nameQuery.trim() === ''
                 ? true
@@ -624,6 +624,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           }
           // 障害を0件と誤認させない。具体的な理由は各チャネルのエラー表示に任せる。
           if (inboxListFailed) return null
+          if (socialChannel === 'instagram' && quickFilter === 'overdue') return <InboxListEmpty filtered onClear={clearInboxFilters} description="Instagram の会話には返信の期限がありません" />
           return <InboxListEmpty filtered={hasInboxFilters} onClear={clearInboxFilters} />
         })()}
 

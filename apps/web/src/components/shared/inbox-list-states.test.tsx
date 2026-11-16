@@ -13,6 +13,8 @@ describe('受信箱の空と失敗はほかの一覧と同じ形', () => {
     const filtered = renderToStaticMarkup(<InboxListEmpty filtered onClear={() => {}} />)
     expect(filtered).toContain('data-inbox-list-state="filtered-empty"')
     expect(filtered).toContain('絞り込みを外す')
+    const instagram = renderToStaticMarkup(<InboxListEmpty filtered onClear={() => {}} description="Instagram の会話には返信の期限がありません" />)
+    expect(instagram).toContain('Instagram の会話には返信の期限がありません')
   })
 
   it('会話とメールが両方失敗しても、知らせと「もう一度読み込む」は1つ', () => {

@@ -13,9 +13,10 @@ type Options = {
   assigneeFilter: string
   unreadOnly: boolean
   channel: "email" | "all" | "line"
+  socialChannel?: 'all' | 'line' | 'instagram'
 }
 
-export function useInboxStats({ selectedAccountId, statusFilter, debouncedNameQuery, assigneeFilter, unreadOnly, channel }: Options) {
+export function useInboxStats({ selectedAccountId, statusFilter, debouncedNameQuery, assigneeFilter, unreadOnly, channel, socialChannel }: Options) {
 
   // 担当の選択肢（設計 `TalkPane` の「担当」）。
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
@@ -116,7 +117,7 @@ export function useInboxStats({ selectedAccountId, statusFilter, debouncedNameQu
    * 「その札を押したときの件数」を表す）。応答が着順違れで戻っても
    * requestId で新しい方だけを採用する。
    */
-  const quickCountsKey = JSON.stringify([statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
+  const quickCountsKey = JSON.stringify([statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel, socialChannel])
 
   useEffect(() => {
     const requestId = ++quickCountsRequestRef.current
@@ -128,7 +129,8 @@ export function useInboxStats({ selectedAccountId, statusFilter, debouncedNameQu
       accountId: selectedAccountId || undefined,
       q: debouncedNameQuery || undefined,
       unreadOnly,
-      channel,
+      channel: socialChannel === 'instagram' ? 'instagram' : socialChannel === 'line' ? 'line' : channel,
+      ...(socialChannel ? { socialChannel } : {}),
     })).then((res) => {
       if (quickCountsRequestRef.current !== requestId) return
       /* 失敗や変な形の応答を0件と読まない。`—` のままにする。 */
@@ -141,7 +143,7 @@ export function useInboxStats({ selectedAccountId, statusFilter, debouncedNameQu
       if (quickCountsRequestRef.current === requestId) setQuickCounts(null)
     })
     return () => { quickCountsRequestRef.current += 1 }
-  }, [refreshVersion, quickCountsKey, statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
+  }, [refreshVersion, quickCountsKey, statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel, socialChannel])
 
   /*
    * ★V8 状態の切り替えの件数（未対応 5・対応中 2…）。一覧と同じ条件（アカウント・担当・名前・

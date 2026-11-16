@@ -11,6 +11,7 @@ import { api, type ChatListItem } from '@/lib/api'
 import { canEditFeature } from '@/lib/staff-capability'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
 import { formatTime } from '@/lib/format'
+import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { ChannelBadge } from './inbox-model'
 
 type Message = { id: string; content: string; createdAt: string; direction: 'incoming' | 'outgoing' }
@@ -35,7 +36,7 @@ export default function InstagramConversation({ chat, role, onChanged }: { chat:
     void api.instagram.conversation(account, chat.friendId).then(result => {
       if (active && result.success) setDetail(result.data)
     }).catch(() => { if (active) setError('会話を読み込めませんでした') })
-    if (canEditFeature('/chats', role) && !readStaffIdentity()?.readOnly) void api.instagram.markConversationRead(account, chat.friendId).then(() => { if (active) onChanged() }).catch(() => undefined)
+    if (canEditFeature('/chats', role) && !readStaffIdentity()?.readOnly) void api.instagram.markConversationRead(account, chat.friendId).then(() => { if (active) { onChanged(); window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT)) } }).catch(() => undefined)
     return () => { active = false }
   }, [account, chat.friendId, role])
   const incoming = detail?.messages.filter(m => m.direction === 'incoming').at(-1)
@@ -51,7 +52,7 @@ export default function InstagramConversation({ chat, role, onChanged }: { chat:
     try {
       await api.instagram.sendReply(account, incoming.id, text, key.current)
       setText(''); key.current = null
-      await load(); onChanged()
+      await load(); onChanged(); window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
     } catch (err) { setError(err instanceof Error ? err.message : '返信できませんでした') }
     finally { lock.current = false; setSending(false) }
   }

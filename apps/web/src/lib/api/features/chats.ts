@@ -76,7 +76,7 @@ export const chatsMethods = {
      */
     quickCounts: (params?: {
       status?: string; operatorId?: string; accountId?: string; q?: string;
-      unreadOnly?: boolean; channel?: 'all' | 'line' | 'email';
+      unreadOnly?: boolean; channel?: 'all' | 'line' | 'email' | 'instagram'; socialChannel?: 'all' | 'line' | 'instagram';
     }) => {
       const query: Record<string, string> = {}
       if (params?.status) query.status = params.status
@@ -88,6 +88,7 @@ export const chatsMethods = {
       if (params?.q) query.q = params.q
       if (params?.unreadOnly) query.unreadOnly = '1'
       if (params?.channel) query.channel = params.channel
+      if (params?.socialChannel) query.socialChannel = params.socialChannel
       return fetchApi<ApiResponse<{
         all: number
         reply: number

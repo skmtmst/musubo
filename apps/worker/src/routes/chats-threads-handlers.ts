@@ -19,7 +19,7 @@ const inboxTimeSql = (column: string) => `julianday(CASE WHEN substr(${column},-
 export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
   const channel = c.req.query('channel') ?? 'all';
   if (!['all', 'line', 'instagram'].includes(channel)) return c.json({ success: false, error: 'invalid_channel' }, 400);
-  if (channel === 'instagram' && (c.req.query('sort') === 'sla_due' || c.req.query('slaState') || ['true', '1'].includes(c.req.query('unansweredOnly') ?? '') || c.req.query('status') || c.req.query('operatorId') || c.req.query('quickFilter'))) return c.json({ success: false, error: 'incompatible_filters' }, 400);
+  if (channel === 'instagram' && (c.req.query('sort') === 'sla_due' || c.req.query('slaState') || ['true', '1'].includes(c.req.query('unansweredOnly') ?? '') || c.req.query('status') || c.req.query('operatorId'))) return c.json({ success: false, error: 'incompatible_filters' }, 400);
   if(c.req.query('sort')==='sla_due'||['overdue','soon'].includes(c.req.query('slaState')??'')) return slaChatList(c);
   try {
     const staff = c.get('staff');
@@ -41,6 +41,10 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
     const visibleScope = await getVisibleLineAccountScope(c.env.DB, staff);
     if (lineAccountId && !visibleScope.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: '受信箱が見つかりません' }, 404);
+    }
+    if (channel === 'instagram' && quickFilter === 'overdue') {
+      const limit = listLimit(c.req.query('limit'), 200);
+      return c.json(buildCursorListResponse({ success: true, data: [], items: [], paging: { limit }, sort: [] }));
     }
     const unansweredOnly =
       c.req.query('unansweredOnly') === 'true' || c.req.query('unansweredOnly') === '1';
@@ -384,10 +388,10 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
     }));
 
     const lineItems = await enrichSlaChats(c.env.DB,data);
-    const includeInstagram = channel !== 'line' && !status && !operatorId && !quickFilter;
+    const includeInstagram = channel !== 'line' && !status && !operatorId && quickFilter !== 'overdue';
     const instagramItems = includeInstagram ? await instagramInboxList(c.env.DB, {
       accounts: lineAccountId ? [lineAccountId] : visibleScope.allowedAccountIds,
-      staffId: staff.id, query, unreadOnly, beforeAt, beforeId, beforeUnread, unreadFirst, limit,
+      staffId: staff.id, query, unreadOnly, beforeAt, beforeId, beforeUnread, unreadFirst, limit, replyOnly: quickFilter === 'reply',
     }) : [];
     const responseItems = [...(channel === 'instagram' ? [] : lineItems.map(item => ({ ...item, channel: 'line' as const }))), ...instagramItems]
       .sort((a, b) => (unreadFirst ? Number(b.isUnread) - Number(a.isUnread) : 0)

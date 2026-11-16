@@ -107,7 +107,10 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     if (unreadOnly) params.unreadOnly = true
     if (quickFilter !== 'all') params.quickFilter = quickFilter
     /* 返事の期限を使う店：「期限超過」は旧い「1時間以上待ち」の絞りを使わない。期限の絞り・並びは読んだ行の slaState・slaDueAt で行う。 */
-    if (slaEnabled && quickFilter === 'overdue') delete params.quickFilter
+    if (slaEnabled && quickFilter === 'overdue' && socialChannel !== 'instagram') {
+      delete params.quickFilter
+      params.channel = 'line'
+    }
     // 新しい順は既定の並びと違うときだけ送る（既定の呼び方は変えない）。続きの位置に未読は使わない。
     if (latest) params.sort = 'latest'
     params.limit = CHAT_PAGE_SIZE

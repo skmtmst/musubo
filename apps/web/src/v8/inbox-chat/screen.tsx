@@ -252,7 +252,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     EMAIL_PAGE_SIZE,
     nameQuery,
     selectedAccountId,
-    emailInboxEnabled: emailInboxEnabled && channel !== 'line',
+    emailInboxEnabled: emailInboxEnabled && channel !== 'line' && socialChannel === 'all' && (quickFilter !== 'overdue' || channel === 'email'),
     statusFilter,
     assigneeFilter,
     unreadOnly,
@@ -344,6 +344,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     assigneeFilter,
     unreadOnly,
     channel,
+    socialChannel,
   })
 
   const {
