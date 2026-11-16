@@ -162,7 +162,9 @@ function FriendAddPublish() {
           try {
             const recipientResult = await api.friendAddRules.testRecipient(selectedAccountId, ruleId)
             if (!isCurrent()) return
-            setRecipient(recipientResult.success && recipientResult.data.available)
+            // 応答に可否が無いときは「確認できない」にする。undefined のままだと、押せないのに理由が付かない。
+            const available = recipientResult.success ? recipientResult.data?.available : false
+            setRecipient(typeof available === 'boolean' ? available : null)
           } catch { if (isCurrent()) setRecipient(null) }
         }
         if (canEdit) await readChecks(selectedAccountId, loaded.rule, isCurrent)

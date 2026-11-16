@@ -89,6 +89,14 @@ it('自分への送信は連続押しでも一度だけ呼ぶ',async()=>{
  expect(button.disabled).toBe(true)
  await act(async()=>resolve({success:true,data:{sent:1}}))
 })
+it('宛先の可否が応答に無いと、確認できない理由を付けて送信できない',async()=>{
+ net.query='id=r';net.testRecipient.mockResolvedValue({success:true,data:{items:[],total:0}})
+ render(<Page/>);await act(async()=>{})
+ const button=screen.getByRole<HTMLButtonElement>('button',{name:'自分にテスト送信'})
+ expect(button.disabled).toBe(true)
+ expect(button.getAttribute('aria-description')).toContain('テストの宛先を確認できません')
+ button.click();expect(net.testSend).not.toHaveBeenCalled()
+})
 it('宛先が無いと送信できない',async()=>{
  net.query='id=r';net.testRecipient.mockResolvedValue({success:true,data:{available:false}})
  render(<Page/>);await act(async()=>{})
