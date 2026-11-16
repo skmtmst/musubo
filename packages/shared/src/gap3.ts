@@ -9,7 +9,7 @@ export type StoreComparisonKey='friendChange'|'blockRate'|'clickRate'|'bookings'
 export interface StoreComparisonRow {accountId:string;name:string;style:string|null;computedAt:string|null;coveredDays:number;periodDays:number;metrics:Record<StoreComparisonKey,{value:number|null;diff:number|null;unit:string;available:boolean}>}
 export interface StoreComparisonResult {rows:StoreComparisonRow[];average:Record<StoreComparisonKey,number|null>;total:number;computedAt:string|null}
 export type HqAttentionKind = 'unhandledChats'|'pendingBookings'|'unpaid'|'connections'|'stoppedDeliveries'|'overdueChats';
-export type HqAttentionCounts = Record<HqAttentionKind, number>;
+export type HqAttentionCounts = Record<Exclude<HqAttentionKind, 'overdueChats'>, number> & { overdueChats: number | null };
 export interface StoreComparisonDay { date:string; values:Record<StoreComparisonKey,number|null>; state:'ready'|'partial'|'failed'|'missing' }
 export interface StoreComparisonDetail {
  accountId:string; style:string|null; computedAt:string|null; coveredDays:number; periodDays:number; values:Record<StoreComparisonKey,number|null>;
