@@ -227,3 +227,20 @@ test('G4-21: 今日の予約は指定した担当だけを返す',async()=>{
  const r=await gapCall(app(),'/api/booking/admin/today?account_id=a&staff_id=bs');expect(r.status).toBe(200);
  expect((await r.json() as any).bookings.map((b:any)=>b.id)).toEqual([rows[0].id]);
 });
+
+test('B5-14: 組の無断記録は本人だけに付き他の人を変えない',async()=>{
+ const r=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'individual-noshow');expect(r.status).toBe(201);
+ const rows=(await r.json() as any).data.bookings;
+ expect((await gapCall(app(),`/api/booking/admin/bookings/${rows[1].id}/visit?account_id=a`,'POST',{kind:'no_show'})).status).toBe(200);
+ const view=await gapCall(app(),`/api/booking/admin/bookings/${rows[0].id}/group?account_id=a`);
+ expect((await view.json() as any).data.members.map((m:any)=>[m.bookingId,m.status])).toEqual([[rows[0].id,'confirmed'],[rows[1].id,'no_show']]);
+ expect(d.raw.prepare('SELECT booking_id,kind FROM booking_visit_marks').all()).toEqual([{booking_id:rows[1].id,kind:'no_show'}]);
+});
+test('G4-21: 指定した担当に当日の予約がなければ空の一覧を返す',async()=>{
+ const made=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'empty-today');expect(made.status).toBe(201);
+ const rows=(await made.json() as any).data.bookings;
+ d.raw.prepare("UPDATE bookings SET starts_at='2026-11-27T05:00:00.000Z',ends_at='2026-11-27T06:00:00.000Z',block_ends_at='2026-11-27T06:00:00.000Z' WHERE id=?").run(rows[1].id);
+ vi.setSystemTime(new Date('2026-11-27T00:00:00Z'));
+ const other=await gapCall(app(),'/api/booking/admin/today?account_id=a&staff_id=bs2');expect((await other.json() as any).bookings.map((b:any)=>b.id)).toEqual([rows[1].id]);
+ const r=await gapCall(app(),'/api/booking/admin/today?account_id=a&staff_id=bs');expect(r.status).toBe(200);expect((await r.json() as any).bookings).toEqual([]);
+});

@@ -108,3 +108,12 @@ test('B6-04: 試しは一致行とfallbackを区別し保存しない',async()=>
  }
  expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
 });
+
+test.each(['menu','staff'] as const)('B6-17: %s の行き先も既定先も使えなければ503',async unavailable=>{
+ d.raw.exec("UPDATE line_accounts SET login_channel_id='login' WHERE id='a'");
+ const {publishFormVersion}=await import('@line-crm/db');expect((await publishFormVersion(d.db,'form',1)).kind).toBe('published');
+ if(unavailable==='menu')d.raw.exec("UPDATE menus SET is_active=0 WHERE id='menu'");else d.raw.exec("UPDATE staff SET is_active=0 WHERE id='bs'");
+ const a=gapApp(d,[formRouting]);
+ const r=await a.request('/api/liff/forms/form/routing/resolve?liffId=liff-a',{method:'POST',headers:{Authorization:'Bearer fixture','Content-Type':'application/json'},body:JSON.stringify({answers:{subject:'転職'}})});
+ expect(r.status).toBe(503);expect(await r.json()).toMatchObject({error:'routing_unavailable'});
+});

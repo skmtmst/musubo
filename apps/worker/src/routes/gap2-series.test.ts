@@ -120,3 +120,12 @@ test('B4-19: 52回の見本は空き情報を一括取得する',async()=>{
   expect(shiftReads).toBe(1);
  }finally{spy.mockRestore();}
 });
+
+test('B4-17: 閲覧のみの担当は繰り返しを変更できない',async()=>{
+ const made=await gapCall(app(),url,'POST',body);expect(made.status).toBe(201);const data=(await made.json() as any).data;
+ const viewer={...gapOwner,id:'s',role:'staff' as const,readOnly:true,permissionKeys:[],viewPermissionKeys:['/booking/bookings']};const a=gapApp(d,[bookingSeries],viewer);
+ const path=`/api/booking/admin/series/${data.series.id}?account_id=a`;
+ expect((await gapCall(a,path)).status).toBe(200);
+ expect((await gapCall(a,path,'PATCH',{scope:'this',fromBookingId:data.bookings[0].id,expectedVersion:1,change:{startsAt:'2026-11-20T06:00:00Z'}})).status).toBe(403);
+ expect(d.raw.prepare('SELECT starts_at FROM bookings ORDER BY series_index').all()).toEqual(data.bookings.map((b:any)=>({starts_at:b.starts_at})));
+});
