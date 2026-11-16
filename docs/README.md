@@ -467,6 +467,7 @@
 
 ## 反映履歴
 
+- [初期設定・比較の確認を追加](release-log/unreleased/91-kenta-backend-small.md) — 反映履歴、確認 2026-11-16。
 - [通知端末の扱いを確認](release-log/unreleased/92-kenta-gap-msg.md) — 反映履歴、確認 2026-11-16。
 
 - [予約・友だち情報・配信の操作と安全性を改善](release-log/unreleased/36-masato-legacy-port.md) — 反映履歴、確認 2026-11-10。
