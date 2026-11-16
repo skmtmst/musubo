@@ -467,6 +467,8 @@
 
 ## 反映履歴
 
+- [自動確認を画面の操作と予定の計算で確認](release-log/unreleased/PR-kenta-q02b-b2.md) — 反映履歴、確認 2026-11-16。
+
 - [初期設定・比較の確認を追加](release-log/unreleased/91-kenta-backend-small.md) — 反映履歴、確認 2026-11-16。
 - [通知端末の扱いを確認](release-log/unreleased/92-kenta-gap-msg.md) — 反映履歴、確認 2026-11-16。
 
