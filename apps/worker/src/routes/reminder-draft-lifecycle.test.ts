@@ -148,6 +148,7 @@ describe('リマインダ下書きのAPI契約', () => {
       method: 'POST', body: JSON.stringify({ targetDate: 'not-a-date' }),
     })
     expect(invalid.status).toBe(400)
+    expect(await invalid.json()).toMatchObject({ error: '基準日が正しくありません' })
     expect(draftMocks.previewReminderDraft).not.toHaveBeenCalled()
 
     const response = await request('/api/reminders/reminder-1/preview', {
@@ -159,6 +160,19 @@ describe('リマインダ下書きのAPI契約', () => {
       expect.objectContaining({ lineAccountId: 'account-1' }),
       new Date('2026-09-10T00:00:00.000Z'),
     )
+  })
+
+  it('基準日の省略と null は現在から7日後で予定を計算する', async () => {
+    const now = Date.parse('2026-11-16T00:00:00.000Z')
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+    try {
+      for (const body of [{}, { targetDate: null }]) {
+        draftMocks.previewReminderDraft.mockClear()
+        const response = await request('/api/reminders/reminder-1/preview', { method: 'POST', body: JSON.stringify(body) })
+        expect(response.status).toBe(200)
+        expect(draftMocks.previewReminderDraft).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ lineAccountId: 'account-1' }), new Date(now + 7 * 86_400_000))
+      }
+    } finally { clock.mockRestore() }
   })
 
   it('テスト送信は冪等キーを必須にし、結果を版へ記録する', async () => {
