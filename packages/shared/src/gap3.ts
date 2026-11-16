@@ -8,7 +8,7 @@ export type StoreComparisonKey='friendChange'|'blockRate'|'clickRate'|'bookings'
 /** coveredDays＝期間のうち集計がそろった日の数、periodDays＝期間の日数。数はそろった日の分だけで出す。 */
 export interface StoreComparisonRow {accountId:string;name:string;style:string|null;computedAt:string|null;coveredDays:number;periodDays:number;metrics:Record<StoreComparisonKey,{value:number|null;diff:number|null;unit:string;available:boolean}>}
 export interface StoreComparisonResult {rows:StoreComparisonRow[];average:Record<StoreComparisonKey,number|null>;total:number;computedAt:string|null}
-export type HqAttentionKind = 'unhandledChats'|'pendingBookings'|'unpaid'|'connections'|'stoppedDeliveries'|'overdueChats';
+export type HqAttentionKind = 'unhandledChats'|'pendingBookings'|'unpaid'|'connections'|'stoppedDeliveries';
 export type HqAttentionCounts = Record<HqAttentionKind, number>;
 export interface StoreComparisonDay { date:string; values:Record<StoreComparisonKey,number|null>; state:'ready'|'partial'|'failed'|'missing' }
 export interface StoreComparisonDetail {

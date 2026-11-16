@@ -70,13 +70,13 @@ test('複数アカウントの名前・スタイル・件数と先頭の行き�
   expect(Number.isFinite(Date.parse(response.data.asOf))).toBe(true);
   expect(response.data.items).toEqual([
     { accountId: 'a', name: '店', style: 'salon',
-      counts: { unhandledChats: 2, pendingBookings: 2, unpaid: 1, connections: 1, stoppedDeliveries: 0, overdueChats: 0 },
+      counts: { unhandledChats: 2, pendingBookings: 2, unpaid: 1, connections: 1, stoppedDeliveries: 0 },
       details: { unhandledChats: [{ id: expect.stringMatching(/^(first|second)$/), href: '/chats' }], pendingBookings: [{ id: 'requested', href: '/booking/bookings' }],
-        unpaid: [{ id: 'payment' }], connections: [{ id: 'bad', href: '/accounts' }], stoppedDeliveries: [], overdueChats: [] } },
+        unpaid: [{ id: 'payment' }], connections: [{ id: 'bad', href: '/accounts' }], stoppedDeliveries: [] } },
     { accountId: 'a2', name: '二号店', style: 'standard',
-      counts: { unhandledChats: 1, pendingBookings: 1, unpaid: 0, connections: 0, stoppedDeliveries: 0, overdueChats: 0 },
+      counts: { unhandledChats: 1, pendingBookings: 1, unpaid: 0, connections: 0, stoppedDeliveries: 0 },
       details: { unhandledChats: [{ id: 'another', href: '/chats' }], pendingBookings: [{ id: 'booking-a2', href: '/events/bookings' }],
-        unpaid: [], connections: [], stoppedDeliveries: [], overdueChats: [] } },
+        unpaid: [], connections: [], stoppedDeliveries: [] } },
   ]);
 });
 
@@ -128,8 +128,8 @@ test('5アカウントは集計5batchと名前1読取で開始し、先のアカ
   const pending = read();
   try {
     await vi.waitFor(() => expect(batch).toHaveBeenCalledTimes(5));
-    expect(batch.mock.calls.every(([statements]) => statements.length === 12)).toBe(true);
-    expect(prepare.mock.calls).toHaveLength(70); // 集計60文＋設定5文＋名前1文＋権限/scope4文。
+    expect(batch.mock.calls.every(([statements]) => statements.length === 10)).toBe(true);
+    expect(prepare.mock.calls).toHaveLength(55); // 集計50文＋名前1文＋権限/scope4文。
   } finally { release(); }
   expect((await pending).data.items).toHaveLength(5);
 });

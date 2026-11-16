@@ -1,5 +1,4 @@
 import type { HqAttentionCounts, HqAttentionKind } from '@line-crm/shared';
-import { businessWindows, inboxSlaSettings, refreshInboxSla, slaState } from './inbox-sla.js';
 
 /** 呼び出し元で、このアカウントが現在の可視範囲に属することを検証する。 */
 export async function readAccountAttention(
@@ -8,13 +7,7 @@ export async function readAccountAttention(
   includeDetails = true,
   detailLimit: 1 | 100 = 100,
 ) {
-  const settings = await inboxSlaSettings(db, a);
-  if (settings.enabled) await refreshInboxSla(db, a);
-  const now = new Date();
-  const windows = settings.enabled && settings.businessHoursOnly ? await businessWindows(db, a, now.toISOString()) : null;
-  const active = settings.enabled && slaState(now.toISOString(), true, null, now.getTime(), windows) === 'overdue';
   const queries: Record<string, string> = {
-    overdueChats: `SELECT c.id,'/chats?slaState=overdue' href FROM chats c JOIN friends f ON f.id=c.friend_id WHERE f.line_account_id=? AND ${active ? '1' : '0'}=1 AND c.status!='resolved' AND c.first_response_at IS NULL AND c.sla_due_at IS NOT NULL AND julianday(c.sla_due_at)<=julianday('now')`,
     unhandledChats: `SELECT c.id,'/chats' href FROM chats c JOIN friends f ON f.id=c.friend_id WHERE f.line_account_id=? AND c.status IN('unread','in_progress','on_hold')`,
     pendingBookings: `SELECT id,'/booking/bookings' href FROM bookings WHERE line_account_id=? AND status='requested' UNION ALL SELECT id,'/events/bookings' href FROM event_bookings WHERE line_account_id=? AND status='requested' UNION ALL SELECT r.id,'/restaurant-test/reservations' href FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE s.line_account_id=? AND r.status='pending' AND r.hold_expires_at IS NULL`,
     unpaid: `SELECT id FROM booking_payments WHERE line_account_id=? AND status IN('unpaid','pending','failed')`,

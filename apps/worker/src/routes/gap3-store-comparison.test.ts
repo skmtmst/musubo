@@ -167,19 +167,6 @@ test('CMP-01/17: 返事の速さは、そろった日の返事だけで真ん中
  const n=await storeNumbers(d.db,'a',comparisonPeriod('2026-10-13','2026-10-15'));expect(n).toMatchObject({coveredDays:2,periodDays:3});expect(n.values.responseMinutes).toBe(5);
 });
 
-test('SLA-28: 統括は可視の店の未返信で期限超過した会話だけ数える',async()=>{
- d.raw.exec(`INSERT INTO inbox_routing_settings(account_id,sla_enabled,sla_business_hours_only,updated_at) VALUES('a',1,0,'2020-01-01');
- INSERT INTO chats(id,friend_id,line_account_id,status,pending_since,sla_due_at,created_at,updated_at) VALUES('late','f','a','unread','2020-01-01','2020-01-01','now','now');`);
- const detail=await read('/api/hq/store-comparison/a');
- expect(detail.attention.counts.overdueChats).toBe(1);
- expect(detail.attention.targets.overdueChats).toEqual([{href:'/chats?slaState=overdue',count:1}]);
- d.raw.exec("UPDATE inbox_routing_settings SET sla_business_hours_only=1 WHERE account_id='a'; INSERT INTO style_holidays(line_account_id,date,name) VALUES('a',date('now','+9 hours'),'休日')");
- expect((await read('/api/hq/store-comparison/a')).attention.counts.overdueChats).toBe(0);
- d.raw.exec("UPDATE inbox_routing_settings SET sla_business_hours_only=0 WHERE account_id='a'");
- d.raw.exec("UPDATE chats SET first_response_at='2020-01-02' WHERE id='late'");
- expect((await read('/api/hq/store-comparison/a')).attention.counts.overdueChats).toBe(0);
-});
-
 test('クリックした人を特定できない記録は、比較用のクリック率を0としない',async()=>{
  d.raw.exec(`INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id,status,sent_at,success_count) VALUES('b1','配信','text','本文','a','sent','2026-10-15T01:00:00Z',20);
  INSERT INTO tracked_links(id,name,original_url,line_account_id) VALUES('l1','リンク','https://example.com','a');
