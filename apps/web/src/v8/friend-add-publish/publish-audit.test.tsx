@@ -2,15 +2,15 @@
 import React from 'react'
 import {act,cleanup,render,screen} from '@testing-library/react'
 import {afterEach,beforeEach,expect,it,vi} from 'vitest'
-const net=vi.hoisted(()=>({role:'owner' as string | null,account:'a',query:'id=r&done=1',test:vi.fn(),testRecipient:vi.fn(),testSend:vi.fn(),validate:vi.fn(),conflicts:vi.fn()}))
+const net=vi.hoisted(()=>({role:'owner' as string | null,account:'a',query:'id=r&done=1',test:vi.fn(),testRecipient:vi.fn(),testSend:vi.fn(),publish:vi.fn(),validate:vi.fn(),conflicts:vi.fn()}))
 vi.mock('next/navigation',()=>({useRouter:()=>({replace:vi.fn(),push:vi.fn()}),useSearchParams:()=>new URLSearchParams(net.query)}))
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:net.account,accounts:[]})}))
 vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{}}))
 vi.mock('@/components/shared/use-permission-lock-reason',()=>({usePermissionLockReason:(allowed:boolean)=>!allowed && net.role === 'viewer' ? 'この操作は管理者だけができます' : undefined}))
 vi.mock('@/lib/staff-role',async importOriginal=>({...await importOriginal<typeof import('@/lib/staff-role')>(),useStaffRole:()=> net.role,canManageRole:(role:string|null)=>role==='owner'||role==='admin'}))
-vi.mock('@/lib/api',async importOriginal=> {const actual=await importOriginal<typeof import('@/lib/api')>();return {...actual,api:{staff:{me:async()=>({success:true,data:{id:'self',role:net.role??'viewer',name:'担当'}})},friendAddRules:{get:async()=>({success:true,data:{rule:{id:'r',name:'案内',status:'stopped',friendKind:'first_time',priority:1,routeNames:[],definition:{routeIds:[],actions:[],messageType:'text',messageText:'案内'}},options:{routes:[],scenarios:[],tags:[]}}}),validate:net.validate,conflicts:net.conflicts,test:net.test,testRecipient:net.testRecipient,testSend:net.testSend}}}})
+vi.mock('@/lib/api',async importOriginal=> {const actual=await importOriginal<typeof import('@/lib/api')>();return {...actual,api:{staff:{me:async()=>({success:true,data:{id:'self',role:net.role??'viewer',name:'担当'}})},friendAddRules:{get:async()=>({success:true,data:{rule:{id:'r',name:'案内',status:'stopped',friendKind:'first_time',priority:1,routeNames:[],definition:{routeIds:[],actions:[],messageType:'text',messageText:'案内'}},options:{routes:[],scenarios:[],tags:[]}}}),validate:net.validate,conflicts:net.conflicts,test:net.test,testRecipient:net.testRecipient,testSend:net.testSend,publish:net.publish}}}})
 import Page from './publish'
-beforeEach(()=>{net.role='owner';net.account='a';net.query='id=r&done=1';net.test.mockReset();net.testRecipient.mockReset().mockResolvedValue({success:true,data:{available:true}});net.testSend.mockReset();net.validate.mockReset().mockResolvedValue({success:true,data:{canPublish:true,checks:[],estimatedAudienceCount:1}});net.conflicts.mockReset().mockResolvedValue({success:true,data:{rules:[],conflicts:[]}})})
+beforeEach(()=>{net.role='owner';net.account='a';net.query='id=r&done=1';net.test.mockReset();net.testRecipient.mockReset().mockResolvedValue({success:true,data:{available:true}});net.testSend.mockReset();net.publish.mockReset();net.validate.mockReset().mockResolvedValue({success:true,data:{canPublish:true,checks:[],estimatedAudienceCount:1}});net.conflicts.mockReset().mockResolvedValue({success:true,data:{rules:[],conflicts:[]}})})
 afterEach(cleanup)
 it('WEB154: doneのURLでも停止中を有効化完了と表示しない',async()=>{
  const view=render(<Page/>);await act(async()=>{})
@@ -50,7 +50,13 @@ for (const role of [null, 'viewer']) it(`権限${role}ではテスト操作を�
   await act(async()=>button.click())
  }
  expect(net.testSend).not.toHaveBeenCalled()
- for (const name of ['有効にする','テストの送り先']) expect(screen.queryByRole('button',{name,exact:true})).toBeNull()
+ if (role === 'viewer') {
+  const button=screen.getByRole('button',{name:'有効にする',exact:true})
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  expect(document.getElementById(button.getAttribute('aria-describedby')!)?.textContent).toBe('この操作は管理者だけができます')
+  await act(async()=>button.click())
+ } else expect(screen.queryByRole('button',{name:'有効にする',exact:true})).toBeNull()
+ expect(net.publish).not.toHaveBeenCalled()
  expect(net.test).not.toHaveBeenCalled()
  expect(net.validate).not.toHaveBeenCalled()
  expect(net.conflicts).not.toHaveBeenCalled()

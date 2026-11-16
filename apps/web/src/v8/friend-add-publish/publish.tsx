@@ -243,7 +243,7 @@ function FriendAddPublish() {
 
   /** 有効にする。押した時点のアカウント・読み込み回数と違ったら、返事を映さない。 */
   const publish = async () => {
-    if (!selectedAccountId || !detail || busy) return
+    if (!canEdit || !selectedAccountId || !detail || busy) return
     const at = { accountId: selectedAccountId, generation: requestRef.current.generation }
     const stillHere = () => requestRef.current.accountId === at.accountId && requestRef.current.generation === at.generation
     setBusy(true)
@@ -415,8 +415,12 @@ function FriendAddPublish() {
           </Button>
         </>
       ) : (
-        /* 閲覧のみ：一覧へ戻る道を残す。 */
-        <Button href="/friend-add-settings">一覧へ戻る</Button>
+        <>
+          <Button href="/friend-add-settings">一覧へ戻る</Button>
+          {role !== null ? <PermissionGatedButton allowed={false} type="button" variant="primary">
+            <Power size={16} aria-hidden="true" />有効にする
+          </PermissionGatedButton> : null}
+        </>
       )}
     >
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
