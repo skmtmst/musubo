@@ -519,9 +519,12 @@ it('変更予定の価格と日時を一覧に表示する', async () => {
   expect(within(row).getByText(/2099/)).toBeTruthy()
 })
 
-it('変更できない所要時間は押せない入力として表示する', async () => {
+it('所要時間を編集して保存できる', async () => {
   nav.params = new URLSearchParams('id=m1')
   render(<MenuEditPage />)
-  const duration = await screen.findByRole('textbox', { name: '時間' }) as HTMLInputElement
-  expect(duration.disabled).toBe(true)
+  const duration = await screen.findByRole('spinbutton', { name: '所要時間' }) as HTMLInputElement
+  expect(duration.disabled).toBe(false)
+  fireEvent.change(duration, { target: { value: '90' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ durationMinutes: 90 })))
 })
