@@ -27,6 +27,12 @@ export type GuideOverlayProps = {
   /** 9項目の何番目か（1から）。帯の見出し「④ 卓と席を登録する」に使う。 */
   stepOrder: number | null
   procedureIndex: number
+  /**
+   * いまこの手順の対象がある画面にいるか。
+   * その画面にいる間は、対象がまだ描かれていないだけなので一時停止しない。
+   * 案内と無関係な画面へ移った時だけ、従来どおり待って一時停止する。
+   */
+  onTargetScreen?: boolean
   /** 9項目それぞれの済み。実データ計測の値をそのまま渡す（ガイドで済みにしない）。 */
   segments: readonly boolean[]
   /** 「この手順をスキップ」と進行トリガーの両方から呼ぶ、次の手順へ。 */
@@ -41,7 +47,8 @@ function readRect(element: Element): Rect {
 }
 
 export function GuideOverlay({
-  active, stepKey, stepLabel, stepOrder, procedureIndex, segments, onAdvanceProcedure, onPause,
+  active, stepKey, stepLabel, stepOrder, procedureIndex, onTargetScreen = false,
+  segments, onAdvanceProcedure, onPause,
 }: GuideOverlayProps) {
   const total = guideProcedureTotal(stepKey)
   /*
@@ -107,13 +114,19 @@ export function GuideOverlay({
     observer.observe(document.body, { childList: true, subtree: true })
     const timer = window.setTimeout(() => {
       if (document.querySelector(`[data-guide-anchor="${anchorName}"]`)) { measure(); return }
+      /*
+        その手順の画面にいる間は止めない（差し戻し R1）。
+        接続済みの時のように対象のボタンが出ない画面でも、吹き出しと帯は出したままにして
+        操作を続けられるようにする。対象の無い手順と同じ置き方（右下）で見せる。
+      */
+      if (onTargetScreen) return
       onPause()
     }, MISSING_ANCHOR_WAIT_MS)
     return () => {
       observer.disconnect()
       window.clearTimeout(timer)
     }
-  }, [active, anchorName, target, measure, onPause])
+  }, [active, anchorName, target, measure, onPause, onTargetScreen])
 
   /* ESCで一時停止（枠14 izsr5）。 */
   useEffect(() => {

@@ -97,6 +97,19 @@ describe('手順別ガイドの重ね表示', () => {
     expect(props.onPause).toHaveBeenCalled()
   })
 
+  /*
+    差し戻し R1: Google接続済みだと「接続する」ボタンが出ないので対象が見つからない。
+    その手順の画面にいる間は止めず、吹き出しと帯を出したままにして操作を続けられるようにする。
+  */
+  it('その手順の画面にいる間は、対象が無くても止めず案内を出し続ける', () => {
+    vi.useFakeTimers()
+    const props = renderOverlay({ stepKey: 'hours', stepOrder: 5, procedureIndex: 1, onTargetScreen: true })
+    act(() => { vi.advanceTimersByTime(3000) })
+    expect(props.onPause).not.toHaveBeenCalled()
+    expect(document.querySelector('[data-guide-balloon]')?.getAttribute('data-guide-balloon')).toBe('hours:1')
+    expect(document.querySelector('[data-guide-bar]')).not.toBeNull()
+  })
+
   it('画面を移って対象が遅れて現れたら、一時停止せずそこを光らせる', async () => {
     const props = renderOverlay()
     expect(document.querySelector('[data-guide-spotlight="tables.create"]')).toBeNull()

@@ -69,23 +69,33 @@ function GuideHostActive({ accountId, children }: { accountId: string; children:
   const pause = useCallback(() => { guide.pause() }, [guide])
 
   /*
-    段が変わったら、その段の画面へ実際に移る（差し戻し R1）。
+    段や手順が変わったら、その手順の対象がある画面へ実際に移る（差し戻し R1）。
     移らないと重ね表示の対象がその画面に無く、案内が消えて先へ進めない。
-    最初の段（前が無い状態）では移らない。枠02/02b のとおり行の「ガイドで開く」で入る。
+    始めた直後も同じ。枠14 共通ルール izsr5 の
+    「ピル／ダッシュボードカードの『続きから』＝最初の未完了ステップの手順1へ」のとおり、
+    ダッシュボードで始めたらその手順の画面まで連れていく（差し戻し R1c）。
+    連れていかないと、ダッシュボードには対象が無いので案内が1.5秒で自動停止してしまう。
+    台本が画面を指定している手順（例: ⑤営業時間の1/2＝設定 › SNS連携）も同じ扱い。
   */
   const router = useRouter()
   const pathname = usePathname()
-  const previousStepKey = useRef<string | null>(null)
+  const previousPlace = useRef<string | null>(null)
   const stepHref = step?.href ?? null
+  const procedureHref = procedure?.href ?? null
+  /** この手順の対象がある画面。手順の指定が無ければ段の行き先。 */
+  const targetHref = procedureHref ?? stepHref
+  const onTargetScreen = !targetHref || pathname === targetHref.split('?')[0]
   useEffect(() => {
-    /* 行き先がまだ分からない間（実測の読み込み中）は前の段を覚えたままにして、判定を先送りする。 */
-    if (guide.phase !== 'active' || !guide.stepKey || !stepHref) return
-    const previous = previousStepKey.current
-    previousStepKey.current = guide.stepKey
-    if (!previous || previous === guide.stepKey) return
-    if (pathname === stepHref.split('?')[0]) return
-    router.push(stepHref)
-  }, [guide.phase, guide.stepKey, stepHref, pathname, router])
+    /* 行き先がまだ分からない間（実測の読み込み中）は前の居場所を覚えたままにして、判定を先送りする。 */
+    if (guide.phase !== 'active' || !guide.stepKey || !targetHref) return
+    const place = `${guide.stepKey}:${guide.procedureIndex}`
+    const previous = previousPlace.current
+    previousPlace.current = place
+    if (onTargetScreen) return
+    /* 同じ居場所で一度連れていった後は繰り返さない（押し戻し合いを防ぐ）。 */
+    if (!procedureHref && previous === place) return
+    router.push(targetHref)
+  }, [guide.phase, guide.stepKey, guide.procedureIndex, targetHref, procedureHref, onTargetScreen, router])
 
   /* 保存できた時・入力がそろった時に進む手順は、画面側の合図で進める。 */
   useGuideSignal(
@@ -103,6 +113,7 @@ function GuideHostActive({ accountId, children }: { accountId: string; children:
         stepLabel={step?.label ?? null}
         stepOrder={index >= 0 ? index + 1 : null}
         procedureIndex={guide.procedureIndex}
+        onTargetScreen={onTargetScreen}
         segments={segments}
         onAdvanceProcedure={advance}
         onPause={pause}

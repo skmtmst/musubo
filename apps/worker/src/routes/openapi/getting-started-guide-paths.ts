@@ -12,7 +12,7 @@ const accountId = {
   schema: { type: 'string' },
 };
 
-const guideProgress = {
+export const guideProgressSchema = {
   type: 'object',
   required: ['phase', 'stepKey', 'procedureIndex', 'updatedAt'],
   properties: {
@@ -20,6 +20,21 @@ const guideProgress = {
     stepKey: { type: 'string', nullable: true, description: '案内中の項目のキー。未開始は null' },
     procedureIndex: { type: 'integer', minimum: 1, description: '項目の中の手順番号（1から）' },
     updatedAt: { type: 'string', nullable: true, description: '最後に保存した時刻' },
+  },
+};
+
+/*
+  成功応答は他の経路と同じ `{ success: true, data: … }` の包み方で返す。
+  実装（getting-started.ts の `c.json({ success: true, data: guidePayload(row) })`）と
+  同じ形をそのまま書く。包みを省くと文書と実応答がずれる（差し戻しの指摘）。
+  ずれの再発は getting-started-guide-contract.test.ts が実応答と突き合わせて見張る。
+*/
+const guideProgressResponse = {
+  type: 'object',
+  required: ['success', 'data'],
+  properties: {
+    success: { type: 'boolean', enum: [true], description: '成功は常に true' },
+    data: guideProgressSchema,
   },
 };
 
@@ -31,7 +46,7 @@ export const gettingStartedGuidePaths = {
       description: '保存がなければ phase=idle / stepKey=null / procedureIndex=1 を返す。',
       parameters: [accountId],
       responses: {
-        '200': { description: 'ガイドの進み具合', content: { 'application/json': { schema: guideProgress } } },
+        '200': { description: 'ガイドの進み具合', content: { 'application/json': { schema: guideProgressResponse } } },
         '400': { description: 'account_id がない' },
         '401': { description: '未認証' },
         '403': { description: '権限なし' },
@@ -60,7 +75,7 @@ export const gettingStartedGuidePaths = {
         },
       },
       responses: {
-        '200': { description: '保存後の進み具合', content: { 'application/json': { schema: guideProgress } } },
+        '200': { description: '保存後の進み具合', content: { 'application/json': { schema: guideProgressResponse } } },
         '400': { description: 'phase / stepKey / procedureIndex が不正、または account_id がない' },
         '401': { description: '未認証' },
         '403': { description: '権限なし' },

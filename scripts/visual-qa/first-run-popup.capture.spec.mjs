@@ -25,6 +25,73 @@ test.describe.configure({ mode: 'serial' })
 
 const MOCK = process.env.VISUAL_QA_MOCK ?? 'http://127.0.0.1:8788'
 
+/*
+  差し戻し（枠08b 4/9・枠02 1/9）: 撮影用の口の既定は3/9で、承認Penの状態と違う。
+  9項目の済みは実データ計測なので、数を直接入れず「元になる応答」を差し替えて作る。
+  ① LINE接続・② 初期セット・⑨ 1通目 はサーバの /api/getting-started、
+  ③ リッチメニューは /api/rich-menu-groups の件数、
+  ④⑤⑥⑦⑧ は /api/restaurant-test/setup-progress の真偽値から決まる
+  （apps/web/src/v8/settings/getting-started/steps.ts と restaurant-setup-progress.ts）。
+*/
+const PEN_STATES = {
+  /* 枠02 (C5i3rw) 1/9: ①だけ済み。②は未設定、③は下書き0件、④〜⑧は未設定。 */
+  '1/9': {
+    server: { accounts: 'done', featureSet: 'todo', firstMessage: 'todo' },
+    richMenuEmpty: true,
+    store: { tables: false, hours: false, menus: false, reception: false, followup: false },
+  },
+  /* 枠08b (Bnkcl) 4/9: ①②③と④卓・席まで済み。⑤以降は未設定。 */
+  '4/9': {
+    server: { accounts: 'done', featureSet: 'done', firstMessage: 'todo' },
+    richMenuEmpty: false,
+    store: { tables: true, hours: false, menus: false, reception: false, followup: false },
+  },
+}
+
+/** 承認Penと同じ済み数の状態を作る。指定しない口は撮影用の口（mock-api）のまま。 */
+async function routePenState(page, name) {
+  const state = PEN_STATES[name]
+  await page.route('**/api/getting-started**', async route => {
+    const url = new URL(route.request().url())
+    if (url.pathname !== '/api/getting-started') { await route.fallback(); return }
+    const steps = [
+      { key: 'accounts', state: state.server.accounts, href: '/accounts', reason: null, webhook: [{ id: 'visual-qa-account', status: 'matched' }] },
+      { key: 'featureSet', state: state.server.featureSet, href: '/settings', reason: null },
+      { key: 'attributes', state: 'todo', href: '/tags?tab=tags', reason: null },
+      { key: 'friendAdd', state: 'todo', href: '/friend-add-settings', reason: null },
+      { key: 'scenario', state: 'todo', href: '/scenarios', reason: null },
+      { key: 'firstMessage', state: state.server.firstMessage, href: '/chats', reason: null },
+    ]
+    await route.fulfill({
+      json: {
+        success: true,
+        data: {
+          accountId: 'visual-qa-account',
+          doneCount: steps.filter(step => step.state === 'done').length,
+          total: steps.length,
+          allDone: false,
+          steps,
+        },
+      },
+    })
+  })
+  await page.route('**/api/restaurant-test/setup-progress**', async route => {
+    const url = new URL(route.request().url())
+    await route.fulfill({
+      json: { success: true, data: { storeId: url.searchParams.get('storeId') ?? 'store-sby', ...state.store } },
+    })
+  })
+  if (state.richMenuEmpty) {
+    await page.route('**/api/rich-menu-groups**', async route => {
+      const url = new URL(route.request().url())
+      if (url.pathname !== '/api/rich-menu-groups') { await route.fallback(); return }
+      await route.fulfill({
+        json: { success: true, data: { items: [], total: 0, limit: 1, sort: 'priority', facets: { total: 0, published: 0, targeting: 0, folderCounts: {} } } },
+      })
+    })
+  }
+}
+
 async function openDashboard(page, width, height) {
   /*
     撮影用の口は使い方のスタイルとガイドの進み具合を持ち続けるので、毎回同じ所から始める。
@@ -80,13 +147,11 @@ for (const width of PC_WIDTHS) {
     await expect(popup).toHaveCount(0)
     /*
       枠14の手順の対象（卓を作る等）は設定画面側にある。
-      ダッシュボードでは対象が無いので自動で一時停止する仕様なので、
-      08bの「ガイドで開く →」でその段の画面へ移ってから吹き出しを撮る。
+      枠14 共通ルール izsr5「『続きから』＝最初の未完了ステップの手順1へ」のとおり、
+      始めると案内がその段の画面まで連れていく（差し戻し R1c）。
     */
-    const open = page.getByRole('link', { name: /ガイドで開く/ }).first()
-    await expect(open, '「ガイドで開く」が無い').toBeVisible({ timeout: 15000 })
-    await open.click()
-    /* 移る前のダッシュボードにも一瞬だけ吹き出しが出る（対象が無い間の猶予）。対象が出てから撮る。 */
+    await expect(page).toHaveURL(/\/restaurant-test\/tables/, { timeout: 15000 })
+    /* 移った直後は対象がまだ描かれていない。対象が出てから撮る。 */
     await expect(page.locator('[data-guide-anchor="tables.create"]'), '手順1/3の対象が出ない')
       .toBeVisible({ timeout: 15000 })
     const balloon = page.locator('[data-guide-balloon]')
@@ -107,6 +172,33 @@ for (const width of PC_WIDTHS) {
     await expect(card, '08bのカードが無い').toBeVisible()
     await card.scrollIntoViewIfNeeded()
     await page.screenshot({ path: `${OUT}/${width}-08b-first-steps.png`, fullPage: false })
+  })
+
+  /* 差し戻し: 承認Penと同じ済み数（枠02=1/9）で照合できるようにする。 */
+  test(`${width}px 枠02 初回ポップアップ 1/9`, async ({ page }) => {
+    await routePenState(page, '1/9')
+    await openDashboard(page, width, 1080)
+    const popup = page.locator('[data-first-run-popup="open"]')
+    await expect(popup, '初回ポップアップが出ない').toBeVisible({ timeout: 15000 })
+    await expect(popup.getByText('1/9', { exact: true }), '枠02の済み数が1/9にならない')
+      .toBeVisible({ timeout: 15000 })
+    await page.screenshot({ path: `${OUT}/${width}-02-popup-1of9.png`, fullPage: false })
+  })
+
+  /* 差し戻し: 承認Penと同じ済み数（枠08b=4/9）で照合できるようにする。 */
+  test(`${width}px 枠08b はじめにやること 4/9`, async ({ page }) => {
+    await routePenState(page, '4/9')
+    await openDashboard(page, width, 1080)
+    const popup = page.locator('[data-first-run-popup="open"]')
+    await expect(popup).toBeVisible({ timeout: 15000 })
+    await popup.getByRole('button', { name: 'あとで', exact: true }).click()
+    await expect(popup).toHaveCount(0)
+    const card = page.getByText('はじめにやること').first()
+    await expect(card, '08bのカードが無い').toBeVisible()
+    await card.scrollIntoViewIfNeeded()
+    await expect(page.getByText('4 / 9 済み', { exact: true }), '枠08bの済み数が4/9にならない')
+      .toBeVisible({ timeout: 15000 })
+    await page.screenshot({ path: `${OUT}/${width}-08b-first-steps-4of9.png`, fullPage: false })
   })
 }
 

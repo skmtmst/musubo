@@ -30,6 +30,12 @@ export type GuideProcedure = {
    */
   anchor: string | null
   trigger: GuideProcedureTrigger
+  /**
+   * この手順の対象がある画面。段の行き先と違う手順だけ書く。
+   * 書いた手順では、別の画面にいる間に案内がこの画面へ連れていく。
+   * 省略時は段の行き先（9項目の行のリンク先）をその手順の画面として扱う。
+   */
+  href?: string
 }
 
 export type GuideStepScript = { stepKey: string; procedures: readonly GuideProcedure[] }
@@ -76,6 +82,13 @@ const SCRIPT: readonly GuideStepScript[] = [
           失敗・中断で戻った時は 1/2 に留まる。合図は設定 › SNS連携の画面が出す。
         */
         trigger: 'event',
+        /*
+          「接続する」ボタンと接続成功の合図は設定 › SNS連携だけにある（差し戻し R1）。
+          段の行き先（営業時間）に留まると、未接続では店舗が選べず、接続済みでは
+          対象が無いまま案内が自動停止してしまう。どちらの状態でもこの画面へ連れていく。
+          接続済みならSNS連携が開いた時点で合図が出て、すぐ手順2/2へ進む。
+        */
+        href: '/settings/sns',
       },
       {
         index: 2,
