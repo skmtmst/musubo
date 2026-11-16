@@ -69,12 +69,13 @@
   min-width: 0;
 }
 
-/* i1Tyj: #1d1d1f 20/800 */
+/* i1Tyj: #1d1d1f 20/800。文字の塊は h24（見出し VliWA を52に収めて輪 cohVt と同じにする） */
 .title {
   margin: 0;
   color: var(--color-ink);
   font-size: var(--text-title);
   font-weight: 800;
+  line-height: var(--tpl-fr02-line-20);
 }
 
 /* fX8qY: #4a5565 13/500 / 行の高さ1.6 */
@@ -96,7 +97,11 @@
   gap: var(--tpl-fr02-gap-4);
 }
 
-/* 行の共通: r10 / gap12 / padding 10 14 / 中央そろえ */
+/*
+  行の共通: r10 / gap12 / padding 10 14 / 中央そろえ。
+  枠では線を枠の内側に描くので、線で高さを増やさない（増やすと9項目が46+2ずつ伸び、
+  カードが606に収まらない: 差し戻し V1／スマホは差し戻し R3）。
+*/
 .row {
   display: flex;
   gap: var(--tpl-fr02-gap-12);
@@ -104,17 +109,17 @@
   padding: var(--tpl-fr02-row-pad);
   border-radius: var(--polish-radius-control);
   background: var(--color-canvas);
-  border: 1px solid transparent;
+  border: 0;
   text-align: left;
 }
 
 /* 済みの行 bnJsJ */
 .rowDone { background: var(--color-canvas); }
 
-/* 現在の行 v4LA6: #e9f7ee / 線 #00833f33 1px */
+/* 現在の行 v4LA6: #e9f7ee / 線 #00833f33 1px（内側に描く） */
 .rowCurrent {
   background: var(--tpl-fr02-brand-bg);
-  border-color: var(--tpl-fr02-brand-line);
+  box-shadow: inset 0 0 0 1px var(--tpl-fr02-brand-line);
 }
 
 /* 印の共通: 26x26 / r999 */
@@ -150,13 +155,14 @@
   color: var(--tpl-fr02-ink-muted);
 }
 
-/* Bp8mT / sSZ60: 14px。現在の行だけ 700 */
+/* Bp8mT / sSZ60: 14px の1行で h17。現在の行だけ 700 */
 .label {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--color-ink);
   font-size: var(--tpl-fr02-text-14);
   font-weight: 500;
+  line-height: var(--tpl-fr02-line-14);
 }
 
 .labelCurrent { font-weight: 700; }
@@ -170,9 +176,10 @@
   color: var(--tpl-fr02-brand);
   font-size: var(--tpl-fr02-text-12);
   font-weight: 600;
+  line-height: var(--tpl-fr02-line-12);
 }
 
-/* pdn85: #00833f / r10 / gap6 / padding 9 14 / 文字 白 13/600 */
+/* pdn85: #00833f / r10 / gap6 / padding 9 14 ＋ 文字 pnUmf 白 13/600 h16 → h34 */
 .rowAction {
   flex: 0 0 auto;
   display: inline-flex;
@@ -185,6 +192,7 @@
   color: var(--color-canvas);
   font-size: var(--polish-text-body);
   font-weight: 600;
+  line-height: var(--tpl-fr02-line-13);
   cursor: pointer;
 }
 
@@ -210,7 +218,12 @@
   align-items: center;
 }
 
-/* 「あとで」 #4a5565 13/600 */
+/*
+  「あとで」 qr72l: #4a5565 13/600 の1行（h16）。
+  枠 02 の足 TTZx2 は h16 なので、#639 の button 最小高さ32pxを足に効かせない
+  （効くと足が32になりカードが606を超え、注記 AtL7E の位置も下がる: 差し戻し V1）。
+  文字の下の注記まで含めて押せる面は広げず、枠の実値をそのまま写す（スマホも同じ扱い）。
+*/
 .later {
   background: none;
   border: 0;
@@ -218,6 +231,8 @@
   color: var(--color-ink-secondary);
   font-size: var(--polish-text-body);
   font-weight: 600;
+  line-height: var(--tpl-fr02-line-13);
+  min-height: 0;
   cursor: pointer;
 }
 
@@ -231,11 +246,12 @@
 /* XJJjl: 伸びる隙間 */
 .footerSpacer { flex: 1 1 auto; }
 
-/* 注記: #9aa3af 12/500 */
+/* 注記 AtL7E: #9aa3af 12/500 の1行（h15） */
 .note {
   color: var(--tpl-fr02-ink-faint);
   font-size: var(--tpl-fr02-text-12);
   font-weight: 500;
+  line-height: var(--tpl-fr02-line-12);
 }
 
 /*
@@ -320,29 +336,17 @@
 
   /*
     hurXo: 行 h46（上下 padding10 ＋ 印 IHxIG 26）。現在の行 FsFGi は h54。
-    枠では線を枠の内側に描くので、線で高さを増やさない（増やすと9項目が46+2ずつ伸び、
-    足が下へずれて「あとで」が枠 02b の位置に来ない: 差し戻し R3）。
+    線を内側に描いて高さを増やさない扱いは共通の .row / .rowCurrent に持たせてある
+    （線で増やすと9項目が46+2ずつ伸び、足が下へずれて「あとで」が枠 02b の位置に
+    来ない: 差し戻し R3）。ここは枠 02b の padding だけ差し替える。
   */
-  .row {
-    padding: var(--tpl-fr02-row-pad-sp);
-    border-width: 0;
-  }
-
-  .rowCurrent { box-shadow: inset 0 0 0 1px var(--tpl-fr02-brand-line); }
+  .row { padding: var(--tpl-fr02-row-pad-sp); }
 
   /* WjTss: 13px 1行（h16）。bf6E7: h21。どちらも印26を超えない。 */
-  .label {
-    font-size: var(--polish-text-body);
-    line-height: var(--tpl-fr02-tight);
-  }
-
-  .badge { line-height: var(--tpl-fr02-tight); }
+  .label { font-size: var(--polish-text-body); line-height: var(--tpl-fr02-line-13); }
 
   /* ZcmBy: padding 9 16 ＋ 文字 JDSIg h16 → h34。現在の行を54に収める。 */
-  .rowAction {
-    padding: var(--tpl-fr02-rowaction-pad-sp);
-    line-height: var(--tpl-fr02-tight);
-  }
+  .rowAction { padding: var(--tpl-fr02-rowaction-pad-sp); }
 
   .rowActionPc { display: none; }
 
@@ -363,8 +367,7 @@
     color: var(--tpl-fr02-ink-muted);
     font-size: var(--tpl-fr02-text-12);
     font-weight: 600;
-    line-height: var(--tpl-fr02-tight);
-    min-height: 0;
+    line-height: var(--tpl-fr02-line-12);
   }
 
   .laterPc { display: none; }
