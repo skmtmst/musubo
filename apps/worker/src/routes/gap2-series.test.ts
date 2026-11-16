@@ -87,3 +87,13 @@ test('B4-02: 8回のうち1回を別時刻にし1回を飛ばすと7件と1組',
  expect(data.bookings.find((x:any)=>x.series_index===1).starts_at).toBe('2026-11-27T06:00:00.000Z');
  expect(d.raw.prepare('SELECT count(*) n FROM booking_series').get()).toEqual({n:1});
 });
+
+test('B4-08: 4回目から取消の見込みは期限後の回だけ料金を出す',async()=>{
+ d.raw.exec(`INSERT INTO booking_cancellation_policies(line_account_id,enabled,tiers_json,no_show_percent,updated_by,updated_at) VALUES('a',1,'[{"beforeHours":24,"percent":0},{"beforeHours":0,"percent":50}]',100,'o','2026-11-16')`);
+ d.raw.prepare("INSERT INTO staff_shifts(id,staff_id,work_date,start_time,end_time) VALUES('fifth','bs','2026-12-18','09:00','18:00')").run();
+ const made=await gapCall(app(),url,'POST',{...body,rule:{freq:'weekly',count:5}});expect(made.status,await made.clone().text()).toBe(201);
+ const data=(await made.json() as any).data;vi.setSystemTime(new Date('2026-12-11T04:00:00Z'));
+ const r=await gapCall(app(),`/api/booking/admin/series/${data.series.id}/impact?account_id=a`,'POST',{scope:'following',fromBookingId:data.bookings[3].id,expectedVersion:1});
+ expect(r.status).toBe(200);const items=(await r.json() as any).data.items;
+ expect(items.map((item:any)=>item.fee.amount)).toEqual([4200,0]);expect(items.map((item:any)=>item.bookingId)).toEqual(data.bookings.slice(3).map((b:any)=>b.id));
+});

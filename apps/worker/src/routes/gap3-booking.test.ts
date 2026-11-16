@@ -168,3 +168,15 @@ test('B5-16: 人数上限を1に下げても既存の組は残り新しい組は
  expect(d.raw.prepare('SELECT count(*) n FROM booking_groups WHERE id=?').get(groupId)).toEqual({n:1});
  expect(d.raw.prepare('SELECT count(*) n FROM bookings WHERE group_id=? AND status=\'confirmed\'').get(groupId)).toEqual({n:2});
 });
+
+test('G4-19: 来店を2回押しても印と状態の変更は一度だけ',async()=>{
+ const created=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'visit-once');
+ const bookingId=(await created.json() as any).data.bookings[0].id;expect(created.status).toBe(201);
+ vi.setSystemTime(new Date('2026-11-20T05:00:00Z'));
+ const path=`/api/booking/admin/bookings/${bookingId}/visit?account_id=a`;
+ const initial=d.raw.prepare('SELECT lock_version FROM bookings WHERE id=?').get(bookingId) as {lock_version:number};
+ const first=await gapCall(app(),path,'POST',{kind:'visited'}),second=await gapCall(app(),path,'POST',{kind:'visited'});
+ expect(first.status).toBe(200);expect([200,409]).toContain(second.status);
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_visit_marks WHERE booking_id=?').get(bookingId)).toEqual({n:1});
+ expect(d.raw.prepare('SELECT status,lock_version FROM bookings WHERE id=?').get(bookingId)).toEqual({status:'completed',lock_version:initial.lock_version+1});
+});

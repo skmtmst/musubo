@@ -672,8 +672,9 @@ it('styles §6-3: 空席確認後に別の人が両方の卓を取ったら確�
  try{
   const store={id:'store',name:'店',timezone:'Asia/Tokyo',line_account_id:'a1',tenant_id:'t1'};
   expect((await customerAvailability(db.db,store,'2027-10-01',2))!.data.slots.some(s=>s.available)).toBe(true);
-  expect((await hold('first_seat','one')).status).toBe(201);expect((await hold('second_seat','two')).status).toBe(201);
-  expect((await hold('third_seat','one')).status).toBe(409);
+  db.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id,display_name) VALUES('f3','Uthree','a1','三人目')");
+  expect((await hold('first_seat','two')).status).toBe(201);expect((await hold('second_seat','three')).status).toBe(201);
+  const last=await hold('third_seat','one');expect(last.status).toBe(409);expect(await last.json()).toMatchObject({error:'slot_conflict'});
   expect(db.raw.prepare('SELECT COUNT(*) n FROM rt_reservations').get()).toEqual({n:2});
  }finally{vi.useRealTimers();}
 });

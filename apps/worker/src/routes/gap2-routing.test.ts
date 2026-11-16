@@ -68,3 +68,18 @@ test('B6-08: 停止した担当への分岐は代替先を返しフォームを�
  expect(r.status).toBe(200);expect(await r.json()).toMatchObject({data:{matchedIndex:-1,target:{menuId:'menu'},fellBack:true}});
  expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
 });
+
+test('B6-13: 50行の振り分けをフォームに保存できる',async()=>{
+ const l=layout(),routing=(l.sections[0].blocks[1] as any).booking.routing;
+ routing.rules=Array.from({length:50},()=>structuredClone(routing.rules[0]));
+ const r=await saveRouting(l);expect(r.status,await r.clone().text()).toBe(200);
+ const row=d.raw.prepare("SELECT layout FROM forms WHERE id='form'").get() as any;
+ expect(JSON.parse(row.layout).sections[0].blocks[1].booking.routing.rules).toHaveLength(50);
+});
+test('B6-13: 51行の直接保存を拒み前のフォームを残す',async()=>{
+ const l=layout(),routing=(l.sections[0].blocks[1] as any).booking.routing;
+ routing.rules=Array.from({length:51},()=>structuredClone(routing.rules[0]));
+ const before=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get();
+ const r=await saveRouting(l);expect(r.status).toBe(400);
+ expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
+});

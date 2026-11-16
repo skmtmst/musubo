@@ -131,3 +131,11 @@ test('HQT-20: 配布先が0店なら確認を受け付けず配布記録を作�
  const id=await create('booking_menu');const r=await call(`/${id}/preflight`,'POST',{accountIds:[]});
  expect(r.status).toBe(400);expect(f.raw.prepare('SELECT COUNT(*) n FROM hq_template_preflights').get()).toEqual({n:0});
 });
+
+test('HQT-19: 一店の書込み失敗を記録し他店の配布は残す',async()=>{
+ const id=await create('booking_menu'),p=await check(id,['a','b']);
+ f.raw.exec("CREATE TRIGGER reject_store_b BEFORE INSERT ON menus WHEN NEW.line_account_id='b' BEGIN SELECT RAISE(ABORT,'store failed'); END");
+ const r=await run(id,p);expect(r.body.data.status).toBe('partial');
+ expect(r.body.data.stores.map((s:any)=>[s.accountId,s.status])).toEqual([['a','succeeded'],['b','failed']]);
+ expect(f.raw.prepare('SELECT line_account_id FROM menus').all()).toEqual([{line_account_id:'a'}]);
+});
