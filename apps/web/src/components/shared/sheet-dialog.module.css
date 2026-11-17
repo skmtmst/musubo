@@ -1,8 +1,12 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 /*
   ボトムシート型の窓（「ダイアログ/中」q3DPdz の変わり形）の持ち主。
   面・掴み手・頭（印＋題＋一言）の見た目はここだけが持つ。
   画面ごとの承認値は --sheet-* のカスタムプロパティで受け取り、
   幅で変わる値も画面側の @media が同じ名前を書き換える（この持ち主に幅の分岐を置かない）。
+  #718: 既定値は components レイヤーに置く。レイヤー外だと画面側の指定が
+  黙って無視されるため、ここに入れて「指定したときだけ画面が勝つ」順にする。
 */
 
 .surface {
@@ -62,4 +66,5 @@
   font-size: var(--sheet-desc-size, var(--polish-text-body));
   font-weight: var(--sheet-desc-weight, 500);
   line-height: var(--sheet-desc-lh, normal);
+}
 }
