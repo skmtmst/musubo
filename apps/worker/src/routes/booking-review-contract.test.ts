@@ -118,3 +118,17 @@ test('同時の本人取消でも返金と監査は一回分だけ', async () =>
   expect(state()).toEqual({ status: 'refunded', refunded_amount: 8400 });
   expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_payment_refunds').get()).toEqual({ n: 1 });
 });
+
+test('B4-09: 顧客向け繰り返しをオフにしたメニューでは直接送信を拒否する', async () => {
+  d.raw.exec('UPDATE menus SET customer_recurring_enabled=0');
+  const r = await selfRequest('requests', { menu_id: 'menu', staff_id: 'bs', starts_at: startsAt, recurrence: { freq: 'weekly', count: 3 } });
+  expect(r.status).toBe(400); expect(await r.json()).toMatchObject({ success: false, error: 'recurring_not_allowed' });
+  expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_series').get()).toEqual({ n: 0 });
+  expect(d.raw.prepare('SELECT COUNT(*) n FROM bookings').get()).toEqual({ n: 0 });
+});
+test('B4-11: 顧客から13回の繰り返し予約は直接送信でも拒否する', async () => {
+  const r = await selfRequest('requests', { menu_id: 'menu', staff_id: 'bs', starts_at: startsAt, recurrence: { freq: 'weekly', count: 13 } });
+  expect(r.status).toBe(400); expect(await r.json()).toMatchObject({ success: false, error: 'invalid_count' });
+  expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_series').get()).toEqual({ n: 0 });
+  expect(d.raw.prepare('SELECT COUNT(*) n FROM bookings').get()).toEqual({ n: 0 });
+});

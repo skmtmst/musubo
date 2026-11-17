@@ -151,6 +151,7 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
     expect(screen.queryByText('本人照合の候補を読み込めませんでした')).toBeNull()
     // 読めていない集計を 0件と書かない。
     expect(screen.queryByText('0件')).toBeNull()
+    expect(screen.getByText('結びついていない —')).toBeTruthy()
   })
 
   test('運用集計だけ403：候補は残し、権限の案内にする（再試行は出さない）', async () => {
