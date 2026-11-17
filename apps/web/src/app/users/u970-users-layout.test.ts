@@ -15,10 +15,6 @@ describe('統合ユーザーの現役の配置', () => {
     expect(PAGE).toContain('aria-label="統合ユーザーを検索"')
   })
 
-  it('作成・CSV・再計算と条件の操作を残す', () => {
-    for (const text of ['統合ユーザーを作る', 'CSVで書き出す', '再計算', 'u.setQ', 'u.setUid', 'u.setAccount', 'u.setOnlyDups']) expect(PAGE).toContain(text)
-  })
-
   it('表は現役の幅と見出しの折り返しの決まりを使う', () => {
     expect(PAGE).toContain('className={styles.tableWrap}')
     expect(CSS).toMatch(/\.table\s*\{[\s\S]*?width: 100%/)

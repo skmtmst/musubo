@@ -370,6 +370,8 @@ test('初回読込では空と表示せず、失敗と成功0件を別の案内�
   expect(host.querySelector('[data-list-state="error"]')).toBeNull()
   await act(async () => finish(response({ success: false, error: 'down' }, 500)))
   await eventually(() => expect(host.textContent).toContain('リマインダを読み込めませんでした'))
+  expect(host.textContent).not.toContain('リマインダの読み込みに失敗しました')
+  expect(host.textContent).not.toContain('いまは読み込めていません')
   expect(host.querySelector('[data-empty-list]')).toBeNull()
   handler = url => url.pathname === '/api/reminders' ? response({ success: true, data: { items: [], total: 0, limit: 20 } }) : base(url)
   const retry = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('もう一度'))!
