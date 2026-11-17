@@ -965,9 +965,8 @@ function publicConnectData(
     basicId: prepared.bot?.basicId ?? null,
     liffId: prepared.liffId,
     followerImport,
-    // 「チャット」オンでもWebhookは届く（LINEは2022-11-30から併用を
-    // サポート）。残す案内は自動返信の重複だけにする。チャットのまま
-    // 運用している店舗にオフを求めない。
+    // LINE はチャットと Webhook の併用に対応している。チャットのオフは求めず、
+    // 自動返信の重複だけを案内する。
     remainingActions: prepared.bot?.chatMode === 'chat'
       ? ['LINE公式アカウントの「チャット」がオンです。メッセージの受信はそのまま動きます。自動返信が二重に届かないよう、LINE Official Account Managerの「あいさつメッセージ」「応答メッセージ」はオフにしてください']
       : [],

@@ -33,6 +33,8 @@ async function submit(){
 test('CS-C02: 全登録先が反映されてから自動化の条件を見る',async()=>{
   expect((await submit()).status).toBe(201);
   expect(observed).toHaveBeenCalledTimes(1);
+  const submission = fixture.raw.prepare('SELECT id FROM form_submissions').get() as { id: string };
+  expect(observed).toHaveBeenCalledWith(fixture.db, expect.objectContaining({ eventType: 'form_submitted', sourceEventId: submission.id }));
   expect(await observed.mock.results[0].value).toEqual({meta:{name:'新しい値'},field:'新しい値'});
 });
 test('CS-C02: 一部登録失敗は判定せず失敗表示、再送で成功したメモを重ねない',async()=>{

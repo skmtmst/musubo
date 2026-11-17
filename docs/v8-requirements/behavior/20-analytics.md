@@ -6,7 +6,7 @@
 
 読んだコード：
 
-- 画面：`apps/web/src/v8/analytics/`（8 つの見かた・成果地点ごとのレポート・ファネルの窓・Search Console）、入口 `apps/web/src/app/analytics/`（`page.tsx`・`reports/new/`）
+- 画面：`apps/web/src/v8/analytics/`（9 つの見かた・成果地点ごとのレポート・ファネルの窓・Search Console）、入口 `apps/web/src/app/analytics/`（`page.tsx`・`reports/new/`）
 - API：`apps/worker/src/routes/analytics.ts`・`apps/worker/src/routes/analytics-exports.ts`・`apps/worker/src/routes/search-console.ts`
 - 集計と送信：`apps/worker/src/services/analytics-reports.ts`・`apps/worker/src/services/analytics-projection.ts`、`packages/db/src/analytics-*.ts`
 - 権限：`packages/shared/src/staff-permissions.ts`、代理ログイン `apps/worker/src/middleware/impersonation.ts`
@@ -17,7 +17,7 @@
 
 | ID | 前提 | 操作手順 | こうなれば良い | だめ | 確かめ方 |
 |---|---|---|---|---|---|
-| AN-01 | 管理者・データあり | 1 分析を開く | 「友だちの増減」が開く（`?tab=` 無し・知らない値も同じ）。8 つの見かたが「概要 4・詳しく見る 4」に区切られて並ぶ | 知らない値で白い画面 | 画面の試験（analytics-v6-contract） |
+| AN-01 | 管理者・データあり | 1 分析を開く | 「友だちの増減」が開く（`?tab=` 無し・知らない値も同じ）。9 つの見かたが「成果を見る」4・「お客さまを分析」3・「利用と保存」2 の順に並ぶ（G5・画面 `analytics.tsx` に合わせた） | 知らない値で白い画面 | 画面の試験（analytics-v6-contract） |
 | AN-02 | データあり | 1 見かたを順に切り替える 2 ブラウザの戻る 3 再読み込み | URL の `?tab=` が変わり、戻る・読み直しで同じ見かたに戻る。旧 `?tab=clicks` は URL クリックへ | 戻ると別の見かた／読み直しで最初に戻る | 画面の試験／検証で手で |
 | AN-03 | 友だちの増減・過去30日 | 1 開く 2 棒を 1 本押す 3 もう一度押す | 増えた・減った・差し引き・今つながっている人数。棒は上に増・下に減、配信・シナリオの日に点。押すとその日の数を下の注に出し、もう一度で消す | 配信の日に減ったのを「配信が原因」と書く | 画面の試験（friends）／Worker（friends） |
 | AN-04 | 読み取りの記録より前の期間を含む | 1 期間を 13 か月にする | 復元できない期間は「一部」と as_of を出す。推測で埋めない | 欠けた日を 0 で描く | 自動：Worker（partial の状態） |
