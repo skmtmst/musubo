@@ -59,8 +59,7 @@ describe('friend-add 新規の優先順位の初期値', () => {
       success: true,
       data: {
         items: [
-          { id: 'rule-shop', priority: 1, isFallback: false },
-          { id: 'rule-instagram', priority: 2, isFallback: false },
+          { id: 'rule-shop', priority: 7, isFallback: false },
           { id: 'rule-fallback', priority: 999999, isFallback: true },
         ],
         options,
@@ -70,8 +69,8 @@ describe('friend-add 新規の優先順位の初期値', () => {
       success: true,
       data: {
         rules: [
-          { id: 'rule-shop', priority: 1 },
-          { id: 'rule-instagram', priority: 2 },
+          { id: 'rule-shop', priority: 7 },
+          { id: 'rule-instagram', priority: 12 },
           { id: 'rule-fallback', priority: 999999 },
         ],
         conflicts: [],
@@ -91,7 +90,8 @@ describe('friend-add 新規の優先順位の初期値', () => {
     })
     const save = ([...host.querySelectorAll('button')].find((button) => button.textContent?.includes('下書きを保存')) ?? querySupplementaryPageAction('下書きを保存'))!
     await act(async () => { save.click(); await Promise.resolve() })
-    expect(api.createDraft).toHaveBeenCalledWith(expect.objectContaining({ priority: 3 }), expect.any(String))
+    expect(api.conflicts).toHaveBeenCalledWith('account-a', 'first_time')
+    expect(api.createDraft).toHaveBeenCalledWith(expect.objectContaining({ priority: 13 }), expect.any(String))
     expect(host.textContent).not.toContain('番目')
   })
 })

@@ -53,7 +53,8 @@ vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
   usePageCrumbs: () => {},
 }))
-vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
+const viewport = vi.hoisted(() => ({ narrow: false }))
+vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => viewport.narrow }))
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {
     status = 0
@@ -522,4 +523,15 @@ it('テンプレートフォルダの閉じた確認は削除しない', async (
   fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'キャンセル' }))
   await act(async () => { await previous() })
   expect(folderRemove).not.toHaveBeenCalled()
+})
+
+it.each([false, true])('テンプレートの一覧行に未分類の丸を出す（狭幅 %s）', async (narrow) => {
+  viewport.narrow = narrow
+  try {
+    await renderList()
+    const row = screen.getByText('予約前日のご案内').closest('tr')!
+    expect(row.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
+    expect(row.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
+    if (narrow) expect(document.querySelector('[data-design-node="L7zA7C"]')).not.toBeNull()
+  } finally { viewport.narrow = false }
 })
