@@ -133,7 +133,7 @@ export type AuditAction =
   | 'webinar.session_capacity'
   | 'event.applicant.export'
   | 'event.change.apply'
-  // #939 N-379: 外部連携の操作履歴。作成・設定変更・動かす/止める・
+  // 外部連携の操作履歴。作成・設定変更・動かす/止める・
   // 合言葉の入れ直し・削除・送り直し・公開APIトークンの発行系。
   | 'webhook.incoming.create'
   | 'webhook.incoming.update'

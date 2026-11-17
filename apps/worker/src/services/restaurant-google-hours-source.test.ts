@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { GoogleProfile, Weekday } from './google-business-profile.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { seedRestaurantFixture } from '../test-utils/restaurant-fixture.js';
@@ -18,7 +18,7 @@ function profile(): GoogleProfile {
 }
 let database: SqliteD1;
 beforeEach(() => { database = createTestD1(); seedRestaurantFixture(database); });
-afterEach(() => database.raw.close());
+afterEach(() => { vi.useRealTimers(); database.raw.close(); });
 
 function connection(status = 'connected', selectedLocation = location) {
   database.raw.prepare(`INSERT INTO rt_google_connections
@@ -71,6 +71,8 @@ it('別のGoogle店舗の写しは使わない', async () => {
 });
 
 it('電話受付もGoogleの通常時間と特別休業日を守る', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-15T00:00:00Z'));
   const value = profile();
   connection();
   cached(value);
@@ -85,6 +87,8 @@ it('電話受付もGoogleの通常時間と特別休業日を守る', async () =
 });
 
 it('前日から続くGoogleの深夜営業でも電話受付できる', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-15T00:00:00Z'));
   const value = profile();
   value.regularHours.MONDAY = [{ open: '23:00', close: '02:00' }];
   connection();
