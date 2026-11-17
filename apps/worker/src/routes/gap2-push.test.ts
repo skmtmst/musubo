@@ -16,7 +16,7 @@ test('G4-01 G4-04 G4-14: 端末1件・本人だけ・代理で登録しない',a
 test('G4-05 G4-07 G4-11: 本文・個人情報なし、他店に届かず、410は外す',async()=>{
  await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',body);const send=vi.fn(async(_subscription:unknown,_payload:unknown)=>({status:410,ok:false}));
  expect(await deliverOperatorPush(d.db,{}, {staffId:'o',account:'b',kind:'new_inquiry',refId:'outside',chatId:'chat'},send)).toEqual({sent:0,failed:0});expect(send).not.toHaveBeenCalled();
- await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'new_inquiry',refId:'msg',chatId:'chat'},send);expect(send).toHaveBeenCalledTimes(1);expect(send.mock.calls[0]?.[1]).toEqual(pushPayload('new_inquiry','f'));expect(d.raw.prepare('SELECT status FROM operator_push_deliveries').get()).toEqual({status:'gone'});expect((d.raw.prepare('SELECT revoked_at FROM operator_push_subscriptions').get() as any).revoked_at).toBeTruthy();
+ await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'new_inquiry',refId:'msg',chatId:'chat'},send);expect(send).toHaveBeenCalledTimes(1);expect(send.mock.calls[0]?.[1]).toEqual(pushPayload('new_inquiry','f','お客さま'));expect(d.raw.prepare('SELECT status FROM operator_push_deliveries').get()).toEqual({status:'gone'});expect((d.raw.prepare('SELECT revoked_at FROM operator_push_subscriptions').get() as any).revoked_at).toBeTruthy();
 });
 test('G4-13 G4-24: 好みの古い版409・役割変更で全端末を外す',async()=>{
  await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',body);const preferences={kinds:['new_inquiry'],quietStart:'22:00',quietEnd:'08:00',quietAllowCritical:false,expectedVersion:0};expect((await gapCall(gapApp(d,[operatorPush]),'/api/me/push/preferences','PUT',preferences)).status).toBe(200);expect((await gapCall(gapApp(d,[operatorPush]),'/api/me/push/preferences','PUT',preferences)).status).toBe(409);d.raw.exec("UPDATE staff_members SET role='admin' WHERE id='o'");expect((d.raw.prepare('SELECT revoked_at FROM operator_push_subscriptions').get() as any).revoked_at).toBeTruthy();
@@ -35,7 +35,7 @@ test.each(['assignment','preference'])('G4-07 G4-08: 朝のまとめも変更後
  const {sweepOperatorPush}=await import('../services/operator-push.js');await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',body);
  d.raw.exec("UPDATE chats SET assignee_staff_id='o';INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES('changed-night','f','incoming','text','秘密の本文','a')");
  await gapCall(gapApp(d,[operatorPush]),'/api/me/push/preferences','PUT',{kinds:['assigned_reply'],quietStart:'00:00',quietEnd:'23:59',quietAllowCritical:false,expectedVersion:0});
- const send=vi.fn(async()=>({ok:true,status:201}));await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'assigned_reply',refId:'changed-night',chatId:'chat'},send);
+ const send=vi.fn(async(_subscription:unknown,_payload:unknown)=>({ok:true,status:201}));await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'assigned_reply',refId:'changed-night',chatId:'chat'},send);
  d.raw.exec("UPDATE operator_push_preferences SET quiet_start='22:00',quiet_end='08:00'");if(change==='assignment')d.raw.exec("UPDATE chats SET assignee_staff_id='s'");else d.raw.exec("UPDATE operator_push_preferences SET kinds_json='[]'");
  await sweepOperatorPush(d.db,{},new Date('2026-11-20T00:00:00Z'),send);expect(send).not.toHaveBeenCalled();expect(d.raw.prepare('SELECT status,error_code FROM operator_push_deliveries').get()).toEqual({status:'failed',error_code:'push_no_longer_authorized'});
 });
@@ -124,4 +124,16 @@ test('G4-01: 登録した端末を一覧しテスト通知を一度送る',async
  const send=vi.fn(async()=>new Response(null,{status:201}));vi.stubGlobal('fetch',send);
  const r=await gapCall(a,'/api/me/push/test','POST',{});expect(r.status).toBe(200);expect(await r.json()).toMatchObject({data:{sent:1,failed:0}});
  expect(send).toHaveBeenCalledTimes(1);expect(d.raw.prepare("SELECT status FROM operator_push_deliveries WHERE kind='test'").get()).toEqual({status:'sent'});
+});
+
+test('G4-05: 問い合わせ通知に名前だけを含め、本文を含めない',async()=>{
+ await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',body);
+ d.raw.exec("UPDATE friends SET display_name='山田' WHERE id='f'; INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES('incoming','f','incoming','text','秘密の本文','a')");
+ const send=vi.fn(async(_subscription:unknown,_payload:unknown)=>({ok:true,status:201}));await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'new_inquiry',refId:'incoming',chatId:'chat'},send);
+ expect(send).toHaveBeenCalledTimes(1);expect(send.mock.calls[0][1]).toMatchObject({title:'新しい問い合わせ：山田さま'});expect(JSON.stringify(send.mock.calls[0][1])).not.toContain('秘密の本文');
+});
+
+test('G4-05: 電話番号やメールを名前に設定していても通知しない',()=>{
+ expect(pushPayload('new_inquiry','f','090-1234-5678').title).toBe('新しい問い合わせ');
+ expect(pushPayload('new_inquiry','f','person@example.test').title).toBe('新しい問い合わせ');
 });
