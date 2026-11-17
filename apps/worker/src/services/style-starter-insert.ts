@@ -40,12 +40,13 @@ export async function insertStyleStarterItems(
     skipExisting?: boolean;
     plannedForms?: PlannedInitialForms;
     preservePreviousStyles?: boolean;
+    sameStyleOnly?: boolean;
   } = {},
 ) {
   const {set,existing,oldProfile,choice}=await prepareStarterInsert(db,account,tenant,style,input,{...options,initialMenu:!options.set && answers.image?.value === 'simple'});
   const inserted:unknown[]=[];
   const updated:Array<{key:string;kind:string}>=[];
-  const plannedForms:PlannedInitialForms=options.plannedForms??new Map(existing.filter(row=>row.kind==='form').map(row=>[row.item_key,row.target_id]));
+  const plannedForms:PlannedInitialForms=options.plannedForms??new Map(existing.filter(row=>row.kind==='form' && (!(options.preservePreviousStyles || options.sameStyleOnly) || row.style===style)).map(row=>[row.item_key,row.target_id]));
   if(input.confirmInitialMenu===true && selected && style==='restaurant' && answers.image?.value==='simple' && set.definition.items.some(item=>item.initialMenu))
     await planInitialMenuHistory(db,account,statements,plannedForms,actor);
   const skipped:StarterSkip[]=[];
@@ -68,7 +69,7 @@ export async function insertStyleStarterItems(
     }
     const sameStyle = existing.find(row => row.item_key === item.key && row.style === style);
     if (firstDeferredSelection && sameStyle) { skip(item.key, 'already_exists'); continue; }
-    let previous = sameStyle ?? (firstDeferredSelection ? undefined : existing.find(row=>row.item_key===item.key));
+    let previous = sameStyle ?? (firstDeferredSelection || options.sameStyleOnly ? undefined : existing.find(row=>row.item_key===item.key));
     if(item.kind==='form'&&previous&&((input.answers as Record<string,SetupAnswer>|undefined)?.image?.value==='simple'||input.confirmInitialMenu===true)) {
       const available=await db.prepare(`SELECT 1 FROM forms f WHERE f.id=? AND f.status='active'
         AND EXISTS(SELECT 1 FROM form_accounts a WHERE a.form_id=f.id AND a.line_account_id=?) AND (SELECT COUNT(*) FROM form_accounts a WHERE a.form_id=f.id)=1`).bind(previous.target_id,account).first();

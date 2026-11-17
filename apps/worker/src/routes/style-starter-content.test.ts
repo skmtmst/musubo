@@ -136,7 +136,7 @@ test('スタイルを後で選ぶ店は、選択後にも初期セットを重�
   await saveProfile(f.db, 'a', DEFAULT_TENANT_ID, 'owner', { expectedVersion: pending!.version, style: 'salon', answers: { booking: { mode: 'configured', value: true } } });
   const selected = await profile(f.db, 'a');
   expect(selected!.selection_mode).toBe('configured');
-  const items = f.raw.prepare("SELECT item_key FROM style_starter_items WHERE line_account_id='a' ORDER BY item_key").all() as Array<{item_key:string}>;
+  const items = f.raw.prepare("SELECT item_key FROM style_starter_items WHERE line_account_id='a' AND style='salon' ORDER BY item_key").all() as Array<{item_key:string}>;
   expect(items.some(item => item.item_key === 'booking')).toBe(true);
   expect(new Set(items.map(item => item.item_key)).size).toBe(items.length);
   expect(starterRows()).toHaveLength(1);

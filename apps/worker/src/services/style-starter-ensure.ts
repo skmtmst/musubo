@@ -24,7 +24,7 @@ async function planMissingStarterItems(
   const answers = JSON.parse(p.answers_json ?? '{}') as Record<string, SetupAnswer>;
   // 店が編集した物を上書きしないよう、ある物は必ず飛ばす（skipExisting は既定の true のまま）。
   const result = await insertStyleStarterItems(
-    db, account, tenant, actor, {}, selected, p.style, answers, statements, now,
+    db, account, tenant, actor, {}, selected, p.style, answers, statements, now, { sameStyleOnly: true },
   );
   return { ...result, statements };
 }
@@ -43,8 +43,8 @@ export async function starterApplication(db: D1Database, account: string, tenant
   }
   const keys = set.definition.items.map(item => item.key);
   const count = (await db
-    .prepare('SELECT COUNT(DISTINCT item_key) AS n FROM style_starter_items WHERE line_account_id=? AND item_key IN (SELECT value FROM json_each(?))')
-    .bind(account, JSON.stringify(keys))
+    .prepare('SELECT COUNT(DISTINCT item_key) AS n FROM style_starter_items WHERE line_account_id=? AND style=? AND item_key IN (SELECT value FROM json_each(?))')
+    .bind(account, p.style, JSON.stringify(keys))
     .first<{ n: number }>())?.n ?? 0;
   let missing: number | null;
   try {
@@ -93,7 +93,7 @@ export async function ensureStyleStarterItems(
     inserted: (inserted as Array<{ key: string; kind: string }>).map(({ key, kind }) => ({ key, kind })),
     updated,
     skipped,
-    existing: existing.filter((row) => keys.has(row.item_key)).length,
+    existing: existing.filter((row) => row.style === p.style && keys.has(row.item_key)).length,
     starterSet: { id: set.id, version: set.version },
   };
   if (!inserted.length && !updated.length) return result;
