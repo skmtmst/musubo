@@ -678,7 +678,7 @@
     "763_folder_membership_revisions.sql",
     "764_broadcast_ab_live.sql",
     "765_ec_auto_line_cap.sql",
-    "766_onboarding_guide_progress.sql"
+    "770_onboarding_guide_progress.sql"
   ],
   "migrationCount": 679
 }
