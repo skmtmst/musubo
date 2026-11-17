@@ -223,6 +223,7 @@ describe('埋め込むJS', () => {
     const sent: Array<{ url: string; blob: Blob }> = [];
     const elements = new Map<string, any>();
     const cookies = new Map<string, string>();
+    const listeners = new Map<string, (event: any) => void>();
     const body = {
       appendChild(element: any) { elements.set(element.id, element); element.parentNode = body; },
       removeChild(element: any) { elements.delete(element.id); },
@@ -234,15 +235,15 @@ describe('埋め込むJS', () => {
       referrer: '', readyState: 'complete', body,
       getElementById: (id: string) => elements.get(id),
       createElement: () => ({ style: {}, setAttribute() {}, addEventListener() {}, appendChild() {} }),
-      addEventListener() {},
+      addEventListener: (type: string, callback: (event: any) => void) => listeners.set(type, callback),
     };
     const window: any = { crypto: { randomUUID: () => '12345678-1234-1234-1234-123456789abc' } };
     runInNewContext(await res.text(), {
-      window, document, Blob, location: { hostname: 'shop.example', pathname: '/thanks', search: '?secret=private' },
+      window, document, Blob, location: { hostname: 'shop.example', pathname: '/thanks', search: '?secret=private', href: 'https://shop.example/thanks?secret=private' },
       navigator: { sendBeacon: (url: string, blob: Blob) => { sent.push({ url, blob }); return true; } },
     });
     const messages = async () => Promise.all(sent.map(async ({ url, blob }) => ({ url, payload: JSON.parse(await blob.text()) })));
-    return { window, elements, messages };
+    return { window, elements, listeners, messages };
   }
 
   it('WorkerのURLとタグのキーを使って閲覧を送る', async () => {
@@ -254,8 +255,12 @@ describe('埋め込むJS', () => {
   });
 
   it('クエリ文字列を送らずホストとパスだけ送る', async () => {
-    const { messages } = await executeScript();
+    const { messages, window, listeners } = await executeScript();
+    window.lhConsent(true);
+    window.lhTrack('購入', 1);
+    listeners.get('click')!({ target: { closest: () => ({ getAttribute: () => 'button' }) } });
     const sent = await messages();
+    expect(sent).toHaveLength(5);
     expect(sent[0].payload).toMatchObject({ host: 'shop.example', path: '/thanks' });
     expect(JSON.stringify(sent)).not.toContain('secret');
   });

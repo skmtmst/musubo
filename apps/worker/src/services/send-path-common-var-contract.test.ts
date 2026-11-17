@@ -80,13 +80,18 @@ const LINE_SEND_PATTERN =
   /\.(pushMessage|replyMessage|multicast|broadcast|narrowcast)(WithRequestId)?\s*\(/;
 
 // これらの送信口は、未解決の値を実際に送らない動作試験で守る。
-// auto-reply-unmatched.test.ts / form-layout-effects.test.ts /
-// friend-add-rules-f12-test-send.test.ts / webhook-friend-add-send.test.ts
+// routes/auto-reply-unmatched.test.ts / features/forms/form-layout-effects.test.ts /
+// routes/friend-add-rules-f12-test-send.test.ts / features/automations/automation-action-executors.test.ts /
+// features/rich-menus/rich-menu-tap.test.ts / services/dedup-broadcast.test.ts /
+// routes/chats-send-interpolation.test.ts と services/scheduled-chat-sends.test.ts
 const BEHAVIOR_TESTED = new Set([
   'features/auto-replies/auto-reply-unmatched.ts',
   'features/forms/form-layout-effects.ts',
   'routes/friend-add-rules.ts',
-  'routes/webhook.ts',
+  'features/automations/automation-action-handlers.ts',
+  'features/rich-menus/rich-menu-tap.ts',
+  'services/dedup-broadcast.ts',
+  'services/manual-send-interpolation.ts',
 ]);
 
 describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () => {

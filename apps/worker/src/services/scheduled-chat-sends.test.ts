@@ -291,6 +291,16 @@ describe('送信予約のdispatcher(N-025)', () => {
     expect(logged.n).toBe(0);
   });
 
+  test('存在しない共通情報を含む予約は送らず失敗の出所を残す', async () => {
+    await schedule({ id: 's-var-missing', key: '99999999-2222-4333-8444-555555555557', at: '2026-01-09T23:00:00.000Z', content: '案内: {{var.missing}}' });
+    await processDueScheduledChatSends(env(), { now: NOW });
+    expect(pushMessage).not.toHaveBeenCalled();
+    expect(row('s-var-missing').status).toBe('scheduled');
+    expect(sqlite.raw.prepare('SELECT source_kind, var_key FROM common_var_resolution_failures').all()).toEqual([
+      { source_kind: 'chat', var_key: 'missing' },
+    ]);
+  });
+
   // 直しても上限回数を超えたら failed へ確定する(無限再試行はしない)。
   test('解決失敗が上限回数を超えた予約はfailedへ確定する', async () => {
     sqlite.raw.prepare(`UPDATE friends SET display_name = NULL WHERE id = 'fr-1'`).run();
