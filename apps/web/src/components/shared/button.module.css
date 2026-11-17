@@ -478,4 +478,13 @@ html:root .button.button.secondary[data-presentation='step-action'] {
   box-shadow: none;
   color: var(--color-step-action-ink);
   font-weight: var(--step-action-weight-sub);
+  /*
+   * 白い副操作の地は、指定なしの副ボタンと同じ白。乗せると沈んだ白へ。
+   * `background` の一括指定にして、共通の重ね塗り（黒4%）を地の画像ごと消す。
+   * これを書かないと、指定なしの口から外れた分だけ乗せた時に地が暗くなる。
+   */
+  background: var(--color-canvas);
+}
+html:root .button.button.secondary[data-presentation='step-action']:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
 }
