@@ -42,7 +42,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => React.createElement('a', { href }, children),
+  default: ({ children, ...props }: React.ComponentProps<'a'>) => React.createElement('a', props, children),
 }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
@@ -100,6 +100,7 @@ afterEach(async () => {
 describe('V8 統括のメンバーの窓', () => {
   it('本人の二段階認証設定を一覧の下に表示する', () => {
     expect(screen.getByText('統括の設定')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'メンバー' }).getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('table', { name: '権限者の一覧' })).toBeTruthy()
     expect(screen.getByRole('searchbox', { name: '名前・メールで探す' })).toBeTruthy()
     expect(screen.getByRole('region', { name: '自分の設定' })).toBeTruthy()

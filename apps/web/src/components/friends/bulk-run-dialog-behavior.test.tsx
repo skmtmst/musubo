@@ -145,6 +145,7 @@ describe('一括操作の小窓の確認と実行', () => {
     expect(dialog().textContent).toContain('確認して送る本文')
     const submit = [...dialog().querySelectorAll('button')].find((button) => button.textContent?.trim() === '1人に実行する')!
     expect(submit.disabled).toBe(true)
+    expect(dialog().textContent).toContain('この操作は取り消せません')
     expect(calls.create).not.toHaveBeenCalled()
     await act(async () => dialog().querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
     await press('1人に実行する')
