@@ -467,7 +467,7 @@
 
 ## 反映履歴
 
-- [配信と予定確認の動作を確かめる試験を見直し](release-log/unreleased/PR-kenta-q02b-b6.md) — 反映履歴、確認 2026-11-17。
+- [配信と予定確認の動作を確かめる試験を見直し](release-log/unreleased/103-kenta-q02b-b6.md) — 反映履歴、確認 2026-11-17。
 
 - [プログラムと連携処理の説明書きを整理](release-log/unreleased/95-kenta-q04-worker.md) — 反映履歴、確認 2026-11-16。
 
