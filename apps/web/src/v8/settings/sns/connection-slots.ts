@@ -7,8 +7,8 @@
  *
  * 契約枠の数え方（要件 §4-1）:
  *   有料枠 = Σ max(0, 接続数 − 契約枠)（サービスごとに出して足す）
- * `packages/shared` の `musuboLinkedAdditionPrice` はまだ「max(Google, Instagram) − 1」で数えるため、
- * 契約枠に合わせた数え方はここで持つ。単価・上限10個・無料期間¥0・日割りは共通設計をそのまま使う。
+ * `packages/shared` の `linkedAccountSlots` も同じ数え方になった（`LinkedAccountCounts.contracted`）。
+ * ここではサービス1つぶんの枠と画面の表示を扱う。単価・上限10個・無料期間¥0・日割りは共通設計をそのまま使う。
  */
 
 import {

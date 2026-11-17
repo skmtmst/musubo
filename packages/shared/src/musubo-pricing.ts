@@ -21,9 +21,23 @@ export const DEFAULT_MUSUBO_PRICE_SCHEDULE: Readonly<MusuboPriceSchedule> = Obje
   extraFriendBlockSize: 10_000,
 });
 
+/** 契約枠。サービスごとに別々に数える（要件 §5 Q6）。 */
+export interface LinkedAccountQuota {
+  googleBusiness: number;
+  instagram: number;
+}
+
+/** 契約枠の既定。枠数を返す口が無い間はこの値で数える。 */
+export const DEFAULT_LINKED_ACCOUNT_QUOTA: LinkedAccountQuota = Object.freeze({
+  googleBusiness: 1,
+  instagram: 1,
+});
+
 export interface LinkedAccountCounts {
   googleBusiness: number;
   instagram: number;
+  /** 省略時は `DEFAULT_LINKED_ACCOUNT_QUOTA`（各サービス1枠）。 */
+  contracted?: LinkedAccountQuota;
 }
 
 /** LINE's ready insight reports cumulative adds and current blocks for one date. */
@@ -86,11 +100,14 @@ function safeYen(value: bigint, name: string): number {
   return Number(value);
 }
 
-/** More of Google Business and Instagram, minus the first included slot. */
+/** 有料枠 = Σ max(0, 接続数 − 契約枠)。サービス別に数えて合算する（要件 §4-1）。 */
 export function linkedAccountSlots(counts: LinkedAccountCounts): number {
   const google = wholeNonnegative(counts.googleBusiness, 'googleBusiness');
   const instagram = wholeNonnegative(counts.instagram, 'instagram');
-  return Math.max(0, Math.max(google, instagram) - 1);
+  const quota = counts.contracted ?? DEFAULT_LINKED_ACCOUNT_QUOTA;
+  const googleQuota = wholeNonnegative(quota.googleBusiness, 'contracted.googleBusiness');
+  const instagramQuota = wholeNonnegative(quota.instagram, 'contracted.instagram');
+  return Math.max(0, google - googleQuota) + Math.max(0, instagram - instagramQuota);
 }
 
 export function friendAllowanceForLineCount(lineCount: number, schedule: MusuboPriceSchedule): number {

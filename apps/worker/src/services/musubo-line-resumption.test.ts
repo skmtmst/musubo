@@ -90,9 +90,9 @@ it('shows and charges the accepted friend and linked-slot options without changi
     instagram_count=3 WHERE line_account_id='line-old'`).run();
   const offer = await getMusuboLineResumptionOffer(env, tenantId, now);
   expect(offer).toMatchObject({ kind: 'paid_expired', options: {
-    friendBlocks: 1, linkedSlots: 2, friendOverageMonthlyYen: 1_100,
-    linkedSlotsMonthlyYen: 6_600, optionsMonthlyYen: 7_700,
-    optionsDueNowYen: 7_700, totalDueNowYen: 13_600,
+    friendBlocks: 1, linkedSlots: 3, friendOverageMonthlyYen: 1_100,
+    linkedSlotsMonthlyYen: 9_900, optionsMonthlyYen: 11_000,
+    optionsDueNowYen: 11_000, totalDueNowYen: 16_900,
   } });
   await acceptMusuboLineResumption(env, tenantId, now);
   follower.friends = 12_001;
@@ -101,7 +101,7 @@ it('shows and charges the accepted friend and linked-slot options without changi
   ensure.mockClear();
   await requestMusuboLineResumption(env, tenantId, now);
   await reconcileMusuboLineResumption(env, tenantId, now);
-  expect(ensure.mock.calls[1]?.[1]).toMatchObject({ purpose: 'options', unitAmountYen: 7_700 });
+  expect(ensure.mock.calls[1]?.[1]).toMatchObject({ purpose: 'options', unitAmountYen: 11_000 });
 });
 
 it('holds LINE access when one Stripe subscription cannot be confirmed, then retries', async () => {

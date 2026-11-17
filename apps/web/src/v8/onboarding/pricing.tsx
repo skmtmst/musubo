@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import {
   DEFAULT_MUSUBO_PRICE_SCHEDULE,
   friendAllowanceForLineCount,
+  linkedAccountSlots,
   musuboPrice,
   type MusuboPriceSchedule,
   type MusuboTrialPeriod,
@@ -65,10 +66,14 @@ function PlannedCountSelect({ label, id, value, onChange, linked = false, otherL
   otherLinkedCount?: number
   linkedSlotYen?: number
 }) {
-  const otherService = label === 'Googleマイビジネス' ? 'Instagram' : 'Googleマイビジネス'
+  const isGoogle = label === 'Googleマイビジネス'
+  const otherService = isGoogle ? 'Instagram' : 'Googleマイビジネス'
   const priceHint = (count: number) => {
     if (otherLinkedCount > 10) return '個別見積もり'
-    const slots = Math.max(count, otherLinkedCount) - 1
+    // 有料枠はサービスごとに契約枠を超えた分を数える（要件 §4-1）。共通設計と同じ関数で出す。
+    const slots = linkedAccountSlots(isGoogle
+      ? { googleBusiness: count, instagram: otherLinkedCount }
+      : { googleBusiness: otherLinkedCount, instagram: count })
     return slots > 0 ? `+${yen(slots * linkedSlotYen)}／月` : '追加料金なし'
   }
   return <Field label={label} htmlFor={id} optional={false}>

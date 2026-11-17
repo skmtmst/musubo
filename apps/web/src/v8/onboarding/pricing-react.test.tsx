@@ -73,7 +73,7 @@ describe('Penの利用料金確認', () => {
     expect([...document.querySelectorAll<HTMLButtonElement>('[role="option"] button')].find((button) => button.title.startsWith('1個：'))?.title)
       .toBe('1個：+¥3,300／月')
     expect([...document.querySelectorAll<HTMLButtonElement>('[role="option"] button')].find((button) => button.title.startsWith('3個：'))?.title)
-      .toBe('3個：+¥6,600／月')
+      .toBe('3個：+¥9,900／月')
   })
 
   it('料金詳細を開くと閉じるボタンに焦点を移し、Escで元の操作へ戻す', async () => {

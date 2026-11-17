@@ -22,7 +22,7 @@ describe('追加連携枠の解除', () => {
     await act(async () => root.render(<LinkedAccountRemoval view={view} onRemove={onRemove} onBack={onBack} />))
     expect(host.textContent).toContain('Googleマイビジネス')
     expect(host.textContent).toContain('3個 → 2個')
-    expect(host.textContent).toContain('2枠 → 1枠')
+    expect(host.textContent).toContain('3枠 → 2枠')
     expect(host.textContent).toContain('−¥3,300')
     expect(host.textContent).toContain('解除後すぐ')
     expect(host.textContent).toContain('2027年2月8日')
@@ -30,8 +30,9 @@ describe('追加連携枠の解除', () => {
     expect(onRemove).toHaveBeenCalledOnce()
   })
 
-  it('少ないほうを解除しても追加枠が減らなければ料金は変えない', async () => {
-    await act(async () => root.render(<LinkedAccountRemoval view={{ ...view, service: 'instagram', before: { googleBusiness: 3, instagram: 2 }, after: { googleBusiness: 3, instagram: 1 } }} onRemove={onRemove} onBack={onBack} />))
+  it('契約枠の中の接続を解除して追加枠が減らなければ料金は変えない', async () => {
+    const contracted = { googleBusiness: 1, instagram: 2 }
+    await act(async () => root.render(<LinkedAccountRemoval view={{ ...view, service: 'instagram', before: { googleBusiness: 3, instagram: 2, contracted }, after: { googleBusiness: 3, instagram: 1, contracted } }} onRemove={onRemove} onBack={onBack} />))
     expect(host.textContent).toContain('料金変更なし')
     expect(host.textContent).toContain('2枠 → 2枠')
   })
