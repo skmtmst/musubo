@@ -406,7 +406,7 @@ it('動いていない稼働ルールの件数に保管済みを含めない', a
 
 describe('ルール一覧の読み込みと表示', () => {
   it('読み込み中から成功へ切り替わり、一覧を表示する', async () => {
-    let resolve!: (value: any) => void
+    let resolve!: (value: unknown) => void
     vi.spyOn(api.automations, 'list').mockImplementationOnce(() => new Promise(done => { resolve = done }))
     await render(<AutomationListV8 />)
     expect(host.querySelector('[data-list-state="loading"]')?.getAttribute('aria-label')).toBe('ルールを読み込んでいます')
@@ -502,7 +502,7 @@ describe('ルール一覧の読み込みと表示', () => {
   })
 
   it('店を切り替えた後に前の店の返事が届いても表示しない', async () => {
-    let resolveOld!: (value: any) => void
+    let resolveOld!: (value: unknown) => void
     vi.spyOn(api.automations, 'list').mockImplementationOnce(() => new Promise(done => { resolveOld = done })).mockResolvedValueOnce({ success: true, data: [automation('new', '新しい店')], summary: null })
     await render(<AutomationListV8 />)
     account.id = 'account-b'
