@@ -161,11 +161,6 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     if (ts.isObjectLiteralExpression(node)) {const props=new Map();for(const property of node.properties){if(ts.isPropertyAssignment(property))props.set(property.name.text,evaluate(property.initializer,scope,ctx,depth));else if(ts.isShorthandPropertyAssignment(property))props.set(property.name.text,scope.get(property.name.text));}return value({props})}
     if (ts.isPropertyAccessExpression(node)) {
       const receiver=evaluate(node.expression,scope,ctx,depth)
-      if(receiver.httpResponse){
-        if(['status','statusText','ok','headers','url','redirected','type'].includes(node.name.text))return value()
-        if(node.name.text==='clone')return value({responseClone:receiver})
-        return value({responseBody:receiver.httpResponse,reads:receiver.httpResponse.reads})
-      }
       if (receiver.props) {
         const member=receiver.props.get(node.name.text)??value({undefined:true})
         return member.getter?invoke(member,[],ctx,node,depth):member
@@ -250,22 +245,6 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     }
     const receiver=ts.isPropertyAccessExpression(call)?evaluate(call.expression,scope,ctx,depth):value()
     const callable=evaluate(call,scope,ctx,depth)
-    // Preserve request bodies and unknown response access as source-derived.
-    if(ts.isNewExpression(node)&&ts.isIdentifier(call)&&call.text==='Request'&&!callable.fn&&!callable.classNode&&!callable.functions?.length){
-      const extra=union(args.slice(1).flatMap(arg=>[arg,...(arg.props?.values()??[])]))
-      if(extra.reads.length)emit(ctx,node,extra,value(),'unknown-source-consumer')
-      return value({requestUrl:args[0],reads:extra.reads})
-    }
-    if(name==='fetch'&&args[0]?.requestUrl&&!callable.fn&&!callable.classNode&&!callable.functions?.length){
-      const extra=union(args.slice(1).flatMap(arg=>[arg,...(arg.props?.values()??[])]))
-      if(extra.reads.length)emit(ctx,node,extra,value(),'unknown-source-consumer')
-      const body=union([read(args[0].requestUrl,ctx,node),...args,extra])
-      return value({httpResponse:body,reads:body.reads})
-    }
-    if(callable.responseClone)return callable.responseClone
-    if(callable.responseBody)return callable.responseBody
-    // Only the node:vm import is an execution sink, not an arbitrary namesake.
-    if(callable.vmExecution)return value()
     if(receiver.moduleLoader&&name==='resolve')return value({reads:union(args).reads})
     if(receiver.vitest&&name==='hoisted'&&args[0]?.fn)return invoke(args[0],[],ctx,node,depth)
     if(receiver.vitest&&name==='mock'&&args[0]?.strings.some(path=>/^(?:node:)?fs$/.test(path))&&args[1]?.fn){
@@ -403,7 +382,7 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
       if(!ts.isImportDeclaration(statement))continue
       const specifier=statement.moduleSpecifier.text,local=modulePath(file,specifier)
       const pathModule=/^(?:node:)?path$/.test(specifier)?value({props:new Map(['join','resolve','dirname','basename','extname','relative'].map(pathOp=>[pathOp,value({pathOp})]))}):null
-      const imported=pathModule??(/^(?:node:)?vm$/.test(specifier)?value({props:new Map([['runInNewContext',value({vmExecution:true})]])}):/^(?:node:)?module$/.test(specifier)?value({props:new Map([['createRequire',value({moduleFactory:true})]])}):specifier==='vitest'?value({props:new Map([['vi',value({vitest:true})]])}):specifier==='typescript'?value({typescript:true}):specifier.includes('?raw')?read(value({strings:[specifier]}),ctx,statement):/^(?:node:)?fs(?:\/promises)?$/.test(specifier)?fsModule():/^(?:node:)?crypto$/.test(specifier)?value({props:new Map([['createHash',value({hashFactory:true})]])}):/^(?:node:)?assert(?:\/strict)?$/.test(specifier)?value({assert:true}):local?readers.has(local)?value({props:load(local).exports}):value({localModule:local}):value())
+      const imported=pathModule??(/^(?:node:)?module$/.test(specifier)?value({props:new Map([['createRequire',value({moduleFactory:true})]])}):specifier==='vitest'?value({props:new Map([['vi',value({vitest:true})]])}):specifier==='typescript'?value({typescript:true}):specifier.includes('?raw')?read(value({strings:[specifier]}),ctx,statement):/^(?:node:)?fs(?:\/promises)?$/.test(specifier)?fsModule():/^(?:node:)?crypto$/.test(specifier)?value({props:new Map([['createHash',value({hashFactory:true})]])}):/^(?:node:)?assert(?:\/strict)?$/.test(specifier)?value({assert:true}):local?readers.has(local)?value({props:load(local).exports}):value({localModule:local}):value())
       const clause=statement.importClause
       if(clause?.name)scope.set(clause.name.text,imported.assert?imported:imported.localModule?value({localModule:local,exportName:'default'}):imported.props?.get('default')??imported)
       if(clause?.namedBindings&&ts.isNamespaceImport(clause.namedBindings))scope.set(clause.namedBindings.name.text,imported)

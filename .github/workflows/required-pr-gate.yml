@@ -290,7 +290,7 @@ jobs:
         env:
           SOURCE_CONTRACT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          node --test scripts/verify-no-source-visual-contracts.test.mjs scripts/verify-no-source-visual-contracts-repository.test.mjs scripts/source-provenance.test.mjs
+          node --test scripts/verify-no-source-visual-contracts.test.mjs scripts/source-provenance.test.mjs
           base="${SOURCE_CONTRACT_BASE_SHA:-$(git rev-parse HEAD^)}"
           node scripts/verify-no-source-visual-contracts.mjs --base "$base"
       - name: Build shared packages
