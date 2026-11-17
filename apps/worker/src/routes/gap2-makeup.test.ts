@@ -117,3 +117,17 @@ test.each(['sequential','concurrent'] as const)('欠席を2回送っても振替
  expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_makeup_credits').get()).toEqual({n:1});
  expect(d.raw.prepare("SELECT absence_reported_at IS NOT NULL AS absent FROM event_bookings WHERE id='eb'").get()).toEqual({absent:1});
 });
+
+test('B3-10 B3-11: 管理者だけが理由付きで延長し、古い版は上書きできない',async()=>{
+ const credit=(await absence(d.db,'a','f','eb','customer')).makeupCredit as {id:string;expires_at:string;version:number};
+ const url=`/api/booking/admin/makeup-credits/${credit.id}/operations?account_id=a`;
+ const body={operation:'extend',expiresAt:'2027-01-20T05:00:00Z',expectedVersion:credit.version,reason:'休講'};
+ for(const [who,im] of [[{...gapOwner,role:'staff' as const},false],[{...gapOwner,readOnly:true},false],[gapOwner,true]] as const) expect((await gapCall(gapApp(d,[bookingMakeup],who,im),url,'POST',body)).status).toBe(403);
+ expect((await gapCall(gapApp(d,[bookingMakeup]),url,'POST',{...body,reason:'  '})).status).toBe(400);
+ expect((await gapCall(gapApp(d,[bookingMakeup]),url,'POST',{...body,expiresAt:credit.expires_at})).status).toBe(400);
+ expect((await gapCall(gapApp(d,[bookingMakeup]),url.replace('=a','=b'),'POST',body)).status).toBe(404);
+ expect((await gapCall(gapApp(d,[bookingMakeup]),url,'POST',body)).status).toBe(200);
+ expect((await gapCall(gapApp(d,[bookingMakeup]),url,'POST',{...body,expiresAt:'2027-02-20T05:00:00Z'})).status).toBe(409);
+ expect(d.raw.prepare('SELECT expires_at,version FROM booking_makeup_credits WHERE id=?').get(credit.id)).toEqual({expires_at:'2027-01-20T05:00:00.000Z',version:credit.version+1});
+ expect(d.raw.prepare("SELECT reason,actor_principal_id FROM audit_events WHERE action='makeup.extend'").all()).toEqual([{reason:'休講',actor_principal_id:'o'}]);
+});
