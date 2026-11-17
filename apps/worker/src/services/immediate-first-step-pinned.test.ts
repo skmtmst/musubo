@@ -87,6 +87,22 @@ describe('pushImmediateFirstStep の版固定（実D1）', () => {
     expect(JSON.stringify(sent[0].messages)).not.toContain('書き換えた1通目');
   });
 
+  it('初回の即時送信は共通情報が未解決なら送らない', async () => {
+    const { scenario, step1 } = await seedScenario(testDb.db);
+    testDb.raw.prepare("INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES('acc-1','店','ch','tok','secret')").run();
+    testDb.raw.prepare("UPDATE scenarios SET line_account_id='acc-1' WHERE id=?").run(scenario.id);
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'acc-1' });
+    await updateScenarioStep(testDb.db, step1.id, { message_content: '営業時間: {{var.hours}}' });
+    await publishScenarioVersion(testDb.db, scenario.id, { staffId: null, idempotencyKey: 'pin-common-var' });
+    const enrollment = (await enrollFriendInScenario(testDb.db, 'friend-1', scenario.id))!;
+    const { sent, client } = replyHarness();
+    expect(await pushImmediateFirstStep(testDb.db, 'friend-1', scenario.id, ctx, {
+      enrollment: enrollment as FriendScenario, reply: { client, replyToken: 'rt-1' },
+    })).toBe(false);
+    expect(sent).toEqual([]);
+    expect(testDb.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+  });
+
   it('公開後の template 編集は固定版へ混入しない', async () => {
     const scenario = await createScenario(testDb.db, { name: '案内', triggerType: 'manual' });
     // template の解決は「公開版があり、持ち主が両方はっきりしていて一致する」
