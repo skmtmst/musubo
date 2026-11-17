@@ -142,6 +142,9 @@ const ALLOWLIST_MAX = 769;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/booking/admin/groups/{id}/cancellation-quote',
+  'GET /api/liff/booking/groups/{id}/cancellation-quote',
+  'POST /api/booking/admin/makeup-credits/{id}/operations',
   'GET /api/hq/billing/musubo/last-line-end',
   'POST /api/hq/billing/musubo/last-line-end',
   'GET /api/hq/billing/musubo/line-addition',

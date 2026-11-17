@@ -1,5 +1,33 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const bookingAdminPaths = {
+  '/api/booking/admin/makeup-credits/{id}/operations': {
+    post: {
+      tags: ['Booking'], summary: '振替の期限を延長する',
+      description: 'オーナー・管理者が理由を添えて期限を延ばす。期限の短縮は不可。古い版は409。代理ログインでは変更できない。',
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      requestBody: { required: true, content: { 'application/json': { schema: {
+        type: 'object', required: ['operation', 'expiresAt', 'reason', 'expectedVersion'], properties: {
+          operation: { type: 'string', enum: ['extend'] }, expiresAt: { type: 'string', format: 'date-time' },
+          reason: { type: 'string', minLength: 1, maxLength: 1000 }, expectedVersion: { type: 'integer', minimum: 0 },
+        },
+      } } } },
+      responses: { '200': { description: '延長後の期限と版' }, '400': { description: '入力不正・短縮' }, '403': { description: '権限なし・代理ログイン' }, '404': { description: '振替または店舗なし' }, '409': { description: '版競合または変更できない状態' } },
+    },
+  },
+  '/api/booking/admin/groups/{id}/cancellation-quote': {
+    get: {
+      tags: ['Booking'], summary: '組の予約を取り消す前に料金を確認する',
+      description: '取消対象の各予約の料金と合計、組と各予約の版を返す。予約の変更や課金は行わない。',
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      responses: { '200': { description: '各人の見積もりと合計額（円）' }, '400': { description: '入力不正' }, '403': { description: '店舗または予約の権限なし' }, '404': { description: '対象の組なし' } },
+    },
+  },
   // ── Booking detail edit / retry / audit  ─────────────
   '/api/booking/admin/bookings.csv': {
     get: {
