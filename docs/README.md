@@ -467,7 +467,7 @@
 
 ## 反映履歴
 
-- [返信期限を過ぎた会話を確認](release-log/unreleased/PR-kenta-c12-overdue.md) — 反映履歴、確認 2026-11-17。
+- [返信期限を過ぎた会話を確認](release-log/unreleased/110-kenta-c12-overdue.md) — 反映履歴、確認 2026-11-17。
 
 - [列車：試験だけの4本](release-log/unreleased/102-kenta-train-tests.md) — まとめて入れた試験の履歴。確認 2026-11-17。
 
