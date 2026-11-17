@@ -219,3 +219,15 @@ describe('N-023 個別送信失敗台帳', () => {
     expect(forbidden.status).toBe(404);
   });
 });
+
+test('UNS-22: LINEが500なら失敗を記録し自動的に再送しない',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));
+ try{
+  mocks.pushMessage.mockRejectedValueOnce(Object.assign(new Error('provider error'),{status:500}));
+  const response=await send('chat-1',KEY1);
+  expect(response.status).toBe(502);
+  expect(await response.json()).toMatchObject({success:false,code:'LINE_TEMPORARILY_UNAVAILABLE',data:{retryable:true}});
+  expect(row(KEY1)).toMatchObject({status:'failed',failure_code:'LINE_TEMPORARILY_UNAVAILABLE',attempt_count:1,retryable:1});
+  expect(mocks.pushMessage).toHaveBeenCalledTimes(1);
+ }finally{vi.useRealTimers();}
+});
