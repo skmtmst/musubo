@@ -1,3 +1,4 @@
+import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import {bookingMakeup} from './booking-makeup.js';
 import {absence,makeupOptions,useMakeup,expireMakeup} from '../features/booking/booking-makeup.js';
@@ -6,10 +7,10 @@ import type {SqliteD1} from '../test-utils/d1-sqlite.js';
 import {deleteCustomerData} from '../services/customer-data-deletion.js';
 import {purgeTablesChildFirst,tenantScopeCondition} from '@line-crm/db';
 let d:SqliteD1;
-beforeEach(()=>{d=gapFixture();d.raw.exec(`INSERT INTO events(id,line_account_id,name,is_published,lifecycle_status,makeup_rule_json) VALUES('lesson','a','教室',1,'published','{"enabled":true,"cutoffHours":3,"validDays":30,"monthlyCap":2,"target":"same_kind","targetIds":[]}');
+beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));d=gapFixture();useSqliteClock(d.raw,()=>new Date());d.raw.exec(`INSERT INTO events(id,line_account_id,name,is_published,lifecycle_status,makeup_rule_json) VALUES('lesson','a','教室',1,'published','{"enabled":true,"cutoffHours":3,"validDays":30,"monthlyCap":2,"target":"same_kind","targetIds":[]}');
  INSERT INTO event_slots(id,event_id,starts_at,ends_at,capacity) VALUES('src','lesson','2026-11-20T05:00:00Z','2026-11-20T06:00:00Z',1),('dst','lesson','2026-11-27T05:00:00Z','2026-11-27T06:00:00Z',1),('late','lesson','2027-01-27T05:00:00Z','2027-01-27T06:00:00Z',1);
  INSERT INTO event_bookings(id,line_account_id,event_id,slot_id,friend_id,status,requested_at,identity_key) VALUES('eb','a','lesson','src','f','confirmed','2026-10-16T00:00:00Z','solo:f');`);vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));});
-afterEach(()=>{d.raw.close();vi.unstubAllGlobals();});
+afterEach(()=>{d.raw.close();vi.useRealTimers();vi.unstubAllGlobals();});
 test('B3-01 B3-03 B3-05 B3-06 B3-07: 欠席と振替先の選択は別。二重でも各1件',async()=>{
  const first=await absence(d.db,'a','f','eb','customer');expect(first.eventBooking.status).toBe('absent');expect(first.makeupCredit).toBeTruthy();
  await absence(d.db,'a','f','eb','customer');expect(d.raw.prepare('SELECT count(*) n FROM booking_makeup_credits').get()).toEqual({n:1});

@@ -1,7 +1,10 @@
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 vi.mock('./feature-enforcement.js',()=>({featureJobCanRun:async()=>true}));
+const dispatch = vi.hoisted(() => vi.fn(async (_db: D1Database, _event: unknown) => []));
+vi.mock('../features/automations/automation-triggers/index.js', () => ({ dispatchAutomationEventWithLogging: dispatch }));
 import {processPendingMileageEvents,toJstString} from '@line-crm/db';
 import {createTestD1,insertFriend,type SqliteD1} from '../test-utils/d1-sqlite.js';
+import {useSqliteClock} from '../test-utils/sqlite-clock.js';
 import {recordTrackedClick,processTrackedClick,processDueTrackedClicks} from './tracked-click-steps.js';
 import type { Env } from '../worker-env.js';
 let item:SqliteD1;
@@ -29,4 +32,15 @@ it('PKG68 retries a real tag failure while preserving one real mileage event and
  expect(item.raw.prepare("SELECT status FROM workflow_steps WHERE process_kind='tracked_click' AND step_key='__run'").get()).toEqual({status:'succeeded'});
  await processPendingMileageEvents(item.db,{now:toJstString(new Date(Date.now()+2*86400_000))});
  expect(item.raw.prepare('SELECT COUNT(*) AS n FROM mileage_ledger WHERE source_event_id=?').get(saved.id)).toEqual({n:1});
+});
+
+it('保存したクリックのIDを自動化の発生元として使う', async () => {
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-17T00:00:00Z'));useSqliteClock(item.raw,()=>new Date());
+ try {
+  dispatch.mockClear();
+  const saved=await recordTrackedClick(item.db,{linkId:'click-link',friendId:'click-friend',identityVerified:true,accountId:'click-account',tagId:null,scenarioId:null,linkName:'test',conversionPointIds:[]});
+  await processTrackedClick({DB:item.db,LINE_CHANNEL_ACCESS_TOKEN:'test'} as Env['Bindings'],saved.id,saved.plan);
+  expect(dispatch).toHaveBeenCalledTimes(1);
+  expect(dispatch.mock.calls[0][1]).toMatchObject({eventType:'link_clicked',sourceEventId:saved.id});
+ } finally { vi.useRealTimers(); }
 });

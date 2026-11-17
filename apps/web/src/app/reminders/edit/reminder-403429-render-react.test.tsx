@@ -115,6 +115,14 @@ describe('D015 リマインダ編集の取得失敗（実描画）', () => {
     expect(within(alert).getByRole('button', { name: 'もう一度読み込む' })).not.toBeNull()
   })
 
+  it('その他の失敗は下書き固有の案内を出す', async () => {
+    fixture.getDraft.mockRejectedValue(new TestApiError(500, 'secret internal'))
+    render(<ReminderEditV8 stage="messages" reminderId="r-1" />)
+    expect(await screen.findByText('下書きを読み込めませんでした')).toBeTruthy()
+    expect(document.body.textContent).toContain('下書きを読み込めませんでした。')
+    expect(document.body.textContent).not.toContain('secret internal')
+  })
+
   it('429から読み直すと直り、古い失敗文は消える', async () => {
     fixture.getDraft.mockRejectedValueOnce(new TestApiError(429, 'API error: 429'))
     fixture.getDraft.mockResolvedValue(draftResponse())
@@ -127,6 +135,7 @@ describe('D015 リマインダ編集の取得失敗（実描画）', () => {
     })
     expect(fixture.getDraft).toHaveBeenCalledTimes(2)
     // 下書きが描かれる（通知ステップの1通目の本文が複数箇所に出る）。
-    expect(screen.getAllByText('前日のお知らせ本文').length).toBeGreaterThanOrEqual(1)
+    await waitFor(() => expect(screen.getAllByText('前日のお知らせ本文').length).toBeGreaterThanOrEqual(1))
+    expect(document.body.textContent).not.toContain('読み込めませんでした')
   })
 })
