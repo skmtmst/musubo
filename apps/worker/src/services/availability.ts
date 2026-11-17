@@ -1257,7 +1257,7 @@ function diagnoseRejectedStart(
 export async function getAvailability(
   db: D1Database,
   params: GetAvailabilityParams,
-): Promise<{ by_staff: AvailabilityByStaff[]; closed_dates: string[] }> {
+): Promise<{ by_staff: AvailabilityByStaff[]; closed_dates: string[]; calendar_sync?: CalendarSyncState[] }> {
   const loaded = await loadAvailabilityData(db, params);
   if (loaded.kind === 'no_menu' || loaded.kind === 'no_staff') {
     return { by_staff: [], closed_dates: [] };
