@@ -38,7 +38,7 @@ type CommonProps = {
   /** 権限で使えない理由。Tab・吹き出しを保ち、送信と移動を止める専用の口。 */
   lockedReason?: string | null
   /** 欄の横の小さな文字操作。指定した操作だけ詰め、既定のボタンは変えない。 */
-  presentation?: 'account-inline' | 'registration-inline' | 'restaurant' | 'row-action' | 'hours'
+  presentation?: 'account-inline' | 'registration-inline' | 'restaurant' | 'row-action' | 'hours' | 'step-action'
   className?: string
   /** Authored action words only; entity names and arbitrary values remain unchanged. */
   actionWording?: boolean

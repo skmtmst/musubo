@@ -41,8 +41,8 @@ export function FirstStepsGuideFooter({ guide }: { guide: FirstStepsGuide }) {
   const restart = () => { guide.reset(); guide.start() }
   return (
     <div className={styles.guideFooter}>
-      <Button size="compact" variant="primary" onClick={guide.phase === 'paused' ? guide.resume : guide.start}>続きからガイドで進める</Button>
-      <Button size="compact" onClick={restart}>ガイドを最初から開始</Button>
+      <Button size="compact" variant="primary" presentation="step-action" onClick={guide.phase === 'paused' ? guide.resume : guide.start}>続きからガイドで進める</Button>
+      <Button size="compact" presentation="step-action" onClick={restart}>ガイドを最初から開始</Button>
       <FirstStepsGuideNote />
     </div>
   )
@@ -62,7 +62,7 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
   const nextKey = summary ? nextFirstStepKey(summary) : null
   const guideVisible = Boolean(guide && summary && !complete && !readOnly)
   return (
-    <Card as="section" className={styles.card} layout="vertical" contentPadding="var(--step-card-pad)" gap="var(--step-card-gap)" aria-labelledby="first-steps-title" data-design-node="r3X34">
+    <Card as="section" className={styles.card} edge="hairline" layout="vertical" contentPadding="var(--step-card-pad)" gap="var(--step-card-gap)" aria-labelledby="first-steps-title" data-design-node="r3X34">
       <div className={styles.head}>
         <h2 id="first-steps-title" className={styles.title}>はじめにやること</h2>
         {summary ? <>
@@ -88,10 +88,10 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
             </SetupStepLabel>
             {(!step.done || step.key === 'hours') && (readOnly || step.state === 'forbidden') ? <><Button size="compact" lockedReason={lockUnless(false, 'manager')}>ガイドで開く</Button></> : !step.done && !step.href ? <span className={styles.count}>未確認</span> : step.done && step.key !== 'hours' ? null : step.done ? (
               /* 済みの段は案内が無いので、確かめ直すための行き先だけ残す。 */
-              <TextLink tone="action" href={step.href!} className={styles.link} aria-label={`${step.label}（開く）`}>開く</TextLink>
+              <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}（開く）`}>開く</TextLink>
             ) : (
               /* まだの段はどれも、この行からその段のガイドを始める。 */
-              <TextLink tone="action" href={step.href!} className={styles.link} aria-label={`${step.label}をガイドで開く`} onClick={() => guide?.startAt?.(step.key)}>ガイドで開く</TextLink>
+              <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}をガイドで開く`} onClick={() => guide?.startAt?.(step.key)}>ガイドで開く</TextLink>
             )}
           </SetupStepRow>
         ))}

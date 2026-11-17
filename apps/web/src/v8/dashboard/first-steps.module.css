@@ -107,16 +107,9 @@
 
 /*
  * カード外周は正本（yG81W / X1paMZ）の stroke #E5E7EB・1px・内側そろえ。
- * 共通カードは縁を影（--card-shadow）で出す作りで、ここでは影を消しているため枠が無くなる。
- * border だと中身が 2px 狭まるので、段と同じ「内側の輪郭」で描いて寸法を変えない。
- * 共通カードは既定の見た目で `outline-color: transparent` を当てる強い口
- * （`html:root .card[data-card-variant='default']:not(…)×4`）を持つため、
- * `[class]` を重ねて強さを上回らせる。押したときの focus-visible の輪郭は共通側に残す。
+ * 縁の描き方は所有部品 shared/card の `edge="hairline"` が持つ（共通CSSの既定は変えない）。
+ * 色は上の `--color-hairline` をそのまま使うので、見た目は変わらない。
  */
-html:root .card[class][class][class][class][class][class]:not(:focus-visible) {
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-}
 
 .head {
   display: flex;
@@ -178,52 +171,19 @@ html:root .card[class][class][class][class][class][class]:not(:focus-visible) {
 
 /*
  * 下段の2操作は正本の寸法（主 206×46・副 191×46・文字 15）。
- * 共通ボタン側の文字14は `:root .button:is(.primary, .secondary)…` という
- * 層の外の強い指定なので、こちらも `html:root` と `[class]` の重ねで
- * 強さを上げ、枠08b の中だけで勝つようにする（共通CSSは触らない）。
+ * 文字の大きさ・太さ・行の高さ、主の縁なし、副の枠・影なし・文字色は、
+ * 所有部品 shared/button の `presentation="step-action"` が持つ（共通CSSの既定は変えない）。
+ * ここに残すのは高さと左右の余白だけ。寸法は画面の持ちもの。
  */
 html:root .guideFooter button[class][class][class] {
   height: var(--step-action-h);
   /* 左右の余白は正本の幅（主206・副191）に合わせた値。 */
   padding-inline: var(--step-action-pad);
-  font-size: var(--step-action-text);
-  /* 共通側は `:root .button:is(.primary,.secondary):is(…)` が 600 を直書きするので、
-     正本（HQg7M）の 700 もこの強い口で上書きする。副操作は下で 600 に戻す。 */
-  font-weight: var(--step-action-weight);
-  line-height: var(--step-action-text-lh);
 }
 
-/*
- * 主操作は正本（m1CCF / QCgSL）に stroke が無い。
- * 共通側 `:root .primary` が `outline: 1px solid var(--color-primary-border)` を載せるので、
- * 枠08b の中だけで消す（押したときの focus-visible の輪郭は残す）。
- */
-html:root .guideFooter button[data-variant='primary'][class][class][class]:not(:focus-visible) {
-  outline: none;
-}
-
-/*
- * 副操作は正本（QQIQM）どおり白地・#D1D5DB の細い枠・影なし・文字 #1F2937。
- * 共通側は同じところで「線ではなく影で浮かせる」ため影を載せるので、ここで消して枠に戻す。
- */
+/* 副操作は枠の 1px ぶんだけ左右を詰めて、正本の幅 191 を保つ。 */
 html:root .guideFooter button[data-variant='secondary'][class][class][class] {
-  /* 枠の 1px ぶんだけ左右の余白を詰めて、正本の幅 191 を保つ。 */
   padding-inline: calc(var(--step-action-pad) - 1px);
-  border: 1px solid var(--color-field-border);
-  box-shadow: none;
-  color: var(--color-step-action-ink);
-  /* 正本（nRUtn / I4ipmc）の副操作の字は 600。上の強い口の 700 をここで戻す。 */
-  font-weight: var(--step-action-weight-sub);
-}
-
-/*
- * 段の「ガイドで開く」。文字を描く子は共通 TextLink の `.label` で、
- * そちらは層の外の `:root .label` で 12/500 を指定している。
- * 共通CSSは触らず、`html:root .link span` で強さを上げて正本の 14（SP13）/700 にする。
- */
-html:root .link span {
-  font-size: var(--step-link-text);
-  font-weight: 700;
 }
 
 /*
@@ -303,4 +263,11 @@ html:root .link span {
 .link {
   flex-shrink: 0;
   white-space: nowrap;
+  /*
+   * 段の「ガイドで開く」の字は正本（PC14 / SP13・700）。
+   * 文字を描く子は共通 TextLink の `.label` なので、
+   * 所有部品側の `emphasis="row-step"` へ値だけを渡す。
+   */
+  --text-link-row-step-size: var(--step-link-text);
+  --text-link-row-step-weight: var(--step-action-weight);
 }
