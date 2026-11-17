@@ -435,7 +435,8 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
   })
 
   it('決まり2：下書きも予約済みも確認してから削除する', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z'))
     try {
       deleteBroadcast.mockClear()
       // 前の試験の検索語（URL に置かれる）を外す。
@@ -456,6 +457,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
       clickMenuItem('削除する')
       await flush()
       expect(document.body.textContent).toContain('「未購入者フォロー」を削除しますか？')
+      expect(document.querySelector('[role="alertdialog"] h2')?.textContent).toBe('「未購入者フォロー」を削除しますか？')
       expect([...host.querySelectorAll('tr')].some((tr) => tr.textContent?.includes('未購入者フォロー'))).toBe(true)
       await act(async () => { vi.advanceTimersByTime(5100) })
       expect(deleteBroadcast).not.toHaveBeenCalled()
@@ -467,7 +469,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
       openMenuOf('8月キャンペーンのお知らせ')
       clickMenuItem('削除する')
       await flush()
-      expect(document.body.textContent).toContain('を削除しますか？')
+      expect(document.querySelector('[role="alertdialog"] h2')?.textContent).toBe('「8月キャンペーンのお知らせ」を削除しますか？')
     } finally {
       vi.useRealTimers()
     }
