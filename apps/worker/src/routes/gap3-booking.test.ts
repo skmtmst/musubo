@@ -244,3 +244,12 @@ test('G4-21: 指定した担当に当日の予約がなければ空の一覧を�
  const other=await gapCall(app(),'/api/booking/admin/today?account_id=a&staff_id=bs2');expect((await other.json() as any).bookings.map((b:any)=>b.id)).toEqual([rows[1].id]);
  const r=await gapCall(app(),'/api/booking/admin/today?account_id=a&staff_id=bs');expect(r.status).toBe(200);expect((await r.json() as any).bookings).toEqual([]);
 });
+
+test('B5-10: 組取消の前に全員のキャンセル料と合計を返す',async()=>{
+ const made=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'quote-group');expect(made.status).toBe(201);const data=(await made.json() as any).data;
+ const policy=JSON.stringify({enabled:true,tiers:[{beforeHours:24,percent:0},{beforeHours:0,percent:50}],noShowPercent:100,version:1});d.raw.prepare('UPDATE bookings SET policy_snapshot_json=? WHERE group_id=?').run(policy,data.groupId);
+ vi.setSystemTime(new Date('2026-11-20T00:00:00Z'));const quote=await gapCall(app(),`/api/booking/admin/groups/${data.groupId}/cancellation-quote?account_id=a`);expect(quote.status).toBe(200);
+ expect((await quote.json() as any).data).toMatchObject({version:1,totalFee:8400,members:[{feeNow:4200},{feeNow:4200}]});
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM bookings WHERE status='confirmed'").get()).toEqual({n:2});
+ expect((await gapCall(app(),`/api/booking/admin/groups/${data.groupId}/cancellation-quote?account_id=b`)).status).toBe(403);expect(fetch).not.toHaveBeenCalled();
+});

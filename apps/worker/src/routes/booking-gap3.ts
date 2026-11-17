@@ -46,6 +46,12 @@ export async function groupView(db:D1Database,a:string,id:string){
  const rows=(await db.prepare('SELECT b.*,m.name menu_name,s.name staff_name FROM bookings b JOIN menus m ON m.id=b.menu_id LEFT JOIN staff s ON s.id=b.staff_id WHERE b.group_id=? AND b.line_account_id=? ORDER BY b.group_index,b.id').bind(id,a).all<Record<string,unknown>>()).results;
  return {groupId:g.id,ownerName:g.display_name,version:g.version,members:rows.map(b=>({bookingId:b.id,personName:b.person_label,label:b.person_label,menuName:b.menu_name,staffName:b.staff_name,startsAt:b.starts_at,endsAt:b.ends_at,status:b.status,version:b.lock_version}))};
 }
+async function groupCancellationQuote(db:D1Database,account:string,id:string){
+ const group=await groupView(db,account,id),now=new Date();
+ const members=await Promise.all(group.members.filter(m=>['requested','confirmed'].includes(String(m.status))).map(async m=>({bookingId:m.bookingId,version:m.version,status:m.status,...await bookingCancellationQuote(db,String(m.bookingId),account,now)})));
+ return {version:group.version,members,totalFee:members.reduce((sum,m)=>sum+m.feeNow,0)};
+}
+bookingGap3.get('/api/booking/admin/groups/:id/cancellation-quote',async c=>{const a=await gapAccount(c);return c.json({success:true,data:await groupCancellationQuote(c.env.DB,a,c.req.param('id'))});});
 bookingGap3.get('/api/booking/admin/bookings/:id/group',async c=>{const a=await gapAccount(c),b=await book(c,a);return c.json({success:true,data:b.group_id?await groupView(c.env.DB,a,String(b.group_id)):null});});
 bookingGap3.get('/api/booking/admin/bookings/:id/series',async c=>{
  const a=await gapAccount(c),b=await book(c,a);return c.json({success:true,data:b.series_id?{series:await c.env.DB.prepare('SELECT * FROM booking_series WHERE id=? AND line_account_id=?').bind(b.series_id,a).first(),bookings:(await c.env.DB.prepare('SELECT * FROM bookings WHERE series_id=? AND line_account_id=? ORDER BY series_index').bind(b.series_id,a).all()).results}:null});
@@ -82,6 +88,11 @@ bookingGap3.get('/api/liff/booking/cost-estimate',async c=>{
 });
 
 async function self(c:Context<Env>){const a=await resolveAccountIdFromLiff(c),u=await verifyCallerLineUserId(c,a??undefined);if(!a||!u)throw new GapError('unauthorized',401);const f=await resolveFriendId(c,u,a);if(!f)throw new GapError('not_found',404);return {a,f};}
+bookingGap3.get('/api/liff/booking/groups/:id/cancellation-quote',async c=>{
+ const {a,f}=await self(c),id=c.req.param('id');
+ if(!await c.env.DB.prepare('SELECT id FROM booking_groups WHERE id=? AND line_account_id=? AND friend_id=?').bind(id,a,f).first())throw new GapError('not_found',404);
+ return liffBookingJson(c,{success:true,data:await groupCancellationQuote(c.env.DB,a,id)});
+});
 bookingGap3.get('/api/liff/booking/group-availability',async c=>{
  const {a,f}=await self(c);let members:unknown;try{members=JSON.parse(c.req.query('members')??'null');}catch{throw new GapError('invalid_members');}
  return liffBookingJson(c, {success:true,data:await previewParty(c.env.DB,a,await partyInput(c.env.DB,a,f,members),c.req.query('startMode')??'parallel',c.req.query('from')??'',c.req.query('to')??c.req.query('from')??'',c.env)});
