@@ -128,3 +128,16 @@ test('飲食の4面は、フォームと同じ店の予約履歴へつなぎ、�
   expect(pending.map(button=>button.label)).toEqual(buttons.map(button=>button.label));
   expect(pending[1]).toMatchObject({actionData:'',ready:false});
 });
+
+test('スタイルを後で選ぶ店は、選択後にも初期セットを重複なく受け取る', async () => {
+  await initializeAccountStyle(f.db, 'a', DEFAULT_TENANT_ID, 'owner');
+  const pending = await profile(f.db, 'a');
+  expect(pending!.selection_mode).toBe('later');
+  await saveProfile(f.db, 'a', DEFAULT_TENANT_ID, 'owner', { expectedVersion: pending!.version, style: 'salon', answers: { booking: { mode: 'configured', value: true } } });
+  const selected = await profile(f.db, 'a');
+  expect(selected!.selection_mode).toBe('configured');
+  const items = f.raw.prepare("SELECT item_key FROM style_starter_items WHERE line_account_id='a' ORDER BY item_key").all() as Array<{item_key:string}>;
+  expect(items.some(item => item.item_key === 'booking')).toBe(true);
+  expect(new Set(items.map(item => item.item_key)).size).toBe(items.length);
+  expect(starterRows()).toHaveLength(1);
+});

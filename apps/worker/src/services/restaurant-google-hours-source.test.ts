@@ -17,18 +17,8 @@ function profile(): GoogleProfile {
   };
 }
 let database: SqliteD1;
-/*
-  この検査は 2026-11-16（月）の時間帯を使う。電話受付は過去の時刻を断るので、
-  実時間がその日を過ぎると結果が変わってしまう。時計をその前の金曜に固定して、
-  いつ走らせても同じ結果にする。
-*/
-beforeEach(() => {
-  vi.useFakeTimers({ shouldAdvanceTime: true });
-  vi.setSystemTime(new Date('2026-11-13T00:00:00Z'));
-  database = createTestD1();
-  seedRestaurantFixture(database);
-});
-afterEach(() => { database.raw.close(); vi.useRealTimers(); });
+beforeEach(() => { database = createTestD1(); seedRestaurantFixture(database); });
+afterEach(() => { vi.useRealTimers(); database.raw.close(); });
 
 function connection(status = 'connected', selectedLocation = location) {
   database.raw.prepare(`INSERT INTO rt_google_connections
@@ -81,6 +71,8 @@ it('別のGoogle店舗の写しは使わない', async () => {
 });
 
 it('電話受付もGoogleの通常時間と特別休業日を守る', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-15T00:00:00Z'));
   const value = profile();
   connection();
   cached(value);
@@ -95,6 +87,8 @@ it('電話受付もGoogleの通常時間と特別休業日を守る', async () =
 });
 
 it('前日から続くGoogleの深夜営業でも電話受付できる', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-15T00:00:00Z'));
   const value = profile();
   value.regularHours.MONDAY = [{ open: '23:00', close: '02:00' }];
   connection();
