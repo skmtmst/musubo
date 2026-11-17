@@ -467,6 +467,8 @@
 
 ## 反映履歴
 
+- [振替と問い合わせ通知の修正](release-log/unreleased/PR-kenta-gapfix.md) — 反映履歴、確認 2026-11-17。
+
 - [列車：試験だけの4本](release-log/unreleased/102-kenta-train-tests.md) — まとめて入れた試験の履歴。確認 2026-11-17。
 
 - [欠席と振替の動きを確認](release-log/unreleased/101-kenta-gaptest-b1.md) — 反映履歴、確認 2026-11-16。
