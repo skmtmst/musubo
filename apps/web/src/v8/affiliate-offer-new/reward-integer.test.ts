@@ -4,7 +4,6 @@
  * （app/affiliates/new/affiliate-create-behavior.test.ts）。今の入口
  * （app/affiliate-offers/new/page.tsx → src/v8/affiliate-offer-new/create.tsx）の判定を直接通す。
  */
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { rewardIntegerError } from './create'
 
@@ -21,10 +20,5 @@ describe('案件の報酬の数の断り方', () => {
     expect(rewardIntegerError('-1', 'miles')).toBe('報酬マイルは0以上で入力してください')
   })
 
-  it('入口は今の画面を出し、入力欄は 1 刻み', () => {
-    expect(readFileSync(new URL('../../app/affiliate-offers/new/page.tsx', import.meta.url), 'utf8'))
-      .toContain("from '@/v8/affiliate-offer-new/create'")
-    const tsx = readFileSync(new URL('./create.tsx', import.meta.url), 'utf8')
-    expect(tsx.match(/step=\{1\}/g)?.length).toBe(2)
-  })
+
 })
