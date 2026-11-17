@@ -285,7 +285,8 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
       const seen=new Set(),parts=[]
       const collect=part=>{if(!part||seen.has(part))return;seen.add(part);parts.push(part);for(const child of part.props?.values()??[])collect(child);for(const child of part.items??[])collect(child)}
       args.forEach(collect)
-      return union(parts)
+      const result=union(parts)
+      return name==='stringify' && (args[0]?.items || args[0]?.props) ? {...result,strings:[]} : result
     }
     if(name==='require'&&args[0]?.strings.some(s=>/^(?:node:)?fs$/.test(s)))return fsModule()
     if(name==='require'&&args[0]?.strings.some(s=>/^(?:node:)?assert(?:\/strict)?$/.test(s)))return value({assert:true})
@@ -365,7 +366,7 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     if(ts.isIdentifier(call)&&scope.get(call.text).assert){matcher('toBeTruthy',false,args[0]??value(),value(),ctx,node);return value()}
     const raw=union([receiver,...args])
     if(raw.reads.length){emit(ctx,node,raw,value(),'unknown-source-consumer');return raw}
-    if(args.some(arg=>arg.strings.some(target)))return read(union(args),ctx,node)
+    for(const arg of args)if(!arg.items&&!arg.props&&!arg.collection&&arg.strings.some(target))return read(value({strings:args.flatMap(v=>v.items||v.props||v.collection?[]:v.strings)}),ctx,node)
     return value()
   }
   const load = file => {
