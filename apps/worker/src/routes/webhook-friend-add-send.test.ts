@@ -9,6 +9,7 @@ import { Hono } from 'hono';
 import type Database from 'better-sqlite3';
 import type { Env } from '../worker-env.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 import { publishScenarioVersion } from '@line-crm/db';
 import { isFriendAddResendSuppressed } from '../features/friends/friend-add-routing.js';
 
@@ -706,6 +707,20 @@ describe('POST /webhook — クーポン本文の送信も直前の関門をく�
     ).length;
   }
 
+  test('クーポン本文の未解決の共通情報は送らず失敗に残す', async () => {
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T01:00:00Z'));useSqliteClock(raw,()=>new Date());
+    try {
+      enableCoupon();
+      raw.prepare("UPDATE account_settings SET value=json_set(value,'$.messageTemplate',?) WHERE key='nen.friend_add_coupon'")
+        .run('案内 {{var.hours}} コード {coupon_code} 期限 {expires_on}');
+      eccubeMocks.createEccubeCoupon.mockResolvedValue(undefined);
+      await postFollow('coupon-var-missing',db,EC_ENV);
+      expect(lineClientMocks.pushMessage.mock.calls.some(call=>JSON.stringify(call[1]).includes('コード'))).toBe(false);
+      expect(raw.prepare("SELECT source_kind,source_id,var_key,reason FROM common_var_resolution_failures WHERE source_id='friend_add_coupon'").all())
+        .toEqual([{source_kind:'notification',source_id:'friend_add_coupon',var_key:'hours',reason:'missing'}]);
+    } finally {vi.useRealTimers();}
+  });
+
   test('クーポン作成中に予約を奪われたら、本文を送らない', async () => {
     enableCoupon();
     // 作成（外部API）の最中に、別の実行が予約を奪う。
@@ -915,6 +930,18 @@ describe('POST /webhook — 流入リンクの案内の共通情報 (N-189)', ()
   });
 });
 
+
+test('初回テキストに未解決の共通情報があれば送らない', async () => {
+  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T01:00:00Z'));useSqliteClock(raw,()=>new Date());
+  try {
+    raw.prepare("UPDATE friend_add_rule_versions SET status='draft' WHERE id='version-1'").run();
+    raw.prepare(`INSERT INTO friend_add_rule_versions(id,rule_id,version_number,definition_snapshot,status) SELECT 'text-version','rule-1',2,json_set(definition_snapshot,'$.messageType','text','$.messageText','こんにちは {{var.shop}}','$.scenarioId',NULL),'published' FROM friend_add_rule_versions WHERE id='version-1'`).run();
+    raw.prepare("UPDATE friend_add_rules SET current_version_id='text-version' WHERE id='rule-1'").run();
+    await postFollow('direct-var-missing');
+    expect(lineClientMocks.pushMessage).not.toHaveBeenCalled();
+    expect(raw.prepare("SELECT var_key,reason FROM common_var_resolution_failures").all()).toEqual([{var_key:'shop',reason:'missing'}]);
+  } finally {vi.useRealTimers();}
+});
 
 test('公開した初回のテキストを共通情報を解決して1回だけ送り、送信履歴を残す', async () => {
   raw.prepare(`UPDATE friend_add_rule_versions SET status='draft' WHERE id='version-1'`).run();

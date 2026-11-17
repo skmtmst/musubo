@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { emptyLayout } from '@line-crm/shared';
+import { publishFormVersion } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 const observed = vi.hoisted(()=>vi.fn());
@@ -10,6 +11,7 @@ vi.mock('../services/line-proxy-send.js',()=>({pushViaHarnessProxy:vi.fn(async()
 vi.mock('../services/operator-notification-dispatch.js',()=>({dispatchOperatorEvent:vi.fn(async()=>{})}));
 vi.mock('../services/event-bus.js',()=>({fireOutgoingWebhooks:vi.fn(async()=>{}),fireEvent:vi.fn(async()=>{})}));
 const {forms}=await import('./forms.js');
+const {pushViaHarnessProxy}=await import('../services/line-proxy-send.js');
 let fixture:SqliteD1;
 beforeEach(()=>{
   fixture=createTestD1();observed.mockReset();vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('real transport forbidden')}));
@@ -30,6 +32,18 @@ async function submit(){
   const res=await app.request('/api/forms/form/submit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer fake','Idempotency-Key':'aaaaaaaa-1111-4333-8444-111111111111'},body:JSON.stringify({data:{name:'新しい値'}})},{DB:fixture.db,LINE_CHANNEL_ACCESS_TOKEN:'fake',WORKER_URL:'https://fake.test'} as Env['Bindings'],{waitUntil:(p:Promise<unknown>)=>pending.push(p),passThroughOnException:()=>{},props:{}} as ExecutionContext);
   await Promise.all(pending);return res;
 }
+test('回答後の返信は未解決の共通情報を送らない',async()=>{
+  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T01:00:00Z'));
+  try{
+    vi.mocked(pushViaHarnessProxy).mockClear();
+    fixture.raw.prepare("UPDATE forms SET on_submit_message_type='text',on_submit_message_content='営業時間: {{var.hours}}',content_revision=content_revision+1 WHERE id='form'").run();
+    const row=fixture.raw.prepare("SELECT content_revision FROM forms WHERE id='form'").get() as {content_revision:number};
+    expect((await publishFormVersion(fixture.db,'form',row.content_revision)).kind).toBe('published');
+    await submit();
+    expect(pushViaHarnessProxy).not.toHaveBeenCalled();
+    expect(fixture.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+  }finally{vi.useRealTimers();}
+});
 test('CS-C02: 全登録先が反映されてから自動化の条件を見る',async()=>{
   expect((await submit()).status).toBe(201);
   expect(observed).toHaveBeenCalledTimes(1);

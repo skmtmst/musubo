@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createTestD1, insertFriend, type SqliteD1 } from '../../test-utils/d1-sqlite'
+import { useSqliteClock } from '../../test-utils/sqlite-clock.js'
 import {
   createScenario,
   createScenarioStep,
@@ -76,7 +77,7 @@ describe('質問の押下を版へ結びつける（実D1）', () => {
     ).map((r) => r.tag_id)
   }
 
-  async function seedPublishedQuestion(options?: { accountId?: string | null }) {
+  async function seedPublishedQuestion(options?: { accountId?: string | null; reply?: string }) {
     const scenario = await createScenario(testDb.db, { name: '案内', triggerType: 'manual' })
     if (options?.accountId !== undefined) {
       insertAccount(options.accountId!)
@@ -92,9 +93,9 @@ describe('質問の押下を版へ結びつける（実D1）', () => {
     })
     testDb.raw
       .prepare(`UPDATE scenario_steps SET question_json = ? WHERE id = ?`)
-      .run(question('公開時の返信'), step.id)
+      .run(question(options?.reply ?? '公開時の返信'), step.id)
 
-    insertFriend(testDb.raw, 'friend-1', { line_user_id: 'U-friend-1' })
+    insertFriend(testDb.raw, 'friend-1', { line_user_id: 'U-friend-1', ...(options?.accountId ? {line_account_id:options.accountId} : {}) })
     await publishScenarioVersion(testDb.db, scenario.id, {
       staffId: null,
       idempotencyKey: 'q-k1',
@@ -137,6 +138,24 @@ describe('質問の押下を版へ結びつける（実D1）', () => {
   // ---------------------------------------------------------------
   // 2. 版の写しから実行する
   // ---------------------------------------------------------------
+
+  it('質問の返信は未解決の共通情報を送らず、登録後は値を入れる', async () => {
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T01:00:00Z'));useSqliteClock(testDb.raw,()=>new Date());
+    try {
+      const {scenario,versionStepId}=await seedPublishedQuestion({accountId:'account',reply:'営業時間: {{var.hours}}'});
+      const {replied,client}=replyHarness();
+      const answer=(friendId:string)=>handleQuestionAnswer(testDb.db,client as never,{id:friendId,line_user_id:'U-'+friendId},
+        {kind:'version',stepId:versionStepId,choiceIndex:0},'reply-token');
+      await answer('friend-1');
+      expect(replied).toEqual([]);
+      expect(testDb.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+      testDb.raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES('hours','account','営業時間','hours','text','10時')").run();
+      insertFriend(testDb.raw,'friend-2',{line_user_id:'U-friend-2',line_account_id:'account'});
+      await enrollFriendInScenario(testDb.db,'friend-2',scenario.id);
+      await answer('friend-2');
+      expect(replied).toEqual(['営業時間: 10時']);
+    } finally {vi.useRealTimers()}
+  })
 
   it('下書きの通を消してもボタンが効く（版の写しから答える）', async () => {
     const { step, versionStepId } = await seedPublishedQuestion()
