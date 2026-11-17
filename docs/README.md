@@ -467,7 +467,7 @@
 
 ## 反映履歴
 
-- [自動確認の動作への置き換え](release-log/unreleased/PR-kenta-q02b-b8.md) — 実際の動きで確かめる試験の履歴。確認 2026-11-18。
+- [自動確認の動作への置き換え](release-log/unreleased/112-kenta-q02b-b8.md) — 実際の動きで確かめる試験の履歴。確認 2026-11-18。
 
 - [列車：試験だけの4本](release-log/unreleased/102-kenta-train-tests.md) — まとめて入れた試験の履歴。確認 2026-11-17。
 
