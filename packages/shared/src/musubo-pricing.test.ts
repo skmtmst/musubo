@@ -41,7 +41,7 @@ describe('musubo LINE pricing', () => {
     expect(linkedAccountSlots({ googleBusiness: 0, instagram: 0 })).toBe(0);
     expect(linkedAccountSlots({ googleBusiness: 2, instagram: 1 })).toBe(1);
     expect(linkedAccountSlots({ googleBusiness: 2, instagram: 3 })).toBe(2);
-    // 1枠(¥3,300)で Google・Instagram が各1個ずつ同時に増える（2026-11-16 利用者決定 Q6'）。
+    // 1枠(¥3,300)で Google・Instagram が各1個ずつ同時に増える（要件 §5 Q6'）。
     // 基本は各1個なので、各2個なら1枠、各3個なら2枠。片方だけ多くても枠は増えない。
     expect(linkedAccountSlots({ googleBusiness: 2, instagram: 2 })).toBe(1);
     expect(linkedAccountSlots({ googleBusiness: 3, instagram: 2 })).toBe(2);
