@@ -95,6 +95,17 @@
 }
 
 /*
+ * `--step-mark-ring` は共通側で「次の段の行の緑2px枠」と「丸印の内枠」の両方に使われる
+ * 共有変数（setup-step-row.module.css / progress.module.css）。上の 2px は行用で、
+ * 丸印（未了・済み）は正本（C1: brOt1 等）どおり #D1D5DB・1px のまま変えない。
+ * 行の2px継承が丸印まで届かないよう、丸印そのものの要素に 1px と正本の色を直書きで戻す。
+ */
+.card [data-step-mark] {
+  --step-mark-ring: 1px;
+  --color-step-todo-border: #d1d5db;
+}
+
+/*
  * カード外周は正本（yG81W / X1paMZ）の stroke #E5E7EB・1px・内側そろえ。
  * 共通カードは縁を影（--card-shadow）で出す作りで、ここでは影を消しているため枠が無くなる。
  * border だと中身が 2px 狭まるので、段と同じ「内側の輪郭」で描いて寸法を変えない。
