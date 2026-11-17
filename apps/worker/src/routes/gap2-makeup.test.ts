@@ -131,3 +131,12 @@ test('B3-10 B3-11: 管理者だけが理由付きで延長し、古い版は上�
  expect(d.raw.prepare('SELECT expires_at,version FROM booking_makeup_credits WHERE id=?').get(credit.id)).toEqual({expires_at:'2027-01-20T05:00:00.000Z',version:credit.version+1});
  expect(d.raw.prepare("SELECT reason,actor_principal_id FROM audit_events WHERE action='makeup.extend'").all()).toEqual([{reason:'休講',actor_principal_id:'o'}]);
 });
+
+test('B3-04: 満席なら券を保ち、予約可能な近い3回を返す',async()=>{
+ const credit=(await absence(d.db,'a','f','eb','customer')).makeupCredit as {id:string};
+ d.raw.exec(`INSERT INTO event_slots(id,event_id,starts_at,ends_at,capacity) VALUES
+ ('n1','lesson','2026-11-26T05:00:00Z','2026-11-26T06:00:00Z',1),('n2','lesson','2026-11-28T05:00:00Z','2026-11-28T06:00:00Z',1),('n3','lesson','2026-11-29T05:00:00Z','2026-11-29T06:00:00Z',1),('n4','lesson','2026-11-30T05:00:00Z','2026-11-30T06:00:00Z',1);
+ INSERT INTO event_bookings(id,line_account_id,event_id,slot_id,friend_id,status,requested_at,identity_key) VALUES('full','a','lesson','dst','f2','confirmed','2026-11-16','solo:f2');`);
+ try {await useMakeup(d.db,'a','f',credit.id,'dst','new');throw Error('expected conflict');}catch(error){expect(error).toMatchObject({code:'makeup_slot_unavailable',status:409,alternatives:[{id:'n1'},{id:'n2'},{id:'n3'}]});}
+ expect(d.raw.prepare('SELECT status FROM booking_makeup_credits WHERE id=?').get(credit.id)).toEqual({status:'open'});
+});

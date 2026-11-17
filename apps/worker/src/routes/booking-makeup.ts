@@ -2,11 +2,11 @@ import { liffBookingJson } from './liff-booking-response.js';
 import {Hono,type Context} from 'hono';
 import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapKey,gapWrite} from '../services/gap-common.js';
-import {absence,expireMakeup,makeupRule,makeupOptions,useMakeup,extendMakeup} from '../features/booking/booking-makeup/index.js';
+import {MakeupSlotUnavailable,absence,expireMakeup,makeupRule,makeupOptions,useMakeup,extendMakeup} from '../features/booking/booking-makeup/index.js';
 import {resolveAccountIdFromLiff,verifyCallerLineUserId,resolveFriendId} from './booking.js';
 import {requirePermission} from '../middleware/role-guard.js';
 export const bookingMakeup=new Hono<Env>();
-bookingMakeup.onError((e,c)=>(c.req.path.startsWith('/api/liff/') ? liffBookingJson(c, {success:false,error:e instanceof GapError?e.code:'makeup_unavailable'}, e instanceof GapError?e.status:503) : c.json({success:false,error:e instanceof GapError?e.code:'makeup_unavailable'},e instanceof GapError?e.status:503)));
+bookingMakeup.onError((e,c)=>(c.req.path.startsWith('/api/liff/') ? liffBookingJson(c, {success:false,error:e instanceof GapError?e.code:'makeup_unavailable',...(e instanceof MakeupSlotUnavailable?{alternatives:e.alternatives}:{})}, e instanceof GapError?e.status:503) : c.json({success:false,error:e instanceof GapError?e.code:'makeup_unavailable'},e instanceof GapError?e.status:503)));
 async function self(c:Context<Env>){const a=await resolveAccountIdFromLiff(c),u=await verifyCallerLineUserId(c);if(!a||!u)throw new GapError('unauthorized',401);const f=await resolveFriendId(c,u,a);if(!f)throw new GapError('not_found',404);return {a,f};}
 bookingMakeup.put('/api/events/admin/:id/makeup-rule',requirePermission('/events'),async(c)=>{
  gapWrite(c,{admin:true});const a=await gapAccount(c),b=await gapBody(c),r=makeupRule(b.rule);
