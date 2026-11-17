@@ -19,16 +19,17 @@ beforeEach(() => {
 afterEach(() => fixture.raw.close());
 function app() { const a = new Hono<Env>(); a.use('*', async (c,next) => { c.set('staff',{id:'actor',name:'管理者',role:'owner',readOnly:false}); await next(); }); a.route('/',chats); return a; }
 test('担当者名簿と友だち一覧は同じ役割で閲覧できる', async () => {
-  for (const role of ['owner', 'admin', 'staff'] as const) {
+  for (const role of ['owner', 'admin', 'staff', 'viewer'] as const) {
     const target = new Hono<Env>();
     target.use('*', async (c, next) => {
-      c.set('staff', { id: 'actor', name: '担当', role, readOnly: false });
+      // 未定義の役割を注入し、認可が拒否することも確かめる。
+      c.set('staff', { id: 'actor', name: '担当', role: role as 'owner' | 'admin' | 'staff', readOnly: false });
       await next();
     });
     target.route('/', chats);
     target.route('/', friends);
     for (const path of ['/api/operators?lineAccountId=shop-a', '/api/friends?lineAccountId=shop-a&includeTags=false']) {
-      expect((await target.request(path, {}, { DB: fixture.db })).status).toBe(200);
+      expect((await target.request(path, {}, { DB: fixture.db })).status).toBe(role === 'viewer' ? 403 : 200);
     }
   }
   const anonymous = new Hono<Env>();

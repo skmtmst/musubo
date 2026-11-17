@@ -183,7 +183,8 @@ describe('N-032 friend stats account scope integration (#664)', () => {
     try {
       testDb.raw.exec(`
         INSERT INTO staff_members(id,name,role,access_level,api_key,permission_keys,account_scope,tenant_id)
-          VALUES ('owner','管理者','owner','full','key-owner','[]','all','${DEFAULT_TENANT_ID}');
+          VALUES ('owner','管理者','owner','full','key-owner','[]','all','${DEFAULT_TENANT_ID}'),
+          ('admin','副管理者','admin','full','key-admin','[]','all','${DEFAULT_TENANT_ID}');
         INSERT INTO analytics_cross_runs(id,line_account_id,query_json,state,period_from,period_to,time_zone,data_cutoff_at,created_at)
           VALUES ('result','account-a','{}','available','2026-11-01','2026-11-16','Asia/Tokyo','2026-11-17T00:00:00.000Z','2026-11-17T00:00:00.000Z');
         INSERT INTO analytics_result_audiences(id,line_account_id,source_kind,source_result_id,selection_key,member_count,expires_at,created_at)
@@ -195,6 +196,9 @@ describe('N-032 friend stats account scope integration (#664)', () => {
       expect(response.status).toBe(200);
       const data = await response.json<FriendListResponse>();
       expect(data.data.items.map(item => item.id)).toEqual(['friend-a-1']);
+      const admin = await get(path, 'key-admin');
+      expect(admin.status).toBe(200);
+      expect((await admin.json<FriendListResponse>()).data.items.map(item => item.id)).toEqual(['friend-a-1']);
       expect((await get(path, 'key-all')).status).toBe(403);
       expect((await get(path.replace('account-a', 'account-b'), 'key-owner')).status).toBe(404);
       vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z'));
@@ -207,6 +211,7 @@ describe('N-032 friend stats account scope integration (#664)', () => {
   });
 
   it('担当と配信中シナリオで絞ってから件数とページを決める', async () => {
+    insertFriend(testDb.raw, 'friend-a-unassigned', { line_account_id: 'account-a' });
     testDb.raw.exec(`
       INSERT INTO operators(id,name,email) VALUES ('operator','担当','operator@example.test');
       INSERT INTO chats(id,friend_id,operator_id,status,created_at,updated_at) VALUES
@@ -215,7 +220,7 @@ describe('N-032 friend stats account scope integration (#664)', () => {
       INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES ('scenario','案内','manual','account-a');
       INSERT INTO friend_scenarios(id,friend_id,scenario_id,status) VALUES
         ('fs1','friend-a-1','scenario','active'),('fs2','friend-a-2','scenario','delivering'),
-        ('fs3','friend-b-1','scenario','completed');
+        ('fs3','friend-b-1','scenario','completed'),('fs4','friend-a-unassigned','scenario','active');
     `);
     const path = '/api/friends?lineAccountId=account-a&operatorId=operator&scenarioId=scenario&limit=1&includeTags=false';
     const first = await (await get(path + '&offset=0', 'key-all')).json<FriendListResponse>();

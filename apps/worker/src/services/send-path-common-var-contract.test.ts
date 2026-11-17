@@ -83,7 +83,10 @@ const LINE_SEND_PATTERN =
 // routes/auto-reply-unmatched.test.ts / features/forms/form-layout-effects.test.ts /
 // routes/friend-add-rules-f12-test-send.test.ts / features/automations/automation-action-executors.test.ts /
 // features/rich-menus/rich-menu-tap.test.ts / services/dedup-broadcast.test.ts /
-// routes/chats-send-interpolation.test.ts と services/scheduled-chat-sends.test.ts
+// routes/chats-send-interpolation.test.ts と services/scheduled-chat-sends.test.ts、
+// carousel-tap-common-vars / scenario-test-send / auto-reply-runs / event-bus /
+// reminder-delivery / immediate-first-step-pinned / broadcast-wide-context /
+// broadcast-common-var-validity / operator-notification-dispatch / step-delivery-pinned
 const BEHAVIOR_TESTED = new Set([
   'features/auto-replies/auto-reply-unmatched.ts',
   'features/forms/form-layout-effects.ts',
@@ -92,6 +95,16 @@ const BEHAVIOR_TESTED = new Set([
   'features/rich-menus/rich-menu-tap.ts',
   'services/dedup-broadcast.ts',
   'services/manual-send-interpolation.ts',
+  'services/carousel-tap.ts',
+  'features/scenarios/scenario-test-send.ts',
+  'features/auto-replies/auto-reply.ts',
+  'services/event-bus.ts',
+  'services/reminder-delivery.ts',
+  'services/immediate-first-step.ts',
+  'features/broadcasts/broadcast-wide-context.ts',
+  'features/broadcasts/broadcast.ts',
+  'services/operator-notification-dispatch.ts',
+  'services/step-delivery.ts',
 ]);
 
 describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () => {
