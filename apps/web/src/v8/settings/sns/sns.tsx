@@ -367,13 +367,15 @@ export default function SnsSettingsPage() {
     <>
       <p className={styles.listTitle}>{connected ? 'できること' : 'つなぐとできること'}</p>
       <ul className={styles.checks}>
-        {CAPABILITIES[service].map((text) => <li key={text}><Check size={16} aria-hidden />{text}</li>)}
+        {CAPABILITIES[service].map((text) => <li key={text}><Check size={16} aria-hidden className={styles.checkMark} />{text}</li>)}
       </ul>
     </>
   )
 
-  const googleBadge = visibleGoogleError || !visibleGoogle ? null : GOOGLE_CONNECTION_STATUS[visibleGoogle.connection.status] ?? GOOGLE_CONNECTION_STATUS.disconnected
-  const igBadge = igState ? INSTAGRAM_CONNECTION_STATUS[igState] : null
+  /* 札そのものではなく、共通部品 StatusBadge へ渡す状態の値（文言と色）だけを選ぶ。
+     札の見た目は StatusBadge が持ち、この画面では作らない。 */
+  const googleStatusLabel = visibleGoogleError || !visibleGoogle ? null : GOOGLE_CONNECTION_STATUS[visibleGoogle.connection.status] ?? GOOGLE_CONNECTION_STATUS.disconnected
+  const igStatusLabel = igState ? INSTAGRAM_CONNECTION_STATUS[igState] : null
 
   return (
     <SaveErrorScope errors={saveErrors}><PageFrame kind="settings" boardId="y3GGTs">
@@ -398,7 +400,7 @@ export default function SnsSettingsPage() {
         {actionError && !removePlan && !addPlan ? <Notice tone="danger">{actionError}</Notice> : null}
 
         <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="sns-google-title">
-          {cardHead('googleBusiness', slots.googleBusiness, googleBadge, 'sns-google-title')}
+          {cardHead('googleBusiness', slots.googleBusiness, googleStatusLabel, 'sns-google-title')}
           {!accountId ? (
             <ListState kind="empty" title="LINEアカウントを選んでください" description="画面右上で接続先のLINEアカウントを選んでください。" />
           ) : visibleGoogleError ? (
@@ -463,7 +465,7 @@ export default function SnsSettingsPage() {
         </Card>
 
         <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="sns-instagram-title">
-          {cardHead('instagram', slots.instagram, igBadge, 'sns-instagram-title')}
+          {cardHead('instagram', slots.instagram, igStatusLabel, 'sns-instagram-title')}
           {!accountId ? (
             <ListState kind="empty" title="LINEアカウントを選んでください" description="画面右上で接続先のLINEアカウントを選んでください。" />
           ) : visibleInstagramError ? (

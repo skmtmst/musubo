@@ -80,7 +80,7 @@
 
 /* 2件目以降の行の上にだけ線を引く（箱の角を線で切らない）。 */
 .conn + .conn {
-  box-shadow: inset 0 1px 0 var(--color-divider);
+  box-shadow: var(--tpl-e1-sns-conn-divider);
 }
 
 /* 行の1段目：接続の名前・状態の札・（余白）・この行の操作。 */
@@ -172,7 +172,8 @@
   min-width: 0;
 }
 
-.checks svg {
+/* 「できること」の行頭のチェック印。印自身に組を付け、親から子の形を塗らない。 */
+.checkMark {
   flex: none;
   width: var(--tpl-e1-sns-can-mark-w);
   color: var(--color-action);
