@@ -148,6 +148,7 @@ describe('リマインダ下書きのAPI契約', () => {
       method: 'POST', body: JSON.stringify({ targetDate: 'not-a-date' }),
     })
     expect(invalid.status).toBe(400)
+    expect(await invalid.json()).toMatchObject({ error: '基準日が正しくありません' })
     expect(draftMocks.previewReminderDraft).not.toHaveBeenCalled()
 
     const response = await request('/api/reminders/reminder-1/preview', {
@@ -159,6 +160,26 @@ describe('リマインダ下書きのAPI契約', () => {
       expect.objectContaining({ lineAccountId: 'account-1' }),
       new Date('2026-09-10T00:00:00.000Z'),
     )
+  })
+
+  it('基準日の省略と null は固定した現在から7日後を使う', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-03T10:00:00.000Z'))
+    try {
+      for (const body of [{}, { targetDate: null }]) {
+        draftMocks.previewReminderDraft.mockClear()
+        const response = await request('/api/reminders/reminder-1/preview', {
+          method: 'POST', body: JSON.stringify(body),
+        })
+        expect(response.status).toBe(200)
+        expect(draftMocks.previewReminderDraft).toHaveBeenCalledWith(
+          expect.anything(), expect.objectContaining({ lineAccountId: 'account-1' }),
+          new Date('2026-09-10T10:00:00.000Z'),
+        )
+      }
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('テスト送信は冪等キーを必須にし、結果を版へ記録する', async () => {
