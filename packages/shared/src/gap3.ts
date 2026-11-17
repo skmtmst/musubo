@@ -10,12 +10,13 @@ export interface StoreComparisonRow {accountId:string;name:string;style:string|n
 export interface StoreComparisonResult {rows:StoreComparisonRow[];average:Record<StoreComparisonKey,number|null>;total:number;computedAt:string|null}
 export type HqAttentionKind = 'unhandledChats'|'pendingBookings'|'unpaid'|'connections'|'stoppedDeliveries';
 export type HqAttentionCounts = Record<HqAttentionKind, number>;
+export type HqOverdueAttention = { status:'enabled'; overdueCount:number|null; uncertainCount:number; href:string } | { status:'disabled'; overdueCount:null; uncertainCount:null; href:string };
 export interface StoreComparisonDay { date:string; values:Record<StoreComparisonKey,number|null>; state:'ready'|'partial'|'failed'|'missing' }
 export interface StoreComparisonDetail {
  accountId:string; style:string|null; computedAt:string|null; coveredDays:number; periodDays:number; values:Record<StoreComparisonKey,number|null>;
  trend:StoreComparisonDay[];
  recentBroadcasts:Array<{id:string;title:string;status:string;sent_at:string|null}>;
- attention:{status:'ready';counts:HqAttentionCounts;targets:Partial<Record<HqAttentionKind,Array<{href:string;count:number}>>>}|{status:'unavailable';counts:null};
+ attention:{status:'ready';counts:HqAttentionCounts;overdue:HqOverdueAttention;targets:Partial<Record<HqAttentionKind,Array<{href:string;count:number}>>>}|{status:'unavailable';counts:null};
 }
 export type AutoLineKind='cart'|'browse'|'restock';
 export interface AutoLineRule {kind:AutoLineKind;enabled:boolean;waitMinutes:number;messages:unknown[];version:number;testMode:true}

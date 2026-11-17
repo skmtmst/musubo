@@ -288,6 +288,7 @@ styles.get('/api/hq/style-attention', async (c) => {
     style: byId.get(account.id)?.style ?? 'standard',
     name: byId.get(account.id)?.name ?? '',
     counts: attention[index].counts,
+    overdue: attention[index].overdue,
     details: attention[index].details,
   }));
   return c.json({

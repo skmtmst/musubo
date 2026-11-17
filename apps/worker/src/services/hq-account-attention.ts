@@ -15,13 +15,20 @@ export async function readAccountAttention(
     stoppedDeliveries: `SELECT id,'/broadcasts' href FROM broadcasts WHERE line_account_id=? AND status IN('stopped','failed')`,
   };
 
+  const now = new Date().toISOString();
   const entries = Object.entries(queries);
   const statements = entries.flatMap(([kind, sql]) => {
     const bindings = Array.from(
       { length: kind === 'pendingBookings' ? 3 : 1 },
       () => a,
     );
-    const count = db.prepare(`SELECT COUNT(*) count FROM (${sql})`).bind(...bindings);
+    const count = kind === 'unhandledChats'
+      ? db.prepare(`SELECT COUNT(*) count,
+        (SELECT COALESCE(MAX(sla_enabled),0) FROM inbox_routing_settings WHERE account_id=?) enabled,
+        (SELECT COUNT(*) FROM chats c JOIN friends f ON f.id=c.friend_id WHERE f.line_account_id=? AND c.pending_since IS NOT NULL AND c.first_response_at IS NULL AND c.status!='resolved' AND julianday(c.sla_due_at)<=julianday(?)) overdue,
+        (SELECT COUNT(*) FROM chats c JOIN friends f ON f.id=c.friend_id WHERE f.line_account_id=? AND c.pending_since IS NOT NULL AND c.first_response_at IS NULL AND c.status!='resolved' AND julianday(c.sla_due_at) IS NULL) missing
+        FROM (${sql})`).bind(a, a, now, a, ...bindings)
+      : db.prepare(`SELECT COUNT(*) count FROM (${sql})`).bind(...bindings);
     if (includeDetails) {
       return [count, db.prepare(sql + ` LIMIT ${detailLimit}`).bind(...bindings)];
     }
@@ -52,5 +59,9 @@ export async function readAccountAttention(
       );
     }
   });
-  return { counts: counts as HqAttentionCounts, details, targets };
+  const sla = results[0].results[0] as { enabled: number; overdue: number; missing: number };
+  const overdue = sla.enabled
+    ? { status: 'enabled' as const, overdueCount: sla.missing ? null : sla.overdue, uncertainCount: sla.missing, href: '/chats' }
+    : { status: 'disabled' as const, overdueCount: null, uncertainCount: null, href: '/chats' };
+  return { counts: counts as HqAttentionCounts, details, targets, overdue };
 }

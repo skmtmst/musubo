@@ -69,11 +69,11 @@ test('複数アカウントの名前・スタイル・件数と先頭の行き�
   expect(Object.keys(response.data).sort()).toEqual(['asOf', 'items']);
   expect(Number.isFinite(Date.parse(response.data.asOf))).toBe(true);
   expect(response.data.items).toEqual([
-    { accountId: 'a', name: '店', style: 'salon',
+    { accountId: 'a', name: '店', style: 'salon', overdue: { status: 'disabled', overdueCount: null, uncertainCount: null, href: '/chats' },
       counts: { unhandledChats: 2, pendingBookings: 2, unpaid: 1, connections: 1, stoppedDeliveries: 0 },
       details: { unhandledChats: [{ id: expect.stringMatching(/^(first|second)$/), href: '/chats' }], pendingBookings: [{ id: 'requested', href: '/booking/bookings' }],
         unpaid: [{ id: 'payment' }], connections: [{ id: 'bad', href: '/accounts' }], stoppedDeliveries: [] } },
-    { accountId: 'a2', name: '二号店', style: 'standard',
+    { accountId: 'a2', name: '二号店', style: 'standard', overdue: { status: 'disabled', overdueCount: null, uncertainCount: null, href: '/chats' },
       counts: { unhandledChats: 1, pendingBookings: 1, unpaid: 0, connections: 0, stoppedDeliveries: 0 },
       details: { unhandledChats: [{ id: 'another', href: '/chats' }], pendingBookings: [{ id: 'booking-a2', href: '/events/bookings' }],
         unpaid: [], connections: [], stoppedDeliveries: [] } },
@@ -182,3 +182,24 @@ test('統括のトーク数と受信箱の状態別数は友だちの所属で�
     {href:'/chats?status=unread',count:1}, {href:'/chats?status=in_progress',count:1}, {href:'/chats?status=on_hold',count:1},
   ]));
 })
+
+
+test('期限は保存値だけを読み、不明な期限があれば件数を確定しない', async () => {
+  chat('late'); chat('missing'); chat('done', 'a', 'resolved');
+  d.raw.exec(`INSERT INTO inbox_routing_settings(account_id,sla_enabled,updated_at) VALUES('a',1,'now');
+    UPDATE chats SET pending_since='2026-01-01',sla_due_at='2026-01-02' WHERE id IN ('late','done');
+    UPDATE chats SET pending_since='2026-01-01' WHERE id='missing'`);
+  const before = d.raw.prepare('SELECT * FROM chats ORDER BY id').all();
+  const batch = vi.spyOn(d.db, 'batch');
+  const partial = await readAccountAttention(d.db, 'a');
+  expect(partial.overdue).toMatchObject({status:'enabled',overdueCount:null,uncertainCount:1});
+  expect(partial.counts.unhandledChats).toBe(2);
+  expect(batch).toHaveBeenCalledTimes(1);
+  expect(d.raw.prepare('SELECT * FROM chats ORDER BY id').all()).toEqual(before);
+  d.raw.exec("UPDATE chats SET sla_due_at='invalid' WHERE id='missing'");
+  expect((await readAccountAttention(d.db, 'a')).overdue).toMatchObject({overdueCount:null,uncertainCount:1});
+  d.raw.exec("UPDATE chats SET sla_due_at='2099-01-01' WHERE id='missing'");
+  expect((await readAccountAttention(d.db, 'a')).overdue).toMatchObject({overdueCount:1,uncertainCount:0});
+  d.raw.exec("UPDATE inbox_routing_settings SET sla_enabled=0 WHERE account_id='a'");
+  expect((await readAccountAttention(d.db, 'a')).overdue).toMatchObject({status:'disabled',overdueCount:null});
+});
