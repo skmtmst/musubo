@@ -467,7 +467,7 @@
 
 ## 反映履歴
 
-- [自動確認で見本のデータを読み込みと取り違える問題を修正](release-log/unreleased/PR-kenta-quality-guard-mock.md) — 反映履歴、確認 2026-11-17。
+- [自動確認で見本のデータを読み込みと取り違える問題を修正](release-log/unreleased/106-kenta-quality-guard-mock.md) — 反映履歴、確認 2026-11-17。
 
 - [自動確認を実際の画面の動きで確認](release-log/unreleased/104-kenta-q02b-b5.md) — 反映履歴、確認 2026-11-17。
 
