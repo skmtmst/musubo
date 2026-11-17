@@ -97,6 +97,7 @@ let hidden = false
 
 beforeEach(() => {
   vi.useFakeTimers()
+  vi.setSystemTime(new Date('2026-11-17T00:00:00.000Z'))
   net.calls.length = 0
   net.handler = respond
   state.clear()
@@ -153,6 +154,43 @@ async function setVisibility(next: boolean) {
 }
 
 describe('メール会話の実React動作(#630)', () => {
+  it('前の会話の遅い返事で、選び直した会話を上書きしない', async () => {
+    let resolveA: (value: unknown) => void = () => { throw new Error('未設定') }
+    state.set('B', 'unread')
+    net.handler = (url) => url === '/api/support/email/threads/A'
+      ? new Promise((resolve) => { resolveA = resolve })
+      : respond(url)
+    await render('A')
+    expect(threadCalls('A')).toBe(1)
+    await render('B')
+    expect(host.textContent).toContain('件名 B')
+    await act(async () => { resolveA(threadBody('A', 'unread', '件名 A')) })
+    expect(host.textContent).toContain('件名 B')
+    expect(host.textContent).not.toContain('件名 A')
+  })
+
+  it('同じ会話でも古い更新が新しい更新を上書きしない', async () => {
+    let resolveOld: (value: unknown) => void = () => { throw new Error('未設定') }
+    let calls = 0
+    net.handler = (url) => {
+      if (url === '/api/support/email/threads/A') {
+        calls += 1
+        if (calls === 2) return new Promise((resolve) => { resolveOld = resolve })
+        return Promise.resolve(threadBody('A', 'unread', calls === 1 ? '最初の件名' : '新しい件名'))
+      }
+      return respond(url)
+    }
+    await render('A')
+    expect(host.textContent).toContain('最初の件名')
+    await wait(5000)
+    expect(calls).toBe(2)
+    await selectStatus('in_progress')
+    expect(host.textContent).toContain('新しい件名')
+    await act(async () => { resolveOld(threadBody('A', 'unread', '古い件名')) })
+    expect(host.textContent).toContain('新しい件名')
+    expect(host.textContent).not.toContain('古い件名')
+  })
+
   it('対応済みAから未対応Bへ切り替えても、Bの会話を初回で取って読み込み中で止まらない', async () => {
     state.set('A', 'resolved')
     state.set('B', 'unread')
