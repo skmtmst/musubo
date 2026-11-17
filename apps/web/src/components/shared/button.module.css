@@ -485,6 +485,10 @@ html:root .button.button.secondary[data-presentation='step-action'] {
    */
   background: var(--color-canvas);
 }
-html:root .button.button.secondary[data-presentation='step-action']:hover:not(:disabled) {
+html:root .button.button.secondary[data-presentation='step-action']:hover:not(:disabled):not(:active) {
+  /*
+   * 押している間はこの乗せた時の面を外し、既存の押下時の面（:active、339行の口経由）に戻す。
+   * ここを付けないと、このセレクタの詳しさが既存の:active規則より勝ってしまい、押下中も乗せた時の色のままになる。
+   */
   background: var(--color-canvas-sunken);
 }
