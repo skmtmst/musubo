@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../worker-env.js';
 import { chats } from './chats.js';
+import { friends } from './friends.js';
 let fixture: SqliteD1;
 beforeEach(() => {
   fixture = createTestD1({ foreignKeys: true });
@@ -17,6 +18,27 @@ beforeEach(() => {
 });
 afterEach(() => fixture.raw.close());
 function app() { const a = new Hono<Env>(); a.use('*', async (c,next) => { c.set('staff',{id:'actor',name:'管理者',role:'owner',readOnly:false}); await next(); }); a.route('/',chats); return a; }
+test('担当者名簿と友だち一覧は同じ役割で閲覧できる', async () => {
+  for (const role of ['owner', 'admin', 'staff', 'viewer'] as const) {
+    const target = new Hono<Env>();
+    target.use('*', async (c, next) => {
+      // 未定義の役割を注入し、認可が拒否することも確かめる。
+      c.set('staff', { id: 'actor', name: '担当', role: role as 'owner' | 'admin' | 'staff', readOnly: false });
+      await next();
+    });
+    target.route('/', chats);
+    target.route('/', friends);
+    for (const path of ['/api/operators?lineAccountId=shop-a', '/api/friends?lineAccountId=shop-a&includeTags=false']) {
+      expect((await target.request(path, {}, { DB: fixture.db })).status).toBe(role === 'viewer' ? 403 : 200);
+    }
+  }
+  const anonymous = new Hono<Env>();
+  anonymous.route('/', chats);
+  anonymous.route('/', friends);
+  for (const path of ['/api/operators', '/api/friends']) {
+    expect((await anonymous.request(path, {}, { DB: fixture.db })).status).toBe(403);
+  }
+});
 test('担当の候補は選択した店で対応できるログインユーザーだけ', async () => {
   const response = await app().request('/api/operators?lineAccountId=shop-a',{}, {DB:fixture.db});
   expect(response.status).toBe(200);
