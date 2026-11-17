@@ -14,6 +14,16 @@
   --tpl-guideov-dim: #0f172a73; --tpl-guideov-ring-border: 3px solid var(--tpl-guideov-brand); --tpl-guideov-radius: 14px; --tpl-guideov-ring-shadow: 0 0 18px #00833f66;
   --tpl-guideov-balloon-w: 340px; --tpl-guideov-balloon-pad: 16px 18px; --tpl-guideov-balloon-shadow: 0 10px 28px #10182840; --tpl-guideov-balloon-offset: 8px; --tpl-guideov-balloon-bottom: 96px; --tpl-guideov-balloon-radius-sp: 14px 14px 0 0;
   --tpl-guideov-gap-4: 4px; --tpl-guideov-gap-8: 8px; --tpl-guideov-gap-10: 10px; --tpl-guideov-pill-pad: 3px 8px; --tpl-guideov-pill-bg: #e9f7ee; --tpl-guideov-text-12: 12px; --tpl-guideov-title: 14.5px; --tpl-guideov-body: 12.5px; --tpl-guideov-body-max-h: 6em;
+  --tpl-guideov-line-18: 18px;
+  /*
+    「この手順をスキップ」と「一時停止」は面も枠も持たない文字だけの操作。
+    見た目は所有部品 shared/button の `presentation="quiet-text"` が持つので、
+    ここでは枠 04-1 (dQfu4) の実値だけを渡す。高さと余白は寸法なので画面に残す。
+  */
+  --quiet-text-ink: var(--color-ink-secondary);
+  --quiet-text-size: var(--tpl-guideov-text-12);
+  --quiet-text-weight: 600;
+  --quiet-text-lh: var(--tpl-guideov-line-18);
   --tpl-guideov-bar-w: 300px; --tpl-guideov-bar-pad: 12px 16px; --tpl-guideov-bar-shadow: 0 8px 24px #10182859; --tpl-guideov-bar-pause-color: #9aa3af; --tpl-guideov-segment-h: 3px; --tpl-guideov-segment-bg: #3f3f46; --tpl-guideov-caption: 11.5px; --tpl-guideov-caption-color: #d1d5db;
   position: fixed;
   inset: 0;
@@ -88,17 +98,12 @@
   align-items: center;
 }
 
-.skip {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-guideov-text-12);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.skip:hover { text-decoration: underline; }
+/*
+  「この手順をスキップ」。寸法だけ画面が持つ。高さは中身で決まる値なので
+  共通ボタンの40を外して auto に戻す（最小の高さ32は素のボタンと同じ、
+  globals.css のタップ高さの共通規定をそのまま使う）。
+*/
+html:root .balloonFooter button[class][class][class] { height: auto; }
 
 /* ガイド帯。Pen 04-1 dkVoV。 */
 .bar {
@@ -114,7 +119,10 @@
   pointer-events: auto;
 }
 
+/* 帯の中の「一時停止」だけ色と文字の大きさを差し替える（11px は使わない:★V8境界規約）。 */
 .barHeader {
+  --quiet-text-ink: var(--tpl-guideov-bar-pause-color);
+  --quiet-text-size: var(--polish-text-note);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -127,18 +135,8 @@
   font-weight: 700;
 }
 
-.barPause {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--tpl-guideov-bar-pause-color);
-  /* 11px は使わない（★V8境界規約）。既存の最小サイズに合わせる。 */
-  font-size: var(--polish-text-note);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.barPause:hover { text-decoration: underline; }
+/* 「一時停止」の高さは寸法なので画面に残し、共通ボタンの40を外して中身の高さへ戻す。 */
+html:root .barHeader button[class][class][class] { height: auto; }
 
 /* 進み線 9本。Pen 04-1 DjaHp。 */
 .progress {

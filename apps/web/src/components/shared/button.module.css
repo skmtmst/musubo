@@ -492,3 +492,67 @@ html:root .button.button.secondary[data-presentation='step-action']:hover:not(:d
    */
   background: var(--color-canvas-sunken);
 }
+
+/*
+ * 初回ポップアップの行の主操作（承認済み Pen 枠 02 pdn85 / 枠 02b ZcmBy）。
+ * 文字の大きさ・太さ・行の高さ・丸み・地の色・押した時の面は、持ち主のここで持つ。
+ * 高さと左右の余白は画面の寸法なので、画面側（first-run-popup.module.css）に残す。
+ * 地は `background-color` だけを変える。一括指定にすると素のボタンに乗る
+ * 共通の重ね塗り（黒4%の地の画像）が消え、乗せた時の見え方が置き換え前と変わる。
+ */
+html:root .button.button[data-presentation='first-run-start'] {
+  display: flex;
+  justify-content: normal;
+  gap: var(--first-run-start-gap);
+  border: 0;
+  border-radius: var(--first-run-start-radius);
+  background-color: var(--first-run-start-bg);
+  box-shadow: none;
+  color: var(--first-run-start-ink);
+  white-space: normal;
+  font-size: var(--first-run-start-text);
+  font-weight: var(--first-run-start-weight);
+  line-height: var(--first-run-start-lh);
+}
+html:root .button.button[data-presentation='first-run-start']:not(:focus-visible) { outline: none; }
+html:root .button.button[data-presentation='first-run-start']:hover:not(:disabled) {
+  background-color: var(--first-run-start-bg-hover);
+  filter: none;
+}
+html:root .button.button[data-presentation='first-run-start']:active:not(:disabled) {
+  background-color: var(--first-run-start-bg-hover);
+  /* 置き換え前の素のボタンは押しても暗くならない。共通の暗転だけ外し、0.98倍の沈みは残す。 */
+  filter: none;
+}
+
+/*
+ * 面も枠も持たない、文字だけの控えめな操作
+ * （初回ポップアップの「あとで」枠 02 qr72l / 枠 02b VJR0w、
+ *   開店準備ガイドの「この手順をスキップ」「一時停止」枠 04-1 dQfu4）。
+ * 色・文字の大きさ・太さ・行の高さは画面の変数から読む。
+ * 高さと最小の高さは画面の寸法なので、画面側に残す。
+ */
+html:root .button.button[data-presentation='quiet-text'] {
+  display: block;
+  align-items: normal;
+  justify-content: normal;
+  gap: initial;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  box-shadow: none;
+  color: var(--quiet-text-ink);
+  white-space: normal;
+  font-size: var(--quiet-text-size);
+  font-weight: var(--quiet-text-weight);
+  line-height: var(--quiet-text-lh);
+}
+html:root .button.button[data-presentation='quiet-text']:not(:focus-visible) { outline: none; }
+/* 置き換え前と同じく、乗せた時だけ下線を引く（面の色は変えない）。 */
+html:root .button.button[data-presentation='quiet-text']:hover:not(:disabled) {
+  background-color: transparent;
+  text-decoration: underline;
+  filter: none;
+}
+html:root .button.button[data-presentation='quiet-text']:active:not(:disabled) { filter: none; }

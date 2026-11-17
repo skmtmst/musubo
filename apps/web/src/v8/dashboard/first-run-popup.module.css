@@ -34,29 +34,36 @@
   padding: var(--tpl-firstrun-scrim-pad);
 }
 
-/* 枠 02 のカード G8vBl。幅・角・影・余白は承認値を変数に置く。 */
+/*
+  枠 02 のカード G8vBl。面・掴み手・見出しの見た目は持ち主 SheetDialog が持つので、
+  ここは承認値を --sheet-* の名前で渡すだけにする（本当の性質はここに書かない）。
+  幅で変わる値は下の @media が同じ名前を書き換える。
+*/
 .card {
-  width: var(--tpl-firstrun-card-w);
-  max-width: 100%;
-  max-height: calc(100vh - var(--tpl-firstrun-card-gap-pc));
-  overflow-y: auto;
-  background: var(--color-canvas);
-  border-radius: var(--polish-radius-dialog);
-  box-shadow: var(--tpl-firstrun-card-shadow);
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-firstrun-card-gap);
-  padding: var(--tpl-firstrun-card-pad);
-}
-
-/* スマホの掴み手 iNVoW / hUSUR（PCでは出さない） */
-.grabber { display: none; }
-
-/* 枠 02 の見出し VliWA: gap16 / 中央そろえ */
-.header {
-  display: flex;
-  gap: var(--tpl-firstrun-header-gap);
-  align-items: center;
+  --sheet-w: var(--tpl-firstrun-card-w);
+  --sheet-max-w: 100%;
+  --sheet-h: auto;
+  --sheet-max-h: calc(100vh - var(--tpl-firstrun-card-gap-pc));
+  --sheet-overflow-x: visible;
+  --sheet-overflow-y: auto;
+  --sheet-bg: var(--color-canvas);
+  --sheet-radius: var(--polish-radius-dialog);
+  --sheet-shadow: var(--tpl-firstrun-card-shadow);
+  --sheet-gap: var(--tpl-firstrun-card-gap);
+  --sheet-pad: var(--tpl-firstrun-card-pad);
+  /* 見出し VliWA: gap16 / 中央そろえ。c570F: 縦 gap4。 */
+  --sheet-header-gap: var(--tpl-firstrun-header-gap);
+  --sheet-header-text-gap: var(--tpl-firstrun-gap-4);
+  /* i1Tyj: #1d1d1f 20/800。文字の塊は h24（見出しを52に収めて輪 cohVt と同じにする） */
+  --sheet-title-ink: var(--color-ink);
+  --sheet-title-size: var(--text-title);
+  --sheet-title-weight: 800;
+  --sheet-title-lh: var(--tpl-firstrun-line-20);
+  /* fX8qY: #4a5565 13/500 / 行の高さ1.6 */
+  --sheet-desc-ink: var(--color-ink-secondary);
+  --sheet-desc-size: var(--polish-text-body);
+  --sheet-desc-weight: 500;
+  --sheet-desc-lh: 1.6;
 }
 
 /* 済み数の輪 cohVt。正円で、線は主色の太線。 */
@@ -76,32 +83,6 @@
   color: var(--tpl-firstrun-brand);
   font-size: var(--tpl-firstrun-text-14);
   font-weight: 700;
-}
-
-/* c570F: 縦 gap4 */
-.headerText {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-firstrun-gap-4);
-  min-width: 0;
-}
-
-/* i1Tyj: #1d1d1f 20/800。文字の塊は h24（見出し VliWA を52に収めて輪 cohVt と同じにする） */
-.title {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-title);
-  font-weight: 800;
-  line-height: var(--tpl-firstrun-line-20);
-}
-
-/* fX8qY: #4a5565 13/500 / 行の高さ1.6 */
-.lead {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--polish-text-body);
-  font-weight: 500;
-  line-height: 1.6;
 }
 
 /* 一言はPCの言い方を既定にして、スマホ幅だけ枠02bの短い言い方へ差し替える。 */
@@ -133,8 +114,21 @@
 /* 済みの行 bnJsJ */
 .rowDone { background: var(--color-canvas); }
 
-/* 現在の行 v4LA6。薄い主色の地に、内側へ描く細線（線で高さを増やさない）。 */
+/*
+  現在の行 v4LA6。薄い主色の地に、内側へ描く細線（線で高さを増やさない）。
+  行の「ガイドで進める」pdn85 の見た目（地の色・文字・丸み・押した時）は
+  所有部品 shared/button の `presentation="first-run-start"` が持つ。
+  ここで渡すのは枠の実値だけ（共通CSSの既定は変えない）。
+*/
 .rowCurrent {
+  --first-run-start-gap: var(--tpl-firstrun-gap-6);
+  --first-run-start-radius: var(--polish-radius-control);
+  --first-run-start-bg: var(--tpl-firstrun-brand);
+  --first-run-start-bg-hover: var(--tpl-firstrun-brand-hover);
+  --first-run-start-ink: var(--color-canvas);
+  --first-run-start-text: var(--polish-text-body);
+  --first-run-start-weight: 600;
+  --first-run-start-lh: var(--tpl-firstrun-line-13);
   background: var(--tpl-firstrun-brand-bg);
   box-shadow: var(--tpl-firstrun-row-ring);
 }
@@ -196,24 +190,16 @@
   line-height: var(--tpl-firstrun-line-12);
 }
 
-/* 行の「ガイドで進める」pdn85。主色の地に白文字 pnUmf。高さは現在の行に収まる値。 */
-.rowAction {
+/*
+  行の「ガイドで進める」pdn85。寸法は画面の持ちもの。縮まず、枠の左右の余白をそのまま写す。
+  高さは中身で決まる値（枠の34）なので、共通ボタンの40を外して auto に戻す。
+  最小の高さ32は素のボタンと同じ、globals.css のタップ高さの共通規定をそのまま使う。
+*/
+html:root .rowCurrent button[class][class][class] {
   flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-firstrun-gap-6);
-  background: var(--tpl-firstrun-brand);
-  border: 0;
-  border-radius: var(--polish-radius-control);
+  height: auto;
   padding: var(--tpl-firstrun-rowaction-pad);
-  color: var(--color-canvas);
-  font-size: var(--polish-text-body);
-  font-weight: 600;
-  line-height: var(--tpl-firstrun-line-13);
-  cursor: pointer;
 }
-
-.rowAction:hover { background: var(--tpl-firstrun-brand-hover); }
 
 /* 文面は枠ごとに違う（枠02「ガイドで進める」／枠02b「進める」）。 */
 .rowActionPc { display: inline; }
@@ -228,32 +214,32 @@
   font-weight: 500;
 }
 
-/* 枠 02 の足 TTZx2: gap12 / 中央そろえ */
+/*
+  枠 02 の足 TTZx2: gap12 / 中央そろえ。
+  「あとで」 qr72l: #4a5565 13/600 の1行（h16）。面も枠も持たない文字だけの操作なので、
+  見た目は所有部品 shared/button の `presentation="quiet-text"` が持つ。
+  ここで渡すのは枠の実値（色・大きさ・太さ・行の高さ）だけ。
+*/
 .footer {
+  --quiet-text-ink: var(--color-ink-secondary);
+  --quiet-text-size: var(--polish-text-body);
+  --quiet-text-weight: 600;
+  --quiet-text-lh: var(--tpl-firstrun-line-13);
   display: flex;
   gap: var(--tpl-firstrun-gap-12);
   align-items: center;
 }
 
 /*
-  「あとで」 qr72l: #4a5565 13/600 の1行（h16）。
   足 TTZx2 は1行の高さなので、共通の button 最小高さを足に効かせない
   （効くと足が32になりカードが606を超え、注記 AtL7E の位置も下がる: 差し戻し V1）。
   文字の下の注記まで含めて押せる面は広げず、枠の実値をそのまま写す（スマホも同じ扱い）。
+  高さは寸法なので画面に残す。
 */
-.later {
-  background: none;
-  border: 0;
-  padding: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--polish-text-body);
-  font-weight: 600;
-  line-height: var(--tpl-firstrun-line-13);
+html:root .footer button[class][class][class] {
+  height: auto;
   min-height: 0;
-  cursor: pointer;
 }
-
-.later:hover { text-decoration: underline; }
 
 /* 文面は枠ごとに違う（枠02「あとで」／枠02b「あとで（下にスワイプで閉じる）」）。 */
 .laterPc { display: inline; }
@@ -282,55 +268,44 @@
   }
 
   .card {
-    width: 100%;
-    max-width: none;
+    --sheet-w: 100%;
+    --sheet-max-w: none;
     /*
       枠 02b のシート noXJA: x0 y118 w390 h782（390x900）。
       上端を画面の上から118pxの所に置くので、高さは残り全部にする。
       中身の長さで縮めない（差し戻し R3）。
     */
-    height: calc(100vh - var(--tpl-firstrun-card-gap-sp));
-    max-height: none;
-    overflow: hidden;
-    border-radius: var(--tpl-firstrun-radius-sheet);
-    gap: var(--tpl-firstrun-gap-12);
-    padding: var(--tpl-firstrun-card-pad-sp);
+    --sheet-h: calc(100vh - var(--tpl-firstrun-card-gap-sp));
+    --sheet-max-h: none;
+    --sheet-overflow-x: hidden;
+    --sheet-overflow-y: hidden;
+    --sheet-radius: var(--tpl-firstrun-radius-sheet);
+    --sheet-gap: var(--tpl-firstrun-gap-12);
+    --sheet-pad: var(--tpl-firstrun-card-pad-sp);
+    /* 掴み手 iNVoW はここで出す。棒 hUSUR は薄い灰色の丸棒。 */
+    --sheet-grabber-display: flex;
+    --sheet-grabber-w: var(--tpl-firstrun-grabber-w);
+    --sheet-grabber-h: var(--tpl-firstrun-grabber-h);
+    --sheet-grabber-color: var(--tpl-firstrun-line-grabber);
+    /* isJJM: gap12。nU2Eh: 縦 gap2。 */
+    --sheet-header-gap: var(--tpl-firstrun-gap-12);
+    --sheet-header-text-gap: var(--tpl-firstrun-gap-2);
+    /* vMdb9: 17px の1行で高さ21。見出しの塊を41に収めて isJJM の44（輪 K4fHC）に合わせる。 */
+    --sheet-title-size: var(--tpl-firstrun-title-sp);
+    --sheet-title-weight: 700;
+    --sheet-title-lh: var(--tpl-firstrun-tight);
+    /* gEPIi 12/500 行の高さ1.5 */
+    --sheet-desc-size: var(--tpl-firstrun-text-12);
+    --sheet-desc-lh: 1.5;
   }
 
-  /* 掴み手 iNVoW は中央そろえ。棒 hUSUR は薄い灰色の丸棒。 */
-  .grabber {
-    display: flex;
-    justify-content: center;
-  }
-
-  .grabberBar {
-    width: var(--tpl-firstrun-grabber-w);
-    height: var(--tpl-firstrun-grabber-h);
-    border-radius: var(--polish-radius-pill);
-    background: var(--tpl-firstrun-line-grabber);
-  }
-
-  /* isJJM: gap12 / 輪 K4fHC 44x44 / 文字 12 */
-  .header { gap: var(--tpl-firstrun-gap-12); }
-
+  /* 輪 K4fHC 44x44 / 文字 12 */
   .ring {
     width: var(--tpl-firstrun-ring-sp);
     height: var(--tpl-firstrun-ring-sp);
   }
 
   .ringText { font-size: var(--tpl-firstrun-text-12); }
-
-  /* nU2Eh: 縦 gap2 / vMdb9 17/700 / gEPIi 12/500 行の高さ1.5 */
-  .headerText { gap: var(--tpl-firstrun-gap-2); }
-
-  /* vMdb9: 17px の1行で高さ21。見出しの塊を41に収めて isJJM の44（輪 K4fHC）に合わせる。 */
-  .title {
-    font-size: var(--tpl-firstrun-title-sp);
-    font-weight: 700;
-    line-height: var(--tpl-firstrun-tight);
-  }
-
-  .lead { font-size: var(--tpl-firstrun-text-12); line-height: 1.5; }
 
   /* gEPIi「順番に進めるとLINE予約を受け付けられます」。1行に収める。 */
   .leadPc { display: none; }
@@ -362,15 +337,23 @@
   /* WjTss: 13px 1行（h16）。bf6E7: h21。どちらも印26を超えない。 */
   .label { font-size: var(--polish-text-body); line-height: var(--tpl-firstrun-line-13); }
 
-  /* ZcmBy: padding 9 16 ＋ 文字 JDSIg h16 → h34。現在の行を54に収める。 */
-  .rowAction { padding: var(--tpl-firstrun-rowaction-pad-sp); }
+  /* ZcmBy: padding 9 16 ＋ 文字 JDSIg h16 → h34。現在の行を54に収める。寸法は画面の持ちもの。 */
+  html:root .rowCurrent button[class][class][class] { padding: var(--tpl-firstrun-rowaction-pad-sp); }
 
   .rowActionPc { display: none; }
 
   .rowActionMobile { display: inline; }
 
-  /* UanUf: 上 padding4 / 中央そろえ。注記は出さない（枠 02b の足は1行） */
+  /*
+    UanUf: 上 padding4 / 中央そろえ。注記は出さない（枠 02b の足は1行）
+    VJR0w: 「あとで」は #6b7682 相当の弱い色 12/600。1行（h15）で足 UanUf を19に収める。
+    見た目は所有部品 shared/button の `presentation="quiet-text"` が持つので、
+    ここでは枠 02b の実値だけを渡す（太さ600は広い幅と同じなので据え置き）。
+  */
   .footer {
+    --quiet-text-ink: var(--tpl-firstrun-ink-muted);
+    --quiet-text-size: var(--tpl-firstrun-text-12);
+    --quiet-text-lh: var(--tpl-firstrun-line-12);
     padding-top: var(--tpl-firstrun-gap-4);
     justify-content: center;
   }
@@ -378,14 +361,6 @@
   .footerSpacer { display: none; }
 
   .note { display: none; }
-
-  /* VJR0w: #6b7682 相当の弱い色 12/600。1行（h15）で足 UanUf を19に収める。 */
-  .later {
-    color: var(--tpl-firstrun-ink-muted);
-    font-size: var(--tpl-firstrun-text-12);
-    font-weight: 600;
-    line-height: var(--tpl-firstrun-line-12);
-  }
 
   .laterPc { display: none; }
 

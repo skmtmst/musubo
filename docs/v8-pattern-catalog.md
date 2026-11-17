@@ -381,8 +381,9 @@
   - 補助操作がある帯は、共通部品が左の最大ボタン幅を左右とも確保し、主操作を中央で折り返す。理由の行が増えても左は最初のボタン行へそろえる。実幅が左右同幅の配置に足りない場合は、共通部品で補助操作を上・中央の組を下へ積み、間を8px以上にする。画面側で幅や上下位置を補正しない。
   - 未保存の確認は `UnsavedLeaveDialog` を使う。保存・破棄の意味が異なる場合のみ `saveLabel` / `discardLabel` / `error` / `onSavedLeave` を渡し、保存成功後の移動と破棄の処理を分ける。破棄だけの権限は `discardDisabled` / `discardLockedReason` で保存から分け、保持した操作も現在の権限を守る。省略時の表示と動きは変えない。
   - 参照だけの窓は右上の×で閉じ、下の帯に閉じるボタンを置かない。操作の帯は取消と主操作を中央、脇の操作を `leadingAction` へ。理由などの入力は本文に置く。全画面の検査は `scripts/visual-qa/dialog-footer-contract.test.ts`。
+  - **ボトムシートの変わり形（B-172）**：画面下から出る窓は `shared/sheet-dialog.tsx`／`shared/sheet-dialog.module.css` の `SheetDialog` が持つ。窓の役割（`role="dialog"`・`aria-modal`・題との結び付け）・掴み手・頭（印＋題＋一言）はこの持ち主だけが持ち、画面は承認済みの寸法と見た目を `--sheet-*` のカスタムプロパティで渡す。幅で変わる値は画面側の `@media` が同じ名前を書き換え、持ち主に幅の分岐を置かない。中身（一覧・足）は `children`、題の左の印は `mark` に入れる。既存の `Dialog`（中央に出る窓・自前の頭と×と足の線）はそのまま保ち、置き換えない。最初の使い先は「はじめにやること」の初回ポップアップ（枠 02 `C5i3rw`／枠 02b `nt3Po`）。目印（`role="dialog"`・`styles.lead`）を外して数を減らしたのではなく、持ち主をこの表に足して画面から持ち主へ移した。
   - 読む変数：`--polish-radius-dialog`・`--polish-window-*`・`--card-edge`
-- **持ち主（Pen）**：`q3DPdz`「ダイアログ/中」
+- **持ち主（Pen）**：`q3DPdz`「ダイアログ/中」（ボトムシートの変わり形は 枠 02 `C5i3rw`／枠 02b `nt3Po`）
 - **見つけ方（コード）**：
   - raw-dialog：`role=["']dialog["']|aria-modal=|<dialog\b` — 窓を手書き
   - confirm：`\bwindow\.confirm\(|(?<![\w.])confirm\(\s*['"']` — ブラウザの confirm

@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from 'react'
+import Button from '@/components/shared/button'
+import SheetDialog from '@/components/shared/sheet-dialog'
 import { publishSetupChip, useSetupChipReopen } from '@/v8/onboarding/public/setup-chip/index'
 import { nextFirstStepKey, type FirstStepsSummary } from './first-steps'
 import styles from './first-run-popup.module.css'
@@ -139,11 +141,22 @@ export function FirstRunPopup({ summary, onStartGuide, onClose }: FirstRunPopupP
 
   return (
     <div className={styles.scrim} data-first-run-popup="open" onClick={onClose}>
-      <div
+      <SheetDialog
         className={styles.card}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
+        titleId={titleId}
+        title="開店準備を始めましょう"
+        /* 枠 02 の輪 cohVt（スマホは K4fHC）。印は画面が作って持ち主に渡す。 */
+        mark={<span className={styles.ring}><span className={styles.ringText}>{position}</span></span>}
+        /*
+          枠 02 (C5i3rw) と 枠 02b (nt3Po) で一言が違う。
+          スマホは1行に収める短い言い方なので、幅で入れ替える（描き出し後の幅判定を増やさない）。
+        */
+        description={(
+          <>
+            <span className={styles.leadPc}>上から順に進めると、LINEで予約を受け付けられるようになります。</span>
+            <span className={styles.leadSp}>順番に進めるとLINE予約を受け付けられます</span>
+          </>
+        )}
         onClick={event => event.stopPropagation()}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
@@ -151,24 +164,6 @@ export function FirstRunPopup({ summary, onStartGuide, onClose }: FirstRunPopupP
         onTouchCancel={onTouchEnd}
         style={dragY ? { transform: `translateY(${dragY}px)` } : undefined}
       >
-        {/* 枠 02b の掴み手。PCでは出さない。 */}
-        <div className={styles.grabber}><span className={styles.grabberBar} /></div>
-
-        <div className={styles.header}>
-          <span className={styles.ring}><span className={styles.ringText}>{position}</span></span>
-          <div className={styles.headerText}>
-            <h2 id={titleId} className={styles.title}>開店準備を始めましょう</h2>
-            {/*
-              枠 02 (C5i3rw) と 枠 02b (nt3Po) で一言が違う。
-              スマホは1行に収める短い言い方なので、幅で入れ替える（描き出し後の幅判定を増やさない）。
-            */}
-            <p className={styles.lead}>
-              <span className={styles.leadPc}>上から順に進めると、LINEで予約を受け付けられるようになります。</span>
-              <span className={styles.leadSp}>順番に進めるとLINE予約を受け付けられます</span>
-            </p>
-          </div>
-        </div>
-
         {/* 枠 02b の「最終行の直下に『あとで』」を実測で見張るための目印（差し戻し R3）。 */}
         <div className={styles.rows} data-first-run-rows={summary.steps.length}>
           {summary.steps.map((step, index) => {
@@ -195,10 +190,10 @@ export function FirstRunPopup({ summary, onStartGuide, onClose }: FirstRunPopupP
                 <div key={step.key} className={`${styles.row} ${styles.rowCurrent}`}>
                   {mark}
                   {label}
-                  <button type="button" className={styles.rowAction} onClick={onStartGuide}>
+                  <Button presentation="first-run-start" onClick={onStartGuide}>
                     <span className={styles.rowActionPc}>ガイドで進める</span>
                     <span className={styles.rowActionMobile}>進める</span>
-                  </button>
+                  </Button>
                 </div>
               )
             }
@@ -224,16 +219,16 @@ export function FirstRunPopup({ summary, onStartGuide, onClose }: FirstRunPopupP
         </div>
 
         <div className={styles.footer}>
-          <button type="button" className={styles.later} onClick={onClose}>
+          <Button presentation="quiet-text" onClick={onClose}>
             <span className={styles.laterPc}>あとで</span>
             <span className={styles.laterMobile}>あとで（下にスワイプで閉じる）</span>
-          </button>
+          </Button>
           <span className={styles.footerSpacer} />
           <span className={styles.note}>
             {`閉じたあとは右上の「開店準備 ${summary.done}/${summary.total}」からいつでも再開できます`}
           </span>
         </div>
-      </div>
+      </SheetDialog>
     </div>
   )
 }

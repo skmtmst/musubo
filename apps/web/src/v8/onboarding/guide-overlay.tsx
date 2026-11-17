@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import Button from '@/components/shared/button'
 import { scrollMotion } from '@/components/shared/overlay-utils'
 import { balloonPlacement, dimPanels, isOffScreen, spotlightRing, type Rect } from './guide-overlay-geometry'
 import { guideProcedure, guideProcedureTotal } from './guide-script'
@@ -199,14 +200,14 @@ export function GuideOverlay({
         </div>
         <p className={styles.body}>{procedure.body}</p>
         <div className={styles.balloonFooter}>
-          <button type="button" className={styles.skip} onClick={onAdvanceProcedure}>この手順をスキップ</button>
+          <Button presentation="quiet-text" onClick={onAdvanceProcedure}>この手順をスキップ</Button>
         </div>
       </div>
 
       <div className={styles.bar} data-guide-bar="" style={{ left: 264, top: Math.max(16, viewport.height - 84) }}>
         <div className={styles.barHeader}>
           <span className={styles.barTitle}>開店準備ガイド</span>
-          <button type="button" className={styles.barPause} onClick={onPause}>一時停止</button>
+          <Button presentation="quiet-text" onClick={onPause}>一時停止</Button>
         </div>
         <div className={styles.progress}>
           {segments.map((done, index) => (
