@@ -181,7 +181,7 @@
 .link { display: inline-flex; align-items: center; gap: var(--tpl-e1-sns-gap-7); color: var(--color-action); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-e1-sns-row-lh); text-decoration: none; }
 .link:hover { text-decoration: underline; }
 
-/* 段の頭：題と札の間をあけて札を右へ寄せる。 */
+/* 段の頭：題のあとをあけて、個数と「接続を追加する」を右へ寄せる（未接続の札は題の隣）。 */
 .rowSpacer { flex: 1 1 0; min-width: 0; }
 
 /* 細い画面では「接続を追加する」を一覧の下へ移し、幅いっぱいの押しやすい的にする（F2）。 */

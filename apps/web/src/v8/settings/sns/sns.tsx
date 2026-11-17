@@ -313,33 +313,37 @@ export default function SnsSettingsPage() {
   const busyId = busy && removePlan ? removePlan.connection.id : null
   const unitYen = `${formatNumber(SNS_SLOT_UNIT_YEN)}円`
 
-  /** 段の頭：公式ロゴ・題・連携の個数・「接続を追加する」。接続が無いときは「未接続」の札。 */
-  const cardHead = (service: SnsService, serviceSlots: SnsServiceSlots, badge: { label: string; tone: 'success' | 'neutral' | 'danger' } | null, titleId: string) => (
-    <div className={styles.cardHead}>
-      <span className={styles.mark}>{service === 'googleBusiness' ? <GoogleMark size={22} /> : <InstagramMark size={22} />}</span>
-      <h2 id={titleId} className={styles.cardTitle}>{serviceCardTitle(service)}</h2>
-      <span className={styles.rowSpacer} />
-      {serviceSlots.connections.length ? (
-        <>
-          <span className={styles.count}>{slotCountText(serviceSlots)}</span>
-          <span className={styles.addWide}>
-            <Button
-              variant="secondary"
-              size="compact"
-              onClick={() => startAddition(service)}
-              disabled={busy}
-              lockedReason={additionLockedReason(service)}
-            >
-              <Plus size={16} aria-hidden />
-              接続を追加する
-            </Button>
-          </span>
-        </>
-      ) : badge ? (
-        <StatusBadge tone={badge.tone} size="compact" dot={false}>{badge.label}</StatusBadge>
-      ) : null}
-    </div>
-  )
+  /** 段の頭：公式ロゴ・題・連携の個数・「接続を追加する」。接続が無いときは題の隣に「未接続」の札。 */
+  const cardHead = (service: SnsService, serviceSlots: SnsServiceSlots, badge: { label: string; tone: 'success' | 'neutral' | 'danger' } | null, titleId: string) => {
+    const connected = serviceSlots.connections.length > 0
+    return (
+      <div className={styles.cardHead}>
+        <span className={styles.mark}>{service === 'googleBusiness' ? <GoogleMark size={22} /> : <InstagramMark size={22} />}</span>
+        <h2 id={titleId} className={styles.cardTitle}>{serviceCardTitle(service)}</h2>
+        {!connected && badge ? (
+          <StatusBadge tone={badge.tone} size="compact" dot={false}>{badge.label}</StatusBadge>
+        ) : null}
+        <span className={styles.rowSpacer} />
+        {connected ? (
+          <>
+            <span className={styles.count}>{slotCountText(serviceSlots)}</span>
+            <span className={styles.addWide}>
+              <Button
+                variant="secondary"
+                size="compact"
+                onClick={() => startAddition(service)}
+                disabled={busy}
+                lockedReason={additionLockedReason(service)}
+              >
+                <Plus size={16} aria-hidden />
+                接続を追加する
+              </Button>
+            </span>
+          </>
+        ) : null}
+      </div>
+    )
+  }
 
   /** 細い画面の「接続を追加する」。一覧の下に幅いっぱいで置く（F2）。 */
   const addNarrow = (service: SnsService) => (
