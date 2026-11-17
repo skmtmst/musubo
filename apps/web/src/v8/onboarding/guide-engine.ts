@@ -24,6 +24,29 @@ export type GuideEngineState = { phase: GuideEnginePhase; stepKey: string | null
 
 export type GuideEngineAction = 'start' | 'pause' | 'resume' | 'advance' | 'advanceProcedure' | 'complete' | 'reset'
 
+/**
+ * 案内を動かす側へ渡す操作の形。useGuideEngine の返り値がこれに当たる。
+ * 画面側の表示用の型を取り込まず、ここを唯一の受け渡し口にする
+ * （画面の部品と案内の入れ物が互いを読み合わないようにするため）。
+ */
+export type GuideControl = {
+  phase: GuideEnginePhase
+  /** 今案内している段。サーバーが正本で、控えは最初の表示を速くするためだけに使う。 */
+  stepKey: string | null
+  /** 今案内している手順の番号（1から）。 */
+  procedureIndex: number
+  anchor: GuideAnchor | null
+  pausedAnchor: GuideAnchor | null
+  start: () => void
+  pause: () => void
+  resume: () => void
+  reset: () => void
+  /** 同じ段の次の手順へ（1/3→2/3→3/3）。 */
+  advanceProcedure: () => void
+  /** 選んだ段の手順1から始める。持たない呼び出し元もあるので任意。 */
+  startAt?: (stepKey: string) => void
+}
+
 const initialState: GuideEngineState = { phase: 'idle', stepKey: null, procedureIndex: 1 }
 
 export function guideEngineStorageKey(accountId: string): string {

@@ -26,8 +26,8 @@ export const guideProgressSchema = {
 /*
   成功応答は他の経路と同じ `{ success: true, data: … }` の包み方で返す。
   実装（getting-started.ts の `c.json({ success: true, data: guidePayload(row) })`）と
-  同じ形をそのまま書く。包みを省くと文書と実応答がずれる（差し戻しの指摘）。
-  ずれの再発は getting-started-guide-contract.test.ts が実応答と突き合わせて見張る。
+  同じ形をそのまま書く。包みを省くと文書と実応答がずれる。
+  ずれは getting-started-guide-contract.test.ts が実応答と突き合わせて見張る。
 */
 const guideProgressResponse = {
   type: 'object',

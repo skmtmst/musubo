@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from 'react'
-import { publishSetupChip, useSetupChipReopen } from '@/v8/onboarding/setup-chip'
+import { publishSetupChip, useSetupChipReopen } from '@/v8/onboarding/public/setup-chip/index'
 import { nextFirstStepKey, type FirstStepsSummary } from './first-steps'
 import styles from './first-run-popup.module.css'
 

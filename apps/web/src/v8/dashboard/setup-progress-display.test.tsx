@@ -13,7 +13,7 @@ const steps = buildStepsFromApi(keys.map(key => ({ key, state: key === 'accounts
 it.each(['restaurant', 'salon', 'consult', 'lesson', 'standard', 'ec'] as const)('%sは基本の数と線を1つにし、済んだ番号と残りの設定を残す', style => {
   const state: StyleState = { style, version: 1, styleSelected: true, answers: Object.fromEntries(questionsFor(style).map(q => [q.key, { mode: 'later' }])) }
   const summary = summarizeFirstSteps(steps, style)
-  /* 枠08b v01（利用者承認 2026-11-16）: 使い方の設定の塊はカードに同居させない。 */
+  /* 使い方の設定の塊はカードに同居させない。 */
   const setup = summarizeSetup(state, [], [{ target_id: 'notice', kind: 'automation', status: 'draft', is_sample: 1, draftRevision: 'draft' }])
   expect(setup.total).toBeGreaterThan(0)
   render(<FirstStepsCard summary={summary} folded={false} onToggle={vi.fn()} />)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
@@ -11,142 +11,29 @@ import { lockUnless } from '@/components/shared/permission-lock'
 import HelpTip from '@/components/shared/help-tip'
 import TextLink from '@/components/shared/text-link'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { canManageRole } from '@/lib/staff-role'
 import styles from './first-steps.module.css'
 import { ProgressBar, StepMark } from '@/components/shared/progress'
 
-import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
-import { doneCount, stepsForStyle, type StepResult, type StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
-import { useStyleSetupProgress } from '@/v8/onboarding/public/style-setup-progress/index'
-import { useGuideEngine, type GuideAnchor, type GuideEnginePhase } from '@/v8/onboarding/public/guide-engine/index'
-import { useSharedGuide } from '@/v8/onboarding/public/guide-overlay/index'
-import type { AccountStyle } from '@line-crm/shared'
+import { nextFirstStepKey, type FirstStepsGuide, type FirstStepsSummary } from './first-steps-model'
 
-export type FirstStepsSummary = {
-  steps: Array<{ key: string; ordinal?: string; label: string; href: string | null; link: string; done: boolean; state: StepResult['state']; reason?: string }>
-  done: number
-  total: number
-}
-
-/** 設定画面と同じ状態・権限・行き先を使い、別の完了条件を持たない。 */
-export function summarizeFirstSteps(steps: ReadonlyArray<StepResult>, style: AccountStyle | null = null, progress?: StyleSetupProgress): FirstStepsSummary {
-  const displaySteps = stepsForStyle(steps, style, progress)
-  /* 行の操作名は「ガイドで開く」1つに揃える（枠08b v01）。済みの段だけは案内が無いので「開く」。 */
-  return { steps: displaySteps.map((step) => ({ key: step.key, ordinal: step.ordinal, label: step.title, href: step.action?.href ?? null, link: step.action ? (step.state === 'done' ? '開く →' : 'ガイドで開く →') : step.blockedReason ?? '状態を確認する', done: step.state === 'done', state: step.state, reason: step.state === 'unknown' ? step.next : undefined })), done: doneCount(displaySteps), total: displaySteps.length }
-}
-
-export function shouldShowFirstSteps(role: string | null, summary: FirstStepsSummary | null): boolean {
-  return role !== null && summary !== null
-}
-
-export function firstStepsStorageKey(accountId: string): string {
-  return `lh:v8:first-steps-folded:${accountId}`
-}
-
-/** 前の「閉じる」の印。押した人は畳んだ形で出す。 */
-export function firstStepsLegacyDismissedKey(accountId: string): string {
-  return `lh:v8:first-steps-dismissed:${accountId}`
-}
-
-/** 畳んでいるか。'1' 畳む・'0' 開く。印が無ければ前の「閉じる」を見る。 */
-export function readFirstStepsFolded(accountId: string | null): boolean {
-  if (!accountId || typeof window === 'undefined') return false
-  try {
-    const saved = window.localStorage.getItem(firstStepsStorageKey(accountId))
-    if (saved === '1' || saved === '0') return saved === '1'
-    return window.localStorage.getItem(firstStepsLegacyDismissedKey(accountId)) === '1'
-  } catch { return false }
-}
-
-/** 最初の1通を待っている（友だち追加の時の配信は済み、最初の1通はまだ）。 */
-export function waitingForFirstMessage(steps: ReadonlyArray<StepResult>): boolean {
-  return steps.find((step) => step.key === 'friendAdd')?.state === 'done' && steps.find((step) => step.key === 'firstMessage')?.state === 'todo'
-}
+/* 状態・保存・実測は first-steps-model に置く。呼び出し元の入口を変えないため、ここから名前を通す。 */
+export {
+  firstStepsLegacyDismissedKey,
+  firstStepsStorageKey,
+  nextFirstStepKey,
+  readFirstStepsFolded,
+  shouldShowFirstSteps,
+  summarizeFirstSteps,
+  useFirstMessageArrived,
+  useFirstSteps,
+  waitingForFirstMessage,
+} from './first-steps-model'
+export type { FirstStepsGuide, FirstStepsSummary } from './first-steps-model'
 
 /**
- * 最初の1通が、この画面で見ている間に「まだ」から「済み」に変わったか。
- * 開いた時にもう済みだった人・別のアカウントへ移った直後は数えない（後から来た人には出さない）。
- */
-export function useFirstMessageArrived(accountId: string | null, steps: ReadonlyArray<StepResult>, ready: boolean) {
-  const seen = useRef<{ accountId: string | null; state: StepResult['state'] | null }>({ accountId: null, state: null })
-  const [arrived, setArrived] = useState(false)
-  useEffect(() => {
-    if (!ready) return
-    const state = steps.find((step) => step.key === 'firstMessage')?.state ?? null
-    const before = seen.current
-    seen.current = { accountId, state }
-    if (before.accountId === accountId && before.state === 'todo' && state === 'done') setArrived(true)
-  }, [accountId, steps, ready])
-  useEffect(() => { setArrived(false) }, [accountId])
-  return { arrived, dismiss: useCallback(() => setArrived(false), []) }
-}
-
-export function useFirstSteps(accountId: string | null, role: string | null, options: { qrOpen?: boolean; style?: AccountStyle | null; storeId?: string | null } = {}) {
-  const enabled = Boolean(accountId) && role !== null
-  const [folded, setFolded] = useState(false)
-  const [waiting, setWaiting] = useState(false)
-  const state = useFirstRun(accountId, enabled, canManageRole(role) && (Boolean(options.qrOpen) || waiting))
-  const style = options.style === undefined ? 'standard' : options.style
-  const progress = useStyleSetupProgress(accountId, style, enabled, options.storeId)
-  const displaySteps = stepsForStyle(state.steps, style, progress.progress)
-  const summary = state.status === 'ready' && style ? summarizeFirstSteps(state.steps, style, progress.progress) : null
-  /* 待つ帯（はじめにやること）が開いて見えている間だけ、最初の1通を待って読み直す。 */
-  const visibleWaiting = canManageRole(role) && state.status === 'ready' && !folded && waitingForFirstMessage(state.steps)
-  useEffect(() => { setWaiting(visibleWaiting) }, [visibleWaiting])
-  const done = useFirstMessageArrived(accountId, state.steps, state.status === 'ready')
-  /*
-    ガイドの持ち主は全画面で1つ（GuideHost）。貸してもらえる時はそれを使い、
-    同じ状態を2つの持ち主がサーバーへ書かないように自前の持ち主は動かさない。
-  */
-  const shared = useSharedGuide()
-  const ownGuide = useGuideEngine(shared ? null : accountId, canManageRole(role) ? summary : null)
-  const guide = shared?.guide ?? ownGuide
-  useEffect(() => { setFolded(readFirstStepsFolded(accountId)) }, [accountId])
-  const toggle = useCallback(() => {
-    setFolded((current) => {
-      const next = !current
-      if (accountId) {
-        try { window.localStorage.setItem(firstStepsStorageKey(accountId), next ? '1' : '0') } catch { /* 覚えられなくても今は畳む・開く */ }
-      }
-      return next
-    })
-  }, [accountId])
-  return {
-    status: !enabled ? 'idle' as const : state.status === 'loading' || progress.status === 'loading' ? 'loading' as const : state.status,
-    summary: shouldShowFirstSteps(role, summary) ? summary : null, folded, toggle, error: state.error, reload: () => { state.reload(); progress.reload() },
-    steps: displaySteps, progress: progress.progress, firstRun: state.firstRun, starter: state.starter, watchExpired: state.watchExpired, rewatch: state.rewatch,
-    arrived: canManageRole(role) && done.arrived, dismissArrived: done.dismiss, guide,
-  }
-}
-
-/** 次にやる 1 つ。まだで、行き先があるうちの最初の段。 */
-export function nextFirstStepKey(summary: FirstStepsSummary): string | null {
-  return summary.steps.find((step) => !step.done && step.href)?.key ?? null
-}
-
-/** ガイドの操作だけを受け取る。完了判定は持たず、はじめにやることの実測に従う。 */
-export type FirstStepsGuide = {
-  phase: GuideEnginePhase
-  /** 今案内している段。サーバーが正本（枠14 L3lP08 の「現在ステップ」）。 */
-  stepKey: string | null
-  /** 今案内している手順の番号（1から）。同 L3lP08 の「現在手順」。 */
-  procedureIndex: number
-  anchor: GuideAnchor | null
-  pausedAnchor: GuideAnchor | null
-  start: () => void
-  pause: () => void
-  resume: () => void
-  reset: () => void
-  /** 同じ段の次の手順へ（1/3→2/3→3/3）。 */
-  advanceProcedure: () => void
-  /** 選んだ段の手順1から始める（枠08b の行の「ガイドで開く」）。 */
-  startAt?: (stepKey: string) => void
-}
-
-/**
- * 08b の再開導線（Pen 枠 Bnkcl の SuTRi）。9項目の一覧の下に、
- * 「続きからガイドで進める」「ガイドを最初から開始」と注記をこの順で置く。
- * 一時停止はガイドバー側（Pen 枠 orKSi の共通ルール）なので、ここには出さない。
+ * 9項目の一覧の下に置く再開の導線。
+ * 「続きからガイドで進める」「ガイドを最初から開始」と注記をこの順で出す。
+ * 一時停止は案内の帯側で受けるので、ここには出さない（同じ操作を2か所に置かない）。
  */
 export function FirstStepsGuideFooter({ guide }: { guide: FirstStepsGuide }) {
   const anchor = guide.anchor ?? guide.pausedAnchor
@@ -161,13 +48,13 @@ export function FirstStepsGuideFooter({ guide }: { guide: FirstStepsGuide }) {
   )
 }
 
-/** 08b の注記。狭い幅でも切れないよう、帯の中ではなくカードの下に置く。 */
+/** チェックの付き方の注記。狭い幅でも切れないよう、帯の中ではなくカードの下に置く。 */
 export function FirstStepsGuideNote() {
   return <p className={styles.note}>チェックは設定の実データで自動判定。ガイドを使わなくても付きます</p>
 }
 
 /*
-  枠08b v01: カードは「見出し → 9項目 → 続きから/最初から/注記」だけにする。
+  カードは「見出し → 9項目 → 続きから/最初から/注記」だけにする。
   「選んだ機能の設定」ブロックと「使い方の設定を開く」は置かない（利用者判断）。
 */
 export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, feedback, guide, readOnly = false }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onRetry?: () => void; feedback?: ReactNode; guide?: FirstStepsGuide; readOnly?: boolean }) {
@@ -203,7 +90,7 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
               /* 済みの段は案内が無いので、確かめ直すための行き先だけ残す。 */
               <TextLink tone="action" href={step.href!} className={styles.link} aria-label={`${step.label}（開く）`}>開く</TextLink>
             ) : (
-              /* 08b v01: まだの段はどれも、この行からその段のガイドを始める。 */
+              /* まだの段はどれも、この行からその段のガイドを始める。 */
               <TextLink tone="action" href={step.href!} className={styles.link} aria-label={`${step.label}をガイドで開く`} onClick={() => guide?.startAt?.(step.key)}>ガイドで開く</TextLink>
             )}
           </SetupStepRow>

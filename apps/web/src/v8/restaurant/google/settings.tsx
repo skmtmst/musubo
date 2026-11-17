@@ -14,7 +14,7 @@ import { errorMessage, formatYmd } from './format'
 import styles from './google.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { emitGuideSignal } from '@/v8/onboarding/guide-signal'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 
 
 /*

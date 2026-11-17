@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useOptionalAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
 import { useStaffRole } from '@/lib/staff-role'
-import { useFirstSteps } from '@/v8/dashboard/first-steps'
+import { useFirstSteps } from '@/v8/dashboard/public/first-steps-model/index'
 import { GUIDE_ENGINE_EVENT, readGuideEngineState } from './guide-engine'
 import { GuideOverlay } from './guide-overlay'
 import { guideProcedure } from './guide-script'
@@ -14,8 +14,7 @@ import { useGuideSignal } from './guide-signal'
 
 /*
   開店準備ガイドの入れ物。全画面で1つ。画面側は置かない。
-  承認済み Pen /Users/masatosakamoto/Documents/musubo-course-media-upload-20261110.pen
-  枠 14 (orKSi) 共通ルール izsr5 の「案内はどの画面でも同じ形で出す」に従う。
+  案内はどの画面でも同じ形で出すため、画面ごとに別の入れ物を作らない。
 
   案内する手順の対象（卓を作る・メニューを保存する…）は、はじめにやることの画面ではなく
   それぞれの設定画面にあるので、重ね表示はダッシュボードではなくアプリ全体に1つ置く。
@@ -69,11 +68,10 @@ function GuideHostActive({ accountId, children }: { accountId: string; children:
   const pause = useCallback(() => { guide.pause() }, [guide])
 
   /*
-    段や手順が変わったら、その手順の対象がある画面へ実際に移る（差し戻し R1）。
+    段や手順が変わったら、その手順の対象がある画面へ実際に移る。
     移らないと重ね表示の対象がその画面に無く、案内が消えて先へ進めない。
-    始めた直後も同じ。枠14 共通ルール izsr5 の
-    「ピル／ダッシュボードカードの『続きから』＝最初の未完了ステップの手順1へ」のとおり、
-    ダッシュボードで始めたらその手順の画面まで連れていく（差し戻し R1c）。
+    始めた直後も同じ。「続きから」は最初の未完了の段の手順1なので、
+    ダッシュボードで始めたらその手順の画面まで連れていく。
     連れていかないと、ダッシュボードには対象が無いので案内が1.5秒で自動停止してしまう。
     台本が画面を指定している手順（例: ⑤営業時間の1/2＝設定 › SNS連携）も同じ扱い。
   */

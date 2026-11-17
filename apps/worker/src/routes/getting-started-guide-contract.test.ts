@@ -5,8 +5,8 @@ import { gettingStartedGuidePaths } from './openapi/getting-started-guide-paths.
 
 /*
   文書（OpenAPI）と実応答の形が同じかを、実際に経路を呼んで突き合わせる。
-  coverage の検査は「書いてあるか」しか見ないので、包み方のずれを見つけられない
-  （差し戻しの指摘）。ここでは 200 応答の本文をスキーマに当てて確かめる。
+  coverage の検査は「書いてあるか」しか見ないので、包み方のずれを見つけられない。
+  ここでは 200 応答の本文をスキーマに当てて確かめる。
 */
 
 const row = {
@@ -137,7 +137,7 @@ it('文書は成功の包み（success と data）を必須にしている', () 
   }
 });
 
-it('包みを外した応答は差分として検出できる（検査自体の確かさ）', () => {
+it('包みの無い応答は差分として検出できる（検査自体の確かさ）', () => {
   expect(mismatches(documented('get'), { phase: 'idle', stepKey: null, procedureIndex: 1, updatedAt: null }).length)
     .toBeGreaterThan(0);
 });

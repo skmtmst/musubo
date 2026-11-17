@@ -57,9 +57,8 @@ const style = (deferred = true) => ok({ style: 'standard', styleSelected: true, 
 const guide = () => screen.getByRole('region', { name: 'はじめにやること' })
 const retry = (title: string) => within(screen.getByText(title).closest('[data-list-state="error"]') as HTMLElement).getByRole('button', { name: 'もう一度読み込む', exact: true })
 /*
-  前は「使い方の設定を開く」ボタンの出現で使い方GETの完了を見ていた。
-  枠08b v01（利用者承認 2026-11-16）でその入口と「選んだ機能の設定」ブロックを
-  カードから外したので、取得が終わったことは呼び出しの落ち着きで見る。
+  カードには「使い方の設定を開く」入口と「選んだ機能の設定」ブロックを置かない。
+  そのため取得が終わったことは、画面上の入口ではなく呼び出しの落ち着きで見る。
 */
 async function pendingSetup() {
   await waitFor(() => { expect(net.style).toHaveBeenCalled(); expect(net.warnings).toHaveBeenCalled(); expect(net.items).toHaveBeenCalled() })
@@ -228,7 +227,7 @@ it.each(['viewer', 'staff', null])('役割%sは許可された状態だけ読み
     expect(await screen.findByRole('heading', { name: 'はじめにやること', exact: true })).toBeTruthy()
     expect(net.progress).toHaveBeenCalledTimes(1)
     if (role === 'viewer') expect(within(guide()).queryAllByRole('link')).toHaveLength(0)
-    /* 枠08b v01: 使い方の設定の入口はカードから外した。役割にかかわらず出ない。 */
+    /* 使い方の設定の入口はカードに置かない。役割にかかわらず出ない。 */
     expect(screen.queryByRole('button', { name: '使い方の設定を開く', exact: true })).toBeNull()
     expect(screen.queryByRole('dialog')).toBeNull()
   }
@@ -262,7 +261,7 @@ it('APIの空stepsは正規化された未確認を表示し、全完了や0/0�
   expect(net.features).toHaveBeenCalledWith('A')
 })
 
-/* 枠08b v01: 使い方の設定の入口を外したので、カードから勝手に質問が開かず保存も始めない。 */
+/* カードに使い方の設定の入口を置かないので、カードから勝手に質問が開かず保存も始めない。 */
 it('カードからは質問が開かず、保存も始めない', async () => {
   render(<DashboardV8 />)
   expect(await pendingSetup()).toBeTruthy()

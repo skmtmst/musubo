@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from 'react'
 import type { ReactNode } from 'react'
-import type { FirstStepsGuide, FirstStepsSummary } from '@/v8/dashboard/first-steps'
+import type { GuideControl, GuideSummary } from './guide-engine'
 
 /*
   全画面に1つだけ置くガイドの持ち主を、はじめにやることの帯にも貸す入れ物。
@@ -12,7 +12,7 @@ import type { FirstStepsGuide, FirstStepsSummary } from '@/v8/dashboard/first-st
   入れ物が無い所（単体試験・入れ物の外）では、画面側が自分で持つ形に戻る。
 */
 
-export type SharedGuide = { guide: FirstStepsGuide; summary: FirstStepsSummary | null }
+export type SharedGuide = { guide: GuideControl; summary: GuideSummary | null }
 
 const GuideSharedContext = createContext<SharedGuide | null>(null)
 

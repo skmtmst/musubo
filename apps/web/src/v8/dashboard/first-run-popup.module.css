@@ -7,29 +7,46 @@
 
 /* 枠 02 の覆い lyjdu #0f172a59 */
 .scrim {
+  /*
+    この枠だけの色と寸法。共通トークンの正本（globals.css）は他の約300画面が使うため
+    書き換えず、覆いの中だけで名前を付ける。数字と色は必ずカスタムプロパティに置く
+    （v8-boundary.test.ts の「CSS に数字を直書きしない」見張りに合わせる）。
+  */
+  --tpl-firstrun-brand: #00833f; --tpl-firstrun-brand-hover: #006e35; --tpl-firstrun-brand-bg: #e9f7ee; --tpl-firstrun-brand-line: #00833f33;
+  --tpl-firstrun-scrim: #0f172a59; --tpl-firstrun-scrim-pad: 24px; --tpl-firstrun-card-w: 620px; --tpl-firstrun-card-gap-pc: 48px; --tpl-firstrun-card-shadow: 0 12px 32px #10182833; --tpl-firstrun-card-gap: 14px; --tpl-firstrun-card-pad: 28px;
+  --tpl-firstrun-header-gap: 16px; --tpl-firstrun-ring: 52px; --tpl-firstrun-ring-border: 3px solid var(--tpl-firstrun-brand); --tpl-firstrun-text-14: 14px; --tpl-firstrun-gap-2: 2px; --tpl-firstrun-gap-3: 3px; --tpl-firstrun-gap-4: 4px; --tpl-firstrun-gap-6: 6px; --tpl-firstrun-gap-12: 12px;
+  --tpl-firstrun-row-ring: inset 0 0 0 1px var(--tpl-firstrun-brand-line);
+  --tpl-firstrun-row-pad: 10px 14px; --tpl-firstrun-row-pad-sp: 10px 12px; --tpl-firstrun-mark: 26px; --tpl-firstrun-text-12: 12px; --tpl-firstrun-ring-thin: 1.5px solid var(--tpl-firstrun-brand); --tpl-firstrun-line-muted: #d6dade; --tpl-firstrun-ring-thin-muted: 1.5px solid var(--tpl-firstrun-line-muted); --tpl-firstrun-ink-muted: #6b7682;
+  --tpl-firstrun-badge-pad: 3px 8px; --tpl-firstrun-rowaction-pad: 9px 14px; --tpl-firstrun-chevron-color: #b6bcc4; --tpl-firstrun-ink-faint: #9aa3af;
+  /*
+    文字の塊の高さは枠の実値をそのまま使う（20px→24 / 14px→17 / 13px→16 / 12px→15）。
+    指定しないと素の line-height になり、現在の行・足・見出しが枠より高くなる。
+  */
+  --tpl-firstrun-line-20: 24px; --tpl-firstrun-line-14: 17px; --tpl-firstrun-line-13: 16px; --tpl-firstrun-line-12: 15px;
+  --tpl-firstrun-card-gap-sp: 118px; --tpl-firstrun-radius-sheet: 20px 20px 0 0; --tpl-firstrun-card-pad-sp: 12px 16px 24px; --tpl-firstrun-grabber-w: 36px; --tpl-firstrun-grabber-h: 4px; --tpl-firstrun-line-grabber: #d1d5db; --tpl-firstrun-ring-sp: 44px; --tpl-firstrun-title-sp: 17px; --tpl-firstrun-tight: 1.25; --tpl-firstrun-rowaction-pad-sp: 9px 16px;
   position: fixed;
   inset: 0;
   z-index: 70;
-  background: var(--tpl-fr02-scrim);
+  background: var(--tpl-firstrun-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--tpl-fr02-scrim-pad);
+  padding: var(--tpl-firstrun-scrim-pad);
 }
 
-/* 枠 02 のカード G8vBl: 620 / #ffffff / r16 / 影 0 12 32 #10182833 / 縦 gap14 / padding28 */
+/* 枠 02 のカード G8vBl。幅・角・影・余白は承認値を変数に置く。 */
 .card {
-  width: var(--tpl-fr02-card-w);
+  width: var(--tpl-firstrun-card-w);
   max-width: 100%;
-  max-height: calc(100vh - var(--tpl-fr02-card-gap-pc));
+  max-height: calc(100vh - var(--tpl-firstrun-card-gap-pc));
   overflow-y: auto;
   background: var(--color-canvas);
   border-radius: var(--polish-radius-dialog);
-  box-shadow: var(--tpl-fr02-card-shadow);
+  box-shadow: var(--tpl-firstrun-card-shadow);
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-fr02-card-gap);
-  padding: var(--tpl-fr02-card-pad);
+  gap: var(--tpl-firstrun-card-gap);
+  padding: var(--tpl-firstrun-card-pad);
 }
 
 /* スマホの掴み手 iNVoW / hUSUR（PCでは出さない） */
@@ -38,26 +55,26 @@
 /* 枠 02 の見出し VliWA: gap16 / 中央そろえ */
 .header {
   display: flex;
-  gap: var(--tpl-fr02-header-gap);
+  gap: var(--tpl-firstrun-header-gap);
   align-items: center;
 }
 
-/* 輪 cohVt: 52x52 / r999 / 線 #00833f 3px */
+/* 済み数の輪 cohVt。正円で、線は主色の太線。 */
 .ring {
-  width: var(--tpl-fr02-ring);
-  height: var(--tpl-fr02-ring);
+  width: var(--tpl-firstrun-ring);
+  height: var(--tpl-firstrun-ring);
   flex: 0 0 auto;
   border-radius: var(--polish-radius-pill);
-  border: var(--tpl-fr02-ring-border);
+  border: var(--tpl-firstrun-ring-border);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* hvJuA: #00833f 14/700 */
+/* 輪の中の「済み/全体」hvJuA。主色の太字。 */
 .ringText {
-  color: var(--tpl-fr02-brand);
-  font-size: var(--tpl-fr02-text-14);
+  color: var(--tpl-firstrun-brand);
+  font-size: var(--tpl-firstrun-text-14);
   font-weight: 700;
 }
 
@@ -65,7 +82,7 @@
 .headerText {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-fr02-gap-4);
+  gap: var(--tpl-firstrun-gap-4);
   min-width: 0;
 }
 
@@ -75,7 +92,7 @@
   color: var(--color-ink);
   font-size: var(--text-title);
   font-weight: 800;
-  line-height: var(--tpl-fr02-line-20);
+  line-height: var(--tpl-firstrun-line-20);
 }
 
 /* fX8qY: #4a5565 13/500 / 行の高さ1.6 */
@@ -94,7 +111,7 @@
 .rows {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-fr02-gap-4);
+  gap: var(--tpl-firstrun-gap-4);
 }
 
 /*
@@ -104,9 +121,9 @@
 */
 .row {
   display: flex;
-  gap: var(--tpl-fr02-gap-12);
+  gap: var(--tpl-firstrun-gap-12);
   align-items: center;
-  padding: var(--tpl-fr02-row-pad);
+  padding: var(--tpl-firstrun-row-pad);
   border-radius: var(--polish-radius-control);
   background: var(--color-canvas);
   border: 0;
@@ -116,43 +133,43 @@
 /* 済みの行 bnJsJ */
 .rowDone { background: var(--color-canvas); }
 
-/* 現在の行 v4LA6: #e9f7ee / 線 #00833f33 1px（内側に描く） */
+/* 現在の行 v4LA6。薄い主色の地に、内側へ描く細線（線で高さを増やさない）。 */
 .rowCurrent {
-  background: var(--tpl-fr02-brand-bg);
-  box-shadow: inset 0 0 0 1px var(--tpl-fr02-brand-line);
+  background: var(--tpl-firstrun-brand-bg);
+  box-shadow: var(--tpl-firstrun-row-ring);
 }
 
-/* 印の共通: 26x26 / r999 */
+/* 行頭の印の共通。正円で、行の高さを決める大きさ。 */
 .mark {
-  width: var(--tpl-fr02-mark);
-  height: var(--tpl-fr02-mark);
+  width: var(--tpl-firstrun-mark);
+  height: var(--tpl-firstrun-mark);
   flex: 0 0 auto;
   border-radius: var(--polish-radius-pill);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--tpl-fr02-text-12);
+  font-size: var(--tpl-firstrun-text-12);
   font-weight: 700;
 }
 
-/* NXvTP: #00833f の丸に白い✓ */
+/* 済みの印 NXvTP。主色の丸に白い✓。 */
 .markDone {
-  background: var(--tpl-fr02-brand);
+  background: var(--tpl-firstrun-brand);
   color: var(--color-canvas);
 }
 
-/* tICdq: 白丸＋線 #00833f 1.5 / 数字 #00833f */
+/* 現在の印 tICdq。白丸に主色の細線と、主色の数字。 */
 .markCurrent {
   background: var(--color-canvas);
-  border: var(--tpl-fr02-ring-thin);
-  color: var(--tpl-fr02-brand);
+  border: var(--tpl-firstrun-ring-thin);
+  color: var(--tpl-firstrun-brand);
 }
 
 /* l92Tzv: 白丸＋線 #d6dade 1.5 / 数字 #6b7682 */
 .markTodo {
   background: var(--color-canvas);
-  border: var(--tpl-fr02-ring-thin-muted);
-  color: var(--tpl-fr02-ink-muted);
+  border: var(--tpl-firstrun-ring-thin-muted);
+  color: var(--tpl-firstrun-ink-muted);
 }
 
 /* Bp8mT / sSZ60: 14px の1行で h17。現在の行だけ 700 */
@@ -160,43 +177,43 @@
   flex: 1 1 auto;
   min-width: 0;
   color: var(--color-ink);
-  font-size: var(--tpl-fr02-text-14);
+  font-size: var(--tpl-firstrun-text-14);
   font-weight: 500;
-  line-height: var(--tpl-fr02-line-14);
+  line-height: var(--tpl-firstrun-line-14);
 }
 
 .labelCurrent { font-weight: 700; }
 
-/* r7xHZ0: #e9f7ee / r999 / padding 3 8 / 文字 #00833f 12/600 */
+/* 「完了」の札 r7xHZ0。薄い主色の地に、主色の小さな文字。 */
 .badge {
   flex: 0 0 auto;
-  background: var(--tpl-fr02-brand-bg);
+  background: var(--tpl-firstrun-brand-bg);
   border-radius: var(--polish-radius-pill);
-  padding: var(--tpl-fr02-badge-pad);
-  color: var(--tpl-fr02-brand);
-  font-size: var(--tpl-fr02-text-12);
+  padding: var(--tpl-firstrun-badge-pad);
+  color: var(--tpl-firstrun-brand);
+  font-size: var(--tpl-firstrun-text-12);
   font-weight: 600;
-  line-height: var(--tpl-fr02-line-12);
+  line-height: var(--tpl-firstrun-line-12);
 }
 
-/* pdn85: #00833f / r10 / gap6 / padding 9 14 ＋ 文字 pnUmf 白 13/600 h16 → h34 */
+/* 行の「ガイドで進める」pdn85。主色の地に白文字 pnUmf。高さは現在の行に収まる値。 */
 .rowAction {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: var(--tpl-fr02-gap-6);
-  background: var(--tpl-fr02-brand);
+  gap: var(--tpl-firstrun-gap-6);
+  background: var(--tpl-firstrun-brand);
   border: 0;
   border-radius: var(--polish-radius-control);
-  padding: var(--tpl-fr02-rowaction-pad);
+  padding: var(--tpl-firstrun-rowaction-pad);
   color: var(--color-canvas);
   font-size: var(--polish-text-body);
   font-weight: 600;
-  line-height: var(--tpl-fr02-line-13);
+  line-height: var(--tpl-firstrun-line-13);
   cursor: pointer;
 }
 
-.rowAction:hover { background: var(--tpl-fr02-brand-hover); }
+.rowAction:hover { background: var(--tpl-firstrun-brand-hover); }
 
 /* 文面は枠ごとに違う（枠02「ガイドで進める」／枠02b「進める」）。 */
 .rowActionPc { display: inline; }
@@ -206,7 +223,7 @@
 /* ykRGy: 「›」 #b6bcc4 15/500 */
 .chevron {
   flex: 0 0 auto;
-  color: var(--tpl-fr02-chevron-color);
+  color: var(--tpl-firstrun-chevron-color);
   font-size: var(--text-lead);
   font-weight: 500;
 }
@@ -214,13 +231,13 @@
 /* 枠 02 の足 TTZx2: gap12 / 中央そろえ */
 .footer {
   display: flex;
-  gap: var(--tpl-fr02-gap-12);
+  gap: var(--tpl-firstrun-gap-12);
   align-items: center;
 }
 
 /*
   「あとで」 qr72l: #4a5565 13/600 の1行（h16）。
-  枠 02 の足 TTZx2 は h16 なので、#639 の button 最小高さ32pxを足に効かせない
+  足 TTZx2 は1行の高さなので、共通の button 最小高さを足に効かせない
   （効くと足が32になりカードが606を超え、注記 AtL7E の位置も下がる: 差し戻し V1）。
   文字の下の注記まで含めて押せる面は広げず、枠の実値をそのまま写す（スマホも同じ扱い）。
 */
@@ -231,7 +248,7 @@
   color: var(--color-ink-secondary);
   font-size: var(--polish-text-body);
   font-weight: 600;
-  line-height: var(--tpl-fr02-line-13);
+  line-height: var(--tpl-firstrun-line-13);
   min-height: 0;
   cursor: pointer;
 }
@@ -248,10 +265,10 @@
 
 /* 注記 AtL7E: #9aa3af 12/500 の1行（h15） */
 .note {
-  color: var(--tpl-fr02-ink-faint);
-  font-size: var(--tpl-fr02-text-12);
+  color: var(--tpl-firstrun-ink-faint);
+  font-size: var(--tpl-firstrun-text-12);
   font-weight: 500;
-  line-height: var(--tpl-fr02-line-12);
+  line-height: var(--tpl-firstrun-line-12);
 }
 
 /*
@@ -272,48 +289,48 @@
       上端を画面の上から118pxの所に置くので、高さは残り全部にする。
       中身の長さで縮めない（差し戻し R3）。
     */
-    height: calc(100vh - var(--tpl-fr02-card-gap-sp));
+    height: calc(100vh - var(--tpl-firstrun-card-gap-sp));
     max-height: none;
     overflow: hidden;
-    border-radius: var(--tpl-fr02-radius-sheet);
-    gap: var(--tpl-fr02-gap-12);
-    padding: var(--tpl-fr02-card-pad-sp);
+    border-radius: var(--tpl-firstrun-radius-sheet);
+    gap: var(--tpl-firstrun-gap-12);
+    padding: var(--tpl-firstrun-card-pad-sp);
   }
 
-  /* iNVoW: 中央そろえ / hUSUR: 36x4 #d1d5db r999 */
+  /* 掴み手 iNVoW は中央そろえ。棒 hUSUR は薄い灰色の丸棒。 */
   .grabber {
     display: flex;
     justify-content: center;
   }
 
   .grabberBar {
-    width: var(--tpl-fr02-grabber-w);
-    height: var(--tpl-fr02-grabber-h);
+    width: var(--tpl-firstrun-grabber-w);
+    height: var(--tpl-firstrun-grabber-h);
     border-radius: var(--polish-radius-pill);
-    background: var(--tpl-fr02-line-grabber);
+    background: var(--tpl-firstrun-line-grabber);
   }
 
   /* isJJM: gap12 / 輪 K4fHC 44x44 / 文字 12 */
-  .header { gap: var(--tpl-fr02-gap-12); }
+  .header { gap: var(--tpl-firstrun-gap-12); }
 
   .ring {
-    width: var(--tpl-fr02-ring-sp);
-    height: var(--tpl-fr02-ring-sp);
+    width: var(--tpl-firstrun-ring-sp);
+    height: var(--tpl-firstrun-ring-sp);
   }
 
-  .ringText { font-size: var(--tpl-fr02-text-12); }
+  .ringText { font-size: var(--tpl-firstrun-text-12); }
 
   /* nU2Eh: 縦 gap2 / vMdb9 17/700 / gEPIi 12/500 行の高さ1.5 */
-  .headerText { gap: var(--tpl-fr02-gap-2); }
+  .headerText { gap: var(--tpl-firstrun-gap-2); }
 
   /* vMdb9: 17px の1行で高さ21。見出しの塊を41に収めて isJJM の44（輪 K4fHC）に合わせる。 */
   .title {
-    font-size: var(--tpl-fr02-title-sp);
+    font-size: var(--tpl-firstrun-title-sp);
     font-weight: 700;
-    line-height: var(--tpl-fr02-tight);
+    line-height: var(--tpl-firstrun-tight);
   }
 
-  .lead { font-size: var(--tpl-fr02-text-12); line-height: 1.5; }
+  .lead { font-size: var(--tpl-firstrun-text-12); line-height: 1.5; }
 
   /* gEPIi「順番に進めるとLINE予約を受け付けられます」。1行に収める。 */
   .leadPc { display: none; }
@@ -322,7 +339,7 @@
 
   /* SYPr1: 縦 gap3 / 行 padding 10 12 */
   .rows {
-    gap: var(--tpl-fr02-gap-3);
+    gap: var(--tpl-firstrun-gap-3);
     /*
       見出しと足は動かさず、9項目だけシートの中で動かす。
       ただし余白を吸って伸ばさない（伸ばすと足が画面下端へ押し下がり、
@@ -340,13 +357,13 @@
     （線で増やすと9項目が46+2ずつ伸び、足が下へずれて「あとで」が枠 02b の位置に
     来ない: 差し戻し R3）。ここは枠 02b の padding だけ差し替える。
   */
-  .row { padding: var(--tpl-fr02-row-pad-sp); }
+  .row { padding: var(--tpl-firstrun-row-pad-sp); }
 
   /* WjTss: 13px 1行（h16）。bf6E7: h21。どちらも印26を超えない。 */
-  .label { font-size: var(--polish-text-body); line-height: var(--tpl-fr02-line-13); }
+  .label { font-size: var(--polish-text-body); line-height: var(--tpl-firstrun-line-13); }
 
   /* ZcmBy: padding 9 16 ＋ 文字 JDSIg h16 → h34。現在の行を54に収める。 */
-  .rowAction { padding: var(--tpl-fr02-rowaction-pad-sp); }
+  .rowAction { padding: var(--tpl-firstrun-rowaction-pad-sp); }
 
   .rowActionPc { display: none; }
 
@@ -354,7 +371,7 @@
 
   /* UanUf: 上 padding4 / 中央そろえ。注記は出さない（枠 02b の足は1行） */
   .footer {
-    padding-top: var(--tpl-fr02-gap-4);
+    padding-top: var(--tpl-firstrun-gap-4);
     justify-content: center;
   }
 
@@ -364,10 +381,10 @@
 
   /* VJR0w: #6b7682 相当の弱い色 12/600。1行（h15）で足 UanUf を19に収める。 */
   .later {
-    color: var(--tpl-fr02-ink-muted);
-    font-size: var(--tpl-fr02-text-12);
+    color: var(--tpl-firstrun-ink-muted);
+    font-size: var(--tpl-firstrun-text-12);
     font-weight: 600;
-    line-height: var(--tpl-fr02-line-12);
+    line-height: var(--tpl-firstrun-line-12);
   }
 
   .laterPc { display: none; }

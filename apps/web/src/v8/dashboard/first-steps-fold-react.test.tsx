@@ -95,7 +95,7 @@ describe('はじめにやることを畳む', () => {
   })
 })
 
-/* 枠08b v01（利用者承認 2026-11-16）: カードは9項目と再開導線だけ。前の付属物は置かない。 */
+/* カードに置くのは9項目と再開導線だけ。ほかの塊は同居させない。 */
 it('「選んだ機能の設定」ブロックと「使い方の設定を開く」はカードに出さない', async () => {
   await act(async () => { render(<FirstStepsCard summary={summary} folded={false} onToggle={() => {}} />) })
   expect(screen.getAllByRole('progressbar')).toHaveLength(1)

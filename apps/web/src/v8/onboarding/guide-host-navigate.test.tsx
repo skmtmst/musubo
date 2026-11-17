@@ -27,7 +27,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: nav.push, replace:
 vi.mock('@/contexts/account-context', () => ({ useOptionalAccount: () => ({ selectedAccountId: 'account-1' }) }))
 vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'restaurant' } }) }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
-vi.mock('@/v8/dashboard/first-steps', () => ({ useFirstSteps: () => ({ status: 'success', guide: state.guide, summary: state.summary }) }))
+vi.mock('@/v8/dashboard/public/first-steps-model/index', () => ({ useFirstSteps: () => ({ status: 'success', guide: state.guide, summary: state.summary }) }))
 /* 重ね表示そのものは guide-overlay-react.test.tsx が見張る。ここは行き先だけ。 */
 vi.mock('./guide-overlay', () => ({ GuideOverlay: () => null }))
 
