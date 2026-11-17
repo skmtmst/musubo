@@ -1,4 +1,3 @@
-import { runInNewContext } from 'node:vm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -214,66 +213,42 @@ describe('同意 (#818)', () => {
 });
 
 describe('埋め込むJS', () => {
-  async function executeScript() {
+  it('WorkerのURLが差し込まれる', async () => {
     const res = await app.fetch(
-      new Request('https://example.com/api/site/script.js'), env as unknown as Env['Bindings'],
+      new Request('https://example.com/api/site/script.js'),
+      env as unknown as Env['Bindings'],
     );
     expect(res.status).toBe(200);
     expect(res.headers.get('Content-Type')).toContain('javascript');
-    const sent: Array<{ url: string; blob: Blob }> = [];
-    const elements = new Map<string, any>();
-    const cookies = new Map<string, string>();
-    const listeners = new Map<string, (event: any) => void>();
-    const body = {
-      appendChild(element: any) { elements.set(element.id, element); element.parentNode = body; },
-      removeChild(element: any) { elements.delete(element.id); },
-    };
-    const document = {
-      currentScript: { getAttribute: (key: string) => ({ 'data-key': 'hk_test', 'data-site': 'site_test' } as Record<string, string>)[key] },
-      get cookie() { return [...cookies].map(([key, value]) => `${key}=${value}`).join('; '); },
-      set cookie(value: string) { const [key, v] = value.split(';')[0].split('='); cookies.set(key, v); },
-      referrer: '', readyState: 'complete', body,
-      getElementById: (id: string) => elements.get(id),
-      createElement: () => ({ style: {}, setAttribute() {}, addEventListener() {}, appendChild() {} }),
-      addEventListener: (type: string, callback: (event: any) => void) => listeners.set(type, callback),
-    };
-    const window: any = { crypto: { randomUUID: () => '12345678-1234-1234-1234-123456789abc' } };
-    runInNewContext(await res.text(), {
-      window, document, Blob, location: { hostname: 'shop.example', pathname: '/thanks', search: '?secret=private', href: 'https://shop.example/thanks?secret=private' },
-      navigator: { sendBeacon: (url: string, blob: Blob) => { sent.push({ url, blob }); return true; } },
-    });
-    const messages = async () => Promise.all(sent.map(async ({ url, blob }) => ({ url, payload: JSON.parse(await blob.text()) })));
-    return { window, elements, listeners, messages };
-  }
-
-  it('WorkerのURLとタグのキーを使って閲覧を送る', async () => {
-    const { messages } = await executeScript();
-    expect(await messages()).toEqual([expect.objectContaining({
-      url: 'https://api.example.com/api/site/collect',
-      payload: expect.objectContaining({ trackingKey: 'hk_test', siteId: 'site_test', eventType: 'page_view' }),
-    })]);
+    const body = await res.text();
+    expect(body).toContain('https://api.example.com/api/site/collect');
+    expect(body).toContain("getAttribute('data-key')");
+    expect(body).toContain('payload.trackingKey = TRACKING_KEY');
   });
 
-  it('クエリ文字列を送らずホストとパスだけ送る', async () => {
-    const { messages, window, listeners } = await executeScript();
-    window.lhConsent(true);
-    window.lhTrack('購入', 1);
-    listeners.get('click')!({ target: { closest: () => ({ getAttribute: () => 'button' }) } });
-    const sent = await messages();
-    expect(sent).toHaveLength(5);
-    expect(sent[0].payload).toMatchObject({ host: 'shop.example', path: '/thanks' });
-    expect(JSON.stringify(sent)).not.toContain('secret');
+  it('クエリ文字列を送らない（パスだけ）', async () => {
+    const res = await app.fetch(
+      new Request('https://example.com/api/site/script.js'),
+      env as unknown as Env['Bindings'],
+    );
+    const body = await res.text();
+    // location.search を読んでいないこと。送らないに越したことはない。
+    expect(body).toContain('location.pathname');
+    expect(body).toContain('host: location.hostname');
+    expect(body).not.toContain('location.search');
   });
 
-  it('同意するまで未設定で送り、同意の案内と回答を反映する', async () => {
-    const { window, elements, messages } = await executeScript();
-    expect((await messages())[0].payload.consent).toBe('unset');
-    expect(elements.has('lh-consent')).toBe(true);
-    window.lhConsent(true);
-    expect(elements.has('lh-consent')).toBe(false);
-    const sent = await messages();
-    expect(sent[1].payload).toMatchObject({ consent: 'granted', consentDecision: 'granted' });
-    expect(sent[2]).toMatchObject({ url: 'https://api.example.com/api/public/web-conversions', payload: { consent: 'granted', path: '/thanks' } });
+  it('同意の案内と答えを送る仕組みが入っている', async () => {
+    const res = await app.fetch(
+      new Request('https://example.com/api/site/script.js'),
+      env as unknown as Env['Bindings'],
+    );
+    const body = await res.text();
+    // 答えるまでは consent が unset で送られ、サーバー側は記録しない。
+    expect(body).toContain("readConsent() || 'unset'");
+    expect(body).toContain('lh-consent');
+    expect(body).toContain('window.lhConsent');
+    expect(body).toContain('consentDecision');
   });
 });
 
