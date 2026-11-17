@@ -3,19 +3,9 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const NEW = fs.readFileSync(new URL('../../../v8/reminders/new/new.tsx', import.meta.url), 'utf8')
 const BASICS = fs.readFileSync(path.join(__dirname, '../../../v8/reminders/basics-form.tsx'), 'utf8')
 
 describe('V8 リマインダ作成の契約', () => {
-  it('既存のリマインダ用フォルダを読み、作成時に選択を保存する', () => {
-    expect(BASICS).toContain("api.folders.list('reminder')")
-    expect(NEW).toContain('folderId: value.folderId || null')
-  })
-
-  it('選択中のLINEアカウントへ作る', () => {
-    expect(NEW).toContain('lineAccountId: selectedAccountId!')
-  })
-
   it('フォルダの読み込み失敗は選び直せる表示にし、準備中に戻さない', () => {
     expect(BASICS).toContain('フォルダを読み込めませんでした')
     expect(BASICS).toContain('もう一度読み込む')

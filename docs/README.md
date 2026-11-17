@@ -457,6 +457,7 @@
 - [鍵が漏れたときの入れ替えと練習（B-351/13）](security/KEY-ROTATION.md)
 - [ログイン不要の入口（B-351/4）](security/PUBLIC-ENTRYPOINTS.md)
 - [ローンチ前の安全確認（B-265・B-332・B-343・B-351）](security/README.md)
+- [本番前にオーナーがやること1枚（D6）](security/OWNER-HANDOFF-1116.md)
 - [公開前の安全点検表](security/SECURITY-CHECKLIST.md)
 - [安全監視：画面とAPIの契約（B-343）](security/SECURITY-MONITOR-CONTRACT.md)
 - [添付・支払明細の取得と取り直し（B-351/4）](security/SIGNED-DOWNLOADS.md)
@@ -465,6 +466,20 @@
 - [本人確認・ログイン・保存期限の実装説明](security/step-up-and-retention.md)
 
 ## 反映履歴
+
+- [本番直前の関門を2つ足す](release-log/unreleased/47-kenta-release-gates.md) — 5万人で3秒の速度の関門と、Next.js 更新時の全幅の崩れの見張りの履歴。確認 2026-11-12。
+
+- [自動確認を実際の画面の動きで確認](release-log/unreleased/104-kenta-q02b-b5.md) — 反映履歴、確認 2026-11-17。
+
+- [配信と予定確認の動作を確かめる試験を見直し](release-log/unreleased/103-kenta-q02b-b6.md) — 反映履歴、確認 2026-11-17。
+
+- [プログラムと連携処理の説明書きを整理](release-log/unreleased/95-kenta-q04-worker.md) — 反映履歴、確認 2026-11-16。
+
+- [自動確認を実際の動きで確認](release-log/unreleased/94-kenta-q02b.md) — 反映履歴、確認 2026-11-16。
+
+- [通知の試験を時間帯に左右されないよう修正](release-log/unreleased/97-kenta-worker-fix.md) — 反映履歴、確認 2026-11-16。
+- [初期設定・比較の確認を追加](release-log/unreleased/91-kenta-backend-small.md) — 反映履歴、確認 2026-11-16。
+- [通知端末の扱いを確認](release-log/unreleased/92-kenta-gap-msg.md) — 反映履歴、確認 2026-11-16。
 
 - [予約・友だち情報・配信の操作と安全性を改善](release-log/unreleased/36-masato-legacy-port.md) — 反映履歴、確認 2026-11-10。
 - [運営コンソールの問い合わせ画面をPenと照合して修正](release-log/unreleased/41-masato-ops-support-pen-parity.md) — スマートフォンの返信欄とテンプレート引用画面、確認 2026-11-11。
@@ -1229,4 +1244,6 @@
 - [閲覧のみの操作を灰色に（残り）](release-log/unreleased/71-kenta-viewer-gray-app.md) — #60 の続きの履歴。確認 2026-11-15。
 - [文書：A15 の判断を言葉とスタイルの表へ](release-log/unreleased/72-kenta-a15-docs.md) — 来なかった・LINE通知の入口の履歴。確認 2026-11-15。
 - [文書：登録メディアの受け入れ表](release-log/unreleased/74-kenta-media-docs.md) — 一度に10件・使用先の出し方の履歴。確認 2026-11-15。
-- [本番直前の関門を2つ足す](release-log/unreleased/47-kenta-release-gates.md) — 5万人で3秒の速度の関門と、Next.js 更新時の全幅の崩れの見張りの履歴。確認 2026-11-12。
+- [文書：手動テストの要件の整理](release-log/unreleased/79-kenta-a15-req.md) — 画面と決定に合わせた要件の変更履歴。確認 2026-11-15。
+- [文書：本番前の点検3資料の見直しとオーナー1枚](release-log/unreleased/85-kenta-d6-handoff.md) — 点検表・二段階認証・事故手順の履歴。確認 2026-11-16。
+- [日付に左右される自動確認の修正](release-log/unreleased/90-kenta-worker-date.md) — 予約の自動確認の変更履歴。確認 2026-11-16。
