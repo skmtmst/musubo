@@ -79,8 +79,18 @@ const NON_TEMPLATE_PATHS: Array<{ file: string; label: string }> = [
 const LINE_SEND_PATTERN =
   /\.(pushMessage|replyMessage|multicast|broadcast|narrowcast)(WithRequestId)?\s*\(/;
 
+// これらの送信口は、未解決の値を実際に送らない動作試験で守る。
+// auto-reply-unmatched.test.ts / form-layout-effects.test.ts /
+// friend-add-rules-f12-test-send.test.ts / webhook-friend-add-send.test.ts
+const BEHAVIOR_TESTED = new Set([
+  'features/auto-replies/auto-reply-unmatched.ts',
+  'features/forms/form-layout-effects.ts',
+  'routes/friend-add-rules.ts',
+  'routes/webhook.ts',
+]);
+
 describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () => {
-  for (const { file, mustCall, label } of SEND_PATHS) {
+  for (const { file, mustCall, label } of SEND_PATHS.filter(path => !BEHAVIOR_TESTED.has(path.file))) {
     it(`${label}（${file}）は ${mustCall} を使う`, () => {
       const source = read(file);
       expect(source).toContain(mustCall);
