@@ -4,6 +4,7 @@ import { hasPendingStyleSelection, profile, type StyleProfile } from './style-pr
 import { StyleError } from './style-setup-core.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
 import { starter } from './style-starter-set.js';
+import { starterResourceExists } from './style-starter-presence.js';
 import { applyCatalogStarter, type StarterCatalogRuntime } from './style-starter-catalog-apply.js';
 
 /**
@@ -24,9 +25,24 @@ async function planMissingStarterItems(
   const answers = JSON.parse(p.answers_json ?? '{}') as Record<string, SetupAnswer>;
   // 店が編集した物を上書きしないよう、ある物は必ず飛ばす（skipExisting は既定の true のまま）。
   const result = await insertStyleStarterItems(
-    db, account, tenant, actor, {}, selected, p.style, answers, statements, now, { sameStyleOnly: true },
+    db, account, tenant, actor, {}, selected, p.style, answers, statements, now, { repairMissing: true },
   );
   return { ...result, statements };
+}
+
+async function countPresentStarterItems(db: D1Database, account: string, style: string, items: Array<{key: string; kind: string}>) {
+  const rows = (await db.prepare('SELECT item_key,kind,target_id,style FROM style_starter_items WHERE line_account_id=?').bind(account)
+    .all<{item_key:string;kind:string;target_id:string;style:string}>()).results;
+  let count = 0;
+  for (const item of items) {
+    const matching = rows.filter(row => row.item_key === item.key && row.kind === item.kind);
+    const current = rows.find(row => row.item_key === item.key && row.style === style);
+    const candidates = current ? [current] : matching;
+    for (const row of candidates) {
+      if (row.kind === item.kind && await starterResourceExists(db, account, row)) { count++; break; }
+    }
+  }
+  return count;
 }
 
 /** はじめにやることの「初期セットが入っているか」。読むだけで書かない。 */
@@ -41,11 +57,7 @@ export async function starterApplication(db: D1Database, account: string, tenant
     const count = selections.filter(selection => rows.some(row => row.template_id === selection.templateId && row.template_version_id === selection.versionId && row.state === 'succeeded')).length;
     return { applied: count === selections.length, count, missing: set.autoInsert && p.selection_mode==='configured' ? selections.length - count : 0 };
   }
-  const keys = set.definition.items.map(item => item.key);
-  const count = (await db
-    .prepare('SELECT COUNT(DISTINCT item_key) AS n FROM style_starter_items WHERE line_account_id=? AND style=? AND item_key IN (SELECT value FROM json_each(?))')
-    .bind(account, p.style, JSON.stringify(keys))
-    .first<{ n: number }>())?.n ?? 0;
+  const count = await countPresentStarterItems(db, account, p.style, set.definition.items);
   let missing: number | null;
   try {
     const plan = await planMissingStarterItems(db,account,tenant,'getting-started',p,new Date().toISOString());
@@ -87,13 +99,12 @@ export async function ensureStyleStarterItems(
   const answers = JSON.parse(p.answers_json) as Record<string,SetupAnswer>;
   if(answers.image?.mode==='configured' && answers.image.value==='simple')
     await materializeInitialMenuAssets(db,images,account,p.style,(await starter(db,tenant,p.style,true)).definition);
-  const { set, inserted, updated, skipped, existing, statements } = await planMissingStarterItems(db,account,tenant,actor,p,now);
-  const keys = new Set(set.definition.items.map((item) => item.key));
+  const { set, inserted, updated, skipped, statements } = await planMissingStarterItems(db,account,tenant,actor,p,now);
   const result = {
     inserted: (inserted as Array<{ key: string; kind: string }>).map(({ key, kind }) => ({ key, kind })),
     updated,
     skipped,
-    existing: existing.filter((row) => row.style === p.style && keys.has(row.item_key)).length,
+    existing: await countPresentStarterItems(db, account, p.style, set.definition.items),
     starterSet: { id: set.id, version: set.version },
   };
   if (!inserted.length && !updated.length) return result;

@@ -6,6 +6,7 @@ import { initialFormLayout,initialFormScopeGuards } from './style-initial-form.j
 import { initialMenuNeedsRefresh } from './style-initial-refresh.js';
 import type { PlannedInitialForms } from './style-initial-buttons.js';
 import { sameStarterSnapshot } from './style-starter-snapshot.js';
+import { starterResourceExists, missingStarterGuard } from './style-starter-presence.js';
 import {prepareStarterInsert} from './style-starter-insert-context.js';
 import { styleMenuButtons } from './style-menu-buttons.js';
 import { friendAddStarterStatements } from './style-starter-friend-add.js';
@@ -40,13 +41,13 @@ export async function insertStyleStarterItems(
     skipExisting?: boolean;
     plannedForms?: PlannedInitialForms;
     preservePreviousStyles?: boolean;
-    sameStyleOnly?: boolean;
+    repairMissing?: boolean;
   } = {},
 ) {
   const {set,existing,oldProfile,choice}=await prepareStarterInsert(db,account,tenant,style,input,{...options,initialMenu:!options.set && answers.image?.value === 'simple'});
   const inserted:unknown[]=[];
   const updated:Array<{key:string;kind:string}>=[];
-  const plannedForms:PlannedInitialForms=options.plannedForms??new Map(existing.filter(row=>row.kind==='form' && (!(options.preservePreviousStyles || options.sameStyleOnly) || row.style===style)).map(row=>[row.item_key,row.target_id]));
+  const plannedForms:PlannedInitialForms=options.plannedForms??new Map(existing.filter(row=>row.kind==='form' && (!options.preservePreviousStyles || row.style===style)).map(row=>[row.item_key,row.target_id]));
   if(input.confirmInitialMenu===true && selected && style==='restaurant' && answers.image?.value==='simple' && set.definition.items.some(item=>item.initialMenu))
     await planInitialMenuHistory(db,account,statements,plannedForms,actor);
   const skipped:StarterSkip[]=[];
@@ -69,7 +70,17 @@ export async function insertStyleStarterItems(
     }
     const sameStyle = existing.find(row => row.item_key === item.key && row.style === style);
     if (firstDeferredSelection && sameStyle) { skip(item.key, 'already_exists'); continue; }
-    let previous = sameStyle ?? (firstDeferredSelection || options.sameStyleOnly ? undefined : existing.find(row=>row.item_key===item.key));
+    let previous = sameStyle ?? (firstDeferredSelection ? undefined : existing.find(row=>row.item_key===item.key && row.kind===item.kind));
+    let missingCurrent: typeof sameStyle;
+    if (options.repairMissing) {
+      const candidates = sameStyle ? [sameStyle] : existing.filter(row=>row.item_key===item.key && row.kind===item.kind);
+      previous = undefined;
+      for (const row of candidates) {
+        if (row.kind === item.kind && await starterResourceExists(db,account,row)) { previous = row; break; }
+      }
+      if (previous) { skip(item.key,'already_exists'); continue; }
+      if (sameStyle) missingCurrent = sameStyle;
+    }
     if(item.kind==='form'&&previous&&((input.answers as Record<string,SetupAnswer>|undefined)?.image?.value==='simple'||input.confirmInitialMenu===true)) {
       const available=await db.prepare(`SELECT 1 FROM forms f WHERE f.id=? AND f.status='active'
         AND EXISTS(SELECT 1 FROM form_accounts a WHERE a.form_id=f.id AND a.line_account_id=?) AND (SELECT COUNT(*) FROM form_accounts a WHERE a.form_id=f.id)=1`).bind(previous.target_id,account).first();
@@ -200,9 +211,13 @@ export async function insertStyleStarterItems(
       skip(item.key,'answer_later');
       continue;
     }
+    if (missingCurrent) {
+      if (missingCurrent.kind === item.kind) statements.push(missingStarterGuard(db,account,missingCurrent));
+      statements.push(db.prepare('DELETE FROM style_starter_items WHERE line_account_id=? AND style=? AND item_key=? AND target_id=?').bind(account,style,item.key,missingCurrent.target_id));
+    }
     const chosen = choice?.[item.key];
     const styleNames: Record<AccountStyle, string> = { standard: '標準', ec: 'EC', restaurant: '飲食店', salon: 'サロン', consult: '相談', lesson: '教室' };
-    const sampleName = '【見本】' + (firstDeferredSelection && existing.some(row => row.item_key === item.key) ? styleNames[style] + '：' : '') + item.name;
+    const sampleName = '【見本】' + ((firstDeferredSelection || options.repairMissing) && existing.some(row => row.item_key === item.key && row.style !== style) ? styleNames[style] + '：' : '') + item.name;
     if (chosen && !['sample', 'existing', 'configured'].includes(chosen.mode))
       throw new StyleError('invalid_choices');
     let id = crypto.randomUUID(),
