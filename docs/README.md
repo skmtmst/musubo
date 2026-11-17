@@ -467,6 +467,8 @@
 
 ## 反映履歴
 
+- [自動確認を実際の画面の動きで確認](release-log/unreleased/PR-kenta-q02b-b7.md) — 反映履歴、確認 2026-11-17。
+
 - [プログラムと連携処理の説明書きを整理](release-log/unreleased/95-kenta-q04-worker.md) — 反映履歴、確認 2026-11-16。
 
 - [自動確認を実際の動きで確認](release-log/unreleased/94-kenta-q02b.md) — 反映履歴、確認 2026-11-16。
