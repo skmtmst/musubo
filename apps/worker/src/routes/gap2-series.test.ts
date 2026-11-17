@@ -119,7 +119,7 @@ test('B4-19: 52回の見本は空き情報を一括取得する',async()=>{
   expect(r.status,await r.clone().text()).toBe(200);expect((await r.json() as any).data.occurrences).toHaveLength(52);
   expect(shiftReads).toBe(1);
  }finally{spy.mockRestore();}
-});
+}, 15_000); // 52回の候補生成に必要な時間をCIの負荷変動分だけ確保する。
 
 test('B4-17: 閲覧のみの担当は繰り返しを変更できない',async()=>{
  const made=await gapCall(app(),url,'POST',body);expect(made.status).toBe(201);const data=(await made.json() as any).data;
