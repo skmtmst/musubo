@@ -70,6 +70,19 @@ describe('実DB: テスト送信は送る側のアカウントで解決する', 
     expect(fallbackCross[0]).toMatchObject({ type: 'text', text: 'step の控え' });
   });
 
+  it('テスト送信は未解決の共通情報では止め、登録済みの値を送る', async () => {
+    const push = vi.spyOn(LineClient.prototype, 'pushMessage').mockResolvedValue(undefined as never);
+    try {
+      const step = { ...stepFor(null), message_content: '営業時間: {{var.hours}}' };
+      const send = () => testSendSteps(store.db, new LineClient('dummy-token'), [step as never], 'friend-1', 'account-1');
+      await expect(send()).rejects.toThrow();
+      expect(push).not.toHaveBeenCalled();
+      store.raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES ('var','account-1','営業時間','hours','text','10時')").run();
+      await expect(send()).resolves.toMatchObject({ ok: true, sent: 1 });
+      expect(push).toHaveBeenCalledWith('U1', [{ type: 'text', text: '営業時間: 10時' }]);
+    } finally { push.mockRestore(); }
+  });
+
   it('持ち主未定では送らず、送り先の持ち主にも送らない', async () => {
     const id = await publishedTemplate('account-1', '公開版の本文');
     const result = await testSendSteps(
