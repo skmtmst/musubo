@@ -721,6 +721,22 @@ describe('POST /webhook — クーポン本文の送信も直前の関門をく�
     } finally {vi.useRealTimers();}
   });
 
+  test('クーポン本文の共通情報を現在の値に置き換えて送る', async () => {
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T01:00:00Z'));useSqliteClock(raw,()=>new Date());
+    try {
+      enableCoupon();
+      raw.prepare("UPDATE account_settings SET value=json_set(value,'$.messageTemplate',?) WHERE key='nen.friend_add_coupon'")
+        .run('案内 {{var.hours}} コード {coupon_code} 期限 {expires_on}');
+      raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES('hours','account-1','営業時間','hours','text','10時')").run();
+      eccubeMocks.createEccubeCoupon.mockResolvedValue(undefined);
+      await postFollow('coupon-var-success',db,EC_ENV);
+      const sends=lineClientMocks.pushMessage.mock.calls.filter(call=>JSON.stringify(call[1]).includes('案内 10時'));
+      expect(sends).toHaveLength(1);
+      expect(JSON.stringify(sends[0][1])).not.toContain('{{var.');
+      expect(raw.prepare("SELECT status FROM nen_friend_add_coupon_issues WHERE friend_id='friend-1'").get()).toEqual({status:'sent'});
+    } finally {vi.useRealTimers();}
+  });
+
   test('クーポン作成中に予約を奪われたら、本文を送らない', async () => {
     enableCoupon();
     // 作成（外部API）の最中に、別の実行が予約を奪う。

@@ -32,16 +32,20 @@ async function submit(){
   const res=await app.request('/api/forms/form/submit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer fake','Idempotency-Key':'aaaaaaaa-1111-4333-8444-111111111111'},body:JSON.stringify({data:{name:'新しい値'}})},{DB:fixture.db,LINE_CHANNEL_ACCESS_TOKEN:'fake',WORKER_URL:'https://fake.test'} as Env['Bindings'],{waitUntil:(p:Promise<unknown>)=>pending.push(p),passThroughOnException:()=>{},props:{}} as ExecutionContext);
   await Promise.all(pending);return res;
 }
-test('回答後の返信は未解決の共通情報を送らない',async()=>{
+test('回答後の返信は未解決なら送らず、値を直せば再開する',async()=>{
   vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T01:00:00Z'));
   try{
     vi.mocked(pushViaHarnessProxy).mockClear();
     fixture.raw.prepare("UPDATE forms SET on_submit_message_type='text',on_submit_message_content='営業時間: {{var.hours}}',content_revision=content_revision+1 WHERE id='form'").run();
     const row=fixture.raw.prepare("SELECT content_revision FROM forms WHERE id='form'").get() as {content_revision:number};
     expect((await publishFormVersion(fixture.db,'form',row.content_revision)).kind).toBe('published');
-    await submit();
+    expect((await submit()).status).toBe(202);
     expect(pushViaHarnessProxy).not.toHaveBeenCalled();
     expect(fixture.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+    fixture.raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES ('hours','a','営業時間','hours','text','10時')").run();
+    expect((await submit()).status).toBe(200);
+    expect(pushViaHarnessProxy).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(vi.mocked(pushViaHarnessProxy).mock.calls[0][3])).toContain('営業時間: 10時');
   }finally{vi.useRealTimers();}
 });
 test('CS-C02: 全登録先が反映されてから自動化の条件を見る',async()=>{
