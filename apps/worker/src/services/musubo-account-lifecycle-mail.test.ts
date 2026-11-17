@@ -40,20 +40,19 @@ describe('LINE追加・連携解除のメール', () => {
       linkedAccountSlotYen: 3300, nextMonthlyChargeAt: '2027-02-08T00:00:00+09:00', actionUrl };
     const removed = musuboLinkedAccountMail({ ...common, event: 'removed' });
     expect(removed.text).toContain('3個 → 2個');
-    expect(removed.text).toContain('3枠 → 2枠');
-    expect(removed.text).toContain('¥6,600／月');
+    expect(removed.text).toContain('2枠 → 1枠');
+    expect(removed.text).toContain('¥3,300／月');
     expect(removed.text).toContain('次の月次請求日までに枠を再利用した場合');
     const added = musuboLinkedAccountMail({ ...common, event: 'added', before: common.after, after: common.before, amountPaidNowYen: 1650 });
     expect(added.text).toContain('¥1,650');
-    expect(added.text).toContain('¥9,900／月');
+    expect(added.text).toContain('¥6,600／月');
   });
 
-  it('契約枠の中の解除では減額を案内しない', () => {
-    const contracted = { googleBusiness: 3, instagram: 1 };
+  it('多いほうの連携数が変わらない解除では減額を案内しない', () => {
     const removed = musuboLinkedAccountMail({
       event: 'removed', lineName: '公式LINE A', service: 'googleBusiness',
-      before: { googleBusiness: 3, instagram: 3, contracted },
-      after: { googleBusiness: 2, instagram: 3, contracted },
+      before: { googleBusiness: 3, instagram: 3 },
+      after: { googleBusiness: 2, instagram: 3 },
       linkedAccountSlotYen: 3300, nextMonthlyChargeAt: '2027-02-08T00:00:00+09:00', actionUrl,
     });
     expect(removed.text).toContain('今回の解除では料金は変わりません');
@@ -80,11 +79,10 @@ describe('LINE追加・連携解除のメール', () => {
     })).toThrow(/Invalid current charge/);
   });
 
-  it('契約枠の中の連携は、追加枠と請求を増やさず案内する', () => {
-    const contracted = { googleBusiness: 1, instagram: 2 };
+  it('別サービスの既存追加枠を再利用する連携は、追加枠と請求を増やさず案内する', () => {
     const added = musuboLinkedAccountMail({
       event: 'added', lineName: '公式LINE A', service: 'instagram',
-      before: { googleBusiness: 2, instagram: 1, contracted }, after: { googleBusiness: 2, instagram: 2, contracted },
+      before: { googleBusiness: 2, instagram: 1 }, after: { googleBusiness: 2, instagram: 2 },
       amountPaidNowYen: 0, linkedAccountSlotYen: 3300,
       nextMonthlyChargeAt: '2027-02-08T00:00:00+09:00', actionUrl,
     });

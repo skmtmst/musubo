@@ -37,36 +37,20 @@ describe('musubo LINE pricing', () => {
     expect(musuboPrice({ ...base, lineCount: 6, friendCountExcludingBlocked: 50_001 }).friendOverageMonthlyYen).toBe(1_100);
   });
 
-  it('charges each social service for what it exceeds its own contracted quota by', () => {
+  it('counts the larger social connection count once for each LINE', () => {
     expect(linkedAccountSlots({ googleBusiness: 0, instagram: 0 })).toBe(0);
     expect(linkedAccountSlots({ googleBusiness: 2, instagram: 1 })).toBe(1);
-    // 旧式の max(G,I)−1 との差：どちらのサービスも枠を超えたら両方数える
-    expect(linkedAccountSlots({ googleBusiness: 2, instagram: 2 })).toBe(2);
-    expect(linkedAccountSlots({ googleBusiness: 2, instagram: 3 })).toBe(3);
+    expect(linkedAccountSlots({ googleBusiness: 2, instagram: 3 })).toBe(2);
+    // 1枠(¥3,300)で Google・Instagram が各1個ずつ同時に増える（2026-11-16 利用者決定 Q6'）。
+    // 基本は各1個なので、各2個なら1枠、各3個なら2枠。片方だけ多くても枠は増えない。
+    expect(linkedAccountSlots({ googleBusiness: 2, instagram: 2 })).toBe(1);
+    expect(linkedAccountSlots({ googleBusiness: 3, instagram: 2 })).toBe(2);
+    expect(linkedAccountSlots({ googleBusiness: 3, instagram: 3 })).toBe(2);
     const result = musuboPrice({ ...base, lineCount: 2, linkedAccountsByLine: [
       { googleBusiness: 2, instagram: 1 }, { googleBusiness: 2, instagram: 3 },
     ] });
-    expect(result.linkedAccountSlots).toBe(4);
-    expect(result.linkedAccountSlotsMonthlyYen).toBe(13_200);
-  });
-
-  it('uses the per-service contracted quota when one is given', () => {
-    expect(linkedAccountSlots({ googleBusiness: 2, instagram: 3,
-      contracted: { googleBusiness: 2, instagram: 3 } })).toBe(0);
-    expect(linkedAccountSlots({ googleBusiness: 4, instagram: 1,
-      contracted: { googleBusiness: 2, instagram: 3 } })).toBe(2);
-    expect(linkedAccountSlots({ googleBusiness: 1, instagram: 1,
-      contracted: { googleBusiness: 0, instagram: 0 } })).toBe(2);
-    const result = musuboPrice({ ...base, lineCount: 2, linkedAccountsByLine: [
-      { googleBusiness: 3, instagram: 3, contracted: { googleBusiness: 3, instagram: 2 } },
-      { googleBusiness: 1, instagram: 1 },
-    ] });
-    expect(result.linkedAccountSlots).toBe(1);
-    expect(result.linkedAccountSlotsMonthlyYen).toBe(3_300);
-    expect(() => linkedAccountSlots({ googleBusiness: 1, instagram: 1,
-      contracted: { googleBusiness: -1, instagram: 1 } })).toThrow();
-    expect(() => linkedAccountSlots({ googleBusiness: 1, instagram: 1,
-      contracted: { googleBusiness: 1.5, instagram: 1 } })).toThrow();
+    expect(result.linkedAccountSlots).toBe(3);
+    expect(result.linkedAccountSlotsMonthlyYen).toBe(9_900);
   });
 
   it('discounts LINE base only, leaving headquarters and linked slots unchanged', () => {

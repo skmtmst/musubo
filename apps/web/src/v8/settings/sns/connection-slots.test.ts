@@ -4,8 +4,9 @@
  * 画面ではなくこの文書が判定を持つ決まりなので、受入条件のうち数の話はここで確かめる。
  * - 受入条件1：1サービスに接続を2件積める（Google 2件・Instagram 2件）。
  * - 受入条件2：契約枠の中の追加は料金確認を挟まない（`within-quota`）。
- * - 受入条件3：枠を超える追加は有料枠 = Σ max(0, 接続数 − 契約枠)、1枠 ¥3,300（税込）、
- *   無料期間中は0円、追加した月は日割り。各サービス11個目は個別見積もり。
+ * - 受入条件3：枠を超える追加は有料枠 = max(0, max(Google数, Instagram数) − 1)、
+ *   1枠 ¥3,300（税込）で両サービスが各1個ずつ増える。無料期間中は0円、追加した月は日割り。
+ *   各サービス11個目は個別見積もり。
  * - 受入条件4：解除で枠数が減り、契約枠は変わらない。
  */
 
@@ -36,19 +37,22 @@ function conn(service: SnsService, id: string, over: Partial<SnsConnectionView> 
   return { id, service, name: id, meta: [], state: 'connected', primary: false, version: 1, ...over }
 }
 
-function service(svc: SnsService, connected: number, contracted: number): SnsServiceSlots {
+function service(svc: SnsService, connected: number): SnsServiceSlots {
   return {
     service: svc,
     connections: Array.from({ length: connected }, (_, i) => conn(svc, `${svc}-${i + 1}`)),
-    contracted,
   }
 }
 
-/** `view(Google接続数, Google契約枠, Instagram接続数, Instagram契約枠)`。 */
-function view(g: number, gc: number, ig: number, igc: number): SnsSlotsView {
+/**
+ * `view(Google接続数, Instagram接続数, 契約枠)`。
+ * 契約枠は両サービス共通の1つの数（1 + 買った追加枠の数）。
+ */
+function view(g: number, ig: number, contracted: number): SnsSlotsView {
   return {
-    googleBusiness: service('googleBusiness', g, gc),
-    instagram: service('instagram', ig, igc),
+    contracted,
+    googleBusiness: service('googleBusiness', g),
+    instagram: service('instagram', ig),
   }
 }
 
@@ -61,21 +65,25 @@ describe('契約枠の数え方（受入条件1・3）', () => {
     expect(slotMonthlyYen(0)).toBe(0)
   })
 
-  it('有料枠はサービスごとに max(0, 接続数 − 契約枠) を出して足す', () => {
-    // 契約枠の中なら有料枠は出ない（Google 2件・Instagram 2件を契約枠どおり持てる）。
-    expect(paidSlotCount(view(2, 2, 2, 2))).toBe(0)
-    // 片方だけ超える。
-    expect(paidSlotCount(view(3, 2, 2, 2))).toBe(1)
-    // 両方超えたら足す（Google +2・Instagram +1）。
-    expect(paidSlotCount(view(4, 2, 3, 2))).toBe(3)
-    // 契約枠より少ない側はマイナスにしない。
-    expect(paidSlotCount(view(0, 3, 4, 2))).toBe(2)
+  it('有料枠は max(0, 多いほうの接続数 − 1)。1枠で両サービスが各1個ずつ増える', () => {
+    // 基本料金に Google・Instagram が各1個ぶん入るので、各1個までは有料枠なし。
+    expect(paidSlotCount(view(1, 1, 1))).toBe(0)
+    expect(paidSlotCount(view(0, 0, 1))).toBe(0)
+    // 1枠(¥3,300)で両サービスが各2個になるので、{2,2} は1枠ぶん。
+    expect(paidSlotCount(view(2, 2, 2))).toBe(1)
+    // 片方だけ3個でも、多いほうで決まるので2枠。
+    expect(paidSlotCount(view(3, 2, 3))).toBe(2)
+    // 2枠なら各3個ぶん。{3,3} も同じ2枠。
+    expect(paidSlotCount(view(3, 3, 3))).toBe(2)
+    // 少ない側の数は料金に効かない。
+    expect(paidSlotCount(view(0, 4, 4))).toBe(3)
   })
 
-  it('「連携 n個（契約枠 m個）」を出す', () => {
-    expect(slotCountText(service('googleBusiness', 2, 2))).toBe('連携 2個（契約枠 2個）')
-    expect(slotCountText(service('instagram', 3, 1))).toBe('連携 3個（契約枠 1個）')
-    expect(slotCountText(service('instagram', 0, 1))).toBe('連携 0個（契約枠 1個）')
+  it('「連携 n個（契約枠 m個）」を出す。契約枠は両サービス同じ数', () => {
+    const slots = view(2, 3, 2)
+    expect(slotCountText(slots.googleBusiness, slots.contracted)).toBe('連携 2個（契約枠 2個）')
+    expect(slotCountText(slots.instagram, slots.contracted)).toBe('連携 3個（契約枠 2個）')
+    expect(slotCountText(service('instagram', 0), 1)).toBe('連携 0個（契約枠 1個）')
   })
 })
 
@@ -84,45 +92,47 @@ describe('追加の筋書き（受入条件2・3）', () => {
   const TRIAL = { kind: 'trialing' } as const
 
   it('契約枠の中の追加は料金確認を挟まずそのまま認可へ進む', () => {
-    const plan = planAddition(view(1, 2, 0, 1), 'googleBusiness', PAID)
+    const plan = planAddition(view(1, 0, 2), 'googleBusiness', PAID)
     expect(plan).toEqual({ kind: 'within-quota', service: 'googleBusiness', connectedAfter: 2, contracted: 2 })
   })
 
   it('契約枠の中の追加は請求の段が分からなくても進める', () => {
-    const plan = planAddition(view(0, 1, 1, 2), 'instagram', null)
+    const plan = planAddition(view(0, 1, 2), 'instagram', null)
     expect(plan.kind).toBe('within-quota')
   })
 
   it('枠を超える追加は日割りの請求つきで料金確認へ進む（支払い中）', () => {
-    const plan = planAddition(view(2, 2, 1, 1), 'googleBusiness', PAID)
+    const plan = planAddition(view(2, 2, 2), 'googleBusiness', PAID)
     if (plan.kind !== 'over-quota') throw new Error(`over-quota のはずが ${plan.kind}`)
 
     expect(plan.connectedBefore).toBe(2)
     expect(plan.connectedAfter).toBe(3)
     expect(plan.contracted).toBe(2)
-    expect(plan.paidSlotsBefore).toBe(0)
-    expect(plan.paidSlotsAfter).toBe(1)
+    // 契約枠2個ぶん（= 買った1枠）がすでに有料枠1枠。超えるので1枠増える。
+    expect(plan.paidSlotsBefore).toBe(1)
+    expect(plan.paidSlotsAfter).toBe(2)
     expect(plan.addedSlots).toBe(1)
     expect(plan.monthlyIncreaseYen).toBe(3300)
-    expect(plan.monthlyAfterYen).toBe(3300)
+    expect(plan.monthlyAfterYen).toBe(6600)
     // 月次期間の残り15/30日ぶんの日割り。
     expect(plan.dueNowYen).toBe(1650)
     expect(plan.trialing).toBe(false)
   })
 
   it('すでに有料枠がある状態でも、増える枠は1枠ぶんだけ数える', () => {
-    const plan = planAddition(view(3, 2, 2, 1), 'instagram', PAID)
+    const plan = planAddition(view(3, 3, 3), 'googleBusiness', PAID)
     if (plan.kind !== 'over-quota') throw new Error(`over-quota のはずが ${plan.kind}`)
 
-    // Google +1・Instagram +1 で有料枠は2枠。
+    // 契約枠3個 = 買った2枠。4個目で3枠になる。
     expect(plan.paidSlotsBefore).toBe(2)
     expect(plan.paidSlotsAfter).toBe(3)
+    expect(plan.addedSlots).toBe(1)
     expect(plan.monthlyIncreaseYen).toBe(3300)
     expect(plan.monthlyAfterYen).toBe(9900)
   })
 
   it('無料期間中は今回の支払いが0円になる', () => {
-    const plan = planAddition(view(1, 1, 0, 1), 'googleBusiness', TRIAL)
+    const plan = planAddition(view(1, 0, 1), 'googleBusiness', TRIAL)
     if (plan.kind !== 'over-quota') throw new Error(`over-quota のはずが ${plan.kind}`)
 
     expect(plan.trialing).toBe(true)
@@ -133,7 +143,7 @@ describe('追加の筋書き（受入条件2・3）', () => {
   })
 
   it('請求の段が分からないときは枠を超える追加を止める', () => {
-    const plan = planAddition(view(1, 1, 0, 1), 'googleBusiness', null)
+    const plan = planAddition(view(1, 0, 1), 'googleBusiness', null)
     expect(plan).toEqual({
       kind: 'billing-unknown',
       service: 'googleBusiness',
@@ -144,7 +154,7 @@ describe('追加の筋書き（受入条件2・3）', () => {
 
   it('上限10個に達していたら個別見積もりで止める（11個目）', () => {
     for (const billing of [PAID, TRIAL, null]) {
-      const plan = planAddition(view(SNS_CONNECTION_LIMIT, 2, 0, 1), 'googleBusiness', billing)
+      const plan = planAddition(view(SNS_CONNECTION_LIMIT, 0, 2), 'googleBusiness', billing)
       expect(plan).toEqual({
         kind: 'individual-quote',
         service: 'googleBusiness',
@@ -155,15 +165,15 @@ describe('追加の筋書き（受入条件2・3）', () => {
   })
 
   it('上限はサービスごとに数える（片方が上限でも他方は追加できる）', () => {
-    const slots = view(SNS_CONNECTION_LIMIT, 2, 1, 2)
+    const slots = view(SNS_CONNECTION_LIMIT, 1, 2)
     expect(planAddition(slots, 'googleBusiness', PAID).kind).toBe('individual-quote')
     expect(planAddition(slots, 'instagram', PAID).kind).toBe('within-quota')
   })
 })
 
 describe('解除の筋書き（受入条件4）', () => {
-  it('1件だけ減り、契約枠は変わらない', () => {
-    const slots = view(2, 2, 2, 2)
+  it('多いほうの接続数が変わらない解除では有料枠が減らない', () => {
+    const slots = view(2, 2, 2)
     const target = slots.googleBusiness.connections[1]!
     const plan = planRemoval(slots, 'googleBusiness', target)
 
@@ -171,38 +181,41 @@ describe('解除の筋書き（受入条件4）', () => {
     expect(plan.connectedBefore).toBe(2)
     expect(plan.connectedAfter).toBe(1)
     expect(plan.contracted).toBe(2)
-    // 契約枠の中なので有料枠は動かない。
-    expect(plan.paidSlotsBefore).toBe(0)
-    expect(plan.paidSlotsAfter).toBe(0)
+    // Instagram が2個のままなので、多いほうは2個で変わらない。
+    expect(plan.paidSlotsBefore).toBe(1)
+    expect(plan.paidSlotsAfter).toBe(1)
     expect(plan.monthlyDecreaseYen).toBe(0)
   })
 
-  it('契約枠を超えていた分を解除すると有料枠が1枠減る', () => {
-    const slots = view(3, 2, 2, 2)
+  it('多いほうの接続数が減る解除は有料枠が1枠減る', () => {
+    const slots = view(3, 2, 3)
     const plan = planRemoval(slots, 'googleBusiness', slots.googleBusiness.connections[2]!)
 
-    expect(plan.paidSlotsBefore).toBe(1)
-    expect(plan.paidSlotsAfter).toBe(0)
-    expect(plan.contracted).toBe(2)
+    expect(plan.paidSlotsBefore).toBe(2)
+    expect(plan.paidSlotsAfter).toBe(1)
+    // 契約枠は解除しても変わらない。
+    expect(plan.contracted).toBe(3)
     expect(plan.monthlyDecreaseYen).toBe(3300)
   })
 
-  it('解除するサービス以外の有料枠は残す', () => {
-    const slots = view(3, 2, 3, 2)
+  it('少ないほうのサービスを解除しても料金は変わらない', () => {
+    const slots = view(3, 3, 3)
     const plan = planRemoval(slots, 'instagram', slots.instagram.connections[0]!)
 
-    // Instagram の1枠だけ減り、Google の1枠は残る。
+    // Google が3個のままなので有料枠2枠は残る。
     expect(plan.paidSlotsBefore).toBe(2)
-    expect(plan.paidSlotsAfter).toBe(1)
-    expect(plan.monthlyDecreaseYen).toBe(3300)
+    expect(plan.paidSlotsAfter).toBe(2)
+    expect(plan.monthlyDecreaseYen).toBe(0)
   })
 
   it('最後の1件を解除しても0個より下がらない', () => {
-    const slots = view(1, 1, 0, 1)
+    const slots = view(1, 0, 1)
     const plan = planRemoval(slots, 'googleBusiness', slots.googleBusiness.connections[0]!)
 
     expect(plan.connectedAfter).toBe(0)
     expect(plan.contracted).toBe(1)
+    expect(plan.paidSlotsBefore).toBe(0)
+    expect(plan.paidSlotsAfter).toBe(0)
     expect(plan.monthlyDecreaseYen).toBe(0)
   })
 })
@@ -253,11 +266,10 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
         lastSyncedAt: '2026-11-01T00:00:00.000Z',
         confirmationRevision: 4,
       }),
-      2,
       fmt,
     )
 
-    expect(slots.contracted).toBe(2)
+    expect(slots.service).toBe('googleBusiness')
     expect(slots.connections).toHaveLength(1)
     const row = slots.connections[0]!
     expect(row).toMatchObject({
@@ -272,18 +284,18 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
   })
 
   it('Google の未接続・読み取れないときは行を作らない', () => {
-    expect(googleSlots(googleData({ status: 'disconnected' }), 1, fmt).connections).toHaveLength(0)
-    expect(googleSlots(null, 1, fmt).connections).toHaveLength(0)
+    expect(googleSlots(googleData({ status: 'disconnected' }), fmt).connections).toHaveLength(0)
+    expect(googleSlots(null, fmt).connections).toHaveLength(0)
   })
 
   it('Google の選ぶ段・認可切れはそれぞれの状態の行になる', () => {
-    const pending = googleSlots(googleData({ status: 'pending_location' }), 1, fmt).connections[0]!
+    const pending = googleSlots(googleData({ status: 'pending_location' }), fmt).connections[0]!
     // 店舗名が無いときは店の名前で代わりに出す。
     expect(pending).toMatchObject({ state: 'pending', name: '然カフェ 本店', version: null })
 
-    expect(googleSlots(googleData({ status: 'expired' }), 1, fmt).connections[0]!.state).toBe('expired')
-    expect(googleSlots(googleData({ status: 'reauth_required' }), 1, fmt).connections[0]!.state).toBe('expired')
-    expect(googleSlots(googleData({ status: 'no_permission' }), 1, fmt).connections[0]!.state).toBe('error')
+    expect(googleSlots(googleData({ status: 'expired' }), fmt).connections[0]!.state).toBe('expired')
+    expect(googleSlots(googleData({ status: 'reauth_required' }), fmt).connections[0]!.state).toBe('expired')
+    expect(googleSlots(googleData({ status: 'no_permission' }), fmt).connections[0]!.state).toBe('error')
   })
 
   function igStatus(
@@ -305,9 +317,9 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
   }
 
   it('Instagram の接続済みは `@ユーザー名` の行になり、主連携は持たない', () => {
-    const slots = instagramSlots(igStatus('connected', IG_CONNECTION), 2, fmt)
+    const slots = instagramSlots(igStatus('connected', IG_CONNECTION), fmt)
 
-    expect(slots.contracted).toBe(2)
+    expect(slots.service).toBe('instagram')
     const row = slots.connections[0]!
     expect(row).toMatchObject({
       id: 'ig-1',
@@ -321,22 +333,18 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
   })
 
   it('Instagram はユーザー名が無いときページ名を出す', () => {
-    const slots = instagramSlots(
-      igStatus('connected', { ...IG_CONNECTION, username: null }),
-      1,
-      fmt,
-    )
+    const slots = instagramSlots(igStatus('connected', { ...IG_CONNECTION, username: null }), fmt)
     expect(slots.connections[0]!.name).toBe('然カフェ')
   })
 
   it('Instagram の認可切れも行として出す', () => {
-    const slots = instagramSlots(igStatus('expired', IG_CONNECTION), 1, fmt)
+    const slots = instagramSlots(igStatus('expired', IG_CONNECTION), fmt)
     expect(slots.connections[0]!.state).toBe('expired')
   })
 
   it('Instagram の未接続・未設定・読み取れないときは行を作らない', () => {
-    expect(instagramSlots(igStatus('disconnected'), 1, fmt).connections).toHaveLength(0)
-    expect(instagramSlots(igStatus('unconfigured'), 1, fmt).connections).toHaveLength(0)
-    expect(instagramSlots(null, 1, fmt).connections).toHaveLength(0)
+    expect(instagramSlots(igStatus('disconnected'), fmt).connections).toHaveLength(0)
+    expect(instagramSlots(igStatus('unconfigured'), fmt).connections).toHaveLength(0)
+    expect(instagramSlots(null, fmt).connections).toHaveLength(0)
   })
 })

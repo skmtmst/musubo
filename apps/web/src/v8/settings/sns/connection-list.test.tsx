@@ -41,7 +41,6 @@ function conn(
 function googleSlots(): SnsServiceSlots {
   return {
     service: 'googleBusiness',
-    contracted: 2,
     connections: [
       conn('googleBusiness', 'gc-1', '然カフェ 本店', {
         primary: true,
@@ -58,7 +57,6 @@ function googleSlots(): SnsServiceSlots {
 function instagramSlots(): SnsServiceSlots {
   return {
     service: 'instagram',
-    contracted: 2,
     connections: [
       conn('instagram', 'ig-1', '@nen_cafe', { meta: ['ビジネスアカウント', '接続した日 10/7'] }),
       conn('instagram', 'ig-2', '@nen_cafe_ekimae', {
@@ -125,7 +123,7 @@ describe('複数の接続を一覧に出す（受入条件1）', () => {
 
   it('接続が1件も無いときは一覧の箱ごと出さない', () => {
     const { container } = render(
-      <SnsConnectionList slots={{ service: 'instagram', contracted: 1, connections: [] }} canManage />,
+      <SnsConnectionList slots={{ service: 'instagram', connections: [] }} canManage />,
     )
     expect(container.firstChild).toBeNull()
   })

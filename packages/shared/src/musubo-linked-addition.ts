@@ -21,10 +21,7 @@ export interface MusuboLinkedAdditionPrice {
   dueNowYen: number;
 }
 
-/**
- * 1本のLINEへの追加。契約枠（サービス別）を超えた分だけ有料枠が増える。
- * `before.contracted` はそのまま `after` へ引き継ぐので、枠内の追加は増額0円になる。
- */
+/** An addition to one LINE uses the larger linked-service count, not their sum. */
 export function musuboLinkedAdditionPrice(input: MusuboLinkedAdditionInput): MusuboLinkedAdditionPrice {
   if (input.service !== 'googleBusiness' && input.service !== 'instagram') throw new RangeError('Invalid linked service');
   if (!Number.isSafeInteger(input.slotUnitYen) || input.slotUnitYen < 0) throw new RangeError('slotUnitYen must be nonnegative JPY');

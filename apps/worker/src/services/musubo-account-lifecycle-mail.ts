@@ -161,7 +161,7 @@ export function musuboFinalLineMail(input: {
   });
 }
 
-/** Mail 21 and 22. Slots count what each service exceeds its own contracted quota by, per LINE. */
+/** Mail 21 and 22. The number of slots comes from the larger service count per LINE. */
 export function musuboLinkedAccountMail(input: {
   event: 'added' | 'removed';
   lineName: string;

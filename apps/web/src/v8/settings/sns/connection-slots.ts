@@ -5,14 +5,21 @@
  * API の返事を整える場所。いまの API は Google・Instagram どちらも接続が1件ぶんの形なので、
  * ここで1件の配列に直す。API が配列を返すようになったら、直すのはこの文書だけで済む。
  *
- * 契約枠の数え方（要件 §4-1）:
- *   有料枠 = Σ max(0, 接続数 − 契約枠)（サービスごとに出して足す）
- * `packages/shared` の `linkedAccountSlots` も同じ数え方になった（`LinkedAccountCounts.contracted`）。
- * ここではサービス1つぶんの枠と画面の表示を扱う。単価・上限10個・無料期間¥0・日割りは共通設計をそのまま使う。
+ * 枠と料金の数え方（要件 §3・§4-1）:
+ *   基本料金に Google・Instagram が各1個ぶん入る。追加枠1枠（¥3,300税込）を足すと
+ *   両サービスの上限が同時に各1個増える（2枠なら各3個）。だから
+ *   有料枠 = max(0, max(Google数, Instagram数) − 1) で、`@line-crm/shared` の
+ *   `linkedAccountSlots` が正本。ここでは数え直さずそれを使う。
+ *
+ *   契約枠も同じ考え方で、LINEアカウントごとに1つの数（= 1 + 合意済みの追加枠数）。
+ *   サービス別に別の数を持たない。契約枠は「料金の確認を挟むかどうか」と
+ *   「連携 n個（契約枠 m個）」の表示にだけ使い、請求額は接続数から出す
+ *   （解除したら次回の月次請求から減らす、という今までの進み方をそのまま保つため）。
  */
 
 import {
   DEFAULT_MUSUBO_PRICE_SCHEDULE,
+  linkedAccountSlots,
   prorateMonthlyIncrement,
   type InstagramConnectionStatus,
 } from '@line-crm/shared'
@@ -46,15 +53,18 @@ export type SnsConnectionView = {
   version: number | null
 }
 
-/** 1サービスぶんの接続と枠。 */
+/** 1サービスぶんの接続。契約枠は両サービス共通なので `SnsSlotsView` が持つ。 */
 export type SnsServiceSlots = {
   service: SnsService
   connections: SnsConnectionView[]
-  /** 契約時にヒアリングした個数。HQ が持つ。 */
-  contracted: number
 }
 
 export type SnsSlotsView = {
+  /**
+   * 契約枠。LINEアカウントごとに1つの数で、Google・Instagram の両方に同じだけ効く。
+   * 値は 1 + 合意済みの追加枠数（追加枠なしなら1）。HQ が持つ。
+   */
+  contracted: number
   googleBusiness: SnsServiceSlots
   instagram: SnsServiceSlots
 }
@@ -66,25 +76,35 @@ export type SnsSlotBilling =
 
 /**
  * 契約枠の既定。
- * 契約枠は HQ が持ち、LINEアカウントごとにサービス別で返る形になる（要件 §4-1）。
+ * 契約枠は HQ が持ち、LINEアカウントごとに1つの数（両サービス共通）で返る形になる（要件 §4-1）。
  * その欄を返す API はまだ無い（要件 §6 の「API型」は別の担当）ので、
- * 返るまでは今の単一接続と同じ1個として数える。
+ * 返るまでは基本料金に入っている各1個ぶんだけを契約枠として数える。
  * 少なく見せて料金の確認を飛ばすことがない側へ寄せた既定。
  */
 export const SNS_DEFAULT_CONTRACTED = 1
 
 /* ------------------------------------------------------------------ 枠の数え方 */
 
-function overQuota(connected: number, contracted: number): number {
-  return Math.max(0, connected - contracted)
+/**
+ * 有料枠 = max(0, max(Google数, Instagram数) − 1)。
+ * 1枠で両サービスの上限が同時に1個ずつ増えるので、多いほうの数だけで決まる。
+ * 数式は `@line-crm/shared` の `linkedAccountSlots` が正本なので、ここでは数え直さない。
+ */
+export function paidSlotCount(slots: SnsSlotsView): number {
+  return linkedAccountSlots({
+    googleBusiness: slots.googleBusiness.connections.length,
+    instagram: slots.instagram.connections.length,
+  })
 }
 
-/** 有料枠 = Σ max(0, 接続数 − 契約枠)。サービスごとに出して足す。 */
-export function paidSlotCount(slots: SnsSlotsView): number {
-  return (
-    overQuota(slots.googleBusiness.connections.length, slots.googleBusiness.contracted) +
-    overQuota(slots.instagram.connections.length, slots.instagram.contracted)
-  )
+/** 片方のサービスの数だけを入れ替えたときの有料枠。追加・解除した後の枠数を出すのに使う。 */
+function paidSlotCountWith(slots: SnsSlotsView, service: SnsService, connected: number): number {
+  const counts = {
+    googleBusiness: slots.googleBusiness.connections.length,
+    instagram: slots.instagram.connections.length,
+  }
+  counts[service] = connected
+  return linkedAccountSlots(counts)
 }
 
 /** 枠の料金（税込・月額）。 */
@@ -136,7 +156,7 @@ export function planAddition(
 ): SnsAdditionPlan {
   const target = slots[service]
   const connectedBefore = target.connections.length
-  const contracted = target.contracted
+  const contracted = slots.contracted
 
   if (connectedBefore >= SNS_CONNECTION_LIMIT) {
     return { kind: 'individual-quote', service, connected: connectedBefore, contracted }
@@ -151,7 +171,7 @@ export function planAddition(
   }
 
   const paidSlotsBefore = paidSlotCount(slots)
-  const paidSlotsAfter = paidSlotsBefore + 1
+  const paidSlotsAfter = paidSlotCountWith(slots, service, connectedAfter)
   const addedSlots = paidSlotsAfter - paidSlotsBefore
   const monthlyIncreaseYen = slotMonthlyYen(addedSlots)
   const trialing = billing.kind === 'trialing'
@@ -205,16 +225,14 @@ export function planRemoval(
   const connectedBefore = target.connections.length
   const connectedAfter = Math.max(0, connectedBefore - 1)
   const paidSlotsBefore = paidSlotCount(slots)
-  const paidSlotsAfter =
-    paidSlotsBefore -
-    (overQuota(connectedBefore, target.contracted) - overQuota(connectedAfter, target.contracted))
+  const paidSlotsAfter = paidSlotCountWith(slots, service, connectedAfter)
 
   return {
     service,
     connection,
     connectedBefore,
     connectedAfter,
-    contracted: target.contracted,
+    contracted: slots.contracted,
     paidSlotsBefore,
     paidSlotsAfter,
     monthlyDecreaseYen: slotMonthlyYen(paidSlotsBefore - paidSlotsAfter),
@@ -238,7 +256,6 @@ function googleState(status: string | null | undefined): SnsConnectionState {
  */
 export function googleSlots(
   data: GoogleConnectionData | null,
-  contracted: number,
   formatLastSynced: (iso: string) => string,
 ): SnsServiceSlots {
   const connection = data?.connection ?? null
@@ -260,7 +277,7 @@ export function googleSlots(
     })
   }
 
-  return { service: 'googleBusiness', connections, contracted }
+  return { service: 'googleBusiness', connections }
 }
 
 /**
@@ -269,7 +286,6 @@ export function googleSlots(
  */
 export function instagramSlots(
   status: InstagramConnectionStatus | null,
-  contracted: number,
   formatConnected: (iso: string) => string,
 ): SnsServiceSlots {
   const connection = status?.connection ?? null
@@ -289,7 +305,7 @@ export function instagramSlots(
     })
   }
 
-  return { service: 'instagram', connections, contracted }
+  return { service: 'instagram', connections }
 }
 
 /** サービスの呼び方。ダイアログの文言は承認デザインに合わせて「Googleマイビジネス」。 */
@@ -302,9 +318,9 @@ export function serviceCardTitle(service: SnsService): string {
   return service === 'googleBusiness' ? 'Google ビジネス' : 'Instagram'
 }
 
-/** 「連携 n個（契約枠 m個）」。 */
-export function slotCountText(slots: SnsServiceSlots): string {
-  return `連携 ${slots.connections.length}個（契約枠 ${slots.contracted}個）`
+/** 「連携 n個（契約枠 m個）」。契約枠は両サービス共通の数なので外から渡す。 */
+export function slotCountText(slots: SnsServiceSlots, contracted: number): string {
+  return `連携 ${slots.connections.length}個（契約枠 ${contracted}個）`
 }
 
 /**

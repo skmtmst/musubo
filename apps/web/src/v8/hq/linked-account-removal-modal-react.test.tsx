@@ -34,10 +34,8 @@ describe('追加連携枠の解除', () => {
     expect(onConfirm).toHaveBeenCalledOnce()
   })
 
-  it('契約枠の中の接続を解除すれば減額なしと表示する', async () => {
-    await act(async () => { root.render(<LinkedAccountRemovalModal {...base} service="instagram"
-      before={{ googleBusiness: 3, instagram: 2, contracted: { googleBusiness: 1, instagram: 2 } }}
-      phase="review" onConfirm={onConfirm} />) })
+  it('解除しても多いほうが変わらなければ減額なしと表示する', async () => {
+    await act(async () => { root.render(<LinkedAccountRemovalModal {...base} service="instagram" phase="review" onConfirm={onConfirm} />) })
     expect(document.body.textContent).toContain('¥0 / 月（変更なし）')
     expect(document.body.textContent).toContain('追加枠の料金は変わりません')
   })
@@ -53,9 +51,7 @@ describe('追加連携枠の解除', () => {
   })
 
   it('減額がない解除の完了画面では支払済み枠が空くと誤案内しない', async () => {
-    await act(async () => { root.render(<LinkedAccountRemovalModal {...base} service="instagram"
-      before={{ googleBusiness: 3, instagram: 2, contracted: { googleBusiness: 1, instagram: 2 } }}
-      phase="complete" onAccounts={onAccounts} onBilling={onBilling} />) })
+    await act(async () => { root.render(<LinkedAccountRemovalModal {...base} service="instagram" phase="complete" onAccounts={onAccounts} onBilling={onBilling} />) })
     expect(document.body.textContent).toContain('ほかの連携先は引き続き利用できます')
     expect(document.body.textContent).not.toContain('支払済みの枠は')
   })

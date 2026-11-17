@@ -178,10 +178,12 @@ export default function SnsSettingsPage() {
   const googleStatus = visibleGoogle?.connection.status ?? null
   const igState = visibleInstagram?.state ?? null
 
-  /* 画面が必要とする形（サービスごとの接続と契約枠）へ直す。契約枠を返す API が入るまでは既定値。 */
+  /* 画面が必要とする形（サービスごとの接続と、両サービス共通の契約枠）へ直す。
+     契約枠を返す API が入るまでは既定値。 */
   const slots: SnsSlotsView = {
-    googleBusiness: googleSlots(visibleGoogle, SNS_DEFAULT_CONTRACTED, (iso) => formatDate(iso, { style: 'detail' })),
-    instagram: instagramSlots(visibleInstagram, SNS_DEFAULT_CONTRACTED, (iso) => formatDate(iso, { style: 'day' })),
+    contracted: SNS_DEFAULT_CONTRACTED,
+    googleBusiness: googleSlots(visibleGoogle, (iso) => formatDate(iso, { style: 'detail' })),
+    instagram: instagramSlots(visibleInstagram, (iso) => formatDate(iso, { style: 'day' })),
   }
   const canManageGoogle = canManage && (visibleGoogle?.permissions.canManageConnection ?? true)
 
@@ -326,7 +328,7 @@ export default function SnsSettingsPage() {
         <span className={styles.rowSpacer} />
         {connected ? (
           <>
-            <span className={styles.count}>{slotCountText(serviceSlots)}</span>
+            <span className={styles.count}>{slotCountText(serviceSlots, slots.contracted)}</span>
             <span className={styles.addWide}>
               <Button
                 variant="secondary"

@@ -18,10 +18,7 @@ export interface MusuboLinkedRemovalPrice {
   refundNowYen: 0;
 }
 
-/**
- * 接続はすぐ止め、返す減額は次の月初から効く。
- * 契約枠（サービス別）は解除しても変わらないので、枠内まで減らしても減額は0円になる。
- */
+/** Stop the connection immediately; the returned reduction applies at the next monthly billing boundary. */
 export function musuboLinkedRemovalPrice(input: MusuboLinkedRemovalInput): MusuboLinkedRemovalPrice {
   if (input.service !== 'googleBusiness' && input.service !== 'instagram') throw new RangeError('Invalid linked service');
   if (!Number.isSafeInteger(input.slotUnitYen) || input.slotUnitYen < 0) throw new RangeError('slotUnitYen must be nonnegative JPY');

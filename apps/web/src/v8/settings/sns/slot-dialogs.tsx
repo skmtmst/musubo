@@ -194,11 +194,14 @@ function connectedCountText(slots: SnsSlotsView): string {
     .join('・ ')
 }
 
-/** 「契約枠：Googleマイビジネス 2個 ・ Instagram 3個」。 */
+/**
+ * 「契約枠：Googleマイビジネス 2個 ・ Instagram 2個」。
+ * 契約枠は両サービス共通の1つの数（1枠で両方が1個ずつ増える）なので、同じ数を両方に出す。
+ */
 function contractedCountText(slots: SnsSlotsView): string {
   const order: SnsService[] = ['googleBusiness', 'instagram']
   return `契約枠：${order
-    .map((service) => `${serviceName(service)} ${slots[service].contracted}個`)
+    .map((service) => `${serviceName(service)} ${slots.contracted}個`)
     .join(' ・ ')}`
 }
 

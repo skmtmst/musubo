@@ -49,17 +49,19 @@ function conn(service: SnsService, id: string, name = id): SnsConnectionView {
   return { id, service, name, meta: [], state: 'connected', primary: false, version: 1 }
 }
 
-function service(svc: SnsService, connected: number, contracted: number): SnsServiceSlots {
+function service(svc: SnsService, connected: number): SnsServiceSlots {
   return {
     service: svc,
-    contracted,
     connections: Array.from({ length: connected }, (_, i) => conn(svc, `${svc}-${i + 1}`, `${svc} ${i + 1}`)),
   }
 }
 
-/** `view(Google接続数, Google契約枠, Instagram接続数, Instagram契約枠)`。 */
-function view(g: number, gc: number, ig: number, igc: number): SnsSlotsView {
-  return { googleBusiness: service('googleBusiness', g, gc), instagram: service('instagram', ig, igc) }
+/**
+ * `view(Google接続数, Instagram接続数, 契約枠)`。
+ * 契約枠は両サービス共通の1つの数（1枠で両方が1個ずつ増える）。
+ */
+function view(g: number, ig: number, contracted: number): SnsSlotsView {
+  return { contracted, googleBusiness: service('googleBusiness', g), instagram: service('instagram', ig) }
 }
 
 function overQuotaPlan(slots: SnsSlotsView, svc: SnsService, billing: SnsSlotBilling) {
@@ -81,7 +83,7 @@ function dialog() {
 describe('F3 枠を超える追加・支払い中（受入条件3）', () => {
   function renderPaid(over: Partial<React.ComponentProps<typeof SnsSlotPaidDialog>> = {}) {
     const props = {
-      plan: overQuotaPlan(view(2, 2, 1, 1), 'googleBusiness', PAID),
+      plan: overQuotaPlan(view(1, 1, 1), 'googleBusiness', PAID),
       accountName: ACCOUNT,
       onCancel: vi.fn(),
       onConfirm: vi.fn(),
@@ -96,12 +98,12 @@ describe('F3 枠を超える追加・支払い中（受入条件3）', () => {
     const win = dialog()
 
     expect(screen.getByRole('dialog', { name: /追加連携枠の料金を確認/ })).toBeTruthy()
-    expect(win.getByText(/契約枠（Googleマイビジネス 2個）を使い切っているため/)).toBeTruthy()
+    expect(win.getByText(/契約枠（Googleマイビジネス 1個）を使い切っているため/)).toBeTruthy()
 
     expect(win.getByText('次回からの月額増分（税込）')).toBeTruthy()
     expect(win.getByText('＋¥3,300 / 月')).toBeTruthy()
     expect(
-      win.getByText('Googleマイビジネス 2個 → 3個 ・ 契約枠 2個｜有料の追加枠 0枠 → 1枠'),
+      win.getByText('Googleマイビジネス 1個 → 2個 ・ 契約枠 1個｜有料の追加枠 0枠 → 1枠'),
     ).toBeTruthy()
 
     expect(win.getByText('追加後の連携枠料金（税込）')).toBeTruthy()
@@ -113,13 +115,13 @@ describe('F3 枠を超える追加・支払い中（受入条件3）', () => {
   })
 
   it('すでに有料枠があるときは増えたあとの合計を出す', () => {
-    renderPaid({ plan: overQuotaPlan(view(3, 2, 2, 1), 'instagram', PAID) })
+    renderPaid({ plan: overQuotaPlan(view(3, 3, 3), 'instagram', PAID) })
     const win = dialog()
 
     expect(win.getByText('＋¥3,300 / 月')).toBeTruthy()
-    // Google 1枠 ＋ Instagram 2枠 = 3枠。
+    // 多いほうが4個になるので3枠（契約枠3個 = すでに2枠ぶん）。
     expect(win.getByText('¥9,900 / 月')).toBeTruthy()
-    expect(win.getByText('Instagram 2個 → 3個 ・ 契約枠 1個｜有料の追加枠 2枠 → 3枠')).toBeTruthy()
+    expect(win.getByText('Instagram 3個 → 4個 ・ 契約枠 3個｜有料の追加枠 2枠 → 3枠')).toBeTruthy()
   })
 
   it('同意したときだけ認可へ進み、戻るでは進まない', () => {
@@ -143,7 +145,7 @@ describe('F4 枠を超える追加・無料期間（受入条件3）', () => {
   it('追加料金0円と、無料期間が終わったあとの料金を出す', () => {
     render(
       <SnsSlotTrialDialog
-        plan={overQuotaPlan(view(1, 1, 1, 1), 'instagram', TRIAL)}
+        plan={overQuotaPlan(view(1, 1, 1), 'instagram', TRIAL)}
         accountName={ACCOUNT}
         onCancel={vi.fn()}
         onConfirm={vi.fn()}
@@ -170,19 +172,19 @@ describe('F4 枠を超える追加・無料期間（受入条件3）', () => {
     }
 
     const { unmount } = render(
-      <SnsSlotAdditionDialog plan={overQuotaPlan(view(1, 1, 0, 1), 'googleBusiness', TRIAL)} {...base} />,
+      <SnsSlotAdditionDialog plan={overQuotaPlan(view(1, 0, 1), 'googleBusiness', TRIAL)} {...base} />,
     )
     expect(screen.getByRole('dialog', { name: /追加料金はかかりません/ })).toBeTruthy()
     unmount()
 
-    render(<SnsSlotAdditionDialog plan={overQuotaPlan(view(1, 1, 0, 1), 'googleBusiness', PAID)} {...base} />)
+    render(<SnsSlotAdditionDialog plan={overQuotaPlan(view(1, 0, 1), 'googleBusiness', PAID)} {...base} />)
     expect(screen.getByRole('dialog', { name: /追加連携枠の料金を確認/ })).toBeTruthy()
   })
 })
 
 describe('F5 11個目の個別見積もり（受入条件3）', () => {
   it('上限といまの連携数・契約枠を出し、認可へ進む口は置かない', () => {
-    const slots = view(SNS_CONNECTION_LIMIT, 2, 2, 2)
+    const slots = view(SNS_CONNECTION_LIMIT, 2, 2)
     const onContact = vi.fn()
     render(
       <SnsSlotQuoteDialog
@@ -217,7 +219,7 @@ describe('F6 解除の確認（受入条件4）', () => {
   }
 
   it('解除する1件・連携数の減り・契約枠は変わらないことを書く', () => {
-    const slots = view(3, 2, 2, 2)
+    const slots = view(3, 2, 2)
     render(
       <SnsSlotRemovalDialog
         plan={removal(slots, 'googleBusiness', 2)}
@@ -241,11 +243,12 @@ describe('F6 解除の確認（受入条件4）', () => {
     expect(win.getByText('契約枠')).toBeTruthy()
     expect(win.getByText('2個（変わりません）')).toBeTruthy()
     expect(win.getByText('有料の追加連携枠')).toBeTruthy()
-    expect(win.getByText('1枠 → 0枠')).toBeTruthy()
+    // 多いほうが3個→2個に減るので、有料枠も1枠減る。
+    expect(win.getByText('2枠 → 1枠')).toBeTruthy()
   })
 
   it('次回の請求日が分かるときだけ減額の箱を出す', () => {
-    const slots = view(3, 2, 2, 2)
+    const slots = view(3, 2, 2)
     const plan = removal(slots, 'googleBusiness', 2)
     const base = { plan, accountName: ACCOUNT, onCancel: vi.fn(), onConfirm: vi.fn() }
 
@@ -263,8 +266,8 @@ describe('F6 解除の確認（受入条件4）', () => {
     ).toBeTruthy()
   })
 
-  it('契約枠の中の接続を解除するときは減額の箱を出さない', () => {
-    const slots = view(2, 2, 2, 2)
+  it('多いほうの連携数が変わらない解除では減額の箱を出さない', () => {
+    const slots = view(2, 2, 2)
     render(
       <SnsSlotRemovalDialog
         plan={removal(slots, 'googleBusiness', 1)}
@@ -275,12 +278,13 @@ describe('F6 解除の確認（受入条件4）', () => {
       />,
     )
 
-    expect(dialog().getByText('0枠 → 0枠')).toBeTruthy()
+    // Instagram が2個のままなので、多いほうは2個で変わらない。
+    expect(dialog().getByText('1枠 → 1枠')).toBeTruthy()
     expect(screen.queryByText('次回の月次請求から')).toBeNull()
   })
 
   it('解除するで進み、戻るでは進まない', () => {
-    const slots = view(2, 2, 2, 2)
+    const slots = view(2, 2, 2)
     const onCancel = vi.fn()
     const onConfirm = vi.fn()
     render(
