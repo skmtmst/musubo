@@ -6,7 +6,7 @@
 
 入口：`app/settings/sns/page.tsx`（新しい画面なので V8 だけ）。板は `y3GGTs`。
 
-絵：★`/Users/masatosakamoto/Documents/LINE-Harness-Design/新規デザイン/2026-11-16_GoogleビジネスとInstargram複数連携_設定SNS連携/設定SNS連携_複数接続_第1段_v7.pen`（2026-11-16 利用者承認「v7 を第1段の正本として承認します。」）。F1 `tIRy5`（広い画面・複数接続）／F2 `VH2Ga`（細い画面）／F3 `q9hcp9`（枠を超える追加・支払い中）／F4 `uB88I`（枠を超える追加・無料期間）／F5 `R4dYE`（11個目の個別見積もり）／F6 `JvuLH`（解除の確認）／F7（未接続）／F8（閲覧のみ）。V8-B `YINmJ`・`DFnll` は**過去の版**で、食い違うところは v7 が優先する。
+絵：★`/Users/masatosakamoto/Documents/LINE-Harness-Design/新規デザイン/2026-11-16_GoogleビジネスとInstargram複数連携_設定SNS連携/設定SNS連携_複数接続_第1段_v8.pen`（2026-11-17 利用者承認「v8を承認する」。v8 は v7 の 4つの窓の内側余白だけを 28px→24px にした版で、ほかは同じ。v7 は版の経緯として無変更で保存）。F1 `tIRy5`（広い画面・複数接続）／F2 `VH2Ga`（細い画面）／F3 `q9hcp9`（枠を超える追加・支払い中）／F4 `uB88I`（枠を超える追加・無料期間）／F5 `R4dYE`（11個目の個別見積もり）／F6 `JvuLH`（解除の確認）／F7（未接続）／F8（閲覧のみ）。V8-B `YINmJ`・`DFnll` は**過去の版**で、食い違うところは v8 が優先する。
 
 Googleビジネスと Instagram の2つだけ（X は入れない）。
 
