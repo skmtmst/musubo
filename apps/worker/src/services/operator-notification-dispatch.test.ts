@@ -81,6 +81,22 @@ describe('運用者通知の自動発火と登録簿', () => {
     seedBase(testDb);
   });
 
+  it('担当通知は未解決の共通情報を送らず、値があれば置き換える', async () => {
+    vi.useFakeTimers({toFake:['Date']});
+    vi.setSystemTime(new Date('2026-11-19T01:00:00Z'));
+    try {
+      await publishRule(testDb, {conditions:{recipientIds:['owner-1'],message:'営業時間: {{var.hours}}'},channels:['line']});
+      const send = (sourceEventId: string) => dispatchOperatorEvent(testDb.db, env, {lineAccountId:'account-1',eventType:'booking_created',sourceEventId,executionMode:'automatic'});
+      await send('booking-1');
+      expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+      expect(testDb.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+      testDb.raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES('var','account-1','営業時間','hours','text','10時')").run();
+      await send('booking-2');
+      expect(pushMessageWithRequestId).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(pushMessageWithRequestId.mock.calls)).toContain('営業時間: 10時');
+    } finally { vi.useRealTimers(); }
+  });
+
   it.each([
     ['通知する時間', '2026-11-19T08:00:00+09:00', 'failed', 'push_unavailable'],
     ['通知を控える時間', '2026-11-19T22:00:00+09:00', 'suppressed_quiet', null],

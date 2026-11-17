@@ -1,5 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent } from './event-bus.js';
+import { LineClient } from '@line-crm/line-sdk';
+import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 
 const actionScoreMocks = vi.hoisted(() => ({
   applyActionScoreEvent: vi.fn(),
@@ -122,6 +124,25 @@ describe('fireEvent — send_message action logging', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('イベントからの自動返信は共通情報がないと送らず、値があれば置き換える', async () => {
+    const sql = createTestD1();
+    try {
+      sql.raw.prepare("INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES ('acc-1','店','ch','token','secret')").run();
+      insertFriend(sql.raw, 'friend-1', { line_user_id: 'U_test', line_account_id: 'acc-1' });
+      const db = await import('@line-crm/db');
+      vi.mocked(db.getActiveAutomationsByEvent).mockResolvedValue([{ id:'auto-1', line_account_id:'acc-1', conditions:'{}', actions:JSON.stringify([{type:'send_message',params:{messageType:'text',content:'営業時間: {{var.hours}}'}}]) }] as never);
+      const send = () => fireEvent(sql.db, 'tag_added', { friendId:'friend-1', eventData:{} }, 'token', 'acc-1');
+      await send();
+      const client = vi.mocked(LineClient).mock.results.at(-1)?.value;
+      expect(client.pushMessage).not.toHaveBeenCalled();
+      expect(sql.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+      sql.raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES ('var','acc-1','営業時間','hours','text','10時')").run();
+      await send();
+      const second = vi.mocked(LineClient).mock.results.at(-1)?.value;
+      expect(second.pushMessage).toHaveBeenCalledWith('U_test', [{type:'text',text:'営業時間: 10時'}], undefined);
+    } finally { sql.raw.close(); }
   });
 
   it('logs flex outgoing message to messages_log when send_message fires via reply', async () => {
