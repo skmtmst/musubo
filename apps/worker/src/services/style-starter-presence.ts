@@ -8,7 +8,7 @@ function presenceSql(kind: string): string {
   if (kind === 'form') return "SELECT 1 FROM forms f JOIN form_accounts a ON a.form_id=f.id WHERE f.id=? AND a.line_account_id=? AND f.status!='archived'";
   const resource = resourceTables[kind];
   if (!resource) throw new StyleError('invalid_resource');
-  const live = kind === 'template' || kind === 'booking_menu' ? ' AND deleted_at IS NULL' : '';
+  const live = ['template', 'booking_menu', 'reminder'].includes(kind) ? ' AND deleted_at IS NULL' : kind === 'friend_add_rule' ? " AND archived_at IS NULL AND status!='archived'" : kind === 'automation' ? " AND status!='archived'" : '';
   return `SELECT 1 FROM ${resource.table} WHERE id=? AND ${resource.account}=?${live}`;
 }
 export async function starterResourceExists(db: D1Database, account: string, row: {kind:string;target_id:string}) {

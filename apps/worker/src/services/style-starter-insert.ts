@@ -78,7 +78,7 @@ export async function insertStyleStarterItems(
       for (const row of candidates) {
         if (row.kind === item.kind && await starterResourceExists(db,account,row)) { previous = row; break; }
       }
-      if (previous) { skip(item.key,'already_exists'); continue; }
+      if (previous && previous.style !== style) { skip(item.key,'already_exists'); continue; }
       if (sameStyle) missingCurrent = sameStyle;
     }
     if(item.kind==='form'&&previous&&((input.answers as Record<string,SetupAnswer>|undefined)?.image?.value==='simple'||input.confirmInitialMenu===true)) {

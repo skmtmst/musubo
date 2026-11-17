@@ -125,6 +125,24 @@ describe('新しいアカウントの初期セット', () => {
     const remaining = sql.raw.prepare("SELECT * FROM style_starter_items WHERE line_account_id='a' AND style='salon' AND item_key!=? ORDER BY item_key").all(shared.item_key);
     expect(remaining).toEqual((before as Array<{item_key:string}>).filter(row => row.item_key !== shared.item_key));
   });
+  test.each([
+    ['reminder', 'salon', "UPDATE reminders SET deleted_at='2026-11-17' WHERE id=?"],
+    ['automation', 'restaurant', "UPDATE automation_definitions SET status='archived' WHERE id=?"],
+    ['friend_add_rule', 'standard', "UPDATE friend_add_rules SET status='archived',archived_at='2026-11-17' WHERE id=?"],
+  ])('削除した %s の見本を補充する', async (kind, style, remove) => {
+    await initializeAccountStyle(sql.db, 'a', 't', 'owner');
+    expect((await request(base + '?account_id=a', 'PUT', {expectedVersion: 1, style, answers: allAnswers})).status).toBe(200);
+    const original = sql.raw.prepare("SELECT item_key,target_id FROM style_starter_items WHERE line_account_id='a' AND style=? AND kind=? LIMIT 1").get(style, kind) as {item_key:string;target_id:string};
+    expect(original).toBeTruthy();
+    sql.raw.prepare(remove).run(original.target_id);
+    const result = await request(ensurePath, 'POST', {expectedVersion: version()});
+    expect(result.status).toBe(200);
+    expect(result.body.data.inserted).toContainEqual(expect.objectContaining({key:original.item_key, kind}));
+    const replacement = sql.raw.prepare("SELECT target_id FROM style_starter_items WHERE line_account_id='a' AND style=? AND item_key=?").get(style, original.item_key) as {target_id:string};
+    expect(replacement.target_id).not.toBe(original.target_id);
+    const again = await request(ensurePath, 'POST', {expectedVersion: version()});
+    expect(again.body.data.inserted).toEqual([]);
+  });
   test('通常切り替えで再利用した見本を不足と判定しない', async () => {
     await initializeAccountStyle(sql.db, 'a', 't', 'owner');
     expect((await request(base + '?account_id=a', 'PUT', {expectedVersion: 1, style: 'standard', answers: allAnswers})).status).toBe(200);
