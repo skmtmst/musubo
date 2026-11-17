@@ -71,6 +71,8 @@ const buttonByText = (text: string) =>
 const dialogTitles = () => Array.from(document.querySelectorAll('[role="dialog"] h2')).map((h) => h.textContent)
 
 beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-17T00:00:00.000Z'))
   me.mockResolvedValue({ success: true, data: { id: 'owner', name: 'Kenta', role: 'owner', accountScope: 'all' } })
   list.mockResolvedValue({ success: true, data: [staffMember] })
   update.mockResolvedValue({ success: true, data: staffMember })
@@ -92,10 +94,14 @@ afterEach(async () => {
   root = null
   document.body.innerHTML = ''
   vi.clearAllMocks()
+  vi.useRealTimers()
 })
 
 describe('V8 統括のメンバーの窓', () => {
   it('本人の二段階認証設定を一覧の下に表示する', () => {
+    expect(screen.getByText('統括の設定')).toBeTruthy()
+    expect(screen.getByRole('table', { name: '権限者の一覧' })).toBeTruthy()
+    expect(screen.getByRole('searchbox', { name: '名前・メールで探す' })).toBeTruthy()
     expect(screen.getByRole('region', { name: '自分の設定' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '二段階認証' })).toBeTruthy()
   })
