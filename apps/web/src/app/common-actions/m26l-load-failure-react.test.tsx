@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * m26l 実 React 回帰（監査 R583・R584・R585）。
- * 隣の m26l-load-failure-contract.test.ts が source 文字列だけを見るのに対し、
- * こちらは本物の React で本物の new/edit ページを mount し、差し替えるのは
+ * 本物の React で本物の new/edit ページを mount し、差し替えるのは
  * 通信（api.commonActions）だけ。振る舞いが壊れたら落ちる。
  */
 import React, { act } from 'react'
@@ -161,6 +160,7 @@ describe('R583 下書きなしと通信失敗の言い分け（本物のReact）
     expect(text()).toContain('公開済みの版はそのままです')
     expect(text()).toContain('前の版から新版を作る')
     expect(text()).toContain('版の画面へ戻る')
+    expect([...container.querySelectorAll('a')].find(a => a.textContent?.trim() === '版の画面へ戻る')?.getAttribute('href')).toBe('/common-actions/versions?id=ca-1')
     // 再読込では直らないので、通信障害の再読込の口は出さない。
     expect(text()).not.toContain('もう一度読み込む')
     expect(text()).not.toContain('下書きを読み込めませんでした')
@@ -195,6 +195,7 @@ describe('R584 再取得の成功後は古い失敗文を残さない（本物�
     const nameInput = container.querySelector('input') as HTMLInputElement | null
     expect(nameInput, '名前の入力欄がある').toBeTruthy()
     expect(nameInput!.value).toBe('テストアクション')
+    expect(container.querySelector('[data-design-part="notice"][data-tone="danger"]')).toBeNull()
   })
 })
 
@@ -206,6 +207,7 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
 
     expect(text()).toContain('読み込みに失敗しました')
     expect(buttonNamed('選択肢をもう一度読み込む'), '選択肢だけの再取得ボタンがある').toBeTruthy()
+    await act(async () => { (container.querySelector('[data-action-row] button[aria-expanded]') as HTMLButtonElement).click() })
     // 失敗時は真の0件（選べる◯◯がありません）と混ぜない。
     expect(text()).not.toContain('選べるタグがありません')
     // 保存の入口は閉じ、理由を示す。
@@ -228,6 +230,10 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
       fireEvent.change(nameInput!, { target: { value: '監査の記録' } })
     })
 
+    const description = container.querySelector<HTMLInputElement>('input[placeholder="使う場面や目的を書きます"]')!
+    await act(async () => { fireEvent.change(description, { target: { value: '残したい説明' } }); buttonNamed('待ち時間を入れる')!.click() })
+    expect(container.querySelectorAll('[data-action-row]')).toHaveLength(2)
+    expect(container.querySelectorAll('[data-action-row]')[1].textContent).toContain('5 分待つ')
     const retry = buttonNamed('選択肢をもう一度読み込む')
     expect(retry, '再取得ボタンがある').toBeTruthy()
     await act(async () => { retry!.click() })
@@ -236,6 +242,9 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
     // 失敗文は消え、入力は保たれる。
     expect(text()).not.toContain('読み込みに失敗しました')
     expect((container.querySelector('input') as HTMLInputElement).value).toBe('監査の記録')
+    expect(container.querySelector<HTMLInputElement>('input[placeholder="使う場面や目的を書きます"]')?.value).toBe('残したい説明')
+    expect(container.querySelectorAll('[data-action-row]')).toHaveLength(2)
+    expect(container.querySelectorAll('[data-action-row]')[1].textContent).toContain('5 分待つ')
     // 候補が戻る（空でない取得なので真の0件の文は出ない）。共有Selectは
     // 閉じている間は候補名を描かないため、0件文の不在で戻りを確かめる。
     expect(text()).not.toContain('選べるタグがありません')
