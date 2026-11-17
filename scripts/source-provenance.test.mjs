@@ -99,3 +99,14 @@ test('module loaders execute imports and keep file reader aliases traceable', ()
   const source=`import{createRequire}from'node:module';import{readFileSync}from'node:fs';import{it,expect}from'vitest';const load=createRequire(import.meta.url);const src=readFileSync('product.tsx');it('value',()=>{load.externalAssert(src);expect(load.resolve(src)).toContain('label')})`;
   assert.equal(analyzeSourceTests(new Map([[entry,source]])).length,2);
 }));
+
+
+test('HTTP metadata and node vm execution preserve body provenance', () => regressionCase(() => {
+  const prefix = `import {runInNewContext as execute} from 'node:vm';import {readFileSync} from 'node:fs';import {it,expect} from 'vitest';it('http',async()=>{const res=await app.fetch(new Request('https://example.com/script.js'));`;
+  const run=body=>analyzeSourceTests(new Map([[entry,prefix+body+'})']]));
+  assert.deepEqual(run(`expect(res.status).toBe(200);expect(res.headers.get('Content-Type')).toContain('javascript');execute(await res.text(), {})`),[]);
+  for(const expression of ['await res.text()','await res.json()','await res.arrayBuffer()','await res.clone().text()','await (await res.blob()).text()'])assert.ok(run(`expect(${expression}).toContain('className')`).length,expression);
+  assert.ok(run(`unknown(await res.text())`).length);
+  assert.ok(run(`app.fetch(new Request('https://example.com/script.js',{body:readFileSync('a.tsx')}))`).length);
+  assert.ok(run(`app.fetch(new Request('https://example.com/script.js'),{src:readFileSync('a.tsx')})`).length);
+}));
