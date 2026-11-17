@@ -201,3 +201,5 @@ test('adopting the split-file reader retains old assertions and detects new stri
   assert.equal(newSourceAssertions(direct, run(`expect(src).toContain('styles.row')`)).length, 1)
   assert.equal(compare(run(`expect(src).toContain('styles.row')`, 'apps/web/src/example.tsx', helperSource.replace("readFileSync(path,'utf8')", "readFileSync(path,'utf8')+'styles.row'"))).length, 1)
 })
+
+
