@@ -81,6 +81,8 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z'))
   forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   clearToastsForTest()
   fixture.listMenus = async () => ({ menus: MENUS })
@@ -90,9 +92,43 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 
 describe('担当まとめ（V8）の読み込みと保存', () => {
+  test('元の表との差分だけを未保存として扱い、保存後は基準を更新する', async () => {
+    renderPage()
+    await screen.findByText('だれがどのメニューを受けるか')
+    expect(screen.queryByText('未保存の変更があります')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '保存する', exact: true }))
+    expect(await screen.findByText('変更はありません。')).toBeTruthy()
+    expect(fixture.putBulk).not.toHaveBeenCalled()
+    const box = screen.getByRole('checkbox', { name: 'カット を 担当A が受ける' })
+    fireEvent.click(box)
+    expect(screen.getByText('未保存の変更があります')).toBeTruthy()
+    fireEvent.click(box)
+    expect(screen.queryByText('未保存の変更があります')).toBeNull()
+    fireEvent.click(box)
+    fireEvent.click(screen.getByRole('button', { name: '保存する', exact: true }))
+    await waitFor(() => expect(fixture.putBulk).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.queryByText('未保存の変更があります')).toBeNull())
+    fireEvent.click(box)
+    expect(screen.getByText('未保存の変更があります')).toBeTruthy()
+  })
+
+  test('保存が失敗したら理由と未保存を残し、もう一度保存できる', async () => {
+    fixture.putBulk = vi.fn().mockRejectedValueOnce(new Error('private')).mockResolvedValue({ ok: true })
+    renderPage()
+    await screen.findByText('だれがどのメニューを受けるか')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'カット を 担当A が受ける' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する', exact: true }))
+    expect(await screen.findByText(/保存できませんでした/)).toBeTruthy()
+    expect(screen.getByText('未保存の変更があります')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '保存する', exact: true }))
+    await waitFor(() => expect(fixture.putBulk).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByText('未保存の変更があります')).toBeNull())
+  })
+
   test('担当割当でも予約設定の題と9つのタブを保つ', async () => {
     renderPage()
     await screen.findByText('だれがどのメニューを受けるか')
