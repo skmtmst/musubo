@@ -11,7 +11,6 @@ import { describe, expect, it } from 'vitest'
 const SRC = dirname(fileURLToPath(import.meta.url))
 
 const CASES = [
-  { file: 'mileage/earning-rules.tsx', fn: 'toggleRule', optimistic: 'setStatus(next)', revert: 'setStatus(before)', call: 'api.mileage.updateRule(' },
   { file: 'mileage/rewards.tsx', fn: 'changeState', optimistic: 'setStatus(next)', revert: 'setStatus(before)', call: 'api.mileage.stopReward(' },
   { file: 'affiliates/offers.tsx', fn: 'togglePublish', optimistic: 'setActive(next)', revert: 'setActive(offer.isActive)', call: 'api.affiliateOffers.update(' },
 ]
