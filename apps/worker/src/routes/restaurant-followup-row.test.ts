@@ -5,6 +5,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import * as followupTestSend from '../services/restaurant-followup-test-send.js';
 import { NotificationDeliveryIncomplete } from '../services/recorded-notification-send.js';
+import { CommonVarResolutionFailedError } from '../services/interpolation-context.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 type MockStaff = {
   id: string;
@@ -318,6 +319,15 @@ for(const [reason,code,message] of [
  try{
   const response=await request(path+'/engines/reservation_created/test-send'+scope,{expectedTargetVersion:1});
   expect(response.status).toBe(409);expect(await response.json()).toMatchObject({success:false,code,error:expect.stringContaining(message)});
+ }finally{send.mockRestore();}
+});
+
+it('未登録の共通情報はテスト送信せず、配信のテストと同じ422で名前を返す',async()=>{
+ newStore();const send=vi.spyOn(followupTestSend,'testRestaurantFollowupEngine').mockRejectedValueOnce(new CommonVarResolutionFailedError([{varKey:'hours',reason:'missing'}],{kind:'test_send',id:'step'}));
+ try{
+  const response=await request(path+'/engines/reservation_created/test-send'+scope,{expectedTargetVersion:1});
+  expect(response.status).toBe(422);
+  expect(await response.json()).toMatchObject({success:false,error:'共通情報を解決できません: {{var.hours}}'});
  }finally{send.mockRestore();}
 });
 

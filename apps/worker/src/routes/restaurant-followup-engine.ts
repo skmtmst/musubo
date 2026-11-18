@@ -11,6 +11,7 @@ import { readRestaurantFollowupEngineStates } from '../services/restaurant-follo
 import { startRestaurantFollowupEngine } from '../services/restaurant-followup-engine-start.js';
 import { testRestaurantFollowupEngine } from '../services/restaurant-followup-test-send.js';
 import { NotificationDeliveryIncomplete } from '../services/recorded-notification-send.js';
+import { CommonVarResolutionFailedError } from '../services/interpolation-context.js';
 import { resolveReminderTestRecipient } from '../services/reminder-draft.js';
 
 async function scope(c:Context<Env>){
@@ -27,6 +28,7 @@ function draftInput(value:unknown):value is FollowupDraftInput{
   &&!!body.timing&&typeof body.timing==='object'&&Array.isArray(body.messageBubbles);
 }
 function failure(c:Context<Env>,error:unknown){
+ if(error instanceof CommonVarResolutionFailedError)return inputError(c,{success:false,error:`共通情報を解決できません: ${error.failures.map(f=>`{{var.${f.varKey}}}`).join(', ')}`},422,['CommonVarResolutionFailedError']);
  if(error instanceof FollowupDraftError){
   const payload={success:false,code:error.code,error:error.message};
   return error.code==='invalid_followup'?inputError(c,payload,422,error.field?[error.field]:[]):c.json(payload,409);

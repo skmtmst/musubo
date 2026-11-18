@@ -467,6 +467,8 @@
 
 ## 反映履歴
 
+- [来店フォローのテスト送信を修正](release-log/unreleased/PR-kenta-visit-vars.md) — 反映履歴、確認 2026-11-18。
+
 - [お客さま画面の設定確認を改善](release-log/unreleased/116-kenta-q02b-b12.md) — 反映履歴、確認 2026-11-18。
 
 - [配信と通知の内容を確かめる試験を見直し](release-log/unreleased/113-kenta-q02b-b9.md) — 反映履歴、確認 2026-11-18。
