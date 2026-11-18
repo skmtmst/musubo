@@ -257,9 +257,11 @@ test(`${MOBILE_WIDTH}px 枠14 吹き出しは画面下部固定`, async ({ page 
   await expect(popup).toBeVisible({ timeout: 15000 })
   await popup.getByRole('button', { name: '進める', exact: true }).click()
   await expect(popup).toHaveCount(0)
-  const open = page.getByRole('link', { name: /ガイドで開く/ }).first()
-  await expect(open, 'スマホで「ガイドで開く」が無い').toBeVisible({ timeout: 15000 })
-  await open.click()
+  /*
+    枠14 共通ルール izsr5 のとおり、始めた直後にその手順の画面まで連れていく
+    （PC と同じ形。ダッシュボードに「ガイドで開く」を置く形は a32571717c で無くなった）。
+  */
+  await expect(page).toHaveURL(/\/restaurant-test\/tables/, { timeout: 15000 })
   await expect(page.locator('[data-guide-anchor="tables.create"]'), 'スマホで手順1/3の対象が出ない')
     .toBeVisible({ timeout: 15000 })
   const balloon = page.locator('[data-guide-balloon]')
