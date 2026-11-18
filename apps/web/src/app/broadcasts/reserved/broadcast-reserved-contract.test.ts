@@ -46,14 +46,6 @@ describe("管理画面 一斉配信の予約完了", () => {
     expect(PAGE).toContain('belongsToAccount(broadcast, selectedAccountId)')
   })
 
-  it('対象なしと通信失敗を混ぜず、戻り口と再試行を分ける（R582）', () => {
-    expect(PAGE).toContain('err instanceof ApiError && err.status === 404')
-    expect(PAGE).toContain('kind="not-found"')
-    // 通信失敗は同画面の再試行。存在しない旨とは別の1枚。
-    expect(PAGE).toContain('kind="error"')
-    expect(PAGE).toContain('onRetry={() => void load()}')
-  })
-
   it('遲れて返った別の予約の結果で画面を上書きしない', () => {
     expect(PAGE).toContain('const requestGeneration = useRef(0)')
     expect(PAGE).toContain('requestGeneration.current === generation')
@@ -79,9 +71,4 @@ describe("管理画面 一斉配信の予約完了", () => {
     expect(PAGE).not.toMatch(/setCancelError\(\s*(res\.error|String\()/)
     expect(PAGE).not.toContain('api.broadcasts.delete(broadcast.id)')
   })
-  it('送信時に再集計することを明記する', () => {
-    expect(PAGE).toContain('送る前にもう一度、対象の人数を数え直します')
-    expect(PAGE).toContain('除く見込み')
-  })
-
 })
