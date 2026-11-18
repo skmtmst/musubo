@@ -65,7 +65,7 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
      始めるのは各行の「開く」なので、まだ始めていない間はカードに同じ操作を増やさない。 */
   const guideVisible = Boolean(guide && summary && !complete && !readOnly && (guide.phase === 'active' || guide.phase === 'paused'))
   return (
-    <Card as="section" className={styles.card} edge="hairline" layout="vertical" contentPadding="var(--step-card-pad)" gap="var(--step-card-gap)" aria-labelledby="first-steps-title" data-design-node="r3X34">
+    <Card as="section" className={styles.card} edge="hairline" layout="vertical" contentPadding="var(--step-card-pad-block) var(--step-card-pad-inline)" gap="var(--step-card-gap)" aria-labelledby="first-steps-title" data-design-node="r3X34">
       <div className={styles.head}>
         <h2 id="first-steps-title" className={styles.title}>はじめにやること</h2>
         {summary ? <>
