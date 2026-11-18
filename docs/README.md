@@ -467,6 +467,8 @@
 
 ## 反映履歴
 
+- [お客さま画面の設定確認を改善](release-log/unreleased/116-kenta-q02b-b12.md) — 反映履歴、確認 2026-11-18。
+
 - [配信と通知の内容を確かめる試験を見直し](release-log/unreleased/113-kenta-q02b-b9.md) — 反映履歴、確認 2026-11-18。
 
 - [自動確認を実際の画面の動きで確認](release-log/unreleased/105-kenta-q02b-b7.md) — 反映履歴、確認 2026-11-17。
