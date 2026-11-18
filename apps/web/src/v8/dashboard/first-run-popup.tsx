@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from 'react'
+import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
 import SheetDialog from '@/components/shared/sheet-dialog'
 import { publishSetupChip, useSetupChipReopen } from '@/v8/onboarding/public/setup-chip/index'
@@ -139,7 +140,16 @@ export function FirstRunPopup({ summary, onStartGuide, onClose }: FirstRunPopupP
   /* 枠 02 の輪 hvJuA / 帯の札 XzDt5 と同じ「済み/全体」。 */
   const position = `${summary.done}/${summary.total}`
 
-  return (
+  /*
+    窓は body 直下に出す（shared/dialog と同じ持ち方）。
+    枠は画面の真ん中に重ねる作りで、scrim は position:fixed なので見た目は変わらない。
+    画面の中に置いたままだと、本文の囲み（app-shell の main）の overflow に
+    カードの影が掛かっている判定になる。重なりの持ち主を body に揃えて直す。
+  */
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
+  const overlay = (
     <div className={styles.scrim} data-first-run-popup="open" onClick={onClose}>
       <SheetDialog
         className={styles.card}
@@ -231,4 +241,7 @@ export function FirstRunPopup({ summary, onStartGuide, onClose }: FirstRunPopupP
       </SheetDialog>
     </div>
   )
+
+  if (!mounted || typeof document === 'undefined') return overlay
+  return createPortal(overlay, document.body)
 }

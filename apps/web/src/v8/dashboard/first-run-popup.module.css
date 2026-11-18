@@ -13,17 +13,29 @@
     （v8-boundary.test.ts の「CSS に数字を直書きしない」見張りに合わせる）。
   */
   --tpl-firstrun-brand: #00833f; --tpl-firstrun-brand-hover: #006e35; --tpl-firstrun-brand-bg: #e9f7ee; --tpl-firstrun-brand-line: #00833f33;
-  --tpl-firstrun-scrim: #0f172a59; --tpl-firstrun-scrim-pad: 24px; --tpl-firstrun-card-w: 620px; --tpl-firstrun-card-gap-pc: 48px; --tpl-firstrun-card-shadow: 0 12px 32px #10182833; --tpl-firstrun-card-gap: 14px; --tpl-firstrun-card-pad: 28px;
-  --tpl-firstrun-header-gap: 16px; --tpl-firstrun-ring: 52px; --tpl-firstrun-ring-border: 3px solid var(--tpl-firstrun-brand); --tpl-firstrun-text-14: 14px; --tpl-firstrun-gap-2: 2px; --tpl-firstrun-gap-3: 3px; --tpl-firstrun-gap-4: 4px; --tpl-firstrun-gap-6: 6px; --tpl-firstrun-gap-12: 12px;
+  --tpl-firstrun-scrim: #0f172a59; --tpl-firstrun-scrim-pad: 24px; --tpl-firstrun-card-w: 620px; --tpl-firstrun-card-gap-pc: 48px; --tpl-firstrun-card-shadow: 0 12px 32px #10182833; --tpl-firstrun-card-gap: 14px;
+  /* 中の余白は段の 24（§6.5 の 1「段（箱）の内側 24」）。枠の 28 は段の外なので段に寄せる。 */
+  --tpl-firstrun-card-pad: 24px;
+  --tpl-firstrun-header-gap: 16px; --tpl-firstrun-ring: 52px; --tpl-firstrun-ring-border: 3px solid var(--tpl-firstrun-brand); --tpl-firstrun-text-14: 14px; --tpl-firstrun-gap-2: 2px; --tpl-firstrun-gap-4: 4px; --tpl-firstrun-gap-6: 6px; --tpl-firstrun-gap-12: 12px;
   --tpl-firstrun-row-ring: inset 0 0 0 1px var(--tpl-firstrun-brand-line);
   --tpl-firstrun-row-pad: 10px 14px; --tpl-firstrun-row-pad-sp: 10px 12px; --tpl-firstrun-mark: 26px; --tpl-firstrun-text-12: 12px; --tpl-firstrun-ring-thin: 1.5px solid var(--tpl-firstrun-brand); --tpl-firstrun-line-muted: #d6dade; --tpl-firstrun-ring-thin-muted: 1.5px solid var(--tpl-firstrun-line-muted); --tpl-firstrun-ink-muted: #6b7682;
-  --tpl-firstrun-badge-pad: 3px 8px; --tpl-firstrun-rowaction-pad: 9px 14px; --tpl-firstrun-chevron-color: #b6bcc4; --tpl-firstrun-ink-faint: #9aa3af;
+  /*
+    札と行のボタンの内側は余白の段（§6.5 の 1）に寄せる。枠の 3・9 は段の外なので、
+    札は 3→2、行のボタンは 9→8（高さ 34→32）。32 は押せる高さの下限と同じで、
+    行（54）には今までどおり収まる。
+  */
+  --tpl-firstrun-badge-pad: 2px 8px; --tpl-firstrun-rowaction-pad: 8px 14px; --tpl-firstrun-chevron-color: #b6bcc4; --tpl-firstrun-ink-faint: #9aa3af;
   /*
     文字の塊の高さは枠の実値をそのまま使う（20px→24 / 14px→17 / 13px→16 / 12px→15）。
     指定しないと素の line-height になり、現在の行・足・見出しが枠より高くなる。
   */
   --tpl-firstrun-line-20: 24px; --tpl-firstrun-line-14: 17px; --tpl-firstrun-line-13: 16px; --tpl-firstrun-line-12: 15px;
-  --tpl-firstrun-card-gap-sp: 118px; --tpl-firstrun-radius-sheet: 20px 20px 0 0; --tpl-firstrun-card-pad-sp: 12px 16px 24px; --tpl-firstrun-grabber-w: 36px; --tpl-firstrun-grabber-h: 4px; --tpl-firstrun-line-grabber: #d1d5db; --tpl-firstrun-ring-sp: 44px; --tpl-firstrun-title-sp: 17px; --tpl-firstrun-tight: 1.25; --tpl-firstrun-rowaction-pad-sp: 9px 16px;
+  /*
+    118 は余白ではなくシートの上端の位置（枠 02b の noXJA y118）。
+    余白の段（§6.5 の 1）は padding・margin・gap の決まりなので、
+    位置だと分かる名前にして枠の実値 118 をそのまま残す。
+  */
+  --tpl-firstrun-sheet-top: 118px; --tpl-firstrun-radius-sheet: 20px 20px 0 0; --tpl-firstrun-card-pad-sp: 12px 16px 24px; --tpl-firstrun-grabber-w: 36px; --tpl-firstrun-grabber-h: 4px; --tpl-firstrun-line-grabber: #d1d5db; --tpl-firstrun-ring-sp: 44px; --tpl-firstrun-title-sp: 17px; --tpl-firstrun-tight: 1.25; --tpl-firstrun-rowaction-pad-sp: 8px 16px;
   position: fixed;
   inset: 0;
   z-index: 70;
@@ -237,8 +249,23 @@ html:root .rowCurrent button[class][class][class] {
   高さは寸法なので画面に残す。
 */
 html:root .footer button[class][class][class] {
+  position: relative;
   height: auto;
   min-height: 0;
+}
+
+/*
+  高さは1行（16）のままなので、押せる範囲だけを上下に広げる
+  （§6.5 の 7「文字の大きさは変えず、押せる範囲を広げる」）。
+  位置を持つ透明な ::before なので、足の高さもカードの高さも変わらない
+  （min-height を戻すと 差し戻し V1 に戻るため、寸法には手を入れない）。
+  左右は文字の幅のままで、隣の注記までは広げない。
+*/
+html:root .footer button[class][class][class]::before {
+  content: '';
+  position: absolute;
+  inset-block: -5px;
+  inset-inline: 0;
 }
 
 /* 文面は枠ごとに違う（枠02「あとで」／枠02b「あとで（下にスワイプで閉じる）」）。 */
@@ -275,7 +302,7 @@ html:root .footer button[class][class][class] {
       上端を画面の上から118pxの所に置くので、高さは残り全部にする。
       中身の長さで縮めない（差し戻し R3）。
     */
-    --sheet-h: calc(100vh - var(--tpl-firstrun-card-gap-sp));
+    --sheet-h: calc(100vh - var(--tpl-firstrun-sheet-top));
     --sheet-max-h: none;
     --sheet-overflow-x: hidden;
     --sheet-overflow-y: hidden;
@@ -312,9 +339,13 @@ html:root .footer button[class][class][class] {
 
   .leadSp { display: inline; }
 
-  /* SYPr1: 縦 gap3 / 行 padding 10 12 */
+  /*
+    SYPr1: 縦 gap3 / 行 padding 10 12。
+    3 は余白の段の外（§6.5 の 1）なので、段の 2 にする。9行で 9px 分だけ詰まるが、
+    .rows は縮む側（flex: 0 1 auto）なので見出し・足・「あとで」の位置は動かない。
+  */
   .rows {
-    gap: var(--tpl-firstrun-gap-3);
+    gap: var(--tpl-firstrun-gap-2);
     /*
       見出しと足は動かさず、9項目だけシートの中で動かす。
       ただし余白を吸って伸ばさない（伸ばすと足が画面下端へ押し下がり、
@@ -337,7 +368,7 @@ html:root .footer button[class][class][class] {
   /* WjTss: 13px 1行（h16）。bf6E7: h21。どちらも印26を超えない。 */
   .label { font-size: var(--polish-text-body); line-height: var(--tpl-firstrun-line-13); }
 
-  /* ZcmBy: padding 9 16 ＋ 文字 JDSIg h16 → h34。現在の行を54に収める。寸法は画面の持ちもの。 */
+  /* ZcmBy: padding 9 16 ＋ 文字 JDSIg h16 → h34。9 は余白の段の外なので 8（h32）。行の54には収まる。 */
   html:root .rowCurrent button[class][class][class] { padding: var(--tpl-firstrun-rowaction-pad-sp); }
 
   .rowActionPc { display: none; }
