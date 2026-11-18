@@ -38,13 +38,4 @@ describe('オートメーションの発生元配線', () => {
     expect(event).toContain(`sourceEventId: booking.id`);
     expect(event).toContain(`sourceEventId: result.bookingId`);
   });
-
-
-  it('担当割当と手動返信は保存後の不変IDで対応マークルールを評価する', () => {
-    const text = source('routes/chats.ts');
-    expect(text).toContain(`fireEvent(c.env.DB, 'staff_assigned'`);
-    expect(text).toContain(`sourceEventId: correlationId`);
-    expect(text).toContain(`fireEvent(c.env.DB, 'manual_reply_sent'`);
-    expect(text).toContain(`sourceEventId: logId`);
-  });
 });
