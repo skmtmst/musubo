@@ -19,11 +19,12 @@ import { useAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
 import { GoogleConnectionSettings } from '@/v8/restaurant/google'
-import { ApiError, api } from '@/lib/api'
+import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './sns.module.css'
 import { formatDate, formatNumber } from '@/lib/format'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { isSaveConflict } from '@/components/shared/save-conflict'
 import SnsConnectionList from './connection-list'
 import { GoogleMark, InstagramMark } from './brand-marks'
 import {
@@ -346,7 +347,7 @@ export default function SnsSettingsPage() {
       })
       await load()
     } catch (saveFailure) {
-      if (saveFailure instanceof ApiError && saveFailure.status === 409) {
+      if (isSaveConflict(saveFailure)) {
         await load()
         setActionError('ほかの人が先に主連携を変えました。いまの状態を読み込み直したので、もう一度お試しください。')
         return
