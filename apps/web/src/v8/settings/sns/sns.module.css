@@ -172,14 +172,20 @@
   min-width: 0;
 }
 
-/* 「できること」の行頭のチェック印。印自身に組を付け、親から子の形を塗らない。 */
+/* 「できること」の行頭のチェック印。印自身に組を付け、親から子の形を塗らない。
+   絵は Google（F1 `iEXYb`・`BQFa8`・`mpvCg`／F7 の5つ）が `$green-dark`（#0B9A4B）、
+   Instagram（F1 `Gnr09`・`JRhTH`）が `$green`（#06C755）で、2つの緑が混ざっている。
+   画面は深い緑 1 つ #087A3E（--color-accent-deep）にそろえる。明るい緑 #06C755 は
+   LINE の決まりの所だけという決まり（docs/v8-design-rules.md:526）があるため。 */
 .checkMark {
   flex: none;
   width: var(--tpl-e1-sns-can-mark-w);
-  color: var(--color-action);
+  color: var(--color-accent-deep);
 }
 
-.link { display: inline-flex; align-items: center; gap: var(--tpl-e1-sns-gap-7); color: var(--color-action); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-e1-sns-row-lh); text-decoration: none; }
+/* 行の中の移動（「営業時間へ →」）。絵の `j4sm6s`・`u0SoyW` は `$green-dark` で、
+   本文の中のリンクは緑 #087A3E の決まり（docs/v8-design-rules.md:528）とも一致する。 */
+.link { display: inline-flex; align-items: center; gap: var(--tpl-e1-sns-gap-7); color: var(--color-accent-deep); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-e1-sns-row-lh); text-decoration: none; }
 .link:hover { text-decoration: underline; }
 
 /* 段の頭：題のあとをあけて、個数と「接続を追加する」を右へ寄せる（未接続の札は題の隣）。 */

@@ -72,6 +72,7 @@ export function SnsSlotPaidDialog({
       designHeaderPadding="var(--tpl-e1-sns-slot-dlg-head-pad)"
       designContentPadding="var(--tpl-e1-sns-slot-dlg-body-pad)"
       designFooterPadding="var(--tpl-e1-sns-slot-dlg-foot-pad)"
+      headerIcon={false}
       footerDivider={false}
       footerLeadFlexible={false}
       title="追加連携枠の料金を確認"
@@ -136,6 +137,7 @@ export function SnsSlotTrialDialog({
       designHeaderPadding="var(--tpl-e1-sns-slot-dlg-head-pad)"
       designContentPadding="var(--tpl-e1-sns-slot-dlg-body-pad)"
       designFooterPadding="var(--tpl-e1-sns-slot-dlg-foot-pad)"
+      headerIcon={false}
       footerDivider={false}
       footerLeadFlexible={false}
       title="追加料金はかかりません"
@@ -225,6 +227,7 @@ export function SnsSlotQuoteDialog({
       designHeaderPadding="var(--tpl-e1-sns-slot-dlg-head-pad)"
       designContentPadding="var(--tpl-e1-sns-slot-dlg-body-pad)"
       designFooterPadding="var(--tpl-e1-sns-slot-dlg-foot-pad)"
+      headerIcon={false}
       footerDivider={false}
       footerLeadFlexible={false}
       title="追加の連携は個別見積もりになります"
@@ -276,6 +279,7 @@ export function SnsSlotRemovalDialog({
   const cardTitle = serviceCardTitle(plan.service)
   const showDecrease = plan.monthlyDecreaseYen > 0 && Boolean(nextBillingLabel)
 
+  // 絵（JvuLH の題 nbmJr）は題の文字だけで左の印が無いので、共通部品の口 headerIcon={false} で印を省く。
   return (
     <Dialog
       open
@@ -285,6 +289,7 @@ export function SnsSlotRemovalDialog({
       designHeaderPadding="var(--tpl-e1-sns-slot-dlg-head-pad)"
       designContentPadding="var(--tpl-e1-sns-slot-dlg-body-pad)"
       designFooterPadding="var(--tpl-e1-sns-slot-dlg-foot-pad)"
+      headerIcon={false}
       footerDivider={false}
       footerLeadFlexible={false}
       title={`${cardTitle}の接続を解除しますか？`}
