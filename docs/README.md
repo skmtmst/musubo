@@ -467,6 +467,8 @@
 
 ## 反映履歴
 
+- [画面検査の待ち時間を短縮](release-log/unreleased/119-masato-v8-ci-parallel.md) — 反映履歴、確認 2026-11-18。
+
 - [自動確認を実際の動きで確認](release-log/unreleased/115-kenta-q02b-b10.md) — 反映履歴、確認 2026-11-18。
 
 - [お客さま画面の設定確認を改善](release-log/unreleased/116-kenta-q02b-b12.md) — 反映履歴、確認 2026-11-18。
