@@ -23,6 +23,8 @@ jobs:
       full_suite: ${{ steps.scope.outputs.full_suite }}
       db_tests: ${{ steps.scope.outputs.db_tests }}
       docs_tests: ${{ steps.scope.outputs.docs_tests }}
+      v8_run: ${{ steps.scope.outputs.v8_run }}
+      v8_compare: ${{ steps.scope.outputs.v8_compare }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -66,6 +68,8 @@ jobs:
             echo "full_suite=true" >> "$GITHUB_OUTPUT"
             echo "db_tests=true" >> "$GITHUB_OUTPUT"
             echo "docs_tests=true" >> "$GITHUB_OUTPUT"
+            echo "v8_run=true" >> "$GITHUB_OUTPUT"
+            echo "v8_compare=false" >> "$GITHUB_OUTPUT"
             echo "PR差分がない手動実行のため、全検査を行います。"
             exit 0
           fi
@@ -86,6 +90,14 @@ jobs:
             echo "文書・ワークフローだけの変更のため、高速検査を行います。"
           fi
           echo "full_suite=$full_suite" >> "$GITHUB_OUTPUT"
+
+          echo "v8_compare=true" >> "$GITHUB_OUTPUT"
+          # The guard must also exercise changes to its own workflow.
+          if grep -qE '^(apps/web/|packages/shared/|scripts/visual-qa/|pnpm-lock\.yaml$|\.github/workflows/required-pr-gate\.yml$)' <<< "$changed"; then
+            echo "v8_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "v8_run=false" >> "$GITHUB_OUTPUT"
+          fi
 
           # apps/docs の試験は、画面の中身だけでなく
           # `.github/workflows/deploy-cloudflare-docs.yml` を読んで、配り先の枝と
@@ -656,64 +668,39 @@ jobs:
         run: |
           node apps/web/src/app/form-submissions/form-submissions-browser-behavior.mjs
 
-  v8-screen-guard:
-    name: V8 screen guard
+  v8-build:
+    name: Build the V8 browser fixtures
     needs: changes
-    if: needs.changes.outputs.full_suite == 'true'
+    if: needs.changes.outputs.v8_run == 'true'
     runs-on: ubuntu-latest
-    # Check the current V8 screens at 1152, 1440 and 1920.
     env:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:8788
       NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
       NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED: 'true'
-      V8_SPEED_ENFORCEMENT: ${{ vars.V8_SPEED_ENFORCEMENT }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - name: Decide whether to run the screen guard
-        id: scope
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            echo "compare=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "compare=true" >> "$GITHUB_OUTPUT"
-          if git diff --name-only "$BASE_SHA...$HEAD_SHA" \
-            | grep -qE '^(apps/web/|packages/shared/|scripts/visual-qa/|pnpm-lock\.yaml$)'; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-        if: steps.scope.outputs.run == 'true'
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        if: steps.scope.outputs.run == 'true'
         with:
           node-version: '22.23.4'
           cache: pnpm
-      - if: steps.scope.outputs.run == 'true'
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - name: Build the right-panel fixtures with the conversation AI entry
-        if: steps.scope.outputs.run == 'true'
         env:
           NEXT_PUBLIC_CONVERSATION_AI_ENABLED: 'true'
         run: |
           pnpm --filter @line-harness/update-engine build
           pnpm --filter web build
-          cp -a apps/web/out /tmp/detail-out
+          cp -a apps/web/out "$RUNNER_TEMP/detail-out"
       - name: Build the PR admin against the visual-qa mock API
-        if: steps.scope.outputs.run == 'true'
         run: |
           pnpm --filter @line-harness/update-engine build
           pnpm --filter web build
-          cp -a apps/web/out /tmp/head-out
+          cp -a apps/web/out "$RUNNER_TEMP/head-out"
       - name: Build the base admin against the same mock API
-        if: steps.scope.outputs.run == 'true' && steps.scope.outputs.compare == 'true'
+        if: needs.changes.outputs.v8_compare == 'true'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -722,22 +709,71 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm --filter @line-harness/update-engine build
           pnpm --filter web build
+          cp -a apps/web/out "$RUNNER_TEMP/base-out"
+      - name: Package the exact builds for the browser jobs
+        env:
+          COMPARE: ${{ needs.changes.outputs.v8_compare }}
+        run: |
+          builds=(detail-out head-out)
+          if [ "$COMPARE" = "true" ]; then
+            builds+=(base-out)
+          fi
+          tar -czf "$RUNNER_TEMP/v8-builds.tar.gz" -C "$RUNNER_TEMP" "${builds[@]}"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v8-static-builds
+          path: ${{ runner.temp }}/v8-builds.tar.gz
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
+
+  v8-screen-guard:
+    name: V8 screen guard (${{ matrix.suite }})
+    needs: [changes, v8-build]
+    if: needs.changes.outputs.v8_run == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Separate runners keep the speed measurement free of competing browser jobs.
+      matrix:
+        suite: [navigation, fixtures, presentation, speed]
+    env:
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8788
+      NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
+      NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED: 'true'
+      V8_SPEED_ENFORCEMENT: ${{ vars.V8_SPEED_ENFORCEMENT }}
+      V8_COMPARE_URL: ${{ needs.changes.outputs.v8_compare == 'true' && 'http://127.0.0.1:4311' || '' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.23.4'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: v8-static-builds
+          path: ${{ runner.temp }}
+      - name: Extract the exact builds from this run
+        run: tar -xzf "$RUNNER_TEMP/v8-builds.tar.gz" -C /tmp
+      - name: Build the shared module used by the mock API
+        run: pnpm --filter @line-crm/shared build
       - name: Install Chromium for the V8 screen guard
-        if: steps.scope.outputs.run == 'true'
         run: pnpm exec playwright install --with-deps chromium
       - name: Start the mock API and serve the built admin
-        if: steps.scope.outputs.run == 'true'
+        id: serve
         run: |
           node scripts/visual-qa/mock-api.mjs > /tmp/mock-api.log 2>&1 &
           node apps/web/scripts/v8-guard/serve-out.mjs /tmp/head-out 4310 > /tmp/serve-head.log 2>&1 &
-          if [ "${{ steps.scope.outputs.compare }}" = "true" ]; then
-            node apps/web/scripts/v8-guard/serve-out.mjs /tmp/base/apps/web/out 4311 > /tmp/serve-base.log 2>&1 &
+          if [ -n "$V8_COMPARE_URL" ]; then
+            node apps/web/scripts/v8-guard/serve-out.mjs /tmp/base-out 4311 > /tmp/serve-base.log 2>&1 &
           fi
           ready=false
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:4310/friends > /dev/null \
               && curl -sf 'http://127.0.0.1:8788/api/friends?account_id=visual-qa-account' > /dev/null \
-              && { [ "${{ steps.scope.outputs.compare }}" != "true" ] || curl -sf http://127.0.0.1:4311/friends > /dev/null; }; then
+              && { [ -z "$V8_COMPARE_URL" ] || curl -sf http://127.0.0.1:4311/friends > /dev/null; }; then
               ready=true
               break
             fi
@@ -749,17 +785,17 @@ jobs:
             exit 1
           fi
       - name: No permission copy flashes during navigation
-        if: steps.scope.outputs.run == 'true'
+        if: matrix.suite == 'navigation'
         env:
           V8_GUARD_BASE: http://127.0.0.1:4310
           V8_GUARD_ARTIFACT_DIR: /tmp/v8-guard/permission-navigation
         run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/permission-flash.test.mjs apps/web/scripts/v8-guard/permission-navigation.test.mjs
       - name: No V8 layout breaks at 1152, 1440 and 1920
-        if: steps.scope.outputs.run == 'true'
+        if: matrix.suite == 'fixtures'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
       # 空白量は診断のみ。切れ・重なり・操作の遮断を必須で確認する。
       - name: Broken fixtures must fail the V8 layout guard
-        if: steps.scope.outputs.run == 'true'
+        if: matrix.suite == 'fixtures'
         env:
           V8_GUARD_BASE: http://127.0.0.1:4310
           V8_GUARD_DETAIL_OUT: /tmp/detail-out
@@ -768,71 +804,71 @@ jobs:
           node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/viewport-footer.test.mjs
           node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/heading-band.test.mjs apps/web/scripts/v8-guard/store-heading.test.mjs apps/web/scripts/v8-guard/dashboard-content.test.mjs apps/web/scripts/v8-guard/home-pending-heading.test.mjs apps/web/scripts/v8-guard/document-title.test.mjs apps/web/scripts/v8-guard/canonical-route.test.mjs apps/web/scripts/v8-guard/dialog-footer.test.mjs apps/web/scripts/v8-guard/dialog-leading.test.mjs apps/web/scripts/v8-guard/patrol-layout.test.mjs apps/web/scripts/v8-guard/scheduled-message.test.mjs apps/web/scripts/v8-guard/route-pending.test.mjs apps/web/scripts/v8-guard/style-switcher.test.mjs apps/web/scripts/v8-guard/monthly-flow.test.mjs
       - name: Sidebar, booking and pagination details stay as designed
-        if: steps.scope.outputs.run == 'true'
+        if: matrix.suite == 'fixtures'
         run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/nav-detail.test.mjs apps/web/scripts/v8-guard/booking-dialog-layout.test.mjs apps/web/scripts/v8-guard/booking-title.test.mjs
       - name: Narrow preview opens once and preserves form input
-        if: steps.scope.outputs.run == 'true'
+        if: matrix.suite == 'fixtures'
         run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/narrow-preview.test.mjs
       - name: Train 17 waitlist failure and inflow mouse regressions
-        if: steps.scope.outputs.run == 'true'
+        if: matrix.suite == 'fixtures'
         run: node apps/web/scripts/v8-guard/stgfix17-browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix17
       - name: Booking preview date agrees through settings and preview tabs
-        if: steps.scope.outputs.run == 'true'
+        if: matrix.suite == 'fixtures'
         run: node apps/web/scripts/v8-guard/stgfix18-preview.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix18-preview
       - name: No new V8 layout or owner-rule defects
-        if: steps.scope.outputs.run == 'true'
-        run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'
+        if: matrix.suite == 'navigation'
+        run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json --compare-url "$V8_COMPARE_URL"
       - name: Store comparison delta labels stay inside their values
-        if: steps.scope.outputs.run == 'true'
+        if: matrix.suite == 'fixtures'
         run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/store-compare-layout.test.mjs
       - name: Inventory edge insets, folder dots and page actions on all admin screens
-        if: steps.scope.outputs.run == 'true'
-        run: node apps/web/scripts/v8-guard/presentation-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/presentation --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'
+        if: matrix.suite == 'presentation'
+        run: node apps/web/scripts/v8-guard/presentation-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/presentation --compare-url "$V8_COMPARE_URL"
       - name: List row rules
-        if: steps.scope.outputs.run == 'true'
+        if: matrix.suite == 'presentation'
         run: |
           node apps/web/scripts/list-row-audit.mjs
           node apps/web/scripts/v8-guard/list-row-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-rows.json
           node apps/web/scripts/v8-guard/list-skeleton-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-skeleton.json
       - name: Speed measurement and reference policy controls
-        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        if: ${{ !cancelled() && steps.serve.outcome == 'success' && matrix.suite == 'speed' }}
         run: node --test apps/web/scripts/v8-guard/mock-local.test.mjs apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/speed-check.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs apps/web/scripts/v8-guard/stgfix17-targets.test.mjs
       - name: Common V8 speed checks (11 scenes, five medians)
         id: speed_budget
-        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        if: ${{ !cancelled() && steps.serve.outcome == 'success' && matrix.suite == 'speed' }}
         env:
           V8_SPEED_PROFILE: ci
         run: pnpm qa:speed http://127.0.0.1:4310 /tmp/v8-guard/speed.json
       - name: Train 17 absolute targets
-        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        if: ${{ !cancelled() && steps.serve.outcome == 'success' && matrix.suite == 'speed' }}
         run: node apps/web/scripts/v8-guard/stgfix17-targets.mjs /tmp/v8-guard/speed.json
       - name: 2000 friends meet absolute speed targets
         id: stress_speed
-        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        if: ${{ !cancelled() && steps.serve.outcome == 'success' && matrix.suite == 'speed' }}
         env:
           V8_SPEED_PROFILE: ci
         run: node apps/web/scripts/v8-guard/stress-targets.mjs /tmp/v8-guard/speed.json
       - name: PERF-01 fixed list speed targets
         id: perf3_targets
-        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        if: ${{ !cancelled() && steps.serve.outcome == 'success' && matrix.suite == 'speed' }}
         run: node apps/web/scripts/v8-guard/perf3-targets.mjs /tmp/v8-guard/speed.json
       - name: Report speed reference results (including incomplete measurements)
-        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        if: ${{ !cancelled() && steps.serve.outcome == 'success' && matrix.suite == 'speed' }}
         env:
           SPEED_BUDGET_OUTCOME: ${{ steps.speed_budget.outcome }}
           STRESS_SPEED_OUTCOME: ${{ steps.stress_speed.outcome }}
           PERF3_TARGETS_OUTCOME: ${{ steps.perf3_targets.outcome }}
         run: node apps/web/scripts/v8-guard/speed-report.mjs /tmp/v8-guard/speed.json
       - name: Virtual table selection, keyboard and layout
-        if: steps.scope.outputs.run == 'true'
+        if: matrix.suite == 'fixtures'
         run: |
           node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 scripts/visual-qa/friends-table-state.test.mjs
           node scripts/visual-qa/friends-table.browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stress-table
       - name: Upload V8 screen guard results
-        if: always() && steps.scope.outputs.run == 'true'
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: v8-screen-guard
+          name: v8-screen-guard-${{ matrix.suite }}
           path: |
             /tmp/v8-guard/
             /tmp/mock-api.log
@@ -841,13 +877,26 @@ jobs:
           retention-days: 7
 
       - name: Upload separate speed diagnosis traces
-        if: always() && steps.scope.outputs.run == 'true'
+        if: always() && matrix.suite == 'speed'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: v8-speed-diagnosis
           path: /tmp/v8-guard/speed.json.diagnosis/
           if-no-files-found: ignore
           retention-days: 7
+
+      # Every selected suite records success separately. The final check also
+      # checks these markers so a missing or skipped suite cannot pass.
+      - name: Record the completed V8 suite
+        env:
+          SUITE: ${{ matrix.suite }}
+        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/$SUITE.passed"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v8-pass-${{ matrix.suite }}
+          path: ${{ runner.temp }}/${{ matrix.suite }}.passed
+          if-no-files-found: error
+          retention-days: 1
 
   required-pr-gate:
     name: required-pr-gate
@@ -862,11 +911,18 @@ jobs:
       - web-build
       - mcp-checks
       - docs-checks
+      - v8-build
       - v8-screen-guard
     if: always()
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        if: needs.changes.outputs.v8_run == 'true' && needs.v8-screen-guard.result == 'success'
+        with:
+          pattern: v8-pass-*
+          path: ${{ runner.temp }}/v8-pass
       - name: Require every selected check to pass
+        if: ${{ !cancelled() }}
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           REPOSITORY_RESULT: ${{ needs.repository-checks.result }}
@@ -878,6 +934,8 @@ jobs:
           WEB_BUILD_RESULT: ${{ needs.web-build.result }}
           MCP_CHECKS_RESULT: ${{ needs.mcp-checks.result }}
           DOCS_CHECKS_RESULT: ${{ needs.docs-checks.result }}
+          V8_RUN: ${{ needs.changes.outputs.v8_run }}
+          V8_BUILD_RESULT: ${{ needs.v8-build.result }}
           V8_SCREEN_GUARD_RESULT: ${{ needs.v8-screen-guard.result }}
         run: |
           failed=0
@@ -891,13 +949,29 @@ jobs:
             "$WEB_UNIT_RESULT" \
             "$WEB_BUILD_RESULT" \
             "$MCP_CHECKS_RESULT" \
-            "$DOCS_CHECKS_RESULT" \
-            "$V8_SCREEN_GUARD_RESULT"; do
+            "$DOCS_CHECKS_RESULT"; do
             case "$result" in
               success|skipped) ;;
               *) failed=1 ;;
             esac
           done
+
+          case "$V8_RUN:$V8_BUILD_RESULT:$V8_SCREEN_GUARD_RESULT" in
+            true:success:success)
+              for suite in navigation fixtures presentation speed; do
+                marker="$RUNNER_TEMP/v8-pass/v8-pass-$suite/$suite.passed"
+                if [[ ! -f "$marker" ]] || [[ "$(< "$marker")" != "$GITHUB_SHA" ]]; then
+                  echo "::error::V8の検査結果がありません。対象: $suite"
+                  failed=1
+                fi
+              done
+              ;;
+            false:skipped:skipped) ;;
+            *)
+              echo "::error::V8の選択・ビルド・実行結果が一致しません。"
+              failed=1
+              ;;
+          esac
 
           if [ "$failed" -ne 0 ]; then
             echo "::error::選択された検査に失敗または中断があります。"

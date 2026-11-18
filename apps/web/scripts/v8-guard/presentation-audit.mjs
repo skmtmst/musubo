@@ -35,13 +35,24 @@ const routes = [...known, ...pages.filter(path => !known.some(r => r.split('?')[
 const selected = process.env.PRESENTATION_ROUTES?.split(',') ?? routes
 const browser = await chromium.launch()
 const rows = []
+const timing = { openMs: 0, readyMs: 0, inspectMs: 0, screenshotMs: 0, closeMs: 0, reportMs: 0 }
 async function inspect(url, route, width, capture) {
   let page
   const errors = []
+  let phase = 'openMs'
+  let started = performance.now()
+  function nextPhase(next) {
+    const now = performance.now()
+    timing[phase] += now - started
+    phase = next
+    started = now
+  }
   try {
     page = await openPage(browser, { baseUrl: url, route, width, stable: true, settleMs: 0, requireSuccess: true, onPageError: e => errors.push(e.message) })
+    nextPhase('readyMs')
     await page.waitForFunction(() => document.querySelector('main h1,main h2') || /画面を表示できませんでした/.test(document.body.innerText), undefined, { timeout: 5000 })
     await page.waitForLoadState('networkidle')
+    nextPhase('inspectMs')
     const pageFailure = await page.evaluate(() => /画面を表示できませんでした/.test(document.body.innerText) || [...document.querySelectorAll('main h1,main h2')].some(el => el.textContent?.trim() === 'ページが見つかりません'))
     if (pageFailure) throw new Error('画面のエラー境界を表示しています')
     const loadFailure = await page.evaluate(() => Boolean(document.querySelector('[data-list-state="error"]')) || [...document.querySelectorAll('[role="alert"]')].some(el => /読み込めません|読み込みに失敗|取得できません|取得に失敗/.test(el.textContent ?? '')))
@@ -67,13 +78,18 @@ async function inspect(url, route, width, capture) {
     })
     const findings = [...await page.evaluate(scanEdges), ...await page.evaluate(scanOwner)]
     if (capture && /^\/(tags|accounts|templates|friends|booking|bookings|webhooks|nen-members|hq\/store-comparison)(\/|\?|$)/.test(route)) {
+      nextPhase('screenshotMs')
       const slug = route.slice(1).replaceAll('/', '-').replace(/[?=&]/g, '-')
       await page.screenshot({ path: join(out, `${width}-${slug}.png`), fullPage: true })
     }
     return { width, route, finalPath: new URL(page.url()).pathname, ...inventory, errors, findings }
   } catch (error) {
     return { width, route, error: error.message, errors }
-  } finally { await page?.close() }
+  } finally {
+    nextPhase('closeMs')
+    await page?.close()
+    timing.closeMs += performance.now() - started
+  }
 }
 const problems = row => [
   ...row.findings,
@@ -97,8 +113,13 @@ try {
       rows.push({ ...head, baseError, newFindings: [...result.failures, ...reviewFindings], existingFindings: result.existing ?? [], baselineFindings: base && !baseError ? problems(base) : null })
       console.log(`${width} ${route} : ${head.title ?? '題なし'} / 新規${result.failures.length} / 要確認${reviewFindings.length} / 既存${result.existing?.length ?? 0}`)
     }
+    const reportStarted = performance.now()
     writeFileSync(join(out, 'presentation.json'), JSON.stringify(rows, null, 2) + '\n')
+    timing.reportMs += performance.now() - reportStarted
   }
 } finally { await browser.close() }
 writeFileSync(join(out, 'presentation.md'), '| 幅 | 画面 | 帯/カード/表/知らせ/道具 | 新規/既存の指摘 | 名前/丸の不足 |\n|---|---|---|---|---|\n' + rows.map(r => `| ${r.width} | ${r.route} | ${r.error ? '測定失敗' : r.existingError ? '既存の測定失敗' : [r.bands,r.cards,r.tables,r.notices,r.tools].join('/')} | ${r.error ?? r.existingError ?? `${r.newFindings.length}/${r.existingFindings.length}`} | ${r.names ?? '—'}/${r.missingDots?.length ?? '—'} |`).join('\n') + '\n')
+const timingSummary = Object.fromEntries(Object.entries(timing).map(([phase, ms]) => [phase, Math.round(ms)]))
+writeFileSync(join(out, 'presentation-timing.json'), JSON.stringify({ cases: rows.length, compared: !!compareUrl, ...timingSummary }, null, 2) + '\n')
+console.log('V8表示監査の処理時間（累計ms）', timingSummary)
 if (rows.some(r => r.error || r.errors.length || r.newFindings.length)) process.exitCode = 1
