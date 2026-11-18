@@ -54,9 +54,12 @@
   --step-action-w: 180px;
   --step-action-text: 14px;
   --step-action-text-lh: 20px;
-  /* 注記の字は正本（xK5CF / PdmLK）どおり PC・SP とも添え字の大きさ。 */
+  /* 注記の字は正本（xK5CF / PdmLK）どおり PC・SP とも添え字の大きさ。
+     行の高さと寄せは正本の実測どおり PC（xK5CF）が 1.46・右寄せ、
+     SP（PdmLK）が 1.5・左寄せ。共通の 19px トークンは 12px の注記には合わないので使わない。 */
   --step-note-size: var(--polish-text-support);
-  --step-note-lh: var(--tpl-d23-ob-text-lh);
+  --step-note-lh: 1.46;
+  --step-note-align: right;
 }
 
 /*
@@ -132,6 +135,8 @@
   */
   font-weight: 500;
   line-height: var(--step-note-lh);
+  /* 正本（xK5CF）は2操作の右で残り幅いっぱいを取り、文字は右端に寄せる。SP（PdmLK）は左寄せ。 */
+  text-align: var(--step-note-align);
 }
 
 /*
@@ -166,8 +171,9 @@ html:root .guideFooter button[class][class][class] {
   .card {
     --step-head-gap: 10px;
     --step-footer-gap: 10px;
-    /* 注記の大きさはカード既定と同じなので、ここは行の高さだけ正本（PdmLK）の 1.5 にする。 */
+    /* 注記の大きさはカード既定と同じ。行の高さは正本（PdmLK）の 1.5、寄せは正本どおり左。 */
     --step-note-lh: 1.5;
+    --step-note-align: left;
     --tpl-list-row-multi-h: 52px;
   }
   /*
