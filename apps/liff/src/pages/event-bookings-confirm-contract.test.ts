@@ -23,7 +23,6 @@ afterEach(() => { cleanup(); vi.resetAllMocks(); });
  */
 
 const root = join(import.meta.dirname, '..');
-const page = readFileSync(join(import.meta.dirname, 'event-bookings.tsx'), 'utf8');
 const dialog = readFileSync(join(import.meta.dirname, '../components/ui/confirm-dialog.tsx'), 'utf8');
 
 /** 注意書きの中の字に当てないため、コメントを外す。 */
@@ -55,10 +54,6 @@ describe('LIFF にブラウザの確認窓を残さない', () => {
 });
 
 describe('イベント予約の取り消し確認', () => {
-  it('共通の確認窓を開くだけで、ブラウザの confirm を呼ばない', () => {
-    expect(code(page), 'ブラウザのconfirmへ戻っている').not.toMatch(BROWSER_DIALOG);
-  });
-
   it('題は日時＋行事の問いかけで、閉じると送らず、取り消しを確認して予約IDだけ送る', async () => {
     const booking = { id: 'booking-confirm', event_id: 'event-confirm', source: 'booking', status: 'confirmed', event_name: '撮影会', slot_starts_at: '2099-10-20T10:00:00Z', slot_ends_at: '2099-10-20T11:00:00Z', cancel_deadline_hours_before: 24 };
     calls.read.mockResolvedValue({ items: [booking] });
