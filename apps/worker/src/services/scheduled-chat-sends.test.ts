@@ -296,8 +296,8 @@ describe('送信予約のdispatcher(N-025)', () => {
     await processDueScheduledChatSends(env(), { now: NOW });
     expect(pushMessage).not.toHaveBeenCalled();
     expect(row('s-var-missing').status).toBe('scheduled');
-    expect(sqlite.raw.prepare('SELECT source_kind, var_key FROM common_var_resolution_failures').all()).toEqual([
-      { source_kind: 'chat', var_key: 'missing' },
+    expect(sqlite.raw.prepare('SELECT source_kind, source_id, var_key FROM common_var_resolution_failures').all()).toEqual([
+      { source_kind: 'chat', source_id: 's-var-missing', var_key: 'missing' },
     ]);
   });
 

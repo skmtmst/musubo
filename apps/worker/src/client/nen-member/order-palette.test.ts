@@ -17,6 +17,16 @@ test('購入履歴とECへの操作は共通の配色の変更に追従する',a
   await act(async()=>{unmount=mountNenMember(document.getElementById('app')!,{liffId:'fixture',lineUserId:'friend',idToken:'fixture'});});
   const page=document.querySelector('.nm-portal-orders-page'),link=document.querySelector('.nm-order-primary-link');
   expect(page).not.toBeNull();expect(link).not.toBeNull();
+  const header=document.querySelector('.nm-home-header'),activeNav=document.querySelector('.nm-bottom-nav button.active');
+  expect(header).not.toBeNull();expect(activeNav).not.toBeNull();
+  document.documentElement.style.setProperty('--customer-ground','rgb(10, 20, 30)');
+  document.documentElement.style.setProperty('--customer-primary','rgb(40, 50, 60)');
+  expect(getComputedStyle(header!).backgroundColor).toBe('rgb(10, 20, 30)');
+  expect(getComputedStyle(activeNav!).color).toBe('rgb(40, 50, 60)');
+  const preview=document.createElement('div');preview.className='nm-photo-preview-frame';
+  const photo=document.createElement('img');preview.append(photo);document.body.append(preview);
+  expect(getComputedStyle(photo).objectFit).toBe('contain');
+  preview.remove();
   document.documentElement.style.setProperty('--photo-ink','rgb(1, 2, 3)');
   document.documentElement.style.setProperty('--photo-accent','rgb(4, 5, 6)');
   expect(getComputedStyle(page!).color).toBe('rgb(1, 2, 3)');
