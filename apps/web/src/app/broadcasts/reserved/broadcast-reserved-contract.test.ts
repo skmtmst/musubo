@@ -22,40 +22,12 @@ describe("管理画面 一斉配信の予約完了", () => {
     expect(FORM).not.toContain('idempotencyKey: crypto.randomUUID()')
   })
 
-  it('保存した配信を読み直し予約状態を確かめる', () => {
-    expect(PAGE).toContain('api.broadcasts.get(id)')
-    expect(PAGE).toContain("broadcast.status !== 'scheduled'")
-    expect(PAGE).toContain('!broadcast.scheduledAt')
-  })
-
-  it('予約人数を保存値や固定値で作らず現在の見込みとして表示する', () => {
-    /*
-      **保存した数を出さない。** 予約してから配信までに友だちが増減するので、
-      いま数え直した見込みを出す。
-    */
-    expect(PAGE).toContain('api.broadcasts.preflight')
-    expect(PAGE).toContain('const audienceCount = estimate?.audienceCount ?? null')
-    expect(PAGE).not.toContain('totalCount')
-  })
-
-  it('未取得と実値0を分ける', () => {
-    expect(PAGE).toContain('formatNumber(estimate.hiddenExcluded')
-  })
-
-  it('選択中アカウントと所属先が違う配信を表示しない', () => {
-    expect(PAGE).toContain('belongsToAccount(broadcast, selectedAccountId)')
-  })
-
   it('遲れて返った別の予約の結果で画面を上書きしない', () => {
     expect(PAGE).toContain('const requestGeneration = useRef(0)')
     expect(PAGE).toContain('requestGeneration.current === generation')
     expect(PAGE).toContain('if (!isCurrent()) return')
     expect(PAGE).toContain('requestGeneration.current += 1')
     expect(PAGE).toContain('if (isCurrent()) setLoading(false)')
-  })
-
-  it('予約した内容を実値で読み合わせる', () => {
-    expect(PAGE).toContain('const scheduledLabel = formatJst(broadcast.scheduledAt)')
   })
 
   it('予約後の操作は本物のAPIまたは実在する画面へつなぐ', () => {

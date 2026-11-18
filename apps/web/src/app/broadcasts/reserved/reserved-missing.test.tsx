@@ -92,6 +92,8 @@ describe('broadcasts/reserved の対象なし案内（R582）', () => {
     render(<Page />)
     expect(await screen.findByText('このアカウントの友だち全員 37 人（除く見込み 2 人）')).toBeTruthy()
     expect(screen.getByText('送る前にもう一度、対象の人数を数え直します')).toBeTruthy()
+    expect(apiMocks.get).toHaveBeenCalledWith('broadcast-missing')
+    expect(screen.getAllByText(/9月8日 10:00/).length).toBeGreaterThan(0)
     expect(apiMocks.preflight).toHaveBeenCalledWith(expect.objectContaining({
       targetType: 'all', lineAccountId: 'visual-qa-account',
       messageContent: broadcast.messageContent,
@@ -106,6 +108,36 @@ describe('broadcasts/reserved の対象なし案内（R582）', () => {
     expect(screen.getByText('このアカウントの友だち全員')).toBeTruthy()
     expect(screen.queryByText(/全員 0 人/)).toBeNull()
     expect(screen.queryByText('予約結果を読み込めませんでした')).toBeNull()
+  })
+
+  it('除く見込みが0のときは表示せず、実数は桁区切りで表示する', async () => {
+    apiMocks.get.mockResolvedValue({ success: true, data: broadcast })
+    apiMocks.preflight.mockResolvedValue({ success: true, data: { audienceCount: 37, hiddenExcluded: 1234, warnings: [] } })
+    const view = render(<Page />)
+    expect(await screen.findByText('このアカウントの友だち全員 37 人（除く見込み 1,234 人）')).toBeTruthy()
+    view.unmount()
+    apiMocks.preflight.mockResolvedValue({ success: true, data: { audienceCount: 0, hiddenExcluded: 0, warnings: [] } })
+    render(<Page />)
+    expect(await screen.findByText('このアカウントの友だち全員 0 人')).toBeTruthy()
+    expect(screen.queryByText(/除く見込み/)).toBeNull()
+  })
+
+  it.each([
+    { status: 'draft', scheduledAt: broadcast.scheduledAt },
+    { status: 'scheduled', scheduledAt: null },
+  ])('予約中でない、または日時がないと予約済みとして出さない', async (change) => {
+    apiMocks.get.mockResolvedValue({ success: true, data: { ...broadcast, ...change } })
+    render(<Page />)
+    expect(await screen.findByText('予約状態を確認できませんでした')).toBeTruthy()
+    expect(screen.queryByText('一斉配信を予約しました')).toBeNull()
+  })
+
+  it('別アカウントの予約を表示しない', async () => {
+    apiMocks.get.mockResolvedValue({ success: true, data: { ...broadcast, lineAccountId: 'different-account' } })
+    render(<Page />)
+    expect(await screen.findByText('選択中のアカウントの配信ではありません')).toBeTruthy()
+    expect(screen.queryByText('一斉配信を予約しました')).toBeNull()
+    expect(screen.queryByText(broadcast.title)).toBeNull()
   })
 
   it('予約の詳細リンクに保存したIDを安全に渡す', async () => {
