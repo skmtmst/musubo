@@ -283,6 +283,17 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
     expect(row.meta).toEqual(['owner@example.com', '最後に取り込んだ日時 日時(2026-11-01T00:00:00.000Z)'])
   })
 
+  it('主連携はサーバーの値で決め、先頭を主連携と決め打ちしない', () => {
+    const data = googleData({ id: 'gc-1', status: 'connected', locationTitle: '然カフェ 本店', confirmationRevision: 4 })
+
+    // サーバーがこの接続を主連携としているとき。
+    expect(googleSlots(data, fmt, 'gc-1').connections[0]!.primary).toBe(true)
+    // 別の接続が主連携のときは札を付けない。
+    expect(googleSlots(data, fmt, 'gc-2').connections[0]!.primary).toBe(false)
+    // 口が取れないとき（null）は今までどおり1件しか出せないので主連携として扱う。
+    expect(googleSlots(data, fmt).connections[0]!.primary).toBe(true)
+  })
+
   it('Google の未接続・読み取れないときは行を作らない', () => {
     expect(googleSlots(googleData({ status: 'disconnected' }), fmt).connections).toHaveLength(0)
     expect(googleSlots(null, fmt).connections).toHaveLength(0)
