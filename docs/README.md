@@ -468,6 +468,8 @@
 
 ## 反映履歴
 
+- [保守時に確認する説明を整理](release-log/unreleased/PR-kenta-q04-misc.md) — 反映履歴、確認 2026-11-19。
+
 - [SNS連携で残る3つの口の決まり](release-log/unreleased/120-kenta-sns-multilink-ports.md) — 反映履歴、確認 2026-11-18。
 
 - [自動確認を実際の動きで確認](release-log/unreleased/115-kenta-q02b-b10.md) — 反映履歴、確認 2026-11-18。
