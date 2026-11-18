@@ -139,11 +139,12 @@ it.each(['viewer', 'staff'])('%sにも使い方の設定の入口を出さず、
   await screen.findByRole('heading', { name: 'はじめにやること' })
   await waitFor(() => { expect(state.warnings).toHaveBeenCalledWith('a'); expect(state.items).toHaveBeenCalledWith('a') })
   expect(screen.queryByRole('button', { name: '使い方の設定を開く' })).toBeNull()
-  expect(screen.queryByRole('button', { name: '確かめる' })).toBeNull()
+  /* 「確かめる」は9項目の最終確認の行だけ。使い方の設定の入口（設定を確認する・中身を見る）は出さない。 */
+  expect(screen.queryByRole('button', { name: '設定を確認する' })).toBeNull()
   expect(screen.queryByRole('button', { name: '中身を見る' })).toBeNull()
   if (role === 'viewer') {
-    /* 閲覧のみは行の入口も灰色の「ガイドで開く」で残す。 */
-    const locked = screen.getAllByRole('button', { name: 'ガイドで開く' })
+    /* 閲覧のみは行の入口も灰色の「開く」で残す。 */
+    const locked = screen.getAllByRole('button', { name: '開く' })
     expect(locked.length).toBeGreaterThan(0)
     for (const button of locked) expect(button.getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(locked[0])

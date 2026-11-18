@@ -226,6 +226,12 @@ html:root .guideFooter button[data-variant='secondary'][class][class][class] {
    */
   .spacer { display: none; }
   .fold { margin-inline-start: auto; }
+  /*
+   * 「設定を読み直す」が出る時だけ頭は 270px を超える（実測 403px）。
+   * 正本の枠は 310 幅で切り落としているが、実機で操作が切れると押せないので、
+   * この時だけ折り返して2行目に落とす。題・進捗数・「畳む」の位置と間は正本のまま。
+   */
+  .head { flex-wrap: wrap; }
   html:root .guideFooter button[class][class][class] { width: 100%; }
   .note { margin-inline-start: 0; }
 }

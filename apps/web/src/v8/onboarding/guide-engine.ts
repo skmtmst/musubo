@@ -287,7 +287,7 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
     /** 最初から始める時は見送りの記憶も消す（また1段目から案内する）。 */
     start: useCallback(() => { setSkipped(EMPTY_SKIPPED); commit('start', guideAnchor(summary)?.key ?? null) }, [commit, summary]),
     /**
-     * 選んだ段からガイドを始める（枠08b の行の「ガイドで開く」）。
+     * 選んだ段からガイドを始める（枠08b の行の「開く」）。
      * 止まっている時は 'start'、もう動いている時は 'advance' で段を移す。
      * どちらもその段の手順1から始まり、画面の移動は GuideHost が行う。
      */

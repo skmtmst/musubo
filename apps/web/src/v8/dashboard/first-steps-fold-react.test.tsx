@@ -45,17 +45,18 @@ describe('はじめにやることを畳む', () => {
       condition: 'condition', next: 'next', action: { label: 'same secondary action', href: '/' }, blockedReason: null,
     }))
     const cases = [
-      ['restaurant', ['リッチメニューを選ぶ', '卓と席を登録する', '営業時間を設定する', 'コースとメニューを登録する', '予約枠と在庫を設定する', 'LINE来店フォローを確認する']],
-      ['salon', ['メニューを登録する', '営業時間を設定する', '担当者を登録する', '予約の受付を確認する']],
-      ['consult', ['面談の枠を作る', '営業時間を設定する', '面談の URL を用意する', '面談の受付を確認する']],
-      ['lesson', ['クラスを作る', '営業時間を設定する', '会員を登録する', 'クラスの予約を受け付ける']],
-      ['ec', ['ストアをつなぐ', '営業時間を設定する', 'ストアの商品を確認する', '注文の受付を確認する']],
-      ['standard', ['友だちの分け方を決める', '営業時間を設定する', '友だち追加時の配信を作る', 'シナリオを作る']],
+      /* 題は承認済み Pen「はじめにやること08d_v04」(la9o6) の短い言い方に合わせる。 */
+      ['restaurant', ['リッチメニューを選ぶ', '卓と席を登録する', '営業時間を決める', 'メニューを作る', '予約枠を決める', 'フォローを見る']],
+      ['salon', ['メニューを登録する', '営業時間を決める', '担当者を登録する', '予約の受付を確認する']],
+      ['consult', ['面談の枠を作る', '営業時間を決める', '面談の URL を用意する', '面談の受付を確認する']],
+      ['lesson', ['クラスを作る', '営業時間を決める', '会員を登録する', 'クラスの予約を受け付ける']],
+      ['ec', ['ストアをつなぐ', '営業時間を決める', 'ストアの商品を確認する', '注文の受付を確認する']],
+      ['standard', ['友だちの分け方を決める', '営業時間を決める', '友だち追加時の配信を作る', 'シナリオを作る']],
     ] as const
     for (const [style, labels] of cases) {
       const result = summarizeFirstSteps(steps, style)
       expect(result.steps.map((step) => step.label)).toEqual(labels)
-      expect(result.steps.map((step) => step.state)).toEqual(labels.map(label => style === 'standard' && label !== '営業時間を設定する' ? 'stalled' : 'unknown'))
+      expect(result.steps.map((step) => step.state)).toEqual(labels.map(label => style === 'standard' && label !== '営業時間を決める' ? 'stalled' : 'unknown'))
     }
   })
 
@@ -126,37 +127,37 @@ it('全部済んだら一覧を出さず、進みの1本だけを残す', async 
 })
 
 
-it('権限のない段の入口も灰色の「ガイドで開く」で残す', () => {
+it('権限のない段の入口も灰色の「開く」で残す', () => {
   const forbidden = summarizeFirstSteps(buildStepsFromApi([{ key: 'attributes', state: 'forbidden', href: null, reason: '管理者に頼んでください' }]))
   render(<FirstStepsCard summary={forbidden} folded={false} onToggle={() => {}} />)
-  const button = screen.getByRole('button', { name: 'ガイドで開く', exact: true })
+  const button = screen.getByRole('button', { name: '開く', exact: true })
   expect(button.getAttribute('aria-disabled')).toBe('true')
   expect(button.hasAttribute('disabled')).toBe(false)
   expect(button.hasAttribute('href')).toBe(false)
   fireEvent.click(button)
 })
 
-/* 枠08b v01: 未完了の行はすべて「ガイドで開く」で、押すとその段のガイドが始まり画面へ移る。 */
-it('未完了の行は「ガイドで開く」だけにし、押すとその段のガイドが始まる', () => {
+/* Pen v04: 未完了の行は「開く」1つ（最終確認だけ「確かめる」）で、押すとその段のガイドが始まり画面へ移る。 */
+it('未完了の行は「開く」だけにし、押すとその段のガイドが始まる', () => {
   const startAt = vi.fn()
   render(<FirstStepsCard summary={summary} folded={false} onToggle={() => {}}
     guide={{ phase: 'idle', stepKey: null, procedureIndex: 1, anchor: null, pausedAnchor: null, start: () => {}, resume: () => {}, pause: () => {}, reset: () => {}, advanceProcedure: () => {}, startAt }} />)
   const todo = summary.steps.filter(step => !step.done && step.href)
   const links = screen.getAllByRole('link')
   expect(links).toHaveLength(todo.length)
-  for (const link of links) expect(link.textContent).toBe('ガイドで開く')
+  expect(links.map(link => link.textContent)).toEqual(todo.map(step => step.key === 'firstMessage' ? '確かめる' : '開く'))
   expect(screen.queryByRole('link', { name: /（開く）/ })).toBeNull()
-  const first = screen.getByRole('link', { name: `${todo[0].label}をガイドで開く` })
+  const first = screen.getByRole('link', { name: `${todo[0].label}を開く` })
   expect(first.getAttribute('href')).toBe(todo[0].href)
   fireEvent.click(first)
   expect(startAt).toHaveBeenCalledWith(todo[0].key)
 })
 
-it('閲覧のみの人は行の「ガイドで開く」を押せず理由を残す', () => {
+it('閲覧のみの人は行の「開く」を押せず理由を残す', () => {
   const startAt = vi.fn()
   render(<FirstStepsCard summary={summary} folded={false} onToggle={() => {}} readOnly
     guide={{ phase: 'idle', stepKey: null, procedureIndex: 1, anchor: null, pausedAnchor: null, start: () => {}, resume: () => {}, pause: () => {}, reset: () => {}, advanceProcedure: () => {}, startAt }} />)
-  const button = screen.getAllByRole('button', { name: 'ガイドで開く' })[0]
+  const button = screen.getAllByRole('button', { name: '開く' })[0]
   expect(button.getAttribute('aria-disabled')).toBe('true')
   fireEvent.click(button)
   expect(startAt).not.toHaveBeenCalled()

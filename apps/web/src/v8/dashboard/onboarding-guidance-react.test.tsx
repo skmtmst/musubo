@@ -240,8 +240,8 @@ it.each(['viewer', 'staff', null])('役割%sは許可された状態だけ読み
     expect(net.warnings).toHaveBeenCalledWith('A'); expect(net.items).toHaveBeenCalledWith('A')
     expect(screen.queryByRole('heading', { name: '選んだ機能の設定' })).toBeNull()
     if (role === 'viewer') {
-      /* 閲覧のみは行の入口も灰色の「ガイドで開く」になる。 */
-      const locked = within(guide()).getAllByRole('button', { name: 'ガイドで開く' })
+      /* 閲覧のみは行の入口も灰色の「開く」になる。 */
+      const locked = within(guide()).getAllByRole('button', { name: '開く' })
       expect(locked.length).toBeGreaterThan(0)
       for (const button of locked) expect(button.getAttribute('aria-disabled')).toBe('true')
       fireEvent.click(locked[0])

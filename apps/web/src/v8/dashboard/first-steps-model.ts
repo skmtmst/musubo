@@ -26,8 +26,8 @@ export type FirstStepsGuide = GuideControl
 /** 設定画面と同じ状態・権限・行き先を使い、別の完了条件を持たない。 */
 export function summarizeFirstSteps(steps: ReadonlyArray<StepResult>, style: AccountStyle | null = null, progress?: StyleSetupProgress): FirstStepsSummary {
   const displaySteps = stepsForStyle(steps, style, progress)
-  /* 行の操作名は「ガイドで開く」1つに揃える。済みの段だけは案内が無いので「開く」。 */
-  return { steps: displaySteps.map((step) => ({ key: step.key, ordinal: step.ordinal, label: step.title, href: step.action?.href ?? null, link: step.action ? (step.state === 'done' ? '開く →' : 'ガイドで開く →') : step.blockedReason ?? '状態を確認する', done: step.state === 'done', state: step.state, reason: step.state === 'unknown' ? step.next : undefined })), done: doneCount(displaySteps), total: displaySteps.length }
+  /* 行の操作名は Pen v04 どおり「開く」1つに揃える。最終確認だけ「確かめる」。 */
+  return { steps: displaySteps.map((step) => ({ key: step.key, ordinal: step.ordinal, label: step.title, href: step.action?.href ?? null, link: step.action ? (step.key === 'firstMessage' ? '確かめる →' : '開く →') : step.blockedReason ?? '状態を確認する', done: step.state === 'done', state: step.state, reason: step.state === 'unknown' ? step.next : undefined })), done: doneCount(displaySteps), total: displaySteps.length }
 }
 
 export function shouldShowFirstSteps(role: string | null, summary: FirstStepsSummary | null): boolean {

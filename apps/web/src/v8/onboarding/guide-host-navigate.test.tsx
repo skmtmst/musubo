@@ -66,7 +66,7 @@ describe('案内の入れ物が段の画面へ移る', () => {
     expect(nav.push).toHaveBeenCalledWith('/settings/sns')
   })
 
-  it('未接続で行の「ガイドで開く」から入った時も、1/2の対象がある画面へ移る', () => {
+  it('未接続で行の「開く」から入った時も、1/2の対象がある画面へ移る', () => {
     nav.path = '/dashboard'
     state.guide = { ...state.guide, stepKey: 'hours', procedureIndex: 1 }
     render(<GuideHost><p>中身</p></GuideHost>)

@@ -19,7 +19,7 @@ import { useAccount } from '@/contexts/account-context'
 import { formatNumber,formatTime } from '@/lib/format'
 import { formatWaitRough } from '@/lib/format-duration'
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
-import { SetupWarningBands, ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
+import { ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import ListState from '@/components/shared/list-state'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
 import { useSetupWizard } from '@/v8/onboarding/public/setup-wizard/index'
@@ -350,7 +350,6 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
     ...d.visibleRight.map((item) => item.id),
   ])
   const looseFailures = partialFailuresWithoutCard(data?.partialFailures ?? [], shownCardIds)
-  const setupBands = setup.data ? <SetupWarningBands data={setup.data} configureAllowed={canManage} role={role} /> : null
   /* 初期セットが入っていない時の［入れ直す］。版は使い方の設定が読めてから渡す（閲覧のみには出さない）。 */
   const starterRetry = canManage && d.selectedAccountId && starterRetryVisible(start.starter, starterResult.inserted) ? (
     <StarterRetryNotice key={d.selectedAccountId} accountId={d.selectedAccountId} starter={start.starter} version={setup.data?.state.version ?? null}
@@ -363,12 +362,12 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
   const firstRunPopup = useFirstRunPopup({
     accountId: d.selectedAccountId, canManage, summary: onboardingSummary, guidePhase: start.guide.phase,
   })
-  const notice = start.error || setup.error || start.progress?.notices?.length || start.summary || starterRetry || setupRest || setup.data?.warnings.length || viewer || d.error || d.periodNotice || looseFailures.length ? (
+  const notice = start.error || setup.error || start.progress?.notices?.length || start.summary || starterRetry || setupRest || viewer || d.error || d.periodNotice || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
         <ReadOnlyNotice />
       ) : null}
-      {setupBands}
+      {/* 未設定のボタンの警告の帯は出さない（承認済み Pen「はじめにやること08d_v04」でこの帯を削除）。 */}
       {starterRetry}
       {showOnboarding ? <FirstStepsCard
         onRetry={start.reload} summary={onboardingSummary} readOnly={role === 'viewer'} folded={start.folded} onToggle={start.toggle}

@@ -1,7 +1,7 @@
 'use client'
 import { FirstStepsCard, FirstStepsFeedback, useFirstSteps, FirstRunDoneDialog, FirstRunPopup, useFirstRunPopup } from '@/v8/dashboard/public/first-steps/index'
 import { canManageRole } from '@/lib/staff-role'
-import { SetupWarningBands, ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
+import { ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
 import { useSetupWizard } from '@/v8/onboarding/public/setup-wizard/index'
 import { FriendAddLink } from '@/v8/dashboard/public/friend-add/index'
@@ -249,7 +249,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         {absence.notice}
         {absence.dialog}
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
-        {setup.data ? <SetupWarningBands data={setup.data} configureAllowed={canManageRole(role)} role={role} /> : null}
+        {/* 未設定のボタンの警告の帯は出さない（承認済み Pen「はじめにやること08d_v04」でこの帯を削除）。 */}
         <ReservationFormRepairNotices notices={start.progress?.notices} role={role}/>
         {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'} guide={start.guide}
           onRecheck={start.watchExpired ? start.rewatch : undefined}

@@ -32,7 +32,8 @@ export type { FirstStepsGuide, FirstStepsSummary } from './first-steps-model'
 
 /**
  * 9項目の一覧の下に置く再開の導線。
- * 「続きからガイドで進める」「ガイドを最初から開始」と注記をこの順で出す。
+ * 承認済み Pen「はじめにやること08d_v04」(sL2CD/rvGC6) どおり
+ * 「続きから進める」「最初から始める」と注記をこの順で出す。
  * 一時停止は案内の帯側で受けるので、ここには出さない（同じ操作を2か所に置かない）。
  */
 export function FirstStepsGuideFooter({ guide }: { guide: FirstStepsGuide }) {
@@ -41,8 +42,8 @@ export function FirstStepsGuideFooter({ guide }: { guide: FirstStepsGuide }) {
   const restart = () => { guide.reset(); guide.start() }
   return (
     <div className={styles.guideFooter}>
-      <Button size="compact" variant="primary" presentation="step-action" onClick={guide.phase === 'paused' ? guide.resume : guide.start}>続きからガイドで進める</Button>
-      <Button size="compact" presentation="step-action" onClick={restart}>ガイドを最初から開始</Button>
+      <Button size="compact" variant="primary" presentation="step-action" onClick={guide.phase === 'paused' ? guide.resume : guide.start}>続きから進める</Button>
+      <Button size="compact" presentation="step-action" onClick={restart}>最初から始める</Button>
       <FirstStepsGuideNote />
     </div>
   )
@@ -60,7 +61,9 @@ export function FirstStepsGuideNote() {
 export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, feedback, guide, readOnly = false }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onRetry?: () => void; feedback?: ReactNode; guide?: FirstStepsGuide; readOnly?: boolean }) {
   const complete = Boolean(summary && summary.total > 0 && summary.done === summary.total)
   const nextKey = summary ? nextFirstStepKey(summary) : null
-  const guideVisible = Boolean(guide && summary && !complete && !readOnly)
+  /* 再開の導線はガイド進行中だけ（承認済み Pen：通常 la9o6/FJ6Xd には無く、進行中 sL2CD/rvGC6 にだけある）。
+     始めるのは各行の「開く」なので、まだ始めていない間はカードに同じ操作を増やさない。 */
+  const guideVisible = Boolean(guide && summary && !complete && !readOnly && (guide.phase === 'active' || guide.phase === 'paused'))
   return (
     <Card as="section" className={styles.card} edge="hairline" layout="vertical" contentPadding="var(--step-card-pad)" gap="var(--step-card-gap)" aria-labelledby="first-steps-title" data-design-node="r3X34">
       <div className={styles.head}>
@@ -79,22 +82,26 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
       </div>
       {feedback}
       {summary && !complete ? <SetupStepList id="first-steps-list" columns={3} hidden={folded}>
-        {summary.steps.map((step, index) => (
+        {summary.steps.map((step, index) => {
+          /* 行の操作名は Pen v04 どおり「開く」1つに揃える。最終確認だけ受け取りを見る「確かめる」。 */
+          const actionLabel = step.key === 'firstMessage' ? '確かめる' : '開く'
+          return (
           <SetupStepRow key={step.key} done={step.done} next={step.key === nextKey}>
             <StepMark done={step.done} />
             <SetupStepLabel title={step.label} help={step.state === 'unknown' && step.reason ? <HelpTip label={`${step.label}の未確認の理由`}>{step.reason}</HelpTip> : undefined}>
               <span aria-hidden="true">{step.ordinal ?? index + 1}. </span><span>{step.label}</span>
               <span className="sr-only">{step.done ? '（済み）' : step.state === 'unknown' ? '（未確認）' : step.state === 'forbidden' ? '（権限がありません）' : '（まだ）'}</span>
             </SetupStepLabel>
-            {(!step.done || step.key === 'hours') && (readOnly || step.state === 'forbidden') ? <><Button size="compact" lockedReason={lockUnless(false, 'manager')}>ガイドで開く</Button></> : !step.done && !step.href ? <span className={styles.count}>未確認</span> : step.done && step.key !== 'hours' ? null : step.done ? (
+            {(!step.done || step.key === 'hours') && (readOnly || step.state === 'forbidden') ? <><Button size="compact" lockedReason={lockUnless(false, 'manager')}>{actionLabel}</Button></> : !step.done && !step.href ? <span className={styles.count}>未確認</span> : step.done && step.key !== 'hours' ? null : step.done ? (
               /* 済みの段は案内が無いので、確かめ直すための行き先だけ残す。 */
-              <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}（開く）`}>開く</TextLink>
+              <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}（${actionLabel}）`}>{actionLabel}</TextLink>
             ) : (
               /* まだの段はどれも、この行からその段のガイドを始める。 */
-              <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}をガイドで開く`} onClick={() => guide?.startAt?.(step.key)}>ガイドで開く</TextLink>
+              <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}を${actionLabel}`} onClick={() => guide?.startAt?.(step.key)}>{actionLabel}</TextLink>
             )}
           </SetupStepRow>
-        ))}
+          )
+        })}
       </SetupStepList> : null}
       {guideVisible && !folded ? <FirstStepsGuideFooter guide={guide!} /> : null}
     </Card>

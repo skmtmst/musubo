@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * 08b の再開導線（承認済み Pen /Users/masatosakamoto/Documents/musubo-course-media-upload-20261110.pen 枠 Bnkcl）。
- * Pen の SuTRi どおり「続きからガイドで進める」「ガイドを最初から開始」と注記がこの順で並ぶこと・
+ * 08b の再開導線（承認済み Pen「はじめにやること08d_v04」枠 sL2CD/rvGC6）。
+ * Pen どおり「続きから進める」「最初から始める」と注記がこの順で並ぶこと・
  * 止めた所から続けられること・行き先が実在する段だけを案内すること・
  * チェックは実データで付くという注記が狭い幅でも出ることを見張る。
  * 一時停止はガイドバー側（枠 orKSi の共通ルール）なので、ここには出さない。
@@ -27,24 +27,24 @@ describe('はじめにやることの再開導線', () => {
     const value = guide()
     render(<FirstStepsGuideFooter guide={value} />)
     const texts = Array.from(document.body.querySelectorAll('button, p')).map(node => node.textContent)
-    expect(texts).toEqual(['続きからガイドで進める', 'ガイドを最初から開始', 'チェックは設定の実データで自動判定。ガイドを使わなくても付きます'])
-    fireEvent.click(screen.getByRole('button', { name: '続きからガイドで進める' }))
+    expect(texts).toEqual(['続きから進める', '最初から始める', 'チェックは設定の実データで自動判定。ガイドを使わなくても付きます'])
+    fireEvent.click(screen.getByRole('button', { name: '続きから進める' }))
     expect(value.start).toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'ガイドを最初から開始' }))
+    fireEvent.click(screen.getByRole('button', { name: '最初から始める' }))
     expect(value.reset).toHaveBeenCalled()
   })
 
   it('案内中も操作は同じで、一時停止はここに出さない', () => {
     const value = guide({ phase: 'active' })
     render(<FirstStepsGuideFooter guide={value} />)
-    expect(screen.getByRole('button', { name: '続きからガイドで進める' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '続きから進める' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '一時停止' })).toBeNull()
   })
 
   it('一時停止は止めた段から再開する', () => {
-    const value = guide({ phase: 'paused', anchor: null, pausedAnchor: { key: 'hours', label: '営業時間を設定する', href: '/settings/hours' } })
+    const value = guide({ phase: 'paused', anchor: null, pausedAnchor: { key: 'hours', label: '営業時間を決める', href: '/settings/hours' } })
     render(<FirstStepsGuideFooter guide={value} />)
-    fireEvent.click(screen.getByRole('button', { name: '続きからガイドで進める' }))
+    fireEvent.click(screen.getByRole('button', { name: '続きから進める' }))
     expect(value.resume).toHaveBeenCalled()
   })
 
