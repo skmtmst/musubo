@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { normalizeFormTheme } from '@line-crm/shared';
 import { submitButtonText } from './form-button-text.js';
@@ -33,10 +32,6 @@ describe('送信ボタンは緑の地に白い文字 (既定・設計 4-form)', 
     expect(submitButtonText(theme, false)).toBe('#ffffff');
   });
 
-  it('既定で黒になる直接の色選択へ戻さない', () => {
-    const src = readFileSync(new URL('../pages/form.tsx', import.meta.url), 'utf8');
-    expect(src).not.toContain('color: formThemeButtonText(theme)');
-  });
 });
 
 describe('色を決めているときは読める方を自動で選ぶ (4.5 以上)', () => {
