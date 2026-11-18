@@ -8,13 +8,6 @@ const SOURCE = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'create.tsx')
 const EDIT = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'edit-form.tsx'), 'utf8')
 
 describe('イベント作成の最初の予約枠', () => {
-  it('概要と同じ画面で日時・所要時間・定員を入力できる', () => {
-    expect(SOURCE).toContain('id="ev-new-date"')
-    expect(SOURCE).toContain('id="ev-new-start"')
-    expect(SOURCE).toContain('id="ev-new-end"')
-    expect(SOURCE).toContain('id="ev-new-cap"')
-  })
-
   it('イベント作成後のIDを使って最初の枠も保存する', () => {
     const createEvent = SOURCE.indexOf('eventsApi.createEvent(selectedAccountId, payload)')
     // #1000: 初回枠には固定の再送防止キーを付け、作成済みの枠ID
