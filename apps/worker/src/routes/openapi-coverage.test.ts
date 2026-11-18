@@ -165,6 +165,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/ops/applications/{applicationId}/quotes/{id}/resolve-send',
   'POST /api/ops/applications/{applicationId}/quotes/{id}/send',
   'POST /api/ops/pricing-conditions',
+  'GET /api/settings/sns/connections',
+  'PUT /api/settings/sns/google-primary',
   'PUT /api/ops/applications/{applicationId}/quotes/{id}',
   'PUT /api/ops/pricing-conditions/{id}',
   "GET /api/hq/broadcasts/test-recipients",
