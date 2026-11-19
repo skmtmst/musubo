@@ -171,3 +171,17 @@ it('検証先でない予定が100件あっても登録済みの人の通知を�
  expect(fakeProxy).toHaveBeenCalledTimes(1);
  expect(await fakeProxy.mock.calls[0][0].json()).toMatchObject({to:'Uf'});
 });
+
+it('検証先でない期限切れ通知は閉じ、結果不明の通知は保留する',async()=>{
+ fixture.raw.exec(`INSERT INTO friends(id,line_user_id,line_account_id) VALUES('outside','Uoutside','a');
+ INSERT INTO member_rank_notices(id,account_id,friend_id,change_key,kind,tier_id,purpose,messages_json,base_messages_json,scheduled_at)
+ VALUES('expired','a','outside','change','upgrade','tier','notice','[{"type":"text","text":"hi"}]','[{"type":"text","text":"hi"}]','2026-10-16T20:00:00.000Z'),
+ ('expired-unknown','a','outside','change-unknown','upgrade','tier','notice','[{"type":"text","text":"hi"}]','[{"type":"text","text":"hi"}]','2026-10-16T20:00:00.000Z');
+ INSERT INTO outbound_send_requests(idempotency_key,channel,resource_id,payload_hash,line_account_id,status,failure_code,last_failed_at,created_at,updated_at)
+ VALUES('unknown-key','line','rank-notice:expired-unknown','hash','a','unknown','TIMEOUT','2026-10-16','2026-10-16','2026-10-16')`);
+ const {processStagingRankNotices}=await import('./member-rank-live-notices.js');
+ await processStagingRankNotices({DB:fixture.db,DEPLOY_ENV:'staging',RANK_NOTICE_STAGING_DELIVERY_ENABLED:'true',WORKER_PUBLIC_URL:'https://worker.invalid'} as never,now);
+ expect(fixture.raw.prepare("SELECT status FROM member_rank_notices WHERE id='expired'").get()).toEqual({status:'skipped_late'});
+ expect(fixture.raw.prepare("SELECT status FROM member_rank_notices WHERE id='expired-unknown'").get()).toEqual({status:'scheduled'});
+ expect(fakeProxy).toHaveBeenCalledTimes(1);
+});

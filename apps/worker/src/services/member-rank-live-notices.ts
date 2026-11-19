@@ -20,6 +20,11 @@ async function candidate(db:D1Database,id:string,now:Date):Promise<Candidate|nul
 
 /** テスト用の送信口を注入できる。実送信の設定を持たない限り呼び出されない。 */
 export async function processLiveRankNotices(db:D1Database,now:Date,options:{transmit:Transmit;stagingOnly?:boolean}){
+ // 検証先でない予定も期限切れになったら閉じる。結果不明の送信は保留する。
+ if(options.stagingOnly)await db.prepare(`UPDATE member_rank_notices SET status='skipped_late',processed_at=?
+  WHERE id IN (SELECT n.id FROM member_rank_notices n WHERE n.status='scheduled' AND julianday(?)>julianday(n.scheduled_at,'+3 hours')
+   AND NOT EXISTS(SELECT 1 FROM outbound_send_requests o WHERE o.resource_id='rank-notice:'||n.id AND o.status IN('in_progress','unknown','succeeded'))
+   ORDER BY n.scheduled_at,n.id LIMIT 100) AND status='scheduled'`).bind(now.toISOString(),now.toISOString()).run();
  const rows=(await db.prepare(`SELECT n.id FROM member_rank_notices n WHERE n.status='scheduled' AND julianday(n.scheduled_at)<=julianday(?)
  AND NOT EXISTS(SELECT 1 FROM outbound_send_requests o WHERE o.resource_id='rank-notice:'||n.id AND (o.status IN('in_progress','unknown','succeeded') OR (o.status='failed' AND (o.retryable=0 OR o.next_retry_at>?))))
  AND (?=0 OR EXISTS(SELECT 1 FROM account_settings s JOIN friends f ON f.id=n.friend_id AND f.line_account_id=n.account_id AND f.is_following=1
