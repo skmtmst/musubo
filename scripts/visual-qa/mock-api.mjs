@@ -309,7 +309,7 @@ let commonVarFolders = COMMON_VAR_FOLDERS.map((folder) => ({ ...folder }))
 // `verified` を返す必要がある。申告時に受けた targetMediaId を覚えておく。
 const mediaUploadSessionTargets = new Map()
 
-/** 統括の友だち情報欄・対応マーク（#1657）の返事。店の使用先集計は混ぜない。 */
+/** 統括の友だち情報欄・対応マークの返事。店の使用先集計は混ぜない。 */
 const HQ_ATTRIBUTE_ROWS = [
   ...FRIEND_ATTRIBUTE_FIELDS.map((field) => ({
     template: { id: `visual-hq-attr-${field.id}`, name: field.name, description: null, template_type: 'friend_field', folder_id: field.folderId ? ({ 'friend-field-folder-pets': 'visual-hq-folder-inquiry', 'friend-field-folder-contact': 'visual-hq-folder-booking', 'friend-field-folder-purchase': 'visual-hq-folder-ec' }[field.folderId] ?? null) : null, revision: 1, updated_at: field.updatedAt, friend_count: field.usageCount, distributed_account_count: 1, distributed_account_names: ['本店'], distributed_account_more: 0, outdated_account_count: 0, current_version: 1 },
@@ -749,7 +749,7 @@ const OPS_SUPPORT_DETAIL = {
  * 名前はすべて作り物で、日時は固定（撮るたびに同じ絵になる）。
  */
 const HQ_SUPPORT_REQUESTS = [
-  /* 絵 `b8xBtZ`・`OhguS`（2026-10-06 絵に合わせた）：対応中の #1042 と解決済みの #1031。 */
+  /* 絵 `b8xBtZ`・`OhguS`：対応中の #1042 と解決済みの #1031。 */
   {
     id: 'visual-ticket-1', kind: 'bug', kindLabel: '不具合の報告',
     subject: 'LINE の Webhook が遅れる', body: '夕方の一斉配信のあと、友だちの返信が管理画面に出るまで 10 分ほどかかります。昨日から急に遅くなりました。',
@@ -1010,7 +1010,7 @@ const DASHBOARD_UPCOMING = {
 }
 
 /**
- * L (#824 数字の出どころ)の見本。型は `api.ts` の `DeliveryFailureOrigins` どおり。
+ * L (数字の出どころ)の見本。型は `api.ts` の `DeliveryFailureOrigins` どおり。
  * 同じ失敗は1件・送り直しは数えない形（合計3件）。
  */
 const DASHBOARD_DELIVERY_FAILURE_ORIGINS = {
@@ -1078,7 +1078,7 @@ const DASHBOARD_OVERVIEW = {
     funnelAlerts: 0,
     automationFailures: 0,
   },
-  // PR #1016 の未取得判別契約。値だけでなく、基準時刻と期間も本番APIとそろえる。
+  // 未取得判別契約。値だけでなく、基準時刻と期間も本番APIとそろえる。
   metrics: {
     activeFriends: {
       value: 398,
@@ -1273,7 +1273,7 @@ const EC_CONNECTOR = {
   },
   health: { today: 148, last30Days: 2486, failed: 2, lastReceivedAt: '2026-09-06T09:58:00+09:00', lastSucceededAt: '2026-09-06T09:58:00+09:00' },
   impact: { ...EC_OVERVIEW.impact },
-  // 本番の口は retryPolicy を常に null で返す(#517 中5b)。つなぎ先単位の
+  // 本番の口は retryPolicy を常に null で返す。つなぎ先単位の
   // やり直し方針は無く、再試行は実行単位(next_retry_at / max_attempts)で持つ。
   // 目視確認が本番と別物にならないよう、モックも null に揃える。
   retryPolicy: null,
@@ -2019,10 +2019,10 @@ const SHAPES = {
     version: 1,
   },
   // 左メニューの出し分け。無いと汎用の空一覧が返り「機能設定を読み込めませんでした」になり、
-  // メニューが基本の9項目だけになる（2026-09-24 の点検で発覚）。
+  // メニューが基本の9項目だけになる。
   // 設定の画面（★V8 設定の中のメニュー・プール管理 u3iab3）は「プール管理」が見える統括で描かれている。
   // 機能設定の既定（multi_store_hierarchy は既定オフ）はそのまま、表示の出し分けだけオンで返す。
-  // 成果とアフィリエイト（affiliates）も絵は機能がある前提で描かれている（Eo56k ほか。2026-10-15 司令塔）。
+  // 成果とアフィリエイト（affiliates）も絵は機能がある前提で描かれている（Eo56k ほか）。
   // 本物の既定値（affiliates は既定オフ）は変えず、表示の出し分けだけオンで返す。
   '/api/settings/features/visibility': { features: { ...FEATURES, multi_store_hierarchy: true, affiliates: true } },
   '/api/inbox/unanswered/count': { total: 5, byAccount: [{ accountId: 'visual-qa-account', accountName: '然-NEN-TEST', count: 5 }], oldestWaitMinutes: 9110 },
@@ -2280,7 +2280,7 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   }
   if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/validate$/.test(pathname)) {
     // 失敗系は visualState=error で切り替える。固定成功だけだと公開不可の
-    // 状態を確かめられない (#501-軽)。器は本物の失敗応答と同じ形。
+    // 状態を確かめられない。器は本物の失敗応答と同じ形。
     if (query.get('visualState') === 'error') {
       return {
         success: false,
@@ -2332,7 +2332,7 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   }
   /*
    * 本番の口は `{success,data}` で包む。包むのは外側（このファイルの返し口）なので、
-   * ここは素の値を返す（ここでも包むと二重になり、作る⑤が落ちていた・2026-10-06）。
+   * ここは素の値を返す（ここでも包むと二重になり、作る⑤が落ちる）。
    */
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/test$/.test(pathname)) {
     return AUTO_REPLY_PUBLISH_TEST
@@ -2403,7 +2403,7 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   if (method === 'POST' && pathname === '/api/saved-searches/preview') {
     return FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL
   }
-  /* 機能29の操作系。承認・拒否・取消・枠の増減を目視できるよう固定の返事を返す(点検#520の中7)。 */
+  /* 機能29の操作系。承認・拒否・取消・枠の増減を目視できるよう固定の返事を返す。 */
   if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/bookings\/[^/]+\/decide$/.test(pathname)) {
     const bookingId = pathname.split('/').pop()
     const found = EVENT_BOOKINGS.find((booking) => booking.id === bookingId) ?? EVENT_BOOKINGS[0]
@@ -2485,7 +2485,7 @@ const RAW = {
     担当×メニューの一括表。実口（`booking.ts`）と同じ
     `{staff: [{staff_id, matrix}]}` の形。`success` で包む・`staff` を
     付けないと、設定画面の担当タブ・メニュー作成画面が
-    `c.value.staff is not iterable` で落ちる（2026-10-03 点検）。
+    `c.value.staff is not iterable` で落ちる。
   */
   '/api/booking/admin/staff-menus': {
     staff: BOOKING_STAFF.map((staff) => ({
@@ -2947,7 +2947,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     /*
      * 統括のお問い合わせ（`apps/worker/src/routes/hq-support.ts`）と同じ器。
      * 無いと既定の `{items,total,page,limit}` が返り、画面の `kinds.map` で
-     * `/hq/support` が真っ白になった（2026-09-25）。
+     * `/hq/support` が真っ白になる。
      */
     return {
       success: true,
@@ -2960,7 +2960,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
           { key: 'other', label: 'その他' },
         ],
         accounts: [{ id: 'visual-qa-account', name: '然 -NEN- 本店' }],
-        /* 絵 `b8xBtZ`・`OhguS` の送信者（2026-10-06 絵に合わせた）。 */
+        /* 絵 `b8xBtZ`・`OhguS` の送信者。 */
         sender: {
           tenantName: '然 -NEN- 本部',
           name: '見本 18',
@@ -2974,7 +2974,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     /*
      * 統括のお問い合わせの続き（`HqSupportDetail`）。
      * 無いと既定の `{items,total,page,limit}` が返り、日時の整形で落ちて
-     * `/hq/support/detail?id=visual-ticket-1` が開けなかった（2026-09-25）。
+     * `/hq/support/detail?id=visual-ticket-1` が開けなくなる。
      */
     const hqSupportDetail = /^\/api\/hq\/support\/requests\/([^/]+)$/.exec(pathname)
     if (method === 'GET' && hqSupportDetail) {
@@ -3885,7 +3885,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (/^\/api\/friend-add-rules\/[^/]+$/.test(pathname)) {
     // 未知IDは本物と同じく404にする。何を渡しても同一設定を返すと、
-    // 存在しない設定の画面が空にならず実機差異に気づけない (#501-軽)。
+    // 存在しない設定の画面が空にならず実機差異に気づけない。
     const ruleId = pathname.split('/').pop()
     const found = FRIEND_ADD_RULES.items.find((item) => item.id === ruleId)
     if (!found) return { success: false, error: 'Not found' }
@@ -3944,7 +3944,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     */
     return { success: true, data: DASHBOARD_PREFERENCES }
   }
-  // M (今後の予定)・L (#824 数字の出どころ)の見本。型どおりの名前で返す。
+  // M (今後の予定)・L (数字の出どころ)の見本。型どおりの名前で返す。
   if (pathname === '/api/dashboard/upcoming') return { success: true, data: DASHBOARD_UPCOMING }
   if (pathname === '/api/dashboard/delivery-failure-origins') {
     return { success: true, data: DASHBOARD_DELIVERY_FAILURE_ORIGINS }
@@ -4028,7 +4028,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   /*
    * 友だち詳細（★V8 Q5F2QE・JCDRm）の履歴・次の予定・回答。friend-1 だけ。
-   * 絵の「最近の履歴」3行・「進行中」1行・回答カード2枚と同じ形にする（2026-10-07）。
+   * 絵の「最近の履歴」3行・「進行中」1行・回答カード2枚と同じ形にする。
    */
   /* 行動スコアの明細（V8 R8NNi「点数の変化の明細」）。新しい順に5件、合計は上から足し引きが合う。 */
   const friendScore = pathname.match(/^\/api\/friends\/([^/]+)\/score$/)
@@ -4262,7 +4262,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       }
     }
   }
-  // #820: 版の履歴。新しい版から返す。status は in_use / reserved / past。
+  // 版の履歴。新しい版から返す。status は in_use / reserved / past。
   const templateVersions = /^\/api\/templates\/(template-\d+)\/versions$/.exec(pathname)
   if (templateVersions) {
     if (templateVersions[1] === 'template-1') return { success: true, data: TEMPLATE_1_VERSIONS }
@@ -4274,7 +4274,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       ],
     }
   }
-  // #820: この版に戻す。過去の版は変えず、その中身で新しい版を作る。
+  // この版に戻す。過去の版は変えず、その中身で新しい版を作る。
   const templateRevert = method === 'POST' && /^\/api\/templates\/(template-\d+)\/revert$/.exec(pathname)
   if (templateRevert) {
     return { success: true, data: { id: templateRevert[1], publishedVersion: 4, hasDraft: false } }
@@ -4297,14 +4297,14 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
      */
     return { success: true, data: TEST_RECIPIENT_LOGIN_USERS }
   }
-  // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
+  // 管理画面の保存・保管・削除の流れ。絵の検証用に成功だけ返す。
   /*
    * 配布URLの土台。無いと既定の器（`{items,total,page,limit}`）が返り、
    * 画面が器に `.replace` して白画面になっていた。
    * 本物は文字列か null を返す（`account-settings.ts`）。
    */
   if (pathname === '/api/account-settings/link-base-url' || pathname === '/api/account-settings/tracked-link-base-url') return { success: true, data: null }
-  // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
+  // 管理画面の保存・保管・削除の流れ。絵の検証用に成功だけ返す。
   if (method === 'POST' && pathname === '/api/forms/drafts') {
     return { success: true, data: { id: 'form-draft-qa', isActive: false } }
   }
@@ -4340,7 +4340,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /*
     管理者確認（担当未割り当て）の口。実口（`forms.ts`）と同じく配列で返す。
     既定の `{items,total,…}` に落ちると、画面が配列として読めず
-    `e is not iterable` で落ちる（2026-10-03 点検）。
+    `e is not iterable` で落ちる。
     見本のフォームはすべて担当付きなので空が正しい。
   */
   if (pathname === '/api/forms/unassigned') {
@@ -4360,8 +4360,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (formSubmissions) {
     /*
      * 互換用の古い形（ページ分けなし）は配列だけを返す。**実口と同じく上限200件**
-     * （`MAX_LIST_LIMIT`）。#722 の前はここが 500 で、実口は 200 で切っていた。
-     * モックで確かめた人が「500件来る」と誤解する形だった。
+     * （`MAX_LIST_LIMIT`）。実口と異なる上限だと件数を誤認する。
      */
     if (query.get('page') === null && query.get('limit') === null) {
       return { success: true, data: FORM_SUBMISSIONS.items.slice(0, 200) }
@@ -4414,7 +4413,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: RICH_MENU_FOLDERS, unfiledCount: RICH_MENU_GROUPS.filter((group) => !group.folderId).length }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'webhook') {
-    // 板 `ZSbFY`：送り先の箱。送り先にフォルダの列がまだ無いので、件数（itemCount）は本物と同じく返さない（#730）。
+    // 板 `ZSbFY`：送り先の箱。送り先にフォルダの列がまだ無いので、件数（itemCount）は本物と同じく返さない。
     return {
       success: true,
       data: [
@@ -4425,7 +4424,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'automation') {
-    // 板 `LWQXd`：ルールの箱。ルールにフォルダの列がまだ無いので、件数（itemCount）は本物と同じく返さない（#730）。
+    // 板 `LWQXd`：ルールの箱。ルールにフォルダの列がまだ無いので、件数（itemCount）は本物と同じく返さない。
     return {
       success: true,
       data: [
@@ -4436,7 +4435,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'common_action') {
-    // 板 `LnGNw`：共通アクションの箱。共通アクションにフォルダの列がまだ無いので、件数（itemCount）は返さない（#730）。
+    // 板 `LnGNw`：共通アクションの箱。共通アクションにフォルダの列がまだ無いので、件数（itemCount）は返さない。
     return {
       success: true,
       data: [
@@ -4866,8 +4865,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /*
     メールの会話の中身。実口（`support-inbox.ts`）と同じ
     `{thread, messages, …}` の形。無いと既定の `{items,total,…}` に落ち、
-    受信箱でメールを開くと `reading 'id'`（`detail.thread.id`）で落ちる
-    （2026-10-03 点検）。載っていない ID は実口と同じく失敗にする。
+    受信箱でメールを開くと `reading 'id'`（`detail.thread.id`）で落ちる。
+    載っていない ID は実口と同じく失敗にする。
   */
   const emailThread = /^\/api\/support\/email\/threads\/([^/]+)$/.exec(pathname)
   if (emailThread) {
@@ -5034,7 +5033,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: FRIEND_BULK_RUN.detail }
   }
   /*
-   * 削除する前の影響（PR #381）。**一覧の `usedIn` から組み立てる。**
+   * 削除する前の影響。**一覧の `usedIn` から組み立てる。**
    * 別々に持つと、一覧が「配信3」なのに削除画面は「なし」という
    * ありえない絵になり、どちらが本当か分からなくなる。
    */
@@ -5141,7 +5140,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/ad-platforms') return { success: true, data: AD_PLATFORMS }
   /*
-   * #818 流入元ごとの広告費の台帳。数は V8 の板（`qSTVR`・`ZxKL5`）にそろえる。
+   * 流入元ごとの広告費の台帳。数は V8 の板（`qSTVR`・`ZxKL5`）にそろえる。
    * この30日の広告費 ¥86,000・友だち追加 73 人・つないだ広告 2 件。
    * 手で入れた費用は板（qSTVR）どおり2件。
    */
@@ -5214,13 +5213,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/analytics/ref-summary') {
     return { success: true, data: INFLOW_SUMMARY }
   }
-  // #514-9: 計測リンクの一覧。本番の GET /api/tracked-links と同じ形で返す。
+  // 計測リンクの一覧。本番の GET /api/tracked-links と同じ形で返す。
   if (pathname === '/api/tracked-links') {
     return { success: true, data: TRACKED_LINKS }
   }
   if (/^\/api\/analytics\/ref\/[^/]+$/.test(pathname)) {
     /*
-      #514-8・9: 本番の GET /api/analytics/ref/:refCode と同じ形
+      本番の GET /api/analytics/ref/:refCode と同じ形
       (refCode・name・friends[id・displayName・trackedAt・currentStatus])で返す。
       firstPage・conversion・miles の豊富な形は本番に無いので持たせない。
     */
@@ -5256,7 +5255,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   */
   if (pathname === '/api/affiliates') return { success: true, data: AFFILIATES }
   if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
-  // #823 案件の決まりの版・上限の残り・成果の付け方の記録。
+  // 案件の決まりの版・上限の残り・成果の付け方の記録。
   const offerVersions = /^\/api\/affiliate-offers\/([^/]+)\/versions$/.exec(pathname)
   if (offerVersions) return { success: true, data: OFFER_VERSIONS }
   const offerCapStatus = /^\/api\/affiliate-offers\/([^/]+)\/cap-status$/.exec(pathname)
@@ -5321,7 +5320,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     },
   }
   if (pathname === '/api/automation-runs') {
-    // #519 軽: 本番口と同じく search・status・limit で絞る（固定7件を返さない）。
+    // 本番口と同じく search・status・limit で絞る（固定7件を返さない）。
     // R24: offset にも連動させ、ページ送りの撮影ができるようにする。
     const runStatus = query.get('status')
     const runSearch = (query.get('search') ?? '').trim().toLocaleLowerCase('ja')
@@ -5579,11 +5578,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: NEN_PHOTO_DERIVATIVES }
   }
   if (/^\/api\/nen-members\/photos\/[^/]+$/.test(pathname)) return { success: true, data: NEN_PHOTO_DETAIL }
-  // #817: 報酬の決まりの版。新しい版から返す。
+  // 報酬の決まりの版。新しい版から返す。
   if (pathname === '/api/nen-members/photo-reward-policy/versions') {
     return { success: true, data: NEN_PHOTO_REWARD_POLICY_VERSIONS }
   }
-  // #817: 新しい版を作る・この版に戻す。過去の版は変えず、新しい版を作る。
+  // 新しい版を作る・この版に戻す。過去の版は変えず、新しい版を作る。
   if (method === 'POST' && pathname === '/api/nen-members/photo-reward-policy/versions') {
     return {
       success: true,
@@ -5615,9 +5614,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/ec-commerce/events') {
     if (query.get('view') === 'actions') {
       /*
-       * 前は出来事の配列をそのまま返していて、画面の
-       * `data.items` が取れず「読み込めませんでした」になっていた。
-       * 本物と同じ処理1件ずつの器で返す。
+       * 画面が `data.items` を読めるよう、本物と同じ処理1件ずつの器で返す。
        */
       /* 本物と同じく注文番号で注文を結ぶ（★V8-B nAesv：行の「…」から注文の状況を開ける）。 */
       const items = EC_ACTION_EXECUTIONS.items.map((execution) => {
@@ -6084,7 +6081,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
           state: 'available',
           stateReason: null,
           clickRateDefinition: 'クリック率は「実人数 ÷ 届いた人数」で出しています。',
-          // 点検#508軽5: 初回・最終日時とタグ由来がないと、その表示を壊しても撮影で気づけない。
+          // 初回・最終日時とタグ由来がないと、その表示を壊しても撮影で気づけない。
           // 絵（iK4cQ）の5件。初回・最終日時とタグ由来は1件目・3件目に入れて、行の補足を撮影で見られるようにする。
           hasMore: false,
           links: [
@@ -6463,15 +6460,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/friend-fields-stats') {
     /*
       友だち情報欄の帯。**口が無いと既定の器（`{items,total,page,limit}`）が返り、
-      `summary.inUse` が `undefined` になって画面に「使用中 undefined件」と出ていた。**
-      設計 `HBTk0` と文字を並べて初めて分かった。
-      画面側も `undefined` を出さないよう直したが、正しい返事もここに置く。
+      `summary.inUse` が `undefined` になり画面に「使用中 undefined件」と出る。**
     */
     return { success: true, data: { total: 12, inUse: 9, registeredFriends: 187, formLinks: 6, updatedThisMonth: 3 } }
   }
   if (pathname === '/api/friends') {
     /*
-     * 点検 #496-23：絞り・検索・ページ送りを無視した固定231件だと、
+     * 絞り・検索・ページ送りを無視した固定231件だと、
      * 画面確認で絞りが効いて見えて実機差異に気づけない。
      * クエリに連動させる。絞り無しの既定は従来どおり（全件・total 231）で、
      * 既定の撮影が変わらないようにする。
@@ -6510,7 +6505,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
 /*
  * 長いデータ（VISUAL_QA_LONG=1 のときだけ。既定では何も変えない）。
  * 本番の長い名前・長い題・長い URL・タグの多い人で、画面が崩れないかを見るため
- * （V8 の積み替えの見張り。2026-10-01、試験用データが短く崩れが隠れていた）。
+ * （試験用データが短いと崩れが隠れるため）。
  * 名前・題・説明・本文の短い文字に長い名前を足し、タグを10個に増やし、URL を長くする。
  * id・状態・種類などの値には触らない（画面の分岐を変えないため）。
  */
@@ -6576,11 +6571,7 @@ const server = createServer((req, res) => {
   /*
     **いま動いているモックが、いまのファイルかを言う。**
 
-    直したはずの返事が反映されず、しかもどこにも出ない、というのを
-    何度かやった。直近では `/api/friend-fields-stats` を足したのに
-    古いモックが動いたままで、画面に `undefined` が出続けた。
-    さらに前には、口が足りない古いモックのせいで7画面が
-    「画面を表示できませんでした」で落ち、実装の不具合に見えていた。
+    古いモックが動くと応答の不一致が実装の不具合に見えてしまう。
 
     ここが自分の中身の指紋を返し、`capture-screens.mjs` が
     ディスク上のファイルと突き合わせて、違えば撮影に入る前に止まる。
@@ -7213,7 +7204,7 @@ const server = createServer((req, res) => {
       return
     }
     /*
-     * 一覧の「編集する」「複製する」・稼働切替・保管（#942 N-352）。
+     * 一覧の「編集する」「複製する」・稼働切替・保管。
      * 本番（`apps/worker/src/routes/automations.ts`）と同じ器で返す。
      * 無いと一覧で405になり、赤い帯「編集用の下書きを作れませんでした」
      * が出ていた（1920px見直し③）。DBへは書かない。
@@ -7453,7 +7444,7 @@ const server = createServer((req, res) => {
       return
     }
     /*
-      共通情報の差し替え（PR #1131）。候補取得・影響確認・実行完了を
+      共通情報の差し替え。候補取得・影響確認・実行完了を
       同じPOSTの入力で分けるが、モックは保存せず固定結果だけ返す。
     */
     /* 板 `xxKtW`：「電話番号」の差し替え候補（問い合わせ先が先頭）と、差し替えたときの影響。 */
@@ -7591,7 +7582,7 @@ const server = createServer((req, res) => {
       res.writeHead(201).end(JSON.stringify({ success: true, data: FRIEND_SAVED_VIEWS.items[0] }))
       return
     }
-    // #518 中5: 目視 QA で確認窓・復旧フローが検証できるよう、停止・復旧・
+    // 目視 QA で確認窓・復旧フローが検証できるよう、停止・復旧・
     // 手動チェックの POST に本物と同じ形の成功応答を返す(DBへは書かない)。
     if (method === 'POST' && url.pathname === '/api/operations/health/runs') {
       res.writeHead(200).end(JSON.stringify({ success: true, duplicate: false, data: OPERATION_HEALTH }))
@@ -7643,7 +7634,7 @@ const server = createServer((req, res) => {
       return
     }
     /*
-      リッチメニューの書き込み系 (#502中)。DBへは書かず、本番契約と同じ
+      リッチメニューの書き込み系。DBへは書かず、本番契約と同じ
       HTTP状態と器を返す。編集・公開・予約・適用・削除の画面検証用。
       409/400 の代表例つき (削除ブロック・冪等キーなし・順序の形違い)。
     */
@@ -7857,7 +7848,6 @@ const server = createServer((req, res) => {
  *
  * 画像比較は24件を並べて走らせるので、途中で1回でも落ちると、そこから先の
  * 画面が全部ログインへ飛ぶ。そして「ログイン画面を撮って通過」になる。
- * 実際に一度そうなった（2026-08-26）。
  */
 server.on('clientError', (_error, socket) => {
   if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\n\r\n')
@@ -7867,7 +7857,7 @@ server.on('error', (error) => {
    * **ポートが埋まっているときは止まる。**
    *
    * ここで握ると、古いモックが動いたまま新しいほうが「起動した」顔をする。
-   * 直したはずの中身が反映されず、しかもどこにも出ない。一度そうなった。
+   * そのままでは変更が反映されず、不具合を見落とす。
    */
   if (error.code === 'EADDRINUSE') {
     console.error(`[visual-qa] ${HOST}:${PORT} は使用中。先に動いているモックを止める。`)

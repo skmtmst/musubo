@@ -77,7 +77,7 @@ interface Target {
   config: string;
 }
 
-/** wrangler 設定から database_name を読む。名前を二重に持つと片方だけ直したときに事故る。 */
+/** wrangler 設定から database_name を読む。名前を二重に持つと片方だけ変更したときに設定と名前がずれる。 */
 export function databaseNameOf(configText: string): string {
   const match = /\[\[d1_databases\]\][\s\S]*?database_name\s*=\s*"([^"]+)"/.exec(configText);
   if (!match) throw new Error('wrangler 設定から database_name を読めませんでした');
