@@ -13,20 +13,20 @@ export interface MeetingCreator {
 /** 失敗しても予約と固定URLはそのまま。通信結果不明は照合待ちとする。 */
 export async function createConfirmedBookingMeeting(db: D1Database, bookingId: string, creator: MeetingCreator): Promise<'created' | 'failed' | 'unknown' | 'skipped'> {
   const booking = await db.prepare(`SELECT id,line_account_id,staff_id,starts_at,ends_at,lock_version
-    FROM bookings WHERE id=? AND status='confirmed' AND meeting_mode='online'`)
+    FROM bookings WHERE id=? AND status='confirmed' AND meeting_mode='online' AND meeting_url_source IS NOT 'manual'`)
     .bind(bookingId).first<{id:string;line_account_id:string;staff_id:string;starts_at:string;ends_at:string;lock_version:number}>();
   if (!booking) return 'skipped';
   const key = `booking-meeting:${booking.id}:${booking.lock_version}`;
   const now = new Date().toISOString();
   await db.prepare(`INSERT OR IGNORE INTO booking_meeting_links
     (id,booking_id,provider,status,idempotency_key,created_at,updated_at,staff_id,starts_at,ends_at)
-    SELECT ?,?,?,'pending',?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM bookings WHERE id=? AND status='confirmed' AND meeting_mode='online' AND lock_version=?)`).bind(crypto.randomUUID(), booking.id, creator.provider, key, now, now, booking.staff_id, booking.starts_at, booking.ends_at, booking.id, booking.lock_version).run();
+    SELECT ?,?,?,'pending',?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM bookings WHERE id=? AND status='confirmed' AND meeting_mode='online' AND meeting_url_source IS NOT 'manual' AND lock_version=?)`).bind(crypto.randomUUID(), booking.id, creator.provider, key, now, now, booking.staff_id, booking.starts_at, booking.ends_at, booking.id, booking.lock_version).run();
   const claimed = await db.prepare(`UPDATE booking_meeting_links SET attempt_count=1,updated_at=?
     WHERE booking_id=? AND provider=? AND idempotency_key=? AND status='pending' AND attempt_count=0
     AND EXISTS (SELECT 1 FROM bookings b WHERE b.id=booking_meeting_links.booking_id AND b.status='confirmed' AND b.lock_version=?)`)
     .bind(now, booking.id, creator.provider, key, booking.lock_version).run();
   if (claimed.meta.changes !== 1) {
-    await db.prepare("UPDATE booking_meeting_links SET status='cancelled' WHERE idempotency_key=? AND status='pending' AND attempt_count=0 AND NOT EXISTS (SELECT 1 FROM bookings WHERE id=? AND status='confirmed' AND meeting_mode='online' AND lock_version=?)").bind(key,booking.id,booking.lock_version).run();
+    await db.prepare("UPDATE booking_meeting_links SET status='cancelled' WHERE idempotency_key=? AND status='pending' AND attempt_count=0 AND NOT EXISTS (SELECT 1 FROM bookings WHERE id=? AND status='confirmed' AND meeting_mode='online' AND meeting_url_source IS NOT 'manual' AND lock_version=?)").bind(key,booking.id,booking.lock_version).run();
     const existing = await db.prepare('SELECT status FROM booking_meeting_links WHERE idempotency_key=?').bind(key).first<{status:string}>();
     return existing?.status === 'active' ? 'created' : existing?.status === 'failed' ? 'failed' : 'unknown';
   }

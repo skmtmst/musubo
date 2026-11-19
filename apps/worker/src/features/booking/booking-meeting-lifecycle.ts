@@ -11,8 +11,8 @@ export async function reconcileBookingMeeting(db: D1Database, input: {
   removers: Partial<Record<MeetingProvider, MeetingRemover>>;
   creator?: MeetingCreator;
 }): Promise<'done' | 'failed' | 'unknown'> {
-  const booking=await db.prepare('SELECT status FROM bookings WHERE id=? AND line_account_id=?')
-    .bind(input.bookingId,input.accountId).first<{status:string}>();
+  const booking=await db.prepare('SELECT status,meeting_mode,meeting_url_source FROM bookings WHERE id=? AND line_account_id=?')
+    .bind(input.bookingId,input.accountId).first<{status:string;meeting_mode:string|null;meeting_url_source:string|null}>();
   if (!booking) return 'failed';
   const pending=await db.prepare(`SELECT id,provider,staff_id,external_meeting_id,last_error_code FROM booking_meeting_links
     WHERE booking_id=? AND status='cancel_pending' ORDER BY created_at,id`).bind(input.bookingId)
@@ -20,10 +20,13 @@ export async function reconcileBookingMeeting(db: D1Database, input: {
   for (const row of pending.results ?? []) {
     const remover=input.removers[row.provider];
     if (!remover || !row.staff_id || !row.external_meeting_id) return 'failed';
-    const claim=await db.prepare(`UPDATE booking_meeting_links SET last_error_code='delete_started',updated_at=?
-      WHERE id=? AND status='cancel_pending' AND (last_error_code IS NULL OR last_error_code='delete_failed')`)
+    const claim=await db.prepare(`UPDATE booking_meeting_links SET last_error_code='delete_started',attempt_count=attempt_count+1,updated_at=?
+      WHERE id=? AND status='cancel_pending' AND attempt_count<4 AND (last_error_code IS NULL OR last_error_code='delete_failed')`)
       .bind(new Date().toISOString(),row.id).run();
-    if (claim.meta.changes!==1) return 'unknown';
+    if (claim.meta.changes!==1) {
+      const current=await db.prepare('SELECT attempt_count,last_error_code FROM booking_meeting_links WHERE id=?').bind(row.id).first<{attempt_count:number;last_error_code:string|null}>();
+      return current && current.attempt_count>=4 && current.last_error_code==='delete_failed' ? 'failed' : 'unknown';
+    }
     const controller=new AbortController();
     const timer=setTimeout(()=>controller.abort(),8000);
     let outcome:'deleted'|'failed'|'unknown';
@@ -38,7 +41,9 @@ export async function reconcileBookingMeeting(db: D1Database, input: {
   }
   const unresolved=await db.prepare("SELECT id FROM booking_meeting_links WHERE booking_id=? AND status='pending' AND attempt_count>0 LIMIT 1").bind(input.bookingId).first();
   if (unresolved) return 'unknown';
-  if (booking.status==='confirmed' && input.creator) {
+  const needsMeeting=booking.status==='confirmed' && booking.meeting_mode==='online' && booking.meeting_url_source!=='manual';
+  if (needsMeeting && !input.creator) return 'failed';
+  if (needsMeeting && input.creator) {
     const created=await createConfirmedBookingMeeting(db,input.bookingId,input.creator);
     if (created==='failed' || created==='unknown') return created;
   }
