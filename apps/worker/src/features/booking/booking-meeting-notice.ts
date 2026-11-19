@@ -1,7 +1,9 @@
 /** 会議の問題は通知センターに同じ会議につき一度だけ記録する。 */
-export async function notifyMeetingIssue(db:D1Database,input:{accountId:string;bookingId:string;linkId:string;reason:'unknown'|'failed'}):Promise<void> {
- const id=`meeting:${JSON.stringify([input.accountId,input.linkId])}`;
- const body=input.reason==='unknown'
+export async function notifyMeetingIssue(db:D1Database,input:{accountId:string;bookingId:string;linkId:string;reason:'unknown'|'failed'|'manual_review'}):Promise<void> {
+ const id=`meeting:${JSON.stringify([input.accountId,input.linkId])}${input.reason==='manual_review'?':manual_review':''}`;
+ const body=input.reason==='manual_review'
+  ? '元の担当者の会議が残っています。相手先で削除するか、元の担当者が連携し直してください。'
+  : input.reason==='unknown'
   ? '会議サービスの処理結果を確認できません。予約の会議を確認してください。'
   : '会議サービスの処理に失敗しました。予約の会議を確認してください。';
  await db.prepare(`INSERT OR IGNORE INTO notifications(id,event_type,title,body,channel,status,metadata,line_account_id,category)

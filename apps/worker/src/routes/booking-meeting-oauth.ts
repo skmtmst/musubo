@@ -67,6 +67,7 @@ bookingMeetingOAuth.get('/api/booking/admin/meeting-oauth/callback',async c=>{
  try{tokens=await exchangeMeetingAuthorization(config,{code:c.req.query('code')!,verifier:consumed.verifier,signal:AbortSignal.timeout(15000)});}catch{return c.redirect(adminReturn(c,accountId,consumed.staffId,'failed'));}
  const connected=await finishAuthorizedMeetingConnection(c.env.DB,{accountId,staffId:consumed.staffId,provider:consumed.provider,actorId,state,encryptionKey:key,credential:{provider:consumed.provider,externalAccountId:tokens.externalAccountId,refreshToken:tokens.refreshToken}});
  if(!connected)return c.redirect(adminReturn(c,accountId,consumed.staffId,'failed'));
+ await c.env.DB.prepare("UPDATE booking_meeting_links SET last_error_code=NULL,updated_at=? WHERE staff_id=? AND provider=? AND status='cancel_pending' AND last_error_code='manual_review' AND booking_id IN (SELECT id FROM bookings WHERE line_account_id=?)").bind(new Date().toISOString(),consumed.staffId,consumed.provider,accountId).run();
  auditLog(c,'booking.meeting.connect',{id:consumed.staffId,kind:consumed.provider},{lineAccountId:accountId});
  return c.redirect(adminReturn(c,accountId,consumed.staffId,'connected'));
 });

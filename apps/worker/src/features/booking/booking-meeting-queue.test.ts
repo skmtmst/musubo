@@ -35,3 +35,14 @@ it('予約機能が停止中の店には回復処理を実行しない',async()=
  expect(await processMeetingQueue(d.db,deps)).toBe(0);expect(calls).toBe(0);
  expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE event_type='booking_meeting_issue'").get()).toEqual({n:0});
 });
+it('削除できない旧会議は対応方法を一度知らせ、順番待ちから外す',async()=>{
+ d.raw.exec(`UPDATE booking_meeting_links SET status='cancel_pending',external_meeting_id='old',last_error_code=NULL,updated_at='2020-01-01' WHERE booking_id='bk';
+ INSERT INTO booking_meeting_links(id,booking_id,provider,status,idempotency_key,external_meeting_id,meeting_url,created_at,updated_at) VALUES('new','bk','teams','active','new-key','remote-new','https://example.test/new','2020-01-02','2020-01-02')`);
+ const deps:MeetingQueueDependencies={resolve:async()=>({removers:{},verifiers:{},unavailable:[{staffId:'bs',provider:'zoom'}]})};
+ expect(await processMeetingQueue(d.db,deps)).toBe(1);
+ expect(d.raw.prepare("SELECT last_error_code FROM booking_meeting_links WHERE id!='new'").get()).toEqual({last_error_code:'manual_review'});
+ const notice=d.raw.prepare("SELECT body FROM notifications WHERE body LIKE '%元の担当者%' ").get() as {body:string};
+ expect(notice.body).toContain('相手先で削除');
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE event_type='booking_meeting_issue'").get()).toEqual({n:1});
+ expect(await processMeetingQueue(d.db,deps)).toBe(0);
+});

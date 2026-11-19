@@ -20,7 +20,7 @@ export async function processMeetingQueue(db:D1Database,deps:MeetingQueueDepende
  const gate=createFeatureJobGate();
  const rows=await db.prepare(`SELECT b.id booking_id,b.line_account_id account_id
   FROM bookings b JOIN booking_meeting_links l ON l.booking_id=b.id
-  WHERE NOT ${accountFeatureOffExclusionSql('b.line_account_id','booking')} AND (l.status='cancel_pending' OR (l.status='pending' AND l.attempt_count>0))
+  WHERE NOT ${accountFeatureOffExclusionSql('b.line_account_id','booking')} AND ((l.status='cancel_pending' AND l.last_error_code IS NOT 'manual_review') OR (l.status='pending' AND l.attempt_count>0))
    AND ((? IS NOT NULL AND b.id=? AND b.line_account_id=?) OR (? IS NULL AND julianday(l.updated_at)<=julianday('now','-1 minute')))
   GROUP BY b.id,b.line_account_id ORDER BY MIN(l.updated_at),b.id LIMIT ?`).bind(target?.bookingId??null,target?.bookingId??null,target?.accountId??null,target?.bookingId??null,Math.max(1,Math.min(100,limit)))
   .all<{booking_id:string;account_id:string}>();
@@ -29,7 +29,7 @@ export async function processMeetingQueue(db:D1Database,deps:MeetingQueueDepende
   if(!await gate.canRun(db,row.account_id,'booking','booking meeting recovery'))continue;
   const services=await deps.resolve({accountId:row.account_id,bookingId:row.booking_id});
   if(!services) {
-   const link=await db.prepare("SELECT id FROM booking_meeting_links WHERE booking_id=? AND (status='cancel_pending' OR (status='pending' AND attempt_count>0)) ORDER BY created_at,id LIMIT 1").bind(row.booking_id).first<{id:string}>();
+   const link=await db.prepare("SELECT id FROM booking_meeting_links WHERE booking_id=? AND ((status='cancel_pending' AND last_error_code IS NOT 'manual_review') OR (status='pending' AND attempt_count>0)) ORDER BY created_at,id LIMIT 1").bind(row.booking_id).first<{id:string}>();
    if(link)await notifyMeetingIssue(db,{accountId:row.account_id,bookingId:row.booking_id,linkId:link.id,reason:'failed'});
    await db.prepare("UPDATE booking_meeting_links SET updated_at=? WHERE booking_id=? AND (status='cancel_pending' OR (status='pending' AND attempt_count>0)) AND julianday(updated_at)<=julianday('now','-1 minute')").bind(new Date().toISOString(),row.booking_id).run();
    continue;
@@ -48,8 +48,25 @@ export async function processMeetingQueue(db:D1Database,deps:MeetingQueueDepende
    if(!verifier || await verifyUnknownMeeting(db,{linkId:link.id,accountId:row.account_id,verifier})!=='verified')unknown=true;
   }
   const outcome=unknown?'unknown':await reconcileBookingMeeting(db,{bookingId:row.booking_id,accountId:row.account_id,creator:services.creator,removers:services.removers,unavailable:services.unavailable});
+  if(outcome==='failed' && services.unavailable?.length) {
+   for(const missing of services.unavailable) {
+    const stale=await db.prepare(`SELECT l.id FROM booking_meeting_links l JOIN bookings b ON b.id=l.booking_id
+     WHERE l.booking_id=? AND b.line_account_id=? AND l.status='cancel_pending' AND l.staff_id=? AND l.provider=?
+       AND (b.status!='confirmed' OR b.meeting_mode!='online' OR b.meeting_url_source='manual'
+         OR EXISTS (SELECT 1 FROM booking_meeting_links current WHERE current.booking_id=b.id AND current.status='active'))`)
+     .bind(row.booking_id,row.account_id,missing.staffId,missing.provider).all<{id:string}>();
+    for(const link of stale.results??[]) {
+     await notifyMeetingIssue(db,{accountId:row.account_id,bookingId:row.booking_id,linkId:link.id,reason:'manual_review'});
+     await db.prepare(`UPDATE booking_meeting_links SET last_error_code='manual_review'
+      WHERE id=? AND status='cancel_pending' AND (last_error_code IS NULL OR last_error_code='delete_failed') AND NOT EXISTS (
+       SELECT 1 FROM booking_meeting_connections c JOIN bookings b ON b.line_account_id=c.line_account_id
+       WHERE b.id=booking_meeting_links.booking_id AND c.staff_id=booking_meeting_links.staff_id
+        AND c.provider=booking_meeting_links.provider AND c.refresh_state IN ('ready','refreshing'))`).bind(link.id).run();
+    }
+   }
+  }
   if(outcome!=='done') {
-   const link=await db.prepare("SELECT id FROM booking_meeting_links WHERE booking_id=? AND (status='cancel_pending' OR (status='pending' AND attempt_count>0)) ORDER BY created_at,id LIMIT 1").bind(row.booking_id).first<{id:string}>();
+   const link=await db.prepare("SELECT id FROM booking_meeting_links WHERE booking_id=? AND ((status='cancel_pending' AND last_error_code IS NOT 'manual_review') OR (status='pending' AND attempt_count>0)) ORDER BY created_at,id LIMIT 1").bind(row.booking_id).first<{id:string}>();
    if(link)await notifyMeetingIssue(db,{accountId:row.account_id,bookingId:row.booking_id,linkId:link.id,reason:outcome});
   }
   if(outcome!=='done')await db.prepare("UPDATE booking_meeting_links SET updated_at=? WHERE booking_id=? AND (status='cancel_pending' OR (status='pending' AND attempt_count>0)) AND julianday(updated_at)<=julianday('now','-1 minute')").bind(new Date().toISOString(),row.booking_id).run();
