@@ -11,8 +11,8 @@ vi.mock('@/lib/api', async original => {
   }
 })
 import PendingInboxCard from './pending-inbox-card'
-beforeEach(() => { fixture.requests = []; fixture.staffId = 'staff-a'; window.localStorage.clear() })
-afterEach(cleanup)
+beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-17T00:00:00.000Z')); fixture.requests = []; fixture.staffId = 'staff-a'; window.localStorage.clear() })
+afterEach(() => { cleanup(); vi.useRealTimers() })
 it('本人APIのIDごとに保存した件数を復元し、同じ端末の別の担当者へ混ぜない', async () => {
   window.localStorage.setItem('lh_pending_inbox_page_size:staff-a', '10')
   window.localStorage.setItem('lh_pending_inbox_page_size:staff-b', '20')
@@ -27,6 +27,7 @@ it('本人APIのIDごとに保存した件数を復元し、同じ端末の別�
 
 it('見出しの行の右端に、共通の文字リンクで「受信箱へ」を1つだけ置く', async () => {
   const { container, findByRole } = render(<PendingInboxCard />)
+  expect(await findByRole('heading', { name: '対応が必要な受信（全アカウント）' })).toBeTruthy()
   const link = await findByRole('link', { name: '受信箱へ' })
   expect(link.getAttribute('href')).toBe('/chats')
   expect(link.closest('[data-design-node="t0jk8p"]')).not.toBeNull()
