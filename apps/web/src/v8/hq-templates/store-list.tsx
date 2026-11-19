@@ -6,7 +6,7 @@ import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import SegmentedControl from '@/components/shared/segmented'
 import { FOLDER_SELECT_COLORS } from '@/components/shared/folder-select'
 
-import { KIND_LABEL,KIND_TABS,STARTER_SET_TAB,TAG_QUICK_FILTERS,WORDS,type TagQuickFilter } from './store-list-options'
+import { KIND_LABEL,KIND_TABS,REWARD_TAB,STARTER_SET_TAB,TAG_QUICK_FILTERS,WORDS,type TagQuickFilter } from './store-list-options'
 export { KIND_TABS,hqTemplateTabsForStarterSets } from './store-list-options'
 export { sentLabel,stateOf } from './store-list-stats'
 export { type HqStoreListProps } from './store-list-types'
@@ -169,7 +169,7 @@ export default function HqStoreList(props: HqStoreListProps) {
           count: kindCounts?.[tab.kind],
           current: kind === tab.kind,
           onClick: () => { onKindChange(tab.kind); setPage(1) },
-        })), STARTER_SET_TAB]}
+        })), REWARD_TAB, STARTER_SET_TAB]}
       />
   ) : undefined
 
