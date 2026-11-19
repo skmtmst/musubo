@@ -10,9 +10,9 @@ export type LiveIntent = {
 export async function scheduleLiveIntent(db: D1Database, intent: LiveIntent, now = new Date()): Promise<boolean> {
  const at = now.toISOString();
  const result = await db.prepare(`INSERT INTO ec_auto_line_live_intents
-  (id,account_id,kind,occurrence_key,friend_id,product_id,due_at,payload_json,created_at,updated_at)
-  VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account_id,kind,occurrence_key,friend_id) DO NOTHING`)
-  .bind(intent.id,intent.accountId,intent.kind,intent.occurrenceKey,intent.friendId,intent.productId,intent.dueAt,intent.payload,at,at).run();
+  (id,account_id,kind,occurrence_key,friend_id,product_id,due_at,original_due_at,payload_json,created_at,updated_at)
+  VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account_id,kind,occurrence_key,friend_id) DO NOTHING`)
+  .bind(intent.id,intent.accountId,intent.kind,intent.occurrenceKey,intent.friendId,intent.productId,intent.dueAt,intent.dueAt,intent.payload,at,at).run();
  return result.meta.changes === 1;
 }
 
@@ -27,9 +27,16 @@ export async function sendLiveIntent(db: D1Database, intent: LiveIntent, send: (
   state = 'sent';
  } catch (error) {
   state = error instanceof NotificationDeliveryIncomplete ? error.deliveryStatus : 'unknown';
+  // An HTTP timeout or server error cannot prove that LINE did not accept the request.
+  if(state==='failed' && error instanceof NotificationDeliveryIncomplete && !error.blockedReason){
+   const key=await createBroadcastRetryKey('notification',`ec-live:${intent.id}`,'line',intent.friendId);
+   const record=await db.prepare('SELECT failure_code FROM outbound_send_requests WHERE idempotency_key=?').bind(key).first<{failure_code:string|null}>();
+   if(!record || !['LINE_RATE_LIMITED','LINE_REQUEST_REJECTED'].includes(record.failure_code??''))state='unknown';
+  }
  }
- await db.prepare("UPDATE ec_auto_line_live_intents SET state=?,updated_at=? WHERE id=? AND state='sending'")
+ const saved=await db.prepare("UPDATE ec_auto_line_live_intents SET state=?,updated_at=? WHERE id=? AND state='sending'")
   .bind(state,new Date().toISOString(),intent.id).run();
+ if(saved.meta.changes!==1)throw new Error('ec_live_intent_completion_not_saved');
  return state;
 }
 
