@@ -469,7 +469,7 @@
 
 ## 反映履歴
 
-- [A/B配信の検証用送信](release-log/unreleased/PR-kenta-c11-ab-live.md) — 反映履歴、確認 2026-11-20。
+- [A/B配信の検証用送信](release-log/unreleased/127-kenta-c11-ab-live.md) — 反映履歴、確認 2026-11-20。
 
 - [保守時に確認する説明を整理](release-log/unreleased/121-kenta-q04-misc.md) — 反映履歴、確認 2026-11-19。
 
