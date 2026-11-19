@@ -209,6 +209,7 @@
 - [③-2 ライバルに対抗する機能：要件と「操作と挙動」の一覧（B-340）](v8-requirements/gap-features/README.md)
 - [U1 送信の取り消しと「送る前の確かめ」（板 lKmZK ほか 6 か所）](v8-requirements/gap-features/U1-unsend-and-send-confirm.md)
 - [Googleビジネス・Instagram 複数連携の要件（2026-11-16 決定）](v8-requirements/multi-sns-connections.md)
+- [Googleビジネス・Instagram 複数連携：3つの口の契約（契約枠・主連携・請求）](v8-requirements/multi-sns-connections-ports.md)
 - [動きのばらつき（2026-10-09・オーナー「同じ動きにした方がいいのに動きがバラバラのもの」）](v8-requirements/owner-decisions/BEHAVIOR-AUDIT-1009.md)
 - [行き先と触り方のばらつき（2026-10-09・オーナー「遷移先などはできる限りデザインや触り方は統一」）](v8-requirements/owner-decisions/DESTINATION-AUDIT-1009.md)
 - [一覧の骨格の点検（AH・2026-10-09）](v8-requirements/owner-decisions/LIST-SKELETON-AUDIT-1009.md)
@@ -469,6 +470,8 @@
 ## 反映履歴
 
 - [振替と問い合わせ通知の修正](release-log/unreleased/111-kenta-gapfix.md) — 反映履歴、確認 2026-11-17。
+
+- [自動確認の動作への置き換え](release-log/unreleased/112-kenta-q02b-b8.md) — 実際の動きで確かめる試験の履歴。確認 2026-11-18。
 
 - [SNS連携で残る3つの口の決まり](release-log/unreleased/120-kenta-sns-multilink-ports.md) — 反映履歴、確認 2026-11-18。
 

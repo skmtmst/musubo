@@ -4,15 +4,6 @@ import { describe, expect, it } from 'vitest'
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 
 describe('V8 予約メニューの取得状態', () => {
-  it('一覧と店舗設定を別々に待ち、一覧は一覧の応答だけで出す (DEEP-26)', () => {
-    expect(PAGE).toContain("type LoadStatus = 'loading' | 'ready' | 'error'")
-    // まとめて待つ間も、それぞれの返答で別の状態を更新する。
-    expect(PAGE).toContain('bookingApi.listMenus(accountId).then')
-    expect(PAGE).toContain('bookingApi.getSettings(accountId).then')
-    expect(PAGE).toContain("setMenusStatus('ready')")
-    expect(PAGE).toContain("setSettingsStatus('ready')")
-
-  })
 
   it('APIの内部エラーを利用者へそのまま出さない', () => {
     expect(PAGE).toContain("setMenusError(bookingErrorMessage(error, '読み込み'))")
