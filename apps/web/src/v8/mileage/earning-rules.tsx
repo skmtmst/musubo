@@ -1,4 +1,6 @@
 'use client'
+
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { responseApiError } from '@/lib/api'
 
@@ -593,12 +595,10 @@ export default function EarningRulesTab() {
   )
 
   /* 主ボタンは素の Button で渡し、題の右の自動整列（副→主）に載せる。 */
-  const createButton = (full: boolean) => (
-    readonly ? null : (
-      <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href="/mileage/earning-rules/new">
+  const createButton = (full: boolean) => balanceSource === 'ec' ? null : (
+    <PermissionGatedButton allowed={!roleReadonly} variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href="/mileage/earning-rules/new">
         <Plus size={16} aria-hidden="true" /> 決めごとを作る
-      </Button>
-    )
+      </PermissionGatedButton>
   )
 
   /*
@@ -934,7 +934,7 @@ export default function EarningRulesTab() {
       }
       stats={stats}
       folders={folderPanel}
-      folderNav={{ rows: [{ id: 'all', label: 'すべて' }], activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
+      folderNav={{ rows: [{ id: 'all', label: 'すべて' }], activeId: 'all', onSelect: () => undefined, createAction: createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>

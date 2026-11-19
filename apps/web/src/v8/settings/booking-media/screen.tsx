@@ -14,6 +14,7 @@ import { PageFooter } from '@/components/templates/page-footer'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import PermissionGatedButton from '@/components/shared/permission-gated-button'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -167,6 +168,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   const canManage = canManageRole(role)
+  const lockReason = usePermissionLockReason(canManage)
 
   const { stores, storeId } = storeSelection
   const setStoreId = storeSelection.choose
@@ -490,7 +492,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
                         ...(row.loginUrl ? [{ id: 'open-login', label: '管理画面を開く', external: true, href: row.loginUrl! }] : []),
                       ]}
                     />
-                  ) : null}
+                  ) : role !== null ? <RowActions subjectName={row.name} menuItems={[]} menuLockedReason={lockReason} menuButtonProps={lockReason ? undefined : { disabled: true }} /> : null}
                 </Td>
               </Tr>
             )

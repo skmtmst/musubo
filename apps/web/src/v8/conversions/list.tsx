@@ -1,4 +1,6 @@
 'use client'
+
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import SegmentedControl from '@/components/shared/segmented'
 import { DetailContent, DetailField } from '@/components/shared/detail-content'
 import { formatYen } from '@line-crm/shared';
@@ -844,10 +846,9 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
       options={managedFolderOptions('conversion', folders, { allId: '', unfiledId: FOLDER_UNFILED })}
     /></SaveErrorField>
   )
-  /* 閲覧のみには作るボタンを置かない（場所だけ空ける）。 */
-  const createLink = <Button variant="primary" href="/conversions/new"><Plus size={16} aria-hidden="true" />成果地点を作る</Button>
-  const createButton = canEdit ? createLink : <span className={styles.createSpace} aria-hidden="true" />
-  const createInRow = canEdit ? createLink : <span className={styles.createSpaceRow} aria-hidden="true" />
+  const createLink = <PermissionGatedButton allowed={canEdit} variant="primary" href="/conversions/new"><Plus size={16} aria-hidden="true" />成果地点を作る</PermissionGatedButton>
+  const createButton = createLink
+  const createInRow = createLink
 
   /* ===== 道具の段 ===== */
   /* 1152 の板は札を2つ（動いている・止めている）だけ。ほかの状態は「よく使う絞り込み」から選ぶ。 */

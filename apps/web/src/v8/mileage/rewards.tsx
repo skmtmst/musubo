@@ -1,5 +1,7 @@
 'use client'
 
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
+
 import StatusBadge from '@/components/shared/status-badge'
 import { mileageStatusTone } from './parts'
 
@@ -582,12 +584,10 @@ export default function RewardsTab() {
   )
 
   /* 主ボタンは素の Button で渡し、題の右の自動整列（副→主）に載せる。 */
-  const createButton = (full: boolean) => (
-    readonly ? null : (
-      <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href="/mileage/rewards/edit">
+  const createButton = (full: boolean) => balanceSource === 'ec' ? null : (
+    <PermissionGatedButton allowed={!roleReadonly} variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href="/mileage/rewards/edit">
         <Plus size={16} aria-hidden="true" /> 使い道を作る
-      </Button>
-    )
+      </PermissionGatedButton>
   )
 
   const chooseFolder = (id: string) => { setPage(1); setFolderId(id) }
@@ -891,7 +891,7 @@ export default function RewardsTab() {
       }
       stats={stats}
       folders={folderPanel}
-      folderNav={{ rows: managedFolderNavRows('mileage_reward', folders), activeId: folderId, onSelect: chooseFolder, createAction: readonly ? undefined : createButton(false) }}
+      folderNav={{ rows: managedFolderNavRows('mileage_reward', folders), activeId: folderId, onSelect: chooseFolder, createAction: createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
     >
