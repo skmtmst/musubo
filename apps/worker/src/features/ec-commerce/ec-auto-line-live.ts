@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Message } from '@line-crm/line-sdk';
 import { tzHHMM, tzDateStr, getAccountTimeZone } from '../../services/availability.js';
 import { restaurantCivilTime } from '../../services/restaurant-booking.js';
@@ -74,7 +75,7 @@ export async function processLiveAutoLine(db:D1Database,now:Date,transmit:Transm
    const last=await eligible(db,row.id,new Date());
    if(!last||last.line_user_id!==row.line_user_id||last.payload_json!==row.payload_json)throw new NotificationDeliveryBlocked('ec_delivery_changed');
    await transmit({intentId:row.id,accountId:row.account_id,friendId:row.friend_id,to:row.line_user_id,messages,retryKey});
-  },now);}catch{console.error('ec_live_intent_completion_failed');continue;}
+  },now);}catch{logger.error('ec_live_intent_completion_failed');continue;}
   if(state==='unclaimed')await db.prepare("UPDATE ec_auto_line_cap_reservations SET state='released',release_actor='system',release_reason='intent_not_claimed',released_at=? WHERE id=? AND state='reserved' AND EXISTS(SELECT 1 FROM ec_auto_line_live_intents WHERE id=? AND state IN('scheduled','failed')) AND NOT EXISTS(SELECT 1 FROM outbound_send_requests WHERE resource_id=?)").bind(now.toISOString(),reservation,row.id,`ec-live:${row.id}`).run();
   if(state==='sent')await db.prepare("UPDATE ec_auto_line_cap_reservations SET state='accepted' WHERE id=? AND state='started'").bind(reservation).run();
   else if(state==='unknown')await db.prepare("UPDATE ec_auto_line_cap_reservations SET state='unknown' WHERE id=? AND state IN('reserved','started')").bind(reservation).run();
