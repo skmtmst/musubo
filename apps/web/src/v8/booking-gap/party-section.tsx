@@ -21,6 +21,8 @@ import { formatNumber } from '@/lib/format'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
+import { CustomerInfoRows } from '@/components/shared/customer-info-rows'
+import { DetailContent, DetailSection } from '@/components/shared/detail-content'
 import { withHonorific } from '@line-crm/shared'
 
 /*
@@ -128,14 +130,14 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
         {quoteError ? <Notice tone="danger" message={quoteError} action={quoteStale ? reload ? <Button onClick={reload}>この組を読み直す</Button> : undefined : <Button onClick={() => setQuoteGeneration(value => value + 1)}>もう一度確認する</Button>} /> : null}
         {!quote && !quoteError ? <p>キャンセル料を確認しています。</p> : null}
         {quote && quoteScope === targetScope.current && confirmedScope === targetScope.current ? <div aria-label="キャンセル料の内訳">
-          <p>キャンセル料の見込み</p>
-          {quote.members.map(item => <p key={item.bookingId}>{party.members.find(member => member.bookingId === item.bookingId)?.label || party.members.find(member => member.bookingId === item.bookingId)?.personName}　¥{formatNumber(item.feeNow)}</p>)}
-          <p>合計　¥{formatNumber(quote.totalFee)}</p>
+          <DetailContent><DetailSection title="キャンセル料の見込み">
+            <CustomerInfoRows rows={quote.members.map(item => ({ key: item.bookingId, label: party.members.find(member => member.bookingId === item.bookingId)?.label || party.members.find(member => member.bookingId === item.bookingId)?.personName || '予約', value: `¥${formatNumber(item.feeNow)}` }))} />
+          </DetailSection><DetailSection><CustomerInfoRows rows={[{ label: '合計', value: `¥${formatNumber(quote.totalFee)}`, emphasis: true }]} /></DetailSection></DetailContent>
         </div> : null}
 
         {confirmedScope !== targetScope.current && canOperate ? <Notice tone="warn">{cancellable.length === 0 ? '取り消せる予約がなくなりました。' : <>組の内容が更新されました。最新の内容を確認してください。<ul>{cancellable.map(member => <li key={member.bookingId}>{member.label || member.personName}・{member.menuName}・{member.staffName ?? '担当未設定'}・{hm(member.startsAt)}〜{hm(member.endsAt)}</li>)}</ul><Button onClick={() => setConfirmedScope(targetScope.current)}>最新の内容を確認しました</Button></>}</Notice> : null}
         <Field label="取り消す理由" required><TextField aria-label="取り消す理由" value={reason} maxLength={500} onChange={(event) => setReason(event.target.value)} /></Field>
-        <p>取り消すと元に戻せません。来店済み・取消済みの予約は変えません。この操作ではLINEを自動送信しません。必要な連絡は受信箱から行ってください。</p>
+        <Notice tone="info">取り消すと元に戻せません。来店済み・取消済みの予約は変えません。この操作ではLINEを自動送信しません。必要な連絡は受信箱から行ってください。</Notice>
         {error && reload ? <Button onClick={reload}>この組を読み直す</Button> : null}
       </Dialog>
       {preparing.dialog}

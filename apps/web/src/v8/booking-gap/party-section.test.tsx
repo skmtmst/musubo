@@ -208,9 +208,9 @@ test('取消前に全員の料金と合計を確認し、確認できない場�
   expect(cancelGroup).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'もう一度確認する' }))
   const breakdown = await screen.findByLabelText('キャンセル料の内訳')
-  expect(breakdown.textContent).toContain('チョコ　¥2,000')
-  expect(breakdown.textContent).toContain('マロン　¥1,500')
-  expect(breakdown.textContent).toContain('合計　¥3,500')
+  expect(breakdown.textContent).toContain('チョコ¥2,000')
+  expect(breakdown.textContent).toContain('マロン¥1,500')
+  expect(breakdown.textContent).toContain('合計¥3,500')
 })
 
 

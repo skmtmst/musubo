@@ -25,4 +25,5 @@
   margin: 0;
   min-width: 0;
 }
+.rows > [data-emphasis] { font-weight: var(--polish-value-weight); color: var(--color-ink); }
 }

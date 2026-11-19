@@ -27,6 +27,8 @@ it('景品の確認から30分たつと配らず、同じ送り先を確かめ�
   vi.setSystemTime(new Date('2026-11-19T00:30:00Z'))
   fireEvent.click(within(dialog).getByRole('button', { name: 'この内容で配る' }))
   const expired = await screen.findByRole('dialog', { name: '確かめの期限が切れました' })
+  expect(screen.getAllByRole('dialog')).toHaveLength(1)
+  expect(expired.querySelector('.lucide-triangle-alert')).not.toBeNull()
   expect(net.distribute).not.toHaveBeenCalled()
   fireEvent.click(within(expired).getByRole('button', { name: 'もう一度確かめる' }))
   await waitFor(() => expect(net.preflight).toHaveBeenCalledTimes(2))

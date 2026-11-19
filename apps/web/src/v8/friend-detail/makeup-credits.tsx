@@ -59,10 +59,9 @@ export default function MakeupCredits({ accountId, friendId, canEdit }: { accoun
       <span>期限：{formatListTimestamp(item.expires_at)}{item.status === 'expired' ? '（期限切れ）' : ''}</span>{' '}
       <Button disabled={!allowed} lockedReason={allowed ? undefined : !canEdit ? '閲覧のみのため操作できません' : 'オーナー・管理者のみ操作できます'} onClick={() => { setTarget(item); setDate(''); setReason(''); setError(''); setConflict(false) }}>期限を延ばす</Button>
     </div>)}
-    <Dialog open={Boolean(target) && !conflict} title="振替の期限を延ばす" description={target ? `現在の期限：${formatListTimestamp(target.expires_at)}` : ''} confirmLabel="期限を延ばす" confirmDisabled={!valid || !allowed} confirmDisabledReason={!valid ? '現在より後の期限と理由を入力してください' : undefined} busy={busy} error={error} onCancel={() => setTarget(null)} onConfirm={() => void extend()}>
+    <Dialog open={Boolean(target) && !conflict} title="振替の期限を延ばす" contentLayout="form" description={target ? `現在の期限：${formatListTimestamp(target.expires_at)}。オーナー・管理者が、現在の期限より後の日付へ延ばせます。` : ''} confirmLabel="期限を延ばす" confirmDisabled={!valid || !allowed} confirmDisabledReason={!valid ? '現在より後の期限と理由を入力してください' : undefined} busy={busy} error={error} onCancel={() => setTarget(null)} onConfirm={() => void extend()}>
       <Field label="新しい期限" required><DateField aria-label="新しい期限" value={date} onChange={setDate} disabled={busy} /></Field>
       <Field label="理由" required><TextArea aria-label="理由" value={reason} onChange={event => setReason(event.target.value)} maxLength={1000} disabled={busy} /></Field>
-      <p>オーナー・管理者のみ操作できます。現在の期限より後の日付を指定してください。</p>
     </Dialog>
     <Dialog open={conflict} title="振替の状態が変わりました" description="別の操作や期限切れにより状態が変わりました。最新の情報を確認してから、もう一度操作してください。" confirmLabel="最新の情報を確認" busy={busy} onCancel={() => void refreshConflict()} onConfirm={() => void refreshConflict()} />
   </Card>
