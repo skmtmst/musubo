@@ -18,13 +18,14 @@ export async function createConfirmedBookingMeeting(db: D1Database, bookingId: s
   const key = `booking-meeting:${booking.id}:${booking.lock_version}`;
   const now = new Date().toISOString();
   await db.prepare(`INSERT OR IGNORE INTO booking_meeting_links
-    (id,booking_id,provider,status,idempotency_key,created_at,updated_at)
-    VALUES (?,?,?,'pending',?,?,?)`).bind(crypto.randomUUID(), booking.id, creator.provider, key, now, now).run();
+    (id,booking_id,provider,status,idempotency_key,created_at,updated_at,staff_id,starts_at,ends_at)
+    SELECT ?,?,?,'pending',?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM bookings WHERE id=? AND status='confirmed' AND meeting_mode='online' AND lock_version=?)`).bind(crypto.randomUUID(), booking.id, creator.provider, key, now, now, booking.staff_id, booking.starts_at, booking.ends_at, booking.id, booking.lock_version).run();
   const claimed = await db.prepare(`UPDATE booking_meeting_links SET attempt_count=1,updated_at=?
     WHERE booking_id=? AND provider=? AND idempotency_key=? AND status='pending' AND attempt_count=0
     AND EXISTS (SELECT 1 FROM bookings b WHERE b.id=booking_meeting_links.booking_id AND b.status='confirmed' AND b.lock_version=?)`)
     .bind(now, booking.id, creator.provider, key, booking.lock_version).run();
   if (claimed.meta.changes !== 1) {
+    await db.prepare("UPDATE booking_meeting_links SET status='cancelled' WHERE idempotency_key=? AND status='pending' AND attempt_count=0 AND NOT EXISTS (SELECT 1 FROM bookings WHERE id=? AND status='confirmed' AND meeting_mode='online' AND lock_version=?)").bind(key,booking.id,booking.lock_version).run();
     const existing = await db.prepare('SELECT status FROM booking_meeting_links WHERE idempotency_key=?').bind(key).first<{status:string}>();
     return existing?.status === 'active' ? 'created' : existing?.status === 'failed' ? 'failed' : 'unknown';
   }

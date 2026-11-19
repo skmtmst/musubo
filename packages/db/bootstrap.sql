@@ -1721,7 +1721,7 @@ CREATE TABLE booking_meeting_links (
   attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
   last_error_code TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL, staff_id TEXT, starts_at TEXT, ends_at TEXT,
   CHECK (status <> 'active' OR (external_meeting_id IS NOT NULL AND meeting_url IS NOT NULL))
 );
 
@@ -12386,6 +12386,16 @@ BEGIN SELECT RAISE(ABORT,'hq_origin_account_mismatch'); END;
 CREATE TRIGGER booking_hq_origin_update BEFORE UPDATE OF hq_template_id,hq_template_version_id ON menus WHEN NEW.hq_template_id IS NOT NULL
 AND NOT EXISTS(SELECT 1 FROM hq_templates t JOIN hq_template_versions v ON v.template_id=t.id AND v.tenant_id=t.tenant_id JOIN line_accounts a ON a.tenant_id=t.tenant_id WHERE t.id=NEW.hq_template_id AND v.id=NEW.hq_template_version_id AND a.id=NEW.line_account_id)
 BEGIN SELECT RAISE(ABORT,'hq_origin_account_mismatch'); END;
+
+CREATE TRIGGER booking_meeting_link_invalidate
+AFTER UPDATE OF status, staff_id, starts_at, ends_at, meeting_mode, meeting_url, meeting_url_source ON bookings
+WHEN (OLD.status='confirmed' AND NEW.status<>'confirmed')
+ OR OLD.staff_id IS NOT NEW.staff_id OR OLD.starts_at IS NOT NEW.starts_at OR OLD.ends_at IS NOT NEW.ends_at
+ OR (OLD.meeting_mode='online' AND NEW.meeting_mode IS NOT 'online')
+ OR (NEW.meeting_url_source='manual' AND (OLD.meeting_url IS NOT NEW.meeting_url OR OLD.meeting_url_source IS NOT NEW.meeting_url_source))
+BEGIN
+ UPDATE booking_meeting_links SET status='cancel_pending',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+ WHERE booking_id=NEW.id AND status='active'; UPDATE booking_meeting_links SET status='cancelled',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE booking_id=NEW.id AND status='pending' AND attempt_count=0; END;
 
 CREATE TRIGGER booking_menu_photo_guard_insert BEFORE INSERT ON menus BEGIN SELECT CASE WHEN NEW.photo_media_id IS NOT NULL AND NEW.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM media WHERE id = NEW.photo_media_id AND line_account_id = NEW.line_account_id AND kind = 'image' AND (archived_at IS NULL OR NEW.photo_media_id IS NULL)) THEN RAISE(ABORT, 'booking_photo_media_unavailable') END; END;
 

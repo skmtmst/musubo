@@ -679,7 +679,8 @@
     "764_broadcast_ab_live.sql",
     "765_ec_auto_line_cap.sql",
     "769_musubo_contracted_linked_slots.sql",
-    "776_booking_meeting_links.sql"
+    "776_booking_meeting_links.sql",
+    "777_booking_meeting_lifecycle.sql"
   ],
-  "migrationCount": 680
+  "migrationCount": 681
 }
