@@ -366,7 +366,7 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     if(ts.isIdentifier(call)&&scope.get(call.text).assert){matcher('toBeTruthy',false,args[0]??value(),value(),ctx,node);return value()}
     const raw=union([receiver,...args])
     if(raw.reads.length){emit(ctx,node,raw,value(),'unknown-source-consumer');return raw}
-    for(const arg of args)if(!arg.items&&!arg.props&&!arg.collection&&arg.strings.some(target))return read(value({strings:args.flatMap(v=>v.items||v.props||v.collection?[]:v.strings)}),ctx,node)
+    for(const arg of args)if(!arg.props&&arg.strings.some(target))return read(value({strings:args.flatMap(v=>v.props?[]:v.strings)}),ctx,node)
     return value()
   }
   const load = file => {

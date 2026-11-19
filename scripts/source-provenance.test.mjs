@@ -102,7 +102,9 @@ test('module loaders execute imports and keep file reader aliases traceable', ()
 
 test('mock file names are not reads while real source reads remain detectable', () => regressionCase(() => {
   const run = code => analyzeSourceTests(new Map([[entry, `import {it,expect} from 'vitest';import fs from 'node:fs';${code}`]]))
-  assert.equal(run(`it('array',()=>{const response=unknown(['apps/web/x.ts']);expect(response).toContain('ok')})`).length, 0)
+  assert.ok(run(`it('array',()=>{const files=['apps/web/x.ts'];expect(readAll(files)).toContain('ok')})`).length)
+  assert.ok(run(`it('map',()=>{const files=['apps/web/x.ts'];const contents=files.map(f=>fs.readFileSync(f));expect(contents).toContain('ok')})`).length)
+  assert.ok(run(`it('literal array',()=>expect(readAll(['apps/web/x.ts'])).toContain('ok'))`).length)
   assert.equal(run(`function json(data){return new Response(JSON.stringify(data))}it('github',()=>{const response=json([{filename:'apps/web/x.ts'}]);unknown(response)})`).length, 0)
   assert.ok(run(`it('opaque',()=>expect(unknown('apps/web/x.ts')).toContain('ok'))`).length)
   assert.equal(run(`it('mock',()=>{const response=unknown({files:[{filename:'apps/web/x.ts'}]});expect(response).toContain('ok')})`).length, 0)
