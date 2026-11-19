@@ -111,3 +111,14 @@ it('メールは署名対象全体のバイト上限へ変更せず、既存のb
   expect(await response.json()).toMatchObject({ error: 'Invalid email payload' });
   expect(mocks.storeEmail).not.toHaveBeenCalled();
 });
+it.each([
+  [{ DEPLOY_ENV:'staging', EC_AUTO_LINE_LIVE_SEND_ENABLED:'true' }, true],
+  [{ DEPLOY_ENV:'production', EC_AUTO_LINE_LIVE_SEND_ENABLED:'true' }, false],
+  [{ DEPLOY_ENV:'staging' }, false],
+] as const)('EC の本送信予定は検証環境の明示設定だけで作る: %o',async(settings,enabled)=>{
+  const route=routes[0],body=JSON.stringify(route.body);
+  const response=await app().request(route.path,{method:'POST',body,headers:{'content-type':'application/json','x-line-account-id':'a','x-nen-timestamp':timestamp,'x-nen-signature':sign(body)}},{DB:db,...settings} as Env['Bindings']);
+  expect(response.status).toBe(202);
+  if(enabled)expect(mocks.ingest).toHaveBeenCalledWith(db,'a',route.body,expect.any(Date),true);
+  else expect(mocks.ingest).toHaveBeenCalledWith(db,'a',route.body);
+});
