@@ -131,8 +131,8 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
         {!quote && !quoteError ? <p>キャンセル料を確認しています。</p> : null}
         {quote && quoteScope === targetScope.current && confirmedScope === targetScope.current ? <div aria-label="キャンセル料の内訳">
           <DetailContent><DetailSection title="キャンセル料の見込み">
-            <CustomerInfoRows rows={quote.members.map(item => ({ key: item.bookingId, label: party.members.find(member => member.bookingId === item.bookingId)?.label || party.members.find(member => member.bookingId === item.bookingId)?.personName || '予約', value: `¥${formatNumber(item.feeNow)}` }))} />
-          </DetailSection><DetailSection><CustomerInfoRows rows={[{ label: '合計', value: `¥${formatNumber(quote.totalFee)}`, emphasis: true }]} /></DetailSection></DetailContent>
+            <CustomerInfoRows valueAlign="end" rows={quote.members.map(item => ({ key: item.bookingId, label: party.members.find(member => member.bookingId === item.bookingId)?.label || party.members.find(member => member.bookingId === item.bookingId)?.personName || '予約', value: `¥${formatNumber(item.feeNow)}` }))} />
+          </DetailSection><DetailSection><CustomerInfoRows valueAlign="end" rows={[{ label: '合計', value: `¥${formatNumber(quote.totalFee)}`, emphasis: true }]} /></DetailSection></DetailContent>
         </div> : null}
 
         {confirmedScope !== targetScope.current && canOperate ? <Notice tone="warn">{cancellable.length === 0 ? '取り消せる予約がなくなりました。' : <>組の内容が更新されました。最新の内容を確認してください。<ul>{cancellable.map(member => <li key={member.bookingId}>{member.label || member.personName}・{member.menuName}・{member.staffName ?? '担当未設定'}・{hm(member.startsAt)}〜{hm(member.endsAt)}</li>)}</ul><Button onClick={() => setConfirmedScope(targetScope.current)}>最新の内容を確認しました</Button></>}</Notice> : null}
