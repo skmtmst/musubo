@@ -4871,6 +4871,15 @@
       "column": "account_id"
     }
   },
+  "booking_meeting_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "booking_id",
+      "parent": "bookings",
+      "parentColumn": "id"
+    }
+  },
   "booking_addons": {
     "category": "purge",
     "scope": {

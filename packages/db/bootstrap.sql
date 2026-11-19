@@ -1710,6 +1710,21 @@ CREATE TABLE booking_makeup_credits(
  use_idempotency_key TEXT,use_request_json TEXT
 );
 
+CREATE TABLE booking_meeting_links (
+  id TEXT PRIMARY KEY NOT NULL,
+  booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL CHECK (provider IN ('google_meet', 'zoom', 'teams')),
+  external_meeting_id TEXT,
+  meeting_url TEXT,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'active', 'failed', 'cancel_pending', 'cancelled')),
+  idempotency_key TEXT NOT NULL UNIQUE,
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  last_error_code TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (status <> 'active' OR (external_meeting_id IS NOT NULL AND meeting_url IS NOT NULL))
+);
+
 CREATE TABLE "booking_menu_resources" (
   menu_id TEXT NOT NULL REFERENCES menus(id) ON DELETE CASCADE,
   resource_id TEXT NOT NULL REFERENCES booking_resources(id) ON DELETE RESTRICT,
@@ -10218,6 +10233,12 @@ CREATE INDEX idx_booking_entitlements_friend ON booking_entitlements(line_accoun
 
 CREATE INDEX idx_booking_exceptions_account_dates
   ON booking_availability_exceptions(line_account_id, date_from, date_to, scope_kind);
+
+CREATE INDEX idx_booking_meeting_links_booking ON booking_meeting_links(booking_id, created_at);
+
+CREATE UNIQUE INDEX idx_booking_meeting_links_current ON booking_meeting_links(booking_id) WHERE status IN ('pending', 'active');
+
+CREATE UNIQUE INDEX idx_booking_meeting_links_remote ON booking_meeting_links(provider, external_meeting_id) WHERE external_meeting_id IS NOT NULL;
 
 CREATE INDEX idx_booking_menu_resources_resource
   ON booking_menu_resources(resource_id, menu_id);
