@@ -2,6 +2,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { activateMonthly, monthlyContract, monthlyCycle, monthlyFixture, monthlyNow } from '../../test-utils/monthly-ledger.js';
 import { scheduleMonthlyRetry } from './monthly-retry-ledger.js';
 import { executeMonthlyAttempt } from './monthly-attempt-execution.js';
+import { runMonthlyAttemptMockCron } from './monthly-attempt-cron.js';
+import type { Env } from '../../worker-env.js';
 
 const opened: ReturnType<typeof monthlyFixture>[] = [];
 afterEach(() => { for (const d of opened.splice(0)) d.raw.close(); });
@@ -39,4 +41,17 @@ it('未入金が確定した試行から次の再試行を作る', async () => {
   expect((await executeMonthlyAttempt(d.db,'renewal',0,{pay:async()=> 'failed'},new Date(monthlyNow))).status).toBe('failed');
   expect(d.raw.prepare("SELECT scheduled_at FROM booking_monthly_attempts WHERE cycle_id='renewal' AND attempt_no=1").get())
     .toEqual({ scheduled_at: '2026-11-13T00:00:00.000Z' });
+});
+it('模擬の定期実行は両方の設定とテスト宛先がある検証環境だけで再試行を作る', async () => {
+  const d = monthlyFixture(); opened.push(d);
+  await monthlyContract(d); monthlyCycle(d, { id: 'initial', month: '2026-10', paid: true }); activateMonthly(d);
+  monthlyCycle(d, { id: 'mock_mock', kind: 'renewal' });
+  const env = { DB:d.db, DEPLOY_ENV:'staging', MONTHLY_INVOICE_MOCK_CRON_ENABLED:'true', MONTHLY_PAYMENT_MOCK_FAILURE_ENABLED:'true' } as Env['Bindings'];
+  expect(await runMonthlyAttemptMockCron({...env, DEPLOY_ENV:'production'},new Date(monthlyNow))).toEqual({enabled:false});
+  expect(await runMonthlyAttemptMockCron({...env, MONTHLY_PAYMENT_MOCK_FAILURE_ENABLED:undefined},new Date(monthlyNow))).toEqual({enabled:false});
+  expect(await runMonthlyAttemptMockCron(env,new Date(monthlyNow))).toMatchObject({attempted:0});
+  d.raw.exec(`INSERT INTO account_settings(line_account_id,key,value) VALUES('a','test_recipients','["f"]')`);
+  expect(await runMonthlyAttemptMockCron(env,new Date(monthlyNow))).toMatchObject({attempted:1});
+  expect(d.raw.prepare("SELECT state FROM booking_monthly_attempts WHERE cycle_id='mock_mock' AND attempt_no=0").get()).toEqual({state:'failed'});
+  expect(d.raw.prepare("SELECT scheduled_at FROM booking_monthly_attempts WHERE cycle_id='mock_mock' AND attempt_no=1").get()).toEqual({scheduled_at:'2026-11-13T00:00:00.000Z'});
 });
