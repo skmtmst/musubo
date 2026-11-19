@@ -14,6 +14,28 @@ const { broadcasts } = await import('./broadcasts.js');
 describe('複数吹き出しのテスト送信', () => {
   beforeEach(() => line.pushMessage.mockReset().mockResolvedValue({}));
 
+  it('配信テストは未解決の共通情報を送らず、登録後の値を送る', async () => {
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T01:00:00Z'));
+    const {db,raw}=createTestD1({now:()=>new Date()});
+    try {
+      raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES ('account-1','channel-1','店','token','secret');
+        INSERT INTO account_settings(id,line_account_id,key,value) VALUES('setting-1','account-1','test_recipients','["friend-1"]');
+        INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id,track_links,created_at)
+          VALUES('broadcast-1','試験','text','営業時間: {{var.hours}}','all','draft','account-1',0,'2026-01-01');`);
+      insertFriend(raw,'friend-1',{line_account_id:'account-1'});
+      const app=new Hono<{Bindings:{DB:D1Database;WORKER_URL:string}}>();
+      app.use('*',async(c,next)=>{c.env={DB:db,WORKER_URL:'https://worker.test'};c.set('staff' as never,{id:'owner',name:'Owner',role:'owner',readOnly:false} as never);await next()});
+      app.route('/',broadcasts);
+      const send=()=>app.request('/api/broadcasts/broadcast-1/test-send',{method:'POST'});
+      expect((await send()).status).toBe(422);expect(line.pushMessage).not.toHaveBeenCalled();
+      expect(raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+      raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES ('hours','account-1','営業時間','hours','text','10時')").run();
+      vi.setSystemTime(new Date('2026-11-18T01:00:11Z'));
+      expect((await send()).status).toBe(200);
+      expect(line.pushMessage.mock.calls[0][1]).toEqual([{type:'text',text:'【テスト配信】\n営業時間: 10時'}]);
+    } finally {raw.close();vi.useRealTimers();}
+  });
+
   it('本番と同じ2通をまとめて送り、2通ぶんを記録する', async () => {
     const { db, raw } = createTestD1();
     raw.prepare(

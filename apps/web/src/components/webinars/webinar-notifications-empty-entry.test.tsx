@@ -84,6 +84,25 @@ function button(text: string): HTMLButtonElement {
 }
 
 describe('通知の設定がまだ無いウェビナー（WEBINAR-09）', () => {
+  it('読み込み中は失敗や未設定にしない', async () => {
+    net.notifications.mockImplementation(() => new Promise(() => {}))
+    await mount()
+    expect(host.querySelector('[data-list-state="loading"]')).not.toBeNull()
+    expect(host.textContent).not.toContain('通知の設定がまだありません')
+    expect(host.textContent).not.toContain('通知の設定を読み込めませんでした')
+  })
+  it('返事の器が不正なら失敗として表示する', async () => {
+    net.notifications.mockResolvedValue({ data: null })
+    await mount()
+    expect(host.textContent).toContain('通知の設定を読み込めませんでした')
+    expect(host.textContent).not.toContain('通知の設定がまだありません')
+  })
+  it('返事が物でないなら失敗として表示する', async () => {
+    net.notifications.mockResolvedValue({ data: 'unexpected' })
+    await mount()
+    expect(host.textContent).toContain('通知の設定を読み込めませんでした')
+    expect(host.textContent).not.toContain('通知の設定がまだありません')
+  })
   it('未設定には入力入口を出し、押すと全部OFFの編集に入る', async () => {
     net.notifications.mockResolvedValue({ data: { settings: null, overview: overview() } })
     await mount()
