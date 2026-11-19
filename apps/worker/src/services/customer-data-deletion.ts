@@ -63,6 +63,8 @@ function conditionsFor(target: DeletionTarget): Record<string, string> {
   result.event_booking_transition_runs = `line_account_id IS ?3 AND (json_extract(input_snapshot,'$.friendId')=?1 OR json_extract(input_snapshot,'$.recipient')=?2)`;
   result.style_analytics_results = `line_account_id IS ?3 AND EXISTS(SELECT 1 FROM json_each(style_analytics_results.selection_json,'$.ids') p WHERE json_extract(p.value,'$.friendId')=?1)`;
   result.media_file_scans = 'id IN (SELECT scan_id FROM form_submission_files WHERE friend_id = ?1)';
+  result.workflow_steps = `scope_id = 'line:' || ?3 AND process_kind = 'booking_outlook_sync'
+    AND EXISTS (SELECT 1 FROM bookings b WHERE b.id = workflow_steps.subject_id AND b.line_account_id = ?3 AND b.friend_id = ?1)`;
   return result;
 }
 function childFirst(tables: string[]): string[] {
@@ -75,6 +77,7 @@ function childFirst(tables: string[]): string[] {
     if (table === 'form_submissions') for (const child of ['form_submission_files', 'form_submit_outbox', 'form_submit_claims', 'form_capacity_claims', 'media_file_scans']) if (tables.includes(child)) visit(child);
     if (table === 'form_submission_files' && tables.includes('media_file_scans')) visit('media_file_scans');
     if (table === 'form_submit_claims' && tables.includes('form_submit_outbox')) visit('form_submit_outbox');
+    if (table === 'bookings' && tables.includes('workflow_steps')) visit('workflow_steps');
     result.push(table);
   };
   for (const table of tables) visit(table);

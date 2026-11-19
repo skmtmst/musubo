@@ -386,6 +386,27 @@ it('retains all 13 tables, all amounts and other customers through failure, retr
   expect(await claimPhotoNotificationDelivery(sqlite.db,{decisionId:'deleted-0-review',lineAccountId:'fixture-account',leaseId:'lease',leaseExpiresAt:'2999-01-01'})).toBeNull();
 });
 
+it('removes meeting links and Outlook booking records only for the deleted customer', async () => {
+  const { seedDeletionRecords } = await import('../../../../packages/db/test/fixtures/customer-deletion.mjs');
+  seedDeletionRecords(sqlite.raw, 'deleted', 'fixture-friend');
+  seedDeletionRecords(sqlite.raw, 'kept', 'kept-friend');
+  sqlite.raw.exec(`INSERT INTO booking_meeting_links (id, booking_id, provider, status, idempotency_key, created_at, updated_at)
+    VALUES ('deleted-link','deleted-0-booking','zoom','pending','deleted-key','now','now'),
+           ('kept-link','kept-0-booking','zoom','pending','kept-key','now','now');
+    INSERT INTO workflow_steps (scope_id, process_kind, subject_id, step_key, retry_key, created_at, updated_at)
+    VALUES ('line:fixture-account','booking_outlook_sync','deleted-0-booking','current','a',0,0),
+           ('line:fixture-account','booking_outlook_sync','kept-0-booking','current','b',0,0),
+           ('line:other-account','booking_outlook_sync','deleted-0-booking','current','c',0,0),
+           ('line:fixture-account','booking_outlook_busy','fixture-staff','current','d',0,0);`);
+  await deleteCustomerData(env(), { kind: 'friend_data', id: 'fixture-friend', friendId: 'fixture-friend', accountId: 'fixture-account', lineUserId: 'LINE-fixture-friend' }, 'owner');
+  expect(sqlite.raw.prepare('SELECT id FROM booking_meeting_links').all()).toEqual([{ id: 'kept-link' }]);
+  expect(sqlite.raw.prepare('SELECT scope_id, process_kind, subject_id FROM workflow_steps ORDER BY retry_key').all()).toEqual([
+    { scope_id: 'line:fixture-account', process_kind: 'booking_outlook_sync', subject_id: 'kept-0-booking' },
+    { scope_id: 'line:other-account', process_kind: 'booking_outlook_sync', subject_id: 'deleted-0-booking' },
+    { scope_id: 'line:fixture-account', process_kind: 'booking_outlook_busy', subject_id: 'fixture-staff' },
+  ]);
+});
+
 it('refuses a partial schema before intent, R2 or customer data changes', async () => {
   sqlite.raw.exec(`DROP TRIGGER booking_payments_history_insert;
     DROP TRIGGER booking_payments_history_detach;
