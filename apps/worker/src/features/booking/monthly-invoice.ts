@@ -9,12 +9,21 @@ export interface MonthlyInvoiceProvider {
 export async function createMonthlyInvoice(db: D1Database, cycleId: string, provider: MonthlyInvoiceProvider, now = new Date()) {
   const at = now.toISOString();
   const row = await db.prepare(`SELECT y.id,y.connected_account,y.amount,c.customer_id FROM booking_monthly_cycles y
-    JOIN booking_monthly_contracts c ON c.id=y.contract_id
-    WHERE y.id=? AND y.state='planned' AND c.test_mode=1 AND c.customer_id IS NOT NULL`).bind(cycleId)
+    JOIN booking_monthly_contracts c ON c.id=y.contract_id AND c.account_id=y.account_id AND c.tenant_id=y.tenant_id
+    JOIN line_accounts a ON a.id=c.account_id AND a.tenant_id=c.tenant_id JOIN tenants t ON t.id=c.tenant_id
+    WHERE y.id=? AND y.state='planned' AND y.test_mode=1 AND c.test_mode=1 AND c.customer_id IS NOT NULL
+    AND c.state IN ('applying','active','stop_scheduled') AND c.service_state='enabled'
+    AND (c.stop_effective_at IS NULL OR julianday(c.stop_effective_at)>julianday(y.service_start))
+    AND a.is_active=1 AND a.archived_at IS NULL AND t.status='active' AND julianday(y.due_at)<=julianday(?)`).bind(cycleId,at)
     .first<{id:string;connected_account:string;amount:number;customer_id:string}>();
   if (!row) return { status: 'unavailable' as const };
-  const claim = await db.prepare("UPDATE booking_monthly_cycles SET state='preparing',version=version+1,updated_at=? WHERE id=? AND state='planned'")
-    .bind(at, cycleId).run();
+  const claim = await db.prepare(`UPDATE booking_monthly_cycles SET state='preparing',version=version+1,updated_at=?
+    WHERE id=? AND state='planned' AND EXISTS(SELECT 1 FROM booking_monthly_contracts c
+    JOIN line_accounts a ON a.id=c.account_id AND a.tenant_id=c.tenant_id JOIN tenants t ON t.id=c.tenant_id
+    WHERE c.id=booking_monthly_cycles.contract_id AND c.state IN ('applying','active','stop_scheduled')
+    AND c.service_state='enabled' AND c.test_mode=1 AND c.customer_id=? AND a.is_active=1 AND a.archived_at IS NULL AND t.status='active'
+    AND (c.stop_effective_at IS NULL OR julianday(c.stop_effective_at)>julianday(booking_monthly_cycles.service_start)))`)
+    .bind(at, cycleId, row.customer_id).run();
   if (claim.meta.changes !== 1) return { status: 'unavailable' as const };
   try {
     const invoice = await provider.create({ account: row.connected_account, customer: row.customer_id, amount: row.amount,
