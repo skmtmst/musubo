@@ -36,3 +36,13 @@ it('削除が明確に失敗した場合は待ち行を残して後から再試�
  expect(remove).toHaveBeenCalledTimes(2);
  expect(d.raw.prepare('SELECT status FROM booking_meeting_links').get()).toEqual({status:'cancelled'});
 });
+
+it('旧担当の接続がなくても新担当の会議を作り、旧会議は要確認として残す',async()=>{
+ d.raw.exec("UPDATE bookings SET starts_at='2026-11-21T05:00:00Z',lock_version=lock_version+1 WHERE id='bk'");
+ create.mockResolvedValueOnce({kind:'created',meetingId:'new-remote',url:'https://example.test/new'});
+ const old=d.raw.prepare('SELECT staff_id FROM booking_meeting_links').get() as {staff_id:string};
+ const result=await reconcileBookingMeeting(d.db,{bookingId:'bk',accountId:'a',removers:{},creator,unavailable:[{staffId:old.staff_id,provider:'zoom'}]});
+ expect(result).toBe('failed');
+ expect((d.raw.prepare('SELECT status FROM booking_meeting_links ORDER BY status').all() as {status:string}[]).map(row=>row.status)).toEqual(['active','cancel_pending']);
+ expect(create).toHaveBeenCalledTimes(2);
+});

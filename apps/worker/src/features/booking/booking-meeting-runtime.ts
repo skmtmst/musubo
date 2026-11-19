@@ -5,6 +5,7 @@ import {meetingAccessToken} from './booking-meeting-access.js';
 import {cachedMeetingAccess} from './booking-meeting-credentials.js';
 import {meetingOAuthConfig} from './booking-meeting-oauth-config.js';
 import {meetingProvider} from './booking-meeting-providers.js';
+import {preferredMeetingProvider} from './booking-meeting-preference.js';
 
 type Token={token:string;accountId:string;connectionId:string;version:number;expiresAt:string};
 async function isTestRecipient(db:D1Database,accountId:string,bookingId:string):Promise<boolean>{
@@ -23,14 +24,20 @@ export function meetingQueueDependencies(env:Env['Bindings']):MeetingQueueDepend
   const latest=rows.results?.[0];if(!latest)return null;
   const targets=new Map<string,{staffId:string;provider:MeetingProvider}>();
   for(const row of rows.results??[])if(row.staff_id)targets.set(JSON.stringify([row.staff_id,row.provider]),{staffId:row.staff_id,provider:row.provider});
-  if(booking.status==='confirmed')targets.set(JSON.stringify([booking.staff_id,latest.provider]),{staffId:booking.staff_id,provider:latest.provider});
+  const selected=booking.status==='confirmed'?await preferredMeetingProvider(env.DB,{accountId,staffId:booking.staff_id}):null;
+  if(booking.status==='confirmed'&&!selected)return null;
+  if(selected)targets.set(JSON.stringify([booking.staff_id,selected]),{staffId:booking.staff_id,provider:selected});
+  const unavailable:Array<{staffId:string;provider:MeetingProvider}>=[];
   const tokens=new Map<string,Token>();
   for(const [mapKey,target] of targets){
    const config=meetingOAuthConfig(env,target.provider);if(!config)return null;
    // 外部会議の8秒の期限の前に鍵を取得し、回転を最後まで保存する。
    const access=await meetingAccessToken(env.DB,{accountId,staffId:target.staffId,provider:target.provider,encryptionKey:env.LINE_CREDENTIAL_ENCRYPTION_KEY,config,signal:new AbortController().signal});
    if(access.kind==='busy'||access.kind==='retryable')return {deferred:true,removers:{},verifiers:{}};
-   if(access.kind!=='ready')return null;
+   if(access.kind!=='ready'){
+    if((access.kind==='missing'||access.kind==='reconnect') && (target.staffId!==booking.staff_id || target.provider!==selected)){unavailable.push(target);continue;}
+    return null;
+   }
    tokens.set(mapKey,{token:access.token,accountId:access.externalAccountId,connectionId:access.connectionId,version:access.version,expiresAt:access.expiresAt});
   }
   const byProvider=new Map<MeetingProvider,ReturnType<typeof meetingProvider>>();
@@ -50,6 +57,6 @@ export function meetingQueueDependencies(env:Env['Bindings']):MeetingQueueDepend
   const removers:NonNullable<Awaited<ReturnType<MeetingQueueDependencies['resolve']>>>['removers']={};
   const verifiers:NonNullable<Awaited<ReturnType<MeetingQueueDependencies['resolve']>>>['verifiers']={};
   for(const [provider,adapter] of byProvider){removers[provider]=adapter;verifiers[provider]=adapter;}
-  return {creator:byProvider.get(latest.provider),removers,verifiers};
+  return {creator:selected?byProvider.get(selected):undefined,removers,verifiers,unavailable};
  }};
 }

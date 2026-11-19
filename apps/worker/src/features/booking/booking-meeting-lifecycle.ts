@@ -5,11 +5,12 @@ export interface MeetingRemover {
   remove(input: { staffId: string; meetingId: string; idempotencyKey: string; signal: AbortSignal }): Promise<'deleted' | 'failed' | 'unknown'>;
 }
 
-/** 古い会議の削除が確かになってから、確定中の予約に新しい会議を作る。 */
+/** 削除不能な旧担当の会議は要確認として残し、新担当の会議を作る。 */
 export async function reconcileBookingMeeting(db: D1Database, input: {
   bookingId: string; accountId: string;
   removers: Partial<Record<MeetingProvider, MeetingRemover>>;
   creator?: MeetingCreator;
+  unavailable?: Array<{staffId:string;provider:MeetingProvider}>;
 }): Promise<'done' | 'failed' | 'unknown'> {
   const booking=await db.prepare('SELECT status,meeting_mode,meeting_url_source FROM bookings WHERE id=? AND line_account_id=?')
     .bind(input.bookingId,input.accountId).first<{status:string;meeting_mode:string|null;meeting_url_source:string|null}>();
@@ -17,7 +18,12 @@ export async function reconcileBookingMeeting(db: D1Database, input: {
   const pending=await db.prepare(`SELECT id,provider,staff_id,external_meeting_id,last_error_code FROM booking_meeting_links
     WHERE booking_id=? AND status='cancel_pending' ORDER BY created_at,id`).bind(input.bookingId)
     .all<{id:string;provider:MeetingProvider;staff_id:string|null;external_meeting_id:string|null;last_error_code:string|null}>();
+  let needsAttention=false;
   for (const row of pending.results ?? []) {
+    if (row.staff_id && input.unavailable?.some(item=>item.staffId===row.staff_id && item.provider===row.provider)) {
+      needsAttention=true;
+      continue;
+    }
     const remover=input.removers[row.provider];
     if (!remover || !row.staff_id || !row.external_meeting_id) return 'failed';
     const claim=await db.prepare(`UPDATE booking_meeting_links SET last_error_code='delete_started',attempt_count=attempt_count+1,updated_at=?
@@ -43,11 +49,11 @@ export async function reconcileBookingMeeting(db: D1Database, input: {
   if (unresolved) return 'unknown';
   const needsMeeting=booking.status==='confirmed' && booking.meeting_mode==='online' && booking.meeting_url_source!=='manual';
   const active=needsMeeting ? await db.prepare("SELECT id FROM booking_meeting_links WHERE booking_id=? AND status='active' LIMIT 1").bind(input.bookingId).first() : null;
-  if(active)return 'done';
+  if(active)return needsAttention?'failed':'done';
   if (needsMeeting && !input.creator) return 'failed';
   if (needsMeeting && input.creator) {
     const created=await createConfirmedBookingMeeting(db,input.bookingId,input.creator);
     if (created==='failed' || created==='unknown') return created;
   }
-  return 'done';
+  return needsAttention?'failed':'done';
 }
