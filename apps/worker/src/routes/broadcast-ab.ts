@@ -2,7 +2,7 @@ import { storedDeliveryLimit } from '../features/broadcasts/broadcast-delivery-l
 import {Hono,type Context} from 'hono';
 import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapKey,gapWrite,gapVersion} from '../services/gap-common.js';
-import {abSettings,abAudience,abStats,splitAb,startAbMock,finishMockRemainder,startAbLive,liveTestAudience,recoverAbLiveStart} from '../features/broadcasts/broadcast-ab/index.js';
+import {abSettings,abAudience,abStats,splitAb,startAbMock,finishMockRemainder,startAbLive,liveTestAudience,recoverAbLiveStart,liveAbStats,trackAbLiveMessages} from '../features/broadcasts/broadcast-ab/index.js';
 import {assertChanged,clearAssertions} from '../features/booking/booking-series/index.js';
 import {requirePermission,requireIrreversibleConfirmation,hasStaffPermission} from '../middleware/role-guard.js';
 import {BROADCAST_DEFINITION_EDIT_KEY,BROADCAST_DEFINITION_PUBLISH_KEY} from '@line-crm/shared';
@@ -27,12 +27,20 @@ broadcastAb.put('/api/broadcasts/:id/variants/:key',requirePermission(BROADCAST_
  try{await c.env.DB.batch([c.env.DB.prepare("UPDATE broadcasts SET lock_version=lock_version+1,approval_status='none' WHERE id=? AND lock_version=? AND status='draft' AND NOT EXISTS(SELECT 1 FROM broadcast_ab_live_tests WHERE broadcast_id=broadcasts.id) AND NOT EXISTS(SELECT 1 FROM broadcast_ab_tests WHERE broadcast_id=? AND status!='draft')").bind(id,v,id),assertChanged(c.env.DB),c.env.DB.prepare(`INSERT INTO broadcast_variants(id,broadcast_id,variant_key,messages_json,created_at) VALUES(?,?,?,?,?) ON CONFLICT(broadcast_id,variant_key) DO UPDATE SET messages_json=excluded.messages_json,version=version+1`).bind(crypto.randomUUID(),id,key,JSON.stringify([{type:'text',text:b.text}]),new Date().toISOString()),clearAssertions(c.env.DB)]);}catch(e){if(/CHECK constraint/.test(String(e)))throw new GapError('ab_test_active_or_version_conflict',409);throw e;}return c.json({success:true,data:{key,version:v+1}});
 });
 broadcastAb.get('/api/broadcasts/:id/ab-result',requirePermission('/broadcasts'),async(c)=>{
- await scope(c);const id=c.req.param('id');await recoverAbLiveStart(c.env.DB,id);const test=await c.env.DB.prepare('SELECT * FROM broadcast_ab_tests WHERE broadcast_id=?').bind(id).first();if(!test)throw new GapError('not_found',404);
- const live=await c.env.DB.prepare('SELECT status,start_result_json FROM broadcast_ab_live_tests WHERE broadcast_id=?').bind(id).first<{status:string;start_result_json:string|null}>();
+ const scoped=await scope(c);const id=c.req.param('id');await recoverAbLiveStart(c.env.DB,id);const test=await c.env.DB.prepare('SELECT * FROM broadcast_ab_tests WHERE broadcast_id=?').bind(id).first();if(!test)throw new GapError('not_found',404);
+ const live=await c.env.DB.prepare('SELECT status,start_result_json,stats_json,decide_at,decided_at,winner,remainder_scheduled_at,remainder_sent_at,decide_after_minutes FROM broadcast_ab_live_tests WHERE broadcast_id=?').bind(id).first<{status:string;start_result_json:string|null;stats_json:string|null;decide_at:string;decided_at:string|null;winner:string|null;remainder_scheduled_at:string|null;remainder_sent_at:string|null;decide_after_minutes:number}>();
  const remainder=await c.env.DB.prepare("SELECT count(*) count,SUM(state='sent') sent FROM broadcast_ab_recipients WHERE broadcast_id=? AND variant_key='R'").bind(id).first();
  let liveTestRecipientCount:number|null=null;
  if(c.env.DEPLOY_ENV==='staging'&&c.env.AB_LIVE_DELIVERY_ENABLED==='true'){try{liveTestRecipientCount=(await liveTestAudience(c.env.DB,id)).ids.length;}catch(error){if(!(error instanceof GapError&&error.code==='invalid_test_recipients'))throw error;}}
- return c.json({success:true,data:{...test,variants:await abStats(c.env.DB,id),remainder,testMode:!live,...(live?{status:live.status,liveStart:live.start_result_json?JSON.parse(live.start_result_json):null}:{}),liveTestRecipientCount}});
+ if(live){
+  const cutoff=new Date(Math.min(Date.now(),Date.parse(live.decide_at))).toISOString();
+  const tracked=await c.env.DB.prepare("SELECT COUNT(DISTINCT CASE WHEN substr(dedup_key,1,length(?))=? THEN 'A' WHEN substr(dedup_key,1,length(?))=? THEN 'B' END) n FROM tracked_links").bind(`${scoped.line_account_id}|ab-live:${id}:A|`,`${scoped.line_account_id}|ab-live:${id}:A|`,`${scoped.line_account_id}|ab-live:${id}:B|`,`${scoped.line_account_id}|ab-live:${id}:B|`).first<{n:number}>();
+  const variants=(await liveAbStats(c.env.DB,id,cutoff)).map(v=>({...v,clicks:tracked?.n===2?v.clicks:null,clickRate:tracked?.n===2&&v.sent?v.clicks/v.sent:null,bookings:null,purchases:null,purchaseAmount:null}));
+  const rest=await c.env.DB.prepare("SELECT COUNT(*) count,SUM(state='sent') sent FROM broadcast_ab_live_recipients WHERE broadcast_id=? AND variant_key='R'").bind(id).first();
+  const stats=live.stats_json?JSON.parse(live.stats_json) as {reason?:string;confidence?:number}:null;
+  return c.json({success:true,data:{...live,variants,remainder:{...rest,scheduledAt:live.remainder_scheduled_at,sentAt:live.remainder_sent_at},decideAt:live.decide_at,decidedAt:live.decided_at,decideAfterMinutes:live.decide_after_minutes,confidence:stats?.confidence??null,reason:stats?.reason??null,testMode:false,liveStart:live.start_result_json?JSON.parse(live.start_result_json):null,liveTestRecipientCount}});
+ }
+ return c.json({success:true,data:{...test,variants:await abStats(c.env.DB,id),remainder,testMode:true,liveTestRecipientCount}});
 });
 broadcastAb.post('/api/broadcasts/:id/ab-test/choose',requirePermission(BROADCAST_DEFINITION_PUBLISH_KEY),requireIrreversibleConfirmation('broadcast-send'),async(c)=>{
  gapWrite(c);const row=await scope(c);if(storedDeliveryLimit(row))throw new GapError('人数の上限とA/Bは併用できません。',409);const id=c.req.param('id'),b=await gapBody(c),key=gapKey(c);if(!['A','B','none'].includes(String(b.variant)))throw new GapError('invalid_variant');if(b.testMode!==true)throw new GapError('test_mode_required',409);
@@ -81,7 +89,9 @@ async function startAbLiveRequest(c:Context<Env>,id:string,b:{expectedVersion?:u
   const current=await liveTestAudience(c.env.DB,id);
   const friend=await c.env.DB.prepare('SELECT line_user_id FROM friends WHERE id=? AND line_account_id=?').bind(input.friendId,accountId).first<{line_user_id:string|null}>();
   if(!current.ids.includes(input.friendId)||friend?.line_user_id!==input.to[0]||!(await getSendPermissionForAccount(c.env.DB,accountId)).allowed||await isOperationCapabilityStopped(c.env.DB,accountId,'broadcast_dispatch')||!await featureJobCanRun(c.env.DB,{accountId,featureId:'broadcasts',job:'broadcast deliveries'})||await broadcastQuietHoursShift(c.env.DB,accountId,new Date().toISOString()))throw new NotificationDeliveryBlocked('recipient_changed');
-  await pushViaHarnessProxy(c.env.WORKER_PUBLIC_URL||c.env.WORKER_URL||'https://worker.invalid',token,input.to[0],input.messages,input.retryKey,request=>dispatchLineProxyLocally(request,c.env),'broadcast_dispatch');
+  const workerUrl=c.env.WORKER_PUBLIC_URL||c.env.WORKER_URL;if(!workerUrl)throw new NotificationDeliveryBlocked('tracking_url_unavailable');
+  const messages=await trackAbLiveMessages(c.env.DB,{broadcastId:id,variantKey:input.variantKey,accountId,friendId:input.friendId,workerUrl,messages:input.messages});
+  await pushViaHarnessProxy(workerUrl,token,input.to[0],messages,input.retryKey,request=>dispatchLineProxyLocally(request,c.env),'broadcast_dispatch');
  }});
 }
 /** 許可済みの開始操作の再送だけを扱い、新しい開始や送信は行わない。 */

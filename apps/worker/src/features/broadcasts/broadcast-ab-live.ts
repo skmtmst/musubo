@@ -1,4 +1,5 @@
 import type {Message} from '@line-crm/line-sdk';
+import {validateAbLiveUrls} from './broadcast-ab-live-links.js';
 import {GapError} from '../../services/gap-common.js';
 import {assertChanged,clearAssertions} from '../booking/booking-series/index.js';
 import {abAudience,splitAb} from './broadcast-ab.js';
@@ -60,7 +61,8 @@ export async function startAbLive(db:D1Database,id:string,expectedVersion:number
  for(const variantKey of ['A','B']){
   const raw=variantRows.find(v=>v.variant_key===variantKey)!.messages_json;
   let parsed:Message[];try{parsed=JSON.parse(raw) as Message[];if(!Array.isArray(parsed)||parsed.length===0)throw new GapError('two_variants_required',409);}catch(error){if(error instanceof GapError)throw error;throw new GapError('two_variants_required',409);}
-  resolvedByVariant.set(variantKey,await resolveLiveVariantMessages(db,account,id,parsed,now));
+  const resolved=await resolveLiveVariantMessages(db,account,id,parsed,now);
+  validateAbLiveUrls(resolved);resolvedByVariant.set(variantKey,resolved);
  }
  const statements=[db.prepare("UPDATE broadcasts SET lock_version=lock_version+1 WHERE id=? AND status='draft' AND stopped_at IS NULL AND lock_version=?").bind(id,expectedVersion),assertChanged(db),
   db.prepare("INSERT INTO broadcast_ab_live_tests(broadcast_id,test_ratio_pct,metric,decide_after_minutes,undecided_policy,status,started_at,decide_at,version,start_key,start_request_json,start_result_json,created_at) VALUES(?,?,?,?,?,'live_testing',?,?,1,?,?,?,?)").bind(id,t.test_ratio_pct,t.metric,t.decide_after_minutes,t.undecided_policy,at,decide,key,request,null,at)];

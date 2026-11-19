@@ -57,6 +57,7 @@ export async function scheduled(
   if (lane === 'restaurantMinute') {
     await runIsolatedScheduledJobs([
       {name:'restaurant events',run:()=>processRestaurantEvents(env)},
+      {name:'AB test decisions (test transport)',run:async()=>{if(env.DEPLOY_ENV==='staging'&&env.AB_LIVE_DELIVERY_ENABLED==='true'){const {decideAbLiveTests}=await import('../features/broadcasts/broadcast-ab/index.js');await decideAbLiveTests(env.DB,new Date(event.scheduledTime));}}},
       {name:'customer segments and ranks',run:async()=>{
         const now=new Date(event.scheduledTime);
         if(japanCalendar(now).getUTCHours()<4)return;

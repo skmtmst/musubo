@@ -198,3 +198,21 @@ test('店舗のトークンがなければ既定トークンを使わない',asy
  expect(r.status).toBe(409);expect(proxy).not.toHaveBeenCalled();
  expect(d.raw.prepare('SELECT status FROM broadcast_ab_live_tests WHERE broadcast_id=\'br\'').get()).toEqual({status:'live_stopped'});
 });
+
+test('本送信では案ごとに違う計測リンクを作り、宛先の署名を付ける',async()=>{
+ await configure();await setBroadcastApprovalThreshold(d.db,'a',10000);
+ d.raw.prepare("UPDATE broadcast_variants SET messages_json=? WHERE broadcast_id='br' AND variant_key='A'").run(JSON.stringify([{type:'text',text:'案 A https://example.com/a'}]));
+ d.raw.prepare("UPDATE broadcast_variants SET messages_json=? WHERE broadcast_id='br' AND variant_key='B'").run(JSON.stringify([{type:'text',text:'案 B https://example.com/b'}]));
+ const app=gapApp(d,[broadcastAb,broadcasts],gapOwner,false,{DEPLOY_ENV:'staging',AB_LIVE_DELIVERY_ENABLED:'true',WORKER_URL:'https://worker.invalid'});
+ const r=await app.request('/api/broadcasts/br/send',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':'track','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({expectedVersion:4,confirmedRecipientCount:2400,confirmedTestRecipientCount:20,liveMode:true})});
+ expect(r.status).toBe(202);expect(proxy).toHaveBeenCalledTimes(4);
+ for(const [req] of proxy.mock.calls){const body=await req.json() as {messages:Array<{text:string}>};expect(body.messages[0].text).toMatch(/https:\/\/worker\.invalid\/t\/[^ ]+\?identity=/);}
+ const links=d.raw.prepare("SELECT dedup_key FROM tracked_links WHERE dedup_key LIKE 'a|ab-live:br:%' ORDER BY dedup_key").all() as Array<{dedup_key:string}>;
+ expect(links.map(x=>x.dedup_key)).toEqual(['a|ab-live:br:A|https://example.com/a','a|ab-live:br:B|https://example.com/b']);
+});
+
+test('計測できないLINEリンクは試しの記録や送信より前に止める',async()=>{
+ await configure();d.raw.prepare("UPDATE broadcast_variants SET messages_json=? WHERE broadcast_id='br' AND variant_key='A'").run(JSON.stringify([{type:'text',text:'https://line.me/R/example'}]));
+ const send=transmit();await expect(startAbLive(d.db,'br',4,20,'unsupported',{transmit:send,liveDeliveryEnabled:true})).rejects.toThrow('ab_tracking_unsupported');
+ expect(send).not.toHaveBeenCalled();expect(d.raw.prepare('SELECT COUNT(*) n FROM broadcast_ab_live_tests').get()).toEqual({n:0});
+});
