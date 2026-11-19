@@ -6,24 +6,30 @@ import { customerAvailability, type CustomerReservationRow, type CustomerStore }
 import { restaurantSeatCapacity } from '../../services/restaurant-seat-capacity.js';
 import { readRestaurantCustomerReservationForm } from '../../services/restaurant-reservation-form.js';
 import { bookingStripeTestRequest, listBookingStripeTestRefunds } from './booking-stripe-test-api.js';
+import { restaurantTestEnabled } from '../../lib/environment-features.js';
+import { accountFeatureIsEnabled } from '../../services/feature-enforcement.js';
 
 interface Payment {id:string;line_account_id:string;store_id:string;reservation_id:string;connect_account:string;amount:number;payment_intent_id:string|null;status:string;refund_started_at:string|null;stripe_refund_id:string|null}
 const paymentById=(db:D1Database,id:string)=>db.prepare('SELECT * FROM restaurant_payment_requests WHERE id=?').bind(id).first<Payment>();
 /** 全額のみ。結果不明は同じ操作の照会・再送で回収し、成功するまで取消を確定しない。 */
-export async function refundRestaurantPayment(env:Env['Bindings'],id:string):Promise<'refunded'|'pending'> {
+export async function refundRestaurantPayment(env:Env['Bindings'],id:string,reconcileOnly=false):Promise<'refunded'|'pending'> {
  const db=env.DB;let p=await paymentById(db,id);
  if(!p?.payment_intent_id || !/^pi_[A-Za-z0-9]+$/.test(p.payment_intent_id))return 'pending';
  if(p.status==='refunded')return 'refunded';
  if(!['paid','refund_pending'].includes(p.status))return 'pending';
  let first=false;
  if(p.status==='paid') {
+  if(reconcileOnly || !restaurantTestEnabled(env) || !await accountFeatureIsEnabled(db,p.line_account_id,'restaurant_test'))return 'pending';
   const now=new Date().toISOString();const update=await db.prepare("UPDATE restaurant_payment_requests SET status='refund_pending',refund_started_at=?,updated_at=? WHERE id=? AND status='paid'").bind(now,now,id).run();
   first=Boolean(update.meta.changes);p=await paymentById(db,id);if(!p || p.status==='refunded')return p?.status==='refunded'?'refunded':'pending';
  }
  const saved=p, intent=p.payment_intent_id;
  if(!intent || !env.BOOKING_STRIPE_TEST_SECRET_KEY || !/^sk_test_[A-Za-z0-9]+$/.test(env.BOOKING_STRIPE_TEST_SECRET_KEY))return 'pending';
- const send=()=>bookingStripeTestRequest({key:env.BOOKING_STRIPE_TEST_SECRET_KEY,connectedAccount:saved.connect_account,operation:'refunds',idempotencyKey:`restaurant_refund_${saved.id}`,
-  body:{payment_intent:intent,amount:saved.amount,'metadata[restaurant_payment_id]':saved.id}});
+ const send=async()=>{
+  if(!restaurantTestEnabled(env) || !await accountFeatureIsEnabled(db,saved.line_account_id,'restaurant_test'))throw new Error('restaurant_payment_disabled');
+  return bookingStripeTestRequest({key:env.BOOKING_STRIPE_TEST_SECRET_KEY,connectedAccount:saved.connect_account,operation:'refunds',idempotencyKey:`restaurant_refund_${saved.id}`,
+   body:{payment_intent:intent,amount:saved.amount,'metadata[restaurant_payment_id]':saved.id}});
+ };
  let refund:Record<string,unknown>|undefined;
  try {
   if(first)refund=await send();
@@ -31,7 +37,7 @@ export async function refundRestaurantPayment(env:Env['Bindings'],id:string):Pro
    const matches=(await listBookingStripeTestRefunds({key:env.BOOKING_STRIPE_TEST_SECRET_KEY,connectedAccount:saved.connect_account,paymentIntentId:intent}))
     .filter(row=>(row.metadata as Record<string,unknown>|undefined)?.restaurant_payment_id===saved.id);
    if(matches.length===1)refund=matches[0];
-   else if(matches.length===0 && saved.refund_started_at && Date.now()-Date.parse(saved.refund_started_at)<23*60*60*1000)refund=await send();
+   else if(!reconcileOnly && matches.length===0 && saved.refund_started_at && Date.now()-Date.parse(saved.refund_started_at)<23*60*60*1000)refund=await send();
   }
  } catch { return 'pending'; }
  if(!refund || (refund.livemode!==undefined && refund.livemode!==false) || typeof refund.id!=='string' || !/^re_[A-Za-z0-9]+$/.test(refund.id)
@@ -103,6 +109,7 @@ export async function cancelPaidRestaurantReservation(env:Env['Bindings'],paymen
  if(!row)return 'pending';
  if(row.status==='cancelled')return 'cancelled';
  if(row.customer_version!==expectedVersion || !['pending','confirmed'].includes(row.status))return 'pending';
+ if(payment.status==='paid' && (!restaurantTestEnabled(env) || !await accountFeatureIsEnabled(db,payment.line_account_id,'restaurant_test')))return 'pending';
  if(payment.status==='paid' || payment.status==='refunded') {
   const next=payment.status==='paid'?'refund_pending':'refunded';
   await db.prepare(`UPDATE restaurant_payment_requests SET status=?,cancel_requested=1,cancel_expected_version=?,cancel_reason=?,

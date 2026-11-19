@@ -2,6 +2,8 @@ import { beforeEach,afterEach,expect,it,vi } from 'vitest';
 import { gapFixture } from '../../test-utils/gap1.js';
 import type { Env } from '../../worker-env.js';
 const finish=vi.hoisted(()=>vi.fn(async()=>{}));
+const featureEnabled=vi.hoisted(()=>vi.fn(async()=>true));
+vi.mock('../../services/feature-enforcement.js',async original=>({...await original<typeof import('../../services/feature-enforcement.js')>(),accountFeatureIsEnabled:featureEnabled}));
 vi.mock('./restaurant-payment-finish.js',()=>({finishRestaurantPaidReservation:finish}));
 import { startRestaurantPayment } from './restaurant-payment-start.js';
 import { applyRestaurantPaymentReceipt } from './booking-stripe-webhooks/restaurant-payment.js';
@@ -12,7 +14,7 @@ const start=(id='r1',form='form1')=>startRestaurantPayment(env(),'a','Uf',id,1,{
 function event(){return {id:'evt_restaurant',account:'acct_original',api_version:'2024-06-20',created:Math.floor(Date.now()/1000),type:'checkout.session.completed',livemode:false,data:{object:{id:'cs_test_abc',object:'checkout.session',livemode:false,status:'complete',mode:'payment',payment_status:'paid',amount_total:25200,currency:'jpy',customer:'cus_person',payment_intent:'pi_restaurant'}}};}
 async function save(){const e=event();return storeBookingStripeReceipt(f.db,normalizeBookingStripeEvent(e),await stripeReceiptDigest(JSON.stringify(e)));}
 beforeEach(()=>{
- f=gapFixture();finish.mockClear();
+ f=gapFixture();finish.mockClear();featureEnabled.mockResolvedValue(true);
  f.raw.exec(`UPDATE line_accounts SET liff_id='1234567890-abcdef' WHERE id='a';
  INSERT INTO rt_organizations(id,account_id,name) VALUES('org','a','組織'); INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store','org','店','s','a');
  INSERT INTO rt_menu_items(id,store_id,kind,name,price,duration_minutes,allergens_json) VALUES('course','store','course','コース',8400,90,'[]');
@@ -52,6 +54,13 @@ it('店が停止した後の入金は返金に進める',async()=>{
  expect(await applyRestaurantPaymentReceipt(env(),'acct_original','evt_restaurant')).toBe('applied');
  expect(f.raw.prepare('SELECT status FROM restaurant_payment_requests').get()).toEqual({status:'refund_pending'});
  expect(finish).toHaveBeenCalledTimes(1);
+});
+it('停止中の入金通知は入金を記録するだけで新たな返金を始めない',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async(url:string)=>url.endsWith('/customers')?Response.json({id:'cus_person',livemode:false}):Response.json({id:'cs_test_abc',url:'https://checkout.stripe.com/c/pay/cs_test_abc',livemode:false})));
+ await start();await save();featureEnabled.mockResolvedValue(false);
+ expect(await applyRestaurantPaymentReceipt(env(),'acct_original','evt_restaurant')).toBe('applied');
+ expect(f.raw.prepare('SELECT status FROM restaurant_payment_requests').get()).toEqual({status:'paid'});
+ expect(finish).not.toHaveBeenCalled();
 });
 it('通知の一時的な保存エラーは回収対象から外さず、次回に入金を反映する',async()=>{
  const {recoverRestaurantPayments}=await import('./restaurant-payment-recovery.js');
