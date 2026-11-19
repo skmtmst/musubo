@@ -59,6 +59,7 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["v8/restaurant/closures/closures.module.css", ".grid", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/scenarios/results.module.css", ".table", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/settings/accounts/accounts.module.css", ".table", "表・一覧の行。外側のカードと影を重ねない。"],
+  ["v8/settings/sns/sns.module.css", ".list", "カードの中の接続一覧の枠。内容は行で区切り、外側のカードと影を重ねない。"],
   ["v8/templates/question-new.module.css", ".choice", "入力欄・補助操作・選択肢。中身のカードではない。"],
   ["v8/emergency/send-path-coverage-panel.tsx", "className=\"border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/broadcasts/broadcast-approval.tsx", "className=\"bg-warning-bg rounded-card border-hairline border p-5\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],

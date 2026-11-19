@@ -654,3 +654,38 @@ for(const broken of ['{broken',JSON.stringify({version:3,data:{fields:[]}})])it(
   expect(warn).toHaveBeenCalledWith('restaurant_reservation_form_recovery');
  }finally{warn.mockRestore();}
 });
+
+it('styles §6-3: 営業時間の版が予約直前に変われば仮押さえを作らない',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2027-09-30T00:00:00Z'));
+ const {useSqliteClock}=await import('../test-utils/sqlite-clock.js');useSqliteClock(db.raw,()=>new Date());
+ const prepare=db.db.prepare.bind(db.db);let changed=false;
+ const spy=vi.spyOn(db.db,'prepare').mockImplementation(sql=>{
+  if(!changed&&sql.includes('INSERT INTO rt_reservations(id,store_id,source')){changed=true;db.raw.exec("UPDATE rt_opening_hours_settings SET version=version+1 WHERE store_id='store'");}
+  return prepare(sql);
+ });
+ try{const r=await hold('hours_race');expect(changed).toBe(true);expect(r.status).toBe(409);expect(db.raw.prepare('SELECT COUNT(*) n FROM rt_reservations').get()).toEqual({n:0});}
+ finally{spy.mockRestore();vi.useRealTimers();}
+});
+it('styles §6-3: 空席確認後に別の人が両方の卓を取ったら確保しない',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2027-09-30T00:00:00Z'));
+ const {useSqliteClock}=await import('../test-utils/sqlite-clock.js');useSqliteClock(db.raw,()=>new Date());
+ try{
+  const store={id:'store',name:'店',timezone:'Asia/Tokyo',line_account_id:'a1',tenant_id:'t1'};
+  expect((await customerAvailability(db.db,store,'2027-10-01',2))!.data.slots.some(s=>s.available)).toBe(true);
+  db.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id,display_name) VALUES('f3','Uthree','a1','三人目')");
+  expect((await hold('first_seat','two')).status).toBe(201);expect((await hold('second_seat','three')).status).toBe(201);
+  const last=await hold('third_seat','one');expect(last.status).toBe(409);expect(await last.json()).toMatchObject({error:'slot_conflict'});
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM rt_reservations').get()).toEqual({n:2});
+ }finally{vi.useRealTimers();}
+});
+it('styles §6-3: 空席確認後にLINE枠を停止したら新規の仮押さえを拒否する',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2027-09-30T00:00:00Z'));
+ const {useSqliteClock}=await import('../test-utils/sqlite-clock.js');useSqliteClock(db.raw,()=>new Date());
+ try{
+  const store={id:'store',name:'店',timezone:'Asia/Tokyo',line_account_id:'a1',tenant_id:'t1'};
+  expect((await customerAvailability(db.db,store,'2027-10-01',2))!.data.slots.some(s=>s.available)).toBe(true);
+  db.raw.exec("INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity,line_capacity) VALUES('slot','store','2027-10-01T03:00:00Z',8,0)");
+  expect((await hold('closed_line')).status).toBe(409);
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM rt_reservations').get()).toEqual({n:0});
+ }finally{vi.useRealTimers();}
+});

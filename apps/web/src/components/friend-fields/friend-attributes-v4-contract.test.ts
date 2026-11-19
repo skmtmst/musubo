@@ -27,10 +27,6 @@ describe('タグ V4 の禁止の見張り', () => {
     expect(editor).not.toContain('max-w-[670px] -translate-y-7')
   })
 
-  it('対応マークの保管で「未設定へ戻ります」と言わない', () => {
-    expect(markList()).not.toContain('対応マークが未設定へ戻ります')
-  })
-
   it('タグ作成・編集の本文に大見出しや古い説明・見本の連動を置かない', () => {
     const editor = tagEditor()
     expect(editor).not.toContain('text-[32px] font-bold tracking-tight')

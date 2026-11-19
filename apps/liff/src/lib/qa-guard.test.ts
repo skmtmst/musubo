@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 /**
  * 本番の束に偽物が入らないことの見張り。
@@ -27,6 +27,8 @@ function listSourceFiles(dir: string): string[] {
   return out;
 }
 
+afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
+
 describe('qa fake is tree-shaken from production', () => {
   test('src は偽物を静的に import しない', () => {
     const offenders = listSourceFiles(SRC_ROOT).filter((file) =>
@@ -35,13 +37,14 @@ describe('qa fake is tree-shaken from production', () => {
     expect(offenders).toEqual([]);
   });
 
-  test('alias は VITE_LIFF_QA=1 のときだけ付く', () => {
-    const config = readFileSync(join(LIFF_ROOT, 'vite.config.ts'), 'utf8');
-    expect(config).toContain('VITE_LIFF_QA');
-    expect(config).toContain('@line/liff');
-    expect(config).toContain('liff-qa');
-    // alias は条件式の中にだけ置く。無条件だと本番にも偽物が入る。
-    expect(config).toContain("process.env.VITE_LIFF_QA === '1'");
-    expect(config).toMatch(/\?\s*\{\s*alias:/);
+  test('alias は VITE_LIFF_QA=1 のときだけ付く', async () => {
+    for (const value of [undefined, '0', 'true', '1']) {
+      vi.resetModules();
+      vi.stubEnv('VITE_LIFF_QA', value);
+      const { default: config } = await import('../../vite.config.js');
+      expect(config.resolve?.alias ?? {}).toEqual(value === '1'
+        ? { '@line/liff': fileURLToPath(new URL('./liff-qa.ts', import.meta.url)) }
+        : {});
+    }
   });
 });

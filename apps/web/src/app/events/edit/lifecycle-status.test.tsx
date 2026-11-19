@@ -37,13 +37,21 @@ vi.mock('@/lib/api', async (importOriginal) => {
 const { default: EditEventPage } = await import('./page')
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z'))
   document.documentElement.dataset.theme = 'v8'
   net.getEvent.mockReset()
   net.setEventLifecycle.mockReset()
 })
-afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
+afterEach(() => { cleanup(); delete document.documentElement.dataset.theme; vi.useRealTimers() })
 
 describe('公開の状態（WEB318/319）', () => {
+  it('申込の一覧へ表示中のイベントIDを渡す', async () => {
+    net.getEvent.mockResolvedValue({ id: 'ev-1', lifecycle_status: 'published', is_published: 1 })
+    render(<EditEventPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'その他の操作' }))
+    expect((await screen.findByText('申込の一覧を見る')).closest('a')?.getAttribute('href')).toBe('/events/bookings?id=ev-1')
+  })
   it('状態が読めなかったら、読み直しを出す', async () => {
     net.getEvent.mockRejectedValue(new Error('down'))
     render(<EditEventPage />)

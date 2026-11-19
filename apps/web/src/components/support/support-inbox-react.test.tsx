@@ -108,6 +108,7 @@ let hidden = false
 
 beforeEach(() => {
   vi.useFakeTimers()
+  vi.setSystemTime(new Date('2026-11-17T00:00:00.000Z'))
   net.calls.length = 0
   net.handler = respond
   inboxByStatus.clear()
@@ -167,6 +168,22 @@ async function choose(name: string) {
 }
 
 describe('問い合わせ受信箱の実React動作(#630)', () => {
+  it('別の会話を選ぶと、取得中は前の会話の詳細を消す', async () => {
+    inboxByStatus.set('open', [item('t1', '最初さん', 'resolved'), item('t2', '次の人', 'unread')])
+    threadStatus.set('t1', 'resolved')
+    let resolveNext: (value: unknown) => void = () => { throw new Error('未設定') }
+    net.handler = (url) => url === '/api/support/email/threads/t2'
+      ? new Promise((resolve) => { resolveNext = resolve })
+      : respond(url)
+    await render()
+    await choose('最初さん')
+    expect(host.querySelector('h2')?.textContent).toBe('件名 t1')
+    await choose('次の人')
+    expect(host.querySelector('h2')?.textContent).not.toBe('件名 t1')
+    await act(async () => { resolveNext(await respond('/api/support/email/threads/t2')) })
+    expect(host.querySelector('h2')?.textContent).toBe('件名 t2')
+  })
+
   it('「対応済み」「すべて」へ変えても初回は取りに行き、前の一覧を残さない', async () => {
     inboxByStatus.set('open', [item('t1', '未解決さん', 'unread')])
     inboxByStatus.set('resolved', [item('t2', '対応済みさん', 'resolved')])
@@ -174,6 +191,7 @@ describe('問い合わせ受信箱の実React動作(#630)', () => {
 
     await render()
     expect(host.textContent).toContain('未解決さん')
+    expect(inboxCalls('open')).toBe(1)
 
     // 対応済みは5秒更新の対象外だが、初回の1回は取る。
     await selectFilter('resolved')

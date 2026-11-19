@@ -138,3 +138,11 @@ describe('上限付き配信を確定する公開の口', () => {
   });
 
 });
+
+it('UNS-08: 配信を並行して2回確定しても配信開始は一度だけ',async()=>{
+ seed();
+ const [first,second]=await Promise.all([call('/api/broadcasts/limited/send',{expectedVersion:1,confirmedRecipientCount:2}),call('/api/broadcasts/limited/send',{expectedVersion:1,confirmedRecipientCount:2})]);
+ expect([first.status,second.status].sort()).toEqual([200,409]);
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM broadcast_send_claims WHERE broadcast_id='limited'").get()).toEqual({n:2});
+ expect(sends.recipients).toEqual([]);expect(sends.all).toBe(0);
+});

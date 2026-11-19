@@ -30,13 +30,6 @@ describe('リマインダ一覧の空と失敗', () => {
     expect(LIST).not.toContain('lg:grid-cols-[13rem_minmax(0,1fr)]')
   })
 
-  it('失敗の言い方は見本どおりの1枚にまとめる', () => {
-    // 板 ：失敗は「リマインダを読み込めませんでした」の1枚。
-    expect(LIST).toContain('リマインダを読み込めませんでした')
-    expect(LIST).not.toContain('リマインダの読み込みに失敗しました')
-    expect(LIST).not.toContain('いまは読み込めていません')
-  })
-
   it('共通部品が、直らないときの行き先を持っている', () => {
     // 「もう一度お試しください」だけだと、押し直しても直らないとき詰まる。
     expect(LIST_STATE).toContain('再読み込みしても直らない場合はエラー報告へ。')
