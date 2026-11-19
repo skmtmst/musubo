@@ -21,13 +21,13 @@ Googleビジネスと Instagram の2つだけ（X は入れない）。
 
 - サービスごとに接続を複数積める。上限は各サービス 10個（`SNS_CONNECTION_LIMIT`）。
 - 判定は画面ではなく `connection-slots.ts` が持つ。画面は返ってきた筋書き（`SnsAdditionPlan` / `SnsRemovalPlan`）を出すだけ。
-- 契約枠は**両サービス共通の1つの数**（LINEアカウントごとに1つ・既定 `SNS_DEFAULT_CONTRACTED` = 1個）。サービス別の2つの数は持たない。1枠 月額 `SNS_SLOT_UNIT_YEN`（¥3,300・税込）で Google・Instagram が**各1個ずつ同時に増える**（2枠なら各3個）。
+- 契約枠は**両サービス共通の1つの数**（LINEアカウントごとに1つ）。サーバーの `contracted` を出し、口が取れないときだけ `SNS_DEFAULT_CONTRACTED`（1個）へ戻す（下の「契約枠・主連携・請求の口」）。サービス別の2つの数は持たない。1枠 月額 `SNS_SLOT_UNIT_YEN`（¥3,300・税込）で Google・Instagram が**各1個ずつ同時に増える**（2枠なら各3個）。
 - 有料の追加枠は画面で数え直さず `@line-crm/shared` の `linkedAccountSlots` を正本にする＝**max(0, max(Google数, Instagram数) − 1)**（要件 §3・§5 Q6'）。無料期間中は0円、追加した月は日割り。金額の文字は共通の料金表から作り、画面に数字を直書きしない。
 - この数え方の帰結：少ないほうのサービスへの追加は有料枠が増えない（請求も増えない）。多いほうの個数が変わらない解除は減額しない。
 - ［接続を追加する］を押したときの分かれ道（`planAddition`）：
   1. 接続数が既に10個 → `individual-quote`。F5 の個別見積もりの小窓で止める（認可へ進まない）。
   2. 追加後も契約枠の中 → `within-quota`。**料金の確認を挟まず**そのまま認可画面へ進む。
-  3. 枠を超えるが請求の段が分からない → `billing-unknown`。下の「今の口で出せないもの」を見る。
+  3. 枠を超えるが請求の段が分からない（口が 404／`billing: null`） → `billing-unknown`。押せない状態にして理由を添える。
   4. それ以外 → `over-quota`。F3（支払い中・日割りの請求あり）か F4（無料期間・0円）の小窓で料金を確認し、同意した場合にだけ認可画面へ進む。
 - 解除（`planRemoval`）：F6 の確認の小窓。1件だけを解除し、ほかの接続のデータは消えない。有料枠の前後（`N枠 → M枠`）をいつも示し、減額の金額は有料枠が実際に減るときだけ出す（**契約枠は変わらない**）。
 - 既存の単一接続の環境は、接続1件の一覧として同じ画面に出る（移行で画面側の作り替えは要らない）。
@@ -58,23 +58,30 @@ Googleビジネスと Instagram の2つだけ（X は入れない）。
 - 画面の先頭にも `ReadOnlyNotice` を1本出す。
 - これは以前の「閲覧のみには接続・解除のボタンを置かない」という決めを**置き換える**（v7 F8 と AGENTS.md §15 が優先）。
 
+## 契約枠・主連携・請求の口（`GET /api/settings/sns/connections`）
+
+- 口：`api.snsConnections.get(accountId)`（形は `packages/shared/src/sns-connection-ports.ts` の `SnsConnectionPorts`、実装は `apps/worker/src/routes/sns-connections.ts`）。owner／admin だけが読める。
+- 画面はこの口から **`contracted`（契約枠）・`billing`（請求の段）・`googleConnections[].isPrimary`（主連携）・`primaryVersion`（版）** の4つだけを取る。金額・有料枠の数え方は `packages/shared/src/musubo-pricing.ts` が正本なので、画面では数え直さない。
+- **口が取れない LINEアカウントでは今までの表示へ戻す**。契約枠の記録が無い LINEアカウントでは 404 が返るのが正しいので、読み込み失敗の案内は出さず、契約枠 `SNS_DEFAULT_CONTRACTED`（1個）・`billing-unknown` として扱う（枠の中の追加はそのまま進み、枠を超える追加だけが押せない状態になる）。
+- 請求の段が `trialing` なら F4（0円）、`paid` なら F3（日割りの請求あり）の小窓を出す。`null`（Stripe から取れなかったとき）は引き続き `billing-unknown`。
+- 主連携の札は `isPrimary` が真の接続の行だけに出す。**先頭の行を主連携と決め打ちしない**（`googleSlots` の第3引数に主連携の接続の目印を渡す）。口が取れないときだけ、1件しか出せない今の作りに合わせてその1件を主連携として扱う。
+- 主連携の切り替えは `PUT /api/settings/sns/google-primary`（`expectedVersion` に `primaryVersion`）。版が合わなければ 409 で、画面は読み直して理由を出す。
+
 ## 今の口で出せないもの
 
-- 請求の段（無料期間か支払い中か・月次期間の残り日数）を返す口がまだ無い（要件 §6「課金」は Codex 担当）。日付と残り日数はサーバーの値だけを使う決まりなので画面で作らず、`BILLING = null` として扱う。この間、**契約枠の中の追加はそのまま進める**が、枠を超える追加は押せない状態にして理由を添える（`billing-unknown`）。口が入ったらここを差し替える。
-- 同じ理由で、F6 の「次の請求からの減額」の箱は出さない（`nextBillingLabel={null}`）。減額の金額は計算できているが、いつから減るのかをサーバーが返せないため。
-- 「主連携にする」を切り替える口がまだ無い（要件 §6「API型」は Codex 担当）。`SnsConnectionList` は `onSetPrimary` を渡されたときだけ行の中の［主連携にする］を出すので、今は出ない。口が入ったら渡す。ボタンは接続が2件以上あって、その行が主連携でないときだけ出す。
-- 契約枠の個数を返す口がまだ無い。`SNS_DEFAULT_CONTRACTED`（1個）を既定として出す。
+- **Google の接続を2件以上出す口がまだ無い。** 接続の口（`GET /api/restaurant-test/google/connection`）は1件分の `connection` しか返さず、解除（`googleDisconnect`）にも接続ごとの目印の引数が無い。`ports.googleConnections` を一覧の元にすると、解除が別の接続に当たる・選ぶ段（`pending_location`）の行が消えるという不整合が出るため、一覧の元は接続の口のままにしている。表の作り（migration 771）と接続ごとの Google 一覧・解除の口が入ってから差し替える。
+- 上の帰結として、**［主連携にする］は今は画面に出ない**（`SnsConnectionList` は接続が2件以上あってその行が主連携でないときだけ出すので、1件では出ない）。切り替えの口と `expectedVersion` の受け渡しは実装済みで、2件目が出せるようになった時点で押せるようになる。
+- F6 の「次の請求からの減額」の箱は出さない（`nextBillingLabel={null}`）。請求の段は残り日数（`monthlyDaysRemaining` / `monthlyDaysInPeriod`）だけを返し、**次の請求日は持たない**。日付を画面で作らない決まりなので、減額の金額が計算できていても箱は出さない。
 - Instagram の DM・コメントの返信（口が無い）。受信箱での見え方の見本も、実際の口ができるまで置かない。
 - 投稿の「今月 N件・次の予約」（投稿の数を返す口が接続の口に無い）。
 
-### 第1段で実画面に出せる窓は F6 だけ（目視照合の範囲）
+### 実画面で開ける窓（目視照合の範囲）
 
-上の理由から、4つの窓のうち**実際に開けるのは F6 `JvuLH`（解除の確認）だけ**。
-
-- F3 `q9hcp9`・F4 `uB88I`（枠を超える追加の料金確認）：請求の口が無く `BILLING = null` のため `billing-unknown` で押せない状態になり、窓が開かない。
-- F5 `R4dYE`：接続が10件以上必要で、今の口（Google・Instagram 各1件）では作れない。
-- 4つの窓は `slot-dialogs.tsx` で**同じ3つの変数**（`--tpl-e1-sns-slot-dlg-head-pad` / `-body-pad` / `-foot-pad`）と `designWidth={560}` を共有している。よって F6 を実画面で測れば共通の仕組みは確かめられ、残り3つは同じ変数を指すことの読み取り確認で補う。実画面で4つ測ったことにはしない。
-- 請求の口が入ったら F3・F4 を実画面で測り直す。
+- F6 `JvuLH`（解除の確認）：開ける。
+- F3 `q9hcp9`・F4 `uB88I`（枠を超える追加の料金確認）：請求の口が入ったので**開ける**（`trialing` → F4、`paid` → F3）。`planAddition` は**サービスごとの件数+1**を共通の `contracted` と比べるので、2件目を作る必要はない。契約枠1個のまま Instagram が1件つながっていれば、次の［接続を追加する］がすでに枠を超える（1+1 > 1）。実画面で開く条件は、口が 200 を返すこと（`musubo_line_usage` に `status` が `active`／`ending` で `contracted_linked_slots >= 1` の行がある）と、請求の段が `trialing`／`paid` のどちらかで取れること。
+- F5 `R4dYE`：接続が10件以上必要で、今の作り（各1件）では作れない。
+- 4つの窓は `slot-dialogs.tsx` で**同じ3つの変数**（`--tpl-e1-sns-slot-dlg-head-pad` / `-body-pad` / `-foot-pad`）と `designWidth={560}` を共有している。よって F3・F4・F6 を実画面で測れば共通の仕組みは確かめられ、F5 は同じ変数を指すことの読み取り確認で補う。実画面で4つ測ったことにはしない。
+- migration 771 で表の作りが変わり接続を10件並べられるようになったら、F5 を実画面で測り直す（`docs/v8-requirements/multi-sns-connections-ports.md` §5）。
 
 ## 承認デザインとのずれ（記録）
 

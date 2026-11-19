@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ArrowRight, Check, Plus, RefreshCw } from 'lucide-react'
-import type { InstagramConnectionStatus } from '@line-crm/shared'
+import type { InstagramConnectionStatus, SnsConnectionPorts } from '@line-crm/shared'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -24,9 +24,11 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './sns.module.css'
 import { formatDate, formatNumber } from '@/lib/format'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { isSaveConflict } from '@/components/shared/save-conflict'
 import SnsConnectionList from './connection-list'
 import { GoogleMark, InstagramMark } from './brand-marks'
 import {
+  asConnectionPorts,
   googleSlots,
   instagramSlots,
   planAddition,
@@ -67,13 +69,11 @@ const CAPABILITIES: Record<SnsService, string[]> = {
 const LOCKED_REASON = 'オーナーか管理者だけが接続を変更できます'
 
 /**
- * 請求の段（無料期間か支払い中か・月次期間の残り日数）を返す API はまだ無い（要件 §6「課金」は別の担当）。
- * 日付と残り日数はサーバーの値だけを使う決まりなので、画面で作らず「分からない」として扱い、
- * 枠を超える追加だけを押せない状態にする（connection-slots の `billing-unknown`）。
+ * 枠を超える追加を止めるときの理由。
+ * 請求の段（無料期間か支払い中か・月次期間の残り日数）はサーバーの値だけを使う決まりなので、
+ * 口が返らないときは画面で作らず「分からない」として扱い、枠を超える追加だけを押せない状態にする
+ * （connection-slots の `billing-unknown`）。
  */
-const BILLING: SnsSlotBilling | null = null
-
-/** 枠を超える追加を止めるときの理由。 */
 const BILLING_UNKNOWN_REASON = '追加の料金を確かめられないため、いまは枠を超える追加ができません。しばらくしてからもう一度お試しください。'
 
 /** 戻り先（`/settings/sns?instagram=…`）で出す案内。Worker の折り返しが付ける。 */
@@ -118,8 +118,11 @@ export default function SnsSettingsPage() {
   const [googleError, setGoogleError] = useState<unknown>(null)
   const [instagram, setInstagram] = useState<InstagramConnectionStatus | null>(null)
   const [instagramError, setInstagramError] = useState<unknown>(null)
+  /** 契約枠・主連携・請求の段。契約枠の記録が無い LINEアカウントでは取れない（null）。 */
+  const [ports, setPorts] = useState<SnsConnectionPorts | null>(null)
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const loadVersion = useRef(0)
+  const [primaryBusyId, setPrimaryBusyId] = useState<string | null>(null)
   const [addPlan, setAddPlan] = useState<SnsAdditionPlan | null>(null)
   const [removePlan, setRemovePlan] = useState<SnsRemovalPlan | null>(null)
   const [confirmAccountId, setConfirmAccountId] = useState<string | null>(null)
@@ -165,6 +168,15 @@ export default function SnsSettingsPage() {
           setInstagramError(null)
         })
         .catch((caught) => { if (version === loadVersion.current) { setInstagram(null); setInstagramError(caught) } }),
+      // 契約枠・主連携・請求の段。契約枠の記録が無い LINEアカウントでは 404 が返るのが正しいので、
+      // 取れないことを失敗として出さず、今までの既定（契約枠1・billing-unknown）へ戻す。
+      // 返事が成功でも中身の形が違うことがあるので、読める形かを確かめてから受け取る。
+      api.snsConnections.get(accountId)
+        .then((res) => {
+          if (version !== loadVersion.current) return
+          setPorts(res.success ? asConnectionPorts(res.data) : null)
+        })
+        .catch(() => { if (version === loadVersion.current) setPorts(null) }),
     ])
     if (version === loadVersion.current) setLoadedAccountId(accountId)
   }, [accountId])
@@ -175,14 +187,21 @@ export default function SnsSettingsPage() {
   const visibleGoogleError = loadedAccountId === accountId ? googleError : null
   const visibleInstagram = loadedAccountId === accountId ? instagram : null
   const visibleInstagramError = loadedAccountId === accountId ? instagramError : null
+  const visiblePorts = loadedAccountId === accountId ? ports : null
   const googleStatus = visibleGoogle?.connection.status ?? null
   const igState = visibleInstagram?.state ?? null
 
+  /* 請求の段と主連携はサーバーの値だけを使う。取れないときは画面で作らない。 */
+  const billing: SnsSlotBilling | null = visiblePorts?.billing ?? null
+  const googlePrimaryId = visiblePorts
+    ? visiblePorts.googleConnections.find((connection) => connection.isPrimary)?.id ?? null
+    : null
+
   /* 画面が必要とする形（サービスごとの接続と、両サービス共通の契約枠）へ直す。
-     契約枠を返す API が入るまでは既定値。 */
+     契約枠はサーバーの値。口が取れないときだけ既定値へ戻す。 */
   const slots: SnsSlotsView = {
-    contracted: SNS_DEFAULT_CONTRACTED,
-    googleBusiness: googleSlots(visibleGoogle, (iso) => formatDate(iso, { style: 'detail' })),
+    contracted: visiblePorts?.contracted ?? SNS_DEFAULT_CONTRACTED,
+    googleBusiness: googleSlots(visibleGoogle, (iso) => formatDate(iso, { style: 'detail' }), googlePrimaryId),
     instagram: instagramSlots(visibleInstagram, (iso) => formatDate(iso, { style: 'day' })),
   }
   const canManageGoogle = canManage && (visibleGoogle?.permissions.canManageConnection ?? true)
@@ -246,7 +265,7 @@ export default function SnsSettingsPage() {
   /** 1件追加する。契約枠の中はそのまま認可へ、超えるときは画面内の料金確認へ（要件 §4-1）。 */
   const startAddition = (service: SnsService) => {
     if (!accountId) return
-    const plan = planAddition(slots, service, BILLING)
+    const plan = planAddition(slots, service, billing)
     if (plan.kind === 'within-quota') { void beginConnect(service); return }
     if (plan.kind === 'billing-unknown') return
     setActionError('')
@@ -256,7 +275,7 @@ export default function SnsSettingsPage() {
   /** 枠を超える追加を押せない状態にする理由。押せるときは何も添えない。 */
   const additionLockedReason = (service: SnsService): string | undefined => {
     if (!canManage) return LOCKED_REASON
-    const plan = planAddition(slots, service, BILLING)
+    const plan = planAddition(slots, service, billing)
     return plan.kind === 'billing-unknown' ? BILLING_UNKNOWN_REASON : undefined
   }
 
@@ -312,7 +331,38 @@ export default function SnsSettingsPage() {
     }
   }
 
-  const busyId = busy && removePlan ? removePlan.connection.id : null
+  /**
+   * 主連携を切り替える（`PUT /api/settings/sns/google-primary`・要件 §4-3）。
+   * 主連携は Google の接続にだけ設けるので、この操作は Google カードにしか置かない。
+   * ほかの人が先に切り替えていた場合は版が合わず 409 で返るので、読み直してから理由を出す。
+   */
+  const setGooglePrimary = async (connection: SnsConnectionView) => {
+    if (!accountId || !canManageGoogle || !visiblePorts) return
+    setPrimaryBusyId(connection.id)
+    setBusy(true)
+    setActionError('')
+    try {
+      await api.snsConnections.setGooglePrimary({
+        lineAccountId: accountId,
+        connectionId: connection.id,
+        expectedVersion: visiblePorts.primaryVersion,
+      })
+      await load()
+    } catch (saveFailure) {
+      if (isSaveConflict(saveFailure)) {
+        await load()
+        setActionError('ほかの人が先に主連携を変えました。いまの状態を読み込み直したので、もう一度お試しください。')
+        return
+      }
+      const fieldFailure = saveErrors.capture(saveFailure)
+      if (!fieldFailure) setActionError('主連携を切り替えられませんでした。もう一度お試しください。')
+    } finally {
+      setBusy(false)
+      setPrimaryBusyId(null)
+    }
+  }
+
+  const busyId = busy ? removePlan?.connection.id ?? primaryBusyId : null
   const unitYen = `${formatNumber(SNS_SLOT_UNIT_YEN)}円`
 
   /** 段の頭：公式ロゴ・題・連携の個数・「接続を追加する」。接続が無いときは題の隣に「未接続」の札。 */
@@ -419,6 +469,8 @@ export default function SnsSettingsPage() {
                 lockedReason={LOCKED_REASON}
                 busyId={busyId}
                 onReconnect={() => { void beginConnect('googleBusiness') }}
+                /* 切り替えの口（版付き）が取れているときだけ［主連携にする］を置く。 */
+                onSetPrimary={visiblePorts ? (connection) => { void setGooglePrimary(connection) } : undefined}
                 onDisconnect={(connection) => askDisconnect('googleBusiness', connection)}
                 rowLink={(connection) => connection.state === 'connected' && visibleGoogle.connection.locationName ? { href: '/settings/google-hours', label: '営業時間へ' } : null}
               />

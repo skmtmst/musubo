@@ -68,7 +68,7 @@ export function SnsSlotPaidDialog({
       open
       designNode="q9hcp9"
       designWidth={560}
-      designMinHeight={426}
+      designMinHeight={430}
       designHeaderPadding="var(--tpl-e1-sns-slot-dlg-head-pad)"
       designContentPadding="var(--tpl-e1-sns-slot-dlg-body-pad)"
       designFooterPadding="var(--tpl-e1-sns-slot-dlg-foot-pad)"
@@ -133,7 +133,7 @@ export function SnsSlotTrialDialog({
       open
       designNode="uB88I"
       designWidth={560}
-      designMinHeight={426}
+      designMinHeight={430}
       designHeaderPadding="var(--tpl-e1-sns-slot-dlg-head-pad)"
       designContentPadding="var(--tpl-e1-sns-slot-dlg-body-pad)"
       designFooterPadding="var(--tpl-e1-sns-slot-dlg-foot-pad)"
@@ -223,7 +223,7 @@ export function SnsSlotQuoteDialog({
       open
       designNode="R4dYE"
       designWidth={560}
-      designMinHeight={296}
+      designMinHeight={300}
       designHeaderPadding="var(--tpl-e1-sns-slot-dlg-head-pad)"
       designContentPadding="var(--tpl-e1-sns-slot-dlg-body-pad)"
       designFooterPadding="var(--tpl-e1-sns-slot-dlg-foot-pad)"
@@ -285,7 +285,7 @@ export function SnsSlotRemovalDialog({
       open
       designNode="JvuLH"
       designWidth={560}
-      designMinHeight={470}
+      designMinHeight={474}
       designHeaderPadding="var(--tpl-e1-sns-slot-dlg-head-pad)"
       designContentPadding="var(--tpl-e1-sns-slot-dlg-body-pad)"
       designFooterPadding="var(--tpl-e1-sns-slot-dlg-foot-pad)"
@@ -336,7 +336,7 @@ export function SnsSlotRemovalDialog({
             <span className={styles.boxAmountSmall}>
               {`−${formatYen(plan.monthlyDecreaseYen)} / 月（税込）`}
             </span>
-            <span className={styles.boxDetail}>
+            <span className={styles.boxDetailWide}>
               {`${nextBillingLabel}から1枠あたり${formatYen(SNS_SLOT_UNIT_YEN)}の減額を反映します。今回分の返金はありません。`}
             </span>
           </div>
