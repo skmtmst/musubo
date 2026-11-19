@@ -104,11 +104,6 @@ test('HQT-01 HQT-02 HQT-07 HQT-16: 同名を守り停止で配る、支払い未
  const detail=await call<Detail>(`/${id}`);expect((await call(`/${id}`,'PATCH',{name:'新版',definition:defs.booking_menu,expectedRevision:detail.body.data.template.revision-1})).status).toBe(409);
  expect((await call(`/${id}`,'DELETE',{expectedRevision:detail.body.data.template.revision})).status).toBe(200);expect(f.raw.prepare('SELECT hq_template_id FROM menus WHERE id=?').get(made.id)).toEqual({hq_template_id:null});
 });
-test('HQT-03 HQT-14: 予約を使わない店は配らない、代理も配れない',async()=>{
- const id=await create('booking_menu');f.raw.exec("INSERT INTO account_styles(line_account_id,style,updated_at) VALUES('a','ec',datetime('now'))");const p=await check(id);expect((p.stores[0] as any).warnings).toContain('booking_not_used');expect((await run(id,p)).body.data.status).toBe('failed');expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
- const im=new Hono<Env>();im.use('*',async(c,next)=>{c.set('staff',staff);c.set('impersonation',{id:'im',tenantId:'t',mode:'write',piiRevealed:true,startedAt:'2026-10-16'});await next();});im.route('/',hqTemplates);const r=await im.request(`/api/hq/templates/${id}/preflight`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountIds:['a']})},{DB:f.db} as Env['Bindings']);expect(r.status).toBe(403);
-});
-
 test('HQT-09: 配られたクーポン景品はコードがなければ公開できない',async()=>{
  const id=await create('mileage_reward');expect((await run(id,await check(id))).body.data.status).toBe('completed');
  const row=f.raw.prepare('SELECT id,status FROM mileage_rewards').get() as {id:string;status:string};expect(row.status).toBe('draft');
@@ -165,4 +160,9 @@ test('HQT-18: 予約メニューの確認は29分後でも有効',async()=>{
 test('HQT-18: 予約メニューの確認は30分後に期限切れ',async()=>{
  const id=await create('booking_menu'),p=await check(id);vi.setSystemTime(new Date('2026-11-16T00:30:00Z'));
  const r=await run(id,p);expect(r.body.data.stores[0].status).toBe('version_conflict');expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
+});
+
+test('HQT-03 HQT-14: 予約を使わない店は配らない、代理も配れない',async()=>{
+ const id=await create('booking_menu');f.raw.exec("INSERT INTO account_styles(line_account_id,style,updated_at) VALUES('a','ec',datetime('now'))");const p=await check(id);expect((p.stores[0] as any).warnings).toContain('booking_not_used');expect((await run(id,p)).body.data.status).toBe('failed');expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
+ const im=new Hono<Env>();im.use('*',async(c,next)=>{c.set('staff',staff);c.set('impersonation',{id:'im',tenantId:'t',mode:'write',piiRevealed:true,startedAt:'2026-10-16'});await next();});im.route('/',hqTemplates);const r=await im.request(`/api/hq/templates/${id}/preflight`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountIds:['a']})},{DB:f.db} as Env['Bindings']);expect(r.status).toBe(403);
 });
