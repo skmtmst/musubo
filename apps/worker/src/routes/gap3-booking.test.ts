@@ -244,3 +244,11 @@ test('G4-21: 指定した担当に当日の予約がなければ空の一覧を�
  const other=await gapCall(app(),'/api/booking/admin/today?account_id=a&staff_id=bs2');expect((await other.json() as any).bookings.map((b:any)=>b.id)).toEqual([rows[1].id]);
  const r=await gapCall(app(),'/api/booking/admin/today?account_id=a&staff_id=bs');expect(r.status).toBe(200);expect((await r.json() as any).bookings).toEqual([]);
 });
+
+test('B5-01: 人数上限1のメニューでは2人の予約を作れない',async()=>{
+ d.raw.prepare("UPDATE menus SET max_party_size=1 WHERE id='menu'").run();
+ const response=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input);
+ expect(response.status).toBe(400);
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM bookings').get()).toEqual({n:0});
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_groups').get()).toEqual({n:0});
+});
