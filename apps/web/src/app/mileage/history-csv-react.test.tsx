@@ -33,6 +33,8 @@ const result = (name: string) => ({
 let blob: NodeBlob | undefined
 let download: ReturnType<typeof vi.spyOn>
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-18T03:00:00Z'))
   window.history.replaceState(null, '', '/mileage')
   window.dispatchEvent(new Event('popstate'))
   mocks.account = 'A'
@@ -43,7 +45,7 @@ beforeEach(() => {
   vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
   download = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
 })
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
 const ready = () => waitFor(() => expect(screen.getByRole('button', { name: 'CSVで書き出す' }).hasAttribute('disabled')).toBe(false))
 
 test('絞り込み前後の件数が同じでも、表示中の新しい履歴を書き出す', async () => {
@@ -97,6 +99,7 @@ test('逆転した期間では取得せず、実際の暦で直して種類・�
   mocks.history.mockResolvedValue(result('条件に合う会員'))
   render(<Screen />)
   await screen.findByText('日付の条件を確認してください')
+  expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()
   expect(mocks.history).not.toHaveBeenCalled()
   fireEvent.click(screen.getByLabelText('よく使う絞り込み'))
   fireEvent.click(await screen.findByRole('button', { name: '日付・種類・状態を指定' }))
