@@ -37,7 +37,11 @@ async function eligible(db:D1Database,id:string,now:Date):Promise<Row|null>{
 export async function processLiveAutoLine(db:D1Database,now:Date,transmit:Transmit):Promise<{processed:number}>{
  // Recover only confirmed accepts; uncertain and interrupted claims remain held.
  await db.prepare("UPDATE ec_auto_line_cap_reservations SET state='accepted' WHERE mode='live' AND state IN('reserved','started','unknown') AND live_intent_id IN (SELECT id FROM ec_auto_line_live_intents WHERE state='sent')").run();
- const pending=(await db.prepare("SELECT id FROM ec_auto_line_live_intents WHERE state='sending' ORDER BY updated_at LIMIT 100").all<{id:string}>()).results;
+ await db.prepare(`UPDATE ec_auto_line_cap_reservations SET state='released',release_actor='system',release_reason='unclaimed_reservation_expired',released_at=?
+  WHERE id IN (SELECT c.id FROM ec_auto_line_cap_reservations c JOIN ec_auto_line_live_intents i ON i.id=c.live_intent_id
+   WHERE c.mode='live' AND c.state='reserved' AND julianday(c.reserved_at)<=julianday(?,'-5 minutes') AND i.state IN('scheduled','failed')
+   AND NOT EXISTS(SELECT 1 FROM outbound_send_requests o WHERE o.resource_id='ec-live:'||i.id) LIMIT 100) AND state='reserved'`).bind(now.toISOString(),now.toISOString()).run();
+ const pending=(await db.prepare("SELECT i.id FROM ec_auto_line_live_intents i WHERE i.state='sending' AND EXISTS(SELECT 1 FROM outbound_send_requests o WHERE o.resource_id='ec-live:'||i.id AND o.status='succeeded') ORDER BY i.updated_at LIMIT 100").all<{id:string}>()).results;
  for(const item of pending)if(await reconcileLiveIntent(db,item.id,now))await db.prepare("UPDATE ec_auto_line_cap_reservations SET state='accepted' WHERE mode='live' AND live_intent_id=? AND state IN('reserved','started','unknown')").bind(item.id).run();
  await db.prepare("UPDATE ec_auto_line_live_intents SET state='failed',updated_at=? WHERE id IN (SELECT id FROM ec_auto_line_live_intents WHERE state='scheduled' AND julianday(due_at)<=julianday(?,'-3 hours') ORDER BY due_at,id LIMIT 100) AND state='scheduled'").bind(now.toISOString(),now.toISOString()).run();
  const rows=(await db.prepare(`SELECT i.id FROM ec_auto_line_live_intents i
@@ -61,7 +65,8 @@ export async function processLiveAutoLine(db:D1Database,now:Date,transmit:Transm
   const reservation=crypto.randomUUID();
   if((await prepareAutoLineLiveCap(db,row.account_id,row.id,now,reservation).run()).meta.changes!==1)continue;
   const intent:LiveIntent={id:row.id,accountId:row.account_id,kind:row.kind,occurrenceKey:row.occurrence_key,friendId:row.friend_id,productId:row.product_id,dueAt:row.due_at,payload:row.payload_json};
-  const state=await sendLiveIntent(db,intent,async retryKey=>{
+  let state:Awaited<ReturnType<typeof sendLiveIntent>>;
+  try{state=await sendLiveIntent(db,intent,async retryKey=>{
    const fresh=await eligible(db,row.id,new Date());
    if(!fresh||fresh.line_user_id!==row.line_user_id||fresh.payload_json!==row.payload_json)throw new NotificationDeliveryBlocked('ec_delivery_changed');
    const started=await db.prepare("UPDATE ec_auto_line_cap_reservations SET state='started' WHERE id=? AND mode='live' AND state='reserved' AND live_intent_id=?").bind(reservation,row.id).run();
@@ -69,7 +74,8 @@ export async function processLiveAutoLine(db:D1Database,now:Date,transmit:Transm
    const last=await eligible(db,row.id,new Date());
    if(!last||last.line_user_id!==row.line_user_id||last.payload_json!==row.payload_json)throw new NotificationDeliveryBlocked('ec_delivery_changed');
    await transmit({intentId:row.id,accountId:row.account_id,friendId:row.friend_id,to:row.line_user_id,messages,retryKey});
-  },now);
+  },now);}catch{console.error('ec_live_intent_completion_failed');continue;}
+  if(state==='unclaimed')await db.prepare("UPDATE ec_auto_line_cap_reservations SET state='released',release_actor='system',release_reason='intent_not_claimed',released_at=? WHERE id=? AND state='reserved' AND EXISTS(SELECT 1 FROM ec_auto_line_live_intents WHERE id=? AND state IN('scheduled','failed')) AND NOT EXISTS(SELECT 1 FROM outbound_send_requests WHERE resource_id=?)").bind(now.toISOString(),reservation,row.id,`ec-live:${row.id}`).run();
   if(state==='sent')await db.prepare("UPDATE ec_auto_line_cap_reservations SET state='accepted' WHERE id=? AND state='started'").bind(reservation).run();
   else if(state==='unknown')await db.prepare("UPDATE ec_auto_line_cap_reservations SET state='unknown' WHERE id=? AND state IN('reserved','started')").bind(reservation).run();
   else if(state==='failed')await db.prepare(`UPDATE ec_auto_line_cap_reservations SET state='released',release_actor='system',release_reason='delivery_failed_before_acceptance',released_at=?

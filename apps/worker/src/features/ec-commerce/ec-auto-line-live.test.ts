@@ -2,13 +2,14 @@ import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {gapFixture} from '../../test-utils/gap1.js';
 import {NotificationDeliveryBlocked} from '../../services/recorded-notification-send.js';
 import {processLiveAutoLine,processStagingAutoLine} from './ec-auto-line-live.js';
+import {prepareLiveEventPlan} from './ec-auto-line-live-plan.js';
 const fakeProxy=vi.hoisted(()=>vi.fn(async (_request:Request)=>new Response('',{status:200,headers:{'x-line-request-id':'fake'}})));
 vi.mock('../../services/local-line-proxy.js',()=>({dispatchLineProxyLocally:fakeProxy}));
 vi.mock('../../services/feature-enforcement.js',()=>({featureJobCanRun:vi.fn(async()=>true)}));
 let f:ReturnType<typeof gapFixture>;
 const now=new Date('2026-10-16T03:00:00Z');
 const send=vi.fn(async()=>{});
-beforeEach(()=>{
+beforeEach(async()=>{
  f=gapFixture();fakeProxy.mockClear();vi.useFakeTimers();vi.setSystemTime(now);send.mockReset().mockResolvedValue(undefined);
  f.raw.exec(`INSERT INTO ec_connectors(id,line_account_id,provider,shop_domain,status,created_at,updated_at) VALUES('ec','a','ec_cube','example.test','connected','now','now');
  INSERT INTO users(id,tenant_id) VALUES('u','t');
@@ -19,6 +20,7 @@ beforeEach(()=>{
  INSERT INTO account_settings(id,line_account_id,key,value) VALUES('test','a','test_recipients','["f"]');
  INSERT INTO ec_auto_line_rules(account_id,kind,enabled,wait_minutes,messages_json) VALUES('a','cart',1,60,'[{"type":"text","text":"お知らせ"}]');
  INSERT INTO ec_behavior_events(id,account_id,friend_id,type,product_id,product_snapshot_json,occurred_at,received_at,dedupe_key) VALUES('event','a','f','cart_add','p','{}','2026-10-16T01:00:00Z','2026-10-16T01:00:00Z','event');`);
+ await f.db.batch(prepareLiveEventPlan(f.db,'event'));
 });
 afterEach(()=>{vi.useRealTimers();f.raw.close();});
 const state=()=>f.raw.prepare('SELECT state FROM ec_auto_line_live_intents').get();
@@ -59,6 +61,7 @@ it.each(['browse','restock'] as const)('%s の予定も検証先に一度だけ�
  else f.raw.exec(`INSERT INTO ec_behavior_events(id,account_id,friend_id,type,product_id,product_snapshot_json,occurred_at,received_at,dedupe_key) VALUES
  ('sub','a','f','restock_subscribe','p','{}','2026-10-16T01:00:00Z','2026-10-16T01:00:00Z','sub'),
  ('stock','a',NULL,'restock','p','{"stock":1}','2026-10-16T02:00:00Z','2026-10-16T02:00:00Z','stock')`);
+ await f.db.batch(prepareLiveEventPlan(f.db,kind==='browse'?'v2':'stock'));
  await processLiveAutoLine(f.db,now,send);await processLiveAutoLine(f.db,now,send);
  expect(send).toHaveBeenCalledTimes(1);expect(state()).toEqual({state:'sent'});
 });
@@ -116,7 +119,7 @@ it('検証設定が有効なら模擬プロキシへ送り、LINE の再試行�
 });
 it('受理後の保存が失敗しても次回に台帳から復旧し、再送しない',async()=>{
  f.raw.exec("CREATE TRIGGER fail_intent_complete BEFORE UPDATE ON ec_auto_line_live_intents WHEN NEW.state='sent' BEGIN SELECT RAISE(ABORT,'failed'); END");
- await expect(processLiveAutoLine(f.db,now,send)).rejects.toThrow();
+ await expect(processLiveAutoLine(f.db,now,send)).resolves.toEqual({processed:0});
  expect(send).toHaveBeenCalledTimes(1);expect(state()).toEqual({state:'sending'});
  f.raw.exec('DROP TRIGGER fail_intent_complete');
  await processLiveAutoLine(f.db,now,send);
@@ -126,6 +129,7 @@ it('受理後の保存が失敗しても次回に台帳から復旧し、再送�
 it('同じ人の複数の商品も1日の上限を共有する',async()=>{
  f.raw.exec(`INSERT INTO ec_auto_line_product_identities(tenant_id,account_id,product_id,canonical_product_id,evidence_ref,verified_at) VALUES('t','a','other-product','other-product','catalog','2026-10-01');
  INSERT INTO ec_behavior_events(id,account_id,friend_id,type,product_id,product_snapshot_json,occurred_at,received_at,dedupe_key) VALUES('event2','a','f','cart_add','other-product','{}','2026-10-16T01:01:00Z','2026-10-16T01:01:00Z','event2')`);
+ await f.db.batch(prepareLiveEventPlan(f.db,'event2'));
  await processLiveAutoLine(f.db,now,send);await processLiveAutoLine(f.db,now,send);
  expect(send).toHaveBeenCalledTimes(1);
  expect(f.raw.prepare("SELECT count(*) n FROM ec_auto_line_cap_reservations WHERE mode='live' AND state='accepted'").get()).toEqual({n:1});
@@ -137,4 +141,14 @@ it('最後の機能停止確認で止まったら検証送信しない',async()=
  const env={DB:f.db,DEPLOY_ENV:'staging',EC_AUTO_LINE_LIVE_SEND_ENABLED:'true',WORKER_PUBLIC_URL:'https://worker.invalid'} as never;
  await processStagingAutoLine(env,now);
  expect(fakeProxy).not.toHaveBeenCalled();expect(state()).toEqual({state:'failed'});
+});
+
+it('送信前に残った古い上限枠を解放し、予定を再処理できる',async()=>{
+ const {prepareAutoLineLiveCap}=await import('./ec-auto-line-live-cap.js');
+ const item=f.raw.prepare('SELECT id FROM ec_auto_line_live_intents').get() as {id:string};
+ const old=new Date(now.getTime()-6*60000);
+ expect((await prepareAutoLineLiveCap(f.db,'a',item.id,old,'orphan').run()).meta.changes).toBe(1);
+ await processLiveAutoLine(f.db,now,send);
+ expect(send).toHaveBeenCalledTimes(1);expect(state()).toEqual({state:'sent'});
+ expect(f.raw.prepare("SELECT state,release_reason FROM ec_auto_line_cap_reservations WHERE id='orphan'").get()).toEqual({state:'released',release_reason:'unclaimed_reservation_expired'});
 });

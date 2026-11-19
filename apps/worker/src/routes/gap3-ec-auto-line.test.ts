@@ -163,3 +163,23 @@ test('本人や商品同一性の根拠が欠ければ模擬処理も保留し�
  expect(d.raw.prepare('SELECT candidate_id,mode,state FROM ec_auto_line_cap_reservations').all()).toEqual([{candidate_id:'send-e',mode:'simulation',state:'accepted'}]);
  expect(fetch).not.toHaveBeenCalled();
 });
+test('ISO以外の有効な日時も正規化して保存し同じイベントを再送しても重複させない',async()=>{
+ d.raw.exec("INSERT INTO ec_identity_links(id,tenant_id,candidate_id,source_key,shop_key,external_customer_id,line_account_id,friend_id,linked_at) VALUES('link','t','approved-candidate','ec_cube','example.test','customer','a','f','2026-10-16')");
+ await enable();
+ const event={eventId:'offset',customerId:'customer',productId:'p',type:'cart_add',occurredAt:'2026-10-16T10:00:00+0900',trackingConsent:true};
+ await ingestBehavior(d.db,'a',event,at,true);await ingestBehavior(d.db,'a',event,at,true);
+ expect(d.raw.prepare("SELECT occurred_at FROM ec_behavior_events WHERE dedupe_key='offset'").get()).toEqual({occurred_at:'2026-10-16T01:00:00.000Z'});
+ expect(d.raw.prepare('SELECT count(*) n FROM ec_auto_line_live_intents').get()).toEqual({n:1});
+});
+test('実送信が既定オフなら行動だけ記録し、明示オンのときに予定も原子的に記録する',async()=>{
+ d.raw.exec("INSERT INTO ec_identity_links(id,tenant_id,candidate_id,source_key,shop_key,external_customer_id,line_account_id,friend_id,linked_at) VALUES('link','t','approved-candidate','ec_cube','example.test','customer','a','f','2026-10-16')");
+ await enable();
+ const event={eventId:'off',customerId:'customer',productId:'p',type:'cart_add',occurredAt:'2026-10-16T01:00:00Z',trackingConsent:true};
+ await ingestBehavior(d.db,'a',event,at);
+ expect(d.raw.prepare('SELECT count(*) n FROM ec_auto_line_live_intents').get()).toEqual({n:0});
+ await ingestBehavior(d.db,'a',{...event,eventId:'on'},at,true);
+ expect(d.raw.prepare('SELECT count(*) n FROM ec_auto_line_live_intents').get()).toEqual({n:1});
+ d.raw.exec("CREATE TRIGGER fail_live_plan BEFORE INSERT ON ec_auto_line_live_intents BEGIN SELECT RAISE(ABORT,'test'); END");
+ await expect(ingestBehavior(d.db,'a',{...event,eventId:'rollback'},at,true)).rejects.toThrow();
+ expect(d.raw.prepare("SELECT id FROM ec_behavior_events WHERE dedupe_key='rollback'").get()).toBeUndefined();
+});

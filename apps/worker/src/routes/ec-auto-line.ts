@@ -22,7 +22,7 @@ ecAutoLine.post('/api/ec/events',async c=>{
  if(!(await verifyNenWebhook({...signed,secret,rawBody:raw})).ok)throw new GapError('invalid_signature',401);
  const connector=await c.env.DB.prepare("SELECT e.id FROM ec_connectors e JOIN line_accounts a ON a.id=e.line_account_id JOIN tenants t ON t.id=a.tenant_id WHERE e.line_account_id=? AND t.status='active' AND e.status='connected' AND a.is_active=1 AND a.archived_at IS NULL").bind(a).first();if(!connector)throw new GapError('connector_unavailable',409);
  const count=await c.env.DB.prepare("SELECT count(*) n FROM ec_behavior_events WHERE account_id=? AND julianday(received_at)>=julianday(?,'-1 minute')").bind(a,new Date().toISOString()).first<{n:number}>();if((count?.n??0)>=600)return c.json({success:false,error:'rate_limited'},429);
- let body;try{body=JSON.parse(raw);}catch{throw new GapError('invalid_body');}return c.json({success:true,data:await ingestBehavior(c.env.DB,a,body)},202);
+ let body;try{body=JSON.parse(raw);}catch{throw new GapError('invalid_body');}return c.json({success:true,data:await ingestBehavior(c.env.DB,a,body,new Date(),c.env.DEPLOY_ENV==='staging'&&c.env.EC_AUTO_LINE_LIVE_SEND_ENABLED==='true')},202);
 });
 ecAutoLine.get('/api/ec/auto-line/rules',async c=>{const a=await gapAccount(c);return c.json({success:true,data:await autoLineRules(c.env.DB,a)});});
 for(const method of ['PUT','POST']as const)ecAutoLine.on(method,method==='PUT'?'/api/ec/auto-line/rules/:kind':'/api/ec/auto-line/rules/:kind/enable',async c=>{
