@@ -1,4 +1,4 @@
-/* SNS 連携 複数接続 第1段の料金・解除の窓（承認 v8 の F3 q9hcp9・F4 uB88I・F5 R4dYE・F6 JvuLH）。寸法は globals.css の --tpl-e1-sns-slot-* と --text-* だけを使う。 */
+/* SNS 連携 複数接続 第1段の料金・解除の窓（承認 v10 の F3 q9hcp9・F4 uB88I・F5 R4dYE・F6 JvuLH）。寸法は globals.css の --tpl-e1-sns-slot-* と --text-* だけを使う。 */
 
 .body {
   display: flex;
@@ -26,9 +26,12 @@
   min-width: 0;
 }
 
-/* 枠線だけの箱（F3「今回の追加分」・F4「今回のお支払い」・F6「次回の月次請求から」）。 */
+/* 枠線だけの箱（F3「今回の追加分」・F4「今回のお支払い」・F6「次回の月次請求から」）。
+   絵は枠線を箱の内側に描く（F3 upNsY は高さ70で最初の字が上から16px）。CSS の border は箱の外へ足されるので、
+   内側の余白から線の1pxを引いて、字の位置と箱の高さを絵と同じにする。 */
 .boxOutlined {
   composes: box;
+  padding: calc(var(--tpl-e1-sns-slot-box-pad) - 1px);
   border: 1px solid var(--color-hairline);
   background: none;
 }
@@ -63,11 +66,17 @@
   line-height: var(--tpl-e1-sns-slot-strong-lh);
 }
 
-/* 箱の中の細かい内訳。折り返す。 */
+/* 箱の中の細かい内訳（F3 S0v05K・F5 M1tZJ は1行ぶんの高さ）。 */
 .boxDetail {
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   line-height: var(--tpl-e1-sns-slot-detail-lh);
+}
+
+/* 同じ内訳のうち、絵が広い行間で折り返す所（F6 MBqTQ）。 */
+.boxDetailWide {
+  composes: boxDetail;
+  line-height: var(--tpl-e1-sns-slot-detail-wrap-lh);
 }
 
 /* 箱の外の合計行（label ……… 金額）。 */
@@ -122,4 +131,20 @@
   line-height: var(--tpl-e1-sns-slot-value-lh);
   text-align: right;
   min-width: 0;
+}
+
+/* ★この4つの窓（本文に .body の印が付いた窓）だけ、共通の Dialog の段を絵に合わせる。窓の枠・×・題・操作の段は共通部品のまま。
+   共通の本文は子の間隔12pxと下端の逃げ8pxを持つ（子のボタンの輪・影がスクロール窓の下端に触れないため）。
+   ここの本文は段を自前の間隔16pxで並べ、ボタンは下の操作の段に置くので、その20pxを外して絵の高さにそろえる。
+   ボタンの字は絵が 13/600 だが、共通ボタンの持ち主が「主と白い副は 14/600・高さは変えない」と決めているので字はそのままにし、
+   絵と同じ左右の余白（14px）だけ足す。高さ36・角丸・影・地色は共通部品のまま絵と同じ。
+   値は globals.css の [data-theme="v8"] の --tpl-e1-sns-slot-*。 */
+:global(:root [data-design-part='dialog']):has(.body) > :global(div:nth-child(2)) {
+  gap: var(--polish-space-none);
+}
+:global(:root [data-design-part='dialog']):has(.body) > :global(div:nth-child(2))::after {
+  display: none;
+}
+:global(:root [data-design-part='dialog']):has(.body) > :global(div:nth-child(3)) :global(button) {
+  padding-inline: var(--tpl-e1-sns-slot-btn-pad-x);
 }

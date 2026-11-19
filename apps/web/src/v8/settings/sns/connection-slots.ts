@@ -22,6 +22,8 @@ import {
   linkedAccountSlots,
   prorateMonthlyIncrement,
   type InstagramConnectionStatus,
+  type SnsConnectionPorts,
+  type SnsGoogleConnectionPort,
   type SnsSlotBilling as SharedSnsSlotBilling,
 } from '@line-crm/shared'
 import type { GoogleConnectionData } from '@/lib/restaurant-google-api'
@@ -86,6 +88,28 @@ export type SnsSlotBilling = SharedSnsSlotBilling
  * 少なく見せて料金の確認を飛ばすことがない側へ寄せた既定。
  */
 export const SNS_DEFAULT_CONTRACTED = 1
+
+/**
+ * `GET /api/settings/sns/connections` の返事が、この画面が読める形かどうかを確かめる。
+ *
+ * サーバーや疑似APIは、知らない道でも `success: true` のまま別の形の中身を返すことがある。
+ * 形を見ずに受け取ると主連携を探すところで画面全体が止まるので、
+ * 必要な項目がそろっていないときは「取れなかった」のと同じ扱いにして、
+ * 既定（契約枠1・請求の段なし）へ戻す。
+ */
+export function asConnectionPorts(data: unknown): SnsConnectionPorts | null {
+  if (!data || typeof data !== 'object') return null
+  const ports = data as Partial<SnsConnectionPorts>
+  if (typeof ports.contracted !== 'number' || typeof ports.primaryVersion !== 'number') return null
+  if (!Array.isArray(ports.googleConnections)) return null
+  const connectionsReadable = ports.googleConnections.every((connection) => {
+    if (!connection || typeof connection !== 'object') return false
+    const port = connection as Partial<SnsGoogleConnectionPort>
+    return typeof port.id === 'string' && typeof port.isPrimary === 'boolean'
+  })
+  if (!connectionsReadable) return null
+  return data as SnsConnectionPorts
+}
 
 /* ------------------------------------------------------------------ 枠の数え方 */
 

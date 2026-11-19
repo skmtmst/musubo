@@ -615,6 +615,19 @@ describe('Instagram の返事の形が違うとき', () => {
   })
 })
 
+describe('契約枠・主連携・請求の口の返事の形が違うとき', () => {
+  it('成功でも別の形の中身なら画面を止めず、既定（契約枠1）で出す', async () => {
+    fixture.googleConnection.mockResolvedValue(googleData())
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('connected', CONNECTED) })
+    /* 口を持たないサーバーが一覧の形で返す場合。主連携を探すところで画面を止めない。 */
+    fixture.snsPorts.mockResolvedValue({ success: true, data: { items: [], total: 0, page: 1, limit: 20 } })
+    render(<SnsSettingsPage />)
+
+    expect(await igCard().findByText('連携 1個（契約枠 1個）')).toBeTruthy()
+    expect(screen.queryByText(/連携の状態を読み取れませんでした/)).toBeNull()
+  })
+})
+
 describe('Instagram のログインから戻ったときの帯', () => {
   it('うまくいったことを知らせ、閉じると印を消す', async () => {
     fixture.search.value = 'instagram=connected'

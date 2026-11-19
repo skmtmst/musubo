@@ -28,6 +28,7 @@ import { isSaveConflict } from '@/components/shared/save-conflict'
 import SnsConnectionList from './connection-list'
 import { GoogleMark, InstagramMark } from './brand-marks'
 import {
+  asConnectionPorts,
   googleSlots,
   instagramSlots,
   planAddition,
@@ -169,10 +170,11 @@ export default function SnsSettingsPage() {
         .catch((caught) => { if (version === loadVersion.current) { setInstagram(null); setInstagramError(caught) } }),
       // 契約枠・主連携・請求の段。契約枠の記録が無い LINEアカウントでは 404 が返るのが正しいので、
       // 取れないことを失敗として出さず、今までの既定（契約枠1・billing-unknown）へ戻す。
+      // 返事が成功でも中身の形が違うことがあるので、読める形かを確かめてから受け取る。
       api.snsConnections.get(accountId)
         .then((res) => {
           if (version !== loadVersion.current) return
-          setPorts(res.success && res.data ? res.data : null)
+          setPorts(res.success ? asConnectionPorts(res.data) : null)
         })
         .catch(() => { if (version === loadVersion.current) setPorts(null) }),
     ])
