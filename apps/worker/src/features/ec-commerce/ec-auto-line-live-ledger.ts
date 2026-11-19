@@ -1,3 +1,4 @@
+import { createBroadcastRetryKey } from '../broadcasts/broadcast-retry-key/index.js';
 import { NotificationDeliveryIncomplete, sendRecordedNotification } from '../../services/recorded-notification-send.js';
 
 export type LiveIntent = {
@@ -34,10 +35,13 @@ export async function sendLiveIntent(db: D1Database, intent: LiveIntent, send: (
 
 /** Restore only a confirmed acceptance; an unfinished request is never resent automatically. */
 export async function reconcileLiveIntent(db: D1Database, id: string, now = new Date()): Promise<boolean> {
+ const intent = await db.prepare("SELECT friend_id FROM ec_auto_line_live_intents WHERE id=? AND state='sending'").bind(id).first<{friend_id:string}>();
+ if (!intent) return false;
+ const key = await createBroadcastRetryKey('notification',`ec-live:${id}`,'line',intent.friend_id);
  const result = await db.prepare(`UPDATE ec_auto_line_live_intents SET state='sent',updated_at=?
-  WHERE id=? AND state='sending' AND EXISTS (
-   SELECT 1 FROM outbound_send_requests o WHERE o.resource_id='ec-live:'||ec_auto_line_live_intents.id
+  WHERE id=? AND friend_id=? AND state='sending' AND EXISTS (
+   SELECT 1 FROM outbound_send_requests o WHERE o.idempotency_key=? AND o.resource_id='ec-live:'||ec_auto_line_live_intents.id
     AND o.channel='line' AND o.line_account_id=ec_auto_line_live_intents.account_id AND o.status='succeeded'
-  )`).bind(now.toISOString(),id).run();
+  )`).bind(now.toISOString(),id,intent.friend_id,key).run();
  return result.meta.changes === 1;
 }
