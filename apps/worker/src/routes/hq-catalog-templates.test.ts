@@ -147,6 +147,12 @@ test('HQT-12: 閲覧のみはひな形を読めるが保存と配布を開始で
  expect((await run(id,p)).status).toBe(403);expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
 });
 
+test.each(['booking_menu','mileage_reward'] as const)('HQT-18: %s の期限切れは編集競合と区別する',async type=>{
+ const id=await create(type),p=await check(id);
+ f.raw.prepare("UPDATE hq_template_preflights SET expires_at=? WHERE idempotency_fingerprint=?").run('2026-11-15T23:59:59Z',p.preflightId);
+ const r=await run(id,p);expect(r.body.data.stores[0]).toMatchObject({status:'version_conflict',reason:'確かめの期限が切れました。もう一度確かめてください'});
+});
+
 test('HQT-03: EC専用店を除き予約を使う店だけへ配る',async()=>{
  const id=await create('booking_menu');f.raw.exec("INSERT INTO account_styles(line_account_id,style,updated_at) VALUES('a','ec',datetime('now'))");
  const p=await check(id,['a','b']);expect((p.stores.find(s=>s.accountId==='a') as any).warnings).toContain('booking_not_used');
@@ -159,10 +165,4 @@ test('HQT-18: 予約メニューの確認は29分後でも有効',async()=>{
 test('HQT-18: 予約メニューの確認は30分後に期限切れ',async()=>{
  const id=await create('booking_menu'),p=await check(id);vi.setSystemTime(new Date('2026-11-16T00:30:00Z'));
  const r=await run(id,p);expect(r.body.data.stores[0].status).toBe('version_conflict');expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
-});
-
-test.each(['booking_menu','mileage_reward'] as const)('HQT-18: %s の期限切れは編集競合と区別する',async type=>{
- const id=await create(type),p=await check(id);
- f.raw.prepare("UPDATE hq_template_preflights SET expires_at=? WHERE idempotency_fingerprint=?").run('2026-11-15T23:59:59Z',p.preflightId);
- const r=await run(id,p);expect(r.body.data.stores[0]).toMatchObject({status:'version_conflict',reason:'確かめの期限が切れました。もう一度確かめてください'});
 });
