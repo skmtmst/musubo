@@ -2926,6 +2926,21 @@ CREATE TABLE ec_auto_line_cap_reservations (
       OR (state != 'released' AND release_actor IS NULL AND release_reason IS NULL AND released_at IS NULL))
 );
 
+CREATE TABLE ec_auto_line_live_intents (
+ id TEXT PRIMARY KEY,
+ account_id TEXT NOT NULL REFERENCES line_accounts(id),
+ kind TEXT NOT NULL CHECK(kind IN ('cart','browse','restock')),
+ occurrence_key TEXT NOT NULL,
+ friend_id TEXT NOT NULL REFERENCES friends(id),
+ product_id TEXT NOT NULL,
+ due_at TEXT NOT NULL,
+ payload_json TEXT NOT NULL CHECK(json_valid(payload_json)),
+ state TEXT NOT NULL DEFAULT 'scheduled' CHECK(state IN ('scheduled','sending','sent','failed','unknown')),
+ created_at TEXT NOT NULL,
+ updated_at TEXT NOT NULL,
+ UNIQUE(account_id,kind,occurrence_key,friend_id)
+);
+
 CREATE TABLE ec_auto_line_product_identities (
   tenant_id TEXT NOT NULL REFERENCES tenants(id),
   account_id TEXT NOT NULL REFERENCES line_accounts(id),
@@ -3075,6 +3090,15 @@ CREATE TABLE ec_orders (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE (line_account_id, source_key, external_order_id)
+);
+
+CREATE TABLE ec_restock_occurrences (
+ id TEXT PRIMARY KEY,
+ account_id TEXT NOT NULL REFERENCES line_accounts(id),
+ product_id TEXT NOT NULL,
+ source_event_id TEXT NOT NULL,
+ occurred_at TEXT NOT NULL,
+ UNIQUE(account_id,source_event_id)
 );
 
 CREATE TABLE ec_v6_dispatches (
@@ -9828,6 +9852,8 @@ CREATE UNIQUE INDEX ec_auto_line_cap_one_per_day
 
 CREATE INDEX ec_auto_line_cap_rolling
   ON ec_auto_line_cap_reservations(tenant_id, user_id, mode, reserved_at, canonical_product_id) WHERE state != 'released';
+
+CREATE INDEX ec_auto_line_live_intents_due ON ec_auto_line_live_intents(state,due_at);
 
 CREATE INDEX ec_auto_line_sends_caps ON ec_auto_line_sends(account_id,friend_id,sent_at,product_id);
 
