@@ -36,6 +36,7 @@ export const bookingMakeupApi={
  absence:(liffId:string,id:string,token:string,key:string)=>fetchApi<Result<{eventBooking:{id:string;status:'absent'};makeupCredit:MakeupCredit|null;reasonIfNone:string|null}>>(liff(`/api/liff/events/bookings/${e(id)}/absence`,liffId),{...json('POST',{}),headers:bearer(token,key)}),
  list:(liffId:string,token:string)=>fetchApi<Result<MakeupCredit[]>>(liff('/api/liff/events/makeup-credits',liffId),{headers:bearer(token)}),
  listByStore:(a:string,friendId:string)=>fetchApi<Result<MakeupCredit[]>>(account('/api/booking/admin/makeup-credits',a)+`&friend_id=${e(friendId)}`),
+ extend:(a:string,id:string,input:{expiresAt:string;reason:string;expectedVersion:number})=>fetchApi<Result<{id:string;expiresAt:string;version:number}>>(account(`/api/booking/admin/makeup-credits/${e(id)}/operations`,a),json('POST',{operation:'extend',...input})),
  options:(liffId:string,id:string,token:string,from?:string)=>fetchApi<Result<Array<{id:string;event_id:string;starts_at:string;ends_at:string;capacity:number|null;occupied:number}>>>(liff(`/api/liff/events/makeup-credits/${e(id)}/options`,liffId)+(from?`&from=${e(from)}`:''),{headers:bearer(token)}),
  use:(liffId:string,id:string,eventSlotId:string,token:string,key:string)=>fetchApi<Result<{bookingId:string;replayed:boolean}>>(liff(`/api/liff/events/makeup-credits/${e(id)}/use`,liffId),{...json('POST',{eventSlotId}),headers:bearer(token,key)}),
 };
