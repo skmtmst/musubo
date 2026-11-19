@@ -75,6 +75,7 @@ it('HTTP 408 の結果は不明として保留し自動再送しない',async()=
  await processLiveAutoLine(f.db,now,send);await processLiveAutoLine(f.db,now,send);
  expect(send).toHaveBeenCalledTimes(1);expect(state()).toEqual({state:'unknown'});
  expect(f.raw.prepare('SELECT state FROM ec_auto_line_cap_reservations').get()).toEqual({state:'unknown'});
+ expect(f.raw.prepare('SELECT status,retryable FROM outbound_send_requests').get()).toEqual({status:'unknown',retryable:0});
 });
 it('上限枠を確保した後に検証先を外されたら送らない',async()=>{
  const original=f.db.prepare.bind(f.db);let changed=false;

@@ -31,7 +31,11 @@ export async function sendLiveIntent(db: D1Database, intent: LiveIntent, send: (
   if(state==='failed' && error instanceof NotificationDeliveryIncomplete && !error.blockedReason){
    const key=await createBroadcastRetryKey('notification',`ec-live:${intent.id}`,'line',intent.friendId);
    const record=await db.prepare('SELECT failure_code FROM outbound_send_requests WHERE idempotency_key=?').bind(key).first<{failure_code:string|null}>();
-   if(!record || !['LINE_RATE_LIMITED','LINE_REQUEST_REJECTED'].includes(record.failure_code??''))state='unknown';
+   if(!record || !['LINE_RATE_LIMITED','LINE_REQUEST_REJECTED'].includes(record.failure_code??'')){
+    state='unknown';
+    // The shared ledger must not leave an ambiguous request eligible for a retry.
+    await db.prepare("UPDATE outbound_send_requests SET status='unknown',retryable=0,next_retry_at=NULL WHERE idempotency_key=? AND status='failed' AND failure_code='LINE_TEMPORARILY_UNAVAILABLE'").bind(key).run();
+   }
   }
  }
  const saved=await db.prepare("UPDATE ec_auto_line_live_intents SET state=?,updated_at=? WHERE id=? AND state='sending'")
