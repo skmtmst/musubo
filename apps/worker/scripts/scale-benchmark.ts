@@ -262,7 +262,7 @@ const PROBES: Probe[] = [
   { key: 'inbox-counts', label: '受信箱の件数（すべて・要返信）', screen: '受信箱', path: `/api/chats/quick-counts?lineAccountId=${ACCOUNT_ID}&channel=line` },
   { key: 'tags', label: 'タグの一覧（人数つき）', screen: 'タグ', path: `/api/tags?withCounts=1&lineAccountId=${ACCOUNT_ID}`, slow: true },
   { key: 'broadcasts', label: '一斉配信の一覧', screen: '一斉配信', path: `/api/broadcasts?lineAccountId=${ACCOUNT_ID}&limit=20` },
-  { key: 'dashboard', label: 'ダッシュボードの数', screen: 'ダッシュボード', path: `/api/dashboard/overview?period=30d&account_id=${ACCOUNT_ID}` },
+  { key: 'dashboard', label: 'ダッシュボードの数（30日）', screen: 'ダッシュボード', path: `/api/dashboard/overview?period=last30&account_id=${ACCOUNT_ID}` },
 ];
 
 /** 対照用の重い SQL。数秒かかる数え上げで、読んだ行と走査の欄にも対照の跡が出る。 */

@@ -468,6 +468,8 @@
 
 ## 反映履歴
 
+- [本番直前の関門を2つ足す](release-log/unreleased/47-kenta-release-gates.md) — 5万人で3秒の速度の関門と、Next.js 更新時の全幅の崩れの見張りの履歴。確認 2026-11-12。
+
 - [SNS連携で残る3つの口の決まり](release-log/unreleased/120-kenta-sns-multilink-ports.md) — 反映履歴、確認 2026-11-18。
 
 - [自動確認を実際の動きで確認](release-log/unreleased/115-kenta-q02b-b10.md) — 反映履歴、確認 2026-11-18。
