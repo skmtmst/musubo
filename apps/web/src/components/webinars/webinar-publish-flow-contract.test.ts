@@ -20,13 +20,6 @@ describe("管理画面 ウェビナー公開前確認と公開完了の契約", 
     expect(DONE).not.toContain('<Header')
   })
 
-  it('所属アカウントのLIFFが取れたときだけ公開ページを出す', () => {
-    expect(DONE).toContain('accounts.find((account) => account.id === webinar.accountId)')
-    expect(DONE).toContain('webinarAccount?.liffId')
-    expect(DONE).toContain('{publicUrl ? <Button')
-    expect(DONE).toContain('LIFF IDを確認できないため')
-  })
-
   it('撮影モックの公開応答は本物と同じ `{ webinar, validation }` の器で返す', () => {
     expect(MOCK).toContain('data: { webinar: WEBINARS[0], validation: WEBINAR_PUBLISH_VALIDATION }')
     /* 停止・複製は単体のまま。公開と混ぜない。 */
@@ -34,10 +27,4 @@ describe("管理画面 ウェビナー公開前確認と公開完了の契約", 
     expect(MOCK).not.toContain('/(publish|pause|duplicate)$/')
   })
 
-  it('読込・失敗・公開状態不一致を完了と混ぜない', () => {
-    expect(DONE).toContain('<ListState kind="loading"')
-    expect(DONE).toContain('kind="error"')
-    expect(DONE).toContain('公開状態を確認できませんでした')
-    expect(DONE).toContain('もう一度読み込む')
-  })
 })

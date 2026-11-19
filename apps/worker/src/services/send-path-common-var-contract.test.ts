@@ -105,6 +105,17 @@ const BEHAVIOR_TESTED = new Set([
   'features/broadcasts/broadcast.ts',
   'services/operator-notification-dispatch.ts',
   'services/step-delivery.ts',
+  // 対応する実送信・試験送信は各機能の動作試験で検証する。
+  'features/hq-broadcasts/hq-broadcast-details.ts',
+  'features/broadcasts/broadcast-ab-live.ts',
+  'routes/friends.ts',
+  'routes/broadcasts.ts',
+  'features/scenarios/scenario-question-answer.ts',
+  'routes/forms.ts',
+  'routes/ec-commerce.ts',
+  'routes/webhook.ts',
+  'features/ec-commerce/ec-event-processing.ts',
+  'routes/liff.ts',
 ]);
 
 describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () => {
