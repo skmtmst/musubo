@@ -54,9 +54,15 @@ describe('local workerd D1 binding', () => {
     expect(remove).toHaveBeenCalledExactlyOnceWith([`private/${fileId}`]);
   }, 30_000);
   it('executes the full friend relation graph with D1 numbered bindings', async () => {
+    await native.batch([
+      native.prepare("INSERT INTO ec_auto_line_live_intents(id,account_id,kind,occurrence_key,friend_id,product_id,due_at,payload_json,created_at,updated_at) VALUES(?, 'account','cart','event',?,'product','2026-11-19T00:00:00Z','[]','now','now')").bind(`intent-${friendId}`,friendId),
+      native.prepare("INSERT INTO ec_auto_line_live_intents(id,account_id,kind,occurrence_key,friend_id,product_id,due_at,payload_json,created_at,updated_at) VALUES('intent-other','account','cart','event','other','product','2026-11-19T00:00:00Z','[]','now','now')"),
+    ]);
     expect(await deleteCustomerData(env(), target('friend_data'), 'owner')).toMatchObject({ deleted: true });
     expect(await native.prepare('SELECT id FROM friends WHERE id=?').bind(friendId).first()).toBeNull();
     expect(await native.prepare("SELECT id FROM friends WHERE id='other'").first()).toBeTruthy();
+    expect(await native.prepare('SELECT id FROM ec_auto_line_live_intents WHERE id=?').bind(`intent-${friendId}`).first()).toBeNull();
+    expect(await native.prepare("SELECT id FROM ec_auto_line_live_intents WHERE id='intent-other'").first()).toBeTruthy();
     expect(await native.prepare('SELECT id FROM form_submission_files WHERE id=?').bind(fileId).first()).toBeNull();
     expect(remove).toHaveBeenCalledExactlyOnceWith([`private/${fileId}`]);
   }, 30_000);
