@@ -4,7 +4,6 @@ import {useSqliteClock} from '../test-utils/sqlite-clock.js';
 import {bookingPassNotices} from './booking-pass-notices.js';
 import {processPassNotices} from '../features/booking/booking-pass-notices.js';
 import {entitlementUseStatement} from '../features/booking/booking-entitlements.js';
-import {readFileSync} from 'node:fs';
 import {processLivePassNotices,processStagingPassNotices} from '../features/booking/booking-pass-live-notices.js';
 import type {Env} from '../worker-env.js';
 let d:ReturnType<typeof gapFixture>;
@@ -40,8 +39,6 @@ test('B2-18/19-DEFAULT: 初期オフ、オンには版と模擬を要求、閲�
  expect(notices()).toEqual([]);
 });
 test('検証のテスト宛先だけ本送信し、送信直前に宛先変更があれば止める',async()=>{
- d.raw.exec(readFileSync(new URL('../../../../packages/db/migrations/772_monthly_failure_notices.sql',import.meta.url),'utf8'));
- d.raw.exec(readFileSync(new URL('../../../../packages/db/migrations/773_monthly_notice_cap.sql',import.meta.url),'utf8'));
  await enable(true,false);await consume();
  const send=vi.fn(async()=>{});
  expect(await processStagingPassNotices({DB:d.db,DEPLOY_ENV:'staging'} as Env['Bindings'],now)).toEqual({processed:0});
@@ -56,8 +53,6 @@ test('検証のテスト宛先だけ本送信し、送信直前に宛先変更�
  expect(result.data.items[0].status).toBe('sent');
 });
 test('期限14日前の通知も検証先に送り、設定停止・同意撤回・夜間は送らない',async()=>{
- d.raw.exec(readFileSync(new URL('../../../../packages/db/migrations/772_monthly_failure_notices.sql',import.meta.url),'utf8'));
- d.raw.exec(readFileSync(new URL('../../../../packages/db/migrations/773_monthly_notice_cap.sql',import.meta.url),'utf8'));
  await enable(false,true);
  d.raw.exec(`INSERT INTO account_settings(line_account_id,key,value) VALUES('a','test_recipients','["f"]')`);
  await processPassNotices(d.db,now,'a',true);expect(notices()).toMatchObject([{kind:'expiry_14_days',status:'scheduled'}]);

@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { afterEach, expect, it, vi } from 'vitest';
 import { activateMonthly, monthlyContract, monthlyCycle, monthlyFixture, monthlyNow } from '../../test-utils/monthly-ledger.js';
 import { stopExhaustedMonthlyCycle } from './monthly-exhausted.js';
@@ -9,8 +8,6 @@ const opened: ReturnType<typeof monthlyFixture>[] = [];
 afterEach(() => { for (const d of opened.splice(0)) d.raw.close(); });
 it('最後の確定失敗だけで停止し、本人と店の通知予約を一度だけ残す', async () => {
   const d = monthlyFixture(); opened.push(d);
-  d.raw.exec(readFileSync(new URL('../../../../../packages/db/migrations/772_monthly_failure_notices.sql',import.meta.url),'utf8'));
-  d.raw.exec(readFileSync(new URL('../../../../../packages/db/migrations/773_monthly_notice_cap.sql',import.meta.url),'utf8'));
   await monthlyContract(d); monthlyCycle(d,{id:'initial',month:'2026-10',paid:true}); activateMonthly(d);
   monthlyCycle(d,{id:'renewal',kind:'renewal'});
   expect(await stopExhaustedMonthlyCycle(d.db,'renewal',new Date(monthlyNow))).toEqual({stopped:false});

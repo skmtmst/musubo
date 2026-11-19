@@ -1811,6 +1811,27 @@ CREATE TABLE booking_monthly_event_applications (
  REFERENCES booking_monthly_cycles(id,contract_id,tenant_id,account_id) ON DELETE RESTRICT
 );
 
+CREATE TABLE booking_monthly_failure_notices (
+  cycle_id TEXT NOT NULL REFERENCES booking_monthly_cycles(id) ON DELETE RESTRICT,
+  audience TEXT NOT NULL CHECK(audience IN ('friend','store')),
+  account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  created_at TEXT NOT NULL CHECK(julianday(created_at) IS NOT NULL),
+  PRIMARY KEY(cycle_id,audience)
+);
+
+CREATE TABLE booking_monthly_notice_cap (
+  cycle_id TEXT NOT NULL,
+  audience TEXT NOT NULL,
+  account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  day_jst TEXT NOT NULL,
+  reserved_at TEXT NOT NULL,
+  PRIMARY KEY(cycle_id,audience),
+  UNIQUE(account_id,friend_id,day_jst),
+  FOREIGN KEY(cycle_id,audience) REFERENCES booking_monthly_failure_notices(cycle_id,audience) ON DELETE RESTRICT
+);
+
 CREATE TABLE booking_monthly_operations (
  id TEXT PRIMARY KEY, contract_id TEXT NOT NULL, tenant_id TEXT NOT NULL, account_id TEXT NOT NULL,
  request_key TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN('stop_next_month','stop_now','waive','payment_method','expire','restore')),
@@ -1890,6 +1911,15 @@ CREATE TABLE booking_pass_billing_events (
  kind TEXT NOT NULL CHECK(kind IN('checkout.session.completed','invoice.paid','invoice.payment_failed','customer.subscription.deleted')),
  period_start TEXT NOT NULL,period_end TEXT NOT NULL,occurred_at TEXT NOT NULL,request_json TEXT NOT NULL CHECK(json_valid(request_json)),
  result TEXT NOT NULL CHECK(result IN('recorded','applied','ignored')),test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1)
+);
+
+CREATE TABLE booking_pass_notice_cap (
+  notice_id TEXT PRIMARY KEY REFERENCES booking_entitlement_notices(id) ON DELETE RESTRICT,
+  account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  day_jst TEXT NOT NULL,
+  reserved_at TEXT NOT NULL,
+  UNIQUE(account_id,friend_id,day_jst)
 );
 
 CREATE TABLE "booking_pass_plans" (

@@ -678,7 +678,9 @@
     "763_folder_membership_revisions.sql",
     "764_broadcast_ab_live.sql",
     "765_ec_auto_line_cap.sql",
-    "769_musubo_contracted_linked_slots.sql"
+    "769_musubo_contracted_linked_slots.sql",
+    "772_monthly_failure_notices.sql",
+    "773_monthly_notice_cap.sql"
   ],
-  "migrationCount": 679
+  "migrationCount": 681
 }
