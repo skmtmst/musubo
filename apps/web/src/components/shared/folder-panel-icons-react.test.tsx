@@ -126,6 +126,13 @@ describe('作る操作と閲覧時の場所取り', () => {
     expect(host.querySelectorAll('aside > div[aria-hidden="true"]')).toHaveLength(1)
   })
 
+  it('閲覧のみでも渡された作る操作を表示する', async () => {
+    const rows: FolderPanelRow[] = [{ id: 'all', kind: 'all', label: 'すべて' }]
+    await act(async () => root.render(<FolderPanel readOnly rows={rows} activeId="all" onSelect={() => {}} createAction={<button aria-disabled="true">作る</button>} />))
+    expect(host.querySelector('button[aria-disabled="true"]')?.textContent).toBe('作る')
+    expect(host.querySelectorAll('aside > div[aria-hidden="true"]')).toHaveLength(0)
+  })
+
   it('作る操作を持たない分類列には空きを足さず、選ぶ窓は明示して空きを省ける', async () => {
     const rows: FolderPanelRow[] = [{ id: 'all', kind: 'all', label: 'すべて' }]
     await act(async () => root.render(<FolderPanel rows={rows} activeId="all" onSelect={() => {}} />))
@@ -144,7 +151,7 @@ describe('選ぶだけのフォルダ列', () => {
       leadingActions: [{ id: 'send', label: '配る', onSelect: mutate }],
       trailing: <button onClick={mutate}>まとめて選ぶ</button>,
     }]} activeId="f1" onSelect={onSelect} onAddFolder={mutate}
-      createAction={<button onClick={mutate}>作る</button>} reserveCreateSpace>
+      reserveCreateSpace>
       <button onClick={mutate}>追加操作</button>
     </FolderPanel>))
     expect(host.querySelector('[aria-hidden="true"].' + styles.createPlaceholder)).not.toBeNull()
