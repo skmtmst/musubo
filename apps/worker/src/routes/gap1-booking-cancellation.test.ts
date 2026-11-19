@@ -41,14 +41,19 @@ test('B1-12 B1-13 B1-24: 無料の取消は請求なし、期限後は予約時�
  const snapshot=JSON.parse((d.raw.prepare('SELECT policy_snapshot_json FROM bookings WHERE id=?').get('bk') as any).policy_snapshot_json);
  expect(cancellationQuote(snapshot,'2026-11-20T05:00:00Z',8400,new Date('2026-11-20T04:00:00Z')).feeNow).toBe(4200);
 });
-test('B1-14 B1-15 B1-17: 計算以上の額を拒否、2人同時でも模擬請求は1回',async()=>{
+test('B1-14 B1-15 B1-17: 計算以上の額を拒否、2人同時でも試験請求は1回',async()=>{
  connect();await save();seedGapBooking(d);cancel();
+ d.raw.exec("UPDATE booking_payment_connections SET provider_account_id='acct_test123'; INSERT INTO booking_payment_methods(id,friend_id,line_account_id,setup_id,idempotency_key,status,created_at,stripe_customer_id,stripe_payment_method_id) VALUES('pm','f','a','seti_card','cardkey','ready',datetime('now'),'cus_card','pm_card'); INSERT INTO booking_card_checkout_requests(id,line_account_id,friend_id,idempotency_key,booking_json,connect_account,customer_id,created_at) VALUES('pm','a','f','cardkey','{}','acct_test123','cus_card',datetime('now')); UPDATE bookings SET booking_payment_method_id='pm' WHERE id='bk'");
+ const fetchMock=vi.fn(async(_url:unknown,init?:RequestInit)=>{const form=new URLSearchParams(String(init?.body));return Response.json({id:'pi_charge',livemode:false,status:'succeeded',amount:4200,currency:'jpy',customer:'cus_card',payment_method:'pm_card',metadata:{booking_charge_id:form.get('metadata[booking_charge_id]')}});});
+ vi.stubGlobal('fetch',fetchMock);
+ const a=gapApp(d,[bookingCancellation],gapOwner,false,{BOOKING_STRIPE_TEST_SECRET_KEY:'sk_test_example'});
  const chargePath='/api/booking/admin/bookings/bk/charges?account_id=a';
- expect((await gapCall(app(),chargePath,'POST',{...chargeBody(),amount:8400})).status).toBe(400);
- expect((await gapCall(app(),chargePath,'POST',chargeBody())).status).toBe(409);
- d.raw.exec("INSERT INTO booking_payment_methods(id,friend_id,line_account_id,setup_id,idempotency_key,status,created_at) VALUES('pm','f','a','seti_test','key','ready',datetime('now'))");
- const rs=await Promise.all([gapCall(app(),chargePath,'POST',chargeBody()),gapCall(app(),chargePath,'POST',chargeBody())]);expect(rs.map(r=>r.status).sort()).toEqual([200,409]);
- expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_cancellation_events').get()).toEqual({n:1});expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+ expect((await gapCall(a,chargePath,'POST',{...chargeBody(),amount:8400})).status).toBe(400);
+ const rs=await Promise.all([gapCall(a,chargePath,'POST',chargeBody()),gapCall(a,chargePath,'POST',chargeBody())]);expect(rs.map(r=>r.status).sort()).toEqual([200,409]);
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_cancellation_events').get()).toEqual({n:1});expect(fetchMock).toHaveBeenCalledTimes(1);
+ const charged=d.raw.prepare('SELECT id,version FROM booking_charges WHERE booking_id=?').get('bk') as {id:string;version:number};
+ expect((await gapCall(a,`/api/booking/admin/charges/${charged.id}/refund?account_id=a`,'POST',{reason:'返金',expectedVersion:charged.version,confirmed:true,confirmedIrreversible:true})).status).toBe(409);
+ expect(d.raw.prepare('SELECT status FROM booking_charges WHERE id=?').get(charged.id)).toEqual({status:'succeeded'});
 });
 test('B1-16 B1-18 B1-19: 理由つき免除・全額模擬返金・スタッフの返金禁止',async()=>{
  connect();await save();seedGapBooking(d);cancel();let row=d.raw.prepare('SELECT id FROM booking_charges').get() as any;

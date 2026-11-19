@@ -1617,7 +1617,7 @@ CREATE TABLE booking_charges (
  kind TEXT NOT NULL CHECK(kind IN('cancellation_fee','no_show_fee')),amount INTEGER NOT NULL CHECK(amount>=0),
  policy_snapshot_json TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN('pending','processing','succeeded','failed','unknown','waived','refunded')),
  reason TEXT,actor_staff_id TEXT,stripe_payment_intent_id TEXT,idempotency_key TEXT,version INTEGER NOT NULL DEFAULT 1,
- test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
+ test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),created_at TEXT NOT NULL,updated_at TEXT NOT NULL, stripe_connected_account_id TEXT, stripe_call_started_at TEXT,
  UNIQUE(booking_id,kind),UNIQUE(line_account_id,idempotency_key)
 );
 
@@ -12325,6 +12325,15 @@ CREATE TRIGGER booking_cancellation_policy_snapshot AFTER INSERT ON bookings
 BEGIN UPDATE bookings SET policy_snapshot_json=(SELECT json_object('enabled',json(CASE WHEN enabled=1 THEN 'true' ELSE 'false' END),'tiers',json(tiers_json),'noShowPercent',no_show_percent,'version',version)
  FROM booking_cancellation_policies WHERE line_account_id=NEW.line_account_id) WHERE id=NEW.id AND policy_snapshot_json IS NULL; END;
 
+CREATE TRIGGER booking_charge_block_status_change
+BEFORE UPDATE OF status ON bookings
+WHEN NEW.status<>OLD.status AND EXISTS (
+  SELECT 1 FROM booking_charges c WHERE c.booking_id=OLD.id AND c.line_account_id=OLD.line_account_id
+    AND c.status IN ('processing','unknown','succeeded')
+)
+BEGIN
+  SELECT RAISE(ABORT,'booking_charge_in_progress'); END;
+
 CREATE TRIGGER booking_entitlement_confirm AFTER UPDATE OF status ON bookings
 WHEN NEW.status='confirmed' AND OLD.status<>'confirmed'
 BEGIN  UPDATE booking_entitlement_uses SET consumed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE booking_id=NEW.id AND consumed_at IS NULL; END;
@@ -12349,6 +12358,13 @@ BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
 
 CREATE TRIGGER booking_entitlement_use_validate BEFORE INSERT ON booking_entitlement_uses
 BEGIN  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM bookings b JOIN booking_entitlements e ON e.id=NEW.entitlement_id WHERE b.id=NEW.booking_id AND b.line_account_id=e.line_account_id AND b.friend_id=e.friend_id AND e.status='active' AND (e.menu_id IS NULL OR e.menu_id=b.menu_id) AND julianday(b.starts_at)>=julianday(e.valid_from) AND julianday(b.starts_at)<julianday(e.expires_at) AND b.status IN ('requested','confirmed') AND NEW.consumed_at IS NULL) THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+
+CREATE TRIGGER booking_failed_fee_revert
+AFTER UPDATE OF status ON bookings
+WHEN OLD.status IN ('cancelled','no_show') AND NEW.status NOT IN ('cancelled','no_show')
+BEGIN
+  UPDATE booking_charges SET status='waived',reason='cancellation_reverted',version=version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+    WHERE booking_id=NEW.id AND line_account_id=NEW.line_account_id AND status='failed'; END;
 
 CREATE TRIGGER booking_fixed_meeting_cancel AFTER UPDATE OF status ON bookings WHEN NEW.status IN('cancelled','rejected','expired')
 BEGIN UPDATE bookings SET meeting_url=NULL,meeting_url_source=NULL WHERE id=NEW.id; END;
