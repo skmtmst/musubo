@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import Checkbox from '@/components/shared/checkbox'
-import { TriangleAlert } from 'lucide-react'
+import { StatusDot } from '@/components/shared/status-pill'
 import Dialog from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls'
 import Notice from '@/components/shared/notice'
@@ -93,15 +93,15 @@ export default function CatalogRewards() {
       {error && !target ? <Notice tone="warn" message={error} action={<Button onClick={() => void load()}>もう一度読み込む</Button>} /> : null}
       {rewards === null ? <p role="status">読み込んでいます…</p> : rewards.length === 0 ? <p>保存した景品のひな形はありません。</p> : rewards.map(reward => <div key={reward.id}><span>{reward.name}</span>{' '}<Button disabled={!allowed || role === null} lockedReason={allowed ? undefined : '統括の管理者のみ配れます'} onClick={() => { setTarget(reward); setError('') }}>配る</Button></div>)}
     </Card>
-    <Dialog open={Boolean(target)} title={expiredDialog ? '確かめの期限が切れました' : preflight ? '景品を配る前に確かめる' : '景品を配る先を選ぶ'} description={expiredDialog ? '確認から30分が過ぎました。配る前にもう一度、配布先と内容を確認してください。' : target ? `「${target.name}」を配ります。引換コードと在庫は配らず、交換は停止中で入ります。確かめ直すと配り方の選択は選び直しになります。` : ''} titleIcon={expiredDialog ? <TriangleAlert size={20} /> : undefined} descriptionBand={expiredDialog ? 'warning' : undefined} busy={busy} error={expiredDialog ? undefined : error} onCancel={expiredDialog ? () => setExpiredDialog(false) : close}
+    <Dialog open={Boolean(target)} title={expiredDialog ? '確かめの期限が切れました' : preflight ? '景品を配る前に確かめる' : '景品を配る先を選ぶ'} titleContent={expiredDialog ? <><StatusDot tone="caution" />{' '}確かめの期限が切れました</> : undefined} headerIcon={expiredDialog ? false : undefined} confirmation={expiredDialog} description={expiredDialog ? '確認から30分が過ぎました。配る前にもう一度、配布先と内容を確認してください。' : target ? `「${target.name}」を配ります。引換コードと在庫は配らず、交換は停止中で入ります。確かめ直すと配り方の選択は選び直しになります。` : ''} busy={busy} error={expiredDialog ? undefined : error} onCancel={expiredDialog ? () => setExpiredDialog(false) : close}
       confirmLabel={expiredDialog ? 'もう一度確かめる' : preflight ? 'この内容で配る' : '配る先を確かめる'} confirmLockedReason={allowed ? undefined : '統括の管理者のみ配れます'} confirmDisabled={!allowed || (expiredDialog ? busy : preflight ? !resolvedItems(preflight, choices) || Boolean(pending) : !selected.length)} onConfirm={() => { if (expiredDialog) { setExpiredDialog(false); void check() } else void (preflight ? run() : check()) }}>
-      {!expiredDialog && !preflight ? accounts.map(account => <Checkbox key={account.id} checked={selected.includes(account.id)} onCheckedChange={value => setSelected(current => value ? [...current, account.id] : current.filter(id => id !== account.id))}>{account.name}</Checkbox>) : null}
-      {!expiredDialog && preflight && !result ? preflight.stores.map(store => <section key={store.accountId}><h3>{store.accountName ?? accounts.find(account => account.id === store.accountId)?.name}</h3>
+      {expiredDialog ? null : <>{!preflight ? accounts.map(account => <Checkbox key={account.id} checked={selected.includes(account.id)} onCheckedChange={value => setSelected(current => value ? [...current, account.id] : current.filter(id => id !== account.id))}>{account.name}</Checkbox>) : null}
+      {preflight && !result ? preflight.stores.map(store => <section key={store.accountId}><h3>{store.accountName ?? accounts.find(account => account.id === store.accountId)?.name}</h3>
         {store.warnings?.map(warning => <p key={warning}>{warning === 'reward_codes_required' ? '引換コードは各店で設定してください。' : 'このアカウントには確認が必要な項目があります。'}</p>)}
         {store.items.map(item => item.operation === 'reuse' ? <p key={item.sourceId}>{item.name}：既存の設定を使います</p> : item.duplicate ? <Field key={item.sourceId} label={`${item.name}の配り方`}><Select aria-label={`${store.accountName ?? store.accountId} ${item.name}の配り方`} value={choices[choiceKey(store.accountId,item.sourceId)] ?? ''} onChange={value => setChoices(current => ({ ...current, [choiceKey(store.accountId,item.sourceId)]: value as DistributionMode }))} options={[{ value: '', label: '選択してください' }, ...item.allowedModes.map(mode => ({ value: mode, label: modes[mode] }))]} /></Field> : <p key={item.sourceId}>{item.name}：新しく作ります</p>)}
       </section>) : null}
-      {!expiredDialog && result ? <><p>配布結果：{result.status === 'completed' ? '完了' : '確認が必要です'}</p>{result.stores.map(store => <p key={store.accountId}>{store.accountName ?? store.accountId}：{store.reason ?? store.status}</p>)}</> : null}
-      {!expiredDialog && pending && (!result || result.stores.some(store => store.status === 'pending' || store.status === 'staged')) ? <Button onClick={() => void refresh()} disabled={busy}>結果を確認</Button> : null}
+      {result ? <><p>配布結果：{result.status === 'completed' ? '完了' : '確認が必要です'}</p>{result.stores.map(store => <p key={store.accountId}>{store.accountName ?? store.accountId}：{store.reason ?? store.status}</p>)}</> : null}
+      {pending && (!result || result.stores.some(store => store.status === 'pending' || store.status === 'staged')) ? <Button onClick={() => void refresh()} disabled={busy}>結果を確認</Button> : null}</>}
     </Dialog>
   </PageFrame>
 }
