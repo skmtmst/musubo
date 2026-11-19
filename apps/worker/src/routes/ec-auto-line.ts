@@ -61,25 +61,31 @@ ecAutoLine.post('/api/ec/auto-line/rules/:kind/test',async c=>{gapWrite(c,{admin
 // Ambiguous live deliveries require a store administrator's review.
 ecAutoLine.get('/api/ec/auto-line/live/unknown',async c=>{
  const staff=c.get('staff');if(!staff || staff.readOnly || !['owner','admin'].includes(staff.role) || c.get('impersonation'))throw new GapError('forbidden',403);
- const account=await gapAccount(c);
- const rows=(await c.env.DB.prepare("SELECT id,kind,occurrence_key occurrenceKey,friend_id friendId,product_id productId,created_at createdAt,updated_at version FROM ec_auto_line_live_intents WHERE account_id=? AND state='unknown' ORDER BY created_at,id LIMIT 100").bind(account).all<{id:string;friendId:string}>()).results;
+ const account=await gapAccount(c),offset=parseOffsetPaging({offset:c.req.query('offset')},{offsetPolicy:{}}).offset;
+ if(!Number.isSafeInteger(offset)||offset<0)throw new GapError('invalid_pagination');
+ const rows=(await c.env.DB.prepare("SELECT id,kind,occurrence_key occurrenceKey,friend_id friendId,product_id productId,created_at createdAt,updated_at version FROM ec_auto_line_live_intents WHERE account_id=? AND state='unknown' ORDER BY created_at,id LIMIT 100 OFFSET ?").bind(account,offset).all<{id:string;friendId:string}>()).results;
  const items=await Promise.all(rows.map(async row=>{
   const key=await createBroadcastRetryKey('notification',`ec-live:${row.id}`,'line',row.friendId);
   const ledger=await c.env.DB.prepare("SELECT status,failure_code failureCode,attempt_count attemptCount,created_at createdAt,updated_at updatedAt,completed_at completedAt FROM outbound_send_requests WHERE idempotency_key=? AND resource_id=? AND channel='line' AND line_account_id=?").bind(key,`ec-live:${row.id}`,account).first();
   return {...row,ledger:ledger??null};
  }));
- return c.json({success:true,data:{items}});
+ return c.json({success:true,data:{items,nextOffset:items.length===100?offset+100:null}});
 });
 
 ecAutoLine.post('/api/ec/auto-line/live/unknown/:id/resolve',async c=>{
  const staff=c.get('staff');if(!staff || staff.readOnly || !['owner','admin'].includes(staff.role) || c.get('impersonation'))throw new GapError('forbidden',403);
  const account=await gapAccount(c),body=await gapBody(c),id=c.req.param('id');
  if(typeof body.reason!=='string'||!body.reason.trim()||body.reason.length>500)throw new GapError('reason_required');
- if(typeof body.expectedVersion!=='string'||!body.expectedVersion || !['sent','not_sent'].includes(String(body.resolution)))throw new GapError('invalid_resolution');
+ if(typeof body.expectedVersion!=='string'||!body.expectedVersion || (typeof body.resolution!=='string'||!['sent','not_sent'].includes(body.resolution)))throw new GapError('invalid_resolution');
+ const intent=await c.env.DB.prepare('SELECT friend_id FROM ec_auto_line_live_intents WHERE id=? AND account_id=?').bind(id,account).first<{friend_id:string}>();if(!intent)throw new GapError('not_found',404);
+ const key=await createBroadcastRetryKey('notification',`ec-live:${id}`,'line',intent.friend_id);
  const at=new Date().toISOString(),sent=body.resolution==='sent';
- const update=c.env.DB.prepare("UPDATE ec_auto_line_live_intents SET state=?,updated_at=? WHERE id=? AND account_id=? AND state='unknown' AND updated_at=?").bind(sent?'sent':'failed',at,id,account,body.expectedVersion);
+ const ledger=await c.env.DB.prepare('SELECT status,failure_code FROM outbound_send_requests WHERE idempotency_key=?').bind(key).first<{status:string;failure_code:string|null}>();
+ if(!sent && ledger && (['succeeded','in_progress'].includes(ledger.status) || ledger.status==='unknown' && ledger.failure_code==='NOTIFICATION_DELIVERY_UNKNOWN'))throw new GapError('ledger_indicates_sent_or_pending',409);
+ const update=c.env.DB.prepare("UPDATE ec_auto_line_live_intents SET state=?,updated_at=? WHERE id=? AND account_id=? AND state='unknown' AND updated_at=? AND (?=1 OR NOT EXISTS(SELECT 1 FROM outbound_send_requests WHERE idempotency_key=? AND (status IN ('succeeded','in_progress') OR (status='unknown' AND failure_code='NOTIFICATION_DELIVERY_UNKNOWN'))))").bind(sent?'sent':'failed',at,id,account,body.expectedVersion,sent?1:0,key);
  const cap=sent?c.env.DB.prepare("UPDATE ec_auto_line_cap_reservations SET state='accepted' WHERE live_intent_id=? AND account_id=? AND mode='live' AND state IN('reserved','started','unknown')").bind(id,account):c.env.DB.prepare("UPDATE ec_auto_line_cap_reservations SET state='released',release_actor=?,release_reason=?,released_at=? WHERE live_intent_id=? AND account_id=? AND mode='live' AND state IN('reserved','started','unknown')").bind(staff.id,body.reason.trim(),at,id,account);
- const audit=c.env.DB.prepare("INSERT INTO operation_audit(id,target_kind,target_id,action,actor_id,detail_json,created_at) VALUES(?,'ec_auto_line_live_intent',?,'unknown_resolved',?,?,?)").bind(crypto.randomUUID(),id,staff.id,JSON.stringify({accountId:account,resolution:body.resolution,reason:body.reason.trim(),previousVersion:body.expectedVersion}),at);
+ const audit=c.env.DB.prepare(`INSERT INTO operation_audit(id,target_kind,target_id,action,actor_id,detail_json,created_at)
+ VALUES(?,'ec_auto_line_live_intent',?,'unknown_resolved',?,json_object('accountId',?,'resolution',?,'reason',?,'previousVersion',?,'ledgerStatus',(SELECT status FROM outbound_send_requests WHERE idempotency_key=?),'ledgerFailureCode',(SELECT failure_code FROM outbound_send_requests WHERE idempotency_key=?)),?)`).bind(crypto.randomUUID(),id,staff.id,account,body.resolution,body.reason.trim(),body.expectedVersion,key,key,at);
  try{await c.env.DB.batch([update,assertChanged(c.env.DB),cap,audit,clearAssertions(c.env.DB)]);}catch(e){if(/CHECK constraint/.test(String(e)))throw new GapError('version_conflict',409);throw e;}
  return c.json({success:true,data:{id,state:sent?'sent':'failed',version:at}});
 });

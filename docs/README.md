@@ -742,6 +742,8 @@
 - [1765-kenta-booking-ci-checks.md](release-log/unreleased/1765-kenta-booking-ci-checks.md)
 - [1765-kenta-deploy-safety-reason.md](release-log/unreleased/1765-kenta-deploy-safety-reason.md)
 - [1765-kenta-gap1-1016.md](release-log/unreleased/1765-kenta-gap1-1016.md)
+- [PR-kenta-g6-unknown-ops.md](release-log/unreleased/PR-kenta-g6-unknown-ops.md)
+
 - [1765-kenta-gap3-api-integration.md](release-log/unreleased/1765-kenta-gap3-api-integration.md)
 - [1765-kenta-gapui-integration.md](release-log/unreleased/1765-kenta-gapui-integration.md)
 - [1765-kenta-liff-booking-review.md](release-log/unreleased/1765-kenta-liff-booking-review.md)
