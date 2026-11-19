@@ -77,6 +77,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 import BroadcastForm from './broadcast-form'
+import { ApiError } from '@/lib/api/transport/errors'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -221,6 +222,17 @@ describe('一斉配信のテスト送信（#986）', () => {
     await act(async () => { finish({ success: true, data: { id: 'fake-draft', version: 1 } }); await Promise.resolve() })
     expect(sendApi).not.toHaveBeenCalled()
   })
+  it('テスト送信中にアカウントを切り替えたら前の店の失敗を出さない', async () => {
+    let reject!: (reason: unknown) => void
+    sendApi.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+    await openTestDialog()
+    await confirmTestSend()
+    expect(sendApi).toHaveBeenCalled()
+    account.id = 'acc-2'
+    await act(async () => { root.render(<BroadcastForm tags={[]} onSuccess={() => {}} onCancel={() => {}} />) })
+    await act(async () => reject(new ApiError(422, '失敗', 'COMMON_VAR_UNRESOLVED', {variables:[{key:'hours',displayName:'前の店舗',reason:'missing'}]})))
+    expect(document.body.textContent).not.toContain('前の店舗')
+  })
   it('送信先を読み込んだだけでは実行履歴は0件で、固定の成功・日時を出さない', async () => {
     await openTestDialog()
     expect(sendApi).not.toHaveBeenCalled()
@@ -245,6 +257,17 @@ describe('一斉配信のテスト送信（#986）', () => {
     expect(el.textContent).not.toContain('管理者')
     // 先頭だけ色を変えた「選ばれている風」の行がない。
     expect(el.querySelectorAll('.bg-accent-soft, .border-accent')).toHaveLength(0)
+  })
+
+  it('共通情報の不足は名前と登録先を示し、再試行できる', async () => {
+    sendApi.mockRejectedValueOnce(new ApiError(422, '共通情報を解決できません: {{var.hours}}', 'COMMON_VAR_UNRESOLVED', {variables:[{key:'hours',displayName:'営業時間',reason:'missing'}]}))
+    await openTestDialog()
+    await confirmTestSend()
+    expect(dialog().textContent).toContain('テスト送信できませんでした')
+    expect(dialog().textContent).toContain('「営業時間」の共通情報がまだ登録されていません。')
+    expect(dialog().querySelector('a[href="/contents/vars"]')?.textContent).toContain('共通情報を開く')
+    const retry = [...dialog().querySelectorAll('button')].find(button => button.textContent?.trim() === 'テストを送る')
+    expect(retry?.disabled).toBe(false)
   })
 
   it('0成功2失敗はエラーとして知らせ、成功扱いにしない', async () => {

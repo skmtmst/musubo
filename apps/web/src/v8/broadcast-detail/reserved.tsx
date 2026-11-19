@@ -1,5 +1,7 @@
 'use client'
 
+import { CommonVarTestFailure, type CommonVarFailure } from '@/components/shared/common-var-test-failure'
+
 /*
  * ★V8 一斉配信を予約したあと（絵の再撮 ）。2026-10-06 一から書き直し。
  *
@@ -47,6 +49,7 @@ export interface ReservedProps {
   duplicate: () => void
   actionBusy: 'test' | 'duplicate' | null
   actionError: string
+  missingVars?: CommonVarFailure[] | null
   clearActionError: () => void
   /** 予約の取消の窓と実行。 */
   cancelOpen: boolean
@@ -72,6 +75,7 @@ export default function Reserved({
   duplicate,
   actionBusy,
   actionError,
+  missingVars,
   clearActionError,
   cancelOpen,
   openCancel,
@@ -109,6 +113,7 @@ export default function Reserved({
         </Button>
         {canCancel ? <Button variant="text" textTone="danger" onClick={openCancel}>予約を取り消す…</Button> : null}
       </div>
+      {missingVars && <CommonVarTestFailure names={missingVars} />}
       {actionError ? <Notice tone="danger" message={actionError} onClose={clearActionError} /> : null}
     </> : null}
     <SectionHeader title="メッセージ" />

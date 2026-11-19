@@ -2,7 +2,8 @@ import type { CommonVarResolutionFailedError } from './interpolation-context.js'
 
 /** 表示名を対象のLINEアカウントから取得し、見つからない場合はキーを使う。 */
 export async function commonVarTestError(db: D1Database, accountId: string | null, error: CommonVarResolutionFailedError) {
-  const keys = [...new Set(error.failures.map(failure => failure.varKey))];
+  const failures = [...new Map(error.failures.map(failure => [failure.varKey, failure])).values()];
+  const keys = failures.map(failure => failure.varKey);
   let rows: Array<{var_key:string;name:string}> = [];
   if (accountId) {
     try {
@@ -17,6 +18,6 @@ export async function commonVarTestError(db: D1Database, accountId: string | nul
     success: false as const,
     code: 'COMMON_VAR_UNRESOLVED',
     error: `共通情報を解決できません: ${error.failures.map(failure => `{{var.${failure.varKey}}}`).join(', ')}`,
-    data: { variables: keys.map(key => ({ key, displayName: names.get(key) ?? key })) },
+    data: { variables: failures.map(({varKey,reason}) => ({ key:varKey, displayName: names.get(varKey) ?? varKey, reason })) },
   };
 }

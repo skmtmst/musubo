@@ -5,6 +5,7 @@ import type { BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { api,type ApiBroadcast } from '@/lib/api'
+import { commonVarFailureNames } from '@/components/shared/common-var-test-failure'
 import { notifyToast } from '@/components/shared/toast'
 import { formatTime } from '@/lib/format'
 import type { Dispatch,SetStateAction } from 'react'
@@ -45,6 +46,7 @@ export async function testBroadcast({ isCurrent, onDraftSaved, persistDraft, rej
       onDraftSaved?.(draft)
       attempted = true
       const res = await api.broadcasts.testSend(draft.id)
+      if (!isCurrent()) return
       acknowledged = res.success
       /*
        * **HTTPの成功と配信の成功は分ける。** 全員に失敗しても
@@ -59,7 +61,16 @@ export async function testBroadcast({ isCurrent, onDraftSaved, persistDraft, rej
       if (acknowledged) notifyToast(view.message, { tone: view.kind === 'success' ? 'success' : view.kind === 'error' ? 'error' : 'info' })
       return acknowledged
     } catch (saveFailure) {
+      if (!isCurrent()) return
       if (acknowledged) { notifyToast('送信は受け付けました。表示を読み直してください。'); return true }
+      const names = attempted ? commonVarFailureNames(saveFailure) : null
+      if (names) {
+        const view: TestSendView = {kind:'error', message:'テスト送信できませんでした', commonVars:names}
+        setTestRetryBlocked(false)
+        setTestResult(view)
+        setTestHistory(history => [view, ...history])
+        return
+      }
       const fieldFailure = saveErrors.capture(saveFailure);
       setTestRetryBlocked(attempted)
 

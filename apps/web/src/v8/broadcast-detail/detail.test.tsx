@@ -166,6 +166,29 @@ const buttonText = (text: string) => (buttons().find((button) => button.textCont
 const linkText = (text: string) => ([...document.querySelectorAll('a')].find((a) => a.textContent?.trim() === text) ?? querySupplementaryPageAction(text)) as HTMLAnchorElement | undefined
 
 describe('V8 一斉配信の詳細', () => {
+  it('テスト送信で共通情報が足りなければ名前と登録先を表示する', async () => {
+    const test = vi.spyOn(api.broadcasts, 'testSend').mockRejectedValueOnce(new ApiError(422, '共通情報を解決できません: {{var.hours}}', 'COMMON_VAR_UNRESOLVED', {variables:[{key:'hours',displayName:'営業時間',reason:'missing'}]}))
+    try {
+      await render(<BroadcastDetail {...detailProps()} />)
+      await act(async () => { buttonText('テストを送る')!.click() })
+      expect(host.textContent).toContain('テスト送信できませんでした')
+      expect(host.textContent).toContain('「営業時間」の共通情報がまだ登録されていません。')
+      expect(linkText('共通情報を開く')?.getAttribute('href')).toBe('/contents/vars')
+    } finally { test.mockRestore() }
+  })
+
+  it('別の配信へ切り替えた後は前のテスト失敗を出さない', async () => {
+    let reject!: (reason: unknown) => void
+    const test = vi.spyOn(api.broadcasts, 'testSend').mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+    try {
+      await render(<BroadcastDetail {...detailProps()} />)
+      await act(async () => { buttonText('テストを送る')!.click() })
+      await render(<BroadcastDetail {...detailProps({broadcast:broadcast({id:'broadcast-other'})})} />)
+      await act(async () => reject(new ApiError(422, '失敗', 'COMMON_VAR_UNRESOLVED', {variables:[{key:'hours',displayName:'前の店舗'}]})))
+      expect(host.textContent).not.toContain('前の店舗')
+    } finally { test.mockRestore() }
+  })
+
   it('編集できてもテスト送信の鍵が無ければ押し口を隠す', async () => {
     access.role = 'staff'
     rememberStaffIdentity({ role: 'staff', permissionKeys: ['/broadcasts', 'broadcast.definition.edit'] } as StaffMember)
