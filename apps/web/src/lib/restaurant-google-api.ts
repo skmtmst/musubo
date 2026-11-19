@@ -278,8 +278,16 @@ const base = '/api/restaurant-test/google'
 
 export const restaurantGoogleApi = {
   connection: (accountId: string) => fetchApi<GoogleConnectionData>(withAccount(`${base}/connection`, accountId)),
-  connectStart: (accountId: string) =>
-    fetchApi<{ success: true; mode: 'connect' | 'reconnect'; authorizeUrl: string }>(withAccount(`${base}/connect/start`, accountId), { method: 'POST', body: '{}' }),
+  // connection_id はつなぎ直す接続そのものの id。`add` は接続を増やすとき（宛先なし）。
+  // どちらも付けないと、サーバーは接続が1件だけのときその1件を相手にする。
+  connectStart: (accountId: string, target?: { connectionId?: string | null; add?: boolean }) =>
+    fetchApi<{ success: true; mode: 'connect' | 'reconnect'; authorizeUrl: string }>(
+      withAccount(`${base}/connect/start`, accountId, {
+        connection_id: target?.add ? undefined : target?.connectionId ?? undefined,
+        mode: target?.add ? 'add' : undefined,
+      }),
+      { method: 'POST', body: '{}' },
+    ),
   // confirmSwitch は「前につないでいた店舗とは別の店舗に切り替える」確認を取れたときだけ true。
   // 付けずに別店舗を送ると、サーバーが code: 'switch_confirmation_required' で止める。
   selectLocation: (accountId: string, locationName: string, confirmSwitch?: boolean, expected?: { expectedConnectionId: string; expectedConfirmationRevision: number }) =>
@@ -287,8 +295,12 @@ export const restaurantGoogleApi = {
       method: 'POST',
       body: JSON.stringify(confirmSwitch ? { locationName, confirmSwitch: true, ...expected } : { locationName }),
     }),
+  // 解除は1件だけ。expected を付けると「その接続・その版」以外では止まる。
   disconnect: (accountId: string, expected?: { expectedConnectionId: string; expectedConfirmationRevision: number }) =>
-    fetchApi<{ success: true; revoked: boolean; connection: GoogleConnection }>(withAccount(`${base}/disconnect`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true, ...expected }) }),
+    fetchApi<{ success: true; revoked: boolean; connection: GoogleConnection }>(
+      withAccount(`${base}/disconnect`, accountId, { connection_id: expected?.expectedConnectionId }),
+      { method: 'POST', body: JSON.stringify({ confirmed: true, ...expected }) },
+    ),
   syncReviews: (accountId: string) =>
     fetchApi<{ success: true; fetched: number; complete: boolean; averageRating: number | null; totalReviewCount: number | null; syncedAt: string }>(
       withAccount(`${base}/reviews/sync`, accountId),

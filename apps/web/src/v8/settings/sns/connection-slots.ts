@@ -51,6 +51,11 @@ export type SnsConnectionView = {
   primary: boolean
   /** 解除のときに送る版。無い接続は null。 */
   version: number | null
+  /**
+   * API へ操作先として送る接続の id。画面には出さない。
+   * `id` は行の見分け（key・処理中の印）用で、API が受け取る id とは別物。
+   */
+  connectionId?: string | null
 }
 
 /** 1サービスぶんの接続。契約枠は両サービス共通なので `SnsSlotsView` が持つ。 */
@@ -274,6 +279,7 @@ export function googleSlots(
       state: googleState(status),
       primary: true,
       version: connection.confirmationRevision ?? null,
+      connectionId: connection.id ?? null,
     })
   }
 
@@ -302,6 +308,7 @@ export function instagramSlots(
       state: status.state === 'expired' ? 'expired' : 'connected',
       primary: false,
       version: connection.version,
+      connectionId: connection.id ?? null,
     })
   }
 

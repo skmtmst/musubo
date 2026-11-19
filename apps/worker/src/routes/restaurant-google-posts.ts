@@ -789,6 +789,12 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/publish', requ
   if (!postWriteEnabled(c.env, store)) return fail(c, 403, 'この環境ではGoogleへ投稿できません', { code: 'write_disabled' });
   if (row.status === 'published' || row.status === 'accepted') return fail(c, 409, 'この投稿はすでに送信済みです', { code: 'already_sent' });
   if (row.status === 'cancelled' || row.status === 'deleted') return fail(c, 409, 'この投稿は取り消されています', { code: 'cancelled' });
+  // 送信を始めた接続が分かっている行は、その接続からしか出せない。別の接続で再実行すると
+  // 送達不明の再確認が別の店舗（location）の一覧を見て空振りし、そのまま再投稿して
+  // この行の connection_id を今の接続へ付け替えてしまう（二重投稿＋付け替え）。
+  if (row.connection_id && row.connection_id !== connection.id) {
+    return fail(c, 409, 'この投稿は別のGoogle接続で送信を始めています', { code: 'connection_mismatch' });
+  }
   if (row.publish_mode === 'scheduled') return fail(c, 400, '日時指定の投稿はこの環境では未対応です', { code: 'not_supported' }, ["store"]);
 
   const timeZone = await storeTimeZone(c, store.id);

@@ -113,6 +113,46 @@ async function connection(
   if (!row) throw new InstagramError('disconnected', 404);
   return row;
 }
+/**
+ * 書き換え（つなぎ直し・確認・取り込み・解除）で触る接続を1件に決める。
+ * 接続IDの指定があればそれだけを引く。指定が無いときは、接続が1件しか無いときだけ
+ * 今までどおりその1件を使い、2件以上あるなら断る（先頭を取り違えて別の接続を
+ * 書き換えないため）。読み取りの既定（`connectionRow`）とは別に、ここだけ厳しくする。
+ */
+async function writeTarget(c: Context<Env>, id: string): Promise<Connection> {
+  const connectionId = requestedConnectionId(c);
+  if (connectionId) return await connection(c, id, connectionId);
+  if (await manyConnections(c, id))
+    throw new InstagramError('connection_required', 400);
+  return await connection(c, id, null);
+}
+/** 同じLINEアカウントに接続が2件以上あるか。既定の1件に落としていいかの判断に使う。 */
+async function manyConnections(c: Context<Env>, id: string): Promise<boolean> {
+  const counted = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM instagram_connections WHERE line_account_id=?',
+  )
+    .bind(id)
+    .first<{ n: number }>();
+  return (counted?.n ?? 0) > 1;
+}
+/**
+ * つなぎ直しの宛先。接続IDの指定があればそれだけを引き（無ければ 404）、
+ * 指定が無いときは接続が1件以下のときだけ既定へ落とす。1件も無ければ新規作成（null）。
+ */
+async function startTarget(
+  c: Context<Env>,
+  id: string,
+  connectionId: string | null,
+): Promise<Connection | null> {
+  if (connectionId) {
+    const row = await connectionRow(c, id, connectionId);
+    if (!row) throw new InstagramError('not_found', 404);
+    return row;
+  }
+  if (await manyConnections(c, id))
+    throw new InstagramError('connection_required', 400);
+  return await connectionRow(c, id, null);
+}
 const ready = (c: Context<Env>): InstagramConfig => {
   const cfg = instagramConfig(c.env);
   if (!cfg) throw new InstagramError('unconfigured', 503);
@@ -153,6 +193,7 @@ instagram.get('/api/instagram/connection', async (c) => {
           state: expired(row) ? 'expired' : 'connected',
           replyEnabled: false,
           connection: {
+            id: row.id,
             pageId: row.page_id,
             instagramId: row.instagram_id,
             pageName: row.page_name,
@@ -177,10 +218,14 @@ instagram.post(
       now = new Date();
     // どの接続をつなぎ直すのかを state に預ける。ブラウザの折り返しでは画面の状態が
     // 残らないので、ここで決めた宛先だけを callback が使う。
-    // 指定が無ければ既定の接続（1件だけの今までの画面）をつなぎ直す。
+    // `mode=add` は新しい接続を増やす（宛先なし）。接続IDの指定はその接続のつなぎ直し。
+    // どちらも無いときは、接続が1件だけならその1件（772より前と同じ動き）、
+    // 2件以上あるなら取り違えないように断る。
     const requested = requestedConnectionId(c);
-    const target = await connectionRow(c, id, requested);
-    if (requested && !target) throw new InstagramError('not_found', 404);
+    const adding = c.req.query('mode') === 'add';
+    if (adding && requested)
+      throw new InstagramError('connection_target_conflict', 400);
+    const target = adding ? null : await startTarget(c, id, requested);
     await c.env.DB.prepare(
       "INSERT INTO instagram_oauth_states(state_hash,line_account_id,connection_id,staff_id,phase,expires_at,created_at) VALUES(?,?,?,?,'started',?,?)",
     )
@@ -451,7 +496,7 @@ instagram.post(
   inputJsonBoundary(), async (c) => {
     const id = await account(c),
       cfg = ready(c),
-      r = await connection(c, id, requestedConnectionId(c));
+      r = await writeTarget(c, id);
     if (expired(r)) throw new InstagramError('meta_token_expired', 409);
     // Instagram は同じ合鍵を延長するので、つながっている相手と許可の範囲は変わらない。
     // 投稿先IDは /me の正確な値で照合し、古い丸め済みIDだけ修復する。
@@ -513,8 +558,16 @@ instagram.delete(
     if (!b || !Number.isSafeInteger(b.expectedVersion) || b.expectedVersion < 1)
       throw new InstagramError('expected_version_required', 400);
     // 解除は1件だけ。どの接続を解除するかを先に決める。
+    // 接続が2件以上あるのに指定が無ければ断る（先頭を間違って消さないため）。
     // 接続が見つからないときは今までと同じ 409（版の衝突）で返す。
-    const target = await connectionRow(c, id, requestedConnectionId(c));
+    const target = await writeTarget(c, id).catch((failure) => {
+      if (
+        failure instanceof InstagramError &&
+        failure.code === 'connection_required'
+      )
+        throw failure;
+      return null;
+    });
     if (!target) throw new InstagramError('version_conflict', 409);
     // 子を先に消す。版が変わっていたら本文・トークンを消さない。
     // 受信メッセージは「この接続のぶん」と「772の移行で接続が付かなかった同じInstagramの古いぶん」だけ。
@@ -524,8 +577,10 @@ instagram.delete(
         'DELETE FROM instagram_messages WHERE line_account_id=? AND (connection_id=? OR (connection_id IS NULL AND instagram_id=?)) AND EXISTS(SELECT 1 FROM instagram_connections WHERE id=? AND version=?)',
       ).bind(id, target.id, target.instagram_id, target.id, b.expectedVersion),
       c.env.DB.prepare(
-        'DELETE FROM instagram_oauth_states WHERE line_account_id=? AND (connection_id=? OR connection_id IS NULL) AND EXISTS(SELECT 1 FROM instagram_connections WHERE id=? AND version=?)',
-      ).bind(id, target.id, target.id, b.expectedVersion),
+        // 接続が付いていない途中状態（新しい接続を増やす途中）は、ほかの接続が
+        // 残っていないときだけ片付ける。追加の途中を横から消さない。
+        'DELETE FROM instagram_oauth_states WHERE line_account_id=? AND (connection_id=? OR (connection_id IS NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections WHERE line_account_id=? AND id<>?))) AND EXISTS(SELECT 1 FROM instagram_connections WHERE id=? AND version=?)',
+      ).bind(id, target.id, id, target.id, target.id, b.expectedVersion),
       c.env.DB.prepare(
         'DELETE FROM instagram_connections WHERE id=? AND version=?',
       ).bind(target.id, b.expectedVersion),
@@ -540,7 +595,8 @@ instagram.post(
   inputJsonBoundary(), async (c) => {
     const id = await account(c),
       cfg = ready(c),
-      r = await connection(c, id, requestedConnectionId(c));
+      // 取り込みは接続の情報を書き換えるので、宛先を1件に決めてから進める。
+      r = await writeTarget(c, id);
     if (expired(r)) throw new InstagramError('meta_token_expired', 409);
     const token = await decryptInstagramCredential(
       r.page_token_encrypted,

@@ -912,3 +912,81 @@ describe('削除', () => {
     expect(googleCalls.some((x) => x.init?.method === 'DELETE')).toBe(false);
   });
 });
+
+/*
+ * 772 で1つの店舗に2つのGoogle接続（別のlocation）を持てるようにしたので、
+ * 「送信を始めた接続」と「いま選んでいる接続」が違う場合の決めごとを固める（受入条件4）。
+ * ここを守らないと、送達不明の再確認が別のlocationの一覧を見て空振りし、そのまま
+ * 再投稿して行の connection_id を付け替える＝二重投稿になる。
+ */
+describe('接続が2件あるとき（複数接続）', () => {
+  const LOCATION_2 = 'accounts/111/locations/333';
+
+  /** 同じ店舗の2件目の接続。location が違うので一意索引（store_id, location_name）に当たらない。 */
+  async function seedSecondConnection(): Promise<void> {
+    testDb.raw
+      .prepare(
+        `INSERT INTO rt_google_connections
+          (id, store_id, line_account_id, google_account_email, location_name, location_title, refresh_token_enc, access_token_enc, access_token_expires_at, status, connected_at, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run('conn-2', 'store-shibuya', 'account-2', 'owner2@example.test', LOCATION_2, 'こもれび食堂 原宿店', await encryptCredential('refresh-secret-2', ENC_KEY), await encryptCredential('access-secret-2', ENC_KEY), '2099-01-01T00:00:00.000Z', 'connected', '2026-09-23T01:00:00.000Z', 1);
+  }
+
+  const connectionIdOf = (id: string) =>
+    (testDb.raw.prepare('SELECT connection_id FROM rt_google_posts WHERE id = ?').get(id) as { connection_id: string | null }).connection_id;
+
+  it('送信を始めた接続と別の接続で再確認しても、Googleへ出さず付け替えない', async () => {
+    await seedSecondConnection();
+    const draft = await createDraft();
+    // 1件目の接続で送って結果不明にする（送達不明＝pending_confirm）。
+    createFailStatus = 500;
+    expect((await publish(draft.json.post!.id)).status).toBe(502);
+    createFailStatus = null;
+    expect(connectionIdOf(draft.json.post!.id)).toBe('conn-1');
+
+    const calls = googleCalls.length;
+    const wrong = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}/publish?connection_id=conn-2`, { body: { confirmed: true } });
+    expect(wrong.status).toBe(409);
+    expect(await wrong.json()).toMatchObject({ code: 'connection_mismatch' });
+    // 別の接続の一覧を見に行かない（空振り→再投稿の入口を閉じる）。
+    expect(googleCalls).toHaveLength(calls);
+    expect(connectionIdOf(draft.json.post!.id)).toBe('conn-1');
+  });
+
+  it('送信を始めた接続を選べば、同じ接続で再確認して付け替えずに確定する', async () => {
+    await seedSecondConnection();
+    const draft = await createDraft();
+    createFailStatus = 500;
+    expect((await publish(draft.json.post!.id)).status).toBe(502);
+    createFailStatus = null;
+
+    // Googleには実際は届いていた。1件目のlocationの一覧に出す。
+    const row = testDb.raw.prepare('SELECT sent_at FROM rt_google_posts WHERE id = ?').get(draft.json.post!.id) as { sent_at: string };
+    googlePostsOnGoogle.push({ name: `${LOCATION}/localPosts/silent1`, topicType: 'STANDARD', summary: standardBody.summary, state: 'LIVE', createTime: new Date(Date.parse(row.sent_at) + 1000).toISOString() });
+
+    const again = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}/publish?connection_id=conn-1`, { body: { confirmed: true } });
+    expect(again.status).toBe(200);
+    expect((await again.json()) as Record<string, unknown>).toMatchObject({ post: { status: 'published' } });
+    expect(createCalls()).toHaveLength(1); // 作り直していない
+    expect(connectionIdOf(draft.json.post!.id)).toBe('conn-1');
+  });
+
+  it('2件目の接続を選んだ下書きは、2件目のlocationへ出して2件目を記録する', async () => {
+    await seedSecondConnection();
+    const draft = await createDraft();
+    const r = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}/publish?connection_id=conn-2`, { body: { confirmed: true } });
+    expect(r.status).toBe(200);
+    expect(createCalls().map((x) => x.url)).toEqual([`https://mybusiness.googleapis.com/v4/${LOCATION_2}/localPosts`]);
+    expect(connectionIdOf(draft.json.post!.id)).toBe('conn-2');
+  });
+
+  it('存在しない接続IDは404で、Googleへ一度も通信しない', async () => {
+    await seedSecondConnection();
+    const draft = await createDraft();
+    const r = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}/publish?connection_id=conn-404`, { body: { confirmed: true } });
+    expect(r.status).toBe(404);
+    expect(await r.json()).toMatchObject({ code: 'connection_not_found' });
+    expect(googleCalls).toHaveLength(0);
+  });
+});

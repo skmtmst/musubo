@@ -279,8 +279,21 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
       state: 'connected',
       primary: true,
       version: 4,
+      // 行の目印とは別に「操作する相手」を持つ。画面はこれをAPIへ渡す。
+      connectionId: 'gc-1',
     })
     expect(row.meta).toEqual(['owner@example.com', '最後に取り込んだ日時 日時(2026-11-01T00:00:00.000Z)'])
+  })
+
+  it('Google は接続の id が無いとき操作先を空にする（店舗名で代用しない）', () => {
+    const row = googleSlots(
+      googleData({ status: 'connected', locationName: 'locations/1', locationTitle: '然カフェ 本店' }),
+      fmt,
+    ).connections[0]!
+
+    // 一覧の並びには店舗名を使うが、APIへ渡す相手は分からないので付けない。
+    expect(row.id).toBe('locations/1')
+    expect(row.connectionId).toBeNull()
   })
 
   it('Google の未接続・読み取れないときは行を作らない', () => {
@@ -306,6 +319,8 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
   }
 
   const IG_CONNECTION = {
+    /* 接続そのものの id。画面には出さないが、操作の宛先としてAPIへ渡す。 */
+    id: 'igc-1',
     pageId: 'page-1',
     instagramId: 'ig-1',
     pageName: '然カフェ',
@@ -328,8 +343,18 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
       state: 'connected',
       primary: false,
       version: 3,
+      // 行の目印は Instagram のアカウント id。操作の相手は接続そのものの id で別物。
+      connectionId: 'igc-1',
     })
     expect(row.meta).toEqual(['ビジネスアカウント', '接続した日 日時(2026-10-07T01:00:00.000Z)'])
+  })
+
+  it('Instagram は接続の id が無いとき操作先を空にする（アカウントidで代用しない）', () => {
+    const row = instagramSlots(igStatus('connected', { ...IG_CONNECTION, id: undefined }), fmt).connections[0]!
+
+    // ここで instagramId を宛先に使うとサーバーが見つけられず必ず失敗する。
+    expect(row.id).toBe('ig-1')
+    expect(row.connectionId).toBeNull()
   })
 
   it('Instagram はユーザー名が無いときページ名を出す', () => {

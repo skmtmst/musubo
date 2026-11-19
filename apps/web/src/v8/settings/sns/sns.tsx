@@ -98,7 +98,10 @@ const GOOGLE_FLASH: Record<string, { tone: 'success' | 'warn' | 'danger'; text: 
 type DisconnectTicket = {
   scope: { id: string | null }
   service: SnsService
+  /** 画面の行を見分ける目印。API の宛先ではない。 */
   connectionId: string
+  /** API へ宛先として送る接続の id。古い返事で分からないときは null。 */
+  apiConnectionId: string | null
   version: number | null
   /** Google の版の口。版が無い接続は null（版の確認なしで解除する）。 */
   googleExpected: { expectedConnectionId: string; expectedConfirmationRevision: number } | null
@@ -199,18 +202,23 @@ export default function SnsSettingsPage() {
   )) disconnectTicket.current = null
   const renderedDisconnectTicket = disconnectTicket.current
 
-  /** 認可画面へ進む。Google は店舗（ロケーション）の選択まで Google 側で行う。 */
-  const beginConnect = async (service: SnsService) => {
+  /**
+   * 認可画面へ進む。Google は店舗（ロケーション）の選択まで Google 側で行う。
+   * `target` は宛先。行の「つなぎ直す」はその行の接続、「接続を追加する」は `add`。
+   * どちらも渡さないと、サーバーは接続が1件のときだけその1件を相手にする。
+   */
+  const beginConnect = async (service: SnsService, target?: { connection?: SnsConnectionView; add?: boolean }) => {
     if (!accountId) return
     setBusy(true)
     setActionError('')
     try {
+      const connectionId = target?.add ? null : target?.connection?.connectionId ?? null
       if (service === 'googleBusiness') {
-        const res = await restaurantGoogleApi.connectStart(accountId)
+        const res = await restaurantGoogleApi.connectStart(accountId, { connectionId, add: target?.add })
         window.location.assign(res.authorizeUrl)
         return
       }
-      const res = await api.instagram.start(accountId)
+      const res = await api.instagram.start(accountId, { connectionId, add: target?.add })
       if (!res.success) throw new Error(res.error)
       window.location.href = res.data.url
     } catch (saveFailure) {
@@ -227,13 +235,16 @@ export default function SnsSettingsPage() {
   /**
    * Instagram の接続を確かめ直す（前からある機能・`POST /api/instagram/refresh`）。
    * 認可はやり直さず、今の接続がまだ生きているかをサーバーに確かめて表示を更新する。
+   * 札はカードに1つなので、この段に見えている接続をすべて確かめる（承認デザイン F8 のまま）。
    */
   const checkInstagram = async () => {
     if (!accountId) return
     setBusy(true)
     setActionError('')
     try {
-      await api.instagram.refresh(accountId)
+      const targets = slots.instagram.connections
+      if (targets.length === 0) await api.instagram.refresh(accountId)
+      else for (const connection of targets) await api.instagram.refresh(accountId, connection.connectionId)
       await load()
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
@@ -247,7 +258,10 @@ export default function SnsSettingsPage() {
   const startAddition = (service: SnsService) => {
     if (!accountId) return
     const plan = planAddition(slots, service, BILLING)
-    if (plan.kind === 'within-quota') { void beginConnect(service); return }
+    // 1件目は「増やす」ではなく今までどおりの接続開始にする。こうすると解除済みの行を
+    // つなぎ直せて、使われない行が溜まらない。2件目からは必ず新しい行を足す（add）。
+    const add = slots[service].connections.length > 0
+    if (plan.kind === 'within-quota') { void beginConnect(service, { add }); return }
     if (plan.kind === 'billing-unknown') return
     setActionError('')
     setAddPlan(plan)
@@ -263,15 +277,16 @@ export default function SnsSettingsPage() {
   /** 解除の確認を開く。版を控え、LINEアカウントの切り替えで無効にする。 */
   const askDisconnect = (service: SnsService, connection: SnsConnectionView) => {
     if (!accountId || !canManage) return
-    const googleConnection = service === 'googleBusiness' ? visibleGoogle?.connection ?? null : null
-    const revision = googleConnection?.confirmationRevision
+    // 版の口は「押した行の接続」から作る。段の先頭の接続ではない。
+    const revision = connection.version
     disconnectTicket.current = {
       scope: accountScope.current,
       service,
       connectionId: connection.id,
+      apiConnectionId: connection.connectionId ?? null,
       version: connection.version,
-      googleExpected: googleConnection?.id && Number.isSafeInteger(revision) && (revision as number) >= 1
-        ? { expectedConnectionId: googleConnection.id, expectedConfirmationRevision: revision as number }
+      googleExpected: service === 'googleBusiness' && connection.connectionId && Number.isSafeInteger(revision) && (revision as number) >= 1
+        ? { expectedConnectionId: connection.connectionId, expectedConfirmationRevision: revision as number }
         : null,
     }
     setActionError('')
@@ -291,7 +306,7 @@ export default function SnsSettingsPage() {
           setActionError('接続の版を読み取れませんでした。画面を読み込み直してからもう一度お試しください。')
           return false
         }
-        await api.instagram.disconnect(accountId, ticket.version)
+        await api.instagram.disconnect(accountId, ticket.version, ticket.apiConnectionId)
       } else {
         await restaurantGoogleApi.disconnect(accountId, ticket.googleExpected ?? undefined)
       }
@@ -418,7 +433,7 @@ export default function SnsSettingsPage() {
                 canManage={canManageGoogle}
                 lockedReason={LOCKED_REASON}
                 busyId={busyId}
-                onReconnect={() => { void beginConnect('googleBusiness') }}
+                onReconnect={(connection) => { void beginConnect('googleBusiness', { connection }) }}
                 onDisconnect={(connection) => askDisconnect('googleBusiness', connection)}
                 rowLink={(connection) => connection.state === 'connected' && visibleGoogle.connection.locationName ? { href: '/settings/google-hours', label: '営業時間へ' } : null}
               />
@@ -479,7 +494,7 @@ export default function SnsSettingsPage() {
                 canManage={canManage}
                 lockedReason={LOCKED_REASON}
                 busyId={busyId}
-                onReconnect={() => { void beginConnect('instagram') }}
+                onReconnect={(connection) => { void beginConnect('instagram', { connection }) }}
                 onDisconnect={(connection) => askDisconnect('instagram', connection)}
               />
               {addNarrow('instagram')}
@@ -537,7 +552,7 @@ export default function SnsSettingsPage() {
           busy={busy}
           error={actionError || undefined}
           onCancel={() => { setAddPlan(null); setActionError('') }}
-          onConfirm={() => { void beginConnect(addPlan.service) }}
+          onConfirm={() => { void beginConnect(addPlan.service, { add: true }) }}
         />
       ) : null}
 

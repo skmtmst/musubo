@@ -686,9 +686,12 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireConnec
   if (!client) return fail(c, 503, 'Google接続の設定（OAuthクライアント）がこの環境にありません', { code: 'oauth_not_configured' });
   const store = await ensureStoreForGoogle(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
-  // connection_id を渡すとその接続の再接続になる（渡さないときは今までどおり主連携）。
+  // connection_id を渡すとその接続のつなぎ直しになる（渡さないときは今までどおり主連携）。
+  // mode=add は「接続を増やす」。既にある接続は一切見ないので、主連携を取り違えてつなぎ直さない。
+  const adding = c.req.query('mode') === 'add';
   const wanted = requestedConnectionId(c);
-  const existing = await connectionFor(c, store.id, wanted);
+  if (adding && wanted) return fail(c, 400, '接続の追加では接続IDを指定できません', { code: 'connection_target_conflict' });
+  const existing = adding ? null : await connectionFor(c, store.id, wanted);
   if (!existing && wanted) return fail(c, 404, '指定されたGoogleの接続が見つかりません', { code: 'connection_not_found' });
   const mode = existing?.status === 'connected' || existing?.status === 'expired' || existing?.status === 'no_permission' ? 'reconnect' : 'connect';
 
@@ -703,11 +706,13 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireConnec
   const expiresAt = new Date(Date.now() + OAUTH_STATE_MAX_AGE_SEC * 1000).toISOString();
   await dbFor(c.env, store.id)
     .prepare(
-      // connection_id を控えるのは、戻ってきたときにどの接続の再接続かを取り違えないため。
+      // connection_id を控えるのは、戻ってきたときにどの接続を書き換えるかを取り違えないため。
+      // つなぎ直しだけでなく、解除済みの接続をもう一度つなぐ場合もその行を控える。
+      // 接続を増やすとき（mode=add）だけ空にして、戻りで新しい行を足す。
       `INSERT INTO rt_google_oauth_states (state, store_id, line_account_id, connection_id, staff_id, mode, code_verifier_enc, expires_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(state, store.id, store.lineAccountId, mode === 'reconnect' ? existing?.id ?? null : null, c.get('staff')!.id, mode, verifierEnc, expiresAt)
+    .bind(state, store.id, store.lineAccountId, existing?.id ?? null, c.get('staff')!.id, mode, verifierEnc, expiresAt)
     .run();
   c.header('Set-Cookie', stateCookie(state));
   auditLog(c, 'restaurant.google.connect.start', { id: store.id, kind: 'rt_store' }, { lineAccountId: store.lineAccountId });
@@ -782,8 +787,14 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     const options: RequestOptions = { fetch, accessToken: tokens.accessToken };
     const email = await fetchAccountEmail(options);
     const locations = await listManageableLocations(options);
-    // 認可を始めた時に控えた接続へ戻す。控えが無い（新規接続）ときは今までどおり主連携を見る。
-    const existing = await connectionFor(c, store.id, stateRow.connection_id);
+    // 認可を始めた時に控えた接続へ戻す。控えが空なら接続を増やすので、既にある接続は見ない
+    // （主連携を取り違えて書き換えないため）。つなぎ直しの控えが空のまま戻ってきた古い途中状態
+    // （この修正より前に始めた認可）だけは、今までどおり主連携を見る。
+    const existing = stateRow.connection_id
+      ? await connectionFor(c, store.id, stateRow.connection_id)
+      : stateRow.mode === 'reconnect'
+        ? await connectionFor(c, store.id, null)
+        : null;
     if (!existing && stateRow.connection_id) {
       return c.redirect(adminReturnUrl(c, lineAccountId, 'error:connection_not_found'));
     }
@@ -842,6 +853,15 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     // 1店舗に複数の接続が並ぶので、store_id を衝突の鍵にした upsert は使えない。
     // 対象の接続が決まっているなら id で更新し、決まっていないなら新しい行を足す。
     const connectionId = existing?.id ?? crypto.randomUUID();
+    // 同じ店舗（location）を2つの接続で持つことはできない。先に重なりを見て、
+    // 書き込みで制約違反になる前に案内へ戻す（接続を増やすときに同じ店舗を選んだ場合）。
+    if (single) {
+      const taken = await db
+        .prepare('SELECT 1 FROM rt_google_connections WHERE store_id = ? AND location_name = ? AND id <> ? LIMIT 1')
+        .bind(store.id, single.name, connectionId)
+        .first();
+      if (taken) return c.redirect(adminReturnUrl(c, lineAccountId, 'error:location_already_connected'));
+    }
     if (existing) {
       await db
         .prepare(
@@ -954,6 +974,14 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
     .bind(store.id, locationName, connection.id)
     .first<{ location_name: string; location_title: string }>();
   if (!candidate) return fail(c, 400, '選べる店舗ではありません', {}, ["locationName"]);
+  // 同じ店舗（location）を2つの接続で持つことはできない。書き込みで制約違反になる前に重なりを返す。
+  const takenBy = await db
+    .prepare('SELECT 1 FROM rt_google_connections WHERE store_id = ? AND location_name = ? AND id <> ? LIMIT 1')
+    .bind(store.id, locationName, connection.id)
+    .first();
+  if (takenBy) {
+    return fail(c, 409, 'この店舗はすでに別のGoogle接続で使われています', { code: 'location_already_connected' }, ["locationName"]);
+  }
   let selectedLocation: GoogleLocation | undefined;
   try {
     const accessToken = await accessTokenFor(c, connection);

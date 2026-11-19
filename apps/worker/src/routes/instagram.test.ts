@@ -1044,3 +1044,167 @@ it('写真DMと受信時刻の順、別アカウントのカーソルを守る',
     404,
   );
 });
+
+/*
+ * ここから下は「同じLINEアカウントに接続が2件あるとき」の決めごと（受入条件4）。
+ * 772 で1つのLINEアカウントに複数の接続を持てるようにしたので、書き換えの口が
+ * 既定の1件（並び順の先頭）へ落ちると、2件目を押したのに先頭を消す・繋ぎ直す事故が起きる。
+ */
+
+/**
+ * いまの接続をそのまま写して2件目を作る。合鍵はそのまま使えるので、
+ * つなぎ直し・確認・解除がどちらの行を触ったかだけを見られる。
+ * 並び順を後ろにして「既定の1件」にはならないようにする。
+ */
+function addSecondConnection() {
+  db.raw
+    .prepare(
+      `INSERT INTO instagram_connections
+         (id,line_account_id,page_id,instagram_id,page_name,username,page_token_encrypted,user_token_encrypted,
+          expires_at,data_access_expires_at,profile_json,posts_json,refreshed_at,synced_at,connected_by,version,scopes,sort_order)
+       SELECT 'igc-2',line_account_id,'21','21',page_name,'nen_cafe_2',page_token_encrypted,user_token_encrypted,
+              expires_at,data_access_expires_at,profile_json,posts_json,refreshed_at,synced_at,connected_by,7,scopes,1
+         FROM instagram_connections WHERE line_account_id='a1' ORDER BY sort_order, id LIMIT 1`,
+    )
+    .run();
+  const first = db.raw
+    .prepare("SELECT id,version FROM instagram_connections WHERE id<>'igc-2'")
+    .get() as { id: string; version: number };
+  return first;
+}
+
+it('接続が2件あるとき、解除は接続IDの指定が無ければ断る（先頭を消さない）', async () => {
+  await connect();
+  const first = addSecondConnection();
+
+  const res = await req(
+    '/api/instagram/connection',
+    { expectedVersion: first.version },
+    'DELETE',
+  );
+  expect(res.status).toBe(400);
+  expect(await res.text()).toContain('connection_required');
+  // 2件とも残る。版の指定が先頭と一致していても消さない。
+  expect(
+    db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections').get(),
+  ).toEqual({ n: 2 });
+});
+
+it('接続が2件あるとき、解除は指定した接続だけを消す', async () => {
+  await connect();
+  const first = addSecondConnection();
+
+  // 2件目の版は7。先頭の版を渡しても消えない。
+  expect(
+    (
+      await req(
+        '/api/instagram/connection?connectionId=igc-2',
+        { expectedVersion: first.version },
+        'DELETE',
+      )
+    ).status,
+  ).toBe(409);
+  expect(
+    (
+      await req(
+        '/api/instagram/connection?connectionId=igc-2',
+        { expectedVersion: 7 },
+        'DELETE',
+      )
+    ).status,
+  ).toBe(200);
+  expect(
+    db.raw.prepare('SELECT id FROM instagram_connections').all(),
+  ).toEqual([{ id: first.id }]);
+});
+
+it('接続が2件あるとき、接続確認は指定した接続だけを更新する', async () => {
+  await connect();
+  const first = addSecondConnection();
+
+  // 指定が無ければ断る（先頭の合鍵を勝手に延ばさない）。
+  const vague = await req('/api/instagram/refresh', {});
+  expect(vague.status).toBe(400);
+  expect(await vague.text()).toContain('connection_required');
+
+  // 2件目は別のInstagramアカウント。接続確認は `/me` の正確なIDへ直すので、
+  // ここだけ2件目の相手（21）を返させる。先頭（20）と同じIDにはなり得ない。
+  const upstream = globalThis.fetch;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: URL | string, init?: RequestInit) =>
+      new URL(String(url)).pathname.endsWith('/me')
+        ? Response.json({ id: '21', username: 'nen_cafe_2' })
+        : upstream(url as RequestInfo, init),
+    ),
+  );
+
+  expect((await req('/api/instagram/refresh?connectionId=igc-2', {})).status).toBe(200);
+  // 版が上がるのは2件目だけ。先頭は触らない。
+  expect(
+    db.raw.prepare('SELECT id,version FROM instagram_connections ORDER BY id').all(),
+  ).toEqual([{ id: 'igc-2', version: 8 }, { id: first.id, version: first.version }]);
+});
+
+it('接続が2件あるとき、つなぎ直しは指定した接続を宛先として預ける', async () => {
+  await connect();
+  addSecondConnection();
+  db.raw.prepare('DELETE FROM instagram_oauth_states').run();
+
+  // 指定が無ければ断る（どちらを繋ぎ直すのか決まらない）。
+  const vague = await req('/api/instagram/oauth/start', {});
+  expect(vague.status).toBe(400);
+  expect(await vague.text()).toContain('connection_required');
+
+  expect(
+    (await req('/api/instagram/oauth/start?connectionId=igc-2', {})).status,
+  ).toBe(200);
+  expect(
+    db.raw.prepare('SELECT connection_id FROM instagram_oauth_states').all(),
+  ).toEqual([{ connection_id: 'igc-2' }]);
+});
+
+it('接続を増やすときは宛先を持たず、接続IDの同時指定は断る', async () => {
+  await connect();
+  addSecondConnection();
+  db.raw.prepare('DELETE FROM instagram_oauth_states').run();
+
+  // 「増やす」と「この接続を繋ぎ直す」は両立しない。
+  const both = await req('/api/instagram/oauth/start?mode=add&connectionId=igc-2', {});
+  expect(both.status).toBe(400);
+  expect(await both.text()).toContain('connection_target_conflict');
+
+  expect((await req('/api/instagram/oauth/start?mode=add', {})).status).toBe(200);
+  // 増やす途中なので、まだどの接続にも結び付かない。
+  expect(
+    db.raw.prepare('SELECT connection_id FROM instagram_oauth_states').all(),
+  ).toEqual([{ connection_id: null }]);
+});
+
+it('別のLINEアカウントの接続IDを渡しても見つからない扱いにする', async () => {
+  await connect();
+  addSecondConnection();
+  // a2（別の統括）の接続としてもう1件作る。
+  db.raw
+    .prepare(
+      `INSERT INTO instagram_connections
+         (id,line_account_id,page_id,instagram_id,page_name,username,page_token_encrypted,user_token_encrypted,
+          expires_at,data_access_expires_at,refreshed_at,connected_by,version,scopes,sort_order)
+       SELECT 'igc-other','a2','99','99',page_name,'other',page_token_encrypted,user_token_encrypted,
+              expires_at,data_access_expires_at,refreshed_at,connected_by,1,scopes,0
+         FROM instagram_connections WHERE id='igc-2'`,
+    )
+    .run();
+
+  // 読み取りは行が無い扱い、書き換えは 404。どちらも他の統括の行を触らない。
+  expect(
+    (await read(await req('/api/instagram/connection?connectionId=igc-other')))
+      .data.state,
+  ).toBe('disconnected');
+  expect(
+    (await req('/api/instagram/refresh?connectionId=igc-other', {})).status,
+  ).toBe(404);
+  expect(
+    db.raw.prepare("SELECT version FROM instagram_connections WHERE id='igc-other'").get(),
+  ).toEqual({ version: 1 });
+});
