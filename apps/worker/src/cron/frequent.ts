@@ -103,8 +103,8 @@ export async function runFrequentHeavyJobs(
     {
       name: 'booking meeting recovery',
       run: async () => {
-        const {processMeetingQueue}=await import('../features/booking/booking-meeting-queue.js');
-        const {meetingQueueDependencies}=await import('../features/booking/booking-meeting-runtime.js');
+        const {processMeetingQueue}=await import('../features/booking/booking-meeting-queue/index.js');
+        const {meetingQueueDependencies}=await import('../features/booking/booking-meeting-runtime/index.js');
         await processMeetingQueue(env.DB,meetingQueueDependencies(env));
       },
     },

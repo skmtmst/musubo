@@ -543,8 +543,8 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
 
   // 会議の処理を変更案内より先に実行し、URLの不一致を防ぐ。
   try {
-    const {processMeetingQueue}=await import('../../features/booking/booking-meeting-queue.js');
-    const {meetingQueueDependencies}=await import('../../features/booking/booking-meeting-runtime.js');
+    const {processMeetingQueue}=await import('../../features/booking/booking-meeting-queue/index.js');
+    const {meetingQueueDependencies}=await import('../../features/booking/booking-meeting-runtime/index.js');
     await processMeetingQueue(c.env.DB,meetingQueueDependencies(c.env),1,{bookingId,accountId});
   } catch { logger.error('booking_meeting_recovery_failed'); }
 
