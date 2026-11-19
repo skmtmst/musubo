@@ -5625,7 +5625,8 @@ CREATE TABLE musubo_line_usage (
   billed_linked_slots INTEGER NOT NULL DEFAULT 0 CHECK (billed_linked_slots >= 0),
   linked_slots_reduction_at TEXT,
   updated_at TEXT NOT NULL
-);
+, contracted_linked_slots INTEGER NOT NULL DEFAULT 1
+  CHECK (contracted_linked_slots >= 1));
 
 CREATE TABLE musubo_pending_additions (
   id TEXT PRIMARY KEY,

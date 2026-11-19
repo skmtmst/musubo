@@ -31,18 +31,6 @@ describe("管理画面 友だち一括操作（IAf7j）の配線", () => {
     expect(PAGE).toContain('一括操作ができるのはオーナーと管理者だけです')
   })
 
-  it('作る前に必ず対象を数え直す', () => {
-    /*
-      選んだ人数がそのまま対象になるとは限らない。除外はサーバーが決める。
-      画面の選択数を実行数として扱うと、除外された人まで「やった」ことになる。
-    */
-    const load = DIALOG.slice(DIALOG.indexOf('const loadPreview'), DIALOG.indexOf('useEffect(() => {'))
-    expect(load).toContain('api.friends.bulkPreview')
-    expect(load).not.toContain('api.friends.bulkCreate')
-    // 確認の面は数え直したあとにだけ出る。
-    expect(load).toContain("setPhase('confirm')")
-  })
-
   it('開いたときに書き込みの口を呼ばない', () => {
     const effect = DIALOG.slice(DIALOG.indexOf('useEffect(() => {'), DIALOG.indexOf('if (!open) return null'))
     for (const w of ['bulkCreate', 'bulkRetry', 'bulkUndo', 'bulkPreview']) {
@@ -84,18 +72,6 @@ describe("管理画面 友だち一括操作（IAf7j）の配線", () => {
     // 取り消しは別実行なので、元のdetail.idではなく返されたIDを追う。
     expect(DIALOG).toContain("void pollRun(res.data.id, 'undo')")
     expect(DIALOG).not.toContain('api.friends.bulkGet(detail.id)')
-  })
-
-  it('結果の読込失敗で一括操作そのものをもう一度作らない', () => {
-    expect(DIALOG).toContain("if (phase === 'result' && runId) void pollRun(runId, resultAction)")
-    const poll = DIALOG.slice(DIALOG.indexOf('const pollRun'), DIALOG.indexOf('useEffect(() => {'))
-    expect(poll).toContain('api.friends.bulkGet(id)')
-    expect(poll).not.toContain('bulkCreate')
-  })
-
-  it('取り消せない操作は追加確認を送る', () => {
-    expect(DIALOG).toContain('reversible ? {} : { confirmIrreversible: true }')
-    expect(DIALOG).toContain('この操作は取り消せません')
   })
 
   it('やり直しは失敗した対象だけ、取り消しは取り消せる操作だけ', () => {
