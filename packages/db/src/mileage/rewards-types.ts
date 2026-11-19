@@ -3,6 +3,7 @@
 
 export type MileageRewardKind =
   | 'coupon'
+  | 'handgift'
   | 'tag'
   | 'scenario'
   | 'template'

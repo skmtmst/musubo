@@ -20,7 +20,7 @@ describe('手渡し景品', () => {
     const d = fixture();
     try {
       const result = await deliverMileageReward(d.db, 'r', {});
-      expect(result.status).toBe('delivery_failed');
+      expect(result.status).toBe('pending');
       expect(result.message).toContain('店舗でのお渡し');
       expect(d.raw.prepare("SELECT status, delivered_at FROM mileage_redemptions WHERE id='r'").get()).toEqual({ status: 'reserved', delivered_at: null });
     } finally { d.raw.close(); }

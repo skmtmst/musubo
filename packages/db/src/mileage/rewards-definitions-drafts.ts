@@ -20,9 +20,10 @@ export async function createMileageRewardDraft(
        VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
     ).bind(
       rewardId, input.lineAccountId, input.programId ?? 'default', draft.name,
-      draft.description, draft.imageUrl, draft.rewardKind, versionId,
+      draft.description, draft.imageUrl, draft.rewardKind === 'handgift' ? 'tag' : draft.rewardKind, versionId,
       input.createdBy ?? null, now, now,
     ),
+    ...(draft.rewardKind === 'handgift' ? [db.prepare('INSERT INTO mileage_handgift_rewards(reward_id) VALUES (?)').bind(rewardId)] : []),
     db.prepare(
       `INSERT INTO mileage_reward_versions
          (id, reward_id, version_number, status, required_miles, stock_limit,
@@ -54,6 +55,10 @@ export async function updateMileageRewardDraft(
 ): Promise<MileageRewardSummary> {
   const draft = validateMileageRewardDraft(input.draft);
   await requirePublishedActionVersion(db, input.lineAccountId, draft.commonActionVersionId);
+  const existingReward = await getMileageReward(db, { id: input.id, lineAccountId: input.lineAccountId });
+  if (existingReward && ((existingReward.rewardKind === 'handgift') !== (draft.rewardKind === 'handgift'))) {
+    throw new MileageRewardError('invalid_kind_change', '手渡し景品の種類は変更できません。新しい使い道を作ってください', 409);
+  }
   // 書く前に所属と版IDを照合する。版のUPDATEだけ所属を見ない形にしない。
   // 読み込んだ更新番号と一致する保存だけ通す。
   const current = await db.prepare(
@@ -85,7 +90,7 @@ export async function updateMileageRewardDraft(
              ${revisionGuard}
           )`,
     ).bind(
-      draft.name, draft.description, draft.imageUrl, draft.rewardKind, now,
+      draft.name, draft.description, draft.imageUrl, draft.rewardKind === 'handgift' ? 'tag' : draft.rewardKind, now,
       input.id, input.lineAccountId, input.expectedVersionId,
       input.expectedVersionId, ...revisionBinds,
     ),

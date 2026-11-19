@@ -34,7 +34,7 @@ export interface MileageRewardDeliveryOptions {
 }
 
 export interface MileageRewardDeliveryResult {
-  status: 'succeeded' | 'delivery_failed';
+  status: 'succeeded' | 'delivery_failed' | 'pending';
   rewardName: string;
   customerMessage: string;
   rewardCode: string | null;
@@ -206,7 +206,7 @@ export async function deliverMileageReward(
     ).bind(redemptionId).first<{ delivered_at: string | null; cancelled_at: string | null }>();
     const delivered = Boolean(handgift?.delivered_at && !handgift.cancelled_at && plan.redemption.status === 'succeeded');
     return {
-      status: delivered ? 'succeeded' : 'delivery_failed', rewardName: plan.rewardName,
+      status: delivered ? 'succeeded' : plan.redemption.status === 'refunded' || handgift?.cancelled_at ? 'delivery_failed' : 'pending', rewardName: plan.rewardName,
       customerMessage: plan.customerMessage, rewardCode: null, retryAt: null,
       failurePolicy: plan.failurePolicy,
       message: delivered ? null : plan.redemption.status === 'refunded' || handgift?.cancelled_at

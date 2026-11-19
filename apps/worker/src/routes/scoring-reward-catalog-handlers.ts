@@ -353,7 +353,7 @@ export const post__api_mileage_redemptions_17 = async (c: Context<Env, "/api/mil
         kind: 'mileage_redemption', id: reserved.redemption.id,
       });
       return c.json({
-        success: delivery.status === 'succeeded',
+        success: delivery.status === 'succeeded' || delivery.status === 'pending',
         data: {
           replayed: reserved.kind === 'existing',
           redemption: publicMileageRedemption(reserved.redemption),
@@ -478,7 +478,7 @@ export const post__api_mileage_redemptions_id_retry_fulfillment_20 = async (c: C
        */
       const fresh = await getMileageRedemption(c.env.DB, redemption.id);
       const data = { ...delivery, redemption: publicMileageRedemption(fresh ?? redemption) };
-      return c.json({ success: delivery.status === 'succeeded', data },
+      return c.json({ success: delivery.status === 'succeeded' || delivery.status === 'pending', data },
         delivery.status === 'succeeded' ? 200 : 202);
     } catch (error) {
       return mileageRewardError(c, error);
