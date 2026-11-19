@@ -105,6 +105,7 @@ export async function overwriteResource(
   style?: AccountStyle,
   answersOverride?: Record<string, SetupAnswer>,
   plannedForms?: PlannedInitialForms,
+  knownSnapshot?: string | null,
 ) {
   const name = '【見本】' + item.name;
   if (item.kind === 'template') {
@@ -154,7 +155,10 @@ export async function overwriteResource(
   }
   if (item.kind === 'form') {
     if(!style || !item.formTarget) throw new StyleError('invalid_initial_form');
-    const current=await db.prepare(`SELECT f.layout FROM forms f WHERE f.id=? AND f.is_active=0 AND f.status='active'
+    const current = knownSnapshot !== undefined
+      ? (() => { const data = knownSnapshot ? JSON.parse(knownSnapshot) as {active:number;status:string;layout:string|null} : null;
+          return data && data.active === 0 && data.status === 'active' ? {layout:data.layout} : null; })()
+      : await db.prepare(`SELECT f.layout FROM forms f WHERE f.id=? AND f.is_active=0 AND f.status='active'
       AND EXISTS(SELECT 1 FROM form_accounts a WHERE a.form_id=f.id AND a.line_account_id=?)
       AND (SELECT COUNT(*) FROM form_accounts a WHERE a.form_id=f.id)=1`).bind(id,account).first<{layout:string|null}>();
     if(!current)return [];

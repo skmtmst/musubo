@@ -5,7 +5,7 @@ import type { Env } from '../worker-env.js';
 import { styles } from './styles.js';
 import { gettingStarted } from './getting-started.js';
 import { initializeAccountStyle, starter } from '../services/style-setup.js';
-import { ensureStyleStarterItems } from '../services/style-starter-ensure.js';
+import { ensureStyleStarterItems, starterApplication } from '../services/style-starter-ensure.js';
 
 vi.mock('../services/account-access.js', () => ({
   getVisibleLineAccountScope: async () => ({
@@ -100,6 +100,38 @@ beforeEach(async () => {
 afterEach(() => {
   vi.restoreAllMocks();
   sql.raw.close();
+});
+
+test('多数の見本がある店で初期セット確認の問い合わせ回数を抑える', async () => {
+  await initializeAccountStyle(sql.db, 'a', 't', 'owner');
+  for (const style of ['standard', 'salon', 'restaurant', 'ec', 'consult', 'lesson', 'salon']) {
+    const r = await request(base + '?account_id=a', 'PUT', {expectedVersion: version(), style, answers: allAnswers});
+    expect(r.status).toBe(200);
+  }
+  const total = count('style_starter_items');
+  // prepare だけではなく、実行した SQL と batch・exec の往復を数える。
+  let queries = 0;
+  const measured = new Proxy(sql.db, {
+    get(target, prop) {
+      if (prop === 'batch') return (...args: Parameters<D1Database['batch']>) => { queries++; return target.batch(...args); };
+      if (prop === 'exec') return (...args: Parameters<D1Database['exec']>) => { queries++; return target.exec(...args); };
+      if (prop !== 'prepare') return Reflect.get(target, prop);
+      return (query: string) => {
+        const wrap = (statement: D1PreparedStatement): D1PreparedStatement => new Proxy(statement, {
+          get(stmt, method) {
+            if (method === 'bind') return (...args: unknown[]) => wrap(stmt.bind(...args));
+            if (method === 'first' || method === 'all' || method === 'run') return (...args: unknown[]) => { queries++; return (Reflect.get(stmt, method) as (...args: unknown[]) => unknown)(...args); };
+            return Reflect.get(stmt, method);
+          },
+        });
+        return wrap(target.prepare(query));
+      };
+    },
+  });
+  const result = await starterApplication(measured, 'a', 't');
+  expect(total).toBeGreaterThan(30);
+  expect(result).toMatchObject({applied: true, count: 30, missing: 0});
+  expect(queries).toBeLessThanOrEqual(20);
 });
 
 describe('新しいアカウントの初期セット', () => {

@@ -1,23 +1,15 @@
 import type {AccountStyle} from '@line-crm/shared';
 import { profile } from './style-profile.js';
 import { starter } from './style-starter-set.js';
+import { loadStarterPresence } from './style-starter-presence.js';
 import { StyleError } from './style-setup-core.js';
 
-export async function prepareStarterInsert(db:D1Database,account:string,tenant:string|null,style:AccountStyle,input:Record<string,unknown>,options:{set?:Awaited<ReturnType<typeof starter>>;skipExisting?:boolean;initialMenu?:boolean}) {
+export async function prepareStarterInsert(db:D1Database,account:string,tenant:string|null,style:AccountStyle,input:Record<string,unknown>,options:{set?:Awaited<ReturnType<typeof starter>>;skipExisting?:boolean;initialMenu?:boolean;repairMissing?:boolean}) {
   const set = options.set ?? (await starter(db, tenant, style, options.initialMenu));
-  const existing = (
-    await db
-      .prepare('SELECT * FROM style_starter_items WHERE line_account_id=?')
-      .bind(account)
-      .all<{
-        item_key: string;
-        target_id: string;
-        kind: string;
-        style: string;
-        is_sample: number;
-        source_snapshot: string | null;
-      }>()
-  ).results;
+  const existing = options.repairMissing
+    ? await loadStarterPresence(db, account, true)
+    : (await db.prepare('SELECT *, NULL AS present, NULL AS current_snapshot FROM style_starter_items WHERE line_account_id=?').bind(account)
+        .all<{item_key:string;target_id:string;kind:string;style:string;is_sample:number;source_snapshot:string|null;present:number|null;current_snapshot:string|null}>()).results;
   const oldProfile = await profile(db, account);
   const choice = input.choices as
     | Record<

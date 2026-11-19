@@ -4,7 +4,7 @@ import { hasPendingStyleSelection, profile, type StyleProfile } from './style-pr
 import { StyleError } from './style-setup-core.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
 import { starter } from './style-starter-set.js';
-import { starterResourceExists } from './style-starter-presence.js';
+import { loadStarterPresence, starterResourceExists } from './style-starter-presence.js';
 import { applyCatalogStarter, type StarterCatalogRuntime } from './style-starter-catalog-apply.js';
 
 /**
@@ -31,15 +31,14 @@ async function planMissingStarterItems(
 }
 
 async function countPresentStarterItems(db: D1Database, account: string, style: string, items: Array<{key: string; kind: string}>) {
-  const rows = (await db.prepare('SELECT item_key,kind,target_id,style FROM style_starter_items WHERE line_account_id=?').bind(account)
-    .all<{item_key:string;kind:string;target_id:string;style:string}>()).results;
+  const rows = await loadStarterPresence(db, account);
   let count = 0;
   for (const item of items) {
     const matching = rows.filter(row => row.item_key === item.key && row.kind === item.kind);
     const current = rows.find(row => row.item_key === item.key && row.style === style);
     const candidates = current ? [current] : matching;
     for (const row of candidates) {
-      if (row.kind === item.kind && await starterResourceExists(db, account, row)) { count++; break; }
+      if (row.kind === item.kind && starterResourceExists(row)) { count++; break; }
     }
   }
   return count;

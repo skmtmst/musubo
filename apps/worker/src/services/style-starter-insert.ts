@@ -76,7 +76,7 @@ export async function insertStyleStarterItems(
       const candidates = sameStyle ? [sameStyle] : existing.filter(row=>row.item_key===item.key && row.kind===item.kind);
       previous = undefined;
       for (const row of candidates) {
-        if (row.kind === item.kind && await starterResourceExists(db,account,row)) { previous = row; break; }
+        if (row.kind === item.kind && starterResourceExists(row)) { previous = row; break; }
       }
       if (previous && previous.style !== style) { skip(item.key,'already_exists'); continue; }
       if (sameStyle) missingCurrent = sameStyle;
@@ -112,10 +112,10 @@ export async function insertStyleStarterItems(
       if (!choice?.[item.key] || choice[item.key].mode === 'sample') {
         const old = previous!;
         if(old.is_sample && old.source_snapshot && (item.kind==='form'||item.initialMenu)) {
-          const snapshot=await resourceSnapshot(db,account,old.kind,old.target_id);
+          const snapshot=options.repairMissing ? old.current_snapshot : await resourceSnapshot(db,account,old.kind,old.target_id);
           if(sameStarterSnapshot(old.kind,snapshot,old.source_snapshot)) {
             const refresh=item.kind==='form'||await initialMenuNeedsRefresh(db,account,old.target_id,style,plannedForms);
-            const changes=refresh?await overwriteResource(db,account,old.target_id,item,now,style,answers,plannedForms):[];
+            const changes=refresh?await overwriteResource(db,account,old.target_id,item,now,style,answers,plannedForms,options.repairMissing ? snapshot : undefined):[];
             if(changes.length) {
               statements.push(snapshotGuard(db,account,old.kind,old.target_id,snapshot),...changes,
                 recordSnapshot(db,account,old.style,item.key,old.kind,old.target_id));
