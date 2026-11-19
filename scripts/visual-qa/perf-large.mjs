@@ -1,5 +1,5 @@
 /*
- * 件数の多い見本で、管理画面の重さを実際のブラウザで測る（2026-10-07）。
+ * 件数の多い見本で、管理画面の重さを実際のブラウザで測る。
  *
  *   VISUAL_QA_LARGE=1 PORT=<api> node scripts/visual-qa/mock-api.mjs &
  *   node apps/web/scripts/v8-guard/serve-out.mjs apps/web/out <web> &
