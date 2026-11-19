@@ -88,3 +88,9 @@ it('保存が競合しても入力を残し、比べるだけでは入力を捨�
   await screen.findByRole('dialog', { name: '最新の保存と比べる' })
   expect(domain.value).toBe('mine.nen.example')
 })
+
+it('取り込みを止めた間も出来事を記録し、送信やタグの更新を行わないことを伝える', async () => {
+  render(<EcConnector accountId="account-a" />)
+  await screen.findByLabelText('ショップのアドレス')
+  expect(screen.getByText('止めている間もネットショップからの出来事は記録しますが、お知らせの送信やタグの更新は行いません。「設定を保存する」で効きます。')).toBeTruthy()
+})

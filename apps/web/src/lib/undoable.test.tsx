@@ -1,8 +1,5 @@
 // @vitest-environment happy-dom
-/*
- * ★管理画面 sTJsh §1・§4 の共有部品。
- * 先に画面を変える軽い操作と、「元に戻す」で止められる遅延送信の約束を固定する。
- */
+
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
@@ -19,41 +16,19 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('元に戻せる遅延送信（runUndoable）', () => {
-  it('5秒たつまでサーバーへ送らない', async () => {
-    const commit = vi.fn().mockResolvedValue({ success: true })
-    render(<ToastHost />)
-    act(() => {
-      runUndoable({ message: '外しました', commit, undo: vi.fn() })
-    })
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(4999)
-    })
-    expect(commit).not.toHaveBeenCalled()
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1)
-    })
-    expect(commit).toHaveBeenCalledTimes(1)
-  })
-
-  it('「元に戻す」で止めたら送らず、画面の復元を呼ぶ', () => {
+describe('保存と結果の通知（runUndoable）', () => {
+  it('保存が成功してから知らせ、取り消し操作は出さない', async () => {
     const commit = vi.fn().mockResolvedValue({ success: true })
     const undo = vi.fn()
     const { container } = render(<ToastHost />)
-    act(() => {
+    await act(async () => {
       runUndoable({ message: '外しました', commit, undo })
+      await vi.advanceTimersByTimeAsync(0)
     })
-    const undoButton = [...container.querySelectorAll('button')].find(
-      (el) => el.textContent === '元に戻す',
-    ) as HTMLButtonElement
-    act(() => {
-      undoButton.click()
-    })
-    expect(undo).toHaveBeenCalledTimes(1)
-    act(() => {
-      vi.advanceTimersByTime(6000)
-    })
-    expect(commit).not.toHaveBeenCalled()
+    expect(commit).toHaveBeenCalledTimes(1)
+    expect(container.textContent).toContain('外しました')
+    expect(container.textContent).not.toContain('元に戻す')
+    expect(undo).not.toHaveBeenCalled()
   })
 
   it('送信が失敗したら画面を元に戻して失敗の知らせを出す', async () => {
@@ -71,7 +46,7 @@ describe('元に戻せる遅延送信（runUndoable）', () => {
       })
     })
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000)
+      await vi.advanceTimersByTimeAsync(0)
     })
     expect(onCommitError).toHaveBeenCalledTimes(1)
     // undo とは別の復元を渡したときはそちらが使われる
@@ -87,7 +62,7 @@ describe('元に戻せる遅延送信（runUndoable）', () => {
       runUndoable({ message: '外しました', commit, undo: vi.fn(), onCommitted })
     })
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000)
+      await vi.advanceTimersByTimeAsync(0)
     })
     expect(onCommitted).toHaveBeenCalledTimes(1)
   })

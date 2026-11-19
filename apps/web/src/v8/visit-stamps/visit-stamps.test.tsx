@@ -455,3 +455,10 @@ it('記録取消の確認中にアカウントを変えたら古い取消を送�
   if (old) fireEvent.click(within(old).getByRole('button', { name: '取り消す' }))
   expect(fx.reverse).not.toHaveBeenCalled()
 })
+
+it('受け取りボーナスの補足は全文の題名を持つ', async () => {
+  window.history.replaceState(null, '', '/visit-stamps?tab=settings')
+  render(<VisitStampsV8 />)
+  const sub = await screen.findByText('友だちがカードを受け取った時に押す数（0〜50）')
+  expect(sub.getAttribute('title')).toBe('友だちがカードを受け取った時に押す数（0〜50）')
+})

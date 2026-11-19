@@ -1,4 +1,6 @@
 'use client'
+
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import SegmentedControl from '@/components/shared/segmented'
 
 import { openCommonVarDelete,prepareCommonVarRemoval,removeCommonVars } from './list-delete-actions'
@@ -704,12 +706,11 @@ function CommonVarsListInner() {
     { value: UNGROUPED, label: '未分類' },
   ]
 
-  /* 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。 */
-  const createButton = (full: boolean) => canWrite ? (
-    <Button href="/contents/vars/new" variant="primary" className={full ? 'v8-folder-create w-full' : undefined}>
+  const createButton = (full: boolean) => (
+    <PermissionGatedButton allowed={canWrite} href="/contents/vars/new" variant="primary" className={full ? 'v8-folder-create w-full' : undefined}>
       <Plus size={16} aria-hidden="true" />共通情報を作る
-    </Button>
-  ) : null
+    </PermissionGatedButton>
+  )
 
   const folderPanel = (
     /* 共通のフォルダの列（種類 common_var・）。名前・色・並べ替え・消すは「…」から。消すと中身は未分類へ移るので一覧も読み直す。 */
