@@ -210,6 +210,13 @@ export default function AutoRepliesListV8() {
       if (requestScope !== accountScope.current) return
       loadedScope.current = requestScope
       setItems(arRes.data as AutoReply[])
+      const saved = savedReorder.current
+      if (saved && saved.scope === requestScope) {
+        setReorderOverlay(current => current === saved.value ? {
+          ...current, priorities: new Map((arRes.data as AutoReply[]).map(row => [row.id, row.priority ?? 0])), refreshed: true,
+        } : current)
+        savedReorder.current = null
+      }
       setConflictCount(summaryRes?.success ? summaryRes.data.conflictCount : null)
       setDispatchStopped(summaryRes?.success ? summaryRes.data.dispatchStopped ?? null : null)
       setTemplateListAvailable(tplRes.success)
@@ -251,6 +258,11 @@ export default function AutoRepliesListV8() {
    * ページ・絞り込みが変わったら重ねは捨てる（違う一覧に貼らない）。
    */
   const [optimisticRows, setOptimisticRows] = useState<{ key: string; rows: AutoReply[] } | null>(null)
+  const [reorderOverlay, setReorderOverlay] = useState<{ key: string; priorities: Map<string, number>; refreshed: boolean } | null>(null)
+  const savedReorder = useRef<{ scope: typeof accountScope.current; value: NonNullable<typeof reorderOverlay> } | null>(null)
+  const reorderTicket = useRef<object | null>(null)
+  const [reorderBusy, setReorderBusy] = useState(false)
+  useEffect(() => { savedReorder.current = null; reorderTicket.current = null; setReorderBusy(false); setReorderOverlay(null) }, [selectedAccountId])
   const listContextKey = JSON.stringify({
     account: selectedAccountId ?? '',
     query,
@@ -260,7 +272,15 @@ export default function AutoRepliesListV8() {
     pageSize,
     page,
   })
-  const rules = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : items
+  const baseRules = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : items
+  const rules = useMemo(() => {
+    if (!reorderOverlay || reorderOverlay.key !== listContextKey) return baseRules
+    return baseRules.map(row => reorderOverlay.priorities.has(row.id)
+      ? { ...row, priority: reorderOverlay.priorities.get(row.id) as number } : row)
+  }, [baseRules, reorderOverlay, listContextKey])
+  useEffect(() => {
+    if (!optimisticRows && reorderOverlay?.refreshed) setReorderOverlay(current => current === reorderOverlay ? null : current)
+  }, [optimisticRows, reorderOverlay])
   const pendingToggleRef = useRef(pendingToggle); pendingToggleRef.current = pendingToggle
   const openPendingToggle = (target: PendingToggle) => {
     if (!canRunList()) return
@@ -534,16 +554,17 @@ export default function AutoRepliesListV8() {
   const applyPriorityUpdates = (updates: Array<{ id: string; priority: number }>, notice: string) => {
     if (!canRunList()) return
     duplicateFeedback.clear()
-    if (updates.length === 0) return
+    if (updates.length === 0 || reorderTicket.current) return
+    const ticket = {}
+    reorderTicket.current = ticket
+    setReorderBusy(true)
     const requestAccountId = selectedAccountId
-    const nextById = new Map(updates.map((u) => [u.id, u.priority] as const))
     const key = listContextKey
-    setOptimisticRows({
-      key,
-      rows: rules.map((r) =>
-        nextById.has(r.id) ? { ...r, priority: nextById.get(r.id) as number } : r,
-      ),
-    })
+    const nextById = new Map(reorderOverlay?.key === key ? reorderOverlay.priorities : [])
+    for (const update of updates) nextById.set(update.id, update.priority)
+    const before = { key, priorities: new Map(rules.map(row => [row.id, row.priority ?? 0])), refreshed: false }
+    const optimistic = { key, priorities: nextById, refreshed: false }
+    setReorderOverlay(optimistic)
     setMoveNotice(notice)
     setActionError('')
     runUndoable({
@@ -555,15 +576,21 @@ export default function AutoRepliesListV8() {
           if (!result.success) throw new Error('reorder_failed')
         }
       },
-      undo: () => setOptimisticRows(current => current?.key === key ? null : current),
+      undo: () => setReorderOverlay(current => current === optimistic ? null : current),
       onCommitError: () => {
-        setOptimisticRows(current => current?.key === key ? null : current)
-        if (selectedAccountIdRef.current === requestAccountId) void load()
+        if (reorderTicket.current === ticket) { reorderTicket.current = null; setReorderBusy(false) }
+        setReorderOverlay(current => current === optimistic ? before : current)
+        if (selectedAccountIdRef.current === requestAccountId) {
+          savedReorder.current = { scope: renderedScope, value: before }
+          void load()
+        }
       },
       failureMessage: '順番を変えられませんでした。画面を読み直してからお試しください。',
-      onCommitted: () => {
-        setOptimisticRows(current => current?.key === key ? null : current)
-        if (selectedAccountIdRef.current === requestAccountId) void load()
+      onCommitted: async () => {
+        if (selectedAccountIdRef.current !== requestAccountId) return
+        savedReorder.current = { scope: renderedScope, value: optimistic }
+        await load()
+        if (reorderTicket.current === ticket) { reorderTicket.current = null; setReorderBusy(false) }
       },
     })
   }
@@ -786,7 +813,7 @@ export default function AutoRepliesListV8() {
     </>
   )
 
-  const listBody = renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lockedReason, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle: setPendingToggleFromList, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState })
+  const listBody = renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lockedReason, reorderBusy, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle: setPendingToggleFromList, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState })
 
   /* ページ送りは型の pagination 枠へ（余白は型）。 */
   const listPager = ready ? (
