@@ -252,3 +252,12 @@ test('B5-01: 人数上限1のメニューでは2人の予約を作れない',asy
  expect(d.raw.prepare('SELECT COUNT(*) n FROM bookings').get()).toEqual({n:0});
  expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_groups').get()).toEqual({n:0});
 });
+
+test('B5-13: スタッフは2人分の予約を同じ組で作れる',async()=>{
+ const staff={...gapOwner,id:'s',role:'staff' as const,permissionKeys:['/booking/bookings']};
+ const response=await gapCall(gapApp(d,[booking,bookingGap3],staff),'/api/booking/admin/groups?account_id=a','POST',input);
+ expect(response.status,await response.clone().text()).toBe(201);
+ const data=(await response.json() as {data:{groupId:string;bookings:Array<{staff_id:string}>}}).data;
+ expect(data.bookings.map(x=>x.staff_id)).toEqual(['bs','bs2']);
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM bookings WHERE group_id=?').get(data.groupId)).toEqual({n:2});
+});
