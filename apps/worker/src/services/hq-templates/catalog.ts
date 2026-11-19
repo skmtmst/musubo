@@ -37,7 +37,7 @@ export function parseCatalogDefinition(type:HqCatalogTemplateType,value:unknown)
 const columns:Record<string,string[]>={
  menus:['id','line_account_id',...bookingKeys.filter(k=>!['autoTagName','paymentMode'].includes(k)),'is_active','deleted_at','auto_tag_id','version','created_at','updated_at','hq_template_id','hq_template_version_id','hq_customized'],
  menu_versions:['id','menu_id','version_number','name','category_label','description','duration_minutes','buffer_after_minutes','base_price','price_mode','sort_order','is_active','rules_json','created_at'],
- mileage_rewards:['id','line_account_id','program_id','name','description','image_url','reward_kind','status','sort_order','current_draft_version_id','current_published_version_id','created_at','updated_at','archived_at','folder_id'],
+ mileage_rewards:['id','line_account_id','program_id','name','description','image_url','reward_kind','status','sort_order','current_draft_version_id','current_published_version_id','created_at','updated_at','archived_at','folder_id','hq_template_id','hq_template_version_id'],
  mileage_reward_versions:['id','reward_id','version_number','status','required_miles','stock_limit','per_friend_limit','starts_at','ends_at','benefit_expires_days','common_action_version_id','failure_policy','customer_message','created_at','published_at','target_conditions','revision'],
  tags:['id','name','status','version','updated_at'],scenarios:['id','name','is_active','updated_at','current_published_version_id'],
  common_actions:['id','name','status','current_published_version_id','archived_at','updated_at'],
@@ -105,6 +105,7 @@ export function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,sna
   const previous=snap.versions.find(v=>v.id===existing?.current_draft_version_id),versionId=previous?String(previous.id):crypto.randomUUID();
   if(existing)add(`UPDATE mileage_rewards SET name=?,description=?,image_url=?,reward_kind=?,current_draft_version_id=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`,[name,d.description,d.imageUrl,d.rewardKind,versionId,id,accountId]);
   else add(`INSERT INTO mileage_rewards(id,line_account_id,program_id,name,description,image_url,reward_kind,status,current_draft_version_id) VALUES (?,?,'default',?,?,?,?,'draft',?)`,[id,accountId,name,d.description,d.imageUrl,d.rewardKind,versionId]);
+  if(origin)add('UPDATE mileage_rewards SET hq_template_id=?,hq_template_version_id=? WHERE id=? AND line_account_id=?',[origin.templateId,origin.versionId,id,accountId]);
   const vals=[d.requiredMiles,d.stockLimit,d.perFriendLimit,d.startsAt,d.endsAt,d.benefitExpiresDays,d.commonActionVersionId,d.failurePolicy,d.customerMessage,d.targetConditions?JSON.stringify(d.targetConditions):null];
   const cols=['required_miles','stock_limit','per_friend_limit','starts_at','ends_at','benefit_expires_days','common_action_version_id','failure_policy','customer_message','target_conditions'];
   if(previous)add(`UPDATE mileage_reward_versions SET ${cols.map(k=>`${k}=?`).join(',')},revision=revision+1 WHERE id=? AND reward_id=? AND status='draft'`,[...vals,versionId,id]);

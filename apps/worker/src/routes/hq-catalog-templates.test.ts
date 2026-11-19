@@ -1,3 +1,5 @@
+import Database from 'better-sqlite3';
+import { readFileSync } from 'node:fs';
 import { Hono } from 'hono';
 import { publishMileageReward } from '@line-crm/db';
 import { useSqliteClock } from '../test-utils/sqlite-clock.js';
@@ -159,4 +161,53 @@ test('HQT-18: 予約メニューの確認は29分後でも有効',async()=>{
 test('HQT-18: 予約メニューの確認は30分後に期限切れ',async()=>{
  const id=await create('booking_menu'),p=await check(id);vi.setSystemTime(new Date('2026-11-16T00:30:00Z'));
  const r=await run(id,p);expect(r.body.data.stores[0].status).toBe('version_conflict');expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
+});
+
+test('HQT-22: 景品のひな形を削除しても店の景品と版と出所を残し再配布を止める',async()=>{
+ const id=await create('mileage_reward');
+ expect((await run(id,await check(id))).body.data.status).toBe('completed');
+ const before=f.raw.prepare('SELECT id,hq_template_id,hq_template_version_id FROM mileage_rewards').get() as {id:string;hq_template_id:string|null;hq_template_version_id:string|null};
+ expect(before.hq_template_id).toBe(id);expect(before.hq_template_version_id).toBeTruthy();
+ const versions=f.raw.prepare('SELECT * FROM mileage_reward_versions WHERE reward_id=?').all(before.id);
+ const detail=await call<Detail>(`/${id}`);
+ expect((await call(`/${id}`,'DELETE',{expectedRevision:detail.body.data.template.revision})).status).toBe(200);
+ expect(f.raw.prepare('SELECT hq_template_id,hq_template_version_id FROM mileage_rewards WHERE id=?').get(before.id)).toEqual({hq_template_id:id,hq_template_version_id:before.hq_template_version_id});
+ expect(f.raw.prepare('SELECT archived_at IS NOT NULL archived FROM hq_templates WHERE id=?').get(id)).toEqual({archived:1});
+ expect((await call(`/${id}/preflight`,'POST',{accountIds:['a']})).status).toBe(404);
+ expect(f.raw.prepare('SELECT * FROM mileage_reward_versions WHERE reward_id=?').all(before.id)).toEqual(versions);
+});
+
+test('HQT-22: 既存の成功した配布だけ出所を復元する',()=>{
+ const legacy=new Database(':memory:');
+ try {
+  legacy.exec(`CREATE TABLE mileage_rewards(id TEXT PRIMARY KEY,line_account_id TEXT);
+   CREATE TABLE hq_templates(id TEXT,tenant_id TEXT,archived_at TEXT);
+   CREATE TABLE hq_template_versions(id TEXT,template_id TEXT,tenant_id TEXT);
+   CREATE TABLE line_accounts(id TEXT,tenant_id TEXT);
+   CREATE TABLE hq_template_preflight_resolutions(preflight_id TEXT,tenant_id TEXT,template_id TEXT,template_version_id TEXT,target_account_id TEXT,item_kind TEXT,target_id TEXT);
+   CREATE TABLE hq_template_distribution_results(preflight_id TEXT,tenant_id TEXT,status TEXT,finished_at TEXT);
+   INSERT INTO line_accounts VALUES('a','t'); INSERT INTO hq_templates VALUES('hq','t','deleted');
+   INSERT INTO hq_template_versions VALUES('v','hq','t'); INSERT INTO mileage_rewards VALUES('r','a'),('unrelated','a');
+   INSERT INTO hq_template_preflight_resolutions VALUES('p','t','hq','v','a','mileage_reward','r'),('failed','t','hq','v','a','mileage_reward','unrelated');
+   INSERT INTO hq_template_distribution_results VALUES('p','t','succeeded','2026-01-01'),('failed','t','failed','2026-01-02');`);
+  legacy.exec(readFileSync(new URL('../../../../packages/db/migrations/782_hq_reward_origin.sql',import.meta.url),'utf8'));
+  expect(legacy.prepare('SELECT id,hq_template_id,hq_template_version_id FROM mileage_rewards ORDER BY id').all()).toEqual([
+   {id:'r',hq_template_id:'hq',hq_template_version_id:'v'}, {id:'unrelated',hq_template_id:null,hq_template_version_id:null}]);
+ } finally {legacy.close();}
+});
+
+test('HQT-22: 配布途中に削除したら残りの店へ配らない',async()=>{
+ const id=await create('mileage_reward'),p=await check(id,['a','b']);
+ const original=f.db.batch.bind(f.db);let archived=false;
+ f.db.batch=async statements=>{
+  const result=await original(statements);
+  if(!archived&&f.raw.prepare("SELECT COUNT(*) n FROM hq_template_distribution_results WHERE status='succeeded'").get() && (f.raw.prepare("SELECT COUNT(*) n FROM hq_template_distribution_results WHERE status='succeeded'").get() as {n:number}).n===1){
+   archived=true;f.raw.prepare("UPDATE hq_templates SET archived_at='2026-11-16T00:00:00Z' WHERE id=?").run(id);
+  }
+  return result;
+ };
+ const result=await run(id,p);
+ expect(archived).toBe(true);expect(result.body.data.status).toBe('partial');
+ expect(result.body.data.stores.map(s=>s.status).sort()).toEqual(['failed','succeeded']);
+ expect(f.raw.prepare('SELECT line_account_id FROM mileage_rewards').all()).toHaveLength(1);
 });
