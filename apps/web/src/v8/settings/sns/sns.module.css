@@ -1,4 +1,6 @@
-/* ★V8-B SNS 連携（`YINmJ`・`DFnll`／2026-10-07 承認）。寸法は globals.css の --tpl-e1-* だけを使う。板の頭は型（PageHeading）が持つ。 */
+/* 設定 › SNS 連携（複数接続 第1段／F1 tIRy5 広い画面・F2 VH2Ga 細い画面・F7 未接続・F8 閲覧のみ／2026-11-16 承認 v7）。
+   寸法は globals.css の --tpl-e1-* と --text-* だけを使う。板の頭は型（PageHeading）が持つ。
+   広い画面の値は 1024px 以上で当てる（設定の他の画面と同じ境目）。 */
 
 .body {
   display: flex;
@@ -12,13 +14,16 @@
   margin-block: 0;
 }
 
-/* 段の頭：頭文字の四角・題・（余白）・状態の札・「…」の横並び */
+/* 段の頭：公式ロゴ・題・（余白）・連携の個数・「接続を追加する」の横並び。 */
 .cardHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--tpl-e1-sns-row-gap);
   min-width: 0;
 }
+
+/* ロゴの枠。公式アセットをそのまま中へ置くだけで、色は足さない。 */
 .mark {
   display: inline-flex;
   flex: none;
@@ -28,9 +33,6 @@
   height: var(--tpl-e1-sns-mark);
   border-radius: var(--tpl-e1-sns-mark-radius);
   background: var(--color-surface-pearl);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 700;
 }
 
 .cardTitle {
@@ -46,6 +48,76 @@
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   line-height: var(--tpl-e1-sns-sub-lh);
+}
+
+/* 「連携 n個（契約枠 m個）」。段の頭の右端、追加ボタンの手前。 */
+.count {
+  flex: none;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-sns-count-lh);
+}
+
+/* 接続の一覧。枠線の箱の中に行を積み、行の間だけ薄い線を引く。 */
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: var(--polish-space-none);
+  padding: var(--polish-space-none);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--tpl-e1-sns-list-radius);
+  list-style: none;
+  min-width: 0;
+}
+
+.conn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-sns-conn-gap);
+  padding: var(--tpl-e1-sns-conn-pad);
+  min-width: 0;
+}
+
+/* 2件目以降の行の上にだけ線を引く（箱の角を線で切らない）。 */
+.conn + .conn {
+  box-shadow: var(--tpl-e1-sns-conn-divider);
+}
+
+/* 行の1段目：接続の名前・状態の札・（余白）・この行の操作。 */
+.nameRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-e1-sns-name-gap);
+  min-width: 0;
+}
+
+.name {
+  color: var(--color-ink);
+  font-size: var(--tpl-e1-sns-name-size);
+  font-weight: 700;
+  line-height: var(--tpl-e1-sns-name-lh);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* 行の2段目：取り込んだ日時・接続した日などの控えめな1行。 */
+.meta {
+  margin: var(--polish-space-none);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-sns-meta-lh);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* 行の3段目：行の中の移動（「営業時間へ →」）。 */
+.btnRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-e1-sns-row-gap);
+  min-width: 0;
 }
 
 /* 追加決まり1: 操作は左に1行で並べる。1つだけ中央に浮かせない。 */
@@ -64,14 +136,71 @@
   line-height: var(--tpl-e1-sns-note-lh);
 }
 
-.links { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-e1-sns-gap-4); min-height: var(--tpl-e1-sns-min-height-5); }
-.listTitle { margin: var(--polish-space-none); color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-e1-sns-row-lh); }
-.checks { display: flex; flex-direction: column; gap: var(--tpl-e1-sns-gap-6); margin: var(--polish-space-none); padding: var(--polish-space-none); list-style: none; font-size: var(--text-caption); line-height: var(--tpl-e1-sns-row-lh); color: var(--color-ink); }
-.checks li { display: flex; align-items: center; gap: var(--tpl-e1-sns-row-gap); }
-.checks svg { color: var(--color-action); flex: none; }
+/* 一覧の下につく補足（契約枠・主連携・Instagram の但し書き）。行間を広くとる。 */
+.foot {
+  margin: var(--polish-space-none);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-sns-foot-lh);
+}
 
-.link { display: inline-flex; align-items: center; gap: var(--tpl-e1-sns-gap-7); color: var(--color-action); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-e1-sns-row-lh); text-decoration: none; }
+/* 「できること」の見出しと箇条書き。 */
+.listTitle {
+  margin: var(--polish-space-none);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-e1-sns-can-title-lh);
+}
+
+.checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-sns-can-gap);
+  margin: var(--polish-space-none);
+  padding: var(--polish-space-none);
+  list-style: none;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  line-height: var(--tpl-e1-sns-row-lh);
+}
+
+.checks li {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-sns-can-row-gap);
+  min-width: 0;
+}
+
+/* 「できること」の行頭のチェック印。印自身に組を付け、親から子の形を塗らない。
+   絵は Google（F1 `iEXYb`・`BQFa8`・`mpvCg`／F7 の5つ）が `$green-dark`（#0B9A4B）、
+   Instagram（F1 `Gnr09`・`JRhTH`）が `$green`（#06C755）で、2つの緑が混ざっている。
+   画面は深い緑 1 つ（--color-accent-deep）にそろえる。明るい緑 #06C755 は
+   LINE の決まりの所だけという決まり（docs/v8-design-rules.md:526）があるため。 */
+.checkMark {
+  flex: none;
+  width: var(--tpl-e1-sns-can-mark-w);
+  color: var(--color-accent-deep);
+}
+
+/* 行の中の移動（「営業時間へ →」）。絵の `j4sm6s`・`u0SoyW` は `$green-dark` で、
+   本文の中のリンクは深い緑（--color-accent-deep）の決まり（docs/v8-design-rules.md:528）とも一致する。 */
+.link { display: inline-flex; align-items: center; gap: var(--tpl-e1-sns-gap-7); color: var(--color-accent-deep); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-e1-sns-row-lh); text-decoration: none; }
 .link:hover { text-decoration: underline; }
 
-/* 段の頭：題と札の間をあけて札を右へ寄せる。 */
+/* 段の頭：題のあとをあけて、個数と「接続を追加する」を右へ寄せる（未接続の札は題の隣）。 */
 .rowSpacer { flex: 1 1 0; min-width: 0; }
+
+/* 細い画面では「接続を追加する」を一覧の下へ移し、幅いっぱいの押しやすい的にする（F2）。 */
+.addWide { display: none; }
+.addNarrow { display: block; }
+
+@media (min-width: 1024px) {
+  .count { line-height: var(--tpl-e1-sns-count-lh-wide); }
+  .conn { padding: var(--tpl-e1-sns-conn-pad-wide); }
+  .nameRow { gap: var(--tpl-e1-sns-name-gap-wide); }
+  .name { font-size: var(--tpl-e1-sns-name-size-wide); line-height: var(--tpl-e1-sns-name-lh-wide); }
+  .meta { line-height: var(--tpl-e1-sns-meta-lh-wide); }
+  .addWide { display: block; }
+  .addNarrow { display: none; }
+}
