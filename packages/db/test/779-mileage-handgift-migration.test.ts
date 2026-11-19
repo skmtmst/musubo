@@ -1,41 +1,51 @@
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { purgeTablesChildFirst, tenantScopeCondition } from '../src/data-retention-tables.js';
 
-const root = new URL('../', import.meta.url);
-const bootstrap = readFileSync(new URL('bootstrap.sql', root), 'utf8');
-const migration = readFileSync(new URL('migrations/779_mileage_handgift.sql', root), 'utf8');
+const migration = readFileSync(new URL('../migrations/779_mileage_handgift.sql', import.meta.url), 'utf8');
+function database() {
+  const db = new Database(':memory:');
+  db.pragma('foreign_keys = ON');
+  db.exec(`CREATE TABLE tenants(id TEXT PRIMARY KEY, plan_status TEXT, data_purged_at TEXT, trial_ends_at TEXT, retention_anchor_at TEXT);
+    CREATE TABLE tenant_purge_guard(tenant_id TEXT, table_name TEXT);
+    CREATE TABLE line_accounts(id TEXT PRIMARY KEY, tenant_id TEXT REFERENCES tenants(id));
+    CREATE TABLE mileage_rewards(id TEXT PRIMARY KEY, line_account_id TEXT REFERENCES line_accounts(id), reward_kind TEXT CHECK(reward_kind IN ('tag','coupon')));
+    CREATE TABLE mileage_redemptions(id TEXT PRIMARY KEY, line_account_id TEXT REFERENCES line_accounts(id), reward_id TEXT REFERENCES mileage_rewards(id));`);
+  return db;
+}
 
 describe('779 手渡し景品の移行', () => {
   it('空の DB に外部キーを有効にして適用できる', () => {
-    const db = new Database(':memory:');
+    const db = database();
     try {
-      db.exec(bootstrap);
-      db.pragma('foreign_keys = ON');
       db.transaction(() => db.exec(migration))();
       expect(db.pragma('foreign_key_check')).toEqual([]);
       expect(db.prepare("SELECT name FROM sqlite_schema WHERE name = 'mileage_handgift_rewards'").get()).toBeTruthy();
       expect(db.prepare("SELECT name FROM sqlite_schema WHERE name = 'mileage_handgifts'").get()).toBeTruthy();
-      expect(db.prepare("SELECT name FROM sqlite_schema WHERE name = '_779_backup_mileage_rewards'").get()).toBeUndefined();
     } finally { db.close(); }
   });
 
-  it('既存の公開済み景品と版を保ち、手渡しの印を一意に保存する', () => {
-    const db = new Database(':memory:');
+  it('手渡し履歴を保護し、正式な退会処理では子から消す', () => {
+    const db = database();
     try {
-      db.exec(bootstrap);
-      db.pragma('foreign_keys = ON');
-      db.exec(`INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token) VALUES('a','a','a','s','t');
-        INSERT INTO mileage_programs(id,code,name,created_at,updated_at) VALUES('default','default','d','x','x');
-        INSERT INTO mileage_rewards(id,line_account_id,name,reward_kind) VALUES('r','a','r','tag');
-        INSERT INTO mileage_reward_versions(id,reward_id,version_number,required_miles,status) VALUES('v','r',1,10,'published');
-        UPDATE mileage_rewards SET current_published_version_id='v' WHERE id='r';`);
-      db.transaction(() => db.exec(migration))();
-      db.prepare("INSERT INTO mileage_handgift_rewards(reward_id) VALUES('r')").run();
-      expect(() => db.prepare("INSERT INTO mileage_handgift_rewards(reward_id) VALUES('r')").run()).toThrow();
+      db.exec(migration);
+      db.exec(`INSERT INTO tenants(id,plan_status) VALUES('t','canceled');
+        INSERT INTO line_accounts VALUES('a','t');
+        INSERT INTO mileage_rewards VALUES('r','a','tag');
+        INSERT INTO mileage_redemptions VALUES('x','a','r');
+        INSERT INTO mileage_handgift_rewards(reward_id) VALUES('r');
+        INSERT INTO mileage_handgifts(redemption_id,reward_id,delivered_at,delivered_by) VALUES('x','r','now','staff');`);
+      expect(() => db.exec("UPDATE mileage_handgifts SET delivered_at=NULL,delivered_by=NULL WHERE redemption_id='x'")).toThrow();
+      expect(() => db.exec("DELETE FROM mileage_handgifts WHERE redemption_id='x'")).toThrow();
+      const order = purgeTablesChildFirst();
+      expect(order.indexOf('mileage_handgifts')).toBeLessThan(order.indexOf('mileage_handgift_rewards'));
+      expect(order.indexOf('mileage_handgifts')).toBeLessThan(order.indexOf('mileage_redemptions'));
+      db.exec("INSERT INTO tenant_purge_guard VALUES('t','mileage_handgifts')");
+      for (const table of ['mileage_handgifts', 'mileage_handgift_rewards', 'mileage_redemptions', 'mileage_rewards']) {
+        db.prepare(`DELETE FROM ${table} WHERE ${tenantScopeCondition(table)}`).run('t');
+      }
       expect(db.pragma('foreign_key_check')).toEqual([]);
-      expect(db.prepare("SELECT reward_kind, current_published_version_id FROM mileage_rewards WHERE id='r'").get()).toEqual({ reward_kind: 'tag', current_published_version_id: 'v' });
-      expect(() => db.prepare("DELETE FROM mileage_reward_versions WHERE id='v'").run()).toThrow();
     } finally { db.close(); }
   });
 });

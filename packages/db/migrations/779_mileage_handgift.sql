@@ -39,3 +39,17 @@ WHEN (OLD.delivered_at IS NOT NULL AND
        OR OLD.cancellation_reason IS NOT NEW.cancellation_reason))
   OR (OLD.cancelled_at IS NOT NULL AND OLD.delivered_at IS NULL AND NEW.delivered_at IS NOT NULL)
 BEGIN SELECT RAISE(ABORT, 'handgift history is immutable'); END;
+
+-- テナントの正式な消去以外では受け渡し履歴を消さない。
+CREATE TRIGGER mileage_handgifts_no_delete BEFORE DELETE ON mileage_handgifts
+WHEN NOT EXISTS (
+  SELECT 1 FROM tenant_purge_guard g
+  JOIN tenants t ON t.id = g.tenant_id
+  JOIN line_accounts a ON a.tenant_id = t.id
+  JOIN mileage_redemptions r ON r.line_account_id = a.id
+  WHERE g.table_name = 'mileage_handgifts' AND r.id = OLD.redemption_id
+    AND t.data_purged_at IS NULL
+    AND (t.plan_status = 'canceled' OR
+      (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL))
+)
+BEGIN SELECT RAISE(ABORT, 'handgift history cannot be deleted'); END;
