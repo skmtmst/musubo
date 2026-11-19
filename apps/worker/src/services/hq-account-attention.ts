@@ -59,7 +59,8 @@ export async function readAccountAttention(
       );
     }
   });
-  const sla = results[0].results[0] as { enabled: number; overdue: number; missing: number };
+  const countResultsByKind = new Map(entries.map(([kind], index) => [kind, results[index * 2]]));
+  const sla = countResultsByKind.get('unhandledChats')!.results[0] as { enabled: number; overdue: number; missing: number };
   const overdue = sla.enabled
     ? { status: 'enabled' as const, overdueCount: sla.missing ? null : sla.overdue, uncertainCount: sla.missing, href: '/chats' }
     : { status: 'disabled' as const, overdueCount: null, uncertainCount: null, href: '/chats' };

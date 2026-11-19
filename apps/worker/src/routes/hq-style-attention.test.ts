@@ -203,3 +203,18 @@ test('期限は保存値だけを読み、不明な期限があれば件数を�
   d.raw.exec("UPDATE inbox_routing_settings SET sla_enabled=0 WHERE account_id='a'");
   expect((await readAccountAttention(d.db, 'a')).overdue).toMatchObject({status:'disabled',overdueCount:null});
 });
+
+test('集計の並び順を変えても期限超過の結果を会話の集計から取得する', async () => {
+  chat('late');
+  d.raw.exec("INSERT INTO inbox_routing_settings(account_id,sla_enabled,updated_at) VALUES('a',1,'now'); UPDATE chats SET pending_since='2026-01-01',sla_due_at='2026-01-02' WHERE id='late'");
+  const entries = Object.entries;
+  const spy = vi.spyOn(Object, 'entries').mockImplementation(((value: object) => {
+    const rows = entries(value);
+    return Object.hasOwn(value, 'unhandledChats') && Object.hasOwn(value, 'pendingBookings') ? rows.reverse() : rows;
+  }) as typeof Object.entries);
+  try {
+    const result = await readAccountAttention(d.db, 'a');
+    expect(result.overdue).toMatchObject({ status: 'enabled', overdueCount: 1, uncertainCount: 0 });
+    expect(result.counts.unhandledChats).toBe(1);
+  } finally { spy.mockRestore(); }
+});
