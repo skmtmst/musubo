@@ -1,6 +1,7 @@
 import type { Env } from '../../worker-env.js';
 import { executeMonthlyAttempt } from './monthly-attempt-execution.js';
 import { scheduleMonthlyRetry } from './monthly-retry-ledger.js';
+import { stopExhaustedMonthlyCycle } from './monthly-exhausted.js';
 
 /** 確定失敗の模擬は検証先に限定し、2つの設定を明示した時だけ実行する。 */
 export async function runMonthlyAttemptMockCron(env: Env['Bindings'], now: Date) {
@@ -32,5 +33,10 @@ export async function runMonthlyAttemptMockCron(env: Env['Bindings'], now: Date)
     WHERE ${filter} AND a.state='pending' AND julianday(a.scheduled_at)<=julianday(?)
     ORDER BY a.scheduled_at,a.cycle_id LIMIT 100`).bind(at).all<{cycle_id:string;attempt_no:number}>()).results;
   for (const row of due) await executeMonthlyAttempt(db,row.cycle_id,row.attempt_no,{pay:async()=> 'failed'},now);
+  const exhausted = (await db.prepare(`SELECT y.id FROM booking_monthly_cycles y JOIN booking_monthly_contracts c ON c.id=y.contract_id
+    JOIN booking_monthly_attempts a ON a.cycle_id=y.id AND a.attempt_no=3 AND a.state='failed'
+    WHERE ${filter} AND y.state IN ('open','retry_wait','requires_action') ORDER BY a.finished_at,y.id LIMIT 100`)
+    .all<{id:string}>()).results;
+  for (const row of exhausted) await stopExhaustedMonthlyCycle(db,row.id,now);
   return { enabled: true, attempted: due.length };
 }
