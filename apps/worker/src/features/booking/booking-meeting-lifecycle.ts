@@ -20,9 +20,9 @@ export async function reconcileBookingMeeting(db: D1Database, input: {
   for (const row of pending.results ?? []) {
     const remover=input.removers[row.provider];
     if (!remover || !row.staff_id || !row.external_meeting_id) return 'failed';
-    const claim=await db.prepare(`UPDATE booking_meeting_links SET last_error_code='delete_started'
+    const claim=await db.prepare(`UPDATE booking_meeting_links SET last_error_code='delete_started',updated_at=?
       WHERE id=? AND status='cancel_pending' AND (last_error_code IS NULL OR last_error_code='delete_failed')`)
-      .bind(row.id).run();
+      .bind(new Date().toISOString(),row.id).run();
     if (claim.meta.changes!==1) return 'unknown';
     const controller=new AbortController();
     const timer=setTimeout(()=>controller.abort(),8000);

@@ -4,6 +4,7 @@ export type MeetingCreateResult =
   | { kind: 'created'; meetingId: string; url: string }
   | { kind: 'failed'; code: string }
   | { kind: 'unknown' };
+/** 作成先が照合できるよう、一意の鍵を会議に保存する。 */
 export interface MeetingCreator {
   provider: MeetingProvider;
   create(input: { bookingId: string; idempotencyKey: string; startsAt: string; endsAt: string; staffId: string; signal: AbortSignal }): Promise<MeetingCreateResult>;
