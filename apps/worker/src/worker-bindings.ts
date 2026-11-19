@@ -35,6 +35,7 @@ export type WorkerBindings = {
     RANK_NOTICE_STAGING_DELIVERY_ENABLED?: string;
     MONTHLY_INVOICE_MOCK_CRON_ENABLED?: string;
     MONTHLY_PAYMENT_MOCK_FAILURE_ENABLED?: string;
+    MONTHLY_FAILURE_STAGING_DELIVERY_ENABLED?: string;
     /** 明示したときだけ A/B の本送信を始める。既定では止める。 */
     AB_LIVE_DELIVERY_ENABLED?: string;
     /** 検証環境専用とし、外部送信の停止と対象の識別を必須にする。 */
