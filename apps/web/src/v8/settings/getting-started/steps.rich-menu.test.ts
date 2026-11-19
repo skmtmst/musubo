@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildSteps, stepsForStyle, type StyleSetupProgress } from './steps'
+import { buildSteps, buildStepsFromApi, stepsForStyle, type StyleSetupProgress } from './steps'
 
 const base = () => buildSteps({
   accounts: [], featureSet: null, tagCount: 0, friendFieldCount: 0, friendAdd: null,
@@ -8,8 +8,34 @@ const base = () => buildSteps({
 
 const restaurant = (steps: StyleSetupProgress['steps'] = {}) => stepsForStyle(base(), 'restaurant', { style: 'restaurant', steps })
 
-describe('飲食の初期設定9項目', () => {
-  it('③にリッチメニューを選ぶを置き、9項目の並びを保つ', () => {
+/* 口の応答から作る。初期セットが済みのときは一覧から外れる。 */
+const fromApi = (featureSet: 'done' | 'todo') => buildStepsFromApi([
+  { key: 'accounts', state: 'done', href: '/accounts', reason: null },
+  { key: 'featureSet', state: featureSet, href: '/settings', reason: null },
+  { key: 'attributes', state: 'todo', href: '/tags?tab=tags', reason: null },
+  { key: 'friendAdd', state: 'todo', href: '/friend-add-settings', reason: null },
+  { key: 'scenario', state: 'todo', href: '/scenarios', reason: null },
+  { key: 'firstMessage', state: 'todo', href: '/chats', reason: null },
+])
+
+describe('飲食の初期設定（承認済み Pen v09）', () => {
+  it('初期セットが済みなら使う機能を外して8項目にする', () => {
+    const result = stepsForStyle(fromApi('done'), 'restaurant', { style: 'restaurant', steps: {} })
+    expect(result.map(step => step.key)).toEqual(['accounts', 'richMenu', 'attributes', 'hours', 'friendAdd', 'scenario', 'followup', 'firstMessage'])
+    expect(result.map(step => step.title)).toEqual([
+      'LINEアカウントをつなぐ', 'リッチメニューを選ぶ', '卓と席を登録する', '営業時間を設定する',
+      'コースとメニューを登録する', '予約枠と在庫を設定する', 'LINE来店フォローを確認する', '最初の1通を受け取る',
+    ])
+    expect(result.map(step => step.ordinal)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8'])
+  })
+
+  it('初期セットがまだなら一覧に残して9項目にする', () => {
+    const result = stepsForStyle(fromApi('todo'), 'restaurant', { style: 'restaurant', steps: {} })
+    expect(result.map(step => step.key)).toEqual(['accounts', 'featureSet', 'richMenu', 'attributes', 'hours', 'friendAdd', 'scenario', 'followup', 'firstMessage'])
+    expect(result.map(step => step.ordinal)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9'])
+  })
+
+  it('③にリッチメニューを選ぶを置き、まだ選んでいないときの並びを保つ', () => {
     const result = restaurant()
     expect(result.map(step => step.key)).toEqual(['accounts', 'featureSet', 'richMenu', 'attributes', 'hours', 'friendAdd', 'scenario', 'followup', 'firstMessage'])
     expect(result.map(step => step.ordinal)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9'])

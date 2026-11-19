@@ -18,8 +18,8 @@
     中の余白は承認された枠 02 の実値 28。利用者が承認した Pen の版・枠が完成基準なので、
     段（§6.5 の 1）へ寄せた 24 には戻さない（24 だとカードが 606 に届かず 596 になる）。
   */
-  --tpl-firstrun-card-pad: 28px;
-  --tpl-firstrun-header-gap: 16px; --tpl-firstrun-ring: 52px; --tpl-firstrun-ring-border: 3px solid var(--tpl-firstrun-brand); --tpl-firstrun-text-14: 14px; --tpl-firstrun-gap-2: 2px; --tpl-firstrun-gap-3: 3px; --tpl-firstrun-gap-4: 4px; --tpl-firstrun-gap-6: 6px; --tpl-firstrun-gap-12: 12px;
+  --tpl-firstrun-card-pad: 24px;
+  --tpl-firstrun-header-gap: 16px; --tpl-firstrun-ring: 52px; --tpl-firstrun-ring-border: 3px solid var(--tpl-firstrun-brand); --tpl-firstrun-text-14: 14px; --tpl-firstrun-gap-2: 2px;--tpl-firstrun-gap-4: 4px; --tpl-firstrun-gap-6: 6px; --tpl-firstrun-gap-12: 12px;
   --tpl-firstrun-row-ring: inset 0 0 0 1px var(--tpl-firstrun-brand-line);
   --tpl-firstrun-row-pad: 10px 14px; --tpl-firstrun-row-pad-sp: 10px 12px; --tpl-firstrun-mark: 26px; --tpl-firstrun-text-12: 12px; --tpl-firstrun-ring-thin: 1.5px solid var(--tpl-firstrun-brand); --tpl-firstrun-line-muted: #d6dade; --tpl-firstrun-ring-thin-muted: 1.5px solid var(--tpl-firstrun-line-muted); --tpl-firstrun-ink-muted: #6b7682;
   /*
@@ -27,7 +27,7 @@
     行のボタンは 9 で高さ 34 になり、現在行 54（上下 padding10 ＋ 34）が枠と一致する。
     段（§6.5 の 1）へ寄せた 2・8 には戻さない（戻すと札 19・行のボタン 32 で枠と違う）。
   */
-  --tpl-firstrun-badge-pad: 3px 8px; --tpl-firstrun-rowaction-pad: 9px 14px; --tpl-firstrun-chevron-color: #b6bcc4; --tpl-firstrun-ink-faint: #9aa3af;
+  --tpl-firstrun-badge-pad: 2px 8px; --tpl-firstrun-rowaction-pad: 8px 14px; --tpl-firstrun-chevron-color: #b6bcc4; --tpl-firstrun-ink-faint: #9aa3af;
   /*
     文字の塊の高さは枠の実値をそのまま使う（20px→24 / 14px→17 / 13px→16 / 12px→15）。
     指定しないと素の line-height になり、現在の行・足・見出しが枠より高くなる。
@@ -38,7 +38,7 @@
     余白の段（§6.5 の 1）は padding・margin・gap の決まりなので、
     位置だと分かる名前にして枠の実値 118 をそのまま残す。
   */
-  --tpl-firstrun-sheet-top: 118px; --tpl-firstrun-radius-sheet: 20px 20px 0 0; --tpl-firstrun-card-pad-sp: 12px 16px 24px; --tpl-firstrun-grabber-w: 36px; --tpl-firstrun-grabber-h: 4px; --tpl-firstrun-line-grabber: #d1d5db; --tpl-firstrun-ring-sp: 44px; --tpl-firstrun-title-sp: 17px; --tpl-firstrun-tight: 1.25; --tpl-firstrun-rowaction-pad-sp: 9px 16px; --tpl-firstrun-rowaction-reach-sp: -5px;
+  --tpl-firstrun-sheet-top: 118px; --tpl-firstrun-radius-sheet: 20px 20px 0 0; --tpl-firstrun-card-pad-sp: 12px 16px 24px; --tpl-firstrun-grabber-w: 36px; --tpl-firstrun-grabber-h: 4px; --tpl-firstrun-line-grabber: #d1d5db; --tpl-firstrun-ring-sp: 44px; --tpl-firstrun-title-sp: 17px; --tpl-firstrun-tight: 1.25; --tpl-firstrun-rowaction-pad-sp: 8px 16px; --tpl-firstrun-rowaction-reach-sp: -6px;
   position: fixed;
   inset: 0;
   z-index: 70;
@@ -347,7 +347,7 @@ html:root .footer button[class][class][class]::before {
     （段へ寄せた 2 に戻すと足 UanUf の位置が枠と 2px ずれる）。
   */
   .rows {
-    gap: var(--tpl-firstrun-gap-3);
+    gap: var(--tpl-firstrun-gap-2);
     /*
       見出しと足は動かさず、9項目だけシートの中で動かす。
       ただし余白を吸って伸ばさない（伸ばすと足が画面下端へ押し下がり、

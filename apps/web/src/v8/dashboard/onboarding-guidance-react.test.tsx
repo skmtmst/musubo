@@ -111,7 +111,8 @@ it.each([
   net.progress.mockResolvedValue(basic(complete))
   render(<DashboardV8 />)
   const basicProgress = await screen.findByRole('progressbar', { name: 'はじめにやることの進み' })
-  expect(basicProgress.getAttribute('aria-valuenow')).toBe(complete ? '6' : '5')
+  /* 済みの「使う機能」は一覧から外れる（承認済み Pen v09）ので、基本は5段＋営業時間の6段になる。 */
+  expect(basicProgress.getAttribute('aria-valuenow')).toBe(complete ? '5' : '4')
   expect(within(guide()).getByRole('button', { name: '開く', exact: true }).getAttribute('aria-expanded')).toBe('false')
   expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(true)
   await pendingSetup()
@@ -120,11 +121,11 @@ it.each([
   expect(net.save).not.toHaveBeenCalled(); expect(net.activate).not.toHaveBeenCalled()
 })
 
-it('カードの進みは基本6段の1つだけにし、選んだ機能の設定と入口は置かない', async () => {
+it('カードの進みは基本の段の1つだけにし、選んだ機能の設定と入口は置かない', async () => {
   net.progress.mockResolvedValue(basic(true))
   render(<DashboardV8 />)
   await pendingSetup()
-  expect(within(guide()).getByText('6 / 7 済み')).toBeTruthy()
+  expect(within(guide()).getByText('5 / 6 済み')).toBeTruthy()
   expect(within(guide()).getAllByRole('progressbar')).toHaveLength(1)
   expect(within(guide()).queryByRole('progressbar', { name: '使い方の設定の進み' })).toBeNull()
   expect(guide().textContent).not.toMatch(/質問 \d|済み \d+件/)
@@ -191,12 +192,12 @@ it('両GETが失敗したときは各再試行が対応する取得だけをや�
   await waitFor(() => { expect(net.progress).toHaveBeenCalledTimes(2); expect(net.style).toHaveBeenCalledTimes(2) })
 })
 
-it('基本6段の進みだけを示し、畳む・開くで一覧だけが切り替わる', async () => {
+it('基本の段の進みだけを示し、畳む・開くで一覧だけが切り替わる', async () => {
   net.progress.mockResolvedValue(basic(true))
   render(<DashboardV8 />)
   await pendingSetup()
   expect(screen.getAllByRole('progressbar')).toHaveLength(1)
-  expect(within(guide()).getByText('6 / 7 済み')).toBeTruthy()
+  expect(within(guide()).getByText('5 / 6 済み')).toBeTruthy()
   fireEvent.click(within(guide()).getByRole('button', { name: '畳む', exact: true }))
   expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(true)
   fireEvent.click(within(guide()).getByRole('button', { name: '開く', exact: true }))
@@ -211,7 +212,7 @@ it('基本が全完了で後回しの設定行が無ければ済みの1行へ畳
   await waitFor(() => { expect(net.progress).toHaveBeenCalledTimes(1); expect(net.style).toHaveBeenCalledTimes(1) })
   await act(async () => { await Promise.resolve() })
   expect(screen.getByRole('heading', { name: 'はじめにやること', exact: true })).toBeTruthy()
-  expect(within(guide()).getByText('7 / 7 済み')).toBeTruthy()
+  expect(within(guide()).getByText('6 / 6 済み')).toBeTruthy()
   expect(within(guide()).queryByRole('list')).toBeNull()
   expect(screen.getByRole('progressbar', {name:'はじめにやることの進み'})).toBeTruthy()
 })
@@ -274,7 +275,8 @@ it('既知の業種を設定取得の失敗で標準へ戻さず、実物が未�
   net.style.mockRejectedValue(new Error('setup unavailable'))
   render(<DashboardV8 accountStyle="ec" />)
   const progress = await screen.findByRole('progressbar', { name: 'はじめにやることの進み' })
-  expect(progress.getAttribute('aria-valuenow')).toBe('2')
+  /* 済みの「使う機能」は一覧から外れるので、済みは①接続だけ。 */
+  expect(progress.getAttribute('aria-valuenow')).toBe('1')
   const card = guide()
   expect(within(card).getByText('ストアをつなぐ')).toBeTruthy()
   expect(within(card).getByText('ストアの商品を確認する')).toBeTruthy()

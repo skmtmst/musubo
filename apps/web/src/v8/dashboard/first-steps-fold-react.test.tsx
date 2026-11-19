@@ -46,7 +46,8 @@ describe('はじめにやることを畳む', () => {
     }))
     const cases = [
       /* 題は承認済み Pen「はじめにやること08d_v04」(la9o6) の短い言い方に合わせる。 */
-      ['restaurant', ['リッチメニューを選ぶ', '卓と席を登録する', '営業時間を決める', 'メニューを作る', '予約枠を決める', 'フォローを見る']],
+      /* 飲食だけは承認済み Pen v09（枠 C5i3rw / nt3Po）の言い方に合わせる。 */
+      ['restaurant', ['リッチメニューを選ぶ', '卓と席を登録する', '営業時間を設定する', 'コースとメニューを登録する', '予約枠と在庫を設定する', 'LINE来店フォローを確認する']],
       ['salon', ['メニューを登録する', '営業時間を決める', '担当者を登録する', '予約の受付を確認する']],
       ['consult', ['面談の枠を作る', '営業時間を決める', '面談の URL を用意する', '面談の受付を確認する']],
       ['lesson', ['クラスを作る', '営業時間を決める', '会員を登録する', 'クラスの予約を受け付ける']],
@@ -76,7 +77,8 @@ describe('はじめにやることを畳む', () => {
     expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(true)
     // 畳んでも頭の1行（題・数・進み）は残る。
     expect(screen.getByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
-    expect(screen.getByText('2 / 6 済み')).toBeTruthy()
+    /* 済みの「使う機能」は一覧から外れる（承認済み Pen v09）ので、残る5段のうち済みは①接続だけ。 */
+    expect(screen.getByText('1 / 5 済み')).toBeTruthy()
     expect(screen.getByRole('progressbar', { name: 'はじめにやることの進み' })).toBeTruthy()
     await act(async () => { fireEvent.click(open) })
     expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(false)

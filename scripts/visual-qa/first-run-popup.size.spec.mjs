@@ -1,11 +1,13 @@
 /*
   枠 02 (C5i3rw) の寸法を実画面で突き合わせる。
-  承認済み Pen /Users/masatosakamoto/Documents/musubo-course-media-upload-20261110.pen の
-  実測値（Pencil の Get で取得した bounds）:
-    カード G8vBl   x410 y197 w620 h606
+  承認済み Pen「初回ガイドポップアップ_余白段あわせ_v09」（新規デザイン配下・枠 C5i3rw / nt3Po）
+  の実測値（Pencil の Get で取得した bounds）:
+    カード G8vBl   x410 y227 w620 h546
     見出し VliWA   h52（輪 cohVt 52 と同じ）
-    一覧 LcMa3     h454（通常行 46 x8 ＋ 現在行 54 ＋ gap4 x8）
-    通常行 bnJsJ   h46 / 現在行 v4LA6 h54 / 足 TTZx2 h16
+    一覧 LcMa3     h402（通常行 46 x7 ＋ 現在行 52 ＋ gap4 x7）
+    通常行 bnJsJ   h46 / 現在行 v4LA6 h52 / 足 TTZx2 h16
+    操作 pdn85 h32 / 札 r7xHZ0 h19
+  一覧は8項目。初期セット（使う機能）は接続時に決まるので、済みなら一覧から外す。
   差し戻し V1（カードが40.3px高い）の再発を止めるための検査。
   実行前に Next dev とモックAPIを上げておく:
     VISUAL_QA_MOCK=http://127.0.0.1:8788 VISUAL_QA_BASE=http://127.0.0.1:3101 \
@@ -21,7 +23,7 @@ test.use({ timezoneId: QA_TIMEZONE })
 const BASE = process.env.VISUAL_QA_BASE ?? 'http://localhost:3101'
 const MOCK = process.env.VISUAL_QA_MOCK ?? 'http://127.0.0.1:8788'
 
-/* 枠 02 と同じ 1/9（①済み・②が現在）。撮影テストの PEN_STATES['1/9'] と同じ元データ。 */
+/* 枠 02 と同じ 1/8（①済み・リッチメニューが現在。初期セットは済みなので一覧に出ない）。 */
 async function routePenState(page) {
   await page.route('**/api/getting-started**', async route => {
     const url = new URL(route.request().url())
@@ -31,7 +33,7 @@ async function routePenState(page) {
     }
     const steps = [
       { key: 'accounts', state: 'done', href: '/accounts', reason: null, webhook: [{ id: 'visual-qa-account', status: 'matched' }] },
-      { key: 'featureSet', state: 'todo', href: '/settings', reason: null },
+      { key: 'featureSet', state: 'done', href: '/settings', reason: null },
       { key: 'attributes', state: 'todo', href: '/tags?tab=tags', reason: null },
       { key: 'friendAdd', state: 'todo', href: '/friend-add-settings', reason: null },
       { key: 'scenario', state: 'todo', href: '/scenarios', reason: null },
@@ -76,7 +78,7 @@ async function openPopup(page, width, height) {
   return popup
 }
 
-test('枠 02: 1440x1000・1/9 のカードと行が Pen の実測値どおり', async ({ page }) => {
+test('枠 02: 1440x1000・1/8 のカードと行が Pen の実測値どおり', async ({ page }) => {
   const popup = await openPopup(page, 1440, 1000)
   const got = await popup.evaluate(node => {
     const box = el => {
@@ -100,20 +102,20 @@ test('枠 02: 1440x1000・1/9 のカードと行が Pen の実測値どおり', 
       badge: box(rows.map(el => el.querySelector('[class*="badge"]')).find(Boolean)).h,
     }
   })
-  expect(got.card).toEqual({ x: 410, y: 197, w: 620, h: 606 })
+  expect(got.card).toEqual({ x: 410, y: 227, w: 620, h: 546 })
   expect(got.header).toBe(52)
-  expect(got.rows).toBe(454)
+  expect(got.rows).toBe(402)
   expect(got.footer).toBe(16)
   expect(got.rowDone).toBe(46)
-  expect(got.rowCurrent).toBe(54)
-  expect(got.rowTodo).toEqual([46, 46, 46, 46, 46, 46, 46])
-  /* 操作 pdn85 h34・札 r7xHZ0 h21。枠の padding（9px 14px・3px 8px）どおりの高さ。 */
-  expect(got.action).toBe(34)
-  expect(got.badge).toBe(21)
+  expect(got.rowCurrent).toBe(52)
+  expect(got.rowTodo).toEqual([46, 46, 46, 46, 46, 46])
+  /* 操作 pdn85 h32・札 r7xHZ0 h19。枠の padding（8px 14px・2px 8px）どおりの高さ。 */
+  expect(got.action).toBe(32)
+  expect(got.badge).toBe(19)
 })
 
 /* 枠 02b (nt3Po) のシート noXJA: x0 y118 w390 h782。PC の直しで崩していないことを見る。 */
-test('枠 02b: 390x900・1/9 のシートが画面下部固定のまま', async ({ page }) => {
+test('枠 02b: 390x900・1/8 のシートが画面下部固定のまま', async ({ page }) => {
   const popup = await openPopup(page, 390, 900)
   const card = await popup.evaluate(node => {
     const b = node.querySelector('[class*="card"]').getBoundingClientRect()
@@ -125,12 +127,13 @@ test('枠 02b: 390x900・1/9 のシートが画面下部固定のまま', async 
 /*
   枠 02b を指で押す端末で見る。共通規定（globals.css の `@media (pointer: coarse)` の
   min-height 44）が効くと操作 ZcmBy が 44 になり、現在行が 64 へ伸びて
-  足 UanUf が枠の y660 より下がる。高さは枠の 34 のまま、押せる範囲だけ広げる
+  足 UanUf が枠の位置より下がる。高さは枠の 32 のまま、押せる範囲だけ広げる
   （§6.5 の 7）形を固定する。
+  足 UanUf はシート noXJA の中で y484。シートが y118 なので画面では y602。
 */
 test.describe('指で押す端末', () => {
   test.use({ hasTouch: true })
-  test('枠 02b: 操作は枠どおり h34・押せる範囲は44以上・足は y660', async ({ page }) => {
+  test('枠 02b: 操作は枠どおり h32・押せる範囲は44以上・足は y602', async ({ page }) => {
     const popup = await openPopup(page, 390, 900)
     const got = await popup.evaluate(node => {
       const card = node.querySelector('[class*="card"]')
@@ -150,10 +153,10 @@ test.describe('指で押す端末', () => {
         reach,
       }
     })
-    expect(got.action).toBe(34)
-    expect(got.rowCurrent).toBe(54)
-    expect(got.gap).toBe('3px')
-    expect(got.footerY).toBe(660)
+    expect(got.action).toBe(32)
+    expect(got.rowCurrent).toBe(52)
+    expect(got.gap).toBe('2px')
+    expect(got.footerY).toBe(602)
     expect(got.reach).toBe(true)
   })
 })

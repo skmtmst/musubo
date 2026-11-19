@@ -26,22 +26,23 @@ test.describe.configure({ mode: 'serial' })
 const MOCK = process.env.VISUAL_QA_MOCK ?? 'http://127.0.0.1:8788'
 
 /*
-  差し戻し（枠08b 4/9・枠02 1/9）: 撮影用の口の既定は3/9で、承認Penの状態と違う。
-  9項目の済みは実データ計測なので、数を直接入れず「元になる応答」を差し替えて作る。
-  ① LINE接続・② 初期セット・⑨ 1通目 はサーバの /api/getting-started、
-  ③ リッチメニューは /api/rich-menu-groups の件数、
-  ④⑤⑥⑦⑧ は /api/restaurant-test/setup-progress の真偽値から決まる
+  承認済み Pen v09（枠 C5i3rw / nt3Po）に合わせる。
+  済み数は実データ計測なので、数を直接入れず「元になる応答」を差し替えて作る。
+  ① LINE接続・② 初期セット・最後の1通 はサーバの /api/getting-started、
+  リッチメニューは /api/rich-menu-groups の件数、
+  卓と席・営業時間・メニュー・予約枠・来店フォロー は /api/restaurant-test/setup-progress の真偽値から決まる
   （apps/web/src/v8/settings/getting-started/steps.ts と restaurant-setup-progress.ts）。
+  ② 初期セットはLINE接続時に決まるので、済みなら一覧から外れて8段になる（Pen v09）。
 */
 const PEN_STATES = {
-  /* 枠02 (C5i3rw) 1/9: ①だけ済み。②は未設定、③は下書き0件、④〜⑧は未設定。 */
+  /* 枠02 (C5i3rw) 1/9: ①だけ済み。②は未設定なので一覧に残り9段。③は下書き0件、以降は未設定。 */
   '1/9': {
     server: { accounts: 'done', featureSet: 'todo', firstMessage: 'todo' },
     richMenuEmpty: true,
     store: { tables: false, hours: false, menus: false, reception: false, followup: false },
   },
-  /* 枠08b (Bnkcl) 4/9: ①②③と④卓・席まで済み。⑤以降は未設定。 */
-  '4/9': {
+  /* 枠08b (Bnkcl) 3/8: ①接続・リッチメニュー・卓と席まで済み。②は済みで一覧から外れるので8段。 */
+  '3/8': {
     server: { accounts: 'done', featureSet: 'done', firstMessage: 'todo' },
     richMenuEmpty: false,
     store: { tables: true, hours: false, menus: false, reception: false, followup: false },
@@ -95,7 +96,7 @@ async function routePenState(page, name) {
 async function openDashboard(page, width, height) {
   /*
     撮影用の口は使い方のスタイルとガイドの進み具合を持ち続けるので、毎回同じ所から始める。
-    9項目の一覧（枠08b）と卓・席の手順（枠14）は飲食店のスタイルで出るので restaurant に合わせる。
+    はじめにやることの一覧（枠08b）と卓・席の手順（枠14）は飲食店のスタイルで出るので restaurant に合わせる。
   */
   await page.request.put(`${MOCK}/api/dashboard/style?accountId=visual-qa-account`, {
     data: { style: 'restaurant' },
@@ -185,9 +186,9 @@ for (const width of PC_WIDTHS) {
     await page.screenshot({ path: `${OUT}/${width}-02-popup-1of9.png`, fullPage: false })
   })
 
-  /* 差し戻し: 承認Penと同じ済み数（枠08b=4/9）で照合できるようにする。 */
-  test(`${width}px 枠08b はじめにやること 4/9`, async ({ page }) => {
-    await routePenState(page, '4/9')
+  /* 承認済み Pen v09: ②が済みなら一覧から外れるので、枠08bの状態は3/8になる。 */
+  test(`${width}px 枠08b はじめにやること 3/8`, async ({ page }) => {
+    await routePenState(page, '3/8')
     await openDashboard(page, width, 1080)
     const popup = page.locator('[data-first-run-popup="open"]')
     await expect(popup).toBeVisible({ timeout: 15000 })
@@ -196,9 +197,9 @@ for (const width of PC_WIDTHS) {
     const card = page.getByText('はじめにやること').first()
     await expect(card, '08bのカードが無い').toBeVisible()
     await card.scrollIntoViewIfNeeded()
-    await expect(page.getByText('4 / 9 済み', { exact: true }), '枠08bの済み数が4/9にならない')
+    await expect(page.getByText('3 / 8 済み', { exact: true }), '枠08bの済み数が3/8にならない')
       .toBeVisible({ timeout: 15000 })
-    await page.screenshot({ path: `${OUT}/${width}-08b-first-steps-4of9.png`, fullPage: false })
+    await page.screenshot({ path: `${OUT}/${width}-08b-first-steps-3of8.png`, fullPage: false })
   })
 }
 
