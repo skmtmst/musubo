@@ -193,7 +193,7 @@ describe('migration 313 共通情報の使用数・履歴・差し替え', () =>
     expect(sqlite.prepare("SELECT archived_at FROM common_vars WHERE id = 'source'").get()).toEqual({ archived_at: null });
   });
 
-  it('別の表の使用先が同じIDを持つとき、差し替え済みと決めつけない', async () => {
+  it('別の表の使用先が同じIDでも、それぞれ差し替え可能なら止めない', async () => {
     sqlite.exec(`
       INSERT INTO automation_definitions (id, line_account_id, name, status)
       VALUES ('same-id', 'account-1', '新しい自動化', 'active');
@@ -202,6 +202,19 @@ describe('migration 313 共通情報の使用数・履歴・差し替え', () =>
       UPDATE automation_definitions SET current_published_version_id = 'auto-version' WHERE id = 'same-id';
       INSERT INTO automations (id, line_account_id, name, event_type, actions)
       VALUES ('same-id', 'account-1', '古い自動化', 'friend_add', '[{"varKey":"old_hours"}]');
+    `);
+    const source = (await getCommonVarById(db, 'source', 'account-1'))!;
+    const replacement = (await getCommonVarById(db, 'replacement', 'account-1'))!;
+    const plan = await getCommonVarReplacementPlan(db, source, replacement);
+    expect(plan.blockedTotal).toBe(0);
+  });
+
+  it('同じIDの別表に未検出の差し替え先があっても公開版の使用先を見落とさない', async () => {
+    sqlite.exec(`
+      INSERT INTO scenario_steps (id, scenario_id, step_order, message_type, message_content, message_bubbles_json)
+      VALUES ('shared-id', 'scenario-1', 1, 'text', '', '[{"varKey":"old_hours"}]');
+      INSERT INTO scenario_versions (id, scenario_id, version_number, steps_snapshot, status, published_at, created_at, updated_at)
+      VALUES ('shared-id', 'scenario-1', 1, '[{"message":"{{var.old_hours}}"}]', 'published', '2026-01-01', '2026-01-01', '2026-01-01');
     `);
     const source = (await getCommonVarById(db, 'source', 'account-1'))!;
     const replacement = (await getCommonVarById(db, 'replacement', 'account-1'))!;
