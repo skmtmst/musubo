@@ -1,5 +1,7 @@
 'use client'
 
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
+
 import ListDateTime from '@/components/shared/list-date-time'
 
 import ListToolbar, { ListToolbarFrame, ListToolbarOptional, ListToolbarSort } from '@/components/shared/list-toolbar';
@@ -536,10 +538,7 @@ export default function InflowListV8({
       ]}
     /></SaveErrorField>
   )
-  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
-  const createButton = readonly
-    ? null
-    : <Button variant="primary" href="/inflow-links/new"><Plus size={16} aria-hidden="true" />流入リンクを作る</Button>
+  const createButton = <PermissionGatedButton allowed={!readonly} variant="primary" href="/inflow-links/new"><Plus size={16} aria-hidden="true" />流入リンクを作る</PermissionGatedButton>
 
   /* ===== 道具の段 ===== */
   const filterChips = (

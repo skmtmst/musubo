@@ -380,6 +380,10 @@ export default function ScenariosListV8() {
    * ページ・絞り込みが変わったら重ねは捨てる（違う一覧に貼らない）。
    */
   const [optimisticRows, setOptimisticRows] = useState<{ key: string; rows: ScenarioRow[] } | null>(null)
+  const [reorderOverlay, setReorderOverlay] = useState<{ key: string; ids: string[]; refreshed: boolean } | null>(null)
+  const reorderTicket = useRef<object | null>(null)
+  const [reorderBusy, setReorderBusy] = useState(false)
+  useEffect(() => { reorderTicket.current = null; setReorderBusy(false); setReorderOverlay(null) }, [selectedAccountId])
   const listContextKey = JSON.stringify({
     account: selectedAccountId ?? '',
     query: serverQuery,
@@ -390,10 +394,14 @@ export default function ScenariosListV8() {
   })
   /* 取り消し待ちの削除（5秒）の行は一覧から外して描く（動きの点検 17 番）。 */
   const shownRows = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : scenarioList.items
-  const scenarios = useMemo(
-    () => shownRows,
-    [shownRows],
-  )
+  const scenarios = useMemo(() => {
+    if (!reorderOverlay || reorderOverlay.key !== listContextKey) return shownRows
+    const position = new Map(reorderOverlay.ids.map((id, index) => [id, index]))
+    return [...shownRows].sort((a, b) => (position.get(a.id) ?? Infinity) - (position.get(b.id) ?? Infinity))
+  }, [shownRows, reorderOverlay, listContextKey])
+  useEffect(() => {
+    if (!optimisticRows && reorderOverlay?.refreshed) setReorderOverlay(current => current === reorderOverlay ? null : current)
+  }, [optimisticRows, reorderOverlay])
   /* 戻ってきたら前のスクロール位置へ（中身が描けてから）。 */
   useListScrollMemory(scenarioList.loaded)
   const loadScenarios = scenarioList.retry
@@ -429,10 +437,7 @@ export default function ScenariosListV8() {
   }
   const scenarioFilterActive = Boolean(serverQuery || activeParam !== undefined || createdThisMonthOnly || folderFilter)
 
-  /*
-   * 掴んで入れ替えた並びを先に描き換え、裏で保存する（★V8 サクサク感 B）。
-   * 5秒のあいだは知らせの「元に戻す」で送らずに戻せる。
-   */
+  /* 並びを先に描き換え、裏で保存する。 */
   const handleReorder = (ids: string[]) => {
     if (!requireWrite()) return
     setActionError('')
@@ -443,7 +448,13 @@ export default function ScenariosListV8() {
       void loadScenarios()
       return
     }
-    setOptimisticRows({ key, rows: nextRows })
+    if (reorderTicket.current) return
+    const ticket = {}
+    reorderTicket.current = ticket
+    setReorderBusy(true)
+    const before = reorderOverlay?.key === key ? reorderOverlay : { key, ids: scenarios.map(row => row.id), refreshed: false }
+    const optimistic = { key, ids: nextRows.map(row => row.id), refreshed: false }
+    setReorderOverlay(optimistic)
     runUndoable({
       message: '並び順を変えました',
       commit: async () => {
@@ -455,12 +466,20 @@ export default function ScenariosListV8() {
         const res = await api.scenarios.reorder(fullOrder)
         if (!res.success) throw new Error(res.error)
       },
-      undo: () => { if (currentScope()) setOptimisticRows(null) },
-      failureMessage: '並び順を保存できませんでした。',
-      onCommitted: () => {
+      undo: () => {
+        if (reorderTicket.current === ticket) { reorderTicket.current = null; setReorderBusy(false) }
         if (!currentScope()) return
-        setOptimisticRows(null)
-        void loadScenarios()
+        setReorderOverlay(current => current === optimistic ? before : current)
+        if (before) void scenarioList.retryAndWait().then(refreshed => {
+          if (refreshed && currentScope()) setReorderOverlay(current => current === before ? { ...current, refreshed: true } : current)
+        })
+      },
+      failureMessage: '並び順を保存できませんでした。',
+      onCommitted: async () => {
+        if (!currentScope()) return
+        if (reorderTicket.current === ticket) { reorderTicket.current = null; setReorderBusy(false) }
+        const refreshed = await scenarioList.retryAndWait()
+        if (refreshed && currentScope()) setReorderOverlay(current => current === optimistic ? { ...current, refreshed: true } : current)
       },
     })
   }
@@ -531,11 +550,7 @@ export default function ScenariosListV8() {
     })
   }
 
-  /*
-   * まとめて「止める／再開」は押した瞬間に描き換え、裏で保存する
-   * （★V8 サクサク感 B）。確認の窓は出さず、5秒のあいだ知らせの
-   * 「元に戻す」で送らずに戻せる。1本ずつの開始前チェックは詳細画面で行う。
-   */
+  /* まとめて「止める／再開」も先に描き換え、裏で保存する。 */
   const runBulkToggle = (next: boolean, ids: string[]) => {
     if (!requireWrite('publish')) return
     if (ids.length === 0 || toggleBusyRef.current) return
@@ -774,7 +789,7 @@ export default function ScenariosListV8() {
    * 動かせるのは絞り込みが無く、全件が1ページに出ているときだけ（リマインダ・リッチメニューと同じ決まり）。
    * 保存は渡した行に 0 から番号を振り直すため、一部の行だけで保存すると隠れた行と番号がぶつかる。
    */
-  const reorderDisabledReason = serverQuery || activeParam !== undefined || createdThisMonthOnly || folderFilter
+  const reorderDisabledReason = reorderBusy ? '並び順を保存しています' : serverQuery || activeParam !== undefined || createdThisMonthOnly || folderFilter
     ? '絞り込みを外すと動かせます' : null
   const canReorder = !editDisabled && reorderDisabledReason === null
 

@@ -1277,3 +1277,8 @@
 - [文書：手動テストの要件の整理](release-log/unreleased/79-kenta-a15-req.md) — 画面と決定に合わせた要件の変更履歴。確認 2026-11-15。
 - [文書：本番前の点検3資料の見直しとオーナー1枚](release-log/unreleased/85-kenta-d6-handoff.md) — 点検表・二段階認証・事故手順の履歴。確認 2026-11-16。
 - [日付に左右される自動確認の修正](release-log/unreleased/90-kenta-worker-date.md) — 予約の自動確認の変更履歴。確認 2026-11-16。
+- [全画面の確かめA14の直し](release-log/unreleased/82-kenta-a14-fix.md) — フォルダの「…」・面談の表などの履歴。確認 2026-11-15。
+- [操作後のお知らせと保管確認](release-log/unreleased/81-kenta-archive-undo.md) — お知らせと保管時の操作の変更履歴。確認 2026-11-15。
+- [EC連携を止めている間の案内](release-log/unreleased/78-kenta-words-behavior.md) — 画面の案内を実際の動きに合わせた修正履歴。確認 2026-11-15。
+- [閲覧のみの作るボタン・行の操作を灰色に](release-log/unreleased/73-kenta-train-viewer.md) — 閲覧のみの人への表示をそろえた履歴。確認 2026-11-15。
+- [列車 1116](release-log/unreleased/83-kenta-train-1116.md) — まとめて入れた直しの履歴。確認 2026-11-16。

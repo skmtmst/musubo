@@ -1,5 +1,7 @@
 'use client'
 
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
+
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { OverlayDepthContext } from '@/components/shared/overlay-utils'
@@ -189,11 +191,11 @@ export default function HqBroadcastList() {
     { key: 'open', title: '平均の開封率', icon: MailOpen, value: ready ? openRate : null, unit: '%', detail: ready ? (openRate == null ? 'まだ数えていません' : '送った配信の合計') : emptyValue('unknown') },
   ]
 
-  const createButton = (full: boolean) => canManage ? (
-    <Button variant="primary" href={NEW_HREF} className={full ? 'v8-folder-create w-full' : undefined}>
+  const createButton = (full: boolean) => (
+    <PermissionGatedButton allowed={canManage} need="tenantWide" variant="primary" href={NEW_HREF} className={full ? 'v8-folder-create w-full' : undefined}>
       <Plus size={16} aria-hidden="true" />配信を作る
-    </Button>
-  ) : null
+    </PermissionGatedButton>
+  )
 
   const countIn = (id: string) => all.filter((run) => (id === 'none' ? !folderIdOf(run) || !(folders ?? []).some((f) => f.id === folderIdOf(run)) : folderIdOf(run) === id)).length
   const folderRows: FolderPanelRow[] = [

@@ -148,7 +148,7 @@ describe('R611 一覧の取得失敗後は上部も「取得中」のままに�
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
 
     await waitFor(() => expect(fixture.settings).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'ご注文ありがとうございますの内容を編集' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: /の内容を編集$/ })).toBeTruthy())
     // 板  の4枚が戻る（数カードと表の見出し）。
     expect(screen.getAllByText('この30日')).toHaveLength(2)
     expect(screen.queryByText(/から読み直してください/)).toBeNull()

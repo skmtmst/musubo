@@ -1,4 +1,6 @@
 'use client'
+
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import { DetailContent, DetailField, DetailInlineEdit } from '@/components/shared/detail-content'
 import DetailPanel from '@/components/shared/detail-panel';
 import { useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
@@ -774,10 +776,7 @@ function WebinarList() {
       ]}
     /></SaveErrorField>
   )
-  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
-  const createButton = canEdit
-    ? <Button variant="primary" href="/webinars/new"><Plus size={16} aria-hidden="true" />ウェビナーを作る</Button>
-    : null
+  const createButton = <PermissionGatedButton allowed={canEdit} variant="primary" href="/webinars/new"><Plus size={16} aria-hidden="true" />ウェビナーを作る</PermissionGatedButton>
 
   /* ===== 道具の段 ===== */
   const shownChipCounts = chipCounts && chipCounts.accountId === selectedAccountId ? chipCounts : null

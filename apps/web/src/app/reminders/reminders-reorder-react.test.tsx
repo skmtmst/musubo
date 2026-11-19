@@ -23,6 +23,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const reminders = {
     ...actual.api.reminders,
     reorder: (ids: string[]) => fetchApi('/api/reminders/reorder', { method: 'PATCH', body: JSON.stringify({ ids }) }),
+    update: (id: string, data: unknown) => fetchApi(`/api/reminders/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   }
   return { ...actual, fetchApi, api: { ...actual.api, reminders } }
 })
@@ -102,7 +103,10 @@ let root: Root
 /* サーバーの「自分で並べた順」。reorder で書き換わり、sort=order の一覧はこの順で返る。 */
 let serverOrder: string[] = []
 let reorderCalls: string[][] = []
+let stoppedIds: string[] = []
 let failReorder = false
+let waitRefresh: Promise<void> | null = null
+let waitSave: Promise<void> | null = null
 let totalOverride: number | null = null
 let paged = false
 
@@ -112,8 +116,8 @@ const NEXT_ORDER = ['c', 'b', 'a']
 
 function reminder(id: string) {
   return {
-    id, name: NAMES[id], description: null, isActive: true, folderId: null,
-    lifecycleStatus: 'published', stepCount: 1, displayOrder: serverOrder.indexOf(id),
+    id, name: NAMES[id], description: null, isActive: !stoppedIds.includes(id), folderId: null,
+    lifecycleStatus: stoppedIds.includes(id) ? 'stopped' : 'published', stepCount: 1, displayOrder: serverOrder.indexOf(id),
     plannedDeliveries: null, lastSentAt: null,
     createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
   }
@@ -123,8 +127,11 @@ beforeEach(() => {
   search = ''
   role = 'owner'
   serverOrder = ['a', 'b', 'c']
+  stoppedIds = []
   reorderCalls = []
   failReorder = false
+  waitRefresh = null
+  waitSave = null
   totalOverride = null
   paged = false
   toasts.length = 0
@@ -133,12 +140,15 @@ beforeEach(() => {
     if (url === '/api/reminders/reorder') {
       const ids = (JSON.parse(init?.body ?? '{}') as { ids: string[] }).ids
       reorderCalls.push(ids)
+      if (waitSave) await waitSave
       if (failReorder) return { success: false, error: 'boom' }
       // 渡された行に 0 から番号を振り直す（packages/db の reorderReminders と同じ）。
       serverOrder = [...ids, ...serverOrder.filter((id) => !ids.includes(id))]
       return { success: true, data: { updated: ids.length } }
     }
+    if (/^\/api\/reminders\/[abc]$/.test(url) && init?.method === 'PATCH') { stoppedIds = stoppedIds.filter(id => !url.endsWith('/' + id)); return { success: true, data: {} } }
     if (url.startsWith('/api/reminders?')) {
+      if (reorderCalls.length && waitRefresh) await waitRefresh
       const params = new URLSearchParams(url.slice(url.indexOf('?') + 1))
       const sort = params.get('sort')
       const ids = sort === 'next' ? NEXT_ORDER : serverOrder
@@ -254,6 +264,71 @@ describe('リマインダ一覧の並び替え', () => {
     act(() => root.unmount())
     root = createRoot(host)
     await mount('sort=order')
+    expect(rowOrder()).toEqual(['b', 'a', 'c'])
+  })
+
+  it('並べ替えの保存中に一斉再開しても新しい並びを保つ', async () => {
+    stoppedIds = ['a']
+    await mount('sort=order')
+    let finish!: () => void
+    waitSave = new Promise(resolve => { finish = resolve })
+    key(handles()[0], 'ArrowDown')
+    await flush()
+    expect(rowOrder()).toEqual(['b', 'a', 'c'])
+    act(() => { host.querySelector<HTMLInputElement>('input[aria-label="Aのお知らせを選択"]')!.click() })
+    const resume = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === '再開')
+    expect(resume).toBeTruthy()
+    act(() => { resume!.click() })
+    await flush()
+    expect(rowOrder()).toEqual(['b', 'a', 'c'])
+    await act(async () => { finish() })
+    await flush()
+    expect(rowOrder()).toEqual(['b', 'a', 'c'])
+  })
+
+  it('一斉再開と重なって保存が失敗したら元の並びを保つ', async () => {
+    stoppedIds = ['a']
+    await mount('sort=order')
+    let finish!: () => void
+    waitSave = new Promise(resolve => { finish = resolve })
+    key(handles()[0], 'ArrowDown')
+    await flush()
+    act(() => { host.querySelector<HTMLInputElement>('input[aria-label="Aのお知らせを選択"]')!.click() })
+    const resume = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === '再開')!
+    act(() => { resume.click() })
+    await flush()
+    expect(rowOrder()).toEqual(['b', 'a', 'c'])
+    failReorder = true
+    await act(async () => { finish() })
+    await flush()
+    expect(rowOrder()).toEqual(['a', 'b', 'c'])
+    expect(toasts).toEqual(['並び替えを保存できませんでした。'])
+  })
+
+  it('保存中は次の並べ替えを受け付けない', async () => {
+    await mount('sort=order')
+    let finish!: () => void
+    waitSave = new Promise(resolve => { finish = resolve })
+    key(handles()[0], 'ArrowDown')
+    await flush()
+    expect(reorderCalls).toEqual([['b', 'a', 'c']])
+    expect(host.querySelector('[data-reorder-disabled]')?.getAttribute('title')).toBe('並び順を保存しています')
+    expect(rowOrder()).toEqual(['b', 'a', 'c'])
+    await act(async () => { finish() })
+    await flush()
+    expect(reorderCalls).toHaveLength(1)
+  })
+
+  it('保存が終わっても読み直しが返るまで新しい並びを保つ', async () => {
+    await mount('sort=order')
+    let finish!: () => void
+    waitRefresh = new Promise(resolve => { finish = resolve })
+    key(handles()[0], 'ArrowDown')
+    await flush()
+    expect(reorderCalls).toEqual([['b', 'a', 'c']])
+    expect(rowOrder()).toEqual(['b', 'a', 'c'])
+    await act(async () => { finish() })
+    await flush()
     expect(rowOrder()).toEqual(['b', 'a', 'c'])
   })
 
