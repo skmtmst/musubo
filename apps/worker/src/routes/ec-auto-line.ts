@@ -71,6 +71,19 @@ ecAutoLine.get('/api/ec/auto-line/live/unknown',async c=>{
  return c.json({success:true,data:{items}});
 });
 
+ecAutoLine.post('/api/ec/auto-line/live/unknown/:id/resolve',async c=>{
+ const staff=c.get('staff');if(!staff || staff.readOnly || !['owner','admin'].includes(staff.role) || c.get('impersonation'))throw new GapError('forbidden',403);
+ const account=await gapAccount(c),body=await gapBody(c),id=c.req.param('id');
+ if(typeof body.reason!=='string'||!body.reason.trim()||body.reason.length>500)throw new GapError('reason_required');
+ if(typeof body.expectedVersion!=='string'||!body.expectedVersion || !['sent','not_sent'].includes(String(body.resolution)))throw new GapError('invalid_resolution');
+ const at=new Date().toISOString(),sent=body.resolution==='sent';
+ const update=c.env.DB.prepare("UPDATE ec_auto_line_live_intents SET state=?,updated_at=? WHERE id=? AND account_id=? AND state='unknown' AND updated_at=?").bind(sent?'sent':'failed',at,id,account,body.expectedVersion);
+ const cap=sent?c.env.DB.prepare("UPDATE ec_auto_line_cap_reservations SET state='accepted' WHERE live_intent_id=? AND account_id=? AND mode='live' AND state IN('reserved','started','unknown')").bind(id,account):c.env.DB.prepare("UPDATE ec_auto_line_cap_reservations SET state='released',release_actor=?,release_reason=?,released_at=? WHERE live_intent_id=? AND account_id=? AND mode='live' AND state IN('reserved','started','unknown')").bind(staff.id,body.reason.trim(),at,id,account);
+ const audit=c.env.DB.prepare("INSERT INTO operation_audit(id,target_kind,target_id,action,actor_id,detail_json,created_at) VALUES(?,'ec_auto_line_live_intent',?,'unknown_resolved',?,?,?)").bind(crypto.randomUUID(),id,staff.id,JSON.stringify({accountId:account,resolution:body.resolution,reason:body.reason.trim(),previousVersion:body.expectedVersion}),at);
+ try{await c.env.DB.batch([update,assertChanged(c.env.DB),cap,audit,clearAssertions(c.env.DB)]);}catch(e){if(/CHECK constraint/.test(String(e)))throw new GapError('version_conflict',409);throw e;}
+ return c.json({success:true,data:{id,state:sent?'sent':'failed',version:at}});
+});
+
 // Only a verified store administrator can inspect or resolve simulated unknown outcomes.
 ecAutoLine.get('/api/ec/auto-line/cap/unknown',async c=>{
  gapWrite(c,{admin:true});const a=await gapAccount(c);
