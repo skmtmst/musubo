@@ -2,3 +2,4 @@
 export { bookingCancellationQuote, bookingCancellationReview, customerCancellationDeadline, cancellationPolicy, cancellationQuote, cancellationSetupUrl, requireCancellationTestConnection, validCancellationPolicy } from '../booking-cancellation.js';
 export { startCardCheckout } from '../booking-card-checkout.js';
 export { chargeCancellation } from '../booking-card-charge.js';
+export { refundCancellationCharge } from '../booking-charge-refund.js';

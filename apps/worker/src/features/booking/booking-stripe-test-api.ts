@@ -35,7 +35,7 @@ export async function bookingStripeTestRequest(
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new BookingStripeTestError('stripe_result_unknown', true);
   const result = value as Record<string, unknown>;
-  if (result.livemode !== false) throw new BookingStripeTestError('live_mode_not_approved', true);
+  if (result.livemode !== false && !(input.operation === 'refunds' && result.livemode === undefined)) throw new BookingStripeTestError('live_mode_not_approved', true);
   return result;
 }
 
@@ -52,5 +52,19 @@ export async function searchBookingStripeTestCharge(input:{key?:string;connected
   if (!response.ok || !data || typeof data!=='object' || !Array.isArray((data as {data?:unknown}).data) || (data as {has_more?:unknown}).has_more!==false) throw new BookingStripeTestError('stripe_result_unknown',true);
   const rows=(data as {data:unknown[]}).data;
   if (rows.some(row=>!row || typeof row!=='object' || Array.isArray(row) || (row as {livemode?:unknown}).livemode!==false)) throw new BookingStripeTestError('stripe_result_unknown',true);
+  return rows as Record<string,unknown>[];
+}
+
+/** Stripeの返金一覧を照会する。ページが残る場合は結果不明として扱う。 */
+export async function listBookingStripeTestRefunds(input:{key?:string;connectedAccount:string;paymentIntentId:string},fetchImpl:typeof fetch=fetch):Promise<Record<string,unknown>[]> {
+  if (!input.key || !/^sk_test_[A-Za-z0-9]+$/.test(input.key)) throw new BookingStripeTestError('stripe_test_key_required');
+  if (!/^acct_[A-Za-z0-9]+$/.test(input.connectedAccount) || !/^pi_[A-Za-z0-9]+$/.test(input.paymentIntentId)) throw new BookingStripeTestError('invalid_stripe_account');
+  const query=new URLSearchParams({payment_intent:input.paymentIntentId,limit:'100'});
+  let response:Response;try { response=await fetchImpl(`https://api.stripe.com/v1/refunds?${query}`,{method:'GET',redirect:'error',signal:AbortSignal.timeout(10000),headers:{Authorization:`Bearer ${input.key}`,'Stripe-Account':input.connectedAccount,'Stripe-Version':STRIPE_BOOKING_API_VERSION}}); }
+  catch { throw new BookingStripeTestError('stripe_result_unknown',true); }
+  let value:unknown;try { value=await response.json(); } catch { throw new BookingStripeTestError('stripe_result_unknown',true); }
+  if(!response.ok || !value || typeof value!=='object' || !Array.isArray((value as {data?:unknown}).data) || (value as {has_more?:unknown}).has_more!==false) throw new BookingStripeTestError('stripe_result_unknown',true);
+  const rows=(value as {data:unknown[]}).data;
+  if(rows.some(row=>!row || typeof row!=='object' || Array.isArray(row) || ((row as {livemode?:unknown}).livemode!==undefined && (row as {livemode?:unknown}).livemode!==false)))throw new BookingStripeTestError('stripe_result_unknown',true);
   return rows as Record<string,unknown>[];
 }

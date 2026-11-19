@@ -19,3 +19,22 @@ WHEN OLD.status IN ('cancelled','no_show') AND NEW.status NOT IN ('cancelled','n
 BEGIN
   UPDATE booking_charges SET status='waived',reason='cancellation_reverted',version=version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
     WHERE booking_id=NEW.id AND line_account_id=NEW.line_account_id AND status='failed'; END;
+
+-- 返金の送信結果が不明でも、同じ請求に返金を重ねない。
+CREATE TABLE booking_charge_refund_requests (
+  id TEXT PRIMARY KEY,
+  charge_id TEXT NOT NULL UNIQUE REFERENCES booking_charges(id),
+  line_account_id TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  expected_version INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  connect_account TEXT NOT NULL,
+  payment_intent_id TEXT NOT NULL,
+  amount INTEGER NOT NULL CHECK(amount>0),
+  status TEXT NOT NULL CHECK(status IN ('processing','unknown','succeeded')),
+  stripe_refund_id TEXT UNIQUE,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(line_account_id,idempotency_key)
+);

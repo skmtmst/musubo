@@ -4839,6 +4839,13 @@
       "parentColumn": "id"
     }
   },
+  "booking_charge_refund_requests": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "booking_charges": {
     "category": "retain",
     "scope": {
