@@ -212,3 +212,16 @@ test('取消前に全員の料金と合計を確認し、確認できない場�
   expect(breakdown.textContent).toContain('マロン　¥1,500')
   expect(breakdown.textContent).toContain('合計　¥3,500')
 })
+
+
+test('料金の版が古いときは組を読み直すまで取消できない', async () => {
+  groupCancellationQuote.mockResolvedValueOnce({ success: true, data: { version: 3, totalFee: 0, members: [] } })
+  const reload = vi.fn()
+  render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" onReload={reload} />)
+  fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  expect(await screen.findByText('予約の内容が変わりました。最新の情報を確認してください。')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'この組を読み直す' }))
+  expect(reload).toHaveBeenCalledTimes(1)
+  expect(groupCancellationQuote).toHaveBeenCalledTimes(1)
+  expect(cancelGroup).not.toHaveBeenCalled()
+})

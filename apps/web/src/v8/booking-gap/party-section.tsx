@@ -55,6 +55,7 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
   const [quote, setQuote] = useState<Awaited<ReturnType<typeof bookingAdvancedApi.groupCancellationQuote>>['data'] | null>(null)
   const [quoteScope, setQuoteScope] = useState<typeof targetScope.current | null>(null)
   const [quoteError, setQuoteError] = useState('')
+  const [quoteStale, setQuoteStale] = useState(false)
   const [quoteGeneration, setQuoteGeneration] = useState(0)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
@@ -68,17 +69,17 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
     if (!open || !accountId || confirmedScope !== targetScope.current) return
     const scope = targetScope.current
     let live = true
-    setQuote(null); setQuoteScope(null); setQuoteError('')
+    setQuote(null); setQuoteScope(null); setQuoteError(''); setQuoteStale(false)
     void bookingAdvancedApi.groupCancellationQuote(accountId, scope.groupId).then(({ data }) => {
       if (!live || scope !== targetScope.current) return
-      const expected = party.members.filter(member => member.status === 'requested' || member.status === 'confirmed')
-      if (data.version !== scope.version || data.members.length !== expected.length || data.members.some(item => !expected.some(member => member.bookingId === item.bookingId && member.version === item.version && member.status === item.status))) {
-        setQuoteError('予約の内容が変わりました。最新の情報を確認してください。'); return
+      const expected = (JSON.parse(membersKey) as Array<[string, number | undefined, string]>).filter(([, , status]) => status === 'requested' || status === 'confirmed')
+      if (data.version !== scope.version || data.members.length !== expected.length || data.members.some(item => !expected.some(([id, version, status]) => id === item.bookingId && version === item.version && status === item.status))) {
+        setQuoteStale(true); setQuoteError('予約の内容が変わりました。最新の情報を確認してください。'); return
       }
       setQuote(data); setQuoteScope(scope)
     }).catch(() => { if (live && scope === targetScope.current) setQuoteError('キャンセル料を確認できませんでした。もう一度お試しください。') })
     return () => { live = false }
-  }, [open, accountId, confirmedScope, party.members, quoteGeneration])
+  }, [open, accountId, confirmedScope, membersKey, quoteGeneration])
 
   async function cancelAll() {
     if (!accountId || confirmedScope !== targetScope.current || busy || !canOperate || lockedReason || !reason.trim() || cancellable.length === 0 || !quote || quoteScope !== targetScope.current || quote.version !== targetScope.current.version) return
@@ -124,7 +125,7 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
         busy={busy} error={error || undefined} cancelLabel="キャンセル" onCancel={() => { if (!busy) { confirmationTicket.current = null; setOpen(false) } }} confirmLabel="まとめて取り消す" confirmLockedReason={lockedReason} confirmDisabled={!canOperate || confirmedScope !== targetScope.current || !reason.trim() || cancellable.length === 0 || !quote || quoteScope !== targetScope.current} confirmDisabledReason={!canOperate ? permissionAllowed ? operationDisabledReason : undefined : cancellable.length === 0 ? '取り消せる予約がありません' : confirmedScope !== targetScope.current ? '最新の内容を確認してください' : !reason.trim() ? '取り消す理由を入れてください' : !quote || quoteScope !== targetScope.current ? 'キャンセル料を確認してください' : undefined} onConfirm={() => { if (renderedTicket && renderedTicket === confirmationTicket.current && currentCanOperate.current) void cancelAll() }}
 >
         <OperationTargetSummary accounts={[{ id: confirmedScope?.accountId ?? '' }]} />
-        {quoteError ? <Notice tone="danger" message={quoteError} action={<Button onClick={() => setQuoteGeneration(value => value + 1)}>もう一度確認する</Button>} /> : null}
+        {quoteError ? <Notice tone="danger" message={quoteError} action={quoteStale ? reload ? <Button onClick={reload}>この組を読み直す</Button> : undefined : <Button onClick={() => setQuoteGeneration(value => value + 1)}>もう一度確認する</Button>} /> : null}
         {!quote && !quoteError ? <p>キャンセル料を確認しています。</p> : null}
         {quote && quoteScope === targetScope.current && confirmedScope === targetScope.current ? <div aria-label="キャンセル料の内訳">
           <p>キャンセル料の見込み</p>
