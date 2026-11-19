@@ -14,6 +14,7 @@ import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../worker-env';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
+import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 
 const pushMessageWithRequestId = vi.hoisted(() => vi.fn());
 vi.mock('@line-crm/line-sdk', async (importOriginal) => {
@@ -139,6 +140,20 @@ function seedDefinition(status: string) {
 }
 
 describe('N-328: EC顧客通知を共通送信台帳へ書く', () => {
+  it('ECの顧客通知は共通情報がなければ送らず、登録済みの値を送る', async () => {
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T01:00:00Z'));useSqliteClock(sqlite,()=>new Date());
+    try {
+      sqlite.prepare("UPDATE ec_notification_settings SET title_override='営業時間: {{var.hours}}' WHERE event_type='ec.order.confirmed'").run();
+      await post(baseEvent({event_id:'event-var-missing'}));
+      expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+      expect(sqlite.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+      sqlite.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES ('hours','account-a','営業時間','hours','text','10時')").run();
+      expect((await post(baseEvent({event_id:'event-var-success'}))).status).toBe(200);
+      expect(pushMessageWithRequestId).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(pushMessageWithRequestId.mock.calls[0][1])).toContain('営業時間: 10時');
+    } finally {vi.useRealTimers();}
+  });
+
   it.each([
     [0, 1, '店舗Aの通知', false],
     [1, 0, '店舗Aの通知', true],

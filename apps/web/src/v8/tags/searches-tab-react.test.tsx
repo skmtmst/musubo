@@ -131,7 +131,7 @@ describe('行', () => {
     const name = within(row).getByText('VIPかつ未契約')
     expect(name.closest('a')?.getAttribute('href')).toMatch(/^\/tags\/searches\/edit\?id=s1(&|$)/)
     expect(name.getAttribute('title')).toBe('VIPかつ未契約')
-    expect(name.closest('[title="条件を確認・編集"]')).toBeNull()
+    expect(row.querySelector('[title="条件を確認・編集"]')).toBeNull()
     expect(within(row).getByRole('link', { name: '「VIPかつ未契約」で友だち一覧を開く' }).getAttribute('href')).toMatch(/^\/friends\?savedSearch=s1(&|$)/)
     expect(within(row).getByRole('button', { name: '保存した検索「VIPかつ未契約」の操作' })).toBeTruthy()
   })
