@@ -25,6 +25,8 @@ it('state の再利用を拒み、本人の鍵を暗号化して保存し切断�
  expect(data.data.authorizationUrl).not.toContain('fixture-secret');
  const callback=`/api/booking/admin/meeting-oauth/callback?state=${encodeURIComponent(state)}&code=fixture-code`;
  const completed=await gapCall(app,callback);expect(completed.status).toBe(302);expect(completed.headers.get('location')).toContain('meeting_connection=connected');expect(request).toHaveBeenCalledTimes(2);
+ expect((await gapCall(app,`${path}/prefer?account_id=a`,'POST',{})).status).toBe(200);
+ expect(await (await gapCall(app,`${path}?account_id=a`)).json()).toMatchObject({data:{preferred:true}});
  const saved=d.raw.prepare('SELECT credential_enc FROM booking_meeting_connections').get() as {credential_enc:string};expect(saved.credential_enc).not.toContain('fixture-refresh');
  expect((await gapCall(app,callback)).status).toBe(401);
  expect((await gapCall(app,`${path}?account_id=a`,'DELETE')).status).toBe(200);
@@ -36,4 +38,10 @@ it('state Cookie がある場合は一致を確かめ、違えば交換しない
  const data=await started.json() as {data:{authorizationUrl:string}};const state=new URL(data.data.authorizationUrl).searchParams.get('state')!;
  const response=await app.request(`/api/booking/admin/meeting-oauth/callback?state=${encodeURIComponent(state)}&code=fixture-code`,{headers:{Cookie:'booking_meeting_oauth_state=wrong'}});
  expect(response.status).toBe(401);expect(fetcher).not.toHaveBeenCalled();
+});
+it('接続していないサービスは優先先にできず、閲覧のみは変更できない',async()=>{
+ const app=gapApp(d,[bookingMeetingOAuth]);
+ expect((await gapCall(app,`${path}/prefer?account_id=a`,'POST',{})).status).toBe(409);
+ const read=gapApp(d,[bookingMeetingOAuth],{...gapOwner,readOnly:true});
+ expect((await gapCall(read,`${path}/prefer?account_id=a`,'POST',{})).status).toBe(403);
 });

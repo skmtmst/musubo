@@ -160,6 +160,8 @@ export type AuditAction =
   | 'webhook.api_token.rotate'
   | 'webhook.api_token.reactivate'
   // #838 第2段: Google Sheets 連携の接続・切断・出力先変更・手動同期。
+  | 'booking.meeting.preferred'
+  | 'booking.meeting.manual.resolve'
   | 'booking.meeting.connect.start'
   | 'booking.meeting.connect'
   | 'booking.meeting.disconnect'

@@ -106,3 +106,16 @@ test('メニューの会議発行方法は版を確認して保存する',async(
  expect((await gapCall(app(),path,'PUT',{url:null,issuance:'manual',expectedVersion:data.data.version})).status).toBe(409);
  expect(await (await gapCall(app(),path)).json()).toMatchObject({data:{issuance:'automatic'}});
 });
+test('相手先で削除した会議だけを確認の上で対応済みにする',async()=>{
+ seedGapBooking(d);
+ d.raw.exec("INSERT INTO booking_meeting_links(id,booking_id,provider,status,idempotency_key,last_error_code,created_at,updated_at) VALUES('old','bk','zoom','cancel_pending','old-key','manual_review','2026-01-01','2026-01-01')");
+ const list='/api/booking/admin/bookings/bk/meeting-links?account_id=a';
+ expect(await (await gapCall(app(),list)).json()).toMatchObject({data:{items:[{id:'old',provider:'zoom'}]}});
+ expect((await gapCall(app(),list.replace('account_id=a','account_id=b'))).status).toBe(404);
+ const path='/api/booking/admin/bookings/bk/meeting-links/old/resolve?account_id=a';
+ expect((await gapCall(app(),path,'POST',{})).status).toBe(400);
+ expect((await gapCall(app(),path,'POST',{confirmed:true})).status).toBe(200);
+ expect(d.raw.prepare("SELECT status,last_error_code FROM booking_meeting_links WHERE id='old'").get()).toEqual({status:'cancelled',last_error_code:'manual_resolved'});
+ expect(await (await gapCall(app(),list)).json()).toMatchObject({data:{items:[]}});
+ expect((await gapCall(app(),path,'POST',{confirmed:true})).status).toBe(404);
+});

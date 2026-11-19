@@ -6,6 +6,7 @@ import {beginMeetingAuthorization,consumeMeetingAuthorization} from '../features
 import {deleteMeetingCredential,finishAuthorizedMeetingConnection,meetingConnectionState,type ConnectionProvider} from '../features/booking/booking-meeting-credentials/index.js';
 import {exchangeMeetingAuthorization,meetingAuthorizationUrl,newMeetingVerifier} from '../features/booking/booking-meeting-oauth-client/index.js';
 import {auditLog} from '../lib/audit-log.js';
+import {preferredMeetingProvider,setPreferredMeetingProvider} from '../features/booking/booking-meeting-preference/index.js';
 import {meetingOAuthConfig} from '../features/booking/booking-meeting-oauth-config/index.js';
 
 export const bookingMeetingOAuth=new Hono<Env>();
@@ -35,7 +36,15 @@ const base='/api/booking/admin/staff/:id/connections/:provider';
 bookingMeetingOAuth.get(base,async c=>{
  const accountId=await gapAccount(c),staffId=c.req.param('id')!,provider=providerOf(c.req.param('provider')!);await staffTarget(c,accountId,staffId,false);
  const state=await meetingConnectionState(c.env.DB,{accountId,staffId,provider});
- return c.json({success:true,data:{state,mode:meetingOAuthConfig(c.env,provider)?'configured':'mock'}});
+ const preferred=provider==='outlook'?false:(await preferredMeetingProvider(c.env.DB,{accountId,staffId}))===provider;
+ return c.json({success:true,data:{state,preferred,mode:meetingOAuthConfig(c.env,provider)?'configured':'mock'}});
+});
+bookingMeetingOAuth.post(base+'/prefer',async c=>{
+ gapWrite(c);const accountId=await gapAccount(c),staffId=c.req.param('id')!,provider=providerOf(c.req.param('provider')!);await staffTarget(c,accountId,staffId,true);
+ if(provider==='outlook')throw new GapError('invalid_provider');
+ if(!await setPreferredMeetingProvider(c.env.DB,{accountId,staffId,provider}))throw new GapError('meeting_not_connected',409);
+ auditLog(c,'booking.meeting.preferred',{id:staffId,kind:provider},{lineAccountId:accountId});
+ return c.json({success:true,data:{preferred:true}});
 });
 bookingMeetingOAuth.post(base+'/connect',async c=>{
  gapWrite(c);const accountId=await gapAccount(c),staffId=c.req.param('id')!,provider=providerOf(c.req.param('provider')!);await staffTarget(c,accountId,staffId,true);

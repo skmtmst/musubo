@@ -34,3 +34,9 @@ export const gap1Paths:Record<string,Record<string,ReturnType<typeof operation>>
 (gap1Paths["/api/booking/admin/staff/{id}/connections/{provider}"]??={}).delete=operation("DELETE","/api/booking/admin/staff/{id}/connections/{provider}","担当の会議・Outlook の接続を切る。");
 (gap1Paths["/api/booking/admin/staff/{id}/connections/{provider}/connect"]??={}).post=operation("POST","/api/booking/admin/staff/{id}/connections/{provider}/connect","担当の会議・Outlook の認可を始める。設定がない場合は模擬を返す。");
 (gap1Paths["/api/booking/admin/meeting-oauth/callback"]??={}).get=operation("GET","/api/booking/admin/meeting-oauth/callback","認可状態と担当者を確認し接続を保存する。");
+
+(gap1Paths["/api/booking/admin/staff/{id}/connections/{provider}/prefer"]??={}).post=operation("POST","/api/booking/admin/staff/{id}/connections/{provider}/prefer","担当者が優先する会議サービスを選ぶ。");
+
+(gap1Paths["/api/booking/admin/bookings/{id}/meeting-links/{linkId}/resolve"]??={}).post=operation("POST","/api/booking/admin/bookings/{id}/meeting-links/{linkId}/resolve","相手先で削除済みの古い会議を対応済みにする。");
+
+(gap1Paths["/api/booking/admin/bookings/{id}/meeting-links"]??={}).get=operation("GET","/api/booking/admin/bookings/{id}/meeting-links","手作業の確認が必要な会議を確認する。");

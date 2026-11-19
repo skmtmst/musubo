@@ -5,6 +5,7 @@ import {calendarSwitch,validMeetingUrl} from '../features/booking/booking-calend
 import {bookingChannelBounds} from '../features/booking/booking-channels/index.js';
 import {getAccountTimeZone} from '../services/availability.js';
 import {BOOKING_STAFF_OWN_KEY} from '@line-crm/shared';
+import {auditLog} from '../lib/audit-log.js';
 export const bookingCalendarSettings=new Hono<Env>();
 bookingCalendarSettings.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'calendar_settings_unavailable'},e instanceof GapError?e.status:503));
 async function staffTarget(c:Context<Env>,account:string,id:string,write:boolean){
@@ -81,6 +82,26 @@ bookingCalendarSettings.post('/api/booking/admin/bookings/:id/meeting',async (c:
  .bind(b.action,b.url??null,b.action,id,a,v).run();
  if(!r.meta.changes)throw new GapError('version_conflict',409);
  return c.json({success:true,data:await c.env.DB.prepare('SELECT meeting_url url,meeting_url_source source,lock_version version FROM bookings WHERE id=? AND line_account_id=?').bind(id,a).first()});
+});
+
+bookingCalendarSettings.get('/api/booking/admin/bookings/:id/meeting-links',async (c:Context<Env>):Promise<Response>=>{
+ const account=await gapAccount(c),id=c.req.param('id');
+ const booking=await c.env.DB.prepare('SELECT id FROM bookings WHERE id=? AND line_account_id=?').bind(id,account).first();
+ if(!booking)throw new GapError('not_found',404);
+ const rows=await c.env.DB.prepare("SELECT l.id,l.provider,l.staff_id,l.starts_at,l.ends_at,l.created_at,s.display_name staff_name FROM booking_meeting_links l LEFT JOIN staff s ON s.id=l.staff_id AND s.line_account_id=? WHERE l.booking_id=? AND l.status='cancel_pending' AND l.last_error_code='manual_review' ORDER BY l.created_at,l.id").bind(account,id).all();
+ return c.json({success:true,data:{items:rows.results??[]}});
+});
+
+bookingCalendarSettings.post('/api/booking/admin/bookings/:id/meeting-links/:linkId/resolve',async (c:Context<Env>):Promise<Response>=>{
+ gapWrite(c,{admin:true});const account=await gapAccount(c),body=await gapBody(c);
+ if(body.confirmed!==true)throw new GapError('confirmation_required');
+ const result=await c.env.DB.prepare(`UPDATE booking_meeting_links SET status='cancelled',last_error_code='manual_resolved',updated_at=?
+  WHERE id=? AND booking_id=? AND status='cancel_pending' AND last_error_code='manual_review'
+  AND EXISTS(SELECT 1 FROM bookings b WHERE b.id=booking_meeting_links.booking_id AND b.line_account_id=?)`)
+  .bind(new Date().toISOString(),c.req.param('linkId'),c.req.param('id'),account).run();
+ if(!result.meta.changes)throw new GapError('not_found',404);
+ auditLog(c,'booking.meeting.manual.resolve',{id:c.req.param('linkId')!,kind:'booking_meeting_link'},{lineAccountId:account});
+ return c.json({success:true,data:{resolved:true}});
 });
 
 bookingCalendarSettings.post('/api/booking/admin/bookings/:id/calendar/rewrite',async (c:Context<Env>):Promise<Response>=>{
