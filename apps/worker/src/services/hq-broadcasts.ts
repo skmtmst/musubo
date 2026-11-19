@@ -8,7 +8,7 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
 import type { HqMediaRuntime } from './hq-media.js';
 import { resolveHqBroadcastAudience, countHqAudience } from '../features/hq-broadcasts/hq-broadcast-audience/index.js';
 import { hqBroadcastApprovalState } from '../features/hq-broadcasts/hq-broadcast-approval/index.js';
-import { getLineAccountById, getStaffById, getBroadcastById, closeClaimsForStop } from '@line-crm/db';
+import { getLineAccountById, getStaffById, getBroadcastById, jstNow } from '@line-crm/db';
 import type { HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun } from '@line-crm/shared';
 import { requireHqTemplateAuthority } from './hq-templates/contract.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
@@ -224,13 +224,17 @@ export async function readHqBroadcastResult(db:D1Database,run:RunRow):Promise<Hq
   return {input,id:run.id,title:input.title,status:run.status,version:run.version,scheduledAt:run.scheduled_at,targets:rows.map((r,index)=>({...(r.preflight_json?JSON.parse(r.preflight_json):{accountId:r.line_account_id,accountName:r.account_name,audienceCount:null,remaining:null,connected:false,paused:false,blockedReasons:[]}),failureReasons:failures.filter(f=>f.line_account_id===r.line_account_id).map(f=>classifyHqFailure(f.state,f.error_code,f.count)).concat(r.child_status==='sent'&&r.total_count===0?[{code:'no_friends',label:'友だちが0人です',count:0,retryable:false}]:r.child_status==='draft'&&run.status==='scheduled'?[{code:'before_send_failed',label:'送信前の確認で止まりました。店舗の送信前確認をやり直してください',count:0,retryable:true}]:[]),excluded:!!r.excluded,broadcastId:r.broadcast_id,status:r.excluded?'excluded':(run.status==='cancelled'?'cancelled':r.child_status==='draft'&&run.status!=='prepared'?'failed':r.child_status??'prepared'),openedCount:r.opened_count,clickedCount:r.clicked_count,reactionCount:r.reaction_count,blockedCount:blocks.blocksByAccount.find(b=>b.accountId===r.line_account_id)?.blockCount??null,approvalStatus:r.approval_status??'none',successCount:r.success_count??0,totalCount:r.total_count??0,version:r.lock_version??1,retryableCount:counts[index],stopped:!!r.stopped_at}))};
 }
 export async function stopHqBroadcast(db:D1Database,run:RunRow,actorId:string,cancel:boolean,version:number) {
-  const token=crypto.randomUUID(),ops=[db.prepare(`UPDATE hq_broadcast_runs SET status=?,version=version+1,dispatch_token=? WHERE id=? AND version=? AND status NOT IN ('cancelled')`).bind(cancel?'cancelled':'stopped',token,run.id,version)];
+  const now=jstNow(),token=crypto.randomUUID(),ops=[db.prepare(`UPDATE hq_broadcast_runs SET status=?,version=version+1,dispatch_token=? WHERE id=? AND version=? AND status NOT IN ('cancelled')`).bind(cancel?'cancelled':'stopped',token,run.id,version)];
   const targets=(await db.prepare('SELECT * FROM hq_broadcast_targets WHERE run_id=?').bind(run.id).all<Target>()).results;
   for(const t of targets){if(t.broadcast_id)ops.push(db.prepare(`UPDATE broadcasts SET status=CASE WHEN status='scheduled' THEN 'draft' ELSE status END,scheduled_at=NULL,
     stopped_at=COALESCE(stopped_at,datetime('now')),stopped_by=?,lock_version=lock_version+1 WHERE id=? AND status IN ('scheduled','sending') AND EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND dispatch_token=?)`).bind(actorId,t.broadcast_id,run.id,token));
+    if(t.broadcast_id)ops.push(db.prepare(`UPDATE broadcast_send_claims SET
+      state=CASE WHEN dispatched_at IS NULL THEN 'failed' ELSE 'unknown' END,
+      error_code=CASE WHEN dispatched_at IS NULL THEN 'stopped_before_dispatch' ELSE 'stopped_mid_dispatch' END,
+      settled_at=?,updated_at=?
+      WHERE broadcast_id=? AND state='claimed' AND EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND dispatch_token=?)`).bind(now,now,t.broadcast_id,run.id,token));
     ops.push(db.prepare(`INSERT INTO hq_broadcast_audit(id,run_id,line_account_id,actor_id,action) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND dispatch_token=?)`).bind(crypto.randomUUID(),run.id,t.line_account_id,actorId,cancel?'cancelled':'stopped',run.id,token));}
   const r=await db.batch(ops);if(!r[0].meta.changes)throw new StampError('別の担当者が先に操作しました',409);
-  for(const t of targets)if(t.broadcast_id)await closeClaimsForStop(db,t.broadcast_id);
   return readHqBroadcastResult(db,await getHqBroadcastRun(db,run.tenant_id,run.id));
 }
 export async function retryHqBroadcastTarget(db:D1Database,run:RunRow,accountId:string,actorId:string,version:number,confirmation?:{count:number;token:string}) {
