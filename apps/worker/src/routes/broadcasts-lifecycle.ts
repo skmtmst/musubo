@@ -29,6 +29,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
   }
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
 
+  if(await c.env.DB.prepare('SELECT 1 FROM broadcast_ab_live_tests WHERE broadcast_id=?').bind(id).first())return c.json({success:false,error:'A/B配信の開始後は変更できません'},409);
   if(await simulationContext(c.env.DB,existing.id))return c.json({success:false,error:'use_simulation_draft_endpoint'},409);
   if (existing.status !== 'draft' && existing.status !== 'scheduled') {
     return inputError(c, { success: false, error: 'Only draft or scheduled broadcasts can be updated' }, 400, []);
