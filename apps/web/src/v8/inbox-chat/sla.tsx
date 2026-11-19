@@ -38,6 +38,14 @@ export function SlaBadge({ fields, now }: { fields: ChatSlaFields; now: number }
   return <StatusBadge tone={badge.tone} dot={false} size="compact" data-sla-badge={badge.tone}>{badge.text}</StatusBadge>
 }
 
+/**
+ * 「期限超過」の一覧に残す会話か。行は口が期限の絞り（上の「期限超過 N」・統括の件数と同じ数え方）で返すので、
+ * 手元の時計や札の状態（営業時間外など）で選び直さない。この画面で解決済みにした会話と、期限が消えた会話だけを外す。
+ */
+export function staysInOverdueList(fields: ChatSlaFields, status: string | null | undefined): boolean {
+  return status !== 'resolved' && Boolean(fields.slaDueAt)
+}
+
 /** 担当の名前の後ろに付ける印。自動で決まった担当だけ「（自動）」。 */
 export function assigneeLabel(name: string | null, fields: ChatSlaFields): string {
   if (!name) return '未割り当て'

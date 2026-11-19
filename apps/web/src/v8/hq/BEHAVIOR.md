@@ -32,6 +32,9 @@
   - 読み込んだ `revision` を `expectedRevision` として送る。既存の会社表示設定の版を共用し、ほかの人の先行保存は409。同じ保存の再送では版・監査を増やさない。失敗時に入力を消したり自動で読み直したりしない。
   - `GET /api/postal-code/search?code=` を再利用。複数候補と既に手入力した住所は、候補を選んだときだけ住所へ入れる。未取得・検索失敗では手入力を保つ。検索中の郵便番号・住所の編集には古い返信を適用しない。
 - ホーム：`GET /api/line-accounts`（タグ・接続状態・数を含む）・`GET /api/line-account-tags`・`GET /api/tenants/me`（説明の統括名）・運営のお知らせ（`PlatformNotices`）。
+- ホームの数の帯「返信の期限を過ぎた会話」：`GET /api/hq/style-attention` の店ごとの `overdue` を、表示中（アーカイブを除く）の店で足す。期限を使う店が無ければ出さない。出すときは数（アカウント・友だち合計・今月の配信）と気をつけること（接続に問題・返信の期限）の2段にする。
+  - 期限が未設定の会話がある店が混じれば合計を出さず「確定できません」と「期限未設定 N件」（全店の合計）。読み込みの失敗・古い口で値が無い・表示中の店が応答に無いときは 0 と出さない（「—」と理由）。
+  - 押すと、1店ならその店に切り替えて受信箱を期限超過で開く（`/chats?quick=overdue`）。複数店なら別の店へ進まず、店と件数の一覧から選んだ店だけを開く。
 - メンバー：`GET /api/staff/me` → 担当範囲が限られる人は一覧を呼ばない（M025）→ `GET /api/staff`・`GET /api/line-accounts`・最終ログイン。
 - 請求：`GET /api/hq/billing/summary`・`GET /api/hq/billing/invoices`（履歴だけの失敗は概要と分ける：R118、502 は決済サービスの案内：M023）。
 - お問い合わせ：`GET /api/hq/support/context`・`GET /api/hq/support/requests`。やり取り：`GET /api/hq/support/requests/:id` と、送信者・一覧・店舗名のために `staff/me`・`tenants/me`・`requests`・`context`。

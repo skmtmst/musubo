@@ -26,3 +26,11 @@ it.each([0, NaN, -1, Infinity, 0.5])('invalid maxColumns %s preserves a finite o
   expect(container.querySelectorAll('[data-kpi-strip]')).toHaveLength(1)
   expect(container.querySelector('[data-kpi-strip]')?.children.length).toBe(6)
 })
+
+it('段に分けたときは、画面の className を段の包み全体にだけ付ける（包みが中身の幅に縮まない）', () => {
+  const { container } = render(<KpiBand className="screen-band" maxColumns={3}>{Array.from({ length: 5 }, (_, i) => <KpiCard key={i} title={`Metric ${i}`} value={i} unit="件" detail={null} />)}</KpiBand>)
+  const rows = container.querySelector('[data-shared-part="kpi-band-rows"]')
+  expect(rows?.classList.contains('screen-band')).toBe(true)
+  expect(Array.from(rows?.children ?? []).map(row => row.children.length)).toEqual([3, 2])
+  expect(container.querySelectorAll('[data-kpi-strip].screen-band')).toHaveLength(0)
+})

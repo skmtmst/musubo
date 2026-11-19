@@ -5,7 +5,7 @@
  *  - 担当の名前の後ろに、自動で決まったときだけ「（自動）」。
  */
 import { describe, expect, it } from 'vitest'
-import { assigneeLabel, formatSlaDistance, slaBadgeOf } from './sla'
+import { assigneeLabel, formatSlaDistance, slaBadgeOf, staysInOverdueList } from './sla'
 
 const now = Date.parse('2026-10-16T10:15:00.000Z')
 const at = (minutes: number) => new Date(now + minutes * 60000).toISOString()
@@ -36,5 +36,18 @@ describe('assigneeLabel', () => {
     expect(assigneeLabel('Kenta', { assignedBy: 'auto' })).toBe('Kenta（自動）')
     expect(assigneeLabel('Kenta', { assignedBy: 'manual' })).toBe('Kenta')
     expect(assigneeLabel(null, { assignedBy: 'auto' })).toBe('未割り当て')
+  })
+})
+
+describe('staysInOverdueList', () => {
+  it('口が返した期限超過の行は、札が「営業時間外」でも時計で選び直さずに残す', () => {
+    expect(staysInOverdueList({ slaDueAt: at(-20), slaState: 'overdue' }, 'unread')).toBe(true)
+    expect(staysInOverdueList({ slaDueAt: at(-90), slaState: 'outside_hours' }, 'in_progress')).toBe(true)
+    expect(staysInOverdueList({ slaDueAt: at(3), slaState: 'soon' }, 'unread')).toBe(true)
+  })
+  it('この画面で解決済みにした行と、期限が消えた行だけを外す', () => {
+    expect(staysInOverdueList({ slaDueAt: at(-20), slaState: 'overdue' }, 'resolved')).toBe(false)
+    expect(staysInOverdueList({ slaDueAt: null, slaState: 'none' }, 'unread')).toBe(false)
+    expect(staysInOverdueList({}, 'unread')).toBe(false)
   })
 })

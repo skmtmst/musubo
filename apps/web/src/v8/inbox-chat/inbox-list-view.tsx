@@ -30,7 +30,7 @@ import { chatListPreview } from './list-preview';
 import styles from './list-parts.module.css';
 import { savedViewSummary } from './saved-view-summary';
 import { normalizeSavedViewConditions } from './saved-view-types';
-import { SlaBadge, assigneeLabel, type ChatSlaFields } from './sla';
+import { SlaBadge, assigneeLabel, staysInOverdueList, type ChatSlaFields } from './sla';
 
 type Props = {
   unreadOnly: boolean
@@ -53,6 +53,8 @@ type Props = {
   savedViewError: string
   setSlaReload: Dispatch<SetStateAction<number>>
   slaEnabled: boolean
+  /** 「期限超過」で開いたが、店の返事の期限の設定を読めなかった。違う条件の一覧は出さず、失敗として知らせる。 */
+  overdueSlaFailed: boolean
   overdueTotal: number | null
   quickFilter: "all" | "reply" | "overdue"
   setQuickFilter: Dispatch<SetStateAction<"all" | "reply" | "overdue">>
@@ -99,7 +101,7 @@ type Props = {
   setSortOrder: (next: InboxSort) => void
 }
 
-export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, chats, handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
+export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueSlaFailed, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, chats, handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
   // 緑の点は目で見る印。読み上げには名前で絞り込み中を伝える。
   const savedSearchLabel = hasInboxFilters ? '保存した検索（絞り込み中）' : '保存した検索'
   // 並びは題の横の印から選ぶ。選んだ並びは吹き出しとメニューの ✓ で分かるようにする。
@@ -282,7 +284,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
         options={[
           { key: 'all' as const, label: 'すべて' },
           { key: 'reply' as const, label: '要返信' },
-          slaEnabled
+          slaEnabled || overdueSlaFailed
             ? { key: 'overdue' as const, label: '期限超過' }
             : { key: 'overdue' as const, label: '1時間以上待ち' },
         ].map((filter) => ({
@@ -394,8 +396,11 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
             ...(channel !== 'line' && emailError ? ['email' as const] : []),
           ]}
           shown={channel === 'line' ? ['line'] : channel === 'email' ? ['email'] : ['line', 'email']}
+          detail={channel !== 'email' && overdueSlaFailed ? '返事の期限の設定を読み込めなかったため、期限超過の会話を出せません。' : undefined}
           onRetry={() => {
-            if (channel !== 'email' && chatListFailed) void loadChats()
+            // 期限の設定が読めなかったときは、設定から読み直す（読めれば一覧も取り直す）。
+            if (channel !== 'email' && overdueSlaFailed) setSlaReload((n) => n + 1)
+            else if (channel !== 'email' && chatListFailed) void loadChats()
             if (channel !== 'line' && emailError) void loadEmails()
           }}
         />
@@ -579,9 +584,10 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           if (latest) mailRows.sort((a, b) => String(b.at).localeCompare(String(a.at)))
           const rows: ChatListWindowItem[] = []
           if (slaEnabled) {
-            // 期限が近い順（過ぎた物が先）。期限の無い行・メールは後ろへ。「期限超過」は期限を過ぎた行だけ。
+            // 期限が近い順（過ぎた物が先）。期限の無い行・メールは後ろへ。
+            // 「期限超過」の行は口が期限の絞りで返す（上の「期限超過 N」と同じ口・同じ条件）。ここでは解決済みにした行だけ外す。
             const dueOf = (chat: ChatSlaFields) => (chat.slaDueAt ? Date.parse(chat.slaDueAt) : Infinity)
-            const linePicked = (quickFilter === 'overdue' ? chats.filter((chat) => (chat as ChatSlaFields).slaState === 'overdue') : chats)
+            const linePicked = (quickFilter === 'overdue' ? chats.filter((chat) => staysInOverdueList(chat as ChatSlaFields, chat.status)) : chats)
             const keyed = new Set(linePicked.map((chat) => chat.id))
             const lineByDue = lineRows.filter((row) => keyed.has(row.key)).sort((a, b) => dueOf(chats.find((chat) => chat.id === a.key) as ChatSlaFields) - dueOf(chats.find((chat) => chat.id === b.key) as ChatSlaFields))
             rows.push(...lineByDue, ...(quickFilter === 'overdue' ? [] : mailRows))
