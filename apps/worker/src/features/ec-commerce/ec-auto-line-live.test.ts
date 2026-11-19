@@ -130,3 +130,10 @@ it('同じ人の複数の商品も1日の上限を共有する',async()=>{
  expect(f.raw.prepare("SELECT count(*) n FROM ec_auto_line_cap_reservations WHERE mode='live' AND state='accepted'").get()).toEqual({n:1});
  expect(f.raw.prepare("SELECT count(*) n FROM ec_auto_line_live_intents WHERE state='sent'").get()).toEqual({n:1});
 });
+it('最後の機能停止確認で止まったら検証送信しない',async()=>{
+ const {featureJobCanRun}=await import('../../services/feature-enforcement.js');
+ vi.mocked(featureJobCanRun).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+ const env={DB:f.db,DEPLOY_ENV:'staging',EC_AUTO_LINE_LIVE_SEND_ENABLED:'true',WORKER_PUBLIC_URL:'https://worker.invalid'} as never;
+ await processStagingAutoLine(env,now);
+ expect(fakeProxy).not.toHaveBeenCalled();expect(state()).toEqual({state:'failed'});
+});

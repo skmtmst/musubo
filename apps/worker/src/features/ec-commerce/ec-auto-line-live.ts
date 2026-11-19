@@ -92,6 +92,7 @@ export async function processStagingAutoLine(env:import('../../worker-env.js').E
   const account=await env.DB.prepare(`SELECT channel_access_token,channel_access_token_encrypted FROM line_accounts la WHERE la.id=? AND la.is_active=1 AND la.archived_at IS NULL AND ${activeTenantLineAccountSql('la.id')}`).bind(input.accountId).first<{channel_access_token:string|null;channel_access_token_encrypted:string|null}>();
   if(!account)throw new NotificationDeliveryBlocked('account_unavailable');
   const token=await resolveLineCredential(account.channel_access_token_encrypted,account.channel_access_token,{lineAccountId:input.accountId,field:'channel_access_token'},env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+  if(!(await getSendPermissionForAccount(env.DB,input.accountId)).allowed||await isOperationCapabilityStopped(env.DB,input.accountId,'broadcast_dispatch')||!await featureJobCanRun(env.DB,{accountId:input.accountId,featureId:'ec_commerce',job:'EC auto line'}))throw new NotificationDeliveryBlocked('sending_stopped');
   const latest=await eligible(env.DB,input.intentId,new Date());
   if(!token||!latest||latest.account_id!==input.accountId||latest.friend_id!==input.friendId||latest.line_user_id!==input.to||JSON.stringify(JSON.parse(latest.payload_json))!==JSON.stringify(input.messages))throw new NotificationDeliveryBlocked('ec_recipient_changed');
   await pushViaHarnessProxy(env.WORKER_PUBLIC_URL||env.WORKER_URL||'https://worker.invalid',token,input.to,input.messages,input.retryKey,request=>dispatchLineProxyLocally(request,env));
