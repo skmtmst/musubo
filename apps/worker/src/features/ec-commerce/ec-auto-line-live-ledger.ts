@@ -31,3 +31,13 @@ export async function sendLiveIntent(db: D1Database, intent: LiveIntent, send: (
   .bind(state,new Date().toISOString(),intent.id).run();
  return state;
 }
+
+/** Restore only a confirmed acceptance; an unfinished request is never resent automatically. */
+export async function reconcileLiveIntent(db: D1Database, id: string, now = new Date()): Promise<boolean> {
+ const result = await db.prepare(`UPDATE ec_auto_line_live_intents SET state='sent',updated_at=?
+  WHERE id=? AND state='sending' AND EXISTS (
+   SELECT 1 FROM outbound_send_requests o WHERE o.resource_id='ec-live:'||ec_auto_line_live_intents.id
+    AND o.channel='line' AND o.line_account_id=ec_auto_line_live_intents.account_id AND o.status='succeeded'
+  )`).bind(now.toISOString(),id).run();
+ return result.meta.changes === 1;
+}
