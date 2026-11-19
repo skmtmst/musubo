@@ -138,6 +138,7 @@
 - [V7 追加要件（流れ図・受信箱のキー操作・写真の連続審査・処理の進み）](v6-requirements/v7-additions-requirements.md)
 - [未実装機能の確定（2026-09-25）](v6-requirements/v7-unbuilt-features-confirmed.md)
 - [V8 で足した決まり（要件）の索引](v8-requirements/README.md)
+- [SNS連携で残る3つの口の決まり](v8-requirements/multi-sns-connections-ports.md)
 - [B-244〜B-247 適用の点検表（2026-10-12）](v8-requirements/b244-rollout-audit.md)
 - [01 ダッシュボード 操作と挙動（受け入れ）](v8-requirements/behavior/01-dashboard.md)
 - [02 受信箱 操作と挙動（受け入れ）](v8-requirements/behavior/02-inbox.md)
@@ -467,6 +468,8 @@
 - [本人確認・ログイン・保存期限の実装説明](security/step-up-and-retention.md)
 
 ## 反映履歴
+
+- [AI が作った配信の承認手順を整理](release-log/unreleased/PR-kenta-g2-docs.md) — 反映履歴、確認 2026-11-19。
 
 - [SNS連携で残る3つの口の決まり](release-log/unreleased/120-kenta-sns-multilink-ports.md) — 反映履歴、確認 2026-11-18。
 
