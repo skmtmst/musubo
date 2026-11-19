@@ -3,6 +3,11 @@ import assert from 'node:assert/strict'
 import { connectGuardBrowser } from './browser-session.mjs'
 import { scanLayoutOverflow } from './layout-overflow.mjs'
 
+test('成果の一覧を正式な URL で横幅の見張りに含める', async () => {
+  const { ROUTES } = await import('./browser-env.mjs')
+  assert.equal(ROUTES.conversions, '/affiliates?tab=points')
+})
+
 for (const width of [1024,1152,1440,1920]) test(`overflow, right edge and missing full text fail at ${width}; restoration is clean`, async () => {
   const browser = await connectGuardBrowser()
   try {
