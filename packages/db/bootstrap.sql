@@ -7749,14 +7749,14 @@ CREATE TABLE "rt_google_connections" (
   sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0)
 );
 
-CREATE TABLE rt_google_location_candidates (
-  id TEXT PRIMARY KEY,
+CREATE TABLE "rt_google_location_candidates" (
+  id TEXT PRIMARY KEY NOT NULL,
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  connection_id TEXT REFERENCES rt_google_connections(id) ON DELETE SET NULL,
   location_name TEXT NOT NULL,
   location_title TEXT NOT NULL,
   address_text TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')), connection_id TEXT REFERENCES rt_google_connections(id) ON DELETE SET NULL,
-  UNIQUE(store_id, location_name)
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE "rt_google_metrics_daily" (
@@ -11679,6 +11679,12 @@ CREATE INDEX idx_rt_google_connections_store_772
 
 CREATE INDEX idx_rt_google_location_candidates_connection_772
   ON rt_google_location_candidates(connection_id);
+
+CREATE UNIQUE INDEX idx_rt_google_location_candidates_key_772
+  ON rt_google_location_candidates(COALESCE(connection_id, 'store:' || store_id), location_name);
+
+CREATE INDEX idx_rt_google_location_candidates_store_772
+  ON rt_google_location_candidates(store_id);
 
 CREATE UNIQUE INDEX idx_rt_google_metrics_daily_key_772
   ON rt_google_metrics_daily(COALESCE(connection_id, 'store:' || store_id), date);

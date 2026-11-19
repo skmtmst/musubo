@@ -226,7 +226,43 @@ ALTER TABLE rt_google_oauth_states ADD COLUMN connection_id TEXT REFERENCES rt_g
 CREATE INDEX idx_rt_google_oauth_states_connection_772
   ON rt_google_oauth_states(connection_id);
 
-ALTER TABLE rt_google_location_candidates ADD COLUMN connection_id TEXT REFERENCES rt_google_connections(id) ON DELETE SET NULL;
+-- 店舗の選択候補は接続ごとの一時的な一覧。UNIQUE(store_id, location_name) のままだと、
+-- 同じ店舗の2つの接続が同じGoogleアカウント（同じ候補一覧）で選択待ちになったとき、
+-- 後から認可した側の候補が INSERT OR IGNORE で黙って落ちて「選べる店舗ではありません」になる。
+-- 接続を鍵に含めて作り直す。
+CREATE TABLE rt_google_location_candidates_new (
+  id TEXT PRIMARY KEY NOT NULL,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  connection_id TEXT REFERENCES rt_google_connections(id) ON DELETE SET NULL,
+  location_name TEXT NOT NULL,
+  location_title TEXT NOT NULL,
+  address_text TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+INSERT INTO rt_google_location_candidates_new (
+  id, store_id, connection_id, location_name, location_title, address_text, created_at
+)
+SELECT
+  -- 旧定義は非INTEGERの主キーに NULL を通すので、空の行があっても落ちないようにする
+  COALESCE(d.id, 'cand_' || d.store_id || ':' || d.location_name),
+  d.store_id,
+  (SELECT c.id FROM rt_google_connections c
+     WHERE c.store_id = d.store_id
+     ORDER BY c.sort_order, c.created_at, c.id LIMIT 1),
+  d.location_name, d.location_title, d.address_text, d.created_at
+FROM rt_google_location_candidates d;
+
+DROP TABLE rt_google_location_candidates;
+
+ALTER TABLE rt_google_location_candidates_new RENAME TO rt_google_location_candidates;
+
+-- 接続ごとに同じ店舗名は1件。接続が無い引き継ぎ行だけは店舗ごとに1件として残す
+CREATE UNIQUE INDEX idx_rt_google_location_candidates_key_772
+  ON rt_google_location_candidates(COALESCE(connection_id, 'store:' || store_id), location_name);
+
+CREATE INDEX idx_rt_google_location_candidates_store_772
+  ON rt_google_location_candidates(store_id);
 
 CREATE INDEX idx_rt_google_location_candidates_connection_772
   ON rt_google_location_candidates(connection_id);

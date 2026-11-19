@@ -76,9 +76,14 @@ function before(): Database.Database {
       state TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
       staff_id TEXT NOT NULL, mode TEXT NOT NULL, code_verifier_enc TEXT NOT NULL,
       expires_at TEXT NOT NULL);
+    -- 446_restaurant_google_business.sql:45-53 と同じ列をそろえる。
+    -- address_text と created_at を省くと 772 の移送SELECT（d.address_text / d.created_at）が
+    -- 「no such column」で落ち、移行の中身ではなく土台の写し間違いで試験が赤くなる。
     CREATE TABLE rt_google_location_candidates (
       id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
       location_name TEXT NOT NULL, location_title TEXT NOT NULL,
+      address_text TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(store_id, location_name));
 
     CREATE TABLE instagram_connections (
@@ -117,7 +122,8 @@ function before(): Database.Database {
     INSERT INTO rt_google_write_log(id,store_id,kind,result) VALUES('wl1','s1','connect','accepted');
     INSERT INTO rt_google_oauth_states(state,store_id,staff_id,mode,code_verifier_enc,expires_at)
       VALUES('st1','s1','staff1','reconnect','v1.verifier','2030-01-01');
-    INSERT INTO rt_google_location_candidates VALUES('lc1','s1','locations/222','候補の店');
+    INSERT INTO rt_google_location_candidates(id,store_id,location_name,location_title,address_text,created_at)
+      VALUES('lc1','s1','locations/222','候補の店','東京都渋谷区1-1-1','2026-02-01');
 
     INSERT INTO instagram_connections(line_account_id,page_id,instagram_id,page_name,username,
       page_token_encrypted,user_token_encrypted,expires_at,profile_json,refreshed_at,synced_at,connected_by,version,scopes)
