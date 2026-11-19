@@ -5,6 +5,7 @@ import { syncConfirmedBookingToGoogle } from './booking-calendar-sync.js';
 import { getReminderTiming, insertConfirmationReminders } from './booking-confirm.js';
 import { notifyForBooking } from './booking-notification.js';
 import { finishBookingOperation, queueBookingOperation, type BookingOperationKind } from './booking-operation-runs.js';
+import { createConfirmedBookingMeeting, type MeetingCreator } from './booking-meeting-create.js';
 import type { GoogleServiceAccountCredentials } from '../../services/google-service-account.js';
 
 const workflowKey = (id: string) => `${id}:confirmation-effects`;
@@ -18,7 +19,7 @@ export function confirmationWorkflowStatement(db: D1Database, bookingId: string,
     .bind(crypto.randomUUID(), workflowKey(bookingId), bookingId);
 }
 
-interface Options { now?: Date; credentials?: GoogleServiceAccountCredentials }
+interface Options { now?: Date; credentials?: GoogleServiceAccountCredentials; meetingCreator?: MeetingCreator }
 
 /** 3入口共通。成功した工程は飛ばす。LINEの到達不明は人の確認に残す。 */
 export async function runConfirmedBookingSideEffects(db: D1Database, bookingId: string, options: Options = {}): Promise<void> {
@@ -78,6 +79,10 @@ export async function runConfirmedBookingSideEffects(db: D1Database, bookingId: 
     if (result.failed > 0) throw new Error('conversion_incomplete');
     return { conversion: 'recorded' };
   });
+  if (options.meetingCreator) {
+    try { await createConfirmedBookingMeeting(db, bookingId, options.meetingCreator); }
+    catch { logger.warn('booking_meeting_create_failed'); }
+  }
   await step('google_calendar', 'google-calendar:create', async (operationId) => {
     const result = await syncConfirmedBookingToGoogle(db, options.credentials ?? {}, bookingId, `lh${operationId.replaceAll('-', '')}`);
     return { calendarSync: result.synced ? 'synced' : 'not_configured', skipped: !result.synced };

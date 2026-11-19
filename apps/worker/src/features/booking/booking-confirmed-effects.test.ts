@@ -200,3 +200,13 @@ it.each([['other','f',201], ['a','other',201], ['a','f',202]] as const)
     expect(count('booking_slot_allocations')).toBe(1);
     expect(count('booking_audit_logs')).toBe(0);
   });
+
+it('確定の共通処理で会議を発行し、回収時に重複させない', async () => {
+  sql.raw.exec("UPDATE menus SET meeting_mode='online'; UPDATE bookings SET status='confirmed',meeting_mode='online'");
+  const create = vi.fn(async () => ({ kind: 'created' as const, meetingId: 'remote-test', url: 'https://example.test/meeting' }));
+  const meetingCreator = { provider: 'zoom' as const, create };
+  await runConfirmedBookingSideEffects(sql.db, 'b', {now, meetingCreator});
+  await runConfirmedBookingSideEffects(sql.db, 'b', {now, meetingCreator});
+  expect(create).toHaveBeenCalledTimes(1);
+  expect(sql.raw.prepare("SELECT status FROM booking_meeting_links WHERE booking_id='b'").get()).toEqual({status:'active'});
+});

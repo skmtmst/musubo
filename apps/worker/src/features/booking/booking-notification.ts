@@ -28,7 +28,7 @@ interface BookingNotificationRow {
 
 async function loadNotificationRow(db:D1Database,bookingId:string,accountId?:string) {
   return await db.prepare(`SELECT b.starts_at,b.line_account_id,b.status,b.lock_version,b.friend_id,
-    b.meeting_mode,b.meeting_url,b.policy_snapshot_json,m.name AS menu_name,s.display_name AS staff_name,
+    b.meeting_mode,CASE WHEN b.meeting_url_source='manual' THEN b.meeting_url ELSE COALESCE((SELECT ml.meeting_url FROM booking_meeting_links ml WHERE ml.booking_id=b.id AND b.status='confirmed' AND ml.status='active' LIMIT 1),b.meeting_url) END AS meeting_url,b.policy_snapshot_json,m.name AS menu_name,s.display_name AS staff_name,
     la.channel_access_token,la.channel_access_token_encrypted,la.liff_id,ast.style AS notification_style,f.line_user_id,bs.timezone,
     COALESCE(m.cancel_deadline_hours_before*60,bs.cancel_deadline_minutes_before,1440) cancel_deadline_minutes_before
     FROM bookings b INNER JOIN menus m ON m.id=b.menu_id INNER JOIN staff s ON s.id=b.staff_id
