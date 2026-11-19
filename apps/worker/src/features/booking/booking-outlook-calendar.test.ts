@@ -24,3 +24,16 @@ it('未知の予定状態は安全のため予定ありとして扱う',async()=
  const fetcher=vi.fn(async()=>new Response(JSON.stringify({value:[event('x','unknown')]}))) as unknown as typeof fetch;
  expect(await outlookCalendar(async()=> 'token',fetcher).busy(input)).toHaveLength(1);
 });
+it('予約の予定は一意の取引IDで作り、参加者を含めない',async()=>{
+ const fetcher=vi.fn(async(_url:RequestInfo|URL,_init?:RequestInit)=>new Response(JSON.stringify({id:'immutable-id'}),{status:201}));
+ const calendar=outlookCalendar(async()=> 'token',fetcher as unknown as typeof fetch);
+ const result=await calendar.create({staffId:'s',calendarId:'calendar',start:input.start,end:input.end,title:'予約',description:'管理画面で確認',transactionId:'stable-transaction',signal:input.signal});
+ expect(result).toEqual({kind:'created',eventId:'immutable-id'});
+ const [,options]=fetcher.mock.calls[0];const body=JSON.parse(String(options?.body)) as Record<string,unknown>;
+ expect(body.transactionId).toBe('stable-transaction');expect(body.start).toEqual({dateTime:'2026-12-01T00:00:00.000',timeZone:'UTC'});expect(body).not.toHaveProperty('attendees');expect((options?.headers as Record<string,string>).Prefer).toContain('ImmutableId');
+});
+it('作成中の通信断は結果不明として自動再送しない',async()=>{
+ const fetcher=vi.fn(async()=>{throw new Error('network')}) as unknown as typeof fetch;
+ const result=await outlookCalendar(async()=> 'token',fetcher).create({staffId:'s',calendarId:'calendar',start:input.start,end:input.end,title:'予約',description:'',transactionId:'stable',signal:input.signal});
+ expect(result).toEqual({kind:'unknown'});expect(fetcher).toHaveBeenCalledOnce();
+});

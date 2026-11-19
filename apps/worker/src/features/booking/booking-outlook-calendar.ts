@@ -30,5 +30,19 @@ export function outlookCalendar(tokenForStaff:(staffId:string)=>Promise<string|n
   }
   return result;
  }
- return {busy};
+ /** 予定作成は安定した transactionId を使い、参加者を含めない。 */
+ async function create(input:{staffId:string;calendarId:string;start:string;end:string;title:string;description:string;transactionId:string;signal:AbortSignal}):Promise<{kind:'created';eventId:string}|{kind:'failed'}|{kind:'unknown'}> {
+  let token:string|null;try{token=await tokenForStaff(input.staffId);}catch{return {kind:'failed'};}if(!token)return {kind:'failed'};
+  if(!input.calendarId||!input.transactionId||!input.title||!Number.isFinite(Date.parse(input.start))||!Number.isFinite(Date.parse(input.end))||Date.parse(input.start)>=Date.parse(input.end))return {kind:'failed'};
+  const id=encodeURIComponent(input.calendarId);
+  const event={subject:input.title,body:{contentType:'text',content:input.description},start:{dateTime:new Date(input.start).toISOString().slice(0,-1),timeZone:'UTC'},end:{dateTime:new Date(input.end).toISOString().slice(0,-1),timeZone:'UTC'},transactionId:input.transactionId};
+  try {
+   const response=await request(`https://graph.microsoft.com/v1.0/me/calendars/${id}/events`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Prefer:'IdType="ImmutableId"'},body:JSON.stringify(event),signal:input.signal});
+   if(!response.ok)return response.status>=400&&response.status<500&&![408,409].includes(response.status)?{kind:'failed'}:{kind:'unknown'};
+   const data:unknown=await response.json();
+   if(!data||typeof data!=='object'||Array.isArray(data)||typeof (data as Record<string,unknown>).id!=='string'||!(data as Record<string,string>).id)return {kind:'unknown'};
+   return {kind:'created',eventId:(data as Record<string,string>).id};
+  }catch{return {kind:'unknown'};}
+ }
+ return {busy,create};
 }
