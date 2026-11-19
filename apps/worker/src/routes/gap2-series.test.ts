@@ -1,6 +1,7 @@
 import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import {bookingSeries} from './booking-series.js';
+import booking from './booking.js';
 import {gapFixture,gapApp,gapCall,gapOwner,seedGapBooking} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
 import {recurrenceDates} from '../features/booking/booking-series.js';
@@ -128,4 +129,16 @@ test('B4-17: 閲覧のみの担当は繰り返しを変更できない',async()=
  expect((await gapCall(a,path)).status).toBe(200);
  expect((await gapCall(a,path,'PATCH',{scope:'this',fromBookingId:data.bookings[0].id,expectedVersion:1,change:{startsAt:'2026-11-20T06:00:00Z'}})).status).toBe(403);
  expect(d.raw.prepare('SELECT starts_at FROM bookings ORDER BY series_index').all()).toEqual(data.bookings.map((b:any)=>({starts_at:b.starts_at})));
+});
+
+
+test('B4-18: LIFFでこの回だけ変更し、組の次の回を保つ',async()=>{
+ const created=await gapCall(app(),url,'POST',body);expect(created.status).toBe(201);
+ const data=(await created.json() as {data:{series:{id:string};bookings:Array<{id:string;lock_version:number}>}}).data;
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({sub:'Uf'}))));
+ const a=gapApp(d,[booking,bookingSeries]);
+ const response=await a.request(`/api/liff/booking/${data.bookings[0].id}/reschedule?liffId=liff-a`,{method:'POST',headers:{Authorization:'Bearer token','Content-Type':'application/json'},body:JSON.stringify({starts_at:'2026-11-20T06:00:00.000Z',lock_version:data.bookings[0].lock_version})},undefined,{waitUntil:()=>{},passThroughOnException:()=>{}} as any);
+ expect(response.status,await response.clone().text()).toBe(200);
+ expect(d.raw.prepare('SELECT starts_at,series_index FROM bookings WHERE series_id=? ORDER BY series_index').all(data.series.id)).toEqual([
+  {starts_at:'2026-11-20T06:00:00.000Z',series_index:0},{starts_at:'2026-11-27T05:00:00.000Z',series_index:1},{starts_at:'2026-12-04T05:00:00.000Z',series_index:2}]);
 });
