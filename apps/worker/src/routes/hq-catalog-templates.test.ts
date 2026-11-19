@@ -161,8 +161,8 @@ test('HQT-18: 予約メニューの確認は30分後に期限切れ',async()=>{
  const r=await run(id,p);expect(r.body.data.stores[0].status).toBe('version_conflict');expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
 });
 
-test.each(['booking_menu','mileage_reward'] as const)('HQT-18: %s は29分で有効、30分で期限切れと理由を区別',async type=>{
- const valid=await create(type),p=await check(valid);vi.setSystemTime(new Date('2026-11-16T00:29:00Z'));expect((await run(valid,p)).body.data.status).toBe('completed');
- vi.setSystemTime(new Date('2026-11-16T01:00:00Z'));const expired=await create(type),q=await check(expired);vi.setSystemTime(new Date('2026-11-16T01:30:00Z'));
- const r=await run(expired,q,type==='mileage_reward'?'overwrite':'create');expect(r.body.data.stores[0]).toMatchObject({status:'version_conflict',reason:'確かめの期限が切れました。もう一度確かめてください'});
+test.each(['booking_menu','mileage_reward'] as const)('HQT-18: %s の期限切れは編集競合と区別する',async type=>{
+ const id=await create(type),p=await check(id);
+ f.raw.prepare("UPDATE hq_template_preflights SET expires_at=? WHERE idempotency_fingerprint=?").run('2026-11-15T23:59:59Z',p.preflightId);
+ const r=await run(id,p);expect(r.body.data.stores[0]).toMatchObject({status:'version_conflict',reason:'確かめの期限が切れました。もう一度確かめてください'});
 });

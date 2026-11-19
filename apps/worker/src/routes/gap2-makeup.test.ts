@@ -140,3 +140,25 @@ test('B3-04: 満席なら券を保ち、予約可能な近い3回を返す',asyn
  try {await useMakeup(d.db,'a','f',credit.id,'dst','new');throw Error('expected conflict');}catch(error){expect(error).toMatchObject({code:'makeup_slot_unavailable',status:409,alternatives:[{id:'n1'},{id:'n2'},{id:'n3'}]});}
  expect(d.raw.prepare('SELECT status FROM booking_makeup_credits WHERE id=?').get(credit.id)).toEqual({status:'open'});
 });
+
+test('B3-04: 大量の満席を挟んでも近い3回だけを定数回の問い合わせで取得する',async()=>{
+ const credit=(await absence(d.db,'a','f','eb','customer')).makeupCredit as {id:string};
+ d.raw.prepare("INSERT INTO event_bookings(id,line_account_id,event_id,slot_id,friend_id,status,requested_at,identity_key) VALUES('full','a','lesson','dst','f2','confirmed','2026-11-16','solo:f2')").run();
+ const slot=d.raw.prepare("INSERT INTO event_slots(id,event_id,starts_at,ends_at,capacity) VALUES(?,'lesson',?,?,1)"),booking=d.raw.prepare("INSERT INTO event_bookings(id,line_account_id,event_id,slot_id,friend_id,status,requested_at,identity_key) VALUES(?,'a','lesson',?,'f2','confirmed','2026-11-16','solo:f2')");
+ for(let i=0;i<320;i++){
+  const starts=new Date(Date.parse('2026-11-27T05:00:00Z')+(i+1)*60000),id=`candidate-${i}`;
+  slot.run(id,starts.toISOString(),new Date(starts.getTime()+3600000).toISOString());
+  if(i<240)booking.run(`occupied-${i}`,id);
+ }
+ let queries=0;const resultSizes:number[]=[],original=d.db.prepare.bind(d.db);
+ const measured={...d.db,prepare(sql:string){queries++;const statement=original(sql);return new Proxy(statement,{get(target,key,receiver){
+  if(key!=='bind')return Reflect.get(target,key,receiver);
+  return (...args:unknown[])=>{const bound=target.bind(...args);return new Proxy(bound,{get(boundTarget,method,boundReceiver){
+   if(method!=='all')return Reflect.get(boundTarget,method,boundReceiver);
+   return async()=>{const result=await boundTarget.all();resultSizes.push(result.results.length);return result;};
+  }});};
+ }});}} as D1Database;
+ try{await useMakeup(measured,'a','f',credit.id,'dst','bounded');throw Error('expected conflict');}catch(error){expect(error).toMatchObject({code:'makeup_slot_unavailable',alternatives:[{id:'candidate-240'},{id:'candidate-241'},{id:'candidate-242'}]});}
+ expect(queries).toBeLessThanOrEqual(5);expect(resultSizes.length).toBeGreaterThan(0);expect(Math.max(...resultSizes)).toBeLessThanOrEqual(3);
+ expect(d.raw.prepare('SELECT status FROM booking_makeup_credits WHERE id=?').get(credit.id)).toEqual({status:'open'});
+});
