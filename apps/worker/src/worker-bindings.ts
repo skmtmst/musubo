@@ -31,6 +31,9 @@ export type WorkerBindings = {
     RESTAURANT_TEST_ENABLED?: string;
     GOOGLE_BUSINESS_ENABLED?: string;
     DEPLOY_ENV?: string;
+    /** 検証環境の会議 OAuth は秘密設定と明示的な有効化が揃う場合だけ使用。 */
+    BOOKING_MEETING_OAUTH_ENABLED?: string;
+    BOOKING_MEETING_OAUTH_CONFIG?: string;
     /** 検証環境で明示したときだけランク通知を実送信する。 */
     RANK_NOTICE_STAGING_DELIVERY_ENABLED?: string;
     /** 明示したときだけ A/B の本送信を始める。既定では止める。 */

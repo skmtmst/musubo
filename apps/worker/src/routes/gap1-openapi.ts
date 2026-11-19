@@ -29,3 +29,8 @@ export const gap1Paths:Record<string,Record<string,ReturnType<typeof operation>>
 (gap1Paths["/api/booking/admin/staff/{id}/meeting-url"]??={}).put=operation("PUT","/api/booking/admin/staff/{id}/meeting-url","会議URLの手入力・固定URLの反映。外部の会議は作成しない。");
 (gap1Paths["/api/inbox/routing-settings"]??={}).put=operation("PUT","/api/inbox/routing-settings","受信箱の自動担当割当の設定。");
 (gap1Paths["/api/line-accounts/{id}/senders/{senderId}"]??={}).put=operation("PUT","/api/line-accounts/{id}/senders/{senderId}","送信者名・画像の登録、編集、保管。実送信なし。");
+
+(gap1Paths["/api/booking/admin/staff/{id}/connections/{provider}"]??={}).get=operation("GET","/api/booking/admin/staff/{id}/connections/{provider}","担当の会議・Outlook の接続状態を確認する。");
+(gap1Paths["/api/booking/admin/staff/{id}/connections/{provider}"]??={}).delete=operation("DELETE","/api/booking/admin/staff/{id}/connections/{provider}","担当の会議・Outlook の接続を切る。");
+(gap1Paths["/api/booking/admin/staff/{id}/connections/{provider}/connect"]??={}).post=operation("POST","/api/booking/admin/staff/{id}/connections/{provider}/connect","担当の会議・Outlook の認可を始める。設定がない場合は模擬を返す。");
+(gap1Paths["/api/booking/admin/meeting-oauth/callback"]??={}).get=operation("GET","/api/booking/admin/meeting-oauth/callback","認可状態と担当者を確認し接続を保存する。");
