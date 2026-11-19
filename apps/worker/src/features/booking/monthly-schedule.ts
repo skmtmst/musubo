@@ -14,7 +14,8 @@ export async function scheduleMonthlyRenewals(db: D1Database, now = new Date()) 
     const day = tzDateStr(c.timezone, now);
     if (!day.endsWith('-01')) continue;
     const month = day.slice(0, 7);
-    const next = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 1)).toISOString().slice(0, 10);
+    const year=Number(month.slice(0,4)), number=Number(month.slice(5,7));
+    const next=`${number===12?year+1:year}-${String(number===12?1:number+1).padStart(2,'0')}-01`;
     const start = restaurantCivilTime(day, 0, c.timezone), end = restaurantCivilTime(next, 0, c.timezone);
     const at = now.toISOString();
     const result = await db.prepare(`INSERT INTO booking_monthly_cycles

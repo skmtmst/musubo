@@ -20,7 +20,7 @@ it('確定した失敗から同じ請求の次の試行を一度だけ記録す�
   expect(d.raw.prepare("SELECT attempt_no,scheduled_at,state FROM booking_monthly_attempts WHERE cycle_id='renewal' AND attempt_no=1").get())
     .toEqual({ attempt_no: 1, scheduled_at: '2026-11-13T00:00:00.000Z', state: 'pending' });
 });
-it('期限前は実行せず、同時実行と結果不明を再送しない', async () => {
+it('期限まで実行を待ち、同時実行と結果不明を再送しない', async () => {
   const d = monthlyFixture(); opened.push(d);
   await monthlyContract(d); monthlyCycle(d, { id: 'initial', month: '2026-10', paid: true }); activateMonthly(d);
   monthlyCycle(d, { id: 'renewal', kind: 'renewal' });
