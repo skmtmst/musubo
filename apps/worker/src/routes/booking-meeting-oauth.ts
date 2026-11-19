@@ -4,8 +4,9 @@ import type {Env} from '../worker-env.js';
 import {gapAccount,gapWrite,GapError} from '../services/gap-common.js';
 import {beginMeetingAuthorization,consumeMeetingAuthorization} from '../features/booking/booking-meeting-oauth-state/index.js';
 import {deleteMeetingCredential,finishAuthorizedMeetingConnection,meetingConnectionState,type ConnectionProvider} from '../features/booking/booking-meeting-credentials/index.js';
-import {exchangeMeetingAuthorization,meetingAuthorizationUrl,newMeetingVerifier,type MeetingOAuthConfig} from '../features/booking/booking-meeting-oauth-client/index.js';
+import {exchangeMeetingAuthorization,meetingAuthorizationUrl,newMeetingVerifier} from '../features/booking/booking-meeting-oauth-client/index.js';
 import {auditLog} from '../lib/audit-log.js';
+import {meetingOAuthConfig} from '../features/booking/booking-meeting-oauth-config/index.js';
 
 export const bookingMeetingOAuth=new Hono<Env>();
 bookingMeetingOAuth.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'meeting_oauth_unavailable'},e instanceof GapError?e.status:503));
@@ -18,18 +19,6 @@ async function staffTarget(c:Context<Env>,accountId:string,staffId:string,write:
  if(!target)throw new GapError('not_found',404);
  const actor=c.get('staff');
  if(write&&(!['owner','admin','staff'].includes(actor.role)||(actor.role==='staff'&&(target.staff_member_id!==actor.id||!actor.permissionKeys?.includes(BOOKING_STAFF_OWN_KEY)))))throw new GapError('forbidden',403);
-}
-/** OAuth 設定は Worker の秘密設定から取得し、応答やログに含めない。 */
-function oauthConfig(c:Context<Env>,provider:ConnectionProvider):MeetingOAuthConfig|null {
- if(c.env.DEPLOY_ENV!=='staging'||c.env.BOOKING_MEETING_OAUTH_ENABLED!=='true'||!c.env.BOOKING_MEETING_OAUTH_CONFIG)return null;
- try{
-  const parsed:unknown=JSON.parse(c.env.BOOKING_MEETING_OAUTH_CONFIG);if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))return null;
-  const item=(parsed as Record<string,unknown>)[provider];if(!item||typeof item!=='object'||Array.isArray(item))return null;
-  const config=item as Record<string,unknown>;if(typeof config.clientId!=='string'||!config.clientId||typeof config.clientSecret!=='string'||!config.clientSecret)return null;
-  const origin=new URL(c.env.WORKER_URL);if(origin.protocol!=='https:'||origin.username||origin.password)return null;
-  const redirectUri=new URL('/api/booking/admin/meeting-oauth/callback',origin).toString();
-  return {provider,clientId:config.clientId,clientSecret:config.clientSecret,redirectUri};
- }catch{return null;}
 }
 const callbackPath='/api/booking/admin/meeting-oauth/callback';
 const cookieName='booking_meeting_oauth_state';
@@ -46,11 +35,11 @@ const base='/api/booking/admin/staff/:id/connections/:provider';
 bookingMeetingOAuth.get(base,async c=>{
  const accountId=await gapAccount(c),staffId=c.req.param('id')!,provider=providerOf(c.req.param('provider')!);await staffTarget(c,accountId,staffId,false);
  const state=await meetingConnectionState(c.env.DB,{accountId,staffId,provider});
- return c.json({success:true,data:{state,mode:oauthConfig(c,provider)?'configured':'mock'}});
+ return c.json({success:true,data:{state,mode:meetingOAuthConfig(c.env,provider)?'configured':'mock'}});
 });
 bookingMeetingOAuth.post(base+'/connect',async c=>{
  gapWrite(c);const accountId=await gapAccount(c),staffId=c.req.param('id')!,provider=providerOf(c.req.param('provider')!);await staffTarget(c,accountId,staffId,true);
- const config=oauthConfig(c,provider);if(!config)return c.json({success:true,data:{mode:'mock',authorizationUrl:null}});
+ const config=meetingOAuthConfig(c.env,provider);if(!config)return c.json({success:true,data:{mode:'mock',authorizationUrl:null}});
  if(!c.env.LINE_CREDENTIAL_ENCRYPTION_KEY)throw new GapError('oauth_not_configured',503);
  const verifier=newMeetingVerifier();const state=await beginMeetingAuthorization(c.env.DB,{accountId,staffId,actorId:c.get('staff').id,provider,verifier,encryptionKey:c.env.LINE_CREDENTIAL_ENCRYPTION_KEY});
  c.header('Set-Cookie',stateCookie(state));
@@ -73,7 +62,7 @@ bookingMeetingOAuth.get('/api/booking/admin/meeting-oauth/callback',async c=>{
  const key=c.env.LINE_CREDENTIAL_ENCRYPTION_KEY;if(!key)throw new GapError('oauth_not_configured',503);
  const consumed=await consumeMeetingAuthorization(c.env.DB,{accountId,state,actorId,encryptionKey:key});if(!consumed)throw new GapError('invalid_state',401);
  if(c.req.query('error')||!c.req.query('code'))return c.redirect(adminReturn(c,accountId,consumed.staffId,'denied'));
- const config=oauthConfig(c,consumed.provider);if(!config)throw new GapError('oauth_not_configured',503);
+ const config=meetingOAuthConfig(c.env,consumed.provider);if(!config)throw new GapError('oauth_not_configured',503);
  let tokens:Awaited<ReturnType<typeof exchangeMeetingAuthorization>>;
  try{tokens=await exchangeMeetingAuthorization(config,{code:c.req.query('code')!,verifier:consumed.verifier,signal:AbortSignal.timeout(15000)});}catch{return c.redirect(adminReturn(c,accountId,consumed.staffId,'failed'));}
  const connected=await finishAuthorizedMeetingConnection(c.env.DB,{accountId,staffId:consumed.staffId,provider:consumed.provider,actorId,state,encryptionKey:key,credential:{provider:consumed.provider,externalAccountId:tokens.externalAccountId,refreshToken:tokens.refreshToken}});

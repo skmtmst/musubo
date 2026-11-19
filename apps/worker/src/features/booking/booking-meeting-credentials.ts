@@ -19,14 +19,14 @@ export async function hasMeetingCredential(db:D1Database,input:Scope):Promise<bo
  return !!row;
 }
 /** 未失効の access token のみ返す。更新用の鍵は返さない。 */
-export async function cachedMeetingAccess(db:D1Database,input:Scope & {encryptionKey:string}):Promise<{token:string;externalAccountId:string;expiresAt:string}|null>{
+export async function cachedMeetingAccess(db:D1Database,input:Scope & {encryptionKey:string}):Promise<{token:string;externalAccountId:string;expiresAt:string;connectionId:string;version:number}|null>{
  const row=await db.prepare(`SELECT c.id,c.version,c.credential_enc FROM booking_meeting_connections c JOIN staff s ON s.id=c.staff_id AND s.line_account_id=c.line_account_id AND s.deleted_at IS NULL
  WHERE c.line_account_id=? AND c.staff_id=? AND c.provider=? AND c.refresh_state='ready'`).bind(input.accountId,input.staffId,input.provider).first<{id:string;version:number;credential_enc:string}>();
  if(!row)return null;
  const credential=await decode(row.credential_enc,input.provider,input.encryptionKey);
  if(!credential.accessToken||!credential.accessExpiresAt||Date.parse(credential.accessExpiresAt)<=Date.now()+60000||!Number.isFinite(Date.parse(credential.accessExpiresAt)))return null;
  const current=await db.prepare("SELECT id FROM booking_meeting_connections WHERE id=? AND version=? AND refresh_state='ready'").bind(row.id,row.version).first();
- return current?{token:credential.accessToken,externalAccountId:credential.externalAccountId,expiresAt:credential.accessExpiresAt}:null;
+ return current?{token:credential.accessToken,externalAccountId:credential.externalAccountId,expiresAt:credential.accessExpiresAt,connectionId:row.id,version:row.version}:null;
 }
 /** claim が取れなかったとき、更新中と切断・要再接続を区別する。 */
 export async function meetingConnectionState(db:D1Database,input:Scope):Promise<'ready'|'refreshing'|'unknown'|'missing'>{

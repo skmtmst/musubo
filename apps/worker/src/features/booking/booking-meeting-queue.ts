@@ -8,6 +8,7 @@ import type { MeetingCreator, MeetingProvider } from './booking-meeting-create.j
 export interface MeetingQueueDependencies {
   resolve(input:{accountId:string;bookingId:string}):Promise<{
     creator?:MeetingCreator;
+    deferred?:boolean;
     removers:Partial<Record<MeetingProvider,MeetingRemover>>;
     verifiers:Partial<Record<MeetingProvider,MeetingVerifier>>;
   } | null>;
@@ -29,6 +30,10 @@ export async function processMeetingQueue(db:D1Database,deps:MeetingQueueDepende
   if(!services) {
    const link=await db.prepare("SELECT id FROM booking_meeting_links WHERE booking_id=? AND (status='cancel_pending' OR (status='pending' AND attempt_count>0)) ORDER BY created_at,id LIMIT 1").bind(row.booking_id).first<{id:string}>();
    if(link)await notifyMeetingIssue(db,{accountId:row.account_id,bookingId:row.booking_id,linkId:link.id,reason:'failed'});
+   await db.prepare("UPDATE booking_meeting_links SET updated_at=? WHERE booking_id=? AND (status='cancel_pending' OR (status='pending' AND attempt_count>0)) AND julianday(updated_at)<=julianday('now','-1 minute')").bind(new Date().toISOString(),row.booking_id).run();
+   continue;
+  }
+  if(services.deferred) {
    await db.prepare("UPDATE booking_meeting_links SET updated_at=? WHERE booking_id=? AND (status='cancel_pending' OR (status='pending' AND attempt_count>0)) AND julianday(updated_at)<=julianday('now','-1 minute')").bind(new Date().toISOString(),row.booking_id).run();
    continue;
   }
