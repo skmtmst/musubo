@@ -26,3 +26,13 @@ it('試験環境では鍵を先に更新し、切断後は同じ access token �
  const result=await deps!.removers.zoom!.remove({staffId:'bs',meetingId:JSON.stringify(['provider-user','id']),idempotencyKey:'key',signal:new AbortController().signal});
  expect(result).toBe('failed');expect(fetcher).toHaveBeenCalledOnce();
 });
+it('自動発行のメニューと試験宛先だけに担当の会議を用意する',async()=>{
+ const {meetingCreatorForBooking}=await import('./booking-meeting-runtime.js');
+ const fetcher=vi.fn(async()=>new Response(JSON.stringify({access_token:'fixture-access',refresh_token:'fixture-rotated',expires_in:3600})));vi.stubGlobal('fetch',fetcher);
+ expect(await meetingCreatorForBooking(env(),'bk')).toBeNull();expect(fetcher).not.toHaveBeenCalled();
+ d.raw.exec("INSERT INTO account_settings(id,line_account_id,key,value) VALUES('auto','a','booking.meeting.automatic:menu','automatic')");
+ const creator=await meetingCreatorForBooking(env(),'bk');
+ expect(creator && typeof creator!=='string' ? creator.provider : null).toBe('zoom');expect(fetcher).toHaveBeenCalledOnce();
+ d.raw.exec("UPDATE bookings SET meeting_url_source='manual' WHERE id='bk'");
+ expect(await meetingCreatorForBooking(env(),'bk')).toBeNull();
+});

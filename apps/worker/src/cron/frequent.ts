@@ -106,6 +106,9 @@ export async function runFrequentHeavyJobs(
         const {processMeetingQueue}=await import('../features/booking/booking-meeting-queue/index.js');
         const {meetingQueueDependencies}=await import('../features/booking/booking-meeting-runtime/index.js');
         await processMeetingQueue(env.DB,meetingQueueDependencies(env));
+        const {recoverConfirmedBookingSideEffects}=await import('../features/booking/booking-confirmed-effects/index.js');
+        const {meetingCreatorForBooking}=await import('../features/booking/booking-meeting-runtime/index.js');
+        await recoverConfirmedBookingSideEffects(env.DB,{now:new Date(event.scheduledTime),meetingDeferredOnly:true,credentials:{email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY},meetingCreatorForBooking:id=>meetingCreatorForBooking(env,id)});
       },
     },
     {

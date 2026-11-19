@@ -1,3 +1,4 @@
+import { meetingCreatorForBooking } from '../../features/booking/booking-meeting-runtime/index.js';
 import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
@@ -114,7 +115,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
   }
 
   if (next === 'confirmed') {
-    await runConfirmedBookingSideEffects(c.env.DB, id, { credentials: googleCredentials(c.env) });
+    await runConfirmedBookingSideEffects(c.env.DB, id, { credentials: googleCredentials(c.env), meetingCreatorForBooking: id => meetingCreatorForBooking(c.env,id) });
     // 「予約が入ったとき」の送信Webhook購読者へも届ける。
     c.executionCtx.waitUntil(
       fireOutgoingWebhooks(c.env.DB, 'booking_created', {

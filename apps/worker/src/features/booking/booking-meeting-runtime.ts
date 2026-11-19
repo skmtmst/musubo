@@ -60,3 +60,27 @@ export function meetingQueueDependencies(env:Env['Bindings']):MeetingQueueDepend
   return {creator:selected?byProvider.get(selected):undefined,removers,verifiers,unavailable};
  }};
 }
+
+/** 確定時は対象メニューの自動発行がオンの場合だけ、担当者の接続を用意する。 */
+export async function meetingCreatorForBooking(env:Env['Bindings'],bookingId:string):Promise<ReturnType<typeof meetingProvider>|null|'deferred'|'unavailable'> {
+ if(env.DEPLOY_ENV!=='staging'||env.BOOKING_MEETING_REAL_ENABLED!=='true'||!env.LINE_CREDENTIAL_ENCRYPTION_KEY)return null;
+ const booking=await env.DB.prepare(`SELECT b.line_account_id,b.staff_id FROM bookings b JOIN account_settings a
+  ON a.line_account_id=b.line_account_id AND a.key='booking.meeting.automatic:'||b.menu_id AND a.value='automatic'
+  WHERE b.id=? AND b.status='confirmed' AND b.meeting_mode='online' AND b.meeting_url_source IS NOT 'manual'`)
+  .bind(bookingId).first<{line_account_id:string;staff_id:string}>();
+ if(!booking||!await isTestRecipient(env.DB,booking.line_account_id,bookingId))return null;
+ const accountId=booking.line_account_id,staffId=booking.staff_id;
+ const provider=await preferredMeetingProvider(env.DB,{accountId,staffId});if(!provider)return 'unavailable';
+ const config=meetingOAuthConfig(env,provider);if(!config)return 'unavailable';
+ const access=await meetingAccessToken(env.DB,{accountId,staffId,provider,encryptionKey:env.LINE_CREDENTIAL_ENCRYPTION_KEY,config,signal:new AbortController().signal});
+ if(access.kind==='busy'||access.kind==='retryable')return 'deferred';
+ if(access.kind!=='ready')return 'unavailable';
+ return meetingProvider(provider,async target=>{
+  if(target!==staffId||!await isTestRecipient(env.DB,accountId,bookingId))return null;
+  const current=await env.DB.prepare("SELECT id FROM booking_meeting_connections WHERE id=? AND line_account_id=? AND staff_id=? AND provider=? AND version=? AND refresh_state='ready'")
+   .bind(access.connectionId,accountId,staffId,provider,access.version).first();
+  if(current&&Date.parse(access.expiresAt)>Date.now()+10000)return {token:access.token,accountId:access.externalAccountId};
+  const refreshed=await cachedMeetingAccess(env.DB,{accountId,staffId,provider,encryptionKey:env.LINE_CREDENTIAL_ENCRYPTION_KEY!});
+  return refreshed?.connectionId===access.connectionId?{token:refreshed.token,accountId:refreshed.externalAccountId}:null;
+ });
+}

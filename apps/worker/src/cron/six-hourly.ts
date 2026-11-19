@@ -96,7 +96,8 @@ export async function runSixHourlyHeavyJobs(
     {
       name: 'booking expirer',
       run: async () => {
-        const result = await runExpirer(env.DB, { now: new Date(), sender: sendBookingNotification,
+        const {meetingCreatorForBooking}=await import('../features/booking/booking-meeting-runtime/index.js');
+        const result = await runExpirer(env.DB, { now: new Date(), sender: sendBookingNotification, meetingCreatorForBooking: id=>meetingCreatorForBooking(env,id),
           credentials: { email: env.GOOGLE_SERVICE_ACCOUNT_EMAIL, privateKey: env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY } });
         logger.log("src_index_log");
       },

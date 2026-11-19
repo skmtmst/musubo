@@ -6,10 +6,11 @@ export async function expireBookingPaymentIfHeld(
   db: D1Database,
   lineAccountId: string,
   bookingId: string,
+  meetingCreatorForBooking?: Parameters<typeof reconcilePaidBookingPayment>[5],
 ) {
   const record = await getBookingPaymentByBooking(db, lineAccountId, bookingId);
   if (!record) return null;
-  if (record.status === 'paid') await reconcilePaidBookingPayment(db, record.id);
+  if (record.status === 'paid') await reconcilePaidBookingPayment(db, record.id, new Date(), false, {}, meetingCreatorForBooking);
   else await reconcileExpiredBookingPayment(db, record.id);
   return getBookingPaymentByBooking(db, lineAccountId, bookingId);
 }
