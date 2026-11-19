@@ -20,8 +20,8 @@ export async function outlookCalendarForBooking(env:Env['Bindings'],input:{accou
   if(staffId!==input.staffId||!await eligible())return null;
   const row=await env.DB.prepare("SELECT id FROM booking_meeting_connections WHERE id=? AND line_account_id=? AND staff_id=? AND provider='outlook' AND version=? AND refresh_state='ready'")
    .bind(access.connectionId,input.accountId,staffId,access.version).first();
-  if(row&&Date.parse(access.expiresAt)>Date.now()+10000)return access.token;
+  if(row&&Date.parse(access.expiresAt)>Date.now()+10000)return {token:access.token,accountId:access.externalAccountId};
   const refreshed=await cachedMeetingAccess(env.DB,{accountId:input.accountId,staffId,provider:'outlook',encryptionKey:env.LINE_CREDENTIAL_ENCRYPTION_KEY!});
-  return refreshed?.connectionId===access.connectionId?refreshed.token:null;
- });
+  return refreshed?.connectionId===access.connectionId?{token:refreshed.token,accountId:refreshed.externalAccountId}:null;
+ },fetch,{allowMutations:env.BOOKING_OUTLOOK_MUTATIONS_ENABLED==='true'});
 }

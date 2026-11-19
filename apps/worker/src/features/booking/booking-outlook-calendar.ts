@@ -1,9 +1,11 @@
 /** Outlook は予定の題名や参加者を取得しない。読み取り失敗は例外にし、空き扱いにしない。 */
 export interface OutlookBusy {start:string;end:string;eventId:string}
 export class OutlookCalendarError extends Error {constructor(){super('outlook_calendar_unavailable');}}
-export function outlookCalendar(tokenForStaff:(staffId:string)=>Promise<string|null>,request:typeof fetch=fetch) {
+type OutlookAccess=string|{token:string;accountId:string}|null;
+export function outlookCalendar(tokenForStaff:(staffId:string)=>Promise<OutlookAccess>,request:typeof fetch=fetch,options:{allowMutations?:boolean}={}) {
+ const tokenValue=(access:OutlookAccess)=>typeof access==='string'?access:access?.token??null;
  async function busy(input:{staffId:string;start:string;end:string;ownEventIds:string[];signal:AbortSignal}):Promise<OutlookBusy[]> {
-  const token=await tokenForStaff(input.staffId);if(!token)throw new OutlookCalendarError();
+  const token=tokenValue(await tokenForStaff(input.staffId));if(!token)throw new OutlookCalendarError();
   const from=Date.parse(input.start),to=Date.parse(input.end);if(!Number.isFinite(from)||!Number.isFinite(to)||from>=to)throw new OutlookCalendarError();
   const url=new URL('https://graph.microsoft.com/v1.0/me/calendarView');
   url.searchParams.set('startDateTime',new Date(from).toISOString());url.searchParams.set('endDateTime',new Date(to).toISOString());
@@ -31,8 +33,8 @@ export function outlookCalendar(tokenForStaff:(staffId:string)=>Promise<string|n
   return result;
  }
  /** 予定作成は安定した transactionId を使い、参加者を含めない。 */
- async function create(input:{staffId:string;calendarId:string;start:string;end:string;title:string;description:string;transactionId:string;signal:AbortSignal}):Promise<{kind:'created';eventId:string}|{kind:'failed'}|{kind:'unknown'}> {
-  let token:string|null;try{token=await tokenForStaff(input.staffId);}catch{return {kind:'failed'};}if(!token)return {kind:'failed'};
+ async function create(input:{staffId:string;calendarId:string;start:string;end:string;title:string;description:string;transactionId:string;signal:AbortSignal}):Promise<{kind:'created';eventId:string;accountId?:string}|{kind:'failed'}|{kind:'unknown'}> {
+  let access:OutlookAccess;try{access=await tokenForStaff(input.staffId);}catch{return {kind:'failed'};}const token=tokenValue(access);if(!token)return {kind:'failed'};
   if(!input.calendarId||!input.transactionId||!input.title||!Number.isFinite(Date.parse(input.start))||!Number.isFinite(Date.parse(input.end))||Date.parse(input.start)>=Date.parse(input.end))return {kind:'failed'};
   const id=encodeURIComponent(input.calendarId);
   const event={subject:input.title,body:{contentType:'text',content:input.description},start:{dateTime:new Date(input.start).toISOString().slice(0,-1),timeZone:'UTC'},end:{dateTime:new Date(input.end).toISOString().slice(0,-1),timeZone:'UTC'},transactionId:input.transactionId};
@@ -41,8 +43,33 @@ export function outlookCalendar(tokenForStaff:(staffId:string)=>Promise<string|n
    if(!response.ok)return response.status>=400&&response.status<500&&![408,409].includes(response.status)?{kind:'failed'}:{kind:'unknown'};
    const data:unknown=await response.json();
    if(!data||typeof data!=='object'||Array.isArray(data)||typeof (data as Record<string,unknown>).id!=='string'||!(data as Record<string,string>).id)return {kind:'unknown'};
-   return {kind:'created',eventId:(data as Record<string,string>).id};
+   return {kind:'created',eventId:(data as Record<string,string>).id,...(access&&typeof access!=='string'?{accountId:access.accountId}:{})};
   }catch{return {kind:'unknown'};}
  }
- return {busy,create};
+ /** 参加者が一人でもいる予定や、版を照合できない予定は更新しない。 */
+ async function mutate(input:{staffId:string;accountId:string;eventId:string;action:'update'|'delete';start?:string;end?:string;signal:AbortSignal}):Promise<'done'|'failed'|'unknown'> {
+  if(!options.allowMutations || !input.eventId || !input.accountId)return 'failed';
+  if(input.action==='update' && (!input.start || !input.end || !Number.isFinite(Date.parse(input.start)) || !Number.isFinite(Date.parse(input.end)) || Date.parse(input.start)>=Date.parse(input.end)))return 'failed';
+  try {
+   const access=await tokenForStaff(input.staffId);
+   if(!access||typeof access==='string'||access.accountId!==input.accountId||!access.token)return 'failed';
+   const url=`https://graph.microsoft.com/v1.0/me/events/${encodeURIComponent(input.eventId)}`;
+   const found=await request(`${url}?$select=id,attendees,isOrganizer`,{headers:{Authorization:`Bearer ${access.token}`,Prefer:'IdType="ImmutableId"'},signal:input.signal});
+   if(found.status===404||found.status===410)return input.action==='delete'?'done':'failed';
+   if(found.status===401||found.status===403)return 'failed';
+   if(!found.ok)return 'unknown';
+   const raw:unknown=await found.json();
+   if(!raw||typeof raw!=='object'||Array.isArray(raw))return 'unknown';
+   const event=raw as Record<string,unknown>,etag=event['@odata.etag'];
+   if(event.id!==input.eventId||event.isOrganizer!==true||!Array.isArray(event.attendees)||event.attendees.length!==0||typeof etag!=='string'||!etag)return 'failed';
+   const current=await tokenForStaff(input.staffId);
+   if(!current||typeof current==='string'||current.accountId!==input.accountId||!current.token)return 'failed';
+   const body=input.action==='update'?JSON.stringify({start:{dateTime:new Date(input.start!).toISOString().slice(0,-1),timeZone:'UTC'},end:{dateTime:new Date(input.end!).toISOString().slice(0,-1),timeZone:'UTC'}}):undefined;
+   const result=await request(url,{method:input.action==='update'?'PATCH':'DELETE',headers:{Authorization:`Bearer ${current.token}`,'If-Match':etag,Prefer:'IdType="ImmutableId"',...(body?{'Content-Type':'application/json'}:{})},...(body?{body}:{}),signal:input.signal});
+   if(result.ok||input.action==='delete'&&(result.status===404||result.status===410))return 'done';
+   if(result.status>=400&&result.status<500&&![408,409,429].includes(result.status))return 'failed';
+   return 'unknown';
+  }catch{return 'unknown';}
+ }
+ return {busy,create,mutate};
 }

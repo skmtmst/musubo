@@ -37,3 +37,25 @@ it('作成中の通信断は結果不明として自動再送しない',async()=
  const result=await outlookCalendar(async()=> 'token',fetcher).create({staffId:'s',calendarId:'calendar',start:input.start,end:input.end,title:'予約',description:'',transactionId:'stable',signal:input.signal});
  expect(result).toEqual({kind:'unknown'});expect(fetcher).toHaveBeenCalledOnce();
 });
+it('予定の変更・取消は明示設定と同じ主催者を要し、参加者に通知を送らない',async()=>{
+ const fetcher=vi.fn(async(_url:RequestInfo|URL,init?:RequestInit)=>init?.method?new Response(null,{status:204}):new Response(JSON.stringify({id:'event',isOrganizer:true,attendees:[], '@odata.etag':'"version-1"'})));
+ const token=async()=>({token:'token',accountId:'owner'});
+ const base={staffId:'s',accountId:'owner',eventId:'event',signal:input.signal};
+ expect(await outlookCalendar(token,fetcher as typeof fetch).mutate({...base,action:'delete'})).toBe('failed');expect(fetcher).not.toHaveBeenCalled();
+ const calendar=outlookCalendar(token,fetcher as typeof fetch,{allowMutations:true});
+ expect(await calendar.mutate({...base,action:'update',start:input.start,end:input.end})).toBe('done');
+ const [,patch]=fetcher.mock.calls[1];expect(patch?.method).toBe('PATCH');expect(JSON.parse(String(patch?.body))).not.toHaveProperty('attendees');expect((patch?.headers as Record<string,string>)['If-Match']).toBe('"version-1"');
+ expect(await calendar.mutate({...base,action:'delete'})).toBe('done');expect(fetcher.mock.calls[3][1]?.method).toBe('DELETE');
+ expect(await calendar.mutate({...base,accountId:'different',action:'delete'})).toBe('failed');expect(fetcher).toHaveBeenCalledTimes(4);
+});
+it('予定に参加者がいれば通知を防ぐため変更・取消を送らない',async()=>{
+ const fetcher=vi.fn(async()=>new Response(JSON.stringify({id:'event',isOrganizer:true,attendees:[{emailAddress:{address:'customer@example.test'}}], '@odata.etag':'"v1"'})));
+ const calendar=outlookCalendar(async()=>({token:'token',accountId:'owner'}),fetcher as typeof fetch,{allowMutations:true});
+ expect(await calendar.mutate({staffId:'s',accountId:'owner',eventId:'event',action:'delete',signal:input.signal})).toBe('failed');expect(fetcher).toHaveBeenCalledOnce();
+});
+
+it('予定の作成に使った Microsoft アカウントの識別子を一緒に返す',async()=>{
+ const fetcher=vi.fn(async()=>new Response(JSON.stringify({id:'event'}),{status:201}));
+ const calendar=outlookCalendar(async()=>({token:'token',accountId:'owner'}),fetcher as typeof fetch);
+ expect(await calendar.create({staffId:'s',calendarId:'calendar',start:input.start,end:input.end,title:'予約',description:'',transactionId:'key',signal:input.signal})).toEqual({kind:'created',eventId:'event',accountId:'owner'});
+});
