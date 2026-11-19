@@ -66,6 +66,17 @@ test('期限14日前の通知も検証先に送り、設定停止・同意撤回
  expect(await processLivePassNotices(d.db,now,send,()=>now)).toEqual({processed:1});
  expect(send).toHaveBeenCalledWith(expect.objectContaining({messages:[expect.objectContaining({text:expect.stringContaining('あと14日')})]}));
 });
+test('LINEへ送信した結果が失敗なら記録し、自動で再送しない',async()=>{
+ await enable(true,false);await consume();
+ d.raw.exec(`INSERT INTO account_settings(line_account_id,key,value) VALUES('a','test_recipients','["f"]')`);
+ await processPassNotices(d.db,now,'a',true);
+ const send=vi.fn(async()=>{throw {status:429};});
+ expect(await processLivePassNotices(d.db,now,send,()=>now)).toEqual({processed:0});
+ expect(await processLivePassNotices(d.db,now,send,()=>now)).toEqual({processed:0});
+ expect(send).toHaveBeenCalledOnce();
+ const result=await (await gapCall(app(),'/api/booking/admin/pass-notices?account_id=a&planId=p&limit=10')).json() as any;
+ expect(result.data.items[0].status).toBe('delivery_failed');
+});
 test('B2-18: 申込では知らせ0、確定の減算と同時に1件、取消/再利用でも二重にしない',async()=>{
  await enable(true,false);
  seedGapBooking(d,'bk','requested','2026-10-20T01:00:00Z');await entitlementUseStatement(d.db,'bk','e','2026-10-20T01:00:00Z','Asia/Tokyo').run();expect(notices()).toEqual([]);

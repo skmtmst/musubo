@@ -27,7 +27,8 @@ bookingPassNotices.get('/api/booking/admin/pass-notices',async c=>{
  const where='line_account_id=? AND (? IS NULL OR plan_id=?)',binds=[a,plan??null,plan??null];
  const items=(await c.env.DB.prepare(`SELECT id,entitlement_id entitlementId,plan_id planId,kind,purpose,messages_json,scheduled_at scheduledAt,
  CASE WHEN EXISTS(SELECT 1 FROM outbound_send_requests o WHERE o.resource_id='pass-notice:'||booking_entitlement_notices.id AND o.status='succeeded') THEN 'sent'
- WHEN EXISTS(SELECT 1 FROM outbound_send_requests o WHERE o.resource_id='pass-notice:'||booking_entitlement_notices.id AND o.status IN ('in_progress','unknown')) THEN 'delivery_unknown' ELSE status END status,
+ WHEN EXISTS(SELECT 1 FROM outbound_send_requests o WHERE o.resource_id='pass-notice:'||booking_entitlement_notices.id AND o.status IN ('in_progress','unknown')) THEN 'delivery_unknown'
+ WHEN EXISTS(SELECT 1 FROM outbound_send_requests o WHERE o.resource_id='pass-notice:'||booking_entitlement_notices.id AND o.status='failed' AND COALESCE(o.failure_code,'')!='NOTIFICATION_PRECONDITION_CHANGED') THEN 'delivery_failed' ELSE status END status,
  processed_at processedAt,test_mode testMode FROM booking_entitlement_notices WHERE ${where} ORDER BY scheduled_at DESC,id LIMIT ? OFFSET ?`).bind(...binds,limit,offset).all<{messages_json:string;status:string}>()).results.map(({messages_json,...r})=>({...r,messages:JSON.parse(messages_json)}));
  const total=await c.env.DB.prepare(`SELECT count(*) n FROM booking_entitlement_notices WHERE ${where}`).bind(...binds).first<{n:number}>();
  return c.json({success:true,data:buildOffsetListResponse({ items,total:total?.n??0,sent:items.some(item=>item.status==='sent'),testMode:true, paging: { limit, offset }, sort: [{ field: 'scheduledAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] })});

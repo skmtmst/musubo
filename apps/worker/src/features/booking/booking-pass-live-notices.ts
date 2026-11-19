@@ -31,7 +31,7 @@ async function eligible(db:D1Database,id:string,now:Date):Promise<{row:Candidate
 
 export async function processLivePassNotices(db:D1Database,now:Date,transmit:Transmit,clock:()=>Date=()=>new Date()){
  const rows=(await db.prepare(`SELECT n.id FROM booking_entitlement_notices n WHERE n.status='scheduled' AND julianday(n.scheduled_at)<=julianday(?)
- AND NOT EXISTS(SELECT 1 FROM outbound_send_requests o WHERE o.resource_id='pass-notice:'||n.id AND o.status IN ('succeeded','unknown','in_progress')) ORDER BY n.scheduled_at,n.id LIMIT 100`).bind(now.toISOString()).all<{id:string}>()).results;
+ AND NOT EXISTS(SELECT 1 FROM outbound_send_requests o WHERE o.resource_id='pass-notice:'||n.id AND (o.status IN ('succeeded','unknown','in_progress') OR o.status='failed' AND COALESCE(o.failure_code,'')!='NOTIFICATION_PRECONDITION_CHANGED')) ORDER BY n.scheduled_at,n.id LIMIT 100`).bind(now.toISOString()).all<{id:string}>()).results;
  let processed=0;
  for(const item of rows){
   const candidate=await eligible(db,item.id,now);if(!candidate)continue;
