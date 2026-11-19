@@ -469,7 +469,7 @@
 
 ## 反映履歴
 
-- [AI が作った配信の承認手順を整理](release-log/unreleased/PR-kenta-g2-docs.md) — 反映履歴、確認 2026-11-19。
+- [AI が作った配信の承認手順を整理](release-log/unreleased/124-kenta-g2-docs.md) — 反映履歴、確認 2026-11-19。
 
 - [SNS連携で残る3つの口の決まり](release-log/unreleased/120-kenta-sns-multilink-ports.md) — 反映履歴、確認 2026-11-18。
 
