@@ -121,10 +121,19 @@ export async function getCommonVarReplacementPlan(
   const impact = await getCommonVarUsageImpact(db, source.var_key, source.line_account_id);
   // 更新対象は版ごとの行だが、使用先は定義ごとに1件として数える。
   // 行数を引き算すると同じ定義の複数版が他の未対応使用先を隠す。
-  const blockedTotal = impact.unscopedFormTotal + impact.items.filter((item) =>
-    item.is_historical !== 1 && item.source_status !== 'sending_fixed'
-      && !coveredUsages.has(`${item.kind}:${item.source_id}`),
-  ).length;
+  // 異なる表に同じIDがある場合は、どちらを覆ったか区別できない。
+  // 推測で差し替え済みにせず、同じ種類・IDが重複する使用先は止める。
+  const usageKeyCounts = new Map<string, number>();
+  for (const item of impact.items) {
+    if (item.is_historical === 1 || item.source_status === 'sending_fixed') continue;
+    const key = `${item.kind}:${item.source_id}`;
+    usageKeyCounts.set(key, (usageKeyCounts.get(key) ?? 0) + 1);
+  }
+  const blockedTotal = impact.unscopedFormTotal + impact.items.filter((item) => {
+    const key = `${item.kind}:${item.source_id}`;
+    return item.is_historical !== 1 && item.source_status !== 'sending_fixed'
+      && (!coveredUsages.has(key) || (usageKeyCounts.get(key) ?? 0) > 1);
+  }).length;
   return {
     source,
     replacement,

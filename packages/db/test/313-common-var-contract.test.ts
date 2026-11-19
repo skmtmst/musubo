@@ -193,6 +193,24 @@ describe('migration 313 共通情報の使用数・履歴・差し替え', () =>
     expect(sqlite.prepare("SELECT archived_at FROM common_vars WHERE id = 'source'").get()).toEqual({ archived_at: null });
   });
 
+  it('別の表の使用先が同じIDを持つとき、差し替え済みと決めつけない', async () => {
+    sqlite.exec(`
+      INSERT INTO automation_definitions (id, line_account_id, name, status)
+      VALUES ('same-id', 'account-1', '新しい自動化', 'active');
+      INSERT INTO automation_versions (id, automation_id, version_number, status, trigger_type, action_config)
+      VALUES ('auto-version', 'same-id', 1, 'published', 'friend_add', '[{"varKey":"old_hours"}]');
+      UPDATE automation_definitions SET current_published_version_id = 'auto-version' WHERE id = 'same-id';
+      INSERT INTO automations (id, line_account_id, name, event_type, actions)
+      VALUES ('same-id', 'account-1', '古い自動化', 'friend_add', '[{"varKey":"old_hours"}]');
+    `);
+    const source = (await getCommonVarById(db, 'source', 'account-1'))!;
+    const replacement = (await getCommonVarById(db, 'replacement', 'account-1'))!;
+    const plan = await getCommonVarReplacementPlan(db, source, replacement);
+    expect(plan.blockedTotal).toBeGreaterThan(0);
+    await expect(applyCommonVarReplacementPlan(db, plan, 'staff-1', '差し替え'))
+      .rejects.toThrow('Common variable replacement is blocked');
+  });
+
   it('プレビュー後に本文が変わったら、一部だけ置換せず全体をロールバックする', async () => {
     const source = (await getCommonVarById(db, 'source', 'account-1'))!;
     const replacement = (await getCommonVarById(db, 'replacement', 'account-1'))!;
