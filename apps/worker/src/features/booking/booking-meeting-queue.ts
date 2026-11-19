@@ -1,3 +1,4 @@
+import { notifyMeetingIssue } from './booking-meeting-notice.js';
 import { reconcileBookingMeeting, type MeetingRemover } from './booking-meeting-lifecycle.js';
 import { verifyUnknownMeeting, type MeetingVerifier } from './booking-meeting-verify.js';
 import type { MeetingCreator, MeetingProvider } from './booking-meeting-create.js';
@@ -8,8 +9,6 @@ export interface MeetingQueueDependencies {
     removers:Partial<Record<MeetingProvider,MeetingRemover>>;
     verifiers:Partial<Record<MeetingProvider,MeetingVerifier>>;
   } | null>;
-  /** 同一予約と理由の通知は通知先で重複排除する。 */
-  notify(input:{accountId:string;bookingId:string;reason:'unknown'|'failed'}):Promise<void>;
 }
 
 /** 既存の会議を読み、確定していない結果は先に読み取りで照合する。 */
@@ -24,7 +23,9 @@ export async function processMeetingQueue(db:D1Database,deps:MeetingQueueDepende
  for(const row of rows.results??[]) {
   const services=await deps.resolve({accountId:row.account_id,bookingId:row.booking_id});
   if(!services) {
-   await db.prepare("UPDATE booking_meeting_links SET updated_at=? WHERE booking_id=? AND (status='cancel_pending' OR (status='pending' AND attempt_count>0)) AND (last_error_code IS NULL OR last_error_code<>'delete_started')").bind(new Date().toISOString(),row.booking_id).run();
+   const link=await db.prepare("SELECT id FROM booking_meeting_links WHERE booking_id=? AND (status='cancel_pending' OR (status='pending' AND attempt_count>0)) ORDER BY created_at,id LIMIT 1").bind(row.booking_id).first<{id:string}>();
+   if(link)await notifyMeetingIssue(db,{accountId:row.account_id,bookingId:row.booking_id,linkId:link.id,reason:'failed'});
+   await db.prepare("UPDATE booking_meeting_links SET updated_at=? WHERE booking_id=? AND (status='cancel_pending' OR (status='pending' AND attempt_count>0)) AND julianday(updated_at)<=julianday('now','-1 minute')").bind(new Date().toISOString(),row.booking_id).run();
    continue;
   }
   const links=await db.prepare(`SELECT id,provider FROM booking_meeting_links WHERE booking_id=?
@@ -36,7 +37,10 @@ export async function processMeetingQueue(db:D1Database,deps:MeetingQueueDepende
    if(!verifier || await verifyUnknownMeeting(db,{linkId:link.id,accountId:row.account_id,verifier})!=='verified')unknown=true;
   }
   const outcome=unknown?'unknown':await reconcileBookingMeeting(db,{bookingId:row.booking_id,accountId:row.account_id,creator:services.creator,removers:services.removers});
-  if(outcome!=='done')await deps.notify({accountId:row.account_id,bookingId:row.booking_id,reason:outcome});
+  if(outcome!=='done') {
+   const link=await db.prepare("SELECT id FROM booking_meeting_links WHERE booking_id=? AND (status='cancel_pending' OR (status='pending' AND attempt_count>0)) ORDER BY created_at,id LIMIT 1").bind(row.booking_id).first<{id:string}>();
+   if(link)await notifyMeetingIssue(db,{accountId:row.account_id,bookingId:row.booking_id,linkId:link.id,reason:outcome});
+  }
   if(outcome!=='done')await db.prepare("UPDATE booking_meeting_links SET updated_at=? WHERE booking_id=? AND (status='cancel_pending' OR (status='pending' AND attempt_count>0)) AND julianday(updated_at)<=julianday('now','-1 minute')").bind(new Date().toISOString(),row.booking_id).run();
   processed++;
  }
