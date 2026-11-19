@@ -217,9 +217,11 @@ export function CancelReservationDialog({ reservation, accountId, busy, onClose,
   accountId: string
   busy: boolean
   onClose: () => void
-  onConfirm: (id: string) => void
+  onConfirm: (id: string, reason: 'store' | 'customer' | null) => void
 }) {
   const hold = reservation ? isHold(reservation) : false
+  const [reason, setReason] = useState<'store' | 'customer' | ''>('')
+  useEffect(() => { setReason('') }, [reservation?.id])
   return (
     <RsDialog
       noValidate
@@ -232,12 +234,13 @@ export function CancelReservationDialog({ reservation, accountId, busy, onClose,
       actions={(
         <>
           <Button onClick={onClose} disabled={busy}>キャンセル</Button>
-          <Button variant="danger" disabled={busy} onClick={() => { if (reservation) onConfirm(reservation.id) }}>{hold ? '解除する' : '取り消す'}</Button>
+          <Button variant="danger" disabled={busy || (!hold && !reason)} onClick={() => { if (reservation) onConfirm(reservation.id, hold ? null : reason || null) }}>{hold ? '解除する' : '取り消す'}</Button>
         </>
       )}
     >
       {reservation ? <OperationTargetSummary accounts={[{ id: accountId }]} store={{ id: reservation.store_id, name: reservation.store_name }} /> : null}
       {reservation ? <p className={styles.dialogStrong}>{hold ? `押さえ ${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}` : `${monthDayWeek(reservation.starts_at)} ${hm(reservation.starts_at)} ${withHonorific(reservation.customer_name)} ${reservation.guest_count}名`}</p> : null}
+      {!hold && reservation ? <Field label="取消の理由" required><Select aria-label="取消の理由" value={reason} onChange={value => setReason(value as 'store' | 'customer' | '')} options={[{value:'',label:'選んでください'},{value:'store',label:'店の都合'},{value:'customer',label:'お客さまの都合'}]} /></Field> : null}
       <DialogNote>{hold ? '押さえを解除すると、その時間の卓は空きに戻ります。台帳には履歴が残ります。' : '台帳には取消として残ります。その時間帯の卓は空きに戻ります。取り消した予約は「復活」で戻せます。'}</DialogNote>
     </RsDialog>
   )

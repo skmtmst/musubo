@@ -588,7 +588,6 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/restaurant-test/inbound-emails',
     'GET /api/restaurant-test/intake-addresses',
     'GET /api/restaurant-test/login-members',
-    'GET /api/restaurant-test/menus/:id/deposit',
     'GET /api/search-console/performance',
     'GET /api/settings/features',
     'GET /api/site/pages',

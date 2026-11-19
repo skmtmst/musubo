@@ -57,7 +57,9 @@ bookingCancellation.post('/api/liff/booking/setup-webhook',async (c:Context<Env>
 });
 bookingCancellation.get('/api/booking/admin/bookings/:id/charges',async (c:Context<Env>):Promise<Response>=>{
  const a=await gapAccount(c),id=c.req.param('id')!,quote=await bookingCancellationQuote(c.env.DB,id,a);
- const rows=(await c.env.DB.prepare('SELECT * FROM booking_charges WHERE booking_id=? AND line_account_id=? ORDER BY created_at,id').bind(id,a).all()).results;
+ const rows=(await c.env.DB.prepare(`SELECT c.*,r.idempotency_key refund_key,r.status refund_status,r.reason refund_reason
+   FROM booking_charges c LEFT JOIN booking_charge_refund_requests r ON r.charge_id=c.id AND r.line_account_id=c.line_account_id
+   WHERE c.booking_id=? AND c.line_account_id=? ORDER BY c.created_at,c.id`).bind(id,a).all()).results;
  return c.json({success:true,data:{charges:rows,quote,testMode:true}});
 });
 bookingCancellation.post('/api/booking/admin/bookings/:id/charges',async (c:Context<Env>):Promise<Response>=>{
