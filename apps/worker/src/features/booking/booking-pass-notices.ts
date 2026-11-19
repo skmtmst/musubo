@@ -42,7 +42,7 @@ export async function processPassNotices(db:D1Database,now=new Date(),account?:s
     await db.prepare("UPDATE booking_entitlement_notices SET scheduled_at=? WHERE id=? AND status='scheduled'").bind(restaurantCivilTime(day,8*60,zone),n.id).run();continue;
    }
    // 本送信の対象は simulated に確定せず、専用の送信処理に渡す。
-   if(preserveTestRecipients && await db.prepare(`SELECT 1 FROM booking_entitlement_notices n JOIN account_settings s ON s.line_account_id=n.line_account_id AND s.key='test_recipients'
+   if(preserveTestRecipients && now.getTime()-Date.parse(scheduled)<=3*3600000 && await db.prepare(`SELECT 1 FROM booking_entitlement_notices n JOIN account_settings s ON s.line_account_id=n.line_account_id AND s.key='test_recipients'
      JOIN json_each(CASE WHEN json_valid(s.value) THEN CASE WHEN json_type(s.value)='array' THEN s.value ELSE '[]' END ELSE '[]' END) j ON j.type='text' AND j.value=n.friend_id
      WHERE n.id=? AND NOT EXISTS(SELECT 1 FROM json_each(CASE WHEN json_valid(s.value) THEN CASE WHEN json_type(s.value)='array' THEN s.value ELSE '[]' END ELSE '[]' END) invalid WHERE invalid.type!='text' OR length(trim(invalid.value))=0)`).bind(n.id).first())continue;
    const r=await db.prepare(`UPDATE booking_entitlement_notices AS n SET status=CASE
