@@ -165,7 +165,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater, onBusyCh
         if (nextWeek === week) load(); else setWeek(nextWeek);
       }}>
         <div role="group" aria-label="近い振替先" className="mt-3 space-y-2">
-          {nearby.map(option => <Button key={option.slot_id} variant="option" selected={option.slot_id === nearbyPicked} aria-pressed={option.slot_id === nearbyPicked} onClick={() => setNearbyPicked(option.slot_id)}>{mdHm(option.starts_at)} {option.name}</Button>)}
+          {nearby.map(option => <Button key={option.slot_id} variant="option" selected={option.slot_id === nearbyPicked} aria-pressed={option.slot_id === nearbyPicked} onClick={() => setNearbyPicked(option.slot_id)}>{mdHm(option.starts_at)} {option.name}{option.remaining !== null ? ` 残り ${option.remaining} 席` : ' 空きあり'}</Button>)}
         </div>
       </ConfirmDialog>
       {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
