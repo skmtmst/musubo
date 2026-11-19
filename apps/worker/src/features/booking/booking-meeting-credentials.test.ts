@@ -41,7 +41,7 @@ it('担当者を削除すると暗号化された鍵も削除する',async()=>{
  d.raw.exec("UPDATE staff SET deleted_at='2026-11-19T00:00:00Z' WHERE id='bs'");
  expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_meeting_connections').get()).toEqual({n:0});
 });
-it('接続し直した鍵は古い更新の結果で上書きされない',async()=>{
+it('再接続した鍵は古い更新の結果で上書きされない',async()=>{
  await connect(input);
  const scope={accountId:'a',staffId:'bs',provider:'zoom' as const,encryptionKey:key};
  const old=await claimMeetingRefresh(d.db,scope);expect(old).not.toBeNull();

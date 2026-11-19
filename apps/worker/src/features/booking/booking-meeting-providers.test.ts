@@ -41,7 +41,7 @@ it('Google の会議は一意の目印が一致した場合だけ照合する',a
  expect(await provider.verifyCreate({staffId:'s',idempotencyKey:'key',signal:input.signal})).toMatchObject({kind:'found',idempotencyKey:'key'});
  expect(await provider.verifyCreate({staffId:'s',idempotencyKey:'other',signal:input.signal})).toEqual({kind:'unknown'});
 });
-it('別アカウントへつなぎ直した後は元の会議を削除済みと判定しない',async()=>{
+it('別アカウントへの再接続後は元の会議を削除済みと判定しない',async()=>{
  const request=vi.fn() as unknown as typeof fetch;
  const provider=meetingProvider('zoom',async()=>({token:'test-token',accountId:'new-owner'}),request);
  const meetingId=JSON.stringify(['old-owner','123']);
