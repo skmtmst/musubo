@@ -310,3 +310,53 @@ ALTER TABLE instagram_oauth_states ADD COLUMN connection_id TEXT REFERENCES inst
 
 CREATE INDEX idx_instagram_oauth_states_connection_772
   ON instagram_oauth_states(connection_id);
+
+-- ---------------------------------------------------------------------------
+-- 7. 子表の connection_id が、その行自身の店舗／LINEアカウントの接続であることをDBで保証する
+--    外部キーだけでは「接続が実在するか」しか見ないので、統括Aの口コミに統括Bの接続IDを
+--    入れても通ってしまう（PRAGMA foreign_key_check も 0 件になる）。アプリ側の絞り込みを
+--    信用せず、書き込みの時点で止める。
+--    複合外部キーにせずトリガーにしたのは、754 と書き方が揃うことと、
+--    子表8つを table-rebuild せずに足せるため。
+--    connection_id が NULL の行（移行直後の引き継ぎ行・接続削除で SET NULL された行）は通す。
+-- ---------------------------------------------------------------------------
+
+CREATE TRIGGER rt_google_reviews_connection_store_insert BEFORE INSERT ON rt_google_reviews WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_reviews_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_reviews WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_posts_connection_store_insert BEFORE INSERT ON rt_google_posts WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_posts_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_posts WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_changes_connection_store_insert BEFORE INSERT ON rt_google_changes WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_changes_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_changes WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_write_log_connection_store_insert BEFORE INSERT ON rt_google_write_log WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_write_log_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_write_log WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_oauth_states_connection_store_insert BEFORE INSERT ON rt_google_oauth_states WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_oauth_states_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_oauth_states WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_location_candidates_connection_store_insert BEFORE INSERT ON rt_google_location_candidates WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_location_candidates_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_location_candidates WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_profiles_connection_store_insert BEFORE INSERT ON rt_google_profiles WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_profiles_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_profiles WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_metrics_daily_connection_store_insert BEFORE INSERT ON rt_google_metrics_daily WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_metrics_daily_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_metrics_daily WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER instagram_messages_connection_account_insert BEFORE INSERT ON instagram_messages WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections c WHERE c.id=NEW.connection_id AND c.line_account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'instagram_connection_account_mismatch'); END;
+
+CREATE TRIGGER instagram_messages_connection_account_update BEFORE UPDATE OF connection_id,line_account_id ON instagram_messages WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections c WHERE c.id=NEW.connection_id AND c.line_account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'instagram_connection_account_mismatch'); END;
+
+CREATE TRIGGER instagram_oauth_states_connection_account_insert BEFORE INSERT ON instagram_oauth_states WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections c WHERE c.id=NEW.connection_id AND c.line_account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'instagram_connection_account_mismatch'); END;
+
+CREATE TRIGGER instagram_oauth_states_connection_account_update BEFORE UPDATE OF connection_id,line_account_id ON instagram_oauth_states WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections c WHERE c.id=NEW.connection_id AND c.line_account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'instagram_connection_account_mismatch'); END;

@@ -391,4 +391,74 @@ describe('772 Googleビジネス・Instagram の複数連携', () => {
       { content: '2号店へのDM' },
     ]);
   });
+
+  it('他の店舗の接続IDを取り込み・履歴に混ぜる書き込みを拒否する', () => {
+    // 外部キーは「接続が実在するか」しか見ない。s2 の接続を s1 の行に挿せると、
+    // 統括をまたいでデータが混ざる経路になるのでトリガーで止める
+    db.prepare(
+      `INSERT INTO rt_google_connections(id,store_id,location_name,status)
+         VALUES('gc2','s2','locations/222','connected')`,
+    ).run();
+
+    const tables: Array<[string, string]> = [
+      ['rt_google_reviews', `INSERT INTO rt_google_reviews(id,store_id,connection_id,review_name,star_rating,create_time)
+         VALUES('rv9','s1','gc2','locations/222/reviews/r9',5,'2026-02-02')`],
+      ['rt_google_posts', `INSERT INTO rt_google_posts(id,store_id,connection_id,kind)
+         VALUES('po9','s1','gc2','standard')`],
+      ['rt_google_changes', `INSERT INTO rt_google_changes(id,store_id,connection_id,kind,summary)
+         VALUES('ch9','s1','gc2','profile','越境')`],
+      ['rt_google_write_log', `INSERT INTO rt_google_write_log(id,store_id,connection_id,kind,result)
+         VALUES('wl9','s1','gc2','connect','accepted')`],
+      ['rt_google_oauth_states', `INSERT INTO rt_google_oauth_states(state,store_id,connection_id,staff_id,mode,code_verifier_enc,expires_at)
+         VALUES('st9','s1','gc2','staff1','reconnect','v1.v','2030-01-01')`],
+      ['rt_google_location_candidates', `INSERT INTO rt_google_location_candidates(id,store_id,connection_id,location_name,location_title)
+         VALUES('lc9','s1','gc2','locations/999','越境の候補')`],
+      ['rt_google_profiles', `INSERT INTO rt_google_profiles(store_id,connection_id,location_name,profile_json,fingerprint,fetched_at)
+         VALUES('s1','gc2','locations/222','{}','fp9','2026-02-02')`],
+      ['rt_google_metrics_daily', `INSERT INTO rt_google_metrics_daily(store_id,connection_id,date,call_clicks)
+         VALUES('s1','gc2','2026-02-02',3)`],
+    ];
+    for (const [table, sql] of tables) {
+      expect(() => db.prepare(sql).run(), table).toThrow('google_connection_store_mismatch');
+    }
+
+    // 既にある行を別店舗の接続へ付け替えるのも止める
+    expect(() =>
+      db.prepare('UPDATE rt_google_reviews SET connection_id=? WHERE id=?').run('gc2', 'rv1'),
+    ).toThrow('google_connection_store_mismatch');
+    // 自分の店舗の接続なら通る
+    expect(() =>
+      db.prepare('UPDATE rt_google_reviews SET connection_id=? WHERE id=?').run('gc1', 'rv1'),
+    ).not.toThrow();
+  });
+
+  it('他のLINEアカウントの接続IDを受信・OAuth状態に混ぜる書き込みを拒否する', () => {
+    db.prepare(
+      `INSERT INTO instagram_connections(id,line_account_id,page_id,instagram_id,page_name,
+         page_token_encrypted,user_token_encrypted,expires_at,refreshed_at,connected_by)
+         VALUES('igc_a2','a2','page2','ig2','別アカウント','v1.p','v1.u','2030-01-01','2026-02-02','staff1')`,
+    ).run();
+
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO instagram_messages(id,line_account_id,connection_id,instagram_id,sender_id,recipient_id,content,received_at,created_at)
+             VALUES('m9','a1','igc_a2','ig2','customer','ig2','越境のDM','2026-02-02','2026-02-02')`,
+        )
+        .run(),
+    ).toThrow('instagram_connection_account_mismatch');
+
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO instagram_oauth_states(state_hash,line_account_id,connection_id,staff_id,phase,expires_at,created_at)
+             VALUES('sh9','a1','igc_a2','staff1','selecting','2030-01-01','2026-02-02')`,
+        )
+        .run(),
+    ).toThrow('instagram_connection_account_mismatch');
+
+    expect(() =>
+      db.prepare('UPDATE instagram_messages SET connection_id=? WHERE id=?').run('igc_a2', 'm1'),
+    ).toThrow('instagram_connection_account_mismatch');
+  });
 });

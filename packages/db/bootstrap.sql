@@ -13058,6 +13058,14 @@ CREATE TRIGGER instagram_connection_tenant_insert BEFORE INSERT ON instagram_con
 
 CREATE TRIGGER instagram_connection_tenant_update BEFORE UPDATE OF instagram_id,line_account_id ON instagram_connections WHEN EXISTS(SELECT 1 FROM instagram_connections existing JOIN line_accounts old_account ON old_account.id=existing.line_account_id JOIN line_accounts new_account ON new_account.id=NEW.line_account_id WHERE existing.instagram_id=NEW.instagram_id AND existing.line_account_id<>NEW.line_account_id AND COALESCE(old_account.tenant_id,'00000000-0000-4000-8000-000000000001')<>COALESCE(new_account.tenant_id,'00000000-0000-4000-8000-000000000001')) BEGIN SELECT RAISE(ABORT,'instagram_cross_tenant'); END;
 
+CREATE TRIGGER instagram_messages_connection_account_insert BEFORE INSERT ON instagram_messages WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections c WHERE c.id=NEW.connection_id AND c.line_account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'instagram_connection_account_mismatch'); END;
+
+CREATE TRIGGER instagram_messages_connection_account_update BEFORE UPDATE OF connection_id,line_account_id ON instagram_messages WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections c WHERE c.id=NEW.connection_id AND c.line_account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'instagram_connection_account_mismatch'); END;
+
+CREATE TRIGGER instagram_oauth_states_connection_account_insert BEFORE INSERT ON instagram_oauth_states WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections c WHERE c.id=NEW.connection_id AND c.line_account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'instagram_connection_account_mismatch'); END;
+
+CREATE TRIGGER instagram_oauth_states_connection_account_update BEFORE UPDATE OF connection_id,line_account_id ON instagram_oauth_states WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections c WHERE c.id=NEW.connection_id AND c.line_account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'instagram_connection_account_mismatch'); END;
+
 CREATE TRIGGER line_account_tag_links_scope
 BEFORE INSERT ON line_account_tag_links
 WHEN NOT EXISTS (
@@ -13352,6 +13360,38 @@ CREATE TRIGGER rt_followup_store_connected AFTER UPDATE OF line_account_id ON rt
 CREATE TRIGGER rt_followup_target_event_receipt AFTER INSERT ON rt_reservation_events
  WHEN NEW.reservation_id IS NOT NULL AND NEW.event_type LIKE 'restaurant.reservation.%'
  BEGIN INSERT INTO rt_reservation_event_receipts(event_id,consumer_key) VALUES(NEW.id,'followup_targets'); END;
+
+CREATE TRIGGER rt_google_changes_connection_store_insert BEFORE INSERT ON rt_google_changes WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_changes_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_changes WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_location_candidates_connection_store_insert BEFORE INSERT ON rt_google_location_candidates WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_location_candidates_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_location_candidates WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_metrics_daily_connection_store_insert BEFORE INSERT ON rt_google_metrics_daily WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_metrics_daily_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_metrics_daily WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_oauth_states_connection_store_insert BEFORE INSERT ON rt_google_oauth_states WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_oauth_states_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_oauth_states WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_posts_connection_store_insert BEFORE INSERT ON rt_google_posts WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_posts_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_posts WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_profiles_connection_store_insert BEFORE INSERT ON rt_google_profiles WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_profiles_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_profiles WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_reviews_connection_store_insert BEFORE INSERT ON rt_google_reviews WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_reviews_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_reviews WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_write_log_connection_store_insert BEFORE INSERT ON rt_google_write_log WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_write_log_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_write_log WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
 
 CREATE TRIGGER rt_inventory_reservation_delete AFTER DELETE ON rt_reservations BEGIN UPDATE rt_inventory_slots SET version=version+1, updated_at=datetime('now'), reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND r.departed_at IS NULL AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now')) AND datetime(r.starts_at)<datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(rt_inventory_slots.starts_at)),0) WHERE (store_id=OLD.store_id AND datetime(starts_at)<datetime(OLD.ends_at) AND datetime(starts_at, '+' || slot_minutes || ' minutes')>datetime(OLD.starts_at)); END;
 
