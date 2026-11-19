@@ -9,6 +9,7 @@ import BottomBar from './ui/bottom-bar.js';
 import Icon from './ui/icon.js';
 import { mdHm } from './absence-sheet.js';
 import StatusView from './ui/status-view.js';
+import ConfirmDialog from './ui/confirm-dialog.js';
 
 const jstDate = (iso: string) => japanDate(new Date(iso));
 const mondayOf = (date: string) => { const d = new Date(`${date}T00:00:00Z`); return addDays(date, -((d.getUTCDay() + 6) % 7)); };
@@ -44,6 +45,8 @@ export default function MakeupPicker({ credit, source, onUsed, onLater, onBusyCh
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showNearby, setShowNearby] = useState(false);
+  const [nearby, setNearby] = useState<MakeupOption[]>([]);
+  const [nearbyPicked, setNearbyPicked] = useState<string | null>(null);
   const requireChoice = useRef(false);
   const key = useRef(crypto.randomUUID());
   const generation = useRef(0);
@@ -75,7 +78,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater, onBusyCh
   const days = Array.from({ length: 7 }, (_, i) => addDays(week, i));
   const rows = (options ?? []).filter((o) => { const date = jstDate(o.starts_at); return day ? date === day : date >= week && date <= addDays(week, 6); });
   const chosen = (options ?? []).find((o) => o.slot_id === picked) ?? null;
-  const nearby = showNearby ? (options ?? []).filter((o) => !o.full).sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at) || a.slot_id.localeCompare(b.slot_id)).slice(0, 3) : [];
+
 
   async function use() {
     if (!chosen || chosen.full || busy || credit.status !== 'open' || !Number.isFinite(expires) || Date.now() >= expires || Date.parse(chosen.starts_at) > expires || Date.parse(chosen.starts_at) <= Date.now()) return;
@@ -86,7 +89,19 @@ export default function MakeupPicker({ credit, source, onUsed, onLater, onBusyCh
       if (!request.isCurrent(version)) return;
       logFailure('makeup-use', e);
       const code = (e as { body?: { error?: string } }).body?.error;
-      if (code === 'makeup_slot_unavailable' || code === 'slot_full' || code === 'slot_conflict') { requireChoice.current = true; setPicked(null); setShowNearby(true); key.current = crypto.randomUUID(); setError('この回は埋まりました。ほかの回を選んでください。振替は残っています。'); load(); }
+      if (code === 'makeup_slot_unavailable' || code === 'slot_full' || code === 'slot_conflict') {
+        const body: unknown = (e as { body?: unknown }).body;
+        const raw = body && typeof body === 'object' && 'alternatives' in body ? body.alternatives : null;
+        const candidates: MakeupOption[] = Array.isArray(raw) ? raw.flatMap((value: unknown) => {
+          if (!value || typeof value !== 'object') return [];
+          const item = value as Record<string, unknown>;
+          if (typeof item.id !== 'string' || typeof item.event_id !== 'string' || typeof item.starts_at !== 'string' || typeof item.ends_at !== 'string' || typeof item.name !== 'string') return [];
+          const at = Date.parse(item.starts_at);
+          if (!Number.isFinite(at) || at <= Date.now() || at > expires) return [];
+          return [{ slot_id: item.id, event_id: item.event_id, starts_at: item.starts_at, ends_at: item.ends_at, name: item.name, remaining: typeof item.capacity === 'number' && typeof item.occupied === 'number' ? Math.max(0, item.capacity - item.occupied) : null, full: false }];
+        }).slice(0, 3) : [];
+        requireChoice.current = true; setPicked(null); setNearby(candidates); setNearbyPicked(null); setShowNearby(true); key.current = crypto.randomUUID(); setError('この回は埋まりました。ほかの回を選んでください。振替は残っています。'); load();
+      }
       else setError('振替を予約できませんでした。振替は残っています。もう一度お試しください。');
     } finally { if (request.isCurrent(version)) { setBusy(false); onBusyChange?.(false); } }
   }
@@ -142,12 +157,17 @@ export default function MakeupPicker({ credit, source, onUsed, onLater, onBusyCh
           </ul>
         )}
       </div>
-      {nearby.length > 0 ? <div role="group" aria-label="近い振替先" className="space-y-2">
-        <h3 className="text-sm font-bold text-ink">近い振替先</h3>
-        {nearby.map(option => <Button key={option.slot_id} variant="option" onClick={() => {
-          requireChoice.current = true; setShowNearby(false); setWeek(mondayOf(jstDate(option.starts_at))); setDay(jstDate(option.starts_at)); setPicked(option.slot_id); setError(null);
-        }}>{mdHm(option.starts_at)} {option.name}</Button>)}
-      </div> : null}
+      <ConfirmDialog open={showNearby} title="この回は満席になりました" description={nearby.length ? '近い空き回を選べます。振替は残っています。' : '近い空き回がありません。別の日時を選んでください。'} cancelLabel="キャンセル" confirmLabel="この回にする" confirmDisabled={!nearbyPicked} onCancel={() => setShowNearby(false)} onConfirm={() => {
+        const option = nearby.find((item) => item.slot_id === nearbyPicked);
+        if (!option) return;
+        requireChoice.current = true; setShowNearby(false); setDay(jstDate(option.starts_at)); setPicked(option.slot_id); setError(null);
+        const nextWeek = mondayOf(jstDate(option.starts_at));
+        if (nextWeek === week) load(); else setWeek(nextWeek);
+      }}>
+        <div role="group" aria-label="近い振替先" className="mt-3 space-y-2">
+          {nearby.map(option => <Button key={option.slot_id} variant="option" selected={option.slot_id === nearbyPicked} aria-pressed={option.slot_id === nearbyPicked} onClick={() => setNearbyPicked(option.slot_id)}>{mdHm(option.starts_at)} {option.name}</Button>)}
+        </div>
+      </ConfirmDialog>
       {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
       <div className="relative z-10"><BottomBar>
         <Button variant="primary" disabled={!chosen || busy} onClick={() => void use()}>{chosen ? `${mdHm(chosen.starts_at)} に振り替える` : '振替先を選んでください'}</Button>
