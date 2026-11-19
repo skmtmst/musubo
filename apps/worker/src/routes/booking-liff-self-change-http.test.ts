@@ -410,6 +410,22 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     }
   });
 
+  test('B4-18: LIFFでこの回だけ変更し、組の次の回を保つ', async () => {
+    mockSlots([D11, D12, D13]);
+    const first = await adminCreate('menu-ok', T1, 'series-first');
+    const next = await adminCreate('menu-ok', T3, 'series-next');
+    sqlite.prepare(`INSERT INTO booking_series(id,line_account_id,friend_id,menu_id,staff_policy,rule_json,created_by,status,created_at,idempotency_key,request_json)
+      SELECT 'series','account-ny',friend_id,menu_id,'same','{}','owner','active','2026-10-01','series-key','{}' FROM bookings WHERE id=?`).run(first);
+    sqlite.prepare("UPDATE bookings SET series_id='series',series_index=0 WHERE id=?").run(first);
+    sqlite.prepare("UPDATE bookings SET series_id='series',series_index=1 WHERE id=?").run(next);
+    const version = (sqlite.prepare('SELECT lock_version FROM bookings WHERE id=?').get(first) as {lock_version:number}).lock_version;
+    const response = await selfPost(`/api/liff/booking/${first}/reschedule`, {starts_at:T2,lock_version:version});
+    expect(response.status,await response.clone().text()).toBe(200);
+    expect(sqlite.prepare('SELECT starts_at,series_index FROM bookings WHERE series_id=? ORDER BY series_index').all('series')).toEqual([
+      {starts_at:T2,series_index:0},{starts_at:T3,series_index:1},
+    ]);
+  });
+
   test('予約履歴の版とメニュー・担当を使って日時変更と取消ができる', async () => {
     mockSlots([D11, D12]);
     const id = await adminCreate('menu-ok', T1, 'history-actions');
