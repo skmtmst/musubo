@@ -434,7 +434,7 @@ async function replaceLocationCandidates(
 
 /**
  * 接続1件の状態を書き換える。同じ店舗の他の接続の状態と版は触らない。
- * （以前は store_id で絞っていたため、片方の権限切れで両方が expired になっていた）
+ * （store_id だけで絞ると、片方の権限切れで両方が expired になってしまう）
  */
 export async function setConnectionStatusForEnv(env: Env['Bindings'], connection: ConnectionRef, status: ConnectionStatus, error?: string | null): Promise<void> {
   await dbFor(env, connection.store_id)

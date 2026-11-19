@@ -325,7 +325,7 @@ describe('772 Googleビジネス・Instagram の複数連携', () => {
 
     expect(db.prepare('SELECT id FROM rt_google_connections').all()).toEqual([{ id: 'gc1' }]);
     expect(db.prepare('SELECT fingerprint FROM rt_google_profiles').all()).toEqual([{ fingerprint: 'fp1' }]);
-    // 1件目の口コミと返信はそのまま。消した接続の行は履歴として残り、帰属だけ外れる
+    // 1件目の口コミと返信はそのまま。削除した接続の行は履歴として残り、帰属だけ外れる
     expect(db.prepare('SELECT id,connection_id FROM rt_google_reviews ORDER BY id').all()).toEqual([
       { id: 'rv1', connection_id: 'gc1' },
       { id: 'rv2', connection_id: null },

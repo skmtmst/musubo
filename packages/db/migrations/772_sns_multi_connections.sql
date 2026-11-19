@@ -172,7 +172,7 @@ CREATE INDEX idx_rt_google_metrics_daily_store_date
 --    （一意制約の変更が不要な表は ADD COLUMN のみ。review_name / google_post_name は
 --      ロケーション名を含むため、既存の一意制約は複数接続でも衝突しない）
 --
---    接続を消したときは ON DELETE SET NULL にする。履歴を黙って失わず、外部キーが
+--    接続を削除したときは ON DELETE SET NULL にする。履歴を黙って失わず、外部キーが
 --    有効でも削除が止まらない。接続ごとの取り込みデータの削除は
 --    `DELETE … WHERE connection_id = ?` としてアプリ側で明示的に行う。
 -- ---------------------------------------------------------------------------

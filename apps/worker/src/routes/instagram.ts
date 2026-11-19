@@ -75,7 +75,7 @@ async function account(c: Context<Env>): Promise<string> {
 }
 /**
  * 画面が見ている接続の指定。`connectionId` が無ければ既定（並び順の先頭）を使う。
- * 772 までは1つのLINEアカウントに1接続だけだったので、送ってこない画面は今までと同じ1件を見る。
+ * 1つのLINEアカウントに1接続だけの作りに合わせ、送ってこない画面は同じ1件を見る。
  */
 function requestedConnectionId(c: Context<Env>): string | null {
   const id = c.req.query('connectionId');
@@ -618,7 +618,7 @@ instagram.post(
         },
       ),
     ]);
-    // 取り直したのはこの接続の分だけ。同じLINEアカウントの別の接続の内容は上書きしない。
+    // 取り直すのはこの接続の分だけ。同じLINEアカウントの別の接続の内容は上書きしない。
     const saved = await c.env.DB.prepare(
       'UPDATE instagram_connections SET profile_json=?,posts_json=?,username=?,synced_at=? WHERE id=? AND version=?',
     )
