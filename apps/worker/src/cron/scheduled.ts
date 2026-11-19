@@ -69,7 +69,7 @@ export async function scheduled(
         const {processStoreComparison}=await import('../services/store-comparison.js');
         await processStoreComparison(env.DB,now);
       }},
-      {name:'pass notice simulations',run:async()=>{const {processPassNotices}=await import('../features/booking/booking-pass-notices/index.js');await processPassNotices(env.DB,new Date(event.scheduledTime));}},
+      {name:'pass notice simulations',run:async()=>{const now=new Date(event.scheduledTime),live=env.DEPLOY_ENV==='staging'&&env.PASS_NOTICE_STAGING_DELIVERY_ENABLED==='true';const {processPassNotices}=await import('../features/booking/booking-pass-notices/index.js');await processPassNotices(env.DB,now,undefined,live);if(live){const {processStagingPassNotices}=await import('../features/booking/booking-pass-live-notices.js');await processStagingPassNotices(env,now);}}},
       {name:'pass billing grace',run:async()=>{const {expirePassGrace}=await import('../features/booking/booking-pass-billing/index.js');await expirePassGrace(env.DB,new Date(event.scheduledTime));}},
       {name:'monthly renewal scheduling',run:async()=>{const {scheduleMonthlyRenewals}=await import('../features/booking/monthly-schedule.js');await scheduleMonthlyRenewals(env.DB,new Date(event.scheduledTime));}},
       {name:'monthly invoice mock dispatch',run:async()=>{const {runMonthlyInvoiceMockCron}=await import('../features/booking/monthly-invoice-cron.js');await runMonthlyInvoiceMockCron(env,new Date(event.scheduledTime));}},

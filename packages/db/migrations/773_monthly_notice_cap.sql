@@ -10,3 +10,11 @@ CREATE TABLE booking_monthly_notice_cap (
   UNIQUE(account_id,friend_id,day_jst),
   FOREIGN KEY(cycle_id,audience) REFERENCES booking_monthly_failure_notices(cycle_id,audience) ON DELETE RESTRICT
 );
+CREATE TABLE booking_pass_notice_cap (
+  notice_id TEXT PRIMARY KEY REFERENCES booking_entitlement_notices(id) ON DELETE RESTRICT,
+  account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE RESTRICT,
+  day_jst TEXT NOT NULL,
+  reserved_at TEXT NOT NULL,
+  UNIQUE(account_id,friend_id,day_jst)
+);

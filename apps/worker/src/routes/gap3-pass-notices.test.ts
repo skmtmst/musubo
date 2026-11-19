@@ -4,6 +4,9 @@ import {useSqliteClock} from '../test-utils/sqlite-clock.js';
 import {bookingPassNotices} from './booking-pass-notices.js';
 import {processPassNotices} from '../features/booking/booking-pass-notices.js';
 import {entitlementUseStatement} from '../features/booking/booking-entitlements.js';
+import {readFileSync} from 'node:fs';
+import {processLivePassNotices,processStagingPassNotices} from '../features/booking/booking-pass-live-notices.js';
+import type {Env} from '../worker-env.js';
 let d:ReturnType<typeof gapFixture>;
 let now:Date;
 beforeEach(()=>{
@@ -35,6 +38,38 @@ test('B2-18/19-DEFAULT: 初期オフ、オンには版と模擬を要求、閲�
  await enable();expect((await gapCall(app(),base,'PUT',{remainingOne:false,expiry14Days:false,expectedVersion:1,testMode:true})).status).toBe(409);
  // 有効化より前に起きた残り1回のイベントを、さかのぼって作らない。
  expect(notices()).toEqual([]);
+});
+test('検証のテスト宛先だけ本送信し、送信直前に宛先変更があれば止める',async()=>{
+ d.raw.exec(readFileSync(new URL('../../../../packages/db/migrations/772_monthly_failure_notices.sql',import.meta.url),'utf8'));
+ d.raw.exec(readFileSync(new URL('../../../../packages/db/migrations/773_monthly_notice_cap.sql',import.meta.url),'utf8'));
+ await enable(true,false);await consume();
+ const send=vi.fn(async()=>{});
+ expect(await processStagingPassNotices({DB:d.db,DEPLOY_ENV:'staging'} as Env['Bindings'],now)).toEqual({processed:0});
+ d.raw.exec(`INSERT INTO account_settings(line_account_id,key,value) VALUES('a','test_recipients','["f"]')`);
+ await processPassNotices(d.db,now,'a',true);expect(notices()).toMatchObject([{status:'scheduled'}]);
+ const changed=()=>{d.raw.exec("UPDATE account_settings SET value='[]' WHERE line_account_id='a' AND key='test_recipients'");return now;};
+ expect(await processLivePassNotices(d.db,now,send,changed)).toEqual({processed:0});expect(send).not.toHaveBeenCalled();
+ d.raw.exec(`UPDATE account_settings SET value='["f"]' WHERE line_account_id='a' AND key='test_recipients'`);
+ expect(await processLivePassNotices(d.db,now,send,()=>now)).toEqual({processed:1});
+ expect(send).toHaveBeenCalledOnce();expect(await processLivePassNotices(d.db,now,send,()=>now)).toEqual({processed:0});
+ const result=await (await gapCall(app(),'/api/booking/admin/pass-notices?account_id=a&planId=p&limit=10')).json() as any;
+ expect(result.data.items[0].status).toBe('sent');
+});
+test('期限14日前の通知も検証先に送り、設定停止・同意撤回・夜間は送らない',async()=>{
+ d.raw.exec(readFileSync(new URL('../../../../packages/db/migrations/772_monthly_failure_notices.sql',import.meta.url),'utf8'));
+ d.raw.exec(readFileSync(new URL('../../../../packages/db/migrations/773_monthly_notice_cap.sql',import.meta.url),'utf8'));
+ await enable(false,true);
+ d.raw.exec(`INSERT INTO account_settings(line_account_id,key,value) VALUES('a','test_recipients','["f"]')`);
+ await processPassNotices(d.db,now,'a',true);expect(notices()).toMatchObject([{kind:'expiry_14_days',status:'scheduled'}]);
+ const send=vi.fn(async()=>{});
+ d.raw.exec("INSERT INTO friend_delivery_consents(line_account_id,friend_id,purpose,state,reason,source) VALUES('a','f','transaction','revoked','test','manual')");
+ expect(await processLivePassNotices(d.db,now,send,()=>now)).toEqual({processed:0});
+ d.raw.exec("DELETE FROM friend_delivery_consents WHERE friend_id='f'; UPDATE booking_pass_plans SET notify_expiry_14_days=0 WHERE id='p'");
+ expect(await processLivePassNotices(d.db,now,send,()=>now)).toEqual({processed:0});
+ d.raw.exec("UPDATE booking_pass_plans SET notify_expiry_14_days=1 WHERE id='p'");
+ expect(await processLivePassNotices(d.db,new Date('2026-10-16T13:00:00Z'),send,()=>now)).toEqual({processed:0});
+ expect(await processLivePassNotices(d.db,now,send,()=>now)).toEqual({processed:1});
+ expect(send).toHaveBeenCalledWith(expect.objectContaining({messages:[expect.objectContaining({text:expect.stringContaining('あと14日')})]}));
 });
 test('B2-18: 申込では知らせ0、確定の減算と同時に1件、取消/再利用でも二重にしない',async()=>{
  await enable(true,false);
