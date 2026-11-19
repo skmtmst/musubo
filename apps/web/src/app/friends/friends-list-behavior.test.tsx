@@ -84,6 +84,8 @@ async function openAdvancedConditions() {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z'))
   flushListUrlState()
   at('/friends')
   sessionStorage.clear()
@@ -96,6 +98,7 @@ afterEach(() => {
   cleanup()
   flushListUrlState()
   sessionStorage.clear()
+  vi.useRealTimers()
 })
 
 describe('URLから来る絞り込みの0件', () => {
@@ -127,6 +130,13 @@ describe('URLから来る絞り込みの0件', () => {
 })
 
 describe('友だち一覧の読込状態', () => {
+  it('失敗の返事の内部文を利用者に出さない', async () => {
+    fx.list.mockResolvedValueOnce({ success: false, error: 'private backend detail' })
+    render(<List />)
+    expect(await screen.findByText('友だちを読み込めませんでした')).toBeTruthy()
+    expect(document.body.textContent).not.toContain('private backend detail')
+    expect(screen.queryByText('まだ友だちがいません')).toBeNull()
+  })
   it('読込失敗を0件として出さず、件数とCSVを止め、もう一度読める', async () => {
     fx.list.mockRejectedValueOnce(new Error('down')).mockResolvedValue(answer([row('戻った人')]))
     render(<List />)
