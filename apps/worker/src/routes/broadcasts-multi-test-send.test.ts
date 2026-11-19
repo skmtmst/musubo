@@ -27,7 +27,7 @@ describe('複数吹き出しのテスト送信', () => {
       app.use('*',async(c,next)=>{c.env={DB:db,WORKER_URL:'https://worker.test'};c.set('staff' as never,{id:'owner',name:'Owner',role:'owner',readOnly:false} as never);await next()});
       app.route('/',broadcasts);
       const send=()=>app.request('/api/broadcasts/broadcast-1/test-send',{method:'POST'});
-      expect((await send()).status).toBe(422);expect(line.pushMessage).not.toHaveBeenCalled();
+      const rejected=await send();expect(rejected.status).toBe(422);expect(await rejected.json()).toMatchObject({code:'COMMON_VAR_UNRESOLVED',error:'共通情報を解決できません: {{var.hours}}',data:{variables:[{key:'hours',displayName:'hours'}]}});expect(line.pushMessage).not.toHaveBeenCalled();
       expect(raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
       raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES ('hours','account-1','営業時間','hours','text','10時')").run();
       vi.setSystemTime(new Date('2026-11-18T01:00:11Z'));

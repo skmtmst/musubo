@@ -194,7 +194,7 @@ async function requestApi<T>(path: string, options: FetchApiOptions | undefined,
     if (res.status === 401 && typeof window !== 'undefined' && !isSessionLostExempt(code)) {
       clearApiReadCache()
     }
-    const error = responseApiError(res, raw, code, res.status === 409 || res.status === 429 || res.status === 502 || res.status === 503 && code === 'invalid_saved_form'
+    const error = responseApiError(res, raw, code, res.status === 409 || res.status === 429 || res.status === 502 || res.status === 503 && code === 'invalid_saved_form' || res.status === 422 && code === 'COMMON_VAR_UNRESOLVED'
         ? extractApiErrorData(raw)
         : undefined)
     const detail = { status: res.status, code, feature: extractFeatureDisabledDetail(raw) }

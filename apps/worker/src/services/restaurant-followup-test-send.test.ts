@@ -43,7 +43,7 @@ for(const trigger of ['reservation_created','reservation_24h'] as const)it(`${tr
 for(const trigger of ['reservation_created','reservation_24h'] as const)it(`${trigger}のテスト送信は未登録の共通情報で止め、登録後に見本と共に送る`,async()=>{
  const input=await draft(trigger,'{{name}}さん {{var.guest_count}}名 営業時間: {{var.hours}}'),push=vi.fn(async()=>({data:null,requestId:'request'}));
  const send=()=>testRestaurantFollowupEngine(t.db,input,{createClient:()=>({pushMessageWithRequestId:push})});
- await expect(send()).rejects.toMatchObject({name:'CommonVarResolutionFailedError',failures:[{varKey:'hours',reason:'missing'}]});
+ await expect(send()).rejects.toMatchObject({name:'CommonVarResolutionFailedError',lineAccountId:'a',failures:[{varKey:'hours',reason:'missing'}]});
  expect(push).not.toHaveBeenCalled();
  expect(t.raw.prepare('SELECT var_key,reason,source_kind FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing',source_kind:'test_send'}]);
  expect(t.raw.prepare('SELECT count(*) n FROM outbound_send_requests').get()).toEqual({n:0});

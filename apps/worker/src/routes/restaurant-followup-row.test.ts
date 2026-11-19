@@ -203,7 +203,7 @@ describe('7行の補完とオンのHTTP境界',()=>{
  it('未作成の正当な店は200と7行、知らない店は404',async()=>{
   newStore();const response=await request(path+scope);expect(response.status).toBe(200);
   expect(await response.json()).toMatchObject({data:{template:null,bindings:[],rows:expect.any(Array)}});
-  expect((testDb.raw.prepare('SELECT COUNT(*) n FROM rt_store_followup_rows WHERE store_id=\'new\'').get() as any).n).toBe(7);
+  expect((testDb.raw.prepare('SELECT COUNT(*) n FROM rt_store_followup_rows WHERE store_id=\'new\'').get() as {n:number}).n).toBe(7);
   expect((await request('/api/restaurant-test/followups/missing'+scope)).status).toBe(404);
   expect((await request('/api/restaurant-test/followups/foreign'+scope)).status).toBe(404);
  });
@@ -221,11 +221,11 @@ describe('7行の補完とオンのHTTP境界',()=>{
   expect((await requestWithMethod(path+'/rows/reservation_created'+scope,'PUT',{expectedRowVersion:1,enabled:true},'reader')).status).toBe(403);
   authMocks.getStaffByApiKey.mockResolvedValue({id:'staff',name:'担当',role:'staff',access_level:'full',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:1});
   expect((await requestWithMethod(path+'/rows/reservation_created'+scope,'PUT',{expectedRowVersion:1,enabled:true},'staff')).status).toBe(403);
-  expect((testDb.raw.prepare('SELECT COUNT(*) n FROM scenarios').get() as any).n).toBe(0);
+  expect((testDb.raw.prepare('SELECT COUNT(*) n FROM scenarios').get() as {n:number}).n).toBe(0);
  });
  it('記念日は何日前と現地時刻を保存し、不正な時期と別起点への記念日時刻を拒む',async()=>{
   newStore();expect((await requestWithMethod(path+'/rows/anniversary_before'+scope,'PUT',{expectedRowVersion:1,enabled:true})).status).toBe(200);
-  const get=async()=> (await (await request(path+scope)).json() as any).data;
+  const get=async()=> (await (await request(path+scope)).json() as {data:{bindings:Array<{step_id:string}>,template:{template_version:number}}}).data;
   let page=await get();const step=page.bindings[0].step_id,url=path+'/bindings/'+step+scope;
   const body={expectedVersion:page.template.template_version,trigger:'anniversary_before',anniversaryDaysBefore:3,anniversaryTime:'09:25',enabled:true};
   expect((await requestWithMethod(url,'PATCH',body)).status).toBe(200);page=await get();
@@ -323,11 +323,22 @@ for(const [reason,code,message] of [
 });
 
 it('未登録の共通情報はテスト送信せず、配信のテストと同じ422で名前を返す',async()=>{
- newStore();const send=vi.spyOn(followupTestSend,'testRestaurantFollowupEngine').mockRejectedValueOnce(new CommonVarResolutionFailedError([{varKey:'hours',reason:'missing'}],{kind:'test_send',id:'step'}));
+ newStore();testDb.raw.exec("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value,status) VALUES('h','account-1','営業時間','hours','text','', 'draft'),('p','account-1','電話番号','phone','text','','draft'),('foreign-h','account-2','別店の営業時間','hours','text','','draft')");
+ const send=vi.spyOn(followupTestSend,'testRestaurantFollowupEngine').mockRejectedValueOnce(new CommonVarResolutionFailedError([{varKey:'hours',reason:'missing'},{varKey:'phone',reason:'missing'}],{kind:'test_send',id:'step'},'account-1'));
  try{
   const response=await request(path+'/engines/reservation_created/test-send'+scope,{expectedTargetVersion:1});
   expect(response.status).toBe(422);
-  expect(await response.json()).toMatchObject({success:false,error:'共通情報を解決できません: {{var.hours}}'});
+  expect(await response.json()).toMatchObject({success:false,code:'COMMON_VAR_UNRESOLVED',error:'共通情報を解決できません: {{var.hours}}, {{var.phone}}',data:{variables:[{key:'hours',displayName:'営業時間'},{key:'phone',displayName:'電話番号'}]}});
+ }finally{send.mockRestore();}
+});
+
+it('解決時のアカウントが不明なら別の店の名前を使わない',async()=>{
+ newStore();testDb.raw.exec("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES('foreign-h','account-2','別店の名前','hours','text','')");
+ const send=vi.spyOn(followupTestSend,'testRestaurantFollowupEngine').mockRejectedValueOnce(new CommonVarResolutionFailedError([{varKey:'hours',reason:'missing'}],{kind:'test_send',id:'step'}));
+ try{
+  const response=await request(path+'/engines/reservation_created/test-send'+scope,{expectedTargetVersion:1});
+  expect(response.status).toBe(422);
+  expect(await response.json()).toMatchObject({code:'COMMON_VAR_UNRESOLVED',data:{variables:[{key:'hours',displayName:'hours'}]}});
  }finally{send.mockRestore();}
 });
 

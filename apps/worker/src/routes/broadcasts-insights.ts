@@ -1,3 +1,4 @@
+import { commonVarTestError } from '../services/common-var-test-error.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { parseJsonArray } from './broadcast-json.js';
@@ -369,10 +370,7 @@ export const post__api_broadcasts_id_test_send_3 = async (c: Context<Env, "/api/
     });
   } catch (error) {
     if (error instanceof CommonVarResolutionFailedError) {
-      return inputError(c, {
-        success: false,
-        error: `共通情報を解決できません: ${error.failures.map((f) => `{{var.${f.varKey}}}`).join(', ')}`,
-      }, 422, ["CommonVarResolutionFailedError"]);
+      return inputError(c, await commonVarTestError(c.env.DB, accountId, error), 422, ["CommonVarResolutionFailedError"]);
     }
     throw error;
   }
