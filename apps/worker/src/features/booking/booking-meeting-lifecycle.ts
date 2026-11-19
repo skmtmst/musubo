@@ -42,6 +42,8 @@ export async function reconcileBookingMeeting(db: D1Database, input: {
   const unresolved=await db.prepare("SELECT id FROM booking_meeting_links WHERE booking_id=? AND status='pending' AND attempt_count>0 LIMIT 1").bind(input.bookingId).first();
   if (unresolved) return 'unknown';
   const needsMeeting=booking.status==='confirmed' && booking.meeting_mode==='online' && booking.meeting_url_source!=='manual';
+  const active=needsMeeting ? await db.prepare("SELECT id FROM booking_meeting_links WHERE booking_id=? AND status='active' LIMIT 1").bind(input.bookingId).first() : null;
+  if(active)return 'done';
   if (needsMeeting && !input.creator) return 'failed';
   if (needsMeeting && input.creator) {
     const created=await createConfirmedBookingMeeting(db,input.bookingId,input.creator);

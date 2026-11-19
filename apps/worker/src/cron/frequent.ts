@@ -101,6 +101,14 @@ export async function runFrequentHeavyJobs(
       run: async () => {const {refreshCalendarBusyCaches,processCalendarSwitchJobs}=await import('../features/booking/booking-calendar-settings/index.js');const credentials={email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY};await refreshCalendarBusyCaches(env.DB,credentials,new Date(event.scheduledTime));await processCalendarSwitchJobs(env.DB,credentials,new Date(event.scheduledTime));},
     },
     {
+      name: 'booking meeting recovery',
+      run: async () => {
+        const {processMeetingQueue}=await import('../features/booking/booking-meeting-queue.js');
+        const {meetingQueueDependencies}=await import('../features/booking/booking-meeting-runtime.js');
+        await processMeetingQueue(env.DB,meetingQueueDependencies(env));
+      },
+    },
+    {
       name: 'booking sync notices',
       run: async () => {
         const { processBookingSyncNoticeQueue } = await import('../features/booking/booking-sync-rules/index.js');

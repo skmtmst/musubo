@@ -23,3 +23,15 @@ it('つなぎが使えないときも通知センターに一度だけ残す',as
  await processMeetingQueue(d.db,deps);
  expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE event_type='booking_meeting_issue'").get()).toEqual({n:1});
 });
+it('予約変更時は指定した店と予約だけを待たずに回復する',async()=>{
+ const deps:MeetingQueueDependencies={resolve:async()=>({removers:{},verifiers:{zoom:{verifyCreate:async input=>({kind:'found',meetingId:'remote',url:'https://example.test/room',idempotencyKey:input.idempotencyKey}),verifyDelete:async()=> 'unknown'}}})};
+ expect(await processMeetingQueue(d.db,deps,1,{bookingId:'bk',accountId:'b'})).toBe(0);
+ expect(await processMeetingQueue(d.db,deps,1,{bookingId:'bk',accountId:'a'})).toBe(1);
+ expect(d.raw.prepare("SELECT status FROM booking_meeting_links").get()).toEqual({status:'active'});
+});
+it('予約機能が停止中の店には回復処理を実行しない',async()=>{
+ d.raw.exec("INSERT INTO account_settings(id,line_account_id,key,value) VALUES('stop','a','feature.booking','false'); UPDATE booking_meeting_links SET updated_at='2020-01-01T00:00:00Z'");
+ let calls=0; const deps:MeetingQueueDependencies={resolve:async()=>{calls++;return null}};
+ expect(await processMeetingQueue(d.db,deps)).toBe(0);expect(calls).toBe(0);
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE event_type='booking_meeting_issue'").get()).toEqual({n:0});
+});

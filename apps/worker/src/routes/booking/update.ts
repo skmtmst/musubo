@@ -541,6 +541,13 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
     credentials: googleCredentials(c.env),
   });
 
+  // 会議の処理を変更案内より先に実行し、URLの不一致を防ぐ。
+  try {
+    const {processMeetingQueue}=await import('../../features/booking/booking-meeting-queue.js');
+    const {meetingQueueDependencies}=await import('../../features/booking/booking-meeting-runtime.js');
+    await processMeetingQueue(c.env.DB,meetingQueueDependencies(c.env),1,{bookingId,accountId});
+  } catch { logger.error('booking_meeting_recovery_failed'); }
+
   // ---- 変更案内の LINE 通知 ----
   // 明示的に送らない指定が無い限り、連携済みの予約には変更を知らせる。
   // 未連携の予約では送らない (operation 行も作らない)。

@@ -1,3 +1,5 @@
+import {accountFeatureOffExclusionSql} from '@line-crm/db';
+import {createFeatureJobGate} from '../../services/feature-enforcement.js';
 import { notifyMeetingIssue } from './booking-meeting-notice.js';
 import { reconcileBookingMeeting, type MeetingRemover } from './booking-meeting-lifecycle.js';
 import { verifyUnknownMeeting, type MeetingVerifier } from './booking-meeting-verify.js';
@@ -12,15 +14,17 @@ export interface MeetingQueueDependencies {
 }
 
 /** 既存の会議を読み、確定していない結果は先に読み取りで照合する。 */
-export async function processMeetingQueue(db:D1Database,deps:MeetingQueueDependencies,limit=50):Promise<number> {
+export async function processMeetingQueue(db:D1Database,deps:MeetingQueueDependencies,limit=50,target?:{bookingId:string;accountId:string}):Promise<number> {
+ const gate=createFeatureJobGate();
  const rows=await db.prepare(`SELECT b.id booking_id,b.line_account_id account_id
   FROM bookings b JOIN booking_meeting_links l ON l.booking_id=b.id
-  WHERE (l.status='cancel_pending' OR (l.status='pending' AND l.attempt_count>0))
-   AND julianday(l.updated_at)<=julianday('now','-1 minute')
-  GROUP BY b.id,b.line_account_id ORDER BY MIN(l.updated_at),b.id LIMIT ?`).bind(Math.max(1,Math.min(100,limit)))
+  WHERE NOT ${accountFeatureOffExclusionSql('b.line_account_id','booking')} AND (l.status='cancel_pending' OR (l.status='pending' AND l.attempt_count>0))
+   AND ((? IS NOT NULL AND b.id=? AND b.line_account_id=?) OR (? IS NULL AND julianday(l.updated_at)<=julianday('now','-1 minute')))
+  GROUP BY b.id,b.line_account_id ORDER BY MIN(l.updated_at),b.id LIMIT ?`).bind(target?.bookingId??null,target?.bookingId??null,target?.accountId??null,target?.bookingId??null,Math.max(1,Math.min(100,limit)))
   .all<{booking_id:string;account_id:string}>();
  let processed=0;
  for(const row of rows.results??[]) {
+  if(!await gate.canRun(db,row.account_id,'booking','booking meeting recovery'))continue;
   const services=await deps.resolve({accountId:row.account_id,bookingId:row.booking_id});
   if(!services) {
    const link=await db.prepare("SELECT id FROM booking_meeting_links WHERE booking_id=? AND (status='cancel_pending' OR (status='pending' AND attempt_count>0)) ORDER BY created_at,id LIMIT 1").bind(row.booking_id).first<{id:string}>();
