@@ -199,8 +199,8 @@ test('HQT-22: 既存の成功した配布だけ出所を復元する',()=>{
 test('HQT-22: 配布途中に削除したら残りの店へ配らない',async()=>{
  const id=await create('mileage_reward'),p=await check(id,['a','b']);
  const original=f.db.batch.bind(f.db);let archived=false;
- f.db.batch=async statements=>{
-  const result=await original(statements);
+ f.db.batch=async <T=unknown>(statements:D1PreparedStatement[]):Promise<D1Result<T>[]>=>{
+  const result=await original(statements) as D1Result<T>[];
   if(!archived&&f.raw.prepare("SELECT COUNT(*) n FROM hq_template_distribution_results WHERE status='succeeded'").get() && (f.raw.prepare("SELECT COUNT(*) n FROM hq_template_distribution_results WHERE status='succeeded'").get() as {n:number}).n===1){
    archived=true;f.raw.prepare("UPDATE hq_templates SET archived_at='2026-11-16T00:00:00Z' WHERE id=?").run(id);
   }
