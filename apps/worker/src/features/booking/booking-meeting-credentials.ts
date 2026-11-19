@@ -1,7 +1,7 @@
 import {decryptCredential,encryptCredential} from '@line-crm/db';
 import type {MeetingProvider} from './booking-meeting-create.js';
 export type ConnectionProvider=MeetingProvider|'outlook';
-type Credential={provider:ConnectionProvider;externalAccountId:string;refreshToken:string};
+type Credential={provider:ConnectionProvider;externalAccountId:string;refreshToken:string;accessToken?:string;accessExpiresAt?:string};
 type Scope={accountId:string;staffId:string;provider:ConnectionProvider};
 
 async function decode(value:string,provider:ConnectionProvider,key:string):Promise<Credential>{
@@ -9,13 +9,24 @@ async function decode(value:string,provider:ConnectionProvider,key:string):Promi
  if(!data||typeof data!=='object'||Array.isArray(data))throw new Error('invalid_meeting_credential');
  const v=data as Record<string,unknown>;
  if(v.provider!==provider||typeof v.externalAccountId!=='string'||!v.externalAccountId||typeof v.refreshToken!=='string'||!v.refreshToken)throw new Error('invalid_meeting_credential');
- return {provider,externalAccountId:v.externalAccountId,refreshToken:v.refreshToken};
+ if((v.accessToken!==undefined&&typeof v.accessToken!=='string')||(v.accessExpiresAt!==undefined&&typeof v.accessExpiresAt!=='string'))throw new Error('invalid_meeting_credential');
+ return {provider,externalAccountId:v.externalAccountId,refreshToken:v.refreshToken,...(typeof v.accessToken==='string'?{accessToken:v.accessToken}:{}),...(typeof v.accessExpiresAt==='string'?{accessExpiresAt:v.accessExpiresAt}:{})};
 }
 /** 管理画面へは接続状態だけを返す。更新用の鍵は返さない。 */
 export async function hasMeetingCredential(db:D1Database,input:Scope):Promise<boolean>{
  const row=await db.prepare(`SELECT c.id FROM booking_meeting_connections c JOIN staff s ON s.id=c.staff_id AND s.line_account_id=c.line_account_id AND s.deleted_at IS NULL
  WHERE c.line_account_id=? AND c.staff_id=? AND c.provider=? AND c.refresh_state='ready'`).bind(input.accountId,input.staffId,input.provider).first();
  return !!row;
+}
+/** 未失効の access token のみ返す。更新用の鍵は返さない。 */
+export async function cachedMeetingAccess(db:D1Database,input:Scope & {encryptionKey:string}):Promise<{token:string;externalAccountId:string;expiresAt:string}|null>{
+ const row=await db.prepare(`SELECT c.id,c.version,c.credential_enc FROM booking_meeting_connections c JOIN staff s ON s.id=c.staff_id AND s.line_account_id=c.line_account_id AND s.deleted_at IS NULL
+ WHERE c.line_account_id=? AND c.staff_id=? AND c.provider=? AND c.refresh_state='ready'`).bind(input.accountId,input.staffId,input.provider).first<{id:string;version:number;credential_enc:string}>();
+ if(!row)return null;
+ const credential=await decode(row.credential_enc,input.provider,input.encryptionKey);
+ if(!credential.accessToken||!credential.accessExpiresAt||Date.parse(credential.accessExpiresAt)<=Date.now()+60000||!Number.isFinite(Date.parse(credential.accessExpiresAt)))return null;
+ const current=await db.prepare("SELECT id FROM booking_meeting_connections WHERE id=? AND version=? AND refresh_state='ready'").bind(row.id,row.version).first();
+ return current?{token:credential.accessToken,externalAccountId:credential.externalAccountId,expiresAt:credential.accessExpiresAt}:null;
 }
 /** claim が取れなかったとき、更新中と切断・要再接続を区別する。 */
 export async function meetingConnectionState(db:D1Database,input:Scope):Promise<'ready'|'refreshing'|'unknown'|'missing'>{
@@ -64,4 +75,18 @@ export async function finishAuthorizedMeetingConnection(db:D1Database,input:Scop
   db.prepare('DELETE FROM booking_meeting_oauth_states WHERE state=? AND line_account_id=? AND actor_id=? AND changes()=1').bind(input.state,input.accountId,input.actorId),
  ]);
  return operations[0].meta.changes===1;
+}
+/** 鍵の交換が始まっていない、または再利用できる一時障害のときだけ claim を戻す。 */
+export async function releaseMeetingRefresh(db:D1Database,input:{id:string;claim:string;version:number}):Promise<boolean>{
+ const r=await db.prepare(`UPDATE booking_meeting_connections SET refresh_state='ready',refresh_claim=NULL,version=version+1,updated_at=?
+  WHERE id=? AND version=? AND refresh_state='refreshing' AND refresh_claim=?`).bind(new Date().toISOString(),input.id,input.version,input.claim).run();
+ return r.meta.changes===1;
+}
+/** 更新処理が中断したときは、鍵が使われたか分からないため再送しない。 */
+export async function recoverStaleMeetingRefresh(db:D1Database,input:Scope & {now?:Date}):Promise<boolean>{
+ const now=input.now??new Date(),cutoff=new Date(now.getTime()-120000).toISOString();
+ const r=await db.prepare(`UPDATE booking_meeting_connections SET refresh_state='unknown',refresh_claim=NULL,version=version+1,updated_at=?
+ WHERE line_account_id=? AND staff_id=? AND provider=? AND refresh_state='refreshing' AND updated_at<?`)
+ .bind(now.toISOString(),input.accountId,input.staffId,input.provider,cutoff).run();
+ return r.meta.changes===1;
 }
