@@ -160,3 +160,14 @@ it('送信直前に検証先から外れたら送らない',async()=>{
  await processStagingRankNotices({DB:fixture.db,DEPLOY_ENV:'staging',RANK_NOTICE_STAGING_DELIVERY_ENABLED:'true'} as never,now);
  expect(fakeProxy).not.toHaveBeenCalled();spy.mockRestore();
 });
+
+it('検証先でない予定が100件あっても登録済みの人の通知を送る',async()=>{
+ fixture.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('outside','Uoutside','a')");
+ const insert=fixture.raw.prepare(`INSERT INTO member_rank_notices(id,account_id,friend_id,change_key,kind,tier_id,purpose,messages_json,base_messages_json,scheduled_at)
+ VALUES(?,'a','outside',?,'upgrade','tier','notice','[{"type":"text","text":"hi"}]','[{"type":"text","text":"hi"}]','2026-10-17T00:59:00.000Z')`);
+ for(let i=0;i<101;i++)insert.run(`outside-${i}`,`change-${i}`);
+ const {processStagingRankNotices}=await import('./member-rank-live-notices.js');
+ await processStagingRankNotices({DB:fixture.db,DEPLOY_ENV:'staging',RANK_NOTICE_STAGING_DELIVERY_ENABLED:'true',WORKER_PUBLIC_URL:'https://worker.invalid'} as never,now);
+ expect(fakeProxy).toHaveBeenCalledTimes(1);
+ expect(await fakeProxy.mock.calls[0][0].json()).toMatchObject({to:'Uf'});
+});

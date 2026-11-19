@@ -19,10 +19,15 @@ async function candidate(db:D1Database,id:string,now:Date):Promise<Candidate|nul
 }
 
 /** テスト用の送信口を注入できる。実送信の設定を持たない限り呼び出されない。 */
-export async function processLiveRankNotices(db:D1Database,now:Date,options:{transmit:Transmit}){
+export async function processLiveRankNotices(db:D1Database,now:Date,options:{transmit:Transmit;stagingOnly?:boolean}){
  const rows=(await db.prepare(`SELECT n.id FROM member_rank_notices n WHERE n.status='scheduled' AND julianday(n.scheduled_at)<=julianday(?)
  AND NOT EXISTS(SELECT 1 FROM outbound_send_requests o WHERE o.resource_id='rank-notice:'||n.id AND (o.status IN('in_progress','unknown','succeeded') OR (o.status='failed' AND (o.retryable=0 OR o.next_retry_at>?))))
- ORDER BY n.scheduled_at,n.id LIMIT 100`).bind(now.toISOString(),now.toISOString()).all<{id:string}>()).results;
+ AND (?=0 OR EXISTS(SELECT 1 FROM account_settings s JOIN friends f ON f.id=n.friend_id AND f.line_account_id=n.account_id AND f.is_following=1
+   JOIN json_each(CASE WHEN json_valid(s.value) THEN CASE WHEN json_type(s.value)='array' THEN s.value ELSE '[]' END ELSE '[]' END) recipient
+   WHERE s.line_account_id=n.account_id AND s.key='test_recipients' AND recipient.type='text' AND recipient.value=n.friend_id
+   AND NOT EXISTS(SELECT 1 FROM json_each(CASE WHEN json_valid(s.value) THEN CASE WHEN json_type(s.value)='array' THEN s.value ELSE '[]' END ELSE '[]' END) invalid
+     WHERE invalid.type!='text' OR length(trim(invalid.value))=0)))
+ ORDER BY n.scheduled_at,n.id LIMIT 100`).bind(now.toISOString(),now.toISOString(),options.stagingOnly?1:0).all<{id:string}>()).results;
  let processed=0;
  for(const row of rows){
   const item=await candidate(db,row.id,now);if(!item||item.status!=='scheduled')continue;
@@ -55,7 +60,7 @@ export async function processStagingRankNotices(env:import('../worker-env.js').E
  const {featureJobCanRun}=await import('./feature-enforcement.js');
  const {pushViaHarnessProxy}=await import('./line-proxy-send.js');
  const {dispatchLineProxyLocally}=await import('./local-line-proxy.js');
- return processLiveRankNotices(env.DB,now,{transmit:async input=>{
+ return processLiveRankNotices(env.DB,now,{stagingOnly:true,transmit:async input=>{
   if(!(await getSendPermissionForAccount(env.DB,input.accountId)).allowed||await isOperationCapabilityStopped(env.DB,input.accountId,'broadcast_dispatch')||!await featureJobCanRun(env.DB,{accountId:input.accountId,featureId:'mileage',job:'rank notices'}))throw new NotificationDeliveryBlocked('sending_stopped');
   const account=await env.DB.prepare(`SELECT channel_access_token,channel_access_token_encrypted FROM line_accounts la WHERE la.id=? AND la.is_active=1 AND la.archived_at IS NULL AND ${activeTenantLineAccountSql('la.id')}`).bind(input.accountId).first<{channel_access_token:string|null;channel_access_token_encrypted:string|null}>();
   if(!account)throw new NotificationDeliveryBlocked('account_unavailable');
