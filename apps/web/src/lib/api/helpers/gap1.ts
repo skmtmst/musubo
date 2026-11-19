@@ -1,5 +1,6 @@
 import {fetchApi} from '../../api';
-import type {LineSender,SendConfirmationPreview,InboxFirstResponseSettings,InboxFirstResponseWrite,BookingCancellationPolicy,BookingCancellationQuote,BookingCancellationCharge,BookingCalendarSwitch,BookingCalendarSwitchWrite} from '@line-crm/shared';
+import type {LineSender,SendConfirmationPreview,InboxFirstResponseSettings,InboxFirstResponseWrite,InboxSlaState,BookingCancellationPolicy,BookingCancellationQuote,BookingCancellationCharge,BookingCalendarSwitch,BookingCalendarSwitchWrite} from '@line-crm/shared';
+import type { ChatListItem } from '../types/chats';
 type Result<T>={success:true;data:T};
 const e=encodeURIComponent;
 const account=(path:string,id:string)=>`${path}?account_id=${e(id)}`;
@@ -21,7 +22,7 @@ export const lineSenderApi={
 export const inboxRoutingApi={
  get:(id:string)=>fetchApi<Result<InboxFirstResponseSettings>>(account('/api/inbox/routing-settings',id)),
  save:(id:string,input:InboxFirstResponseWrite)=>fetchApi<Result<InboxFirstResponseSettings>>(account('/api/inbox/routing-settings',id),json('PUT',input)),
- listByDeadline:(id:string,options:{overdue?:boolean;limit?:number;beforeDueAt?:string;beforeId?:string}={})=>{const q=new URLSearchParams({lineAccountId:id,sort:'sla_due'});if(options.overdue)q.set('slaState','overdue');if(options.limit)q.set('limit',String(options.limit));if(options.beforeDueAt)q.set('beforeDueAt',options.beforeDueAt);if(options.beforeId)q.set('beforeId',options.beforeId);return fetchApi<{success:true;data:Array<{id:string;friendId:string;conversationId:string;lastMessage:string|null;unread:boolean;slaDueAt:string|null;slaState:string;assignedBy:string|null}>;total:number}>(`/api/chats?${q}`);},
+ listByDeadline:(id:string,options:{overdue?:boolean;limit?:number;beforeDueAt?:string;beforeId?:string;status?:string;operatorId?:string;q?:string;unreadOnly?:boolean}={})=>{const q=new URLSearchParams({lineAccountId:id,sort:'sla_due'});if(options.overdue)q.set('slaState','overdue');if(options.limit)q.set('limit',String(options.limit));if(options.beforeDueAt)q.set('beforeDueAt',options.beforeDueAt);if(options.beforeId)q.set('beforeId',options.beforeId);if(options.status)q.set('status',options.status);if(options.operatorId)q.set('operatorId',options.operatorId);if(options.q)q.set('q',options.q);if(options.unreadOnly)q.set('unreadOnly','1');return fetchApi<{success:true;data:Array<ChatListItem & {conversationId:string;slaDueAt:string|null;slaState:InboxSlaState;assignedBy:'auto'|'manual'|null}>;total:number}>(`/api/chats?${q}`);},
 };
 export const bookingCancellationApi={
  cancel:(liffId:string,bookingId:string,input:{lock_version:number;feeAccepted?:true;expectedFeeAmount?:number},idToken:string)=>fetchApi<{status:string;feeNow?:number}>(`/api/liff/booking/${e(bookingId)}/cancel?${new URLSearchParams({liffId})}`,{...json('POST',input),headers:{Authorization:`Bearer ${idToken}`}}),
