@@ -5,6 +5,7 @@ import {simulateAttribution,simulationResults} from '../features/ec-commerce/ec-
 import {assertChanged,clearAssertions} from '../features/booking/booking-series/index.js';
 import {requirePermission} from '../middleware/role-guard.js';
 import {Hono} from 'hono';
+import {createBroadcastRetryKey} from '../features/broadcasts/broadcast-retry-key/index.js';
 import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapVersion,gapWrite,gapKey} from '../services/gap-common.js';
 import {autoKinds,autoLineRules,ingestBehavior,processAutoLineMock} from '../features/ec-commerce/ec-auto-line/index.js';
@@ -56,6 +57,19 @@ ecAutoLine.get('/api/ec/auto-line/stats',async c=>{
  const a=await gapAccount(c),r=await c.env.DB.prepare("SELECT count(*) total,count(CASE WHEN status='simulated' THEN 1 END) simulated,count(CASE WHEN status LIKE 'skipped_%' THEN 1 END) skipped FROM ec_auto_line_sends WHERE account_id=?").bind(a).first();return c.json({success:true,data:{...r,sent:0,clicks:null,purchases:null,simulatedResults:await simulationResults(c.env.DB,a),testMode:true}});
 });
 ecAutoLine.post('/api/ec/auto-line/rules/:kind/test',async c=>{gapWrite(c,{admin:true});const a=await gapAccount(c),kind=c.req.param('kind');if(!autoKinds.includes(kind as typeof autoKinds[number]))throw new GapError('invalid_kind');return c.json({success:true,data:{preview:(await autoLineRules(c.env.DB,a)).find(r=>r.kind===kind),sent:false,testMode:true}});});
+
+// Ambiguous live deliveries require a store administrator's review.
+ecAutoLine.get('/api/ec/auto-line/live/unknown',async c=>{
+ const staff=c.get('staff');if(!staff || staff.readOnly || !['owner','admin'].includes(staff.role) || c.get('impersonation'))throw new GapError('forbidden',403);
+ const account=await gapAccount(c);
+ const rows=(await c.env.DB.prepare("SELECT id,kind,occurrence_key occurrenceKey,friend_id friendId,product_id productId,created_at createdAt,updated_at version FROM ec_auto_line_live_intents WHERE account_id=? AND state='unknown' ORDER BY created_at,id LIMIT 100").bind(account).all<{id:string;friendId:string}>()).results;
+ const items=await Promise.all(rows.map(async row=>{
+  const key=await createBroadcastRetryKey('notification',`ec-live:${row.id}`,'line',row.friendId);
+  const ledger=await c.env.DB.prepare("SELECT status,failure_code failureCode,attempt_count attemptCount,created_at createdAt,updated_at updatedAt,completed_at completedAt FROM outbound_send_requests WHERE idempotency_key=? AND resource_id=? AND channel='line' AND line_account_id=?").bind(key,`ec-live:${row.id}`,account).first();
+  return {...row,ledger:ledger??null};
+ }));
+ return c.json({success:true,data:{items}});
+});
 
 // Only a verified store administrator can inspect or resolve simulated unknown outcomes.
 ecAutoLine.get('/api/ec/auto-line/cap/unknown',async c=>{
