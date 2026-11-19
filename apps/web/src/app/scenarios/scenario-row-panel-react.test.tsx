@@ -40,11 +40,12 @@ const row = (id: string, name: string) => ({
 })
 const puts: Array<{ url: string; body: unknown }> = []
 const deletes: string[] = []
+let deleteStatus = 500
 function handler(url: URL, init?: RequestInit) {
   if (url.pathname === '/api/scenarios/s1/confirmation') return response({ success: true, data: { contentRevision: 1, activeCount: 1, rowIdSum: 1, rowIdSquareSum: 1, totalCount: 1, totalRowIdSum: 1, totalRowIdSquareSum: 1, referrers: [] } })
   if (init?.method === 'DELETE' && url.pathname.startsWith('/api/scenarios/')) {
     deletes.push(url.pathname)
-    return response({ success: false, error: 'Internal Server Error' }, 500)
+    return response({ success: false, error: 'Internal Server Error' }, deleteStatus)
   }
   if (init?.method === 'PUT' && url.pathname.startsWith('/api/scenarios/')) {
     puts.push({ url: url.pathname, body: JSON.parse(String(init.body)) })
@@ -63,15 +64,18 @@ async function settle() {
   await act(async () => { await Promise.resolve(); await Promise.resolve() })
 }
 async function eventually(check: () => void, timeout = 3000) {
-  const started = Date.now()
+  const started = performance.now()
   while (true) {
     try { check(); return } catch (error) {
-      if (Date.now() - started >= timeout) throw error
+      if (performance.now() - started >= timeout) throw error
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
     }
   }
 }
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z'))
+  deleteStatus = 500
   window.history.replaceState(null, '', '/scenarios')
   pushes.length = 0
   puts.length = 0
@@ -87,6 +91,7 @@ afterEach(() => {
   act(() => { root.unmount() })
   host.remove()
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 async function openFirstRow() {
@@ -153,7 +158,8 @@ test('パネルで名前を変えると保存口へ送る', async () => {
   expect(puts[0]).toEqual({ url: '/api/scenarios/s1', body: { name: '変えた名前' } })
 })
 
-test('削除に失敗したら確認窓を閉じず、窓の中に失敗を出す', async () => {
+test.each([500, 200])('削除が失敗ならHTTP %sでも確認窓を閉じず、窓の中に失敗を出す', async (status) => {
+  deleteStatus = status
   await openFirstRow()
   await eventually(() => {
     if (!document.body.querySelector('[data-design-part="detail-panel"]')) throw new Error('panel not open')

@@ -78,6 +78,9 @@ function errorCard(): HTMLElement | null {
   return host.querySelector('[data-list-state="error"]')
 }
 
+beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z')) })
+afterEach(() => { vi.useRealTimers() })
+
 describe('M029 流入経路一覧の取得失敗は原因どおりに言い分ける', () => {
   beforeEach(() => {
     entryRoutesStatus = 500
@@ -138,6 +141,11 @@ describe('M029 流入経路一覧の取得失敗は原因どおりに言い分�
     expect(card).not.toBeNull()
     expect(card!.textContent).toContain('流入リンクを読み込めませんでした')
     expect(card!.querySelector('button')).not.toBeNull()
+    const routeCard = [...host.querySelectorAll('[data-design-version]')].find(element => element.querySelector('[data-kpi-label]')?.textContent?.trim() === '経路')
+    expect(routeCard).toBeTruthy()
+    expect(routeCard!.textContent).toContain('—')
+    expect(routeCard!.textContent).toContain('読み込めませんでした')
+    expect(routeCard!.textContent).not.toContain('0件')
   })
 })
 

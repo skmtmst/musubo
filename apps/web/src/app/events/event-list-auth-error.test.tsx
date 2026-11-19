@@ -18,6 +18,7 @@ import type { EventListItem } from '@/lib/api'
 
 const listEvents = vi.hoisted(() => vi.fn())
 const staffMe = vi.hoisted(() => vi.fn())
+const selected = vi.hoisted(() => ({ account: 'acc-1' }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -46,7 +47,7 @@ vi.mock('next/link', () => ({
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'acc-1' }),
+  useAccount: () => ({ selectedAccountId: selected.account }),
 }))
 
 vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
@@ -135,6 +136,9 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z'))
+  selected.account = 'acc-1'
   history.replaceState({}, '', '/events')
   window.dispatchEvent(new PopStateEvent('popstate'))
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -150,6 +154,7 @@ afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
   document.body.innerHTML = ''
+  vi.useRealTimers()
 })
 
 async function flush() {
@@ -173,11 +178,39 @@ function retryButton(): HTMLElement | null {
 }
 
 describe('R601 イベント一覧の権限不足と通信失敗の言い分け', () => {
+  it('店を切り替えた後に前の一覧が届いても新しい一覧を保つ', async () => {
+    let resolveOld!: (value: unknown) => void
+    listEvents.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+    listEvents.mockResolvedValue({ ...listPayload(), items: [item({ id: 'new', name: '新しい店舗' })] })
+    await renderPage()
+    selected.account = 'acc-2'
+    await renderPage()
+    expect(bodyText()).toContain('新しい店舗')
+    await act(async () => { resolveOld({ ...listPayload(), items: [item({ id: 'old', name: '前の店舗' })] }) })
+    await flush()
+    expect(bodyText()).toContain('新しい店舗')
+    expect(bodyText()).not.toContain('前の店舗')
+  })
+
+  it('店を切り替えた後に前の一覧が失敗しても新しい一覧を保つ', async () => {
+    let rejectOld!: (error: Error) => void
+    listEvents.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectOld = reject }))
+    listEvents.mockResolvedValue({ ...listPayload(), items: [item({ id: 'new', name: '新しい店舗' })] })
+    await renderPage()
+    selected.account = 'acc-2'
+    await renderPage()
+    expect(bodyText()).toContain('新しい店舗')
+    await act(async () => { rejectOld(new Error('old account failed')) })
+    await flush()
+    expect(bodyText()).toContain('新しい店舗')
+    expect(bodyText()).not.toContain('登録したイベントは消えていません')
+  })
+
   it('403 は権限不足の1枚で、管理者への依頼を出し、権限を確認後に読み直せる', async () => {
     listEvents.mockRejectedValue(new ApiError(403, 'forbidden'))
     await renderPage()
     expect(bodyText()).toContain('イベントを見る権限がありません')
-    expect(bodyText()).toContain('管理者')
+    expect(bodyText()).toContain('管理者に権限を確かめてください。')
     expect(retryButton(), '権限を確認した後に読み直せる').toBeTruthy()
   })
 
