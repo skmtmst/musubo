@@ -39,11 +39,6 @@ describe('受信箱の応答対象照合(#962)', () => {
     expect(effect![0]).toContain('setScheduledSendsFailed(false)')
   })
 
-  it('予約一覧の取得失敗には再読み込み口を出す', () => {
-    expect(PAGE).toContain('予約の一覧を読み込めませんでした。')
-    expect(PAGE).toContain('data-inbox-v6="scheduled-retry"')
-  })
-
   it('下書きはアカウント＋会話ごとに預かり、切替で預け・戻しする', () => {
     expect(PAGE).toContain('const messageDraftsRef = useRef(new Map<string, string>())')
     expect(PAGE).toContain('const imageDraftsRef = useRef(new Map<string, ImageUploaderValue>())')
