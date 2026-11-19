@@ -54,6 +54,10 @@ async function measure(page, heading) {
   await expect(desktop).toBeVisible()
   const button = desktop.locator('nav button', { hasText: heading })
   await expect(button).toBeVisible()
+  // 見出しが先に描画され、権限やアカウントの読み込み後にリンクが加わる。
+  // 測る対象がそろうまで待ち、存在しない場合は計測を飛ばさず試験を失敗させる。
+  await expect(desktop.locator('nav a').first()).toHaveCount(1)
+  await expect(desktop.locator('a').filter({ hasText: /^(設定|統括の設定)$/ }).first()).toHaveCount(1)
   return page.evaluate((name) => {
     const desk = document.querySelector('aside:not(#mobile-menu)')
     const btn = [...desk.querySelectorAll('nav button')].find((b) => b.textContent?.trim() === name)
