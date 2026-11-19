@@ -5,7 +5,7 @@ import type { Env } from '../../worker-env.js';
 import type {SeriesInput,BookingRecurrence} from '@line-crm/shared';
 import {getBookingAdminSettings,resolveBookingPaymentConfig} from '@line-crm/db';
 import {GapError,gapKey} from '../../services/gap-common.js';
-import {getAvailability,getAccountTimeZone,tzDateStr} from '../../services/availability.js';
+import {getAvailability,getAccountTimeZone,tzDateStr,addDays} from '../../services/availability.js';
 import {assignBookingStaff} from './booking-assignment.js';
 import {bookingAddons,type BookingAddon} from './booking-addons.js';
 import {menuAudience} from './booking-audience.js';
@@ -111,7 +111,7 @@ export async function createBulkBooking(c:Context<Env>,a:string,f:string,b:Recor
   const window=await db.prepare(`SELECT MIN(COALESCE(m.booking_window_days,s.booking_window_days)) days
    FROM menus m LEFT JOIN booking_settings s ON s.line_account_id=m.line_account_id
    WHERE m.line_account_id=? AND m.id IN (SELECT value FROM json_each(?))`).bind(a,JSON.stringify(members.map(m=>m.menuId))).first<{days:number|null}>();
-  if(window?.days!=null){const day=new Date(`${tzDateStr(tz,new Date())}T00:00:00Z`);day.setUTCDate(day.getUTCDate()+window.days);to=[to,day.toISOString().slice(0,10)].sort()[0];}
+  if(window?.days!=null){to=[to,addDays(tzDateStr(tz,new Date()),window.days)].sort()[0];}
   const slots=to<from?[]:(await previewParty(db,a,members,b.startMode??'parallel',from,to,c.env,{nearestTo:requested,maxTime:end,limit:3})).slots;
   const alternatives=slots.map(slot=>slot.startsAt).filter(time=>Date.parse(time)!==requested&&Date.parse(time)<=end)
    .sort((x,y)=>Math.abs(Date.parse(x)-requested)-Math.abs(Date.parse(y)-requested)||Date.parse(x)-Date.parse(y)).slice(0,3);
