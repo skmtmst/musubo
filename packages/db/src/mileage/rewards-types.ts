@@ -22,7 +22,8 @@ export type MileageRedemptionStatus =
   | 'delivering'
   | 'succeeded'
   | 'delivery_failed'
-  | 'refunded';
+  | 'refunded'
+  | 'cancelled';
 
 export interface MileageRewardVersion {
   id: string;

@@ -95,7 +95,7 @@ export async function reserveMileageRewardRedemption(
      */
     const count = await db.prepare(
       `SELECT COUNT(*) AS count FROM mileage_redemptions
-        WHERE reward_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'`,
+        WHERE reward_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded' AND (status != 'reserved' OR anonymized_at IS NULL)`,
     ).bind(reward.id, ...(limitKeys.length ? sqlIdSet(limitKeys).binds : [])).first<{ count: number }>();
     if ((count?.count ?? 0) >= version.perFriendLimit) {
       throw new MileageRewardError('friend_limit_reached', 'この使い道は交換上限に達しています', 409);
@@ -108,7 +108,7 @@ export async function reserveMileageRewardRedemption(
   if (version.stockLimit != null) {
     const count = await db.prepare(
       `SELECT COUNT(*) AS count FROM mileage_redemptions
-        WHERE reward_version_id = ? AND status != 'refunded'`,
+        WHERE reward_version_id = ? AND status != 'refunded' AND (status != 'reserved' OR anonymized_at IS NULL)`,
     ).bind(version.id).first<{ count: number }>();
     if ((count?.count ?? 0) >= version.stockLimit) {
       throw new MileageRewardError('out_of_stock', 'この使い道は在庫切れです', 409);
@@ -188,13 +188,13 @@ export async function reserveMileageRewardRedemption(
             ))
             AND (? IS NULL OR (
               SELECT COUNT(*) FROM mileage_redemptions stock
-               WHERE stock.reward_version_id = ? AND stock.status != 'refunded'
+               WHERE stock.reward_version_id = ? AND stock.status != 'refunded' AND (stock.status != 'reserved' OR stock.anonymized_at IS NULL)
             ) < ?)
             AND (? IS NULL OR (
               SELECT COUNT(*) FROM mileage_redemptions person_limit
                WHERE person_limit.reward_id = ?
                  AND person_limit.beneficiary_key IN (${limitPlaceholders})
-                 AND person_limit.status != 'refunded'
+                 AND person_limit.status != 'refunded' AND (person_limit.status != 'reserved' OR person_limit.anonymized_at IS NULL)
             ) < ?)`,
       ).bind(
         redemptionId, reward.lineAccountId, reward.programId, beneficiaryKey,
@@ -278,7 +278,7 @@ export async function reserveMileageRewardRedemption(
     if (version.stockLimit != null) {
       const currentStock = await db.prepare(
         `SELECT COUNT(*) AS count FROM mileage_redemptions
-          WHERE reward_version_id = ? AND status != 'refunded'`,
+          WHERE reward_version_id = ? AND status != 'refunded' AND (status != 'reserved' OR anonymized_at IS NULL)`,
       ).bind(version.id).first<{ count: number }>();
       if ((currentStock?.count ?? 0) >= version.stockLimit) {
         throw new MileageRewardError('out_of_stock', 'この使い道は在庫切れです', 409);
@@ -287,7 +287,7 @@ export async function reserveMileageRewardRedemption(
     if (version.perFriendLimit != null) {
       const currentCount = await db.prepare(
         `SELECT COUNT(*) AS count FROM mileage_redemptions
-          WHERE reward_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'`,
+          WHERE reward_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded' AND (status != 'reserved' OR anonymized_at IS NULL)`,
       ).bind(reward.id, ...(limitKeys.length ? sqlIdSet(limitKeys).binds : [])).first<{ count: number }>();
       if ((currentCount?.count ?? 0) >= version.perFriendLimit) {
         throw new MileageRewardError('friend_limit_reached', 'この使い道は交換上限に達しています', 409);
@@ -314,7 +314,7 @@ export async function reserveMileageRewardRedemption(
   if (version.stockLimit != null) {
     const currentStock = await db.prepare(
       `SELECT COUNT(*) AS count FROM mileage_redemptions
-        WHERE reward_version_id = ? AND status != 'refunded'`,
+        WHERE reward_version_id = ? AND status != 'refunded' AND (status != 'reserved' OR anonymized_at IS NULL)`,
     ).bind(version.id).first<{ count: number }>();
     if ((currentStock?.count ?? 0) >= version.stockLimit) {
       throw new MileageRewardError('out_of_stock', 'この使い道は在庫切れです', 409);
@@ -323,7 +323,7 @@ export async function reserveMileageRewardRedemption(
   if (version.perFriendLimit != null) {
     const currentCount = await db.prepare(
       `SELECT COUNT(*) AS count FROM mileage_redemptions
-        WHERE reward_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'`,
+        WHERE reward_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded' AND (status != 'reserved' OR anonymized_at IS NULL)`,
     ).bind(reward.id, ...(limitKeys.length ? sqlIdSet(limitKeys).binds : [])).first<{ count: number }>();
     if ((currentCount?.count ?? 0) >= version.perFriendLimit) {
       throw new MileageRewardError('friend_limit_reached', 'この使い道は交換上限に達しています', 409);

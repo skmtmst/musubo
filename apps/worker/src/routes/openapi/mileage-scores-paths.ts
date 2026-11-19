@@ -66,7 +66,7 @@ export const mileageScoresPaths = {
       tags: ['Mileage'], summary: '届かなかった特典交換の一覧を取得（既定は要対応：失敗中＋配送中）',
       parameters: [
         { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
-        { name: 'status', in: 'query', schema: { type: 'string', enum: ['all', 'needs_attention', 'reserved', 'delivering', 'succeeded', 'delivery_failed', 'refunded'] } },
+        { name: 'status', in: 'query', schema: { type: 'string', enum: ['all', 'needs_attention', 'reserved', 'delivering', 'succeeded', 'delivery_failed', 'refunded', 'cancelled'] } },
         { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
         { name: 'offset', in: 'query', schema: { type: 'integer', minimum: 0 } },
       ],

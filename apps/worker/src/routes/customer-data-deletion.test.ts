@@ -1,10 +1,11 @@
-import { createMileageRewardDraft, publishMileageReward, reserveMileageRewardRedemption } from '@line-crm/db';
+import { createMileageRewardDraft, getMileageRedemption, listMileageRedemptions, publishMileageReward, reserveMileageRewardRedemption } from '@line-crm/db';
 import { cancelHandgift, deliverHandgift } from '../features/mileage/index.js';
 import { seedExistingRestaurantFollowup } from '../test-utils/restaurant-followup-fixture.js';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { forms } from './forms.js';
+import { FEATURE_IMPACT_COVERAGE } from './feature-settings-definition-collect-feature-impact.js';
 import { friends } from './friends.js';
 import { formDocuments } from './form-documents.js';
 import { deleteCustomerData, deletionJournalId, friendDeletionCondition } from '../services/customer-data-deletion.js';
@@ -73,11 +74,31 @@ describe('private data deletion', () => {
     const row = sqlite.raw.prepare('SELECT * FROM mileage_redemptions WHERE id=?').get(redemption.id) as Record<string, unknown>;
     expect(row).toMatchObject({ beneficiary_friend_id: null, beneficiary_user_id: null, status: state });
     expect(JSON.stringify(row)).not.toMatch(/friend:u|customer-private|request-private|fingerprint-private/);
-    if (state !== 'reserved') {
+    {
       const gift = sqlite.raw.prepare('SELECT * FROM mileage_handgifts WHERE redemption_id=?').get(redemption.id);
       expect(gift).toBeTruthy(); expect(JSON.stringify(gift)).not.toContain('customer-private');
+      if (state === 'reserved') expect(gift).toMatchObject({ delivered_at: null, cancelled_at: expect.any(String), cancelled_by: 'env-owner', cancellation_reason: '顧客データ削除に伴う取消' });
     }
-    expect(sqlite.raw.prepare('SELECT COUNT(*) AS n FROM mileage_redemptions WHERE reward_id=? AND status != ?').get(reward.id, 'refunded')).toEqual({ n: state === 'refunded' ? 0 : 1 });
+    expect((await getMileageRedemption(sqlite.db, redemption.id))?.status).toBe(state === 'reserved' ? 'cancelled' : state);
+    if (state === 'reserved') {
+      expect((await listMileageRedemptions(sqlite.db, { lineAccountId: 'a', status: 'reserved', limit: 20, offset: 0 })).items).toHaveLength(0);
+      expect((await listMileageRedemptions(sqlite.db, { lineAccountId: 'a', status: 'cancelled', limit: 20, offset: 0 })).items).toHaveLength(1);
+      expect((await listMileageRedemptions(sqlite.db, { lineAccountId: 'a', status: 'needs_attention', limit: 20, offset: 0 })).items).toHaveLength(0);
+      const coverage = FEATURE_IMPACT_COVERAGE.mileage;
+      if (coverage.scope !== 'counted') throw new Error('マイルの影響件数が定義されていません');
+      const source = coverage.sources.find(item => item.targetType === '処理中のマイル交換');
+      expect(source).toBeTruthy();
+      expect(sqlite.raw.prepare(`SELECT COUNT(*) AS n ${source!.fromWhere}`).get('a')).toEqual({ n: 0 });
+      expect(sqlite.raw.prepare("SELECT COUNT(*) AS n FROM mileage_ledger WHERE source='mileage_reward_refund'").get()).toEqual({ n: 0 });
+      sqlite.raw.exec(`INSERT INTO friends(id,line_user_id,line_account_id) VALUES('w','LINE-new','a');
+        INSERT INTO mileage_ledger(id,program_id,beneficiary_friend_id,entry_type,status,amount,reason,source,idempotency_key,occurred_at,created_at) VALUES
+        ('grant-v','default','v','grant','available',100,'付与','test','grant-v-key','now','now'),
+        ('grant-w','default','w','grant','available',100,'付与','test','grant-w-key','now','now')`);
+      const next = await Promise.allSettled(['v', 'w'].map(friendId => reserveMileageRewardRedemption(sqlite.db,
+        { lineAccountId: 'a', friendId, rewardId: reward.id, idempotencyKey: `next-${friendId}`, requestFingerprint: `fp-${friendId}` })));
+      expect(next.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+      expect(next.filter(result => result.status === 'rejected')).toHaveLength(1);
+    }
     expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
     expect(await deliverHandgift(sqlite.db, operation)).toBe(false);
     expect(await cancelHandgift(sqlite.db, { ...operation, expectedStatus: 'reserved', reason: '取消' })).toBe('conflict');

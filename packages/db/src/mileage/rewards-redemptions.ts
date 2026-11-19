@@ -18,7 +18,8 @@ export function mapRedemption(row: RedemptionRow): MileageRewardRedemption {
     rewardKindSnapshot: row.reward_kind_snapshot,
     idempotencyKey: row.idempotency_key,
     requestFingerprint: row.request_fingerprint,
-    status: row.status,
+    // 匿名化された手渡し待ちは、削除に伴い返却せず取消済み。DBの既存CHECKは変えない。
+    status: row.status === 'reserved' && row.anonymized_at ? 'cancelled' : row.status,
     attemptCount: row.attempt_count,
     nextRetryAt: row.next_retry_at,
     failureCode: row.failure_code,
@@ -82,9 +83,11 @@ export async function listMileageRedemptions(
              WHERE c.redemption_id = r.id AND c.status = 'reserved'
           )
         ))))`
+      : status === 'cancelled' ? "AND r.status = 'reserved' AND r.anonymized_at IS NOT NULL"
+      : status === 'reserved' ? "AND r.status = ? AND r.anonymized_at IS NULL"
       : 'AND r.status = ?';
   const binds: unknown[] = [input.lineAccountId];
-  if (status !== 'all' && status !== 'needs_attention') binds.push(status);
+  if (status !== 'all' && status !== 'needs_attention' && status !== 'cancelled') binds.push(status);
   const totalRow = await db.prepare(
     `SELECT COUNT(*) AS count FROM mileage_redemptions r
       WHERE r.line_account_id = ? ${statusClause}`,

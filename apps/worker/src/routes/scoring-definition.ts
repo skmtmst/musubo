@@ -99,7 +99,7 @@ export async function handleMileageRewardDraftUpdate(c: Context<Env>) {
 }
 
 export const MILEAGE_REDEMPTION_LIST_STATUSES = new Set<string>([
-  'all', 'needs_attention', 'reserved', 'delivering', 'succeeded', 'delivery_failed', 'refunded',
+  'all', 'needs_attention', 'reserved', 'delivering', 'succeeded', 'delivery_failed', 'refunded', 'cancelled',
 ]);
 
 export const MILEAGE_ENTRY_TYPES = new Set<MileageEntryType>([

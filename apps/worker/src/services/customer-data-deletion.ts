@@ -257,6 +257,21 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
     const preservedMileage = new Set(['mileage_redemptions', 'mileage_handgifts', 'mileage_redemption_attempts', 'mileage_redemption_step_deliveries', 'mileage_reward_codes']);
     if (target.kind === 'friend_data') {
       const ids = (table: string) => JSON.stringify((byTable.get(table)?.rows ?? []).map(row => row._delete_rowid));
+      const pendingIds = ids('mileage_redemptions');
+      const cancelledAt = new Date().toISOString();
+      // 既に渡した・取消済みの記録を手渡し待ちとして扱わない。
+      statements.push(guard(`NOT EXISTS (SELECT 1 FROM mileage_redemptions r JOIN mileage_handgift_rewards h ON h.reward_id = r.reward_id
+        JOIN mileage_handgifts g ON g.redemption_id = r.id WHERE r.rowid IN (SELECT value FROM json_each(?))
+        AND r.status = 'reserved' AND (g.delivered_at IS NOT NULL OR g.cancelled_at IS NOT NULL))`, [pendingIds]));
+      // 未受渡しの景品だけを取消。元のマイル台帳は削除し、返却の行は作らない。
+      statements.push(db.prepare(`INSERT INTO mileage_handgifts(redemption_id,reward_id,cancelled_at,cancelled_by,cancellation_reason)
+        SELECT r.id,r.reward_id,?,?, '顧客データ削除に伴う取消' FROM mileage_redemptions r
+        JOIN mileage_handgift_rewards h ON h.reward_id = r.reward_id
+        WHERE r.rowid IN (SELECT value FROM json_each(?)) AND r.status = 'reserved' AND r.anonymized_at IS NULL
+        ON CONFLICT(redemption_id) DO UPDATE SET cancelled_at=excluded.cancelled_at,
+          cancelled_by=excluded.cancelled_by,cancellation_reason=excluded.cancellation_reason
+        WHERE mileage_handgifts.delivered_at IS NULL AND mileage_handgifts.cancelled_at IS NULL`)
+        .bind(cancelledAt, actorId, pendingIds));
       // 取消理由は自由入力なので、削除の認可中に定型文へ置き換える。
       statements.push(db.prepare(`UPDATE mileage_handgifts SET cancellation_reason = '削除済みのお客さまの取消'
         WHERE rowid IN (SELECT value FROM json_each(?)) AND cancelled_at IS NOT NULL`).bind(ids('mileage_handgifts')));
