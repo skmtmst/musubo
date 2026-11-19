@@ -1,4 +1,6 @@
 'use client'
+
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import SegmentedControl from '@/components/shared/segmented'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import StatusBadge from '@/components/shared/status-badge'
@@ -258,10 +260,7 @@ export default function CommonActionsV8() {
     ...folders.map((folder) => ({ kind: 'folder' as const, id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
     { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
-  /* 閲覧のみには押せない「共通アクションを作る」を置かない（場所だけ空ける）。 */
-  const createButton = canEdit
-    ? <Button variant="primary" href="/common-actions/new" className="v8-folder-create w-full"><Plus size={16} aria-hidden="true" />共通アクションを作る</Button>
-    : <span className={styles.createSpace} aria-hidden="true" />
+  const createButton = <PermissionGatedButton allowed={canEdit} variant="primary" href="/common-actions/new" className="v8-folder-create w-full"><Plus size={16} aria-hidden="true" />共通アクションを作る</PermissionGatedButton>
 
   /* ===== 道具の段 ===== */
   const filterChips = (
@@ -428,7 +427,7 @@ export default function CommonActionsV8() {
           placeholder="例： 購入・予約"
         />
       </>}
-      folderNav={foldersError?undefined:{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: canEdit ? createButton : undefined }}
+      folderNav={foldersError?undefined:{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>
