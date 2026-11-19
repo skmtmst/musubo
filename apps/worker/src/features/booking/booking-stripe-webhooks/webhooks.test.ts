@@ -242,3 +242,17 @@ describe('キャンセル料のカード登録通知', () => {
     expect(f.raw.prepare('SELECT n FROM card_effects').get()).toEqual({n:1});
   });
 });
+
+
+it('カード登録の通知が関連付けより先に届いても、関連の保存後に保留から反映する', async () => {
+  const { replayCardSetupReceipts } = await import('./card-setup.js');
+  f.raw.exec("INSERT INTO booking_payment_methods(id,friend_id,line_account_id,setup_id,idempotency_key,created_at) VALUES('request1','f','a','seti_card','request-key',datetime('now'))");
+  const e = {id:'evt_card_early',account:'acct_original',api_version:'2024-06-20',created:Math.floor(Date.now()/1000),type:'setup_intent.succeeded',livemode:false,
+    data:{object:{id:'seti_card',object:'setup_intent',livemode:false,status:'succeeded',customer:'cus_person',payment_method:'pm_card',metadata:{booking_payment_method_id:'request1'}}}};
+  expect((await send(e)).status).toBe(202);
+  expect(f.raw.prepare('SELECT status FROM booking_payment_methods WHERE id=?').get('request1')).toEqual({status:'pending'});
+  await bind({tenantId:'t',accountId:'a',friendId:'f',purpose:'payment_method',targetId:'request1',connectAccount:'acct_original',objectId:'seti_card',objectKind:'setup_intent',amount:null,currency:null,customerId:'cus_person'});
+  await replayCardSetupReceipts(f.db,'acct_original','seti_card','request1');
+  expect(f.raw.prepare('SELECT status,stripe_customer_id,stripe_payment_method_id FROM booking_payment_methods WHERE id=?').get('request1')).toEqual({status:'ready',stripe_customer_id:'cus_person',stripe_payment_method_id:'pm_card'});
+  expect(rows()[0].status).toBe('succeeded');
+});

@@ -195,8 +195,8 @@ export const api = {
     };
   },
   /** カードの登録（gap1・試験モード）。登録済みなら status=ready、まだなら url の登録画面へ。 */
-  cancellationSetup: (menuId: string, idempotencyKey: string) =>
-    post<{ success: true; data: { setupIntentId: string; url: string; status: string; testMode: boolean } }>('/api/liff/booking/setup-intent', { menuId, policyAccepted: true }, { 'Idempotency-Key': idempotencyKey }).then((res) => res.data),
+  cancellationSetup: (input: {menuId:string;staffId:string;startsAt:string;partySize:number}, idempotencyKey: string) =>
+    post<{ success: true; data: { setupIntentId: string; url: string; status: string; testMode: boolean } }>('/api/liff/booking/setup-intent', { ...input, policyAccepted: true }, { 'Idempotency-Key': idempotencyKey }).then((res) => res.data),
   /** お支払いありの予約だけ payment が付く。なしの店では今までどおり付かない。 */
   startBookingPayment: (bookingId: string) =>
     post<{ payment: BookingPayment | null; checkoutUrl: string | null }>(

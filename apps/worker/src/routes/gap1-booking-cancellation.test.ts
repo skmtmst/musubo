@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 import {beforeEach,afterEach,expect,test,vi} from 'vitest';
 import {bookingCancellation} from './booking-cancellation.js';
 import {gapFixture,gapApp,gapCall,gapOwner,seedGapBooking} from '../test-utils/gap1.js';
@@ -60,8 +61,12 @@ test('B1-16 B1-18 B1-19: 理由つき免除・全額模擬返金・スタッフ�
  expect((await gapCall(app(),refund,'POST',body)).status).toBe(200);expect((await gapCall(app(),refund,'POST',body)).status).toBe(409);
 });
 test('B1-08 B1-11: 本人のカード登録を1件にし、署名なしの完了は拒否',async()=>{
- connect();await save();const key=crypto.randomUUID(),url='/api/liff/booking/setup-intent?liffId=liff-a',body={menuId:'menu',policyAccepted:true};
- const request=()=>app().request(url,{method:'POST',headers:{Authorization:'Bearer token','Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(body)});
+ connect();await save();
+ if (!d.raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='booking_card_checkout_requests'").get()) d.raw.exec(readFileSync('../../packages/db/migrations/774_booking_card_checkout_requests.sql','utf8'));
+ d.raw.exec("UPDATE booking_payment_connections SET provider_account_id='acct_test123'; UPDATE line_accounts SET liff_id='1234567890-abcdef' WHERE id='a'");
+ vi.stubGlobal('fetch',vi.fn(async(input:unknown)=>{if(String(input).includes('oauth2/v2.1/verify'))return Response.json({sub:'Uf'});if(String(input).endsWith('/customers'))return Response.json({id:'cus_card',livemode:false});if(String(input).endsWith('/checkout/sessions'))return Response.json({id:'cs_test_abc',url:'https://checkout.stripe.com/c/pay/cs_test_abc',livemode:false});throw new Error('unexpected_external_request');}));
+ const key=crypto.randomUUID(),url='/api/liff/booking/setup-intent?liffId=1234567890-abcdef',body={menuId:'menu',staffId:'bs',startsAt:'2026-12-01T05:00:00Z',partySize:1,policyAccepted:true};
+ const request=()=>gapApp(d,[bookingCancellation],gapOwner,false,{BOOKING_STRIPE_TEST_SECRET_KEY:'sk_test_example'}).request(url,{method:'POST',headers:{Authorization:'Bearer token','Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(body)});
  expect((await request()).status).toBe(201);expect((await request()).status).toBe(201);expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_payment_methods').get()).toEqual({n:1});
  expect((await gapCall(app(),'/api/liff/booking/setup-webhook','POST',{livemode:false})).status).toBe(401);
  expect(d.raw.prepare('SELECT status FROM booking_payment_methods').get()).toEqual({status:'pending'});

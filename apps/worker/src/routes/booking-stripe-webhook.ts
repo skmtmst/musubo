@@ -2,7 +2,7 @@ import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { isStripeTestEvent, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
-import { applyBookingStripeReceipt, BookingStripeError, normalizeBookingStripeEvent, storeBookingStripeReceipt, stripeReceiptDigest, supportedBookingStripeType } from '../features/booking/booking-stripe-webhooks/index.js';
+import { applyCardCheckoutReceipt, applyCardSetupReceipt, BookingStripeError, normalizeBookingStripeEvent, storeBookingStripeReceipt, stripeReceiptDigest, supportedBookingStripeType } from '../features/booking/booking-stripe-webhooks/index.js';
 export const bookingStripeWebhook = new Hono<Env>();
 /** Connect試験イベントの唯一の実受信口。署名鍵は模擬やSaaSの鍵へ戻さない。 */
 bookingStripeWebhook.post('/api/booking/stripe-test/webhook',async c => {
@@ -22,25 +22,17 @@ bookingStripeWebhook.post('/api/booking/stripe-test/webhook',async c => {
   try {
     const event = normalizeBookingStripeEvent(value);
     const result = await storeBookingStripeReceipt(c.env.DB,event,await stripeReceiptDigest(raw));
+    if (result.status !== 'review_required' && event.type === 'checkout.session.completed') {
+      const applied = await applyCardCheckoutReceipt(c.env.DB,event.account,event.id);
+      if (applied === 'applied' || applied === 'duplicate') return c.json({success:true,data:{status:'applied'}},200);
+      if (applied === 'review_required') return c.json({success:true,data:{status:'review_required'}},202);
+    }
     // metadata は署名済みでも、それだけでは信用せず、保存済み binding と登録待ちの行に照合する。
     const metadata = (value as {data?:{object?:{metadata?:Record<string,unknown>}}}).data?.object?.metadata;
     const requestId = metadata?.booking_payment_method_id;
     if (result.status !== 'review_required' && event.type === 'setup_intent.succeeded'
       && typeof requestId === 'string' && requestId.length > 0 && requestId.length <= 255) {
-      const applied = await applyBookingStripeReceipt(c.env.DB,event.account,event.id,async ({event: verified,binding}) => {
-        if (binding.purpose !== 'payment_method' || binding.targetId !== requestId || verified.object.status !== 'succeeded'
-          || !verified.object.customer || !verified.object.paymentMethod) throw new BookingStripeError('stripe_binding_mismatch');
-        return [c.env.DB.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM booking_payment_methods p
-          JOIN booking_payment_connections c ON c.line_account_id=p.line_account_id
-          WHERE p.id=? AND p.line_account_id=? AND p.friend_id=? AND p.setup_id=? AND p.test_mode=1
-            AND c.provider_account_id=? AND c.test_mode=1 AND c.disconnected_at IS NULL
-            AND (p.status='pending' OR (p.status='ready' AND p.stripe_customer_id=? AND p.stripe_payment_method_id=?)))
-          THEN 'true' ELSE 'stripe_payment_method_mismatch' END)`)
-          .bind(requestId,binding.accountId,binding.friendId,verified.object.id,event.account,verified.object.customer,verified.object.paymentMethod),
-          c.env.DB.prepare(`UPDATE booking_payment_methods SET status='ready',stripe_customer_id=?,stripe_payment_method_id=?
-            WHERE id=? AND line_account_id=? AND friend_id=? AND setup_id=? AND status='pending' AND test_mode=1`)
-            .bind(verified.object.customer,verified.object.paymentMethod,requestId,binding.accountId,binding.friendId,verified.object.id)];
-      });
+      const applied = await applyCardSetupReceipt(c.env.DB,event.account,event.id,requestId);
       if (applied === 'applied' || applied === 'duplicate') return c.json({success:true,data:{status:'applied'}},200);
       if (applied === 'review_required') return c.json({success:true,data:{status:'review_required'}},202);
     }

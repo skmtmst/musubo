@@ -678,7 +678,8 @@
     "763_folder_membership_revisions.sql",
     "764_broadcast_ab_live.sql",
     "765_ec_auto_line_cap.sql",
-    "769_musubo_contracted_linked_slots.sql"
+    "769_musubo_contracted_linked_slots.sql",
+    "774_booking_card_checkout_requests.sql"
   ],
-  "migrationCount": 679
+  "migrationCount": 680
 }

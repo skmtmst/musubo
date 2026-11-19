@@ -169,6 +169,7 @@
   "webinar_viewers": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "rt_reservation_confirmations": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "scenario_source_jobs": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
+  "booking_card_checkout_requests": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]},{"parent":"booking_payment_methods","columns":[{"column":"id","parentColumn":"id"}]}]},
   "booking_payment_methods": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "booking_calendar_switch_jobs": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"bookings","columns":[{"column":"booking_id","parentColumn":"id"}]}]},
   "ai_request_claims": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"chats","columns":[{"column":"chat_id","parentColumn":"id"}]}]},

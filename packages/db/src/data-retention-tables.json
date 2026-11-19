@@ -4823,6 +4823,13 @@
       "column": "line_account_id"
     }
   },
+  "booking_card_checkout_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "booking_payment_methods": {
     "category": "purge",
     "scope": {

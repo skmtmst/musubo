@@ -3,7 +3,7 @@ import { liffBookingJson } from './liff-booking-response.js';
 import {Hono,type Context} from 'hono';
 import type { Env } from '../worker-env.js';
 import {gapAccount,gapBody,gapKey,gapVersion,gapWrite,GapError} from '../services/gap-common.js';
-import {cancellationPolicy,validCancellationPolicy,requireCancellationTestConnection,bookingCancellationQuote,bookingCancellationReview,cancellationSetupUrl} from '../features/booking/booking-cancellation/index.js';
+import {startCardCheckout,cancellationPolicy,validCancellationPolicy,requireCancellationTestConnection,bookingCancellationQuote,bookingCancellationReview} from '../features/booking/booking-cancellation/index.js';
 import {resolveAccountIdFromLiff,resolveFriendId,verifyCallerLineUserId} from './booking.js';
 import {readBodyWithinLimit,isStripeTestEvent,verifyStripeSignature} from '../services/stripe-signature.js';
 export const bookingCancellation=new Hono<Env>();
@@ -37,11 +37,8 @@ bookingCancellation.post('/api/liff/booking/setup-intent',async (c:Context<Env>)
  const {account,friend}=await liff(c),key=gapKey(c),b=await gapBody(c);await requireCancellationTestConnection(c.env.DB,account);
  if(typeof b.menuId!=='string'||!await c.env.DB.prepare('SELECT id FROM menus WHERE id=? AND line_account_id=? AND is_active=1 AND deleted_at IS NULL').bind(b.menuId,account).first())throw new GapError('invalid_menu');
  if(b.policyAccepted!==true)throw new GapError('policy_acceptance_required');
- const id=crypto.randomUUID();
- await c.env.DB.prepare(`INSERT INTO booking_payment_methods(id,friend_id,line_account_id,setup_id,idempotency_key,created_at)
- VALUES(?,?,?,?,?,?) ON CONFLICT(line_account_id,friend_id,idempotency_key) DO NOTHING`).bind(id,friend,account,`seti_test_${id}`,key,new Date().toISOString()).run();
- const row=(await c.env.DB.prepare('SELECT setup_id,status FROM booking_payment_methods WHERE line_account_id=? AND friend_id=? AND idempotency_key=?').bind(account,friend,key).first<{setup_id:string;status:string}>())!;
- return liffBookingJson(c, {success:true,data:{setupIntentId:row.setup_id,url:cancellationSetupUrl(row.setup_id),status:row.status,testMode:true}},201);
+ const data=await startCardCheckout(c.env,account,friend,key,b);
+ return liffBookingJson(c,{success:true,data},201);
 });
 // 署名を検証した試験イベントだけが登録済みに進められる。クライアントの自己申告は受けない。
 bookingCancellation.post('/api/liff/booking/setup-webhook',async (c:Context<Env>):Promise<Response>=>{

@@ -1,3 +1,4 @@
+import { clearCardSetupResume, saveCardSetupResume, type CardSetupResume } from '../lib/card-setup-resume.js';
 import { useCustomerWords, useCustomerStyle } from './customer-style-scope.js';
 import PaymentPreparingNote from './payment-preparing-note.js';
 import { useEffect,useState } from 'react';
@@ -42,7 +43,11 @@ export default function Confirm({
   onBack,
   onRegisterBack,
   onSubmitted,
+  cardResume,
+  cardSetupReturned = false,
 }: {
+  cardResume?: CardSetupResume | null;
+  cardSetupReturned?: boolean;
   menu: MenuItem;
   staff: StaffItem;
   slot: SlotPick;
@@ -69,18 +74,19 @@ export default function Confirm({
 }) {
   const words = useCustomerWords();
   const style = useCustomerStyle();
-  const [chosenMode, setChosenMode] = useState<'online' | 'in_person' | null>(null);
+  const [chosenMode, setChosenMode] = useState<'online' | 'in_person' | null>(cardResume?.meetingMode ?? null);
   const meetingMode = menu.meeting_mode === 'customer_choice' ? chosenMode
     : menu.meeting_mode === 'online' || menu.meeting_mode === 'in_person' ? menu.meeting_mode : null;
   const missingMeetingMode = (style === 'consult' || menu.meeting_mode === 'customer_choice') && !meetingMode;
   // 414 幅の板（）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
   const deadline = menu.cancel_deadline_hours_before == null ? cancelDeadlineMinutesBefore : menu.cancel_deadline_hours_before * 60;
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState(cardResume?.note ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [idemKey] = useState(() => crypto.randomUUID());
-  const [setupKey] = useState(() => crypto.randomUUID());
+  const [idemKey, setIdemKey] = useState(() => cardResume?.bookingKey ?? crypto.randomUUID());
+  const [setupKey, setSetupKey] = useState(() => cardResume?.setupKey ?? crypto.randomUUID());
+  const [returned, setReturned] = useState(cardSetupReturned);
   /* 見積もりを読めたときだけ予約を送る。失敗を「決まりなし」に読み替えない。 */
   const [policy, setPolicy] = useState<BookingCancellationPreview | null>(null);
   const [policyState, setPolicyState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -165,9 +171,11 @@ export default function Confirm({
       if (policy) {
         consent = { policyAccepted: true, policyVersion: policy.version };
         if (policy.cardRequired !== false) {
-          const setup = await api.cancellationSetup(menu.id, setupKey);
+          const setup = await api.cancellationSetup({menuId:menu.id,staffId:staff.id,startsAt,partySize:party?.size ?? 1}, setupKey);
           if (!request.isCurrent(generation)) return;
           if (setup.status !== 'ready') {
+            if (returned) { setError('カードの登録を確認しています。しばらくしてからもう一度お試しください。'); return; }
+            saveCardSetupResume({menu,staff,slot,party,note,meetingMode,setupKey,bookingKey:idemKey});
             window.location.assign(setup.url);
             return;
           }
@@ -194,6 +202,7 @@ export default function Confirm({
         setError('予約できませんでした。もう一度お試しください');
         return;
       }
+      clearCardSetupResume();
       onSubmitted({
         bookingId: created.booking_id,
         status: created.status,
@@ -210,6 +219,11 @@ export default function Confirm({
         setPolicyState('loading');
         setPolicyRetry((n) => n + 1);
         setError('キャンセル料の決まりが変わりました。もう一度確かめてから予約してください。');
+      } else if (err.status === 409 && (err.body?.error === 'stripe_checkout_expired' || err.body?.error === 'idempotency_conflict')) {
+        clearCardSetupResume(); setSetupKey(crypto.randomUUID()); setIdemKey(crypto.randomUUID()); setReturned(false);
+        setError('登録の期限が切れたか、予約内容が変わりました。もう一度カードを登録してください。');
+      } else if (err.status === 409 && err.body?.error === 'stripe_result_unknown') {
+        setError('カード登録の結果を確認できません。重複を防ぐため、担当者へご連絡ください。');
       } else if (err.status === 409 && err.body?.error === 'card_not_registered') {
         setError('カードの登録が済んでいません。もう一度押して、カードを登録してください。');
       } else if (err.status === 409 && err.body?.error === 'payment_not_connected') {

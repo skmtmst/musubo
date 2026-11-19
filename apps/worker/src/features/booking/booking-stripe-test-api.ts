@@ -1,3 +1,4 @@
+import { STRIPE_BOOKING_API_VERSION } from './booking-stripe-webhooks/types.js';
 import { encodeForm } from '../../services/stripe-api.js';
 
 /** Stripe Connect の予約決済専用。模擬プロバイダーは別のまま残す。 */
@@ -20,7 +21,7 @@ export async function bookingStripeTestRequest(
     response = await fetchImpl(`https://api.stripe.com/v1/${input.operation}`, {
       method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10000),
       headers: { Authorization: `Bearer ${input.key}`, 'Stripe-Account': input.connectedAccount,
-        'Idempotency-Key': input.idempotencyKey, 'Content-Type': 'application/x-www-form-urlencoded' },
+        'Idempotency-Key': input.idempotencyKey, 'Stripe-Version': STRIPE_BOOKING_API_VERSION, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: encodeForm(input.body),
     });
   } catch { throw new BookingStripeTestError('stripe_result_unknown', true); }

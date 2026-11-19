@@ -5,3 +5,6 @@ export { bookingStripeReceiptId, listPendingBookingStripeReceipts, storeBookingS
 export { purgeUnboundBookingStripeReceipts, markOverdueBookingStripeReceipts } from './retention.js';
 export { BookingStripeError, STRIPE_BOOKING_API_VERSION, supportedBookingStripeType } from './types.js';
 export type { BookingStripeBinding, BookingStripeEvent, StripeBookingPurpose } from './types.js';
+export { applyCardCheckoutReceipt, replayCardCheckoutReceipts } from './card-checkout.js';
+export { applyCardSetupReceipt, replayCardSetupReceipts } from './card-setup.js';
+export { recoverCardSetupReceipts } from './card-recovery.js';
