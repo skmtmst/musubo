@@ -1,3 +1,4 @@
+import { isStagingTestRecipient } from './staging-test-recipient.js';
 import type { Message } from '@line-crm/line-sdk';
 import { NotificationDeliveryBlocked, NotificationDeliveryIncomplete, sendRecordedNotification } from './recorded-notification-send.js';
 
@@ -63,6 +64,7 @@ export async function processStagingRankNotices(env:import('../worker-env.js').E
   const fresh=await candidate(env.DB,input.noticeId,new Date());
   let freshMessages:unknown;try{freshMessages=JSON.parse(fresh?.messages??'');}catch{throw new NotificationDeliveryBlocked('rank_notice_changed');}
   if(!fresh||fresh.status!=='scheduled'||fresh.gate||fresh.line_user_id!==input.to||JSON.stringify(freshMessages)!==JSON.stringify(input.messages)||(!Number.isFinite(Date.parse(fresh.scheduled_at))||Date.parse(fresh.scheduled_at)>Date.now())||((new Date().getUTCHours()+9)%24)<10||((new Date().getUTCHours()+9)%24)>=21)throw new NotificationDeliveryBlocked('rank_notice_changed');
+  if(!await isStagingTestRecipient(env.DB,input.accountId,input.friendId,input.to))throw new NotificationDeliveryBlocked('not_a_test_recipient');
   await pushViaHarnessProxy(env.WORKER_PUBLIC_URL||env.WORKER_URL||'https://worker.invalid',token,input.to,input.messages,input.retryKey,request=>dispatchLineProxyLocally(request,env));
  }});
 }

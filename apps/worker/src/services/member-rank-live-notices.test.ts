@@ -14,6 +14,7 @@ beforeEach(()=>{
  fixture.raw.exec(`INSERT INTO tags(id,name,line_account_id) VALUES('rank-tag','ランク','a');
  INSERT INTO member_rank_programs(account_id,status,updated_at) VALUES('a','active','2026-10-17T00:00:00Z');
  INSERT INTO member_rank_tiers(id,account_id,sort,name,threshold,tag_id) VALUES('tier','a',0,'金',0,'rank-tag');
+ INSERT INTO account_settings(id,line_account_id,key,value) VALUES('rank-test-recipients','a','test_recipients','["f"]');
  INSERT INTO member_rank_notices(id,account_id,friend_id,change_key,kind,tier_id,purpose,messages_json,base_messages_json,scheduled_at)
  VALUES('notice-1','a','f','2026-10-17T00:00:00.000Z:tier','upgrade','tier','marketing','[{"type":"text","text":"ランク変更"},{"type":"text","text":"特典"}]','[{"type":"text","text":"ランク変更"}]','2026-10-17T01:00:00.000Z');`);
 });
@@ -140,4 +141,22 @@ it('機能が停止中なら送信せず、共通台帳に理由を残す',async
  expect(fixture.raw.prepare("SELECT status,failure_code FROM outbound_send_requests WHERE resource_id='rank-notice:notice-1'").get()).toEqual({status:'failed',failure_code:'NOTIFICATION_PRECONDITION_CHANGED'});
  const response=await gapCall(gapApp(fixture,[memberRanks]),'/api/member-ranks/notices?account_id=a');
  const body=await response.json() as {data:{items:Array<{status:string}>}};expect(body.data.items[0].status).toBe('delivery_blocked');
+});
+
+it.each(['missing','empty','malformed','outside'])('検証先が %s なら実送信しない',async condition=>{
+ if(condition==='missing')fixture.raw.exec("DELETE FROM account_settings WHERE id='rank-test-recipients'");
+ else fixture.raw.prepare("UPDATE account_settings SET value=? WHERE id='rank-test-recipients'").run(condition==='empty'?'[]':condition==='malformed'?'invalid':'["outside"]');
+ const {processStagingRankNotices}=await import('./member-rank-live-notices.js');
+ await processStagingRankNotices({DB:fixture.db,DEPLOY_ENV:'staging',RANK_NOTICE_STAGING_DELIVERY_ENABLED:'true'} as never,now);
+ expect(fakeProxy).not.toHaveBeenCalled();
+});
+it('送信直前に検証先から外れたら送らない',async()=>{
+ const original=fixture.db.prepare.bind(fixture.db);
+ const spy=vi.spyOn(fixture.db,'prepare').mockImplementation((sql:string)=>{
+  if(sql.includes('SELECT s.value FROM account_settings s'))fixture.raw.exec("UPDATE account_settings SET value='[]' WHERE id='rank-test-recipients'");
+  return original(sql);
+ });
+ const {processStagingRankNotices}=await import('./member-rank-live-notices.js');
+ await processStagingRankNotices({DB:fixture.db,DEPLOY_ENV:'staging',RANK_NOTICE_STAGING_DELIVERY_ENABLED:'true'} as never,now);
+ expect(fakeProxy).not.toHaveBeenCalled();spy.mockRestore();
 });
