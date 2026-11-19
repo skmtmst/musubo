@@ -3,3 +3,6 @@ export { abAudience, abSettings, abStats, decideAbTests, finishMockRemainder, sp
 export { startAbLive, liveTestAudience, recoverAbLiveStart } from '../broadcast-ab-live.js';
 export {decideAbLiveTests, liveAbStats} from '../broadcast-ab-live-decision.js';
 export {trackAbLiveMessages} from '../broadcast-ab-live-links.js';
+export {createStagingAbTransmit} from '../broadcast-ab-live-transport.js';
+export {chooseAbLive, processAbLiveRemainders} from '../broadcast-ab-live-remainder.js';
+export {reserveAbLiveQuota} from '../broadcast-ab-live-quota.js';

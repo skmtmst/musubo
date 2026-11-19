@@ -472,6 +472,24 @@ export const post__api_broadcasts_id_stop_3 = async (c: Context<Env, "/api/broad
   }
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
 
+  // A/B は試験と残りを独自台帳で扱い、通常配信の sending には変更しない。
+  const abLive=await c.env.DB.prepare('SELECT status FROM broadcast_ab_live_tests WHERE broadcast_id=?').bind(id).first<{status:string}>();
+  if(abLive){
+    if(c.get('impersonation'))return c.json({success:false,error:'代理ログイン中は停止できません'},403);
+    if((existing as unknown as {stopped_at:string|null}).stopped_at)return c.json({success:true,data:serializeBroadcast(existing),alreadyStopped:true});
+    const body=await c.req.json().catch(()=>({} as Record<string,unknown>));
+    const version=parseExpectedVersion((body as Record<string,unknown>).expectedVersion);
+    if(version===null)return inputError(c,{success:false,error:'expectedVersion（画面が読み込んだ版）が必要です。',code:'EXPECTED_VERSION_REQUIRED'},400,['expectedVersion']);
+    const result=await c.env.DB.batch([
+      c.env.DB.prepare("UPDATE broadcasts SET stopped_at=?,stopped_by=?,lock_version=lock_version+1 WHERE id=? AND stopped_at IS NULL AND lock_version=? AND EXISTS(SELECT 1 FROM broadcast_ab_live_tests WHERE broadcast_id=? AND status IN ('live_testing','live_undecided','live_decided'))").bind(new Date().toISOString(),c.get('staff')?.id??null,id,version,id),
+      c.env.DB.prepare("UPDATE broadcast_ab_live_tests SET status='live_stopped',start_result_json=COALESCE(start_result_json,json_object('status','live_stopped','reason','stopped','testMode',json('false'))),version=version+1 WHERE broadcast_id=? AND status IN ('live_testing','live_undecided','live_decided') AND changes()=1").bind(id),
+    ]);
+    if(result[0].meta.changes!==1)return c.json({success:false,error:'配信の状態が変わりました。読み直してください。',code:'VERSION_MISMATCH'},409);
+    await recordBroadcastControlAudit(c,'broadcast.stop',existing,{});
+    const updated=await getBroadcastById(c.env.DB,id);
+    return c.json({success:true,data:updated?serializeBroadcast(updated):null});
+  }
+
   /*
    * 全員配信（target_type='all'）は止められない。
    *

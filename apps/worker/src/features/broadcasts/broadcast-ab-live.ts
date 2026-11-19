@@ -110,7 +110,7 @@ export async function startAbLive(db:D1Database,id:string,expectedVersion:number
 }
 
 /** 案文の共通情報を厳格に解く。人別の差し込みはまとめ送りできないため開始しない。 */
-async function resolveLiveVariantMessages(db:D1Database,accountId:string|null,id:string,messages:Message[],now:Date):Promise<Message[]>{
+export async function resolveLiveVariantMessages(db:D1Database,accountId:string|null,id:string,messages:Message[],now:Date):Promise<Message[]>{
  const out:Message[]=[];
  for(const message of messages){
   if(message.type!=='text'){out.push(message);continue;}

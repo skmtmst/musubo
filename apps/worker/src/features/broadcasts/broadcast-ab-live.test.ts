@@ -14,6 +14,7 @@ beforeEach(()=>{proxy.mockClear();vi.useFakeTimers({toFake:['Date']});vi.setSyst
 afterEach(()=>{d.raw.close();vi.unstubAllGlobals();vi.useRealTimers();});
 async function configure(){const app=gapApp(d,[broadcastAb]);for(const [key,v] of [['A',1],['B',2]] as const)expect((await gapCall(app,`/api/broadcasts/br/variants/${key}`,'PUT',{text:key,expectedVersion:v})).status).toBe(200);expect((await gapCall(app,p,'PUT',{testRatioPct:20,metric:'click',decideAfterMinutes:60,undecidedPolicy:'stop',expectedVersion:3})).status).toBe(200);}
 const transmit=()=>vi.fn(async(_input:AbLiveTransmitInput)=>undefined);
+function allowQuota(){vi.stubGlobal('fetch',vi.fn(async(input:RequestInfo|URL)=>new Response(JSON.stringify(String(input).includes('consumption')?{totalUsage:0}:{type:'limited',value:20}),{status:200})));}
 
 test('R4a-01: 旗がなければ本送信は始めない（既定オフ）',async()=>{
  await configure();const send=transmit();
@@ -177,7 +178,7 @@ test('処理が中断して15分を過ぎたら停止とし、再送しない',a
 });
 
 test('検証環境の送信入口は Proxy と送信台帳を使い、登録宛先だけに送る',async()=>{
- await configure();await setBroadcastApprovalThreshold(d.db,'a',10000);
+ allowQuota();await configure();await setBroadcastApprovalThreshold(d.db,'a',10000);
  const app=gapApp(d,[broadcastAb,broadcasts],gapOwner,false,{DEPLOY_ENV:'staging',AB_LIVE_DELIVERY_ENABLED:'true',WORKER_URL:'https://worker.invalid'});
  const r=await app.request('/api/broadcasts/br/send',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':'staging','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({expectedVersion:4,confirmedRecipientCount:2400,confirmedTestRecipientCount:20,liveMode:true})});
  expect(await r.clone().json()).toMatchObject({success:true});expect(r.status).toBe(202);
@@ -196,11 +197,11 @@ test('店舗のトークンがなければ既定トークンを使わない',asy
  const app=gapApp(d,[broadcastAb,broadcasts],gapOwner,false,{DEPLOY_ENV:'staging',AB_LIVE_DELIVERY_ENABLED:'true',WORKER_URL:'https://worker.invalid',LINE_CHANNEL_ACCESS_TOKEN:'default-should-not-be-used'});
  const r=await app.request('/api/broadcasts/br/send',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':'missing-token','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({expectedVersion:4,confirmedRecipientCount:2400,confirmedTestRecipientCount:20,liveMode:true})});
  expect(r.status).toBe(409);expect(proxy).not.toHaveBeenCalled();
- expect(d.raw.prepare('SELECT status FROM broadcast_ab_live_tests WHERE broadcast_id=\'br\'').get()).toEqual({status:'live_stopped'});
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM broadcast_ab_live_tests WHERE broadcast_id='br'").get()).toEqual({n:0});
 });
 
 test('本送信では案ごとに違う計測リンクを作り、宛先の署名を付ける',async()=>{
- await configure();await setBroadcastApprovalThreshold(d.db,'a',10000);
+ allowQuota();await configure();await setBroadcastApprovalThreshold(d.db,'a',10000);
  d.raw.prepare("UPDATE broadcast_variants SET messages_json=? WHERE broadcast_id='br' AND variant_key='A'").run(JSON.stringify([{type:'text',text:'案 A https://example.com/a'}]));
  d.raw.prepare("UPDATE broadcast_variants SET messages_json=? WHERE broadcast_id='br' AND variant_key='B'").run(JSON.stringify([{type:'text',text:'案 B https://example.com/b'}]));
  const app=gapApp(d,[broadcastAb,broadcasts],gapOwner,false,{DEPLOY_ENV:'staging',AB_LIVE_DELIVERY_ENABLED:'true',WORKER_URL:'https://worker.invalid'});
@@ -215,4 +216,12 @@ test('計測できないLINEリンクは試しの記録や送信より前に止�
  await configure();d.raw.prepare("UPDATE broadcast_variants SET messages_json=? WHERE broadcast_id='br' AND variant_key='A'").run(JSON.stringify([{type:'text',text:'https://line.me/R/example'}]));
  const send=transmit();await expect(startAbLive(d.db,'br',4,20,'unsupported',{transmit:send,liveDeliveryEnabled:true})).rejects.toThrow('ab_tracking_unsupported');
  expect(send).not.toHaveBeenCalled();expect(d.raw.prepare('SELECT COUNT(*) n FROM broadcast_ab_live_tests').get()).toEqual({n:0});
+});
+
+test('試しの途中で停止すると残りを送らず、同じ鍵の再要求にも停止を返す',async()=>{
+ await configure();const app=gapApp(d,[broadcastAb,broadcasts]);let n=0;
+ const send=vi.fn(async()=>{if(++n===1){const r=await gapCall(app,'/api/broadcasts/br/stop','POST',{expectedVersion:5});expect(r.status).toBe(200);}});
+ await expect(startAbLive(d.db,'br',4,20,'stop-mid',{transmit:send,liveDeliveryEnabled:true})).rejects.toThrow('ab_delivery_stopped');
+ expect(send).toHaveBeenCalledTimes(1);
+ expect(await startAbLive(d.db,'br',4,20,'stop-mid',{transmit:send,liveDeliveryEnabled:true})).toMatchObject({status:'live_stopped',reason:'stopped'});
 });

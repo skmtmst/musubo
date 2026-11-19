@@ -2,7 +2,7 @@ import { storedDeliveryLimit } from '../features/broadcasts/broadcast-delivery-l
 import {Hono,type Context} from 'hono';
 import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapKey,gapWrite,gapVersion} from '../services/gap-common.js';
-import {abSettings,abAudience,abStats,splitAb,startAbMock,finishMockRemainder,startAbLive,liveTestAudience,recoverAbLiveStart,liveAbStats,trackAbLiveMessages} from '../features/broadcasts/broadcast-ab/index.js';
+import {abSettings,abAudience,abStats,splitAb,startAbMock,finishMockRemainder,startAbLive,liveTestAudience,recoverAbLiveStart,liveAbStats,createStagingAbTransmit,chooseAbLive,reserveAbLiveQuota} from '../features/broadcasts/broadcast-ab/index.js';
 import {assertChanged,clearAssertions} from '../features/booking/booking-series/index.js';
 import {requirePermission,requireIrreversibleConfirmation,hasStaffPermission} from '../middleware/role-guard.js';
 import {BROADCAST_DEFINITION_EDIT_KEY,BROADCAST_DEFINITION_PUBLISH_KEY} from '@line-crm/shared';
@@ -43,7 +43,9 @@ broadcastAb.get('/api/broadcasts/:id/ab-result',requirePermission('/broadcasts')
  return c.json({success:true,data:{...test,variants:await abStats(c.env.DB,id),remainder,testMode:true,liveTestRecipientCount}});
 });
 broadcastAb.post('/api/broadcasts/:id/ab-test/choose',requirePermission(BROADCAST_DEFINITION_PUBLISH_KEY),requireIrreversibleConfirmation('broadcast-send'),async(c)=>{
- gapWrite(c);const row=await scope(c);if(storedDeliveryLimit(row))throw new GapError('人数の上限とA/Bは併用できません。',409);const id=c.req.param('id'),b=await gapBody(c),key=gapKey(c);if(!['A','B','none'].includes(String(b.variant)))throw new GapError('invalid_variant');if(b.testMode!==true)throw new GapError('test_mode_required',409);
+ gapWrite(c);const row=await scope(c);if(storedDeliveryLimit(row))throw new GapError('人数の上限とA/Bは併用できません。',409);const id=c.req.param('id'),b=await gapBody(c),key=gapKey(c);if(!['A','B','none'].includes(String(b.variant)))throw new GapError('invalid_variant');
+ if(b.liveMode===true){if(c.env.DEPLOY_ENV!=='staging'||c.env.AB_LIVE_DELIVERY_ENABLED!=='true')throw new GapError('live_delivery_disabled',409);return c.json({success:true,data:await chooseAbLive(c.env.DB,id,row.line_account_id,c.get('staff').id,key,b.variant as 'A'|'B'|'none',Number(b.confirmedRecipientCount))});}
+ if(b.testMode!==true)throw new GapError('test_mode_required',409);
  const current=await c.env.DB.prepare('SELECT status,choice_key,choice_value FROM broadcast_ab_tests WHERE broadcast_id=?').bind(id).first<{status:string;choice_key:string|null;choice_value:string|null}>();if(!current)throw new GapError('not_found',404);
  if(current.choice_key===key&&current.choice_value===b.variant)return c.json({success:true,data:{variant:current.choice_value,testMode:true},replayed:true});
  const count=(await c.env.DB.prepare("SELECT COUNT(*) n FROM broadcast_ab_recipients WHERE broadcast_id=? AND variant_key='R' AND state='pending'").bind(id).first<{n:number}>())!.n;
@@ -72,27 +74,11 @@ async function startAbLiveRequest(c:Context<Env>,id:string,b:{expectedVersion?:u
  if(!(await getSendPermissionForAccount(c.env.DB,accountId)).allowed)throw new GapError('配信が止まっています',409);
  const {isOperationCapabilityStopped}=await import('@line-crm/db');
  if(await isOperationCapabilityStopped(c.env.DB,accountId,'broadcast_dispatch'))throw new GapError('緊急停止中のため送信できません',409);
- const {guardScheduledBroadcastQuota}=await import('../features/broadcasts/broadcast/index.js');
- const quota=await guardScheduledBroadcastQuota(c.env.DB,broadcast as never,accountId,{reserveBroadcastId:id});
- if(quota.blocked)throw new GapError(quota.message??'送信枠が足りないため送れません',409);
- const {activeTenantLineAccountSql,resolveLineCredential}=await import('@line-crm/db');
- const {featureJobCanRun}=await import('../services/feature-enforcement.js');
- const {pushViaHarnessProxy}=await import('../services/line-proxy-send.js');
- const {dispatchLineProxyLocally}=await import('../services/local-line-proxy.js');
- const {NotificationDeliveryBlocked}=await import('../services/recorded-notification-send.js');
- return startAbLive(c.env.DB,id,gapVersion(b.expectedVersion),Number(b.confirmedTestRecipientCount),gapKey(c),{liveDeliveryEnabled:true,transmit:async input=>{
-  if(!(await getSendPermissionForAccount(c.env.DB,accountId)).allowed||await isOperationCapabilityStopped(c.env.DB,accountId,'broadcast_dispatch')||!await featureJobCanRun(c.env.DB,{accountId,featureId:'broadcasts',job:'broadcast deliveries'}))throw new NotificationDeliveryBlocked('sending_stopped');
-  const account=await c.env.DB.prepare(`SELECT channel_access_token,channel_access_token_encrypted FROM line_accounts la WHERE la.id=? AND la.is_active=1 AND la.archived_at IS NULL AND ${activeTenantLineAccountSql('la.id')}`).bind(accountId).first<{channel_access_token:string|null;channel_access_token_encrypted:string|null}>();
-  if(!account)throw new NotificationDeliveryBlocked('account_unavailable');
-  const token=await resolveLineCredential(account.channel_access_token_encrypted,account.channel_access_token,{lineAccountId:accountId,field:'channel_access_token'},c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
-  if(!token)throw new NotificationDeliveryBlocked('account_unavailable');
-  const current=await liveTestAudience(c.env.DB,id);
-  const friend=await c.env.DB.prepare('SELECT line_user_id FROM friends WHERE id=? AND line_account_id=?').bind(input.friendId,accountId).first<{line_user_id:string|null}>();
-  if(!current.ids.includes(input.friendId)||friend?.line_user_id!==input.to[0]||!(await getSendPermissionForAccount(c.env.DB,accountId)).allowed||await isOperationCapabilityStopped(c.env.DB,accountId,'broadcast_dispatch')||!await featureJobCanRun(c.env.DB,{accountId,featureId:'broadcasts',job:'broadcast deliveries'})||await broadcastQuietHoursShift(c.env.DB,accountId,new Date().toISOString()))throw new NotificationDeliveryBlocked('recipient_changed');
-  const workerUrl=c.env.WORKER_PUBLIC_URL||c.env.WORKER_URL;if(!workerUrl)throw new NotificationDeliveryBlocked('tracking_url_unavailable');
-  const messages=await trackAbLiveMessages(c.env.DB,{broadcastId:id,variantKey:input.variantKey,accountId,friendId:input.friendId,workerUrl,messages:input.messages});
-  await pushViaHarnessProxy(workerUrl,token,input.to[0],messages,input.retryKey,request=>dispatchLineProxyLocally(request,c.env),'broadcast_dispatch');
- }});
+ const key=gapKey(c),count=Number(b.confirmedTestRecipientCount),quotaId=`ab-start:${id}:${key}:${count}`;
+ await reserveAbLiveQuota(c.env,quotaId,accountId,count);
+ const result=await startAbLive(c.env.DB,id,gapVersion(b.expectedVersion),count,key,{liveDeliveryEnabled:true,transmit:createStagingAbTransmit(c.env,id,accountId)});
+ const {releaseQuotaSlot}=await import('../features/broadcasts/broadcast-quota-guard/index.js');await releaseQuotaSlot(c.env.DB,accountId,quotaId).catch(()=>undefined);
+ return result;
 }
 /** 許可済みの開始操作の再送だけを扱い、新しい開始や送信は行わない。 */
 export async function maybeReplayAbStart(c:Context<Env>,id:string,b:{testMode?:unknown;liveMode?:unknown;expectedVersion?:unknown;confirmedRecipientCount?:unknown;confirmedTestRecipientCount?:unknown}|null){
