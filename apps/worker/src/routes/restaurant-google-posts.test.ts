@@ -158,12 +158,12 @@ async function seedInstagramConnection(options: { scopes?: string; expiresAt?: s
   testDb.raw
     .prepare(
       `INSERT INTO instagram_connections
-        (line_account_id, page_id, instagram_id, page_name, username, page_token_encrypted, user_token_encrypted,
+        (id, line_account_id, page_id, instagram_id, page_name, username, page_token_encrypted, user_token_encrypted,
          expires_at, data_access_expires_at, refreshed_at, connected_by, scopes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
-      'account-2', 'page-1', 'ig-1', 'こもれび食堂 渋谷店', 'komorebi',
+      'igc_account-2', 'account-2', 'page-1', 'ig-1', 'こもれび食堂 渋谷店', 'komorebi',
       await encryptCredential('page-secret', META_ENV.META_TOKEN_ENCRYPTION_KEY),
       await encryptCredential('user-secret', META_ENV.META_TOKEN_ENCRYPTION_KEY),
       options.expiresAt ?? '2099-01-01T00:00:00.000Z',

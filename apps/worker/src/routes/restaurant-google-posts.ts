@@ -81,6 +81,8 @@ interface PostRow {
   id: string;
   confirmation_revision: number;
   store_id: string;
+  /** どのGoogle接続で作った・取り込んだ投稿か。解除で接続が消えた行は NULL になる（772）。 */
+  connection_id: string | null;
   kind: LocalPostKind | 'alert';
   origin: 'admin' | 'google';
   summary: string;
@@ -380,13 +382,16 @@ async function updateDraft(c: Context<Env>, store: StoreContext, id: string, inp
     .run();
 }
 
-type PostStatusPatch = Partial<{ status: PostStatus; error: string | null; requestId: string | null; sentAt: string | null; publishedAt: string | null; checkedAt: string | null; deletedAt: string | null; contentFingerprint: string | null; googlePostName: string | null; googleState: string | null; searchUrl: string | null; googleCreateTime: string | null; googleUpdateTime: string | null; origin: 'admin' | 'google'; mediaJson: string; instagramStatus: PostRow['instagram_status']; instagramPermalink: string | null; instagramError: string | null; instagramPublishedAt: string | null }>;
+type PostStatusPatch = Partial<{ status: PostStatus; connectionId: string | null; error: string | null; requestId: string | null; sentAt: string | null; publishedAt: string | null; checkedAt: string | null; deletedAt: string | null; contentFingerprint: string | null; googlePostName: string | null; googleState: string | null; searchUrl: string | null; googleCreateTime: string | null; googleUpdateTime: string | null; origin: 'admin' | 'google'; mediaJson: string; instagramStatus: PostRow['instagram_status']; instagramPermalink: string | null; instagramError: string | null; instagramPublishedAt: string | null }>;
 
 async function setStatusForEnv(env: Env['Bindings'], storeId: string, id: string, patch: PostStatusPatch): Promise<void> {
   const sets: string[] = ['updated_at = ?'];
   const values: unknown[] = [nowIso()];
   const columns: Record<string, unknown> = {
     status: patch.status,
+    // どの接続で送った投稿かを確定させる。画面の見た目は変わらないので visible には入れない
+    // （ここで版を上げると、画面を開いたままの利用者の送信が版違いで弾かれる）。
+    connection_id: patch.connectionId,
     error: patch.error,
     request_id: patch.requestId,
     sent_at: patch.sentAt,
@@ -446,8 +451,11 @@ async function crossPostToInstagram(c: Context<Env>, store: StoreContext, row: P
     if (!cfg) throw new InstagramError('instagram_unconfigured', 503);
     const connection = await dbFor(c.env)
       .prepare(
+        // 772で接続が複数持てるようになったので、並び順を決めて同時投稿の宛先を固定する
+        // （並びを書かないと複数接続のとき宛先が実行ごとに変わりうる）。
+        // 宛先を画面から選ぶ口は、UIの承認を取ってから別に足す。
         `SELECT instagram_id, page_token_encrypted, scopes, expires_at, data_access_expires_at
-           FROM instagram_connections WHERE line_account_id = ? LIMIT 1`,
+           FROM instagram_connections WHERE line_account_id = ? ORDER BY sort_order, id LIMIT 1`,
       )
       .bind(store.lineAccountId)
       .first<InstagramConnectionRow>();
@@ -549,9 +557,24 @@ restaurantGooglePosts.get('/api/restaurant-test/google/posts', async (c) => {
 
 // ---------- 取り込み（sync） ----------
 
-/** Google側の投稿一覧をDBへ写す。手動sync（下のエンドポイント）と定期再同期の両方から使う。 */
-export async function applyGooglePostsSync(env: Env['Bindings'], storeId: string, googlePosts: GooglePost[]): Promise<void> {
-  const rows = (await dbFor(env, storeId).prepare('SELECT * FROM rt_google_posts WHERE store_id = ?').bind(storeId).all<PostRow>()).results;
+/**
+ * Google側の投稿一覧をDBへ写す。手動sync（下のエンドポイント）と定期再同期の両方から使う。
+ *
+ * 取り込み元の接続のぶんだけを見る。店舗の全投稿を相手にすると、同じ店舗の別の接続で
+ * 作った投稿が「Google側に無い」と判定され、黙って削除済みになる。
+ * 接続が分からない行（接続解除で connection_id が空になった行）は、名前の突き合わせには
+ * 使うが削除判定の対象にしない。
+ */
+export async function applyGooglePostsSync(
+  env: Env['Bindings'],
+  connection: { id: string; store_id: string },
+  googlePosts: GooglePost[],
+): Promise<void> {
+  const storeId = connection.store_id;
+  const rows = (await dbFor(env, storeId)
+    .prepare('SELECT * FROM rt_google_posts WHERE store_id = ? AND (connection_id = ? OR connection_id IS NULL)')
+    .bind(storeId, connection.id)
+    .all<PostRow>()).results;
   const byName = new Map(rows.filter((r) => r.google_post_name).map((r) => [r.google_post_name as string, r]));
   const seenNames = new Set<string>();
   const now = nowIso();
@@ -603,13 +626,14 @@ export async function applyGooglePostsSync(env: Env['Bindings'], storeId: string
     await dbFor(env, storeId)
       .prepare(
         `INSERT INTO rt_google_posts
-           (id, store_id, kind, origin, summary, title, media_json, status, google_post_name, google_state, search_url,
+           (id, store_id, connection_id, kind, origin, summary, title, media_json, status, google_post_name, google_state, search_url,
             google_create_time, google_update_time, checked_at, published_at)
-         VALUES (?, ?, ?, 'google', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, 'google', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
         storeId,
+        connection.id,
         post.kind === 'unknown' || post.kind === 'alert' ? 'standard' : post.kind,
         post.summary,
         post.title,
@@ -626,8 +650,11 @@ export async function applyGooglePostsSync(env: Env['Bindings'], storeId: string
       .run();
   }
 
-  // Google側から消えた公開済み投稿を検知する。
+  // Google側から消えた公開済み投稿を検知する。消すのは取り込み元の接続の行だけ。
+  // connection_id が空の行（解除で接続が消えた行）は、どの接続のものか分からないので
+  // 「Google側に無い」と断定できない。名前の突き合わせには使うが削除判定はしない。
   for (const row of rows) {
+    if (row.connection_id !== connection.id) continue;
     if (row.status === 'published' && row.google_post_name && !seenNames.has(row.google_post_name)) {
       await setStatusForEnv(env, storeId, row.id, { status: 'deleted', deletedAt: now, checkedAt: now });
     }
@@ -649,11 +676,11 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/sync', inputJsonBo
   try {
     googlePosts = await listLocalPosts(options, connection.location_name!);
   } catch (error) {
-    if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, store.id, 'no_permission', 'no_permission');
+    if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, connection, 'no_permission', 'no_permission');
     return googleErrorResponse(c, error);
   }
 
-  await applyGooglePostsSync(c.env, store.id, googlePosts);
+  await applyGooglePostsSync(c.env, connection, googlePosts);
   return c.json({ success: true });
 });
 
@@ -791,6 +818,7 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/publish', requ
         if ((await fingerprintOfGooglePost(p)) !== fingerprint) continue;
         await setStatus(c, store.id, row.id, {
           status: p.state === 'LIVE' ? 'published' : p.state === 'REJECTED' ? 'rejected' : 'accepted',
+          connectionId: connection.id,
           googlePostName: p.name,
           googleState: p.state,
           searchUrl: p.searchUrl,
@@ -802,16 +830,19 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/publish', requ
       }
     }
   } catch (error) {
-    if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, store.id, 'no_permission', 'no_permission');
+    if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, connection, 'no_permission', 'no_permission');
     return googleErrorResponse(c, error);
   }
 
   const requestId = crypto.randomUUID();
-  await setStatus(c, store.id, row.id, { status: 'pending_confirm', requestId, sentAt: nowIso(), contentFingerprint: fingerprint });
+  // 送信を始めた時点でどの接続へ出すかを行に書く。結果が不明なまま残った行も、
+  // 次のsyncで同じ接続の一覧と照合できる。
+  await setStatus(c, store.id, row.id, { status: 'pending_confirm', connectionId: connection.id, requestId, sentAt: nowIso(), contentFingerprint: fingerprint });
   try {
     const created = await createLocalPost(options, connection.location_name!, validated.draft);
     await setStatus(c, store.id, row.id, {
       status: created.state === 'LIVE' ? 'published' : created.state === 'REJECTED' ? 'rejected' : 'accepted',
+      connectionId: connection.id,
       googlePostName: created.name,
       googleState: created.state,
       searchUrl: created.searchUrl,
@@ -831,7 +862,7 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/publish', requ
     const detail = error instanceof GoogleBusinessError && error.message && !error.message.startsWith('google_') ? error.message : null;
     if (!unknownResult) await setStatus(c, store.id, row.id, { status: 'failed', error: detail ?? kind });
     auditLog(c, 'restaurant.google.post.publish', { id: row.id, kind: 'rt_google_post' }, { result: 'failed', lineAccountId: store.lineAccountId });
-    if (kind === 'no_permission') await setConnectionStatus(c, store.id, 'no_permission', 'no_permission');
+    if (kind === 'no_permission') await setConnectionStatus(c, connection, 'no_permission', 'no_permission');
     if (kind === 'invalid_request') {
       return fail(c, 400, `Googleに受け付けられない内容です${detail ? `（${detail}）` : ''}`, {
         code: 'invalid_request',
@@ -884,6 +915,12 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/remove', requi
   if (body.confirmed !== true) return fail(c, 400, '削除の確認が必要です', { code: 'confirmation_required' }, ["confirmed"]);
   if (!writeEnabled(c.env)) return fail(c, 403, 'この環境ではGoogleを操作できません', { code: 'write_disabled' });
   if (!row.google_post_name) return fail(c, 409, 'まだGoogleへ公開されていません', { code: 'not_published' });
+  // 投稿は公開した接続の店舗（location）に属する。別の接続のトークンで消そうとすると
+  // Googleは not_found を返し、下の catch が「削除済み」と記録してしまう＝他の接続の投稿が
+  // 画面から消える。どの接続で出したか分かっている行は、その接続からしか消せないようにする。
+  if (row.connection_id && row.connection_id !== connection.id) {
+    return fail(c, 409, 'この投稿は別のGoogle接続で公開されています', { code: 'connection_mismatch' });
+  }
   for (const value of [body.expectedPostRevision, body.expectedConnectionRevision]) {
     if (value !== undefined && (!Number.isSafeInteger(value) || (value as number) < 1)) return fail(c, 400, '確認した版が不正です');
   }
@@ -895,7 +932,9 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/remove', requi
   const current = async () => {
     const [post, selected] = await Promise.all([
       postFor(c, store.id, row.id),
-      db.prepare('SELECT id, confirmation_revision AS confirmationRevision, location_title AS locationTitle FROM rt_google_connections WHERE store_id = ?').bind(store.id).first(),
+      // 読み直しは操作対象の接続だけ。店舗で引くと772後は複数行になり、画面が見ている接続と
+      // 別の行の版を返して照合が意味を失う。
+      db.prepare('SELECT id, confirmation_revision AS confirmationRevision, location_title AS locationTitle FROM rt_google_connections WHERE id = ?').bind(connection.id).first(),
     ]);
     return { post: post ? publicPost(post) : null, connection: selected };
   };
@@ -913,11 +952,14 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/remove', requi
     return googleErrorResponse(c, error);
   }
   if (guarded) {
+    // 接続の存在確認は操作対象のID固定。店舗内のどれか1件でよい書き方だと、772後は
+    // 同じ店舗の別の接続が connected なだけで版の照合が通ってしまう。
     const claimed = await db.prepare(`UPDATE rt_google_posts SET confirmation_revision = confirmation_revision + 1
     WHERE id = ? AND store_id = ? AND (? IS NULL OR confirmation_revision = ?)
-      AND EXISTS (SELECT 1 FROM rt_google_connections WHERE store_id = ? AND (? IS NULL OR id = ?)
+      AND EXISTS (SELECT 1 FROM rt_google_connections WHERE id = ? AND store_id = ? AND (? IS NULL OR id = ?)
         AND (? IS NULL OR confirmation_revision = ?) AND status = 'connected')`)
-    .bind(row.id, store.id, body.expectedPostRevision ?? null, body.expectedPostRevision ?? null, store.id,
+    .bind(row.id, store.id, body.expectedPostRevision ?? null, body.expectedPostRevision ?? null,
+      connection.id, store.id,
       body.expectedConnectionId ?? null, body.expectedConnectionId ?? null,
       body.expectedConnectionRevision ?? null, body.expectedConnectionRevision ?? null).run();
     if ((claimed.meta?.changes ?? 0) !== 1) return c.json({ success: false, error: '対象が変わりました。読み直してください', current: await current() }, 409);
