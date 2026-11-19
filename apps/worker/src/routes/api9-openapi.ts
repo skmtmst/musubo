@@ -217,6 +217,12 @@ Object.assign(api9Paths, {
       { storeId: string },
     ),
   },
+  '/api/liff/restaurant/reservations/{id}/payment': {
+    post: {...liff('本人の仮押さえの金額を確定し、Stripe試験モードの支払い画面を開く', ['id'], {
+      type:'object',required:['expectedVersion'],properties:{...versionBody.properties,...customerDetails,
+        paymentMethod:{type:'string',enum:['online','onsite']},expectedFormVersion:{type:'integer',minimum:0}},
+    }),security:[{liffIdToken:[]}]},
+  },
   '/api/liff/restaurant/reservations/{id}/confirm': {
     post: liff(
       '期限内の仮押さえを確定し、自動LINEと媒体閉鎖の作業を台帳に作る',

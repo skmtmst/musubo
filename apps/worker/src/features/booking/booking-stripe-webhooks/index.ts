@@ -8,3 +8,4 @@ export type { BookingStripeBinding, BookingStripeEvent, StripeBookingPurpose } f
 export { applyCardCheckoutReceipt, replayCardCheckoutReceipts } from './card-checkout.js';
 export { applyCardSetupReceipt, replayCardSetupReceipts } from './card-setup.js';
 export { recoverCardSetupReceipts } from './card-recovery.js';
+export { applyRestaurantPaymentReceipt, replayRestaurantPaymentReceipts } from './restaurant-payment.js';

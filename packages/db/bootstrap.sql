@@ -7115,6 +7115,42 @@ CREATE TABLE restaurant_course_payment_settings (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE restaurant_payment_details (
+  request_id TEXT PRIMARY KEY REFERENCES restaurant_payment_requests(id),
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  customer_name TEXT NOT NULL,
+  customer_phone TEXT,
+  allergy_note TEXT,
+  note TEXT,
+  form_version INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE restaurant_payment_requests (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
+  store_id TEXT NOT NULL,
+  reservation_id TEXT NOT NULL UNIQUE,
+  form_submission_id TEXT UNIQUE,
+  connect_account TEXT NOT NULL,
+  request_json TEXT NOT NULL CHECK(json_valid(request_json)),
+  total_amount INTEGER NOT NULL CHECK(total_amount>=0),
+  amount INTEGER NOT NULL CHECK(amount>0 AND amount<=total_amount),
+  customer_id TEXT,
+  checkout_id TEXT UNIQUE,
+  checkout_url TEXT,
+  payment_intent_id TEXT UNIQUE,
+  refund_started_at TEXT,
+  cancel_requested INTEGER NOT NULL DEFAULT 0 CHECK(cancel_requested IN (0,1)),
+  cancel_expected_version INTEGER,
+  cancel_reason TEXT,
+  recovery_retry_at TEXT,
+  stripe_refund_id TEXT UNIQUE,
+  status TEXT NOT NULL CHECK(status IN ('pending','paid','refund_pending','refunded')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE rfm_segment_names(account_id TEXT NOT NULL REFERENCES line_accounts(id),r_bucket INTEGER NOT NULL CHECK(r_bucket BETWEEN 1 AND 5),f_bucket INTEGER NOT NULL CHECK(f_bucket BETWEEN 1 AND 5),name TEXT NOT NULL,PRIMARY KEY(account_id,r_bucket,f_bucket));
 
 CREATE TABLE rich_menu_area_taps (
@@ -13216,6 +13252,32 @@ CREATE TRIGGER restaurant_course_payment_scope_update BEFORE UPDATE ON restauran
 WHEN NOT EXISTS(SELECT 1 FROM rt_menu_items m JOIN rt_stores s ON s.id=m.store_id
   WHERE m.id=NEW.menu_id AND m.kind='course' AND s.id=NEW.store_id AND s.line_account_id=NEW.line_account_id)
 BEGIN SELECT RAISE(ABORT,'course_payment_scope_mismatch'); END;
+
+CREATE TRIGGER restaurant_payment_cancel_claim_guard BEFORE UPDATE ON rt_reservations
+WHEN EXISTS(SELECT 1 FROM restaurant_payment_requests p WHERE p.reservation_id=OLD.id AND p.cancel_requested=1 AND p.status IN ('refund_pending','refunded')
+  AND NOT (p.status='refunded' AND NEW.status='cancelled'))
+BEGIN SELECT RAISE(ABORT,'restaurant_refund_pending'); END;
+
+CREATE TRIGGER restaurant_payment_cancel_guard BEFORE UPDATE OF status ON rt_reservations
+WHEN NEW.status IN ('cancelled','rejected') AND OLD.status<>NEW.status AND EXISTS(SELECT 1 FROM restaurant_payment_requests p WHERE p.reservation_id=NEW.id AND p.status IN ('paid','refund_pending'))
+BEGIN SELECT RAISE(ABORT,'restaurant_refund_pending'); END;
+
+CREATE TRIGGER restaurant_payment_change_guard BEFORE UPDATE OF starts_at,ends_at,guest_count,course_id ON rt_reservations
+WHEN (NEW.starts_at IS NOT OLD.starts_at OR NEW.ends_at IS NOT OLD.ends_at OR NEW.guest_count<>OLD.guest_count OR NEW.course_id IS NOT OLD.course_id)
+  AND EXISTS(SELECT 1 FROM restaurant_payment_requests p WHERE p.reservation_id=NEW.id AND p.status IN ('pending','paid','refund_pending'))
+BEGIN SELECT RAISE(ABORT,'restaurant_payment_change_requires_refund'); END;
+
+CREATE TRIGGER restaurant_payment_confirm_guard BEFORE UPDATE OF status ON rt_reservations
+WHEN NEW.status='confirmed' AND OLD.status<>'confirmed' AND EXISTS(SELECT 1 FROM restaurant_payment_requests p WHERE p.reservation_id=NEW.id AND p.status<>'paid')
+BEGIN SELECT RAISE(ABORT,'restaurant_payment_not_paid'); END;
+
+CREATE TRIGGER restaurant_payment_details_guard BEFORE UPDATE OF customer_name,customer_phone,allergy_note,note ON rt_reservations
+WHEN (NEW.customer_name IS NOT OLD.customer_name OR NEW.customer_phone IS NOT OLD.customer_phone OR NEW.allergy_note IS NOT OLD.allergy_note OR NEW.note IS NOT OLD.note)
+ AND EXISTS(SELECT 1 FROM restaurant_payment_requests p WHERE p.reservation_id=OLD.id AND p.status IN ('pending','paid','refund_pending')
+   AND (p.status<>'paid' OR OLD.status='pending')
+   AND NOT (p.status='paid' AND OLD.status='pending' AND NEW.status='confirmed' AND EXISTS(SELECT 1 FROM restaurant_payment_details d
+     WHERE d.request_id=p.id AND NEW.customer_name IS d.customer_name AND NEW.customer_phone IS d.customer_phone AND NEW.allergy_note IS d.allergy_note AND NEW.note IS d.note)))
+BEGIN SELECT RAISE(ABORT,'restaurant_payment_details_locked'); END;
 
 CREATE TRIGGER rt_closure_reservation_insert BEFORE INSERT ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND NEW.departed_at IS NULL AND EXISTS(SELECT 1 FROM rt_closures c, json_each(c.periods_json) p WHERE c.store_id=NEW.store_id AND c.archived_at IS NULL AND julianday(json_extract(p.value,'$.startsAt'))<julianday(NEW.ends_at) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(NEW.starts_at) AND (json_array_length(c.table_ids_json)=0 OR NEW.table_id IS NULL OR EXISTS(SELECT 1 FROM json_each(c.table_ids_json) t WHERE t.value=NEW.table_id))) BEGIN SELECT RAISE(ABORT,'closure_conflict'); END;
 

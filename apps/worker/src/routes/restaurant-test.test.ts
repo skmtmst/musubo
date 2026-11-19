@@ -1883,3 +1883,13 @@ describe('電話予約と押さえの受付条件', () => {
     }
   });
 });
+
+it('飲食コースの予約金は版を守り、通常メニューの設定と混ざらない',async()=>{
+ seedRestaurantFixture();
+ const path='/api/restaurant-test/menus/menu-ginza/deposit?account_id=account-2';
+ const body={kind:'percent',value:30,conditions:{always:true,minPeople:null,weekdays:null,timeBand:null},inherit:false,expectedVersion:0};
+ expect((await requestWithMethod(path,'PUT',body)).status).toBe(200);
+ expect((await requestWithMethod(path,'PUT',body)).status).toBe(409);
+ expect(await (await request(path)).json()).toMatchObject({data:{kind:'percent',value:30,version:1}});
+ expect(testDb.raw.prepare("SELECT scope_id FROM booking_deposit_rules WHERE account_id='account-2'").all()).toEqual([{scope_id:'course:menu-ginza'}]);
+});

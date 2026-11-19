@@ -1,3 +1,5 @@
+import { depositRule, validDeposit } from '../features/booking/booking-deposit/index.js';
+import { GapError } from '../services/gap-common.js';
 import { getRestaurantReservationForm,putRestaurantReservationForm } from './restaurant-reservation-form.js';
 import { restaurantTableAutomationResponse } from './restaurant-table-automation.js';
 import { stopRestaurantTable } from './restaurant-table-stop.js';
@@ -10,7 +12,7 @@ import { readCloseNotificationSettings, saveCloseNotificationSettings } from '..
 import { StampError } from '../services/visit-stamps.js';
 import { updateRestaurantFollowupBinding } from './restaurant-followup-binding.js';
 import { putRestaurantFollowupSetup, putRestaurantFollowupRow, get__api_restaurant_test_followups_storeId_15 } from './restaurant-followup-row.js';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 
 import type { Env } from '../worker-env.js';
 
@@ -164,6 +166,33 @@ for (const method of ['get','put'] as const) {
     return paymentSettingResponse(c,dbFor(c.env,menu.store_id),{kind:'course',id:menu.id,account:accountId(c)!,storeId:menu.store_id},'mode');
   });
 }
+
+// コースの予約金は通常メニューと識別子を分け、同じ店の設定だけを扱う。
+const courseDeposit = async (c: Context<Env>) => {
+    const method=c.req.method.toLowerCase();
+    c.header('Cache-Control','no-store');
+    if(method==='put' && (c.get('staff').readOnly || c.get('staff').role==='staff' || c.get('impersonation')))return c.json({success:false,error:'forbidden'},403);
+    const account=accountId(c);if(!account)return requiredAccount(c);
+    const organization=await organizationFor(c);if(!organization)return c.json({success:false,error:'not_found'},404);
+    const menu=await dbFor(c.env).prepare(`SELECT m.id,m.store_id FROM rt_menu_items m JOIN rt_stores s ON s.id=m.store_id
+      WHERE m.id=? AND m.kind='course' AND s.organization_id=? AND s.line_account_id=? AND (? IS NULL OR s.id=?)`)
+      .bind(c.req.param('id'),organization.id,account,organization.scopedStoreId,organization.scopedStoreId).first<{id:string;store_id:string}>();
+    if(!menu)return c.json({success:false,error:'not_found'},404);
+    const db=dbFor(c.env,menu.store_id),scope=`course:${menu.id}`;
+    if(method==='get')return c.json({success:true,data:await depositRule(db,account,scope)});
+    const body=await c.req.json<Record<string,unknown>>().catch(()=>null);
+    if(!body || !Number.isSafeInteger(body.expectedVersion) || Number(body.expectedVersion)<0 || typeof body.inherit!=='boolean')return c.json({success:false,error:'invalid_deposit_rule'},400);
+    let rule:ReturnType<typeof validDeposit>;try{rule=validDeposit(body);}catch(error){if(error instanceof GapError)return c.json({success:false,error:error.code},400);throw error;}
+    const version=Number(body.expectedVersion);
+    const result=await db.prepare(`INSERT INTO booking_deposit_rules(account_id,scope_id,rule_json,inherit,updated_by,updated_at)
+      SELECT ?,?,?,?,?,? WHERE ?=0 OR EXISTS(SELECT 1 FROM booking_deposit_rules WHERE account_id=? AND scope_id=? AND version=?)
+      ON CONFLICT(account_id,scope_id) DO UPDATE SET rule_json=excluded.rule_json,inherit=excluded.inherit,version=version+1,updated_by=excluded.updated_by,updated_at=excluded.updated_at WHERE version=?`)
+      .bind(account,scope,JSON.stringify(rule),body.inherit?1:0,c.get('staff').id,new Date().toISOString(),version,account,scope,version,version).run();
+    if(!result.meta.changes)return c.json({success:false,error:'version_conflict'},409);
+    return c.json({success:true,data:await depositRule(db,account,scope)});
+};
+restaurantTest.get('/api/restaurant-test/menus/:id/deposit',requireRole('owner','admin','staff'),courseDeposit);
+restaurantTest.put('/api/restaurant-test/menus/:id/deposit',requireRole('owner','admin','staff'),courseDeposit);
 
 /** 全枠を一括保存し、どれか一つの版が古ければ一件も変更しない。 */
 restaurantTest.put('/api/restaurant-test/inventory/allocation', requireRole('owner', 'admin'), inputJsonBoundary({"storeId":["string"],"slots":["array"],"otaCapacity":["number"],"lineCapacity":["number"],"walkInCapacity":["number"],"sameDayCapacity":["number"]}), put__api_restaurant_test_inventory_allocation_6);

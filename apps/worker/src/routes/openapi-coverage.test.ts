@@ -45,6 +45,7 @@ function isCoveredRoute(method: string, path: string): boolean {
   if (INFRASTRUCTURE_PATHS.has(path)) return false;
   if (path.startsWith('/api/restaurant-test') && ![
     '/api/restaurant-test/menus/:id/payment',
+    '/api/restaurant-test/menus/:id/deposit',
     '/api/restaurant-test/assignment-settings',
     '/api/restaurant-test/table-auto-assignment-settings',
     '/api/restaurant-test/store-groups', '/api/restaurant-test/store-groups/:id/members/:storeId', '/api/restaurant-test/stores/:id/referral-location',
@@ -600,6 +601,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'DELETE /api/line-account-folders/{id}',
   'PUT /api/line-accounts/{id}/folder',
   'GET /api/hq/templates/kind-counts',
+  'GET /api/restaurant-test/menus/{id}/deposit',
+  'PUT /api/restaurant-test/menus/{id}/deposit',
   'GET /api/restaurant-test/opening-hours',
   'PUT /api/restaurant-test/opening-hours',
   'POST /api/restaurant-test/reservation-link',
@@ -622,6 +625,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/liff/restaurant/availability',
   'POST /api/liff/restaurant/holds',
   'GET /api/liff/restaurant/reservations',
+  'POST /api/liff/restaurant/reservations/{id}/payment',
   'POST /api/liff/restaurant/reservations/{id}/confirm',
   'POST /api/liff/restaurant/reservations/{id}/cancel',
   'POST /api/liff/restaurant/reservations/{id}/reschedule',
@@ -1401,7 +1405,7 @@ describe('OpenAPIと公開APIの同期', () => {
       const classification = routeClassification(entry.honoPath, method);
       const operation = spec.paths[path]?.[method.toLowerCase() as 'get'];
       // LIFF ハンドラ自身が、対象アカウントの LINE ID トークンを検証する。
-      const verifiedLiff = ['/api/liff/booking/monthly-contracts','/api/liff/files/:id/download',"/api/liff/booking/cost-estimate","/api/liff/booking/group-availability","/api/liff/booking/pass-purchases/:id","/api/liff/booking/series/preview","/api/liff/member-card","/api/liff/booking/pass-plans/:id/checkout","/api/liff/forms/:id/routing/resolve","/api/liff/events/bookings/:id/absence","/api/liff/events/makeup-credits","/api/liff/events/makeup-credits/:id/options","/api/liff/events/makeup-credits/:id/use","/api/liff/booking/cancellation-quote","/api/liff/booking/setup-intent",'/api/liff/notification-preferences', '/api/liff/notification-preferences/:purpose', '/api/liff/restaurant/courses', '/api/liff/restaurant/referrals', '/api/liff/restaurant/form-booking'].includes(entry.honoPath);
+      const verifiedLiff = ['/api/liff/booking/monthly-contracts','/api/liff/files/:id/download',"/api/liff/booking/cost-estimate","/api/liff/booking/group-availability","/api/liff/booking/pass-purchases/:id","/api/liff/booking/series/preview","/api/liff/member-card","/api/liff/booking/pass-plans/:id/checkout","/api/liff/forms/:id/routing/resolve","/api/liff/events/bookings/:id/absence","/api/liff/events/makeup-credits","/api/liff/events/makeup-credits/:id/options","/api/liff/events/makeup-credits/:id/use","/api/liff/booking/cancellation-quote","/api/liff/booking/setup-intent",'/api/liff/notification-preferences', '/api/liff/notification-preferences/:purpose', '/api/liff/restaurant/courses', '/api/liff/restaurant/referrals', '/api/liff/restaurant/form-booking','/api/liff/restaurant/reservations/:id/payment'].includes(entry.honoPath);
       if (verifiedLiff) {
         if (JSON.stringify(operation?.security) !== '[{"liffIdToken":[]}]') problems.push(`${key}: LINE IDトークンの表示が無い`);
       } else if (classification?.kind === 'public') {

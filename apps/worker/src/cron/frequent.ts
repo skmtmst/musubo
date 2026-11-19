@@ -1,3 +1,4 @@
+import { recoverRestaurantPayments } from '../features/booking/restaurant-payment-recovery/index.js';
 import { purgeUnboundBookingStripeReceipts, markOverdueBookingStripeReceipts, recoverCardSetupReceipts } from '../features/booking/booking-stripe-webhooks/index.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
@@ -72,6 +73,7 @@ export async function runFrequentHeavyJobs(
       run: async () => { await purgeExpiredFormDocuments(env.DB, env.IMAGES, new Date(event.scheduledTime)); },
     },
     {name:'API draft and integration retention',run:async()=>{const now=new Date(event.scheduledTime);await purgeExpiredScenarioDrafts(env.DB,now);await purgeInstagramTransientData(env.DB,now);await purgeUnboundBookingStripeReceipts(env.DB,event.scheduledTime);const pending=await markOverdueBookingStripeReceipts(env.DB,event.scheduledTime);if(pending>0)logger.warn('booking_stripe_binding_overdue');}},
+    {name:'restaurant payment recovery',run:async()=>{const result=await recoverRestaurantPayments(env);if(result.failed)logger.warn('restaurant_payment_recovery_failed');}},
     {name:'booking card setup recovery',run:async()=>{const result=await recoverCardSetupReceipts(env.DB);if(result.failed)logger.warn('booking_card_setup_recovery_failed');}},
     {name:'booking waitlist expiry and promotion',run:async()=>{const {processBookingWaitlists}=await import('../services/waitlist-tick.js');await processBookingWaitlists(env);}},
     {
