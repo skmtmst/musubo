@@ -1,5 +1,13 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const mileageScoresPaths = {
+  '/api/mileage/redemptions/{id}/hand-delivery': {
+    post: {
+      tags: ['Mileage'], summary: '手渡し景品を渡した記録を残す',
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId'], properties: { accountId: { type: 'string' } } } } } },
+      responses: { '200': { description: '手渡しを記録' }, '403': { description: '権限がありません' }, '404': { description: 'アカウントが見つかりません' }, '409': { description: '手渡しできない交換' } },
+    },
+  },
   '/api/mileage/rules': {
     get: {
       tags: ['Mileage'], summary: 'LINEアカウント範囲内のマイル付与ルールを取得',

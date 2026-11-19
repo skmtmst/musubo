@@ -199,6 +199,21 @@ export async function deliverMileageReward(
   options: MileageRewardDeliveryOptions = {},
 ): Promise<MileageRewardDeliveryResult> {
   const plan = await getMileageRewardDeliveryPlan(db, redemptionId);
+  // 手渡しの交換は店舗が確認するまで自動配送の対象にしない。
+  if (plan.isHandgift) {
+    const handgift = await db.prepare(
+      'SELECT delivered_at, cancelled_at FROM mileage_handgifts WHERE redemption_id = ?',
+    ).bind(redemptionId).first<{ delivered_at: string | null; cancelled_at: string | null }>();
+    const delivered = Boolean(handgift?.delivered_at && !handgift.cancelled_at && plan.redemption.status === 'succeeded');
+    return {
+      status: delivered ? 'succeeded' : 'delivery_failed', rewardName: plan.rewardName,
+      customerMessage: plan.customerMessage, rewardCode: null, retryAt: null,
+      failurePolicy: plan.failurePolicy,
+      message: delivered ? null : plan.redemption.status === 'refunded' || handgift?.cancelled_at
+        ? '交換は取り消されています。' : '店舗でのお渡しをお待ちください。',
+    };
+  }
+
   let source: 'ec' | 'musubo' | null = null;
   try { if (plan.redemption.lineAccountId) source = await resolveMileageSource(db, plan.redemption.lineAccountId); } catch { /* 読めない場合も保留 */ }
   if (source !== 'musubo') return {
