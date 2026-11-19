@@ -1,5 +1,13 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const mileageScoresPaths = {
+  '/api/mileage/redemptions/{id}/hand-cancel': {
+    post: {
+      tags: ['Mileage'], summary: '手渡し景品の交換を取り消す',
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'expectedStatus'], properties: { expectedStatus: { type: 'string', enum: ['reserved', 'succeeded'] }, accountId: { type: 'string' }, reason: { type: 'string', maxLength: 500 } } } } } },
+      responses: { '200': { description: '取消とマイル返却' }, '400': { description: '取消理由が不正' }, '403': { description: '権限がありません' }, '404': { description: 'アカウントが見つかりません' }, '409': { description: '取り消せない交換' } },
+    },
+  },
   '/api/mileage/redemptions/{id}/hand-delivery': {
     post: {
       tags: ['Mileage'], summary: '手渡し景品を渡した記録を残す',

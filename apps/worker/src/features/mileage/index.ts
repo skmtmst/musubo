@@ -3,3 +3,4 @@ export { deliverMileageReward, processDueMileageRewardDeliveries } from './milea
 export { mileageAdjustmentMessage, sendMileageAdjustmentNotification } from './mileage-adjustment-notification.js';
 
 export { deliverHandgift } from "./handgift-delivery.js";
+export { cancelHandgift } from "./handgift-cancel.js";
