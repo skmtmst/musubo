@@ -12,7 +12,7 @@ WHEN NEW.status<>OLD.status AND EXISTS (
 BEGIN
   SELECT RAISE(ABORT,'booking_charge_in_progress'); END;
 
--- 失敗が確定した請求も、無断などを取り消したら請求しない履歴へ移す。
+-- 失敗が確定した請求は、予約状態の復帰に伴い免除する。
 CREATE TRIGGER booking_failed_fee_revert
 AFTER UPDATE OF status ON bookings
 WHEN OLD.status IN ('cancelled','no_show') AND NEW.status NOT IN ('cancelled','no_show')
@@ -49,6 +49,7 @@ CREATE TABLE restaurant_payment_requests (
   form_submission_id TEXT UNIQUE,
   connect_account TEXT NOT NULL,
   request_json TEXT NOT NULL CHECK(json_valid(request_json)),
+  policy_accepted_at TEXT,
   total_amount INTEGER NOT NULL CHECK(total_amount>=0),
   amount INTEGER NOT NULL CHECK(amount>0 AND amount<=total_amount),
   customer_id TEXT,
@@ -61,7 +62,8 @@ CREATE TABLE restaurant_payment_requests (
   cancel_reason TEXT,
   recovery_retry_at TEXT,
   stripe_refund_id TEXT UNIQUE,
-  status TEXT NOT NULL CHECK(status IN ('pending','paid','refund_pending','refunded')),
+  cancellation_fee INTEGER,
+  status TEXT NOT NULL CHECK(status IN ('pending','paid','refund_pending','refunded','forfeited')),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

@@ -5,6 +5,7 @@ export interface CustomerLiffRuntime {
   getProfile(): Promise<{ userId: string; displayName: string }>;
   getAccessToken(): string | null;
   closeWindow(): void;
+  openWindow?(options:{url:string;external:boolean}): void;
 }
 
 let runtime: CustomerLiffRuntime | null = null;
@@ -16,4 +17,5 @@ export default {
   getProfile: () => (runtime ?? sdk).getProfile(),
   getAccessToken: () => (runtime ?? sdk).getAccessToken(),
   closeWindow: () => (runtime ?? sdk).closeWindow(),
+  openWindow: (options:{url:string;external:boolean}) => runtime?.openWindow ? runtime.openWindow(options) : sdk.openWindow(options),
 };

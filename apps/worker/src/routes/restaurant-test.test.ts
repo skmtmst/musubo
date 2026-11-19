@@ -1,8 +1,9 @@
+import { registerRestaurantDepositTests } from '../test-utils/restaurant-deposit-tests.js';
 import { registerRestaurantMenuConfirmationTests } from '../test-utils/restaurant-menu-confirmation.js';
 import { seedRestaurantFixture as seedRestaurantData } from '../test-utils/restaurant-fixture.js';
 import { publishScenarioVersion } from '@line-crm/db';
 import { checkRestaurantMenuMedia, checkRestaurantMenuPrice } from '../test-utils/restaurant-menu-media.js';
-import { seedNoticeFriend } from '../test-utils/restaurant-test-fixture-helpers.js';
+import { seedNoticeFriend, type MockStaff } from '../test-utils/restaurant-test-fixture-helpers.js';
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -10,17 +11,6 @@ import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-
-type MockStaff = {
-  id: string;
-  name: string;
-  role: 'owner' | 'admin' | 'staff';
-  access_level: 'full' | 'read_only';
-  permission_keys: string;
-  assigned_line_account_id: string | null;
-  can_access_descendant_accounts: number;
-  tenant_id?: string | null;
-};
 
 const authMocks = vi.hoisted(() => ({
   getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
@@ -1001,7 +991,7 @@ describe('飲食店向けテストAPI', () => {
     expect(grown.status).toBe(200);
     expect(slotOf()).toBe(3);
 
-    const cancelled = await requestWithMethod(`/api/restaurant-test/reservations/${id}?account_id=account-1`, 'PATCH', { status: 'cancelled' });
+    const cancelled = await requestWithMethod(`/api/restaurant-test/reservations/${id}?account_id=account-1`, 'PATCH', { status: 'cancelled', cancellationCause:'store' });
     expect(cancelled.status).toBe(200);
     expect(slotOf()).toBe(0);
 
@@ -1884,12 +1874,4 @@ describe('電話予約と押さえの受付条件', () => {
   });
 });
 
-it('飲食コースの予約金は版を守り、通常メニューの設定と混ざらない',async()=>{
- seedRestaurantFixture();
- const path='/api/restaurant-test/menus/menu-ginza/deposit?account_id=account-2';
- const body={kind:'percent',value:30,conditions:{always:true,minPeople:null,weekdays:null,timeBand:null},inherit:false,expectedVersion:0};
- expect((await requestWithMethod(path,'PUT',body)).status).toBe(200);
- expect((await requestWithMethod(path,'PUT',body)).status).toBe(409);
- expect(await (await request(path)).json()).toMatchObject({data:{kind:'percent',value:30,version:1}});
- expect(testDb.raw.prepare("SELECT scope_id FROM booking_deposit_rules WHERE account_id='account-2'").all()).toEqual([{scope_id:'course:menu-ginza'}]);
-});
+registerRestaurantDepositTests(() => testDb, seedRestaurantFixture, request, requestWithMethod);

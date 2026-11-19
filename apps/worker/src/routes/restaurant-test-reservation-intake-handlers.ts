@@ -1,4 +1,4 @@
-import { cancelPaidRestaurantReservation } from '../features/booking/restaurant-payment-finish/index.js';
+import { cancelPaidRestaurantReservation, restaurantPaidCancellationQuote, retainRestaurantCancellation } from '../features/booking/restaurant-payment-finish/index.js';
 import { phoneIntakeFailure } from '../services/restaurant-phone-intake.js';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
@@ -364,9 +364,15 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
   if(payment && (payment.status==='pending' || payment.status==='refund_pending' || (payment.status==='paid' && current.status==='pending'))
     && (next.customer_name!==current.customer_name || next.customer_phone!==current.customer_phone || next.allergy_note!==current.allergy_note || next.note!==current.note))
     return c.json({success:false,error:'お支払いの確認中はお客様情報を変更できません',code:'payment_details_locked'},409);
+  if(next.status==='cancelled' && current.status!=='cancelled' && !(current.status==='pending' && current.hold_expires_at && (!payment || payment.status==='pending')) && !['store','customer'].includes(String(body.cancellationCause)))return inputError(c,{success:false,error:'取消の理由を選んでください'},400,['cancellationCause']);
   if(payment && next.status==='cancelled' && current.status!=='cancelled' && ['paid','refund_pending','refunded'].includes(payment.status)) {
-    if(Object.keys(body).some(key=>!['expectedVersion','status','cancellationReason'].includes(key)))return c.json({success:false,error:'返金を伴う取消は、ほかの変更と分けてください'},409);
-    if(await cancelPaidRestaurantReservation(c.env,payment.id,current.customer_version,next.cancel_reason)!=='cancelled')
+    if(Object.keys(body).some(key=>!['expectedVersion','status','cancellationReason','cancellationCause'].includes(key)))return c.json({success:false,error:'返金を伴う取消は、ほかの変更と分けてください'},409);
+    const quote=body.cancellationCause==='customer'?await restaurantPaidCancellationQuote(dbFor(c.env,current.store_id),payment.id):null;
+    if(body.cancellationCause==='customer' && !quote)return c.json({success:false,error:'予約時の取消条件を確認してください',code:'cancellation_policy_unknown'},409);
+    const cancelled=quote && quote.feeNow>0 && payment.status==='paid'
+      ? await retainRestaurantCancellation(c.env,payment.id,current.customer_version,quote.feeNow)
+      : await cancelPaidRestaurantReservation(c.env,payment.id,current.customer_version,next.cancel_reason)==='cancelled';
+    if(!cancelled)
       return c.json({success:false,error:'返金を確認しています。しばらくしてから読み直してください',code:'refund_pending'},409);
     await applyReservationInventoryChange(dbFor(c.env,current.store_id),current.store_id,
       {starts_at:current.starts_at,guest_count:current.guest_count,status:current.status},

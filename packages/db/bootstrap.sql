@@ -7134,6 +7134,7 @@ CREATE TABLE restaurant_payment_requests (
   form_submission_id TEXT UNIQUE,
   connect_account TEXT NOT NULL,
   request_json TEXT NOT NULL CHECK(json_valid(request_json)),
+  policy_accepted_at TEXT,
   total_amount INTEGER NOT NULL CHECK(total_amount>=0),
   amount INTEGER NOT NULL CHECK(amount>0 AND amount<=total_amount),
   customer_id TEXT,
@@ -7146,7 +7147,8 @@ CREATE TABLE restaurant_payment_requests (
   cancel_reason TEXT,
   recovery_retry_at TEXT,
   stripe_refund_id TEXT UNIQUE,
-  status TEXT NOT NULL CHECK(status IN ('pending','paid','refund_pending','refunded')),
+  cancellation_fee INTEGER,
+  status TEXT NOT NULL CHECK(status IN ('pending','paid','refund_pending','refunded','forfeited')),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

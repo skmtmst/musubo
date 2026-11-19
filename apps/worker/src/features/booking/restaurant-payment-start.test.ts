@@ -10,7 +10,7 @@ import { applyRestaurantPaymentReceipt } from './booking-stripe-webhooks/restaur
 import { normalizeBookingStripeEvent,storeBookingStripeReceipt,stripeReceiptDigest } from './booking-stripe-webhooks/index.js';
 let f:ReturnType<typeof gapFixture>;
 const env=()=>({DB:f.db,BOOKING_STRIPE_TEST_SECRET_KEY:'sk_test_example',DEPLOY_ENV:'test',RESTAURANT_TEST_ENABLED:'true'} as Env['Bindings']);
-const start=(id='r1',form='form1')=>startRestaurantPayment(env(),'a','Uf',id,1,{formSubmissionId:form,formId:'form',paymentMethod:'online'});
+const start=(id='r1',form='form1')=>startRestaurantPayment(env(),'a','Uf',id,1,{formSubmissionId:form,formId:'form',paymentMethod:'online',policyAccepted:true,policyVersion:0,expectedTotal:25200,expectedAmount:25200});
 function event(){return {id:'evt_restaurant',account:'acct_original',api_version:'2024-06-20',created:Math.floor(Date.now()/1000),type:'checkout.session.completed',livemode:false,data:{object:{id:'cs_test_abc',object:'checkout.session',livemode:false,status:'complete',mode:'payment',payment_status:'paid',amount_total:25200,currency:'jpy',customer:'cus_person',payment_intent:'pi_restaurant'}}};}
 async function save(){const e=event();return storeBookingStripeReceipt(f.db,normalizeBookingStripeEvent(e),await stripeReceiptDigest(JSON.stringify(e)));}
 beforeEach(()=>{
@@ -25,6 +25,15 @@ beforeEach(()=>{
        ('r2','store','line','本人','Uf',3,'2099-10-21T01:00:00.000Z','2099-10-21T02:30:00.000Z','pending','2999-01-01T00:00:00.000Z','request_2','course');`);
 });
 afterEach(()=>{f.raw.close();vi.unstubAllGlobals();});
+it('同意と金額・決まりの版を確認し、不一致なら Stripe を呼ばない',async()=>{
+ const fetchMock=vi.fn();vi.stubGlobal('fetch',fetchMock);
+ const preview=await startRestaurantPayment(env(),'a','Uf','r1',1,{formSubmissionId:'form1',formId:'form',paymentMethod:'online',preview:true});
+ expect(preview).toMatchObject({required:true,preview:true,quote:{amount:25200}});
+ await expect(startRestaurantPayment(env(),'a','Uf','r1',1,{formSubmissionId:'form1',formId:'form',paymentMethod:'online'})).rejects.toMatchObject({code:'payment_confirmation_required'});
+ await expect(startRestaurantPayment(env(),'a','Uf','r1',1,{formSubmissionId:'form1',formId:'form',paymentMethod:'online',policyAccepted:true,policyVersion:1,expectedAmount:25200,expectedTotal:25200})).rejects.toMatchObject({code:'payment_confirmation_required'});
+ await expect(startRestaurantPayment(env(),'a','Uf','r1',1,{formSubmissionId:'form1',formId:'form',paymentMethod:'online',policyAccepted:true,policyVersion:0,expectedAmount:1,expectedTotal:25200})).rejects.toMatchObject({code:'payment_confirmation_required'});
+ expect(fetchMock).not.toHaveBeenCalled();
+});
 for(const early of [false,true])it(early?'入金通知が先でも金額と本人を照合して反映':'支払いURLの保存後に入金通知を反映',async()=>{
  vi.stubGlobal('fetch',vi.fn(async(url:string,init:RequestInit)=>{
   if(url.endsWith('/customers'))return Response.json({id:'cus_person',livemode:false});

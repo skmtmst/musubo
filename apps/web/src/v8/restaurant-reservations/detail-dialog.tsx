@@ -90,6 +90,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const [confirmNoShow, setConfirmNoShow] = useState<{ id: string; scope: object; ticket: object } | null>(null)
   const noShowTicket = useRef<object | null>(null)
   const [history, setHistory] = useState<History>({ state: 'loading' })
+  const [payment,setPayment]=useState<{scope:string;state:'loading'|'error'|'ready';data?:{status:string;amount:number;total:number;remaining:number}|null}>({scope:'',state:'loading'})
   const id = reservation?.id ?? ''
   const storeId = reservation?.store_id ?? ''
   const confirmationScope = useRef({ accountId, id, storeId, canWrite, status: reservation?.status, operationScope })
@@ -97,6 +98,13 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const renderedScope = confirmationScope.current
   const phone = reservation?.customer_phone ?? ''
   const lineUid = reservation?.line_uid ?? ''
+  const paymentScope=JSON.stringify([accountId,id,storeId,reservation?.customer_version,reservation?.status])
+  useEffect(()=>{
+    if(!id || !accountId || !storeId)return
+    let live=true;setPayment({scope:paymentScope,state:'loading'})
+    Promise.resolve().then(()=>restaurantTestApi.reservationPayment(accountId,id)).then(result=>{if(live)setPayment({scope:paymentScope,state:'ready',data:result.data.payment})}).catch(()=>{if(live)setPayment({scope:paymentScope,state:'error'})})
+    return()=>{live=false}
+  },[id,accountId,storeId,paymentScope])
 
   const currentScope = useRef({ id, accountId, storeId, operationScope })
   if (currentScope.current.id !== id || currentScope.current.accountId !== accountId || currentScope.current.storeId !== storeId || currentScope.current.operationScope !== operationScope) currentScope.current = { id, accountId, storeId, operationScope }
@@ -129,6 +137,8 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const failureNotice = failure?.scope === scope ? <Notice tone="danger" role="alert" message={conflict ? 'ほかの操作で予約が変わりました。読み直してから、もう一度選んでください。' : describeApiFailure(failure.error, '来店・退店の記録')} action={onReload ? <Button type="button" variant="secondary" size="compact" onClick={onReload}>読み直す</Button> : undefined} /> : null
   const unreadNotice = waitingForReload ? <Notice tone="warn" role="alert" message="保存しましたが、最新の予約を読み込めませんでした。読み直してから続けてください。" action={onReload ? <Button type="button" variant="secondary" size="compact" onClick={onReload}>読み直す</Button> : undefined} /> : null
   const stampStatus = stampNotice?.scope === scope ? <Notice tone="info" role="status" message={stampNotice.message} /> : null
+  const currentPayment=payment.scope===paymentScope?payment:null
+  const paymentText=!currentPayment || currentPayment.state==='loading'?'確認中':currentPayment.state==='error'?'取得できませんでした':!currentPayment.data?'お支払いの記録なし':`${({pending:'支払い待ち',paid:'予約金の支払い済み',refund_pending:'返金を確認中',refunded:'返金済み',forfeited:'キャンセル料に充当'} as Record<string,string>)[currentPayment.data.status]??'状態を確認中'} ${polishFormatYen(currentPayment.data.amount)}${currentPayment.data.status==='paid'?`・お店で ${polishFormatYen(currentPayment.data.remaining)}`:''}`
   const workingStatus = busy ? <Notice tone="info" role="status" message="予約を反映しています。完了するまでお待ちください。" /> : null
 
   /* これまでの来店（来店済みの数と前回）。連絡先が無い予約は数えない。遅い応答は捨てる。 */
@@ -185,6 +195,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
     <DetailField label="お客さま">{withHonorific(reservation.customer_name, 'さま', { space: true })}</DetailField>
     <DetailField label="予約元"><ReservationSource value={reservation.source} note={reservation.note} /></DetailField>
     <DetailField label="人数・コース">{`${reservation.guest_count}名・${reservation.course_name ?? '席のみ'}${course?.price ? ` ${polishFormatYen(course.price)}` : ''}`}</DetailField>
+    <DetailField label="お支払い">{paymentText}</DetailField>
     <DetailField label="電話">{maskPhone(reservation.customer_phone) || '電話未登録'}</DetailField>
     <ReservationDining dense presentation="detail" title="お客さまの食事情報" entry={seatBoardEntry(reservation as unknown as Record<string, unknown>)} />
     <DetailField label="来店"><span title={historyText(history)}>{history.state === 'ready' ? `${polishFormatNumber(history.count)}回` : '—'}</span></DetailField>
@@ -215,6 +226,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
       )}
     >
       <DetailField label="状態">{currentStatus}</DetailField>
+      <DetailField label="お支払い">{paymentText}</DetailField>
       {dining}
       <div className={styles.facts}>
         <p className={styles.fact}>{detailWhen(reservation, table)}</p>

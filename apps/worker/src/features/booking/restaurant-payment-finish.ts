@@ -8,9 +8,41 @@ import { readRestaurantCustomerReservationForm } from '../../services/restaurant
 import { bookingStripeTestRequest, listBookingStripeTestRefunds } from './booking-stripe-test-api.js';
 import { restaurantTestEnabled } from '../../lib/environment-features.js';
 import { accountFeatureIsEnabled } from '../../services/feature-enforcement.js';
+import { cancellationQuote, validCancellationPolicy } from './booking-cancellation.js';
 
-interface Payment {id:string;line_account_id:string;store_id:string;reservation_id:string;connect_account:string;amount:number;payment_intent_id:string|null;status:string;refund_started_at:string|null;stripe_refund_id:string|null}
+interface Payment {id:string;line_account_id:string;store_id:string;reservation_id:string;connect_account:string;amount:number;payment_intent_id:string|null;status:string;refund_started_at:string|null;stripe_refund_id:string|null;request_json:string;policy_accepted_at:string|null}
 const paymentById=(db:D1Database,id:string)=>db.prepare('SELECT * FROM restaurant_payment_requests WHERE id=?').bind(id).first<Payment>();
+
+/** 支払い時に保存した規則だけを使用する。規則が欠けている場合は手動確認に止める。 */
+export async function restaurantPaidCancellationQuote(db:D1Database,id:string) {
+ const payment=await paymentById(db,id);if(!payment)return null;
+ let snapshot: {startsAt?:unknown;total?:unknown;cancellationPolicy?:unknown;policyAccepted?:unknown};
+ try {snapshot=JSON.parse(payment.request_json);} catch {return null;}
+ if(snapshot.policyAccepted!==true || !payment.policy_accepted_at || !Number.isFinite(Date.parse(payment.policy_accepted_at)) || typeof snapshot.startsAt!=='string' || !Number.isFinite(Date.parse(snapshot.startsAt)) || !Number.isSafeInteger(snapshot.total) || Number(snapshot.total)<0 || !validCancellationPolicy(snapshot.cancellationPolicy))return null;
+ const quote=cancellationQuote(snapshot.cancellationPolicy,snapshot.startsAt,Number(snapshot.total));
+ const reservation=await db.prepare('SELECT status FROM rt_reservations WHERE id=? AND store_id=?').bind(payment.reservation_id,payment.store_id).first<{status:string}>();
+ const feeNow=reservation?.status==='pending'?0:Math.min(quote.feeNow,payment.amount);
+ return {...quote,feeNow,deposit:payment.amount,remainingFee:0};
+}
+
+/** 期限後の顧客都合は予約金をキャンセル料に充て、予約と記録を同じ batch で確定する。 */
+export async function retainRestaurantCancellation(env:Env['Bindings'],id:string,expectedVersion:number,expectedFee:number):Promise<boolean> {
+ const db=env.DB,p=await paymentById(db,id),quote=await restaurantPaidCancellationQuote(db,id);
+ if(!p || p.status!=='paid' || !quote || quote.feeNow<=0 || quote.feeNow!==expectedFee || p.amount>quote.feeNow)return false;
+ const row=await db.prepare('SELECT id,store_id,line_uid,customer_version,status FROM rt_reservations WHERE id=?').bind(p.reservation_id).first<{id:string;store_id:string;line_uid:string;customer_version:number;status:string}>();
+ if(!row || row.customer_version!==expectedVersion || !['pending','confirmed'].includes(row.status))return false;
+ try {
+  await db.batch([
+   db.prepare(`UPDATE restaurant_payment_requests SET status='forfeited',cancellation_fee=?,updated_at=? WHERE id=? AND status='paid'
+     AND EXISTS(SELECT 1 FROM rt_reservations WHERE id=? AND customer_version=? AND status IN ('pending','confirmed'))`).bind(quote.feeNow,new Date().toISOString(),id,row.id,expectedVersion),
+   db.prepare("SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'restaurant_cancellation_conflict' END)"),
+   db.prepare("UPDATE rt_reservations SET confirmation_revision=confirmation_revision+1,status='cancelled',cancel_reason='customer',customer_version=customer_version+1,hold_expires_at=NULL,updated_at=datetime('now') WHERE id=? AND customer_version=? AND status IN ('pending','confirmed')").bind(row.id,expectedVersion),
+   db.prepare("SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'restaurant_cancellation_conflict' END)"),
+   db.prepare(`INSERT OR IGNORE INTO rt_customer_notice_outbox(id,store_id,reservation_id,customer_version,line_uid,message,retry_key) VALUES(?,?,?,?,?,?,?)`)
+     .bind(`restaurant-customer:${row.id}:${expectedVersion+1}`,row.store_id,row.id,expectedVersion+1,row.line_uid,'予約を取り消しました。',crypto.randomUUID())
+  ]);return true;
+ } catch {return false;}
+}
 /** 全額のみ。結果不明は同じ操作の照会・再送で回収し、成功するまで取消を確定しない。 */
 export async function refundRestaurantPayment(env:Env['Bindings'],id:string,reconcileOnly=false):Promise<'refunded'|'pending'> {
  const db=env.DB;let p=await paymentById(db,id);

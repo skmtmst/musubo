@@ -392,7 +392,8 @@ export const get__api_restaurant_test_reservations_id_23 = async (c: Context<Env
   .bind(c.req.param('id'),org.id,org.scopedStoreId,org.scopedStoreId).first<Record<string,unknown>>();
  if(!row)return c.json({success:false,error:'not_found'},404);
  const entry=seatBoardEntry(row);
- return c.json({success:true,data:{reservation:entry,courseAllergens:entry.dining?.courseAllergens??null,allergensSource:'registered_at_booking'}});
+ const payment=await dbFor(c.env).prepare(`SELECT status,amount,total_amount FROM restaurant_payment_requests WHERE reservation_id=? AND line_account_id=(SELECT line_account_id FROM rt_stores WHERE id=?)`).bind(c.req.param('id'),row.store_id).first<{status:string;amount:number;total_amount:number}>();
+ return c.json({success:true,data:{reservation:entry,courseAllergens:entry.dining?.courseAllergens??null,allergensSource:'registered_at_booking',payment:payment?{status:payment.status,amount:payment.amount,total:payment.total_amount,remaining:payment.total_amount-payment.amount}:null}});
 };
 
 export const get__api_restaurant_test_store_groups_24 = async (c: Context<Env, "/api/restaurant-test/store-groups">) => {

@@ -379,6 +379,23 @@ export default function Form({ readOnlyDocument = false }: {readOnlyDocument?:bo
   const [bookingRetrying, setBookingRetrying] = useState(false);
   /** 確保できた予約 (終わりの画面の一文「次回のご予約（10月14日 13:00）は…」に使う)。 */
   const [booked, setBooked] = useState<Array<{ startsAt: string; status: string }>>([]);
+  const [formPayment,setFormPayment]=useState<{blockId:string;submissionKey:string;paymentMethod?:'online'|'onsite';total:number;amount:number;remaining:number;cancellation:string;policyVersion:number}|null>(null);
+  const [formPaymentAccepted,setFormPaymentAccepted]=useState(false);
+  const [formPaymentChoice,setFormPaymentChoice]=useState<'online'|'onsite'|undefined>();
+  const [formPaymentChoiceRequired,setFormPaymentChoiceRequired]=useState(false);
+  const paymentRequest=search.get('payment_request'),paymentStore=search.get('storeId'),paymentResult=search.get('payment_result');
+  useEffect(()=>{
+    if(!paymentRequest || !paymentStore || !paymentResult)return;
+    let active=true;
+    restaurantBookingApi.mine(paymentStore).then(result=>{
+      if(!active)return;
+      const row=result.data.find(item=>item.paymentRequestId===paymentRequest);
+      setDone(true);
+      if(row?.status==='confirmed') {setBooked([{startsAt:row.startsAt,status:row.status}]);setBookingError(null);}
+      else {setBooked([]);setBookingError(row?.paymentStatus==='refunded'?'予約を確定できなかったため、お支払いは返金されました。':paymentResult==='cancelled'?'お支払いは完了していません。':'お支払いと予約の状態を確認しています。しばらくしてから読み直してください。');}
+    }).catch(()=>{if(active){setDone(true);setBookingError('お支払いの状態を読み込めませんでした。');}});
+    return()=>{active=false};
+  },[paymentRequest,paymentStore,paymentResult]);
 
   const submitErrorText = (err: unknown): string => {
     const status = (err as { status?: number }).status;
@@ -410,17 +427,22 @@ export default function Form({ readOnlyDocument = false }: {readOnlyDocument?:bo
       if (style === 'consult' && slot.kind !== 'seats' && !meetingMode) return '会い方を確かめてから日時を選び直してください。回答は保存されています。';
       try {
         const res = slot.kind === 'seats'
-          ? (await restaurantBookingApi.formBooking({formId:id!,blockId:block.id,submissionKey:key})).data
+          ? (await restaurantBookingApi.formBooking({formId:id!,blockId:block.id,submissionKey:key,preview:true,...(formPaymentChoice?{paymentMethod:formPaymentChoice}:{})})).data
           : await api.createRequest(
           { menu_id: slot.menuId, staff_id: slot.staffId, starts_at: slot.startsAt, ...(meetingMode ? { meeting_mode: meetingMode } : {}), ...(routingToken.current && routingBlock?.id === block.id ? { routingToken: routingToken.current } : {}) },
           `${key}:booking:${block.id}`,
         );
         if (!request.isCurrent(generation)) return null;
+        if('payment' in res && res.payment && 'required' in res.payment && res.payment.required) {
+          setFormPaymentAccepted(false);setFormPayment({blockId:block.id,submissionKey:key,paymentMethod:formPaymentChoice,total:res.payment.quote.total,amount:res.payment.quote.amount,remaining:res.payment.quote.remaining,cancellation:res.payment.quote.cancellation.text,policyVersion:res.payment.quote.cancellation.version});
+          return '回答を保存しました。予約を完了するにはお支払いが必要です。';
+        }
         made.push({ startsAt: slot.startsAt, status: res?.status ?? 'requested' });
         setBooked([...made]);
       } catch (err) {
         logFailure('form-booking-request', err);
         const code = (err as { body?: { error?: string } }).body?.error;
+        if(code==='payment_method_required'){setFormPaymentChoiceRequired(true);return 'お支払い方法を選んで、予約を取り直してください。';}
         if (code === 'slot_not_available') {
           return '選んだ枠が埋まりました。日時を選び直してください。';
         }
@@ -601,18 +623,20 @@ export default function Form({ readOnlyDocument = false }: {readOnlyDocument?:bo
               試しの回答のため、集計には入りません。
             </p>
           ) : null}
-          {bookingError && (
+          {formPayment && <div className="mx-6 mb-6"><p>{`料金 ${formPayment.total.toLocaleString('ja-JP')} 円・今お支払い ${formPayment.amount.toLocaleString('ja-JP')} 円・お店で ${formPayment.remaining.toLocaleString('ja-JP')} 円`}</p><p>{formPayment.cancellation}</p><label><input type="checkbox" checked={formPaymentAccepted} onChange={event=>setFormPaymentAccepted(event.target.checked)} />キャンセル料の決まりを確認しました</label><Button variant="primary" disabled={!formPaymentAccepted || bookingRetrying} onClick={()=>void (async()=>{if(!id || !formPayment || !formPaymentAccepted || bookingRetrying)return;setBookingRetrying(true);try{const result=await restaurantBookingApi.formBooking({formId:id,blockId:formPayment.blockId,submissionKey:formPayment.submissionKey,...(formPayment.paymentMethod?{paymentMethod:formPayment.paymentMethod}:{}),policyAccepted:true,policyVersion:formPayment.policyVersion,expectedAmount:formPayment.amount,expectedTotal:formPayment.total});if(result.data.payment?.status==='paid'){setBookingError('お支払いと予約の状態を確認しています。');setFormPayment(null);return;}const url=new URL(result.data.payment?.url??'');if(url.protocol!=='https:' || url.hostname!=='checkout.stripe.com' || url.username || url.password || url.port)throw new Error('invalid_checkout_url');liff.openWindow({url:url.toString(),external:true});}catch{setBookingError('お支払いの内容を確認できませんでした。もう一度お試しください。');setFormPayment(null);}finally{setBookingRetrying(false);}})()}>お支払いへ進む</Button></div>}
+          {bookingError && !formPayment && (
             <div className="mx-6 mb-6 rounded-[10px] border border-liff-line-strong bg-canvas p-4">
               <p className="text-sm font-bold text-ink">{bookingError}</p>
+              {formPaymentChoiceRequired && <fieldset><legend>お支払い方法</legend><label><input type="radio" name="form-payment" checked={formPaymentChoice==='online'} onChange={()=>setFormPaymentChoice('online')} />オンラインで先払い</label><label><input type="radio" name="form-payment" checked={formPaymentChoice==='onsite'} onChange={()=>setFormPaymentChoice('onsite')} />お店で払う</label></fieldset>}
               <div className="mt-3 flex gap-2">
                 <Button variant="primary" className="flex-1"
                   type="button"
-                  onClick={() => void retryBookings()}
-                  disabled={bookingRetrying}
+                  onClick={() => paymentRequest ? window.location.reload() : void retryBookings()}
+                  disabled={bookingRetrying || (!paymentRequest && formPaymentChoiceRequired && !formPaymentChoice)}
                 >
-                  {bookingRetrying ? '確保中…' : '予約を取り直す'}
+                  {bookingRetrying ? '確保中…' : paymentRequest ? 'お支払いを読み直す' : '予約を取り直す'}
                 </Button>
-                <Button variant="secondary" className="flex-1"
+                {!paymentRequest && <Button variant="secondary" className="flex-1"
                   type="button"
                   onClick={() => {
                     setBookingError(null);
@@ -621,7 +645,7 @@ export default function Form({ readOnlyDocument = false }: {readOnlyDocument?:bo
                   }}
                 >
                   日時を選び直す
-                </Button>
+                </Button>}
               </div>
             </div>
           )}

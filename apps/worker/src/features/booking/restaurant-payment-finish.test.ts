@@ -4,7 +4,7 @@ import type { Env } from '../../worker-env.js';
 import { tzDateStr } from '../../services/availability.js';
 const featureEnabled=vi.hoisted(()=>vi.fn(async()=>true));
 vi.mock('../../services/feature-enforcement.js',async original=>({...await original<typeof import('../../services/feature-enforcement.js')>(),accountFeatureIsEnabled:featureEnabled}));
-import { cancelPaidRestaurantReservation,finishRestaurantPaidReservation,refundRestaurantPayment } from './restaurant-payment-finish.js';
+import { cancelPaidRestaurantReservation,finishRestaurantPaidReservation,refundRestaurantPayment,restaurantPaidCancellationQuote,retainRestaurantCancellation } from './restaurant-payment-finish.js';
 import { recoverRestaurantPayments } from './restaurant-payment-recovery.js';
 let f:ReturnType<typeof gapFixture>;
 const env=()=>({DB:f.db,BOOKING_STRIPE_TEST_SECRET_KEY:'sk_test_example',DEPLOY_ENV:'test',RESTAURANT_TEST_ENABLED:'true'} as Env['Bindings']);
@@ -69,6 +69,27 @@ it('期限後に席が埋まっていたら自動で全額返金し、予約を�
  await finishRestaurantPaidReservation(env(),'pay');
  expect(f.raw.prepare("SELECT status FROM restaurant_payment_requests WHERE id='pay'").get()).toEqual({status:'refunded'});
  expect(f.raw.prepare("SELECT status FROM rt_reservations WHERE id='r'").get()).toEqual({status:'pending'});expect(mock).toHaveBeenCalledTimes(1);
+});
+it('期限後の顧客都合は予約時の料金を確認し、予約金を残して取消する',async()=>{
+ const policy={enabled:true,version:1,tiers:[{beforeHours:100,percent:0},{beforeHours:0,percent:50}],noShowPercent:100};
+ f.raw.prepare("UPDATE restaurant_payment_requests SET request_json=?,policy_accepted_at=datetime('now') WHERE id=?").run(JSON.stringify({startsAt:starts,total:25200,cancellationPolicy:policy,policyAccepted:true}),'pay');
+ f.raw.exec("UPDATE rt_reservations SET status='confirmed' WHERE id='r'");
+ const quote=await restaurantPaidCancellationQuote(f.db,'pay');expect(quote?.feeNow).toBe(7560);
+ expect(await retainRestaurantCancellation(env(),'pay',1,7560)).toBe(false);
+ expect(await retainRestaurantCancellation(env(),'pay',2,7560)).toBe(true);
+ expect(f.raw.prepare("SELECT status,cancellation_fee FROM restaurant_payment_requests WHERE id='pay'").get()).toEqual({status:'forfeited',cancellation_fee:7560});
+ expect(f.raw.prepare("SELECT status FROM rt_reservations WHERE id='r'").get()).toEqual({status:'cancelled'});
+});
+it('席がまだ確定していない入金は期限後でもキャンセル料を取らない',async()=>{
+ const policy={enabled:true,version:1,tiers:[{beforeHours:100,percent:0},{beforeHours:0,percent:50}],noShowPercent:100};
+ f.raw.prepare("UPDATE restaurant_payment_requests SET request_json=?,policy_accepted_at=datetime('now') WHERE id=?").run(JSON.stringify({startsAt:starts,total:25200,cancellationPolicy:policy,policyAccepted:true}),'pay');
+ expect((await restaurantPaidCancellationQuote(f.db,'pay'))?.feeNow).toBe(0);
+});
+it('同意の記録がない予約からは予約金を充当しない',async()=>{
+ const policy={enabled:true,version:1,tiers:[{beforeHours:100,percent:0},{beforeHours:0,percent:50}],noShowPercent:100};
+ f.raw.prepare('UPDATE restaurant_payment_requests SET request_json=? WHERE id=?').run(JSON.stringify({startsAt:starts,total:25200,cancellationPolicy:policy}),'pay');
+ expect(await restaurantPaidCancellationQuote(f.db,'pay')).toBeNull();
+ expect(await retainRestaurantCancellation(env(),'pay',1,12600)).toBe(false);
 });
 it('取消の返金が不明でも予約の状態を固定し、回収後に取消を完了する',async()=>{
  f.raw.exec("UPDATE rt_reservations SET status='confirmed' WHERE id='r'");

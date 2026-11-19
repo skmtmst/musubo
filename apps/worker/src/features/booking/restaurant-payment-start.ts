@@ -1,4 +1,4 @@
-import { normalizePhone, restaurantReservationAnswerError, type RestaurantCustomerDetails } from '@line-crm/shared';
+import { normalizePhone, restaurantReservationAnswerError, yenPercent, type RestaurantCustomerDetails } from '@line-crm/shared';
 import { customerDetailValue, validCustomerDetails } from '../../services/restaurant-customer-booking.js';
 import { readRestaurantCustomerReservationForm } from '../../services/restaurant-reservation-form.js';
 import { GapError } from '../../services/gap-common.js';
@@ -7,12 +7,13 @@ import { restaurantPaymentQuote } from './restaurant-payment-quote.js';
 import { bookingStripeTestRequest } from './booking-stripe-test-api.js';
 import { prepareBookingStripeBinding } from './booking-stripe-webhooks/index.js';
 import { replayRestaurantPaymentReceipts } from './booking-stripe-webhooks/restaurant-payment.js';
+import { cancellationPolicy, cancellationQuote } from './booking-cancellation.js';
 
 interface Reservation {id:string;store_id:string;line_uid:string;course_id:string|null;guest_count:number;starts_at:string;status:string;customer_version:number;hold_expires_at:string|null;timezone:string;tenant_id:string;liff_id:string;friend_id:string;customer_name:string;customer_phone:string|null;allergy_note:string|null;note:string|null}
 interface Attempt {id:string;reservation_id:string;form_submission_id:string|null;connect_account:string;request_json:string;total_amount:number;amount:number;customer_id:string|null;checkout_id:string|null;checkout_url:string|null;status:string;created_at:string}
 
 /** 本人の仮押さえから金額を固定し、同じ予約・同じ回答の支払いを重ねない。 */
-export async function startRestaurantPayment(env:Env['Bindings'],account:string,uid:string,reservationId:string,version:number,input:RestaurantCustomerDetails & {paymentMethod?:unknown;formSubmissionId?:string;formId?:string}) {
+export async function startRestaurantPayment(env:Env['Bindings'],account:string,uid:string,reservationId:string,version:number,input:RestaurantCustomerDetails & {paymentMethod?:unknown;formSubmissionId?:string;formId?:string;preview?:boolean;policyAccepted?:boolean;policyVersion?:number;expectedAmount?:number;expectedTotal?:number}) {
   const db=env.DB;
   const reservation=await db.prepare(`SELECT r.id,r.store_id,r.line_uid,r.course_id,r.guest_count,r.starts_at,r.status,r.customer_version,r.hold_expires_at,r.customer_name,r.customer_phone,r.allergy_note,r.note,s.timezone,a.tenant_id,a.liff_id,f.id friend_id
     FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id JOIN line_accounts a ON a.id=s.line_account_id
@@ -36,32 +37,38 @@ export async function startRestaurantPayment(env:Env['Bindings'],account:string,
     'accountSetting',(SELECT json_object('mode',mode,'provider',provider,'hold',hold_minutes) FROM booking_payment_configs WHERE line_account_id=?),
     'rules',json((SELECT json_group_array(json_object('scope',scope_id,'rule',json(rule_json),'inherit',inherit,'version',version))
       FROM (SELECT scope_id,rule_json,inherit,version FROM booking_deposit_rules WHERE account_id=? AND scope_id IN ('',?) ORDER BY scope_id))),
-    'timezone',(SELECT timezone FROM rt_stores WHERE id=? AND line_account_id=?))`;
-  const priceArgs=[reservation.course_id,reservation.store_id,reservation.course_id,account,reservation.store_id,account,account,reservation.course_id ? `course:${reservation.course_id}` : '',reservation.store_id,account];
+    'timezone',(SELECT timezone FROM rt_stores WHERE id=? AND line_account_id=?),
+    'cancellation',(SELECT json_object('enabled',enabled,'tiers',json(tiers_json),'noShow',no_show_percent,'version',version) FROM booking_cancellation_policies WHERE line_account_id=?))`;
+  const priceArgs=[reservation.course_id,reservation.store_id,reservation.course_id,account,reservation.store_id,account,account,reservation.course_id ? `course:${reservation.course_id}` : '',reservation.store_id,account,account];
   const stateBefore=await db.prepare(priceStateSql).bind(...priceArgs).first<Record<string,string>>();
   const stateBeforeJson=stateBefore ? Object.values(stateBefore)[0] : null;
-  const quote=await restaurantPaymentQuote(db,{accountId:account,friendId:reservation.friend_id,storeId:reservation.store_id,courseId:reservation.course_id,
+  const initialQuote=await restaurantPaymentQuote(db,{accountId:account,friendId:reservation.friend_id,storeId:reservation.store_id,courseId:reservation.course_id,
     guestCount:reservation.guest_count,startsAt:reservation.starts_at,timezone:reservation.timezone,paymentMethod:input.paymentMethod});
+  const policy=await cancellationPolicy(db,account);
+  const quote={...initialQuote,cancellation:{...cancellationQuote(policy,reservation.starts_at,initialQuote.total),version:policy.version}};
+  if(quote.amount>0 && ((quote.kind==='deposit' && !policy.enabled) || (policy.enabled && (policy.tiers.filter(t=>t.percent>0).some(t=>yenPercent(quote.total,t.percent)<quote.amount) || yenPercent(quote.total,policy.noShowPercent)<quote.amount))))throw new GapError('deposit_exceeds_cancellation_fee',409);
   const stateAfter=await db.prepare(priceStateSql).bind(...priceArgs).first<Record<string,string>>();
   if(!stateBeforeJson || !stateAfter || Object.values(stateAfter)[0]!==stateBeforeJson)throw new GapError('payment_setting_changed',409);
   if(quote.amount===0)return {required:false as const,quote};
+  if(input.preview)return {required:true as const,preview:true as const,quote,status:'preview' as const,url:null};
+  if(input.policyAccepted!==true || input.policyVersion!==policy.version || input.expectedAmount!==quote.amount || input.expectedTotal!==quote.total)throw new GapError('payment_confirmation_required',409);
   if(!/^\d+-[A-Za-z0-9]+$/.test(reservation.liff_id ?? '') || !reservation.tenant_id)throw new GapError('payment_not_connected',409);
   const connection=await db.prepare(`SELECT provider_account_id FROM booking_payment_connections WHERE line_account_id=? AND provider='stripe' AND test_mode=1 AND disconnected_at IS NULL`)
     .bind(account).first<{provider_account_id:string}>();
   if(!connection || !/^acct_[A-Za-z0-9]+$/.test(connection.provider_account_id) || quote.provider!=='stripe')throw new GapError('payment_not_connected',409);
   if(!env.BOOKING_STRIPE_TEST_SECRET_KEY || !/^sk_test_[A-Za-z0-9]+$/.test(env.BOOKING_STRIPE_TEST_SECRET_KEY))throw new GapError('stripe_test_key_required',409);
   const requestJson=JSON.stringify({reservationId,courseId:reservation.course_id,guestCount:reservation.guest_count,startsAt:reservation.starts_at,
-    paymentMethod:input.paymentMethod ?? null,unitPrice:quote.unitPrice,total:quote.total,amount:quote.amount,kind:quote.kind,settingVersion:quote.settingVersion,depositRule:quote.depositRule,formVersion:formSnapshot.form?.version ?? 0});
+    paymentMethod:input.paymentMethod ?? null,unitPrice:quote.unitPrice,total:quote.total,amount:quote.amount,kind:quote.kind,settingVersion:quote.settingVersion,depositRule:quote.depositRule,cancellationPolicy:policy,policyAccepted:true,formVersion:formSnapshot.form?.version ?? 0});
   const now=new Date().toISOString(),id=crypto.randomUUID();
   await db.batch([
     db.prepare(`SELECT json(CASE WHEN (${priceStateSql})=? THEN '{}' ELSE 'RESTAURANT_PAYMENT_CHANGED' END)`).bind(...priceArgs,stateBeforeJson),
     ...(formSnapshot.form?[formSnapshot.guard]:[]),
-    db.prepare(`INSERT INTO restaurant_payment_requests(id,line_account_id,tenant_id,store_id,reservation_id,form_submission_id,connect_account,request_json,total_amount,amount,status,created_at,updated_at)
-    SELECT ?,?,?,?,?,?,?,?,?,?,'pending',?,? WHERE EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id
+    db.prepare(`INSERT INTO restaurant_payment_requests(id,line_account_id,tenant_id,store_id,reservation_id,form_submission_id,connect_account,request_json,policy_accepted_at,total_amount,amount,status,created_at,updated_at)
+    SELECT ?,?,?,?,?,?,?,?,?,?,?,'pending',?,? WHERE EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id
       WHERE r.id=? AND r.line_uid=? AND s.line_account_id=? AND r.status='pending' AND r.customer_version=? AND julianday(r.hold_expires_at)>julianday(?)
       AND r.guest_count=? AND r.starts_at=? AND r.course_id IS ?)
     AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND kind='course' AND status='active' AND price=?))
-    ON CONFLICT DO NOTHING`).bind(id,account,reservation.tenant_id,reservation.store_id,reservationId,input.formSubmissionId ?? null,connection.provider_account_id,requestJson,quote.total,quote.amount,now,now,
+    ON CONFLICT DO NOTHING`).bind(id,account,reservation.tenant_id,reservation.store_id,reservationId,input.formSubmissionId ?? null,connection.provider_account_id,requestJson,now,quote.total,quote.amount,now,now,
       reservationId,uid,account,version,now,reservation.guest_count,reservation.starts_at,reservation.course_id,reservation.course_id,reservation.course_id,reservation.store_id,quote.unitPrice),
     db.prepare(`INSERT INTO restaurant_payment_details(request_id,friend_id,customer_name,customer_phone,allergy_note,note,form_version)
       SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM restaurant_payment_requests WHERE id=?) ON CONFLICT(request_id) DO NOTHING`)
@@ -87,7 +94,7 @@ export async function startRestaurantPayment(env:Env['Bindings'],account:string,
   if(!attempt.checkout_id) {
     const link=await db.prepare('SELECT token FROM rt_reservation_links WHERE store_id=?').bind(reservation.store_id).first<{token:string}>();
     if(!input.formId && !link?.token)throw new GapError('reservation_link_required',409);
-    const params=new URLSearchParams({liffId:reservation.liff_id,...(input.formId?{page:'form',id:input.formId}:{page:'restaurant',token:link!.token}),payment_request:attempt.id});
+    const params=new URLSearchParams({liffId:reservation.liff_id,...(input.formId?{page:'form',id:input.formId,storeId:reservation.store_id}:{page:'restaurant',token:link!.token}),payment_request:attempt.id});
     const target=`https://liff.line.me/${reservation.liff_id}?${params}`;
     // Stripeの最短30分と同じ申込の有効期限を固定し、再送で本文を変えない。
     const createdAt=Date.parse(attempt.created_at);

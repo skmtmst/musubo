@@ -33,11 +33,13 @@ export type CustomerReservationRow = {
   seat_type: string | null;
   course_id?: string | null;
   course_name?: string | null;
+  payment_status?: string | null;
+  payment_request_id?: string | null;
 };
 export function customerBooking(r: CustomerReservationRow): RestaurantCustomerBooking {
   return { id:r.id, storeId:r.store_id, startsAt:r.starts_at, endsAt:r.ends_at, guestCount:r.guest_count,
     status:r.status, version:r.customer_version, holdExpiresAt:r.hold_expires_at,
-    note:r.note, customerPhone:r.customer_phone ? normalizePhone(r.customer_phone) : null, customerName:r.customer_name,allergyNote:r.allergy_note,seatType:r.seat_type, courseId:r.course_id ?? null, courseName:r.course_name ?? null };
+    note:r.note, customerPhone:r.customer_phone ? normalizePhone(r.customer_phone) : null, customerName:r.customer_name,allergyNote:r.allergy_note,seatType:r.seat_type, courseId:r.course_id ?? null, courseName:r.course_name ?? null, ...(r.payment_status === undefined ? {} : {paymentStatus:r.payment_status,paymentRequestId:r.payment_request_id ?? null}) };
 }
 /** 任意欄はUnicodeの文字数で検査。空欄・nullは保存済みの値を消す。 */
 export function validCustomerDetails(b: {note?: unknown; customerPhone?: unknown;customerName?:unknown;allergyNote?:unknown}): boolean {

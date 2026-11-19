@@ -1,7 +1,7 @@
 import { GapError } from '../services/gap-common.js';
 import { startRestaurantPayment } from '../features/booking/restaurant-payment-start/index.js';
 import { restaurantPaymentQuote } from '../features/booking/restaurant-payment-quote/index.js';
-import { cancelPaidRestaurantReservation, finishRestaurantPaidReservation } from '../features/booking/restaurant-payment-finish/index.js';
+import { cancelPaidRestaurantReservation, finishRestaurantPaidReservation, restaurantPaidCancellationQuote, retainRestaurantCancellation } from '../features/booking/restaurant-payment-finish/index.js';
 import { readRestaurantCustomerReservationForm,RestaurantReservationFormError } from '../services/restaurant-reservation-form.js';
 import { restaurantReservationAnswerError } from '@line-crm/shared';
 import { liffBookingJson, liffBookingInputError } from './liff-booking-response.js';
@@ -226,10 +226,10 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
 });
 restaurantCustomerBooking.post('/api/liff/restaurant/reservations/:id/payment',inputJsonBoundary(),async c=>{
   const self=await identity(c);if(self instanceof Response)return self;
-  const b=await c.req.json<RestaurantCustomerConfirmInput & {paymentMethod?:unknown}>().catch(()=>null);
+  const b=await c.req.json<RestaurantCustomerConfirmInput & {paymentMethod?:unknown;preview?:boolean;policyAccepted?:boolean;policyVersion?:number;expectedAmount?:number;expectedTotal?:number}>().catch(()=>null);
   if(!b || !Number.isSafeInteger(b.expectedVersion) || b.expectedVersion<1)return liffBookingInputError(c,{success:false,error:'expected_version_required'},400,['expectedVersion']);
   const result=await startRestaurantPayment(c.env,self.accountId,self.uid,c.req.param('id'),b.expectedVersion,
-    {paymentMethod:b.paymentMethod,customerName:b.customerName,customerPhone:b.customerPhone,allergyNote:b.allergyNote,note:b.note,expectedFormVersion:b.expectedFormVersion});
+    {paymentMethod:b.paymentMethod,customerName:b.customerName,customerPhone:b.customerPhone,allergyNote:b.allergyNote,note:b.note,expectedFormVersion:b.expectedFormVersion,preview:b.preview,policyAccepted:b.policyAccepted,policyVersion:b.policyVersion,expectedAmount:b.expectedAmount,expectedTotal:b.expectedTotal});
   return liffBookingJson(c,{success:true,data:result});
 });
 restaurantCustomerBooking.get(
@@ -242,9 +242,9 @@ restaurantCustomerBooking.get(
     const rows = (
       await dbFor(c.env, store.id)
         .prepare(
-          'SELECT *, (SELECT seat_type FROM rt_tables t WHERE t.id=rt_reservations.table_id AND t.store_id=rt_reservations.store_id) AS seat_type, (SELECT name FROM rt_menu_items m WHERE m.id=rt_reservations.course_id AND m.store_id=rt_reservations.store_id) AS course_name FROM rt_reservations WHERE store_id=? AND line_uid=? ORDER BY starts_at DESC LIMIT 100',
+          'SELECT *, (SELECT seat_type FROM rt_tables t WHERE t.id=rt_reservations.table_id AND t.store_id=rt_reservations.store_id) AS seat_type, (SELECT name FROM rt_menu_items m WHERE m.id=rt_reservations.course_id AND m.store_id=rt_reservations.store_id) AS course_name, (SELECT status FROM restaurant_payment_requests p WHERE p.reservation_id=rt_reservations.id AND p.line_account_id=?) AS payment_status, (SELECT id FROM restaurant_payment_requests p WHERE p.reservation_id=rt_reservations.id AND p.line_account_id=?) AS payment_request_id FROM rt_reservations WHERE store_id=? AND line_uid=? ORDER BY starts_at DESC LIMIT 100',
         )
-        .bind(store.id, self.uid)
+        .bind(self.accountId,self.accountId,store.id, self.uid)
         .all<CustomerReservationRow>()
     ).results;
     return liffBookingJson(c, { success: true, data: rows.map(customerBooking) });
@@ -263,7 +263,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
       const self = await identity(c);
       if (self instanceof Response) return self;
       const b = await c.req
-        .json<RestaurantCustomerConfirmInput & {startsAt?: string; guestCount?: number; courseId?: string | null;paymentMethod?:unknown}>()
+        .json<RestaurantCustomerConfirmInput & {startsAt?: string; guestCount?: number; courseId?: string | null;paymentMethod?:unknown;feeAccepted?:boolean;expectedFeeAmount?:number}>()
         .catch(() => null);
       if (
         !b ||
@@ -313,19 +313,27 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         return liffBookingJson(c, { success: false, error: 'state_conflict' }, 409);
       const settings = await getBookingAdminSettings(db, self.accountId);
       if (!settings) return liffBookingJson(c, { success: false, error: 'not_found' }, 404);
+      const existingPayment=await db.prepare('SELECT id,status,request_json FROM restaurant_payment_requests WHERE reservation_id=? AND line_account_id=?')
+        .bind(row.id,self.accountId).first<{id:string;status:string;request_json:string}>();
       if (
         action !== 'confirm' &&
+        !(action==='cancel' && existingPayment && ['paid','refund_pending','refunded'].includes(existingPayment.status)) &&
         Date.now() >=
           Date.parse(row.starts_at) -
             settings.cancelDeadlineMinutesBefore * 60000
       )
         return liffBookingJson(c, { success: false, error: 'self_deadline_passed' }, 403);
-      const existingPayment=await db.prepare('SELECT id,status,request_json FROM restaurant_payment_requests WHERE reservation_id=? AND line_account_id=?')
-        .bind(row.id,self.accountId).first<{id:string;status:string;request_json:string}>();
       if(action==='reschedule' && existingPayment && ['pending','paid','refund_pending'].includes(existingPayment.status))return liffBookingJson(c,{success:false,error:'payment_change_requires_refund'},409);
       if(action==='cancel' && existingPayment && ['paid','refund_pending','refunded'].includes(existingPayment.status)) {
-        const result=await cancelPaidRestaurantReservation(c.env,existingPayment.id,row.customer_version);
-        if(result!=='cancelled')return liffBookingJson(c,{success:false,error:'refund_pending'},409);
+        const quote=await restaurantPaidCancellationQuote(db,existingPayment.id);
+        if(!quote)return liffBookingJson(c,{success:false,error:'cancellation_policy_unknown'},409);
+        if(quote.feeNow>0 && existingPayment.status==='paid') {
+          if(b.feeAccepted!==true || b.expectedFeeAmount!==quote.feeNow)return liffBookingJson(c,{success:false,error:'fee_confirmation_required',data:quote},409);
+          if(!await retainRestaurantCancellation(c.env,existingPayment.id,row.customer_version,quote.feeNow))return liffBookingJson(c,{success:false,error:'cancellation_conflict'},409);
+        } else {
+          const result=await cancelPaidRestaurantReservation(c.env,existingPayment.id,row.customer_version);
+          if(result!=='cancelled')return liffBookingJson(c,{success:false,error:'refund_pending'},409);
+        }
         await finish(c,store);
         const cancelled=await db.prepare('SELECT *,NULL seat_type FROM rt_reservations WHERE id=?').bind(row.id).first<CustomerReservationRow>();
         return liffBookingJson(c,{success:true,data:customerBooking(cancelled!)});
@@ -512,7 +520,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/referrals',inputJsonBoundar
 /** 保存済み回答の公開版だけから、既存の席予約の口へ渡す。回答の再送も台帳を増やさない。 */
 restaurantCustomerBooking.post('/api/liff/restaurant/form-booking',inputJsonBoundary(),async c=>{
  const self=await identity(c);if(self instanceof Response)return self;
- const b=await c.req.json<{formId:string;blockId:string;submissionKey:string}>();
+ const b=await c.req.json<{formId:string;blockId:string;submissionKey:string;paymentMethod?:unknown;preview?:boolean;policyAccepted?:boolean;policyVersion?:number;expectedAmount?:number;expectedTotal?:number}>();
  if(!b || ![b.formId,b.blockId,b.submissionKey].every(v=>typeof v==='string' && v.length>0 && v.length<=200))return liffBookingInputError(c,{success:false,error:'invalid_form_booking'},400,['formId','blockId','submissionKey']);
  const db=dbFor(c.env);
  const saved=await db.prepare(`SELECT s.id,s.data,v.layout,v.fields FROM form_submit_claims q
@@ -543,7 +551,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/form-booking',inputJsonBoun
    if(!held.ok)return held;
    const result=await held.json() as {data:{id:string;version:number}};holdId=result.data.id;version=result.data.version;
  }
- const payment=await startRestaurantPayment(c.env,self.accountId,self.uid,holdId,version,{formSubmissionId:saved.id,formId:b.formId,paymentMethod:(b as {paymentMethod?:unknown}).paymentMethod});
+ const payment=await startRestaurantPayment(c.env,self.accountId,self.uid,holdId,version,{formSubmissionId:saved.id,formId:b.formId,paymentMethod:b.paymentMethod,preview:b.preview,policyAccepted:b.policyAccepted,policyVersion:b.policyVersion,expectedAmount:b.expectedAmount,expectedTotal:b.expectedTotal});
  if(payment.required) {
    const row=await db.prepare('SELECT *,NULL seat_type FROM rt_reservations WHERE id=?').bind(holdId).first<CustomerReservationRow>();
    return liffBookingJson(c,{success:true,data:{...customerBooking(row!),payment}});

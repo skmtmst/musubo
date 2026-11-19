@@ -1,1 +1,1 @@
-export { refundRestaurantPayment, finishRestaurantPaidReservation, cancelPaidRestaurantReservation } from '../restaurant-payment-finish.js';
+export { refundRestaurantPayment, finishRestaurantPaidReservation, cancelPaidRestaurantReservation, restaurantPaidCancellationQuote, retainRestaurantCancellation } from '../restaurant-payment-finish.js';

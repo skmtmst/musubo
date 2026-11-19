@@ -1,4 +1,6 @@
 import { depositRule, validDeposit } from '../features/booking/booking-deposit/index.js';
+import { cancellationPolicy } from '../features/booking/booking-cancellation/index.js';
+import { yenPercent } from '@line-crm/shared';
 import { GapError } from '../services/gap-common.js';
 import { getRestaurantReservationForm,putRestaurantReservationForm } from './restaurant-reservation-form.js';
 import { restaurantTableAutomationResponse } from './restaurant-table-automation.js';
@@ -174,20 +176,28 @@ const courseDeposit = async (c: Context<Env>) => {
     if(method==='put' && (c.get('staff').readOnly || c.get('staff').role==='staff' || c.get('impersonation')))return c.json({success:false,error:'forbidden'},403);
     const account=accountId(c);if(!account)return requiredAccount(c);
     const organization=await organizationFor(c);if(!organization)return c.json({success:false,error:'not_found'},404);
-    const menu=await dbFor(c.env).prepare(`SELECT m.id,m.store_id FROM rt_menu_items m JOIN rt_stores s ON s.id=m.store_id
+    const menu=await dbFor(c.env).prepare(`SELECT m.id,m.store_id,m.price FROM rt_menu_items m JOIN rt_stores s ON s.id=m.store_id
       WHERE m.id=? AND m.kind='course' AND s.organization_id=? AND s.line_account_id=? AND (? IS NULL OR s.id=?)`)
-      .bind(c.req.param('id'),organization.id,account,organization.scopedStoreId,organization.scopedStoreId).first<{id:string;store_id:string}>();
+      .bind(c.req.param('id'),organization.id,account,organization.scopedStoreId,organization.scopedStoreId).first<{id:string;store_id:string;price:number}>();
     if(!menu)return c.json({success:false,error:'not_found'},404);
     const db=dbFor(c.env,menu.store_id),scope=`course:${menu.id}`;
     if(method==='get')return c.json({success:true,data:await depositRule(db,account,scope)});
     const body=await c.req.json<Record<string,unknown>>().catch(()=>null);
     if(!body || !Number.isSafeInteger(body.expectedVersion) || Number(body.expectedVersion)<0 || typeof body.inherit!=='boolean')return c.json({success:false,error:'invalid_deposit_rule'},400);
     let rule:ReturnType<typeof validDeposit>;try{rule=validDeposit(body);}catch(error){if(error instanceof GapError)return c.json({success:false,error:error.code},400);throw error;}
+    const policy=await cancellationPolicy(db,account);
+    if(!body.inherit && rule.kind!=='none' && Number(rule.value)>0) {
+      const amount=rule.kind==='percent'?yenPercent(menu.price,Number(rule.value)):Math.min(menu.price,Number(rule.value));
+      if(!policy.enabled || policy.tiers.filter(t=>t.percent>0).some(t=>yenPercent(menu.price,t.percent)<amount) || yenPercent(menu.price,policy.noShowPercent)<amount)
+        return c.json({success:false,error:'キャンセル料が予約金以上になるよう設定してください',code:'deposit_exceeds_cancellation_fee'},409);
+    }
     const version=Number(body.expectedVersion);
     const result=await db.prepare(`INSERT INTO booking_deposit_rules(account_id,scope_id,rule_json,inherit,updated_by,updated_at)
-      SELECT ?,?,?,?,?,? WHERE ?=0 OR EXISTS(SELECT 1 FROM booking_deposit_rules WHERE account_id=? AND scope_id=? AND version=?)
+      SELECT ?,?,?,?,?,? WHERE (?=0 OR EXISTS(SELECT 1 FROM booking_deposit_rules WHERE account_id=? AND scope_id=? AND version=?))
+      AND ((?=0 AND NOT EXISTS(SELECT 1 FROM booking_cancellation_policies WHERE line_account_id=?)) OR EXISTS(SELECT 1 FROM booking_cancellation_policies WHERE line_account_id=? AND version=?))
+      AND EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND kind='course' AND price=?)
       ON CONFLICT(account_id,scope_id) DO UPDATE SET rule_json=excluded.rule_json,inherit=excluded.inherit,version=version+1,updated_by=excluded.updated_by,updated_at=excluded.updated_at WHERE version=?`)
-      .bind(account,scope,JSON.stringify(rule),body.inherit?1:0,c.get('staff').id,new Date().toISOString(),version,account,scope,version,version).run();
+      .bind(account,scope,JSON.stringify(rule),body.inherit?1:0,c.get('staff').id,new Date().toISOString(),version,account,scope,version,policy.version,account,account,policy.version,menu.id,menu.store_id,menu.price,version).run();
     if(!result.meta.changes)return c.json({success:false,error:'version_conflict'},409);
     return c.json({success:true,data:await depositRule(db,account,scope)});
 };

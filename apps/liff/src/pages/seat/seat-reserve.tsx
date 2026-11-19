@@ -96,6 +96,12 @@ export default function SeatReserve() {
   const [result, setResult] = useState<{ booking: RestaurantCustomerBooking; changed: boolean } | null>(null);
   const [mine, setMine] = useState<RestaurantCustomerBooking[]>([]);
   const [cancelling, setCancelling] = useState<RestaurantCustomerBooking | null>(null);
+  const [cancelFee,setCancelFee]=useState<number|null>(null);
+  const [paymentChoice,setPaymentChoice]=useState<'online'|'onsite'|undefined>();
+  const [choosePayment,setChoosePayment]=useState(false);
+  const [paymentConfirm,setPaymentConfirm]=useState<{id:string;version:number;details:import('@line-crm/shared').RestaurantCustomerDetails & {paymentMethod?:'online'|'onsite'};total:number;amount:number;remaining:number;cancellation:string;policyVersion:number}|null>(null);
+  const [paymentAccepted,setPaymentAccepted]=useState(false);
+  const [paymentError,setPaymentError]=useState<string|null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState('LINEのお客さま');
@@ -169,7 +175,13 @@ export default function SeatReserve() {
       const selected=requested && /^\d{4}-\d{2}-\d{2}$/.test(requested) && requested>=t ? requested:t;
       setDate(selected);
       await loadDays(s, [...c.map((x) => x.date), addDays(t, c.length),selected], defaultGuests);
-      if (showMine) await loadMine(s);
+      const paymentRequest=params.get('payment_request');
+      if(paymentRequest && params.get('payment_result')) {
+        const rows=(await restaurantBookingApi.mine(s.id)).data;
+        const paid=rows.find(row=>row.paymentRequestId===paymentRequest);
+        if(paid?.status==='confirmed') {setResult({booking:paid,changed:false});setView('done');}
+        else {setMine(upcomingBookings(rows));setView('mine');setError(paid?.paymentStatus==='refunded'?'予約を確定できなかったため、お支払いは返金されました。':params.get('payment_result')==='cancelled'?'お支払いは完了していません。':'お支払いと予約の状態を確認しています。しばらくしてから読み直してください。');}
+      } else if (showMine) await loadMine(s);
       setLoadState('ready');
     } catch (e) {
       logFailure('seat-link', e);
@@ -294,6 +306,14 @@ export default function SeatReserve() {
     setBusy(true);
     setError(null);
     try {
+      if(!target && hold) {
+        const details={note:note.trim()||null,customerPhone:normalizePhone(phone)||null,customerName:customerName.trim(),allergyNote:allergy.trim()||null,expectedFormVersion:store.reservationForm?.version??0,...(paymentChoice?{paymentMethod:paymentChoice}:{})};
+        const prepared=await restaurantBookingApi.payment(hold.id,hold.version,{...details,preview:true});
+        if(!mutation.isCurrent(requestGeneration))return;
+        if(prepared.data.required) {
+          setPaymentError(null);setPaymentAccepted(false);setPaymentConfirm({id:hold.id,version:hold.version,details,total:prepared.data.quote.total,amount:prepared.data.quote.amount,remaining:prepared.data.quote.remaining,cancellation:prepared.data.quote.cancellation.text,policyVersion:prepared.data.quote.cancellation.version});return;
+        }
+      }
       const r = target
         ? await restaurantBookingApi.reschedule(target.id, {
             expectedVersion: target.version,
@@ -305,6 +325,7 @@ export default function SeatReserve() {
             note: note.trim() || null,
             customerPhone: normalizePhone(phone) || null,
             customerName:customerName.trim(),allergyNote:allergy.trim()||null,expectedFormVersion:store.reservationForm?.version??0,
+            ...(paymentChoice ? {paymentMethod:paymentChoice} : {}),
             ...(params.get('referralId') ? {referralId:params.get('referralId')!} : {}),
           });
       if (!mutation.isCurrent(requestGeneration)) return;
@@ -315,6 +336,7 @@ export default function SeatReserve() {
       setView('done');
     } catch (e) {
       if (!mutation.isCurrent(requestGeneration)) return;
+      if((e as {body?:{error?:string}}).body?.error==='payment_method_required') {setChoosePayment(true);setError('お支払い方法を選んでください。');return;}
       logFailure(target ? 'seat-reschedule' : 'seat-confirm', e);
       setError(seatErrorMessage(e));
       if((e as {body?:{error?:string}}).body?.error==='reservation_form_changed'){
@@ -337,6 +359,7 @@ export default function SeatReserve() {
       restaurantBookingApi.cancel(hold.id, hold.version).catch((e) => logFailure('seat-release', e));
     }
     setHold(null);
+    setPaymentChoice(undefined);setChoosePayment(false);setPaymentConfirm(null);
     setExpired(false);
     setError(null);
     requestId.current = null;
@@ -377,12 +400,14 @@ export default function SeatReserve() {
     setBusy(true);
     setError(null);
     try {
-      await restaurantBookingApi.cancel(cancelling.id, cancelling.version);
+      await restaurantBookingApi.cancel(cancelling.id, cancelling.version,cancelFee===null?undefined:{feeAccepted:true,expectedFeeAmount:cancelFee});
       setCancelling(null);
+      setCancelFee(null);
       await loadMine(store);
     } catch (e) {
-      logFailure('seat-cancel', e);
-      setError(seatErrorMessage(e));
+      const body=(e as {body?:{error?:string;data?:{feeNow?:unknown}}}).body;
+      if(body?.error==='fee_confirmation_required' && Number.isSafeInteger(body.data?.feeNow) && Number(body.data?.feeNow)>0) {setCancelFee(Number(body.data?.feeNow));setError(null);}
+      else {logFailure('seat-cancel', e);setError(seatErrorMessage(e));}
     } finally {
       busyRef.current=false;
       setBusy(false);
@@ -390,6 +415,7 @@ export default function SeatReserve() {
   }
 
   function newBooking() {
+    setPaymentChoice(undefined);setChoosePayment(false);setPaymentConfirm(null);
     courseRef.current=null;
     setCourseId(null);
     setNote('');
@@ -482,13 +508,14 @@ export default function SeatReserve() {
             </section>}
             {<CourseChoice compact courses={courses} value={courseId} disabled={busy} onChange={id=>{
               setReferrals([]);setReferralLoaded(false);
-              courseRef.current=id; setCourseId(id); setStartsAt(null); requestId.current=null;
+              courseRef.current=id; setCourseId(id); setStartsAt(null); requestId.current=null;setPaymentChoice(undefined);setChoosePayment(false);setPaymentConfirm(null);
               void loadDays(store,[...chips.map(c=>c.date),date],guestCount);
             }} />}
 
             </>
           )}
           {view === 'confirm' && slot && (
+            <>
             <SeatConfirm
                 timeZone={store.timezone}
                 storeName={store.name}
@@ -516,6 +543,8 @@ export default function SeatReserve() {
                 onBack={backToPick}
                 onExpired={() => setExpired(true)}
               />
+            {choosePayment && <fieldset><legend>お支払い方法</legend><label><input type="radio" name="restaurant-payment" checked={paymentChoice==='online'} onChange={()=>setPaymentChoice('online')} />オンラインで先払い</label><label><input type="radio" name="restaurant-payment" checked={paymentChoice==='onsite'} onChange={()=>setPaymentChoice('onsite')} />お店で払う</label></fieldset>}
+            </>
           )}
           {view === 'done' && result && (
             <SeatDone
@@ -527,6 +556,7 @@ export default function SeatReserve() {
             />
           )}
           {view === 'mine' && (
+            <>
             <SeatMine
               rows={mine}
               timeZone={store.timezone}
@@ -538,6 +568,8 @@ export default function SeatReserve() {
                 setCancelling(b);
               }}
             />
+            {params.get('payment_result') && <Button variant="secondary" onClick={()=>void load()}>支払いと予約を読み直す</Button>}
+            </>
           )}
         </div>
       </div>
@@ -590,6 +622,7 @@ export default function SeatReserve() {
         </BottomBar>
       )}
 
+      <ConfirmDialog open={Boolean(paymentConfirm)} title="お支払い内容を確認" description={paymentConfirm?`料金 ${paymentConfirm.total.toLocaleString('ja-JP')} 円・今お支払い ${paymentConfirm.amount.toLocaleString('ja-JP')} 円・お店で ${paymentConfirm.remaining.toLocaleString('ja-JP')} 円。${paymentConfirm.cancellation}`:''} confirmLabel="お支払いへ進む" busy={busy} error={paymentError??undefined} confirmDisabled={!paymentAccepted} onCancel={()=>{if(!busy)setPaymentConfirm(null)}} onConfirm={()=>{void (async()=>{if(!paymentConfirm || !paymentAccepted || busy)return;setBusy(true);setPaymentError(null);try{const result=await restaurantBookingApi.payment(paymentConfirm.id,paymentConfirm.version,{...paymentConfirm.details,policyAccepted:true,policyVersion:paymentConfirm.policyVersion,expectedAmount:paymentConfirm.amount,expectedTotal:paymentConfirm.total});if(result.data.status==='paid'){setPaymentError('お支払いを確認しています。予約一覧を読み直してください。');return;}const url=new URL(result.data.url??'');if(url.protocol!=='https:' || url.hostname!=='checkout.stripe.com' || url.username || url.password || url.port)throw new Error('invalid_checkout_url');liff.openWindow({url:url.toString(),external:true});}catch{setPaymentError('お支払いの内容を確認できませんでした。閉じて最初からやり直してください。');}finally{setBusy(false);}})()}}><label><input type="checkbox" checked={paymentAccepted} onChange={event=>setPaymentAccepted(event.target.checked)} />キャンセル料の決まりを確認しました</label></ConfirmDialog>
       <ConfirmDialog
         open={!!cancelling}
         title="ご予約を取り消しますか"
@@ -597,7 +630,7 @@ export default function SeatReserve() {
           cancelling
             ? (() => {
                 const p = zonedParts(cancelling.startsAt, store.timezone);
-                return `${longDate(p.date)}${p.hm}〜・${cancelling.guestCount}名のご予約を取り消します。元に戻せません。`;
+                return `${longDate(p.date)}${p.hm}〜・${cancelling.guestCount}名のご予約を取り消します。${cancelFee===null?'元に戻せません。':`予約金 ${cancelFee.toLocaleString('ja-JP')} 円をキャンセル料に充てます。`}`;
               })()
             : ''
         }
@@ -609,6 +642,7 @@ export default function SeatReserve() {
         onConfirm={() => void doCancel()}
         onCancel={() => {
           setCancelling(null);
+          setCancelFee(null);
           setError(null);
         }}
       />

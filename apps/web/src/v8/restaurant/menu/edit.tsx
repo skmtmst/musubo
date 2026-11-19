@@ -197,6 +197,7 @@ function MenuEditBody() {
       }
       /* お支払いの版が古い（409）ときは共通の帯と比べる窓で選んでもらう。ページの中身は保存済み。 */
       if (cause instanceof PaymentConflictError) { setSaved(draft); setError('メニュー本体は保存しました。お支払いの設定は、閉じて最新の内容と比べてください。'); return false }
+      if (cause instanceof ApiError && cause.code==='deposit_exceeds_cancellation_fee') { setSaved(draft); setError('メニュー本体は保存しました。キャンセル料が予約金以上になるよう設定してください。'); return false }
       saveErrors.capture(cause)
       if (cause instanceof ApiError && cause.code === 'MENU_IMAGE_UNAVAILABLE') setImageError('選択した画像を利用できません。登録メディアから選び直してください。')
       setError('保存できませんでした。入力を確かめて、もう一度お試しください。')

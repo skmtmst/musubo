@@ -523,6 +523,32 @@ describe('飲食4：コース・フォーム・系列店',()=>{
   db.raw.prepare("INSERT INTO form_submissions(id,form_id,friend_id,data,form_version_id) VALUES('answer','form','f1',?,?)").run(JSON.stringify({seat:{kind:'seats',storeId:'store',guestCount:2,startsAt:start}}),version.v);
   db.raw.exec(`INSERT INTO form_submit_claims(tenant_id,line_account_id,form_id,friend_id,idempotency_key,request_hash,status,submission_id,owner,created_at,updated_at,expires_at) VALUES('t1','a1','form','f1','submission-key','hash','completed','answer','owner',datetime('now'),datetime('now'),datetime('now','+1 day'))`);
  }
+ it('有料フォームは金額を下見して同意を保存し、同じ回答で二重決済しない',async()=>{
+  course();savedAnswer();
+  db.raw.prepare("UPDATE form_submissions SET data=? WHERE id='answer'").run(JSON.stringify({seat:{kind:'seats',storeId:'store',courseId:'c90',guestCount:2,startsAt:start}}));
+  db.raw.exec(`UPDATE line_accounts SET liff_id='1234567890-abcdef' WHERE id='a1';
+   INSERT INTO booking_payment_configs(line_account_id,mode,provider,hold_minutes,created_at,updated_at) VALUES('a1','online','stripe',10,datetime('now'),datetime('now'));
+   INSERT INTO booking_payment_connections(line_account_id,provider,provider_account_id,test_mode,connected_at) VALUES('a1','stripe','acct_original',1,datetime('now'));`);
+  const fetchMock=vi.fn(async(url:string,init?:RequestInit)=>{
+   if(String(url).includes('oauth2/v2.1/verify')){const body=new URLSearchParams(String(init?.body));return Response.json({sub:'U'+body.get('id_token'),aud:body.get('client_id'),exp:Date.now()/1000+3600});}
+   if(String(url).endsWith('/customers'))return Response.json({id:'cus_form',livemode:false});
+   if(String(url).endsWith('/checkout/sessions'))return Response.json({id:'cs_test_form',url:'https://checkout.stripe.com/c/pay/cs_test_form',livemode:false});
+   throw new Error('unexpected');
+  });vi.stubGlobal('fetch',fetchMock);
+  const testApp=app({BOOKING_STRIPE_TEST_SECRET_KEY:'sk_test_example'});
+  const call=(body:unknown)=>testApp.request('/api/liff/restaurant/form-booking?liffId=1234567890-abcdef',{method:'POST',headers:{Authorization:'Bearer one','Content-Type':'application/json'},body:JSON.stringify(body)});
+  const base={formId:'form',blockId:'seat-block',submissionKey:'submission-key'};
+  const preview=await call({...base,preview:true});expect(preview.status).toBe(200);
+  expect(await preview.json()).toMatchObject({data:{payment:{preview:true,quote:{total:10000,amount:10000}}}});
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM restaurant_payment_requests').get()).toEqual({n:0});
+  expect((await call(base)).status).toBe(409);
+  const accepted={...base,policyAccepted:true,policyVersion:0,expectedAmount:10000,expectedTotal:10000};
+  expect((await call(accepted)).status).toBe(200);expect((await call(accepted)).status).toBe(200);
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM restaurant_payment_requests').get()).toEqual({n:1});
+  expect(db.raw.prepare('SELECT policy_accepted_at FROM restaurant_payment_requests').get()).toEqual({policy_accepted_at:expect.any(String)});
+  expect(fetchMock.mock.calls.filter(([url])=>String(url).endsWith('/checkout/sessions'))).toHaveLength(1);
+  vi.unstubAllGlobals();
+ });
  it('保存済みフォームの公開版から既存台帳へ予約。同時再試行で回答と予約を増やさず下書き変更を使わない',async()=>{
   savedAnswer();
   db.raw.exec("UPDATE forms SET layout='{}' WHERE id='form'");
@@ -711,7 +737,7 @@ it('コース単価×人数を試験決済し、署名済み入金で席の検�
  const h=await call('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,requestId:'paid_request_1',courseId:'paid-course'});expect(h.status).toBe(201);
  const holdData=(await read(h)).data;
  expect((await call(`/api/liff/restaurant/reservations/${holdData.id}/confirm`,{expectedVersion:holdData.version})).status).toBe(409);
- const payment=await call(`/api/liff/restaurant/reservations/${holdData.id}/payment`,{expectedVersion:holdData.version,customerName:'本人',note:'窓側'});
+ const payment=await call(`/api/liff/restaurant/reservations/${holdData.id}/payment`,{expectedVersion:holdData.version,customerName:'本人',note:'窓側',policyAccepted:true,policyVersion:0,expectedAmount:10000,expectedTotal:10000});
  expect(payment.status).toBe(200);expect(await payment.json()).toMatchObject({data:{required:true,status:'pending',quote:{total:10000,amount:10000}}});
  expect((await call(`/api/liff/restaurant/reservations/${holdData.id}/payment`,{expectedVersion:holdData.version},'two')).status).toBe(404);
  expect((await call(`/api/liff/restaurant/reservations/${holdData.id}/confirm`,{expectedVersion:holdData.version})).status).toBe(409);
