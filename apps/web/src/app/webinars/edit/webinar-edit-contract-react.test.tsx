@@ -199,6 +199,7 @@ it('通知と CTA は子の段が1回だけ取り、CTA の枚数は取得と保
 it('公開中で URL を検査済みなら、編集の口の URL を別窓で開く', async () => {
   await render()
   const link = ([...host.querySelectorAll('a')].find((anchor) => anchor.textContent?.includes('公開ページを見る')) ?? querySupplementaryPageAction('公開ページを見る'))
+  expect(host.textContent).not.toContain('プレビューは準備中です')
   expect(link?.getAttribute('href')).toBe(PUBLIC_URL)
   expect(link?.getAttribute('target')).toBe('_blank')
   expect(link?.getAttribute('rel')).toContain('noopener')
@@ -217,6 +218,7 @@ it.each([
   await render()
   expect([...host.querySelectorAll('a')].some((anchor) => anchor.textContent?.includes('公開ページを見る'))).toBe(false)
   expect(host.textContent).toContain(reason)
+  expect(host.textContent).not.toContain('プレビューは準備中です')
   for (const other of ['LINE公式アカウントを確認しています。', 'このウェビナーのLINE公式アカウントを確認できません。', 'LINE公式アカウントにLIFF IDが設定されていません。', '公開すると、友だちが見るページを確認できます。']) {
     if (other !== reason) expect(host.textContent).not.toContain(other)
   }
