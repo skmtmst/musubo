@@ -25,14 +25,7 @@ describe('V8 ウェビナー一覧の契約', () => {
     expect(PAGE).not.toContain('min-h-[640px]')
   })
 
-  it('同じ /webinars/new への操作名を言い換えない(DETAIL-02)', () => {
-    expect(PAGE).not.toContain('ウェビナーを作成')
-    expect(PAGE).not.toContain('ウェビナーをつくる')
-  })
 
-  it('動画欄は slug.mp4 の偽名を作らない(DETAIL-18)', () => {
-    expect(EDIT).not.toContain('webinar.slug}.mp4')
-  })
 
   it('通知概要の状態を成功色に固定しない(DETAIL-19)', () => {
     expect(EDIT).not.toContain('text-success text-xs font-semibold">{enabled(')

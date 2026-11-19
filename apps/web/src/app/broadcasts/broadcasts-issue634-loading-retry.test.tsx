@@ -119,6 +119,7 @@ describe('#634 一斉配信の読込表示と再読み込み', () => {
     render(<BroadcastsPage />)
 
     await waitFor(() => expect(screen.getByText('一斉配信を読み込めませんでした')).toBeTruthy())
+    expect(screen.queryByText('いまは読み込めていません。上の案内をご覧ください。')).toBeNull()
 
     // ★管理画面 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
