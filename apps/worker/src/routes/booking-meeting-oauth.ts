@@ -72,7 +72,7 @@ bookingMeetingOAuth.get('/api/booking/admin/meeting-oauth/callback',async c=>{
  const accountId=await gapAccount(c,row.line_account_id);await staffTarget(c,accountId,row.staff_id,true);
  const key=c.env.LINE_CREDENTIAL_ENCRYPTION_KEY;if(!key)throw new GapError('oauth_not_configured',503);
  const consumed=await consumeMeetingAuthorization(c.env.DB,{accountId,state,actorId,encryptionKey:key});if(!consumed)throw new GapError('invalid_state',401);
- if(c.req.query('error')||!c.req.query('code'))return c.redirect(adminReturn(c,accountId,consumed.staffId,'denied')); 
+ if(c.req.query('error')||!c.req.query('code'))return c.redirect(adminReturn(c,accountId,consumed.staffId,'denied'));
  const config=oauthConfig(c,consumed.provider);if(!config)throw new GapError('oauth_not_configured',503);
  let tokens:Awaited<ReturnType<typeof exchangeMeetingAuthorization>>;
  try{tokens=await exchangeMeetingAuthorization(config,{code:c.req.query('code')!,verifier:consumed.verifier,signal:AbortSignal.timeout(15000)});}catch{return c.redirect(adminReturn(c,accountId,consumed.staffId,'failed'));}
