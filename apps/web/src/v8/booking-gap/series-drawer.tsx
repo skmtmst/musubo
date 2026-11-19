@@ -4,7 +4,7 @@ import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
-import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
+import { isConflictResponse } from '@/components/shared/save-conflict'
 
 import { Field } from '@/components/shared/form-controls'
 
@@ -17,13 +17,13 @@ import { CalendarX2 } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Drawer from '@/components/shared/drawer'
+import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
 import SegmentedControl from '@/components/shared/segmented'
 import Toggle from '@/components/shared/toggle'
 import NumberField from '@/components/shared/number-field'
 import { Skeleton } from '@/components/shared/skeleton'
 import { notifySaved } from '@/components/shared/toast'
-import { ApiError } from '@/lib/api'
 import { bookingSeriesApi } from '@/lib/api/helpers/gap2'
 import type { RecurrenceFrequency as SeriesFreq, SeriesOccurrence } from '@line-crm/shared'
 import { reasonText, createdCount, dayOf, dayWithWeekday, FREQ_OPTIONS, hm, initialPick, ruleLabel, weekdayOf, type Pick } from './series-model'
@@ -66,6 +66,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [list, setList] = useState<SeriesOccurrence[]>([])
   const [unreadable, setUnreadable] = useState(false)
+  const [unavailableDismissed, setUnavailableDismissed] = useState(false)
   const [picks, setPicks] = useState<Record<number, Pick>>({})
   const [busy, setBusy] = useState(false)
   const [conflict, setConflict] = useState(false)
@@ -78,7 +79,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
 
   useEffect(() => {
     if (!open) return
-    setOn(true); setFreq('weekly'); setCountText('8'); setPicks({}); setConflict(false); setError(''); key.current = crypto.randomUUID()
+    setUnavailableDismissed(false); setOn(true); setFreq('weekly'); setCountText('8'); setPicks({}); setConflict(false); setError(''); key.current = crypto.randomUUID()
   }, [open])
 
   /* 確かめ直す：入力が止まってから。古い返事は捨てる。 */
@@ -96,7 +97,8 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
       }).then((res) => {
         if (!current) return
         setList(res.data.occurrences)
-        setUnreadable(res.data.occurrences.some((o) => !o.available && o.reason === 'calendar_unreadable'))
+        setUnavailableDismissed(false)
+        setUnreadable(res.data.occurrences.some((o) => !o.available && (o.reason === 'calendar_unreadable' || o.reason === 'calendar_unavailable')))
         setPicks(Object.fromEntries(res.data.occurrences.map((o) => [o.index, initialPick(o)])))
         setState('ready')
       }).catch(() => { if (current) setState('error') })
@@ -209,6 +211,11 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
         {on && state === 'ready' ? <p className={styles.note}>{formatNumber(list.length)} 回のうち {made} 件を入れます{skipped.length ? `（${skipped.map((o) => dayOf(o.startsAt, summary.timeZone)).join('・')} は飛ばす）` : ''}。保存の直前に空きを確かめ直します。</p> : null}
       </div>
     </Drawer>
+    <Dialog open={open && state === 'ready' && unreadable && !unavailableDismissed} title="この回は予約できません" size="small" contentLayout="form"
+      description="担当者の予定を確認できないため、空きを確かめられません。"
+      cancelLabel="キャンセル" confirmLabel="別の日時を選ぶ" onCancel={() => setUnavailableDismissed(true)} onConfirm={onClose}>
+      {list.filter(item => !item.available && (item.reason === 'calendar_unavailable' || item.reason === 'calendar_unreadable')).map(item => <p key={item.index}>{dayWithWeekday(item.startsAt, summary.timeZone)} {hm(item.startsAt, summary.timeZone)}　確認できません</p>)}
+    </Dialog>
     </>
   )}</SaveErrorScope>)
 }
