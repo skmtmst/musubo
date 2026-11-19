@@ -8,7 +8,7 @@ import { jstCalendar as japanCalendar, jstDate as japanDate } from '@/lib/jst-da
 import { copyBroadcastDraft,copyRecentBroadcast } from './broadcast-copy-draft'
 import { applyBroadcastTemplate } from './broadcast-apply-template'
 import { placeBroadcastTemplate } from './broadcast-place-template'
-import { broadcastAbProblem, B_DRAFT_UNAVAILABLE } from './broadcast-ab-guard'
+import { broadcastAbProblem } from './broadcast-ab-guard'
 import { broadcastAbSendProblem } from './broadcast-ab-send-guard'
 import BroadcastCheckAcknowledgement from './broadcast-check-acknowledgement'
 import { useBroadcastFormError } from './use-broadcast-form-error'
@@ -69,6 +69,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave/index'
 import { useBroadcastAb } from '@/v8/broadcast-ab/public/use-ab/index'
+import { broadcastAbApi } from '@/v8/broadcast-ab/public/api/index'
 import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/public/host/index'
 import type { Folder,SendConfirmationPreview } from '@line-crm/shared'
 import { AlertTriangle,ArrowRight,CheckCircle2,Eye,Save } from 'lucide-react'
@@ -286,6 +287,8 @@ export default function BroadcastForm({
     何人に何をいつ送るのかを読み合わせる場所が無かった。
   */
   const { open: confirmOpen, setOpen: setConfirmOpen, scope: confirmationScope, renderedScope: renderedConfirmationScope } = useScopedDialog()
+  const [abTestRecipientCount, setAbTestRecipientCount] = useState<number | null>(null)
+  const abStartKey = useRef<string | null>(null)
   const [acknowledgementKey, setAcknowledgementKey] = useState<string | null>(null)
   const [preflightDialogOpen, setPreflightDialogOpen] = useState(false)
   const { open: testDialogOpen, setOpen: setTestDialogOpen, scope: testScope, renderedScope: renderedTestScope } = useScopedDialog()
@@ -506,6 +509,7 @@ export default function BroadcastForm({
         createKey: draftSession.current.createKey,
       }
       draftSessionsByAccount.current.set(draftSession.current.accountId, draftSession.current)
+      ab.restoreDraft(draft.draftPayload?.draftAb)
       setEditingDraft(draft)
       saveConflict.clear()
       // 読み込んだ下書きの形を「保存ずみ」の基準にし直す（★管理画面 §5 未保存判定）。
@@ -942,7 +946,7 @@ export default function BroadcastForm({
   const sendInputProblem = useRef<string | null>(null)
   sendInputProblem.current = liveStepProblems.audience?.message ?? liveStepProblems.schedule?.message ?? null
 
-  const draftPayload = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) => buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, deliveryLimit, selectedAccountId, sendChoice, spreadStartMode, spreadMinutes: effectiveSpreadMinutes, scheduledDate, scheduledTime, targetMode, targetPayload, title, trackLinks }, scheduledAt, saveAsDraft, confirmedCount)
+  const draftPayload = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) => ({ ...buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, deliveryLimit, selectedAccountId, sendChoice, spreadStartMode, spreadMinutes: effectiveSpreadMinutes, scheduledDate, scheduledTime, targetMode, targetPayload, title, trackLinks }, scheduledAt, saveAsDraft, confirmedCount), ...(saveAsDraft && ab.b ? { draftAb: { bubbles: ab.b, enabled: ab.enabled, settings: ab.settings } } : {}) })
 
   /**
    * テスト後の修正も同じ下書きへ上書きし、予約時に別レコードを作らない。
@@ -961,7 +965,7 @@ export default function BroadcastForm({
    * 誤保存は persistDraft が別の口で止めている）。
    */
   const formFingerprint = JSON.stringify(
-    draftPayload(scheduledAtIso()),
+    { ...draftPayload(scheduledAtIso()), draftAb: ab.b ? { bubbles: ab.b, enabled: ab.enabled, settings: ab.settings } : null },
     (key, value) => (key === 'lineAccountId' ? undefined : value),
   )
   const cleanFingerprintRef = useRef<string | null>(null)
@@ -970,14 +974,14 @@ export default function BroadcastForm({
     if (cleanFingerprintRef.current === null) cleanFingerprintRef.current = formFingerprint
   })
   const draftDirty = cleanFingerprintRef.current !== null && formFingerprint !== cleanFingerprintRef.current
-  const dirty = draftDirty || ab.b !== null
+  const dirty = draftDirty
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving, subject: '配信の変更' })
   const queuedAutosave = useRef({ fingerprint: formFingerprint, step: currentStep })
   if (queuedAutosave.current.fingerprint !== formFingerprint) queuedAutosave.current = { fingerprint: formFingerprint, step: currentStep }
   const draftAutosave = useDraftAutosave({
     fingerprint: `${selectedAccountId}:${formFingerprint}`,
     dirty: draftDirty,
-    enabled: Boolean(selectedAccountId) && ab.b === null && !saveConflict.conflict && !validate(),
+    enabled: Boolean(selectedAccountId) && !saveConflict.conflict && !validate(),
     paused: saving || testSending || leaveTarget !== null,
     save: async () => {
       if (!selectedAccountId || validate()) return false
@@ -990,9 +994,9 @@ export default function BroadcastForm({
       return true
     },
   })
-  const draftStatusLabel = ab.b !== null ? 'B案は下書きに保存できません' : draftAutosave.label
+  const draftStatusLabel = draftAutosave.label
 
-  const saveDraftNow = () => ab.b !== null ? (setError(broadcastAbProblem(bubbles, ab.b, ab.enabled, targetMode === 'all') || B_DRAFT_UNAVAILABLE), Promise.resolve(false)) : saveBroadcastDraft({ cleanFingerprintRef, draftAutosave, formFingerprint, onDraftSaved, persistDraft, rejectValidation, saveErrors, scheduledAtIso, selectedAccountIdRef, setError, setSaving, validate })
+  const saveDraftNow = () => saveBroadcastDraft({ cleanFingerprintRef, draftAutosave, formFingerprint, onDraftSaved, persistDraft, rejectValidation, saveErrors, scheduledAtIso, selectedAccountIdRef, setError, setSaving, validate })
 
   /**
    * テスト送信。下書きを作って、そこから自分宛に送る。
@@ -1026,6 +1030,9 @@ export default function BroadcastForm({
     const validationError = broadcastAbSendProblem(ab.enabled, audienceCount) || validate() || sendInputProblem.current
     if (validationError) { rejectValidation(validationError); return }
     if (!selectedAccountId) return
+    if (ab.enabled && (!currentStep || sendMode !== 'now')) { setError('A/Bの検証送信は作成手順から「今すぐ送る」を選んでください。'); return }
+    setAbTestRecipientCount(null)
+    abStartKey.current = crypto.randomUUID()
     confirmationScope.current = { accountId: selectedAccountId, generation: accountGenerationRef.current }
     setError('')
     setAcknowledgementKey(null)
@@ -1207,7 +1214,8 @@ export default function BroadcastForm({
    * 二者承認の出し分け（設計 A-1・A-4）。人数は配信前チェックの数だけを使う。
    * 5手順の作成画面では、設定が読めるまで送信の確定を止める。
    */
-  const needsApproval = audienceCount !== null
+  const abAlreadyApproved = Boolean(ab.enabled && !draftDirty && editingDraft?.approvalStatus === 'approved' && editingDraft.version === draftSession.current.version)
+  const needsApproval = !abAlreadyApproved && audienceCount !== null
     && approvalConfig !== null
     && (preflight?.deliveryLimit?.candidateCount ?? audienceCount) >= approvalConfig.threshold
   const needsApprovalSingle = needsApproval && approvalConfig?.singleOperator === true
@@ -1224,14 +1232,27 @@ export default function BroadcastForm({
   const [previewSeq, setPreviewSeq] = useState(0)
   useEffect(() => { setConfirmOpen(false); setApprovalConfig(null); setSendPreview({ state: 'loading', data: null, broadcast: null }) }, [selectedAccountId])
   useEffect(() => {
-    if (!confirmOpen || needsApprovalSingle || !currentStep) return
+    if (!confirmOpen || (!ab.enabled && needsApprovalSingle) || !currentStep) return
     let alive = true
     setSendPreview({ state: 'loading', data: null, broadcast: null })
     void (async () => {
       try {
-        const saved = await persistDraft(scheduledAtIso(), true, undefined, 'confirm')
+        let saved = abAlreadyApproved ? editingDraft : await persistDraft(scheduledAtIso(), true, undefined, 'confirm')
         if (!alive) return
         if (!saved) { setSendPreview({ state: 'error', data: null, broadcast: null }); return }
+        if (ab.enabled && !abAlreadyApproved) {
+          const version = await ab.persist(saved.id, Number(saved.version ?? 0), bubbles)
+          if (!alive) return
+          const session = { ...draftSession.current, version }
+          draftSession.current = session
+          draftSessionsByAccount.current.set(selectedAccountIdRef.current || null, session)
+          saved = { ...saved, version }
+        }
+        if (ab.enabled) {
+          const info = await broadcastAbApi.result(saved.id)
+          if (!alive) return
+          setAbTestRecipientCount(info.data.liveTestRecipientCount ?? null)
+        }
         const preview = await chatSafetyApi.sendPreview(saved.id)
         if (!alive) return
         setSendPreview(preview.success ? { state: 'ready', data: preview.data, broadcast: saved } : { state: 'error', data: null, broadcast: saved })
@@ -1256,12 +1277,33 @@ export default function BroadcastForm({
   const pendingChecks = preflightChecks.filter(check => !check.done)
   const unconfirmedCount = preflight ? pendingChecks.length : null
   // アカウント・保存内容・確認結果が変わったとき、前の了承を使わない。
-  const confirmationKey = JSON.stringify([selectedAccountId, formFingerprint, preflightChecks.map(({ key, value, done }) => ({ key, value, done })), sendPreview.data, previewSeq])
-  const confirmationBlocked = pendingChecks.length > 0 && acknowledgementKey !== confirmationKey
+  const confirmationKey = JSON.stringify([selectedAccountId, formFingerprint, preflightChecks.map(({ key, value, done }) => ({ key, value, done })), sendPreview.data, abTestRecipientCount, previewSeq])
+  const confirmationBlocked = (pendingChecks.length > 0 && acknowledgementKey !== confirmationKey) || (ab.enabled && (abTestRecipientCount === null || abTestRecipientCount < 2))
   const confirmedDeliveryLimit = currentStep && !needsApprovalSingle ? sendPreview.data?.deliveryLimit : preflight?.deliveryLimit
   const confirmationCurrent = renderedConfirmationScope !== null && renderedConfirmationScope.generation === accountGenerationRef.current && renderedConfirmationScope.accountId === selectedAccountId
   const visibleConfirmOpen = confirmOpen && confirmationCurrent
-  const confirmationFields = <>{confirmationScope.current && <OperationTargetSummary accounts={[{ id: confirmationScope.current.accountId }]} />}{confirmedDeliveryLimit && <Notice tone="info">配信できる候補{formatNumber(confirmedDeliveryLimit.candidateCount)}人から、無作為に最大{formatNumber(confirmedDeliveryLimit.recipientCount)}人へ送ります。確認後に人数を増やしません。</Notice>}<BroadcastCheckAcknowledgement issues={pendingChecks.map(check => `${check.label}：${check.value}`)} checked={acknowledgementKey === confirmationKey} onCheckedChange={checked => setAcknowledgementKey(checked ? confirmationKey : null)} disabled={saving} /></>
+  const abTrialCount = abTestRecipientCount === null ? null : ab.settings.testRatioPct === 50 ? abTestRecipientCount : 2 * Math.max(1, Math.floor(abTestRecipientCount * ab.settings.testRatioPct / 200))
+  const confirmationFields = <>{ab.enabled && <Notice tone={abTestRecipientCount !== null && abTestRecipientCount >= 2 ? 'info' : 'warn'}>{abTestRecipientCount === null ? '検証環境の設定とテスト宛先を確認できません。' : `テスト宛先 ${formatNumber(abTestRecipientCount)} 人のうち、今すぐ A・B に ${formatNumber(abTrialCount)} 人へ送ります。残り ${formatNumber(abTestRecipientCount - (abTrialCount ?? 0))} 人には人数不足なら自動送信しません。`}</Notice>}{confirmationScope.current && <OperationTargetSummary accounts={[{ id: confirmationScope.current.accountId }]} />}{confirmedDeliveryLimit && <Notice tone="info">配信できる候補{formatNumber(confirmedDeliveryLimit.candidateCount)}人から、無作為に最大{formatNumber(confirmedDeliveryLimit.recipientCount)}人へ送ります。確認後に人数を増やしません。</Notice>}<BroadcastCheckAcknowledgement issues={pendingChecks.map(check => `${check.label}：${check.value}`)} checked={acknowledgementKey === confirmationKey} onCheckedChange={checked => setAcknowledgementKey(checked ? confirmationKey : null)} disabled={saving} /></>
+  const confirmAb = async () => {
+    if (!ab.enabled || !sendPreview.data || !sendPreview.broadcast || abTestRecipientCount === null || abTestRecipientCount < 2 || !abStartKey.current || saving || submittingRef.current) return
+    if (needsApprovalSingle && !approvalCountMatched) { setError('人数を入れて一致させてください'); return }
+    if (needsApproval && !needsApprovalSingle && !approverId) { setError('承認をお願いする人を選んでください'); return }
+    const account = selectedAccountIdRef.current
+    submittingRef.current = true; setSaving(true); setError('')
+    try {
+      if (needsApproval && !needsApprovalSingle) {
+        const requested = await api.broadcasts.approval.request(sendPreview.broadcast.id, { approverStaffId: approverId, note: approvalNote.trim() || undefined })
+        if (!requested.success) { setError(requested.error); return }
+      } else {
+        const started = await broadcastAbApi.startLive(sendPreview.broadcast.id, Number(sendPreview.data.expectedVersion), sendPreview.data.recipients, abTestRecipientCount, abStartKey.current)
+        if (!started.success || started.data.status !== 'live_testing') { setError('試しの送信を停止しました。結果を確認してください。'); return }
+      }
+      if (account !== selectedAccountIdRef.current) return
+      setConfirmOpen(false); onSuccess(sendPreview.broadcast)
+    } catch (caught) {
+      if (account === selectedAccountIdRef.current && !saveErrors.capture(caught)) setError('A/B 配信を開始できませんでした。内容を確認してください。')
+    } finally { submittingRef.current = false; setSaving(false) }
+  }
   const confirmMessage = async () => {
     const abProblem = broadcastAbSendProblem(ab.enabled, audienceCount)
     if (abProblem) { setError(abProblem); return }
@@ -1269,12 +1311,14 @@ export default function BroadcastForm({
     const problem = sendInputProblem.current
     if (problem) { rejectValidation(problem); return Promise.resolve() }
     if (!canConfirm || confirmationBlocked) return
+    if (ab.enabled) return confirmAb()
     return confirmBroadcastMessage({ onSuccess, scheduledAtIso, sendPreview, setConfirmOpen, setError, setPreviewSeq })
   }
 
   const save = async () => {
     if (confirmOpen && (!renderedConfirmationScope || renderedConfirmationScope !== confirmationScope.current || renderedConfirmationScope.generation !== accountGenerationRef.current)) return
     if (confirmOpen && (!canConfirm || confirmationBlocked)) return
+    if (ab.enabled && confirmOpen && currentStep) return confirmAb()
     return saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, deliveryLimited:!!deliveryLimit, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, sendProblem: () => sendInputProblem.current, setConfirmOpen, setError, setSaving, submittingRef, validate })
   }
 
@@ -1473,7 +1517,7 @@ export default function BroadcastForm({
       「保存して移る」は下書きへ保存できたらそのまま移動し、
       保存できないときはこの画面へ戻って直す。
     */}
-    {renderBroadcastConfirmDialogs({ bDraftUnsupported: ab.b !== null, selectedAccountId, canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen: visibleConfirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendWhenLabel, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title })}
+    {renderBroadcastConfirmDialogs({ abEnabled: ab.enabled, abTestRecipientCount, abTrialCount, bDraftUnsupported: false, selectedAccountId, canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen: visibleConfirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendWhenLabel, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title })}
     {renderBroadcastEditorDialogs({ confirmationBlocked, confirmationFields, ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen: visibleConfirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, testTargetAccountId: renderedTestScope?.accountId ?? null, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen: testDialogOpen && testScopeCurrent(), testHistory, testRecipients, testRecipientState, testResult, testSending, testRetryBlocked, testResultOpen, setTestResultOpen, title, trackLinks })}
   </div></MessageComposerPage></SaveErrorScope>
 }

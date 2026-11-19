@@ -23,7 +23,23 @@ export function useBroadcastAb() {
   }, [])
   const removeB = useCallback(() => { setB(null); setTab('A'); setEnabled(false) }, [])
 
-  /* 保存のあと：B 案と設定を口へ送る。A/B を外したら設定を消す。 */
+  const restoreDraft = useCallback((value: unknown) => {
+    const draft = value && typeof value === 'object' ? value as Record<string, unknown> : null
+    const bubbles = Array.isArray(draft?.bubbles) ? draft.bubbles.filter((item): item is BroadcastBubble =>
+      Boolean(item) && typeof item === 'object' && typeof item.id === 'string' && typeof item.type === 'string' && Boolean(item.content)) : []
+    const stored = draft?.settings && typeof draft.settings === 'object' ? draft.settings as Partial<AbSettings> : {}
+    setB(bubbles.length ? bubbles : null)
+    setEnabled(Boolean(bubbles.length && draft?.enabled))
+    setSettings({
+      testRatioPct: [10, 20, 30, 50].includes(Number(stored.testRatioPct)) ? stored.testRatioPct! : AB_DEFAULT.testRatioPct,
+      metric: stored.metric === 'click' || stored.metric === 'booking' || stored.metric === 'purchase' ? stored.metric : AB_DEFAULT.metric,
+      decideAfterMinutes: [60, 120, 240, 480, 1440].includes(Number(stored.decideAfterMinutes)) ? stored.decideAfterMinutes! : AB_DEFAULT.decideAfterMinutes,
+      undecidedPolicy: stored.undecidedPolicy === 'send_a' ? 'send_a' : 'stop',
+    })
+    setTab('A')
+  }, [])
+
+  /* 保存のあと：B 案と設定を口へ送る。 */
   /* 版は配信の lock_version。案・設定を保存するたびに新しい版が返るので、続けて渡す。返り値は最後の版。 */
   const persist = useCallback(async (broadcastId: string, version: number, aBubbles: BroadcastBubble[]): Promise<number> => {
     if (!b || !enabled) return version
@@ -33,7 +49,7 @@ export function useBroadcastAb() {
     return test.data.version
   }, [b, enabled, settings])
 
-  return { tab, setTab, b, setB, hasB: b !== null, enabled: enabled && b !== null, setEnabled, settings, setSettings, addB, removeB, persist }
+  return { tab, setTab, b, setB, hasB: b !== null, enabled: enabled && b !== null, setEnabled, settings, setSettings, addB, removeB, restoreDraft, persist }
 }
 
 export type BroadcastAb = ReturnType<typeof useBroadcastAb>

@@ -18,18 +18,11 @@ describe('実際に送る処理の入口', () => {
     expect(ctx.persistDraft).not.toHaveBeenCalled()
     expect(ctx.rejectValidation).toHaveBeenCalledExactlyOnceWith('送る時間を選んでください')
   })
-  it.each([
-    ['now', null, 'A/Bは送信に使えず、人数も未確定です。③でB案を消し、人数を確認してください。'],
-    ['scheduled', null, 'A/Bは送信に使えず、人数も未確定です。③でB案を消し、人数を確認してください。'],
-    ['now', 1999, 'A/Bは送信未対応です（条件2,000人以上、現在1,999人）。③でB案を消すとA案を配信できます。'],
-    ['scheduled', 1999, 'A/Bは送信未対応です（条件2,000人以上、現在1,999人）。③でB案を消すとA案を配信できます。'],
-    ['now', 2000, 'A/Bは送信未対応です。③でB案を消すとA案を配信できます。'],
-    ['scheduled', 2000, 'A/Bは送信未対応です。③でB案を消すとA案を配信できます。'],
-  ] as const)('A/B有効・%s・対象%s人は保存や送信を始めない', async (sendMode, audienceCount, reason) => {
+  it.each(['now', 'scheduled'] as const)('A/B有効・%sは通常の送信口を通さない', async sendMode => {
     const persist = vi.fn()
-    const ctx = { ...context(), sendMode, audienceCount, ab: { enabled: true, persist } as never }
+    const ctx = { ...context(), sendMode, ab: { enabled: true, persist } as never }
     await saveBroadcast(ctx)
-    expect(ctx.setError).toHaveBeenCalledWith(reason)
+    expect(ctx.setError).toHaveBeenCalledWith('A/B配信は確認画面から開始してください。')
     expect(ctx.persistDraft).not.toHaveBeenCalled()
     expect(persist).not.toHaveBeenCalled()
     expect(ctx.onSuccess).not.toHaveBeenCalled()

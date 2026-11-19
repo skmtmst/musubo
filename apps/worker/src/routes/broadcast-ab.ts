@@ -28,7 +28,7 @@ broadcastAb.put('/api/broadcasts/:id/variants/:key',requirePermission(BROADCAST_
 });
 broadcastAb.get('/api/broadcasts/:id/ab-result',requirePermission('/broadcasts'),async(c)=>{
  const scoped=await scope(c);const id=c.req.param('id');await recoverAbLiveStart(c.env.DB,id);const test=await c.env.DB.prepare('SELECT * FROM broadcast_ab_tests WHERE broadcast_id=?').bind(id).first();if(!test)throw new GapError('not_found',404);
- const live=await c.env.DB.prepare('SELECT status,start_result_json,stats_json,decide_at,decided_at,winner,remainder_scheduled_at,remainder_sent_at,decide_after_minutes FROM broadcast_ab_live_tests WHERE broadcast_id=?').bind(id).first<{status:string;start_result_json:string|null;stats_json:string|null;decide_at:string;decided_at:string|null;winner:string|null;remainder_scheduled_at:string|null;remainder_sent_at:string|null;decide_after_minutes:number}>();
+ const live=await c.env.DB.prepare('SELECT status,start_result_json,stats_json,decide_at,decided_at,decided_by,winner,remainder_scheduled_at,remainder_sent_at,decide_after_minutes FROM broadcast_ab_live_tests WHERE broadcast_id=?').bind(id).first<{status:string;start_result_json:string|null;stats_json:string|null;decide_at:string;decided_at:string|null;decided_by:string|null;winner:string|null;remainder_scheduled_at:string|null;remainder_sent_at:string|null;decide_after_minutes:number}>();
  const remainder=await c.env.DB.prepare("SELECT count(*) count,SUM(state='sent') sent FROM broadcast_ab_recipients WHERE broadcast_id=? AND variant_key='R'").bind(id).first();
  let liveTestRecipientCount:number|null=null;
  if(c.env.DEPLOY_ENV==='staging'&&c.env.AB_LIVE_DELIVERY_ENABLED==='true'){try{liveTestRecipientCount=(await liveTestAudience(c.env.DB,id)).ids.length;}catch(error){if(!(error instanceof GapError&&error.code==='invalid_test_recipients'))throw error;}}
@@ -38,7 +38,7 @@ broadcastAb.get('/api/broadcasts/:id/ab-result',requirePermission('/broadcasts')
   const variants=(await liveAbStats(c.env.DB,id,cutoff)).map(v=>({...v,clicks:tracked?.n===2?v.clicks:null,clickRate:tracked?.n===2&&v.sent?v.clicks/v.sent:null,bookings:null,purchases:null,purchaseAmount:null}));
   const rest=await c.env.DB.prepare("SELECT COUNT(*) count,SUM(state='sent') sent FROM broadcast_ab_live_recipients WHERE broadcast_id=? AND variant_key='R'").bind(id).first();
   const stats=live.stats_json?JSON.parse(live.stats_json) as {reason?:string;confidence?:number}:null;
-  return c.json({success:true,data:{...live,variants,remainder:{...rest,scheduledAt:live.remainder_scheduled_at,sentAt:live.remainder_sent_at},decideAt:live.decide_at,decidedAt:live.decided_at,decideAfterMinutes:live.decide_after_minutes,confidence:stats?.confidence??null,reason:stats?.reason??null,testMode:false,liveStart:live.start_result_json?JSON.parse(live.start_result_json):null,liveTestRecipientCount}});
+  return c.json({success:true,data:{...live,variants,remainder:{...rest,scheduledAt:live.remainder_scheduled_at,sentAt:live.remainder_sent_at},decideAt:live.decide_at,decidedAt:live.decided_at,decideAfterMinutes:live.decide_after_minutes,confidence:stats?.confidence??null,reason:stats?.reason??null,manuallyChosen:!!live.decided_by&&live.decided_by!=='auto',fallback:stats?.reason==='undecided'&&!!live.winner&&live.decided_by==='auto',testMode:false,liveStart:live.start_result_json?JSON.parse(live.start_result_json):null,liveTestRecipientCount}});
  }
  return c.json({success:true,data:{...test,variants:await abStats(c.env.DB,id),remainder,testMode:true,liveTestRecipientCount}});
 });

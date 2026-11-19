@@ -10,7 +10,7 @@ import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { formatNumber } from '@/lib/format'
 import type { AbMetric, AbUndecided } from './api'
-import { AB_DECIDE_HOURS, AB_MIN_TOTAL, AB_RATIOS, METRIC_WORD, UNDECIDED_WORD, abBlockedReason, decideTime, hm, splitAudience } from './model'
+import { AB_DECIDE_HOURS, AB_MIN_TOTAL, AB_RATIOS, METRIC_WORD, UNDECIDED_WORD, abBlockedReason, decideTime, hm } from './model'
 import type { BroadcastAb } from './use-ab'
 import styles from './ab.module.css'
 
@@ -31,9 +31,8 @@ export default function BroadcastAbSettings({ ab, total, targetAll, start, appro
   onNarrow: () => void
 }) {
   if (!ab.hasB) return null
-  const blocked = abBlockedReason(targetAll, total)
+  const blocked = abBlockedReason(targetAll, total, true)
   const on = ab.enabled && blocked === null
-  const split = splitAudience(total ?? 0, ab.settings.testRatioPct)
   const half = ab.settings.testRatioPct / 2
   const decideAt = decideTime(start, ab.settings.decideAfterMinutes)
   const set = <K extends keyof typeof ab.settings>(key: K, value: (typeof ab.settings)[K]) => ab.setSettings({ ...ab.settings, [key]: value })
@@ -45,9 +44,9 @@ export default function BroadcastAbSettings({ ab, total, targetAll, start, appro
         <span className={styles.spacer} />
         {canEdit && blocked === null ? <Toggle label="A/B で試す" checked={ab.enabled} onChange={ab.setEnabled} /> : null}
       </div>
-      {on ? <Notice tone="warn" appearance="soft">A/Bは送信未対応です。③でB案を消すとA案を配信できます。</Notice> : null}
+      {on ? <Notice tone="warn" appearance="soft">検証環境で設定がオンのとき、登録したテスト宛先だけに送ります。人数が足りないときは勝ちを決めず、自動では残りへ送りません。</Notice> : null}
       {blocked === 'all' ? (
-        <Notice tone="warn" appearance="soft" action={canEdit ? <Button onClick={onNarrow}>絞り込みにする</Button> : undefined}>全員への配信では使えません。A/Bは現在、送信に対応していません。</Notice>
+        <Notice tone="warn" appearance="soft" action={canEdit ? <Button onClick={onNarrow}>絞り込みにする</Button> : undefined}>全員への配信ではA/Bを使えません。</Notice>
       ) : blocked === 'few' ? (
         <Notice tone="warn" appearance="soft">{`A/Bは送信未対応です。対象条件は ${formatNumber(AB_MIN_TOTAL)} 人以上です（今 ${formatNumber(total ?? 0)} 人）。`}</Notice>
       ) : on ? (
@@ -58,16 +57,16 @@ export default function BroadcastAbSettings({ ab, total, targetAll, start, appro
               <div className={styles.ratioBar} aria-hidden="true">
                 <span className={styles.ratioA} style={{ flexBasis: `${half}%` }}>{`A ${half}%`}</span>
                 <span className={styles.ratioB} style={{ flexBasis: `${half}%` }}>{`B ${half}%`}</span>
-                {ab.settings.testRatioPct < 50 ? <span className={styles.ratioRest}>{`残り ${100 - ab.settings.testRatioPct}%${total === null ? '' : `（${formatNumber(split.rest)} 人）`}に勝った方`}</span> : null}
+                {ab.settings.testRatioPct < 50 ? <span className={styles.ratioRest}>{`残り ${100 - ab.settings.testRatioPct}%`}</span> : null}
               </div>
               <Select aria-label="試す割合" size="full" value={String(ab.settings.testRatioPct)} onChange={(value) => set('testRatioPct', Number(value) as typeof ab.settings.testRatioPct)}
-                options={AB_RATIOS.map((pct) => { const s = splitAudience(total ?? 0, pct); const people = total === null ? '人数は最終確認で数えます' : `A ${formatNumber(s.a)} 人・B ${formatNumber(s.b)} 人`; return { value: String(pct), label: pct >= 50 ? `試す割合：50%（全員を半分ずつ・${people}）` : `試す割合：${pct}%（${people}）` } })} />
+                options={AB_RATIOS.map((pct) => ({ value: String(pct), label: pct >= 50 ? '試す割合：50%（テスト宛先を半分ずつ）' : `試す割合：${pct}%（人数は最終確認で表示）` }))} />
             </div>
             <div className={styles.column}>
               <RadioCardGroup legend="勝ちの決め方" legendVisible className={styles.metricRow}>
                 {(['click', 'booking', 'purchase'] as AbMetric[]).map((metric) => (
                   <RadioCard key={metric} variant="row" name="ab-metric" value={metric} checked={ab.settings.metric === metric} onChange={() => set('metric', metric)} title={METRIC_WORD[metric]}
-                    disabled={metric === 'purchase' && !ecConnected} disabledReason={metric === 'purchase' && !ecConnected ? 'EC がつながっていません' : undefined} />
+                    disabled={metric !== 'click'} disabledReason={metric === 'purchase' && !ecConnected ? 'EC がつながっていません' : metric !== 'click' ? '現在はクリックのみ選べます' : undefined} />
                 ))}
               </RadioCardGroup>
               <Select aria-label="決めるまでの時間" size="full" value={String(ab.settings.decideAfterMinutes)} onChange={(value) => set('decideAfterMinutes', Number(value))}
@@ -83,7 +82,7 @@ export default function BroadcastAbSettings({ ab, total, targetAll, start, appro
                 </Notice>
           ) : (
                   <Notice tone="info" icon={<Info aria-hidden="true" />}>
-                    {`${hm(decideAt)} に勝ちを決め、残りの人へ送ります。決まらないときは${ab.settings.undecidedPolicy === 'stop' ? '止めて知らせ、24 時間選ばなければ送らずに終えます' : ' A 案を送ります'}。夜の静かな時間（21〜8 時）にかかるときは 8:00 に送ります。`}
+                    {`${hm(decideAt)} に結果を確認します。人数が足りなければ自動送信しません。決まらないときは${ab.settings.undecidedPolicy === 'stop' ? '止めて知らせ、24 時間選ばなければ送らずに終えます' : ' A 案を送ります'}。夜の静かな時間（21〜8 時）にかかるときは 8:00 に送ります。`}
                   </Notice>
           )}
         </>
@@ -95,10 +94,6 @@ export default function BroadcastAbSettings({ ab, total, targetAll, start, appro
 /** 送る前の確かめの窓に足す 1 行（★V8 a5r5Wg）。 */
 export function abConfirmLine(ab: BroadcastAb, total: number | null, start: Date): string | null {
   if (!ab.enabled || total === null) return null
-  const split = splitAudience(total, ab.settings.testRatioPct)
-  const half = ab.settings.testRatioPct / 2
-  const head = `A ${half}%（${formatNumber(split.a)} 人）・B ${half}%（${formatNumber(split.b)} 人）`
-  return split.rest > 0
-    ? `${head}・残り ${100 - ab.settings.testRatioPct}%（${formatNumber(split.rest)} 人）は ${hm(decideTime(start, ab.settings.decideAfterMinutes))} に勝った方を送ります。`
-    : `${head}。全員を半分ずつに分けて送り、残りはありません。`
+  void start
+  return '検証環境のテスト宛先だけへ試験送信します。人数不足なら勝ちを決めず、残りへ自動送信しません。'
 }
