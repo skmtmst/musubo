@@ -236,14 +236,16 @@ export const COMMON_VAR_USAGE_SUMMARY_SQL = `SELECT
     `(SELECT COUNT(*) FROM (${source.sql})) AS ${source.kind}`).join(',\n  ')},
   (SELECT COUNT(*) FROM forms f
     LEFT JOIN form_versions v ON v.id = f.current_published_version_id
-    CROSS JOIN (SELECT ? AS token) target
+    CROSS JOIN (SELECT ? AS token, ? AS var_key) target
     WHERE NOT EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id)
       AND (instr(coalesce(f.on_submit_message_content, ''), target.token) > 0
         OR instr(coalesce(f.fields, ''), target.token) > 0
         OR instr(coalesce(f.layout, ''), target.token) > 0
         OR instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
         OR instr(coalesce(v.fields, ''), target.token) > 0
-        OR instr(coalesce(v.layout, ''), target.token) > 0)) AS unscoped_form`;
+        OR instr(coalesce(v.layout, ''), target.token) > 0
+        OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(f.layout) THEN f.layout ELSE 'null' END, '$.references') j WHERE j.key = 'varKey' AND CAST(j.value AS TEXT) = target.var_key)
+        OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(v.layout) THEN v.layout ELSE 'null' END, '$.references') j WHERE j.key = 'varKey' AND CAST(j.value AS TEXT) = target.var_key))) AS unscoped_form`;
 
 /**
  * 一覧に出す使用先件数をまとめて数える。
@@ -277,7 +279,7 @@ export async function getCommonVarUsageSummaries(
       const values = COMMON_VAR_USAGE_QUERIES.flatMap((source) =>
         source.values(varKey, token, lineAccountId));
       return db.prepare(COMMON_VAR_USAGE_SUMMARY_SQL)
-        .bind(...values, token);
+        .bind(...values, token, varKey);
     });
     const results = await db.batch<Record<CommonVarUsageKind, number> & { unscoped_form: number }>(statements);
     keys.forEach((varKey, index) => {
