@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 import { tenantPublicBoundaryMiddleware } from '../middleware/tenant-public-boundary.js';
 import { liffRoutes } from './liff.js';
 
@@ -82,6 +83,30 @@ describe('form intro referral ownership', () => {
       VALUES('ref-link','Ref','https://example.test',?,?, 'intro')`).run(account, active);
   }
   function firstLink() { return db.raw.prepare("SELECT first_tracked_link_id FROM friends WHERE id='friend-a'").get(); }
+  it('フォーム案内は未解決の共通情報を送らず、登録後の値を送る', async () => {
+    vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T01:00:00Z'));useSqliteClock(db.raw,()=>new Date());
+    try {
+      seedLink('account-a');
+      db.raw.prepare("UPDATE message_templates SET message_content='営業時間: {{var.hours}} {formUrl}' WHERE id='intro'").run();
+      const oauth = async () => {
+        const signed = await signedLiffState('fixture-signing-key', { account: 'bot-a', form: 'form-fixture', ref: 'ref-link' });
+        return liffRoutes.request(`https://api.fixture.test/auth/callback?code=fixture&state=${encodeURIComponent(signed.state)}`,
+          { headers: { Cookie: signed.cookie } }, { DB: db.db, LINE_CHANNEL_SECRET: 'fixture-signing-key', LINE_LOGIN_CHANNEL_ID: 'channel-a',
+            LINE_LOGIN_CHANNEL_SECRET: 'fixture-login', LINE_CHANNEL_ACCESS_TOKEN: 'unused' } as Env['Bindings']);
+      };
+      await send({...valid,ref:'ref-link'});
+      expect(push).not.toHaveBeenCalled();
+      expect(db.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+      db.raw.prepare('DELETE FROM common_var_resolution_failures').run();
+      await oauth();
+      expect(push).not.toHaveBeenCalled();
+      expect(db.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+      db.raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES('hours','account-a','営業時間','hours','text','10時')").run();
+      expect((await send({...valid,ref:'ref-link'})).status).toBe(200);
+      await oauth();expect(push).toHaveBeenCalledTimes(2);
+      expect(JSON.stringify(push.mock.calls)).toContain('営業時間: 10時');
+    } finally {vi.useRealTimers();}
+  });
   it('pins an active same-account ref and sends the normal campaign intro', async () => {
     seedLink('account-a');
     expect((await send({ ...valid, ref: 'ref-link' })).status).toBe(200);

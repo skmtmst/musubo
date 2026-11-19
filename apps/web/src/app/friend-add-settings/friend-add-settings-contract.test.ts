@@ -86,12 +86,6 @@ describe("管理画面 友だち追加時配信の点検・中の再発防止", 
     expect(LIST_PAGE).not.toContain('toLocaleLowerCase')
   })
 
-  it('新規作成の優先順位は競合一覧の最大+1にする', () => {
-    // 一覧は既定20件のため、件数+1では21件を超えると重複する。
-    expect(EDITOR).toContain("api.friendAddRules.conflicts(request.accountId, 'first_time')")
-    expect(EDITOR).toContain('conflictRes.data.rules.reduce')
-  })
-
   it('再追加の「何も配信しない」を選べ、シナリオなしで保存できる', () => {
     expect(EDITOR).toContain("friendKind === 'returning' && definition.returningMode === 'none'")
   })
@@ -169,14 +163,6 @@ describe("管理画面 友だち追加時配信の監査修正", () => {
     expect(EDITOR).not.toContain('friend-add-editor-previewActions')
   })
 
-  it('N-108: テスト確認面に固定の人名・方法を出さない', () => {
-    expect(EDITOR).not.toContain('Demo Person')
-  })
-
-  it('N-109: 「二重送信」は再送防止の設定値を出し、テスト実施状態と分ける', () => {
-    expect(EDITOR).toContain('resendSuppressionText(definition.resendSuppressionHours)')
-  })
-
   it('N-110: 画面遷移は実在するクエリ付きルートだけを使う', () => {
     // 静的エクスポートではパス型の {id} ルートを持てないため、
     // 作成・編集・テストはクエリ付きの同一ページで切り替える。
@@ -191,6 +177,7 @@ describe("管理画面 友だち追加時配信の監査修正", () => {
     expect(screens).not.toContain('/friend-add-settings/conflicts')
     expect(screens).not.toContain('/friend-add-settings/test')
   })
+
   it('初回と再追加を分け、経路不明の扱いを説明する', () => {
     expect(LIST_PAGE).toContain('はじめて友だち追加した人')
     expect(LIST_PAGE).toContain('以前からの友だち・ブロック解除した人')

@@ -208,6 +208,7 @@
 - [H1 統括のひな形：予約メニューとマイルの景品（板 YYWAs）](v8-requirements/gap-features/H1-hq-booking-menu-reward-templates.md)
 - [③-2 ライバルに対抗する機能：要件と「操作と挙動」の一覧（B-340）](v8-requirements/gap-features/README.md)
 - [U1 送信の取り消しと「送る前の確かめ」（板 lKmZK ほか 6 か所）](v8-requirements/gap-features/U1-unsend-and-send-confirm.md)
+- [Googleビジネス・Instagram 複数連携の要件（2026-11-16 決定）](v8-requirements/multi-sns-connections.md)
 - [動きのばらつき（2026-10-09・オーナー「同じ動きにした方がいいのに動きがバラバラのもの」）](v8-requirements/owner-decisions/BEHAVIOR-AUDIT-1009.md)
 - [行き先と触り方のばらつき（2026-10-09・オーナー「遷移先などはできる限りデザインや触り方は統一」）](v8-requirements/owner-decisions/DESTINATION-AUDIT-1009.md)
 - [一覧の骨格の点検（AH・2026-10-09）](v8-requirements/owner-decisions/LIST-SKELETON-AUDIT-1009.md)
@@ -468,6 +469,28 @@
 ## 反映履歴
 
 - [統括の一斉配信の停止と再送の競合](release-log/unreleased/50-kenta-hq-stop-claims.md) — 統括の一斉配信の停止と再送の競合の履歴。確認 2026-11-13。
+
+- [SNS連携で残る3つの口の決まり](release-log/unreleased/120-kenta-sns-multilink-ports.md) — 反映履歴、確認 2026-11-18。
+
+- [自動確認を実際の動きで確認](release-log/unreleased/115-kenta-q02b-b10.md) — 反映履歴、確認 2026-11-18。
+
+- [お客さま画面の設定確認を改善](release-log/unreleased/116-kenta-q02b-b12.md) — 反映履歴、確認 2026-11-18。
+
+- [配信と通知の内容を確かめる試験を見直し](release-log/unreleased/113-kenta-q02b-b9.md) — 反映履歴、確認 2026-11-18。
+
+- [GoogleビジネスとInstagramの複数連携（第1段）](release-log/unreleased/108-kenta-sns-multilink.md) — 反映履歴、確認 2026-11-17。
+
+- [自動確認を実際の画面の動きで確認](release-log/unreleased/105-kenta-q02b-b7.md) — 反映履歴、確認 2026-11-17。
+
+- [列車：試験だけの4本](release-log/unreleased/102-kenta-train-tests.md) — まとめて入れた試験の履歴。確認 2026-11-17。
+
+- [欠席と振替の動きを確認](release-log/unreleased/101-kenta-gaptest-b1.md) — 反映履歴、確認 2026-11-16。
+
+- [絞り込みや分析の自動確認を改善](release-log/unreleased/100-kenta-q02b-b4.md) — 反映履歴、確認 2026-11-17。
+
+- [一覧や返信の自動確認を改善](release-log/unreleased/99-kenta-q02b-b3.md) — 反映履歴、確認 2026-11-17。
+
+- [自動確認を画面の操作と予定の計算で確認](release-log/unreleased/96-kenta-q02b-b2.md) — 反映履歴、確認 2026-11-16。
 
 - [自動確認を実際の画面の動きで確認](release-log/unreleased/104-kenta-q02b-b5.md) — 反映履歴、確認 2026-11-17。
 

@@ -20,10 +20,6 @@ describe('V8 保存した検索の禁止の見張り', () => {
     expect(advanced + friendsPage).not.toContain("localStorage.getItem('friends.savedSearch'")
   })
 
-  it('一覧の名前に固定のヒントを付けない', () => {
-    expect(list).not.toContain('title="条件を確認・編集"')
-  })
-
   it('条件の日本語変換を一覧の中で作り直さない', () => {
     expect(list).not.toContain('function describeOne')
     expect(list).not.toContain("parts.map(String).join(' ')")

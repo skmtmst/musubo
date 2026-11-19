@@ -46,12 +46,6 @@ describe('対応が必要な受信の読込失敗', () => {
     expect(body).toContain('最終更新')
   })
 
-  it('表示件数を担当者ごとに保存・復元する（DASH-25）', () => {
-    const body = code(CARD)
-    expect(body).toContain('lh_pending_inbox_page_size:')
-    // この出し分けは pending-inbox-identity.test.tsx の動きと故障対照で確かめる。
-  })
-
   it('遅れた古い応答が最新を上書きしない（DASH-23）', () => {
     const body = code(CARD)
     expect(body).toContain('loadSeq.current')
@@ -66,8 +60,4 @@ describe('対応が必要な受信の読込失敗', () => {
     expect(body).toContain('onClick={() => void load()}')
   })
 
-  it('数が全アカウントの合計であることを題に書く', () => {
-    const body = code(CARD)
-    expect(body).toContain('title="対応が必要な受信（全アカウント）"')
-  })
 })

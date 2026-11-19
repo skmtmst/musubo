@@ -35,6 +35,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import NotificationsV8 from '@/test-utils/webinar-notifications'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import { fireEvent } from '@testing-library/react'
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
@@ -65,16 +66,17 @@ function render(): HTMLElement {
   roots.push(root)
   act(() => {
     root.render(
-      <NotificationsV8
+      <><NotificationsV8
         webinarId="webinar-1"
         editor={EDITOR}
-      />,
+      /><ToastHost /></>,
     )
   })
   return host
 }
 
   beforeEach(() => {
+    clearToastsForTest()
     Object.values(apiMocks).forEach(mock => mock.mockReset())
     apiMocks.testNotificationRecipients.mockResolvedValue({ data: { count: 1, recipients: [{ id: 'f1', displayName: '確認の人' }], token: 'token', confirmationId: 'confirmation' } })
     apiMocks.notifications.mockResolvedValue({
@@ -94,6 +96,47 @@ function render(): HTMLElement {
   })
 
 describe('通知と視聴後のことのV8（E7iAYs）', () => {
+  it.each([
+    ['申込のお礼', 'registrationEnabled'], ['前日のご案内', 'dayBeforeEnabled'],
+    ['開始前のお知らせ', 'hourBeforeEnabled'], ['開始のお知らせ', 'startEnabled'],
+    ['見逃した人への案内', 'missedEnabled'], ['見終わった人へのお礼', 'completedEnabled'],
+  ] as const)('%sだけを切り替えて保存する', async (label, field) => {
+    const host = render()
+    await act(async () => undefined)
+    const toggle = host.querySelector(`[role="switch"][aria-label="${label}"]`)
+    expect(toggle).not.toBeNull()
+    await act(async () => { fireEvent.click(toggle!) })
+    await act(async () => { querySupplementaryPageAction('下書きを保存')!.click() })
+    expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(1)
+    const input = apiMocks.saveNotifications.mock.calls[0][1] as Record<string, unknown>
+    for (const key of ['registrationEnabled', 'dayBeforeEnabled', 'hourBeforeEnabled', 'startEnabled', 'missedEnabled', 'completedEnabled'] as const) {
+      expect(input[key]).toBe(key === field ? !SETTINGS[key] : SETTINGS[key])
+    }
+  })
+
+  it('件数と通知対象の人数・延べ予約を別々の実値で表示する', async () => {
+    apiMocks.notifications.mockResolvedValue({ data: { settings: SETTINGS, overview: {
+      total: 23, pending: 2, sent: 11, failed: 3, skipped: 4, cancelled: 5,
+      audience: { people: 7, bookings: 9, definition: 'active_registrations' }, skippedReasons: [],
+    } } })
+    const host = render()
+    await act(async () => undefined)
+    const counts = [...host.querySelectorAll('dl > div')].map(node => node.textContent)
+    expect(counts).toEqual(expect.arrayContaining(['送った11', '届かなかった3', '見送り4']))
+    await act(async () => { fireEvent.click(host.querySelector('button[aria-label="送った数と通知の対象"]')!) })
+    const note = host.querySelector('[role="note"]')!
+    expect(note.textContent).toContain('予定 2件・取消 5件・合計 23件')
+    expect(note.textContent).toContain('通知の対象：7人（取消を除いた有効な申込。延べ予約は9件）')
+  })
+
+  it('保存時に予定数と取消数を知らせる', async () => {
+    apiMocks.saveNotifications.mockResolvedValue({ data: { settings: SETTINGS, queued: 4, cancelled: 2 } })
+    const host = render()
+    await act(async () => undefined)
+    await act(async () => { fireEvent.click(host.querySelector('[role="switch"][aria-label="申込のお礼"]')!) })
+    await act(async () => { querySupplementaryPageAction('下書きを保存')!.click() })
+    expect(document.body.textContent).toContain('4件を予定に入れ、2件を取り消しました。')
+  })
   it('板IDと通知の段・実績・視聴後の段を描く', async () => {
     const host = render()
     await act(async () => undefined)
@@ -126,7 +169,6 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
     await act(async () => undefined)
     const toggle = host.querySelector('[role="switch"][aria-label="申込のお礼"]') as HTMLInputElement
     await act(async () => { fireEvent.click(toggle) })
-    const save = ([...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
     await act(async () => { querySupplementaryPageAction('下書きを保存')!.click() })
     expect(host.textContent).toContain('入力を残しました')
     expect((toggle.getAttribute('aria-checked') === 'true')).toBe(false)
@@ -172,7 +214,6 @@ it('通知保存後に版の読込が失敗しても、再開時は保存を繰�
   await act(async () => undefined)
   await act(async () => { fireEvent.click(host.querySelector('[role="switch"][aria-label="申込のお礼"]')!) })
   await act(async () => { fireEvent.change(host.querySelector('input[aria-label="視聴完了メッセージ本文"]')!, { target: { value: '再開後も残す本文' } }) })
-  const save = ([...host.querySelectorAll('button')].find(el => el.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
   await act(async () => { querySupplementaryPageAction('下書きを保存')!.click() })
   expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(1)
   expect(host.textContent).toContain('入力を残しました')
