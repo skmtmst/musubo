@@ -469,7 +469,7 @@
 
 ## 反映履歴
 
-- [回数券の知らせと月謝の検証準備](release-log/unreleased/PR-kenta-c3c8-monthly.md) — 反映履歴、確認 2026-11-20。
+- [回数券の知らせと月謝の検証準備](release-log/unreleased/126-kenta-c3c8-monthly.md) — 反映履歴、確認 2026-11-20。
 
 - [保守時に確認する説明を整理](release-log/unreleased/121-kenta-q04-misc.md) — 反映履歴、確認 2026-11-19。
 
