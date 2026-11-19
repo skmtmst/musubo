@@ -92,7 +92,10 @@ afterEach(() => { cleanup() })
 
 describe('並び・件数・よく使う絞り込みは口へ渡す', () => {
   it('並びは更新順・作成順・名前順だけで、選ぶと 1 頁目から取り直す', async () => {
-    await start()
+    const view = await start()
+    expect(view.container.textContent).not.toContain('表示件数の切り替えは準備中です')
+    expect(view.container.textContent).not.toContain('保存した条件は準備中です')
+    expect(view.container.textContent).not.toContain('保存した条件')
     expect(lastPageCall()).toEqual(['account-1', expect.objectContaining({ sort: 'updated', page: 1, limit: 20 })])
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '並び' })) })
     expect(screen.getAllByRole('option').map((option) => option.textContent?.trim())).toEqual(['更新順', '作成順', '名前順'])
@@ -108,8 +111,11 @@ describe('並び・件数・よく使う絞り込みは口へ渡す', () => {
 
   it('公開中のみ・下書きのみは、取った頁を絞り直さず状態を口へ渡す', async () => {
     await start()
-    await choose('よく使う絞り込み', '公開中のみ')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'よく使う絞り込み' })) })
+    expect(screen.getAllByRole('option').map(option => option.textContent?.trim())).toEqual(['よく使う絞り込み', '公開中のみ', '下書きのみ', 'アーカイブ済み'])
+    await act(async () => { fireEvent.click(screen.getAllByRole('option')[1].querySelector('button') ?? screen.getAllByRole('option')[1]) })
     await waitFor(() => expect(lastPageCall()).toEqual(['account-1', expect.objectContaining({ status: 'active' })]))
+    expect(await screen.findByRole('link', { name: '「入門ウェビナー」の詳細を見る' })).toBeTruthy()
     await choose('よく使う絞り込み', '下書きのみ')
     await waitFor(() => expect(lastPageCall()).toEqual(['account-1', expect.objectContaining({ status: 'draft' })]))
   })
@@ -120,9 +126,17 @@ describe('フォルダ', () => {
     mocks.grand = 5
     await start()
     expect(mocks.folders).toHaveBeenCalledWith('account-1')
+    expect(document.body.textContent).not.toContain('フォルダ名と件数は一覧APIへの接続後に表示します。')
     await waitFor(() => expect(folderRow('セミナー').textContent).toContain('2'))
     await waitFor(() => expect(folderRow('未分類').textContent).toContain('3'))
     expect(folderRow('すべて').textContent).toContain('5')
+    expect([...document.querySelectorAll('[data-folder-select]')].map(node => node.getAttribute('title'))).toEqual(['すべて', 'セミナー', '未分類'])
+  })
+
+  it('フォルダが空なら固定のフォルダを足さない', async () => {
+    mocks.folders.mockResolvedValue({ success: true, data: [] })
+    await start()
+    await waitFor(() => expect([...document.querySelectorAll('[data-folder-select]')].map(node => node.getAttribute('title'))).toEqual(['すべて', '未分類']))
   })
 
   it('フォルダや未分類を選ぶと、その絞りで口から取り直す', async () => {
@@ -265,7 +279,7 @@ describe('アカウント', () => {
 
 describe('頁と読めなかったとき', () => {
   it('全件と頁数を出し、次の頁は口から 2 頁目を取る', async () => {
-    mocks.list.mockImplementation(async (_account: string, params: WebinarListParams) => params.limit === 1 ? response([], 45) : response([webinar()], 45))
+    mocks.list.mockImplementation(async (_account: string, params: WebinarListParams) => params.limit === 1 ? response([], 45) : response([params.page === 2 ? webinar({ id: 'w-21', title: '21件目' }) : webinar()], 45))
     await start()
     const pager = screen.getByRole('navigation', { name: 'ウェビナー一覧のページ送り' })
     expect(pager.textContent).toContain('45')
@@ -273,6 +287,8 @@ describe('頁と読めなかったとき', () => {
     expect(within(pager).queryByRole('button', { name: '4ページ目へ' })).toBeNull()
     await act(async () => { fireEvent.click(within(pager).getByRole('button', { name: '次のページ' })) })
     await waitFor(() => expect(lastPageCall()).toEqual(['account-1', expect.objectContaining({ page: 2, limit: 20 })]))
+    expect(await screen.findByRole('link', { name: '「21件目」の詳細を見る' })).toBeTruthy()
+    expect(document.body.textContent).not.toMatch(/ほかに\s*\d+\s*件あります/)
   })
 
   it('頁の器で来なかった返事は空の一覧にせず、読めなかったと出す', async () => {

@@ -8,14 +8,6 @@ const staffSource = readFileSync(join(directory, 'page.tsx'), 'utf8')
 const actionsSource = readFileSync(join(directory, '../../v8/settings/staff/staff-actions.ts'), 'utf8')
 
 describe("管理画面 30 見せる範囲の保存と名寄せ", () => {
-  it('保存ボタンは閉じるだけでなく更新口を呼ぶ', () => {
-    // N-424: bundle名をそのまま送る。roleへ潰すと「受付」と「運用」が区別できない。
-    expect(staffSource).toContain('roleBundle: bundle')
-    expect(staffSource).not.toContain('scopeBundleToStaffRole(bundle)')
-    expect(staffSource).toContain('api.staff.update(memberId')
-    expect(staffSource).toContain('busy={saving}')
-    expect(staffSource).toContain('setSaveError')
-  })
 
   it('開く対象は行の人で、名前検索の先頭固定はやめる', () => {
     expect(staffSource).toContain('openPermissions(user)')

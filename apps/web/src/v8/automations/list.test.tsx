@@ -135,6 +135,7 @@ async function waitFor(check: () => boolean, label: string) {
 
 const buttons = () => [...host.querySelectorAll('button, a')] as HTMLElement[]
 const named = (text: string) => buttons().filter((element) => (element.textContent ?? '').trim() === text)
+const metric = (label: string) => [...host.querySelectorAll('[data-kpi-label]')].find(node => node.textContent?.trim() === label)?.parentElement?.parentElement?.textContent ?? ''
 
 describe('V8 オートメーションのルール一覧（LWQXd）', () => {
   it('条件に外れた回数と30日間動かなかったルール数を区別する', async () => {
@@ -204,6 +205,25 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
     await chooseRowAction('編集する')
     expect(host.textContent).toContain(message)
     expect(list.mock.calls.length).toBe(before + ([404, 409].includes(Number(status)) ? 1 : 0))
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('編集は公開版から下書きを作り、その下書きを開く', async () => {
+    const edit = vi.spyOn(api.automations, 'createDraftFromAutomation').mockResolvedValue({ success: true, data: { id: 'draft-1' } } as never)
+    await render(<AutomationListV8 />)
+    await chooseRowAction('編集する')
+    expect(edit).toHaveBeenCalledWith('au-1')
+    expect(push).toHaveBeenCalledWith(expect.stringContaining('/automations/drafts?id=draft-1'))
+  })
+
+  it('編集用の下書きが通信失敗なら通信の案内を表示し、読み直さない', async () => {
+    vi.spyOn(api.automations, 'createDraftFromAutomation').mockRejectedValue(new TypeError('offline'))
+    const list = vi.spyOn(api.automations, 'list')
+    await render(<AutomationListV8 />)
+    const before = list.mock.calls.length
+    await chooseRowAction('編集する')
+    expect(host.textContent).toContain('通信状態を確かめて')
+    expect(list).toHaveBeenCalledTimes(before)
     expect(push).not.toHaveBeenCalled()
   })
 
@@ -382,4 +402,122 @@ it('動いていない稼働ルールの件数に保管済みを含めない', a
   await render(<AutomationListV8 />)
   await waitFor(() => Boolean(host.textContent?.includes('稼働中')), '一覧')
   expect(host.textContent).toContain('稼働中で直近30日動いていないルール 1')
+})
+
+describe('ルール一覧の読み込みと表示', () => {
+  it('読み込み中から成功へ切り替わり、一覧を表示する', async () => {
+    let resolve!: (value: unknown) => void
+    vi.spyOn(api.automations, 'list').mockImplementationOnce(() => new Promise(done => { resolve = done }))
+    await render(<AutomationListV8 />)
+    expect(host.querySelector('[data-list-state="loading"]')?.getAttribute('aria-label')).toBe('ルールを読み込んでいます')
+    expect(host.textContent).not.toContain('まだオートメーションがありません')
+    await act(async () => { resolve({ success: true, data: automations, summary: null }) })
+    expect(host.textContent).toContain('問い合わせを担当へ知らせる')
+    expect(host.querySelector('[data-list-state="loading"]')).toBeNull()
+  })
+
+  it('店を切り替えた先の取得が失敗したら、以前の行と数を残さない', async () => {
+    const list = vi.spyOn(api.automations, 'list').mockResolvedValueOnce({ success: true, data: automations, summary: { active: 1, stopped: 1, executionCount30d: 9876, failureCount30d: 42 } }).mockRejectedValueOnce(new Error('offline'))
+    await render(<AutomationListV8 />)
+    expect(host.textContent).toContain('問い合わせを担当へ知らせる')
+    expect(metric('今月動いた')).toContain('9,876')
+    expect(metric('条件に外れた')).toContain('1,240')
+    account.id = 'account-b'
+    await render(<AutomationListV8 />)
+    expect(list).toHaveBeenCalledTimes(2)
+    expect(host.textContent).toContain('ルールを読み込めませんでした')
+    expect(host.textContent).not.toContain('問い合わせを担当へ知らせる')
+    expect(host.textContent).not.toContain('9,876')
+    expect(host.textContent).not.toContain('1,240')
+  })
+
+  it('取得失敗は空と区別し、読み直しで復帰する', async () => {
+    const list = vi.spyOn(api.automations, 'list').mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ success: true, data: automations, summary: null })
+    await render(<AutomationListV8 />)
+    expect(host.textContent).toContain('ルールは消えていません。')
+    expect(host.textContent).not.toContain('まだオートメーションがありません')
+    expect(host.textContent).not.toContain('最初のオートメーションを作る')
+    const retry = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('もう一度'))!
+    expect(retry).toBeTruthy()
+    await act(async () => { retry.click() })
+    await waitFor(() => Boolean(host.textContent?.includes('問い合わせを担当へ知らせる')), '再取得')
+    expect(list).toHaveBeenCalledTimes(2)
+  })
+
+  it('一覧と集計の未取得を0として表示しない', async () => {
+    vi.spyOn(api.automations, 'list').mockImplementationOnce(() => new Promise(() => {}))
+    await render(<AutomationListV8 />)
+    const band = host.querySelector('[data-template-region="stats"]')!
+    expect(band.textContent).toContain('—')
+    expect(band.textContent).not.toMatch(/ルール\s*0/)
+    expect(band.textContent).not.toMatch(/失敗\s*0/)
+  })
+
+  it('一覧は読めても集計が無ければ実行・失敗・条件外を未取得と表示する', async () => {
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => new URL(String(input)).pathname === '/api/automation-runs' ? Promise.reject(new Error('offline')) : originalFetch(input, init))
+    vi.spyOn(api.automations, 'list').mockResolvedValueOnce({ success: true, data: automations, summary: null })
+    await render(<AutomationsPage />)
+    for (const label of ['今月動いた', '失敗', '条件に外れた']) {
+      expect(metric(label)).toContain('—')
+      expect(metric(label)).not.toMatch(/0\s*(回|件)/)
+    }
+    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="この画面の説明"]')!.click() })
+    expect(host.textContent).toContain('削減時間はまだ数えられていません')
+    expect(host.textContent).not.toContain('およそ0時間')
+  })
+
+  it('30日の実績から動いた回数と失敗、削減時間を表示する', async () => {
+    vi.spyOn(api.automations, 'list').mockResolvedValueOnce({ success: true, data: automations, summary: { active: 1, stopped: 1, executionCount30d: 360, failureCount30d: 7 } })
+    await render(<AutomationsPage />)
+    const band = host.querySelector('[data-template-region="stats"]')!
+    expect(band).toBeTruthy()
+    expect(metric('今月動いた')).toContain('360')
+    expect(metric('失敗')).toContain('7')
+    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="この画面の説明"]')!.click() })
+    expect(host.textContent).toContain('およそ3時間の削減')
+    expect(host.textContent).toContain('1回30秒として計算しています')
+  })
+
+  it('行に実績を表示し、動いた記録へ名前を渡す', async () => {
+    vi.spyOn(api.automations, 'list').mockResolvedValueOnce({ success: true, data: [automation('au-1', '問い合わせを担当へ知らせる', { failureCount30d: 7 })], summary: null })
+    await render(<AutomationListV8 />)
+    const row = host.querySelector('[data-row-id="au-1"]')!
+    expect(row.textContent).toContain('312 回')
+    expect(row.textContent).toContain('失敗 7 回')
+    await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="ルール「問い合わせを担当へ知らせる」の操作"]')!.click() })
+    const menu = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(node => node.textContent?.trim() === '動いた記録を見る')!
+    expect(menu).toBeTruthy()
+    await act(async () => { menu.click() })
+    expect(push).toHaveBeenCalledWith(`/automations/runs?search=${encodeURIComponent('問い合わせを担当へ知らせる')}`)
+  })
+
+  it('空の一覧は空状態と作成の案内を表示する', async () => {
+    vi.spyOn(api.automations, 'list').mockResolvedValueOnce({ success: true, data: [], summary: null })
+    await render(<AutomationListV8 />)
+    expect(host.querySelector('[data-empty-list="first"]')).not.toBeNull()
+    expect(host.textContent).toContain('まだオートメーションがありません')
+    expect(host.textContent).toContain('決めた動きを自動で続けます。')
+    expect(host.textContent).not.toContain('ルールを読み込めませんでした')
+  })
+
+  it('店を切り替えた後に前の店の返事が届いても表示しない', async () => {
+    let resolveOld!: (value: unknown) => void
+    vi.spyOn(api.automations, 'list').mockImplementationOnce(() => new Promise(done => { resolveOld = done })).mockResolvedValueOnce({ success: true, data: [automation('new', '新しい店')], summary: null })
+    await render(<AutomationListV8 />)
+    account.id = 'account-b'
+    await render(<AutomationListV8 />)
+    expect(host.textContent).toContain('新しい店')
+    await act(async () => { resolveOld({ success: true, data: [automation('old', '古い店')], summary: null }) })
+    expect(host.textContent).toContain('新しい店')
+    expect(host.textContent).not.toContain('古い店')
+  })
+
+  it('動いた回数順では30日の実績が多い順に並ぶ', async () => {
+    vi.spyOn(api.automations, 'list').mockResolvedValueOnce({ success: true, data: [automation('small', '少ない', { executionCount30d: 1 }), automation('large', '多い', { executionCount30d: 200 })], summary: null })
+    window.history.replaceState({}, '', '/automations?sort=runs')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    await render(<AutomationListV8 />)
+    expect([...host.querySelectorAll('[data-row-id]')].map(row => row.getAttribute('data-row-id'))).toEqual(['large', 'small'])
+  })
 })
