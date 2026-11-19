@@ -52,6 +52,10 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
   const currentCanOperate = useRef(canOperate)
   currentCanOperate.current = canOperate && permissionAllowed
   const lockedReason = usePermissionLockReason(permissionAllowed)
+  const [quote, setQuote] = useState<Awaited<ReturnType<typeof bookingAdvancedApi.groupCancellationQuote>>['data'] | null>(null)
+  const [quoteScope, setQuoteScope] = useState<typeof targetScope.current | null>(null)
+  const [quoteError, setQuoteError] = useState('')
+  const [quoteGeneration, setQuoteGeneration] = useState(0)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -60,8 +64,24 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
   useEffect(() => { setOpen(false); setBusy(false) }, [accountId, party.groupId])
   useEffect(() => { setBusy(false) }, [party.version, membersKey])
   const cancellable = party.members.filter((member) => member.status === 'requested' || member.status === 'confirmed')
+  useEffect(() => {
+    if (!open || !accountId || confirmedScope !== targetScope.current) return
+    const scope = targetScope.current
+    let live = true
+    setQuote(null); setQuoteScope(null); setQuoteError('')
+    void bookingAdvancedApi.groupCancellationQuote(accountId, scope.groupId).then(({ data }) => {
+      if (!live || scope !== targetScope.current) return
+      const expected = party.members.filter(member => member.status === 'requested' || member.status === 'confirmed')
+      if (data.version !== scope.version || data.members.length !== expected.length || data.members.some(item => !expected.some(member => member.bookingId === item.bookingId && member.version === item.version && member.status === item.status))) {
+        setQuoteError('予約の内容が変わりました。最新の情報を確認してください。'); return
+      }
+      setQuote(data); setQuoteScope(scope)
+    }).catch(() => { if (live && scope === targetScope.current) setQuoteError('キャンセル料を確認できませんでした。もう一度お試しください。') })
+    return () => { live = false }
+  }, [open, accountId, confirmedScope, party.members, quoteGeneration])
+
   async function cancelAll() {
-    if (!accountId || confirmedScope !== targetScope.current || busy || !canOperate || lockedReason || !reason.trim() || cancellable.length === 0) return
+    if (!accountId || confirmedScope !== targetScope.current || busy || !canOperate || lockedReason || !reason.trim() || cancellable.length === 0 || !quote || quoteScope !== targetScope.current || quote.version !== targetScope.current.version) return
     const scope = targetScope.current
     const expectedMembers = party.members.map(member => ({ bookingId: member.bookingId, version: member.version, status: member.status }))
     if (expectedMembers.some(member => !Number.isSafeInteger(member.version))) { setError('予約を読み直してから、もう一度お試しください。'); return }
@@ -101,9 +121,17 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
         {cancellable.length > 0 ? <Button variant="secondary" disabled={!canOperate} lockedReason={lockedReason} disabledReason={permissionAllowed ? operationDisabledReason : undefined} onClick={() => { if (!accountId) { preparing.open('組をまとめて取り消す'); return }; confirmationTicket.current = {}; setConfirmedScope(targetScope.current); setReason(''); setError(''); setOpen(true) }}>組をまとめて取り消す</Button> : null}
       </DialogActions>
       <Dialog open={open && confirmedScope?.accountId === accountId && confirmedScope?.groupId === party.groupId} title="組をまとめて取り消しますか？" titleNote={`${formatNumber(cancellable.length)} 件の予約をまとめて取り消します`} size="small" contentLayout="form" role="alertdialog"
-        busy={busy} error={error || undefined} cancelLabel="キャンセル" onCancel={() => { if (!busy) { confirmationTicket.current = null; setOpen(false) } }} confirmLabel="まとめて取り消す" confirmLockedReason={lockedReason} confirmDisabled={!canOperate || confirmedScope !== targetScope.current || !reason.trim() || cancellable.length === 0} confirmDisabledReason={!canOperate ? permissionAllowed ? operationDisabledReason : undefined : cancellable.length === 0 ? '取り消せる予約がありません' : confirmedScope !== targetScope.current ? '最新の内容を確認してください' : !reason.trim() ? '取り消す理由を入れてください' : undefined} onConfirm={() => { if (renderedTicket && renderedTicket === confirmationTicket.current && currentCanOperate.current) void cancelAll() }}
+        busy={busy} error={error || undefined} cancelLabel="キャンセル" onCancel={() => { if (!busy) { confirmationTicket.current = null; setOpen(false) } }} confirmLabel="まとめて取り消す" confirmLockedReason={lockedReason} confirmDisabled={!canOperate || confirmedScope !== targetScope.current || !reason.trim() || cancellable.length === 0 || !quote || quoteScope !== targetScope.current} confirmDisabledReason={!canOperate ? permissionAllowed ? operationDisabledReason : undefined : cancellable.length === 0 ? '取り消せる予約がありません' : confirmedScope !== targetScope.current ? '最新の内容を確認してください' : !reason.trim() ? '取り消す理由を入れてください' : !quote || quoteScope !== targetScope.current ? 'キャンセル料を確認してください' : undefined} onConfirm={() => { if (renderedTicket && renderedTicket === confirmationTicket.current && currentCanOperate.current) void cancelAll() }}
 >
         <OperationTargetSummary accounts={[{ id: confirmedScope?.accountId ?? '' }]} />
+        {quoteError ? <Notice tone="danger" message={quoteError} action={<Button onClick={() => setQuoteGeneration(value => value + 1)}>もう一度確認する</Button>} /> : null}
+        {!quote && !quoteError ? <p>キャンセル料を確認しています。</p> : null}
+        {quote && quoteScope === targetScope.current && confirmedScope === targetScope.current ? <div aria-label="キャンセル料の内訳">
+          <p>キャンセル料の見込み</p>
+          {quote.members.map(item => <p key={item.bookingId}>{party.members.find(member => member.bookingId === item.bookingId)?.label || party.members.find(member => member.bookingId === item.bookingId)?.personName}　¥{formatNumber(item.feeNow)}</p>)}
+          <p>合計　¥{formatNumber(quote.totalFee)}</p>
+        </div> : null}
+
         {confirmedScope !== targetScope.current && canOperate ? <Notice tone="warn">{cancellable.length === 0 ? '取り消せる予約がなくなりました。' : <>組の内容が更新されました。最新の内容を確認してください。<ul>{cancellable.map(member => <li key={member.bookingId}>{member.label || member.personName}・{member.menuName}・{member.staffName ?? '担当未設定'}・{hm(member.startsAt)}〜{hm(member.endsAt)}</li>)}</ul><Button onClick={() => setConfirmedScope(targetScope.current)}>最新の内容を確認しました</Button></>}</Notice> : null}
         <Field label="取り消す理由" required><TextField aria-label="取り消す理由" value={reason} maxLength={500} onChange={(event) => setReason(event.target.value)} /></Field>
         <p>取り消すと元に戻せません。来店済み・取消済みの予約は変えません。この操作ではLINEを自動送信しません。必要な連絡は受信箱から行ってください。</p>

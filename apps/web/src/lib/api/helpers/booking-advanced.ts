@@ -1,5 +1,5 @@
 import { fetchApi } from '../../api';
-import type { DepositRule, CancellationOptions, BookingGroupView, BookingRecurrence } from '@line-crm/shared';
+import type { DepositRule, CancellationOptions, BookingGroupView, BookingRecurrence, BookingCancellationQuote } from '@line-crm/shared';
 type Result<T> = {
     success: true;
     data: T;
@@ -57,6 +57,7 @@ export const bookingAdvancedApi = {
     } | null>>(account(`/api/booking/admin/bookings/${e(id)}/payment-method`, a)),
     group: (a: string, id: string) => fetchApi<Result<BookingGroupView | null>>(account(`/api/booking/admin/bookings/${e(id)}/group`, a)),
     series: (a: string, id: string) => fetchApi<Result<unknown>>(account(`/api/booking/admin/bookings/${e(id)}/series`, a)),
+    groupCancellationQuote: (a: string, id: string) => fetchApi<Result<{ version: number; totalFee: number; members: Array<BookingCancellationQuote & { bookingId: string; version: number; status: string }> }>>(account(`/api/booking/admin/groups/${e(id)}/cancellation-quote`, a)),
     cancelGroup: (a: string, id: string, reason: string, expectedVersion: number, expectedMembers?: Array<{ bookingId: string; version: number; status: string }>) => fetchApi<Result<{
         cancelled: number;
         version: number;
