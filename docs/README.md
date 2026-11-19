@@ -210,6 +210,7 @@
 - [U1 送信の取り消しと「送る前の確かめ」（板 lKmZK ほか 6 か所）](v8-requirements/gap-features/U1-unsend-and-send-confirm.md)
 - [複数連携：3つの口の契約（契約枠・主連携・請求）（2026-11-18 決定）](v8-requirements/multi-sns-connections-ports.md)
 - [Googleビジネス・Instagram 複数連携の要件（2026-11-16 決定）](v8-requirements/multi-sns-connections.md)
+- [Googleビジネス・Instagram 複数連携：3つの口の契約（契約枠・主連携・請求）](v8-requirements/multi-sns-connections-ports.md)
 - [動きのばらつき（2026-10-09・オーナー「同じ動きにした方がいいのに動きがバラバラのもの」）](v8-requirements/owner-decisions/BEHAVIOR-AUDIT-1009.md)
 - [行き先と触り方のばらつき（2026-10-09・オーナー「遷移先などはできる限りデザインや触り方は統一」）](v8-requirements/owner-decisions/DESTINATION-AUDIT-1009.md)
 - [一覧の骨格の点検（AH・2026-10-09）](v8-requirements/owner-decisions/LIST-SKELETON-AUDIT-1009.md)
