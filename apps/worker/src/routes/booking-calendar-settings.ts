@@ -54,11 +54,22 @@ bookingCalendarSettings.on(['GET','PUT'],'/api/booking/admin/staff/:id/meeting-u
  return c.json({success:true,data:await c.env.DB.prepare('SELECT fixed_meeting_url url,meeting_url_version version FROM staff WHERE id=?').bind(id).first()});
 });
 bookingCalendarSettings.on(['GET','PUT'],'/api/booking/admin/menus/:id/meeting-url',async (c:Context<Env>):Promise<Response>=>{
- const account=await gapAccount(c),id=c.req.param('id'),row=await c.env.DB.prepare('SELECT fixed_meeting_url url,version FROM menus WHERE id=? AND line_account_id=? AND deleted_at IS NULL').bind(id,account).first<{url:string|null;version:number}>();
+ const account=await gapAccount(c),id=c.req.param('id')!,settingKey=`booking.meeting.automatic:${id}`;
+ const row=await c.env.DB.prepare(`SELECT m.fixed_meeting_url url,m.version,COALESCE(s.value,'manual') issuance FROM menus m
+  LEFT JOIN account_settings s ON s.line_account_id=m.line_account_id AND s.key=?
+  WHERE m.id=? AND m.line_account_id=? AND m.deleted_at IS NULL`).bind(settingKey,id,account).first<{url:string|null;version:number;issuance:string}>();
  if(!row)throw new GapError('not_found',404);if(c.req.method==='GET')return c.json({success:true,data:row});
- gapWrite(c,{admin:true});const b=await gapBody(c),v=gapVersion(b.expectedVersion);if(!validMeetingUrl(b.url))throw new GapError('invalid_meeting_url');
- const r=await c.env.DB.prepare('UPDATE menus SET fixed_meeting_url=?,version=version+1 WHERE id=? AND line_account_id=? AND version=?').bind(b.url,id,account,v).run();if(!r.meta.changes)throw new GapError('version_conflict',409);
- return c.json({success:true,data:{url:b.url,version:v+1}});
+ gapWrite(c,{admin:true});const b=await gapBody(c),v=gapVersion(b.expectedVersion);
+ if(!validMeetingUrl(b.url))throw new GapError('invalid_meeting_url');
+ if(b.issuance!==undefined&&b.issuance!=='manual'&&b.issuance!=='automatic')throw new GapError('invalid_meeting_issuance');
+ const issuance=b.issuance??row.issuance;
+ const results=await c.env.DB.batch([
+  c.env.DB.prepare('UPDATE menus SET fixed_meeting_url=?,version=version+1 WHERE id=? AND line_account_id=? AND version=? AND deleted_at IS NULL').bind(b.url,id,account,v),
+  c.env.DB.prepare(`INSERT INTO account_settings(id,line_account_id,key,value) SELECT ?,?,?,? WHERE changes()=1
+   ON CONFLICT(line_account_id,key) DO UPDATE SET value=excluded.value,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`).bind(crypto.randomUUID(),account,settingKey,issuance)
+ ]);
+ if(!results[0].meta.changes)throw new GapError('version_conflict',409);
+ return c.json({success:true,data:{url:b.url,version:v+1,issuance}});
 });
 bookingCalendarSettings.post('/api/booking/admin/bookings/:id/meeting',async (c:Context<Env>):Promise<Response>=>{
  gapWrite(c);const a=await gapAccount(c),b=await gapBody(c),id=c.req.param('id'),v=gapVersion(b.expectedVersion);

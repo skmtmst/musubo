@@ -96,3 +96,13 @@ test('B7-06: Googleに予定の題名を要求せず、終日とfreeを塞がず
  expect(await client.getTimedBusy(request.timeMin,request.timeMax)).toEqual([{id:'private',start:'2026-10-16T03:00:00Z',end:'2026-10-16T04:00:00Z'}]);
  const url=new URL(String(mock.mock.calls[0][0]));expect(url.searchParams.get('fields')).not.toMatch(/summary|description|attendee/);
 });
+test('メニューの会議発行方法は版を確認して保存する',async()=>{
+ const path='/api/booking/admin/menus/menu/meeting-url?account_id=a';
+ const before=await gapCall(app(),path);expect(before.status).toBe(200);
+ const data=await before.json() as {data:{version:number;issuance:string}};
+ expect(data.data.issuance).toBe('manual');
+ expect((await gapCall(app(),path,'PUT',{url:null,issuance:'automatic',expectedVersion:data.data.version})).status).toBe(200);
+ expect(await (await gapCall(app(),path)).json()).toMatchObject({data:{issuance:'automatic'}});
+ expect((await gapCall(app(),path,'PUT',{url:null,issuance:'manual',expectedVersion:data.data.version})).status).toBe(409);
+ expect(await (await gapCall(app(),path)).json()).toMatchObject({data:{issuance:'automatic'}});
+});
