@@ -31,3 +31,23 @@ it('予約と違う担当者の鍵は読み出さない',async()=>{
  expect(await outlookCalendarForBooking(env(),{accountId:'a',bookingId:'bk',staffId:'bs2'})).toBeNull();
  expect(fetcher).not.toHaveBeenCalled();
 });
+it('検証用の予約だけ予定を作り、取消は別の明示設定がある場合だけ行う',async()=>{
+ const {syncOutlookBookingForEnv,recoverOutlookBookings}=await import('./booking-outlook-sync-runtime.js');
+ d.raw.exec("INSERT INTO booking_calendar_switches(line_account_id,scope_id,write_enabled,updated_by,updated_at) VALUES('a','',1,'o','2026-01-01'),('a','bs',1,'o','2026-01-01')");
+ const fetcher=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>{
+  if(String(url).includes('login.microsoftonline.com'))return new Response(JSON.stringify({access_token:'fixture-access',refresh_token:'fixture-refresh',expires_in:3600}));
+  if(init?.method==='POST')return new Response(JSON.stringify({id:'event'}),{status:201});
+  if(init?.method==='DELETE')return new Response(null,{status:204});
+  return new Response(JSON.stringify({id:'event',attendees:[],isOrganizer:true,'@odata.etag':'"v1"'}));
+ });vi.stubGlobal('fetch',fetcher);
+ expect(await syncOutlookBookingForEnv(env(),'bk')).toBe('done');
+ const create=fetcher.mock.calls.find(call=>call[1]?.method==='POST'&&String(call[0]).includes('graph.microsoft.com'));
+ expect(create).toBeDefined();expect(JSON.parse(String(create?.[1]?.body))).not.toHaveProperty('attendees');
+ d.raw.exec("UPDATE bookings SET status='cancelled',lock_version=lock_version+1 WHERE id='bk'");
+ expect(await syncOutlookBookingForEnv(env(),'bk')).toBe('skipped');
+ expect(fetcher.mock.calls.some(call=>call[1]?.method==='DELETE')).toBe(false);
+ d.raw.exec("UPDATE workflow_steps SET updated_at=0 WHERE process_kind='booking_outlook_sync'");
+ expect(await recoverOutlookBookings(env(),new Date())).toBe(0);
+ expect(await recoverOutlookBookings(env({BOOKING_OUTLOOK_MUTATIONS_ENABLED:'true'}),new Date())).toBe(1);
+ expect(fetcher.mock.calls.filter(call=>call[1]?.method==='DELETE')).toHaveLength(1);
+});

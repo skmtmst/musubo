@@ -59,3 +59,9 @@ it('予定の作成に使った Microsoft アカウントの識別子を一緒�
  const calendar=outlookCalendar(async()=>({token:'token',accountId:'owner'}),fetcher as typeof fetch);
  expect(await calendar.create({staffId:'s',calendarId:'calendar',start:input.start,end:input.end,title:'予約',description:'',transactionId:'key',signal:input.signal})).toEqual({kind:'created',eventId:'event',accountId:'owner'});
 });
+it('送信直前にスイッチが戻ったときは取消を送らない',async()=>{
+ const fetcher=vi.fn(async()=>new Response(JSON.stringify({id:'event',isOrganizer:true,attendees:[],'@odata.etag':'"v1"'})));
+ const calendar=outlookCalendar(async()=>({token:'token',accountId:'owner'}),fetcher as typeof fetch,{allowMutations:true});
+ expect(await calendar.mutate({staffId:'s',accountId:'owner',eventId:'event',action:'delete',signal:input.signal,authorize:async()=>false})).toBe('failed');
+ expect(fetcher).toHaveBeenCalledOnce();
+});

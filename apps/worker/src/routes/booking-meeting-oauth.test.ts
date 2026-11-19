@@ -45,3 +45,10 @@ it('接続していないサービスは優先先にできず、閲覧のみは�
  const read=gapApp(d,[bookingMeetingOAuth],{...gapOwner,readOnly:true});
  expect((await gapCall(read,`${path}/prefer?account_id=a`,'POST',{})).status).toBe(403);
 });
+it('Google の読み込み中は試験対象外の Outlook 接続を始めない',async()=>{
+ d.raw.exec("INSERT INTO booking_calendar_switches(line_account_id,scope_id,read_enabled,updated_by,updated_at) VALUES('a','bs',1,'o','2026-01-01')");
+ const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);
+ const app=gapApp(d,[bookingMeetingOAuth],gapOwner,false,{...bindings,BOOKING_MEETING_OAUTH_CONFIG:JSON.stringify({outlook:{clientId:'id',clientSecret:'secret'}})});
+ const response=await gapCall(app,'/api/booking/admin/staff/bs/connections/outlook/connect?account_id=a','POST',{});
+ expect(response.status).toBe(409);expect(await response.json()).toMatchObject({error:'outlook_test_staff_required'});expect(fetcher).not.toHaveBeenCalled();
+});

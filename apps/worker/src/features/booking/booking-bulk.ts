@@ -1,3 +1,4 @@
+import {calendarCredentialsForEnv} from './booking-outlook-busy-runtime.js';
 import {verifyRoutingToken} from '../forms/form-routing/index.js';
 import {depositEstimate,cancellationCardRequired} from './booking-deposit.js';
 import type {Context} from 'hono';
@@ -31,7 +32,7 @@ export async function partyInput(db:D1Database,a:string,f:string,value:unknown):
 /** 同じ枠を重複割当しないよう、公開前に各人の担当者と時間区間を確保する。 */
 export async function previewParty(db:D1Database,a:string,members:PreparedMember[],startMode:unknown,from:string,to:string,env:Record<string,unknown>){
  if(!['parallel','sequential'].includes(String(startMode))||![from,to].every(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)&&Number.isFinite(Date.parse(x)))||from>to||Date.parse(to)-Date.parse(from)>31*86400000)throw new GapError('invalid_party_range');
- const tz=await getAccountTimeZone(db,a),availability=await Promise.all(members.map(m=>getAvailability(db,{lineAccountId:a,menuId:m.menuId,staffId:m.staffId??undefined,from,to,minLeadTimeMinutes:60,now:new Date(),applyStoreRules:true,additionalDurationMinutes:m.addons.reduce((n,r)=>n+r.duration_minutes,0),forceCalendarRefresh:true,googleCredentials:{email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL as string,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY as string}})));
+ const tz=await getAccountTimeZone(db,a),availability=await Promise.all(members.map(m=>getAvailability(db,{lineAccountId:a,menuId:m.menuId,staffId:m.staffId??undefined,from,to,minLeadTimeMinutes:60,now:new Date(),applyStoreRules:true,additionalDurationMinutes:m.addons.reduce((n,r)=>n+r.duration_minutes,0),forceCalendarRefresh:true,googleCredentials:calendarCredentialsForEnv(env as unknown as Env['Bindings'])})));
  const starts=[...new Set(availability[0].by_staff.flatMap(s=>s.slots.map(t=>t.startUtc!)))].sort();
  const slots:Array<{startsAt:string;members:Array<{staffId:string;startsAt:string;endsAt:string}>}>=[];
  for(const start of starts){const chosen:Array<{staffId:string;startsAt:string;endsAt:string}>=[];let cursor=start;
@@ -83,7 +84,7 @@ export async function createBulkBooking(c:Context<Env>,a:string,f:string,b:Recor
  if(!(await menuAudience(db,a,b.menu_id,f)).visible)throw new GapError('menu_not_available',403);
  const addons=await bookingAddons(db,a,b.menu_id,b.addonIds,f);
  const member:PreparedMember={menuId:b.menu_id,staffId:typeof b.staff_id==='string'?b.staff_id:null,addons,duration:menu.duration_minutes+addons.reduce((n,r)=>n+r.duration_minutes,0),buffer:menu.buffer_after_minutes,price:menu.base_price,version:menu.version,meetingMode:menu.meeting_mode};members=[member];
- const av=await getAvailability(db,{lineAccountId:a,menuId:member.menuId,staffId:member.staffId??undefined,from:tzDateStr(tz,new Date(dates[0])),to:tzDateStr(tz,new Date(dates.at(-1)!)),minLeadTimeMinutes:60,now:new Date(),applyStoreRules:true,additionalDurationMinutes:addons.reduce((n,r)=>n+r.duration_minutes,0),forceCalendarRefresh:true,googleCredentials:{email:c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY}});
+ const av=await getAvailability(db,{lineAccountId:a,menuId:member.menuId,staffId:member.staffId??undefined,from:tzDateStr(tz,new Date(dates[0])),to:tzDateStr(tz,new Date(dates.at(-1)!)),minLeadTimeMinutes:60,now:new Date(),applyStoreRules:true,additionalDurationMinutes:addons.reduce((n,r)=>n+r.duration_minutes,0),forceCalendarRefresh:true,googleCredentials:calendarCredentialsForEnv(c.env)});
  planned=[];for(const [index,start]of dates.entries()){
  const choice=Array.isArray(b.choices)?b.choices.find((x:{index:number})=>x.index===index):null;if(choice?.action==='skip')continue;
  const at=choice?.alternativeStartsAt??start;if(typeof at!=='string'||!Number.isFinite(Date.parse(at)))throw new GapError('invalid_choices');

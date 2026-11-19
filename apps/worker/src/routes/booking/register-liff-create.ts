@@ -1,3 +1,4 @@
+import {syncOutlookBookingForEnv} from '../../features/booking/booking-outlook-sync-runtime/index.js';
 import { meetingCreatorForBooking } from '../../features/booking/booking-meeting-runtime/index.js';
 import { liffBookingJson, liffBookingInputError, liffBookingResponse } from '../liff-booking-response.js';
 import { logger } from '@line-crm/shared/server';
@@ -468,7 +469,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     // 承認なし確定: 承認で確定したときと同じ始末をその場でそろえる。
     // 失敗しても予約は成立させる（承認の動きと同じ扱い）。
     try {
-      await runConfirmedBookingSideEffects(c.env.DB, bookingId, { credentials: googleCredentials(c.env), meetingCreatorForBooking: id => meetingCreatorForBooking(c.env,id) });
+      await runConfirmedBookingSideEffects(c.env.DB, bookingId, { credentials: googleCredentials(c.env), meetingCreatorForBooking: id => meetingCreatorForBooking(c.env,id), outlookSyncBooking: id=>syncOutlookBookingForEnv(c.env,id) });
     } catch (error) {
       logger.error("booking.liff_booking_requests_create_failed");
     }

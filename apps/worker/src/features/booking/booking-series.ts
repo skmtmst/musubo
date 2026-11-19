@@ -1,3 +1,5 @@
+import {calendarCredentialsForEnv} from './booking-outlook-busy-runtime.js';
+import type {Env} from '../../worker-env.js';
 import type {BookingRecurrence,SeriesInput,SeriesOccurrence} from '@line-crm/shared';
 import {getAccountTimeZone,getAvailability,tzDateStr,tzHHMM} from '../../services/availability.js';
 import {restaurantCivilTime} from '../../services/restaurant-booking.js';
@@ -31,7 +33,7 @@ export function recurrenceDates(startsAt:string,rule:BookingRecurrence,tz:string
 export async function previewSeries(db:D1Database,account:string,input:SeriesInput,env:Record<string,unknown>,excludeBookingId?:string,customerFacing=false):Promise<SeriesOccurrence[]>{
  const tz=await getAccountTimeZone(db,account),dates=recurrenceDates(input.startsAt,input.rule,tz);
  if(dates.some(d=>Date.parse(d)<Date.now()))throw new GapError('past_datetime');
- const availability=await getAvailability(db,{lineAccountId:account,menuId:input.menuId,staffId:input.staffId??undefined,from:tzDateStr(tz,new Date(dates[0])),to:tzDateStr(tz,new Date(dates.at(-1)!)),now:new Date(),minLeadTimeMinutes:customerFacing?60:0,applyStoreRules:customerFacing,excludeBookingId,forceCalendarRefresh:true,googleCredentials:{email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL as string,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY as string}});
+ const availability=await getAvailability(db,{lineAccountId:account,menuId:input.menuId,staffId:input.staffId??undefined,from:tzDateStr(tz,new Date(dates[0])),to:tzDateStr(tz,new Date(dates.at(-1)!)),now:new Date(),minLeadTimeMinutes:customerFacing?60:0,applyStoreRules:customerFacing,excludeBookingId,forceCalendarRefresh:true,googleCredentials:calendarCredentialsForEnv(env as unknown as Env['Bindings'])});
  const actual=new Set((await db.prepare('SELECT id FROM staff WHERE line_account_id=? AND is_active=1 AND deleted_at IS NULL AND is_designation_optional=0').bind(account).all<{id:string}>()).results.map(r=>r.id));
  const out:SeriesOccurrence[]=[];
  for(let index=0;index<dates.length;index++){

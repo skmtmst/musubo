@@ -39,7 +39,8 @@ export function outlookCalendar(tokenForStaff:(staffId:string)=>Promise<OutlookA
   const id=encodeURIComponent(input.calendarId);
   const event={subject:input.title,body:{contentType:'text',content:input.description},start:{dateTime:new Date(input.start).toISOString().slice(0,-1),timeZone:'UTC'},end:{dateTime:new Date(input.end).toISOString().slice(0,-1),timeZone:'UTC'},transactionId:input.transactionId};
   try {
-   const response=await request(`https://graph.microsoft.com/v1.0/me/calendars/${id}/events`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Prefer:'IdType="ImmutableId"'},body:JSON.stringify(event),signal:input.signal});
+   const url=input.calendarId==='primary'?'https://graph.microsoft.com/v1.0/me/calendar/events':`https://graph.microsoft.com/v1.0/me/calendars/${id}/events`;
+   const response=await request(url,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Prefer:'IdType="ImmutableId"'},body:JSON.stringify(event),signal:input.signal});
    if(!response.ok)return response.status>=400&&response.status<500&&![408,409].includes(response.status)?{kind:'failed'}:{kind:'unknown'};
    const data:unknown=await response.json();
    if(!data||typeof data!=='object'||Array.isArray(data)||typeof (data as Record<string,unknown>).id!=='string'||!(data as Record<string,string>).id)return {kind:'unknown'};
@@ -47,7 +48,7 @@ export function outlookCalendar(tokenForStaff:(staffId:string)=>Promise<OutlookA
   }catch{return {kind:'unknown'};}
  }
  /** 参加者が一人でもいる予定や、版を照合できない予定は更新しない。 */
- async function mutate(input:{staffId:string;accountId:string;eventId:string;action:'update'|'delete';start?:string;end?:string;signal:AbortSignal}):Promise<'done'|'failed'|'unknown'> {
+ async function mutate(input:{staffId:string;accountId:string;eventId:string;action:'update'|'delete';start?:string;end?:string;signal:AbortSignal;authorize?:()=>Promise<boolean>}):Promise<'done'|'failed'|'unknown'> {
   if(!options.allowMutations || !input.eventId || !input.accountId)return 'failed';
   if(input.action==='update' && (!input.start || !input.end || !Number.isFinite(Date.parse(input.start)) || !Number.isFinite(Date.parse(input.end)) || Date.parse(input.start)>=Date.parse(input.end)))return 'failed';
   try {
@@ -65,11 +66,23 @@ export function outlookCalendar(tokenForStaff:(staffId:string)=>Promise<OutlookA
    const current=await tokenForStaff(input.staffId);
    if(!current||typeof current==='string'||current.accountId!==input.accountId||!current.token)return 'failed';
    const body=input.action==='update'?JSON.stringify({start:{dateTime:new Date(input.start!).toISOString().slice(0,-1),timeZone:'UTC'},end:{dateTime:new Date(input.end!).toISOString().slice(0,-1),timeZone:'UTC'}}):undefined;
+   if(input.authorize&&!await input.authorize())return 'failed';
    const result=await request(url,{method:input.action==='update'?'PATCH':'DELETE',headers:{Authorization:`Bearer ${current.token}`,'If-Match':etag,Prefer:'IdType="ImmutableId"',...(body?{'Content-Type':'application/json'}:{})},...(body?{body}:{}),signal:input.signal});
    if(result.ok||input.action==='delete'&&(result.status===404||result.status===410))return 'done';
    if(result.status>=400&&result.status<500&&![408,409,429].includes(result.status))return 'failed';
    return 'unknown';
   }catch{return 'unknown';}
  }
- return {busy,create,mutate};
+ /** 結果不明の削除は、同じ主催者で予定の有無だけを読み取る。 */
+ async function verify(input:{staffId:string;accountId:string;eventId:string;signal:AbortSignal}):Promise<'present'|'absent'|'unknown'> {
+  try{
+   const access=await tokenForStaff(input.staffId);
+   if(!access||typeof access==='string'||access.accountId!==input.accountId||!access.token)return 'unknown';
+   const response=await request(`https://graph.microsoft.com/v1.0/me/events/${encodeURIComponent(input.eventId)}?$select=id`,{headers:{Authorization:`Bearer ${access.token}`,Prefer:'IdType="ImmutableId"'},signal:input.signal});
+   if(response.status===404||response.status===410)return 'absent';
+   if(!response.ok)return 'unknown';
+   const raw:unknown=await response.json();return raw&&typeof raw==='object'&&!Array.isArray(raw)&&(raw as Record<string,unknown>).id===input.eventId?'present':'unknown';
+  }catch{return 'unknown';}
+ }
+ return {busy,create,mutate,verify};
 }

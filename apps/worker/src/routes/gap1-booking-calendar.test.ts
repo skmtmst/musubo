@@ -119,3 +119,74 @@ test('相手先で削除した会議だけを確認の上で対応済みにす�
  expect(await (await gapCall(app(),list)).json()).toMatchObject({data:{items:[]}});
  expect((await gapCall(app(),path,'POST',{confirmed:true})).status).toBe(404);
 });
+test('Outlook の予定が読めないときは空き枠を閉じる',async()=>{
+ seedGapBooking(d);d.raw.exec("UPDATE staff_members SET line_user_id='Uf2' WHERE id='s'; INSERT INTO account_settings(id,line_account_id,key,value) VALUES('test-staff','a','test_recipients','[\"f2\"]')");
+ d.raw.exec("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('outlook','a','bs','outlook','encrypted','o','2026-01-01','2026-01-01')");
+ expect((await gapCall(app(),staffPath,'PUT',{readEnabled:true,writeEnabled:true,expectedVersion:0})).status).toBe(200);
+ await gapCall(app(),accountPath,'PUT',{readEnabled:true,writeEnabled:true,expectedVersion:0});
+ await expect(readCalendarBusy(d.db,{},request)).rejects.toThrow();
+ expect(await syncConfirmedBookingToGoogle(d.db,{},'bk')).toEqual({synced:false});expect(create).not.toHaveBeenCalled();
+});
+test('Outlook の一括書き込みと予定の削除は明示設定を待ち、スイッチの版を守る',async()=>{
+ const {outlookCalendar}=await import('../features/booking/booking-outlook-calendar.js');
+ const {syncOutlookBooking}=await import('../features/booking/booking-outlook-sync.js');
+ const {calendarSwitch}=await import('../features/booking/calendar-switch-state.js');
+ seedGapBooking(d);
+ d.raw.exec("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('outlook','a','bs','outlook','encrypted','o','2026-01-01','2026-01-01')");
+ expect((await gapCall(app(),accountPath,'PUT',{readEnabled:false,writeEnabled:true,expectedVersion:0})).status).toBe(200);
+ expect((await gapCall(app(),staffPath,'PUT',{readEnabled:false,writeEnabled:true,includeBacklog:true,expectedVersion:0})).status).toBe(200);
+ const fetcher=vi.fn(async(_url:RequestInfo|URL,init?:RequestInit)=>{
+  if(init?.method==='POST')return new Response(JSON.stringify({id:'event'}),{status:201});
+  if(init?.method==='DELETE')return new Response(null,{status:204});
+  return new Response(JSON.stringify({id:'event',isOrganizer:true,attendees:[],'@odata.etag':'"v1"'}));
+ });
+ const calendar={...outlookCalendar(async()=>({token:'fixture',accountId:'owner'}),fetcher as typeof fetch,{allowMutations:true}),accountId:'owner'};
+ const sync=async(bookingId:string,options?:{removeOnly?:boolean;switchScope?:string;switchVersion?:number})=>syncOutlookBooking(d.db,{accountId:'a',bookingId},{
+  resolve:async()=>calendar,allowMutations:true,removeOnly:options?.removeOnly,
+  authorizeRemoval:options?.removeOnly?async()=>{const current=await calendarSwitch(d.db,'a',options.switchScope);return !current.writeEnabled&&current.version===options.switchVersion;}:undefined,
+ });
+ await processCalendarSwitchJobs(d.db,{},new Date(),{allowMutations:true,sync});
+ expect(fetcher.mock.calls.filter(call=>call[1]?.method==='POST')).toHaveLength(1);
+ const post=fetcher.mock.calls.find(call=>call[1]?.method==='POST');expect(JSON.parse(String(post?.[1]?.body))).not.toHaveProperty('attendees');
+ expect((await gapCall(app(),staffPath,'PUT',{readEnabled:false,writeEnabled:false,removeFutureEvents:true,confirmed:true,expectedVersion:1})).status).toBe(200);
+ await processCalendarSwitchJobs(d.db,{},new Date(),{allowMutations:false,sync});
+ expect(fetcher.mock.calls.some(call=>call[1]?.method==='DELETE')).toBe(false);
+ await processCalendarSwitchJobs(d.db,{},new Date(),{allowMutations:true,sync});
+ expect(fetcher.mock.calls.filter(call=>call[1]?.method==='DELETE')).toHaveLength(1);
+});
+test('Outlook の取消が設定待ちで50件あっても Google の処理は進む',async()=>{
+ connect();seedGapBooking(d);await enable();
+ const stmt=d.raw.prepare("INSERT INTO booking_calendar_switch_jobs(id,line_account_id,staff_id,booking_id,action,switch_scope,switch_version,created_at) VALUES(?,'a','bs','bk','delete','outlook:bs',?,'2020-01-01')");
+ for(let i=1;i<=50;i++)stmt.run(`outlook-wait-${i}`,i);
+ d.raw.exec("INSERT INTO booking_calendar_switch_jobs(id,line_account_id,staff_id,booking_id,action,switch_scope,switch_version,created_at) VALUES('google-later','a','bs','bk','write','bs',1,'2026-01-01')");
+ await processCalendarSwitchJobs(d.db,{},new Date(),{allowMutations:false,sync:async()=>{throw new Error('must_not_run')}});
+ expect(d.raw.prepare("SELECT status FROM booking_calendar_switch_jobs WHERE id='google-later'").get()).toEqual({status:'done'});
+});
+test('削除を繰り返し処理できない場合は運用者に知らせる',async()=>{
+ seedGapBooking(d);
+ d.raw.exec(`INSERT INTO booking_calendar_switches(line_account_id,scope_id,write_enabled,updated_by,updated_at) VALUES('a','bs',0,'o','2026-01-01');
+ INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,status,retry_key,result_json,created_at,updated_at) VALUES('line:a','booking_outlook_sync','bk','current','succeeded','x','{"eventId":"event","accountId":"owner","staffId":"bs","startsAt":"2026-11-20T05:00:00Z","endsAt":"2026-11-20T06:00:00Z"}',0,0);
+ INSERT INTO booking_calendar_switch_jobs(id,line_account_id,staff_id,booking_id,action,switch_scope,switch_version,created_at) VALUES('outlook-job','a','bs','bk','delete','outlook:bs',1,'2020-01-01')`);
+ for(let i=0;i<3;i++)await processCalendarSwitchJobs(d.db,{},new Date(),{allowMutations:true,sync:async()=> 'skipped'});
+ expect(d.raw.prepare("SELECT attempts,status FROM booking_calendar_switch_jobs WHERE id='outlook-job'").get()).toEqual({attempts:3,status:'failed'});
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE event_type='booking_outlook_issue'").get()).toEqual({n:1});
+});
+test('Google と Outlook の予定を両方除き、確定時に Outlook を読み直す',async()=>{
+ d.raw.exec("UPDATE staff_members SET line_user_id='Uf2' WHERE id='s'; INSERT INTO account_settings(id,line_account_id,key,value) VALUES('test-staff','a','test_recipients','[\"f2\"]')");
+ connect();
+ d.raw.exec("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('outlook','a','bs','outlook','encrypted','o','2026-01-01','2026-01-01')");
+ await enable();
+ const google=vi.spyOn(GoogleCalendarClient.prototype,'getTimedBusy').mockResolvedValue([{id:'g-event',start:'2026-10-16T01:00:00Z',end:'2026-10-16T02:00:00Z'}]);
+ const outlook=vi.fn(async()=>[{start:'2026-10-16T03:00:00Z',end:'2026-10-16T04:00:00Z'}]);
+ const result=await readCalendarBusy(d.db,{outlookBusy:outlook},{...request,fresh:true});
+ expect(result).toEqual([{start:'2026-10-16T01:00:00Z',end:'2026-10-16T02:00:00Z'},{start:'2026-10-16T03:00:00Z',end:'2026-10-16T04:00:00Z'}]);
+ await readCalendarBusy(d.db,{outlookBusy:outlook},{...request,fresh:true});expect(outlook).toHaveBeenCalledTimes(2);
+ await expect(readCalendarBusy(d.db,{outlookBusy:async()=>{throw new Error('offline')}},{...request,fresh:true})).rejects.toThrow();
+ google.mockRestore();
+});
+
+test('試験対象外の担当者は Outlook 読み込みをオンにできない',async()=>{
+ d.raw.exec("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('outlook','a','bs','outlook','encrypted','o','2026-01-01','2026-01-01')");
+ const response=await gapCall(app(),staffPath,'PUT',{readEnabled:true,writeEnabled:false,expectedVersion:0});
+ expect(response.status).toBe(409);expect(await response.json()).toMatchObject({error:'outlook_test_staff_required'});
+});

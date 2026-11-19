@@ -21,7 +21,8 @@ export function confirmationWorkflowStatement(db: D1Database, bookingId: string,
     .bind(crypto.randomUUID(), workflowKey(bookingId), bookingId);
 }
 
-interface Options { now?: Date; credentials?: GoogleServiceAccountCredentials; meetingCreator?: MeetingCreator; meetingDeferredOnly?: boolean; meetingCreatorForBooking?: (bookingId:string)=>Promise<MeetingCreator|null|'deferred'|'unavailable'> }
+export type OutlookSyncCallback=(bookingId:string)=>Promise<'done'|'skipped'|'failed'|'unknown'|'busy'>;
+interface Options { now?: Date; credentials?: GoogleServiceAccountCredentials; meetingCreator?: MeetingCreator; meetingDeferredOnly?: boolean; meetingCreatorForBooking?: (bookingId:string)=>Promise<MeetingCreator|null|'deferred'|'unavailable'>; outlookSyncBooking?:OutlookSyncCallback }
 
 /** 3入口共通。成功した工程は飛ばす。LINEの到達不明は人の確認に残す。 */
 export async function runConfirmedBookingSideEffects(db: D1Database, bookingId: string, options: Options = {}): Promise<void> {
@@ -106,6 +107,9 @@ export async function runConfirmedBookingSideEffects(db: D1Database, bookingId: 
     const result = await syncConfirmedBookingToGoogle(db, options.credentials ?? {}, bookingId, `lh${operationId.replaceAll('-', '')}`);
     return { calendarSync: result.synced ? 'synced' : 'not_configured', skipped: !result.synced };
   });
+  if(options.outlookSyncBooking){
+    try{await options.outlookSyncBooking(bookingId);}catch{logger.warn('booking_outlook_confirmation_failed');}
+  }
   if (row.friend_id && policy.send_line_confirmation !== false && !meetingDeferred) {
     try { await notifyForBooking(db, bookingId, 'approved'); }
     catch { /* 台帳に到達不明を残す。自動で二度送らない。残りの工程は続ける。 */ }
