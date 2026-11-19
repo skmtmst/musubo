@@ -130,10 +130,10 @@ test('G4-05: 問い合わせ通知に名前だけを含め、本文を含めな�
  await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',body);
  d.raw.exec("UPDATE friends SET display_name='山田' WHERE id='f'; INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES('incoming','f','incoming','text','秘密の本文','a')");
  const send=vi.fn(async(_subscription:unknown,_payload:unknown)=>({ok:true,status:201}));await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'new_inquiry',refId:'incoming',chatId:'chat'},send);
- expect(send).toHaveBeenCalledTimes(1);expect(send.mock.calls[0][1]).toMatchObject({title:'新しい問い合わせ：山田さま'});expect(JSON.stringify(send.mock.calls[0][1])).not.toContain('秘密の本文');
+ expect(send).toHaveBeenCalledTimes(1);expect(send.mock.calls[0][1]).toMatchObject({title:'musubo',body:'新しい問い合わせ：山田さま'});expect(JSON.stringify(send.mock.calls[0][1])).not.toContain('秘密の本文');
 });
 
 test('G4-05: 電話番号やメールを名前に設定していても通知しない',()=>{
- expect(pushPayload('new_inquiry','f','090-1234-5678').title).toBe('新しい問い合わせ');
- expect(pushPayload('new_inquiry','f','person@example.test').title).toBe('新しい問い合わせ');
+ expect(pushPayload('new_inquiry','f','090-1234-5678').body).toBe('新しい問い合わせ');
+ expect(pushPayload('new_inquiry','f','person@example.test').body).toBe('新しい問い合わせ');
 });
