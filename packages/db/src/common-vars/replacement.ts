@@ -13,9 +13,9 @@ export const COMMON_VAR_REPLACEMENT_SOURCES: ReplacementSource[] = [
   { table: 'auto_replies', kind: 'auto_reply', columns: ['response_content', 'actions_json'], sql: `SELECT id, response_content, actions_json FROM auto_replies WHERE line_account_id = ? AND deleted_at IS NULL` },
   { table: 'forms', kind: 'form', columns: ['on_submit_message_content', 'fields', 'layout'], sql: `SELECT DISTINCT f.id, f.on_submit_message_content, f.fields, f.layout, pv.on_submit_message_content AS published_on_submit_message_content, pv.fields AS published_fields, pv.layout AS published_layout FROM forms f JOIN form_accounts fa ON fa.form_id = f.id LEFT JOIN form_versions pv ON pv.id = f.current_published_version_id WHERE fa.line_account_id = ?` },
   { table: 'automations', kind: 'automation', columns: ['conditions', 'actions'], sql: `SELECT id, conditions, actions FROM automations WHERE line_account_id = ?` },
-  { table: 'automation_versions', kind: 'automation', columns: ['trigger_config', 'condition_config', 'action_config'], sql: `SELECT v.id, v.trigger_config, v.condition_config, v.action_config FROM automation_versions v JOIN automation_definitions d ON d.id = v.automation_id WHERE d.line_account_id = ? AND v.id IN (d.current_draft_version_id, d.current_published_version_id)` },
+  { table: 'automation_versions', kind: 'automation', columns: ['trigger_config', 'condition_config', 'action_config'], sql: `SELECT v.id, d.id AS usage_source_id, v.trigger_config, v.condition_config, v.action_config FROM automation_versions v JOIN automation_definitions d ON d.id = v.automation_id WHERE d.line_account_id = ? AND v.id IN (d.current_draft_version_id, d.current_published_version_id)` },
   { table: 'account_settings', kind: 'friend_add', columns: ['value'], sql: `SELECT id, value FROM account_settings WHERE line_account_id = ? AND key = 'friend_add_routing'` },
-  { table: 'common_action_versions', kind: 'common_action', columns: ['action_config'], sql: `SELECT v.id, v.action_config FROM common_action_versions v JOIN common_actions a ON a.id = v.common_action_id WHERE a.line_account_id = ? AND v.id IN (a.current_draft_version_id, a.current_published_version_id)` },
+  { table: 'common_action_versions', kind: 'common_action', columns: ['action_config'], sql: `SELECT v.id, a.id AS usage_source_id, v.action_config FROM common_action_versions v JOIN common_actions a ON a.id = v.common_action_id WHERE a.line_account_id = ? AND v.id IN (a.current_draft_version_id, a.current_published_version_id)` },
 ];
 
 export function replaceStructuredCommonVar(value: unknown, sourceKey: string, replacementKey: string): boolean {
@@ -77,6 +77,7 @@ export async function getCommonVarReplacementPlan(
     throw new Error('Incompatible common variable replacement');
   }
   const targets: CommonVarReplacementTarget[] = [];
+  const coveredUsages = new Set<string>();
   for (const descriptor of COMMON_VAR_REPLACEMENT_SOURCES) {
     const result = await db.prepare(descriptor.sql)
       .bind(...replacementQueryValues(descriptor, source.line_account_id))
@@ -105,6 +106,7 @@ export async function getCommonVarReplacementPlan(
         }
       }
       if (Object.keys(columns).length > 0) {
+        coveredUsages.add(`${descriptor.kind}:${row.usage_source_id ?? row.id}`);
         targets.push({
           table: descriptor.table,
           id: String(row.id),
@@ -117,7 +119,12 @@ export async function getCommonVarReplacementPlan(
     }
   }
   const impact = await getCommonVarUsageImpact(db, source.var_key, source.line_account_id);
-  const blockedTotal = Math.max(0, impact.blockingTotal - targets.length);
+  // 更新対象は版ごとの行だが、使用先は定義ごとに1件として数える。
+  // 行数を引き算すると同じ定義の複数版が他の未対応使用先を隠す。
+  const blockedTotal = impact.unscopedFormTotal + impact.items.filter((item) =>
+    item.is_historical !== 1 && item.source_status !== 'sending_fixed'
+      && !coveredUsages.has(`${item.kind}:${item.source_id}`),
+  ).length;
   return {
     source,
     replacement,
