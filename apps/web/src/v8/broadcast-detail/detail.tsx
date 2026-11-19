@@ -347,7 +347,7 @@ export default function BroadcastDetail({
             </Button>
           ) : null}</>} />
 
-      {missingVars && <CommonVarTestFailure names={missingVars} />}
+      {missingVars && <div className={styles.conflictWrap}><CommonVarTestFailure names={missingVars} /></div>}
 
       {conflict ? (
         <div className={styles.conflictWrap} data-design-node="Q28Gb">
