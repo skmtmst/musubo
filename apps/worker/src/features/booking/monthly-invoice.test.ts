@@ -2,6 +2,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { activateMonthly, monthlyContract, monthlyCycle, monthlyFixture, monthlyNow } from '../../test-utils/monthly-ledger.js';
 import { createMonthlyInvoice } from './monthly-invoice.js';
 import { dispatchMonthlyInvoices } from './monthly-invoice-dispatch.js';
+import { runMonthlyInvoiceMockCron } from './monthly-invoice-cron.js';
+import type { Env } from '../../worker-env.js';
 
 const opened: ReturnType<typeof monthlyFixture>[] = [];
 afterEach(() => { for (const d of opened.splice(0)) d.raw.close(); });
@@ -35,4 +37,16 @@ it('期限になった予定だけを試験の請求口に渡す', async () => {
   expect(await dispatchMonthlyInvoices(d.db, { create }, new Date(monthlyNow))).toEqual({ created: 1, unknown: 0 });
   expect(await dispatchMonthlyInvoices(d.db, { create }, new Date(monthlyNow))).toEqual({ created: 0, unknown: 0 });
   expect(create).toHaveBeenCalledOnce();
+});
+it('定期の模擬処理は明示設定と検証環境とテスト宛先が揃ったときだけ動く', async () => {
+  const d = await fixture(), now = new Date(monthlyNow);
+  const env = { DB: d.db, DEPLOY_ENV: 'staging' } as Env['Bindings'];
+  expect(await runMonthlyInvoiceMockCron(env, now)).toEqual({ enabled: false });
+  expect(await runMonthlyInvoiceMockCron({ ...env, DEPLOY_ENV: 'production', MONTHLY_INVOICE_MOCK_CRON_ENABLED: 'true' }, now)).toEqual({ enabled: false });
+  const enabled = { ...env, MONTHLY_INVOICE_MOCK_CRON_ENABLED: 'true' };
+  expect(await runMonthlyInvoiceMockCron(enabled, now)).toMatchObject({ created: 0 });
+  d.raw.exec(`INSERT INTO account_settings(line_account_id,key,value) VALUES('a','test_recipients','["f"]')`);
+  expect(await runMonthlyInvoiceMockCron(enabled, now)).toMatchObject({ created: 1 });
+  expect(await runMonthlyInvoiceMockCron(enabled, now)).toMatchObject({ created: 0 });
+  expect(d.raw.prepare("SELECT invoice_id FROM booking_monthly_cycles WHERE id='next'").get()).toEqual({ invoice_id: 'in_mock_next' });
 });
