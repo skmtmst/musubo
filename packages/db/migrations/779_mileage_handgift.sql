@@ -1,5 +1,6 @@
 -- 店頭で渡す景品の種類と引渡し・訂正の記録。
 -- 既存の景品・交換の種類制約は変更しない。
+ALTER TABLE mileage_redemptions ADD COLUMN anonymized_at TEXT;
 CREATE TABLE mileage_handgift_rewards (
   reward_id TEXT PRIMARY KEY REFERENCES mileage_rewards(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -36,7 +37,18 @@ WHEN (OLD.delivered_at IS NOT NULL AND
       (OLD.delivered_at IS NOT NEW.delivered_at OR OLD.delivered_by IS NOT NEW.delivered_by))
   OR (OLD.cancelled_at IS NOT NULL AND
       (OLD.cancelled_at IS NOT NEW.cancelled_at OR OLD.cancelled_by IS NOT NEW.cancelled_by
-       OR OLD.cancellation_reason IS NOT NEW.cancellation_reason))
+       OR (OLD.cancellation_reason IS NOT NEW.cancellation_reason AND NOT (
+         NEW.cancellation_reason = '削除済みのお客さまの取消' AND EXISTS (
+           SELECT 1 FROM mileage_redemptions r JOIN friends f
+             ON f.id = r.beneficiary_friend_id OR (r.beneficiary_friend_id IS NULL AND (
+               r.beneficiary_key = 'friend:' || f.id OR
+               (f.user_id IS NOT NULL AND (f.user_id = r.beneficiary_user_id OR r.beneficiary_key = 'user:' || f.user_id))))
+           JOIN operation_audit a ON a.id = 'customer-delete:friend_data:' || f.id
+           WHERE r.id = OLD.redemption_id AND a.action = 'deleting'
+             AND a.target_kind = 'customer_deletion' AND a.friend_id = f.id
+             AND json_extract(a.detail_json, '$.leaseUntil') > CAST(strftime('%s','now') AS INTEGER) * 1000
+         )
+       ))))
   OR (OLD.cancelled_at IS NOT NULL AND OLD.delivered_at IS NULL AND NEW.delivered_at IS NOT NULL)
 BEGIN SELECT RAISE(ABORT, 'handgift history is immutable'); END;
 

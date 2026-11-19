@@ -199,6 +199,7 @@ export async function deliverMileageReward(
   options: MileageRewardDeliveryOptions = {},
 ): Promise<MileageRewardDeliveryResult> {
   const plan = await getMileageRewardDeliveryPlan(db, redemptionId);
+  if (plan.redemption.anonymizedAt) throw new MileageRewardError('not_found', '交換履歴が見つかりません', 404);
   // 手渡しの交換は店舗が確認するまで自動配送の対象にしない。
   if (plan.isHandgift) {
     const handgift = await db.prepare(
@@ -283,7 +284,7 @@ export async function deliverMileageReward(
   const statusBeforeClaim = plan.redemption.status;
   const claim = await db.prepare(
     `UPDATE mileage_redemptions SET status = 'delivering', updated_at = ?
-      WHERE id = ? AND (status IN ('reserved', 'delivery_failed')
+      WHERE id = ? AND anonymized_at IS NULL AND (status IN ('reserved', 'delivery_failed')
         OR (status = 'delivering' AND updated_at < ?))`,
   ).bind(now, redemptionId, leaseCutoff).run();
   if ((claim.meta?.changes ?? 0) !== 1) {
@@ -548,9 +549,9 @@ export async function processDueMileageRewardDeliveries(
   const leaseCutoff = new Date(
     new Date(options.now).getTime() - STALE_DELIVERY_LEASE_MS,
   ).toISOString();
-  const dueWhere = `status = 'delivery_failed' AND next_retry_at IS NOT NULL AND next_retry_at <= ?`;
+  const dueWhere = `anonymized_at IS NULL AND status = 'delivery_failed' AND next_retry_at IS NOT NULL AND next_retry_at <= ?`;
   const owners = await db.prepare(`SELECT DISTINCT line_account_id FROM mileage_redemptions
-    WHERE status IN ('delivery_failed','delivering','refunded') AND line_account_id IS NOT NULL ORDER BY line_account_id`).bind()
+    WHERE anonymized_at IS NULL AND status IN ('delivery_failed','delivering','refunded') AND line_account_id IS NOT NULL ORDER BY line_account_id`).bind()
     .all<{ line_account_id: string }>();
   const accountBatch = selectMileageAccountBatch(owners.results.map(row => row.line_account_id), options.now);
   if (accountBatch.length < owners.results.length) logger.warn('mileage_delivery.accounts_deferred');
@@ -571,7 +572,7 @@ export async function processDueMileageRewardDeliveries(
   const mileageOff = accountFeatureOffExclusionSql('mileage_redemptions.line_account_id', 'mileage');
   const findEligible = async (where: string, order: string, date: string, cap: number) => {
     return db.prepare(`SELECT id FROM mileage_redemptions
-        WHERE ${where} AND NOT ${mileageOff} AND line_account_id IS NOT NULL
+        WHERE anonymized_at IS NULL AND ${where} AND NOT ${mileageOff} AND line_account_id IS NOT NULL
           AND line_account_id IN (SELECT value FROM json_each(?))
           AND ${activeTenantLineAccountSql('mileage_redemptions.line_account_id')}
         ORDER BY ${order}, id LIMIT ?`).bind(date, eligibleJson, cap).all<{ id: string }>();

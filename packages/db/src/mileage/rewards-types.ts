@@ -115,6 +115,7 @@ export interface MileageRewardRedemption {
   failureMessage: string | null;
   deliveredAt: string | null;
   refundedAt: string | null;
+  anonymizedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -176,6 +177,7 @@ export type RedemptionRow = {
   failure_message: string | null;
   delivered_at: string | null;
   refunded_at: string | null;
+  anonymized_at: string | null;
   created_at: string;
   updated_at: string;
 };

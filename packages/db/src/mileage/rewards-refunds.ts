@@ -23,7 +23,7 @@ export async function refundMileageRewardRedemption(
   input: { redemptionId: string; reason: string },
 ): Promise<MileageRewardRedemption> {
   const current = await getMileageRedemption(db, input.redemptionId);
-  if (!current) throw new MileageRewardError('not_found', '交換履歴が見つかりません', 404);
+  if (!current || current.anonymizedAt) throw new MileageRewardError('not_found', '交換履歴が見つかりません', 404);
   if (current.status === 'succeeded') {
     throw new MileageRewardError('already_delivered', 'すでに特典を渡した交換は返金できません', 409);
   }
@@ -35,7 +35,7 @@ export async function refundMileageRewardRedemption(
   const claimed = await db.prepare(
     `UPDATE mileage_redemptions
         SET status = 'refunded', refunded_at = ?, next_retry_at = NULL, updated_at = ?
-      WHERE id = ? AND status NOT IN ('succeeded', 'refunded')`,
+      WHERE id = ? AND anonymized_at IS NULL AND status NOT IN ('succeeded', 'refunded')`,
   ).bind(now, now, current.id).run();
   if ((claimed.meta?.changes ?? 0) !== 1) {
     const latest = await getMileageRedemption(db, current.id);
@@ -83,6 +83,9 @@ export async function completeRefundWrites(
   if (!existing) {
     try {
       await db.batch([
+        db.prepare(`SELECT json(CASE WHEN EXISTS (SELECT 1 FROM mileage_redemptions
+          WHERE id = ? AND anonymized_at IS NULL) THEN '{}' ELSE 'redemption_anonymized' END)`)
+          .bind(current.id),
         db.prepare(
           `INSERT INTO mileage_ledger
              (id, program_id, beneficiary_user_id, beneficiary_friend_id,
@@ -267,7 +270,7 @@ export async function findIncompleteMileageRefunds(
   if (input.lineAccountIds) binds.push(JSON.stringify(input.lineAccountIds));
   const rows = await db.prepare(
     `SELECT r.* FROM mileage_redemptions r
-      WHERE r.status = 'refunded'
+      WHERE r.status = 'refunded' AND r.anonymized_at IS NULL
         AND (
           NOT EXISTS (
             SELECT 1 FROM mileage_ledger l

@@ -25,6 +25,7 @@ export function mapRedemption(row: RedemptionRow): MileageRewardRedemption {
     failureMessage: row.failure_message,
     deliveredAt: row.delivered_at,
     refundedAt: row.refunded_at,
+    anonymizedAt: row.anonymized_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -69,7 +70,7 @@ export async function listMileageRedemptions(
   const statusClause = status === 'all'
     ? ''
     : status === 'needs_attention'
-      ? `AND (r.status IN ('delivery_failed', 'delivering')
+      ? `AND (r.anonymized_at IS NULL AND (r.status IN ('delivery_failed', 'delivering')
         OR (r.status = 'refunded' AND (
           NOT EXISTS (
             SELECT 1 FROM mileage_ledger l
@@ -80,7 +81,7 @@ export async function listMileageRedemptions(
             SELECT 1 FROM mileage_reward_codes c
              WHERE c.redemption_id = r.id AND c.status = 'reserved'
           )
-        )))`
+        ))))`
       : 'AND r.status = ?';
   const binds: unknown[] = [input.lineAccountId];
   if (status !== 'all' && status !== 'needs_attention') binds.push(status);

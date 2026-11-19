@@ -9,7 +9,7 @@ export async function cancelHandgift(db: D1Database, input: {
     db.prepare(`INSERT INTO mileage_handgifts (redemption_id, reward_id, cancelled_at, cancelled_by, cancellation_reason)
       SELECT r.id, r.reward_id, ?, ?, ? FROM mileage_redemptions r
       JOIN mileage_handgift_rewards h ON h.reward_id = r.reward_id
-      WHERE r.id = ? AND r.line_account_id = ? AND r.status = ?
+      WHERE r.id = ? AND r.line_account_id = ? AND r.anonymized_at IS NULL AND r.status = ?
         AND r.spend_ledger_entry_id IS NOT NULL AND r.reward_code_id IS NULL
         AND (r.status = 'reserved' OR EXISTS (SELECT 1 FROM mileage_handgifts g
           WHERE g.redemption_id = r.id AND g.delivered_at IS NOT NULL AND g.cancelled_at IS NULL))
@@ -18,7 +18,7 @@ export async function cancelHandgift(db: D1Database, input: {
       WHERE mileage_handgifts.cancelled_at IS NULL`)
       .bind(now, input.actorId, input.reason, input.redemptionId, input.accountId, input.expectedStatus),
     db.prepare(`UPDATE mileage_redemptions SET status = 'refunded', refunded_at = ?, updated_at = ?, next_retry_at = NULL
-      WHERE id = ? AND line_account_id = ? AND status IN ('reserved', 'succeeded')
+      WHERE id = ? AND line_account_id = ? AND anonymized_at IS NULL AND status IN ('reserved', 'succeeded')
         AND EXISTS (SELECT 1 FROM mileage_handgifts h WHERE h.redemption_id = mileage_redemptions.id
           AND h.cancelled_at = ? AND h.cancelled_by = ? AND h.cancellation_reason = ?)`)
       .bind(now, now, input.redemptionId, input.accountId, now, input.actorId, input.reason),
@@ -26,7 +26,7 @@ export async function cancelHandgift(db: D1Database, input: {
   if ((results[0]?.meta?.changes ?? 0) !== 1 || (results[1]?.meta?.changes ?? 0) !== 1) {
     const existing = await db.prepare(`SELECT h.cancellation_reason FROM mileage_handgifts h
       JOIN mileage_redemptions r ON r.id = h.redemption_id
-      WHERE r.id = ? AND r.line_account_id = ? AND r.status = 'refunded' AND h.cancelled_at IS NOT NULL`)
+      WHERE r.id = ? AND r.line_account_id = ? AND r.anonymized_at IS NULL AND r.status = 'refunded' AND h.cancelled_at IS NOT NULL`)
       .bind(input.redemptionId, input.accountId).first<{ cancellation_reason: string }>();
     if (!existing) return 'conflict';
     try { await refundMileageRewardRedemption(db, { redemptionId: input.redemptionId, reason: existing.cancellation_reason }); return 'completed'; }
