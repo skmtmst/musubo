@@ -14,7 +14,9 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ account: 'A', id: 'one', get: vi.fn(), update: vi.fn(), decide: vi.fn(), confirmation: undefined as undefined | (() => void), cancel: undefined as undefined | (() => void) }))
+const m = vi.hoisted(() => ({ group: vi.fn(), account: 'A', id: 'one', get: vi.fn(), update: vi.fn(), decide: vi.fn(), confirmation: undefined as undefined | (() => void), cancel: undefined as undefined | (() => void) }))
+
+vi.mock('@/v8/booking-payments/public/booking-group/index', () => ({ BookingGroupSection: (props: { accountId: string; bookingId: string; canOperate: boolean }) => { m.group(props); return <div>組の予約の確認</div> } }))
 
 vi.mock('@/components/shared/confirm-dialog', async original => {
   const actual = await original<typeof import('@/components/shared/confirm-dialog')>()
@@ -319,4 +321,11 @@ it.each([403, 503])('詳細の%sは原因を言い分け、手動の読み直し
   expect(m.get).toHaveBeenLastCalledWith('A', 'one')
   expect(m.get).toHaveBeenCalledTimes(2)
   expect(m.update).not.toHaveBeenCalled()
+})
+
+it('予約詳細から同じアカウントと予約の組を確認できる', async () => {
+  m.get.mockResolvedValue({ booking: booking('one') })
+  render(<Page />)
+  expect(await screen.findByText('組の予約の確認')).toBeTruthy()
+  expect(m.group).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'A', bookingId: 'one' }))
 })
