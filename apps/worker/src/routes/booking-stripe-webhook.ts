@@ -2,7 +2,7 @@ import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { isStripeTestEvent, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
-import { BookingStripeError, normalizeBookingStripeEvent, storeBookingStripeReceipt, stripeReceiptDigest, supportedBookingStripeType } from '../features/booking/booking-stripe-webhooks/index.js';
+import { applyBookingStripeReceipt, BookingStripeError, normalizeBookingStripeEvent, storeBookingStripeReceipt, stripeReceiptDigest, supportedBookingStripeType } from '../features/booking/booking-stripe-webhooks/index.js';
 export const bookingStripeWebhook = new Hono<Env>();
 /** Connect試験イベントの唯一の実受信口。署名鍵は模擬やSaaSの鍵へ戻さない。 */
 bookingStripeWebhook.post('/api/booking/stripe-test/webhook',async c => {
@@ -20,7 +20,30 @@ bookingStripeWebhook.post('/api/booking/stripe-test/webhook',async c => {
   if(!supportedBookingStripeType(envelope.type))return c.json({success:true,data:{status:'ignored'}},200);
   if (!isStripeTestEvent(value)) return c.json({success: false, error: 'live_mode_not_approved'},409);
   try {
-    const result = await storeBookingStripeReceipt(c.env.DB,normalizeBookingStripeEvent(value),await stripeReceiptDigest(raw));
+    const event = normalizeBookingStripeEvent(value);
+    const result = await storeBookingStripeReceipt(c.env.DB,event,await stripeReceiptDigest(raw));
+    // metadata は署名済みでも、それだけでは信用せず、保存済み binding と登録待ちの行に照合する。
+    const metadata = (value as {data?:{object?:{metadata?:Record<string,unknown>}}}).data?.object?.metadata;
+    const requestId = metadata?.booking_payment_method_id;
+    if (result.status !== 'review_required' && event.type === 'setup_intent.succeeded'
+      && typeof requestId === 'string' && requestId.length > 0 && requestId.length <= 255) {
+      const applied = await applyBookingStripeReceipt(c.env.DB,event.account,event.id,async ({event: verified,binding}) => {
+        if (binding.purpose !== 'payment_method' || binding.targetId !== requestId || verified.object.status !== 'succeeded'
+          || !verified.object.customer || !verified.object.paymentMethod) throw new BookingStripeError('stripe_binding_mismatch');
+        return [c.env.DB.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM booking_payment_methods p
+          JOIN booking_payment_connections c ON c.line_account_id=p.line_account_id
+          WHERE p.id=? AND p.line_account_id=? AND p.friend_id=? AND p.setup_id=? AND p.test_mode=1
+            AND c.provider_account_id=? AND c.test_mode=1 AND c.disconnected_at IS NULL
+            AND (p.status='pending' OR (p.status='ready' AND p.stripe_customer_id=? AND p.stripe_payment_method_id=?)))
+          THEN 'true' ELSE 'stripe_payment_method_mismatch' END)`)
+          .bind(requestId,binding.accountId,binding.friendId,verified.object.id,event.account,verified.object.customer,verified.object.paymentMethod),
+          c.env.DB.prepare(`UPDATE booking_payment_methods SET status='ready',stripe_customer_id=?,stripe_payment_method_id=?
+            WHERE id=? AND line_account_id=? AND friend_id=? AND setup_id=? AND status='pending' AND test_mode=1`)
+            .bind(verified.object.customer,verified.object.paymentMethod,requestId,binding.accountId,binding.friendId,verified.object.id)];
+      });
+      if (applied === 'applied' || applied === 'duplicate') return c.json({success:true,data:{status:'applied'}},200);
+      if (applied === 'review_required') return c.json({success:true,data:{status:'review_required'}},202);
+    }
     if(result.status==='review_required')logger.warn('booking_stripe_webhook_review_required');
     // 保存済みで未反映。後続の業務が外部IDを確定した時に、共通の消費口から再開する。
     return c.json({success: true, data: result},result.status === 'applied' ? 200 : 202);

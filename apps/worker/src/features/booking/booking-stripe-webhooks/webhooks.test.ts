@@ -228,3 +228,17 @@ it('同じCheckoutでもsetupを購入の入金へ読み替えない',async()=>{
   expect(await applyBookingStripeReceipt(f.db,'acct_original','evt_setup',effect)).toBe('review_required');
   expect(f.raw.prepare('SELECT uses FROM effects').get()).toEqual({uses:0});
 });
+
+describe('キャンセル料のカード登録通知', () => {
+  it('紐付け済みの申込だけを登録済みにし、同じ通知の再送では二重反映しない', async () => {
+    f.raw.exec("INSERT INTO booking_payment_methods(id,friend_id,line_account_id,setup_id,idempotency_key,created_at) VALUES('request1','f','a','seti_card','request-key',datetime('now')); CREATE TABLE card_effects(n INTEGER); INSERT INTO card_effects VALUES(0); CREATE TRIGGER card_once AFTER UPDATE OF status ON booking_payment_methods WHEN NEW.status='ready' BEGIN UPDATE card_effects SET n=n+1; END;");
+    const cardBinding: BookingStripeBinding = {tenantId:'t',accountId:'a',friendId:'f',purpose:'payment_method',targetId:'request1',connectAccount:'acct_original',objectId:'seti_card',objectKind:'setup_intent',amount:null,currency:null,customerId:'cus_person'};
+    await bind(cardBinding);
+    const e = {id:'evt_card',account:'acct_original',api_version:'2024-06-20',created:Math.floor(Date.now()/1000),type:'setup_intent.succeeded',livemode:false,
+      data:{object:{id:'seti_card',object:'setup_intent',livemode:false,status:'succeeded',customer:'cus_person',payment_method:'pm_card',metadata:{booking_payment_method_id:'request1'}}}};
+    expect((await send(e)).status).toBe(200);
+    expect((await send(e)).status).toBe(200);
+    expect(f.raw.prepare('SELECT status,stripe_customer_id,stripe_payment_method_id FROM booking_payment_methods WHERE id=?').get('request1')).toEqual({status:'ready',stripe_customer_id:'cus_person',stripe_payment_method_id:'pm_card'});
+    expect(f.raw.prepare('SELECT n FROM card_effects').get()).toEqual({n:1});
+  });
+});
