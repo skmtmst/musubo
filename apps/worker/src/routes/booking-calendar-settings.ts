@@ -110,10 +110,10 @@ bookingCalendarSettings.post('/api/booking/admin/bookings/:id/meeting',async (c:
 
 bookingCalendarSettings.get('/api/booking/admin/bookings/:id/meeting-status',async c=>{
  const account=await gapAccount(c),id=c.req.param('id');
- const booking=await c.env.DB.prepare('SELECT id FROM bookings WHERE id=? AND line_account_id=?').bind(id,account).first();if(!booking)throw new GapError('not_found',404);
+ const booking=await c.env.DB.prepare('SELECT id,lock_version FROM bookings WHERE id=? AND line_account_id=?').bind(id,account).first<{id:string;lock_version:number}>();if(!booking)throw new GapError('not_found',404);
  const row=await c.env.DB.prepare(`SELECT l.status,l.provider FROM booking_meeting_links l JOIN bookings b ON b.id=l.booking_id
   WHERE b.id=? AND b.line_account_id=? AND l.idempotency_key='booking-meeting:'||b.id||':'||b.lock_version ORDER BY l.created_at DESC,l.id DESC LIMIT 1`).bind(id,account).first<{status:string;provider:string}>();
- return c.json({success:true,data:{state:row?.status==='failed'?'failed':row?.status==='pending'?'unknown':row?.status==='active'?'active':'none',provider:row?.provider??null}});
+ return c.json({success:true,data:{state:row?.status==='failed'?'failed':row?.status==='pending'?'unknown':row?.status==='active'?'active':'none',provider:row?.provider??null,version:booking.lock_version}});
 });
 bookingCalendarSettings.post('/api/booking/admin/bookings/:id/meeting-retry',async c=>{
  gapWrite(c,{admin:true});const accountId=await gapAccount(c),bookingId=c.req.param('id')!,requestKey=gapKey(c);
