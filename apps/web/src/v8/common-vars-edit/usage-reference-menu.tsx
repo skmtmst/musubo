@@ -29,9 +29,10 @@ export function UsageReferenceMenu({ usage, version, pinDisabledReason, canPin, 
   }
   if (!fixed || usage.referencedVersion !== version || unavailableReason || pinDisabledReason) {
     const googleReason = fixed && pinDisabledReason ? `${pinDisabledReason} 固定済みの場合は送らず要確認になります` : pinDisabledReason
-    const reason = unavailableReason ?? googleReason ?? (valueChanged ? '変更を保存してから固定してください' : undefined)
+    const reason = unavailableReason ?? googleReason
+    const unsavedReason = !reason && valueChanged ? '変更を保存してから固定してください' : undefined
     items.push({ id: 'pin', label: `版 ${version} で固定`, icon: null,
-      lockedReason: reason ?? undefined,
+      lockedReason: reason ?? undefined, disabled: Boolean(unsavedReason), disabledReason: unsavedReason,
       onSelect: () => onChoose('pin') })
   }
   return <RowMenu label={`${usage.name}の操作`} size="row" items={items} showGroupHeadings={false} />
