@@ -12315,6 +12315,11 @@ CREATE TRIGGER banner_projects_folder_insert BEFORE INSERT ON banner_projects WH
 
 CREATE TRIGGER banner_projects_folder_update BEFORE UPDATE OF folder_id,tenant_id ON banner_projects WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM hq_banner_folders WHERE id=NEW.folder_id AND tenant_id=NEW.tenant_id AND kind='project' AND archived_at IS NULL) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 
+CREATE TRIGGER booking_assignment_reassign AFTER UPDATE OF staff_id ON bookings
+WHEN OLD.staff_id IS NOT NEW.staff_id AND NEW.assignment_method IS OLD.assignment_method
+BEGIN
+  UPDATE bookings SET assignment_method='manual', assignment_reviewed_at=NULL WHERE id=NEW.id; END;
+
 CREATE TRIGGER booking_audit_logs_history_detach AFTER UPDATE OF booking_id ON booking_audit_logs BEGIN UPDATE booking_audit_logs SET booking_id_history = COALESCE(NEW.booking_id, OLD.booking_id, OLD.booking_id_history) WHERE id = NEW.id; END;
 
 CREATE TRIGGER booking_audit_logs_history_insert AFTER INSERT ON booking_audit_logs BEGIN UPDATE booking_audit_logs SET booking_id_history = COALESCE(NEW.booking_id, NEW.booking_id_history) WHERE id = NEW.id; END;

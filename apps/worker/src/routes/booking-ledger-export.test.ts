@@ -208,6 +208,24 @@ describe('GET /api/booking/admin/requests の担当者・種別絞り込み (N-3
     expect(bySourceBody.requests.map((r) => r.id)).toEqual(['B2']);
   });
 
+  test('受付は自動割当の未確認と承認待ちを重複なく数え、確認後は未確認から外す', async () => {
+    insertBooking(sqlite, { id: 'auto', friend: 'f1', status: 'confirmed' });
+    insertBooking(sqlite, { id: 'both', friend: 'f1', status: 'requested' });
+    insertBooking(sqlite, { id: 'old', friend: 'f1', status: 'confirmed' });
+    sqlite.exec("UPDATE bookings SET assignment_method='automatic' WHERE id IN ('auto','both')");
+    const { app, env } = makeApp(db);
+    const url = '/api/booking/admin/requests?account_id=acc1&reception=attention';
+    const response = await app.request(url, {}, env);
+    const body = await response.json() as { total: number; requestedCount: number; unassignedCount: number; attentionCount: number; requests: Array<{ id: string }> };
+    expect(response.status).toBe(200);
+    expect([body.total, body.requestedCount, body.unassignedCount, body.attentionCount]).toEqual([2, 1, 2, 2]);
+    const reviewed = await app.request('/api/booking/admin/requests/auto/assignment-review?account_id=acc1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lock_version: 0 }) }, env);
+    expect(reviewed.status).toBe(200);
+    expect((await app.request('/api/booking/admin/requests/auto/assignment-review?account_id=acc1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lock_version: 0 }) }, env)).status).toBe(409);
+    const after = await (await app.request(url, {}, env)).json() as { total: number; unassignedCount: number };
+    expect([after.total, after.unassignedCount]).toEqual([1, 1]);
+  });
+
   test('CHECK外の種別値は条件にしない（0件化で誤解させない）', async () => {
     insertBooking(sqlite, { id: 'B1', friend: 'f1', source: 'liff' });
     const { app, env } = makeApp(db);

@@ -269,7 +269,10 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
   // 席数 + 営業時間版 + 資源を同時に確かめ、どれか外れれば 0 行更新になる。
   const update = c.env.DB.prepare(
     `UPDATE bookings SET
-        confirmation_revision = confirmation_revision + 1, staff_id = ?, menu_id = ?, starts_at = ?, ends_at = ?, block_ends_at = ?,
+        confirmation_revision = confirmation_revision + 1,
+        assignment_method = CASE WHEN staff_id <> ? THEN 'manual' ELSE assignment_method END,
+        assignment_reviewed_at = CASE WHEN staff_id <> ? THEN NULL ELSE assignment_reviewed_at END,
+        staff_id = ?, menu_id = ?, starts_at = ?, ends_at = ?, block_ends_at = ?,
         price_at_booking = ?, customer_note = ?, internal_note = ?,
         notification_policy_snapshot = ?, updated_by_staff_id = ?,
         lock_version = lock_version + 1,
@@ -300,6 +303,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
         ${STORE_SETTINGS_VERSION_GUARD_SQL}
         ${BOOKING_RESOURCE_CAPACITY_GUARD_EXCLUDE_SQL}`,
   ).bind(
+    newStaffId, newStaffId,
     newStaffId,
     newMenuId,
     newStartsAt.toISOString(),

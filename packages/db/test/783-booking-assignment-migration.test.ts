@@ -15,6 +15,8 @@ describe('783 booking assignment method', () => {
       for (const method of ['designated', 'automatic', 'manual']) {
         db.prepare('INSERT INTO bookings (id,staff_id,assignment_method) VALUES (?,?,?)').run(method, 's', method);
       }
+      db.prepare("UPDATE bookings SET assignment_reviewed_at='2026-01-01', staff_id='t' WHERE id='automatic'").run();
+      expect(db.prepare("SELECT assignment_method, assignment_reviewed_at FROM bookings WHERE id='automatic'").get()).toEqual({ assignment_method: 'manual', assignment_reviewed_at: null });
       expect(() => db.prepare("INSERT INTO bookings (id,staff_id,assignment_method) VALUES ('bad','s','other')").run()).toThrow();
     } finally { db.close(); }
   });
