@@ -609,7 +609,7 @@ export default function Form({ readOnlyDocument = false }: {readOnlyDocument?:bo
           style={{ backgroundColor: hasCustomTheme ? theme.sub : undefined }}
         >
           {/* 上の帯と下の帯の間の真ん中に置く (送信しました)。 */}
-          <div className="flex min-h-[calc(100dvh-var(--liff-header-h)-1px-90px)] flex-col items-center justify-center px-6">
+          <div className={formPayment || bookingError ? 'flex flex-col items-center justify-center px-6 py-6' : 'flex min-h-[calc(100dvh-var(--liff-header-h)-1px-90px)] flex-col items-center justify-center px-6'}>
             <StatusView
               icon="check"
               tone="success"
