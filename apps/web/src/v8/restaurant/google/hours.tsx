@@ -14,6 +14,7 @@ import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { HoursCalendarPage } from './hours-calendar-page'
 import { restaurantGoogleApi, type GoogleDayHours } from '@/lib/restaurant-google-api'
+import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
 import { emitGuideSignal } from '@/v8/onboarding/public/guide-overlay/index'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -27,6 +28,8 @@ import styles from './hours.module.css'
 
 export default function HoursPage({ accountId, tabs, initialMode, initialDate, shared = false }: {accountId:string;tabs:ReactNode;initialMode?:string|null;initialDate?:string|null;shared?:boolean}) {
  const m=useHoursWorkspace(accountId)
+ const { guide } = useSharedGuide() ?? {}
+ const confirmingImportedHours = !shared && guide?.phase === 'active' && guide.stepKey === 'hours' && guide.procedureIndex === 2
  const {allowed,lockedReason,known}=useGooglePermission('manager', true, shared ? '/settings/sns' : '/restaurant-test/google')
  const [panel,setPanel]=useState<HoursPanel|null>(()=>initialMode?initialMode==='weekly'?{kind:'weekly'}:initialMode==='text'?{kind:'text'}:{kind:'dates',dates:initialDate?[initialDate]:[]}:null)
  const [expanded,setExpanded]=useState(false),[history,setHistory]=useState(false),[calendar,setCalendar]=useState(false),[month,setMonth]=useState(''),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[actionError,setActionError]=useState(''),[sent,setSent]=useState<'google'|'local'|null>(null)
@@ -51,6 +54,39 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate, s
  const ranges:Array<{start:string;end:string;closed:boolean;periods:typeof current.periods;memo:string}>=[]
  for(const d of special){const last=ranges.at(-1),memo=workspace.notes[d.date]??'';if(last&&hoursDateAdd(last.end,1)===d.date&&last.closed===d.closed&&JSON.stringify(last.periods)===JSON.stringify(d.periods)&&last.memo===memo)last.end=d.date;else ranges.push({start:d.date,end:d.date,closed:d.closed,periods:d.periods,memo})}
  const changed=hasHoursDraft(workspace)
+ const hasImportedHours = HOURS_WEEKDAYS.some(weekday => data.profile.regularHours[weekday].length > 0)
+ const showImportedHours = confirmingImportedHours && !changed && !panel && !confirm && !calendar && !sent && !initialMode
+ if (showImportedHours) return (
+  <HoursWorkspaceFrame context={<span>{data.profile.title ?? data.store.name}</span>}>
+   <div className={styles.tabs}>{tabs}</div>
+   <div className={styles.content}>
+    {data.stale ? <Notice tone="warn">Googleから最新の営業時間を読み込めませんでした。接続を確認して再読み込みしてください。</Notice>
+      : hasImportedHours ? <Notice tone="success">Googleビジネスと接続しました。営業時間を取り込みました。</Notice>
+      : <Notice tone="warn">Googleビジネスに通常の営業時間がありません。Googleビジネスで設定してから再読み込みしてください。</Notice>}
+    <div className={styles.importedHours}>
+     <Card contentPadding="var(--space-20)" layout="vertical" gap="normal">
+      <h2>取り込んだ営業時間</h2>
+      <div className={styles.weekList}>{HOURS_WEEKDAYS.map(weekday => (
+       <div className={styles.weekRow} key={weekday}>
+        <span>{WEEKDAY_JA[weekday]}曜日</span>
+        <span>{hoursText(data.profile.regularHours[weekday], '定休日')}</span>
+       </div>
+      ))}</div>
+      <Notice tone="warn">営業時間が違うときは、Googleビジネスで正しい時間に変更してから「Googleから再読み込み」を押してください。</Notice>
+      <div data-guide-slot="hours.confirm" data-guide-narrow style={{ display: 'contents' }} />
+      <div className={styles.actions}>
+       <Button data-guide-anchor="hours.confirm" presentation="hours" variant="primary" size="field"
+         disabled={disabled || data.stale || !hasImportedHours} lockedReason={lockedReason}
+         onClick={() => emitGuideSignal('hours.confirm')}>この営業時間で確定</Button>
+       <Button presentation="hours" size="field" disabled={disabled} lockedReason={lockedReason}
+         onClick={() => void m.load(true)}>Googleから再読み込み</Button>
+      </div>
+     </Card>
+    </div>
+   </div>
+  </HoursWorkspaceFrame>
+ )
+
  return <><HoursWorkspaceFrame context={<span>{data.profile.title??data.store.name} · {data.timeZone==='Asia/Tokyo'?'日本時間':data.timeZone}</span>}><div className={styles.tabs}>{tabs}</div>
   {confirm?<HoursConfirm data={data} workspace={workspace} changes={m.changes} onBack={()=>setConfirm(false)} onSend={()=>void send()} busy={busy} disabled={disabled} lockedReason={lockedReason} error={actionError}/>:calendar?<HoursCalendarPage data={data} workspace={workspace} holidays={config.holidays} month={month||today.slice(0,7)} onMonth={setMonth} selected={calendarDate||today} onSelect={setCalendarDate} onBack={()=>setCalendar(false)} onEdit={dates=>open({kind:'dates',dates,mode:dates.length>1?'range':'dates'})} onRemove={dates=>{const pending=workspace.draft.days.filter(d=>!dates.includes(d.date));for(const date of dates)if(data.profile.specialHours.some(d=>d.date===date))pending.push({date,closed:!weekly[HOURS_WEEKDAYS[(new Date(`${date}T12:00:00Z`).getUTCDay()+6)%7]].length,periods:weekly[HOURS_WEEKDAYS[(new Date(`${date}T12:00:00Z`).getUTCDay()+6)%7]],remove:true});m.update({...workspace,draft:{...workspace.draft,days:pending,reviewIds:[]}})}} onReview={()=>void review()} disabled={disabled} changed={changed}/>:<div className={styles.content}>
    <PageHeading title="営業時間" titleSize="workspace" inset="none" separator="none" actions={<Button presentation="hours" variant="text" size="compact" icon={<History size={15}/>} onClick={()=>setHistory(true)}>変更履歴</Button>}/>

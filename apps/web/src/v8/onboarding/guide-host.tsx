@@ -131,8 +131,9 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
   useGuideSignal('reception.menuPublished', Boolean(accountId && inPublishReview), advance, accountId ?? undefined)
   const offerPublishing = needsPublishReview && !inPublishReview && onTargetScreen
   const reviewingTables = guide.stepKey === 'attributes' && guide.procedureIndex === 3
+  const reviewingHours = guide.stepKey === 'hours' && guide.procedureIndex === 2
   const showComplete = scripted && Boolean(summary?.total && summary.done === summary.total) &&
-    (first.arrived || guide.phase === 'active' || guide.phase === 'paused') && !offerPublishing && !reviewingTables
+    (first.arrived || guide.phase === 'active' || guide.phase === 'paused') && !offerPublishing && !reviewingTables && !reviewingHours
   const showReceive = firstMessageStep && !step.done && guide.phase === 'active' && pathname === '/' && !qrOpen && channelId
   const showMenuPicker = menuPickerStep && !step.done && guide.phase === 'active' && pathname === '/' &&
     accountId && style.data?.styleSelected && !style.stale
@@ -142,13 +143,14 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
     <GuideSharedProvider value={shared}>
       {children}
       <GuideOverlay
-        active={guide.phase === 'active' && !offerPublishing && !inPublishReview && !showReceive && !showComplete && !showMenuPicker}
+        active={guide.phase === 'active' && !offerPublishing && !showReceive && !showComplete && !showMenuPicker}
         stepKey={guide.stepKey}
         stepLabel={step?.label ?? null}
         stepOrder={index >= 0 ? index + 1 : null}
         procedureIndex={guide.procedureIndex}
         onTargetScreen={!leavingGuideScreen}
         scripted={scripted}
+        showProcedure={!inPublishReview}
         nextLabel={next?.label}
         segments={segments}
         onAdvanceProcedure={advance}

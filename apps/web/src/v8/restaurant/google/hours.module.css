@@ -102,3 +102,5 @@
 .dateChip{padding:var(--hours-date-chip-padding);border-radius:var(--radius-pill);background:var(--hours-date-chip-background);color:var(--color-success);}
 
 .confirmCaption{font-size:var(--hours-editor-body-size);margin:0;}
+
+.importedHours { max-width: var(--tpl-guide-imported-hours-w); --tpl-guide-imported-hours-w: 640px; }
