@@ -492,6 +492,8 @@
 
 - [はじめにやることと初期設定のリッチメニュー手順](release-log/unreleased/109-masato-first-steps-guide.md) — 反映履歴、確認 2026-11-17。
 
+- [LINEアカウントの接続再確認を修正](release-log/unreleased/136-masato-line-account-live-check.md)
+
 - [自動確認を実際の画面の動きで確認](release-log/unreleased/105-kenta-q02b-b7.md) — 反映履歴、確認 2026-11-17。
 
 - [列車：試験だけの4本](release-log/unreleased/102-kenta-train-tests.md) — まとめて入れた試験の履歴。確認 2026-11-17。
