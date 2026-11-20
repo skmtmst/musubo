@@ -109,10 +109,10 @@ function asD1(sqlite: Database.Database): D1Database {
   return db as unknown as D1Database;
 }
 
-function makeApp(db: D1Database, role: 'owner' | 'admin' | 'staff' = 'owner') {
+function makeApp(db: D1Database, role: 'owner' | 'admin' | 'staff' = 'owner', hqRole?: 'operator' | 'viewer') {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'owner-1', name: 'Owner', role, readOnly: false });
+    c.set('staff', { id: 'owner-1', name: 'Owner', role, readOnly: false, hqRole });
     return next();
   });
   app.route('/', booking);
@@ -353,6 +353,13 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
     expect(conflictHooks.notifyBookingConflicts).toHaveBeenCalledWith(db,'acc1');
     expect((await create('enabled')).status).toBe(201);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM bookings').get()).toEqual({ n:1 });
+  });
+
+  test('統括の運用担当が担当を選んだ予約は手動として記録する', async () => {
+    const {app,env}=makeApp(db,'staff','operator');
+    const response=await app.request('/api/booking/admin/bookings?account_id=acc1',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':'hq-manual'},body:JSON.stringify({booking_customer_id:'customer-1',menu_id:'m1',staff_id:'s1',starts_at:futureStartsAt(),send_line_confirmation:false})},env as never,execCtx);
+    expect(response.status,await response.clone().text()).toBe(201);
+    expect(sqlite.prepare('SELECT assignment_method FROM bookings').get()).toEqual({assignment_method:'manual'});
   });
 
   test('担当を店が選んだ電話予約は手動として記録する', async () => {
