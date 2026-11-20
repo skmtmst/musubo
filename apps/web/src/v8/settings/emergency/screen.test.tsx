@@ -187,14 +187,18 @@ describe('運用状態の外側', () => {
     expect(state.cleanupCalls).toEqual(['account-1'])
   })
 
-  it('閲覧のみには外部の予定・会議の確認を読みに行かない', async () => {
+  it('閲覧のみにも外部の予定・会議の確認を出し、記録のボタンは灰色＋理由にする', async () => {
     roleState.role = 'viewer'
     verifiedStaffRole('viewer')
     state.cleanupItems = [{ id: 'job-1', provider: 'zoom', staffId: 'staff-1', startsAt: '2030-01-02T01:00:00Z' }]
     try {
       await renderScreen('health')
-      expect(state.cleanupCalls).toEqual([])
-      expect(screen.queryByText(/外部の予定・会議の確認/)).toBeNull()
+      expect(await screen.findByText('外部の予定・会議の確認 1 件')).toBeTruthy()
+      expect(state.cleanupCalls).toEqual(['account-1'])
+      const button = screen.getByRole('button', { name: '片づけ済みにする' })
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      const reasonId = button.getAttribute('aria-describedby') ?? ''
+      expect(reasonId.split(' ').map((id) => document.getElementById(id)?.textContent ?? '').join('')).toContain('閲覧のみのため変更できません。')
     } finally {
       roleState.role = 'owner'
     }
