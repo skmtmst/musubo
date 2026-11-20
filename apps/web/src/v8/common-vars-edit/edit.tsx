@@ -65,6 +65,10 @@ function usageReferenceText(mode: CommonVarDeleteImpactItem['referenceMode'], ve
   return mode === 'live' ? '最新の値' : mode === 'pinned' ? version == null ? '固定した値' : `版 ${version} で固定` : mode === 'operation' ? '値を操作' : '—'
 }
 
+function usageNextDescription(usage: CommonVarDeleteImpactItem): string {
+  return `次に公開した版から ${usage.referenceMode === 'pinned' ? usage.referencedVersion == null ? '固定します' : `版 ${usage.referencedVersion} で固定します` : '最新の値を使います'}`
+}
+
 function usageHasNextChange(usage: CommonVarDeleteImpactItem): boolean {
   return Boolean(usage.publishedReferenceMode && (usage.publishedReferenceMode !== usage.referenceMode || (usage.referenceMode === 'pinned' && usage.publishedReferencedVersion !== usage.referencedVersion)))
 }
@@ -888,18 +892,17 @@ function EditCommonVarV8Inner() {
               <h2 id="cv-edit-usage-heading" className={styles.cardTitle}>使用先 {formatNumber(impact.total)}か所</h2>
               {pinError ? <Notice tone="danger">{pinError}</Notice> : null}
               <ConfirmDialog open={pinTarget !== null && pinTarget.accountId === selectedAccountId && pinTarget.itemId === item?.id} title={pinTarget?.mode === 'live' ? '最新の値に戻しますか' : 'この版で固定しますか'} description={`${pinTarget?.name ?? ''} を${pinTarget?.mode === 'live' ? '最新の値に戻し' : `版 ${pinTarget?.version ?? ''} に固定し`}ます。${pinTarget?.kind === 'broadcast' ? '承認待ち・承認済みの場合は承認が取り消されます。' : '次に公開した版から反映します。'}`} confirmLabel={pinTarget?.mode === 'live' ? '最新の値に戻す' : '固定する'} error={pinError} busy={pinBusy !== null} onCancel={() => setPinTarget(null)} onConfirm={() => { if (pinTarget) void pinBroadcast(pinTarget.href) }} />
-              <DataTable label="使っている場所" columnWeights={[2.2, 1.5, 5.5, 1, 1]}>
+              <DataTable label="使っている場所" columnWeights={[3.8, 1.45, 3.3, 1, 1]}>
                 <thead><TableHeadRow><Th>使用先</Th><Th>状態</Th><Th>参照方法</Th><Th>版</Th><Th align="right" columnKind="menu">操作</Th></TableHeadRow></thead>
                 <tbody>{(showAllUsages ? impact.items : impact.items.slice(0, 20)).map((usage, index) => <Tr key={`${usage.kind}-${usage.href}-${index}`}>
                   <Td><PageLink href={usage.href}><TruncatedText value={usage.name} /></PageLink></Td><Td><TruncatedText value={usage.status === '使われています' ? '使用中' : usage.status} /></Td>
-                  <Td><span className={styles.usageReference}><TruncatedText value={usageReferenceText(usage.publishedReferenceMode ?? usage.referenceMode, usage.publishedReferenceMode ? usage.publishedReferencedVersion : usage.referencedVersion)} />{usageHasNextChange(usage) ? <StatusBadge dot={false} size="micro" tone="info">{`次の公開から ${usageReferenceText(usage.referenceMode, usage.referencedVersion)}`}</StatusBadge> : null}</span></Td>
+                  <Td><span className={styles.usageReference}><TruncatedText value={usageReferenceText(usage.publishedReferenceMode ?? usage.referenceMode, usage.publishedReferenceMode ? usage.publishedReferencedVersion : usage.referencedVersion)} />{usageHasNextChange(usage) ? <StatusBadge dot={false} size="micro" tone="info"><span tabIndex={0} title={usageNextDescription(usage)} aria-label={usageNextDescription(usage)}>{usage.referenceMode === 'pinned' ? usage.referencedVersion == null ? '次回 固定' : `次回 版${usage.referencedVersion}` : '次回 最新'}</span></StatusBadge> : null}</span></Td>
                   <Td><TruncatedText value={usage.publishedReferenceMode ? usage.publishedReferencedVersion == null ? '—' : `版 ${usage.publishedReferencedVersion}` : usage.referencedVersion == null ? '—' : `版 ${usage.referencedVersion}`} /></Td>
                   <Td align="right" columnKind="menu">{canWrite && item && selectedAccountId ? <UsageReferenceMenu usage={usage} version={item.version} pinDisabledReason={item.pinDisabledReason} canPin={usage.kind === 'scenario' ? canPinScenario : usage.kind === 'form' ? canPinForm : canPinBroadcast} valueChanged={value !== item.value} busy={pinBusy !== null} onChoose={(mode) => setPinTarget({ href: usage.href, name: usage.name, accountId: selectedAccountId, itemId: item.id, version: item.version, kind: usage.kind === 'scenario' ? 'scenario' : usage.kind === 'form' ? 'form' : 'broadcast', mode })} /> : null}</Td>
                 </Tr>)}</tbody>
               </DataTable>
               <p className={styles.fieldHint}>送信済み・完了済みの内容は、値を変えても変わりません。</p>
-              {impact.items.some(usageHasNextChange) ? <p className={styles.fieldHint}>『次の公開から』の札が付いた使用先は、次に公開した版から反映します。</p> : null}
-              {impact.items.some(usage => (usage.kind === 'scenario' && /[?&](step|action)=/.test(usage.href)) || (usage.kind === 'form' && !usage.publishedReferenceMode)) ? <p className={styles.fieldHint}>シナリオとフォームの下書きの変更は、次に公開した版から反映します。</p> : null}
+              {impact.items.some(usage => usageHasNextChange(usage) || (usage.kind === 'scenario' && /[?&](step|action)=/.test(usage.href)) || (usage.kind === 'form' && !usage.publishedReferenceMode)) ? <p className={styles.fieldHint}>『次回』の札が付いた使用先と、シナリオ・フォームの下書きの変更は、次に公開した版から反映します。</p> : null}
               {item?.pinDisabledReason && impact.items.some(usage => usage.kind === 'broadcast' && usage.referenceMode === 'pinned' && !usage.status.includes('送信済み') && !usage.status.includes('完了済み')) ? <p className={styles.fieldHint}>Google と連携した固定版は送らず要確認になります。「…」から最新の値に戻せます。</p> : null}
               {item?.pinDisabledReason && impact.items.some(usage => (usage.kind === 'scenario' || usage.kind === 'form') && (usage.referenceMode === 'pinned' || usage.publishedReferenceMode === 'pinned')) ? <p className={styles.fieldHint}>Google と連携した固定版は送信・表示できません。下書きで最新の値に戻し、公開し直してください。</p> : null}
               {impact.unscopedFormTotal > 0 ? <p className={styles.fieldHint}>所属を確認できない使用先が {formatNumber(impact.unscopedFormTotal)}か所あります。</p> : null}

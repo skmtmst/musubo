@@ -232,7 +232,7 @@ it.each([
     unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind, kindLabel: name, name, status: '使用中', href, blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
   } })
   render(<Editor />)
-  expect(await screen.findByText('シナリオとフォームの下書きの変更は、次に公開した版から反映します。')).toBeTruthy()
+  expect(await screen.findByText('『次回』の札が付いた使用先と、シナリオ・フォームの下書きの変更は、次に公開した版から反映します。')).toBeTruthy()
   fireEvent.click(await screen.findByRole('button', { name: `${name}の操作` }))
   fireEvent.click(await screen.findByRole('menuitem', { name: '版 1 で固定' }))
   const dialog = await screen.findByRole('dialog', { name: 'この版で固定しますか' })
@@ -253,9 +253,9 @@ it('フォームは公開中と次の公開の参照を区別して示す', asyn
   state.impact.mockResolvedValue({ success:true, data:{ variable:{id:'var-1',name:'営業時間',varKey:'hours'},total:1,blockingTotal:1,historicalTotal:0,
     unscopedFormTotal:0,canDelete:false,byKind:{},items:[{kind:'form',kindLabel:'フォーム',name:'回答',status:'公開中',href:'/form-submissions/edit?id=form',blocksDeletion:true,currentPreview:'10時',referenceMode:'pinned',referencedVersion:1,publishedReferenceMode:'live',publishedReferencedVersion:2}],unavailableReferences:[],checkedAt:'',recommendedAction:'review_references'} })
   render(<Editor />)
-  expect(await screen.findByText('次の公開から 版 1 で固定')).toBeTruthy()
+  expect((await screen.findByTitle('次に公開した版から 版 1 で固定します')).textContent).toBe('次回 版1')
   expect(screen.getByTitle('版 2')).toBeTruthy()
-  expect(screen.getByText('『次の公開から』の札が付いた使用先は、次に公開した版から反映します。')).toBeTruthy()
+  expect(screen.getByText('『次回』の札が付いた使用先と、シナリオ・フォームの下書きの変更は、次に公開した版から反映します。')).toBeTruthy()
 })
 
 it('シナリオの送信アクションも行末から固定できる', async () => {
