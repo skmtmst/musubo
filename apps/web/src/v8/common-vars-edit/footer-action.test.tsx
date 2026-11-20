@@ -253,7 +253,7 @@ it('フォームは公開中と次の公開の参照を区別して示す', asyn
   state.impact.mockResolvedValue({ success:true, data:{ variable:{id:'var-1',name:'営業時間',varKey:'hours'},total:1,blockingTotal:1,historicalTotal:0,
     unscopedFormTotal:0,canDelete:false,byKind:{},items:[{kind:'form',kindLabel:'フォーム',name:'回答',status:'公開中',href:'/form-submissions/edit?id=form',blocksDeletion:true,currentPreview:'10時',referenceMode:'pinned',referencedVersion:1,publishedReferenceMode:'live',publishedReferencedVersion:null}],unavailableReferences:[],checkedAt:'',recommendedAction:'review_references'} })
   render(<Editor />)
-  expect(await screen.findByTitle('最新の値（次: 版 1）')).toBeTruthy()
+  expect(await screen.findByTitle('最新→次:版1')).toBeTruthy()
 })
 
 it('シナリオの送信アクションも行末から固定できる', async () => {
