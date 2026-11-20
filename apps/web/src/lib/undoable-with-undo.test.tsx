@@ -1,9 +1,5 @@
 // @vitest-environment happy-dom
-/*
- * ★V8 （A-2 採用）受信箱の右の欄でその場で直す：押した瞬間に変えて裏で保存し、
- * 通ったら［元に戻す］付きの白い知らせ（5秒・乗せている間は止まる）、失敗したら戻して
- * 理由と［もう一度試す］。共通の知らせ（ToastHost）で確かめる。
- */
+
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
@@ -25,38 +21,20 @@ const buttonByText = (root: HTMLElement, text: string) =>
   [...root.querySelectorAll('button')].find((el) => el.textContent?.includes(text)) as HTMLButtonElement | undefined
 
 describe('runOptimisticWithUndo（その場で直す）', () => {
-  it('通ったら成功の文と［元に戻す］を出し、押すと画面を戻して逆の保存を送る', async () => {
+  it('保存したら成功の知らせを出し、逆の保存は行わない', async () => {
     const request = vi.fn().mockResolvedValue({ success: true })
-    const undoRequest = vi.fn().mockResolvedValue({ success: true })
+    const undoRequest = vi.fn()
     const revert = vi.fn()
     const { container } = render(<ToastHost />)
     await act(async () => {
-      runOptimisticWithUndo({ request, revert, undoRequest, successMessage: '対応状況を「対応中」にしました', failureMessage: '対応状況を変えられませんでした。', retry: vi.fn() })
+      runOptimisticWithUndo({ request, revert, undoRequest, successMessage: '保存しました', failureMessage: '保存できませんでした。', retry: vi.fn() })
       await vi.advanceTimersByTimeAsync(0)
     })
     expect(request).toHaveBeenCalledTimes(1)
-    expect(container.textContent).toContain('対応状況を「対応中」にしました')
-    const undo = buttonByText(container, '元に戻す')
-    expect(undo).toBeTruthy()
-    await act(async () => {
-      undo!.click()
-      await vi.advanceTimersByTimeAsync(0)
-    })
-    expect(revert).toHaveBeenCalledTimes(1)
-    expect(undoRequest).toHaveBeenCalledTimes(1)
-  })
-
-  it('知らせは5秒で消える（元に戻す付き）', async () => {
-    const { container } = render(<ToastHost />)
-    await act(async () => {
-      runOptimisticWithUndo({ request: vi.fn().mockResolvedValue({ success: true }), revert: vi.fn(), undoRequest: vi.fn(), successMessage: 'タグ「VIP」を付けました', failureMessage: 'x', retry: vi.fn() })
-      await vi.advanceTimersByTimeAsync(4900)
-    })
-    expect(container.textContent).toContain('タグ「VIP」を付けました')
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000)
-    })
-    expect(container.textContent).not.toContain('タグ「VIP」を付けました')
+    expect(container.textContent).toContain('保存しました')
+    expect(buttonByText(container, '元に戻す')).toBeUndefined()
+    expect(undoRequest).not.toHaveBeenCalled()
+    expect(revert).not.toHaveBeenCalled()
   })
 
   it('失敗したら画面を戻し、口の理由と［もう一度試す］を出す。押すとやり直す', async () => {
@@ -87,21 +65,6 @@ describe('runOptimisticWithUndo（その場で直す）', () => {
     })
     expect(container.textContent).toContain('メモを保存できませんでした。通信を確かめて')
     expect(container.textContent).not.toContain('API error')
-  })
-
-  it('元に戻す保存が失敗したら、画面をもう一度直して知らせる', async () => {
-    const reapply = vi.fn()
-    const { container } = render(<ToastHost />)
-    await act(async () => {
-      runOptimisticWithUndo({ request: vi.fn().mockResolvedValue({ success: true }), revert: vi.fn(), reapply, undoRequest: vi.fn().mockRejectedValue(new Error('x')), retry: vi.fn(), successMessage: '外しました', failureMessage: 'x' })
-      await vi.advanceTimersByTimeAsync(0)
-    })
-    await act(async () => {
-      buttonByText(container, '元に戻す')!.click()
-      await vi.advanceTimersByTimeAsync(0)
-    })
-    expect(reapply).toHaveBeenCalledTimes(1)
-    expect(container.textContent).toContain('元に戻せませんでした')
   })
 
   it('成功の文が空なら知らせない（管理画面 の画面は静かに終わる）', async () => {

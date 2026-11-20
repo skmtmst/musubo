@@ -19,8 +19,9 @@ import type { StyleSetupData } from './use-style-setup'
 import styles from './setup-card.module.css'
 
 /*
- * ダッシュボードの警告の帯と「はじめにやること」（★V8 修正案 Bdfxm。決まり  追記）。
- * - 中身が決まっていないのにリッチメニューにボタンがある物は、上の帯で知らせる（押すとその設定の画面へ）。
+ * 警告の帯と「はじめにやること」（★V8 修正案 Bdfxm。決まり  追記）。
+ * - 中身が決まっていないのにリッチメニューにボタンがある物は、リッチメニューの見本の画面の帯で知らせる
+ *   （押すとその設定の画面へ）。ホームには出さない（承認済み Pen「はじめにやること08d_v04」）。
  * - はじめにやること：済んだ数／全部・進みの線・［質問の続きを開く］。あとで設定した質問・止めている
  *   自動の送信・見本の画像のまま、を 1 行ずつ。最後に済んだ物の 1 行。
  */
@@ -37,7 +38,7 @@ export function ReservationFormRepairNotices({notices,role}:{notices?:readonly {
   return <>{notices?.map(item=><Notice key={item.href} tone="warn" action={<Button {...(canRepair?{href:item.href}:{disabled:true})} lockedReason={permissionLockReason(role,canRepair,'manager')}>予約フォームを直す →</Button>}>{item.message}</Notice>)}</>
 }
 
-/** 上の警告の帯（Bdfxm の「帯/注意（行き先つき）」）。機能ごとに 1 本。 */
+/** 警告の帯（Bdfxm の「帯/注意（行き先つき）」）。機能ごとに 1 本。ホーム（dashboard・style-dashboard）では呼ばない。 */
 export function SetupWarningBands({ data, configureAllowed = true, role }: { data: StyleSetupData; configureAllowed?: boolean; role?: string | null }) {
   const preparing = usePreparingDialog()
   const seen = new Set<string>()

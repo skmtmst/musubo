@@ -54,6 +54,9 @@ vi.mock('@/lib/api', () => ({
     },
   },
   ApiError: class ApiError extends Error {},
+  /* 開店準備ガイドの入れ物が、はじめにやることの実測（コース・担当・出来事）を通る。 */
+  bookingApi: { listMenus: vi.fn(), listStaff: vi.fn(), getSettings: vi.fn() },
+  eventsApi: { listEvents: vi.fn() },
 }))
 
 vi.mock('next/navigation', () => ({

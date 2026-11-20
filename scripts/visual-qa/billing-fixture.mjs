@@ -1,6 +1,6 @@
 /** ローカルの表示確認だけに使う料金。鍵・価格ID・外部決済は持たない。 */
 export const BILLING_SUMMARY = {
-  /* 絵 `JB8V1`：スタンダードを月払いで契約中（2026-10-06 絵に合わせた。使うのは請求の画面と左下の札だけ）。 */
+  /* 絵 `JB8V1`：スタンダードを月払いで契約中（使うのは請求の画面と左下の札だけ）。 */
   state: 'active', planKey: 'standard', planInterval: 'month', planName: 'スタンダード', planStatus: 'active',
   trialEndsAt: null, trialEndsLabel: null, trialDaysLeft: null,
   trialMonthlyImages: 20, currentPeriodEndsAt: '2026-11-01T00:00:00.000Z', currentPeriodEndsLabel: '11/1（日）',

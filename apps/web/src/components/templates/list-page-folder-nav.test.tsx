@@ -34,6 +34,12 @@ describe('一覧の型：板が狭いときに畳む左の列（folderNav）', (
     expect(onSelect).toHaveBeenCalledWith('f1')
   })
 
+  it('閲覧のみでも畳んだ段に作る操作を表示する', () => {
+    const { container } = render(<ListPage readOnly title="一覧" folders={<nav>列</nav>} folderNav={{ rows, activeId: '', onSelect: () => {}, createAction: <button aria-disabled="true">作る</button> }}>本文</ListPage>)
+    const button = collapsedRegion(container)!.querySelector('button[aria-disabled="true"]')
+    expect(button?.textContent).toBe('作る')
+  })
+
   it('選んだフォルダの削除なども畳んだ欄から実行できる', () => {
     const onDelete = vi.fn()
     const folders = [rows[0], { ...rows[1], onDelete }]
@@ -43,7 +49,7 @@ describe('一覧の型：板が狭いときに畳む左の列（folderNav）', (
     expect(onDelete).toHaveBeenCalledOnce()
   })
 
-  it('呼び名を渡すとその名で出す（統括のアカウントは「タグ：すべて」）。作るボタンを渡さない（閲覧のみ）ときは作るを出さない', () => {
+  it('呼び名を渡すとその名で出す（統括のアカウントは「タグ：すべて」）。作るボタンを渡さないときは作るを出さない', () => {
     const { container } = render(
       <ListPage title="一覧" folders={<nav>列</nav>} folderNav={{ rows, activeId: 'f1', onSelect: () => {}, label: 'タグ' }}>本文</ListPage>,
     )

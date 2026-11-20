@@ -169,3 +169,5 @@
   /* B28: 1152 では日付の段を1段に保つ。更新時刻は補足なので狭い板では隠し、読み直すを落とさない。 */
   .updated { display: none; }
 }
+
+.statePay { display: flex; align-items: center; min-width: 0; overflow: hidden; white-space: nowrap; }
