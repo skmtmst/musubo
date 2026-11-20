@@ -30,17 +30,14 @@ describe('検索に出さない（worker）', () => {
     expect(res.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
   });
 
-  it('本体の index.ts が robots の口と見出しを全部の応答の前に付けている', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { fileURLToPath } = await import('node:url');
-    const src = readFileSync(fileURLToPath(new URL('../index.ts', import.meta.url)), 'utf8');
-    const robots = src.indexOf("app.get('/robots.txt', robotsTxtHandler)");
-    const header = src.indexOf("app.use('*', noindexHeaderMiddleware)");
-    const auth = src.indexOf("app.use('*', authMiddleware)");
-    expect(robots).toBeGreaterThan(0);
-    expect(header).toBeGreaterThan(0);
-    // ログインの見張りより前（ログインしていないボットにも返す）
-    expect(robots).toBeLessThan(auth);
-    expect(header).toBeLessThan(auth);
-  });
+  it('本体の未認証リクエストでも robots と noindex を返す', async () => {
+    const { app } = await import('../index.js');
+    const robots = await app.request('/robots.txt', {}, {} as never);
+    expect(robots.status).toBe(200);
+    expect(await robots.text()).toBe(ROBOTS_TXT);
+    expect(robots.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
+    const protectedResponse = await app.request('/api/friends', {}, {} as never);
+    expect(protectedResponse.status).toBe(401);
+    expect(protectedResponse.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
+  }, 30000);
 });

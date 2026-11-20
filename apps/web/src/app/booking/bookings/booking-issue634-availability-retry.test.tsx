@@ -71,6 +71,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import BookingsPage from './page'
+import { ApiError } from '@/lib/api'
 
 const summary = {
   total: 0, requested: 0, monthTotal: 0, monthConfirmed: 0,
@@ -82,6 +83,8 @@ const menu = { id: 'menu-1', name: 'カット', is_active: 1, duration_minutes: 
 const staff = { id: 'staff-1', display_name: '山田', is_active: 1 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z'))
   vi.clearAllMocks()
   // R317: 台帳は同じタブの保存へ条件を残す。新しいタブ相当の前提にする。
   window.sessionStorage.clear()
@@ -96,9 +99,27 @@ beforeEach(() => {
   fixture.getBreaks.mockResolvedValue({ breaks: [] })
 })
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.useRealTimers() })
 
 describe('#634 予約管理の空き枠・一覧の再読み込み', () => {
+  it('有効なメニューをまとめて空き枠を取得する', async () => {
+    fixture.listMenus.mockResolvedValue({ menus: [menu, { ...menu, id: 'menu-2' }, { ...menu, id: 'hidden', is_active: 0 }] })
+    render(<BookingsPage />)
+    await waitFor(() => expect(fixture.availabilityBatch).toHaveBeenCalled())
+    expect(fixture.availabilityBatch).toHaveBeenCalledWith('account-a', expect.objectContaining({ menuIds: ['menu-1', 'menu-2'] }))
+    expect(fixture.availability).not.toHaveBeenCalled()
+  })
+
+  it('一括口が未対応のときはメニューごとの口へ退く', async () => {
+    fixture.listMenus.mockResolvedValue({ menus: [menu, { ...menu, id: 'menu-2' }] })
+    fixture.availabilityBatch.mockRejectedValue(new ApiError(404, 'not found'))
+    fixture.availability.mockResolvedValue({ by_staff: [] })
+    render(<BookingsPage />)
+    await waitFor(() => expect(fixture.availability).toHaveBeenCalledTimes(2))
+    expect(fixture.availabilityBatch).toHaveBeenCalledTimes(1)
+    expect(fixture.availability).toHaveBeenCalledWith('account-a', expect.objectContaining({ menuId: 'menu-1' }))
+    expect(fixture.availability).toHaveBeenCalledWith('account-a', expect.objectContaining({ menuId: 'menu-2' }))
+  })
   it('集計・メニュー・担当の取得失敗から「もう一度読み込む」で取り直す', async () => {
     fixture.requestsSummary.mockRejectedValueOnce(new Error('down'))
     fixture.listMenus.mockRejectedValueOnce(new Error('down'))

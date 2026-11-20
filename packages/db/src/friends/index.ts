@@ -171,7 +171,7 @@ function isMissingFollowLifecycleColumn(error: unknown): boolean {
 
 /**
  * friends.line_user_id のグローバル UNIQUE 違反。
- * UNIQUE(line_account_id, line_user_id) 移行前は、別アカウント所有の行が
+ * グローバル UNIQUE 制約がある環境では、別アカウント所有の行が
  * あるとこのスコープ用の行を INSERT できない。呼出側は
  * 「このアカウントでは友だち行を作れない」として扱う。相手アカウントの行を
  * 更新したり返したりして履歴を混線させてはいけない。

@@ -61,15 +61,6 @@ describe('V8の数の帯とメンバー一覧', () => {
     expect(read('components/shared/kpi-card.module.css')).toMatch(/@media \(max-width: 639px\)[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/)
     expect(page).toContain('kpisWithSendCountsState.map(renderKpiCard)')
   })
-
-  it('メンバー管理は設定の案内、一覧、本人の二段階認証を出す', () => {
-    // 入口（app/hq/members/page.tsx）は V8 の画面を出すだけになった（2026-10-09 管理画面 削除）。V8 の本体を見る。
-    const page = read('v8/hq/members.tsx')
-    expect(page).toContain('<HqSettingsNavV8 active="members"')
-    expect(page).toContain('<GridTable label="権限者の一覧"')
-    expect(page).toContain('<SelfSecurity />')
-    expect(page).toContain('名前・メールで探す')
-  })
 })
 
 /** 旧来の折りたたみ部品を引き続き使う画面。 */

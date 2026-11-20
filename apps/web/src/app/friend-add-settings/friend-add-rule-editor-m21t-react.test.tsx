@@ -263,6 +263,7 @@ describe('R261 再追加「何も配信しない」は配信欄を適用外に�
     await renderExisting({ returningMode: 'none', messageText: 'おかえりなさい' })
     expect(host.textContent).toContain('再追加では配信しません')
     expect(host.textContent).toContain('配信なし')
+    expect(host.textContent).not.toContain('Demo Person')
     expect(host.textContent).not.toContain('おかえりなさい')
   })
 
@@ -300,6 +301,7 @@ describe('R262 確認段のテストは経路・日時・友だちを指定で�
     state.search = 'step=preview'
     await renderExisting()
     await act(async () => { button('試す条件を指定').click() })
+    expect(document.body.textContent).not.toContain('Demo Person')
     await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: '試す流入リンク' })) })
     const route = await findByRole(document.body, 'radio', { name: '紹介QR' })
     await act(async () => { fireEvent.click(route); fireEvent.click(within(route.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '選ぶ' })); fireEvent.change(getByRole(document.body, 'textbox', { name: '想定日時' }), { target: { value: '2026-09-28T10:00' } }) })
@@ -311,6 +313,8 @@ describe('R262 確認段のテストは経路・日時・友だちを指定で�
     const result = await findByRole(document.body, 'radio', { name: '見本 141' })
     await act(async () => { fireEvent.click(result); fireEvent.click(within(result.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '選ぶ' })) })
     await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: 'この条件でテストする' })); await Promise.resolve() })
+    expect(host.textContent).toContain('テストで判定が通りました')
+    expect(document.body.textContent).not.toContain('Demo Person')
     expect(api.test).toHaveBeenCalledWith('account-a', 'rule-1', {
       routeId: 'route-1', expectedAt: '2026-09-28T10:00', friendId: 'friend-1',
     })
@@ -324,4 +328,16 @@ describe('R262 確認段のテストは経路・日時・友だちを指定で�
       routeId: null, expectedAt: null, friendId: null,
     })
   })
+})
+
+
+it('確認画面の二重送信対策は保存した時間を表示し、テスト未実施と分ける', async () => {
+  state.search = 'step=preview'
+  await renderExisting({ resendSuppressionHours: 168 })
+  expect(host.textContent).toContain('二重送信を防ぐ')
+  expect(host.textContent).toContain('同じ人へは7日に1回まで')
+  expect(host.textContent).toContain('テストで判定が通るまで')
+  const row = [...host.querySelectorAll('li')].find(item => item.textContent?.includes('二重送信を防ぐ'))
+  expect(row?.textContent).toContain('同じ人へは7日に1回まで')
+  expect(row?.textContent).not.toContain('テスト')
 })

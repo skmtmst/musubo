@@ -52,6 +52,37 @@ afterEach(() => {
 })
 
 describe('統合ユーザーの失敗と0件（WEB322）', () => {
+  it('数の帯は利用者向けの名前と取得した友だち数を出す', async () => {
+    fixture.list.mockResolvedValue({ success: true, data: { rows: [], total: 0 } })
+    fixture.stats.mockResolvedValue({ success: true, data: { uniquePeople: 2, totalFollowing: 7, friendDups: 0 } })
+    render(<UsersV8 />)
+    expect(await screen.findByTitle('紐付く友だち：7件（各アカウントの友だち登録）')).toBeTruthy()
+    expect(screen.getByLabelText('統合ユーザーの集計')).toBeTruthy()
+    expect(within(screen.getByLabelText('統合ユーザーの集計')).getByText('統合ユーザー')).toBeTruthy()
+    expect(screen.getByText('UID連携済み')).toBeTruthy()
+    expect(document.body.textContent).not.toContain('重複配信の削減')
+    expect(document.querySelector('[title="重複配信の削減"]')).toBeNull()
+    expect(document.body.textContent).not.toContain('余分な行数')
+    expect(document.body.textContent).not.toContain('余分率')
+  })
+  it('読込中・失敗・空を分け、失敗後に再取得できる', async () => {
+    let reject!: (reason: Error) => void
+    fixture.list.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+      .mockResolvedValue({ success: true, data: { rows: [], total: 0 } })
+    render(<UsersV8 />)
+    await waitFor(() => expect(fixture.list).toHaveBeenCalled())
+    const table = screen.getByRole('table')
+    expect(table.parentElement?.getAttribute('aria-busy')).toBe('true')
+    expect(table.querySelectorAll('tbody tr[aria-hidden="true"]')).toHaveLength(5)
+    expect(screen.queryByText('条件に合う人はいません')).toBeNull()
+    expect(screen.queryByText('統合ユーザーを読み込めませんでした')).toBeNull()
+    await act(async () => { reject(new Error('offline')) })
+    expect(await screen.findByText('統合ユーザーを読み込めませんでした')).toBeTruthy()
+    expect(screen.queryByText('条件に合う人はいません')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }))
+    expect(await screen.findByText('条件に合う人はいません')).toBeTruthy()
+    expect(screen.queryByText('統合ユーザーを読み込めませんでした')).toBeNull()
+  })
   it('一覧が読めなかったとき、数の帯と件数に 0人を出さない', async () => {
     fixture.list.mockRejectedValue(new Error('down'))
     render(<UsersV8 />)

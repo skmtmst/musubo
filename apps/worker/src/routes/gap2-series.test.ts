@@ -63,3 +63,69 @@ test('B4-01 B5-15: 統括の削除順で追加分と予約を消してから組�
  for(const table of purgeTablesChildFirst().filter(t=>tables.has(t)))d.raw.prepare(`DELETE FROM ${table} WHERE ${tenantScopeCondition(table)}`).run('t');
  for(const table of tables)expect(d.raw.prepare(`SELECT COUNT(*) n FROM ${table}`).get()).toEqual({n:0});
 });
+
+function seedEightWeeks(){
+ for(const date of ['2026-12-18','2026-12-25','2027-01-01','2027-01-08','2027-01-15'])d.raw.prepare("INSERT INTO staff_shifts(id,staff_id,work_date,start_time,end_time) VALUES(?,'bs',?,'09:00','18:00')").run(date,date);
+ seedGapBooking(d,'busy1','confirmed','2026-11-27T05:00:00.000Z');
+ seedGapBooking(d,'busy2','confirmed','2026-12-04T05:00:00.000Z');
+}
+test('B4-01: 8回の候補のうち埋まっている2回を明示する',async()=>{
+ seedEightWeeks();
+ const r=await gapCall(app(),'/api/booking/admin/series/preview?account_id=a','POST',{...body,rule:{freq:'weekly',count:8}});
+ expect(r.status).toBe(200);
+ const occurrences=(await r.json() as any).data.occurrences;
+ expect(occurrences).toHaveLength(8);
+ expect(occurrences.filter((x:any)=>!x.available).map((x:any)=>x.index)).toEqual([1,2]);
+ expect(occurrences.filter((x:any)=>!x.available).every((x:any)=>x.reason==='slot_unavailable')).toBe(true);
+});
+test('B4-02: 8回のうち1回を別時刻にし1回を飛ばすと7件と1組',async()=>{
+ seedEightWeeks();
+ const r=await gapCall(app(),url,'POST',{...body,rule:{freq:'weekly',count:8},choices:[{index:1,action:'keep',alternativeStartsAt:'2026-11-27T06:00:00.000Z'},{index:2,action:'skip'}]});
+ expect(r.status,await r.clone().text()).toBe(201);
+ const data=(await r.json() as any).data;
+ expect(data.bookings).toHaveLength(7);expect(data.skipped.map((x:any)=>x.index)).toEqual([2]);
+ expect(data.bookings.find((x:any)=>x.series_index===1).starts_at).toBe('2026-11-27T06:00:00.000Z');
+ expect(d.raw.prepare('SELECT count(*) n FROM booking_series').get()).toEqual({n:1});
+});
+
+test('B4-08: 4回目から取消の見込みは期限後の回だけ料金を出す',async()=>{
+ d.raw.exec(`INSERT INTO booking_cancellation_policies(line_account_id,enabled,tiers_json,no_show_percent,updated_by,updated_at) VALUES('a',1,'[{"beforeHours":24,"percent":0},{"beforeHours":0,"percent":50}]',100,'o','2026-11-16')`);
+ d.raw.prepare("INSERT INTO staff_shifts(id,staff_id,work_date,start_time,end_time) VALUES('fifth','bs','2026-12-18','09:00','18:00')").run();
+ const made=await gapCall(app(),url,'POST',{...body,rule:{freq:'weekly',count:5}});expect(made.status,await made.clone().text()).toBe(201);
+ const data=(await made.json() as any).data;vi.setSystemTime(new Date('2026-12-11T04:00:00Z'));
+ const r=await gapCall(app(),`/api/booking/admin/series/${data.series.id}/impact?account_id=a`,'POST',{scope:'following',fromBookingId:data.bookings[3].id,expectedVersion:1});
+ expect(r.status).toBe(200);const items=(await r.json() as any).data.items;
+ expect(items.map((item:any)=>item.fee.amount)).toEqual([4200,0]);expect(items.map((item:any)=>item.bookingId)).toEqual(data.bookings.slice(3).map((b:any)=>b.id));
+});
+
+test('B4-17: 閲覧のみの担当は繰り返しの一覧を読み取消できない',async()=>{
+ const made=await gapCall(app(),url,'POST',body);expect(made.status).toBe(201);const data=(await made.json() as any).data;
+ const viewer={...gapOwner,id:'s',role:'staff' as const,readOnly:true,permissionKeys:[],viewPermissionKeys:['/booking/bookings']};const a=gapApp(d,[bookingSeries],viewer);
+ const detail=await gapCall(a,`/api/booking/admin/series/${data.series.id}?account_id=a`);expect(detail.status).toBe(200);expect((await detail.json() as any).data.bookings).toHaveLength(3);
+ const cancel=await gapCall(a,`/api/booking/admin/series/${data.series.id}/cancel?account_id=a`,'POST',{scope:'this',fromBookingId:data.bookings[0].id,expectedVersion:1});
+ expect(cancel.status).toBe(403);expect(d.raw.prepare("SELECT COUNT(*) n FROM bookings WHERE status='cancelled'").get()).toEqual({n:0});
+});
+
+test('B4-19: 52回の見本は空き情報を一括取得する',async()=>{
+ const start=Date.parse('2026-11-20T05:00:00Z');
+ for(let i=4;i<52;i++){
+  const date=new Date(start+i*7*86400000).toISOString().slice(0,10);
+  d.raw.prepare("INSERT INTO staff_shifts(id,staff_id,work_date,start_time,end_time) VALUES(?,'bs',?,'09:00','18:00')").run(`week-${i}`,date);
+ }
+ const prepare=d.db.prepare.bind(d.db);let shiftReads=0;
+ const spy=vi.spyOn(d.db,'prepare').mockImplementation(sql=>{if(/FROM staff_shifts/i.test(sql))shiftReads++;return prepare(sql);});
+ try{
+  const r=await gapCall(app(),'/api/booking/admin/series/preview?account_id=a','POST',{...body,rule:{freq:'weekly',count:52}});
+  expect(r.status,await r.clone().text()).toBe(200);expect((await r.json() as any).data.occurrences).toHaveLength(52);
+  expect(shiftReads).toBe(1);
+ }finally{spy.mockRestore();}
+}, 15_000); // 52回の候補生成に必要な時間をCIの負荷変動分だけ確保する。
+
+test('B4-17: 閲覧のみの担当は繰り返しを変更できない',async()=>{
+ const made=await gapCall(app(),url,'POST',body);expect(made.status).toBe(201);const data=(await made.json() as any).data;
+ const viewer={...gapOwner,id:'s',role:'staff' as const,readOnly:true,permissionKeys:[],viewPermissionKeys:['/booking/bookings']};const a=gapApp(d,[bookingSeries],viewer);
+ const path=`/api/booking/admin/series/${data.series.id}?account_id=a`;
+ expect((await gapCall(a,path)).status).toBe(200);
+ expect((await gapCall(a,path,'PATCH',{scope:'this',fromBookingId:data.bookings[0].id,expectedVersion:1,change:{startsAt:'2026-11-20T06:00:00Z'}})).status).toBe(403);
+ expect(d.raw.prepare('SELECT starts_at FROM bookings ORDER BY series_index').all()).toEqual(data.bookings.map((b:any)=>({starts_at:b.starts_at})));
+});

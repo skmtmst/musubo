@@ -97,6 +97,7 @@ describe('R180 独自マークの保管（使用0人）', () => {
 
     const dialog = await screen.findByRole('alertdialog', { name: '「独自マーク」を保管しますか' })
     expect(dialog.textContent).toContain('そのまま保管できます')
+    expect(dialog.textContent).not.toContain('対応マークが未設定へ戻ります')
     // 置き換え先の選択欄は出ない（0人には要らない）。
     expect(dialog.textContent).not.toContain('置き換え先')
 

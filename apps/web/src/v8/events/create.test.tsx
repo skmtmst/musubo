@@ -18,14 +18,32 @@ vi.mock('./application-preview', () => ({ default: () => null }))
 import EventsCreate from './create'
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-03T08:00:00Z'))
   createEvent.mockReset()
   createSlots.mockReset()
   push.mockReset()
   Element.prototype.scrollIntoView = vi.fn()
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.useRealTimers() })
 
 describe('イベント作成の入力確認', () => {
+  it('概要と同じ画面で日付・開始・終了・定員を入力できる', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-03T08:00:00Z'))
+    try {
+      render(<EventsCreate />)
+      expect(screen.getByLabelText('イベント名')).toBeTruthy()
+      expect(screen.getByLabelText('日付').id).toBe('ev-new-date')
+      expect(screen.getByLabelText('開始の時刻').id).toBe('ev-new-start')
+      expect(screen.getByLabelText('終わりの時刻').id).toBe('ev-new-end')
+      const capacity = screen.getByLabelText('定員') as HTMLInputElement
+      expect(capacity.id).toBe('ev-new-cap')
+      fireEvent.change(capacity, { target: { value: '25' } })
+      expect(capacity.value).toBe('25')
+    } finally { cleanup(); vi.useRealTimers() }
+  })
+
   it('保存前に不足する欄を知らせて名前へ移り、通信しない', () => {
     render(<EventsCreate />)
     fireEvent.click(getPageAction({ name: '下書きを保存' }))

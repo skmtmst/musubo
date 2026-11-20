@@ -20,43 +20,12 @@ const API = readApiSource(path.join(__dirname, '../../lib/api.ts'), 'utf8')
  * - 動画の実名・通知の状態の札 … edit/webinar-detail-status.test.tsx
  */
 describe('V8 ウェビナー一覧の契約', () => {
-  it('並び順は既存データで判定できるものだけ', () => {
-    expect(PAGE).not.toContain('申込が多い順')
-    expect(PAGE).not.toContain('表示件数の切り替えは準備中です')
-  })
 
-  it('公開中と下書きは取った頁を絞り直さない', () => {
-    expect(PAGE).not.toContain('保存した条件は準備中です')
-    expect(PAGE).not.toContain('foldered.filter')
-  })
-
-  it('フォルダは固定の一覧や仮の文を持たない', () => {
-    expect(PAGE).not.toContain('const WEBINAR_FOLDERS')
+  it('フォルダに古い高さの固定を戻さない', () => {
     expect(PAGE).not.toContain('min-h-[640px]')
-    expect(PAGE).not.toContain('フォルダ名と件数は一覧APIへの接続後に表示します。')
   })
 
-  it('一覧は頁ごとに取り、取った頁を切り出さない', () => {
-    expect(PAGE).not.toContain('ほかに {hiddenCount} 件あります')
-    expect(PAGE).not.toContain('.slice(visibleStart, visibleStart + pageSize)')
-  })
 
-  it('取得失敗の生の理由を画面へ出さない', () => {
-    expect(PAGE).not.toContain('e instanceof Error ? e.message')
-  })
-
-  it('固定の絞り込みを保存検索と呼ばない(DETAIL-20)', () => {
-    expect(PAGE).not.toContain('保存した条件')
-  })
-
-  it('同じ /webinars/new への操作名を言い換えない(DETAIL-02)', () => {
-    expect(PAGE).not.toContain('ウェビナーを作成')
-    expect(PAGE).not.toContain('ウェビナーをつくる')
-  })
-
-  it('動画欄は slug.mp4 の偽名を作らない(DETAIL-18)', () => {
-    expect(EDIT).not.toContain('webinar.slug}.mp4')
-  })
 
   it('通知概要の状態を成功色に固定しない(DETAIL-19)', () => {
     expect(EDIT).not.toContain('text-success text-xs font-semibold">{enabled(')

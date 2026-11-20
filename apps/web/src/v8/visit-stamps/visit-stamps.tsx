@@ -660,7 +660,7 @@ function VisitStampsScreen() {
                 <div className={styles.receiptRow}>
                   <span className={styles.texts}>
                     <span className={styles.name}>カードを受け取った時のボーナス</span>
-                    <span className={styles.sub}>友だちがカードを受け取った時に押す数（0〜50）</span>
+                    <span className={styles.sub} title="友だちがカードを受け取った時に押す数（0〜50）">友だちがカードを受け取った時に押す数（0〜50）</span>
                   </span>
                   <SaveErrorField names={["receiptBonus","settings.receiptBonus","receipt_bonus","settings.receipt_bonus"]}><NumberInput leadingAdornment={<Plus size={16} aria-hidden="true" />} unit="個" note={false} {...fieldProps('receiptBonus')} aria-label="カードを受け取った時のボーナス" type="number" min={0} max={50} readOnly={ro} value={settings.receiptBonus ?? 0} onChange={e => set({ receiptBonus: Number(e.target.value) })} /></SaveErrorField>
                 </div>
