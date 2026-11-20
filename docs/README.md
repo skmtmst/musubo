@@ -470,7 +470,7 @@
 
 ## 反映履歴
 
-- [シナリオとフォームの共通情報を版で固定](release-log/unreleased/PR-kenta-c21-pins-more.md) — 反映履歴、確認 2026-11-20。
+- [シナリオとフォームの共通情報を版で固定](release-log/unreleased/140-kenta-c21-pins-more.md) — 反映履歴、確認 2026-11-20。
 
 - [共通情報の差し替えと使用先の確認](release-log/unreleased/129-kenta-c21-common-vars.md) — 反映履歴、確認 2026-11-20。
 
