@@ -18,12 +18,16 @@ it('閲覧のみでも最小限だけ返し、別アカウントを拒む',async
  const viewer=gapApp(d,[bookingCalendarSettings],{...gapOwner,readOnly:true},false,{LINE_CREDENTIAL_ENCRYPTION_KEY:key});
  expect((await gapCall(viewer,path)).status).toBe(200);
  expect((await gapCall(viewer,'/api/booking/admin/external-cleanup/job/resolve?account_id=a','POST',{confirmed:true})).status).toBe(403);
+ const staffViewer=gapApp(d,[bookingCalendarSettings],{...gapOwner,id:'s',role:'staff',readOnly:true},false,{LINE_CREDENTIAL_ENCRYPTION_KEY:key});
+ expect((await gapCall(staffViewer,path)).status).toBe(200);
+ expect((await gapCall(staffViewer,'/api/booking/admin/external-cleanup/job/resolve?account_id=a','POST',{confirmed:true})).status).toBe(403);
  expect((await gapCall(app,path.replace('account_id=a','account_id=b'))).status).toBe(404);
 });
 it('確認済みの明示と同じ店の要確認行が必要',async()=>{
  const app=gapApp(d,[bookingCalendarSettings],gapOwner,false,{LINE_CREDENTIAL_ENCRYPTION_KEY:key});
  const route='/api/booking/admin/external-cleanup/job/resolve?account_id=a';
  expect((await gapCall(app,route,'POST',{})).status).toBe(400);
+ expect((await gapCall(gapApp(d,[bookingCalendarSettings],gapOwner,true),route,'POST',{confirmed:true})).status).toBe(403);
  expect((await gapCall(app,route,'POST',{confirmed:true,reason:'x'.repeat(201)})).status).toBe(400);
  expect((await gapCall(app,route.replace('account_id=a','account_id=b'),'POST',{confirmed:true})).status).toBe(404);
  expect((await gapCall(app,route,'POST',{confirmed:true,reason:'相手先で確認しました'})).status).toBe(200);
