@@ -132,3 +132,10 @@ test('B4-11: 顧客から13回の繰り返し予約は直接送信でも拒否�
   expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_series').get()).toEqual({ n: 0 });
   expect(d.raw.prepare('SELECT COUNT(*) n FROM bookings').get()).toEqual({ n: 0 });
 });
+
+test('顧客の毎週2回の繰り返し予約は2回とも作れる',async()=>{
+ const response=await selfRequest('requests',{menu_id:'menu',staff_id:'bs',starts_at:startsAt,recurrence:{freq:'weekly',count:2}});
+ expect(response.status,await response.clone().text()).toBe(201);
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_series').get()).toEqual({n:1});
+ expect(d.raw.prepare('SELECT starts_at FROM bookings ORDER BY series_index').all()).toEqual([{starts_at:'2026-11-20T05:00:00.000Z'},{starts_at:'2026-11-27T05:00:00.000Z'}]);
+});

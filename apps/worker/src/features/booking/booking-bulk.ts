@@ -31,7 +31,19 @@ export async function partyInput(db:D1Database,a:string,f:string,value:unknown):
 /** 同じ枠を重複割当しないよう、公開前に各人の担当者と時間区間を確保する。 */
 export async function previewParty(db:D1Database,a:string,members:PreparedMember[],startMode:unknown,from:string,to:string,env:Record<string,unknown>,options?:{nearestTo:number;maxTime:number;limit:number}){
  if(!['parallel','sequential'].includes(String(startMode))||![from,to].every(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)&&Number.isFinite(Date.parse(x)))||from>to||Date.parse(to)-Date.parse(from)>31*86400000)throw new GapError('invalid_party_range');
- const tz=await getAccountTimeZone(db,a),availability=await Promise.all(members.map(m=>getAvailability(db,{lineAccountId:a,menuId:m.menuId,staffId:m.staffId??undefined,from,to,minLeadTimeMinutes:60,now:new Date(),applyStoreRules:true,additionalDurationMinutes:m.addons.reduce((n,r)=>n+r.duration_minutes,0),forceCalendarRefresh:true,googleCredentials:{email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL as string,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY as string}})));
+ const tz=await getAccountTimeZone(db,a);
+ const durationRows=options||startMode==='sequential'?(await db.prepare(`SELECT sm.staff_id,sm.menu_id,sm.override_duration_minutes FROM staff_menus sm JOIN staff s ON s.id=sm.staff_id WHERE s.line_account_id=? AND sm.is_offered=1 AND sm.menu_id IN (SELECT value FROM json_each(?))`).bind(a,JSON.stringify(members.map(m=>m.menuId))).all<{staff_id:string;menu_id:string;override_duration_minutes:number|null}>()).results:[];
+ const durationMap=new Map(durationRows.map(row=>[JSON.stringify([row.staff_id,row.menu_id]),row.override_duration_minutes]));
+ // 60 is the LCM of supported slot intervals (5, 10, 15, 30, 60).
+ const offsets:number[][]=[[0]];
+ if(startMode==='sequential')for(let i=1;i<members.length;i++){
+  const previous=members[i-1],addons=previous.addons.reduce((n,r)=>n+r.duration_minutes,0),base=previous.duration-addons;
+  const durations=[base,...durationRows.filter(r=>r.menu_id===previous.menuId).map(r=>r.override_duration_minutes??base)];
+  offsets.push([...new Set(offsets[i-1].flatMap(offset=>durations.map(duration=>(offset+duration+addons+previous.buffer)%60)))]);
+ }
+ const availability=await Promise.all(members.map((m,i)=>getAvailability(db,{lineAccountId:a,menuId:m.menuId,staffId:m.staffId??undefined,from,to,minLeadTimeMinutes:60,now:new Date(),applyStoreRules:true,additionalDurationMinutes:m.addons.reduce((n,r)=>n+r.duration_minutes,0),...(startMode==='sequential'&&i>0?{internalSlotOffsetsMinutes:offsets[i]}:{}),forceCalendarRefresh:true,googleCredentials:{email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL as string,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY as string}})));
+ const availableTimes=availability.map(result=>new Map(result.by_staff.map(staff=>[staff.staff_id,new Set(staff.slots.map(slot=>Date.parse(slot.startUtc!)))])));
+ const hasSlot=(index:number,staffId:string,at:number)=>availableTimes[index].get(staffId)?.has(at)??false;
  const starts=[...new Set(availability[0].by_staff.flatMap(s=>s.slots.map(t=>t.startUtc!)))];
  if(options)starts.sort((x,y)=>Math.abs(Date.parse(x)-options.nearestTo)-Math.abs(Date.parse(y)-options.nearestTo)||Date.parse(x)-Date.parse(y));
  else starts.sort();
@@ -42,17 +54,15 @@ export async function previewParty(db:D1Database,a:string,members:PreparedMember
   const key=JSON.stringify([tzDateStr(tz,new Date(at)),candidates]);
   let selected=assignments.get(key);if(!selected){selected=assignBookingStaff(db,a,at,tz,candidates);assignments.set(key,selected);}return selected;
  };
- const durationRows=options||startMode==='sequential'?(await db.prepare(`SELECT sm.staff_id,sm.menu_id,sm.override_duration_minutes FROM staff_menus sm JOIN staff s ON s.id=sm.staff_id WHERE s.line_account_id=? AND sm.is_offered=1 AND sm.menu_id IN (SELECT value FROM json_each(?))`).bind(a,JSON.stringify(members.map(m=>m.menuId))).all<{staff_id:string;menu_id:string;override_duration_minutes:number|null}>()).results:[];
- const durationMap=new Map(durationRows.map(row=>[JSON.stringify([row.staff_id,row.menu_id]),row.override_duration_minutes]));
  for(const start of starts){if(options&&(Date.parse(start)===options.nearestTo||Date.parse(start)>options.maxTime))continue;
  let eligibleFirst:Set<string>|undefined;let eligibleParallel:string[][]|undefined;
  if(startMode==='sequential'){
-  const first=availability[0].by_staff.filter(s=>(!members[0].staffId||s.staff_id===members[0].staffId)&&s.slots.some(slot=>Date.parse(slot.startUtc!)===Date.parse(start)));
+  const first=availability[0].by_staff.filter(s=>(!members[0].staffId||s.staff_id===members[0].staffId)&&hasSlot(0,s.staff_id,Date.parse(start)));
   eligibleFirst=new Set(first.filter(candidate=>{
    let cursor=Date.parse(start);
    return members.every((member,i)=>{
     const staff=member.staffId??candidate.staff_id;
-    const slot=availability[i].by_staff.find(s=>s.staff_id===staff)?.slots.some(t=>Date.parse(t.startUtc!)===cursor);
+    const slot=hasSlot(i,staff,cursor);
     if(!slot)return false;
     const addons=member.addons.reduce((n,r)=>n+r.duration_minutes,0);
     const duration=durationMap.get(JSON.stringify([staff,member.menuId]))??member.duration-addons;
@@ -63,14 +73,14 @@ export async function previewParty(db:D1Database,a:string,members:PreparedMember
   if(!eligibleFirst.size)continue;
  }
  if(startMode==='parallel'){
-  const eligible=members.map((m,i)=>availability[i].by_staff.filter(s=>(!m.staffId||m.staffId===s.staff_id)&&s.slots.some(t=>Date.parse(t.startUtc!)===Date.parse(start))).map(s=>s.staff_id));
+  const eligible=members.map((m,i)=>availability[i].by_staff.filter(s=>(!m.staffId||m.staffId===s.staff_id)&&hasSlot(i,s.staff_id,Date.parse(start))).map(s=>s.staff_id));
   const fits=(index:number,used:Set<string>):boolean=>index===eligible.length||eligible[index].some(id=>!used.has(id)&&fits(index+1,new Set([...used,id])));
   if(!fits(0,new Set()))continue;eligibleParallel=eligible;
  }
  const chosen:Array<{staffId:string;startsAt:string;endsAt:string}>=[];let cursor=start;
  for(const [i,m]of members.entries()){
  const at=startMode==='sequential'?cursor:start;
- let candidates=availability[i].by_staff.filter(s=>(i!==0||!eligibleFirst||eligibleFirst.has(s.staff_id))&&s.slots.some(t=>Date.parse(t.startUtc!)===Date.parse(at))&&(!chosen.some(x=>x.staffId===s.staff_id&&Date.parse(x.startsAt)<Date.parse(at)+(m.duration+m.buffer)*60000&&Date.parse(x.endsAt)>Date.parse(at)))) .map(s=>s.staff_id);
+ let candidates=availability[i].by_staff.filter(s=>(i!==0||!eligibleFirst||eligibleFirst.has(s.staff_id))&&hasSlot(i,s.staff_id,Date.parse(at))&&(!chosen.some(x=>x.staffId===s.staff_id&&Date.parse(x.startsAt)<Date.parse(at)+(m.duration+m.buffer)*60000&&Date.parse(x.endsAt)>Date.parse(at)))) .map(s=>s.staff_id);
  if(eligibleParallel){const available=eligibleParallel;const fitsRest=(index:number,used:Set<string>):boolean=>index===available.length||available[index].some(id=>!used.has(id)&&fitsRest(index+1,new Set([...used,id])));candidates=candidates.filter(id=>fitsRest(i+1,new Set([...chosen.map(x=>x.staffId),id])));}
  const forced=m.staffId??(startMode==='sequential'?chosen[0]?.staffId:undefined);
  const staff=forced?(candidates.includes(forced)?forced:null):await assign(at,candidates);

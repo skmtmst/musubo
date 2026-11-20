@@ -359,10 +359,11 @@ test('B5-07: 順番予約の刻みと片付け時間が合わなくても問い�
   const day=new Date(Date.parse('2026-11-20T00:00:00Z')+i*86400000).toISOString().slice(0,10);
   for(const staff of ['bs','bs2'])d.raw.prepare("INSERT OR IGNORE INTO staff_shifts(id,staff_id,work_date,start_time,end_time) VALUES(?,?,?,'09:00','18:00')").run(`buffer-${staff}-${day}`,staff,day);
  }
+ seedGapBooking(d,'busy-buffer');d.raw.prepare("UPDATE bookings SET staff_id='bs2',ends_at='2026-11-20T07:00:00.000Z',block_ends_at='2026-11-20T07:00:00.000Z' WHERE id='busy-buffer'").run();
  const prepare=d.db.prepare.bind(d.db);let queries=0;const spy=vi.spyOn(d.db,'prepare').mockImplementation(sql=>{queries++;return prepare(sql);});
  try {
   const response=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...input,startMode:'sequential',members:[{menuId:'menu'},{menuId:'menu',staffId:'bs2'}]});
-  expect(response.status).toBe(409);expect((await response.json() as {alternatives:string[]}).alternatives).toEqual([]);expect(queries).toBeLessThanOrEqual(1000);
+  expect(response.status).toBe(409);expect((await response.json() as {alternatives:string[]}).alternatives.length).toBeGreaterThan(0);expect(queries).toBeLessThanOrEqual(1000);
  } finally {spy.mockRestore();}
 });
 
@@ -376,4 +377,55 @@ test('B5-07: メニューごとに担当が違う順番予約は案内された�
  const retry=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...body,starts_at:candidate});
  expect(retry.status,await retry.clone().text()).toBe(201);
  expect((await retry.json() as {data:{bookings:Array<{staff_id:string}>}}).data.bookings.map(x=>x.staff_id)).toEqual(['bs2','bs2']);
+});
+
+test('B5-05: 片付け10分のあと刻み外の時刻から同じ担当で続けて予約できる',async()=>{
+ d.raw.prepare("UPDATE menus SET buffer_after_minutes=10 WHERE id='menu'").run();
+ const members=[{menuId:'menu',staffId:'bs'},{menuId:'menu',staffId:'bs'}];
+ const response=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...input,members,startMode:'sequential'});
+ expect(response.status,await response.clone().text()).toBe(201);
+ const data=await response.json() as {data:{bookings:Array<{starts_at:string;ends_at:string;staff_id:string}>}};
+ expect(data.data.bookings.map(row=>[new Date(row.starts_at).toISOString(),new Date(row.ends_at).toISOString(),row.staff_id])).toEqual([
+  ['2026-11-20T05:00:00.000Z','2026-11-20T06:00:00.000Z','bs'],
+  ['2026-11-20T06:10:00.000Z','2026-11-20T07:10:00.000Z','bs'],
+ ]);
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_groups').get()).toEqual({n:1});
+});
+
+
+test('B5-05: 刻み外の2人目に他の予約が重なる場合は組を作らない',async()=>{
+ d.raw.prepare("UPDATE menus SET buffer_after_minutes=10 WHERE id='menu'").run();
+ seedGapBooking(d,'busy-off-grid','confirmed','2026-11-20T06:10:00.000Z');
+ const members=[{menuId:'menu',staffId:'bs'},{menuId:'menu',staffId:'bs'}];
+ const response=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...input,members,startMode:'sequential'});
+ expect(response.status).toBe(409);expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_groups').get()).toEqual({n:0});
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM bookings').get()).toEqual({n:1});
+});
+
+test('B5-05: 担当ごとの所要時間と片付けを加えた時刻から続けて予約する',async()=>{
+ d.raw.exec("UPDATE menus SET buffer_after_minutes=10 WHERE id='menu'; UPDATE staff_menus SET override_duration_minutes=55 WHERE staff_id='bs' AND menu_id='menu'");
+ const members=Array.from({length:3},()=>({menuId:'menu',staffId:'bs'}));
+ const response=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...input,members,startMode:'sequential'});
+ expect(response.status,await response.clone().text()).toBe(201);
+ const rows=(await response.json() as {data:{bookings:Array<{starts_at:string}>}}).data.bookings;
+ expect(rows.map(row=>new Date(row.starts_at).toISOString())).toEqual(['2026-11-20T05:00:00.000Z','2026-11-20T06:05:00.000Z','2026-11-20T07:10:00.000Z']);
+});
+
+test('B5-05: 続きの候補を増やしても先頭は店の15分刻みを守る',async()=>{
+ d.raw.exec("UPDATE menus SET buffer_after_minutes=10 WHERE id='menu'; UPDATE booking_settings SET slot_granularity_minutes=15 WHERE line_account_id='a'");
+ const {partyInput,previewParty}=await import('../features/booking/booking-bulk.js');
+ const members=await partyInput(d.db,'a','f',[{menuId:'menu',staffId:'bs'},{menuId:'menu',staffId:'bs'}]);
+ const result=await previewParty(d.db,'a',members,'sequential','2026-11-20','2026-11-20',{});
+ expect(result.slots.length).toBeGreaterThan(0);
+ expect(result.slots.every(slot=>new Date(slot.startsAt).getUTCMinutes()%15===0)).toBe(true);
+ expect(result.slots.some(slot=>new Date(slot.members[1].startsAt).getUTCMinutes()%15!==0)).toBe(true);
+});
+
+test('B5-05: 刻み外の2人目の途中に重なる予約がある場合は組を作らない',async()=>{
+ d.raw.prepare("UPDATE menus SET buffer_after_minutes=10 WHERE id='menu'").run();
+ seedGapBooking(d,'busy-mid','confirmed','2026-11-20T06:30:00.000Z');
+ const members=[{menuId:'menu',staffId:'bs'},{menuId:'menu',staffId:'bs'}];
+ const response=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...input,members,startMode:'sequential'});
+ expect(response.status).toBe(409);expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_groups').get()).toEqual({n:0});
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM bookings').get()).toEqual({n:1});
 });
