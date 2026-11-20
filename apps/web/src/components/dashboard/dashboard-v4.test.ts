@@ -352,6 +352,10 @@ describe('ダッシュボード通知', () => {
     })).toBe('/broadcasts')
     expect(dashboardNotificationDestination({
       ...data.items[1],
+      eventType: 'booking_external_cleanup_review',
+    })).toBe('/emergency')
+    expect(dashboardNotificationDestination({
+      ...data.items[1],
       eventType: 'release',
     })).toBe('/updates')
     expect(dashboardNotificationDestination({
