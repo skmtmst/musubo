@@ -26,8 +26,13 @@
 /* F6 JvuLH 解除の確認の「戻る」「解除する」は絵では 13/600。共通の押しボタンの作りは変えず、
    この窓（外枠に designNode が出る）の操作の段の中だけ文字の値を差し替える。
    共通の押しボタンの白い副ボタンの決め（button.module.css の `:root .button:is(.primary,.secondary)…`）は
-   レイヤーの外にあるので、こちらも `:root` を足して強さで上に出す。 */
+   レイヤーの外にあるので、こちらも `:root` を足して強さで上に出す。
+   横幅は共通の決め（dialog.module.css の `.designButton` が `width:auto` / `min-width:0`）で文字から
+   決まるため「戻る」が 58 になる。絵は 60 なので、この窓の中だけ下限を 60 にする。
+   「解除する」は文字から 131 になり絵と同じなので、下限を足しても変わらない。
+   細い画面で共通の決めが幅いっぱい（`width:100%`）にする所も、下限 60 のままなので崩れない。 */
 :root [data-design-node='JvuLH'] [data-dialog-actions] button[data-dialog-action] {
+  min-width: var(--tpl-e1-sns-dlg-btn-min-w);
   font-size: var(--tpl-e1-sns-dlg-btn-size);
   font-weight: 600;
   line-height: var(--tpl-e1-sns-dlg-btn-lh);
