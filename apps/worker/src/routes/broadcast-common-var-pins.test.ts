@@ -1,0 +1,42 @@
+import { describe, expect, it } from 'vitest';
+import { Hono } from 'hono';
+import type { Env } from '../worker-env.js';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import { inputJsonBoundary } from '../lib/input-errors.js';
+import { putBroadcastCommonVarPin } from './broadcast-common-var-pins.js';
+
+describe('一斉配信の共通情報固定', () => {
+  it('同じアカウントの使用先と版だけを保存し、送信開始後は変えない', async () => {
+    const { db, raw } = createTestD1();
+    raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES ('a','c','A','t','s')").run();
+    raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,value) VALUES ('v','a','店舗','shop_name','新')").run();
+    raw.prepare("INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES ('old','v',1,'店舗','旧','変更')").run();
+    raw.prepare("INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id) VALUES ('b','配信','text','{{ var.shop_name }}','all','draft','a')").run();
+    const app = new Hono<Env>();
+    app.use('*', async (c, next) => { c.env = { DB: db } as Env['Bindings']; c.set('staff', { id: 'owner', name: 'Owner', role: 'owner', readOnly: false }); await next(); });
+    app.put('/api/broadcasts/:id/common-var-pins/:varId', inputJsonBoundary({accountId:['string'],versionId:['string'],expectedVersion:['number']}), putBroadcastCommonVarPin);
+    const put = (versionId: string) => app.request('/api/broadcasts/b/common-var-pins/v', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accountId: 'a', versionId, expectedVersion: 1 }) });
+    raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES ('other','c2','B','t','s')").run();
+    raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,value) VALUES ('v2','other','別店舗','shop_name','別')").run();
+    raw.prepare("INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES ('other-version','v2',1,'別店舗','別','変更')").run();
+    expect((await put('missing')).status).toBe(409);
+    expect((await put('other-version')).status).toBe(409);
+    raw.prepare("UPDATE broadcasts SET approval_status='approved' WHERE id='b'").run();
+    expect((await put('old')).status).toBe(200);
+    expect(raw.prepare("SELECT lock_version, approval_status FROM broadcasts WHERE id='b'").get()).toEqual({ lock_version: 2, approval_status: 'none' });
+    const stale = await put('old');
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ code: 'VERSION_CONFLICT' });
+    expect(raw.prepare('SELECT version_id FROM broadcast_common_var_pins').get()).toEqual({ version_id: 'old' });
+    raw.prepare("UPDATE broadcasts SET hq_run_id='hq' WHERE id='b'").run();
+    expect((await put('old')).status).toBe(403);
+    raw.prepare("UPDATE broadcasts SET hq_run_id=NULL, target_type='multi-account-dedup', account_ids=? WHERE id='b'").run(JSON.stringify(['a', 'other']));
+    const scopedApp = new Hono<Env>();
+    scopedApp.use('*', async (c, next) => { c.env = { DB: db } as Env['Bindings']; c.set('staff', { id: 'scoped', name: 'Scoped', role: 'owner', readOnly: false, featureEnabledLineAccountIds: ['a'] }); await next(); });
+    scopedApp.put('/api/broadcasts/:id/common-var-pins/:varId', inputJsonBoundary({accountId:['string'],versionId:['string'],expectedVersion:['number']}), putBroadcastCommonVarPin);
+    const scoped = await scopedApp.request('/api/broadcasts/b/common-var-pins/v', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accountId: 'a', versionId: 'old', expectedVersion: 2 }) });
+    expect(scoped.status).toBe(404);
+    raw.prepare("UPDATE broadcasts SET status='sending' WHERE id='b'").run();
+    expect((await put('old')).status).toBe(409);
+  });
+});

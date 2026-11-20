@@ -1,3 +1,4 @@
+import { putBroadcastCommonVarPin } from './broadcast-common-var-pins.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
 
 import { Hono } from 'hono';
@@ -74,6 +75,8 @@ broadcasts.get('/api/broadcasts/:id/per-account-stats', get__api_broadcasts_id_p
 broadcasts.post('/api/broadcasts/preflight', requirePermission(BROADCAST_DEFINITION_PUBLISH_KEY), inputJsonBoundary(), post__api_broadcasts_preflight_1);
 
 broadcasts.post('/api/broadcasts', inputJsonBoundary({"title":["string"],"messageType":["string"],"messageContent":["string"],"messageBubbles":["array"],"targetType":["string"],"targetTagId":["null","string"],"scheduledAt":["null","string"],"lineAccountId":["null","string"],"altText":["null","string"],"accountIds":["array"],"dedupPriority":["array"],"trackLinks":["boolean"],"stealthSpreadMinutes":["number"],"folderId":["null","string"],"measureOpens":["boolean"],"saveAsDraft":["boolean"],"draftStep":["string"],"internalMemo":["null","string"],"afterActionVersionId":["null","string"]}), post__api_broadcasts_2);
+
+broadcasts.put('/api/broadcasts/:id/common-var-pins/:varId', requirePermission(BROADCAST_DEFINITION_EDIT_KEY), inputJsonBoundary({accountId:['string'],versionId:['string'],expectedVersion:['number']}), putBroadcastCommonVarPin);
 
 // PUT /api/broadcasts/:id - update draft
 broadcasts.put('/api/broadcasts/:id', inputJsonBoundary({"title":["string"],"messageType":["string"],"messageContent":["string"],"messageBubbles":["array"],"targetType":["string"],"targetTagId":["null","string"],"scheduledAt":["null","string"],"trackLinks":["boolean"],"folderId":["null","string"],"measureOpens":["boolean"],"stealthSpreadMinutes":["number"],"lineAccountId":["null","string"],"accountIds":["array"],"saveAsDraft":["boolean"],"draftStep":["null","string"],"internalMemo":["null","string"],"afterActionVersionId":["null","string"],"expectedVersion":["number"]}), put__api_broadcasts_id_1);

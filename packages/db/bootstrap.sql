@@ -2328,6 +2328,13 @@ CREATE TABLE broadcast_asset_versions (
   UNIQUE (asset_id, version_number)
 );
 
+CREATE TABLE broadcast_common_var_pins (
+  broadcast_id TEXT NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
+  common_var_id TEXT NOT NULL REFERENCES common_vars(id) ON DELETE CASCADE,
+  version_id TEXT NOT NULL REFERENCES common_var_versions(id) ON DELETE CASCADE,
+  PRIMARY KEY (broadcast_id, common_var_id)
+);
+
 CREATE TABLE broadcast_execution_contexts (
  broadcast_id TEXT PRIMARY KEY REFERENCES broadcasts(id) ON DELETE CASCADE,account_id TEXT NOT NULL REFERENCES line_accounts(id),
  purpose TEXT NOT NULL CHECK(purpose IN('transaction','notice','marketing')),execution_mode TEXT NOT NULL DEFAULT 'simulation' CHECK(execution_mode='simulation'),
