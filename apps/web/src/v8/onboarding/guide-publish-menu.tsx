@@ -36,16 +36,24 @@ export function GuidePublishMenu({ accountId, onLater, onReview }: {
     return () => { current = false }
   }, [accountId, attempt])
 
+  const title = '予約の受け付けが始まりました'
   const href = preview.state === 'ready' ? `/rich-menus/edit?id=${encodeURIComponent(preview.id)}` : '/rich-menus'
   return (
-    <Dialog open designNode="Hg6Zl" designWidth={540} exactDesignWidth title="予約の受け付けが始まりました"
-      titleIcon={<PartyPopper aria-hidden="true" size={24} />} designLayout="stacked"
-      description="リッチメニューを公開すると、LINEのトーク画面から予約できるようになります。"
+    <Dialog open designNode="Hg6Zl" designWidth={540} exactDesignWidth title={title}
+      headerIcon={false} designLayout="stacked" designMinHeight={preview.state === 'ready' && preview.image ? 510 : undefined}
+      titleContent={<span className={styles.heading}>
+        <span className={styles.mark} aria-hidden="true"><PartyPopper size={28} /></span>
+        <span>{title}</span>
+      </span>}
+      description="あとはリッチメニューを公開するだけ。公開すると、LINEの友だちのトーク画面にメニューが表示され、予約の入口ができます。"
       onCancel={onLater} footerDivider={false}
-      footer={<DialogActions>
-        <Button onClick={onLater}>あとで</Button>
-        <Button variant="primary" onClick={() => onReview(href)}>リッチメニューを公開する</Button>
-      </DialogActions>}
+      footer={<div className={styles.footer}>
+        <DialogActions align="center">
+          <Button onClick={onLater}>あとで</Button>
+          <Button variant="primary" onClick={() => onReview(href)}>リッチメニューを公開する</Button>
+        </DialogActions>
+        <p>公開前に内容を確認できます</p>
+      </div>}
     >
       <div className={styles.preview}>
         {preview.state === 'loading' ? <ListState kind="loading" /> : null}
@@ -60,7 +68,6 @@ export function GuidePublishMenu({ accountId, onLater, onReview }: {
         </figure> : null}
         {preview.state === 'multiple' ? <p>一覧から公開する下書きを選べます。</p> : null}
         {preview.state === 'empty' ? <p>リッチメニューの一覧から状況を確認できます。</p> : null}
-        <p>公開前に内容を確認できます</p>
       </div>
     </Dialog>
   )

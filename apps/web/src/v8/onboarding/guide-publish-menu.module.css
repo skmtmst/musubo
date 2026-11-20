@@ -1,3 +1,31 @@
+.heading {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-14);
+  text-align: center;
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: var(--space-56, 56px);
+  aspect-ratio: 1;
+  color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+  border-radius: var(--polish-radius-pill);
+}
+
+.footer {
+  display: grid;
+  gap: var(--space-14);
+  text-align: center;
+}
+
+.footer p {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
 .preview {
   display: grid;
   gap: var(--space-12);
@@ -7,7 +35,8 @@
 .menu {
   display: grid;
   gap: var(--space-8);
-  margin: 0;
+  margin: 0 auto;
+  width: min(100%, 300px);
 }
 
 .image {

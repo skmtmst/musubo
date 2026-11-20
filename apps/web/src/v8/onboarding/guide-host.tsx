@@ -1,6 +1,6 @@
 'use client'
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useOptionalAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
@@ -57,7 +57,11 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
   const role = useStaffRole()
   const style = useAccountStyle(accountId)
   const pathname = usePathname()
-  const searchParams = useSearchParams()
+  const [qrOpen, setQrOpen] = useState(false)
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setQrOpen(new URLSearchParams(window.location.search).get('qr') === 'base'))
+    return () => window.cancelAnimationFrame(frame)
+  }, [pathname])
   const first = useFirstSteps(accountId, role, { style: style.data?.style ?? null, enabled: armed || pathname === '/', watchFirstMessage })
   const { guide, summary } = first
   const shared = useMemo<SharedGuide>(() => ({ guide, summary }), [guide, summary])
@@ -89,7 +93,7 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
   /** この手順の対象がある画面。手順の指定が無ければ段の行き先。 */
   const targetHref = procedureHref ?? stepHref
   const checkingFirstMessage = guide.stepKey === 'firstMessage' &&
-    (pathname.startsWith('/scenarios') || (pathname === '/' && searchParams.get('qr') === 'base'))
+    (pathname.startsWith('/scenarios') || (pathname === '/' && qrOpen))
   const onTargetScreen = !targetHref || pathname === targetHref.split(/[?#]/)[0] || checkingFirstMessage
   const place = `${accountId}:${guide.stepKey}:${guide.procedureIndex}`
   const leavingGuideScreen = !onTargetScreen && reachedPlace.current === place
