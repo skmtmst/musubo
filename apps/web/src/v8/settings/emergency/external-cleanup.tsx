@@ -47,7 +47,9 @@ function kindLabel(item: BookingExternalCleanupItem): string {
 /** 一覧の1行と確認窓で同じ言い方にする。分からない値は「—」。 */
 function summaryOf(item: BookingExternalCleanupItem, staffNames: ReadonlyMap<string, string> | null): string {
   const staff = (item.staffId && staffNames?.get(item.staffId)) || '—'
-  return `${kindLabel(item)}・担当：${staff}・予定：${formatListTimestamp(item.startsAt)}`
+  // 日付と時刻は1つのかたまりで読むので、その間では折り返さない。
+  const startsAt = formatListTimestamp(item.startsAt).replace(' ', '\u00a0')
+  return `${kindLabel(item)}・担当：${staff}・予定：${startsAt}`
 }
 
 function confirmDescription(item: BookingExternalCleanupItem, staffNames: ReadonlyMap<string, string> | null): string {

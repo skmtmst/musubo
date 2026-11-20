@@ -64,6 +64,7 @@ it('件数・種類・担当・予定の日時（別の年でも時刻まで）�
   expect(await screen.findByText('外部の予定・会議の確認 2 件')).toBeTruthy()
   expect(await screen.findByText('Zoom の会議・担当：山田 花子・予定：2030/01/02 10:00')).toBeTruthy()
   expect(screen.getByText('種類が分からない予定・会議・担当：—・予定：—')).toBeTruthy()
+  expect(screen.getByText(/Zoom の会議/).textContent).toContain('2030/01/02\u00a010:00')
   expect(screen.getAllByText('要確認')).toHaveLength(2)
   expect(net.listExternalCleanups).toHaveBeenCalledWith('account')
   expect(net.listStaff).toHaveBeenCalledWith('account')
@@ -88,7 +89,8 @@ it('確認窓で確かめてから記録し、行を消して知らせる', asyn
   fireEvent.click(screen.getAllByRole('button', { name: '片づけ済みにする' })[0])
   expect(net.resolveExternalCleanup).not.toHaveBeenCalled()
   const dialog = screen.getByRole('dialog', { name: '相手先で片づけましたか？' })
-  expect(dialog.textContent).toContain('Zoom の会議・担当：山田 花子・予定：2030/01/02 10:00')
+  // 日付と時刻の間は折り返さない空白でつなぐ（窓でも行でも、かたまりで読める）。
+  expect(dialog.textContent).toContain('Zoom の会議・担当：山田 花子・予定：2030/01/02\u00a010:00')
   // 会議の URL だけの相手先は空き枠に関わらないので、空きの注意を出さない。
   expect(dialog.textContent).not.toContain('予約の空きから外れます')
   fireEvent.click(within(dialog).getByRole('button', { name: '片づけ済みにする' }))
