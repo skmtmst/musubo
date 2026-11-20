@@ -39,6 +39,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-test-api'
 import { MenuPaymentFields, PaymentConflictError, PaymentSideCard, useMenuPayment } from '@/v8/booking-payments/public/menu-payment/index'
 import { emitGuideSignal } from '@/v8/onboarding/public/guide-overlay/index'
+import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
 import styles from './edit.module.css'
 
 /*
@@ -52,6 +53,13 @@ import styles from './edit.module.css'
 type Period = 'lunch' | 'dinner' | 'both'
 type Draft = { duration: string; kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string; description: string; imageMediaId: string | null; status: 'draft' | 'active' }
 const LIST_HREF = '/restaurant-test/menu'
+const GUIDE_DURATION_OPTIONS = Array.from({ length: 12 }, (_, index) => {
+  const minutes = (index + 1) * 30
+  const hours = Math.floor(minutes / 60)
+  const remainder = minutes % 60
+  const label = hours ? `${hours}時間${remainder ? `${remainder}分` : ''}（${minutes}分）` : `${minutes}分`
+  return { value: String(minutes), label }
+})
 
 
 function periodLabel(periods: string[]): string {
@@ -130,6 +138,9 @@ function MenuEditBody() {
 
   const editing = item
   const course = draft.kind === 'course'
+  const guide = useSharedGuide()?.guide
+  const guidedCourse = !editing && course && guide?.stepKey === 'friendAdd' &&
+    (guide.phase === 'active' || guide.phase === 'paused')
   const payment = useMenuPayment('course', selectedAccountId, editing && editing.kind === 'course' ? editing.id : null)
   const priceChanged = Boolean(editing && draft.price !== '' && Number(draft.price) !== editing.price)
   const priceStartsAt = draft.effectiveAt ? new Date(datetimeLocalJstToUtcIso(draft.effectiveAt)) : null
@@ -143,7 +154,8 @@ function MenuEditBody() {
   const valid = draft.name.trim() !== '' && draft.price !== '' && Number.isInteger(Number(draft.price)) && Number(draft.price) >= 0 && !exceedsPriceLimit
   const durationError = !course ? undefined : draft.duration === '' ? '所要時間を入力してください。' : !Number.isInteger(Number(draft.duration)) || Number(draft.duration) < 15 || Number(draft.duration) > 600 ? '所要時間は15〜600分の整数で入力してください。' : undefined
   /* 開店準備ガイド⑥の手順2/3（枠14 KI5X0）は基本を入れ終えた時に次へ進む。 */
-  useEffect(() => { if (valid) emitGuideSignal('menu.form') }, [valid])
+  const guideFormReady = valid && !durationError
+  useEffect(() => { if (guideFormReady) emitGuideSignal('menu.form') }, [guideFormReady])
   const priceError = draft.price === '' ? undefined : Number(draft.price) < 0 ? '値段は0円以上で入れてください。' : exceedsPriceLimit ? '値段は1,000,000円以下で入れてください。' : !Number.isInteger(Number(draft.price)) ? '値段は整数で入れてください。' : undefined
 
   const [confirmationScope, setConfirmationScope] = useState('')
@@ -288,8 +300,14 @@ function MenuEditBody() {
               <Field label={course ? '1名の値段' : '値段'} htmlFor="rs-menu-price" required error={priceError}>
                 <SaveErrorField names={['price', 'draft.price']}><NumberInput id="rs-menu-price" aria-label="価格（税込）" unit="円" type="number" min={0} required value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} /></SaveErrorField>
               </Field>
-              {course ? <Field label="所要時間" htmlFor="rs-menu-duration" required error={durationAttempted ? durationError : undefined}>
-                <NumberInput id="rs-menu-duration" aria-label="所要時間" unit="分" min={15} max={600} required value={draft.duration} onChange={(event) => setDraft({ ...draft, duration: event.target.value })} />
+              {course ? <Field label="所要時間" htmlFor="rs-menu-duration" required
+                note={guidedCourse ? '30分〜6時間・30分きざみ。この時間ぶん、席と予約枠を使います。' : undefined}
+                error={durationAttempted ? durationError : undefined}>
+                {guidedCourse
+                  ? <Select id="rs-menu-duration" aria-label="所要時間" size="full" value={draft.duration}
+                    options={GUIDE_DURATION_OPTIONS} onChange={duration => setDraft(current => ({ ...current, duration }))} />
+                  : <NumberInput id="rs-menu-duration" aria-label="所要時間" unit="分" min={15} max={600} required
+                    value={draft.duration} onChange={event => setDraft(current => ({ ...current, duration: event.target.value }))} />}
               </Field> : null}
             </SettingsFormRow>
             <SettingsFormRow layout="columns" columns={3}>
