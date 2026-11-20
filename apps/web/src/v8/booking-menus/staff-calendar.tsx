@@ -22,6 +22,7 @@ import HelpTip from '@/components/shared/help-tip'
 import Radio from '@/components/shared/radio'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import StatusBadge from '@/components/shared/status-badge'
+import { RowStatusActions } from '@/components/shared/row-actions'
 import Toggle from '@/components/shared/toggle'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
@@ -192,10 +193,13 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
           {error ? <Notice tone="danger">{error}</Notice> : null}
           <DetailSection title="カレンダー">
             {ready.store ? <p className={styles.minor}>{`店全体の同期：読み込み ${onOff(ready.store.readEnabled)}・書き込み ${onOff(ready.store.writeEnabled)}（予約設定 › 担当スタッフの上で変えます）`}</p> : null}
-            <DetailField label="Outlook カレンダー">
-              <StatusBadge tone={connections.outlook?.state === 'ready' || connections.outlook?.state === 'refreshing' ? 'success' : connections.outlook?.state === 'unknown' ? 'danger' : 'neutral'} size="compact">{connections.outlook?.state === 'ready' || connections.outlook?.state === 'refreshing' ? 'つながっている' : connections.outlook?.state === 'unknown' ? '切れています' : connections.outlook ? 'つないでいない' : '確認できません'}</StatusBadge>{' '}
-              {canEdit && connections.outlook && (connections.outlook.state === 'ready' || connections.outlook.state === 'refreshing' ? <Button size="compact" disabled={busy} onClick={() => setDisconnecting('outlook')}>切る</Button> : <Button size="compact" disabled={busy} onClick={() => void connect('outlook')}>{connections.outlook.state === 'unknown' ? 'つなぎ直す' : 'つなぐ'}</Button>)}
-            </DetailField>
+            <div className={styles.outlookSection}>
+              <DetailField label="Outlook カレンダー">
+                <div className={styles.outlookRow}><RowStatusActions status={<StatusBadge tone={connections.outlook?.state === 'ready' || connections.outlook?.state === 'refreshing' ? 'success' : connections.outlook?.state === 'unknown' ? 'danger' : 'neutral'} size="compact">{connections.outlook?.state === 'ready' || connections.outlook?.state === 'refreshing' ? 'つながっている' : connections.outlook?.state === 'unknown' ? '切れています' : connections.outlook ? 'つないでいない' : '確認できません'}</StatusBadge>}>
+                  {canEdit && connections.outlook && (connections.outlook.state === 'ready' || connections.outlook.state === 'refreshing' ? <Button size="compact" disabled={busy} onClick={() => setDisconnecting('outlook')}>切る</Button> : <Button size="compact" disabled={busy} onClick={() => void connect('outlook')}>{connections.outlook.state === 'unknown' ? 'つなぎ直す' : 'つなぐ'}</Button>)}
+                </RowStatusActions></div>
+              </DetailField>
+            </div>
             <DetailField label="予定を読み込み、空き枠から外す">{canEdit ? <Toggle label="カレンダーの読み込み" checked={mine.readEnabled} disabled={busy} onChange={(on) => void saveSwitch({ readEnabled: on, writeEnabled: mine.writeEnabled })} /> : onOff(mine.readEnabled)}</DetailField>
             <DetailField label="確定した予約をカレンダーに書く">{canEdit ? <Toggle label="カレンダーの書き込み" checked={mine.writeEnabled} disabled={busy}
               onChange={(on) => { if (on) void saveSwitch({ readEnabled: mine.readEnabled, writeEnabled: true }); else { setError(null); setWriteOff('keep') } }} /> : onOff(mine.writeEnabled)}</DetailField>
@@ -210,19 +214,20 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
                 <RadioGroup label="自動で発行するときの会議">
                   {providers.filter(([provider]) => provider !== 'outlook').map(([provider, label]) => (
                     <div key={provider} className={`${styles.row} ${styles.providerRow}`}>
-                      <Radio name={`staff-meeting-provider-${person?.id}`} checked={connections[provider]?.preferred ?? false} disabled={busy || connections[provider]?.state !== 'ready'} onChange={() => provider !== 'outlook' && void prefer(provider)}>{label}</Radio>
-                      <StatusBadge tone={connections[provider]?.state === 'ready' || connections[provider]?.state === 'refreshing' ? 'success' : connections[provider]?.state === 'unknown' ? 'danger' : 'neutral'} size="compact">{connections[provider]?.state === 'ready' || connections[provider]?.state === 'refreshing' ? 'つながっている' : connections[provider]?.state === 'unknown' ? '切れています' : connections[provider] ? 'つないでいない' : '確認できません'}</StatusBadge>
-                      {connections[provider] && (connections[provider]?.state === 'ready' || connections[provider]?.state === 'refreshing' ? <Button size="compact" disabled={busy} onClick={() => setDisconnecting(provider)}>切る</Button> : <Button size="compact" disabled={busy} onClick={() => void connect(provider)}>{connections[provider]?.state === 'unknown' ? 'つなぎ直す' : 'つなぐ'}</Button>)}
+                      <span title={connections[provider]?.state !== 'ready' ? 'つなぐと選べます' : undefined}><Radio name={`staff-meeting-provider-${person?.id}`} checked={connections[provider]?.preferred ?? false} aria-disabled={busy || connections[provider]?.state !== 'ready'} aria-description={connections[provider]?.state !== 'ready' ? 'つなぐと選べます' : undefined} onClick={event => { if (busy || connections[provider]?.state !== 'ready') event.preventDefault() }} onChange={() => { if (!busy && connections[provider]?.state === 'ready' && provider !== 'outlook') void prefer(provider) }}>{label}</Radio></span>
+                      <RowStatusActions status={<StatusBadge tone={connections[provider]?.state === 'ready' || connections[provider]?.state === 'refreshing' ? 'success' : connections[provider]?.state === 'unknown' ? 'danger' : 'neutral'} size="compact">{connections[provider]?.state === 'ready' || connections[provider]?.state === 'refreshing' ? 'つながっている' : connections[provider]?.state === 'unknown' ? '切れています' : connections[provider] ? 'つないでいない' : '確認できません'}</StatusBadge>}>
+                        {connections[provider] && (connections[provider]?.state === 'ready' || connections[provider]?.state === 'refreshing' ? <Button size="compact" disabled={busy} onClick={() => setDisconnecting(provider)}>切る</Button> : <Button size="compact" disabled={busy} onClick={() => void connect(provider)}>{connections[provider]?.state === 'unknown' ? 'つなぎ直す' : 'つなぐ'}</Button>)}
+                      </RowStatusActions>
                     </div>
                   ))}
                 </RadioGroup>
-                <Field label="固定の会議の URL" optional error={urlInvalid ? 'https:// で始まる URL を入れてください' : undefined}>
+                <div className={styles.fixedUrl}><Field label="固定の会議の URL" optional error={urlInvalid ? 'https:// で始まる URL を入れてください' : undefined}>
                   <div className={styles.urlLine}>
                     <SaveErrorField names={["url","fixedMeetingUrl"]}><TextField aria-label="固定の会議の URL" value={ready.url?.value ?? ''} placeholder="https://meet.google.com/…" disabled={ready.url === null}
                       onChange={(event) => ready.url && setLoad({ ...ready, url: { ...ready.url, value: event.target.value } })} /></SaveErrorField>
 
                   </div>
-                </Field>
+                </Field></div>
                 <p className={styles.minor}>自動で作れないときにも、この URL を使います。</p>
               </>
             ) : <p className={styles.readValue}>{ready.url?.saved || '固定の URL はありません'}</p>}

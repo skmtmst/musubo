@@ -44,6 +44,14 @@ it('Outlook が切れているときはつなぎ直しを案内する', async ()
   expect(await screen.findByRole('button', { name: 'つなぎ直す' })).toBeTruthy()
   expect(screen.getByText(/Outlook カレンダーをつなぎ直してください/)).toBeTruthy()
 })
+it('未接続の会議サービスは理由を示し選択しない', async () => {
+  render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit onClose={() => undefined} />)
+  const radio = await screen.findByRole('radio', { name: 'Zoom' })
+  expect(radio.getAttribute('aria-disabled')).toBe('true')
+  expect(radio.closest('[title]')?.getAttribute('title')).toBe('つなぐと選べます')
+  fireEvent.click(radio)
+  expect(net.prefer).not.toHaveBeenCalled()
+})
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 it('書き込みをオフにするときは確かめの窓で「先の予定を消す」を選び、confirmed と removeFutureEvents を版つきで送る', async () => {
