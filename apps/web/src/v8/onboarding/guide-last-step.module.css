@@ -162,7 +162,7 @@
   gap: var(--space-16);
 }
 
-.completeFooter > button {
+.completeFooter [data-shared-button] {
   min-height: calc(var(--control-h) + var(--space-4));
 }
 

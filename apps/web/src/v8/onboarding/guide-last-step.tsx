@@ -82,7 +82,9 @@ export function GuideSetupComplete({ onClose, onHome }: { onClose: () => void; o
       designNode="N9qLt" designLayout="stacked-centered" designWidth={560} exactDesignWidth designMinHeight={472}
       headerIcon={false} onCancel={onClose} footerDivider={false} initialFocusId="guide-complete-home"
       footer={<div className={styles.completeFooter}>
-        <Button id="guide-complete-home" fullWidth variant="primary" onClick={onHome}>ダッシュボードへ</Button>
+        <DialogActions padding="none">
+          <Button id="guide-complete-home" fullWidth variant="primary" onClick={onHome}>ダッシュボードへ</Button>
+        </DialogActions>
         <img src="/brand/musubo-color.png" width={78} alt="musubo" />
       </div>}
     >
