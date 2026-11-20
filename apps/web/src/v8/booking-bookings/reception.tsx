@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { withHonorific } from '@line-crm/shared'
 import { bookingApi, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { jstDate } from '@/lib/jst-datetime'
@@ -65,7 +66,7 @@ export default function BookingReception({ onOpen, refreshKey, canOperate = fals
     {state.requests.length ? <DataTable><thead><TableHeadRow><Th grow>予約</Th><Th>日時</Th><Th grow>内容</Th><Th>担当</Th><Th>状態</Th><Th>操作</Th></TableHeadRow></thead><tbody>
       {state.requests.map(row => { const pending = row.assignment_method === 'automatic' && !row.assignment_reviewed_at; return <Tr key={row.id}><Td grow><RowNameButton onClick={() => onOpen(row.id)}>{row.friend_name || '名前未設定'}</RowNameButton></Td><Td><TruncatedText value={`${formatDate(row.starts_at, { style: 'list-day-weekday' })}${formatTime(row.starts_at)}`} /></Td><Td grow>{row.menu_name}</Td><Td>{row.staff_name || '担当を確認'}</Td><Td><StatusBadge tone={pending || row.status === 'requested' ? 'caution' : 'neutral'}>{row.status === 'requested' ? '承認待ち' : pending ? '担当を確認' : '予約済み'}</StatusBadge></Td><Td>{pending && canOperate ? <Button variant="text" size="compact" busy={busy === row.id} disabled={!!busy} onClick={() => setTarget(row)}>担当を確認</Button> : null}</Td></Tr> })}
     </tbody></DataTable> : <ListState kind="empty" title={state.unknownCount && (filter === 'unassigned' || filter === 'attention') ? '担当の記録前の予約があるため、すべては確認できません' : '今日以降の該当する予約はありません'} />}
-    <ConfirmDialog open={target !== null} title="担当を確認しましたか？" description={`${target?.staff_name || '担当者'}さんが担当する予約として確認します。`} confirmLabel="確認した" busy={!!busy} onCancel={() => { if (!busy) setTarget(null) }} onConfirm={() => { if (target) void review(target) }} />
+    <ConfirmDialog open={target !== null} title="担当を確認しましたか？" description={`${target?.staff_name ? withHonorific(target.staff_name) : '担当者'}が担当する予約として確認します。`} confirmLabel="確認した" busy={!!busy} onCancel={() => { if (!busy) setTarget(null) }} onConfirm={() => { if (target) void review(target) }} />
     {state.total > PAGE_SIZE ? <Pagination page={page} pageCount={Math.ceil(state.total / PAGE_SIZE)} onPageChange={setPage} ariaLabel="予約受付のページ送り" /> : null}
   </Card>
 }

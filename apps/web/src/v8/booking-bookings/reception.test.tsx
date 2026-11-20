@@ -24,6 +24,7 @@ it('要対応と未割り当てを分けて表示し担当確認を送る', asyn
   await waitFor(() => expect(screen.queryByText('待ち')).toBeNull())
   expect(await screen.findByText('自動')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: '担当を確認' }))
+  expect(screen.getByText('佐藤さんが担当する予約として確認します。')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: '確認した' }))
   await waitFor(() => expect(mocks.review).toHaveBeenCalledWith('a', '自動', 0))
 })
@@ -71,4 +72,11 @@ it('記録前がなければ未割り当て0件と表示する', async () => {
   mocks.list.mockResolvedValue({ requests: [], total: 0, requestedCount: 0, unassignedCount: 0, attentionCount: 0, unknownCount: 0 })
   render(<BookingReception onOpen={() => {}} />)
   expect(await screen.findByText(/未割り当て 0件/)).toBeTruthy()
+})
+it('担当者名に敬称があれば確認画面で重ねない', async () => {
+  const reservation = { ...row('自動', 'confirmed', 'automatic'), staff_name: '佐藤さん' }
+  mocks.list.mockResolvedValue({ requests: [reservation], total: 1, requestedCount: 0, unassignedCount: 1, attentionCount: 1, unknownCount: 0 })
+  render(<BookingReception onOpen={() => {}} canOperate />)
+  fireEvent.click(await screen.findByRole('button', { name: '担当を確認' }))
+  expect(screen.getByText('佐藤さんが担当する予約として確認します。')).toBeTruthy()
 })
