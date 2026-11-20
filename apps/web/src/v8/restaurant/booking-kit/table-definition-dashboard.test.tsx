@@ -7,12 +7,17 @@ import { snapshotOf, store, tables } from './test-data'
 import type { RestaurantSnapshot } from '@/lib/restaurant-test-api'
 const api = vi.hoisted(() => ({ openingHours: vi.fn(), reservationsDay: vi.fn(), createReservation: vi.fn(), snapshot: vi.fn() }))
 const state = vi.hoisted(() => ({ data: null as RestaurantSnapshot | null, entry: 'walk-in' as 'phone' | 'walk-in' }))
+/* 初回ポップアップ（枠02/02b）はガイド案内中に重ねないので、止まっている状態を渡す。 */
+const IDLE_GUIDE = vi.hoisted(() => ({
+  phase: 'idle' as const, stepKey: null, procedureIndex: 1, anchor: null, pausedAnchor: null,
+  start: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(), advanceProcedure: vi.fn(),
+}))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/restaurant-test/dashboard', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/v8/onboarding/public/use-style-setup/index', () => ({ useStyleSetup: () => ({ status: 'success' }) }))
 vi.mock('@/v8/onboarding/public/setup-wizard/index', () => ({ useSetupWizard: () => ({}) }))
-vi.mock('@/v8/dashboard/public/first-steps/index', async original => ({ ...(await original<typeof import('@/v8/dashboard/public/first-steps/index')>()), useFirstSteps: () => ({ status: 'success' }) }))
+vi.mock('@/v8/dashboard/public/first-steps/index', async original => ({ ...(await original<typeof import('@/v8/dashboard/public/first-steps/index')>()), useFirstSteps: () => ({ status: 'success', guide: IDLE_GUIDE }) }))
 vi.mock('@/v8/events', () => ({ useEventAbsence: () => ({ allowed: false }) }))
 vi.mock('@/v8/style-dashboard/use-style-dashboard', async () => {
   const { useState } = await import('react'); const { STYLE_CONFIG } = await import('@/v8/style-dashboard/config')

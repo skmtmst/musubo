@@ -225,7 +225,13 @@
   color: var(--color-ink-faint); font-size: 12px; font-weight: var(--font-weight-ui); line-height: 18px;
 }
 :root .detailText { min-width: 0; flex: 1; }
-:root .link { min-height: 0; font-size: 12px; font-weight: 500; line-height: 18px; border: 0; padding: 0; background: none; cursor: pointer; }
+:root .link { position: relative; min-height: 0; font-size: 12px; font-weight: 500; line-height: 18px; border: 0; padding: 0; background: none; cursor: pointer; }
+/*
+  行き先「〇〇へ →」は1行（18）の高さなので、押せる範囲だけを上下に広げる
+  （§6.5 の 7「文字の大きさは変えず、押せる範囲を広げる」）。
+  位置を持つ透明な ::before なので、札の高さ・文字の位置は変わらない。
+*/
+:root .link::before { content: ''; position: absolute; inset-block: -4px; inset-inline: 0; }
 :root .card[data-kpi-presentation='band'] {
   border-radius: 0; outline-color: transparent; box-shadow: none;
 }
