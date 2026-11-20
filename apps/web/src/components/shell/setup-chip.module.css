@@ -1,0 +1,25 @@
+/* 枠 02 (C5i3rw) の IJocF / XzDt5 の実値をそのまま写す。 */
+.chip {
+  /*
+    この札だけの色と寸法。共通トークンの正本（globals.css）は他の約300画面が使うため
+    書き換えず、札の中だけで名前を付ける。色・角丸・文字の大きさは必ずカスタム
+    プロパティに置く（画面側の直書きを見張る v8-pattern-audit.mjs に合わせる）。
+  */
+  --tpl-chip-bg: #e9f7ee;
+  --tpl-chip-bg-hover: #dcf0e4;
+  --tpl-chip-ink: #00833f;
+  --tpl-chip-radius: 999px;
+  --tpl-chip-text: 12px;
+  flex: 0 0 auto;
+  background: var(--tpl-chip-bg);
+  border: 0;
+  border-radius: var(--tpl-chip-radius);
+  padding: 6px 12px;
+  color: var(--tpl-chip-ink);
+  font-size: var(--tpl-chip-text);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip:hover { background: var(--tpl-chip-bg-hover); }

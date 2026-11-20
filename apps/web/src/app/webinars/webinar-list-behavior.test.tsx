@@ -86,6 +86,13 @@ describe('ウェビナー一覧の検索操作', () => {
   })
 })
 describe('ウェビナー一覧の表示状態と操作', () => {
+  it('行のある一覧でも作る操作に古い名前を使わない', async () => {
+    await start()
+    expect(row()).toBeTruthy()
+    expect(screen.queryByText('ウェビナーを作成')).toBeNull()
+    expect(screen.queryByText('ウェビナーをつくる')).toBeNull()
+    for (const link of screen.getAllByRole('link', { name: 'ウェビナーを作る' })) expect(link.getAttribute('href')).toBe('/webinars/new')
+  })
   it('検索中も直前の一覧を残す', async () => {
     await start()
     const pending = deferred<ReturnType<typeof response>>()
@@ -127,6 +134,8 @@ describe('ウェビナー一覧の表示状態と操作', () => {
   it('新規作成の操作名は現在の入口と空の一覧へつながる(DETAIL-02)', async () => {
     mocks.grand = 0; mocks.list.mockResolvedValue(response([])); render(<WebinarList />)
     await screen.findByText('まだウェビナーがありません')
+    expect(screen.queryByText('ウェビナーを作成')).toBeNull()
+    expect(screen.queryByText('ウェビナーをつくる')).toBeNull()
     const links = screen.getAllByRole('link', { name: 'ウェビナーを作る' })
     expect(links.length).toBeGreaterThan(0)
     for (const link of [...links, screen.getByRole('link', { name: '最初のウェビナーを作る' })]) expect(link.getAttribute('href')).toBe('/webinars/new')

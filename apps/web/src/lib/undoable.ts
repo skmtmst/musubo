@@ -4,32 +4,14 @@ import { notifyToast } from '@/components/shared/toast'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { ApiError } from '@/lib/api'
 
-/*
- * ★管理画面 sTJsh §1・§4「押したらすぐ反映」「確認の代わりに元に戻す」。
- *
- * - §4 消す系の操作（`runUndoable`）：画面からはすぐ消し、
- *   サーバーへは5秒後に送る。「元に戻す」で止めたら送らない。
- *   送信が失敗したら画面を元に戻して、やり直せる失敗の知らせを出す。
- * - §1 先に画面を変える軽い操作（`runOptimistic`）：表示は先に変えて
- *   すぐ送る。失敗したら元に戻して「もう一度」の知らせを出す。
- *
- * 取り消せない操作（配信を送る・支払い・予約を消す・友だちを消す・
- * 連携を切る）はここを通さず、従来どおり確認を残して返事を待つ。
- */
+/* 軽い操作はすぐ保存し、失敗時は表示を戻す。確認中の操作は窓で結果を管理する。 */
 
 /** 「元に戻す」の猶予（toast の UNDO_DURATION と揃える）。 */
 const UNDO_WINDOW_MS = 5000
 
 type Commit = () => Promise<{ success: boolean; error?: string } | void> | void
 
-/**
- * 画面側の変更を先に済ませたあと呼ぶ。`commit` は `UNDO_WINDOW_MS` 後に
- * 実行され、「元に戻す」または ⌘Z で止められる。
- *
- * `undo` は戻したときの画面の復元。`onCommitError` は送信失敗時の復元
- * （`undo` と同じ処理を渡せることが多い）。知らせの文は呼び出し側が
- * 運用者の言葉で渡す（例「3人から『VIP』を外しました」）。
- */
+/** 確認中の操作は窓で結果を待ち、通常の操作はすぐ保存する。 */
 export type ConfirmedUndoResult = { status: 'committed' | 'undone' } | { status: 'failed'; error: unknown; message?: string }
 export type ConfirmedUndoHandle = {
   finished: Promise<ConfirmedUndoResult>
@@ -55,6 +37,19 @@ type UndoableOptions = {
 export function runUndoable(options: UndoableOptions & { confirmation: true }): ConfirmedUndoHandle
 export function runUndoable(options: UndoableOptions): void
 export function runUndoable(options: UndoableOptions & { confirmation?: boolean }): ConfirmedUndoHandle | void {
+  if (!options.confirmation) {
+    void Promise.resolve().then(() => options.commit()).then((res) => {
+      if (res && res.success === false) throw new Error(res.error ?? '')
+      notifyToast(options.message)
+      void Promise.resolve().then(() => options.onCommitted?.()).catch(() => {
+        notifyToast('保存しました。表示を読み直してください。', { tone: 'error' })
+      })
+    }).catch(() => {
+      ;(options.onCommitError ?? options.undo)()
+      notifyToast(options.failureMessage ?? 'できませんでした。もう一度お試しください。', { tone: 'error' })
+    })
+    return
+  }
   let finish: ((result: ConfirmedUndoResult) => void) | undefined
   const finished = options.confirmation ? new Promise<ConfirmedUndoResult>(resolve => { finish = resolve }) : undefined
   let closeUndoWindow: (() => void) | undefined
@@ -128,11 +123,7 @@ export function runUndoable(options: UndoableOptions & { confirmation?: boolean 
       notifyToast('操作は取り消しました。表示を読み直してください。', { tone: 'error' })
     } finally { finish?.({ status: 'undone' }) }
   }
-  const dismiss = options.confirmation ? () => {} : notifyToast(options.message, {
-    actionLabel: '元に戻す',
-    onAction: undo,
-    lifecycle: { onPause: pauseCommit, onResume: resumeCommit },
-  })
+  const dismiss = () => {}
   if (finished && undoWindowClosed) {
     const holds = new Set<'pointer' | 'focus'>()
     return {
@@ -183,16 +174,7 @@ export function runOptimistic(options: {
 /** 失敗の理由（口が返した日本語）。機械の文（API error: 500 など）・空は出さない。 */
 const failureReason = (error: unknown): string => japaneseDetailOf(error)
 
-/**
- * ★V8 受信箱の右の欄でその場で直す（A-2 採用・）。
- *
- * 呼び出し側が画面を先に変えてから呼ぶ。裏で `request` を送り、
- * - 通ったら白い知らせ「〇〇にしました ［元に戻す］」（5秒。乗せている間・押している間は止まる）。
- *   ［元に戻す］は画面を戻して `undoRequest` を送る。それも失敗したら、戻した画面をまた直して知らせる。
- * - 失敗したら画面を戻し、理由と［もう一度試す］の知らせを出す。
- * 知らせは提案 F の共通の知らせ（積み重ね・消えた隙間を詰める）。
- * 返り値は知らせを消す関数（メモのように続けて保存するとき、前の知らせを片づける）。
- */
+/** 先に表示を変えた操作を保存し、失敗時は表示と再試行を提供する。 */
 export function runOptimisticWithUndo(options: {
   request: Commit
   /** 対象や同じ項目の後続操作が変わったら、表示・再試行・取り消しを失効させる。 */
@@ -232,28 +214,8 @@ export function runOptimisticWithUndo(options: {
       if (!current()) return
       if (res && res.success === false) throw new ApiError(400, res.error ?? '')
       options.onSuccess?.(res)
-      const undoRequest = options.undoRequest
       const message = options.successMessageOf?.() ?? options.successMessage
-      // 文が空なら知らせない（管理画面 の画面は今までどおり静かに終わる）。
-      if (!message) return
-      dismissCurrent = notifyToast(message, undoRequest ? {
-        actionLabel: '元に戻す',
-        onAction: () => {
-          if (!current()) return
-          options.revert()
-          void Promise.resolve()
-            .then(() => undoRequest())
-            .then((undoRes) => {
-              if (undoRes && undoRes.success === false) throw new ApiError(400, undoRes.error ?? '')
-            })
-            .catch((error: unknown) => {
-              if (!current()) return
-              options.reapply?.()
-              const reason = failureReason(error)
-              notifyToast(`元に戻せませんでした。${reason || '通信を確かめて、もう一度お試しください。'}`, { tone: 'error' })
-            })
-        },
-      } : undefined)
+      if (message) dismissCurrent = notifyToast(message)
     })
     .catch(fail)
   return handle

@@ -334,9 +334,9 @@ html:root .button.text[data-shared-button]:is(:disabled, [aria-disabled='true'],
 :root .button.inline.text.textAccent { color: var(--color-accent-deep); }
 
 /* 灰色の面でもキーボードの焦点だけは輪で示す。 */
-:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):not(:focus-visible) { outline-color: transparent; }
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='step-action']):not(:focus-visible) { outline-color: transparent; }
 html:root .button:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
-:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):active:not(:disabled) { background: var(--polish-control-hover); }
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='step-action']):active:not(:disabled) { background: var(--polish-control-hover); }
 
 /* 窓の取消・副操作は線のない淡い面。 */
 html:root :is(:global([data-design-part='dialog']), :global([data-design-part='drawer'])) :global([data-window-actions]) .secondary {
@@ -375,13 +375,13 @@ html:root .button.secondary[data-presentation='row-action']:focus-visible {
   outline-offset: var(--polish-focus-offset);
 }
 /* 主ボタンと白い副ボタンは、文字 14/600・印 16（線 1.75）・間 8。高さは変えない。 */
-:root .button:is(.primary, .secondary):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action']) {
+:root .button:is(.primary, .secondary):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action'], [data-presentation='step-action']) {
   gap: var(--polish-space-row);
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
 }
-:root .button:is(.primary, .secondary):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action']) > svg {
+:root .button:is(.primary, .secondary):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action'], [data-presentation='step-action']) > svg {
   width: 16px;
   height: 16px;
   stroke-width: var(--polish-icon-stroke);
@@ -461,3 +461,98 @@ html:root .button.button.primary[data-presentation='hours']:not([data-permission
 html:root .button.button.text[data-presentation='hours'] { font-weight:600; }
 
 html:root .button.button[data-presentation='hours']:focus-visible { outline:var(--polish-focus-width) solid var(--polish-focus); outline-offset:var(--polish-focus-offset); }
+
+/*
+ * 段の下の2操作（はじめにやること HQg7M / QQIQM）。指定したボタンだけに効かせる。
+ * 文字の大きさ・太さ・行の高さ、主操作の縁なし、副操作の細い枠・影なし・文字色を持ち主側で持つ。
+ * 高さと左右の余白は画面の寸法なので、ここでは持たない。
+ */
+html:root .button.button[data-presentation='step-action'] {
+  font-size: var(--step-action-text);
+  font-weight: var(--step-action-weight);
+  line-height: var(--step-action-text-lh);
+}
+html:root .button.button.primary[data-presentation='step-action']:not(:focus-visible) { outline: none; }
+html:root .button.button.secondary[data-presentation='step-action'] {
+  border: 1px solid var(--color-field-border);
+  box-shadow: none;
+  color: var(--color-step-action-ink);
+  font-weight: var(--step-action-weight-sub);
+  /*
+   * 白い副操作の地は、指定なしの副ボタンと同じ白。乗せると沈んだ白へ。
+   * `background` の一括指定にして、共通の重ね塗り（黒4%）を地の画像ごと消す。
+   * これを書かないと、指定なしの口から外れた分だけ乗せた時に地が暗くなる。
+   */
+  background: var(--color-canvas);
+}
+html:root .button.button.secondary[data-presentation='step-action']:hover:not(:disabled):not(:active) {
+  /*
+   * 押している間はこの乗せた時の面を外し、既存の押下時の面（:active、339行の口経由）に戻す。
+   * ここを付けないと、このセレクタの詳しさが既存の:active規則より勝ってしまい、押下中も乗せた時の色のままになる。
+   */
+  background: var(--color-canvas-sunken);
+}
+
+/*
+ * 初回ポップアップの行の主操作（承認済み Pen 枠 02 pdn85 / 枠 02b ZcmBy）。
+ * 文字の大きさ・太さ・行の高さ・丸み・地の色・押した時の面は、持ち主のここで持つ。
+ * 高さと左右の余白は画面の寸法なので、画面側（first-run-popup.module.css）に残す。
+ * 地は `background-color` だけを変える。一括指定にすると素のボタンに乗る
+ * 共通の重ね塗り（黒4%の地の画像）が消え、乗せた時の見え方が置き換え前と変わる。
+ */
+html:root .button.button[data-presentation='first-run-start'] {
+  display: flex;
+  justify-content: normal;
+  gap: var(--first-run-start-gap);
+  border: 0;
+  border-radius: var(--first-run-start-radius);
+  background-color: var(--first-run-start-bg);
+  box-shadow: none;
+  color: var(--first-run-start-ink);
+  white-space: normal;
+  font-size: var(--first-run-start-text);
+  font-weight: var(--first-run-start-weight);
+  line-height: var(--first-run-start-lh);
+}
+html:root .button.button[data-presentation='first-run-start']:not(:focus-visible) { outline: none; }
+html:root .button.button[data-presentation='first-run-start']:hover:not(:disabled) {
+  background-color: var(--first-run-start-bg-hover);
+  filter: none;
+}
+html:root .button.button[data-presentation='first-run-start']:active:not(:disabled) {
+  background-color: var(--first-run-start-bg-hover);
+  /* 置き換え前の素のボタンは押しても暗くならない。共通の暗転だけ外し、0.98倍の沈みは残す。 */
+  filter: none;
+}
+
+/*
+ * 面も枠も持たない、文字だけの控えめな操作
+ * （初回ポップアップの「あとで」枠 02 qr72l / 枠 02b VJR0w、
+ *   開店準備ガイドの「この手順をスキップ」「一時停止」枠 04-1 dQfu4）。
+ * 色・文字の大きさ・太さ・行の高さは画面の変数から読む。
+ * 高さと最小の高さは画面の寸法なので、画面側に残す。
+ */
+html:root .button.button[data-presentation='quiet-text'] {
+  display: block;
+  align-items: normal;
+  justify-content: normal;
+  gap: initial;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  box-shadow: none;
+  color: var(--quiet-text-ink);
+  white-space: normal;
+  font-size: var(--quiet-text-size);
+  font-weight: var(--quiet-text-weight);
+  line-height: var(--quiet-text-lh);
+}
+html:root .button.button[data-presentation='quiet-text']:not(:focus-visible) { outline: none; }
+/* 置き換え前と同じく、乗せた時だけ下線を引く（面の色は変えない）。 */
+html:root .button.button[data-presentation='quiet-text']:hover:not(:disabled) {
+  background-color: transparent;
+  text-decoration: underline;
+  filter: none;
+}
+html:root .button.button[data-presentation='quiet-text']:active:not(:disabled) { filter: none; }
