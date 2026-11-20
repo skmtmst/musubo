@@ -61,6 +61,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
 type CommonActionOption = { id: string; label: string }
 
 const KINDS: ReadonlyArray<{ value: MileageRewardKind; label: string; note: string }> = [
+  { value: 'handgift', label: '手渡し（お店で渡す）', note: '交換後、お店で景品をお渡しします。' },
   { value: 'coupon', label: 'クーポンを渡す', note: '引換コードを配ります。交換後の動きを選ばなくても出せます' },
   { value: 'tag', label: 'タグを付ける', note: '付けたタグで、配信や絞り込みにつなげます' },
   { value: 'scenario', label: 'シナリオを始める', note: '交換した人だけに、続きの案内を流します' },
@@ -259,7 +260,7 @@ function RewardEditorInner() {
     return true
   }
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
-    setForm((now) => ({ ...now, [key]: value }))
+    setForm((now) => ({ ...now, [key]: value, ...(key === 'rewardKind' && value === 'handgift' ? { commonActionVersionId: '' } : {}) }))
     setFailure('')
     setTestResult(null)
   }
@@ -396,6 +397,7 @@ function RewardEditorInner() {
     if (selectedAccountId) setPublishTarget({ accountId: selectedAccountId, generation: scope.current.generation })
   }
   const kindNote = KINDS.find((kind) => kind.value === form.rewardKind)?.note ?? ''
+  const kindLocked = (kind: MileageRewardKind) => Boolean(reward && ((reward.rewardKind === 'handgift') !== (kind === 'handgift')))
   const requiredMiles = Number(form.requiredMiles)
   const perFriend = form.perFriendLimit.trim() === '' ? '何回でも' : `${form.perFriendLimit} 回まで`
   const errorOf = (message: string) => (touched && errors.includes(message) ? message : undefined)
@@ -470,7 +472,7 @@ function RewardEditorInner() {
       <Card variant="form" aria-label="渡すもの">
         <CardHeader size="stacked" title="渡すもの" />
         <SettingsFormRow layout="columns">
-          <SelectField label="交換後に渡すもの" htmlFor="reward-action" requirement={rewardActionRequirement(form.rewardKind)}
+          {form.rewardKind !== 'handgift' ? <SelectField label="交換後に渡すもの" htmlFor="reward-action" requirement={rewardActionRequirement(form.rewardKind)}
             help={form.rewardKind === 'coupon' ? 'クーポンは引換コードで渡すので、選ばなくても出せます' : '共通アクションの版を指定します'}
           >
             <SaveErrorField names={["commonActionVersionId","form.commonActionVersionId","common_action_version_id","form.common_action_version_id"]}><EntitySelect kind="common_action"
@@ -489,7 +491,7 @@ function RewardEditorInner() {
               ]}
               disabled={commonActionsFailed}
             /></SaveErrorField>
-          </SelectField>
+          </SelectField> : null}
           <SelectField label="渡すものの種類" htmlFor="reward-kind" help={kindNote}>
             <SaveErrorField names={["rewardKind","form.rewardKind","reward_kind","form.reward_kind"]}><Select
               id="reward-kind"
@@ -497,7 +499,7 @@ function RewardEditorInner() {
               size="full"
               value={form.rewardKind}
               onChange={(next) => set('rewardKind', next as MileageRewardKind)}
-              options={KINDS.map((kind) => ({ value: kind.value, label: kind.label }))}
+              options={KINDS.map((kind) => ({ value: kind.value, label: kind.label, disabled: kindLocked(kind.value) }))}
             /></SaveErrorField>
           </SelectField>
         </SettingsFormRow>
@@ -579,6 +581,8 @@ function RewardEditorInner() {
               name="reward-kind-cards"
               value={kind.value}
               checked={form.rewardKind === kind.value}
+              disabled={kindLocked(kind.value)}
+              disabledReason={kindLocked(kind.value) ? '作成後は手渡しと他の種類を切り替えられません' : undefined}
               onChange={() => set('rewardKind', kind.value)}
               title={kind.label}
               note={kind.note}
