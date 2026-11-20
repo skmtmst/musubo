@@ -159,6 +159,7 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
         onCreate={() => { pause(); router.push('/rich-menus/new') }} onReload={style.reload} /> : null}
       {showReceive && summary ? <GuideReceiveFirstMessage key={accountId} channelId={channelId}
         step={index + 1} total={summary.total} watchExpired={first.watchExpired}
+        richMenuPublished={Boolean(first.progress?.richMenuPublished)}
         onRewatch={first.rewatch} onLater={pause} /> : null}
       {showComplete ? <GuideSetupComplete onClose={dismissComplete}
         onHome={() => { dismissComplete(); router.push('/') }} /> : null}

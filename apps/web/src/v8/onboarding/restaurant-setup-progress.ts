@@ -11,18 +11,22 @@ export function unknownRestaurantSetup(reason: string): StyleSetupProgress {
  * ③リッチメニューを選ぶ。アカウント単位の下書きで決まるので、店舗の集計とは別に読む。
  * 公開済みも下書きを作った後の形なので、1つでもあれば済みにする。
  */
-export async function loadRichMenuEvidence(accountId: string): Promise<{ complete: boolean | null; reason: string }> {
+export async function loadRichMenuEvidence(accountId: string): Promise<{ complete: boolean | null; reason: string; published?: boolean }> {
   try {
     const response = await api.richMenuGroups.listPage(accountId, { page: 1, limit: 1 })
     if (!response.success || !Array.isArray(response.data?.items)) return { complete: null, reason: 'リッチメニューの状態を確認できませんでした' }
-    return { complete: response.data.items.length > 0, reason: '最初のリッチメニューを選び、下書きを作ってください' }
+    return {
+      complete: response.data.items.length > 0,
+      reason: '最初のリッチメニューを選び、下書きを作ってください',
+      published: (response.data.facets?.published ?? 0) > 0 || response.data.items.some(item => item.status === 'published'),
+    }
   } catch { return { complete: null, reason: 'リッチメニューの状態を確認できませんでした' } }
 }
 
 /** 店舗の集計とリッチメニューを別に読み、片方が未取得でももう片方の判定を保つ。 */
 export async function loadRestaurantSetupProgress(accountId: string, selectedStoreId?: string | null): Promise<StyleSetupProgress> {
-  const [base, richMenu] = await Promise.all([loadRestaurantStoreProgress(accountId, selectedStoreId), loadRichMenuEvidence(accountId)])
-  return { ...base, steps: { ...base.steps, richMenu } }
+  const [base, { published, ...richMenu }] = await Promise.all([loadRestaurantStoreProgress(accountId, selectedStoreId), loadRichMenuEvidence(accountId)])
+  return { ...base, richMenuPublished: published, steps: { ...base.steps, richMenu } }
 }
 
 /** 店舗を混ぜず、選ばれた1店舗だけを読む。前の店の値で未取得を補わない。 */

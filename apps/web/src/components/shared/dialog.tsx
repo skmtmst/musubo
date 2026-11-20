@@ -25,7 +25,7 @@ export type DialogProps = {
    * 渡さなければ size の幅のまま。互換経路では効かない。
    */
   /** 頭・説明・本文・操作を同じ余白で積む小窓（ 等）。 */
-  designLayout?: 'stacked' | 'stacked-centered' | 'stacked-guided' | 'fullscreen'
+  designLayout?: 'stacked' | 'stacked-centered' | 'stacked-guided' | 'stacked-picker' | 'fullscreen'
   /** 確認のボタンを先に置く板だけで指定する。 */
   confirmFirst?: boolean
   designWidth?: number
@@ -341,7 +341,7 @@ export default function Dialog({
         </div>
         {headerAction ? <div className={styles.headerAction}>{headerAction}</div> : null}
         {/* ガイドの窓はフッターの操作で閉じる。 */}
-        {designLayout !== 'stacked-centered' && designLayout !== 'stacked-guided' && designLayout !== 'fullscreen' ? (
+        {designLayout !== 'stacked-centered' && designLayout !== 'stacked-guided' && designLayout !== 'stacked-picker' && designLayout !== 'fullscreen' ? (
           <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={discard.requestClose} disabled={busy}>
             <X aria-hidden="true" size={20} />
           </IconButton>

@@ -10,23 +10,18 @@ import Link from '@/components/shared/list-navigation'
 import { qrToDataURL } from '@/lib/qr-image'
 import styles from './guide-last-step.module.css'
 
-const RECEIVE_INSTRUCTIONS = [
-  'スマホのカメラでQRを読み取る',
-  '友だち追加すると、あいさつ＋リッチメニューが届く',
-  '届いたら、この画面に自動でチェックが付きます',
-]
-
 const NEXT_ACTIONS = [
   { href: '/broadcasts/new', icon: Megaphone, label: 'はじめての配信を作る', note: 'お店のお知らせを友だちに届ける' },
   { href: '/templates/edit?kind=coupon', icon: Ticket, label: 'クーポンを作る', note: '来店のきっかけをつくる' },
   { href: '/line-notifications', icon: Bell, label: '予約の通知を設定', note: '新しい予約をすぐ知る' },
 ]
 
-export function GuideReceiveFirstMessage({ channelId, step, total, watchExpired, onRewatch, onLater }: {
+export function GuideReceiveFirstMessage({ channelId, step, total, watchExpired, richMenuPublished, onRewatch, onLater }: {
   channelId: string
   step: number
   total: number
   watchExpired: boolean
+  richMenuPublished: boolean
   onRewatch: () => void
   onLater: () => void
 }) {
@@ -48,6 +43,11 @@ export function GuideReceiveFirstMessage({ channelId, step, total, watchExpired,
   }, [channelId, attempt])
 
   const title = '最初の1通を受け取る'
+  const instructions = [
+    'スマホのカメラでQRを読み取る',
+    richMenuPublished ? '友だち追加すると、あいさつ＋リッチメニューが届く' : '友だち追加して、あいさつメッセージを確認する',
+    '届いたら、この画面に自動でチェックが付きます',
+  ]
   return (
     <Dialog open title={title} titleContent={<span className={styles.receiveTitle}>
       <span className={styles.step}>{step}/{total}</span>
@@ -62,7 +62,7 @@ export function GuideReceiveFirstMessage({ channelId, step, total, watchExpired,
             : qr ? <img className={styles.qr} src={qr} alt="友だち追加のQRコード" width={150} height={150} />
               : <ListState kind="loading" title="QRコードを用意しています" />}
           <ol className={styles.instructions}>
-            {RECEIVE_INSTRUCTIONS.map((instruction, index) => <li key={instruction}><span className={styles.instructionNumber} aria-hidden="true">{index + 1}</span>{instruction}</li>)}
+            {instructions.map((instruction, index) => <li key={instruction}><span className={styles.instructionNumber} aria-hidden="true">{index + 1}</span>{instruction}</li>)}
           </ol>
         </div>
         <p className={styles.waiting} role="status"><Hourglass size={16} aria-hidden="true" />{watchExpired ? 'まだ受信を確認できていません。' : '受信を待っています… 届くと自動で完了になり、開店準備完了の画面へ進みます'}</p>

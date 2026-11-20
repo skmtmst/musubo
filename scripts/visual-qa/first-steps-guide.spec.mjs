@@ -12,7 +12,14 @@ async function openFixture(page, { width = 1440, firstStep = 'attributes', delay
   await routeLocalApi({ page })
   await page.setViewportSize({ width, height: 1000 })
   await page.request.put(`${mock}/api/dashboard/style?accountId=${accountId}`, { data: { style: 'restaurant' } })
-  await page.request.put(`${mock}/api/getting-started/guide?accountId=${accountId}`, { data: { phase: 'idle', stepKey: null, procedureIndex: 1 } })
+  let guide = { phase: 'idle', stepKey: null, procedureIndex: 1, updatedAt: '2026-11-20T00:00:00Z' }
+  await page.route('**/api/getting-started/guide?**', route => {
+    if (route.request().method() === 'PUT') {
+      const { phase, stepKey, procedureIndex } = route.request().postDataJSON()
+      guide = { ...guide, phase, stepKey, procedureIndex }
+    }
+    return route.fulfill({ json: { success: true, data: guide } })
+  })
   await page.addInitScript((account) => {
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
     localStorage.setItem('lh_selected_account', account)
@@ -123,10 +130,16 @@ test('Penの5つの型から選んだリッチメニューを保存し、卓へ�
   await expect(menuPicker.getByRole('button', { name: 'これにする', exact: true })).toHaveCount(5)
   const bounds = await menuPicker.boundingBox()
   expect(bounds.width).toBeCloseTo(860, 0)
+  expect(Math.abs(bounds.height - 726)).toBeLessThanOrEqual(1)
   const note = menuPicker.getByText('クーポン等の強調色も各型のパレット内で統一', { exact: true })
   const noteBounds = await note.boundingBox()
   expect(noteBounds.x + noteBounds.width).toBeLessThan(bounds.x + bounds.width)
   await page.screenshot({ path: testInfo.outputPath('guide-menu-picker.png') })
+  await page.setViewportSize({ width: 390, height: 900 })
+  await expect(menuPicker.getByRole('button', { name: '0から自分で作る' })).toBeVisible()
+  const mobile = await menuPicker.boundingBox()
+  expect(mobile.x + mobile.width).toBeLessThanOrEqual(390)
+  await page.screenshot({ path: testInfo.outputPath('guide-menu-picker-mobile.png') })
   const night = menuPicker.getByRole('article', { name: '夜（深い紺）', exact: true })
   await night.getByRole('button', { name: 'これにする', exact: true }).click()
   await expect(page).toHaveURL(/\/restaurant-test\/tables$/, { timeout: 15000 })

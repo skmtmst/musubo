@@ -87,6 +87,7 @@ export interface GettingStartedInput {
 
 /** 業種の設定画面で実物を読んだ結果。未取得・失敗はnull、対象外の段は省略できる。 */
 export type StyleSetupProgress = {
+  richMenuPublished?: boolean
   notices?:Array<{message:string;href:string}>
   style: AccountStyle
   steps: Partial<Record<'attributes' | 'friendAdd' | 'scenario' | 'hours' | 'followup' | 'richMenu', { complete: boolean | null; reason?: string }>>

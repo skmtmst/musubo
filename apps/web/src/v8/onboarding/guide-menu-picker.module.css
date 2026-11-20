@@ -39,7 +39,7 @@
 
 .preset {
   display: grid;
-  gap: var(--space-6);
+  gap: var(--space-4);
 }
 
 .artwork {
@@ -68,7 +68,8 @@
 .details small,
 .footer small {
   color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
+  font-size: var(--text-micro);
+  font-weight: var(--font-weight-reading);
 }
 
 .palette {
