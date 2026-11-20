@@ -2995,8 +2995,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    return {success:true,data:{entries:entries.slice(offset,offset+limit),total:entries.length,offset,limit}}
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/snapshot') {
-    return { success: true, data: RESTAURANT_SNAPSHOT }
-  }
+    return { success: true, data: RESTAURANT_SNAPSHOT } }
   if (method === 'GET' && pathname === '/api/restaurant-test/store-groups') return { success: true, data: [] }
   if (method === 'GET' && pathname === '/api/restaurant-test/stores') {
     return { success: true, data: { organization: RESTAURANT_SNAPSHOT.organization, stores: RESTAURANT_SNAPSHOT.stores } }
