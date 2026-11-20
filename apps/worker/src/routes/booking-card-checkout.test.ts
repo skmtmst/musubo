@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { createHmac } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { gapApp, gapFixture } from '../test-utils/gap1.js';
+import { gapApp, gapFixture, seedGapBooking } from '../test-utils/gap1.js';
+import { chargeCancellation } from '../features/booking/booking-card-charge.js';
+import { refundCancellationCharge } from '../features/booking/booking-charge-refund.js';
+import type { Env } from '../worker-env.js';
 import { bookingCancellation } from './booking-cancellation.js';
 import { bookingStripeWebhook } from './booking-stripe-webhook.js';
 
@@ -67,4 +70,24 @@ it('関連付けの保存後に処理が止まっても定時の回収で登録�
   fixture.raw.exec("UPDATE workflow_steps SET error_code=NULL WHERE subject_id='evt_recover'");
   expect(await recoverCardSetupReceipts(fixture.db)).toEqual({failed:0});
   expect(fixture.raw.prepare('SELECT status FROM booking_payment_methods WHERE id=?').get('request1')).toEqual({status:'ready'});
+});
+
+it('模擬Stripeでカード登録から請求と返金まで同じカードで進む',async()=>{
+ let requestId='';const calls:string[]=[];
+ vi.stubGlobal('fetch',vi.fn(async(url:RequestInfo | URL,init?:RequestInit)=>{
+  const path=String(url);calls.push(path);const fields=new URLSearchParams(String(init?.body));
+  if(path.includes('oauth2/v2.1/verify'))return Response.json({sub:'Uf'});
+  if(path.endsWith('/customers')){requestId=fields.get('metadata[booking_payment_method_id]')!;return Response.json({id:'cus_person',livemode:false});}
+  if(path.endsWith('/checkout/sessions'))return Response.json({id:'cs_test_abc',url:'https://checkout.stripe.com/c/pay/cs_test_abc',livemode:false});
+  if(path.endsWith('/payment_intents')){expect(fields.get('amount')).toBe('4200');expect(fields.get('customer')).toBe('cus_person');expect(fields.get('payment_method')).toBe('pm_card');expect(fields.get('off_session')).toBe('true');expect((init?.headers as Record<string,string>)['Idempotency-Key']).toBe('booking_charge_charge1');return Response.json({id:'pi_charge1',livemode:false,status:'succeeded',amount:4200,currency:'jpy',customer:'cus_person',payment_method:'pm_card',metadata:{booking_charge_id:'charge1'}});}
+  if(path.endsWith('/refunds'))return Response.json({id:'re_refund1',status:'succeeded',amount:4200,currency:'jpy',payment_intent:'pi_charge1',metadata:{booking_refund_request_id:fields.get('metadata[booking_refund_request_id]')}});
+  throw new Error('unexpected mock request');
+ }));
+ expect((await start()).status).toBe(201);expect((await notify('checkout.session.completed',requestId)).status).toBe(200);expect((await notify('setup_intent.succeeded',requestId)).status).toBe(200);
+ seedGapBooking(fixture);fixture.raw.prepare("UPDATE bookings SET booking_payment_method_id=?,status='cancelled' WHERE id='bk'").run(requestId);
+ fixture.raw.exec("INSERT INTO booking_charges(id,booking_id,line_account_id,kind,amount,policy_snapshot_json,status,created_at,updated_at) VALUES('charge1','bk','a','cancellation_fee',4200,'{}','pending',datetime('now'),datetime('now'))");
+ const env={DB:fixture.db,BOOKING_STRIPE_TEST_SECRET_KEY:'sk_test_example'} as Env['Bindings'];
+ const charged=await chargeCancellation(env,'a','bk','charge-key',{kind:'cancellation_fee',amount:4200},1,'o');expect(charged.row.status).toBe('succeeded');
+ expect((await refundCancellationCharge(env,'a','charge1','refund-key',charged.row.version,'店の都合','o')).status).toBe('refunded');
+ expect(calls.filter(path=>path.endsWith('/payment_intents'))).toHaveLength(1);expect(calls.filter(path=>path.endsWith('/refunds'))).toHaveLength(1);
 });
