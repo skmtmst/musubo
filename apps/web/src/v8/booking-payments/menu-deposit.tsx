@@ -67,8 +67,8 @@ export function CourseDepositFields({ deposit, readOnly }: { deposit: MenuDeposi
   if(readOnly)return <p>{kind==='inherit'?'店の設定に従う':kind==='none'?'予約金なし':kind==='percent'?`料金の ${rule.value ?? 0}%`:`${yen(rule.value ?? 0)}`}</p>
   return <>
     <TestModeNote>本当の請求は起きません</TestModeNote>
-    <SegmentedControl aria-label="予約金" value={kind} onChange={value => deposit.setDraft({ ...rule, inherit:value==='inherit', kind:value==='amount'?'amount':value==='percent'?'percent':'none', value:value==='amount'||value==='percent' ? rule.value ?? 30 : null })}
-      options={[{value:'inherit',label:'店の設定'},{value:'none',label:'なし'},{value:'amount',label:'金額で指定'},{value:'percent',label:'料金の割合'}]} />
+    <Field label="予約金"><SegmentedControl aria-label="予約金" selectionMode="radio" appearance="intake-stop" value={kind} onChange={value => deposit.setDraft({ ...rule, inherit:value==='inherit', kind:value==='amount'?'amount':value==='percent'?'percent':'none', value:value==='amount'||value==='percent' ? rule.value ?? 30 : null })}
+      options={[{value:'inherit',label:'店の設定'},{value:'none',label:'なし'},{value:'amount',label:'金額で指定'},{value:'percent',label:'料金の割合'}]} /></Field>
     {(kind==='amount'||kind==='percent') && <Field label="予約金" required><NumberInput aria-label="予約金の値" type="number" min={1} max={kind==='percent'?100:undefined} unit={kind==='percent'?'%':'円'} value={rule.value ?? ''} onChange={event=>deposit.setDraft({...rule,value:event.target.value===''?null:Number(event.target.value)})} /></Field>}
   </>
 }

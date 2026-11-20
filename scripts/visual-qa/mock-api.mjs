@@ -2987,6 +2987,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 飲食店向けテスト（`/restaurant-test/*`）。`restaurant-test-api.ts` の
    * 読み口だけを固定で返す。書き込み（発行・承認・保存）は従来どおり405。
    */
+  if (method === 'GET' && /^\/api\/restaurant-test\/menus\/[^/]+\/deposit$/.test(pathname)) return { success: true, data: { kind: 'none', value: null, inherit: true, version: 0, conditions: { always: true, minPeople: null, weekdays: null, timeBand: null } } }
   if(method==='GET'&&pathname==='/api/restaurant-test/floors')return {success:true,data:RESTAURANT_FLOORS.filter(f=>f.storeId===(query.get('storeId')??'store-sby'))}
   if(method==='GET'&&pathname==='/api/restaurant-test/board'){
    const from=Date.parse(query.get('from')),to=Date.parse(query.get('to')),offset=Number(query.get('offset')??0),limit=Number(query.get('limit')??500);
