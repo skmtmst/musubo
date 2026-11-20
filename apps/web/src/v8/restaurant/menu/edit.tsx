@@ -131,6 +131,8 @@ function MenuEditBody() {
   const course = draft.kind === 'course'
   const payment = useMenuPayment('course', selectedAccountId, editing && editing.kind === 'course' ? editing.id : null)
   const deposit = useMenuDeposit(selectedAccountId, editing && editing.kind === 'course' ? editing.id : null, 'course')
+  const depositRule = deposit.draft
+  const depositInvalid = Boolean(editing?.kind === 'course' && depositRule && !depositRule.inherit && (depositRule.kind === 'amount' || depositRule.kind === 'percent') && (depositRule.value === null || !Number.isInteger(depositRule.value) || depositRule.value <= 0 || (depositRule.kind === 'percent' && depositRule.value > 100)))
   const priceChanged = Boolean(editing && draft.price !== '' && Number(draft.price) !== editing.price)
   const priceStartsAt = draft.effectiveAt ? new Date(datetimeLocalJstToUtcIso(draft.effectiveAt)) : null
   const priceStartsLater = Boolean(priceStartsAt && priceStartsAt.getTime() > Date.now())
@@ -155,7 +157,7 @@ function MenuEditBody() {
   useEffect(() => { setBusy(false); setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setMenuConflict(false); setError(null) }, [contextKey])
 
   async function save(version = confirmedRevision) {
-    if (!canEdit || !selectedAccountId || !valid || menuConflict) return
+    if (!canEdit || !selectedAccountId || !valid || depositInvalid || menuConflict) return
     if (editing && (!dirty || !Number.isSafeInteger(version) || !version)) return
     const isCurrent = captureResource()
     if (!isCurrent()) return
@@ -269,7 +271,7 @@ function MenuEditBody() {
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
           {/* 開店準備ガイド⑥の手順3/3（枠14 hYTr8）の光らせる先。 */}
-          {canEdit ? <Button data-guide-anchor="menu.save" variant="primary" busy={busy} disabled={menuConflict || !valid || (Boolean(editing) && !dirty)} disabledReason={!valid ? priceError ? '値段を確認してください。' : '名前と値段を入力してください。' : editing && !dirty ? '変更していません' : undefined} onClick={() => { setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing?.confirmation_revision ?? null); setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save(editing?.confirmation_revision ?? null) }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
+          {canEdit ? <Button data-guide-anchor="menu.save" variant="primary" busy={busy} disabled={menuConflict || !valid || depositInvalid || (Boolean(editing) && !dirty)} disabledReason={depositInvalid ? '予約金の金額または割合を入力してください。' : !valid ? priceError ? '値段を確認してください。' : '名前と値段を入力してください。' : editing && !dirty ? '変更していません' : undefined} onClick={() => { setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing?.confirmation_revision ?? null); setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save(editing?.confirmation_revision ?? null) }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
         </>}
       >
         {error ? <Notice tone="danger" role="alert">{error}{menuConflict ? <Button onClick={() => { void load() }}>最新を読み込む</Button> : null}</Notice> : null}
