@@ -8,6 +8,14 @@ vi.mock('@/lib/staff-role', () => ({ useStaffRole: net.role, canAdministerRole: 
 const { MeetingReviewSection } = await import('./meeting-review-section')
 const { ApiError } = await import('@/lib/api')
 afterEach(() => { cleanup(); vi.resetAllMocks() })
+it.each([true, false])('固定 URL の有無 %s に応じて案内を出す', async hasFixedUrl => {
+  net.role.mockReturnValue('owner')
+  net.meetingReviews.mockResolvedValue({ data: { items: [] } })
+  net.meetingStatus.mockResolvedValue({ data: { state: 'failed', provider: 'zoom', version: 1, hasFixedUrl } })
+  render(<MeetingReviewSection accountId="account" bookingId="booking" canOperate />)
+  await screen.findByText('会議の URL を作れませんでした')
+  expect(Boolean(screen.queryByText('お客さまには「会議の URL は前日までにお送りします」と案内します。'))).toBe(!hasFixedUrl)
+})
 it('確実な失敗だけ再発行でき、結果不明なら操作を隠す', async () => {
   net.role.mockReturnValue('owner')
   net.meetingReviews.mockResolvedValue({ data: { items: [] } })

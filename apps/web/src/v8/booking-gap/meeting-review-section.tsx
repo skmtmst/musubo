@@ -14,7 +14,7 @@ import { canAdministerRole, useStaffRole } from '@/lib/staff-role'
 import styles from './meeting-review-section.module.css'
 
 type Review = { id: string; provider: string; staff_name: string | null; starts_at: string | null; ends_at: string | null }
-type MeetingStatus = {state:'none'|'active'|'failed'|'unknown';provider:'google_meet'|'zoom'|'teams'|null;version:number}
+type MeetingStatus = {state:'none'|'active'|'failed'|'unknown';provider:'google_meet'|'zoom'|'teams'|null;version:number;hasFixedUrl:boolean}
 const names: Record<string, string> = { google_meet: 'Google Meet', zoom: 'Zoom', teams: 'Microsoft Teams' }
 
 export function MeetingReviewSection({ accountId, bookingId, canOperate }: { accountId: string; bookingId: string; canOperate: boolean }) {
@@ -91,7 +91,7 @@ export function MeetingReviewSection({ accountId, bookingId, canOperate }: { acc
         </div>
       </Field> : null}
       {meeting.provider === 'teams' ? <p>Teams の会議は相手のサービスで確認してください。</p> : canOperate && canAdministerRole(role) ? <div className={styles.retry}><Button variant="secondary" size="compact" disabled={busy} onClick={() => void retry()}>もう一度発行する</Button></div> : null}
-      <p>お客さまには「会議の URL は前日までにお送りします」と案内します。</p>
+      {meeting.hasFixedUrl === false ? <p className={styles.note}>お客さまには「会議の URL は前日までにお送りします」と案内します。</p> : null}
     </> : null}
     {items.map(item => <div key={item.id}>
       <p>{names[item.provider] ?? '会議'}・{item.staff_name ?? '担当者不明'}</p>

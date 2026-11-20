@@ -22,3 +22,11 @@ it('結果不明の状態を返し、再発行を受け付けない',async()=>{
  expect(await (await gapCall(app,path,'POST',{},'same')).json()).toMatchObject({data:{outcome:'unavailable'}});
  expect(d.raw.prepare("SELECT status FROM booking_meeting_links WHERE id='link'").get()).toEqual({status:'pending'});
 });
+it('予約の固定URLの有無を発行状態とともに返す',async()=>{
+ const app=gapApp(d,[bookingCalendarSettings]);
+ const status=path.replace('meeting-retry','meeting-status');
+ d.raw.exec("UPDATE bookings SET meeting_url=NULL WHERE id='bk'");
+ expect(await (await gapCall(app,status)).json()).toMatchObject({data:{hasFixedUrl:false}});
+ d.raw.exec("UPDATE bookings SET meeting_url='https://example.test/fixed' WHERE id='bk'");
+ expect(await (await gapCall(app,status)).json()).toMatchObject({data:{hasFixedUrl:true}});
+});
