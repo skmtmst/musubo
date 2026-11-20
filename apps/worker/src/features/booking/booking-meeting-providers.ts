@@ -48,7 +48,37 @@ export function meetingProvider(provider:MeetingProvider,tokenForStaff:TokenSour
   try{const result=await call(input.staffId,url,'DELETE',undefined,input.signal,identity[0]);if(!result)return 'failed';const r=result.response;if(r.ok||r.status===404||r.status===410)return 'deleted';return r.status===401||r.status===403?'failed':'unknown';}catch{return 'unknown';}
  }
  async function verifyCreate(input:Parameters<MeetingVerifier['verifyCreate']>[0]):ReturnType<MeetingVerifier['verifyCreate']>{
-  if(provider!=='google_meet')return {kind:'unknown'};
+  if(provider==='zoom'){
+   // 一覧は agenda が250文字に切られるため、候補は詳細で鍵を照合する。不在は再作成の根拠にしない。
+   if(!input.idempotencyKey||input.idempotencyKey.length>250)return {kind:'unknown'};
+   try{
+    let page='',accountId='',found:{meetingId:string;url:string}|null=null;
+    const seen=new Set<string>();
+    for(let n=0;n<10;n++){
+     const query=new URLSearchParams({type:'upcoming',page_size:'100'});if(page)query.set('next_page_token',page);
+     const result=await call(input.staffId,`https://api.zoom.us/v2/users/me/meetings?${query}`,'GET',undefined,input.signal,accountId||undefined);
+     if(!result||!result.response.ok)return {kind:'unknown'};
+     accountId=result.accountId;
+     const data=obj(await result.response.json());if(!Array.isArray(data.meetings))return {kind:'unknown'};
+     for(const item of data.meetings){
+      const candidate=obj(item);if(text(candidate.agenda)!==input.idempotencyKey)continue;
+      const id=text(candidate.id)||(typeof candidate.id==='number'&&Number.isSafeInteger(candidate.id)?String(candidate.id):'');
+      if(!id)return {kind:'unknown'};
+      const detail=await call(input.staffId,`https://api.zoom.us/v2/meetings/${encodeURIComponent(id)}`,'GET',undefined,input.signal,accountId);
+      if(!detail||!detail.response.ok)return {kind:'unknown'};
+      const meeting=obj(await detail.response.json()),remoteId=text(meeting.id)||(typeof meeting.id==='number'&&Number.isSafeInteger(meeting.id)?String(meeting.id):''),url=text(meeting.join_url);
+      if(remoteId!==id||text(meeting.agenda)!==input.idempotencyKey||!validUrl(provider,url)||found)return {kind:'unknown'};
+      found={meetingId:packId(accountId,id),url};
+     }
+     if(data.next_page_token!==undefined&&typeof data.next_page_token!=='string')return {kind:'unknown'};
+     page=text(data.next_page_token);if(!page)return found?{kind:'found',...found,idempotencyKey:input.idempotencyKey}:{kind:'unknown'};
+     if(seen.has(page))return {kind:'unknown'};seen.add(page);
+    }
+   }catch{return {kind:'unknown'};}
+   return {kind:'unknown'};
+  }
+  // Graph の読み取り API は externalId での検索を提供しない。createOrGet は新規作成し得るため使わない。
+  if(provider==='teams')return {kind:'unknown'};
   const id=await googleEventId(input.idempotencyKey);
   try{const result=await call(input.staffId,`https://www.googleapis.com/calendar/v3/calendars/primary/events/${id}`,'GET',undefined,input.signal);if(!result||!result.response.ok)return {kind:'unknown'};
    const data=obj(await result.response.json()),privateData=obj(obj(data.extendedProperties).private);const key=text(privateData.bookingKey),meetingId=text(data.id),url=text(data.hangoutLink);

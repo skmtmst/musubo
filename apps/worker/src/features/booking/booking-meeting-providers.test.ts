@@ -57,3 +57,40 @@ it('Google 会議には招待者や顧客情報を入れず、予定を空き扱
  expect(body).not.toHaveProperty('attendees');expect(body).not.toHaveProperty('participants');expect(JSON.stringify(body)).not.toContain('customer');
  expect(JSON.stringify(body)).toContain(input.idempotencyKey);
 });
+it('Zoom の一覧と詳細を読み、完全一致した会議だけを照合する',async()=>{
+ const request=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>{
+  expect(init?.method).toBe('GET');
+  const u=new URL(String(url));
+  if(u.pathname==='/v2/users/me/meetings')return new Response(JSON.stringify(u.searchParams.has('next_page_token')
+   ?{meetings:[{id:123,agenda:'key'}],next_page_token:''}
+   :{meetings:[{id:456,agenda:'other'}],next_page_token:'next'}));
+  expect(u.pathname).toBe('/v2/meetings/123');
+  return new Response(JSON.stringify({id:123,agenda:'key',join_url:'https://us02web.zoom.us/j/123'}));
+ });
+ const verifier=meetingProvider('zoom',async()=>({token:'test-token',accountId:'owner'}),request as unknown as typeof fetch);
+ expect(await verifier.verifyCreate({staffId:'s',idempotencyKey:'key',signal:input.signal})).toEqual({kind:'found',meetingId:JSON.stringify(['owner','123']),url:'https://us02web.zoom.us/j/123',idempotencyKey:'key'});
+ expect(request).toHaveBeenCalledTimes(3);
+});
+it('Zoom で未発見、複数一致、詳細の不一致、ページング不能なら要確認にする',async()=>{
+ for(const kind of ['empty','multiple','mismatch','page'] as const){
+  const request=vi.fn(async(url:RequestInfo|URL)=>{
+   if(new URL(String(url)).pathname==='/v2/users/me/meetings')return new Response(JSON.stringify(kind==='empty'?{meetings:[]}:kind==='page'?{meetings:[],next_page_token:'same'}:{meetings:kind==='multiple'?[{id:1,agenda:'key'},{id:2,agenda:'key'}]:[{id:1,agenda:'key'}]}));
+   const id=Number(new URL(String(url)).pathname.split('/').pop());
+   return new Response(JSON.stringify({id,agenda:kind==='mismatch'?'other':'key',join_url:`https://zoom.us/j/${id}`}));
+  });
+  expect(await meetingProvider('zoom',async()=>({token:'t',accountId:'owner'}),request as unknown as typeof fetch).verifyCreate({staffId:'s',idempotencyKey:'key',signal:input.signal})).toEqual({kind:'unknown'});
+  expect(request.mock.calls.every(call=>String(call[0]).startsWith('https://api.zoom.us/'))).toBe(true);
+ }
+});
+it('Teams の結果不明では自動作成せず要確認にする',async()=>{
+ const request=vi.fn() as unknown as typeof fetch;
+ expect(await meetingProvider('teams',async()=>({token:'t',accountId:'owner'}),request).verifyCreate({staffId:'s',idempotencyKey:'key',signal:input.signal})).toEqual({kind:'unknown'});
+ expect(request).not.toHaveBeenCalled();
+});
+it('Zoom の一覧と詳細の間で別アカウントに切り替わると照合しない',async()=>{
+ let calls=0;
+ const token=async()=>({token:'t',accountId:++calls===1?'first':'second'});
+ const request=vi.fn(async()=>new Response(JSON.stringify({meetings:[{id:123,agenda:'key'}],next_page_token:''})));
+ expect(await meetingProvider('zoom',token,request as unknown as typeof fetch).verifyCreate({staffId:'s',idempotencyKey:'key',signal:input.signal})).toEqual({kind:'unknown'});
+ expect(request).toHaveBeenCalledOnce();
+});
