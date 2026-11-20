@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ApiError, fetchApi } from '@/lib/api'
+import { withHonorific } from '@line-crm/shared'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { canAdministerRole, useStaffRole } from '@/lib/staff-role'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -60,7 +62,7 @@ export default function HandgiftRedemptions({ accountId, readonly }: { accountId
       setTarget(null); setReason(''); setRefresh(n => n + 1)
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) { setTarget(null); setReason(''); setNotice('状態が変わったため、最新の一覧を表示しました。'); setRefresh(n => n + 1) }
-      else if (!saveErrors.capture(err)) setError(err instanceof Error ? err.message : '操作を完了できませんでした')
+      else if (!saveErrors.capture(err)) setError(describeApiFailure(err, '操作'))
     }
     finally { lock.current = false; setBusy(false) }
   }
@@ -79,7 +81,7 @@ export default function HandgiftRedemptions({ accountId, readonly }: { accountId
     {data.data.pagination.total > 100 ? <Pagination page={page} pageCount={Math.ceil(data.data.pagination.total / 100)} onPageChange={setPage} ariaLabel="交換のページ送り" /> : null}
     <SaveErrorScope errors={saveErrors}><ConfirmDialog open={target !== null} title={target?.action === 'deliver' ? '景品を渡しましたか？' : '交換を取り消しますか？'} description={target?.action === 'deliver' ? '景品を渡した記録を残します。' : target?.item.status === 'succeeded' ? '景品が戻ったことを確認してください。取り消すとマイルを戻し、渡した記録と取消の記録を残します。' : '取り消すと交換したマイルをお客さまに戻します。'} confirmLabel={target?.action === 'deliver' ? '渡した' : '取り消す'} busy={busy} error={error} onCancel={() => { if (!busy) { setTarget(null); setReason(''); setError(''); saveErrors.reset(); if (pending) { setNotice(pending); setRefresh(n => n + 1) }; setPending('') } }} onConfirm={() => { void submit() }}>
       {pending ? <Notice tone="info">{pending} もう一度押すと処理を再開します。</Notice> : null}
-      {target ? <p>{target.item.friendName || '名前未設定'} さん・{target.item.rewardNameSnapshot || target.item.rewardName}・交換番号 {target.item.id.slice(-8)}</p> : null}
+      {target ? <p>{target.item.friendName ? withHonorific(target.item.friendName, 'さん', { space: true }) : '名前未設定'}・{target.item.rewardNameSnapshot || target.item.rewardName}・交換番号 {target.item.id.slice(-8)}</p> : null}
       {target?.action === 'cancel' && target.item.status === 'succeeded' ? <Field label="取り消す理由（必須）" htmlFor="handgift-reason"><SaveErrorField names={["reason", "cancellation_reason", "cancellationReason"]}><TextField id="handgift-reason" value={reason} onChange={event => setReason(event.target.value)} maxLength={500} /></SaveErrorField></Field> : null}
     </ConfirmDialog></SaveErrorScope>
   </Card>

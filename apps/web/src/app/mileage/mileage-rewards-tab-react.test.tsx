@@ -109,6 +109,7 @@ function stubFetch(options: {
       return options.onRetry ? options.onRetry() : json({ success: true, data: {} })
     }
     if (url.includes('/api/mileage/redemptions')) {
+      if (params.get('kind') === 'handgift') return json({ success: true, data: { items: [], pagination: { total: 0, limit: 100, offset: 0 } } })
       redemptionsCalls += 1
       const override = options.onRedemptions?.(redemptionsCalls)
       if (override) return override
