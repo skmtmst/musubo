@@ -64,6 +64,17 @@ async function seedHandgift() {
 }
 
 describe('private data deletion', () => {
+  it('手渡しの交換だけを本人名と交換時のマイル付きで一覧する', async () => {
+    const { redemption } = await seedHandgift();
+    const query = { lineAccountId: 'a', status: 'all' as const, kind: 'handgift' as const, limit: 20, offset: 0 };
+    const result = await listMileageRedemptions(sqlite.db, query);
+    expect(result.pagination.total).toBe(1);
+    expect(result.items[0]).toMatchObject({ id: redemption.id, friendName: 'customer-private', requiredMiles: 30 });
+    sqlite.raw.prepare("UPDATE mileage_redemptions SET reward_kind_snapshot='coupon' WHERE id=?").run(redemption.id);
+    const filtered = await listMileageRedemptions(sqlite.db, query);
+    expect(filtered.pagination.total).toBe(0);
+    expect(filtered.items).toEqual([]);
+  });
   it.each(['reserved', 'succeeded', 'refunded'] as const)('交換%sの友だちを匿名化し、履歴と景品の数を残す', async state => {
     const { reward, redemption, operation } = await seedHandgift();
     if (state !== 'reserved') expect(await deliverHandgift(sqlite.db, operation)).toBe(true);

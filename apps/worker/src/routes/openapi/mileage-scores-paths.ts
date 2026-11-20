@@ -67,6 +67,7 @@ export const mileageScoresPaths = {
       parameters: [
         { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
         { name: 'status', in: 'query', schema: { type: 'string', enum: ['all', 'needs_attention', 'reserved', 'delivering', 'succeeded', 'delivery_failed', 'refunded', 'cancelled'] } },
+        { name: 'kind', in: 'query', schema: { type: 'string', enum: ['handgift'] } },
         { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
         { name: 'offset', in: 'query', schema: { type: 'integer', minimum: 0 } },
       ],

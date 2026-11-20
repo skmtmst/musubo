@@ -200,6 +200,8 @@ export type MileageRedemptionListStatus = MileageRedemptionStatus | 'all' | 'nee
 
 export interface MileageRedemptionListItem extends MileageRewardRedemption {
   rewardName: string;
+  friendName: string | null;
+  requiredMiles: number;
 }
 
 export type MileageRedemptionStepStatus = 'started' | 'sent';

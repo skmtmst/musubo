@@ -51,6 +51,7 @@ export async function listMileageRedemptions(
   input: {
     lineAccountId: string;
     status?: MileageRedemptionListStatus;
+    kind?: 'handgift';
     limit: number;
     offset: number;
   },
@@ -86,22 +87,26 @@ export async function listMileageRedemptions(
       : status === 'cancelled' ? "AND r.status = 'reserved' AND r.anonymized_at IS NOT NULL"
       : status === 'reserved' ? "AND r.status = ? AND r.anonymized_at IS NULL"
       : 'AND r.status = ?';
+  const kindClause = input.kind === 'handgift' ? "AND r.reward_kind_snapshot = 'handgift'" : '';
+  const order = input.kind === 'handgift' ? "CASE WHEN r.status = 'reserved' AND r.anonymized_at IS NULL THEN 0 ELSE 1 END, r.updated_at DESC, r.id" : 'r.updated_at DESC, r.id';
   const binds: unknown[] = [input.lineAccountId];
   if (status !== 'all' && status !== 'needs_attention' && status !== 'cancelled') binds.push(status);
   const totalRow = await db.prepare(
     `SELECT COUNT(*) AS count FROM mileage_redemptions r
-      WHERE r.line_account_id = ? ${statusClause}`,
+      WHERE r.line_account_id = ? ${statusClause} ${kindClause}`,
   ).bind(...binds).first<{ count: number }>();
   const rows = await db.prepare(
-    `SELECT r.*, reward.name AS reward_name
+    `SELECT r.*, reward.name AS reward_name, COALESCE(f.system_display_name, f.display_name) AS friend_name, version.required_miles
        FROM mileage_redemptions r
        JOIN mileage_rewards reward ON reward.id = r.reward_id
-      WHERE r.line_account_id = ? ${statusClause}
-      ORDER BY r.updated_at DESC, r.id
+       JOIN mileage_reward_versions version ON version.id = r.reward_version_id
+       LEFT JOIN friends f ON f.id = r.beneficiary_friend_id
+      WHERE r.line_account_id = ? ${statusClause} ${kindClause}
+      ORDER BY ${order}
       LIMIT ? OFFSET ?`,
-  ).bind(...binds, limit, offset).all<RedemptionRow & { reward_name: string }>();
+  ).bind(...binds, limit, offset).all<RedemptionRow & { reward_name: string; friend_name: string | null; required_miles: number }>();
   return {
-    items: rows.results.map((row) => ({ ...mapRedemption(row), rewardName: row.reward_name })),
+    items: rows.results.map((row) => ({ ...mapRedemption(row), rewardName: row.reward_name, friendName: row.friend_name, requiredMiles: row.required_miles })),
     pagination: { total: totalRow?.count ?? 0, limit, offset },
   };
 }
