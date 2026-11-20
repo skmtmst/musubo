@@ -470,7 +470,7 @@
 
 ## 反映履歴
 
-- [予約受付での担当確認と要対応](release-log/unreleased/PR-kenta-c25-assign.md) — 反映履歴、確認 2026-11-20。
+- [予約受付での担当確認と要対応](release-log/unreleased/139-kenta-c25-assign.md) — 反映履歴、確認 2026-11-20。
 
 - [手渡し景品と予約受付管理の画面](release-log/unreleased/134-kenta-c25-screens.md) — 反映履歴、確認 2026-11-20。
 
