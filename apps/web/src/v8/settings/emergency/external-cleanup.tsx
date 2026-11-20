@@ -227,8 +227,10 @@ export function ExternalCleanupSection({ accountId, reloadRequest }: { accountId
           })}
         </div>
       ) : null}
+      {/* 題（21 字）を1行で読めるよう、確かめの窓の段のうち 560 を使う。 */}
       <ConfirmDialog
         open={target !== null}
+        size="medium"
         contentLayout="form"
         dirty={reason.trim().length > 0}
         title="相手のサービスで消したことを確かめましたか？"
