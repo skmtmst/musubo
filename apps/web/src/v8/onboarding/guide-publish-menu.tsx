@@ -40,7 +40,7 @@ export function GuidePublishMenu({ accountId, onLater, onReview }: {
   const href = preview.state === 'ready' ? `/rich-menus/edit?id=${encodeURIComponent(preview.id)}` : '/rich-menus'
   return (
     <Dialog open designNode="Hg6Zl" designWidth={540} exactDesignWidth title={title}
-      headerIcon={false} designLayout="stacked" designMinHeight={preview.state === 'ready' && preview.image ? 510 : undefined}
+      headerIcon={false} designLayout="stacked-centered" designMinHeight={preview.state === 'ready' && preview.image ? 510 : undefined}
       titleContent={<span className={styles.heading}>
         <span className={styles.mark} aria-hidden="true"><PartyPopper size={28} /></span>
         <span>{title}</span>
@@ -63,8 +63,8 @@ export function GuidePublishMenu({ accountId, onLater, onReview }: {
         }} /> : null}
         {preview.state === 'ready' ? <figure className={styles.menu}>
           {preview.image ? <img className={styles.image} src={api.richMenuGroups.imageUrl(preview.image)}
-            alt={preview.name} width={2500} height={preview.size === 'compact' ? 843 : 1686} /> : null}
-          <figcaption>{preview.name}</figcaption>
+            alt={preview.name} width={2500} height={preview.size === 'compact' ? 843 : 1686} />
+            : <figcaption>{preview.name}</figcaption>}
         </figure> : null}
         {preview.state === 'multiple' ? <p>一覧から公開する下書きを選べます。</p> : null}
         {preview.state === 'empty' ? <p>リッチメニューの一覧から状況を確認できます。</p> : null}

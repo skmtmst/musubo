@@ -8,7 +8,7 @@
 .mark {
   display: grid;
   place-items: center;
-  width: var(--space-56, 56px);
+  width: calc(var(--space-32) + var(--space-24));
   aspect-ratio: 1;
   color: var(--color-accent-deep);
   background: var(--color-accent-soft);

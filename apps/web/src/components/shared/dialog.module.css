@@ -342,7 +342,7 @@
   padding: 0 var(--polish-space-section);
   margin: var(--polish-space-field) 0 var(--polish-space-card);
 }
-:root .panel[data-design-layout='stacked'] > .descriptionBand { padding: 0; margin: 0; }
+:root .panel[data-design-layout^='stacked'] > .descriptionBand { padding: 0; margin: 0; }
 :root .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -1px; }
 :root .close svg { width: 16px; height: 16px; }
 :root .content { width: 100%; padding: 24px; }
@@ -389,15 +389,23 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
 
 /* 個別の板が指定した短い確認窓。既定の段の余白は変えない。 */
-:root .panel[data-design-layout='stacked'] { --dialog-stack-gap: 14px; padding: 24px; gap: var(--dialog-stack-gap); }
-:root .panel[data-design-layout='stacked'] > .headerRow { padding: 0; align-items: center; }
-:root .panel[data-design-layout='stacked'] .title { font-size: 17px; line-height: 26px; font-weight: 700; }
-:root .panel[data-design-layout='stacked'] > .description { margin: 0; width: 100%; line-height: 22px; }
-:root .panel[data-design-layout='stacked'] > .content { padding: 0; align-items: stretch; }
-:root .panel[data-design-layout='stacked'] .actions { padding: 0; border: 0; }
+:root .panel[data-design-layout^='stacked'] { --dialog-stack-gap: 14px; padding: 24px; gap: var(--dialog-stack-gap); }
+:root .panel[data-design-layout^='stacked'] > .headerRow { padding: 0; align-items: center; }
+:root .panel[data-design-layout^='stacked'] .title { font-size: 17px; line-height: 26px; font-weight: 700; }
+:root .panel[data-design-layout^='stacked'] > .description { margin: 0; width: 100%; line-height: 22px; }
+:root .panel[data-design-layout^='stacked'] > .content { padding: 0; align-items: stretch; }
+:root .panel[data-design-layout^='stacked'] .actions { padding: 0; border: 0; }
+
+:root .panel[data-design-layout='stacked-centered'] { padding: calc(var(--space-24) + var(--space-4)); }
+:root .panel[data-design-layout='stacked-centered'] > .headerRow { position: relative; }
+:root .panel[data-design-layout='stacked-centered'] .headerContent { align-items: center; }
+:root .panel[data-design-layout='stacked-centered'] .close { position: absolute; inset-block-start: 0; inset-inline-end: 0; }
+:root .panel[data-design-layout='stacked-centered'] .title { font-size: var(--text-title); line-height: var(--space-24); }
+:root .panel[data-design-layout='stacked-centered'] > .description { text-align: center; }
+
 :root .panel[data-confirm-first] .actions .buttonPair > button:last-of-type { order: -1; }
 
-:root .panel[data-design-layout='stacked'] .close { width: var(--control-icon-size); height: var(--control-icon-size); min-height: 0; padding: 0; }
+:root .panel[data-design-layout^='stacked'] .close { width: var(--control-icon-size); height: var(--control-icon-size); min-height: 0; padding: 0; }
 
 :root .panel[data-footer-align='start'] .actions[data-dialog-action-pair] { grid-template-columns: auto minmax(0, 1fr); }
 :root .panel[data-design-footer-gap] .actions { gap: var(--dialog-footer-gap); }
@@ -554,7 +562,7 @@ html:root .panel:not([data-layout]):not([data-design-layout]) > .footer > .actio
 html:root .panel[data-confirmation='compact']:not([data-layout]):not([data-design-layout]) > .headerRow {
   padding-block-end: 0;
 }
-html:root .panel[data-confirmation='compact'][data-design-layout='stacked'] > .footer {
+html:root .panel[data-confirmation='compact'][data-design-layout^='stacked'] > .footer {
   margin-block-start: calc(var(--polish-window-divider-space) - var(--dialog-stack-gap));
 }
 

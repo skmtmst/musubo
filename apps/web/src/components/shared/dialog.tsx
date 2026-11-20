@@ -25,7 +25,7 @@ export type DialogProps = {
    * 渡さなければ size の幅のまま。互換経路では効かない。
    */
   /** 頭・説明・本文・操作を同じ余白で積む小窓（ 等）。 */
-  designLayout?: 'stacked'
+  designLayout?: 'stacked' | 'stacked-centered'
   /** 確認のボタンを先に置く板だけで指定する。 */
   confirmFirst?: boolean
   designWidth?: number
@@ -288,7 +288,7 @@ export default function Dialog({
       {/* 絵が無いときは今までどおり h2 を直接置く。囲むと既存の余白が動く。 */}
       {titlePart}
       {titleNote ? <p className={styles.titleNote}>{titleNote}</p> : null}
-      {designLayout === 'stacked' || descriptionBand === 'danger' ? null : descriptionNode}
+      {designLayout || descriptionBand === 'danger' ? null : descriptionNode}
     </>
   )
   const panel = (
@@ -345,7 +345,7 @@ export default function Dialog({
           <X aria-hidden="true" size={20} />
         </IconButton>
       </div>
-      {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><Notice tone="danger" statusWord={false} data-qa-dialog-callout>{descriptionNode}</Notice></div> : designLayout === 'stacked' ? descriptionNode : null}
+      {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><Notice tone="danger" statusWord={false} data-qa-dialog-callout>{descriptionNode}</Notice></div> : designLayout ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
       {children ? <div className={styles.content} data-window-body data-dialog-content data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error || automaticError ? <Notice tone="danger" role="alert">

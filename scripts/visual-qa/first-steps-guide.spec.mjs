@@ -124,6 +124,11 @@ test('店舗の進捗を読む間は暫定値を表示しない', async ({ page 
 
 test('受付開始後は公開前の案内を出し、あとでを押すと来店フォローへ進む', async ({ page }, testInfo) => {
   await openFixture(page, { storeProgress: { tables: true, hours: true, menus: true } })
+  await page.route('**/api/rich-menu-groups?**', async route => {
+    if (new URL(route.request().url()).searchParams.get('filter') !== 'draft') return route.fallback()
+    const menu = { id: 'rmg-autumn', accountId, name: '検証用リッチメニュー', size: 'large', status: 'draft', thumbnailR2Key: 'qa-thumb-autumn' }
+    await route.fulfill({ json: { success: true, data: { items: [menu], total: 1 } } })
+  })
   await page.goto(base)
   await page.getByRole('button', { name: 'ガイドで進める', exact: true }).click()
   await expect(page).toHaveURL(/\/restaurant-test\/inventory$/)
@@ -140,7 +145,8 @@ test('受付開始後は公開前の案内を出し、あとでを押すと来�
   const announcement = page.getByRole('dialog', { name: '予約の受け付けが始まりました' })
   await expect(announcement).toBeVisible()
   await expect(announcement.getByRole('button', { name: 'リッチメニューを公開する' })).toBeVisible()
-  await page.screenshot({ path: testInfo.outputPath('reception-rich-menu-prompt.png') })
+  await expect(announcement.getByRole('img', { name: '検証用リッチメニュー' })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('reception-rich-menu-prompt.png'), animations: 'disabled' })
   await announcement.getByRole('button', { name: 'あとで', exact: true }).click()
   await expect(page).toHaveURL(/\/restaurant-test\/line-followup$/)
   await expect(page.locator('[data-guide-balloon="followup:1"]')).toBeVisible()
