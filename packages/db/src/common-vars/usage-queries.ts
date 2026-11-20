@@ -74,6 +74,16 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
              AND json_extract(CASE WHEN json_valid(sa.config_json)
                                    THEN sa.config_json ELSE 'null' END, '$.varKey') = ?
            UNION ALL
+          SELECT 'scenario_message_actions' AS source_table, sa.id AS source_id, s.id AS source_parent_id,
+                 s.name || '・送信アクション' AS source_name,
+                 CASE WHEN s.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
+                 CASE WHEN instr(coalesce(sa.config_json,''), ?) > 0 THEN sa.config_json ELSE coalesce(t.message_content,'') END AS source_content,
+                 0 AS is_historical
+          FROM scenario_actions sa JOIN scenarios s ON s.id=sa.scenario_id
+          LEFT JOIN templates t ON t.id=COALESCE(json_extract(CASE WHEN json_valid(sa.config_json) THEN sa.config_json ELSE '{}' END,'$.templateId'), json_extract(CASE WHEN json_valid(sa.config_json) THEN sa.config_json ELSE '{}' END,'$.template_id')) AND t.line_account_id=s.line_account_id AND t.message_bubbles_json IS NULL
+          WHERE s.line_account_id=? AND sa.action_type IN ('send_message','send_template')
+            AND (instr(coalesce(sa.config_json,''), ?) > 0 OR instr(coalesce(t.message_content,''), ?) > 0)
+          UNION ALL
           -- N-186: 公開版スナップショットは編集中の下書きと別物。公開済み版から
           -- 送られる通文は、版を固定した時点で写した内容で差し込まれるため、
           -- 使用先として数える。下書き・廃止版は含めない。
@@ -83,10 +93,21 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
                  v.steps_snapshot AS source_content, 0 AS is_historical
             FROM scenario_versions v JOIN scenarios s ON s.id = v.scenario_id
            WHERE s.line_account_id = ? AND v.status = 'published'
-             AND instr(coalesce(v.steps_snapshot, ''), ?) > 0`,
+             AND instr(coalesce(v.steps_snapshot, ''), ?) > 0
+          UNION ALL
+          SELECT 'scenario_version_actions',v.id,s.id,s.name || '・公開版の送信アクション','published',v.actions_snapshot,0
+          FROM scenario_versions v JOIN scenarios s ON s.id=v.scenario_id
+          WHERE s.line_account_id=? AND v.status='published' AND (
+            instr(coalesce(v.actions_snapshot,''),?)>0 OR EXISTS (
+              SELECT 1 FROM json_each(CASE WHEN json_valid(v.actions_snapshot) THEN v.actions_snapshot ELSE '[]' END) action
+              JOIN templates t ON t.line_account_id=s.line_account_id AND t.message_bubbles_json IS NULL
+                AND t.id=COALESCE(json_extract(CASE WHEN json_valid(json_extract(action.value,'$.config_json')) THEN json_extract(action.value,'$.config_json') ELSE '{}' END,'$.templateId'),
+                  json_extract(CASE WHEN json_valid(json_extract(action.value,'$.config_json')) THEN json_extract(action.value,'$.config_json') ELSE '{}' END,'$.template_id'))
+              WHERE json_extract(action.value,'$.action_type') IN ('send_template','send_message') AND instr(coalesce(t.message_content,''),?)>0
+            ))`,
     values: (varKey, token, account) => [
       token, token, account, token, token, token, account, varKey,
-      account, token,
+      token, account, token, token, account, token, account, token, token,
     ],
   },
   {

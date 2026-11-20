@@ -3,7 +3,9 @@ import { accountOpeningHours } from './account-opening-hours.js';
 import { resolveMusuboCommonVarsAt } from './google-common-vars.js';
 
 export type PinOwner = { kind: 'scenario'; versionId: string; liveStepId: string }
-  | { kind: 'scenarioDraft'; liveStepId: string } | { kind: 'form'; versionId: string };
+  | { kind: 'scenarioDraft'; liveStepId: string }
+  | { kind: 'scenarioAction'; versionId: string; liveActionId: string }
+  | { kind: 'scenarioActionDraft'; liveActionId: string } | { kind: 'form'; versionId: string };
 type PinRow = { common_var_id: string; var_key: string; archived_at: string | null; status: string;
   valid_from: string | null; valid_until: string | null; value: string | null; version_no: number | null };
 
@@ -15,7 +17,11 @@ export async function resolveUsagePinnedCommonVars(
     ? { table: 'scenario_version_common_var_pins', where: 'p.scenario_version_id = ? AND p.live_step_id = ?', params: [owner.versionId, owner.liveStepId] }
     : owner.kind === 'scenarioDraft'
       ? { table: 'scenario_step_common_var_pins', where: 'p.scenario_step_id = ?', params: [owner.liveStepId] }
-      : { table: 'form_version_common_var_pins', where: 'p.form_version_id = ?', params: [owner.versionId] };
+      : owner.kind === 'scenarioAction'
+        ? { table: 'scenario_version_action_common_var_pins', where: 'p.scenario_version_id = ? AND p.live_action_id = ?', params: [owner.versionId, owner.liveActionId] }
+        : owner.kind === 'scenarioActionDraft'
+          ? { table: 'scenario_action_common_var_pins', where: 'p.scenario_action_id = ?', params: [owner.liveActionId] }
+          : { table: 'form_version_common_var_pins', where: 'p.form_version_id = ?', params: [owner.versionId] };
   const pins = await db.prepare(`SELECT c.id AS common_var_id, c.var_key, c.archived_at, c.status, c.valid_from, c.valid_until,
       v.value, v.version_no FROM ${selection.table} p
       JOIN common_vars c ON c.id = p.common_var_id AND c.line_account_id = ?

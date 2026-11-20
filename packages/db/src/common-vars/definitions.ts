@@ -110,6 +110,87 @@ export async function getCommonVarUsageImpact(
     }
   }
 
+  // 下書きの固定は次回の公開で使われる。公開中の版は別の写しを保持する。
+  const draftPins = await db.prepare(`SELECT 'scenario_steps' AS source_table, p.scenario_step_id AS source_id, v.version_no, v.value
+      FROM scenario_step_common_var_pins p JOIN common_vars c ON c.id=p.common_var_id
+      JOIN common_var_versions v ON v.id=p.version_id AND v.common_var_id=c.id
+      WHERE c.line_account_id=? AND c.var_key=? AND c.archived_at IS NULL
+    UNION ALL SELECT 'scenario_message_actions',p.scenario_action_id,v.version_no,v.value FROM scenario_action_common_var_pins p
+      JOIN common_vars c ON c.id=p.common_var_id JOIN common_var_versions v ON v.id=p.version_id AND v.common_var_id=c.id
+      WHERE c.line_account_id=? AND c.var_key=? AND c.archived_at IS NULL
+    UNION ALL SELECT 'forms',p.form_id,v.version_no,v.value FROM form_common_var_pins p
+      JOIN common_vars c ON c.id=p.common_var_id JOIN common_var_versions v ON v.id=p.version_id AND v.common_var_id=c.id
+      WHERE c.line_account_id=? AND c.var_key=? AND c.archived_at IS NULL`)
+    .bind(lineAccountId, varKey, lineAccountId, varKey, lineAccountId, varKey)
+    .all<{ source_table: string; source_id: string; version_no: number; value: string }>();
+  const draftPinMap = new Map(draftPins.results.map(pin => [`${pin.source_table}:${pin.source_id}`, pin]));
+  const publishedFormPins = await db.prepare(`SELECT f.id AS source_id, v.version_no, v.value
+    FROM forms f JOIN form_version_common_var_pins p ON p.form_version_id=f.current_published_version_id
+    JOIN common_vars c ON c.id=p.common_var_id AND c.line_account_id=? AND c.var_key=? AND c.archived_at IS NULL
+    JOIN common_var_versions v ON v.id=p.version_id AND v.common_var_id=c.id`).bind(lineAccountId, varKey)
+    .all<{ source_id: string; version_no: number; value: string }>();
+  const publishedFormPinMap = new Map(publishedFormPins.results.map(pin => [pin.source_id, pin]));
+  for (const item of items) {
+    const pin = draftPinMap.get(`${item.source_table}:${item.source_id}`);
+    if (item.source_table === 'forms') {
+      item.draft_fixed_version = pin ? Number(pin.version_no) : null;
+      const published = item.source_status === 'published' ? publishedFormPinMap.get(item.source_id) : undefined;
+      if (published) { item.fixed_version = Number(published.version_no); item.fixed_value = published.value; }
+    } else if (pin) { item.fixed_version = Number(pin.version_no); item.fixed_value = pin.value; }
+  }
+
+  // 公開済みシナリオは、該当するすべての通が同じ版で固定されている場合のみ
+  // 共通情報の保存で変わらないと数える。混在・読取不能は安全側に倒す。
+  const publishedScenarioPins = await db.prepare(`SELECT p.scenario_version_id, p.live_step_id, v.version_no, v.value
+    FROM scenario_version_common_var_pins p JOIN common_vars c ON c.id=p.common_var_id
+    JOIN common_var_versions v ON v.id=p.version_id AND v.common_var_id=c.id
+    WHERE c.line_account_id=? AND c.var_key=? AND c.archived_at IS NULL`).bind(lineAccountId, varKey)
+    .all<{ scenario_version_id: string; live_step_id: string; version_no: number; value: string }>();
+  const placeholder = new RegExp(`\\{\\{\\s*var\\.${varKey}\\s*\\}\\}`, 'u');
+  for (const item of items) {
+    if (item.source_table !== 'scenario_versions') continue;
+    try {
+      const steps: unknown = JSON.parse(item.source_content);
+      if (!Array.isArray(steps)) continue;
+      const referenced = steps.filter(step => placeholder.test(JSON.stringify(step)));
+      if (!referenced.length) continue;
+      const pins = referenced.map(step => publishedScenarioPins.results.find(pin =>
+        pin.scenario_version_id === item.source_id && pin.live_step_id === step.live_step_id));
+      if (pins.every(pin => pin && pin.version_no === pins[0]?.version_no)) {
+        item.fixed_version = Number(pins[0]!.version_no);
+        item.fixed_value = pins[0]!.value;
+      }
+    } catch { /* 不明な版は固定と決めつけない。 */ }
+  }
+
+  const publishedActionPins = await db.prepare(`SELECT p.scenario_version_id, p.live_action_id, v.version_no, v.value
+    FROM scenario_version_action_common_var_pins p JOIN common_vars c ON c.id=p.common_var_id
+    JOIN common_var_versions v ON v.id=p.version_id AND v.common_var_id=c.id
+    WHERE c.line_account_id=? AND c.var_key=? AND c.archived_at IS NULL`).bind(lineAccountId, varKey)
+    .all<{ scenario_version_id: string; live_action_id: string; version_no: number; value: string }>();
+  for (const item of items) {
+    if (item.source_table !== 'scenario_version_actions') continue;
+    try {
+      const actions: unknown = JSON.parse(item.source_content);
+      if (!Array.isArray(actions)) continue;
+      // テンプレートの本文はこの写しにない。直接本文と混じる場合も、
+      // テンプレート側の固定を見落として変化しないと断定しない。
+      const hasTemplate = actions.some(action => {
+        try {
+          const config = JSON.parse(typeof action.config_json === 'string' ? action.config_json : '{}') as Record<string, unknown>;
+          return Boolean(config.templateId ?? config.template_id);
+        } catch { return true; }
+      });
+      if (hasTemplate) continue;
+      const referenced = actions.filter(action => placeholder.test(JSON.stringify(action)));
+      const pins = referenced.map(action => publishedActionPins.results.find(pin =>
+        pin.scenario_version_id === item.source_id && pin.live_action_id === action.action_id));
+      if (pins.length && pins.every(pin => pin && pin.version_no === pins[0]?.version_no)) {
+        item.fixed_version = Number(pins[0]!.version_no); item.fixed_value = pins[0]!.value;
+      }
+    } catch { /* 読めない写しを固定済みと決めつけない。 */ }
+  }
+
   // form_accounts が1件も無い古いフォームだけは、どのアカウントのものか
   // 確定できない。名前や本文は返さず、件数だけ残して削除を安全側に止める。
   const unscopedForms = await db.prepare(

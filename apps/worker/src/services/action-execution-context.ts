@@ -6,6 +6,7 @@ export async function executeConfiguredAction(db: D1Database, input: {
   friendId: string; accountId?: string | null; source: string; sourceEventId: string;
   actionId: string; type: string; params: Record<string, unknown>;
   dependencies?: AutomationActionExecutorDependencies;
+  commonVarPinOwner?: import('./usage-pinned-common-vars.js').PinOwner;
 }): Promise<void> {
   const friend = await db.prepare('SELECT line_account_id FROM friends WHERE id = ?').bind(input.friendId)
     .first<{ line_account_id: string | null }>();
@@ -17,5 +18,5 @@ export async function executeConfiguredAction(db: D1Database, input: {
   await executor({ db, runId: key, lineAccountId: accountId, automationId: input.source,
     automationVersionId: input.source, friendId: input.friendId, sourceEventId: input.sourceEventId,
     inputEvent: { type: input.source }, action: { id: input.actionId, type: input.type, params: input.params, onFailure: 'stop' },
-    stepExecutionId: key, idempotencyKey: key, attemptNumber: 1, commonActionVersionId: null, isTest: false });
+    stepExecutionId: key, idempotencyKey: key, attemptNumber: 1, commonActionVersionId: null, isTest: false, commonVarPinOwner: input.commonVarPinOwner });
 }

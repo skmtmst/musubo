@@ -944,6 +944,14 @@
       "parentColumn": "id"
     }
   },
+  "scenario_action_common_var_pins": {
+    "category": "purge",
+    "scope": { "by": "parent", "column": "common_var_id", "parent": "common_vars", "parentColumn": "id" }
+  },
+  "scenario_version_action_common_var_pins": {
+    "category": "purge",
+    "scope": { "by": "parent", "column": "common_var_id", "parent": "common_vars", "parentColumn": "id" }
+  },
   "scenario_step_common_var_pins": {
     "category": "purge",
     "scope": { "by": "parent", "column": "common_var_id", "parent": "common_vars", "parentColumn": "id" }

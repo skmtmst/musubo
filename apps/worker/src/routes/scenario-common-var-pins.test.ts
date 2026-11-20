@@ -5,6 +5,7 @@ import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
 import * as openingHours from '../services/account-opening-hours.js';
 import { putScenarioCommonVarPin } from './scenario-common-var-pins.js';
+import { scenarios } from './scenarios.js';
 
 describe('シナリオの共通情報固定', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -25,6 +26,12 @@ describe('シナリオの共通情報固定', () => {
     expect((await put('old',1)).status).toBe(200);
     expect((await put(null,1)).status).toBe(409);
     expect((await put(null,2)).status).toBe(200);
+    expect(raw.prepare('SELECT count(*) AS n FROM scenario_step_common_var_pins').get()).toEqual({ n: 0 });
+    const scopedApp = new Hono<Env>();
+    scopedApp.use('*', async (c, next) => { c.env = { DB: db } as Env['Bindings']; c.set('staff', { id:'scoped',name:'Scoped',role:'owner',readOnly:false,featureEnabledLineAccountIds:['b'] }); await next(); });
+    scopedApp.route('/', scenarios);
+    const forbidden = await scopedApp.request('/api/scenarios/sc/steps/step/common-var-pins/var', {method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({accountId:'a',versionId:'old',expectedVersion:3})});
+    expect(forbidden.status).toBe(404);
     expect(raw.prepare('SELECT count(*) AS n FROM scenario_step_common_var_pins').get()).toEqual({ n: 0 });
     raw.close();
   });

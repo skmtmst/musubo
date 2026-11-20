@@ -208,7 +208,10 @@ export async function buildVersionSnapshotActions(
     // 無いアクションを版に残すと、旧版の購読で永遠に発火しない行が積もる。
     const order = a.step_id === null ? null : orderByStepId.get(a.step_id);
     if (a.step_id !== null && order === undefined) continue;
+    const pins = await db.prepare(`SELECT common_var_id, version_id FROM scenario_action_common_var_pins
+      WHERE scenario_action_id=? ORDER BY common_var_id`).bind(a.id).all<{ common_var_id: string; version_id: string }>();
     out.push({
+      ...(pins.results.length ? { common_var_pins: pins.results } : {}),
       version_action_id: `${versionId}#a${a.id}`,
       action_id: a.id,
       hook: a.hook,
@@ -240,6 +243,7 @@ export function normalizeVersionActionSnapshot(
       : null;
   return {
     action_id: entry['action_id'] ?? null,
+    ...(entry['common_var_pins'] ? { common_var_pins: entry['common_var_pins'] } : {}),
     hook: entry['hook'] ?? null,
     step_order: stepOrder,
     live_step_id: entry['live_step_id'] ?? null,

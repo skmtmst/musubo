@@ -87,6 +87,8 @@ describe('保存期限の分類表', () => {
   it('シナリオとフォームの固定は共通情報と公開版より先に削除する', () => {
     const order = purgeTablesChildFirst();
     const pairs = [
+      ['scenario_action_common_var_pins', 'scenario_actions'],
+      ['scenario_version_action_common_var_pins', 'scenario_versions'],
       ['scenario_step_common_var_pins', 'scenario_steps'],
       ['scenario_version_common_var_pins', 'scenario_versions'],
       ['form_common_var_pins', 'forms'],

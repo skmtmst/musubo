@@ -557,7 +557,7 @@ export function commonVarUsageHref(item: CommonVarUsageItem): string {
   switch (item.kind) {
     case 'template': return `/templates/edit?id=${id}`;
     case 'broadcast': return `/broadcasts/detail?id=${id}`;
-    case 'scenario': return `/scenarios/detail?id=${id}`;
+    case 'scenario': return item.source_table === 'scenario_steps' ? `/scenarios/detail?id=${id}&step=${encodeURIComponent(item.source_id)}` : item.source_table === 'scenario_message_actions' ? `/scenarios/detail?id=${id}&action=${encodeURIComponent(item.source_id)}` : `/scenarios/detail?id=${id}`;
     case 'reminder': return `/reminders/edit?id=${id}`;
     case 'auto_reply': return `/auto-replies/edit?id=${id}`;
     case 'form': return `/form-submissions/edit?id=${id}`;

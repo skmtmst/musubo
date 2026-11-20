@@ -63,6 +63,7 @@ export interface AutomationActionContext {
   commonActionVersionId: string | null;
   isTest: boolean;
   restaurantDeliveryScope?: RestaurantAutomationDeliveryScope;
+  commonVarPinOwner?: import('../../services/usage-pinned-common-vars.js').PinOwner;
 }
 
 export type AutomationActionExecutor = (

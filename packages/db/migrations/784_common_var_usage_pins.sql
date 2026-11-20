@@ -31,3 +31,19 @@ BEGIN SELECT RAISE(ABORT, 'published_pin_immutable'); END;
 CREATE TRIGGER form_version_common_var_pins_immutable
 BEFORE UPDATE ON form_version_common_var_pins
 BEGIN SELECT RAISE(ABORT, 'published_pin_immutable'); END;
+CREATE TABLE scenario_action_common_var_pins (
+  scenario_action_id TEXT NOT NULL REFERENCES scenario_actions(id) ON DELETE CASCADE,
+  common_var_id TEXT NOT NULL REFERENCES common_vars(id) ON DELETE RESTRICT,
+  version_id TEXT NOT NULL REFERENCES common_var_versions(id) ON DELETE RESTRICT,
+  PRIMARY KEY (scenario_action_id, common_var_id)
+);
+CREATE TABLE scenario_version_action_common_var_pins (
+  scenario_version_id TEXT NOT NULL REFERENCES scenario_versions(id) ON DELETE CASCADE,
+  live_action_id TEXT NOT NULL,
+  common_var_id TEXT NOT NULL REFERENCES common_vars(id) ON DELETE RESTRICT,
+  version_id TEXT NOT NULL REFERENCES common_var_versions(id) ON DELETE RESTRICT,
+  PRIMARY KEY (scenario_version_id, live_action_id, common_var_id)
+);
+CREATE TRIGGER scenario_version_action_common_var_pins_immutable
+BEFORE UPDATE ON scenario_version_action_common_var_pins
+BEGIN SELECT RAISE(ABORT, 'published_pin_immutable'); END;

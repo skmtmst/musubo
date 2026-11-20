@@ -197,7 +197,8 @@ export async function publishScenarioVersion(
     const versionNumber = Number(next?.version_number ?? 1);
     const id = crypto.randomUUID();
     const snapshotSteps = draftSteps.map(step => ({ ...step, version_step_id: `${id}:${step.step_order}` }));
-    const snapshotActions = await buildVersionSnapshotActions(db, id, scenarioId, steps);
+    const snapshotActions = draftActions.map(action => ({ ...action, version_action_id: `${id}#a${action.action_id}`,
+      version_step_id: typeof action.version_step_id === 'string' ? `${id}:${action.version_step_id.split(':').at(-1)}` : null }));
     const now = jstNow();
     try {
       // 単一原子。INSERT は素直な形にし、競合は制約違反で検出する
@@ -233,6 +234,12 @@ export async function publishScenarioVersion(
            FROM json_each(?) step, json_each(step.value, '$.common_var_pins') pin
            WHERE EXISTS (SELECT 1 FROM scenario_versions WHERE id = ?)`,
         ).bind(id, JSON.stringify(snapshotSteps), id),
+        db.prepare(
+          `INSERT INTO scenario_version_action_common_var_pins (scenario_version_id, live_action_id, common_var_id, version_id)
+           SELECT ?, json_extract(action.value, '$.action_id'), json_extract(pin.value, '$.common_var_id'), json_extract(pin.value, '$.version_id')
+           FROM json_each(?) action, json_each(action.value, '$.common_var_pins') pin
+           WHERE EXISTS (SELECT 1 FROM scenario_versions WHERE id = ?)`,
+        ).bind(id, JSON.stringify(snapshotActions), id),
         db.prepare(
           `UPDATE scenarios SET content_revision = content_revision + 1, current_published_version_id = ?, updated_at = ?
             WHERE id = ? AND EXISTS (SELECT 1 FROM scenario_versions WHERE id = ?)`,
