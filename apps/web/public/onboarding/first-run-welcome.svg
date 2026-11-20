@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 212 66">
+  <style>
+    path { fill: none; stroke: #1d1d1f; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: write 375ms ease-out var(--start) forwards; }
+    circle { fill: #087a3e; opacity: 0; animation: tip 375ms linear var(--start); }
+    @keyframes write { to { stroke-dashoffset: 0; } }
+    @keyframes tip { 1%, 99% { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) {
+      path { animation: none; stroke-dashoffset: 0; }
+      circle { display: none; }
+    }
+  </style>
+  <g style="--start: 900ms">
+    <path d="M21 16 Q26 21 42 20 M32 9 L31 46 Q45 46 40 52 Q35 60 21 55 Q15 51 20 47 Q31 42 50 53" pathLength="1" />
+    <circle r="2.4"><animateMotion path="M21 16 Q26 21 42 20 M32 9 L31 46 Q45 46 40 52 Q35 60 21 55 Q15 51 20 47 Q31 42 50 53" begin="900ms" dur="375ms" /></circle>
+  </g>
+  <g style="--start: 1275ms">
+    <path d="M76 10 Q83 14 92 15 M68 31 Q84 23 94 29 Q104 43 78 57" pathLength="1" />
+    <circle r="2.4"><animateMotion path="M76 10 Q83 14 92 15 M68 31 Q84 23 94 29 Q104 43 78 57" begin="1275ms" dur="375ms" /></circle>
+  </g>
+  <g style="--start: 1650ms">
+    <path d="M126 18 Q138 16 147 19 Q149 21 137 26 M126 41 Q118 53 143 54 Q150 54 154 51" pathLength="1" />
+    <circle r="2.4"><animateMotion path="M126 18 Q138 16 147 19 Q149 21 137 26 M126 41 Q118 53 143 54 Q150 54 154 51" begin="1650ms" dur="375ms" /></circle>
+  </g>
+  <g style="--start: 2025ms">
+    <path d="M173 15 Q184 11 198 14 L182 25 Q177 30 169 34 Q187 27 198 28 Q185 33 181 44 Q172 57 199 58" pathLength="1" />
+    <circle r="2.4"><animateMotion path="M173 15 Q184 11 198 14 L182 25 Q177 30 169 34 Q187 27 198 28 Q185 33 181 44 Q172 57 199 58" begin="2025ms" dur="375ms" /></circle>
+  </g>
+</svg>

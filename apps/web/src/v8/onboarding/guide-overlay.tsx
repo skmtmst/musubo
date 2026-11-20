@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
+import { Check } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { scrollMotion } from '@/components/shared/overlay-utils'
 import { balloonPlacement, dimPanels, isOffScreen, spotlightRing, type Rect } from './guide-overlay-geometry'
@@ -40,6 +42,8 @@ export type GuideOverlayProps = {
   onAdvanceProcedure: () => void
   /** 帯の「一時停止」・ESC・対象外画面への移動から呼ぶ。 */
   onPause: () => void
+  scripted?: boolean
+  nextLabel?: string
 }
 
 function readRect(element: Element): Rect {
@@ -49,46 +53,62 @@ function readRect(element: Element): Rect {
 
 export function GuideOverlay({
   active, stepKey, stepLabel, stepOrder, procedureIndex, onTargetScreen = false,
-  segments, onAdvanceProcedure, onPause,
+  segments, onAdvanceProcedure, onPause, scripted = true, nextLabel,
 }: GuideOverlayProps) {
-  const total = guideProcedureTotal(stepKey)
+  const total = scripted ? guideProcedureTotal(stepKey) : 0
   /*
     台本に無い手順番号（古い保存値など）でも案内を消さない。
     台本が分かっている段なら最後の手順に寄せて見せる。段そのものが分からない時だけ何も出さない。
   */
   const safeIndex = total > 0 ? Math.min(Math.max(procedureIndex, 1), total) : procedureIndex
-  const procedure = guideProcedure(stepKey, safeIndex)
+  const procedure = scripted ? guideProcedure(stepKey, safeIndex) : null
   const anchorName = procedure?.anchor ?? null
 
+  const [bottomOffset, setBottomOffset] = useState(0)
+  const [inDialog, setInDialog] = useState(false)
   const [target, setTarget] = useState<Rect | null>(null)
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null)
   const [balloonHeight, setBalloonHeight] = useState(0)
   const balloonRef = useRef<HTMLDivElement | null>(null)
-  /** 対象がすぐ見つからない時に一度だけ待つ。描き途中で一時停止にしない。 */
-  const missingSince = useRef<number | null>(null)
 
   const measure = useCallback(() => {
     if (typeof window === 'undefined') return
-    setViewport({ width: window.innerWidth, height: window.innerHeight })
-    if (!anchorName) { setTarget(null); return }
-    const element = document.querySelector(`[data-guide-anchor="${anchorName}"]`)
-    if (!element) { setTarget(null); return }
-    missingSince.current = null
-    setTarget(readRect(element))
+    const width = window.innerWidth
+    const height = window.innerHeight
+    setViewport(previous => previous?.width === width && previous.height === height ? previous : { width, height })
+    const saveControls = Array.from(document.querySelectorAll(
+      '[data-sticky-actions], [data-guide-anchor="reception.save"], button[form="rs-table-editor"][type="submit"]',
+    ))
+    const reserved = saveControls.map(readRect).filter(box => box.height > 0 && box.top > height - 160 && box.top < height)
+    setBottomOffset(Math.max(0, ...reserved.map(box => height - box.top + 8)))
+    const element = anchorName ? document.querySelector(`[data-guide-anchor="${anchorName}"]`) : null
+    const dialog = element?.closest('[role=dialog]')
+    setInDialog(Boolean(dialog))
+    const next = element ? readRect(dialog ?? element) : null
+    setTarget(previous => previous && next && previous.left === next.left && previous.top === next.top &&
+      previous.width === next.width && previous.height === next.height ? previous : next)
   }, [anchorName])
 
   /* スクロール追従・リサイズ再計算（枠14 izsr5）。 */
   useEffect(() => {
-    if (!active || !procedure) return
+    if (!active) return
     measure()
-    const onScroll = () => measure()
-    window.addEventListener('scroll', onScroll, true)
-    window.addEventListener('resize', onScroll)
-    return () => {
-      window.removeEventListener('scroll', onScroll, true)
-      window.removeEventListener('resize', onScroll)
+    let frame = 0
+    const scheduleMeasure = () => {
+      if (frame) return
+      frame = window.requestAnimationFrame(() => { frame = 0; measure() })
     }
-  }, [active, procedure, measure])
+    const observer = new MutationObserver(scheduleMeasure)
+    observer.observe(document.body, { childList: true, subtree: true })
+    window.addEventListener('scroll', scheduleMeasure, true)
+    window.addEventListener('resize', scheduleMeasure)
+    return () => {
+      observer.disconnect()
+      window.cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', scheduleMeasure, true)
+      window.removeEventListener('resize', scheduleMeasure)
+    }
+  }, [active, procedure, onTargetScreen, measure])
 
   /* 対象が画面外なら自動スクロール（枠14 izsr5）。 */
   useEffect(() => {
@@ -103,18 +123,9 @@ export function GuideOverlay({
     対象を持つ手順で、待っても対象が現れない時だけ止める。
   */
   useEffect(() => {
-    if (!active || !anchorName || target) return
-    if (missingSince.current === null) missingSince.current = 1
-    /*
-      画面を移った直後は対象がまだ描かれていない。
-      描き足されるのを見張って、現れたらその場で測る（ここで測り直さないと光らないままになる）。
-    */
-    const observer = new MutationObserver(() => {
-      if (document.querySelector(`[data-guide-anchor="${anchorName}"]`)) measure()
-    })
-    observer.observe(document.body, { childList: true, subtree: true })
+    if (!active || !stepLabel || (target && onTargetScreen) || (!anchorName && onTargetScreen)) return
     const timer = window.setTimeout(() => {
-      if (document.querySelector(`[data-guide-anchor="${anchorName}"]`)) { measure(); return }
+      if (anchorName && document.querySelector(`[data-guide-anchor="${anchorName}"]`)) { measure(); return }
       /*
         その手順の画面にいる間は止めない（差し戻し R1）。
         接続済みの時のように対象のボタンが出ない画面でも、吹き出しと帯は出したままにして
@@ -123,19 +134,16 @@ export function GuideOverlay({
       if (onTargetScreen) return
       onPause()
     }, MISSING_ANCHOR_WAIT_MS)
-    return () => {
-      observer.disconnect()
-      window.clearTimeout(timer)
-    }
-  }, [active, anchorName, target, measure, onPause, onTargetScreen])
+    return () => window.clearTimeout(timer)
+  }, [active, anchorName, target, measure, onPause, onTargetScreen, stepLabel])
 
   /* ESCで一時停止（枠14 izsr5）。 */
   useEffect(() => {
-    if (!active || !procedure) return
+    if (!active) return
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onPause() }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [active, procedure, onPause])
+  }, [active, onPause])
 
   /*
     対象を押した時に進む手順（trigger 'click'）。
@@ -155,21 +163,24 @@ export function GuideOverlay({
     if (height && height !== balloonHeight) setBalloonHeight(height)
   }, [procedure, balloonHeight, target])
 
-  if (!active || !procedure || !viewport) return null
+  if (!active || !stepKey || !viewport) return null
 
   const ring = target ? spotlightRing(target) : null
   const panels = target ? dimPanels(target, viewport) : []
+  const tablesComplete = stepKey === 'attributes' && safeIndex === 3 && Boolean(stepOrder && segments[stepOrder - 1])
   const placement = target
     ? balloonPlacement(target, viewport, balloonHeight)
     // 対象を光らせない手順（枠 04-3）は画面の右下に置く。
-    : { left: Math.max(16, viewport.width - 340 - 24), top: Math.max(16, viewport.height - balloonHeight - 120), side: 'below' as const }
+    : tablesComplete
+      ? { left: Math.max(16, Math.min(1000, viewport.width - 330 - 24)), top: Math.min(300, viewport.height / 3) }
+      : { left: Math.max(16, viewport.width - 340 - 24), top: Math.max(16, viewport.height - balloonHeight - 120 - bottomOffset) }
 
-  const caption = stepLabel && stepOrder
-    ? `${ORDER_MARKS[stepOrder - 1] ?? ''} ${stepLabel}（手順 ${safeIndex}/${total}）`
-    : `手順 ${safeIndex}/${total}`
+  const order = stepOrder ? ORDER_MARKS[stepOrder - 1] : ''
+  const label = order && stepLabel ? `${order} ${stepLabel}` : stepLabel ?? '開店準備'
+  const caption = total ? `${label}（手順 ${safeIndex}/${total}）` : label
 
   return (
-    <div className={styles.root}>
+    <div className={styles.root} data-guide-dialog={inDialog || undefined} data-guide-table-complete={tablesComplete || undefined} style={{ '--guide-save-clearance': `${bottomOffset}px` } as CSSProperties}>
       {panels.map((panel, index) => (
         <div
           key={`dim-${index}`}
@@ -185,36 +196,50 @@ export function GuideOverlay({
         />
       ) : null}
 
-      {/* 読み上げに乗せる（枠14 izsr5「吹き出しはaria-liveで読み上げ」）。 */}
-      <div
-        ref={balloonRef}
-        className={styles.balloon}
-        style={{ left: placement.left, top: placement.top }}
-        role="status"
-        aria-live="polite"
-        data-guide-balloon={`${stepKey ?? ''}:${safeIndex}`}
-      >
-        <div className={styles.balloonHeader}>
-          <span className={styles.pill}>{`手順 ${safeIndex}/${total}`}</span>
-          <span className={styles.title}>{procedure.title}</span>
+      <div className={styles.stack}>
+        {procedure ? <div
+          ref={balloonRef}
+          className={styles.balloon}
+          style={{ left: placement.left, top: placement.top }}
+          role="status"
+          aria-live="polite"
+          data-guide-balloon={`${stepKey ?? ''}:${safeIndex}`}
+        >
+          <div className={styles.balloonHeader}>
+            <span className={styles.pill}>{`手順 ${safeIndex}/${total}`}</span>
+            <span className={styles.title}>{procedure.title}</span>
+          </div>
+          <p className={styles.body}>{tablesComplete ? procedure.body : stepKey === 'attributes' && safeIndex === 3 ? '受付中の卓を1件以上用意してください。追加を見送る場合は、この手順をスキップできます。' : procedure.body}</p>
+          <div className={styles.balloonFooter}>
+            <Button presentation="quiet-text" onClick={onAdvanceProcedure}>この手順をスキップ</Button>
+          </div>
+        </div> : null}
+        {tablesComplete ? (
+          <div className={styles.completed} role="status">
+            <span className={styles.completeMark} aria-hidden="true"><Check size={14} /></span>
+            <div className={styles.completeCopy}>
+              <strong>{order} 卓と席の登録が完了しました</strong>
+              <span className={styles.caption}>
+                開店準備 {segments.filter(Boolean).length}/{segments.length}
+                {nextLabel ? ` ・ 次は「${nextLabel}」です` : null}
+              </span>
+            </div>
+            <Button size="compact" variant="primary" onClick={onAdvanceProcedure}>次へ進む</Button>
+          </div>
+        ) : null}
+        <div className={styles.bar} data-guide-bar="">
+          <div className={styles.barHeader}>
+            <span className={styles.barTitle}>開店準備ガイド</span>
+            <Button presentation="quiet-text" onClick={onPause}>一時停止</Button>
+          </div>
+          <div className={styles.progress}>
+            {segments.map((done, index) => (
+              <span key={`segment-${index}`} className={done ? `${styles.segment} ${styles.segmentDone}` : styles.segment} />
+            ))}
+          </div>
+          <span className={styles.caption}>{caption}</span>
+          {!procedure && stepLabel ? <div className={styles.barHeader}><Button presentation="quiet-text" onClick={onAdvanceProcedure}>この手順をスキップ</Button></div> : null}
         </div>
-        <p className={styles.body}>{procedure.body}</p>
-        <div className={styles.balloonFooter}>
-          <Button presentation="quiet-text" onClick={onAdvanceProcedure}>この手順をスキップ</Button>
-        </div>
-      </div>
-
-      <div className={styles.bar} data-guide-bar="" style={{ left: 264, top: Math.max(16, viewport.height - 84) }}>
-        <div className={styles.barHeader}>
-          <span className={styles.barTitle}>開店準備ガイド</span>
-          <Button presentation="quiet-text" onClick={onPause}>一時停止</Button>
-        </div>
-        <div className={styles.progress}>
-          {segments.map((done, index) => (
-            <span key={`segment-${index}`} className={done ? `${styles.segment} ${styles.segmentDone}` : styles.segment} />
-          ))}
-        </div>
-        <span className={styles.caption}>{caption}</span>
       </div>
     </div>
   )
