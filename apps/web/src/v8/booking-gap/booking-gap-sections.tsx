@@ -6,6 +6,7 @@ import { bookingSeriesApi } from '@/lib/api/helpers/gap2'
 
 import { BookingGroupSection } from '@/v8/booking-payments/public/booking-group/index'
 import SeriesPanelSection from './series-panel-section'
+import { MeetingReviewSection } from './meeting-review-section'
 
 /*
  * 予約の詳細パネルに足す段（繰り返し）。繰り返しの 1 回でない予約には何も出さない。
@@ -34,6 +35,7 @@ export default function BookingGapSections({ accountId, bookingId, seriesId, cus
   }, [accountId, bookingId, seriesId, tick])
   const changed = useCallback(() => { setTick((n) => n + 1); onChanged() }, [onChanged])
   return <>
+    <MeetingReviewSection accountId={accountId} bookingId={bookingId} canOperate={canOperate} />
     <BookingGroupSection key={`${accountId}:${bookingId}:${tick}`} accountId={accountId} bookingId={bookingId} canOperate={canOperate} onChanged={changed} />
     {data ? <SeriesPanelSection series={data.series} bookings={data.bookings} accountId={accountId} customerName={customerName} menuName={menuName} bookingId={bookingId} startsAt={startsAt} canOperate={canOperate} onChanged={changed} /> : null}
   </>
