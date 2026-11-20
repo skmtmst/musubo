@@ -1,4 +1,6 @@
 'use client'
+
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useListSnapshot } from '@/lib/use-list-snapshot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -331,9 +333,8 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
 
   const filterActive = Boolean(query || type !== 'all' || folderFilter)
 
-  /* 閲覧のみには作るボタンを置かない。 */
-  const createButton = (wide: boolean) => status === 'forbidden' || !canEdit ? null : (
-    <Button {...(host ? { onClick: host.onCreate, disabled: host.busy } : { href: '/tags/fields/new' })} variant="primary" className={wide ? styles.createWide : undefined}><Plus size={16} aria-hidden="true" />項目を作る</Button>
+  const createButton = (wide: boolean) => status === 'forbidden' ? null : (
+    <PermissionGatedButton allowed={canEdit} need={host ? 'tenantWide' : 'feature'} {...(host ? { onClick: host.onCreate, disabled: host.busy } : { href: '/tags/fields/new' })} variant="primary" className={wide ? styles.createWide : undefined}><Plus size={16} aria-hidden="true" />項目を作る</PermissionGatedButton>
   )
 
   return { accountId, canEdit, narrow, host, explanation, items, loaded, status, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, page, setPage, dragId, setDragId, pendingDelete, setPendingDelete, deleteError, deleteNeedsReview, leavingId, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, openMenuId, setOpenMenuId, setActiveFieldId, openFieldDetail, load, loadFolders, visible, pages, currentPage, pageItems, liveOrder, bodyRef, activeField, activeFieldIndex, applyOrder, move, keyboardMove, remove, removeFolder, rowMenuItems, fieldContextItems, kpis, folderRows, folderDotOf, filterActive, createButton, detailGuard }

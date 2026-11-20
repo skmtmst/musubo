@@ -47,13 +47,8 @@ export async function configureAdminAuth(options: AdminAuthOptions): Promise<voi
     await wrangler(["versions", "deploy", "--name", options.workerName, "--yes"]);
   }
 
-  // Verify the secrets actually landed on the deployed Worker. The bulk /
-  // versions path can silently no-op in some auth states, and a setup that
-  // aborted earlier (e.g. the Worker-deploy failure fixed in
-  // create-line-harness@0.1.27, issue #177) never reaches this step at all — in
-  // both cases the Worker is left without ADMIN_ORIGIN and admin login then
-  // fails with an opaque CORS error (issue #179). Surface it now, at setup time,
-  // instead of leaving the operator to debug a browser CORS block.
+  // Verify the secrets landed: bulk deployment can silently skip them, and
+  // missing ADMIN_ORIGIN otherwise surfaces as an opaque browser CORS error.
   const missing = await findMissingAdminAuthSecrets(options.workerName);
 
   s.stop("管理画面の認証設定完了");

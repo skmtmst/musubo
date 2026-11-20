@@ -46,6 +46,7 @@ vi.mock('../../services/step-delivery.js', () => ({
 }));
 
 import { matchAndReply } from './auto-reply.js';
+import { resolveSendInterpolationExtra } from '../../services/interpolation-context.js';
 
 const friend = {
   id: 'friend-1',
@@ -186,6 +187,17 @@ describe('自動応答の受信イベント台帳', () => {
     expect(dbMocks.recordAutoReplyHit).toHaveBeenCalledTimes(1);
     expect(dbMocks.markAutoReplyEvaluationFinished.mock.invocationCallOrder[0])
       .toBeLessThan(dbMocks.recordAutoReplyHit.mock.invocationCallOrder[0]);
+  });
+
+  it('共通情報を解決できない返信はLINEを呼ばず失敗にする', async () => {
+    const db = dbWithRules([{ ...rule(), response_content: '営業時間: {{var.missing}}' }]);
+    const replyMessageWithRequestId = vi.fn();
+    vi.mocked(resolveSendInterpolationExtra).mockRejectedValueOnce(new Error('common_var_unresolved'));
+    const result = await matchAndReply(db, { replyMessageWithRequestId } as unknown as LineClient, friend, '予約したい', 'reply-token', opts());
+    expect(resolveSendInterpolationExtra).toHaveBeenCalledWith(db, 'friend-1', '営業時間: {{var.missing}}', { kind: 'auto_reply', id: 'rule-1' });
+    expect(result).toEqual({ matched: true, replyTokenConsumed: false });
+    expect(replyMessageWithRequestId).not.toHaveBeenCalled();
+    expect(dbMocks.markAutoReplyEvaluationFinished).toHaveBeenCalledWith(db, expect.objectContaining({ status: 'reply_failed' }));
   });
 
   it('返信できなかったときはヒットに数えず、失敗として分ける', async () => {

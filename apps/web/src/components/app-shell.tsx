@@ -31,6 +31,7 @@ import ViewPermissionGate from './view-permission-gate'
 import { PagePendingLayout } from './templates/page-pending'
 import { routePendingForPath } from '@/lib/route-pending'
 import MusuboLogo from './shared/musubo-logo'
+import { GuideHost } from '@/v8/onboarding/public/guide-overlay/index'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -101,6 +102,11 @@ function AuthenticatedAppShell({ children, pathname }: { children: React.ReactNo
       <AccountProvider>
         <PageChromeProvider>
           {(
+            /*
+              開店準備ガイドの重ね表示。全画面で1つ。画面側は置かない。
+              案内中・一時停止中でなければ何も読まず、何も出さない。
+            */
+            <GuideHost>
             <div className={`${styles.shell} ${onboarding ? styles.onboardingShell : ''}`}>
               {/*
                 本文へ移動（★V7 修正方針 §2）。ふだんは見えず、Tab で最初に焦点が来たときだけ
@@ -128,6 +134,7 @@ function AuthenticatedAppShell({ children, pathname }: { children: React.ReactNo
                 </Workspace>
               </div>
             </div>
+            </GuideHost>
           )}
         </PageChromeProvider>
       </AccountProvider>

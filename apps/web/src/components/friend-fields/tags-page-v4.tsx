@@ -340,10 +340,11 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
               const requestGeneration = scope.current.generation
               setSaving(true); setSaveError('')
               try {
-                await api.tags.archive(tag.id, accountId, {
+                const result = await api.tags.archive(tag.id, accountId, {
                   expectedVersion: impact.tag.version,
                   impactRevision: impact.revision,
                 }, crypto.randomUUID())
+                if (!result.success) throw new Error(result.error)
                 if (!active.current || requestGeneration !== scope.current.generation) return
                 onArchived(`「${tag.name}」を保管しました`)
               } catch (reason) {

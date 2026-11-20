@@ -353,3 +353,14 @@ it('自動応答を取得できない時は状態を断定しない', async () =
   expect(host.textContent).not.toContain('確認できる自動応答のうち、有効なルールが')
   expect(host.textContent).not.toContain('確認できる自動応答に、有効なルールはありません。')
 })
+
+it.each([false, true])('自動応答の一覧行に未分類の丸を出す（狭幅 %s）', async (narrow) => {
+  const media = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({ matches: narrow, media: query, onchange: null, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(() => true) }))
+  try {
+    act(() => { root.render(<AutoRepliesListV8 />) })
+    await flush()
+    const row = host.querySelector('[data-row-id="ar-1"]')!
+    expect(row.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
+    expect(row.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
+  } finally { media.mockRestore() }
+})

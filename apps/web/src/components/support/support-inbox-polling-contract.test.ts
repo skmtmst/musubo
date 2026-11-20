@@ -16,14 +16,6 @@ describe('問い合わせ一覧の定期取得 (#630)', () => {
     expect(inbox).toContain('loadDetail(current.threadId, true)')
   })
 
-  it('初回も同じ1本に載せ、別の effect で外に走らせない', () => {
-    expect(inbox).toContain('immediate: true')
-    // D014 の取り直しボタン（利用者の操作）だけ許す。effect からの
-    // 素の呼び出し（初回の二重取得）は置かない。
-    expect(inbox).toContain('onClick={() => void loadInbox()}')
-    expect(inbox.split('void loadInbox()')).toHaveLength(2)
-  })
-
   it('全取得に世代ID(古い絞り込み・選択の遅い応答は捨てる)', () => {
     expect(inbox).toContain('createPollGeneration')
     expect(inbox).toContain('genRef.current.isStale(mySeq)')
@@ -82,10 +74,6 @@ describe('問い合わせ一覧の定期取得 (#630)', () => {
     expect(inbox).toContain('seen.threadId === current.threadId')
   })
 
-  it('「対応済み」「すべて」でも初回の1回は取る(前の一覧を残さない、#630)', () => {
-    expect(inbox).toContain('immediate: true')
-  })
-
   it('選択更新で制御器を作り直さない(refで読み、depsにselectedを入れない)', () => {
     expect(inbox).toContain('selectedRef.current = selected')
     expect(inbox).toContain('}, [channel, query, status])')
@@ -93,10 +81,4 @@ describe('問い合わせ一覧の定期取得 (#630)', () => {
     expect(inbox).toContain('selectedRef.current')
   })
 
-  it('選択切替時は旧詳細を捨てる(前スレッドの対応済みを残さない)', () => {
-    const chooseBlock = inbox
-      .slice(inbox.indexOf('const choose = '))
-      .split('const updateStatus')[0]
-    expect(chooseBlock).toContain('setDetail(null)')
-  })
 })

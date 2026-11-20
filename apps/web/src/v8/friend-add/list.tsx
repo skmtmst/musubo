@@ -1,5 +1,7 @@
 'use client'
 
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
+
 import { isSaveConflict } from '@/components/shared/save-conflict'
 
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -637,11 +639,11 @@ function FriendAddList() {
     ...folders.map((entry) => ({ kind: entry.key === UNFILED ? 'unfiled' as const : 'folder' as const, id: entry.key, label: entry.name, color: entry.color, count: entry.count,
       onEdit: canEdit && entry.id && entry.key !== UNFILED ? () => { setFolderName(entry.name); setFolderColor(folderDisplayColor(entry)); setEditingFolder({ id: entry.id!, name: entry.name, color: entry.color }); setFolderError(''); setFolderDialogOpen(true) } : undefined })),
   ]
-  const createButton = canEdit ? (
-    <Button variant="primary" href="/friend-add-settings?view=new" className={styles.createButton}>
+  const createButton = (
+    <PermissionGatedButton allowed={canEdit} variant="primary" href="/friend-add-settings?view=new" className={styles.createButton}>
       <Plus size={16} aria-hidden="true" />初回案内を作る
-    </Button>
-  ) : null
+    </PermissionGatedButton>
+  )
   const searchBox = (
     <div className={styles.searchBox}>
       <SearchField

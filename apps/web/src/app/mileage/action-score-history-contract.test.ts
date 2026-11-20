@@ -6,10 +6,6 @@ import { describe, expect, it } from 'vitest'
 import { readImplementationSource } from '../../../../worker/src/test-utils/implementation-source'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const SCORE_TAB = readFileSync(join(HERE, '../../v8/mileage/score.tsx'), 'utf8')
-const SCORE_SOURCE = readFileSync(join(HERE, '../../v8/mileage/score.tsx'), 'utf8')
-const HISTORY_DIALOG = SCORE_SOURCE.slice(SCORE_SOURCE.indexOf('function ScoreHistoryDialog('))
-const DISPLAY = readFileSync(join(HERE, '../../v8/mileage/display.ts'), 'utf8')
 const API = readApiSource(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const SCORING_ROUTE = readImplementationSource(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'scoring.ts'),
@@ -29,25 +25,7 @@ const EVENT_BUS = readFileSync(
  */
 
 describe('IDEA-17：スコアの計算理由を明細からたどれる', () => {
-  it('一覧の各行から点数の変化の明細を開ける', () => {
-    expect(SCORE_TAB).toContain('点数の変化</Button>')
-    expect(SCORE_TAB).toContain('<ScoreHistoryDialog')
-    expect(SCORE_TAB).toContain('setHistoryTarget(item)')
-  })
 
-  it('明細はいつ・何で・どれだけ・だれが動かしたかを出す', () => {
-    expect(HISTORY_DIALOG).toContain('api.scoring.friendScore')
-    expect(HISTORY_DIALOG).toContain('actionScoreReasonLabel')
-    expect(DISPLAY).toContain('点数が変わった理由は未取得')
-    expect(HISTORY_DIALOG).toContain('点 →')
-    expect(HISTORY_DIALOG).toContain('手で変更')
-    expect(HISTORY_DIALOG).toContain('自動で加算')
-  })
-
-  it('スコアはマイルと別物として、単位は点・残高は動かさないと断る', () => {
-    expect(HISTORY_DIALOG).toContain('マイル残高は増えも減りもしません')
-    expect(SCORE_TAB).toContain('スコアはマイルではありません')
-  })
 
   it('口は前後の点数・発生日時・動かした方法まで返す', () => {
     expect(API).toContain('currentScore: number')

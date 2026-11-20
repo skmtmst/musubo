@@ -27,8 +27,8 @@ vi.mock('@/lib/api', async original => ({ ...(await original<typeof import('@/li
   deleteStaff: (...args: unknown[]) => fixture.remove(...args),
 } }))
 import StaffPage from './page'
-beforeEach(() => { verifiedStaffRole('owner'); fixture.allowed = true; fixture.account = 'account-a'; fixture.crumbs = []; fixture.confirm = null; fixture.openTanaka = null; fixture.remove.mockReset().mockResolvedValue({ ok: true }) })
-afterEach(() => { cleanup(); verifiedStaffRole(null) })
+beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z')); verifiedStaffRole('owner'); fixture.allowed = true; fixture.account = 'account-a'; fixture.crumbs = []; fixture.confirm = null; fixture.openTanaka = null; fixture.remove.mockReset().mockResolvedValue({ ok: true }) })
+afterEach(() => { cleanup(); verifiedStaffRole(null); vi.useRealTimers() })
 
 it('どのスタッフにもシフト1つとメニュー1つ、編集と最後の削除を保つ', async () => {
   const view = render(<StaffPage />)
@@ -98,6 +98,43 @@ it('削除は確認後だけ送り、失敗したら窓で理由を示して再�
   fireEvent.click(screen.getByRole('button', { name: '削除する' }))
   await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   expect(fixture.remove).toHaveBeenCalledTimes(2)
+})
+
+it('削除中は窓を閉じられず、失敗後に開き直すと古い理由を消す', async () => {
+  let reject!: (reason: Error) => void
+  fixture.remove.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+  render(<StaffPage />)
+  await screen.findByText('佐藤')
+  fireEvent.click(screen.getByRole('button', { name: '佐藤のその他操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+  expect(fixture.remove).toHaveBeenCalledWith('account-a', 's0')
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(screen.getByRole('alertdialog')).toBeTruthy()
+  await act(async () => reject(new Error('private backend detail')))
+  expect(await screen.findByText('このスタッフを削除できませんでした。状態を読み直してから、もう一度お試しください。')).toBeTruthy()
+  expect(screen.getByRole('alertdialog').textContent).not.toContain('private backend detail')
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  fireEvent.click(screen.getByRole('button', { name: '佐藤のその他操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  expect(screen.getByRole('alertdialog').textContent).not.toContain('このスタッフを削除できませんでした')
+})
+
+it('削除失敗後に店を切り替えて窓を開くと、前の店の失敗を消す', async () => {
+  fixture.remove.mockRejectedValueOnce(new Error('private backend detail'))
+  const view = render(<StaffPage />)
+  await screen.findByText('佐藤')
+  fireEvent.click(screen.getByRole('button', { name: '佐藤のその他操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+  expect(await screen.findByText('このスタッフを削除できませんでした。状態を読み直してから、もう一度お試しください。')).toBeTruthy()
+  fixture.account = 'account-b'
+  view.rerender(<StaffPage />)
+  await screen.findByText('佐藤')
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '佐藤のその他操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  expect(screen.getByRole('alertdialog').textContent).not.toContain('このスタッフを削除できませんでした')
 })
 
 it('スタッフ削除の対象を表示し、アカウント変更後の古い確認は実行しない', async () => {
