@@ -9,9 +9,12 @@ describe('783 booking assignment method', () => {
   it('keeps existing bookings unknown and records only valid methods', () => {
     const db = new Database(':memory:');
     try {
-      db.exec("CREATE TABLE bookings (id TEXT PRIMARY KEY, staff_id TEXT NOT NULL); INSERT INTO bookings VALUES ('old','s')");
+      db.exec("CREATE TABLE bookings (id TEXT PRIMARY KEY, staff_id TEXT NOT NULL); INSERT INTO bookings VALUES ('old','s'), ('old2','t')");
       db.exec(migration);
-      expect(db.prepare("SELECT assignment_method, assignment_reviewed_at FROM bookings WHERE id='old'").get()).toEqual({ assignment_method: 'unknown', assignment_reviewed_at: null });
+      expect(db.prepare("SELECT id, staff_id, assignment_method, assignment_reviewed_at FROM bookings WHERE id LIKE 'old%' ORDER BY id").all()).toEqual([
+        { id: 'old', staff_id: 's', assignment_method: 'unknown', assignment_reviewed_at: null },
+        { id: 'old2', staff_id: 't', assignment_method: 'unknown', assignment_reviewed_at: null },
+      ]);
       for (const method of ['designated', 'automatic', 'manual']) {
         db.prepare('INSERT INTO bookings (id,staff_id,assignment_method) VALUES (?,?,?)').run(method, 's', method);
       }

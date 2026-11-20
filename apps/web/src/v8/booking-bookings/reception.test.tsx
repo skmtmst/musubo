@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import BookingReception from './reception'
 const mocks = vi.hoisted(() => ({ list: vi.fn(), review: vi.fn() }))
@@ -28,11 +28,28 @@ it('要対応と未割り当てを分けて表示し担当確認を送る', asyn
   fireEvent.click(screen.getByRole('button', { name: '確認した' }))
   await waitFor(() => expect(mocks.review).toHaveBeenCalledWith('a', '自動', 0))
 })
-it('閲覧のみの人には確認操作を出さない', async () => {
-  seed(); render(<BookingReception onOpen={() => {}} />)
-  await screen.findByText('自動')
-  expect(screen.queryByRole('button', { name: '担当を確認' })).toBeNull()
+it('権限がない人には担当確認を押せない形で出し、hover と focus で理由を伝える', async () => {
+  seed(); render(<BookingReception onOpen={() => {}} canOperate={false} />)
+  const button = await screen.findByRole('button', { name: '担当を確認' })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  expect((button as HTMLButtonElement).disabled).toBe(false)
+  fireEvent.pointerEnter(button, { pointerType: 'mouse' })
+  expect(screen.getByRole('tooltip').textContent).toBe('予約を変更する権限がありません。管理者に依頼してください。')
+  fireEvent.pointerLeave(button, { pointerType: 'mouse' })
+  act(() => button.focus()); expect(document.activeElement).toBe(button)
+  expect(screen.getByRole('tooltip').textContent).toBe('予約を変更する権限がありません。管理者に依頼してください。')
+  fireEvent.keyDown(button, { key: 'Enter' }); fireEvent.click(button)
+  expect(screen.queryByRole('dialog')).toBeNull(); expect(mocks.review).not.toHaveBeenCalled()
 })
+it('確認の途中で権限がなくなれば操作を閉じる', async () => {
+  seed(); const view = render(<BookingReception onOpen={() => {}} canOperate />)
+  fireEvent.click(await screen.findByRole('button', { name: '担当を確認' }))
+  expect(screen.getByRole('dialog')).toBeTruthy()
+  view.rerender(<BookingReception onOpen={() => {}} canOperate={false} />)
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(mocks.review).not.toHaveBeenCalled()
+})
+
 it('読み込み失敗を0件として表示しない', async () => {
   mocks.list.mockRejectedValue(new Error('offline')); render(<BookingReception onOpen={() => {}} />)
   expect(await screen.findByText('予約受付を読み込めませんでした')).toBeTruthy()

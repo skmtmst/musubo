@@ -243,6 +243,20 @@ describe('GET /api/booking/admin/requests の担当者・種別絞り込み (N-3
     expect((await viewer.app.request('/api/booking/admin/requests/past/assignment-review?account_id=acc1', { method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lock_version:0}) },viewer.env)).status).toBe(403);
   });
 
+  test('記録前の予約は未割り当てに数えず、承認待ちなら要対応に残す', async () => {
+    insertBooking(sqlite, { id: 'old-confirmed', friend: 'f1', status: 'confirmed' });
+    insertBooking(sqlite, { id: 'old-requested', friend: 'f1', status: 'requested' });
+    insertBooking(sqlite, { id: 'new-auto', friend: 'f1', status: 'confirmed' });
+    sqlite.exec("UPDATE bookings SET assignment_method='automatic' WHERE id='new-auto'");
+    const { app, env } = makeApp(db);
+    const base = '/api/booking/admin/requests?account_id=acc1&from=2026-10-01T00%3A00%3A00.000Z&reception=';
+    const unassigned = await (await app.request(`${base}unassigned`, {}, env)).json() as { requests: Array<{id:string}>; unknownCount:number; unassignedCount:number; requestedCount:number; attentionCount:number };
+    expect(unassigned.requests.map(item => item.id)).toEqual(['new-auto']);
+    expect([unassigned.unknownCount, unassigned.unassignedCount, unassigned.requestedCount, unassigned.attentionCount]).toEqual([2, 1, 1, 2]);
+    const attention = await (await app.request(`${base}attention`, {}, env)).json() as { requests: Array<{id:string}> };
+    expect(new Set(attention.requests.map(item => item.id))).toEqual(new Set(['new-auto', 'old-requested']));
+  });
+
   test('担当確認は他店舗の予約や閲覧専用の操作を拒否する', async () => {
     insertBooking(sqlite, { id:'other', account:'acc2', friend:'f9', staff:'s9', menu:'m9' });
     sqlite.exec("UPDATE bookings SET assignment_method='automatic' WHERE id='other'");
