@@ -100,6 +100,7 @@ export type DialogProps = {
   /** 権限不足はTabで止まれるボタンと吹き出しにする。 */
   confirmLockedReason?: string
   actionWidthReserve?: 'states' | 'idle'
+  guideSlot?: string
   confirmPlacement?: 'start'
   error?: string
   confirmLabel?: string
@@ -188,6 +189,7 @@ export default function Dialog({
   confirmDisabledReason,
   confirmLockedReason,
   actionWidthReserve,
+  guideSlot,
   confirmPlacement,
   onConfirm,
   onCancel,
@@ -357,6 +359,7 @@ export default function Dialog({
       {error || automaticError ? <Notice tone="danger" role="alert">
         {error || automaticError}
       </Notice> : null}
+      {open && guideSlot ? <div data-guide-slot={guideSlot} style={{ display: 'contents' }} /> : null}
       <div className={styles.footer} data-window-actions>
       {footer != null ? (layout === 'account-inset' ? <div className={styles.insetActions}>{footer}</div> : footer) : (onConfirm ? (
         /*
@@ -382,6 +385,8 @@ export default function Dialog({
             </Button>
             <Button
               actionWording
+              data-guide-anchor={guideSlot}
+              data-guide-action-label={guideSlot ? confirmLabel : undefined}
               data-dialog-action={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
               variant={confirmVariant ?? (primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? isDeleteConfirmation(confirmLabel) ? 'text' : 'secondary' : 'primary')}
               textTone={tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? 'danger' : undefined}

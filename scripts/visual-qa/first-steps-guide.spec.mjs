@@ -8,11 +8,11 @@ const accountId = 'visual-qa-account'
 const guideBar = '[data-guide-bar]'
 const tableForm = '[data-guide-balloon="attributes:2"]'
 
-async function openFixture(page, { width = 1440, firstStep = 'attributes', delayProgress, storeProgress = {}, onMenuSave, menuSaveFailures = [] } = {}) {
+async function openFixture(page, { width = 1440, height = 1000, initialGuide, firstStep = 'attributes', delayProgress, storeProgress = {}, onMenuSave, menuSaveFailures = [] } = {}) {
   await routeLocalApi({ page })
-  await page.setViewportSize({ width, height: 1000 })
+  await page.setViewportSize({ width, height })
   await page.request.put(`${mock}/api/dashboard/style?accountId=${accountId}`, { data: { style: 'restaurant' } })
-  let guide = { phase: 'idle', stepKey: null, procedureIndex: 1, updatedAt: '2026-11-20T00:00:00Z' }
+  let guide = { phase: 'idle', stepKey: null, procedureIndex: 1, updatedAt: '2026-11-20T00:00:00Z', ...initialGuide }
   await page.route('**/api/getting-started/guide?**', route => {
     if (route.request().method() === 'PUT') {
       const { phase, stepKey, procedureIndex } = route.request().postDataJSON()
@@ -97,9 +97,8 @@ test('保存の失敗に留まり、成功後は手順3を再開して営業時�
   await expect(page.locator(tableForm)).toBeVisible()
 
   const form = page.getByRole('dialog', { name: '卓を作る' })
-  await form.getByRole('textbox', { name: '卓番', exact: true }).fill('QA01')
-  await form.getByRole('textbox', { name: '表示名', exact: true }).fill('検証用の卓')
-  const save = form.getByRole('button', { name: '卓を作る', exact: true })
+  await form.getByRole('textbox', { name: '卓の名前', exact: true }).fill('検証用の卓')
+  const save = form.getByRole('button', { name: '保存する', exact: true })
   await save.click()
   await expect(form.getByRole('alert')).toContainText('卓を保存できませんでした')
   await expect(page.locator(tableForm)).toBeVisible()
@@ -234,6 +233,7 @@ test('受付開始後は公開前の案内を出し、あとでを押すと来�
   await announcement.getByRole('button', { name: 'リッチメニューを公開する', exact: true }).click()
   await expect(page).toHaveURL(/\/rich-menus\/edit\?id=rmg-2&step=publish$/, { timeout: 15000 })
   await expect(page.getByRole('heading', { name: '公開の前の確認', exact: true })).toBeVisible({ timeout: 15000 })
+  await expect(page.locator(guideBar)).toContainText('予約枠と在庫を設定する')
   await page.goBack()
   await announcement.getByRole('button', { name: 'あとで', exact: true }).click()
   await expect(page).toHaveURL(/\/restaurant-test\/line-followup$/, { timeout: 15000 })
@@ -300,4 +300,138 @@ test('QRで待機し、閉じている間に届いた最初の1通も再読込�
   await page.reload()
   await expect(page.getByRole('heading', { name: 'ダッシュボード', exact: true })).toBeVisible()
   await expect(complete).toHaveCount(0)
+})
+
+for (const [width, height] of [[1440, 1000], [1152, 768], [390, 844], [667, 375]]) {
+  test(`卓の作成中もフォームとガイドの操作に届く ${width}×${height}`, async ({ page }, info) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await openFixture(page, { width, height, initialGuide: { phase: 'active', stepKey: 'attributes', procedureIndex: 2 } })
+    await page.goto(`${base}/restaurant-test/tables`)
+    const form = page.getByRole('dialog', { name: '卓を作る' })
+    const name = form.getByRole('textbox', { name: '卓の名前' })
+    await name.fill('窓側')
+    const plus = form.getByRole('button', { name: '席数を増やす' })
+    for (let count = 0; count < 2; count++) await plus.click()
+    await expect(form.getByLabel('席数', { exact: true })).toHaveText('4 席')
+    await form.getByRole('button', { name: '席の種類' }).click()
+    await page.getByRole('option', { name: 'カウンター', exact: true }).click()
+    await form.getByRole('button', { name: '保存する', exact: true }).click({ trial: true })
+    const stop = form.getByRole('button', { name: '一時停止' })
+    const skip = form.getByRole('button', { name: 'この手順をスキップ' })
+    await stop.click({ trial: true })
+    await skip.click({ trial: true })
+    if (width === 1440) {
+      const panel = await form.boundingBox()
+      expect(panel.width).toBeCloseTo(500, 0)
+      const balloon = await page.locator(tableForm).boundingBox()
+      expect(balloon.x).toBeGreaterThan(panel.x + panel.width)
+    }
+    await page.screenshot({ path: info.outputPath('guided-table.png') })
+    const visited = new Set()
+    for (let tab = 0; tab < 18; tab++) {
+      await page.keyboard.press('Tab')
+      visited.add(await page.evaluate(() => document.activeElement?.textContent?.trim()))
+    }
+    expect(visited).toContain('一時停止')
+    expect(visited).toContain('この手順をスキップ')
+    if (width === 1440) {
+      await form.getByRole('button', { name: 'キャンセル', exact: true }).click()
+      await expect(form).toHaveCount(0)
+      await expect(page.locator(guideBar)).toHaveCount(0)
+    }
+  })
+}
+
+test('公開確認では最後の公開ボタンにガイドが移る', async ({ page }, info) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await openFixture(page, { initialGuide: { phase: 'active', stepKey: 'friendAdd', procedureIndex: 2 }, storeProgress: { tables: true, hours: true } })
+  await page.goto(`${base}/restaurant-test/menu/edit`)
+  await expect(page.locator('[data-guide-spotlight="menu.form"]')).toBeVisible()
+  await page.getByRole('button', { name: '所要時間', exact: true }).click()
+  await page.getByRole('option', { name: '2時間30分（150分）', exact: true }).click()
+  await page.screenshot({ path: info.outputPath('guided-course-basics.png') })
+  await page.getByRole('textbox', { name: 'メニュー名' }).fill('ガイド検証用')
+  await page.getByRole('spinbutton', { name: '価格（税込）' }).fill('4200')
+  await expect(page.locator('[data-guide-balloon="friendAdd:3"]')).toBeVisible()
+  await page.getByRole('button', { name: '保存する状態', exact: true }).click()
+  await page.getByRole('option', { name: '公開', exact: true }).click()
+  await page.getByRole('button', { name: '保存して追加する', exact: true }).click()
+  const confirmation = page.getByRole('dialog', { name: 'このメニューを公開しますか？' })
+  await expect(confirmation.locator(guideBar)).toBeVisible()
+  await confirmation.getByRole('button', { name: '一時停止', exact: true }).click({ trial: true })
+  const confirm = confirmation.getByRole('button', { name: '公開して追加する', exact: true })
+  await expect(confirm).toHaveAttribute('data-guide-anchor', 'menu.save')
+  await expect(confirmation.locator('[data-guide-balloon]')).toContainText('「公開して追加する」')
+  await confirm.click({ trial: true })
+  await page.screenshot({ path: info.outputPath('guided-course-confirmation.png') })
+  await confirmation.getByRole('button', { name: 'キャンセル', exact: true }).click()
+  await expect(page.locator('[data-guide-balloon="friendAdd:3"]')).toBeVisible()
+})
+
+test('取り込んだ営業時間は編集せず確定できる', async ({ page }, info) => {
+  await openFixture(page, { initialGuide: { phase: 'active', stepKey: 'hours', procedureIndex: 2 }, storeProgress: { tables: true, hours: true } })
+  await page.goto(`${base}/restaurant-test/google?tab=hours`)
+  await expect(page.getByRole('heading', { name: '取り込んだ営業時間' })).toBeVisible()
+  const reload = page.getByRole('button', { name: 'Googleから再読み込み' })
+  await reload.click({ trial: true })
+  const confirm = page.getByRole('button', { name: 'この営業時間で確定', exact: true })
+  await expect(confirm).toHaveAttribute('data-guide-anchor', 'hours.confirm')
+  await page.screenshot({ path: info.outputPath('guided-hours-confirmation.png') })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await reload.click({ trial: true })
+  await confirm.click({ trial: true })
+  await page.screenshot({ path: info.outputPath('guided-hours-confirmation-mobile.png') })
+  await confirm.click()
+  await expect(page).toHaveURL(/\/restaurant-test\/menu$/)
+})
+
+test('来店フォローのおすすめ候補を表示したまま後で使う選択もできる', async ({ page }, info) => {
+  await openFixture(page, { initialGuide: { phase: 'active', stepKey: 'followup', procedureIndex: 1 }, storeProgress: { tables: true, hours: true, menus: true, reception: true } })
+  await page.goto(`${base}/restaurant-test/line-followup`)
+  await expect(page.getByRole('switch', { name: '予約したときを使う' })).toBeChecked()
+  await expect(page.getByRole('switch', { name: '前日の確認を使う' })).toBeChecked()
+  await expect(page.getByRole('button', { name: '保存して作る' })).toBeEnabled()
+  await page.screenshot({ path: info.outputPath('guided-followup-initial.png') })
+  await page.getByRole('button', { name: '今は使わない', exact: true }).click()
+  const confirmation = page.getByRole('dialog', { name: '今は使わないと設定しますか' })
+  await expect(confirmation.locator(guideBar)).toBeVisible()
+  await confirmation.getByRole('button', { name: '今は使わない', exact: true }).click({ trial: true })
+  await page.screenshot({ path: info.outputPath('guided-followup-later.png') })
+})
+
+test('営業時間の編集パネル内で説明を読んで次の操作に進める', async ({ page }, info) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await openFixture(page, {
+    width: 390, height: 844,
+    initialGuide: { phase: 'active', stepKey: 'hours', procedureIndex: 2 },
+    storeProgress: { tables: true, hours: true },
+  })
+  await page.goto(`${base}/restaurant-test/google?tab=hours&mode=weekly`)
+  const editor = page.getByRole('dialog', { name: '毎週の営業時間を編集' })
+  await expect(editor.locator('[data-guide-balloon="hours:2"]')).toContainText('「変更内容を確認」')
+  await editor.getByRole('button', { name: '一時停止', exact: true }).click({ trial: true })
+  await expect(editor.getByRole('button', { name: '変更内容を確認' })).toHaveAttribute('data-guide-anchor', 'hours.confirm')
+  await page.screenshot({ path: info.outputPath('guided-hours-editor.png') })
+})
+
+test('来店フォローは明示保存でおすすめ2件を下書きにする', async ({ page }) => {
+  await openFixture(page, { initialGuide: { phase: 'active', stepKey: 'followup', procedureIndex: 1 }, storeProgress: { tables: true, hours: true, menus: true, reception: true } })
+  const writes = []
+  let initializedRows
+  await page.route('**/api/restaurant-test/followups/**', async route => {
+    if (route.request().method() === 'GET') return route.fallback()
+    const path = new URL(route.request().url()).pathname
+    writes.push(path.split('/').pop())
+    if (!path.endsWith('/engines/initialize')) return route.fulfill({ status: 403, json: { success: false } })
+    initializedRows = route.request().postDataJSON().rows
+    await route.fulfill({ json: { success: true, data: {} } })
+  })
+  await page.goto(`${base}/restaurant-test/line-followup`)
+  const save = page.getByRole('button', { name: '保存して作る', exact: true })
+  await expect(save).toBeEnabled()
+  expect(writes).toHaveLength(0)
+  await save.click()
+  await expect.poll(() => initializedRows?.filter(row => row.input.enabled).map(row => row.trigger)).toEqual(['reservation_created', 'reservation_24h'])
+  await expect(page.getByRole('dialog', { name: /最初の1通を受け取る/ })).toBeVisible()
+  expect(writes).toEqual(['initialize'])
 })

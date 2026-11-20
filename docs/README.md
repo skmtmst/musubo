@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
+
 - [開店準備ガイドの修正](release-log/unreleased/133-masato-restaurant-setup-guide.md)
 
 - [コースの所要時間の変更](release-log/unreleased/88-kenta-course-duration.md) — コースの時間を追加・変更する修正の履歴。確認 2026-11-16。

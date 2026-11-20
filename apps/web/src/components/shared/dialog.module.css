@@ -630,3 +630,18 @@ html:root .panel[data-title-content] .title > span:last-child { min-width: 0; fl
 }
 :root .panel[data-design-layout='fullscreen'] > .content { flex: 1; padding: 0; }
 :root .panel[data-design-layout='fullscreen'] > .content::after { content: none; }
+
+@media (max-width: 680px), (max-height: 560px) {
+  :root .overlay[data-viewport-fit][data-design-top]:has(> .panel > [data-guide-slot]) {
+    padding-top: var(--space-16);
+  }
+
+  :root .overlay[data-viewport-fit][data-design-top] > .panel:has(> [data-guide-slot]) {
+    max-height: calc(100dvh - 2 * var(--space-16));
+  }
+}
+
+:root .overlay:has(> .panel > [data-guide-slot="tables.form"] [data-guide-table-editor]) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
