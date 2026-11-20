@@ -101,3 +101,23 @@ it('会議URLの保存は下の操作帯に置き、まとまりの読み上げ�
   fireEvent.click(save)
   await waitFor(() => expect(net.saveStaffUrl).toHaveBeenCalledWith('acc-1', 'bs-1', 'https://meet.example.invalid/new', 1))
 })
+it('接続に失敗した場合は理由を通知し、画面を残す', async () => {
+  net.connect.mockRejectedValue(new Error('offline'))
+  render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit onClose={() => undefined} />)
+  const buttons = await screen.findAllByRole('button', { name: 'つなぐ' })
+  fireEvent.click(buttons[0])
+  expect(await screen.findByText('接続を開始できませんでした。もう一度お試しください。')).toBeTruthy()
+  expect(screen.getByRole('region', { name: '会議の URL' })).toBeTruthy()
+})
+
+it('別の操作を始めると古いURL欄のエラーを消す', async () => {
+  net.saveStaffUrl.mockRejectedValue({ status: 422, fields: { url: 'この会議のURLは使えません' } })
+  render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit onClose={() => undefined} />)
+  const field = await screen.findByRole('textbox', { name: '固定の会議の URL' })
+  fireEvent.change(field, { target: { value: 'https://meet.example.invalid/new' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  expect(await screen.findByText('この会議のURLは使えません')).toBeTruthy()
+  fireEvent.click(screen.getByRole('switch', { name: 'カレンダーの読み込み' }))
+  await waitFor(() => expect(screen.queryByText('この会議のURLは使えません')).toBeNull())
+  expect(net.saveSwitches).toHaveBeenCalled()
+})

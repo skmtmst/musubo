@@ -8,6 +8,7 @@ import Notice from '@/components/shared/notice'
 import { notifySaved } from '@/components/shared/toast'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { bookingCalendarApi } from '@/lib/api/helpers/gap1'
 import { ApiError } from '@/lib/api'
 import { canAdministerRole, useStaffRole } from '@/lib/staff-role'
@@ -18,6 +19,7 @@ type MeetingStatus = {state:'none'|'active'|'failed'|'unknown';provider:'google_
 const names: Record<string, string> = { google_meet: 'Google Meet', zoom: 'Zoom', teams: 'Microsoft Teams' }
 
 export function MeetingReviewSection({ accountId, bookingId, canOperate }: { accountId: string; bookingId: string; canOperate: boolean }) {
+  const saveErrors = useSaveFormErrors()
   const role = useStaffRole()
   const [items, setItems] = useState<Review[]>([])
   const [target, setTarget] = useState<Review | null>(null)
@@ -30,11 +32,11 @@ export function MeetingReviewSection({ accountId, bookingId, canOperate }: { acc
   useEffect(() => {
     let alive = true
     generation.current++
-    setItems([]); setTarget(null); setError(''); setBusy(false); setMeeting(null); setManualUrl(''); retryKey.current = null
+    setItems([]); setTarget(null); setError(''); setBusy(false); setMeeting(null); setManualUrl(''); saveErrors.reset(); retryKey.current = null
     void Promise.resolve().then(() => bookingCalendarApi.meetingReviews(accountId, bookingId)).then(result => { if (alive) setItems(result.data.items) }).catch(() => { if (alive) setError('会議の確認状況を読み込めませんでした。') })
     void Promise.resolve().then(() => bookingCalendarApi.meetingStatus(accountId, bookingId)).then(result => { if (alive) setMeeting(result.data) }).catch(() => { if (alive) setError('会議の発行状況を読み込めませんでした。') })
     return () => { alive = false; generation.current++ }
-  }, [accountId, bookingId])
+  }, [accountId, bookingId, saveErrors])
   async function resolve() {
     if (!target || !canOperate || !canAdministerRole(role) || busy) return
     const id = target.id
@@ -69,15 +71,15 @@ export function MeetingReviewSection({ accountId, bookingId, canOperate }: { acc
   async function saveManualUrl() {
     if (!canOperate || !meeting || busy || !/^https:\/\/\S+$/.test(manualUrl.trim())) return
     const started = generation.current
-    setBusy(true); setError('')
+    setBusy(true); setError(''); saveErrors.reset()
     try {
       await bookingCalendarApi.setBookingUrl(accountId, bookingId, {action:'set_manual',url:manualUrl.trim(),expectedVersion:meeting.version})
       if (started === generation.current) { setMeeting({ ...meeting, state:'none' }); setManualUrl(''); notifySaved('会議の URL を保存しました。') }
-    } catch { if (started === generation.current) setError('URL を保存できませんでした。予約を読み直してからお試しください。') }
+    } catch (cause) { if (started === generation.current && !saveErrors.capture(cause)) setError('URL を保存できませんでした。予約を読み直してからお試しください。') }
     finally { if (started === generation.current) setBusy(false) }
   }
   if (!items.length && !error && meeting?.state !== 'failed' && meeting?.state !== 'unknown') return null
-  return <Card variant="form" gap="normal">
+  return <SaveErrorScope errors={saveErrors}><Card variant="form" gap="normal">
     <CardHeader size="stacked" title="会議の確認" />
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {meeting?.state === 'unknown' ? <p>相手のサービスで確かめてください。</p> : null}
@@ -86,7 +88,7 @@ export function MeetingReviewSection({ accountId, bookingId, canOperate }: { acc
       <p>予約は確定しています。URL を手で入れるか、もう一度発行してください。</p>
       {canOperate ? <Field label="会議の URL（https://）" note={!manualUrl.trim() ? 'URL を入力してください。' : !/^https:\/\/\S+$/.test(manualUrl.trim()) ? 'https:// で始まる URL を入力してください。' : undefined}>
         <div className={styles.urlLine}>
-          <TextField aria-label="会議の URL（https://）" value={manualUrl} placeholder="https://" onChange={event => setManualUrl(event.target.value)} />
+          <SaveErrorField names={["url", "meeting_url", "meetingUrl"]}><TextField aria-label="会議の URL（https://）" value={manualUrl} placeholder="https://" onChange={event => setManualUrl(event.target.value)} /></SaveErrorField>
           <Button variant="secondary" size="field" disabled={busy || !/^https:\/\/\S+$/.test(manualUrl.trim())} onClick={() => void saveManualUrl()}>URL を保存</Button>
         </div>
       </Field> : null}
@@ -102,5 +104,5 @@ export function MeetingReviewSection({ accountId, bookingId, canOperate }: { acc
     <Dialog open={target !== null} title="相手先で会議を削除しましたか？" titleNote={target ? `${names[target.provider] ?? '会議'}・${target.staff_name ?? '担当者不明'}・${target.starts_at ? new Date(target.starts_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '日時不明'}` : undefined} error={error || undefined} size="medium" busy={busy} cancelLabel="やめる" onCancel={() => setTarget(null)} confirmLabel="削除したことを記録" onConfirm={() => void resolve()}>
       <p>相手先で削除したことを確認してから記録してください。</p>
     </Dialog>
-  </Card>
+  </Card></SaveErrorScope>
 }

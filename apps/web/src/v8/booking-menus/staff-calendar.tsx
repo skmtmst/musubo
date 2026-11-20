@@ -50,7 +50,7 @@ const healthMessages: Record<string, string> = {
   outlook_unavailable: 'Outlook カレンダーを読み込めません。接続を確認してください。',
 }
 
-function saveError(cause: unknown): string {
+function saveError(cause: unknown, fallback = '保存できませんでした。もう一度お試しください。'): string {
   if (cause instanceof ApiError) {
     const messages: Record<string, string> = {
       outlook_test_staff_required: '担当者本人がテスト送信の相手に登録されていないため、Outlook を使えません。',
@@ -64,7 +64,7 @@ function saveError(cause: unknown): string {
   if (isConflictResponse(cause)) return CONFLICT_TEXT.retry
   if (cause instanceof ApiError && cause.status === 403) return 'この操作をする権限がありません。'
   if (cause instanceof ApiError && cause.status === 400) return 'https:// で始まる URL を入れてください。'
-  return '保存できませんでした。もう一度お試しください。'
+  return fallback
 }
 
 export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onClose }: {
@@ -88,7 +88,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
   const reload = useCallback(async () => {
     if (!staffId) return
     const sequence = ++loadSequence.current
-    setConnections({})
+    setConnections({}); saveErrors.reset()
     setLoad({ state: 'loading' }); setError(null)
     try {
       const [mine, store, url] = await Promise.all([
@@ -105,7 +105,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
     } catch {
       if (sequence === loadSequence.current) setLoad({ state: 'error' })
     }
-  }, [accountId, staffId])
+  }, [accountId, staffId, saveErrors])
   useEffect(() => { void reload(); return () => { loadSequence.current++ } }, [reload])
   useEffect(() => {
     if (!staffId) return
@@ -120,31 +120,34 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
 
   async function connect(provider: Provider) {
     if (!staffId || !canEdit || busy) return
-    setBusy(true); setError(null)
+    setBusy(true); setError(null); saveErrors.reset()
     try {
       const response = await bookingCalendarApi.connect(accountId, staffId, provider)
       if (response.data.authorizationUrl) window.location.assign(response.data.authorizationUrl)
       else setError('接続の準備ができていません。管理者にお問い合わせください。')
-    } catch (cause) { setError(saveError(cause)) } finally { setBusy(false) }
+    } catch (cause) {
+      saveErrors.capture(cause)
+      setError(saveError(cause, '接続を開始できませんでした。もう一度お試しください。'))
+    } finally { setBusy(false) }
   }
 
   async function disconnect(provider: Provider) {
     if (!staffId || !canEdit || busy) return
-    setBusy(true); setError(null)
+    setBusy(true); setError(null); saveErrors.reset()
     try { await bookingCalendarApi.disconnect(accountId, staffId, provider); setDisconnecting(null); await reload() }
-    catch (cause) { setError(saveError(cause)) } finally { setBusy(false) }
+    catch (cause) { saveErrors.capture(cause); setError(saveError(cause)) } finally { setBusy(false) }
   }
 
   async function prefer(provider: Exclude<Provider, 'outlook'>) {
     if (!staffId || !canEdit || busy) return
-    setBusy(true); setError(null)
+    setBusy(true); setError(null); saveErrors.reset()
     try { await bookingCalendarApi.prefer(accountId, staffId, provider); await reload() }
-    catch (cause) { setError(saveError(cause)) } finally { setBusy(false) }
+    catch (cause) { saveErrors.capture(cause); setError(saveError(cause)) } finally { setBusy(false) }
   }
 
   async function saveSwitch(next: { readEnabled: boolean; writeEnabled: boolean }, extra?: { removeFutureEvents: boolean }) {
     if (load.state !== 'ready' || !staffId) return
-    setBusy(true); setError(null)
+    setBusy(true); setError(null); saveErrors.reset()
     try {
       const response = await bookingCalendarApi.saveSwitches(accountId, { ...next, expectedVersion: load.mine.version, ...(extra ? { confirmed: true, removeFutureEvents: extra.removeFutureEvents } : {}) }, staffId)
       setLoad({ ...load, mine: response.data })
@@ -160,7 +163,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
 
   async function saveUrl() {
     if (!canEdit || busy || urlInvalid || load.state !== 'ready' || !load.url || !staffId) return
-    setBusy(true); setError(null)
+    setBusy(true); setError(null); saveErrors.reset()
     try {
       const response = await bookingCalendarApi.saveStaffUrl(accountId, staffId, load.url.value.trim() || null, load.url.version)
       setLoad({ ...load, url: { value: response.data.url ?? '', saved: response.data.url ?? '', version: response.data.version } })
