@@ -4,6 +4,7 @@ import {outlookCalendar} from './booking-outlook-calendar.js';
 import {meetingAccessToken} from './booking-meeting-access.js';
 import {cachedMeetingAccess} from './booking-meeting-credentials.js';
 import {meetingOAuthConfig} from './booking-meeting-oauth-config.js';
+import {cleanupOwnEventIds} from './booking-external-cleanup-busy.js';
 
 type Input={lineAccountId:string;staffId:string;timeMin:string;timeMax:string};
 /** 担当者本人の LINE 友だちが同一アカウントの試験送信先に含まれるか。 */
@@ -31,7 +32,8 @@ export async function outlookBusyForStaff(env:Env['Bindings'],input:Input):Promi
   WHERE scope_id=? AND process_kind='booking_outlook_sync' AND step_key='current' AND json_extract(result_json,'$.staffId')=?
   AND json_extract(result_json,'$.accountId')=? AND json_extract(result_json,'$.eventId') IS NOT NULL`)
   .bind(`line:${input.lineAccountId}`,input.staffId,access.externalAccountId).all<{id:string}>();
- const busy=await calendar.busy({staffId:input.staffId,start:input.timeMin,end:input.timeMax,ownEventIds:(own.results??[]).map(row=>row.id),signal:AbortSignal.timeout(8000)});
+ const cleanup=await cleanupOwnEventIds(env.DB,{accountId:input.lineAccountId,staffId:input.staffId,provider:'outlook',externalAccountId:access.externalAccountId,encryptionKey:env.LINE_CREDENTIAL_ENCRYPTION_KEY});
+ const busy=await calendar.busy({staffId:input.staffId,start:input.timeMin,end:input.timeMax,ownEventIds:[...(own.results??[]).map(row=>row.id),...cleanup],signal:AbortSignal.timeout(8000)});
  const intervals=busy.map(({start,end})=>({start,end}));const now=Date.now();
  const still=await env.DB.prepare("SELECT id FROM booking_meeting_connections WHERE id=? AND line_account_id=? AND staff_id=? AND provider='outlook' AND refresh_state='ready'")
   .bind(access.connectionId,input.lineAccountId,input.staffId).first();
@@ -72,5 +74,6 @@ export async function refreshOutlookBusyCaches(env:Env['Bindings'],now=new Date(
 /** 既存の空き枠計算に Outlook の読み取りを渡す。 */
 export function calendarCredentialsForEnv(env:Env['Bindings']) {
  return {email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+  cleanupEventIds:(input:{lineAccountId:string;staffId:string;calendarId:string;connectionId:string})=>cleanupOwnEventIds(env.DB,{accountId:input.lineAccountId,staffId:input.staffId,provider:'google_calendar',calendarId:input.calendarId,connectionId:input.connectionId,encryptionKey:env.LINE_CREDENTIAL_ENCRYPTION_KEY}),
   outlookBusy:(input:Input)=>outlookBusyForStaff(env,input)};
 }

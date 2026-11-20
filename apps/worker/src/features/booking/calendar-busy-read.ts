@@ -16,6 +16,8 @@ export async function readGoogleCalendarBusy(db:D1Database,credentials:GoogleSer
  try {
   const client=await clientForConnection(conn,credentials,{db,accountId:input.lineAccountId}),busy=await client.getTimedBusy(input.timeMin,input.timeMax);
   const own=new Set((await db.prepare('SELECT external_event_id FROM bookings WHERE line_account_id=? AND external_calendar_id=? AND external_event_id IS NOT NULL').bind(input.lineAccountId,conn.calendar_id).all<{external_event_id:string}>()).results.map(r=>r.external_event_id));
+  if(credentials.cleanupEventIds)for(const id of await credentials.cleanupEventIds({lineAccountId:input.lineAccountId,staffId:input.staffId,calendarId:conn.calendar_id,connectionId:conn.id}))own.add(id);
+  else if(await db.prepare("SELECT 1 FROM workflow_steps WHERE scope_id=? AND process_kind='booking_external_cleanup' LIMIT 1").bind(`line:${input.lineAccountId}`).first())throw new GoogleCalendarReadError(503);
   const intervals=busy.filter(r=>!own.has(r.id)).map(({start,end})=>({start,end}));
   await db.prepare(`INSERT INTO booking_calendar_busy_cache(line_account_id,staff_id,connection_id,calendar_id,time_min,time_max,busy_json,last_read_at)
    VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(line_account_id,staff_id) DO UPDATE SET connection_id=excluded.connection_id,calendar_id=excluded.calendar_id,

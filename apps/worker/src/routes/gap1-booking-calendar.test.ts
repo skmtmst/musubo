@@ -18,6 +18,19 @@ async function enable(){await gapCall(app(),accountPath,'PUT',on);await gapCall(
 beforeEach(()=>{vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-16T00:00:00Z'));d=gapFixture();timed.mockResolvedValue([]);create.mockImplementation(async e=>({eventId:e.id!}));del.mockResolvedValue(undefined);vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('unexpected_external_request');}));});
 afterEach(()=>{d.raw.close();vi.useRealTimers();vi.clearAllMocks();vi.unstubAllGlobals();});
 const request={lineAccountId:'a',staffId:'bs',timeMin:'2026-10-16T00:00:00Z',timeMax:'2026-10-17T00:00:00Z'};
+test('後片づけ待ちの Google 予定は空き時間から除外する',async()=>{
+ const {encryptCredential}=await import('@line-crm/db');
+ const {cleanupIndex}=await import('../features/booking/booking-external-cleanup-proof.js');
+ const {calendarCredentialsForEnv}=await import('../features/booking/booking-outlook-busy-runtime.js');
+ connect();await enable();
+ const key=btoa('k'.repeat(32));
+ const index=await cleanupIndex(key,'a','google_calendar','bs');
+ const payload=JSON.stringify(await encryptCredential(JSON.stringify({provider:'google_calendar',staffId:'bs',calendarId:'cal',connectionId:'gc',remoteId:'own',action:'delete'}),key));
+ d.raw.prepare("INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,status,retry_key,input_json,created_at,updated_at) VALUES('line:a','booking_external_cleanup','cleanup','current','pending',?,?,0,0)").run(index.index,payload);
+ timed.mockResolvedValue([{id:'own',start:'2026-10-16T01:00:00Z',end:'2026-10-16T02:00:00Z'},{id:'other',start:'2026-10-16T03:00:00Z',end:'2026-10-16T04:00:00Z'}]);
+ const credentials=calendarCredentialsForEnv({DB:d.db,LINE_CREDENTIAL_ENCRYPTION_KEY:key} as any);
+ expect(await readCalendarBusy(d.db,credentials,{...request,fresh:true})).toEqual([{start:'2026-10-16T03:00:00Z',end:'2026-10-16T04:00:00Z'}]);
+});
 test('B7-01 B7-43 B7-50: 初期オフ、両方がオンになるまで読み書きしない',async()=>{
  connect();expect((await (await gapCall(app(),accountPath)).json() as any).data).toMatchObject({readEnabled:false,writeEnabled:false});
  await gapCall(app(),staffPath,'PUT',on);expect(await readCalendarBusy(d.db,{},request)).toBeNull();expect(timed).not.toHaveBeenCalled();
