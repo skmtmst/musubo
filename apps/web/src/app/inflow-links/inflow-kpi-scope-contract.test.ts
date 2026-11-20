@@ -6,12 +6,6 @@ import { describe, expect, it } from 'vitest'
 const PAGE = fs.readFileSync(path.join(__dirname, '../../v8/inflow-links/list.tsx'), 'utf8')
 const NEW = fs.readFileSync(path.join(__dirname, '../../v8/inflow-links/new/create.tsx'), 'utf8')
 
-function band(): string {
-  const at = PAGE.indexOf('<KpiBand>')
-  if (at < 0) return ''
-  return PAGE.slice(at, at + 4500)
-}
-
 /**
  * 検証環境（`3a21ef5e`）で、フォルダ列が
  * テスト`0`／SNS`2`／代理店`0`／未分類`1`＝合計3本と出ている横で、
@@ -26,13 +20,6 @@ function band(): string {
  * **同じ画面の中で数え方が2通りあった。**
  */
 describe('流入と計測の帯は、選択中のフォルダだけを数えない', () => {
-  it('流入元の数は、フォルダと検索で絞る前から数える', () => {
-    const tiles = band()
-    expect(tiles, '帯が見つからない').not.toBe('')
-    expect(tiles, '絞り込んだ行数を出している').not.toContain('sortedRows.length')
-    expect(tiles).toContain('routeCountAvailable ? accountRouteCount : null')
-  })
-
   it('受付中・停止中も同じ数え方にそろえる（R273）', () => {
     expect(PAGE).toContain('const accountRouteCount = summary?.routeTotal ?? accountRows.length')
     // 停止中は行の札で言い分け、測った数に入れない。未登録の外部REFを

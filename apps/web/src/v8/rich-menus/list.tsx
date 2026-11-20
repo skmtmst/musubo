@@ -1,4 +1,6 @@
 'use client'
+
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import { DetailContent, DetailField } from '@/components/shared/detail-content'
 
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
@@ -844,8 +846,8 @@ export default function RichMenusListV8() {
   ]
 
   const goCreate = () => router.push('/rich-menus/new')
-  const createButton = canEdit ? (
-    <Button
+  const createButton = (
+    <PermissionGatedButton allowed={canEdit}
       type="button"
       variant="primary"
       className={narrow ? undefined : styles.createWide}
@@ -853,8 +855,8 @@ export default function RichMenusListV8() {
     >
       <Plus size={16} aria-hidden="true" />
       メニューを作る
-    </Button>
-  ) : null
+    </PermissionGatedButton>
+  )
 
   const folderPanel = (
     <ManagedFolderPanel
@@ -1355,7 +1357,7 @@ export default function RichMenusListV8() {
           />
         </KpiBand>
       </>}
-      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: (id) => { setFolderFilter(id); setPage(1) }, createAction: createButton ?? undefined }}
+      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: (id) => { setFolderFilter(id); setPage(1) }, createAction: createButton }}
       folders={folderPanel}
       toolbar={wideToolbar}
       pagination={listPager}

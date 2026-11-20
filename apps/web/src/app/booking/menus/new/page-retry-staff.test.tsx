@@ -58,8 +58,10 @@ import { ApiError as MockApiError } from '@/lib/api'
 
 const flush = () => act(async () => { await Promise.resolve() })
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.useRealTimers() })
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z'))
   vi.clearAllMocks()
   m.account = 'A'
   m.create.mockImplementation(async () => ({ id: `new-${m.create.mock.calls.length}` }))
@@ -186,6 +188,7 @@ describe('DEEP-17: アカウント切替で前の担当を持ち込まない', (
   it('担当候補の取得が終わるまで作成させない', async () => {
     m.staff.mockImplementation(() => new Promise(() => {}))
     render(<Page />)
+    expect(screen.getByText('担当を読み込んでいます').closest('[aria-busy="true"]')).toBeTruthy()
     fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), {
       target: { value: '検証メニュー' },
     })
@@ -264,6 +267,15 @@ describe('R535: 応答消失後の再送は同じキーで送る', () => {
 })
 
 describe('R536: 担当候補の取得失敗は画面内で取り直せる', () => {
+  it('担当が0人なら未登録を案内し、作成は送らない', async () => {
+    m.staff.mockResolvedValue({ staff: [] })
+    render(<Page />)
+    await flush()
+    expect(screen.getByText(/まだスタッフが登録されていません/)).toBeTruthy()
+    fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), { target: { value: '検証メニュー' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存して公開' })) })
+    expect(m.create).not.toHaveBeenCalled()
+  })
   it('通信断のあと復旧すれば、入力を保ったまま再取得できる', async () => {
     m.staff.mockRejectedValueOnce(new Error('network'))
     render(<Page />)

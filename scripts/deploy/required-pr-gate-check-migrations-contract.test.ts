@@ -7,10 +7,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const gate = readFileSync(join(HERE, '../..', '.github', 'workflows', 'required-pr-gate.yml'), 'utf8');
 
 /**
- * 追加のみ方針の静的検査(#742)は必須ゲートで走らせる。
+ * 追加のみ方針の静的検査は必須ゲートで走らせる。
  *
  * 検査本体はあるのにゲートが呼ばないと、赤いまま誰も気づかない
- * （354 がその形だった）。呼び出しを外すとこの試験が赤くなる。
+ * ため、呼び出しを外すとこの試験が赤くなる。
  * yml の字面を見るだけの試験で、workflow 自体は実行しない。
  */
 describe('必須ゲートは migration 安全検査を呼ぶ(#742)', () => {

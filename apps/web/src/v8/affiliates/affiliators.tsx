@@ -1,5 +1,7 @@
 'use client'
 
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
+
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 
 
@@ -444,13 +446,10 @@ export default function AffiliatorsTab() {
     </KpiBand>
   )
 
-  /* 主ボタンは素の Button で渡し、題の右の自動整列（副→主）に載せる。 */
   const createButton = (full: boolean) => (
-    readonly ? null : (
-      <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href="/affiliates/new" aria-label="アフィリエイターを作る" title="アフィリエイターを作る">
+    <PermissionGatedButton allowed={!readonly} variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href="/affiliates/new" aria-label="アフィリエイターを作る" title="アフィリエイターを作る">
         {!full && <Plus size={16} aria-hidden="true" />} アフィリエイターを作る
-      </Button>
-    )
+      </PermissionGatedButton>
   )
 
   const groupCount = (key: GroupKey) => rows.filter(GROUPS.find((g) => g.key === key)?.match ?? (() => true)).length
@@ -688,7 +687,7 @@ export default function AffiliatorsTab() {
         </>
       }
       stats={stats}
-      folderNav={{ rows: managedFolderNavRows('affiliate', folders), activeId: folderId, onSelect: chooseFolder, createAction: readonly ? undefined : createButton(false) }}
+      folderNav={{ rows: managedFolderNavRows('affiliate', folders), activeId: folderId, onSelect: chooseFolder, createAction: createButton(false) }}
       folders={folderPanel}
       toolbar={toolbar}
       pagination={pager}

@@ -22,6 +22,7 @@ vi.mock('@/components/dashboard/qr-dialog', () => ({ default: ({ open }: { open:
 
 import StyleDashboard from './style-dashboard'
 import { buildStepsFromApi } from '@/v8/settings/getting-started/steps'
+import { firstRunPopupDismissedKey } from '@/v8/dashboard/first-run-popup'
 
 const metric = (value: number, unit = '件') => ({ value, status: 'available' as const, unit, formula: '選択した期間の実集計' })
 const snapshot: StyleSnapshot = { style: 'restaurant', from: '2026-10-29T15:00:00Z', to: '2026-10-30T15:00:00Z', timeZone: 'Asia/Tokyo', asOf: '2026-10-30T05:00:00Z', dateBasis: 'visit', range: 'today', metrics: { bookings: metric(4), guests: metric(23, '人'), firstTime: metric(2), regular: metric(3), unseated: metric(1), mediaCloseTasks: metric(2), attention: metric(3), freeTables: metric(5, '卓'), noShowRate: metric(0.05, '%') }, previous: {}, items: [], newBookings: [], resultId: 'real' }
@@ -29,6 +30,8 @@ const schedule: StyleSchedule = { style: 'restaurant', from: snapshot.from, to: 
 
 beforeEach(() => {
   vi.clearAllMocks()
+  /* ここは上の段と使い方の窓だけを見る。初回ポップアップ（枠02）は閉じた後の状態にして重ねない。 */
+  for (const id of ['a', 'b']) localStorage.setItem(firstRunPopupDismissedKey(id), '1')
   state.role = 'admin'
   state.search = ''
   firstRun.notices = undefined
@@ -41,7 +44,7 @@ beforeEach(() => {
   state.summary.mockResolvedValue({ data: snapshot })
   state.schedule.mockResolvedValue({ success: true, data: schedule })
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); localStorage.clear() })
 
 it('上の段を軽くするため読み直しは文字の押し口にする', async () => {
   render(<StyleDashboard style="restaurant" />)
@@ -100,7 +103,7 @@ it.each(['restaurant', 'salon', 'consult', 'lesson'] as const)('%sの専用画�
   const view = render(<StyleDashboard style={style} />)
   const title = await screen.findByRole('heading', { name: 'はじめにやること' })
   const card = title.closest('section')!
-  expect(card.querySelectorAll('#first-steps-list > li')).toHaveLength(style === 'restaurant' ? 8 : 7)
+  expect(card.querySelectorAll('#first-steps-list > li')).toHaveLength(style === 'restaurant' ? 9 : 7)
   const band = view.container.querySelector('[data-style-dashboard]')!
   expect(card.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
@@ -112,48 +115,40 @@ it('専用画面の閲覧のみでもカードを隠さず、設定の操作を�
   expect(card.querySelectorAll('button[aria-disabled="true"]').length).toBeGreaterThan(0)
 })
 
-it.each([
-  ['restaurant', '席の予約設定'], ['salon', 'メニュー・料金'], ['consult', '面談の予約設定'], ['lesson', 'クラス・スケジュール'],
-] as const)('%sの選んだ機能の設定は同じ口と部品で読み、既存の質問へ開く', async (style, note) => {
+/*
+  カードに置くのは9項目と再開導線だけで、
+  「選んだ機能の設定」ブロックと「使い方の設定を開く」は置かない。
+  使い方の状態（警告・入った物）は同じ口で読み続け、帯だけに出す。
+*/
+it.each(['restaurant', 'salon', 'consult', 'lesson'] as const)('%sも同じ口で使い方の状態を読むが、カードに選んだ機能の設定は置かない', async style => {
   const profile = { style, styleSelected: true, version: 2, cards: [], answers: { image: { mode: 'configured', value: 'simple' } } }
   state.get.mockResolvedValue({ success: true, data: profile })
   render(<StyleDashboard style={style} />)
-  expect(await screen.findByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
-  expect(screen.getByText('入ったお知らせを動かす')).toBeTruthy()
-  expect(screen.getByText(new RegExp(note))).toBeTruthy()
-  expect(state.warnings).toHaveBeenCalledWith('a')
-  expect(state.items).toHaveBeenCalledWith('a')
-  fireEvent.click(screen.getByRole('button', { name: '中身を見る' }))
-  expect(await screen.findByRole('dialog', { name: '準備ができました' })).toBeTruthy()
-  await screen.findByRole('heading', { name: '入った物', exact: true })
-  expect(state.push).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('button', { name: '閉じる', exact: true }))
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  fireEvent.click(screen.getByRole('button', { name: '使い方の設定を開く' }))
-  expect(await screen.findByRole('dialog')).toBeTruthy()
+  await screen.findByRole('heading', { name: 'はじめにやること' })
+  await waitFor(() => { expect(state.warnings).toHaveBeenCalledWith('a'); expect(state.items).toHaveBeenCalledWith('a') })
+  expect(screen.queryByRole('heading', { name: '選んだ機能の設定' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '使い方の設定を開く' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '中身を見る' })).toBeNull()
+  expect(screen.queryByRole('dialog')).toBeNull()
   expect(state.push).not.toHaveBeenCalled()
 })
 
-it.each(['viewer', 'staff'])('%sは設定の欄を読み、変更と中身を見る操作を理由付きで止める', async role => {
+it.each(['viewer', 'staff'])('%sにも使い方の設定の入口を出さず、カードから質問も保存も始めない', async role => {
   state.role = role
   render(<StyleDashboard style="restaurant" />)
-  const button = await screen.findByRole('button', { name: '使い方の設定を開く' })
-  expect(button.getAttribute('aria-disabled')).toBe('true')
-  fireEvent.focus(button)
-  expect((await screen.findByRole('tooltip')).textContent).toContain('管理者')
-  fireEvent.click(button)
-  expect(state.push).not.toHaveBeenCalled()
-  expect(await screen.findByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
-  expect(state.warnings).toHaveBeenCalledWith('a')
-  expect(state.items).toHaveBeenCalledWith('a')
-  const confirm = screen.getByRole('button', { name: '確かめる' })
-  expect(confirm.getAttribute('aria-disabled')).toBe('true')
-  fireEvent.click(confirm)
-  expect(state.push).not.toHaveBeenCalled()
-  const read = screen.getByRole('button', { name: '中身を見る' })
-  expect(read.getAttribute('aria-disabled')).toBe('true')
-  expect(document.getElementById(read.getAttribute('aria-describedby')!)?.textContent).toContain('中身はオーナーか管理者が見られます')
-  fireEvent.click(read)
+  await screen.findByRole('heading', { name: 'はじめにやること' })
+  await waitFor(() => { expect(state.warnings).toHaveBeenCalledWith('a'); expect(state.items).toHaveBeenCalledWith('a') })
+  expect(screen.queryByRole('button', { name: '使い方の設定を開く' })).toBeNull()
+  /* 「確かめる」は9項目の最終確認の行だけ。使い方の設定の入口（設定を確認する・中身を見る）は出さない。 */
+  expect(screen.queryByRole('button', { name: '設定を確認する' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '中身を見る' })).toBeNull()
+  if (role === 'viewer') {
+    /* 閲覧のみは行の入口も灰色の「開く」で残す。 */
+    const locked = screen.getAllByRole('button', { name: '開く' })
+    expect(locked.length).toBeGreaterThan(0)
+    for (const button of locked) expect(button.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(locked[0])
+  }
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(state.push).not.toHaveBeenCalled()
   expect(state.save).not.toHaveBeenCalled()
@@ -165,11 +160,11 @@ it('設定の取得失敗を未設定にせず、同じ口を読み直せる', a
   expect(await screen.findByText('使い方の設定を確認できませんでした')).toBeTruthy()
   expect(screen.queryByRole('button', { name: '使い方の設定を開く' })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
-  expect(await screen.findByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
+  expect(await screen.findByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
   await waitFor(() => expect(state.warnings).toHaveBeenCalledTimes(2))
 })
 
-it('選んだ機能の設定が遅れたときは案内と数字を一緒に出す', async () => {
+it('使い方の状態が遅れたときは案内と数字を一緒に出す', async () => {
   let resolve!: (value: unknown) => void
   state.warnings.mockImplementationOnce(() => new Promise(done => { resolve = done }))
   const view = render(<StyleDashboard style="restaurant" />)
@@ -177,7 +172,7 @@ it('選んだ機能の設定が遅れたときは案内と数字を一緒に出�
   await waitFor(() => expect(view.container.querySelector('[data-pending="true"]')).not.toBeNull())
   await act(async () => resolve({ success: true, data: { items: [] } }))
   await waitFor(() => expect(view.container.querySelector('[data-pending="true"]')).toBeNull())
-  expect(await screen.findByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
+  expect(await screen.findByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
   expect(await screen.findByText('未配席 1・枠閉じ 2')).toBeTruthy()
 })
 
@@ -208,7 +203,7 @@ it.each(['viewer', 'staff'])('役割%sでは専用画面のURLでも質問を開
   await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   state.role = role
   view.rerender(<StyleDashboard style="restaurant" />)
-  await screen.findByRole('heading', { name: '選んだ機能の設定' })
+  await screen.findByRole('heading', { name: 'はじめにやること' })
   expect(screen.queryByRole('dialog')).toBeNull()
 })
 

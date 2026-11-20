@@ -1,6 +1,6 @@
 import { readApiSource } from '../../apps/web/scripts/test-api-source.mjs'
 /*
- * NENコラム下書き作成の形が4者で約束違いしていないかの試験(点検 #512 の中8)。
+ * NENコラム下書き作成の形が4者で約束違いしていないかの試験。
  *
  * 本番口(`POST /api/nen-campaigns/columns`)は `data: { id, queued }` を返すが、
  * 画面確認の固定応答(`NEN_COLUMN_CREATE.success.body`)に `queued` がなく、
