@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { gapFixture, seedGapBooking } from '../../test-utils/gap1.js';
 import { createConfirmedBookingMeeting, type MeetingCreator } from './booking-meeting-create.js';
+import { meetingProvider } from './booking-meeting-providers.js';
 let d: ReturnType<typeof gapFixture>;
 beforeEach(() => { d=gapFixture(); d.raw.exec("UPDATE menus SET meeting_mode='online', fixed_meeting_url='https://example.test/fixed' WHERE id='menu'"); seedGapBooking(d); d.raw.exec("UPDATE bookings SET meeting_mode='online' WHERE id='bk'"); });
 afterEach(() => d.raw.close());
@@ -17,6 +18,14 @@ it('通信結果不明は自動で再送せず、固定URLを残す', async () =
  expect(await createConfirmedBookingMeeting(d.db,'bk',provider)).toBe('unknown');
  expect(create).toHaveBeenCalledTimes(1);
  expect(d.raw.prepare('SELECT meeting_url FROM bookings WHERE id=?').get('bk')).toEqual({meeting_url:'https://example.test/fixed'});
+});
+it.each(['google_meet','zoom','teams'] as const)('%s の応答が失われても外部への作成は再送しない', async provider => {
+ const request=vi.fn(async()=>{throw new Error('response lost')});
+ const adapter=meetingProvider(provider,async()=>({token:'fixture',accountId:'owner'}),request as unknown as typeof fetch);
+ expect(await createConfirmedBookingMeeting(d.db,'bk',adapter)).toBe('unknown');
+ expect(await createConfirmedBookingMeeting(d.db,'bk',adapter)).toBe('unknown');
+ expect(request).toHaveBeenCalledTimes(1);
+ expect(d.raw.prepare('SELECT status,last_error_code FROM booking_meeting_links').get()).toEqual({status:'pending',last_error_code:'result_unknown'});
 });
 it('発行失敗は予約を確定のまま残す', async () => {
  const provider:MeetingCreator={provider:'teams',create:async()=>({kind:'failed',code:'offline'})};

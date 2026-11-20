@@ -48,6 +48,24 @@ it('作成の結果が不明なら同じ取引IDで時間をおいて照合す�
  const second=JSON.parse(String(network.mock.calls[1][1]?.body)) as {transactionId:string};
  expect(first.transactionId).toBe(second.transactionId);
 });
+it('作成成功後の応答消失でも同じ取引IDで復旧し予定を増やさない',async()=>{
+ let now=1000000,first=true;
+ const events=new Map<string,string>();
+ const network=vi.fn(async(_url:RequestInfo|URL,init?:RequestInit)=>{
+  const body=JSON.parse(String(init?.body)) as {transactionId:string};
+  if(!events.has(body.transactionId))events.set(body.transactionId,`event-${events.size+1}`);
+  if(first){first=false;throw new Error('response lost');}
+  return new Response(JSON.stringify({id:events.get(body.transactionId)}),{status:201});
+ });
+ const client={...outlookCalendar(async()=>({token:'fixture',accountId:'owner'}),network as typeof fetch,{allowMutations:true}),accountId:'owner'};
+ const options={resolve:async()=>client,allowMutations:true,now:()=>now};
+ expect(await syncOutlookBooking(d.db,input,options)).toBe('unknown');
+ expect(await syncOutlookBooking(d.db,input,options)).toBe('busy');
+ now+=120001;
+ expect(await syncOutlookBooking(d.db,input,options)).toBe('done');
+ expect(network).toHaveBeenCalledTimes(2);expect(events.size).toBe(1);
+ expect(JSON.parse(String(network.mock.calls[0][1]?.body)).transactionId).toBe(JSON.parse(String(network.mock.calls[1][1]?.body)).transactionId);
+});
 it('同時に確定を回収しても予定は一つだけ作る',async()=>{
  const [a,b]=await Promise.all([syncOutlookBooking(d.db,input,deps),syncOutlookBooking(d.db,input,deps)]);
  expect([a,b]).toContain('done');expect(calls).toHaveBeenCalledOnce();
