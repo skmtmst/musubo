@@ -1284,4 +1284,4 @@
 - [閲覧のみの作るボタン・行の操作を灰色に](release-log/unreleased/73-kenta-train-viewer.md) — 閲覧のみの人への表示をそろえた履歴。確認 2026-11-15。
 - [列車 1116](release-log/unreleased/83-kenta-train-1116.md) — まとめて入れた直しの履歴。確認 2026-11-16。
 
-- [統括の一括配信の削除漏れ](release-log/unreleased/PR-kenta-hq-purge-multi.md) — 統括のデータ削除に配信記録を含めた修正履歴。確認 2026-11-20。
+- [統括の一括配信の削除漏れ](release-log/unreleased/138-kenta-hq-purge-multi.md) — 統括のデータ削除に配信記録を含めた修正履歴。確認 2026-11-20。
