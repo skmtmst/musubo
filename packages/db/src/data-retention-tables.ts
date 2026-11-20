@@ -23,6 +23,7 @@ export type RetentionCategory = 'purge' | 'retain' | 'global';
  * publicIngress … 受信の種類ごとに成果地点または計測サイトから統括をたどる。
  */
 export type RetentionScope =
+  | { by: 'broadcast'; column: string }
   | { by: 'publicIngress'; column: string }
   | { by: 'workflow'; column: string }
   | { by: 'tenant'; column: string }
@@ -81,7 +82,7 @@ export function purgeTablesChildFirst(): string[] {
     if (!scope) return [];
     if (scope.by === 'publicIngress') return ['conversion_points', 'measurement_sites'];
     if (scope.by === 'parent') return [scope.parent];
-    if (scope.by === 'workflow' || (scope.by === 'lineAccount' && name !== 'line_accounts')) return ['line_accounts'];
+    if (scope.by === 'workflow' || scope.by === 'broadcast' || (scope.by === 'lineAccount' && name !== 'line_accounts')) return ['line_accounts'];
     return [];
   };
   const measure = (name: string, seen: Set<string>): number => {
@@ -118,6 +119,17 @@ export function tenantScopeCondition(table: string): string {
 }
 
 function buildCondition(table: string, scope: RetentionScope, seen: Set<string>): string {
+  if (scope.by === 'broadcast') {
+    if (table !== 'broadcasts') throw new Error(`配信の削除条件は未定義です: ${table}`);
+    return `${table}.id IN (
+      WITH target(tenant_id) AS (SELECT ?)
+      SELECT b.id FROM broadcasts b WHERE b.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=(SELECT tenant_id FROM target))
+      UNION ALL
+      SELECT b.id FROM broadcasts b WHERE b.target_type='multi-account-dedup' AND b.line_account_id IS NULL
+        AND json_type(b.account_ids)='array'
+        AND EXISTS (SELECT 1 FROM json_each(b.account_ids) a JOIN line_accounts l ON l.id=a.value WHERE l.tenant_id=(SELECT tenant_id FROM target))
+        AND NOT EXISTS (SELECT 1 FROM json_each(b.account_ids) a LEFT JOIN line_accounts l ON l.id=a.value WHERE l.id IS NULL OR l.tenant_id IS NOT (SELECT tenant_id FROM target)))`;
+  }
   if (scope.by === 'publicIngress') return `(${table}.kind, ${table}.${scope.column}) IN (
     WITH target(tenant_id) AS (SELECT ?)
     SELECT 'conversion_nonce', id FROM conversion_points WHERE tenant_id=(SELECT tenant_id FROM target)

@@ -2289,9 +2289,9 @@ CREATE TABLE broadcast_after_action_runs (
   UNIQUE (broadcast_id, friend_id, action_id)
 );
 
-CREATE TABLE broadcast_approval_events (
+CREATE TABLE "broadcast_approval_events" (
   id              TEXT PRIMARY KEY,
-  broadcast_id    TEXT NOT NULL REFERENCES broadcasts (id) ON DELETE CASCADE,
+  broadcast_id    TEXT REFERENCES broadcasts (id) ON DELETE SET NULL,
   actor_staff_id  TEXT NOT NULL,
   action          TEXT NOT NULL CHECK (action IN ('requested', 'approved', 'rejected', 'cancelled', 'expired', 'reminded')),
   reason          TEXT,
