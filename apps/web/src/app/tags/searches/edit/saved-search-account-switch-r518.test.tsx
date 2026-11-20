@@ -7,7 +7,7 @@ import { getPageAction } from '@/test-utils/page-action'
  * 出なかった（Aの条件でBへ複製する恐れがあった）。
  */
 import React from 'react'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 const mockState = vi.hoisted(() => ({
@@ -101,11 +101,13 @@ vi.mock('@/lib/use-feature-visibility', () => ({
   useFeatureVisibility: () => ({ status: 'ready', features: { saved_searches: true }, enabled: () => true }),
 }))
 
+beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z')) })
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   mockState.accountId = 'a1'
   mockState.bMode = 'network-error'
+  vi.useRealTimers()
 })
 
 describe('R518 アカウント切替後の取得失敗', () => {
@@ -167,6 +169,6 @@ describe('R518 アカウント切替後の取得失敗', () => {
     await screen.findByText('保存した検索が見つかりません')
     expect(screen.queryByDisplayValue('Aの検索')).toBeNull()
     expect(screen.queryByRole('button', { name: '複製して保存する' })).toBeNull()
-    expect(screen.getByRole('link', { name: '保存した検索の一覧へ戻る' })).not.toBeNull()
+    expect(screen.getByRole('link', { name: '保存した検索の一覧へ戻る' }).getAttribute('href')).toBe('/tags?tab=searches')
   })
 })

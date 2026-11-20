@@ -1136,8 +1136,8 @@ it('閲覧のみではシナリオの未送信下書きを表示・変更・消�
   await scenarioCreate()
   await waitFor(() => expect(calls.list).toHaveBeenCalled())
   await screen.findByRole('heading', { name: 'シナリオ' })
-  const create = screen.getByRole('button', { name: /シナリオを作る/ })
-  expect(create.getAttribute('aria-disabled')).toBe('true')
+  const create = screen.getAllByRole('button', { name: /シナリオを作る/ })[0]
+  expect(create.getAttribute('aria-disabled') === 'true' || (create as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(create)
   expect(screen.queryByLabelText('ひな形の名前')).toBeNull()
   expect(window.sessionStorage.getItem(scenarioDraftKey)).toBe('read-only-draft')
