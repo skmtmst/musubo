@@ -2,61 +2,56 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import BookingReception from './reception'
-const mocks = vi.hoisted(() => ({ list: vi.fn() }))
-vi.mock('@/lib/api', () => ({ bookingApi: { listRequests: mocks.list } }))
+const mocks = vi.hoisted(() => ({ list: vi.fn(), review: vi.fn() }))
+vi.mock('@/lib/api', () => ({ bookingApi: { listRequests: mocks.list, reviewAssignment: mocks.review } }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a' }) }))
 afterEach(() => { cleanup(); vi.resetAllMocks() })
-const row = (id: string, name: string, status: string) => ({ id, friend_name: name, status, staff_id: 's', staff_name: '佐藤', menu_name: '相談', starts_at: '2026-11-20T05:00:00Z' })
-function seed(requested = [row('b', '山田', 'requested')], confirmed = [row('c', '鈴木', 'confirmed')]) {
-  mocks.list.mockImplementation(async (_account: string, status: string, params: { limit: number; offset: number }) => {
-    const rows = status === 'requested' ? requested : confirmed
-    return { total: rows.length, requests: rows.slice(params.offset, params.offset + params.limit) }
+const row = (id: string, status: string, method: string) => ({ id, friend_name: id, status, assignment_method: method, assignment_reviewed_at: null, lock_version: 0, staff_id: 's', staff_name: '佐藤', menu_name: '相談', starts_at: '2026-11-20T05:00:00Z' })
+function seed() {
+  const rows = [row('待ち', 'requested', 'unknown'), row('自動', 'confirmed', 'automatic'), row('予約', 'confirmed', 'manual')]
+  mocks.list.mockImplementation(async (_account: string, _status: string, params: { reception: string; limit: number; offset: number }) => {
+    const selected = rows.filter(r => params.reception === 'all' || params.reception === 'requested' && r.status === 'requested' || params.reception === 'unassigned' && r.assignment_method === 'automatic' || params.reception === 'attention' && (r.status === 'requested' || r.assignment_method === 'automatic'))
+    return { total: selected.length, requestedCount: 1, unassignedCount: 1, attentionCount: 2, requests: selected.slice(params.offset, params.offset + params.limit) }
   })
 }
-it('すべてでは承認待ちを先に表示し、承認待ちだけに絞る', async () => {
-  seed(); const open = vi.fn(); render(<BookingReception onOpen={open} />)
-  expect(await screen.findByText('承認待ち 1件（今日以降）')).toBeTruthy()
-  const rows = within(screen.getByRole('table')).getAllByRole('row')
-  expect(within(rows[1]).getByText('山田')).toBeTruthy()
-  expect(within(rows[2]).getByText('鈴木')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: '山田' })); expect(open).toHaveBeenCalledWith('b')
+it('要対応と未割り当てを分けて表示し担当確認を送る', async () => {
+  seed(); mocks.review.mockResolvedValue({ success: true }); render(<BookingReception onOpen={() => {}} canOperate />)
+  expect(await screen.findByText('要対応 2件・未割り当て 1件・承認待ち 1件（今日以降）')).toBeTruthy()
+  expect(screen.getByText(/記録前の予約/)).toBeTruthy()
   const tabs = screen.getByRole('group', { name: '予約受付の絞り込み' })
-  fireEvent.click(within(tabs).getByRole('button', { name: '承認待ち' }))
-  await waitFor(() => expect(screen.queryByText('鈴木')).toBeNull())
-  expect(await screen.findByText('山田')).toBeTruthy()
-  expect(within(tabs).queryByRole('button', { name: '要対応' })).toBeNull()
-  expect(screen.queryByText(/未割り当て/)).toBeNull()
-  expect(mocks.list).toHaveBeenCalledWith('a', 'requested', expect.objectContaining({ from: expect.any(String) }))
+  fireEvent.click(within(tabs).getByRole('button', { name: '未割り当て' }))
+  await waitFor(() => expect(screen.queryByText('待ち')).toBeNull())
+  expect(await screen.findByText('自動')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '担当を確認' }))
+  fireEvent.click(screen.getByRole('button', { name: '確認した' }))
+  await waitFor(() => expect(mocks.review).toHaveBeenCalledWith('a', '自動', 0))
 })
-it('すべての2ページ目でも承認待ちを確定予約より先に並べる', async () => {
-  seed(Array.from({ length: 21 }, (_, i) => row(`r${i}`, `待ち${i}`, 'requested')), [row('c', '確定客', 'confirmed')])
-  render(<BookingReception onOpen={() => {}} />)
-  expect(await screen.findByText('待ち0')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: /次/ }))
-  const name = await screen.findByText('待ち20')
-  const rows = within(name.closest('table')!).getAllByRole('row')
-  expect(within(rows[1]).getByText('待ち20')).toBeTruthy()
-  expect(within(rows[2]).getByText('確定客')).toBeTruthy()
+it('閲覧のみの人には確認操作を出さない', async () => {
+  seed(); render(<BookingReception onOpen={() => {}} />)
+  await screen.findByText('自動')
+  expect(screen.queryByRole('button', { name: '担当を確認' })).toBeNull()
 })
 it('読み込み失敗を0件として表示しない', async () => {
   mocks.list.mockRejectedValue(new Error('offline')); render(<BookingReception onOpen={() => {}} />)
   expect(await screen.findByText('予約受付を読み込めませんでした')).toBeTruthy()
-  expect(screen.queryByText('今日以降の該当する予約はありません')).toBeNull()
 })
-it('詳細を閉じた後に再読込する', async () => {
-  seed(); const view = render(<BookingReception onOpen={() => {}} refreshKey="b" />)
-  await screen.findByText('山田'); const before = mocks.list.mock.calls.length
-  view.rerender(<BookingReception onOpen={() => {}} />)
+it('詳細を開き、閉じた後は一覧を読み直す', async () => {
+  seed(); const open = vi.fn(); const view = render(<BookingReception onOpen={open} refreshKey="before" />)
+  fireEvent.click(await screen.findByRole('button', { name: '待ち' }))
+  expect(open).toHaveBeenCalledWith('待ち')
+  const before = mocks.list.mock.calls.length
+  view.rerender(<BookingReception onOpen={open} refreshKey="after" />)
   await waitFor(() => expect(mocks.list.mock.calls.length).toBeGreaterThan(before))
 })
-
-it('予約が減り最終ページが無くなれば有効なページに戻る', async () => {
-  seed(Array.from({ length: 21 }, (_, i) => row(`r${i}`, `待ち${i}`, 'requested')), [])
+it('件数が減って最後のページがなくなれば前のページに戻る', async () => {
+  const rows = Array.from({ length: 21 }, (_, i) => row(`待ち${i}`, 'requested', 'unknown'))
+  let total = 21
+  mocks.list.mockImplementation(async (_account: string, _status: string, params: { offset: number; limit: number }) => ({ total, requestedCount: total, unassignedCount: 0, attentionCount: total, requests: rows.slice(params.offset, Math.min(total, params.offset + params.limit)) }))
   const view = render(<BookingReception onOpen={() => {}} refreshKey="before" />)
-  expect(await screen.findByText('待ち0')).toBeTruthy()
+  await screen.findByText('待ち0')
   fireEvent.click(screen.getByRole('button', { name: /次/ }))
-  expect(await screen.findByText('待ち20')).toBeTruthy()
-  seed([row('r0', '待ち0', 'requested')], [])
+  await screen.findByText('待ち20')
+  total = 1
   view.rerender(<BookingReception onOpen={() => {}} refreshKey="after" />)
   expect(await screen.findByText('待ち0')).toBeTruthy()
   expect(screen.queryByText('今日以降の該当する予約はありません')).toBeNull()

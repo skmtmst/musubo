@@ -572,6 +572,7 @@ export const bookingApi = {
     source?: string
     from?: string
     to?: string
+    reception?: 'all' | 'requested' | 'unassigned' | 'attention'
   }) => {
     const query = new URLSearchParams({ status })
     if (params?.limit) query.set('limit', String(params.limit))
@@ -582,10 +583,15 @@ export const bookingApi = {
     if (params?.source) query.set('source', params.source)
     if (params?.from) query.set('from', params.from)
     if (params?.to) query.set('to', params.to)
-    return fetchApi<{ requests: BookingRequest[]; total: number }>(
+    if (params?.reception) query.set('reception', params.reception)
+    return fetchApi<{ requests: BookingRequest[]; total: number; requestedCount: number; unassignedCount: number; attentionCount: number }>(
       withAccount(`/api/booking/admin/requests?${query.toString()}`, accountId),
     )
   },
+  reviewAssignment: (accountId: string, id: string, lockVersion: number) => fetchApi<{ success: boolean }>(
+    withAccount(`/api/booking/admin/requests/${encodeURIComponent(id)}/assignment-review`, accountId),
+    { method: 'POST', body: JSON.stringify({ lock_version: lockVersion }) },
+  ),
   /**
    * 予約台帳CSVの書出しURL (#933 N-397)。一覧と同じ絞り込みをそのまま受ける。
    * サーバ側は最大5000件までで、範囲の断りはCSV先頭の注記行に入る。
