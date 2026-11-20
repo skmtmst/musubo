@@ -20,6 +20,8 @@
 - [style-experience-player/index.ts](style-experience-player/index.ts)：`StyleExperiencePlayer`・`StyleExperiencePlayerProps`・`STYLE_EXPERIENCE_SCRIPT`・`StyleExperienceCan`・`StyleExperienceScript`・`StyleExperienceStyle`
 - [public/model/index.ts](public/model/index.ts)：`StyleWarning`・`FEATURES`・`STYLE_CHOICES`・`featureHref`・`featureName`・`sampleMenuFor`・`styleLabel`
 - [public/sample-menu/index.ts](public/sample-menu/index.ts)：`SampleMenuTiles`
+- [public/guide-engine/index.ts](public/guide-engine/index.ts)：`useGuideEngine`・`GuideAnchor`・`GuideEnginePhase`・`GuideSummary`（開店準備ガイドの進み具合。正本はサーバー、localStorageは控え）
+- [public/guide-overlay/index.ts](public/guide-overlay/index.ts)：`GuideHost`・`GuideOverlay`・`GuideSharedProvider`・`useSharedGuide`・`SharedGuide`・`guideProcedure`・`guideProcedureTotal`・`guideAnchorAttribute`・`emitGuideSignal`・`useGuideSignal`（手順別の案内。`GuideHost` は全画面で1つだけ `AuthenticatedAppShell` に置く）
 - [public/setup-card/index.ts](public/setup-card/index.ts)：`SetupCard`・`SetupWarningBands`・`setupSummary`
 - [public/style-setup-progress/index.ts](public/style-setup-progress/index.ts)：`useStyleSetupProgress`・`loadStyleSetupProgress`（業種の設定を実物のGETで確認）
 - [public/style-entry/index.ts](public/style-entry/index.ts)：`StyleEntry`
@@ -41,6 +43,9 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 
 - [BEHAVIOR.md](BEHAVIOR.md)
 - [first-run-watch.test.tsx](first-run-watch.test.tsx)
+- [guide-engine.test.ts](guide-engine.test.ts)
+- [guide-overlay-geometry.test.ts](guide-overlay-geometry.test.ts)（枠 04-1 の寸法どおりの位置計算）
+- [guide-overlay-react.test.tsx](guide-overlay-react.test.tsx)（吹き出しの文面・進行トリガー・スキップ・ESC・対象外画面での自動一時停止）
 - [load-state.test.tsx](load-state.test.tsx)
 - [model.test.ts](model.test.ts)
 - [initial-menu-choice.test.tsx](initial-menu-choice.test.tsx)

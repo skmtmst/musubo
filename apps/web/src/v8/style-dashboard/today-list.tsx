@@ -23,11 +23,10 @@ const COLUMNS: Record<IndustryStyle, Column[]> = {
   restaurant: [
     { key: 'time', label: '時刻', width: 'var(--tpl-sd-col-time)' },
     { key: 'name', label: '名前' },
-    { key: 'people', label: '人数', width: 'var(--tpl-sd-col-people)' },
-    { key: 'seat', label: '卓', width: 'var(--tpl-sd-col-seat)' },
+    { key: 'peopleSeat', label: '人数・卓', width: 'var(--tpl-sd-col-people-seat)' },
     { key: 'course', label: 'コース', width: 'var(--tpl-sd-col-course)' },
-    { key: 'pay', label: 'お支払い', width: 'var(--tpl-sd-col-pay)' },
-    { key: 'state', label: '状態', width: 'var(--tpl-sd-col-state)' },
+    { key: 'pay', label: '支払', width: 'var(--tpl-sd-col-pay-short)' },
+    { key: 'state', label: '状態', width: 'var(--tpl-sd-col-restaurant-state)' },
     { key: 'action', label: '来店', width: 'var(--tpl-sd-col-action)' },
   ],
   salon: [
@@ -44,8 +43,7 @@ const COLUMNS: Record<IndustryStyle, Column[]> = {
     { key: 'name', label: '相談者' },
     { key: 'meet', label: '会い方', width: 'var(--tpl-sd-col-meet)' },
     { key: 'staff', label: '担当', width: 'var(--tpl-sd-col-staff)' },
-    { key: 'pay', label: 'お支払い', width: 'var(--tpl-sd-col-pay-narrow)' },
-    { key: 'state', label: '状態', width: 'var(--tpl-sd-col-state-narrow)' },
+    { key: 'statePay', label: '状態・支払', width: 'var(--tpl-sd-col-state-pay)' },
     { key: 'action', label: '入る', width: 'var(--tpl-sd-col-action-wide)' },
   ],
   lesson: [
@@ -86,6 +84,8 @@ export function TodayList({ style, rows, note, canWrite, busyId, selectedId, men
       case 'time': return <span className={styles.cellText}>{row.time}</span>
       case 'time2': return <><span className={styles.cellStrong}>{row.time}</span>{row.endTime ? <span className={styles.cellSub}>{row.endTime}</span> : null}</>
       case 'name': return <>{onSelect ? <button type="button" className={styles.nameButton} onClick={() => onSelect(row)}><TruncatedText value={row.name} /></button> : <span className={styles.cellStrong}><TruncatedText value={row.name} /></span>}{row.sub ? <span className={styles.cellSub}><TruncatedText value={row.sub} /></span> : null}</>
+      case 'peopleSeat': return <TruncatedText className={styles.cellText} value={`${row.people == null ? '—' : `${row.people}人`} / ${row.seat ?? '—'}`} />
+      case 'statePay': return <span className={styles.statePay} title={`${row.state?.label ?? '—'} / ${row.pay?.label ?? '—'}`}><StatusOrDash badge={row.state} /><TruncatedText value={` / ${row.pay?.label ?? '—'}`} /></span>
       case 'people': return <span className={styles.cellText}>{row.people ?? '—'}</span>
       case 'seat': return <TruncatedText className={styles.cellText} value={row.seat ?? '—'} />
       case 'staff': return <TruncatedText className={styles.cellText} value={row.staff ?? '—'} />

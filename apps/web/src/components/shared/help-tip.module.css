@@ -235,6 +235,18 @@ html:root .button[data-help-trigger='text'] {
   margin: 0; aspect-ratio: auto; border-radius: var(--radius-control);
   color: inherit; font: inherit; text-align: inherit; justify-content: flex-start;
 }
+/*
+  題から開く説明は1行の高さ（18px）しかないので、押せる範囲だけを上下に広げる
+  （§6.5 の 7「文字の大きさは変えず、押せる範囲を広げる」）。
+  位置を持つ透明な ::before なので、行の高さ・幅・見た目は変わらない。
+  印から開く札は今までどおり札自体が当たり（上の content: none）。
+*/
+html:root .button[data-help-trigger='text']::before {
+  content: '';
+  position: absolute;
+  inset-block: -4px;
+  inset-inline: 0;
+}
 html:root .button[data-help-trigger='text']:hover { text-decoration: underline; }
 html:root .button[data-help-trigger='text']:focus-visible { outline-offset: 2px; }
 html:root .button[data-help-trigger='text']:active { scale: 1; }
