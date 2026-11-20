@@ -32,6 +32,7 @@ vi.mock('next/navigation', async (load) => ({
 
 import { ApiError } from '@/lib/api/transport/errors'
 import { GuideSharedProvider } from '@/v8/onboarding/public/guide-shared/index'
+import { useGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 import MenuPage from './menu'
 import MenuEditPage from './edit'
 import { snapshotOf } from '../booking-kit/test-data'
@@ -352,6 +353,30 @@ describe('mauOC コースの編集ページ', () => {
     fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '7000' } })
     fireEvent.click(screen.getByRole('button', { name: /保存して追加する/ }))
     await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', name: '冬のコース', price: 7000 })))
+  })
+
+  it.each(['draft', 'active'] as const)('コースを%sで保存するとき公開だけでガイドを進める', async status => {
+    const advance = vi.fn()
+    function MenuWithGuide() {
+      useGuideSignal('menu.save', true, advance)
+      return <MenuEditPage />
+    }
+    nav.params = new URLSearchParams('store=store-1')
+    render(<MenuWithGuide />)
+    fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '春のコース' } })
+    fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '8800' } })
+    if (status === 'active') {
+      fireEvent.click(screen.getByRole('button', { name: '保存する状態', exact: true }))
+      fireEvent.click(within(screen.getByRole('option', { name: '公開', exact: true })).getByRole('button'))
+    }
+    fireEvent.click(screen.getByRole('button', { name: '保存して追加する', exact: true }))
+    if (status === 'active') {
+      expect(advance).not.toHaveBeenCalled()
+      fireEvent.click(await screen.findByRole('button', { name: '公開して追加する', exact: true }))
+    }
+    await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/restaurant-test/menu'))
+    expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({ status }))
+    expect(advance).toHaveBeenCalledTimes(status === 'active' ? 1 : 0)
   })
 
   it('保存に失敗したら入力を残して知らせ、一覧へ戻らない', async () => {
