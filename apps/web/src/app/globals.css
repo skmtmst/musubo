@@ -2,44 +2,11 @@
 @import "tailwindcss";
 @import "../components/shared/kpi-band-v8.css";
 @import "../components/shared/phone-preview-tokens.css"; @import "../components/shared/musubo-pricing-tokens.css";
-@import "../components/shared/focus-ring.css"; @import "../components/shared/scrollbars.css"; @import "../components/shared/autofill.css";
+@import "../components/shared/focus-ring.css"; @import "../components/shared/scrollbars.css"; @import "../components/shared/autofill.css"; @import "../v8/settings/sns/sns-board.css";
 
 [data-design-node="yPkWe"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
 [data-design-node="YfTfJ"] [data-design-part="dialog"] { width: min(680px, calc(100% - 32px)); }
 [data-design-node="N2J629"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
-
-/*
- * 設定 › SNS 連携（板 y3GGTs）だけの寸法。承認 v10 の絵（F1 tIRy5 広い画面・F2 VH2Ga 細い画面・
- * F6 JvuLH 解除の確認）に合わせる。型（PageHeading）と共通の押しボタンの作りは変えず、
- * この板・この窓の中だけ値を差し替える。他の画面は名前が違うので当たらない。
- */
-[data-design-node="y3GGTs"] {
-  /* 題は細い画面で 20/700/24（F2 QMp7t）。型の compact の決めをこの板の中だけ絵の値にする。 */
-  --tpl-compact-title-size: var(--tpl-e1-sns-page-title-size);
-  --tpl-compact-title-weight: var(--tpl-e1-sns-page-title-weight);
-  --tpl-compact-title-lh: var(--tpl-e1-sns-page-title-lh);
-  /* 細い画面は題もカードも板の端（x=16・幅358）までのばす（F2 VH2Ga）。 */
-  --tpl-head-pad-side: var(--tpl-e1-sns-edge-narrow);
-}
-
-/* 広い画面は絵（F1 rj9uz）のとおり題を 26/bold/38 にし、頭の左右の余白は共通の値へ戻す。 */
-@media (min-width: 1024px) {
-  [data-design-node="y3GGTs"] {
-    --tpl-compact-title-size: var(--tpl-e1-sns-page-title-size-wide);
-    --tpl-compact-title-lh: var(--tpl-e1-sns-page-title-lh-wide);
-    --tpl-head-pad-side: var(--polish-space-section);
-  }
-}
-
-/* F6 JvuLH 解除の確認の「戻る」「解除する」は絵では 13/600。共通の押しボタンの作りは変えず、
-   この窓（外枠に designNode が出る）の操作の段の中だけ文字の値を差し替える。
-   共通の押しボタンの白い副ボタンの決め（button.module.css の `:root .button:is(.primary,.secondary)…`）は
-   レイヤーの外にあるので、こちらも `:root` を足して強さで上に出す。 */
-:root [data-design-node="JvuLH"] [data-dialog-actions] button[data-dialog-action] {
-  font-size: var(--tpl-e1-sns-dlg-btn-size);
-  font-weight: 600;
-  line-height: var(--tpl-e1-sns-dlg-btn-lh);
-}
 
 /**
  * デザイントークン。

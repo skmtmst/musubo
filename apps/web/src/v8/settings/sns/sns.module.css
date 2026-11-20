@@ -4,8 +4,8 @@
    型・共通部品の見た目は、この画面の板（[data-design-node='y3GGTs']）の中だけで差し替える。
    他の画面と共通部品の作りは変えない（この束は @layer の外なので、共通部品の @layer components より強い）。
    板そのものに当てる値（題の大きさ・頭の左右の余白・解除の窓の押しボタン）は、
-   CSS Module の決まり（どの規則にも画面の名前を1つ入れる）に合わないので globals.css の
-   先頭にある data-design-node の並びへ置く。画面の名前で絞るので他の画面には当たらない。 */
+   CSS Module の決まり（どの規則にも画面の名前を1つ入れる）に合わないので、隣の sns-board.css
+   （globals.css から読み込む）へ置く。画面の名前で絞るので他の画面には当たらない。 */
 
 .body {
   display: flex;
@@ -256,13 +256,13 @@
 .slotFoot { order: 1; }
 
 /* 細い画面だけ、カードを板の端（x=16・幅358）までのばす（F2 VH2Ga）。
-   頭の左右の余白は globals.css の板ごとの並びで同じ境目に合わせている。 */
+   頭の左右の余白は sns-board.css で同じ境目に合わせている。 */
 @media (max-width: 1023.98px) {
   .body { padding: var(--tpl-e1-sns-body-pad-narrow); }
 }
 
 @media (min-width: 1024px) {
-  /* 広い画面は絵（F1 tIRy5）のとおり枠の話を題のすぐ下に置く。題の大きさは globals.css 側。 */
+  /* 広い画面は絵（F1 tIRy5）のとおり枠の話を題のすぐ下に置く。題の大きさは sns-board.css 側。 */
   .slotFoot { order: 0; }
   .count { line-height: var(--tpl-e1-sns-count-lh-wide); }
   .conn { padding: var(--tpl-e1-sns-conn-pad-wide); }
