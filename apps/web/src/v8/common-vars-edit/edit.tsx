@@ -859,13 +859,13 @@ function EditCommonVarV8Inner() {
               <h2 id="cv-edit-usage-heading" className={styles.cardTitle}>使用先 {formatNumber(impact.total)}か所</h2>
               {pinError ? <Notice tone="danger">{pinError}</Notice> : null}
               <ConfirmDialog open={pinTarget !== null && pinTarget.accountId === selectedAccountId && pinTarget.itemId === item?.id} title={pinTarget?.mode === 'live' ? '最新の値に戻しますか' : 'この版で固定しますか'} description={`${pinTarget?.name ?? ''} を${pinTarget?.mode === 'live' ? '最新の値に戻し' : `版 ${pinTarget?.version ?? ''} に固定し`}ます。承認待ち・承認済みの場合は承認が取り消されます。`} confirmLabel={pinTarget?.mode === 'live' ? '最新の値に戻す' : '固定する'} error={pinError} busy={pinBusy !== null} onCancel={() => setPinTarget(null)} onConfirm={() => { if (pinTarget) void pinBroadcast(pinTarget.href) }} />
-              <DataTable label="使っている場所">
-                <thead><TableHeadRow><Th>使用先</Th><Th>状態</Th><Th>参照方法</Th><Th>版</Th><Th>操作</Th></TableHeadRow></thead>
+              <DataTable label="使っている場所" columnWeights={[4.2, 1.8, 2.4, 0.9, 1.2]}>
+                <thead><TableHeadRow><Th>使用先</Th><Th>状態</Th><Th>参照方法</Th><Th>版</Th><Th align="right" columnKind="menu">操作</Th></TableHeadRow></thead>
                 <tbody>{(showAllUsages ? impact.items : impact.items.slice(0, 20)).map((usage, index) => <Tr key={`${usage.kind}-${usage.href}-${index}`}>
                   <Td><PageLink href={usage.href}><TruncatedText value={usage.name} /></PageLink></Td><Td><TruncatedText value={usage.status} /></Td>
-                  <Td>{usage.referenceMode === 'live' ? '最新の値' : usage.referenceMode === 'pinned' ? usage.referencedVersion == null ? '固定した値' : `版 ${usage.referencedVersion} で固定` : usage.referenceMode === 'operation' ? '値を操作' : '—'}</Td>
+                  <Td><TruncatedText value={usage.referenceMode === 'live' ? '最新の値' : usage.referenceMode === 'pinned' ? usage.referencedVersion == null ? '固定した値' : `版 ${usage.referencedVersion} で固定` : usage.referenceMode === 'operation' ? '値を操作' : '—'} /></Td>
                   <Td>{usage.referencedVersion == null ? '—' : `版 ${usage.referencedVersion}`}</Td>
-                  <Td>{canWrite && item && selectedAccountId ? <UsageReferenceMenu usage={usage} version={item.version} pinDisabledReason={item.pinDisabledReason} canPin={canPinBroadcast} valueChanged={value !== item.value} busy={pinBusy !== null} onChoose={(mode) => setPinTarget({ href: usage.href, name: usage.name, accountId: selectedAccountId, itemId: item.id, version: item.version, mode })} /> : null}</Td>
+                  <Td align="right" columnKind="menu">{canWrite && item && selectedAccountId ? <UsageReferenceMenu usage={usage} version={item.version} pinDisabledReason={item.pinDisabledReason} canPin={canPinBroadcast} valueChanged={value !== item.value} busy={pinBusy !== null} onChoose={(mode) => setPinTarget({ href: usage.href, name: usage.name, accountId: selectedAccountId, itemId: item.id, version: item.version, mode })} /> : null}</Td>
                 </Tr>)}</tbody>
               </DataTable>
               <p className={styles.fieldHint}>送信済み・完了済みの内容は、値を変えても変わりません。</p>
