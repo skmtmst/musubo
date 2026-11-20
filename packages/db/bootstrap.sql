@@ -5625,7 +5625,8 @@ CREATE TABLE musubo_line_usage (
   billed_linked_slots INTEGER NOT NULL DEFAULT 0 CHECK (billed_linked_slots >= 0),
   linked_slots_reduction_at TEXT,
   updated_at TEXT NOT NULL
-);
+, contracted_linked_slots INTEGER NOT NULL DEFAULT 1
+  CHECK (contracted_linked_slots >= 1));
 
 CREATE TABLE musubo_pending_additions (
   id TEXT PRIMARY KEY,
@@ -6363,6 +6364,17 @@ CREATE TABLE notifications (
   line_account_id TEXT REFERENCES line_accounts(id),
   category        TEXT NOT NULL DEFAULT 'info' CHECK (category IN ('error', 'update', 'info')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE onboarding_guide_progress (
+  staff_id TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  phase TEXT NOT NULL CHECK (phase IN ('idle', 'active', 'paused', 'done')),
+  step_key TEXT,
+  procedure_index INTEGER NOT NULL DEFAULT 1 CHECK (procedure_index >= 1),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (staff_id, line_account_id)
 );
 
 CREATE TABLE operation_alert_events (
@@ -11383,6 +11395,9 @@ CREATE INDEX idx_notifications_center ON notifications(line_account_id, category
 CREATE INDEX idx_notifications_created ON notifications (created_at);
 
 CREATE INDEX idx_notifications_status ON notifications (status);
+
+CREATE INDEX idx_onboarding_guide_progress_account
+  ON onboarding_guide_progress(line_account_id, updated_at DESC);
 
 CREATE INDEX idx_operation_alert_events_alert_created
   ON operation_alert_events(alert_id, created_at DESC);

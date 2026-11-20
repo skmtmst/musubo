@@ -2,8 +2,8 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-const net = vi.hoisted(() => ({ progress: vi.fn(), dismiss: vi.fn(), mark: vi.fn(), starterSet: vi.fn(), starterItems: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { gettingStarted: { get: net.progress, dismiss: net.dismiss, markFirstRunDoneSeen: net.mark } } }))
+const net = vi.hoisted(() => ({ progress: vi.fn(), dismiss: vi.fn(), mark: vi.fn(), starterSet: vi.fn(), starterItems: vi.fn(), guideGet: vi.fn(() => Promise.resolve({ data: null })), guidePut: vi.fn(() => Promise.resolve({ data: null })) }))
+vi.mock('@/lib/api', () => ({ api: { gettingStarted: { get: net.progress, dismiss: net.dismiss, markFirstRunDoneSeen: net.mark, guide: { get: net.guideGet, put: net.guidePut } } } }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { starterSet: net.starterSet, starterItems: net.starterItems } }))
 vi.mock('@/components/shared/list-navigation', async importOriginal => ({
   ...await importOriginal<typeof import('@/components/shared/list-navigation')>(),
@@ -136,9 +136,9 @@ describe('最初の1通が届いた時の窓', () => {
     await waitFor(() => expect(screen.getByText('止めています')).toBeTruthy())
     expect(screen.queryByText(/読まれ/)).toBeNull()
     const next = screen.getAllByRole('link', { name: '開く' }).map((link) => link.getAttribute('href'))
-    expect(next).toEqual(['/restaurant-test/tables', '/restaurant-test/google?tab=hours', '/restaurant-test/inventory', '/restaurant-test/line-followup'])
+    expect(next).toEqual(['/getting-started/rich-menu', '/restaurant-test/tables', '/restaurant-test/google?tab=hours', '/restaurant-test/inventory', '/restaurant-test/line-followup'])
     expect(screen.queryByText('コースとメニューを登録する')).toBeNull()
-    expect(next).toHaveLength(4)
+    expect(next).toHaveLength(5)
     for (const button of screen.getAllByRole('button', { name: '閉じる' })) fireEvent.click(button)
     expect(onClose).toHaveBeenCalled()
     expect(net.dismiss).not.toHaveBeenCalled()

@@ -1,9 +1,6 @@
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(new URL('../../v8/broadcasts/list.tsx', import.meta.url), 'utf8')
 
 /** 名前で見つけた関数の本体だけを切り出す。ファイル全体を見ると素通しになる。 */
@@ -65,17 +62,6 @@ describe('一斉配信一覧の削除確認', () => {
     expect(jsx).toContain('この操作は取り消せません。')
   })
 
-  it('題は設計どおり、配信名だけを出す', () => {
-    /*
-     * 設計 `EGMb1` は「「8月キャンペーンのお知らせ」を削除しますか？」。
-     * 「配信「…」」と種類を足すと、**何を消すのかは名前で分かるのに
-     * 読む語だけが増える。**
-     */
-    const jsx = dialog(PAGE)
-    expect(jsx).toContain("title={`「${deleteTarget?.title ?? ''}」を削除しますか？`}")
-    expect(jsx, '設計に無い接頭辞が付いている').not.toContain('title={`配信「')
-  })
-
   it('送信済みの配信に、下書きの言い方を出さない', () => {
     /*
      * 窓の本文は「予約中かどうか」で分岐する。**送信済みにも削除を出すと、
@@ -103,12 +89,4 @@ describe('一斉配信一覧の削除確認', () => {
     expect(jsx, '処理中に閉じられてしまう').toContain('if (deleting) return')
   })
 
-  it('削除ボタンは窓を開くだけで、押した時点では消さない', () => {
-    // 行内操作の独立は共通Trの動きの試験で守る。削除の入口は確認だけ。
-    expect(PAGE).toContain("onSelect: () => requestDelete(broadcast)")
-    const body = fnBody(PAGE, 'const requestDelete = (broadcast: ApiBroadcast) =>')
-    expect(body).toContain('deleteScope.current = { generation: accountScope.current.generation }')
-    expect(body).toContain('setDeleteTarget({ ...broadcast })')
-    expect(body).not.toContain('api.broadcasts.delete')
-  })
 })

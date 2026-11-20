@@ -201,6 +201,8 @@ async function clickButton(scope: ParentNode, text: string) {
 
 describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 Worker の省略形）', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z'))
     // 前の描画のURL書き込みを終えてから、新しい試験のURLへ戻す。
     flushListUrlState()
     window.history.replaceState(null, '', '/inflow-links')
@@ -220,6 +222,7 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     flushListUrlState()
     host.remove()
     vi.unstubAllGlobals()
+    vi.useRealTimers()
   })
 
   it('検索0・解除・友だちなし・フォルダの間、帯は全体のまま', async () => {
@@ -240,7 +243,7 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     // 検索で0件になっても帯は全体のまま。
     await setSearch('そんざいしないさーち')
     expect(host.textContent).toContain('条件に合うものがありません')
-    expect(kpiText()).toContain('6件')
+    expect(kpiCards()[0]).toContain('6件')
     expect(kpiText()).toContain('17人')
 
     // 検索を消すと一覧が戻り、帯は変わらない。
@@ -252,7 +255,7 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     await clickButton(preset, '友だち追加なし')
     expect(host.textContent).toContain('店頭QR')
     expect(host.textContent).not.toContain('春キャンペーン')
-    expect(kpiText()).toContain('6件')
+    expect(kpiCards()[0]).toContain('6件')
     expect(kpiText()).toContain('17人')
 
     // フォルダ「SNS」を選んでも帯は全体のまま。
@@ -265,7 +268,7 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     await clickButton(folder!, 'SNS')
     expect(host.textContent).toContain('春キャンペーン')
     expect(host.textContent).not.toContain('チラシ')
-    expect(kpiText()).toContain('6件')
+    expect(kpiCards()[0]).toContain('6件')
     expect(kpiText()).toContain('17人')
   })
 

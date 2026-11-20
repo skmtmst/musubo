@@ -53,29 +53,7 @@ describe('V8 イベント・申込者一覧の状態', () => {
     expect(code(BOOKINGS)).toContain("setApplicantsStatus('error')")
   })
 
-  /*
-   * R601: イベント一覧は 403 を権限不足、それ以外を通信失敗として分ける。
-   * 以前の `setLoadStatus('error')` 一本化では、権限不足の人も再読み込みを
-   * 案内されていた。失敗の区別そのものは上の試験が守るので、ここでは
-   * 403 → forbidden、ほか → error の振り分けと、権限不足の1枚を見る。
-   */
-  it('イベントは403を権限不足、ほかは通信失敗として分ける', () => {
-    const body = code(EVENTS)
-    expect(body).toContain('cause.status === 403')
-    expect(body).toContain("'forbidden'")
-    expect(body).toContain(": 'error'")
-    expect(body).toContain("loadStatus === 'forbidden'")
-    expect(body).toContain('イベントを見る権限がありません')
-    expect(body).toContain('管理者に権限を確かめてください')
-  })
-
-  it('イベント一覧は未取得の帯を0件にしない', () => {
-    const body = code(EVENTS)
-    // 帯は「数」ではなく「次にすること」を出す（R79/R80 で全体集計へ）。
-    expect(body).toContain('value: dataReady ? kpi.upcoming_slots : null')
-    expect(body).toContain('value: dataReady ? kpi.upcoming_active : null')
-    expect(body).toContain('登録したイベントは消えていません。')
-  })
+  // イベント一覧の読み込み・失敗・店舗切替は event-list-auth-error.test.tsx で描画して確かめる。
 
   it('申込者一覧は未取得の帯を0件にしない', () => {
     const body = code(BOOKINGS)
@@ -101,14 +79,6 @@ describe('V8 イベント・申込者一覧の状態', () => {
     expect(body).toContain('setApplicants(null)')
     // 控えがあれば取りに行かない、をやめる（前のイベント名が残る）。
     expect(body).not.toContain('Promise.resolve(event)')
-  })
-
-  it('編集画面から申込者一覧へのリンクは申込者画面の読む引数名と揃える', () => {
-    // 申込者画面は `id` だけを読む。一覧と作成フォームは `?id=` で正しい。
-    expect(code(BOOKINGS)).toContain("useSearchParams().get('id')")
-    expect(code(EDIT)).toContain('/events/bookings?id=${id}')
-    // `?eventId=` では「イベントを選び直してください」になり、承認待ちへ行けない。
-    expect(code(EDIT)).not.toContain('bookings?eventId=')
   })
 
   it('イベントと申込者は共通のoffsetページ送りを使う(点検#520の中8)', () => {

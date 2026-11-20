@@ -1324,8 +1324,7 @@ ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staf
           : ('later' as const),
       };
     })
-    // 過去の注文は「出荷予定」ではない。以前は上限だけを見ていたため、
-    // 何週間も前の注文まで「今日・明日」に入り続けていた。
+    // 過去の注文は出荷予定ではないため、今日より前の日付を除く。
     .filter((row) => row.shipDate !== null && (!todayJst || row.shipDate >= todayJst))
     .sort((a, b) => (a.shipDate ?? '').localeCompare(b.shipDate ?? ''));
 

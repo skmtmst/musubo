@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
+import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 
 const access = vi.hoisted(() => vi.fn());
 
@@ -71,6 +72,25 @@ describe('点検・中: テスト送信の連打防止', () => {
     expect(second.status).toBe(429);
     await expect(second.json()).resolves.toMatchObject({ success: false });
   });
+});
+
+it('ECのテスト通知は未解決の共通情報を送らず登録後に置き換える', async () => {
+  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T01:00:00Z'));
+  const fixture=createTestD1({now:()=>new Date()});const external=vi.fn(async()=>new Response('{}',{status:200}));
+  try {
+    access.mockResolvedValue(true);vi.stubGlobal('fetch',external);
+    fixture.raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('ec-vars','ec-vars','店','token','secret');
+      INSERT INTO account_settings(id,line_account_id,key,value) VALUES('setting-ec','ec-vars','test_recipients','["friend-ec"]');`);
+    insertFriend(fixture.raw,'friend-ec',{line_account_id:'ec-vars'});
+    const body={eventType:'ec.order.confirmed',accountId:'ec-vars',title:'営業時間: {{var.hours}}',introText:'',outroText:'',buttonLabel:'',buttonUrl:'',imageUrl:''};
+    const send=()=>app().request('/api/ec-commerce/test-send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)},{DB:fixture.db} as Env['Bindings']);
+    await send();expect(external).not.toHaveBeenCalled();
+    expect(fixture.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+    fixture.raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES('hours','ec-vars','営業時間','hours','text','10時')").run();
+    vi.setSystemTime(new Date('2026-11-18T01:01:00Z'));
+    expect((await send()).status).toBe(200);expect(external).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(external.mock.calls)).toContain('営業時間: 10時');
+  } finally { fixture.raw.close();vi.unstubAllGlobals();vi.useRealTimers(); }
 });
 
 describe('テスト送信先の確認', () => {

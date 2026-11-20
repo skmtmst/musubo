@@ -1,7 +1,13 @@
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
-import { hasFirstDeliveredMessage, hasSavedFeatureConfiguration } from '@line-crm/db';
+import {
+  getOnboardingGuideProgress,
+  hasFirstDeliveredMessage,
+  hasSavedFeatureConfiguration,
+  saveOnboardingGuideProgress,
+} from '@line-crm/db';
+import type { OnboardingGuidePhase, OnboardingGuideProgressRow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -235,6 +241,81 @@ gettingStarted.post('/api/getting-started/first-run-done-seen', requireRole('own
   const row = await c.env.DB.prepare('SELECT first_run_done_seen_at AS seen_at FROM account_styles WHERE line_account_id = ?')
     .bind(accountId).first<{ seen_at: string | null }>();
   return c.json({ success: true, data: { doneSeenAt: jst(row?.seen_at), tracked: row !== null } });
+});
+
+/*
+  ガイドの進行状態（ユーザー×アカウント）。
+  承認済み Pen 枠 14 (orKSi) の L3lP08 どおり、
+  「有効/一時停止・現在ステップ・現在手順」をここに置き、
+  リロード・端末切替・離脱のあとも同じ所から再開できるようにする。
+
+  **9項目の済み判定はここに入れない。** 完了は上の GET /api/getting-started が
+  いまの中身を数えて出すもので、ガイドを使わなくてもチェックは付く（枠14 L3lP08）。
+*/
+const GUIDE_PHASES: OnboardingGuidePhase[] = ['idle', 'active', 'paused', 'done'];
+
+async function requireGuideScope(c: {
+  env: Env['Bindings'];
+  get: (key: 'staff') => AuthenticatedStaff | undefined;
+  req: { query: (key: string) => string | undefined };
+}): Promise<{ staffId: string; accountId: string } | { response: Response }> {
+  const staff = c.get('staff');
+  if (!staff?.id) {
+    return { response: Response.json({ success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 }) };
+  }
+  const accountId = c.req.query('account_id') ?? c.req.query('accountId') ?? null;
+  if (!accountId) {
+    return { response: Response.json({ success: false, error: 'LINEアカウントを選択してください' }, { status: 400 }) };
+  }
+  const visibleScope = await getVisibleLineAccountScope(c.env.DB, staff);
+  if (!visibleScope.allowedAccountIds.includes(accountId)) {
+    return { response: Response.json({ success: false, error: 'Not found' }, { status: 404 }) };
+  }
+  return { staffId: staff.id, accountId };
+}
+
+function guidePayload(row: OnboardingGuideProgressRow | null) {
+  // 行が無いのは「まだ案内を始めていない」。既定を返して画面側で分岐を増やさない。
+  return {
+    phase: row?.phase ?? 'idle',
+    stepKey: row?.step_key ?? null,
+    procedureIndex: row?.procedure_index ?? 1,
+    updatedAt: row?.updated_at ?? null,
+  };
+}
+
+gettingStarted.get('/api/getting-started/guide', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const scope = await requireGuideScope(c);
+  if ('response' in scope) return scope.response;
+  const row = await getOnboardingGuideProgress(c.env.DB, scope.staffId, scope.accountId);
+  return c.json({ success: true, data: guidePayload(row) });
+});
+
+gettingStarted.put('/api/getting-started/guide', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
+  const scope = await requireGuideScope(c);
+  if ('response' in scope) return scope.response;
+
+  const body = await c.req.json<{ phase?: unknown; stepKey?: unknown; procedureIndex?: unknown }>().catch(() => null);
+  if (!body || !GUIDE_PHASES.includes(body.phase as OnboardingGuidePhase)) {
+    return inputError(c, { success: false, error: '案内の状態が正しくありません' }, 400, ['phase']);
+  }
+  if (body.stepKey != null && typeof body.stepKey !== 'string') {
+    return inputError(c, { success: false, error: '案内の段が正しくありません' }, 400, ['stepKey']);
+  }
+  // 現在手順は1から数える。数でない値や0以下は保存せず、入力の誤りとして返す。
+  const procedureIndex = body.procedureIndex ?? 1;
+  if (!Number.isInteger(procedureIndex) || (procedureIndex as number) < 1) {
+    return inputError(c, { success: false, error: '案内の手順が正しくありません' }, 400, ['procedureIndex']);
+  }
+
+  const row = await saveOnboardingGuideProgress(c.env.DB, {
+    staffId: scope.staffId,
+    lineAccountId: scope.accountId,
+    phase: body.phase as OnboardingGuidePhase,
+    stepKey: (body.stepKey as string | null | undefined) ?? null,
+    procedureIndex: procedureIndex as number,
+  });
+  return c.json({ success: true, data: guidePayload(row) });
 });
 
 export { gettingStarted };

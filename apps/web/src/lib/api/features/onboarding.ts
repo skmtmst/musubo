@@ -1,6 +1,6 @@
 import { fetchApi } from '../transport/request'
 import type { ApiResponse } from '@line-crm/shared'
-import type { GettingStartedFirstRun, GettingStartedStarter, GettingStartedStep, Recipe, ManualLink } from '../types/onboarding'
+import type { GettingStartedFirstRun, GettingStartedGuidePhase, GettingStartedGuideState, GettingStartedStarter, GettingStartedStep, Recipe, ManualLink } from '../types/onboarding'
 
 export const onboardingMethods = {
 /** はじめの設定の順路。台帳 #134。**毎回いまの中身を数える（キャッシュしない）。** */
@@ -29,6 +29,22 @@ export const onboardingMethods = {
       fetchApi<ApiResponse<{ dismissed: boolean }>>('/api/getting-started/dismiss', {
         method: 'POST',
       }),
+    /*
+      案内の進行状態（ユーザー×アカウント）。承認済み Pen 枠 14 (orKSi) の L3lP08 どおり、
+      これがサーバー側の正本。ブラウザ保存は表示を速くするための控えに留める。
+      **9項目の済み判定はここに入っていない。** 完了は上の get が実データを数えて返す。
+    */
+    guide: {
+      get: (accountId: string) =>
+        fetchApi<ApiResponse<GettingStartedGuideState>>(
+          `/api/getting-started/guide?account_id=${encodeURIComponent(accountId)}`,
+        ),
+      save: (accountId: string, input: { phase: GettingStartedGuidePhase; stepKey: string | null; procedureIndex: number }) =>
+        fetchApi<ApiResponse<GettingStartedGuideState>>(
+          `/api/getting-started/guide?account_id=${encodeURIComponent(accountId)}`,
+          { method: 'PUT', body: JSON.stringify(input) },
+        ),
+    },
   },
 /** レシピ。台帳 #134。 */
   recipes: {

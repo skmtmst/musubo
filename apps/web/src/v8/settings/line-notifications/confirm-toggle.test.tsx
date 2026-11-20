@@ -92,7 +92,7 @@ test('テスト送信は窓に表示した宛先IDを固定して送る', async 
     return json({ success: true, data: [] })
   })
   render(<Screen />)
-  fireEvent.click(await screen.findByRole('button', { name: '注文の見出しの内容を編集' }))
+  fireEvent.click(await screen.findByRole('button', { name: '注文が確定したときの内容を編集' }))
   fireEvent.click(await screen.findByRole('button', { name: 'テスト受信者に送る' }))
   const dialog = await screen.findByRole('dialog', { name: 'テスト受信者に送信しますか？' })
   expect(await within(dialog).findByText(/受信者（1名）/)).toBeTruthy()
