@@ -6385,6 +6385,17 @@ CREATE TABLE notifications (
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE onboarding_guide_progress (
+  staff_id TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  phase TEXT NOT NULL CHECK (phase IN ('idle', 'active', 'paused', 'done')),
+  step_key TEXT,
+  procedure_index INTEGER NOT NULL DEFAULT 1 CHECK (procedure_index >= 1),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (staff_id, line_account_id)
+);
+
 CREATE TABLE operation_alert_events (
   id                    TEXT PRIMARY KEY,
   alert_id              TEXT NOT NULL REFERENCES operation_alerts(id) ON DELETE CASCADE,
@@ -11403,6 +11414,9 @@ CREATE INDEX idx_notifications_center ON notifications(line_account_id, category
 CREATE INDEX idx_notifications_created ON notifications (created_at);
 
 CREATE INDEX idx_notifications_status ON notifications (status);
+
+CREATE INDEX idx_onboarding_guide_progress_account
+  ON onboarding_guide_progress(line_account_id, updated_at DESC);
 
 CREATE INDEX idx_operation_alert_events_alert_created
   ON operation_alert_events(alert_id, created_at DESC);

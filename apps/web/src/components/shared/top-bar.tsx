@@ -116,6 +116,13 @@ export interface TopBarProps {
   showIdentity?: boolean
   /** 運営の自分の操作。省いたときの名前と配置は変えない。 */
   identityActions?: ActionMenuItem[]
+  /**
+   * 右側のいちばん左（LINEアカウント切り替えの前）に差す小さな口。
+   * ★承認済み Pen /Users/masatosakamoto/Documents/musubo-course-media-upload-20261110.pen
+   * 枠 02 (C5i3rw) の並び（隙間 → 開店準備の札 `IJocF` → 切り替え `AG4UL` → 鈴 `cnsio`）に合わせる。
+   * 渡さなければ今までどおり何も増えない。
+   */
+  leadingAction?: ReactNode
   className?: string
 }
 
@@ -152,6 +159,7 @@ export default function TopBar({
   hqReturn = null,
   showIdentity = true,
   identityActions,
+  leadingAction = null,
   className,
 }: TopBarProps) {
   const [switchOpen, setSwitchOpen] = useState(false)
@@ -263,6 +271,8 @@ export default function TopBar({
       </div> : null}
 
       <div className={styles.actions}>
+        {/* 枠 02 (C5i3rw) の札 IJocF は切り替えの左。渡されたときだけ出す。 */}
+        {leadingAction}
         {showAccountSwitcher ? <>
           {/*
             ★V8: 帯の探す欄はオーナー決定で外した（2026-10-01）。
