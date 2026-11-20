@@ -469,6 +469,8 @@
 
 ## 反映履歴
 
+- [共通情報の差し替え件数の直し](release-log/unreleased/129-kenta-c21-common-vars.md) — 反映履歴、確認 2026-11-20。
+
 - [保守時に確認する説明を整理](release-log/unreleased/121-kenta-q04-misc.md) — 反映履歴、確認 2026-11-19。
 
 - [一斉配信の自動確認を改善](release-log/unreleased/114-kenta-q02b-b11.md) — 反映履歴、確認 2026-11-18。
