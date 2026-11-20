@@ -1,5 +1,6 @@
 import { auditEventStatement, encryptCredential, RETENTION_R2_KEY_COLUMNS } from '@line-crm/db';
 import { planExternalCleanup } from '../features/booking/booking-external-cleanup-plan.js';
+import { cleanupIndex, cleanupRecipientProof } from '../features/booking/booking-external-cleanup-proof.js';
 import relations from './customer-data-relations.json';
 import protectedRelations from './customer-data-protected-relations.json';
 
@@ -156,7 +157,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       snapshots.push({ table, condition, rows, keys: rows.flatMap(row => columns.flatMap(col => typeof row[col] === 'string' && row[col] ? [row[col] as string] : [])) });
     }
     const byTable = new Map(snapshots.map(snapshot => [snapshot.table, snapshot]));
-    const cleanup: Array<{id:string;payload:string}> = [];
+    const cleanup: Array<{id:string;payload:string;index:string;retainUntil:number}> = [];
     let testRecipients:string|null=null;
     let testRecipientProof:string|undefined;
     if (target.kind === 'friend_data') {
@@ -170,9 +171,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
         testRecipients=setting?.value??null;
         let eligible=false;try{const ids:unknown=JSON.parse(testRecipients??'null');eligible=Array.isArray(ids)&&ids.includes(target.id);}catch{/* 対象外 */}
         if(eligible&&testRecipients!==null){
-          const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(env.LINE_CREDENTIAL_ENCRYPTION_KEY),{name:'HMAC',hash:'SHA-256'},false,['sign']);
-          const digest=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(JSON.stringify(['cleanup-test-recipients',target.accountId,testRecipients])));
-          testRecipientProof=btoa(String.fromCharCode(...new Uint8Array(digest)));
+          testRecipientProof=await cleanupRecipientProof(env.LINE_CREDENTIAL_ENCRYPTION_KEY,target.accountId,testRecipients);
         }
       }
       for (const booking of byTable.get('bookings')?.rows ?? []) {
@@ -183,7 +182,11 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
         if(planned.length&&!env.LINE_CREDENTIAL_ENCRYPTION_KEY)throw new DeletionFailure(503,'deletion_cleanup_key_missing');
         for(const item of planned) {
           const scoped=item.provider==='google_calendar'?item:testRecipientProof?{...item,testRecipientProof}:{...item,action:'review' as const};
-          cleanup.push({id:crypto.randomUUID(),payload:JSON.stringify(await encryptCredential(JSON.stringify(scoped),env.LINE_CREDENTIAL_ENCRYPTION_KEY))});
+          const index=await cleanupIndex(env.LINE_CREDENTIAL_ENCRYPTION_KEY!,target.accountId!,item.provider,item.staffId);
+          const created=Date.now(),start=Date.parse(item.startsAt??''),minimum=created+(Number.isFinite(start)?90:730)*86400000;
+          // 将来の予定は日時を過ぎるまで、空き枠から除くための参照が要る。期限は週単位に丸める。
+          const retainUntil=Math.ceil(Math.max(minimum,Number.isFinite(start)?start+86400000:minimum)/(7*86400000))*(7*86400000);
+          cleanup.push({id:crypto.randomUUID(),index:index.index,retainUntil,payload:JSON.stringify(await encryptCredential(JSON.stringify(scoped),env.LINE_CREDENTIAL_ENCRYPTION_KEY))});
         }
       }
     }
@@ -223,8 +226,8 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
         ON actual.rowid = json_extract(expected.value,'$.rowid') WHERE ${columns.map(col => `actual.${q(col)} IS NOT json_extract(expected.value,'$.values.${col}')`).join(' OR ')})`,
         [JSON.stringify(snapshot.rows.map(row => ({ rowid: row._delete_rowid, values: Object.fromEntries(columns.map(col => [col, row[col] ?? null])) })))]));
     }
-    for(const item of cleanup) statements.push(db.prepare(`INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,status,retry_key,input_json,created_at,updated_at)
-      VALUES(?,'booking_external_cleanup',?,'current','pending',?,?,?,?)`).bind(`line:${target.accountId}`,item.id,item.id,item.payload,Date.now(),Date.now()));
+    for(const item of cleanup) statements.push(db.prepare(`INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,status,retry_key,input_json,result_json,created_at,updated_at)
+      VALUES(?,'booking_external_cleanup',?,'current','pending',?,?,?,?,?)`).bind(`line:${target.accountId}`,item.id,item.index,item.payload,JSON.stringify({retainUntil:item.retainUntil}),Date.now(),Date.now()));
     if (target.kind === 'friend_data') {
       const affiliateCondition = conditions.affiliates;
       // 承認済み保持表以外へスキーマを増やさず、既に NULL を許す参照を解除する。紹介者の名前とコードも除く。
