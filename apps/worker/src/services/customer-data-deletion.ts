@@ -148,7 +148,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       OR EXISTS (SELECT 1 FROM mileage_ledger l WHERE l.beneficiary_user_id = f.user_id OR l.beneficiary_friend_id = f.id)
     ))`;
   if (target.kind === 'friend_data') {
-    // 手渡し待ちは外部送信がなく、匿名にした交換として在庫を保持する。
+    // 手渡し待ちは外部送信がないため削除時に取消し、在庫を戻す。
     const checks = await db.batch([
       db.prepare(`SELECT 1 WHERE ${unfinishedMileage}`).bind(...(mileageCondition.includes('?3') ? params : [params[0]])),
       db.prepare(`SELECT 1 WHERE ${sharedMileage}`).bind(params[0]),
