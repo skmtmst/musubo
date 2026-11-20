@@ -6554,8 +6554,8 @@ const server = createServer((req, res) => {
     return
   }
 
-  /* ③-2 第2弾（繰り返し・同伴・行き先を分ける）の見本。送られた回数・間隔から返す。保存はしない。 */
-  if (/^\/api\/booking\/admin\/(series|bookings\/[^/]+\/group)/.test(url.pathname)) {
+  /* ③-2 第2弾（繰り返し・同伴・行き先を分ける）と外部の予定・会議の確認の見本。回数・間隔は送られた値から返す。保存はしない。 */
+  if (/^\/api\/booking\/admin\/(series|external-cleanup|bookings\/[^/]+\/group)/.test(url.pathname)) {
     let raw = ''
     req.on('data', (chunk) => { raw += chunk })
     req.on('end', () => {
