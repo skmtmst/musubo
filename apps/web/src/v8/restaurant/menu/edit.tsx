@@ -184,10 +184,9 @@ function MenuEditBody() {
         await restaurantTestApi.createMenu(selectedAccountId, { storeId, ...body, status: draft.status })
         if (!stillHere()) return
         notifySaved(draft.status === 'draft' ? '下書きのメニューを追加しました。' : 'メニューを公開しました。')
-        /* 開店準備ガイド⑥の手順3/3（枠14 hYTr8）は新しく作れた時に次へ進む。 */
-        emitGuideSignal('menu.save')
       }
       if (!stillHere()) return
+      if (draft.status === 'active' && (!editing || editing.status === 'draft')) emitGuideSignal('menu.save')
       setSaved(draft)
       router.push(LIST_HREF)
       return true
