@@ -84,6 +84,7 @@ type StaffLike = {
   readOnly: boolean;
   permissionKeys?: string[];
   viewPermissionKeys?: string[];
+  hqRole?: 'operator' | 'viewer';
 };
 
 function makeApp(db: D1Database, staff: StaffLike = { id: 'owner-1', name: 'Owner', role: 'owner', readOnly: false }) {
@@ -249,6 +250,18 @@ describe('GET /api/booking/admin/requests の担当者・種別絞り込み (N-3
     const owner = makeApp(db);
     expect((await owner.app.request('/api/booking/admin/requests/other/assignment-review?account_id=acc1', request, owner.env)).status).toBe(409);
     expect(sqlite.prepare("SELECT assignment_reviewed_at,lock_version FROM bookings WHERE id='other'").get()).toEqual({assignment_reviewed_at:null,lock_version:0});
+  });
+
+  test('統括の運用担当は確認でき、閲覧担当は確認できない', async () => {
+    insertBooking(sqlite, {id:'hq',friend:'f1'});
+    sqlite.exec("UPDATE bookings SET assignment_method='automatic' WHERE id='hq'");
+    const request = {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lock_version:0})};
+    const viewer=makeApp(db,{id:'hq-view',name:'Viewer',role:'staff',readOnly:false,hqRole:'viewer'});
+    const path='/api/booking/admin/requests/hq/assignment-review?account_id=acc1';
+    expect((await viewer.app.request(path,request,viewer.env)).status).toBe(403);
+    const operator=makeApp(db,{id:'hq-operator',name:'Operator',role:'staff',readOnly:false,hqRole:'operator'});
+    expect((await operator.app.request(path,request,operator.env)).status).toBe(200);
+    expect(sqlite.prepare("SELECT lock_version FROM bookings WHERE id='hq'").get()).toEqual({lock_version:1});
   });
 
   test('CHECK外の種別値は条件にしない（0件化で誤解させない）', async () => {
