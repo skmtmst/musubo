@@ -8,6 +8,7 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
+- [面談・飲食店の予約一覧の修正履歴](release-log/unreleased/86-kenta-1360.md)
 - [最初に読む：製品とコードの入口](START-HERE.md)
 - [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
 - [更新時のマイグレーション履歴と復旧](update-migration-history.md)
@@ -469,6 +470,10 @@
 
 ## 反映履歴
 
+- [保守時に確認する説明を整理](release-log/unreleased/121-kenta-q04-misc.md) — 反映履歴、確認 2026-11-19。
+
+- [一斉配信の自動確認を改善](release-log/unreleased/114-kenta-q02b-b11.md) — 反映履歴、確認 2026-11-18。
+
 - [自動確認の動作への置き換え](release-log/unreleased/112-kenta-q02b-b8.md) — 実際の動きで確かめる試験の履歴。確認 2026-11-18。
 
 - [SNS連携で残る3つの口の決まり](release-log/unreleased/120-kenta-sns-multilink-ports.md) — 反映履歴、確認 2026-11-18。
@@ -480,6 +485,8 @@
 - [配信と通知の内容を確かめる試験を見直し](release-log/unreleased/113-kenta-q02b-b9.md) — 反映履歴、確認 2026-11-18。
 
 - [GoogleビジネスとInstagramの複数連携（第1段）](release-log/unreleased/108-kenta-sns-multilink.md) — 反映履歴、確認 2026-11-17。
+
+- [はじめにやることと初期設定のリッチメニュー手順](release-log/unreleased/109-masato-first-steps-guide.md) — 反映履歴、確認 2026-11-17。
 
 - [自動確認を実際の画面の動きで確認](release-log/unreleased/105-kenta-q02b-b7.md) — 反映履歴、確認 2026-11-17。
 
@@ -1273,3 +1280,8 @@
 - [EC自動LINEの検証送信](release-log/unreleased/125-kenta-g6-ec-live.md) — 検証先を限定したお知らせの変更履歴。確認 2026-11-19。
 
 - [日付に左右される自動確認の修正](release-log/unreleased/90-kenta-worker-date.md) — 予約の自動確認の変更履歴。確認 2026-11-16。
+- [全画面の確かめA14の直し](release-log/unreleased/82-kenta-a14-fix.md) — フォルダの「…」・面談の表などの履歴。確認 2026-11-15。
+- [操作後のお知らせと保管確認](release-log/unreleased/81-kenta-archive-undo.md) — お知らせと保管時の操作の変更履歴。確認 2026-11-15。
+- [EC連携を止めている間の案内](release-log/unreleased/78-kenta-words-behavior.md) — 画面の案内を実際の動きに合わせた修正履歴。確認 2026-11-15。
+- [閲覧のみの作るボタン・行の操作を灰色に](release-log/unreleased/73-kenta-train-viewer.md) — 閲覧のみの人への表示をそろえた履歴。確認 2026-11-15。
+- [列車 1116](release-log/unreleased/83-kenta-train-1116.md) — まとめて入れた直しの履歴。確認 2026-11-16。

@@ -313,7 +313,10 @@ describe('V8 流入と計測の一覧', () => {
     await render()
     expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
     const create = [...host.querySelectorAll('button')].filter((button) => button.textContent?.includes('流入リンクを作る'))
-    expect(create).toHaveLength(0)
+    expect(create.length).toBeGreaterThan(0)
+    expect(create.every(button => button.getAttribute('aria-disabled') === 'true')).toBe(true)
+    await act(async () => { create[0].click() })
+    expect(host.querySelector('a[href="/inflow-links/new"]')).toBeNull()
     expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeFalsy()
     const selection = host.querySelector('[aria-label="夏のInstagram投稿をまとめて操作の対象にする"]') as HTMLInputElement
     expect(selection).toBeNull()

@@ -15,7 +15,12 @@ import unlistedRoutes from '@/test-utils/view-permission-unlisted-cases.json'
 
 const nav = vi.hoisted(() => ({ path: '/', me: vi.fn() }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => nav.path, useSearchParams: () => new URLSearchParams() }))
-vi.mock('@/lib/api', () => ({ api: { staff: { me: nav.me } } }))
+/* 開店準備ガイドの入れ物が、はじめにやることの実測（コース・担当・出来事）を通る。 */
+vi.mock('@/lib/api', () => ({
+  api: { staff: { me: nav.me } },
+  bookingApi: { listMenus: vi.fn(), listStaff: vi.fn(), getSettings: vi.fn() },
+  eventsApi: { listEvents: vi.fn() },
+}))
 const { pass } = await vi.hoisted(async () => {
   const { createElement } = await import('react')
   return { pass: (name: string) => ({ default: ({ children }: { children: React.ReactNode }) => createElement('div', { 'data-delegated': name }, children) }) }
@@ -26,7 +31,8 @@ vi.mock('./store-selection-gate', () => pass('store'))
 vi.mock('./feature-disabled-gate', () => pass('feature'))
 vi.mock('./ops/ops-shell', () => pass('ops-shell'))
 vi.mock('./mobile/mobile-shell', () => pass('mobile-shell'))
-vi.mock('@/contexts/account-context', () => ({ AccountProvider: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
+/* 開店準備ガイドの入れ物（全画面で1つ）が店を見るので、選んでいない状態を返す。 */
+vi.mock('@/contexts/account-context', () => ({ AccountProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>, useOptionalAccount: () => null }))
 vi.mock('./shell/app-top-bar', () => ({ default: () => null }))
 vi.mock('./layout/sidebar', () => ({ default: () => null }))
 vi.mock('./layout/settings-inner-nav', () => ({ default: () => null, isSettingsAreaPath: () => false }))

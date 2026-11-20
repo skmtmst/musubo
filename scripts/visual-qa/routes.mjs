@@ -45,9 +45,6 @@ export const ROUTES = [
  * `undefined の ◯◯ を読めない` を見て、その口の形だけを
  * `mock-api.mjs` の `SHAPES` に足す。配列で返る口は `api.ts` から
  * 自動で読んでいる（`api-shapes.mjs`）ので、手で足さない。
- *
- * 2026-08-26: 5件（`/` `/analytics` `/broadcasts` `/rich-menus`
- * `/automations`）を直して `ROUTES` へ移した。いまは空。
  */
 export const NOT_READY = []
 

@@ -8,6 +8,6 @@
  * Kept in lockstep with apps/worker/wrangler.toml (+ staging).
  *
  * global_fetch_strictly_public limits subrequests to the public Internet
- * route (N-366 strict-public boundary for outbound webhooks).
+ * route, preventing outbound webhooks from accessing private addresses.
  */
 export const WORKER_COMPATIBILITY_FLAGS = ['nodejs_compat', 'global_fetch_strictly_public'];

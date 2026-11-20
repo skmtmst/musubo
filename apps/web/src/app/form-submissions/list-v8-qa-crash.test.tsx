@@ -49,6 +49,8 @@ let pendingPrefixes: string[] = []
 /* 並べ替え試験：箱の一覧と入れ替え口の記録 */
 let folderFixtures: unknown[] | null = null
 const swapOrderCalls: string[] = []
+let folderListCalls = 0
+let swapResult: () => Promise<{ success: boolean; data?: { swapped: string[] } }> = async () => ({ success: true, data: { swapped: ['a', 'b'] } })
 vi.mock('@/lib/api', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
@@ -57,7 +59,7 @@ vi.mock('@/lib/api', async importOriginal => {
       if (pendingPrefixes.some((prefix) => path.startsWith(prefix))) return new Promise(() => {})
       if (path.includes('/swap-order')) {
         swapOrderCalls.push(path)
-        return { success: true, data: { swapped: ['a', 'b'] } }
+        return swapResult()
       }
       if (path.startsWith('/api/folders')) {
         if (folderFixtures) return { success: true, data: folderFixtures }
@@ -71,9 +73,9 @@ vi.mock('@/lib/api', async importOriginal => {
       ...actual.api,
       folders: {
         ...actual.api.folders,
-        list: async () => ({ success: true, data: folderFixtures ?? [] }),
+        list: async () => { folderListCalls++; return { success: true, data: folderFixtures ?? [] } },
         create: foldersCreate,
-        swapOrder: actual.api.folders.swapOrder,
+        swapOrder: async (...args: unknown[]) => { swapOrderCalls.push(String(args[0])); return swapResult() },
       },
       forms: { ...actual.api.forms, deleteImpact: formsDeleteImpact, update: formsUpdate, duplicate: formsDuplicate },
       listStats: { get: async () => ({ success: true, data: null }) },
@@ -127,6 +129,8 @@ beforeEach(() => {
   pendingPrefixes = []
   folderFixtures = null
   swapOrderCalls.length = 0
+  folderListCalls = 0
+  swapResult = async () => ({ success: true, data: { swapped: ['a', 'b'] } })
   try {
     if (window.localStorage == null) {
       const store = new Map<string, string>()
@@ -355,13 +359,15 @@ describe('V8 サクサク感 A・B', () => {
     expect(host.querySelectorAll('[data-skeleton]').length).toBeGreaterThanOrEqual(5)
   })
 
-  it('箱の並べ替えは押した瞬間に並びが変わり、保存は5秒後に送る', async () => {
+  it.each([true, false])('箱の並べ替えは即時反映して保存し、失敗時は戻す（成功: %s）', async (success) => {
     if (window.localStorage == null) return
     window.localStorage.setItem('lh_staff_role', 'admin')
     folderFixtures = [
       { id: 'f1', kind: 'form', name: '受付中', parentId: null, displayOrder: 1, color: null },
       { id: 'f2', kind: 'form', name: '準備中', parentId: null, displayOrder: 2, color: null },
     ]
+    let finish!: (value: { success: boolean; data?: { swapped: string[] } }) => void
+    swapResult = () => new Promise(resolve => { finish = resolve })
     await act(async () => { root.render(<FormSubmissionsListV8 />) })
     await flush()
     const aside = host.querySelector('aside[aria-label="フォルダ"]')
@@ -379,10 +385,22 @@ describe('V8 サクサク感 A・B', () => {
     expect(down).toBeTruthy()
     await act(async () => { fireEvent.click(down!) })
     await flush()
-    // 押した瞬間に並びが変わる。保存は5秒後なのでまだ送らない。
+    // 保存中も押した並びを保ち、保存はすぐ1回送る。
     expect(order()[1]).toContain('準備中')
     expect(order()[2]).toContain('受付中')
-    expect(swapOrderCalls.length).toBe(0)
+    expect(swapOrderCalls.length).toBe(1)
+    const readsBefore = folderListCalls
+    await act(async () => { fireEvent.change(host.querySelector('input[placeholder="フォーム名・質問文"]')!, { target: { value: '来店' } }) })
+    await flush()
+    expect(folderListCalls).toBeGreaterThan(readsBefore)
+    expect(order()[1]).toContain('準備中')
+    expect(order()[2]).toContain('受付中')
+    if (success) folderFixtures = [folderFixtures![1], folderFixtures![0]]
+    await act(async () => { finish({ success, data: { swapped: ['f1', 'f2'] } }) })
+    await flush()
+    expect(order()[1]).toContain(success ? '準備中' : '受付中')
+    expect(order()[2]).toContain(success ? '受付中' : '準備中')
+    expect(swapOrderCalls.length).toBe(1)
   })
 })
 

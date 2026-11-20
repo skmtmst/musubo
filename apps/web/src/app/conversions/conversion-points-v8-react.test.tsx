@@ -1,3 +1,4 @@
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { findDetailMenuItem } from '@/test-utils/detail-menu'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
@@ -252,7 +253,7 @@ test('行から右の詳細を開き、停止の確認では理由を必須に�
   expect(stopBodies).toEqual([expect.objectContaining({ reason: '計測の仕方を変えるため', expectedVersion: 3 })])
 })
 
-test('v8 の閲覧のみでは帯が出て、作る操作は置かない（押せない形でも置かない・2026-10-06 オーナー）', async () => {
+test('v8 の閲覧のみは帯と作る操作の理由を出す', async () => {
   staffRole = verifiedStaffRole('viewer')
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<ConversionsPage />))
@@ -264,7 +265,9 @@ test('v8 の閲覧のみでは帯が出て、作る操作は置かない（押�
     expect(host.textContent).toContain('閲覧のみで見ています')
   })
   const createLinks = [...host.querySelectorAll('a, button')].filter((element) => element.textContent?.includes('成果地点を作る'))
-  expect(createLinks).toEqual([])
+  expect(createLinks.length).toBeGreaterThan(0)
+  for (const button of createLinks) await expectPermissionLocked(button)
+  expect(host.querySelector('a[href="/conversions/new"]')).toBeNull()
   expect(host.querySelector('button[disabled][title="この操作にはオーナーか管理者の権限が要ります"]')).toBeNull()
   expect(posted).toEqual([])
 })
