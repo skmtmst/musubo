@@ -16,8 +16,9 @@ function seed() {
 }
 it('要対応と未割り当てを分けて表示し担当確認を送る', async () => {
   seed(); mocks.review.mockResolvedValue({ success: true }); render(<BookingReception onOpen={() => {}} canOperate />)
-  expect(await screen.findByText('要対応 2件以上・未割り当て 1件以上・承認待ち 1件（今日以降）')).toBeTruthy()
+  expect(await screen.findByText('要対応 2件・未割り当て 1件・承認待ち 1件（今日以降）')).toBeTruthy()
   expect(screen.getByText(/記録前の予約/)).toBeTruthy()
+  expect(screen.getAllByText('11/20（金）14:00')).toHaveLength(3)
   const tabs = screen.getByRole('group', { name: '予約受付の絞り込み' })
   fireEvent.click(within(tabs).getByRole('button', { name: '未割り当て' }))
   await waitFor(() => expect(screen.queryByText('待ち')).toBeNull())
@@ -56,11 +57,11 @@ it('件数が減って最後のページがなくなれば前のページに戻�
   expect(await screen.findByText('待ち0')).toBeTruthy()
   expect(screen.queryByText('今日以降の該当する予約はありません')).toBeNull()
 })
-it('記録前の予約がある場合、未割り当てを0件と断定しない', async () => {
+it('記録前の予約を件数の注記と空の表示で伝える', async () => {
   mocks.list.mockResolvedValue({ requests: [row('記録前', 'confirmed', 'unknown')], total: 1, requestedCount: 0, unassignedCount: 0, attentionCount: 0, unknownCount: 1 })
   render(<BookingReception onOpen={() => {}} />)
-  expect(await screen.findByText(/未割り当て 確認できません/)).toBeTruthy()
-  expect(screen.queryByText(/未割り当て 0件/)).toBeNull()
+  expect(await screen.findByText(/未割り当て 0件/)).toBeTruthy()
+  expect(screen.getByText(/記録前の予約/)).toBeTruthy()
   mocks.list.mockResolvedValue({ requests: [], total: 0, requestedCount: 0, unassignedCount: 0, attentionCount: 0, unknownCount: 1 })
   fireEvent.click(within(screen.getByRole('group', {name:'予約受付の絞り込み'})).getByRole('button', {name:'未割り当て'}))
   expect(await screen.findByText('担当の記録前の予約があるため、すべては確認できません')).toBeTruthy()
