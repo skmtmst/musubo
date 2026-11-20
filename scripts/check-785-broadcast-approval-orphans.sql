@@ -1,4 +1,4 @@
--- 読み取り専用。0 件以外なら 785 を適用せず、参照元の確認・対処を行う。
+-- 読み取り専用。785 適用時に配信 ID が NULL になる承認履歴を数える。
 SELECT COUNT(*) AS orphan_count
 FROM broadcast_approval_events AS approval
 LEFT JOIN broadcasts AS broadcast ON broadcast.id = approval.broadcast_id

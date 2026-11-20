@@ -23,28 +23,19 @@ it('785 の事前点検は空の表では 0 件、孤児を含めるとその件
   db.close();
 });
 
-it('孤児がある状態で 785 を実行すると、参照を NULL にせず外部キー違反で止まる', () => {
+it('孤児があっても履歴を保ち、存在しない参照だけ NULL にする', () => {
   const db = oldSchema();
   db.pragma('foreign_keys = OFF');
-  db.exec("INSERT INTO broadcast_approval_events(id,broadcast_id,actor_staff_id,action) VALUES ('orphan','missing','staff','approved')");
+  db.exec("INSERT INTO broadcasts VALUES ('b1'); INSERT INTO broadcast_approval_events(id,broadcast_id,actor_staff_id,action,reason,created_at) VALUES ('orphan','missing','staff','approved','reason','2026-01-01'),('valid','b1','other','rejected',NULL,'2026-01-02')");
   db.pragma('foreign_keys = ON');
   expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
-  expect(() => db.exec(readFileSync(join(migrationDir, '785_broadcast_approval_retention.sql'), 'utf8'))).toThrow(/FOREIGN KEY constraint failed/);
-  expect(db.prepare('SELECT id,broadcast_id FROM broadcast_approval_events').all()).toEqual([{ id: 'orphan', broadcast_id: 'missing' }]);
-  expect(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='broadcast_approval_events_new'").get()).toBeDefined();
-  db.close();
-});
-
-it('トランザクション内の失敗はロールバックで一時表を残さない', () => {
-  const db = oldSchema();
-  db.pragma('foreign_keys = OFF');
-  db.exec("INSERT INTO broadcast_approval_events(id,broadcast_id,actor_staff_id,action) VALUES ('orphan','missing','staff','approved')");
-  db.pragma('foreign_keys = ON');
-  db.exec('BEGIN');
-  expect(() => db.exec(readFileSync(join(migrationDir, '785_broadcast_approval_retention.sql'), 'utf8'))).toThrow(/FOREIGN KEY constraint failed/);
-  db.exec('ROLLBACK');
+  db.exec(readFileSync(join(migrationDir, '785_broadcast_approval_retention.sql'), 'utf8'));
+  expect(db.prepare('SELECT id,broadcast_id,actor_staff_id,action,reason,created_at FROM broadcast_approval_events ORDER BY id').all()).toEqual([
+    { id: 'orphan', broadcast_id: null, actor_staff_id: 'staff', action: 'approved', reason: 'reason', created_at: '2026-01-01' },
+    { id: 'valid', broadcast_id: 'b1', actor_staff_id: 'other', action: 'rejected', reason: null, created_at: '2026-01-02' },
+  ]);
   expect(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='broadcast_approval_events_new'").get()).toBeUndefined();
-  expect(db.prepare('SELECT id,broadcast_id FROM broadcast_approval_events').all()).toEqual([{ id: 'orphan', broadcast_id: 'missing' }]);
+  expect(db.pragma('foreign_key_check')).toEqual([]);
   db.close();
 });
 
