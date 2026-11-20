@@ -79,8 +79,47 @@ const NON_TEMPLATE_PATHS: Array<{ file: string; label: string }> = [
 const LINE_SEND_PATTERN =
   /\.(pushMessage|replyMessage|multicast|broadcast|narrowcast)(WithRequestId)?\s*\(/;
 
+// これらの送信口は、未解決の値を実際に送らない動作試験で守る。
+// routes/auto-reply-unmatched.test.ts / features/forms/form-layout-effects.test.ts /
+// routes/friend-add-rules-f12-test-send.test.ts / features/automations/automation-action-executors.test.ts /
+// features/rich-menus/rich-menu-tap.test.ts / services/dedup-broadcast.test.ts /
+// routes/chats-send-interpolation.test.ts と services/scheduled-chat-sends.test.ts、
+// carousel-tap-common-vars / scenario-test-send / auto-reply-runs / event-bus /
+// reminder-delivery / immediate-first-step-pinned / broadcast-wide-context /
+// broadcast-common-var-validity / operator-notification-dispatch / step-delivery-pinned
+const BEHAVIOR_TESTED = new Set([
+  'features/auto-replies/auto-reply-unmatched.ts',
+  'features/forms/form-layout-effects.ts',
+  'routes/friend-add-rules.ts',
+  'features/automations/automation-action-handlers.ts',
+  'features/rich-menus/rich-menu-tap.ts',
+  'services/dedup-broadcast.ts',
+  'services/manual-send-interpolation.ts',
+  'services/carousel-tap.ts',
+  'features/scenarios/scenario-test-send.ts',
+  'features/auto-replies/auto-reply.ts',
+  'services/event-bus.ts',
+  'services/reminder-delivery.ts',
+  'services/immediate-first-step.ts',
+  'features/broadcasts/broadcast-wide-context.ts',
+  'features/broadcasts/broadcast.ts',
+  'services/operator-notification-dispatch.ts',
+  'services/step-delivery.ts',
+  // 対応する実送信・試験送信は各機能の動作試験で検証する。
+  'features/hq-broadcasts/hq-broadcast-details.ts',
+  'features/broadcasts/broadcast-ab-live.ts',
+  'routes/friends.ts',
+  'routes/broadcasts.ts',
+  'features/scenarios/scenario-question-answer.ts',
+  'routes/forms.ts',
+  'routes/ec-commerce.ts',
+  'routes/webhook.ts',
+  'features/ec-commerce/ec-event-processing.ts',
+  'routes/liff.ts',
+]);
+
 describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () => {
-  for (const { file, mustCall, label } of SEND_PATHS) {
+  for (const { file, mustCall, label } of SEND_PATHS.filter(path => !BEHAVIOR_TESTED.has(path.file))) {
     it(`${label}（${file}）は ${mustCall} を使う`, () => {
       const source = read(file);
       expect(source).toContain(mustCall);

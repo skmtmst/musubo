@@ -4,7 +4,6 @@
  * ここを取り違えると、**画面が真っ白になる**。一覧の口が
  * `{items:[],total:0}` に落ちれば `xxx.filter is not a function`、
  * 1件返す口が `[]` に落ちれば `undefined.toLocaleString()` になる。
- * どちらも実際に起きた（2026-08-26）。
  */
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。

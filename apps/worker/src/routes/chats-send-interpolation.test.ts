@@ -208,6 +208,14 @@ describe('手動送信の差し込み(N-026)', () => {
     expect(outbox()).toHaveLength(2); // 成功分の image+text のみ
   });
 
+  test('画像付き送信の共通情報の失敗記録は会話の出所を持つ', async () => {
+    const response=await postCombined({image:{originalContentUrl:'https://x/o.jpg',previewImageUrl:'https://x/p.jpg'},text:'営業時間: {{var.deleted_key}}'},KEY6);
+    expect(response.status).toBe(400);
+    expect(pushMessage).not.toHaveBeenCalled();
+    expect(sqlite.raw.prepare('SELECT source_kind,source_id,var_key,reason FROM common_var_resolution_failures').all())
+      .toEqual([{source_kind:'chat',source_id:'fr-1',var_key:'deleted_key',reason:'missing'}]);
+  });
+
   test('消えた共通情報は空文字にせず400で止め、失敗台帳へ変数名を残す(N-189)', async () => {
     const res = await postSend({ content: '営業時間: {{var.deleted_key}}', revision: 0 }, KEY5);
     expect(res.status).toBe(400);

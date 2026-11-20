@@ -52,6 +52,15 @@ async function openMove() {
   return { dialog, checks, first }
 }
 
+it('未分類へ移すと空文字ではなくnullを送る', async () => {
+  const { dialog } = await openMove()
+  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '移動先のフォルダ' })) })
+  await act(async () => { fireEvent.click(within(screen.getByRole('option', { name: '未分類', exact: true })).getByRole('button')) })
+  expect(within(dialog).getByRole('button', { name: '移動先のフォルダ' }).textContent).toBe('未分類')
+  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '移動する' })) })
+  await waitFor(() => expect(net.update.mock.calls).toEqual([['r1', { folderId: null }], ['r2', { folderId: null }]]))
+})
+
 it('移動の失敗は窓に具体的な理由を出し、移動先と選択を保ち、保存済みを除いて未完了だけ再試行する', async () => {
   net.update.mockResolvedValueOnce({ success: true, data: {} }).mockRejectedValueOnce(new Error('通信できませんでした。'))
   const { dialog, checks } = await openMove()

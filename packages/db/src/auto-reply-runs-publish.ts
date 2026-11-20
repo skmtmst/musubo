@@ -224,9 +224,8 @@ export async function ensureAutoReplyPublishedVersion(
   const id = crypto.randomUUID();
   /*
    * 実行の同一判定に混ぜない運用項目は、実行版を張り替えても引き継ぐ。
-   * 引き継がないと、従来の更新口（PUT /api/auto-replies/:id）で定義を
-   * 直したあとの初回評価で、新版に社内メモが載らず編集画面から消える
-   * （AUTOREPLY-09）。
+   * 引き継がないと、更新口（PUT /api/auto-replies/:id）で定義を更新した
+   * 後に社内メモが編集画面から消える（AUTOREPLY-09）。
    */
   const previous = current ?? (latest?.status === 'published' ? latest : null);
   let snapshotToSave = snapshot;

@@ -97,9 +97,6 @@ export default function AssignMatrixV8() {
   const [grid, setGrid] = useState<Record<string, Record<string, StaffMenuMatrix>>>({})
   /* 保存済みの表を控えておき、差分が未保存と分かるようにする（管理画面 #975 U075 と同じ）。 */
   const [savedGrid, setSavedGrid] = useState<Record<string, Record<string, StaffMenuMatrix>> | null>(null)
-  /** 「元に戻す」が新しい書きかけを消さないための、今の表の写し。 */
-  const gridRef = useRef(grid)
-  gridRef.current = grid
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   /** 保存が終わった直後の1.2秒だけ、保存ボタンに完了（✓）を出す。 */
@@ -198,7 +195,7 @@ export default function AssignMatrixV8() {
     }))
   }
 
-  /** 表1枚ぶんを一括の口へ流す。元に戻すときも同じ口を使う。 */
+  /** 表1枚ぶんを一括の口へ流す。 */
   async function putGrid(next: Record<string, Record<string, StaffMenuMatrix>>) {
     await bookingApi.putStaffMenusBulk(
       selectedAccountId!,
@@ -225,7 +222,6 @@ export default function AssignMatrixV8() {
 
   async function saveAll() {
     if (!selectedAccountId) return
-    const before = savedGrid ?? grid
     setSaving(true)
     setSaveDone(false)
     setError(null)
@@ -233,10 +229,7 @@ export default function AssignMatrixV8() {
       await putGrid(grid)
       setSavedGrid(grid)
       flashDone()
-      notifySaved('保存しました', {
-        actionLabel: '元に戻す',
-        onAction: () => void undoSave(before, grid),
-      })
+      notifySaved('保存しました')
     } catch (e) {
       const fieldFailure = saveErrors.capture(e)
 
@@ -250,34 +243,6 @@ export default function AssignMatrixV8() {
     }
   }
 
-  /** 保存直後の「元に戻す」：保存前の表を同じ一括の口で入れ直す。 */
-  async function undoSave(before: Record<string, Record<string, StaffMenuMatrix>>, after: Record<string, Record<string, StaffMenuMatrix>>) {
-    if (!selectedAccountId) return
-    if (JSON.stringify(gridRef.current) !== JSON.stringify(after)) {
-      notifyToast('ほかの変更が入ったため、元に戻せませんでした')
-      return
-    }
-    setSaving(true)
-    setSaveDone(false)
-    setError(null)
-    try {
-      await putGrid(before)
-      setGrid(before)
-      setSavedGrid(before)
-      flashDone()
-      notifyToast('元に戻しました')
-    } catch (e) {
-      const fieldFailure = saveErrors.capture(e)
-
-      { if (!fieldFailure)
-
-      setError(
-        `${withPermissionFailure(e, describeSaveFailure(e), 'store')}（元に戻せませんでした。画面を再読み込みして最新の状態を確認してください）`,
-      ) }
-    } finally {
-      setSaving(false)
-    }
-  }
 
   /* 「いま受付できる人数」（有効の担当だけ）と「割ってある人数」を分ける（管理画面 R308 と同じ）。 */
   const assignedCounts = useMemo(() => {

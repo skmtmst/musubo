@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
@@ -175,6 +175,96 @@ describe('N-032 friend stats account scope integration (#664)', () => {
       addBreakdown: expectedIds.length,
       stats: expectedIds.length,
     });
+  });
+
+  it('分析対象は同じ店の有効期限内の会員だけに限定する', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-17T00:00:00.000Z'));
+    try {
+      testDb.raw.exec(`
+        INSERT INTO staff_members(id,name,role,access_level,api_key,permission_keys,account_scope,tenant_id)
+          VALUES ('owner','管理者','owner','full','key-owner','[]','all','${DEFAULT_TENANT_ID}'),
+          ('admin','副管理者','admin','full','key-admin','[]','all','${DEFAULT_TENANT_ID}');
+        INSERT INTO analytics_cross_runs(id,line_account_id,query_json,state,period_from,period_to,time_zone,data_cutoff_at,created_at)
+          VALUES ('result','account-a','{}','available','2026-11-01','2026-11-16','Asia/Tokyo','2026-11-17T00:00:00.000Z','2026-11-17T00:00:00.000Z');
+        INSERT INTO analytics_result_audiences(id,line_account_id,source_kind,source_result_id,selection_key,member_count,expires_at,created_at)
+          VALUES ('audience','account-a','cross','result','all',1,'2026-11-18T00:00:00.000Z','2026-11-17T00:00:00.000Z');
+        INSERT INTO analytics_result_audience_members(audience_id,friend_id) VALUES ('audience','friend-a-1');
+      `);
+      const path = '/api/friends?lineAccountId=account-a&audienceId=audience&includeTags=false';
+      const response = await get(path, 'key-owner');
+      expect(response.status).toBe(200);
+      const data = await response.json<FriendListResponse>();
+      expect(data.data.items.map(item => item.id)).toEqual(['friend-a-1']);
+      const admin = await get(path, 'key-admin');
+      expect(admin.status).toBe(200);
+      expect((await admin.json<FriendListResponse>()).data.items.map(item => item.id)).toEqual(['friend-a-1']);
+      expect((await get(path, 'key-all')).status).toBe(403);
+      expect((await get(path.replace('account-a', 'account-b'), 'key-owner')).status).toBe(404);
+      vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z'));
+      const expired = await get(path, 'key-owner');
+      expect(expired.status).toBe(410);
+      expect(await expired.json()).toMatchObject({ error: 'この分析結果の対象者は24時間を過ぎました。もう一度集計してください' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('担当と配信中シナリオで絞ってから件数とページを決める', async () => {
+    insertFriend(testDb.raw, 'friend-a-unassigned', { line_account_id: 'account-a' });
+    testDb.raw.exec(`
+      INSERT INTO operators(id,name,email) VALUES ('operator','担当','operator@example.test');
+      INSERT INTO chats(id,friend_id,operator_id,status,created_at,updated_at) VALUES
+        ('chat1','friend-a-1','operator','unread','2026','2026'),
+        ('chat2','friend-a-2','operator','unread','2026','2026');
+      INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES ('scenario','案内','manual','account-a');
+      INSERT INTO friend_scenarios(id,friend_id,scenario_id,status) VALUES
+        ('fs1','friend-a-1','scenario','active'),('fs2','friend-a-2','scenario','delivering'),
+        ('fs3','friend-b-1','scenario','completed'),('fs4','friend-a-unassigned','scenario','active');
+    `);
+    const path = '/api/friends?lineAccountId=account-a&operatorId=operator&scenarioId=scenario&limit=1&includeTags=false';
+    const first = await (await get(path + '&offset=0', 'key-all')).json<FriendListResponse>();
+    const second = await (await get(path + '&offset=1', 'key-all')).json<FriendListResponse>();
+    expect(first.data.total).toBe(2);
+    expect(second.data.total).toBe(2);
+    expect([...first.data.items, ...second.data.items].map(item => item.id).sort()).toEqual(['friend-a-1', 'friend-a-2']);
+    testDb.raw.prepare("UPDATE friend_scenarios SET status='completed' WHERE id='fs1'").run();
+    const remaining = await (await get(path, 'key-all')).json<FriendListResponse>();
+    expect(remaining.data.total).toBe(1);
+    expect(remaining.data.items.map(item => item.id)).toEqual(['friend-a-2']);
+  });
+
+  it('一覧に担当者と対応マークの情報を返す', async () => {
+    testDb.raw.exec(`
+      INSERT INTO operators(id,name,email) VALUES ('operator','担当','operator@example.test');
+      INSERT INTO chats(id,friend_id,operator_id,status,created_at,updated_at)
+        VALUES ('chat1','friend-a-1','operator','unread','2026','2026');
+      INSERT INTO support_marks(id,name,color) VALUES ('mark','対応中','#123456');
+      UPDATE friends SET support_mark_id='mark' WHERE id='friend-a-1';
+    `);
+    const response = await get('/api/friends?lineAccountId=account-a&includeChatStatus=true&includeTags=false', 'key-all');
+    expect(response.status).toBe(200);
+    const { data } = await response.json<{data:{items:Array<{id:string;operator:unknown;supportMark:unknown}>}}>();
+    const first = data.items.find(item => item.id === 'friend-a-1');
+    const second = data.items.find(item => item.id === 'friend-a-2');
+    expect(first).toMatchObject({ operator: { id: 'operator', name: '担当' }, supportMark: { id: 'mark', name: '対応中', color: '#123456' } });
+    expect(second).toMatchObject({ operator: null, supportMark: null });
+  });
+
+  it('情報欄の null はキーを削除し、文字列以外を拒む', async () => {
+    testDb.raw.prepare("UPDATE friends SET metadata=? WHERE id='friend-a-1'")
+      .run(JSON.stringify({ important: 'yes', memo: 'keep' }));
+    const update = (body: unknown) => target.app.request('/api/friends/friend-a-1/metadata', {
+      method: 'PUT', headers: { Authorization: 'Bearer key-all', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, target.env);
+    expect((await update({ important: null })).status).toBe(200);
+    const row = () => testDb.raw.prepare("SELECT metadata FROM friends WHERE id='friend-a-1'").get() as { metadata: string };
+    expect(JSON.parse(row().metadata)).toEqual({ memo: 'keep' });
+    const invalid = await update({ memo: 123 });
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({ error: 'metadata values must be string or null' });
+    expect(JSON.parse(row().metadata)).toEqual({ memo: 'keep' });
   });
 
   it('詳細条件と保存条件は情報欄の保存値で同じ友だちを選ぶ', async () => {

@@ -155,6 +155,7 @@ test('同じ行を続けて操作しても更新は1回だけ送る', async ({ p
   pending[0].respond({ success: true, data: {} })
   await reloaded
   await expect(page.getByRole('row').filter({ hasText: name })).not.toContainText('切り替え中')
+  await expect(page.getByRole('status', { name: '知らせ', exact: true }).getByRole('button', { name: '元に戻す' })).toHaveCount(0)
 })
 
 for (const order of ['failure-first', 'success-first'] as const) {

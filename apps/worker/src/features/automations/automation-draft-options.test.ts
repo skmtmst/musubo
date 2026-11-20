@@ -125,8 +125,7 @@ describe('下書きの選択可能一覧(#734)', () => {
    */
   it('S4: 共有の処理 ⊆ 実行器の鍵（共通アクションは展開・待機はエンジンで処理）', () => {
     const keys = new Set(Object.keys(createAutomationActionExecutors({})));
-    const engine = readFileSync(join(import.meta.dirname, "automation-engine.ts"), 'utf8');
-    expect(engine).toContain("action.type === 'common_action'");
+    // 共通アクションの展開と版の固定は automation-engine.test.ts が実行して確かめる。
     for (const option of AUTOMATION_DRAFT_ACTION_OPTIONS) {
       if (option.value === 'common_action' || option.value === 'wait') continue;
       expect(keys.has(option.value), `実行器に無い処理: ${option.value}`).toBe(true);

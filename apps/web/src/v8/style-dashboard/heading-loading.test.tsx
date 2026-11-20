@@ -27,6 +27,7 @@ vi.mock('@/v8/restaurant/front-desk/public/phone-drawer/index', () => ({ PhoneRe
 vi.mock('@/v8/restaurant/front-desk/public/walk-in-dialog/index', () => ({ WalkInDialog: ({ open, storeId }: { open: boolean; storeId: string }) => open ? <div role="dialog" aria-label="ウォークイン受付">{storeId}</div> : null }))
 
 import StyleDashboard from './style-dashboard'
+import { firstRunPopupDismissedKey } from '@/v8/dashboard/first-run-popup'
 import { buildStepsFromApi } from '@/v8/settings/getting-started/steps'
 
 const metric = (value: number, unit = '件') => ({ value, status: 'available' as const, unit, formula: '選択した期間の実集計' })
@@ -35,6 +36,8 @@ const schedule: StyleSchedule = { style: 'restaurant', from: snapshot.from, to: 
 
 beforeEach(() => {
   vi.clearAllMocks()
+  /* ここは見出しの操作だけを見る。初回ポップアップ（枠02/02b）は閉じた後の状態にして重ねない。 */
+  for (const id of ['a', 'b']) localStorage.setItem(firstRunPopupDismissedKey(id), '1')
   storeState.store = null; storeState.snapshot = null; storeState.tableDefinition = undefined; storeState.loading = true; storeState.error = null
   state.role = 'admin'
   state.search = ''
@@ -47,7 +50,7 @@ beforeEach(() => {
   state.summary.mockResolvedValue({ data: snapshot })
   state.schedule.mockResolvedValue({ success: true, data: schedule })
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); localStorage.clear() })
 
 const heading = () => within(document.querySelector('[data-template-region="heading"]') as HTMLElement)
 const actions = () => document.querySelector('[data-page-heading-actions]')!

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
+import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 import {
   createScenario,
   createScenarioStep,
@@ -84,6 +85,26 @@ describe('processStepDeliveries の版固定（実D1）', () => {
     const enrollment = (await enrollFriendInScenario(testDb.db, 'friend-1', scenario.id))!;
     return { scenario, step1, enrollment };
   }
+
+  it('シナリオの配信は未解決の共通情報を送らない', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-17T00:00:00Z'));
+    useSqliteClock(testDb.raw, () => new Date());
+    try {
+      testDb.raw.prepare("INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES('account','店','ch','token','secret')").run();
+      const scenario = await createScenario(testDb.db, { name: '案内', triggerType: 'manual' });
+      testDb.raw.prepare("UPDATE scenarios SET line_account_id='account' WHERE id=?").run(scenario.id);
+      await createScenarioStep(testDb.db, { scenarioId: scenario.id, stepOrder: 0, messageType: 'text', messageContent: '営業時間: {{var.hours}}' });
+      insertFriend(testDb.raw, 'friend-1', { line_user_id: 'U-friend-1', line_account_id: 'account' });
+      await publishScenarioVersion(testDb.db, scenario.id, { staffId: null, idempotencyKey: 'cron-var' });
+      await enrollFriendInScenario(testDb.db, 'friend-1', scenario.id);
+      const { sent, client } = pushHarness();
+      await processStepDeliveries(testDb.db, client as never);
+      expect(sent).toEqual([]);
+      expect(accountSends).toEqual([]);
+      expect(testDb.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+    } finally { vi.useRealTimers(); }
+  });
 
   it('配信停止の人には送らず、購読を一時停止する',async()=>{
     const {enrollment}=await seedPublished();
