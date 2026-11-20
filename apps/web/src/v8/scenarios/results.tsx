@@ -21,6 +21,7 @@ import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources';
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
+import HelpTip from '@/components/shared/help-tip';
 import ScenarioResultSummary from './result-summary'
 import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -593,8 +594,8 @@ export default function ScenarioResultsV8() {
                     return (
                       <GridRow key={sub.id} data-subscription-status={sub.status}>
                         <GridNameCell folder={false} name={<TruncatedText value={sub.friendName} />} />
-                        <GridCell title={sub.pauseReason === 'delivery_unconfirmed' ? DELIVERY_UNCONFIRMED_REASON : sub.pauseReason === 'common_var_unavailable' ? '固定した共通情報の状態や期限を確認してください' : undefined}>
-                          {sub.pauseReason === 'delivery_unconfirmed' ? <DeliveryUnconfirmedBadge /> : <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>}
+                        <GridCell title={sub.pauseReason === 'delivery_unconfirmed' ? DELIVERY_UNCONFIRMED_REASON : undefined}>
+                          {sub.pauseReason === 'delivery_unconfirmed' ? <DeliveryUnconfirmedBadge /> : sub.pauseReason === 'common_var_unavailable' ? <HelpTip hover tone="dark" label="要確認の理由" trigger={<StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>}>固定した共通情報の状態や期限を確認してください</HelpTip> : <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>}
                         </GridCell>
                         <GridCell>{sub.currentDisplayOrder !== undefined ? (sub.currentDisplayOrder === null ? '—' : `${sub.currentDisplayOrder} 通目まで`) : sortedSteps.some((step) => step.stepOrder === sub.currentStepOrder) ? `${sortedSteps.findIndex((step) => step.stepOrder === sub.currentStepOrder) + 1} 通目まで` : '—'}</GridCell>
                         <GridCell><TruncatedText value={nextLabel(sub)} /></GridCell>

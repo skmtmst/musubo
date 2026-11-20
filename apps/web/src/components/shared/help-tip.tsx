@@ -25,6 +25,7 @@ export default function HelpTip({
   hover = false,
   placement = 'below',
   reserveSpace = false,
+  tone = 'default',
   children,
 }: {
   /** 読み上げ名（例：「今月の完了率の説明」）。吹き出しとは aria-describedby でつなぐ。 */
@@ -37,6 +38,8 @@ export default function HelpTip({
   placement?: 'above' | 'below'
   /** 開いた説明が次の本文を覆わないよう高さを確保する。 */
   reserveSpace?: boolean
+  /** 注意・停止理由を黒い吹き出しで示す。 */
+  tone?: 'default' | 'dark'
   /**
    * 1〜2文の補足。長い説明がある場所への「くわしく」リンクも
    * ここへ一緒に渡す（`<a href="...">くわしく</a>`）。
@@ -143,7 +146,7 @@ export default function HelpTip({
         {trigger ?? <span aria-hidden="true">{icon ? <span className={styles.sourceMark}>{icon}</span> : <CircleHelp className={styles.markIcon} strokeWidth={1.75} aria-hidden="true" data-help-mark="" />}</span>}
       </button>
       {open ? (
-        <span ref={tipRef} role="note" id={tipId} className={styles.tip} style={position}>
+        <span ref={tipRef} role="note" id={tipId} className={styles.tip} data-tone={tone} style={position}>
           {children}
         </span>
       ) : null}

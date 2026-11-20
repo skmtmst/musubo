@@ -32,4 +32,14 @@ describe('固定できない理由', () => {
     fireEvent.keyDown(item, { key: 'Enter' })
     expect(choose).not.toHaveBeenCalled()
   })
+  it('保存前の変更は項目内の理由を示して固定を無効にする', async () => {
+    const choose = vi.fn()
+    render(<UsageReferenceMenu usage={base} version={2} canPin valueChanged busy={false} onChoose={choose} />)
+    fireEvent.click(screen.getByRole('button', { name: '案内の操作' }))
+    const item = await screen.findByRole('menuitem', { name: /版 2 で固定/ })
+    expect(item.hasAttribute('disabled')).toBe(true)
+    expect(item.textContent).toContain('変更を保存してから固定してください')
+    expect(choose).not.toHaveBeenCalled()
+  })
+
 })
