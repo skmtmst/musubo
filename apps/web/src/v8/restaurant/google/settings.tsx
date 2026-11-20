@@ -1,7 +1,7 @@
 'use client'
 import { useGooglePermission } from './use-google-permission'
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link2, RefreshCw } from 'lucide-react'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
@@ -14,6 +14,7 @@ import { errorMessage, formatYmd } from './format'
 import styles from './google.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 
 
 /*
@@ -50,6 +51,18 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
   // 店舗の選択待ちなのに前の店舗名が残っている＝別の店舗へ切り替えようとしている状態。
   const previousTitle = connection.status === 'pending_location' ? connection.locationTitle : null
   const switchingLocation = Boolean(connection.locationName) && selectedLocation !== '' && selectedLocation !== connection.locationName
+
+  /*
+    開店準備ガイド⑤時間の手順1/2（枠14 Nm43L）は、押した時ではなく
+    Googleとつながった時に2/2へ進める（差し戻し R4）。
+    認可画面から戻って「接続済み」になり、取り込む対象の店舗が決まった時だけが成功の合図。
+    店舗の選択待ち・期限切れ・権限なしは営業時間を取り込めないので合図を出さず、1/2に留まる
+    （Worker の requireConnectedStore も同じ条件で断る: 差し戻し R4 の再修正）。
+  */
+  const googleLinked = connection.status === 'connected' && Boolean(connection.locationName)
+  useEffect(() => {
+    if (googleLinked) emitGuideSignal('hours.googleConnect')
+  }, [googleLinked])
 
   const startConnect = async () => {
     if (!canManage || busy || !data.oauthConfigured) return
@@ -117,12 +130,13 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
     return (
       <SaveErrorScope errors={saveErrors}><div className={styles.connectionPanel}>
         <SectionHeader size="small" title={<span id="google-connect-title">Googleアカウントを接続</span>} />
-        <p className={styles.preText}>{'店舗を管理しているGoogleアカウントでログインしてください。\n接続する店舗は、1つのLINEアカウントにつき1店舗です。'}</p>
+        <p className={styles.preText}>{'店舗を管理しているGoogleアカウントでログインしてください。'}</p>
         {!data.oauthConfigured ? <Notice tone="warn">この環境にはGoogle接続の設定がありません。運営に連絡してください。</Notice> : null}
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
         {(
           <div className={styles.buttonRow}>
-            <Button lockedReason={lockedReason} variant="primary" onClick={() => void startConnect()} disabled={!canManage || busy || !data.oauthConfigured} busy={Boolean(busy)} busyLabel="処理中…"><Link2 aria-hidden className={styles.icon16} />接続する</Button>
+            {/* 開店準備ガイド⑤の手順1/2（枠14 Nm43L）の光らせる先。 */}
+            <Button data-guide-anchor="hours.googleConnect" lockedReason={lockedReason} variant="primary" onClick={() => void startConnect()} disabled={!canManage || busy || !data.oauthConfigured} busy={Boolean(busy)} busyLabel="処理中…"><Link2 aria-hidden className={styles.icon16} />接続する</Button>
           </div>
         )}
         <p className={styles.grayNote}>初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。接続後は、このLINEアカウントの店舗だけを表示します。</p>

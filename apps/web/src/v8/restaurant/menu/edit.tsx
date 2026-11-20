@@ -38,6 +38,7 @@ import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-test-api'
 import { MenuPaymentFields, PaymentConflictError, PaymentSideCard, useMenuPayment } from '@/v8/booking-payments/public/menu-payment/index'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-overlay/index'
 import styles from './edit.module.css'
 
 /*
@@ -141,6 +142,8 @@ function MenuEditBody() {
   const exceedsPriceLimit = (!editing || priceChanged) && Number(draft.price) > 1_000_000
   const valid = draft.name.trim() !== '' && draft.price !== '' && Number.isInteger(Number(draft.price)) && Number(draft.price) >= 0 && !exceedsPriceLimit
   const durationError = !course ? undefined : draft.duration === '' ? '所要時間を入力してください。' : !Number.isInteger(Number(draft.duration)) || Number(draft.duration) < 15 || Number(draft.duration) > 600 ? '所要時間は15〜600分の整数で入力してください。' : undefined
+  /* 開店準備ガイド⑥の手順2/3（枠14 KI5X0）は基本を入れ終えた時に次へ進む。 */
+  useEffect(() => { if (valid) emitGuideSignal('menu.form') }, [valid])
   const priceError = draft.price === '' ? undefined : Number(draft.price) < 0 ? '値段は0円以上で入れてください。' : exceedsPriceLimit ? '値段は1,000,000円以下で入れてください。' : !Number.isInteger(Number(draft.price)) ? '値段は整数で入れてください。' : undefined
 
   const [confirmationScope, setConfirmationScope] = useState('')
@@ -184,6 +187,8 @@ function MenuEditBody() {
         await restaurantTestApi.createMenu(selectedAccountId, { storeId, ...body, status: draft.status })
         if (!stillHere()) return
         notifySaved(draft.status === 'draft' ? '下書きのメニューを追加しました。' : 'メニューを公開しました。')
+        /* 開店準備ガイド⑥の手順3/3（枠14 hYTr8）は新しく作れた時に次へ進む。 */
+        emitGuideSignal('menu.save')
       }
       if (!stillHere()) return
       setSaved(draft)
@@ -264,7 +269,8 @@ function MenuEditBody() {
         destructive={canEdit && editing ? <Button variant="text" textTone="danger" onClick={() => { setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing.confirmation_revision); setError(null); setDeleting(true) }} disabled={busy || menuConflict}>削除する</Button> : undefined}
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
-          {canEdit ? <Button variant="primary" busy={busy} disabled={menuConflict || !valid || (Boolean(editing) && !dirty)} disabledReason={!valid ? priceError ? '値段を確認してください。' : '名前と値段を入力してください。' : editing && !dirty ? '変更していません' : undefined} onClick={() => { if (durationError) { setDurationAttempted(true); return }; setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing?.confirmation_revision ?? null); setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save(editing?.confirmation_revision ?? null) }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
+          {/* 開店準備ガイド⑥の手順3/3（枠14 hYTr8）の光らせる先。 */}
+          {canEdit ? <Button data-guide-anchor="menu.save" variant="primary" busy={busy} disabled={menuConflict || !valid || (Boolean(editing) && !dirty)} disabledReason={!valid ? priceError ? '値段を確認してください。' : '名前と値段を入力してください。' : editing && !dirty ? '変更していません' : undefined} onClick={() => { if (durationError) { setDurationAttempted(true); return }; setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing?.confirmation_revision ?? null); setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save(editing?.confirmation_revision ?? null) }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
         </>}
       >
         {error ? <Notice tone="danger" role="alert">{error}{menuConflict ? <Button onClick={() => { void load() }}>最新を読み込む</Button> : null}</Notice> : null}
@@ -274,7 +280,8 @@ function MenuEditBody() {
             {!editing || draftItem ? <Field label="保存する状態" help="下書きは、お客さまに見せるメニューには出ません。内容を確かめてから公開できます。">
               <SaveErrorField names={['status', 'draft.status']}><Select aria-label="保存する状態" size="full" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value === 'active' ? 'active' : 'draft' })} options={[{ value: 'draft', label: '下書き' }, { value: 'active', label: '公開' }]} /></SaveErrorField>
             </Field> : null}
-            <SettingsFormRow layout="columns" columns={3}>
+            {/* 開店準備ガイド⑥の手順2/3（枠14 KI5X0）の光らせる先。 */}
+            <SettingsFormRow data-guide-anchor="menu.form" layout="columns" columns={3}>
               <Field label={course ? 'コースの名前' : 'メニューの名前'} htmlFor="rs-menu-name" required>
                 <SaveErrorField names={['name', 'draft.name']}><TextField id="rs-menu-name" aria-label="メニュー名" required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></SaveErrorField>
               </Field>

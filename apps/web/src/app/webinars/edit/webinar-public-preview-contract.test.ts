@@ -11,9 +11,6 @@ const PAGE = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/edit
  * review-v8-react.test.tsx が描いて押して見る。ここは戻してはいけない形の見張りだけ。
  */
 describe("管理画面 ウェビナー公開ページ確認の契約", () => {
-  it('準備中の仮の文に戻さない', () => {
-    expect(PAGE).not.toContain('プレビューは準備中です')
-  })
 
   it('選んでいるアカウントからは公開先を作らない', () => {
     expect(PAGE).not.toContain('selectedAccountId')

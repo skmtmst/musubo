@@ -127,3 +127,17 @@ it('保存中は入力の変更を受け付けない', async () => {
   const input = screen.getByLabelText('名前', { exact: true })
   expect(input.closest('[inert]')).not.toBeNull()
 })
+
+it('ファネルの段の種類はサーバーの全種類を利用者が選べる', async () => {
+  const { V6_FUNNEL_STEP_KINDS } = await import('../../../../../packages/db/src/analytics-funnels')
+  const { FUNNEL_STEP_KINDS } = await import('./funnel-form')
+  expect(FUNNEL_STEP_KINDS.map(option => option.key).sort()).toEqual([...V6_FUNNEL_STEP_KINDS].sort())
+  render(<FunnelFormV8 accountId="account-1" onCancel={() => {}} onCreated={() => {}} />)
+  fireEvent.click(screen.getByRole('button', { name: '2段目で何をしたら進むか' }))
+  const choice = await screen.findByRole('radio', { name: 'ほかの条件' })
+  fireEvent.click(choice)
+  fireEvent.click(within(choice.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '2段目の種類' }))
+  const list = await screen.findByRole('listbox')
+  expect(within(list).getAllByRole('option').map(option => option.textContent?.trim())).toEqual(FUNNEL_STEP_KINDS.map(option => option.label))
+})

@@ -14,11 +14,11 @@ import styles from './parts.module.css'
 import { useDialogScrollHint } from './use-dialog-scroll-hint'
 
 /** 行の「…」。読み上げ名は「{subject}の操作」。 */
-export function RowMore({ subject, items }: { subject: string; items: ActionMenuItem[] }) {
+export function RowMore({ subject, items, lockedReason }: { subject: string; items: ActionMenuItem[]; lockedReason?: string }) {
   if (items.length === 0) return <span className={styles.morePlaceholder} aria-hidden="true" />
   return (
     <span className={styles.moreBox}>
-      <RowMenu appearance="plain" label={`${subject}の操作`} menuLabel={`${subject}の操作の一覧`} className={styles.more} items={items} />
+      <RowMenu appearance="plain" label={`${subject}の操作`} menuLabel={`${subject}の操作の一覧`} className={styles.more} items={items} lockedReason={lockedReason} />
     </span>
   )
 }

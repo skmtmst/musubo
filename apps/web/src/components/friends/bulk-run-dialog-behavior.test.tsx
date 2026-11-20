@@ -30,6 +30,8 @@ let host: HTMLDivElement
 let root: Root
 const closed = vi.fn()
 beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-01T00:00:00.000Z'))
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   vi.clearAllMocks()
   calls.preview.mockResolvedValue({ success: true, data: { selectedCount: 2, targetCount: 1, excludedCount: 1, accountBreakdown: [], exclusions: [], sample: [], reversible: true } })
@@ -50,6 +52,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await act(async () => root.unmount())
   host.remove()
+  vi.useRealTimers()
 })
 const dialog = () => document.body.querySelector<HTMLElement>('[role="dialog"]')!
 async function press(text: string) {
@@ -72,6 +75,18 @@ async function enter(label: string, value: string) {
 }
 
 describe('一括操作の小窓の確認と実行', () => {
+  it('結果取得に失敗しても再作成せず結果だけ読み直す', async () => {
+    calls.get.mockRejectedValueOnce(new Error('offline'))
+    await preview()
+    await press('1人に実行する')
+    expect(calls.create).toHaveBeenCalledTimes(1)
+    expect(calls.get).toHaveBeenCalledWith('run-1')
+    expect(dialog().querySelector('[role="alert"]')).not.toBeNull()
+    await press('読み直す')
+    expect(calls.get).toHaveBeenCalledTimes(2)
+    expect(calls.get).toHaveBeenLastCalledWith('run-1')
+    expect(calls.create).toHaveBeenCalledTimes(1)
+  })
   it('確認するまで書き込まず、実行する人数はサーバーが数えた対象を使う', async () => {
     expect(calls.create).not.toHaveBeenCalled()
     await preview()
@@ -80,6 +95,7 @@ describe('一括操作の小窓の確認と実行', () => {
     expect(dialog().textContent).toContain('1人に実行する')
     await press('1人に実行する')
     expect(calls.create).toHaveBeenCalledTimes(1)
+    expect(calls.create.mock.calls[0][2]).not.toHaveProperty('confirmIrreversible')
     await press('読み直す')
     expect(calls.create).toHaveBeenCalledTimes(1)
     expect(calls.get).toHaveBeenCalledTimes(2)
@@ -129,6 +145,7 @@ describe('一括操作の小窓の確認と実行', () => {
     expect(dialog().textContent).toContain('確認して送る本文')
     const submit = [...dialog().querySelectorAll('button')].find((button) => button.textContent?.trim() === '1人に実行する')!
     expect(submit.disabled).toBe(true)
+    expect(dialog().textContent).toContain('この操作は取り消せません')
     expect(calls.create).not.toHaveBeenCalled()
     await act(async () => dialog().querySelector<HTMLInputElement>('input[type="checkbox"]')!.click())
     await press('1人に実行する')

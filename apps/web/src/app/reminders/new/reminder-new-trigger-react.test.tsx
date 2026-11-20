@@ -20,15 +20,16 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
  * ここで見たいのは選んだ後の起点の判断なので、素の <select> に置き換える。
  */
 vi.mock('@/components/shared/select', () => ({
-  default: ({ 'aria-label': label, value, onChange, options, error }: {
+  default: ({ 'aria-label': label, value, onChange, options, error, disabled }: {
     'aria-label'?: string
     error?: string
+    disabled?: boolean
     value: string
     onChange: (value: string) => void
     options: Array<{ value: string; label: string }>
   }) => React.createElement(React.Fragment, null, React.createElement(
     'select',
-    { 'aria-label': label, 'aria-invalid': error ? true : undefined, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    { 'aria-label': label, 'aria-invalid': error ? true : undefined, disabled, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
     options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
   ), error ? React.createElement('p', { role: 'alert' }, error) : null),
 }))
@@ -126,6 +127,49 @@ async function waitFieldOptions(accountId: string) {
     expect([...select.options].some((option) => option.value === `field-birthday-${accountId}`)).toBe(true)
   })
 }
+
+describe('作成時のフォルダ', () => {
+  it('選んだフォルダとアカウントを下書きに保存する', async () => {
+    fixture.foldersList.mockResolvedValue({ success: true, data: [{ id: 'folder-1', name: '予約', color: null }] })
+    render(<NewReminderPage />)
+    await waitFor(() => expect([...((screen.getByLabelText('フォルダ') as HTMLSelectElement).options)].some(o => o.value === 'folder-1')).toBe(true))
+    expect(fixture.foldersList).toHaveBeenCalledWith('reminder')
+    expect(screen.queryByText('フォルダ分けは準備中です')).toBeNull()
+    expect((screen.getByLabelText('フォルダ') as HTMLSelectElement).disabled).toBe(false)
+    fireEvent.change(screen.getByLabelText('フォルダ'), { target: { value: 'folder-1' } })
+    fillName()
+    fireEvent.click(screen.getByRole('radio', { name: /友だち情報欄の日付/ }))
+    await waitFieldOptions('account-1')
+    fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday-account-1' } })
+    goNext()
+    await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
+    expect(fixture.createDraft.mock.calls[0][0]).toEqual(expect.objectContaining({ folderId: 'folder-1', lineAccountId: 'account-1' }))
+  })
+
+  it('フォルダが0件なら未分類で作る', async () => {
+    render(<NewReminderPage />)
+    await waitFor(() => expect((screen.getByLabelText('フォルダ') as HTMLSelectElement).textContent).toContain('未分類'))
+    expect((screen.getByLabelText('フォルダ') as HTMLSelectElement).disabled).toBe(false)
+    fillName()
+    fireEvent.click(screen.getByRole('radio', { name: /友だち情報欄の日付/ }))
+    await waitFieldOptions('account-1')
+    fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday-account-1' } })
+    goNext()
+    await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
+    expect(fixture.createDraft.mock.calls[0][0].folderId).toBeNull()
+  })
+
+  it('フォルダの取得失敗を知らせて読み直せる', async () => {
+    fixture.foldersList.mockResolvedValueOnce({ success: false, error: 'failed' })
+    fixture.foldersList.mockResolvedValue({ success: true, data: [{ id: 'folder-1', name: '予約', color: null }] })
+    render(<NewReminderPage />)
+    const retry = await screen.findByRole('button', { name: 'もう一度読み込む' })
+    expect(screen.getByLabelText('フォルダ').textContent).toContain('フォルダを読み込めませんでした')
+    fireEvent.click(retry)
+    await waitFor(() => expect(screen.getByLabelText('フォルダ').textContent).toContain('予約'))
+    expect(fixture.foldersList).toHaveBeenCalledTimes(2)
+  })
+})
 
 describe('起点の実在候補選択', () => {
   it('友だち情報欄を選ぶと日付型の項目だけが選べる', async () => {

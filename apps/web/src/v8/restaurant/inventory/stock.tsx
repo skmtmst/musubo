@@ -26,6 +26,7 @@ import { DialogContentRow } from '@/components/shared/dialog-form-row'
 
 import { useAccount } from '@/contexts/account-context'
 import { useStaffRole } from '@/lib/staff-role'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-overlay/index'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { ApiError, fetchApi } from '@/lib/api'
@@ -64,9 +65,10 @@ function storeToday(timezone: string | undefined): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: timezone || 'Asia/Tokyo' }).format(new Date())
 }
 
-function NumberField({ id, 'aria-describedby': describedBy, label, value, onChange, canEdit, invalid = false }: { id?: string; 'aria-describedby'?: string; label: string; value: number; onChange: (value: number) => void; canEdit: boolean; invalid?: boolean }) {
+function NumberField({ id, 'aria-describedby': describedBy, 'data-guide-anchor': guideAnchor, label, value, onChange, canEdit, invalid = false }: { id?: string; 'aria-describedby'?: string; 'data-guide-anchor'?: string; label: string; value: number; onChange: (value: number) => void; canEdit: boolean; invalid?: boolean }) {
   return (
     <SaveErrorField names={["value"]}><NumberInput
+      data-guide-anchor={guideAnchor}
       type="number"
       min={0}
       aria-label={label}
@@ -233,6 +235,9 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   const slotInvalid = selected ? currentSlotAlloc.ota + currentSlotAlloc.line + currentSlotAlloc.walkin > selected.row.total_capacity : true
   const remainder = totalSeats - alloc.ota - alloc.line - alloc.walkin
   const lowSlot = (slot: SlotInfo) => slot.free / Math.max(totalSeats, 1) < 0.2
+  /* 開店準備ガイド⑦の手順1/2（枠14 zvzk4）はLINEの席数を入れ終えた時に次へ進む。 */
+  const receptionReady = alloc.line > 0 && !allocInvalid
+  useEffect(() => { if (receptionReady) emitGuideSignal('reception.lineSeats') }, [receptionReady])
 
   const updateAlloc = (next: Alloc) => {
     if (!allocVersions) setAllocVersions(rows.map((r) => ({ id: r.id, expectedVersion: r.version ?? 0 })))
@@ -323,7 +328,8 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
         throw err
       }
     }, '受付時間と配分を保存しました。予約サイトへは書き戻していません。').then((ok) => {
-      if (ok) { setConflict(null); setDiffOpen(false); setAllocOverride(null); setAllocVersions(null); setRefresh((n) => n + 1) }
+      /* 開店準備ガイド⑦の手順2/2（枠14 t8xvM）は保存できた時に次へ進む。 */
+      if (ok) { setConflict(null); setDiffOpen(false); setAllocOverride(null); setAllocVersions(null); setRefresh((n) => n + 1); emitGuideSignal('reception.save') }
     })
   }
 
@@ -433,7 +439,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
             {noActiveTablesReason ? <DialogNote>{noActiveTablesReason}</DialogNote> : null}
             <div className={styles.allocGrid}>
               <Field label={<><span className={styles.allocLabel}>予約サイト</span></>}><SaveErrorField names={["ota","alloc.ota"]}><NumberField canEdit={canEdit} invalid={allocInvalid} label="予約サイト" value={alloc.ota} onChange={(ota) => updateAlloc({ ...alloc, ota })} /></SaveErrorField></Field>
-              <Field label={<><span className={styles.allocLabel}>LINE 専用</span></>}><SaveErrorField names={["line","alloc.line"]}><NumberField canEdit={canEdit} invalid={allocInvalid} label="LINE 専用" value={alloc.line} onChange={(line) => updateAlloc({ ...alloc, line })} /></SaveErrorField></Field>
+              <Field label={<><span className={styles.allocLabel}>LINE 専用</span></>}><SaveErrorField names={["line","alloc.line"]}><NumberField data-guide-anchor="reception.lineSeats" canEdit={canEdit} invalid={allocInvalid} label="LINE 専用" value={alloc.line} onChange={(line) => updateAlloc({ ...alloc, line })} /></SaveErrorField></Field>
               <Field label={<><span className={styles.allocLabel}>当日（ウォークイン）</span></>}><SaveErrorField names={["walkin","alloc.walkin"]}><NumberField canEdit={canEdit} invalid={allocInvalid} label="当日（ウォークイン）" value={alloc.walkin} onChange={(walkin) => updateAlloc({ ...alloc, walkin })} /></SaveErrorField></Field>
               <div className={styles.allocField}><span className={styles.allocLabel}>店頭・電話</span>
                 <span className={styles.remainder}>{`${remainder}（残り）`}</span>
@@ -600,7 +606,8 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
               {conflict ? (
                 <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy} onClick={() => setDiffOpen(true)}><Check size={16} aria-hidden="true" />比べてから保存</Button>
               ) : (
-                <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy || allocInvalid || (!hoursDraft && rows.length === 0) || (allocOverride === null && !hoursChanged)} disabledReason={allocOverride === null && !hoursChanged ? "変更していません" : undefined} onClick={() => saveAll(false)}><Check size={16} aria-hidden="true" />受付時間と配分を保存</Button>
+                /* 開店準備ガイド⑦の手順2/2（枠14 t8xvM）の光らせる先。 */
+                <Button data-guide-anchor="reception.save" lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy || allocInvalid || (!hoursDraft && rows.length === 0) || (allocOverride === null && !hoursChanged)} disabledReason={allocOverride === null && !hoursChanged ? "変更していません" : undefined} onClick={() => saveAll(false)}><Check size={16} aria-hidden="true" />受付時間と配分を保存</Button>
               )}
             </>
           )}

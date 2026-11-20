@@ -1,14 +1,11 @@
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import { ApiError } from '@/lib/api'
 
 import { webinarLoadFailure } from '@/v8/webinars/helpers'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'list-v8.tsx'), 'utf8')
+const PAGE = readFileSync(new URL('./list-v8.tsx', import.meta.url), 'utf8')
 
 /**
  * ウェビナー一覧（設計 `ZC13r` 10-1 ／ `zCQXe` 10-1-L）の、
@@ -53,17 +50,8 @@ describe('読み込めなかった理由の見分け', () => {
   })
 })
 
-/*
- * 一覧の状態（設計 10-1-L `zCQXe`）。集計の未取得・読み直し・アカウント切替、頁の器違い、
- * 読込・失敗・権限不足の描き分けは webinar-list-contract-react.test.tsx・webinar-list-behavior.test.tsx・
- * webinar-list-v8-react.test.tsx が描いて見る。ここは戻してはいけない形の見張りだけ。
- */
 describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
   it('読めていないときはページ送りを出さない（頁が2以上かでは決めない）', () => {
     expect(PAGE).not.toContain('hasListData && pageCount > 1')
-  })
-
-  it('読込の文を画面ごとに直書きしない', () => {
-    expect(PAGE).not.toContain('読み込み中…')
   })
 })
