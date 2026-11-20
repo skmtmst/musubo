@@ -871,7 +871,7 @@ export {
   deleteCommonVar, deleteCommonVarSchedule, getCommonVarById, getCommonVarByIdIncludingArchived, getCommonVarMap, getCommonVarReplacementCandidates,
   getCommonVarReplacementPlan, getCommonVarSchedules, getCommonVarUsageCounts, getCommonVarUsageImpact, getCommonVarUsageSummaries, getCommonVarVersions,
   getCommonVars, isCommonVarsEnabled, isSecretLikeValue, listCommonVarExpiryCandidates, markCommonVarExpiryNotice, normalizeCommonVarValidityAt,
-  normalizeCommonVarValue, resolveCommonVarValuesAt, setCommonVarStatus, updateCommonVar,
+  normalizeCommonVarValue, resolveCommonVarValuesAt, resolvePinnedCommonVarAt, evaluatePinnedCommonVar, setCommonVarStatus, updateCommonVar,
 } from './common-vars/index';
 export type {
   CommonVar, CommonVarExpiryBehavior, CommonVarExpiryCandidate, CommonVarReplacementPlan, CommonVarReplacementTarget, CommonVarResolution,

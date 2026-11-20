@@ -1,6 +1,6 @@
 import type { CommonVarResolutionFailureReason } from './resolution-types.js';
 
-type PinnedResult = { ok: true; value: string; version: number }
+export type PinnedResult = { ok: true; value: string; version: number }
   | { ok: false; reason: CommonVarResolutionFailureReason };
 
 /** 版の値は固定し、送信時点の共通情報の状態・有効期間を必ず確認する。 */
@@ -12,6 +12,10 @@ export async function resolvePinnedCommonVarAt(
     WHERE c.id = ? AND c.line_account_id = ? AND c.archived_at IS NULL AND v.id = ?`)
     .bind(commonVarId, lineAccountId, versionId)
     .first<{ status: string; var_key: string; valid_from: string | null; valid_until: string | null; value: string; version_no: number }>();
+  return evaluatePinnedCommonVar(row, executionAt);
+}
+
+export function evaluatePinnedCommonVar(row: { status: string; var_key: string; valid_from: string | null; valid_until: string | null; value: string; version_no: number } | null, executionAt: string): PinnedResult {
   if (!row) return { ok: false, reason: 'missing' };
   if (row.status === 'stopped' || row.status === 'draft') return { ok: false, reason: row.status };
   if (row.status !== 'active') return { ok: false, reason: 'missing' };
