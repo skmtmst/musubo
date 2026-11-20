@@ -1,5 +1,12 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const formsPaths = {
+  '/api/forms/{id}/common-var-pins/{varId}': {
+    put: { tags: ['Forms'], summary: '次に公開する版で使う共通情報の固定を変更',
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }, { name: 'varId', in: 'path', required: true, schema: { type: 'string' } }],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId','versionId','expectedVersion'], properties: { accountId: { type: 'string' }, versionId: { type: 'string', nullable: true }, expectedVersion: { type: 'integer', minimum: 1 } } } } } },
+      responses: { '200': { description: '変更済み' }, '400': { description: '入力が不正' }, '404': { description: '使用先が見つからない' }, '409': { description: '使用先または版を確認できない' } },
+    },
+  },
   '/api/forms/{id}/images/{blockId}': {
     get: {
       tags: ['Forms'], summary: '公開中のフォームが採用した固定版の画像を表示', security: [],

@@ -111,6 +111,10 @@ export async function publishFormVersion(
                AND v.source_content_revision = forms.content_revision
           )`,
     ).bind(versionId, now, id, expectedContentRevision, versionId),
+    db.prepare(`INSERT INTO form_version_common_var_pins(form_version_id,common_var_id,version_id)
+      SELECT ?, p.common_var_id, p.version_id FROM form_common_var_pins p
+      WHERE p.form_id=? AND EXISTS (SELECT 1 FROM form_versions WHERE id=? AND form_id=?)`)
+      .bind(versionId, id, versionId, id),
     ...formMediaUsageStatements(db, id),
   ]);
 

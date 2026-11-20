@@ -29,12 +29,18 @@ export function serializeCommonVarDeleteImpact(
       status: commonVarUsageStatus(item),
       href: commonVarUsageHref(item),
       blocksDeletion: item.is_historical !== 1 && item.source_status !== 'sending_fixed',
-      referenceMode: item.source_status === 'sending_fixed' || item.fixed_version != null ? 'pinned' as const
+      referenceMode: item.draft_fixed_version !== undefined ? (item.draft_fixed_version === null ? 'live' as const : 'pinned' as const)
+        : item.source_status === 'sending_fixed' || item.fixed_version != null ? 'pinned' as const
         : item.is_historical === 1 || ['scenario_actions', 'automations', 'automation_definitions', 'common_actions', 'account_settings'].includes(item.source_table)
           ? (item.source_table === 'scenario_actions' ? 'operation' as const : 'unknown' as const) : 'live' as const,
-      referencedVersion: item.source_status === 'sending_fixed' || item.fixed_version != null ? item.fixed_version ?? null
+      referencedVersion: item.draft_fixed_version !== undefined ? item.draft_fixed_version ?? variable.version
+        : item.source_status === 'sending_fixed' || item.fixed_version != null ? item.fixed_version ?? null
         : item.is_historical === 1 || ['scenario_actions', 'automations', 'automation_definitions', 'common_actions', 'account_settings'].includes(item.source_table)
           ? null : variable.version,
+      ...(item.source_table === 'forms' && item.source_status === 'published' ? {
+        publishedReferenceMode: item.fixed_version == null ? 'live' as const : 'pinned' as const,
+        publishedReferencedVersion: item.fixed_version ?? null,
+      } : {}),
       currentPreview: readableCommonVarUsage(item.source_content, token)
         .replaceAll(token, item.fixed_value ?? variable.value),
     })),
@@ -155,7 +161,7 @@ export async function commonVarUsageRevision(
   const raw = [
     `${variable.id}:${variable.version}`,
     ...impact.items.map((item) => [
-      item.kind, item.source_id, item.source_parent_id ?? '', item.source_status ?? '', item.source_content, item.fixed_version ?? '',
+      item.kind, item.source_id, item.source_parent_id ?? '', item.source_status ?? '', item.source_content, item.fixed_version ?? '', item.draft_fixed_version ?? '',
     ].join(':')).sort(),
     `unscoped:${impact.unscopedFormTotal}`,
   ].join('\n');

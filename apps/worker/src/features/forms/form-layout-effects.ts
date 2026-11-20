@@ -239,6 +239,7 @@ export interface FormEffectInput {
   answers: FormAnswers;
   /** 解決失敗の台帳に残す出所（フォームID）。無いときは回答IDを使う */
   formId?: string;
+  formVersionId?: string | null;
   env?: Env['Bindings'];
   /** タグ付与に伴うシナリオの即時配信で使う */
   push?: { defaultAccessToken: string; workerUrl?: string };
@@ -664,7 +665,9 @@ export async function runFormAction(
           if(template?.message_bubbles_json) throw new Error('MULTIPLE_MESSAGES_REQUIRE_BUNDLE_SENDER');
           if (!template || !template.published_version) throw new Error('公開済みのテンプレートを選んでください');
           const { expandSendCommonVars } = await import('../../services/interpolation-context.js');
-          const content = await expandSendCommonVars(db, template.message_content, { kind: 'form_reply', id: input.formId ?? friendId }, { friendId, messageType: template.message_type });
+          const content = await expandSendCommonVars(db, template.message_content, { kind: 'form_reply', id: input.formId ?? friendId }, { friendId, messageType: template.message_type }, undefined, input.formVersionId ? { kind: 'form', versionId: input.formVersionId } : undefined);
+          if (input.formVersionId) await expandSendCommonVars(db, template.message_content, { kind: 'form_reply', id: input.formId ?? friendId },
+            { friendId, messageType: template.message_type }, undefined, { kind: 'form', versionId: input.formVersionId });
           if (template.message_type === 'text') await input.pushText!(content, pushSuffix ?? `research-template:${template.id}`);
           else {
             if (!input.pushMessage) throw new Error('回答後の送信を利用できません');
@@ -687,8 +690,10 @@ export async function runFormAction(
         const text = await expandSendCommonVars(
           db, action.text,
           { kind: 'form_reply', id: input.formId ?? input.idempotencyPrefix ?? friendId },
-          { friendId },
+          { friendId }, undefined, input.formVersionId ? { kind: 'form', versionId: input.formVersionId } : undefined,
         );
+        if (input.formVersionId) await expandSendCommonVars(db, action.text, { kind: 'form_reply', id: input.formId ?? friendId },
+          { friendId }, undefined, { kind: 'form', versionId: input.formVersionId });
         await input.pushText(text, pushSuffix ?? `send_text:${action.text}`);
       }
       return;
@@ -707,8 +712,10 @@ export async function runFormAction(
       const content = await expandSendCommonVars(
         db, template.message_content,
         { kind: 'form_reply', id: input.formId ?? input.idempotencyPrefix ?? friendId },
-        { friendId, messageType: template.message_type },
+        { friendId, messageType: template.message_type }, undefined, input.formVersionId ? { kind: 'form', versionId: input.formVersionId } : undefined,
       );
+      if (input.formVersionId) await expandSendCommonVars(db, template.message_content, { kind: 'form_reply', id: input.formId ?? friendId },
+        { friendId, messageType: template.message_type }, undefined, { kind: 'form', versionId: input.formVersionId });
       if (template.message_type === 'text') {
         if (content) {
           await input.pushText(content, pushSuffix ?? `send_template:${action.templateId}`);
