@@ -396,13 +396,23 @@ it('removes meeting links and Outlook booking records only for the deleted custo
     INSERT INTO workflow_steps (scope_id, process_kind, subject_id, step_key, retry_key, created_at, updated_at)
     VALUES ('line:fixture-account','booking_outlook_sync','deleted-0-booking','current','a',0,0),
            ('line:fixture-account','booking_meeting_retry','deleted-0-booking','request','retry',0,0),
+           ('line:fixture-account','booking_calendar_create','deleted-0-booking','create','removed-google',0,0),
+           ('line:fixture-account','booking_calendar_create','kept-0-booking','create','kept-google',0,0),
+           ('line:other-account','booking_calendar_create','deleted-0-booking','create','other-google',0,0),
            ('line:fixture-account','booking_outlook_sync','kept-0-booking','current','b',0,0),
            ('line:fixture-account','booking_meeting_retry','kept-0-booking','request','b2',0,0),
            ('line:other-account','booking_outlook_sync','deleted-0-booking','current','c',0,0),
            ('line:fixture-account','booking_outlook_busy','fixture-staff','current','d',0,0);`);
+  sqlite.raw.prepare("UPDATE workflow_steps SET input_json=? WHERE process_kind='booking_calendar_create' AND retry_key='removed-google'")
+    .run(JSON.stringify({snapshot:{event:{summary:'テストのお客さま'}}}));
   await deleteCustomerData(env(), { kind: 'friend_data', id: 'fixture-friend', friendId: 'fixture-friend', accountId: 'fixture-account', lineUserId: 'LINE-fixture-friend' }, 'owner');
   expect(sqlite.raw.prepare('SELECT id FROM booking_meeting_links').all()).toEqual([{ id: 'kept-link' }]);
-  expect(sqlite.raw.prepare('SELECT scope_id, process_kind, subject_id FROM workflow_steps ORDER BY retry_key').all()).toEqual([
+  expect(sqlite.raw.prepare("SELECT scope_id,subject_id FROM workflow_steps WHERE process_kind='booking_calendar_create' ORDER BY retry_key").all()).toEqual([
+    { scope_id: 'line:fixture-account', subject_id: 'kept-0-booking' },
+    { scope_id: 'line:other-account', subject_id: 'deleted-0-booking' },
+  ]);
+  expect(sqlite.raw.prepare("SELECT COUNT(*) AS n FROM workflow_steps WHERE input_json LIKE '%テストのお客さま%'").get()).toEqual({n:0});
+  expect(sqlite.raw.prepare("SELECT scope_id, process_kind, subject_id FROM workflow_steps WHERE process_kind!='booking_calendar_create' ORDER BY retry_key").all()).toEqual([
     { scope_id: 'line:fixture-account', process_kind: 'booking_outlook_sync', subject_id: 'kept-0-booking' },
     { scope_id: 'line:fixture-account', process_kind: 'booking_meeting_retry', subject_id: 'kept-0-booking' },
     { scope_id: 'line:other-account', process_kind: 'booking_outlook_sync', subject_id: 'deleted-0-booking' },
