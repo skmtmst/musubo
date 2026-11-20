@@ -3506,6 +3506,13 @@ CREATE TABLE form_capacity_claims (
   PRIMARY KEY (form_id, slot_key, submission_id)
 );
 
+CREATE TABLE form_common_var_pins (
+  form_id TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+  common_var_id TEXT NOT NULL REFERENCES common_vars(id) ON DELETE RESTRICT,
+  version_id TEXT NOT NULL REFERENCES common_var_versions(id) ON DELETE RESTRICT,
+  PRIMARY KEY (form_id, common_var_id)
+);
+
 CREATE TABLE form_opens (
   id TEXT PRIMARY KEY,
   form_id TEXT NOT NULL,
@@ -3592,6 +3599,13 @@ CREATE TABLE form_test_tokens (
   created_by_staff_id TEXT,
   expires_at          TEXT NOT NULL,
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
+CREATE TABLE form_version_common_var_pins (
+  form_version_id TEXT NOT NULL REFERENCES form_versions(id) ON DELETE CASCADE,
+  common_var_id TEXT NOT NULL REFERENCES common_vars(id) ON DELETE RESTRICT,
+  version_id TEXT NOT NULL REFERENCES common_var_versions(id) ON DELETE RESTRICT,
+  PRIMARY KEY (form_version_id, common_var_id)
 );
 
 CREATE TABLE form_versions (
@@ -8503,6 +8517,13 @@ CREATE TABLE scenario_source_jobs (
  UNIQUE(source_kind,source_id,source_event_id,scenario_version_id,step_id)
 );
 
+CREATE TABLE scenario_step_common_var_pins (
+  scenario_step_id TEXT NOT NULL REFERENCES scenario_steps(id) ON DELETE CASCADE,
+  common_var_id TEXT NOT NULL REFERENCES common_vars(id) ON DELETE RESTRICT,
+  version_id TEXT NOT NULL REFERENCES common_var_versions(id) ON DELETE RESTRICT,
+  PRIMARY KEY (scenario_step_id, common_var_id)
+);
+
 CREATE TABLE "scenario_steps" (
   id              TEXT PRIMARY KEY,
   scenario_id     TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
@@ -8538,6 +8559,14 @@ CREATE TABLE "scenario_triggers" (
   kind TEXT NOT NULL CHECK (kind IN ('friend_add', 'tag_added', 'form_answer', 'booking_confirmed')),
   tag_id TEXT REFERENCES tags (id) ON DELETE CASCADE,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE scenario_version_common_var_pins (
+  scenario_version_id TEXT NOT NULL REFERENCES scenario_versions(id) ON DELETE CASCADE,
+  live_step_id TEXT NOT NULL,
+  common_var_id TEXT NOT NULL REFERENCES common_vars(id) ON DELETE RESTRICT,
+  version_id TEXT NOT NULL REFERENCES common_var_versions(id) ON DELETE RESTRICT,
+  PRIMARY KEY (scenario_version_id, live_step_id, common_var_id)
 );
 
 CREATE TABLE scenario_versions (
@@ -12808,6 +12837,10 @@ CREATE TRIGGER folders_mileage_reward_legacy_insert AFTER INSERT ON folders WHEN
 
 CREATE TRIGGER folders_mileage_reward_legacy_update AFTER UPDATE ON folders WHEN NEW.kind='mileage_reward' BEGIN UPDATE mileage_reward_folders SET name=NEW.name,display_order=NEW.display_order,updated_at=NEW.updated_at WHERE id=NEW.id AND line_account_id=NEW.account_id AND (name IS NOT NEW.name OR display_order IS NOT NEW.display_order); END;
 
+CREATE TRIGGER form_version_common_var_pins_immutable
+BEFORE UPDATE ON form_version_common_var_pins
+BEGIN SELECT RAISE(ABORT, 'published_pin_immutable'); END;
+
 CREATE TRIGGER friend_add_rule_folders_common_delete AFTER DELETE ON friend_add_rule_folders BEGIN DELETE FROM folders WHERE id=OLD.id AND kind='friend_add_rule' AND account_id=OLD.line_account_id; END;
 
 CREATE TRIGGER friend_add_rule_folders_common_insert AFTER INSERT ON friend_add_rule_folders WHEN NOT EXISTS(SELECT 1 FROM folders WHERE id=NEW.id) BEGIN INSERT INTO folders(id,kind,account_id,name,color,created_at,updated_at) VALUES(NEW.id,'friend_add_rule',NEW.line_account_id,NEW.name,NEW.color,NEW.created_at,NEW.updated_at); END;
@@ -13425,6 +13458,10 @@ CREATE TRIGGER rt_waitlist_reservation_insert BEFORE INSERT ON rt_reservations W
 CREATE TRIGGER rt_waitlist_reservation_update BEFORE UPDATE OF departed_at,table_id,starts_at,ends_at,status ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND NEW.departed_at IS NULL AND ((NEW.waitlist_entry_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_seat_waitlist w JOIN rt_reservations r ON r.waitlist_entry_id=w.id WHERE r.id=NEW.id AND w.id=NEW.waitlist_entry_id AND w.status='converted') AND NOT EXISTS(SELECT 1 FROM rt_seat_waitlist w WHERE w.id=NEW.waitlist_entry_id AND w.store_id=NEW.store_id AND w.line_uid=NEW.line_uid AND w.table_id=NEW.table_id AND w.guest_count=NEW.guest_count AND julianday(w.starts_at)=julianday(NEW.starts_at) AND julianday(w.ends_at)=julianday(NEW.ends_at) AND ((w.status='invited' AND julianday(w.hold_expires_at)>julianday('now')) OR (w.status='converted' AND EXISTS(SELECT 1 FROM rt_reservations r WHERE r.id=NEW.id AND r.waitlist_entry_id=w.id))))) OR (EXISTS(SELECT 1 FROM rt_seat_waitlist w WHERE w.store_id=NEW.store_id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND COALESCE(NEW.waitlist_entry_id,'')<>w.id AND (NEW.table_id IS NULL OR w.table_id=NEW.table_id) AND julianday(w.starts_at)<julianday(NEW.ends_at) AND julianday(w.ends_at)>julianday(NEW.starts_at))) OR (NEW.waitlist_entry_id IS NOT NULL AND (EXISTS(SELECT 1 FROM rt_reservations r WHERE r.id<>NEW.id AND r.store_id=NEW.store_id AND r.table_id=NEW.table_id AND r.status NOT IN ('cancelled','no_show') AND r.departed_at IS NULL AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at))))) BEGIN SELECT RAISE(ABORT,'restaurant_table_conflict'); END;
 
 CREATE TRIGGER rt_walkin_arrival_event AFTER INSERT ON rt_seat_visit_marks WHEN NEW.kind='visited' AND NEW.undone_at IS NULL BEGIN INSERT OR IGNORE INTO rt_reservation_events(id,reservation_id,store_id,event_type,reservation_version,occurred_at,request_id,line_account_id,friend_id,payload_json) SELECT 'rt:'||r.id||':'||r.customer_version||':restaurant.arrived',r.id,r.store_id,'restaurant.arrived',r.customer_version,NEW.marked_at,COALESCE(NEW.request_id,NEW.id),s.line_account_id,(SELECT id FROM friends WHERE line_account_id=s.line_account_id AND line_user_id=r.line_uid),json_object('reservationId',r.id,'storeId',r.store_id,'startsAt',r.starts_at,'endsAt',r.ends_at,'status',r.status,'guestCount',r.guest_count) FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE r.id=NEW.reservation_id AND r.status IN('visited','seated'); END;
+
+CREATE TRIGGER scenario_version_common_var_pins_immutable
+BEFORE UPDATE ON scenario_version_common_var_pins
+BEGIN SELECT RAISE(ABORT, 'published_pin_immutable'); END;
 
 CREATE TRIGGER style_booking_meeting_snapshot AFTER INSERT ON bookings
 WHEN NEW.meeting_mode IS NULL OR NEW.meeting_location IS NULL

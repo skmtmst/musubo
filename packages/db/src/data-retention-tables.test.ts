@@ -84,6 +84,23 @@ describe('保存期限の分類表', () => {
     expect(tenantScopeCondition('hq_broadcast_saved_views')).toContain('hq_broadcast_saved_views.tenant_id = ?');
     expect(tenantScopeCondition('hq_template_saved_views')).toContain('hq_template_saved_views.tenant_id = ?');
   });
+  it('シナリオとフォームの固定は共通情報と公開版より先に削除する', () => {
+    const order = purgeTablesChildFirst();
+    const pairs = [
+      ['scenario_step_common_var_pins', 'scenario_steps'],
+      ['scenario_version_common_var_pins', 'scenario_versions'],
+      ['form_common_var_pins', 'forms'],
+      ['form_version_common_var_pins', 'form_versions'],
+    ];
+    for (const [table, owner] of pairs) {
+      expect(RETENTION_TABLES[table]?.category).toBe('purge');
+      for (const parent of [owner, 'common_vars', 'common_var_versions']) {
+        expect(order.indexOf(table)).toBeGreaterThanOrEqual(0);
+        expect(order.indexOf(table)).toBeLessThan(order.indexOf(parent));
+      }
+    }
+  });
+
   it('bootstrap.sql の表がすべて分類されている', () => {
     const missing = [...schemaTables].filter((name) => !RETENTION_TABLES[name]).sort();
     expect(
