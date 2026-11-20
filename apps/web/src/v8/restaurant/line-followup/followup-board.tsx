@@ -14,6 +14,7 @@ import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-
 import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 import { describeSaveFailure } from '@/lib/api/transport/errors'
 import { followupBoardApi,type FollowupBoardSnapshot } from '@/lib/api/helpers/restaurant-followup-board'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-overlay/index'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { boardRows,draftInput,FOLLOWUP_NAMES,followupTimingLabel,rowContentKey,rowVersionKey,type FollowupCardModel } from './board-model'
@@ -125,7 +126,7 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
     {row.trigger==='review_request'&&<p className={styles.support} role="status">{snapshot.reviewCount==null?'送信履歴は読めませんでした':`送信履歴 ${snapshot.reviewCount}件`}</p>}
    </Card>)}
   </ListPageCards>
-  <StickyBar status={`オン ${selectedOn}つ・変更 ${changed.length+(formChanged?1:0)}件`} actions={<><Button variant="secondary" disabled={!canManage||busy||dirty||selectedOn>0} lockedReason={lockedReason} disabledReason={dirty?'先に変更を保存してください':selectedOn>0?'オンの送り方を止めて保存してから選べます':undefined} onClick={()=>setNotUsing(true)}>今は使わない</Button><Button variant="secondary" disabled={!canManage||busy||!dirty} lockedReason={lockedReason} onClick={()=>install(snapshot)}>元に戻す</Button><Button variant="primary" disabled={!canManage||busy||!dirty} lockedReason={lockedReason} busy={busy} onClick={()=>void save()}>保存して作る</Button></>}/>
+  <StickyBar status={`オン ${selectedOn}つ・変更 ${changed.length+(formChanged?1:0)}件`} actions={<><Button variant="secondary" disabled={!canManage||busy||dirty||selectedOn>0} lockedReason={lockedReason} disabledReason={dirty?'先に変更を保存してください':selectedOn>0?'オンの送り方を止めて保存してから選べます':undefined} onClick={()=>setNotUsing(true)}>今は使わない</Button><Button variant="secondary" disabled={!canManage||busy||!dirty} lockedReason={lockedReason} onClick={()=>install(snapshot)}>元に戻す</Button>{/* 開店準備ガイド⑧の手順1/1（枠14 wcvyI）は保存できた時に進む。 */}<Button data-guide-anchor="followup.save" variant="primary" disabled={!canManage||busy||!dirty} lockedReason={lockedReason} busy={busy} onClick={()=>void save().then(ok=>{if(ok)emitGuideSignal('followup.save')})}>保存して作る</Button></>}/>
   {editor&&<FollowupEditor key={editor.trigger} row={editor} accountId={accountId} storeName={storeName} pageDirty={dirty} pageBusy={busy} onDiscardPage={()=>{install(snapshot);saveErrors.reset();setEditor(null)}} onCancel={()=>{saveErrors.reset();setEditor(null)}} onConfirm={row=>{if(permission.current){update(row);setEditor(null)}}}/>}
   {formEditor&&<ReservationFormEditor definition={form} storeName={storeName} pageDirty={dirty} pageBusy={busy} onDiscardPage={()=>{install(snapshot);saveErrors.reset();setFormEditor(false)}} onCancel={()=>{saveErrors.reset();setFormEditor(false)}} onConfirm={next=>{if(permission.current){setForm(next);setFormRepairAccepted(true);setFormEditor(false)}}}/>}
   {testRow&&<TestStartDialog key={testRow.trigger} row={testRow} accountId={accountId} storeId={storeId} storeName={storeName} recipient={snapshot.board.testRecipient} canManage={canManage} lockedReason={lockedReason} onCancel={()=>{setTest(null);void load().catch(()=>{})}} onStarted={load}/>}
