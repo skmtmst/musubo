@@ -124,6 +124,8 @@ test('訂正配信はA/B設定と本送信を始めず台帳外へ送らない',
  await expect(startAbMock(d.db,'br',4,2400,'mock-correction')).rejects.toThrow('訂正配信ではA/Bテストを使えません');
  await expect(startAbLive(d.db,'br',4,2400,'live-correction',{transmit:send,liveDeliveryEnabled:true})).rejects.toThrow('訂正配信ではA/Bテストを使えません');
  expect(send).not.toHaveBeenCalled();
+});
+
 test('A/B配信は未解決の共通情報を送らず、値があれば置き換える',async()=>{
  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T01:00:00Z'));
  try{
