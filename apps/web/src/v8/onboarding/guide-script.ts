@@ -55,7 +55,7 @@ const SCRIPT: readonly GuideStepScript[] = [
       {
         index: 2,
         title: '名前と席数を入れて保存',
-        body: '卓の名前と席数を確認し、フォーム下の「卓を作る」を押します。保存できたら手順3/3へ進みます。',
+        body: '卓の名前と席数を入れましょう。「保存する」を押すと卓が登録され、手順3/3に進みます。',
         anchor: 'tables.form',
         trigger: 'event',
       },
@@ -93,7 +93,7 @@ const SCRIPT: readonly GuideStepScript[] = [
       {
         index: 2,
         title: '営業時間を確認して確定',
-        body: '営業時間を編集し、「変更内容を確認」を押します。「Googleに反映する」または「設定を保存する」を押してください。',
+        body: '取り込んだ営業時間を確かめて「この営業時間で確定」を押します。違うときはGoogleビジネスで直してから「Googleから再読み込み」を押してください。',
         anchor: 'hours.confirm',
         trigger: 'event',
       },
@@ -155,7 +155,7 @@ const SCRIPT: readonly GuideStepScript[] = [
       {
         index: 1,
         title: '内容を確認して保存',
-        body: '使う送り方を確認して「保存して作る」を押してください。使わない場合は「今は使わない」を選べます。',
+        body: '使う送り方を「保存して作る」で下書きにします。送信はテストと承認のあと始められます。使わない場合は「今は使わない」を選びます。',
         anchor: 'followup.save',
         trigger: 'event',
       },
