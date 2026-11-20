@@ -14,6 +14,7 @@ import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { HoursCalendarPage } from './hours-calendar-page'
 import { restaurantGoogleApi, type GoogleDayHours } from '@/lib/restaurant-google-api'
+import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
 import { emitGuideSignal } from '@/v8/onboarding/public/guide-overlay/index'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -39,6 +40,8 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate, s
  useEffect(()=>{if(!sendFailed)return;const frame=requestAnimationFrame(()=>failureRef.current?.scrollIntoView?.({block:'nearest'}));return()=>cancelAnimationFrame(frame)},[sendFailed])
  const [editorUnsaved,setEditorUnsaved]=useState(false)
  const operation=useRef(false)
+ const mounted = useRef(false)
+ useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
  const {leaveTarget,confirmLeave,cancelLeave}=useUnsavedGuard({dirty:Boolean(m.config)&&(!m.saved||editorUnsaved),busy:busy||m.saving})
  const review=async()=>{if(!allowed||operation.current)return;operation.current=true;setBusy(true);setActionError('');setSendFailed(false);try{await m.review();setPanel(null);setConfirm(true);setSent(null)}catch(e){setActionError(errorMessage(e,'変更内容を確認できませんでした。入力内容は残っています。'))}finally{setBusy(false);operation.current=false}}
  const send=async()=>{if(!allowed||operation.current||!m.data)return;operation.current=true;setBusy(true);setActionError('');try{for(const change of m.changes){if(['applied','accepted'].includes(change.status))continue;await restaurantGoogleApi.sendChange(accountId,change.id)}const google=m.changes.length>0;await m.complete(google);setConfirm(false);setSent(google?'google':'local');/* 開店準備ガイド⑤の手順2/2（枠14 kYvXk）は確定できた時に進む。 */emitGuideSignal('hours.confirm')}catch(e){setSendFailed(true);setConfirm(false);setCalendar(false);setActionError(errorMessage(e,'Googleに送信できませんでした。入力した内容は残っています。'));const refreshed=await Promise.all(m.changes.map(c=>restaurantGoogleApi.change(accountId,c.id).catch(()=>null)));m.setChanges(m.changes.map((c,i)=>refreshed[i]?.change??c))}finally{setBusy(false);operation.current=false}}
@@ -56,6 +59,44 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate, s
  const changed=hasHoursDraft(workspace)
  const hasImportedHours = HOURS_WEEKDAYS.some(weekday => data.profile.regularHours[weekday].length > 0)
  const showImportedHours = confirmingImportedHours && !changed && !panel && !confirm && !calendar && !sent && !initialMode
+ const importedWeek = HOURS_WEEKDAYS.reduce<Array<{ days: string[]; hours: string }>>((groups, weekday) => {
+  const hours = hoursText(data.profile.regularHours[weekday], '定休日')
+  const previous = groups.at(-1)
+  if (previous?.hours === hours) previous.days.push(WEEKDAY_JA[weekday])
+  else groups.push({ days: [WEEKDAY_JA[weekday]], hours })
+  return groups
+ }, [])
+ const confirmImported = async () => {
+  if (disabled || data.stale || !hasImportedHours || operation.current) return
+  operation.current = true
+  setBusy(true)
+  setActionError('')
+  try {
+   const { data: hours } = await restaurantTestApi.openingHours(accountId, data.store.id)
+   if (hours.storeId !== data.store.id || !hours.version || !hours.hours?.some(day => day.periods.length))
+    throw new Error('予約の営業時間を読み込めませんでした。Googleから再読み込みしてください。')
+   const nextOpen = hoursDateRange(hoursDateAdd(today, 1), hoursDateAdd(today, 14)).find(date => {
+    const special = data.profile.specialHours.find(day => day.date === date)
+    if (special) return !special.closed && special.periods.length > 0
+    return (hours.hours?.find(day => day.weekday === new Date(`${date}T12:00:00Z`).getUTCDay())?.periods.length ?? 0) > 0
+   })
+   if (!nextOpen) throw new Error('予約枠を作れる営業日がありません。Googleの営業時間を確認してください。')
+   const openToday = day(today)
+   const initialDays = !openToday.closed && openToday.periods.length ? [today, nextOpen] : [nextOpen]
+   for (const date of initialDays) {
+    if (!mounted.current) return
+    await restaurantTestApi.generateInventory(accountId, {
+     storeId: data.store.id, date, expectedHoursVersion: hours.version, otaCapacity: 0, lineCapacity: 0, walkInCapacity: 0,
+    })
+   }
+   if (mounted.current) emitGuideSignal('hours.confirm', accountId)
+  } catch (cause) {
+   setActionError(errorMessage(cause, '予約枠を作れませんでした。もう一度お試しください。'))
+  } finally {
+   operation.current = false
+   setBusy(false)
+  }
+ }
  if (showImportedHours) return (
   <HoursWorkspaceFrame context={<span>{data.profile.title ?? data.store.name}</span>}>
    <div className={styles.tabs}>{tabs}</div>
@@ -63,13 +104,14 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate, s
     {data.stale ? <Notice tone="warn">Googleから最新の営業時間を読み込めませんでした。接続を確認して再読み込みしてください。</Notice>
       : hasImportedHours ? <Notice tone="success">Googleビジネスと接続しました。営業時間を取り込みました。</Notice>
       : <Notice tone="warn">Googleビジネスに通常の営業時間がありません。Googleビジネスで設定してから再読み込みしてください。</Notice>}
+    {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
     <div className={styles.importedHours}>
      <Card contentPadding="var(--space-20)" layout="vertical" gap="normal">
       <h2>取り込んだ営業時間</h2>
-      <div className={styles.weekList}>{HOURS_WEEKDAYS.map(weekday => (
-       <div className={styles.weekRow} key={weekday}>
-        <span>{WEEKDAY_JA[weekday]}曜日</span>
-        <span>{hoursText(data.profile.regularHours[weekday], '定休日')}</span>
+      <div className={styles.weekList}>{importedWeek.map(({ days, hours }) => (
+       <div className={styles.weekRow} key={days[0]}>
+        <span>{days.length > 2 ? `${days[0]}〜${days.at(-1)}曜` : `${days.join('・')}曜`}</span>
+        <span>{hours}</span>
        </div>
       ))}</div>
       <Notice tone="warn">営業時間が違うときは、Googleビジネスで正しい時間に変更してから「Googleから再読み込み」を押してください。</Notice>
@@ -77,7 +119,7 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate, s
       <div className={styles.actions}>
        <Button data-guide-anchor="hours.confirm" presentation="hours" variant="primary" size="field"
          disabled={disabled || data.stale || !hasImportedHours} lockedReason={lockedReason}
-         onClick={() => emitGuideSignal('hours.confirm')}>この営業時間で確定</Button>
+         onClick={() => void confirmImported()} busy={busy}>この営業時間で確定</Button>
        <Button presentation="hours" size="field" disabled={disabled} lockedReason={lockedReason}
          onClick={() => void m.load(true)}>Googleから再読み込み</Button>
       </div>

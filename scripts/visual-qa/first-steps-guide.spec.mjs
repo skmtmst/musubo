@@ -117,7 +117,7 @@ test('保存の失敗に留まり、成功後は手順3を再開して営業時�
   await expect(next).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('table-next-after-reload.png') })
   await next.click()
-  await expect(page).toHaveURL(/\/settings\/sns$|\/restaurant-test\/google\?tab=hours$/, { timeout: 15000 })
+  await expect(page).toHaveURL(/\/restaurant-test\/google\?tab=hours$/, { timeout: 15000 })
 })
 
 test('Penの5つの型を表示し、欄のエラーを確認してから保存すると卓へ進む', async ({ page }, testInfo) => {
@@ -209,7 +209,8 @@ test('受付開始後は公開前の案内を出し、あとでを押すと来�
   await page.goto(base)
   await page.getByRole('button', { name: 'ガイドで進める', exact: true }).click()
   await expect(page).toHaveURL(/\/restaurant-test\/inventory$/, { timeout: 15000 })
-  for (const [label, value] of [['予約サイト', '0'], ['当日（ウォークイン）', '0'], ['LINE 専用', '1']]) {
+  await page.getByRole('button', { name: '予約サイト・当日枠などの詳しい配分', exact: true }).click()
+  for (const [label, value] of [['予約サイト', '0'], ['当日（ウォークイン）', '0'], ['LINEで受ける席数（各枠）', '1']]) {
     const input = page.getByRole('spinbutton', { name: label, exact: true })
     await input.press('ControlOrMeta+a')
     await input.press(value)
@@ -368,8 +369,16 @@ test('公開確認では最後の公開ボタンにガイドが移る', async ({
   await expect(page.locator('[data-guide-balloon="friendAdd:3"]')).toBeVisible()
 })
 
-test('取り込んだ営業時間は編集せず確定できる', async ({ page }, info) => {
+test('取り込んだ営業時間の確定は予約枠の作成成功まで次へ進めない', async ({ page }, info) => {
   await openFixture(page, { initialGuide: { phase: 'active', stepKey: 'hours', procedureIndex: 2 }, storeProgress: { tables: true, hours: true } })
+  let requests = 0
+  await page.route('**/api/restaurant-test/inventory/generate?**', async route => {
+    const body = route.request().postDataJSON()
+    expect(body).toMatchObject({ storeId: 'store-sby', expectedHoursVersion: 4, otaCapacity: 0, lineCapacity: 0, walkInCapacity: 0 })
+    requests += 1
+    if (requests === 1) return route.fulfill({ status: 409, json: { success: false, error: '営業時間が変わりました。読み直してください。' } })
+    return route.fulfill({ json: { success: true, data: { generated: 4, slotMinutes: 30 } } })
+  })
   await page.goto(`${base}/restaurant-test/google?tab=hours`)
   await expect(page.getByRole('heading', { name: '取り込んだ営業時間' })).toBeVisible()
   const reload = page.getByRole('button', { name: 'Googleから再読み込み' })
@@ -382,7 +391,11 @@ test('取り込んだ営業時間は編集せず確定できる', async ({ page 
   await confirm.click({ trial: true })
   await page.screenshot({ path: info.outputPath('guided-hours-confirmation-mobile.png') })
   await confirm.click()
+  await expect(page.getByText('営業時間が変わりました。読み直してください。')).toBeVisible()
+  await expect(page.locator('[data-guide-balloon="hours:2"]')).toBeVisible()
+  await confirm.click()
   await expect(page).toHaveURL(/\/restaurant-test\/menu$/)
+  expect(requests).toBeGreaterThan(1)
 })
 
 test('来店フォローのおすすめ候補を表示したまま後で使う選択もできる', async ({ page }, info) => {
@@ -434,4 +447,49 @@ test('来店フォローは明示保存でおすすめ2件を下書きにする'
   await expect.poll(() => initializedRows?.filter(row => row.input.enabled).map(row => row.trigger)).toEqual(['reservation_created', 'reservation_24h'])
   await expect(page.getByRole('dialog', { name: /最初の1通を受け取る/ })).toBeVisible()
   expect(writes).toEqual(['initialize'])
+})
+
+test('Googleに接続した状態で戻っても取込内容を確認する', async ({ page }, info) => {
+  await openFixture(page, {
+    initialGuide: { phase: 'active', stepKey: 'hours', procedureIndex: 1 },
+    storeProgress: { tables: true, hours: true },
+  })
+  await page.goto(`${base}/restaurant-test/google?tab=hours&google=connected`)
+  await expect(page.getByRole('heading', { name: '取り込んだ営業時間' })).toBeVisible()
+  await expect(page.locator('[data-guide-balloon="hours:2"]')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'この営業時間で確定' })).toBeEnabled()
+  await page.screenshot({ path: info.outputPath('after-google-connect.png') })
+})
+
+test('枠がない日は配分を保存済みにせず、枠作成を案内する', async ({ page }, info) => {
+  await openFixture(page, {
+    initialGuide: { phase: 'active', stepKey: 'scenario', procedureIndex: 1 },
+    storeProgress: { tables: true, hours: true, menus: true },
+  })
+  await page.route('**/api/restaurant-test/inventory/day?**', route => route.fulfill({ json: { success: true, data: [], closures: [] } }))
+  await page.goto(`${base}/restaurant-test/inventory`)
+  const empty = page.getByText('この日の時間帯がありません')
+  await expect(empty).toBeVisible()
+  const line = page.getByRole('spinbutton', { name: 'LINEで受ける席数（各枠）' })
+  await line.fill('1')
+  await expect(page.getByRole('button', { name: '受付時間と配分を保存' })).toBeDisabled()
+  await expect(page.locator('[data-guide-balloon="scenario:1"]')).toContainText('「この日の枠を作る」')
+  await expect(page.getByRole('button', { name: 'この日の枠を作る' })).toHaveAttribute('data-guide-anchor', 'reception.lineSeats')
+  await page.screenshot({ path: info.outputPath('empty-inventory.png') })
+})
+
+test('リッチメニューがすでに公開中なら公開案内を飛ばす', async ({ page }, info) => {
+  await openFixture(page, {
+    initialGuide: { phase: 'active', stepKey: 'scenario', procedureIndex: 2 },
+    storeProgress: { tables: true, hours: true, menus: true, reception: true },
+  })
+  await page.route('**/api/rich-menu-groups?**', route => route.fulfill({ json: {
+    success: true,
+    data: { items: [{ id: 'rmg-live', accountId, status: 'published' }], total: 1, facets: { published: 1 } },
+  } }))
+  await page.goto(`${base}/restaurant-test/inventory`)
+  await expect(page).toHaveURL(/\/restaurant-test\/line-followup$/)
+  await expect(page.locator('[data-guide-balloon="followup:1"]')).toBeVisible()
+  await expect(page.getByRole('dialog', { name: '予約の受け付けが始まりました' })).toHaveCount(0)
+  await page.screenshot({ path: info.outputPath('after-already-published.png') })
 })

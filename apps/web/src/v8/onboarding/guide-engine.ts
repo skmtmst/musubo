@@ -131,7 +131,7 @@ export type GuideAnchor = { key: string; label: string; href: string }
 
 function needsGuideReview(state: GuideEngineState): boolean {
   return (state.stepKey === 'attributes' && state.procedureIndex === 3) ||
-    (state.stepKey === 'hours' && state.procedureIndex === 2) ||
+    state.stepKey === 'hours' ||
     (state.stepKey === 'scenario' && state.procedureIndex === 2)
 }
 
