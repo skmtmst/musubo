@@ -124,7 +124,11 @@ describe('席の予約の流れ', () => {
     open();fireEvent.click(await screen.findByRole('radio',{name:'19:00 空きあり'}));fireEvent.click(screen.getByRole('button',{name:'この時刻で進む'}));
     await screen.findByText('ご予約の内容');fireEvent.click(screen.getByRole('button',{name:'予約を確定する'}));
     const dialog=await screen.findByRole('dialog',{name:'お支払い内容を確認'});
-    expect(dialog.textContent).toContain('2,520');expect(seat.confirm).not.toHaveBeenCalled();
+    for (const [label, amount] of [['料金', '8,400円'], ['今お支払い', '2,520円'], ['お店で', '5,880円']] as const) {
+      const term = [...dialog.querySelectorAll('dt')].find(node => node.textContent === label);
+      expect(term?.parentElement?.querySelector('dd')?.textContent).toBe(amount);
+    }
+    expect(dialog.textContent).toContain('前日まで無料');expect(seat.confirm).not.toHaveBeenCalled();
     expect((screen.getByRole('button',{name:'お支払いへ進む'}) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole('checkbox',{name:'キャンセル料の決まりを確認しました'}));fireEvent.click(screen.getByRole('button',{name:'お支払いへ進む'}));
     await vi.waitFor(()=>expect(sdk.openWindow).toHaveBeenCalledWith({url:'https://checkout.stripe.com/c/pay/cs_test_example',external:true}));

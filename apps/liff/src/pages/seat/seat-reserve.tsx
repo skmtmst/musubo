@@ -2,6 +2,7 @@ import { defaultRestaurantReservationForm,restaurantReservationAnswerError } fro
 import { useRequestGeneration } from '../../lib/use-request-generation.js';
 import { FieldError, PaymentMethodChoices, PaymentPolicyConsent } from '../../components/forms/controls.js';
 import CourseChoice from '../../components/course-choice.js';
+import PaymentSummary from '../../components/payment-summary.js';
 import Card from '../../components/ui/card.js';
 import Badge from '../../components/ui/badge.js';
 import { useUrlStep } from '../../lib/use-url-step.js';
@@ -622,7 +623,7 @@ export default function SeatReserve() {
         </BottomBar>
       )}
 
-      <ConfirmDialog open={Boolean(paymentConfirm)} title="お支払い内容を確認" description={paymentConfirm?`料金 ${paymentConfirm.total.toLocaleString('ja-JP')} 円・今お支払い ${paymentConfirm.amount.toLocaleString('ja-JP')} 円・お店で ${paymentConfirm.remaining.toLocaleString('ja-JP')} 円。${paymentConfirm.cancellation}`:''} confirmLabel="お支払いへ進む" busy={busy} error={paymentError??undefined} confirmDisabled={!paymentAccepted} onCancel={()=>{if(!busy)setPaymentConfirm(null)}} onConfirm={()=>{void (async()=>{if(!paymentConfirm || !paymentAccepted || busy)return;setBusy(true);setPaymentError(null);try{const result=await restaurantBookingApi.payment(paymentConfirm.id,paymentConfirm.version,{...paymentConfirm.details,policyAccepted:true,policyVersion:paymentConfirm.policyVersion,expectedAmount:paymentConfirm.amount,expectedTotal:paymentConfirm.total});if(result.data.status==='paid'){setPaymentError('お支払いを確認しています。予約一覧を読み直してください。');return;}const url=new URL(result.data.url??'');if(url.protocol!=='https:' || url.hostname!=='checkout.stripe.com' || url.username || url.password || url.port)throw new Error('invalid_checkout_url');liff.openWindow({url:url.toString(),external:true});}catch{setPaymentError('お支払いの内容を確認できませんでした。閉じて最初からやり直してください。');}finally{setBusy(false);}})()}}><PaymentPolicyConsent accepted={paymentAccepted} onChange={setPaymentAccepted} /></ConfirmDialog>
+      <ConfirmDialog open={Boolean(paymentConfirm)} title="お支払い内容を確認" description="" confirmLabel="お支払いへ進む" busy={busy} error={paymentError??undefined} confirmDisabled={!paymentAccepted} onCancel={()=>{if(!busy)setPaymentConfirm(null)}} onConfirm={()=>{void (async()=>{if(!paymentConfirm || !paymentAccepted || busy)return;setBusy(true);setPaymentError(null);try{const result=await restaurantBookingApi.payment(paymentConfirm.id,paymentConfirm.version,{...paymentConfirm.details,policyAccepted:true,policyVersion:paymentConfirm.policyVersion,expectedAmount:paymentConfirm.amount,expectedTotal:paymentConfirm.total});if(result.data.status==='paid'){setPaymentError('お支払いを確認しています。予約一覧を読み直してください。');return;}const url=new URL(result.data.url??'');if(url.protocol!=='https:' || url.hostname!=='checkout.stripe.com' || url.username || url.password || url.port)throw new Error('invalid_checkout_url');liff.openWindow({url:url.toString(),external:true});}catch{setPaymentError('お支払いの内容を確認できませんでした。閉じて最初からやり直してください。');}finally{setBusy(false);}})()}}><div className="space-y-3">{paymentConfirm && <PaymentSummary {...paymentConfirm} />}<PaymentPolicyConsent accepted={paymentAccepted} onChange={setPaymentAccepted} /></div></ConfirmDialog>
       <ConfirmDialog
         open={!!cancelling}
         title="ご予約を取り消しますか"

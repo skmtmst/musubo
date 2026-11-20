@@ -3,6 +3,7 @@ import { useCustomerWords, useCustomerStyle } from '../components/customer-style
 import { LiffApiError, liffErrorMessage } from '../lib/api-error.js';
 import { useRequestGeneration } from '../lib/use-request-generation.js';
 import SeatBookingBlock from '../components/seat-booking-block.js';
+import PaymentSummary from '../components/payment-summary.js';
 import { restaurantBookingApi } from '../lib/api.js';
 import FormReception, { choiceReceptionLabel } from '../components/form-reception.js';
 import { TextInput, RadioChoiceInput, CheckboxChoiceInput, PaymentMethodChoices, PaymentPolicyConsent, FieldLabel, FieldCount } from '../components/forms/controls.js';
@@ -442,7 +443,7 @@ export default function Form({ readOnlyDocument = false }: {readOnlyDocument?:bo
       } catch (err) {
         logFailure('form-booking-request', err);
         const code = (err as { body?: { error?: string } }).body?.error;
-        if(code==='payment_method_required'){setFormPaymentChoiceRequired(true);return 'お支払い方法を選んで、予約を取り直してください。';}
+        if(code==='payment_method_required'){setFormPaymentChoiceRequired(true);return 'お支払い方法を選んでください。';}
         if (code === 'slot_not_available') {
           return '選んだ枠が埋まりました。日時を選び直してください。';
         }
@@ -623,11 +624,11 @@ export default function Form({ readOnlyDocument = false }: {readOnlyDocument?:bo
               試しの回答のため、集計には入りません。
             </p>
           ) : null}
-          {formPayment && <div className="mx-6 mb-6"><p>{`料金 ${formPayment.total.toLocaleString('ja-JP')} 円・今お支払い ${formPayment.amount.toLocaleString('ja-JP')} 円・お店で ${formPayment.remaining.toLocaleString('ja-JP')} 円`}</p><p>{formPayment.cancellation}</p><PaymentPolicyConsent accepted={formPaymentAccepted} onChange={setFormPaymentAccepted} /><Button variant="primary" disabled={!formPaymentAccepted || bookingRetrying} onClick={()=>void (async()=>{if(!id || !formPayment || !formPaymentAccepted || bookingRetrying)return;setBookingRetrying(true);try{const result=await restaurantBookingApi.formBooking({formId:id,blockId:formPayment.blockId,submissionKey:formPayment.submissionKey,...(formPayment.paymentMethod?{paymentMethod:formPayment.paymentMethod}:{}),policyAccepted:true,policyVersion:formPayment.policyVersion,expectedAmount:formPayment.amount,expectedTotal:formPayment.total});if(result.data.payment?.status==='paid'){setBookingError('お支払いと予約の状態を確認しています。');setFormPayment(null);return;}const url=new URL(result.data.payment?.url??'');if(url.protocol!=='https:' || url.hostname!=='checkout.stripe.com' || url.username || url.password || url.port)throw new Error('invalid_checkout_url');liff.openWindow({url:url.toString(),external:true});}catch{setBookingError('お支払いの内容を確認できませんでした。もう一度お試しください。');setFormPayment(null);}finally{setBookingRetrying(false);}})()}>お支払いへ進む</Button></div>}
+          {formPayment && <div className="mx-6 mb-6 space-y-3"><PaymentSummary {...formPayment} /><PaymentPolicyConsent accepted={formPaymentAccepted} onChange={setFormPaymentAccepted} /><Button variant="primary" disabled={!formPaymentAccepted || bookingRetrying} onClick={()=>void (async()=>{if(!id || !formPayment || !formPaymentAccepted || bookingRetrying)return;setBookingRetrying(true);try{const result=await restaurantBookingApi.formBooking({formId:id,blockId:formPayment.blockId,submissionKey:formPayment.submissionKey,...(formPayment.paymentMethod?{paymentMethod:formPayment.paymentMethod}:{}),policyAccepted:true,policyVersion:formPayment.policyVersion,expectedAmount:formPayment.amount,expectedTotal:formPayment.total});if(result.data.payment?.status==='paid'){setBookingError('お支払いと予約の状態を確認しています。');setFormPayment(null);return;}const url=new URL(result.data.payment?.url??'');if(url.protocol!=='https:' || url.hostname!=='checkout.stripe.com' || url.username || url.password || url.port)throw new Error('invalid_checkout_url');liff.openWindow({url:url.toString(),external:true});}catch{setBookingError('お支払いの内容を確認できませんでした。もう一度お試しください。');setFormPayment(null);}finally{setBookingRetrying(false);}})()}>お支払いへ進む</Button></div>}
           {bookingError && !formPayment && (
             <div className="mx-6 mb-6 rounded-[10px] border border-liff-line-strong bg-canvas p-4">
               <p className="text-sm font-bold text-ink">{bookingError}</p>
-              {formPaymentChoiceRequired && <PaymentMethodChoices name="form-payment" value={formPaymentChoice} onChange={setFormPaymentChoice} />}
+              {formPaymentChoiceRequired && <div className="mt-3"><PaymentMethodChoices name="form-payment" value={formPaymentChoice} onChange={setFormPaymentChoice} /></div>}
               <div className="mt-3 flex gap-2">
                 <Button variant="primary" className="flex-1"
                   type="button"
