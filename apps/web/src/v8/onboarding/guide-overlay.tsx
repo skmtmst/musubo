@@ -76,10 +76,10 @@ export function GuideOverlay({
     const width = window.innerWidth
     const height = window.innerHeight
     setViewport(previous => previous?.width === width && previous.height === height ? previous : { width, height })
-    const saveBars = Array.from(document.querySelectorAll(
+    const saveControls = Array.from(document.querySelectorAll(
       '[data-sticky-actions], [data-guide-anchor="reception.save"], button[form="rs-table-editor"][type="submit"]',
     ))
-    const reserved = saveBars.map(readRect).filter(box => box.height > 0 && box.top > height - 160 && box.top < height)
+    const reserved = saveControls.map(readRect).filter(box => box.height > 0 && box.top > height - 160 && box.top < height)
     setBottomOffset(Math.max(0, ...reserved.map(box => height - box.top + 8)))
     const element = anchorName ? document.querySelector(`[data-guide-anchor="${anchorName}"]`) : null
     const dialog = element?.closest('[role=dialog]')

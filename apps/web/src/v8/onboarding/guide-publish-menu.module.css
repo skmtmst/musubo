@@ -27,6 +27,7 @@
 }
 
 .preview {
+  --tpl-guide-preview-width: 300px;
   display: grid;
   gap: var(--space-12);
   text-align: center;
@@ -36,7 +37,7 @@
   display: grid;
   gap: var(--space-8);
   margin: 0 auto;
-  width: min(100%, 300px);
+  width: min(100%, var(--tpl-guide-preview-width));
 }
 
 .image {

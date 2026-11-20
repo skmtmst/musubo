@@ -127,11 +127,15 @@ test('受付開始後は公開前の案内を出し、あとでを押すと来�
   await page.goto(base)
   await page.getByRole('button', { name: 'ガイドで進める', exact: true }).click()
   await expect(page).toHaveURL(/\/restaurant-test\/inventory$/)
-  await page.getByRole('spinbutton', { name: '予約サイト', exact: true }).fill('0')
-  await page.getByRole('spinbutton', { name: '当日（ウォークイン）', exact: true }).fill('0')
-  await page.getByRole('spinbutton', { name: 'LINE 専用', exact: true }).fill('1')
+  for (const [label, value] of [['予約サイト', '0'], ['当日（ウォークイン）', '0'], ['LINE 専用', '1']]) {
+    const input = page.getByRole('spinbutton', { name: label, exact: true })
+    await input.press('ControlOrMeta+a')
+    await input.press(value)
+    await expect(input).toHaveValue(value)
+  }
   await expect(page.locator('[data-guide-balloon="scenario:2"]')).toBeVisible()
   const save = page.getByRole('button', { name: '受付時間と配分を保存', exact: true })
+  await expect(save).toBeEnabled()
   await save.click()
   const announcement = page.getByRole('dialog', { name: '予約の受け付けが始まりました' })
   await expect(announcement).toBeVisible()
