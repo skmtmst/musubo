@@ -3,7 +3,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const state = vi.hoisted(() => ({ role: 'owner' as 'owner' | 'viewer', account: 'a', impact: vi.fn(), remove: vi.fn(), setStatus: vi.fn() }))
+const state = vi.hoisted(() => ({ role: 'owner' as 'owner' | 'viewer', account: 'a', impact: vi.fn(), remove: vi.fn(), setStatus: vi.fn(), detail: vi.fn(), pin: vi.fn(), broadcast: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams('id=var-1') }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account, loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
@@ -12,8 +12,9 @@ vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api,
     folders: { ...actual.api.folders, list: async () => ({ success: true, data: [] }) },
+    broadcasts: { ...actual.api.broadcasts, get: state.broadcast },
     commonVars: { ...actual.api.commonVars,
-      detail: async () => ({ success: true, data: { id: 'var-1', name: '営業時間', key: 'hours', type: 'text', value: '10時', memo: '', status: 'active', validFrom: null, validUntil: null, version: 1, usages: [], history: [], usageCount: 0, usagePage: { total: 0, shown: 0 } } }),
+      detail: state.detail, pinBroadcast: state.pin,
       schedules: async () => ({ success: true, data: [] }), deleteImpact: state.impact, delete: state.remove, setStatus: state.setStatus,
     },
   } }
@@ -21,6 +22,9 @@ vi.mock('@/lib/api', async original => {
 import Editor from './edit'
 
 beforeEach(() => {
+  state.detail.mockReset().mockResolvedValue({ success: true, data: { id: 'var-1', name: '営業時間', key: 'hours', type: 'text', value: '10時', memo: '', status: 'active', validFrom: null, validUntil: null, version: 1, usages: [], history: [{ id: 'version-1', version: 1 }], usageCount: 0, usagePage: { total: 0, shown: 0 } } })
+  state.pin.mockReset().mockResolvedValue({ success: true })
+  state.broadcast.mockReset().mockResolvedValue({ success: true, data: { version: 4 } })
   state.role = 'owner'
   state.account = 'a'
   state.impact.mockReset().mockResolvedValue({ success: true, data: {
@@ -179,4 +183,49 @@ it('使用先ごとに参照方法と確かめられた版を表示する', asyn
   expect(within(table).getByText('固定した値')).toBeTruthy()
   expect(within(table).getByText('版 5')).toBeTruthy()
   expect(within(table).getByText('版 3')).toBeTruthy()
+})
+
+it('一斉配信の下書きに現在の版を固定できる', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 1, blockingTotal: 1, historicalTotal: 0,
+    unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'broadcast', kindLabel: '一斉配信', name: '案内', status: '下書き', href: '/broadcasts/detail?id=b-1', blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  fireEvent.click(await screen.findByRole('button', { name: '版 1 で固定' }))
+  const dialog = await screen.findByRole('dialog', { name: 'この版で固定しますか' })
+  expect(within(dialog).getByText(/承認が取り消されます/)).toBeTruthy()
+  fireEvent.click(within(dialog).getByRole('button', { name: '固定する' }))
+  await waitFor(() => expect(state.pin).toHaveBeenCalledWith('b-1', 'var-1', { accountId: 'a', versionId: 'version-1', expectedVersion: 4 }))
+})
+
+it('Google連携の値は固定を押せず理由を示す', async () => {
+  state.detail.mockResolvedValue({ success: true, data: { id: 'var-1', name: '営業時間', key: 'business_hours', type: 'text', value: '10時', memo: '', status: 'active', version: 1, usages: [], history: [{ id: 'version-1', version: 1 }], usagePage: { total: 0, shown: 0 }, pinDisabledReason: 'Google と連携した値は、いつも最新を使います' } })
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'business_hours' }, total: 1, blockingTotal: 1, historicalTotal: 0,
+    unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'broadcast', kindLabel: '一斉配信', name: '案内', status: '下書き', href: '/broadcasts/detail?id=b-1', blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  const button = await screen.findByRole('button', { name: 'この版で固定' })
+  expect(button.hasAttribute('disabled')).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: '固定できない理由' }))
+  expect(await screen.findByText('Google と連携した値は、いつも最新を使います')).toBeTruthy()
+  expect(state.pin).not.toHaveBeenCalled()
+})
+
+it('固定済みの下書きは変更件数に含めず版を表示する', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 1, blockingTotal: 1, historicalTotal: 0,
+    sendingFixedTotal: 0, unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'broadcast', kindLabel: '一斉配信', name: '案内', status: '下書き', href: '/broadcasts/detail?id=b-1', blocksDeletion: true, currentPreview: '旧', referenceMode: 'pinned', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  const table = await screen.findByRole('table', { name: '使っている場所' })
+  expect(within(table).getByText('固定した値')).toBeTruthy()
+  expect(within(table).getByText('版 1')).toBeTruthy()
+  expect(screen.getByRole('button', { name: /0か所に反映して保存/ })).toBeTruthy()
+  fireEvent.click(within(table).getByRole('button', { name: '最新の値に戻す' }))
+  const dialog = await screen.findByRole('dialog', { name: '最新の値に戻しますか' })
+  expect(state.pin).not.toHaveBeenCalled()
+  fireEvent.click(within(dialog).getByRole('button', { name: '最新の値に戻す' }))
+  await waitFor(() => expect(state.pin).toHaveBeenCalledWith('b-1', 'var-1', { accountId: 'a', versionId: null, expectedVersion: 4 }))
+  expect(within(table).queryByRole('button', { name: '版 1 で固定し直す' })).toBeNull()
 })

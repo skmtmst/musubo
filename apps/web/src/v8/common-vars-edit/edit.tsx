@@ -13,7 +13,8 @@ import { changeText,scheduleStamp } from './edit-text'
 
 
 import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useFeatureAccess, usePermissionAccess } from '@/lib/use-feature-access'
+import { BROADCAST_DEFINITION_EDIT_KEY } from '@line-crm/shared'
 import type { CommonVar,CommonVarChangeImpact,CommonVarDeleteImpact,CommonVarSchedule,Folder } from '@line-crm/shared'
 import { ArrowRight,Check,GitCompare,Pause,Play,Smartphone,Trash2 } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
@@ -30,6 +31,7 @@ import DateTimeField,{ TimeField } from '@/components/shared/date-time-field'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import HelpTip from '@/components/shared/help-tip'
 import LinePreview from '@/components/shared/line-preview'
 import MusuboMark from '@/components/shared/musubo-mark'
 import ListState from '@/components/shared/list-state'
@@ -54,7 +56,7 @@ import { focusFieldById } from '@/lib/use-form-errors'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import styles from './edit.module.css'
-import { blockingErrors,historicalText,impactBreakdown,impactCsv,impactStateFromError,impactStateText,overLimitCount,placeholderText,reflectionScopeText,reflectionTimingText,scheduleErrorText,urgentImpactCount,type ChangeImpactState } from './impact'
+import { blockingErrors,changeCounts,historicalText,impactBreakdown,impactCsv,impactStateFromError,impactStateText,overLimitCount,placeholderText,reflectionScopeText,reflectionTimingText,scheduleErrorText,urgentImpactCount,type ChangeImpactState } from './impact'
 import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 function EditCommonVarV8Inner() {
@@ -78,6 +80,9 @@ function EditCommonVarV8Inner() {
    * staff には閲覧のみの帯を出し、保存などの押し口は置かない（2026-10-06 オーナー決定）。
    */
   const canWrite = useFeatureAccess('commonVars')
+  const canEditBroadcasts = usePermissionAccess('/broadcasts')
+  const canEditBroadcastDefinitions = usePermissionAccess(BROADCAST_DEFINITION_EDIT_KEY)
+  const canPinBroadcast = canWrite && canEditBroadcasts && canEditBroadcastDefinitions
 
   const [item, setItem] = useState<CommonVarDetail | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
@@ -125,6 +130,10 @@ function EditCommonVarV8Inner() {
   const [impact, setImpact] = useState<CommonVarDeleteImpact | CommonVarChangeImpact | null>(null)
   const [impactState, setImpactState] = useState<ChangeImpactState>('loading')
   const [showAllUsages, setShowAllUsages] = useState(false)
+  const [pinBusy, setPinBusy] = useState<string | null>(null)
+  const [pinError, setPinError] = useState('')
+  const [pinTarget, setPinTarget] = useState<{ href: string; name: string; accountId: string; itemId: string; version: number; mode: 'pin' | 'live' } | null>(null)
+  useEffect(() => { setPinTarget(null); setPinError(''); setPinBusy(null) }, [selectedAccountId])
   /** 狭い板ではスマホの見え方を窓で見る（板 ）。 */
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -165,6 +174,34 @@ function EditCommonVarV8Inner() {
     }, 400)
     return () => clearTimeout(timer)
   }, [item, selectedAccountId, value, loadImpact])
+
+  const pinBroadcast = async (href: string) => {
+    if (!item || !selectedAccountId || pinBusy || !pinTarget || pinTarget.href !== href || pinTarget.accountId !== selectedAccountId || pinTarget.itemId !== item.id || latestAccountRef.current !== selectedAccountId) return
+    if (pinTarget.mode === 'pin' && pinTarget.version !== item.version) { setPinError('共通情報の版が変わりました。読み直してください'); return }
+    const broadcastId = new URL(href, window.location.origin).searchParams.get('id')
+    const currentVersion = item.history.find((entry) => entry.version === item.version)
+    if (!broadcastId || (pinTarget.mode === 'pin' && !currentVersion)) { setPinError('現在の版を確認できません。画面を読み直してください'); return }
+    let requestedVersion: string | null = null
+    if (pinTarget.mode === 'pin') {
+      if (!currentVersion) { setPinError('現在の版を確認できません。画面を読み直してください'); return }
+      requestedVersion = currentVersion.id
+    }
+    const accountId = selectedAccountId
+    setPinBusy(broadcastId)
+    setPinError('')
+    try {
+      const broadcast = await api.broadcasts.get(broadcastId)
+      if (!broadcast.success || broadcast.data.version == null) throw new Error('配信の版を確認できません')
+      const result = await api.commonVars.pinBroadcast(broadcastId, item.id, { accountId, versionId: requestedVersion, expectedVersion: broadcast.data.version })
+      if (!result.success) throw new Error(pinTarget.mode === 'live' ? '最新の値に戻せませんでした。読み直してください' : '固定できませんでした。読み直してください')
+      if (latestAccountRef.current === accountId) setPinTarget(null)
+      if (latestAccountRef.current === accountId) await loadImpact(item.id, accountId, value === item.value ? undefined : value, item.version)
+    } catch (err) {
+      if (latestAccountRef.current === accountId) setPinError(err instanceof Error ? err.message : pinTarget.mode === 'live' ? '最新の値に戻せませんでした。読み直してください' : '固定できませんでした。読み直してください')
+    } finally {
+      if (latestAccountRef.current === accountId) setPinBusy(null)
+    }
+  }
 
   const blocked = impact && 'canSave' in impact && impactState === 'ready'
     ? blockingErrors(impact)
@@ -742,7 +779,7 @@ function EditCommonVarV8Inner() {
                 busyLabel="保存中…"
               >
                 {impactState === 'ready' && impact && impact.unscopedFormTotal === 0
-                  ? `${formatNumber(impact.blockingTotal)}か所に反映して保存`
+                  ? `${formatNumber(changeCounts(impact).immediate)}か所に反映して保存`
                   : '保存する'}
               </Button>
             )
@@ -820,11 +857,18 @@ function EditCommonVarV8Inner() {
           {impactState === 'ready' && impact && impact.items.length > 0 ? (
             <section className={styles.card} aria-labelledby="cv-edit-usage-heading">
               <h2 id="cv-edit-usage-heading" className={styles.cardTitle}>使っている場所</h2>
+              {pinError ? <Notice tone="danger">{pinError}</Notice> : null}
+              <ConfirmDialog open={pinTarget !== null && pinTarget.accountId === selectedAccountId && pinTarget.itemId === item?.id} title={pinTarget?.mode === 'live' ? '最新の値に戻しますか' : 'この版で固定しますか'} description={`${pinTarget?.name ?? ''} を${pinTarget?.mode === 'live' ? '最新の値に戻し' : `版 ${pinTarget?.version ?? ''} に固定し`}ます。承認待ち・承認済みの場合は承認が取り消されます。`} confirmLabel={pinTarget?.mode === 'live' ? '最新の値に戻す' : '固定する'} error={pinError} busy={pinBusy !== null} onCancel={() => setPinTarget(null)} onConfirm={() => { if (pinTarget) void pinBroadcast(pinTarget.href) }} />
               <DataTable label="使っている場所">
                 <thead><TableHeadRow><Th>使っている場所</Th><Th>状態</Th><Th>参照方法</Th><Th>共通情報の版</Th></TableHeadRow></thead>
                 <tbody>{(showAllUsages ? impact.items : impact.items.slice(0, 20)).map((usage, index) => <Tr key={`${usage.kind}-${usage.href}-${index}`}>
                   <Td><PageLink href={usage.href}><TruncatedText value={usage.name} /></PageLink></Td><Td>{usage.status}</Td>
-                  <Td>{usage.referenceMode === 'live' ? '最新の値' : usage.referenceMode === 'pinned' ? '固定した値' : usage.referenceMode === 'operation' ? '値を操作' : '—'}</Td>
+                  <Td>{usage.referenceMode === 'live' ? '最新の値' : usage.referenceMode === 'pinned' ? '固定した値' : usage.referenceMode === 'operation' ? '値を操作' : '—'}{' '}
+                    {usage.referenceMode === 'pinned' && item?.pinDisabledReason ? <HelpTip label="送信時の注意" hover>Google と連携したため、この固定版では送らず要確認になります。</HelpTip> : null}
+                    {canPinBroadcast && item && selectedAccountId && usage.kind === 'broadcast' && usage.status === '下書き' ? <>
+                      {usage.referenceMode === 'pinned' ? <Button type="button" variant="secondary" disabled={pinBusy !== null} onClick={() => setPinTarget({ href: usage.href, name: usage.name, accountId: selectedAccountId, itemId: item.id, version: item.version, mode: 'live' })}>最新の値に戻す</Button> : null}
+                      {usage.referenceMode !== 'pinned' || usage.referencedVersion !== item.version ? item.pinDisabledReason ? <><Button type="button" variant="secondary" disabled>この版で固定</Button><HelpTip label="固定できない理由" hover>{item.pinDisabledReason}</HelpTip></> : <Button type="button" variant="secondary" disabled={pinBusy !== null || value !== item.value} onClick={() => setPinTarget({ href: usage.href, name: usage.name, accountId: selectedAccountId, itemId: item.id, version: item.version, mode: 'pin' })}>{usage.referenceMode === 'pinned' ? `版 ${item.version} で固定し直す` : `版 ${item.version} で固定`}</Button> : null}
+                    </> : null}</Td>
                   <Td>{usage.referencedVersion == null ? '—' : `版 ${usage.referencedVersion}`}</Td>
                 </Tr>)}</tbody>
               </DataTable>
@@ -837,7 +881,7 @@ function EditCommonVarV8Inner() {
               <h2 id="cv-edit-impact-heading" className={styles.cardTitle}>変える前に影響を見る</h2>
               <p className={styles.cardNote} title={impact ? [reflectionScopeText(impact), reflectionTimingText(impact), historicalText(impact), ...('canSave' in impact ? [impactBreakdown(impact), `予約中・配信中：${urgentImpactCount(impact) ?? NOT_AVAILABLE}か所`, `文字数超過：${overLimitCount(impact)}か所`] : [])].filter(Boolean).join('\n') : undefined}>
                 {impactState === 'ready' && impact
-                  ? `${impact.blockingTotal > impact.unscopedFormTotal ? `${formatNumber(impact.blockingTotal - impact.unscopedFormTotal)}か所に次に送る・動くときから新しい値が入ります。` : '確認できた使用先に変わる場所はありません。'}送信開始時に固定した配信と届いた文は変わりません${impact.unscopedFormTotal > 0 ? '。所属を確認できない使用先があります' : ''}`
+                  ? `${changeCounts(impact).immediate > impact.unscopedFormTotal ? `${formatNumber(changeCounts(impact).immediate - impact.unscopedFormTotal)}か所に次に送る・動くときから新しい値が入ります。` : '確認できた使用先に変わる場所はありません。'}送信開始時に固定した配信と届いた文は変わりません${impact.unscopedFormTotal > 0 ? '。所属を確認できない使用先があります' : ''}`
                   : '次に送る・動くときから新しい値が入ります。すでに届いた文は変わりません'}
               </p>
             </div>

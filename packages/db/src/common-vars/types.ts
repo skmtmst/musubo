@@ -34,6 +34,7 @@ export interface CommonVarUsageImpact {
 export interface CommonVarUsageItem {
   source_table: string;
   fixed_version?: number | null;
+  fixed_value?: string;
   kind: CommonVarUsageKind;
   source_id: string;
   source_parent_id: string | null;

@@ -16,7 +16,7 @@ describe('一斉配信の共通情報固定', () => {
     raw.prepare("INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id) VALUES ('b','配信','text','{{ var.shop_name }}','all','draft','a')").run();
     const app = new Hono<Env>();
     app.use('*', async (c, next) => { c.env = { DB: db } as Env['Bindings']; c.set('staff', { id: 'owner', name: 'Owner', role: 'owner', readOnly: false }); await next(); });
-    app.put('/api/broadcasts/:id/common-var-pins/:varId', inputJsonBoundary({accountId:['string'],versionId:['string'],expectedVersion:['number']}), putBroadcastCommonVarPin);
+    app.put('/api/broadcasts/:id/common-var-pins/:varId', inputJsonBoundary({accountId:['string'],versionId:['string','null'],expectedVersion:['number']}), putBroadcastCommonVarPin);
     const put = (versionId: string) => app.request('/api/broadcasts/b/common-var-pins/v', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accountId: 'a', versionId, expectedVersion: 1 }) });
     raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES ('other','c2','B','t','s')").run();
     raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,value) VALUES ('v2','other','別店舗','shop_name','別')").run();
@@ -43,6 +43,21 @@ describe('一斉配信の共通情報固定', () => {
     raw.prepare("INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id) VALUES ('b-hours','配信','text','{{var.business_hours}}','all','draft','a')").run();
     const manual = await app.request('/api/broadcasts/b-hours/common-var-pins/hours', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accountId: 'a', versionId: 'hours-version', expectedVersion: 1 }) });
     expect(manual.status).toBe(200);
+    const missingVersion = await app.request('/api/broadcasts/b-hours/common-var-pins/hours', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accountId: 'a', expectedVersion: 2 }) });
+    expect(missingVersion.status).toBe(400);
+    expect(raw.prepare("SELECT COUNT(*) AS n FROM broadcast_common_var_pins WHERE broadcast_id='b-hours'").get()).toEqual({ n: 1 });
+    const staleUnpin = await app.request('/api/broadcasts/b-hours/common-var-pins/hours', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accountId: 'a', versionId: null, expectedVersion: 1 }) });
+    expect(staleUnpin.status).toBe(409);
+    raw.prepare("UPDATE broadcasts SET status='sending' WHERE id='b-hours'").run();
+    const sendingUnpin = await app.request('/api/broadcasts/b-hours/common-var-pins/hours', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accountId: 'a', versionId: null, expectedVersion: 2 }) });
+    expect(sendingUnpin.status).toBe(409);
+    raw.prepare("UPDATE broadcasts SET status='draft', approval_status='approved' WHERE id='b-hours'").run();
+    raw.prepare("INSERT INTO rt_google_connections(id,store_id,status) VALUES ('connection-again','store','disconnected')").run();
+    const unpin = await app.request('/api/broadcasts/b-hours/common-var-pins/hours', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accountId: 'a', versionId: null, expectedVersion: 2 }) });
+    expect(unpin.status).toBe(200);
+    expect(raw.prepare("SELECT COUNT(*) AS n FROM broadcast_common_var_pins WHERE broadcast_id='b-hours'").get()).toEqual({ n: 0 });
+    expect(raw.prepare("SELECT lock_version, approval_status FROM broadcasts WHERE id='b-hours'").get()).toEqual({ lock_version: 3, approval_status: 'none' });
+
     raw.prepare("UPDATE broadcasts SET approval_status='approved' WHERE id='b'").run();
     expect((await put('old')).status).toBe(200);
     expect(raw.prepare("SELECT lock_version, approval_status FROM broadcasts WHERE id='b'").get()).toEqual({ lock_version: 2, approval_status: 'none' });
@@ -55,7 +70,7 @@ describe('一斉配信の共通情報固定', () => {
     raw.prepare("UPDATE broadcasts SET hq_run_id=NULL, target_type='multi-account-dedup', account_ids=? WHERE id='b'").run(JSON.stringify(['a', 'other']));
     const scopedApp = new Hono<Env>();
     scopedApp.use('*', async (c, next) => { c.env = { DB: db } as Env['Bindings']; c.set('staff', { id: 'scoped', name: 'Scoped', role: 'owner', readOnly: false, featureEnabledLineAccountIds: ['a'] }); await next(); });
-    scopedApp.put('/api/broadcasts/:id/common-var-pins/:varId', inputJsonBoundary({accountId:['string'],versionId:['string'],expectedVersion:['number']}), putBroadcastCommonVarPin);
+    scopedApp.put('/api/broadcasts/:id/common-var-pins/:varId', inputJsonBoundary({accountId:['string'],versionId:['string','null'],expectedVersion:['number']}), putBroadcastCommonVarPin);
     const scoped = await scopedApp.request('/api/broadcasts/b/common-var-pins/v', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accountId: 'a', versionId: 'old', expectedVersion: 2 }) });
     expect(scoped.status).toBe(404);
     raw.prepare("UPDATE broadcasts SET status='sending' WHERE id='b'").run();

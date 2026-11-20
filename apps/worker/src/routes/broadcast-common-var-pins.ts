@@ -19,8 +19,9 @@ export async function putBroadcastCommonVarPin(c: Context<Env, '/api/broadcasts/
   const boundary = await broadcastWriteBoundary(c, broadcastAccountIds(existing), { operationKey: BROADCAST_DEFINITION_EDIT_KEY });
   if (!boundary.allowed) return c.json({ success: false, error: '操作する権限がありません' }, 403);
   const body = validatedInputBody(c);
+  const removePin = body?.versionId === null;
   if (!body || typeof body.accountId !== 'string' || !body.accountId.trim()
-      || typeof body.versionId !== 'string' || !body.versionId.trim()
+      || (!removePin && (typeof body.versionId !== 'string' || !body.versionId.trim()))
       || typeof body.expectedVersion !== 'number' || !Number.isInteger(body.expectedVersion) || body.expectedVersion < 1) {
     return c.json({ success: false, error: 'アカウント、版と配信の更新番号を指定してください' }, 400);
   }
@@ -33,11 +34,16 @@ export async function putBroadcastCommonVarPin(c: Context<Env, '/api/broadcasts/
   if (!variable || !commonVarKeysInContent(content).includes(variable.var_key)) {
     return c.json({ success: false, error: '使用先または版を確認できません' }, 409);
   }
-  if (variable.var_key === 'business_hours' && (await accountOpeningHours(c.env.DB, body.accountId.trim())).source !== 'manual') {
+  if (!removePin && variable.var_key === 'business_hours' && (await accountOpeningHours(c.env.DB, body.accountId.trim())).source !== 'manual') {
     return c.json({ success: false, code: 'GOOGLE_VALUE_LIVE_ONLY', error: 'Google と連携した値は、いつも最新を使います' }, 409);
   }
-  const results = await c.env.DB.batch([
-    c.env.DB.prepare(`INSERT INTO broadcast_common_var_pins (broadcast_id, common_var_id, version_id)
+  const writePin = removePin
+    ? c.env.DB.prepare(`DELETE FROM broadcast_common_var_pins WHERE broadcast_id = ? AND common_var_id = ?
+      AND EXISTS (SELECT 1 FROM broadcasts b JOIN common_vars cv ON cv.id = ? AND cv.line_account_id = ? AND cv.archived_at IS NULL
+        WHERE b.id = ? AND b.status = 'draft' AND b.common_var_snapshot IS NULL AND b.lock_version = ?
+        AND ((b.target_type <> 'multi-account-dedup' AND b.line_account_id = ?) OR (b.target_type = 'multi-account-dedup' AND EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(b.account_ids) THEN b.account_ids ELSE '[]' END) WHERE value = ?))))`)
+      .bind(existing.id, c.req.param('varId'), c.req.param('varId'), body.accountId.trim(), existing.id, body.expectedVersion, body.accountId.trim(), body.accountId.trim())
+    : c.env.DB.prepare(`INSERT INTO broadcast_common_var_pins (broadcast_id, common_var_id, version_id)
       SELECT b.id, cv.id, v.id FROM broadcasts b
       JOIN common_vars cv ON cv.id = ? AND cv.line_account_id = ? AND cv.archived_at IS NULL
       JOIN common_var_versions v ON v.id = ? AND v.common_var_id = cv.id
@@ -49,7 +55,9 @@ export async function putBroadcastCommonVarPin(c: Context<Env, '/api/broadcasts/
         ))
         AND ((b.target_type <> 'multi-account-dedup' AND b.line_account_id = ?) OR (b.target_type = 'multi-account-dedup' AND EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(b.account_ids) THEN b.account_ids ELSE '[]' END) WHERE value = ?)))
       ON CONFLICT(broadcast_id, common_var_id) DO UPDATE SET version_id = excluded.version_id`)
-      .bind(c.req.param('varId'), body.accountId.trim(), body.versionId.trim(), existing.id, body.expectedVersion, body.accountId.trim(), body.accountId.trim()),
+      .bind(c.req.param('varId'), body.accountId.trim(), String(body.versionId).trim(), existing.id, body.expectedVersion, body.accountId.trim(), body.accountId.trim());
+  const results = await c.env.DB.batch([
+    writePin,
     c.env.DB.prepare(`UPDATE broadcasts SET lock_version = lock_version + 1,
       approval_status = CASE WHEN approval_status IN ('pending','approved') THEN 'none' ELSE approval_status END,
       approval_decided_by_staff_id = NULL, approval_decided_at = NULL,
@@ -61,5 +69,5 @@ export async function putBroadcastCommonVarPin(c: Context<Env, '/api/broadcasts/
     if (current && current.lock_version !== body.expectedVersion) return c.json({ success: false, code: 'VERSION_CONFLICT', error: '配信が更新されました。読み直してください' }, 409);
     return c.json({ success: false, error: '使用先または版を確認できません' }, 409);
   }
-  return c.json({ success: true, data: { versionId: body.versionId.trim(), version: body.expectedVersion + 1 } });
+  return c.json({ success: true, data: { versionId: removePin ? null : String(body.versionId).trim(), version: body.expectedVersion + 1 } });
 }
