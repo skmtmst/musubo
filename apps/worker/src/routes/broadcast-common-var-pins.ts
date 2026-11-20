@@ -5,6 +5,7 @@ import type { Env } from '../worker-env.js';
 import { validatedInputBody } from '../lib/input-errors.js';
 import { simulationContext } from '../features/broadcasts/broadcast-simulation/index.js';
 import { broadcastAccountIds, broadcastWriteBoundary, canAccessBroadcast } from './broadcasts-definition.js';
+import { accountOpeningHours } from '../services/account-opening-hours.js';
 import { commonVarKeysInContent } from '../services/common-var-snapshot.js';
 
 /** 送信開始前の下書きだけ、承認を取り消して固定版を変更する。 */
@@ -32,12 +33,20 @@ export async function putBroadcastCommonVarPin(c: Context<Env, '/api/broadcasts/
   if (!variable || !commonVarKeysInContent(content).includes(variable.var_key)) {
     return c.json({ success: false, error: '使用先または版を確認できません' }, 409);
   }
+  if (variable.var_key === 'business_hours' && (await accountOpeningHours(c.env.DB, body.accountId.trim())).source !== 'manual') {
+    return c.json({ success: false, code: 'GOOGLE_VALUE_LIVE_ONLY', error: 'Google と連携した値は、いつも最新を使います' }, 409);
+  }
   const results = await c.env.DB.batch([
     c.env.DB.prepare(`INSERT INTO broadcast_common_var_pins (broadcast_id, common_var_id, version_id)
       SELECT b.id, cv.id, v.id FROM broadcasts b
       JOIN common_vars cv ON cv.id = ? AND cv.line_account_id = ? AND cv.archived_at IS NULL
       JOIN common_var_versions v ON v.id = ? AND v.common_var_id = cv.id
       WHERE b.id = ? AND b.status = 'draft' AND b.common_var_snapshot IS NULL AND b.lock_version = ?
+        AND (cv.var_key <> 'business_hours' OR NOT EXISTS (
+          SELECT 1 FROM rt_stores s JOIN rt_google_connections c ON c.store_id = s.id
+          WHERE s.line_account_id = cv.line_account_id AND c.status IS NOT NULL
+            AND s.id = (SELECT s2.id FROM rt_stores s2 WHERE s2.line_account_id = cv.line_account_id ORDER BY s2.id LIMIT 1)
+        ))
         AND ((b.target_type <> 'multi-account-dedup' AND b.line_account_id = ?) OR (b.target_type = 'multi-account-dedup' AND EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(b.account_ids) THEN b.account_ids ELSE '[]' END) WHERE value = ?)))
       ON CONFLICT(broadcast_id, common_var_id) DO UPDATE SET version_id = excluded.version_id`)
       .bind(c.req.param('varId'), body.accountId.trim(), body.versionId.trim(), existing.id, body.expectedVersion, body.accountId.trim(), body.accountId.trim()),
