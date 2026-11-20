@@ -81,6 +81,22 @@ export async function getCommonVarUsageImpact(
     byKind[source.kind] = found.length;
   }
 
+  // 送信中の写しから、このアカウント・このキーの版だけを読む。
+  // 古い写しや壊れた写しは不明とし、現在の版で代用しない。
+  for (const item of items) {
+    if (item.source_table !== 'broadcasts' || item.source_status !== 'sending_fixed') continue;
+    const row = await db.prepare('SELECT common_var_snapshot FROM broadcasts WHERE id = ?')
+      .bind(item.source_id).first<{ common_var_snapshot: string | null }>();
+    item.fixed_version = null;
+    try {
+      const parsed = JSON.parse(row?.common_var_snapshot ?? 'null') as {
+        accounts?: Record<string, { entries?: Array<{ varKey?: string; version?: unknown }> }>;
+      } | null;
+      const version = parsed?.accounts?.[lineAccountId]?.entries?.find((entry) => entry.varKey === varKey)?.version;
+      if (typeof version === 'number' && Number.isSafeInteger(version) && version > 0) item.fixed_version = version;
+    } catch { /* 版を確かめられない写しは不明とする。 */ }
+  }
+
   // form_accounts が1件も無い古いフォームだけは、どのアカウントのものか
   // 確定できない。名前や本文は返さず、件数だけ残して削除を安全側に止める。
   const unscopedForms = await db.prepare(

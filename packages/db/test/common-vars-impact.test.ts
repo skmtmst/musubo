@@ -80,6 +80,19 @@ describe('common variable usage impact', () => {
     raw.close();
   });
 
+  it('送信開始時の版は対象アカウントの写しから読み、別アカウントの版を使わない', async () => {
+    const raw = new Database(':memory:');
+    raw.exec(readFileSync(join(process.cwd(), 'bootstrap.sql'), 'utf8'));
+    raw.exec(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('a1','c1','A1','t','s'), ('a2','c2','A2','t','s');
+      INSERT INTO broadcasts (id, title, message_type, message_content, target_type, status, line_account_id, account_ids, common_var_snapshot)
+      VALUES ('b', '配信', 'text', '{{var.shop_hours}}', 'multi-account-dedup', 'sending', 'a1', '["a1","a2"]',
+      '{"accounts":{"a1":{"entries":[{"varKey":"shop_hours","version":3}]},"a2":{"entries":[{"varKey":"shop_hours","version":9}]}}}');`);
+    expect((await getCommonVarUsageImpact(asD1(raw), 'shop_hours', 'a1')).items[0].fixed_version).toBe(3);
+    expect((await getCommonVarUsageImpact(asD1(raw), 'shop_hours', 'a2')).items[0].fixed_version).toBe(9);
+    raw.close();
+  });
+
   it('does not hide a failed scan as zero usages', async () => {
     const db = {
       prepare: vi.fn(() => ({

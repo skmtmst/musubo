@@ -56,6 +56,8 @@ export interface CommonVarDeleteImpactItem {
   status: string;
   href: string;
   blocksDeletion: boolean;
+  referenceMode?: "live" | "pinned" | "unknown";
+  referencedVersion?: number | null;
   currentPreview: string;
 }
 
