@@ -20,6 +20,7 @@ vi.mock('@/lib/api', async original => {
   } }
 })
 import Editor from './edit'
+import { ApiError } from '@/lib/api'
 
 beforeEach(() => {
   state.detail.mockReset().mockResolvedValue({ success: true, data: { id: 'var-1', name: '営業時間', key: 'hours', type: 'text', value: '10時', memo: '', status: 'active', validFrom: null, validUntil: null, version: 1, usages: [], history: [{ id: 'version-1', version: 1 }], usageCount: 0, usagePage: { total: 0, shown: 0 } } })
@@ -198,6 +199,21 @@ it('一斉配信の下書きに現在の版を固定できる', async () => {
   expect(within(dialog).getByText(/承認が取り消されます/)).toBeTruthy()
   fireEvent.click(within(dialog).getByRole('button', { name: '固定する' }))
   await waitFor(() => expect(state.pin).toHaveBeenCalledWith('b-1', 'var-1', { accountId: 'a', versionId: 'version-1', expectedVersion: 4 }))
+})
+
+it('固定に失敗したときは技術的なエラーを出さずに案内する', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 1, blockingTotal: 1, historicalTotal: 0,
+    unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'broadcast', kindLabel: '一斉配信', name: '案内', status: '下書き', href: '/broadcasts/detail?id=b-1', blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
+  } })
+  state.pin.mockRejectedValue(new ApiError(500))
+  render(<Editor />)
+  fireEvent.click(await screen.findByRole('button', { name: '案内の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '版 1 で固定' }))
+  const dialog = await screen.findByRole('dialog', { name: 'この版で固定しますか' })
+  fireEvent.click(within(dialog).getByRole('button', { name: '固定する' }))
+  expect(await within(dialog).findByText('版の固定に失敗しました。時間をおいて、もう一度お試しください。')).toBeTruthy()
+  expect(screen.queryByText('API error: 500')).toBeNull()
 })
 
 it('Google連携の値は固定を押せず理由を示す', async () => {

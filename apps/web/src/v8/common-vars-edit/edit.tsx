@@ -13,6 +13,7 @@ export { changeText,scheduleStamp } from './edit-text'
 import { changeText,scheduleStamp } from './edit-text'
 
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useFeatureAccess, usePermissionAccess } from '@/lib/use-feature-access'
 import { BROADCAST_DEFINITION_EDIT_KEY } from '@line-crm/shared'
@@ -197,7 +198,7 @@ function EditCommonVarV8Inner() {
       if (latestAccountRef.current === accountId) setPinTarget(null)
       if (latestAccountRef.current === accountId) await loadImpact(item.id, accountId, value === item.value ? undefined : value, item.version)
     } catch (err) {
-      if (latestAccountRef.current === accountId) setPinError(err instanceof Error ? err.message : pinTarget.mode === 'live' ? '最新の値に戻せませんでした。読み直してください' : '固定できませんでした。読み直してください')
+      if (latestAccountRef.current === accountId) setPinError(describeApiFailure(err, pinTarget.mode === 'live' ? '最新の値への変更' : '版の固定'))
     } finally {
       if (latestAccountRef.current === accountId) setPinBusy(null)
     }
