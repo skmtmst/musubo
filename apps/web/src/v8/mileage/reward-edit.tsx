@@ -396,7 +396,6 @@ function RewardEditorInner() {
     if (editing && loadedScope.current !== scope.current.generation) return
     if (selectedAccountId) setPublishTarget({ accountId: selectedAccountId, generation: scope.current.generation })
   }
-  const kindNote = KINDS.find((kind) => kind.value === form.rewardKind)?.note ?? ''
   const kindLocked = (kind: MileageRewardKind) => Boolean(reward && ((reward.rewardKind === 'handgift') !== (kind === 'handgift')))
   const requiredMiles = Number(form.requiredMiles)
   const perFriend = form.perFriendLimit.trim() === '' ? '何回でも' : `${form.perFriendLimit} 回まで`
@@ -471,39 +470,29 @@ function RewardEditorInner() {
 
       <Card variant="form" aria-label="渡すもの">
         <CardHeader size="stacked" title="渡すもの" />
-        <SettingsFormRow layout="columns">
-          {form.rewardKind !== 'handgift' ? <SelectField label="交換後に渡すもの" htmlFor="reward-action" requirement={rewardActionRequirement(form.rewardKind)}
-            help={form.rewardKind === 'coupon' ? 'クーポンは引換コードで渡すので、選ばなくても出せます' : '共通アクションの版を指定します'}
-          >
-            <SaveErrorField names={["commonActionVersionId","form.commonActionVersionId","common_action_version_id","form.common_action_version_id"]}><EntitySelect kind="common_action"
-              id="reward-action"
-              error={errorOf('交換後に渡すものを選んでください')}
-              aria-label="交換後に渡すもの"
-              size="full"
-              value={form.commonActionVersionId}
-              onChange={(next) => set('commonActionVersionId', next)}
-              options={[
-                { value: '', label: commonActionsFailed ? '公開版を読み込めませんでした' : '公開中の共通アクションを選ぶ' },
-                ...(form.commonActionVersionId && !commonActions.some((item) => item.id === form.commonActionVersionId)
-                  ? [{ value: form.commonActionVersionId, label: '現在選択中の公開版' }]
-                  : []),
-                ...commonActions.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.label })),
-              ]}
-              disabled={commonActionsFailed}
-            /></SaveErrorField>
-          </SelectField> : null}
-          <SelectField label="渡すものの種類" htmlFor="reward-kind" help={kindNote}>
-            <SaveErrorField names={["rewardKind","form.rewardKind","reward_kind","form.reward_kind"]}><Select
-              id="reward-kind"
-              aria-label="渡すものの種類"
-              size="full"
-              value={form.rewardKind}
-              onChange={(next) => set('rewardKind', next as MileageRewardKind)}
-              options={KINDS.map((kind) => ({ value: kind.value, label: kind.label, disabled: kindLocked(kind.value) }))}
-            /></SaveErrorField>
-          </SelectField>
-        </SettingsFormRow>
-        <SelectField label="渡せなかったとき" htmlFor="reward-failure" help="マイルは交換の時点で引かれます。渡せなかったときの決めごとがないと、引かれたまま何も届きません">
+        <RadioCardGroup legend="渡すものの種類" legendVisible>
+          {KINDS.filter(kind => kind.value === 'coupon' || kind.value === 'handgift').sort((a, b) => a.value === 'coupon' ? -1 : b.value === 'coupon' ? 1 : 0).map(kind => <RadioCard
+            key={kind.value} name="reward-kind-primary" value={kind.value} title={kind.label}
+            variant="form" note={kind.value === 'handgift' ? '交換後、お店で景品をお渡しします。' : undefined} checked={form.rewardKind === kind.value} disabled={kindLocked(kind.value)}
+            disabledReason={kindLocked(kind.value) ? '作成後は手渡しと他の種類を切り替えられません' : undefined}
+            onChange={() => set('rewardKind', kind.value)} />)}
+          <RadioCard name="reward-kind-primary" value="other" title="ほかの特典（タグ・シナリオなど）" variant="form"
+            checked={form.rewardKind !== 'coupon' && form.rewardKind !== 'handgift'}
+            disabled={kindLocked('tag')} disabledReason={kindLocked('tag') ? '作成後は手渡しと他の種類を切り替えられません' : undefined}
+            onChange={() => { if (form.rewardKind === 'coupon' || form.rewardKind === 'handgift') set('rewardKind', 'tag') }} />
+        </RadioCardGroup>
+        {form.rewardKind !== 'handgift' ? <SelectField label="交換後に渡すもの" htmlFor="reward-action" requirement={rewardActionRequirement(form.rewardKind)}
+          help={form.rewardKind === 'coupon' ? 'クーポンは引換コードで渡すので、選ばなくても出せます' : '共通アクションの版を指定します'}>
+          <SaveErrorField names={["commonActionVersionId","form.commonActionVersionId","common_action_version_id","form.common_action_version_id"]}><EntitySelect kind="common_action"
+            id="reward-action" error={errorOf('交換後に渡すものを選んでください')} aria-label="交換後に渡すもの" size="full"
+            value={form.commonActionVersionId} onChange={(next) => set('commonActionVersionId', next)}
+            options={[
+              { value: '', label: commonActionsFailed ? '公開版を読み込めませんでした' : '公開中の共通アクションを選ぶ' },
+              ...(form.commonActionVersionId && !commonActions.some((item) => item.id === form.commonActionVersionId) ? [{ value: form.commonActionVersionId, label: '現在選択中の公開版' }] : []),
+              ...commonActions.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.label })),
+            ]} disabled={commonActionsFailed} /></SaveErrorField>
+        </SelectField> : null}
+        {form.rewardKind !== 'handgift' ? <SelectField label="渡せなかったとき" htmlFor="reward-failure" help="マイルは交換の時点で引かれます。渡せなかったときの決めごとがないと、引かれたまま何も届きません">
           <SaveErrorField names={["failurePolicy","form.failurePolicy","failure_policy","form.failure_policy"]}><Select
             id="reward-failure"
             aria-label="渡せなかったときにどうするか"
@@ -512,7 +501,7 @@ function RewardEditorInner() {
             onChange={(next) => set('failurePolicy', next as MileageRewardFailurePolicy)}
             options={FAILURE_POLICIES.map((item) => ({ value: item.value, label: item.label }))}
           /></SaveErrorField>
-        </SelectField>
+        </SelectField> : null}
       </Card>
 
       <Card variant="form" aria-label="だれが交換できるか">
