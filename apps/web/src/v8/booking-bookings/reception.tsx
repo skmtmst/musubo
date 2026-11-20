@@ -8,7 +8,6 @@ import Card, { CardHeader } from '@/components/shared/card'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Th, Td, Tr, RowNameButton } from '@/components/shared/table'
@@ -42,7 +41,6 @@ export default function BookingReception({ onOpen, refreshKey }: { onOpen: (id: 
   return <Card variant="form" aria-label="予約受付管理">
     <CardHeader size="stacked" title="予約受付管理" />
     <KpiBand layout="booking"><KpiCard presentation="band" title="承認待ち" value={state.total} unit="件" detail="今日以降の予約" /></KpiBand>
-    <Notice tone="info">未割り当ての予約は、この一覧では確認できません。</Notice>
     {state.requests.length ? <DataTable><thead><TableHeadRow><Th grow>予約</Th><Th>日時</Th><Th grow>内容</Th><Th>担当</Th><Th>状態</Th></TableHeadRow></thead><tbody>
       {state.requests.map(row => <Tr key={row.id}><Td grow><RowNameButton onClick={() => onOpen(row.id)}>{row.friend_name || '名前未設定'}</RowNameButton></Td><Td>{formatDay(row.starts_at)} {formatTime(row.starts_at)}</Td><Td grow>{row.menu_name}</Td><Td>{row.staff_name || '担当を確認'}</Td><Td><StatusBadge tone="caution">承認待ち</StatusBadge></Td></Tr>)}
     </tbody></DataTable> : <ListState kind="empty" title="今日以降の承認待ちはありません" />}

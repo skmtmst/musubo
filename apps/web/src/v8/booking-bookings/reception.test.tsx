@@ -13,7 +13,8 @@ it('今日以降の承認待ちをページ単位で読み、詳細を開く', a
   fireEvent.click(await screen.findByRole('button', { name: '山田' }))
   expect(open).toHaveBeenCalledWith('b')
   expect(mocks.list).toHaveBeenCalledWith('a', 'requested', expect.objectContaining({ limit: 20, offset: 0, from: expect.any(String) }))
-  expect(screen.getByText('未割り当ての予約は、この一覧では確認できません。')).toBeTruthy()
+  expect(screen.queryByText(/未割り当て/)).toBeNull()
+  expect(screen.queryByRole('button', { name: /未割り当て/ })).toBeNull()
 })
 it('読み込み失敗を0件として表示しない', async () => {
   mocks.list.mockRejectedValue(new Error('offline')); render(<BookingReception onOpen={() => {}} />)
