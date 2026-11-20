@@ -49,7 +49,7 @@ export function meetingProvider(provider:MeetingProvider,tokenForStaff:TokenSour
  }
  async function verifyCreate(input:Parameters<MeetingVerifier['verifyCreate']>[0]):ReturnType<MeetingVerifier['verifyCreate']>{
   if(provider==='zoom'){
-   // 一覧は agenda が250文字に切られるため、候補は詳細で鍵を照合する。不在は再作成の根拠にしない。
+   // 一覧は agenda が250文字に切られるため、候補は詳細で鍵を照合する。不在を再送に使うのは確実に失敗した行だけ。
    if(!input.idempotencyKey||input.idempotencyKey.length>250)return {kind:'unknown'};
    try{
     let page='',accountId='',found:{meetingId:string;url:string}|null=null;
@@ -71,7 +71,7 @@ export function meetingProvider(provider:MeetingProvider,tokenForStaff:TokenSour
       found={meetingId:packId(accountId,id),url};
      }
      if(data.next_page_token!==undefined&&typeof data.next_page_token!=='string')return {kind:'unknown'};
-     page=text(data.next_page_token);if(!page)return found?{kind:'found',...found,idempotencyKey:input.idempotencyKey}:{kind:'unknown'};
+     page=text(data.next_page_token);if(!page)return found?{kind:'found',...found,idempotencyKey:input.idempotencyKey}:{kind:'absent'};
      if(seen.has(page))return {kind:'unknown'};seen.add(page);
     }
    }catch{return {kind:'unknown'};}
@@ -80,7 +80,7 @@ export function meetingProvider(provider:MeetingProvider,tokenForStaff:TokenSour
   // Graph の読み取り API は externalId での検索を提供しない。createOrGet は新規作成し得るため使わない。
   if(provider==='teams')return {kind:'unknown'};
   const id=await googleEventId(input.idempotencyKey);
-  try{const result=await call(input.staffId,`https://www.googleapis.com/calendar/v3/calendars/primary/events/${id}`,'GET',undefined,input.signal);if(!result||!result.response.ok)return {kind:'unknown'};
+  try{const result=await call(input.staffId,`https://www.googleapis.com/calendar/v3/calendars/primary/events/${id}`,'GET',undefined,input.signal);if(!result)return {kind:'unknown'};if(result.response.status===404)return {kind:'absent'};if(!result.response.ok)return {kind:'unknown'};
    const data=obj(await result.response.json()),privateData=obj(obj(data.extendedProperties).private);const key=text(privateData.bookingKey),meetingId=text(data.id),url=text(data.hangoutLink);
    return data.status!=='cancelled'&&key===input.idempotencyKey&&meetingId===id&&validUrl(provider,url)?{kind:'found',meetingId:packId(result.accountId,meetingId),url,idempotencyKey:key}:{kind:'unknown'};
   }catch{return {kind:'unknown'};}

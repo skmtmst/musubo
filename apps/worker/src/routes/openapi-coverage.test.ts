@@ -202,6 +202,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   "POST /api/booking/admin/staff/{id}/connections/{provider}/prefer",
   "POST /api/booking/admin/bookings/{id}/meeting-links/{linkId}/resolve",
   "GET /api/booking/admin/bookings/{id}/meeting-links",
+  "GET /api/booking/admin/bookings/{id}/meeting-status",
+  "POST /api/booking/admin/bookings/{id}/meeting-retry",
   "DELETE /api/booking/admin/staff/{id}/connections/{provider}",
   "GET /api/booking/admin/menus/{id}/deposit",
   "GET /api/booking/admin/pass-notices",

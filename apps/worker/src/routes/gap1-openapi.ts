@@ -40,3 +40,5 @@ export const gap1Paths:Record<string,Record<string,ReturnType<typeof operation>>
 (gap1Paths["/api/booking/admin/bookings/{id}/meeting-links/{linkId}/resolve"]??={}).post=operation("POST","/api/booking/admin/bookings/{id}/meeting-links/{linkId}/resolve","相手先で削除済みの古い会議を対応済みにする。");
 
 (gap1Paths["/api/booking/admin/bookings/{id}/meeting-links"]??={}).get=operation("GET","/api/booking/admin/bookings/{id}/meeting-links","手作業の確認が必要な会議を確認する。");
+(gap1Paths["/api/booking/admin/bookings/{id}/meeting-status"]??={}).get=operation("GET","/api/booking/admin/bookings/{id}/meeting-status","会議の発行状態を確認する。");
+(gap1Paths["/api/booking/admin/bookings/{id}/meeting-retry"]??={}).post=operation("POST","/api/booking/admin/bookings/{id}/meeting-retry","確実に失敗した会議の再発行を試みる。");

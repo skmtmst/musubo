@@ -1,12 +1,15 @@
 import {Hono,type Context} from 'hono';
 import type { Env } from '../worker-env.js';
-import {gapAccount,gapBody,gapVersion,gapWrite,GapError} from '../services/gap-common.js';
+import {gapAccount,gapBody,gapKey,gapVersion,gapWrite,GapError} from '../services/gap-common.js';
 import {calendarSwitch,validMeetingUrl} from '../features/booking/booking-calendar-settings/index.js';
 import {outlookStaffIsTestRecipient} from '../features/booking/booking-outlook-busy-runtime/index.js';
 import {bookingChannelBounds} from '../features/booking/booking-channels/index.js';
 import {getAccountTimeZone} from '../services/availability.js';
 import {BOOKING_STAFF_OWN_KEY} from '@line-crm/shared';
 import {auditLog} from '../lib/audit-log.js';
+import {meetingCreatorForBooking} from '../features/booking/booking-meeting-runtime/index.js';
+import {retryFailedMeeting} from '../features/booking/booking-meeting-retry.js';
+import {featureJobCanRun} from '../services/feature-enforcement.js';
 export const bookingCalendarSettings=new Hono<Env>();
 bookingCalendarSettings.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'calendar_settings_unavailable'},e instanceof GapError?e.status:503));
 async function staffTarget(c:Context<Env>,account:string,id:string,write:boolean){
@@ -103,6 +106,22 @@ bookingCalendarSettings.post('/api/booking/admin/bookings/:id/meeting',async (c:
  .bind(b.action,b.url??null,b.action,id,a,v).run();
  if(!r.meta.changes)throw new GapError('version_conflict',409);
  return c.json({success:true,data:await c.env.DB.prepare('SELECT meeting_url url,meeting_url_source source,lock_version version FROM bookings WHERE id=? AND line_account_id=?').bind(id,a).first()});
+});
+
+bookingCalendarSettings.get('/api/booking/admin/bookings/:id/meeting-status',async c=>{
+ const account=await gapAccount(c),id=c.req.param('id');
+ const booking=await c.env.DB.prepare('SELECT id FROM bookings WHERE id=? AND line_account_id=?').bind(id,account).first();if(!booking)throw new GapError('not_found',404);
+ const row=await c.env.DB.prepare(`SELECT l.status,l.provider FROM booking_meeting_links l JOIN bookings b ON b.id=l.booking_id
+  WHERE b.id=? AND b.line_account_id=? AND l.idempotency_key='booking-meeting:'||b.id||':'||b.lock_version ORDER BY l.created_at DESC,l.id DESC LIMIT 1`).bind(id,account).first<{status:string;provider:string}>();
+ return c.json({success:true,data:{state:row?.status==='failed'?'failed':row?.status==='pending'?'unknown':row?.status==='active'?'active':'none',provider:row?.provider??null}});
+});
+bookingCalendarSettings.post('/api/booking/admin/bookings/:id/meeting-retry',async c=>{
+ gapWrite(c,{admin:true});const accountId=await gapAccount(c),bookingId=c.req.param('id')!,requestKey=gapKey(c);
+ const booking=await c.env.DB.prepare('SELECT id FROM bookings WHERE id=? AND line_account_id=?').bind(bookingId,accountId).first();if(!booking)throw new GapError('not_found',404);
+ if(!await featureJobCanRun(c.env.DB,{accountId,featureId:'booking',job:'booking meeting retry'}))throw new GapError('booking_disabled',409);
+ const outcome=await retryFailedMeeting(c.env.DB,{accountId,bookingId,requestKey,resolve:async()=>{const adapter=await meetingCreatorForBooking(c.env,bookingId);return adapter && typeof adapter!=='string'?adapter:null;}});
+ auditLog(c,'booking.meeting.retry',{id:bookingId,kind:'booking_meeting_retry'},{lineAccountId:accountId});
+ return c.json({success:true,data:{outcome}});
 });
 
 bookingCalendarSettings.get('/api/booking/admin/bookings/:id/meeting-links',async (c:Context<Env>):Promise<Response>=>{

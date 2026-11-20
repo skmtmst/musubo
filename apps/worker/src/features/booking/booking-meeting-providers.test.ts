@@ -78,7 +78,7 @@ it('Zoom で未発見、複数一致、詳細の不一致、ページング不�
    const id=Number(new URL(String(url)).pathname.split('/').pop());
    return new Response(JSON.stringify({id,agenda:kind==='mismatch'?'other':'key',join_url:`https://zoom.us/j/${id}`}));
   });
-  expect(await meetingProvider('zoom',async()=>({token:'t',accountId:'owner'}),request as unknown as typeof fetch).verifyCreate({staffId:'s',idempotencyKey:'key',signal:input.signal})).toEqual({kind:'unknown'});
+  expect(await meetingProvider('zoom',async()=>({token:'t',accountId:'owner'}),request as unknown as typeof fetch).verifyCreate({staffId:'s',idempotencyKey:'key',signal:input.signal})).toEqual({kind:kind==='empty'?'absent':'unknown'});
   expect(request.mock.calls.every(call=>String(call[0]).startsWith('https://api.zoom.us/'))).toBe(true);
  }
 });
