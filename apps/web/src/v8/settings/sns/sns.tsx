@@ -442,7 +442,8 @@ export default function SnsSettingsPage() {
             <GoogleConnectionSettings key={accountId} accountId={accountId} data={visibleGoogle} onChanged={() => { void load() }} />
           ) : slots.googleBusiness.connections.length ? (
             <>
-              <p className={styles.foot}>{`契約済みの枠数までは、そのまま接続を追加できます。枠を超えて追加する場合は料金の確認があります（1枠 月額${unitYen}・税込、無料期間中は0円）。11個目からは個別見積もりです。`}</p>
+              {/* 枠の話は広い画面では題のすぐ下（F1 tIRy5）、細い画面では板の最後（F2 VH2Ga）。並べ替えは CSS の order が持つ。 */}
+              <p className={`${styles.foot} ${styles.slotFoot}`}>{`契約済みの枠数までは、そのまま接続を追加できます。枠を超えて追加する場合は料金の確認があります（1枠 月額${unitYen}・税込、無料期間中は0円）。11個目からは個別見積もりです。`}</p>
               <SnsConnectionList
                 slots={slots.googleBusiness}
                 canManage={canManageGoogle}
@@ -453,7 +454,6 @@ export default function SnsSettingsPage() {
                 /* 行き先は行ごとに見る。店舗を選び終えた接続だけ営業時間の画面へ出す。 */
                 rowLink={(connection) => connection.state === 'connected' && connection.locationName ? { href: '/settings/google-hours', label: '営業時間へ' } : null}
               />
-              {addNarrow('googleBusiness')}
               {restaurantStyle ? (
                 <>
                   {/* 前からある件数の表と移動。店舗名と取り込んだ日時は行の中に出るので、ここでは繰り返さない。 */}
@@ -471,6 +471,8 @@ export default function SnsSettingsPage() {
                 </>
               ) : null}
               <p className={styles.foot}>主連携は、営業時間や店舗情報の正本となる接続です。予約枠や営業中の判定にはこの接続の情報を使います。「主連携にする」でいつでも切り替えられます。</p>
+              {/* 細い画面の「接続を追加する」は主連携の説明のあと（F2 VH2Ga）。広い画面では隠れ、題の隣の押しボタンが残る（F1 tIRy5）。 */}
+              {addNarrow('googleBusiness')}
               {capabilities('googleBusiness', true)}
             </>
           ) : (

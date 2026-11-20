@@ -1,6 +1,11 @@
-/* 設定 › SNS 連携（複数接続 第1段／F1 tIRy5 広い画面・F2 VH2Ga 細い画面・F7 未接続・F8 閲覧のみ／2026-11-16 承認 v7）。
+/* 設定 › SNS 連携（複数接続 第1段／F1 tIRy5 広い画面・F2 VH2Ga 細い画面・F6 JvuLH 解除の確認・F7 未接続・F8 liCQN 閲覧のみ／2026-11-16 承認 v10）。
    寸法は globals.css の --tpl-e1-* と --text-* だけを使う。板の頭は型（PageHeading）が持つ。
-   広い画面の値は 1024px 以上で当てる（設定の他の画面と同じ境目）。 */
+   広い画面の値は 1024px 以上で当てる（設定の他の画面と同じ境目）。
+   型・共通部品の見た目は、この画面の板（[data-design-node='y3GGTs']）の中だけで差し替える。
+   他の画面と共通部品の作りは変えない（この束は @layer の外なので、共通部品の @layer components より強い）。
+   板そのものに当てる値（題の大きさ・頭の左右の余白・解除の窓の押しボタン）は、
+   CSS Module の決まり（どの規則にも画面の名前を1つ入れる）に合わないので globals.css の
+   先頭にある data-design-node の並びへ置く。画面の名前で絞るので他の画面には当たらない。 */
 
 .body {
   display: flex;
@@ -12,6 +17,32 @@
 /* 本文の縦積みが間隔の唯一の持ち主。共有Noticeの上下余白を消し、帯→次の段を16にそろえる。 */
 :global(:root) .body > :global([data-design-part='notice']) {
   margin-block: 0;
+}
+
+/* F8 liCQN 閲覧のみの帯。共有の ReadOnlyNotice の作りは変えず、この画面の中だけ絵の色・印にする。 */
+:global(:root) .body > :global([data-read-only-notice]) {
+  padding: var(--tpl-e1-sns-ro-pad);
+  border: 1px solid var(--tpl-e1-sns-ro-edge);
+  border-radius: var(--tpl-e1-sns-ro-radius);
+  background: var(--tpl-e1-sns-ro-bg);
+  box-shadow: none;
+  color: var(--tpl-e1-sns-ro-ink);
+  font-size: var(--tpl-e1-sns-ro-size);
+  font-weight: 600;
+}
+
+/* 共有の帯は青い丸で知らせる。絵は「ⓘ」なので、丸の置き場所をたたんで文のはじめに印を出す。
+   どちらも読み上げの対象外（aria-hidden）なので、伝わる内容は変わらない。 */
+:global(:root) .body > :global([data-read-only-notice] > div > span:first-child) {
+  display: none;
+}
+
+:global(:root) .body > :global([data-read-only-notice]) :global([data-notice-message])::before {
+  content: 'ⓘ';
+  margin-right: var(--tpl-e1-sns-ro-icon-gap);
+  color: var(--tpl-e1-sns-ro-ink);
+  font-size: var(--tpl-e1-sns-ro-icon-size);
+  font-weight: 700;
 }
 
 /* 段の頭：公式ロゴ・題・（余白）・連携の個数・「接続を追加する」の横並び。 */
@@ -221,7 +252,18 @@
 .addWide { display: none; }
 .addNarrow { display: block; }
 
+/* 枠の話は、細い画面では板のいちばん下（F2 VH2Ga）。文の順を変えずに置き場所だけ下げる。 */
+.slotFoot { order: 1; }
+
+/* 細い画面だけ、カードを板の端（x=16・幅358）までのばす（F2 VH2Ga）。
+   頭の左右の余白は globals.css の板ごとの並びで同じ境目に合わせている。 */
+@media (max-width: 1023.98px) {
+  .body { padding: var(--tpl-e1-sns-body-pad-narrow); }
+}
+
 @media (min-width: 1024px) {
+  /* 広い画面は絵（F1 tIRy5）のとおり枠の話を題のすぐ下に置く。題の大きさは globals.css 側。 */
+  .slotFoot { order: 0; }
   .count { line-height: var(--tpl-e1-sns-count-lh-wide); }
   .conn { padding: var(--tpl-e1-sns-conn-pad-wide); }
   .nameRow { gap: var(--tpl-e1-sns-name-gap-wide); }
