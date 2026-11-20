@@ -472,6 +472,8 @@
 
 - [開店準備ガイドの修正](release-log/unreleased/133-masato-restaurant-setup-guide.md)
 
+- [コースの所要時間の変更](release-log/unreleased/88-kenta-course-duration.md) — コースの時間を追加・変更する修正の履歴。確認 2026-11-16。
+
 - [保守時に確認する説明を整理](release-log/unreleased/121-kenta-q04-misc.md) — 反映履歴、確認 2026-11-19。
 
 - [一斉配信の自動確認を改善](release-log/unreleased/114-kenta-q02b-b11.md) — 反映履歴、確認 2026-11-18。

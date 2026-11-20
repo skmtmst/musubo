@@ -31,6 +31,7 @@ vi.mock('next/navigation', async (load) => ({
 }))
 
 import { ApiError } from '@/lib/api/transport/errors'
+import { GuideSharedProvider } from '@/v8/onboarding/public/guide-shared/index'
 import MenuPage from './menu'
 import MenuEditPage from './edit'
 import { snapshotOf } from '../booking-kit/test-data'
@@ -529,9 +530,30 @@ it('変更予定の価格と日時を一覧に表示する', async () => {
   expect(within(row).getByText(/2099/)).toBeTruthy()
 })
 
-it('変更できない所要時間は押せない入力として表示する', async () => {
+it('所要時間を編集して保存できる', async () => {
   nav.params = new URLSearchParams('id=m1')
   render(<MenuEditPage />)
-  const duration = await screen.findByRole('textbox', { name: '時間' }) as HTMLInputElement
-  expect(duration.disabled).toBe(true)
+  const duration = await screen.findByRole('spinbutton', { name: '所要時間' }) as HTMLInputElement
+  expect(duration.disabled).toBe(false)
+  fireEvent.change(duration, { target: { value: '90' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ durationMinutes: 90 })))
+})
+
+it('開店準備では所要時間を30分刻みで選び、選択した分数を保存する', async () => {
+  render(<GuideSharedProvider value={{ summary: null, guide: {
+    phase: 'active', stepKey: 'friendAdd', procedureIndex: 2, anchor: null, pausedAnchor: null,
+    start: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(), advanceProcedure: vi.fn(),
+  } }}><MenuEditPage /></GuideSharedProvider>)
+  fireEvent.click(await screen.findByRole('button', { name: '所要時間' }))
+  expect(screen.getByRole('option', { name: '30分', exact: true })).toBeTruthy()
+  expect(screen.getByRole('option', { name: '6時間（360分）' })).toBeTruthy()
+  expect(screen.getAllByRole('option')).toHaveLength(12)
+  fireEvent.click(within(screen.getByRole('option', { name: '2時間30分（150分）' })).getByRole('button'))
+  fireEvent.change(screen.getByRole('textbox', { name: 'メニュー名' }), { target: { value: '季節の会席コース' } })
+  fireEvent.change(screen.getByRole('spinbutton', { name: '価格（税込）' }), { target: { value: '8800' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
+  await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({
+    kind: 'course', name: '季節の会席コース', price: 8800, durationMinutes: 150,
+  })))
 })
