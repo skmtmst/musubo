@@ -1,4 +1,5 @@
-import { auditEventStatement, RETENTION_R2_KEY_COLUMNS } from '@line-crm/db';
+import { auditEventStatement, encryptCredential, RETENTION_R2_KEY_COLUMNS } from '@line-crm/db';
+import { planExternalCleanup } from '../features/booking/booking-external-cleanup-plan.js';
 import relations from './customer-data-relations.json';
 import protectedRelations from './customer-data-protected-relations.json';
 
@@ -63,7 +64,7 @@ function conditionsFor(target: DeletionTarget): Record<string, string> {
   result.event_booking_transition_runs = `line_account_id IS ?3 AND (json_extract(input_snapshot,'$.friendId')=?1 OR json_extract(input_snapshot,'$.recipient')=?2)`;
   result.style_analytics_results = `line_account_id IS ?3 AND EXISTS(SELECT 1 FROM json_each(style_analytics_results.selection_json,'$.ids') p WHERE json_extract(p.value,'$.friendId')=?1)`;
   result.media_file_scans = 'id IN (SELECT scan_id FROM form_submission_files WHERE friend_id = ?1)';
-  result.workflow_steps = `scope_id = 'line:' || ?3 AND process_kind IN ('booking_outlook_sync','booking_meeting_retry','booking_calendar_create')
+  result.workflow_steps = `scope_id = 'line:' || ?3 AND process_kind IN ('booking_outlook_sync','booking_meeting_retry','booking_calendar_create','booking_calendar_delete')
     AND EXISTS (SELECT 1 FROM bookings b WHERE b.id = workflow_steps.subject_id AND b.line_account_id = ?3 AND b.friend_id = ?1)`;
   return result;
 }
@@ -85,7 +86,7 @@ function childFirst(tables: string[]): string[] {
 }
 type Snapshot = { table: string; condition: string; rows: Array<Record<string, unknown> & { _delete_rowid: number }>; keys: string[] };
 
-export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2Bucket, 'delete'> }, target: DeletionTarget, actorId: string): Promise<{ deleted: true; replayed: boolean }> {
+export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2Bucket, 'delete'>; LINE_CREDENTIAL_ENCRYPTION_KEY?: string; DEPLOY_ENV?:string; BOOKING_MEETING_REAL_ENABLED?:string }, target: DeletionTarget, actorId: string): Promise<{ deleted: true; replayed: boolean }> {
   const db = env.DB, id = deletionJournalId(target.kind, target.id);
   const prior = await deletionJournal(db, target.kind, target.id);
   if (prior?.action === 'deleted') return { deleted: true, replayed: true };
@@ -154,6 +155,38 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       const columns = RETENTION_R2_KEY_COLUMNS.filter(entry => entry.table === table).map(entry => entry.column);
       snapshots.push({ table, condition, rows, keys: rows.flatMap(row => columns.flatMap(col => typeof row[col] === 'string' && row[col] ? [row[col] as string] : [])) });
     }
+    const byTable = new Map(snapshots.map(snapshot => [snapshot.table, snapshot]));
+    const cleanup: Array<{id:string;payload:string}> = [];
+    let testRecipients:string|null=null;
+    let testRecipientProof:string|undefined;
+    if (target.kind === 'friend_data') {
+      const links=byTable.get('booking_meeting_links')?.rows ?? [], steps=byTable.get('workflow_steps')?.rows ?? [];
+      // 外部呼出中の処理が完了していない場合、先に結果を確定してから削除する。
+      const now=Date.now();
+      if (steps.some(row=>row.status==='running' && Number(row.lease_expires_at)>now && ['booking_calendar_create','booking_calendar_delete','booking_outlook_sync'].includes(String(row.process_kind))) ||
+          links.some(row=>((row.status==='pending' && Number(row.attempt_count)>0 && !row.last_error_code) || (row.status==='cancel_pending' && row.last_error_code==='delete_started')) && (!Number.isFinite(Date.parse(String(row.updated_at))) || Date.parse(String(row.updated_at))>now-120000))) throw new DeletionFailure(503,'deletion_retry_required');
+      if(target.accountId && env.DEPLOY_ENV==='staging' && env.BOOKING_MEETING_REAL_ENABLED==='true' && env.LINE_CREDENTIAL_ENCRYPTION_KEY) {
+        const setting=await db.prepare("SELECT value FROM account_settings WHERE line_account_id=? AND key='test_recipients'").bind(target.accountId).first<{value:string}>();
+        testRecipients=setting?.value??null;
+        let eligible=false;try{const ids:unknown=JSON.parse(testRecipients??'null');eligible=Array.isArray(ids)&&ids.includes(target.id);}catch{/* 対象外 */}
+        if(eligible&&testRecipients!==null){
+          const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(env.LINE_CREDENTIAL_ENCRYPTION_KEY),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+          const digest=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(JSON.stringify(['cleanup-test-recipients',target.accountId,testRecipients])));
+          testRecipientProof=btoa(String.fromCharCode(...new Uint8Array(digest)));
+        }
+      }
+      for (const booking of byTable.get('bookings')?.rows ?? []) {
+        const id=String(booking.id);
+        const planned=planExternalCleanup({booking,meetings:links.filter(row=>row.booking_id===id),workflows:steps.filter(row=>row.subject_id===id),now:Date.now()});
+        if(planned.length&&!target.accountId)throw new DeletionFailure(503,'deletion_retry_required');
+        // 後片づけに必要な外部参照を平文保存しない。鍵が無いときは削除を延期する。
+        if(planned.length&&!env.LINE_CREDENTIAL_ENCRYPTION_KEY)throw new DeletionFailure(503,'deletion_cleanup_key_missing');
+        for(const item of planned) {
+          const scoped=item.provider==='google_calendar'?item:testRecipientProof?{...item,testRecipientProof}:{...item,action:'review' as const};
+          cleanup.push({id:crypto.randomUUID(),payload:JSON.stringify(await encryptCredential(JSON.stringify(scoped),env.LINE_CREDENTIAL_ENCRYPTION_KEY))});
+        }
+      }
+    }
     const keys = [...new Set(snapshots.flatMap(snapshot => snapshot.keys))];
     if (keys.length && !env.IMAGES) throw new DeletionFailure(503, 'deletion_retry_required');
     // R2 の削除は冪等なので、全削除が成功するまで DB のキーを残して再試行可能にする。
@@ -167,6 +200,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       return db.prepare(`UPDATE operation_audit SET target_kind = CASE WHEN (${normalized}) THEN 'customer_deletion' ELSE NULL END WHERE id = ?`).bind(...bindings, id);
     };
     const statements = [db.prepare('PRAGMA defer_foreign_keys = ON'), guard("action = 'deleting' AND json_extract(detail_json, '$.token') = ?", [token])];
+    if(testRecipientProof) statements.push(guard("(SELECT value FROM account_settings WHERE line_account_id=? AND key='test_recipients') IS ?",[target.accountId,testRecipients]));
     // R2 待機中に追加された保持対象を、連動削除で失わないようにする。
     for (const check of protectedChecks) statements.push(guard(`NOT EXISTS (SELECT 1 FROM ${q(check.table)} WHERE ${check.condition})`, check.condition.includes('?3') ? params : [params[0]]));
     // R2 待機中に増えたファイルや子行も、再試行で到達できる形を保つ。
@@ -179,7 +213,8 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
         AND NOT EXISTS (SELECT 1 FROM ${q(snapshot.table)} WHERE ${condition} AND rowid NOT IN (SELECT value FROM json_each(?${slot})))`, [...bound, rowids]));
       // キー交換に加え回答・友だちの付替も検出する。照合のスナップショット値は一時バインドだけとし、台帳へ保存しない。
       const first = snapshot.rows[0];
-      const candidates = ['id', 'line_user_id', 'line_account_id', 'form_id', 'submission_id',
+      const guardedFields:Record<string,string[]>={bookings:['lock_version','status','starts_at','external_event_id','external_calendar_id','staff_id'],booking_meeting_links:['status','last_error_code','attempt_count','idempotency_key','external_meeting_id','staff_id','starts_at'],workflow_steps:['status','input_json','result_json','lease_expires_at','updated_at']};
+      const candidates = ['id', 'line_user_id', 'line_account_id', 'form_id', 'submission_id',...(guardedFields[snapshot.table]??[]),
         ...(graph[snapshot.table]?.friendColumns ?? []),
         ...(graph[snapshot.table]?.references.flatMap(ref => ref.columns.map(col => col.column)) ?? []),
         ...RETENTION_R2_KEY_COLUMNS.filter(entry => entry.table === snapshot.table).map(entry => entry.column)];
@@ -188,7 +223,8 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
         ON actual.rowid = json_extract(expected.value,'$.rowid') WHERE ${columns.map(col => `actual.${q(col)} IS NOT json_extract(expected.value,'$.values.${col}')`).join(' OR ')})`,
         [JSON.stringify(snapshot.rows.map(row => ({ rowid: row._delete_rowid, values: Object.fromEntries(columns.map(col => [col, row[col] ?? null])) })))]));
     }
-    const byTable = new Map(snapshots.map(snapshot => [snapshot.table, snapshot]));
+    for(const item of cleanup) statements.push(db.prepare(`INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,status,retry_key,input_json,created_at,updated_at)
+      VALUES(?,'booking_external_cleanup',?,'current','pending',?,?,?,?)`).bind(`line:${target.accountId}`,item.id,item.id,item.payload,Date.now(),Date.now()));
     if (target.kind === 'friend_data') {
       const affiliateCondition = conditions.affiliates;
       // 承認済み保持表以外へスキーマを増やさず、既に NULL を許す参照を解除する。紹介者の名前とコードも除く。
@@ -221,9 +257,10 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       after: { deletedRows: completed.rows }, createdAt: completed.completedAt, retentionClass: 'general' }));
     await db.batch(statements);
     return { deleted: true, replayed: false };
-  } catch {
+  } catch (error) {
     // 記録は固定コードに限り、顧客本文・ファイル名・キー・外部エラーをログへ出さない。
     await db.prepare("UPDATE operation_audit SET action = 'retryable' WHERE id = ? AND action = 'deleting' AND json_extract(detail_json,'$.token') = ?").bind(id, token).run().catch(() => {});
+    if(error instanceof DeletionFailure && error.code==='deletion_cleanup_key_missing')throw error;
     throw new DeletionFailure(503, 'deletion_retry_required');
   }
 }
