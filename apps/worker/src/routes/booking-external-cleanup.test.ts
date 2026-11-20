@@ -23,6 +23,13 @@ it('閲覧のみでも最小限だけ返し、別アカウントを拒む',async
  expect((await gapCall(staffViewer,'/api/booking/admin/external-cleanup/job/resolve?account_id=a','POST',{confirmed:true})).status).toBe(403);
  expect((await gapCall(app,path.replace('account_id=a','account_id=b'))).status).toBe(404);
 });
+it('復号できない対象も閲覧のみの一覧に残す',async()=>{
+ d.raw.prepare("UPDATE workflow_steps SET input_json=? WHERE subject_id='job'").run(JSON.stringify('invalid'));
+ const viewer=gapApp(d,[bookingCalendarSettings],{...gapOwner,id:'s',role:'staff',readOnly:true},false,{LINE_CREDENTIAL_ENCRYPTION_KEY:key});
+ const response=await gapCall(viewer,path);
+ expect(response.status).toBe(200);
+ expect(await response.json()).toMatchObject({data:{items:[{id:'job',provider:null,staffId:null,startsAt:null}]}});
+});
 it('確認済みの明示と同じ店の要確認行が必要',async()=>{
  const app=gapApp(d,[bookingCalendarSettings],gapOwner,false,{LINE_CREDENTIAL_ENCRYPTION_KEY:key});
  const route='/api/booking/admin/external-cleanup/job/resolve?account_id=a';
