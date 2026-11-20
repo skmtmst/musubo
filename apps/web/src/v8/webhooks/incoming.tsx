@@ -129,6 +129,8 @@ export default function WebhooksIncomingV8() {
   const { selectedAccountId, accounts } = useAccount()
   const accountRef = useRef(selectedAccountId)
   accountRef.current = selectedAccountId
+  const mountedRef = useRef(false)
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
   const accountScopeRef = useRef({ accountId: selectedAccountId })
   if (accountScopeRef.current.accountId !== selectedAccountId) accountScopeRef.current = { accountId: selectedAccountId }
   const staffRole = useStaffRole()
@@ -329,7 +331,7 @@ export default function WebhooksIncomingV8() {
     if (!canManageWebhooksNow()) { setError(management.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
     const accountId = selectedAccountId
     const scope = accountScopeRef.current
-    const isCurrent = () => accountScopeRef.current === scope
+    const isCurrent = () => mountedRef.current && accountScopeRef.current === scope
     if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId) {
       setError('LINEアカウントの一覧を読み直してください')
       return
@@ -361,10 +363,7 @@ export default function WebhooksIncomingV8() {
       await reload()
       if (!isCurrent()) return
       clear()
-      notifyToast(`「${item.name}」を${!currentActive ? '動かしました' : '止めました'}。`, {
-        actionLabel: '元に戻す',
-        onAction: () => { if (isCurrent()) void handleToggle(item, !currentActive) },
-      })
+      notifyToast(`「${item.name}」を${!currentActive ? '動かしました' : '止めました'}。`)
     } catch (caught) {
       if (!isCurrent()) return
       saveErrors.capture(caught);

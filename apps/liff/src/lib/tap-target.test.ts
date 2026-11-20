@@ -2,10 +2,10 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import Button from '../components/ui/Button.js';
-import { styleBrowser } from '../test-utils/style-browser.js';
+import { STYLE_BROWSER_HOOK_TIMEOUT, styleBrowser } from '../test-utils/style-browser.js';
 
 let view: Awaited<ReturnType<typeof styleBrowser>>;
-beforeAll(async () => { view = await styleBrowser(); }, 30000);
+beforeAll(async () => { view = await styleBrowser(); }, STYLE_BROWSER_HOOK_TIMEOUT);
 afterAll(async () => { await view?.browser.close(); });
 
 it.each(['icon', 'arrow', 'chip', 'restaurant-control'] as const)('%s は見た目の外側も44px以上の範囲で押せる', async variant => {

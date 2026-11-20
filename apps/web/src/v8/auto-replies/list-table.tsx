@@ -35,6 +35,7 @@ type RenderAutoReplyListContext = {
   allOnPageSelected: boolean
   canEdit: boolean
   canRunList: () => boolean
+  reorderBusy: boolean
   lockedReason?: string
   clearFilters: () => void
   clearSelection: () => void
@@ -88,7 +89,7 @@ type RenderAutoReplyListContext = {
   visibleLoadState: LoadState
 }
 
-export function renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lockedReason, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState }: RenderAutoReplyListContext) {
+export function renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lockedReason, reorderBusy, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState }: RenderAutoReplyListContext) {
   return <DelayedSkeleton loading={visibleLoadState === 'loading'} skeleton={
     <div className={styles.tableWrap} aria-busy="true" aria-label="読み込んでいます">
       <ListSkeleton rows={4} columns={narrow ? 3 : 4} />
@@ -179,7 +180,7 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lo
                   <Td
                     className={styles.gripCell}
                     onClick={(event) => event.stopPropagation()}
-                    draggable={canEdit && sortKey === 'priority'}
+                    draggable={canEdit && !reorderBusy && sortKey === 'priority'}
                     onDragStart={() => { if (canRunList()) setDragId(r.id) }}
                     onDragEnd={() => setDragId(null)}
                   >
@@ -187,7 +188,7 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lo
                       label={name}
                       disabled={!canEdit && !lockedReason}
                       lockedReason={lockedReason}
-                      disabledReason={sortKey !== 'priority' ? '並びを「評価順」にすると動かせます' : null}
+                      disabledReason={reorderBusy ? '並び順を保存しています' : sortKey !== 'priority' ? '並びを「評価順」にすると動かせます' : null}
                       onMove={(direction) => keyboardMove(r.id, direction)}
                     >
                       <span aria-hidden>⠿</span>

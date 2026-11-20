@@ -14,6 +14,11 @@ const fx = vi.hoisted(() => ({
   ensure: vi.fn(),
   startReload: vi.fn(),
   setupReload: vi.fn(),
+  /* ガイドは未開始。ここは差し込みの再試行を見る所なので、案内は何も出さない形で渡す。 */
+  guide: {
+    phase: 'idle' as const, stepKey: null, procedureIndex: 1, anchor: null, pausedAnchor: null,
+    start: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(), advanceProcedure: vi.fn(),
+  },
 }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('') }))
 vi.mock('@/components/shared/list-navigation', async original => ({ ...(await original<object>()), useListNavigationRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }))
@@ -21,7 +26,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ refreshAccou
 vi.mock('@/lib/staff-role', async original => ({ ...(await original<object>()), useStaffRole: () => fx.role, useStaffIdentity: () => null }))
 vi.mock('./first-steps', async original => ({
   ...await original<typeof import('./first-steps')>(),
-  useFirstSteps: () => ({ error: null, summary: null, folded: false, toggle: vi.fn(), reload: fx.startReload, steps: [], firstRun: null, starter: fx.starter, arrived: false }),
+  useFirstSteps: () => ({ error: null, summary: null, folded: false, toggle: vi.fn(), reload: fx.startReload, steps: [], firstRun: null, starter: fx.starter, arrived: false, guide: fx.guide }),
   FirstStepsCard: () => null,
 }))
 vi.mock('@/v8/onboarding/public/use-style-setup/index', () => ({

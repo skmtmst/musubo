@@ -1,4 +1,6 @@
 'use client'
+
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import SegmentedControl from '@/components/shared/segmented'
 
 import { TAG_ADD_ACTION_LABEL } from '@/components/shared/action-words'
@@ -409,13 +411,10 @@ export default function OffersTab() {
     </KpiBand>
   )
 
-  /* 主ボタンは素の Button で渡し、題の右の自動整列（副→主）に載せる。 */
   const createButton = (full: boolean) => (
-    readonly ? null : (
-      <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} onClick={openCreate}>
+    <PermissionGatedButton allowed={!readonly} variant="primary" className={full ? 'v8-folder-create w-full' : undefined} onClick={openCreate}>
         <Plus size={16} aria-hidden="true" /> 案件を作る
-      </Button>
-    )
+      </PermissionGatedButton>
   )
 
   const chooseFolder = (id: string) => resetPage(() => setFolderId(id))
@@ -578,7 +577,7 @@ export default function OffersTab() {
       help={readonly ? '行の「…」から 決まり（受付期間・上限・数える期間）を見る。' : '行の「…」から 編集・決まり・公開を止める・複製。'}
       actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={16} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}
-      folderNav={{ rows: managedFolderNavRows('affiliate_offer', folders), activeId: folderId, onSelect: chooseFolder, createAction: readonly ? undefined : createButton(false) }}
+      folderNav={{ rows: managedFolderNavRows('affiliate_offer', folders), activeId: folderId, onSelect: chooseFolder, createAction: createButton(false) }}
       folders={folderPanel}
       toolbar={toolbar}
       pagination={pager}

@@ -4,6 +4,8 @@
  * 数のカード・プロジェクトのカード・作る窓（名前が空なら押せない）・ライブラリの次の12件・
  * 閲覧のみには押せないボタン（作る・取り込む・星）を置かない。
  */
+vi.mock('@/components/shared/use-permission-lock-reason', () => ({ usePermissionLockReason: (allowed: boolean) => allowed ? undefined : '統括の管理権限が必要です' }))
+
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, within } from '@testing-library/react'
@@ -207,16 +209,19 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     act(() => { root.render(<HqBannersListV8 />) })
     await flush()
     expect(host.textContent).toContain('秋のキャンペーン')
-    expect(buttonNamed('プロジェクトを作る')).toBeUndefined()
+    expect(buttonNamed('プロジェクトを作る')?.getAttribute('aria-disabled')).toBe('true')
+    act(() => { buttonNamed('プロジェクトを作る')?.click() })
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
     expect(host.querySelector('[aria-label="秋のキャンペーン をお気に入りから外す"]')).toBeNull()
-    expect(Array.from(host.querySelectorAll('button')).filter((b) => b.disabled)).toEqual([])
     act(() => { root.unmount() })
     nav.query = 'tab=library'
     root = createRoot(host)
     act(() => { root.render(<HqBannersListV8 />) })
     await flush()
     expect(host.textContent).toContain('1–12 件 / 23 件')
-    expect(buttonNamed('画像を取り込む')).toBeUndefined()
+    expect(buttonNamed('画像を取り込む')?.getAttribute('aria-disabled')).toBe('true')
+    act(() => { buttonNamed('画像を取り込む')?.click() })
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
     expect(host.querySelector('[aria-label="お気に入りにする"]')).toBeNull()
   })
 })

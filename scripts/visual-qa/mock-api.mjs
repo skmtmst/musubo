@@ -48,6 +48,7 @@ import { encodePng } from './v8-png.mjs'
 import { LARGE_ENABLED, largeBody } from './large-mode.mjs'
 import { BILLING_INVOICES, BILLING_SUMMARY, BILLING_METRICS } from './billing-fixture.mjs'
 import { opsFirstRunMock } from './ops-first-run-mock.mjs'
+import { gettingStartedGuideRead, gettingStartedGuideWrite } from './getting-started-guide-mock.mjs'
 import {
   mileageWriteResponse,
   MILEAGE_REWARDS,
@@ -77,10 +78,7 @@ import {
   MEDIA_REPLACEMENT_IMPACT_EMPTY,
   MEDIA_FOLDERS,
   MEDIA_ITEMS,
-  MEDIA_QUOTA,
-  FILE_SCAN_ITEMS,
-  FILE_SCAN_CONFIG,
-  FRIEND_ADD_RUNS,
+  MEDIA_QUOTA, FILE_SCAN_ITEMS, FILE_SCAN_CONFIG, FRIEND_ADD_RUNS,
   AUTO_REPLIES, AUTO_REPLY_NEW_DRAFT, AUTO_REPLY_NEW_LIVE, AUTO_REPLY_NEW_CONFLICTS, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS, AUTO_REPLY_CONFLICT_SUMMARY,
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
@@ -2892,6 +2890,7 @@ function gapuiCWrite(method, pathname, query) {
 }
 
 function bodyFor(method, pathname, query = new URLSearchParams()) {
+  { const guide = gettingStartedGuideRead(method, pathname, query); if (guide) return guide }
   { const musuboFlow = musuboFlowRead(method, pathname); if (musuboFlow) return musuboFlow }
   { const followup = restaurantFollowupRead(method, pathname); if (followup) return followup }
   { const gapuiC = gapuiCRead(method, pathname, query); if (gapuiC) return gapuiC }
@@ -7804,6 +7803,7 @@ const server = createServer((req, res) => {
       res.writeHead(200).end(JSON.stringify({ success: true, data: RESTAURANT_CLOSURE_PREVIEW }))
       return
     }
+    if (gettingStartedGuideWrite(method, url, req, res)) return
     res.writeHead(405).end(
       JSON.stringify({ success: false, error: '画面確認用のため、更新はできません' }),
     )

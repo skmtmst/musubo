@@ -17,10 +17,9 @@ const FIELDS = read('fields-tab.tsx')
  * 共通 Toast 以外の自前通知は作らない。
  */
 describe('UXタグ B 楽観的＋元に戻す', () => {
-  it('タグの星（重要）の列と切り替えは置かない（tagstar・2026-10-09）。知らせから元に戻す口は残す', () => {
+  it('タグの星（重要）の列と切り替えは置かない（tagstar・2026-10-09）。知らせからの取り消しを使わない', () => {
     expect(TAB).not.toContain('isStarred: next } : item')
     expect(TAB).not.toContain('★のみ表示')
-    expect(TAB).toContain('元に戻す')
     expect(TAB).toContain('notifyToast')
   })
 

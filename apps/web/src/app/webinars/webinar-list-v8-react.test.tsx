@@ -1,3 +1,4 @@
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
@@ -165,15 +166,17 @@ test('v8 で何も無いときは eAQ3t の「まだ無い」が出る', async (
   expect(board?.textContent).toContain('まだウェビナーがありません')
 })
 
-// 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
-test('v8 の閲覧のみ（jiNg0）は作る・編集を出さず、閲覧のみの帯を出す', async () => {
+test('v8 の閲覧のみは作る操作を理由付きで拒否し、編集は出さない', async () => {
   staffRole = verifiedStaffRole('staff')
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="UyUMw"]')
   expect(board).not.toBeNull()
   const texts = [...board!.querySelectorAll('button, a')].map((el) => el.textContent ?? '')
-  expect(texts.some((t) => t.includes('ウェビナーを作る'))).toBe(false)
+  const create = [...board!.querySelectorAll('button')].filter(button => button.textContent?.includes('ウェビナーを作る'))
+  expect(create.length).toBeGreaterThan(0)
+  for (const button of create) await expectPermissionLocked(button)
+  expect(board!.querySelector('a[href="/webinars/new"]')).toBeNull()
   expect(texts.some((t) => t === '編集')).toBe(false)
   expect(board?.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
 })
