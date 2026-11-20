@@ -42,6 +42,7 @@ import { hqBannersPaths } from './hq-banners-paths.js';
 import { nenMembersPaths } from './nen-members-paths.js';
 import { hqBillingPaths } from './hq-billing-paths.js';
 import { musuboOnboardingPaths } from './musubo-onboarding-paths.js';
+import { gettingStartedGuidePaths } from './getting-started-guide-paths.js';
 import { opsSupportPaths } from './ops-support-paths.js';
 import { hqTemplateUploadPaths, hqDistributionPaths } from './hq-distribution-paths.js';
 import { stylePaths } from '../styles-openapi.js';
@@ -128,6 +129,7 @@ export const paths = {
   ...nenMembersPaths,
   ...hqBillingPaths,
   ...musuboOnboardingPaths,
+  ...gettingStartedGuidePaths,
   ...opsSupportPaths,
   ...hqTemplateUploadPaths,
   ...stylePaths,

@@ -19,7 +19,7 @@ import { useAccount } from '@/contexts/account-context'
 import { formatNumber,formatTime } from '@/lib/format'
 import { formatWaitRough } from '@/lib/format-duration'
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
-import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
+import { ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import ListState from '@/components/shared/list-state'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
 import { useSetupWizard } from '@/v8/onboarding/public/setup-wizard/index'
@@ -31,6 +31,7 @@ import { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 import styles from './dashboard.module.css'
 import { FirstStepsCard,FirstStepsFeedback,summarizeFirstSteps,useFirstSteps } from './first-steps'
 import { FirstRunDoneDialog } from './first-run-done'
+import { FirstRunPopup, useFirstRunPopup } from './first-run-popup'
 import { StarterRetryNotice, starterRetryVisible, useStarterRetryResult } from './starter-retry'
 import { FriendAddLink } from './friend-add'
 import SectionHeader from './head'
@@ -82,7 +83,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
   /* 〜：はじめの質問の答え・警告の帯・はじめにやること（スタイルの口が読めたときだけ）。 */
   const setup = useStyleSetup(d.selectedAccountId, role)
   const wizard = useSetupWizard(d.selectedAccountId, setup.data?.state, role, setup.reload)
-  const { openStep: openSetupStep, qrRequested } = wizard
+  const { qrRequested } = wizard
   const start = useFirstSteps(d.selectedAccountId, role, { qrOpen: qrRequested, style: setup.data?.state.style ?? accountStyle })
   const starterResult = useStarterRetryResult(d.selectedAccountId)
   const setupRest = setupSummary(setup.data, !canManage)
@@ -349,7 +350,6 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
     ...d.visibleRight.map((item) => item.id),
   ])
   const looseFailures = partialFailuresWithoutCard(data?.partialFailures ?? [], shownCardIds)
-  const setupBands = setup.data ? <SetupWarningBands data={setup.data} configureAllowed={canManage} role={role} /> : null
   /* 初期セットが入っていない時の［入れ直す］。版は使い方の設定が読めてから渡す（閲覧のみには出さない）。 */
   const starterRetry = canManage && d.selectedAccountId && starterRetryVisible(start.starter, starterResult.inserted) ? (
     <StarterRetryNotice key={d.selectedAccountId} accountId={d.selectedAccountId} starter={start.starter} version={setup.data?.state.version ?? null}
@@ -358,18 +358,20 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
   ) : null
   const onboardingSummary = start.summary ?? (canManage && setupRest && start.steps.length > 0 ? summarizeFirstSteps(start.steps) : null)
   const showOnboarding = role !== null && Boolean(onboardingSummary || setupRest || start.error || setup.error || !canManage)
-  const notice = start.error || setup.error || start.progress?.notices?.length || start.summary || starterRetry || setupRest || setup.data?.warnings.length || viewer || d.error || d.periodNotice || looseFailures.length ? (
+  /* 初回ポップアップ（枠 02 / 02b）と、上の帯の「開店準備 N/9」の札。 */
+  const firstRunPopup = useFirstRunPopup({
+    accountId: d.selectedAccountId, canManage, summary: onboardingSummary, guidePhase: start.guide.phase,
+  })
+  const notice = start.error || setup.error || start.progress?.notices?.length || start.summary || starterRetry || setupRest || viewer || d.error || d.periodNotice || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
         <ReadOnlyNotice />
       ) : null}
-      {setupBands}
+      {/* 未設定のボタンの警告の帯は出さない（承認済み Pen「はじめにやること08d_v04」でこの帯を削除）。 */}
       {starterRetry}
       {showOnboarding ? <FirstStepsCard
         onRetry={start.reload} summary={onboardingSummary} readOnly={role === 'viewer'} folded={start.folded} onToggle={start.toggle}
         onRecheck={start.watchExpired ? start.rewatch : undefined}
-        onConfigure={setupRest ? () => openSetupStep(setupRest.nextStep) : role !== null && !canManage ? () => openSetupStep('style') : undefined} configureAllowed={canManage}
-        setupTasks={setupRest ? <SetupTasks heading summary={setupRest} onOpenStep={openSetupStep} configureAllowed={canManage} role={role} /> : role !== null && !canManage ? <SetupTasksUnavailable error={setup.error} onRetry={setup.reload} /> : undefined}
         feedback={<>
           {start.error ? <FirstStepsFeedback error={start.error} onRetry={start.reload} /> : null}
           {setup.error && canManage ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : null}
@@ -439,6 +441,14 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       {/* はじめの質問の窓（B-313）。`?setup=0〜|summary` かスタイル未選択の最初の訪問で開く。 */}
       {/* 最初の1通が、この画面で見ている間に届いた時だけ（SPEC-11 ③）。 */}
       {start.arrived && setup.data && d.selectedAccountId && canManage ? <FirstRunDoneDialog accountId={d.selectedAccountId} style={setup.data.state.style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} progress={start.progress} onClose={start.dismissArrived} /> : null}
+      {/* 「開店準備を始めましょう」（枠 02 ＝ PC / 枠 02b ＝ スマホ下部固定）。 */}
+      {firstRunPopup.open && onboardingSummary ? (
+        <FirstRunPopup
+          summary={onboardingSummary}
+          onStartGuide={() => { firstRunPopup.close(); start.guide.start() }}
+          onClose={firstRunPopup.close}
+        />
+      ) : null}
       {wizard.dialog}
       {qrRequested && !d.preferences.main.some(item => item.id === 'friend-add' && item.visible) ? <FriendAddLink dialogOnly officialProfileUrl={data?.metrics?.officialProfileUrl.value} visualQa={data?.visualQa} canManage={canManage} /> : null}
     </DashboardPage>
