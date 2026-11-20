@@ -242,6 +242,15 @@ describe('GET /api/booking/admin/requests の担当者・種別絞り込み (N-3
     expect((await viewer.app.request('/api/booking/admin/requests/past/assignment-review?account_id=acc1', { method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lock_version:0}) },viewer.env)).status).toBe(403);
   });
 
+  test('担当確認は他店舗の予約や閲覧専用の操作を拒否する', async () => {
+    insertBooking(sqlite, { id:'other', account:'acc2', friend:'f9', staff:'s9', menu:'m9' });
+    sqlite.exec("UPDATE bookings SET assignment_method='automatic' WHERE id='other'");
+    const request = { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({lock_version:0}) };
+    const owner = makeApp(db);
+    expect((await owner.app.request('/api/booking/admin/requests/other/assignment-review?account_id=acc1', request, owner.env)).status).toBe(409);
+    expect(sqlite.prepare("SELECT assignment_reviewed_at,lock_version FROM bookings WHERE id='other'").get()).toEqual({assignment_reviewed_at:null,lock_version:0});
+  });
+
   test('CHECK外の種別値は条件にしない（0件化で誤解させない）', async () => {
     insertBooking(sqlite, { id: 'B1', friend: 'f1', source: 'liff' });
     const { app, env } = makeApp(db);

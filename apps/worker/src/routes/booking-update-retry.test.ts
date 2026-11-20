@@ -279,10 +279,12 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
 
   test('スタッフ移動は既存の空き照合・版・監査を使い、通知OFFを守る', async () => {
     insertBooking(sqlite,{ id:'b1',friend:'f1' });
+    sqlite.exec("UPDATE bookings SET assignment_method='automatic', assignment_reviewed_at='2026-11-01' WHERE id='b1'");
     const { app, env } = makeApp(db);
     const result = await app.request('/api/booking/admin/bookings/b1/reassign?account_id=acc1',{ method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify({ staffId:'s2',notifyCustomer:false }) },env as never,execCtx);
     expect(result.status).toBe(200);
     expect(sqlite.prepare('SELECT staff_id,lock_version FROM bookings WHERE id=?').get('b1')).toEqual({ staff_id:'s2',lock_version:1 });
+    expect(sqlite.prepare('SELECT assignment_method,assignment_reviewed_at FROM bookings WHERE id=?').get('b1')).toEqual({assignment_method:'manual',assignment_reviewed_at:null});
     expect(availabilityMocks.calls.some((call) => call.staffId==='s2' && call.excludeBookingId==='b1')).toBe(true);
     expect(notifierMocks.sendBookingNotification).not.toHaveBeenCalled();
     expect(conflictHooks.notifyBookingConflicts).toHaveBeenCalledWith(db,'acc1');
