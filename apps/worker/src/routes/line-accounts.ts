@@ -25,8 +25,6 @@ import type { FollowerImportClient } from '../services/follower-import-state.js'
 import { canAccessAllLineAccounts, getVisibleLineAccountScope, validateAccountHierarchy } from '../services/account-access.js';
 import { copyLineAccountSettings, normalizeCopyItems } from '../services/account-copy.js';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
-import { fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
-import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
 import { lineConnectStep, prepareLineConnection, type LineConnectStep } from '../services/line-account-connect.js';
 import { getLineRegistrationReceipt } from '../services/line-registration-receipt.js';
 import { getAuthorizedLineAccount, getVisibleLineAccountEntry } from './line-account-access.js';
@@ -37,7 +35,7 @@ import { readCapacity, normalizeOptionalString, validateLoginChannelPair, readCo
 import { serializeLineAccount, serializeLineAccountFull } from './line-accounts-view.js';
 import { fetchPreConnectFollowerTotal, fetchPreConnectFollowerInsight } from '../services/musubo-large-line-consultation.js';
 import { acceptedWebhookUrls, isAcceptedWebhookUrl, publicAccountUrls,
-  connectionCheckResponse } from './line-accounts-connection-view.js';
+  connectionCheckResponse, readLiveAccountConnection } from './line-accounts-connection-view.js';
 
 const lineAccounts = new Hono<Env>();
 
@@ -90,22 +88,7 @@ lineAccounts.get('/api/line-accounts', async (c) => {
     const results = await mapWithConcurrency(
       items,
       LINE_LIVE_ACCOUNT_CONCURRENCY,
-      async (item) => {
-        const [profile, webhook, plan] = await Promise.all([
-          fetchBotProfile(item.channel_access_token),
-          fetchWebhookEndpointState(item.channel_access_token, accountWebhookUrl(base, item.channel_id), [...acceptedWebhookUrls(c.env, accountWebhookUrl(base, item.channel_id)), ...acceptedWebhookUrls(c.env, `${base}/webhook`)]),
-          fetchLineMonthlyPlan(item.channel_access_token),
-        ]);
-
-        return {
-          ...serializeWithStats(item),
-          displayName: profile.displayName || item.name,
-          pictureUrl: profile.pictureUrl || null,
-          basicId: profile.basicId || null,
-          webhook,
-          plan,
-        };
-      },
+      async (item) => ({ ...serializeWithStats(item), ...await readLiveAccountConnection(c.env, base, item) }),
     );
     return c.json({ success: true, data: results });
   } catch (err) {

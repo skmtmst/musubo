@@ -24,7 +24,8 @@
   --quiet-text-size: var(--tpl-guideov-text-12);
   --quiet-text-weight: 600;
   --quiet-text-lh: var(--tpl-guideov-line-18);
-  --tpl-guideov-bar-w: 300px; --tpl-guideov-bar-pad: 12px 16px; --tpl-guideov-bar-shadow: 0 8px 24px #10182859; --tpl-guideov-bar-pause-color: #9aa3af; --tpl-guideov-segment-h: 3px; --tpl-guideov-segment-bg: #3f3f46; --tpl-guideov-caption: 11.5px; --tpl-guideov-caption-color: #d1d5db;
+  --tpl-guideov-complete-balloon-w: 330px; --tpl-guideov-complete-bar-bottom: 148px;
+  --tpl-guideov-bar-left: 264px; --tpl-guideov-completed-w: 464px; --tpl-guideov-bar-w: 300px; --tpl-guideov-bar-pad: 12px 16px; --tpl-guideov-bar-shadow: 0 8px 24px #10182859; --tpl-guideov-bar-pause-color: #9aa3af; --tpl-guideov-segment-h: 3px; --tpl-guideov-segment-bg: #3f3f46; --tpl-guideov-caption: 11.5px; --tpl-guideov-caption-color: #d1d5db;
   position: fixed;
   inset: 0;
   z-index: 70;
@@ -32,11 +33,13 @@
   pointer-events: none;
 }
 
+.root[data-guide-dialog] { z-index: 91; }
+
 /* 暗幕 4枚。Pen 04-1 z8qKxY/AmAKC/Lt7PG/v8doAa と同じ色。 */
 .dim {
   position: fixed;
   background: var(--tpl-guideov-dim);
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 /* 光の輪。Pen 04-1 IzuXL。 */
@@ -51,7 +54,7 @@
 /* 吹き出し。Pen 04-1 mkzrI。 */
 .balloon {
   position: fixed;
-  width: var(--tpl-guideov-balloon-w);
+  width: min(var(--tpl-guideov-balloon-w), 100%);
   display: flex;
   flex-direction: column;
   gap: var(--tpl-guideov-gap-10);
@@ -106,8 +109,12 @@
 html:root .balloonFooter button[class][class][class] { height: auto; }
 
 /* ガイド帯。Pen 04-1 dkVoV。 */
+.stack { display: contents; }
+
 .bar {
   position: fixed;
+  inset-inline-start: clamp(var(--space-16), calc(100vw - var(--tpl-guideov-bar-w) - var(--space-16)), var(--tpl-guideov-bar-left));
+  inset-block-end: max(var(--space-12), var(--guide-save-clearance));
   width: var(--tpl-guideov-bar-w);
   display: flex;
   flex-direction: column;
@@ -160,6 +167,40 @@ html:root .barHeader button[class][class][class] { height: auto; }
   font-weight: 500;
 }
 
+[data-guide-table-complete] .bar {
+  inset-block-end: max(var(--tpl-guideov-complete-bar-bottom), var(--guide-save-clearance));
+}
+
+[data-guide-table-complete] .balloon { width: min(var(--tpl-guideov-complete-balloon-w), 100%); }
+
+.completed {
+  position: fixed;
+  inset-inline-end: var(--space-24);
+  inset-block-end: max(var(--space-24), var(--guide-save-clearance));
+  width: min(var(--tpl-guideov-completed-w), calc(100% - 2 * var(--space-24)));
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-14) var(--space-20);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+  border-radius: var(--polish-radius-card);
+  box-shadow: var(--tpl-guideov-bar-shadow);
+  pointer-events: auto;
+}
+
+.completeMark {
+  display: grid;
+  place-items: center;
+  width: var(--tpl-firstrun-mark, var(--space-24));
+  aspect-ratio: 1;
+  flex: none;
+  border-radius: var(--polish-radius-pill);
+  background: var(--tpl-guideov-brand);
+}
+
+.completeCopy { display: flex; flex: 1; flex-direction: column; min-width: 0; font-size: var(--polish-text-body); }
+
 /*
   スマホ幅は吹き出しを画面下部に固定する簡易表示にする
   （枠14 共通ルール izsr5）。
@@ -170,25 +211,29 @@ html:root .barHeader button[class][class][class] { height: auto; }
     帯は画面のいちばん下。吹き出しはその上に積む。
     重ねると説明が帯で隠れて読めないので、帯の高さ(実測 約92px)分だけ上へ置く。
   */
-  .balloon {
-    left: var(--tpl-guideov-balloon-offset) !important;
-    right: var(--tpl-guideov-balloon-offset);
-    top: auto !important;
-    bottom: var(--tpl-guideov-balloon-bottom);
+  .stack {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: var(--guide-save-clearance);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .balloon, .bar, .completed, [data-guide-table-complete] .balloon {
+    position: static;
     width: auto;
+    box-sizing: border-box;
+  }
+
+  .balloon {
+    margin-inline: var(--tpl-guideov-balloon-offset);
     border-radius: var(--tpl-guideov-balloon-radius-sp);
   }
 
-  .bar {
-    left: 0 !important;
-    right: 0;
-    top: auto !important;
-    bottom: 0;
-    width: auto;
-    box-sizing: border-box;
-    box-shadow: none;
-    border-radius: 0;
-  }
+  .completed { margin-inline: var(--space-8); }
+
+  .bar { box-shadow: none; border-radius: 0; }
 
   /* 簡易表示。長い説明で画面を埋めない。 */
   .body {

@@ -25,6 +25,7 @@ export const checkStyle = (style: unknown): AccountStyle => {
 export const questionKeys = [
   'style',
   'image',
+  'restaurantMenuPreset',
   'cancelDeadline',
   'seats',
   'hours',
