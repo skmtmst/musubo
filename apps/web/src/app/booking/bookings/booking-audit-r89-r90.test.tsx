@@ -244,7 +244,7 @@ describe('監査 R89: 状態変更の後は集計・カレンダーも更新す�
    it('WEB296：期間の取得失敗から再試行したら、その期間を読み直す', async () => {
      let rangeCalls = 0
      fixture.listRequests.mockImplementation(async (_a: string, _s: string, params: Record<string, unknown>) => {
-       if (params?.from && ++rangeCalls === 1) throw new Error('network')
+       if (_s === 'all' && params?.from && ++rangeCalls === 1) throw new Error('network')
        return { requests: [], total: 0 }
      })
      render(<BookingsPage />)
