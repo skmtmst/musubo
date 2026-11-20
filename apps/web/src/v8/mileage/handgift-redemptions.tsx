@@ -25,6 +25,7 @@ export default function HandgiftRedemptions({ accountId, readonly }: { accountId
   const saveErrors = useSaveFormErrors()
   const role = useStaffRole()
   const allowed = !readonly && canAdministerRole(role)
+  const disabledReason = allowed ? undefined : readonly ? '閲覧のみのため操作できません。' : 'オーナーまたは管理者に依頼してください。'
   const [page, setPage] = useState(1)
   const [loaded, setLoaded] = useState<{ accountId: string; data: Page } | null>(null)
   const [failed, setFailed] = useState(false)
@@ -75,7 +76,7 @@ export default function HandgiftRedemptions({ accountId, readonly }: { accountId
       {items.map(item => {
         const name = item.friendName || (!item.anonymizedAt ? '名前未設定' : null)
         const status = item.status === 'reserved' ? '手渡し待ち' : item.status === 'succeeded' ? '手渡し済み' : item.status === 'cancelled' ? 'データ削除により取消（マイル返却なし）' : item.status === 'refunded' ? '取消済み' : item.status
-        return <Tr key={item.id}><Td grow>{name || (item.status === 'cancelled' ? '削除済みのお客さま' : '名前を確認できません')}</Td><Td grow>{item.rewardNameSnapshot || item.rewardName}・{item.requiredMiles}マイル</Td><Td><StatusBadge tone={item.status === 'reserved' ? 'caution' : 'neutral'}>{status}</StatusBadge></Td><Td>{allowed && !item.anonymizedAt && item.status === 'reserved' ? <><Button onClick={() => { setError(''); setTarget({ item, action: 'deliver' }) }}>渡した</Button> <Button onClick={() => { setError(''); setTarget({ item, action: 'cancel' }) }}>取り消す</Button></> : null}{allowed && !item.anonymizedAt && item.status === 'succeeded' ? <Button onClick={() => { setError(''); setTarget({ item, action: 'cancel' }) }}>渡した記録を取り消す</Button> : null}</Td></Tr>
+        return <Tr key={item.id}><Td grow>{name || (item.status === 'cancelled' ? '削除済みのお客さま' : '名前を確認できません')}</Td><Td grow>{item.rewardNameSnapshot || item.rewardName}・{item.requiredMiles}マイル</Td><Td><StatusBadge tone={item.status === 'reserved' ? 'caution' : 'neutral'}>{status}</StatusBadge></Td><Td>{!item.anonymizedAt && item.status === 'reserved' ? <><Button disabled={!allowed} disabledReason={disabledReason} lockedReason={disabledReason} onClick={() => { setError(''); setTarget({ item, action: 'deliver' }) }}>渡した</Button> <Button disabled={!allowed} disabledReason={disabledReason} lockedReason={disabledReason} onClick={() => { setError(''); setTarget({ item, action: 'cancel' }) }}>取り消す</Button></> : null}{!item.anonymizedAt && item.status === 'succeeded' ? <Button disabled={!allowed} disabledReason={disabledReason} lockedReason={disabledReason} onClick={() => { setError(''); setTarget({ item, action: 'cancel' }) }}>渡した記録を取り消す</Button> : null}</Td></Tr>
       })}
     </tbody></DataTable>}
     {data.data.pagination.total > 100 ? <Pagination page={page} pageCount={Math.ceil(data.data.pagination.total / 100)} onPageChange={setPage} ariaLabel="交換のページ送り" /> : null}

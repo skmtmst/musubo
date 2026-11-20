@@ -79,6 +79,7 @@ describe('private data deletion', () => {
     const { reward, redemption, operation } = await seedHandgift();
     if (state !== 'reserved') expect(await deliverHandgift(sqlite.db, operation)).toBe(true);
     if (state === 'refunded') expect(await cancelHandgift(sqlite.db, { ...operation, expectedStatus: 'succeeded', reason: 'customer-private' })).toBe('completed');
+    const delivered = sqlite.raw.prepare('SELECT delivered_at, delivered_by FROM mileage_handgifts WHERE redemption_id=?').get(redemption.id);
     const response = await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env());
     expect(response.status).toBe(200);
     expect(sqlite.raw.prepare("SELECT id FROM friends WHERE id='u'").get()).toBeUndefined();
@@ -89,8 +90,12 @@ describe('private data deletion', () => {
       const gift = sqlite.raw.prepare('SELECT * FROM mileage_handgifts WHERE redemption_id=?').get(redemption.id);
       expect(gift).toBeTruthy(); expect(JSON.stringify(gift)).not.toContain('customer-private');
       if (state === 'reserved') expect(gift).toMatchObject({ delivered_at: null, cancelled_at: expect.any(String), cancelled_by: 'env-owner', cancellation_reason: '顧客データ削除に伴う取消' });
+      else expect(gift).toMatchObject(delivered as object);
+      if (state === 'refunded') expect(gift).toMatchObject({ cancelled_at: expect.any(String), cancellation_reason: '削除済みのお客さまの取消' });
     }
     expect((await getMileageRedemption(sqlite.db, redemption.id))?.status).toBe(state === 'reserved' ? 'cancelled' : state);
+    const history = await listMileageRedemptions(sqlite.db, { lineAccountId: 'a', status: 'all', kind: 'handgift', limit: 20, offset: 0 });
+    expect(history.items).toEqual([expect.objectContaining({ id: redemption.id, friendName: null, anonymizedAt: expect.any(String), status: state === 'reserved' ? 'cancelled' : state })]);
     if (state === 'reserved') {
       expect((await listMileageRedemptions(sqlite.db, { lineAccountId: 'a', status: 'reserved', limit: 20, offset: 0 })).items).toHaveLength(0);
       expect((await listMileageRedemptions(sqlite.db, { lineAccountId: 'a', status: 'cancelled', limit: 20, offset: 0 })).items).toHaveLength(1);
@@ -110,12 +115,58 @@ describe('private data deletion', () => {
       expect(next.filter(result => result.status === 'fulfilled')).toHaveLength(1);
       expect(next.filter(result => result.status === 'rejected')).toHaveLength(1);
     }
+    if (state !== 'reserved') {
+      sqlite.raw.exec(`INSERT INTO mileage_ledger(id,program_id,beneficiary_friend_id,entry_type,status,amount,reason,source,idempotency_key,occurred_at,created_at)
+        VALUES ('grant-v','default','v','grant','available',100,'付与','test','grant-v-key','now','now')`);
+      const next = reserveMileageRewardRedemption(sqlite.db, { lineAccountId: 'a', friendId: 'v', rewardId: reward.id, idempotencyKey: 'next-v', requestFingerprint: 'fp-v' });
+      if (state === 'succeeded') await expect(next).rejects.toMatchObject({ code: 'out_of_stock' });
+      else await expect(next).resolves.toMatchObject({ redemption: expect.any(Object) });
+    }
     expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
     expect(await deliverHandgift(sqlite.db, operation)).toBe(false);
+    if (state === 'succeeded') expect(await cancelHandgift(sqlite.db, { ...operation, expectedStatus: 'succeeded', reason: '訂正' })).toBe('conflict');
     expect(await cancelHandgift(sqlite.db, { ...operation, expectedStatus: 'reserved', reason: '取消' })).toBe('conflict');
     expect(sqlite.raw.prepare("SELECT COUNT(*) AS n FROM mileage_ledger WHERE beneficiary_friend_id='u'").get()).toEqual({ n: 0 });
     expect(sqlite.raw.prepare("SELECT COUNT(*) AS n FROM mileage_grant_lots WHERE beneficiary_key='friend:u'").get()).toEqual({ n: 0 });
     expect(sqlite.raw.prepare('SELECT COUNT(*) AS n FROM mileage_spend_allocations WHERE redemption_id=?').get(redemption.id)).toEqual({ n: 0 });
+  });
+
+  it.each(['reserved', 'delivering', 'delivery_failed'] as const)('未完了の通常交換 %s があれば削除を始めない', async state => {
+    const { reward, redemption } = await seedHandgift();
+    sqlite.raw.prepare('DELETE FROM mileage_handgift_rewards WHERE reward_id=?').run(reward.id);
+    sqlite.raw.prepare('UPDATE mileage_redemptions SET status=? WHERE id=?').run(state, redemption.id);
+    const before = sqlite.raw.prepare('SELECT status,beneficiary_friend_id,anonymized_at FROM mileage_redemptions WHERE id=?').get(redemption.id);
+    const ledgerCount = count('mileage_ledger');
+    const response = await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'mileage_redemption_open' });
+    expect(sqlite.raw.prepare('SELECT status,beneficiary_friend_id,anonymized_at FROM mileage_redemptions WHERE id=?').get(redemption.id)).toEqual(before);
+    expect(sqlite.raw.prepare("SELECT id FROM friends WHERE id='u'").get()).toBeTruthy();
+    expect(count('mileage_ledger')).toBe(ledgerCount);
+    expect(count('operation_audit')).toBe(0);
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('返却の台帳が未完了なら手渡し取消済みでも削除を始めない', async () => {
+    const { redemption, operation } = await seedHandgift();
+    expect(await cancelHandgift(sqlite.db, { ...operation, expectedStatus: 'reserved', reason: '取消' })).toBe('completed');
+    sqlite.raw.prepare("DELETE FROM mileage_ledger WHERE idempotency_key=?").run(`mileage-redemption-refund:${redemption.id}`);
+    const response = await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'mileage_redemption_open' });
+    expect(sqlite.raw.prepare('SELECT status,beneficiary_friend_id,anonymized_at FROM mileage_redemptions WHERE id=?').get(redemption.id)).toEqual({ status: 'refunded', beneficiary_friend_id: 'u', anonymized_at: null });
+    expect(sqlite.raw.prepare("SELECT id FROM friends WHERE id='u'").get()).toBeTruthy();
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('削除の途中に取消されたら匿名化を確定しない', async () => {
+    const { redemption, operation } = await seedHandgift();
+    remove.mockImplementationOnce(async () => { expect(await cancelHandgift(sqlite.db, { ...operation, expectedStatus: 'reserved', reason: '取消' })).toBe('completed'); });
+    const response = await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env());
+    expect(response.status).toBe(503);
+    expect(sqlite.raw.prepare("SELECT id FROM friends WHERE id='u'").get()).toBeTruthy();
+    expect(sqlite.raw.prepare('SELECT status,anonymized_at FROM mileage_redemptions WHERE id=?').get(redemption.id)).toEqual({ status: 'refunded', anonymized_at: null });
+    expect(sqlite.raw.prepare("SELECT COUNT(*) n FROM mileage_ledger WHERE source='mileage_reward_refund'").get()).toEqual({ n: 1 });
   });
 
   it('削除の途中で手渡しされたら匿名化を確定しない', async () => {

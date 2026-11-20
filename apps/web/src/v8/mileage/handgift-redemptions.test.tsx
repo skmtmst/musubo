@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import HandgiftRedemptions from './handgift-redemptions'
 
@@ -28,12 +28,36 @@ it('渡した後の訂正は理由を必須にし渡した状態を指定する'
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '取り消す' }))
   await waitFor(() => expect(mocks.fetch).toHaveBeenCalledWith('/api/mileage/redemptions/r1/hand-cancel', expect.objectContaining({ body: JSON.stringify({ accountId: 'a', expectedStatus: 'succeeded', reason: '訂正' }) })))
 })
-it('閲覧のみの人には操作を表示しない', async () => {
-  setup('reserved'); render(<HandgiftRedemptions accountId="a" readonly />)
-  expect(await screen.findByText('山田 花子')).toBeTruthy()
-  expect(screen.queryByRole('button', { name: '渡した' })).toBeNull()
-  expect(screen.queryByRole('button', { name: '取り消す' })).toBeNull()
+it.each([
+  { role: 'owner', readonly: true, reason: '閲覧のみのため操作できません。' },
+  { role: 'staff', readonly: false, reason: 'オーナーまたは管理者に依頼してください。' },
+])('権限がない人には操作と理由を表示し、送信させない: $role / $readonly', async ({ role, readonly, reason }) => {
+  setup('reserved'); mocks.role = role; render(<HandgiftRedemptions accountId="a" readonly={readonly} />)
+  const deliver = await screen.findByRole('button', { name: '渡した' })
+  const cancel = screen.getByRole('button', { name: '取り消す' })
+  for (const button of [deliver, cancel]) {
+    expect(button.getAttribute('aria-disabled')).toBe('true')
+    expect((button as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.pointerEnter(button, { pointerType: 'mouse' })
+    expect(screen.getByRole('tooltip').textContent).toBe(reason)
+    fireEvent.pointerLeave(button, { pointerType: 'mouse' })
+    act(() => button.focus())
+    expect(document.activeElement).toBe(button)
+    expect(screen.getByRole('tooltip').textContent).toBe(reason)
+    fireEvent.keyDown(button, { key: 'Enter' }); fireEvent.click(button)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.blur(button)
+  }
+  expect(mocks.fetch.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(0)
 })
+it('権限のない人にも手渡し後の訂正を押せない形で表示する', async () => {
+  setup('succeeded'); mocks.role = 'staff'; render(<HandgiftRedemptions accountId="a" readonly={false} />)
+  const button = await screen.findByRole('button', { name: '渡した記録を取り消す' })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  act(() => button.focus()); expect(screen.getByRole('tooltip').textContent).toBe('オーナーまたは管理者に依頼してください。')
+  fireEvent.click(button); expect(screen.queryByRole('dialog')).toBeNull()
+})
+
 it('データ削除による取消は返却なしと表示する', async () => {
   setup('cancelled'); render(<HandgiftRedemptions accountId="a" readonly={false} />)
   expect(await screen.findByText('データ削除により取消（マイル返却なし）')).toBeTruthy()
