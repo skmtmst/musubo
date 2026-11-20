@@ -11,6 +11,7 @@ import { Field } from '@/components/shared/form-controls'
 import { bookingCalendarApi } from '@/lib/api/helpers/gap1'
 import { ApiError } from '@/lib/api'
 import { canAdministerRole, useStaffRole } from '@/lib/staff-role'
+import styles from './meeting-review-section.module.css'
 
 type Review = { id: string; provider: string; staff_name: string | null; starts_at: string | null; ends_at: string | null }
 type MeetingStatus = {state:'none'|'active'|'failed'|'unknown';provider:'google_meet'|'zoom'|'teams'|null;version:number}
@@ -80,13 +81,18 @@ export function MeetingReviewSection({ accountId, bookingId, canOperate }: { acc
     <CardHeader size="stacked" title="会議の確認" />
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {meeting?.state === 'unknown' ? <p>相手のサービスで確かめてください。</p> : null}
-    {meeting?.state === 'failed' ? <><p>会議の URL を作れませんでした。予約は確定しています。</p>
-      {meeting.provider === 'teams' ? <p>Teams の会議は相手のサービスで確認してください。</p> : canOperate && canAdministerRole(role) ? <Button size="compact" disabled={busy} onClick={() => void retry()}>もう一度発行する</Button> : null}
+    {meeting?.state === 'failed' ? <>
+      <p className={styles.failure}>会議の URL を作れませんでした</p>
+      <p>予約は確定しています。URL を手で入れるか、もう一度発行してください。</p>
+      {canOperate ? <Field label="会議の URL（https://）" note={!manualUrl.trim() ? 'URL を入力してください。' : !/^https:\/\/\S+$/.test(manualUrl.trim()) ? 'https:// で始まる URL を入力してください。' : undefined}>
+        <div className={styles.urlLine}>
+          <TextField aria-label="会議の URL（https://）" value={manualUrl} placeholder="https://" onChange={event => setManualUrl(event.target.value)} />
+          <Button variant="secondary" size="field" disabled={busy || !/^https:\/\/\S+$/.test(manualUrl.trim())} onClick={() => void saveManualUrl()}>URL を保存</Button>
+        </div>
+      </Field> : null}
+      {meeting.provider === 'teams' ? <p>Teams の会議は相手のサービスで確認してください。</p> : canOperate && canAdministerRole(role) ? <div className={styles.retry}><Button variant="secondary" size="compact" disabled={busy} onClick={() => void retry()}>もう一度発行する</Button></div> : null}
+      <p>お客さまには「会議の URL は前日までにお送りします」と案内します。</p>
     </> : null}
-    {canOperate && meeting?.state === 'failed' ? <Field label="会議の URL（https://）">
-      <TextField aria-label="会議の URL（https://）" value={manualUrl} placeholder="https://" onChange={event => setManualUrl(event.target.value)} />
-      <Button size="compact" disabled={busy || !/^https:\/\/\S+$/.test(manualUrl.trim())} onClick={() => void saveManualUrl()}>URL を保存</Button>
-    </Field> : null}
     {items.map(item => <div key={item.id}>
       <p>{names[item.provider] ?? '会議'}・{item.staff_name ?? '担当者不明'}</p>
       <p>{item.starts_at ? new Date(item.starts_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '日時不明'}</p>

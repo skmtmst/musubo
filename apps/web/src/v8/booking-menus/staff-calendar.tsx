@@ -193,12 +193,11 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
           {error ? <Notice tone="danger">{error}</Notice> : null}
           <DetailSection title="カレンダー">
             {ready.store ? <p className={styles.minor}>{`店全体の同期：読み込み ${onOff(ready.store.readEnabled)}・書き込み ${onOff(ready.store.writeEnabled)}（予約設定 › 担当スタッフの上で変えます）`}</p> : null}
-            <div className={styles.outlookSection}>
-              <DetailField label="Outlook カレンダー">
-                <div className={styles.outlookRow}><RowStatusActions status={<StatusBadge tone={connections.outlook?.state === 'ready' || connections.outlook?.state === 'refreshing' ? 'success' : connections.outlook?.state === 'unknown' ? 'danger' : 'neutral'} size="compact">{connections.outlook?.state === 'ready' || connections.outlook?.state === 'refreshing' ? 'つながっている' : connections.outlook?.state === 'unknown' ? '切れています' : connections.outlook ? 'つないでいない' : '確認できません'}</StatusBadge>}>
+            <div className={`${styles.row} ${styles.providerRow} ${styles.outlookSection}`}>
+              <span>Outlook カレンダー</span>
+              <RowStatusActions status={<StatusBadge tone={connections.outlook?.state === 'ready' || connections.outlook?.state === 'refreshing' ? 'success' : connections.outlook?.state === 'unknown' ? 'danger' : 'neutral'} size="compact">{connections.outlook?.state === 'ready' || connections.outlook?.state === 'refreshing' ? 'つながっている' : connections.outlook?.state === 'unknown' ? '切れています' : connections.outlook ? 'つないでいない' : '確認できません'}</StatusBadge>}>
                   {canEdit && connections.outlook && (connections.outlook.state === 'ready' || connections.outlook.state === 'refreshing' ? <Button size="compact" disabled={busy} onClick={() => setDisconnecting('outlook')}>切る</Button> : <Button size="compact" disabled={busy} onClick={() => void connect('outlook')}>{connections.outlook.state === 'unknown' ? 'つなぎ直す' : 'つなぐ'}</Button>)}
-                </RowStatusActions></div>
-              </DetailField>
+              </RowStatusActions>
             </div>
             <DetailField label="予定を読み込み、空き枠から外す">{canEdit ? <Toggle label="カレンダーの読み込み" checked={mine.readEnabled} disabled={busy} onChange={(on) => void saveSwitch({ readEnabled: on, writeEnabled: mine.writeEnabled })} /> : onOff(mine.readEnabled)}</DetailField>
             <DetailField label="確定した予約をカレンダーに書く">{canEdit ? <Toggle label="カレンダーの書き込み" checked={mine.writeEnabled} disabled={busy}
