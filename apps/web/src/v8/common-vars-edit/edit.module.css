@@ -225,3 +225,6 @@
 
 .fieldError, .fieldErrorNoticePlacement { margin: 0; }
 .roBand { }
+
+.usageReference { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-width: 0; white-space: nowrap; }
+.usageReference > [data-design-node="xRvDB"] { flex-shrink: 0; }

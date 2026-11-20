@@ -39,7 +39,7 @@ export function serializeCommonVarDeleteImpact(
           ? null : variable.version,
       ...(item.source_table === 'forms' && item.source_status === 'published' ? {
         publishedReferenceMode: item.fixed_version == null ? 'live' as const : 'pinned' as const,
-        publishedReferencedVersion: item.fixed_version ?? null,
+        publishedReferencedVersion: item.fixed_version ?? variable.version ?? null,
       } : {}),
       currentPreview: readableCommonVarUsage(item.source_content, token)
         .replaceAll(token, item.fixed_value ?? variable.value),
