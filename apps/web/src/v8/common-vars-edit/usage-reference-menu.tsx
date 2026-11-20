@@ -24,14 +24,14 @@ export function UsageReferenceMenu({ usage, version, pinDisabledReason, canPin, 
   const items: ActionMenuItem[] = []
   if (fixed) {
     items.push({ id: 'live', label: '最新の値に戻す', icon: null,
-      disabled: Boolean(unavailableReason), disabledReason: unavailableReason,
+      lockedReason: unavailableReason,
       onSelect: () => onChoose('live') })
   }
   if (!fixed || usage.referencedVersion !== version || unavailableReason || pinDisabledReason) {
     const googleReason = fixed && pinDisabledReason ? `${pinDisabledReason} 固定済みの場合は送らず要確認になります` : pinDisabledReason
     const reason = unavailableReason ?? googleReason ?? (valueChanged ? '変更を保存してから固定してください' : undefined)
     items.push({ id: 'pin', label: `版 ${version} で固定`, icon: null,
-      disabled: Boolean(reason), disabledReason: reason ?? undefined,
+      lockedReason: reason ?? undefined,
       onSelect: () => onChoose('pin') })
   }
   return <RowMenu label={`${usage.name}の操作`} size="row" items={items} showGroupHeadings={false} />
