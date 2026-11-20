@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [会議の接続情報の保存方法の説明](release-log/unreleased/PR-kenta-b7-secret-doc.md) — 反映履歴、確認 2026-11-20。
+
 - [開店準備ガイドの修正](release-log/unreleased/133-masato-restaurant-setup-guide.md)
 
 - [コースの所要時間の変更](release-log/unreleased/88-kenta-course-duration.md) — コースの時間を追加・変更する修正の履歴。確認 2026-11-16。
