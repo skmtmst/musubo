@@ -11,6 +11,7 @@ import {
   advanceFriendScenario,
   completeFriendScenario,
   claimFriendScenarioForDelivery,
+  pauseFriendScenarioDelivery,
   enrollFriendInScenario,
   getLineAccountByChannelId,
   getLineAccountById,
@@ -26,7 +27,7 @@ import { expandVariables } from './message-interpolation.js';
 import { resolveMetadata } from './step-metadata.js';
 import { messageToLogPayload } from './message-log-payload.js';
 import { decorateForFriendPush } from './auto-track.js';
-import { resolveSendInterpolationExtra } from './interpolation-context.js';
+import { CommonVarResolutionFailedError, resolveSendInterpolationExtra } from './interpolation-context.js';
 import { buildQuestionMessages, parseQuestion } from '../features/scenarios/scenario-question/index.js';
 
 export interface ImmediatePushContext {
@@ -305,7 +306,8 @@ export async function pushImmediateFirstStep(
     const extra = await resolveSendInterpolationExtra(
       db, friend.id,
       `${resolved.messageContent}\n${resolved.questionJson ?? ''}`,
-      { kind: 'first_step', id: firstStep.id },
+      { kind: 'first_step', id: firstStep.id }, undefined,
+      firstStep.live_step_id ? { kind: 'scenario', versionId: source.pinnedVersionId, liveStepId: firstStep.live_step_id } : undefined,
     );
     const expanded = expandVariables(
       resolved.messageContent,
@@ -357,6 +359,9 @@ export async function pushImmediateFirstStep(
       await releaseClaim();
       return false;
     }
+    if (firstStep.live_step_id) await resolveSendInterpolationExtra(db, friend.id,
+      `${resolved.messageContent}\n${resolved.questionJson ?? ''}`, { kind: 'first_step', id: firstStep.id }, undefined,
+      { kind: 'scenario', versionId: source.pinnedVersionId, liveStepId: firstStep.live_step_id });
     try {
       if (options?.reply) {
         await options.reply.client.replyMessage(options.reply.replyToken, messages);
@@ -442,8 +447,8 @@ export async function pushImmediateFirstStep(
         // 送信後の記録・通番更新の失敗でも、cron の再送を防ぐため可能な限り購読を進める。
         await settleAfterSend();
       } else if (claimedEnrollmentId) {
-        // 未送信なら実行権をすぐ返し、delivering のまま回復待ちにしない。
-        await releaseClaimById(db, claimedEnrollmentId);
+        if (err instanceof CommonVarResolutionFailedError && err.pinnedFailure) await pauseFriendScenarioDelivery(db, claimedEnrollmentId, 'common_var_unavailable');
+        else await releaseClaimById(db, claimedEnrollmentId);
       }
     } catch (settleErr) {
       logger.error("immediate_first_step.settle_first_step_failed");

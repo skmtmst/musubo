@@ -13,7 +13,7 @@ import {
   jstNow,
 } from '@line-crm/db'
 import { buildQuestionMessages, parseQuestionPostback } from './scenario-question'
-import { handleQuestionAnswer } from './scenario-question-answer'
+import { handleQuestionAnswer, resumeQuestionAnswer } from './scenario-question-answer'
 
 /**
  * 下書き通の削除後も質問へ回答できるよう、版所有の通 ID を解析し、購読が固定した版の返信・アクション・選択肢を実行する。
@@ -155,6 +155,22 @@ describe('質問の押下を版へ結びつける（実D1）', () => {
       await answer('friend-2');
       expect(replied).toEqual(['営業時間: 10時']);
     } finally {vi.useRealTimers()}
+  })
+
+  it('固定した値が停止中なら返信を送らず、未送信を確認して再開したときだけ送る', async () => {
+    const { scenario, step } = await seedPublishedQuestion({ accountId: 'account', reply: '営業時間: {{var.hours}}' })
+    testDb.raw.exec(`INSERT INTO common_vars(id,line_account_id,name,var_key,value,status) VALUES('hours','account','営業時間','hours','新','stopped');
+      INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES('hours-old','hours',1,'営業時間','旧','test');`)
+    testDb.raw.prepare('INSERT INTO scenario_step_common_var_pins VALUES(?,?,?)').run(step.id,'hours','hours-old')
+    const version = await publishScenarioVersion(testDb.db, scenario.id, { staffId: null, idempotencyKey: 'question-pinned' })
+    const { replied, pushed, client } = replyHarness()
+    await handleQuestionAnswer(testDb.db, client as never, friend, {kind:'version',stepId:`${version.id}:0`,choiceIndex:0}, 'reply-token')
+    expect(replied).toEqual([])
+    const root = testDb.raw.prepare("SELECT subject_id FROM workflow_steps WHERE process_kind='question_answer' AND step_key='__run'").get() as {subject_id:string}
+    expect(testDb.raw.prepare("SELECT status FROM workflow_steps WHERE subject_id=? AND step_key='reply_waiting_common_var'").get(root.subject_id)).toEqual({status:'succeeded'})
+    testDb.raw.prepare("UPDATE common_vars SET status='active' WHERE id='hours'").run()
+    await resumeQuestionAnswer(testDb.db, {scopeId:'line:account',executionId:root.subject_id,actorId:'owner',reason:'共通情報を確認',lineClient:client as never})
+    expect(pushed).toEqual(['営業時間: 旧'])
   })
 
   it('下書きの通を消してもボタンが効く（版の写しから答える）', async () => {

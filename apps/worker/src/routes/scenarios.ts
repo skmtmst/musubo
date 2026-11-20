@@ -1,4 +1,5 @@
 import { inputJsonBoundary } from '../lib/input-errors.js';
+import { putScenarioCommonVarPin } from './scenario-common-var-pins.js';
 import { Hono } from 'hono';
 
 import type { Env } from '../worker-env.js';
@@ -77,6 +78,8 @@ scenarios.delete('/api/scenarios/:id', requireDeliveryAccess('scenarios'), requi
 scenarios.post('/api/scenarios/:id/steps', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, inputJsonBoundary({"stepOrder":["number"],"delayMinutes":["number"],"offsetDays":["number"],"offsetMinutes":["number"],"deliveryTime":["string"],"messageType":["string"],"messageContent":["string"],"conditionType":["null","string"],"conditionValue":["null","string"],"nextStepOnFalse":["null","number"],"templateId":["null","string"],"onReachTagId":["null","string"],"afterSend":["string"],"isDraft":["boolean"]}), post__api_scenarios_id_steps_10);
 
 // PUT /api/scenarios/:id/steps/:stepId - update step (accepts camelCase)
+scenarios.put('/api/scenarios/:id/steps/:stepId/common-var-pins/:varId', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, inputJsonBoundary({accountId:['string'],versionId:['string','null'],expectedVersion:['number']}), putScenarioCommonVarPin);
+
 scenarios.put('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, inputJsonBoundary({"stepOrder":["number"],"delayMinutes":["number"],"offsetDays":["number"],"offsetMinutes":["number"],"deliveryTime":["string"],"messageType":["string"],"messageContent":["string"],"conditionType":["null","string"],"conditionValue":["null","string"],"nextStepOnFalse":["null","number"],"templateId":["null","string"],"onReachTagId":["null","string"],"afterSend":["string"],"isDraft":["boolean"]}), put__api_scenarios_id_steps_stepId_1);
 
 

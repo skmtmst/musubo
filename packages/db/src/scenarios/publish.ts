@@ -176,8 +176,8 @@ export async function publishScenarioVersion(
         db.prepare(
           `INSERT OR IGNORE INTO scenario_publish_keys
              (publish_idempotency_key, scenario_id, version_id, content_snapshot, created_at)
-           VALUES (?, ?, ?, ?, ?)`,
-        ).bind(input.idempotencyKey, scenarioId, current.id, draftPayload, jstNow()),
+           SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM scenarios WHERE id=? AND content_revision=?)`,
+        ).bind(input.idempotencyKey, scenarioId, current.id, draftPayload, jstNow(), scenarioId, scenario.content_revision),
       ]);
       const row = await db.prepare(
         `SELECT * FROM scenario_publish_keys WHERE publish_idempotency_key = ?`,
@@ -196,7 +196,7 @@ export async function publishScenarioVersion(
     ).bind(scenarioId).first<{ version_number: number }>();
     const versionNumber = Number(next?.version_number ?? 1);
     const id = crypto.randomUUID();
-    const snapshotSteps = await buildVersionSnapshotSteps(db, id, steps, scenario.line_account_id ?? null);
+    const snapshotSteps = draftSteps.map(step => ({ ...step, version_step_id: `${id}:${step.step_order}` }));
     const snapshotActions = await buildVersionSnapshotActions(db, id, scenarioId, steps);
     const now = jstNow();
     try {
@@ -209,7 +209,8 @@ export async function publishScenarioVersion(
               on_complete_mode, on_complete_scenario_id, steps_snapshot, actions_snapshot,
               status, published_at, published_by_staff_id,
               created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?)`,
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?
+           WHERE EXISTS (SELECT 1 FROM scenarios WHERE id = ? AND content_revision = ?)`,
         ).bind(
           id,
           scenarioId,
@@ -224,20 +225,28 @@ export async function publishScenarioVersion(
           input.staffId,
           now,
           now,
+          scenarioId, scenario.content_revision,
         ),
         db.prepare(
+          `INSERT INTO scenario_version_common_var_pins (scenario_version_id, live_step_id, common_var_id, version_id)
+           SELECT ?, json_extract(step.value, '$.live_step_id'), json_extract(pin.value, '$.common_var_id'), json_extract(pin.value, '$.version_id')
+           FROM json_each(?) step, json_each(step.value, '$.common_var_pins') pin
+           WHERE EXISTS (SELECT 1 FROM scenario_versions WHERE id = ?)`,
+        ).bind(id, JSON.stringify(snapshotSteps), id),
+        db.prepare(
           `UPDATE scenarios SET content_revision = content_revision + 1, current_published_version_id = ?, updated_at = ?
-            WHERE id = ?`,
-        ).bind(id, now, scenarioId),
+            WHERE id = ? AND EXISTS (SELECT 1 FROM scenario_versions WHERE id = ?)`,
+        ).bind(id, now, scenarioId, id),
         db.prepare(
           `UPDATE scenario_versions SET status = 'retired', updated_at = ?
-            WHERE scenario_id = ? AND status = 'published' AND id != ?`,
-        ).bind(now, scenarioId, id),
+            WHERE scenario_id = ? AND status = 'published' AND id != ?
+              AND EXISTS (SELECT 1 FROM scenario_versions WHERE id = ?)`,
+        ).bind(now, scenarioId, id, id),
         db.prepare(
           `INSERT INTO scenario_publish_keys
              (publish_idempotency_key, scenario_id, version_id, content_snapshot, created_at)
-           VALUES (?, ?, ?, ?, ?)`,
-        ).bind(input.idempotencyKey, scenarioId, id, draftPayload, now),
+           SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM scenario_versions WHERE id = ?)`,
+        ).bind(input.idempotencyKey, scenarioId, id, draftPayload, now, id),
       ]);
     } catch (error) {
       const kind = classifyPublishBatchError(error);
@@ -257,7 +266,8 @@ export async function publishScenarioVersion(
       throw error;
     }
     const saved = await getScenarioVersionById(db, scenarioId, id);
-    if (!saved || saved.status !== 'published') throw new Error('SCENARIO_NOT_PUBLISHED');
+    if (!saved) throw new Error('SCENARIO_PUBLISH_CONFLICT');
+    if (saved.status !== 'published') throw new Error('SCENARIO_NOT_PUBLISHED');
     return saved;
   }
   throw new Error('SCENARIO_PUBLISH_CONFLICT');

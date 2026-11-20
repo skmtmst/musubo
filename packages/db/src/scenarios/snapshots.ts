@@ -31,7 +31,10 @@ export async function buildVersionSnapshotSteps(
     // 倒す。配信時にはもう templates 表を読まないので、境界の判断はここが
     // 最後の砦になる。
     const resolved = await resolveStepContent(db, s, lineAccountId);
+    const pins = await db.prepare(`SELECT common_var_id, version_id FROM scenario_step_common_var_pins
+      WHERE scenario_step_id = ? ORDER BY common_var_id`).bind(s.id).all<{ common_var_id: string; version_id: string }>();
     out.push({
+      ...(pins.results.length ? { common_var_pins: pins.results } : {}),
       version_step_id: `${versionId}:${s.step_order}`,
       step_order: s.step_order,
       delay_minutes: s.delay_minutes,

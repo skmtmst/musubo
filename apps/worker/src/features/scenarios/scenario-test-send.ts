@@ -86,7 +86,7 @@ export async function buildStepMessages(
   const extra = await resolveSendInterpolationExtra(
     db, friend.id,
     `${resolved.messageContent}\n${resolved.questionJson ?? ''}`,
-    { kind: 'test_send', id: step.id },
+    { kind: 'test_send', id: step.id }, undefined, { kind: 'scenarioDraft', liveStepId: step.id },
   )
 
   const question = parseQuestion(resolved.questionJson)

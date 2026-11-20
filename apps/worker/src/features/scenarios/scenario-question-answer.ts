@@ -80,6 +80,7 @@ interface ResolvedAnswerTarget {
   /** 版に固定されたアクション。live を読まないための写し。 */
   pinnedActions: PinnedScenarioAction[] | null
   versionStepId: string | null
+  pinOwner: { kind: 'scenario'; versionId: string; liveStepId: string } | undefined
 }
 
 export async function handleQuestionAnswer(
@@ -137,7 +138,7 @@ export async function handleQuestionAnswer(
     try {
       const {expandSendCommonVars}=await import('../../services/interpolation-context.js')
       const expanded=await expandSendCommonVars(db,text,{kind:'scenario',id:target.versionStepId ?? input.stepId},
-        {lineAccountId:accountId,friendId:friend.id})
+        {lineAccountId:accountId,friendId:friend.id}, undefined, target.pinOwner)
       result.replyTokenConsumed=await sendReply(lineClient,friend,replyToken,expanded)
     } catch { /* The accepted first choice and its remaining work stay intact. */ }
     return result
@@ -207,17 +208,27 @@ export async function executeQuestionAnswer(
       if(outcome.failed || outcome.skippedIncomplete) throw new Error('answer_action_failed')
       return outcome
     })
-  // 再利用できない replyToken を消費する前に試行記録を保存する。実行中断や応答喪失は送達不明とし、管理者による再開でも再送しない。
-  if(choice.reply?.trim() && !resuming) {
+  // 試行記録の後は送達不明として再送しない。共通情報の確認待ちで試行前に止まった返信だけ、管理者の再開時に送る。
+  const replyRef = { ...execution.ref, stepKey: 'reply_attempt' }
+  const waitingRef = { ...execution.ref, stepKey: 'reply_waiting_common_var' }
+  const waitingReply = resuming ? await getWorkflowStep(db, waitingRef) : null
+  const mayRetryReply = waitingReply?.status === 'succeeded' && !await getWorkflowStep(db, replyRef)
+  if(choice.reply?.trim() && (!resuming || mayRetryReply)) {
     try {
       const {expandSendCommonVars}=await import('../../services/interpolation-context.js')
       const text=await expandSendCommonVars(db,choice.reply,{kind:'scenario',id:target.versionStepId ?? target.logLiveStepId ?? target.scenarioId},
-        {lineAccountId:target.scenarioAccountId,friendId:friend.id})
+        {lineAccountId:target.scenarioAccountId,friendId:friend.id}, undefined, target.pinOwner)
       await execution.step('reply_attempt',async()=>({attempted:true}))
       if(replyToken) { consumed=true;await lineClient.replyMessage(replyToken,[{type:'text',text}]) }
       else await lineClient.pushMessage(friend.line_user_id,[{type:'text',text}],await stableWebhookStepId(execution.sourceEventId,'reply'))
       await execution.step('reply_confirmed',async()=>({accepted:true}))
-    }catch { failed=true }
+    }catch (error) {
+      const { CommonVarResolutionFailedError } = await import('../../services/interpolation-context.js')
+      if (error instanceof CommonVarResolutionFailedError && error.pinnedFailure) {
+        await execution.step('reply_waiting_common_var', async () => ({ waiting: true }))
+      }
+      failed=true
+    }
   }
   if(failed) await execution.fail();else {try{await execution.complete()}catch(error){await execution.fail();throw error}}
   return consumed
@@ -373,6 +384,7 @@ async function resolveAnswerTarget(
     logVersionStepId: null,
     pinnedActions: null,
     versionStepId: null,
+    pinOwner: undefined,
   }
 }
 
@@ -413,6 +425,7 @@ async function buildVersionTarget(
     logVersionStepId: parts.versionStepId,
     pinnedActions: parseScenarioVersionActions(version),
     versionStepId: parts.versionStepId,
+    pinOwner: parts.liveStepId ? { kind: 'scenario', versionId: version.id, liveStepId: parts.liveStepId } : undefined,
   }
 }
 

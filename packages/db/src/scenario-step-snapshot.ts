@@ -28,6 +28,7 @@ export function normalizeVersionStepSnapshot(
     target_condition_json: entry['target_condition_json'] ?? null,
     question_json: entry['question_json'] ?? null,
     is_draft: entry['is_draft'] ?? 0,
+    ...(entry['common_var_pins'] ? { common_var_pins: entry['common_var_pins'] } : {}),
     live_step_id: entry['live_step_id'] ?? null,
     created_at: entry['created_at'] ?? null,
   };
