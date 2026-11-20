@@ -11,12 +11,12 @@ function seed() {
   const rows = [row('待ち', 'requested', 'unknown'), row('自動', 'confirmed', 'automatic'), row('予約', 'confirmed', 'manual')]
   mocks.list.mockImplementation(async (_account: string, _status: string, params: { reception: string; limit: number; offset: number }) => {
     const selected = rows.filter(r => params.reception === 'all' || params.reception === 'requested' && r.status === 'requested' || params.reception === 'unassigned' && r.assignment_method === 'automatic' || params.reception === 'attention' && (r.status === 'requested' || r.assignment_method === 'automatic'))
-    return { total: selected.length, requestedCount: 1, unassignedCount: 1, attentionCount: 2, requests: selected.slice(params.offset, params.offset + params.limit) }
+    return { total: selected.length, requestedCount: 1, unassignedCount: 1, attentionCount: 2, unknownCount: 1, requests: selected.slice(params.offset, params.offset + params.limit) }
   })
 }
 it('要対応と未割り当てを分けて表示し担当確認を送る', async () => {
   seed(); mocks.review.mockResolvedValue({ success: true }); render(<BookingReception onOpen={() => {}} canOperate />)
-  expect(await screen.findByText('要対応 2件・未割り当て 1件・承認待ち 1件（今日以降）')).toBeTruthy()
+  expect(await screen.findByText('要対応 2件以上・未割り当て 1件以上・承認待ち 1件（今日以降）')).toBeTruthy()
   expect(screen.getByText(/記録前の予約/)).toBeTruthy()
   const tabs = screen.getByRole('group', { name: '予約受付の絞り込み' })
   fireEvent.click(within(tabs).getByRole('button', { name: '未割り当て' }))
@@ -46,7 +46,7 @@ it('詳細を開き、閉じた後は一覧を読み直す', async () => {
 it('件数が減って最後のページがなくなれば前のページに戻る', async () => {
   const rows = Array.from({ length: 21 }, (_, i) => row(`待ち${i}`, 'requested', 'unknown'))
   let total = 21
-  mocks.list.mockImplementation(async (_account: string, _status: string, params: { offset: number; limit: number }) => ({ total, requestedCount: total, unassignedCount: 0, attentionCount: total, requests: rows.slice(params.offset, Math.min(total, params.offset + params.limit)) }))
+  mocks.list.mockImplementation(async (_account: string, _status: string, params: { offset: number; limit: number }) => ({ total, requestedCount: total, unassignedCount: 0, attentionCount: total, unknownCount: total, requests: rows.slice(params.offset, Math.min(total, params.offset + params.limit)) }))
   const view = render(<BookingReception onOpen={() => {}} refreshKey="before" />)
   await screen.findByText('待ち0')
   fireEvent.click(screen.getByRole('button', { name: /次/ }))
@@ -55,4 +55,19 @@ it('件数が減って最後のページがなくなれば前のページに戻�
   view.rerender(<BookingReception onOpen={() => {}} refreshKey="after" />)
   expect(await screen.findByText('待ち0')).toBeTruthy()
   expect(screen.queryByText('今日以降の該当する予約はありません')).toBeNull()
+})
+it('記録前の予約がある場合、未割り当てを0件と断定しない', async () => {
+  mocks.list.mockResolvedValue({ requests: [row('記録前', 'confirmed', 'unknown')], total: 1, requestedCount: 0, unassignedCount: 0, attentionCount: 0, unknownCount: 1 })
+  render(<BookingReception onOpen={() => {}} />)
+  expect(await screen.findByText(/未割り当て 確認できません/)).toBeTruthy()
+  expect(screen.queryByText(/未割り当て 0件/)).toBeNull()
+  mocks.list.mockResolvedValue({ requests: [], total: 0, requestedCount: 0, unassignedCount: 0, attentionCount: 0, unknownCount: 1 })
+  fireEvent.click(within(screen.getByRole('group', {name:'予約受付の絞り込み'})).getByRole('button', {name:'未割り当て'}))
+  expect(await screen.findByText('担当の記録前の予約があるため、すべては確認できません')).toBeTruthy()
+  expect(screen.queryByText('今日以降の該当する予約はありません')).toBeNull()
+})
+it('記録前がなければ未割り当て0件と表示する', async () => {
+  mocks.list.mockResolvedValue({ requests: [], total: 0, requestedCount: 0, unassignedCount: 0, attentionCount: 0, unknownCount: 0 })
+  render(<BookingReception onOpen={() => {}} />)
+  expect(await screen.findByText(/未割り当て 0件/)).toBeTruthy()
 })

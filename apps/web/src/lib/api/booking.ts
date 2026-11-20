@@ -584,7 +584,7 @@ export const bookingApi = {
     if (params?.from) query.set('from', params.from)
     if (params?.to) query.set('to', params.to)
     if (params?.reception) query.set('reception', params.reception)
-    return fetchApi<{ requests: BookingRequest[]; total: number; requestedCount: number; unassignedCount: number; attentionCount: number }>(
+    return fetchApi<{ requests: BookingRequest[]; total: number; requestedCount: number; unassignedCount: number; attentionCount: number; unknownCount: number }>(
       withAccount(`/api/booking/admin/requests?${query.toString()}`, accountId),
     )
   },

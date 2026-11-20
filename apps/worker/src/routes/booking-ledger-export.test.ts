@@ -232,8 +232,8 @@ describe('GET /api/booking/admin/requests の担当者・種別絞り込み (N-3
     sqlite.exec("UPDATE bookings SET assignment_method='automatic' WHERE id IN ('auto','reviewed','cancelled','past'); UPDATE bookings SET assignment_method='designated' WHERE id='designated'; UPDATE bookings SET assignment_method='manual' WHERE id='manual'; UPDATE bookings SET assignment_reviewed_at='2026-10-01' WHERE id='reviewed'");
     const { app, env } = makeApp(db);
     const path = '/api/booking/admin/requests?account_id=acc1&reception=unassigned&from=2026-10-01T00%3A00%3A00.000Z';
-    const data = await (await app.request(path, {}, env)).json() as { requests: Array<{id:string}>; total:number; unassignedCount:number };
-    expect(data.requests.map(r => r.id)).toEqual(['auto']); expect(data.unassignedCount).toBe(1);
+    const data = await (await app.request(path, {}, env)).json() as { requests: Array<{id:string}>; total:number; unassignedCount:number; unknownCount:number };
+    expect(data.requests.map(r => r.id)).toEqual(['auto']); expect(data.unassignedCount).toBe(1); expect(data.unknownCount).toBe(1);
     const request = (id: string, version: number) => app.request(`/api/booking/admin/requests/${id}/assignment-review?account_id=acc1`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({lock_version: version}) }, env);
     for (const id of ['unknown','designated','manual','reviewed','cancelled']) expect((await request(id,0)).status).toBe(409);
     expect((await request('auto', 1)).status).toBe(409);

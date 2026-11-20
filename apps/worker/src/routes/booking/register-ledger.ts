@@ -23,10 +23,10 @@ booking.get('/api/booking/admin/requests', async (c) => {
     const selected = reception === 'requested' ? " AND b.status = 'requested'" : reception === 'unassigned' ? ` AND ${unassigned}` : reception === 'attention' ? ` AND ${attention}` : '';
     const [rows, totals, count] = await Promise.all([
       c.env.DB.prepare(`SELECT b.*, m.name AS menu_name, s.display_name AS staff_name, COALESCE(f.display_name,bc.display_name) AS friend_name, bc.phone_last4 AS customer_phone_last4, bc.pet_name AS customer_pet_name, CASE WHEN f.id IS NULL THEN 0 ELSE 1 END AS is_line_linked ${BOOKING_LEDGER_JOINS} ${base}${selected} ORDER BY CASE WHEN ${attention} THEN 0 ELSE 1 END, b.starts_at ASC, b.id ASC LIMIT ? OFFSET ?`).bind(...values, limit, offset).all(),
-      c.env.DB.prepare(`SELECT SUM(CASE WHEN b.status='requested' THEN 1 ELSE 0 END) AS requested, SUM(CASE WHEN ${unassigned} THEN 1 ELSE 0 END) AS unassigned, SUM(CASE WHEN ${attention} THEN 1 ELSE 0 END) AS attention ${BOOKING_LEDGER_JOINS} ${base}`).bind(...values).first<{requested:number|null;unassigned:number|null;attention:number|null}>(),
+      c.env.DB.prepare(`SELECT SUM(CASE WHEN b.status='requested' THEN 1 ELSE 0 END) AS requested, SUM(CASE WHEN ${unassigned} THEN 1 ELSE 0 END) AS unassigned, SUM(CASE WHEN ${attention} THEN 1 ELSE 0 END) AS attention, SUM(CASE WHEN b.assignment_method='unknown' THEN 1 ELSE 0 END) AS unknown ${BOOKING_LEDGER_JOINS} ${base}`).bind(...values).first<{requested:number|null;unassigned:number|null;attention:number|null;unknown:number|null}>(),
       c.env.DB.prepare(`SELECT COUNT(*) AS total ${BOOKING_LEDGER_JOINS} ${base}${selected}`).bind(...values).first<{total:number}>(),
     ]);
-    return listResponse(c, { requests: rows.results, total: Number(count?.total ?? 0), requestedCount: Number(totals?.requested ?? 0), unassignedCount: Number(totals?.unassigned ?? 0), attentionCount: Number(totals?.attention ?? 0), limit, offset });
+    return listResponse(c, { requests: rows.results, total: Number(count?.total ?? 0), requestedCount: Number(totals?.requested ?? 0), unassignedCount: Number(totals?.unassigned ?? 0), attentionCount: Number(totals?.attention ?? 0), unknownCount: Number(totals?.unknown ?? 0), limit, offset });
   }
   const [rows, count] = await Promise.all([
     c.env.DB.prepare(
