@@ -24,6 +24,14 @@ describe('固定版の送信時の確認', () => {
     expect(await read()).toEqual({ ok: false, reason: 'stopped' });
     raw.prepare("UPDATE common_vars SET status = 'active', valid_until = '2026-11-20T00:00:00Z' WHERE id = 'v'").run();
     expect(await read()).toEqual({ ok: false, reason: 'expired' });
+    raw.prepare("UPDATE common_vars SET status = 'draft', valid_until = NULL WHERE id = 'v'").run();
+    expect(await read()).toEqual({ ok: false, reason: 'draft' });
+    raw.prepare("UPDATE common_vars SET status = 'active', valid_from = '2026-11-21T00:00:00Z' WHERE id = 'v'").run();
+    expect(await read()).toEqual({ ok: false, reason: 'not_started' });
+    raw.prepare("UPDATE common_vars SET valid_from = 'invalid' WHERE id = 'v'").run();
+    expect(await read()).toEqual({ ok: false, reason: 'invalid_window' });
+    raw.prepare("UPDATE common_vars SET valid_from = NULL, archived_at = '2026-11-19T00:00:00Z' WHERE id = 'v'").run();
+    expect(await read()).toEqual({ ok: false, reason: 'missing' });
     raw.close();
   });
 });
