@@ -173,13 +173,14 @@ it('使用先ごとに参照方法と確かめられた版を表示する', asyn
     variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 2, blockingTotal: 1,
     historicalTotal: 0, sendingFixedTotal: 1, unscopedFormTotal: 0, canDelete: false, byKind: {},
     items: [
-      { kind: 'template', kindLabel: 'テンプレート', name: '案内', status: '公開中', href: '/templates/1', blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 5 },
+      { kind: 'template', kindLabel: 'テンプレート', name: '案内', status: '使われています', href: '/templates/1', blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 5 },
       { kind: 'broadcast', kindLabel: '一斉配信', name: '送信中', status: '配信中', href: '/broadcasts/1', blocksDeletion: false, currentPreview: '9時', referenceMode: 'pinned', referencedVersion: 3 },
     ], unavailableReferences: [], checkedAt: '2026-10-14T00:00:00+09:00', recommendedAction: 'review_references',
   } })
   render(<Editor />)
   const table = await screen.findByRole('table', { name: '使っている場所' })
   expect(within(table).getByText('最新の値')).toBeTruthy()
+  expect(within(table).getByText('使用中')).toBeTruthy()
   expect(within(table).getByText('版 3 で固定')).toBeTruthy()
   expect(within(table).getByText('版 5')).toBeTruthy()
   expect(within(table).getByTitle('版 3')).toBeTruthy()

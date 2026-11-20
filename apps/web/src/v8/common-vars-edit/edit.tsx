@@ -862,7 +862,7 @@ function EditCommonVarV8Inner() {
               <DataTable label="使っている場所" columnWeights={[3.9, 1.8, 2.4, 1.2, 1.2]}>
                 <thead><TableHeadRow><Th>使用先</Th><Th>状態</Th><Th>参照方法</Th><Th>版</Th><Th align="right" columnKind="menu">操作</Th></TableHeadRow></thead>
                 <tbody>{(showAllUsages ? impact.items : impact.items.slice(0, 20)).map((usage, index) => <Tr key={`${usage.kind}-${usage.href}-${index}`}>
-                  <Td><PageLink href={usage.href}><TruncatedText value={usage.name} /></PageLink></Td><Td><TruncatedText value={usage.status} /></Td>
+                  <Td><PageLink href={usage.href}><TruncatedText value={usage.name} /></PageLink></Td><Td><TruncatedText value={usage.status === '使われています' ? '使用中' : usage.status} /></Td>
                   <Td><TruncatedText value={usage.referenceMode === 'live' ? '最新の値' : usage.referenceMode === 'pinned' ? usage.referencedVersion == null ? '固定した値' : `版 ${usage.referencedVersion} で固定` : usage.referenceMode === 'operation' ? '値を操作' : '—'} /></Td>
                   <Td><TruncatedText value={usage.referencedVersion == null ? '—' : `版 ${usage.referencedVersion}`} /></Td>
                   <Td align="right" columnKind="menu">{canWrite && item && selectedAccountId ? <UsageReferenceMenu usage={usage} version={item.version} pinDisabledReason={item.pinDisabledReason} canPin={canPinBroadcast} valueChanged={value !== item.value} busy={pinBusy !== null} onChoose={(mode) => setPinTarget({ href: usage.href, name: usage.name, accountId: selectedAccountId, itemId: item.id, version: item.version, mode })} /> : null}</Td>
