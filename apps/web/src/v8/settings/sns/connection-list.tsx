@@ -9,6 +9,9 @@
  *   並びは絵のとおり「主連携」→状態の札。印の丸は絵に無いので出さない。
  * - 行の右端は、絵のとおり［主連携にする］／［つなぎ直す］→「⋯」の順に置く。
  *   行の中に出した操作は「⋯」から外す（同じ操作を2か所に置かない）。
+ * - 操作の置き場所は画面幅で変わる。広い画面（F1）は名前と同じ段、細い画面（F2）は
+ *   控えめな1行の下。「⋯」はどちらでも名前と同じ段に残す。
+ *   同じ押しどころを2つ置かずに済むよう、置き場所の入れ替えは sns.module.css の桝目で行う。
  * - 閲覧しかできない人には操作を消さず、押せない理由を添えて置く（AGENTS.md §15・F8）。
  * - 「主連携にする」は接続が2件以上あって、その行がまだ主連携でないときだけ出す。
  *   接続が1件のときは選ぶ意味がないので出さない（要件 §4-3）。
@@ -106,30 +109,9 @@ export default function SnsConnectionList({
               <StatusBadge tone={status.tone} size="compact" dot={false}>
                 {status.label}
               </StatusBadge>
-              <span className={styles.rowSpacer} />
-              {quickPrimary ? (
-                <Button
-                  variant="secondary"
-                  size="compact"
-                  presentation="row-action"
-                  lockedReason={canManage ? undefined : lockedReason}
-                  disabled={!canManage || busy}
-                  onClick={() => onSetPrimary?.(connection)}
-                >
-                  主連携にする
-                </Button>
-              ) : null}
-              {quickReconnect ? (
-                <Button
-                  size="compact"
-                  lockedReason={canManage ? undefined : lockedReason}
-                  disabled={!canManage || busy}
-                  onClick={() => onReconnect?.(connection)}
-                >
-                  つなぎ直す
-                </Button>
-              ) : null}
-              {items.length ? (
+            </div>
+            {items.length ? (
+              <div className={styles.rowMenu}>
                 <RowMenu
                   label={`${connection.name}の操作`}
                   items={items}
@@ -138,9 +120,37 @@ export default function SnsConnectionList({
                   size="row"
                   lockedReason={canManage ? undefined : lockedReason}
                 />
-              ) : null}
-            </div>
+              </div>
+            ) : null}
             {connection.meta.length ? <p className={styles.meta}>{connection.meta.join('・')}</p> : null}
+            {quickPrimary || quickReconnect ? (
+              <div className={styles.rowActions}>
+                {quickPrimary ? (
+                  <Button
+                    variant="secondary"
+                    size="compact"
+                    presentation="row-action"
+                    lockedReason={canManage ? undefined : lockedReason}
+                    disabled={!canManage || busy}
+                    onClick={() => onSetPrimary?.(connection)}
+                  >
+                    主連携にする
+                  </Button>
+                ) : null}
+                {quickReconnect ? (
+                  <Button
+                    /* 絵（F1 WRn2M・F2 fzNHe）の行の中の［つなぎ直す］は緑の実塗り。 */
+                    variant="primary"
+                    size="compact"
+                    lockedReason={canManage ? undefined : lockedReason}
+                    disabled={!canManage || busy}
+                    onClick={() => onReconnect?.(connection)}
+                  >
+                    つなぎ直す
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
             {link ? (
               <div className={styles.btnRow}>
                 <Link className={styles.link} href={link.href}>

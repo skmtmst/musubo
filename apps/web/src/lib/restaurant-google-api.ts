@@ -40,6 +40,13 @@ export type GoogleConnectionData = {
   permissions: { canManageConnection: boolean; canPublishReply: boolean }
 }
 
+/** 接続一覧の返事。接続が複数あっても全件入る。先頭が「宛先を付けないときに操作される接続」。 */
+export type GoogleConnectionsData = {
+  success: true
+  store: { id: string; name: string; lineAccountId: string }
+  connections: GoogleConnection[]
+}
+
 export type GoogleReview = {
   id: string
   reviewName: string
@@ -278,6 +285,9 @@ const base = '/api/restaurant-test/google'
 
 export const restaurantGoogleApi = {
   connection: (accountId: string) => fetchApi<GoogleConnectionData>(withAccount(`${base}/connection`, accountId)),
+  // 一覧の行の元。connection が返す1件ぶんの欄（まとめ・候補・権限）はこちらには入らないので、
+  // 画面は両方を読む。
+  connections: (accountId: string) => fetchApi<GoogleConnectionsData>(withAccount(`${base}/connections`, accountId)),
   // connection_id はつなぎ直す接続そのものの id。`add` は接続を増やすとき（宛先なし）。
   // どちらも付けないと、サーバーは接続が1件だけのときその1件を相手にする。
   connectStart: (accountId: string, target?: { connectionId?: string | null; add?: boolean }) =>

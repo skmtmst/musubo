@@ -344,6 +344,27 @@ export async function connectionFor(c: Context<Env>, storeId: string, connection
   return connectionForEnv(c.env, storeId, connectionId);
 }
 
+/**
+ * この店舗の接続を全件、画面に出す順で返す。並べ方は connectionForEnv と同じなので、
+ * 先頭が「接続IDを渡さなかったときに操作される接続」と必ず一致する。
+ */
+async function connectionsFor(c: Context<Env>, storeId: string): Promise<ConnectionRow[]> {
+  const rows = await dbFor(c.env, storeId)
+    .prepare(
+      `SELECT c.* FROM rt_google_connections c
+       WHERE c.store_id = ?
+       ORDER BY CASE WHEN c.id = (
+             SELECT json_extract(a.value, '$.data.connectionId') FROM account_settings a
+             JOIN rt_stores s ON s.id = c.store_id
+             WHERE a.line_account_id = s.line_account_id AND a.key = ?
+           ) THEN 0 ELSE 1 END,
+         c.sort_order, COALESCE(c.connected_at, ''), c.id`,
+    )
+    .bind(storeId, GOOGLE_PRIMARY_KEY)
+    .all<ConnectionRow>();
+  return rows.results ?? [];
+}
+
 /** 画面が指定した操作対象の接続ID。未指定なら undefined（主連携を使う）。 */
 export function requestedConnectionId(c: Context<Env>): string | undefined {
   const value = c.req.query('connection_id');
@@ -678,6 +699,22 @@ restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
     oauthConfigured: Boolean(oauthClient(c)),
     aiAvailable: Boolean(c.env.AI || c.env.OPENAI_API_KEY),
     permissions: await googlePermissions(c),
+  });
+});
+
+/**
+ * 設定›SNS連携の一覧が出す行の元。接続が複数あっても全件返す。
+ * 入口は googleAccessGuard（APIキー拒否・統括の照合・LINEアカウントの権限確認）を通っていて、
+ * 店舗は ensureStoreForGoogle が見えている範囲から決めるので、別の統括や
+ * 権限の無いLINEアカウントの接続はここから出ない。
+ */
+restaurantGoogle.get('/api/restaurant-test/google/connections', async (c) => {
+  const store = await ensureStoreForGoogle(c);
+  if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
+  return c.json({
+    success: true,
+    store: { id: store.id, name: store.name, lineAccountId: store.lineAccountId },
+    connections: (await connectionsFor(c, store.id)).map((row) => publicConnection(row)),
   });
 });
 

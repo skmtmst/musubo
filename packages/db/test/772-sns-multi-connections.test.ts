@@ -7,6 +7,12 @@ const migration = readFileSync(
   join(import.meta.dirname, '..', 'migrations', '772_sns_multi_connections.sql'),
   'utf8',
 );
+// 772 は「足すだけ」。旧Workerの ON CONFLICT が当たる互換索引（末尾 `_compat_772`）を
+// 残してあるので、2件目の接続が入るようになるのは 773 を当てた後。
+const dropCompat = readFileSync(
+  join(import.meta.dirname, '..', 'migrations', '773_sns_multi_connections_drop_compat.sql'),
+  'utf8',
+);
 
 // 772 を当てる直前の形（446/447/511/512/603/611/754/757/769 まで適用済み）
 function before(): Database.Database {
@@ -136,12 +142,15 @@ function before(): Database.Database {
   return db;
 }
 
-describe('772 Googleビジネス・Instagram の複数連携', () => {
+describe('772＋773 Googleビジネス・Instagram の複数連携', () => {
   let db: Database.Database;
 
+  // 移行が全部済んだ形（772 → 新しいWorker → 773 まで進んだ状態）で確かめる。
+  // 途中の形（772 だけ当てた状態）は後ろの「段階移行」の節で別に確かめる。
   beforeEach(() => {
     db = before();
     db.exec(migration);
+    db.exec(dropCompat);
   });
 
   it('既存の接続・履歴・暗号化された認証情報・主連携設定を引き継ぐ', () => {
@@ -352,19 +361,27 @@ describe('772 Googleビジネス・Instagram の複数連携', () => {
     ).toThrow(/UNIQUE/);
   });
 
-  it('接続IDを渡さないInstagram接続の作成は拒否される', () => {
-    // SQLiteは非INTEGERの主キーにNULLを通し、NULL同士を別物として扱う。NOT NULLが無いと
-    // id を渡さない既存コード（apps/worker/src/routes/instagram.ts）が静かにid=NULLの行を増やす
+  it('Instagram接続のidはNULLにならない（渡さなければ既定値、明示NULLは拒否）', () => {
+    // SQLiteは非INTEGERの主キーにNULLを通し、NULL同士を別物として扱う。放っておくと
+    // id を渡さない既存コード（apps/worker/src/routes/instagram.ts）が静かにid=NULLの行を増やす。
+    // 772 は NOT NULL と既定値の両方を置いて、どちらの書き方でもNULL行ができないようにしている。
+    db.prepare(
+      `INSERT INTO instagram_connections(line_account_id,page_id,instagram_id,page_name,
+         page_token_encrypted,user_token_encrypted,expires_at,refreshed_at,connected_by)
+         VALUES('a1','page2','ig2','接続ID無し','v1.p','v1.u','2030-01-01','2026-02-02','staff1')`,
+    ).run();
+    expect(db.prepare(`SELECT COUNT(*) n FROM instagram_connections WHERE id LIKE 'igc_%'`).get()).toEqual({ n: 2 });
+
     expect(() =>
       db
         .prepare(
-          `INSERT INTO instagram_connections(line_account_id,page_id,instagram_id,page_name,
+          `INSERT INTO instagram_connections(id,line_account_id,page_id,instagram_id,page_name,
              page_token_encrypted,user_token_encrypted,expires_at,refreshed_at,connected_by)
-             VALUES('a1','page2','ig2','接続ID無し','v1.p','v1.u','2030-01-01','2026-02-02','staff1')`,
+             VALUES(NULL,'a1','page3','ig3','明示NULL','v1.p','v1.u','2030-01-01','2026-02-02','staff1')`,
         )
         .run(),
     ).toThrow(/NOT NULL/);
-    expect(db.prepare('SELECT COUNT(*) n FROM instagram_connections').get()).toEqual({ n: 1 });
+    expect(db.prepare('SELECT COUNT(*) n FROM instagram_connections WHERE id IS NULL').get()).toEqual({ n: 0 });
   });
 
   it('同じ統括なら共有でき、別の統括は拒否し続ける', () => {
@@ -466,5 +483,175 @@ describe('772 Googleビジネス・Instagram の複数連携', () => {
     expect(() =>
       db.prepare('UPDATE instagram_messages SET connection_id=? WHERE id=?').run('igc_a2', 'm1'),
     ).toThrow('instagram_connection_account_mismatch');
+  });
+});
+
+// 配備の順番は「DBを先、Workerを後」（docs/migration-runbook.md）。772 を当ててから
+// 新しいWorkerが行き渡るまでは、旧Workerと新Workerが同じDBへ同時に書く時間帯ができる。
+// その時間帯に両方の書き込みが通ることと、2件目の接続が入るのは 773 の後になることを確かめる。
+describe('772 だけ当てた段階移行の途中（旧Workerと新Workerが同時に動く時間帯）', () => {
+  let db: Database.Database;
+
+  beforeEach(() => {
+    db = before();
+    db.exec(migration);
+  });
+
+  // 以下のSQLは分岐点 efc5d25c45 の旧Workerから conflict target をそのまま写したもの。
+  it('旧Workerの upsert が5か所すべてそのまま通る', () => {
+    // apps/worker/src/routes/restaurant-google.ts: ON CONFLICT(store_id)
+    db.prepare(
+      `INSERT INTO rt_google_connections
+         (id, store_id, line_account_id, google_account_email, location_name, location_title,
+          refresh_token_enc, access_token_enc, status, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(store_id) DO UPDATE SET
+         confirmation_revision = rt_google_connections.confirmation_revision + 1,
+         line_account_id = excluded.line_account_id,
+         location_name = excluded.location_name,
+         refresh_token_enc = excluded.refresh_token_enc,
+         status = excluded.status,
+         updated_at = excluded.updated_at`,
+    ).run('gc1', 's1', 'a1', 'owner@example.com', 'locations/111', '既存の店', 'v2.refresh', 'v2.access', 'connected', '2026-03-01');
+    expect(
+      db.prepare('SELECT confirmation_revision r, refresh_token_enc t FROM rt_google_connections WHERE id=?').get('gc1'),
+    ).toEqual({ r: 8, t: 'v2.refresh' });
+
+    // apps/worker/src/routes/restaurant-google-profile.ts と
+    // apps/worker/src/services/google-business-resync.ts: ON CONFLICT(store_id)
+    db.prepare(
+      `INSERT INTO rt_google_profiles (store_id, location_name, profile_json, fingerprint, fetched_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(store_id) DO UPDATE SET location_name = excluded.location_name, profile_json = excluded.profile_json,
+         fingerprint = excluded.fingerprint, fetched_at = excluded.fetched_at, updated_at = excluded.updated_at`,
+    ).run('s1', 'locations/111', '{"title":"更新後"}', 'fp-new', '2026-03-01', '2026-03-01');
+    // 引き継いだ接続IDは消えず、同じ1行が書き換わる
+    expect(db.prepare('SELECT connection_id c, fingerprint f FROM rt_google_profiles').all()).toEqual([
+      { c: 'gc1', f: 'fp-new' },
+    ]);
+
+    // apps/worker/src/services/google-business-resync.ts: ON CONFLICT(store_id, date)
+    db.prepare(
+      `INSERT INTO rt_google_metrics_daily (store_id, date, call_clicks, fetched_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(store_id, date) DO UPDATE SET call_clicks = excluded.call_clicks, fetched_at = excluded.fetched_at`,
+    ).run('s1', '2026-02-01', 21, '2026-03-01');
+    expect(db.prepare('SELECT connection_id c, call_clicks n FROM rt_google_metrics_daily').all()).toEqual([
+      { c: 'gc1', n: 21 },
+    ]);
+
+    // apps/worker/src/routes/restaurant-google.ts: INSERT OR IGNORE
+    db.prepare(
+      `INSERT OR IGNORE INTO rt_google_location_candidates (id, store_id, location_name, location_title, address_text)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run('lc2', 's1', 'locations/222', '候補の店', '東京都渋谷区1-1-1');
+    expect(db.prepare('SELECT COUNT(*) n FROM rt_google_location_candidates WHERE store_id=?').get('s1')).toEqual({ n: 1 });
+
+    // apps/worker/src/routes/instagram.ts: ON CONFLICT(line_account_id)。id を渡さない形
+    const result = db
+      .prepare(
+        `INSERT INTO instagram_connections(line_account_id,page_id,instagram_id,page_name,username,page_token_encrypted,user_token_encrypted,expires_at,data_access_expires_at,scopes,profile_json,refreshed_at,connected_by) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ?=0 OR EXISTS(SELECT 1 FROM instagram_connections WHERE line_account_id=?) ON CONFLICT(line_account_id) DO UPDATE SET page_id=excluded.page_id,instagram_id=excluded.instagram_id,page_name=excluded.page_name,username=excluded.username,page_token_encrypted=excluded.page_token_encrypted,user_token_encrypted=excluded.user_token_encrypted,expires_at=excluded.expires_at,data_access_expires_at=excluded.data_access_expires_at,scopes=excluded.scopes,profile_json=excluded.profile_json,posts_json=NULL,synced_at=NULL,refreshed_at=excluded.refreshed_at,connected_by=excluded.connected_by,version=version+1 WHERE version=?`,
+      )
+      .run(
+        'a1', 'ig1', 'ig1', '既存ページ', 'existing_shop', 'v2.page', 'v2.user', '2030-01-01', null,
+        'instagram_basic', '{"username":"existing_shop"}', '2026-03-01', 'staff1',
+        4, 'a1', 4,
+      );
+    // 版の衝突判定（!result.meta.changes で 409）が段階移行中も効く形で1行書き換わる
+    expect(result.changes).toBe(1);
+    expect(db.prepare('SELECT id,version,page_token_encrypted t FROM instagram_connections').all()).toEqual([
+      { id: 'igc_a1', version: 5, t: 'v2.page' },
+    ]);
+  });
+
+  it('新Workerの upsert も同じ時間帯にそのまま通る', () => {
+    // apps/worker/src/routes/restaurant-google-profile.ts と google-business-resync.ts の新しい形
+    db.prepare(
+      `INSERT INTO rt_google_profiles (store_id, connection_id, location_name, profile_json, fingerprint, fetched_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(COALESCE(connection_id, 'store:' || store_id)) DO UPDATE SET location_name = excluded.location_name,
+         profile_json = excluded.profile_json, fingerprint = excluded.fingerprint, fetched_at = excluded.fetched_at,
+         updated_at = excluded.updated_at`,
+    ).run('s1', 'gc1', 'locations/111', '{"title":"新Worker"}', 'fp-conn', '2026-03-02', '2026-03-02');
+    expect(db.prepare('SELECT connection_id c, fingerprint f FROM rt_google_profiles').all()).toEqual([
+      { c: 'gc1', f: 'fp-conn' },
+    ]);
+
+    db.prepare(
+      `INSERT INTO rt_google_metrics_daily (store_id, connection_id, date, call_clicks, fetched_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(COALESCE(connection_id, 'store:' || store_id), date) DO UPDATE SET
+         call_clicks = excluded.call_clicks, fetched_at = excluded.fetched_at`,
+    ).run('s1', 'gc1', '2026-02-01', 33, '2026-03-02');
+    expect(db.prepare('SELECT connection_id c, call_clicks n FROM rt_google_metrics_daily').all()).toEqual([
+      { c: 'gc1', n: 33 },
+    ]);
+
+    // apps/worker/src/routes/instagram.ts の新しい形: ON CONFLICT(id)
+    const result = db
+      .prepare(
+        `INSERT INTO instagram_connections(id,line_account_id,page_id,instagram_id,page_name,page_token_encrypted,user_token_encrypted,expires_at,refreshed_at,connected_by)
+         VALUES(?,?,?,?,?,?,?,?,?,?)
+         ON CONFLICT(id) DO UPDATE SET page_id=excluded.page_id,page_token_encrypted=excluded.page_token_encrypted,
+           refreshed_at=excluded.refreshed_at,version=version+1 WHERE version=?`,
+      )
+      .run('igc_a1', 'a1', 'page1', 'ig1', '既存ページ', 'v3.page', 'v3.user', '2030-01-01', '2026-03-02', 'staff1', 4);
+    expect(result.changes).toBe(1);
+    expect(db.prepare('SELECT version,page_token_encrypted t FROM instagram_connections').all()).toEqual([
+      { version: 5, t: 'v3.page' },
+    ]);
+  });
+
+  it('互換索引が残っているあいだは2件目の接続行が入らない', () => {
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO rt_google_connections(id,store_id,location_name,status) VALUES('gc2','s1','locations/222','connected')`,
+        )
+        .run(),
+    ).toThrow(/UNIQUE/);
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO instagram_connections(id,line_account_id,page_id,instagram_id,page_name,
+             page_token_encrypted,user_token_encrypted,expires_at,refreshed_at,connected_by)
+             VALUES('igc2','a1','page2','ig2','2号店','v1.p','v1.u','2030-01-01','2026-02-02','staff1')`,
+        )
+        .run(),
+    ).toThrow(/UNIQUE/);
+  });
+
+  it('773 で互換索引を外すと2件目の接続行が入る', () => {
+    db.exec(dropCompat);
+
+    db.prepare(
+      `INSERT INTO rt_google_connections(id,store_id,location_name,status,sort_order)
+         VALUES('gc2','s1','locations/222','connected',1)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO instagram_connections(id,line_account_id,page_id,instagram_id,page_name,
+         page_token_encrypted,user_token_encrypted,expires_at,refreshed_at,connected_by,sort_order)
+         VALUES('igc2','a1','page2','ig2','2号店','v1.p','v1.u','2030-01-01','2026-02-02','staff1',1)`,
+    ).run();
+
+    expect(db.prepare('SELECT id FROM rt_google_connections WHERE store_id=? ORDER BY sort_order').all('s1')).toEqual([
+      { id: 'gc1' },
+      { id: 'gc2' },
+    ]);
+    expect(db.prepare('SELECT id FROM instagram_connections WHERE line_account_id=? ORDER BY sort_order').all('a1')).toEqual([
+      { id: 'igc_a1' },
+      { id: 'igc2' },
+    ]);
+
+    // 773 の後も新Workerの当たり先は変わらない（接続ごとに1行の鍵は残る）
+    db.prepare(
+      `INSERT INTO rt_google_profiles (store_id, connection_id, location_name, profile_json, fingerprint, fetched_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(COALESCE(connection_id, 'store:' || store_id)) DO UPDATE SET fingerprint = excluded.fingerprint`,
+    ).run('s1', 'gc2', 'locations/222', '{}', 'fp2', '2026-03-03', '2026-03-03');
+    expect(db.prepare('SELECT connection_id c, fingerprint f FROM rt_google_profiles ORDER BY c').all()).toEqual([
+      { c: 'gc1', f: 'fp1' },
+      { c: 'gc2', f: 'fp2' },
+    ]);
   });
 });

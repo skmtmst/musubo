@@ -19,10 +19,16 @@
 --     列を新設しない。
 --   - テナント（統括）越えの拒否は 754 のトリガー2本を同じ条件で作り直して維持する。
 --
--- 注意（アプリ側と同時に出す必要がある変更）:
---   store_id / line_account_id の一意制約が無くなるため、
---   `ON CONFLICT(store_id)` / `ON CONFLICT(line_account_id)` の upsert は
---   このmigrationの適用後は成立しない。Worker 側の差し替えと同時に適用する。
+-- 当てる順番（止めずに入れ替えるための段取り）:
+--   このmigrationは「足すだけ」にしてある。表を作り直して店舗・LINEアカウントの
+--   主キー / UNIQUE を外すが、同じ形の UNIQUE 索引（末尾 `_compat_772`）を同時に作るので、
+--   `ON CONFLICT(store_id)` / `ON CONFLICT(line_account_id)` と書いた配備中のWorkerは
+--   このmigrationを当てた後もそのまま動く。接続IDで読み書きする新しいWorkerは
+--   `COALESCE(connection_id, 'store:' || store_id)` の式索引に当たるので、
+--   どちらの書き方でも upsert が通る。
+--   772（DB）→ 新しいWorkerを配備 → 773（互換索引だけを外す）の順に進める。
+--   `_compat_772` が残っているあいだは同じ店舗 / LINEアカウントの2件目の接続行は入らない。
+--   2件目が実際に入るのは 773 を当てた後。
 
 -- ---------------------------------------------------------------------------
 -- 1. rt_google_connections: store_id の UNIQUE を外し、並び順を持たせる
@@ -82,6 +88,11 @@ CREATE UNIQUE INDEX idx_rt_google_connections_location_772
 CREATE INDEX idx_rt_google_connections_store_772
   ON rt_google_connections(store_id, sort_order, created_at);
 
+-- 446 の UNIQUE(store_id) と同じ形。配備中のWorkerの `ON CONFLICT(store_id)` が
+-- 当たる先を残すためだけに置く。773 で外す。
+CREATE UNIQUE INDEX idx_rt_google_connections_store_compat_772
+  ON rt_google_connections(store_id);
+
 -- ---------------------------------------------------------------------------
 -- 2. rt_google_profiles: 店舗単位の主キーを接続単位の鍵に置き換える
 -- ---------------------------------------------------------------------------
@@ -116,6 +127,11 @@ CREATE UNIQUE INDEX idx_rt_google_profiles_key_772
   ON rt_google_profiles(COALESCE(connection_id, 'store:' || store_id));
 
 CREATE INDEX idx_rt_google_profiles_store_772 ON rt_google_profiles(store_id);
+
+-- 447 の PRIMARY KEY(store_id) と同じ形。配備中のWorkerの `ON CONFLICT(store_id)` が
+-- 当たる先を残すためだけに置く。773 で外す。
+CREATE UNIQUE INDEX idx_rt_google_profiles_store_compat_772
+  ON rt_google_profiles(store_id);
 
 -- ---------------------------------------------------------------------------
 -- 3. rt_google_metrics_daily: (store_id, date) の主キーを接続単位に置き換える
@@ -166,6 +182,11 @@ CREATE UNIQUE INDEX idx_rt_google_metrics_daily_key_772
 
 CREATE INDEX idx_rt_google_metrics_daily_store_date
   ON rt_google_metrics_daily(store_id, date DESC);
+
+-- 512 の PRIMARY KEY(store_id, date) と同じ形。配備中のWorkerの
+-- `ON CONFLICT(store_id, date)` が当たる先を残すためだけに置く。773 で外す。
+CREATE UNIQUE INDEX idx_rt_google_metrics_daily_store_date_compat_772
+  ON rt_google_metrics_daily(store_id, date);
 
 -- ---------------------------------------------------------------------------
 -- 4. Google 取り込み・履歴・OAuth状態を接続単位で引けるようにする
@@ -267,6 +288,11 @@ CREATE INDEX idx_rt_google_location_candidates_store_772
 CREATE INDEX idx_rt_google_location_candidates_connection_772
   ON rt_google_location_candidates(connection_id);
 
+-- 446 の UNIQUE(store_id, location_name) と同じ形。配備中のWorkerの
+-- `INSERT OR IGNORE` が同じ重複の弾き方を続けられるように残す。773 で外す。
+CREATE UNIQUE INDEX idx_rt_google_location_candidates_store_compat_772
+  ON rt_google_location_candidates(store_id, location_name);
+
 -- ---------------------------------------------------------------------------
 -- 5. instagram_connections: line_account_id の主キーを外し、不変の接続IDを導入する
 --    （既存行の id は移行前の1接続1アカウントから決まる 'igc_' || line_account_id）
@@ -275,7 +301,11 @@ CREATE INDEX idx_rt_google_location_candidates_connection_772
 CREATE TABLE instagram_connections_new (
   -- NOT NULL を付ける。SQLite は非INTEGERの主キーに NULL を通し、NULL同士は別物として扱うので、
   -- id を渡さない既存の INSERT が黙って id=NULL の行をいくつも作ってしまう。止めるほうを選ぶ。
-  id TEXT PRIMARY KEY NOT NULL,
+  -- そのうえで既定値を置く。配備中の旧Workerの upsert は id を渡さず、SQLite は
+  -- ON CONFLICT の衝突解決より前に NOT NULL を見るので、既定値がないと既存行を
+  -- 更新するだけの経路でも `NOT NULL constraint failed` で落ちてしまう。
+  -- 既定値で埋めれば旧Workerの upsert は通り、id を明示 NULL で渡す書き方は今も弾かれる。
+  id TEXT PRIMARY KEY NOT NULL DEFAULT ('igc_' || lower(hex(randomblob(12)))),
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
   page_id TEXT NOT NULL,
   instagram_id TEXT NOT NULL,
@@ -318,6 +348,11 @@ CREATE INDEX idx_instagram_connections_account_772
 -- 同じLINEアカウントに同じInstagramアカウントを二重に接続させない
 CREATE UNIQUE INDEX idx_instagram_connections_account_ig_772
   ON instagram_connections(line_account_id, instagram_id);
+
+-- 603 / 754 の PRIMARY KEY(line_account_id) と同じ形。配備中のWorkerの
+-- `ON CONFLICT(line_account_id)` が当たる先を残すためだけに置く。773 で外す。
+CREATE UNIQUE INDEX idx_instagram_connections_account_compat_772
+  ON instagram_connections(line_account_id);
 
 -- 754 の統括（テナント）越え拒否を同じ条件で作り直す。1接続1行ではなくなったので、
 -- 同じLINEアカウント内の複数行は通し、別統括のLINEアカウントとの共有だけを止める。

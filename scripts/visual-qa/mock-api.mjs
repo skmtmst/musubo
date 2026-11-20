@@ -1,4 +1,4 @@
-import { createGoogleHoursWorkspace, createGoogleHoursProfile, GOOGLE_STORE, GOOGLE_CONNECTION, GOOGLE_REVIEWS, GOOGLE_CONNECTION_DATA, GOOGLE_POSTS, GOOGLE_POST_LIST, GOOGLE_PERFORMANCE } from './google-hours-profile-fixture.mjs'
+import { createGoogleHoursWorkspace, createGoogleHoursProfile, GOOGLE_STORE, GOOGLE_CONNECTION, GOOGLE_REVIEWS, GOOGLE_POSTS, GOOGLE_POST_LIST, GOOGLE_PERFORMANCE } from './google-hours-profile-fixture.mjs'
 import { RESTAURANT_LINE_FLOWS, restaurantFollowupRead } from './mock-restaurant-followup.mjs'
 import { musuboFlowRead } from './musubo-flow-fixtures.mjs'
 import { templateFolderList } from './mock-template-folders.mjs'
@@ -46,6 +46,7 @@ import { styleDashboardMock } from './style-dashboard-mock.mjs'
 import { styleSetupRead, styleSetupWrite } from './style-setup-fixtures.mjs'
 import { encodePng } from './v8-png.mjs'
 import { LARGE_ENABLED, largeBody } from './large-mode.mjs'
+import { SNS_CONNECTION_PATHS, snsConnectionBody } from './sns-multi-mode.mjs'
 import { BILLING_INVOICES, BILLING_SUMMARY, BILLING_METRICS } from './billing-fixture.mjs'
 import { opsFirstRunMock } from './ops-first-run-mock.mjs'
 import {
@@ -3047,9 +3048,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/restaurant-test/intake-addresses') {
     return { success: true, data: RESTAURANT_INTAKE_ADDRESSES }
   }
-  if (method === 'GET' && pathname === '/api/restaurant-test/google/connection') return GOOGLE_CONNECTION_DATA
-  // SNS 連携（y3GGTs）の Instagram：まだつないでいない（絵の「まだつないでいません」）。汎用の一覧を返すと読み込み中のまま止まる。
-  if (method === 'GET' && pathname === '/api/instagram/connection') return { success: true, data: { state: 'disconnected', replyEnabled: false } }
+  // SNS 連携（y3GGTs）の Google・Instagram の接続と接続一覧は sns-multi-mode.mjs にまとめた。
+  if (method === 'GET' && SNS_CONNECTION_PATHS.has(pathname)) return snsConnectionBody(pathname)
   if (method === 'GET' && pathname === '/api/restaurant-test/google/reviews') {
     return { success: true, reviews: GOOGLE_REVIEWS, page: 1, perPage: 20, total: GOOGLE_REVIEWS.length, connection: GOOGLE_CONNECTION }
   }

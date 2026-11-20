@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from 'vitest'
 import type { InstagramConnectionStatus } from '@line-crm/shared'
-import type { GoogleConnectionData } from '@/lib/restaurant-google-api'
+import type { GoogleConnection, GoogleConnectionData } from '@/lib/restaurant-google-api'
 import {
   SNS_CONNECTION_LIMIT,
   SNS_DEFAULT_CONTRACTED,
@@ -371,5 +371,118 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
     expect(instagramSlots(igStatus('disconnected'), fmt).connections).toHaveLength(0)
     expect(instagramSlots(igStatus('unconfigured'), fmt).connections).toHaveLength(0)
     expect(instagramSlots(null, fmt).connections).toHaveLength(0)
+  })
+
+  /**
+   * 接続一覧の口の返事から行を作る道（受入条件1・承認済み Pen v10 の F1 `tIRy5`・F2 `VH2Ga`）。
+   * v10 は Google・Instagram とも「連携 2個」の一覧で、Google は両方の行の末尾に
+   * 「営業時間へ →」がある。並びはサーバーが主連携→並び順で返すので、ここでは並べ替えない。
+   */
+  describe('接続一覧の口の返事を複数行へ直す（受入条件1）', () => {
+    const GOOGLE_LIST: GoogleConnection[] = [
+      {
+        id: 'gc-1',
+        status: 'connected',
+        locationName: 'locations/1',
+        locationTitle: '然 渋谷店',
+        googleAccountEmail: 'shop@example.com',
+        lastSyncedAt: '2026-10-02T08:00:00.000Z',
+        confirmationRevision: 4,
+      },
+      {
+        id: 'gc-2',
+        status: 'connected',
+        locationName: 'locations/2',
+        locationTitle: '然 恵比寿店',
+        googleAccountEmail: 'shop@example.com',
+        lastSyncedAt: '2026-10-01T21:00:00.000Z',
+        confirmationRevision: 2,
+      },
+    ]
+
+    it('Google は一覧の件数ぶんの行になり、先頭だけが主連携', () => {
+      const slots = googleSlots(googleData({ id: 'gc-1', status: 'connected' }), fmt, GOOGLE_LIST)
+
+      expect(slots.connections).toHaveLength(2)
+      expect(slots.connections.map((row) => [row.name, row.primary, row.connectionId, row.version])).toEqual([
+        ['然 渋谷店', true, 'gc-1', 4],
+        ['然 恵比寿店', false, 'gc-2', 2],
+      ])
+      expect(slotCountText(slots, 2)).toBe('連携 2個（契約枠 2個）')
+    })
+
+    it('Google は行ごとに店舗の目印を持つ（営業時間への行き先を行ごとに決められる）', () => {
+      const rows = googleSlots(googleData({ id: 'gc-1', status: 'connected' }), fmt, GOOGLE_LIST).connections
+      expect(rows.map((row) => row.locationName)).toEqual(['locations/1', 'locations/2'])
+
+      const pendingRow = googleSlots(googleData({ id: 'gc-1', status: 'connected' }), fmt, [
+        GOOGLE_LIST[0]!,
+        { ...GOOGLE_LIST[1]!, locationName: undefined },
+      ]).connections
+      expect(pendingRow[1]!.locationName).toBeNull()
+    })
+
+    it('Google は一覧の中の解除済みを行にしない。残った先頭が主連携になる', () => {
+      const slots = googleSlots(googleData({ id: 'gc-1', status: 'connected' }), fmt, [
+        { ...GOOGLE_LIST[0]!, status: 'disconnected' },
+        GOOGLE_LIST[1]!,
+      ])
+
+      expect(slots.connections.map((row) => [row.connectionId, row.primary])).toEqual([['gc-2', true]])
+    })
+
+    it('Google は一覧を読めていないとき1件ぶんの返事から1行だけ作る', () => {
+      const data = googleData({ id: 'gc-1', status: 'connected', locationTitle: '然 渋谷店' })
+      for (const list of [null, undefined, []] as const) {
+        const slots = googleSlots(data, fmt, list)
+        expect(slots.connections.map((row) => row.connectionId)).toEqual(['gc-1'])
+        expect(slots.connections[0]!.primary).toBe(true)
+      }
+    })
+
+    const IG_LIST = {
+      state: 'connected' as const,
+      connections: [
+        { ...IG_CONNECTION, id: 'igc-1', instagramId: 'ig-1', username: 'zen_shibuya', state: 'connected' as const },
+        {
+          ...IG_CONNECTION,
+          id: 'igc-2',
+          instagramId: 'ig-2',
+          username: 'zen_ebisu',
+          version: 7,
+          state: 'expired' as const,
+          syncedAt: '2026-10-01T01:00:00.000Z',
+        },
+      ],
+    }
+
+    it('Instagram は一覧の件数ぶんの行になり、状態は行ごと・主連携は持たない', () => {
+      const slots = instagramSlots(igStatus('connected', IG_CONNECTION), fmt, IG_LIST)
+
+      expect(slots.connections.map((row) => [row.name, row.state, row.connectionId, row.version, row.primary])).toEqual([
+        ['@zen_shibuya', 'connected', 'igc-1', 3, false],
+        ['@zen_ebisu', 'expired', 'igc-2', 7, false],
+      ])
+      expect(slots.connections[1]!.meta).toEqual(['ビジネスアカウント', '接続した日 日時(2026-10-01T01:00:00.000Z)'])
+    })
+
+    it('Instagram は一覧を読めていないとき1件ぶんの返事から1行だけ作る', () => {
+      const status = igStatus('connected', IG_CONNECTION)
+      for (const list of [null, undefined, { state: 'connected' as const, connections: [] }] as const) {
+        expect(instagramSlots(status, fmt, list).connections.map((row) => row.connectionId)).toEqual(['igc-1'])
+      }
+    })
+
+    it('一覧の行はそのまま解除の筋書きへ渡せる（枠は減り、契約枠は動かない）', () => {
+      const google = googleSlots(googleData({ id: 'gc-1', status: 'connected' }), fmt, GOOGLE_LIST)
+      const instagram = instagramSlots(igStatus('connected', IG_CONNECTION), fmt, IG_LIST)
+      const view: SnsSlotsView = { contracted: 2, googleBusiness: google, instagram }
+
+      const plan = planRemoval(view, 'googleBusiness', google.connections[1]!)
+      expect(plan.connection.connectionId).toBe('gc-2')
+      expect(plan.connectedBefore).toBe(2)
+      expect(plan.connectedAfter).toBe(1)
+      expect(plan.contracted).toBe(2)
+    })
   })
 })

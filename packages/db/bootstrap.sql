@@ -4726,7 +4726,11 @@ CREATE TABLE incoming_webhooks (
 CREATE TABLE "instagram_connections" (
   -- NOT NULL を付ける。SQLite は非INTEGERの主キーに NULL を通し、NULL同士は別物として扱うので、
   -- id を渡さない既存の INSERT が黙って id=NULL の行をいくつも作ってしまう。止めるほうを選ぶ。
-  id TEXT PRIMARY KEY NOT NULL,
+  -- そのうえで既定値を置く。配備中の旧Workerの upsert は id を渡さず、SQLite は
+  -- ON CONFLICT の衝突解決より前に NOT NULL を見るので、既定値がないと既存行を
+  -- 更新するだけの経路でも `NOT NULL constraint failed` で落ちてしまう。
+  -- 既定値で埋めれば旧Workerの upsert は通り、id を明示 NULL で渡す書き方は今も弾かれる。
+  id TEXT PRIMARY KEY NOT NULL DEFAULT ('igc_' || lower(hex(randomblob(12)))),
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
   page_id TEXT NOT NULL,
   instagram_id TEXT NOT NULL,

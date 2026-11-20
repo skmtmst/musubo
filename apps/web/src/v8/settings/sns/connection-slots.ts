@@ -23,7 +23,8 @@ import {
   prorateMonthlyIncrement,
   type InstagramConnectionStatus,
 } from '@line-crm/shared'
-import type { GoogleConnectionData } from '@/lib/restaurant-google-api'
+import type { GoogleConnection, GoogleConnectionData } from '@/lib/restaurant-google-api'
+import type { InstagramConnectionList } from '@/lib/api/features/settings'
 import { GOOGLE_CONNECTION_STATUS } from '@/lib/status-labels'
 
 /** 連携できる先。主連携は Google ビジネスの接続にだけ設ける（要件 §4-3）。 */
@@ -56,6 +57,11 @@ export type SnsConnectionView = {
    * `id` は行の見分け（key・処理中の印）用で、API が受け取る id とは別物。
    */
   connectionId?: string | null
+  /**
+   * Google で選んだ店舗（ロケーション）の目印。行の末尾に営業時間の画面への行き先を出すかどうかに使う。
+   * 店舗を選び終えていない接続と Instagram の行では空。
+   */
+  locationName?: string | null
 }
 
 /** 1サービスぶんの接続。契約枠は両サービス共通なので `SnsSlotsView` が持つ。 */
@@ -254,62 +260,111 @@ function googleState(status: string | null | undefined): SnsConnectionState {
   return 'error'
 }
 
+/** Google の接続1件を画面の1行へ直す。 */
+function googleRow(
+  connection: GoogleConnection,
+  storeName: string | undefined,
+  primary: boolean,
+  formatLastSynced: (iso: string) => string,
+): SnsConnectionView {
+  const meta: string[] = []
+  if (connection.googleAccountEmail) meta.push(connection.googleAccountEmail)
+  if (connection.lastSyncedAt) meta.push(`最後に取り込んだ日時 ${formatLastSynced(connection.lastSyncedAt)}`)
+  return {
+    id: connection.id ?? connection.locationName ?? 'google',
+    service: 'googleBusiness',
+    name: connection.locationTitle ?? storeName ?? '接続先',
+    meta,
+    state: googleState(connection.status),
+    primary,
+    version: connection.confirmationRevision ?? null,
+    connectionId: connection.id ?? null,
+    locationName: connection.locationName ?? null,
+  }
+}
+
 /**
  * Google の返事を接続の配列へ直す。
- * いまの API は接続が1件ぶんの形なので、繋がっているときだけ1件の配列にする。
+ * `list` は接続一覧の口の返事で、接続が何件あってもそのぶんの行を作る。
+ * 一覧を読めていないときは、1件ぶんの `data` から繋がっている1件だけを作る。
  * 主連携は API が持つようになるまで、先頭の接続を正本として扱う（要件 §4-3 の既定）。
+ * 一覧の並びはサーバーが主連携→並び順で返すので、ここでは並べ替えない。
  */
 export function googleSlots(
   data: GoogleConnectionData | null,
   formatLastSynced: (iso: string) => string,
+  list?: GoogleConnection[] | null,
 ): SnsServiceSlots {
-  const connection = data?.connection ?? null
-  const status = connection?.status ?? null
-  const connections: SnsConnectionView[] = []
-
-  if (connection && status !== 'disconnected') {
-    const meta: string[] = []
-    if (connection.googleAccountEmail) meta.push(connection.googleAccountEmail)
-    if (connection.lastSyncedAt) meta.push(`最後に取り込んだ日時 ${formatLastSynced(connection.lastSyncedAt)}`)
-    connections.push({
-      id: connection.id ?? connection.locationName ?? 'google',
+  const storeName = data?.store.name
+  if (list && list.length > 0) {
+    return {
       service: 'googleBusiness',
-      name: connection.locationTitle ?? data?.store.name ?? '接続先',
-      meta,
-      state: googleState(status),
-      primary: true,
-      version: connection.confirmationRevision ?? null,
-      connectionId: connection.id ?? null,
-    })
+      connections: list
+        .filter((connection) => connection.status !== 'disconnected')
+        .map((connection, index) => googleRow(connection, storeName, index === 0, formatLastSynced)),
+    }
+  }
+
+  const connection = data?.connection ?? null
+  const connections: SnsConnectionView[] = []
+  if (connection && connection.status !== 'disconnected') {
+    connections.push(googleRow(connection, storeName, true, formatLastSynced))
   }
 
   return { service: 'googleBusiness', connections }
 }
 
+/** Instagram の接続1件を画面の1行へ直す。期限切れかどうかは行ごとに持つ。 */
+function instagramRow(
+  connection: {
+    id?: string | null
+    instagramId: string
+    pageName: string
+    username: string | null
+    version: number
+    syncedAt: string | null
+  },
+  expired: boolean,
+  formatConnected: (iso: string) => string,
+): SnsConnectionView {
+  const meta = ['ビジネスアカウント']
+  if (connection.syncedAt) meta.push(`接続した日 ${formatConnected(connection.syncedAt)}`)
+  return {
+    id: connection.instagramId,
+    service: 'instagram',
+    name: connection.username ? `@${connection.username}` : connection.pageName,
+    meta,
+    state: expired ? 'expired' : 'connected',
+    primary: false,
+    version: connection.version,
+    connectionId: connection.id ?? null,
+  }
+}
+
 /**
  * Instagram の返事を接続の配列へ直す。
+ * `list` は接続一覧の口の返事で、接続が何件あってもそのぶんの行を作る。
+ * 一覧を読めていないときは、1件ぶんの `status` から繋がっている1件だけを作る。
  * Instagram には主連携を設けないので `primary` は常に false（要件 §4-3）。
  */
 export function instagramSlots(
   status: InstagramConnectionStatus | null,
   formatConnected: (iso: string) => string,
+  list?: InstagramConnectionList | null,
 ): SnsServiceSlots {
+  if (list && list.connections.length > 0) {
+    return {
+      service: 'instagram',
+      connections: list.connections.map((connection) =>
+        instagramRow(connection, connection.state === 'expired', formatConnected),
+      ),
+    }
+  }
+
   const connection = status?.connection ?? null
   const connections: SnsConnectionView[] = []
-
   if (connection && (status?.state === 'connected' || status?.state === 'expired')) {
-    const meta = ['ビジネスアカウント']
-    if (connection.syncedAt) meta.push(`接続した日 ${formatConnected(connection.syncedAt)}`)
-    connections.push({
-      id: connection.instagramId,
-      service: 'instagram',
-      name: connection.username ? `@${connection.username}` : connection.pageName,
-      meta,
-      state: status.state === 'expired' ? 'expired' : 'connected',
-      primary: false,
-      version: connection.version,
-      connectionId: connection.id ?? null,
-    })
+    connections.push(instagramRow(connection, status.state === 'expired', formatConnected))
   }
 
   return { service: 'instagram', connections }

@@ -62,7 +62,8 @@ type Payload = {
   data: {
     url: string;
     state: string;
-    connection: { version: number };
+    connection: { version: number; id: string };
+    connections: { id: string; instagramId: string; state: string; version: number }[];
     version: number;
     connected: boolean;
     value: unknown;
@@ -201,6 +202,47 @@ it('接続確認で保存済みの誤った投稿先IDを正確なプロフィ�
   expect(db.raw.prepare('SELECT page_id,instagram_id FROM instagram_connections').get()).toEqual({
     page_id: '20', instagram_id: '20',
   });
+});
+it('接続一覧は同じLINEアカウントの接続を全件、既定と同じ並びで返す', async () => {
+  await connect();
+  addSecondConnection();
+
+  const list = await read(await req('/api/instagram/connections', undefined, 'GET'));
+  expect(list.data.state).toBe('connected');
+  expect(list.data.connections.map((row: { instagramId: string }) => row.instagramId)).toEqual(['20', '21']);
+  // 先頭は接続IDを省いたときに読まれる1件と同じ。画面はこの順で行を並べる。
+  const single = await read(await req('/api/instagram/connection', undefined, 'GET'));
+  expect(list.data.connections[0].id).toBe(single.data.connection.id);
+  expect(list.data.connections[1].id).toBe('igc-2');
+  expect(list.data.connections[1].version).toBe(7);
+  // 合鍵は行ごとにも出さない。
+  expect(JSON.stringify(list)).not.toContain('token');
+  expect(JSON.stringify(list)).not.toContain('encrypted');
+});
+it('接続一覧は行ごとに期限を見て、1件が切れても他の行は使えるままにする', async () => {
+  await connect();
+  addSecondConnection();
+  db.raw.prepare("UPDATE instagram_connections SET expires_at='2000-01-01T00:00:00.000Z' WHERE id='igc-2'").run();
+
+  const list = await read(await req('/api/instagram/connections', undefined, 'GET'));
+  expect(list.data.connections.map((row: { state: string }) => row.state)).toEqual(['connected', 'expired']);
+  expect(list.data.state).toBe('connected');
+});
+it('接続一覧に別の統括・権限の無いLINEアカウントの接続は出ない', async () => {
+  await connect();
+  addSecondConnection();
+  const otherStaff = { ...admin, tenantId: 't2' };
+
+  // 別統括のstaffからは、こちらのLINEアカウントそのものが見えない。
+  expect((await app(otherStaff).request('/api/instagram/connections?lineAccountId=a1')).status).toBe(404);
+  // 自分の側のLINEアカウントを見ても、こちらの接続は混ざらない。
+  const own = await read(await app(otherStaff).request('/api/instagram/connections?lineAccountId=a2'));
+  expect(own.data).toEqual({ state: 'disconnected', connections: [] });
+});
+it('設定なしの配備先では接続一覧も未設定を返し、Metaへ出て行かない', async () => {
+  const list = await read(await req('/api/instagram/connections', undefined, 'GET', admin, false));
+  expect(list.data).toEqual({ state: 'unconfigured', connections: [] });
+  expect(fetch).not.toHaveBeenCalled();
 });
 it('同じ統括の2つのLINEアカウントへ同じInstagramを接続でき、別統括には共有しない', async () => {
   db.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('a3','3','3','','','t1')");

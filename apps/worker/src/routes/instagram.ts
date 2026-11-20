@@ -207,6 +207,42 @@ instagram.get('/api/instagram/connection', async (c) => {
       : { state: 'disconnected', replyEnabled: false },
   });
 });
+/**
+ * 設定›SNS連携の一覧が出す行の元。接続が複数あっても全件返す。
+ * `account(c)` が canAccessAllLineAccounts で見える範囲を確かめ、見えなければ 404 にするので、
+ * 別の統括・権限の無いLINEアカウントの接続はここから出ない。
+ * 並び順は既定の接続を決める `connectionRow` と同じにして、先頭が既定と一致するようにする。
+ */
+instagram.get('/api/instagram/connections', async (c) => {
+  const id = await account(c);
+  if (!instagramConfig(c.env)) {
+    return c.json({ success: true, data: { state: 'unconfigured' as const, connections: [] } });
+  }
+  const rows = await c.env.DB.prepare(
+    'SELECT * FROM instagram_connections WHERE line_account_id=? ORDER BY sort_order, id',
+  )
+    .bind(id)
+    .all<Connection>();
+  return c.json({
+    success: true,
+    data: {
+      state: (rows.results ?? []).length ? ('connected' as const) : ('disconnected' as const),
+      connections: (rows.results ?? []).map((row) => ({
+        id: row.id,
+        // 行ごとに期限を見る。1件が切れていても他の行は使えるので、まとめて「期限切れ」にしない。
+        state: expired(row) ? ('expired' as const) : ('connected' as const),
+        pageId: row.page_id,
+        instagramId: row.instagram_id,
+        pageName: row.page_name,
+        username: row.username,
+        expiresAt: row.expires_at,
+        dataAccessExpiresAt: row.data_access_expires_at,
+        version: row.version,
+        syncedAt: row.synced_at,
+      })),
+    },
+  });
+});
 instagram.post(
   '/api/instagram/oauth/start',
   requireRole('owner', 'admin'),

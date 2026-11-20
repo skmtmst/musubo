@@ -17,9 +17,10 @@ import { GOOGLE_CONNECTION_STATUS, INSTAGRAM_CONNECTION_STATUS } from '@/lib/sta
 import { usePageTitle, usePageCrumbs } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
-import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
+import { restaurantGoogleApi, type GoogleConnection, type GoogleConnectionData } from '@/lib/restaurant-google-api'
 import { GoogleConnectionSettings } from '@/v8/restaurant/google'
 import { api } from '@/lib/api'
+import type { InstagramConnectionList } from '@/lib/api/features/settings'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './sns.module.css'
 import { formatDate, formatNumber } from '@/lib/format'
@@ -121,6 +122,10 @@ export default function SnsSettingsPage() {
   const [googleError, setGoogleError] = useState<unknown>(null)
   const [instagram, setInstagram] = useState<InstagramConnectionStatus | null>(null)
   const [instagramError, setInstagramError] = useState<unknown>(null)
+  /* 一覧の口の返事。接続が何件あってもここに全部入る。
+     読めなかったときは null にして、1件ぶんの返事から行を作る。 */
+  const [googleList, setGoogleList] = useState<GoogleConnection[] | null>(null)
+  const [instagramList, setInstagramList] = useState<InstagramConnectionList | null>(null)
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const loadVersion = useRef(0)
   const [addPlan, setAddPlan] = useState<SnsAdditionPlan | null>(null)
@@ -168,6 +173,14 @@ export default function SnsSettingsPage() {
           setInstagramError(null)
         })
         .catch((caught) => { if (version === loadVersion.current) { setInstagram(null); setInstagramError(caught) } }),
+      /* 一覧の口。行の並びだけを受け取る（まとめ・候補・権限は上の1件ぶんの返事から読む）。
+         口が無い配備先では失敗するので、そのときは null のままにして画面を止めない。 */
+      restaurantGoogleApi.connections(accountId)
+        .then((res) => { if (version === loadVersion.current) setGoogleList(res?.connections ?? null) })
+        .catch(() => { if (version === loadVersion.current) setGoogleList(null) }),
+      api.instagram.connections(accountId)
+        .then((res) => { if (version === loadVersion.current) setInstagramList(res.success && res.data?.connections ? res.data : null) })
+        .catch(() => { if (version === loadVersion.current) setInstagramList(null) }),
     ])
     if (version === loadVersion.current) setLoadedAccountId(accountId)
   }, [accountId])
@@ -178,6 +191,8 @@ export default function SnsSettingsPage() {
   const visibleGoogleError = loadedAccountId === accountId ? googleError : null
   const visibleInstagram = loadedAccountId === accountId ? instagram : null
   const visibleInstagramError = loadedAccountId === accountId ? instagramError : null
+  const visibleGoogleList = loadedAccountId === accountId ? googleList : null
+  const visibleInstagramList = loadedAccountId === accountId ? instagramList : null
   const googleStatus = visibleGoogle?.connection.status ?? null
   const igState = visibleInstagram?.state ?? null
 
@@ -185,8 +200,8 @@ export default function SnsSettingsPage() {
      契約枠を返す API が入るまでは既定値。 */
   const slots: SnsSlotsView = {
     contracted: SNS_DEFAULT_CONTRACTED,
-    googleBusiness: googleSlots(visibleGoogle, (iso) => formatDate(iso, { style: 'detail' })),
-    instagram: instagramSlots(visibleInstagram, (iso) => formatDate(iso, { style: 'day' })),
+    googleBusiness: googleSlots(visibleGoogle, (iso) => formatDate(iso, { style: 'detail' }), visibleGoogleList),
+    instagram: instagramSlots(visibleInstagram, (iso) => formatDate(iso, { style: 'day' }), visibleInstagramList),
   }
   const canManageGoogle = canManage && (visibleGoogle?.permissions.canManageConnection ?? true)
 
@@ -435,7 +450,8 @@ export default function SnsSettingsPage() {
                 busyId={busyId}
                 onReconnect={(connection) => { void beginConnect('googleBusiness', { connection }) }}
                 onDisconnect={(connection) => askDisconnect('googleBusiness', connection)}
-                rowLink={(connection) => connection.state === 'connected' && visibleGoogle.connection.locationName ? { href: '/settings/google-hours', label: '営業時間へ' } : null}
+                /* 行き先は行ごとに見る。店舗を選び終えた接続だけ営業時間の画面へ出す。 */
+                rowLink={(connection) => connection.state === 'connected' && connection.locationName ? { href: '/settings/google-hours', label: '営業時間へ' } : null}
               />
               {addNarrow('googleBusiness')}
               {restaurantStyle ? (

@@ -2,6 +2,26 @@ import { fetchApi } from '../transport/request'
 import type { ApiResponse } from '@line-crm/shared'
 
 /**
+ * 接続一覧の返事。行ごとに状態と版を持つ。先頭が「connectionId を省いたときに操作される接続」。
+ * 1件ぶんの `connection` と違い、1件が期限切れでも他の行は使えるので state は行ごとに見る。
+ */
+export type InstagramConnectionList = {
+  state: 'unconfigured' | 'disconnected' | 'connected'
+  connections: Array<{
+    id: string
+    state: 'connected' | 'expired'
+    pageId: string
+    instagramId: string
+    pageName: string
+    username: string | null
+    expiresAt: string
+    dataAccessExpiresAt: string | null
+    version: number
+    syncedAt: string | null
+  }>
+}
+
+/**
  * Instagram の口に付ける問い合わせ。接続が2つ以上あるときは connectionId で相手を決める。
  * 空の id は付けない（付けるとサーバーが見つからない扱いにする）。
  */
@@ -114,6 +134,8 @@ export const settingsMethods = {
     // connectionId は操作する接続そのものの id。省略すると既定の1件が相手になるため、
     // 接続が2つ以上あるときは画面で選んだ行の id を必ず渡す。
     connection: (accountId:string,connectionId?:string|null)=>fetchApi<ApiResponse<import('@line-crm/shared').InstagramConnectionStatus>>(`/api/instagram/connection?${instagramParams(accountId,connectionId)}`),
+    // 一覧の行の元。行ごとの id・版をここから受け取り、つなぎ直す・解除するで送り返す。
+    connections: (accountId:string)=>fetchApi<ApiResponse<InstagramConnectionList>>(`/api/instagram/connections?${instagramParams(accountId)}`),
     // mode='add' は「いまの接続を繋ぎ直す」ではなく「接続を増やす」とき。
     start: (accountId:string,target?:{connectionId?:string|null;add?:boolean})=>fetchApi<ApiResponse<{url:string;expiresAt:string}>>(`/api/instagram/oauth/start?${instagramParams(accountId,target?.connectionId,target?.add?{mode:'add'}:undefined)}`,{method:'POST',body:'{}'}),
     // 折り返しはブラウザがそのまま踏む（/settings/sns?instagram=... へ戻る）ので、画面から叩く口は持たない。

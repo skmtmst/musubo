@@ -70,10 +70,14 @@
   min-width: 0;
 }
 
+/* 行の中は桝目で組む。操作の置き場所が画面幅で変わる（広い画面は名前と同じ段、
+   細い画面は控えめな1行の下）ので、同じ押しどころを2つ置かずに場所だけ入れ替える。
+   横の隙間は 0 にして、実際に置いた物の margin で空ける（空の桝で隙間が出ないように）。 */
 .conn {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-e1-sns-conn-gap);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: var(--polish-space-none);
+  row-gap: var(--tpl-e1-sns-conn-gap);
   padding: var(--tpl-e1-sns-conn-pad);
   min-width: 0;
 }
@@ -83,7 +87,7 @@
   box-shadow: var(--tpl-e1-sns-conn-divider);
 }
 
-/* 行の1段目：接続の名前・状態の札・（余白）・この行の操作。 */
+/* 行の1段目：接続の名前と状態の札。右端の「⋯」は .rowMenu で同じ段に置く。 */
 .nameRow {
   display: flex;
   flex-wrap: wrap;
@@ -101,8 +105,29 @@
   min-width: 0;
 }
 
+/* 「⋯」。絵（F1 `daB2Q`・F2 `JtSq9`）はどちらの幅でも名前と同じ段の右端。 */
+.rowMenu {
+  display: flex;
+  align-items: center;
+  grid-row: 1;
+  grid-column: 3;
+  margin-left: var(--tpl-e1-sns-row-gap);
+}
+
+/* 行の中の操作（［主連携にする］［つなぎ直す］）。細い画面は絵（F2 `u1kzKR`）のとおり
+   控えめな1行の下に置き、広い画面は下の @media で名前と同じ段（F1）へ戻す。 */
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-e1-sns-row-gap);
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
 /* 行の2段目：取り込んだ日時・接続した日などの控えめな1行。 */
 .meta {
+  grid-column: 1 / -1;
   margin: var(--polish-space-none);
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
@@ -111,8 +136,9 @@
   min-width: 0;
 }
 
-/* 行の3段目：行の中の移動（「営業時間へ →」）。 */
+/* 行の最後の段：行の中の移動（「営業時間へ →」）。 */
 .btnRow {
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -201,6 +227,12 @@
   .nameRow { gap: var(--tpl-e1-sns-name-gap-wide); }
   .name { font-size: var(--tpl-e1-sns-name-size-wide); line-height: var(--tpl-e1-sns-name-lh-wide); }
   .meta { line-height: var(--tpl-e1-sns-meta-lh-wide); }
+  /* 広い画面は絵（F1 `vGV4d`・`WRn2M`）のとおり操作を名前と同じ段の「⋯」の左へ戻す。 */
+  .rowActions {
+    grid-row: 1;
+    grid-column: 2;
+    margin-left: var(--tpl-e1-sns-row-gap);
+  }
   .addWide { display: block; }
   .addNarrow { display: none; }
 }
