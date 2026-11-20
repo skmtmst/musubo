@@ -8,6 +8,8 @@ import { useStaffRole } from '@/lib/staff-role'
 import { useFirstSteps } from '@/v8/dashboard/public/first-steps-model/index'
 import { GUIDE_ENGINE_EVENT, readGuideEngineState } from './guide-engine'
 import { GuideOverlay } from './guide-overlay'
+import { GuideReceiveFirstMessage, GuideSetupComplete } from './guide-last-step'
+import { GuideMenuPicker } from './guide-menu-picker'
 import { GuidePublishMenu } from './guide-publish-menu'
 import { guideProcedure } from './guide-script'
 import { GuideSharedProvider, type SharedGuide } from './guide-shared'
@@ -55,6 +57,7 @@ export function GuideHost({ children }: { children: ReactNode }) {
 
 function GuideSession({ accountId, armed, watchFirstMessage, children }: { accountId: string | null; armed: boolean; watchFirstMessage: boolean; children: ReactNode }) {
   const role = useStaffRole()
+  const channelId = useOptionalAccount()?.selectedAccount?.channelId
   const style = useAccountStyle(accountId)
   const pathname = usePathname()
   const [qrOpen, setQrOpen] = useState(false)
@@ -91,10 +94,15 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
   const stepHref = step?.href ?? null
   const procedureHref = procedure?.href ?? null
   /** この手順の対象がある画面。手順の指定が無ければ段の行き先。 */
-  const targetHref = procedureHref ?? stepHref
+  const firstMessageStep = scripted && step?.key === 'firstMessage'
+  const menuPickerStep = scripted && step?.key === 'richMenu'
+  const targetHref = firstMessageStep || menuPickerStep ? '/' : procedureHref ?? stepHref
   const checkingFirstMessage = guide.stepKey === 'firstMessage' &&
     (pathname.startsWith('/scenarios') || (pathname === '/' && qrOpen))
-  const onTargetScreen = !targetHref || pathname === targetHref.split(/[?#]/)[0] || checkingFirstMessage
+  const needsPublishReview = scripted && step?.key === 'scenario' && step.done &&
+    guide.procedureIndex === 2 && guide.phase === 'active'
+  const inPublishReview = needsPublishReview && pathname.startsWith('/rich-menus')
+  const onTargetScreen = inPublishReview || !targetHref || pathname === targetHref.split(/[?#]/)[0] || checkingFirstMessage
   const place = `${accountId}:${guide.stepKey}:${guide.procedureIndex}`
   const leavingGuideScreen = !onTargetScreen && reachedPlace.current === place
   useEffect(() => {
@@ -120,14 +128,21 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
     () => { if (procedure?.anchor !== 'reception.save') advance() },
   )
   useSetupSaveSignal(scripted && armed, first.refresh)
-  const offerPublishing = scripted && step?.key === 'scenario' && step.done &&
-    guide.procedureIndex === 2 && guide.phase === 'active' && onTargetScreen
+  useGuideSignal('reception.menuPublished', Boolean(accountId && inPublishReview), advance, accountId ?? undefined)
+  const offerPublishing = needsPublishReview && !inPublishReview && onTargetScreen
+  const reviewingTables = guide.stepKey === 'attributes' && guide.procedureIndex === 3
+  const showComplete = scripted && Boolean(summary?.total && summary.done === summary.total) &&
+    (first.arrived || guide.phase === 'active' || guide.phase === 'paused') && !offerPublishing && !reviewingTables
+  const showReceive = firstMessageStep && !step.done && guide.phase === 'active' && pathname === '/' && !qrOpen && channelId
+  const showMenuPicker = menuPickerStep && !step.done && guide.phase === 'active' && pathname === '/' &&
+    accountId && style.data?.styleSelected && !style.stale
+  const dismissComplete = () => { guide.complete?.(); first.dismissArrived() }
 
   return (
     <GuideSharedProvider value={shared}>
       {children}
       <GuideOverlay
-        active={guide.phase === 'active' && !offerPublishing}
+        active={guide.phase === 'active' && !offerPublishing && !inPublishReview && !showReceive && !showComplete && !showMenuPicker}
         stepKey={guide.stepKey}
         stepLabel={step?.label ?? null}
         stepOrder={index >= 0 ? index + 1 : null}
@@ -139,8 +154,16 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
         onAdvanceProcedure={advance}
         onPause={pause}
       />
+      {showMenuPicker && summary && style.data ? <GuideMenuPicker key={accountId} accountId={accountId}
+        version={style.data.version} step={index + 1} total={summary.total} onLater={advance}
+        onCreate={() => { pause(); router.push('/rich-menus/new') }} onReload={style.reload} /> : null}
+      {showReceive && summary ? <GuideReceiveFirstMessage key={accountId} channelId={channelId}
+        step={index + 1} total={summary.total} watchExpired={first.watchExpired}
+        onRewatch={first.rewatch} onLater={pause} /> : null}
+      {showComplete ? <GuideSetupComplete onClose={dismissComplete}
+        onHome={() => { dismissComplete(); router.push('/') }} /> : null}
       {offerPublishing && accountId ? <GuidePublishMenu key={accountId} accountId={accountId}
-        onLater={advance} onReview={href => { pause(); router.push(href) }} /> : null}
+        onLater={advance} onReview={href => router.push(href)} /> : null}
     </GuideSharedProvider>
   )
 }

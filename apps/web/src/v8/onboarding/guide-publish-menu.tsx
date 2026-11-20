@@ -37,7 +37,7 @@ export function GuidePublishMenu({ accountId, onLater, onReview }: {
   }, [accountId, attempt])
 
   const title = '予約の受け付けが始まりました'
-  const href = preview.state === 'ready' ? `/rich-menus/edit?id=${encodeURIComponent(preview.id)}` : '/rich-menus'
+  const href = preview.state === 'ready' ? `/rich-menus/edit?id=${encodeURIComponent(preview.id)}&step=publish` : '/rich-menus'
   return (
     <Dialog open designNode="Hg6Zl" designWidth={540} exactDesignWidth title={title}
       headerIcon={false} designLayout="stacked-centered" designMinHeight={preview.state === 'ready' && preview.image ? 510 : undefined}

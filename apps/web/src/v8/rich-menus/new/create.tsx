@@ -120,7 +120,7 @@ function stepFromParam(key: string | null): StepKey | null {
  * `editGroupId` を渡すと、その下書き（またはいまのメニュー）を読み込んで同じウィザードで直す
  * （/rich-menus/edit の V8）。読み込むまでは手順の中身を出さず、すべての手順へ戻れる。
  */
-export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: string; host?: RichMenuCreateHost } = {}) {
+export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { editGroupId?: string; host?: RichMenuCreateHost; initialStep?: string } = {}) {
   const router = useListNavigationRouter()
   const saveErrors = useSaveFormErrors()
   usePageTitle(host ? 'リッチメニュー' : 'リッチメニューを作る')
@@ -142,8 +142,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
    * 後の移動は中の状態だけ（URLは書かない）。
    */
   const [step, setStep] = useState<StepKey>(() => {
-    if (typeof window === 'undefined') return 'shape'
-    return stepFromParam(new URLSearchParams(window.location.search).get('step')) ?? 'shape'
+    const stepParam = initialStep ?? (typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('step'))
+    return stepFromParam(stepParam) ?? 'shape'
   })
   /* 直すときは、すでに下書きがあるので全部の手順へ戻れる。 */
   const [maxStepIndex, setMaxStepIndex] = useState(editGroupId || host?.initial ? STEP_KEYS.length - 1 : 0)

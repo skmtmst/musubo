@@ -19,23 +19,24 @@ const SETUP_SAVE_SIGNALS = new Set(['tables.form', 'hours.confirm', 'menu.save',
  * 手順が終わった合図を出す。`anchor` は guide-script.ts の anchor と同じ名前。
  * 案内が一時停止していても、保存の合図で完了状況を読み直す。
  */
-export function emitGuideSignal(anchor: string): void {
+export function emitGuideSignal(anchor: string, accountId?: string): void {
   if (typeof window === 'undefined') return
   try {
-    window.dispatchEvent(new CustomEvent(GUIDE_SIGNAL_EVENT, { detail: { anchor } }))
+    window.dispatchEvent(new CustomEvent(GUIDE_SIGNAL_EVENT, { detail: { anchor, accountId } }))
   } catch { /* 合図が出せなくても画面の保存そのものは終わっている */ }
 }
 
 /** 今の手順の合図だけ受ける。別の手順の合図では進めない。 */
-export function useGuideSignal(anchor: string | null, enabled: boolean, onSignal: () => void): void {
+export function useGuideSignal(anchor: string | null, enabled: boolean, onSignal: () => void, accountId?: string): void {
   useLayoutEffect(() => {
     if (!enabled || !anchor || typeof window === 'undefined') return
     const handle = (event: Event) => {
-      if ((event as CustomEvent<{ anchor?: string }>).detail?.anchor === anchor) onSignal()
+      const detail = (event as CustomEvent<{ anchor?: string; accountId?: string }>).detail
+      if (detail?.anchor === anchor && (!accountId || detail.accountId === accountId)) onSignal()
     }
     window.addEventListener(GUIDE_SIGNAL_EVENT, handle)
     return () => window.removeEventListener(GUIDE_SIGNAL_EVENT, handle)
-  }, [anchor, enabled, onSignal])
+  }, [anchor, enabled, onSignal, accountId])
 }
 
 /** 保存できたときだけ施設の設定を読み直す。入力途中の合図は対象にしない。 */

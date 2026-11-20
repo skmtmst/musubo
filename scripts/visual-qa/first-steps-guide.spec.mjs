@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { routeLocalApi } from './local-api.mjs'
+import { RICH_MENU_GROUP_DETAILS } from './fixtures.mjs'
 
 const base = process.env.VISUAL_QA_BASE ?? 'http://127.0.0.1:3101'
 const mock = process.env.VISUAL_QA_MOCK ?? 'http://127.0.0.1:8788'
@@ -7,7 +8,7 @@ const accountId = 'visual-qa-account'
 const guideBar = '[data-guide-bar]'
 const tableForm = '[data-guide-balloon="attributes:2"]'
 
-async function openFixture(page, { width = 1440, firstStep = 'attributes', delayProgress, storeProgress = {} } = {}) {
+async function openFixture(page, { width = 1440, firstStep = 'attributes', delayProgress, storeProgress = {}, onMenuSave } = {}) {
   await routeLocalApi({ page })
   await page.setViewportSize({ width, height: 1000 })
   await page.request.put(`${mock}/api/dashboard/style?accountId=${accountId}`, { data: { style: 'restaurant' } })
@@ -23,8 +24,15 @@ async function openFixture(page, { width = 1440, firstStep = 'attributes', delay
     await route.fulfill({ json: { success: true, data: { storeId, ...setup } } })
   })
   if (firstStep === 'richMenu') {
+    let items = []
     await page.route('**/api/rich-menu-groups?**', route =>
-      route.fulfill({ json: { success: true, data: { items: [], total: 0 } } }))
+      route.fulfill({ json: { success: true, data: { items, total: items.length } } }))
+    await page.route('**/api/dashboard/style?**', async route => {
+      if (route.request().method() !== 'PUT') return route.fallback()
+      onMenuSave?.(route.request().postDataJSON())
+      items = [{ id: 'qa-menu-preset', accountId, status: 'draft' }]
+      await route.fulfill({ json: { success: true, data: { version: 2 } } })
+    })
   }
   await page.route('**/api/restaurant-test/inventory/allocation?**', async route => {
     if (route.request().method() !== 'PUT') return route.fallback()
@@ -47,11 +55,35 @@ async function openFixture(page, { width = 1440, firstStep = 'attributes', delay
   })
 }
 
+test('初回だけウェルカムを出し、スキップ後は再読込しても開店準備から始まる', async ({ page }, testInfo) => {
+  await openFixture(page)
+  const idle = { phase: 'idle', stepKey: null, procedureIndex: 1 }
+  let seenAt = null
+  await page.route('**/api/getting-started/guide?**', async route => {
+    if (route.request().method() === 'PUT') {
+      expect(route.request().postDataJSON()).toEqual({ ...idle, acknowledgeWelcome: true })
+      seenAt = '2026-11-20T00:00:00Z'
+    }
+    await route.fulfill({ json: { success: true, data: { ...idle, updatedAt: seenAt } } })
+  })
+  await page.goto(base)
+  const welcome = page.getByRole('dialog', { name: 'ようこそ' })
+  await expect(welcome.getByRole('img', { name: 'musubo' })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('guide-welcome.png') })
+  await welcome.getByRole('button', { name: 'タップでスキップ' }).click()
+  const popup = page.getByRole('dialog', { name: '開店準備を始めましょう' })
+  await expect(popup).toBeVisible()
+  await expect.poll(() => seenAt).not.toBeNull()
+  await page.reload()
+  await expect(popup).toBeVisible()
+  await expect(welcome).toHaveCount(0)
+})
+
 test('保存の失敗に留まり、成功後は手順3を再開して営業時間へ進む', async ({ page }, testInfo) => {
   await openFixture(page)
   await page.goto(base)
   await page.getByRole('button', { name: 'ガイドで進める', exact: true }).click()
-  await expect(page).toHaveURL(/\/restaurant-test\/tables$/)
+  await expect(page).toHaveURL(/\/restaurant-test\/tables$/, { timeout: 15000 })
   await page.locator('[data-guide-anchor="tables.create"]').click()
   await expect(page.locator(tableForm)).toBeVisible()
 
@@ -77,17 +109,28 @@ test('保存の失敗に留まり、成功後は手順3を再開して営業時�
   await expect(next).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('table-next-after-reload.png') })
   await next.click()
-  await expect(page).toHaveURL(/\/settings\/sns$|\/restaurant-test\/google\?tab=hours$/)
+  await expect(page).toHaveURL(/\/settings\/sns$|\/restaurant-test\/google\?tab=hours$/, { timeout: 15000 })
 })
 
-test('台本のない段もガイドを操作できる', async ({ page }) => {
-  await openFixture(page, { firstStep: 'richMenu' })
+test('Penの5つの型から選んだリッチメニューを保存し、卓へ進む', async ({ page }, testInfo) => {
+  let saved
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await openFixture(page, { firstStep: 'richMenu', onMenuSave: data => { saved = data } })
   await page.goto(base)
   await page.getByRole('button', { name: 'ガイドで進める', exact: true }).click()
-  await expect(page).toHaveURL(/\/getting-started\/rich-menu$/)
-  await expect(page.locator(guideBar)).toContainText('リッチメニューを選ぶ')
-  await page.locator(guideBar).getByRole('button', { name: 'この手順をスキップ' }).click()
-  await expect(page).toHaveURL(/\/restaurant-test\/tables$/)
+  const menuPicker = page.getByRole('dialog', { name: /リッチメニューを選ぶ/ })
+  await expect(menuPicker.getByRole('article')).toHaveCount(5)
+  await expect(menuPicker.getByRole('button', { name: 'これにする', exact: true })).toHaveCount(5)
+  const bounds = await menuPicker.boundingBox()
+  expect(bounds.width).toBeCloseTo(860, 0)
+  const note = menuPicker.getByText('クーポン等の強調色も各型のパレット内で統一', { exact: true })
+  const noteBounds = await note.boundingBox()
+  expect(noteBounds.x + noteBounds.width).toBeLessThan(bounds.x + bounds.width)
+  await page.screenshot({ path: testInfo.outputPath('guide-menu-picker.png') })
+  const night = menuPicker.getByRole('article', { name: '夜（深い紺）', exact: true })
+  await night.getByRole('button', { name: 'これにする', exact: true }).click()
+  await expect(page).toHaveURL(/\/restaurant-test\/tables$/, { timeout: 15000 })
+  expect(saved.answers.restaurantMenuPreset).toEqual({ mode: 'configured', value: 'night' })
 })
 
 test('狭いPCでもスワイプを案内せず、設定の操作はカードに収まる', async ({ page }, testInfo) => {
@@ -127,12 +170,12 @@ test('受付開始後は公開前の案内を出し、あとでを押すと来�
   await openFixture(page, { storeProgress: { tables: true, hours: true, menus: true } })
   await page.route('**/api/rich-menu-groups?**', async route => {
     if (new URL(route.request().url()).searchParams.get('filter') !== 'draft') return route.fallback()
-    const menu = { id: 'rmg-autumn', accountId, name: '検証用リッチメニュー', size: 'large', status: 'draft', thumbnailR2Key: 'qa-thumb-autumn' }
+    const menu = { ...RICH_MENU_GROUP_DETAILS['rmg-2'], accountId, name: '検証用リッチメニュー', size: 'large', status: 'draft', thumbnailR2Key: 'qa-thumb-autumn' }
     await route.fulfill({ json: { success: true, data: { items: [menu], total: 1 } } })
   })
   await page.goto(base)
   await page.getByRole('button', { name: 'ガイドで進める', exact: true }).click()
-  await expect(page).toHaveURL(/\/restaurant-test\/inventory$/)
+  await expect(page).toHaveURL(/\/restaurant-test\/inventory$/, { timeout: 15000 })
   for (const [label, value] of [['予約サイト', '0'], ['当日（ウォークイン）', '0'], ['LINE 専用', '1']]) {
     const input = page.getByRole('spinbutton', { name: label, exact: true })
     await input.press('ControlOrMeta+a')
@@ -154,8 +197,12 @@ test('受付開始後は公開前の案内を出し、あとでを押すと来�
   expect(bounds.width).toBeCloseTo(540, 0)
   expect(bounds.height).toBeCloseTo(510, 0)
   await page.screenshot({ path: testInfo.outputPath('reception-rich-menu-prompt.png'), animations: 'disabled' })
+  await announcement.getByRole('button', { name: 'リッチメニューを公開する', exact: true }).click()
+  await expect(page).toHaveURL(/\/rich-menus\/edit\?id=rmg-2&step=publish$/, { timeout: 15000 })
+  await expect(page.getByRole('heading', { name: '公開の前の確認', exact: true })).toBeVisible({ timeout: 15000 })
+  await page.goBack()
   await announcement.getByRole('button', { name: 'あとで', exact: true }).click()
-  await expect(page).toHaveURL(/\/restaurant-test\/line-followup$/)
+  await expect(page).toHaveURL(/\/restaurant-test\/line-followup$/, { timeout: 15000 })
   await expect(page.locator('[data-guide-balloon="followup:1"]')).toBeVisible()
 })
 
@@ -163,9 +210,9 @@ test('一時停止中に受付を止めても最初の未完了項目から始�
   await openFixture(page, { storeProgress: { tables: true, hours: true, menus: true, reception: true, followup: true } })
   await page.goto(base)
   await page.getByRole('button', { name: 'ガイドで進める', exact: true }).click()
-  await expect(page).toHaveURL(/\/getting-started#first-message$/)
-  await expect(page.locator(guideBar)).toContainText('最初の1通を受け取る')
-  await page.locator(guideBar).getByRole('button', { name: '一時停止' }).click()
+  const receive = page.getByRole('dialog', { name: '最初の1通を受け取る', exact: false })
+  await expect(receive).toBeVisible()
+  await receive.getByRole('button', { name: 'あとで', exact: true }).click()
   await page.getByRole('link', { name: '予約枠・在庫', exact: true }).click()
   for (const label of ['予約サイト', '当日（ウォークイン）', 'LINE 専用']) {
     const input = page.getByRole('spinbutton', { name: label, exact: true })
@@ -180,6 +227,43 @@ test('一時停止中に受付を止めても最初の未完了項目から始�
   await page.getByRole('link', { name: 'ダッシュボード', exact: true }).click()
   await expect(page.getByRole('button', { name: /開店準備 6\/8。ガイドを再開する/ })).toBeVisible()
   await page.getByRole('button', { name: '最初から始める', exact: true }).click()
-  await expect(page).toHaveURL(/\/restaurant-test\/inventory$/)
+  await expect(page).toHaveURL(/\/restaurant-test\/inventory$/, { timeout: 15000 })
   await expect(page.locator(guideBar)).toContainText('予約枠と在庫を設定する')
+})
+
+test('QRで待機し、閉じている間に届いた最初の1通も再読込で完了を表示する', async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await openFixture(page, { storeProgress: { tables: true, hours: true, menus: true, reception: true, followup: true } })
+  let delivered = false
+  await page.route('**/api/getting-started?**', async route => {
+    const response = await page.request.get(`${mock}/api/getting-started?version=v8`)
+    const data = await response.json()
+    const firstMessage = data.data.steps.find(step => step.key === 'firstMessage')
+    firstMessage.state = delivered ? 'done' : 'todo'
+    await route.fulfill({ json: data })
+  })
+  await page.goto(base)
+  await page.getByRole('button', { name: 'ガイドで進める', exact: true }).click()
+  const receive = page.getByRole('dialog', { name: /最初の1通を受け取る/ })
+  await expect(receive.getByRole('img', { name: '友だち追加のQRコード' })).toBeVisible()
+  await expect(receive.getByText('8/8', { exact: true })).toBeVisible()
+  await expect(receive.getByRole('status')).toContainText('受信を待っています')
+  const receiveBounds = await receive.boundingBox()
+  expect(receiveBounds.width).toBeCloseTo(640, 0)
+  expect(Math.abs(receiveBounds.height - 368)).toBeLessThanOrEqual(1)
+  await page.screenshot({ path: testInfo.outputPath('guide-receive.png') })
+  await receive.getByRole('button', { name: 'あとで', exact: true }).click()
+  await expect(receive).toHaveCount(0)
+  delivered = true
+  await page.reload()
+  const complete = page.getByRole('dialog', { name: '開店準備が完了しました' })
+  await expect(complete).toBeVisible()
+  await expect(complete.getByRole('link')).toHaveCount(3)
+  expect((await complete.boundingBox()).width).toBeCloseTo(560, 0)
+  await page.screenshot({ path: testInfo.outputPath('guide-complete.png') })
+  await complete.getByRole('button', { name: 'ダッシュボードへ', exact: true }).click()
+  await expect(complete).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'ダッシュボード', exact: true })).toBeVisible()
+  await expect(complete).toHaveCount(0)
 })

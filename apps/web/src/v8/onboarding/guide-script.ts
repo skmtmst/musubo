@@ -113,7 +113,7 @@ const SCRIPT: readonly GuideStepScript[] = [
       {
         index: 2,
         title: '基本を入力',
-        body: '名前と値段を入れると、ガイドは自動で次の手順へ進みます。所要時間と写真もここで設定できます。',
+        body: '名前と値段を入れると、ガイドは自動で次の手順へ進みます。写真はあとからも追加できます。',
         anchor: 'menu.form',
         href: '/restaurant-test/menu/edit',
         trigger: 'valid',

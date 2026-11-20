@@ -5,7 +5,7 @@ import { getRichMenuGroupWithPages, publishFormVersion } from '@line-crm/db';
 import { assembleRichMenuGroupInput, richMenuLiveToSnapshot } from '../features/rich-menus/rich-menu-group-input.js';
 import { validateRichMenuGroupForPublish } from '../lib/rich-menu-publisher.js';
 import { beforeEach, afterEach, expect, test, vi } from 'vitest';
-import { ACCOUNT_STYLES, DEFAULT_TENANT_ID, INITIAL_MENUS, initialMenuBounds, initialMenuImageKey, initialMenuPng, validateFormForPublish } from '@line-crm/shared';
+import { ACCOUNT_STYLES, DEFAULT_TENANT_ID, INITIAL_MENUS, RESTAURANT_GUIDE_MENU_IDS, RESTAURANT_GUIDE_MENUS, initialMenuBounds, initialMenuImageKey, initialMenuPng, validateFormForPublish } from '@line-crm/shared';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { saveProfile, profile } from '../services/style-setup.js';
 import { starterApplication, ensureStyleStarterItems } from '../services/style-starter-ensure.js';
@@ -37,6 +37,30 @@ test.each(ACCOUNT_STYLES)('%sの4面は画像・座標・行き先が一致し�
  expect(ids.length).toBeGreaterThan(0);
  for(const id of ids)expect(f.raw.prepare('SELECT line_account_id FROM form_accounts WHERE form_id=?').get(id)).toEqual({line_account_id:'a'});
  const original=menu().id;await choose(style);expect(menu().id).toBe(original);expect(areas()).toHaveLength(4);
+});
+
+test.each(RESTAURANT_GUIDE_MENU_IDS)('%sを選ぶと図の面数と座標で下書きを作る', async preset => {
+ const images={head:vi.fn().mockResolvedValue(null),put:vi.fn().mockResolvedValue(null)};
+ f.raw.exec(`INSERT INTO rt_organizations(id,account_id,name) VALUES('org','a','本部');
+   INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store-a','org','A','a','a');`);
+ await saveProfile(f.db,'a',DEFAULT_TENANT_ID,'owner',{
+   expectedVersion:0,style:'restaurant',confirmInitialMenu:true,
+   answers:{image:{mode:'configured',value:'simple'},restaurantMenuPreset:{mode:'configured',value:preset}},
+ },{images:images as unknown as R2Bucket});
+ const key=initialMenuImageKey('a','restaurant',preset);
+ expect(menu()).toMatchObject({status:'draft',image_r2_key:key});
+ const bounds=RESTAURANT_GUIDE_MENUS[preset].areas.map(({target,...area})=>area).sort((a,b)=>a.y-b.y||a.x-b.x);
+ expect(areas()).toHaveLength(bounds.length);
+ areas().forEach((area,index)=>expect(area).toMatchObject(bounds[index]));
+ const token=(f.raw.prepare("SELECT token FROM rt_reservation_links WHERE store_id='store-a'").get() as {token:string}).token;
+ const booking=areas().find(area=>area.label==='予約する')!;
+ expect(booking.form_id).toBe(null);
+ expect(JSON.parse(String(booking.action_data)).uri).toMatch(new RegExp(`page=restaurant&token=${token}$`));
+ const [imageKey, bytes]=images.put.mock.calls[0] as unknown as [string, Uint8Array];
+ expect(imageKey).toBe(key);
+ const png=new DataView(bytes.buffer,bytes.byteOffset);
+ expect([png.getUint32(16),png.getUint32(20)]).toEqual([2500,1686]);
+ expect(f.raw.prepare('SELECT COUNT(*) n FROM messages_log').get()).toEqual({n:0});
 });
 
 test('席とLINEの入口が無い間も4面を詰め直さず、入れ直しは自分の店だけを補う',async()=>{
