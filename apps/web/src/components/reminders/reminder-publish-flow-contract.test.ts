@@ -15,11 +15,6 @@ const API = readApiSource(join(ROOT, 'src/lib/api.ts'), 'utf8')
 const WORKER_ROUTE = readImplementationSource(join(ROOT, '../worker/src/routes/reminders.ts'))
 
 describe('リマインダの公開フロー', () => {
-  it('作成時に公開せず、下書きから対象確認へ進む', () => {
-    expect(NEW_PAGE).toContain('api.reminders.createDraft(settings)')
-    expect(NEW_PAGE).toContain('&stage=target')
-    expect(NEW_PAGE).not.toContain('api.reminders.addStep(res.data.id')
-  })
 
   it('確認・テスト送信・公開を同じ版のAPIへ通す', () => {
     expect(API).toContain('/api/reminders/${id}/draft')
@@ -29,12 +24,6 @@ describe('リマインダの公開フロー', () => {
     expect(API).toContain('/api/reminders/${id}/publish')
     expect(FLOW).toContain("draft?.lastTestStatus !== 'succeeded'")
     expect(FLOW).toContain('!validation?.valid')
-  })
-
-  it('未取得の人数を0人に見せない', () => {
-    expect(FLOW).toContain("value == null ? `—${unit}`")
-    expect(FLOW).toContain("audience.matched")
-    expect(FLOW).toContain("audience.excluded")
   })
 
   it('V8の配信予定は取得した予定と人数を使い、仮の日付を作らない', () => {

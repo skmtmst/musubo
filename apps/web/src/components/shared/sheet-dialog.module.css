@@ -1,0 +1,70 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/*
+  ボトムシート型の窓（「ダイアログ/中」q3DPdz の変わり形）の持ち主。
+  面・掴み手・頭（印＋題＋一言）の見た目はここだけが持つ。
+  画面ごとの承認値は --sheet-* のカスタムプロパティで受け取り、
+  幅で変わる値も画面側の @media が同じ名前を書き換える（この持ち主に幅の分岐を置かない）。
+  既定値は components レイヤーの中に置く。レイヤー外だと画面側の指定が
+  黙って無視されるため、ここに入れて「指定したときだけ画面が勝つ」順にする。
+*/
+
+.surface {
+  width: var(--sheet-w, 100%);
+  max-width: var(--sheet-max-w, 100%);
+  height: var(--sheet-h, auto);
+  max-height: var(--sheet-max-h, 100%);
+  overflow-x: var(--sheet-overflow-x, visible);
+  overflow-y: var(--sheet-overflow-y, auto);
+  background: var(--sheet-bg, var(--color-canvas));
+  border-radius: var(--sheet-radius, var(--polish-radius-dialog));
+  box-shadow: var(--sheet-shadow, none);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sheet-gap, 0);
+  padding: var(--sheet-pad, 0);
+}
+
+/* 掴み手。出す幅だけ画面が --sheet-grabber-display を flex にする。 */
+.grabber {
+  display: var(--sheet-grabber-display, none);
+  justify-content: center;
+}
+
+.grabberBar {
+  width: var(--sheet-grabber-w, 0);
+  height: var(--sheet-grabber-h, 0);
+  border-radius: var(--polish-radius-pill);
+  background: var(--sheet-grabber-color, currentcolor);
+}
+
+/* 頭。印（丸い札など）は画面から渡す差し込みなので、ここでは置き方だけ持つ。 */
+.header {
+  display: flex;
+  gap: var(--sheet-header-gap, 0);
+  align-items: center;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sheet-header-text-gap, 0);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  color: var(--sheet-title-ink, var(--color-ink));
+  font-size: var(--sheet-title-size, var(--text-title));
+  font-weight: var(--sheet-title-weight, 800);
+  line-height: var(--sheet-title-lh, normal);
+}
+
+.description {
+  margin: 0;
+  color: var(--sheet-desc-ink, var(--color-ink-secondary));
+  font-size: var(--sheet-desc-size, var(--polish-text-body));
+  font-weight: var(--sheet-desc-weight, 500);
+  line-height: var(--sheet-desc-lh, normal);
+}
+}

@@ -26,15 +26,14 @@ it('実際の一覧で、名前・人数・卓・コースを各見出しの下�
   const data = today()
   render(<TodayList style="restaurant" rows={data.rows} note={data.rowsNote} canWrite={false} busyId="" menuFor={() => []} onVisit={() => {}} onUndo={() => {}} />)
   const rows = screen.getAllByRole('row')
-  expect(within(rows[0]).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['時刻', '名前', '人数', '卓', 'コース', 'お支払い', '状態', '来店'])
+  expect(within(rows[0]).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['時刻', '名前', '人数・卓', 'コース', '支払', '状態', '来店'])
   const cells = within(rows[1]).getAllByRole('cell')
   expect(cells[1].textContent).toContain('顧客 花子')
-  expect(cells[2].textContent).toBe('2')
-  expect(cells[3].textContent).toBe('窓側2人卓・奥の4人卓')
-  expect(within(cells[3]).getByTitle('窓側2人卓・奥の4人卓')).toBeTruthy()
-  expect(cells[4].textContent).toContain('季節のコース')
-  expect(cells[3].textContent).not.toContain('担当')
-  expect(cells[4].textContent).not.toContain('花子')
+  expect(cells[2].textContent).toBe('2人 / 窓側2人卓・奥の4人卓')
+  expect(within(cells[2]).getByTitle('2人 / 窓側2人卓・奥の4人卓')).toBeTruthy()
+  expect(cells[3].textContent).toContain('季節のコース')
+  expect(cells[2].textContent).not.toContain('担当')
+  expect(cells[3].textContent).not.toContain('花子')
 })
 
 it.each(['restaurant', 'salon', 'consult'] as const)('%sの一覧・盤・カレンダーで顧客名をメニュー名に代用しない', style => {
@@ -85,4 +84,13 @@ it('古い応答でも担当名を卓にせず、顧客名と同じ題をコー�
 it('古い応答の卓軸は卓の列名だけ使い、コースなしは席のみと出す', () => {
   const data = today({ ...schedule, columns: [{ id: 't1', name: '窓側2人卓', kind: 'table' }], entries: [{ ...schedule.entries[0], columnIds: ['t1'], tableNames: undefined, title: booking.name, booking: { ...booking, menuId: null, menuName: null } }] })
   expect(data.rows[0]).toMatchObject({ seat: '窓側2人卓', course: '席のみ' })
+})
+
+it('面談の状態と支払を一つの列に表示し、全文を確認できる', () => {
+  const data = today(schedule, 'consult')
+  const rowsWithPayment = [{ ...data.rows[0], state: { label: '確定', tone: 'success' as const }, pay: { label: '支払済み', tone: 'success' as const } }]
+  render(<TodayList style="consult" rows={rowsWithPayment} note="" canWrite={false} busyId="" menuFor={() => []} onVisit={() => {}} onUndo={() => {}} />)
+  expect(screen.getByRole('columnheader', { name: '状態・支払' })).toBeTruthy()
+  const combined = screen.getByTitle('確定 / 支払済み')
+  expect(combined.querySelector('[data-tone=success]')).toBeTruthy()
 })

@@ -21,7 +21,7 @@ describe('運営コンソールの画面確認モック', () => {
   it('お問い合わせ詳細の見本が HqSupportDetail 型どおりの器を持つ', () => {
     /*
      * 見本が無いと既定の `{items,total,page,limit}` が返り、日時の整形で
-     * 落ちて `/hq/support/detail?id=visual-ticket-1` が開けなかった（2026-09-25）。
+     * 落ちて `/hq/support/detail?id=visual-ticket-1` が開けなくなる。
      */
     // 口は運営チケットと同型の正規表現で受けるため、素のパス文字ではなく正規表現の形で拾う。
     expect(MOCK_API).toContain('/hq\\/support\\/requests\\/');
@@ -33,7 +33,7 @@ describe('運営コンソールの画面確認モック', () => {
     }
     /*
      * 本物と同じく、最初の本文は `messages` に入れない（画面で2回出る）。
-     * 統括からの続き（authorKind: 'tenant'）は入れてよいが、最初の本文と同じ文は入れない（絵 `OhguS`、2026-10-06）。
+     * 統括からの続き（authorKind: 'tenant'）は入れてよいが、最初の本文と同じ文は入れない（絵 `OhguS`）。
      * 運営の追記の名は `musubo 運営 ／ 名前` の形。
      */
     const firstBody = /subject: 'LINE の Webhook が遅れる', body: '([^']+)'/.exec(block)?.[1];

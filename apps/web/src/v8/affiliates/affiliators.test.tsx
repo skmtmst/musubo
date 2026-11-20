@@ -119,7 +119,11 @@ describe('V8 アフィリエイター', () => {
     verifiedStaffRole('staff')
     await render()
     expect(host.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
-    expect(host.textContent).not.toContain('アフィリエイターを作る')
+    const create = [...host.querySelectorAll<HTMLButtonElement>('button')].filter(button => button.textContent?.includes('アフィリエイターを作る'))
+    expect(create.length).toBeGreaterThan(0)
+    expect(create.every(button => button.getAttribute('aria-disabled') === 'true')).toBe(true)
+    await act(async () => { create[0].click() })
+    expect(host.querySelector('a[href="/affiliates/new"]')).toBeNull()
     const selection = host.querySelector('[aria-label="多い人を選ぶ"]') as HTMLInputElement
     expect(selection).toBeNull()
     expect(updateAffiliate).not.toHaveBeenCalled()

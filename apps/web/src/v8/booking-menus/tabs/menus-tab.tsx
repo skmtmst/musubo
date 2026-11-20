@@ -129,7 +129,6 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
     }
     const fromIndex = ordered.findIndex((item) => item.id === movedId)
     const toIndex = nextIds.indexOf(movedId)
-    const previousIds = ordered.map((item) => item.id)
     setOrderOverride(nextIds)
     reorderBusyRef.current = true
     setReorderBusy(true)
@@ -140,10 +139,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
       })
       setOrderOverride(null)
       onReload()
-      notifyToast(`「${moved.name}」を${toIndex < fromIndex ? '上' : '下'}へ移しました。`, undoable ? {
-        actionLabel: '元に戻す',
-        onAction: () => { void persistOrder(movedId, previousIds, false) },
-      } : undefined)
+      notifyToast(`「${moved.name}」を${toIndex < fromIndex ? '上' : '下'}へ移しました。`)
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause)
       setOrderOverride(null)
@@ -195,13 +191,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
         return copy
       })
       onReload()
-      notifyToast(next ? `「${menu.name}」をお客さまの画面へ出しました。` : `「${menu.name}」の新しい予約を止めました。`, {
-        actionLabel: '元に戻す',
-        onAction: () => {
-          const latest = menusRef.current.find((item) => item.id === menu.id) ?? menu
-          void toggleVisibility(latest, !next)
-        },
-      })
+      notifyToast(next ? `「${menu.name}」をお客さまの画面へ出しました。` : `「${menu.name}」の新しい予約を止めました。`)
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause)
       setVisOverride((current) => {

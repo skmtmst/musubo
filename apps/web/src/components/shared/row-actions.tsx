@@ -292,6 +292,8 @@ export type RowActionsProps = {
   menuNote?: string
   /** aria名に使う行の名前（例：テンプレート名）。 */
   subjectName?: string
+  /** 権限で「⋯」を開けない理由。渡すと灰色で出し、押すと理由を見せる。 */
+  menuLockedReason?: string
   /** 「⋯」ボタンへ渡す追加属性（撮影入口の data-qa-open など）。 */
   menuButtonProps?: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-expanded' | 'aria-label' | 'children' | 'className' | 'onClick' | 'type'> & {
     [key: `data-${string}`]: string | undefined
@@ -326,6 +328,7 @@ export function RowActions({
   destructiveItem,
   menuNote,
   subjectName,
+  menuLockedReason,
   menuButtonProps,
   className,
 }: RowActionsProps) {
@@ -349,7 +352,7 @@ export function RowActions({
   return (
     <span data-row-actions="" className={[styles.rowActions, className].filter(Boolean).join(' ')}>
       {primary ? <RowActionButton action={primary} defaultLabel="承認する" primary /> : detail ? <RowActionButton action={detail} defaultLabel="詳細" /> : null}
-      <RowMenu appearance={menuAppearance} size={menuSize} items={items}
+      <RowMenu appearance={menuAppearance} size={menuSize} items={items} lockedReason={menuLockedReason}
         label={subjectName ? `${subjectName}のその他操作` : 'そのほかの操作'}
         menuLabel={subjectName ? `${subjectName}の操作` : '操作'}
         note={menuNote ?? (items.length ? undefined : 'この行に使える操作はありません')}

@@ -16,6 +16,7 @@ const fixture = vi.hoisted(() => ({
   listStaff: null as null | (() => Promise<unknown>),
   listStaffMenusBulk: null as null | (() => Promise<unknown>),
   putStaffMenusBulk: null as null | ((...args: unknown[]) => Promise<unknown>),
+  getStaffMenus: vi.fn(),
 }))
 
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
@@ -43,6 +44,7 @@ vi.mock('@/lib/api', () => ({
     listMenus: (...args: unknown[]) => fixture.listMenus!(...(args as [])),
     listStaff: (...args: unknown[]) => fixture.listStaff!(...(args as [])),
     listStaffMenusBulk: (...args: unknown[]) => fixture.listStaffMenusBulk!(...(args as [])),
+    getStaffMenus: (...args: unknown[]) => fixture.getStaffMenus(...args),
     putStaffMenusBulk: (...args: unknown[]) => fixture.putStaffMenusBulk!(...args),
   },
 }))
@@ -75,6 +77,8 @@ function matrixRow(staffId: string, offeredMenuIds: string[]) {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z'))
   fixture.listMenus = async () => ({ menus: MENUS })
   fixture.listStaff = async () => ({ staff: STAFF })
   fixture.listStaffMenusBulk = async () => ({
@@ -84,11 +88,13 @@ beforeEach(() => {
     ],
   })
   fixture.putStaffMenusBulk = vi.fn(async () => ({ ok: true }))
+  fixture.getStaffMenus.mockReset().mockResolvedValue({ matrix: [] })
 })
 
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 
 /** メニュー名の行。 */
@@ -97,6 +103,26 @@ function menuRow(name: string): HTMLElement {
 }
 
 describe('R308 提供できる数は有効の担当だけ', () => {
+  test('担当ごとに読まず、割り当て表を一括で1回だけ読む', async () => {
+    fixture.listStaffMenusBulk = vi.fn(async () => ({ staff: [matrixRow('staff-a', ['menu-cut']), matrixRow('staff-h', [])] }))
+    render(<MenuStaffMatrix />)
+    await screen.findByText('カット')
+    expect(fixture.listStaffMenusBulk).toHaveBeenCalledTimes(1)
+    expect(fixture.listStaffMenusBulk).toHaveBeenCalledWith('account-a')
+    expect(fixture.getStaffMenus).not.toHaveBeenCalled()
+    expect((within(menuRow('カット')).getByRole('checkbox', { name: 'カット を 稼働さん が受ける' }) as HTMLInputElement).checked).toBe(true)
+  })
+
+  test('一括取得に失敗したときだけ担当ごとに読み直す', async () => {
+    fixture.listStaffMenusBulk = vi.fn(async () => { throw new Error('unavailable') })
+    render(<MenuStaffMatrix />)
+    await screen.findByText('カット')
+    expect(fixture.listStaffMenusBulk).toHaveBeenCalledTimes(1)
+    expect(fixture.getStaffMenus).toHaveBeenCalledTimes(2)
+    expect(fixture.getStaffMenus).toHaveBeenCalledWith('account-a', 'staff-a')
+    expect(fixture.getStaffMenus).toHaveBeenCalledWith('account-a', 'staff-h')
+  })
+
   test('非公開の担当は割当として数え、見出しに「非公開」と出す', async () => {
     render(<MenuStaffMatrix />)
     await screen.findByText('カット')

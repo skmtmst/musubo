@@ -1,6 +1,7 @@
 import { afterAll, beforeEach } from 'vitest'
 import { setTestReducedMotion } from './reduced-motion'
 import { clearApiReadCache } from '../lib/api/transport/read-cache'
+import { resetListUrlState } from '../components/shared/list-url-state'
 
 // Vitest 4 only permits spying on functions. Happy DOM does not implement the
 // native print/confirm dialogs, and Node 26 exposes an unusable localStorage
@@ -28,4 +29,4 @@ if (typeof window !== 'undefined') {
   })
 }
 
-beforeEach(() => { setTestReducedMotion(true); clearApiReadCache() })
+beforeEach(() => { setTestReducedMotion(true); clearApiReadCache(); resetListUrlState() })

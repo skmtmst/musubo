@@ -18,14 +18,13 @@ it('確認を指定しない失敗は復元後に通知の理由を読み、復�
   expect(notify).toHaveBeenLastCalledWith('元の表示へ戻しました。', { tone: 'error' })
 })
 
-it('確認の口を渡さない経路は元の通知と5秒の期限を保ち、返り値も変えない', async () => {
+it('確認を指定しない操作は保存後に取り消し操作のない知らせを出す', async () => {
   const commit = vi.fn().mockResolvedValue(undefined), undo = vi.fn()
   expect(runUndoable({ message: '移動しました', commit, undo })).toBeUndefined()
-  expect(notify).toHaveBeenCalledWith('移動しました', expect.objectContaining({ actionLabel: '元に戻す', onAction: expect.any(Function) }))
-  await vi.advanceTimersByTimeAsync(4999)
-  expect(commit).not.toHaveBeenCalled()
-  await vi.advanceTimersByTimeAsync(1)
+  await vi.advanceTimersByTimeAsync(0)
   expect(commit).toHaveBeenCalledTimes(1)
+  expect(notify).toHaveBeenCalledWith('移動しました')
+  expect(undo).not.toHaveBeenCalled()
 })
 
 it('確認の窓の取り消しは送信0、通知に同じ操作を重ねず、二度目は何もしない', async () => {

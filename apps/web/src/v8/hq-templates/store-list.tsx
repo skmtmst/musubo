@@ -1,5 +1,7 @@
 'use client'
 
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
+
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { OverlayDepthContext } from '@/components/shared/overlay-utils'
@@ -173,10 +175,10 @@ export default function HqStoreList(props: HqStoreListProps) {
       />
   ) : undefined
 
-  const createButton = (full: boolean) => !canEdit ? null : (
-    <Button type="button" variant="primary" className={full ? 'v8-folder-create w-full' : undefined} disabled={!ready || busy} onClick={onCreate}>
+  const createButton = (full: boolean) => (
+    <PermissionGatedButton allowed={canEdit} need="tenantWide" type="button" variant="primary" className={full ? 'v8-folder-create w-full' : undefined} disabled={!ready || busy} onClick={onCreate}>
       <Plus size={16} aria-hidden="true" />{words.create}
-    </Button>
+    </PermissionGatedButton>
   )
 
   const leadingActions = (id: string, name: string): ActionMenuItem[] | undefined => {

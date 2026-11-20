@@ -1,7 +1,7 @@
 /**
  * V8・V8-B の板と画面の対応表（`v8-design-map.json`）を作る。
  *
- * 絵の正本は司令塔の作業フォルダ（`V8_DESIGN_DIR`、既定は
+ * 絵の正本は作業フォルダ（`V8_DESIGN_DIR`、既定は
  * `/Users/kentakenta/lh-work/design/v8`）にあり、リポジトリには入れない。
  * この道具は、その3つの表を読んで「板ID → 画面の場所・種類・幅」だけを
  * 抜き出した JSON を作る。JSON は画面を開くための案内として使い、見た目の合否には使わない。
@@ -11,7 +11,7 @@
  *
  * 読みもの（優先順位は上から）
  *   1. BOARD-INDEX.md … 板ID・文書（V8/V8-B）・板の名前・見本の場所（496枚）
- *   2. HANDOVER-MAP.md … V8 の板の画面の場所・種類（Devin が場所を直すと変わる）
+ *   2. HANDOVER-MAP.md … V8 の板の画面の場所・種類
  *   3. V8B-HANDOVER-MAP.md … V8-B の板の画面の場所・種類
  *   4. specs/pages/*.md … 仕様が名指しする板ID（対応表に無いと警告だけ出す）
  */
