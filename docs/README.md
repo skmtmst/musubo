@@ -470,7 +470,7 @@
 
 ## 反映履歴
 
-- [予約の試験用決済と予約金](release-log/unreleased/PR-kenta-c4c5-payments.md) — 反映履歴、確認 2026-11-20。
+- [予約の試験用決済と予約金](release-log/unreleased/131-kenta-c4c5-payments.md) — 反映履歴、確認 2026-11-20。
 
 - [保守時に確認する説明を整理](release-log/unreleased/121-kenta-q04-misc.md) — 反映履歴、確認 2026-11-19。
 
