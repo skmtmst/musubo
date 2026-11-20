@@ -92,7 +92,7 @@ export function GuideSetupComplete({ onClose, onHome }: { onClose: () => void; o
         <h3>次にできること</h3>
         <div className={styles.nextActions}>
           {NEXT_ACTIONS.map(({ href, icon: Icon, label, note }) => (
-            <Card key={href} frame="ring" contentPadding="var(--space-14) var(--space-14)">
+            <Card key={href} edge="hairline" contentPadding="var(--space-14) var(--space-14)">
               <div className={styles.nextAction}>
                 <Icon className={styles.choiceIcon} size={16} aria-hidden="true" />
                 <Link className={styles.choiceLink} href={href} onClick={onClose}>{label}</Link>

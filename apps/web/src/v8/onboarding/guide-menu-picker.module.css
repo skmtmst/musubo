@@ -18,7 +18,7 @@
   aspect-ratio: 1;
   border: var(--space-2) solid var(--color-accent);
   border-radius: var(--radius-pill);
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
   font-size: var(--text-body);
 }
 

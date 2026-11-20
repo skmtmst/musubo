@@ -8,7 +8,7 @@ const accountId = 'visual-qa-account'
 const guideBar = '[data-guide-bar]'
 const tableForm = '[data-guide-balloon="attributes:2"]'
 
-async function openFixture(page, { width = 1440, firstStep = 'attributes', delayProgress, storeProgress = {}, onMenuSave } = {}) {
+async function openFixture(page, { width = 1440, firstStep = 'attributes', delayProgress, storeProgress = {}, onMenuSave, menuSaveFailures = [] } = {}) {
   await routeLocalApi({ page })
   await page.setViewportSize({ width, height: 1000 })
   await page.request.put(`${mock}/api/dashboard/style?accountId=${accountId}`, { data: { style: 'restaurant' } })
@@ -36,6 +36,8 @@ async function openFixture(page, { width = 1440, firstStep = 'attributes', delay
       route.fulfill({ json: { success: true, data: { items, total: items.length } } }))
     await page.route('**/api/dashboard/style?**', async route => {
       if (route.request().method() !== 'PUT') return route.fallback()
+      const failure = menuSaveFailures.shift()
+      if (failure) return route.fulfill(failure)
       onMenuSave?.(route.request().postDataJSON())
       items = [{ id: 'qa-menu-preset', accountId, status: 'draft' }]
       await route.fulfill({ json: { success: true, data: { version: 2 } } })
@@ -119,10 +121,17 @@ test('保存の失敗に留まり、成功後は手順3を再開して営業時�
   await expect(page).toHaveURL(/\/settings\/sns$|\/restaurant-test\/google\?tab=hours$/, { timeout: 15000 })
 })
 
-test('Penの5つの型から選んだリッチメニューを保存し、卓へ進む', async ({ page }, testInfo) => {
+test('Penの5つの型を表示し、欄のエラーを確認してから保存すると卓へ進む', async ({ page }, testInfo) => {
   let saved
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  await openFixture(page, { firstStep: 'richMenu', onMenuSave: data => { saved = data } })
+  await openFixture(page, {
+    firstStep: 'richMenu',
+    onMenuSave: data => { saved = data },
+    menuSaveFailures: [
+      { status: 422, json: { error: '入力内容を確認してください', fields: { 'answers.restaurantMenuPreset': 'リッチメニューの型を選び直してください' } } },
+      { status: 409, json: { code: 'version_conflict', error: '設定が変更されました。読み直してください。' } },
+    ],
+  })
   await page.goto(base)
   await page.getByRole('button', { name: 'ガイドで進める', exact: true }).click()
   const menuPicker = page.getByRole('dialog', { name: /リッチメニューを選ぶ/ })
@@ -141,7 +150,19 @@ test('Penの5つの型から選んだリッチメニューを保存し、卓へ�
   expect(mobile.x + mobile.width).toBeLessThanOrEqual(390)
   await page.screenshot({ path: testInfo.outputPath('guide-menu-picker-mobile.png') })
   const night = menuPicker.getByRole('article', { name: '夜（深い紺）', exact: true })
-  await night.getByRole('button', { name: 'これにする', exact: true }).click()
+  const selectNight = night.getByRole('button', { name: 'これにする', exact: true })
+  await selectNight.click()
+  const presetGroup = menuPicker.getByRole('group', { name: 'リッチメニューの型' })
+  await expect(presetGroup).toHaveAttribute('aria-invalid', 'true')
+  await expect(presetGroup).toHaveAccessibleDescription('リッチメニューの型を選び直してください')
+  await expect(selectNight).toBeEnabled()
+  await selectNight.click()
+  const reload = menuPicker.getByRole('button', { name: '読み直す', exact: true })
+  await expect(reload).toBeVisible()
+  await expect(selectNight).toBeDisabled()
+  await reload.click()
+  await expect(selectNight).toBeEnabled()
+  await selectNight.click()
   await expect(page).toHaveURL(/\/restaurant-test\/tables$/, { timeout: 15000 })
   expect(saved.answers.restaurantMenuPreset).toEqual({ mode: 'configured', value: 'night' })
 })
