@@ -124,7 +124,7 @@ export default function SnsConnectionList({
             ) : null}
             {connection.meta.length ? <p className={styles.meta}>{connection.meta.join('・')}</p> : null}
             {quickPrimary || quickReconnect ? (
-              <div className={styles.rowActions}>
+              <div className={styles.connOps}>
                 {quickPrimary ? (
                   <Button
                     variant="secondary"
