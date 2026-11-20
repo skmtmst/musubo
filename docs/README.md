@@ -470,7 +470,7 @@
 
 ## 反映履歴
 
-- [手渡し景品の交換と取消](release-log/unreleased/PR-kenta-c25-handgift.md) — 反映履歴、確認 2026-11-20。
+- [手渡し景品の交換と取消](release-log/unreleased/128-kenta-c25-handgift.md) — 反映履歴、確認 2026-11-20。
 
 - [保守時に確認する説明を整理](release-log/unreleased/121-kenta-q04-misc.md) — 反映履歴、確認 2026-11-19。
 
