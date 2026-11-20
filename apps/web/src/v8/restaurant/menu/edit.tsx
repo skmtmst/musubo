@@ -242,7 +242,7 @@ function MenuEditBody() {
 
   const side = useMemo(() => (
     <div className={styles.side}>
-      <PaymentSideCard title="決済をつないでいない店のとき">「お支払い」の段は出さず、この 1 行だけ出します（押せない形にしない）。</PaymentSideCard>
+      <PaymentSideCard title="決済をつないでいない店のとき">決済をつないでいないと、お客さまにはお支払いの段が出ません。</PaymentSideCard>
       <PaymentSideCard title="お客さまの見え方">予約の 5 段目に「お支払い」が出て、Stripe の支払いページへ進みます。払い終わると予約が決まります。払われないと仮の予約は取り消します。</PaymentSideCard>
     </div>
   ), [])
