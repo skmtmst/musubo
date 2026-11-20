@@ -8,11 +8,11 @@ import {getAccountTimeZone} from '../services/availability.js';
 import {BOOKING_STAFF_OWN_KEY} from '@line-crm/shared';
 import {auditLog} from '../lib/audit-log.js';
 import {meetingCreatorForBooking} from '../features/booking/booking-meeting-runtime/index.js';
-import {retryFailedMeeting} from '../features/booking/booking-meeting-retry.js';
+import {retryFailedMeeting} from '../features/booking/booking-meeting-retry/index.js';
 import {featureJobCanRun} from '../services/feature-enforcement.js';
 import {decryptCredential} from '@line-crm/db';
-import type {CleanupPlanItem} from '../features/booking/booking-external-cleanup-plan.js';
-import {notifyExternalCleanupReview} from '../features/booking/booking-external-cleanup-runner.js';
+import type {CleanupPlanItem} from '../features/booking/booking-external-cleanup-plan/index.js';
+import {notifyExternalCleanupReview} from '../features/booking/booking-external-cleanup-runner/index.js';
 export const bookingCalendarSettings=new Hono<Env>();
 bookingCalendarSettings.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'calendar_settings_unavailable'},e instanceof GapError?e.status:503));
 bookingCalendarSettings.get('/api/booking/admin/external-cleanup',async c=>{

@@ -102,7 +102,7 @@ export async function runFrequentHeavyJobs(
     },
     {
       name: 'booking external cleanup',
-      run: async () => {const {recoverExternalCleanup}=await import('../features/booking/booking-external-cleanup-runtime.js');await recoverExternalCleanup(env,event.scheduledTime);},
+      run: async () => {const {recoverExternalCleanup}=await import('../features/booking/booking-external-cleanup-runtime/index.js');await recoverExternalCleanup(env,event.scheduledTime);},
     },
     {
       name: 'booking meeting recovery',

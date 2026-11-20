@@ -1,6 +1,6 @@
 import { auditEventStatement, encryptCredential, RETENTION_R2_KEY_COLUMNS } from '@line-crm/db';
-import { planExternalCleanup } from '../features/booking/booking-external-cleanup-plan.js';
-import { cleanupIndex, cleanupRecipientProof } from '../features/booking/booking-external-cleanup-proof.js';
+import { planExternalCleanup } from '../features/booking/booking-external-cleanup-plan/index.js';
+import { cleanupIndex, cleanupRecipientProof } from '../features/booking/booking-external-cleanup-proof/index.js';
 import relations from './customer-data-relations.json';
 import protectedRelations from './customer-data-protected-relations.json';
 
