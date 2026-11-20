@@ -28,7 +28,9 @@ describe('V8 ダッシュボードの言葉', () => {
   it('はじめにやることは設定画面と同じ段を数え、未確認は済みにしない', () => {
     const steps = buildStepsFromApi([{ key: 'accounts', state: 'done', href: '/accounts', reason: null }, { key: 'featureSet', state: 'done', href: '/settings', reason: null }])
     const summary = summarizeFirstSteps(steps)
-    expect(summary).toMatchObject({ done: 2, total: 6 })
+    /* 済みの「使う機能」は一覧から外れる（承認済み Pen v09）。残るのは①接続と未了の4段。 */
+    expect(summary).toMatchObject({ done: 1, total: 5 })
+    expect(summary.steps.some((step) => step.key === 'featureSet')).toBe(false)
     expect(summary.steps.map((step) => step.label)).toEqual(steps.map((step) => step.title))
     expect(summary.steps.find((step) => step.key === 'firstMessage')).toMatchObject({ done: false, href: null })
     expect(summary.steps.some((step) => step.key === 'invite')).toBe(false)

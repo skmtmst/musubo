@@ -537,7 +537,7 @@ export const FRIEND_ADD_EVENTS = {
 }
 
 /**
- * 友だち追加時配信の新しい実行結果契約（PR #1111）。
+ * 友だち追加時配信の新しい実行結果契約。
  * 一覧4行と集計値は設計 `P2J0Te` に置かれた固定値を使う。
  */
 export const FRIEND_ADD_RUNS = {
@@ -1037,7 +1037,7 @@ export const FORMS = [
 
 /**
  * 機能13 `EMBIK`。一覧の1ページ目と、画面全体18件の集計を同じ応答で返す。
- * 2026-10-11の指定に合わせ、18件の範囲を実際に返す。最初の5行は固定絵の見本を保つ。
+ * 18件の範囲を実際に返す。最初の5行は固定絵の見本を保つ。
  * 編集画面の選択肢など、ほかの口は `FORMS` の全部のまま。
  */
 export const FORM_LIST = {
@@ -1224,7 +1224,7 @@ export const NEN_COLUMN_CREATE = {
   },
   success: {
     status: 201,
-    // 本番口は `data: { id, queued }` を返す(点検 #512 の中8)。数は固定値。
+    // 本番口は `data: { id, queued }` を返す。数は固定値。
     body: { success: true, data: { id: 'nen-column-draft-1', queued: 0 } },
   },
   inputError: {
@@ -1266,7 +1266,7 @@ const nenCampaignSetting = (campaignKey, label, category, triggerEvent, delayDay
   buttonLabel,
   buttonUrl: buttonLabel ? 'https://example.com/nen' : null,
   imageUrl: null,
-  // 実口・型と揃える(#728)。値は未設定時の実口の決めごとと同じ。
+  // 実口・型と揃える。値は未設定時の実口の決めごとと同じ。
   dedupWindowDays: 30,
   excludeFormRespondents: false,
   afterActions: campaignKey === 'review_request' ? [
@@ -1379,7 +1379,7 @@ export const NEN_JOBS = [
 ]
 
 /*
-  機能21の新しい集計・履歴契約（PR #1117）。既存の設定・コラム・ペット・
+  機能21の新しい集計・履歴契約。既存の設定・コラム・ペット・
   配信jobと同じIDだけを使い、画面ごとに別の作り物が生まれないようにする。
 */
 const NEN_METRICS_RANGE = {
@@ -1708,7 +1708,7 @@ export const COMMON_VAR_DELETE_IMPACT_ERROR = {
   error: '使用先を確認できないため削除できません',
 }
 
-/** PR #1131 の詳細・差し替え契約。既存の会社名と使用先を共通で使う。 */
+/** 詳細・差し替え契約。既存の会社名と使用先を共通で使う。 */
 const COMMON_VAR_SOURCE = COMMON_VARS.find((variable) => variable.id === COMMON_VAR_DELETE_IMPACT.variable.id)
 const COMMON_VAR_REPLACEMENT = COMMON_VARS.find((variable) => variable.id === 'common-var-hours')
 
@@ -2141,7 +2141,7 @@ export const RICH_MENU_DELETE_IMPACT = {
     name: '来店後フォローメニュー',
     status: 'published',
   },
-  // #430/#1206: 削除影響でも一覧と同じ固定の割当人数を返す。
+  // 削除影響でも一覧と同じ固定の割当人数を返す。
   currentAudience: { value: 8140, state: 'available', reason: null },
   // 全員の既定を消すので、出し分けに当たらない友だちに出るメニューは無い（板 `yOyCg`）。
   nextDisplay: {
@@ -2648,7 +2648,7 @@ export const FRIEND_DETAILS = {
    */
   'friend-0': {
     id: 'friend-0',
-    // 実口 GET /api/friends/:id と同じく所属アカウントを返す。無いと受信箱が「別アカウントの相手」と判断して会話を開かない(#673)。
+    // 実口 GET /api/friends/:id と同じく所属アカウントを返す。無いと受信箱が「別アカウントの相手」と判断して会話を開かない。
     lineAccountId: 'visual-qa-account',
     displayName: 'Kyohei Yamamoto',
     systemDisplayName: 'Kyohei Yamamoto',
@@ -2666,7 +2666,7 @@ export const FRIEND_DETAILS = {
   },
   'friend-1': {
     id: 'friend-1',
-    // 実口 GET /api/friends/:id と同じく所属アカウントを返す。無いと受信箱が「別アカウントの相手」と判断して会話を開かない(#673)。
+    // 実口 GET /api/friends/:id と同じく所属アカウントを返す。無いと受信箱が「別アカウントの相手」と判断して会話を開かない。
     lineAccountId: 'visual-qa-account',
     displayName: 'Demo Person (Obama)',
     systemDisplayName: 'Demo Person (Obama)',
@@ -2794,8 +2794,7 @@ export const TEMPLATE_TEST_RECIPIENTS = [
  * 受信箱の保存した検索（設計 `ASsb3`）。
  *
  * **友だち側の `{all,any}` とは別の形。** 受信箱は軸ごとに値を持つ。
- * 前はここに `{ all: [], any: [] }` を入れていたので、
- * 名前の下の要約が全部「絞り込みなし」になっていた。
+ * `{ all: [], any: [] }` では名前の下の要約が全部「絞り込みなし」になる。
  *
  * 名前と中身は設計の3件をそのまま置く。
  */
@@ -2943,8 +2942,7 @@ export const FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL = {
   対応マーク（設計 `rIhbN` 4-3、`GMvBd` 4-3-A）。
 
   **「保留」を必ず入れる。** 撮影の手順が「保留」を押して編集画面へ進む。
-  行が無いと押しどころが描かれず、4-3-A が1枚も撮れない
-  （kentavndng/line-harness-board#105 に挙げていた欠け）。
+  行が無いと押しどころが描かれず、4-3-A が1枚も撮れない。
 */
 const SUPPORT_MARK_BASE = [
   {
@@ -3747,10 +3745,10 @@ export const BROADCASTS = [
   afterActionVersionId: index === 1 ? 'common-action-version-broadcast-tagged' : null,
   version: 1,
   createdAt: '2026-08-16T00:00:00.000Z',
-  // 承認の絡み（#816 C）。0行目は依頼中、2行目は承認を通って送信済み。
+  // 承認の絡み。0行目は依頼中、2行目は承認を通って送信済み。
   // 記録の見本（BROADCAST_ACTIVITY）と合わせる。無い行は 'none'。
   approvalStatus: index === 0 ? 'pending' : index === 2 ? 'approved' : 'none',
-  // 10の状態（#816）。承認待ちは承認の軸が先（deriveBroadcastDisplayStatus
+  // 10の状態。承認待ちは承認の軸が先（deriveBroadcastDisplayStatus
   // と同じ）。0行目は status が予約済みでも「承認待ち」で見せる。
   displayStatus: index === 0 ? 'pending_approval' : String(status),
   displayStatusLabel: { draft: '下書き', pending_approval: '承認待ち', scheduled: '予約済み', sent: '送信済み', failed: 'エラー' }[index === 0 ? 'pending_approval' : status] ?? String(status),
@@ -3763,7 +3761,7 @@ export const BROADCASTS = [
 }))
 
 /**
- * 一斉配信の宛先台帳の見本（#816 / C-2）。
+ * 一斉配信の宛先台帳の見本。
  *
  * 行がある8人（届いた5・一時的1・届けられなかった1・送達不明1）と、
  * まだ送っていない20人（名前の一覧は無い）。
@@ -3785,7 +3783,7 @@ export const BROADCAST_RECIPIENTS = {
   },
 }
 
-/** 一斉配信の操作の記録の見本（#816 / C-3）。新しい順。消せない。 */
+/** 一斉配信の操作の記録の見本。新しい順。消せない。 */
 export const BROADCAST_ACTIVITY = [
   { kind: 'lifecycle', action: 'send_started', label: '送信を始めた', actorStaffId: null, actorName: '自動', reason: null, createdAt: '2026-10-01T10:00:00+09:00' },
   { kind: 'approval', action: 'approved', label: '承認した', actorStaffId: 'staff-approver', actorName: '見本 121', reason: null, createdAt: '2026-09-25T21:02:00+09:00' },
@@ -3868,7 +3866,7 @@ export const BROADCAST_SAVED_VIEWS = [
     id: 'broadcast-view-reserved',
     name: '予約中のみ',
     // 保存側（page.tsx saveCurrentView）と同じ形にする。旧形の
-    // `statuses` では適用処理が読み替えられず復元不良になる（点検 #490 中5）。
+    // `statuses` では適用処理が読み替えられず復元不良になる。
     filters: { titleQuery: '', statusFilter: 'scheduled', dateFrom: '', dateTo: '', folderFilter: '' },
     sortKey: 'scheduled',
     pageSize: 20,
@@ -3904,7 +3902,7 @@ export const BROADCAST_PREFLIGHT = {
     evaluatedAt: '2026-08-24T00:55:00.000Z',
     representatives: [
       // 画面（broadcast-form 対象プレビュー）と口（BroadcastPreflight）の
-      // 実形に合わせる。`note` だけでは画像と要約が空表示になる（点検 #490 中6）。
+      // 実形に合わせる。`note` だけでは画像と要約が空表示になる。
       { friendId: 'friend-1', displayName: 'Demo Person', pictureUrl: null, summary: '予約・未対応' },
       { friendId: 'friend-2', displayName: 'Masato S.', pictureUrl: null, summary: '予約・対応中' },
       { friendId: 'friend-3', displayName: '見本 15', pictureUrl: null, summary: '予約・未対応' },
@@ -4317,7 +4315,7 @@ export const FRIEND_FIELD_FOLDERS = [
 ]
 
 /**
- * 友だち情報欄を変える前の固定確認。#1092 の保存契約と同じ器で、
+ * 友だち情報欄を変える前の固定確認。保存契約と同じ器で、
  * 値は変えずに「そのまま／人が確認／空欄」と使用先を返す。
  */
 export const FRIEND_FIELD_MIGRATION_PREVIEW = {
@@ -4901,7 +4899,7 @@ export const SITE_TRACKING_SUMMARY = {
   lastEventAt: '2026-08-25T11:17:00.000Z',
 }
 
-/* #514-14: 計測先ホストとパスを分け、本番と同じ形で返す。 */
+/* 計測先ホストとパスを分け、本番と同じ形で返す。 */
 export const SITE_TRACKING_PAGES = [
   { host: 'shop.example.com', path: '/', views: 12480, visitors: 186 },
   { host: 'shop.example.com', path: '/shop/', views: 8120, visitors: 94 },
@@ -4923,7 +4921,7 @@ export const AD_PLATFORMS = [
 ]
 
 /*
- * #818 流入元ごとの広告費の台帳。数は V8 の板（`qSTVR`・`ZxKL5`）にそろえる。
+ * 流入元ごとの広告費の台帳。数は V8 の板（`qSTVR`・`ZxKL5`）にそろえる。
  * この30日の広告費 ¥86,000（Google ¥52,000＋Meta ¥34,000）・
  * 友だち追加 73 人（42＋31）・つないだ広告 2 件。
  * 友だち1人あたりは ¥1,178（86,000÷73、四捨五入）で板と合う。
@@ -4949,7 +4947,7 @@ export const AD_COST_PLATFORMS = [
 ]
 
 /*
-  #514-8: 本番の口が返す形だけにする。friendName・conversionName・nextRetryAt は
+  本番の口が返す形だけにする。friendName・conversionName・nextRetryAt は
   口が返さない(画面も読まない)。豊富な形を返すとずれを隠す。
 */
 /* 板 `p0kA3`（広告への送信履歴）の5行。数の帯（`FDBsG`）は口の summary（この30日 送った15・待っている2・断られた1）を読む。 */
@@ -4977,7 +4975,7 @@ export const AD_EVENT_MAPPINGS = [
 ]
 
 /*
-  #514-9: 撮影環境で tracked_link 行と展開行を確認するための計測リンク。
+  撮影環境で tracked_link 行と展開行を確認するための計測リンク。
   本番の GET /api/tracked-links と同じ形。flyer-spring は entry_route が
   停止中のため tracked_link 行として出て、停止中譲りの分岐も写る。
 */
@@ -5017,7 +5015,7 @@ export const LOGIN_AUDIT = [
 /** 機能30。ログインユーザーの一覧・役割・監査を実API契約で撮る固定値。 */
 /*
  * access表は本番では staff_members と同じ表が元なので、同じ人は
- * STAFF_MEMBERS とID・メールを一致させる(#530)。違うID・メールの
+ * STAFF_MEMBERS とID・メールを一致させる。違うID・メールの
  * ままでは画面の名寄せが「要確認」になり、EOTS4の撮影が回らない。
  */
 export const accessUser = (id, name, roleBundle, status, options = {}) => ({
@@ -5151,7 +5149,7 @@ export const AFFILIATE_OFFERS = [
 ]
 
 /*
- * #823 案件の決まりの版と上限の残り・成果の付け方の記録。
+ * 案件の決まりの版と上限の残り・成果の付け方の記録。
  * 型どおりの名前（api.ts の OfferVersion・OfferCapStatus・AttributionDecisionView）で返す。
  */
 export const OFFER_VERSIONS = [
@@ -5282,7 +5280,7 @@ export const MILEAGE_FRIENDS = { balanceSource: 'musubo',
 const mileageRule = (id, name, eventType, amount, conditions, isActive = true) => ({
   id, name, eventType, source: null, amount,
   initialStatus: 'available', conditions,
-  /* #532(#521): 旧口も帰属アカウントを持つ。新規は必須。 */
+  /* 旧口も帰属アカウントを持つ。新規は必須。 */
   lineAccountId: 'visual-qa-account', isActive,
   validFrom: null, validUntil: null,
   createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
@@ -5871,10 +5869,10 @@ const automationRun = ({
   automationId,
   automationName,
   automationVersionId: `${automationId}-version-3`,
-  // #942 N-354: 実行時に固定された版番号とテスト印。
+  // 実行時に固定された版番号とテスト印。
   versionNumber: 3,
   isTest: false,
-  // #942 N-353: 終わっていない実行だけ取りやめられる。見本の行は終了済み。
+  // 終わっていない実行だけ取りやめられる。見本の行は終了済み。
   canCancel: false,
   friendId: `friend-${id}`,
   friendName: subject,
@@ -5920,7 +5918,7 @@ export const AUTOMATION_RUNS = {
  * 具体的な条件を含んでいて、`AUTOMATION_TRIGGER_LABELS`(正本)の種類名
  * (「行動スコアが条件に達したとき」)とは**別のものを指している**。
  * カタログとして「こういう自動化ができます」を見せる文言なので、
- * **正本へ寄せない**(#735)。
+ * **正本へ寄せない**。
  *
  * 一方、`AUTOMATION_RUNS` の実行記録は実口が
  * `automationTriggerLabel(row.trigger_type)` で正本から引くので、
@@ -6163,10 +6161,10 @@ export const BOOKING_AVAILABILITY = {
   closed_dates: ['2026-09-05', '2026-09-06'],
 }
 
-/* #414 の availability 契約。予約枠ごとの定員・残数・状態を固定する。 */
+/* availability の応答形式。予約枠ごとの定員・残数・状態を固定する。 */
 for (const staff of BOOKING_AVAILABILITY.by_staff) {
   for (const slot of staff.slots) {
-    // resources は実APIも画面も使わない(点検#516の中5)。あると本番との差に気づけない。
+    // resources は実APIも画面も使わない。あると本番との差に気づけない。
     delete slot.resources
     Object.assign(slot, {
       capacity: 2,
@@ -6265,8 +6263,8 @@ export const BOOKING_AVAILABILITY_RULES = [
 ]
 
 /*
-  担当者の休憩(N-405 #655)。本番の GET breaks と同じ器で返す。
-  枠への差し引きは #1471 合流まで効かないので、画面は保存のみを約束する。
+  担当者の休憩。本番の GET breaks と同じ器で返す。
+  枠への差し引きは効かないので、画面は保存のみを約束する。
 */
 /* 板 `d5fmnM`・`E3YDK` のいつもの休憩。月〜金 13:00-14:00。 */
 export const BOOKING_BREAKS = {
@@ -6393,7 +6391,7 @@ export const BOOKING_PROXY_CREATE = {
   },
 }
 
-/** #444。代理予約の確認前に読む顧客カルテと、サーバー計算済みの通知予定。 */
+/** 代理予約の確認前に読む顧客カルテと、サーバー計算済みの通知予定。 */
 export const BOOKING_CUSTOMER_CONTEXT = BOOKING_PROXY_CREATE.success.body.customer_context
 export const BOOKING_REMINDER_PREVIEW = {
   reminders: [
@@ -6403,7 +6401,7 @@ export const BOOKING_REMINDER_PREVIEW = {
 }
 export const BOOKING_CONFLICT_ALTERNATIVES = BOOKING_PROXY_CREATE.conflict.body.data
 
-/** #444。一覧の先頭 `bk-1` を開いたときの顧客・履歴・通知実績。 */
+/** 一覧の先頭 `bk-1` を開いたときの顧客・履歴・通知実績。 */
 export const BOOKING_ADMIN_DETAIL = {
   booking: {
     id: 'bk-1', startsAt: '2026-09-03T00:00:00.000Z', endsAt: '2026-09-03T01:45:00.000Z', status: 'confirmed',
@@ -6940,9 +6938,9 @@ export const EVENT_LIFF_CHANGE_RESULT = { id: 'ev-booking-2', status: 'confirmed
   **同伴のペット**も入れる（設計は「ももちゃん（犬・4歳）」のように出す）。
 */
 /*
-  実APIの申込一覧と同じ器にする(点検#520の中7)。JOIN列がないと、画面の
+  実APIの申込一覧と同じ器にする。JOIN列がないと、画面の
   「予約枠は未取得」「友だちは未取得」が出たままになり、本番との差に気づけない。
-  eb-4 は実DBのCHECK制約に無い 'waitlist' だったので 'requested' に直した。
+  eb-4 は実DBのCHECK制約に合わせて 'requested' を使う。
   キャンセル待ちの札は待ち列(EVENT_WAITLIST)の画面で撮る。
 */
 const eventBookingRow = (row) => ({
@@ -6995,10 +6993,8 @@ const tagSummary = (...ids) => LINE_ACCOUNT_TAGS.filter((tag) => ids.includes(ta
 
 /**
  * LINEアカウント一覧。設計 `QT91v` の稼働3・停止1・保管2と親子関係。
- * 統括ホーム（絵 `JKjsE`）のために、タグ・接続状態（`connection`）・権限者の数（`stats.staffCount`）を足した（2026-10-06）。
- * 2026-10-07：絵 `JKjsE`・`a7lUk`・`V7vn3` の5件にそろえた（本店→渋谷店→TEST→2025年イベント→旧キャンペーンの並び、
- * 渋谷店の親は本店、2025年イベントは稼働・旧キャンペーンはアーカイブ、LINE ID は @nen-…、旧テストアカウントは外した）。
- * 名前を使う66枚を前後で測り、下がった板なし（a7lUk 73→89）。
+ * 統括ホーム（絵 `JKjsE`）向けにタグ・接続状態（`connection`）・権限者の数（`stats.staffCount`）を含める。
+ * 絵 `JKjsE`・`a7lUk`・`V7vn3` に合わせて親子関係と状態を用意する。
  */
 export const LINE_ACCOUNTS = [
   lineAccount('visual-qa-account', '2007123456', '然-NEN-TEST', 2, {
@@ -7148,7 +7144,7 @@ export const NEN_PHOTO_DETAIL = {
   caption: 'はじめて海に行きました', image_width: 2048, image_height: 1536,
   image_byte_size: 1887437, captured_device: 'iPhone 15', animal_type: 'dog',
   breed: 'ラブラドール', birthday: '2025-08-24', submission_count: 3, returned_count: 0,
-  // #817: 重複なし・いま使っている報酬の決まり（第3版・10pt）。
+  // 重複なし・いま使っている報酬の決まり（第3版・10pt）。
   duplicate: null, rewardPolicy: { versionNumber: 3, policyKey: 'v3', points: 10 },
   risks: [
     { flag: 'face', confidence: 0.78, note: 'うしろに人の顔', provider: 'visual-qa', model_version: 'fixture-1', assessed_at: '2026-08-25T08:10:00.000Z' },
@@ -7209,7 +7205,7 @@ export const NEN_PHOTO_BULK_DECISION_RESULT = {
   ],
 }
 
-/** #817: 報酬の決まりの版。新しい版から返す。status は in_use / reserved / past。 */
+/** 報酬の決まりの版。新しい版から返す。status は in_use / reserved / past。 */
 export const NEN_PHOTO_REWARD_POLICY_VERSIONS = [
   /* ★V8-B 版の履歴（N1br7）の絵と同じ4つの版。 */
   {
@@ -7243,7 +7239,7 @@ const publicationPhoto = (id, photoId, petName, ownerName, count, label, type = 
 })
 
 export const NEN_PHOTO_PUBLICATIONS = {
-  // #580 軽: 概要は現物8件と一致させる（実APIは items.length を数える）。
+  // 概要は現物8件と一致させる（実APIは items.length を数える）。
   // 掲載先は type:label の重なりなし5か所（pub-6は掲載先なし）。
   summary: {
     publishedCount: 8, placementCount: 5,
@@ -7815,7 +7811,7 @@ export const OPERATION_HISTORY = [
   },
 ].map((incident) => ({
   ...incident,
-  // サーバーの履歴口が付ける項目(#518 中5)。無いと配備分岐の目視ができない。
+  // サーバーの履歴口が付ける項目。無いと配備分岐の目視ができない。
   historyKind: 'incident',
   occurredAt: incident.createdAt,
   beforeSnapshot: operationControlSnapshot({
@@ -7832,7 +7828,7 @@ export const OPERATION_HISTORY = [
     actorId: incident.resolvedByActorId, stoppedAt: null, capturedAt: incident.resolvedAt,
   }),
 })).concat([
-  // サーバーが返す配備要素の形(#518 中5)。更新履歴タブの「管理画面の更新」
+  // サーバーが返す配備要素の形。更新履歴タブの「管理画面の更新」
   // 欄(`historyKind === 'deployment'` 分岐)の目視確認用。
   {
     id: 'deployment:deploy-20260825-0800',
@@ -8108,7 +8104,7 @@ export const WEBINAR_PARTICIPANTS = {
 }
 
 /**
- * 共通情報を**変える前**の確認（`uNBlA` 14-1-B。口は #773）。
+ * 共通情報を**変える前**の確認（`uNBlA` 14-1-B）。
  *
  * 削除前の使用先に、保存すると何がどう変わるかを足したもの。
  * `nextValue` は呼ぶ側が入れる。ここでは形と**言い分けの見本**だけを持つ。
@@ -8209,9 +8205,8 @@ export function commonVarChangeImpact(nextValue) {
 }
 
 /*
- * 全ルート監査（2026-09-25）担当Aの欠け埋め。
+ * 画面確認に使う API 応答。
  * いずれも本物の Worker（`apps/worker/src/routes/`）が返す形。
- * 画面側は変えず、偽APIの返しだけを実APIの形に直す。
  */
 
 /** テスト送信先の候補（LINE連携済みのログインユーザー）。本物は配列。 */

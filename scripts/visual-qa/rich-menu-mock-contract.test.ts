@@ -2,7 +2,7 @@
  * リッチメニューの画面確認モックが本物と約束違いしていないかの試験。
  *
  * mock が参照系 (GET) だけだと、編集・公開・予約・適用・削除の画面検証が
- * mock で再現できず、画面と口のずれを隠す (点検 #502 の中)。
+ * mock で再現できず、画面と口のずれを隠す。
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

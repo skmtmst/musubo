@@ -11,7 +11,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(process.cwd(), 'src/v8/tags/create.tsx'), 'utf8')
 const ROUTE = fs.readFileSync(path.join(process.cwd(), 'src/app/tags/new/page.tsx'), 'utf8')
-const LIST = fs.readFileSync(path.join(process.cwd(), 'src/v8/tags/tags-tab.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(process.cwd(), 'src/lib/api.ts'), 'utf8')
 
 
@@ -54,7 +53,6 @@ describe('タグ作成の名前検査の契約', () => {
     expect(ROUTE).toContain('<Screen />')
     expect(ROUTE).not.toContain('LegacyNewTagPage')
     expect(ROUTE).toContain('<CreatePage')
-    expect(LIST).toContain('<Button href="/tags/new" variant="primary"')
     const { action, save, remove } = renderCopyAction()
     expect(action.getAttribute('href')).toBe('/tags/new?copy=copy-source')
     expect(save).not.toHaveBeenCalled()

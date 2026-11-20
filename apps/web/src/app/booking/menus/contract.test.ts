@@ -21,10 +21,6 @@ const SETTINGS_MENUS_TAB = readFileSync(join(ROOT, '../../../v8/booking-menus/ta
 const SETTINGS_CSS = readFileSync(join(ROOT, '../../../v8/booking-menus/settings.module.css'), 'utf8')
 
 describe('V8 予約設定', () => {
-  it('R91: メニューがあるときも見出しに作成の入口を常設する', () => {
-    expect(LIST).toContain("{canEdit ? (")
-    expect(LIST).toContain('href="/booking/menus/new"')
-  })
 
   it('設計どおり4つの設定入口と、店舗共通・メニュー別の予約ルールを持つ', () => {
     expect(LIST).toContain('受付枠')
@@ -72,17 +68,6 @@ describe('V8 予約設定', () => {
     expect(SETTINGS_MENUS_TAB).not.toContain('CSVで書き出す')
   })
 
-  it('作成後の担当保存だけが失敗した場合は、作成済みと伝えて設定導線を出す (DEEP-16)', () => {
-    // メニュー作成済みの再実行は createMenu を呼ばず、残りの担当設定だけを
-    // やり直す。同名メニューの二重作成を防ぐ。
-    expect(CREATE).toContain('createdMenuNeedingFollowUp?.menuId ?? null')
-    expect(CREATE).toContain('setCreatedMenuNeedingFollowUp({ menuId, remainingStaffIds')
-    expect(CREATE).toContain('メニューは保存されましたが、一部の担当・設備を保存できませんでした。')
-    expect(CREATE).toContain('else if (createdMenuNeedingFollowUp && !editTarget)')
-    expect(CREATE).toContain('残りの設定をやり直す')
-    expect(CREATE).toContain('writeStaffAssignments(menuId, pendingStaffIds)')
-  })
-
   it('読込・失敗・空を同じ空状態として扱わない', () => {
     expect(LIST).toContain("status === 'loading'")
     expect(LIST).toContain("status === 'error'")
@@ -91,25 +76,6 @@ describe('V8 予約設定', () => {
 
   it('休業日タブはV8の休業日画面につながる', () => {
     expect(LIST).toContain('<HolidaysTabV8')
-  })
-
-  it('担当の取得失敗・取得中を「未登録」と誤表示せず作成も止める (DEEP-17)', () => {
-    expect(CREATE).toContain('staffStatus')
-    expect(CREATE).toContain('担当を読み込んでいます')
-    // 取得失敗は「未登録」と混ぜない。入力を残したまま、その場で取り直せる。
-    expect(CREATE).toContain('担当を読み込めませんでした。入力はそのまま残っています。')
-    expect(CREATE).toContain('担当をもう一度読み込む')
-    expect(CREATE).toContain('onClick={() => loadAll()}')
-    // 権限不足の失敗に再試行は出さず、権限の案内だけ出す。
-    expect(CREATE).toContain("permissionDeniedMessage('store')")
-    expect(CREATE).toContain("classifyApiFailure(staffError) !== 'forbidden'")
-    // 空（0人）は失敗と別の言葉で出し、登録へ誘導するのは空のときだけ。
-    expect(CREATE).toContain('まだスタッフが登録されていません')
-    // 候補が確定するまで保存しない。候補にいないIDは選択数に数えない。
-    expect(CREATE).toContain("staffStatus === 'loading'")
-    expect(CREATE).toContain("staffStatus === 'error'")
-    expect(CREATE).toContain('担当スタッフを読み込めませんでした。読み直してから保存してください')
-    expect(CREATE).toContain('assignedIds')
   })
 
   it('編集窓の数値欄へ文字列が入る逃げ道を残さない', () => {

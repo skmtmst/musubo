@@ -7,8 +7,6 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const staff = vi.hoisted(() => ({ role: 'owner' as string | null }))
@@ -54,7 +52,6 @@ vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }
 import PoolNewV8 from './create'
 import PoolNewPage from '@/app/pools/new/page'
 
-const v8tsx = readFileSync(join(process.cwd(), 'src/v8/settings/pools/create.tsx'), 'utf8')
 
 const ACCOUNTS = [
   { id: 'a1', name: '然-NEN-渋谷店' },
@@ -209,8 +206,11 @@ describe('V8-B プールを作る（D0AOyx）', () => {
   })
 
   /* 板の印は「番号つきの節とプレビューが出る」で描画して確かめる。 */
-  it('V8 の決まり（準備中なし）を守る', () => {
-    expect(v8tsx).not.toContain('準備中')
+  it('実際のプール作成画面に未接続の準備中を表示しない', async () => {
+    await act(async () => { root.render(<PoolNewPage />) })
+    await flush()
+    expect(host.querySelector('#pl-name')).toBeTruthy()
+    expect(host.textContent).not.toContain('準備中')
   })
 })
 

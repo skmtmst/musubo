@@ -8,7 +8,7 @@
  * 503から直ったときは予約内容まで戻れる。
  */
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const params = vi.hoisted(() => ({ id: 'broadcast-missing' as string | null }))
@@ -58,8 +58,6 @@ vi.mock('@/lib/api', () => {
 import { ApiError } from '@/lib/api'
 import Page from './page'
 
-const flush = () => act(async () => { await Promise.resolve() })
-
 beforeEach(() => {
   params.id = 'broadcast-missing'
   apiMocks.get.mockReset()
@@ -93,6 +91,9 @@ describe('broadcasts/reserved の対象なし案内（R582）', () => {
     } })
     render(<Page />)
     expect(await screen.findByText('このアカウントの友だち全員 37 人（除く見込み 2 人）')).toBeTruthy()
+    expect(screen.getByText('送る前にもう一度、対象の人数を数え直します')).toBeTruthy()
+    expect(apiMocks.get).toHaveBeenCalledWith('broadcast-missing')
+    expect(screen.getAllByText(/9月8日 10:00/).length).toBeGreaterThan(0)
     expect(apiMocks.preflight).toHaveBeenCalledWith(expect.objectContaining({
       targetType: 'all', lineAccountId: 'visual-qa-account',
       messageContent: broadcast.messageContent,
@@ -107,6 +108,45 @@ describe('broadcasts/reserved の対象なし案内（R582）', () => {
     expect(screen.getByText('このアカウントの友だち全員')).toBeTruthy()
     expect(screen.queryByText(/全員 0 人/)).toBeNull()
     expect(screen.queryByText('予約結果を読み込めませんでした')).toBeNull()
+  })
+
+  it('除く見込みが0のときは表示せず、実数は桁区切りで表示する', async () => {
+    apiMocks.get.mockResolvedValue({ success: true, data: broadcast })
+    apiMocks.preflight.mockResolvedValue({ success: true, data: { audienceCount: 37, hiddenExcluded: 1234, warnings: [] } })
+    const view = render(<Page />)
+    expect(await screen.findByText('このアカウントの友だち全員 37 人（除く見込み 1,234 人）')).toBeTruthy()
+    view.unmount()
+    apiMocks.preflight.mockResolvedValue({ success: true, data: { audienceCount: 0, hiddenExcluded: 0, warnings: [] } })
+    render(<Page />)
+    expect(await screen.findByText('このアカウントの友だち全員 0 人')).toBeTruthy()
+    expect(screen.queryByText(/除く見込み/)).toBeNull()
+  })
+
+  it.each([
+    { status: 'draft', scheduledAt: broadcast.scheduledAt },
+    { status: 'scheduled', scheduledAt: null },
+  ])('予約中でない、または日時がないと予約済みとして出さない', async (change) => {
+    apiMocks.get.mockResolvedValue({ success: true, data: { ...broadcast, ...change } })
+    render(<Page />)
+    expect(await screen.findByText('予約状態を確認できませんでした')).toBeTruthy()
+    expect(screen.queryByText('一斉配信を予約しました')).toBeNull()
+  })
+
+  it('別アカウントの予約を表示しない', async () => {
+    apiMocks.get.mockResolvedValue({ success: true, data: { ...broadcast, lineAccountId: 'different-account' } })
+    render(<Page />)
+    expect(await screen.findByText('選択中のアカウントの配信ではありません')).toBeTruthy()
+    expect(screen.queryByText('一斉配信を予約しました')).toBeNull()
+    expect(screen.queryByText(broadcast.title)).toBeNull()
+  })
+
+  it('予約の詳細リンクに保存したIDを安全に渡す', async () => {
+    const id = '予約 & detail'
+    params.id = id
+    apiMocks.get.mockResolvedValue({ success: true, data: { ...broadcast, id } })
+    render(<Page />)
+    const link = await screen.findByRole('link', { name: '予約の内容を見る' })
+    expect(link.getAttribute('href')).toBe(`/broadcasts/detail?id=${encodeURIComponent(id)}`)
   })
 
   it('存在しないIDでは一覧へ戻る口だけを出す', async () => {

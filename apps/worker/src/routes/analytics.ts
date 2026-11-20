@@ -70,8 +70,7 @@ function readRange(
   if (days > MAX_RANGE_DAYS) {
     return { ok: false, error: `期間は ${MAX_RANGE_DAYS} 日までにしてください` };
   }
-  // 終了日はその日いっぱいを含める。'2026-08-16' で切ると、その日のぶんが
-  // まるごと落ちる。
+  // 終了日のデータをすべて含めるため、時刻をその日の末尾にする。
   return { ok: true, value: { from: fromRaw, to: `${toRaw}T23:59:59.999` } };
 }
 

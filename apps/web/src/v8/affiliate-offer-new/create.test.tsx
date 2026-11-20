@@ -26,6 +26,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import AffiliateOfferCreateV8 from './create'
+import NewAffiliateOfferPage from '@/app/affiliate-offers/new/page'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 let host: HTMLDivElement
@@ -72,4 +73,15 @@ describe('案件を作る（Td4TN）', () => {
     expect(document.activeElement).toBe(name)
     expect(host.querySelector('[data-design-part="validation-summary"]')?.textContent).toContain('2か所直してください：案件名・報酬額（円）')
   })
+})
+
+
+test('案件の入口から表示した2つの報酬欄は整数単位で入力する', async () => {
+  await act(async () => { root.render(<NewAffiliateOfferPage />) })
+  for (let i = 0; i < 5; i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
+  for (const id of ['of-amount', 'of-miles']) {
+    const input = host.querySelector<HTMLInputElement>(`#${id}`)
+    expect(input?.type).toBe('number')
+    expect(input?.step).toBe('1')
+  }
 })

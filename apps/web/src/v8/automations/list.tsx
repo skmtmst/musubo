@@ -1,5 +1,7 @@
 'use client'
 
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
+
 import { formatListTimestamp } from '@/lib/format'
 import StatusBadge from '@/components/shared/status-badge'
 
@@ -432,12 +434,11 @@ export default function AutomationListV8() {
       options={managedFolderOptions('automation', folders, { allId: '', unfiledId: UNFILED })}
     /></SaveErrorField>
   )
-  /* 閲覧のみには押せない「ルールを作る」を置かない（場所だけ空ける）。 */
-  const createButton = (full: boolean) => canEdit ? (
-    <Button variant="primary" href="/automations/new" className={full ? 'v8-folder-create w-full' : undefined}>
+  const createButton = (full: boolean) => (
+    <PermissionGatedButton allowed={canEdit} variant="primary" href="/automations/new" className={full ? 'v8-folder-create w-full' : undefined}>
       <Plus size={16} aria-hidden="true" />ルールを作る
-    </Button>
-  ) : <span className={full ? styles.createSpace : styles.createSpaceInline} aria-hidden="true" />
+    </PermissionGatedButton>
+  )
 
   /* ===== 道具の段 ===== */
   const filterChips = (

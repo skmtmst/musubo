@@ -191,7 +191,10 @@ describe('V8 リッチメニュー一覧', () => {
     fixture.role = 'staff'
     const view = render(<RichMenusListV8 />)
     await view.findByText('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
-    expect(view.queryAllByRole('button', { name: /メニューを作る/ })).toHaveLength(0)
+    const create = view.getAllByRole('button', { name: /メニューを作る/ })
+    expect(create.every(button => button.getAttribute('aria-disabled') === 'true')).toBe(true)
+    fireEvent.click(create[0])
+    expect(view.queryByRole('dialog')).toBeNull()
   })
 
   test('消せないメニューは「まだ消せません」の窓で、理由を短く・取り下げで外れる2つを1行に並べる', async () => {
