@@ -33,7 +33,7 @@ export default defineConfig({
     baseURL: BASE,
   },
   webServer: {
-    command: `node ${fileURLToPath(new URL('./contents-permission-behavior-server.mjs', import.meta.url))}`,
+    command: `node '${fileURLToPath(new URL('./contents-permission-behavior-server.mjs', import.meta.url)).replaceAll("'", "'\\''")}'`,
     url: `${BASE}/contents`,
     /*
       **使い回さない。** 前の実行が残っていると古い `out` を配り続け、

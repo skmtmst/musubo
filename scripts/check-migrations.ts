@@ -107,7 +107,7 @@ const RULES: Rule[] = [
   {
     // pragma_table_info(...) / pragma_foreign_key_list(...) などの
     // テーブル値関数形式は引数が固定でも、括弧無しの `FROM pragma_x` でも
-    // D1 の authorizer が SQLITE_AUTH で拒否する(#744)。
+    // D1 の authorizer が SQLITE_AUTH で拒否する。
     // 文形式の `PRAGMA name` はこの規則に掛からない。
     label:
       'pragma table-valued function is forbidden (D1 authorizer rejects pragma_* with SQLITE_AUTH)',
@@ -214,7 +214,7 @@ const SIDECAR_BACKUP_TABLES: Record<string, ReadonlySet<string>> = {
     'migration_382_friend_tags_backup',
     'migration_382_friend_tag_side_effect_runs_backup',
   ]),
-  // #937: conversion_points 再構築で CASCADE の子表（conversion_events /
+  // conversion_points 再構築で CASCADE の子表（conversion_events /
   // dedup_claims / revisions）を一時退避し、新表へ戻してから片付ける。
   '440_conversion_draft_and_ingest.sql': new Set([
     'migration_440_conversion_events_backup',
@@ -276,14 +276,14 @@ const GRANDFATHERED_REBUILDS = new Set([
   '135_step_message_kinds_rename.sql',
   '139_step_carousel_swap.sql',
   '140_step_carousel_rename.sql',
-  // 2026-09-03 に棚卸しで見つけた4本。いずれも印が付く前に検証・本番へ当てた
+  // いずれも印が付く前に検証・本番へ当てた
   // 作り直しで、release.yml の安全検査を毎回落としていた。
   '189_analytics_cross.sql',
   '192_inbox_v6_foundation.sql',
   '202_ec_event_account_and_identity.sql',
   '265_nen_shared_friend_add_coupon.sql',
-  // #742: 354 は旧形式の作り直し（印なし・`_v1` 命名の逆向き手順）で、
-  // #744 の記録により検証 D1 へ適用済み（380・381 まで適用、382 のみ未適用）。
+  // 354 は旧形式の作り直し（印なし・`_v1` 命名の逆向き手順）で、
+  // 検証 D1 へ適用済み（380・381 まで適用、382 のみ未適用）。
   // 適用済みのため本体は書き換えず、ここで救済する。実質は正しい作り直し
   // （全行を世代0埋めで写してから旧表を落とす）で、禁止規則・coherence 条件
   // 自体は弱めない。これ以降の追加はしないこと（新規は印を使う）。

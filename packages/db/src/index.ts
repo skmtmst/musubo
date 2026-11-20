@@ -1026,6 +1026,12 @@ export type {
   DashboardDefaultPreferenceRow, DashboardPreferenceRow, DashboardPreferenceSaveResult,
 } from './dashboard-preferences';
 export {
+  deleteOnboardingGuideProgress, getOnboardingGuideProgress, saveOnboardingGuideProgress,
+} from './onboarding-guide-progress';
+export type {
+  OnboardingGuidePhase, OnboardingGuideProgressRow,
+} from './onboarding-guide-progress';
+export {
   UPCOMING_ITEM_LIMIT, getDashboardUpcoming,
 } from './dashboard-upcoming';
 export type {

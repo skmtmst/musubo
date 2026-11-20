@@ -652,6 +652,20 @@ describe('運用者通知の送る条件',()=>{
       expect(pushMessageWithRequestId).toHaveBeenCalledTimes(2);
     } finally {t.raw.close();vi.useRealTimers();}
   });
+  it('営業時間外の翌朝まとめは設定時刻まで待ってから送る',async()=>{
+    vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-16T20:00:00+09:00'));
+    const t=createTestD1();seedBase(t);
+    try {
+      await publishRule(t,{conditions:{schedule:'morning_digest'}});
+      pushMessageWithRequestId.mockClear();pushMessageWithRequestId.mockResolvedValue({requestId:'ok'});
+      await dispatchOperatorEvent(t.db,env,{lineAccountId:'account-1',eventType:'booking_created',sourceEventId:'digest-night',executionMode:'automatic'});
+      expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+      await sweepOperatorNotifications(t.db,env,{now:new Date('2026-10-17T08:59:00+09:00')});
+      expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+      await sweepOperatorNotifications(t.db,env,{now:new Date('2026-10-17T09:00:01+09:00')});
+      expect(pushMessageWithRequestId).toHaveBeenCalledTimes(2);
+    } finally {t.raw.close();vi.useRealTimers();}
+  });
   it('勤務中だけの条件では勤務表にない人へ送らない',async()=>{
     const t=createTestD1();seedBase(t);
     try {
