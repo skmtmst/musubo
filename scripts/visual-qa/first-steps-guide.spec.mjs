@@ -202,7 +202,7 @@ test('受付開始後は公開前の案内を出し、あとでを押すと来�
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await openFixture(page, { storeProgress: { tables: true, hours: true, menus: true } })
   await page.route('**/api/rich-menu-groups?**', async route => {
-    if (new URL(route.request().url()).searchParams.get('filter') !== 'draft') return route.fallback()
+    if (route.request().method() !== 'GET') return route.fallback()
     const menu = { ...RICH_MENU_GROUP_DETAILS['rmg-2'], accountId, name: '検証用リッチメニュー', size: 'large', status: 'draft', thumbnailR2Key: 'qa-thumb-autumn' }
     await route.fulfill({ json: { success: true, data: { items: [menu], total: 1 } } })
   })
@@ -326,6 +326,10 @@ for (const [width, height] of [[1440, 1000], [1152, 768], [390, 844], [667, 375]
       expect(panel.width).toBeCloseTo(500, 0)
       const balloon = await page.locator(tableForm).boundingBox()
       expect(balloon.x).toBeGreaterThan(panel.x + panel.width)
+      const saveBox = await form.getByRole('button', { name: '保存する', exact: true }).boundingBox()
+      const ring = await page.locator('[data-guide-spotlight="tables.form"]').boundingBox()
+      expect(ring.width).toBeLessThan(saveBox.width + 40)
+      expect(Math.abs((ring.x + ring.width / 2) - (saveBox.x + saveBox.width / 2))).toBeLessThan(2)
     }
     await page.screenshot({ path: info.outputPath('guided-table.png') })
     const visited = new Set()
@@ -492,4 +496,23 @@ test('リッチメニューがすでに公開中なら公開案内を飛ばす',
   await expect(page.locator('[data-guide-balloon="followup:1"]')).toBeVisible()
   await expect(page.getByRole('dialog', { name: '予約の受け付けが始まりました' })).toHaveCount(0)
   await page.screenshot({ path: info.outputPath('after-already-published.png') })
+})
+
+test('スマホの上部から閉じたガイドを開き直せる', async ({ browser }, info) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 900 }, hasTouch: true, isMobile: true })
+  const page = await context.newPage()
+  try {
+    await openFixture(page, { width: 390, height: 900 })
+    await page.goto(base)
+    const popup = page.getByRole('dialog', { name: '開店準備を始めましょう' })
+    await popup.getByRole('button', { name: /あとで/ }).tap()
+    await expect(popup).toHaveCount(0)
+    const reopen = page.getByRole('button', { name: /開店準備.*はじめにやることを開く/ })
+    await expect(reopen).toBeInViewport()
+    await page.screenshot({ path: info.outputPath('mobile-guide-reopen.png') })
+    await reopen.tap()
+    await expect(popup).toBeVisible()
+  } finally {
+    await context.close()
+  }
 })
