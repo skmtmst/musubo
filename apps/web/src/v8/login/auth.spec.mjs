@@ -17,6 +17,8 @@ for (const width of [1152,1440,1920]) test(`shared list tools and support action
   await page.addInitScript(() => {
     localStorage.setItem('lh_selected_account', 'visual-qa-account')
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
+    // 初回だけ出る案内は閉じた印を置く。ここで見るのは別の画面と窓なので重ねない。
+    localStorage.setItem('lh:v8:first-run-popup-dismissed:visual-qa-account', '1')
   })
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url())
@@ -119,7 +121,7 @@ for (const width of [1152,1440,1920]) test(`MFA input and centered auth buttons 
   expect(errors).toEqual([])
 })
 for (const width of [1152,1440,1920]) test(`policy confirmation and authenticator settings at ${width}`, async ({ page }) => {
-  await page.addInitScript(() => { localStorage.setItem('lh_selected_account','visual-qa-account'); sessionStorage.setItem('lh_auth_selection_cleared','1') })
+  await page.addInitScript(() => { localStorage.setItem('lh_selected_account','visual-qa-account'); sessionStorage.setItem('lh_auth_selection_cleared','1'); localStorage.setItem('lh:v8:first-run-popup-dismissed:visual-qa-account','1') })
   await page.setViewportSize({ width, height: 1000 })
   let required = true, writes = 0
   await page.route('**/api/**', async route => {
@@ -171,6 +173,8 @@ test('new style selection opens once, explicit later and legacy later stay defer
   await page.addInitScript(() => {
     localStorage.setItem('lh_selected_account', 'visual-qa-account')
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
+    // 初回だけ出る案内は閉じた印を置く。ここで見るのは別の画面と窓なので重ねない。
+    localStorage.setItem('lh:v8:first-run-popup-dismissed:visual-qa-account', '1')
   })
   const fixture = await (await page.request.get(`http://127.0.0.1:${mockPort}/api/dashboard/style`)).json()
   let pending = true, mode = 'later', selected = false, version = 1, writes = 0
@@ -222,6 +226,8 @@ async function useIndustryFixture(page, style = 'salon', legacyMeet = false) {
   await page.addInitScript(() => {
     localStorage.setItem('lh_selected_account', 'visual-qa-account')
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
+    // 初回だけ出る案内は閉じた印を置く。ここで見るのは別の画面と窓なので重ねない。
+    localStorage.setItem('lh:v8:first-run-popup-dismissed:visual-qa-account', '1')
   })
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url())

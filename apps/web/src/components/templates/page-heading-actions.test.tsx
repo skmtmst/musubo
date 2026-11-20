@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import { PageHeading } from './page-frame'
 import { CreatePage } from './create-page'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -25,6 +26,15 @@ it('題の右に主操作と文字の副操作を1つ置き、残りの操作を
   fireEvent.click(await screen.findByRole('menuitem', { name: '複製する' }))
   expect(extra).toHaveBeenCalledOnce()
   await waitFor(() => expect(container.querySelector('[data-page-heading-actions] [aria-expanded="true"]')).toBeNull())
+})
+
+it('権限付きの主操作も副操作の右に置き、権限が無ければ実行しない', () => {
+  const create = vi.fn()
+  const { container } = render(<PageHeading title="一覧" actions={<><PermissionGatedButton allowed={false} variant="primary" onClick={create}>作る</PermissionGatedButton><Button>CSVで書き出す</Button></>} />)
+  const controls = [...container.querySelectorAll('[data-page-heading-actions] button')]
+  expect(controls.map(button => button.textContent)).toEqual(['CSVで書き出す', '作る'])
+  fireEvent.click(controls[1])
+  expect(create).not.toHaveBeenCalled()
 })
 
 it('属性付きの包みの非表示・操作・読み上げを保つ', () => {

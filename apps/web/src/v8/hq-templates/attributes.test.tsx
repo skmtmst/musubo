@@ -8,6 +8,7 @@ import { fieldDefinition, fieldOf } from './attribute-model'
 import type { HqFriendAttributeDetail } from '@line-crm/shared'
 const mocks = vi.hoisted(() => ({ role: 'owner', list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), folders: vi.fn(), createFolder: vi.fn(), updateFolder: vi.fn(), deleteFolder: vi.fn(), stats: vi.fn(), accounts: vi.fn(), received: vi.fn(), preflight: vi.fn(), distribute: vi.fn(), result: vi.fn(), context: vi.fn() }))
 vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => ['owner', 'admin'].includes(mocks.role), useStaffRole: () => mocks.role, useStaffIdentity: () => ({ id: 'hq-owner' }), canManageRole: (role: string) => ['owner', 'admin'].includes(role) }))
+vi.mock('@/components/shared/use-permission-lock-reason', () => ({ usePermissionLockReason: (allowed: boolean) => allowed ? undefined : '統括の管理権限が必要です' }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/friend-attributes' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { context: mocks.context } }))
@@ -71,7 +72,13 @@ describe('統括の情報欄・対応マーク', () => {
   })
   it('店の情報欄一覧を使い、API未取得の使用先は—、閲覧のみは変更操作を隠す', async () => {
     mocks.role = 'staff'; render(<HqAttributes type="friend_field" tab="fields" onTab={vi.fn()} />)
-    await screen.findByText('愛犬のお名前'); expect(screen.queryByRole('button', { name: '項目を作る' })).toBeNull(); expect(screen.queryByRole('button', { name: '愛犬のお名前を配る' })).toBeNull()
+    await screen.findByText('愛犬のお名前')
+    const create = screen.getAllByRole('button', { name: '項目を作る' })
+    expect(create.every(button => button.getAttribute('aria-disabled') === 'true')).toBe(true)
+    fireEvent.click(create[0])
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocks.create).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: '愛犬のお名前を配る' })).toBeNull()
     expect(screen.getAllByText('—').length).toBeGreaterThan(0); expect(screen.queryByText('友だち詳細・テンプレート差し込み')).toBeNull()
     expect([...document.querySelectorAll('[title]')].some((element) => element.getAttribute('title')?.includes('友だち詳細'))).toBe(false)
   })

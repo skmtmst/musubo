@@ -500,11 +500,11 @@ export default function HqHomeV8() {
     { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: accountsReadable ? localUnfiled : null },
   ]
 
-  const createAccount = canManage ? (
-    <Button href="/accounts/new" variant="primary">
+  const createAccount = (
+    <PermissionGatedButton allowed={canManage} need="tenantWide" href="/accounts/new" variant="primary">
       <Plus aria-hidden="true" className={styles.buttonIcon} />アカウントを登録
-    </Button>
-  ) : null
+    </PermissionGatedButton>
+  )
   const selectFolder = (id: string) => { setFolder(id); resetPage() }
   const folderColumn = (
     <div className={styles.folderBox}>

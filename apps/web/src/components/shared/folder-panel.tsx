@@ -235,7 +235,7 @@ export default function FolderPanel({
   return (
     // **読み上げ名を持つ。** 帯が何の分類かを、見出しの外からも辿れるように。
     <aside aria-label="フォルダ" className={`${styles.panel} overflow-visible`}>
-      {!readOnly && createAction ? <div className={styles.create}>{createAction}</div> : reserveCreateSpace ? <div className={`${styles.create} ${styles.createPlaceholder}`} aria-hidden="true" /> : null}
+      {createAction ? <div className={styles.create}>{createAction}</div> : reserveCreateSpace ? <div className={`${styles.create} ${styles.createPlaceholder}`} aria-hidden="true" /> : null}
       {showHeading && !headingAfterAll ? <div className={`${styles.heading} flex items-center justify-between`}>
         {hasExplanation ? <p className=" font-semibold">{heading}<HelpTip label={`${heading}の説明`}>
           {heading === 'フォルダ' ? <span>{FOLDER_DELETE_HELP}</span> : null}

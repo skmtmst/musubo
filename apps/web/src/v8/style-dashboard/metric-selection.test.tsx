@@ -16,6 +16,7 @@ vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { warnings: vi.fn().mockR
 vi.mock('@/lib/api', async importOriginal => { const actual = await importOriginal<typeof import('@/lib/api')>(); return { ...actual, bookingApi: { ...actual.bookingApi, getPaymentConfig: vi.fn().mockResolvedValue({ data: {} }) } } })
 import StyleDashboard from './style-dashboard'
 import { styleApi } from '@/lib/api/helpers/styles'
+import { firstRunPopupDismissedKey } from '@/v8/dashboard/first-run-popup'
 const cards = [{ id: 'connection-alert', visible: true }, { id: 'ledger', visible: true }, { id: 'analytics', visible: true }]
 const profile = () => ({ data: { cards, version: state.version, metricIds: [...state.ids], metricsCustomized: state.customized } })
 const metric = (value: number, unit = '件') => ({ value, status: 'available' as const, unit, formula: '選択した期間の実集計' })
@@ -24,6 +25,8 @@ const schedule: StyleSchedule = { style: 'salon', from: snapshot.from, to: snaps
 function labels() { return Array.from(document.querySelectorAll('[data-style-dashboard] [data-kpi-label]')).map(node => node.getAttribute('title')) }
 async function open() { await waitFor(() => expect(state.summary).toHaveBeenCalled()); fireEvent.click(getPageAction({ name: '表示を変える' })); const drawer = await screen.findByRole('dialog', { name: /表示を変える/ }); await within(drawer).findByRole('switch', { name: '分析', exact: true }); return drawer }
 beforeEach(() => {
+  /* ここは数の帯の選択だけを見る。初回ポップアップ（枠02）は閉じた後の状態にして見出しの操作に重ねない。 */
+  for (const id of ['a', 'b']) localStorage.setItem(firstRunPopupDismissedKey(id), '1')
   vi.clearAllMocks(); state.params = ''; state.account = 'a'; state.role = 'admin'; state.version = 2; state.customized = false; state.ids = ['bookings', 'attention', 'nextBookingRate', 'paidAmount', 'newBookings']; state.error = null
   state.get.mockImplementation(async () => profile()); state.summary.mockResolvedValue({ data: snapshot }); vi.mocked(styleApi.schedule).mockResolvedValue({ success: true, data: schedule })
   state.save.mockImplementation(async (_account, version, _cards, ids) => {
@@ -34,7 +37,7 @@ beforeEach(() => {
   })
   state.reset.mockImplementation(async () => { state.customized = false; state.version++; state.ids = ['bookings', 'attention', 'nextBookingRate', 'paidAmount', 'newBookings']; return profile() })
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); localStorage.clear() })
 
 it('未選択は呼び戻し・無断率を保ち、変更した数だけ版付き保存して再読込後も順番を復元する', async () => {
   const view = render(<StyleDashboard style="salon" />)

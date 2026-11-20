@@ -143,6 +143,8 @@ const ALLOWLIST_MAX = 769;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/getting-started/guide',
+  'PUT /api/getting-started/guide',
   'GET /api/hq/billing/musubo/last-line-end',
   'POST /api/hq/billing/musubo/last-line-end',
   'GET /api/hq/billing/musubo/line-addition',

@@ -1,11 +1,7 @@
 // @vitest-environment happy-dom
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
-/*
- * 担当メニューをまとめて決める（V8・）の「サクサク感」。
- * A: 読み込み中は目に見える「読み込み中」の文字を置かず、升目表の形の骨組みで待つ。
- * B: 保存ボタンは「保存中 → ✓ 保存しました」と中の表示だけ変わり、知らせの「元に戻す」で戻せる。
- */
+
 import React from 'react'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -150,7 +146,7 @@ describe('担当まとめ（V8）の読み込みと保存', () => {
     expect(await screen.findByText('だれがどのメニューを受けるか')).toBeTruthy()
   })
 
-  test('保存はボタンの中だけ変わり「元に戻す」で戻せる', async () => {
+  test('保存後は成功を知らせ、取り消し操作を出さない', async () => {
     renderPage()
     await screen.findByText('だれがどのメニューを受けるか')
 
@@ -166,19 +162,13 @@ describe('担当まとめ（V8）の読み込みと保存', () => {
     expect(await screen.findByRole('button', { name: '保存しています…' })).toBeTruthy()
 
     await act(async () => { gate.resolve({ ok: true }) })
-    // 完了（✓：ボタンと知らせ）がでて、知らせに「元に戻す」が付く。
+    // 保存結果を知らせる。
     await waitFor(() => { expect(screen.getByRole('status', { name: '知らせ' }).textContent).toContain('保存しました') })
     expect(screen.getByRole('button', { name: '保存する', exact: true })).toBeTruthy()
     const firstCall = (fixture.putBulk as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]
     expect(JSON.stringify(firstCall)).toContain('"is_offered":true')
 
-    fireEvent.click(screen.getByRole('button', { name: '元に戻す' }))
-    await waitFor(() => {
-      const calls = (fixture.putBulk as unknown as { mock: { calls: unknown[][] } }).mock.calls
-      expect(calls.length).toBe(2)
-    })
-    const secondCall = (fixture.putBulk as unknown as { mock: { calls: unknown[][] } }).mock.calls[1]
-    expect(JSON.stringify(secondCall)).toContain('"is_offered":false')
-    await screen.findByText('元に戻しました')
+    expect(screen.queryByRole('button', { name: '元に戻す' })).toBeNull()
+    expect(fixture.putBulk).toHaveBeenCalledTimes(1)
   })
 })

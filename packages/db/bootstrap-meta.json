@@ -679,8 +679,9 @@
     "764_broadcast_ab_live.sql",
     "765_ec_auto_line_cap.sql",
     "769_musubo_contracted_linked_slots.sql",
+    "770_onboarding_guide_progress.sql",
     "774_booking_card_checkout_requests.sql",
     "775_booking_charge_stripe_identity.sql"
   ],
-  "migrationCount": 681
+  "migrationCount": 682
 }

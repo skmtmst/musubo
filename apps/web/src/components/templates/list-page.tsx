@@ -17,7 +17,7 @@ import { FolderNarrowContext, FolderNarrowActionsContext, folderRowIds, uniqueFo
  * 左の列（フォルダ・タグ・設定のメニュー）を、白い板が狭いとき（1100 未満）に
  * 道具の段の先頭へ畳んで出すための中身。絵の の1段目「作る・フォルダ：すべて」。
  * 画面は FolderPanel に渡しているのと同じ rows・activeId・onSelect・作るボタンを渡すだけ。
- * 閲覧のみの画面は createAction を渡さない（押せない作るボタンは出さない）。
+ * 閲覧のみの画面でも、権限に応じて押せない作るボタンを渡す。
  */
 export interface ListFolderNav {
   rows: Array<Pick<FolderPanelRow, 'id' | 'label'> & Partial<FolderPanelRow>>
