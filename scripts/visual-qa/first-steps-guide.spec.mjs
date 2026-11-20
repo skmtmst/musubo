@@ -158,3 +158,28 @@ test('受付開始後は公開前の案内を出し、あとでを押すと来�
   await expect(page).toHaveURL(/\/restaurant-test\/line-followup$/)
   await expect(page.locator('[data-guide-balloon="followup:1"]')).toBeVisible()
 })
+
+test('一時停止中に受付を止めても最初の未完了項目から始め直せる', async ({ page }) => {
+  await openFixture(page, { storeProgress: { tables: true, hours: true, menus: true, reception: true, followup: true } })
+  await page.goto(base)
+  await page.getByRole('button', { name: 'ガイドで進める', exact: true }).click()
+  await expect(page).toHaveURL(/\/getting-started#first-message$/)
+  await expect(page.locator(guideBar)).toContainText('最初の1通を受け取る')
+  await page.locator(guideBar).getByRole('button', { name: '一時停止' }).click()
+  await page.getByRole('link', { name: '予約枠・在庫', exact: true }).click()
+  for (const label of ['予約サイト', '当日（ウォークイン）', 'LINE 専用']) {
+    const input = page.getByRole('spinbutton', { name: label, exact: true })
+    await input.press('ControlOrMeta+a')
+    await input.press('0')
+    await expect(input).toHaveValue('0')
+  }
+  const save = page.getByRole('button', { name: '受付時間と配分を保存', exact: true })
+  await expect(save).toBeEnabled()
+  await save.click()
+  await expect(page.getByText('受付時間と配分を保存しました。予約サイトへは書き戻していません。')).toBeVisible()
+  await page.getByRole('link', { name: 'ダッシュボード', exact: true }).click()
+  await expect(page.getByRole('button', { name: /開店準備 6\/8。ガイドを再開する/ })).toBeVisible()
+  await page.getByRole('button', { name: '最初から始める', exact: true }).click()
+  await expect(page).toHaveURL(/\/restaurant-test\/inventory$/)
+  await expect(page.locator(guideBar)).toContainText('予約枠と在庫を設定する')
+})

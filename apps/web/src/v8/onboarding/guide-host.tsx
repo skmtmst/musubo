@@ -11,7 +11,7 @@ import { GuideOverlay } from './guide-overlay'
 import { GuidePublishMenu } from './guide-publish-menu'
 import { guideProcedure } from './guide-script'
 import { GuideSharedProvider, type SharedGuide } from './guide-shared'
-import { useGuideSignal } from './guide-signal'
+import { useGuideSignal, useSetupSaveSignal } from './guide-signal'
 
 /*
   開店準備ガイドの入れ物。全画面で1つ。画面側は置かない。
@@ -117,11 +117,9 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
   useGuideSignal(
     procedure?.trigger === 'event' || procedure?.trigger === 'valid' ? procedure.anchor : null,
     guide.phase === 'active',
-    () => {
-      if (procedure?.anchor !== 'reception.save') advance()
-      first.refresh()
-    },
+    () => { if (procedure?.anchor !== 'reception.save') advance() },
   )
+  useSetupSaveSignal(scripted && armed, first.refresh)
   const offerPublishing = scripted && step?.key === 'scenario' && step.done &&
     guide.procedureIndex === 2 && guide.phase === 'active' && onTargetScreen
 
