@@ -124,6 +124,7 @@ test.each(['booking_menu','mileage_reward'] as const)('HQT-18: %s の配布前�
  const result=await call<Preflight & {expiresAt:string}>(`/${id}/preflight`,'POST',{accountIds:['a']});
  const after=Date.now(),expires=Date.parse(result.body.data.expiresAt);
  expect(result.status).toBe(200);expect(expires).toBeGreaterThanOrEqual(before+30*60_000);expect(expires).toBeLessThanOrEqual(after+30*60_000);
+});
 
 test('HQT-09: 配られたクーポン景品はコードがなければ公開できない',async()=>{
  const id=await create('mileage_reward');expect((await run(id,await check(id))).body.data.status).toBe('completed');
