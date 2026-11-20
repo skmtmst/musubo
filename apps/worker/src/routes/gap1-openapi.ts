@@ -42,5 +42,5 @@ export const gap1Paths:Record<string,Record<string,ReturnType<typeof operation>>
 (gap1Paths["/api/booking/admin/bookings/{id}/meeting-links"]??={}).get=operation("GET","/api/booking/admin/bookings/{id}/meeting-links","手作業の確認が必要な会議を確認する。");
 (gap1Paths["/api/booking/admin/bookings/{id}/meeting-status"]??={}).get=operation("GET","/api/booking/admin/bookings/{id}/meeting-status","会議の発行状態を確認する。");
 (gap1Paths["/api/booking/admin/bookings/{id}/meeting-retry"]??={}).post=operation("POST","/api/booking/admin/bookings/{id}/meeting-retry","確実に失敗した会議の再発行を試みる。");
-(gap1Paths["/api/booking/admin/external-cleanup"]??={}).get=operation("GET","/api/booking/admin/external-cleanup","顧客削除後に外部の予定を確認する対象を一覧する。");
-(gap1Paths["/api/booking/admin/external-cleanup/{id}/resolve"]??={}).post=operation("POST","/api/booking/admin/external-cleanup/{id}/resolve","相手先で後片づけしたことを記録する。");
+(gap1Paths["/api/booking/admin/external-cleanup"]??={}).get=operation("GET","/api/booking/admin/external-cleanup","顧客削除後に外部の予定を確認する対象を、閲覧できるアカウントの範囲で一覧する。");
+(gap1Paths["/api/booking/admin/external-cleanup/{id}/resolve"]??={}).post=operation("POST","/api/booking/admin/external-cleanup/{id}/resolve","管理者が confirmed:true と任意の reason（200文字以内）で、相手先で後片づけしたことを監査に記録する。");

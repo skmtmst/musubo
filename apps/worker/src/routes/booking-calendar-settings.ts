@@ -10,13 +10,13 @@ import {auditLog} from '../lib/audit-log.js';
 import {meetingCreatorForBooking} from '../features/booking/booking-meeting-runtime/index.js';
 import {retryFailedMeeting} from '../features/booking/booking-meeting-retry/index.js';
 import {featureJobCanRun} from '../services/feature-enforcement.js';
-import {decryptCredential} from '@line-crm/db';
+import {auditDeviceFamily,auditEventStatement,decryptCredential,maskAuditIp} from '@line-crm/db';
 import type {CleanupPlanItem} from '../features/booking/booking-external-cleanup-plan/index.js';
 import {notifyExternalCleanupReview} from '../features/booking/booking-external-cleanup-runner/index.js';
 export const bookingCalendarSettings=new Hono<Env>();
 bookingCalendarSettings.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'calendar_settings_unavailable'},e instanceof GapError?e.status:503));
 bookingCalendarSettings.get('/api/booking/admin/external-cleanup',async c=>{
- gapWrite(c,{admin:true});const account=await gapAccount(c);
+ const account=await gapAccount(c);
  const rows=await c.env.DB.prepare("SELECT subject_id,input_json FROM workflow_steps WHERE scope_id=? AND process_kind='booking_external_cleanup' AND status='unknown' ORDER BY created_at,subject_id LIMIT 100").bind(`line:${account}`).all<{subject_id:string;input_json:string|null}>();
  const items=[];
  for(const row of rows.results??[]){
@@ -30,9 +30,16 @@ bookingCalendarSettings.get('/api/booking/admin/external-cleanup',async c=>{
 bookingCalendarSettings.post('/api/booking/admin/external-cleanup/:id/resolve',async c=>{
  gapWrite(c,{admin:true});const account=await gapAccount(c),body=await gapBody(c),id=c.req.param('id');
  if(body.confirmed!==true)throw new GapError('confirmation_required');
- const result=await c.env.DB.prepare("DELETE FROM workflow_steps WHERE scope_id=? AND process_kind='booking_external_cleanup' AND subject_id=? AND step_key='current' AND status='unknown'").bind(`line:${account}`,id).run();
+ if(body.reason!==undefined && (typeof body.reason!=='string'||body.reason.length>200))throw new GapError('invalid_reason');
+ const reason=typeof body.reason==='string'?body.reason.trim():'';
+ const scope=`line:${account}`,staff=c.get('staff');
+ const guard="EXISTS(SELECT 1 FROM workflow_steps WHERE scope_id=? AND process_kind='booking_external_cleanup' AND subject_id=? AND step_key='current' AND status='unknown')";
+ const [audit,result]=await c.env.DB.batch([
+  auditEventStatement(c.env.DB,{tenantId:staff.tenantId,lineAccountId:account,category:'business',actorPrincipalId:staff.id,actorRole:staff.role,action:'booking.external.cleanup.resolve',targetId:id,targetKind:'booking_external_cleanup',result:'success',reason:reason||null,requestTraceId:c.req.header('cf-ray')??c.req.header('x-request-id')??null,ipPrefix:maskAuditIp(c.req.header('cf-connecting-ip')),deviceFamily:auditDeviceFamily(c.req.header('user-agent'))},{sql:guard,params:[scope,id]}),
+  c.env.DB.prepare("DELETE FROM workflow_steps WHERE scope_id=? AND process_kind='booking_external_cleanup' AND subject_id=? AND step_key='current' AND status='unknown'").bind(scope,id),
+ ]);
  if(!result.meta.changes)throw new GapError('not_found',404);
- auditLog(c,'booking.external.cleanup.resolve',{id,kind:'booking_external_cleanup'},{lineAccountId:account});
+ if(audit.meta.changes)c.set('auditRecorded',true);
  await notifyExternalCleanupReview(c.env.DB,account).catch(()=>{});
  return c.json({success:true,data:{resolved:true}});
 });
