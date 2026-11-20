@@ -180,7 +180,7 @@ it('使用先ごとに参照方法と確かめられた版を表示する', asyn
   render(<Editor />)
   const table = await screen.findByRole('table', { name: '使っている場所' })
   expect(within(table).getByText('最新の値')).toBeTruthy()
-  expect(within(table).getByText('固定した値')).toBeTruthy()
+  expect(within(table).getByText('版 3 で固定')).toBeTruthy()
   expect(within(table).getByText('版 5')).toBeTruthy()
   expect(within(table).getByText('版 3')).toBeTruthy()
 })
@@ -191,7 +191,8 @@ it('一斉配信の下書きに現在の版を固定できる', async () => {
     unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'broadcast', kindLabel: '一斉配信', name: '案内', status: '下書き', href: '/broadcasts/detail?id=b-1', blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
   } })
   render(<Editor />)
-  fireEvent.click(await screen.findByRole('button', { name: '版 1 で固定' }))
+  fireEvent.click(await screen.findByRole('button', { name: '案内の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '版 1 で固定' }))
   const dialog = await screen.findByRole('dialog', { name: 'この版で固定しますか' })
   expect(within(dialog).getByText(/承認が取り消されます/)).toBeTruthy()
   fireEvent.click(within(dialog).getByRole('button', { name: '固定する' }))
@@ -205,9 +206,9 @@ it('Google連携の値は固定を押せず理由を示す', async () => {
     unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'broadcast', kindLabel: '一斉配信', name: '案内', status: '下書き', href: '/broadcasts/detail?id=b-1', blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
   } })
   render(<Editor />)
-  const button = await screen.findByRole('button', { name: 'この版で固定' })
+  fireEvent.click(await screen.findByRole('button', { name: '案内の操作' }))
+  const button = await screen.findByRole('menuitem', { name: /版 1 で固定/ })
   expect(button.hasAttribute('disabled')).toBe(true)
-  fireEvent.click(screen.getByRole('button', { name: '固定できない理由' }))
   expect(await screen.findByText('Google と連携した値は、いつも最新を使います')).toBeTruthy()
   expect(state.pin).not.toHaveBeenCalled()
 })
@@ -219,13 +220,57 @@ it('固定済みの下書きは変更件数に含めず版を表示する', asyn
   } })
   render(<Editor />)
   const table = await screen.findByRole('table', { name: '使っている場所' })
-  expect(within(table).getByText('固定した値')).toBeTruthy()
+  expect(within(table).getByText('版 1 で固定')).toBeTruthy()
   expect(within(table).getByText('版 1')).toBeTruthy()
   expect(screen.getByRole('button', { name: /0か所に反映して保存/ })).toBeTruthy()
-  fireEvent.click(within(table).getByRole('button', { name: '最新の値に戻す' }))
+  fireEvent.click(within(table).getByRole('button', { name: '案内の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '最新の値に戻す' }))
   const dialog = await screen.findByRole('dialog', { name: '最新の値に戻しますか' })
   expect(state.pin).not.toHaveBeenCalled()
   fireEvent.click(within(dialog).getByRole('button', { name: '最新の値に戻す' }))
   await waitFor(() => expect(state.pin).toHaveBeenCalledWith('b-1', 'var-1', { accountId: 'a', versionId: null, expectedVersion: 4 }))
   expect(within(table).queryByRole('button', { name: '版 1 で固定し直す' })).toBeNull()
+})
+
+it('使用先の見出しに全件数と送信済みの補足を示す', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 8, blockingTotal: 1, historicalTotal: 1,
+    unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'broadcast', kindLabel: '一斉配信', name: '過去の案内', status: '送信済み・変わりません', href: '/broadcasts/detail?id=b-1', blocksDeletion: false, currentPreview: '10時', referenceMode: 'pinned', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  expect(await screen.findByRole('heading', { name: '使用先 8か所' })).toBeTruthy()
+  expect(screen.getByText('送信済み・完了済みの内容は、値を変えても変わりません。')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '過去の案内の操作' }))
+  expect((await screen.findByRole('menuitem', { name: /版 1 で固定/ })).hasAttribute('disabled')).toBe(true)
+  expect((await screen.findAllByText('送信済み・完了済みの配信は変更できません')).length).toBeGreaterThan(0)
+})
+
+it('Google連携後の固定は理由を示し、手動で最新に戻せる', async () => {
+  state.detail.mockResolvedValue({ success: true, data: { id: 'var-1', name: '営業時間', key: 'business_hours', type: 'text', value: '10時', memo: '', status: 'active', version: 2, usages: [], history: [{ id: 'version-2', version: 2 }], usagePage: { total: 0, shown: 0 }, pinDisabledReason: 'Google と連携した値は、いつも最新を使います' } })
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'business_hours' }, total: 1, blockingTotal: 1, historicalTotal: 0,
+    unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'broadcast', kindLabel: '一斉配信', name: '案内', status: '下書き', href: '/broadcasts/detail?id=b-1', blocksDeletion: true, currentPreview: '旧', referenceMode: 'pinned', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  const table = await screen.findByRole('table', { name: '使っている場所' })
+  expect(within(table).getByText('版 1 で固定')).toBeTruthy()
+  expect(screen.getByText('Google と連携した固定版は送らず要確認になります。下書きで「…」から最新の値に戻せます。')).toBeTruthy()
+  fireEvent.click(within(table).getByRole('button', { name: '案内の操作' }))
+  expect((await screen.findByRole('menuitem', { name: /版 2 で固定/ })).hasAttribute('disabled')).toBe(true)
+  expect(await screen.findByText(/固定済みの場合は送らず要確認になります/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('menuitem', { name: '最新の値に戻す' }))
+  expect(await screen.findByRole('dialog', { name: '最新の値に戻しますか' })).toBeTruthy()
+  expect(state.pin).not.toHaveBeenCalled()
+})
+
+it('一斉配信以外の使用先は固定できない理由を表示する', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 1, blockingTotal: 1, historicalTotal: 0,
+    unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'form', kindLabel: 'フォーム', name: '申込フォーム', status: '公開中', href: '/form-submissions/edit?id=f-1', blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  fireEvent.click(await screen.findByRole('button', { name: '申込フォームの操作' }))
+  expect((await screen.findByRole('menuitem', { name: /版 1 で固定/ })).hasAttribute('disabled')).toBe(true)
+  expect(screen.getByText('この使用先では固定できません')).toBeTruthy()
+  expect(state.pin).not.toHaveBeenCalled()
 })

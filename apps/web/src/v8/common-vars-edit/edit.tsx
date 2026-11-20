@@ -6,6 +6,7 @@ import { b244Requirements,formatHourMinute,historyStamp,jstNowLocalInput,utcToJs
 import { saveCommonVar } from './edit-save'
 import { renderScheduleCard } from './edit-schedule-card'
 import { renderValueFields } from './edit-value-fields'
+import { UsageReferenceMenu } from './usage-reference-menu'
 export { historyStamp } from './edit-model'
 export { changeText,scheduleStamp } from './edit-text'
 
@@ -31,7 +32,6 @@ import DateTimeField,{ TimeField } from '@/components/shared/date-time-field'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
-import HelpTip from '@/components/shared/help-tip'
 import LinePreview from '@/components/shared/line-preview'
 import MusuboMark from '@/components/shared/musubo-mark'
 import ListState from '@/components/shared/list-state'
@@ -856,22 +856,21 @@ function EditCommonVarV8Inner() {
 
           {impactState === 'ready' && impact && impact.items.length > 0 ? (
             <section className={styles.card} aria-labelledby="cv-edit-usage-heading">
-              <h2 id="cv-edit-usage-heading" className={styles.cardTitle}>使っている場所</h2>
+              <h2 id="cv-edit-usage-heading" className={styles.cardTitle}>使用先 {formatNumber(impact.total)}か所</h2>
               {pinError ? <Notice tone="danger">{pinError}</Notice> : null}
               <ConfirmDialog open={pinTarget !== null && pinTarget.accountId === selectedAccountId && pinTarget.itemId === item?.id} title={pinTarget?.mode === 'live' ? '最新の値に戻しますか' : 'この版で固定しますか'} description={`${pinTarget?.name ?? ''} を${pinTarget?.mode === 'live' ? '最新の値に戻し' : `版 ${pinTarget?.version ?? ''} に固定し`}ます。承認待ち・承認済みの場合は承認が取り消されます。`} confirmLabel={pinTarget?.mode === 'live' ? '最新の値に戻す' : '固定する'} error={pinError} busy={pinBusy !== null} onCancel={() => setPinTarget(null)} onConfirm={() => { if (pinTarget) void pinBroadcast(pinTarget.href) }} />
               <DataTable label="使っている場所">
-                <thead><TableHeadRow><Th>使っている場所</Th><Th>状態</Th><Th>参照方法</Th><Th>共通情報の版</Th></TableHeadRow></thead>
+                <thead><TableHeadRow><Th>使っている場所</Th><Th>状態</Th><Th>参照方法</Th><Th>共通情報の版</Th><Th>操作</Th></TableHeadRow></thead>
                 <tbody>{(showAllUsages ? impact.items : impact.items.slice(0, 20)).map((usage, index) => <Tr key={`${usage.kind}-${usage.href}-${index}`}>
                   <Td><PageLink href={usage.href}><TruncatedText value={usage.name} /></PageLink></Td><Td>{usage.status}</Td>
-                  <Td>{usage.referenceMode === 'live' ? '最新の値' : usage.referenceMode === 'pinned' ? '固定した値' : usage.referenceMode === 'operation' ? '値を操作' : '—'}{' '}
-                    {usage.referenceMode === 'pinned' && item?.pinDisabledReason ? <HelpTip label="送信時の注意" hover>Google と連携したため、この固定版では送らず要確認になります。</HelpTip> : null}
-                    {canPinBroadcast && item && selectedAccountId && usage.kind === 'broadcast' && usage.status === '下書き' ? <>
-                      {usage.referenceMode === 'pinned' ? <Button type="button" variant="secondary" disabled={pinBusy !== null} onClick={() => setPinTarget({ href: usage.href, name: usage.name, accountId: selectedAccountId, itemId: item.id, version: item.version, mode: 'live' })}>最新の値に戻す</Button> : null}
-                      {usage.referenceMode !== 'pinned' || usage.referencedVersion !== item.version ? item.pinDisabledReason ? <><Button type="button" variant="secondary" disabled>この版で固定</Button><HelpTip label="固定できない理由" hover>{item.pinDisabledReason}</HelpTip></> : <Button type="button" variant="secondary" disabled={pinBusy !== null || value !== item.value} onClick={() => setPinTarget({ href: usage.href, name: usage.name, accountId: selectedAccountId, itemId: item.id, version: item.version, mode: 'pin' })}>{usage.referenceMode === 'pinned' ? `版 ${item.version} で固定し直す` : `版 ${item.version} で固定`}</Button> : null}
-                    </> : null}</Td>
+                  <Td>{usage.referenceMode === 'live' ? '最新の値' : usage.referenceMode === 'pinned' ? usage.referencedVersion == null ? '固定した値' : `版 ${usage.referencedVersion} で固定` : usage.referenceMode === 'operation' ? '値を操作' : '—'}</Td>
                   <Td>{usage.referencedVersion == null ? '—' : `版 ${usage.referencedVersion}`}</Td>
+                  <Td>{canWrite && item && selectedAccountId ? <UsageReferenceMenu usage={usage} version={item.version} pinDisabledReason={item.pinDisabledReason} canPin={canPinBroadcast} valueChanged={value !== item.value} busy={pinBusy !== null} onChoose={(mode) => setPinTarget({ href: usage.href, name: usage.name, accountId: selectedAccountId, itemId: item.id, version: item.version, mode })} /> : null}</Td>
                 </Tr>)}</tbody>
               </DataTable>
+              <p className={styles.fieldHint}>送信済み・完了済みの内容は、値を変えても変わりません。</p>
+              {item?.pinDisabledReason && impact.items.some((usage) => usage.kind === 'broadcast' && usage.referenceMode === 'pinned' && !usage.status.includes('送信済み') && !usage.status.includes('完了済み')) ? <p className={styles.fieldHint}>Google と連携した固定版は送らず要確認になります。下書きで「…」から最新の値に戻せます。</p> : null}
+              {impact.unscopedFormTotal > 0 ? <p className={styles.fieldHint}>所属を確認できない使用先が {formatNumber(impact.unscopedFormTotal)}か所あります。</p> : null}
               {impact.items.length > 20 ? <Button type="button" variant="text" onClick={() => setShowAllUsages(!showAllUsages)}>{showAllUsages ? '閉じる' : `ほか ${formatNumber(impact.items.length - 20)} か所を見る`}</Button> : null}
             </section>
           ) : null}
