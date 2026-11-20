@@ -8,6 +8,7 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
+- [面談・飲食店の予約一覧の修正履歴](release-log/unreleased/86-kenta-1360.md)
 - [最初に読む：製品とコードの入口](START-HERE.md)
 - [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
 - [更新時のマイグレーション履歴と復旧](update-migration-history.md)
@@ -208,6 +209,8 @@
 - [H1 統括のひな形：予約メニューとマイルの景品（板 YYWAs）](v8-requirements/gap-features/H1-hq-booking-menu-reward-templates.md)
 - [③-2 ライバルに対抗する機能：要件と「操作と挙動」の一覧（B-340）](v8-requirements/gap-features/README.md)
 - [U1 送信の取り消しと「送る前の確かめ」（板 lKmZK ほか 6 か所）](v8-requirements/gap-features/U1-unsend-and-send-confirm.md)
+- [Googleビジネス・Instagram 複数連携の要件（2026-11-16 決定）](v8-requirements/multi-sns-connections.md)
+- [Googleビジネス・Instagram 複数連携：3つの口の契約（契約枠・主連携・請求）](v8-requirements/multi-sns-connections-ports.md)
 - [動きのばらつき（2026-10-09・オーナー「同じ動きにした方がいいのに動きがバラバラのもの」）](v8-requirements/owner-decisions/BEHAVIOR-AUDIT-1009.md)
 - [行き先と触り方のばらつき（2026-10-09・オーナー「遷移先などはできる限りデザインや触り方は統一」）](v8-requirements/owner-decisions/DESTINATION-AUDIT-1009.md)
 - [一覧の骨格の点検（AH・2026-10-09）](v8-requirements/owner-decisions/LIST-SKELETON-AUDIT-1009.md)
@@ -468,6 +471,48 @@
 ## 反映履歴
 
 - [Google口コミの返信を下書き保存](release-log/unreleased/89-kenta-review-draft.md) — 反映履歴、確認 2026-11-16。
+
+- [保守時に確認する説明を整理](release-log/unreleased/121-kenta-q04-misc.md) — 反映履歴、確認 2026-11-19。
+
+- [一斉配信の自動確認を改善](release-log/unreleased/114-kenta-q02b-b11.md) — 反映履歴、確認 2026-11-18。
+
+- [自動確認の動作への置き換え](release-log/unreleased/112-kenta-q02b-b8.md) — 実際の動きで確かめる試験の履歴。確認 2026-11-18。
+
+- [SNS連携で残る3つの口の決まり](release-log/unreleased/120-kenta-sns-multilink-ports.md) — 反映履歴、確認 2026-11-18。
+
+- [自動確認を実際の動きで確認](release-log/unreleased/115-kenta-q02b-b10.md) — 反映履歴、確認 2026-11-18。
+
+- [お客さま画面の設定確認を改善](release-log/unreleased/116-kenta-q02b-b12.md) — 反映履歴、確認 2026-11-18。
+
+- [配信と通知の内容を確かめる試験を見直し](release-log/unreleased/113-kenta-q02b-b9.md) — 反映履歴、確認 2026-11-18。
+
+- [GoogleビジネスとInstagramの複数連携（第1段）](release-log/unreleased/108-kenta-sns-multilink.md) — 反映履歴、確認 2026-11-17。
+
+- [はじめにやることと初期設定のリッチメニュー手順](release-log/unreleased/109-masato-first-steps-guide.md) — 反映履歴、確認 2026-11-17。
+
+- [自動確認を実際の画面の動きで確認](release-log/unreleased/105-kenta-q02b-b7.md) — 反映履歴、確認 2026-11-17。
+
+- [列車：試験だけの4本](release-log/unreleased/102-kenta-train-tests.md) — まとめて入れた試験の履歴。確認 2026-11-17。
+
+- [欠席と振替の動きを確認](release-log/unreleased/101-kenta-gaptest-b1.md) — 反映履歴、確認 2026-11-16。
+
+- [絞り込みや分析の自動確認を改善](release-log/unreleased/100-kenta-q02b-b4.md) — 反映履歴、確認 2026-11-17。
+
+- [一覧や返信の自動確認を改善](release-log/unreleased/99-kenta-q02b-b3.md) — 反映履歴、確認 2026-11-17。
+
+- [自動確認を画面の操作と予定の計算で確認](release-log/unreleased/96-kenta-q02b-b2.md) — 反映履歴、確認 2026-11-16。
+
+- [自動確認を実際の画面の動きで確認](release-log/unreleased/104-kenta-q02b-b5.md) — 反映履歴、確認 2026-11-17。
+
+- [配信と予定確認の動作を確かめる試験を見直し](release-log/unreleased/103-kenta-q02b-b6.md) — 反映履歴、確認 2026-11-17。
+
+- [プログラムと連携処理の説明書きを整理](release-log/unreleased/95-kenta-q04-worker.md) — 反映履歴、確認 2026-11-16。
+
+- [自動確認を実際の動きで確認](release-log/unreleased/94-kenta-q02b.md) — 反映履歴、確認 2026-11-16。
+
+- [通知の試験を時間帯に左右されないよう修正](release-log/unreleased/97-kenta-worker-fix.md) — 反映履歴、確認 2026-11-16。
+- [初期設定・比較の確認を追加](release-log/unreleased/91-kenta-backend-small.md) — 反映履歴、確認 2026-11-16。
+- [通知端末の扱いを確認](release-log/unreleased/92-kenta-gap-msg.md) — 反映履歴、確認 2026-11-16。
 
 - [予約・友だち情報・配信の操作と安全性を改善](release-log/unreleased/36-masato-legacy-port.md) — 反映履歴、確認 2026-11-10。
 - [運営コンソールの問い合わせ画面をPenと照合して修正](release-log/unreleased/41-masato-ops-support-pen-parity.md) — スマートフォンの返信欄とテンプレート引用画面、確認 2026-11-11。
@@ -1235,3 +1280,8 @@
 - [文書：手動テストの要件の整理](release-log/unreleased/79-kenta-a15-req.md) — 画面と決定に合わせた要件の変更履歴。確認 2026-11-15。
 - [文書：本番前の点検3資料の見直しとオーナー1枚](release-log/unreleased/85-kenta-d6-handoff.md) — 点検表・二段階認証・事故手順の履歴。確認 2026-11-16。
 - [日付に左右される自動確認の修正](release-log/unreleased/90-kenta-worker-date.md) — 予約の自動確認の変更履歴。確認 2026-11-16。
+- [全画面の確かめA14の直し](release-log/unreleased/82-kenta-a14-fix.md) — フォルダの「…」・面談の表などの履歴。確認 2026-11-15。
+- [操作後のお知らせと保管確認](release-log/unreleased/81-kenta-archive-undo.md) — お知らせと保管時の操作の変更履歴。確認 2026-11-15。
+- [EC連携を止めている間の案内](release-log/unreleased/78-kenta-words-behavior.md) — 画面の案内を実際の動きに合わせた修正履歴。確認 2026-11-15。
+- [閲覧のみの作るボタン・行の操作を灰色に](release-log/unreleased/73-kenta-train-viewer.md) — 閲覧のみの人への表示をそろえた履歴。確認 2026-11-15。
+- [列車 1116](release-log/unreleased/83-kenta-train-1116.md) — まとめて入れた直しの履歴。確認 2026-11-16。

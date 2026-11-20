@@ -175,6 +175,16 @@ describe('#708 保管の確定直前にほかが保管したとき', () => {
     })
   })
 
+  test('受付に失敗した応答では確認窓を閉じず、成功を知らせない', async () => {
+    fixture.archive = vi.fn(async () => ({ success: false, error: '保存できません' }))
+    await openDeleteDialog()
+    expect(fixture.archive).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'このタグを保管する' })) })
+    expect(await screen.findByText('保管できませんでした。影響を読み直して、もう一度お試しください。')).toBeTruthy()
+    expect(screen.getByText('「旧キャンペーン」を保管しますか？')).toBeTruthy()
+    expect(screen.queryByText('「旧キャンペーン」を保管しました')).toBeNull()
+  })
+
   test('ほかの 409 は今までどおり失敗として出る', async () => {
     const { ApiError } = await import('@/lib/api')
     fixture.archive = vi.fn(async () => {

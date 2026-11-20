@@ -30,7 +30,7 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 - [BEHAVIOR.md](BEHAVIOR.md)
 - [create-results.test.tsx](create-results.test.tsx)
 - [list-folder-dot-and-reorder.test.tsx](list-folder-dot-and-reorder.test.tsx)
-- [list-parts.test.ts](list-parts.test.ts)
+- [list-counts-and-actions.test.tsx](list-counts-and-actions.test.tsx)
 - [result-summary.test.tsx](result-summary.test.tsx)
 
 実行：`NEXT_PUBLIC_API_URL=http://127.0.0.1:8788 pnpm --filter web test -- src/v8/scenarios`。関連する入口の試験も実行してください。保存・入力保持・権限・別店舗・失敗からの回復を守り、文書の整合だけを動作の合格に数えません。

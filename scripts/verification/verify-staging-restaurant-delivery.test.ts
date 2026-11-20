@@ -416,8 +416,7 @@ describe('staging delivery verification safety', () => {
   });
 
   test('puts the values it actually read into the failure reasons', () => {
-    // 理由が `title` の1語だけだったため、検証環境の1回の実行から原因が分からず
-    // Claude と Codex の往復が無駄になった。実測値と行き先を必ず添える。
+    // 原因を判断できるよう、実測値と行き先を必ず添える。
     expect(screenFailures(passingScreen({ title: null, observedType: null })))
       .toEqual(['title(none, want=デリバリー受注)']);
     expect(screenFailures(passingScreen({ title: '店舗が選ばれていません' })))
@@ -475,7 +474,7 @@ describe('staging delivery verification safety', () => {
   });
 
   test('fails a screen that shows a load failure or throws, even when the title is right', () => {
-    // 題が出ているだけでは合格にしない。これが今回直した取りこぼし。
+    // 題が出ているだけでは合格にしない。
     expect(screenFailures(passingScreen())).toEqual([]);
 
     // 画面の中の「注文を表示できませんでした」。Node から読み口を呼べていても、
@@ -500,7 +499,7 @@ describe('staging delivery verification safety', () => {
       loadFailures: ['forbidden:表示する権限がありません'],
     }))).toEqual(['load-failure(forbidden:表示する権限がありません)']);
 
-    // 未捕捉の例外も不合格。数えるだけで通していたのを直した。
+    // 未捕捉の例外も不合格。
     expect(screenFailures(passingScreen({ pageErrors: 1 }))).toEqual(['page-error(1)']);
 
     // もとから見ていた3つは引き続き不合格。

@@ -1,4 +1,6 @@
 'use client'
+
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import { DetailContent, DetailField, DetailInlineEdit } from '@/components/shared/detail-content'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -367,12 +369,11 @@ export default function EventsListV8() {
     },
   ]
 
-  /* 作る場所と余白は共通フォルダ列へ。閲覧のみでは出さない。 */
-  const createButton = canEdit ? (
-    <Button variant="primary" href="/events/new" className="v8-folder-create w-full">
+  const createButton = (
+    <PermissionGatedButton allowed={canEdit} variant="primary" href="/events/new" className="v8-folder-create w-full">
       <Plus size={16} aria-hidden="true" />イベントを作る
-    </Button>
-  ) : null
+    </PermissionGatedButton>
+  )
 
   const folderRows = managedFolderNavRows('event', folders, { allId: '', unfiledId: UNFILED })
 
@@ -711,7 +712,7 @@ export default function EventsListV8() {
         </KpiBand>
       )}
       folders={folderPanel}
-      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: canEdit ? createButton : undefined }}
+      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton }}
       toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{toolbar}</>}
       pagination={pager}
       overlays={overlays}

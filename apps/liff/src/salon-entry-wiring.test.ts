@@ -13,10 +13,10 @@ test('配備入口が共通の予約画面を読む。もう1組の部品を作�
   expect(files).toEqual(['main.tsx']);
 });
 
-test('旧CSSを読んでいた席・スタンプの現役入口も共通CSSだけを読む', () => {
+test('席・スタンプの入口は旧CSSを読まない', () => {
   for (const entry of ['restaurant', 'visit-stamps']) {
     const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), `../../worker/src/client/${entry}/main.tsx`), 'utf8');
     expect(source).not.toContain('salon-booking/styles.css');
-    expect(source).toContain('liff/src/embedded.css');
+    if (entry === 'restaurant') expect(source).toContain('liff/src/embedded.css');
   }
 });

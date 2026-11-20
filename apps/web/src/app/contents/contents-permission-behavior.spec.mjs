@@ -206,7 +206,12 @@ async function expectManagementHidden(page, { canRegister = false } = {}) {
   await expect(page.getByText('すべてのメディアを選択', { exact: true })).toHaveCount(0)
   const register = page.getByRole('button', { name: 'メディアを登録する', exact: true })
   if (canRegister) await expect(register.first()).toBeVisible()
-  else await expect(register).toHaveCount(0)
+  else {
+    await expect(register.first()).toBeVisible()
+    await expect(register.first()).toHaveAttribute('aria-disabled', 'true')
+    await register.first().click({ force: true })
+    await expect(page.getByRole('dialog', { name: 'ファイルを入れる', exact: true })).toHaveCount(0)
+  }
 }
 
 /** 削除時の使用箇所照会に加え、編集・削除等の書き込み要求も実際に監視する。 */
@@ -291,7 +296,7 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
   })
 
   for (const restriction of [{ readOnly: true }, { roleBundle: 'view_only' }]) {
-    test(`閲覧専用（${Object.keys(restriction)[0]}）は登録を隠し、プレビューとダウンロードを保つ`, async ({ page }) => {
+    test(`閲覧専用（${Object.keys(restriction)[0]}）は登録を理由付きで拒否し、プレビューとダウンロードを保つ`, async ({ page }) => {
       const management = managementRequestLog()
       await stubApi(page, {
         role: 'staff',

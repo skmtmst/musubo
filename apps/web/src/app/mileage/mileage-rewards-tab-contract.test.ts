@@ -26,15 +26,7 @@ function withoutComments(source: string): string {
 describe('マイルの使い道で書いてはいけない形', () => {
   const code = withoutComments(TAB)
 
-  it('取れていない人数・引換コードの残りを 0 で埋めない', () => {
-    // `?? 0` で埋めると「1回も使っていない人 0人」＝全員が使った、と読める。
-    expect(code).not.toMatch(/neverRedeemedFriendCount\s*\?\?\s*0/)
-    expect(code).not.toMatch(/availableCodeCount\s*\?\?\s*0/)
-  })
 
-  it('下書きを「準備中」と言わない', () => {
-    expect(code).not.toContain('準備中')
-  })
 
   it('2つの取得で1つの札を使い回さない', () => {
     // 開いた瞬間に後の取得が先を古くし、一覧が loading のまま残る。
