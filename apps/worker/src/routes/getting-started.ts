@@ -6,6 +6,7 @@ import {
   hasFirstDeliveredMessage,
   hasSavedFeatureConfiguration,
   saveOnboardingGuideProgress,
+  acknowledgeOnboardingWelcome,
 } from '@line-crm/db';
 import type { OnboardingGuidePhase, OnboardingGuideProgressRow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -280,7 +281,7 @@ gettingStarted.put('/api/getting-started/guide', requireRole('owner', 'admin', '
   const scope = await requireGuideScope(c);
   if ('response' in scope) return scope.response;
 
-  const body = await c.req.json<{ phase?: unknown; stepKey?: unknown; procedureIndex?: unknown }>().catch(() => null);
+  const body = await c.req.json<{ phase?: unknown; stepKey?: unknown; procedureIndex?: unknown; acknowledgeWelcome?: unknown }>().catch(() => null);
   if (!body || !GUIDE_PHASES.includes(body.phase as OnboardingGuidePhase)) {
     return inputError(c, { success: false, error: '案内の状態が正しくありません' }, 400, ['phase']);
   }
@@ -291,6 +292,14 @@ gettingStarted.put('/api/getting-started/guide', requireRole('owner', 'admin', '
   const procedureIndex = body.procedureIndex ?? 1;
   if (!Number.isInteger(procedureIndex) || (procedureIndex as number) < 1) {
     return inputError(c, { success: false, error: '案内の手順が正しくありません' }, 400, ['procedureIndex']);
+  }
+
+  if (body.acknowledgeWelcome !== undefined) {
+    if (body.acknowledgeWelcome !== true || body.phase !== 'idle' || body.stepKey != null || procedureIndex !== 1) {
+      return inputError(c, { success: false, error: 'ウェルカムの確認内容が正しくありません' }, 400, ['acknowledgeWelcome']);
+    }
+    const row = await acknowledgeOnboardingWelcome(c.env.DB, scope.staffId, scope.accountId);
+    return c.json({ success: true, data: guidePayload(row) });
   }
 
   const row = await saveOnboardingGuideProgress(c.env.DB, {

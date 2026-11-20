@@ -342,7 +342,7 @@
   padding: 0 var(--polish-space-section);
   margin: var(--polish-space-field) 0 var(--polish-space-card);
 }
-:root .panel[data-design-layout='stacked'] > .descriptionBand { padding: 0; margin: 0; }
+:root .panel[data-design-layout^='stacked'] > .descriptionBand { padding: 0; margin: 0; }
 :root .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -1px; }
 :root .close svg { width: 16px; height: 16px; }
 :root .content { width: 100%; padding: 24px; }
@@ -389,15 +389,48 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
 
 /* 個別の板が指定した短い確認窓。既定の段の余白は変えない。 */
-:root .panel[data-design-layout='stacked'] { --dialog-stack-gap: 14px; padding: 24px; gap: var(--dialog-stack-gap); }
-:root .panel[data-design-layout='stacked'] > .headerRow { padding: 0; align-items: center; }
-:root .panel[data-design-layout='stacked'] .title { font-size: 17px; line-height: 26px; font-weight: 700; }
-:root .panel[data-design-layout='stacked'] > .description { margin: 0; width: 100%; line-height: 22px; }
-:root .panel[data-design-layout='stacked'] > .content { padding: 0; align-items: stretch; }
-:root .panel[data-design-layout='stacked'] .actions { padding: 0; border: 0; }
+:root .panel[data-design-layout^='stacked'] { --dialog-stack-gap: 14px; padding: 24px; gap: var(--dialog-stack-gap); }
+:root .panel[data-design-layout^='stacked'] > .headerRow { padding: 0; align-items: center; }
+:root .panel[data-design-layout^='stacked'] .title { font-size: 17px; line-height: 26px; font-weight: 700; }
+:root .panel[data-design-layout^='stacked'] > .description { margin: 0; width: 100%; line-height: 22px; }
+:root .panel[data-design-layout^='stacked'] > .content { padding: 0; align-items: stretch; }
+:root .panel[data-design-layout^='stacked'] .actions { padding: 0; border: 0; }
+
+:root .panel[data-design-layout='stacked-centered'] { padding: calc(var(--space-24) + var(--space-4)); }
+:root .panel[data-design-layout='stacked-centered'] .headerContent { align-items: center; }
+:root .panel[data-design-layout='stacked-centered'] .title { font-size: var(--text-title); line-height: var(--space-24); }
+:root .panel[data-design-layout='stacked-centered'] > .description { text-align: center; font-weight: var(--font-weight-reading); }
+:root .panel:is([data-design-layout='stacked-centered'], [data-design-layout='stacked-guided'], [data-design-layout='stacked-picker']) > .content::after { content: none; }
+:root .panel[data-design-layout='stacked-guided'] { padding: calc(var(--space-24) + var(--space-2)); gap: var(--space-16); }
+:root .panel[data-design-layout='stacked-picker'] { gap: var(--space-10); }
+:root .panel:is([data-design-layout='stacked-guided'], [data-design-layout='stacked-picker']) .title { width: 100%; }
+:root .panel:is([data-design-layout='stacked-guided'], [data-design-layout='stacked-picker']) .actions { justify-content: flex-start; }
+:root .panel[data-design-layout='stacked-centered'] .buttonPair { gap: var(--space-12); }
+:root .panel[data-design-layout='stacked-centered'] .buttonPair > button {
+  min-height: calc(var(--control-h) + var(--space-4));
+  padding-inline: var(--space-24);
+  border-radius: var(--radius-control);
+}
+html:root .panel[data-design-layout='stacked-centered'] .actions [data-variant='secondary'] {
+  background: var(--color-canvas);
+  padding-inline: var(--space-16);
+}
+html:root .panel[data-design-layout='stacked-centered'] .actions [data-variant='secondary']:not(:focus-visible) {
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+}
+html:root .panel[data-design-layout='stacked-centered'] .actions [data-variant='secondary']:hover:not(:disabled) {
+  background: var(--polish-hover);
+}
+:root .overlay:is([data-design-layout='stacked-centered'], [data-design-layout='stacked-guided'], [data-design-layout='stacked-picker']) {
+  background: color-mix(in srgb, var(--color-ink-secondary) 42%, transparent);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 :root .panel[data-confirm-first] .actions .buttonPair > button:last-of-type { order: -1; }
 
-:root .panel[data-design-layout='stacked'] .close { width: var(--control-icon-size); height: var(--control-icon-size); min-height: 0; padding: 0; }
+:root .panel[data-design-layout^='stacked'] .close { width: var(--control-icon-size); height: var(--control-icon-size); min-height: 0; padding: 0; }
 
 :root .panel[data-footer-align='start'] .actions[data-dialog-action-pair] { grid-template-columns: auto minmax(0, 1fr); }
 :root .panel[data-design-footer-gap] .actions { gap: var(--dialog-footer-gap); }
@@ -554,7 +587,7 @@ html:root .panel:not([data-layout]):not([data-design-layout]) > .footer > .actio
 html:root .panel[data-confirmation='compact']:not([data-layout]):not([data-design-layout]) > .headerRow {
   padding-block-end: 0;
 }
-html:root .panel[data-confirmation='compact'][data-design-layout='stacked'] > .footer {
+html:root .panel[data-confirmation='compact'][data-design-layout^='stacked'] > .footer {
   margin-block-start: calc(var(--polish-window-divider-space) - var(--dialog-stack-gap));
 }
 
@@ -574,3 +607,26 @@ html:root .panel[data-title-content] .title { min-width: 0; }
 html:root .panel[data-title-content] .title > span:last-child { min-width: 0; flex: 1; }
 
 .actionNote { grid-column: 1 / -1; flex-basis: 100%; min-height: var(--space-24); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--space-20); text-align: center; }
+
+/* ウェルカムのように画面全体を使う案内。 */
+:root .overlay[data-design-layout='fullscreen'] {
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+:root .panel[data-design-layout='fullscreen'] {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+:root .panel[data-design-layout='fullscreen']:not(:focus-visible) { outline-color: transparent; }
+:root .panel[data-design-layout='fullscreen']:focus-visible {
+  outline: var(--polish-focus-width) solid var(--color-focus-ring);
+  outline-offset: calc(-1 * var(--polish-focus-width));
+}
+:root .panel[data-design-layout='fullscreen'] > .content { flex: 1; padding: 0; }
+:root .panel[data-design-layout='fullscreen'] > .content::after { content: none; }

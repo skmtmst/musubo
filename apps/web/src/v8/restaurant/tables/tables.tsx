@@ -1,4 +1,5 @@
 'use client'
+import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
 import { DetailPreview } from '@/components/shared/detail-content'
 
 import { tableRequirements as b244Requirements } from './requirements'
@@ -19,7 +20,7 @@ import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { ApiError } from '@/lib/api/transport/errors'
 import KpiCard from '@/components/shared/kpi-card'
-import { useEffect,useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect,useMemo, useRef, useState } from 'react'
 import { Grid2X2, Inbox, Plus, Settings2 } from 'lucide-react'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import Button from '@/components/shared/button'
@@ -136,13 +137,22 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
   /* この卓に入っている、これから先の予約（取消・無断キャンセル・来店済みは除く）。 */
   const upcoming = stopping ? stopScope!.reservations : []
 
-  const openNew = (floorId?:string) => {
+  const openNew = useCallback((floorId?: string) => {
     setEditorError('')
     setDraft({ code: '', label: '', seatType: 'table', seatDetailType:'table', minCapacity: '1', maxCapacity: '2', floorX: '', floorY: '', joinGroup: '',floorId:floorId??floors[0]?.id??'floor-'+store?.id,shape:'rectangle',orientation:'horizontal',smokingPolicy:'non_smoking',partition:'open',shoesAllowed:true,isActive:true,visibleOnMap:true,chairArrangement:'both',chairSide:'left' })
     setCreateCount(1)
     setFieldErrors({})
     setEditor('new')
-  }
+  }, [floors, store?.id])
+  const { guide } = useSharedGuide() ?? {}
+  const resumeForm = guide?.phase === 'active' && guide.stepKey === 'attributes' && guide.procedureIndex === 2
+  const reopened = useRef(false)
+  useEffect(() => {
+    if (!resumeForm) { reopened.current = false; return }
+    if (!canEdit || !store || !snapshotAccountCurrent || reopened.current) return
+    reopened.current = true
+    if (!editor) openNew()
+  }, [resumeForm, canEdit, store, snapshotAccountCurrent, editor, openNew])
   const openEdit = (table: RestaurantTable) => {
     setEditorError('')
     setDraft({
