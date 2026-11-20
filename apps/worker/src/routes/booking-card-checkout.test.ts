@@ -73,14 +73,14 @@ it('関連付けの保存後に処理が止まっても定時の回収で登録�
 });
 
 it('模擬Stripeでカード登録から請求と返金まで同じカードで進む',async()=>{
- let requestId='';const calls:string[]=[];
+ let requestId='';const calls:string[]=[];const sends:RequestInit[]=[];
  vi.stubGlobal('fetch',vi.fn(async(url:RequestInfo | URL,init?:RequestInit)=>{
   const path=String(url);calls.push(path);const fields=new URLSearchParams(String(init?.body));
   if(path.includes('oauth2/v2.1/verify'))return Response.json({sub:'Uf'});
   if(path.endsWith('/customers')){requestId=fields.get('metadata[booking_payment_method_id]')!;return Response.json({id:'cus_person',livemode:false});}
   if(path.endsWith('/checkout/sessions'))return Response.json({id:'cs_test_abc',url:'https://checkout.stripe.com/c/pay/cs_test_abc',livemode:false});
   if(path.endsWith('/payment_intents')){expect(fields.get('amount')).toBe('4200');expect(fields.get('customer')).toBe('cus_person');expect(fields.get('payment_method')).toBe('pm_card');expect(fields.get('off_session')).toBe('true');expect((init?.headers as Record<string,string>)['Idempotency-Key']).toBe('booking_charge_charge1');return Response.json({id:'pi_charge1',livemode:false,status:'succeeded',amount:4200,currency:'jpy',customer:'cus_person',payment_method:'pm_card',metadata:{booking_charge_id:'charge1'}});}
-  if(path.endsWith('/refunds'))return Response.json({id:'re_refund1',status:'succeeded',amount:4200,currency:'jpy',payment_intent:'pi_charge1',metadata:{booking_refund_request_id:fields.get('metadata[booking_refund_request_id]')}});
+  if(path.endsWith('/refunds')){sends.push(init!);return Response.json({id:'re_refund1',status:'succeeded',amount:4200,currency:'jpy',payment_intent:'pi_charge1',metadata:{booking_refund_request_id:fields.get('metadata[booking_refund_request_id]')}});}
   throw new Error('unexpected mock request');
  }));
  expect((await start()).status).toBe(201);expect((await notify('checkout.session.completed',requestId)).status).toBe(200);expect((await notify('setup_intent.succeeded',requestId)).status).toBe(200);
@@ -90,4 +90,6 @@ it('模擬Stripeでカード登録から請求と返金まで同じカードで�
  const charged=await chargeCancellation(env,'a','bk','charge-key',{kind:'cancellation_fee',amount:4200},1,'o');expect(charged.row.status).toBe('succeeded');
  expect((await refundCancellationCharge(env,'a','charge1','refund-key',charged.row.version,'店の都合','o')).status).toBe('refunded');
  expect(calls.filter(path=>path.endsWith('/payment_intents'))).toHaveLength(1);expect(calls.filter(path=>path.endsWith('/refunds'))).toHaveLength(1);
+ const refundId=(fixture.raw.prepare('SELECT id FROM booking_charge_refund_requests WHERE charge_id=?').get('charge1') as {id:string}).id;
+ expect(new URLSearchParams(String(sends[0].body)).get('amount')).toBe('4200');expect(new URLSearchParams(String(sends[0].body)).get('payment_intent')).toBe('pi_charge1');expect((sends[0].headers as Record<string,string>)['Idempotency-Key']).toBe(`booking_refund_${refundId}`);
 });
