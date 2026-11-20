@@ -126,6 +126,12 @@ export function nextGuideEngineState(current: GuideEngineState, action: GuideEng
 
 export type GuideAnchor = { key: string; label: string; href: string }
 
+function savedGuideAnchor(summary: GuideSummary | null, state: GuideEngineState): GuideAnchor | null {
+  const step = summary?.steps.find(item => item.key === state.stepKey)
+  const reviewsTables = state.stepKey === 'attributes' && state.procedureIndex === 3
+  return step?.href && (!step.done || reviewsTables) ? { key: step.key, label: step.label, href: step.href } : null
+}
+
 /** 見送った段（この案内の間だけ覚える）。済みにはしないので、設定画面のチェックは付かない。 */
 const EMPTY_SKIPPED: ReadonlySet<string> = new Set<string>()
 
@@ -175,7 +181,7 @@ const BLOCK_ON_SAVE_FAILURE: ReadonlySet<GuideEngineAction> = new Set(['advance'
  * 進行状態はサーバーが正本。開いた直後は控えを見せ、読み込めたらサーバーの値に合わせる。
  * 進む操作は保存できた時だけ確定し、保存に失敗した時は元の所に戻す。
  */
-export function useGuideEngine(accountId: string | null, summary: GuideSummary | null) {
+export function useGuideEngine(accountId: string | null, summary: GuideSummary | null, scripted = true) {
   const [state, setState] = useState<GuideEngineState>(initialState)
   /**
    * この案内の間だけ見送った段。済みにはしない（完了判定は実データ計測のまま）。
@@ -183,16 +189,17 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
    */
   const [skipped, setSkipped] = useState<ReadonlySet<string>>(EMPTY_SKIPPED)
   /** サーバーの値を受け取るまでは、控えの値で進む操作を保存しない（古い値で上書きしない）。 */
-  const loaded = useRef(false)
+  const pending = useRef<Promise<boolean>>(Promise.resolve(true))
+  const generation = useRef(0)
 
   useEffect(() => {
-    loaded.current = false
+    const current = ++generation.current
     setState(readGuideEngineState(accountId))
+    pending.current = Promise.resolve(true)
     if (!accountId) return
-    let live = true
-    void api.gettingStarted.guide.get(accountId)
+    const request = api.gettingStarted.guide.get(accountId)
       .then(response => {
-        if (!live) return
+        if (generation.current !== current || pending.current !== request) return
         // 読めなかった時は控えのまま続ける（案内を取り上げない）。
         if (!response?.success || !response.data) return
         const next = guideStateFromServer(response.data)
@@ -200,20 +207,24 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
         writeGuideEngineState(accountId, next)
       })
       .catch(() => { /* 通信できなくても控えで案内は続ける */ })
-      .finally(() => { if (live) loaded.current = true })
-    return () => { live = false }
+      .then(() => true)
+    pending.current = request
+    return () => { generation.current += 1 }
   }, [accountId])
 
   const persist = useCallback(async (next: GuideEngineState) => {
     if (!accountId) return true
     writeGuideEngineState(accountId, next)
-    if (!loaded.current) return true
-    try {
-      const response = await api.gettingStarted.guide.save(accountId, {
-        phase: next.phase, stepKey: next.stepKey, procedureIndex: next.procedureIndex,
-      })
-      return Boolean(response?.success)
-    } catch { return false }
+    const request = pending.current.then(async () => {
+      try {
+        const response = await api.gettingStarted.guide.save(accountId, {
+          phase: next.phase, stepKey: next.stepKey, procedureIndex: next.procedureIndex,
+        })
+        return Boolean(response?.success)
+      } catch { return false }
+    })
+    pending.current = request
+    return request
   }, [accountId])
 
   const commit = useCallback((action: GuideEngineAction, stepKey: string | null = null) => {
@@ -225,10 +236,11 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
     const next = nextGuideEngineState(previous, action, stepKey)
     if (next === previous) return
     setState(next)
-    void persist(next).then(saved => {
-      if (saved || !BLOCK_ON_SAVE_FAILURE.has(action)) return
-      // 保存できなかった進行は取り消す。見た目だけ進んで記録が残らない状態を作らない。
-      setState(current => (current === next ? previous : current))
+    const currentGeneration = generation.current
+    const request = persist(next)
+    void request.then(saved => {
+      if (saved || !BLOCK_ON_SAVE_FAILURE.has(action) || generation.current !== currentGeneration || pending.current !== request) return
+      setState(previous)
       if (accountId) writeGuideEngineState(accountId, previous)
     })
   }, [state, persist, accountId])
@@ -237,15 +249,13 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
   const finished = Boolean(summary && summary.total > 0 && summary.done === summary.total)
 
   /* 9項目が済んだら案内を閉じる。まだ始めていない人の記録は作らない。 */
+  const reviewingCompletion = scripted && (
+    state.stepKey === 'attributes' && state.procedureIndex === 3 ||
+    state.stepKey === 'scenario' && state.procedureIndex === 2
+  )
   useEffect(() => {
-    if (!finished) return
-    setState(current => {
-      if (current.phase === 'idle' || current.phase === 'done') return current
-      const next = nextGuideEngineState(current, 'complete')
-      void persist(next)
-      return next
-    })
-  }, [finished, persist])
+    if (finished && !reviewingCompletion && state.phase !== 'idle') commit('complete')
+  }, [finished, reviewingCompletion, state.phase, commit])
 
   /*
     済んだ段から次の段へ進める。一時停止の間は動かさない。
@@ -254,15 +264,15 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
   useEffect(() => {
     if (state.phase !== 'active' || !anchor || anchor.key === state.stepKey) return
     const current = summary?.steps.find(item => item.key === state.stepKey)
-    if (current && guidable(current, skipped)) return
+    if (current && (guidable(current, skipped) || reviewingCompletion)) return
     commit('advance', nextGuidedStepKey(summary, state.stepKey, skipped) ?? anchor.key)
-  }, [state.phase, state.stepKey, anchor, summary, skipped, commit])
+  }, [state.phase, state.stepKey, reviewingCompletion, anchor, summary, skipped, commit])
 
   /** 手順を見送って次の段へ移る。済みにはせず、存在する次の案内へ渡す（枠14 共通ルール）。 */
   const advanceProcedure = useCallback(() => {
     if (state.phase !== 'active') return
-    const total = guideProcedureTotal(state.stepKey)
-    if (!(total > 0 && state.procedureIndex >= total)) {
+    const total = scripted ? guideProcedureTotal(state.stepKey) : 0
+    if (state.procedureIndex < total) {
       commit('advanceProcedure')
       return
     }
@@ -271,21 +281,21 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
     const nextKey = nextGuidedStepKey(summary, current, nextSkipped)
     if (!nextKey) {
       // 案内できる段がもう無い。完了を偽らず、再開できる形で止める。
-      commit('pause')
+      commit(finished ? 'complete' : 'pause')
       return
     }
     if (current) setSkipped(nextSkipped)
     commit('advance', nextKey)
-  }, [state, summary, skipped, commit])
+  }, [state, summary, skipped, commit, scripted, finished])
 
   return {
     phase: state.phase,
     stepKey: state.stepKey,
     procedureIndex: state.procedureIndex,
     anchor: state.phase === 'done' ? null : anchor,
-    pausedAnchor: state.phase === 'paused' ? anchor : null,
+    pausedAnchor: state.phase === 'paused' ? savedGuideAnchor(summary, state) ?? anchor : null,
     /** 最初から始める時は見送りの記憶も消す（また1段目から案内する）。 */
-    start: useCallback(() => { setSkipped(EMPTY_SKIPPED); commit('start', guideAnchor(summary)?.key ?? null) }, [commit, summary]),
+    start: useCallback(() => { setSkipped(EMPTY_SKIPPED); commit(state.phase === 'active' ? 'advance' : 'start', guideAnchor(summary)?.key ?? null) }, [commit, summary, state.phase]),
     /**
      * 選んだ段からガイドを始める（枠08b の行の「開く」）。
      * 止まっている時は 'start'、もう動いている時は 'advance' で段を移す。
@@ -297,7 +307,7 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
     }, [commit, state.phase]),
     pause: useCallback(() => commit('pause'), [commit]),
     /** 続きから再開する時は見送った段を飛ばしたまま戻る。 */
-    resume: useCallback(() => commit('resume', guideAnchor(summary, skipped)?.key ?? null), [commit, summary, skipped]),
+    resume: useCallback(() => commit('resume', savedGuideAnchor(summary, state)?.key ?? guideAnchor(summary, skipped)?.key ?? null), [commit, summary, skipped, state]),
     reset: useCallback(() => { setSkipped(EMPTY_SKIPPED); commit('reset') }, [commit]),
     /** 同じ段の次の手順へ。1/3→2/3→3/3。最後の手順では段をまたいで次の案内へ（枠14 の台本）。 */
     advanceProcedure,

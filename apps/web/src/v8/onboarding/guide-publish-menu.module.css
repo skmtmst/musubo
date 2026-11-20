@@ -1,0 +1,17 @@
+.preview {
+  display: grid;
+  gap: var(--space-12);
+  text-align: center;
+}
+
+.menu {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+}
+
+.image {
+  width: 100%;
+  height: auto;
+  border-radius: var(--polish-radius-card);
+}

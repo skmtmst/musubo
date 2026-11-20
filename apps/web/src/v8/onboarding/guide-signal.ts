@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useLayoutEffect } from 'react'
 
 /*
   「保存できた」「入力がそろった」で次の手順へ進む合図（承認済み Pen 枠 14 (orKSi) 共通ルール izsr5）。
@@ -27,7 +27,7 @@ export function emitGuideSignal(anchor: string): void {
 
 /** 今の手順の合図だけ受ける。別の手順の合図では進めない。 */
 export function useGuideSignal(anchor: string | null, enabled: boolean, onSignal: () => void): void {
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!enabled || !anchor || typeof window === 'undefined') return
     const handle = (event: Event) => {
       if ((event as CustomEvent<{ anchor?: string }>).detail?.anchor === anchor) onSignal()

@@ -117,7 +117,7 @@ export function stepsForStyle(steps: ReadonlyArray<StepResult>, style: AccountSt
   }
   switch (style) {
     case 'restaurant':
-      replace('attributes', '卓と席を登録する', '座席・卓を用意する', '座席・卓を開く', '/restaurant-test/tables', '座席・卓が登録されている', '座席と卓を登録し、予約で使う席を用意します。')
+      replace('attributes', '卓と席を登録する', '受付中の卓を1件以上用意する', '座席・卓を開く', '/restaurant-test/tables', '受付中で定員が1人以上の卓がある', '卓を作るか、停止中の卓の受付を再開してください。')
       replace('friendAdd', 'コースとメニューを登録する', '予約で受け付ける内容を決める', 'メニュー管理を開く', '/restaurant-test/menu', '予約で受け付けるコースとメニューが登録されている', '予約で受け付けるコースとメニューを登録します。')
       replace('scenario', '予約枠と在庫を設定する', '予約枠と在庫を用意する', '予約枠を開く', '/restaurant-test/inventory', '予約枠と在庫が用意され、受付を確認している', '予約枠と在庫を用意し、予約の受付を確認します。')
       if (copy.length > 0) {
