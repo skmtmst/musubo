@@ -2,10 +2,10 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
 import Button from './Button.js';
-import { styleBrowser } from '../../test-utils/style-browser.js';
+import { STYLE_BROWSER_HOOK_TIMEOUT, styleBrowser } from '../../test-utils/style-browser.js';
 
 let view: Awaited<ReturnType<typeof styleBrowser>>;
-beforeAll(async () => { view = await styleBrowser(); }, 30000);
+beforeAll(async () => { view = await styleBrowser(); }, STYLE_BROWSER_HOOK_TIMEOUT);
 afterAll(async () => { await view?.browser.close(); });
 afterEach(async () => { await view.page.mouse.up(); await view.page.emulateMedia({ reducedMotion: 'no-preference' }); });
 

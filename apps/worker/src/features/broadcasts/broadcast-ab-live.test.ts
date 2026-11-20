@@ -124,4 +124,21 @@ test('訂正配信はA/B設定と本送信を始めず台帳外へ送らない',
  await expect(startAbMock(d.db,'br',4,2400,'mock-correction')).rejects.toThrow('訂正配信ではA/Bテストを使えません');
  await expect(startAbLive(d.db,'br',4,2400,'live-correction',{transmit:send,liveDeliveryEnabled:true})).rejects.toThrow('訂正配信ではA/Bテストを使えません');
  expect(send).not.toHaveBeenCalled();
+test('A/B配信は未解決の共通情報を送らず、値があれば置き換える',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T01:00:00Z'));
+ try{
+  const app=gapApp(d,[broadcastAb]);
+  expect((await gapCall(app,'/api/broadcasts/br/variants/A','PUT',{text:'営業時間: {{var.hours}}',expectedVersion:1})).status).toBe(200);
+  expect((await gapCall(app,'/api/broadcasts/br/variants/B','PUT',{text:'B',expectedVersion:2})).status).toBe(200);
+  expect((await gapCall(app,p,'PUT',{testRatioPct:20,metric:'click',decideAfterMinutes:60,undecidedPolicy:'stop',expectedVersion:3})).status).toBe(200);
+  const send=transmit(),opts={transmit:send,liveDeliveryEnabled:true,now:new Date()};
+  await expect(startAbLive(d.db,'br',4,2400,'live-var',opts)).rejects.toMatchObject({message:expect.stringContaining('common_var_unresolved')});
+  expect(send).not.toHaveBeenCalled();
+  expect(d.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+  expect(d.raw.prepare('SELECT COUNT(*) n FROM broadcast_ab_live_tests').get()).toEqual({n:0});
+  d.raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES ('hours','a','営業時間','hours','text','10時')").run();
+  await startAbLive(d.db,'br',4,2400,'live-var',opts);
+  expect(send).toHaveBeenCalledTimes(2);
+  expect(send.mock.calls.find(([call])=>call.variantKey==='A')?.[0].messages).toEqual([{type:'text',text:'営業時間: 10時'}]);
+ }finally{vi.useRealTimers();}
 });

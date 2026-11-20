@@ -43,6 +43,7 @@ import {planFloorTables} from '@/components/shared/restaurant-floor-placement'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { notifyToast } from '@/components/shared/toast'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-overlay/index'
 
 
 /*
@@ -260,6 +261,8 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
       return
     }
     if (ok) {
+      /* 開店準備ガイドの手順2/3（枠14 F8mSog）は保存できた時に次へ進む。 */
+      if (!editing) emitGuideSignal('tables.form')
       setEditor(null)
       if(editing&&editing.is_active&&!draft.isActive){
         if (saveScope === scope.current && canEditRef.current) setPendingStop({ id: editing.id, scope: saveScope, before: beforeSave })
@@ -414,7 +417,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
         onCancel={() => setEditor(null)}
         actions={<><Button presentation="restaurant" type="button" onClick={() => setEditor(null)} disabled={busy}>キャンセル</Button><Button presentation="restaurant" type="submit" form="rs-table-editor" variant="primary" disabled={busy}><Plus size={16} aria-hidden="true" />{editing ? '変更を保存' : createCount===1?'卓を作る':`${createCount}卓を作る`}</Button></>}
       >
-        {draft && selectedAccountId && store ? <form id="rs-table-editor" ref={editorRef} className={styles.editorFields} noValidate onSubmit={(event) => { event.preventDefault(); void save() }}>
+        {draft && selectedAccountId && store ? <form id="rs-table-editor" data-guide-anchor="tables.form" ref={editorRef} className={styles.editorFields} noValidate onSubmit={(event) => { event.preventDefault(); void save() }}>
           {editorError ? <Notice tone="danger" role="alert">{editorError}</Notice> : null}
           <TablePenEditor draft={draft} onChange={setDraft} floors={floors} errors={fieldErrors} onCapacity={changeCapacity} count={createCount} onCount={setCreateCount} canBatch={!editing}/>
         </form> : null}

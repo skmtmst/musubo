@@ -1,3 +1,4 @@
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
@@ -267,8 +268,7 @@ test('受け皿の理由を見ると停止できない説明を出す', async ()
   })
 })
 
-// オーナー決定（2026-10-06）：閲覧のみの人には変える操作を押せない形でも置かず、隠す。
-test('v8 の閲覧のみは作る操作を置かない（隠す）', async () => {
+test('v8 の閲覧のみは作る操作を理由付きで拒否する', async () => {
   staffRole = verifiedStaffRole('staff')
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<FriendAddSettingsPage />))
@@ -278,7 +278,8 @@ test('v8 の閲覧のみは作る操作を置かない（隠す）', async () =>
   })
   const create = ([...host.querySelectorAll('button, a')]
     .find((item) => item.textContent?.includes('初回案内を作る')) ?? querySupplementaryPageAction('初回案内を作る'))
-  expect(create).toBeUndefined()
+  await expectPermissionLocked(create)
+  expect(host.querySelector('a[href="/friend-add-settings?view=new"]')).toBeNull()
 })
 
 test('v8 の閲覧のみは見出しの下に閲覧のみの帯が出る（板 LEwkJ）', async () => {

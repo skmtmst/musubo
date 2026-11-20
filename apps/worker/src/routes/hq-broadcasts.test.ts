@@ -129,6 +129,21 @@ describe('店と共通の一括配信 API-18',()=>{
   expect((await call(`/api/broadcasts/${child}/approval`)).status).toBe(404);
   expect((await call(`/api/broadcasts/${child}/approval-request`,'POST',{})).status).toBe(404);
  });
+ it('統括のテスト送信は未解決の共通情報を送らず、登録後の値を送る',async()=>{
+  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T01:00:00Z'));
+  try{
+   f.raw.exec(`INSERT INTO account_settings(line_account_id,key,value) VALUES('shop','test_recipients','["friend"]')`);
+   const r=await made({messageContent:'営業時間: {{var.hours}}'});vi.mocked(fetch).mockClear();
+   const send=()=>call(`/api/hq/broadcasts/${r.id}/test-send`,'POST',{accountId:'shop'});
+   await send();
+   expect(f.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+   expect(vi.mocked(fetch).mock.calls.filter(([url])=>String(url).endsWith('/message/push'))).toHaveLength(0);
+   f.raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES ('hours','shop','営業時間','hours','text','10時')").run();
+   expect((await send()).status).toBe(200);
+   const calls=vi.mocked(fetch).mock.calls.filter(([url])=>String(url).endsWith('/message/push'));
+   expect(calls).toHaveLength(1);expect(JSON.stringify(calls[0][1]?.body)).toContain('営業時間: 10時');
+  }finally{vi.useRealTimers();}
+ });
  it('テストは店内の設定宛先だけに全吹き出しを送り、混在宛先・短時間の繰り返しを止める',async()=>{
   f.raw.exec(`INSERT INTO account_settings(line_account_id,key,value) VALUES('shop','test_recipients','["friend"]')`);
   const r=await made({messageBubbles:[{id:'one',type:'text',content:{text:'1つ目'}},{id:'two',type:'text',content:{text:'2つ目'}}]});

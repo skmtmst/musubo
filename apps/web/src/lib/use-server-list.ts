@@ -104,6 +104,8 @@ export function useOffsetServerList<T>({
 }) {
   const [navigation, setNavigation] = useState({ requestKey, page: 1 })
   const [retryVersion, setRetryVersion] = useState(0)
+  const refreshWaiters = useRef<Array<(success: boolean) => void>>([])
+  useEffect(() => () => { for (const finish of refreshWaiters.current.splice(0)) finish(false) }, [])
   const page = navigation.requestKey === requestKey ? navigation.page : 1
   const { value: state, setValue: setState } = useListSnapshot<LoadState<T>>(JSON.stringify([requestKey, page, initialLimit]), initialState(initialLimit))
   /*
@@ -134,6 +136,11 @@ export function useOffsetServerList<T>({
     }
 
     const controller = new AbortController()
+    const waiters = refreshWaiters.current.splice(0)
+    const finishRefresh = (success: boolean) => {
+      if (!success) { refreshWaiters.current.push(...waiters.splice(0)); return }
+      for (const finish of waiters.splice(0)) finish(true)
+    }
     /*
      * 同じ条件で行が出ているときは残し、画面側へ `refreshing` を渡す。
      * 未取得の条件では ListState の読み込み表示を出す。
@@ -148,6 +155,7 @@ export function useOffsetServerList<T>({
      */
     const timeout = setTimeout(() => {
       controller.abort()
+      finishRefresh(false)
       setState((current) => (current.loading
         ? { ...current, loading: false, error: new Error('一覧の読み込みが時間切れになりました') }
         : current))
@@ -166,9 +174,11 @@ export function useOffsetServerList<T>({
           loading: false,
           error: null,
         })
+        finishRefresh(true)
       },
       (error: unknown) => {
         if (controller.signal.aborted) return
+        finishRefresh(false)
         // 通信の失敗では前の行を残す。権限を失ったときだけ隠す。
         setState((current) => ({ ...current, ...(classifyApiFailure(error) === 'forbidden' ? { items: [], loaded: false } : {}), loading: false, error: asError(error) }))
       },
@@ -176,6 +186,7 @@ export function useOffsetServerList<T>({
     return () => {
       clearTimeout(timeout)
       controller.abort()
+      finishRefresh(false)
     }
   }, [initialLimit, load, navigation.requestKey, page, requestKey, requestTimeoutMs, retryVersion, setState])
 
@@ -186,6 +197,10 @@ export function useOffsetServerList<T>({
     if (pageUrlKey) writeListUrlParam(pageUrlKey, safePage > 1 ? String(safePage) : '')
   }, [pageUrlKey])
   const retry = useCallback(() => setRetryVersion((version) => version + 1), [])
+  const retryAndWait = useCallback(() => new Promise<boolean>((resolve) => {
+    refreshWaiters.current.push(resolve)
+    setRetryVersion((version) => version + 1)
+  }), [])
   const pageCount = serverListPageCount(state.total, state.limit)
 
   return {
@@ -194,6 +209,7 @@ export function useOffsetServerList<T>({
     pageCount,
     setPage,
     retry,
+    retryAndWait,
     /*
      * 同じ条件の行を残した読み直し中。画面側の RefreshCover へ渡す。
      */

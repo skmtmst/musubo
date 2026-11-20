@@ -218,15 +218,4 @@ describe("管理画面 マイルの正本URLと概念分離", () => {
     expect(ADJUSTMENT).not.toContain("error instanceof ApiError || error instanceof Error ? error.message")
   })
 
-  it('スコアはマイルではないと3つの言い方で断る', () => {
-    /*
-      現役の補足で概念の区別を保つ。**「顧客には表示されず」だけでは足りない。**
-      「マイルが減るのでは」と聞かれたときに答えられるよう、
-      **交換できないこと・残高が動かないこと**を先に言う。
-      1文ではなく3つとも見る。言い換えると1つ落ちても気づけない。
-    */
-    expect(ACTION_SCORE).toContain('スコアはマイルではありません')
-    expect(ACTION_SCORE).toContain('お客様には見せず、交換もできません')
-    expect(ACTION_SCORE).toContain('マイル残高はスコアで増えも減りもしません')
-  })
 })

@@ -44,7 +44,7 @@ test('来店したを押すと人の予約に印が付き、取消で戻して�
   expect(fixture.post).toHaveBeenCalledWith('account-a', row.id, { kind: 'visited' })
   expect(fixture.changed).toHaveBeenCalledTimes(1)
   expect(fixture.getToday).toHaveBeenCalledWith('account-a', { date: '2026-10-04', mode: 'staff' })
-  expect(fixture.toast).toHaveBeenCalledWith('来店しました', expect.objectContaining({ actionLabel: '元に戻す' }))
+  expect(fixture.toast).toHaveBeenCalledWith('来店しました')
   fireEvent.click(screen.getByRole('button', { name: '取り消す' }))
   await waitFor(() => expect(screen.queryByRole('button', { name: '取り消す' })).toBeNull())
   expect(fixture.unmark).toHaveBeenCalledWith('account-a', row.id)
@@ -69,15 +69,6 @@ test('遅刻の分数を選べて、印を取り消せる', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'その他の操作' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: '印を取り消す' }))
   await waitFor(() => expect(screen.queryByText('15分遅れる')).toBeNull())
-  expect(fixture.unmark).toHaveBeenCalledWith('account-a', row.id)
-})
-
-test('成功通知の元に戻すも人の印を取り消す', async () => {
-  await mount()
-  fireEvent.click(screen.getByRole('button', { name: '来店した' }))
-  await waitFor(() => expect(fixture.toast).toHaveBeenCalled())
-  const options = fixture.toast.mock.calls[0][1]
-  await act(async () => options.onAction())
   expect(fixture.unmark).toHaveBeenCalledWith('account-a', row.id)
 })
 

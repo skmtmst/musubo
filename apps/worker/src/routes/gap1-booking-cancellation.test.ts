@@ -23,7 +23,7 @@ function connect(){d.raw.exec("INSERT INTO booking_payment_connections(line_acco
 function cancel(at='2026-11-20T04:00:00Z'){d.raw.prepare("UPDATE bookings SET status='cancelled',decided_at=? WHERE id='bk'").run(at);}
 function chargeBody(){return {kind:'cancellation_fee',amount:4200,expectedVersion:1};}
 beforeEach(()=>{d=gapFixture();vi.stubGlobal('fetch',vi.fn(async(input:unknown)=>{if(String(input).includes('oauth2/v2.1/verify'))return new Response(JSON.stringify({sub:'Uf'}));throw new Error('unexpected_external_request');}));});
-afterEach(()=>{d.raw.close();vi.unstubAllGlobals();});
+afterEach(()=>{d.raw.close();vi.useRealTimers();vi.unstubAllGlobals();});
 test('B1-01 B1-03 B1-29 B1-32: 試験接続だけ有効化、版を守りliveを拒否',async()=>{
  expect((await save()).status).toBe(409);connect();expect((await save()).status).toBe(200);expect((await save()).status).toBe(409);
  d.raw.exec('UPDATE booking_payment_connections SET test_mode=0');expect((await gapCall(app(),path,'PUT',{...policy,expectedVersion:1})).status).toBe(409);
@@ -81,6 +81,7 @@ test('B1-08: 署名が正しい試験の完了通知だけでカードを登録�
  const r=await app().request('/api/liff/booking/setup-webhook',{method:'POST',headers:{'stripe-signature':`t=${t},v1=${sig}`},body});expect(r.status).toBe(200);expect(d.raw.prepare('SELECT status FROM booking_payment_methods').get()).toEqual({status:'ready'});
 });
 test('B1-07 B1-08 B1-24: 実際のLIFF予約口も同意なしと古い決まりの版を拒否する',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));
  connect();await save();const {default:booking}=await import('./booking.js');
  const a=gapApp(d,[booking]);const request=(b:unknown)=>a.request('/api/liff/booking/requests?liffId=liff-a',{method:'POST',headers:{Authorization:'Bearer token','Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify(b)});
  const b={menu_id:'menu',staff_id:'bs',starts_at:'2026-11-20T05:00:00Z'};

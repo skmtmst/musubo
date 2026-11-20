@@ -4,9 +4,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { ACCOUNT_STYLES } from '@line-crm/shared'
 import { loadStyleSetupProgress } from './style-setup-progress'
 import { useStyleSetupProgress } from './use-style-setup-progress'
-const net = vi.hoisted(() => ({ menus: vi.fn(), staff: vi.fn(), settings: vi.fn(), account: vi.fn(), events: vi.fn(), members: vi.fn(), snapshot: vi.fn(), context: vi.fn(), restaurantProgress: vi.fn(), hours: vi.fn(), connector: vi.fn(), googleProfile: vi.fn(), googleConnection: vi.fn() }))
+const net = vi.hoisted(() => ({ menus: vi.fn(), staff: vi.fn(), settings: vi.fn(), account: vi.fn(), events: vi.fn(), members: vi.fn(), snapshot: vi.fn(), context: vi.fn(), restaurantProgress: vi.fn(), hours: vi.fn(), connector: vi.fn(), googleProfile: vi.fn(), googleConnection: vi.fn(), richMenus: vi.fn() }))
 vi.mock('@/lib/api', () => ({
-  api: { lineAccounts: { get: net.account }, ecCommerce: { connector: net.connector } },
+  api: { lineAccounts: { get: net.account }, ecCommerce: { connector: net.connector }, richMenuGroups: { listPage: net.richMenus } },
   bookingApi: { listMenus: net.menus, listStaff: net.staff, getSettings: net.settings }, eventsApi: { listEvents: net.events },
 }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { members: net.members } }))
@@ -32,6 +32,7 @@ beforeEach(() => {
   net.context.mockResolvedValue({ success: true, data: { selectedStore: { id: 'store' } } })
   net.restaurantProgress.mockResolvedValue({ success: true, data: { storeId: 'store', tables: true, hours: true, menus: true, reception: true, followup: true, followupRequired: true } })
   net.hours.mockResolvedValue({ success: true, data: { hours: [{ periods: [{ opensAt: '09:00', closesAt: '18:00' }] }] } })
+  net.richMenus.mockResolvedValue({ success: true, data: { items: [{ id: 'group' }] } })
   net.connector.mockResolvedValue({ success: true, data: { configured: true, connector: { status: 'connected', secretConfigured: true, eventTypes: ['ec.order.confirmed'] }, health: { lastSucceededAt: '2026-10-28T00:00:00Z' } } })
 })
 afterEach(cleanup)
@@ -40,7 +41,7 @@ const values = (progress: Awaited<ReturnType<typeof loadStyleSetupProgress>>) =>
 it.each(ACCOUNT_STYLES)('%sはその段の既存APIの実設定だけを使う', async style => {
   const progress = await loadStyleSetupProgress('a', style)
   expect(progress.style).toBe(style)
-  expect(values(progress)).toEqual(style === 'standard' ? [true] : style === 'ec' ? [true, true, null, true] : style === 'restaurant' ? [true, true, true, true, true] : [true, true, true, true])
+  expect(values(progress)).toEqual(style === 'standard' ? [true] : style === 'ec' ? [true, true, null, true] : style === 'restaurant' ? [true, true, true, true, true, true] : [true, true, true, true])
   if (style === 'standard') for (const [name, method] of Object.entries(net)) if (!['googleProfile', 'googleConnection'].includes(name)) expect(method).not.toHaveBeenCalled()
   if (style === 'ec') expect(progress.steps.friendAdd?.reason).toContain('商品を確認できる情報がまだありません')
 })
@@ -48,7 +49,7 @@ it.each(ACCOUNT_STYLES)('%sはその段の既存APIの実設定だけを使う',
 it.each(['restaurant', 'salon', 'consult', 'lesson', 'ec'] as const)('%sの取得失敗を設定済みにせず、未確認の理由を渡す', async style => {
   for (const method of Object.values(net)) method.mockRejectedValue(new Error('offline'))
   const progress = await loadStyleSetupProgress('a', style)
-  expect(values(progress)).toEqual(style === 'restaurant' ? [null, null, null, null, null] : [null, null, null, null])
+  expect(values(progress)).toEqual(style === 'restaurant' ? [null, null, null, null, null, null] : [null, null, null, null])
   for (const step of Object.values(progress.steps)) expect(step?.reason).toBeTruthy()
 })
 
@@ -59,7 +60,8 @@ it('読めた未登録はfalse、開催日時や商品の情報が足りない�
   net.events.mockResolvedValue({ items: [{ id: 'draft', is_published: 0, next_slot_starts_at: null }], total: 1 })
   expect(values(await loadStyleSetupProgress('a', 'lesson'))).toEqual([true, null, false, false])
   net.snapshot.mockResolvedValue({ success: true, data: { stores: [], tables: [], menuItems: [], inventory: [] } })
-  expect(values(await loadStyleSetupProgress('a', 'restaurant'))).toEqual([null, null, null, null, null])
+  /* リッチメニューは店舗の集計とは別に読むので、店が読めなくても下書きの有無で決まる。 */
+  expect(values(await loadStyleSetupProgress('a', 'restaurant'))).toEqual([null, null, null, null, null, true])
 })
 
 it('担当者がいてもメニューとの対応や営業時間を確かめないまま受付済みにしない', async () => {

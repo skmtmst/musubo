@@ -19,6 +19,7 @@ import { useManualHref } from '@/lib/use-manual-href'
 import { defaultTitleForPath } from '@/lib/page-title'
 import { canReturnToHqFrom } from '@/lib/hq-return'
 import { useOnboardingAccess } from '@/components/auth-guard'
+import { SetupChip } from './setup-chip'
 
 /**
  * 共通トップバーを、いまの画面の値へつなぐ層。
@@ -311,6 +312,8 @@ export default function AppTopBar() {
         （オーナー 2026-10-07・絵 zUg8S の zyFtB・l0VY4 を隠した）。互換経路は今までどおり。
       */
       showIdentity={false}
+      /* 枠 02 (C5i3rw) の「開店準備 N/9」の札。値を出す画面の間だけ出る。 */
+      leadingAction={<SetupChip />}
     />
     </div>
     {accountsLoadFailed ? (

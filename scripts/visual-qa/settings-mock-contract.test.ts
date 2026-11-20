@@ -2,7 +2,7 @@
  * 機能設定の画面確認モックが本物と約束違いしていないかの試験。
  *
  * mock が版（`version`）を返さないと、画面の `expectedVersion` 付き
- * 一括保存の欠落に目視確認で気づけない（点検 #507 の中6）。
+ * 一括保存の欠落に目視確認で気づけない。
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

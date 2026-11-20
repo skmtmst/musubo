@@ -14,6 +14,7 @@ import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { HoursCalendarPage } from './hours-calendar-page'
 import { restaurantGoogleApi, type GoogleDayHours } from '@/lib/restaurant-google-api'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-overlay/index'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useGooglePermission } from './use-google-permission'
@@ -37,7 +38,7 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate, s
  const operation=useRef(false)
  const {leaveTarget,confirmLeave,cancelLeave}=useUnsavedGuard({dirty:Boolean(m.config)&&(!m.saved||editorUnsaved),busy:busy||m.saving})
  const review=async()=>{if(!allowed||operation.current)return;operation.current=true;setBusy(true);setActionError('');setSendFailed(false);try{await m.review();setPanel(null);setConfirm(true);setSent(null)}catch(e){setActionError(errorMessage(e,'変更内容を確認できませんでした。入力内容は残っています。'))}finally{setBusy(false);operation.current=false}}
- const send=async()=>{if(!allowed||operation.current||!m.data)return;operation.current=true;setBusy(true);setActionError('');try{for(const change of m.changes){if(['applied','accepted'].includes(change.status))continue;await restaurantGoogleApi.sendChange(accountId,change.id)}const google=m.changes.length>0;await m.complete(google);setConfirm(false);setSent(google?'google':'local')}catch(e){setSendFailed(true);setConfirm(false);setCalendar(false);setActionError(errorMessage(e,'Googleに送信できませんでした。入力した内容は残っています。'));const refreshed=await Promise.all(m.changes.map(c=>restaurantGoogleApi.change(accountId,c.id).catch(()=>null)));m.setChanges(m.changes.map((c,i)=>refreshed[i]?.change??c))}finally{setBusy(false);operation.current=false}}
+ const send=async()=>{if(!allowed||operation.current||!m.data)return;operation.current=true;setBusy(true);setActionError('');try{for(const change of m.changes){if(['applied','accepted'].includes(change.status))continue;await restaurantGoogleApi.sendChange(accountId,change.id)}const google=m.changes.length>0;await m.complete(google);setConfirm(false);setSent(google?'google':'local');/* 開店準備ガイド⑤の手順2/2（枠14 kYvXk）は確定できた時に進む。 */emitGuideSignal('hours.confirm')}catch(e){setSendFailed(true);setConfirm(false);setCalendar(false);setActionError(errorMessage(e,'Googleに送信できませんでした。入力した内容は残っています。'));const refreshed=await Promise.all(m.changes.map(c=>restaurantGoogleApi.change(accountId,c.id).catch(()=>null)));m.setChanges(m.changes.map((c,i)=>refreshed[i]?.change??c))}finally{setBusy(false);operation.current=false}}
  const close=()=>{void m.flush().then(()=>setPanel(null)).catch(()=>undefined)}
  const open=(value:HoursPanel)=>{setSent(null);setSendFailed(false);setActionError('');setPanel(value)}
  if(m.loading)return <PageFrame kind="list"><ListState kind="loading" title="営業時間を読み込んでいます"/></PageFrame>

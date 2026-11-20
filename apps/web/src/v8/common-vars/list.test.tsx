@@ -344,7 +344,10 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     await flush()
     expect(host.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
     const create = [...host.querySelectorAll('button, a')].filter((b) => b.textContent?.includes('共通情報を作る'))
-    expect(create).toHaveLength(0)
+    expect(create.length).toBeGreaterThan(0)
+    expect(create.every(button => button.getAttribute('aria-disabled') === 'true')).toBe(true)
+    act(() => { (create[0] as HTMLButtonElement).click() })
+    expect(host.querySelector('a[href="/contents/vars/new"]')).toBeNull()
     act(() => { buttonByLabel('共通情報「会社名」の操作').click() })
     await flush()
     const menu = document.querySelector('[role="menu"]')!
@@ -354,3 +357,15 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+it.each([false, true])('共通情報の一覧行に未分類の丸を出す（狭幅 %s）', async (narrow) => {
+  const media = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({ matches: narrow, media: query, onchange: null, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(() => true) }))
+  try {
+    act(() => { root.render(<CommonVarsListV8 />) })
+    await flush()
+    const row = host.querySelector('[data-row-id="v-company"]')!
+    expect(row.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
+    expect(row.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
+    if (narrow) expect(document.querySelector('[data-design-node="XIzkJ"]')).not.toBeNull()
+  } finally { media.mockRestore() }
+})

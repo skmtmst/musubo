@@ -678,7 +678,9 @@
     "763_folder_membership_revisions.sql",
     "764_broadcast_ab_live.sql",
     "765_ec_auto_line_cap.sql",
-    "767_broadcast_correction_source.sql"
+    "767_broadcast_correction_source.sql",
+    "769_musubo_contracted_linked_slots.sql",
+    "770_onboarding_guide_progress.sql"
   ],
-  "migrationCount": 679
+  "migrationCount": 681
 }

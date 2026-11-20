@@ -972,10 +972,13 @@
         "apps/web/src/components/shared/dialog-form-row.tsx",
         "apps/web/src/components/shared/dialog-content-row.module.css",
         "apps/web/src/components/shared/dialog-recipient-list.tsx",
-        "apps/web/src/components/shared/dialog-recipient-list.module.css"
+        "apps/web/src/components/shared/dialog-recipient-list.module.css",
+        "apps/web/src/components/shared/sheet-dialog.tsx",
+        "apps/web/src/components/shared/sheet-dialog.module.css"
           ],
           "components": [
             "Dialog",
+            "SheetDialog",
             "ConfirmDialog",
             "DialogSteps",
             "DialogChoiceCards",

@@ -63,6 +63,21 @@ const noPause = async () => undefined
 
 describe('リマインダ配信の実行記録', () => {
 
+  it('共通情報がないリマインダは送らず、失敗の理由を残す', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-08-28T09:00:00Z'))
+    const { db, raw } = createTestD1({ now: () => new Date() })
+    try {
+      seedReminder(raw)
+      raw.prepare("UPDATE reminder_steps SET message_content='営業時間: {{var.hours}}' WHERE id='step-1'").run()
+      const send = vi.fn(async () => ({ requestId: 'accepted' }))
+      const client = makeClient(send)
+      await processReminderDeliveries(db, client, { now: new Date(), pause: noPause, resolveClient: async () => client })
+      expect(send).not.toHaveBeenCalled()
+      expect(raw.prepare('SELECT var_key, reason FROM common_var_resolution_failures').all()).toEqual([{ var_key: 'hours', reason: 'missing' }])
+    } finally { raw.close(); vi.useRealTimers() }
+  })
+
   it.each(['cron','manual','queued','expired_manual','exhausted_manual'])('holds an ambiguous historical reminder via %s without another request',async mode=>{
     const {db,raw}=createTestD1();seedReminder(raw);let sends=0;
     const client=makeClient(async()=>{sends++;throw Object.assign(new Error('rejected'),{status:429});});

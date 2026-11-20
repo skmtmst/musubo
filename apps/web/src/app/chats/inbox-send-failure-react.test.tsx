@@ -29,6 +29,7 @@ const json = (data: unknown, status = 200) => new Response(JSON.stringify(data),
 })
 
 let sendKeys: Array<string | null> = []
+let requests: Array<{ url: string; path: string; method: string }> = []
 
 let sendResponse: () => Response = () => json({
   success: true,
@@ -36,6 +37,7 @@ let sendResponse: () => Response = () => json({
 })
 
 function responseFor(url: URL, init?: RequestInit): Response {
+  requests.push({ url: url.href, path: url.pathname, method: init?.method ?? 'GET' })
   if (url.pathname === '/api/chats/friend-a/send' && init?.method === 'POST') {
     sendKeys.push(new Headers(init.headers).get('Idempotency-Key'))
     return sendResponse()
@@ -101,6 +103,7 @@ describe('N-028/N-029 受信箱送信の失敗理由', () => {
 
   beforeEach(() => {
     sendKeys = []
+    requests = []
     fixture.params = new URLSearchParams('friend=friend-a')
     sendResponse = () => json({
       success: true,
@@ -139,6 +142,15 @@ describe('N-028/N-029 受信箱送信の失敗理由', () => {
       .find((b) => b.textContent?.trim() === '送信する')!
     await act(async () => { button.click() })
   }
+
+  it('画面の手動返信は受信箱の口へ1回送り、Proxyへ送らない', async () => {
+    await act(async () => root.render(<ChatsPage />))
+    await eventually(() => expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull())
+    requests = []
+    await typeAndSend('こんにちは')
+    expect(requests.filter(request => request.method === 'POST' && request.path.includes('/send')).map(request => request.path)).toEqual(['/api/chats/friend-a/send'])
+    expect(requests.some(request => /line-proxy|\/v2\/bot\/message\/push/.test(request.url))).toBe(false)
+  })
 
   it('429は送信制限と待機時間を入力欄の近くへ出し、入力を残す', async () => {
     sendResponse = () => json({
