@@ -223,7 +223,13 @@ function stubBrowser(theme: string | undefined, measured: unknown) {
 }
 
 describe('撮る前に偽ログインを置く', () => {
-  it('偽ログインの値だけを置く', () => {
+  it('偽ログインの値と初回ポップアップの閉じた印だけを置く', () => {
+    /*
+     * 撮影は初回案内を閉じた状態から始める。重なった案内で本来見たい中身が
+     * 隠れたり押せなくなるのを防ぐため。ポップアップ自体の見張り
+     * （first-run-popup.*.spec.mjs）はこの印を外して出すので、ここで閉じても
+     * ポップアップの表示・保存・読み直しの確認は失われない。
+     */
     expect(PARITY_INIT).toEqual({
       lh_csrf: 'visual-qa-csrf',
       lh_staff_role: 'owner',
@@ -232,6 +238,7 @@ describe('撮る前に偽ログインを置く', () => {
       lh_staff_view_permissions: '[]',
       lh_selected_account: 'visual-qa-account',
       lh_auth_selection_cleared: '1',
+      'lh:v8:first-run-popup-dismissed:visual-qa-account': '1',
     })
   })
 

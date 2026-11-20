@@ -5,8 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 /*
- * 2026-10-03 点検の画面エラー（JS）3件の再発防止。いずれも「偽 API の応答が
- * 本物の API と違う形」だった。画面は本物の形を前提に読むので、偽 API が
+ * 画面は本物の API の応答の形を前提に読むので、偽 API が
  * 既定の `{success, data:{items,…}}` に落ちると画面が落ちる。
  *
  * - /booking/menus … `c.value.staff is not iterable`（staff-menus が未定義）

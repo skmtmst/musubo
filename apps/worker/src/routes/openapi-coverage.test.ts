@@ -145,6 +145,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/booking/admin/groups/{id}/cancellation-quote',
   'GET /api/liff/booking/groups/{id}/cancellation-quote',
   'POST /api/booking/admin/makeup-credits/{id}/operations',
+  'GET /api/getting-started/guide',
+  'PUT /api/getting-started/guide',
   'GET /api/hq/billing/musubo/last-line-end',
   'POST /api/hq/billing/musubo/last-line-end',
   'GET /api/hq/billing/musubo/line-addition',

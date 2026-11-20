@@ -1,3 +1,4 @@
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
@@ -174,15 +175,16 @@ test('v8 では新しい一覧（FM94M）が出て、管理画面 は出ない',
   expect(host?.querySelector('[data-page-template="list"] [data-template-region="content"]')?.textContent).toContain('問い合わせ先')
 })
 
-// 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
-test('staff では閲覧のみの帯が出て、作る操作は出さない', async () => {
+test('staff では閲覧のみの帯と作る操作の理由が出る', async () => {
   window.localStorage.setItem('lh_staff_role', 'staff'); rememberStaffIdentity({ role: 'staff' } as StaffMember)
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   expect(host?.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
   const createButtons = Array.from(host?.querySelectorAll('button, a') ?? [])
     .filter((element) => element.textContent?.includes('共通情報を作る'))
-  expect(createButtons).toHaveLength(0)
+  expect(createButtons.length).toBeGreaterThan(0)
+  for (const button of createButtons) await expectPermissionLocked(button)
+  expect(host?.querySelector('a[href="/contents/vars/new"]')).toBeNull()
 })
 
 test('旧テーマ属性が残っていてもV8の一覧が出る', async () => {

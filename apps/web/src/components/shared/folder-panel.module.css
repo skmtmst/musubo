@@ -60,7 +60,10 @@
  */
 :root .row:not([data-active]) .menu {
   position: absolute; right: 10px; top: 50%; translate: 0 -50%;
-  opacity: 0; pointer-events: none;
+  /* 見た目は乗せるまで出さないが、当たり判定は残す。外すと触らずに
+     押す操作（自動試験・ホバーなしの当たり判定）が件数の札に遮られて
+     押せない。マウスの動きは変わらない（乗せた時点で出ている）。 */
+  opacity: 0; pointer-events: auto;
 }
 :root .row:not([data-active]):hover .menu,
 :root .row:not([data-active]):focus-within .menu,

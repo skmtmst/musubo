@@ -150,7 +150,7 @@ describe('右の欄でその場で直す', () => {
     })
   })
 
-  it('対応状況は選んだ瞬間に変え、版を送らずその項目だけ保存し、［元に戻す］で前の状態を送る', async () => {
+  it('対応状況は選んだ瞬間に変え、版を送らずその項目だけ保存する', async () => {
     mocks.update.mockResolvedValue({ success: true, data: { revision: 4 } })
     await renderPanel()
     const select = document.querySelector('select[aria-label="対応状況を変える"]') as HTMLSelectElement
@@ -161,9 +161,8 @@ describe('右の欄でその場で直す', () => {
     expect(select.value).toBe('in_progress')
     await eventually(() => { expect(host.textContent).toContain('対応状況を「対応中」にしました') })
     expect(mocks.update).toHaveBeenCalledWith('friend-0', { status: 'in_progress' })
-    await act(async () => { button('元に戻す')!.click() })
-    await eventually(() => { expect(mocks.update).toHaveBeenLastCalledWith('friend-0', { status: 'unread' }) })
-    expect((document.querySelector('select[aria-label="対応状況を変える"]') as HTMLSelectElement).value).toBe('unread')
+    expect(button('元に戻す')).toBeUndefined()
+    expect(select.value).toBe('in_progress')
   })
 
   it('担当の保存に失敗したら選ぶ前に戻し、理由と［もう一度試す］を出す', async () => {
@@ -181,7 +180,7 @@ describe('右の欄でその場で直す', () => {
     await eventually(() => { expect(host.textContent).toContain('担当をMasatoにしました') })
   })
 
-  it('タグは1つずつ外し、［元に戻す］で付け直す（ほかのタグに触らない）', async () => {
+  it('タグは確認してから1つずつ外す（ほかのタグに触らない）', async () => {
     mocks.removeTag.mockResolvedValue({ success: true, data: null })
     mocks.addTag.mockResolvedValue({ success: true, data: null })
     await renderPanel()
@@ -193,8 +192,8 @@ describe('右の欄でその場で直す', () => {
     await act(async () => { button('外す')!.click() })
     await eventually(() => { expect(host.textContent).toContain('タグ「未契約」を外しました') })
     expect(mocks.removeTag).toHaveBeenCalledWith('friend-0', 'tag-a')
-    await act(async () => { button('元に戻す')!.click() })
-    await eventually(() => { expect(mocks.addTag).toHaveBeenCalledWith('friend-0', 'tag-a') })
+    expect(button('元に戻す')).toBeUndefined()
+    expect(mocks.addTag).not.toHaveBeenCalled()
   })
 
   it('タグを外す確認をキャンセルすると、タグも保存先も変えない', async () => {
@@ -251,7 +250,7 @@ describe('右の欄でその場で直す', () => {
       expect(mocks.update).toHaveBeenNthCalledWith(2, 'friend-0', { notes: '新しいメモ', revision: 5 })
     })
 
-    it('相手もメモを直していたら、あとから直したこちらを残して知らせ、［元に戻す］で相手のメモに戻す', async () => {
+    it('相手もメモを直していたら、あとから直したこちらを残して知らせる', async () => {
       mocks.update
         .mockRejectedValueOnce(new ApiError(409, 'ほかの担当者が先に更新しました', 'REVISION_CONFLICT'))
         .mockResolvedValue({ success: true, data: { revision: 6 } })
@@ -259,9 +258,8 @@ describe('右の欄でその場で直す', () => {
       await renderPanel()
       await typeMemo('自分のメモ')
       await eventually(() => { expect(host.textContent).toContain('ほかの人が先にメモを直していました') })
-      await act(async () => { button('元に戻す')!.click() })
-      await eventually(() => { expect(mocks.update).toHaveBeenLastCalledWith('friend-0', { notes: '相手のメモ' }) })
-      expect((document.getElementById('inbox-panel-memo') as HTMLTextAreaElement).value).toBe('相手のメモ')
+      expect(button('元に戻す')).toBeUndefined()
+      expect((document.getElementById('inbox-panel-memo') as HTMLTextAreaElement).value).toBe('自分のメモ')
     })
   })
 })

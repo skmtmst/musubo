@@ -1,3 +1,4 @@
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -180,13 +181,16 @@ async function renderPage() {
 }
 
 describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
-  test('閲覧専用は登録を隠し、一覧・表示切替・権限の説明を保つ', async () => {
+  test('閲覧専用は登録を理由付きで拒否し、一覧と表示切替を保つ', async () => {
     readOnly = true
     await renderPage()
     expect(host?.textContent).toContain('秋の新商品.jpg')
     expect(host?.querySelector('[data-page-template="list"] [data-template-region="content"]')?.textContent).toContain('秋の新商品.jpg')
     expect(host?.textContent).toContain('閲覧のみで見ています')
-    expect([...host!.querySelectorAll('button')].some(button => button.textContent?.includes('メディアを登録する'))).toBe(false)
+    const create = [...host!.querySelectorAll('button')].filter(button => button.textContent?.includes('メディアを登録する'))
+    expect(create.length).toBeGreaterThan(0)
+    for (const button of create) await expectPermissionLocked(button)
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
     expect(host!.querySelector('[aria-label="一覧で並べる"]')).not.toBeNull()
     const pager = host!.querySelector('[data-list-pager]')!
     expect(pager.textContent).not.toContain('管理者だけ')

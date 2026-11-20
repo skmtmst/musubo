@@ -266,7 +266,9 @@ html:root .actionRow > :is(button, a) { grid-row: 1; padding-inline: var(--polis
 
 
 /* 通常の白いカードは影だけで浮かせ、枠の線を重ねない。 */
-html:root .card[data-card-variant='default']:not([data-card-frame]):not([data-card-surface]):not([data-appearance]):not(:focus-visible) { border: 0; outline-color: transparent; }
+html:root .card[data-card-variant='default']:not([data-card-frame]):not([data-card-surface]):not([data-appearance]):not([data-card-edge]):not(:focus-visible) { border: 0; outline-color: transparent; }
+/* 影ではなく内側の細い線で縁を出すカード（edge="hairline"）。指定したカードだけに効かせる。 */
+html:root .card[data-card-edge='hairline']:not(:focus-visible) { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -1px; }
 html:root .card:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
 /* 変更案と、その前提を確認する内側の面。指定したカードにのみ適用する。 */
