@@ -395,13 +395,16 @@ it('removes meeting links and Outlook booking records only for the deleted custo
            ('kept-link','kept-0-booking','zoom','pending','kept-key','now','now');
     INSERT INTO workflow_steps (scope_id, process_kind, subject_id, step_key, retry_key, created_at, updated_at)
     VALUES ('line:fixture-account','booking_outlook_sync','deleted-0-booking','current','a',0,0),
+           ('line:fixture-account','booking_meeting_retry','deleted-0-booking','request','retry',0,0),
            ('line:fixture-account','booking_outlook_sync','kept-0-booking','current','b',0,0),
+           ('line:fixture-account','booking_meeting_retry','kept-0-booking','request','b2',0,0),
            ('line:other-account','booking_outlook_sync','deleted-0-booking','current','c',0,0),
            ('line:fixture-account','booking_outlook_busy','fixture-staff','current','d',0,0);`);
   await deleteCustomerData(env(), { kind: 'friend_data', id: 'fixture-friend', friendId: 'fixture-friend', accountId: 'fixture-account', lineUserId: 'LINE-fixture-friend' }, 'owner');
   expect(sqlite.raw.prepare('SELECT id FROM booking_meeting_links').all()).toEqual([{ id: 'kept-link' }]);
   expect(sqlite.raw.prepare('SELECT scope_id, process_kind, subject_id FROM workflow_steps ORDER BY retry_key').all()).toEqual([
     { scope_id: 'line:fixture-account', process_kind: 'booking_outlook_sync', subject_id: 'kept-0-booking' },
+    { scope_id: 'line:fixture-account', process_kind: 'booking_meeting_retry', subject_id: 'kept-0-booking' },
     { scope_id: 'line:other-account', process_kind: 'booking_outlook_sync', subject_id: 'deleted-0-booking' },
     { scope_id: 'line:fixture-account', process_kind: 'booking_outlook_busy', subject_id: 'fixture-staff' },
   ]);

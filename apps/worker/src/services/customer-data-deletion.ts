@@ -63,7 +63,7 @@ function conditionsFor(target: DeletionTarget): Record<string, string> {
   result.event_booking_transition_runs = `line_account_id IS ?3 AND (json_extract(input_snapshot,'$.friendId')=?1 OR json_extract(input_snapshot,'$.recipient')=?2)`;
   result.style_analytics_results = `line_account_id IS ?3 AND EXISTS(SELECT 1 FROM json_each(style_analytics_results.selection_json,'$.ids') p WHERE json_extract(p.value,'$.friendId')=?1)`;
   result.media_file_scans = 'id IN (SELECT scan_id FROM form_submission_files WHERE friend_id = ?1)';
-  result.workflow_steps = `scope_id = 'line:' || ?3 AND process_kind = 'booking_outlook_sync'
+  result.workflow_steps = `scope_id = 'line:' || ?3 AND process_kind IN ('booking_outlook_sync','booking_meeting_retry')
     AND EXISTS (SELECT 1 FROM bookings b WHERE b.id = workflow_steps.subject_id AND b.line_account_id = ?3 AND b.friend_id = ?1)`;
   return result;
 }
