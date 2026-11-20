@@ -13,9 +13,9 @@ function seed(requested = [row('b', '山田', 'requested')], confirmed = [row('c
     return { total: rows.length, requests: rows.slice(params.offset, params.offset + params.limit) }
   })
 }
-it('すべてでは要対応を先に表示し、切り替えで承認待ちと要対応を絞る', async () => {
+it('すべてでは承認待ちを先に表示し、承認待ちだけに絞る', async () => {
   seed(); const open = vi.fn(); render(<BookingReception onOpen={open} />)
-  expect(await screen.findByText('要対応 1件・承認待ち 1件')).toBeTruthy()
+  expect(await screen.findByText('承認待ち 1件（今日以降）')).toBeTruthy()
   const rows = within(screen.getByRole('table')).getAllByRole('row')
   expect(within(rows[1]).getByText('山田')).toBeTruthy()
   expect(within(rows[2]).getByText('鈴木')).toBeTruthy()
@@ -24,8 +24,7 @@ it('すべてでは要対応を先に表示し、切り替えで承認待ちと�
   fireEvent.click(within(tabs).getByRole('button', { name: '承認待ち' }))
   await waitFor(() => expect(screen.queryByText('鈴木')).toBeNull())
   expect(await screen.findByText('山田')).toBeTruthy()
-  fireEvent.click(within(tabs).getByRole('button', { name: '要対応' }))
-  expect(await screen.findByText('山田')).toBeTruthy()
+  expect(within(tabs).queryByRole('button', { name: '要対応' })).toBeNull()
   expect(screen.queryByText(/未割り当て/)).toBeNull()
   expect(mocks.list).toHaveBeenCalledWith('a', 'requested', expect.objectContaining({ from: expect.any(String) }))
 })

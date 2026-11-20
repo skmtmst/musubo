@@ -12,8 +12,8 @@ import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Th, Td, Tr, RowNameButton } from '@/components/shared/table'
 import { formatDay, formatTime } from '@/lib/format'
 
-type Filter = 'all' | 'requested' | 'attention'
-type Page = { account: string; requests: BookingRequest[]; total: number; attention: number }
+type Filter = 'all' | 'requested'
+type Page = { account: string; requests: BookingRequest[]; total: number; requestedCount: number }
 type Result = { requests: BookingRequest[]; total: number }
 const PAGE_SIZE = 20
 function valid(result: Result): Result {
@@ -39,7 +39,7 @@ export default function BookingReception({ onOpen, refreshKey }: { onOpen: (id: 
       const start = (page - 1) * PAGE_SIZE
       if (filter !== 'all') {
         const requested = await get('requested', PAGE_SIZE, start)
-        return { account, requests: requested.requests, total: requested.total, attention: requested.total }
+        return { account, requests: requested.requests, total: requested.total, requestedCount: requested.total }
       }
       // まず件数を取得し、ページ境界にかかる分だけを読む。承認待ちを必ず先に並べる。
       const [requestedCount, confirmedCount] = await Promise.all([get('requested', 1, 0), get('confirmed', 1, 0)])
@@ -49,7 +49,7 @@ export default function BookingReception({ onOpen, refreshKey }: { onOpen: (id: 
         requestedLength ? get('requested', requestedLength, start) : Promise.resolve(null),
         confirmedLength ? get('confirmed', confirmedLength, Math.max(0, start - requestedCount.total)) : Promise.resolve(null),
       ])
-      return { account, requests: [...(requested?.requests ?? []), ...(confirmed?.requests ?? [])], total: requestedCount.total + confirmedCount.total, attention: requestedCount.total }
+      return { account, requests: [...(requested?.requests ?? []), ...(confirmed?.requests ?? [])], total: requestedCount.total + confirmedCount.total, requestedCount: requestedCount.total }
     })().then(result => {
       if (!active) return
       const lastPage = Math.max(1, Math.ceil(result.total / PAGE_SIZE))
@@ -62,9 +62,9 @@ export default function BookingReception({ onOpen, refreshKey }: { onOpen: (id: 
   if (error) return <ListState kind="error" title="予約受付を読み込めませんでした" onRetry={() => setRevision(n => n + 1)} />
   if (state?.account !== selectedAccountId) return <ListState kind="loading" title="予約受付を読み込んでいます" />
   return <Card variant="form" aria-label="予約受付管理">
-    <CardHeader size="stacked" title="予約受付管理" meta={`要対応 ${state.attention}件・承認待ち ${state.attention}件`} />
+    <CardHeader size="stacked" title="予約受付管理" meta={`承認待ち ${state.requestedCount}件（今日以降）`} />
     <SegmentedControl aria-label="予約受付の絞り込み" value={filter} onChange={next => { setPage(1); setFilter(next) }} options={[
-      { value: 'all', label: 'すべて' }, { value: 'requested', label: '承認待ち' }, { value: 'attention', label: '要対応' },
+      { value: 'all', label: 'すべて' }, { value: 'requested', label: '承認待ち' },
     ]} />
     {state.requests.length ? <DataTable><thead><TableHeadRow><Th grow>予約</Th><Th>日時</Th><Th grow>内容</Th><Th>担当</Th><Th>状態</Th></TableHeadRow></thead><tbody>
       {state.requests.map(row => <Tr key={row.id}><Td grow><RowNameButton onClick={() => onOpen(row.id)}>{row.friend_name || '名前未設定'}</RowNameButton></Td><Td>{formatDay(row.starts_at)} {formatTime(row.starts_at)}</Td><Td grow>{row.menu_name}</Td><Td>{row.staff_name || '担当を確認'}</Td><Td><StatusBadge tone={row.status === 'requested' ? 'caution' : 'neutral'}>{row.status === 'requested' ? '承認待ち' : '予約済み'}</StatusBadge></Td></Tr>)}
