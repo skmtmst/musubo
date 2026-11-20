@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 /* 担当スタッフのつなぐ先（B7・uRd8A・GcYWx）：読み込み・書き込みは別々に保存、書き込みのオフは確かめの窓を通す。閲覧のみは押せるものを置かない。 */
 
-const net = vi.hoisted(() => ({ getSwitches: vi.fn(), saveSwitches: vi.fn(), getStaffUrl: vi.fn(), saveStaffUrl: vi.fn() }))
+const net = vi.hoisted(() => ({ getSwitches: vi.fn(), saveSwitches: vi.fn(), getStaffUrl: vi.fn(), saveStaffUrl: vi.fn(), connection: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), prefer: vi.fn() }))
 vi.mock('@/lib/api/helpers/gap1', async (load) => {
   const actual = await load<typeof import('@/lib/api/helpers/gap1')>()
   return { ...actual, bookingCalendarApi: { ...actual.bookingCalendarApi, ...net } }
@@ -21,12 +21,34 @@ beforeEach(() => {
   net.saveSwitches.mockImplementation(async (_id, input) => ({ success: true, data: { ...SWITCH, ...input, version: 4 } }))
   net.getStaffUrl.mockResolvedValue({ success: true, data: { url: 'https://meet.google.com/abc', version: 1 } })
   net.saveStaffUrl.mockResolvedValue({ success: true, data: { url: 'https://meet.google.com/xyz', version: 2 } })
+  net.connection.mockImplementation(async (_id, _staff, provider) => ({ data: { state: provider === 'outlook' ? 'ready' : 'missing', preferred: false, mode: 'configured' } }))
+  net.disconnect.mockResolvedValue({ data: { disconnected: true } })
+})
+
+it('Outlook の切断は確認してから送る', async () => {
+  render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit onClose={() => undefined} />)
+  fireEvent.click(await screen.findByRole('button', { name: '切る' }))
+  expect(net.disconnect).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: '接続を切る' }))
+  await waitFor(() => expect(net.disconnect).toHaveBeenCalledWith('acc-1', 'bs-1', 'outlook'))
+})
+
+it('Outlook が読めない理由を表示する', async () => {
+  net.getSwitches.mockResolvedValue({ data: { ...SWITCH, health: { error_code: 'outlook_test_staff_required', failed_since: null, last_success_at: null } } })
+  render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit onClose={() => undefined} />)
+  expect(await screen.findByText('担当者本人をテスト送信の相手に登録してください。')).toBeTruthy()
+})
+it('Outlook が切れているときはつなぎ直しを案内する', async () => {
+  net.connection.mockImplementation(async (_id, _staff, provider) => ({ data: { state: provider === 'outlook' ? 'unknown' : 'missing', preferred: false, mode: 'configured' } }))
+  render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit onClose={() => undefined} />)
+  expect(await screen.findByRole('button', { name: 'つなぎ直す' })).toBeTruthy()
+  expect(screen.getByText(/Outlook カレンダーをつなぎ直してください/)).toBeTruthy()
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 it('書き込みをオフにするときは確かめの窓で「先の予定を消す」を選び、confirmed と removeFutureEvents を版つきで送る', async () => {
   render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit onClose={() => undefined} />)
-  fireEvent.click(await screen.findByRole('switch', { name: 'Google カレンダーの書き込み' }))
+  fireEvent.click(await screen.findByRole('switch', { name: 'カレンダーの書き込み' }))
   expect(net.saveSwitches).not.toHaveBeenCalled()
   fireEvent.click(await screen.findByRole('radio', { name: /これから先の予約の予定を消す（12 件）/ }))
   fireEvent.click(screen.getByRole('button', { name: '書き込みをオフにする' }))
@@ -35,7 +57,7 @@ it('書き込みをオフにするときは確かめの窓で「先の予定を�
 
 it('読み込みは確かめなしで、そのスタッフの切り替えとして保存する', async () => {
   render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit onClose={() => undefined} />)
-  fireEvent.click(await screen.findByRole('switch', { name: 'Google カレンダーの読み込み' }))
+  fireEvent.click(await screen.findByRole('switch', { name: 'カレンダーの読み込み' }))
   await waitFor(() => expect(net.saveSwitches).toHaveBeenCalledWith('acc-1', { readEnabled: false, writeEnabled: true, expectedVersion: 3 }, 'bs-1'))
 })
 
