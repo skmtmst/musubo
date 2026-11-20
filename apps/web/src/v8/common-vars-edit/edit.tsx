@@ -892,7 +892,7 @@ function EditCommonVarV8Inner() {
               <h2 id="cv-edit-usage-heading" className={styles.cardTitle}>使用先 {formatNumber(impact.total)}か所</h2>
               {pinError ? <Notice tone="danger">{pinError}</Notice> : null}
               <ConfirmDialog open={pinTarget !== null && pinTarget.accountId === selectedAccountId && pinTarget.itemId === item?.id} title={pinTarget?.mode === 'live' ? '最新の値に戻しますか' : 'この版で固定しますか'} description={`${pinTarget?.name ?? ''} を${pinTarget?.mode === 'live' ? '最新の値に戻し' : `版 ${pinTarget?.version ?? ''} に固定し`}ます。${pinTarget?.kind === 'broadcast' ? '承認待ち・承認済みの場合は承認が取り消されます。' : '次に公開した版から反映します。'}`} confirmLabel={pinTarget?.mode === 'live' ? '最新の値に戻す' : '固定する'} error={pinError} busy={pinBusy !== null} onCancel={() => setPinTarget(null)} onConfirm={() => { if (pinTarget) void pinBroadcast(pinTarget.href) }} />
-              <DataTable label="使っている場所" columnWeights={[3.8, 1.45, 3.3, 1, 1]}>
+              <DataTable label="使っている場所" columnWeights={[3.65, 1.6, 3.3, 1, 1]}>
                 <thead><TableHeadRow><Th>使用先</Th><Th>状態</Th><Th>参照方法</Th><Th>版</Th><Th align="right" columnKind="menu">操作</Th></TableHeadRow></thead>
                 <tbody>{(showAllUsages ? impact.items : impact.items.slice(0, 20)).map((usage, index) => <Tr key={`${usage.kind}-${usage.href}-${index}`}>
                   <Td><PageLink href={usage.href}><TruncatedText value={usage.name} /></PageLink></Td><Td><TruncatedText value={usage.status === '使われています' ? '使用中' : usage.status === '送信済み・変わりません' ? '送信済み' : usage.status} /></Td>
