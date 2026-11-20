@@ -138,7 +138,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const unreadNotice = waitingForReload ? <Notice tone="warn" role="alert" message="保存しましたが、最新の予約を読み込めませんでした。読み直してから続けてください。" action={onReload ? <Button type="button" variant="secondary" size="compact" onClick={onReload}>読み直す</Button> : undefined} /> : null
   const stampStatus = stampNotice?.scope === scope ? <Notice tone="info" role="status" message={stampNotice.message} /> : null
   const currentPayment=payment.scope===paymentScope?payment:null
-  const paymentText=!currentPayment || currentPayment.state==='loading'?'確認中':currentPayment.state==='error'?'取得できませんでした':!currentPayment.data?'お支払いの記録なし':`${({pending:'支払い待ち',paid:'予約金の支払い済み',refund_pending:'返金を確認中',refunded:'返金済み',forfeited:'キャンセル料に充当'} as Record<string,string>)[currentPayment.data.status]??'状態を確認中'} ${polishFormatYen(currentPayment.data.amount)}${currentPayment.data.status==='paid'?`・お店で ${polishFormatYen(currentPayment.data.remaining)}`:''}`
+  const paymentText=!currentPayment || currentPayment.state==='loading'?'確認中':currentPayment.state==='error'?'お支払いの状態を読み込めませんでした。予約を開き直してください。':!currentPayment.data?'お支払いの記録なし':`${({pending:'支払い待ち',paid:'予約金の支払い済み',refund_pending:'返金を確認中',refunded:'返金済み',forfeited:'キャンセル料に充当'} as Record<string,string>)[currentPayment.data.status]??'状態を確認中'} ${polishFormatYen(currentPayment.data.amount)}${currentPayment.data.status==='paid'?`・お店で ${polishFormatYen(currentPayment.data.remaining)}`:''}`
   const workingStatus = busy ? <Notice tone="info" role="status" message="予約を反映しています。完了するまでお待ちください。" /> : null
 
   /* これまでの来店（来店済みの数と前回）。連絡先が無い予約は数えない。遅い応答は捨てる。 */

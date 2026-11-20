@@ -5,7 +5,7 @@ import { useRequestGeneration } from '../lib/use-request-generation.js';
 import SeatBookingBlock from '../components/seat-booking-block.js';
 import { restaurantBookingApi } from '../lib/api.js';
 import FormReception, { choiceReceptionLabel } from '../components/form-reception.js';
-import { TextInput, ChoiceInput, FieldLabel, FieldCount } from '../components/forms/controls.js';
+import { TextInput, RadioChoiceInput, CheckboxChoiceInput, PaymentMethodChoices, PaymentPolicyConsent, FieldLabel, FieldCount } from '../components/forms/controls.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import liff from '../lib/liff-runtime.js';
@@ -623,11 +623,11 @@ export default function Form({ readOnlyDocument = false }: {readOnlyDocument?:bo
               試しの回答のため、集計には入りません。
             </p>
           ) : null}
-          {formPayment && <div className="mx-6 mb-6"><p>{`料金 ${formPayment.total.toLocaleString('ja-JP')} 円・今お支払い ${formPayment.amount.toLocaleString('ja-JP')} 円・お店で ${formPayment.remaining.toLocaleString('ja-JP')} 円`}</p><p>{formPayment.cancellation}</p><label><input type="checkbox" checked={formPaymentAccepted} onChange={event=>setFormPaymentAccepted(event.target.checked)} />キャンセル料の決まりを確認しました</label><Button variant="primary" disabled={!formPaymentAccepted || bookingRetrying} onClick={()=>void (async()=>{if(!id || !formPayment || !formPaymentAccepted || bookingRetrying)return;setBookingRetrying(true);try{const result=await restaurantBookingApi.formBooking({formId:id,blockId:formPayment.blockId,submissionKey:formPayment.submissionKey,...(formPayment.paymentMethod?{paymentMethod:formPayment.paymentMethod}:{}),policyAccepted:true,policyVersion:formPayment.policyVersion,expectedAmount:formPayment.amount,expectedTotal:formPayment.total});if(result.data.payment?.status==='paid'){setBookingError('お支払いと予約の状態を確認しています。');setFormPayment(null);return;}const url=new URL(result.data.payment?.url??'');if(url.protocol!=='https:' || url.hostname!=='checkout.stripe.com' || url.username || url.password || url.port)throw new Error('invalid_checkout_url');liff.openWindow({url:url.toString(),external:true});}catch{setBookingError('お支払いの内容を確認できませんでした。もう一度お試しください。');setFormPayment(null);}finally{setBookingRetrying(false);}})()}>お支払いへ進む</Button></div>}
+          {formPayment && <div className="mx-6 mb-6"><p>{`料金 ${formPayment.total.toLocaleString('ja-JP')} 円・今お支払い ${formPayment.amount.toLocaleString('ja-JP')} 円・お店で ${formPayment.remaining.toLocaleString('ja-JP')} 円`}</p><p>{formPayment.cancellation}</p><PaymentPolicyConsent accepted={formPaymentAccepted} onChange={setFormPaymentAccepted} /><Button variant="primary" disabled={!formPaymentAccepted || bookingRetrying} onClick={()=>void (async()=>{if(!id || !formPayment || !formPaymentAccepted || bookingRetrying)return;setBookingRetrying(true);try{const result=await restaurantBookingApi.formBooking({formId:id,blockId:formPayment.blockId,submissionKey:formPayment.submissionKey,...(formPayment.paymentMethod?{paymentMethod:formPayment.paymentMethod}:{}),policyAccepted:true,policyVersion:formPayment.policyVersion,expectedAmount:formPayment.amount,expectedTotal:formPayment.total});if(result.data.payment?.status==='paid'){setBookingError('お支払いと予約の状態を確認しています。');setFormPayment(null);return;}const url=new URL(result.data.payment?.url??'');if(url.protocol!=='https:' || url.hostname!=='checkout.stripe.com' || url.username || url.password || url.port)throw new Error('invalid_checkout_url');liff.openWindow({url:url.toString(),external:true});}catch{setBookingError('お支払いの内容を確認できませんでした。もう一度お試しください。');setFormPayment(null);}finally{setBookingRetrying(false);}})()}>お支払いへ進む</Button></div>}
           {bookingError && !formPayment && (
             <div className="mx-6 mb-6 rounded-[10px] border border-liff-line-strong bg-canvas p-4">
               <p className="text-sm font-bold text-ink">{bookingError}</p>
-              {formPaymentChoiceRequired && <fieldset><legend>お支払い方法</legend><label><input type="radio" name="form-payment" checked={formPaymentChoice==='online'} onChange={()=>setFormPaymentChoice('online')} />オンラインで先払い</label><label><input type="radio" name="form-payment" checked={formPaymentChoice==='onsite'} onChange={()=>setFormPaymentChoice('onsite')} />お店で払う</label></fieldset>}
+              {formPaymentChoiceRequired && <PaymentMethodChoices name="form-payment" value={formPaymentChoice} onChange={setFormPaymentChoice} />}
               <div className="mt-3 flex gap-2">
                 <Button variant="primary" className="flex-1"
                   type="button"
@@ -1223,8 +1223,7 @@ function BlockView({
               return (
                 <div key={choice.id}>
                   <FormChoiceRow selected={checkedRadio}>
-                    <ChoiceInput
-                      type="radio"
+                    <RadioChoiceInput
                       name={block.name}
                       checked={checkedRadio}
                       disabled={choiceAvailability?.[choice.id]?.full}
@@ -1254,8 +1253,7 @@ function BlockView({
               return (
                 <div key={choice.id}>
                   <FormChoiceRow selected={isChecked}>
-                    <ChoiceInput
-                      type="checkbox"
+                    <CheckboxChoiceInput
                       checked={isChecked}
                       disabled={choiceAvailability?.[choice.id]?.full}
                       onChange={() => {

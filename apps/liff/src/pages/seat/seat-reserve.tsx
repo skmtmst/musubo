@@ -1,6 +1,6 @@
 import { defaultRestaurantReservationForm,restaurantReservationAnswerError } from '@line-crm/shared';
 import { useRequestGeneration } from '../../lib/use-request-generation.js';
-import { FieldError } from '../../components/forms/controls.js';
+import { FieldError, PaymentMethodChoices, PaymentPolicyConsent } from '../../components/forms/controls.js';
 import CourseChoice from '../../components/course-choice.js';
 import Card from '../../components/ui/card.js';
 import Badge from '../../components/ui/badge.js';
@@ -543,7 +543,7 @@ export default function SeatReserve() {
                 onBack={backToPick}
                 onExpired={() => setExpired(true)}
               />
-            {choosePayment && <fieldset><legend>お支払い方法</legend><label><input type="radio" name="restaurant-payment" checked={paymentChoice==='online'} onChange={()=>setPaymentChoice('online')} />オンラインで先払い</label><label><input type="radio" name="restaurant-payment" checked={paymentChoice==='onsite'} onChange={()=>setPaymentChoice('onsite')} />お店で払う</label></fieldset>}
+            {choosePayment && <PaymentMethodChoices name="restaurant-payment" value={paymentChoice} onChange={setPaymentChoice} />}
             </>
           )}
           {view === 'done' && result && (
@@ -622,7 +622,7 @@ export default function SeatReserve() {
         </BottomBar>
       )}
 
-      <ConfirmDialog open={Boolean(paymentConfirm)} title="お支払い内容を確認" description={paymentConfirm?`料金 ${paymentConfirm.total.toLocaleString('ja-JP')} 円・今お支払い ${paymentConfirm.amount.toLocaleString('ja-JP')} 円・お店で ${paymentConfirm.remaining.toLocaleString('ja-JP')} 円。${paymentConfirm.cancellation}`:''} confirmLabel="お支払いへ進む" busy={busy} error={paymentError??undefined} confirmDisabled={!paymentAccepted} onCancel={()=>{if(!busy)setPaymentConfirm(null)}} onConfirm={()=>{void (async()=>{if(!paymentConfirm || !paymentAccepted || busy)return;setBusy(true);setPaymentError(null);try{const result=await restaurantBookingApi.payment(paymentConfirm.id,paymentConfirm.version,{...paymentConfirm.details,policyAccepted:true,policyVersion:paymentConfirm.policyVersion,expectedAmount:paymentConfirm.amount,expectedTotal:paymentConfirm.total});if(result.data.status==='paid'){setPaymentError('お支払いを確認しています。予約一覧を読み直してください。');return;}const url=new URL(result.data.url??'');if(url.protocol!=='https:' || url.hostname!=='checkout.stripe.com' || url.username || url.password || url.port)throw new Error('invalid_checkout_url');liff.openWindow({url:url.toString(),external:true});}catch{setPaymentError('お支払いの内容を確認できませんでした。閉じて最初からやり直してください。');}finally{setBusy(false);}})()}}><label><input type="checkbox" checked={paymentAccepted} onChange={event=>setPaymentAccepted(event.target.checked)} />キャンセル料の決まりを確認しました</label></ConfirmDialog>
+      <ConfirmDialog open={Boolean(paymentConfirm)} title="お支払い内容を確認" description={paymentConfirm?`料金 ${paymentConfirm.total.toLocaleString('ja-JP')} 円・今お支払い ${paymentConfirm.amount.toLocaleString('ja-JP')} 円・お店で ${paymentConfirm.remaining.toLocaleString('ja-JP')} 円。${paymentConfirm.cancellation}`:''} confirmLabel="お支払いへ進む" busy={busy} error={paymentError??undefined} confirmDisabled={!paymentAccepted} onCancel={()=>{if(!busy)setPaymentConfirm(null)}} onConfirm={()=>{void (async()=>{if(!paymentConfirm || !paymentAccepted || busy)return;setBusy(true);setPaymentError(null);try{const result=await restaurantBookingApi.payment(paymentConfirm.id,paymentConfirm.version,{...paymentConfirm.details,policyAccepted:true,policyVersion:paymentConfirm.policyVersion,expectedAmount:paymentConfirm.amount,expectedTotal:paymentConfirm.total});if(result.data.status==='paid'){setPaymentError('お支払いを確認しています。予約一覧を読み直してください。');return;}const url=new URL(result.data.url??'');if(url.protocol!=='https:' || url.hostname!=='checkout.stripe.com' || url.username || url.password || url.port)throw new Error('invalid_checkout_url');liff.openWindow({url:url.toString(),external:true});}catch{setPaymentError('お支払いの内容を確認できませんでした。閉じて最初からやり直してください。');}finally{setBusy(false);}})()}}><PaymentPolicyConsent accepted={paymentAccepted} onChange={setPaymentAccepted} /></ConfirmDialog>
       <ConfirmDialog
         open={!!cancelling}
         title="ご予約を取り消しますか"
