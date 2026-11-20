@@ -85,7 +85,7 @@ export function GuideSetupComplete({ onClose, onHome }: { onClose: () => void; o
         <DialogActions padding="none">
           <Button id="guide-complete-home" fullWidth variant="primary" onClick={onHome}>ダッシュボードへ</Button>
         </DialogActions>
-        <img src="/brand/musubo-color.png" width={78} alt="musubo" />
+        <img src="/brand/musubo-color.png" width={78} height={23} alt="musubo" />
       </div>}
     >
       <section className={styles.next} aria-label="次にできること">

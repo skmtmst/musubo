@@ -2,7 +2,7 @@
   position: absolute;
   inset: 0;
   background: linear-gradient(115deg, var(--color-canvas), color-mix(in srgb, var(--color-canvas) 80%, var(--color-accent-soft)));
-  animation: welcome-leave 500ms var(--motion-ease-out) 3000ms both;
+  animation: welcome-leave var(--motion-welcome-fade) var(--motion-ease-out) var(--motion-welcome-hold) both;
 }
 
 .content {
@@ -17,7 +17,7 @@
   display: block;
   width: min(var(--tpl-welcome-logo-width), 64vw);
   height: auto;
-  animation: welcome-logo 900ms var(--motion-ease-out) both;
+  animation: welcome-logo var(--motion-welcome-logo) var(--motion-ease-out) both;
 }
 
 .writing {
@@ -26,6 +26,7 @@
   inset-inline-start: 50%;
   translate: -50% 0;
   inline-size: 70%;
+  block-size: auto;
   overflow: visible;
 }
 
