@@ -4,13 +4,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 /*
- * 全ルート監査（2026-09-25）担当A: 偽APIの欠けていた口が、
+ * 偽 API が、
  * 本物の Worker と同じ器で返すことを見張る。
  *
  * 起動して叩くのではなく `bodyFor` を直接読む。bind が要らないので
- * 砂場でも走る。欠けていた頃はすべて既定の器
+ * 砂場でも走る。必要な口が無いとすべて既定の器
  *（`{items:[],total:0,page:1,limit:20}`）が返り、画面が落ちたり
- * 「読み込めませんでした」になっていた。
+ * 「読み込めませんでした」と表示されたりする。
  */
 const HERE = dirname(fileURLToPath(import.meta.url))
 

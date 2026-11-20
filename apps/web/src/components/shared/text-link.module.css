@@ -67,6 +67,16 @@
 .root[data-inline] .label { font-size: inherit; line-height: inherit; }
 .root[data-inline]:hover { text-decoration: underline; }
 
+/*
+ * 一覧の段の行で使う強めのリンク（emphasis="row-step"）。
+ * 文字を描く子は `.label` なので、ここで大きさと太さを持つ。値は画面が段で渡す。
+ * 指定したリンクだけに効かせ、既定の 12/500 は変えない。
+ */
+html:root .root[data-emphasis='row-step'] .label {
+  font-size: var(--text-link-row-step-size, var(--text-caption));
+  font-weight: var(--text-link-row-step-weight, var(--polish-weight-label));
+}
+
 /* 幅が限られる短い操作名だけを省略する。文中・長い名前の既定は変えない。 */
 .root[data-truncate] { min-width: 0; max-width: 100%; white-space: nowrap; }
 .root[data-truncate] .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

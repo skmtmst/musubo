@@ -2,7 +2,7 @@
 /**
  * 日本郵便の公開郵便番号データを取り込み、`postal_codes` へ入れる種を作る。
  *
- * 取得元（公式・司令塔が存在確認済み）:
+ * 取得元（公式）:
  * - https://www.post.japanpost.jp/service/search/zipcode/download/utf-zip.html
  * - 形式説明 https://www.post.japanpost.jp/service/search/zipcode/download/utf-readme.html
  *

@@ -1,11 +1,7 @@
 // @vitest-environment happy-dom
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
-/*
- * 予約設定（V8）の「サクサク感」。
- * メニューの公開・並びは先に画面を変えて裏で保存する。
- * 失敗したら戻して「もう一度」、成功したら「元に戻す」の知らせを出す。
- */
+
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -165,12 +161,8 @@ describe('メニューの公開・並びは先に画面を変える', () => {
     expect(fixture.patchMenu).toHaveBeenCalledWith(
       'account-a', 'menu-1', 1, expect.objectContaining({ is_active: false }),
     )
-    // 元に戻すで出し直す口を叩く。
-    fireEvent.click(screen.getByRole('button', { name: '元に戻す' }))
-    await waitFor(() => { expect(fixture.patchMenu).toHaveBeenCalledTimes(2) })
-    expect(fixture.patchMenu).toHaveBeenLastCalledWith(
-      'account-a', 'menu-1', 1, expect.objectContaining({ is_active: true }),
-    )
+    expect(screen.queryByRole('button', { name: '元に戻す' })).toBeNull()
+    expect(fixture.patchMenu).toHaveBeenCalledTimes(1)
   })
 
   test('保存に失敗したら戻して「もう一度」の知らせを出す', async () => {

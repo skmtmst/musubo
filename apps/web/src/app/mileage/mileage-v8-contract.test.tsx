@@ -1,3 +1,4 @@
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
@@ -355,7 +356,7 @@ test('v8 のタブごとに板 ID が替わる（S35pO・CJlf4・oRbJi・IRPw8�
   }
 })
 
-test('v8 の閲覧のみは帯が出て、作る操作は出さない（E2Any）', async () => {
+test('v8 の閲覧のみは帯が出て、作る操作を理由付きで拒否する', async () => {
   staffRole = verifiedStaffRole('staff')
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<MileagePage />))
@@ -365,8 +366,10 @@ test('v8 の閲覧のみは帯が出て、作る操作は出さない（E2Any）
     expect(host.textContent).toContain('友だち追加')
   })
   expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
-  /* 2026-10-06 オーナー：閲覧のみの人には、押せない形で残さず隠す。 */
-  expect(host.textContent).not.toContain('決めごとを作る')
+  const create = [...host.querySelectorAll('button')].filter(button => button.textContent?.includes('決めごとを作る'))
+  expect(create.length).toBeGreaterThan(0)
+  for (const button of create) await expectPermissionLocked(button)
+  expect(host.querySelector('a[href="/mileage/earning-rules/new"]')).toBeNull()
   expect(host.querySelector('[aria-label="友だち追加を上へ"]')).toBeNull()
 })
 

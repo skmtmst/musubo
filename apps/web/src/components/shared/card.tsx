@@ -36,6 +36,8 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   /** 選んだカードの枠と面。指定したカードだけ共通の選択色にする。 */
   selected?: boolean
   surface?: 'standard' | 'inset' | 'muted' | 'bordered' | 'danger' | 'proposal' | 'preview'
+  /** 影ではなく内側の細い線で縁を出すカード（はじめにやること r3X34）。指定したカードだけ。 */
+  edge?: 'hairline'
 }
 
 /*
@@ -66,6 +68,7 @@ export default function Card({
   appearance,
   gap,
   surface = 'standard',
+  edge,
   selected,
   spacing,
   ...props
@@ -107,7 +110,7 @@ export default function Card({
   return (
     <CardTag ref={setCardRef} className={classes} data-design-part="card" data-appearance={appearance} data-gap={gapToken} data-spacing={spacing}
       data-card-frame={frame === 'ring' ? frame : undefined} data-card-selected={selected || undefined} data-card-padding={padding} data-card-variant={variant}
-      data-card-surface={surface === 'standard' ? undefined : surface} data-card-corner={corner === 'control' ? corner : undefined}
+      data-card-surface={surface === 'standard' ? undefined : surface} data-card-corner={corner === 'control' ? corner : undefined} data-card-edge={edge}
       data-card-spacing={contentPadding || gapValue ? '' : undefined}
       data-card-spacing-sides={contentPadding && hasSides(contentPadding) ? '' : undefined}
       style={contentPadding || gapValue ? { ...style, '--card-content-padding': contentPadding ?? '0px', '--card-content-gap': gapValue ?? '0px' } as CSSProperties : style} {...props}>

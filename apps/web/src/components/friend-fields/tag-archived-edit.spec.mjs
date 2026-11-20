@@ -188,6 +188,37 @@ test.describe('Issue #710 保管済みタグの編集は名前と説明だけ（
     await expect(page.getByRole('region', { name: 'タグ連動' })).toBeVisible()
   })
 
+  test('タグは確認してから保管し、知らせに取り消しを出さない', async ({ page }) => {
+    const item = { ...ACTIVE_TAG, friendCount: 0 }
+    const tags = { [item.id]: item }
+    let archiveRequests = 0
+    await stubApi(page, tags)
+    await page.route('**/api/tags/tag-active/dependencies**', async route => {
+      await route.fulfill({ status: 200, headers: corsHeaders(), body: JSON.stringify({ success: true, data: {
+        tag: { id: item.id, name: item.name, version: item.version, status: item.status }, friendCount: 0,
+        referenceCounts: {}, references: [], linkedActions: [], pendingRunCount: 0, blockingReferenceCount: 0,
+        canArchive: true, canDelete: true, revision: 'revision-1',
+        mileageImpact: { configured: false, self: 0, referrer: 0, multiplier: null, priority: 0, reapplyPolicy: 'first_only', historyPreserved: true },
+      } }) })
+    })
+    await page.route('**/api/tags/tag-active/archive**', async route => {
+      archiveRequests++
+      item.status = 'archived'
+      await route.fulfill({ status: 200, headers: corsHeaders(), body: JSON.stringify({ success: true, data: { archived: true, replacedFriendCount: 0 } }) })
+    })
+    await page.goto(`${BASE}/tags`, { waitUntil: 'networkidle' })
+    await page.getByRole('button', { name: `タグ「${item.name}」の操作` }).click()
+    await page.getByRole('menuitem', { name: '保管する', exact: true }).click()
+    const dialog = page.getByRole('alertdialog', { name: `「${item.name}」を保管しますか？` })
+    await expect(dialog).toBeVisible()
+    expect(archiveRequests).toBe(0)
+    await dialog.getByPlaceholder(item.name).fill(item.name)
+    await dialog.getByRole('button', { name: 'このタグを保管する' }).click()
+    await expect.poll(() => archiveRequests).toBe(1)
+    await expect(page.getByRole('status', { name: '知らせ' })).toContainText('保管しました')
+    await expect(page.getByRole('status', { name: '知らせ' }).getByRole('button', { name: '元に戻す' })).toHaveCount(0)
+  })
+
   test('保管したタグは保管一覧のバッジで識別でき、通常のタグへは付けない', async ({ page }) => {
     const tags = { [ACTIVE_TAG.id]: { ...ACTIVE_TAG }, [ARCHIVED_TAG.id]: { ...ARCHIVED_TAG } }
     await stubApi(page, tags)
