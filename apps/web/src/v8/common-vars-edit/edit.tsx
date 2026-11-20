@@ -820,7 +820,7 @@ function EditCommonVarV8Inner() {
             <section className={styles.card} aria-labelledby="cv-edit-usage-heading">
               <h2 id="cv-edit-usage-heading" className={styles.cardTitle}>使っている場所</h2>
               <DataTable label="使っている場所">
-                <thead><TableHeadRow><Th>使っている場所</Th><Th>状態</Th><Th>参照方法</Th><Th>版</Th></TableHeadRow></thead>
+                <thead><TableHeadRow><Th>使っている場所</Th><Th>状態</Th><Th>参照方法</Th><Th>共通情報の版</Th></TableHeadRow></thead>
                 <tbody>{impact.items.map((usage, index) => <Tr key={`${usage.kind}-${usage.href}-${index}`}>
                   <Td>{usage.name}</Td><Td>{usage.status}</Td>
                   <Td>{usage.referenceMode === 'live' ? '最新の値' : usage.referenceMode === 'pinned' ? '固定した値' : '確認できません'}</Td>

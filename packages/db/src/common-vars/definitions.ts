@@ -84,7 +84,7 @@ export async function getCommonVarUsageImpact(
   // 送信中の写しから、このアカウント・このキーの版だけを読む。
   // 古い写しや壊れた写しは不明とし、現在の版で代用しない。
   for (const item of items) {
-    if (item.source_table !== 'broadcasts' || item.source_status !== 'sending_fixed') continue;
+    if (item.source_table !== 'broadcasts' || (item.source_status !== 'sending_fixed' && item.is_historical !== 1)) continue;
     const row = await db.prepare('SELECT common_var_snapshot FROM broadcasts WHERE id = ?')
       .bind(item.source_id).first<{ common_var_snapshot: string | null }>();
     item.fixed_version = null;
