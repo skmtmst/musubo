@@ -18,6 +18,7 @@ import { usePageTitle, usePageCrumbs } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
 import { restaurantGoogleApi, type GoogleConnection, type GoogleConnectionData } from '@/lib/restaurant-google-api'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 import { GoogleConnectionSettings } from '@/v8/restaurant/google'
 import { api } from '@/lib/api'
 import type { InstagramConnectionList } from '@/lib/api/features/settings'
@@ -194,6 +195,10 @@ export default function SnsSettingsPage() {
   const visibleGoogleList = loadedAccountId === accountId ? googleList : null
   const visibleInstagramList = loadedAccountId === accountId ? instagramList : null
   const googleStatus = visibleGoogle?.connection.status ?? null
+  const googleLocation = visibleGoogle?.connection.locationName
+  useEffect(() => {
+    if (googleStatus === 'connected' && googleLocation) emitGuideSignal('hours.googleConnect')
+  }, [googleStatus, googleLocation])
   const igState = visibleInstagram?.state ?? null
 
   /* 画面が必要とする形（サービスごとの接続と、両サービス共通の契約枠）へ直す。
@@ -482,6 +487,7 @@ export default function SnsSettingsPage() {
               <div className={styles.actions}>
                 <Button
                   variant="secondary"
+                  data-guide-anchor="hours.googleConnect"
                   onClick={() => startAddition('googleBusiness')}
                   disabled={busy}
                   busy={Boolean(busy)}

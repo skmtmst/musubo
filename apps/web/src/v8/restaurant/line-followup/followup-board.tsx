@@ -96,7 +96,7 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
  async function decideNotUsing(){
   if(lock.current||!canManage||!snapshot||dirty||rows.some(row=>row.enabled))return
   lock.current=true;setBusy(true);setError('')
-  try{assertCurrent();await followupBoardApi.notUsing(accountId,storeId,snapshot.page.setup?.version??0);if(alive.current){setNotUsing(false);await load()}}catch(e){if(alive.current)setError(describeSaveFailure(e))}finally{lock.current=false;if(alive.current)setBusy(false)}
+  try{assertCurrent();await followupBoardApi.notUsing(accountId,storeId,snapshot.page.setup?.version??0);if(alive.current){setNotUsing(false);await load();emitGuideSignal('followup.save')}}catch(e){if(alive.current)setError(describeSaveFailure(e))}finally{lock.current=false;if(alive.current)setBusy(false)}
  }
  if(loading&&!snapshot)return <p role="status">LINE来店フォローを読み込んでいます…</p>
  if(!snapshot||!form)return <Notice tone="danger" action={<Button variant="secondary" onClick={()=>void load().catch(()=>{})}>読み直す</Button>}>{error||'設定を読み込めませんでした'}</Notice>
