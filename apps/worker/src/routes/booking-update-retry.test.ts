@@ -412,6 +412,18 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
     } finally { vi.unstubAllGlobals(); }
   });
 
+  test.each(['admin','liff'])('%s の仮担当は自動割当がオフなら不明として記録する', async source => {
+    sqlite.exec("INSERT INTO staff(id,line_account_id,name,display_name,is_designation_optional) VALUES('optional','acc1','指名なし','指名なし',1); INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES('optional','m1',1); UPDATE line_accounts SET liff_id='test-liff' WHERE id='acc1'");
+    vi.stubGlobal('fetch',vi.fn(async () => Response.json({sub:'U1'})));
+    try {
+      const {app,env}=makeApp(db);
+      const liff=source==='liff';
+      const result=await app.request(liff?'/api/liff/booking/requests?liffId=test-liff':'/api/booking/admin/bookings?account_id=acc1',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':`optional-${source}`, ...(liff?{Authorization:'Bearer mocked_id_token'}:{})},body:JSON.stringify({menu_id:'m1',staff_id:'optional',starts_at:futureStartsAt(),...(!liff?{booking_customer_id:'customer-1',send_line_confirmation:false}:{})})},env as never,execCtx);
+      expect(result.status,await result.clone().text()).toBe(201);
+      expect(sqlite.prepare('SELECT assignment_method FROM bookings').get()).toEqual({assignment_method:'unknown'});
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   test('LINEで担当を指名した予約は指名として記録する', async () => {
     sqlite.prepare('UPDATE line_accounts SET liff_id=? WHERE id=?').run('test-liff','acc1');
     vi.stubGlobal('fetch',vi.fn(async () => Response.json({sub:'U1'})));
