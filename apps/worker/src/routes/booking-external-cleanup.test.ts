@@ -52,3 +52,10 @@ it('理由の連絡先は監査の共通処理で伏せる',async()=>{
  expect((await gapCall(app,'/api/booking/admin/external-cleanup/job/resolve?account_id=a','POST',{confirmed:true,reason:'連絡先 test@example.test を確認'})).status).toBe(200);
  expect(d.raw.prepare("SELECT reason FROM audit_events WHERE action='booking.external.cleanup.resolve'").get()).toEqual({reason:'連絡先 [masked-email] を確認'});
 });
+it('同時に確認されても監査は1件だけ残る',async()=>{
+ const app=gapApp(d,[bookingCalendarSettings],gapOwner,false,{LINE_CREDENTIAL_ENCRYPTION_KEY:key});
+ const route='/api/booking/admin/external-cleanup/job/resolve?account_id=a';
+ const responses=await Promise.all([gapCall(app,route,'POST',{confirmed:true,reason:'確認済み'}),gapCall(app,route,'POST',{confirmed:true,reason:'確認済み'})]);
+ expect(responses.map(response=>response.status).sort()).toEqual([200,404]);
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='booking.external.cleanup.resolve'").get()).toEqual({n:1});
+});
