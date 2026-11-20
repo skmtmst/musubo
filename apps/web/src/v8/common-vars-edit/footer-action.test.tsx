@@ -257,7 +257,7 @@ it('使用先の見出しに全件数と送信済みの補足を示す', async (
   } })
   render(<Editor />)
   expect(await screen.findByRole('heading', { name: '使用先 8か所' })).toBeTruthy()
-  expect(screen.getByTitle('送信済み・変わりません')).toBeTruthy()
+  expect(screen.getByTitle('送信済み')).toBeTruthy()
   expect(screen.getByRole('columnheader', { name: '使用先' })).toBeTruthy()
   expect(screen.getByRole('columnheader', { name: '版' })).toBeTruthy()
   expect(screen.getByText('送信済み・完了済みの内容は、値を変えても変わりません。')).toBeTruthy()
