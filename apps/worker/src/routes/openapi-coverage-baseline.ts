@@ -63,6 +63,8 @@ export const BASELINE_DOCUMENTED = new Set<string>([
   "GET /api/booking/admin/cancellation-options",
   "GET /api/booking/admin/deposit-rules",
   "GET /api/booking/admin/meeting-capabilities",
+  "GET /api/booking/admin/external-cleanup",
+  "POST /api/booking/admin/external-cleanup/{id}/resolve",
   "GET /api/booking/admin/meeting-oauth/callback",
   "GET /api/booking/admin/staff/{id}/connections/{provider}",
   "POST /api/booking/admin/staff/{id}/connections/{provider}/connect",

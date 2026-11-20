@@ -162,6 +162,7 @@ export type AuditAction =
   // #838 第2段: Google Sheets 連携の接続・切断・出力先変更・手動同期。
   | 'booking.meeting.preferred'
   | 'booking.meeting.manual.resolve'
+  | 'booking.external.cleanup.resolve'
   | 'booking.meeting.retry'
   | 'booking.meeting.connect.start'
   | 'booking.meeting.connect'
