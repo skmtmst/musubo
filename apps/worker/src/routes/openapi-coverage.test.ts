@@ -238,6 +238,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   "POST /api/booking/admin/pass-plans/{id}/start",
   "POST /api/booking/admin/pass-plans/{id}/stop",
   "POST /api/booking/admin/pass-purchases/simulate-event",
+  "POST /api/booking/admin/requests/{id}/assignment-review",
   "POST /api/booking/admin/series/{id}/impact",
   "POST /api/booking/pass-payments/webhook",
   "POST /api/broadcasts/simulation-drafts",

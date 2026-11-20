@@ -226,6 +226,22 @@ describe('GET /api/booking/admin/requests の担当者・種別絞り込み (N-3
     expect([after.total, after.unassignedCount]).toEqual([1, 1]);
   });
 
+  test('受付は記録前・確認済・取消・期間前を未割り当てに数えず、権限と版を確認する', async () => {
+    for (const id of ['auto', 'unknown', 'designated', 'manual', 'reviewed', 'cancelled', 'past']) insertBooking(sqlite, { id, friend: 'f1', status: id === 'cancelled' ? 'cancelled' : 'confirmed', startsAt: id === 'past' ? '2026-09-01T02:00:00.000Z' : undefined });
+    sqlite.exec("UPDATE bookings SET assignment_method='automatic' WHERE id IN ('auto','reviewed','cancelled','past'); UPDATE bookings SET assignment_method='designated' WHERE id='designated'; UPDATE bookings SET assignment_method='manual' WHERE id='manual'; UPDATE bookings SET assignment_reviewed_at='2026-10-01' WHERE id='reviewed'");
+    const { app, env } = makeApp(db);
+    const path = '/api/booking/admin/requests?account_id=acc1&reception=unassigned&from=2026-10-01T00%3A00%3A00.000Z';
+    const data = await (await app.request(path, {}, env)).json() as { requests: Array<{id:string}>; total:number; unassignedCount:number };
+    expect(data.requests.map(r => r.id)).toEqual(['auto']); expect(data.unassignedCount).toBe(1);
+    const request = (id: string, version: number) => app.request(`/api/booking/admin/requests/${id}/assignment-review?account_id=acc1`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({lock_version: version}) }, env);
+    for (const id of ['unknown','designated','manual','reviewed','cancelled']) expect((await request(id,0)).status).toBe(409);
+    expect((await request('auto', 1)).status).toBe(409);
+    expect((await request('auto', 0)).status).toBe(200);
+    expect(sqlite.prepare("SELECT lock_version FROM bookings WHERE id='auto'").get()).toEqual({lock_version:1});
+    const viewer = makeApp(db, { id:'s1', name:'Viewer', role:'staff', readOnly:false, viewPermissionKeys:['/booking/bookings'] });
+    expect((await viewer.app.request('/api/booking/admin/requests/past/assignment-review?account_id=acc1', { method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lock_version:0}) },viewer.env)).status).toBe(403);
+  });
+
   test('CHECK外の種別値は条件にしない（0件化で誤解させない）', async () => {
     insertBooking(sqlite, { id: 'B1', friend: 'f1', source: 'liff' });
     const { app, env } = makeApp(db);

@@ -44,7 +44,7 @@ export async function previewSeries(db:D1Database,account:string,input:SeriesInp
 }
 export function assertChanged(db:D1Database){return db.prepare('INSERT INTO booking_batch_assertions(id,ok) VALUES(?,changes())').bind(crypto.randomUUID());}
 export function clearAssertions(db:D1Database){return db.prepare('DELETE FROM booking_batch_assertions');}
-export async function seriesInsert(db:D1Database,a:string,friend:string,menu:string,staff:string,start:string,id:string,series:string|null,index:number,actor:string,options:{status?:'confirmed'|'requested';groupId?:string;label?:string;addonDuration?:number;extraPrice?:number;policy?:unknown;meetingMode?:string;assignmentMethod?:'automatic'|'designated'|'manual'}={}){
+export async function seriesInsert(db:D1Database,a:string,friend:string,menu:string,staff:string,start:string,id:string,series:string|null,index:number,actor:string,options:{status?:'confirmed'|'requested';groupId?:string;label?:string;addonDuration?:number;extraPrice?:number;policy?:unknown;meetingMode?:string;assignmentMethod?:'automatic'|'designated'|'manual'|'unknown'}={}){
  const m=await db.prepare(`SELECT m.*,COALESCE(sm.override_duration_minutes,m.duration_minutes) dur,COALESCE(sm.override_price,m.base_price) price FROM menus m JOIN staff_menus sm ON sm.menu_id=m.id AND sm.staff_id=? AND sm.is_offered=1 JOIN staff s ON s.id=sm.staff_id AND s.line_account_id=m.line_account_id AND s.is_active=1 AND s.deleted_at IS NULL WHERE m.id=? AND m.line_account_id=? AND m.is_active=1 AND m.deleted_at IS NULL`).bind(staff,menu,a).first<{dur:number;buffer_after_minutes:number;price:number;version:number}>();
  if(!m)throw new GapError('menu_not_offered');
  m.dur+=options.addonDuration??0;m.price+=options.extraPrice??0;

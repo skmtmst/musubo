@@ -131,6 +131,7 @@ test('B5-02: 2人分と1人目の追加メニューの料金を合算する',asy
  expect(r.status,await r.clone().text()).toBe(201);
  const data=(await r.json() as any).data;expect(data.total).toBe(12500);
  expect(data.bookings.map((b:any)=>b.price_at_booking)).toEqual([7500,5000]);
+ expect(d.raw.prepare('SELECT assignment_method FROM bookings ORDER BY group_index').all()).toEqual([{assignment_method:'manual'},{assignment_method:'manual'}]);
 });
 test('B5-05: 追加15分を含む同じ担当の75分と60分を続ける',async()=>{
  seedGroupAddon();
@@ -147,6 +148,7 @@ test('B5-06: 指名なしの2人には重ならない別々の担当を割り当
  expect(r.status,await r.clone().text()).toBe(201);
  const rows=(await r.json() as any).data.bookings;
  expect(rows).toHaveLength(2);expect(new Set(rows.map((b:any)=>b.staff_id))).toEqual(new Set(['bs','bs2']));
+ expect(d.raw.prepare('SELECT assignment_method FROM bookings ORDER BY group_index').all()).toEqual([{assignment_method:'automatic'},{assignment_method:'automatic'}]);
  expect(rows.map((b:any)=>new Date(b.starts_at).toISOString())).toEqual([input.starts_at,input.starts_at]);
 });
 test('B5-08: 同じキーでの組予約再送は同じ組と2人を返す',async()=>{

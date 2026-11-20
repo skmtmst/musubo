@@ -4,6 +4,7 @@ import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { hasStaffPermission } from '../../middleware/role-guard.js';
 import { listResponse } from '../../lib/list-etag.js';
+import { inputJsonBoundary } from '../../lib/input-errors.js';
 import { resolveAccountIdAdmin } from './identity.js';
 import { bookingLedgerFilter, BOOKING_LEDGER_JOINS, BOOKING_CSV_EXPORT_LIMIT, csvNoteValue, BOOKING_CSV_STATUS_LABEL, BOOKING_CSV_SOURCE_LABEL, csvTimestamp, csvCell } from './ledger-input.js';
 
@@ -46,7 +47,7 @@ booking.get('/api/booking/admin/requests', async (c) => {
 });
 
 // 自動で選ばれた担当者を確認したことを、表示中の版に限って記録する。
-booking.post('/api/booking/admin/requests/:id/assignment-review', async (c) => {
+booking.post('/api/booking/admin/requests/:id/assignment-review', inputJsonBoundary(), async (c) => {
   if (!hasStaffPermission(c, '/booking/bookings')) return c.json({ error: 'permission_denied' }, 403);
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);

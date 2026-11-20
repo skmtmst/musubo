@@ -347,9 +347,17 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
     const result = await create('enabled');
     expect(result.status).toBe(201);
     expect(sqlite.prepare('SELECT staff_id FROM bookings').get()).toEqual({ staff_id:'s1' });
+    expect(sqlite.prepare('SELECT assignment_method FROM bookings').get()).toEqual({ assignment_method:'automatic' });
     expect(conflictHooks.notifyBookingConflicts).toHaveBeenCalledWith(db,'acc1');
     expect((await create('enabled')).status).toBe(201);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM bookings').get()).toEqual({ n:1 });
+  });
+
+  test('担当を店が選んだ電話予約は手動として記録する', async () => {
+    const { app, env } = makeApp(db);
+    const response = await app.request('/api/booking/admin/bookings?account_id=acc1', { method:'POST', headers:{'Content-Type':'application/json','Idempotency-Key':'manual-staff'}, body:JSON.stringify({booking_customer_id:'customer-1',menu_id:'m1',staff_id:'s1',starts_at:futureStartsAt(),send_line_confirmation:false}) }, env as never, execCtx);
+    expect(response.status).toBe(201);
+    expect(sqlite.prepare('SELECT assignment_method FROM bookings').get()).toEqual({assignment_method:'manual'});
   });
 
   test('新方式は同じ枠の連続予約を交互に割り当て、優先順と上限もHTTP作成へ反映する', async () => {
@@ -395,9 +403,21 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
       const result = await create('line-auto','optional');
       expect(result.status).toBe(201);
       expect(sqlite.prepare('SELECT staff_id FROM bookings').get()).toEqual({ staff_id:'s1' });
+    expect(sqlite.prepare('SELECT assignment_method FROM bookings').get()).toEqual({ assignment_method:'automatic' });
       expect(conflictHooks.notifyBookingConflicts).toHaveBeenCalledWith(db,'acc1');
       expect((await create('line-auto','optional')).status).toBe(201);
       expect(sqlite.prepare('SELECT COUNT(*) AS n FROM bookings').get()).toEqual({ n:1 });
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  test('LINEで担当を指名した予約は指名として記録する', async () => {
+    sqlite.prepare('UPDATE line_accounts SET liff_id=? WHERE id=?').run('test-liff','acc1');
+    vi.stubGlobal('fetch',vi.fn(async () => Response.json({sub:'U1'})));
+    try {
+      const { app, env } = makeApp(db);
+      const result = await app.request('/api/liff/booking/requests?liffId=test-liff', { method:'POST', headers:{'Content-Type':'application/json','Idempotency-Key':'line-nominated',Authorization:'Bearer mocked_id_token'}, body:JSON.stringify({menu_id:'m1',staff_id:'s1',starts_at:futureStartsAt()}) }, env as never, execCtx);
+      expect(result.status).toBe(201);
+      expect(sqlite.prepare('SELECT assignment_method FROM bookings').get()).toEqual({assignment_method:'designated'});
     } finally { vi.unstubAllGlobals(); }
   });
 
