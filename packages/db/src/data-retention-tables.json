@@ -5200,5 +5200,6 @@
   "musubo_final_line_notices": {"category":"purge","scope":{"by":"tenant","column":"tenant_id"}},
   "registration_applications": {"category":"retain","scope":{"by":"tenant","column":"tenant_id"}},
   "staff_passkey_challenges": {"category":"purge","scope":{"by":"parent","column":"staff_id","parent":"staff_members","parentColumn":"id"}},
-  "staff_passkeys": {"category":"purge","scope":{"by":"parent","column":"staff_id","parent":"staff_members","parentColumn":"id"}}
+  "staff_passkeys": {"category":"purge","scope":{"by":"parent","column":"staff_id","parent":"staff_members","parentColumn":"id"}},
+  "onboarding_guide_progress": {"category":"purge","scope":{"by":"lineAccount","column":"line_account_id"}}
 }

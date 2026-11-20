@@ -23,7 +23,8 @@ vi.mock('./shell/app-top-bar', () => ({ default: () => <header data-test="topbar
 vi.mock('./update/update-banner', () => ({ UpdateBanner: () => null }))
 vi.mock('./session-lost-notice', () => ({ default: () => <div data-test="session" /> }))
 vi.mock('./auth-guard', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="auth">{children}</div>, useOnboardingAccess: () => false }))
-vi.mock('@/contexts/account-context', () => ({ AccountProvider: ({ children }: { children: ReactNode }) => <div data-test="account">{children}</div> }))
+/* 開店準備ガイドの入れ物（全画面で1つ）が店を見るので、選んでいない状態を返す。 */
+vi.mock('@/contexts/account-context', () => ({ AccountProvider: ({ children }: { children: ReactNode }) => <div data-test="account">{children}</div>, useOptionalAccount: () => null }))
 vi.mock('./hq-access-gate', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="hq-access">{children}</div> }))
 vi.mock('./view-permission-gate', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="permission">{children}</div> }))
 vi.mock('./root-landing-gate', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="root">{children}</div> }))

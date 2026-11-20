@@ -238,6 +238,12 @@ export const PARITY_INIT = {
   lh_staff_view_permissions: '[]',
   lh_selected_account: 'visual-qa-account',
   lh_auth_selection_cleared: '1',
+  /*
+   * 初回ポップアップは閉じた印を置く。既存の見張りは画面の中身や行き先を調べるので、
+   * 初回だけ出る案内が重なると本来見たいものを押せない。
+   * ポップアップ自体の見張り（first-run-popup.*.spec.mjs）はこの印を外して出す。
+   */
+  'lh:v8:first-run-popup-dismissed:visual-qa-account': '1',
 }
 
 /** 撮った絵が V8 でなければ比較を止める。 */

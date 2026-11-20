@@ -1,31 +1,194 @@
 /*
  * はじめにやること（★V8 修正案 D-3・絵 `r3X34`）。
- * 白い角丸カード（枠 hairline・角12・内側 18/20・段の間14）。
- * 頭：題 15/700・数 13・進みの線 160×6・畳む／開く 13/500＋矢印16（間4）。
+ * 白い角丸カード（線なし・影2層・角12・内側 16/20・段の間14）。
+ * 頭：題 15/700・数 13・進みの線 6（間4）・畳む／開く 13/500＋矢印16（間4）。
  * 手順：3列×2行（間8）。済みは緑の丸に白い ✓・薄い文字・ごく薄い灰の地、まだは白い丸、次の 1 つは緑の枠。
+ */
+
+/*
+ * 承認済み Pen「はじめにやること08d_v06」の 4 枠
+ * （la9o6 PC通常 / sL2CD PCガイド / FJ6Xd SP通常 / rvGC6 SPガイド）実測に合わせる。
+ * v06 の寸法・色は共通トークンの既定（globals.css の --tpl-d23-ob-* / --polish-* / --color-*）と
+ * 一致していた。つまり正本は「共通部品そのまま」なので、ここでは上書きを足さず外す方向で合わせる。
+ * 参照専用の枠08b v01r（nvQmI / ahwHx）の寸法・色は正本ではないので、ここでは使わない。
+ * 共通トークンの正本（globals.css）は他の約300画面が使うため書き換えず、
+ * カードの中だけで上書きする。
+ */
+/*
+ * 数字と色は必ず「数字を含まない名前」のカスタムプロパティに置く。
+ * 共通トークン名に数字が入るもの（--tpl-d23-ob-*）は、
+ * v8-boundary.test.ts の「CSS に数字を直書きしない」見張りが
+ * 名前の数字でつまずくため、var() で差し替えるだけにする。
+ */
+.card {
+  /*
+   * 注記の色は正本（xK5CF / PdmLK）が共通の「control の添え字」と同じ濃い灰なので、
+   * 共通トークンをそのまま指す。docs/v8-design-rules.md §6.47 の
+   * 「文字と地の明暗差は 4.5:1 以上」を満たすのはこの濃さ。
+   */
+  --color-step-note-ink: var(--color-ink-secondary);
+  /* 操作の字は正本どおり 600（w6DXYN / rntpz / SR0lf）。 */
+  --tpl-button-weight: 600;
+  --step-action-weight: var(--tpl-button-weight);
+  --step-action-weight-sub: var(--tpl-button-weight);
+
+  /* カードの外枠と内側（角12・上下16／左右20・段の間14）。角は共通既定のまま。 */
+  --step-card-pad-block: 16px;
+  --step-card-pad-inline: 20px;
+  --step-card-gap: var(--tpl-d23-ob-gap);
+
+  /* 頭（題・進捗数・畳む）。間は正本 Az0FG の 12。 */
+  --step-head-gap: var(--tpl-d23-ob-head-gap);
+  --step-title-size: var(--polish-text-section);
+  --step-title-lh: var(--tpl-d23-ob-title-lh);
+  --step-head-text: var(--polish-text-body);
+  --step-head-text-lh: var(--tpl-d23-ob-text-lh);
+
+  /* 進みの線は正本 xKj1N どおり頭の残り幅いっぱい（高さ6・間4は共通既定）。 */
+  --progress-steps-w: 100%;
+
+  /* 下段（2操作と注記）。高さ36・左右16・幅180は正本 pTC77 の実測。 */
+  --step-footer-gap: var(--tpl-d23-ob-head-gap);
+  --step-action-h: var(--control-h);
+  --step-action-pad: var(--space-16);
+  --step-action-w: 180px;
+  --step-action-text: 14px;
+  --step-action-text-lh: 20px;
+  /* 注記の字は正本（xK5CF / PdmLK）どおり PC・SP とも添え字の大きさ。
+     行の高さと寄せは正本の実測どおり PC（xK5CF）が 1.46・右寄せ、
+     SP（PdmLK）が 1.5・左寄せ。共通の 19px トークンは 12px の注記には合わないので使わない。 */
+  --step-note-size: var(--polish-text-support);
+  --step-note-lh: 1.46;
+  --step-note-align: right;
+}
+
+/*
+ * カード外周は正本（la9o6 / sL2CD / FJ6Xd / rvGC6）どおり、線なしで外に落ちる影2層。
+ * 値は共通の --card-shadow（globals.css）が正本と同じ色・向き・大きさなので、
+ * ここでは何も足さず、所有部品 shared/card の既定の面をそのまま使う。
  */
 
 .head {
   display: flex;
   align-items: center;
-  gap: var(--tpl-d23-ob-head-gap);
+  gap: var(--step-head-gap);
   min-width: 0;
 }
 
 .title {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--tpl-d23-ob-title);
+  /* 承認枠の見出しは PC・SP どちらも 15/22（la9o6 / FJ6Xd 実測）。 */
+  font-size: var(--step-title-size);
   font-weight: 700;
-  line-height: var(--tpl-d23-ob-title-lh);
+  line-height: var(--step-title-lh);
   white-space: nowrap;
 }
 
+/* 進みの線。正本（xKj1N）は頭の残り幅いっぱい。SP では正本（FJ6Xd）どおり出さない。 */
+.pips {
+  display: inline-flex;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* 線がある時は伸び縮みを線に任せ、無い時だけ空きが伸びて「畳む」を右端へ送る。 */
+.pips ~ .spacer {
+  flex: 0 1 0;
+}
+
 .count {
+  /* 正本の進捗数は 13/19・#4A5565・500（la9o6 / FJ6Xd）。 */
   color: var(--color-ink-secondary);
-  font-size: var(--tpl-d23-ob-text);
-  line-height: var(--tpl-d23-ob-text-lh);
+  font-size: var(--step-head-text);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--step-head-text-lh);
   white-space: nowrap;
+}
+
+/*
+ * 再開の導線。9項目の一覧の下に「続きから進める」「最初から始める」を並べ、
+ * その右（SPでは下）に注記を置く（正本 pTC77 / q9XBK と同じ順）。狭い幅では縦に折り返す。
+ */
+.guideFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--step-footer-gap);
+  min-width: 0;
+}
+
+/*
+ * 注記。正本（xK5CF）は2操作のすぐ右で残り幅いっぱい、SP（PdmLK）は下に折り返す。
+ */
+.note {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--color-step-note-ink);
+  font-size: var(--step-note-size);
+  /*
+    正本の注記は太さ指定なしだが、12px は
+    docs/v8-design-rules.md §6.5 の 2「14px 以下の UI 文字は 500」
+    （§6.14 でも同じ値を §6.5 から取ると明記）に従って 500 にする。
+    文字の大きさ・色・位置は正本のまま。
+  */
+  font-weight: 500;
+  line-height: var(--step-note-lh);
+  /* 正本（xK5CF）は2操作の右で残り幅いっぱいを取り、文字は右端に寄せる。SP（PdmLK）は左寄せ。 */
+  text-align: var(--step-note-align);
+}
+
+/*
+ * 下段の2操作は正本の寸法（主・副ともに 180×36・文字 14/600）。
+ * 文字の大きさ・太さ・行の高さ、主の縁、副の枠・文字色は、
+ * 所有部品 shared/button の `presentation="step-action"` が持つ（共通CSSの既定は変えない）。
+ * ここに残すのは幅と高さと左右の余白だけ。寸法は画面の持ちもの。
+ * 触る端末では所有部品 shared/button.module.css の `@media (pointer: coarse)` が
+ * 高さの下限を持つため、PC の 36 より高い当たり判定になる。承認済み Pen v06 の
+ * SP 枠（FJ6Xd / rvGC6）もこの下限どおりの高さで描かれている。
+ * なお docs/v8-design-rules.md §6.14 のボタン高 36 は PC の正本で、
+ * §6.5-7 の 24 は管理画面の押せる所の下限、§6.48 の 44×44 は /m の節に限る。
+ */
+html:root .guideFooter button[class][class][class] {
+  width: var(--step-action-w);
+  height: var(--step-action-h);
+  padding-inline: var(--step-action-pad);
+}
+
+/*
+ * SP390（FJ6Xd / rvGC6）: 進みの線を出さず「畳む」までカードの中に収め、2操作は縦積みの全幅。
+ * 題は PC と同じ 15/22、注記は 12/1.5、頭の間は正本 CIUpZ の 10、下段の間は q9XBK の 10。
+ * 段の高さは正本 mmQ8z の 52。段幅は受容済みの差（正本310→実装270）があるため、
+ * 頭が270pxに収まるか毎回実測する。
+ */
+@container v8-page (width < 640px) {
+  .pips { display: none; }
+  .guideFooter {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .card {
+    --step-head-gap: 10px;
+    --step-footer-gap: 10px;
+    /* 注記の大きさはカード既定と同じ。行の高さは正本（PdmLK）の 1.5、寄せは正本どおり左。 */
+    --step-note-lh: 1.5;
+    --step-note-align: left;
+    --tpl-list-row-multi-h: 52px;
+  }
+  /*
+   * 正本（CIUpZ）の頭は「題＋進捗数」と「畳む」の2かたまりで、間に伸び縮みの箱はない。
+   * 実装の `.spacer` を SP で外し、「畳む」を右端寄せにする。
+   * これで間は正本どおり 10 のまま、余分な1つ分（10px）が消えて 270px に収まる。
+   */
+  .spacer { display: none; }
+  .fold { margin-inline-start: auto; }
+  /*
+   * 「設定を読み直す」が出る時だけ頭は 270px を超える（実測 403px）。
+   * 正本も SP の頭を2行にしてあるので、折り返して2行目に落とす。
+   */
+  .head { flex-wrap: wrap; }
+  html:root .guideFooter button[class][class][class] { width: 100%; }
 }
 
 .spacer {
@@ -43,9 +206,10 @@
   color: var(--color-ink-secondary);
   cursor: pointer;
   font: inherit;
-  font-size: var(--tpl-d23-ob-text);
-  font-weight: 500;
-  line-height: var(--tpl-d23-ob-text-lh);
+  /* 正本の「畳む」は 13/19・#4A5565・500（OGTSv）。 */
+  font-size: var(--step-head-text);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--step-head-text-lh);
   white-space: nowrap;
 }
 
@@ -57,6 +221,10 @@
   flex-shrink: 0;
 }
 
+/*
+ * 段の「開く／確かめる」の字は正本（12/500・緑の操作色）で、
+ * これは共通 TextLink の `emphasis="row-step"` の既定と同じなので値を足さない。
+ */
 .link {
   flex-shrink: 0;
   white-space: nowrap;
