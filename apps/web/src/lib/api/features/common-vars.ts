@@ -56,6 +56,12 @@ export const commonVarsMethods = {
       fetchApi<ApiResponse<{ versionId: string | null; version: number }>>(`/api/broadcasts/${encodeURIComponent(broadcastId)}/common-var-pins/${encodeURIComponent(variableId)}`, {
         method: 'PUT', body: JSON.stringify(data),
       }),
+    pinScenario: (scenarioId: string, stepId: string, variableId: string, data: { accountId: string; versionId: string | null; expectedVersion: number }) =>
+      fetchApi<ApiResponse<{ versionId: string | null; version: number }>>(`/api/scenarios/${encodeURIComponent(scenarioId)}/steps/${encodeURIComponent(stepId)}/common-var-pins/${encodeURIComponent(variableId)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    pinScenarioAction: (scenarioId: string, actionId: string, variableId: string, data: { accountId: string; versionId: string | null; expectedVersion: number }) =>
+      fetchApi<ApiResponse<{ versionId: string | null; version: number }>>(`/api/scenarios/${encodeURIComponent(scenarioId)}/actions/${encodeURIComponent(actionId)}/common-var-pins/${encodeURIComponent(variableId)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    pinForm: (formId: string, variableId: string, data: { accountId: string; versionId: string | null; expectedVersion: number }) =>
+      fetchApi<ApiResponse<{ versionId: string | null; version: number }>>(`/api/forms/${encodeURIComponent(formId)}/common-var-pins/${encodeURIComponent(variableId)}`, { method: 'PUT', body: JSON.stringify(data) }),
     /** varKey は変えられない（テンプレートの差し込みが空になるため）。保存には影響確認の確認値が要る。 */
     update: (id: string, accountId: string, data: {
       name?: string

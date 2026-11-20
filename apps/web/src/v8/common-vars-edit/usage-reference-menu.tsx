@@ -14,11 +14,13 @@ export function UsageReferenceMenu({ usage, version, pinDisabledReason, canPin, 
   busy: boolean
   onChoose: (mode: 'pin' | 'live') => void
 }) {
-  const draft = usage.kind === 'broadcast' && usage.status === '下書き'
-  const unavailableReason = !canPin ? '一斉配信を編集する権限がありません'
-    : usage.kind !== 'broadcast' ? 'この使用先では固定できません'
-      : usage.status.includes('送信済み') || usage.status.includes('完了済み') ? '送信済み・完了済みの配信は変更できません'
-        : !draft ? '下書きの一斉配信だけ変更できます'
+  const scenarioParams = new URL(usage.href, 'https://example.invalid').searchParams
+  const scenarioDraft = usage.kind === 'scenario' && (scenarioParams.has('step') || scenarioParams.has('action'))
+  const supported = usage.kind === 'broadcast' || usage.kind === 'form' || scenarioDraft
+  const unavailableReason = !canPin ? 'この使用先を編集する権限がありません'
+    : !supported ? 'この使用先では固定できません'
+      : usage.kind === 'broadcast' && (usage.status.includes('送信済み') || usage.status.includes('完了済み')) ? '送信済み・完了済みの配信は変更できません'
+        : usage.kind === 'broadcast' && usage.status !== '下書き' ? '下書きの一斉配信だけ変更できます'
           : busy ? '処理中です' : undefined
   const fixed = usage.referenceMode === 'pinned'
   const items: ActionMenuItem[] = []
