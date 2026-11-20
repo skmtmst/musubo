@@ -31,7 +31,7 @@ export function serializeCommonVarDeleteImpact(
       blocksDeletion: commonVarUsageChangesOnSave(item),
       referenceMode: item.source_status === 'sending_fixed' || (item.is_historical === 1 && item.fixed_version != null) ? 'pinned' as const
         : item.is_historical === 1 || ['scenario_actions', 'automations', 'automation_definitions', 'common_actions', 'account_settings'].includes(item.source_table)
-          ? 'unknown' as const : 'live' as const,
+          ? (item.source_table === 'scenario_actions' ? 'operation' as const : 'unknown' as const) : 'live' as const,
       referencedVersion: item.source_status === 'sending_fixed' || (item.is_historical === 1 && item.fixed_version != null) ? item.fixed_version ?? null
         : item.is_historical === 1 || ['scenario_actions', 'automations', 'automation_definitions', 'common_actions', 'account_settings'].includes(item.source_table)
           ? null : variable.version,

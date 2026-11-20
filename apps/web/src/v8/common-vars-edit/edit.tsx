@@ -19,7 +19,7 @@ import { ArrowRight,Check,GitCompare,Pause,Play,Smartphone,Trash2 } from 'lucide
 import { useSearchParams } from 'next/navigation'
 import { Suspense,useCallback,useEffect,useRef,useState } from 'react'
 
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import PageLink, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Button from '@/components/shared/button'
@@ -124,6 +124,7 @@ function EditCommonVarV8Inner() {
 
   const [impact, setImpact] = useState<CommonVarDeleteImpact | CommonVarChangeImpact | null>(null)
   const [impactState, setImpactState] = useState<ChangeImpactState>('loading')
+  const [showAllUsages, setShowAllUsages] = useState(false)
   /** 狭い板ではスマホの見え方を窓で見る（板 ）。 */
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -821,12 +822,13 @@ function EditCommonVarV8Inner() {
               <h2 id="cv-edit-usage-heading" className={styles.cardTitle}>使っている場所</h2>
               <DataTable label="使っている場所">
                 <thead><TableHeadRow><Th>使っている場所</Th><Th>状態</Th><Th>参照方法</Th><Th>共通情報の版</Th></TableHeadRow></thead>
-                <tbody>{impact.items.map((usage, index) => <Tr key={`${usage.kind}-${usage.href}-${index}`}>
-                  <Td>{usage.name}</Td><Td>{usage.status}</Td>
-                  <Td>{usage.referenceMode === 'live' ? '最新の値' : usage.referenceMode === 'pinned' ? '固定した値' : '確認できません'}</Td>
+                <tbody>{(showAllUsages ? impact.items : impact.items.slice(0, 20)).map((usage, index) => <Tr key={`${usage.kind}-${usage.href}-${index}`}>
+                  <Td><PageLink href={usage.href}><TruncatedText value={usage.name} /></PageLink></Td><Td>{usage.status}</Td>
+                  <Td>{usage.referenceMode === 'live' ? '最新の値' : usage.referenceMode === 'pinned' ? '固定した値' : usage.referenceMode === 'operation' ? '値を操作' : '—'}</Td>
                   <Td>{usage.referencedVersion == null ? '—' : `版 ${usage.referencedVersion}`}</Td>
                 </Tr>)}</tbody>
               </DataTable>
+              {impact.items.length > 20 ? <Button type="button" variant="text" onClick={() => setShowAllUsages(!showAllUsages)}>{showAllUsages ? '閉じる' : `ほか ${formatNumber(impact.items.length - 20)} か所を見る`}</Button> : null}
             </section>
           ) : null}
 
