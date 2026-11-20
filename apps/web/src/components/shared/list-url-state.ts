@@ -75,6 +75,17 @@ export function flushListUrlState(): void {
   flushPending()
 }
 
+/**
+ * 書きかけの URL を捨てる（試験用）。
+ * 画面では popstate が pending を消すが、試験の replaceState は popstate を発火しない。
+ * 先送り（rAF→setTimeout）が試験の境界までに流れ終わらないと、
+ * 絞り込みが次の試験へ持ち越される。試験ごとの初期化で呼ぶ。
+ */
+export function resetListUrlState(): void {
+  pending = null
+  scheduled = false
+}
+
 if (typeof window !== 'undefined') {
   // 別の画面へ移る・戻るときは、書きかけを先に書いてから。
   window.addEventListener('popstate', () => { pending = null })

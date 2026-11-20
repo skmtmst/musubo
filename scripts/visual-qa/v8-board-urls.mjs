@@ -39,7 +39,7 @@ export const BOARD_URLS = {
   rI5uh: '/hq/banners/project?id=banner-project-qa-1',
   B24oNg: '/hq/banners/project?id=banner-project-qa-1',
   I0w2e: '/hq/banners/project?id=banner-project-qa-1',
-  // 親の画面（/hq・/ops）だけを書いていた板・入口が別の画面へ送る板（監査 ROOT-19 の残り・2026-10-08）
+  // 親の画面（/hq・/ops）だけを書いていた板・入口が別の画面へ送る板
   // 統括のアカウント登録 ①〜⑤（手順は画面の中だけで持つ：v8/account-new/BEHAVIOR.md）
   xj3zz: '/accounts/new',
   JYfda: '/accounts/new',
@@ -59,7 +59,7 @@ export const BOARD_URLS = {
   ou60i: '/restaurant-test/organization',
   // ログイン・はじめの設定のまとめ板は、V8 の画面がある「はじめの設定」へ（ログインは V8 の分けなし）
   BOj1a: '/getting-started',
-  // 撮影の対応表が親の画面（/hq・/ops・一覧など）だけを書いていた板 → その板の画面（監査 ROOT-19 の残り・2026-10-08）
+  // 撮影の対応表が親の画面（/hq・/ops・一覧など）だけを書いていた板 → その板の画面
   Gqve5: '/affiliates/new', // 成果とアフィリエイト アフィリエイターを作る（競合）V8
   RaMf3: '/affiliates/new', // 成果とアフィリエイト アフィリエイターを作る V8
   G83vi: '/analytics/reports/new', // 分析 レポートを作る（競合）V8
@@ -104,7 +104,7 @@ export const BOARD_URLS = {
   LPOe7: '/webinars/new', // ウェビナー ②動画（日時指定・開催回）V8
   XCUNf: '/webinars/new', // ウェビナー ⑤確認 V8
   j7PP04: '/webinars/new', // ウェビナー ①基本設定（作る）V8
-  // 撮影の対応表に場所が無かった板 → 板と画面の表の場所（監査 ROOT-19 の残り・2026-10-08）
+  // 撮影の対応表に場所が無かった板 → 板と画面の表の場所
   d8X09: '/', // 1. ダッシュボード
   mcOqK: '/', // ★P5 ダッシュボード /（編集・隠れているカード）2026-10-01
   CFAyf: '/accounts/detail?id=visual-qa-account', // LINEアカウント 送受信を止める V8
@@ -164,16 +164,16 @@ export const BOARD_URLS = {
   bMpC5: '/staff', // 組織・権限 ユーザーの停止 V8
   H031gC: '/webhooks?tab=incoming', // 外部連携 受け取る設定を追加 V8
   YZ57z: '/webhooks?tab=sheets', // 外部連携 Google Sheets の接続を解除 V8
-  // 撮影の対応表が別の画面を書いていた板 → その板の画面（監査 ROOT-19 の残り・2026-10-08）
+  // 撮影の対応表が別の画面を書いていた板 → その板の画面
   Td4TN: '/affiliate-offers/new', // 成果とアフィリエイト 案件を作る V8（機能追加 F-23・API待ち）
   XJUqs: '/auto-replies/edit', // 自動応答 作る⑤ 確認 V8
   LnGNw: '/common-actions', // オートメーション 共通アクション V8
   j2hfkS: '/common-actions/new', // オートメーション 共通アクションを作る V8
   ziSgL: '/common-actions/versions', // オートメーション 共通アクション 版と使われている場所 V8
   h1G4d: '/search-console', // 分析 Search Console V8
-  // 開く指定が要る板（監査 ROOT-19 の残り・2026-10-08）
+  // 開く指定が要る板
   tnTn9: '/affiliates?affiliate=af-1', // 成果とアフィリエイト アフィリエイターの詳細（引き出し）V8
-  // 撮影の対応表のほうが細かい（タブ指定つき）板（監査 ROOT-19 の残り・2026-10-08）
+  // 撮影の対応表のほうが細かい（タブ指定つき）板
   AzrZq: '/analytics?view=conversion-report', // 分析 成果地点ごとのレポート V8
   IWnYX: '/tags?tab=searches', // 友だち属性 保存した検索 V8
   q5gbcM: '/tags?tab=fields', // 友だち属性 友だち情報欄 V8

@@ -1,5 +1,7 @@
 'use client'
 
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
+
 import { useListUrlValue, useListUrlJsonValue } from '@/components/shared/list-url-state'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -275,11 +277,11 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     { key: 'archived', label: 'アーカイブ', count: archivedCount },
   ]
 
-  const createProject = canManage ? (
-    <Button variant="primary" onClick={() => { setFormError(''); setFormOpen(true) }}>
+  const createProject = (
+    <PermissionGatedButton allowed={canManage} need="tenantWide" variant="primary" onClick={() => { setFormError(''); setFormOpen(true) }}>
       <Plus aria-hidden="true" className={styles.buttonIcon} />プロジェクトを作る
-    </Button>
-  ) : null
+    </PermissionGatedButton>
+  )
   const folders = (
     <>
       <ManagedFolderPanel
@@ -595,11 +597,11 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
     { key: 'unused', label: '未使用', count: ready ? counts?.unused ?? null : null },
   ]
 
-  const uploadImage = canManage ? (
-    <Button variant="primary" onClick={() => setUploadOpen(true)}>
+  const uploadImage = (
+    <PermissionGatedButton allowed={canManage} need="tenantWide" variant="primary" onClick={() => setUploadOpen(true)}>
       <Upload aria-hidden="true" className={styles.buttonIcon} />画像を取り込む
-    </Button>
-  ) : null
+    </PermissionGatedButton>
+  )
   const selectView = (id: string) => { setView(id as LibraryView); resetPage() }
   const folders = (
     <>

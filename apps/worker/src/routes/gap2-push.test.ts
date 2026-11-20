@@ -78,3 +78,50 @@ test.each(['immediate','quiet','retry'])('担当が閲覧のみになったら%s
  if(mode==='retry') await retryOperatorPush(d.db,{},new Date(Date.now()+120000),send);
  expect(send).not.toHaveBeenCalled();
 });
+test('G4-11: 消えた端末だけを外し、他の端末には送る',async()=>{
+ await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',body);
+ await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',{...body,endpoint:body.endpoint+'-second'});
+ const send=vi.fn(async(s:{endpoint:string})=>s.endpoint.endsWith('-second')?{ok:true,status:201}:{ok:false,status:410});
+ const result=await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'new_inquiry',refId:'two-devices',chatId:'chat'},send);
+ expect(result).toEqual({sent:1,failed:1});
+ expect(send).toHaveBeenCalledTimes(2);
+ const rows=d.raw.prepare('SELECT endpoint,revoked_at FROM operator_push_subscriptions ORDER BY endpoint').all() as {endpoint:string;revoked_at:string|null}[];
+ expect(rows.find(r=>r.endpoint===body.endpoint)?.revoked_at).toBeTruthy();
+ expect(rows.find(r=>r.endpoint.endsWith('-second'))?.revoked_at).toBeNull();
+});
+test('G4-12: 5xxが続いた通知は3回まで再試行し、失敗を残す',async()=>{
+ const {retryOperatorPush}=await import('../services/operator-push.js');
+ await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',body);
+ d.raw.exec("INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES('always-fails','f','incoming','text','秘密の本文','a')");
+ const send=vi.fn(async()=>({ok:false,status:503}));
+ await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'new_inquiry',refId:'always-fails',chatId:'chat'},send);
+ for(const minutes of [2,10,45,90]) await retryOperatorPush(d.db,{},new Date(Date.now()+minutes*60_000),send);
+ expect(send).toHaveBeenCalledTimes(4);
+ expect(d.raw.prepare('SELECT status,attempts,next_attempt_at FROM operator_push_deliveries').get()).toEqual({status:'failed',attempts:4,next_attempt_at:null});
+});
+
+test.each(['logout','disabled','role'] as const)('G4-13: %s で本人の全端末だけを無効にする',async change=>{
+ const endpoint='/api/me/push/subscriptions';
+ await gapCall(gapApp(d,[operatorPush]),endpoint,'POST',body);
+ await gapCall(gapApp(d,[operatorPush]),endpoint,'POST',{...body,endpoint:body.endpoint+'-second'});
+ await gapCall(gapApp(d,[operatorPush],{...gapOwner,id:'s',role:'staff'}),endpoint,'POST',{...body,endpoint:body.endpoint+'-other'});
+ if(change==='logout'){
+  d.raw.exec("INSERT INTO admin_sessions(token_hash,staff_id,expires_at) VALUES('session','o','2026-11-20T00:00:00Z'); DELETE FROM admin_sessions WHERE token_hash='session'");
+ }else if(change==='disabled')d.raw.exec("UPDATE staff_members SET is_active=0 WHERE id='o'");
+ else d.raw.exec("UPDATE staff_members SET role='admin' WHERE id='o'");
+ const rows=d.raw.prepare('SELECT staff_id,revoked_at FROM operator_push_subscriptions ORDER BY staff_id,endpoint').all() as {staff_id:string;revoked_at:string|null}[];
+ expect(rows.filter(r=>r.staff_id==='o')).toHaveLength(2);expect(rows.filter(r=>r.staff_id==='o').every(r=>r.revoked_at!==null)).toBe(true);
+ expect(rows.find(r=>r.staff_id==='s')?.revoked_at).toBeNull();
+});
+
+test('G4-01: 登録した端末を一覧しテスト通知を一度送る',async()=>{
+ const pair=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']) as CryptoKeyPair;
+ const jwk=await crypto.subtle.exportKey('jwk',pair.privateKey) as JsonWebKey;
+ const pub=b64(new Uint8Array(await crypto.subtle.exportKey('raw',pair.publicKey) as ArrayBuffer));
+ const a=gapApp(d,[operatorPush],gapOwner,false,{OPERATOR_PUSH_VAPID_PUBLIC_KEY:pub,OPERATOR_PUSH_VAPID_PRIVATE_KEY:jwk.d!,OPERATOR_PUSH_VAPID_SUBJECT:'mailto:operator@example.test'});
+ expect((await gapCall(a,'/api/me/push/subscriptions','POST',body)).status).toBe(201);
+ const listed=await gapCall(a,'/api/me/push');expect(listed.status).toBe(200);expect((await listed.json() as any).data.subscriptions).toHaveLength(1);
+ const send=vi.fn(async()=>new Response(null,{status:201}));vi.stubGlobal('fetch',send);
+ const r=await gapCall(a,'/api/me/push/test','POST',{});expect(r.status).toBe(200);expect(await r.json()).toMatchObject({data:{sent:1,failed:0}});
+ expect(send).toHaveBeenCalledTimes(1);expect(d.raw.prepare("SELECT status FROM operator_push_deliveries WHERE kind='test'").get()).toEqual({status:'sent'});
+});

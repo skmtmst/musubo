@@ -12,11 +12,11 @@ import type { StaffMember } from '@line-crm/shared'
 
 const fixture = vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
-  return { params: 'id=w1', get: vi.fn(), editor: vi.fn(), pause: vi.fn(), testNotifications: vi.fn(), duplicate: vi.fn() }
+  return { params: 'id=w1', accounts: [{ id: 'account-a', liffId: null as string | null }], get: vi.fn(), editor: vi.fn(), pause: vi.fn(), testNotifications: vi.fn(), duplicate: vi.fn() }
 })
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(fixture.params) }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [{ id: 'account-a', liffId: null }], loading: false }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: fixture.accounts, loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
@@ -40,6 +40,7 @@ const editor = {
 beforeEach(() => {
   vi.clearAllMocks()
   fixture.params = 'id=w1'
+  fixture.accounts = [{ id: 'account-a', liffId: null }]
   forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember)
   fixture.get.mockResolvedValue({ success: true, data: webinar })
   fixture.editor.mockResolvedValue({ success: true, data: editor })
@@ -72,6 +73,36 @@ it('取得の失敗は読み直しの口を出し、押すと取り直して公�
   await screen.findByText('公開しました')
   expect(fixture.get).toHaveBeenCalledTimes(2)
   expect(fixture.get).toHaveBeenLastCalledWith('w1')
+})
+
+it('読み込み中は公開結果を表示しない', () => {
+  fixture.get.mockImplementation(() => new Promise(() => {}))
+  const view = render(<PublishedWebinarPage />)
+  expect(view.container.querySelector('[data-list-state="loading"]')).not.toBeNull()
+  expect(screen.queryByText('公開しました')).toBeNull()
+  expect(screen.queryByText('公開状態を確認できませんでした')).toBeNull()
+})
+
+it('所属先のLIFFだけを使い、無ければ公開ページを案内しない', async () => {
+  fixture.editor.mockResolvedValue({ success: true, data: { ...editor, publicPage: { url: 'https://example.invalid/published', unavailableReason: null } } })
+  fixture.accounts = [{ id: 'account-a', liffId: null }, { id: 'account-b', liffId: 'other-liff' }]
+  const view = render(<PublishedWebinarPage />)
+  await screen.findByText('公開しました')
+  expect(view.container.textContent).toContain('LIFF IDを確認できないため')
+  expect(screen.queryByRole('link', { name: '公開ページを見る' })).toBeNull()
+  cleanup()
+  fixture.accounts = [{ id: 'account-a', liffId: 'own-liff' }, { id: 'account-b', liffId: 'other-liff' }]
+  render(<PublishedWebinarPage />)
+  await screen.findByText('公開しました')
+  expect(screen.getByRole('link', { name: '公開ページを見る' }).getAttribute('href')).toBe('https://example.invalid/published')
+})
+
+it('公開前の状態を完了と見せず、編集画面へ案内する', async () => {
+  fixture.get.mockResolvedValueOnce({ success: true, data: { ...webinar, status: 'draft' } })
+  render(<PublishedWebinarPage />)
+  await screen.findByText('公開状態を確認できませんでした')
+  expect(screen.queryByText('公開しました')).toBeNull()
+  expect(screen.getByRole('link', { name: '編集画面へ戻る' }).getAttribute('href')).toBe('/webinars/edit?id=w1')
 })
 
 it('一時停止は表示中の版で送り、通知テストは結果の件数を出す', async () => {

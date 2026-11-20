@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
@@ -14,7 +15,7 @@ beforeAll(async () => {
 
 function stubFetch() {
   vi.stubGlobal('fetch', vi.fn(async () => (
-    new Response(JSON.stringify({ success: true, data: [] }), { status: 200 })
+    new Response(JSON.stringify({ success: true, data: [{ id: 'a1', name: '本店', isActive: true }, { id: 'a2', name: '支店', isActive: true }] }), { status: 200 })
   )))
 }
 
@@ -59,6 +60,54 @@ describe('新規プール窓のラベルの結び付き (R617)', () => {
     expect(input.tagName).toBe('INPUT')
     expect(input.labels?.length ?? 0).toBeGreaterThanOrEqual(1)
     expect(input.id).toBe('pl-name')
+  })
+
+  it('入力後も見えるラベルと受け入れ先を保つ', async () => {
+    const view = await openCreateModal()
+    fireEvent.change(view.getByLabelText('プール名'), { target: { value: '渋谷' } })
+    fireEvent.change(view.getByLabelText('URLに使う名前（あとから変えられません）'), { target: { value: 'shibuya' } })
+    expect(view.getByLabelText('プール名')).toBeTruthy()
+    expect(view.getByLabelText('URLに使う名前（あとから変えられません）')).toBeTruthy()
+    expect(view.getByText('2. いまの受け入れ先')).toBeTruthy()
+  })
+
+  it('受け入れ先を追加する選択口は名前と節の見出しを持つ', async () => {
+    const view = await openCreateModal()
+    await waitFor(() => expect((view.getByRole('button', { name: '＋ アカウントを足す' }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(view.getByRole('button', { name: '＋ アカウントを足す' }))
+    expect(view.getByLabelText('足すアカウント')).toBeTruthy()
+    const heading = view.getByText('2. いまの受け入れ先')
+    expect(heading.id).toBe('pool-create-where')
+    expect(view.container.querySelector('[aria-labelledby="pool-create-where"]')).toBeTruthy()
+  })
+
+  it('URLの意味と変更できない理由を示し、入力後は発行予定のURLに変える', async () => {
+    const view = await openCreateModal()
+    fireEvent.click(view.getByRole('button', { name: 'URLに使う名前（あとから変えられません）の説明' }))
+    expect(view.getByText(/配ったURLが使えなくなるため/)).toBeTruthy()
+    fireEvent.change(view.getByLabelText('URLに使う名前（あとから変えられません）'), { target: { value: 'shibuya' } })
+    expect(view.getByText(/保存すると、このURLが発行されます：/).textContent).toContain('/pool/shibuya')
+  })
+
+  it('プレビューは未発行の説明と入力したURL・受け入れ先を出す', async () => {
+    const view = await openCreateModal()
+    expect(view.getByText(/まだURLは発行されていません/)).toBeTruthy()
+    await waitFor(() => expect(view.getAllByText(/本店/).length).toBeGreaterThan(0))
+    fireEvent.change(view.getByLabelText('URLに使う名前（あとから変えられません）'), { target: { value: 'Shibuya!' } })
+    const invalidUrl = view.getByText('友だち追加URL').nextElementSibling?.textContent ?? ''
+    expect(invalidUrl).toContain('まだURLは発行されていません')
+    expect(invalidUrl).not.toContain('/pool/')
+    fireEvent.click(view.getByRole('button', { name: 'URLに使う名前（あとから変えられません）の説明' }))
+    expect(view.getByText(/配ったURLが使えなくなるため/)).toBeTruthy()
+    expect(view.queryByText(/保存すると、このURLが発行されます：/)).toBeNull()
+    fireEvent.change(view.getByLabelText('URLに使う名前（あとから変えられません）'), { target: { value: 'sample-store' } })
+    const dd = view.getByText('友だち追加URL').nextElementSibling
+    expect(dd?.textContent).toContain('/pool/sample-store')
+    expect(view.getByText('現在の受け入れ先').nextElementSibling?.textContent).toContain('本店')
+    fireEvent.click(view.getByRole('button', { name: '＋ アカウントを足す' }))
+    await pickEntity('足すアカウント', '支店')
+    fireEvent.click(view.getByRole('button', { name: '追加', exact: true }))
+    expect(view.getByText('現在の受け入れ先').nextElementSibling?.textContent).toContain('本店・支店')
   })
 
   it('入力例のplaceholderは残す', async () => {

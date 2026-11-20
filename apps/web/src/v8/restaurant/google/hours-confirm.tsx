@@ -34,6 +34,6 @@ export function HoursConfirm({ data, workspace, changes, onBack, onSend, busy, d
   {error?<Notice tone="danger">{error}</Notice>:null}
   {canGoogle&&!data.writeEnabled?<p className={styles.muted}>この検証環境ではGoogleへの送信が停止されています。入力した変更案は保存されています。</p>:null}
   {canGoogle&&data.writeEnabled&&changes.every(c=>c.kind==='special_hours')?<p className={styles.bodyText}>この{dates.length}日をGoogleの特別営業時間として反映します。</p>:null}
-  <div className={styles.confirmFooter}><div className={styles.actions}><Button presentation="hours" size="field" onClick={onBack} disabled={busy}>編集に戻る</Button><Button presentation="hours" size="field" variant="primary" lockedReason={lockedReason} disabled={disabled||canGoogle&&!data.writeEnabled} busy={busy} widthReserve="idle" onClick={onSend}>{canGoogle?'Googleに反映する':'設定を保存する'}</Button></div></div>
+  <div className={styles.confirmFooter}><div className={styles.actions}><Button presentation="hours" size="field" onClick={onBack} disabled={busy}>編集に戻る</Button><Button data-guide-anchor="hours.confirm" presentation="hours" size="field" variant="primary" lockedReason={lockedReason} disabled={disabled||canGoogle&&!data.writeEnabled} busy={busy} widthReserve="idle" onClick={onSend}>{canGoogle?'Googleに反映する':'設定を保存する'}</Button></div></div>
  </div>
 }

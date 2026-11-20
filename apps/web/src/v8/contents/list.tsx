@@ -1,5 +1,7 @@
 'use client'
 
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
+
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { loadStaffIdentity, useStaffRole, canManageRole } from '@/lib/staff-role'
 import { deleteMediaSelection } from './list-bulk-delete'
@@ -905,11 +907,11 @@ export default function MediaLibraryListV8() {
   ]
 
   /* 登録と取得は担当者も使える（今と同じ）。消す・移す・名前を変えるは管理者だけ。 */
-  const uploadButton = canRegisterMedia ? (
-    <Button type="button" variant="primary" className="v8-folder-create w-full" onClick={() => setUploadOpen(true)}>
+  const uploadButton = (
+    <PermissionGatedButton allowed={canRegisterMedia} type="button" variant="primary" className="v8-folder-create w-full" onClick={() => setUploadOpen(true)}>
       <Plus size={16} aria-hidden="true" />メディアを登録する
-    </Button>
-  ) : null
+    </PermissionGatedButton>
+  )
   const selectFolder = (id: string) => {
     setFolderFilter(id)
     setPage(1)
