@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [一斉配信の過ぎた予約日時を保存しない](release-log/unreleased/59-kenta-broadcast-past-time.md) — 過ぎた日時で即送られる抜け道の修正履歴。確認 2026-11-14。
+
 - [保守時に確認する説明を整理](release-log/unreleased/121-kenta-q04-misc.md) — 反映履歴、確認 2026-11-19。
 
 - [一斉配信の自動確認を改善](release-log/unreleased/114-kenta-q02b-b11.md) — 反映履歴、確認 2026-11-18。

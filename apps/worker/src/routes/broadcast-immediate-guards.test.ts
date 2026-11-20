@@ -32,6 +32,11 @@ vi.mock('../services/account-access.js', () => ({
   }),
   canAccessAllLineAccounts: async () => true,
 }));
+vi.mock('../lib/step-up.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../lib/step-up.js')>();
+  return { ...original, sensitiveStepUpSatisfied: vi.fn(async (c, purpose) =>
+    c.req.header('X-Test-Step-Up') === 'verified' || original.sensitiveStepUpSatisfied(c, purpose)) };
+});
 
 const { broadcasts } = await import('./broadcasts.js');
 
@@ -236,6 +241,44 @@ describe('N-062 即時送信の直前再確認', () => {
 
 
 describe('過去日時からの確認なし送信を防ぐ', () => {
+  test.each([
+    { saveAsDraft: true },
+    { scheduledAt: null },
+  ])('期限切れの予約は %s で下書きに戻せる', async (change) => {
+    const db = createTestD1(); seedBase(db.raw);
+    db.raw.prepare("UPDATE broadcasts SET status = 'scheduled', scheduled_at = '2000-01-01T00:00:00Z' WHERE id = 'bc-1'").run();
+    const response = await setupApp(db).request('/api/broadcasts/bc-1', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Test-Step-Up': 'verified' },
+      body: JSON.stringify({ ...change, expectedVersion: 1 }),
+    });
+    expect(response.status).toBe(200);
+    expect(rowOf(db.raw)).toEqual({ status: 'draft' });
+    db.raw.close();
+  });
+  test.each([null, '2099-01-01T00:00:00Z'])('日時 %s は作成・更新できる', async (scheduledAt) => {
+    const db = createTestD1(); seedBase(db.raw);
+    const app = setupApp(db);
+    for (const method of ['POST', 'PUT']) {
+      const response = await app.request(method === 'POST' ? '/api/broadcasts' : '/api/broadcasts/bc-1', {
+        method, headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: '配信', messageType: 'text', messageContent: '本文', targetType: 'all', lineAccountId: 'acc-1', expectedVersion: 1, scheduledAt }),
+      });
+      expect(response.status).toBe(method === 'POST' ? 201 : 200);
+    }
+    db.raw.close();
+  });
+  test('期限が過ぎた予約は日時を省いた更新でも保存しない', async () => {
+    const db = createTestD1(); seedBase(db.raw);
+    db.raw.prepare("UPDATE broadcasts SET status = 'scheduled', scheduled_at = '2000-01-01T00:00:00Z' WHERE id = 'bc-1'").run();
+    const response = await setupApp(db).request('/api/broadcasts/bc-1', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Test-Step-Up': 'verified' },
+      body: JSON.stringify({ title: '変更後', expectedVersion: 1 }),
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'SCHEDULE_MUST_BE_FUTURE', fields: { scheduledAt: expect.any(String) } });
+    expect(db.raw.prepare("SELECT title FROM broadcasts WHERE id = 'bc-1'").get()).toEqual({ title: 'お知らせ' });
+    db.raw.close();
+  });
   test.each(['2000-01-01T00:00:00Z', 'not-a-date', ''])('作成・更新は不正な予約日時 %s を保存しない', async (scheduledAt) => {
     const db = createTestD1(); seedBase(db.raw);
     const app = setupApp(db);

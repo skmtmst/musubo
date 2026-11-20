@@ -70,7 +70,7 @@ export function BroadcastScheduleStep({ limitToQuota, setLimitToQuota, recipient
                 <label htmlFor="bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">
                   配信日（日本時間）
                 </label>
-                <SaveErrorField names={["scheduledDate","scheduled_date"]}><DateField
+                <SaveErrorField names={["scheduledDate","scheduled_date","scheduledAt","scheduled_at"]}><DateField
                   id="bc-date"
                   value={scheduledDate}
                   onChange={setScheduledDate}
