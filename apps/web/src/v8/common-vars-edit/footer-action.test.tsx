@@ -182,7 +182,7 @@ it('使用先ごとに参照方法と確かめられた版を表示する', asyn
   expect(within(table).getByText('最新の値')).toBeTruthy()
   expect(within(table).getByText('版 3 で固定')).toBeTruthy()
   expect(within(table).getByText('版 5')).toBeTruthy()
-  expect(within(table).getByText('版 3')).toBeTruthy()
+  expect(within(table).getByTitle('版 3')).toBeTruthy()
 })
 
 it('一斉配信の下書きに現在の版を固定できる', async () => {
