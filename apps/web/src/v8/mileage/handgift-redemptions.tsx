@@ -13,12 +13,14 @@ import StatusBadge from '@/components/shared/status-badge'
 import Notice from '@/components/shared/notice'
 import { DataTable, TableHeadRow, Th, Td, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type Item = { anonymizedAt: string | null; createdAt: string; friendName: string | null; requiredMiles: number; id: string; rewardName: string; rewardNameSnapshot: string | null; rewardKindSnapshot: string | null; beneficiaryFriendId: string | null; status: string }
 type Page = { items: Item[]; pagination: { total: number } }
 type Target = { item: Item; action: 'deliver' | 'cancel' }
 
 export default function HandgiftRedemptions({ accountId, readonly }: { accountId: string; readonly: boolean }) {
+  const saveErrors = useSaveFormErrors()
   const role = useStaffRole()
   const allowed = !readonly && canAdministerRole(role)
   const [page, setPage] = useState(1)
@@ -32,7 +34,7 @@ export default function HandgiftRedemptions({ accountId, readonly }: { accountId
   const [notice, setNotice] = useState('')
   const [pending, setPending] = useState('')
   const lock = useRef(false)
-  useEffect(() => { setPage(1); setTarget(null); setReason(''); setError('') }, [accountId])
+  useEffect(() => { setPage(1); setTarget(null); setReason(''); setError(''); saveErrors.reset() }, [accountId, saveErrors])
   useEffect(() => {
     let active = true
     setLoaded(null); setFailed(false)
@@ -48,7 +50,7 @@ export default function HandgiftRedemptions({ accountId, readonly }: { accountId
   const submit = async () => {
     if (!target || !allowed || lock.current || !data || target.item.anonymizedAt) return
     if (target.action === 'cancel' && target.item.status === 'succeeded' && !reason.trim()) { setError('取り消す理由を入力してください'); return }
-    lock.current = true; setBusy(true); setError(''); setPending('')
+    lock.current = true; setBusy(true); setError(''); setPending(''); saveErrors.reset()
     try {
       const endpoint = target.action === 'deliver' ? 'hand-delivery' : 'hand-cancel'
       const body = target.action === 'deliver' ? { accountId } : { accountId, expectedStatus: target.item.status, reason: reason.trim() }
@@ -58,7 +60,7 @@ export default function HandgiftRedemptions({ accountId, readonly }: { accountId
       setTarget(null); setReason(''); setRefresh(n => n + 1)
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) { setTarget(null); setReason(''); setNotice('状態が変わったため、最新の一覧を表示しました。'); setRefresh(n => n + 1) }
-      else setError(err instanceof Error ? err.message : '操作を完了できませんでした')
+      else if (!saveErrors.capture(err)) setError(err instanceof Error ? err.message : '操作を完了できませんでした')
     }
     finally { lock.current = false; setBusy(false) }
   }
@@ -75,10 +77,10 @@ export default function HandgiftRedemptions({ accountId, readonly }: { accountId
       })}
     </tbody></DataTable>}
     {data.data.pagination.total > 100 ? <Pagination page={page} pageCount={Math.ceil(data.data.pagination.total / 100)} onPageChange={setPage} ariaLabel="交換のページ送り" /> : null}
-    <ConfirmDialog open={target !== null} title={target?.action === 'deliver' ? '景品を渡しましたか？' : '交換を取り消しますか？'} description={target?.action === 'deliver' ? '景品を渡した記録を残します。' : target?.item.status === 'succeeded' ? '景品が戻ったことを確認してください。取り消すとマイルを戻し、渡した記録と取消の記録を残します。' : '取り消すと交換したマイルをお客さまに戻します。'} confirmLabel={target?.action === 'deliver' ? '渡した' : '取り消す'} busy={busy} error={error} onCancel={() => { if (!busy) { setTarget(null); setReason(''); setError(''); if (pending) { setNotice(pending); setRefresh(n => n + 1) }; setPending('') } }} onConfirm={() => { void submit() }}>
+    <SaveErrorScope errors={saveErrors}><ConfirmDialog open={target !== null} title={target?.action === 'deliver' ? '景品を渡しましたか？' : '交換を取り消しますか？'} description={target?.action === 'deliver' ? '景品を渡した記録を残します。' : target?.item.status === 'succeeded' ? '景品が戻ったことを確認してください。取り消すとマイルを戻し、渡した記録と取消の記録を残します。' : '取り消すと交換したマイルをお客さまに戻します。'} confirmLabel={target?.action === 'deliver' ? '渡した' : '取り消す'} busy={busy} error={error} onCancel={() => { if (!busy) { setTarget(null); setReason(''); setError(''); saveErrors.reset(); if (pending) { setNotice(pending); setRefresh(n => n + 1) }; setPending('') } }} onConfirm={() => { void submit() }}>
       {pending ? <Notice tone="info">{pending} もう一度押すと処理を再開します。</Notice> : null}
       {target ? <p>{target.item.friendName || '名前未設定'} さん・{target.item.rewardNameSnapshot || target.item.rewardName}・交換番号 {target.item.id.slice(-8)}</p> : null}
-      {target?.action === 'cancel' && target.item.status === 'succeeded' ? <Field label="取り消す理由（必須）" htmlFor="handgift-reason"><TextField id="handgift-reason" value={reason} onChange={event => setReason(event.target.value)} maxLength={500} /></Field> : null}
-    </ConfirmDialog>
+      {target?.action === 'cancel' && target.item.status === 'succeeded' ? <Field label="取り消す理由（必須）" htmlFor="handgift-reason"><SaveErrorField names={["reason", "cancellation_reason", "cancellationReason"]}><TextField id="handgift-reason" value={reason} onChange={event => setReason(event.target.value)} maxLength={500} /></SaveErrorField></Field> : null}
+    </ConfirmDialog></SaveErrorScope>
   </Card>
 }

@@ -7,6 +7,7 @@ import { jstDate } from '@/lib/jst-datetime'
 import Card, { CardHeader } from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import { DEFAULT_PAGE_SIZE as PAGE_SIZE } from '@/components/shared/page-size-options'
 import SegmentedControl from '@/components/shared/segmented'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Th, Td, Tr, RowNameButton } from '@/components/shared/table'
@@ -15,7 +16,6 @@ import { formatDay, formatTime } from '@/lib/format'
 type Filter = 'all' | 'requested'
 type Page = { account: string; requests: BookingRequest[]; total: number; requestedCount: number }
 type Result = { requests: BookingRequest[]; total: number }
-const PAGE_SIZE = 20
 function valid(result: Result): Result {
   if (!Array.isArray(result.requests) || !Number.isFinite(result.total) || result.total < 0) throw new Error('load_failed')
   return result
