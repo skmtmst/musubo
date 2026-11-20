@@ -110,3 +110,22 @@ test('R4a-08: 試しは500人ずつに分けて送り、鍵を分ける',async()
  expect(multicast.mock.calls.every(c=>/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(c[3]??''))).toBe(true);
  expect(fetch).not.toHaveBeenCalled();
 });
+
+test('A/B配信は未解決の共通情報を送らず、値があれば置き換える',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T01:00:00Z'));
+ try{
+  const app=gapApp(d,[broadcastAb]);
+  expect((await gapCall(app,'/api/broadcasts/br/variants/A','PUT',{text:'営業時間: {{var.hours}}',expectedVersion:1})).status).toBe(200);
+  expect((await gapCall(app,'/api/broadcasts/br/variants/B','PUT',{text:'B',expectedVersion:2})).status).toBe(200);
+  expect((await gapCall(app,p,'PUT',{testRatioPct:20,metric:'click',decideAfterMinutes:60,undecidedPolicy:'stop',expectedVersion:3})).status).toBe(200);
+  const send=transmit(),opts={transmit:send,liveDeliveryEnabled:true,now:new Date()};
+  await expect(startAbLive(d.db,'br',4,2400,'live-var',opts)).rejects.toMatchObject({message:expect.stringContaining('common_var_unresolved')});
+  expect(send).not.toHaveBeenCalled();
+  expect(d.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+  expect(d.raw.prepare('SELECT COUNT(*) n FROM broadcast_ab_live_tests').get()).toEqual({n:0});
+  d.raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES ('hours','a','営業時間','hours','text','10時')").run();
+  await startAbLive(d.db,'br',4,2400,'live-var',opts);
+  expect(send).toHaveBeenCalledTimes(2);
+  expect(send.mock.calls.find(([call])=>call.variantKey==='A')?.[0].messages).toEqual([{type:'text',text:'営業時間: 10時'}]);
+ }finally{vi.useRealTimers();}
+});

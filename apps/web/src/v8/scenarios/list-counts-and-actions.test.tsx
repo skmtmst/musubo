@@ -904,3 +904,15 @@ test('一括停止の窓は操作先を示し、アカウント切替で閉じ�
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(update).not.toHaveBeenCalled()
 })
+
+test('表示件数は10・20・50から選び、選んだ件数で一覧を取り直す', async () => {
+  await mount()
+  const control = screen.getByRole('button', { name: '表示件数' })
+  expect(control.closest('[data-page-size]')).not.toBeNull()
+  expect(screen.queryByRole('button', { name: '1ページに出す件数' })).toBeNull()
+  fireEvent.click(control)
+  const options = screen.getAllByRole('option')
+  expect(options.map(option => option.textContent?.trim())).toEqual(['10件表示', '20件表示', '50件表示'])
+  fireEvent.click(options[2].querySelector('button') ?? options[2])
+  await waitFor(() => expect(listPage).toHaveBeenCalledWith(expect.objectContaining({ limit: 50 }), expect.any(AbortSignal)))
+})

@@ -7,6 +7,7 @@ import { Plus } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import PermissionGatedButton from '@/components/shared/permission-gated-button'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import Notice from '@/components/shared/notice'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
@@ -56,6 +57,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const role = useStaffRole()
   /* 閲覧のみの人には、追加・変更・停止・再開のボタンを置かない（2026-10-06 オーナー）。 */
   const canEdit = canManageRole(role)
+  const lockReason = usePermissionLockReason(canEdit)
   const rows = store ? data.menuItems.filter((row) => row.store_id === store.id) : data.menuItems
   const legacyPending = rows.some((item) => item.priceChangeStatus === 'pending')
   const scheduledPrices = rows.filter((item) => item.status === 'active' && item.pendingPrice != null && item.priceChangeStatus === 'approved')
@@ -135,7 +137,8 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
       <Panel
         title="メニュー一覧"
         description="予約台帳・Google投稿・LINEカードで同じマスターを参照します。価格変更は保存時に確定し、指定した開始日時から新価格になります。"
-        aside={<PermissionGatedButton allowed={canEdit} variant="primary" onClick={openNew}><Plus size={16} aria-hidden="true" />メニューを作る</PermissionGatedButton>}
+        /* 開店準備ガイド⑥の手順1/3（枠14 sIFft）の光らせる先。 */
+        aside={<PermissionGatedButton data-guide-anchor="menu.create" allowed={canEdit} variant="primary" onClick={openNew}><Plus size={16} aria-hidden="true" />メニューを作る</PermissionGatedButton>}
         flush
         help={<HelpTip label="メニュー一覧の説明">{canEdit ? '「…」から変更・停止・再開・削除ができます。参照中のメニューは削除できません。' : 'メニューの内容と価格を確認できます。'}</HelpTip>}
       >
@@ -175,11 +178,12 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                     ) : <Status value={archived ? 'archived' : draftItem ? 'draft' : item.status === 'paused' ? 'paused' : 'active'} label={archived ? '停止中' : undefined} />}
                   </Td>
                   <ActionCell className={styles.colOps}>
-                    {canEdit ? (
+                    {canEdit || lockReason ? (
                       <span className={styles.rowActions}>
-                        {archived ? <Button disabled={busy} onClick={() => resume(item)}>再開</Button> : null}
+                        {archived ? <PermissionGatedButton allowed={canEdit} disabled={busy} onClick={() => resume(item)}>再開</PermissionGatedButton> : null}
                         <RowMore
                           subject={`メニュー「${item.name}」`}
+                          lockedReason={canEdit ? undefined : lockReason}
                           items={[
                             { id: 'edit', label: '変更', onSelect: () => openEdit(item) },
                             ...(archived

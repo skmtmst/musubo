@@ -248,8 +248,7 @@ test('v8 の行の「登録者を管理」「配信予定を見る」「実行�
   }
 })
 
-// 2026-10-06 オーナー決定：閲覧のみには押せないボタン・項目を置かずに隠す（帯は出す）。板 。
-test('v8 の閲覧のみ（a5C1p）は選択と作成を隠し、フォルダ追加は理由付きで拒否する', async () => {
+test('v8 の閲覧のみは選択を隠し、作成とフォルダ追加を理由付きで拒否する', async () => {
   document.documentElement.dataset.theme = 'v8'
   handler = (url) => {
     if (url.pathname === '/api/staff/me') return response({ success: true, data: { role: 'viewer' } })
@@ -261,8 +260,10 @@ test('v8 の閲覧のみ（a5C1p）は選択と作成を隠し、フォルダ追
     expect(host.querySelector('[data-design-node="a5C1p"]')?.textContent).toContain('閲覧のみで見ています')
     expect(host.textContent).toContain('契約終了の前に知らせる')
   })
-  const actionTexts = [...host.querySelectorAll('button, a')].map((el) => el.textContent ?? '')
-  expect(actionTexts.some((text) => text.includes('リマインダを作る'))).toBe(false)
+  const create = [...host.querySelectorAll('button')].filter(button => button.textContent?.includes('リマインダを作る'))
+  expect(create.length).toBeGreaterThan(0)
+  for (const button of create) await expectPermissionLocked(button)
+  expect(host.querySelector('a[href="/reminders/new"]')).toBeNull()
   await expectPermissionLocked([...host.querySelectorAll('button')].find(button => button.textContent?.includes('フォルダを追加')))
   const selections = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
   expect(selections).toHaveLength(0)
@@ -370,10 +371,25 @@ test('初回読込では空と表示せず、失敗と成功0件を別の案内�
   expect(host.querySelector('[data-list-state="error"]')).toBeNull()
   await act(async () => finish(response({ success: false, error: 'down' }, 500)))
   await eventually(() => expect(host.textContent).toContain('リマインダを読み込めませんでした'))
+  expect(host.textContent).not.toContain('リマインダの読み込みに失敗しました')
+  expect(host.textContent).not.toContain('いまは読み込めていません')
   expect(host.querySelector('[data-empty-list]')).toBeNull()
   handler = url => url.pathname === '/api/reminders' ? response({ success: true, data: { items: [], total: 0, limit: 20 } }) : base(url)
   const retry = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('もう一度'))!
   await act(async () => retry.click())
   await eventually(() => expect(host.querySelector('[data-empty-list]')).not.toBeNull())
   expect(host.textContent).not.toContain('リマインダを読み込めませんでした')
+})
+
+test.each([false, true])('リマインダの一覧行に未分類の丸を出す（狭幅 %s）', async (narrow) => {
+  const media = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({ matches: narrow, media: query, onchange: null, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(() => true) }))
+  try {
+    document.documentElement.dataset.theme = 'v8'
+    await act(async () => root.render(<RemindersPage />))
+    await eventually(() => expect(host.textContent).toContain('契約終了の前に知らせる'))
+    const row = [...host.querySelectorAll('tr')].find(item => item.textContent?.includes('契約終了の前に知らせる'))!
+    expect(row.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
+    expect(row.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
+    if (narrow) expect(document.querySelector('[data-design-node="Iffil"]')).not.toBeNull()
+  } finally { media.mockRestore() }
 })

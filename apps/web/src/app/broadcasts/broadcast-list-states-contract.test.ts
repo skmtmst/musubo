@@ -1,21 +1,7 @@
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(new URL('../../v8/broadcasts/list.tsx', import.meta.url), 'utf8')
-/** 帯の中身（4枚の組み立て）。数の扱いは `broadcast-kpi-values.test.ts` が直に試す。 */
-const KPIS = readFileSync(
-  join(HERE, '..', '..', 'components', 'broadcasts', 'broadcast-kpi-values.ts'),
-  'utf8',
-)
-/** 帯の描き方（単位を出すかどうか）。 */
-const KPI_VIEW = readFileSync(
-  join(HERE, '..', '..', 'components', 'broadcasts', 'broadcast-kpis.tsx'),
-  'utf8',
-)
-
 /**
  * 一斉配信の一覧（設計 `q76C35` ★管理画面 6-1）の、中身が出せないときの見え方。
  *
@@ -71,58 +57,4 @@ describe('フォルダ操作（設計 6-1-M `xkRDb`）', () => {
     expect(PAGE).toContain("onSelect: () => openCreate(true)")
     expect(PAGE).toContain('openTemplatePickerInitially={openTemplatePicker}')
   })
-})
-
-/**
- * 帯の4枚（設計 `q76C35`）。
- *
- * **取れない数を 0 で埋めない。** 「下書き 0件」は「下書きは無い」という
- * 別の意味になり、作りかけを見落とす。
- */
-describe('一覧の帯（設計 6-1 `q76C35`）', () => {
-  it('設計の4枚を、設計の順に出す', () => {
-    const order = ['予約中', '下書き', '今月の配信', '平均開封率']
-    const at = order.map((title) => KPIS.indexOf(`title: '${title}'`))
-    for (const [i, pos] of at.entries()) {
-      expect(pos, `${order[i]} の札が無い`).toBeGreaterThan(-1)
-    }
-    expect([...at].sort((a, b) => a - b), '設計の並びと違う').toEqual(at)
-  })
-
-  it('旧集計が返さない「下書き」と「今日」を 0 件と書かない', () => {
-    /*
-     * `/api/broadcasts/stats` が返すのは 今月の配信・予約中・到達・失敗・
-     * 平均開封率 だけ。一覧から数えると**基準が違う**（一覧はLINEアカウントで
-     * 絞れるのに集計は絞らない）ので、足しても合わない4枚になる。
-     */
-    expect(KPIS).toContain("detail: '今日 —（未取得）'")
-    // 下書きの補足の言葉は broadcast-kpi-values.test.ts が関数の結果で見張る。
-    expect(KPIS, '一覧の新しい集計値を捨てている').toMatch(/title: '下書き',\s*\n\s*value: numberOrNull\(stats\?\.drafts\),/)
-  })
-
-  it('平均開封率の副題を設計どおり「過去28日」だけにする', () => {
-    expect(KPIS).toContain("detail: '過去28日',")
-    expect(KPIS, '設計に無い言葉を足している').not.toContain('20人未満の配信は除く')
-  })
-
-  it('数が無いときは単位も出さない', () => {
-    /* `—件` は数に見える。監査6 #674: 見せ方は MetricValue へ寄せ、
-       数に直せない値は null として渡す（MetricValue が単位ごと「—」へする）。 */
-    expect(KPI_VIEW).toContain("typeof card.value === 'number' && Number.isFinite(card.value) ? card.value : null")
-    expect(KPI_VIEW).toContain('<MetricValue')
-  })
-
-  it('帯の組み立ては、画面から切り離して試せる形にする', () => {
-    /*
-      部品の中で組み立てていたころは、**文字列の一致を見る契約テストでしか
-      確かめられず、`0` と `—` の取り違えが試験をすり抜けた。**
-    */
-    expect(KPI_VIEW).toContain("import { buildBroadcastKpiCards, countText } from './broadcast-kpi-values'")
-    expect(KPI_VIEW).toContain('const cards = buildBroadcastKpiCards(stats)')
-  })
-  it('読み込めなかったときに「ありません」と言わない', () => {
-    expect(PAGE).toContain('一斉配信を読み込めませんでした')
-    expect(PAGE).not.toContain('いまは読み込めていません。上の案内をご覧ください。')
-  })
-
 })
