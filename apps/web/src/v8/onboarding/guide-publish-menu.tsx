@@ -63,7 +63,7 @@ export function GuidePublishMenu({ accountId, onLater, onReview }: {
         }} /> : null}
         {preview.state === 'ready' ? <figure className={styles.menu}>
           {preview.image ? <img className={styles.image} src={api.richMenuGroups.imageUrl(preview.image)}
-            alt={preview.name} width={2500} height={preview.size === 'compact' ? 843 : 1686} />
+            alt={preview.name} data-size={preview.size} width={2500} height={preview.size === 'compact' ? 843 : 1686} />
             : <figcaption>{preview.name}</figcaption>}
         </figure> : null}
         {preview.state === 'multiple' ? <p>一覧から公開する下書きを選べます。</p> : null}

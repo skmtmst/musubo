@@ -397,11 +397,32 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .panel[data-design-layout^='stacked'] .actions { padding: 0; border: 0; }
 
 :root .panel[data-design-layout='stacked-centered'] { padding: calc(var(--space-24) + var(--space-4)); }
-:root .panel[data-design-layout='stacked-centered'] > .headerRow { position: relative; }
 :root .panel[data-design-layout='stacked-centered'] .headerContent { align-items: center; }
-:root .panel[data-design-layout='stacked-centered'] .close { position: absolute; inset-block-start: 0; inset-inline-end: 0; }
 :root .panel[data-design-layout='stacked-centered'] .title { font-size: var(--text-title); line-height: var(--space-24); }
-:root .panel[data-design-layout='stacked-centered'] > .description { text-align: center; }
+:root .panel[data-design-layout='stacked-centered'] > .description { text-align: center; font-weight: var(--font-weight-reading); }
+:root .panel[data-design-layout='stacked-centered'] > .content::after { content: none; }
+:root .panel[data-design-layout='stacked-centered'] .buttonPair { gap: var(--space-12); }
+:root .panel[data-design-layout='stacked-centered'] .buttonPair > button {
+  min-height: calc(var(--control-h) + var(--space-4));
+  padding-inline: var(--space-24);
+  border-radius: var(--radius-control);
+}
+html:root .panel[data-design-layout='stacked-centered'] .actions [data-variant='secondary'] {
+  background: var(--color-canvas);
+  padding-inline: var(--space-16);
+}
+html:root .panel[data-design-layout='stacked-centered'] .actions [data-variant='secondary']:not(:focus-visible) {
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+}
+html:root .panel[data-design-layout='stacked-centered'] .actions [data-variant='secondary']:hover:not(:disabled) {
+  background: var(--polish-hover);
+}
+:root .overlay[data-design-layout='stacked-centered'] {
+  background: color-mix(in srgb, var(--color-ink-secondary) 42%, transparent);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
 
 :root .panel[data-confirm-first] .actions .buttonPair > button:last-of-type { order: -1; }
 

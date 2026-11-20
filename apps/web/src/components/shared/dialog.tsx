@@ -340,10 +340,12 @@ export default function Dialog({
           {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <Notice tone={descriptionBand === 'warning' ? 'warn' : 'danger'} statusWord={false} icon={null} role="presentation" data-qa-dialog-callout>{heading}</Notice> : heading}
         </div>
         {headerAction ? <div className={styles.headerAction}>{headerAction}</div> : null}
-        {/* 閉じ方は必ず右上の×。フッターの「閉じる」ボタンは置かない（UI-25）。 */}
-        <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={discard.requestClose} disabled={busy}>
-          <X aria-hidden="true" size={20} />
-        </IconButton>
+        {/* 中央に積む案内はフッターに見送り操作がある。通常の窓は右上の×で閉じる。 */}
+        {designLayout !== 'stacked-centered' ? (
+          <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={discard.requestClose} disabled={busy}>
+            <X aria-hidden="true" size={20} />
+          </IconButton>
+        ) : null}
       </div>
       {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><Notice tone="danger" statusWord={false} data-qa-dialog-callout>{descriptionNode}</Notice></div> : designLayout ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
@@ -397,7 +399,7 @@ export default function Dialog({
   const discardDialog = discard.confirming ? <Dialog open={discard.confirming} title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null
   if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}{discardDialog}</OverlayDepthContext.Provider>
   const overlay = (
-    <div className={`${styles.overlay} ${confirmation ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-viewport-fit={fitViewport || undefined} data-design-top={designTop ? '' : undefined} style={{ zIndex: layer, ...(designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : null) }} onMouseDown={(event) => {
+    <div className={`${styles.overlay} ${confirmation ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-design-layout={designLayout} data-viewport-fit={fitViewport || undefined} data-design-top={designTop ? '' : undefined} style={{ zIndex: layer, ...(designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : null) }} onMouseDown={(event) => {
       if (!busy && event.target === event.currentTarget) discard.requestClose()
     }}>
       {panel}

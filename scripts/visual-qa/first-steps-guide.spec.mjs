@@ -123,6 +123,7 @@ test('店舗の進捗を読む間は暫定値を表示しない', async ({ page 
 })
 
 test('受付開始後は公開前の案内を出し、あとでを押すと来店フォローへ進む', async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await openFixture(page, { storeProgress: { tables: true, hours: true, menus: true } })
   await page.route('**/api/rich-menu-groups?**', async route => {
     if (new URL(route.request().url()).searchParams.get('filter') !== 'draft') return route.fallback()
@@ -146,6 +147,12 @@ test('受付開始後は公開前の案内を出し、あとでを押すと来�
   await expect(announcement).toBeVisible()
   await expect(announcement.getByRole('button', { name: 'リッチメニューを公開する' })).toBeVisible()
   await expect(announcement.getByRole('img', { name: '検証用リッチメニュー' })).toBeVisible()
+  await expect(announcement.getByRole('button', { name: '閉じる', exact: true })).toHaveCount(0)
+  const bounds = await announcement.boundingBox()
+  expect(bounds.x).toBeCloseTo(450, 0)
+  expect(bounds.y).toBeCloseTo(245, 0)
+  expect(bounds.width).toBeCloseTo(540, 0)
+  expect(bounds.height).toBeCloseTo(510, 0)
   await page.screenshot({ path: testInfo.outputPath('reception-rich-menu-prompt.png'), animations: 'disabled' })
   await announcement.getByRole('button', { name: 'あとで', exact: true }).click()
   await expect(page).toHaveURL(/\/restaurant-test\/line-followup$/)

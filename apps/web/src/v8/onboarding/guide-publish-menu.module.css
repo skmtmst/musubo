@@ -17,13 +17,14 @@
 
 .footer {
   display: grid;
-  gap: var(--space-14);
+  gap: var(--space-12);
   text-align: center;
 }
 
 .footer p {
-  color: var(--color-ink-secondary);
+  color: var(--color-ink-faint);
   font-size: var(--text-caption);
+  font-weight: var(--font-weight-reading);
 }
 
 .preview {
@@ -43,5 +44,11 @@
 .image {
   width: 100%;
   height: auto;
+  aspect-ratio: 2500 / 1686;
+  object-fit: cover;
   border-radius: var(--polish-radius-card);
+}
+
+.image[data-size='compact'] {
+  aspect-ratio: 2500 / 843;
 }
