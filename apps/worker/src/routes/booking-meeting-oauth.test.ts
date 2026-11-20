@@ -24,7 +24,7 @@ it('state の再利用を拒み、本人の鍵を暗号化して保存し切断�
  const data=await started.json() as {data:{authorizationUrl:string}};const url=new URL(data.data.authorizationUrl);const state=url.searchParams.get('state')!;
  expect(data.data.authorizationUrl).not.toContain('fixture-secret');
  const callback=`/api/booking/admin/meeting-oauth/callback?state=${encodeURIComponent(state)}&code=fixture-code`;
- const completed=await gapCall(app,callback);expect(completed.status).toBe(302);expect(completed.headers.get('location')).toContain('meeting_connection=connected');expect(request).toHaveBeenCalledTimes(2);
+ const completed=await gapCall(app,callback);expect(completed.status).toBe(302);expect(completed.headers.get('location')).toContain('/booking/menus?');expect(completed.headers.get('location')).toContain('meeting_connection=connected');expect(request).toHaveBeenCalledTimes(2);
  expect((await gapCall(app,`${path}/prefer?account_id=a`,'POST',{})).status).toBe(200);
  expect(await (await gapCall(app,`${path}?account_id=a`)).json()).toMatchObject({data:{preferred:true}});
  const saved=d.raw.prepare('SELECT credential_enc FROM booking_meeting_connections').get() as {credential_enc:string};expect(saved.credential_enc).not.toContain('fixture-refresh');

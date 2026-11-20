@@ -32,7 +32,7 @@ function returnedState(cookie:string|undefined):string|null {
 }
 function adminReturn(c:Context<Env>,accountId:string,staffId:string,result:'connected'|'denied'|'failed'):string {
  const origin=new URL(c.env.ADMIN_PUBLIC_URL??c.env.WORKER_URL);if(origin.protocol!=='https:'||origin.username||origin.password)throw new GapError('oauth_not_configured',503);
- const target=new URL('/booking/staff/shifts',origin);target.searchParams.set('tab','staff');target.searchParams.set('staff',staffId);target.searchParams.set('account_id',accountId);target.searchParams.set('meeting_connection',result);return target.toString();
+ const target=new URL('/booking/menus',origin);target.searchParams.set('tab','staff');target.searchParams.set('staff',staffId);target.searchParams.set('account_id',accountId);target.searchParams.set('meeting_connection',result);return target.toString();
 }
 const base='/api/booking/admin/staff/:id/connections/:provider';
 bookingMeetingOAuth.get(base,async c=>{
