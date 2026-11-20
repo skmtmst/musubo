@@ -608,7 +608,7 @@ html:root .panel[data-title-content] .title > span:last-child { min-width: 0; fl
 
 .actionNote { grid-column: 1 / -1; flex-basis: 100%; min-height: var(--space-24); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--space-20); text-align: center; }
 
-/* ウェルカムのように画面全体を使う案内。見出しは読み上げ用に残す。 */
+/* ウェルカムのように画面全体を使う案内。 */
 :root .overlay[data-design-layout='fullscreen'] {
   padding: 0;
   background: transparent;
@@ -623,14 +623,6 @@ html:root .panel[data-title-content] .title > span:last-child { min-width: 0; fl
   outline: 0;
   background: transparent;
   box-shadow: none;
-}
-:root .panel[data-design-layout='fullscreen'] > .headerRow {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  clip-path: inset(50%);
-  overflow: hidden;
 }
 :root .panel[data-design-layout='fullscreen'] > .content { flex: 1; padding: 0; }
 :root .panel[data-design-layout='fullscreen'] > .content::after { content: none; }

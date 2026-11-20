@@ -261,6 +261,7 @@ export default function Dialog({
     if (!open || !modal) return
     document.dispatchEvent(new Event(OVERLAY_MODAL_OPEN_EVENT))
   }, [open, modal])
+  const fullscreen = designLayout === 'fullscreen'
   const shortConfirmation = confirmation && !children && !steps
   const confirmationSizeClass = confirmation && compact
     ? tone === 'destructive'
@@ -300,7 +301,8 @@ export default function Dialog({
       className={`${styles.panel} ${styles.standardPanel} ${confirmation ? styles.confirmationPanel : ''} ${confirmationSizeClass}`}
       role={suppliedRole ?? (tone === 'destructive' ? 'alertdialog' : 'dialog')}
       aria-modal={modal || undefined}
-      aria-labelledby={titleId}
+      aria-label={fullscreen ? title : undefined}
+      aria-labelledby={fullscreen ? undefined : titleId}
       aria-describedby={description ? descriptionId : undefined}
       aria-busy={busy || undefined}
       tabIndex={-1}
@@ -335,18 +337,20 @@ export default function Dialog({
       data-design-part="dialog"
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
     >
-      <div className={styles.headerRow}>
-        <div className={styles.headerContent}>
-          {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <Notice tone={descriptionBand === 'warning' ? 'warn' : 'danger'} statusWord={false} icon={null} role="presentation" data-qa-dialog-callout>{heading}</Notice> : heading}
+      {fullscreen ? null : (
+        <div className={styles.headerRow}>
+          <div className={styles.headerContent}>
+            {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <Notice tone={descriptionBand === 'warning' ? 'warn' : 'danger'} statusWord={false} icon={null} role="presentation" data-qa-dialog-callout>{heading}</Notice> : heading}
+          </div>
+          {headerAction ? <div className={styles.headerAction}>{headerAction}</div> : null}
+          {/* ガイドの窓はフッターの操作で閉じる。 */}
+          {designLayout !== 'stacked-centered' && designLayout !== 'stacked-guided' && designLayout !== 'stacked-picker' ? (
+            <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={discard.requestClose} disabled={busy}>
+              <X aria-hidden="true" size={20} />
+            </IconButton>
+          ) : null}
         </div>
-        {headerAction ? <div className={styles.headerAction}>{headerAction}</div> : null}
-        {/* ガイドの窓はフッターの操作で閉じる。 */}
-        {designLayout !== 'stacked-centered' && designLayout !== 'stacked-guided' && designLayout !== 'stacked-picker' && designLayout !== 'fullscreen' ? (
-          <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={discard.requestClose} disabled={busy}>
-            <X aria-hidden="true" size={20} />
-          </IconButton>
-        ) : null}
-      </div>
+      )}
       {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><Notice tone="danger" statusWord={false} data-qa-dialog-callout>{descriptionNode}</Notice></div> : designLayout ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
       {children ? <div className={styles.content} data-window-body data-dialog-content data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
