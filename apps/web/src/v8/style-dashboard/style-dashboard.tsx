@@ -112,7 +112,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const wizard = useSetupWizard(accountId || null, setup.data?.state, role, setup.reload)
   const { qrRequested } = wizard
   const start = useFirstSteps(accountId || null, role, { style, qrOpen: qrRequested })
-  const restaurantWelcome = style === 'restaurant' && !qrRequested ? start.guide.welcome : undefined
+  const lineConnected = start.summary?.steps.some(step => step.key === 'accounts' && step.done)
+  const restaurantWelcome = style === 'restaurant' && !qrRequested && lineConnected ? start.guide.welcome : undefined
   /* 初回ポップアップ（枠 02 ＝ PC / 枠 02b ＝ スマホ下部固定）と、上の帯の「開店準備 N/9」の札。 */
   const firstRunPopup = useFirstRunPopup({
     accountId: accountId || null, canManage: canManageRole(role), summary: start.summary, guidePhase: start.guide.phase,

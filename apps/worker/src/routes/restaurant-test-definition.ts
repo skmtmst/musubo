@@ -1,4 +1,5 @@
-import { validRestaurantMenuDescription, validRestaurantMenuImage } from './restaurant-menu-media.js';
+import { parseRestaurantCoursePhotos } from '@line-crm/shared';
+import { validRestaurantCoursePhotos, validRestaurantMenuDescription, validRestaurantMenuImage } from './restaurant-menu-media.js';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 import { normalizedPhoneSql } from '../lib/phone-sql.js';
 import type { OrganizationRow, OrganizationContext, SelectedRestaurantStore } from './restaurant-context-types.js';
@@ -415,7 +416,7 @@ export const updateRestaurantMenu = async (c: Context<Env>) => {
     .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
     .first<{ store_id: string; kind: string; name: string; price: number; allergens_json: string; service_periods_json: string; status: string; description: string | null; image_media_id: string | null; duration_minutes: number | null }>();
   if (!current) return c.json({ success: false, error: 'メニューが見つかりません' }, 404);
-  const body = await c.req.json<{ kind?: string; name?: string; price?: number; allergens?: string[]; servicePeriods?: string[]; status?: string; effectiveAt?: string | null; description?: string | null; imageMediaId?: string | null; durationMinutes?: number | null; expectedVersion?: number }>();
+  const body = await c.req.json<{ kind?: string; name?: string; price?: number; allergens?: string[]; servicePeriods?: string[]; status?: string; effectiveAt?: string | null; description?: string | null; imageMediaId?: string | null; photos?: unknown; durationMinutes?: number | null; expectedVersion?: number }>();
   if (body.expectedVersion !== undefined && (!Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1)) return inputError(c, { success: false, error: "確認した版が正しくありません" }, 400, ["expectedVersion"]);
   const kind = body.kind === undefined ? current.kind : body.kind;
   const name = body.name === undefined ? current.name : body.name;
@@ -432,6 +433,11 @@ export const updateRestaurantMenu = async (c: Context<Env>) => {
   if (body.effectiveAt !== undefined && body.effectiveAt !== null && (typeof body.effectiveAt !== 'string' || !Number.isFinite(Date.parse(body.effectiveAt)))) return inputError(c, { success:false,error:'価格の開始日時を確認してください' }, 400, ["effectiveAt"]);
   if (!validRestaurantMenuDescription(body.description)) return inputError(c, { success:false, error:'説明は2000文字以内で入力してください' }, 400, ['description']);
   if ((body.imageMediaId != null && (typeof body.imageMediaId !== 'string' || !body.imageMediaId)) || (body.imageMediaId !== undefined && body.imageMediaId !== current.image_media_id && !await validRestaurantMenuImage(dbFor(c.env, current.store_id), current.store_id, body.imageMediaId))) return inputError(c, { success:false, code:'MENU_IMAGE_UNAVAILABLE', error:'選択した画像を利用できません。登録メディアから選び直してください。' }, 400, ['imageMediaId']);
+  const photos = body.photos === undefined ? [] : parseRestaurantCoursePhotos(body.photos);
+  if (!photos || (body.photos !== undefined && kind !== 'course') || !await validRestaurantCoursePhotos(dbFor(c.env, current.store_id), current.store_id, photos))
+    return inputError(c, { success: false, code: 'MENU_IMAGE_UNAVAILABLE', error: 'コースの写真は店舗の登録メディアから5枚まで選んでください。' }, 400, ['photos']);
+  const galleryChanged = body.photos !== undefined || body.imageMediaId !== undefined || kind !== 'course';
+  const cover = body.photos === undefined ? body.imageMediaId ?? null : photos[0]?.mediaId ?? null;
   const effectiveAt = body.effectiveAt ? new Date(body.effectiveAt).toISOString() : null;
   const db = dbFor(c.env, current.store_id);
   const approvalId = price !== current.price ? crypto.randomUUID() : null;
@@ -439,8 +445,8 @@ export const updateRestaurantMenu = async (c: Context<Env>) => {
   const scheduledChange = approvalId ? await db.prepare(`SELECT id, approval_id FROM rt_menu_change_requests
     WHERE menu_id = ? AND store_id = ? AND status = 'approved' LIMIT 1`)
     .bind(c.req.param('id'), current.store_id).first<{ id: string; approval_id: string }>() : null;
-  const writes = [db.prepare(`UPDATE rt_menu_items SET confirmation_revision = confirmation_revision + 1, kind = ?, name = ?, duration_minutes = ?, allergens_json = ?, service_periods_json = ?, status = ?, description = CASE WHEN ? THEN ? ELSE description END, image_media_id = CASE WHEN ? THEN ? ELSE image_media_id END, updated_at = datetime('now') WHERE id = ? AND store_id = ? AND (? IS NULL OR confirmation_revision = ?)` )
-    .bind(kind, name.trim(), kind === 'course' ? (body.durationMinutes === undefined ? current.duration_minutes : body.durationMinutes) : null, body.allergens === undefined ? current.allergens_json : JSON.stringify(body.allergens), body.servicePeriods === undefined ? current.service_periods_json : JSON.stringify(body.servicePeriods), status, body.description !== undefined ? 1 : 0, body.description?.trim() || null, body.imageMediaId !== undefined ? 1 : 0, body.imageMediaId ?? null, c.req.param('id'), current.store_id, body.expectedVersion ?? null, body.expectedVersion ?? null)];
+  const writes = [db.prepare(`UPDATE rt_menu_items SET confirmation_revision = confirmation_revision + 1, kind = ?, name = ?, duration_minutes = ?, allergens_json = ?, service_periods_json = ?, status = ?, description = CASE WHEN ? THEN ? ELSE description END, image_media_id = CASE WHEN ? THEN ? ELSE image_media_id END, photo_gallery_json = CASE WHEN ? THEN ? ELSE photo_gallery_json END, updated_at = datetime('now') WHERE id = ? AND store_id = ? AND (? IS NULL OR confirmation_revision = ?)` )
+    .bind(kind, name.trim(), kind === 'course' ? (body.durationMinutes === undefined ? current.duration_minutes : body.durationMinutes) : null, body.allergens === undefined ? current.allergens_json : JSON.stringify(body.allergens), body.servicePeriods === undefined ? current.service_periods_json : JSON.stringify(body.servicePeriods), status, body.description !== undefined ? 1 : 0, body.description?.trim() || null, Number(body.imageMediaId !== undefined || body.photos !== undefined), cover, Number(galleryChanged), body.photos === undefined ? null : JSON.stringify(photos), c.req.param('id'), current.store_id, body.expectedVersion ?? null, body.expectedVersion ?? null)];
   if (body.expectedVersion !== undefined) writes.push(db.prepare("SELECT json(CASE WHEN changes() = 1 THEN '{}' ELSE 'menu_confirmation_conflict' END)"));
   if (approvalId) {
     const requester = c.get('staff')?.id || '管理者';
