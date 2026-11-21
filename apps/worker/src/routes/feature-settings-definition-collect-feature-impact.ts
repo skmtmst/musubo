@@ -353,7 +353,7 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
         kind: 'scheduled',
         targetType: '処理中のマイル交換',
         fromWhere: `FROM mileage_redemptions
-         WHERE status IN ('reserved', 'delivering') AND line_account_id = ?`,
+         WHERE status IN ('reserved', 'delivering') AND anonymized_at IS NULL AND line_account_id = ?`,
         idColumn: 'mileage_redemptions.id',
         params: 1,
       },

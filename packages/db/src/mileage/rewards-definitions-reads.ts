@@ -113,7 +113,7 @@ export async function getMileageRewardRedemptionCounts(
   const rows = await db.prepare(
     `SELECT reward_id, reward_version_id, COUNT(*) AS count
        FROM mileage_redemptions
-      WHERE line_account_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'
+      WHERE line_account_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded' AND (status != 'reserved' OR anonymized_at IS NULL)
       GROUP BY reward_id, reward_version_id`,
   ).bind(input.lineAccountId, ...(limitKeys.length ? sqlIdSet(limitKeys).binds : [])).all<{
     reward_id: string;

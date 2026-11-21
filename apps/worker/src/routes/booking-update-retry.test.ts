@@ -109,10 +109,10 @@ function asD1(sqlite: Database.Database): D1Database {
   return db as unknown as D1Database;
 }
 
-function makeApp(db: D1Database, role: 'owner' | 'admin' | 'staff' = 'owner') {
+function makeApp(db: D1Database, role: 'owner' | 'admin' | 'staff' = 'owner', hqRole?: 'operator' | 'viewer') {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'owner-1', name: 'Owner', role, readOnly: false });
+    c.set('staff', { id: 'owner-1', name: 'Owner', role, readOnly: false, hqRole });
     return next();
   });
   app.route('/', booking);
@@ -279,10 +279,12 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
 
   test('スタッフ移動は既存の空き照合・版・監査を使い、通知OFFを守る', async () => {
     insertBooking(sqlite,{ id:'b1',friend:'f1' });
+    sqlite.exec("UPDATE bookings SET assignment_method='automatic', assignment_reviewed_at='2026-11-01' WHERE id='b1'");
     const { app, env } = makeApp(db);
     const result = await app.request('/api/booking/admin/bookings/b1/reassign?account_id=acc1',{ method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify({ staffId:'s2',notifyCustomer:false }) },env as never,execCtx);
     expect(result.status).toBe(200);
     expect(sqlite.prepare('SELECT staff_id,lock_version FROM bookings WHERE id=?').get('b1')).toEqual({ staff_id:'s2',lock_version:1 });
+    expect(sqlite.prepare('SELECT assignment_method,assignment_reviewed_at FROM bookings WHERE id=?').get('b1')).toEqual({assignment_method:'manual',assignment_reviewed_at:null});
     expect(availabilityMocks.calls.some((call) => call.staffId==='s2' && call.excludeBookingId==='b1')).toBe(true);
     expect(notifierMocks.sendBookingNotification).not.toHaveBeenCalled();
     expect(conflictHooks.notifyBookingConflicts).toHaveBeenCalledWith(db,'acc1');
@@ -347,9 +349,24 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
     const result = await create('enabled');
     expect(result.status).toBe(201);
     expect(sqlite.prepare('SELECT staff_id FROM bookings').get()).toEqual({ staff_id:'s1' });
+    expect(sqlite.prepare('SELECT assignment_method FROM bookings').get()).toEqual({ assignment_method:'automatic' });
     expect(conflictHooks.notifyBookingConflicts).toHaveBeenCalledWith(db,'acc1');
     expect((await create('enabled')).status).toBe(201);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM bookings').get()).toEqual({ n:1 });
+  });
+
+  test('統括の運用担当が担当を選んだ予約は手動として記録する', async () => {
+    const {app,env}=makeApp(db,'staff','operator');
+    const response=await app.request('/api/booking/admin/bookings?account_id=acc1',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':'hq-manual'},body:JSON.stringify({booking_customer_id:'customer-1',menu_id:'m1',staff_id:'s1',starts_at:futureStartsAt(),send_line_confirmation:false})},env as never,execCtx);
+    expect(response.status,await response.clone().text()).toBe(201);
+    expect(sqlite.prepare('SELECT assignment_method FROM bookings').get()).toEqual({assignment_method:'manual'});
+  });
+
+  test('担当を店が選んだ電話予約は手動として記録する', async () => {
+    const { app, env } = makeApp(db);
+    const response = await app.request('/api/booking/admin/bookings?account_id=acc1', { method:'POST', headers:{'Content-Type':'application/json','Idempotency-Key':'manual-staff'}, body:JSON.stringify({booking_customer_id:'customer-1',menu_id:'m1',staff_id:'s1',starts_at:futureStartsAt(),send_line_confirmation:false}) }, env as never, execCtx);
+    expect(response.status).toBe(201);
+    expect(sqlite.prepare('SELECT assignment_method FROM bookings').get()).toEqual({assignment_method:'manual'});
   });
 
   test('新方式は同じ枠の連続予約を交互に割り当て、優先順と上限もHTTP作成へ反映する', async () => {
@@ -395,9 +412,33 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
       const result = await create('line-auto','optional');
       expect(result.status).toBe(201);
       expect(sqlite.prepare('SELECT staff_id FROM bookings').get()).toEqual({ staff_id:'s1' });
+    expect(sqlite.prepare('SELECT assignment_method FROM bookings').get()).toEqual({ assignment_method:'automatic' });
       expect(conflictHooks.notifyBookingConflicts).toHaveBeenCalledWith(db,'acc1');
       expect((await create('line-auto','optional')).status).toBe(201);
       expect(sqlite.prepare('SELECT COUNT(*) AS n FROM bookings').get()).toEqual({ n:1 });
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  test.each(['admin','liff'])('%s の仮担当は自動割当がオフなら不明として記録する', async source => {
+    sqlite.exec("INSERT INTO staff(id,line_account_id,name,display_name,is_designation_optional) VALUES('optional','acc1','指名なし','指名なし',1); INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES('optional','m1',1); UPDATE line_accounts SET liff_id='test-liff' WHERE id='acc1'");
+    vi.stubGlobal('fetch',vi.fn(async () => Response.json({sub:'U1'})));
+    try {
+      const {app,env}=makeApp(db);
+      const liff=source==='liff';
+      const result=await app.request(liff?'/api/liff/booking/requests?liffId=test-liff':'/api/booking/admin/bookings?account_id=acc1',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':`optional-${source}`, ...(liff?{Authorization:'Bearer mocked_id_token'}:{})},body:JSON.stringify({menu_id:'m1',staff_id:'optional',starts_at:futureStartsAt(),...(!liff?{booking_customer_id:'customer-1',send_line_confirmation:false}:{})})},env as never,execCtx);
+      expect(result.status,await result.clone().text()).toBe(201);
+      expect(sqlite.prepare('SELECT assignment_method FROM bookings').get()).toEqual({assignment_method:'unknown'});
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  test('LINEで担当を指名した予約は指名として記録する', async () => {
+    sqlite.prepare('UPDATE line_accounts SET liff_id=? WHERE id=?').run('test-liff','acc1');
+    vi.stubGlobal('fetch',vi.fn(async () => Response.json({sub:'U1'})));
+    try {
+      const { app, env } = makeApp(db);
+      const result = await app.request('/api/liff/booking/requests?liffId=test-liff', { method:'POST', headers:{'Content-Type':'application/json','Idempotency-Key':'line-nominated',Authorization:'Bearer mocked_id_token'}, body:JSON.stringify({menu_id:'m1',staff_id:'s1',starts_at:futureStartsAt()}) }, env as never, execCtx);
+      expect(result.status).toBe(201);
+      expect(sqlite.prepare('SELECT assignment_method FROM bookings').get()).toEqual({assignment_method:'designated'});
     } finally { vi.unstubAllGlobals(); }
   });
 

@@ -162,11 +162,15 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   if(body.routingToken){const claim=await verifyRoutingToken(c.env.DB,accountId,friendId,body.routingToken,body.menu_id,body.staff_id||undefined);if(claim.target.staffId)body.staff_id=claim.target.staffId;else body.staff_id='';
    if(claim.target.staffGroupId){const group=await c.env.DB.prepare('SELECT staff_ids_json FROM booking_routing_staff_groups WHERE id=? AND line_account_id=?').bind(claim.target.staffGroupId,accountId).first<{staff_ids_json:string}>();routingAllowedStaff=JSON.parse(group!.staff_ids_json);}}
 
-  if (await needsAutoAssignment(c,accountId,body.staff_id)) {
+  const automaticallyAssigned = await needsAutoAssignment(c,accountId,body.staff_id);
+  if (automaticallyAssigned) {
     const assigned = await autoAssignBookingStaff(c,accountId,body.menu_id,body.starts_at,true,addonDuration,routingAllowedStaff,!!body.routingToken);
     if (!assigned) return liffBookingJson(c, { error: 'auto_assignment_unavailable' }, 409);
     body.staff_id = assigned;
   }
+
+  const assignmentStaff = await c.env.DB.prepare('SELECT is_designation_optional FROM staff WHERE id=? AND line_account_id=?').bind(body.staff_id,accountId).first<{is_designation_optional:number}>();
+  const assignmentMethod = assignmentStaff?.is_designation_optional === 1 ? 'unknown' : (automaticallyAssigned || body.routingToken) ? 'automatic' : 'designated';
 
   // メニューと担当者の組が提供対象かを確認する。
   const menuRow = await c.env.DB
@@ -293,8 +297,8 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
         (id, line_account_id, friend_id, staff_id, menu_id,
          starts_at, ends_at, block_ends_at, status,
          customer_note, price_at_booking, requested_at, decided_at,
-         menu_version_number, menu_snapshot_json,waitlist_entry_id,policy_snapshot_json,meeting_mode,nominated,nomination_fee_at_booking,routing_rule_index,routing_form_version_id)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+         menu_version_number, menu_snapshot_json,waitlist_entry_id,policy_snapshot_json,meeting_mode,nominated,nomination_fee_at_booking,routing_rule_index,routing_form_version_id,assignment_method)
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
         WHERE (SELECT COUNT(*) FROM menus m JOIN json_each(?) j ON m.id=json_extract(j.value,'$.id') AND m.version=json_extract(j.value,'$.version') WHERE m.is_active=1 AND m.deleted_at IS NULL AND m.line_account_id=?)=? AND COALESCE((SELECT version FROM booking_cancellation_policies WHERE line_account_id=?),0)=? AND NOT EXISTS (
           -- 別メニューの予約は、定員に関係なく1件でも塞ぐ。
           -- 1対1の施術とグループを同じ時間に入れることはできない。
@@ -339,6 +343,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       JSON.stringify(body.entitlement_id?{...cancellation,enabled:false}:cancellation),
       bookingMeetingMode,
       nominated?1:0,nominationFee,routing?.matchedIndex??null,routing?.versionId??null,
+      assignmentMethod,
       JSON.stringify(addons),accountId,addons.length,
       accountId,cancellation.version,
       // 別メニューの重なりを見る副問い合わせ

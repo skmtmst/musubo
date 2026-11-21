@@ -56,7 +56,10 @@ vi.mock('@/lib/api', async (importOriginal) => {
       getToday: fixture.getToday,
       postVisitMark: fixture.postVisitMark,
       deleteVisitMark: fixture.deleteVisitMark,
-      listRequests: fixture.listRequests,
+      // 受付の集計と台帳の取得失敗は別々に扱う。
+      listRequests: (account: string, status: string, params?: Record<string, unknown>) => params?.reception
+        ? Promise.resolve({ requests: [], total: 0, requestedCount: 0, unassignedCount: 0, attentionCount: 0, unknownCount: 0 })
+        : fixture.listRequests(account, status, params),
       requestsSummary: fixture.requestsSummary,
       listMenus: fixture.listMenus,
       listStaff: fixture.listStaff,

@@ -14,7 +14,11 @@ const app=()=>gapApp(d,[bookingSeries]);
 test('B4-01 B4-02 B4-04: 3回のpreviewと飛ばす1回、二重押しでも2予約1組',async()=>{
  const preview=await gapCall(app(),'/api/booking/admin/series/preview?account_id=a','POST',body);expect(preview.status).toBe(200);expect((await preview.json() as any).data.occurrences.map((x:any)=>x.available)).toEqual([true,true,true]);
  const b={...body,choices:[{index:1,action:'skip'}]};const r=await gapCall(app(),url,'POST',b,'same-key');expect(r.status).toBe(201);
- const replay=await gapCall(app(),url,'POST',b,'same-key');expect(replay.status).toBe(201);expect(d.raw.prepare('SELECT count(*) n FROM bookings').get()).toEqual({n:2});expect(d.raw.prepare('SELECT count(*) n FROM booking_series').get()).toEqual({n:1});expect(fetch).not.toHaveBeenCalled();
+ const replay=await gapCall(app(),url,'POST',b,'same-key');expect(replay.status).toBe(201);expect(d.raw.prepare('SELECT count(*) n FROM bookings').get()).toEqual({n:2});expect(d.raw.prepare('SELECT count(*) n FROM booking_series').get()).toEqual({n:1});expect(d.raw.prepare('SELECT assignment_method FROM bookings ORDER BY series_index').all()).toEqual([{assignment_method:'manual'},{assignment_method:'manual'}]);expect(fetch).not.toHaveBeenCalled();
+});
+test('担当を選ばない連続予約は自動割当として記録する',async()=>{
+ const r=await gapCall(app(),url,'POST',{...body,staffId:null},'series-auto');expect(r.status).toBe(201);
+ expect(d.raw.prepare('SELECT assignment_method FROM bookings ORDER BY series_index').all()).toEqual([{assignment_method:'automatic'},{assignment_method:'automatic'},{assignment_method:'automatic'}]);
 });
 test('B4-03: 保存直前の競合は全部か無し。batch途中の競合もrollback',async()=>{
  seedGapBooking(d,'busy','confirmed','2026-11-27T05:00:00.000Z');expect((await gapCall(app(),url,'POST',body)).status).toBe(409);expect(d.raw.prepare('SELECT count(*) n FROM booking_series').get()).toEqual({n:0});

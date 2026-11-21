@@ -4,6 +4,7 @@ import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { hasStaffPermission } from '../../middleware/role-guard.js';
 import { listResponse } from '../../lib/list-etag.js';
+import { inputJsonBoundary } from '../../lib/input-errors.js';
 import { resolveAccountIdAdmin } from './identity.js';
 import { bookingLedgerFilter, BOOKING_LEDGER_JOINS, BOOKING_CSV_EXPORT_LIMIT, csvNoteValue, BOOKING_CSV_STATUS_LABEL, BOOKING_CSV_SOURCE_LABEL, csvTimestamp, csvCell } from './ledger-input.js';
 
@@ -12,7 +13,21 @@ booking.get('/api/booking/admin/requests', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 50, limitPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1, maximum: 100 }, offsetPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 0 } });
-  const { where, values } = bookingLedgerFilter(c, accountId);
+  const reception = c.req.query('reception');
+  const { where, values } = bookingLedgerFilter(c, accountId, Boolean(reception));
+  if (reception && !['all', 'requested', 'unassigned', 'attention'].includes(reception)) return c.json({ error: 'invalid_reception_filter' }, 400);
+  if (reception) {
+    const base = `${where} AND b.status IN ('requested','confirmed')`;
+    const unassigned = "b.assignment_method = 'automatic' AND b.assignment_reviewed_at IS NULL";
+    const attention = `(b.status = 'requested' OR (${unassigned}))`;
+    const selected = reception === 'requested' ? " AND b.status = 'requested'" : reception === 'unassigned' ? ` AND ${unassigned}` : reception === 'attention' ? ` AND ${attention}` : '';
+    const [rows, totals, count] = await Promise.all([
+      c.env.DB.prepare(`SELECT b.*, m.name AS menu_name, s.display_name AS staff_name, COALESCE(f.display_name,bc.display_name) AS friend_name, bc.phone_last4 AS customer_phone_last4, bc.pet_name AS customer_pet_name, CASE WHEN f.id IS NULL THEN 0 ELSE 1 END AS is_line_linked ${BOOKING_LEDGER_JOINS} ${base}${selected} ORDER BY CASE WHEN ${attention} THEN 0 ELSE 1 END, b.starts_at ASC, b.id ASC LIMIT ? OFFSET ?`).bind(...values, limit, offset).all(),
+      c.env.DB.prepare(`SELECT SUM(CASE WHEN b.status='requested' THEN 1 ELSE 0 END) AS requested, SUM(CASE WHEN ${unassigned} THEN 1 ELSE 0 END) AS unassigned, SUM(CASE WHEN ${attention} THEN 1 ELSE 0 END) AS attention, SUM(CASE WHEN b.assignment_method='unknown' THEN 1 ELSE 0 END) AS unknown ${BOOKING_LEDGER_JOINS} ${base}`).bind(...values).first<{requested:number|null;unassigned:number|null;attention:number|null;unknown:number|null}>(),
+      c.env.DB.prepare(`SELECT COUNT(*) AS total ${BOOKING_LEDGER_JOINS} ${base}${selected}`).bind(...values).first<{total:number}>(),
+    ]);
+    return listResponse(c, { requests: rows.results, total: Number(count?.total ?? 0), requestedCount: Number(totals?.requested ?? 0), unassignedCount: Number(totals?.unassigned ?? 0), attentionCount: Number(totals?.attention ?? 0), unknownCount: Number(totals?.unknown ?? 0), limit, offset });
+  }
   const [rows, count] = await Promise.all([
     c.env.DB.prepare(
       `SELECT b.*, m.name AS menu_name, s.display_name AS staff_name,
@@ -29,6 +44,18 @@ booking.get('/api/booking/admin/requests', async (c) => {
   // 同じ中身なら304（list-etag）。
   const responseItems = rows.results;
   return listResponse(c, buildOffsetListResponse({ requests: responseItems, total: Number(count?.total ?? 0), limit, offset, items: responseItems, paging: { limit, offset }, sort: [{ field: 'starts_at', direction: 'asc' }] }));
+});
+
+// 自動で選ばれた担当者を確認したことを、表示中の版に限って記録する。
+booking.post('/api/booking/admin/requests/:id/assignment-review', inputJsonBoundary(), async (c) => {
+  if (!hasStaffPermission(c, '/booking/bookings')) return c.json({ error: 'permission_denied' }, 403);
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const body = await c.req.json<{ lock_version?: unknown }>().catch(() => null);
+  if (!body || !Number.isInteger(body.lock_version) || Number(body.lock_version) < 0) return c.json({ error: 'invalid_lock_version' }, 400);
+  const result = await c.env.DB.prepare(`UPDATE bookings SET assignment_reviewed_at=?, lock_version=lock_version+1, updated_at=? WHERE id=? AND line_account_id=? AND lock_version=? AND assignment_method='automatic' AND assignment_reviewed_at IS NULL AND status IN ('requested','confirmed')`).bind(new Date().toISOString(), new Date().toISOString(), c.req.param('id'), accountId, body.lock_version).run();
+  if (!result.meta.changes) return c.json({ error: 'version_conflict' }, 409);
+  return c.json({ success: true });
 });
 
 /**

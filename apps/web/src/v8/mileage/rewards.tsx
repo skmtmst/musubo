@@ -8,6 +8,7 @@ import { mileageStatusTone } from './parts'
 
 import { createAccountTracker, createMileageRewardsFetchGuards, createSingleFlightLock } from './redemption-request-guard'
 import HeldRedemptions from './held-redemptions'
+import HandgiftRedemptions from './handgift-redemptions'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -65,6 +66,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 
 const KIND_LABEL: Record<MileageRewardKind, string> = {
   coupon: 'クーポン',
+  handgift: '手渡し',
   tag: 'タグ',
   scenario: 'シナリオ',
   template: 'メッセージ',
@@ -72,7 +74,8 @@ const KIND_LABEL: Record<MileageRewardKind, string> = {
   rank: 'ランク',
 }
 
-const KIND_FOLDER: Record<MileageRewardKind, 'クーポン' | 'タグ・メッセージ' | 'シナリオ' | '先行・ランク'> = {
+const KIND_FOLDER: Record<MileageRewardKind, 'クーポン' | 'タグ・メッセージ' | 'シナリオ' | '先行・ランク' | '未分類'> = {
+  handgift: '未分類',
   coupon: 'クーポン',
   tag: 'タグ・メッセージ',
   template: 'タグ・メッセージ',
@@ -898,6 +901,7 @@ export default function RewardsTab() {
       {body}
       {!failedSection && retryNotice ? <Notice tone="success" message={retryNotice} /> : null}
       {balanceSource === 'ec' && accountId ? <HeldRedemptions accountId={accountId} /> : null}
+      {balanceSource !== 'ec' && accountId ? <HandgiftRedemptions accountId={accountId} readonly={readonly} /> : null}
       {failedSection}
       {folderMove.overlays}
     </MileageFrame></SaveErrorScope>
