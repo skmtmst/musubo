@@ -14,6 +14,7 @@ import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
+import { commonVarFailureNames, type CommonVarFailure } from '@/components/shared/common-var-test-failure'
 import TargetMissing from '@/components/shared/target-missing'
 import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
@@ -106,6 +107,8 @@ function ReservedBroadcastContent() {
   const [cancelled, setCancelled] = useState(false)
   const [actionBusy, setActionBusy] = useState<'test' | 'duplicate' | null>(null)
   const [actionError, setActionError] = useState('')
+  const [missingVars, setMissingVars] = useState<CommonVarFailure[] | null>(null)
+  useEffect(() => { setMissingVars(null) }, [id, selectedAccountId])
   const duplicateKey = useRef<string | null>(null)
   const requestGeneration = useRef(0)
 
@@ -304,14 +307,20 @@ function ReservedBroadcastContent() {
 
   const testSend = async () => {
     if (actionBusy) return
+    const generation = cancelScope.current.generation
     setActionBusy('test')
     setActionError('')
+    setMissingVars(null)
     try {
       const result = await api.broadcasts.testSend(broadcast.id)
+      if (generation !== cancelScope.current.generation) return
       if (!result.success) throw new Error(result.error)
       notifyToast(`テスト送信が完了しました（成功 ${result.sent ?? 0}件・失敗 ${result.failed ?? 0}件）。`)
-    } catch {
-      setActionError('テスト送信できませんでした。テスト送信先の設定と配信内容を確認してください。')
+    } catch (error) {
+      if (generation !== cancelScope.current.generation) return
+      const names = commonVarFailureNames(error)
+      if (names) setMissingVars(names)
+      else setActionError('テスト送信できませんでした。テスト送信先の設定と配信内容を確認してください。')
     } finally {
       setActionBusy(null)
     }
@@ -321,6 +330,7 @@ function ReservedBroadcastContent() {
     if (actionBusy) return
     setActionBusy('duplicate')
     setActionError('')
+    setMissingVars(null)
     duplicateKey.current ??= crypto.randomUUID()
     try {
       const result = await api.broadcasts.create({
@@ -390,6 +400,7 @@ function ReservedBroadcastContent() {
         duplicate={() => void duplicateBroadcast()}
         actionBusy={actionBusy}
         actionError={actionError}
+        missingVars={missingVars}
         clearActionError={() => setActionError('')}
         cancelOpen={cancelOpen && cancelSnapshot.current?.generation === cancelScope.current.generation && cancelSnapshot.current?.id === broadcast.id}
         openCancel={() => { setCancelError(broadcast.version == null ? '予約の版を確認できません。読み直してから、もう一度選んでください' : ''); setCancelConflict(broadcast.version == null); cancelSnapshot.current = { id: broadcast.id, version: broadcast.version ?? null, generation: cancelScope.current.generation }; setCancelOpen(true) }}

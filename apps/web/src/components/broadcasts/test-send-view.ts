@@ -1,7 +1,9 @@
+import type { CommonVarFailure } from '@/components/shared/common-var-test-failure'
 import { formatNumber } from '@/lib/format'
 export type TestSendView = {
   kind: 'success' | 'partial' | 'error'
   message: string
+  commonVars?: CommonVarFailure[]
 }
 
 /**

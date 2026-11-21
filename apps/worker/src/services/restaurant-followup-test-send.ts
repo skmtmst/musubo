@@ -44,7 +44,7 @@ export async function testRestaurantFollowupEngine(db:D1Database,input:{storeId:
    message_type:String(action.params.messageType??'text'),message_content:String(action.params.content??''),created_at:''});
  }
  const built=await Promise.all(steps.map(step=>buildReminderStepMessage(db,step,friend,new Date('2030-04-01T00:00:00Z'),'test_send',{
-  previewOnly:true,restaurantContext:sample,restaurantVariables:variables,approvedTemplates:snapshot.templates})));
+  restaurantContext:sample,restaurantVariables:variables,approvedTemplates:snapshot.templates})));
  const messages:Message[]=[{type:'text',text:'【テスト送信】予約日時・人数・リンクは見本です。お客さまには送っていません。'},...built.flatMap(item=>item.messages??[item.message])];
  if(messages.length<2)throw new Error('REMINDER_TEST_STEP_NOT_FOUND');
  const resource=followupTestResource(targetId,snapshot),chunkResources:string[]=[];

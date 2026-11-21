@@ -10,18 +10,18 @@ import { readRestaurantFollowupEngineStates } from './restaurant-followup-engine
 import { stopOperationCapabilities,restoreOperationIncident } from '@line-crm/db';
 vi.mock('./feature-enforcement.js',()=>({featureJobCanRun:vi.fn(async()=>true)}));
 let t:SqliteD1;
-beforeEach(()=>{t=createTestD1({foreignKeys:true});t.raw.exec(`
+beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-18T03:00:00Z'));t=createTestD1({foreignKeys:true,now:()=>new Date()});t.raw.exec(`
  INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','c','店','token','secret');
  INSERT INTO rt_organizations(id,account_id,name) VALUES('org','a','組織');
  INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store','org','店舗','S','a');
  INSERT INTO friends(id,line_account_id,line_user_id,display_name) VALUES('f','a','UID','登録した宛先');
  INSERT INTO account_settings(line_account_id,key,value) VALUES('a','test_recipients','["f"]');`);});
-afterEach(()=>t.raw.close());
-async function draft(trigger:'reservation_created'|'reservation_24h'='reservation_created'){
+afterEach(()=>{t.raw.close();vi.useRealTimers();});
+async function draft(trigger:'reservation_created'|'reservation_24h'='reservation_created',text='{{name}}さん、{{var.guest_count}}名のご予約の見本'){
  const row=(await readRestaurantFollowupRows(t.db,'store')).find(row=>row.trigger===trigger)!;
  await saveFollowupDraftFixture(t.db,'store',trigger,{expectedRowVersion:row.version,expectedTargetVersion:0,expectedContentRevision:null,enabled:true,
   timing:trigger==='reservation_created'?{mode:'countdown',offsetMinutes:0}:{mode:'time',offsetDays:-1,sendAtTime:'18:00'},
-  messageBubbles:[{id:'one',type:'text',content:{text:'{{name}}さん、{{var.guest_count}}名のご予約の見本'}}]},'owner');
+  messageBubbles:[{id:'one',type:'text',content:{text}}]},'owner');
  return {storeId:'store',trigger,expectedTargetVersion:1,staffId:'owner'};
 }
 for(const trigger of ['reservation_created','reservation_24h'] as const)it(`${trigger}は登録済み宛先への実テスト成功のあとだけ、同じ版で送り始める`,async()=>{
@@ -39,6 +39,27 @@ for(const trigger of ['reservation_created','reservation_24h'] as const)it(`${tr
  expect((await readRestaurantFollowupEngineStates(t.db,'store'))[0].effectiveSendingStatus).toBe('active');
  if(trigger==='reservation_created')t.raw.exec("UPDATE automation_definitions SET status='stopped'");else t.raw.exec('UPDATE reminders SET is_active=0');
  expect((await readRestaurantFollowupEngineStates(t.db,'store'))[0]).toMatchObject({effectiveSendingStatus:'stopped',reason:expect.stringContaining('止まっています')});
+});
+for(const trigger of ['reservation_created','reservation_24h'] as const)it(`${trigger}のテスト送信は未登録の共通情報で止め、登録後に見本と共に送る`,async()=>{
+ const input=await draft(trigger,'{{name}}さん {{var.guest_count}}名 営業時間: {{var.hours}}'),push=vi.fn(async()=>({data:null,requestId:'request'}));
+ const send=()=>testRestaurantFollowupEngine(t.db,input,{createClient:()=>({pushMessageWithRequestId:push})});
+ await expect(send()).rejects.toMatchObject({name:'CommonVarResolutionFailedError',lineAccountId:'a',failures:[{varKey:'hours',reason:'missing'}]});
+ expect(push).not.toHaveBeenCalled();
+ expect(t.raw.prepare('SELECT var_key,reason,source_kind FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing',source_kind:'test_send'}]);
+ expect(t.raw.prepare('SELECT count(*) n FROM outbound_send_requests').get()).toEqual({n:0});
+ t.raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES('hours','a','営業時間','hours','text','10時')").run();
+ await expect(send()).resolves.toMatchObject({replayed:false,sent:trigger==='reservation_24h'?2:1});
+ expect(push).toHaveBeenCalledTimes(1);
+ expect(JSON.stringify(push.mock.calls[0])).toContain('登録した宛先さん 2名 営業時間: 10時');
+});
+it('最後の吹き出しが未登録なら先の吹き出しも送らない',async()=>{
+ const row=(await readRestaurantFollowupRows(t.db,'store')).find(item=>item.trigger==='reservation_created')!;
+ await saveFollowupDraftFixture(t.db,'store','reservation_created',{expectedRowVersion:row.version,expectedTargetVersion:0,expectedContentRevision:null,enabled:true,
+  timing:{mode:'countdown',offsetMinutes:0},messageBubbles:Array.from({length:5},(_,i)=>({id:`part-${i}`,type:'text',content:{text:i===4?'営業時間 {{var.hours}}':`案内${i+1}`}}))},'owner');
+ const push=vi.fn(async()=>({data:null,requestId:'request'}));
+ await expect(testRestaurantFollowupEngine(t.db,{storeId:'store',trigger:'reservation_created',expectedTargetVersion:1,staffId:'owner'},{createClient:()=>({pushMessageWithRequestId:push})})).rejects.toMatchObject({failures:[{varKey:'hours',reason:'missing'}]});
+ expect(push).not.toHaveBeenCalled();
+ expect(t.raw.prepare('SELECT count(*) n FROM outbound_send_requests').get()).toEqual({n:0});
 });
 it('登録が無い宛先や、送る直前に登録から外れた宛先には送らない',async()=>{
  const input=await draft(),push=vi.fn(async()=>({data:null,requestId:'request'}));

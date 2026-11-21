@@ -11,6 +11,8 @@ import { readRestaurantFollowupEngineStates } from '../services/restaurant-follo
 import { startRestaurantFollowupEngine } from '../services/restaurant-followup-engine-start.js';
 import { testRestaurantFollowupEngine } from '../services/restaurant-followup-test-send.js';
 import { NotificationDeliveryIncomplete } from '../services/recorded-notification-send.js';
+import { CommonVarResolutionFailedError } from '../services/interpolation-context.js';
+import { commonVarTestError } from '../services/common-var-test-error.js';
 import { resolveReminderTestRecipient } from '../services/reminder-draft.js';
 
 async function scope(c:Context<Env>){
@@ -26,7 +28,11 @@ function draftInput(value:unknown):value is FollowupDraftInput{
   &&(body.expectedContentRevision===null||typeof body.expectedContentRevision==='string')&&typeof body.enabled==='boolean'
   &&!!body.timing&&typeof body.timing==='object'&&Array.isArray(body.messageBubbles);
 }
-function failure(c:Context<Env>,error:unknown){
+async function failure(c:Context<Env>,error:unknown){
+ if(error instanceof CommonVarResolutionFailedError){
+  const db=dbFor(c.env,c.req.param('storeId')??'');
+  return inputError(c,await commonVarTestError(db,error.lineAccountId??null,error),422,['CommonVarResolutionFailedError']);
+ }
  if(error instanceof FollowupDraftError){
   const payload={success:false,code:error.code,error:error.message};
   return error.code==='invalid_followup'?inputError(c,payload,422,error.field?[error.field]:[]):c.json(payload,409);

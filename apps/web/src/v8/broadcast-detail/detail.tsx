@@ -4,7 +4,7 @@ import TextLink from '@/components/shared/text-link'
 import { BroadcastAbResult, abStatusDefinition, useAbResult } from '@/v8/broadcast-ab/public/result/index'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { isSaveConflict, SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
-import { useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -41,6 +41,7 @@ import OperationTargetSummary, { type OperationAccountTarget } from '@/component
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Progress from '@/components/shared/progress'
 import Notice from '@/components/shared/notice'
+import { CommonVarTestFailure, commonVarFailureNames, type CommonVarFailure } from '@/components/shared/common-var-test-failure'
 import { Tabs } from '@/components/shared/tabs'
 import { TextField } from '@/components/shared/text-field'
 import { ApprovalRequestFields } from '@/components/broadcasts/broadcast-approval'
@@ -225,16 +226,24 @@ export default function BroadcastDetail({
     }
   }
 
+  const [missingVars, setMissingVars] = useState<CommonVarFailure[] | null>(null)
+  useEffect(() => { setMissingVars(null) }, [broadcast.id, broadcast.lineAccountId])
   const sendTest = async () => {
     if (!canTestSend) return
     if (testing) return
+    const generation = broadcastScope.current.generation
     setTesting(true)
+    setMissingVars(null)
     try {
       const res = await api.broadcasts.testSend(broadcast.id)
+      if (generation !== broadcastScope.current.generation) return
       if (!res.success) throw new Error(res.error)
       notifyToast(`テスト送信が完了しました（成功 ${res.sent ?? 0} 件・失敗 ${res.failed ?? 0} 件）。`)
-    } catch {
-      notifyToast('テスト送信できませんでした。テスト送信先の設定と配信内容を確認してください。', { tone: 'error' })
+    } catch (error) {
+      if (generation !== broadcastScope.current.generation) return
+      const names = commonVarFailureNames(error)
+      if (names) setMissingVars(names)
+      else notifyToast('テスト送信できませんでした。テスト送信先の設定と配信内容を確認してください。', { tone: 'error' })
     } finally {
       setTesting(false)
     }
@@ -337,6 +346,8 @@ export default function BroadcastDetail({
               複製して作る
             </Button>
           ) : null}</>} />
+
+      {missingVars && <div className={styles.conflictWrap}><CommonVarTestFailure names={missingVars} /></div>}
 
       {conflict ? (
         <div className={styles.conflictWrap} data-design-node="Q28Gb">

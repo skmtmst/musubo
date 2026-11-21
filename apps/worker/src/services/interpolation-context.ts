@@ -92,6 +92,7 @@ export class CommonVarResolutionFailedError extends Error {
   constructor(
     readonly failures: ReadonlyArray<CommonVarResolutionFailure>,
     readonly source: CommonVarSendSource,
+    readonly lineAccountId?: string | null,
   ) {
     super(`common_var_unresolved:${failures.map((f) => f.varKey).join(',')}`);
     this.name = 'CommonVarResolutionFailedError';
@@ -139,7 +140,7 @@ export async function resolveSendCommonVars(
       // 台帳の書き込み失敗で送信拒否自体を潰さない。拒否は必ず成立させる。
       logger.error("interpolation_context.resolve_send_common_vars_failed");
     }
-    throw new CommonVarResolutionFailedError(resolved.failures, source);
+    throw new CommonVarResolutionFailedError(resolved.failures, source, lineAccountId);
   }
   return resolved.values;
 }

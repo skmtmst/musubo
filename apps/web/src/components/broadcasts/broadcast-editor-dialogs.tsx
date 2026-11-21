@@ -1,4 +1,6 @@
 'use client'
+
+import { CommonVarTestFailure } from '@/components/shared/common-var-test-failure'
 import { broadcastSendLabel, type BroadcastSendMode } from './broadcast-schedule'
 
 import dynamic from 'next/dynamic'
@@ -212,13 +214,14 @@ export function renderBroadcastEditorDialogs({ confirmationBlocked, confirmation
       titleIcon={<Send size={20} />}
       confirmIcon={<Send size={16} />}
       onCancel={() => { if (!testSending) setTestDialogOpen(false) }}
-      error={testResult?.kind === 'error' ? testResult.message : error || undefined}
+      error={testResult?.commonVars ? undefined : testResult?.kind === 'error' ? testResult.message : error || undefined}
       confirmDisabled={testRetryBlocked}
       confirmDisabledReason="届いたかどうか、配信の記録を確認してください。"
       onSuccess={() => { setTestDialogOpen(false); setTestResultOpen?.(true) }}
       onConfirm={testRecipientState === 'ready' && testRecipients.length > 0 ? () => handleTestSend() : undefined}
     >
       <div className="space-y-3">
+        {testResult?.commonVars && <CommonVarTestFailure names={testResult.commonVars} />}
         <OperationTargetSummary accounts={[{ id: testTargetAccountId ?? '' }]} />
         {ab.hasB && <Notice tone="info">テスト送信は A案で送ります。</Notice>}
         {testRecipientState === 'loading' && <p className="text-sm text-ink-faint">読み込んでいます</p>}
