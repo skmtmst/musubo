@@ -162,6 +162,12 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
     let testRecipientProof:string|undefined;
     if (target.kind === 'friend_data') {
       const links=byTable.get('booking_meeting_links')?.rows ?? [], steps=byTable.get('workflow_steps')?.rows ?? [];
+      // 担当者の変更後も、予定を作った接続の担当者で後片づけする。別のアカウントの接続は参照しない。
+      const calendarStaff:Record<string,string>={};
+      if(target.accountId && steps.some(row=>row.process_kind==='booking_calendar_create'||row.process_kind==='booking_calendar_delete')) {
+        const connections=await db.prepare('SELECT id,staff_id FROM google_calendar_connections WHERE line_account_id=?').bind(target.accountId).all<{id:string;staff_id:string}>();
+        for(const connection of connections.results??[])if(connection.staff_id)calendarStaff[connection.id]=connection.staff_id;
+      }
       // 外部呼出中の処理が完了していない場合、先に結果を確定してから削除する。
       const now=Date.now();
       if (steps.some(row=>row.status==='running' && Number(row.lease_expires_at)>now && ['booking_calendar_create','booking_calendar_delete','booking_outlook_sync'].includes(String(row.process_kind))) ||
@@ -176,7 +182,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       }
       for (const booking of byTable.get('bookings')?.rows ?? []) {
         const id=String(booking.id);
-        const planned=planExternalCleanup({booking,meetings:links.filter(row=>row.booking_id===id),workflows:steps.filter(row=>row.subject_id===id),now:Date.now()});
+        const planned=planExternalCleanup({booking,meetings:links.filter(row=>row.booking_id===id),workflows:steps.filter(row=>row.subject_id===id),now:Date.now(),calendarStaff});
         if(planned.length&&!target.accountId)throw new DeletionFailure(503,'deletion_retry_required');
         // 後片づけに必要な外部参照を平文保存しない。鍵が無いときは削除を延期する。
         if(planned.length&&!env.LINE_CREDENTIAL_ENCRYPTION_KEY)throw new DeletionFailure(503,'deletion_cleanup_key_missing');

@@ -97,7 +97,8 @@ export class GoogleCalendarClient {
         if(!res.ok)throw new GoogleCalendarReadError(res.status);
         return await res.json() as typeof evidence;
       },signal);
-      if(result===null)return !authorize||await authorize()?'done':'review';
+      // 404/410 はアクセス権喪失でも返り得るため、予定が消えた証拠にせず人が確認する。
+      if(result===null)return 'review';
       evidence=result;
     }catch(error){return error instanceof GoogleCalendarReadError && error.status>=400 && error.status<500 && error.status!==408 && error.status!==429?'review':'retry';}
     // Google can retain event details even when status is cancelled; do not assume personal data is gone.
@@ -106,7 +107,7 @@ export class GoogleCalendarClient {
     try {
       if(authorize && !await authorize())return 'review';
       return await this.request(`${base}?sendUpdates=none`,{method:action==='delete'?'DELETE':'PATCH',headers:{Authorization:`Bearer ${this.config.accessToken}`,'Content-Type':'application/json','If-Match':evidence.etag},...(action==='redact'?{body:JSON.stringify({summary:'予約',description:''})}:{})},async res=>{
-        if(res.ok||res.status===404||res.status===410)return 'done' as const;
+        if(res.ok)return 'done' as const;
         void res.body?.cancel().catch(()=>{});
         return 'review' as const;
       },signal,'write');

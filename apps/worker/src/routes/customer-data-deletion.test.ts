@@ -435,6 +435,24 @@ it('顧客削除と同じ取引で後片づけの参照だけを暗号化して�
   expect(sqlite.raw.prepare("SELECT id FROM booking_meeting_links WHERE id='cleanup-link'").get()).toBeUndefined();
 });
 
+it('担当変更後の旧予定も元の担当で後片づけに残し、作成控えの顧客名を消す', async () => {
+  const { seedDeletionRecords } = await import('../../../../packages/db/test/fixtures/customer-deletion.mjs');
+  seedDeletionRecords(sqlite.raw, 'deleted', 'fixture-friend');
+  sqlite.raw.exec(`INSERT INTO staff(id,name,display_name,line_account_id) VALUES('old-staff','Old','Old','fixture-account');
+    INSERT INTO google_calendar_connections(id,calendar_id,line_account_id,staff_id,auth_type) VALUES('old-connection','old-calendar','fixture-account','old-staff','oauth');
+    UPDATE bookings SET external_event_id='current-event',external_calendar_id='old-calendar' WHERE id='deleted-0-booking';`);
+  const insert=sqlite.raw.prepare(`INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,status,retry_key,input_json,created_at,updated_at) VALUES('line:fixture-account','booking_calendar_create','deleted-0-booking',?,'succeeded','synthetic',?,0,0)`);
+  for(const [version,id,start] of [['1','old-event','2020-01-01T00:00:00Z'],['2','current-event','2999-01-01T00:00:00Z']])
+    insert.run(version,JSON.stringify({snapshot:{connectionId:'old-connection',calendarId:'old-calendar',event:{id,start,summary:'顧客名',description:'予約ID'}}}));
+  const encryptionKey=btoa('k'.repeat(32));
+  await deleteCustomerData({...env(),LINE_CREDENTIAL_ENCRYPTION_KEY:encryptionKey},{kind:'friend_data',id:'fixture-friend',friendId:'fixture-friend',accountId:'fixture-account',lineUserId:'LINE-fixture-friend'},'owner');
+  const rows=sqlite.raw.prepare("SELECT input_json FROM workflow_steps WHERE process_kind='booking_external_cleanup'").all() as Array<{input_json:string}>;
+  const items=await Promise.all(rows.map(async row=>JSON.parse(await decryptCredential(JSON.parse(row.input_json),encryptionKey))));
+  expect(items).toEqual(expect.arrayContaining([expect.objectContaining({remoteId:'old-event',staffId:'old-staff',action:'redact'}),expect.objectContaining({remoteId:'current-event',staffId:'old-staff',action:'delete'})]));
+  expect(sqlite.raw.prepare("SELECT COUNT(*) n FROM workflow_steps WHERE process_kind='booking_calendar_create' AND subject_id='deleted-0-booking'").get()).toEqual({n:0});
+  expect(JSON.stringify(rows)).not.toMatch(/顧客名|予約ID|old-event|current-event/);
+});
+
 it('送信結果が不明のまま止まった会議は要確認として残して削除する', async () => {
   const { seedDeletionRecords } = await import('../../../../packages/db/test/fixtures/customer-deletion.mjs');
   seedDeletionRecords(sqlite.raw, 'deleted', 'fixture-friend');

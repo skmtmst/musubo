@@ -25,7 +25,8 @@ export function externalCleanupExecutor(env:Env['Bindings']):CleanupExecutor {
    const current=await connection();if(!current)return 'review';
    try {
     const client=await clientForConnection(current,calendarCredentialsForEnv(env),{db:env.DB,accountId});
-    if(item.action==='review'){const event=await client.getEvent(item.remoteId);return item.uncertainty==='delete' && event===null && await connection()?'done':'review';}
+    // 結果不明の 404 は権限喪失との区別ができない。運用者に相手先での確認を依頼する。
+    if(item.action==='review')return 'review';
     return await client.cleanupEvent(item.remoteId,item.action==='redact'?'redact':'delete',AbortSignal.timeout(10000),async()=>!!await connection());
    }catch{return 'review';}
   }

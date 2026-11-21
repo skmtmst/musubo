@@ -28,6 +28,12 @@ it('予約機能が停止しても Google の個人情報整理は機能の判�
  expect(feature).not.toHaveBeenCalled();
  expect(await externalCleanupExecutor(env())('a',{provider:'zoom',action:'delete',staffId:'bs',remoteId:'meeting'})).toBe('wait');
 });
+it('Google の接続の担当者が違えば外部通信せず要確認にする',async()=>{
+ d.raw.exec("INSERT INTO staff(id,name,display_name,line_account_id) VALUES('other','Other','Other','a'); INSERT INTO google_calendar_connections(id,calendar_id,line_account_id,staff_id,auth_type,is_active) VALUES('conn','c','a','other','oauth',1)");
+ const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);
+ expect(await externalCleanupExecutor(env())('a',{provider:'google_calendar',action:'delete',staffId:'bs',remoteId:'event',calendarId:'c',connectionId:'conn'})).toBe('review');
+ expect(fetcher).not.toHaveBeenCalled();
+});
 it('試験先の一覧が変われば送らず要確認とする',async()=>{
  const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);
  const proof=await cleanupRecipientProof(key,'a','["f"]');d.raw.exec("UPDATE account_settings SET value='[]' WHERE key='test_recipients'");

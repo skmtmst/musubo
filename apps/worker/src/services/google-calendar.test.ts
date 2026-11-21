@@ -6,6 +6,16 @@ function response(body: unknown, status = 200) {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status })));
 }
 describe('顧客削除後の予定整理',()=>{
+ it.each([404,410])('予定を読めない %i は権限喪失と区別できず要確認',async status=>{
+  const transport=vi.fn(async()=>new Response(null,{status}));
+  const calendar=new GoogleCalendarClient({calendarId:'target',accessToken:'token',transport:transport as unknown as typeof fetch});
+  expect(await calendar.cleanupEvent('event','delete')).toBe('review');expect(transport).toHaveBeenCalledTimes(1);
+ });
+ it.each([404,410])('書き込み時の %i も完了にしない',async status=>{
+  const transport=vi.fn(async(_url:RequestInfo|URL,init?:RequestInit)=>init?.method?new Response(null,{status}):new Response(JSON.stringify({id:'event',etag:'v',organizer:{self:true}})));
+  const calendar=new GoogleCalendarClient({calendarId:'target',accessToken:'token',transport:transport as unknown as typeof fetch});
+  expect(await calendar.cleanupEvent('event','redact')).toBe('review');expect(transport).toHaveBeenCalledTimes(2);
+ });
  it.each(['delete','redact'] as const)('%s は参加者が無い版だけを通知せず変更する',async action=>{
   const transport=vi.fn(async(_url:RequestInfo|URL,init?:RequestInit)=>init?.method?new Response(null,{status:204}):new Response(JSON.stringify({id:'event',etag:'"v1"',organizer:{self:true},attendees:[]})));
   const calendar=new GoogleCalendarClient({calendarId:'target',accessToken:'token',transport:transport as unknown as typeof fetch});
