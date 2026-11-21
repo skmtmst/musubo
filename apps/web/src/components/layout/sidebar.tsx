@@ -1,5 +1,6 @@
 'use client'
 
+import { SetupChip } from '@/components/shell/setup-chip'
 import SharedButton from '@/components/shared/button'
 import { useRememberedSidebar } from './use-remembered-sidebar'
 import { revealInScroller } from './sidebar-current-item'
@@ -991,6 +992,7 @@ export default function Sidebar({
         <h1 className={styles.mobileTitle} title={mobileTitle || brand.name || undefined}>
           {mobileTitle || brand.name || 'musubo LINE管理システム'}
         </h1>
+        <SetupChip />
         {/* 公式アカウントの印。名前は画面名が持つので、ここはアイコンだけ。 */}
         <div className={styles.mobileBrand}>
           {brand.iconUrl ? (

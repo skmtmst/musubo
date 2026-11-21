@@ -140,6 +140,7 @@ export type { AutomationWait } from './automation-wait.js';
 export type { RestaurantSetupProgress } from './restaurant-setup-progress.js';
 export * from './initial-rich-menu.js';
 export { initialMenuImageDataUri, initialMenuPng } from './initial-rich-menu-images.js';
+export { RESTAURANT_GUIDE_MENUS, RESTAURANT_GUIDE_MENU_IDS, restaurantGuideMenu, type RestaurantGuideMenu } from './restaurant-guide-menu.js';
 export { parseFormReferences, STORE_INFORMATION_FIELDS } from './form-public-references.js';
 export type { FormReferenceDefinition, PublicFormReference, PublicFormImage, PublicStoreInformation, StoreInformationField } from './form-public-references.js';
 export * from './restaurant-reservation-form.js';
@@ -149,3 +150,4 @@ export type { RestaurantFollowupManagement } from './restaurant-followup-managem
 export { lineMessagePreview } from './line-message-preview.js';
 export { HOURS_WEEKDAYS, HOURS_SERVICE_LABELS, emptyHoursWorkspace, hoursDateAdd, hoursWeekday, validHoursDate, hoursDateRange, hoursPeriodsProblem, effectiveOpeningDate, upcomingHolidayGroups } from './google-hours-workspace.js';
 export type { HoursWeekday, OpeningPeriod, OpeningWeek, OpeningDate, HolidayHoursRule, HoursServiceKind, HoursService, HoursWorkspace, HoursWorkspaceEvent, HoursWorkspaceData } from './google-hours-workspace.js';
+export { RESTAURANT_COURSE_PHOTO_LIMIT, parseRestaurantCoursePhotos, readRestaurantCoursePhotos, type RestaurantCoursePhoto } from './restaurant-course-photos.js';
