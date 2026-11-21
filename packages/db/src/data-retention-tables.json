@@ -5028,6 +5028,8 @@
       "column": "account_id"
     }
   },
+  "ec_auto_line_live_intents": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "ec_restock_occurrences": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
   "ec_auto_line_cap_reservations": {
     "category": "purge",
     "scope": {

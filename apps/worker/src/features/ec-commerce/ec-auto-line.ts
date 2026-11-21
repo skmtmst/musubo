@@ -1,3 +1,4 @@
+import {prepareLiveEventPlan} from './ec-auto-line-live-plan.js';
 import {prepareAutoLineSimulationCap} from './ec-auto-line-cap.js';
 import {GapError} from '../../services/gap-common.js';
 import {getAccountTimeZone,tzHHMM,tzDateStr} from '../../services/availability.js';
@@ -7,21 +8,23 @@ export async function autoLineRules(db:D1Database,a:string){
  const rows=(await db.prepare('SELECT * FROM ec_auto_line_rules WHERE account_id=?').bind(a).all<Record<string,unknown>>()).results;
  return autoKinds.map(kind=>{const r=rows.find(x=>x.kind===kind);return {kind,enabled:!!r?.enabled,waitMinutes:Number(r?.wait_minutes??(kind==='cart'?60:kind==='browse'?1440:0)),messages:JSON.parse(String(r?.messages_json??'[]')),version:Number(r?.version??0),testMode:true};});
 }
-export async function ingestBehavior(db:D1Database,a:string,b:Record<string,unknown>,now=new Date()){
+export async function ingestBehavior(db:D1Database,a:string,b:Record<string,unknown>,now=new Date(),liveEnabled=false){
  if(!b||typeof b!=='object'||Array.isArray(b))throw new GapError('invalid_event');
  if(typeof b.eventId!=='string'||!b.eventId||b.eventId.length>128||!['cart_add','cart_remove','product_view','purchase','restock','restock_subscribe'].includes(String(b.type))||typeof b.productId!=='string'||!b.productId||b.productId.length>128||typeof b.occurredAt!=='string'||!Number.isFinite(Date.parse(b.occurredAt))||Date.parse(b.occurredAt)>now.getTime()+300000)throw new GapError('invalid_event');
  if(!b||typeof b!=='object'||Array.isArray(b))throw new GapError('invalid_event');
+ const occurredAt=new Date(Date.parse(String(b.occurredAt))).toISOString();
  const customer=typeof b.customerId==='string'?b.customerId:null;
  const f=customer?await db.prepare('SELECT friend_id FROM ec_identity_links WHERE line_account_id=? AND external_customer_id=? AND unlinked_at IS NULL').bind(a,customer).first<{friend_id:string}>():null;
  // 公開訪問者の友だち ID を信用しないよう、計測同意は認証済みの自社 EC 接続から受け取る。
  if(['product_view','cart_add','cart_remove'].includes(String(b.type))&&b.trackingConsent!==true)return {accepted:false,reason:'tracking_consent_required'};
- const id=crypto.randomUUID(),insert=await db.prepare(`INSERT INTO ec_behavior_events(id,account_id,friend_id,ec_customer_id,type,product_id,product_snapshot_json,occurred_at,received_at,dedupe_key) SELECT ?,?,?,?,?,?,?,?,?,? WHERE (SELECT count(*) FROM ec_behavior_events WHERE account_id=? AND julianday(received_at)>=julianday(?,'-1 minute'))<600 ON CONFLICT(account_id,dedupe_key) DO NOTHING`).bind(id,a,f?.friend_id??null,customer,b.type,b.productId,JSON.stringify({stock:Number.isSafeInteger(b.stock)?b.stock:null}),b.occurredAt,now.toISOString(),b.eventId,a,now.toISOString()).run();
- const saved=await db.prepare('SELECT id,type,product_id,ec_customer_id,occurred_at FROM ec_behavior_events WHERE account_id=? AND dedupe_key=?').bind(a,b.eventId).first<{id:string;type:string;product_id:string;ec_customer_id:string|null;occurred_at:string}>();if(!saved)throw new GapError('rate_limited',429);if(saved.type!==b.type||saved.product_id!==b.productId||saved.ec_customer_id!==customer||saved.occurred_at!==b.occurredAt)throw new GapError('idempotency_conflict',409);
+ const id=crypto.randomUUID(),statement=db.prepare(`INSERT INTO ec_behavior_events(id,account_id,friend_id,ec_customer_id,type,product_id,product_snapshot_json,occurred_at,received_at,dedupe_key) SELECT ?,?,?,?,?,?,?,?,?,? WHERE (SELECT count(*) FROM ec_behavior_events WHERE account_id=? AND julianday(received_at)>=julianday(?,'-1 minute'))<600 ON CONFLICT(account_id,dedupe_key) DO NOTHING`).bind(id,a,f?.friend_id??null,customer,b.type,b.productId,JSON.stringify({stock:Number.isSafeInteger(b.stock)?b.stock:null}),occurredAt,now.toISOString(),b.eventId,a,now.toISOString());
+ const insert=liveEnabled?(await db.batch([statement,...prepareLiveEventPlan(db,id)]))[0]:await statement.run();
+ const saved=await db.prepare('SELECT id,type,product_id,ec_customer_id,occurred_at FROM ec_behavior_events WHERE account_id=? AND dedupe_key=?').bind(a,b.eventId).first<{id:string;type:string;product_id:string;ec_customer_id:string|null;occurred_at:string}>();if(!saved)throw new GapError('rate_limited',429);if(saved.type!==b.type||saved.product_id!==b.productId||saved.ec_customer_id!==customer||Date.parse(saved.occurred_at)!==Date.parse(occurredAt))throw new GapError('idempotency_conflict',409);
  if(!insert.meta.changes||!f&&b.type!=='restock')return {accepted:true,matched:!!f,duplicate:!insert.meta.changes};
  const rules=await autoLineRules(db,a),kind=b.type==='cart_add'?'cart':b.type==='product_view'?'browse':null;
  if(kind&&f){const r=rules.find(x=>x.kind===kind)!;
- if(r.enabled){const browse=kind!=='browse'||(await db.prepare("SELECT count(*) n FROM ec_behavior_events WHERE account_id=? AND friend_id=? AND product_id=? AND type='product_view' AND julianday(occurred_at)>=julianday(?,'-24 hours')").bind(a,f.friend_id,b.productId,b.occurredAt).first<{n:number}>())!.n>=2;
- if(browse){const due=new Date(Date.parse(b.occurredAt)+r.waitMinutes*60000).toISOString();await db.prepare('INSERT OR IGNORE INTO ec_auto_line_sends(id,account_id,rule_kind,friend_id,product_id,trigger_event_id,scheduled_at,original_due_at,messages_snapshot_json) VALUES(?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),a,kind,f.friend_id,b.productId,id,due,due,JSON.stringify(r.messages)).run();}}
+ if(r.enabled){const browse=kind!=='browse'||(await db.prepare("SELECT count(*) n FROM ec_behavior_events WHERE account_id=? AND friend_id=? AND product_id=? AND type='product_view' AND julianday(occurred_at)>=julianday(?,'-24 hours')").bind(a,f.friend_id,b.productId,occurredAt).first<{n:number}>())!.n>=2;
+ if(browse){const due=new Date(Date.parse(occurredAt)+r.waitMinutes*60000).toISOString();await db.prepare('INSERT OR IGNORE INTO ec_auto_line_sends(id,account_id,rule_kind,friend_id,product_id,trigger_event_id,scheduled_at,original_due_at,messages_snapshot_json) VALUES(?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),a,kind,f.friend_id,b.productId,id,due,due,JSON.stringify(r.messages)).run();}}
  }
  if(b.type==='restock'&&Number(b.stock)>0){const r=rules.find(x=>x.kind==='restock')!;if(r.enabled){await db.prepare(`INSERT OR IGNORE INTO ec_auto_line_sends(id,account_id,rule_kind,friend_id,product_id,trigger_event_id,scheduled_at,original_due_at,messages_snapshot_json) SELECT lower(hex(randomblob(16))),?,'restock',friend_id,?,id,?,?,? FROM ec_behavior_events WHERE account_id=? AND product_id=? AND type='restock_subscribe' AND friend_id IS NOT NULL`).bind(a,b.productId,now.toISOString(),now.toISOString(),JSON.stringify(r.messages),a,b.productId).run();}}
  return {accepted:true,matched:true,duplicate:false};
