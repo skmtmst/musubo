@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { InboxEmailHeading } from '@/components/shared/inbox-content'
 import { InboxDraftArea, InboxInputBox, InboxComposerBottom, InboxComposerActions } from '@/components/shared/inbox-composer'
 import { InboxMessage } from '@/components/shared/inbox-thread'
@@ -53,7 +54,7 @@ export default function InstagramConversation({ chat, role, onChanged }: { chat:
       await api.instagram.sendReply(account, incoming.id, text, key.current)
       setText(''); key.current = null
       await load(); onChanged(); window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
-    } catch (err) { setError(err instanceof Error ? err.message : '返信できませんでした') }
+    } catch (err) { setError(japaneseDetailOf(err) || '返信できませんでした') }
     finally { lock.current = false; setSending(false) }
   }
   return <InboxConversationPane selected>

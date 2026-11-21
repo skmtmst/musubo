@@ -252,7 +252,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     EMAIL_PAGE_SIZE,
     nameQuery,
     selectedAccountId,
-    emailInboxEnabled: emailInboxEnabled && channel !== 'line' && socialChannel === 'all' && (quickFilter !== 'overdue' || channel === 'email'),
+    emailInboxEnabled: emailInboxEnabled && channel !== 'line' && socialChannel === 'all',
     statusFilter,
     assigneeFilter,
     unreadOnly,

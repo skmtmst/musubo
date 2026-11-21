@@ -425,7 +425,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                   残したまま、混ぜ方だけそろえる。
                 */}
         {(() => {
-          const mailRows = (channel === 'line' || socialChannel !== 'all' || (quickFilter === 'overdue' && channel !== 'email') ? [] : emailItems)
+          const mailRows = (channel === 'line' || socialChannel !== 'all' ? [] : emailItems)
             .filter((item) =>
               nameQuery.trim() === ''
                 ? true
