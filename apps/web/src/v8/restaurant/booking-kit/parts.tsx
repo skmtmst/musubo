@@ -28,7 +28,7 @@ export function RowMore({ subject, items, lockedReason }: { subject: string; ite
  * （題の段のあと 14 の間・各段 14・下の線の上 14）で置く。
  * onSubmit を渡すと中身を form にする（Enter で保存できる）。
  */
-export function RsDialog({ open, title, titleNote, titleSize, width, exactWidth = false, minHeight, top, tone, busy, designNode, titleIcon, titleRow, plainTitle = false, headerHeight, contentPadding, bodyGap, bodyOffset, footerPlain = false, footerGap, actionsPlacement = 'body', footerNote, footerNotePlacement = 'above', onCancel, onSubmit, noValidate = false, actions, children }: {
+export function RsDialog({ open, title, titleNote, titleSize, width, exactWidth = false, minHeight, top, tone, busy, designNode, titleIcon, headerIcon, titleRow, plainTitle = false, headerHeight, contentPadding, bodyGap, bodyOffset, footerPlain = false, footerGap, actionsPlacement = 'body', footerNote, footerNotePlacement = 'above', guideSlot, centerActions, onCancel, onSubmit, noValidate = false, actions, children }: {
   open: boolean
   title: string
   /** 題の下の小さな補足（絵の窓の頭が題＋1行のとき）。渡さないときは出ない。 */
@@ -41,8 +41,11 @@ export function RsDialog({ open, title, titleNote, titleSize, width, exactWidth 
   tone?: 'default' | 'destructive'
   busy?: boolean
   designNode?: string
+  guideSlot?: string
+  centerActions?: boolean
   /** 題の左に置く絵（危険な操作の確認の注意三角など）。 */
   titleIcon?: ReactNode
+  headerIcon?: ReactNode
   /*
    * 題の段の形を絵の値にする。`'mark'` は左の丸い印と題を縦の中央でそろえ、
    * 間12・題 18/700 にする（絵 dgeTy・XCVGd の確認の窓）。渡さないときは共通のまま。
@@ -106,9 +109,9 @@ export function RsDialog({ open, title, titleNote, titleSize, width, exactWidth 
     ? footerPlain ? 'var(--tpl-rs-dlg-actions-pad-plain)' : 'var(--tpl-rs-dlg-gap)'
     : `${footerGap}px`
   const footer = actionsPlacement === 'footer' ? (
-    <DialogActions padding={footerPlain ? 'none' : undefined}>
+    <DialogActions align={centerActions ? 'center' : undefined} padding={footerPlain ? 'none' : undefined}>
       {footerNote ? <div className={footerNotePlacement === 'inline' ? styles.inlineFooterNote : styles.footerNote} style={{ '--rs-dlg-actions-pad-top': footerTop } as CSSProperties}>{footerNote}</div> : null}
-      {footerNotePlacement !== 'inline' || scrollHint.hasMore ? <p data-scroll-hint className={styles.scrollHint} style={{ visibility: scrollHint.hasMore ? 'visible' : 'hidden' }} aria-hidden={!scrollHint.hasMore} title="スクロールして続きを確認"><span aria-hidden="true">↓ </span>スクロールして続きを確認</p> : null}
+      {!centerActions && (footerNotePlacement !== 'inline' || scrollHint.hasMore) ? <p data-scroll-hint className={styles.scrollHint} style={{ visibility: scrollHint.hasMore ? 'visible' : 'hidden' }} aria-hidden={!scrollHint.hasMore} title="スクロールして続きを確認"><span aria-hidden="true">↓ </span>スクロールして続きを確認</p> : null}
       {actions}
     </DialogActions>
   ) : undefined
@@ -121,6 +124,7 @@ export function RsDialog({ open, title, titleNote, titleSize, width, exactWidth 
       tone={tone}
       busy={busy}
       titleIcon={titleIcon}
+      headerIcon={headerIcon}
       designTitleRow={titleRow}
       confirmation={plainTitle || undefined}
       designWidth={width}
@@ -133,6 +137,8 @@ export function RsDialog({ open, title, titleNote, titleSize, width, exactWidth 
       footerDivider={actionsPlacement === 'footer' ? !footerPlain : undefined}
       footer={footer}
       designNode={designNode}
+      guideSlot={guideSlot}
+      fitViewport={Boolean(guideSlot)}
       onCancel={onCancel}
     >
       {onSubmit ? (

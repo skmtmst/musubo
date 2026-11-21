@@ -129,12 +129,15 @@ export function nextGuideEngineState(current: GuideEngineState, action: GuideEng
 
 export type GuideAnchor = { key: string; label: string; href: string }
 
+function needsGuideReview(state: GuideEngineState): boolean {
+  return (state.stepKey === 'attributes' && state.procedureIndex === 3) ||
+    state.stepKey === 'hours' ||
+    (state.stepKey === 'scenario' && state.procedureIndex === 2)
+}
+
 function savedGuideAnchor(summary: GuideSummary | null, state: GuideEngineState): GuideAnchor | null {
   const step = summary?.steps.find(item => item.key === state.stepKey)
-  const hasReview =
-    (state.stepKey === 'attributes' && state.procedureIndex === 3) ||
-    (state.stepKey === 'scenario' && state.procedureIndex === 2)
-  return step?.href && (!step.done || hasReview) ? { key: step.key, label: step.label, href: step.href } : null
+  return step?.href && (!step.done || needsGuideReview(state)) ? { key: step.key, label: step.label, href: step.href } : null
 }
 
 /** 見送った段（この案内の間だけ覚える）。済みにはしないので、設定画面のチェックは付かない。 */
@@ -256,10 +259,7 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
   const finished = Boolean(summary && summary.total > 0 && summary.done === summary.total)
 
   /* 9項目が済んだら案内を閉じる。まだ始めていない人の記録は作らない。 */
-  const reviewingCompletion = scripted && (
-    state.stepKey === 'attributes' && state.procedureIndex === 3 ||
-    state.stepKey === 'scenario' && state.procedureIndex === 2
-  )
+  const reviewingCompletion = scripted && needsGuideReview(state)
   useEffect(() => {
     if (finished && !scripted && state.phase !== 'idle') commit('complete')
   }, [finished, scripted, state.phase, commit])

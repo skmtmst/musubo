@@ -86,7 +86,7 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
     始めた直後も同じ。「続きから」は最初の未完了の段の手順1なので、
     ダッシュボードで始めたらその手順の画面まで連れていく。
     連れていかないと、ダッシュボードには対象が無いので案内が1.5秒で自動停止してしまう。
-    台本が画面を指定している手順（例: ⑤営業時間の1/2＝設定 › SNS連携）も同じ扱い。
+    台本が画面を指定している手順も同じ扱い。
   */
   const router = useRouter()
   const requestedPlace = useRef<string | null>(null)
@@ -129,10 +129,14 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
   )
   useSetupSaveSignal(scripted && armed, first.refresh)
   useGuideSignal('reception.menuPublished', Boolean(accountId && inPublishReview), advance, accountId ?? undefined)
-  const offerPublishing = needsPublishReview && !inPublishReview && onTargetScreen
+  const alreadyPublished = first.progress?.richMenuPublished === true
+  const skipPublishPrompt = needsPublishReview && !inPublishReview && onTargetScreen && alreadyPublished
+  useEffect(() => { if (skipPublishPrompt) advance() }, [skipPublishPrompt, advance])
+  const offerPublishing = needsPublishReview && !inPublishReview && onTargetScreen && !alreadyPublished
   const reviewingTables = guide.stepKey === 'attributes' && guide.procedureIndex === 3
+  const reviewingHours = guide.stepKey === 'hours'
   const showComplete = scripted && Boolean(summary?.total && summary.done === summary.total) &&
-    (first.arrived || guide.phase === 'active' || guide.phase === 'paused') && !offerPublishing && !reviewingTables
+    (first.arrived || guide.phase === 'active' || guide.phase === 'paused') && !offerPublishing && !skipPublishPrompt && !reviewingTables && !reviewingHours
   const showReceive = firstMessageStep && !step.done && guide.phase === 'active' && pathname === '/' && !qrOpen && channelId
   const showMenuPicker = menuPickerStep && !step.done && guide.phase === 'active' && pathname === '/' &&
     accountId && style.data?.styleSelected && !style.stale
@@ -142,13 +146,15 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
     <GuideSharedProvider value={shared}>
       {children}
       <GuideOverlay
-        active={guide.phase === 'active' && !offerPublishing && !inPublishReview && !showReceive && !showComplete && !showMenuPicker}
+        active={guide.phase === 'active' && (onTargetScreen || leavingGuideScreen) && !offerPublishing && !skipPublishPrompt && !showReceive && !showComplete && !showMenuPicker}
         stepKey={guide.stepKey}
         stepLabel={step?.label ?? null}
         stepOrder={index >= 0 ? index + 1 : null}
         procedureIndex={guide.procedureIndex}
         onTargetScreen={!leavingGuideScreen}
+        showOverlay={onTargetScreen}
         scripted={scripted}
+        showProcedure={!inPublishReview}
         nextLabel={next?.label}
         segments={segments}
         onAdvanceProcedure={advance}
