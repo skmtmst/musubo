@@ -35,9 +35,9 @@ const MOCK = process.env.VISUAL_QA_MOCK ?? 'http://127.0.0.1:8788'
   ② 初期セットはLINE接続時に決まるので、済みなら一覧から外れて8段になる（Pen v09）。
 */
 const PEN_STATES = {
-  /* 枠02 (C5i3rw) 1/9: ①だけ済み。②は未設定なので一覧に残り9段。③は下書き0件、以降は未設定。 */
-  '1/9': {
-    server: { accounts: 'done', featureSet: 'todo', firstMessage: 'todo' },
+  /* 枠02 (C5i3rw) 1/8: ①だけ表示上済み。初期セットは保存済みで表示から外れる。 */
+  '1/8': {
+    server: { accounts: 'done', featureSet: 'done', firstMessage: 'todo' },
     richMenuEmpty: true,
     store: { tables: false, hours: false, menus: false, reception: false, followup: false },
   },
@@ -175,15 +175,15 @@ for (const width of PC_WIDTHS) {
     await page.screenshot({ path: `${OUT}/${width}-08b-first-steps.png`, fullPage: false })
   })
 
-  /* 差し戻し: 承認Penと同じ済み数（枠02=1/9）で照合できるようにする。 */
-  test(`${width}px 枠02 初回ポップアップ 1/9`, async ({ page }) => {
-    await routePenState(page, '1/9')
+  /* 差し戻し: 承認Penと同じ済み数（枠02=1/8）で照合できるようにする。 */
+  test(`${width}px 枠02 初回ポップアップ 1/8`, async ({ page }) => {
+    await routePenState(page, '1/8')
     await openDashboard(page, width, 1080)
     const popup = page.locator('[data-first-run-popup="open"]')
     await expect(popup, '初回ポップアップが出ない').toBeVisible({ timeout: 15000 })
-    await expect(popup.getByText('1/9', { exact: true }), '枠02の済み数が1/9にならない')
+    await expect(popup.getByText('1/8', { exact: true }), '枠02の済み数が1/8にならない')
       .toBeVisible({ timeout: 15000 })
-    await page.screenshot({ path: `${OUT}/${width}-02-popup-1of9.png`, fullPage: false })
+    await page.screenshot({ path: `${OUT}/${width}-02-popup-1of8.png`, fullPage: false })
   })
 
   /* 承認済み Pen v09: ②が済みなら一覧から外れるので、枠08bの状態は3/8になる。 */
@@ -210,7 +210,7 @@ test(`${MOBILE_WIDTH}px 枠02b ボトムシート`, async ({ page }) => {
   await openDashboard(page, MOBILE_WIDTH, MOBILE_HEIGHT)
   const popup = page.locator('[data-first-run-popup="open"]')
   await expect(popup, 'スマホで初回シートが出ない').toBeVisible({ timeout: 15000 })
-  await expect(page.getByText('あとで（下にスワイプで閉じる）')).toBeVisible()
+  await expect(popup.getByRole('button', { name: 'あとで', exact: true })).toBeVisible()
 
   /* 差し戻し R3: 承認Pen noXJA (x0,y118,w390,h782) と上端・高さを合わせる。 */
   const sheet = await popup.locator('[role="dialog"]').boundingBox()
