@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [友だち追加時のテスト送信](release-log/unreleased/75-kenta-fadd-test.md) — 自分にテスト送信する機能の履歴。確認 2026-11-15。
+
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)

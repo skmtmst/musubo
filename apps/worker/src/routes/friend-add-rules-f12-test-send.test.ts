@@ -96,6 +96,17 @@ function seedRule(raw: SqliteD1['raw'], messageText = 'はじめまして'): voi
 describe('F12: 本人だけへのテスト送信', () => {
   let testDb: SqliteD1;
 
+  it('自分の宛先が未連携または友だちでない場合は送信前に利用不可と分かる', async () => {
+    const { instance, bindings } = buildApp(testDb.db);
+    const url = '/api/friend-add-rules/rule-12/test-recipient?account_id=account-1';
+    const available = await instance.request(url, {}, bindings);
+    expect(await available.json()).toEqual({ success: true, data: { available: true } });
+    testDb.raw.prepare("UPDATE staff_members SET line_user_id = NULL WHERE id = 'owner-1'").run();
+    const missing = await instance.request(url, {}, bindings);
+    expect(await missing.json()).toEqual({ success: true, data: { available: false } });
+    expect(lineClientMocks.pushMessage).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     testDb = createTestD1();
     seedBase(testDb.raw);

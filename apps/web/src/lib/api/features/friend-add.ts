@@ -32,6 +32,13 @@ export const friendAddMethods = {
    * 以後はこの 管理画面 rules/runs 契約だけを使う。
    */
   friendAddRules: {
+    testRecipient: (accountId: string, id: string) => fetchApi<ApiResponse<{ available: boolean }>>(
+      `/api/friend-add-rules/${encodeURIComponent(id)}/test-recipient?account_id=${encodeURIComponent(accountId)}`,
+    ),
+    testSend: (accountId: string, id: string, key: string) => fetchApi<ApiResponse<{ sent: number }>>(
+      `/api/friend-add-rules/${encodeURIComponent(id)}/test-send?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', headers: { 'Idempotency-Key': key }, body: '{}' },
+    ),
     restore: (accountId: string, id: string, expectedVersion: number) => fetchApi<ApiResponse<{ id: string; status: 'draft'; version: number }>>(
       `/api/friend-add-rules/${encodeURIComponent(id)}/unarchive?account_id=${encodeURIComponent(accountId)}`,
       { method: 'POST', body: JSON.stringify({ expectedVersion }) },

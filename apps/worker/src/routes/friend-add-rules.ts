@@ -6,7 +6,7 @@ import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js'
 
 import { get__api_friend_add_runs_1, get__api_friend_add_runs_id_2, post__api_friend_add_runs_id_retry_3, post__api_friend_add_rules_folders_4, patch__api_friend_add_rules_folders_id_5, delete__api_friend_add_rules_folders_id_6, get__api_friend_add_rules_7, patch__api_friend_add_rules_reorder_8, put__api_friend_add_rules_order_9 } from './friend-add-rules-runs-handlers.js';
 
-import { get__api_friend_add_rules_conflicts_1, post__api_friend_add_rules_test_2, post__api_friend_add_rules_drafts_3, get__api_friend_add_rules_id_4, put__api_friend_add_rules_id_draft_5, post__api_friend_add_rules_id_validate_6, post__api_friend_add_rules_id_test_7, post__api_friend_add_rules_id_test_send_8, post__api_friend_add_rules_id_publish_9, post__api_friend_add_rules_id_stop_10, post__api_friend_add_rules_id_unarchive_11, post__api_friend_add_rules_id_duplicate_12, delete__api_friend_add_rules_id_13 } from './friend-add-rules-drafts-handlers.js';
+import { get__api_friend_add_rules_conflicts_1, post__api_friend_add_rules_test_2, post__api_friend_add_rules_drafts_3, get__api_friend_add_rules_id_4, put__api_friend_add_rules_id_draft_5, post__api_friend_add_rules_id_validate_6, post__api_friend_add_rules_id_test_7, post__api_friend_add_rules_id_test_send_8, getFriendAddTestRecipient, post__api_friend_add_rules_id_publish_9, post__api_friend_add_rules_id_stop_10, post__api_friend_add_rules_id_unarchive_11, post__api_friend_add_rules_id_duplicate_12, delete__api_friend_add_rules_id_13 } from './friend-add-rules-drafts-handlers.js';
 import { validateInput, validateReferences } from './friend-add-rules-definition.js';
 
 const friendAddRules = new Hono<Env>();
@@ -77,6 +77,8 @@ friendAddRules.post('/api/friend-add-rules/:id/test', requireRole('owner', 'admi
  *   既存の手動契約（手動1:1は緊急停止の対象外・手動として記録）に新しい例外は作らない。
  * - 実顧客へは送らない。短時間の二度押しは 429 で止める。
  */
+friendAddRules.get('/api/friend-add-rules/:id/test-recipient', requireRole('owner', 'admin', 'staff'), getFriendAddTestRecipient);
+
 friendAddRules.post('/api/friend-add-rules/:id/test-send', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), post__api_friend_add_rules_id_test_send_8);
 
 friendAddRules.post('/api/friend-add-rules/:id/publish', requireDeliveryAccess('friendAdd', 'publish'), inputJsonBoundary(), post__api_friend_add_rules_id_publish_9);

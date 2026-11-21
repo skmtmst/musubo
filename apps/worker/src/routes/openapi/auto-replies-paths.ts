@@ -112,6 +112,17 @@ export const autoRepliesPaths = {
       },
     },
   },
+  '/api/friend-add-rules/{id}/test-recipient': {
+    get: {
+      tags: ['Webhook'],
+      summary: '操作者本人のテスト送信先を確認',
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      responses: { '200': { description: 'Recipient availability' }, '400': { description: 'Account required' }, '404': { description: 'Rule or account not found' } },
+    },
+  },
   '/api/friend-add-rules/{id}/test-send': {
     post: {
       tags: ['Webhook'],
