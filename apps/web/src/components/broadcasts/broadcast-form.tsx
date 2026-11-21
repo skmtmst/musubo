@@ -10,6 +10,7 @@ import { applyBroadcastTemplate } from './broadcast-apply-template'
 import { placeBroadcastTemplate } from './broadcast-place-template'
 import { broadcastAbProblem } from './broadcast-ab-guard'
 import { broadcastAbSendProblem } from './broadcast-ab-send-guard'
+import { abTrialRecipients,BroadcastAbTrialNotice,prepareBroadcastAbConfirmation,startBroadcastAb } from './broadcast-ab-confirm'
 import BroadcastCheckAcknowledgement from './broadcast-check-acknowledgement'
 import { useBroadcastFormError } from './use-broadcast-form-error'
 import { confirmBroadcastMessage } from './broadcast-confirm-action'
@@ -69,7 +70,6 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave/index'
 import { useBroadcastAb } from '@/v8/broadcast-ab/public/use-ab/index'
-import { broadcastAbApi } from '@/v8/broadcast-ab/public/api/index'
 import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/public/host/index'
 import type { Folder,SendConfirmationPreview } from '@line-crm/shared'
 import { AlertTriangle,ArrowRight,CheckCircle2,Eye,Save } from 'lucide-react'
@@ -1240,18 +1240,11 @@ export default function BroadcastForm({
         let saved = abAlreadyApproved ? editingDraft : await persistDraft(scheduledAtIso(), true, undefined, 'confirm')
         if (!alive) return
         if (!saved) { setSendPreview({ state: 'error', data: null, broadcast: null }); return }
-        if (ab.enabled && !abAlreadyApproved) {
-          const version = await ab.persist(saved.id, Number(saved.version ?? 0), bubbles)
-          if (!alive) return
-          const session = { ...draftSession.current, version }
-          draftSession.current = session
-          draftSessionsByAccount.current.set(selectedAccountIdRef.current || null, session)
-          saved = { ...saved, version }
-        }
         if (ab.enabled) {
-          const info = await broadcastAbApi.result(saved.id)
-          if (!alive) return
-          setAbTestRecipientCount(info.data.liveTestRecipientCount ?? null)
+          const prepared = await prepareBroadcastAbConfirmation(saved, { ab, alreadyApproved: abAlreadyApproved, alive: () => alive, bubbles, onVersion: version => { draftSession.current = { ...draftSession.current, version }; draftSessionsByAccount.current.set(selectedAccountIdRef.current || null, draftSession.current) } })
+          if (!prepared) return
+          saved = prepared.saved
+          setAbTestRecipientCount(prepared.testRecipientCount)
         }
         const preview = await chatSafetyApi.sendPreview(saved.id)
         if (!alive) return
@@ -1282,28 +1275,9 @@ export default function BroadcastForm({
   const confirmedDeliveryLimit = currentStep && !needsApprovalSingle ? sendPreview.data?.deliveryLimit : preflight?.deliveryLimit
   const confirmationCurrent = renderedConfirmationScope !== null && renderedConfirmationScope.generation === accountGenerationRef.current && renderedConfirmationScope.accountId === selectedAccountId
   const visibleConfirmOpen = confirmOpen && confirmationCurrent
-  const abTrialCount = abTestRecipientCount === null ? null : ab.settings.testRatioPct === 50 ? abTestRecipientCount : 2 * Math.max(1, Math.floor(abTestRecipientCount * ab.settings.testRatioPct / 200))
-  const confirmationFields = <>{ab.enabled && <Notice tone={abTestRecipientCount !== null && abTestRecipientCount >= 2 ? 'info' : 'warn'}>{abTestRecipientCount === null ? '検証環境の設定とテスト宛先を確認できません。' : `テスト宛先 ${formatNumber(abTestRecipientCount)} 人のうち、今すぐ A・B に ${formatNumber(abTrialCount)} 人へ送ります。残り ${formatNumber(abTestRecipientCount - (abTrialCount ?? 0))} 人には人数不足なら自動送信しません。`}</Notice>}{confirmationScope.current && <OperationTargetSummary accounts={[{ id: confirmationScope.current.accountId }]} />}{confirmedDeliveryLimit && <Notice tone="info">配信できる候補{formatNumber(confirmedDeliveryLimit.candidateCount)}人から、無作為に最大{formatNumber(confirmedDeliveryLimit.recipientCount)}人へ送ります。確認後に人数を増やしません。</Notice>}<BroadcastCheckAcknowledgement issues={pendingChecks.map(check => `${check.label}：${check.value}`)} checked={acknowledgementKey === confirmationKey} onCheckedChange={checked => setAcknowledgementKey(checked ? confirmationKey : null)} disabled={saving} /></>
-  const confirmAb = async () => {
-    if (!ab.enabled || !sendPreview.data || !sendPreview.broadcast || abTestRecipientCount === null || abTestRecipientCount < 2 || !abStartKey.current || saving || submittingRef.current) return
-    if (needsApprovalSingle && !approvalCountMatched) { setError('人数を入れて一致させてください'); return }
-    if (needsApproval && !needsApprovalSingle && !approverId) { setError('承認をお願いする人を選んでください'); return }
-    const account = selectedAccountIdRef.current
-    submittingRef.current = true; setSaving(true); setError('')
-    try {
-      if (needsApproval && !needsApprovalSingle) {
-        const requested = await api.broadcasts.approval.request(sendPreview.broadcast.id, { approverStaffId: approverId, note: approvalNote.trim() || undefined })
-        if (!requested.success) { setError(requested.error); return }
-      } else {
-        const started = await broadcastAbApi.startLive(sendPreview.broadcast.id, Number(sendPreview.data.expectedVersion), sendPreview.data.recipients, abTestRecipientCount, abStartKey.current)
-        if (!started.success || started.data.status !== 'live_testing') { setError('試しの送信を停止しました。結果を確認してください。'); return }
-      }
-      if (account !== selectedAccountIdRef.current) return
-      setConfirmOpen(false); onSuccess(sendPreview.broadcast)
-    } catch (caught) {
-      if (account === selectedAccountIdRef.current && !saveErrors.capture(caught)) setError('A/B 配信を開始できませんでした。内容を確認してください。')
-    } finally { submittingRef.current = false; setSaving(false) }
-  }
+  const abTrialCount = abTrialRecipients(abTestRecipientCount, ab.settings.testRatioPct)
+  const confirmationFields = <>{ab.enabled && <BroadcastAbTrialNotice testRecipientCount={abTestRecipientCount} trialCount={abTrialCount} />}{confirmationScope.current && <OperationTargetSummary accounts={[{ id: confirmationScope.current.accountId }]} />}{confirmedDeliveryLimit && <Notice tone="info">配信できる候補{formatNumber(confirmedDeliveryLimit.candidateCount)}人から、無作為に最大{formatNumber(confirmedDeliveryLimit.recipientCount)}人へ送ります。確認後に人数を増やしません。</Notice>}<BroadcastCheckAcknowledgement issues={pendingChecks.map(check => `${check.label}：${check.value}`)} checked={acknowledgementKey === confirmationKey} onCheckedChange={checked => setAcknowledgementKey(checked ? confirmationKey : null)} disabled={saving} /></>
+  const confirmAb = () => startBroadcastAb({ abEnabled: ab.enabled, approvalCountMatched, approvalNote, approverId, needsApproval, needsApprovalSingle, onSuccess, saveErrors, saving, selectedAccountIdRef, sendPreview, setConfirmOpen, setError, setSaving, startKey: abStartKey.current, submittingRef, testRecipientCount: abTestRecipientCount })
   const confirmMessage = async () => {
     const abProblem = broadcastAbSendProblem(ab.enabled, audienceCount)
     if (abProblem) { setError(abProblem); return }
