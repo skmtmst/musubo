@@ -292,26 +292,43 @@ describe('確認の窓に並べるもの', () => {
   })
 })
 
+/** 承認済みの A/B 下書きを開き直し、了承を済ませた最終確認の窓を返す。 */
+async function openApprovedAbDialog() {
+  mocks.params = 'draft=draft'
+  mocks.get.mockResolvedValue({ success: true, data: {
+    id: 'draft', lineAccountId: 'acc-1', version: 2, status: 'draft', approvalStatus: 'approved',
+    title: '承認済み', messageType: 'text', messageContent: '本文', targetType: 'tag', targetTagId: 'vip',
+    draftPayload: { draftSendChoice: 'now', draftAb: { enabled: true, bubbles: [{ id: 'b1', type: 'text', content: { text: 'B案' } }], settings: { testRatioPct: 20, metric: 'click', decideAfterMinutes: 240, undecidedPolicy: 'stop' } } },
+  } })
+  mocks.config.mockResolvedValue({ success: true, data: { threshold: 5, singleOperator: false } })
+  await render()
+  await click('今すぐ送る', container); await settle(200)
+  const opened = dialog()!
+  expect(opened).not.toBeNull()
+  const acknowledgement = Array.from(opened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))
+  if (acknowledgement && !acknowledgement.checked) await act(async () => { fireEvent.click(acknowledgement) })
+  return opened
+}
+
 describe('画面内の最終確認（IDEA-06）', () => {
   it('承認済みのA/Bを開き直すと再保存せず試験送信する', async () => {
-    mocks.params = 'draft=draft'
-    mocks.get.mockResolvedValue({ success: true, data: {
-      id: 'draft', lineAccountId: 'acc-1', version: 2, status: 'draft', approvalStatus: 'approved',
-      title: '承認済み', messageType: 'text', messageContent: '本文', targetType: 'tag', targetTagId: 'vip',
-      draftPayload: { draftSendChoice: 'now', draftAb: { enabled: true, bubbles: [{ id: 'b1', type: 'text', content: { text: 'B案' } }], settings: { testRatioPct: 20, metric: 'click', decideAfterMinutes: 240, undecidedPolicy: 'stop' } } },
-    } })
-    mocks.config.mockResolvedValue({ success: true, data: { threshold: 5, singleOperator: false } })
-    await render()
-    await click('今すぐ送る', container); await settle(200)
-    const opened = dialog()!
-    expect(opened).not.toBeNull()
-    const acknowledgement = Array.from(opened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))
-    if (acknowledgement && !acknowledgement.checked) await act(async () => { fireEvent.click(acknowledgement) })
+    const opened = await openApprovedAbDialog()
     await click('4 人に試験を送る', opened)
     expect(mocks.update).not.toHaveBeenCalled()
     expect(abMocks.saveVariant).not.toHaveBeenCalled()
     expect(mocks.request).not.toHaveBeenCalled()
     expect(abMocks.startLive).toHaveBeenCalledOnce()
+    expect(mocks.success).toHaveBeenCalledOnce()
+    expect(document.body.textContent).not.toContain('試しの送信を停止しました')
+  })
+
+  it('試験送信の開始が試験中にならなければ、完了へ進まず止まったことを出す', async () => {
+    abMocks.startLive.mockResolvedValue({ success: true, data: { status: 'stopped' } })
+    const opened = await openApprovedAbDialog()
+    await click('4 人に試験を送る', opened)
+    expect(abMocks.startLive).toHaveBeenCalledOnce()
+    expect(mocks.success).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('試しの送信を停止しました。結果を確認してください。')
   })
 
   it('未承認のA/Bは案を保存して承認を依頼し、送信しない', async () => {
