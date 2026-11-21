@@ -27,7 +27,7 @@ const data = {
   organization: { id: 'org-1', account_id: 'account-1', tenant_id: null, tenant_name: null, name: 'テスト組織', status: 'active' },
   stores: [store], memberships: [{ id: 'member-1', store_id: 'store-1', staff_name: '佐藤', email: null, role: 'staff', line_uid: null, google_email: null, status: 'active' }],
   tables: [{ id: 'table-1', confirmation_revision: 1, store_id: 'store-1', code: 'A1', label: '窓際', seat_type: 'table', min_capacity: 1, max_capacity: 4, floor_x: 0, floor_y: 0, join_group: null, is_active: 1 }],
-  menuItems: [{ id: 'menu-1', confirmation_revision: 1, store_id: 'store-1', kind: 'course', name: 'ランチ', price: 1500, tax_mode: 'tax_included', allergens_json: '[]', service_periods_json: '["lunch"]', duration_minutes: null, status: 'active' }],
+  menuItems: [{ id: 'menu-1', confirmation_revision: 1, store_id: 'store-1', kind: 'course', name: 'ランチ', price: 1500, tax_mode: 'tax_included', allergens_json: '[]', service_periods_json: '["lunch"]', duration_minutes: 120, status: 'active' }],
   reservations: [], reservationTotal: 0, inventory: [], approvals: [], connectors: [], reviews: [], posts: [], lineFlows: [],
 }
 
@@ -61,7 +61,7 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
     const edit = render(<RestaurantScreen view="menu-edit" />)
     fireEvent.change(await screen.findByDisplayValue('ランチ'), { target: { value: '夜コース' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'menu-1', expect.objectContaining({ name: '夜コース' })))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'menu-1', expect.objectContaining({ name: '夜コース', durationMinutes: 120 })))
     edit.unmount()
     render(<RestaurantScreen view="menu" />)
     await screen.findByText('メニュー一覧')
@@ -93,7 +93,7 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
     render(<RestaurantScreen view="menu-edit" />)
     fireEvent.change(await screen.findByDisplayValue('ランチ'), { target: { value: 'ランチコース' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'menu-1', expect.objectContaining({ name: 'ランチコース', servicePeriods: ['lunch', 'dinner'] })))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'menu-1', expect.objectContaining({ name: 'ランチコース', durationMinutes: 120, servicePeriods: ['lunch', 'dinner'] })))
   })
 
   it('所属ユーザーを編集し、停止の確認を経て変更APIへ渡す', async () => {
