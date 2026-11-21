@@ -199,6 +199,24 @@ beforeEach(() => {
   }));
 });
 
+test('live LINE account list preserves valid checks alongside a legacy channel ID', async () => {
+  dbMocks.getLineAccounts.mockResolvedValue([
+    fakeAccount,
+    { ...fakeAccount, id: 'acc-legacy', channel_id: 'legacy-account', name: '旧形式' },
+  ]);
+  const app = setupApp();
+  const response = await app.request('/api/line-accounts?live=1');
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    success: true,
+    data: [
+      { id: 'acc-1', webhook: { status: 'matched' }, plan: { key: 'communication' } },
+      { id: 'acc-legacy', channelId: 'legacy-account', webhook: { status: 'unknown' }, plan: { key: 'unknown' } },
+    ],
+  });
+  expect(fetch).toHaveBeenCalledTimes(3);
+});
+
 describe('staff follower-import account scope', () => {
   test('reads a visible store and returns no state for an invisible store', async () => {
     dbMocks.getLineAccounts.mockResolvedValue([fakeAccount, { ...fakeAccount, id: 'acc-other' }]);
