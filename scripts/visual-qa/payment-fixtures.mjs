@@ -120,6 +120,7 @@ export function paymentGet(pathname, query, { restaurantTables = [] } = {}) {
     const friendId = query.get('friend_id')
     void friendId; return { success: true, data: ENTITLEMENTS }
   }
+  if (pathname === '/api/booking/admin/makeup-credits') return { success: true, data: [] }
   if (/^\/api\/booking\/admin\/entitlements\/[^/]+\/history$/.test(pathname)) return { success: true, data: ENTITLEMENT_HISTORY }
   return undefined
 }

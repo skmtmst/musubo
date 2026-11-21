@@ -8,6 +8,7 @@ import DateField from '@/components/shared/date-field'
 import Dialog from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls'
 import Notice from '@/components/shared/notice'
+import { isSaveConflict, SaveConflictBand } from '@/components/shared/save-conflict'
 import { TextArea } from '@/components/shared/text-field'
 import { ApiError } from '@/lib/api'
 import { bookingMakeupApi } from '@/lib/api/helpers/gap2'
@@ -48,13 +49,14 @@ export default function MakeupCredits({ accountId, friendId, canEdit }: { accoun
       await bookingMakeupApi.extend(accountId, target.id, { expiresAt, reason: reason.trim(), expectedVersion: target.version })
       setTarget(null); await reload()
     } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 409 && (cause.code === 'version_conflict' || cause.code === 'invalid_credit_status')) { setConflict(true); setError('') }
+      if (cause instanceof ApiError && isSaveConflict(cause) && (cause.code === 'version_conflict' || cause.code === 'invalid_credit_status')) { setConflict(true); setError('') }
       else setError('期限を延ばせませんでした。内容を確認して、もう一度お試しください。')
     } finally { submitting.current = false; setBusy(false) }
   }
   const refreshConflict = async () => { setTarget(null); setConflict(false); await reload() }
   return <Card variant="form" gap="normal">
     <CardHeader size="stacked" title="振替" />
+    {conflict ? <SaveConflictBand title="振替の状態が変わりました" description="別の操作や期限切れにより状態が変わりました。最新の情報を確認してから、もう一度操作してください。" onReload={() => void refreshConflict()} /> : null}
     {!accountId ? <p>LINEアカウントを選択してください。</p> : loadError ? <Notice tone="warn" message="振替を読み込めませんでした。" action={<Button onClick={() => void reload()}>もう一度読み込む</Button>} /> : credits === null ? <p role="status">振替を読み込んでいます…</p> : credits.filter(item => item.status === 'open' || item.status === 'expired').length === 0 ? <p>使える振替はありません。</p> : credits.filter(item => item.status === 'open' || item.status === 'expired').map(item => <div key={item.id}>
       <span>期限：{formatListTimestamp(item.expires_at)}{item.status === 'expired' ? '（期限切れ）' : ''}</span>{' '}
       <Button disabled={!allowed} lockedReason={allowed ? undefined : !canEdit ? '閲覧のみのため操作できません' : 'オーナー・管理者のみ操作できます'} onClick={() => { setTarget(item); setDate(''); setReason(''); setError(''); setConflict(false) }}>期限を延ばす</Button>
@@ -63,6 +65,5 @@ export default function MakeupCredits({ accountId, friendId, canEdit }: { accoun
       <Field label="新しい期限" required><DateField aria-label="新しい期限" value={date} onChange={setDate} disabled={busy} /></Field>
       <Field label="理由" required><TextArea aria-label="理由" value={reason} onChange={event => setReason(event.target.value)} maxLength={1000} disabled={busy} /></Field>
     </Dialog>
-    <Dialog open={conflict} title="振替の状態が変わりました" description="別の操作や期限切れにより状態が変わりました。最新の情報を確認してから、もう一度操作してください。" confirmLabel="最新の情報を確認" busy={busy} onCancel={() => void refreshConflict()} onConfirm={() => void refreshConflict()} />
   </Card>
 }

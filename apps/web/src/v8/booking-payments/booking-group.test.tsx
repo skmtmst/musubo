@@ -1,18 +1,25 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, expect, it, vi } from 'vitest'
-const net = vi.hoisted(() => ({ group: vi.fn(), cancelGroup: vi.fn() }))
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+const net = vi.hoisted(() => ({ group: vi.fn(), cancelGroup: vi.fn(), groupCancellationQuote: vi.fn() }))
 vi.mock('@/lib/api/helpers/booking-advanced', () => ({ bookingAdvancedApi: net }))
 vi.mock('@/components/shared/toast', () => ({ notifySaved: vi.fn() }))
 import { BookingGroupSection } from './booking-group'
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 const group = (version: number) => ({ success: true, data: { groupId: 'g1', ownerName: '確認用の人', version, members: [1, 2].map((n) => ({ bookingId: `b${n}`, version, label: `${n}人目`, personName: `${n}人目`, menuName: 'メニュー', staffName: null, startsAt: '2026-10-18T01:00:00Z', endsAt: '2026-10-18T02:00:00Z', status: 'confirmed' })) } })
+beforeEach(() => {
+  net.groupCancellationQuote.mockImplementation(async () => {
+    const current = await net.group.mock.results.at(-1)?.value
+    return { success: true, data: { version: current.data.version, totalFee: 0, members: current.data.members.map((member: { bookingId: string; version: number; status: string }) => ({ ...member, feeNow: 0 })) } }
+  })
+})
 it('競合から読み直しても理由を保持し、新しい版でだけ再試行する', async () => {
   net.group.mockResolvedValueOnce(group(2)).mockResolvedValue(group(3))
   net.cancelGroup.mockRejectedValueOnce(new Error('conflict')).mockResolvedValue({ success: true, data: { cancelled: 2, version: 4 } })
   const changed = vi.fn()
   render(<BookingGroupSection accountId="a1" bookingId="b1" canOperate onChanged={changed} />)
   fireEvent.click(await screen.findByRole('button', { name: '組をまとめて取り消す' }))
+  await screen.findByText('キャンセル料の見込み')
   fireEvent.change(screen.getByRole('textbox', { name: '取り消す理由' }), { target: { value: '予定の変更' } })
   fireEvent.click(screen.getByRole('button', { name: 'まとめて取り消す' }))
   await screen.findByText(/取り消せませんでした。入力は残っています/)
@@ -23,6 +30,7 @@ it('競合から読み直しても理由を保持し、新しい版でだけ再�
   expect(net.cancelGroup).toHaveBeenCalledTimes(1)
   expect((screen.getByRole('button', { name: 'まとめて取り消す' }) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByRole('button', { name: '最新の内容を確認しました' }))
+  await waitFor(() => expect((screen.getByRole('button', { name: 'まとめて取り消す' }) as HTMLButtonElement).disabled).toBe(false))
   fireEvent.click(screen.getByRole('button', { name: 'まとめて取り消す' }))
   await waitFor(() => expect(changed).toHaveBeenCalledOnce())
   expect(net.cancelGroup).toHaveBeenLastCalledWith('a1', 'g1', '予定の変更', 3, [{ bookingId: 'b1', version: 3, status: 'confirmed' }, { bookingId: 'b2', version: 3, status: 'confirmed' }])
@@ -33,6 +41,7 @@ it('組の再取得失敗は権限不足と区別し、理由を残して取消�
   net.cancelGroup.mockRejectedValueOnce(new Error('conflict'))
   render(<BookingGroupSection accountId="a1" bookingId="b1" canOperate />)
   fireEvent.click(await screen.findByRole('button', { name: '組をまとめて取り消す' }))
+  await screen.findByText('キャンセル料の見込み')
   const input = screen.getByRole('textbox', { name: '取り消す理由' }) as HTMLInputElement
   fireEvent.change(input, { target: { value: '予定の変更' } })
   fireEvent.click(screen.getByRole('button', { name: 'まとめて取り消す' }))
@@ -63,6 +72,7 @@ it('読み直し中には前の版で送れず、応答後に入力した理由�
   net.cancelGroup.mockRejectedValueOnce(new Error('conflict')).mockResolvedValue({ success: true, data: { cancelled: 2, version: 4 } })
   render(<BookingGroupSection accountId="a1" bookingId="b1" canOperate />)
   fireEvent.click(await screen.findByRole('button', { name: '組をまとめて取り消す' }))
+  await screen.findByText('キャンセル料の見込み')
   const input = screen.getByRole('textbox', { name: '取り消す理由' }) as HTMLInputElement
   fireEvent.change(input, { target: { value: '予定の変更' } })
   fireEvent.click(screen.getByRole('button', { name: 'まとめて取り消す' }))
@@ -80,6 +90,7 @@ it('読み直し中には前の版で送れず、応答後に入力した理由�
   expect(net.cancelGroup).toHaveBeenCalledTimes(1)
   expect((screen.getByRole('button', { name: 'まとめて取り消す' }) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByRole('button', { name: '最新の内容を確認しました' }))
+  await waitFor(() => expect((screen.getByRole('button', { name: 'まとめて取り消す' }) as HTMLButtonElement).disabled).toBe(false))
   fireEvent.click(screen.getByRole('button', { name: 'まとめて取り消す' }))
   await waitFor(() => expect(net.cancelGroup).toHaveBeenCalledTimes(2))
   expect(net.cancelGroup).toHaveBeenLastCalledWith('a1', 'g1', '予定の変更', 3, [{ bookingId: 'b1', version: 3, status: 'confirmed' }, { bookingId: 'b2', version: 3, status: 'confirmed' }])

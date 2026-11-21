@@ -211,7 +211,11 @@ describe('HQひな形の配布フロー', () => {
   })
   it('有効期限切れの確認では実行できない', async () => {
     calls.preflight.mockResolvedValue({ ...checked(), expiresAt: '2020-01-01T00:00:00Z' }); await chooseStores()
-    chooseMode('一括の配布方法', '一括の配布方法：別名で作る'); expect((screen.getByRole('button', { name: 'この内容で2アカウントへ配る' }) as HTMLButtonElement).disabled).toBe(true)
+    const expiredDialog = await screen.findByRole('dialog', { name: '確かめの期限が切れました' })
+    fireEvent.click(within(expiredDialog).getByRole('button', { name: 'キャンセル' }))
+    chooseMode('一括の配布方法', '一括の配布方法：別名で作る')
+    expect((screen.getByRole('button', { name: 'この内容で2アカウントへ配る' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'この内容で2アカウントへ配る' }))
     expect(calls.distribute).not.toHaveBeenCalled(); expect(screen.getByRole('button', { name: '現在版を再確認' })).toBeTruthy()
   })
   it('配布先が差し替わった事前確認を拒否する', async () => {
