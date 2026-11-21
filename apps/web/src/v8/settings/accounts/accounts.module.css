@@ -6,6 +6,7 @@
 /* 頭の2つのボタンの間は 12（型の既定 8 より広い）。 */
 .headActions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--tpl-sa-head-actions-gap);
 }
@@ -24,6 +25,7 @@
 .toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--tpl-sa-tool-gap);
   min-width: 0;
 }
@@ -31,7 +33,11 @@
 .search {
   flex: 0 0 var(--tpl-sa-search-w);
   width: var(--tpl-sa-search-w);
+  max-width: 100%;
 }
+
+.filters { max-width: 100%; overflow-x: auto; }
+.filters > [data-segmented-control] { min-width: max-content; }
 
 .chips {
   display: flex;

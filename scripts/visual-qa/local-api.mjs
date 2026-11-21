@@ -15,6 +15,7 @@ export async function routeLocalApi({ page }) {
       // ページが開いているのに disposed 系のメッセージが出た場合は、本当の異常なので再送出する。
       // 閉じる直前の破棄では isClosed() がまだ false のことがあるため、短い間だけ閉鎖の確定を待つ。
       const message = error instanceof Error ? error.message : String(error)
+      if (/^route\.fetch: Test ended\.(?:\r?\n|$)/.test(message)) return
       const disposedLike = /disposed|Target (page|closed)|has been closed|Request context disposed/i.test(message)
       if (!disposedLike) throw error
       for (let waited = 0; !page.isClosed() && waited < CLOSE_SETTLE_MS; waited += CLOSE_POLL_MS) {
