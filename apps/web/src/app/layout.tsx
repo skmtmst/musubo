@@ -7,6 +7,7 @@ import DocumentTitleRoot from '@/components/shell/document-title'
 import ClientErrorReporter from '@/components/client-error-reporter'
 import ToastHost from '@/components/shared/toast'
 import NameTipHost from '@/components/shared/name-tip'
+import UnsavedHistoryRoot from '@/components/shared/unsaved-history-root'
 
 const DEFAULT_TITLE = 'musubo LINE管理システム'
 
@@ -61,6 +62,7 @@ export default function RootLayout({
     <html lang="ja" data-theme="v8" className={`${inter.variable} ${notoSansJp.variable}`}>
       {/* 書体は globals.css の --font-sans が正本（#976 U080）。inline style はやめる。 */}
       <body className="bg-canvas-sunken text-ink font-sans">
+        <UnsavedHistoryRoot />
         <ClientErrorReporter />
         <DocumentTitleRoot>
           <AppShell>{children}</AppShell>
