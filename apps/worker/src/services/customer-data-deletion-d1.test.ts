@@ -60,6 +60,17 @@ describe('local workerd D1 binding', () => {
     expect(await native.prepare('SELECT id FROM form_submission_files WHERE id=?').bind(fileId).first()).toBeNull();
     expect(remove).toHaveBeenCalledExactlyOnceWith([`private/${fileId}`]);
   }, 30_000);
+  it('deletes delivery order items together with the matching friend order', async () => {
+    await native.batch([
+      native.prepare("INSERT INTO rt_delivery_orders(id,account_id,store_id,service,external_order_id,order_number,received_at,friend_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind('order-'+friendId,'account','store','line','external-'+friendId,'1',1,friendId,1,1),
+      native.prepare("INSERT INTO rt_delivery_order_items(id,order_id,name,note,created_at) VALUES (?,?,?,?,?)").bind('item-'+friendId,'order-'+friendId,'private name','private note',1),
+      native.prepare("INSERT INTO rt_delivery_orders(id,account_id,store_id,service,external_order_id,order_number,received_at,friend_id,created_at,updated_at) VALUES ('other-order','account','store','line','other-order','2',1,'other',1,1)"),
+      native.prepare("INSERT INTO rt_delivery_order_items(id,order_id,name,created_at) VALUES ('other-item','other-order','other',1)"),
+    ]);
+    await deleteCustomerData(env(), target('friend_data'), 'owner');
+    expect(await native.prepare('SELECT id FROM rt_delivery_order_items WHERE id=?').bind('item-'+friendId).first()).toBeNull();
+    expect(await native.prepare("SELECT id FROM rt_delivery_order_items WHERE id='other-item'").first()).toBeTruthy();
+  }, 30_000);
   it('rolls D1 batch back on an error after attachment deletion, then retries', async () => {
     await native.prepare("CREATE TRIGGER fail_customer_delete BEFORE DELETE ON form_submissions BEGIN SELECT RAISE(ABORT,'fail'); END").run();
     await expect(deleteCustomerData(env(), target('form_response'), 'owner')).rejects.toMatchObject({ status: 503 });

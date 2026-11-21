@@ -141,6 +141,7 @@
   "rich_menu_assignment_runs": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "rich_menu_assignments": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "rt_delivery_orders": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[]},
+  "rt_delivery_order_items": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"rt_delivery_orders","columns":[{"column":"order_id","parentColumn":"id"}]}]},
   "rt_reservation_event_receipts": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"rt_reservation_events","columns":[{"column":"event_id","parentColumn":"id"}]}]},
   "rt_reservation_events": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[]},
   "scenario_action_fires": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
