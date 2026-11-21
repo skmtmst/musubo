@@ -44,7 +44,10 @@ vi.mock('@/lib/api', async () => ({
   },
   bookingApi: {
     ...(await import('@/test-utils/booking-visit-api-mock')).bookingVisitApiMock(),
-    listRequests: fixture.listRequests,
+    // 受付は独立した集計 API。台帳とカレンダーの取得回数には含めない。
+    listRequests: (account: string, status: string, params?: Record<string, unknown>) => params?.reception
+      ? Promise.resolve({ requests: [], total: 0, requestedCount: 0, unassignedCount: 0, attentionCount: 0, unknownCount: 0 })
+      : fixture.listRequests(account, status, params),
     requestsSummary: fixture.requestsSummary,
     listMenus: fixture.listMenus,
     listStaff: fixture.listStaff,
