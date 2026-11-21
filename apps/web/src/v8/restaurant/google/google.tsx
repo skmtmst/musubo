@@ -148,8 +148,10 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     try {
       const response = await restaurantGoogleApi.connectStart(accountId, 'hours')
       window.location.assign(response.authorizeUrl)
-    } catch {
-      setConnectFailure('Googleの許可画面を開けませんでした。もう一度お試しください。')
+    } catch (cause) {
+      if (!saveErrors.capture(cause)) {
+        setConnectFailure(errorMessage(cause, 'Googleの許可画面を開けませんでした。もう一度お試しください。'))
+      }
       setConnectBusy(false)
     }
   }
