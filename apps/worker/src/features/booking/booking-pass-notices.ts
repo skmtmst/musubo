@@ -2,7 +2,7 @@ import {getAccountTimeZone,tzDateStr} from '../../services/availability.js';
 import {restaurantCivilTime} from '../../services/restaurant-booking.js';
 import {purposeAliases} from '../broadcasts/broadcast-simulation/index.js';
 
-export async function processPassNotices(db:D1Database,now=new Date(),account?:string){
+export async function processPassNotices(db:D1Database,now=new Date(),account?:string,preserveTestRecipients=false){
  const at=now.toISOString();
  const accounts=(await db.prepare(`SELECT a.id FROM line_accounts a WHERE a.is_active=1 AND a.archived_at IS NULL
  AND (a.tenant_id IS NULL OR EXISTS(SELECT 1 FROM tenants t WHERE t.id=a.tenant_id AND t.status='active')) AND (? IS NULL OR a.id=?)`).bind(account??null,account??null).all<{id:string}>()).results;
@@ -41,6 +41,10 @@ export async function processPassNotices(db:D1Database,now=new Date(),account?:s
     const day=hour>=21?new Date(Date.parse(today+'T00:00:00Z')+86400000).toISOString().slice(0,10):today;
     await db.prepare("UPDATE booking_entitlement_notices SET scheduled_at=? WHERE id=? AND status='scheduled'").bind(restaurantCivilTime(day,8*60,zone),n.id).run();continue;
    }
+   // 本送信の対象は simulated に確定せず、専用の送信処理に渡す。
+   if(preserveTestRecipients && now.getTime()-Date.parse(scheduled)<=3*3600000 && await db.prepare(`SELECT 1 FROM booking_entitlement_notices n JOIN account_settings s ON s.line_account_id=n.line_account_id AND s.key='test_recipients'
+     JOIN json_each(CASE WHEN json_valid(s.value) THEN CASE WHEN json_type(s.value)='array' THEN s.value ELSE '[]' END ELSE '[]' END) j ON j.type='text' AND j.value=n.friend_id
+     WHERE n.id=? AND NOT EXISTS(SELECT 1 FROM json_each(CASE WHEN json_valid(s.value) THEN CASE WHEN json_type(s.value)='array' THEN s.value ELSE '[]' END ELSE '[]' END) invalid WHERE invalid.type!='text' OR length(trim(invalid.value))=0)`).bind(n.id).first())continue;
    const r=await db.prepare(`UPDATE booking_entitlement_notices AS n SET status=CASE
  WHEN NOT EXISTS(SELECT 1 FROM booking_pass_plans p WHERE p.id=n.plan_id AND p.line_account_id=n.line_account_id AND CASE WHEN n.kind='remaining_one' THEN p.notify_remaining_one ELSE p.notify_expiry_14_days END=1) THEN 'skipped_disabled'
  WHEN NOT EXISTS(SELECT 1 FROM booking_entitlements e JOIN friends f ON f.id=e.friend_id AND f.line_account_id=e.line_account_id JOIN line_accounts a ON a.id=e.line_account_id

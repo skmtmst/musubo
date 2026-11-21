@@ -7,7 +7,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({ list: vi.fn(), holders: vi.fn(), start: vi.fn(), stop: vi.fn(), create: vi.fn() }))
+const noticesApi = vi.hoisted(() => ({ settings: vi.fn(), save: vi.fn() }))
 vi.mock('@/lib/api/helpers/gap3', () => ({ bookingPassPlansApi: api }))
+vi.mock('@/lib/api/helpers/booking-pass-notices', () => ({ bookingPassNoticesApi: noticesApi }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return { ...actual, bookingApi: { ...actual.bookingApi, listMenus: async () => ({ menus: [{ id: 'm1', name: 'ヨガ（初級）' }, { id: 'm2', name: '朝ヨガ' }, { id: 'm3', name: 'カット' }] }) } }
@@ -32,6 +34,14 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('回数券・月謝の表', () => {
+  it.each([true, false])('通知の送信可否に応じた案内を出す（%s）', async (deliveryAvailable) => {
+    noticesApi.settings.mockResolvedValue({ success: true, data: { remainingOne: false, expiry14Days: false, version: 1, testMode: true, deliveryAvailable } })
+    render(<PassesTabV8 accountId="a" canEdit />)
+    await screen.findByText('ヨガ 10 回券')
+    fireEvent.click(screen.getByRole('button', { name: 'ヨガ 10 回券の操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '残り・期限の知らせ' }))
+    expect(await screen.findByText(deliveryAvailable ? '検証中です。登録したテスト宛先にだけ LINE で知らせます。' : '今は試験運転です。LINE へは送らず、送る予定だけを記録します。')).toBeTruthy()
+  })
   it('数の帯と、種類ごとの回数・期限・値段・使える予約・持っている人・状態を出す', async () => {
     render(<PassesTabV8 accountId="a" canEdit />)
     await screen.findByText('ヨガ 10 回券')

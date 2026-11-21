@@ -69,8 +69,12 @@ export async function scheduled(
         const {processStoreComparison}=await import('../services/store-comparison.js');
         await processStoreComparison(env.DB,now);
       }},
-      {name:'pass notice simulations',run:async()=>{const {processPassNotices}=await import('../features/booking/booking-pass-notices/index.js');await processPassNotices(env.DB,new Date(event.scheduledTime));}},
+      {name:'pass notice simulations',run:async()=>{const now=new Date(event.scheduledTime),live=env.DEPLOY_ENV==='staging'&&env.PASS_NOTICE_STAGING_DELIVERY_ENABLED==='true';const {processPassNotices}=await import('../features/booking/booking-pass-notices/index.js');if(live){await processPassNotices(env.DB,now,undefined,true);const {processStagingPassNotices}=await import('../features/booking/booking-pass-live-notices/index.js');await processStagingPassNotices(env,now);}else await processPassNotices(env.DB,now);}},
       {name:'pass billing grace',run:async()=>{const {expirePassGrace}=await import('../features/booking/booking-pass-billing/index.js');await expirePassGrace(env.DB,new Date(event.scheduledTime));}},
+      {name:'monthly renewal scheduling',run:async()=>{const {scheduleMonthlyRenewals}=await import('../features/booking/monthly-cron/index.js');await scheduleMonthlyRenewals(env.DB,new Date(event.scheduledTime));}},
+      {name:'monthly invoice mock dispatch',run:async()=>{const {runMonthlyInvoiceMockCron}=await import('../features/booking/monthly-cron/index.js');await runMonthlyInvoiceMockCron(env,new Date(event.scheduledTime));}},
+      {name:'monthly attempt mock dispatch',run:async()=>{const {runMonthlyAttemptMockCron}=await import('../features/booking/monthly-cron/index.js');await runMonthlyAttemptMockCron(env,new Date(event.scheduledTime));}},
+      {name:'monthly failure notices',run:async()=>{const {processStagingMonthlyFailureNotices}=await import('../features/booking/monthly-cron/index.js');await processStagingMonthlyFailureNotices(env,new Date(event.scheduledTime));}},
       {name:'comparison CSV jobs',run:async()=>{const {processComparisonExports}=await import('../services/store-comparison-export.js');await processComparisonExports(env.DB,new Date(event.scheduledTime));}},
       {name:'rank notice simulations',run:async()=>{if(env.DEPLOY_ENV==='staging'&&env.RANK_NOTICE_STAGING_DELIVERY_ENABLED==='true'){const {processStagingRankNotices}=await import('../services/member-rank-live-notices.js');await processStagingRankNotices(env,new Date());}else{const {processRankNotices}=await import('../services/member-ranks.js');await processRankNotices(env.DB,new Date(event.scheduledTime));}}},
       {name:'EC automatic LINE simulation',run:async()=>{
