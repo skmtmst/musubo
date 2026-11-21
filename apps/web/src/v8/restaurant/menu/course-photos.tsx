@@ -25,12 +25,19 @@ export default function CoursePhotos({ accountId, photos, disabled, error, onCha
   const [picking, setPicking] = useState(false)
   const [adjusting, setAdjusting] = useState<RestaurantCoursePhoto | null>(null)
   const [notice, setNotice] = useState('')
+  const [unavailable, setUnavailable] = useState<string[]>([])
   const dragging = useRef<number | null>(null)
   const index = photos.findIndex(photo => photo.mediaId === adjusting?.mediaId)
-  const image = (photo: RestaurantCoursePhoto, alt: string) => accountId
+  const image = (photo: RestaurantCoursePhoto, alt: string) => accountId && !unavailable.includes(photo.mediaId)
     ? <img className={styles.image} src={api.media.contentUrl(photo.mediaId, accountId)} alt={alt}
-        draggable={false} style={{ objectPosition: `${photo.x}% ${photo.y}%` }} />
-    : null
+        draggable={false} style={{ objectPosition: `${photo.x}% ${photo.y}%` }}
+        onError={() => setUnavailable(current => current.includes(photo.mediaId) ? current : [...current, photo.mediaId])} />
+    : <span className={styles.imageUnavailable}>画像なし</span>
+  const remove = (mediaId: string) => {
+    onChange(photos.filter(photo => photo.mediaId !== mediaId))
+    setUnavailable(current => current.filter(id => id !== mediaId))
+    setAdjusting(null)
+  }
   const move = (from: number, to: number) => {
     if (disabled || from === to || from < 0 || to < 0 || to >= photos.length) return
     const next = photos.slice()
@@ -70,6 +77,8 @@ export default function CoursePhotos({ accountId, photos, disabled, error, onCha
     </ul>
     <p className={styles.note}>ドラッグで並べ替え（先頭が表紙）。写真をタップすると表示範囲を調整できます。元の写真はそのまま残ります。</p>
     {error || notice ? <Notice tone={error ? "danger" : "warn"}>{error ?? notice}</Notice> : null}
+    {photos.some(photo => unavailable.includes(photo.mediaId)) ?
+      <Notice tone="warn">画像を読めません。読めない写真を外し、登録メディアから選び直してください。</Notice> : null}
     <MediaPickerDialog open={picking} accountId={accountId} kind="image" accountOnly
       title="コースの写真を選ぶ" onClose={() => setPicking(false)}
       onSelect={media => {
@@ -79,7 +88,7 @@ export default function CoursePhotos({ accountId, photos, disabled, error, onCha
       }} />
     {adjusting ? <Dialog open title="写真の表示範囲を調整" onCancel={() => setAdjusting(null)}
       footer={<DialogActions>
-        <Button variant="text" onClick={() => { onChange(photos.filter(photo => photo.mediaId !== adjusting.mediaId)); setAdjusting(null) }}>写真を外す</Button>
+        <Button variant="text" onClick={() => remove(adjusting.mediaId)}>写真を外す</Button>
         <Button onClick={() => setAdjusting(null)}>キャンセル</Button>
         <Button variant="primary" onClick={() => {
           onChange(photos.map(photo => photo.mediaId === adjusting.mediaId ? adjusting : photo))
