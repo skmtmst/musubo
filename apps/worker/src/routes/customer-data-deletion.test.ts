@@ -223,7 +223,11 @@ describe('private data deletion', () => {
         const group = grouped.get(ref.id) ?? { parent: ref.table, columns: [] };
         group.columns.push({ column: ref.from, parentColumn: ref.to }); grouped.set(ref.id, group);
       }
-      if (table !== 'form_capacity_claims') expect(relation.references).toEqual([...grouped.values()]);
+      if (table === 'rt_delivery_order_items') {
+        // 注文明細の親子関係は FK が無いため、削除時に明示的にたどる。
+        expect([...grouped.values()]).toEqual([]);
+        expect(relation.references).toEqual([{ parent: 'rt_delivery_orders', columns: [{ column: 'order_id', parentColumn: 'id' }] }]);
+      } else if (table !== 'form_capacity_claims') expect(relation.references).toEqual([...grouped.values()]);
     }
     // 生成した条件式が、実スキーマに対して実行可能なことを確かめる。
     for (const table of Object.keys(relations)) sqlite.raw.prepare(`SELECT * FROM "${table}" WHERE ${friendDeletionCondition(table)}`);

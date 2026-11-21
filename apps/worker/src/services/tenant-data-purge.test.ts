@@ -92,6 +92,17 @@ describe('tenant data retention purge', () => {
     return (row as { n: number }).n;
   }
 
+  test('統括の削除で配送注文とその明細をともに消す', async () => {
+    seedTenant('delivery', { anchor: jst(-91) });
+    sqlite.raw.prepare("INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES ('org-delivery','acc-delivery','店','delivery')").run();
+    sqlite.raw.prepare("INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES ('store-delivery','org-delivery','店','store','acc-delivery')").run();
+    sqlite.raw.prepare("INSERT INTO rt_delivery_orders(id,account_id,store_id,service,external_order_id,order_number,received_at,created_at,updated_at) VALUES ('order-delivery','acc-delivery','store-delivery','line','external-delivery','1',1,1,1)").run();
+    sqlite.raw.prepare("INSERT INTO rt_delivery_order_items(id,order_id,name,note,created_at) VALUES ('item-delivery','order-delivery','品名','注記',1)").run();
+    expect((await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW })).completed).toBe(1);
+    expect(count('rt_delivery_orders', 'id = ?', 'order-delivery')).toBe(0);
+    expect(count('rt_delivery_order_items', 'id = ?', 'item-delivery')).toBe(0);
+  });
+
   test('契約終了の統括は保護されたテンプレートも消し、許可を残さない', async () => {
     seedTenant('t1', { anchor: jst(-91) });
     sqlite.raw.prepare("INSERT INTO hq_templates (id, tenant_id, template_type, name) VALUES ('h1', 't1', 'tag', 'test')").run();
