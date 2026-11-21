@@ -190,7 +190,9 @@ export async function describeMediaUsageInner(
 /** 飲食のメニューは専用列を正本として直接照合する。別アカウントの名称を伏せる。 */
 async function restaurantMenuReferences(db: D1Database, mediaId: string, lineAccountId: string, checkedAt: string): Promise<MediaDeleteImpactReference[]> {
   const rows = await db.prepare(`SELECT m.id, m.name, s.line_account_id FROM rt_menu_items m
-    JOIN rt_stores s ON s.id = m.store_id WHERE m.image_media_id = ?`).bind(mediaId)
+    JOIN rt_stores s ON s.id = m.store_id WHERE m.image_media_id = ? OR EXISTS (
+      SELECT 1 FROM json_each(m.photo_gallery_json) photo WHERE json_extract(photo.value, '$.mediaId') = ?
+    )`).bind(mediaId, mediaId)
     .all<{id:string; name:string; line_account_id:string|null}>();
   return rows.results.map(row => ({ kind:'restaurant_menu', name:row.line_account_id === lineAccountId ? row.name : null,
     href:row.line_account_id === lineAccountId ? `/restaurant-test/menu/edit?id=${encodeURIComponent(row.id)}` : null,

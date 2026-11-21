@@ -1026,7 +1026,7 @@ export type {
   DashboardDefaultPreferenceRow, DashboardPreferenceRow, DashboardPreferenceSaveResult,
 } from './dashboard-preferences';
 export {
-  deleteOnboardingGuideProgress, getOnboardingGuideProgress, saveOnboardingGuideProgress,
+  acknowledgeOnboardingWelcome, deleteOnboardingGuideProgress, getOnboardingGuideProgress, saveOnboardingGuideProgress,
 } from './onboarding-guide-progress';
 export type {
   OnboardingGuidePhase, OnboardingGuideProgressRow,
