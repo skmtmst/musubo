@@ -56,7 +56,7 @@ export const rewardMilesRequirement: FormRequirement = {
   check: value => value.trim() && Number.isInteger(Number(value)) && Number(value) > 0 ? null : '必要マイルは1以上の整数で入力してください',
 }
 export function rewardActionRequirement(kind: MileageRewardKind): FormRequirement {
-  return { required: kind !== 'coupon', check: value => kind === 'coupon' || value.trim() ? null : '交換後に渡すものを選んでください' }
+  return { required: kind !== 'coupon' && kind !== 'handgift', check: value => kind === 'coupon' || kind === 'handgift' || value.trim() ? null : '交換後に渡すものを選んでください' }
 }
 
 /**

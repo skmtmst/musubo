@@ -353,7 +353,7 @@ export const post__api_mileage_redemptions_17 = async (c: Context<Env, "/api/mil
         kind: 'mileage_redemption', id: reserved.redemption.id,
       });
       return c.json({
-        success: delivery.status === 'succeeded',
+        success: delivery.status === 'succeeded' || delivery.status === 'pending',
         data: {
           replayed: reserved.kind === 'existing',
           redemption: publicMileageRedemption(reserved.redemption),
@@ -375,17 +375,20 @@ export const get__api_mileage_redemptions_18 = async (c: Context<Env, "/api/mile
       if (!MILEAGE_REDEMPTION_LIST_STATUSES.has(statusValue)) {
         return c.json({ success: false, error: 'status is invalid' }, 400);
       }
+      const kind = c.req.query('kind')?.trim();
+      if (kind && kind !== 'handgift') return c.json({ success: false, error: 'kind is invalid' }, 400);
       const { limit: requestedLimit, offset: requestedOffset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 20, limitPolicy: { fallback: 'finite', minimum: 1, maximum: 100 }, offsetPolicy: { fallback: 'finite', minimum: 0 } });
       const listed = await listMileageRedemptions(c.env.DB, {
         lineAccountId: accountId,
         status: statusValue as MileageRedemptionListStatus,
+        kind: kind === 'handgift' ? kind : undefined,
         limit: requestedLimit,
         offset: requestedOffset,
       });
       return c.json({
         success: true,
         data: buildOffsetListResponse({ items: listed.items.map((item) => publicMileageRedemption(item)),
-          pagination: listed.pagination, total: listed.pagination.total, paging: { limit: listed.pagination.limit, offset: listed.pagination.offset }, sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }),
+          pagination: listed.pagination, total: listed.pagination.total, paging: { limit: listed.pagination.limit, offset: listed.pagination.offset }, sort: kind === 'handgift' ? [{ field: 'handgiftPendingFirst', direction: 'asc' }, { field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] : [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }),
       });
     } catch (error) {
       return mileageRewardError(c, error);
@@ -478,7 +481,7 @@ export const post__api_mileage_redemptions_id_retry_fulfillment_20 = async (c: C
        */
       const fresh = await getMileageRedemption(c.env.DB, redemption.id);
       const data = { ...delivery, redemption: publicMileageRedemption(fresh ?? redemption) };
-      return c.json({ success: delivery.status === 'succeeded', data },
+      return c.json({ success: delivery.status === 'succeeded' || delivery.status === 'pending', data },
         delivery.status === 'succeeded' ? 200 : 202);
     } catch (error) {
       return mileageRewardError(c, error);

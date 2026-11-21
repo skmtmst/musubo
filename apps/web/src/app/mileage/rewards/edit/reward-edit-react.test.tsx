@@ -231,13 +231,31 @@ describe('数の限り', () => {
 })
 
 describe('選べるもの', () => {
-  it('渡すものの種類は保存できる6種類だけを並べ、選ぶと種類が変わる', async () => {
+  it('渡すものの7種類を選べ、選ぶと種類が変わる', async () => {
     await render()
-    const labels = (await openSelect('渡すものの種類')).map((item) => item.textContent?.trim())
-    expect(labels).toEqual(['クーポンを渡す', 'タグを付ける', 'シナリオを始める', 'メッセージを送る', '先にお知らせする', 'ランクを上げる'])
+    const kinds = [...host.querySelectorAll<HTMLInputElement>('input[name="reward-kind-cards"]')]
+    expect(kinds.map((item) => item.value)).toEqual(['handgift', 'coupon', 'tag', 'scenario', 'template', 'early_access', 'rank'])
+    const rank = kinds.find((item) => item.value === 'rank')!
+    await act(async () => { fireEvent.click(rank) })
+    expect(rank.checked).toBe(true)
+  })
 
-    await chooseOption('渡すものの種類', 'ランクを上げる')
-    expect((host.querySelector('input[name="reward-kind-cards"][value="rank"]') as HTMLInputElement).checked).toBe(true)
+  it('手渡しを選ぶと種類を保存する', async () => {
+    await render()
+    const handgift = host.querySelector<HTMLInputElement>('input[name="reward-kind-primary"][value="handgift"]')!
+    await act(async () => { fireEvent.click(handgift) })
+    await fillBasics()
+    await click(button('下書きを保存'))
+    expect(savedDraft().rewardKind).toBe('handgift')
+  })
+
+  it.each([['handgift', 'coupon'], ['coupon', 'handgift']])('作成済みの%sから%sには切り替えられない', async (current, blocked) => {
+    f.query = 'id=reward-1'
+    f.reward.mockResolvedValue({ success: true, data: existing({ rewardKind: current }) })
+    f.rewards.mockResolvedValue({ success: true, data: { rewards: [] } })
+    await render()
+    expect(host.querySelector<HTMLInputElement>(`input[name="reward-kind-cards"][value="${blocked}"]`)?.disabled).toBe(true)
+    expect(host.querySelector<HTMLInputElement>(`input[name="reward-kind-primary"][value="${blocked}"]`)?.disabled).toBe(true)
   })
 
   it('渡せなかったときの決めごとを3つから選び、そのまま保存する', async () => {
