@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [複数アカウント配信の再送時の重複を防止](release-log/unreleased/PR-kenta-a21-multi-resend.md) — 反映履歴、確認 2026-11-21。
+
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
 
 - [開店準備ガイドの修正](release-log/unreleased/133-masato-restaurant-setup-guide.md)
