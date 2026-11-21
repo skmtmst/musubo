@@ -31,6 +31,8 @@ export type BroadcastMessageType =
 
 export interface Broadcast {
   hq_run_id?: string | null;
+  /** 訂正元が削除されても残る、固定宛先を示す印。 */
+  correction_of_broadcast_id?: string | null;
   id: string;
   title: string;
   message_type: BroadcastMessageType;

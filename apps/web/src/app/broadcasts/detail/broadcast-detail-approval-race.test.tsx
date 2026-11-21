@@ -12,6 +12,9 @@ import { buttonByText, click, mount, settle, stubFetchNotFound, type Mounted } f
 
 const net = vi.hoisted(() => ({
   id: 'bc-1',
+  correction: false,
+  send: vi.fn(),
+  approve: vi.fn(),
   remind: null as null | { resolve: (v: unknown) => void },
 }))
 
@@ -43,14 +46,16 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         ...actual.api.broadcasts,
         get: (id: string) => Promise.resolve({ success: true, data: {
           id, title: `配信 ${id}`, messageType: 'text', messageContent: '本文', targetType: 'all', targetTagId: null,
-          status: 'scheduled', scheduledAt: '2026-10-09T01:00:00.000Z', sentAt: null, totalCount: 0, successCount: 0,
+          status: net.correction ? 'draft' : 'scheduled', scheduledAt: net.correction ? null : '2026-10-09T01:00:00.000Z', correctionOfBroadcastId: net.correction ? 'source' : null, version: 3, sentAt: null, totalCount: 0, successCount: 0,
           createdAt: '2026-09-09T00:00:00.000Z', lineAccountId: 'acc-1', accountIds: null, dedupPriority: null,
           failedAccountIds: null, trackLinks: false,
         } as unknown as ApiBroadcast }),
+        send: net.send,
         getInsight: () => Promise.resolve({ success: true, data: null }),
         approval: {
           ...actual.api.broadcasts.approval,
-          get: () => Promise.resolve({ success: true, data: pending }),
+          get: () => Promise.resolve({ success: true, data: net.correction ? { ...pending, viewer: { isApprover: true, canApprove: true, isRequester: false } } : pending }),
+          approve: net.approve,
           candidates: () => Promise.resolve({ success: true, data: [] }),
           remind: () => new Promise((resolve) => { net.remind = { resolve } }),
         },
@@ -66,6 +71,9 @@ beforeEach(() => {
   forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   net.id = 'bc-1'
   net.remind = null
+  net.correction = false
+  net.send.mockReset()
+  net.approve.mockReset()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   stubFetchNotFound()
   view = mount()
@@ -90,4 +98,16 @@ describe('承認の操作の世代（WEB311）', () => {
     expect(view.host.textContent).not.toContain('Aの配信で失敗しました')
     expect(buttonByText(view.host, 'もう一度知らせる')?.disabled).toBe(false)
   })
+  it('訂正を承認後、表示した人数と承認した版で送信する', async () => {
+    net.correction = true
+    net.approve.mockResolvedValue({ success: true, data: { needsSend: true } })
+    net.send.mockResolvedValue({ success: true, data: {} })
+    await view.render(<BroadcastDetailPage />)
+    await settle()
+    await click(buttonByText(view.host, '承認して送る'))
+    await settle()
+    expect(net.approve).toHaveBeenCalledWith('bc-1', 3, undefined)
+    expect(net.send).toHaveBeenCalledWith('bc-1', { expectedVersion: 3, confirmedRecipientCount: 1200 })
+  })
+
 })

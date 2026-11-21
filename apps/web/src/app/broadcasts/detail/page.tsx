@@ -428,7 +428,14 @@ function BroadcastDetailInner() {
         }
         // 予約なし（今すぐ送る分）は、承認のあと既存の送信の流れへ渡す。
         if (approved.data?.needsSend) {
-          const sent = await api.broadcasts.send(id)
+          if (broadcast?.correctionOfBroadcastId && !approvalState) {
+            setApprovalMessage('承認しました。送る人数を確認してから、もう一度送信してください。')
+            await reloadApproval(target)
+            return
+          }
+          const sent = await api.broadcasts.send(id, broadcast?.correctionOfBroadcastId && approvalState
+            ? { expectedVersion: broadcast.version, confirmedRecipientCount: approvalState.gate.recipientCount }
+            : undefined)
           if (moved()) return
           if (!sent.success) {
             setApprovalMessage(`承認しましたが、送信できませんでした。${sent.error}`)

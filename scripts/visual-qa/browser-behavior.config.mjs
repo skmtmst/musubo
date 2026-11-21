@@ -6,6 +6,7 @@ export default defineConfig({
     'scripts/visual-qa/capture.spec.mjs',
     'scripts/visual-qa/friends-interactions.spec.mjs',
     'scripts/visual-qa/busy-buttons.spec.mjs',
+    'scripts/visual-qa/broadcast-correction.spec.mjs',
     'apps/web/src/app/chats/inbox-673-behavior.spec.mjs',
     'apps/web/src/app/contents/vars/new/page.interaction.spec.ts',
   ],

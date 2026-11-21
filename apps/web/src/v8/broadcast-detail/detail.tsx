@@ -63,7 +63,7 @@ import styles from './detail.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import StatusBadge from '@/components/shared/status-badge'
 
 
@@ -196,6 +196,26 @@ export default function BroadcastDetail({
   const cancelTicket = useRef<symbol | null>(null)
   const renderedCancelTicket = cancelTicket.current
   const [testing, setTesting] = useState(false)
+  const correctionErrors = useSaveFormErrors()
+  const correctionRequest = useRef<{ id: string; key: string; busy: boolean } | null>(null)
+  const createCorrection = async () => {
+    if (!canEdit) return
+    if (!correctionRequest.current || correctionRequest.current.id !== broadcast.id) correctionRequest.current = { id: broadcast.id, key: crypto.randomUUID(), busy: false }
+    const request = correctionRequest.current
+    const scopeGeneration = broadcastScope.current.generation
+    if (request.busy) return
+    request.busy = true
+    try {
+      const result = await api.broadcasts.createCorrection(broadcast.id, request.key)
+      if (correctionRequest.current !== request || broadcastScope.current.generation !== scopeGeneration) return
+      if (!result.success) { notifyToast(result.error, { tone: 'error' }); return }
+      router.push(result.data.status && result.data.status !== 'draft'
+        ? `/broadcasts/detail?id=${encodeURIComponent(result.data.id)}`
+        : `/broadcasts/new?draft=${encodeURIComponent(result.data.id)}`)
+    } catch (error) {
+      if (correctionRequest.current === request && broadcastScope.current.generation === scopeGeneration && !correctionErrors.capture(error)) notifyToast(error instanceof ApiError && error.code === 'CORRECTION_NO_RECIPIENTS' ? '送れる相手がいません' : '訂正の下書きを作れませんでした。時間をおいてもう一度お試しください。', { tone: 'error' })
+    } finally { request.busy = false }
+  }
 
   const collision = useSaveConflict<ApiBroadcast>({
     contextKey: broadcast.id,
@@ -273,6 +293,7 @@ export default function BroadcastDetail({
       href: duplicateHref, onSelect: () => router.push(duplicateHref),
     },
   ]
+  if (isSent) menuItems.unshift({ id: 'correction', label: '訂正を送る', disabled: !canEdit, onSelect: () => void createCorrection() })
   if (isScheduled) {
     menuItems.push({
       id: 'cancel-reservation',
@@ -296,18 +317,18 @@ export default function BroadcastDetail({
   const approvalStatus = approval.state?.approval.status ?? null
 
   return (
-    <PageFrame kind="detail" boardId="cgiGB pNiUk F3X1Mo Q28Gb dK1aE wfHIE tPm3e">
+    <SaveErrorScope errors={correctionErrors}><PageFrame kind="detail" boardId="cgiGB pNiUk F3X1Mo Q28Gb dK1aE wfHIE tPm3e">
       <PageHeading title={broadcast.title}
         crumbs={<><p className={styles.meta}>{metaLine(broadcast, audienceLabel)}</p></>}
         steps={<>{isDraft
             ? <DraftStepRail broadcastId={broadcast.id} draftStep={broadcast.draftStep} canEdit={canEdit} />
             : <DeliveryRail broadcast={broadcast} approvalInvolved={approvalInvolved(broadcast, approval.state)} abWaiting={abResult.result?.status === 'undecided' || abResult.result?.status === 'testing'} />}</>}
         titleAccessory={<StatusBadge tone={badgeTone ?? 'neutral'}>{statusLabel}</StatusBadge>}
-        actions={<>{canEdit ? (
+        actions={<>{(canEdit || isSent) ? (
             <>
               <RowMenu
                 label={`配信「${broadcast.title}」の操作`}
-                items={menuItems}
+                items={canEdit ? menuItems : menuItems.filter(item => item.id === 'correction')}
               />
             </>
           ) : null}
@@ -338,6 +359,7 @@ export default function BroadcastDetail({
             </Button>
           ) : null}</>} />
 
+      {broadcast.correction ? <Notice tone="info">訂正あり　<TextLink href={broadcast.correction.status === 'draft' ? `/broadcasts/new?draft=${encodeURIComponent(broadcast.correction.id)}` : `/broadcasts/detail?id=${encodeURIComponent(broadcast.correction.id)}`}>訂正を開く</TextLink></Notice> : null}
       {conflict ? (
         <div className={styles.conflictWrap} data-design-node="Q28Gb">
           <SaveConflictBand title={`ほかの人が配信「${broadcast.title}」を更新しました`}
@@ -447,7 +469,7 @@ export default function BroadcastDetail({
         onConfirm={() => { if (renderedCancelTicket && renderedCancelTicket === cancelTicket.current && cancelGeneration === broadcastScope.current.generation && canEdit) void cancelReservation() }}
         onClose={() => { if (!cancelling) { cancelTicket.current = null; setCancelOpen(false); if (cancelConflict) { setCancelConflict(false); onReload() } } }}
       />
-    </PageFrame>
+    </PageFrame></SaveErrorScope>
   )
 }
 
@@ -716,6 +738,7 @@ function Overview({
 
       {broadcast.status !== 'draft' ? <>
       <h3 className={styles.secTitle}>{isSent ? '配信結果' : '送信の進み具合'}</h3>
+      {isSent && broadcast.correctionOfBroadcastId && total > broadcast.successCount ? <Notice tone="info">送れなかった（友だちから外れた）：{formatNumber(total - broadcast.successCount)}人</Notice> : null}
       {broadcast.status === 'sending' ? (
         <Progress
           state="active"

@@ -1,3 +1,4 @@
+import { createBroadcastCorrection } from './broadcasts-correction.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
 
 import { Hono } from 'hono';
@@ -44,6 +45,8 @@ broadcasts.post('/api/broadcasts/saved-views', requireRole('owner', 'admin'), in
 
 broadcasts.get('/api/broadcasts/:id', get__api_broadcasts_id_8);
 
+broadcasts.post('/api/broadcasts/:id/correction', createBroadcastCorrection);
+
 broadcasts.get('/api/broadcasts/:id/recipients', get__api_broadcasts_id_recipients_9);
 
 // GET /api/broadcasts/:id/activity — 操作の記録
@@ -76,7 +79,7 @@ broadcasts.post('/api/broadcasts/preflight', requirePermission(BROADCAST_DEFINIT
 broadcasts.post('/api/broadcasts', inputJsonBoundary({"title":["string"],"messageType":["string"],"messageContent":["string"],"messageBubbles":["array"],"targetType":["string"],"targetTagId":["null","string"],"scheduledAt":["null","string"],"lineAccountId":["null","string"],"altText":["null","string"],"accountIds":["array"],"dedupPriority":["array"],"trackLinks":["boolean"],"stealthSpreadMinutes":["number"],"folderId":["null","string"],"measureOpens":["boolean"],"saveAsDraft":["boolean"],"draftStep":["string"],"internalMemo":["null","string"],"afterActionVersionId":["null","string"]}), post__api_broadcasts_2);
 
 // PUT /api/broadcasts/:id - update draft
-broadcasts.put('/api/broadcasts/:id', inputJsonBoundary({"title":["string"],"messageType":["string"],"messageContent":["string"],"messageBubbles":["array"],"targetType":["string"],"targetTagId":["null","string"],"scheduledAt":["null","string"],"trackLinks":["boolean"],"folderId":["null","string"],"measureOpens":["boolean"],"stealthSpreadMinutes":["number"],"lineAccountId":["null","string"],"accountIds":["array"],"saveAsDraft":["boolean"],"draftStep":["null","string"],"internalMemo":["null","string"],"afterActionVersionId":["null","string"],"expectedVersion":["number"]}), put__api_broadcasts_id_1);
+broadcasts.put('/api/broadcasts/:id', inputJsonBoundary({"title":["string"],"messageType":["string"],"messageContent":["string"],"messageBubbles":["array"],"targetType":["string"],"targetTagId":["null","string"],"scheduledAt":["null","string"],"trackLinks":["boolean"],"folderId":["null","string"],"measureOpens":["boolean"],"stealthSpreadMinutes":["number"],"lineAccountId":["null","string"],"accountIds":["array"],"saveAsDraft":["boolean"],"draftStep":["null","string"],"internalMemo":["null","string"],"afterActionVersionId":["null","string"],"expectedVersion":["number"],"confirmedRecipientCount":["number"]}), put__api_broadcasts_id_1);
 
 // POST /api/broadcasts/:id/cancel - cancel a scheduled broadcast without deleting its content
 //

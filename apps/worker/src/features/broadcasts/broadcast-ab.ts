@@ -10,7 +10,8 @@ export function abSettings(b:Record<string,unknown>):AbSettings {
  return {test_ratio_pct:Number(b.testRatioPct),metric:'click',decide_after_minutes:Number(b.decideAfterMinutes),undecided_policy:b.undecidedPolicy as 'stop'|'send_a'};
 }
 export async function abAudience(db:D1Database,id:string){
- const b=await db.prepare('SELECT * FROM broadcasts WHERE id=?').bind(id).first<{target_type:string;target_tag_id:string;line_account_id:string;segment_conditions:string|null;hq_run_id:string|null}>();
+ const b=await db.prepare('SELECT * FROM broadcasts WHERE id=?').bind(id).first<{target_type:string;target_tag_id:string;line_account_id:string;segment_conditions:string|null;hq_run_id:string|null;correction_of_broadcast_id:string|null}>();
+ if(b?.correction_of_broadcast_id)throw new GapError('訂正配信ではA/Bテストを使えません',409);
  if(!b||!['tag','segment'].includes(b.target_type)||b.hq_run_id)throw new GapError('AB_NOT_SUPPORTED_FOR_BROADCAST_ALL');
  if(b.target_type==='segment'&&!b.segment_conditions)throw new GapError('AB_SEGMENT_REQUIRED');
  const seg=b.target_type==='segment'?buildSegmentWhere(JSON.parse(b.segment_conditions!)):null;

@@ -213,10 +213,14 @@ export const get__api_broadcasts_id_8 = async (c: Context<Env, "/api/broadcasts/
   }
 
   const view = await broadcastStatusView(c.env.DB, broadcast as unknown as Record<string, unknown>);
+  const correction = await c.env.DB.prepare("SELECT id, status FROM broadcasts WHERE correction_of_broadcast_id=? ORDER BY created_at DESC, id DESC LIMIT 1").bind(id).first<{ id: string; status: string }>();
+  const correctionCreation = broadcast.correction_of_broadcast_id ? await c.env.DB.prepare("SELECT json_extract(detail_json, '$.correctionExcludedAtCreation') n FROM broadcast_lifecycle_events WHERE broadcast_id=? AND action='created' AND CASE WHEN json_valid(detail_json) THEN json_type(detail_json, '$.correctionExcludedAtCreation')='integer' ELSE 0 END ORDER BY created_at,id LIMIT 1").bind(id).first<{n:number}>() : null;
   return c.json({
     success: true,
     data: {
       ...serializeBroadcast(broadcast),
+      correction: correction ?? null,
+      correctionExcludedAtCreation: correctionCreation?.n ?? 0,
       displayStatus: view.displayStatus,
       displayStatusLabel: view.displayStatusLabel,
       ledger: view.ledger,
@@ -367,7 +371,10 @@ export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/
   let count = 0;
   let perAccount: Array<{ accountId: string; sendCount: number }> | undefined;
 
-  if (broadcast.target_type === 'multi-account-dedup') {
+  if (broadcast.correction_of_broadcast_id) {
+    const preview = await broadcastSendPreview(c.env.DB, broadcast);
+    count = preview.recipients;
+  } else if (broadcast.target_type === 'multi-account-dedup') {
     const accountIds = parseJsonArray(raw.account_ids);
     const dedupPriority = raw.dedup_priority == null ? [] : parseJsonArray(raw.dedup_priority);
     if (!accountIds || !dedupPriority || [...accountIds,...dedupPriority].some(id => typeof id !== 'string' || !id.trim())) {
