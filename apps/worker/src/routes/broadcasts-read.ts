@@ -17,6 +17,7 @@ import { getLineAccountById } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { countRetryableRecipients } from '@line-crm/db';
 import { ACCOUNT_ACCESS_ERROR, ledgerCountsForBroadcasts, serializeBroadcast, BroadcastNotificationSettings, BROADCAST_NOTIFICATION_KEY, DEFAULT_BROADCAST_NOTIFICATIONS, notificationSentence, canAccessBroadcast, broadcastStatusView, recipientResultFilter, failedBreakdown } from './broadcasts-definition.js';
 import type { Context, Next } from 'hono';
 
@@ -276,9 +277,10 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
     ).bind(...visibleAccounts.binds,...visibleAccounts.binds,...visibleAccounts.binds,id,...visible.bindings,limit + 1,cursor).all<RecipientRow>();
   const allRows = queryResult.results ?? [];
   const page = allRows.slice(0, limit);
-  const [counts, breakdown] = await Promise.all([
+  const [counts, breakdown, retryableCount] = await Promise.all([
     countBroadcastLedger(c.env.DB, id),
     failedBreakdown(c.env.DB, id),
+    countRetryableRecipients(c.env.DB, id),
   ]);
   const ledgerRows = counts.sent + counts.failed + counts.unknown + counts.claimed;
   const totalCount = raw.total_count as number | null | undefined;
@@ -290,7 +292,7 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
     inFlight: counts.claimed,
     pending: totalCount == null ? null : Math.max(0, Number(totalCount) - ledgerRows),
     total: totalCount == null ? ledgerRows : Number(totalCount),
-    retryableCount: breakdown.temporary,
+    retryableCount,
   };
   const responseItems = page.map((row) => {
         const view = classifyBroadcastRecipient(row.state, row.error_code);

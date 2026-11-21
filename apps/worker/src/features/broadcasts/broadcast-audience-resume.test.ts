@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, insertFriend } from '../../test-utils/d1-sqlite.js';
 import { processQueuedBroadcasts, processBroadcastSend } from './broadcast.js';
-import { reopenFailedClaims, updateBroadcastStatus, beginBroadcastRetryAttempt } from '@line-crm/db';
+import { reopenFailedClaims, reopenUnsentClaims, updateBroadcastStatus, beginBroadcastRetryAttempt } from '@line-crm/db';
 import { prepareHqBroadcast, dispatchHqBroadcast } from '../../services/hq-broadcasts.js';
 
 const sends = vi.hoisted(() => [] as string[]);
@@ -149,4 +149,20 @@ it.each([false,true])('重複除外の旧進捗に宛先snapshotが無い場合�
   const result=await processMultiAccountDedupBroadcast(f.db,{id:'b',account_ids:'["a"]',dedup_priority:'["a"]',target_tag_id:'t',message_type:'text',message_content:'案内',dedup_progress:progress},()=>({async multicast(ids:string[]){sends.push(...ids);return {requestId:'fake'};}} as never));
   expect(sends).toHaveLength(0);expect(result.complete).toBe(false);expect(result.stopped).toBe(true);
   expect(f.raw.prepare("SELECT reason FROM broadcast_lifecycle_events WHERE broadcast_id='b'").get()).toMatchObject({reason:expect.stringContaining('要確認')});
+});
+
+
+it('古い未送信の押さえを再送し、送信済みと送達不明は重ねて送らない', async () => {
+  const f=fixture();
+  await processQueuedBroadcasts(f.db,client);
+  expect(sends).toHaveLength(150);
+  sends.length=0;
+  f.raw.exec("UPDATE broadcasts SET status='sent' WHERE id='b'; UPDATE broadcast_send_claims SET state='unknown',dispatched_at='2026-11-21' WHERE broadcast_id='b' AND friend_id='f156'; UPDATE broadcast_send_claims SET state='failed',error_code='line_http_403' WHERE broadcast_id='b' AND friend_id>='f150' AND friend_id<>'f155' AND friend_id<>'f156'");
+  const {lock_version}=f.raw.prepare("SELECT lock_version FROM broadcasts WHERE id='b'").get() as {lock_version:number};
+  const attempt=await beginBroadcastRetryAttempt(f.db,{id:'b',expectedVersion:lock_version});
+  expect(attempt).toEqual({changes:1,attemptNo:2});
+  expect(await reopenUnsentClaims(f.db,'b',2)).toBe(1);
+  await processQueuedBroadcasts(f.db,client);
+  expect(sends).toEqual(['Uf155']);
+  expect(f.raw.prepare("SELECT state FROM broadcast_send_claims WHERE broadcast_id='b' AND friend_id='f156'").get()).toEqual({state:'unknown'});
 });

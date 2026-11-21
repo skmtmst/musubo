@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { parseJsonArray, parseJsonObject } from './broadcast-json.js';
 import type { Context } from 'hono';
-import { countBroadcastLedger, isTemporaryLedgerErrorCode, deriveBroadcastDisplayStatus, recordBroadcastLifecycleEvent, BROADCAST_DISPLAY_STATUS_LABELS, recordAuditEvent, maskAuditIp, auditDeviceFamily } from '@line-crm/db';
+import { countBroadcastLedger, countRetryableRecipients, isTemporaryLedgerErrorCode, deriveBroadcastDisplayStatus, recordBroadcastLifecycleEvent, BROADCAST_DISPLAY_STATUS_LABELS, recordAuditEvent, maskAuditIp, auditDeviceFamily } from '@line-crm/db';
 import type { BroadcastDisplayStatus } from '@line-crm/db';
 import type { Broadcast as DbBroadcast, BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
@@ -384,9 +384,10 @@ export async function broadcastStatusView(
   row: Record<string, unknown>,
 ): Promise<BroadcastStatusView> {
   const id = String(row.id);
-  const [counts, breakdown] = await Promise.all([
+  const [counts, breakdown, retryableCount] = await Promise.all([
     countBroadcastLedger(db, id),
     failedBreakdown(db, id),
+    countRetryableRecipients(db, id),
   ]);
   const ledgerRows = counts.sent + counts.failed + counts.unknown + counts.claimed;
   const displayStatus = deriveBroadcastDisplayStatus({
@@ -409,7 +410,7 @@ export async function broadcastStatusView(
       failedPermanent: breakdown.permanent,
       unknown: counts.unknown,
       inFlight: counts.claimed,
-      retryableCount: breakdown.temporary,
+      retryableCount,
     },
   };
 }
@@ -599,9 +600,10 @@ async function recordBroadcastControlAudit(
 
 export /** 台帳の数え上げと再送対象数。画面と応答で同じ数を使う。 */
 async function broadcastLedgerSummary(db: D1Database, id: string) {
-  const [counts, breakdown] = await Promise.all([
+  const [counts, breakdown, retryableCount] = await Promise.all([
     countBroadcastLedger(db, id),
     failedBreakdown(db, id),
+    countRetryableRecipients(db, id),
   ]);
   return {
     sent: counts.sent,
@@ -611,7 +613,7 @@ async function broadcastLedgerSummary(db: D1Database, id: string) {
     unknown: counts.unknown,
     inFlight: counts.claimed,
     // 再送できるのは一時的な失敗だけ。
-    retryableCount: breakdown.temporary,
+    retryableCount,
   };
 }
 

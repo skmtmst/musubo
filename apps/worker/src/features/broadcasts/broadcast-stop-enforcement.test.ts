@@ -25,6 +25,8 @@ import {
   reopenFailedClaims,
   closeClaimsForStop,
   countBroadcastLedger,
+  markBroadcastRecipientsDispatched,
+  settleBroadcastRecipients,
 } from '@line-crm/db';
 
 type LineClient = import('@line-crm/line-sdk').LineClient;
@@ -499,6 +501,38 @@ describe('一斉配信の停止（#662）', () => {
          VALUES ('b1', '案内', 'text', 'こんにちは', 'tag', 'tag1', 'sending', 0, 0, 'acc1', 1, '2026-09-11T10:00:00.000')`,
       ).run();
     }
+
+    it('その場送信の停止と再送が重なっても、古い実行は同じ相手に送らない', async () => {
+      const {db,raw}=createTestD1();
+      try {
+        seedAccount(raw); seedFriends(raw,1); seedTagBroadcast(raw);
+        let release!:()=>void; let reached!:()=>void;
+        const gate=new Promise<void>(r=>{release=r;}); const paused=new Promise<void>(r=>{reached=r;});
+        let held=false;
+        const oldDb={...db,prepare(sql:string) {
+          const stmt=db.prepare(sql);
+          if (!sql.includes('SELECT DISTINCT friend_id FROM friend_delivery_consents')) return stmt;
+          return {...stmt, bind(...args:unknown[]) {
+            const bound=stmt.bind(...args);
+            return {...bound, async all() {
+              if (!held) {held=true; reached(); await gate;}
+              return bound.all();
+            }};
+          }} as D1PreparedStatement;
+        }} as D1Database;
+        const old=makeLineClient(); const oldRun=processBroadcastSend(oldDb,old.client,'b1');
+        await paused;
+        expect(await requestBroadcastStop(db,{id:'b1',expectedVersion:1})).toBe(1);
+        await closeClaimsForStop(db,'b1');
+        expect(await beginBroadcastRetryAttempt(db,{id:'b1',expectedVersion:2})).toEqual({changes:1,attemptNo:2});
+        expect(await reopenFailedClaims(db,'b1',2)).toBe(1);
+        await markBroadcastRecipientsDispatched(db,{broadcastId:'b1',attemptNo:2,lineAccountId:'acc1',friendIds:['f0000']});
+        await settleBroadcastRecipients(db,{broadcastId:'b1',friendIds:['f0000'],state:'sent'});
+        release(); await oldRun;
+        expect(old.sentUserIds()).toEqual([]);
+        expect(broadcastRow(raw)).toMatchObject({status:'sending',send_attempt_no:2});
+      } finally {raw.close();}
+    });
 
     it('停止すると次の束を始めず、送信済みにもしない', async () => {
       const { db, raw } = createTestD1();

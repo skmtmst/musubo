@@ -397,13 +397,17 @@ export async function processBroadcastSend(
       let followingFriends: Awaited<ReturnType<typeof getFriendsByTag>>;
       if (known > 0) {
         await db.prepare(`UPDATE broadcast_send_claims SET state='unknown',error_code='interrupted_dispatch'
-          WHERE broadcast_id=? AND state='claimed' AND dispatched_at IS NOT NULL`).bind(broadcastId).run();
+          WHERE broadcast_id=? AND state='claimed' AND dispatched_at IS NOT NULL
+            AND EXISTS (SELECT 1 FROM broadcasts WHERE id=? AND status='sending' AND stopped_at IS NULL AND lock_version=?)`)
+          .bind(broadcastId,broadcastId,broadcast.lock_version ?? 1).run();
         // 最初の台帳の宛先を保ち、現在の所属・ブロック・非表示だけを確認する。
         const ids = scopedFriendIds(await storedBroadcastFriendScope(db, broadcastAccountId));
         await db.prepare(`UPDATE broadcast_send_claims SET state='failed',error_code='recipient_unavailable'
           WHERE broadcast_id=? AND ((state='claimed' AND dispatched_at IS NULL)
             OR (state='failed' AND error_code IN ('line_http_429','stopped_before_dispatch') AND attempt_no=?))
-            AND friend_id NOT IN (${ids.sql})`).bind(broadcastId,Number(broadcast.send_attempt_no ?? 1),...ids.bindings).run();
+            AND friend_id NOT IN (${ids.sql})
+            AND EXISTS (SELECT 1 FROM broadcasts WHERE id=? AND status='sending' AND stopped_at IS NULL AND lock_version=?)`)
+          .bind(broadcastId,Number(broadcast.send_attempt_no ?? 1),...ids.bindings,broadcastId,broadcast.lock_version ?? 1).run();
         followingFriends = (await db.prepare(`SELECT f.* FROM friends f JOIN broadcast_send_claims c ON c.friend_id=f.id
           WHERE c.broadcast_id=? AND ((c.state='claimed' AND c.dispatched_at IS NULL)
             OR (c.state='failed' AND c.error_code IN ('line_http_429','stopped_before_dispatch') AND c.attempt_no=?))
@@ -420,9 +424,10 @@ export async function processBroadcastSend(
         await db.batch([
           db.prepare(`INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state)
             SELECT ?,value,?,?,'claimed' FROM json_each(?)
-            WHERE NOT EXISTS(SELECT 1 FROM broadcast_send_claims WHERE broadcast_id=?)`)
-            .bind(broadcastId,broadcastAccountId,Number(broadcast.send_attempt_no ?? 1),JSON.stringify(followingFriends.map(f=>f.id)),broadcastId),
-          db.prepare('UPDATE broadcasts SET total_count=? WHERE id=?').bind(totalCount,broadcastId),
+            WHERE NOT EXISTS(SELECT 1 FROM broadcast_send_claims WHERE broadcast_id=?)
+              AND EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND status='sending' AND stopped_at IS NULL AND lock_version=?)`)
+            .bind(broadcastId,broadcastAccountId,Number(broadcast.send_attempt_no ?? 1),JSON.stringify(followingFriends.map(f=>f.id)),broadcastId,broadcastId,broadcast.lock_version ?? 1),
+          db.prepare("UPDATE broadcasts SET total_count=? WHERE id=? AND status='sending' AND stopped_at IS NULL AND lock_version=?").bind(totalCount,broadcastId,broadcast.lock_version ?? 1),
         ]);
       }
 
@@ -449,10 +454,9 @@ export async function processBroadcastSend(
         const batch = followingFriends.slice(i, i + MULTICAST_BATCH_SIZE);
         const suppressed = await suppressedFriendIds(db,batch.map(f=>f.id));
         await recordSuppressedBroadcastRecipients(db,broadcast.id,[...suppressed]);
-        const sendable = batch.filter((f) => !blocked.has(f.id)&&!suppressed.has(f.id));
+        let sendable = batch.filter((f) => !blocked.has(f.id)&&!suppressed.has(f.id));
         if (sendable.length === 0) continue;
-        const sendableIds = sendable.map((f) => f.id);
-        const lineUserIds = sendable.map((f) => f.line_user_id);
+
 
 
         if (batchIndex > 0) {
@@ -463,12 +467,24 @@ export async function processBroadcastSend(
 
         const batchMessages = varyTextMessages(messages, batchIndex, totalBatches);
 
-        await markBroadcastRecipientsDispatched(db, {
+        const marked = await markBroadcastRecipientsDispatched(db, {
           broadcastId,
           attemptNo,
           lineAccountId: broadcastAccountId,
-          friendIds: sendableIds,
+          friendIds: sendable.map(f => f.id),
+          expectedLockVersion: broadcast.lock_version ?? 1,
+          requireBatchLock: false,
         });
+        // 停止・再送で版が変わった古い実行は外へ出さずに終える。
+        if (!marked.length) {
+          const current = await getBroadcastById(db,broadcastId);
+          if (!current || current.status !== 'sending' || current.stopped_at || current.lock_version !== broadcast.lock_version) return current!;
+          continue;
+        }
+        const markedIds = new Set(marked);
+        sendable = sendable.filter(f => markedIds.has(f.id));
+        const sendableIds = sendable.map(f => f.id);
+        const lineUserIds = sendable.map(f => f.line_user_id);
         try {
           const retryKey = await createBroadcastRetryKey(
             broadcast.id,
@@ -490,13 +506,15 @@ export async function processBroadcastSend(
           ));
           await db.batch([
             ...logStmts,
-            db.prepare('UPDATE broadcasts SET success_count=success_count+? WHERE id=?').bind(sendable.length,broadcastId),
             ...buildBroadcastSettleStatements(db, {
               broadcastId,
               friendIds: sendableIds,
               state: 'sent',
               lineRequestId: requestId,
             }),
+            db.prepare(`UPDATE broadcasts SET success_count=MAX(success_count,
+              (SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id=? AND state='sent')) WHERE id=?`)
+              .bind(broadcastId,broadcastId),
           ]);
           for (const id of sendableIds) blocked.add(id);
         } catch (err) {
@@ -523,11 +541,14 @@ export async function processBroadcastSend(
         await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch')) {
       return (await getBroadcastById(db, broadcastId))!;
     }
-    await createBroadcastInsight(db, broadcast.id);
-    await updateBroadcastStatus(db, broadcastId, 'sent', { totalCount, successCount });
+    const completed = await db.prepare(`UPDATE broadcasts SET status='sent', sent_at=?,batch_lock_at=NULL,total_count=?,success_count=?
+      WHERE id=? AND status='sending' AND stopped_at IS NULL AND lock_version=?`)
+      .bind(jstNow(),totalCount,successCount,broadcastId,broadcast.lock_version ?? 1).run();
+    if (completed.meta.changes) await createBroadcastInsight(db, broadcast.id);
   } catch (err) {
-    // 再試行できるよう、失敗時は下書きへ戻す。
-    await updateBroadcastStatus(db, broadcastId, 'draft');
+    // 古い実行は新しい試行を下書きに戻さない。
+    await db.prepare(`UPDATE broadcasts SET status='draft' WHERE id=? AND status='sending' AND stopped_at IS NULL AND lock_version=?`)
+      .bind(broadcastId,broadcast.lock_version ?? 1).run();
     throw err;
   }
 

@@ -35,6 +35,7 @@ vi.mock('@line-crm/db', () => ({
   reopenFailedClaims: vi.fn(),
   getRetryableRecipientIds: vi.fn(),
   countBroadcastLedger: mocks.countBroadcastLedger,
+  countRetryableRecipients: vi.fn(async () => 0),
   recordAuditEvent: vi.fn(),
   maskAuditIp: (value: string) => value,
   auditDeviceFamily: vi.fn(),
