@@ -149,3 +149,15 @@ describe('ダッシュボードの対応状況は正本と同じ数を出す', (
     expect(overview.inbox.email).toEqual(counts.email);
   });
 });
+
+it('指定した日本時間の日付の初めから終わりまでだけ成果を集計する', async () => {
+  const { conversionSummary } = await import('./dashboard-snapshots.js');
+  sqlite.prepare("INSERT INTO conversion_points(id, name, event_type) VALUES ('p', '成果', 'manual')").run();
+  const insert = sqlite.prepare('INSERT INTO conversion_events(id, conversion_point_id, friend_id, created_at) VALUES (?, ?, ?, ?)');
+  insert.run('before', 'p', 'fa-unread', '2026-09-18T23:59:59.999');
+  insert.run('start', 'p', 'fa-unread', '2026-09-19T00:00:00.000');
+  insert.run('end', 'p', 'fa-unread', '2026-09-20T23:59:59.999');
+  insert.run('after', 'p', 'fa-unread', '2026-09-21T00:00:00.000');
+  const result = await conversionSummary(db, 'custom', { allowedAccountIds: ['account-a'], includeUnassigned: false }, { from: '2026-09-19', to: '2026-09-20' });
+  expect(result).toEqual({ total: 2, byPoint: [{ name: '成果', count: 2 }] });
+});

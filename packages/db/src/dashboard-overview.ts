@@ -2,7 +2,7 @@ import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { withDisplayReadCache } from './display-read-cache.js';
 import { type DashboardPeriod, type AccountStatsScope, type DashboardOverview, type DashboardSectionStatus, type DashboardMetricState, type DashboardMetricReason } from './dashboard-types.js';
-import { periodStart, monthStart, oldestDashboardTime, dashboardFreshness, summarizeDashboardFreshness } from './dashboard-freshness.js';
+import { periodStart, jstDate, nextDate, monthStart, oldestDashboardTime, dashboardFreshness, summarizeDashboardFreshness } from './dashboard-freshness.js';
 import { accountScopeSql, broadcastScopeSql, count, friendBreakdown, inboxState, ZERO_BREAKDOWN } from './dashboard-inbox.js';
 import { friendTrend, conversionSummary } from './dashboard-snapshots.js';
 
@@ -24,8 +24,9 @@ export async function getDashboardOverview(
    * 合わせて数える。呼び出し側（ルート）が staff の可視範囲で渡す。
    */
   inboxScope: AccountStatsScope = scope,
+  range?: { from: string; to: string },
 ): Promise<DashboardOverview> {
-  return withDisplayReadCache(db, displayDb => dashboardOverview(displayDb, period, scope, inboxScope));
+  return withDisplayReadCache(db, displayDb => dashboardOverview(displayDb, period, scope, inboxScope, range));
 }
 
 async function dashboardOverview(
@@ -33,8 +34,10 @@ async function dashboardOverview(
   period: DashboardPeriod,
   scope: AccountStatsScope,
   inboxScope: AccountStatsScope,
+  range?: { from: string; to: string },
 ): Promise<DashboardOverview> {
-  const start = periodStart(period);
+  const start = range?.from ?? periodStart(period);
+  const end = nextDate(range?.to ?? jstDate());
   const month = monthStart();
   const partialFailures: string[] = [];
   const sourceAsOf = new Map<string, string>();
@@ -87,22 +90,22 @@ async function dashboardOverview(
     db.prepare(
       `SELECT er.name name, COUNT(*) count
          FROM friends f LEFT JOIN entry_routes er ON er.ref_code=f.ref_code
-        WHERE f.created_at >= ? AND ${friendAccount.sql}
+        WHERE f.created_at >= ? AND f.created_at < ? AND ${friendAccount.sql}
         GROUP BY name ORDER BY count DESC LIMIT 3`,
-    ).bind(start, ...friendAccount.binds).all<{ name: string | null; count: number }>(),
+    ).bind(start, end, ...friendAccount.binds).all<{ name: string | null; count: number }>(),
     count(db,
       `SELECT COUNT(*) n FROM (
          SELECT f.ref_code, COUNT(DISTINCT f.id) additions, COUNT(ce.id) conversions
            FROM friends f LEFT JOIN conversion_events ce ON ce.friend_id=f.id
-          WHERE f.created_at >= ? AND ${friendAccount.sql}
+          WHERE f.created_at >= ? AND f.created_at < ? AND ${friendAccount.sql}
           GROUP BY f.ref_code
        ) funnel WHERE additions >= 3 AND conversions = 0`,
-      start, ...friendAccount.binds),
+      start, end, ...friendAccount.binds),
     count(db,
       `SELECT COUNT(*) n FROM automation_logs al
         JOIN friends f ON f.id=al.friend_id
-       WHERE al.status IN ('partial','failed') AND al.created_at >= ? AND ${friendAccount.sql}`,
-      start, ...friendAccount.binds),
+       WHERE al.status IN ('partial','failed') AND al.created_at >= ? AND al.created_at < ? AND ${friendAccount.sql}`,
+      start, end, ...friendAccount.binds),
   ]).then(([scenarios, migrations, bookings, inflow, funnelAlerts, automationFailures]) => ({
     scenarios: { active: scenarios?.active ?? 0, paused: scenarios?.paused ?? 0 },
     migrations: { active: migrations?.active ?? 0, completed: migrations?.completed ?? 0 },
@@ -132,7 +135,7 @@ async function dashboardOverview(
     }),
     // 推移だけは period を渡さない。上の切り替えに関わらず直近7日で見る。
     safe('trend', friendTrend(db, scope), { points: [], asOf: null }),
-    safe('conversions', conversionSummary(db, period, scope), { total: 0, byPoint: [] }),
+    safe('conversions', conversionSummary(db, period, scope, range), { total: 0, byPoint: [] }),
     // プッシュ（こちらから）と リプライ（受信への応答）を分ける。
     // source は 028 で入っている。auto_reply と manual が応答。
     // 見出し「今月の配信」どおり、選んだ期間ではなく今月1日から数える。

@@ -30,3 +30,14 @@ it('長い期間名でも選択値を保ち、指定期間の2日付へ切り替
  expect(onChange).toHaveBeenCalledWith(7)
  expect(onRangeChange).not.toHaveBeenCalled()
 })
+
+it('選択欄では指定期間を窓で編集し、適用するまで変更しない', () => {
+ const onChange = vi.fn(), onRangeChange = vi.fn()
+ render(<PeriodPicker display="select" days={30} onChange={onChange} onRangeChange={onRangeChange} />)
+ fireEvent.click(screen.getByRole('button', { name: '集計期間' }))
+ fireEvent.click(screen.getByRole('menuitem', { name: '期間を指定' }))
+ expect(screen.getByRole('dialog', { name: '期間を指定' })).toBeTruthy()
+ expect(onRangeChange).not.toHaveBeenCalled()
+ fireEvent.click(screen.getByRole('button', { name: '適用する' }))
+ expect(onRangeChange).toHaveBeenCalledOnce()
+})

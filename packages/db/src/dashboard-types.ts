@@ -2,7 +2,7 @@ import type { FriendActiveMonthComparison as importFriendActiveMonthComparison }
 
 
 /** 今日・過去7日・過去30日。旧last28は既存のAPI利用先向けに保持。 */
-export type DashboardPeriod = 'today' | 'last7' | 'last28' | 'last30';
+export type DashboardPeriod = 'today' | 'last7' | 'last28' | 'last30' | 'last90' | 'custom';
 
 export type DashboardSectionState = 'ok' | 'empty' | 'unavailable' | 'stale' | 'estimated' | 'partial';
 
