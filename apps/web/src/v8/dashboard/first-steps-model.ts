@@ -76,15 +76,15 @@ export function useFirstMessageArrived(accountId: string | null, steps: Readonly
   return { arrived, dismiss: useCallback(() => setArrived(false), []) }
 }
 
-export function useFirstSteps(accountId: string | null, role: string | null, options: { qrOpen?: boolean; style?: AccountStyle | null; storeId?: string | null } = {}) {
-  const enabled = Boolean(accountId) && role !== null
+export function useFirstSteps(accountId: string | null, role: string | null, options: { qrOpen?: boolean; style?: AccountStyle | null; storeId?: string | null; enabled?: boolean; watchFirstMessage?: boolean } = {}) {
+  const enabled = options.enabled !== false && Boolean(accountId) && role !== null
   const [folded, setFolded] = useState(false)
   const [waiting, setWaiting] = useState(false)
-  const state = useFirstRun(accountId, enabled, canManageRole(role) && (Boolean(options.qrOpen) || waiting))
+  const state = useFirstRun(accountId, enabled, canManageRole(role) && (Boolean(options.qrOpen) || Boolean(options.watchFirstMessage) || waiting))
   const style = options.style === undefined ? 'standard' : options.style
   const progress = useStyleSetupProgress(accountId, style, enabled, options.storeId)
   const displaySteps = stepsForStyle(state.steps, style, progress.progress)
-  const summary = state.status === 'ready' && style ? summarizeFirstSteps(state.steps, style, progress.progress) : null
+  const summary = state.status === 'ready' && style && progress.status !== 'loading' ? summarizeFirstSteps(state.steps, style, progress.progress) : null
   /* 待つ帯（はじめにやること）が開いて見えている間だけ、最初の1通を待って読み直す。 */
   const visibleWaiting = canManageRole(role) && state.status === 'ready' && !folded && waitingForFirstMessage(state.steps)
   useEffect(() => { setWaiting(visibleWaiting) }, [visibleWaiting])
@@ -94,7 +94,7 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
     同じ状態を2つの持ち主がサーバーへ書かないように自前の持ち主は動かさない。
   */
   const shared = useSharedGuide()
-  const ownGuide = useGuideEngine(shared ? null : accountId, canManageRole(role) ? summary : null)
+  const ownGuide = useGuideEngine(shared || !canManageRole(role) ? null : accountId, canManageRole(role) ? summary : null, style === 'restaurant')
   const guide = shared?.guide ?? ownGuide
   useEffect(() => { setFolded(readFirstStepsFolded(accountId)) }, [accountId])
   const toggle = useCallback(() => {
@@ -109,6 +109,7 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
   return {
     status: !enabled ? 'idle' as const : state.status === 'loading' || progress.status === 'loading' ? 'loading' as const : state.status,
     summary: shouldShowFirstSteps(role, summary) ? summary : null, folded, toggle, error: state.error, reload: () => { state.reload(); progress.reload() },
+    refresh: () => { state.refresh(); progress.reload() },
     steps: displaySteps, progress: progress.progress, firstRun: state.firstRun, starter: state.starter, watchExpired: state.watchExpired, rewatch: state.rewatch,
     arrived: canManageRole(role) && done.arrived, dismissArrived: done.dismiss, guide,
   }

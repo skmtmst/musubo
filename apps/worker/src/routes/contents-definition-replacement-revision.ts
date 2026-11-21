@@ -54,8 +54,8 @@ export async function replacementImpact(
     sourceId, replacementId, lineAccountId: accountId, checkedAt,
   });
   if (!plan) return null;
-  const menuRows = await c.env.DB.prepare('SELECT id FROM rt_menu_items WHERE image_media_id = ? ORDER BY id')
-    .bind(sourceId).all<{id:string}>();
+  const menuRows = await c.env.DB.prepare("SELECT id FROM rt_menu_items WHERE image_media_id = ? OR EXISTS (SELECT 1 FROM json_each(photo_gallery_json) photo WHERE json_extract(photo.value, '$.mediaId') = ?) ORDER BY id")
+    .bind(sourceId, sourceId).all<{id:string}>();
   const direct = await findDirectMediaUsages(c.env.DB, source, accountId);
   const directRefs = direct.map(row => ({ kind: row.refKind, name: row.name, href: row.href, state: 'available' as const,
     scannedAt: checkedAt, replaceable: false, blocker: 'unsupported_reference' as const,

@@ -23,7 +23,7 @@ import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
  * 接続を管理できない人には、接続・解除のボタンを置かない。
  */
 
-export default function SettingsBoard({ accountId, data, onChanged }: { accountId: string; data: GoogleConnectionData; onChanged: () => void }) {
+export default function SettingsBoard({ accountId, data, onChanged, connectSource }: { accountId: string; data: GoogleConnectionData; onChanged: () => void; connectSource?: 'hours' }) {
   const scope = useRef({ accountId, generation: 0 })
   if (scope.current.accountId !== accountId) scope.current = { accountId, generation: scope.current.generation + 1 }
   const saveErrors = useSaveFormErrors()
@@ -69,7 +69,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
     setBusy(true)
     setActionError('')
     try {
-      const response = await restaurantGoogleApi.connectStart(accountId)
+      const response = await restaurantGoogleApi.connectStart(accountId, connectSource)
       window.location.assign(response.authorizeUrl)
     } catch (err) {
       const fieldFailure = saveErrors.capture(err)

@@ -4,6 +4,8 @@ import type {RestaurantFloor} from '@line-crm/shared'
 import {restaurantChairPositions} from '@line-crm/shared'
 import {SaveErrorField} from '@/components/shared/save-form-errors'
 import EntitySelect from './entity-select'
+import Select from './select'
+import { TextField } from './text-field'
 import Toggle from './toggle'
 import styles from './restaurant-table-pen-editor.module.css'
 
@@ -19,6 +21,37 @@ const seatTypes:[Draft['seatDetailType'],string][]=[['table','テーブル'],['c
 function Choice<T extends string>({items,value,onChange}:{items:[T,string][];value:T;onChange:(value:T)=>void}){return <div className={styles.choiceRow}>{items.map(([key,label])=><button key={key} type="button" className={value===key?styles.choiceActive:styles.choice} aria-pressed={value===key} onClick={()=>onChange(key)}>{label}</button>)}</div>}
 function Badge(){return <span className={styles.required}>必須</span>}
 function Label({children,required=false}:{children:React.ReactNode;required?:boolean}){return <span className={styles.label}>{children}{required?<Badge/>:null}</span>}
+export function GuidedTableFields({ draft, onChange, errors }: Pick<Props, 'draft' | 'onChange' | 'errors'>) {
+ const seats = Number(draft.maxCapacity)
+ const changeSeats = (count: number) => onChange({ ...draft, maxCapacity: String(count) })
+ return <div className={styles.guidedFields}>
+   <label className={styles.field}>
+     <Label>卓の名前</Label>
+     <SaveErrorField names={['label']}><TextField aria-label="卓の名前" required value={draft.label}
+       aria-invalid={Boolean(errors.label)} onChange={event => onChange({ ...draft, label: event.target.value })} /></SaveErrorField>
+     {errors.label && <small role="alert">卓の名前を入れてください。</small>}
+   </label>
+   <div className={styles.guidedSeats}>
+     <div className={styles.field}>
+       <Label>席数</Label>
+       <div className={styles.stepper}>
+         <button type="button" aria-label="席数を減らす" disabled={seats <= 1} onClick={() => changeSeats(seats - 1)}>−</button>
+         <output aria-label="席数">{seats} 席</output>
+         <button type="button" aria-label="席数を増やす" disabled={seats >= 200} onClick={() => changeSeats(seats + 1)}>＋</button>
+       </div>
+     </div>
+     <label className={styles.field}>
+       <Label>席の種類</Label>
+       <Select aria-label="席の種類" size="full" value={draft.seatDetailType}
+         options={seatTypes.map(([value, label]) => ({ value, label }))}
+         onChange={value => {
+           const type = seatTypes.find(([key]) => key === value)?.[0]
+           if (type) onChange({ ...draft, seatDetailType: type, seatType: type === 'counter' ? 'counter' : 'table' })
+         }} />
+     </label>
+   </div>
+ </div>
+}
 export default function TablePenEditor({draft,onChange,floors,errors,onCapacity,count,onCount,canBatch=true}:Props){
  const [showConditions,setShowConditions]=useState(false)
  const change=<K extends keyof Draft>(key:K,value:Draft[K])=>onChange({...draft,[key]:value})
