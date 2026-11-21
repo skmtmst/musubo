@@ -164,6 +164,41 @@ describe('削除する行を選ぶ条件', () => {
     expect(failures).toEqual([]);
   });
 
+  it('複数アカウント配信の固定は共通情報の所有者で選び、参照先より先に消す', () => {
+    const foreignKeys = sqlite.pragma('foreign_keys', { simple: true });
+    sqlite.pragma('foreign_keys = ON');
+    sqlite.exec('SAVEPOINT pin_retention');
+    try {
+      sqlite.exec(`
+        INSERT INTO tenants(id,name) VALUES('pin-a','A'),('pin-b','B');
+        INSERT INTO line_accounts(id,tenant_id,name,channel_id,channel_access_token,channel_secret)
+          VALUES('pin-account-a','pin-a','A','pin-channel-a','test','test'),
+                ('pin-account-b','pin-b','B','pin-channel-b','test','test');
+        INSERT INTO broadcasts(id,title,message_type,message_content,target_type,line_account_id)
+          VALUES('pin-broadcast','配信','text','本文','multi-account-dedup',NULL);
+        INSERT INTO common_vars(id,name,var_key,value,line_account_id)
+          VALUES('pin-var-a','A','hours','A','pin-account-a'),('pin-var-b','B','hours','B','pin-account-b');
+        INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason)
+          VALUES('pin-version-a','pin-var-a',1,'A','A','test'),('pin-version-b','pin-var-b',1,'B','B','test');
+        INSERT INTO broadcast_common_var_pins(broadcast_id,common_var_id,version_id)
+          VALUES('pin-broadcast','pin-var-a','pin-version-a'),('pin-broadcast','pin-var-b','pin-version-b');
+      `);
+      const order = purgeTablesChildFirst();
+      for (const parent of ['broadcasts', 'common_vars', 'common_var_versions']) {
+        expect(order.indexOf('broadcast_common_var_pins')).toBeLessThan(order.indexOf(parent));
+      }
+      for (const table of ['broadcast_common_var_pins', 'common_var_versions', 'common_vars']) {
+        sqlite.prepare(`DELETE FROM ${table} WHERE ${tenantScopeCondition(table)}`).run('pin-a');
+      }
+      expect(sqlite.prepare('SELECT common_var_id FROM broadcast_common_var_pins').all()).toEqual([{ common_var_id: 'pin-var-b' }]);
+      expect(sqlite.prepare('SELECT id FROM common_var_versions').all()).toEqual([{ id: 'pin-version-b' }]);
+      expect(sqlite.prepare('SELECT id FROM common_vars').all()).toEqual([{ id: 'pin-var-b' }]);
+    } finally {
+      sqlite.exec('ROLLBACK TO pin_retention; RELEASE pin_retention');
+      sqlite.pragma(`foreign_keys = ${foreignKeys ? 'ON' : 'OFF'}`);
+    }
+  });
+
   it('統括IDを入れる場所がちょうど1つになる', () => {
     for (const table of purgeTablesChildFirst()) {
       const marks = tenantScopeCondition(table).split('?').length - 1;

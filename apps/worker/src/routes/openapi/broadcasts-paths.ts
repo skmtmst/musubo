@@ -33,6 +33,14 @@ export const broadcastsPaths = {
     put: { tags: ['Broadcasts'], summary: '配信更新', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Updated' } } },
     delete: { tags: ['Broadcasts'], summary: '配信削除', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Deleted' }, '409': { description: '送信中・送信済みは削除不可' } } },
   },
+  '/api/broadcasts/{id}/common-var-pins/{varId}': {
+    put: {
+      tags: ['Broadcasts'], summary: '一斉配信で使用する共通情報の版を固定',
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }, { name: 'varId', in: 'path', required: true, schema: { type: 'string' } }],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'versionId', 'expectedVersion'], properties: { accountId: { type: 'string' }, versionId: { type: 'string', nullable: true, description: 'null は最新の値へ戻す' }, expectedVersion: { type: 'integer', minimum: 1 } } } } } },
+      responses: { '200': { description: '固定した' }, '400': { description: '入力が不正' }, '404': { description: 'アクセスできない' }, '409': { description: '使用先または版を確認できない' } },
+    },
+  },
   '/api/broadcasts/{id}/send': {
     post: {
       tags: ['Broadcasts'],

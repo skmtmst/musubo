@@ -8121,7 +8121,7 @@ export function commonVarChangeImpactHours(nextValue) {
   const currentValue = '平日 10:00〜19:00'
   const rows = [
     ['template', 'テンプレート', '店舗のご案内', '使われています', '営業時間は平日 10:00〜19:00です。'],
-    ['broadcast', '一斉配信', '10月のお知らせ（10/3送信）', '配信予約中', '平日 10:00〜19:00…'],
+    ['broadcast', '一斉配信', '10月のお知らせ', '下書き', '平日 10:00〜19:00…'],
     ['auto_reply', '自動応答', '営業時間外の自動返信', '有効', '受付は平日 10:00〜19:00です。'],
     ['template', 'テンプレート', '初めてのご来店案内', '使われています', '営業時間は平日 10:00〜19:00です。'],
     ['template', 'テンプレート', '予約確認のご連絡', '使われています', '営業時間は平日 10:00〜19:00です。'],
@@ -8130,7 +8130,8 @@ export function commonVarChangeImpactHours(nextValue) {
     ['template', 'テンプレート', '移転のお知らせ', '使われています', '営業時間は平日 10:00〜19:00です。'],
   ]
   const items = rows.map(([kind, kindLabel, name, status, currentPreview]) => ({
-    kind, kindLabel, name, status,
+    kind, kindLabel, name, status, href: kind === 'broadcast' ? '/broadcasts/detail?id=broadcast-0' : '/templates',
+    referenceMode: 'live', referencedVersion: 2,
     blocksDeletion: true,
     changesOnSave: true,
     previewAvailable: true,
@@ -8740,9 +8741,8 @@ export const COMMON_VAR_HOURS_DELETE_IMPACT = {
   canDelete: false,
   byKind: COMMON_VAR_HOURS_IMPACT.byKind,
   unavailableReferences: [],
-  items: COMMON_VAR_HOURS_IMPACT.items.map(({ kind, kindLabel, name, status, blocksDeletion, currentPreview }) => ({
-    kind, kindLabel, name, status, blocksDeletion, currentPreview,
-  })),
+  items: COMMON_VAR_HOURS_IMPACT.items.map(({ kind, kindLabel, name, status, href, referenceMode, referencedVersion, blocksDeletion, currentPreview }) => ({
+    kind, kindLabel, name, status, href, referenceMode, referencedVersion, blocksDeletion, currentPreview })),
   checkedAt: '2026-09-07T10:00:00.000+09:00',
 }
 export const COMMON_VAR_HOURS_DETAIL = {

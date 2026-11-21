@@ -1,3 +1,4 @@
+import { accountOpeningHours } from '../services/account-opening-hours.js';
 import { findDirectMediaUsages } from '../features/media/index.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
@@ -601,6 +602,7 @@ export const get__api_common_vars_id_10 = async (c: Context<Env, "/api/common-va
       success: true,
       data: {
         ...serializeVar(variable),
+        pinDisabledReason: variable.var_key === 'business_hours' && (await accountOpeningHours(c.env.DB, accountId)).source !== 'manual' ? 'Google と連携した値は、いつも最新を使います' : null,
         usages: serializedImpact.items.slice(0, 15),
         usagePage: {
           total: impact.total,

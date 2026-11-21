@@ -86,7 +86,7 @@ export function changeCounts(impact: CommonVarDeleteImpact | CommonVarChangeImpa
   hidden: number
 } {
   return {
-    immediate: impact.blockingTotal,
+    immediate: Math.max(0, impact.blockingTotal - impact.items.filter((item) => item.blocksDeletion && item.referenceMode === 'pinned').length),
     historical: impact.historicalTotal,
     hidden: impact.unscopedFormTotal,
   }
@@ -101,8 +101,7 @@ export function changeCounts(impact: CommonVarDeleteImpact | CommonVarChangeImpa
 export function changeSummaryText(impact: CommonVarDeleteImpact | CommonVarChangeImpact): string {
   const { immediate } = changeCounts(impact)
   if (immediate === 0) {
-    return `${placeholderText(impact.variable.varKey)} はどこにも差し込まれていません。`
-      + '保存しても、いま変わる場所はありません。'
+    return impact.total > 0 ? '保存しても、確認できた使用先は変わりません。' : `${placeholderText(impact.variable.varKey)} はどこにも差し込まれていません。保存しても、いま変わる場所はありません。`
   }
   return `保存すると、${placeholderText(impact.variable.varKey)} を差し込んでいる `
     + `${formatNumber(immediate)}か所がすぐ変わります。`

@@ -181,6 +181,9 @@ import {
 } from '../features/broadcasts/broadcast-message-set/index.js';
 import {
   commonVarValuesForAccount,
+  commonVarKeysInContent,
+  BroadcastCommonVarResolutionError,
+  validateSavedPins,
   parseBroadcastCommonVarSnapshot,
 } from './common-var-snapshot.js';
 
@@ -462,6 +465,8 @@ export async function processMultiAccountDedupBroadcast(
               );
               // 外へ出す直前に台帳へ書く。1人ずつ押さえるので、束の途中で
               // 落ちたときに**まだ試していない相手**を送達不明にしない。
+              const pinSnapshot = parseBroadcastCommonVarSnapshot(broadcast.common_var_snapshot);
+              if (pinSnapshot) await validateSavedPins(db, broadcast.id, pinSnapshot, commonVarKeysInContent(combinedMessageContent(sourceParts)), new Date().toISOString());
               await markBroadcastRecipientsDispatched(db, {
                 broadcastId: broadcast.id,
                 attemptNo,
@@ -489,6 +494,8 @@ export async function processMultiAccountDedupBroadcast(
             ...batch.map((r) => r.identKey),
             JSON.stringify(batchMessages),
           );
+          const pinSnapshot = parseBroadcastCommonVarSnapshot(broadcast.common_var_snapshot);
+          if (pinSnapshot) await validateSavedPins(db, broadcast.id, pinSnapshot, commonVarKeysInContent(combinedMessageContent(sourceParts)), new Date().toISOString());
           await markBroadcastRecipientsDispatched(db, {
             broadcastId: broadcast.id,
             attemptNo,
@@ -562,6 +569,7 @@ export async function processMultiAccountDedupBroadcast(
         }
         sentAnyBatch = true; // 1 batch 以上 durable に記録した → 前進保証 & yield 可
         if (batchDeliveryError) {
+          if (batchDeliveryError instanceof BroadcastCommonVarResolutionError) throw batchDeliveryError;
           // 1人ずつ送る経路で落ちた相手。届いていないと断定できたものだけを
           // 再送の対象にし、分からないものは送達不明のまま置く。
           const outcome = classifyDeliveryFailure(batchDeliveryError);
@@ -576,6 +584,7 @@ export async function processMultiAccountDedupBroadcast(
         }
       }
     } catch (err) {
+      if (err instanceof BroadcastCommonVarResolutionError) throw err;
       logger.error("dedup_broadcast.send_account_batch_failed");
       failedAccountIds.push(account.id);
     }
