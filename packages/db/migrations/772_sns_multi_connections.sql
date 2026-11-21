@@ -1,5 +1,15 @@
 -- migration-policy: table-rebuild
+-- migration-state: ledger-only
 -- 772: Googleビジネス・Instagram の複数連携（第1段のDB基盤）
+--
+-- 状態の判定について（`-- migration-state: ledger-only` を書く理由）:
+--   表を作り直すと古い表と一緒にその索引も消えるので、このファイルは
+--   `idx_rt_google_metrics_daily_store_date` と `idx_instagram_connections_instagram_id`
+--   を同じ名前で作り直す。この2本は当てる前から現物に在るため、
+--   `scripts/deploy/migrate.ts status` の現物判定では「26個の目印のうち2個だけ在る」と見えて
+--   「部分（途中で落ちた跡かもしれない）」になり、apply が止まっていた。
+--   実際には途中状態ではない。D1 はファイル単位で当ててから `_migrations` に記録するので、
+--   このファイルは記録で判定する。
 --
 -- 目的: 1つの店舗 / LINEアカウントに複数の接続を持てるようにする。
 --   - rt_google_connections.store_id の UNIQUE（446:8）を外して非一意のFKにする
