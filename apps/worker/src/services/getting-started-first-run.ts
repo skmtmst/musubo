@@ -2,7 +2,7 @@ import { firstDeliveredMessageAt, toJstString } from '@line-crm/db';
 import { instant } from './style-analytics-core.js';
 
 /** 保存の形がまちまち（Z・+09:00・時差なしの日本時間）な時刻を、日本時間の文字にそろえる。 */
-function jst(value: string | null | undefined): string | null {
+export function jst(value: string | null | undefined): string | null {
   if (!value) return null;
   const at = instant(value);
   return Number.isFinite(at) ? toJstString(new Date(at)) : null;
@@ -18,8 +18,8 @@ export async function firstRunTimes(db: D1Database, accountId: string) {
   const [account, style, starter, follow, firstMessage] = await Promise.all([
     db.prepare('SELECT created_at AS at FROM line_accounts WHERE id = ?')
       .bind(accountId).first<{ at: string | null }>(),
-    db.prepare("SELECT first_selected_at AS at FROM account_styles WHERE line_account_id = ?")
-      .bind(accountId).first<{ at: string | null }>(),
+    db.prepare("SELECT first_selected_at AS at, first_run_done_seen_at AS seen_at FROM account_styles WHERE line_account_id = ?")
+      .bind(accountId).first<{ at: string | null; seen_at: string | null }>(),
     db.prepare('SELECT first_starter_at AS at FROM account_styles WHERE line_account_id = ?')
       .bind(accountId).first<{ at: string | null }>(),
     db.prepare(
@@ -39,6 +39,8 @@ export async function firstRunTimes(db: D1Database, accountId: string) {
     starterAt: jst(starter?.at),
     followAt: jst(follow?.at),
     firstMessageAt,
+    doneSeenAt: jst(style?.seen_at),
+    doneSeenTracked: style !== null,
     minutes,
   };
 }
