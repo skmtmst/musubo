@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [フォルダ操作と警告文の自動確認](release-log/unreleased/84-kenta-guards-ci.md) — 自動確認の追加履歴。確認 2026-11-16。
+
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
