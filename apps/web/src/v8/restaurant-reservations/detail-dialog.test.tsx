@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(), reservationsDay: vi.fn(), updateReservation: vi.fn(), createReservation: vi.fn(), holdReservation: vi.fn(),
-  importReservation: vi.fn(), openingHours: vi.fn(), customerSearch: vi.fn(), customerHistory: vi.fn(),
+  importReservation: vi.fn(), openingHours: vi.fn(), customerSearch: vi.fn(), customerHistory: vi.fn(), reservationPayment:vi.fn(),
 }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const held = vi.hoisted(() => ({ confirm: null as null | (() => unknown) }))
@@ -48,6 +48,7 @@ beforeEach(() => {
   fixture.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: null, version: 1, updatedBy: null, updatedAt: null } })
   fixture.updateReservation.mockResolvedValue({ success: true })
   fixture.customerSearch.mockResolvedValue({ data: [] })
+  fixture.reservationPayment.mockResolvedValue({success:true,data:{payment:null}})
   // 日付表示は日本時間。端末がUTCでも8/14となるよう、見本にも時差を明示する。
   fixture.customerHistory.mockResolvedValue({ data: { visitCount: 3, visits: [{ id: 'v1', starts_at: '2026-08-14T19:00:00+09:00', guest_count: 4, allergy_note: null, table_label: null, course_name: null }] } })
 })
@@ -60,6 +61,13 @@ const openDetail = async () => {
 }
 
 describe('AjZhH 予約台帳 予約の詳細', () => {
+  it('予約金の状態と店で支払う残額を表示する',async()=>{
+    fixture.reservationPayment.mockResolvedValue({success:true,data:{payment:{status:'paid',amount:2520,total:8400,remaining:5880}}})
+    const data=snapshotOf({reservations:today,reservationTotal:2})
+    render(<ReservationDetailDialog inline reservation={today[0]} accountId="account-1" tables={data.tables} courses={data.menuItems} busy={false} canWrite onClose={()=>{}} onCancel={()=>{}} onRestore={()=>{}} onEdit={()=>{}} />)
+    expect(await screen.findByText(/予約金の支払い済み.*2,520.*お店で.*5,880/)).toBeTruthy()
+    expect(fixture.reservationPayment).toHaveBeenCalledWith('account-1','r1')
+  })
   it.each([[null, 'なし', false], ['なし', 'なし', false], ['えび', 'えび', true]] as const)('予約詳細のアレルギー %s と連絡先を区別する', (allergy, label, warning) => {
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })
     render(<ReservationDetailDialog reservation={{ ...today[0], allergy_note: allergy }} accountId="account-1" tables={data.tables} courses={data.menuItems}
@@ -138,8 +146,10 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '取り消す' }))
     expect(fixture.updateReservation).not.toHaveBeenCalled()
     const confirm = await screen.findByRole('dialog', { name: 'この予約を取り消しますか？' })
+    fireEvent.click(within(confirm).getByRole('button',{name:'取消の理由'}))
+    fireEvent.click(within(screen.getByRole('option',{name:'店の都合'})).getByRole('button'))
     fireEvent.click(within(confirm).getByRole('button', { name: '取り消す' }))
-    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'cancelled', expectedVersion: 1 }))
+    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'cancelled', cancellationCause:'store', expectedVersion: 1 }))
   })
 
   it('内容を変えるで今の変更の窓へ移る', async () => {

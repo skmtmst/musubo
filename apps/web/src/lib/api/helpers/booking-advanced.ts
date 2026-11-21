@@ -44,6 +44,8 @@ export const bookingAdvancedApi = {
     }) => fetchApi<Result<DepositRule & {
         inherit: boolean;
     }>>(account(`/api/booking/admin/menus/${e(id)}/deposit`, a), json('PUT', b)),
+    courseDeposit: (a: string, id: string) => fetchApi<Result<DepositRule & { inherit: boolean }>>(account(`/api/restaurant-test/menus/${e(id)}/deposit`, a)),
+    saveCourseDeposit: (a: string, id: string, b: Omit<DepositRule, 'version'> & { inherit: boolean; expectedVersion: number }) => fetchApi<Result<DepositRule & { inherit: boolean }>>(account(`/api/restaurant-test/menus/${e(id)}/deposit`, a), json('PUT', b)),
     cancellationOptions: (a: string) => fetchApi<Result<CancellationOptions>>(account('/api/booking/admin/cancellation-options', a)),
     saveCancellationOptions: (a: string, b: {
         cardRequiredFor: CancellationOptions['cardRequiredFor'];

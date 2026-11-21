@@ -187,7 +187,7 @@ describe('無断→有効に戻す→来店→訂正', () => {
     }, env);
     const { data: { id } } = await created.json() as { data: { id: string } };
     expect((await attend(id, 'visited')).status).toBe(200);
-    expect((await patch(id, { status: 'cancelled' })).status).toBe(200);
+    expect((await patch(id, { status: 'cancelled', cancellationCause:'store' })).status).toBe(200);
     expect((await restore(id)).status).toBe(200);
     expect(marks(id)).toEqual([{ kind: 'visited', undone: 1 }]);
     expect((await attend(id, 'no_show')).status).toBe(200);
@@ -254,7 +254,7 @@ describe('無断→有効に戻す→来店→訂正', () => {
     expect(marks(id)).toEqual([]);
 
     /* 取消は来店取消口では戻せない（通常復活のまま）。 */
-    expect((await patch(id, { status: 'cancelled' })).status).toBe(200);
+    expect((await patch(id, { status: 'cancelled', cancellationCause:'store' })).status).toBe(200);
     const cancelledUndo = await attend(id, 'undo_visit');
     expect(cancelledUndo.status).toBe(404);
 

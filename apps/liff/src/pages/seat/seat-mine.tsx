@@ -48,9 +48,8 @@ export default function SeatMine({
               {`${b.guestCount}名・${STATUS_LABEL[b.status] ?? b.status}`}
             </p>
             {late ? (
-              <p className="mt-2 text-[13px] leading-6 text-liff-sub">
-                取り消し・変更の締め切りを過ぎました。お店へ直接ご連絡ください。
-              </p>
+              <><p className="mt-2 text-[13px] leading-6 text-liff-sub">変更の締め切りを過ぎました。変更はお店へ直接ご連絡ください。</p>
+              {b.paymentStatus==='paid' && <Button variant="secondary" onClick={()=>onCancel(b)}>取り消す</Button>}</>
             ) : (
               <>
                 <p className="mt-1 text-xs leading-[18px] text-liff-sub">

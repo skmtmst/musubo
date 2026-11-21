@@ -1597,13 +1597,45 @@ CREATE TABLE booking_cancellation_policies (
  updated_by TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 
+CREATE TABLE booking_card_checkout_requests (
+  id TEXT PRIMARY KEY REFERENCES booking_payment_methods(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  friend_id TEXT NOT NULL REFERENCES friends(id),
+  idempotency_key TEXT NOT NULL,
+  booking_json TEXT NOT NULL CHECK(json_valid(booking_json)),
+  connect_account TEXT NOT NULL,
+  customer_id TEXT,
+  checkout_id TEXT UNIQUE,
+  checkout_url TEXT,
+  created_at TEXT NOT NULL,
+  UNIQUE(line_account_id,friend_id,idempotency_key)
+);
+
+CREATE TABLE booking_charge_refund_requests (
+  id TEXT PRIMARY KEY,
+  charge_id TEXT NOT NULL UNIQUE REFERENCES booking_charges(id),
+  line_account_id TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  expected_version INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  connect_account TEXT NOT NULL,
+  payment_intent_id TEXT NOT NULL,
+  amount INTEGER NOT NULL CHECK(amount>0),
+  status TEXT NOT NULL CHECK(status IN ('processing','unknown','succeeded')),
+  stripe_refund_id TEXT UNIQUE,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(line_account_id,idempotency_key)
+);
+
 CREATE TABLE booking_charges (
  -- 支払の証跡のIDは削除後も残す。顧客・予約・店へのFKで削除を妨げない。
  id TEXT PRIMARY KEY,booking_id TEXT NOT NULL,line_account_id TEXT NOT NULL,
  kind TEXT NOT NULL CHECK(kind IN('cancellation_fee','no_show_fee')),amount INTEGER NOT NULL CHECK(amount>=0),
  policy_snapshot_json TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN('pending','processing','succeeded','failed','unknown','waived','refunded')),
  reason TEXT,actor_staff_id TEXT,stripe_payment_intent_id TEXT,idempotency_key TEXT,version INTEGER NOT NULL DEFAULT 1,
- test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
+ test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),created_at TEXT NOT NULL,updated_at TEXT NOT NULL, stripe_connected_account_id TEXT, stripe_call_started_at TEXT,
  UNIQUE(booking_id,kind),UNIQUE(line_account_id,idempotency_key)
 );
 
@@ -7094,6 +7126,44 @@ CREATE TABLE restaurant_course_payment_settings (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE restaurant_payment_details (
+  request_id TEXT PRIMARY KEY REFERENCES restaurant_payment_requests(id),
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  customer_name TEXT NOT NULL,
+  customer_phone TEXT,
+  allergy_note TEXT,
+  note TEXT,
+  form_version INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE restaurant_payment_requests (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
+  store_id TEXT NOT NULL,
+  reservation_id TEXT NOT NULL UNIQUE,
+  form_submission_id TEXT UNIQUE,
+  connect_account TEXT NOT NULL,
+  request_json TEXT NOT NULL CHECK(json_valid(request_json)),
+  policy_accepted_at TEXT,
+  total_amount INTEGER NOT NULL CHECK(total_amount>=0),
+  amount INTEGER NOT NULL CHECK(amount>0 AND amount<=total_amount),
+  customer_id TEXT,
+  checkout_id TEXT UNIQUE,
+  checkout_url TEXT,
+  payment_intent_id TEXT UNIQUE,
+  refund_started_at TEXT,
+  cancel_requested INTEGER NOT NULL DEFAULT 0 CHECK(cancel_requested IN (0,1)),
+  cancel_expected_version INTEGER,
+  cancel_reason TEXT,
+  recovery_retry_at TEXT,
+  stripe_refund_id TEXT UNIQUE,
+  cancellation_fee INTEGER,
+  status TEXT NOT NULL CHECK(status IN ('pending','paid','refund_pending','refunded','forfeited')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE rfm_segment_names(account_id TEXT NOT NULL REFERENCES line_accounts(id),r_bucket INTEGER NOT NULL CHECK(r_bucket BETWEEN 1 AND 5),f_bucket INTEGER NOT NULL CHECK(f_bucket BETWEEN 1 AND 5),name TEXT NOT NULL,PRIMARY KEY(account_id,r_bucket,f_bucket));
 
 CREATE TABLE rich_menu_area_taps (
@@ -12327,6 +12397,15 @@ CREATE TRIGGER booking_cancellation_policy_snapshot AFTER INSERT ON bookings
 BEGIN UPDATE bookings SET policy_snapshot_json=(SELECT json_object('enabled',json(CASE WHEN enabled=1 THEN 'true' ELSE 'false' END),'tiers',json(tiers_json),'noShowPercent',no_show_percent,'version',version)
  FROM booking_cancellation_policies WHERE line_account_id=NEW.line_account_id) WHERE id=NEW.id AND policy_snapshot_json IS NULL; END;
 
+CREATE TRIGGER booking_charge_block_status_change
+BEFORE UPDATE OF status ON bookings
+WHEN NEW.status<>OLD.status AND EXISTS (
+  SELECT 1 FROM booking_charges c WHERE c.booking_id=OLD.id AND c.line_account_id=OLD.line_account_id
+    AND c.status IN ('processing','unknown','succeeded')
+)
+BEGIN
+  SELECT RAISE(ABORT,'booking_charge_in_progress'); END;
+
 CREATE TRIGGER booking_entitlement_confirm AFTER UPDATE OF status ON bookings
 WHEN NEW.status='confirmed' AND OLD.status<>'confirmed'
 BEGIN  UPDATE booking_entitlement_uses SET consumed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE booking_id=NEW.id AND consumed_at IS NULL; END;
@@ -12351,6 +12430,13 @@ BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
 
 CREATE TRIGGER booking_entitlement_use_validate BEFORE INSERT ON booking_entitlement_uses
 BEGIN  SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM bookings b JOIN booking_entitlements e ON e.id=NEW.entitlement_id WHERE b.id=NEW.booking_id AND b.line_account_id=e.line_account_id AND b.friend_id=e.friend_id AND e.status='active' AND (e.menu_id IS NULL OR e.menu_id=b.menu_id) AND julianday(b.starts_at)>=julianday(e.valid_from) AND julianday(b.starts_at)<julianday(e.expires_at) AND b.status IN ('requested','confirmed') AND NEW.consumed_at IS NULL) THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+
+CREATE TRIGGER booking_failed_fee_revert
+AFTER UPDATE OF status ON bookings
+WHEN OLD.status IN ('cancelled','no_show') AND NEW.status NOT IN ('cancelled','no_show')
+BEGIN
+  UPDATE booking_charges SET status='waived',reason='cancellation_reverted',version=version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+    WHERE booking_id=NEW.id AND line_account_id=NEW.line_account_id AND status='failed'; END;
 
 CREATE TRIGGER booking_fixed_meeting_cancel AFTER UPDATE OF status ON bookings WHEN NEW.status IN('cancelled','rejected','expired')
 BEGIN UPDATE bookings SET meeting_url=NULL,meeting_url_source=NULL WHERE id=NEW.id; END;
@@ -13184,6 +13270,32 @@ CREATE TRIGGER restaurant_course_payment_scope_update BEFORE UPDATE ON restauran
 WHEN NOT EXISTS(SELECT 1 FROM rt_menu_items m JOIN rt_stores s ON s.id=m.store_id
   WHERE m.id=NEW.menu_id AND m.kind='course' AND s.id=NEW.store_id AND s.line_account_id=NEW.line_account_id)
 BEGIN SELECT RAISE(ABORT,'course_payment_scope_mismatch'); END;
+
+CREATE TRIGGER restaurant_payment_cancel_claim_guard BEFORE UPDATE ON rt_reservations
+WHEN EXISTS(SELECT 1 FROM restaurant_payment_requests p WHERE p.reservation_id=OLD.id AND p.cancel_requested=1 AND p.status IN ('refund_pending','refunded')
+  AND NOT (p.status='refunded' AND NEW.status='cancelled'))
+BEGIN SELECT RAISE(ABORT,'restaurant_refund_pending'); END;
+
+CREATE TRIGGER restaurant_payment_cancel_guard BEFORE UPDATE OF status ON rt_reservations
+WHEN NEW.status IN ('cancelled','rejected') AND OLD.status<>NEW.status AND EXISTS(SELECT 1 FROM restaurant_payment_requests p WHERE p.reservation_id=NEW.id AND p.status IN ('paid','refund_pending'))
+BEGIN SELECT RAISE(ABORT,'restaurant_refund_pending'); END;
+
+CREATE TRIGGER restaurant_payment_change_guard BEFORE UPDATE OF starts_at,ends_at,guest_count,course_id ON rt_reservations
+WHEN (NEW.starts_at IS NOT OLD.starts_at OR NEW.ends_at IS NOT OLD.ends_at OR NEW.guest_count<>OLD.guest_count OR NEW.course_id IS NOT OLD.course_id)
+  AND EXISTS(SELECT 1 FROM restaurant_payment_requests p WHERE p.reservation_id=NEW.id AND p.status IN ('pending','paid','refund_pending'))
+BEGIN SELECT RAISE(ABORT,'restaurant_payment_change_requires_refund'); END;
+
+CREATE TRIGGER restaurant_payment_confirm_guard BEFORE UPDATE OF status ON rt_reservations
+WHEN NEW.status='confirmed' AND OLD.status<>'confirmed' AND EXISTS(SELECT 1 FROM restaurant_payment_requests p WHERE p.reservation_id=NEW.id AND p.status<>'paid')
+BEGIN SELECT RAISE(ABORT,'restaurant_payment_not_paid'); END;
+
+CREATE TRIGGER restaurant_payment_details_guard BEFORE UPDATE OF customer_name,customer_phone,allergy_note,note ON rt_reservations
+WHEN (NEW.customer_name IS NOT OLD.customer_name OR NEW.customer_phone IS NOT OLD.customer_phone OR NEW.allergy_note IS NOT OLD.allergy_note OR NEW.note IS NOT OLD.note)
+ AND EXISTS(SELECT 1 FROM restaurant_payment_requests p WHERE p.reservation_id=OLD.id AND p.status IN ('pending','paid','refund_pending')
+   AND (p.status<>'paid' OR OLD.status='pending')
+   AND NOT (p.status='paid' AND OLD.status='pending' AND NEW.status='confirmed' AND EXISTS(SELECT 1 FROM restaurant_payment_details d
+     WHERE d.request_id=p.id AND NEW.customer_name IS d.customer_name AND NEW.customer_phone IS d.customer_phone AND NEW.allergy_note IS d.allergy_note AND NEW.note IS d.note)))
+BEGIN SELECT RAISE(ABORT,'restaurant_payment_details_locked'); END;
 
 CREATE TRIGGER rt_closure_reservation_insert BEFORE INSERT ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND NEW.departed_at IS NULL AND EXISTS(SELECT 1 FROM rt_closures c, json_each(c.periods_json) p WHERE c.store_id=NEW.store_id AND c.archived_at IS NULL AND julianday(json_extract(p.value,'$.startsAt'))<julianday(NEW.ends_at) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(NEW.starts_at) AND (json_array_length(c.table_ids_json)=0 OR NEW.table_id IS NULL OR EXISTS(SELECT 1 FROM json_each(c.table_ids_json) t WHERE t.value=NEW.table_id))) BEGIN SELECT RAISE(ABORT,'closure_conflict'); END;
 

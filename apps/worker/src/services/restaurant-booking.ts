@@ -16,6 +16,7 @@ export async function expireRestaurantHolds(
   const results = await db.batch([
     db.prepare(`UPDATE rt_reservations SET confirmation_revision = confirmation_revision + 1, status = 'cancelled', updated_at = ?
       WHERE status = 'pending' AND hold_expires_at IS NOT NULL
+        AND NOT EXISTS(SELECT 1 FROM restaurant_payment_requests p WHERE p.reservation_id=rt_reservations.id AND (p.status IN ('paid','refund_pending') OR (p.status='refunded' AND p.cancel_requested=1)))
         AND datetime(hold_expires_at) <= datetime(?) AND ${scope}`)
       .bind(now, now, ...scopeArgs),
     db.prepare(`UPDATE rt_inventory_slots SET reserved_count = COALESCE((

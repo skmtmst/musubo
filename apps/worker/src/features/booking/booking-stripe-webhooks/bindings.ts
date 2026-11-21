@@ -2,7 +2,7 @@ import { workflowJson } from '@line-crm/db';
 import { BINDING_PROCESS, BookingStripeError, RECEIPT_PROCESS, type BookingStripeBinding, type StripeBookingPurpose } from './types.js';
 export function bindingScope(account: string): string { return `stripe-test:${account}`; }
 const kinds:Record<StripeBookingPurpose,readonly string[]> = {monthly_invoice: ['invoice'], payment_method: ['setup_intent','checkout.session'], pass_purchase: ['checkout.session'],
-  booking_payment: ['payment_intent'], cancellation_charge: ['payment_intent'], restaurant_payment: ['payment_intent']};
+  booking_payment: ['payment_intent'], cancellation_charge: ['payment_intent'], restaurant_payment: ['payment_intent','checkout.session']};
 /** 本文が示すIDを信用せず、保存済みの店・本人・元の接続で業務の関連を固定する。 */
 export function prepareBookingStripeBinding(db: D1Database, binding: BookingStripeBinding): D1PreparedStatement[] {
   if (!Object.hasOwn(kinds,binding.purpose) || !kinds[binding.purpose].includes(binding.objectKind)

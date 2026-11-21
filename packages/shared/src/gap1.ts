@@ -20,7 +20,8 @@ export interface BookingCancellationConfirmation {feeAccepted:boolean;expectedFe
 export interface BookingCancellationCharge {
  id:string;booking_id:string;line_account_id:string;kind:'cancellation_fee'|'no_show_fee';amount:number;
  status:'pending'|'processing'|'succeeded'|'failed'|'unknown'|'waived'|'refunded';version:number;
- actor_staff_id:string|null;reason:string|null;test_mode:1;
+ actor_staff_id:string|null;reason:string|null;test_mode:1;idempotency_key?:string|null;
+ refund_key?:string|null;refund_reason?:string|null;refund_status?:'processing'|'unknown'|'succeeded'|null;
 }
 export interface BookingCalendarSwitch {readEnabled:boolean;writeEnabled:boolean;version:number;effectiveReadEnabled?:boolean;effectiveWriteEnabled?:boolean;connected?:boolean;futureEventCount?:number}
 export interface BookingCalendarSwitchWrite {readEnabled:boolean;writeEnabled:boolean;expectedVersion:number;confirmed?:boolean;removeFutureEvents?:boolean;includeBacklog?:boolean}

@@ -254,7 +254,8 @@ booking.delete('/api/booking/admin/bookings/:id/visit', requireRole('owner', 'ad
     const updated = await c.env.DB
       .prepare(`UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = ?, lock_version = lock_version + 1,
                     updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE id = ? AND status = ?`)
+        WHERE id = ? AND status = ?
+          AND NOT EXISTS(SELECT 1 FROM booking_charges c WHERE c.booking_id=bookings.id AND c.line_account_id=bookings.line_account_id AND c.status IN ('processing','unknown','succeeded'))`)
       .bind(next, id, row.status)
       .run();
     if ((updated.meta?.changes ?? 0) === 0) {

@@ -853,6 +853,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'PUT /api/restaurant-test/inventory/allocation',
     'PUT /api/restaurant-test/line-flows/:id',
     'PUT /api/restaurant-test/memberships/:id/login',
+    'PUT /api/restaurant-test/menus/:id/deposit',
     'PUT /api/restaurant-test/opening-hours',
     'PUT /api/restaurant-test/stores/:id/referral-location',
     'PUT /api/restaurant-test/tables/layout',

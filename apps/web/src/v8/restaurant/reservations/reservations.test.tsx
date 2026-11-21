@@ -156,8 +156,12 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'キャンセル' }))
     expect(fixture.updateReservation).not.toHaveBeenCalled()
     fireEvent.click(within(row).getByRole('button',{name:'見本 114のその他操作'}));fireEvent.click(screen.getByRole('menuitem',{name:'取消'}))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '取り消す' }))
-    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'cancelled', expectedVersion: 1 }))
+    const dialog = screen.getByRole('dialog')
+    expect((within(dialog).getByRole('button', { name: '取り消す' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(within(dialog).getByRole('button', { name: '取消の理由' }))
+    fireEvent.click(within(screen.getByRole('option', { name: '店の都合' })).getByRole('button'))
+    fireEvent.click(within(dialog).getByRole('button', { name: '取り消す' }))
+    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'cancelled', cancellationCause: 'store', expectedVersion: 1 }))
   })
 
   it('電話の予約を入れる（rm92Y）で台帳に入れると createReservation へ送る', async () => {

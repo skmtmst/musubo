@@ -43,7 +43,7 @@ it('決まりがオンの店は、チェックを入れるまで押せず、入�
   expect(submit.disabled).toBe(false);
   fireEvent.click(submit);
   await vi.waitFor(() => expect(api.createRequest).toHaveBeenCalledWith(expect.objectContaining({ policyAccepted: true, policyVersion: 2, setupIntentId: 'seti_test_1' }), expect.any(String)));
-  expect(api.cancellationSetup).toHaveBeenCalledWith('m1', expect.any(String));
+  expect(api.cancellationSetup).toHaveBeenCalledWith(expect.objectContaining({menuId:'m1',staffId:'s1',partySize:1}), expect.any(String));
 });
 
 it('デポジットがある店は今払う額とお店で払う額を出し、ボタンに今払う額を書く', async () => {

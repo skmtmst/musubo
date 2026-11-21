@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { defaultRestaurantReservationForm,type RestaurantCustomerBooking,type RestaurantCustomerSlot } from '@line-crm/shared';
 
@@ -13,7 +13,7 @@ import { defaultRestaurantReservationForm,type RestaurantCustomerBooking,type Re
  */
 
 vi.mock('@line/liff', () => ({
-  default: { getProfile: vi.fn().mockResolvedValue({ displayName: '見本 143' }), closeWindow: vi.fn() },
+  default: { getProfile: vi.fn().mockResolvedValue({ displayName: '見本 143' }), closeWindow: vi.fn(), openWindow: vi.fn() },
 }));
 vi.mock('../../lib/api.js', () => ({
   api: { customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:"line"}}}),
@@ -30,6 +30,7 @@ vi.mock('../../lib/api.js', () => ({
     referral: vi.fn(),
     availability: vi.fn(),
     hold: vi.fn(),
+    payment: vi.fn(),
     mine: vi.fn(),
     confirm: vi.fn(),
     cancel: vi.fn(),
@@ -90,6 +91,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-10-07T00:00:00Z'));
   vi.mocked(seat.link).mockResolvedValue({ success: true, data: { id: 'st', name: '然 - NEN - 本店', timezone: 'Asia/Tokyo' } });
+  vi.mocked(seat.payment).mockResolvedValue({success:true,data:{required:false,quote:{total:0,amount:0,remaining:0,kind:'none',cancellation:{text:'キャンセル料は掛かりません',version:0}}}});
   vi.mocked(seat.availability).mockImplementation(async (_s, date, guestCount) => ({
     success: true,
     data: { storeId: 'st', date, guestCount, slots: slots(date), cancelDeadlineMinutesBefore: 120, cutoffMinutesBefore: 60 },
@@ -102,6 +104,36 @@ afterEach(() => {
 });
 
 describe('席の予約の流れ', () => {
+  it('期限後の取消はキャンセル料を示してから同意を送り、予約金を充当する', async () => {
+    vi.mocked(seat.mine).mockResolvedValue({success:true,data:[held({status:'confirmed',paymentStatus:'paid',startsAt:new Date('2026-10-07T09:30:00+09:00').toISOString()})]});
+    vi.mocked(seat.cancel).mockRejectedValueOnce(Object.assign(new Error('fee'),{status:409,body:{error:'fee_confirmation_required',data:{feeNow:4200,remainingFee:1680}}})).mockResolvedValueOnce({success:true,data:held({status:'cancelled'})});
+    open('/restaurant/reserve/tok?view=mine');
+    fireEvent.click(await screen.findByRole('button',{name:'取り消す'}));
+    let dialog=await screen.findByRole('alertdialog',{name:'ご予約を取り消しますか'});
+    fireEvent.click(within(dialog).getByRole('button',{name:'取り消す'}));
+    await screen.findByText(/予約金 4,200 円をキャンセル料に充てます/);
+    dialog=screen.getByRole('alertdialog',{name:'ご予約を取り消しますか'});
+    fireEvent.click(within(dialog).getByRole('button',{name:'取り消す'}));
+    expect(seat.cancel).toHaveBeenLastCalledWith('r1',3,{feeAccepted:true,expectedFeeAmount:4200});
+  });
+  it('予約金の額と決まりを確認するまで Stripe を開かず予約を確定しない', async () => {
+    const sdk=(await import('@line/liff')).default;
+    vi.mocked(seat.hold).mockResolvedValue({success:true,data:held()});
+    const quote={total:8400,amount:2520,remaining:5880,kind:'deposit',cancellation:{text:'前日まで無料',version:2}};
+    vi.mocked(seat.payment).mockResolvedValueOnce({success:true,data:{required:true,status:'preview',url:null,quote}}).mockResolvedValueOnce({success:true,data:{required:true,status:'pending',url:'https://checkout.stripe.com/c/pay/cs_test_example',quote}});
+    open();fireEvent.click(await screen.findByRole('radio',{name:'19:00 空きあり'}));fireEvent.click(screen.getByRole('button',{name:'この時刻で進む'}));
+    await screen.findByText('ご予約の内容');fireEvent.click(screen.getByRole('button',{name:'予約を確定する'}));
+    const dialog=await screen.findByRole('dialog',{name:'お支払い内容を確認'});
+    for (const [label, amount] of [['料金', '8,400円'], ['今お支払い', '2,520円'], ['お店で', '5,880円']] as const) {
+      const term = [...dialog.querySelectorAll('dt')].find(node => node.textContent === label);
+      expect(term?.parentElement?.querySelector('dd')?.textContent).toBe(amount);
+    }
+    expect(dialog.textContent).toContain('前日まで無料');expect(seat.confirm).not.toHaveBeenCalled();
+    expect((screen.getByRole('button',{name:'お支払いへ進む'}) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('checkbox',{name:'キャンセル料の決まりを確認しました'}));fireEvent.click(screen.getByRole('button',{name:'お支払いへ進む'}));
+    await vi.waitFor(()=>expect(sdk.openWindow).toHaveBeenCalledWith({url:'https://checkout.stripe.com/c/pay/cs_test_example',external:true}));
+    expect(seat.payment).toHaveBeenLastCalledWith('r1',3,expect.objectContaining({policyAccepted:true,policyVersion:2,expectedAmount:2520,expectedTotal:8400}));
+  });
   it('時刻を選ぶと仮押さえし、返った版で確定して受け付けましたへ進む', async () => {
     vi.mocked(seat.hold).mockResolvedValue({ success: true, data: held() });
     vi.mocked(seat.confirm).mockResolvedValue({ success: true, data: held({ status: 'confirmed', version: 4, holdExpiresAt: null }) });

@@ -6,7 +6,7 @@
 
 ## 数え方と限界
 
-WorkerのHono実登録にある管理認証の外の入口は **211経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。10-17のAPI列車の取り込みで、追加された7経路だけを追記（175＋7）。10-17の列車42で統合後の実登録と照合し、不足していた19経路を追記した（182＋19）。既存行の全入力組合せを再監査したという意味ではない。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。 10-19 P02で店の写真の公開取得1経路を追記（201＋1）。認証の許可範囲は変更しない。 10-19にチャネル別LINE Webhookを追加（202＋1）。10-21に本人確認済みのクリック遷移資格発行を追加（203＋1）。10-31にF1の公開フォーム画像1経路を追加（204＋1）。10-31に本人の月謝契約の閲覧1経路を追加（205＋1）。10-31にStripeのConnect試験の共通の受け口1経路を追加（206＋1）。同日の実登録との照合で、本線から掲載漏れだったパスキー確認2経路・イベント一覧1経路を追記（207＋3、認証範囲の変更なし）。
+WorkerのHono実登録にある管理認証の外の入口は **212経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。10-17のAPI列車の取り込みで、追加された7経路だけを追記（175＋7）。10-17の列車42で統合後の実登録と照合し、不足していた19経路を追記した（182＋19）。既存行の全入力組合せを再監査したという意味ではない。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。 10-19 P02で店の写真の公開取得1経路を追記（201＋1）。認証の許可範囲は変更しない。 10-19にチャネル別LINE Webhookを追加（202＋1）。10-21に本人確認済みのクリック遷移資格発行を追加（203＋1）。10-31にF1の公開フォーム画像1経路を追加（204＋1）。10-31に本人の月謝契約の閲覧1経路を追加（205＋1）。10-31にStripeのConnect試験の共通の受け口1経路を追加（206＋1）。同日の実登録との照合で、本線から掲載漏れだったパスキー確認2経路・イベント一覧1経路を追記（207＋3、認証範囲の変更なし）。
 
 「全経路を列挙」と「すべての入力で安全を確認」は別。表の本人確認・期限はコードの方式で、実配備の設定や全資源ID×本人の組合せはS07/S15の未完を維持する。URLの実値・query・顧客情報は記録しない。
 
@@ -145,6 +145,7 @@ WorkerのHono実登録にある管理認証の外の入口は **211経路**（�
 | `POST /api/liff/restaurant/referrals` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | 検証専用。本番DEPLOY_ENVでは404。リンク/保留/確認は保存期限と本人を照合 | `apps/worker/src/routes/restaurant-customer-booking.ts` |
 | `GET /api/liff/restaurant/reservations` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | 検証専用。本番DEPLOY_ENVでは404。リンク/保留/確認は保存期限と本人を照合 | `apps/worker/src/routes/restaurant-customer-booking.ts` |
 | `POST /api/liff/restaurant/reservations/:id/cancel` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | 検証専用。本番DEPLOY_ENVでは404。リンク/保留/確認は保存期限と本人を照合 | `apps/worker/src/routes/restaurant-customer-booking.ts` |
+| `POST /api/liff/restaurant/reservations/:id/payment` | LINE IDトークンと所属・本人の仮押さえを照合 | IP 3,000/分（単一実行環境） | 本人の予約と金額をサーバーで照合 | 検証専用。本番DEPLOY_ENVでは404。Stripe試験モードのみ | `apps/worker/src/routes/restaurant-customer-booking.ts` |
 | `POST /api/liff/restaurant/reservations/:id/confirm` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | 検証専用。本番DEPLOY_ENVでは404。リンク/保留/確認は保存期限と本人を照合 | `apps/worker/src/routes/restaurant-customer-booking.ts` |
 | `POST /api/liff/restaurant/reservations/:id/reschedule` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | 検証専用。本番DEPLOY_ENVでは404。リンク/保留/確認は保存期限と本人を照合 | `apps/worker/src/routes/restaurant-customer-booking.ts` |
 | `POST /api/liff/send-form-link` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/liff.ts` |

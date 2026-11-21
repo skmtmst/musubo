@@ -39,6 +39,7 @@ beforeEach(() => {
       return reply({ success: true, data: { storeId: 'st', date, guestCount: 2, slots: [{ startsAt: new Date(`${date}T18:00:00+09:00`).toISOString(), endsAt: new Date(`${date}T19:30:00+09:00`).toISOString(), available: true, remainingTables: 2, seatTypes: ['table'] }], cancelDeadlineMinutesBefore: 0, cutoffMinutesBefore: 0 } });
     }
     if (path === '/api/liff/restaurant/holds') return failHold ? reply({ error: 'booking_failed' }, 500) : reply({ success: true, data: booking() }, 201);
+    if (path === '/api/liff/restaurant/reservations/r1/payment') return reply({ success: true, data: { required: false, quote: { total: 0, amount: 0, remaining: 0, kind: 'none', cancellation: { text: 'キャンセル料は掛かりません', version: 0 } } } });
     if (path === '/api/liff/restaurant/reservations/r1/confirm') return failConfirm ? reply({ error: 'booking_failed' }, 500) : reply({ success: true, data: booking('confirmed') });
     if (path === '/api/forms/f') {
       const formLayout = structuredClone(layout);
@@ -90,8 +91,13 @@ for (const entry of ['apps', 'worker'] as const) {
     await screen.findByText(/送信できませんでした/);
     failConfirm = false; fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
     await screen.findByText('ご予約を受け付けました');
+    const previews = writes.filter(w => w.path.endsWith('/payment'));
+    expect(previews).toHaveLength(2); expect(previews[0].body).toEqual(previews[1].body);
+    expect(previews[0].body).toMatchObject({ preview: true, customerName: profileName, expectedFormVersion: 0, expectedVersion: 1 });
+    expect(previews[0].headers.get('Authorization')).toBe('Bearer fixture-token');
     const confirms = writes.filter(w => w.path.endsWith('/confirm'));
     expect(confirms).toHaveLength(2); expect(confirms[0].body).toEqual(confirms[1].body);
+    expect(writes.filter(w => w.path.endsWith('/payment') || w.path.endsWith('/confirm')).map(w => w.path.split('/').at(-1))).toEqual(['payment', 'confirm', 'payment', 'confirm']);
     expect(confirms[0].body).toMatchObject({ customerName: profileName, expectedFormVersion: 0 });
     fireEvent.click(screen.getByRole('button', { name: 'LINEに戻る' }));
     expect((entry === 'worker' ? workerSdk : sdk).closeWindow).toHaveBeenCalledOnce();

@@ -3,7 +3,7 @@ import { liffBookingJson } from './liff-booking-response.js';
 import {Hono,type Context} from 'hono';
 import type { Env } from '../worker-env.js';
 import {gapAccount,gapBody,gapKey,gapVersion,gapWrite,GapError} from '../services/gap-common.js';
-import {cancellationPolicy,validCancellationPolicy,requireCancellationTestConnection,bookingCancellationQuote,bookingCancellationReview,cancellationSetupUrl} from '../features/booking/booking-cancellation/index.js';
+import {startCardCheckout,chargeCancellation,refundCancellationCharge,cancellationPolicy,validCancellationPolicy,requireCancellationTestConnection,bookingCancellationQuote,bookingCancellationReview} from '../features/booking/booking-cancellation/index.js';
 import {resolveAccountIdFromLiff,resolveFriendId,verifyCallerLineUserId} from './booking.js';
 import {readBodyWithinLimit,isStripeTestEvent,verifyStripeSignature} from '../services/stripe-signature.js';
 export const bookingCancellation=new Hono<Env>();
@@ -37,11 +37,8 @@ bookingCancellation.post('/api/liff/booking/setup-intent',async (c:Context<Env>)
  const {account,friend}=await liff(c),key=gapKey(c),b=await gapBody(c);await requireCancellationTestConnection(c.env.DB,account);
  if(typeof b.menuId!=='string'||!await c.env.DB.prepare('SELECT id FROM menus WHERE id=? AND line_account_id=? AND is_active=1 AND deleted_at IS NULL').bind(b.menuId,account).first())throw new GapError('invalid_menu');
  if(b.policyAccepted!==true)throw new GapError('policy_acceptance_required');
- const id=crypto.randomUUID();
- await c.env.DB.prepare(`INSERT INTO booking_payment_methods(id,friend_id,line_account_id,setup_id,idempotency_key,created_at)
- VALUES(?,?,?,?,?,?) ON CONFLICT(line_account_id,friend_id,idempotency_key) DO NOTHING`).bind(id,friend,account,`seti_test_${id}`,key,new Date().toISOString()).run();
- const row=(await c.env.DB.prepare('SELECT setup_id,status FROM booking_payment_methods WHERE line_account_id=? AND friend_id=? AND idempotency_key=?').bind(account,friend,key).first<{setup_id:string;status:string}>())!;
- return liffBookingJson(c, {success:true,data:{setupIntentId:row.setup_id,url:cancellationSetupUrl(row.setup_id),status:row.status,testMode:true}},201);
+ const data=await startCardCheckout(c.env,account,friend,key,b);
+ return liffBookingJson(c,{success:true,data},201);
 });
 // 署名を検証した試験イベントだけが登録済みに進められる。クライアントの自己申告は受けない。
 bookingCancellation.post('/api/liff/booking/setup-webhook',async (c:Context<Env>):Promise<Response>=>{
@@ -60,42 +57,32 @@ bookingCancellation.post('/api/liff/booking/setup-webhook',async (c:Context<Env>
 });
 bookingCancellation.get('/api/booking/admin/bookings/:id/charges',async (c:Context<Env>):Promise<Response>=>{
  const a=await gapAccount(c),id=c.req.param('id')!,quote=await bookingCancellationQuote(c.env.DB,id,a);
- const rows=(await c.env.DB.prepare('SELECT * FROM booking_charges WHERE booking_id=? AND line_account_id=? ORDER BY created_at,id').bind(id,a).all()).results;
+ const rows=(await c.env.DB.prepare(`SELECT c.*,r.idempotency_key refund_key,r.status refund_status,r.reason refund_reason
+   FROM booking_charges c LEFT JOIN booking_charge_refund_requests r ON r.charge_id=c.id AND r.line_account_id=c.line_account_id
+   WHERE c.booking_id=? AND c.line_account_id=? ORDER BY c.created_at,c.id`).bind(id,a).all()).results;
  return c.json({success:true,data:{charges:rows,quote,testMode:true}});
 });
 bookingCancellation.post('/api/booking/admin/bookings/:id/charges',async (c:Context<Env>):Promise<Response>=>{
- gapWrite(c);const account=await gapAccount(c),id=c.req.param('id')!,key=gapKey(c),b=await gapBody(c);await requireCancellationTestConnection(c.env.DB,account);
+ gapWrite(c);const account=await gapAccount(c),id=c.req.param('id')!,key=gapKey(c),b=await gapBody(c);
  if(!['cancellation_fee','no_show_fee'].includes(String(b.kind)))throw new GapError('invalid_kind');
- const row=await c.env.DB.prepare('SELECT c.*,b.friend_id,b.status booking_status FROM booking_charges c JOIN bookings b ON b.id=c.booking_id WHERE c.booking_id=? AND c.line_account_id=? AND c.kind=?').bind(id,account,b.kind)
- .first<{id:string;amount:number;version:number;friend_id:string;status:string;idempotency_key:string|null;booking_status:string}>();
- if(!row||!['cancelled','no_show'].includes(row.booking_status))throw new GapError('charge_not_available',409);
- if(!Number.isSafeInteger(b.amount)||Number(b.amount)!==row.amount||Number(b.amount)<=0)throw new GapError('amount_exceeds_policy');
- if(row.idempotency_key===key&&row.status==='succeeded')return c.json({success:true,data:row,replayed:true,testMode:true});
- if(row.status!=='pending')throw new GapError('already_charged',409);
- if(!await c.env.DB.prepare("SELECT id FROM booking_payment_methods WHERE friend_id=? AND line_account_id=? AND status='ready' AND test_mode=1").bind(row.friend_id,account).first())throw new GapError('card_not_registered',409);
- const v=gapVersion(b.expectedVersion);
- // 模擬請求だけ。Stripeの本番キーもAPIも参照しない。単文CASで同時の請求を1回にする。
- const now=new Date().toISOString(),event=crypto.randomUUID();
- const r=await c.env.DB.batch([
-  c.env.DB.prepare(`UPDATE booking_charges SET status='succeeded',actor_staff_id=?,stripe_payment_intent_id=?,idempotency_key=?,version=version+1,updated_at=? WHERE id=? AND status='pending' AND version=?`)
-   .bind(c.get('staff').id,`pi_test_${row.id}`,key,now,row.id,v),
-  c.env.DB.prepare(`INSERT INTO booking_cancellation_events(id,charge_id,actor_id,action,created_at) SELECT ?,?,?,'charge_test',? WHERE changes()=1`).bind(event,row.id,c.get('staff').id,now)
- ]);
- if(!r[0].meta.changes)throw new GapError('already_charged',409);
- return c.json({success:true,data:await c.env.DB.prepare('SELECT * FROM booking_charges WHERE id=?').bind(row.id).first(),testMode:true});
+ const result=await chargeCancellation(c.env,account,id,key,b,gapVersion(b.expectedVersion),c.get('staff').id);
+ return c.json({success:true,data:result.row,replayed:result.replayed,testMode:true});
 });
 bookingCancellation.post('/api/booking/admin/charges/:id/waive',async (c:Context<Env>):Promise<Response>=>{
  gapWrite(c);const a=await gapAccount(c),b=await gapBody(c),v=gapVersion(b.expectedVersion);
  if(typeof b.reason!=='string'||!b.reason.trim()||b.reason.length>500)throw new GapError('reason_required');
- const r=await c.env.DB.prepare(`UPDATE booking_charges SET status='waived',reason=?,actor_staff_id=?,version=version+1,updated_at=? WHERE id=? AND line_account_id=? AND status='pending' AND version=?`)
+ const r=await c.env.DB.prepare(`UPDATE booking_charges SET status='waived',reason=?,actor_staff_id=?,version=version+1,updated_at=? WHERE id=? AND line_account_id=? AND status IN ('pending','failed') AND version=?`)
  .bind(b.reason.trim(),c.get('staff').id,new Date().toISOString(),c.req.param('id')!,a,v).run();
  if(!r.meta.changes)throw new GapError('version_conflict',409);
  return c.json({success:true,data:{id:c.req.param('id')!,status:'waived',version:v+1}});
 });
 bookingCancellation.post('/api/booking/admin/charges/:id/refund',async (c:Context<Env>):Promise<Response>=>{
- gapWrite(c,{admin:true});const account=await gapAccount(c),b=await gapBody(c),key=gapKey(c),v=gapVersion(b.expectedVersion);await requireCancellationTestConnection(c.env.DB,account);
+ gapWrite(c,{admin:true});const account=await gapAccount(c),b=await gapBody(c),key=gapKey(c),v=gapVersion(b.expectedVersion);
  if(typeof b.reason!=='string'||!b.reason.trim()||b.reason.length>500||b.confirmed!==true||b.confirmedIrreversible!==true)throw new GapError('refund_confirmation_required');
- const r=await c.env.DB.prepare(`UPDATE booking_charges SET status='refunded',reason=?,actor_staff_id=?,version=version+1,updated_at=? WHERE id=? AND line_account_id=? AND status='succeeded' AND version=? AND test_mode=1`)
+ const real=await c.env.DB.prepare('SELECT stripe_connected_account_id FROM booking_charges WHERE id=? AND line_account_id=?').bind(c.req.param('id')!,account).first<{stripe_connected_account_id:string|null}>();
+ if(real?.stripe_connected_account_id) return c.json({success:true,data:await refundCancellationCharge(c.env,account,c.req.param('id')!,key,v,b.reason.trim(),c.get('staff').id),testMode:true,requestKey:key});
+ await requireCancellationTestConnection(c.env.DB,account);
+ const r=await c.env.DB.prepare(`UPDATE booking_charges SET status='refunded',reason=?,actor_staff_id=?,version=version+1,updated_at=? WHERE id=? AND line_account_id=? AND status='succeeded' AND version=? AND test_mode=1 AND stripe_connected_account_id IS NULL`)
  .bind(b.reason.trim(),c.get('staff').id,new Date().toISOString(),c.req.param('id')!,account,v).run();
  if(!r.meta.changes)throw new GapError('already_refunded',409);
  return c.json({success:true,data:{id:c.req.param('id')!,status:'refunded',version:v+1},testMode:true,requestKey:key});

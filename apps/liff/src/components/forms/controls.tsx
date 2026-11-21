@@ -81,6 +81,24 @@ export function FormChoiceRow({ children, selected }: { children: ReactNode; sel
   return <label className={styles.choice} data-selected={selected || undefined}>{children}</label>
 }
 
+export function RadioChoiceInput(props: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  return <ChoiceInput {...props} type="radio" />
+}
+
+export function CheckboxChoiceInput(props: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  return <ChoiceInput {...props} type="checkbox" />
+}
+
+export function PaymentMethodChoices({ name, value, onChange }: { name: string; value: 'online' | 'onsite' | null | undefined; onChange: (value: 'online' | 'onsite') => void }) {
+  return <fieldset><legend>お支払い方法</legend>{(['online', 'onsite'] as const).map(method =>
+    <FormChoiceRow key={method} selected={value === method}><RadioChoiceInput name={name} checked={value === method} onChange={() => onChange(method)} />{method === 'online' ? 'オンラインで先払い' : 'お店で払う'}</FormChoiceRow>
+  )}</fieldset>
+}
+
+export function PaymentPolicyConsent({ accepted, onChange }: { accepted: boolean; onChange: (accepted: boolean) => void }) {
+  return <FormChoiceRow selected={accepted}><CheckboxChoiceInput checked={accepted} onChange={event => onChange(event.target.checked)} />キャンセル料の決まりを確認しました</FormChoiceRow>
+}
+
 export function RatingStars({ name, current, onChange }: { name: string; current: number | null; onChange: (name: string, value: unknown) => void }) {
   return <div role="radiogroup" aria-label="5段階評価" className={styles.stars}>
     {[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" role="radio" aria-checked={current === n} aria-label={`星${n}つ`} onClick={() => onChange(name, current === n ? '' : n)} className={styles.star} data-on={current != null && n <= current || undefined}>{current != null && n <= current ? '★' : '☆'}</button>)}

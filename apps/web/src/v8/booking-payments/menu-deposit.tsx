@@ -2,7 +2,7 @@
 import { yenPercent } from '@line-crm/shared';
 import { formatYen as yen } from '@line-crm/shared';
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CreditCard } from 'lucide-react'
 import Card, { CardHeader } from '@/components/shared/card'
 import Checkbox from '@/components/shared/checkbox'
@@ -13,6 +13,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope } from '@/components/shared/save-form-errors'
 import TextLink from '@/components/shared/text-link'
+import TestModeNote from '@/components/shared/test-mode-note'
 import { bookingAdvancedApi } from '@/lib/api/helpers/booking-advanced'
 import type { DepositRule } from '@line-crm/shared'
 import type { MenuPaymentState } from './menu-payment'
@@ -28,32 +29,49 @@ import styles from './payments.module.css'
 type Choice = 'default' | 'online' | 'onsite' | 'deposit'
 const NEW_MENU_DEPOSIT: DepositRule & { inherit: boolean } = { kind: 'none', value: null, conditions: { always: true, minPeople: null, weekdays: null, timeBand: null }, version: 0, inherit: true }
 
-export function useMenuDeposit(accountId: string | null, menuId: string | null) {
+export function useMenuDeposit(accountId: string | null, menuId: string | null, kind: 'menu' | 'course' = 'menu') {
   const [saved, setSaved] = useState<(DepositRule & { inherit: boolean }) | null>(null)
   const [draft, setDraft] = useState<(DepositRule & { inherit: boolean }) | null>(null)
-  const [ready, setReady] = useState(false)
+  const [loadedKey, setLoadedKey] = useState<string | null>(null)
+  const scopeKey = JSON.stringify([accountId, menuId, kind])
+  const scope = useRef({ key:scopeKey, generation:0 })
+  if(scope.current.key!==scopeKey)scope.current={key:scopeKey,generation:scope.current.generation+1}
+  const ready = Boolean(accountId) && loadedKey === scopeKey
   useEffect(() => {
-    if (!accountId) { setReady(false); return }
+    if (!accountId) { setLoadedKey(null); return }
     /* 作る画面（まだメニューが無い）：いつもの方法から始め、保存でメニューができてから同じ口へ送る（版 0）。 */
-    if (!menuId) { setSaved(NEW_MENU_DEPOSIT); setDraft(NEW_MENU_DEPOSIT); setReady(true); return }
+    if (!menuId) { setSaved(NEW_MENU_DEPOSIT); setDraft(NEW_MENU_DEPOSIT); setLoadedKey(scopeKey); return }
     let alive = true
-    void Promise.resolve().then(() => bookingAdvancedApi.menuDeposit(accountId, menuId))
-      .then((response) => { if (alive) { setSaved(response.data); setDraft(response.data); setReady(true) } })
-      .catch(() => { if (alive) { setSaved(null); setDraft(null); setReady(false) } })
+    void Promise.resolve().then(() => kind === 'course' ? bookingAdvancedApi.courseDeposit(accountId, menuId) : bookingAdvancedApi.menuDeposit(accountId, menuId))
+      .then((response) => { if (alive) { setSaved(response.data); setDraft(response.data); setLoadedKey(scopeKey) } })
+      .catch(() => { if (alive) { setSaved(null); setDraft(null); setLoadedKey(null) } })
     return () => { alive = false }
-  }, [accountId, menuId])
+  }, [accountId, menuId, kind, scopeKey])
   const dirty = ready && JSON.stringify(saved) !== JSON.stringify(draft)
   const save = useCallback(async (targetId?: string) => {
     const id = targetId ?? menuId
-    if (!accountId || !id || !draft || !dirty) return
+    if (!accountId || !id || !draft || !dirty || !ready) return
+    const captured=scope.current
     const { version, ...body } = draft
-    const response = await bookingAdvancedApi.saveMenuDeposit(accountId, id, { ...body, expectedVersion: version })
-    setSaved(response.data); setDraft(response.data)
-  }, [accountId, menuId, draft, dirty])
+    const response = await (kind === 'course' ? bookingAdvancedApi.saveCourseDeposit(accountId, id, { ...body, expectedVersion: version }) : bookingAdvancedApi.saveMenuDeposit(accountId, id, { ...body, expectedVersion: version }))
+    if(scope.current===captured) { setSaved(response.data); setDraft(response.data) }
+  }, [accountId, menuId, draft, dirty, kind, ready])
   return { ready, draft, setDraft, dirty, save }
 }
 export type MenuDepositState = ReturnType<typeof useMenuDeposit>
 
+export function CourseDepositFields({ deposit, readOnly }: { deposit: MenuDepositState; readOnly: boolean }) {
+  const rule=deposit.draft
+  if(!deposit.ready || !rule)return <p>予約金の設定を読み込めませんでした。</p>
+  const kind=rule.inherit ? 'inherit' : rule.kind
+  if(readOnly)return <p>{kind==='inherit'?'店の設定に従う':kind==='none'?'予約金なし':kind==='percent'?`料金の ${rule.value ?? 0}%`:`${yen(rule.value ?? 0)}`}</p>
+  return <>
+    <TestModeNote>本当の請求は起きません</TestModeNote>
+    <Field label="予約金"><SegmentedControl aria-label="予約金" selectionMode="radio" appearance="intake-stop" value={kind} onChange={value => deposit.setDraft({ ...rule, inherit:value==='inherit', kind:value==='amount'?'amount':value==='percent'?'percent':'none', value:value===kind ? rule.value : null })}
+      options={[{value:'inherit',label:'店の設定'},{value:'none',label:'なし'},{value:'amount',label:'金額で指定'},{value:'percent',label:'料金の割合'}]} /></Field>
+    {(kind==='amount'||kind==='percent') && <Field label={kind==='percent'?'割合':'金額'} required><NumberInput aria-label="予約金の値" type="number" min={1} max={kind==='percent'?100:undefined} unit={kind==='percent'?'%':'円'} value={rule.value ?? ''} onChange={event=>deposit.setDraft({...rule,value:event.target.value===''?null:Number(event.target.value)})} /></Field>}
+  </>
+}
 
 export function BookingMenuPaymentCard({ payment, deposit, price, readOnly }: { payment: MenuPaymentState; deposit: MenuDepositState; price: number | null; readOnly: boolean }) {
   const depositOn = Boolean(deposit.draft && !deposit.draft.inherit && deposit.draft.kind !== 'none')

@@ -296,7 +296,10 @@ export function useStyleDashboard(style: IndustryStyle) {
     let reasonSaved = false
     setBusy('cancel')
     try {
-      if (style === 'restaurant' && row.reservationId) await restaurantTestApi.updateReservation(accountId, row.reservationId, { status: 'cancelled', expectedVersion: version(row), cancellationReason: input.reason })
+      if (style === 'restaurant' && row.reservationId) {
+        if(!input.cause)throw new Error('cancellation_cause_required')
+        await restaurantTestApi.updateReservation(accountId, row.reservationId, { status: 'cancelled', expectedVersion: version(row), cancellationReason: input.reason, cancellationCause:input.cause })
+      }
       else {
         if (row.booking?.kind === 'booking') {
           const revision = row.booking.confirmationRevision

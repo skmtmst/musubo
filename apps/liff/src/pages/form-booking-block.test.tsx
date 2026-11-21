@@ -14,6 +14,7 @@ import { CustomerStyleContext } from '../components/customer-style-scope.js';
  * - 予約だけ失敗しても回答は残し、取り直し・選び直しを出す
  */
 vi.mock('../lib/api.js', () => ({
+  restaurantBookingApi: {mine:vi.fn(),formBooking:vi.fn()},
   api: {
     getForm: vi.fn(),
     getMyLatestFormAnswer: vi.fn(),
@@ -37,7 +38,7 @@ vi.mock('../lib/user-message.js', async (importOriginal) => {
   return { ...actual, logFailure: vi.fn() };
 });
 
-const { api } = await import('../lib/api.js');
+const { api,restaurantBookingApi } = await import('../lib/api.js');
 const getForm = vi.mocked(api.getForm);
 const submitForm = vi.mocked(api.submitForm);
 const menus = vi.mocked(api.menus);
@@ -70,7 +71,7 @@ function layout(): FormLayout {
   };
 }
 
-function setup(options: { style?: 'consult'; mode?: MenuItem['meeting_mode'] } = {}) {
+function setup(options: { style?: 'consult'; mode?: MenuItem['meeting_mode'];entry?:string } = {}) {
   getForm.mockResolvedValue({
     id: 'f1',
     name: '来店アンケート',
@@ -100,7 +101,7 @@ function setup(options: { style?: 'consult'; mode?: MenuItem['meeting_mode'] } =
     ],
   });
   render(
-    <CustomerStyleContext.Provider value={options.style ?? null}><MemoryRouter initialEntries={['/forms/f1?liffId=test']}>
+    <CustomerStyleContext.Provider value={options.style ?? null}><MemoryRouter initialEntries={[options.entry ?? '/forms/f1?liffId=test']}>
       <Routes>
         <Route path="/forms/:id" element={<Form />} />
       </Routes>
@@ -117,6 +118,12 @@ afterEach(() => {
 });
 
 describe('予約を入れる', () => {
+  it('支払いから戻っても未確定の予約を確定と表示しない',async()=>{
+    vi.mocked(restaurantBookingApi.mine).mockResolvedValue({success:true,data:[{id:'r',storeId:'store',paymentRequestId:'pay',paymentStatus:'paid',status:'pending',startsAt:'2099-01-01T10:00:00Z',endsAt:'2099-01-01T11:00:00Z',guestCount:2,version:1,holdExpiresAt:null,note:null,customerPhone:null,seatType:null}]});
+    setup({entry:'/forms/f1?liffId=test&storeId=store&payment_request=pay&payment_result=success'});
+    expect(await screen.findByText('お支払いと予約の状態を確認しています。しばらくしてから読み直してください。')).toBeTruthy();
+    expect(screen.queryByText(/ご予約.*が決まりました/)).toBeNull();
+  });
   it('空き枠を選んで送ると回答の後に予約を確保する', async () => {
     setup();
     expect(await screen.findByText('トリミング（小型犬）・105分')).toBeTruthy();
