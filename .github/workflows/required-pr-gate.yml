@@ -585,7 +585,7 @@ jobs:
       # まったく違う古い .next/cache を復元してしまい、Next.js の webpack
       # 永続キャッシュが古い成果物を混入させて偽の失敗を招く(#696)。
       # 完全一致のときだけキャッシュを使う。
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/web/.next/cache
           key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/**/*.[jt]s', 'apps/web/**/*.[jt]sx') }}
