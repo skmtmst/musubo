@@ -110,7 +110,7 @@ it('0円の新規コースは送る値を保って一度だけ作れる', async 
   fireEvent.click(saveButton())
   await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledExactlyOnceWith('account-1', {
     storeId: 'store-1', kind: 'course', name: '架空のメニュー', price: 0, durationMinutes: 120,
-    effectiveAt: null, allergens: [], description: null, imageMediaId: null, servicePeriods: ['dinner'], status: 'draft',
+    effectiveAt: null, allergens: [], description: null, photos: [], servicePeriods: ['dinner'], status: 'draft',
   }))
   expect(fixture.updateMenu).not.toHaveBeenCalled()
 })
