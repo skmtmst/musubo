@@ -128,6 +128,7 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
     () => { if (procedure?.anchor !== 'reception.save') advance() },
   )
   useSetupSaveSignal(scripted && armed, first.refresh)
+  useGuideSignal('accounts.connection', armed && Boolean(accountId), first.refresh, accountId ?? undefined)
   useGuideSignal('reception.menuPublished', Boolean(accountId && inPublishReview), advance, accountId ?? undefined)
   const alreadyPublished = first.progress?.richMenuPublished === true
   const skipPublishPrompt = needsPublishReview && !inPublishReview && onTargetScreen && alreadyPublished
