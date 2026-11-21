@@ -12,7 +12,6 @@ export function useStyleSetupProgress(accountId: string | null, style: AccountSt
   const [tick, setTick] = useState(0)
   useEffect(() => {
     let active = true
-    setSnapshot(null)
     if (!enabled || !accountId || !style || style === 'standard') return
     void loadStyleSetupProgress(accountId, style, storeId).then(progress => {
       if (active) setSnapshot({ scope, progress })

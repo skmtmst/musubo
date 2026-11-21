@@ -69,6 +69,7 @@ export const gettingStartedGuidePaths = {
                 phase: { type: 'string', enum: ['idle', 'active', 'paused', 'done'] },
                 stepKey: { type: 'string', nullable: true },
                 procedureIndex: { type: 'integer', minimum: 1 },
+                acknowledgeWelcome: { type: 'boolean', enum: [true], description: 'phase=idle、現在手順1で指定すると既存の案内を上書きせず初回表示を記録する' },
               },
             },
           },

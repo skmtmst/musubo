@@ -47,7 +47,7 @@ describe('手順別ガイドの重ね表示', () => {
     renderOverlay()
     expect(screen.getByText('手順 1/3')).toBeTruthy()
     expect(screen.getByText('まず卓を作りましょう')).toBeTruthy()
-    expect(screen.getByText(/「\+ 卓を作る」を押すと、卓の名前と席数を入れるフォームが開きます/)).toBeTruthy()
+    expect(screen.getByText(/「卓を作る」を押すと、卓の名前と席数を入れるフォームが開きます/)).toBeTruthy()
     expect(screen.getByText('④ 卓と席を登録する（手順 1/3）')).toBeTruthy()
     expect(screen.getByText('開店準備ガイド')).toBeTruthy()
   })
@@ -121,9 +121,21 @@ describe('手順別ガイドの重ね表示', () => {
     expect(props.onPause).not.toHaveBeenCalled()
   })
 
-  it('台本の無い段（①②③⑨）では何も出さない', () => {
-    renderOverlay({ stepKey: 'richMenu', stepOrder: 3 })
+  it('リッチメニューを選ぶ間も、ガイドの一時停止とスキップを使える', () => {
+    const props = renderOverlay({ stepKey: 'richMenu', stepLabel: 'リッチメニューを選ぶ', stepOrder: 2 })
     expect(document.querySelector('[data-guide-balloon]')).toBeNull()
+    expect(screen.getByText('② リッチメニューを選ぶ')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'この手順をスキップ' }))
+    fireEvent.click(screen.getByRole('button', { name: '一時停止' }))
+    expect(props.onAdvanceProcedure).toHaveBeenCalledOnce()
+    expect(props.onPause).toHaveBeenCalledOnce()
+  })
+
+  it('卓の完了が確認できたら「次へ進む」を使える', () => {
+    const props = renderOverlay({ procedureIndex: 3, segments: [true, true, true, true, false], nextLabel: '営業時間を設定する' })
+    expect(screen.getByText(/次は「営業時間を設定する」です/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '次へ進む' }))
+    expect(props.onAdvanceProcedure).toHaveBeenCalledOnce()
   })
 
   /* 差し戻し R1: 台本外の手順番号（古い保存値）でも案内を消さない。 */

@@ -54,6 +54,19 @@ export async function saveOnboardingGuideProgress(
   return row;
 }
 
+/** ウェルカムを見た記録を作る。別画面で始まった案内の進行はそのまま残す。 */
+export async function acknowledgeOnboardingWelcome(
+  db: D1Database,
+  staffId: string,
+  lineAccountId: string,
+): Promise<OnboardingGuideProgressRow | null> {
+  await db.prepare(
+    `INSERT INTO onboarding_guide_progress (staff_id, line_account_id, phase, procedure_index)
+     VALUES (?, ?, 'idle', 1) ON CONFLICT (staff_id, line_account_id) DO NOTHING`,
+  ).bind(staffId, lineAccountId).run();
+  return getOnboardingGuideProgress(db, staffId, lineAccountId);
+}
+
 export async function deleteOnboardingGuideProgress(
   db: D1Database,
   staffId: string,

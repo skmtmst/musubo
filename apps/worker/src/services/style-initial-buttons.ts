@@ -1,5 +1,5 @@
 import { initialRestaurantStore } from './style-initial-store.js';
-import { INITIAL_MENUS, initialMenuBounds, initialFormKey, initialMenuFormTargets, initialMenuIsDocument, initialMenuDestination, liffActionUrl, type AccountStyle, type InitialMenuTarget } from '@line-crm/shared';
+import { INITIAL_MENUS, RESTAURANT_GUIDE_MENUS, type RestaurantGuideMenu, initialMenuBounds, initialFormKey, initialMenuFormTargets, initialMenuIsDocument, initialMenuDestination, liffActionUrl, type AccountStyle, type InitialMenuTarget } from '@line-crm/shared';
 
 export type StyleMenuButton = {label:string;feature:string;target?:InitialMenuTarget;actionType:string;actionData:string;intent:string;formId?:string|null;bounds?:{x:number;y:number;width:number;height:number};ready?:boolean;reason?:string;destination?:string};
 export type PlannedInitialForms = Map<string,string>;
@@ -20,11 +20,11 @@ async function restaurantHistory(db:D1Database,account:string,base:string,planne
  return link?`${base}/?${new URLSearchParams({page:'restaurant',token:link.token,view:'mine'})}`:'';
 }
 /** 1面も詰め直さない。準備中の移動先は未設定の下書きに保ち、公開の門で止める。 */
-export async function initialMenuButtons(db:D1Database,account:string,style:AccountStyle,planned?:PlannedInitialForms):Promise<StyleMenuButton[]> {
+export async function initialMenuButtons(db:D1Database,account:string,style:AccountStyle,planned?:PlannedInitialForms,preset?:RestaurantGuideMenu):Promise<StyleMenuButton[]> {
  const line=await db.prepare('SELECT liff_id FROM line_accounts WHERE id=? AND is_active=1 AND archived_at IS NULL').bind(account).first<{liff_id:string|null}>();
  const base=line?.liff_id?`https://liff.line.me/${encodeURIComponent(line.liff_id)}`:'';
  const forms=new Set(initialMenuFormTargets(style));
- return Promise.all(INITIAL_MENUS[style].buttons.map(async (button,index) => {
+ const buttons = await Promise.all(INITIAL_MENUS[style].buttons.map(async (button,index) => {
    let actionData='',formId:string|null=null,intent='url',ready=false,reason='LINEのページを設定してください';
    if(forms.has(button.target)) {
      const form=await formTarget(db,account,style,button.target,planned);formId=form?.id??null;
@@ -40,4 +40,21 @@ export async function initialMenuButtons(db:D1Database,account:string,style:Acco
    }
    return {...button,actionType:'uri',actionData,intent,formId,bounds:initialMenuBounds(index),ready,reason,destination:initialMenuDestination(style,button.target)};
  }));
+ if (!preset) return buttons;
+
+ const history = buttons.find(button => button.target === 'history')?.actionData;
+ const bookingUrl = history ? new URL(history) : null;
+ bookingUrl?.searchParams.delete('view');
+ return RESTAURANT_GUIDE_MENUS[preset].areas.map(({ target, ...bounds }) => {
+   const button = buttons.find(item => item.target === target);
+   if (target === 'booking' && button) {
+     const actionData = bookingUrl?.toString() ?? '';
+     return { ...button, bounds, actionData, intent: 'url', formId: null, ready: Boolean(actionData), destination: 'LINEで席を予約' };
+   }
+   if (button) return { ...button, bounds };
+   const label = target === 'coupon' ? 'クーポン' : target === 'stamp' ? 'ショップカード' : 'お電話';
+   const actionData = target === 'stamp' && line?.liff_id ? liffActionUrl({ kind: 'visit_stamp', liffId: line.liff_id }) : '';
+   return { label, feature: target, bounds, actionType: 'uri', actionData, intent: 'url',
+     ready: Boolean(actionData), reason: '公開前にボタンの行き先を設定してください', destination: label };
+ });
 }
