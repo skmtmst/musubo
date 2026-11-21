@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [Google口コミの返信を下書き保存](release-log/unreleased/89-kenta-review-draft.md) — 反映履歴、確認 2026-11-16。
+
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)

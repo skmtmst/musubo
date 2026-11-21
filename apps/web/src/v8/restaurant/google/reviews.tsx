@@ -334,11 +334,11 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
   const alreadyReplied = review.replyStatus === 'published' || review.replyStatus === 'replied' || Boolean(done)
   const pendingConfirm = review.replyStatus === 'pending_confirm'
   const textLength = text.trim().length
-  const canOpenConfirm = canEdit && canPublish && data.writeEnabled && textLength > 0 && textLength <= 4096 && !alreadyReplied && conflict === null && busy === null
+  const canOpenConfirm = canEdit && canPublish && textLength > 0 && textLength <= 4096 && !alreadyReplied && conflict === null && busy === null
   const sourceUrl = data.connection.locationMapsUrl
     ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeTitle)}`
 
-  if (confirming && canEdit && canPublish && data.writeEnabled) {
+  if (confirming && canEdit && canPublish) {
     return (
       <SaveErrorScope errors={saveErrors}><div className={styles.split} data-design-node="xSudF">
         <div className={styles.mainColumn}>
@@ -360,7 +360,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
           <p className={styles.checklist}>{'・予約内容や来店履歴などを追記していません\n・返信は店舗を代表して公開されます\n・通信結果が不明な場合はGoogle側を先に確認します'}</p>
           {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
           <Button onClick={() => setConfirming(false)} disabled={busy !== null} className={styles.fullButton}>修正する</Button>
-          <Button variant="primary" onClick={() => void publish()} disabled={!checked || busy !== null} busy={busy === 'publish'} busyLabel="送信中…" className={styles.fullButton}>この内容で返信する</Button>
+          <Button variant="primary" onClick={() => void publish()} disabled={!checked || busy !== null || !data.writeEnabled} lockedReason={!data.writeEnabled ? '検証環境ではGoogleへ送信できません。' : undefined} busy={busy === 'publish'} busyLabel="送信中…" className={styles.fullButton}>この内容で返信する</Button>
         </Card>
       </div></SaveErrorScope>
     )
@@ -372,8 +372,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
       {done ? <Notice tone="success">Googleに返信を送信しました。反映を確認できるまで「反映確認中」と表示します。</Notice> : null}
       {conflict !== null ? <SaveConflictBand title="別の担当者がすでに返信しています。" description={`表示されている返信：「${conflict}」。重ねて送信せず、最新の内容を読み込んで確認してください。`} onReload={() => void load()} /> : null}
       {pendingConfirm && !done ? <Notice tone="warn">{canEdit ? '前回の送信結果を確認できていません。「この内容で返信する」を押すと、先にGoogle側の状態を照合してから送信します。' : '前回の送信結果を確認できていません。オーナーか管理者にGoogle側の状態の確認を頼んでください。'}</Notice> : null}
-      <div className={styles.split}>
-        <div className={styles.mainColumn}>
+      <div className={styles.mainColumn}>
           <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
             <SectionHeader size="small" title={<>返信する口コミ</>} />
             <p className={styles.reviewMeta}>
@@ -405,32 +404,18 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
                 <span className={styles.spacer} aria-hidden="true" />
                 <span className={textLength > 4096 ? styles.countOver : styles.count}>{`${polishFormatNumber(textLength)} / 4,096`}</span>
               </div>
+              {data.aiAvailable ? <p className={styles.muted}>AIで下書きを作ると、口コミの評価・本文と店舗名をAIの提供会社に送ります。</p> : null}
+              <p className={styles.muted}>下書きは公開されません。</p>
+              <div className={styles.draftTools}>
+                <span className={styles.spacer} aria-hidden="true" />
+                <Button onClick={() => void save()} lockedReason={lockedReason} disabled={!canEdit || busy !== null || textLength === 0 || textLength > 4096} busy={busy === 'save'}>下書きを保存</Button>
+                <Button variant="primary" lockedReason={lockedReason || publishReason} onClick={() => { if (canOpenConfirm) { setChecked(false); setActionError(''); setConfirming(true) } }} disabled={!canOpenConfirm}>返信する</Button>
+              </div>
               {saved ? <p className={styles.saved} role="status">{saved}</p> : null}
             </Card>
           ) : (
             <Card appearance="outlined" layout="vertical" padding="default" gap="normal"><p className={styles.muted}>この口コミへの返信は公開済みです。</p></Card>
           )}
-        </div>
-        <Card appearance="outlined" layout="vertical" padding="default" gap="normal" className={styles.sideColumn} aria-label="公開前の確認">
-          <SectionHeader size="small" title="公開前の確認" />
-          <p className={styles.checklist}>{'・返信先が合っている\n・お客さまの個人情報を書いていない\n・お店の約束（値引きなど）を書いていない'}</p>
-          <p className={styles.grayNote}>
-            {!data.writeEnabled
-              ? '検証環境では Google へは送りません。下書きと承認まで。'
-              : canPublish ? '確認してから Google へ公開します。' : 'Googleへの公開は店舗管理者以上が行います。下書きを保存しておくと、管理者が確認して公開できます。'}
-          </p>
-          {!alreadyReplied ? (
-            <>
-              <Button onClick={() => void save()} lockedReason={lockedReason} disabled={!canEdit || busy !== null || textLength === 0 || textLength > 4096} busy={busy === 'save'} className={styles.fullButton}>下書きを保存する</Button>
-              {data.writeEnabled ? (
-                <Button variant="primary" lockedReason={publishReason} onClick={() => { if (canOpenConfirm) { setChecked(false); setActionError(''); setConfirming(true) } }} disabled={!canOpenConfirm} className={styles.fullButton}>返信内容を確認する</Button>
-              ) : (
-                /* 送れない設定（検証環境・権限なし）のときは送信へ進むボタンを出さない。場所だけ空ける。 */
-                <span className={styles.buttonSpace} aria-hidden="true" />
-              )}
-            </>
-          ) : null}
-        </Card>
       </div>
       <UnsavedLeaveDialog
         open={leaveTarget !== null}
