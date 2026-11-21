@@ -7,6 +7,7 @@ clearPublishPlanDraft
 } from '@/v8/rich-menus/edit/publish-plan-draft'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { notifyToast } from '@/components/shared/toast'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 import { api, ApiError } from '@/lib/api'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { type Group } from './create-types'
@@ -60,6 +61,7 @@ export async function publishMenuNow({ audience, group, confirmedImages, loadChe
           : 'LINEへの登録が終わりました',
       )
       clearPublishPlanDraft(group.id)
+      emitGuideSignal('reception.menuPublished', group.accountId)
       void reloadGroup(group.id).catch(cause => setError(describeApiFailure(cause, '読み込み')))
       return true
     } catch (e) {

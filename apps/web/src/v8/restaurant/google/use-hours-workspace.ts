@@ -16,9 +16,9 @@ export function useHoursWorkspace(accountId:string) {
  const [saved,setSaved]=useState('')
  const [changes,setChanges]=useState<GoogleChange[]>([])
  const version=useRef(0),current=useRef(workspace),savedRef=useRef(''),alive=useRef(true),queue=useRef<Promise<unknown>>(Promise.resolve()),blocked=useRef(false)
- const load=useCallback(async()=>{
+ const load=useCallback(async(force=false)=>{
   setLoading(true);setError('');setSaveError('');blocked.current=false
-  try{const profile=await restaurantGoogleApi.profile(accountId);const setting=await restaurantGoogleApi.hoursWorkspace(accountId);if(!alive.current)return
+  try{const profile=await (force ? restaurantGoogleApi.syncProfile(accountId) : restaurantGoogleApi.profile(accountId));const setting=await restaurantGoogleApi.hoursWorkspace(accountId);if(!alive.current)return
     const w=structuredClone(setting.data)
     if(setting.version===0)w.services=importServices(profile)
     setData(profile);setConfig(setting);version.current=setting.version;current.current=w;setWorkspace(w);const serial=JSON.stringify(w);savedRef.current=serial;setSaved(serial)

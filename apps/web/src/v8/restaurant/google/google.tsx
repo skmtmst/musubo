@@ -9,6 +9,10 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
+import Card, { CardHeader } from '@/components/shared/card'
+import Notice from '@/components/shared/notice'
+import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -27,6 +31,7 @@ import { ChangeConfirmScreen } from './profile-confirm'
 import { HistoryScreen } from './profile-history'
 import { ProfileEditScreen } from './profile-edit'
 import HoursPage from './hours'
+import GoogleConnectionSettings from './settings'
 import styles from './google.module.css'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
@@ -67,13 +72,23 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
-  const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const guide = useSharedGuide()?.guide
+  const guidingHours = guide?.phase === 'active' && guide.stepKey === 'hours'
+  const [connectBusy, setConnectBusy] = useState(false)
+  const [connectFailure, setConnectFailure] = useState('')
+  const { selectedAccountId, setSelectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const returnedAccount = searchParams.get('account_id')
+  const switchingToReturnedAccount = Boolean(searchParams.get('tab') === 'hours' && searchParams.has('google') &&
+    returnedAccount && returnedAccount !== selectedAccountId && accounts.some(account => account.id === returnedAccount))
+  useEffect(() => {
+    if (switchingToReturnedAccount && returnedAccount) setSelectedAccountId(returnedAccount)
+  }, [switchingToReturnedAccount, returnedAccount, setSelectedAccountId])
   const [data, setData] = useState<GoogleConnectionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
-    if (!selectedAccountId) { setData(null); setLoading(false); return }
+    if (!selectedAccountId || switchingToReturnedAccount) { setData(null); setLoading(switchingToReturnedAccount); return }
     setLoading(true)
     setError('')
     try {
@@ -91,13 +106,13 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     } finally {
       setLoading(false)
     }
-  }, [selectedAccountId, saveErrors])
+  }, [selectedAccountId, saveErrors, switchingToReturnedAccount])
 
   useEffect(() => { void load() }, [load])
 
   // 旧ブックマークと旧OAuth戻り先は、接続操作のあるSNS連携へ案内する。
   useEffect(() => {
-    if (searchParams.get('tab') !== 'settings' && !searchParams.has('google')) return
+    if (searchParams.get('tab') !== 'settings' && (!searchParams.has('google') || searchParams.get('tab') === 'hours')) return
     const next = new URLSearchParams()
     for (const key of ['google', 'account_id']) {
       const value = searchParams.get(key)
@@ -117,10 +132,29 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   const tab: GoogleTab = requestedTab === 'profile' && searchParams.get('view') === 'hours' ? 'hours' : requestedTab && requestedTab in TAB_LABELS ? requestedTab : 'reviews'
   const hoursConnected = data?.connection.status === 'connected' && Boolean(data.connection.locationName)
   useEffect(() => {
-    if (tab === 'hours' && selectedAccountId && !accountLoading && !loading && !error && data && !hoursConnected)
+    if (!guidingHours && tab === 'hours' && selectedAccountId && !accountLoading && !loading && !error && data && !hoursConnected)
       samePageUrl.replace('/settings/sns?source=hours')
-  }, [tab, selectedAccountId, accountLoading, loading, error, data, hoursConnected, samePageUrl])
+  }, [guidingHours, tab, selectedAccountId, accountLoading, loading, error, data, hoursConnected, samePageUrl])
+  useEffect(() => {
+    if (!guidingHours || tab !== 'hours' || !hoursConnected || loading || data?.store.lineAccountId !== selectedAccountId) return
+    const frame = requestAnimationFrame(() => emitGuideSignal('hours.googleConnect'))
+    return () => cancelAnimationFrame(frame)
+  }, [guidingHours, guide?.procedureIndex, tab, hoursConnected, loading, data, selectedAccountId])
   const { allowed: canManage } = useGooglePermission('manager')
+  const connect = async (accountId: string) => {
+    if (connectBusy || !canManage || !data?.permissions.canManageConnection) return
+    setConnectBusy(true)
+    setConnectFailure('')
+    try {
+      const response = await restaurantGoogleApi.connectStart(accountId, 'hours')
+      window.location.assign(response.authorizeUrl)
+    } catch (cause) {
+      if (!saveErrors.capture(cause)) {
+        setConnectFailure(errorMessage(cause, 'Googleの許可画面を開けませんでした。もう一度お試しください。'))
+      }
+      setConnectBusy(false)
+    }
+  }
   const view = searchParams.get('view')
   const id = searchParams.get('id')
   const kindParam = searchParams.get('kind')
@@ -157,6 +191,23 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     }
     if (error || !data) return <ListState kind="error" title="Googleビジネスを表示できませんでした" description={error} onRetry={() => void load()} />
     const accountId = selectedAccountId
+    if (guidingHours && tab === 'hours' && data.connection.status === 'pending_location') return <>
+      {googleTabs}
+      <Card className={styles.guideConnection} layout="vertical" gap="normal" padding="spacious">
+        <GoogleConnectionSettings key={accountId} accountId={accountId} data={data} onChanged={() => void load()} connectSource="hours" />
+      </Card>
+    </>
+    if (guidingHours && tab === 'hours' && !hoursConnected) return <>
+      {googleTabs}
+      <Card className={styles.guideConnection} layout="vertical" gap="normal" padding="spacious">
+        <CardHeader size="stacked" title="Googleビジネスプロフィールとつなぐ" />
+        <p>接続すると、お店の営業時間が取り込まれ、予約枠の計算に使われます。</p>
+        {connectFailure || searchParams.get('google')?.startsWith('error:') ? <Notice tone="danger">{connectFailure || 'Googleに接続できませんでした。もう一度お試しください。'}</Notice> : null}
+        {canManage && data.permissions.canManageConnection && data.oauthConfigured
+          ? <Button data-guide-anchor="hours.googleConnect" variant="primary" onClick={() => void connect(accountId)} busy={connectBusy} disabled={connectBusy}>Googleアカウントとつなぐ</Button>
+          : <Notice tone="warn">{canManage && data.permissions.canManageConnection ? 'Google接続の設定を管理者にご確認ください。' : '管理者にGoogleビジネスの接続を依頼してください。'}</Notice>}
+      </Card>
+    </>
     if (!connected) return <ListState kind="empty" title="Googleビジネスは未接続です" description="設定のSNS連携からGoogleアカウントを接続してください。" action={<Link href="/settings/sns">SNS連携を開く</Link>} />
     return (
       <>

@@ -1,6 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
+import { Check } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { scrollMotion } from '@/components/shared/overlay-utils'
 import { balloonPlacement, dimPanels, isOffScreen, spotlightRing, type Rect } from './guide-overlay-geometry'
@@ -23,6 +26,7 @@ const MISSING_ANCHOR_WAIT_MS = 1500
 export type GuideOverlayProps = {
   /** 案内中だけ出す。一時停止・未開始・完了では何も出さない。 */
   active: boolean
+  showOverlay?: boolean
   stepKey: string | null
   stepLabel: string | null
   /** 9項目の何番目か（1から）。帯の見出し「④ 卓と席を登録する」に使う。 */
@@ -40,6 +44,9 @@ export type GuideOverlayProps = {
   onAdvanceProcedure: () => void
   /** 帯の「一時停止」・ESC・対象外画面への移動から呼ぶ。 */
   onPause: () => void
+  scripted?: boolean
+  nextLabel?: string
+  showProcedure?: boolean
 }
 
 function readRect(element: Element): Rect {
@@ -48,73 +55,96 @@ function readRect(element: Element): Rect {
 }
 
 export function GuideOverlay({
-  active, stepKey, stepLabel, stepOrder, procedureIndex, onTargetScreen = false,
-  segments, onAdvanceProcedure, onPause,
+  active, showOverlay = true, stepKey, stepLabel, stepOrder, procedureIndex, onTargetScreen = false,
+  segments, onAdvanceProcedure, onPause, scripted = true, nextLabel, showProcedure = true,
 }: GuideOverlayProps) {
-  const total = guideProcedureTotal(stepKey)
+  const total = scripted ? guideProcedureTotal(stepKey) : 0
   /*
     台本に無い手順番号（古い保存値など）でも案内を消さない。
     台本が分かっている段なら最後の手順に寄せて見せる。段そのものが分からない時だけ何も出さない。
   */
   const safeIndex = total > 0 ? Math.min(Math.max(procedureIndex, 1), total) : procedureIndex
-  const procedure = guideProcedure(stepKey, safeIndex)
+  const procedure = scripted && showProcedure ? guideProcedure(stepKey, safeIndex) : null
   const anchorName = procedure?.anchor ?? null
 
+  const [bottomOffset, setBottomOffset] = useState(0)
+  const [slot, setSlot] = useState<HTMLElement | null>(null)
+  const [inDialog, setInDialog] = useState(false)
+  const [actionLabel, setActionLabel] = useState<string | null>(null)
+  const [applyingHours, setApplyingHours] = useState(false)
+  const [tableDialog, setTableDialog] = useState<Rect | null>(null)
   const [target, setTarget] = useState<Rect | null>(null)
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null)
   const [balloonHeight, setBalloonHeight] = useState(0)
   const balloonRef = useRef<HTMLDivElement | null>(null)
-  /** 対象がすぐ見つからない時に一度だけ待つ。描き途中で一時停止にしない。 */
-  const missingSince = useRef<number | null>(null)
 
   const measure = useCallback(() => {
     if (typeof window === 'undefined') return
-    setViewport({ width: window.innerWidth, height: window.innerHeight })
-    if (!anchorName) { setTarget(null); return }
-    const element = document.querySelector(`[data-guide-anchor="${anchorName}"]`)
-    if (!element) { setTarget(null); return }
-    missingSince.current = null
-    setTarget(readRect(element))
+    const width = window.innerWidth
+    const height = window.innerHeight
+    setViewport(previous => previous?.width === width && previous.height === height ? previous : { width, height })
+    const saveControls = Array.from(document.querySelectorAll(
+      '[data-sticky-actions], [data-guide-anchor="reception.save"], button[form="rs-table-editor"][type="submit"]',
+    ))
+    const reserved = saveControls.map(readRect).filter(box => box.height > 0 && box.top > height - 160 && box.top < height)
+    setBottomOffset(Math.max(0, ...reserved.map(box => height - box.top + 8)))
+    const selector = `[data-guide-anchor="${anchorName}"]`
+    const slotSelector = `[data-guide-slot="${anchorName}"]${width >= 1152 ? ':not([data-guide-narrow])' : ''}`
+    const nextSlot = anchorName ? Array.from(document.querySelectorAll<HTMLElement>(slotSelector)).at(-1) ?? null : null
+    const panel = nextSlot?.closest('[role=dialog], [role=alertdialog]')
+    const element = anchorName ? (panel ?? document).querySelector(selector) : null
+    const dialog = panel ?? element?.closest('[role=dialog]')
+    setSlot(nextSlot)
+    setActionLabel(element?.getAttribute('data-guide-action-label') ?? null)
+    setApplyingHours(element?.hasAttribute('data-guide-hours-apply') ?? false)
+    setInDialog(Boolean(dialog))
+    const tableSave = anchorName === 'tables.form' ? dialog?.querySelector('[data-guide-table-save=ready]') : null
+    const tableBox = anchorName === 'tables.form' && dialog ? readRect(dialog) : null
+    setTableDialog(previous => previous && tableBox && previous.left === tableBox.left && previous.top === tableBox.top &&
+      previous.width === tableBox.width && previous.height === tableBox.height ? previous : tableBox)
+    const highlight = tableSave ?? (anchorName === 'tables.form' ? dialog ?? element : element)
+    const next = highlight ? readRect(highlight) : null
+    setTarget(previous => previous && next && previous.left === next.left && previous.top === next.top &&
+      previous.width === next.width && previous.height === next.height ? previous : next)
   }, [anchorName])
 
   /* スクロール追従・リサイズ再計算（枠14 izsr5）。 */
   useEffect(() => {
-    if (!active || !procedure) return
+    if (!active) return
     measure()
-    const onScroll = () => measure()
-    window.addEventListener('scroll', onScroll, true)
-    window.addEventListener('resize', onScroll)
-    return () => {
-      window.removeEventListener('scroll', onScroll, true)
-      window.removeEventListener('resize', onScroll)
+    let frame = 0
+    const scheduleMeasure = () => {
+      if (frame) return
+      frame = window.requestAnimationFrame(() => { frame = 0; measure() })
     }
-  }, [active, procedure, measure])
+    const observer = new MutationObserver(scheduleMeasure)
+    observer.observe(document.body, { childList: true, subtree: true, attributeFilter: ['data-guide-table-save'] })
+    window.addEventListener('scroll', scheduleMeasure, true)
+    window.addEventListener('resize', scheduleMeasure)
+    return () => {
+      observer.disconnect()
+      window.cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', scheduleMeasure, true)
+      window.removeEventListener('resize', scheduleMeasure)
+    }
+  }, [active, procedure, onTargetScreen, measure])
 
   /* 対象が画面外なら自動スクロール（枠14 izsr5）。 */
   useEffect(() => {
-    if (!active || !anchorName || !target || !viewport) return
+    if (!active || !anchorName || !target || !viewport || slot) return
     if (!isOffScreen(target, viewport)) return
     document.querySelector(`[data-guide-anchor="${anchorName}"]`)
       ?.scrollIntoView({ block: 'center', behavior: scrollMotion() })
-  }, [active, anchorName, target, viewport])
+  }, [active, anchorName, target, viewport, slot])
 
   /*
     ガイド対象外の画面へ移動したら自動で一時停止（枠14 izsr5）。
     対象を持つ手順で、待っても対象が現れない時だけ止める。
   */
   useEffect(() => {
-    if (!active || !anchorName || target) return
-    if (missingSince.current === null) missingSince.current = 1
-    /*
-      画面を移った直後は対象がまだ描かれていない。
-      描き足されるのを見張って、現れたらその場で測る（ここで測り直さないと光らないままになる）。
-    */
-    const observer = new MutationObserver(() => {
-      if (document.querySelector(`[data-guide-anchor="${anchorName}"]`)) measure()
-    })
-    observer.observe(document.body, { childList: true, subtree: true })
+    if (!active || !stepLabel || (target && onTargetScreen) || (!anchorName && onTargetScreen)) return
     const timer = window.setTimeout(() => {
-      if (document.querySelector(`[data-guide-anchor="${anchorName}"]`)) { measure(); return }
+      if (anchorName && document.querySelector(`[data-guide-anchor="${anchorName}"]`)) { measure(); return }
       /*
         その手順の画面にいる間は止めない（差し戻し R1）。
         接続済みの時のように対象のボタンが出ない画面でも、吹き出しと帯は出したままにして
@@ -123,19 +153,18 @@ export function GuideOverlay({
       if (onTargetScreen) return
       onPause()
     }, MISSING_ANCHOR_WAIT_MS)
-    return () => {
-      observer.disconnect()
-      window.clearTimeout(timer)
-    }
-  }, [active, anchorName, target, measure, onPause, onTargetScreen])
+    return () => window.clearTimeout(timer)
+  }, [active, anchorName, target, measure, onPause, onTargetScreen, stepLabel])
 
   /* ESCで一時停止（枠14 izsr5）。 */
   useEffect(() => {
-    if (!active || !procedure) return
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onPause() }
+    if (!active) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) onPause()
+    }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [active, procedure, onPause])
+  }, [active, onPause])
 
   /*
     対象を押した時に進む手順（trigger 'click'）。
@@ -150,26 +179,47 @@ export function GuideOverlay({
     return () => element.removeEventListener('click', onClick)
   }, [active, anchorName, procedure?.trigger, target, onAdvanceProcedure])
 
+  const hasViewport = viewport !== null
   useLayoutEffect(() => {
-    const height = balloonRef.current?.getBoundingClientRect().height ?? 0
-    if (height && height !== balloonHeight) setBalloonHeight(height)
-  }, [procedure, balloonHeight, target])
+    const balloon = balloonRef.current
+    if (!balloon) return
+    const measureHeight = () => setBalloonHeight(balloon.getBoundingClientRect().height)
+    measureHeight()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measureHeight)
+    observer.observe(balloon)
+    return () => observer.disconnect()
+  }, [active, procedure, slot, hasViewport])
 
-  if (!active || !procedure || !viewport) return null
+  if (!active || !showOverlay || !stepKey || !viewport) return null
 
-  const ring = target ? spotlightRing(target) : null
-  const panels = target ? dimPanels(target, viewport) : []
+  const desktopTable = slot && tableDialog && tableDialog.left + tableDialog.width + 30 + 330 + 16 <= viewport.width &&
+    tableDialog.top + 30 + balloonHeight + 16 <= viewport.height ? tableDialog : null
+  const inlineGuide = Boolean(slot && !desktopTable)
+  const ring = target ? spotlightRing(target, desktopTable ? 12 : undefined) : null
+  const panels = target && !slot ? dimPanels(target, viewport) : []
+  const tablesComplete = stepKey === 'attributes' && safeIndex === 3 && Boolean(stepOrder && segments[stepOrder - 1])
+  const courseBasics = anchorName === 'menu.form' && viewport.width >= 1280
   const placement = target
-    ? balloonPlacement(target, viewport, balloonHeight)
-    // 対象を光らせない手順（枠 04-3）は画面の右下に置く。
-    : { left: Math.max(16, viewport.width - 340 - 24), top: Math.max(16, viewport.height - balloonHeight - 120), side: 'below' as const }
+    ? desktopTable
+      ? { left: desktopTable.left + desktopTable.width + 30, top: desktopTable.top + 30 }
+      : anchorName === 'hours.confirm' && !applyingHours && !slot && viewport.width >= 1152
+        ? { left: Math.min(viewport.width - 366, Math.max(760, target.left + target.width + 26)),
+            top: Math.max(16, Math.min(target.top - 47, viewport.height - balloonHeight - 16)) }
+        : balloonPlacement(target, viewport, balloonHeight, courseBasics ? 246 : undefined)
+    : tablesComplete
+      ? { left: Math.max(16, Math.min(1000, viewport.width - 330 - 24)), top: Math.min(300, viewport.height / 3) }
+      : { left: Math.max(16, viewport.width - 340 - 24), top: Math.max(16, viewport.height - balloonHeight - 120 - bottomOffset) }
 
-  const caption = stepLabel && stepOrder
-    ? `${ORDER_MARKS[stepOrder - 1] ?? ''} ${stepLabel}（手順 ${safeIndex}/${total}）`
-    : `手順 ${safeIndex}/${total}`
+  const order = stepOrder ? ORDER_MARKS[stepOrder - 1] : ''
+  const label = order && stepLabel ? `${order} ${stepLabel}` : stepLabel ?? '開店準備'
+  const caption = total ? `${label}（手順 ${safeIndex}/${total}）` : label
 
-  return (
-    <div className={styles.root}>
+  const overlay = (
+    <div className={styles.root} data-guide-dialog={inDialog || undefined}
+      data-inline-guide={inlineGuide || undefined} data-guide-table-editor={Boolean(desktopTable) || undefined}
+      data-guide-course-basics={courseBasics || undefined} data-guide-table-complete={tablesComplete || undefined}
+      style={{ '--guide-save-clearance': `${bottomOffset}px` } as CSSProperties}>
       {panels.map((panel, index) => (
         <div
           key={`dim-${index}`}
@@ -185,37 +235,59 @@ export function GuideOverlay({
         />
       ) : null}
 
-      {/* 読み上げに乗せる（枠14 izsr5「吹き出しはaria-liveで読み上げ」）。 */}
-      <div
-        ref={balloonRef}
-        className={styles.balloon}
-        style={{ left: placement.left, top: placement.top }}
-        role="status"
-        aria-live="polite"
-        data-guide-balloon={`${stepKey ?? ''}:${safeIndex}`}
-      >
-        <div className={styles.balloonHeader}>
-          <span className={styles.pill}>{`手順 ${safeIndex}/${total}`}</span>
-          <span className={styles.title}>{procedure.title}</span>
+      <div className={styles.stack}>
+        {procedure ? <div
+          ref={balloonRef}
+          className={styles.balloon}
+          style={{ left: placement.left, top: placement.top }}
+          role="status"
+          aria-live="polite"
+          data-guide-balloon={`${stepKey ?? ''}:${safeIndex}`}
+        >
+          <div className={styles.balloonHeader}>
+            <span className={styles.pill}>{`手順 ${safeIndex}/${total}`}</span>
+            <span className={styles.title}>{procedure.title}</span>
+          </div>
+          <p className={styles.body}>{tablesComplete ? procedure.body
+            : stepKey === 'attributes' && safeIndex === 3 ? '受付中の卓を1件以上用意してください。追加を見送る場合は、この手順をスキップできます。'
+            : inlineGuide && anchorName === 'menu.save' ? `内容を確認して「${actionLabel ?? '公開して追加する'}」を押します。`
+            : inlineGuide && anchorName === 'followup.save' ? '使わない場合は「今は使わない」を押します。'
+            : inlineGuide && anchorName === 'hours.confirm' && inDialog ? '営業時間を見直して「変更内容を確認」を押します。'
+            : (anchorName === 'reception.lineSeats' || anchorName === 'reception.save') && actionLabel === 'この日の枠を作る' ? '選んだ日にはまだ予約枠がありません。「この日の枠を作る」を押してください。休みの日は営業日を選んでください。'
+            : anchorName === 'hours.confirm' && applyingHours ? '変更内容を確かめて、「Googleに反映する」または「設定を保存する」を押します。'
+            : procedure.body}</p>
+          <div className={styles.balloonFooter}>
+            <Button presentation="quiet-text" onClick={onAdvanceProcedure}>この手順をスキップ</Button>
+          </div>
+        </div> : null}
+        {tablesComplete ? (
+          <div className={styles.completed} role="status">
+            <span className={styles.completeMark} aria-hidden="true"><Check size={14} /></span>
+            <div className={styles.completeCopy}>
+              <strong>{order} 卓と席の登録が完了しました</strong>
+              <span className={styles.caption}>
+                開店準備 {segments.filter(Boolean).length}/{segments.length}
+                {nextLabel ? ` ・ 次は「${nextLabel}」です` : null}
+              </span>
+            </div>
+            <Button size="compact" variant="primary" onClick={onAdvanceProcedure}>次へ進む</Button>
+          </div>
+        ) : null}
+        <div className={styles.bar} data-guide-bar="">
+          <div className={styles.barHeader}>
+            <span className={styles.barTitle}>開店準備ガイド</span>
+            <Button presentation="quiet-text" onClick={onPause}>一時停止</Button>
+          </div>
+          <div className={styles.progress}>
+            {segments.map((done, index) => (
+              <span key={`segment-${index}`} className={done ? `${styles.segment} ${styles.segmentDone}` : styles.segment} />
+            ))}
+          </div>
+          <span className={styles.caption}>{caption}</span>
+          {!procedure && stepLabel ? <div className={styles.barHeader}><Button presentation="quiet-text" onClick={onAdvanceProcedure}>この手順をスキップ</Button></div> : null}
         </div>
-        <p className={styles.body}>{procedure.body}</p>
-        <div className={styles.balloonFooter}>
-          <Button presentation="quiet-text" onClick={onAdvanceProcedure}>この手順をスキップ</Button>
-        </div>
-      </div>
-
-      <div className={styles.bar} data-guide-bar="" style={{ left: 264, top: Math.max(16, viewport.height - 84) }}>
-        <div className={styles.barHeader}>
-          <span className={styles.barTitle}>開店準備ガイド</span>
-          <Button presentation="quiet-text" onClick={onPause}>一時停止</Button>
-        </div>
-        <div className={styles.progress}>
-          {segments.map((done, index) => (
-            <span key={`segment-${index}`} className={done ? `${styles.segment} ${styles.segmentDone}` : styles.segment} />
-          ))}
-        </div>
-        <span className={styles.caption}>{caption}</span>
       </div>
     </div>
   )
+  return slot ? createPortal(overlay, slot) : overlay
 }
