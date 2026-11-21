@@ -470,6 +470,10 @@
 
 ## 反映履歴
 
+- [SNS連携で残る3つの口の決まり](v8-requirements/multi-sns-connections-ports.md)
+
+- [AI が作った配信の承認手順を整理](release-log/unreleased/124-kenta-g2-docs.md) — 反映履歴、確認 2026-11-19。
+
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
