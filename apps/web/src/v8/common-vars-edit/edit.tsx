@@ -902,7 +902,7 @@ function EditCommonVarV8Inner() {
                 </Tr>)}</tbody>
               </DataTable>
               <p className={styles.fieldHint}>送信済み・完了済みの内容は、値を変えても変わりません。</p>
-              {impact.items.some(usage => usageHasNextChange(usage) || (usage.kind === 'scenario' && /[?&](step|action)=/.test(usage.href)) || (usage.kind === 'form' && !usage.publishedReferenceMode)) ? <p className={styles.fieldHint}>『次回』の札が付いた使用先と、シナリオ・フォームの下書きの変更は、次に公開した版から反映します。</p> : null}
+              {impact.items.some(usage => usageHasNextChange(usage) || (usage.kind === 'scenario' && /[?&](step|action)=/.test(usage.href)) || (usage.kind === 'form' && !usage.publishedReferenceMode)) ? <p className={styles.fieldHint}>『次回』の印が付いた使用先と、シナリオ・フォームの下書きの変更は、次に公開した版から反映します。</p> : null}
               {item?.pinDisabledReason && impact.items.some(usage => usage.kind === 'broadcast' && usage.referenceMode === 'pinned' && !usage.status.includes('送信済み') && !usage.status.includes('完了済み')) ? <p className={styles.fieldHint}>Google と連携した固定版は送らず要確認になります。「…」から最新の値に戻せます。</p> : null}
               {item?.pinDisabledReason && impact.items.some(usage => (usage.kind === 'scenario' || usage.kind === 'form') && (usage.referenceMode === 'pinned' || usage.publishedReferenceMode === 'pinned')) ? <p className={styles.fieldHint}>Google と連携した固定版は送信・表示できません。下書きで最新の値に戻し、公開し直してください。</p> : null}
               {impact.unscopedFormTotal > 0 ? <p className={styles.fieldHint}>所属を確認できない使用先が {formatNumber(impact.unscopedFormTotal)}か所あります。</p> : null}

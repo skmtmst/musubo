@@ -232,7 +232,7 @@ it.each([
     unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind, kindLabel: name, name, status: '使用中', href, blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
   } })
   render(<Editor />)
-  expect(await screen.findByText('『次回』の札が付いた使用先と、シナリオ・フォームの下書きの変更は、次に公開した版から反映します。')).toBeTruthy()
+  expect(await screen.findByText('『次回』の印が付いた使用先と、シナリオ・フォームの下書きの変更は、次に公開した版から反映します。')).toBeTruthy()
   fireEvent.click(await screen.findByRole('button', { name: `${name}の操作` }))
   fireEvent.click(await screen.findByRole('menuitem', { name: '版 1 で固定' }))
   const dialog = await screen.findByRole('dialog', { name: 'この版で固定しますか' })
@@ -255,7 +255,7 @@ it('フォームは公開中と次の公開の参照を区別して示す', asyn
   render(<Editor />)
   expect((await screen.findByTitle('次に公開した版から 版 1 で固定します')).textContent).toBe('次回 版1')
   expect(screen.getByTitle('版 2')).toBeTruthy()
-  expect(screen.getByText('『次回』の札が付いた使用先と、シナリオ・フォームの下書きの変更は、次に公開した版から反映します。')).toBeTruthy()
+  expect(screen.getByText('『次回』の印が付いた使用先と、シナリオ・フォームの下書きの変更は、次に公開した版から反映します。')).toBeTruthy()
 })
 
 it('シナリオの送信アクションも行末から固定できる', async () => {
