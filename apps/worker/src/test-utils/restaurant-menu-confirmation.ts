@@ -119,4 +119,20 @@ export function registerRestaurantMenuConfirmationTests(context: {
     expect((await requestWithMethod(menuPath, 'PATCH', {status:'archived', expectedVersion:2})).status).toBe(409);
   });
 
+  it('コースの所要時間を追加・更新して読み直せる', async () => {
+    seedRestaurantFixture();
+    const created = await request('/api/restaurant-test/menu?account_id=account-1', { storeId: 'store-ginza', kind: 'course', name: '時間付き', price: 3000, durationMinutes: 90 });
+    expect(created.status).toBe(201);
+    const id = ((await created.json()) as { data: { id: string } }).data.id;
+    const path = `/api/restaurant-test/menu/${id}?account_id=account-1`;
+    expect(context.testDb().raw.prepare('SELECT duration_minutes FROM rt_menu_items WHERE id=?').get(id)).toEqual({ duration_minutes: 90 });
+    expect((await requestWithMethod(path, 'PATCH', { durationMinutes: 150 })).status).toBe(200);
+    expect((await requestWithMethod(path, 'PATCH', { durationMinutes: 601 })).status).toBe(400);
+    expect((await requestWithMethod(path, 'PATCH', { durationMinutes: null })).status).toBe(400);
+    const list = await requestWithMethod('/api/restaurant-test/menus?account_id=account-1', 'GET');
+    const result = await list.json() as { data: Array<{ id: string; duration_minutes: number }> };
+    expect(result.data.find(item => item.id === id)?.duration_minutes).toBe(150);
+  });
+
+
 }

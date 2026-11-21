@@ -1,16 +1,19 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useOptionalAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
 import { useStaffRole } from '@/lib/staff-role'
 import { useFirstSteps } from '@/v8/dashboard/public/first-steps-model/index'
 import { GUIDE_ENGINE_EVENT, readGuideEngineState } from './guide-engine'
 import { GuideOverlay } from './guide-overlay'
+import { GuideReceiveFirstMessage, GuideSetupComplete } from './guide-last-step'
+import { GuideMenuPicker } from './guide-menu-picker'
+import { GuidePublishMenu } from './guide-publish-menu'
 import { guideProcedure } from './guide-script'
 import { GuideSharedProvider, type SharedGuide } from './guide-shared'
-import { useGuideSignal } from './guide-signal'
+import { useGuideSignal, useSetupSaveSignal } from './guide-signal'
 
 /*
   開店準備ガイドの入れ物。全画面で1つ。画面側は置かない。
@@ -31,11 +34,13 @@ export function GuideHost({ children }: { children: ReactNode }) {
    * 控えが変わった合図でも見直す（ダッシュボードで「開始」を押した直後もここで気づく）。
    */
   const [armed, setArmed] = useState(false)
+  const [watchFirstMessage, setWatchFirstMessage] = useState(false)
 
   useEffect(() => {
     const read = () => {
-      const phase = readGuideEngineState(accountId).phase
+      const { phase, stepKey } = readGuideEngineState(accountId)
       setArmed(phase === 'active' || phase === 'paused')
+      setWatchFirstMessage(phase === 'active' && stepKey === 'firstMessage')
     }
     read()
     if (typeof window === 'undefined') return
@@ -47,14 +52,20 @@ export function GuideHost({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(GUIDE_ENGINE_EVENT, changed)
   }, [accountId])
 
-  if (!accountId || !armed) return <>{children}</>
-  return <GuideHostActive accountId={accountId}>{children}</GuideHostActive>
+  return <GuideSession accountId={accountId} armed={armed} watchFirstMessage={watchFirstMessage}>{children}</GuideSession>
 }
 
-function GuideHostActive({ accountId, children }: { accountId: string; children: ReactNode }) {
+function GuideSession({ accountId, armed, watchFirstMessage, children }: { accountId: string | null; armed: boolean; watchFirstMessage: boolean; children: ReactNode }) {
   const role = useStaffRole()
+  const channelId = useOptionalAccount()?.selectedAccount?.channelId
   const style = useAccountStyle(accountId)
-  const first = useFirstSteps(accountId, role, { style: style.data?.style ?? null })
+  const pathname = usePathname()
+  const [qrOpen, setQrOpen] = useState(false)
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setQrOpen(new URLSearchParams(window.location.search).get('qr') === 'base'))
+    return () => window.cancelAnimationFrame(frame)
+  }, [pathname])
+  const first = useFirstSteps(accountId, role, { style: style.data?.style ?? null, enabled: armed || pathname === '/', watchFirstMessage })
   const { guide, summary } = first
   const shared = useMemo<SharedGuide>(() => ({ guide, summary }), [guide, summary])
 
@@ -63,9 +74,11 @@ function GuideHostActive({ accountId, children }: { accountId: string; children:
   /** 9項目の済みは実データ計測の値のまま渡す（ガイドで済みにしない）。 */
   const segments = useMemo(() => summary?.steps.map(item => item.done) ?? [], [summary])
 
-  const procedure = guideProcedure(guide.stepKey, guide.procedureIndex)
-  const advance = useCallback(() => { guide.advanceProcedure() }, [guide])
-  const pause = useCallback(() => { guide.pause() }, [guide])
+  const scripted = style.data?.style === 'restaurant'
+  const procedure = scripted ? guideProcedure(guide.stepKey, guide.procedureIndex) : null
+  const next = summary?.steps.slice(index + 1).find(item => !item.done && item.href)
+  const advance = guide.advanceProcedure
+  const pause = guide.pause
 
   /*
     段や手順が変わったら、その手順の対象がある画面へ実際に移る。
@@ -73,49 +86,91 @@ function GuideHostActive({ accountId, children }: { accountId: string; children:
     始めた直後も同じ。「続きから」は最初の未完了の段の手順1なので、
     ダッシュボードで始めたらその手順の画面まで連れていく。
     連れていかないと、ダッシュボードには対象が無いので案内が1.5秒で自動停止してしまう。
-    台本が画面を指定している手順（例: ⑤営業時間の1/2＝設定 › SNS連携）も同じ扱い。
+    台本が画面を指定している手順も同じ扱い。
   */
   const router = useRouter()
-  const pathname = usePathname()
-  const previousPlace = useRef<string | null>(null)
+  const requestedPlace = useRef<string | null>(null)
+  const reachedPlace = useRef<string | null>(null)
   const stepHref = step?.href ?? null
   const procedureHref = procedure?.href ?? null
   /** この手順の対象がある画面。手順の指定が無ければ段の行き先。 */
-  const targetHref = procedureHref ?? stepHref
-  const onTargetScreen = !targetHref || pathname === targetHref.split('?')[0]
+  const firstMessageStep = scripted && step?.key === 'firstMessage'
+  const menuPickerStep = scripted && step?.key === 'richMenu'
+  const targetHref = firstMessageStep || menuPickerStep ? '/' : procedureHref ?? stepHref
+  const checkingFirstMessage = guide.stepKey === 'firstMessage' &&
+    (pathname.startsWith('/scenarios') || (pathname === '/' && qrOpen))
+  const needsPublishReview = scripted && step?.key === 'scenario' && step.done &&
+    guide.procedureIndex === 2 && guide.phase === 'active'
+  const inPublishReview = needsPublishReview && pathname.startsWith('/rich-menus')
+  const onTargetScreen = inPublishReview || !targetHref || pathname === targetHref.split(/[?#]/)[0] || checkingFirstMessage
+  const place = `${accountId}:${guide.stepKey}:${guide.procedureIndex}`
+  const leavingGuideScreen = !onTargetScreen && reachedPlace.current === place
   useEffect(() => {
-    /* 行き先がまだ分からない間（実測の読み込み中）は前の居場所を覚えたままにして、判定を先送りする。 */
-    if (guide.phase !== 'active' || !guide.stepKey || !targetHref) return
-    const place = `${guide.stepKey}:${guide.procedureIndex}`
-    const previous = previousPlace.current
-    previousPlace.current = place
-    if (onTargetScreen) return
-    /* 同じ居場所で一度連れていった後は繰り返さない（押し戻し合いを防ぐ）。 */
-    if (!procedureHref && previous === place) return
+    if (guide.phase !== 'active') {
+      requestedPlace.current = null
+      reachedPlace.current = null
+      return
+    }
+    if (!guide.stepKey || !targetHref) return
+    if (onTargetScreen) {
+      reachedPlace.current = place
+      return
+    }
+    if (reachedPlace.current === place || requestedPlace.current === place) return
+    requestedPlace.current = place
     router.push(targetHref)
-  }, [guide.phase, guide.stepKey, guide.procedureIndex, targetHref, procedureHref, onTargetScreen, router])
+  }, [guide.phase, guide.stepKey, place, targetHref, onTargetScreen, router])
 
   /* 保存できた時・入力がそろった時に進む手順は、画面側の合図で進める。 */
   useGuideSignal(
     procedure?.trigger === 'event' || procedure?.trigger === 'valid' ? procedure.anchor : null,
     guide.phase === 'active',
-    advance,
+    () => { if (procedure?.anchor !== 'reception.save') advance() },
   )
+  useSetupSaveSignal(scripted && armed, first.refresh)
+  useGuideSignal('reception.menuPublished', Boolean(accountId && inPublishReview), advance, accountId ?? undefined)
+  const alreadyPublished = first.progress?.richMenuPublished === true
+  const skipPublishPrompt = needsPublishReview && !inPublishReview && onTargetScreen && alreadyPublished
+  useEffect(() => { if (skipPublishPrompt) advance() }, [skipPublishPrompt, advance])
+  const offerPublishing = needsPublishReview && !inPublishReview && onTargetScreen && !alreadyPublished
+  const reviewingTables = guide.stepKey === 'attributes' && guide.procedureIndex === 3
+  const reviewingHours = guide.stepKey === 'hours'
+  const showComplete = scripted && Boolean(summary?.total && summary.done === summary.total) &&
+    (first.arrived || guide.phase === 'active' || guide.phase === 'paused') && !offerPublishing && !skipPublishPrompt && !reviewingTables && !reviewingHours
+  const showReceive = firstMessageStep && !step.done && guide.phase === 'active' && pathname === '/' && !qrOpen && channelId
+  const showMenuPicker = menuPickerStep && !step.done && guide.phase === 'active' && pathname === '/' &&
+    accountId && style.data?.styleSelected && !style.stale
+  const dismissComplete = () => { guide.complete?.(); first.dismissArrived() }
 
   return (
     <GuideSharedProvider value={shared}>
       {children}
       <GuideOverlay
-        active={guide.phase === 'active'}
+        active={guide.phase === 'active' && (onTargetScreen || leavingGuideScreen) && !offerPublishing && !skipPublishPrompt && !showReceive && !showComplete && !showMenuPicker}
         stepKey={guide.stepKey}
         stepLabel={step?.label ?? null}
         stepOrder={index >= 0 ? index + 1 : null}
         procedureIndex={guide.procedureIndex}
-        onTargetScreen={onTargetScreen}
+        onTargetScreen={!leavingGuideScreen}
+        showOverlay={onTargetScreen}
+        scripted={scripted}
+        showProcedure={!inPublishReview}
+        nextLabel={next?.label}
         segments={segments}
         onAdvanceProcedure={advance}
         onPause={pause}
       />
+      {showMenuPicker && summary && style.data ? <GuideMenuPicker key={accountId} accountId={accountId}
+        version={style.data.version} step={index + 1} total={summary.total} onLater={advance}
+        onCreate={() => { pause(); router.push('/rich-menus/new') }} onReload={style.reload} /> : null}
+      {showReceive && summary ? <GuideReceiveFirstMessage key={accountId} channelId={channelId}
+        step={index + 1} total={summary.total} watchExpired={first.watchExpired}
+        richMenuPublished={Boolean(first.progress?.richMenuPublished)}
+        onRewatch={first.rewatch} onLater={pause} /> : null}
+      {showComplete ? <GuideSetupComplete onClose={dismissComplete}
+        onHome={() => { dismissComplete(); router.push('/') }} /> : null}
+      {offerPublishing && accountId ? <GuidePublishMenu key={accountId} accountId={accountId}
+        onLater={advance} onReview={href => router.push(href)} /> : null}
     </GuideSharedProvider>
   )
 }

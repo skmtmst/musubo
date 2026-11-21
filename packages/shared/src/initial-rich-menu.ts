@@ -1,4 +1,5 @@
 import type { AccountStyle } from './style-api.js';
+import type { RestaurantGuideMenu } from './restaurant-guide-menu.js';
 
 /** 初期セットの4面。画像・座標・投入・顧客の入口はこの順序を共有する。 */
 export type InitialMenuTarget = 'booking' | 'history' | 'menu' | 'access' | 'contact' | 'about' | 'classes' | 'schedule' | 'news' | 'application' | 'guide' | 'products' | 'mypage';
@@ -30,7 +31,9 @@ export function initialMenuBounds(index: number) {
  return {x:(index%2)*1250,y:Math.floor(index/2)*843,width:1250,height:843};
 }
 export function initialFormKey(style: AccountStyle, target: InitialMenuTarget) { return `initial-${style}-${target}`; }
-export function initialMenuImageKey(accountId: string, style: AccountStyle) { return `rich-menus/${accountId}/initial/${style}/v${INITIAL_MENU_VERSION}.png`; }
+export function initialMenuImageKey(accountId: string, style: AccountStyle, preset?: RestaurantGuideMenu) {
+ return `rich-menus/${accountId}/initial/${style}/v${INITIAL_MENU_VERSION}${preset ? `-${preset}` : ''}.png`;
+}
 
 const DOCUMENT_TARGETS: readonly InitialMenuTarget[] = ['menu','access','about','news','guide','products'];
 export const initialMenuIsDocument = (target: InitialMenuTarget) => DOCUMENT_TARGETS.includes(target);

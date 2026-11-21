@@ -17,12 +17,12 @@ const BALLOON_GAP = 20
 /** 画面の端に寄せすぎない余白。 */
 const EDGE = 16
 
-export function spotlightRing(target: Rect): Rect {
+export function spotlightRing(target: Rect, inflate = SPOTLIGHT_INFLATE): Rect {
   return {
-    left: target.left - SPOTLIGHT_INFLATE,
-    top: target.top - SPOTLIGHT_INFLATE,
-    width: target.width + SPOTLIGHT_INFLATE * 2,
-    height: target.height + SPOTLIGHT_INFLATE * 2,
+    left: target.left - inflate,
+    top: target.top - inflate,
+    width: target.width + inflate * 2,
+    height: target.height + inflate * 2,
   }
 }
 
@@ -47,22 +47,22 @@ export type BalloonPlacement = { left: number; top: number; side: 'right' | 'lef
  * 吹き出しの置き場所。**対象を覆わない所に置く**（枠14 共通ルール izsr5）。
  * 右に入らなければ左、どちらも入らなければ対象の下に出す。
  */
-export function balloonPlacement(target: Rect, viewport: Viewport, balloonHeight: number): BalloonPlacement {
+export function balloonPlacement(target: Rect, viewport: Viewport, balloonHeight: number, width = BALLOON_WIDTH): BalloonPlacement {
   const ring = spotlightRing(target)
   const clampTop = (value: number) =>
     Math.max(EDGE, Math.min(value, Math.max(EDGE, viewport.height - balloonHeight - EDGE)))
 
   const rightLeft = ring.left + ring.width + BALLOON_GAP
-  if (rightLeft + BALLOON_WIDTH + EDGE <= viewport.width) {
+  if (rightLeft + width + EDGE <= viewport.width) {
     return { left: rightLeft, top: clampTop(ring.top), side: 'right' }
   }
-  const leftLeft = ring.left - BALLOON_GAP - BALLOON_WIDTH
+  const leftLeft = ring.left - BALLOON_GAP - width
   if (leftLeft >= EDGE) {
     return { left: leftLeft, top: clampTop(ring.top), side: 'left' }
   }
-  const centered = ring.left + ring.width / 2 - BALLOON_WIDTH / 2
+  const centered = ring.left + ring.width / 2 - width / 2
   return {
-    left: Math.max(EDGE, Math.min(centered, Math.max(EDGE, viewport.width - BALLOON_WIDTH - EDGE))),
+    left: Math.max(EDGE, Math.min(centered, Math.max(EDGE, viewport.width - width - EDGE))),
     top: clampTop(ring.top + ring.height + BALLOON_GAP),
     side: 'below',
   }
