@@ -50,4 +50,16 @@ export async function checkRestaurantMenuMedia({ testDb, seedRestaurantFixture, 
     expect(missing.status).toBe(400);
     expect(await missing.json()).toMatchObject({ code:'MENU_IMAGE_UNAVAILABLE' });
     expect((await requestWithMethod(path, 'PATCH', { description:'x'.repeat(2001) })).status).toBe(400);
+    const photos = [{ mediaId:'replacement', x:75, y:25 }, { mediaId:'menu-photo', x:30, y:60 }];
+    expect((await requestWithMethod(path, 'PATCH', { photos })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT image_media_id, photo_gallery_json FROM rt_menu_items WHERE id=?').get(id))
+      .toEqual({ image_media_id:'replacement', photo_gallery_json:JSON.stringify(photos) });
+    const secondPhoto = await getMediaDeleteImpactSnapshot(testDb.db, 'menu-photo', 'account-2', '2026-11-03T00:00:00Z');
+    expect(secondPhoto?.impact).toMatchObject({ canDelete:false, usageCount:1 });
+    expect((await requestWithMethod(path, 'PATCH', { photos: [{ mediaId:'other-photo', x:50, y:50 }] })).status).toBe(400);
+    expect((await requestWithMethod(path, 'PATCH', { photos: [{ ...photos[0], x:101 }] })).status).toBe(400);
+    expect((await requestWithMethod(path, 'PATCH', { photos: [...photos, photos[0]] })).status).toBe(400);
+    expect((await requestWithMethod(path, 'PATCH', { name:'写真を保持' })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT photo_gallery_json FROM rt_menu_items WHERE id=?').get(id)).toEqual({ photo_gallery_json:JSON.stringify(photos) });
+
 }

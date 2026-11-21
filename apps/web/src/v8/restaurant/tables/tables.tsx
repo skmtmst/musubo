@@ -441,7 +441,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
         titleRow="mark"
         plainTitle
         onCancel={cancelEditor}
-        actions={<><Button presentation="restaurant" type="button" onClick={cancelEditor} disabled={busy}>キャンセル</Button><Button presentation="restaurant" type="submit" form="rs-table-editor" variant="primary" disabled={busy}>{quickCreate ? null : <Plus size={16} aria-hidden="true" />}{quickCreate ? '保存する' : editing ? '変更を保存' : createCount===1?'卓を作る':`${createCount}卓を作る`}</Button></>}
+        actions={<><Button presentation="restaurant" type="button" onClick={cancelEditor} disabled={busy}>キャンセル</Button><Button data-guide-table-save={quickCreate && draft?.label.trim() && Number(draft.maxCapacity) >= 1 ? 'ready' : undefined} presentation="restaurant" type="submit" form="rs-table-editor" variant="primary" disabled={busy}>{quickCreate ? null : <Plus size={16} aria-hidden="true" />}{quickCreate ? '保存する' : editing ? '変更を保存' : createCount===1?'卓を作る':`${createCount}卓を作る`}</Button></>}
       >
         {draft && selectedAccountId && store ? <form id="rs-table-editor" data-guide-anchor="tables.form" ref={editorRef} className={styles.editorFields} noValidate onSubmit={(event) => { event.preventDefault(); void save() }}>
           {editorError ? <Notice tone="danger" role="alert">{editorError}</Notice> : null}
