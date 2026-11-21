@@ -18,9 +18,9 @@ export function splitAudience(total: number, ratioPct: number): { a: number; b: 
 }
 
 /** 使えない理由（使えるなら null）。全員への配信・人数が足りない（AB-08・AB-09）。 */
-export function abBlockedReason(targetAll: boolean, total: number | null): 'all' | 'few' | null {
+export function abBlockedReason(targetAll: boolean, total: number | null, allowSmall = false): 'all' | 'few' | null {
   if (targetAll) return 'all'
-  if (total !== null && total < AB_MIN_TOTAL) return 'few'
+  if (!allowSmall && total !== null && total < AB_MIN_TOTAL) return 'few'
   return null
 }
 

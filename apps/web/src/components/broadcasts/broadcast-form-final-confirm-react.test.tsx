@@ -17,11 +17,11 @@ import { fireEvent } from '@testing-library/react'
 import { formatDateTime } from '@/lib/format'
 import type { BroadcastPreflight } from '@/lib/api'
 
-const captured = vi.hoisted(() => ({ regular: undefined as undefined | (() => Promise<void>), single: undefined as undefined | (() => Promise<void>), closeRegular: undefined as undefined | ((value: boolean) => void), closeSingle: undefined as undefined | ((value: boolean) => void) }))
+const captured = vi.hoisted(() => ({ regular: undefined as undefined | (() => Promise<void>), single: undefined as undefined | (() => Promise<void>), closeRegular: undefined as undefined | ((value: boolean) => void), setApprover: undefined as undefined | ((value: string) => void), closeSingle: undefined as undefined | ((value: boolean) => void) }))
 vi.mock('./broadcast-confirm-dialogs', async original => {
   const actual = await original<typeof import('./broadcast-confirm-dialogs')>()
   return { ...actual, renderBroadcastConfirmDialogs: (props: Parameters<typeof actual.renderBroadcastConfirmDialogs>[0]) => {
-    if (props.confirmOpen && !props.needsApprovalSingle) { captured.regular = props.confirmMessage; captured.closeRegular = props.setConfirmOpen }
+    if (props.confirmOpen && !props.needsApprovalSingle) { captured.regular = props.confirmMessage; captured.closeRegular = props.setConfirmOpen; captured.setApprover = props.setApproverId }
     return actual.renderBroadcastConfirmDialogs(props)
   } }
 })
@@ -31,6 +31,16 @@ vi.mock('./broadcast-editor-dialogs', async original => {
     if (props.confirmOpen && props.needsApprovalSingle) { captured.single = props.save; captured.closeSingle = props.setConfirmOpen }
     return actual.renderBroadcastEditorDialogs(props)
   } }
+})
+
+const abMocks = vi.hoisted(() => ({ result: vi.fn(), startLive: vi.fn(), saveVariant: vi.fn(), saveTest: vi.fn() }))
+vi.mock('@/v8/broadcast-ab/public/api/index', async original => {
+  const actual = await original<typeof import('@/v8/broadcast-ab/public/api/index')>()
+  return { ...actual, broadcastAbApi: { ...actual.broadcastAbApi, result: abMocks.result, startLive: abMocks.startLive } }
+})
+vi.mock('@/v8/broadcast-ab/api', async original => {
+  const actual = await original<typeof import('@/v8/broadcast-ab/api')>()
+  return { ...actual, broadcastAbApi: { ...actual.broadcastAbApi, saveVariant: abMocks.saveVariant, saveTest: abMocks.saveTest } }
 })
 
 const mocks = vi.hoisted(() => ({ account: 'acc-1', params: '', get: vi.fn(), preview: vi.fn(), confirm: vi.fn(), create: vi.fn(), update: vi.fn(), send: vi.fn(), config: vi.fn(), request: vi.fn(), preflight: vi.fn(), success: vi.fn() }))
@@ -128,6 +138,10 @@ beforeEach(() => {
   mocks.preflight.mockResolvedValue({ success: true, data: PREFLIGHT })
   mocks.preview.mockResolvedValue({ success: true, data: { recipients: 37, excluded: { blocked: 0, optedOut: 0, duplicate: 0, hidden: 0, missingDestination: 0 }, purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '本文', sender: null, expectedVersion: 2 } })
   mocks.confirm.mockResolvedValue({ success: true, data: {} })
+  abMocks.result.mockResolvedValue({ success: true, data: { liveTestRecipientCount: 20 } })
+  abMocks.startLive.mockResolvedValue({ success: true, data: { status: 'live_testing' } })
+  abMocks.saveVariant.mockResolvedValue({ success: true, data: { version: 3 } })
+  abMocks.saveTest.mockResolvedValue({ success: true, data: { version: 4 } })
 })
 afterEach(() => { if (root) act(() => root.unmount()); container?.remove(); vi.useRealTimers() })
 
@@ -278,15 +292,69 @@ describe('確認の窓に並べるもの', () => {
   })
 })
 
+/** 承認済みの A/B 下書きを開き直し、了承を済ませた最終確認の窓を返す。 */
+async function openApprovedAbDialog() {
+  mocks.params = 'draft=draft'
+  mocks.get.mockResolvedValue({ success: true, data: {
+    id: 'draft', lineAccountId: 'acc-1', version: 2, status: 'draft', approvalStatus: 'approved',
+    title: '承認済み', messageType: 'text', messageContent: '本文', targetType: 'tag', targetTagId: 'vip',
+    draftPayload: { draftSendChoice: 'now', draftAb: { enabled: true, bubbles: [{ id: 'b1', type: 'text', content: { text: 'B案' } }], settings: { testRatioPct: 20, metric: 'click', decideAfterMinutes: 240, undecidedPolicy: 'stop' } } },
+  } })
+  mocks.config.mockResolvedValue({ success: true, data: { threshold: 5, singleOperator: false } })
+  await render()
+  await click('今すぐ送る', container); await settle(200)
+  const opened = dialog()!
+  expect(opened).not.toBeNull()
+  const acknowledgement = Array.from(opened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))
+  if (acknowledgement && !acknowledgement.checked) await act(async () => { fireEvent.click(acknowledgement) })
+  return opened
+}
+
 describe('画面内の最終確認（IDEA-06）', () => {
-  it('A/B有効なら最終段で送信を止め、実際の送信へ進まない', async () => {
+  it('承認済みのA/Bを開き直すと再保存せず試験送信する', async () => {
+    const opened = await openApprovedAbDialog()
+    await click('4 人に試験を送る', opened)
+    expect(mocks.update).not.toHaveBeenCalled()
+    expect(abMocks.saveVariant).not.toHaveBeenCalled()
+    expect(mocks.request).not.toHaveBeenCalled()
+    expect(abMocks.startLive).toHaveBeenCalledOnce()
+    expect(mocks.success).toHaveBeenCalledOnce()
+    expect(document.body.textContent).not.toContain('試しの送信を停止しました')
+  })
+
+  it('試験送信の開始が試験中にならなければ、完了へ進まず止まったことを出す', async () => {
+    abMocks.startLive.mockResolvedValue({ success: true, data: { status: 'stopped' } })
+    const opened = await openApprovedAbDialog()
+    await click('4 人に試験を送る', opened)
+    expect(abMocks.startLive).toHaveBeenCalledOnce()
+    expect(mocks.success).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('試しの送信を停止しました。結果を確認してください。')
+  })
+
+  it('未承認のA/Bは案を保存して承認を依頼し、送信しない', async () => {
+    mocks.config.mockResolvedValue({ success: true, data: { threshold: 5, singleOperator: false } })
+    await render({ step: null })
+    await click('B 案を追加', container)
+    await act(async () => { root.render(<BroadcastForm visualQaAugustCampaign currentStep="confirm" tags={[{ id: 'exclude', name: '配信不要' } as never]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }] }} onSuccess={mocks.success} onCancel={() => {}} />) })
+    await settle(); await click('今すぐ送る', container); await settle(200)
+    const opened = dialog()!
+    const acknowledgement = Array.from(opened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))
+    if (acknowledgement && !acknowledgement.checked) await act(async () => { fireEvent.click(acknowledgement) })
+    await act(async () => { captured.setApprover?.('approver') }); await flush()
+    await click('承認を依頼する', opened)
+    expect(abMocks.saveVariant).toHaveBeenCalledTimes(2)
+    expect(abMocks.saveTest).toHaveBeenCalledOnce()
+    expect(mocks.request).toHaveBeenCalledOnce()
+    expect(abMocks.startLive).not.toHaveBeenCalled()
+  })
+
+  it('A/B有効なら通常配信へ流さず専用の確認を開く', async () => {
     await render({ step: null })
     await click('B 案を追加', container)
     await act(async () => { root.render(<BroadcastForm visualQaAugustCampaign currentStep="confirm" tags={[{ id: 'exclude', name: '配信不要' } as never]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }] }} onSuccess={mocks.success} onCancel={() => {}} />) })
     await settle()
-    expect(button('今すぐ送る', container).disabled).toBe(true)
-    expect(container.textContent).toContain('B案を消すとA案を配信できます')
     await click('今すぐ送る', container)
+    expect(dialog()).not.toBeNull()
     expect(mocks.confirm).not.toHaveBeenCalled()
     expect(mocks.send).not.toHaveBeenCalled()
   })
@@ -323,7 +391,7 @@ describe('画面内の最終確認（IDEA-06）', () => {
     const opened = dialog()!
     const ack = Array.from(opened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))
     if (ack && !ack.checked) await act(async () => { fireEvent.click(ack) })
-    const confirm = button('37 人に送る', opened)
+    const confirm = button('0 人に試験を送る', opened)
     const key = Object.keys(confirm).find(item => item.startsWith('__reactProps$'))!
     const handler = (confirm as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
     await act(async () => { handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: confirm, target: confirm }) }); await flush()
@@ -335,7 +403,7 @@ describe('画面内の最終確認（IDEA-06）', () => {
     await click('B 案を追加', container)
     await click('配信を予約する', container)
     expect(dialog()).toBeNull()
-    expect(container.textContent).toContain('A/Bは送信未対応です')
+    expect(container.textContent).toContain('A/Bの検証送信は作成手順から')
     expect(mocks.confirm).not.toHaveBeenCalled()
   })
 

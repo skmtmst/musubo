@@ -31,8 +31,9 @@ export function abStatusDefinition(result: AbResult | null): { label: string; to
     testing: { label: '試し中', tone: 'info' },
     decided: result.remainder.sentAt ? { label: '送信済み', tone: 'success' } : { label: '残りへ送信中', tone: 'info' },
     undecided: { label: '選んでください', tone: 'warning' },
-    finished: { label: '送信済み', tone: 'success' },
+    finished: result.winner ? { label: '送信済み', tone: 'success' } : { label: '送らず終了', tone: 'neutral' },
     expired: { label: '期限切れ', tone: 'neutral' },
+    stopped: { label: '停止', tone: 'neutral' },
   }
   return map[result.status]
 }
@@ -93,7 +94,7 @@ export default function BroadcastAbResult({ broadcastId, ab, canSend, accounts }
     setBusy(true)
     setError('')
     try {
-      const res = await broadcastAbApi.choose(broadcastId, choose, result.remainder.count, key)
+      const res = result.testMode === false ? await broadcastAbApi.chooseLive(broadcastId, choose, result.remainder.count, key) : await broadcastAbApi.choose(broadcastId, choose, result.remainder.count, key)
       if (!res.success) throw new Error('choose failed')
       notifySaved(choose === 'none' ? '送らずに終えました' : `残りの人へ ${choose} 案を送ります`)
       setChoose(null)
@@ -106,7 +107,7 @@ export default function BroadcastAbResult({ broadcastId, ab, canSend, accounts }
       setBusy(false)
     }
   }
-  const metricLine = result ? `勝ちの決め方：${METRIC_WORD[result.metric]}・${result.status === 'undecided' ? `${result.decideAfterMinutes / 60} 時間たっても差が小さく決められない` : `${result.decideAfterMinutes / 60} 時間で決めた`}` : ''
+  const metricLine = result ? `勝ちの決め方：${METRIC_WORD[result.metric]}・${result.status === 'undecided' ? `${result.decideAfterMinutes / 60} 時間後に${result.reason === 'delivery_too_small' ? '人数不足' : result.reason === 'tracking_unavailable' ? '計測できず' : '差が小さく'}決められない` : `${result.decideAfterMinutes / 60} 時間で決めた`}` : ''
   const winner = result?.winner ? result.variants.find((variant) => variant.key === result.winner) : null
   return (
     <Card as="section" className={styles.resultCard} contentPadding="var(--ab-pad)" aria-labelledby="ab-result-title" data-design-node={result?.status === 'undecided' ? 'Eoi7q' : 'n4kwM'}>
@@ -125,13 +126,13 @@ export default function BroadcastAbResult({ broadcastId, ab, canSend, accounts }
             <p className={styles.note}>{`まだ結果がありません（${result.decideAt ? hm(new Date(result.decideAt)) : '—'} に決まります）`}</p>
           ) : (
             <div className={styles.variants}>
-              {result.variants.map((variant) => <Variant key={variant.key} variant={variant} metric={result.metric} winner={result.winner === variant.key} />)}
+              {result.variants.map((variant) => <Variant key={variant.key} variant={variant} metric={result.metric} winner={result.winner === variant.key && !result.manuallyChosen && !result.fallback} />)}
             </div>
           )}
           {result.status === 'decided' || result.status === 'finished' ? (
             winner ? (
                 <Notice tone="success" icon={<Check aria-hidden="true" />}>
-                  {`${result.fallback ? '決められなかったため A 案を送りました' : `${winner.key} 案が勝ちました（${METRIC_WORD[result.metric]}${result.metric === 'click' ? `率 ${pct(winner.clickRate)}` : ''}）`}。残りの ${formatNumber(result.remainder.count)} 人へ ${result.remainder.sentAt ? `${hm(new Date(result.remainder.sentAt))} に送りました` : `${result.remainder.scheduledAt ? hm(new Date(result.remainder.scheduledAt)) : '—'} に送ります`}。`}
+                  {`${result.manuallyChosen ? `${winner.key} 案を選びました` : result.fallback ? '決められなかったため A 案を選びました' : `${winner.key} 案が勝ちました（${METRIC_WORD[result.metric]}${result.metric === 'click' ? `率 ${pct(winner.clickRate)}` : ''}）`}。残りの ${formatNumber(result.remainder.count)} 人へ ${result.remainder.sentAt ? `${hm(new Date(result.remainder.sentAt))} に送りました` : `${result.remainder.scheduledAt ? hm(new Date(result.remainder.scheduledAt)) : '—'} に送ります`}。`}
                 </Notice>
             ) : <p className={styles.note}>送らずに終えました。</p>
           ) : result.status === 'undecided' ? (
@@ -142,10 +143,12 @@ export default function BroadcastAbResult({ broadcastId, ab, canSend, accounts }
                     <Button variant="text" onClick={() => open('none')}>送らずに終える</Button>
                   </> : null}
                 </>}>
-                  <span className={styles.chooseText}>{`残りの ${formatNumber(result.remainder.count)} 人へ送る案を選んでください。${mdwhm(result.chooseUntil)} までに選ばなければ、送らずに終えます。`}</span>
+                  <span className={styles.chooseText}>{`${result.reason === 'delivery_too_small' ? '人数が足りないため決められません。自動では残りへ送りません。' : result.reason === 'tracking_unavailable' ? 'クリックを計測できないため決められません。' : ''}残りの ${formatNumber(result.remainder.count)} 人へ送る案を選んでください。${mdwhm(result.chooseUntil)} までに選ばなければ、送らずに終えます。`}</span>
                 </Notice>
           ) : result.status === 'expired' ? (
             <p className={styles.note}>期限までに選ばれなかったため、送らずに終えました。</p>
+          ) : result.status === 'stopped' ? (
+            <p className={styles.note}>配信を停止しました。未送信の人には送りません。</p>
           ) : result.status === 'testing' ? (
             <p className={styles.note}>{`試し中です。${result.decideAt ? hm(new Date(result.decideAt)) : '—'} に勝ちを決めます。`}</p>
           ) : null}

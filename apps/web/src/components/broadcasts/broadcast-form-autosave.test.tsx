@@ -237,8 +237,9 @@ describe('一斉配信の下書き自動保存（★管理画面 sTJsh §5）', 
     } finally { testAccount.id = 'acc-1' }
   }, 15000)
 
-  it('B案で文字以外の入口は押せず、既存の文字以外は保存前に理由を示す', async () => {
+  it('B案で文字以外の入力を抑止し、不完全な本文は保存しない', async () => {
     await renderForm()
+    await act(async () => { setValue(titleInput(), '秋の案内') })
     const tab = Array.from(container.querySelectorAll('[role="tab"]')).find(el => el.textContent?.trim() === 'リッチメッセージ') as HTMLElement
     await act(async () => { tab.click() })
     await act(async () => { clickButton('B 案を追加') })
@@ -248,7 +249,6 @@ describe('一斉配信の下書き自動保存（★管理画面 sTJsh §5）', 
     expect(bSection.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('aria-disabled')).toBe('true')
     expect((Array.from(bSection.querySelectorAll('button')).find(button => button.textContent?.trim() === 'テンプレートから選ぶ') as HTMLButtonElement).disabled).toBe(true)
     await act(async () => { clickButton('下書きを保存する') })
-    expect(document.body.textContent).toContain('B案の文字以外は保存されません。文字だけにしてから保存してください')
     expect(createApi).not.toHaveBeenCalled()
   })
 
@@ -264,36 +264,35 @@ describe('一斉配信の下書き自動保存（★管理画面 sTJsh §5）', 
     expect(document.body.textContent).toContain('配信の変更は保存されず消えます')
   })
 
-  it('B案と吹き出しが未保存なら、離脱時に両方を示して保存を押せない', async () => {
+  it('B案と吹き出しが未保存なら、離脱時に配信の下書きを保存できる', async () => {
     await renderForm()
     await act(async () => { clickButton('B 案を追加') })
     await act(async () => { root.render(<><BroadcastForm tags={[]} onSuccess={() => {}} onCancel={onCancelSpy} /><UnsavedBubble /></>) })
     await act(async () => { clickButton('キャンセル') })
     expect(document.body.textContent).toContain('吹き出しの作成内容は保存されず消えます')
-    expect(document.body.textContent).toContain('B案は下書きに保存できません')
     const save = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('配信の変更だけ保存して移る'))!
-    expect(save.disabled).toBe(true)
+    expect(save.disabled).toBe(false)
     expect(createApi).not.toHaveBeenCalled()
   })
 
-  it('B案がある間は入力が有効でも自動保存しない', async () => {
+  it('B案と設定を自動保存する', async () => {
     await renderForm()
     await act(async () => { setValue(titleInput(), '秋の案内') })
     await act(async () => { setValue(messageInput(), 'A案の本文') })
     await act(async () => { clickButton('B 案を追加') })
     await waitForDebounce()
-    expect(createApi).not.toHaveBeenCalled()
-    expect(updateApi).not.toHaveBeenCalled()
+    expect(createApi).toHaveBeenCalledOnce()
+    expect(createApi.mock.calls[0][0].draftAb).toMatchObject({ enabled: true, bubbles: [{ content: { text: 'A案の本文' } }] })
   })
 
-  it('B案のある単頁の下書き保存は下書きを保存できない理由を出す', async () => {
+  it('B案のある単頁も下書きを保存する', async () => {
     await renderForm()
     await act(async () => { setValue(titleInput(), '秋の案内') })
     await act(async () => { setValue(messageInput(), '本文') })
     await act(async () => { clickButton('B 案を追加') })
     await act(async () => { clickButton('下書きを保存する') })
-    expect(document.body.textContent).toContain('B案は下書きに保存できません')
-    expect(createApi).not.toHaveBeenCalled()
+    expect(createApi).toHaveBeenCalledOnce()
+    expect(createApi.mock.calls[0][0].draftAb.bubbles[0].content.text).toBe('本文')
   })
 
   it('B案がある状態でのアカウント切替は破棄の確認を通す', async () => {

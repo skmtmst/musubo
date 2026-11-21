@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [A/B配信の検証用送信](release-log/unreleased/127-kenta-c11-ab-live.md) — 反映履歴、確認 2026-11-20。
+
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)

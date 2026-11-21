@@ -18,10 +18,10 @@ export async function abAudience(db:D1Database,id:string){
  const rows=(await db.prepare(`SELECT f.id FROM friends f WHERE f.line_account_id=? AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND COALESCE(f.line_user_id,'')!='' AND ${DELIVERY_CONSENT_ALLOWED_SQL} ${condition} ORDER BY f.id`).bind(b.line_account_id,...(seg?seg.bindings:[b.target_tag_id])).all<{id:string}>()).results;
  return {account:b.line_account_id,ids:rows.map(x=>x.id)};
 }
-export function splitAb(ids:string[],ratio:number,random=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296){
+export function splitAb(ids:string[],ratio:number,random=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296,allowSmall=false){
  const list=[...new Set(ids)];for(let i=list.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[list[i],list[j]]=[list[j],list[i]];}
- const n=ratio===50?Math.floor(list.length/2):Math.floor(list.length*ratio/200);
- if(n<200)throw new GapError('AB_AUDIENCE_TOO_SMALL');
+ const n=ratio===50?Math.floor(list.length/2):Math.max(allowSmall?1:0,Math.floor(list.length*ratio/200));
+ if(!allowSmall&&n<200)throw new GapError('AB_AUDIENCE_TOO_SMALL');
  return list.map((id,i)=>({id,key:(i<n?'A':i<(ratio===50?list.length:2*n)?'B':'R') as 'A'|'B'|'R'}));
 }
 export function abWinner(a:{sent:number;clicks:number},b:{sent:number;clicks:number}){
@@ -47,7 +47,7 @@ export async function startAbMock(db:D1Database,id:string,expectedVersion:number
  if(t.status!=='draft')throw new GapError('ab_already_started',409);
  const {ids}=await abAudience(db,id);if(ids.length!==count)throw new GapError('SEND_PREVIEW_CHANGED',409);const rows=splitAb(ids,t.test_ratio_pct),now=new Date().toISOString(),decide=new Date(Date.now()+t.decide_after_minutes*60000).toISOString();
  const result={status:'testing',decideAt:decide,counts:{A:rows.filter(x=>x.key==='A').length,B:rows.filter(x=>x.key==='B').length,R:rows.filter(x=>x.key==='R').length},testMode:true};
- const statements=[db.prepare("UPDATE broadcasts SET lock_version=lock_version+1 WHERE id=? AND status='draft' AND stopped_at IS NULL AND lock_version=?").bind(id,expectedVersion),assertChanged(db),db.prepare("UPDATE broadcast_ab_tests SET status='testing',started_at=?,decide_at=?,version=version+1,start_key=?,start_request_json=?,start_result_json=? WHERE broadcast_id=? AND status='draft' AND version=?").bind(now,decide,key,request,JSON.stringify(result),id,t.version),assertChanged(db)];
+ const statements=[db.prepare("UPDATE broadcasts SET lock_version=lock_version+1 WHERE id=? AND status='draft' AND stopped_at IS NULL AND lock_version=? AND NOT EXISTS(SELECT 1 FROM broadcast_ab_live_tests WHERE broadcast_id=broadcasts.id)").bind(id,expectedVersion),assertChanged(db),db.prepare("UPDATE broadcast_ab_tests SET status='testing',started_at=?,decide_at=?,version=version+1,start_key=?,start_request_json=?,start_result_json=? WHERE broadcast_id=? AND status='draft' AND version=?").bind(now,decide,key,request,JSON.stringify(result),id,t.version),assertChanged(db)];
  if((await db.prepare('SELECT COUNT(*) n FROM broadcast_variants WHERE broadcast_id=?').bind(id).first<{n:number}>())?.n!==2)throw new GapError('two_variants_required');
  // 模擬だけ。送達台帳には本物と混ぜずtest_modeを固定する。LINE/Stripeには通信しない。
  for(let i=0;i<rows.length;i+=100){const chunk=rows.slice(i,i+100);statements.push(db.prepare(`INSERT INTO broadcast_ab_recipients(broadcast_id,friend_id,variant_key,state,sent_at) SELECT ?,json_extract(value,'$.id'),json_extract(value,'$.key'),CASE WHEN json_extract(value,'$.key')='R' THEN 'pending' ELSE 'sent' END,CASE WHEN json_extract(value,'$.key')='R' THEN NULL ELSE ? END FROM json_each(?)`).bind(id,now,JSON.stringify(chunk)));}

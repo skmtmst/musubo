@@ -14,3 +14,9 @@ test('AB-05 AI-03 G4-01: 模擬の確認・返信案の非送信・端末登録�
  await formRoutingApi.preview('a','f',{question:'answer'});expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/forms/f/routing/preview?account_id=a',expect.objectContaining({method:'POST'}));
  await operatorPushApi.subscribe({endpoint:'https://push.example.test',keys:{p256dh:'key',auth:'auth'},label:'端末'},'device');expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/me/push/subscriptions',expect.objectContaining({headers:{'Idempotency-Key':'device'}}));
 });
+test('A/B検証送信は全体とテスト宛先の人数・確認・同一キーを送る',async()=>{
+ await broadcastAbApi.startLive('b',4,2400,20,'start');
+ expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/broadcasts/b/send',expect.objectContaining({headers:{'Idempotency-Key':'start','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({expectedVersion:4,confirmedRecipientCount:2400,confirmedTestRecipientCount:20,liveMode:true})}));
+ await broadcastAbApi.chooseLive('b','B',16,'choose');
+ expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/broadcasts/b/ab-test/choose',expect.objectContaining({headers:{'Idempotency-Key':'choose','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({variant:'B',confirmedRecipientCount:16,liveMode:true})}));
+});
