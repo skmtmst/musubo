@@ -1975,14 +1975,44 @@ test.each(['/api/line-accounts/connect/check', '/api/line-accounts/connect'])('r
   expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
 });
 
-test('a mismatched Messaging credential cannot be saved by the owner', async () => {
-  const { verifyLineMessagingIdentity } = await import('../services/line-messaging-identity.js');
-  vi.mocked(verifyLineMessagingIdentity).mockResolvedValueOnce(false);
+test('even an owner cannot replace a managed LINE token manually', async () => {
   const response = await setupApp('owner').request('/api/line-accounts/acc-1', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelAccessToken: 'other-shop-token' }),
   });
   expect(response.status).toBe(422);
+  expect(fetch).not.toHaveBeenCalled();
   expect(dbMocks.updateLineAccount).not.toHaveBeenCalled();
+});
+
+test.each([200, 400, 503])('an owner can change the LINE secret without entering a token (LINE %s)', async (status) => {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input).endsWith('/v2/oauth/accessToken')) {
+      const body = init?.body as URLSearchParams;
+      expect(body.get('client_id')).toBe(fakeAccount.channel_id);
+      expect(body.get('client_secret')).toBe('new-channel-secret');
+      return status === 200
+        ? Response.json({ access_token: 'new-issued-token', expires_in: 30 * 86_400 })
+        : new Response(null, { status });
+    }
+    expect(String(input)).toBe('https://api.line.me/v2/bot/info');
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer new-issued-token');
+    return Response.json({ displayName: 'Test account' });
+  }));
+  dbMocks.updateLineAccount.mockResolvedValue(fakeAccount);
+  const response = await setupApp('owner').request('/api/line-accounts/acc-1', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelSecret: 'new-channel-secret' }),
+  });
+  expect(response.status).toBe(status === 400 ? 422 : status);
+  if (status !== 200) {
+    expect(dbMocks.updateLineAccount).not.toHaveBeenCalled();
+    return;
+  }
+  expect(dbMocks.updateLineAccount).toHaveBeenCalledWith(expect.anything(), 'acc-1', expect.objectContaining({
+    channel_access_token: 'new-issued-token',
+    channel_secret: 'new-channel-secret',
+    token_expires_at: expect.stringMatching(/\+09:00$/),
+  }), undefined);
+  expect(JSON.stringify(await response.json())).not.toContain('new-issued-token');
 });
 
 

@@ -26,6 +26,7 @@ describe('runIsolatedScheduledJobs', () => {
   test('通知・5分重処理・6時間重処理を別の実行単位へ振り分ける', () => {
     expect(scheduledLane('*/5 * * * *')).toBe('delivery');
     expect(scheduledLane('1-56/5 * * * *')).toBe('frequentHeavy');
+    expect(scheduledLane('2-57/5 * * * *')).toBe('lineTokenRefresh');
     expect(scheduledLane('0 */6 * * *')).toBe('sixHourlyHeavy');
     expect(scheduledLane('invalid')).toBe('ignored');
   });

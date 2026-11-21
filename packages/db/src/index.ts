@@ -127,7 +127,7 @@ export {
   createLineAccount, deactivateLineAccount, decryptLineAccountCredentials, getLineAccountArchiveBlockers, getLineAccountByChannelId, getLineAccountById,
   getLineAccountConnectionChecksByIdempotencyKey, getLineAccountCredentialHealth, getLineAccountListStats, getLineAccountScopeEntries, getLineAccountLoginChannels, getLineAccountTenantStatus, getLineAccounts,
   getLineAccountsByIds, isLineAccountTenantActive, listAutoSwitchedOutPoolAccounts, listLineAccountsWithTenantStatus, listSkippedDeliveries, recordPoolSwitchEvent,
-  recordSkippedDelivery, resolveLineCredential, restoreLineAccount, saveLineAccountConnectionChecks, setDefaultLineAccount, updateLineAccount,
+  recordSkippedDelivery, resolveLineCredential, restoreLineAccount, saveLineAccountConnectionChecks, saveRenewedLineAccessToken, setDefaultLineAccount, updateLineAccount,
   updateLineAccountFields, updateLineAccountOrder,
 } from './line-accounts';
 export type {

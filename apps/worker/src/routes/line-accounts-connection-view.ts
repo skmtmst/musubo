@@ -1,3 +1,4 @@
+import { tracedFetch } from '@line-crm/shared/server';
 import type { Context } from 'hono';
 import type { LineAccount, LineAccountConnectionCheck } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -67,6 +68,111 @@ export function publicAccountUrls(c: Context<Env>, liffId: string | null, channe
     callback: `${base}/auth/callback`,
     liffEndpoint: liffId ? `${base}?liffId=${encodeURIComponent(liffId)}` : null,
   };
+}
+
+type ConnectionCheckDraft = {
+  kind: 'bot_info' | 'webhook_endpoint' | 'webhook_test' | 'liff_config';
+  result: 'matched' | 'mismatched' | 'unconfigured' | 'unknown' | 'ok' | 'failed';
+  expectedUrl?: string | null;
+  registeredUrl?: string | null;
+  webhookActive?: boolean | null;
+  httpStatus?: number | null;
+};
+
+export async function collectConnectionChecks(
+  account: LineAccount,
+  expectedWebhookUrl: string,
+  expectedLiffEndpointUrl: string | null,
+  acceptedWebhook: readonly string[] = [expectedWebhookUrl],
+): Promise<{ checks: ConnectionCheckDraft[]; botProfile: BotProfile | null }> {
+  const checks: ConnectionCheckDraft[] = [];
+  const headers = { Authorization: `Bearer ${account.channel_access_token}` };
+  let botOk = false;
+  let botProfile: BotProfile | null = null;
+  try {
+    const response = await tracedFetch('https://api.line.me/v2/bot/info', { headers });
+    botOk = response.ok;
+    if (response.ok) botProfile = await response.json<BotProfile>();
+    checks.push({ kind: 'bot_info', result: response.ok ? 'ok' : 'failed', httpStatus: response.status });
+  } catch {
+    checks.push({ kind: 'bot_info', result: 'failed', httpStatus: null });
+  }
+
+  let endpointResult: ConnectionCheckDraft = {
+    kind: 'webhook_endpoint',
+    result: 'unknown',
+    expectedUrl: expectedWebhookUrl,
+    registeredUrl: null,
+    webhookActive: null,
+    httpStatus: null,
+  };
+  let mayTestWebhook = false;
+  if (botOk) {
+    try {
+      const response = await tracedFetch('https://api.line.me/v2/bot/channel/webhook/endpoint', { headers });
+      if (response.ok) {
+        const payload = await response.json<{ endpoint?: string; active?: boolean }>();
+        const registeredUrl = payload.endpoint?.trim() || null;
+        const active = payload.active === true;
+        endpointResult = {
+          kind: 'webhook_endpoint',
+          result: !registeredUrl
+            ? 'unconfigured'
+            : isAcceptedWebhookUrl(registeredUrl, acceptedWebhook) && active
+              ? 'matched'
+              : 'mismatched',
+          expectedUrl: expectedWebhookUrl,
+          registeredUrl,
+          webhookActive: payload.active == null ? null : active,
+          httpStatus: response.status,
+        };
+        mayTestWebhook = endpointResult.result === 'matched';
+      } else {
+        endpointResult.httpStatus = response.status;
+      }
+    } catch {
+      // The canonical unknown state intentionally stores null for unavailable values.
+    }
+  }
+  checks.push(endpointResult);
+
+  if (mayTestWebhook) {
+    try {
+      const response = await tracedFetch('https://api.line.me/v2/bot/channel/webhook/test', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const payload = response.ok ? await response.json<{ success?: boolean }>() : null;
+      checks.push({
+        kind: 'webhook_test',
+        result: response.ok && payload?.success === true ? 'ok' : 'failed',
+        expectedUrl: expectedWebhookUrl,
+        httpStatus: response.status,
+      });
+    } catch {
+      checks.push({ kind: 'webhook_test', result: 'unknown', expectedUrl: expectedWebhookUrl });
+    }
+  } else {
+    checks.push({ kind: 'webhook_test', result: 'unknown', expectedUrl: expectedWebhookUrl });
+  }
+
+  const loginMatchesLiff = Boolean(
+    account.login_channel_id &&
+    account.login_channel_secret &&
+    account.liff_id &&
+    /^\d+$/.test(account.login_channel_id) &&
+    /^\d+-[A-Za-z0-9]+$/.test(account.liff_id) &&
+    account.liff_id.startsWith(`${account.login_channel_id}-`),
+  );
+  checks.push({
+    kind: 'liff_config',
+    // LINE は登録済み Webhook URL の読取 API を公開しないため、ローカルの組合せが正しくても一致と断定せず不明にする。
+    result: loginMatchesLiff ? 'unknown' : 'failed',
+    expectedUrl: expectedLiffEndpointUrl,
+    registeredUrl: null,
+  });
+  return { checks, botProfile };
 }
 
 function serializeConnectionCheck(row: LineAccountConnectionCheck) {
