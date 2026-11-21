@@ -88,7 +88,7 @@ export type {
   BroadcastTargetType, CreateBroadcastInput, UpdateBroadcastInput,
 } from './broadcasts/index';
 export {
-  buildBroadcastSettleStatements, closeClaimsForStop, countBroadcastLedger, countRetryableRecipients, getBlockedRecipientIds, getRetryableRecipientIds, markBroadcastRecipientsDispatched,
+  RETRYABLE_UNSENT_CLAIM_SQL, buildBroadcastSettleStatements, closeClaimsForStop, countBroadcastLedger, countRetryableRecipients, getBlockedRecipientIds, getRetryableRecipientIds, markBroadcastRecipientsDispatched,
   reopenFailedClaims, reopenUnsentClaims, settleBroadcastRecipients,
 } from './broadcast-send-claims';
 export type {

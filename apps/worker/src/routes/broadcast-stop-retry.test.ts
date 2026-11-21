@@ -267,7 +267,12 @@ describe('一斉配信の停止・再開・失敗分再送（#662）', () => {
       const progress = await app(testDb.db).request('/api/broadcasts/b1/progress');
       expect(await progress.json()).toMatchObject({data:{ledger:{retryableCount:1}}});
       const recipients = await app(testDb.db).request('/api/broadcasts/b1/recipients');
-      expect(await recipients.json()).toMatchObject({data:{summary:{retryableCount:1}}});
+      expect(await recipients.json()).toMatchObject({data:{summary:{retryableCount:1,inFlight:1,pending:1},rows:expect.arrayContaining([
+        expect.objectContaining({friendId:'f1',label:'未送信（再送できます）',retryable:true,group:'failed_temporary'}),
+        expect.objectContaining({friendId:'f3',label:'送信中',retryable:false,group:'inflight'}),
+      ])}});
+      const filtered = await app(testDb.db).request('/api/broadcasts/b1/recipients?result=temporary');
+      expect(await filtered.json()).toMatchObject({data:{rows:[expect.objectContaining({friendId:'f1'})]}});
       const res = await app(testDb.db).request('/api/broadcasts/b1/retry-failed', post({ expectedVersion: 1 }, CONFIRM_HEADERS));
       expect(res.status).toBe(202);
       expect(await res.json()).toMatchObject({attemptNo:2,retryTargets:1});

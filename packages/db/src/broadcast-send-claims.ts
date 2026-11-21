@@ -50,13 +50,15 @@ export async function getBlockedRecipientIds(
   return new Set((rows.results ?? []).map((row) => row.friend_id));
 }
 
-const UNLOGGED_CLAIM = `NOT EXISTS (SELECT 1 FROM messages_log m
-  WHERE m.broadcast_id=c.broadcast_id AND m.friend_id=c.friend_id AND m.direction='outgoing'
-    AND COALESCE(m.delivery_type,'') != 'test')`;
-const RETRYABLE_CLAIM = `(COALESCE(c.error_code,'') NOT LIKE 'simulation_%' AND (
-  (c.state='failed' AND c.error_code IN ('line_http_429','stopped_before_dispatch')) OR
-  (c.state='claimed' AND c.dispatched_at IS NULL AND ${UNLOGGED_CLAIM}
-    AND (b.status='sent' OR (b.status='sending' AND b.stopped_at IS NOT NULL)))))`;
+/** 宛先台帳の alias c に対する、完了・停止中で再送できる未送信行の条件。 */
+export const RETRYABLE_UNSENT_CLAIM_SQL = `(c.state='claimed' AND c.dispatched_at IS NULL
+  AND COALESCE(c.error_code,'') NOT LIKE 'simulation_%'
+  AND NOT EXISTS (SELECT 1 FROM messages_log m WHERE m.broadcast_id=c.broadcast_id AND m.friend_id=c.friend_id
+    AND m.direction='outgoing' AND COALESCE(m.delivery_type,'') != 'test')
+  AND EXISTS (SELECT 1 FROM broadcasts b WHERE b.id=c.broadcast_id AND
+    (b.status='sent' OR (b.status='sending' AND b.stopped_at IS NOT NULL))))`;
+const RETRYABLE_CLAIM = `((c.state='failed' AND c.error_code IN ('line_http_429','stopped_before_dispatch'))
+  OR ${RETRYABLE_UNSENT_CLAIM_SQL})`;
 
 /**
  * 再送の対象（一時的な失敗だけ）。

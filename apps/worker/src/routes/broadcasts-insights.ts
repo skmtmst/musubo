@@ -502,7 +502,7 @@ export const get__api_broadcasts_id_progress_4 = async (c: Context<Env, "/api/br
         failedTemporary: breakdown.temporary,
         failedPermanent: breakdown.permanent,
         unknown: ledger.unknown,
-        inFlight: ledger.claimed,
+        inFlight: Math.max(0, ledger.claimed - Math.max(0, retryableCount - breakdown.temporary)),
         retryableCount,
       },
       perAccountStats,
