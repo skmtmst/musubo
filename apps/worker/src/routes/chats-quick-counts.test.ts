@@ -67,6 +67,42 @@ async function counts(filters: Record<string, string> = {}, actor = 'reader-a') 
 }
 
 describe('GET /api/chats/quick-counts (INBOX-09)', () => {
+  test('Instagramの要返信は最後が受信の会話だけで、期限超過はLINEだけ', async () => {
+    seedLine('line-overdue', { age: 2 * 3600_000 });
+    seedEmail('mail-overdue', { age: 2 * 3600_000 });
+    const incoming = new Date(NOW - 2 * 3600_000).toISOString();
+    const outgoing = new Date(NOW - 3600_000).toISOString();
+    const insert = db.raw.prepare(`INSERT INTO instagram_messages(id,line_account_id,instagram_id,sender_id,recipient_id,content,received_at,created_at)
+      VALUES(?,'account-a','ig',?,'ig','hello',?,?)`);
+    insert.run('m1', 'waiting', incoming, incoming);
+    insert.run('m2', 'replied', incoming, incoming);
+    db.raw.prepare(`INSERT INTO instagram_inbox_reads(staff_id,line_account_id,sender_id,last_read_at) VALUES('reader-a','account-a','waiting',?)`).run(outgoing);
+    db.raw.prepare(`INSERT INTO instagram_outbound_messages(idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at,sent_at)
+      VALUES('sent','account-a','ig','replied','reader-a','reply','sent',?,?)`).run(outgoing, outgoing);
+    const instagram = await counts({ channel: 'instagram' });
+    expect(instagram.status).toBe(200);
+    expect(instagram.body.data).toMatchObject({ all: 2, reply: 1, overdue: 0 });
+    expect((await counts({ channel: 'instagram', unreadOnly: '1' })).body.data).toMatchObject({ all: 1, reply: 0, overdue: 0 });
+    const combined = await counts({ channel: 'line', socialChannel: 'all' });
+    expect(combined.body.data).toMatchObject({ all: 3, reply: 2, overdue: 1 });
+    expect((await counts({ channel: 'all', socialChannel: 'all' })).body.data).toMatchObject({ all: 4, reply: 3, overdue: 1 });
+    expect((await counts({ channel: 'email', socialChannel: 'all' })).body.data).toMatchObject({ all: 1, reply: 1, overdue: 1 });
+    expect((await counts({ channel: 'all' })).body.data).toMatchObject({ all: 4, reply: 3 });
+    expect((await counts({ channel: 'instagram', assignee: 'target' })).body.data).toMatchObject({ all: 0, reply: 0 });
+    for (const [channel, quickFilter, expected] of [['instagram', 'reply', 1], ['instagram', 'overdue', 0], ['all', 'reply', 2], ['all', 'overdue', 1]] as const) {
+      const res = await app().request(`/api/chats?channel=${channel}&quickFilter=${quickFilter}`, {}, { DB: db.db });
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { data: unknown[] }).data).toHaveLength(expected);
+    }
+  });
+  test('Instagramの件数は一覧の200件上限を超えて数える', async () => {
+    const at = new Date(NOW).toISOString();
+    const insert = db.raw.prepare(`INSERT INTO instagram_messages(id,line_account_id,instagram_id,sender_id,recipient_id,content,received_at,created_at)
+      VALUES(?,'account-a','ig',?,'ig','hello',?,?)`);
+    for (let i = 0; i < 205; i++) insert.run(`m${i}`, `person${i}`, at, at);
+    const result = await counts({ channel: 'instagram' });
+    expect(result.body.data).toMatchObject({ all: 205, reply: 205, overdue: 0 });
+  });
   test('LINEとメールを合算し、要返信・1時間以上待ちは未対応だけを数える', async () => {
     seedLine('line-unread-recent', { age: 10 * 60_000 });
     seedLine('line-unread-old', { age: 2 * 3600_000 });

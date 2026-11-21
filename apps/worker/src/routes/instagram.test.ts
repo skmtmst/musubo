@@ -32,10 +32,10 @@ const config = {
   META_TOKEN_ENCRYPTION_KEY: btoa('x'.repeat(32)),
   META_WEBHOOK_VERIFY_TOKEN: 'verify_mock',
 };
-function app(staff = admin, configured = true) {
+function app(staff = admin, configured = true, extra: Record<string, string> = {}) {
   const a = new Hono<Env>();
   a.use('*', async (c, next) => {
-    c.env = { DB: db.db, ...(configured ? config : {}) } as Env['Bindings'];
+    c.env = { DB: db.db, ...(configured ? config : {}), ...extra } as Env['Bindings'];
     c.set('staff', staff);
     await next();
   });
@@ -62,6 +62,7 @@ type Payload = {
   data: {
     url: string;
     state: string;
+    dmReconnectRequired: boolean;
     connection: { version: number };
     version: number;
     connected: boolean;
@@ -128,6 +129,7 @@ async function connect() {
   expect(url.searchParams.get('scope')).toContain(
     'instagram_business_content_publish',
   );
+  expect(url.searchParams.get('scope')).toContain('instagram_business_manage_messages');
   // 前につないだことのあるアカウントだと、Instagram は許可の一覧を出さず短い確認だけで
   // 戻すことがある。そのとき後から足した許可は渡されず接続が必ず失敗するため、
   // 毎回ログインと許可の一覧からやり直させる。
@@ -312,6 +314,65 @@ it('同時投稿の許可が無い古い接続は認可切れにして取り直�
   );
   // 期限内でも投稿できないので、更新ではなく接続のやり直しへ回す。
   expect((await req('/api/instagram/refresh', {})).status).toBe(409);
+});
+it('DM の許可がない接続には再接続が必要と返す', async () => {
+  await connect();
+  expect((await read(await req('/api/instagram/connection'))).data.dmReconnectRequired).toBe(true);
+  db.raw.exec("UPDATE instagram_connections SET scopes=scopes || ',instagram_business_manage_messages'");
+  expect((await read(await req('/api/instagram/connection'))).data.dmReconnectRequired).toBe(false);
+});
+it('DM返信を模擬送信し、同じキーを再送しても一度だけ送る', async () => {
+  await connect();
+  db.raw.exec("UPDATE instagram_connections SET scopes=scopes || ',instagram_business_manage_messages'");
+  const now = new Date().toISOString();
+  db.raw.prepare(`INSERT INTO instagram_messages(id,line_account_id,instagram_id,sender_id,recipient_id,content,received_at,created_at)
+    VALUES('m1','a1','20','customer','20','hello',?,?)`).run(now, now);
+  const send = vi.fn(async () => Response.json({ message_id: 'sent-1' }));
+  vi.stubGlobal('fetch', send);
+  const options = { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': '123e4567-e89b-12d3-a456-426614174000' }, body: JSON.stringify({ text: '返信' }) };
+  const staging = app(admin, true, { DEPLOY_ENV: 'staging', INSTAGRAM_STAGING_SEND_ENABLED: 'true' });
+  const first = await staging.request('/api/instagram/messages/m1/reply?lineAccountId=a1', options);
+  expect(first.status).toBe(200);
+  const second = await staging.request('/api/instagram/messages/m1/reply?lineAccountId=a1', options);
+  expect(second.status).toBe(200);
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(db.raw.prepare("SELECT status,staff_id FROM instagram_outbound_messages").get()).toEqual({ status: 'sent', staff_id: 'staff' });
+  const history = await app().request('/api/instagram/conversations/customer?lineAccountId=a1');
+  expect(((await history.json()) as { data: { messages: Array<{ direction: string }> } }).data.messages.map(m => m.direction)).toEqual(['incoming', 'outgoing']);
+  expect((await app().request('/api/instagram/conversations/customer/read?lineAccountId=a1', { method: 'POST' })).status).toBe(200);
+});
+it('24時間を過ぎたDMと閲覧専用の返信は送らない', async () => {
+  await connect();
+  db.raw.exec("UPDATE instagram_connections SET scopes=scopes || ',instagram_business_manage_messages'");
+  db.raw.prepare(`INSERT INTO instagram_messages(id,line_account_id,instagram_id,sender_id,recipient_id,content,received_at,created_at)
+    VALUES('old','a1','20','customer','20','hello','2000-01-01T00:00:00.000Z','2000-01-01T00:00:00.000Z')`).run();
+  const send = vi.fn(); vi.stubGlobal('fetch', send);
+  const options = { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': '123e4567-e89b-12d3-a456-426614174000' }, body: JSON.stringify({ text: '返信' }) };
+  expect((await app().request('/api/instagram/messages/old/reply?lineAccountId=a1', options)).status).toBe(409);
+  expect((await app({ ...admin, readOnly: true }).request('/api/instagram/messages/old/reply?lineAccountId=a1', options)).status).toBe(403);
+  db.raw.prepare("UPDATE instagram_messages SET received_at=? WHERE id='old'").run(new Date().toISOString());
+  db.raw.exec("UPDATE instagram_connections SET scopes='instagram_business_basic,instagram_business_content_publish'");
+  const noPermission = await app().request('/api/instagram/messages/old/reply?lineAccountId=a1', options);
+  expect(noPermission.status).toBe(409);
+  expect(await noPermission.text()).toContain('つなぎ直し');
+  expect(send).not.toHaveBeenCalled();
+});
+it('検証環境で送信を有効にしていなければ外部へ送らない', async () => {
+  await connect();
+  db.raw.exec("UPDATE instagram_connections SET scopes=scopes || ',instagram_business_manage_messages'");
+  const now = new Date().toISOString();
+  db.raw.prepare(`INSERT INTO instagram_messages(id,line_account_id,instagram_id,sender_id,recipient_id,content,received_at,created_at)
+    VALUES('m1','a1','20','customer','20','hello',?,?)`).run(now, now);
+  const send = vi.fn(); vi.stubGlobal('fetch', send);
+  const response = await app(admin, true, { DEPLOY_ENV: 'staging' }).request('/api/instagram/messages/m1/reply?lineAccountId=a1', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': '123e4567-e89b-12d3-a456-426614174000' }, body: JSON.stringify({ text: '返信' }),
+  });
+  expect(response.status).toBe(403);
+  const qa = await app(admin, true, { DEPLOY_ENV: 'staging', INSTAGRAM_STAGING_SEND_ENABLED: 'true', STAGING_QA_ENABLED: 'true' }).request('/api/instagram/messages/m1/reply?lineAccountId=a1', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': '123e4567-e89b-12d3-a456-426614174000' }, body: JSON.stringify({ text: '返信' }),
+  });
+  expect(qa.status).toBe(403);
+  expect(send).not.toHaveBeenCalled();
 });
 /** 折り返しを1回通し、画面へ戻すURLを読む。 */
 async function callback(query: Record<string, string>) {
@@ -609,7 +670,7 @@ it('Webhookの確認・署名・宛先・重複を検査し、審査前の返信
   const previous = vi.mocked(fetch).mock.calls.length;
   expect(
     (await req('/api/instagram/messages/mid1/reply', { text: '返信' })).status,
-  ).toBe(403);
+  ).toBe(400);
   expect(vi.mocked(fetch).mock.calls).toHaveLength(previous);
   db.raw.exec("UPDATE instagram_messages SET created_at='2000-01-01'");
   await purgeInstagramTransientData(db.db);

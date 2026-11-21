@@ -70,6 +70,8 @@ type Props = {
   setAssigneeFilter: Dispatch<SetStateAction<string>>
   setUnreadOnly: Dispatch<SetStateAction<boolean>>
   channel: "email" | "all" | "line"
+  socialChannel: 'all' | 'line' | 'instagram'
+  setSocialChannel: (value: 'all' | 'line' | 'instagram') => void
   emailInboxEnabled: boolean
   router: ReturnType<typeof useRouter>
   nameQuery: string
@@ -99,7 +101,7 @@ type Props = {
   setSortOrder: (next: InboxSort) => void
 }
 
-export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, chats, handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
+export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, socialChannel, setSocialChannel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, chats, handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
   // 緑の点は目で見る印。読み上げには名前で絞り込み中を伝える。
   const savedSearchLabel = hasInboxFilters ? '保存した検索（絞り込み中）' : '保存した検索'
   // 並びは題の横の印から選ぶ。選んだ並びは吹き出しとメニューの ✓ で分かるようにする。
@@ -274,6 +276,9 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           </>
         ) : null}
       </InboxListHeadline>
+      <SegmentedControl size="small" aria-label="受信媒体" value={socialChannel} onChange={setSocialChannel} options={[
+        { value: 'all', label: 'すべて' }, { value: 'line', label: 'LINE' }, { value: 'instagram', label: 'Instagram' },
+      ]} />
       <SegmentedControl<'all' | 'reply' | 'overdue'>
         aria-label="受信箱のクイック絞り込み"
         equalWidth={false}
@@ -282,13 +287,13 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
         options={[
           { key: 'all' as const, label: 'すべて' },
           { key: 'reply' as const, label: '要返信' },
-          slaEnabled
+          (slaEnabled || socialChannel === 'instagram')
             ? { key: 'overdue' as const, label: '期限超過' }
             : { key: 'overdue' as const, label: '1時間以上待ち' },
         ].map((filter) => ({
           value: filter.key,
           label: filter.label,
-          count: slaEnabled && filter.key === 'overdue'
+          count: socialChannel === 'instagram' && filter.key === 'overdue' ? 0 : slaEnabled && filter.key === 'overdue'
             ? overdueTotal ?? undefined
             : quickCountsNow?.[filter.key],
         }))}
@@ -420,7 +425,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                   残したまま、混ぜ方だけそろえる。
                 */}
         {(() => {
-          const mailRows = (channel === 'line' ? [] : emailItems)
+          const mailRows = (channel === 'line' || socialChannel !== 'all' ? [] : emailItems)
             .filter((item) =>
               nameQuery.trim() === ''
                 ? true
@@ -548,7 +553,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                             </p>
                           </div>
                           <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
-                            <ChannelBadge channel="line" />
+                            <ChannelBadge channel={chat.channel === 'instagram' ? 'instagram' : 'line'} />
                             <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
                               <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
                                 {(operatorName ?? '未').charAt(0)}
@@ -619,6 +624,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           }
           // 障害を0件と誤認させない。具体的な理由は各チャネルのエラー表示に任せる。
           if (inboxListFailed) return null
+          if (socialChannel === 'instagram' && quickFilter === 'overdue') return <InboxListEmpty filtered onClear={clearInboxFilters} description="Instagram の会話には返信の期限がありません" />
           return <InboxListEmpty filtered={hasInboxFilters} onClear={clearInboxFilters} />
         })()}
 

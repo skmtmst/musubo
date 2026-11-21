@@ -1,5 +1,25 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const chatsPaths = {
+  '/api/instagram/conversations/{senderId}': {
+    get: {
+      tags: ['Chats'], summary: 'Instagram の会話を取得',
+      parameters: [
+        { name: 'senderId', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      responses: { '200': { description: '会話と返信可否' }, '401': { description: '認証が必要' }, '403': { description: '権限がありません' } },
+    },
+  },
+  '/api/instagram/conversations/{senderId}/read': {
+    post: {
+      tags: ['Chats'], summary: 'Instagram の会話を既読にする',
+      parameters: [
+        { name: 'senderId', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      responses: { '200': { description: '既読を記録' }, '401': { description: '認証が必要' }, '403': { description: '権限がありません' }, '404': { description: '会話が見つかりません' } },
+    },
+  },
   /*
    * 画像と本文を1回の送信単位にする。2回に分けると画像だけが
    * 先に届く部分送信になる。片方だけの送信もこの口で受け付ける。

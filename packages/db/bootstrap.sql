@@ -4732,6 +4732,14 @@ CREATE TABLE "instagram_connections" (
  version INTEGER NOT NULL DEFAULT 1, scopes TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE instagram_inbox_reads (
+  staff_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  sender_id TEXT NOT NULL,
+  last_read_at TEXT NOT NULL,
+  PRIMARY KEY (staff_id, line_account_id, sender_id)
+);
+
 CREATE TABLE "instagram_messages" (
  id TEXT NOT NULL, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
  instagram_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL,
@@ -4743,6 +4751,19 @@ CREATE TABLE instagram_oauth_states (
  state_hash TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
  staff_id TEXT NOT NULL, phase TEXT NOT NULL CHECK(phase IN ('started','exchanging','selecting','connecting')),
  candidates_encrypted TEXT, expires_at TEXT NOT NULL, created_at TEXT NOT NULL
+);
+
+CREATE TABLE instagram_outbound_messages (
+  idempotency_key TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  instagram_id TEXT NOT NULL,
+  sender_id TEXT NOT NULL,
+  staff_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('pending','sent','unknown')),
+  meta_message_id TEXT,
+  created_at TEXT NOT NULL,
+  sent_at TEXT
 );
 
 CREATE TABLE integration_api_tokens (
@@ -10967,6 +10988,12 @@ CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_accou
 CREATE INDEX idx_instagram_connections_instagram_id ON instagram_connections(instagram_id);
 
 CREATE INDEX idx_instagram_messages_account_time_754 ON instagram_messages(line_account_id,received_at,id);
+
+CREATE INDEX idx_instagram_messages_conversation_768
+  ON instagram_messages(line_account_id, sender_id, received_at DESC, id DESC);
+
+CREATE UNIQUE INDEX idx_instagram_outbound_pending_768
+  ON instagram_outbound_messages(instagram_id, sender_id) WHERE status IN ('pending','unknown');
 
 CREATE INDEX idx_integration_api_tokens_account
   ON integration_api_tokens (line_account_id, revoked_at);

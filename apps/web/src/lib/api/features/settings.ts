@@ -99,6 +99,9 @@ export const settingsMethods = {
     }>>(`/api/postal-code/search?code=${encodeURIComponent(code)}`),
   },
   instagram: {
+    conversation: (accountId: string, senderId: string) => fetchApi<ApiResponse<{ messages: Array<{ id: string; content: string; createdAt: string; direction: 'incoming' | 'outgoing' }>; replyState: 'ready' | 'disconnected' | 'permission_required' }>>(`/api/instagram/conversations/${encodeURIComponent(senderId)}?${new URLSearchParams({ lineAccountId: accountId })}`),
+    markConversationRead: (accountId: string, senderId: string) => fetchApi(`/api/instagram/conversations/${encodeURIComponent(senderId)}/read?${new URLSearchParams({ lineAccountId: accountId })}`, { method: 'POST' }),
+    sendReply: (accountId: string, messageId: string, text: string, key: string) => fetchApi(`/api/instagram/messages/${encodeURIComponent(messageId)}/reply?${new URLSearchParams({ lineAccountId: accountId })}`, { method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify({ text }) }),
     connection: (accountId:string)=>fetchApi<ApiResponse<import('@line-crm/shared').InstagramConnectionStatus>>(`/api/instagram/connection?${new URLSearchParams({lineAccountId:accountId})}`),
     start: (accountId:string)=>fetchApi<ApiResponse<{url:string;expiresAt:string}>>(`/api/instagram/oauth/start?${new URLSearchParams({lineAccountId:accountId})}`,{method:'POST',body:'{}'}),
     // 折り返しはブラウザがそのまま踏む（/settings/sns?instagram=... へ戻る）ので、画面から叩く口は持たない。

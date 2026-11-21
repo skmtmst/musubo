@@ -675,6 +675,10 @@ describe('staff feature permissions', () => {
 
   test('permission mapping matches the production routes (N-065 #623)', async () => {
     const { permissionForApiPath } = await import('./auth.js');
+    expect(permissionForApiPath('/api/instagram/conversations/customer')).toBe('/chats');
+    expect(permissionForApiPath('/api/instagram/conversations/customer/read')).toBe('/chats');
+    expect(permissionForApiPath('/api/instagram/messages/message/reply')).toBe('/chats');
+    expect(permissionForApiPath('/api/instagram/connection')).toBe('/webhooks');
     // 予約の変更・取消と個別相談は予約権限、イベント口はイベント権限。
     expect(permissionForApiPath('/api/booking/admin/requests/bk-1')).toBe('/booking/bookings');
     expect(permissionForApiPath('/api/meet-consultations')).toBe('/booking/bookings');

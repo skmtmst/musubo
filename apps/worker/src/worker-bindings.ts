@@ -159,6 +159,7 @@ export type WorkerBindings = {
     META_APP_SECRET?: string;
     // Instagram Login の認証は Facebook ページを使う META_APP 設定とは分離する。
     INSTAGRAM_APP_ID?: string;
+    INSTAGRAM_STAGING_SEND_ENABLED?: string;
     INSTAGRAM_APP_SECRET?: string;
     META_REDIRECT_URI?: string;
     META_GRAPH_API_VERSION?: string;

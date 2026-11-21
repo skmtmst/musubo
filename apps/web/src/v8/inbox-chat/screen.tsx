@@ -10,7 +10,7 @@ import Notice from '@/components/shared/notice';
 import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { InboxPage } from '@/components/templates/inbox-page';
 import { useAccount } from '@/contexts/account-context';
-import { api,fetchApi,type ChatDetailMessage } from '@/lib/api';
+import { api,fetchApi,type ChatDetailMessage,type ChatListItem } from '@/lib/api';
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
 import { useStaffRole } from '@/lib/staff-role';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
@@ -23,6 +23,7 @@ import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,S
 import InboxConversation from './inbox-conversation-view';
 import InboxCustomerPanel from './inbox-customer-panel';
 import InboxList from './inbox-list-view';
+import InstagramConversation from './instagram-conversation';
 import { savedViewFailureMessage } from './saved-view-failure';
 import { useInboxActions } from './use-inbox-actions';
 import { useInboxConversation } from './use-inbox-conversation';
@@ -62,6 +63,9 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
   const visibleThreadId = emailInboxEnabled ? selectedThreadId : null
 
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
+  const [selectedInstagram, setSelectedInstagram] = useState<ChatListItem | null>(null)
+  const [socialChannel, setSocialChannel] = useState<'all' | 'line' | 'instagram'>('all')
+  useEffect(() => { setSelectedInstagram(null) }, [selectedAccountId])
 
   /*
    * URLの `?status=` で絞り込み済みの受信箱を開けるようにする（IDEA-01）。
@@ -248,11 +252,12 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     EMAIL_PAGE_SIZE,
     nameQuery,
     selectedAccountId,
-    emailInboxEnabled: emailInboxEnabled && channel !== 'line',
+    emailInboxEnabled: emailInboxEnabled && channel !== 'line' && socialChannel === 'all',
     statusFilter,
     assigneeFilter,
     unreadOnly,
     quickFilter,
+    socialChannel,
     sort: sortOrder,
     setError,
   })
@@ -339,6 +344,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     assigneeFilter,
     unreadOnly,
     channel,
+    socialChannel,
   })
 
   const {
@@ -473,6 +479,14 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     deepLinkRequestIdRef.current += 1
     deepLinkIdRef.current = null
     setDeepLinkNotice('')
+    const selected = chats.find(chat => chat.id === chatId)
+    if (selected?.channel === 'instagram') {
+      setSelectedChatId(null)
+      setSelectedThreadId(null)
+      setSelectedInstagram(selected)
+      return
+    }
+    setSelectedInstagram(null)
     setSelectedChatId(chatId)
     // friend は外すが、一覧条件の savedView は残す(N-021)。
     router.replace(buildInboxUrl(channel, savedViewParam || null))
@@ -505,6 +519,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     deepLinkIdRef.current = null
     setDeepLinkNotice('')
     setSelectedChatId(null)
+    setSelectedInstagram(null)
     setSelectedThreadId(threadId)
     router.replace(buildInboxUrl(channel, savedViewParam || null))
     setEmailItems((prev) => prev.map((email) => (
@@ -775,13 +790,13 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
             メールを開いたときも同じ。ここが LINE だけを見ていたので、
             メールを開いても一覧が残って中央が半分のままだった。 */}
         <InboxList {...{
-          unreadOnly, selectedChatId, selectedThreadId: visibleThreadId, setFilterOpen, filterOpen, setSavedViewsOpen,
+          unreadOnly, selectedChatId: selectedInstagram?.id ?? selectedChatId, selectedThreadId: visibleThreadId, setFilterOpen, filterOpen, setSavedViewsOpen,
           setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId,
           savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen,
           savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter,
           dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators,
           savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter,
-          setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus,
+          setAssigneeFilter, setUnreadOnly, channel, socialChannel, setSocialChannel: (value: 'all' | 'line' | 'instagram') => { setSocialChannel(value); setSelectedInstagram(null); setSelectedChatId(null); setSelectedThreadId(null); setStatusFilter('all'); setAssigneeFilter('all'); setQuickFilter('all'); if (channel === 'email') router.replace(buildInboxUrl('all', savedViewParam || null)) }, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus,
           assigneeUnread, listScrollRef,
           emailError, loadEmails, chatListFailed, loadChats, emailItems, chats,
           handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters,
@@ -795,7 +810,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           で右の顧客情報を画面外へ押し出していた(#982 LAY-01)。
           顧客情報は狭い幅では列ではなくドロワーで開く（下の aside 参照）。
         */}
-        <InboxConversation {...{
+        {selectedInstagram ? <InstagramConversation key={selectedInstagram.id} chat={selectedInstagram} role={staffRole} onChanged={() => void loadChats()} /> : <InboxConversation {...{
           operators, selectedChatId, selectedThreadId: visibleThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo,
           loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId,
           attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch,
@@ -814,7 +829,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack,
           imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled,
           overdueTotal, chats, emailItems, onOpenAttentionTarget: openAttentionTarget,
-        }} />
+        }} />}
 
         {/*
           友だち詳細。3列に収まる幅（1536px〜）では右列として常設し、
@@ -835,7 +850,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           いまはメールを開いているときは案内を出す。空の枠を出すより、
           なぜ出ないかが分かる方がよい。
         */}
-        <InboxCustomerPanel
+        {!selectedInstagram && <InboxCustomerPanel
           lineContent={lineContent}
           showFriendInfo={showFriendInfo}
           selectedChatId={selectedChatId}
@@ -845,7 +860,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           customerPanelRef={customerPanelRef}
           emailItems={emailItems}
 
-        />
+        />}
       </InboxPage>
     </div></SaveErrorScope>
   )

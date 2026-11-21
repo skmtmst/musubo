@@ -1,6 +1,7 @@
 export interface InstagramConnectionStatus {
   state: 'unconfigured' | 'disconnected' | 'connected' | 'expired';
   replyEnabled: false;
+  dmReconnectRequired?: boolean;
   connection?: {
     pageId: string;
     instagramId: string;

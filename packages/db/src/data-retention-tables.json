@@ -4168,6 +4168,20 @@
       "column": "line_account_id"
     }
   },
+  "instagram_inbox_reads": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "instagram_outbound_messages": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "instagram_messages": {
     "category": "purge",
     "scope": {

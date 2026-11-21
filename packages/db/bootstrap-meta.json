@@ -678,6 +678,7 @@
     "763_folder_membership_revisions.sql",
     "764_broadcast_ab_live.sql",
     "765_ec_auto_line_cap.sql",
+    "768_instagram_inbox.sql",
     "769_musubo_contracted_linked_slots.sql",
     "770_onboarding_guide_progress.sql",
     "786_restaurant_course_gallery.sql"
