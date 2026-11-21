@@ -408,6 +408,9 @@ html:root .footer button[class][class][class]::before {
     justify-content: center;
   }
 
+}
+
+@media (max-width: 480px) and (pointer: coarse) {
   .footerSpacer { display: none; }
 
   .note { display: none; }

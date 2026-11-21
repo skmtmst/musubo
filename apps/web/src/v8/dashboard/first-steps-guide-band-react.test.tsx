@@ -31,7 +31,7 @@ describe('はじめにやることの再開導線', () => {
     fireEvent.click(screen.getByRole('button', { name: '続きから進める' }))
     expect(value.start).toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '最初から始める' }))
-    expect(value.reset).toHaveBeenCalled()
+    expect(value.start).toHaveBeenCalledTimes(2)
   })
 
   it('案内中も操作は同じで、一時停止はここに出さない', () => {

@@ -78,7 +78,7 @@ async function openPopup(page, width, height) {
   return popup
 }
 
-test('枠 02: 1440x1000・1/8 のカードと行が Pen の実測値どおり', async ({ page }) => {
+test('枠 02: 1440x1000・1/8 のカードと行が Pen の実測値どおり', async ({ page }, testInfo) => {
   const popup = await openPopup(page, 1440, 1000)
   const got = await popup.evaluate(node => {
     const box = el => {
@@ -112,6 +112,7 @@ test('枠 02: 1440x1000・1/8 のカードと行が Pen の実測値どおり', 
   /* 操作 pdn85 h32・札 r7xHZ0 h19。枠の padding（8px 14px・2px 8px）どおりの高さ。 */
   expect(got.action).toBe(32)
   expect(got.badge).toBe(19)
+  await page.screenshot({ path: testInfo.outputPath('popup-1440x1000.png') })
 })
 
 /* 枠 02b (nt3Po) のシート noXJA: x0 y118 w390 h782。PC の直しで崩していないことを見る。 */
@@ -133,7 +134,7 @@ test('枠 02b: 390x900・1/8 のシートが画面下部固定のまま', async 
 */
 test.describe('指で押す端末', () => {
   test.use({ hasTouch: true })
-  test('枠 02b: 操作は枠どおり h32・押せる範囲は44以上・足は y602', async ({ page }) => {
+  test('枠 02b: 操作は枠どおり h32・押せる範囲は44以上・足は y602', async ({ page }, testInfo) => {
     const popup = await openPopup(page, 390, 900)
     const got = await popup.evaluate(node => {
       const card = node.querySelector('[class*="card"]')
@@ -158,5 +159,7 @@ test.describe('指で押す端末', () => {
     expect(got.gap).toBe('2px')
     expect(got.footerY).toBe(602)
     expect(got.reach).toBe(true)
+    await expect(popup.getByRole('button', { name: 'あとで（下にスワイプで閉じる）' })).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('popup-390x900.png') })
   })
 })

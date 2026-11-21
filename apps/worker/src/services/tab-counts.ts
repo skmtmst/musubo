@@ -19,7 +19,8 @@ export async function mediaTabCounts(db: D1Database, accountId: string) {
     COUNT(CASE WHEN m.archived_at IS NULL AND NOT EXISTS
       (SELECT 1 FROM media_usages u WHERE u.media_id = m.id) AND menu_uses.image_media_id IS NULL THEN 1 END) AS unused,
     COUNT(CASE WHEN m.archived_at IS NOT NULL THEN 1 END) AS archived
-    FROM media m LEFT JOIN (SELECT DISTINCT image_media_id FROM rt_menu_items WHERE image_media_id IS NOT NULL) menu_uses ON menu_uses.image_media_id = m.id WHERE m.line_account_id = ?`).bind(accountId).first<{
+    FROM media m LEFT JOIN (SELECT image_media_id FROM rt_menu_items WHERE image_media_id IS NOT NULL
+      UNION SELECT json_extract(photo.value, '$.mediaId') FROM rt_menu_items menu, json_each(menu.photo_gallery_json) photo) menu_uses ON menu_uses.image_media_id = m.id WHERE m.line_account_id = ?`).bind(accountId).first<{
       total: number; image: number; video: number; audio: number; file: number; unused: number; archived: number;
     }>();
   if (!row) throw new Error('media_counts_unavailable');
