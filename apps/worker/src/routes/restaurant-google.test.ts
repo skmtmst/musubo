@@ -385,6 +385,19 @@ describe('Googleビジネス：設定（接続）', () => {
     expect(row.code_verifier_enc.startsWith('v1.')).toBe(true);
   });
 
+  it('営業時間で始めた認可の中断は営業時間に戻り、既存のSNS連携の戻り先は維持する', async () => {
+    seedStore();
+    const start = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: { source: 'hours' } });
+    expect(start.status).toBe(200);
+    const state = new URL(((await start.json()) as { authorizeUrl: string }).authorizeUrl).searchParams.get('state')!;
+    const response = await call(`/api/restaurant-test/google/oauth/callback?state=${encodeURIComponent(state)}&error=access_denied`, { cookie: `lh_gb_state=${state}` });
+    const returned = new URL(response.headers.get('location')!);
+    expect(returned.pathname).toBe('/restaurant-test/google');
+    expect(returned.searchParams.get('tab')).toBe('hours');
+    expect(returned.searchParams.get('account_id')).toBe('account-2');
+    expect(returned.searchParams.get('google')).toBe('error:denied');
+  });
+
   it('リダイレクトURIは呼び出し元ホストではなく WORKER_PUBLIC_URL に固定する（redirect_uri_mismatch 防止）', async () => {
     seedStore();
     // Workerは独自ドメインでも workers.dev でも開ける。どちらから呼ばれても

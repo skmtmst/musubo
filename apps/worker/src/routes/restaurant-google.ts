@@ -212,9 +212,9 @@ function stateCookie(value: string, maxAge = OAUTH_STATE_MAX_AGE_SEC): string {
   return `${OAUTH_STATE_COOKIE}=${encodeURIComponent(value)}; Path=${CALLBACK_PATH}; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
 }
 
-function adminReturnUrl(c: Context<Env>, lineAccountId: string | null, result: string): string {
+function adminReturnUrl(c: Context<Env>, lineAccountId: string | null, result: string, hours = false): string {
   const base = (c.env.ADMIN_PUBLIC_URL ?? '').replace(/\/+$/, '');
-  const url = new URL(`${base || new URL(c.req.url).origin}${ADMIN_RETURN_PATH}`);
+  const url = new URL(`${base || new URL(c.req.url).origin}${hours ? '/restaurant-test/google?tab=hours' : ADMIN_RETURN_PATH}`);
   if (lineAccountId) url.searchParams.set('account_id', lineAccountId);
   url.searchParams.set('google', result);
   return url.toString();
@@ -739,7 +739,8 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireConnec
   } catch (error) {
     return googleErrorResponse(c, error);
   }
-  const state = randomToken(32);
+  const body = await c.req.json<{ source?: unknown }>().catch(() => null);
+  const state = (body?.source === 'hours' ? 'hours.' : '') + randomToken(32);
   const expiresAt = new Date(Date.now() + OAUTH_STATE_MAX_AGE_SEC * 1000).toISOString();
   await dbFor(c.env, store.id)
     .prepare(
@@ -797,19 +798,21 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
   if (stateRow.staff_id !== c.get('staff')!.id) {
     return c.redirect(adminReturnUrl(c, lineAccountId, 'error:invalid_state'));
   }
+  // 営業時間の画面から始めた認可は、終わりでも中断でも営業時間へ戻す（state の先頭の合図で見分ける）。
+  const returnToSetup = (result: string) => adminReturnUrl(c, lineAccountId, result, stateRow.state.startsWith('hours.'));
   await dbFor(c.env, stateRow.store_id).prepare('UPDATE rt_google_oauth_states SET used_at = ? WHERE state = ?').bind(nowIso(), state).run();
   if (c.req.query('error') || !code) {
-    return c.redirect(adminReturnUrl(c, lineAccountId, 'error:denied'));
+    return c.redirect(returnToSetup('error:denied'));
   }
   // 店舗が今もこの担当者の統括に属しているか（stateの発行後に変わっていないか）。
   const store = await dbFor(c.env, stateRow.store_id)
     .prepare(`SELECT s.id, s.name, s.organization_id, s.line_account_id FROM rt_stores s JOIN rt_organizations o ON o.id = s.organization_id WHERE s.id = ? AND o.tenant_id = ? LIMIT 1`)
     .bind(stateRow.store_id, staffTenantId(c))
     .first<{ id: string; name: string; organization_id: string; line_account_id: string | null }>();
-  if (!store) return c.redirect(adminReturnUrl(c, lineAccountId, 'error:store_missing'));
+  if (!store) return c.redirect(returnToSetup('error:store_missing'));
 
   const client = oauthClient(c);
-  if (!client) return c.redirect(adminReturnUrl(c, lineAccountId, 'error:oauth_not_configured'));
+  if (!client) return c.redirect(returnToSetup('error:oauth_not_configured'));
   const key = c.env.LINE_CREDENTIAL_ENCRYPTION_KEY;
   const db = dbFor(c.env, store.id);
   try {
@@ -833,7 +836,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
         ? await connectionFor(c, store.id, null)
         : null;
     if (!existing && stateRow.connection_id) {
-      return c.redirect(adminReturnUrl(c, lineAccountId, 'error:connection_not_found'));
+      return c.redirect(returnToSetup('error:connection_not_found'));
     }
     const refreshEnc = tokens.refreshToken ? await encryptCredential(tokens.refreshToken, key) : existing?.refresh_token_enc ?? null;
     const accessEnc = await encryptCredential(tokens.accessToken, key);
@@ -847,7 +850,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
         // 旧店舗名は残したまま「選択待ち」にして、切り替えの確認は選択時に取る。
         if (locations.length === 0) {
           await writeLog(c, existing, { kind: 'reconnect', targetName: existing.location_name, result: 'failed', error: 'no_locations' });
-          return c.redirect(adminReturnUrl(c, lineAccountId, 'error:no_locations'));
+          return c.redirect(returnToSetup('error:no_locations'));
         }
         await db
           .prepare(
@@ -861,7 +864,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
           .run();
         await replaceLocationCandidates(db, store.id, existing.id, locations);
         await writeLog(c, existing, { kind: 'reconnect', targetName: existing.location_name, result: 'unknown', error: 'location_switch_pending' });
-        return c.redirect(adminReturnUrl(c, lineAccountId, 'select_location'));
+        return c.redirect(returnToSetup('select_location'));
       }
       await db
         .prepare(
@@ -876,11 +879,11 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
         .run();
       await writeLog(c, existing, { kind: 'reconnect', targetName: same.name, result: 'accepted' });
       auditLog(c, 'restaurant.google.reconnect', { id: store.id, kind: 'rt_store' }, { lineAccountId });
-      return c.redirect(adminReturnUrl(c, lineAccountId, 'reconnected'));
+      return c.redirect(returnToSetup('reconnected'));
     }
 
     if (locations.length === 0) {
-      return c.redirect(adminReturnUrl(c, lineAccountId, 'error:no_locations'));
+      return c.redirect(returnToSetup('error:no_locations'));
     }
     // 前の店舗が残っている状態（切り替え待ちや解除後）で別の店舗しか無いときは、1件でも自動確定しない。
     // 旧店舗の取り込み済みデータを消す確認を店舗選択画面で取る必要があるため。
@@ -897,7 +900,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
         .prepare('SELECT 1 FROM rt_google_connections WHERE store_id = ? AND location_name = ? AND id <> ? LIMIT 1')
         .bind(store.id, single.name, connectionId)
         .first();
-      if (taken) return c.redirect(adminReturnUrl(c, lineAccountId, 'error:location_already_connected'));
+      if (taken) return c.redirect(returnToSetup('error:location_already_connected'));
     }
     if (existing) {
       await db
@@ -956,17 +959,17 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     const connected: ConnectionRef = { id: connectionId, store_id: store.id };
     if (!single) {
       await replaceLocationCandidates(db, store.id, connectionId, locations);
-      return c.redirect(adminReturnUrl(c, lineAccountId, 'select_location'));
+      return c.redirect(returnToSetup('select_location'));
     }
     await replaceLocationCandidates(db, store.id, connectionId, []);
     await writeLog(c, connected, { kind: 'connect', targetName: single.name, result: 'accepted' });
     auditLog(c, 'restaurant.google.connect', { id: store.id, kind: 'rt_store' }, { lineAccountId });
-    return c.redirect(adminReturnUrl(c, lineAccountId, 'connected'));
+    return c.redirect(returnToSetup('connected'));
   } catch (error) {
     const code = error instanceof GoogleBusinessError ? error.kind : error instanceof CredentialEncryptionKeyError ? 'encryption_key_missing' : 'unknown';
     logger.error("restaurant_google.restaurant_test_google_oauth_callback_list_failed");
     await writeLog(c, { id: stateRow.connection_id, store_id: store.id }, { kind: stateRow.mode, result: 'failed', error: code });
-    return c.redirect(adminReturnUrl(c, lineAccountId, `error:${code}`));
+    return c.redirect(returnToSetup(`error:${code}`));
   }
 });
 

@@ -290,14 +290,19 @@ export const restaurantGoogleApi = {
   connections: (accountId: string) => fetchApi<GoogleConnectionsData>(withAccount(`${base}/connections`, accountId)),
   // connection_id はつなぎ直す接続そのものの id。`add` は接続を増やすとき（宛先なし）。
   // どちらも付けないと、サーバーは接続が1件だけのときその1件を相手にする。
-  connectStart: (accountId: string, target?: { connectionId?: string | null; add?: boolean }) =>
-    fetchApi<{ success: true; mode: 'connect' | 'reconnect'; authorizeUrl: string }>(
+  // `'hours'`（= `{ source: 'hours' }`）は営業時間の画面から始めた合図。認可のあとは営業時間へ戻る。
+  connectStart: (accountId: string, target?: { connectionId?: string | null; add?: boolean; source?: 'hours' } | 'hours') => {
+    const opts = typeof target === 'string' ? { source: target } : target ?? {}
+    const add = 'add' in opts ? opts.add : false
+    const connectionId = 'connectionId' in opts ? opts.connectionId : null
+    return fetchApi<{ success: true; mode: 'connect' | 'reconnect'; authorizeUrl: string }>(
       withAccount(`${base}/connect/start`, accountId, {
-        connection_id: target?.add ? undefined : target?.connectionId ?? undefined,
-        mode: target?.add ? 'add' : undefined,
+        connection_id: add ? undefined : connectionId ?? undefined,
+        mode: add ? 'add' : undefined,
       }),
-      { method: 'POST', body: '{}' },
-    ),
+      { method: 'POST', body: JSON.stringify({ source: opts.source }) },
+    )
+  },
   // confirmSwitch は「前につないでいた店舗とは別の店舗に切り替える」確認を取れたときだけ true。
   // 付けずに別店舗を送ると、サーバーが code: 'switch_confirmation_required' で止める。
   selectLocation: (accountId: string, locationName: string, confirmSwitch?: boolean, expected?: { expectedConnectionId: string; expectedConfirmationRevision: number }) =>

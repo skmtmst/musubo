@@ -26,6 +26,7 @@ const MISSING_ANCHOR_WAIT_MS = 1500
 export type GuideOverlayProps = {
   /** 案内中だけ出す。一時停止・未開始・完了では何も出さない。 */
   active: boolean
+  showOverlay?: boolean
   stepKey: string | null
   stepLabel: string | null
   /** 9項目の何番目か（1から）。帯の見出し「④ 卓と席を登録する」に使う。 */
@@ -54,7 +55,7 @@ function readRect(element: Element): Rect {
 }
 
 export function GuideOverlay({
-  active, stepKey, stepLabel, stepOrder, procedureIndex, onTargetScreen = false,
+  active, showOverlay = true, stepKey, stepLabel, stepOrder, procedureIndex, onTargetScreen = false,
   segments, onAdvanceProcedure, onPause, scripted = true, nextLabel, showProcedure = true,
 }: GuideOverlayProps) {
   const total = scripted ? guideProcedureTotal(stepKey) : 0
@@ -71,6 +72,7 @@ export function GuideOverlay({
   const [inDialog, setInDialog] = useState(false)
   const [actionLabel, setActionLabel] = useState<string | null>(null)
   const [applyingHours, setApplyingHours] = useState(false)
+  const [tableDialog, setTableDialog] = useState<Rect | null>(null)
   const [target, setTarget] = useState<Rect | null>(null)
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null)
   const [balloonHeight, setBalloonHeight] = useState(0)
@@ -96,7 +98,11 @@ export function GuideOverlay({
     setActionLabel(element?.getAttribute('data-guide-action-label') ?? null)
     setApplyingHours(element?.hasAttribute('data-guide-hours-apply') ?? false)
     setInDialog(Boolean(dialog))
-    const highlight = anchorName === 'tables.form' ? dialog ?? element : element
+    const tableSave = anchorName === 'tables.form' ? dialog?.querySelector('[data-guide-table-save=ready]') : null
+    const tableBox = anchorName === 'tables.form' && dialog ? readRect(dialog) : null
+    setTableDialog(previous => previous && tableBox && previous.left === tableBox.left && previous.top === tableBox.top &&
+      previous.width === tableBox.width && previous.height === tableBox.height ? previous : tableBox)
+    const highlight = tableSave ?? (anchorName === 'tables.form' ? dialog ?? element : element)
     const next = highlight ? readRect(highlight) : null
     setTarget(previous => previous && next && previous.left === next.left && previous.top === next.top &&
       previous.width === next.width && previous.height === next.height ? previous : next)
@@ -112,7 +118,7 @@ export function GuideOverlay({
       frame = window.requestAnimationFrame(() => { frame = 0; measure() })
     }
     const observer = new MutationObserver(scheduleMeasure)
-    observer.observe(document.body, { childList: true, subtree: true })
+    observer.observe(document.body, { childList: true, subtree: true, attributeFilter: ['data-guide-table-save'] })
     window.addEventListener('scroll', scheduleMeasure, true)
     window.addEventListener('resize', scheduleMeasure)
     return () => {
@@ -185,11 +191,10 @@ export function GuideOverlay({
     return () => observer.disconnect()
   }, [active, procedure, slot, hasViewport])
 
-  if (!active || !stepKey || !viewport) return null
+  if (!active || !showOverlay || !stepKey || !viewport) return null
 
-  const desktopTable = Boolean(slot && anchorName === 'tables.form' && target &&
-    target.left + target.width + 30 + 330 + 16 <= viewport.width &&
-    target.top + 30 + balloonHeight + 16 <= viewport.height)
+  const desktopTable = slot && tableDialog && tableDialog.left + tableDialog.width + 30 + 330 + 16 <= viewport.width &&
+    tableDialog.top + 30 + balloonHeight + 16 <= viewport.height ? tableDialog : null
   const inlineGuide = Boolean(slot && !desktopTable)
   const ring = target ? spotlightRing(target, desktopTable ? 12 : undefined) : null
   const panels = target && !slot ? dimPanels(target, viewport) : []
@@ -197,7 +202,7 @@ export function GuideOverlay({
   const courseBasics = anchorName === 'menu.form' && viewport.width >= 1280
   const placement = target
     ? desktopTable
-      ? { left: target.left + target.width + 30, top: target.top + 30 }
+      ? { left: desktopTable.left + desktopTable.width + 30, top: desktopTable.top + 30 }
       : anchorName === 'hours.confirm' && !applyingHours && !slot && viewport.width >= 1152
         ? { left: Math.min(viewport.width - 366, Math.max(760, target.left + target.width + 26)),
             top: Math.max(16, Math.min(target.top - 47, viewport.height - balloonHeight - 16)) }
@@ -212,7 +217,7 @@ export function GuideOverlay({
 
   const overlay = (
     <div className={styles.root} data-guide-dialog={inDialog || undefined}
-      data-inline-guide={inlineGuide || undefined} data-guide-table-editor={desktopTable || undefined}
+      data-inline-guide={inlineGuide || undefined} data-guide-table-editor={Boolean(desktopTable) || undefined}
       data-guide-course-basics={courseBasics || undefined} data-guide-table-complete={tablesComplete || undefined}
       style={{ '--guide-save-clearance': `${bottomOffset}px` } as CSSProperties}>
       {panels.map((panel, index) => (
@@ -248,6 +253,7 @@ export function GuideOverlay({
             : inlineGuide && anchorName === 'menu.save' ? `内容を確認して「${actionLabel ?? '公開して追加する'}」を押します。`
             : inlineGuide && anchorName === 'followup.save' ? '使わない場合は「今は使わない」を押します。'
             : inlineGuide && anchorName === 'hours.confirm' && inDialog ? '営業時間を見直して「変更内容を確認」を押します。'
+            : (anchorName === 'reception.lineSeats' || anchorName === 'reception.save') && actionLabel === 'この日の枠を作る' ? '選んだ日にはまだ予約枠がありません。「この日の枠を作る」を押してください。休みの日は営業日を選んでください。'
             : anchorName === 'hours.confirm' && applyingHours ? '変更内容を確かめて、「Googleに反映する」または「設定を保存する」を押します。'
             : procedure.body}</p>
           <div className={styles.balloonFooter}>

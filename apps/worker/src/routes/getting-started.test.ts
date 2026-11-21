@@ -47,6 +47,8 @@ const state = {
 let accountRows = [{
   id: 'account-1',
   is_active: 1,
+  style: null as string | null,
+  webhook_ready: null as number | null,
   channel_access_token: 'token',
   channel_access_token_encrypted: null,
   channel_secret: 'secret',
@@ -106,7 +108,7 @@ function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner', permissionKeys: st
 beforeEach(() => {
   vi.clearAllMocks();
   accountRows = [{
-    id: 'account-1', is_active: 1, channel_access_token: 'token',
+    id: 'account-1', is_active: 1, style: null, webhook_ready: null, channel_access_token: 'token',
     channel_access_token_encrypted: null, channel_secret: 'secret', channel_secret_encrypted: null,
   }];
   state.tags = 1;
@@ -147,6 +149,19 @@ describe('GET /api/getting-started', () => {
     expect(body.data.allDone).toBe(true);
     expect(body.data.steps.map((step) => step.state)).toEqual(['done', 'done', 'done', 'done', 'done']);
   });
+
+  it.each([[0, 1, 'stalled'], [1, 0, 'stalled'], [1, null, 'unknown'], [1, 1, 'done']])(
+    '飲食店の初回設定は稼働状態 %s と確認結果 %s から %s を返す',
+    async (active, webhookReady, status) => {
+      Object.assign(accountRows[0], { style: 'restaurant', is_active: active, webhook_ready: webhookReady });
+      const response = await makeApp().fetch(new Request('https://example.com/api/getting-started?account_id=account-1&version=v8'), { DB: database() });
+      const result = await response.json() as { data: { steps: Array<{key: string; state: string; reason: string | null}> } };
+      const entry = result.data.steps.find(step => step.key === 'accounts');
+      expect(entry?.state).toBe(status);
+      if (status !== 'done') expect(entry?.reason).toContain('確認');
+      expect(webhook.fetchWebhookEndpoint).not.toHaveBeenCalled();
+    },
+  );
 
   it('登録済みならLINE側のWebhookを確認できなくても完了にする', async () => {
     webhook.fetchWebhookEndpoint.mockRejectedValue(new Error('temporary'));
