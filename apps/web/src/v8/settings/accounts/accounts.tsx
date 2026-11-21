@@ -4,7 +4,7 @@ import { tokenExpiryNotice, tokenExpirySummary, tokenExpiryBreakdown, tokenExpir
 
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ArrowUpDown, Plus, Cable, CircleCheck, TriangleAlert, Users } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
@@ -30,6 +30,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { StyleEntry } from '@/v8/onboarding/public/style-entry/index'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import {
   ACCOUNT_FILTERS,
@@ -84,7 +85,8 @@ export default function AccountsV8() {
   const [restoreTarget, setRestoreTarget] = useState<LineAccount | null>(null)
   const [busy, setBusy] = useState(false)
   const [dialogError, setDialogError] = useState('')
-  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  const [notice, setNotice] = useState<{ tone: 'success' | 'warn' | 'error'; text: string } | null>(null)
+  const checkingConnection = useRef(false)
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const [orderingOpen, setOrderingOpen] = useState(false)
 
@@ -115,15 +117,40 @@ export default function AccountsV8() {
   const expiredInProblem = ready ? tokenExpiryBreakdown(accounts).inProblem : 0
   const filterCount = (value: AccountFilter) => (ready ? accounts.filter((a) => matchesFilter(a, value)).length : undefined)
 
-  /** このアカウントの接続を、新しく確かめ直す。一覧全体を最新で取り直す。 */
-  const recheck = useCallback(async (account: LineAccount) => {
+  const recheck = async (account: AccountWithStats) => {
+    if (busy || checkingConnection.current) return
+    checkingConnection.current = true
+    setBusy(true)
     setOpenMenuId(null)
     setNotice(null)
-    const ok = await load(true)
-    setNotice(ok
-      ? { tone: 'success', text: `「${account.name}」を確かめ直しました。` }
-      : { tone: 'error', text: '確かめ直せませんでした。もう一度お試しください。' })
-  }, [load])
+    try {
+      if (blocked || account.archivedAt) {
+        if (await load(true)) setNotice({ tone: 'success', text: '一覧の接続状態を読み直しました。' })
+        return
+      }
+      if (account.revision == null || !Number.isSafeInteger(account.revision) || account.revision < 1) {
+        setNotice({ tone: 'error', text: '接続状態を読み直してから、もう一度お試しください。' })
+        await load(true)
+        return
+      }
+      const result = await api.lineAccounts.checkConnection(account.id, account.revision)
+      if (!result.success || result.data.accountId !== account.id) throw new Error('接続確認の結果を読み込めませんでした。')
+      const webhook = result.data.checks.find(check => check.kind === 'webhook_endpoint')
+      const ready = webhook?.webhookActive === true && (webhook.result === 'matched' || webhook.result === 'ok')
+      if (await load(true)) {
+        setNotice(ready
+          ? { tone: 'success', text: `「${account.name}」のWebhook接続を確認しました。` }
+          : { tone: 'warn', text: `「${account.name}」のWebhook接続を確認できませんでした。LINE側のWebhookの利用とURLを確かめてください。` })
+      }
+      emitGuideSignal('accounts.connection', account.id)
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 409) await load(true)
+      setNotice({ tone: 'error', text: '接続を確認できませんでした。もう一度お試しください。' })
+    } finally {
+      checkingConnection.current = false
+      setBusy(false)
+    }
+  }
 
   const runArchive = useCallback(async (stepUpToken?: string) => {
     if (!archiveTarget || !canManage || lockReason(canManage, 'manager')) return
@@ -170,7 +197,7 @@ export default function AccountsV8() {
   }, [restoreTarget, load, canManage])
 
   /** 行の「…」の中身：詳細・接続をもう一度確かめる・引き継ぎ・アーカイブ（戻す）。 */
-  const menuItems = (account: LineAccount): ActionMenuItem[] => {
+  const menuItems = (account: AccountWithStats): ActionMenuItem[] => {
     const items: ActionMenuItem[] = [
       { id: 'detail', label: '詳細', external: false, href: `/accounts/detail?id=${account.id}`, onSelect: () => { setOpenMenuId(null); router.push(`/accounts/detail?id=${account.id}`) } },
       { id: 'recheck', label: '接続をもう一度確かめる', disabled: busy, onSelect: () => void recheck(account) },
@@ -198,7 +225,7 @@ export default function AccountsV8() {
     <>
       <SettingsPage layout="accounts" help={<>{DESCRIPTION}{"行の「…」から 詳細・接続をもう一度確かめる・既定にする・引き継ぎ（UID の移行）・アーカイブ。"}</>} boardId="V7vn3" title={TITLE} notice={role !== null && blocked ? <ReadOnlyNotice need="manager" /> : undefined} actions={headActions} navigation={<SettingsInnerNav inline />}>
         {notice ? (
-          <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} onClose={() => setNotice(null)} />
+          <Notice tone={notice.tone === 'error' ? 'danger' : notice.tone} message={notice.text} onClose={() => setNotice(null)} />
         ) : null}
 
         <KpiBand data-design="KPIs">
@@ -220,12 +247,14 @@ export default function AccountsV8() {
             onChange={setQuery}
             onClear={() => setQuery('')}
           />
-          <SegmentedControl<AccountFilter>
-            aria-label="状態で絞り込む"
-            value={filter}
-            onChange={setFilter}
-            options={ACCOUNT_FILTERS.map((item) => ({ value: item.value, label: item.label, count: filterCount(item.value) }))}
-          />
+          <div className={styles.filters}>
+            <SegmentedControl<AccountFilter>
+              aria-label="状態で絞り込む"
+              value={filter}
+              onChange={setFilter}
+              options={ACCOUNT_FILTERS.map((item) => ({ value: item.value, label: item.label, count: filterCount(item.value) }))}
+            />
+          </div>
         </div>
 
         {ready && (tokenExpirySummary(accounts) || tokenExpiryBreakdownText(accounts)) ? <Notice tone="warn" compact message={[tokenExpirySummary(accounts), tokenExpiryBreakdownText(accounts)].filter(Boolean).join('・')} /> : null}
