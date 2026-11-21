@@ -470,7 +470,7 @@
 
 ## 反映履歴
 
-- [ブラウザの戻る・進むで入力が消える不具合の修正](release-log/unreleased/PR-kenta-leave-guard-back.md) — 反映履歴、確認 2026-11-21。
+- [ブラウザの戻る・進むで入力が消える不具合の修正](release-log/unreleased/150-kenta-leave-guard-back.md) — 反映履歴、確認 2026-11-21。
 
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
