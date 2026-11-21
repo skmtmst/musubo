@@ -117,3 +117,22 @@ test.each(['sequential','concurrent'] as const)('欠席を2回送っても振替
  expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_makeup_credits').get()).toEqual({n:1});
  expect(d.raw.prepare("SELECT absence_reported_at IS NOT NULL AS absent FROM event_bookings WHERE id='eb'").get()).toEqual({absent:1});
 });
+
+test('B3-05: 振替先を読んで選ばず離れても欠席と振替が残る',async()=>{
+ const credit=(await absence(d.db,'a','f','eb','customer')).makeupCredit as {id:string;expires_at:string};
+ const before=d.raw.prepare('SELECT status,expires_at,used_event_booking_id FROM booking_makeup_credits WHERE id=?').get(credit.id);
+ await makeupOptions(d.db,'a','f',credit.id);
+ expect(d.raw.prepare('SELECT status,expires_at,used_event_booking_id FROM booking_makeup_credits WHERE id=?').get(credit.id)).toEqual(before);
+ expect(before).toEqual({status:'open',expires_at:credit.expires_at,used_event_booking_id:null});
+ expect(d.raw.prepare("SELECT status,absence_reported_at FROM event_bookings WHERE id='eb'").get()).toEqual({status:'cancelled',absence_reported_at:'2026-11-16T00:00:00.000Z'});
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM event_bookings WHERE slot_id='dst'").get()).toEqual({n:0});
+});
+
+test('B3-12: 閲覧のみは欠席・振替の設定を変更できず予約も券も変わらない',async()=>{
+ const viewer={...gapOwner,readOnly:true};const a=gapApp(d,[bookingMakeup],viewer);
+ const before=d.raw.prepare("SELECT status,absence_reported_at FROM event_bookings WHERE id='eb'").get();
+ expect((await gapCall(a,'/api/events/admin/bookings/eb/absence?account_id=a','POST',{grantMakeup:true})).status).toBe(403);
+ expect((await gapCall(a,'/api/events/admin/lesson/makeup-rule?account_id=a','PUT',{rule:{enabled:false},expectedRevision:1})).status).toBe(403);
+ expect(d.raw.prepare("SELECT status,absence_reported_at FROM event_bookings WHERE id='eb'").get()).toEqual(before);
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_makeup_credits').get()).toEqual({n:0});
+});
