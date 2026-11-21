@@ -8,6 +8,7 @@ import type { LineAccount } from '@line-crm/shared'
  */
 
 export type AccountWithStats = LineAccount & {
+  revision?: number
   stats?: { friendCount: number; activeScenarios: number; messagesThisMonth: number }
   timezone?: string
 }

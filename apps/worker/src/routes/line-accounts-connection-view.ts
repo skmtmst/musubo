@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 import type { LineAccount, LineAccountConnectionCheck } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { expectedWebhookUrl as accountWebhookUrl } from '../lib/webhook-endpoint.js';
-import { fetchBotProfile } from '../lib/bot-profile.js';
+import { fetchBotProfile, type BotProfile } from '../lib/bot-profile.js';
 import { classifyLineMonthlyPlan, fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
 import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
 
@@ -86,4 +86,77 @@ export function connectionCheckResponse(account: LineAccount, rows: LineAccountC
     checkedAt: first?.checked_at ?? null, correlationId: first?.correlation_id ?? null,
     expectedUrls: urls, checks: rows.map(serializeConnectionCheck),
   };
+}
+
+type ConnectionVerification = {
+  messagingApi: boolean;
+  webhook: boolean;
+  lineLogin: boolean;
+  liff: boolean;
+  webhookUrl: string | null;
+  botProfile: BotProfile | null;
+  errors: string[];
+};
+
+export async function verifyConnection(input: {
+  channelAccessToken: string;
+  loginChannelId: string;
+  loginChannelSecret: string;
+  liffId: string;
+  expectedWebhookUrl: string | null;
+  acceptedWebhookUrls?: readonly string[];
+}): Promise<ConnectionVerification> {
+  const result: ConnectionVerification = {
+    messagingApi: false,
+    webhook: false,
+    lineLogin: /^\d+$/.test(input.loginChannelId),
+    liff: /^\d+-[A-Za-z0-9]+$/.test(input.liffId),
+    webhookUrl: null,
+    botProfile: null,
+    errors: [],
+  };
+  if (!input.loginChannelSecret.trim()) result.lineLogin = false;
+  if (!result.lineLogin) result.errors.push('LINE LoginのChannel IDまたはChannel Secretを確認してください');
+  if (!result.liff) result.errors.push('LIFF IDの形式を確認してください');
+
+  const headers = { Authorization: `Bearer ${input.channelAccessToken}` };
+  try {
+    const botResponse = await fetch('https://api.line.me/v2/bot/info', { headers });
+    result.messagingApi = botResponse.ok;
+    if (botResponse.ok) result.botProfile = await botResponse.json<BotProfile>();
+    if (!botResponse.ok) result.errors.push('Messaging APIのChannel Access Tokenを確認してください');
+  } catch {
+    result.errors.push('Messaging APIへ接続できませんでした');
+  }
+
+  if (result.messagingApi) {
+    try {
+      const endpointResponse = await fetch('https://api.line.me/v2/bot/channel/webhook/endpoint', {
+        headers: { ...headers, 'Content-Type': 'application/json' },
+      });
+      if (endpointResponse.ok) {
+        const endpoint = await endpointResponse.json<{ endpoint?: string; active?: boolean }>();
+        result.webhookUrl = endpoint.endpoint ?? null;
+        const sameEndpoint = !input.expectedWebhookUrl
+          || isAcceptedWebhookUrl(endpoint.endpoint, input.acceptedWebhookUrls ?? [input.expectedWebhookUrl]);
+        if (endpoint.active && sameEndpoint) {
+          const testResponse = await fetch('https://api.line.me/v2/bot/channel/webhook/test', {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: '{}',
+          });
+          if (testResponse.ok) {
+            const tested = await testResponse.json<{ success?: boolean }>();
+            result.webhook = tested.success === true;
+          }
+        }
+      }
+      if (!result.webhook) {
+        result.errors.push('Webhook URLの一致・利用設定・接続テストを確認してください');
+      }
+    } catch {
+      result.errors.push('Webhookの接続確認に失敗しました');
+    }
+  }
+  return result;
 }

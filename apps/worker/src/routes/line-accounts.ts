@@ -35,7 +35,7 @@ import { readCapacity, normalizeOptionalString, validateLoginChannelPair, readCo
 import { serializeLineAccount, serializeLineAccountFull } from './line-accounts-view.js';
 import { fetchPreConnectFollowerTotal, fetchPreConnectFollowerInsight } from '../services/musubo-large-line-consultation.js';
 import { acceptedWebhookUrls, isAcceptedWebhookUrl, publicAccountUrls,
-  connectionCheckResponse, readLiveAccountConnection } from './line-accounts-connection-view.js';
+  connectionCheckResponse, readLiveAccountConnection, verifyConnection } from './line-accounts-connection-view.js';
 
 const lineAccounts = new Hono<Env>();
 
@@ -137,16 +137,6 @@ lineAccounts.get('/api/line-accounts/summary', async (c) => {
     throw err;
   }
 });
-
-type ConnectionVerification = {
-  messagingApi: boolean;
-  webhook: boolean;
-  lineLogin: boolean;
-  liff: boolean;
-  webhookUrl: string | null;
-  botProfile: BotProfile | null;
-  errors: string[];
-};
 
 type ConnectionCheckDraft = {
   kind: 'bot_info' | 'webhook_endpoint' | 'webhook_test' | 'liff_config';
@@ -251,69 +241,6 @@ async function collectConnectionChecks(
     registeredUrl: null,
   });
   return { checks, botProfile };
-}
-
-async function verifyConnection(input: {
-  channelAccessToken: string;
-  loginChannelId: string;
-  loginChannelSecret: string;
-  liffId: string;
-  expectedWebhookUrl: string | null;
-  acceptedWebhookUrls?: readonly string[];
-}): Promise<ConnectionVerification> {
-  const result: ConnectionVerification = {
-    messagingApi: false,
-    webhook: false,
-    lineLogin: /^\d+$/.test(input.loginChannelId),
-    liff: /^\d+-[A-Za-z0-9]+$/.test(input.liffId),
-    webhookUrl: null,
-    botProfile: null,
-    errors: [],
-  };
-  if (!input.loginChannelSecret.trim()) result.lineLogin = false;
-  if (!result.lineLogin) result.errors.push('LINE LoginのChannel IDまたはChannel Secretを確認してください');
-  if (!result.liff) result.errors.push('LIFF IDの形式を確認してください');
-
-  const headers = { Authorization: `Bearer ${input.channelAccessToken}` };
-  try {
-    const botResponse = await fetch('https://api.line.me/v2/bot/info', { headers });
-    result.messagingApi = botResponse.ok;
-    if (botResponse.ok) result.botProfile = await botResponse.json<BotProfile>();
-    if (!botResponse.ok) result.errors.push('Messaging APIのChannel Access Tokenを確認してください');
-  } catch {
-    result.errors.push('Messaging APIへ接続できませんでした');
-  }
-
-  if (result.messagingApi) {
-    try {
-      const endpointResponse = await fetch('https://api.line.me/v2/bot/channel/webhook/endpoint', {
-        headers: { ...headers, 'Content-Type': 'application/json' },
-      });
-      if (endpointResponse.ok) {
-        const endpoint = await endpointResponse.json<{ endpoint?: string; active?: boolean }>();
-        result.webhookUrl = endpoint.endpoint ?? null;
-        const sameEndpoint = !input.expectedWebhookUrl
-          || isAcceptedWebhookUrl(endpoint.endpoint, input.acceptedWebhookUrls ?? [input.expectedWebhookUrl]);
-        if (endpoint.active && sameEndpoint) {
-          const testResponse = await fetch('https://api.line.me/v2/bot/channel/webhook/test', {
-            method: 'POST',
-            headers: { ...headers, 'Content-Type': 'application/json' },
-            body: '{}',
-          });
-          if (testResponse.ok) {
-            const tested = await testResponse.json<{ success?: boolean }>();
-            result.webhook = tested.success === true;
-          }
-        }
-      }
-      if (!result.webhook) {
-        result.errors.push('Webhook URLの一致・利用設定・接続テストを確認してください');
-      }
-    } catch {
-      result.errors.push('Webhookの接続確認に失敗しました');
-    }
-  }
-  return result;
 }
 
 // 保存前の接続確認。成功してもDBには一切書き込まない。
@@ -1276,13 +1203,14 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
     }
 
     const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
+    const expectedWebhookUrl = accountWebhookUrl(base, body.channelId.trim());
     const verification = await verifyConnection({
       channelAccessToken: body.channelAccessToken.trim(),
       loginChannelId,
       loginChannelSecret,
       liffId,
-      expectedWebhookUrl: accountWebhookUrl(base, body.channelId.trim()),
-      acceptedWebhookUrls: [...acceptedWebhookUrls(c.env, accountWebhookUrl(base, body.channelId.trim())), ...acceptedWebhookUrls(c.env, `${base}/webhook`)],
+      expectedWebhookUrl,
+      acceptedWebhookUrls: [...acceptedWebhookUrls(c.env, expectedWebhookUrl), ...acceptedWebhookUrls(c.env, `${base}/webhook`)],
     });
     if (!verification.messagingApi || !verification.webhook || !verification.lineLogin || !verification.liff) {
       return inputError(c, { success: false, error: 'すべての接続確認を完了してください', details: { connection: verification.errors } }, 400, ["channelAccessToken"]);
@@ -1325,6 +1253,26 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
       lineProfileSyncedAt: verification.botProfile ? jstNow() : null,
     }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
 
+    const expectedRevision = account.revision ?? 1;
+    try {
+      await saveLineAccountConnectionChecks(c.env.DB, {
+        lineAccountId: account.id,
+        expectedRevision,
+        checkedBy: currentStaff.id,
+        checkedAt: jstNow(),
+        correlationId: crypto.randomUUID(),
+        idempotencyKey: `manual-connect-${crypto.randomUUID()}`,
+        checks: [
+          { kind: 'bot_info', result: 'ok', httpStatus: 200 },
+          { kind: 'webhook_endpoint', result: 'matched', expectedUrl: expectedWebhookUrl, registeredUrl: verification.webhookUrl, webhookActive: true, httpStatus: 200 },
+          { kind: 'webhook_test', result: 'ok', httpStatus: 200 },
+        ],
+      });
+    } catch {
+      await deleteUncommittedLineAccount(c.env.DB, account.id);
+      throw new UnexpectedRouteError(c, { success: false, error: '接続確認を保存できなかったため、アカウントは追加していません' });
+    }
+
     if (copyFromAccountId && copyItems.length > 0) {
       try {
         await copyLineAccountSettings(c.env.DB, copyFromAccountId, account.id, copyItems);
@@ -1358,7 +1306,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
     } catch {
       return c.json({ success: false, error: 'style_save_failed', data: { accountId: account.id, style: body.style ?? null, styleSaved: false, retryAt: `/api/dashboard/style?account_id=${encodeURIComponent(account.id)}`, starterRetryAt: `/api/dashboard/style/starter-items/ensure?account_id=${encodeURIComponent(account.id)}` } }, 502);
     }
-    return c.json({ success: true, data: serializeLineAccountFull(account) }, 201);
+    return c.json({ success: true, data: serializeLineAccountFull({ ...account, revision: expectedRevision + 1 }) }, 201);
   } catch (err) {
     if (err instanceof CredentialEncryptionKeyError) {
       return c.json({ success: false, error: 'LINE資格情報の暗号鍵が未設定です' }, 503);
