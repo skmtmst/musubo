@@ -132,7 +132,8 @@ for (const width of [1152, 1440]) test(`統括のアカウントは知らせの�
     checkCards(await page.evaluate(cardNoticeState, labels))
     await photograph(page, 'cards', width)
 
-    const number = page.locator('[data-kpi-action-slot]').first().locator('..').locator('[data-kpi-number]').first()
+    const connectionCard = page.locator('[data-kpi-strip][data-kpi-presentation="band"] > [data-design-version]').filter({ hasText: '接続に問題' })
+    const number = connectionCard.locator('[data-kpi-number]').first()
     const originalNumber = await number.textContent()
     await number.evaluate(el => { el.textContent = '1234'; el.closest('[data-kpi-fit]').style.setProperty('--kpi-fit-chars', '4') })
     console.log('four-digit-layout', width, await page.evaluate(bandDetailState))
@@ -146,7 +147,7 @@ for (const width of [1152, 1440]) test(`統括のアカウントは知らせの�
     await number.evaluate((el, text) => { el.textContent = text; el.closest('[data-kpi-fit]').style.setProperty('--kpi-fit-chars', String(text.length)) }, originalNumber)
 
     // 本体と同じ検査へ壊した実測値を渡し、復元後の緑まで確かめる。
-    const actionSlot = page.locator('[data-kpi-action-slot]').first()
+    const actionSlot = connectionCard.locator('[data-kpi-action-slot]')
     await actionSlot.evaluate(el => { el.style.position = 'relative'; el.style.top = '100px' })
     const brokenBand = await page.evaluate(bandDetailState)
     assert.throws(() => checkBand(brokenBand), /数字の行/, '行き先が落ちたら赤')
@@ -155,7 +156,9 @@ for (const width of [1152, 1440]) test(`統括のアカウントは知らせの�
     await actionSlot.evaluate(el => { el.style.position = 'relative'; el.style.left = '100px' })
     const overflowBand = await page.evaluate(bandDetailState)
     assert.throws(() => checkBand(overflowBand), /カードの右端/, '行き先が右端を越えたら赤')
-    await actionSlot.evaluate(el => { el.style.left = '-100px' })
+    await actionSlot.evaluate(el => { el.style.removeProperty('left') })
+    const beforeOverlap = await page.evaluate(bandDetailState)
+    await actionSlot.evaluate((el, offset) => { el.style.left = `${offset}px` }, beforeOverlap.textRight - beforeOverlap.action.left - 5)
     const overlapBand = await page.evaluate(bandDetailState)
     assert.throws(() => checkBand(overlapBand), /重ならない/, '数と重なったら赤')
     await actionSlot.evaluate(el => { el.style.removeProperty('position'); el.style.removeProperty('left') })
