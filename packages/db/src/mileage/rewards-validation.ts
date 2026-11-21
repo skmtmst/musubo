@@ -13,7 +13,7 @@ export class MileageRewardError extends Error {
 }
 
 export const REWARD_KINDS = new Set<MileageRewardKind>([
-  'coupon', 'tag', 'scenario', 'template', 'early_access', 'rank',
+  'coupon', 'handgift', 'tag', 'scenario', 'template', 'early_access', 'rank',
 ]);
 export const FAILURE_POLICIES = new Set<MileageRewardFailurePolicy>(['retry', 'refund', 'manual']);
 export const TARGET_CONDITION_TYPES = new Set([
@@ -141,7 +141,10 @@ export function validateMileageRewardDraft(value: MileageRewardDraftInput): Requ
     throw new MileageRewardError('invalid_period', '交換終了は交換開始より後にしてください');
   }
   const commonActionVersionId = optionalText(value.commonActionVersionId, '交換後の動き', 100);
-  if (rewardKind !== 'coupon' && !commonActionVersionId) {
+  if (rewardKind === 'handgift' && commonActionVersionId) {
+    throw new MileageRewardError('invalid_action', '手渡し景品には交換後の動きを設定できません');
+  }
+  if (rewardKind !== 'coupon' && rewardKind !== 'handgift' && !commonActionVersionId) {
     throw new MileageRewardError('action_required', '交換後に渡すものを選んでください');
   }
   return {
@@ -209,7 +212,7 @@ export function mapReward(row: RewardRow): MileageRewardSummary {
 export function rewardSelect(versionExpression: string): string {
   return `
   SELECT r.id, r.folder_id, r.line_account_id, r.program_id, r.name, r.description, r.image_url,
-         r.reward_kind, r.status, r.sort_order, r.current_draft_version_id,
+         CASE WHEN EXISTS (SELECT 1 FROM mileage_handgift_rewards h WHERE h.reward_id = r.id) THEN 'handgift' ELSE r.reward_kind END AS reward_kind, r.status, r.sort_order, r.current_draft_version_id,
          r.current_published_version_id, r.created_at, r.updated_at,
          v.id AS version_id, v.version_number, v.status AS version_status,
          v.revision,

@@ -239,6 +239,7 @@ export async function getMileageRewardDeliveryPlan(
   redemption: MileageRewardRedemption;
   rewardName: string;
   rewardKind: MileageRewardKind;
+  isHandgift: boolean;
   customerMessage: string;
   commonActionVersionId: string | null;
   actionConfig: string | null;
@@ -247,6 +248,7 @@ export async function getMileageRewardDeliveryPlan(
   const row = await db.prepare(
     `SELECT r.*, reward.name AS reward_name, reward.reward_kind,
             v.customer_message, v.common_action_version_id, v.failure_policy,
+            EXISTS (SELECT 1 FROM mileage_handgift_rewards h WHERE h.reward_id = reward.id) AS is_handgift,
             cav.action_config
        FROM mileage_redemptions r
        JOIN mileage_rewards reward ON reward.id = r.reward_id
@@ -256,6 +258,7 @@ export async function getMileageRewardDeliveryPlan(
   ).bind(redemptionId).first<RedemptionRow & {
     reward_name: string;
     reward_kind: MileageRewardKind;
+    is_handgift: number;
     customer_message: string;
     common_action_version_id: string | null;
     failure_policy: MileageRewardFailurePolicy;
@@ -268,6 +271,7 @@ export async function getMileageRewardDeliveryPlan(
     // 種類変更が、処理中・成功済みの交換へ混ざらない。凍結前の古い行は親行を読む。
     rewardName: row.reward_name_snapshot ?? row.reward_name,
     rewardKind: row.reward_kind_snapshot ?? row.reward_kind,
+    isHandgift: row.is_handgift === 1,
     customerMessage: row.customer_message,
     commonActionVersionId: row.common_action_version_id,
     actionConfig: row.action_config,

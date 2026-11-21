@@ -57,6 +57,8 @@ export type AuditAction =
   | 'mileage.reward.publish'
   | 'mileage.reward.status'
   | 'mileage.reward.codes.import'
+  | 'mileage.redemption.hand_cancel'
+  | 'mileage.redemption.hand_delivery'
   | 'mileage.redemption.create'
   | 'mileage.redemption.retry'
   | 'affiliate.create'

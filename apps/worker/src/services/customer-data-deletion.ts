@@ -37,6 +37,17 @@ export function friendDeletionCondition(table: string, seen = new Set<string>())
   const next = new Set(seen).add(table);
   const rel = graph[table];
   const conditions = rel.friendColumns.map(col => `${q(table)}.${q(col)} = ?1`);
+  // 友だちが本人に結び付くと、財布や台帳は友だちIDを持たず本人IDだけで保存される。
+  if (['mileage_wallets', 'mileage_ledger', 'mileage_redemptions'].includes(table)) {
+    conditions.push(`EXISTS (SELECT 1 FROM friends subject WHERE subject.id = ?1 AND subject.user_id IS NOT NULL AND ${q(table)}.beneficiary_user_id = subject.user_id)`);
+  }
+  if (['mileage_wallets', 'mileage_grant_lots', 'mileage_redemptions'].includes(table)) {
+    conditions.push(`(${q(table)}.beneficiary_key = 'friend:' || ?1 OR EXISTS (SELECT 1 FROM friends subject WHERE subject.id = ?1 AND subject.user_id IS NOT NULL AND ${q(table)}.beneficiary_key = 'user:' || subject.user_id))`);
+  }
+  if (table === 'mileage_ledger') {
+    conditions.push(`EXISTS (SELECT 1 FROM mileage_grant_lots lot WHERE lot.ledger_entry_id = ${q(table)}.id AND (lot.beneficiary_key = 'friend:' || ?1 OR EXISTS (SELECT 1 FROM friends subject WHERE subject.id = ?1 AND subject.user_id IS NOT NULL AND lot.beneficiary_key = 'user:' || subject.user_id)))`);
+  }
+
   if (rel.lineUserColumn) conditions.push(`(${q(table)}.line_user_id = ?2 AND ${q(table)}.line_account_id IS ?3)`);
   for (const ref of rel.references) {
     // 顧客自身の成果・帰属は紹介者のデータと区別し、参照だけを最後の原子的 batch で外す。
@@ -122,6 +133,29 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
   }
   const preserved = protectedChecks.length ? await db.batch(protectedChecks.map(check => db.prepare(`SELECT 1 AS present FROM ${q(check.table)} WHERE ${check.condition} LIMIT 1`).bind(...(check.condition.includes('?3') ? params : [params[0]])))) : [];
   if (preserved.some(result => result.results.length)) throw new DeletionFailure(409, 'deletion_schema_approval_required');
+  const mileageCondition = conditions.mileage_redemptions?.replaceAll('"mileage_redemptions".', 'r.') ?? '0';
+  const unfinishedMileage = `EXISTS (SELECT 1 FROM mileage_redemptions r WHERE ${mileageCondition} AND r.anonymized_at IS NULL AND (
+    r.status IN ('delivering','delivery_failed') OR
+    (r.status = 'reserved' AND NOT EXISTS (SELECT 1 FROM mileage_handgift_rewards h WHERE h.reward_id = r.reward_id)) OR
+    (r.status = 'refunded' AND (NOT EXISTS (SELECT 1 FROM mileage_ledger l WHERE l.program_id = r.program_id AND l.idempotency_key = 'mileage-redemption-refund:' || r.id)
+      OR EXISTS (SELECT 1 FROM mileage_reward_codes c WHERE c.redemption_id = r.id AND c.status = 'reserved')))
+  ))`;
+  // 複数の友だちが同じ本人の財布を使う場合、他の店の残高を消さない。
+  const sharedMileage = `EXISTS (SELECT 1 FROM friends f JOIN friends other ON other.user_id = f.user_id AND other.id <> f.id
+    WHERE f.id = ?1 AND f.user_id IS NOT NULL AND (
+      EXISTS (SELECT 1 FROM mileage_wallets w WHERE w.beneficiary_key = 'user:' || f.user_id OR w.beneficiary_friend_id = f.id)
+      OR EXISTS (SELECT 1 FROM mileage_redemptions r WHERE r.beneficiary_user_id = f.user_id OR r.beneficiary_friend_id = f.id)
+      OR EXISTS (SELECT 1 FROM mileage_ledger l WHERE l.beneficiary_user_id = f.user_id OR l.beneficiary_friend_id = f.id)
+    ))`;
+  if (target.kind === 'friend_data') {
+    // 手渡し待ちは外部送信がなく、匿名にした交換として在庫を保持する。
+    const checks = await db.batch([
+      db.prepare(`SELECT 1 WHERE ${unfinishedMileage}`).bind(...(mileageCondition.includes('?3') ? params : [params[0]])),
+      db.prepare(`SELECT 1 WHERE ${sharedMileage}`).bind(params[0]),
+    ]);
+    if (checks[0].results.length) throw new DeletionFailure(409, 'mileage_redemption_open');
+    if (checks[1].results.length) throw new DeletionFailure(409, 'shared_identity_mileage');
+  }
   const token = crypto.randomUUID();
   const detail: Detail = { accountId: target.accountId, ...(target.formId ? { formId: target.formId } : {}), token, leaseUntil: Date.now() + 300_000 };
   // 同じ友だちに対する別の対象指定や二重押下を直列化する。
@@ -151,6 +185,14 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       const columns = RETENTION_R2_KEY_COLUMNS.filter(entry => entry.table === table).map(entry => entry.column);
       snapshots.push({ table, condition, rows, keys: rows.flatMap(row => columns.flatMap(col => typeof row[col] === 'string' && row[col] ? [row[col] as string] : [])) });
     }
+    if (target.kind === 'friend_data') {
+      // 別の友だち本人の交換・台帳を親参照だけで巻き込まない。
+      for (const snapshot of snapshots.filter(item => ['mileage_redemptions', 'mileage_ledger', 'mileage_wallets'].includes(item.table))) {
+        if (snapshot.rows.some(row => row.beneficiary_friend_id != null && row.beneficiary_friend_id !== target.id)) {
+          throw new DeletionFailure(409, 'deletion_schema_approval_required');
+        }
+      }
+    }
     const keys = [...new Set(snapshots.flatMap(snapshot => snapshot.keys))];
     if (keys.length && !env.IMAGES) throw new DeletionFailure(503, 'deletion_retry_required');
     // R2 の削除は冪等なので、全削除が成功するまで DB のキーを残して再試行可能にする。
@@ -164,6 +206,11 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       return db.prepare(`UPDATE operation_audit SET target_kind = CASE WHEN (${normalized}) THEN 'customer_deletion' ELSE NULL END WHERE id = ?`).bind(...bindings, id);
     };
     const statements = [db.prepare('PRAGMA defer_foreign_keys = ON'), guard("action = 'deleting' AND json_extract(detail_json, '$.token') = ?", [token])];
+    if (target.kind === 'friend_data') {
+      // 事前確認後〜snapshot の間に増えた交換・共有の財布も確定前に拒否する。
+      statements.push(guard(`NOT ${unfinishedMileage}`, mileageCondition.includes('?3') ? params : [params[0]]));
+      statements.push(guard(`NOT ${sharedMileage}`, [params[0]]));
+    }
     // R2 待機中に追加された保持対象を、連動削除で失わないようにする。
     for (const check of protectedChecks) statements.push(guard(`NOT EXISTS (SELECT 1 FROM ${q(check.table)} WHERE ${check.condition})`, check.condition.includes('?3') ? params : [params[0]]));
     // R2 待機中に増えたファイルや子行も、再試行で到達できる形を保つ。
@@ -179,7 +226,11 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       const candidates = ['id', 'line_user_id', 'line_account_id', 'form_id', 'submission_id',
         ...(graph[snapshot.table]?.friendColumns ?? []),
         ...(graph[snapshot.table]?.references.flatMap(ref => ref.columns.map(col => col.column)) ?? []),
-        ...RETENTION_R2_KEY_COLUMNS.filter(entry => entry.table === snapshot.table).map(entry => entry.column)];
+        ...RETENTION_R2_KEY_COLUMNS.filter(entry => entry.table === snapshot.table).map(entry => entry.column),
+        ...(snapshot.table.startsWith('mileage_')
+          ? ['status', 'updated_at', 'beneficiary_key', 'beneficiary_user_id', 'anonymized_at',
+            'available', 'pending', 'version', 'remaining_amount', 'spend_ledger_entry_id',
+            'delivered_at', 'cancelled_at', 'cancellation_reason', 'lease_expires_at', 'needs_reconcile'] : [])];
       const columns = [...new Set(candidates)].filter(col => first && Object.hasOwn(first, col));
       if (columns.length) statements.push(guard(`NOT EXISTS (SELECT 1 FROM json_each(?) expected LEFT JOIN ${q(snapshot.table)} actual
         ON actual.rowid = json_extract(expected.value,'$.rowid') WHERE ${columns.map(col => `actual.${q(col)} IS NOT json_extract(expected.value,'$.values.${col}')`).join(' OR ')})`,
@@ -203,8 +254,39 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
           WHERE json_extract(candidate.value, '$.affiliateId') IN (${removed}))`)
         .bind(...(affiliateCondition.includes('?3') ? params : [params[0]])));
     }
+    const preservedMileage = new Set(['mileage_redemptions', 'mileage_handgifts', 'mileage_redemption_attempts', 'mileage_redemption_step_deliveries', 'mileage_reward_codes']);
+    if (target.kind === 'friend_data') {
+      const ids = (table: string) => JSON.stringify((byTable.get(table)?.rows ?? []).map(row => row._delete_rowid));
+      const pendingIds = ids('mileage_redemptions');
+      const cancelledAt = new Date().toISOString();
+      // 既に渡した・取消済みの記録を手渡し待ちとして扱わない。
+      statements.push(guard(`NOT EXISTS (SELECT 1 FROM mileage_redemptions r JOIN mileage_handgift_rewards h ON h.reward_id = r.reward_id
+        JOIN mileage_handgifts g ON g.redemption_id = r.id WHERE r.rowid IN (SELECT value FROM json_each(?))
+        AND r.status = 'reserved' AND (g.delivered_at IS NOT NULL OR g.cancelled_at IS NOT NULL))`, [pendingIds]));
+      // 未受渡しの景品だけを取消。元のマイル台帳は削除し、返却の行は作らない。
+      statements.push(db.prepare(`INSERT INTO mileage_handgifts(redemption_id,reward_id,cancelled_at,cancelled_by,cancellation_reason)
+        SELECT r.id,r.reward_id,?,?, '顧客データ削除に伴う取消' FROM mileage_redemptions r
+        JOIN mileage_handgift_rewards h ON h.reward_id = r.reward_id
+        WHERE r.rowid IN (SELECT value FROM json_each(?)) AND r.status = 'reserved' AND r.anonymized_at IS NULL
+        ON CONFLICT(redemption_id) DO UPDATE SET cancelled_at=excluded.cancelled_at,
+          cancelled_by=excluded.cancelled_by,cancellation_reason=excluded.cancellation_reason
+        WHERE mileage_handgifts.delivered_at IS NULL AND mileage_handgifts.cancelled_at IS NULL`)
+        .bind(cancelledAt, actorId, pendingIds));
+      // 取消理由は自由入力なので、削除の認可中に定型文へ置き換える。
+      statements.push(db.prepare(`UPDATE mileage_handgifts SET cancellation_reason = '削除済みのお客さまの取消'
+        WHERE rowid IN (SELECT value FROM json_each(?)) AND cancelled_at IS NOT NULL`).bind(ids('mileage_handgifts')));
+      statements.push(db.prepare(`UPDATE mileage_redemption_attempts SET error_message = NULL
+        WHERE rowid IN (SELECT value FROM json_each(?))`).bind(ids('mileage_redemption_attempts')));
+      const anonymous = `deleted:${crypto.randomUUID()}`;
+      statements.push(db.prepare(`UPDATE mileage_redemptions SET beneficiary_friend_id = NULL, beneficiary_user_id = NULL,
+        beneficiary_key = ?, spend_ledger_entry_id = NULL, idempotency_key = ? || ':' || id,
+        request_fingerprint = 'deleted', failure_message = NULL, next_retry_at = NULL, anonymized_at = ?
+        WHERE rowid IN (SELECT value FROM json_each(?))`)
+        .bind(anonymous, anonymous, new Date().toISOString(), ids('mileage_redemptions')));
+    }
     for (const table of childFirst(Object.keys(conditions))) {
       const snapshot = byTable.get(table)!;
+      if (target.kind === 'friend_data' && preservedMileage.has(table)) continue;
       if (snapshot.rows.length) statements.push(db.prepare(`DELETE FROM ${q(table)} WHERE rowid IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(snapshot.rows.map(row => row._delete_rowid))));
     }
     const formIds = [...new Set(byTable.get('form_submissions')!.rows.map(row => row.form_id as string))];
@@ -218,9 +300,10 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       after: { deletedRows: completed.rows }, createdAt: completed.completedAt, retentionClass: 'general' }));
     await db.batch(statements);
     return { deleted: true, replayed: false };
-  } catch {
+  } catch (error) {
     // 記録は固定コードに限り、顧客本文・ファイル名・キー・外部エラーをログへ出さない。
     await db.prepare("UPDATE operation_audit SET action = 'retryable' WHERE id = ? AND action = 'deleting' AND json_extract(detail_json,'$.token') = ?").bind(id, token).run().catch(() => {});
+    if (error instanceof DeletionFailure && error.status === 409) throw error;
     throw new DeletionFailure(503, 'deletion_retry_required');
   }
 }
