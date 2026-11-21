@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [自動確認で見本のデータを読み込みと取り違える問題を修正](release-log/unreleased/106-kenta-quality-guard-mock.md) — 反映履歴、確認 2026-11-17。
+
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
