@@ -6,8 +6,10 @@ import { Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import { Field } from '@/components/shared/form-controls'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import Notice from '@/components/shared/notice'
+import { TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
 import styles from './course-photos.module.css'
 
@@ -42,7 +44,7 @@ export default function CoursePhotos({ accountId, photos, disabled, error, onCha
     <div className={styles.heading}><strong>写真</strong><span>最大5枚・正方形で表示</span></div>
     <ul className={styles.photos} aria-label="コースの写真">
       {photos.map((photo, position) => (
-        <li key={photo.mediaId} className={position === 0 ? styles.cover : undefined}
+        <li key={photo.mediaId} className={position === 0 ? `${styles.tile} ${styles.cover}` : styles.tile}
           draggable={!disabled}
           onDragStart={event => { dragging.current = position; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', String(position)) }}
           onDragEnd={() => { dragging.current = null }}
@@ -52,16 +54,18 @@ export default function CoursePhotos({ accountId, photos, disabled, error, onCha
             if (dragging.current !== null) move(dragging.current, position)
             dragging.current = null
           }}>
-          <button type="button" className={styles.photoButton} aria-label={`写真 ${position + 1} の表示範囲を調整`}
+          <Button variant="text" size="thumbnail" aria-label={`写真 ${position + 1} の表示範囲を調整`}
             disabled={disabled} onClick={() => setAdjusting(photo)}>
             {image(photo, '')}
             {position === 0 ? <span className={styles.badge}>表紙</span> : null}
-          </button>
+          </Button>
         </li>
       ))}
-      {photos.length < RESTAURANT_COURSE_PHOTO_LIMIT ? <li>
-        <button type="button" className={styles.add} aria-label="写真を追加" disabled={disabled || !accountId}
-          onClick={() => { setNotice(''); setPicking(true) }}><Plus size={16} aria-hidden="true" />追加</button>
+      {photos.length < RESTAURANT_COURSE_PHOTO_LIMIT ? <li className={styles.tile}>
+        <Button variant="text" size="thumbnail" aria-label="写真を追加" disabled={disabled || !accountId}
+          onClick={() => { setNotice(''); setPicking(true) }}>
+          <span className={styles.addLabel}><Plus size={16} aria-hidden="true" />追加</span>
+        </Button>
       </li> : null}
     </ul>
     <p className={styles.note}>ドラッグで並べ替え（先頭が表紙）。写真をタップすると表示範囲を調整できます。元の写真はそのまま残ります。</p>
@@ -83,8 +87,16 @@ export default function CoursePhotos({ accountId, photos, disabled, error, onCha
         }}>この範囲にする</Button>
       </DialogActions>}>
       <div className={styles.preview}>{image(adjusting, `写真 ${index + 1} の表示見本`)}</div>
-      <label className={styles.adjust}>左右の位置<input type="range" min={0} max={100} value={adjusting.x} onChange={event => setAdjusting({ ...adjusting, x: Number(event.target.value) })} /></label>
-      <label className={styles.adjust}>上下の位置<input type="range" min={0} max={100} value={adjusting.y} onChange={event => setAdjusting({ ...adjusting, y: Number(event.target.value) })} /></label>
+      <div className={styles.adjust}>
+        <Field label="左右の位置" optional={false}>
+          <TextField type="range" min={0} max={100} value={adjusting.x}
+            onChange={event => setAdjusting({ ...adjusting, x: Number(event.target.value) })} />
+        </Field>
+        <Field label="上下の位置" optional={false}>
+          <TextField type="range" min={0} max={100} value={adjusting.y}
+            onChange={event => setAdjusting({ ...adjusting, y: Number(event.target.value) })} />
+        </Field>
+      </div>
       <DialogActions>
         <Button disabled={index <= 0} onClick={() => move(index, index - 1)}>前へ移動</Button>
         <Button disabled={index < 0 || index === photos.length - 1} onClick={() => move(index, index + 1)}>後ろへ移動</Button>

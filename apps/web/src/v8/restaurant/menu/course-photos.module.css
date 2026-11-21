@@ -29,29 +29,32 @@
   list-style: none;
 }
 
-.photos li { inline-size: min(100%, var(--course-photo-tile)); }
-.photos .cover { inline-size: min(100%, calc(var(--space-20) * 9)); }
-
-.photoButton, .preview, .add {
+.tile {
+  --tpl-rt-picker-size: 100%;
   position: relative;
+  display: flex;
+  inline-size: min(100%, var(--course-photo-tile));
+  aspect-ratio: 1;
+}
+
+.cover { inline-size: min(100%, calc(var(--space-20) * 9)); }
+
+.addLabel {
   display: grid;
-  place-content: center;
-  inline-size: 100%;
-  block-size: auto;
+  justify-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-caption);
+}
+
+.image { display: block; inline-size: 100%; block-size: 100%; object-fit: cover; }
+.preview {
+  inline-size: min(100%, calc(var(--space-24) * 10));
   aspect-ratio: 1;
   border-radius: var(--radius-control);
   background: var(--color-canvas-sunken);
-  padding: 0;
   overflow: hidden;
 }
 
-.photoButton, .add { border: 0; cursor: pointer; }
-.photoButton:focus-visible, .add:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
-.photoButton:disabled, .add:disabled { cursor: default; }
-.add { border: 1px solid var(--color-hairline); justify-items: center; gap: var(--space-4); font-size: var(--text-caption); }
-
-.image { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; object-fit: cover; }
-.preview { max-inline-size: calc(var(--space-24) * 10); }
 .badge {
   position: absolute;
   inset: var(--space-8) auto auto var(--space-8);
@@ -62,4 +65,4 @@
   font-size: var(--text-caption);
   font-weight: 600;
 }
-.adjust { display: grid; gap: var(--space-8); margin-block-start: var(--space-12); }
+.adjust { display: grid; gap: var(--space-8); margin-block: var(--space-12); }
