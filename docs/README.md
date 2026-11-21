@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [振り分け条件の自動確認](release-log/unreleased/93-kenta-gap-booking.md) — フォームの振り分け条件の確認追加の履歴。確認 2026-11-16。
+
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
