@@ -4,6 +4,7 @@
  *
  * - 一覧は閲覧のみを含めて見られる。記録はオーナーと管理者だけで、ほかの人には灰色のボタンと理由の吹き出しを出す。
  * - 確認窓で確かめ、任意の理由（200 文字まで）を添えて記録する。入力したまま閉じるときは破棄を確かめる。
+ * - 理由を入れたまま再読み込み・ほかの画面へ移る・LINE アカウントを選び直すときも、入力を消す前に確かめる。
  * - 種類・担当・予定の日時だけを出し、分からない値は「—」、全部が無いときは1文にまとめる。
  * - 読めない・権限が無い・ほかの人が先に記録した・記録に失敗したを言い分け、確認が要るものを黙って消さない。
  * - アカウントを切り替えたら前のアカウントの応答を捨てる。
@@ -13,6 +14,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, expect, it, vi } from 'vitest'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -21,6 +23,7 @@ vi.hoisted(() => {
 const net = vi.hoisted(() => ({ listExternalCleanups: vi.fn(), resolveExternalCleanup: vi.fn(), listStaff: vi.fn(), role: vi.fn(), toast: vi.fn() }))
 vi.mock('@/lib/api/helpers/gap1', () => ({ bookingCalendarApi: { listExternalCleanups: net.listExternalCleanups, resolveExternalCleanup: net.resolveExternalCleanup } }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: net.role, canAdministerRole: (role: string | null) => role === 'admin' || role === 'owner' }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn(), refresh: vi.fn() }) }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return { ...actual, bookingApi: { ...actual.bookingApi, listStaff: net.listStaff } }
@@ -31,6 +34,9 @@ vi.mock('@/components/shared/toast', async (importOriginal) => {
 })
 const { ExternalCleanupSection } = await import('./external-cleanup')
 const { ApiError } = await import('@/lib/api')
+const { responseApiError } = await import('@/lib/api/transport/errors')
+/** Worker と同じ形の失敗の返事から、画面が受け取る失敗を作る。 */
+const rejected = (status: number, code: string) => responseApiError(new Response(null, { status }), JSON.stringify({ success: false, error: code }))
 
 const TITLE = '相手のサービスで消したことを確かめましたか？'
 const zoom = { id: 'job-zoom', provider: 'zoom', staffId: 'staff-1', startsAt: '2030-01-02T01:00:00Z' } as const
@@ -45,6 +51,12 @@ const settle = (finish: () => void) => act(async () => { finish(); await new Pro
 function asRole(role: 'owner' | 'admin' | 'staff' | 'viewer' | null) {
   net.role.mockReturnValue(role)
   verifiedStaffRole(role)
+}
+/** 再読み込み・タブを閉じる操作を、番兵が止めたか。 */
+function reloadBlocked(): boolean {
+  const event = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(event)
+  return event.defaultPrevented
 }
 /** 押せない理由（吹き出しと読み上げに使う文）。 */
 function lockedReasonOf(button: HTMLElement): string | null {
@@ -184,7 +196,7 @@ it('理由が長すぎると口が断ったら、欄に理由を出して窓と�
   asRole('owner')
   net.listExternalCleanups.mockResolvedValue(listed(zoom))
   net.listStaff.mockResolvedValue(staff)
-  net.resolveExternalCleanup.mockRejectedValue(new ApiError(400, 'invalid_reason'))
+  net.resolveExternalCleanup.mockRejectedValue(rejected(400, 'invalid_reason'))
   render(<ExternalCleanupSection accountId="account" reloadRequest={0} />)
   fireEvent.click(await screen.findByRole('button', { name: '片づけ済みにする' }))
   const dialog = screen.getByRole('dialog', { name: TITLE })
@@ -194,6 +206,24 @@ it('理由が長すぎると口が断ったら、欄に理由を出して窓と�
   expect(await within(dialog).findByText('理由は 200 文字以内で入力してください。')).toBeTruthy()
   expect((field as HTMLTextAreaElement).value).toBe('相手のサービスで削除した')
   expect(screen.getByRole('dialog', { name: TITLE })).toBeTruthy()
+  expect(net.toast).not.toHaveBeenCalled()
+})
+
+it.each(['confirmation_required', 'invalid_body'])('ほかの入力の誤り（%s）は理由の誤りにせず、共通の失敗文を窓に出す', async (code) => {
+  asRole('owner')
+  net.listExternalCleanups.mockResolvedValue(listed(zoom))
+  net.listStaff.mockResolvedValue(staff)
+  net.resolveExternalCleanup.mockRejectedValue(rejected(400, code))
+  render(<ExternalCleanupSection accountId="account" reloadRequest={0} />)
+  fireEvent.click(await screen.findByRole('button', { name: '片づけ済みにする' }))
+  const dialog = screen.getByRole('dialog', { name: TITLE })
+  const field = within(dialog).getByRole('textbox', { name: /理由/ })
+  fireEvent.change(field, { target: { value: '相手のサービスで削除した' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: '片づけ済みにする' }))
+  expect(await within(dialog).findByText('入力を直してください。')).toBeTruthy()
+  expect(within(dialog).queryByText('理由は 200 文字以内で入力してください。')).toBeNull()
+  expect(field.getAttribute('aria-invalid')).not.toBe('true')
+  expect((field as HTMLTextAreaElement).value).toBe('相手のサービスで削除した')
   expect(net.toast).not.toHaveBeenCalled()
 })
 
@@ -210,9 +240,66 @@ it('理由を入れたまま閉じるときは、破棄してよいかを確か�
   fireEvent.click(within(discard).getByRole('button', { name: '破棄する' }))
   await waitFor(() => expect(screen.queryByRole('dialog', { name: TITLE })).toBeNull())
   expect(net.resolveExternalCleanup).not.toHaveBeenCalled()
+  // 破棄して閉じたら、画面を離れる操作は止めない。
+  expect(reloadBlocked()).toBe(false)
   // もう一度開くと、前の入力は残っていない。
   fireEvent.click(screen.getByRole('button', { name: '片づけ済みにする' }))
   expect((within(screen.getByRole('dialog', { name: TITLE })).getByRole('textbox', { name: /理由/ }) as HTMLTextAreaElement).value).toBe('')
+})
+
+it('理由を入れたままの再読み込みは止め、番兵に届いた戻る操作では入力を消さずに確かめる', async () => {
+  asRole('owner')
+  net.listExternalCleanups.mockResolvedValue(listed(zoom))
+  net.listStaff.mockResolvedValue(staff)
+  render(<ExternalCleanupSection accountId="account" reloadRequest={0} />)
+  // 窓を開く前と、開いても理由が空の間は止めない。
+  await screen.findByRole('button', { name: '片づけ済みにする' })
+  expect(reloadBlocked()).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: '片づけ済みにする' }))
+  const field = within(screen.getByRole('dialog', { name: TITLE })).getByRole('textbox', { name: /理由/ })
+  expect(reloadBlocked()).toBe(false)
+  fireEvent.change(field, { target: { value: 'Zoom で会議を削除した' } })
+  // 再読み込み・タブを閉じる：ブラウザの確認を出す。
+  expect(reloadBlocked()).toBe(true)
+  // 戻る：画面の確認を出し、「編集を続ける」なら入力を残す。
+  act(() => { window.dispatchEvent(new PopStateEvent('popstate')) })
+  fireEvent.click(await screen.findByRole('button', { name: '編集を続ける' }))
+  await waitFor(() => expect(screen.queryByRole('button', { name: '編集を続ける' })).toBeNull())
+  expect((within(screen.getByRole('dialog', { name: TITLE })).getByRole('textbox', { name: /理由/ }) as HTMLTextAreaElement).value).toBe('Zoom で会議を削除した')
+  expect(net.resolveExternalCleanup).not.toHaveBeenCalled()
+})
+
+it('理由を入れたまま LINE アカウントを選び直すと、確かめてから切り替える', async () => {
+  asRole('owner')
+  net.listExternalCleanups.mockResolvedValue(listed(zoom))
+  net.listStaff.mockResolvedValue(staff)
+  const view = render(<ExternalCleanupSection accountId="first" reloadRequest={0} />)
+  fireEvent.click(await screen.findByRole('button', { name: '片づけ済みにする' }))
+  fireEvent.change(within(screen.getByRole('dialog', { name: TITLE })).getByRole('textbox', { name: /理由/ }), { target: { value: 'Zoom で会議を削除した' } })
+  // 上の帯・統括の札の選び直しは、この共通の確認を通ってから切り替える。
+  const switchAccount = vi.fn(() => view.rerender(<ExternalCleanupSection accountId="second" reloadRequest={0} />))
+  act(() => requestUnsavedAction(switchAccount))
+  expect(switchAccount).not.toHaveBeenCalled()
+  fireEvent.click(await screen.findByRole('button', { name: '編集を続ける' }))
+  await waitFor(() => expect(screen.queryByRole('button', { name: '編集を続ける' })).toBeNull())
+  expect(switchAccount).not.toHaveBeenCalled()
+  expect((within(screen.getByRole('dialog', { name: TITLE })).getByRole('textbox', { name: /理由/ }) as HTMLTextAreaElement).value).toBe('Zoom で会議を削除した')
+  // 「保存せずに移る」を選んだときだけ切り替える。
+  act(() => requestUnsavedAction(switchAccount))
+  fireEvent.click(await screen.findByRole('button', { name: '保存せずに移る' }))
+  await waitFor(() => expect(switchAccount).toHaveBeenCalledTimes(1))
+  expect(net.resolveExternalCleanup).not.toHaveBeenCalled()
+})
+
+it('理由が空なら、LINE アカウントの選び直しを止めない', async () => {
+  asRole('owner')
+  net.listExternalCleanups.mockResolvedValue(listed(zoom))
+  net.listStaff.mockResolvedValue(staff)
+  render(<ExternalCleanupSection accountId="first" reloadRequest={0} />)
+  fireEvent.click(await screen.findByRole('button', { name: '片づけ済みにする' }))
+  const switchAccount = vi.fn()
+  act(() => requestUnsavedAction(switchAccount))
+  expect(switchAccount).toHaveBeenCalledTimes(1)
 })
 
 it('カレンダーの予定は、残ると予約の空きから外れることを確認窓で伝える', async () => {

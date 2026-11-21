@@ -13,6 +13,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { describeApiFailure, isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import { ApiError, bookingApi } from '@/lib/api'
 import { bookingCalendarApi, type BookingExternalCleanupItem } from '@/lib/api/helpers/gap1'
 import { formatListTimestamp, formatNumber } from '@/lib/format'
@@ -75,9 +76,12 @@ function confirmDescription(item: BookingExternalCleanupItem, staffNames: Readon
   return item.provider ? `${past}相手のサービスに予定が残っていると、その時間は予約の空きから外れます。` : past
 }
 
-/** 理由が長すぎる・文字でないと口が断った（既知のコード表に無いので文言でも見る）。 */
+/**
+ * 理由を口が断った（長すぎる・文字でない）。共通の読み取りが返事の `error` を code へ入れるので、code だけで見分ける。
+ * 確認の明示が無い・本文の形が違うなど、ほかの入力の誤りは理由の誤りにせず共通の失敗文にする。失敗の原文は読まない。
+ */
 function isReasonRejected(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 400 && (error.code === 'invalid_reason' || error.message === 'invalid_reason')
+  return error instanceof ApiError && error.code === 'invalid_reason'
 }
 
 export function ExternalCleanupSection({ accountId, reloadRequest }: { accountId: string | null; reloadRequest: number }) {
@@ -263,6 +267,8 @@ export function ExternalCleanupSection({ accountId, reloadRequest }: { accountId
           </Field>
         </DialogFormRow>
       </ConfirmDialog>
+      {/* 窓を閉じる時は窓が破棄を確かめる。再読み込み・ほかの画面へ移る時（リンク・探す窓・アカウントの選び直し）は、この番兵が入力した理由を守る。 */}
+      {target !== null ? <FormLeaveGuard dirty={reason.trim().length > 0} busy={busy} capture={false} /> : null}
     </section>
   )
 }
