@@ -136,3 +136,30 @@ it('アカウントを切り替えて戻しても古い削除確定は送らな�
   await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: target, target })
   expect(state.remove).not.toHaveBeenCalled()
 })
+
+it('送信開始時に固定した配信を、変更が反映される件数に含めない', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 3, blockingTotal: 1,
+    historicalTotal: 1, sendingFixedTotal: 1, unscopedFormTotal: 0, canDelete: false,
+    byKind: {}, items: [], unavailableReferences: [], checkedAt: '2026-10-14T00:00:00+09:00', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  expect(await screen.findByRole('button', { name: '1か所に反映して保存' })).toBeTruthy()
+  expect(screen.getByText(/送信開始時に固定した配信と届いた文は変わりません/)).toBeTruthy()
+})
+
+it('所属不明の使用先があるときは反映先の数を断定しない', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 2, blockingTotal: 2,
+    historicalTotal: 0, sendingFixedTotal: 0, unscopedFormTotal: 1, canDelete: false,
+    byKind: {}, items: [], unavailableReferences: [], checkedAt: '2026-10-14T00:00:00+09:00', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  expect(await screen.findByText(/所属を確認できない使用先があります/)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: /か所に反映して保存/ })).toBeNull()
+})
+
+it('確認できた使用先がない場合は、変更が反映される場所がないと示す', async () => {
+  render(<Editor />)
+  expect(await screen.findByText(/確認できた使用先に変わる場所はありません/)).toBeTruthy()
+})

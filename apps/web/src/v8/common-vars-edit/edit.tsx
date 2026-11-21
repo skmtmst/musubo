@@ -739,8 +739,8 @@ function EditCommonVarV8Inner() {
                 busy={saving}
                 busyLabel="保存中…"
               >
-                {impactState === 'ready' && impact && usageTotal !== null
-                  ? `${formatNumber(usageTotal)}か所に反映して保存`
+                {impactState === 'ready' && impact && impact.unscopedFormTotal === 0
+                  ? `${formatNumber(impact.blockingTotal)}か所に反映して保存`
                   : '保存する'}
               </Button>
             )
@@ -820,7 +820,7 @@ function EditCommonVarV8Inner() {
               <h2 id="cv-edit-impact-heading" className={styles.cardTitle}>変える前に影響を見る</h2>
               <p className={styles.cardNote} title={impact ? [reflectionScopeText(impact), reflectionTimingText(impact), historicalText(impact), ...('canSave' in impact ? [impactBreakdown(impact), `予約中・配信中：${urgentImpactCount(impact) ?? NOT_AVAILABLE}か所`, `文字数超過：${overLimitCount(impact)}か所`] : [])].filter(Boolean).join('\n') : undefined}>
                 {impactState === 'ready' && impact
-                  ? `${formatNumber(impact.total)}か所。次に送る・動くときから新しい値が入ります。すでに届いた文は変わりません`
+                  ? `${impact.blockingTotal > impact.unscopedFormTotal ? `${formatNumber(impact.blockingTotal - impact.unscopedFormTotal)}か所に次に送る・動くときから新しい値が入ります。` : '確認できた使用先に変わる場所はありません。'}送信開始時に固定した配信と届いた文は変わりません${impact.unscopedFormTotal > 0 ? '。所属を確認できない使用先があります' : ''}`
                   : '次に送る・動くときから新しい値が入ります。すでに届いた文は変わりません'}
               </p>
             </div>
