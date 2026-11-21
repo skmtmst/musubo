@@ -98,7 +98,24 @@ export async function runFrequentHeavyJobs(
     },
     {
       name: 'calendar busy cache and switch jobs',
-      run: async () => {const {refreshCalendarBusyCaches,processCalendarSwitchJobs}=await import('../features/booking/booking-calendar-settings/index.js');const credentials={email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY};await refreshCalendarBusyCaches(env.DB,credentials,new Date(event.scheduledTime));await processCalendarSwitchJobs(env.DB,credentials,new Date(event.scheduledTime));},
+      run: async () => {const {refreshCalendarBusyCaches,processCalendarSwitchJobs}=await import('../features/booking/booking-calendar-settings/index.js');const {syncOutlookBookingForEnv}=await import('../features/booking/booking-outlook-sync-runtime/index.js');const {refreshOutlookBusyCaches,calendarCredentialsForEnv}=await import('../features/booking/booking-outlook-busy-runtime/index.js');const credentials=calendarCredentialsForEnv(env);await refreshCalendarBusyCaches(env.DB,credentials,new Date(event.scheduledTime));await refreshOutlookBusyCaches(env,new Date(event.scheduledTime));await processCalendarSwitchJobs(env.DB,credentials,new Date(event.scheduledTime),{allowMutations:env.DEPLOY_ENV==='staging'&&env.BOOKING_MEETING_REAL_ENABLED==='true'&&env.BOOKING_OUTLOOK_MUTATIONS_ENABLED==='true',sync:(id,options)=>syncOutlookBookingForEnv(env,id,options)});},
+    },
+    {
+      name: 'booking external cleanup',
+      run: async () => {const {recoverExternalCleanup}=await import('../features/booking/booking-external-cleanup-runtime/index.js');await recoverExternalCleanup(env,event.scheduledTime);},
+    },
+    {
+      name: 'booking meeting recovery',
+      run: async () => {
+        const {processMeetingQueue}=await import('../features/booking/booking-meeting-queue/index.js');
+        const {meetingQueueDependencies}=await import('../features/booking/booking-meeting-runtime/index.js');
+        await processMeetingQueue(env.DB,meetingQueueDependencies(env));
+        const {recoverOutlookBookings,syncOutlookBookingForEnv}=await import('../features/booking/booking-outlook-sync-runtime/index.js');
+        await recoverOutlookBookings(env,new Date(event.scheduledTime));
+        const {recoverConfirmedBookingSideEffects}=await import('../features/booking/booking-confirmed-effects/index.js');
+        const {meetingCreatorForBooking}=await import('../features/booking/booking-meeting-runtime/index.js');
+        await recoverConfirmedBookingSideEffects(env.DB,{now:new Date(event.scheduledTime),meetingDeferredOnly:true,credentials:{email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY},meetingCreatorForBooking:id=>meetingCreatorForBooking(env,id),outlookSyncBooking:id=>syncOutlookBookingForEnv(env,id)});
+      },
     },
     {
       name: 'booking sync notices',

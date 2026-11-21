@@ -63,6 +63,8 @@ export function dashboardNotificationDestination(
   if (item.eventType.startsWith('broadcast')) return '/broadcasts'
   // マニュアル導線の切断は正本表へ。直す場所が押してすぐ分かるようにする。
   if (item.eventType === 'manual_link_broken') return '/settings/manual-links'
+  // 外部の予定・会議の確認は、運用状態の健全性チェックの一覧で相手先の片づけを記録する。
+  if (item.eventType === 'booking_external_cleanup_review') return '/emergency'
   /*
     知らない種類はお知らせ一覧へ。行き先なし(null)にすると、
     押したのに何も起きない(既読だけ付く)死に tap になる。

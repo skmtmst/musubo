@@ -60,6 +60,8 @@ const GUARDED = [
   // 電話のトーク。書きかけの返信は離れる前に確かめる。
   'v8/inbox-chat/mobile-talk-screen.tsx',
   'v8/settings/customer-look/screen.tsx',
+  // 外部の予定・会議の確認の窓の理由欄。窓を開いている間は、再読み込み・ほかの画面へ移る前に確かめる。
+  'v8/settings/emergency/external-cleanup.tsx',
   'v8/hq-deliveries/console.tsx',
   'v8/webhooks/incoming-actions.tsx',
   'components/shared/restaurant-floor-editor.tsx',

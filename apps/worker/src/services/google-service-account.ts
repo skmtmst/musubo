@@ -5,6 +5,8 @@ const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar';
 export interface GoogleServiceAccountCredentials {
   email?: string;
   privateKey?: string;
+  cleanupEventIds?: (input:{lineAccountId:string;staffId:string;calendarId:string;connectionId:string})=>Promise<string[]>;
+  outlookBusy?: (input:{lineAccountId:string;staffId:string;timeMin:string;timeMax:string})=>Promise<Array<{start:string;end:string}>>;
 }
 
 type CachedToken = { accessToken: string; expiresAtMs: number; email: string; scope: string };

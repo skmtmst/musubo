@@ -39,9 +39,11 @@ export function safeMeetingUrl(value: unknown): string | null {
 
 export default function OnlineMeetingCard({ bookingId, status, booking, now = () => Date.now() }: { bookingId: string | null | undefined; status: string; booking?: BookingHistoryItem; now?: () => number }) {
   const [item, setItem] = useState<BookingHistoryItem | null>(null);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const style = useCustomerStyle();
   const current = booking ?? item;
   const [, tick] = useState(0);
+  useEffect(() => { setCopyState('idle'); }, [bookingId]);
   useEffect(() => {
     if (current?.meeting_mode !== 'online' || current.status !== 'confirmed' || status !== 'confirmed') return;
     const timer = setInterval(() => tick((n) => n + 1), 1000);
@@ -73,12 +75,14 @@ export default function OnlineMeetingCard({ bookingId, status, booking, now = ()
         {provider ? `オンライン（${provider}）` : 'オンライン'}
       </p>
       {!confirmed ? (
-        <p className="text-[13px] leading-5 text-ink">会議の自動発行は準備中です。確定後の参加用URLは、トークで担当者へご確認ください。</p>
+        <p className="text-[13px] leading-5 text-ink">予約が確定したら、会議の URL をお送りします。</p>
       ) : !url ? (
-        <p className="text-[13px] leading-5 text-ink">会議の自動発行は準備中です。参加用URLは、トークで担当者へご確認ください。</p>
+        <p className="text-[13px] leading-5 text-ink">会議の URL は前日までにお送りします。</p>
       ) : (
         <>
           <p className="text-[13px] leading-5 text-ink">{`担当：${current.staff_name}`}</p>
+          <Button onClick={() => { if (!navigator.clipboard?.writeText) { setCopyState('failed'); return; } void navigator.clipboard.writeText(url).then(() => setCopyState('copied')).catch(() => setCopyState('failed')); }}>URLをコピー</Button>
+          {copyState !== 'idle' ? <p role="status" className="text-xs text-liff-sub">{copyState === 'copied' ? 'URLをコピーしました。' : 'コピーできませんでした。'}</p> : null}
           {open ? (
             <Button variant="primary" onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>会議に参加する</Button>
           ) : null}

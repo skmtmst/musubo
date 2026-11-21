@@ -1,10 +1,13 @@
 import { logger } from '@line-crm/shared/server';
-import { recordConversionSourceEvent } from '@line-crm/db';
+import { recordConversionSourceEvent, accountFeatureOffExclusionSql } from '@line-crm/db';
+import { featureJobCanRun } from '../../services/feature-enforcement.js';
 import { dispatchAutomationEventWithLogging } from '../automations/automation-triggers/index.js';
 import { syncConfirmedBookingToGoogle } from './booking-calendar-sync.js';
 import { getReminderTiming, insertConfirmationReminders } from './booking-confirm.js';
 import { notifyForBooking } from './booking-notification.js';
 import { finishBookingOperation, queueBookingOperation, type BookingOperationKind } from './booking-operation-runs.js';
+import { createConfirmedBookingMeeting, type MeetingCreator } from './booking-meeting-create.js';
+import { notifyMeetingIssue, notifyMeetingUnavailable } from './booking-meeting-notice.js';
 import type { GoogleServiceAccountCredentials } from '../../services/google-service-account.js';
 
 const workflowKey = (id: string) => `${id}:confirmation-effects`;
@@ -18,7 +21,8 @@ export function confirmationWorkflowStatement(db: D1Database, bookingId: string,
     .bind(crypto.randomUUID(), workflowKey(bookingId), bookingId);
 }
 
-interface Options { now?: Date; credentials?: GoogleServiceAccountCredentials }
+export type OutlookSyncCallback=(bookingId:string)=>Promise<'done'|'skipped'|'failed'|'unknown'|'busy'>;
+interface Options { now?: Date; credentials?: GoogleServiceAccountCredentials; meetingCreator?: MeetingCreator; meetingDeferredOnly?: boolean; meetingCreatorForBooking?: (bookingId:string)=>Promise<MeetingCreator|null|'deferred'|'unavailable'>; outlookSyncBooking?:OutlookSyncCallback }
 
 /** 3入口共通。成功した工程は飛ばす。LINEの到達不明は人の確認に残す。 */
 export async function runConfirmedBookingSideEffects(db: D1Database, bookingId: string, options: Options = {}): Promise<void> {
@@ -78,11 +82,35 @@ export async function runConfirmedBookingSideEffects(db: D1Database, bookingId: 
     if (result.failed > 0) throw new Error('conversion_incomplete');
     return { conversion: 'recorded' };
   });
+  let meetingDeferred=false;
+  try {
+    const creator=options.meetingCreator ?? await options.meetingCreatorForBooking?.(bookingId);
+    if(creator==='deferred'){
+      const workflow=await db.prepare('SELECT created_at FROM booking_operation_runs WHERE idempotency_key=? AND line_account_id=?').bind(workflowKey(bookingId),row.line_account_id).first<{created_at:string}>();
+      const created=workflow?.created_at??'';
+      const createdAt=Date.parse(created && !/[zZ]|[+-]\d\d:\d\d$/.test(created)?`${created}Z`:created);
+      if(Number.isFinite(createdAt) && now.getTime()-createdAt<300000){meetingDeferred=true;pending=true;}
+      else await notifyMeetingUnavailable(db,{accountId:row.line_account_id,bookingId});
+    } else if(creator==='unavailable')await notifyMeetingUnavailable(db,{accountId:row.line_account_id,bookingId});
+    else if(creator){
+      const result=await createConfirmedBookingMeeting(db, bookingId, creator);
+      if(result==='failed'){
+        const link=await db.prepare("SELECT id FROM booking_meeting_links WHERE booking_id=? AND status='failed' ORDER BY created_at DESC,id DESC LIMIT 1").bind(bookingId).first<{id:string}>();
+        if(link)await notifyMeetingIssue(db,{accountId:row.line_account_id,bookingId,linkId:link.id,reason:'failed'});
+      }
+    }
+  } catch { logger.warn('booking_meeting_create_failed'); }
+  await db.prepare(`UPDATE booking_operation_runs SET result_json=${meetingDeferred ? "json_set(result_json,'$.meetingDeferred',1)" : "json_remove(result_json,'$.meetingDeferred')"},updated_at=?
+    WHERE line_account_id=? AND idempotency_key=? AND status IN ('queued','retry_wait')`)
+    .bind(now.toISOString(),row.line_account_id,workflowKey(bookingId)).run();
   await step('google_calendar', 'google-calendar:create', async (operationId) => {
     const result = await syncConfirmedBookingToGoogle(db, options.credentials ?? {}, bookingId, `lh${operationId.replaceAll('-', '')}`);
     return { calendarSync: result.synced ? 'synced' : 'not_configured', skipped: !result.synced };
   });
-  if (row.friend_id && policy.send_line_confirmation !== false) {
+  if(options.outlookSyncBooking){
+    try{await options.outlookSyncBooking(bookingId);}catch{logger.warn('booking_outlook_confirmation_failed');}
+  }
+  if (row.friend_id && policy.send_line_confirmation !== false && !meetingDeferred) {
     try { await notifyForBooking(db, bookingId, 'approved'); }
     catch { /* 台帳に到達不明を残す。自動で二度送らない。残りの工程は続ける。 */ }
     const op = await db.prepare(`SELECT status FROM booking_operation_runs WHERE line_account_id = ? AND idempotency_key = ?`)
@@ -107,11 +135,15 @@ export async function runConfirmedBookingSideEffects(db: D1Database, bookingId: 
 }
 
 export async function recoverConfirmedBookingSideEffects(db: D1Database, options: Options = {}): Promise<void> {
-  const rows = await db.prepare(`SELECT b.id FROM bookings b JOIN booking_operation_runs op
+  const rows = await db.prepare(`SELECT b.id,b.line_account_id FROM bookings b JOIN booking_operation_runs op
     ON op.booking_id = b.id AND op.line_account_id = b.line_account_id
-    WHERE b.status = 'confirmed' AND op.idempotency_key = b.id || ':confirmation-effects'
-      AND op.status IN ('queued','retry_wait') ORDER BY op.created_at, op.id LIMIT 200`).all<{ id: string }>();
+    WHERE b.status = 'confirmed' AND NOT ${accountFeatureOffExclusionSql('b.line_account_id','booking')} AND op.idempotency_key = b.id || ':confirmation-effects'
+      AND op.status IN ('queued','retry_wait')
+      ${options.meetingDeferredOnly ? "AND json_extract(op.result_json,'$.meetingDeferred')=1 AND julianday(op.updated_at)<=julianday(?,'-1 minute')" : ''}
+      ORDER BY op.created_at, op.id LIMIT 200`)
+    .bind(...(options.meetingDeferredOnly ? [(options.now??new Date()).toISOString()] : [])).all<{ id: string; line_account_id:string }>();
   for (const row of rows.results ?? []) {
+    if(!await featureJobCanRun(db,{accountId:row.line_account_id,featureId:'booking',job:'booking meeting recovery'}))continue;
     try { await runConfirmedBookingSideEffects(db, row.id, options); }
     catch { logger.error("booking_confirmation_recovery_failed"); }
   }

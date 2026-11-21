@@ -15,7 +15,7 @@ function booking(status: string, url: string | null) {
 it('確認待ちは URL もボタンも出さず、確定したら LINE で送ると伝える', async () => {
   booking('requested', null);
   render(<OnlineMeetingCard bookingId="b1" status="requested" now={() => START} />);
-  expect(await screen.findByText('会議の自動発行は準備中です。確定後の参加用URLは、トークで担当者へご確認ください。')).toBeTruthy();
+  expect(await screen.findByText('予約が確定したら、会議の URL をお送りします。')).toBeTruthy();
   expect(screen.queryByRole('button', { name: '会議に参加する' })).toBeNull();
 });
 
@@ -40,7 +40,7 @@ it.each([START - 600001, START + 3600001, NaN])('本人の確定予約でも参�
 it.each(['javascript:alert(1)', 'http://meet.google.com/test', 'https://user:pass@example.com/', 'not-url'])('有効でないURL (%s) は参加に使わない', async (url) => {
   booking('confirmed', url);
   render(<OnlineMeetingCard bookingId="b1" status="confirmed" now={() => START} />);
-  await screen.findByText(/参加用URLは、トークで/);
+  await screen.findByText(/会議の URL は前日までにお送りします/);
   expect(screen.queryByRole('button', { name: '会議に参加する' })).toBeNull();
 });
 
@@ -62,7 +62,7 @@ it('本人確認が拒否された場合は参加先を出さない', async () =
 it('待ちの予約にURLが混ざっていても、確定扱いで開けない', async () => {
   booking('requested', 'https://meet.google.com/test');
   render(<OnlineMeetingCard bookingId="b1" status="confirmed" now={() => START} />);
-  await screen.findByText(/確定後の参加用URL/);
+  await screen.findByText(/予約が確定したら/);
   expect(screen.queryByRole('button')).toBeNull();
 });
 
@@ -73,4 +73,15 @@ it('同じ予約IDの会議だけを開く', async () => {
   fireEvent.click(await screen.findByRole('button', { name: '会議に参加する' }));
   expect(open).toHaveBeenCalledWith('https://meet.google.com/test', '_blank', 'noopener,noreferrer');
   open.mockRestore();
+});
+
+it('確定済みの URL をコピーする', async () => {
+  booking('confirmed', 'https://meet.google.com/test');
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal('navigator', { clipboard: { writeText } });
+  render(<OnlineMeetingCard bookingId="b1" status="confirmed" now={() => START - 6000000} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'URLをコピー' }));
+  expect(writeText).toHaveBeenCalledWith('https://meet.google.com/test');
+  expect(await screen.findByText('URLをコピーしました。')).toBeTruthy();
+  vi.unstubAllGlobals();
 });

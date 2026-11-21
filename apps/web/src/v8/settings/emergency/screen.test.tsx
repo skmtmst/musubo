@@ -28,6 +28,8 @@ const state = vi.hoisted(() => ({
   accounts: [] as Array<() => Promise<unknown>>,
   health: null as OperationHealthSnapshot | null,
   healthCalls: [] as string[],
+  cleanupCalls: [] as string[],
+  cleanupItems: [] as Array<{ id: string; provider: 'zoom' | null; staffId: string | null; startsAt: string | null }>,
 }))
 
 vi.mock('@/contexts/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
@@ -67,6 +69,23 @@ vi.mock('@/lib/api', async (importOriginal) => {
         lineReceipts: () => Promise.resolve({ success: true, data: [] }) as Promise<never>,
       },
     },
+    bookingApi: {
+      ...actual.bookingApi,
+      listStaff: () => Promise.resolve({ staff: [{ id: 'staff-1', name: '山田', display_name: '山田 花子' }] }) as Promise<never>,
+    },
+  }
+})
+vi.mock('@/lib/api/helpers/gap1', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api/helpers/gap1')>()
+  return {
+    ...actual,
+    bookingCalendarApi: {
+      ...actual.bookingCalendarApi,
+      listExternalCleanups: (accountId: string) => {
+        state.cleanupCalls.push(accountId)
+        return Promise.resolve({ success: true, data: { items: state.cleanupItems } }) as Promise<never>
+      },
+    },
   }
 })
 
@@ -78,6 +97,8 @@ afterEach(() => {
   state.accounts = []
   state.health = null
   state.healthCalls = []
+  state.cleanupCalls = []
+  state.cleanupItems = []
 })
 
 async function renderScreen(tab: string) {
@@ -155,6 +176,32 @@ describe('運用状態の外側', () => {
     expect(screen.getByRole('button', { name: 'いますぐ確かめる' })).toBeTruthy()
     await openHelp()
     expect(screen.getByText(/9 つの項目を5分ごとに自動で確かめます。/)).toBeTruthy()
+  })
+
+  it('管理者には、外部の予定・会議の確認を健全性チェックに出す', async () => {
+    state.cleanupItems = [{ id: 'job-1', provider: 'zoom', staffId: 'staff-1', startsAt: '2030-01-02T01:00:00Z' }]
+    await renderScreen('health')
+    expect(await screen.findByText('外部の予定・会議の確認 1 件')).toBeTruthy()
+    expect(await screen.findByText('Zoom の会議・担当：山田 花子・予定：2030/01/02 10:00')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '片づけ済みにする' })).toBeTruthy()
+    expect(state.cleanupCalls).toEqual(['account-1'])
+  })
+
+  it('閲覧のみにも外部の予定・会議の確認を出し、記録のボタンは灰色＋理由にする', async () => {
+    roleState.role = 'viewer'
+    verifiedStaffRole('viewer')
+    state.cleanupItems = [{ id: 'job-1', provider: 'zoom', staffId: 'staff-1', startsAt: '2030-01-02T01:00:00Z' }]
+    try {
+      await renderScreen('health')
+      expect(await screen.findByText('外部の予定・会議の確認 1 件')).toBeTruthy()
+      expect(state.cleanupCalls).toEqual(['account-1'])
+      const button = screen.getByRole('button', { name: '片づけ済みにする' })
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      const reasonId = button.getAttribute('aria-describedby') ?? ''
+      expect(reasonId.split(' ').map((id) => document.getElementById(id)?.textContent ?? '').join('')).toContain('閲覧のみのため変更できません。')
+    } finally {
+      roleState.role = 'owner'
+    }
   })
 
   it('閲覧のみには［いますぐ確かめる］を灰色＋理由で出し、押しても確かめ直さない', async () => {

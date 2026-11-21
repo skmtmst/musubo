@@ -1,3 +1,5 @@
+import {syncOutlookBookingForEnv} from '../../features/booking/booking-outlook-sync-runtime/index.js';
+import { meetingCreatorForBooking } from '../../features/booking/booking-meeting-runtime/index.js';
 import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
@@ -458,7 +460,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
 
   let calendarSync: 'not_configured' | 'synced' | 'failed' = 'not_configured';
   if (initialStatus === 'confirmed') {
-    await runConfirmedBookingSideEffects(c.env.DB, bookingId, { credentials: googleCredentials(c.env) });
+    await runConfirmedBookingSideEffects(c.env.DB, bookingId, { credentials: googleCredentials(c.env), meetingCreatorForBooking: id => meetingCreatorForBooking(c.env,id), outlookSyncBooking: id=>syncOutlookBookingForEnv(c.env,id) });
     const calendarOp = await c.env.DB.prepare(`SELECT status, result_json FROM booking_operation_runs
       WHERE booking_id = ? AND kind = 'google_calendar' AND idempotency_key = ?`)
       .bind(bookingId, `${bookingId}:google-calendar:create`).first<{ status: string; result_json: string }>();

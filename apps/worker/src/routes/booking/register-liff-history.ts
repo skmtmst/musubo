@@ -20,7 +20,7 @@ booking.get('/api/liff/booking/me', async (c) => {
   const upcoming = await c.env.DB
     .prepare(
       `SELECT b.menu_snapshot_json, b.id, b.starts_at, b.ends_at, b.status, b.customer_note,
-              b.lock_version, b.menu_id, b.staff_id,b.meeting_mode,CASE WHEN b.status='confirmed' THEN b.meeting_url ELSE NULL END meeting_url,b.meeting_url_source,b.policy_snapshot_json,b.price_at_booking,EXISTS(SELECT 1 FROM booking_entitlement_uses u WHERE u.booking_id=b.id) ticket,
+              b.lock_version, b.menu_id, b.staff_id,b.meeting_mode,CASE WHEN b.status='confirmed' THEN (CASE WHEN b.meeting_url_source='manual' THEN b.meeting_url ELSE COALESCE((SELECT ml.meeting_url FROM booking_meeting_links ml WHERE ml.booking_id=b.id AND b.status='confirmed' AND ml.status='active' LIMIT 1),b.meeting_url) END) ELSE NULL END meeting_url,b.meeting_url_source,b.policy_snapshot_json,b.price_at_booking,EXISTS(SELECT 1 FROM booking_entitlement_uses u WHERE u.booking_id=b.id) ticket,
               m.name AS menu_name,
               COALESCE(m.cancel_deadline_hours_before * 60, bs.cancel_deadline_minutes_before, 1440) AS cancel_deadline_minutes_before,
               s.display_name AS staff_name, s.profile_image_url
@@ -38,7 +38,7 @@ booking.get('/api/liff/booking/me', async (c) => {
 
   const past = await c.env.DB
     .prepare(
-      `SELECT b.menu_snapshot_json, b.id, b.starts_at, b.ends_at, b.status, b.lock_version, b.menu_id, b.staff_id,b.meeting_mode,CASE WHEN b.status='confirmed' THEN b.meeting_url ELSE NULL END meeting_url,b.meeting_url_source,
+      `SELECT b.menu_snapshot_json, b.id, b.starts_at, b.ends_at, b.status, b.lock_version, b.menu_id, b.staff_id,b.meeting_mode,CASE WHEN b.status='confirmed' THEN (CASE WHEN b.meeting_url_source='manual' THEN b.meeting_url ELSE COALESCE((SELECT ml.meeting_url FROM booking_meeting_links ml WHERE ml.booking_id=b.id AND b.status='confirmed' AND ml.status='active' LIMIT 1),b.meeting_url) END) ELSE NULL END meeting_url,b.meeting_url_source,
               m.name AS menu_name,
               s.display_name AS staff_name, s.profile_image_url
          FROM bookings b

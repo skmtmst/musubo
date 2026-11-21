@@ -1,7 +1,8 @@
+import type { MeetingCreator } from './booking-meeting-create.js';
 import { logger } from '@line-crm/shared/server';
 import { activeTenantLineAccountSql, accountFeatureOffExclusionSql } from '@line-crm/db';
 import { reconcileLateBookingPayment } from './booking-late-payment.js';
-import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from './booking-confirmed-effects.js';
+import { confirmationWorkflowStatement, runConfirmedBookingSideEffects, type OutlookSyncCallback } from './booking-confirmed-effects.js';
 import type { GoogleServiceAccountCredentials } from '../../services/google-service-account.js';
 
 // 現在のメニュー設定や料金だけでは、申込時の店払いとオンライン払いを区別できない。
@@ -48,6 +49,8 @@ export async function reconcilePaidBookingPayment(
   now = new Date(),
   applyPaid = false,
   credentials: GoogleServiceAccountCredentials = {},
+  meetingCreatorForBooking?: (bookingId:string)=>Promise<MeetingCreator|null|'deferred'|'unavailable'>,
+  outlookSyncBooking?:OutlookSyncCallback,
 ): Promise<{ duplicate: boolean } | null> {
   const row = await db.prepare(`SELECT id, line_account_id, booking_id, status
     FROM booking_payments WHERE id = ?`).bind(paymentId).first<{
@@ -64,7 +67,7 @@ export async function reconcilePaidBookingPayment(
   if (row.booking_id && await db.prepare(`SELECT id FROM booking_operation_runs
       WHERE booking_id = ? AND line_account_id = ? AND idempotency_key = ? AND status IN ('queued','retry_wait')`)
       .bind(row.booking_id, row.line_account_id, `${row.booking_id}:confirmation-effects`).first()) {
-    try { await runConfirmedBookingSideEffects(db, row.booking_id, { now, credentials }); }
+    try { await runConfirmedBookingSideEffects(db, row.booking_id, { now, credentials, meetingCreatorForBooking, outlookSyncBooking }); }
     catch { logger.error("paid_booking_confirmation_incomplete"); }
   }
   return { duplicate: !applyPaid || (result[0]?.meta?.changes ?? 0) === 0 };
@@ -105,7 +108,7 @@ export function paidBookingPaymentStatements(
 }
 
 /** 人の確認待ちでバッチが埋まらないよう、実行可能な回復処理だけを有限件取得する。 */
-export async function recoverPaidBookingPayments(db: D1Database, now: Date, credentials: GoogleServiceAccountCredentials = {}): Promise<void> {
+export async function recoverPaidBookingPayments(db: D1Database, now: Date, credentials: GoogleServiceAccountCredentials = {}, meetingCreatorForBooking?: (bookingId:string)=>Promise<MeetingCreator|null|'deferred'|'unavailable'>,outlookSyncBooking?:OutlookSyncCallback): Promise<void> {
   const rows = await db.prepare(`SELECT p.id FROM booking_payments p
     JOIN bookings b ON b.id = p.booking_id AND b.line_account_id = p.line_account_id
     LEFT JOIN workflow_steps w ON w.scope_id = 'line:' || p.line_account_id
@@ -124,7 +127,7 @@ export async function recoverPaidBookingPayments(db: D1Database, now: Date, cred
     ORDER BY CASE WHEN b.status = 'requested' THEN 0 ELSE 1 END, p.id LIMIT 200`)
     .bind(now.getTime(), now.getTime()).all<{ id: string }>();
   for (const row of rows.results ?? []) {
-    try { await reconcilePaidBookingPayment(db, row.id, now, false, credentials); }
+    try { await reconcilePaidBookingPayment(db, row.id, now, false, credentials, meetingCreatorForBooking, outlookSyncBooking); }
     catch { logger.error("paid_booking_recovery_failed"); }
   }
 }

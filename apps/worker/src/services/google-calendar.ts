@@ -87,6 +87,32 @@ export class GoogleCalendarClient {
       });
   }
 
+  /** 顧客削除後の予定処理。参加者が無いことと版を確かめ、通知を抑止する。 */
+  async cleanupEvent(eventId:string,action:'delete'|'redact',signal?:AbortSignal,authorize?:()=>Promise<boolean>):Promise<'done'|'retry'|'review'> {
+    const base=`${GCAL_BASE}/calendars/${encodeURIComponent(this.config.calendarId)}/events/${encodeURIComponent(eventId)}`;
+    let evidence:{id?:unknown;status?:unknown;etag?:unknown;attendees?:unknown;attendeesOmitted?:unknown;organizer?:{self?:unknown}};
+    try {
+      const result=await this.request(`${base}?fields=id,status,etag,attendees,attendeesOmitted,organizer(self)`,{headers:{Authorization:`Bearer ${this.config.accessToken}`}},async res=>{
+        if(res.status===404||res.status===410)return null;
+        if(!res.ok)throw new GoogleCalendarReadError(res.status);
+        return await res.json() as typeof evidence;
+      },signal);
+      if(result===null)return !authorize||await authorize()?'done':'review';
+      evidence=result;
+    }catch(error){return error instanceof GoogleCalendarReadError && error.status>=400 && error.status<500 && error.status!==408 && error.status!==429?'review':'retry';}
+    // Google can retain event details even when status is cancelled; do not assume personal data is gone.
+    if(evidence.status!==undefined&&evidence.status!=='confirmed'&&evidence.status!=='tentative')return 'review';
+    if(evidence.id!==eventId||typeof evidence.etag!=='string'||!evidence.etag||evidence.organizer?.self!==true||(evidence.attendeesOmitted!==undefined&&evidence.attendeesOmitted!==false)||(evidence.attendees!==undefined&&(!Array.isArray(evidence.attendees)||evidence.attendees.length!==0)))return 'review';
+    try {
+      if(authorize && !await authorize())return 'review';
+      return await this.request(`${base}?sendUpdates=none`,{method:action==='delete'?'DELETE':'PATCH',headers:{Authorization:`Bearer ${this.config.accessToken}`,'Content-Type':'application/json','If-Match':evidence.etag},...(action==='redact'?{body:JSON.stringify({summary:'予約',description:''})}:{})},async res=>{
+        if(res.ok||res.status===404||res.status===410)return 'done' as const;
+        void res.body?.cancel().catch(()=>{});
+        return 'review' as const;
+      },signal,'write');
+    }catch{return 'review';}
+  }
+
   /** 件数は FreeBusy の結合された区間数ではなく、個々の予定から数える。 */
   async listEventIds(timeMin: string, timeMax: string): Promise<string[]> {
     const ids: string[] = [];

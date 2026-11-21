@@ -200,3 +200,44 @@ it.each([['other','f',201], ['a','other',201], ['a','f',202]] as const)
     expect(count('booking_slot_allocations')).toBe(1);
     expect(count('booking_audit_logs')).toBe(0);
   });
+
+it('確定の共通処理で会議を発行し、回収時に重複させない', async () => {
+  sql.raw.exec("UPDATE menus SET meeting_mode='online'; UPDATE bookings SET status='confirmed',meeting_mode='online'");
+  const create = vi.fn(async () => ({ kind: 'created' as const, meetingId: 'remote-test', url: 'https://example.test/meeting' }));
+  const meetingCreator = { provider: 'zoom' as const, create };
+  await runConfirmedBookingSideEffects(sql.db, 'b', {now, meetingCreator});
+  await runConfirmedBookingSideEffects(sql.db, 'b', {now, meetingCreator});
+  expect(create).toHaveBeenCalledTimes(1);
+  expect(sql.raw.prepare("SELECT status FROM booking_meeting_links WHERE booking_id='b'").get()).toEqual({status:'active'});
+});
+
+it('確定時の担当別サービスを解決してから会議を発行する',async()=>{
+ sql.raw.exec("UPDATE menus SET meeting_mode='online'; UPDATE bookings SET status='confirmed',meeting_mode='online'");
+ const create=vi.fn(async()=>({kind:'created' as const,meetingId:'remote-factory',url:'https://example.test/meeting'}));
+ const resolve=vi.fn(async()=>({provider:'zoom' as const,create}));
+ await runConfirmedBookingSideEffects(sql.db,'b',{now,meetingCreatorForBooking:resolve});
+ expect(resolve).toHaveBeenCalledWith('b');expect(create).toHaveBeenCalledOnce();
+ expect(sql.raw.prepare("SELECT status FROM booking_meeting_links WHERE booking_id='b'").get()).toEqual({status:'active'});
+});
+it('会議の鍵が更新中なら確定通知を待ち、回収で会議を発行する',async()=>{
+ sql.raw.exec("UPDATE menus SET meeting_mode='online'; UPDATE bookings SET status='confirmed',meeting_mode='online'");
+ const create=vi.fn(async()=>({kind:'created' as const,meetingId:'remote-wait',url:'https://example.test/meeting'}));
+ const resolve=vi.fn().mockResolvedValueOnce('deferred').mockResolvedValue({provider:'zoom',create});
+ await runConfirmedBookingSideEffects(sql.db,'b',{now,meetingCreatorForBooking:resolve});
+ expect(effects.send).not.toHaveBeenCalled();
+ sql.raw.prepare("UPDATE booking_operation_runs SET created_at=? WHERE idempotency_key='b:confirmation-effects'").run(now.toISOString());
+ expect(sql.raw.prepare("SELECT status FROM booking_operation_runs WHERE idempotency_key='b:confirmation-effects'").get()).toEqual({status:'queued'});
+ await recoverConfirmedBookingSideEffects(sql.db,{now:new Date(now.getTime()+30000),meetingDeferredOnly:true,meetingCreatorForBooking:resolve});
+ expect(resolve).toHaveBeenCalledTimes(1);
+ await recoverConfirmedBookingSideEffects(sql.db,{now:new Date(now.getTime()+90000),meetingDeferredOnly:true,meetingCreatorForBooking:resolve});
+ expect(create).toHaveBeenCalledOnce();expect(effects.send).toHaveBeenCalledOnce();
+});
+it('会議の準備が5分を超えたら運用者に知らせて確定通知を送る',async()=>{
+ sql.raw.exec("UPDATE menus SET meeting_mode='online'; UPDATE bookings SET status='confirmed',meeting_mode='online'");
+ const resolve=vi.fn().mockResolvedValue('deferred');
+ await runConfirmedBookingSideEffects(sql.db,'b',{now,meetingCreatorForBooking:resolve});
+ sql.raw.prepare("UPDATE booking_operation_runs SET created_at=? WHERE idempotency_key='b:confirmation-effects'").run(now.toISOString());
+ await recoverConfirmedBookingSideEffects(sql.db,{now:new Date(now.getTime()+360000),meetingDeferredOnly:true,meetingCreatorForBooking:resolve});
+ expect(effects.send).toHaveBeenCalledOnce();
+ expect(sql.raw.prepare("SELECT body FROM notifications WHERE id LIKE 'meeting-unavailable:%'").get()).toMatchObject({body:expect.stringContaining('URL を手で入力')});
+});

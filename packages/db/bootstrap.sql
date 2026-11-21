@@ -1710,6 +1710,49 @@ CREATE TABLE booking_makeup_credits(
  use_idempotency_key TEXT,use_request_json TEXT
 );
 
+CREATE TABLE booking_meeting_connections (
+ id TEXT PRIMARY KEY NOT NULL,
+ line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+ staff_id TEXT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+ provider TEXT NOT NULL CHECK(provider IN ('google_meet','zoom','teams','outlook')),
+ credential_enc TEXT NOT NULL,
+ version INTEGER NOT NULL DEFAULT 1 CHECK(version>0),
+ refresh_state TEXT NOT NULL DEFAULT 'ready' CHECK(refresh_state IN ('ready','refreshing','unknown')),
+ refresh_claim TEXT,
+ connected_by TEXT NOT NULL,
+ created_at TEXT NOT NULL,
+ updated_at TEXT NOT NULL,
+ UNIQUE(line_account_id,staff_id,provider),
+ CHECK((refresh_state='refreshing' AND refresh_claim IS NOT NULL) OR (refresh_state<>'refreshing' AND refresh_claim IS NULL))
+);
+
+CREATE TABLE booking_meeting_links (
+  id TEXT PRIMARY KEY NOT NULL,
+  booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL CHECK (provider IN ('google_meet', 'zoom', 'teams')),
+  external_meeting_id TEXT,
+  meeting_url TEXT,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'active', 'failed', 'cancel_pending', 'cancelled')),
+  idempotency_key TEXT NOT NULL UNIQUE,
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  last_error_code TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL, staff_id TEXT, starts_at TEXT, ends_at TEXT,
+  CHECK (status <> 'active' OR (external_meeting_id IS NOT NULL AND meeting_url IS NOT NULL))
+);
+
+CREATE TABLE booking_meeting_oauth_states (
+ state TEXT PRIMARY KEY NOT NULL,
+ line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+ staff_id TEXT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+ actor_id TEXT NOT NULL,
+ provider TEXT NOT NULL CHECK(provider IN ('google_meet','zoom','teams','outlook')),
+ verifier_enc TEXT NOT NULL,
+ used_at TEXT,
+ expires_at TEXT NOT NULL,
+ created_at TEXT NOT NULL
+);
+
 CREATE TABLE "booking_menu_resources" (
   menu_id TEXT NOT NULL REFERENCES menus(id) ON DELETE CASCADE,
   resource_id TEXT NOT NULL REFERENCES booking_resources(id) ON DELETE RESTRICT,
@@ -10232,6 +10275,14 @@ CREATE INDEX idx_booking_entitlements_friend ON booking_entitlements(line_accoun
 CREATE INDEX idx_booking_exceptions_account_dates
   ON booking_availability_exceptions(line_account_id, date_from, date_to, scope_kind);
 
+CREATE INDEX idx_booking_meeting_links_booking ON booking_meeting_links(booking_id, created_at);
+
+CREATE UNIQUE INDEX idx_booking_meeting_links_current ON booking_meeting_links(booking_id) WHERE status IN ('pending', 'active');
+
+CREATE UNIQUE INDEX idx_booking_meeting_links_remote ON booking_meeting_links(provider, external_meeting_id) WHERE external_meeting_id IS NOT NULL;
+
+CREATE INDEX idx_booking_meeting_oauth_states_expiry ON booking_meeting_oauth_states(expires_at);
+
 CREATE INDEX idx_booking_menu_resources_resource
   ON booking_menu_resources(resource_id, menu_id);
 
@@ -12381,6 +12432,20 @@ BEGIN SELECT RAISE(ABORT,'hq_origin_account_mismatch'); END;
 CREATE TRIGGER booking_hq_origin_update BEFORE UPDATE OF hq_template_id,hq_template_version_id ON menus WHEN NEW.hq_template_id IS NOT NULL
 AND NOT EXISTS(SELECT 1 FROM hq_templates t JOIN hq_template_versions v ON v.template_id=t.id AND v.tenant_id=t.tenant_id JOIN line_accounts a ON a.tenant_id=t.tenant_id WHERE t.id=NEW.hq_template_id AND v.id=NEW.hq_template_version_id AND a.id=NEW.line_account_id)
 BEGIN SELECT RAISE(ABORT,'hq_origin_account_mismatch'); END;
+
+CREATE TRIGGER booking_meeting_link_invalidate
+AFTER UPDATE OF status, staff_id, starts_at, ends_at, meeting_mode, meeting_url, meeting_url_source ON bookings
+WHEN (OLD.status='confirmed' AND NEW.status<>'confirmed')
+ OR OLD.staff_id IS NOT NEW.staff_id OR OLD.starts_at IS NOT NEW.starts_at OR OLD.ends_at IS NOT NEW.ends_at
+ OR (OLD.meeting_mode='online' AND NEW.meeting_mode IS NOT 'online')
+ OR (NEW.meeting_url_source='manual' AND (OLD.meeting_url IS NOT NEW.meeting_url OR OLD.meeting_url_source IS NOT NEW.meeting_url_source))
+BEGIN
+ UPDATE booking_meeting_links SET status='cancel_pending',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+ WHERE booking_id=NEW.id AND status='active'; UPDATE booking_meeting_links SET status='cancelled',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE booking_id=NEW.id AND status='pending' AND attempt_count=0; END;
+
+CREATE TRIGGER booking_meeting_remove_staff_credentials AFTER UPDATE OF deleted_at ON staff
+WHEN OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL
+BEGIN DELETE FROM booking_meeting_connections WHERE staff_id=NEW.id; DELETE FROM booking_meeting_oauth_states WHERE staff_id=NEW.id; END;
 
 CREATE TRIGGER booking_menu_photo_guard_insert BEFORE INSERT ON menus BEGIN SELECT CASE WHEN NEW.photo_media_id IS NOT NULL AND NEW.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM media WHERE id = NEW.photo_media_id AND line_account_id = NEW.line_account_id AND kind = 'image' AND (archived_at IS NULL OR NEW.photo_media_id IS NULL)) THEN RAISE(ABORT, 'booking_photo_media_unavailable') END; END;
 

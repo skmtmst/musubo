@@ -1,0 +1,5 @@
+.failure { color: var(--color-danger); }
+.urlLine { display: flex; align-items: center; gap: var(--tpl-bm-8); }
+.urlLine > :first-child { flex: 1 1 auto; min-width: 0; }
+.retry { display: flex; justify-content: flex-start; }
+.note { margin: var(--tpl-layout-zero); color: var(--color-ink-faint); font-size: var(--text-caption); line-height: 1.6; font-weight: var(--font-weight-ui); }
