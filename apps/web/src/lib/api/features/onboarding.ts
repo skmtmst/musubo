@@ -34,7 +34,7 @@ export const onboardingMethods = {
         fetchApi<ApiResponse<GettingStartedGuideState>>(
           `/api/getting-started/guide?account_id=${encodeURIComponent(accountId)}`,
         ),
-      save: (accountId: string, input: { phase: GettingStartedGuidePhase; stepKey: string | null; procedureIndex: number }) =>
+      save: (accountId: string, input: { phase: GettingStartedGuidePhase; stepKey: string | null; procedureIndex: number; acknowledgeWelcome?: true }) =>
         fetchApi<ApiResponse<GettingStartedGuideState>>(
           `/api/getting-started/guide?account_id=${encodeURIComponent(accountId)}`,
           { method: 'PUT', body: JSON.stringify(input) },

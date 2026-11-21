@@ -49,38 +49,31 @@ describe('案内の入れ物が段の画面へ移る', () => {
     state.guide = { ...state.guide, stepKey: 'hours', procedureIndex: 1 }
     view.rerender(<GuideHost><p>中身</p></GuideHost>)
     expect(nav.push).toHaveBeenCalledTimes(1)
-    /* ⑤の1/2の対象（「接続する」と接続成功の合図）は設定 › SNS連携にある。 */
-    expect(nav.push).toHaveBeenCalledWith('/settings/sns')
+    expect(nav.push).toHaveBeenCalledWith('/restaurant-test/google?tab=hours')
   })
 
-  /*
-    差し戻し R1: Google接続済みだと営業時間画面に留まり対象が無く、案内が自動停止していた。
-    接続済み（営業時間画面にいる）・未接続（SNS連携へ飛ばされる）のどちらでも
-    1/2 の対象がある画面へ連れていく。
-  */
-  it('Google接続済みで営業時間画面にいても、1/2の対象がある画面へ移る', () => {
+  it('接続済みの場合も営業時間の画面で進行する', () => {
     const view = render(<GuideHost><p>中身</p></GuideHost>)
     nav.path = '/restaurant-test/google'
     state.guide = { ...state.guide, stepKey: 'hours', procedureIndex: 1 }
     view.rerender(<GuideHost><p>中身</p></GuideHost>)
-    expect(nav.push).toHaveBeenCalledWith('/settings/sns')
+    expect(nav.push).not.toHaveBeenCalled()
   })
 
   it('未接続で行の「開く」から入った時も、1/2の対象がある画面へ移る', () => {
     nav.path = '/dashboard'
     state.guide = { ...state.guide, stepKey: 'hours', procedureIndex: 1 }
     render(<GuideHost><p>中身</p></GuideHost>)
-    expect(nav.push).toHaveBeenCalledWith('/settings/sns')
+    expect(nav.push).toHaveBeenCalledWith('/restaurant-test/google?tab=hours')
   })
 
-  it('2/2（営業時間の確定）では段の行き先へ戻す', () => {
-    nav.path = '/settings/sns'
+  it('1/2から2/2へ進むときは同じ営業時間の画面に留まる', () => {
+    nav.path = '/restaurant-test/google'
     state.guide = { ...state.guide, stepKey: 'hours', procedureIndex: 1 }
     const view = render(<GuideHost><p>中身</p></GuideHost>)
-    expect(nav.push).not.toHaveBeenCalled()
     state.guide = { ...state.guide, stepKey: 'hours', procedureIndex: 2 }
     view.rerender(<GuideHost><p>中身</p></GuideHost>)
-    expect(nav.push).toHaveBeenCalledWith('/restaurant-test/google?tab=hours')
+    expect(nav.push).not.toHaveBeenCalled()
   })
 
   /*
@@ -103,7 +96,7 @@ describe('案内の入れ物が段の画面へ移る', () => {
 
   it('すでにその画面にいる時は移らない', () => {
     const view = render(<GuideHost><p>中身</p></GuideHost>)
-    nav.path = '/settings/sns'
+    nav.path = '/restaurant-test/google'
     state.guide = { ...state.guide, stepKey: 'hours', procedureIndex: 1 }
     view.rerender(<GuideHost><p>中身</p></GuideHost>)
     expect(nav.push).not.toHaveBeenCalled()
