@@ -88,6 +88,20 @@ test('初回だけウェルカムを出し、スキップ後は再読込して�
   await expect(welcome).toHaveCount(0)
 })
 
+test('接続済みなら設定を残してリッチメニューから始められる', async ({ page }) => {
+  await openFixture(page, { initialGuide: { phase: 'paused', stepKey: 'attributes', procedureIndex: 2 } })
+  await page.goto(base)
+  const restart = page.getByRole('button', { name: '最初から始める', exact: true })
+  await expect(restart).toBeVisible()
+  await restart.click()
+  const picker = page.getByRole('dialog', { name: /リッチメニューを選ぶ/ })
+  await expect(picker).toBeVisible()
+  await page.reload()
+  await expect(picker).toBeVisible()
+  await picker.getByRole('button', { name: 'あとで', exact: true }).click()
+  await expect(page).toHaveURL(/\/restaurant-test\/tables/)
+})
+
 test('Webhookが一致した時だけ0/8から次へ進める', async ({ page }) => {
   await openFixture(page, { firstStep: 'richMenu' })
   let checks = 0
@@ -302,6 +316,7 @@ test('一時停止中に受付を止めても最初の未完了項目から始�
   await page.getByRole('link', { name: 'ダッシュボード', exact: true }).click()
   await expect(page.getByRole('button', { name: /開店準備 6\/8。ガイドを再開する/ })).toBeVisible()
   await page.getByRole('button', { name: '最初から始める', exact: true }).click()
+  await page.getByRole('dialog', { name: /リッチメニューを選ぶ/ }).getByRole('button', { name: 'あとで', exact: true }).click()
   await expect(page).toHaveURL(/\/restaurant-test\/inventory$/, { timeout: 15000 })
   await expect(page.locator(guideBar)).toContainText('予約枠と在庫を設定する')
 })
@@ -392,11 +407,20 @@ test('公開確認では最後の公開ボタンにガイドが移る', async ({
   await openFixture(page, { initialGuide: { phase: 'active', stepKey: 'friendAdd', procedureIndex: 2 }, storeProgress: { tables: true, hours: true } })
   await page.goto(`${base}/restaurant-test/menu/edit`)
   await expect(page.locator('[data-guide-spotlight="menu.form"]')).toBeVisible()
-  await page.getByRole('button', { name: '所要時間', exact: true }).click()
-  await page.getByRole('option', { name: '2時間30分（150分）', exact: true }).click()
-  await page.screenshot({ path: info.outputPath('guided-course-basics.png') })
+  const basics = page.locator('[data-guide-balloon="friendAdd:2"]')
+  const duration = page.getByRole('button', { name: '所要時間', exact: true })
+  await expect(duration).toHaveText('所要時間を選ぶ')
+  await expect(page.getByRole('button', { name: '提供時間', exact: true })).toHaveText('提供時間帯を選ぶ')
+  await page.screenshot({ path: info.outputPath('guided-course-empty.png') })
   await page.getByRole('textbox', { name: 'メニュー名' }).fill('ガイド検証用')
   await page.getByRole('spinbutton', { name: '価格（税込）' }).fill('4200')
+  const next = basics.getByRole('button', { name: '次へ', exact: true })
+  await expect(next).toBeDisabled()
+  await duration.click()
+  await page.getByRole('option', { name: '2時間30分（150分）', exact: true }).click()
+  await expect(next).toBeEnabled()
+  await page.screenshot({ path: info.outputPath('guided-course-basics.png') })
+  await next.click()
   await expect(page.locator('[data-guide-balloon="friendAdd:3"]')).toBeVisible()
   await page.getByRole('button', { name: '保存する状態', exact: true }).click()
   await page.getByRole('option', { name: '公開', exact: true }).click()
@@ -668,6 +692,9 @@ test('コースの写真は5枚まで。並べ替えと正方形の表示範囲�
   }
   await page.getByRole('textbox', { name: 'メニュー名' }).fill('写真付きコース')
   await page.getByRole('spinbutton', { name: '価格（税込）' }).fill('4200')
+  await page.getByRole('button', { name: '所要時間', exact: true }).click()
+  await page.getByRole('option', { name: '2時間（120分）', exact: true }).click()
+  await page.locator('[data-guide-balloon="friendAdd:2"]').getByRole('button', { name: '次へ', exact: true }).click()
   await page.getByRole('button', { name: '保存して追加する', exact: true }).click()
   await expect.poll(() => submitted?.photos).toEqual([
     { mediaId: images[1].id, x: 73, y: 50 }, { mediaId: images[0].id, x: 50, y: 50 },

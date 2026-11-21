@@ -73,6 +73,7 @@ export function GuideOverlay({
   const [inDialog, setInDialog] = useState(false)
   const [actionLabel, setActionLabel] = useState<string | null>(null)
   const [applyingHours, setApplyingHours] = useState(false)
+  const [inputReady, setInputReady] = useState(false)
   const [tableDialog, setTableDialog] = useState<Rect | null>(null)
   const [target, setTarget] = useState<Rect | null>(null)
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null)
@@ -109,6 +110,7 @@ export function GuideOverlay({
       setActionLabel(guideLabel ?? null)
     }
     setApplyingHours(element?.hasAttribute('data-guide-hours-apply') ?? false)
+    setInputReady(element?.hasAttribute('data-guide-ready') ?? false)
     setInDialog(Boolean(dialog))
     const tableSave = anchorName === 'tables.form' ? dialog?.querySelector('[data-guide-table-save=ready]') : null
     const tableBox = anchorName === 'tables.form' && dialog ? readRect(dialog) : null
@@ -130,7 +132,7 @@ export function GuideOverlay({
       frame = window.requestAnimationFrame(() => { frame = 0; measure() })
     }
     const observer = new MutationObserver(scheduleMeasure)
-    observer.observe(document.body, { childList: true, subtree: true, attributeFilter: ['data-guide-table-save'] })
+    observer.observe(document.body, { childList: true, subtree: true, attributeFilter: ['data-guide-table-save', 'data-guide-ready'] })
     window.addEventListener('scroll', scheduleMeasure, true)
     window.addEventListener('resize', scheduleMeasure)
     return () => {
@@ -304,6 +306,7 @@ export function GuideOverlay({
             : procedure.body}</p>
           <div className={styles.balloonFooter}>
             <Button presentation="quiet-text" onClick={onAdvanceProcedure}>この手順をスキップ</Button>
+            {procedure.trigger === 'confirm-input' ? <Button variant="primary" size="compact" disabled={!inputReady} onClick={onAdvanceProcedure}>次へ</Button> : null}
           </div>
         </div> : null}
         {tablesComplete ? (
