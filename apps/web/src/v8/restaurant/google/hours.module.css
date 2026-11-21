@@ -104,3 +104,17 @@
 .confirmCaption{font-size:var(--hours-editor-body-size);margin:0;}
 
 .importedHours { max-width: var(--tpl-guide-imported-hours-w); --tpl-guide-imported-hours-w: 640px; }
+
+.importedHours h2 { margin: 0; font-size: var(--hours-card-title-size); font-weight: 600; }
+.importedWeek { display: grid; gap: var(--space-8); }
+.importedDay {
+  display: grid;
+  grid-template-columns: minmax(calc(var(--space-16) * 4), 1fr) minmax(0, 4fr);
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-8) var(--space-14);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  font-size: var(--polish-text-body);
+  overflow-wrap: anywhere;
+}

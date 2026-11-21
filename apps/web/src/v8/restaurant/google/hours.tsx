@@ -5,6 +5,7 @@ import { CalendarDays, ChevronDown, ChevronRight, History, Info, Pencil, Plus, U
 import { HOURS_WEEKDAYS, upcomingHolidayGroups, hoursDateAdd, hoursDateRange } from '@line-crm/shared'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import HoursWorkspaceFrame from '@/components/templates/hours-workspace-frame'
+import { RestaurantPage } from '@/v8/restaurant/common-a/public/frame/index'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import Card from '@/components/shared/card'
@@ -26,6 +27,8 @@ import { HoursConfirm } from './hours-confirm'
 import { dateLabel, hasHoursDraft, hoursText, workspaceDay, hoursHistoryStamp } from './hours-model'
 import { WEEKDAY_JA, errorMessage } from './format'
 import styles from './hours.module.css'
+
+const NO_BOOKABLE_HOURS = '予約枠を作れる営業日がありません。Googleの営業時間を確認してください。'
 
 export default function HoursPage({ accountId, tabs, initialMode, initialDate, shared = false }: {accountId:string;tabs:ReactNode;initialMode?:string|null;initialDate?:string|null;shared?:boolean}) {
  const m=useHoursWorkspace(accountId)
@@ -73,22 +76,27 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate, s
   setActionError('')
   try {
    const { data: hours } = await restaurantTestApi.openingHours(accountId, data.store.id)
-   if (hours.storeId !== data.store.id || !hours.version || !hours.hours?.some(day => day.periods.length))
-    throw new Error('予約の営業時間を読み込めませんでした。Googleから再読み込みしてください。')
+   if (hours.storeId !== data.store.id || !hours.version || !hours.hours?.some(day => day.periods.length)) {
+    setActionError('予約の営業時間を読み込めませんでした。Googleから再読み込みしてください。')
+    return
+   }
    const nextOpen = hoursDateRange(hoursDateAdd(today, 1), hoursDateAdd(today, 14)).find(date => {
     const special = data.profile.specialHours.find(day => day.date === date)
     if (special) return !special.closed && special.periods.length > 0
     return (hours.hours?.find(day => day.weekday === new Date(`${date}T12:00:00Z`).getUTCDay())?.periods.length ?? 0) > 0
    })
-   if (!nextOpen) throw new Error('予約枠を作れる営業日がありません。Googleの営業時間を確認してください。')
+   if (!nextOpen) { setActionError(NO_BOOKABLE_HOURS); return }
    const openToday = day(today)
    const initialDays = !openToday.closed && openToday.periods.length ? [today, nextOpen] : [nextOpen]
+   let slotCount = 0
    for (const date of initialDays) {
     if (!mounted.current) return
-    await restaurantTestApi.generateInventory(accountId, {
+    const { data: result } = await restaurantTestApi.generateInventory(accountId, {
      storeId: data.store.id, date, expectedHoursVersion: hours.version, otaCapacity: 0, lineCapacity: 0, walkInCapacity: 0,
     })
+    slotCount += result.slotCount ?? result.generated
    }
+   if (!slotCount) { setActionError(NO_BOOKABLE_HOURS); return }
    if (mounted.current) emitGuideSignal('hours.confirm', accountId)
   } catch (cause) {
    setActionError(errorMessage(cause, '予約枠を作れませんでした。もう一度お試しください。'))
@@ -98,23 +106,24 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate, s
   }
  }
  if (showImportedHours) return (
-  <HoursWorkspaceFrame context={<span>{data.profile.title ?? data.store.name}</span>}>
-   <div className={styles.tabs}>{tabs}</div>
-   <div className={styles.content}>
+  <RestaurantPage boardId="tYbl8" title="Googleビジネス" subtitle={data.store.name}
+   description="Googleの営業時間を確認して、予約枠を用意します。" bodyGap={12} bodyPadTop={8}>
+    {tabs}
     {data.stale ? <Notice tone="warn">Googleから最新の営業時間を読み込めませんでした。接続を確認して再読み込みしてください。</Notice>
       : hasImportedHours ? <Notice tone="success">Googleビジネスと接続しました。営業時間を取り込みました。</Notice>
       : <Notice tone="warn">Googleビジネスに通常の営業時間がありません。Googleビジネスで設定してから再読み込みしてください。</Notice>}
     {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
     <div className={styles.importedHours}>
-     <Card contentPadding="var(--space-20)" layout="vertical" gap="normal">
+     <Card contentPadding="var(--space-20)" layout="vertical" gap="tight">
       <h2>取り込んだ営業時間</h2>
-      <div className={styles.weekList}>{importedWeek.map(({ days, hours }) => (
-       <div className={styles.weekRow} key={days[0]}>
+      <div className={styles.importedWeek}>{importedWeek.map(({ days, hours }) => (
+       <div className={styles.importedDay} key={days[0]}>
         <span>{days.length > 2 ? `${days[0]}〜${days.at(-1)}曜` : `${days.join('・')}曜`}</span>
         <span>{hours}</span>
        </div>
       ))}</div>
-      <Notice tone="warn">営業時間が違うときは、Googleビジネスで正しい時間に変更してから「Googleから再読み込み」を押してください。</Notice>
+      <p className={styles.muted}>Googleビジネスの通常営業時間を表示しています。</p>
+      <Notice tone="warn">取り込んだ営業時間が違うときは、Googleビジネスで修正してから「Googleから再読み込み」を押してください。</Notice>
       <div data-guide-slot="hours.confirm" data-guide-narrow style={{ display: 'contents' }} />
       <div className={styles.actions}>
        <Button data-guide-anchor="hours.confirm" presentation="hours" variant="primary" size="field"
@@ -125,8 +134,7 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate, s
       </div>
      </Card>
     </div>
-   </div>
-  </HoursWorkspaceFrame>
+  </RestaurantPage>
  )
 
  return <><HoursWorkspaceFrame context={<span>{data.profile.title??data.store.name} · {data.timeZone==='Asia/Tokyo'?'日本時間':data.timeZone}</span>}><div className={styles.tabs}>{tabs}</div>

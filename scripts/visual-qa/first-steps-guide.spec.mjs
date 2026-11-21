@@ -376,14 +376,16 @@ test('公開確認では最後の公開ボタンにガイドが移る', async ({
 test('取り込んだ営業時間の確定は予約枠の作成成功まで次へ進めない', async ({ page }, info) => {
   await openFixture(page, { initialGuide: { phase: 'active', stepKey: 'hours', procedureIndex: 2 }, storeProgress: { tables: true, hours: true } })
   let requests = 0
+  let existingSlots = 0
   await page.route('**/api/restaurant-test/inventory/generate?**', async route => {
     const body = route.request().postDataJSON()
     expect(body).toMatchObject({ storeId: 'store-sby', expectedHoursVersion: 4, otaCapacity: 0, lineCapacity: 0, walkInCapacity: 0 })
     requests += 1
     if (requests === 1) return route.fulfill({ status: 409, json: { success: false, error: '営業時間が変わりました。読み直してください。' } })
-    return route.fulfill({ json: { success: true, data: { generated: 4, slotMinutes: 30 } } })
+    return route.fulfill({ json: { success: true, data: { generated: 0, slotCount: existingSlots, slotMinutes: 30 } } })
   })
   await page.goto(`${base}/restaurant-test/google?tab=hours`)
+  await expect(page.getByRole('heading', { name: 'Googleビジネス', level: 1 })).toBeVisible()
   await expect(page.getByRole('heading', { name: '取り込んだ営業時間' })).toBeVisible()
   const reload = page.getByRole('button', { name: 'Googleから再読み込み' })
   await reload.click({ trial: true })
@@ -397,6 +399,10 @@ test('取り込んだ営業時間の確定は予約枠の作成成功まで次�
   await confirm.click()
   await expect(page.getByText('営業時間が変わりました。読み直してください。')).toBeVisible()
   await expect(page.locator('[data-guide-balloon="hours:2"]')).toBeVisible()
+  await confirm.click()
+  await expect(page.getByText('予約枠を作れる営業日がありません。Googleの営業時間を確認してください。')).toBeVisible()
+  await expect(page.locator('[data-guide-balloon="hours:2"]')).toBeVisible()
+  existingSlots = 4
   await confirm.click()
   await expect(page).toHaveURL(/\/restaurant-test\/menu$/)
   expect(requests).toBeGreaterThan(1)
