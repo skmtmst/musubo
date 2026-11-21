@@ -181,11 +181,12 @@
 
 ## 5. データと API の形の案（Codex が作る・マイグレーション）
 
-- `calendar_connections`（今の `google_calendar_connections` を広げるか、並べて作る）：`id`・`line_account_id`・`staff_id`・`provider`（google_shared／google_oauth／microsoft）・`read_calendar_ids_json`・`write_calendar_id`・`status`（connected／degraded／disconnected）・`last_synced_at`・`last_error_code`・`secret_ref`（鍵は秘密の保管先に・D1 に生で置かない）・`version`。
+- `calendar_connections`（今の `google_calendar_connections` を広げるか、並べて作る）：`id`・`line_account_id`・`staff_id`・`provider`（google_shared／google_oauth／microsoft）・`read_calendar_ids_json`・`write_calendar_id`・`status`（connected／degraded／disconnected）・`last_synced_at`・`last_error_code`・`secret_ref`（認可情報は D1 に AES-GCM で暗号化して保存。下の「認可情報の保存」）・`version`。
 - 同期のスイッチ（B-341 追記 2）：店の設定に `calendar_read_enabled`・`calendar_write_enabled`（初期 0）、`calendar_connections` に `read_enabled`・`write_enabled`（初期 0）と `version`。切り替えの履歴 `calendar_sync_switch_log`（`scope`＝account／staff・`direction`・`before`・`after`・`delete_future_events`・`include_backlog`・`actor_staff_id`・`created_at`）。口：PUT `/api/booking/admin/calendar-sync`（店全体・owner/admin）と PUT `/api/booking/admin/staff/:id/connections/:connId/sync`（担当・本人と owner/admin）。本文 `{read?, write?, deleteFutureEvents?, includeBacklog?, expectedVersion}`、返り値に影響の件数。確かめの窓の件数は GET `.../sync/preview` で出す。
 - `calendar_busy_cache`：`connection_id`・`range_start`・`range_end`・`busy_json`（時間だけ）・`fetched_at`。
 - `booking_calendar_events`：`booking_id`・`connection_id`・`calendar_id`・`external_event_id`（予約 ID から決める）・`status`（pending／written／failed／deleted）・`attempts`・`last_error_code`・`updated_at`。書く作業の順番待ち（outbox）を兼ねる。
-- `meeting_connections`：`staff_id`・`provider`（google_meet／zoom／teams）・`status`・`secret_ref`・`version`。
+- `meeting_connections`：`staff_id`・`provider`（google_meet／zoom／teams）・`status`・`secret_ref`・`version`（認可情報は calendar_connections と同じ扱い）。
+- **認可情報の保存**：担当者の認可情報は担当者・アカウント・サービスごとに D1 に AES-GCM で暗号化して保存する。暗号化鍵とアプリの client secret は Worker の秘密設定に置き、D1 に平文で置かない。画面・ログ・監査には認可情報を出さず、接続を切ったときは暗号文も消す。暗号化鍵が無い場合は接続・利用を行わない。専用の秘密保管サービスへ移す場合は、既存接続の安全な移行・失敗時の復旧・鍵の更新とアクセス権限を別途定める。
 - `bookings` に `meeting_mode`（in_person／online）・`meeting_url`・`meeting_url_source`（fixed_staff／fixed_menu／auto／manual）・`meeting_provider`・`meeting_external_id`・`meeting_status`（none／issued／pending／failed／deleted）・`location_json`。
 - メニューに `meeting_mode_option`（in_person／online／customer_choice）・`meeting_url_mode`（fixed／auto）・`fixed_meeting_url`・`location_json`。担当に `fixed_meeting_url`。
 - 店の設定に `calendar_write_shared_id`・`calendar_title_includes_name`。
@@ -277,7 +278,7 @@
 | Zoom | つなぎの失効・会議の上限 | B-2 の失敗の手順 |
 | Google Meet | 共有方式のカレンダーでは Meet を作れない場合がある | Meet の自動は OAuth のつなぎが要る（技術の仮・Codex が試験で確かめる） |
 | LINE | 確定・リマインドが届かない | 送信の記録に残す（今の仕組み） |
-| 鍵の保管 | 更新の鍵の漏れ | 秘密の保管先に置き、D1 には参照だけ。外した時に鍵を消す |
+| 鍵の保管 | 更新の鍵の漏れ | D1 に AES-GCM で暗号化して保存し、暗号化鍵と client secret は Worker の秘密設定に置く。画面・ログ・監査に出さない。外した時に暗号文を消す。鍵が無ければ接続しない |
 
 ## 8. 決めていない所（B-337：おすすめで決定）
 

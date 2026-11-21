@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [会議の接続情報の保存方法の説明](release-log/unreleased/142-kenta-b7-secret-doc.md) — 反映履歴、確認 2026-11-20。
+
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
