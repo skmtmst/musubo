@@ -40,7 +40,7 @@ import { processOperationAlertNotificationOutbox } from '../services/operation-a
 import { sweepBillingFailureNotices, sweepBillingRecoveryNotices } from '../services/billing-invoice-notifications.js';
 import { OPERATOR_NOTIFICATION_SWEEP_LIMIT, sweepOperatorNotifications } from '../services/operator-notification-dispatch.js';
 
-import { runIsolatedScheduledJobs, scheduledLane } from '../services/scheduled-job-isolation.js';
+import { runIsolatedScheduledJobs, scheduledLane, STAGING_LINE_TOKEN_REFRESH_CRON } from '../services/scheduled-job-isolation.js';
 import { qaEnvironment } from '../services/staging-qa-safety.js';
 
 import { runFrequentHeavyJobs } from './frequent.js';
@@ -54,9 +54,8 @@ export async function scheduled(
 ): Promise<void> {
   // 通知・配信と、再実行できる重い集計・走査を別のCron invocationへ分ける。
   // 重い処理は次の専用tickで処理単位ごとに再試行され、通知tickを占有しない。
-  const lane = scheduledLane(event.cron);
-  if (env.DEPLOY_ENV === 'staging' || env.WORKER_NAME === 'nen-line-stg') {
-    if (lane === 'lineTokenRefresh' && qaEnvironment(env)) {
+  if (event.cron === STAGING_LINE_TOKEN_REFRESH_CRON) {
+    if (qaEnvironment(env)) {
       await refreshLineAccessTokens(env.DB, {
         credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
         syncProfiles: false,
@@ -64,6 +63,8 @@ export async function scheduled(
     }
     return;
   }
+  const lane = scheduledLane(event.cron);
+  if (lane === 'delivery' && (env.DEPLOY_ENV === 'staging' || env.WORKER_NAME === 'nen-line-stg')) return;
   if (lane === 'restaurantMinute') {
     await runIsolatedScheduledJobs([
       {name:'restaurant events',run:()=>processRestaurantEvents(env)},

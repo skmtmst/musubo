@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fileURLToPath } from 'node:url';
 import { getLineAccountById } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { QA_STAGING_DATABASE } from '../services/staging-qa-safety.js';
-import { SCHEDULED_CRONS } from '../services/scheduled-job-isolation.js';
+import { SCHEDULED_CRONS, STAGING_LINE_TOKEN_REFRESH_CRON } from '../services/scheduled-job-isolation.js';
 import { scheduled } from './scheduled.js';
 
 const staging = {
@@ -28,6 +29,12 @@ describe('staging LINE token renewal', () => {
     vi.useRealTimers();
   });
 
+  it('registers exactly the token renewal tick in the deployed staging configuration', async () => {
+    const { unstable_readConfig } = await import('wrangler');
+    const config = unstable_readConfig({ config: fileURLToPath(new URL('../../wrangler.staging.toml', import.meta.url)) });
+    expect(config.triggers?.crons).toEqual([STAGING_LINE_TOKEN_REFRESH_CRON]);
+  });
+
   it('renews an expired token from stored credentials and skips fresh and inactive accounts', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-22T02:00:00Z'));
@@ -44,8 +51,8 @@ describe('staging LINE token renewal', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await tick(SCHEDULED_CRONS.lineTokenRefresh, { ...staging, DB: db });
-    await tick(SCHEDULED_CRONS.lineTokenRefresh, { ...staging, DB: db });
+    await tick(STAGING_LINE_TOKEN_REFRESH_CRON, { ...staging, DB: db });
+    await tick(STAGING_LINE_TOKEN_REFRESH_CRON, { ...staging, DB: db });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const updated = await getLineAccountById(db, 'expired', staging.LINE_CREDENTIAL_ENCRYPTION_KEY);
@@ -57,14 +64,13 @@ describe('staging LINE token renewal', () => {
     expect(updated?.channel_access_token_encrypted).not.toContain('renewed-token');
   });
 
-  it('ignores delivery, other cron lanes and a mismatched staging binding', async () => {
+  it('ignores delivery in staging and renewal in a mismatched environment', async () => {
     const db = { prepare: vi.fn(() => { throw new Error('no database access expected'); }) } as unknown as D1Database;
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    for (const [lane, cron] of Object.entries(SCHEDULED_CRONS)) {
-      if (lane !== 'lineTokenRefresh') await tick(cron, { ...staging, DB: db });
-    }
-    await tick(SCHEDULED_CRONS.lineTokenRefresh, { ...staging, DB: db, D1_DATABASE_ID: 'incorrect-db' });
+    await tick(SCHEDULED_CRONS.delivery, { ...staging, DB: db });
+    await tick(STAGING_LINE_TOKEN_REFRESH_CRON, { ...staging, DB: db, D1_DATABASE_ID: 'incorrect-db' });
+    await tick(STAGING_LINE_TOKEN_REFRESH_CRON, { ...staging, DB: db, DEPLOY_ENV: 'production' });
     await tick(SCHEDULED_CRONS.delivery, { ...staging, DB: db, DEPLOY_ENV: 'production' });
     expect(db.prepare).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -81,7 +87,7 @@ describe('staging LINE token renewal', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await tick(SCHEDULED_CRONS.lineTokenRefresh, { ...staging, DB: db });
+    await tick(STAGING_LINE_TOKEN_REFRESH_CRON, { ...staging, DB: db });
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const current = await getLineAccountById(db, 'account', staging.LINE_CREDENTIAL_ENCRYPTION_KEY);
