@@ -86,6 +86,7 @@ interface ConfirmDialogBaseProps {
   /** 権限で使えない理由。Dialogの専用口へそのまま渡す。 */
   confirmLockedReason?: string
   actionWidthReserve?: 'states' | 'idle'
+  guideSlot?: string
   confirmPlacement?: 'start'
   onCancel: () => void
 }
@@ -144,6 +145,7 @@ export default function ConfirmDialog({
   confirmDisabledReason,
   confirmLockedReason,
   actionWidthReserve,
+  guideSlot,
   confirmPlacement,
   onCancel,
 }: ConfirmDialogProps) {
@@ -275,6 +277,7 @@ export default function ConfirmDialog({
       confirmLockedReason={confirmLockedReason}
       actionWidthReserve={actionWidthReserve}
       confirmPlacement={confirmPlacement}
+      guideSlot={guideSlot}
       error={shownError}
       primaryAction={primaryAction}
       titleIcon={titleIcon !== undefined ? shownTitleIcon : undefined}
