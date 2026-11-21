@@ -55,7 +55,7 @@ const SCRIPT: readonly GuideStepScript[] = [
       {
         index: 2,
         title: '名前と席数を入れて保存',
-        body: '卓の名前と席数を確認し、フォーム下の「卓を作る」を押します。保存できたら手順3/3へ進みます。',
+        body: '卓の名前と席数を入れましょう。「保存する」を押すと卓が登録され、手順3/3に進みます。',
         anchor: 'tables.form',
         trigger: 'event',
       },
@@ -77,23 +77,14 @@ const SCRIPT: readonly GuideStepScript[] = [
         title: 'Googleアカウントとつなぎましょう',
         body: 'お店のGoogleアカウントでログインして許可するだけ。戻ってくると営業時間が取り込まれ、ガイドが自動で再開します。',
         anchor: 'hours.googleConnect',
-        /*
-          押した時ではなく、認可画面から戻ってつながった時に進める（差し戻し R4）。
-          失敗・中断で戻った時は 1/2 に留まる。合図は設定 › SNS連携の画面が出す。
-        */
+        /* 接続の成功を確認してから、同じ営業時間タブの確認へ進む。 */
         trigger: 'event',
-        /*
-          「接続する」ボタンと接続成功の合図は設定 › SNS連携だけにある（差し戻し R1）。
-          段の行き先（営業時間）に留まると、未接続では店舗が選べず、接続済みでは
-          対象が無いまま案内が自動停止してしまう。どちらの状態でもこの画面へ連れていく。
-          接続済みならSNS連携が開いた時点で合図が出て、すぐ手順2/2へ進む。
-        */
-        href: '/settings/sns',
+        href: '/restaurant-test/google?tab=hours',
       },
       {
         index: 2,
         title: '営業時間を確認して確定',
-        body: '営業時間を編集し、「変更内容を確認」を押します。「Googleに反映する」または「設定を保存する」を押してください。',
+        body: '取り込んだ営業時間を確かめて「この営業時間で確定」を押します。違うときはGoogleビジネスで直してから「Googleから再読み込み」を押してください。確定すると最初の予約枠が作られます。',
         anchor: 'hours.confirm',
         trigger: 'event',
       },
@@ -155,7 +146,7 @@ const SCRIPT: readonly GuideStepScript[] = [
       {
         index: 1,
         title: '内容を確認して保存',
-        body: '使う送り方を確認して「保存して作る」を押してください。使わない場合は「今は使わない」を選べます。',
+        body: '使う送り方を「保存して作る」で下書きにします。送信はテストと承認のあと始められます。使わない場合は「今は使わない」を選びます。',
         anchor: 'followup.save',
         trigger: 'event',
       },
