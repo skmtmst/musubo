@@ -166,3 +166,22 @@ it('古い未送信の押さえを再送し、送信済みと送達不明は重�
   expect(sends).toEqual(['Uf155']);
   expect(f.raw.prepare("SELECT state FROM broadcast_send_claims WHERE broadcast_id='b' AND friend_id='f156'").get()).toEqual({state:'unknown'});
 });
+
+it('旧処理と進捗更新が重なっても、送達済みの人数を二重に数えない', async () => {
+  const f=fixture();
+  f.raw.exec("UPDATE broadcasts SET message_content='案内' WHERE id='b'");
+  let injected=false;
+  const racingDb={...f.db,async batch(stmts:D1PreparedStatement[]) {
+    const result=await f.db.batch(stmts);
+    if (!injected && stmts.some(stmt=>((stmt as unknown as {sql?:string}).sql??'').includes('INSERT INTO messages_log'))) {
+      injected=true;
+      f.raw.exec("UPDATE broadcasts SET success_count=(SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id='b' AND state='sent') WHERE id='b'");
+    }
+    return result;
+  }} as D1Database;
+  const multicast={async multicast(ids:string[]){sends.push(...ids); return {requestId:'fake'};}} as never;
+  await processQueuedBroadcasts(racingDb,multicast);
+  expect(injected).toBe(true);
+  expect(sends).toHaveLength(160);
+  expect(f.raw.prepare("SELECT success_count FROM broadcasts WHERE id='b'").get()).toEqual({success_count:160});
+});

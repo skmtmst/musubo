@@ -512,8 +512,8 @@ export async function processBroadcastSend(
               state: 'sent',
               lineRequestId: requestId,
             }),
-            db.prepare(`UPDATE broadcasts SET success_count=MAX(success_count,
-              (SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id=? AND state='sent')) WHERE id=?`)
+            db.prepare(`UPDATE broadcasts SET success_count=
+              (SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id=? AND state='sent') WHERE id=?`)
               .bind(broadcastId,broadcastId),
           ]);
           for (const id of sendableIds) blocked.add(id);
@@ -541,9 +541,10 @@ export async function processBroadcastSend(
         await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch')) {
       return (await getBroadcastById(db, broadcastId))!;
     }
-    const completed = await db.prepare(`UPDATE broadcasts SET status='sent', sent_at=?,batch_lock_at=NULL,total_count=?,success_count=?
+    const completed = await db.prepare(`UPDATE broadcasts SET status='sent', sent_at=?,batch_lock_at=NULL,total_count=?,
+      success_count=CASE WHEN target_type='tag' THEN (SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id=? AND state='sent') ELSE ? END
       WHERE id=? AND status='sending' AND stopped_at IS NULL AND lock_version=?`)
-      .bind(jstNow(),totalCount,successCount,broadcastId,broadcast.lock_version ?? 1).run();
+      .bind(jstNow(),totalCount,broadcastId,successCount,broadcastId,broadcast.lock_version ?? 1).run();
     if (completed.meta.changes) await createBroadcastInsight(db, broadcast.id);
   } catch (err) {
     // 古い実行は新しい試行を下書きに戻さない。
@@ -1015,7 +1016,7 @@ async function processQueuedBroadcastBatches(
   }
   const releaseStopped = async (offset=0) => {
     await db.prepare(`UPDATE broadcasts SET batch_offset=?,batch_lock_at=NULL,
-      success_count=MAX(success_count,(SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id=? AND state='sent'))
+      success_count=(SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id=? AND state='sent')
       WHERE id=? AND stopped_at IS NOT NULL AND batch_offset=-1 AND lock_version=?`)
       .bind(offset,broadcast.id,broadcast.id,lockVersion+1).run();
   };
@@ -1341,9 +1342,7 @@ async function processQueuedBroadcastBatches(
             `UPDATE broadcasts
                 SET batch_offset = ?, batch_lock_at = NULL,
                     success_count = (
-                      SELECT COUNT(DISTINCT friend_id) FROM messages_log
-                       WHERE broadcast_id = ? AND direction = 'outgoing'
-                         AND COALESCE(delivery_type, '') != 'test'
+                      SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id = ? AND state = 'sent'
                     )
               WHERE id = ? AND lock_version = ? AND batch_offset = -1`,
           ).bind(progressBase + currentOffset, broadcast.id, broadcast.id,lockVersion).run();
@@ -1355,9 +1354,7 @@ async function processQueuedBroadcastBatches(
       const progressUpdate=await db.prepare(
         `UPDATE broadcasts
             SET success_count = (
-                  SELECT COUNT(DISTINCT friend_id) FROM messages_log
-                   WHERE broadcast_id = ? AND direction = 'outgoing'
-                     AND COALESCE(delivery_type, '') != 'test'
+                  SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id = ? AND state = 'sent'
                 )
           WHERE id = ? AND lock_version = ? AND batch_offset = -1`,
       ).bind(broadcast.id, broadcast.id,lockVersion).run();
@@ -1483,8 +1480,8 @@ async function processQueuedBroadcastBatches(
     currentOffset += batch.length;
     // 処理中に別実行が取得しないよう、成功数を更新しても batch_offset=-1 のロックは保つ。
     const progressUpdate=await db.prepare(
-      `UPDATE broadcasts SET success_count = success_count + ? WHERE id = ? AND lock_version = ? AND batch_offset = -1`,
-    ).bind(sendable.length, broadcast.id,lockVersion).run();
+      `UPDATE broadcasts SET success_count = (SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id=? AND state='sent') WHERE id = ? AND lock_version = ? AND batch_offset = -1`,
+    ).bind(broadcast.id, broadcast.id,lockVersion).run();
     if(!progressUpdate.meta.changes){await releaseStopped(progressBase+currentOffset);return;}
   }
 

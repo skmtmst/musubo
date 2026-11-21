@@ -342,9 +342,8 @@ describe('一斉配信の停止（#662）', () => {
       expect(calls[0]).toHaveLength(500);
       expect(sentUserIds()).not.toContain('Uf0000');
       expect(sentUserIds()).not.toContain('Uf0001');
-      // 数えるのも送った分だけ。束の大きさで数えると、送っていない3人が
-      // 「届いた」に混ざる。
-      expect(broadcastRow(raw).success_count).toBe(597);
+      // 今回の597人と以前に届いた1人を数え、送達不明の2人は数えない。
+      expect(broadcastRow(raw).success_count).toBe(598);
       expect(await countBroadcastLedger(db, 'b1')).toEqual({
         sent: 598, failed: 0, unknown: 2, claimed: 0,
       });
