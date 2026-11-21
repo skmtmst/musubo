@@ -1,0 +1,94 @@
+'use client'
+
+import { useRef, useState } from 'react'
+import { RESTAURANT_COURSE_PHOTO_LIMIT, type RestaurantCoursePhoto } from '@line-crm/shared'
+import { Plus } from 'lucide-react'
+import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
+import Notice from '@/components/shared/notice'
+import { api } from '@/lib/api'
+import styles from './course-photos.module.css'
+
+type Props = {
+  accountId: string | null
+  photos: RestaurantCoursePhoto[]
+  disabled: boolean
+  error: string | null
+  onChange: (photos: RestaurantCoursePhoto[]) => void
+}
+
+export default function CoursePhotos({ accountId, photos, disabled, error, onChange }: Props) {
+  const [picking, setPicking] = useState(false)
+  const [adjusting, setAdjusting] = useState<RestaurantCoursePhoto | null>(null)
+  const [notice, setNotice] = useState('')
+  const dragging = useRef<number | null>(null)
+  const index = photos.findIndex(photo => photo.mediaId === adjusting?.mediaId)
+  const image = (photo: RestaurantCoursePhoto, alt: string) => accountId
+    ? <img className={styles.image} src={api.media.contentUrl(photo.mediaId, accountId)} alt={alt}
+        draggable={false} style={{ objectPosition: `${photo.x}% ${photo.y}%` }} />
+    : null
+  const move = (from: number, to: number) => {
+    if (disabled || from === to || from < 0 || to < 0 || to >= photos.length) return
+    const next = photos.slice()
+    const [photo] = next.splice(from, 1)
+    if (!photo) return
+    next.splice(to, 0, photo)
+    onChange(next)
+  }
+
+  return <Card variant="form" gap="tight" aria-label="写真">
+    <div className={styles.heading}><strong>写真</strong><span>最大5枚・正方形で表示</span></div>
+    <ul className={styles.photos} aria-label="コースの写真">
+      {photos.map((photo, position) => (
+        <li key={photo.mediaId} className={position === 0 ? styles.cover : undefined}
+          draggable={!disabled}
+          onDragStart={event => { dragging.current = position; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', String(position)) }}
+          onDragEnd={() => { dragging.current = null }}
+          onDragOver={event => { if (dragging.current !== null) event.preventDefault() }}
+          onDrop={event => {
+            event.preventDefault()
+            if (dragging.current !== null) move(dragging.current, position)
+            dragging.current = null
+          }}>
+          <button type="button" className={styles.photoButton} aria-label={`写真 ${position + 1} の表示範囲を調整`}
+            disabled={disabled} onClick={() => setAdjusting(photo)}>
+            {image(photo, '')}
+            {position === 0 ? <span className={styles.badge}>表紙</span> : null}
+          </button>
+        </li>
+      ))}
+      {photos.length < RESTAURANT_COURSE_PHOTO_LIMIT ? <li>
+        <button type="button" className={styles.add} aria-label="写真を追加" disabled={disabled || !accountId}
+          onClick={() => { setNotice(''); setPicking(true) }}><Plus size={16} aria-hidden="true" />追加</button>
+      </li> : null}
+    </ul>
+    <p className={styles.note}>ドラッグで並べ替え（先頭が表紙）。写真をタップすると表示範囲を調整できます。元の写真はそのまま残ります。</p>
+    {error || notice ? <Notice tone={error ? "danger" : "warn"}>{error ?? notice}</Notice> : null}
+    <MediaPickerDialog open={picking} accountId={accountId} kind="image" accountOnly
+      title="コースの写真を選ぶ" onClose={() => setPicking(false)}
+      onSelect={media => {
+        setPicking(false)
+        if (photos.some(photo => photo.mediaId === media.id)) { setNotice('この写真はすでに追加されています。'); return }
+        onChange([...photos, { mediaId: media.id, x: 50, y: 50 }])
+      }} />
+    {adjusting ? <Dialog open title="写真の表示範囲を調整" onCancel={() => setAdjusting(null)}
+      footer={<DialogActions>
+        <Button variant="text" onClick={() => { onChange(photos.filter(photo => photo.mediaId !== adjusting.mediaId)); setAdjusting(null) }}>写真を外す</Button>
+        <Button onClick={() => setAdjusting(null)}>キャンセル</Button>
+        <Button variant="primary" onClick={() => {
+          onChange(photos.map(photo => photo.mediaId === adjusting.mediaId ? adjusting : photo))
+          setAdjusting(null)
+        }}>この範囲にする</Button>
+      </DialogActions>}>
+      <div className={styles.preview}>{image(adjusting, `写真 ${index + 1} の表示見本`)}</div>
+      <label className={styles.adjust}>左右の位置<input type="range" min={0} max={100} value={adjusting.x} onChange={event => setAdjusting({ ...adjusting, x: Number(event.target.value) })} /></label>
+      <label className={styles.adjust}>上下の位置<input type="range" min={0} max={100} value={adjusting.y} onChange={event => setAdjusting({ ...adjusting, y: Number(event.target.value) })} /></label>
+      <DialogActions>
+        <Button disabled={index <= 0} onClick={() => move(index, index - 1)}>前へ移動</Button>
+        <Button disabled={index < 0 || index === photos.length - 1} onClick={() => move(index, index + 1)}>後ろへ移動</Button>
+      </DialogActions>
+    </Dialog> : null}
+  </Card>
+}

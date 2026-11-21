@@ -65,7 +65,7 @@ export type RestaurantInventory = {
 }
 export type RestaurantMenuItem = {
   id: string; store_id: string; kind: 'course' | 'a_la_carte'; name: string; price: number;
-  description?: string | null; image_media_id?: string | null; confirmation_revision: number;
+  description?: string | null; image_media_id?: string | null; photo_gallery_json?: string | null; confirmation_revision: number;
   tax_mode: string; allergens_json: string; service_periods_json: string; duration_minutes: number | null; status: string; pendingPrice?: number | null; pendingEffectiveAt?: string | null; priceChangeStatus?: string | null
 }
 export type RestaurantConnector = {

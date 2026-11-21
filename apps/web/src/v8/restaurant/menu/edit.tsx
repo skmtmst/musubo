@@ -26,6 +26,8 @@ import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
 import { Field, TextArea } from '@/components/shared/form-controls'
 import RegisteredImageSelect from '@/components/shared/registered-image-select'
+import { readRestaurantCoursePhotos, type RestaurantCoursePhoto } from '@line-crm/shared'
+import CoursePhotos from './course-photos'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { TextField } from '@/components/shared/text-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -51,7 +53,7 @@ import styles from './edit.module.css'
  */
 
 type Period = 'lunch' | 'dinner' | 'both'
-type Draft = { duration: string; kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string; description: string; imageMediaId: string | null; status: 'draft' | 'active' }
+type Draft = { duration: string; kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string; description: string; imageMediaId: string | null; photos: RestaurantCoursePhoto[]; status: 'draft' | 'active' }
 const LIST_HREF = '/restaurant-test/menu'
 const GUIDE_DURATION_OPTIONS = Array.from({ length: 12 }, (_, index) => {
   const minutes = (index + 1) * 30
@@ -66,12 +68,12 @@ function periodLabel(periods: string[]): string {
   return periods.map((period) => (period === 'lunch' ? 'ランチ' : 'ディナー')).join('・') || emptyValue('unknown')
 }
 function draftOf(item: RestaurantMenuItem | null): Draft {
-  if (!item) return { duration: '120', kind: 'course', name: '', price: '', period: 'dinner', effectiveAt: '', allergens: '', description: '', imageMediaId: null, status: 'draft' }
+  if (!item) return { duration: '120', kind: 'course', name: '', price: '', period: 'dinner', effectiveAt: '', allergens: '', description: '', imageMediaId: null, photos: [], status: 'draft' }
   const periods = storedStringList(item.service_periods_json)
   return {
     duration: item.duration_minutes == null ? '' : String(item.duration_minutes), kind: item.kind, name: item.name, price: String(item.price),
     period: periods.length > 1 ? 'both' : periods[0] === 'lunch' ? 'lunch' : 'dinner',
-    effectiveAt: '', allergens: storedStringList(item.allergens_json).join(', '), description: item.description ?? '', imageMediaId: item.image_media_id ?? null, status: item.status === 'draft' ? 'draft' : 'active',
+    effectiveAt: '', allergens: storedStringList(item.allergens_json).join(', '), description: item.description ?? '', imageMediaId: item.image_media_id ?? null, photos: readRestaurantCoursePhotos(item.photo_gallery_json, item.image_media_id), status: item.status === 'draft' ? 'draft' : 'active',
   }
 }
 
@@ -178,7 +180,11 @@ function MenuEditBody() {
     setBusy(true); setError(null); setImageError(null)
     const body = {
       kind: draft.kind, name: draft.name, price: Number(draft.price), durationMinutes: course ? Number(draft.duration) : null,
-      description: draft.description.trim() || null, ...(editing && draft.imageMediaId === (editing.image_media_id ?? null) ? {} : { imageMediaId: draft.imageMediaId }),
+      description: draft.description.trim() || null,
+      ...(course
+        ? (!editing || JSON.stringify(draft.photos) !== JSON.stringify(readRestaurantCoursePhotos(editing.photo_gallery_json, editing.image_media_id))
+          ? { photos: draft.photos } : {})
+        : (editing && draft.imageMediaId === (editing.image_media_id ?? null) ? {} : { imageMediaId: draft.imageMediaId })),
       effectiveAt: draft.effectiveAt ? datetimeLocalJstToUtcIso(draft.effectiveAt) : null,
       allergens: draft.allergens.split(',').map((part) => part.trim()).filter(Boolean),
       servicePeriods: draft.period === 'both' ? ['lunch', 'dinner'] : [draft.period],
@@ -285,6 +291,10 @@ function MenuEditBody() {
                   options={[{ value: 'lunch', label: 'ランチ' }, { value: 'dinner', label: 'ディナー' }, { value: 'both', label: 'ランチ・ディナー' }]} /></SaveErrorField>
               </Field>
 
+  const publishStatusField = !editing || draftItem ? <Field label="保存する状態" help="下書きは、お客さまに見せるメニューには出ません。内容を確かめてから公開できます。">
+              <SaveErrorField names={['status', 'draft.status']}><Select aria-label="保存する状態" size="full" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value === 'active' ? 'active' : 'draft' })} options={[{ value: 'draft', label: '下書き' }, { value: 'active', label: '公開' }]} /></SaveErrorField>
+            </Field> : null
+
   return (
     <SaveErrorScope errors={saveErrors}>
       <CreatePage
@@ -305,12 +315,10 @@ function MenuEditBody() {
         </>}
       >
         {error ? <Notice tone="danger" role="alert">{error}{menuConflict ? <Button onClick={() => { void load() }}>最新を読み込む</Button> : null}</Notice> : null}
-        {canEdit ? (
+        {canEdit ? (<>
           <Card variant="form" gap="normal">
             {!guidedCourse ? <CardHeader size="stacked" title="基本" /> : null}
-            {!editing || draftItem ? <Field label="保存する状態" help="下書きは、お客さまに見せるメニューには出ません。内容を確かめてから公開できます。">
-              <SaveErrorField names={['status', 'draft.status']}><Select aria-label="保存する状態" size="full" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value === 'active' ? 'active' : 'draft' })} options={[{ value: 'draft', label: '下書き' }, { value: 'active', label: '公開' }]} /></SaveErrorField>
-            </Field> : null}
+            {guidedCourse ? null : publishStatusField}
             {/* 開店準備ガイド⑥の手順2/3（枠14 KI5X0）の光らせる先。 */}
             <div data-guide-anchor="menu.form" className={styles.guideBasics}>
               {guidedCourse ? <CardHeader size="stacked" title="基本" /> : null}
@@ -325,6 +333,14 @@ function MenuEditBody() {
               </SettingsFormRow>
               {guidedCourse ? <SettingsFormRow layout="columns" columns={3}>{durationField}</SettingsFormRow> : null}
             </div>
+          </Card>
+          {course ? <CoursePhotos key={JSON.stringify([storeAccountId, editing?.id])} accountId={storeAccountId}
+            photos={draft.photos} disabled={busy} error={imageError} onChange={photos => {
+              setImageError(null)
+              setDraft(current => ({ ...current, photos, imageMediaId: photos[0]?.mediaId ?? null }))
+            }} /> : null}
+          <Card variant="form" gap="normal">
+            {guidedCourse ? publishStatusField : null}
             <SettingsFormRow layout="columns" columns={3}>
               <Field label="種類">
                 <SaveErrorField names={['kind', 'draft.kind']}><Select aria-label="種類" size="full" value={draft.kind} onChange={(value) => setDraft({ ...draft, kind: value === 'a_la_carte' ? 'a_la_carte' : 'course' })} options={[{ value: 'course', label: 'コース' }, { value: 'a_la_carte', label: '単品' }]} /></SaveErrorField>
@@ -338,11 +354,11 @@ function MenuEditBody() {
             <Field label="メニューの説明" htmlFor="rs-menu-description" note="2,000文字まで">
               <SaveErrorField names={['description', 'draft.description']}><TextArea id="rs-menu-description" aria-label="メニューの説明" rows={3} maxLength={2000} value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} /></SaveErrorField>
             </Field>
-            <Field label="メニューの画像" error={imageError ?? undefined}>
+            {!course ? <Field label="メニューの画像" error={imageError ?? undefined}>
               <RegisteredImageSelect accountId={storeAccountId} imageId={draft.imageMediaId} imageName={mediaName} disabled={busy}
                 onSelect={media => { setImageError(null); setDraft(current => ({ ...current, imageMediaId: media.id })); setMediaName(media.filename) }}
                 onRemove={() => { setImageError(null); setDraft(current => ({ ...current, imageMediaId: null })) }} />
-            </Field>
+            </Field> : null}
             <Field label="アレルギー（カンマ区切り）" htmlFor="rs-menu-allergens">
               <SaveErrorField names={['allergens', 'draft.allergens']}><TextField id="rs-menu-allergens" value={draft.allergens} onChange={(event) => setDraft({ ...draft, allergens: event.target.value })} /></SaveErrorField>
             </Field>
@@ -350,7 +366,7 @@ function MenuEditBody() {
               ? `価格を変える場合は保存時に確認します。開始日時を空欄にすると保存後すぐに反映します。現在の価格は${formatYen(editing.price)}です。`
               : '追加したメニューは予約台帳で使います。説明と画像は管理画面で確認できます。'}</p>
           </Card>
-        ) : (
+        </>) : (
           <CreateSummaryCard title="メニューの内容" description={editing?.pendingPrice != null ? (editing.priceChangeStatus === 'approved' ? '確定した新価格は指定した開始日時に反映します。' : '以前の価格変更申請が残っています。メニュー一覧から確認してください。') : undefined} rows={[
             { label: '種類', value: draft.kind === 'course' ? 'コース' : '単品' },
             { label: 'メニュー名', value: draft.name || emptyValue('unconfigured') },

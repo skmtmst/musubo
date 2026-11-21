@@ -1,3 +1,5 @@
+import type { RestaurantCoursePhoto } from '@line-crm/shared';
+
 /** メニュー画像はその店舗の登録メディアから選ぶ。 */
 export async function validRestaurantMenuImage(db: D1Database, storeId: string, mediaId: string | null): Promise<boolean> {
   if (mediaId === null) return true;
@@ -9,4 +11,9 @@ export async function validRestaurantMenuImage(db: D1Database, storeId: string, 
 
 export function validRestaurantMenuDescription(value: unknown): value is string | null | undefined {
   return value == null || typeof value === 'string' && value.length <= 2000;
+}
+
+export async function validRestaurantCoursePhotos(db: D1Database, storeId: string, photos: RestaurantCoursePhoto[]) {
+  const checked = await Promise.all(photos.map(photo => validRestaurantMenuImage(db, storeId, photo.mediaId)));
+  return checked.every(Boolean);
 }
