@@ -917,6 +917,10 @@ describe('POST /api/line-accounts', () => {
     });
 
     const body = (await res.json()) as { success: boolean; data: { loginChannelId: string | null; liffId: string | null; loginChannelSecret?: string | null; loginChannelSecretConfigured: boolean } };
+    expect(dbMocks.saveLineAccountConnectionChecks).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      expectedRevision: 1,
+      checks: expect.arrayContaining([expect.objectContaining({ kind: 'webhook_endpoint', result: 'matched', webhookActive: true })]),
+    }));
     expect(body.success).toBe(true);
     expect(body.data.loginChannelId).toBe('2009624792');
     expect(body.data.liffId).toBe('2009624792-XXXX');
@@ -974,7 +978,7 @@ describe('POST /api/line-accounts', () => {
       parentLineAccountId: 'parent',
     });
     await expect(res.json()).resolves.toMatchObject({
-      data: { timezone: 'Asia/Ho_Chi_Minh', revision: 1, parentLineAccountId: 'parent' },
+      data: { timezone: 'Asia/Ho_Chi_Minh', revision: 2, parentLineAccountId: 'parent' },
     });
   });
 

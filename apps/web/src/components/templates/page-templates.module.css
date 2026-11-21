@@ -469,6 +469,7 @@
 /* : 設定の板の違いは SettingsPage.layout から選ぶ。 */
 :global(:root) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settings { gap: 0; }
 :global(:root) .frame[data-template-layout='accounts'] .settingsContent { max-width: none; padding: var(--tpl-sa-content-pad); gap: var(--tpl-sa-gap); }
+:global(:root) .frame[data-template-layout='accounts'] .actions { max-width: 100%; }
 :global(:root) .frame[data-template-layout='account-detail'] .settingsContent { max-width: none; padding: var(--tpl-acd-pad); gap: var(--tpl-acd-stack-gap); }
 :global(:root) .frame[data-template-layout='account-handover'] .settingsContent { max-width: none; padding: var(--tpl-acct-handover-content-pad); gap: var(--tpl-acd-gap); }
 :global(:root) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) { --tpl-setnav-w: var(--tpl-sb-nav-w); --tpl-settings-gap: 0px; }
