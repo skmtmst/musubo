@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-const state = vi.hoisted(() => ({ stepState: 'done' as 'done' | 'todo' | 'forbidden', style: 'standard' as import('@line-crm/shared').AccountStyle, role: 'owner' as string | null, allowed: true, reload: vi.fn() }))
+const state = vi.hoisted(() => ({ stepState: 'done' as 'done' | 'todo' | 'forbidden', style: 'standard' as import('@line-crm/shared').AccountStyle, role: 'owner' as string | null, allowed: true, progressStatus: 'ready' as 'ready' | 'loading', reload: vi.fn() }))
 vi.mock('@/hooks/use-account-style', async original => ({ ...await original<typeof import('@/hooks/use-account-style')>(), useAccountStyle: () => ({ status: 'ready', data: { style: state.style }, error: null, stale: false, reload: vi.fn() }) }))
-vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: () => ({ progress: { style: state.style, steps: { attributes: { complete: false }, friendAdd: { complete: true }, scenario: { complete: null, reason: '受付の設定を確認できていません' } } }, reload: vi.fn() }) }))
+vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: () => ({ status: state.progressStatus, progress: { style: state.style, steps: { attributes: { complete: false }, friendAdd: { complete: true }, scenario: { complete: null, reason: '受付の設定を確認できていません' } } }, reload: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', loading: false }) }))
 vi.mock('@/lib/staff-role', async (original) => ({
   ...await original<typeof import('@/lib/staff-role')>(),
@@ -18,7 +18,7 @@ vi.mock('@/v8/onboarding/use-first-run', async () => {
   return { useFirstRun: () => ({ status: 'ready', error: null, reload: state.reload, steps: buildStepsFromApi(['accounts', 'featureSet', 'attributes', 'friendAdd', 'scenario', 'firstMessage'].map((key) => ({ key, state: state.stepState, href: state.allowed ? '/' : null, reason: null }))) }) }
 })
 import GettingStarted from './getting-started'
-beforeEach(() => { state.reload.mockClear(); state.role = 'owner'; state.allowed = true; state.style = 'standard'; state.stepState = 'done' })
+beforeEach(() => { state.reload.mockClear(); state.role = 'owner'; state.allowed = true; state.style = 'standard'; state.stepState = 'done'; state.progressStatus = 'ready' })
 afterEach(cleanup)
 
 it('送信せずに2つの確認経路へ案内し、受信後の読み直しを置く', () => {
@@ -116,4 +116,14 @@ it('権限が未確認の間は段の操作を押せないボタンにし、リ�
     fireEvent.click(button)
   }
   expect(screen.queryByRole('link', { name: 'シナリオを選んでテスト送信する' })).toBeNull()
+})
+
+it('店舗の完了判定を確認するまで暫定の済み数を表示しない', () => {
+  state.style = 'restaurant'
+  state.progressStatus = 'loading'
+  const view = render(<GettingStarted />)
+  expect(screen.queryByText(/\d+ \/ 8 済み/)).toBeNull()
+  state.progressStatus = 'ready'
+  view.rerender(<GettingStarted />)
+  expect(screen.getByText(/\d+ \/ 8 済み/)).toBeTruthy()
 })

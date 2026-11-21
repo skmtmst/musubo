@@ -64,7 +64,7 @@ export const post__api_restaurant_test_inventory_generate_1 = async (c: Context<
       || Number((batch[1].results[0] as {total:number}).total) < allocation.reduce<number>((a,n)=>a+Number(n),0)) return c.json({success:false,error:'営業時間または卓が変わりました。読み直してください'},409);
     const results = batch.slice(2);
     await adjustInventoryReservedCount(db, body.storeId, '', 0);
-    return c.json({ success: true, data: { generated: results.reduce((sum,r)=>sum+r.meta.changes,0), slotMinutes: 30 } });
+    return c.json({ success: true, data: { generated: results.reduce((sum,r)=>sum+r.meta.changes,0), slotCount: new Set(starts).size, slotMinutes: 30 } });
   } finally { await releaseLock(db,key,owner); }
 };
 

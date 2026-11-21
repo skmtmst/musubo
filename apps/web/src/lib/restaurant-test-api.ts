@@ -65,7 +65,7 @@ export type RestaurantInventory = {
 }
 export type RestaurantMenuItem = {
   id: string; store_id: string; kind: 'course' | 'a_la_carte'; name: string; price: number;
-  description?: string | null; image_media_id?: string | null; confirmation_revision: number;
+  description?: string | null; image_media_id?: string | null; photo_gallery_json?: string | null; confirmation_revision: number;
   tax_mode: string; allergens_json: string; service_periods_json: string; duration_minutes: number | null; status: string; pendingPrice?: number | null; pendingEffectiveAt?: string | null; priceChangeStatus?: string | null
 }
 export type RestaurantConnector = {
@@ -133,7 +133,7 @@ export const restaurantTestApi = {
   openingHours: (accountId: string, storeId: string, date?: string) => fetchApi<{ success: true; data: RestaurantOpeningHours }>(withAccount(`/api/restaurant-test/opening-hours?storeId=${encodeURIComponent(storeId)}${date ? `&date=${encodeURIComponent(date)}` : ''}`, accountId)),
   saveOpeningHours: (accountId: string, body: { storeId: string; hours: NonNullable<RestaurantOpeningHours['hours']>; expectedVersion: number; lateArrivalPolicy?: import('@line-crm/shared').RestaurantLateArrivalPolicy | null }) => fetchApi<{ success: true; data: { version: number } }>(withAccount('/api/restaurant-test/opening-hours', accountId), { method: 'PUT', body: JSON.stringify(body) }),
   inventoryDay: (accountId: string, storeId: string, date: string) => fetchApi<{ success: true; data: RestaurantInventory[]; closures: RestaurantClosure[] }>(withAccount(`/api/restaurant-test/inventory/day?storeId=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`, accountId)),
-  generateInventory: (accountId: string, body: RestaurantAllocation & { storeId: string; date: string; expectedHoursVersion: number }) => fetchApi<{ success: true; data: { generated: number } }>(withAccount('/api/restaurant-test/inventory/generate', accountId), { method: 'POST', body: JSON.stringify(body) }),
+  generateInventory: (accountId: string, body: RestaurantAllocation & { storeId: string; date: string; expectedHoursVersion: number }) => fetchApi<{ success: true; data: { generated: number; slotCount?: number } }>(withAccount('/api/restaurant-test/inventory/generate', accountId), { method: 'POST', body: JSON.stringify(body) }),
   saveInventoryAllocation: (accountId: string, body: RestaurantAllocation & { storeId: string; slots: Array<{ id: string; expectedVersion: number }> }) => fetchApi<{ success: true; data: { updated: number } }>(withAccount('/api/restaurant-test/inventory/allocation', accountId), { method: 'PUT', body: JSON.stringify(body) }),
   holdReservation: (accountId: string, body: RestaurantHoldInput) => fetchApi<{ success: true; data: RestaurantHoldResult }>(withAccount('/api/restaurant-test/reservations/holds', accountId), { method: 'POST', body: JSON.stringify(body) }),
   reservationsDay: (accountId: string, storeId: string, date: string) => fetchApi<{ success: true; data: { date: string; reservations: RestaurantReservation[]; closures: RestaurantClosure[] } }>(withAccount(`/api/restaurant-test/reservations/day?storeId=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`, accountId)),
@@ -208,7 +208,7 @@ export const restaurantTestApi = {
   createMembership: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/memberships', accountId), { method: 'POST', body: JSON.stringify(body) }),
   updateMembership: (accountId: string, id: string, body: Record<string, unknown>, stepUpToken?: string) => fetchApi(withAccount(`/api/restaurant-test/memberships/${encodeURIComponent(id)}`, accountId), { method: 'PATCH', headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined, body: JSON.stringify(body) }),
   updateInventory: (accountId: string, id: string, body: Record<string, unknown>) => fetchApi(withAccount(`/api/restaurant-test/inventory/${id}`, accountId), { method: 'PUT', body: JSON.stringify(body) }),
-  createMenu: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/menu', accountId), { method: 'POST', body: JSON.stringify(body) }),
+  createMenu: (accountId: string, body: Record<string, unknown>) => fetchApi<{ success: true; data: { id: string } }>(withAccount('/api/restaurant-test/menu', accountId), { method: 'POST', body: JSON.stringify(body) }),
   updateMenu: (accountId: string, id: string, body: Record<string, unknown>) => fetchApi<{success:true;data:RestaurantMenuChangeResult}>(withAccount(`/api/restaurant-test/menu/${encodeURIComponent(id)}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
   createGbpPost: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/gbp/posts', accountId), { method: 'POST', body: JSON.stringify(body) }),
   updateReviewDraft: (accountId: string, id: string, replyDraft: string) => fetchApi(withAccount(`/api/restaurant-test/gbp/reviews/${id}/draft`, accountId), { method: 'PUT', body: JSON.stringify({ replyDraft }) }),

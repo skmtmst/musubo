@@ -148,9 +148,9 @@ restaurantTest.post('/api/restaurant-test/tables/:id/stop', requireRole('owner',
 
 restaurantTest.patch('/api/restaurant-test/memberships/:id', requireRole('owner', 'admin'), inputJsonBoundary({"storeId":["null","string"],"staffName":["string"],"email":["null","string"],"role":["string"],"lineUid":["null","string"],"googleEmail":["null","string"],"status":["string"],"expectedPolicyVersion":["number"],"idempotencyKey":["string"]}), patch__api_restaurant_test_memberships_id_5);
 
-restaurantTest.patch('/api/restaurant-test/menu/:id', requireRole('owner', 'admin'), inputJsonBoundary({"kind":["string"],"name":["string"],"price":["number"],"allergens":["array"],"servicePeriods":["array"],"status":["string"],"effectiveAt":["null","string"],"description":["null","string"],"imageMediaId":["null","string"]}), updateRestaurantMenu);
+restaurantTest.patch('/api/restaurant-test/menu/:id', requireRole('owner', 'admin'), inputJsonBoundary({"kind":["string"],"name":["string"],"price":["number"],"allergens":["array"],"servicePeriods":["array"],"status":["string"],"effectiveAt":["null","string"],"description":["null","string"],"imageMediaId":["null","string"],"photos":["array"]}), updateRestaurantMenu);
 
-restaurantTest.patch('/api/restaurant-test/menus/:id', requireRole('owner', 'admin'), inputJsonBoundary({"kind":["string"],"name":["string"],"price":["number"],"allergens":["array"],"servicePeriods":["array"],"status":["string"],"effectiveAt":["null","string"],"description":["null","string"],"imageMediaId":["null","string"]}), updateRestaurantMenu);
+restaurantTest.patch('/api/restaurant-test/menus/:id', requireRole('owner', 'admin'), inputJsonBoundary({"kind":["string"],"name":["string"],"price":["number"],"allergens":["array"],"servicePeriods":["array"],"status":["string"],"effectiveAt":["null","string"],"description":["null","string"],"imageMediaId":["null","string"],"photos":["array"]}), updateRestaurantMenu);
 
 // 飲食の既存の統括/店/機能の境界を先に通す。
 for (const method of ['get','put'] as const) {
@@ -213,7 +213,7 @@ restaurantTest.get('/api/restaurant-test/opening-hours', requireRole('owner', 'a
 
 restaurantTest.put('/api/restaurant-test/opening-hours', requireRole('owner', 'admin'), inputJsonBoundary(), put__api_restaurant_test_opening_hours_9);
 
-restaurantTest.post('/api/restaurant-test/menu', requireRole('owner', 'admin'), inputJsonBoundary({"storeId":["string"],"kind":["string"],"name":["string"],"price":["number"],"allergens":["array"],"servicePeriods":["array"],"status":["string"],"description":["null","string"],"imageMediaId":["null","string"]}), post__api_restaurant_test_menu_10);
+restaurantTest.post('/api/restaurant-test/menu', requireRole('owner', 'admin'), inputJsonBoundary({"storeId":["string"],"kind":["string"],"name":["string"],"price":["number"],"allergens":["array"],"servicePeriods":["array"],"status":["string"],"description":["null","string"],"imageMediaId":["null","string"],"photos":["array"]}), post__api_restaurant_test_menu_10);
 
 restaurantTest.get('/api/restaurant-test/menus', requireRole('owner', 'admin', 'staff'), get__api_restaurant_test_menus_11);
 
