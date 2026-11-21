@@ -126,10 +126,11 @@ export async function publishScenarioVersion(
   scenarioId: string,
   input: { staffId: string | null; idempotencyKey: string },
 ): Promise<ScenarioVersion> {
-  let scenario = await db.prepare(`SELECT * FROM scenarios WHERE id = ?`)
+  const initialScenario = await db.prepare(`SELECT * FROM scenarios WHERE id = ?`)
     .bind(scenarioId)
     .first<Scenario & { current_published_version_id: string | null }>();
-  if (!scenario) throw new Error('SCENARIO_NOT_FOUND');
+  if (!initialScenario) throw new Error('SCENARIO_NOT_FOUND');
+  let scenario = initialScenario;
 
   const steps = await getScenarioSteps(db, scenarioId);
   const draftSteps = await buildVersionSnapshotSteps(db, '', steps, scenario.line_account_id ?? null);
@@ -179,7 +180,7 @@ export async function publishScenarioVersion(
       return version;
     }
     const latest = await db.prepare(`SELECT * FROM scenarios WHERE id = ?`).bind(scenarioId).first<Scenario & { current_published_version_id: string | null }>();
-    if (!latest || latest.line_account_id !== scenario!.line_account_id || latest.current_published_version_id === scenario.current_published_version_id) throw new Error('SCENARIO_PUBLISH_CONFLICT');
+    if (!latest || latest.line_account_id !== scenario.line_account_id || latest.current_published_version_id === scenario.current_published_version_id) throw new Error('SCENARIO_PUBLISH_CONFLICT');
     const latestSteps = await getScenarioSteps(db, scenarioId);
     const latestSnapshot = await buildVersionSnapshotSteps(db, '', latestSteps, latest.line_account_id ?? null);
     const latestActions = await buildVersionSnapshotActions(db, '', scenarioId, latestSteps);
