@@ -773,6 +773,12 @@ jobs:
       - name: Narrow preview opens once and preserves form input
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/narrow-preview.test.mjs
+      # 戻る・進むは Navigation API の有無の両方で回し、故障対照（受け口を Next の後ろへ回す）が赤になることも毎回確かめる。
+      - name: Browser back and forward keep unsaved input behind the leave confirm
+        if: steps.scope.outputs.run == 'true'
+        env:
+          V8_GUARD_BASE: http://127.0.0.1:4310
+        run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/unsaved-history.test.mjs
       - name: Train 17 waitlist failure and inflow mouse regressions
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/stgfix17-browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix17
