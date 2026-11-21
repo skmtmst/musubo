@@ -53,8 +53,10 @@ export async function friendAddStarterStatements(
       .first();
     if (legacy) return null;
     // ensureFriendAddFallbackRules と同じ ID・中身。先に作られていれば何もしない。
-    ruleId = `friend-add-rule-first_time-${account}`;
-    const versionId = `friend-add-rule-version-first_time-${account}`;
+    const defaultRuleId = `friend-add-rule-first_time-${account}`;
+    const oldRule = await db.prepare('SELECT 1 FROM friend_add_rules WHERE id=?').bind(defaultRuleId).first();
+    ruleId = oldRule ? crypto.randomUUID() : defaultRuleId;
+    const versionId = oldRule ? crypto.randomUUID() : `friend-add-rule-version-first_time-${account}`;
     statements.push(
       db
         .prepare(

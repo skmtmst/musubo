@@ -7,6 +7,7 @@ export type StyleProfile = {
   metrics_json: string | null;
   settings_json: string;
   selected_at: string | null;
+  first_selected_at: string | null;
   selection_mode: SetupAnswer['mode'];
   version: number;
   updated_at: string;

@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [スタイルを後から選ぶ店の初期セット](release-log/unreleased/80-kenta-style-later.md) — 修正の履歴。確認 2026-11-15。
+
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)

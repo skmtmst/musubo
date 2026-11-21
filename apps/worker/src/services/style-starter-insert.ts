@@ -6,6 +6,7 @@ import { initialFormLayout,initialFormScopeGuards } from './style-initial-form.j
 import { initialMenuNeedsRefresh } from './style-initial-refresh.js';
 import type { PlannedInitialForms } from './style-initial-buttons.js';
 import { sameStarterSnapshot } from './style-starter-snapshot.js';
+import { starterResourceExists, missingStarterGuard } from './style-starter-presence.js';
 import {prepareStarterInsert} from './style-starter-insert-context.js';
 import { styleMenuButtons } from './style-menu-buttons.js';
 import { friendAddStarterStatements } from './style-starter-friend-add.js';
@@ -39,16 +40,19 @@ export async function insertStyleStarterItems(
     set?: Awaited<ReturnType<typeof starter>>;
     skipExisting?: boolean;
     plannedForms?: PlannedInitialForms;
+    preservePreviousStyles?: boolean;
+    repairMissing?: boolean;
   } = {},
 ) {
   const {set,existing,oldProfile,choice}=await prepareStarterInsert(db,account,tenant,style,input,{...options,initialMenu:!options.set && answers.image?.value === 'simple'});
   const menuPreset = restaurantGuideMenu(style, answers.restaurantMenuPreset);
   const inserted:unknown[]=[];
   const updated:Array<{key:string;kind:string}>=[];
-  const plannedForms:PlannedInitialForms=options.plannedForms??new Map(existing.filter(row=>row.kind==='form').map(row=>[row.item_key,row.target_id]));
+  const plannedForms:PlannedInitialForms=options.plannedForms??new Map(existing.filter(row=>row.kind==='form' && (!options.preservePreviousStyles || row.style===style)).map(row=>[row.item_key,row.target_id]));
   if(input.confirmInitialMenu===true && selected && style==='restaurant' && answers.image?.value==='simple' && set.definition.items.some(item=>item.initialMenu))
     await planInitialMenuHistory(db,account,statements,plannedForms,actor);
   const skipped:StarterSkip[]=[];
+  const firstDeferredSelection = options.preservePreviousStyles === true;
   const skip=(key:string,reason:StarterSkipReason)=>{skipped.push({key,reason});};
   // スタイルを選んでいない（あとで・手動）時は何も入れない。黙って飛ばさず理由を返す。
   if (!selected) for (const item of set.definition.items) skip(item.key,'answer_later');
@@ -65,15 +69,28 @@ export async function insertStyleStarterItems(
       skip(item.key,'auto_insert_off');
       continue;
     }
-    const previous=existing.find(row=>row.item_key===item.key);
+    const sameStyle = existing.find(row => row.item_key === item.key && row.style === style);
+    if (firstDeferredSelection && sameStyle) { skip(item.key, 'already_exists'); continue; }
+    let previous = sameStyle ?? (firstDeferredSelection ? undefined : existing.find(row=>row.item_key===item.key && row.kind===item.kind));
+    let missingCurrent: typeof sameStyle;
+    if (options.repairMissing) {
+      const candidates = sameStyle ? [sameStyle] : existing.filter(row=>row.item_key===item.key && row.kind===item.kind);
+      previous = undefined;
+      for (const row of candidates) {
+        if (row.kind === item.kind && starterResourceExists(row)) { previous = row; break; }
+      }
+      if (previous && previous.style !== style) { skip(item.key,'already_exists'); continue; }
+      if (sameStyle) missingCurrent = sameStyle;
+    }
     if(item.kind==='form'&&previous&&((input.answers as Record<string,SetupAnswer>|undefined)?.image?.value==='simple'||input.confirmInitialMenu===true)) {
       const available=await db.prepare(`SELECT 1 FROM forms f WHERE f.id=? AND f.status='active'
         AND EXISTS(SELECT 1 FROM form_accounts a WHERE a.form_id=f.id AND a.line_account_id=?) AND (SELECT COUNT(*) FROM form_accounts a WHERE a.form_id=f.id)=1`).bind(previous.target_id,account).first();
       if(!available) {
         const snapshot=await resourceSnapshot(db,account,previous.kind,previous.target_id);
         statements.push(snapshotGuard(db,account,previous.kind,previous.target_id,snapshot),
-          db.prepare("UPDATE style_starter_items SET item_key=item_key||':previous:'||target_id WHERE line_account_id=? AND item_key=?").bind(account,item.key));
+          db.prepare("UPDATE style_starter_items SET item_key=item_key||':previous:'||target_id WHERE line_account_id=? AND style=? AND item_key=?").bind(account,previous.style,item.key));
         existing.splice(existing.indexOf(previous),1);
+        previous = undefined;
       }
     }
 
@@ -84,21 +101,22 @@ export async function insertStyleStarterItems(
         AND (SELECT COUNT(*) FROM rich_menu_areas a WHERE a.page_id=p.id)=?`).bind(previous.target_id,account,initialMenuImageKey(account,style,menuPreset),menuPreset ? RESTAURANT_GUIDE_MENUS[menuPreset].areas.length : 4).first();
       if(!canonical || !sameStarterSnapshot(previous.kind,snapshot,previous.source_snapshot)) {
         statements.push(snapshotGuard(db,account,previous.kind,previous.target_id,snapshot));
-        statements.push(db.prepare("UPDATE style_starter_items SET item_key=item_key||':previous:'||target_id WHERE line_account_id=? AND item_key=?").bind(account,item.key));
+        statements.push(db.prepare("UPDATE style_starter_items SET item_key=item_key||':previous:'||target_id WHERE line_account_id=? AND style=? AND item_key=?").bind(account,previous.style,item.key));
         existing.splice(existing.indexOf(previous),1);
+        previous = undefined;
       }
     }
     if (
       options.skipExisting !== false &&
-      existing.some((e) => e.item_key === item.key)
+      previous !== undefined
     ) {
       if (!choice?.[item.key] || choice[item.key].mode === 'sample') {
-        const old = existing.find((e) => e.item_key === item.key)!;
+        const old = previous!;
         if(old.is_sample && old.source_snapshot && (item.kind==='form'||item.initialMenu)) {
-          const snapshot=await resourceSnapshot(db,account,old.kind,old.target_id);
+          const snapshot=options.repairMissing ? old.current_snapshot : await resourceSnapshot(db,account,old.kind,old.target_id);
           if(sameStarterSnapshot(old.kind,snapshot,old.source_snapshot)) {
             const refresh=item.kind==='form'||await initialMenuNeedsRefresh(db,account,old.target_id,style,plannedForms,menuPreset);
-            const changes=refresh?await overwriteResource(db,account,old.target_id,item,now,style,answers,plannedForms):[];
+            const changes=refresh?await overwriteResource(db,account,old.target_id,item,now,style,answers,plannedForms,options.repairMissing ? snapshot : undefined):[];
             if(changes.length) {
               statements.push(snapshotGuard(db,account,old.kind,old.target_id,snapshot),...changes,
                 recordSnapshot(db,account,old.style,item.key,old.kind,old.target_id));
@@ -140,9 +158,9 @@ export async function insertStyleStarterItems(
             statements.push(
               db
                 .prepare(
-                  'UPDATE style_starter_items SET set_id=?,set_version=? WHERE line_account_id=? AND item_key=?',
+                  'UPDATE style_starter_items SET set_id=?,set_version=? WHERE line_account_id=? AND style=? AND item_key=?',
                 )
-                .bind(set.id, set.version, account, item.key),
+                .bind(set.id, set.version, account, old.style, item.key),
             );
             statements.push(
               recordSnapshot(
@@ -162,9 +180,9 @@ export async function insertStyleStarterItems(
       statements.push(
         db
           .prepare(
-            'DELETE FROM style_starter_items WHERE line_account_id=? AND item_key=?',
+            'DELETE FROM style_starter_items WHERE line_account_id=? AND style=? AND item_key=?',
           )
-          .bind(account, item.key),
+          .bind(account, previous!.style, item.key),
       );
     }
     if (
@@ -194,7 +212,13 @@ export async function insertStyleStarterItems(
       skip(item.key,'answer_later');
       continue;
     }
+    if (missingCurrent) {
+      if (missingCurrent.kind === item.kind) statements.push(missingStarterGuard(db,account,missingCurrent));
+      statements.push(db.prepare('DELETE FROM style_starter_items WHERE line_account_id=? AND style=? AND item_key=? AND target_id=?').bind(account,style,item.key,missingCurrent.target_id));
+    }
     const chosen = choice?.[item.key];
+    const styleNames: Record<AccountStyle, string> = { standard: '標準', ec: 'EC', restaurant: '飲食店', salon: 'サロン', consult: '相談', lesson: '教室' };
+    const sampleName = '【見本】' + ((firstDeferredSelection || options.repairMissing) && existing.some(row => row.item_key === item.key && row.style !== style) ? styleNames[style] + '：' : '') + item.name;
     if (chosen && !['sample', 'existing', 'configured'].includes(chosen.mode))
       throw new StyleError('invalid_choices');
     let id = crypto.randomUUID(),
@@ -246,7 +270,7 @@ export async function insertStyleStarterItems(
           .bind(
             id,
             account,
-            '【見本】' + item.name,
+            sampleName,
             item.text ?? item.name,
           ),
       );
@@ -257,7 +281,7 @@ export async function insertStyleStarterItems(
           .prepare(
             `INSERT INTO automation_definitions(id,line_account_id,name,status,created_by) VALUES(?,?,?,'draft',?)`,
           )
-          .bind(id, account, '【見本】' + item.name, actor),
+          .bind(id, account, sampleName, actor),
       );
       statements.push(
         db
@@ -310,7 +334,7 @@ export async function insertStyleStarterItems(
           },
         ],
         lineAccountId: account,
-        name: '【見本】' + item.name,
+        name: sampleName,
         description: null,
         triggerType: style === 'lesson' ? 'event' : 'booking',
         triggerOffsetMinutes: null,
@@ -363,7 +387,7 @@ export async function insertStyleStarterItems(
           .bind(
             id,
             account,
-            '【見本】' + item.name,
+            sampleName,
             item.durationMinutes ?? 60,
             item.price ?? 0,
           ),
@@ -375,7 +399,7 @@ export async function insertStyleStarterItems(
           .prepare(
             `INSERT INTO rich_menu_groups(id,account_id,name,chat_bar_text,size,status) VALUES(?,?,?,'メニュー','large','draft')`,
           )
-          .bind(id, account, '【見本】' + item.name),
+          .bind(id, account, sampleName),
       );
       statements.push(
         db
@@ -423,7 +447,7 @@ export async function insertStyleStarterItems(
           .prepare(
             `INSERT INTO scenarios(id,name,description,trigger_type,is_active,allow_concurrent,line_account_id,created_at,updated_at) VALUES(?,?,?,'manual',0,1,?,?,?)`,
           )
-          .bind(id, '【見本】' + item.name, '友だち追加から始める見本です。動かすまで、だれにも届きません。', account, now, now),
+          .bind(id, sampleName, '友だち追加から始める見本です。動かすまで、だれにも届きません。', account, now, now),
         ...scenarioStepStatements(db, id, item, now),
       );
     } else if (item.kind === 'friend_add_rule') {

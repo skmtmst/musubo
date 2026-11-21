@@ -5,7 +5,7 @@ import type { Env } from '../worker-env.js';
 import { styles } from './styles.js';
 import { gettingStarted } from './getting-started.js';
 import { initializeAccountStyle, starter } from '../services/style-setup.js';
-import { ensureStyleStarterItems } from '../services/style-starter-ensure.js';
+import { ensureStyleStarterItems, starterApplication } from '../services/style-starter-ensure.js';
 
 vi.mock('../services/account-access.js', () => ({
   getVisibleLineAccountScope: async () => ({
@@ -102,7 +102,154 @@ afterEach(() => {
   sql.raw.close();
 });
 
+test('多数の見本がある店で初期セット確認の問い合わせ回数を抑える', async () => {
+  await initializeAccountStyle(sql.db, 'a', 't', 'owner');
+  for (const style of ['standard', 'salon', 'restaurant', 'ec', 'consult', 'lesson', 'salon']) {
+    const r = await request(base + '?account_id=a', 'PUT', {expectedVersion: version(), style, answers: allAnswers});
+    expect(r.status).toBe(200);
+  }
+  const total = count('style_starter_items');
+  // prepare だけではなく、実行した SQL と batch・exec の往復を数える。
+  let queries = 0;
+  const measured = new Proxy(sql.db, {
+    get(target, prop) {
+      if (prop === 'batch') return (...args: Parameters<D1Database['batch']>) => { queries++; return target.batch(...args); };
+      if (prop === 'exec') return (...args: Parameters<D1Database['exec']>) => { queries++; return target.exec(...args); };
+      if (prop !== 'prepare') return Reflect.get(target, prop);
+      return (query: string) => {
+        const wrap = (statement: D1PreparedStatement): D1PreparedStatement => new Proxy(statement, {
+          get(stmt, method) {
+            if (method === 'bind') return (...args: unknown[]) => wrap(stmt.bind(...args));
+            if (method === 'first' || method === 'all' || method === 'run') return (...args: unknown[]) => { queries++; return (Reflect.get(stmt, method) as (...args: unknown[]) => unknown)(...args); };
+            return Reflect.get(stmt, method);
+          },
+        });
+        return wrap(target.prepare(query));
+      };
+    },
+  });
+  const result = await starterApplication(measured, 'a', 't');
+  expect(total).toBeGreaterThan(30);
+  expect(result).toMatchObject({applied: true, count: 30, missing: 0});
+  expect(queries).toBeLessThanOrEqual(20);
+});
+
 describe('新しいアカウントの初期セット', () => {
+  test('選択中の見本だけを数えて欠けた同名の見本を補充する', async () => {
+    await initializeAccountStyle(sql.db, 'a', 't', 'owner');
+    expect((await request(base + '?account_id=a', 'PUT', { expectedVersion: 1, styleMode: 'later' })).status).toBe(200);
+    expect((await request(base + '?account_id=a', 'PUT', { expectedVersion: 2, style: 'salon', answers: allAnswers })).status).toBe(200);
+    const old = sql.raw.prepare("SELECT * FROM style_starter_items WHERE line_account_id='a' AND style='standard' ORDER BY item_key").all();
+    const templates = sql.raw.prepare("SELECT * FROM templates WHERE id IN (SELECT target_id FROM style_starter_items WHERE line_account_id='a' AND style='standard' AND kind='template') ORDER BY id").all();
+    const shared = sql.raw.prepare("SELECT s.item_key FROM style_starter_items s JOIN style_starter_items o ON o.line_account_id=s.line_account_id AND o.item_key=s.item_key AND o.style='standard' WHERE s.line_account_id='a' AND s.style='salon' AND s.kind='template' LIMIT 1").get() as {item_key: string};
+    expect(shared).toBeTruthy();
+    const before = sql.raw.prepare("SELECT * FROM style_starter_items WHERE line_account_id='a' AND style='salon' ORDER BY item_key").all();
+    const initialState = await request('/api/getting-started?account_id=a&version=v8');
+    sql.raw.prepare("UPDATE templates SET deleted_at='2026-11-17' WHERE id=(SELECT target_id FROM style_starter_items WHERE line_account_id='a' AND style='salon' AND item_key=?)").run(shared.item_key);
+    const state = await request('/api/getting-started?account_id=a&version=v8');
+    expect(state.body.data.starter).toMatchObject({count: initialState.body.data.starter.count - 1, missing: 1});
+    const result = await request(ensurePath, 'POST', {expectedVersion: version()});
+    expect(result.status).toBe(200);
+    expect(result.body.data.inserted).toEqual([expect.objectContaining({key: shared.item_key})]);
+    expect(result.body.data.existing).toBe(initialState.body.data.starter.count - 1);
+    expect(sql.raw.prepare("SELECT * FROM style_starter_items WHERE line_account_id='a' AND style='standard' ORDER BY item_key").all()).toEqual(old);
+    for (const row of templates as Array<{id: string}>) expect(sql.raw.prepare('SELECT * FROM templates WHERE id=?').get(row.id)).toEqual(row);
+    const remaining = sql.raw.prepare("SELECT * FROM style_starter_items WHERE line_account_id='a' AND style='salon' AND item_key!=? ORDER BY item_key").all(shared.item_key);
+    expect(remaining).toEqual((before as Array<{item_key:string}>).filter(row => row.item_key !== shared.item_key));
+  });
+  test.each([
+    ['reminder', 'salon', "UPDATE reminders SET deleted_at='2026-11-17' WHERE id=?"],
+    ['automation', 'restaurant', "UPDATE automation_definitions SET status='archived' WHERE id=?"],
+    ['friend_add_rule', 'standard', "UPDATE friend_add_rules SET status='archived',archived_at='2026-11-17' WHERE id=?"],
+  ])('削除した %s の見本を補充する', async (kind, style, remove) => {
+    await initializeAccountStyle(sql.db, 'a', 't', 'owner');
+    expect((await request(base + '?account_id=a', 'PUT', {expectedVersion: 1, style, answers: allAnswers})).status).toBe(200);
+    const original = sql.raw.prepare("SELECT item_key,target_id FROM style_starter_items WHERE line_account_id='a' AND style=? AND kind=? LIMIT 1").get(style, kind) as {item_key:string;target_id:string};
+    expect(original).toBeTruthy();
+    sql.raw.prepare(remove).run(original.target_id);
+    const result = await request(ensurePath, 'POST', {expectedVersion: version()});
+    expect(result.status).toBe(200);
+    expect(result.body.data.inserted).toContainEqual(expect.objectContaining({key:original.item_key, kind}));
+    const replacement = sql.raw.prepare("SELECT target_id FROM style_starter_items WHERE line_account_id='a' AND style=? AND item_key=?").get(style, original.item_key) as {target_id:string};
+    expect(replacement.target_id).not.toBe(original.target_id);
+    const again = await request(ensurePath, 'POST', {expectedVersion: version()});
+    expect(again.body.data.inserted).toEqual([]);
+  });
+  test('通常切り替えで再利用した見本を不足と判定しない', async () => {
+    await initializeAccountStyle(sql.db, 'a', 't', 'owner');
+    expect((await request(base + '?account_id=a', 'PUT', {expectedVersion: 1, style: 'standard', answers: allAnswers})).status).toBe(200);
+    expect((await request(base + '?account_id=a', 'PUT', {expectedVersion: 2, style: 'salon', answers: allAnswers})).status).toBe(200);
+    const old = sql.raw.prepare("SELECT * FROM style_starter_items WHERE line_account_id='a' AND style='standard' ORDER BY item_key").all();
+    const before = sql.raw.prepare("SELECT * FROM templates WHERE line_account_id='a' ORDER BY id").all();
+    const state = await request('/api/getting-started?account_id=a&version=v8');
+    expect(state.body.data.starter.missing).toBe(0);
+    const result = await request(ensurePath, 'POST', {expectedVersion: version()});
+    expect(result.status).toBe(200);
+    expect(result.body.data.inserted).toEqual([]);
+    expect(sql.raw.prepare("SELECT * FROM templates WHERE line_account_id='a' ORDER BY id").all()).toEqual(before);
+    expect(sql.raw.prepare("SELECT * FROM style_starter_items WHERE line_account_id='a' AND style='standard' ORDER BY item_key").all()).toEqual(old);
+  });
+  test('後からサロンを選ぶと標準の見本を保ちサロンの見本を追加する', async () => {
+    await initializeAccountStyle(sql.db, 'a', 't', 'owner');
+    const before = sql.raw.prepare("SELECT * FROM style_starter_items WHERE line_account_id='a' AND style='standard' ORDER BY item_key").all();
+    const templates = sql.raw.prepare("SELECT * FROM templates WHERE line_account_id='a' ORDER BY id").all();
+    const original = sql.raw.prepare("SELECT * FROM scenarios WHERE line_account_id='a'").all();
+    const steps = sql.raw.prepare("SELECT * FROM scenario_steps WHERE scenario_id IN (SELECT id FROM scenarios WHERE line_account_id='a') ORDER BY step_order").all();
+    expect((await request(base + '?account_id=a', 'PUT', { expectedVersion: 1, styleMode: 'later' })).status).toBe(200);
+    expect((await request(base + '?account_id=a', 'PUT', { expectedVersion: 2, style: 'salon', answers: allAnswers })).status).toBe(200);
+    const scenario = sql.raw.prepare("SELECT target_id FROM style_starter_items WHERE line_account_id='a' AND style='salon' AND item_key='friend-add-scenario'").get() as { target_id: string };
+    const actual = sql.raw.prepare('SELECT message_content FROM scenario_steps WHERE scenario_id=? ORDER BY step_order').all(scenario.target_id);
+    const item = (await starter(sql.db, 't', 'salon')).definition.items.find((entry) => entry.key === 'friend-add-scenario')!;
+    expect(actual).toEqual(item.steps!.map((step) => ({ message_content: step.text })));
+    expect(sql.raw.prepare("SELECT * FROM style_starter_items WHERE line_account_id='a' AND style='standard' ORDER BY item_key").all()).toEqual(before);
+    for (const template of templates as Array<{ id: string }>) {
+      expect(sql.raw.prepare('SELECT * FROM templates WHERE id=?').get(template.id)).toEqual(template);
+    }
+    expect(sql.raw.prepare("SELECT * FROM scenarios WHERE id=?").all((original[0] as { id: string }).id)).toEqual(original);
+    expect(sql.raw.prepare("SELECT * FROM scenario_steps WHERE scenario_id=? ORDER BY step_order").all((original[0] as { id: string }).id)).toEqual(steps);
+    const after = sql.raw.prepare("SELECT * FROM style_starter_items WHERE line_account_id='a' ORDER BY style,item_key").all();
+    expect((await request(base + '?account_id=a', 'PUT', { expectedVersion: 3, style: 'salon', answers: allAnswers })).status).toBe(200);
+    expect(sql.raw.prepare("SELECT * FROM style_starter_items WHERE line_account_id='a' ORDER BY style,item_key").all()).toEqual(after);
+  });
+  test('スタイルを後で選ぶと対象の店に見本が入り、再保存しても重複しない', async () => {
+    const item = { key: 'salon-later', kind: 'template', name: 'サロンの案内', text: 'サロンの本文' };
+    expect((await request(hqPath('salon'), 'PUT', { expectedVersion: 0, name: 'サロンの見本', definition: { items: [item] } })).status).toBe(200);
+    await initializeAccountStyle(sql.db, 'a', 't', 'owner');
+    await initializeAccountStyle(sql.db, 'b', 't', 'owner');
+    const otherProfile = sql.raw.prepare("SELECT * FROM account_styles WHERE line_account_id='b'").all();
+    const otherTemplates = sql.raw.prepare("SELECT * FROM templates WHERE line_account_id='b'").all();
+    const otherBefore = sql.raw.prepare("SELECT * FROM style_starter_items WHERE line_account_id='b'").all();
+    expect((await request(base + '?account_id=a', 'PUT', { expectedVersion: 1, styleMode: 'later' })).status).toBe(200);
+    expect(starterRows().some((row) => row.item_key === item.key)).toBe(false);
+    const selected = await request(base + '?account_id=a', 'PUT', { expectedVersion: 2, style: 'salon' });
+    expect(selected.status).toBe(200);
+    expect(selected.body.data.inserted).toEqual(expect.arrayContaining([expect.objectContaining({ key: item.key })]));
+    const rows = starterRows();
+    const created = rows.find((row) => row.item_key === item.key);
+    expect(created).toMatchObject({ kind: 'template' });
+    expect(sql.raw.prepare('SELECT line_account_id FROM templates WHERE id=?').get(created!.target_id)).toEqual({ line_account_id: 'a' });
+    const templateCount = count('templates');
+    expect((await request(base + '?account_id=a', 'PUT', { expectedVersion: 3, style: 'salon' })).status).toBe(200);
+    expect(starterRows()).toEqual(rows);
+    expect(count('templates')).toBe(templateCount);
+    expect(sql.raw.prepare("SELECT * FROM style_starter_items WHERE line_account_id='b'").all()).toEqual(otherBefore);
+    expect(sql.raw.prepare("SELECT * FROM account_styles WHERE line_account_id='b'").all()).toEqual(otherProfile);
+    expect(sql.raw.prepare("SELECT * FROM templates WHERE line_account_id='b'").all()).toEqual(otherTemplates);
+  });
+
+  test('後で選んだスタイルの統括の組が自動投入オフなら、理由を返して入れない', async () => {
+    const item = { key: 'salon-later-off', kind: 'template', name: 'サロンの案内', text: 'サロンの本文' };
+    expect((await request(hqPath('salon'), 'PUT', { expectedVersion: 0, name: 'サロンの見本', definition: { items: [item] }, autoInsert: false })).status).toBe(200);
+    await initializeAccountStyle(sql.db, 'a', 't', 'owner');
+    const before = starterRows();
+    expect((await request(base + '?account_id=a', 'PUT', { expectedVersion: 1, styleMode: 'later' })).status).toBe(200);
+    const selected = await request(base + '?account_id=a', 'PUT', { expectedVersion: 2, style: 'salon' });
+    expect(selected.status).toBe(200);
+    expect(selected.body.data).toMatchObject({ inserted: [], skipped: [{ key: item.key, reason: 'auto_insert_off' }] });
+    expect(starterRows()).toEqual(before);
+    expect(count('templates', "line_account_id='b'")).toBe(0);
+  });
+
   test('1. スタイルの保存で組の数ちょうど入り、自動で送る物は全部止まっている', async () => {
     const r = await request(base + '?account_id=a', 'PUT', { expectedVersion: 0, style: 'salon', answers: allAnswers });
     expect(r.status).toBe(200);
