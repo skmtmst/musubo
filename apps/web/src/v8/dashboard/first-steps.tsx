@@ -37,13 +37,12 @@ export type { FirstStepsGuide, FirstStepsSummary } from './first-steps-model'
  * 一時停止は案内の帯側で受けるので、ここには出さない（同じ操作を2か所に置かない）。
  */
 export function FirstStepsGuideFooter({ guide }: { guide: FirstStepsGuide }) {
-  const anchor = guide.anchor ?? guide.pausedAnchor
+  const anchor = guide.pausedAnchor ?? guide.anchor
   if (!anchor || guide.phase === 'done') return null
-  const restart = () => { guide.reset(); guide.start() }
   return (
     <div className={styles.guideFooter}>
       <Button size="compact" variant="primary" presentation="step-action" onClick={guide.phase === 'paused' ? guide.resume : guide.start}>続きから進める</Button>
-      <Button size="compact" presentation="step-action" onClick={restart}>最初から始める</Button>
+      <Button size="compact" presentation="step-action" onClick={guide.start}>最初から始める</Button>
       <FirstStepsGuideNote />
     </div>
   )
