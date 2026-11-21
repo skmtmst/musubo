@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, insertFriend } from '../../test-utils/d1-sqlite.js';
 import { processQueuedBroadcasts, processBroadcastSend } from './broadcast.js';
-import { reopenFailedClaims, updateBroadcastStatus, beginBroadcastRetryAttempt } from '@line-crm/db';
+import { reopenFailedClaims, updateBroadcastStatus, beginBroadcastRetryAttempt, requestBroadcastStop, resumeBroadcastSending } from '@line-crm/db';
 import { prepareHqBroadcast, dispatchHqBroadcast } from '../../services/hq-broadcasts.js';
 
 const sends = vi.hoisted(() => [] as string[]);
@@ -149,4 +149,72 @@ it.each([false,true])('重複除外の旧進捗に宛先snapshotが無い場合�
   const result=await processMultiAccountDedupBroadcast(f.db,{id:'b',account_ids:'["a"]',dedup_priority:'["a"]',target_tag_id:'t',message_type:'text',message_content:'案内',dedup_progress:progress},()=>({async multicast(ids:string[]){sends.push(...ids);return {requestId:'fake'};}} as never));
   expect(sends).toHaveLength(0);expect(result.complete).toBe(false);expect(result.stopped).toBe(true);
   expect(f.raw.prepare("SELECT reason FROM broadcast_lifecycle_events WHERE broadcast_id='b'").get()).toMatchObject({reason:expect.stringContaining('要確認')});
+});
+
+it.each([[false, false],[true, false],[false, true],[true, true]])('複数アカウントで旧処理と再送・再開が重なっても二重送信しない（個別=%s、再開=%s）', async (personalized, resume) => {
+  const f = createTestD1(); opened.push(f);
+  f.raw.exec(`INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES('a','店A','ca','fake','fake'),('b','店B','cb','fake','fake');
+    INSERT INTO broadcasts(id,title,message_type,message_content,target_type,account_ids,dedup_priority,status,track_links)
+    VALUES('bcast','試験','text','案内','multi-account-dedup','["a","b"]','["a","b"]','sending',0)`);
+  insertFriend(f.raw, 'fa', {line_account_id:'a',line_user_id:'Ushared',user_id:'shared'});
+  insertFriend(f.raw, 'fb', {line_account_id:'b',line_user_id:'Uother',user_id:'shared'});
+  let unblock!: () => void; let reached!: () => void;
+  const paused = new Promise<void>(r => { reached = r; });
+  const gate = new Promise<void>(r => { unblock = r; });
+  let held = false;
+  const oldDb = {...f.db, async batch(statements: D1PreparedStatement[]) {
+    if (!held && statements.some(s => ((s as unknown as {sql?:string}).sql ?? '').includes('dispatched_at, created_at'))) {
+      held = true; reached(); await gate;
+    }
+    return f.db.batch(statements);
+  }} as D1Database;
+  const {processMultiAccountDedupBroadcast} = await import('../../services/dedup-broadcast.js');
+  const args = {id:'bcast',account_ids:'["a","b"]',dedup_priority:'["a","b"]',message_type:'text',message_content:personalized?'{{name}} さん':'案内'};
+  const fake = () => ({async multicast(ids:string[]) {sends.push(...ids);}, async pushMessage(id:string) {sends.push(id);}} as never);
+  const before = f.raw.prepare("SELECT lock_version FROM broadcasts WHERE id='bcast'").get() as {lock_version:number};
+  const oldRun = processMultiAccountDedupBroadcast(oldDb,{...args,lock_version:before.lock_version},fake);
+  await paused;
+  expect(await requestBroadcastStop(f.db,{id:'bcast',expectedVersion:before.lock_version})).toBe(1);
+  if (resume) {
+    expect(await resumeBroadcastSending(f.db,{id:'bcast',expectedVersion:before.lock_version+1})).toBe(1);
+  } else {
+    expect(await beginBroadcastRetryAttempt(f.db,{id:'bcast',expectedVersion:before.lock_version+1})).toEqual({changes:1,attemptNo:2});
+  }
+  const {dedup_progress} = f.raw.prepare("SELECT dedup_progress FROM broadcasts WHERE id='bcast'").get() as {dedup_progress:string};
+  await processMultiAccountDedupBroadcast(f.db,{...args,send_attempt_no:resume?1:2,lock_version:before.lock_version+2,dedup_progress},fake);
+  unblock(); await oldRun;
+  expect(sends).toEqual(['Ushared']);
+  expect(f.raw.prepare("SELECT attempt_no,state FROM broadcast_send_claims WHERE broadcast_id='bcast' AND friend_id='fa'").get()).toEqual({attempt_no:resume?1:2,state:'sent'});
+});
+
+it('重複除外の中断後は送信途中の相手を送達不明にし、残りには送る', async () => {
+  const f = createTestD1(); opened.push(f);
+  f.raw.exec(`INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES('a','店A','ca','fake','fake'),('b','店B','cb','fake','fake');
+    INSERT INTO broadcasts(id,title,message_type,message_content,target_type,account_ids,dedup_priority,status,batch_offset,track_links)
+    VALUES('bcast','試験','text','案内','multi-account-dedup','["a","b"]','["a","b"]','sending',0,0)`);
+  insertFriend(f.raw,'first',{line_account_id:'a'}); insertFriend(f.raw,'second',{line_account_id:'a'}); insertFriend(f.raw,'third',{line_account_id:'b'});
+  const {computeDedupBroadcastPreview} = await import('../../services/dedup-broadcast.js');
+  const audience = await computeDedupBroadcastPreview(f.db,['a','b'],['a','b']);
+  f.raw.prepare("UPDATE broadcasts SET dedup_progress=? WHERE id='bcast'").run(JSON.stringify({sentIdentKeys:[],audience}));
+  f.raw.exec("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state,dispatched_at) VALUES('bcast','first','a',1,'claimed','2026-11-21')");
+  await processQueuedBroadcasts(f.db,client);
+  expect(new Set(sends)).toEqual(new Set(['Usecond','Uthird']));
+  expect(f.raw.prepare("SELECT state,error_code FROM broadcast_send_claims WHERE broadcast_id='bcast' AND friend_id='first'").get()).toEqual({state:'unknown',error_code:'interrupted_dispatch'});
+  expect(f.raw.prepare("SELECT status,success_count FROM broadcasts WHERE id='bcast'").get()).toEqual({status:'sent',success_count:2});
+});
+
+it('前の再送で未送信のまま残った宛先も、次の再送では送れる', async () => {
+  const f = createTestD1(); opened.push(f);
+  f.raw.exec(`INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES('a','店A','ca','fake','fake'),('b','店B','cb','fake','fake');
+    INSERT INTO broadcasts(id,title,message_type,message_content,target_type,account_ids,dedup_priority,status,batch_offset,track_links,send_attempt_no)
+    VALUES('bcast','試験','text','案内','multi-account-dedup','["a","b"]','["a","b"]','sending',0,0,3)`);
+  insertFriend(f.raw,'first',{line_account_id:'a'}); insertFriend(f.raw,'second',{line_account_id:'a'}); insertFriend(f.raw,'third',{line_account_id:'b'});
+  const {computeDedupBroadcastPreview} = await import('../../services/dedup-broadcast.js');
+  const audience = await computeDedupBroadcastPreview(f.db,['a','b'],['a','b']);
+  f.raw.prepare("UPDATE broadcasts SET dedup_progress=? WHERE id='bcast'").run(JSON.stringify({sentIdentKeys:[],audience}));
+  f.raw.exec("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state) VALUES('bcast','first','a',2,'claimed')");
+  await processQueuedBroadcasts(f.db,client);
+  expect(new Set(sends)).toEqual(new Set(['Ufirst','Usecond','Uthird']));
+  expect(f.raw.prepare("SELECT attempt_no,state FROM broadcast_send_claims WHERE broadcast_id='bcast' AND friend_id='first'").get()).toEqual({attempt_no:3,state:'sent'});
+  expect(f.raw.prepare("SELECT status,success_count FROM broadcasts WHERE id='bcast'").get()).toEqual({status:'sent',success_count:3});
 });
