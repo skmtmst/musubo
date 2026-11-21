@@ -470,7 +470,7 @@
 
 ## 反映履歴
 
-- [お客さまデータ削除の漏れを修正](release-log/unreleased/PR-kenta-purge-gaps.md)
+- [お客さまデータ削除の漏れを修正](release-log/unreleased/149-kenta-purge-gaps.md)
 
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
