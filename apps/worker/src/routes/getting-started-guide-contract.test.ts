@@ -19,6 +19,7 @@ const row = {
 const db = {
   getOnboardingGuideProgress: vi.fn(async () => row),
   saveOnboardingGuideProgress: vi.fn(async () => row),
+  acknowledgeOnboardingWelcome: vi.fn(async () => row),
   hasSavedFeatureConfiguration: vi.fn(async () => false),
   hasFirstDeliveredMessage: vi.fn(async () => true),
   toJstString: (date: Date) => date.toISOString(),
@@ -140,4 +141,27 @@ it('文書は成功の包み（success と data）を必須にしている', () 
 it('包みの無い応答は差分として検出できる（検査自体の確かさ）', () => {
   expect(mismatches(documented('get'), { phase: 'idle', stepKey: null, procedureIndex: 1, updatedAt: null }).length)
     .toBeGreaterThan(0);
+});
+
+it('ウェルカムの確認結果は進行を書き換えず、既存の進み具合を返す', async () => {
+  const response = await app().request('/api/getting-started/guide?account_id=account-1', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ phase: 'idle', stepKey: null, procedureIndex: 1, acknowledgeWelcome: true }),
+  }, environment);
+  expect(response.status).toBe(200);
+  expect(db.acknowledgeOnboardingWelcome).toHaveBeenCalledWith(environment.DB, 'staff-1', 'account-1');
+  expect(db.saveOnboardingGuideProgress).not.toHaveBeenCalled();
+  expect(await response.json()).toMatchObject({ data: { phase: 'active', stepKey: 'hours', procedureIndex: 2 } });
+});
+
+it('ウェルカムの確認を通常の進行更新と組み合わせた場合は保存しない', async () => {
+  const response = await app().request('/api/getting-started/guide?account_id=account-1', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ phase: 'active', stepKey: 'hours', procedureIndex: 2, acknowledgeWelcome: true }),
+  }, environment);
+  expect(response.status).toBe(400);
+  expect(db.acknowledgeOnboardingWelcome).not.toHaveBeenCalled();
+  expect(db.saveOnboardingGuideProgress).not.toHaveBeenCalled();
 });

@@ -1,3 +1,4 @@
+import { restaurantGuideMenu } from '@line-crm/shared';
 import { materializeInitialMenuAssets } from './style-initial-assets.js';
 import type { SetupAnswer } from '@line-crm/shared';
 import { hasPendingStyleSelection, profile, type StyleProfile } from './style-profile.js';
@@ -85,7 +86,7 @@ export async function ensureStyleStarterItems(
   const now = new Date().toISOString();
   const answers = JSON.parse(p.answers_json) as Record<string,SetupAnswer>;
   if(answers.image?.mode==='configured' && answers.image.value==='simple')
-    await materializeInitialMenuAssets(db,images,account,p.style,(await starter(db,tenant,p.style,true)).definition);
+    await materializeInitialMenuAssets(db,images,account,p.style,(await starter(db,tenant,p.style,true)).definition,restaurantGuideMenu(p.style,answers.restaurantMenuPreset));
   const { set, inserted, updated, skipped, existing, statements } = await planMissingStarterItems(db,account,tenant,actor,p,now);
   const keys = new Set(set.definition.items.map((item) => item.key));
   const result = {

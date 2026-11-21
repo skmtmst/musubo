@@ -49,7 +49,7 @@ export default function GettingStartedV8() {
   const firstRun = useFirstRun(selectedAccountId, !accountLoading)
   const progress = useStyleSetupProgress(selectedAccountId, profile.data?.style ?? null, !accountLoading)
   const steps = stepsForStyle(firstRun.steps, profile.data?.style ?? null, progress.progress)
-  const status = firstRun.status !== 'ready' || !selectedAccountId ? firstRun.status : profile.status === 'ready' ? 'ready' : profile.status === 'error' ? 'error' : 'loading'
+  const status = firstRun.status !== 'ready' || !selectedAccountId ? firstRun.status : profile.status === 'ready' && progress.status !== 'loading' ? 'ready' : profile.status === 'error' ? 'error' : 'loading'
   const loadError = firstRun.error ?? profile.error
   const reload = () => { firstRun.reload(); progress.reload(); profile.reload() }
   const firstMessage = steps.find(step => step.key === 'firstMessage')
@@ -92,7 +92,7 @@ export default function GettingStartedV8() {
                 action={<Button size="compact" aria-label="受信後に状態を読み直す" onClick={reload}>読み直す</Button>}
               />
               <p className={styles.cardLine}>QRから友だち追加するか、シナリオを選んで自分にテスト送信してください。受け取ったらLINEで本文を確かめてください。</p>
-              {role ? <div className={styles.bottom}>
+              {role ? <div className={styles.messageActions}>
                 <Button href="/?qr=base" lockedReason={sendReason}>友だち追加のQRを開く</Button>
                 <Button href="/scenarios" lockedReason={sendReason}>シナリオを選んでテスト送信する</Button>
               </div> : null}
@@ -127,7 +127,7 @@ function StepRow({ step, role }: { step: StepResult; role: string | null }) {
   const reason = role ? lockUnless(allowed, role === 'viewer' ? 'viewer' : 'feature') : undefined
   const done = step.state === 'done'
   return (
-    <GridRow data-step-state={step.state}>
+    <GridRow className={styles.stepRow} data-step-state={step.state}>
       <GridCell><span className={`${styles.mark} ${done ? styles.markDone : ''}`} aria-label={done ? '済み' : `手順${step.ordinal}`}>{done ? <Check size={16} aria-hidden="true" /> : step.ordinal}</span></GridCell>
       <GridCell><div className={styles.stepBody}>
         <strong className={done ? styles.stepDoneTitle : undefined}><TruncatedText value={step.title} /></strong>
