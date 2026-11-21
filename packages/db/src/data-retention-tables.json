@@ -995,7 +995,7 @@
   "broadcasts": {
     "category": "purge",
     "scope": {
-      "by": "lineAccount",
+      "by": "broadcast",
       "column": "line_account_id"
     }
   },
