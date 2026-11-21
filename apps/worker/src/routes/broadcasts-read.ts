@@ -17,6 +17,7 @@ import { getLineAccountById } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { countRetryableRecipients, RETRYABLE_UNSENT_CLAIM_SQL } from '@line-crm/db';
 import { ACCOUNT_ACCESS_ERROR, ledgerCountsForBroadcasts, serializeBroadcast, BroadcastNotificationSettings, BROADCAST_NOTIFICATION_KEY, DEFAULT_BROADCAST_NOTIFICATIONS, notificationSentence, canAccessBroadcast, broadcastStatusView, recipientResultFilter, failedBreakdown } from './broadcasts-definition.js';
 import type { Context, Next } from 'hono';
 
@@ -257,7 +258,7 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
   interface RecipientRow {
     friend_id: string; line_account_id: string | null; state: string;
     error_code: string | null; line_request_id: string | null; line_account_hidden: number;
-    dispatched_at: string | null; settled_at: string | null; display_name: string | null;
+    dispatched_at: string | null; settled_at: string | null; display_name: string | null; retryable_unsent: number;
   }
   const queryResult = aggregateOnly
     ? { results: [] as RecipientRow[] }
@@ -267,6 +268,7 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
                 CASE WHEN c.line_account_id IS NOT NULL AND c.line_account_id NOT IN (${visibleAccounts.sql}) THEN 1 ELSE 0 END AS line_account_hidden,
                 CASE WHEN c.line_account_id IS NULL OR c.line_account_id IN (${visibleAccounts.sql}) THEN c.line_request_id ELSE NULL END AS line_request_id,
                 c.state, c.error_code, c.dispatched_at, c.settled_at,
+                CASE WHEN ${RETRYABLE_UNSENT_CLAIM_SQL} THEN 1 ELSE 0 END AS retryable_unsent,
                 f.display_name
            FROM broadcast_send_claims c
            LEFT JOIN friends f ON f.id = c.friend_id
@@ -276,9 +278,10 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
     ).bind(...visibleAccounts.binds,...visibleAccounts.binds,...visibleAccounts.binds,id,...visible.bindings,limit + 1,cursor).all<RecipientRow>();
   const allRows = queryResult.results ?? [];
   const page = allRows.slice(0, limit);
-  const [counts, breakdown] = await Promise.all([
+  const [counts, breakdown, retryableCount] = await Promise.all([
     countBroadcastLedger(c.env.DB, id),
     failedBreakdown(c.env.DB, id),
+    countRetryableRecipients(c.env.DB, id),
   ]);
   const ledgerRows = counts.sent + counts.failed + counts.unknown + counts.claimed;
   const totalCount = raw.total_count as number | null | undefined;
@@ -287,13 +290,13 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
     failedTemporary: breakdown.temporary,
     failedPermanent: breakdown.permanent,
     unknown: counts.unknown,
-    inFlight: counts.claimed,
-    pending: totalCount == null ? null : Math.max(0, Number(totalCount) - ledgerRows),
+    inFlight: Math.max(0, counts.claimed - Math.max(0, retryableCount - breakdown.temporary)),
+    pending: totalCount == null ? null : Math.max(0, Number(totalCount) - ledgerRows) + Math.max(0, retryableCount - breakdown.temporary),
     total: totalCount == null ? ledgerRows : Number(totalCount),
-    retryableCount: breakdown.temporary,
+    retryableCount,
   };
   const responseItems = page.map((row) => {
-        const view = classifyBroadcastRecipient(row.state, row.error_code);
+        const view = row.retryable_unsent ? {group:'failed_temporary' as const, label:'未送信（再送できます）', detail:'まだ送っていないため、再送できます', retryable:true} : classifyBroadcastRecipient(row.state, row.error_code);
         return {
           friendId: row.friend_id,
           displayName: row.display_name || '名前がありません',

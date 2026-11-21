@@ -12,6 +12,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
+import { reopenUnsentClaims } from '@line-crm/db';
 import type { Env } from '../worker-env';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
@@ -233,6 +234,85 @@ describe('一斉配信の停止・再開・失敗分再送（#662）', () => {
       seedClaim(testDb, 'f1', 'failed');
       const res = await app(testDb.db).request('/api/broadcasts/b1/retry-failed', post({ expectedVersion: 1 }));
       expect(res.status).toBe(428);
+      expect(broadcastRow(testDb).send_attempt_no).toBe(1);
+    });
+
+    it('未送信の押さえだけが残った完了配信は再送できる', async () => {
+      seedBroadcast(testDb, 'b1', {status:'sent'});
+      seedClaim(testDb, 'f1', 'claimed', {dispatched:false});
+      const res = await app(testDb.db).request('/api/broadcasts/b1/retry-failed', post({expectedVersion:1}, CONFIRM_HEADERS));
+      expect(res.status).toBe(202);
+      expect(await res.json()).toMatchObject({attemptNo:2,retryTargets:1});
+    });
+
+    it('停止中の配信に残った未送信の押さえを再送する', async () => {
+      seedBroadcast(testDb, 'b1', {status:'sending',stopped_at:'2026-11-21'});
+      seedClaim(testDb, 'f1', 'claimed', {dispatched:false});
+      seedClaim(testDb, 'f2', 'unknown');
+      const response = await app(testDb.db).request('/api/broadcasts/b1/retry-failed', post({expectedVersion:1}, CONFIRM_HEADERS));
+      expect(response.status).toBe(202);
+      expect(await response.json()).toMatchObject({attemptNo:2,retryTargets:1});
+      expect(testDb.raw.prepare("SELECT friend_id,state,attempt_no FROM broadcast_send_claims WHERE broadcast_id='b1' ORDER BY friend_id").all()).toEqual([
+        {friend_id:'f1',state:'claimed',attempt_no:2},{friend_id:'f2',state:'unknown',attempt_no:1},
+      ]);
+    });
+
+    it('完了後に残った未送信の押さえだけを再送し、送信済みや送信途中は触らない', async () => {
+      seedBroadcast(testDb, 'b1', { status: 'sent', sent_at: '2026-09-11T10:00:00.000' });
+      seedClaim(testDb, 'f1', 'claimed', { dispatched: false });
+      seedClaim(testDb, 'f2', 'sent');
+      seedClaim(testDb, 'f3', 'claimed', { dispatched: true });
+      const detail = await app(testDb.db).request('/api/broadcasts/b1');
+      expect(await detail.json()).toMatchObject({data:{ledger:{retryableCount:1}}});
+      const progress = await app(testDb.db).request('/api/broadcasts/b1/progress');
+      expect(await progress.json()).toMatchObject({data:{ledger:{retryableCount:1}}});
+      const recipients = await app(testDb.db).request('/api/broadcasts/b1/recipients');
+      expect(await recipients.json()).toMatchObject({data:{summary:{retryableCount:1,inFlight:1,pending:1},rows:expect.arrayContaining([
+        expect.objectContaining({friendId:'f1',label:'未送信（再送できます）',retryable:true,group:'failed_temporary'}),
+        expect.objectContaining({friendId:'f3',label:'送信中',retryable:false,group:'inflight'}),
+      ])}});
+      const filtered = await app(testDb.db).request('/api/broadcasts/b1/recipients?result=temporary');
+      expect(await filtered.json()).toMatchObject({data:{rows:[expect.objectContaining({friendId:'f1'})]}});
+      const res = await app(testDb.db).request('/api/broadcasts/b1/retry-failed', post({ expectedVersion: 1 }, CONFIRM_HEADERS));
+      expect(res.status).toBe(202);
+      expect(await res.json()).toMatchObject({attemptNo:2,retryTargets:1});
+      expect(testDb.raw.prepare(`SELECT friend_id,state,attempt_no,dispatched_at FROM broadcast_send_claims WHERE broadcast_id='b1' ORDER BY friend_id`).all()).toEqual([
+        {friend_id:'f1',state:'claimed',attempt_no:2,dispatched_at:null},
+        {friend_id:'f2',state:'sent',attempt_no:1,dispatched_at:'2026-09-11T09:30:00.000'},
+        {friend_id:'f3',state:'claimed',attempt_no:1,dispatched_at:'2026-09-11T09:30:00.000'},
+      ]);
+    });
+
+    it('遅れた再送処理は新しい送信中の押さえを奪わない', async () => {
+      seedBroadcast(testDb, 'b1', {send_attempt_no:3});
+      seedClaim(testDb, 'f1', 'claimed', {dispatched:false});
+      testDb.raw.exec("UPDATE broadcast_send_claims SET attempt_no=3 WHERE broadcast_id='b1' AND friend_id='f1'");
+      expect(await reopenUnsentClaims(testDb.db,'b1',2)).toBe(0);
+      expect(await reopenUnsentClaims(testDb.db,'b1',3)).toBe(0);
+      expect(testDb.raw.prepare("SELECT state,attempt_no,dispatched_at FROM broadcast_send_claims WHERE broadcast_id='b1' AND friend_id='f1'").get())
+        .toEqual({state:'claimed',attempt_no:3,dispatched_at:null});
+    });
+
+    it('送信済みの記録がある古い押さえは再送対象に数えない', async () => {
+      seedBroadcast(testDb, 'b1', {status:'sent'});
+      seedClaim(testDb, 'f1', 'claimed', {dispatched:false});
+      testDb.raw.exec(`INSERT INTO messages_log(id,friend_id,direction,message_type,content,broadcast_id,created_at)
+        VALUES('log1','f1','outgoing','text','送信済み','b1','2026-11-21')`);
+      const progress=await app(testDb.db).request('/api/broadcasts/b1/progress');
+      expect(await progress.json()).toMatchObject({data:{ledger:{retryableCount:0}}});
+      const res=await app(testDb.db).request('/api/broadcasts/b1/retry-failed',post({expectedVersion:1},CONFIRM_HEADERS));
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({code:'NO_RETRY_TARGET'});
+      expect(broadcastRow(testDb).send_attempt_no).toBe(1);
+    });
+
+    it('送信中の押さえは再送対象にせず、再送操作も断る', async () => {
+      seedBroadcast(testDb, 'b1');
+      seedClaim(testDb, 'f1', 'claimed', {dispatched:false});
+      const progress = await app(testDb.db).request('/api/broadcasts/b1/progress');
+      expect(await progress.json()).toMatchObject({data:{ledger:{retryableCount:0}}});
+      const res = await app(testDb.db).request('/api/broadcasts/b1/retry-failed', post({expectedVersion:1}, CONFIRM_HEADERS));
+      expect(res.status).toBe(409);
       expect(broadcastRow(testDb).send_attempt_no).toBe(1);
     });
 

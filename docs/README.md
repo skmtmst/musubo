@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [送信前に残った相手の再送を修正](release-log/unreleased/147-kenta-resend-claimed.md) — 反映履歴、確認 2026-11-21。
+
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
