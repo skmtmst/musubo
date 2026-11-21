@@ -44,6 +44,6 @@ export function createdCount(list: SeriesOccurrence[], picks: Record<number, Pic
 
 /** 口が返す取れない理由の言葉。知らない理由は「空きがありません」。 */
 export function reasonText(reason: string | null): string {
-  if (reason === 'calendar_unreadable') return '空きを確かめられません'
+  if (reason === 'calendar_unreadable' || reason === 'calendar_unavailable') return '空きを確かめられません'
   return '空きがありません'
 }

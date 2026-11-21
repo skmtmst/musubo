@@ -74,7 +74,7 @@ it('画面を離れた後の完了で、古い画面の一覧を読み直さな�
 it('確保の直前に満席になったら、残った振替と近い3回を出して選び直せる', async () => {
   const alternatives = [22, 23, 24, 25].map(day => ({ ...option, slot_id: `next-${day}`, name: `振替クラス${day}`, starts_at: `2026-10-${day}T01:00:00Z` }))
   vi.mocked(api.makeupOptions).mockResolvedValueOnce({ options: [option] }).mockResolvedValue({ options: [...alternatives].reverse() })
-  vi.mocked(api.useMakeup).mockRejectedValueOnce({ status: 409, body: { error: 'makeup_slot_unavailable' } }).mockResolvedValue({ id: 'new', status: 'confirmed' })
+  vi.mocked(api.useMakeup).mockRejectedValueOnce({ status: 409, body: { error: 'makeup_slot_unavailable', alternatives: alternatives.map(o => ({ ...o, id: o.slot_id })) } }).mockResolvedValue({ id: 'new', status: 'confirmed' })
   const used = vi.fn()
   render(<MakeupPicker credit={credit} onUsed={used} />)
   fireEvent.click(await screen.findByRole('button', { name: /に振り替える/ }))
@@ -87,6 +87,7 @@ it('確保の直前に満席になったら、残った振替と近い3回を出
   expect(used).not.toHaveBeenCalled()
   expect(screen.getByRole('button', { name: '振替先を選んでください' }).hasAttribute('disabled')).toBe(true)
   fireEvent.click(choices[1])
+  fireEvent.click(screen.getByRole('button', { name: 'この回にする' }))
   expect(screen.queryByRole('group', { name: '近い振替先' })).toBeNull()
   fireEvent.click(await screen.findByRole('button', { name: /10\/23.*に振り替える/ }))
   await vi.waitFor(() => expect(used).toHaveBeenCalledTimes(1))
@@ -109,12 +110,13 @@ it('満席後に選んだ別週の回が再読込時に消えても、別の回�
   const selected = { ...option, slot_id: 'selected', name: '選んだ回', starts_at: '2026-11-02T01:00:00Z' };
   const replacement = { ...option, slot_id: 'replacement', name: '別の回', starts_at: '2026-11-03T01:00:00Z' };
   vi.mocked(api.makeupOptions).mockResolvedValueOnce({ options: [option] }).mockResolvedValueOnce({ options: [selected] }).mockResolvedValue({ options: [replacement] });
-  vi.mocked(api.useMakeup).mockRejectedValueOnce({ status: 409, body: { error: 'makeup_slot_unavailable' } });
+  vi.mocked(api.useMakeup).mockRejectedValueOnce({ status: 409, body: { error: 'makeup_slot_unavailable', alternatives: [{ ...selected, id: selected.slot_id }] } });
   const used = vi.fn();
   render(<MakeupPicker credit={credit} onUsed={used} />);
   fireEvent.click(await screen.findByRole('button', { name: /に振り替える/ }));
   const nearby = await screen.findByRole('group', { name: '近い振替先' });
   fireEvent.click(within(nearby).getByRole('button', { name: /選んだ回/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'この回にする' }));
   expect(await screen.findByText('別の回')).toBeTruthy();
   expect(screen.getByRole('button', { name: '振替先を選んでください' }).hasAttribute('disabled')).toBe(true);
   expect(api.useMakeup).toHaveBeenCalledTimes(1);

@@ -195,6 +195,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [receivedFailed, setReceivedFailed] = useState(false)
   const versionsRequest = useRef(0)
   const [preflight, setPreflight] = useState<Preflight | null>(null)
+  const [dismissedExpiry, setDismissedExpiry] = useState<string | null>(null)
   const [choices, setChoices] = useState<Record<string, DistributionMode>>({})
   const [bulkMode, setBulkMode] = useState<'' | DistributionMode>('')
   const [result, setResult] = useState<DistributionResult | null>(null)
@@ -1401,7 +1402,10 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
             {done && failures.length > 0 ? <Button variant="primary" disabled={busy} onClick={() => checkStores(failures.map((s) => s.accountId))}>{`失敗${failures.length}アカウントを再確認`}</Button> : null}
           </>}
       </>}
-      overlays={<DistributionResultDialog
+      overlays={<><ConfirmDialog open={stage === 'duplicates' && Boolean(preflight) && Number.isFinite(expiry) && expired && dismissedExpiry !== preflight?.preflightId}
+        title="確かめの期限が切れました" description="確認の期限が過ぎました。配る前にもう一度、配布先と内容を確認してください。" cancelLabel="キャンセル" confirmLabel="もう一度確かめる" busy={busy}
+        onCancel={() => setDismissedExpiry(preflight?.preflightId ?? null)} onConfirm={() => { setDismissedExpiry(preflight?.preflightId ?? null); checkStores(selected) }} />
+      <DistributionResultDialog
         open={Boolean(result && done && resultDialogFor === `${result.runId}:${result.status}`)}
         title={`配った結果：${detail?.template.name ?? ''}`}
         tag={type === 'tag' ? { name, color: tagColor } : undefined}
@@ -1409,7 +1413,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         rows={(result?.stores ?? []).map((store) => ({ key: store.accountId, name: store.accountName ?? accountName(accounts, store.accountId), store }))}
         busy={busy} onClose={() => setResultDialogFor(null)}
         onRetry={() => { setResultDialogFor(null); checkStores(failures.map((store) => store.accountId)) }}
-      />}
+      /></>}
       >
         <div className={styles.distributionContent}>
         <DistributionTable selectAll={<SaveErrorField names={["length","shownAccounts.length","selected","shown_accounts.length"]}><Checkbox aria-label="表示中のアカウントをすべて選ぶ" checked={shownAccounts.length > 0 && shownAccounts.every((account) => selected.includes(account.id))}

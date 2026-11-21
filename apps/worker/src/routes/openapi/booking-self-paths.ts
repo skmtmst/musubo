@@ -1,5 +1,17 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const bookingSelfPaths = {
+  '/api/liff/booking/groups/{id}/cancellation-quote': {
+    get: {
+      tags: ['Booking'], summary: '本人の組の取消料金を確認する',
+      description: 'LINEのIDトークンをAuthorizationヘッダーで受け、店舗と本人を内部で確認する。本人が予約した組の各人の料金と合計を返す。予約の変更や課金は行わない。',
+      security: [],
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      responses: { '200': { description: '各人の見積もりと合計額（円）' }, '401': { description: 'LINE本人確認なし' }, '404': { description: '本人の組がない' } },
+    },
+  },
   '/api/booking/admin/monthly-contracts': {
     get: {
       tags: ['Booking'], summary: '本人別の月謝契約と直近12か月の請求状態を読む',

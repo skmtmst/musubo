@@ -53,6 +53,12 @@ describe('Visual QA モックの HTTP method 受け渡し', () => {
     child?.kill('SIGTERM')
   })
 
+  it('振替の一覧は画面が扱える配列を返す', async () => {
+    const response = await fetch(`${baseUrl}/api/booking/admin/makeup-credits?line_account_id=a&friend_id=friend-1`)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ success: true, data: [] })
+  })
+
   it('撮影用の機能設定は全キーと版を返し、見本用の機能だけ有効にする', async () => {
     const response = await fetch(`${baseUrl}/api/settings/features`)
     expect(response.status).toBe(200)

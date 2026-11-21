@@ -129,3 +129,10 @@ test('B4-17: 閲覧のみの担当は繰り返しを変更できない',async()=
  expect((await gapCall(a,path,'PATCH',{scope:'this',fromBookingId:data.bookings[0].id,expectedVersion:1,change:{startsAt:'2026-11-20T06:00:00Z'}})).status).toBe(403);
  expect(d.raw.prepare('SELECT starts_at FROM bookings ORDER BY series_index').all()).toEqual(data.bookings.map((b:any)=>({starts_at:b.starts_at})));
 });
+
+test('B4-14: 指名担当のカレンダーが読めない回は確認不能として予約しない',async()=>{
+ const availability=await import('../services/availability.js');
+ const spy=vi.spyOn(availability,'getAvailability').mockResolvedValueOnce({by_staff:[{staff_id:'bs',slots:[]}],closed_dates:[],calendar_sync:[{staff_id:'bs',configured:true,ok:false,error:'unavailable'}]} as unknown as Awaited<ReturnType<typeof availability.getAvailability>>);
+ try {const response=await gapCall(app(),'/api/booking/admin/series/preview?account_id=a','POST',body);expect(response.status).toBe(200);const occurrences=(await response.json() as any).data.occurrences;expect(occurrences.every((o:any)=>!o.available&&o.reason==='calendar_unavailable')).toBe(true);} finally {spy.mockRestore();}
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM bookings').get()).toEqual({n:0});expect(fetch).not.toHaveBeenCalled();
+});

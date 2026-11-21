@@ -187,7 +187,7 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
   const scenarioDefinition = template.template_type === 'scenario' ? parseScenarioDefinition(definition) : null;
   const deliveryDefinition = isDeliveryType(template.template_type) ? await parseDeliveryDefinition(db,template.template_type,definition) : null;
   if(deliveryDefinition && (1+(deliveryDefinition.references?.length??0))*accountIds.length>270) throw new HqTemplateError('INVALID_ACCOUNTS');
-  const preflightId = crypto.randomUUID(), expiresAt = new Date(Date.now() + (template.template_type==='booking_menu'?30:15) * 60_000).toISOString();
+  const preflightId = crypto.randomUUID(), expiresAt = new Date(Date.now() + (isCatalogType(template.template_type)?30:15) * 60_000).toISOString();
   const statements: HqTemplateStatement[] = [], stores = [];
   for (const account of accounts) {
     const snapshot = catalogDefinition ? await catalogSnapshot(db,account.id,template.template_type as import('@line-crm/shared').HqCatalogTemplateType) : tagDefinition ? await tagSnapshot(db, account.id) : scenarioDefinition ? await scenarioSnapshot(db,account.id) : deliveryDefinition ? await deliverySnapshot(db,account.id,template.template_type as import('@line-crm/shared').HqDeliveryTemplateType) : null;
@@ -257,7 +257,7 @@ export async function distributionResult(db: D1Database, authority: HqTemplateAu
       }
       if (r.resolution_mode === 'create') counts.created++; else if (r.resolution_mode === 'overwrite') counts.overwritten++; else counts.aliased++;
     }
-    stores.push({ accountId: row.target_account_id, status: row.status, reason: resultReason(row.status), cleanupPending: Number(cleanup?.count ?? 0) > 0, counts,
+    stores.push({ accountId: row.target_account_id, status: row.status, reason: row.error_code==='PREFLIGHT_EXPIRED'?'確かめの期限が切れました。もう一度確かめてください':resultReason(row.status), cleanupPending: Number(cleanup?.count ?? 0) > 0, counts,
       createdName: row.status === 'succeeded' ? row.created_name ?? null : null });
   }
   const targets = (await db.prepare(`SELECT target_account_id FROM hq_template_preflights WHERE tenant_id=? AND template_id=? AND idempotency_fingerprint=? ORDER BY target_account_id`).bind(authority.tenantId, templateId, runId).all<{ target_account_id: string }>()).results;
@@ -269,7 +269,7 @@ export async function distributionResult(db: D1Database, authority: HqTemplateAu
 export async function distributeTemplate(db: D1Database, authority: HqTemplateAuthority, templateId: string, runId: string, selections: DistributionSelection[], bucket?: R2Bucket, publicBaseUrl?: string, initialResourceCommit?: import('./contract.js').HqInitialResourceCommit) {
   const preflights = (await db.prepare(`SELECT * FROM hq_template_preflights WHERE tenant_id=? AND template_id=? AND idempotency_fingerprint=? ORDER BY target_account_id`).bind(authority.tenantId, templateId, runId).all<HqTemplatePreflight>()).results;
   if (!preflights.length || preflights.some(p => p.created_by !== authority.actorId)) throw new HqTemplateError('NOT_FOUND', 404);
-  if (preflights.some(p => p.status === 'expired')) throw new HqTemplateError('VERSION_CONFLICT', 409);
+  if (preflights.some(p => p.status === 'expired')) throw new HqTemplateError('PREFLIGHT_EXPIRED', 409);
   await requireTargetAccounts(db, authority, preflights.map(p => p.target_account_id));
   const { template } = await templateDetail(db, authority, templateId);
   if (preflights.some(p => p.template_version_id !== preflights[0].template_version_id)) throw new HqTemplateError('INVALID_PREFLIGHT', 409);
@@ -338,7 +338,8 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     if (existing) continue;
     const selected: HqTemplateResolution[] = selections.filter(s => s.accountId === p.target_account_id).map(s => ({ sourceId: s.sourceId, itemKind: stored.find(r => r.preflight_id === p.id && r.source_id === s.sourceId)!.item_kind, mode: s.mode }));
     const snapshot = await storeSnapshot(db, p.target_account_id);
-    const conflict = p.expires_at === null || p.expires_at <= new Date().toISOString() || `hqts1.${await digest(snapshot)}` !== p.snapshot_token;
+    let expired = p.expires_at === null || p.expires_at <= new Date().toISOString();
+    const conflict = expired || `hqts1.${await digest(snapshot)}` !== p.snapshot_token;
     let status = conflict ? 'version_conflict' : 'succeeded';
     let plan: ReturnType<typeof planTags> | null = null;
     if (!conflict) {
@@ -374,7 +375,7 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
       // 各店舗の原子的トランザクション内でも統括の所有権を確認する。
       statements.push(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [p.target_account_id, authority.tenantId]));
       for (const r of resolutions) statements.push({ sql: `UPDATE hq_template_preflight_resolutions SET resolution_mode=?,target_id=COALESCE(?,target_id),alias_name=?,expected_revision=COALESCE(?,expected_revision) WHERE preflight_id=? AND tenant_id=? AND source_id=?`, bindings: [r.mode, r.targetId ?? null, r.mode === 'alias' ? r.aliasName ?? 'pending' : null, r.expectedRevision ?? null, p.id, authority.tenantId, r.sourceId] });
-      statements.push({ sql: `INSERT INTO hq_template_distribution_results(run_id,tenant_id,template_id,template_version_id,target_account_id,preflight_id,idempotency_fingerprint,snapshot_token,status,finished_at) VALUES (?,?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, bindings: [runId, authority.tenantId, templateId, p.template_version_id, p.target_account_id, p.id, runId, p.snapshot_token, finalStatus] }, ...commit, audit(authority, 'distributed', templateId, p.target_account_id, finalStatus === 'succeeded' ? 'success' : 'failed', runId));
+      statements.push({ sql: `INSERT INTO hq_template_distribution_results(run_id,tenant_id,template_id,template_version_id,target_account_id,preflight_id,idempotency_fingerprint,snapshot_token,status,error_code,finished_at) VALUES (?,?,?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, bindings: [runId, authority.tenantId, templateId, p.template_version_id, p.target_account_id, p.id, runId, p.snapshot_token, finalStatus, expired?'PREFLIGHT_EXPIRED':null] }, ...commit, audit(authority, 'distributed', templateId, p.target_account_id, finalStatus === 'succeeded' ? 'success' : 'failed', runId));
       if (finalStatus === 'succeeded' && initialResourceCommit) statements.push(...await initialResourceCommit(p.target_account_id,resolutions));
       if (finalStatus === 'succeeded') statements.push(captureDistributionName(runId, authority.tenantId, p.target_account_id));
       return batch(db, statements);
@@ -383,7 +384,8 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     catch {
       const committed = await db.prepare(`SELECT status FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND target_account_id=?`).bind(runId, authority.tenantId, p.target_account_id).first();
       if (committed) continue;
-      status = !p.expires_at || p.expires_at <= new Date().toISOString() || `hqts1.${await digest(await storeSnapshot(db, p.target_account_id))}` !== p.snapshot_token ? 'version_conflict' : 'failed';
+      expired = !p.expires_at || p.expires_at <= new Date().toISOString();
+      status = expired || `hqts1.${await digest(await storeSnapshot(db, p.target_account_id))}` !== p.snapshot_token ? 'version_conflict' : 'failed';
       try { await persist(status, [], plan?.resolutions ?? selected); } catch { throw new HqTemplateError('RESULT_UNAVAILABLE', 500); }
     }
   }

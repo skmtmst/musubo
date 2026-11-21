@@ -7,14 +7,15 @@ import type { StaffMember } from '@line-crm/shared'
 import type { BookingGroupView as BookingParty } from '@line-crm/shared'
 
 const cancelGroup = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/api/helpers/booking-advanced', () => ({ bookingAdvancedApi: { cancelGroup } }))
+const groupCancellationQuote = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api/helpers/booking-advanced', () => ({ bookingAdvancedApi: { cancelGroup, groupCancellationQuote } }))
 const { default: PartySection } = await import('./party-section')
 
 const party: BookingParty = { groupId: 'g1', ownerName: '見本 143', version: 2, members: [
   { bookingId: 'b1', label: 'チョコ', menuName: '爪切り', staffName: 'Kenta', startsAt: '2026-10-01T04:30:00.000Z', endsAt: '2026-10-01T04:45:00.000Z', status: 'confirmed', version: 1 },
   { bookingId: 'b2', label: 'マロン', menuName: 'トリミング（中型犬）', staffName: '佐々木', startsAt: '2026-10-01T04:00:00.000Z', endsAt: '2026-10-01T05:30:00.000Z', status: 'confirmed', version: 1 },
 ] }
-beforeEach(() => rememberStaffIdentity({ id: 'owner', role: 'owner' } as StaffMember))
+beforeEach(() => { rememberStaffIdentity({ id: 'owner', role: 'owner' } as StaffMember); groupCancellationQuote.mockResolvedValue({ success: true, data: { version: 2, totalFee: 3500, members: [{ bookingId: 'b1', version: 1, status: 'confirmed', feeNow: 2000 }, { bookingId: 'b2', version: 1, status: 'confirmed', feeNow: 1500 }] } }) })
 afterEach(() => { cleanup(); forgetStaffIdentity(); vi.clearAllMocks() })
 
 test('人ごとのメニュー・担当・時間を並べる', () => {
@@ -44,6 +45,7 @@ test('実APIの組IDと版を使い、理由の確認後だけまとめて取り
   const changed = vi.fn()
   render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" onChanged={changed} />)
   fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  await screen.findByText('キャンセル料の見込み')
   expect(screen.getByRole('alertdialog').textContent).toContain('LINEアカウント')
   expect(screen.getByRole('alertdialog').textContent).toContain('環境')
   const confirm = screen.getByRole('button', { name: 'まとめて取り消す' })
@@ -68,6 +70,7 @@ test('失敗しても理由と窓を残し、読み直しを案内する', async
   cancelGroup.mockRejectedValue(new Error('conflict'))
   render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" onChanged={vi.fn()} />)
   fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  await screen.findByText('キャンセル料の見込み')
   fireEvent.change(screen.getByRole('textbox', { name: '取り消す理由' }), { target: { value: '予定の変更' } })
   fireEvent.click(screen.getByRole('button', { name: 'まとめて取り消す' }))
   expect(await screen.findByText(/取り消せませんでした。入力は残っています/)).toBeTruthy()
@@ -103,6 +106,7 @@ test('読み直す口が無い失敗では何もしないボタンを出さず�
   cancelGroup.mockRejectedValue(new Error('down'))
   render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" />)
   fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  await screen.findByText('キャンセル料の見込み')
   fireEvent.change(screen.getByRole('textbox', { name: '取り消す理由' }), { target: { value: '予定の変更' } })
   fireEvent.click(screen.getByRole('button', { name: 'まとめて取り消す' }))
   expect(await screen.findByText(/時間をおいて、もう一度お試しください/)).toBeTruthy()
@@ -115,6 +119,7 @@ test('版が同じ応答でもエラーを消し、入力理由を保持する',
   const reload = vi.fn()
   const { rerender } = render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" onReload={reload} />)
   fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  await screen.findByText('キャンセル料の見込み')
   fireEvent.change(screen.getByRole('textbox', { name: '取り消す理由' }), { target: { value: '予定の変更' } })
   fireEvent.click(screen.getByRole('button', { name: 'まとめて取り消す' }))
   await screen.findByText(/取り消せませんでした。入力は残っています/)
@@ -140,7 +145,9 @@ test('版が変わると最新の対象を示し、理由を保って再確認�
   expect(confirm.disabled).toBe(true)
   fireEvent.click(confirm)
   expect(cancelGroup).not.toHaveBeenCalled()
+  groupCancellationQuote.mockResolvedValueOnce({ success: true, data: { version: 3, totalFee: 3500, members: [{ bookingId: 'b1', version: 1, status: 'confirmed', feeNow: 2000 }, { bookingId: 'b2', version: 1, status: 'confirmed', feeNow: 1500 }] } })
   fireEvent.click(screen.getByRole('button', { name: '最新の内容を確認しました' }))
+  await screen.findByText('キャンセル料の見込み')
   fireEvent.click(confirm)
   await waitFor(() => expect(cancelGroup).toHaveBeenCalledWith('account-1', 'g1', '予定の変更', 3, [{ bookingId: 'b1', version: 1, status: 'confirmed' }, { bookingId: 'b2', version: 1, status: 'confirmed' }]))
 })
@@ -188,5 +195,34 @@ test('閉じた組の取消確認を保持しても取り消さない', () => {
   fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
   fireEvent.click(screen.getByRole('button', { name: '破棄する' }))
   held()
+  expect(cancelGroup).not.toHaveBeenCalled()
+})
+
+test('取消前に全員の料金と合計を確認し、確認できない場合は取消しない', async () => {
+  groupCancellationQuote.mockRejectedValueOnce(new Error('unavailable'))
+  render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" />)
+  fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  expect(await screen.findByText('キャンセル料を確認できませんでした。もう一度お試しください。')).toBeTruthy()
+  fireEvent.change(screen.getByRole('textbox', { name: '取り消す理由' }), { target: { value: '予定の変更' } })
+  expect((screen.getByRole('button', { name: 'まとめて取り消す' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(cancelGroup).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度確認する' }))
+  const breakdown = await screen.findByLabelText('キャンセル料の内訳')
+  expect(breakdown.querySelectorAll('dl[data-value-align="end"]')).toHaveLength(2)
+  expect(breakdown.textContent).toContain('チョコ¥2,000')
+  expect(breakdown.textContent).toContain('マロン¥1,500')
+  expect(breakdown.textContent).toContain('合計¥3,500')
+})
+
+
+test('料金の版が古いときは組を読み直すまで取消できない', async () => {
+  groupCancellationQuote.mockResolvedValueOnce({ success: true, data: { version: 3, totalFee: 0, members: [] } })
+  const reload = vi.fn()
+  render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" onReload={reload} />)
+  fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  expect(await screen.findByText('予約の内容が変わりました。最新の情報を確認してください。')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'この組を読み直す' }))
+  expect(reload).toHaveBeenCalledTimes(1)
+  expect(groupCancellationQuote).toHaveBeenCalledTimes(1)
   expect(cancelGroup).not.toHaveBeenCalled()
 })

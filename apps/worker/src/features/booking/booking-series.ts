@@ -38,7 +38,7 @@ export async function previewSeries(db:D1Database,account:string,input:SeriesInp
   const startsAt=dates[index],candidates=availability.by_staff.filter(s=>actual.has(s.staff_id)&&s.slots.some(t=>Date.parse(t.startUtc!)===Date.parse(startsAt))).map(s=>s.staff_id);
   const staffId=input.staffId?(candidates.includes(input.staffId)?input.staffId:null):await assignBookingStaff(db,account,startsAt,tz,candidates);
   const alternatives=[...new Set(availability.by_staff.flatMap(s=>s.slots.filter(t=>t.date===tzDateStr(tz,new Date(startsAt))).map(t=>t.startUtc!)))].sort((a,b)=>Math.abs(Date.parse(a)-Date.parse(startsAt))-Math.abs(Date.parse(b)-Date.parse(startsAt))).slice(0,3);
-  out.push({index,startsAt,available:!!staffId,staffId,reason:staffId?null:'slot_unavailable',alternatives});
+  out.push({index,startsAt,available:!!staffId,staffId,reason:staffId?null:input.staffId&&availability.calendar_sync?.some(s=>s.staff_id===input.staffId&&s.configured&&!s.ok)?'calendar_unavailable':'slot_unavailable',alternatives});
  }
  return out;
 }

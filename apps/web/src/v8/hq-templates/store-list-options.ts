@@ -25,9 +25,10 @@ export const KIND_TABS: { kind: TemplateKind; label: string; icon: typeof Messag
   { kind: 'research', label: 'リサーチ', icon: ClipboardList },
 ]
 
+export const REWARD_TAB: TabItem = { label: 'マイルの景品', href: '/hq/templates?type=mileage_reward' }
 export const STARTER_SET_TAB: TabItem = { label: '初期セット', href: '/hq/templates/starter-sets' }
 export function hqTemplateTabsForStarterSets(): TabItem[] {
-  return [...KIND_TABS.map((tab) => ({ label: tab.label, href: `/hq/templates?kind=${tab.kind}` })), { ...STARTER_SET_TAB, current: true }]
+  return [...KIND_TABS.map((tab) => ({ label: tab.label, href: `/hq/templates?kind=${tab.kind}` })), REWARD_TAB, { ...STARTER_SET_TAB, current: true }]
 }
 
 export const KIND_LABEL: Record<TemplateKind, string> = Object.fromEntries(KIND_TABS.map((tab) => [tab.kind, tab.label])) as Record<TemplateKind, string>

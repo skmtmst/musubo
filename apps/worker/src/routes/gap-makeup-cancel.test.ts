@@ -1,0 +1,20 @@
+import {afterEach,beforeEach,expect,test,vi} from 'vitest';
+import {useSqliteClock} from '../test-utils/sqlite-clock.js';
+import {gapFixture,gapApp} from '../test-utils/gap1.js';
+import type {SqliteD1} from '../test-utils/d1-sqlite.js';
+import {absence,useMakeup} from '../features/booking/booking-makeup.js';
+import events from './events.js';
+vi.mock('../services/liff-auth.js',async original=>({...await original<object>(),verifyCallerLineUserId:async()=> 'Uf'}));
+let d:SqliteD1;
+beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));d=gapFixture();useSqliteClock(d.raw,()=>new Date());d.raw.exec(`INSERT INTO events(id,line_account_id,name,is_published,lifecycle_status,cancel_deadline_hours_before,makeup_rule_json) VALUES('lesson','a','教室',1,'published',3,'{"enabled":true,"cutoffHours":3,"validDays":30,"monthlyCap":2,"target":"same_kind","targetIds":[]}');
+INSERT INTO event_slots(id,event_id,starts_at,ends_at,capacity) VALUES('src','lesson','2026-11-20T05:00:00Z','2026-11-20T06:00:00Z',1),('dst','lesson','2026-11-27T05:00:00Z','2026-11-27T06:00:00Z',1);
+INSERT INTO event_bookings(id,line_account_id,event_id,slot_id,friend_id,status,requested_at,identity_key) VALUES('eb','a','lesson','src','f','confirmed','2026-10-16T00:00:00Z','solo:f');`);vi.stubGlobal('fetch',vi.fn(()=>{throw Error('external_forbidden')}));});
+afterEach(()=>{d.raw.close();vi.useRealTimers();vi.unstubAllGlobals()});
+test('B3-15: 振替先を締切内に本人が取り消すと券が元の期限で戻る',async()=>{
+ const credit=(await absence(d.db,'a','f','eb','customer')).makeupCredit as {id:string;expires_at:string};
+ const used=await useMakeup(d.db,'a','f',credit.id,'dst','use');
+ d.raw.exec('UPDATE events SET cancel_deadline_hours_before=NULL');
+ const res=await gapApp(d,[events]).request(`/api/liff/events/me/${used.bookingId}/cancel?liffId=liff-a`,{method:'POST',headers:{Authorization:'Bearer customer','Content-Type':'application/json'},body:'{}'});
+ expect(res.status,await res.clone().text()).toBe(200);
+ expect(d.raw.prepare('SELECT status,expires_at FROM booking_makeup_credits WHERE id=?').get(credit.id)).toEqual({status:'open',expires_at:credit.expires_at});expect(fetch).not.toHaveBeenCalled();
+});

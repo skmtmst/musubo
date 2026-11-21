@@ -5,6 +5,7 @@ import { notificationResultUnknown } from './detail-model'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 import { PageHeading } from '@/components/templates/page-frame'
+import { BookingGroupSection } from '@/v8/booking-payments/public/booking-group/index'
 
 
 import Link from 'next/link'
@@ -479,6 +480,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
           </div>
 
           <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-96">
+            {selectedAccountId && detail ? <BookingGroupSection key={`${selectedAccountId}:${id}:${detail.lockVersion}`} accountId={selectedAccountId} bookingId={id} canOperate={canOperate} onChanged={() => void load()} /> : null}
             {/* ---- 確認が必要なことのまとめ (IDEA-27) ---- */}
             <section className="bg-canvas rounded-card border-hairline border p-5">
               <h2 className="text-ink mb-3 text-sm font-semibold">確認が必要なこと</h2>

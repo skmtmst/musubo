@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import type { SeriesOccurrence } from '@line-crm/shared'
 import { ApiError } from '@/lib/api'
@@ -87,4 +87,16 @@ test('日本と日付が違う店舗でも、表示・プレビュー・保存�
   fireEvent.click(screen.getByRole('button', { name: '2 件を入れる' }))
   await waitFor(() => expect(create).toHaveBeenCalledTimes(1))
   expect(create.mock.calls[0][1].rule.weekday).toBe(3)
+})
+
+test('B4-14: 担当者の予定を確認できない回を示し別の日時へ戻る', async () => {
+  const close = vi.fn()
+  preview.mockResolvedValue({ success: true, data: { occurrences: [{ index: 0, startsAt: '2026-11-26T01:00:00.000Z', available: false, staffId: null, reason: 'calendar_unavailable', alternatives: [] }] } })
+  render(<SeriesBookingDrawer open accountId="a" summary={summary} onClose={close} onCreated={vi.fn()} />)
+  const dialog = await screen.findByRole('dialog', { name: 'この回は予約できません' })
+  expect(dialog.textContent).toContain('担当者の予定を確認できないため')
+  expect(dialog.textContent).toContain('確認できません')
+  fireEvent.click(within(dialog).getByRole('button', { name: '別の日時を選ぶ' }))
+  expect(close).toHaveBeenCalledOnce()
+  expect(create).not.toHaveBeenCalled()
 })

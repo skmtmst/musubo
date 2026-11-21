@@ -25,4 +25,6 @@
   margin: 0;
   min-width: 0;
 }
+.rows > [data-emphasis] { font-weight: var(--polish-value-weight); color: var(--color-ink); }
+.rows[data-value-align='end'] > dd { justify-content: flex-end; text-align: right; }
 }

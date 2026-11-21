@@ -5,7 +5,7 @@ import {canAccessAllLineAccounts} from './account-access.js';
 import {sendWebPush} from './web-push.js';
 export function pushIsQuiet(start:string,end:string,now=new Date(),tz='Asia/Tokyo'){const p=new Intl.DateTimeFormat('en-GB',{timeZone:tz,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now);return start===end?false:start<end?start<=p&&p<end:p>=start||p<end;}
 export type PushSender=(s:{endpoint:string;p256dh:string;auth:string},payload:{title:string;body:string;url:string})=>Promise<{status:number;ok:boolean}>;
-export function pushPayload(kind:string,friendId:string){return {title:kind==='test'?'通知のテスト':kind==='assigned_reply'?'担当の会話に返事が来ました':'新しい問い合わせ',body:'会話を開いて確認してください',url:kind==='test'?'/chats':`/chats?friend=${encodeURIComponent(friendId)}`};}
+export function pushPayload(kind:string,friendId:string,displayName?:string|null){const name=displayName?.trim();const safeName=name&&name.length<=40&&!/[\r\n@＠]/.test(name)&&!/[0-9０-９]{4}/.test(name.replace(/[\s()+（）+\-‐－]/g,''))?name:null;return {title:kind==='new_inquiry'?'musubo':kind==='test'?'通知のテスト':'担当の会話に返事が来ました',body:kind==='new_inquiry'?(safeName?`新しい問い合わせ：${safeName}さま`:'新しい問い合わせ'):'会話を開いて確認してください',url:kind==='test'?'/chats':`/chats?friend=${encodeURIComponent(friendId)}`};}
 export async function deliverOperatorPush(db:D1Database,env:Partial<Env['Bindings']>,input:{staffId:string;account:string;kind:'new_inquiry'|'assigned_reply'|'test';refId:string;chatId:string},send?:PushSender){
  const staff=await db.prepare('SELECT * FROM staff_members WHERE id=? AND is_active=1').bind(input.staffId).first<Record<string,unknown>>();if(!staff)return {sent:0,failed:0};
  // SQLから取った本人の権限を使う。通知のルールが古くても外の店へ漏らさない。
@@ -16,13 +16,13 @@ export async function deliverOperatorPush(db:D1Database,env:Partial<Env['Binding
   if(!await canAssignChatTo(db,input.staffId,input.account))return {sent:0,failed:0};
   const assignment=await db.prepare('SELECT c.assignee_staff_id assigned_staff_id FROM chats c JOIN friends f ON f.id=c.friend_id WHERE c.id=? AND f.line_account_id=?').bind(input.chatId,input.account).first<{assigned_staff_id:string|null}>();if(assignment?.assigned_staff_id!==input.staffId)return {sent:0,failed:0};
  }
- const conversation=input.kind==='test'?null:await db.prepare('SELECT friend_id FROM chats c JOIN friends f ON f.id=c.friend_id WHERE c.id=? AND f.line_account_id=?').bind(input.chatId,input.account).first<{friend_id:string}>();if(input.kind!=='test'&&!conversation)return {sent:0,failed:0};
+ const conversation=input.kind==='test'?null:await db.prepare('SELECT c.friend_id,f.display_name FROM chats c JOIN friends f ON f.id=c.friend_id WHERE c.id=? AND f.line_account_id=?').bind(input.chatId,input.account).first<{friend_id:string;display_name:string|null}>();if(input.kind!=='test'&&!conversation)return {sent:0,failed:0};
  const rows=(await db.prepare('SELECT id,endpoint,p256dh,auth FROM operator_push_subscriptions WHERE staff_id=? AND revoked_at IS NULL').bind(input.staffId).all<{id:string;endpoint:string;p256dh:string;auth:string}>()).results;let sent=0,failed=0;
  for(const row of rows){
   const id=crypto.randomUUID(),createdAt=new Date().toISOString(),claim=await db.prepare("INSERT INTO operator_push_deliveries(id,subscription_id,kind,ref_id,line_account_id,status,created_at) VALUES(?,?,?,?,?,'pending',?) ON CONFLICT(subscription_id,kind,ref_id) DO NOTHING").bind(id,row.id,input.kind,input.refId,input.account||null,createdAt).run();if(!claim.meta.changes)continue;
   if(input.kind!=='test'&&pushIsQuiet(preference?.quiet_start??'22:00',preference?.quiet_end??'08:00')){await db.prepare("UPDATE operator_push_deliveries SET status='suppressed_quiet' WHERE id=?").bind(id).run();continue;}
   // 本文を受け取る引数を作らない。名前・電話・メール・質問の文は載せない。
-  const payload=pushPayload(input.kind,conversation?.friend_id??'');
+  const payload=pushPayload(input.kind,conversation?.friend_id??'',conversation?.display_name);
   try{
    if(!send&&(!env.OPERATOR_PUSH_VAPID_PUBLIC_KEY||!env.OPERATOR_PUSH_VAPID_PRIVATE_KEY||!env.OPERATOR_PUSH_VAPID_SUBJECT))throw new Error('vapid_not_configured');
    const result=send?await send(row,payload):await sendWebPush({...row,payload,publicKey:env.OPERATOR_PUSH_VAPID_PUBLIC_KEY!,privateKey:env.OPERATOR_PUSH_VAPID_PRIVATE_KEY!,subject:env.OPERATOR_PUSH_VAPID_SUBJECT!});
@@ -69,11 +69,11 @@ export async function retryOperatorPush(db:D1Database,env:Partial<Env['Bindings'
   if(row.kind==='assigned_reply'&&(!row.line_account_id||!await canAssignChatTo(db,row.staff_id,row.line_account_id)))continue;
   const pref=await db.prepare('SELECT kinds_json,quiet_start,quiet_end FROM operator_push_preferences WHERE staff_id=?').bind(row.staff_id).first<{kinds_json:string;quiet_start:string;quiet_end:string}>();
   if(row.kind!=='test'&&pref&&(!(JSON.parse(pref.kinds_json) as string[]).includes(row.kind)||pushIsQuiet(pref.quiet_start,pref.quiet_end,now)))continue;
-  const conversation=row.kind==='test'?null:await db.prepare('SELECT c.friend_id,c.assignee_staff_id AS operator_id FROM messages_log m JOIN chats c ON c.friend_id=m.friend_id WHERE m.id=? AND m.line_account_id=?').bind(row.ref_id,row.line_account_id).first<{friend_id:string;operator_id:string|null}>();
+  const conversation=row.kind==='test'?null:await db.prepare('SELECT c.friend_id,c.assignee_staff_id AS operator_id,f.display_name FROM messages_log m JOIN chats c ON c.friend_id=m.friend_id JOIN friends f ON f.id=c.friend_id WHERE m.id=? AND m.line_account_id=?').bind(row.ref_id,row.line_account_id).first<{friend_id:string;operator_id:string|null;display_name:string|null}>();
   if(row.kind!=='test'&&(!conversation||row.kind==='assigned_reply'&&conversation.operator_id!==row.staff_id))continue;
   const claim=await db.prepare("UPDATE operator_push_deliveries SET status='pending',attempts=attempts+1,next_attempt_at=NULL WHERE id=? AND status='failed' AND attempts=?").bind(row.id,row.attempts).run();if(!claim.meta.changes)continue;
   try{
-   const payload=pushPayload(row.kind,conversation?.friend_id??''),r=send?await send(row,payload):await sendWebPush({...row,payload,publicKey:env.OPERATOR_PUSH_VAPID_PUBLIC_KEY!,privateKey:env.OPERATOR_PUSH_VAPID_PRIVATE_KEY!,subject:env.OPERATOR_PUSH_VAPID_SUBJECT!});
+   const payload=pushPayload(row.kind,conversation?.friend_id??'',conversation?.display_name),r=send?await send(row,payload):await sendWebPush({...row,payload,publicKey:env.OPERATOR_PUSH_VAPID_PUBLIC_KEY!,privateKey:env.OPERATOR_PUSH_VAPID_PRIVATE_KEY!,subject:env.OPERATOR_PUSH_VAPID_SUBJECT!});
    const gone=r.status===404||r.status===410,retry=!r.ok&&!gone&&(r.status===429||r.status>=500)&&row.attempts+1<4,next=retry?new Date(now.getTime()+[60000,300000,1800000][Math.min(2,row.attempts)]).toISOString():null;
    await db.prepare('UPDATE operator_push_deliveries SET status=?,error_code=?,next_attempt_at=? WHERE id=?').bind(gone?'gone':r.ok?'sent':'failed',r.ok?null:`push_http_${r.status}`,next,row.id).run();if(gone)await db.prepare('UPDATE operator_push_subscriptions SET revoked_at=? WHERE id=?').bind(now.toISOString(),row.subscription_id).run();
   }catch{await db.prepare("UPDATE operator_push_deliveries SET status='failed',error_code='push_unavailable' WHERE id=?").bind(row.id).run();}
