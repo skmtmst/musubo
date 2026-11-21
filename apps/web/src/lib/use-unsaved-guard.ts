@@ -2,34 +2,22 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { canonicalNavigationHref } from './canonical-route'
 import { UNSAVED_ACTION_EVENT } from './unsaved-action'
 import { clearUnsavedCohort, historyGuards, selectUnsavedCohort, selectedUnsavedGuards, type HistoryGuard } from './unsaved-guard-registry'
+import { canonicalLocalUrl, forgetLeave, leaveThroughHistory, releaseHistoryInterception, retainHistoryInterception, type HistoryPlace } from './unsaved-history'
 
-function canonicalLocalUrl(url: URL): URL {
-  return new URL(canonicalNavigationHref(`${url.pathname}${url.search}${url.hash}`), url.origin)
-}
-
+/** 確認のあとに行う移動。戻る・進むは行き先の履歴の位置を持つ（受け止めは unsaved-history.ts が全部の番兵で1つ持つ）。 */
 export type UnsavedLeaveTarget =
   | { kind: 'link'; href: string }
-  | { kind: 'history-back' }
+  | { kind: 'history-back'; to?: HistoryPlace }
   | { kind: 'action'; run: () => void }
-
-// 同じ戻る操作を複数の番兵が受けても、復元と確認は1回にまとめる。
-const handledPopEvents = new WeakSet<Event>()
-let restoringHistory = false
-function onRestoredHistory(event: PopStateEvent) {
-  if (!restoringHistory) return
-  restoringHistory = false
-  handledPopEvents.add(event)
-}
 
 /**
  * 未保存の変更がある間、画面を離れる操作を止める。
  *
  * - ブラウザ再読込・タブ終了: beforeunload で標準の確認を出す
  * - 左メニュー等の画面内リンク: クリックを捕まえて確認対話を出す
- * - 戻る操作: popstate で元の履歴位置へ戻してから確認対話を出す
+ * - 戻る・進む: Next のルーターより先に popstate を受け、元の履歴位置へ戻してから確認対話を出す
  *
  * 保存成功や「保存せずに移る」の確認後は markClean で dirty を外し、
  * 警告がもう出ないようにする。
@@ -68,7 +56,6 @@ export function useUnsavedGuard(options: {
   handlesLocalLinkRef.current = handlesLocalLink
   const onDiscardRef = useRef(onDiscard)
   onDiscardRef.current = onDiscard
-  const allowHistoryLeaveRef = useRef(false)
   const historyCohortRef = useRef<HistoryGuard[] | null>(null)
   /* 公開成功など「離れてよい」と決まった遷移の直前に立てる解除印。 */
   const disarmedRef = useRef(false)
@@ -81,18 +68,23 @@ export function useUnsavedGuard(options: {
     handlesLink: (destination, current, anchor) => !(destination.pathname === current.pathname && anchor.hasAttribute('data-row-local-open') && handlesLocalLinkRef.current?.(destination)),
     discard: () => onDiscardRef.current?.(),
     disarm: () => { disarmedRef.current = true },
+    askHistoryLeave: (to, cohort, destination) => {
+      historyCohortRef.current = cohort
+      // 保存中の入力があれば、元の位置へ戻すだけで確認はまだ出さない。
+      if (cohort.some(entry => entry.busy())) return
+      selectUnsavedCohort(historyGuardRef.current, cohort, entry => entry.handles(destination))
+      setLeaveTarget({ kind: 'history-back', to })
+    },
   }
   useEffect(() => {
     const entry = historyGuardRef.current!
-    if (historyGuards.size === 0) window.addEventListener('popstate', onRestoredHistory)
+    retainHistoryInterception()
     historyGuards.add(entry)
     return () => {
       historyGuards.delete(entry)
       clearUnsavedCohort(entry)
-      if (historyGuards.size === 0) {
-        window.removeEventListener('popstate', onRestoredHistory)
-        restoringHistory = false
-      }
+      forgetLeave(entry)
+      releaseHistoryInterception()
     }
   }, [])
 
@@ -148,40 +140,14 @@ export function useUnsavedGuard(options: {
   }, [dirty, busy])
 
   /*
-   * App Routerにはpages routerのbeforePopStateがないため、戻る操作はpopstateで
-   * ただちに元の履歴位置へ戻してから確認する。確認後だけ次のpopstateを通す。
+   * 戻る・進むは、全部の番兵で1つの受け口（onHistoryTraverse）が Next のルーターより先に受け、止める時だけ
+   * この番兵の askHistoryLeave で確認を出す。入力がきれいになったら解除の印と、決めていた移動の予約を外す。
+   * pane の切替だけが変わる同じ画面の中の戻る・進むは、samePage（handles）で止めない。
    */
   useEffect(() => {
-    if (!dirty && !busy) {
-      allowHistoryLeaveRef.current = false
-      disarmedRef.current = false
-      return
-    }
-    const onPopState = (event: PopStateEvent) => {
-      if (handledPopEvents.has(event)) return
-      if (disarmedRef.current) return
-      if (allowHistoryLeaveRef.current) {
-        allowHistoryLeaveRef.current = false
-        return
-      }
-      /*
-       * paneの切替だけが変わる、同じ画面の中の戻る・進むは離脱ではない。
-       * ここで止めると「同じ画面に居たまま」なのに離脱確認が出る。
-       */
-      const destination = canonicalLocalUrl(new URL(window.location.href))
-      if (samePageRef.current?.(destination)) return
-      handledPopEvents.add(event)
-      const cohort = [...historyGuards].filter(entry => entry.active() && entry.handles(destination))
-      historyCohortRef.current = cohort
-      restoringHistory = true
-      window.history.go(1)
-      if (!cohort.some(entry => entry.busy())) {
-        selectUnsavedCohort(historyGuardRef.current, cohort, entry => entry.handles(destination))
-        setLeaveTarget({ kind: 'history-back' })
-      }
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
+    if (dirty || busy) return
+    disarmedRef.current = false
+    forgetLeave(historyGuardRef.current!)
   }, [dirty, busy])
 
   useEffect(() => {
@@ -235,8 +201,7 @@ export function useUnsavedGuard(options: {
         entry.discard()
       }
       historyCohortRef.current = null
-      allowHistoryLeaveRef.current = true
-      window.history.back()
+      leaveThroughHistory(own!, leaveTarget.to ?? null)
       return
     }
     if (cohort) {
