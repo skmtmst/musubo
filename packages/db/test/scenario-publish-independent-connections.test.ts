@@ -140,8 +140,8 @@ describe('同時公開（独立接続 / 実D1相当）', () => {
     await publishScenarioVersion(a.db, scenario.id, { staffId: null, idempotencyKey: 'base' });
     await updateScenarioStep(a.db, step.id, { message_content: '直した1通目' });
 
-    // A が「次の版番号」を読む直前で止め、その隙に B（別接続）が公開を
-    // 最後まで終える。A は再開して版番号 UNIQUE で弾かれ、取り直す。
+    // A が「次の版番号」を読む直前で止め、その隙に B（別接続）が同じ内容の公開を
+    // 最後まで終える。A は最新の下書きを照合し、既存の公開版を返す。
     pauseOn = {
       pattern: /COALESCE\(MAX\(version_number\)/,
       release: async () => {
@@ -154,10 +154,11 @@ describe('同時公開（独立接続 / 実D1相当）', () => {
     });
 
     const rows = versions(scenario.id);
-    expect(rows.map((r) => r.n)).toEqual([1, 2, 3]);
+    expect(rows.map((r) => r.n)).toEqual([1, 2]);
     expect(rows.filter((r) => r.status === 'published')).toHaveLength(1);
     expect(rows.find((r) => r.status === 'published')!.id).toBe(vA.id);
     expect(pointer(scenario.id)).toBe(vA.id);
+    expect(a.raw.prepare("SELECT version_id FROM scenario_publish_keys WHERE publish_idempotency_key IN ('conn-a','conn-b') ORDER BY publish_idempotency_key").all()).toEqual([{ version_id: vA.id }, { version_id: vA.id }]);
   });
 
   test('同じ確認キーの相手が先に終えると、こちらの書き込みは丸ごと巻き戻る', async () => {

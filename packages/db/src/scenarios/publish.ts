@@ -126,9 +126,9 @@ export async function publishScenarioVersion(
   scenarioId: string,
   input: { staffId: string | null; idempotencyKey: string },
 ): Promise<ScenarioVersion> {
-  const scenario = await db.prepare(`SELECT * FROM scenarios WHERE id = ?`)
+  let scenario = await db.prepare(`SELECT * FROM scenarios WHERE id = ?`)
     .bind(scenarioId)
-    .first<Scenario>();
+    .first<Scenario & { current_published_version_id: string | null }>();
   if (!scenario) throw new Error('SCENARIO_NOT_FOUND');
 
   const steps = await getScenarioSteps(db, scenarioId);
@@ -168,6 +168,29 @@ export async function publishScenarioVersion(
     return replayed;
   }
 
+  // CAS が外れた時、先行公開以外の変更や固定参照の変更を見逃さない。
+  async function recoverPublishRace(): Promise<ScenarioVersion | null> {
+    const row = await db.prepare(`SELECT * FROM scenario_publish_keys WHERE publish_idempotency_key = ?`)
+      .bind(input.idempotencyKey).first<ScenarioPublishKey>();
+    if (row) {
+      if (row.scenario_id !== scenarioId || row.content_snapshot !== draftPayload) throw new Error('SCENARIO_PUBLISH_KEY_CONFLICT');
+      const version = await getScenarioVersionById(db, scenarioId, row.version_id);
+      if (!version) throw new Error('SCENARIO_NOT_PUBLISHED');
+      return version;
+    }
+    const latest = await db.prepare(`SELECT * FROM scenarios WHERE id = ?`).bind(scenarioId).first<Scenario & { current_published_version_id: string | null }>();
+    if (!latest || latest.line_account_id !== scenario!.line_account_id || latest.current_published_version_id === scenario.current_published_version_id) throw new Error('SCENARIO_PUBLISH_CONFLICT');
+    const latestSteps = await getScenarioSteps(db, scenarioId);
+    const latestSnapshot = await buildVersionSnapshotSteps(db, '', latestSteps, latest.line_account_id ?? null);
+    const latestActions = await buildVersionSnapshotActions(db, '', scenarioId, latestSteps);
+    const checked = await db.prepare(`SELECT content_revision FROM scenarios WHERE id = ?`).bind(scenarioId).first<{ content_revision: number }>();
+    if (checked?.content_revision !== latest.content_revision || canonicalPublishPayload(latest, latestSnapshot, latestActions) !== draftPayload) {
+      throw new Error('SCENARIO_PUBLISH_CONFLICT');
+    }
+    scenario = latest;
+    return null;
+  }
+
   for (let attempt = 0; attempt < 5; attempt++) {
     // 期待値の再読込。毎回いまの指針と版番号を取り直す。
     const current = await getScenarioPublishedVersion(db, scenarioId);
@@ -182,7 +205,12 @@ export async function publishScenarioVersion(
       const row = await db.prepare(
         `SELECT * FROM scenario_publish_keys WHERE publish_idempotency_key = ?`,
       ).bind(input.idempotencyKey).first<ScenarioPublishKey>();
-      if (!row || row.scenario_id !== scenarioId || row.content_snapshot !== draftPayload) {
+      if (!row) {
+        const replayed = await recoverPublishRace();
+        if (replayed) return replayed;
+        continue;
+      }
+      if (row.scenario_id !== scenarioId || row.content_snapshot !== draftPayload) {
         throw new Error('SCENARIO_PUBLISH_KEY_CONFLICT');
       }
       const version = await getScenarioVersionById(db, scenarioId, row.version_id);
@@ -269,11 +297,19 @@ export async function publishScenarioVersion(
         }
         throw new Error('SCENARIO_PUBLISH_KEY_CONFLICT');
       }
-      if (kind === 'version-number') continue;
+      if (kind === 'version-number') {
+        const replayed = await recoverPublishRace();
+        if (replayed) return replayed;
+        continue;
+      }
       throw error;
     }
     const saved = await getScenarioVersionById(db, scenarioId, id);
-    if (!saved) throw new Error('SCENARIO_PUBLISH_CONFLICT');
+    if (!saved) {
+      const replayed = await recoverPublishRace();
+      if (replayed) return replayed;
+      continue;
+    }
     if (saved.status !== 'published') throw new Error('SCENARIO_NOT_PUBLISHED');
     return saved;
   }

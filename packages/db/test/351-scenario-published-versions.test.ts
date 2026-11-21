@@ -337,6 +337,50 @@ describe('シナリオ公開版の固定（#644）', () => {
     expect(countVersions(scenario.id)).toBe(3);
   });
 
+  test('他の公開後に下書きが変わっていれば古い内容を再公開しない', async () => {
+    const { scenario, step1 } = await seedScenarioWithSteps();
+    await publish(scenario.id, 'stale-base');
+    await updateScenarioStep(db, step1.id, { message_content: '公開を待つ内容' });
+    let injected = false;
+    const racingDb = { ...db, batch: async (statements: D1PreparedStatement[]) => {
+      if (!injected) {
+        injected = true;
+        await publish(scenario.id, 'stale-winner');
+        await updateScenarioStep(db, step1.id, { message_content: '別の担当が変更した内容' });
+      }
+      return db.batch(statements);
+    } } as unknown as D1Database;
+    await expect(publishScenarioVersion(racingDb, scenario.id, { staffId: null, idempotencyKey: 'stale-loser' })).rejects.toThrow('SCENARIO_PUBLISH_CONFLICT');
+    expect(countVersions(scenario.id)).toBe(2);
+    expect(sqlite.prepare("SELECT count(*) AS n FROM scenario_publish_keys WHERE publish_idempotency_key='stale-loser'").get()).toEqual({ n: 0 });
+  });
+
+  test('他の公開後に固定参照が変われば古い固定版を再公開しない', async () => {
+    const { scenario, step1 } = await seedScenarioWithSteps();
+    sqlite.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('race-pin-a','race-pin-c','A','token','secret');
+      INSERT INTO common_vars(id,line_account_id,name,var_key,value) VALUES('race-pin-var','race-pin-a','案内','notice','新');
+      INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES
+        ('race-pin-v1','race-pin-var',1,'案内','旧','test'),('race-pin-v2','race-pin-var',2,'案内','新','test');`);
+    sqlite.prepare('UPDATE scenarios SET line_account_id=? WHERE id=?').run('race-pin-a', scenario.id);
+    sqlite.prepare('INSERT INTO scenario_step_common_var_pins VALUES (?,?,?)').run(step1.id, 'race-pin-var', 'race-pin-v1');
+    await publish(scenario.id, 'pin-race-base');
+    await updateScenarioStep(db, step1.id, { message_content: '更新した本文' });
+    let injected = false;
+    const racingDb = { ...db, batch: async (statements: D1PreparedStatement[]) => {
+      if (!injected) {
+        injected = true;
+        await publish(scenario.id, 'pin-race-winner');
+        sqlite.prepare('UPDATE scenario_step_common_var_pins SET version_id=? WHERE scenario_step_id=?').run('race-pin-v2', step1.id);
+        sqlite.prepare('UPDATE scenarios SET content_revision=content_revision+1 WHERE id=?').run(scenario.id);
+      }
+      return db.batch(statements);
+    } } as unknown as D1Database;
+    await expect(publishScenarioVersion(racingDb, scenario.id, { staffId: null, idempotencyKey: 'pin-race-loser' })).rejects.toThrow('SCENARIO_PUBLISH_CONFLICT');
+    expect(countVersions(scenario.id)).toBe(2);
+    expect(sqlite.prepare("SELECT count(*) AS n FROM scenario_publish_keys WHERE publish_idempotency_key='pin-race-loser'").get()).toEqual({ n: 0 });
+    expect(sqlite.prepare('SELECT DISTINCT version_id FROM scenario_version_common_var_pins').all()).toEqual([{ version_id: 'race-pin-v1' }]);
+  });
+
   test('キー競合の batch は巻き戻る：409 後に版の残骸も指針の移動もない', async () => {
     const { scenario, step1 } = await seedScenarioWithSteps();
     const v1 = await publish(scenario.id, 'key-atomic-1');
