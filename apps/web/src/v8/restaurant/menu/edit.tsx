@@ -202,9 +202,14 @@ function MenuEditBody() {
         notifySaved(priceChanged ? (priceStartsLater ? '価格変更を確定しました。指定した開始日時に反映します。' : '価格を変更しました。') : 'メニューを更新しました。')
       } else {
         if (!storeId) throw new Error('store_missing')
-        await restaurantTestApi.createMenu(selectedAccountId, { storeId, ...body, status: draft.status })
+        const created = await restaurantTestApi.createMenu(selectedAccountId, { storeId, ...body, status: draft.status })
         if (!stillHere()) return
         notifySaved(draft.status === 'draft' ? '下書きのメニューを追加しました。' : 'メニューを公開しました。')
+        if (guidedCourse && draft.status === 'draft') {
+          setSaved(draft)
+          router.replace(`/restaurant-test/menu/edit?id=${encodeURIComponent(created.data.id)}`)
+          return true
+        }
       }
       if (!stillHere()) return
       if (draft.status === 'active' && (!editing || editing.status === 'draft')) emitGuideSignal('menu.save')
