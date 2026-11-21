@@ -243,6 +243,7 @@ async function runFormPostEffects(input: {
         friendId,
         answers: submissionData,
         formId: input.formId,
+        formVersionId: submission.form_version_id,
         idempotencyPrefix: `form-submit:${submission.id}`,
         push: {
           defaultAccessToken: input.defaultAccessToken,
@@ -505,7 +506,8 @@ async function runFormPostEffects(input: {
         const { resolveSendInterpolationExtra } = await import('../services/interpolation-context.js');
         const extra = await resolveSendInterpolationExtra(
           db, friend.id, form.on_submit_message_content,
-          { kind: 'form_reply', id: input.formId },
+          { kind: 'form_reply', id: input.formId }, undefined,
+          submission.form_version_id ? { kind: 'form', versionId: submission.form_version_id } : undefined,
         );
         const expanded = expandVariables(form.on_submit_message_content, friendData, apiOrigin, form.on_submit_message_type, extra);
         // 1:1 push → /t リンクに f=<friendId> を焼き込み (LIFF 識別ホップ回避)
@@ -517,6 +519,12 @@ async function runFormPostEffects(input: {
         messages.push(buildMessage('flex', JSON.stringify(resultFlex)));
       }
 
+      // プロキシへ出す前に、固定元の停止と期限を再確認する。
+      if (!rewardFromTrackedLink && submission.form_version_id && form.on_submit_message_type && form.on_submit_message_content) {
+        const { resolveSendInterpolationExtra } = await import('../services/interpolation-context.js');
+        await resolveSendInterpolationExtra(db, friend.id, form.on_submit_message_content,
+          { kind: 'form_reply', id: input.formId }, undefined, { kind: 'form', versionId: submission.form_version_id });
+      }
       // プロキシが LINE 送信と messages_log 記録を一体で行う。
       await pushViaHarnessProxy(
         input.origin,

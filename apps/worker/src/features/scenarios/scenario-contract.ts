@@ -1053,7 +1053,9 @@ export async function simulateFriendPlan(
       // 余計な読みをせず、全ての通を未確定で返す（形だけは見える）。
       halt = reasons[0] ?? 'いまは配信できないため、予定は未確定です';
     } else if (inFlight && subscription!.status === 'paused') {
-      halt = subscription!.pause_reason === 'delivery_failed'
+      halt = subscription!.pause_reason === 'common_var_unavailable'
+        ? '固定した共通情報の状態や期限を確認してください。再送されるまで以降の予定は未確定です'
+        : subscription!.pause_reason === 'delivery_failed'
         ? '配信失敗で止まっています。再開・再送されるまで以降の予定は未確定です'
         : '一時停止中です。再開されるまで以降の予定は未確定です';
     } else if (inFlight && subscription!.status === 'delivering') {

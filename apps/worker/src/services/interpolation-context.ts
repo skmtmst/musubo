@@ -8,6 +8,7 @@ import {
 
 import { commonVarKeysInContent } from './common-var-snapshot.js';
 import { resolveMusuboCommonVarsAt } from './google-common-vars.js';
+import { resolveUsagePinnedCommonVars, type PinOwner } from './usage-pinned-common-vars.js';
 
 /**
  * 差し込みに使う値をまとめて用意する。
@@ -92,6 +93,7 @@ export class CommonVarResolutionFailedError extends Error {
   constructor(
     readonly failures: ReadonlyArray<CommonVarResolutionFailure>,
     readonly source: CommonVarSendSource,
+    readonly pinnedFailure = false,
   ) {
     super(`common_var_unresolved:${failures.map((f) => f.varKey).join(',')}`);
     this.name = 'CommonVarResolutionFailedError';
@@ -109,6 +111,7 @@ export async function resolveSendCommonVars(
   content: string,
   source: CommonVarSendSource,
   executionAt = new Date().toISOString(),
+  pinOwner?: PinOwner,
 ): Promise<Record<string, string> | undefined> {
   const varKeys = commonVarKeysInContent(content);
   if (varKeys.length === 0) return undefined;
@@ -120,7 +123,9 @@ export async function resolveSendCommonVars(
       source,
     );
   }
-  const resolved = await resolveMusuboCommonVarsAt(db, lineAccountId, varKeys, executionAt);
+  const resolved = pinOwner
+    ? await resolveUsagePinnedCommonVars(db, lineAccountId, varKeys, pinOwner, executionAt)
+    : await resolveMusuboCommonVarsAt(db, lineAccountId, varKeys, executionAt);
   if (!resolved.ok) {
     const now = new Date().toISOString();
     try {
@@ -139,7 +144,7 @@ export async function resolveSendCommonVars(
       // 台帳の書き込み失敗で送信拒否自体を潰さない。拒否は必ず成立させる。
       logger.error("interpolation_context.resolve_send_common_vars_failed");
     }
-    throw new CommonVarResolutionFailedError(resolved.failures, source);
+    throw new CommonVarResolutionFailedError(resolved.failures, source, 'pinnedFailure' in resolved && resolved.pinnedFailure === true);
   }
   return resolved.values;
 }
@@ -155,6 +160,7 @@ export async function resolveSendInterpolationExtra(
   content: string,
   source: CommonVarSendSource,
   executionAt?: string,
+  pinOwner?: PinOwner,
 ): Promise<InterpolationExtra> {
   const needsFields = FIELD_PATTERN.test(content);
   const varKeys = commonVarKeysInContent(content);
@@ -168,7 +174,7 @@ export async function resolveSendInterpolationExtra(
 
   const [fields, vars] = await Promise.all([
     needsFields ? getFriendFieldMap(db, friendId) : Promise.resolve(undefined),
-    resolveSendCommonVars(db, account?.line_account_id, content, source, executionAt),
+    resolveSendCommonVars(db, account?.line_account_id, content, source, executionAt, pinOwner),
   ]);
   return { fields, vars };
 }
@@ -230,6 +236,7 @@ export async function expandSendCommonVars(
   source: CommonVarSendSource,
   target: { lineAccountId?: string | null; friendId?: string; messageType?: string },
   executionAt?: string,
+  pinOwner?: PinOwner,
 ): Promise<string> {
   const contentValues = commonVarContentValues(content, target.messageType);
   const varKeys = commonVarKeysInContent(contentValues);
@@ -241,7 +248,7 @@ export async function expandSendCommonVars(
     ).bind(target.friendId).first<{ line_account_id: string | null }>();
     lineAccountId = account?.line_account_id;
   }
-  const vars = await resolveSendCommonVars(db, lineAccountId, contentValues, source, executionAt);
+  const vars = await resolveSendCommonVars(db, lineAccountId, contentValues, source, executionAt, pinOwner);
   return substituteCommonVars(content, vars ?? {}, target.messageType);
 }
 

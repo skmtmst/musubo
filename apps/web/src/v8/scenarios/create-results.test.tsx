@@ -362,6 +362,24 @@ describe('配信結果（X4STXS）', () => {
     } finally { stats.enrolledTotal = previous.total; runs.summary = previous.summary }
   })
 
+  test('固定した共通情報の要確認はマウスとフォーカスで理由を示す', async () => {
+    runs.subscriptions.push(sub('common-var-wait', '共通情報待ち', 'paused', 1, 'common_var_unavailable'))
+    try {
+      search = 'id=sc-1'
+      render(<ScenarioResultsV8 />)
+      const trigger = await screen.findByRole('button', { name: '要確認の理由' })
+      const row = trigger.closest('[role="row"]')!
+      expect(within(row).getByText('—（要確認）')).toBeTruthy()
+      const reason = '固定した共通情報の状態や期限を確認してください'
+      fireEvent.mouseEnter(trigger.parentElement!)
+      expect((await screen.findByText(reason)).getAttribute('data-tone')).toBe('dark')
+      fireEvent.pointerLeave(trigger.parentElement!, { pointerType: 'mouse' })
+      await waitFor(() => expect(screen.queryByText(reason)).toBeNull())
+      fireEvent.focus(trigger)
+      expect((await screen.findByText(reason)).getAttribute('data-tone')).toBe('dark')
+    } finally { runs.subscriptions.pop() }
+  })
+
   test('送達不明は要確認と確認方法を出し、再開・再送・移動を出さない', async () => {
     const uncertain = sub('unknown', '確認対象', 'paused', 1, 'delivery_unconfirmed')
     runs.subscriptions.push(uncertain)

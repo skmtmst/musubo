@@ -264,3 +264,6 @@ html:root .button[data-help-trigger='text']:active { scale: 1; }
 html:root :has(> .wrap):not(th, td, [role='columnheader'], [role='cell']) { column-gap: var(--polish-space-row); }
 /* 表の見出しのセルは文字の流れの中に置くので、間は「？」の側で取る。 */
 html:root :is(th, td, [role='columnheader'], [role='cell']) > .wrap { margin-inline-start: var(--polish-space-row); }
+
+html:root .tip[data-tone='dark'] { background: var(--polish-tooltip-bg); color: var(--polish-tooltip-ink); border-color: transparent; border-radius: var(--polish-radius-small); padding: var(--polish-space-row) var(--polish-space-field); max-width: min(var(--polish-tooltip-width), calc(100vw - var(--polish-space-card))); font-size: var(--polish-text-support); }
+html:root .tip[data-tone='dark'] a { color: var(--polish-tooltip-ink); }

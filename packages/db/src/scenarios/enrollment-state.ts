@@ -176,7 +176,7 @@ export async function retryFailedFriendScenario(
               next_delivery_at = ?,
               pause_reason = NULL,
               updated_at = ?
-        WHERE id = ? AND status = 'paused' AND pause_reason = 'delivery_failed'`,
+        WHERE id = ? AND status = 'paused' AND pause_reason IN ('delivery_failed', 'common_var_unavailable')`,
     )
     .bind(now, now, id)
     .run();

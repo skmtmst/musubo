@@ -101,6 +101,54 @@ describe('pushImmediateFirstStep の版固定（実D1）', () => {
     })).toBe(false);
     expect(sent).toEqual([]);
     expect(testDb.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
+    expect(testDb.raw.prepare('SELECT status FROM friend_scenarios WHERE id=?').get(enrollment.id)).toEqual({status:'active'});
+  });
+
+  it('固定した共通情報を送り、停止後は送らず要確認にする', async () => {
+    const { scenario, step1 } = await seedScenario(testDb.db);
+    testDb.raw.exec(`INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES('acc-1','店','ch','tok','secret');
+      INSERT INTO common_vars(id,line_account_id,name,var_key,value,version) VALUES('hours','acc-1','営業時間','hours','新',2);
+      INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES('old','hours',1,'営業時間','旧','test');`);
+    testDb.raw.prepare("UPDATE scenarios SET line_account_id='acc-1' WHERE id=?").run(scenario.id);
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'acc-1' });
+    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'acc-1' });
+    await updateScenarioStep(testDb.db, step1.id, { message_content: '営業時間: {{var.hours}}' });
+    testDb.raw.prepare('INSERT INTO scenario_step_common_var_pins VALUES (?,?,?)').run(step1.id, 'hours', 'old');
+    await publishScenarioVersion(testDb.db, scenario.id, { staffId: null, idempotencyKey: 'fixed-hours' });
+    const first = (await enrollFriendInScenario(testDb.db, 'friend-1', scenario.id))!;
+    const second = (await enrollFriendInScenario(testDb.db, 'friend-2', scenario.id))!;
+    const { sent, client } = replyHarness();
+    expect(await pushImmediateFirstStep(testDb.db, 'friend-1', scenario.id, ctx, { enrollment: first as FriendScenario, reply: { client, replyToken: 'first' } })).toBe(true);
+    expect(JSON.stringify(sent[0].messages)).toContain('営業時間: 旧');
+    testDb.raw.prepare("UPDATE common_vars SET status='stopped' WHERE id='hours'").run();
+    expect(await pushImmediateFirstStep(testDb.db, 'friend-2', scenario.id, ctx, { enrollment: second as FriendScenario, reply: { client, replyToken: 'second' } })).toBe(false);
+    expect(sent).toHaveLength(1);
+    expect(testDb.raw.prepare("SELECT reason FROM common_var_resolution_failures WHERE var_key='hours'").get()).toEqual({ reason: 'stopped' });
+  });
+
+  it('文を組み立てた後に固定元が停止したら送る直前に止める', async () => {
+    const { scenario, step1 } = await seedScenario(testDb.db);
+    testDb.raw.exec(`INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES('acc-1','店','ch','tok','secret');
+      INSERT INTO common_vars(id,line_account_id,name,var_key,value) VALUES('hours','acc-1','営業時間','hours','新');
+      INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES('old','hours',1,'営業時間','旧','test');`);
+    testDb.raw.prepare("UPDATE scenarios SET line_account_id='acc-1' WHERE id=?").run(scenario.id);
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'acc-1' });
+    await updateScenarioStep(testDb.db, step1.id, { message_content: '{{var.hours}}' });
+    testDb.raw.prepare('INSERT INTO scenario_step_common_var_pins VALUES(?,?,?)').run(step1.id, 'hours', 'old');
+    await publishScenarioVersion(testDb.db, scenario.id, { staffId: null, idempotencyKey: 'before-send' });
+    const enrollment = (await enrollFriendInScenario(testDb.db, 'friend-1', scenario.id))!;
+    const prepare = testDb.db.prepare.bind(testDb.db);
+    let pinReads = 0;
+    const spy = vi.spyOn(testDb.db, 'prepare').mockImplementation((query) => {
+      if (query.includes('FROM scenario_version_common_var_pins p') && ++pinReads === 2) testDb.raw.prepare("UPDATE common_vars SET status='stopped' WHERE id='hours'").run();
+      return prepare(query);
+    });
+    try {
+      const { sent, client } = replyHarness();
+      expect(await pushImmediateFirstStep(testDb.db, 'friend-1', scenario.id, ctx, { enrollment: enrollment as FriendScenario, reply: { client, replyToken: 'reply' } })).toBe(false);
+      expect(sent).toEqual([]);
+      expect(testDb.raw.prepare('SELECT status,pause_reason FROM friend_scenarios WHERE id=?').get(enrollment.id)).toEqual({ status:'paused', pause_reason:'common_var_unavailable' });
+    } finally { spy.mockRestore(); }
   });
 
   it('公開後の template 編集は固定版へ混入しない', async () => {

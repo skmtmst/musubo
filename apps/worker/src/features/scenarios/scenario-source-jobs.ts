@@ -12,7 +12,7 @@ import { dbFor } from '../../services/db-router.js';
 import { featureJobCanRun } from '../../services/feature-enforcement.js';
 import { restaurantTestEnabled } from '../../lib/environment-features.js';
 import { expandVariables, resolveMetadata, buildMessage } from '../../services/step-delivery.js';
-import { resolveSendInterpolationExtra } from '../../services/interpolation-context.js';
+import { CommonVarResolutionFailedError, resolveSendInterpolationExtra } from '../../services/interpolation-context.js';
 import { decorateForFriendPush } from '../../services/auto-track.js';
 import { pushViaHarnessProxy } from '../../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../../services/local-line-proxy.js';
@@ -148,7 +148,7 @@ export async function processScenarioSourceJobs(env: Env['Bindings'], send: Sour
             const messages: Message[] = [];
             for (const part of parts) {
                 const scanned = part.messageContent.replace(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g, (m, key: string) => key in vars ? '' : m);
-                const extra = await resolveSendInterpolationExtra(db, friend.id, scanned, { kind: 'scenario', id: j.id });
+                const extra = await resolveSendInterpolationExtra(db, friend.id, scanned, { kind: 'scenario', id: j.id }, undefined, step.live_step_id ? { kind: 'scenario', versionId: j.scenario_version_id, liveStepId: step.live_step_id } : undefined);
                 const content = expandVariables(part.messageContent, { ...friend, metadata } as never, env.WORKER_PUBLIC_URL, part.messageType, { ...extra, vars: { ...extra.vars, ...vars }, deliveredAt: new Date() });
                 const tracked = await decorateForFriendPush(db, part.messageType, content, env.WORKER_PUBLIC_URL, { lineAccountId: j.line_account_id, friendId: j.friend_id, sourceContent: part.messageContent });
                 messages.push(buildMessage(tracked.messageType, tracked.content));
@@ -166,6 +166,13 @@ export async function processScenarioSourceJobs(env: Env['Bindings'], send: Sour
                     throw new Error('source_changed');
                 if (state.trigger === 'reservation_24h' && latest.customer_version !== state.customer_version)
                     throw new Error('source_changed');
+                if (step.live_step_id) {
+                    for (const part of parts) {
+                        const scanned = part.messageContent.replace(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g, (m, key: string) => key in vars ? '' : m);
+                        await resolveSendInterpolationExtra(db, friend.id, scanned, { kind: 'scenario', id: j.id }, undefined,
+                            { kind: 'scenario', versionId: j.scenario_version_id, liveStepId: step.live_step_id });
+                    }
+                }
                 await send(env, j, messages);
             }
             if (j.source_kind === 'restaurant_waitlist')
@@ -173,8 +180,12 @@ export async function processScenarioSourceJobs(env: Env['Bindings'], send: Sour
             if ((await db.prepare("UPDATE scenario_source_jobs SET status='sent',lease_until=NULL,message_log_id=? WHERE id=? AND lease_until=? AND status='running'").bind(logId, j.id, lease).run()).meta.changes)
                 sent++;
         }
-        catch {
-            await db.prepare("UPDATE scenario_source_jobs SET status='failed',lease_until=? WHERE id=? AND status='running' AND lease_until=?").bind(new Date(Date.now() + 60000).toISOString(), j.id, lease).run();
+        catch (error) {
+            if (error instanceof CommonVarResolutionFailedError && error.pinnedFailure) {
+                await db.prepare("UPDATE scenario_source_jobs SET status='failed',attempt_count=50,lease_until=NULL WHERE id=? AND status='running' AND lease_until=?").bind(j.id, lease).run();
+            } else {
+                await db.prepare("UPDATE scenario_source_jobs SET status='failed',lease_until=? WHERE id=? AND status='running' AND lease_until=?").bind(new Date(Date.now() + 60000).toISOString(), j.id, lease).run();
+            }
         }
     }
     return sent;

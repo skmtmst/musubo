@@ -204,6 +204,8 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  // 使用先メニューは親の編集中の値を受け取り、画面離脱は編集画面の番兵が守る。
+  'v8/common-vars-edit/usage-reference-menu.tsx': 'v8/common-vars-edit/edit.tsx',
   'v8/restaurant/google/hours-edit-panel.tsx': 'v8/restaurant/google/hours.tsx',
   'components/shared/folder-row-actions.tsx': 'components/shared/folder-add-dialog.tsx',
   // タブ枠は子の名前編集を保持し、確認は子の共通ガードが担当する。

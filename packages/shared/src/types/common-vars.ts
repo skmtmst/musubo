@@ -56,6 +56,11 @@ export interface CommonVarDeleteImpactItem {
   status: string;
   href: string;
   blocksDeletion: boolean;
+  referenceMode?: "live" | "pinned" | "operation" | "unknown";
+  referencedVersion?: number | null;
+  /** フォームの公開中の参照。編集内容とは別に表示する。 */
+  publishedReferenceMode?: "live" | "pinned";
+  publishedReferencedVersion?: number | null;
   currentPreview: string;
 }
 

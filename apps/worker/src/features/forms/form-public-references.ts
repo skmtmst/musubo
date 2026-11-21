@@ -1,5 +1,6 @@
 import { getFormAccountIds, formBelongsToLineAccount, isSecretLikeValue } from '@line-crm/db';
 import { resolveMusuboCommonVarsAt } from '../../services/google-common-vars.js';
+import { resolveUsagePinnedCommonVars } from '../../services/usage-pinned-common-vars.js';
 import { jstDate, type FormLayout, type FormReferenceDefinition, type PublicFormImage, type PublicFormReference, type PublicStoreInformation } from '@line-crm/shared';
 import { storePhotoVisibility } from '../booking/booking-photos/index.js';
 import { checkMediaGate } from '../../services/file-scan.js';
@@ -78,10 +79,13 @@ function publicUrl(value: string): boolean {
     return url.protocol === 'https:' && !url.username && !url.password && !/[\u0000-\u001f\\]/.test(value);
   } catch { return false; }
 }
-async function storeInformation(db: D1Database, accountId: string, reference: Extract<FormReferenceDefinition, { kind: 'store_information' }>): Promise<PublicStoreInformation | null> {
+async function storeInformation(db: D1Database, accountId: string, reference: Extract<FormReferenceDefinition, { kind: 'store_information' }>, formVersionId?: string | null): Promise<PublicStoreInformation | null> {
   const entries = Object.entries(reference.fields);
   if (!entries.length) return {};
-  const resolved = await resolveMusuboCommonVarsAt(db, accountId, entries.map(([, source]) => source.varKey), new Date().toISOString());
+  const keys = entries.map(([, source]) => source.varKey);
+  const now = new Date().toISOString();
+  const resolved = formVersionId ? await resolveUsagePinnedCommonVars(db, accountId, keys, { kind: 'form', versionId: formVersionId }, now)
+    : await resolveMusuboCommonVarsAt(db, accountId, keys, now);
   if (!resolved.ok) return null;
   const content: PublicStoreInformation = {};
   for (const [field, source] of entries) {
@@ -115,7 +119,7 @@ export async function resolveFormReferences(input: {
         const content: PublicFormImage = { url: url.toString(), alt: reference.alt, width: image.width, height: image.height, mimeType: image.mime_type, versionId: image.id };
         result.push({ blockId: reference.blockId, kind: 'image', state: 'ready', content });
       } else {
-        const content = await storeInformation(input.env.DB, input.accountId, reference);
+        const content = await storeInformation(input.env.DB, input.accountId, reference, input.formVersionId);
         result.push(content === null ? { ...base, state: 'unavailable' }
           : Object.keys(content).length ? { blockId: reference.blockId, kind: 'store_information', state: 'ready', content }
           : { ...base, state: 'empty' });

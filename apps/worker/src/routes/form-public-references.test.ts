@@ -11,6 +11,7 @@ import { featureEnforcementMiddleware } from '../middleware/feature-enforcement.
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../worker-env.js';
 import { forms } from './forms.js';
+import { serializeCommonVarChangeImpact } from './contents-definition-serialize-common-var-delete-impact.js';
 import { scanSingleMediaUsage } from '../features/media/media-usage-scan/index.js';
 import { unhandledWorkerError } from '../lib/unhandled-error.js';
 
@@ -195,6 +196,53 @@ describe('フォームの公開参照と固定画像', () => {
     expect(impact.byKind.form).toBe(1); expect(impact.items.find(item => item.kind === 'form')?.source_id).toBe(created.id);
     sql.raw.prepare("UPDATE common_vars SET status='stopped' WHERE var_key='public_hours'").run();
     expect((await definition(created.id)).data.references[1]).toEqual({ blockId: 'store', kind: 'store_information', state: 'unavailable' });
+  });
+
+  test('固定APIは使用先と同じアカウントの版だけを保存し、古い編集番号を拒む', async () => {
+    const created = await form();
+    sql.raw.prepare(`INSERT INTO staff_members(id,name,role,api_key,is_active,tenant_id,permission_keys,access_level)
+      VALUES('pin-owner','Owner','owner','pin-key',1,'public-tenant','[]','full'),('pin-reader','Reader','owner','reader-key',1,'public-tenant','[]','read_only')`).run();
+    sql.raw.prepare("INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES('old-hours','public_hours',7,'営業時間','旧','test')").run();
+    const expectedVersion = (await getFormById(sql.db, created.id))!.content_revision;
+    const put = (versionId: string | null, version: number) => request(`/api/forms/${created.id}/common-var-pins/public_hours`, {
+      method: 'PUT', headers: { Authorization: 'Bearer pin-key', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: 'a', versionId, expectedVersion: version }),
+    });
+    const denied = await request(`/api/forms/${created.id}/common-var-pins/public_hours`, {
+      method: 'PUT', headers: { Authorization: 'Bearer reader-key', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId:'a', versionId:'old-hours', expectedVersion }),
+    });
+    expect(denied.status).toBe(403);
+    expect((await put('missing', expectedVersion)).status).toBe(409);
+    expect((await put('old-hours', expectedVersion)).status).toBe(200);
+    expect((await put(null, expectedVersion)).status).toBe(409);
+    expect((await put(null, expectedVersion + 1)).status).toBe(200);
+    expect(sql.raw.prepare('SELECT count(*) AS n FROM form_common_var_pins').get()).toEqual({ n: 0 });
+  });
+
+  test('固定は次の公開から反映し、停止・期限切れなら表示しない', async () => {
+    const created = await form();
+    sql.raw.prepare("INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES('old-hours','public_hours',7,'営業時間','固定した営業時間','test')").run();
+    sql.raw.prepare("INSERT INTO form_common_var_pins(form_id,common_var_id,version_id) VALUES(?,'public_hours','old-hours')").run(created.id);
+    sql.raw.prepare('UPDATE forms SET content_revision=content_revision+1 WHERE id=?').run(created.id);
+    sql.raw.prepare("UPDATE common_vars SET value='新しい営業時間' WHERE id='public_hours'").run();
+    expect((await definition(created.id)).data.references[1].content.hours[0].text).toBe('新しい営業時間');
+    const variable = sql.raw.prepare("SELECT * FROM common_vars WHERE id='public_hours'").get() as Parameters<typeof serializeCommonVarChangeImpact>[0];
+    const beforeImpact = await getCommonVarUsageImpact(sql.db, 'public_hours', 'a');
+    expect(serializeCommonVarChangeImpact(variable, beforeImpact, '更新').items.find(item => item.kind === 'form')?.changesOnSave).toBe(true);
+    const edited = await getFormById(sql.db, created.id);
+    const beforeVersions = sql.raw.prepare('SELECT count(*) AS n FROM form_versions WHERE form_id=?').get(created.id);
+    expect((await publishFormVersion(sql.db, created.id, edited!.content_revision + 1)).kind).toBe('conflict');
+    expect(sql.raw.prepare('SELECT count(*) AS n FROM form_versions WHERE form_id=?').get(created.id)).toEqual(beforeVersions);
+    expect(sql.raw.prepare('SELECT count(*) AS n FROM form_version_common_var_pins').get()).toEqual({n:0});
+    expect((await publishFormVersion(sql.db, created.id, edited!.content_revision)).kind).toBe('published');
+    expect((await definition(created.id)).data.references[1].content.hours[0].text).toBe('固定した営業時間');
+    const afterImpact = await getCommonVarUsageImpact(sql.db, 'public_hours', 'a');
+    expect(serializeCommonVarChangeImpact(variable, afterImpact, '更新').items.find(item => item.kind === 'form')?.changesOnSave).toBe(false);
+    sql.raw.prepare("UPDATE common_vars SET valid_until='2020-01-01T00:00:00Z' WHERE id='public_hours'").run();
+    expect((await definition(created.id)).data.references[1].state).toBe('unavailable');
+    sql.raw.prepare("UPDATE common_vars SET valid_until=NULL,status='stopped' WHERE id='public_hours'").run();
+    expect((await definition(created.id)).data.references[1].state).toBe('unavailable');
   });
 
   test('共通情報の取得障害はemptyにせず、ほかの参照を残し共通のエラー記録へ渡す', async () => {

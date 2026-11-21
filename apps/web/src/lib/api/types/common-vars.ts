@@ -14,6 +14,7 @@ export type CommonVarHistoryItem = {
 
 export type CommonVarDetail = CommonVar & {
   memo: string
+  pinDisabledReason?: string | null
   version: number
   archivedAt: string | null
   usages: CommonVarDeleteImpact['items']

@@ -388,22 +388,24 @@ async function sendMessageExecutor(
   // 差し込みを展開せず生のまま送っていた。消えた共通情報は fail-closed で
   // 止め、解決できるものは送信時点の値へ置き換える。
   let content: string;
+  let validationContent = resolved.content;
   try {
     const { expandSendCommonVars } = await import('../../services/interpolation-context.js');
     if(initialGate.source.restaurant){
       const body=substituteRestaurantBooking(resolved.content,initialGate.source.context);
       const vars={...restaurantBookingVariables(initialGate.source.context),...(initialGate.source.waitlistId?await restaurantWaitlistVariables(context.db,context.lineAccountId,initialGate.source.waitlistId):{})};
       const scanned=body.replace(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g,(match,key:string)=>key in vars?'':match);
+      validationContent = scanned;
       const fullFriend=await getFriendById(context.db,friend.id);
       if(!fullFriend)throw invalid('friend_not_found','対象の友だちが見つかりません');
-      const extra=await resolveSendInterpolationExtra(context.db,friend.id,scanned,{kind:'automation',id:context.action.id});
+      const extra=await resolveSendInterpolationExtra(context.db,friend.id,scanned,{kind:context.commonVarPinOwner?'scenario':'automation',id:context.action.id}, undefined, context.commonVarPinOwner);
       content=expandVariables(body,{...fullFriend,metadata:await resolveMetadata(context.db,fullFriend)},undefined,resolved.type,
         {...extra,vars:{...extra.vars,...vars},deliveredAt:new Date(dependencies.now?.()??jstNow())});
     }else{
       content = await expandSendCommonVars(
         context.db, resolved.content,
-        { kind: 'automation', id: context.action.id },
-        { lineAccountId: context.lineAccountId, messageType: resolved.type },
+        { kind: context.commonVarPinOwner ? 'scenario' : 'automation', id: context.action.id },
+        { lineAccountId: context.lineAccountId, messageType: resolved.type }, undefined, context.commonVarPinOwner,
       );
     }
   } catch (error) {
@@ -418,9 +420,7 @@ async function sendMessageExecutor(
   }
   const message = strictMessage(resolved.type, content, resolved.altText);
   const payload = JSON.stringify({ to: friend.line_user_id, messages: [message] });
-  if (await reserveLineOperation(context, payload) === 'replay') {
-    return { output: { replayed: true } };
-  }
+  if (!context.commonVarPinOwner && await reserveLineOperation(context, payload) === 'replay') return { output: { replayed: true } };
   const token = await resolveAccessToken(context, dependencies);
   const client = (dependencies.createLineClient ?? ((value) => new LineClient(value)))(token);
   // 送信呼び出しと送信後の記録は分けて失敗を見る。
@@ -437,6 +437,17 @@ async function sendMessageExecutor(
       .bind(context.stepExecutionId,context.runId,context.runId,context.automationVersionId,...initialGate.guard.binds,...finalGate.guard.binds).run();
     if(right.meta.changes!==1)throw invalid('restaurant_source_changed','予約または承認の内容が変わったため送信できません');
   }
+  if (context.commonVarPinOwner) {
+    const { expandSendCommonVars, CommonVarResolutionFailedError } = await import('../../services/interpolation-context.js');
+    try {
+      await expandSendCommonVars(context.db, validationContent, { kind: 'scenario', id: context.action.id },
+        { lineAccountId: context.lineAccountId, messageType: resolved.type }, undefined, context.commonVarPinOwner);
+    } catch (error) {
+      if (error instanceof CommonVarResolutionFailedError) throw invalid('common_var_unresolved', '固定した共通情報の状態や期限を確認してください');
+      throw error;
+    }
+  }
+  if (context.commonVarPinOwner && await reserveLineOperation(context, payload) === 'replay') return { output: { replayed: true } };
   let response: unknown;
   try {
     response = await client.pushMessage(friend.line_user_id, [message], context.idempotencyKey);
