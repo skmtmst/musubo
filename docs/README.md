@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [予約変更時の卓の重複案内](release-log/unreleased/87-kenta-table-dup.md) — 卓の重複理由と空き卓の案内の履歴。確認 2026-11-16。
+
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)

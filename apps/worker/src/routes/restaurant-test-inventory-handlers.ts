@@ -259,7 +259,9 @@ export const get__api_restaurant_test_availability_16 = async (c: Context<Env, "
  const org=await organizationFor(c),storeId=c.req.query('storeId')||org?.scopedStoreId||'',startsAt=c.req.query('startsAt')||'',endsAt=c.req.query('endsAt')||'',guestCount=Number(c.req.query('guestCount'));
  if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'店舗が正しくありません'},404);
  if(!Number.isFinite(Date.parse(startsAt))||!Number.isFinite(Date.parse(endsAt))||Date.parse(endsAt)<=Date.parse(startsAt)||!Number.isSafeInteger(guestCount)||guestCount<1||guestCount>100)return c.json({success:false,error:'日時と人数を確認してください'},400);
- return c.json({success:true,data:{storeId,startsAt,endsAt,guestCount,tables:await openSeatTables(dbFor(c.env,storeId),storeId,startsAt,endsAt,guestCount)}});
+ const excludeId=c.req.query('excludeReservationId')||'';
+ if(excludeId && !await dbFor(c.env,storeId).prepare('SELECT id FROM rt_reservations WHERE id=? AND store_id=?').bind(excludeId,storeId).first())return c.json({success:false,error:'予約がありません'},404);
+ return c.json({success:true,data:{storeId,startsAt,endsAt,guestCount,tables:await openSeatTables(dbFor(c.env,storeId),storeId,startsAt,endsAt,guestCount,false,excludeId)}});
 };
 
 export const get__api_restaurant_test_closures_id_contact_status_17 = async (c: Context<Env, "/api/restaurant-test/closures/:id/contact-status">) => {

@@ -1042,7 +1042,7 @@ describe('飲食店向けテストAPI', () => {
     const target = data.reservations.find((item) => item.external_id === 'RB-SEAT-B');
     expect(target).toBeDefined();
     const conflict = await requestWithMethod(`/api/restaurant-test/reservations/${target!.id}?account_id=account-1`, 'PATCH', { tableId: 'table-fixed' });
-    expect(conflict.status).toBe(409);
+    expect(conflict.status).toBe(409); expect(await conflict.json()).toMatchObject({ code: 'table_conflict', data: { tableId: 'table-fixed' } }); const invalid = await requestWithMethod(`/api/restaurant-test/reservations/${target!.id}?account_id=account-1`, 'PATCH', { tableId: 'table-fixed', guestCount: 99 }); expect(invalid.status).toBe(409); expect(await invalid.json()).toMatchObject({ code: 'availability_conflict' });
   });
 
   it('卓の位置と結合を保存し、省略時は保持・nullで結合を解除する', async () => {
