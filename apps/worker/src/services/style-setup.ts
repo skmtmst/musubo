@@ -1,7 +1,7 @@
 export { starter } from './style-starter-set.js';
 import { materializeInitialMenuAssets } from './style-initial-assets.js';
 import { starter } from './style-starter-set.js';
-import { restaurantDefaultFeatures, type AccountStyle, type SetupAnswer } from '@line-crm/shared';
+import { restaurantDefaultFeatures, restaurantGuideMenu, type AccountStyle, type SetupAnswer } from '@line-crm/shared';
 import { storeFeatureInitialization } from '@line-crm/db/src/store-feature-initialization.js';
 
 export * from './style-setup-core.js';
@@ -44,10 +44,16 @@ export async function saveProfile(
   const style = checkStyle(
     input.style ?? chosenStyle ?? current?.style ?? 'standard',
   );
+  if (submittedAnswers.restaurantMenuPreset && (
+    !restaurantGuideMenu(style, submittedAnswers.restaurantMenuPreset)
+    || submittedAnswers.image?.value !== 'simple'
+    || input.confirmInitialMenu !== true
+  )) throw new StyleError('invalid_answers');
   const answers = {
     ...JSON.parse(current?.answers_json ?? '{}'),
     ...submittedAnswers,
   } as Record<string, SetupAnswer>;
+  const menuPreset = restaurantGuideMenu(style, answers.restaurantMenuPreset);
   const styleMode =
     options.initialSelectionPending ? 'later' : input.styleMode ??
     submittedAnswers.style?.mode ??
@@ -159,7 +165,7 @@ export async function saveProfile(
   );
   const preparedSet = await starter(db,tenant,style,answers.image?.value==='simple');
   if (selected && answers.image?.mode==='configured' && answers.image.value==='simple')
-    await materializeInitialMenuAssets(db,options.images,account,style,preparedSet.definition);
+    await materializeInitialMenuAssets(db,options.images,account,style,preparedSet.definition,menuPreset);
   const { set, inserted, updated, skipped } = await insertStyleStarterItems(
     db,
     account,

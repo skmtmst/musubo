@@ -1,6 +1,6 @@
 import { initialMenuButtons, type PlannedInitialForms, type StyleMenuButton } from './style-initial-buttons.js';
 import { restaurantMenuButtons } from './style-restaurant-buttons.js';
-import { liffActionUrl, type AccountStyle, type SetupAnswer } from '@line-crm/shared';
+import { liffActionUrl, restaurantGuideMenu, type AccountStyle, type SetupAnswer } from '@line-crm/shared';
 
 import { isCustomerUri, type StarterItem } from './style-starter-definition.js';
 import { featureReadiness } from './style-readiness.js';
@@ -10,7 +10,7 @@ export async function styleMenuButtons(
   db: D1Database, account: string, style: AccountStyle, item: StarterItem,
   answers: Record<string, SetupAnswer>, plannedForms?: PlannedInitialForms,
 ): Promise<StyleMenuButton[]> {
-  if (item.initialMenu) return initialMenuButtons(db,account,style,plannedForms);
+  if (item.initialMenu) return initialMenuButtons(db,account,style,plannedForms,restaurantGuideMenu(style, answers.restaurantMenuPreset));
   if (style === 'restaurant') return restaurantMenuButtons(db, account, style, item, answers);
   const line = await db.prepare('SELECT liff_id FROM line_accounts WHERE id=?')
     .bind(account).first<{ liff_id: string | null }>();

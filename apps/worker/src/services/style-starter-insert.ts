@@ -1,7 +1,7 @@
 import { formMediaUsageStatements } from '@line-crm/db';
 import { styleMenuActionData } from './style-menu-action-data.js';
 import { planInitialMenuHistory } from './style-initial-assets.js';
-import { initialMenuImageKey } from '@line-crm/shared';
+import { initialMenuImageKey, restaurantGuideMenu, RESTAURANT_GUIDE_MENUS } from '@line-crm/shared';
 import { initialFormLayout,initialFormScopeGuards } from './style-initial-form.js';
 import { initialMenuNeedsRefresh } from './style-initial-refresh.js';
 import type { PlannedInitialForms } from './style-initial-buttons.js';
@@ -45,6 +45,7 @@ export async function insertStyleStarterItems(
   } = {},
 ) {
   const {set,existing,oldProfile,choice}=await prepareStarterInsert(db,account,tenant,style,input,{...options,initialMenu:!options.set && answers.image?.value === 'simple'});
+  const menuPreset = restaurantGuideMenu(style, answers.restaurantMenuPreset);
   const inserted:unknown[]=[];
   const updated:Array<{key:string;kind:string}>=[];
   const plannedForms:PlannedInitialForms=options.plannedForms??new Map(existing.filter(row=>row.kind==='form' && (!options.preservePreviousStyles || row.style===style)).map(row=>[row.item_key,row.target_id]));
@@ -97,7 +98,7 @@ export async function insertStyleStarterItems(
       const snapshot=await resourceSnapshot(db,account,previous.kind,previous.target_id);
       const canonical=await db.prepare(`SELECT 1 FROM rich_menu_groups g JOIN rich_menu_pages p ON p.id=g.default_page_id
         WHERE g.id=? AND g.account_id=? AND g.status='draft' AND p.image_r2_key=?
-        AND (SELECT COUNT(*) FROM rich_menu_areas a WHERE a.page_id=p.id)=4`).bind(previous.target_id,account,initialMenuImageKey(account,style)).first();
+        AND (SELECT COUNT(*) FROM rich_menu_areas a WHERE a.page_id=p.id)=?`).bind(previous.target_id,account,initialMenuImageKey(account,style,menuPreset),menuPreset ? RESTAURANT_GUIDE_MENUS[menuPreset].areas.length : 4).first();
       if(!canonical || !sameStarterSnapshot(previous.kind,snapshot,previous.source_snapshot)) {
         statements.push(snapshotGuard(db,account,previous.kind,previous.target_id,snapshot));
         statements.push(db.prepare("UPDATE style_starter_items SET item_key=item_key||':previous:'||target_id WHERE line_account_id=? AND style=? AND item_key=?").bind(account,previous.style,item.key));
@@ -114,7 +115,7 @@ export async function insertStyleStarterItems(
         if(old.is_sample && old.source_snapshot && (item.kind==='form'||item.initialMenu)) {
           const snapshot=options.repairMissing ? old.current_snapshot : await resourceSnapshot(db,account,old.kind,old.target_id);
           if(sameStarterSnapshot(old.kind,snapshot,old.source_snapshot)) {
-            const refresh=item.kind==='form'||await initialMenuNeedsRefresh(db,account,old.target_id,style,plannedForms);
+            const refresh=item.kind==='form'||await initialMenuNeedsRefresh(db,account,old.target_id,style,plannedForms,menuPreset);
             const changes=refresh?await overwriteResource(db,account,old.target_id,item,now,style,answers,plannedForms,options.repairMissing ? snapshot : undefined):[];
             if(changes.length) {
               statements.push(snapshotGuard(db,account,old.kind,old.target_id,snapshot),...changes,
@@ -408,7 +409,7 @@ export async function insertStyleStarterItems(
           .bind(page, id, 'style-' + page),
       );
       if(item.initialMenu) {
-        statements.push(db.prepare("UPDATE rich_menu_pages SET image_r2_key=?,image_content_type='image/png' WHERE id=?").bind(initialMenuImageKey(account,style),page));
+        statements.push(db.prepare("UPDATE rich_menu_pages SET image_r2_key=?,image_content_type='image/png' WHERE id=?").bind(initialMenuImageKey(account,style,menuPreset),page));
       } else if (answers.image?.mode === 'configured' && answers.image.resourceId) {
         const image = await db
           .prepare(

@@ -472,6 +472,16 @@
 
 - [スタイルを後から選ぶ店の初期セット](release-log/unreleased/80-kenta-style-later.md) — 修正の履歴。確認 2026-11-15。
 
+- [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
+
+- [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
+
+- [開店準備ガイドの修正](release-log/unreleased/133-masato-restaurant-setup-guide.md)
+
+- [コース写真の保存項目を追加](release-log/unreleased/144-masato-restaurant-course-gallery-d1.md) — 反映履歴、確認 2026-11-21。
+
+- [コースの所要時間の変更](release-log/unreleased/88-kenta-course-duration.md) — コースの時間を追加・変更する修正の履歴。確認 2026-11-16。
+
 - [保守時に確認する説明を整理](release-log/unreleased/121-kenta-q04-misc.md) — 反映履歴、確認 2026-11-19。
 
 - [一斉配信の自動確認を改善](release-log/unreleased/114-kenta-q02b-b11.md) — 反映履歴、確認 2026-11-18。
@@ -489,6 +499,8 @@
 - [GoogleビジネスとInstagramの複数連携（第1段）](release-log/unreleased/108-kenta-sns-multilink.md) — 反映履歴、確認 2026-11-17。
 
 - [はじめにやることと初期設定のリッチメニュー手順](release-log/unreleased/109-masato-first-steps-guide.md) — 反映履歴、確認 2026-11-17。
+
+- [LINEアカウントの接続再確認を修正](release-log/unreleased/136-masato-line-account-live-check.md)
 
 - [自動確認を実際の画面の動きで確認](release-log/unreleased/105-kenta-q02b-b7.md) — 反映履歴、確認 2026-11-17。
 

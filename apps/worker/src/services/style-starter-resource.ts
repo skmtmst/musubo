@@ -1,6 +1,6 @@
 import { formMediaUsageStatements } from '@line-crm/db';
 import { styleMenuActionData } from './style-menu-action-data.js';
-import { initialMenuImageKey } from '@line-crm/shared';
+import { initialMenuImageKey, restaurantGuideMenu } from '@line-crm/shared';
 import { initialFormLayout,initialFormScopeGuards } from './style-initial-form.js';
 import type { PlannedInitialForms } from './style-initial-buttons.js';
 import { publishedVersionStatement } from '@line-crm/db';
@@ -226,7 +226,9 @@ export async function overwriteResource(
         .bind(id, account),
     ];
     const p = await profile(db, account);
-    const buttons = await styleMenuButtons(db, account, style ?? p?.style ?? 'standard', item, answersOverride ?? JSON.parse(p?.answers_json ?? '{}'), plannedForms);
+    const accountStyle = style ?? p?.style ?? 'standard';
+    const answers = answersOverride ?? JSON.parse(p?.answers_json ?? '{}') as Record<string, SetupAnswer>;
+    const buttons = await styleMenuButtons(db, account, accountStyle, item, answers, plannedForms);
     for (const [i, button] of buttons.entries()) {
       const bounds=button.bounds??{x:(i%3)*833,y:Math.floor(i/3)*843,width:833,height:843};
       statements.push(db.prepare(`INSERT INTO rich_menu_areas(id,page_id,bounds_x,bounds_y,bounds_width,bounds_height,action_type,action_data,intent,label,form_id)
@@ -234,7 +236,7 @@ export async function overwriteResource(
         .bind(crypto.randomUUID(),bounds.x,bounds.y,bounds.width,bounds.height,button.actionType,styleMenuActionData(button),button.intent,button.label,button.formId??null,id,account));
     }
     if(item.initialMenu) statements.push(db.prepare(`UPDATE rich_menu_pages SET image_r2_key=?,image_content_type='image/png' WHERE id=(SELECT default_page_id FROM rich_menu_groups WHERE id=? AND account_id=?)`)
-      .bind(initialMenuImageKey(account,item.initialMenu),id,account));
+      .bind(initialMenuImageKey(account,item.initialMenu,restaurantGuideMenu(accountStyle, answers.restaurantMenuPreset)),id,account));
     return statements;
   }
   if (item.kind === 'tag_set')
