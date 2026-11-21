@@ -1,7 +1,7 @@
 'use client'
-import { FirstStepsCard, FirstStepsFeedback, useFirstSteps, FirstRunDoneDialog } from '@/v8/dashboard/public/first-steps/index'
+import { FirstStepsCard, FirstStepsFeedback, useFirstSteps, FirstRunDoneDialog, FirstRunPopup, FirstRunWelcome, useFirstRunPopup } from '@/v8/dashboard/public/first-steps/index'
 import { canManageRole } from '@/lib/staff-role'
-import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
+import { ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
 import { useSetupWizard } from '@/v8/onboarding/public/setup-wizard/index'
 import { FriendAddLink } from '@/v8/dashboard/public/friend-add/index'
@@ -110,8 +110,14 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const setup = useStyleSetup(accountId || null, role)
   const setupRest = setupSummary(setup.data, !canManageRole(role))
   const wizard = useSetupWizard(accountId || null, setup.data?.state, role, setup.reload)
-  const { openStep: openSetupStep, qrRequested } = wizard
+  const { qrRequested } = wizard
   const start = useFirstSteps(accountId || null, role, { style, qrOpen: qrRequested })
+  const lineConnected = start.summary?.steps.some(step => step.key === 'accounts' && step.done)
+  const restaurantWelcome = style === 'restaurant' && !qrRequested && lineConnected ? start.guide.welcome : undefined
+  /* 初回ポップアップ（枠 02 ＝ PC / 枠 02b ＝ スマホ下部固定）と、上の帯の「開店準備 N/9」の札。 */
+  const firstRunPopup = useFirstRunPopup({
+    accountId: accountId || null, canManage: canManageRole(role), summary: start.summary, guidePhase: start.guide.phase,
+  })
   const emptyBookingState = today ? bookingEmptyState(style, today) : null
   const hasEmptyBookingAction = tab === 'main' && range === 'today' && today && !search && (emptyBookingState === 'no-bookings' || emptyBookingState === 'no-classes')
   const writeLock = role === null ? undefined : lockUnless(canWrite)
@@ -245,12 +251,10 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         {absence.notice}
         {absence.dialog}
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
-        {setup.data ? <SetupWarningBands data={setup.data} configureAllowed={canManageRole(role)} role={role} /> : null}
+        {/* 未設定のボタンの警告の帯は出さない（承認済み Pen「はじめにやること08d_v04」でこの帯を削除）。 */}
         <ReservationFormRepairNotices notices={start.progress?.notices} role={role}/>
-        {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'}
+        {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'} guide={start.guide}
           onRecheck={start.watchExpired ? start.rewatch : undefined}
-          onConfigure={setupRest ? () => openSetupStep(setupRest.nextStep) : !canManageRole(role) ? () => openSetupStep('style') : undefined} configureAllowed={canManageRole(role)}
-          setupTasks={setupRest ? <SetupTasks heading summary={setupRest} onOpenStep={openSetupStep} configureAllowed={canManageRole(role)} role={role} /> : role !== null && !canManageRole(role) ? <SetupTasksUnavailable error={setup.error} onRetry={setup.reload} /> : undefined}
           feedback={<>{start.error ? <FirstStepsFeedback error={start.error} onRetry={start.reload} /> : null}
             {setup.error && canManageRole(role) ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : null}</>} /> : null}
         {metricSelectionFallback ? <Notice tone="info" action={<Button onClick={reloadPresentation}>表示設定を読み直す</Button>}>保存した表示設定を確認できないため、業種の初期表示にしています。</Notice> : null}
@@ -298,7 +302,17 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
           return { snapshot: res.data.snapshot, rows: res.data.reservations.map((r) => ({ time: formatDate(r.startsAt, { style: 'time' }), name: `${withHonorific(r.name, 'さま')}`, sub: `${formatNumber(r.partySize)}名`, pay: null })) }
         }}
         mediaNote={style === 'restaurant' ? '他の予約サイトの同じ時間の枠は、それぞれの管理画面で閉じてください。' : null} />
-      {start.arrived && accountId && canManageRole(role) ? <FirstRunDoneDialog accountId={accountId} style={style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} progress={start.progress} onClose={start.dismissArrived} /> : null}
+      {/* 「開店準備を始めましょう」（承認済み Pen 枠 02 / 02b）。 */}
+      {firstRunPopup.open && restaurantWelcome === 'pending' && start.guide.acknowledgeWelcome
+        ? <FirstRunWelcome onDone={start.guide.acknowledgeWelcome} /> : null}
+      {firstRunPopup.open && start.summary && restaurantWelcome !== 'pending' && restaurantWelcome !== 'loading' ? (
+        <FirstRunPopup
+          summary={start.summary}
+          onStartGuide={() => { firstRunPopup.close(); start.guide.start() }}
+          onClose={firstRunPopup.close}
+        />
+      ) : null}
+      {start.arrived && style !== 'restaurant' && accountId && canManageRole(role) ? <FirstRunDoneDialog accountId={accountId} style={style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} progress={start.progress} onClose={start.dismissArrived} /> : null}
       {preparing.dialog}
       {cancelRow ? (
         <CancelReservationDialog cancellationOnly targetSummary={<OperationTargetSummary accounts={[{ id: accountId }]} store={style === 'restaurant' ? (restaurantStoreReady && store.store && cancelStoreId === store.store.id ? { id: store.store.id, name: store.store.name } : { id: '' }) : undefined} />} open title={`${withHonorific(cancelRow.name, 'さま')}の予約を取り消しますか？`} subtitle={[cancelRow.time, cancelRow.people ? `${formatNumber(cancelRow.people)}名` : null, cancelRow.seat ?? cancelRow.staff, cancelRow.course].filter(Boolean).join('・')}

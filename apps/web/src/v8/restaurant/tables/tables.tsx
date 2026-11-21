@@ -1,4 +1,5 @@
 'use client'
+import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
 import { DetailPreview } from '@/components/shared/detail-content'
 
 import { tableRequirements as b244Requirements } from './requirements'
@@ -19,7 +20,7 @@ import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { ApiError } from '@/lib/api/transport/errors'
 import KpiCard from '@/components/shared/kpi-card'
-import { useEffect,useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect,useMemo, useRef, useState } from 'react'
 import { Grid2X2, Inbox, Plus, Settings2 } from 'lucide-react'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import Button from '@/components/shared/button'
@@ -36,13 +37,14 @@ import TableRowActions from './table-row-actions'
 import StatusBadge from '@/components/shared/status-badge'
 import TableAutoAssignmentDialog from './auto-assignment-dialog'
 import { useSearchParams } from 'next/navigation'
-import TablePenEditor, {type Draft} from '@/components/shared/restaurant-table-pen-editor'
+import TablePenEditor, { GuidedTableFields, type Draft } from '@/components/shared/restaurant-table-pen-editor'
 import RestaurantTableHeaderActions from '@/components/shared/restaurant-table-header-actions'
 import RestaurantFloorPanel from '@/components/shared/restaurant-floor-panel'
 import {planFloorTables} from '@/components/shared/restaurant-floor-placement'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { notifyToast } from '@/components/shared/toast'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-overlay/index'
 
 
 /*
@@ -135,14 +137,32 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
   /* この卓に入っている、これから先の予約（取消・無断キャンセル・来店済みは除く）。 */
   const upcoming = stopping ? stopScope!.reservations : []
 
-  const openNew = (floorId?:string) => {
+  const { guide } = useSharedGuide() ?? {}
+  const guidingCreate = guide?.phase === 'active' && guide.stepKey === 'attributes' && guide.procedureIndex <= 2
+  const [quickCreate, setQuickCreate] = useState(false)
+
+  const openNew = useCallback((floorId?: string) => {
+    setQuickCreate(guidingCreate)
     setEditorError('')
     setDraft({ code: '', label: '', seatType: 'table', seatDetailType:'table', minCapacity: '1', maxCapacity: '2', floorX: '', floorY: '', joinGroup: '',floorId:floorId??floors[0]?.id??'floor-'+store?.id,shape:'rectangle',orientation:'horizontal',smokingPolicy:'non_smoking',partition:'open',shoesAllowed:true,isActive:true,visibleOnMap:true,chairArrangement:'both',chairSide:'left' })
     setCreateCount(1)
     setFieldErrors({})
     setEditor('new')
+  }, [floors, store?.id, guidingCreate])
+  const resumeForm = guide?.phase === 'active' && guide.stepKey === 'attributes' && guide.procedureIndex === 2
+  const reopened = useRef(false)
+  useEffect(() => {
+    if (!resumeForm) { reopened.current = false; return }
+    if (!canEdit || !store || !snapshotAccountCurrent || reopened.current) return
+    reopened.current = true
+    if (!editor) openNew()
+  }, [resumeForm, canEdit, store, snapshotAccountCurrent, editor, openNew])
+  const cancelEditor = () => {
+    setEditor(null)
+    if (quickCreate && resumeForm) guide?.pause()
   }
   const openEdit = (table: RestaurantTable) => {
+    setQuickCreate(false)
     setEditorError('')
     setDraft({
       code: table.code, label: table.label, seatType: table.seat_type,
@@ -175,7 +195,11 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
     if (!selectedAccountId) { setEditorError('LINEアカウントを選んでから、もう一度お試しください。'); return }
     if (!editing && !store) { setEditorError('店舗を選んでから、もう一度お試しください。'); return }
     const errors: Partial<Record<keyof Draft, string>> = {}
-    if ((b244Requirements.draft_code.check(draft.code) !== null)) errors.code = '卓番を入れてください。'
+    const usedCodes = new Set(rows.map(row => row.code.trim()))
+    let firstFreeNumber = 1
+    if (quickCreate) while (usedCodes.has(String(firstFreeNumber))) firstFreeNumber += 1
+    const code = quickCreate ? String(firstFreeNumber) : draft.code.trim()
+    if ((b244Requirements.draft_code.check(code) !== null)) errors.code = '卓番を入れてください。'
     if ((b244Requirements.draft_label.check(draft.label) !== null)) errors.label = '表示名を入れてください。'
     if(!draft.floorId||(floors.length>0&&!floors.some(f=>f.id===draft.floorId))) errors.floorId='階・エリアを選んでください。'
     const min = Number(draft.minCapacity), max = Number(draft.maxCapacity)
@@ -188,11 +212,11 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
     }
     if (!editing && Boolean(draft.floorX.trim()) !== Boolean(draft.floorY.trim())) errors[draft.floorX.trim() ? 'floorY' : 'floorX'] = '横と縦の位置を一緒に指定してください。'
     setFieldErrors(errors)
+    if (quickCreate && errors.floorId) setEditorError(errors.floorId)
     if (Object.keys(errors).length) {
       requestAnimationFrame(() => { const field = editorRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return
     }
-    const code = draft.code.trim()
     if (rows.some(row => row.id !== editing?.id && row.code.trim() === code)) {
       saveErrors.apply({code:'この卓番はすでに使われています。別の卓番を入力してください。'})
       return
@@ -233,7 +257,6 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
               if(floor&&!plan)throw new Error('この階には卓を配置できません。作成する数を減らしてください。')
               if(floor&&plan&&(plan.width!==floor.width||plan.height!==floor.height))await reservationBoardApi.saveFloor(selectedAccountId,{...floor,width:plan.width,height:plan.height,expectedVersion:floor.version})
               const created:string[]=[]
-              const usedCodes=new Set(rows.map(row=>row.code.trim()))
               const nameParts=draft.label.match(/^(.*?)(\d+)$/)
               try{
                 for(let index=0;index<createCount;index++){
@@ -256,10 +279,12 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
             }, createCount===1?'卓を作りました。':`${createCount}卓を作りました。`, options)
           : false
     } catch (cause) {
-      if (!saveErrors.capture(cause)) setEditorError(japaneseDetailOf(cause) || '卓を保存できませんでした。')
+      if (quickCreate || !saveErrors.capture(cause)) setEditorError(japaneseDetailOf(cause) || '卓を保存できませんでした。')
       return
     }
     if (ok) {
+      /* 開店準備ガイドの手順2/3（枠14 F8mSog）は保存できた時に次へ進む。 */
+      if (!editing) emitGuideSignal('tables.form')
       setEditor(null)
       if(editing&&editing.is_active&&!draft.isActive){
         if (saveScope === scope.current && canEditRef.current) setPendingStop({ id: editing.id, scope: saveScope, before: beforeSave })
@@ -401,22 +426,28 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
         open={editor !== null && draft !== null}
         title={editing ? '卓を変更する' : '卓を作る'}
         actionsPlacement="footer"
-        width={824}
+        width={quickCreate ? 500 : 824}
         exactWidth
-        minHeight={650}
-        top={265}
-        headerHeight={62}
+        minHeight={quickCreate ? undefined : 650}
+        top={quickCreate ? 250 : 265}
+        headerHeight={quickCreate ? undefined : 62}
+        guideSlot={quickCreate ? 'tables.form' : undefined}
+        centerActions={quickCreate}
+        footerPlain={quickCreate}
         busy={busy}
-        designNode="ljShF"
-        titleIcon={<Grid2X2 size={17} aria-hidden="true"/>}
+        designNode={quickCreate ? "SZBsN" : "ljShF"}
+        titleIcon={quickCreate ? undefined : <Grid2X2 size={17} aria-hidden="true"/>}
+        headerIcon={quickCreate ? false : undefined}
         titleRow="mark"
         plainTitle
-        onCancel={() => setEditor(null)}
-        actions={<><Button presentation="restaurant" type="button" onClick={() => setEditor(null)} disabled={busy}>キャンセル</Button><Button presentation="restaurant" type="submit" form="rs-table-editor" variant="primary" disabled={busy}><Plus size={16} aria-hidden="true" />{editing ? '変更を保存' : createCount===1?'卓を作る':`${createCount}卓を作る`}</Button></>}
+        onCancel={cancelEditor}
+        actions={<><Button presentation="restaurant" type="button" onClick={cancelEditor} disabled={busy}>キャンセル</Button><Button data-guide-table-save={quickCreate && draft?.label.trim() && Number(draft.maxCapacity) >= 1 ? 'ready' : undefined} presentation="restaurant" type="submit" form="rs-table-editor" variant="primary" disabled={busy}>{quickCreate ? null : <Plus size={16} aria-hidden="true" />}{quickCreate ? '保存する' : editing ? '変更を保存' : createCount===1?'卓を作る':`${createCount}卓を作る`}</Button></>}
       >
-        {draft && selectedAccountId && store ? <form id="rs-table-editor" ref={editorRef} className={styles.editorFields} noValidate onSubmit={(event) => { event.preventDefault(); void save() }}>
+        {draft && selectedAccountId && store ? <form id="rs-table-editor" data-guide-anchor="tables.form" ref={editorRef} className={styles.editorFields} noValidate onSubmit={(event) => { event.preventDefault(); void save() }}>
           {editorError ? <Notice tone="danger" role="alert">{editorError}</Notice> : null}
-          <TablePenEditor draft={draft} onChange={setDraft} floors={floors} errors={fieldErrors} onCapacity={changeCapacity} count={createCount} onCount={setCreateCount} canBatch={!editing}/>
+          {quickCreate
+            ? <GuidedTableFields draft={draft} onChange={setDraft} errors={fieldErrors}/>
+            : <TablePenEditor draft={draft} onChange={setDraft} floors={floors} errors={fieldErrors} onCapacity={changeCapacity} count={createCount} onCount={setCreateCount} canBatch={!editing}/>}
         </form> : null}
       </RsDialog>
       <RsDialog

@@ -43,3 +43,19 @@ export interface ManualLink {
   lastError: string | null
   version: number
 }
+
+/*
+  はじめにやることガイドの進行状態。承認済み Pen 枠 14 (orKSi) の L3lP08 が
+  「有効/一時停止・現在ステップ・現在手順」をユーザー×アカウントでサーバー保存と定める。
+  **9項目の済み判定はここに含めない。** 完了は実データ計測 (setup-progress) 側が持つ。
+*/
+export type GettingStartedGuidePhase = 'idle' | 'active' | 'paused' | 'done'
+
+export interface GettingStartedGuideState {
+  phase: GettingStartedGuidePhase
+  /** いま案内している段。まだ始めていなければ null。 */
+  stepKey: string | null
+  /** 現在手順。1 から数える。 */
+  procedureIndex: number
+  updatedAt: string | null
+}

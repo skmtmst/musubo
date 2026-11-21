@@ -137,7 +137,8 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
       <Panel
         title="メニュー一覧"
         description="予約台帳・Google投稿・LINEカードで同じマスターを参照します。価格変更は保存時に確定し、指定した開始日時から新価格になります。"
-        aside={<PermissionGatedButton allowed={canEdit} variant="primary" onClick={openNew}><Plus size={16} aria-hidden="true" />メニューを作る</PermissionGatedButton>}
+        /* 開店準備ガイド⑥の手順1/3（枠14 sIFft）の光らせる先。 */
+        aside={<PermissionGatedButton data-guide-anchor="menu.create" allowed={canEdit} variant="primary" onClick={openNew}><Plus size={16} aria-hidden="true" />メニューを作る</PermissionGatedButton>}
         flush
         help={<HelpTip label="メニュー一覧の説明">{canEdit ? '「…」から変更・停止・再開・削除ができます。参照中のメニューは削除できません。' : 'メニューの内容と価格を確認できます。'}</HelpTip>}
       >

@@ -17,8 +17,9 @@ function RichMenuEditEntry() {
     backHref="/rich-menus"
     backLabel="リッチメニュー一覧へ戻る"
   />
-  return searchParams.get('step')
-    ? <RichMenuCreateV8 editGroupId={groupId} />
+  const step = searchParams.get('step')
+  return step
+    ? <RichMenuCreateV8 editGroupId={groupId} initialStep={step} />
     : <RichMenuDetailV8 groupId={groupId} />
 }
 

@@ -47,7 +47,7 @@ export const STEP_STATE_LABEL: Record<StepState, string> = {
   unknown: '確かめられません',
 }
 
-export type StepKey = GettingStartedStep['key'] | 'hours' | 'followup'
+export type StepKey = GettingStartedStep['key'] | 'hours' | 'followup' | 'richMenu'
 
 export interface StepResult {
   key: StepKey
@@ -87,16 +87,17 @@ export interface GettingStartedInput {
 
 /** 業種の設定画面で実物を読んだ結果。未取得・失敗はnull、対象外の段は省略できる。 */
 export type StyleSetupProgress = {
+  richMenuPublished?: boolean
   notices?:Array<{message:string;href:string}>
   style: AccountStyle
-  steps: Partial<Record<'attributes' | 'friendAdd' | 'scenario' | 'hours' | 'followup', { complete: boolean | null; reason?: string }>>
+  steps: Partial<Record<'attributes' | 'friendAdd' | 'scenario' | 'hours' | 'followup' | 'richMenu', { complete: boolean | null; reason?: string }>>
 }
 
 /** 業種の3〜5段は、その設定の実測だけで済みを決める。標準の配信判定は流用しない。 */
 export function stepsForStyle(steps: ReadonlyArray<StepResult>, style: AccountStyle | null, progress?: StyleSetupProgress): StepResult[] {
   if (!style || steps.length === 0) return [...steps]
   if (style === 'standard') return appendGoogleHoursStep([...steps], style, progress).map((step, index) => ({ ...step, ordinal: String(index + 1) }))
-  const copy = steps.filter(step => style !== 'restaurant' || !['hours', 'followup'].includes(step.key)).map((step): StepResult => ['attributes', 'friendAdd', 'scenario'].includes(step.key) && step.state !== 'forbidden'
+  const copy = steps.filter(step => style !== 'restaurant' || !['hours', 'followup', 'richMenu'].includes(step.key)).map((step): StepResult => ['attributes', 'friendAdd', 'scenario'].includes(step.key) && step.state !== 'forbidden'
     ? { ...step, state: 'unknown', blockedReason: null, next: '業種の設定状況を確認できませんでした。' }
     : { ...step })
   const replace = (key: keyof StyleSetupProgress['steps'], title: string, sub: string, label: string, href: string, condition: string, instruction: string) => {
@@ -117,20 +118,24 @@ export function stepsForStyle(steps: ReadonlyArray<StepResult>, style: AccountSt
   }
   switch (style) {
     case 'restaurant':
-      replace('attributes', '卓と席を登録する', '座席・卓を用意する', '座席・卓を開く', '/restaurant-test/tables', '座席・卓が登録されている', '座席と卓を登録し、予約で使う席を用意します。')
+      replace('attributes', '卓と席を登録する', '受付中の卓を1件以上用意する', '座席・卓を開く', '/restaurant-test/tables', '受付中で定員が1人以上の卓がある', '卓を作るか、停止中の卓の受付を再開してください。')
       replace('friendAdd', 'コースとメニューを登録する', '予約で受け付ける内容を決める', 'メニュー管理を開く', '/restaurant-test/menu', '予約で受け付けるコースとメニューが登録されている', '予約で受け付けるコースとメニューを登録します。')
       replace('scenario', '予約枠と在庫を設定する', '予約枠と在庫を用意する', '予約枠を開く', '/restaurant-test/inventory', '予約枠と在庫が用意され、受付を確認している', '予約枠と在庫を用意し、予約の受付を確認します。')
       if (copy.length > 0) {
-        const add = (key: 'hours' | 'followup', title: string, href: string, condition: string) => {
+        const add = (key: 'hours' | 'followup' | 'richMenu', title: string, href: string, condition: string, label = '設定を開く') => {
           const result = progress?.style === style ? progress.steps[key] : undefined
           const forbidden = copy.find(step => step.key === 'attributes')?.state === 'forbidden'
           const state: StepState = forbidden ? 'forbidden' : result?.complete === true ? 'done' : result?.complete === false ? 'todo' : 'unknown'
           const step: StepResult = { key, ordinal: '', title, sub: condition, condition, state,
             next: state === 'done' ? '終わっています。設定を見直せます。' : result?.reason?.trim() || `${title}ための設定状況を確認できませんでした。`,
-            action: forbidden ? null : { label: '設定を開く', href }, blockedReason: forbidden ? '管理者に頼んでください' : null }
-          const before = key === 'hours' ? copy.findIndex(item => item.key === 'friendAdd') : copy.findIndex(item => item.key === 'firstMessage')
+            action: forbidden ? null : { label, href }, blockedReason: forbidden ? '管理者に頼んでください' : null }
+          const before = key === 'hours' ? copy.findIndex(item => item.key === 'friendAdd')
+            : key === 'richMenu' ? copy.findIndex(item => item.key === 'attributes')
+            : copy.findIndex(item => item.key === 'firstMessage')
           copy.splice(before < 0 ? copy.length : before, 0, step)
         }
+        /* ③は卓と席の前。実在する「最初のリッチメニューを選ぶ」画面へ案内し、下書きが1つでもあれば済みにする。 */
+        add('richMenu', 'リッチメニューを選ぶ', '/getting-started/rich-menu', 'リッチメニューの下書きが1つ以上ある', 'リッチメニューを選ぶ')
         add('hours', '営業時間を設定する', '/restaurant-test/google?tab=hours', 'Googleビジネスの店舗と営業時間が設定されている')
         add('followup', 'LINE来店フォローを確認する', '/restaurant-test/line-followup', '選んだ来店フォローの設定を確認している')
       }
@@ -166,7 +171,7 @@ function appendGoogleHoursStep(copy: StepResult[], style: AccountStyle, progress
   const result = progress?.style === style ? progress.steps.hours : undefined
   const forbidden = copy.find(step => step.key === 'attributes')?.state === 'forbidden'
   const step: StepResult = {
-    key: 'hours', ordinal: String(copy.length + 1), title: '営業時間を設定する', sub: 'Googleビジネスの営業時間を基準にする',
+    key: 'hours', ordinal: String(copy.length + 1), title: '営業時間を決める', sub: 'Googleビジネスの営業時間を基準にする',
     condition: 'Googleビジネスの店舗と営業時間が設定されている',
     state: forbidden ? 'forbidden' : result?.complete === true ? 'done' : result?.complete === false ? 'todo' : 'unknown',
     next: result?.complete === true ? '終わっています。設定を見直せます。' : result?.reason || 'Googleビジネスの営業時間を確認できませんでした。',
@@ -197,7 +202,7 @@ function accountsStep(input: GettingStartedInput): StepResult {
   return {
     key: 'accounts',
     ordinal: '1',
-    title: 'LINE アカウントをつなぐ',
+    title: 'LINEアカウントをつなぐ',
     sub: 'チャネル ID とアクセストークン',
     state: done ? 'done' : 'todo',
     condition: 'LINEアカウントが1つ以上登録されている',
@@ -210,15 +215,16 @@ function accountsStep(input: GettingStartedInput): StepResult {
 }
 
 /**
- * 段2 使う機能の初期セット。保存済みの設定（version > 0）があれば終わり。
+ * 段2 使う機能を選ぶ。保存済みの設定（version > 0）があれば終わり。
  * まだ選んでいなければ、機能設定で選ぶ。
+ * 題は承認済み Pen「はじめにやること08d_v04」(la9o6) の短い言い方に合わせる。
  */
 export function featureSetStep(entry: FeatureSetEntry | null): StepResult {
   const state: StepState = entry === null ? 'unknown' : entry.kind === 'configured' ? 'done' : entry.kind === 'forbidden' ? 'forbidden' : 'todo'
   return {
     key: 'featureSet',
     ordinal: '2',
-    title: '使う機能の初期セット',
+    title: '使う機能を選ぶ',
     sub: '業種に合わせて機能を出す',
     state,
     condition: '使う機能の初期セットを選んである',
@@ -359,7 +365,7 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
     role: null,
   })
 
-  return display
+  return dropSettledFeatureSet(display
     .filter((base) => base.key !== 'featureSet' || byKey.has('featureSet'))
     .map((base) => {
     const server = byKey.get(base.key)
@@ -416,15 +422,30 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
       action,
       blockedReason: action ? null : server.reason,
     }
-    })
+    }))
+}
+
+/**
+ * 済みの「使う機能を選ぶ」を一覧から外し、段番号を振り直す。
+ * 初期セットは LINEアカウントの接続時に決まるので、済みの段は押せない行として残るだけになる。
+ * 承認済み Pen v09（枠 C5i3rw / nt3Po）の8項目に合わせる。
+ * **`todo` / `unknown` / `forbidden` は残す。** まだ決まっていない間は案内が必要なため。
+ */
+export function dropSettledFeatureSet(steps: ReadonlyArray<StepResult>): StepResult[] {
+  return steps
+    .filter((step) => step.key !== 'featureSet' || step.state !== 'done')
+    .map((step, index) => ({ ...step, ordinal: String(index + 1) }))
 }
 
 /**
  * 口の5段へ初期セット（段2）を足して板の6段にする。段番号を振り直す。
  * 初期セットの状態は機能設定の実物から `featureSetStep` で作る。
+ * **済みのときは足さない。** `dropSettledFeatureSet` と同じ扱いにして、
+ * 古い口から来た一覧でも済みの段が戻らないようにする。
  */
 export function insertFeatureSet(steps: ReadonlyArray<StepResult>, entry: FeatureSetEntry | null): StepResult[] {
   const feature = featureSetStep(entry)
+  if (feature.state === 'done') return steps.map((step, index) => ({ ...step, ordinal: String(index + 1) }))
   const at = steps.findIndex((step) => step.key === 'accounts')
   const merged = at < 0 ? [feature, ...steps] : [...steps.slice(0, at + 1), feature, ...steps.slice(at + 1)]
   return merged.map((step, index) => ({ ...step, ordinal: String(index + 1) }))

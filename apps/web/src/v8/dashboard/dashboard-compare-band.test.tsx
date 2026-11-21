@@ -9,11 +9,16 @@ import type { DashboardComparisons } from '@line-crm/shared'
  * 比べられる「今日の予約」だけに札を出し、受信・写真審査・出荷は比べない。
  */
 const fx = vi.hoisted(() => ({ comparisons: vi.fn(), data: null as unknown, todayActive: 12 as number | null }))
+/* ガイドは未開始。ここは数の帯を見る所なので、案内は何も出さない形で渡す。 */
+const IDLE_GUIDE = vi.hoisted(() => ({
+  phase: 'idle' as const, stepKey: null, procedureIndex: 1, anchor: null, pausedAnchor: null,
+  start: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(), advanceProcedure: vi.fn(),
+}))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('') }))
 vi.mock('@/components/shared/list-navigation', async original => ({ ...(await original<object>()), useListNavigationRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ refreshAccounts: vi.fn(), selectedAccountId: 'A', selectedAccount: null, loading: false }) }))
 vi.mock('@/lib/staff-role', async original => ({ ...(await original<object>()), useStaffRole: () => 'owner', useStaffIdentity: () => null }))
-vi.mock('./first-steps', async original => ({ ...await original<typeof import('./first-steps')>(), useFirstSteps: () => ({ error: null, summary: null, steps: [], folded: false, toggle: vi.fn(), reload: vi.fn() }), FirstStepsCard: () => null }))
+vi.mock('./first-steps', async original => ({ ...await original<typeof import('./first-steps')>(), useFirstSteps: () => ({ error: null, summary: null, steps: [], folded: false, toggle: vi.fn(), reload: vi.fn(), guide: IDLE_GUIDE }), FirstStepsCard: () => null }))
 vi.mock('@/v8/onboarding/public/use-style-setup/index', () => ({ useStyleSetup: () => ({ data: null, error: null, reload: vi.fn() }) }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()

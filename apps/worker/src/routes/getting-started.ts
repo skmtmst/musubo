@@ -1,7 +1,14 @@
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
-import { hasFirstDeliveredMessage, hasSavedFeatureConfiguration } from '@line-crm/db';
+import {
+  getOnboardingGuideProgress,
+  hasFirstDeliveredMessage,
+  hasSavedFeatureConfiguration,
+  saveOnboardingGuideProgress,
+  acknowledgeOnboardingWelcome,
+} from '@line-crm/db';
+import type { OnboardingGuidePhase, OnboardingGuideProgressRow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -62,6 +69,19 @@ function withAccess(
 
 interface AccountRow {
   id: string;
+  style: string | null;
+  is_active: number;
+  webhook_ready: number | null;
+}
+
+function accountStep(rows: AccountRow[], accountId: string | null, version: string | undefined): { state: StepState; reason?: string } {
+  if (!rows.length) return { state: 'todo' };
+  const selected = accountId && rows.find(row => row.id === accountId);
+  if (version !== 'v8' || !selected || selected.style !== 'restaurant') return { state: 'done' };
+  if (!selected.is_active) return { state: 'stalled', reason: 'LINEアカウントが停止中です。LINEアカウント画面で稼働状態を確認してください。' };
+  if (selected.webhook_ready === 1) return { state: 'done' };
+  if (selected.webhook_ready === 0) return { state: 'stalled', reason: 'LINEのWebhookを有効にし、接続を確認してください。' };
+  return { state: 'unknown', reason: 'LINEアカウント画面で接続を確認してください。' };
 }
 
 gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'), async (c) => {
@@ -75,8 +95,13 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
 
     const accountIds = accountId ? [accountId] : visibleScope.allowedAccountIds;
     const accounts = accountIds.length > 0 ? await c.env.DB.prepare(
-      `SELECT id FROM line_accounts
-        WHERE archived_at IS NULL AND id IN (${sqlIdSet(accountIds).sql})`,
+      `SELECT a.id, a.is_active, s.style,
+        (SELECT CASE WHEN c.result IN ('ok','matched') AND c.webhook_active=1 THEN 1 ELSE 0 END
+           FROM line_account_connection_checks c
+          WHERE c.line_account_id=a.id AND c.check_kind='webhook_endpoint' AND c.account_revision=a.revision
+          ORDER BY c.checked_at DESC,c.id DESC LIMIT 1) AS webhook_ready
+        FROM line_accounts a LEFT JOIN account_styles s ON s.line_account_id=a.id
+        WHERE a.archived_at IS NULL AND a.id IN (${sqlIdSet(accountIds).sql})`,
     ).bind(...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<AccountRow>() : { results: [] as AccountRow[] };
     const rows = accounts.results;
 
@@ -140,11 +165,9 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
 
     const hasPublishedRule = ruleRows.results.length > 0;
     const hasFallbackRule = ruleRows.results.some((row) => row.is_unknown_route_fallback === 1);
+    const connection = accountStep(rows, accountId, c.req.query('version'));
     const steps = [
-      {
-        // 登録済みアカウントがあれば段1は完了。接続状態は運用画面で別に確認する。
-        ...withAccess(staff, 'accounts', rows.length > 0 ? 'done' : 'todo'),
-      },
+      withAccess(staff, 'accounts', connection.state, connection.reason),
       withAccess(staff, 'attributes',
         (tagCount?.c ?? 0) > 0 || (fieldCount?.c ?? 0) > 0 ? 'done' : 'todo'),
       withAccess(staff, 'friendAdd',
@@ -220,6 +243,89 @@ gettingStarted.post('/api/getting-started/dismiss', requireRole('owner', 'admin'
   } catch (err) {
     throw err;
   }
+});
+
+/*
+  ガイドの進行状態（ユーザー×アカウント）。
+  承認済み Pen 枠 14 (orKSi) の L3lP08 どおり、
+  「有効/一時停止・現在ステップ・現在手順」をここに置き、
+  リロード・端末切替・離脱のあとも同じ所から再開できるようにする。
+
+  **9項目の済み判定はここに入れない。** 完了は上の GET /api/getting-started が
+  いまの中身を数えて出すもので、ガイドを使わなくてもチェックは付く（枠14 L3lP08）。
+*/
+const GUIDE_PHASES: OnboardingGuidePhase[] = ['idle', 'active', 'paused', 'done'];
+
+async function requireGuideScope(c: {
+  env: Env['Bindings'];
+  get: (key: 'staff') => AuthenticatedStaff | undefined;
+  req: { query: (key: string) => string | undefined };
+}): Promise<{ staffId: string; accountId: string } | { response: Response }> {
+  const staff = c.get('staff');
+  if (!staff?.id) {
+    return { response: Response.json({ success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 }) };
+  }
+  const accountId = c.req.query('account_id') ?? c.req.query('accountId') ?? null;
+  if (!accountId) {
+    return { response: Response.json({ success: false, error: 'LINEアカウントを選択してください' }, { status: 400 }) };
+  }
+  const visibleScope = await getVisibleLineAccountScope(c.env.DB, staff);
+  if (!visibleScope.allowedAccountIds.includes(accountId)) {
+    return { response: Response.json({ success: false, error: 'Not found' }, { status: 404 }) };
+  }
+  return { staffId: staff.id, accountId };
+}
+
+function guidePayload(row: OnboardingGuideProgressRow | null) {
+  // 行が無いのは「まだ案内を始めていない」。既定を返して画面側で分岐を増やさない。
+  return {
+    phase: row?.phase ?? 'idle',
+    stepKey: row?.step_key ?? null,
+    procedureIndex: row?.procedure_index ?? 1,
+    updatedAt: row?.updated_at ?? null,
+  };
+}
+
+gettingStarted.get('/api/getting-started/guide', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const scope = await requireGuideScope(c);
+  if ('response' in scope) return scope.response;
+  const row = await getOnboardingGuideProgress(c.env.DB, scope.staffId, scope.accountId);
+  return c.json({ success: true, data: guidePayload(row) });
+});
+
+gettingStarted.put('/api/getting-started/guide', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
+  const scope = await requireGuideScope(c);
+  if ('response' in scope) return scope.response;
+
+  const body = await c.req.json<{ phase?: unknown; stepKey?: unknown; procedureIndex?: unknown; acknowledgeWelcome?: unknown }>().catch(() => null);
+  if (!body || !GUIDE_PHASES.includes(body.phase as OnboardingGuidePhase)) {
+    return inputError(c, { success: false, error: '案内の状態が正しくありません' }, 400, ['phase']);
+  }
+  if (body.stepKey != null && typeof body.stepKey !== 'string') {
+    return inputError(c, { success: false, error: '案内の段が正しくありません' }, 400, ['stepKey']);
+  }
+  // 現在手順は1から数える。数でない値や0以下は保存せず、入力の誤りとして返す。
+  const procedureIndex = body.procedureIndex ?? 1;
+  if (!Number.isInteger(procedureIndex) || (procedureIndex as number) < 1) {
+    return inputError(c, { success: false, error: '案内の手順が正しくありません' }, 400, ['procedureIndex']);
+  }
+
+  if (body.acknowledgeWelcome !== undefined) {
+    if (body.acknowledgeWelcome !== true || body.phase !== 'idle' || body.stepKey != null || procedureIndex !== 1) {
+      return inputError(c, { success: false, error: 'ウェルカムの確認内容が正しくありません' }, 400, ['acknowledgeWelcome']);
+    }
+    const row = await acknowledgeOnboardingWelcome(c.env.DB, scope.staffId, scope.accountId);
+    return c.json({ success: true, data: guidePayload(row) });
+  }
+
+  const row = await saveOnboardingGuideProgress(c.env.DB, {
+    staffId: scope.staffId,
+    lineAccountId: scope.accountId,
+    phase: body.phase as OnboardingGuidePhase,
+    stepKey: (body.stepKey as string | null | undefined) ?? null,
+    procedureIndex: procedureIndex as number,
+  });
+  return c.json({ success: true, data: guidePayload(row) });
 });
 
 export { gettingStarted };

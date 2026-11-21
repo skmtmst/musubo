@@ -8,6 +8,7 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
+- [面談・飲食店の予約一覧の修正履歴](release-log/unreleased/86-kenta-1360.md)
 - [最初に読む：製品とコードの入口](START-HERE.md)
 - [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
 - [更新時のマイグレーション履歴と復旧](update-migration-history.md)
@@ -471,6 +472,16 @@
 
 - [共通情報の差し替え件数の直し](release-log/unreleased/129-kenta-c21-common-vars.md) — 反映履歴、確認 2026-11-20。
 
+- [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
+
+- [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
+
+- [開店準備ガイドの修正](release-log/unreleased/133-masato-restaurant-setup-guide.md)
+
+- [コース写真の保存項目を追加](release-log/unreleased/144-masato-restaurant-course-gallery-d1.md) — 反映履歴、確認 2026-11-21。
+
+- [コースの所要時間の変更](release-log/unreleased/88-kenta-course-duration.md) — コースの時間を追加・変更する修正の履歴。確認 2026-11-16。
+
 - [保守時に確認する説明を整理](release-log/unreleased/121-kenta-q04-misc.md) — 反映履歴、確認 2026-11-19。
 
 - [一斉配信の自動確認を改善](release-log/unreleased/114-kenta-q02b-b11.md) — 反映履歴、確認 2026-11-18。
@@ -486,6 +497,10 @@
 - [配信と通知の内容を確かめる試験を見直し](release-log/unreleased/113-kenta-q02b-b9.md) — 反映履歴、確認 2026-11-18。
 
 - [GoogleビジネスとInstagramの複数連携（第1段）](release-log/unreleased/108-kenta-sns-multilink.md) — 反映履歴、確認 2026-11-17。
+
+- [はじめにやることと初期設定のリッチメニュー手順](release-log/unreleased/109-masato-first-steps-guide.md) — 反映履歴、確認 2026-11-17。
+
+- [LINEアカウントの接続再確認を修正](release-log/unreleased/136-masato-line-account-live-check.md)
 
 - [自動確認を実際の画面の動きで確認](release-log/unreleased/105-kenta-q02b-b7.md) — 反映履歴、確認 2026-11-17。
 

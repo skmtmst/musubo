@@ -1,0 +1,295 @@
+/*
+  開店準備ガイドの重ね表示。寸法と色は承認済み Pen
+  /Users/masatosakamoto/Documents/musubo-course-media-upload-20261110.pen
+  枠 04-1 (dQfu4) の実値をそのまま使う。ここで見た目を作り変えない。
+*/
+
+.root {
+  /*
+    この重ね表示だけの色と寸法。共通トークンの正本（globals.css）は他の約300画面が
+    使うため書き換えず、この覆いの中だけで名前を付ける。数字と色は必ずカスタム
+    プロパティに置く（v8-boundary.test.ts の「CSS に数字を直書きしない」見張りに合わせる）。
+  */
+  --tpl-guideov-inline-line: 1px;
+  --tpl-guideov-brand: #00833f;
+  --tpl-guideov-dim: #0f172a73; --tpl-guideov-ring-border: 3px solid var(--tpl-guideov-brand); --tpl-guideov-radius: 14px; --tpl-guideov-ring-shadow: 0 0 18px #00833f66;
+  --tpl-guideov-balloon-w: 340px; --tpl-guideov-balloon-pad: 16px 18px; --tpl-guideov-balloon-shadow: 0 10px 28px #10182840; --tpl-guideov-balloon-offset: 8px; --tpl-guideov-balloon-bottom: 96px; --tpl-guideov-balloon-radius-sp: 14px 14px 0 0;
+  --tpl-guideov-gap-4: 4px; --tpl-guideov-gap-8: 8px; --tpl-guideov-gap-10: 10px; --tpl-guideov-pill-pad: 3px 8px; --tpl-guideov-pill-bg: #e9f7ee; --tpl-guideov-text-12: 12px; --tpl-guideov-title: 14.5px; --tpl-guideov-body: 12.5px; --tpl-guideov-body-max-h: 6em;
+  --tpl-guideov-line-18: 18px;
+  /*
+    「この手順をスキップ」と「一時停止」は面も枠も持たない文字だけの操作。
+    見た目は所有部品 shared/button の `presentation="quiet-text"` が持つので、
+    ここでは枠 04-1 (dQfu4) の実値だけを渡す。高さと余白は寸法なので画面に残す。
+  */
+  --quiet-text-ink: var(--color-ink-secondary);
+  --quiet-text-size: var(--tpl-guideov-text-12);
+  --quiet-text-weight: 600;
+  --quiet-text-lh: var(--tpl-guideov-line-18);
+  --tpl-guideov-complete-balloon-w: 330px; --tpl-guideov-complete-bar-bottom: 148px;
+  --tpl-guideov-bar-left: 264px; --tpl-guideov-completed-w: 464px; --tpl-guideov-bar-w: 300px; --tpl-guideov-bar-pad: 6px 16px; --tpl-guideov-bar-shadow: 0 8px 24px #10182859; --tpl-guideov-bar-pause-color: #9aa3af; --tpl-guideov-segment-h: 3px; --tpl-guideov-segment-bg: #3f3f46; --tpl-guideov-caption: 11.5px; --tpl-guideov-caption-color: #d1d5db;
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  /* 暗幕の穴の部分は下の画面を押せるようにする（対象を操作して進む案内のため）。 */
+  pointer-events: none;
+}
+
+.root[data-guide-dialog] { z-index: 91; }
+
+/* 暗幕 4枚。Pen 04-1 z8qKxY/AmAKC/Lt7PG/v8doAa と同じ色。 */
+.dim {
+  position: fixed;
+  background: var(--tpl-guideov-dim);
+  pointer-events: none;
+}
+
+/* 光の輪。Pen 04-1 IzuXL。 */
+.ring {
+  position: fixed;
+  border: var(--tpl-guideov-ring-border);
+  border-radius: var(--tpl-guideov-radius);
+  box-shadow: var(--tpl-guideov-ring-shadow);
+  pointer-events: none;
+}
+
+/* 吹き出し。Pen 04-1 mkzrI。 */
+.balloon {
+  position: fixed;
+  width: min(var(--tpl-guideov-balloon-w), 100%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-guideov-gap-10);
+  padding: var(--tpl-guideov-balloon-pad);
+  background: var(--color-canvas);
+  border-radius: var(--tpl-guideov-radius);
+  box-shadow: var(--tpl-guideov-balloon-shadow);
+  pointer-events: auto;
+}
+
+.balloonHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-guideov-gap-8);
+}
+
+/* 手順の札。Pen 04-1 YV9DQ / srvEW。 */
+.pill {
+  flex: none;
+  padding: var(--tpl-guideov-pill-pad);
+  border-radius: var(--polish-radius-pill);
+  background: var(--tpl-guideov-pill-bg);
+  color: var(--tpl-guideov-brand);
+  font-size: var(--tpl-guideov-text-12);
+  font-weight: 600;
+}
+
+.title {
+  flex: 1;
+  color: var(--color-ink);
+  font-size: var(--tpl-guideov-title);
+  font-weight: 700;
+}
+
+.body {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-guideov-body);
+  font-weight: 500;
+  line-height: 1.65;
+}
+
+.balloonFooter {
+  display: flex;
+  align-items: center;
+}
+
+/*
+  「この手順をスキップ」。寸法だけ画面が持つ。高さは中身で決まる値なので
+  共通ボタンの40を外して auto に戻す（最小の高さ32は素のボタンと同じ、
+  globals.css のタップ高さの共通規定をそのまま使う）。
+*/
+html:root .balloonFooter button[class][class][class] { height: auto; }
+
+/* ガイド帯。Pen 04-1 dkVoV。 */
+.stack { display: contents; }
+
+.bar {
+  position: fixed;
+  inset-inline-start: clamp(var(--space-16), calc(100vw - var(--tpl-guideov-bar-w) - var(--space-16)), var(--tpl-guideov-bar-left));
+  inset-block-end: max(var(--space-12), var(--guide-save-clearance));
+  width: var(--tpl-guideov-bar-w);
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-guideov-gap-4);
+  padding: var(--tpl-guideov-bar-pad);
+  background: var(--color-ink);
+  border-radius: var(--polish-radius-card);
+  box-shadow: var(--tpl-guideov-bar-shadow);
+  pointer-events: auto;
+}
+
+/* 帯の中の「一時停止」だけ色と文字の大きさを差し替える（11px は使わない:★V8境界規約）。 */
+.barHeader {
+  --quiet-text-ink: var(--tpl-guideov-bar-pause-color);
+  --quiet-text-size: var(--polish-text-note);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-guideov-gap-8);
+}
+
+.barTitle {
+  color: var(--color-canvas);
+  font-size: var(--tpl-guideov-text-12);
+  font-weight: 700;
+}
+
+/* 「一時停止」の高さは寸法なので画面に残し、共通ボタンの40を外して中身の高さへ戻す。 */
+html:root .barHeader button[class][class][class] { height: auto; }
+
+/* 進み線 9本。Pen 04-1 DjaHp。 */
+.progress {
+  display: flex;
+  gap: var(--tpl-guideov-gap-4);
+  width: 100%;
+}
+
+.segment {
+  flex: 1;
+  height: var(--tpl-guideov-segment-h);
+  border-radius: var(--polish-radius-pill);
+  background: var(--tpl-guideov-segment-bg);
+}
+
+.segmentDone { background: var(--tpl-guideov-brand); }
+
+.caption {
+  color: var(--tpl-guideov-caption-color);
+  font-size: var(--tpl-guideov-caption);
+  font-weight: 500;
+}
+
+[data-guide-table-complete] .bar {
+  inset-block-end: max(var(--tpl-guideov-complete-bar-bottom), var(--guide-save-clearance));
+}
+
+[data-guide-table-complete] .balloon { width: min(var(--tpl-guideov-complete-balloon-w), 100%); }
+
+.completed {
+  position: fixed;
+  inset-inline-end: var(--space-24);
+  inset-block-end: max(var(--space-24), var(--guide-save-clearance));
+  width: min(var(--tpl-guideov-completed-w), calc(100% - 2 * var(--space-24)));
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-14) var(--space-20);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+  border-radius: var(--polish-radius-card);
+  box-shadow: var(--tpl-guideov-bar-shadow);
+  pointer-events: auto;
+}
+
+.completeMark {
+  display: grid;
+  place-items: center;
+  width: var(--tpl-firstrun-mark, var(--space-24));
+  aspect-ratio: 1;
+  flex: none;
+  border-radius: var(--polish-radius-pill);
+  background: var(--tpl-guideov-brand);
+}
+
+.completeCopy { display: flex; flex: 1; flex-direction: column; min-width: 0; font-size: var(--polish-text-body); }
+
+/*
+  スマホ幅は吹き出しを画面下部に固定する簡易表示にする
+  （枠14 共通ルール izsr5）。
+  光の輪だけ対象を追い、吹き出しと帯は画面の下に固定して読む所を動かさない。
+*/
+@media (max-width: 480px) {
+  /*
+    帯は画面のいちばん下。吹き出しはその上に積む。
+    重ねると説明が帯で隠れて読めないので、帯の高さ(実測 約92px)分だけ上へ置く。
+  */
+  .stack {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: var(--guide-save-clearance);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .balloon, .bar, .completed, [data-guide-table-complete] .balloon {
+    position: static;
+    width: auto;
+    box-sizing: border-box;
+  }
+
+  .balloon {
+    margin-inline: var(--tpl-guideov-balloon-offset);
+    border-radius: var(--tpl-guideov-balloon-radius-sp);
+  }
+
+  .completed { margin-inline: var(--space-8); }
+
+  .bar { box-shadow: none; border-radius: 0; }
+
+  /* 簡易表示。長い説明で画面を埋めない。 */
+  .body {
+    max-height: var(--tpl-guideov-body-max-h);
+    overflow-y: auto;
+  }
+}
+
+/* Guide actions belong to the same focus scope as the form or confirmation. */
+.root[data-inline-guide] {
+  position: relative;
+  inset: auto;
+  flex: none;
+  z-index: auto;
+}
+
+[data-inline-guide] .stack {
+  position: static;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+[data-inline-guide] .balloon,
+[data-inline-guide] .bar {
+  position: static;
+  width: auto;
+  margin-inline: 0;
+  box-shadow: none;
+}
+
+[data-inline-guide] .balloon {
+  box-shadow: inset 0 0 0 var(--tpl-guideov-inline-line) var(--color-control-border);
+  border-radius: var(--tpl-guideov-radius);
+  padding: var(--space-8) var(--space-12);
+  gap: var(--space-4);
+}
+
+[data-inline-guide] .body {
+  max-height: var(--tpl-guideov-body-max-h);
+  overflow: auto;
+}
+
+[data-inline-guide] .bar {
+  border-radius: var(--polish-radius-card);
+}
+
+.root[data-guide-table-editor] .balloon {
+  width: var(--tpl-guideov-complete-balloon-w);
+}
+
+.root[data-guide-table-editor] .bar {
+  inset-block-end: var(--space-12);
+}
+
+.root[data-guide-course-basics] {
+  --tpl-guideov-balloon-w: 246px;
+}

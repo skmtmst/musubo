@@ -23,12 +23,13 @@ it('初期設定の取得失敗を表示用のerrorにし、再取得で保存�
 
 it('別アカウントへ切替後の遅い返事で上書きしない', async () => {
   let resolveOld!: (value: unknown) => void
-  net.progress.mockImplementation((id: string) => id === 'a' ? new Promise((resolve) => { resolveOld = resolve }) : Promise.resolve(ok({ steps: [{ key: 'featureSet', state: 'done', href: '/settings', reason: null }] })))
+  net.progress.mockImplementation((id: string) => id === 'a' ? new Promise((resolve) => { resolveOld = resolve }) : Promise.resolve(ok({ steps: [{ key: 'featureSet', state: 'done', href: '/settings', reason: null }, { key: 'attributes', state: 'done', href: '/tags?tab=tags', reason: null }] })))
   const { result, rerender } = renderHook(({ id }) => useFirstRun(id), { initialProps: { id: 'a' } })
   rerender({ id: 'b' })
   await waitFor(() => expect(result.current.status).toBe('ready'))
-  await act(async () => { resolveOld(ok({ steps: [{ key: 'featureSet', state: 'todo', href: '/settings', reason: null }] })) })
-  expect(result.current.steps.find((step) => step.key === 'featureSet')?.state).toBe('done')
+  await act(async () => { resolveOld(ok({ steps: [{ key: 'featureSet', state: 'done', href: '/settings', reason: null }, { key: 'attributes', state: 'todo', href: '/tags?tab=tags', reason: null }] })) })
+  /* 済みの「使う機能」は一覧から外れるので、遅い返事の見張りは別の段で行う。 */
+  expect(result.current.steps.find((step) => step.key === 'attributes')?.state).toBe('done')
 })
 
 it('役割が分からない時は初期質問APIを読まない', () => {

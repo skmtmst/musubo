@@ -1,13 +1,17 @@
 import { initialRestaurantStore,initialRestaurantStoreGuard } from './style-initial-store.js';
-import { initialMenuImageKey, initialMenuPng, type AccountStyle } from '@line-crm/shared';
+import { initialMenuImageKey, initialMenuPng, type AccountStyle, type RestaurantGuideMenu } from '@line-crm/shared';
+import presetImages from './restaurant-guide-menu-images.json';
 import type { StarterDefinition } from './style-starter-definition.js';
 
 /** 明示的な保存・入れ直し・配布からだけ呼ぶ。読む口では画像も予約リンクも作らない。 */
-export async function materializeInitialMenuAssets(_db:D1Database,images:R2Bucket|undefined,account:string,style:AccountStyle,definition:StarterDefinition) {
+export async function materializeInitialMenuAssets(_db:D1Database,images:R2Bucket|undefined,account:string,style:AccountStyle,definition:StarterDefinition,preset?: RestaurantGuideMenu) {
  if(!definition.items.some(item=>item.initialMenu===style))return;
  if(images) {
-  const key=initialMenuImageKey(account,style);
-  if(!await images.head(key)) await images.put(key,initialMenuPng(style),{httpMetadata:{contentType:'image/png'}});
+  const key=initialMenuImageKey(account,style,preset);
+  if(!await images.head(key)) {
+    const image = preset ? Uint8Array.from(atob(presetImages[preset]), character => character.charCodeAt(0)) : initialMenuPng(style);
+    await images.put(key,image,{httpMetadata:{contentType:'image/png'}});
+  }
  }
 }
 
