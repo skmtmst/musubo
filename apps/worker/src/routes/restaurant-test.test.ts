@@ -1326,10 +1326,10 @@ describe('V8 枠の自動生成と全枠の競合', () => {
     const body={storeId:'store-ginza',date:'2099-10-10',expectedHoursVersion:1,...alloc};
     const res=await request('/api/restaurant-test/inventory/generate?account_id=account-1',body);
     expect(res.status).toBe(200);
-    expect((await res.json() as any).data.generated).toBe(4);
+    expect(await res.json()).toMatchObject({ data: { generated: 4, slotCount: 4 } });
     const rows=testDb.raw.prepare('SELECT starts_at FROM rt_inventory_slots ORDER BY starts_at').all();
     expect(rows[0]).toEqual({starts_at:'2099-10-10T08:00:00.000Z'});
-    expect((await (await request('/api/restaurant-test/inventory/generate?account_id=account-1',body)).json() as any).data.generated).toBe(0);
+    expect(await (await request('/api/restaurant-test/inventory/generate?account_id=account-1',body)).json()).toMatchObject({ data: { generated: 0, slotCount: 4 } });
     expect((await request('/api/restaurant-test/inventory/generate?account_id=account-1',{...body,expectedHoursVersion:0})).status).toBe(409);
   });
   it('全枠のどれか一つが古いと一件も変更せず、正しい版なら全部更新する', async () => {

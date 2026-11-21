@@ -63,6 +63,7 @@ export type DrawerProps = {
    * 開いたときに寄せる先。'panel' は面そのもの（輪を出さない）。題がその場で直せる板で、
    * 開いただけで題に輪が出て編集の入口に見えるのを避ける。Tab で先頭の操作へ進める。
    */
+  guideSlot?: string
   initialFocus?: 'panel'
 }
 
@@ -96,6 +97,7 @@ export default function Drawer({
   toolbar,
   band,
   initialFocus,
+  guideSlot,
 }: DrawerProps) {
   const formInput = useFormInputDirty(open)
   const isDirty = dirty ?? formInput.dirty
@@ -171,6 +173,7 @@ export default function Drawer({
         {error}
       </Notice> : null}
       {band ? <div className={styles.band}>{band}</div> : null}
+      {open && guideSlot ? <div data-guide-slot={guideSlot} style={{ display: 'contents' }} /> : null}
       {hasDetailActions(actions) ? <footer className={styles.actionFooter} data-window-actions><DetailActions {...actions} /></footer> : actions ? null : footer ? <footer className={footerLayout === 'actions' ? styles.actionFooter : styles.footer} data-window-actions>{footer}</footer> : null}
     </aside>
   )

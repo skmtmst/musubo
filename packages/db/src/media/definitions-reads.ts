@@ -4,6 +4,16 @@ import { type MediaRefKind, type MediaUsageMutationResult, type MediaKind, type 
 
 
 
+const restaurantMenuPhotoUses = `(
+  SELECT image_media_id, COUNT(*) AS usage_count FROM (
+    SELECT id, image_media_id FROM rt_menu_items WHERE image_media_id IS NOT NULL
+    UNION
+    SELECT menu.id, json_extract(photo.value, '$.mediaId')
+    FROM rt_menu_items menu, json_each(menu.photo_gallery_json) photo
+  )
+  GROUP BY image_media_id
+)`;
+
 export const LOOKUP_CHUNK = 90;
 export const MEDIA_USAGE_WRITE_CHUNK = 20;
 
@@ -183,7 +193,7 @@ export async function getMedia(
       `SELECT m.*,
               (SELECT COUNT(*) FROM media_usages u WHERE u.media_id = m.id) + COALESCE(menu_uses.usage_count, 0) AS usage_count
          FROM media m
-         LEFT JOIN (SELECT image_media_id, COUNT(*) AS usage_count FROM rt_menu_items WHERE image_media_id IS NOT NULL GROUP BY image_media_id) menu_uses ON menu_uses.image_media_id = m.id
+         LEFT JOIN ${restaurantMenuPhotoUses} menu_uses ON menu_uses.image_media_id = m.id
          ${where}
         ORDER BY ${orderBy}
         LIMIT ? OFFSET ?`,
@@ -217,7 +227,7 @@ export async function countMedia(
     conditions.push('m.size_bytes >= ?');
     values.push(quota.limitBytes * MEDIA_NEAR_LIMIT_SHARE);
   }
-  const row = await db.prepare(`SELECT COUNT(*) AS total FROM media m LEFT JOIN (SELECT image_media_id, COUNT(*) AS usage_count FROM rt_menu_items WHERE image_media_id IS NOT NULL GROUP BY image_media_id) menu_uses ON menu_uses.image_media_id = m.id WHERE ${conditions.join(' AND ')}`)
+  const row = await db.prepare(`SELECT COUNT(*) AS total FROM media m LEFT JOIN ${restaurantMenuPhotoUses} menu_uses ON menu_uses.image_media_id = m.id WHERE ${conditions.join(' AND ')}`)
     .bind(...values).first<{ total: number }>();
   return Number(row?.total ?? 0);
 }
