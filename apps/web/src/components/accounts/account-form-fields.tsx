@@ -163,7 +163,7 @@ export function AccountFormSections({
           type="password"
           hint={showMessagingRequired ? undefined : '設定済み（変更する場合のみ入力）'}
         />
-        <p className="text-xs text-ink-muted">チャネルアクセストークンはmusuboが自動更新します。</p>
+        <p className="text-xs text-ink-secondary">チャネルアクセストークンはmusuboが自動更新します。</p>
       </FormSection>
 
       <FormSection
