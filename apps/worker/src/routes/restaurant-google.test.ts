@@ -691,6 +691,110 @@ describe('Googleビジネス：設定（接続）', () => {
   });
 });
 
+describe('Googleビジネス：接続一覧（受入条件2）', () => {
+  /** いまの接続をそのまま写して2件目を作る。並び順は後ろにする。 */
+  async function seedSecondConnection(): Promise<void> {
+    testDb.raw
+      .prepare(
+        `INSERT INTO rt_google_connections
+          (id, store_id, line_account_id, google_account_email, location_name, location_title, refresh_token_enc, access_token_enc, access_token_expires_at, status, connected_at, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        'conn-2',
+        'store-shibuya',
+        'account-2',
+        'owner@example.test',
+        'accounts/111/locations/333',
+        'こもれび食堂 渋谷2号店',
+        await encryptCredential('refresh-secret-2', ENC_KEY),
+        await encryptCredential('access-secret-2', ENC_KEY),
+        '2099-01-01T00:00:00.000Z',
+        'connected',
+        '2026-09-24T00:00:00.000Z',
+        1,
+      );
+  }
+
+  it('同じ店舗の接続を全件、画面に出す順で返す', async () => {
+    seedStore();
+    await seedConnection();
+    await seedSecondConnection();
+
+    const response = await call('/api/restaurant-test/google/connections?account_id=account-2');
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as {
+      store: { id: string; lineAccountId: string };
+      connections: Array<{ id: string; status: string; locationName: string }>;
+    };
+    expect(json.store).toMatchObject({ id: 'store-shibuya', lineAccountId: 'account-2' });
+    expect(json.connections.map((row) => row.id)).toEqual(['conn-1', 'conn-2']);
+    expect(json.connections.map((row) => row.status)).toEqual(['connected', 'connected']);
+    expect(json.connections[1].locationName).toBe('accounts/111/locations/333');
+    // 先頭は接続IDを省いたときに操作される1件と同じ。画面はこの順で行を並べる。
+    const single = await call('/api/restaurant-test/google/connection?account_id=account-2');
+    const singleJson = (await single.json()) as { connection: { id: string } };
+    expect(json.connections[0].id).toBe(singleJson.connection.id);
+    // 合鍵は行ごとにも出さない。Googleへも出て行かない。
+    expect(JSON.stringify(json)).not.toContain('secret');
+    expect(JSON.stringify(json)).not.toContain('enc');
+    expect(googleCalls).toEqual([]);
+  });
+
+  it('主連携に決めた接続を先頭に出す', async () => {
+    seedStore();
+    await seedConnection();
+    await seedSecondConnection();
+    testDb.raw
+      .prepare('INSERT INTO account_settings (id, line_account_id, key, value) VALUES (?, ?, ?, ?)')
+      .run('as-1', 'account-2', 'sns.google.primary_connection', JSON.stringify({ data: { connectionId: 'conn-2' } }));
+
+    const response = await call('/api/restaurant-test/google/connections?account_id=account-2');
+    const json = (await response.json()) as { connections: Array<{ id: string }> };
+    expect(json.connections.map((row) => row.id)).toEqual(['conn-2', 'conn-1']);
+  });
+
+  it('別のLINEアカウントを見てもこちらの接続は混ざらない', async () => {
+    seedStore();
+    await seedConnection();
+    await seedSecondConnection();
+    testDb.raw
+      .prepare(
+        `INSERT INTO line_accounts
+          (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
+         VALUES (?, ?, ?, ?, ?, 1, ?)`,
+      )
+      .run('account-1', 'channel-1', '然-NEN-TEST', 'token', 'secret', TENANT);
+
+    const response = await call('/api/restaurant-test/google/connections?account_id=account-1');
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as { store: { lineAccountId: string }; connections: unknown[] };
+    expect(json.store.lineAccountId).toBe('account-1');
+    expect(json.connections).toEqual([]);
+  });
+
+  it('権限の無いLINEアカウントの接続一覧は見せない', async () => {
+    seedStore();
+    await seedConnection();
+    authMocks.lineAccounts = authMocks.lineAccounts.filter((account) => account.id !== 'account-2');
+    const response = await call('/api/restaurant-test/google/connections?account_id=account-2');
+    expect(response.status).toBe(403);
+  });
+
+  it('環境のAPIキーでは接続一覧も403にする', async () => {
+    seedStore();
+    await seedConnection();
+    // 管理セッションの接頭辞を付けずに生の鍵を出す。外部スクリプトと同じ呼び方。
+    const response = await app().request(
+      '/api/restaurant-test/google/connections?account_id=account-2',
+      { headers: { Authorization: 'Bearer owner-key' } },
+      env,
+    );
+    expect(response.status).toBe(403);
+    expect(googleCalls).toHaveLength(0);
+  });
+});
+
 describe('Googleビジネス：口コミ', () => {
   it('同期は最後のページまで取得し、2回目でも件数が増えない。★3以下は要確認', async () => {
     seedStore();
@@ -1030,4 +1134,144 @@ it('Googleの店舗選択は同じ統括かつ担当範囲だけを返す', asyn
   const admin = await call('/api/restaurant-test/google/connection?account_id=account-2', { token: 'admin-session' });
   expect(admin.status).toBe(200);
   expect((await admin.json() as { stores: { id: string }[] }).stores.map(store => store.id)).toEqual(['store-shibuya']);
+});
+
+/*
+ * 772 で1つの店舗に2つのGoogle接続（別のlocation）を持てるようにしたので、
+ * 「どの接続を操作しているか」を取り違えないことを固める（受入条件4）。
+ * ここを守らないと、2件目のつなぎ直し・解除が1件目に当たり、生きている接続の
+ * トークンと取り込み済みの口コミまで消える。
+ */
+describe('Googleビジネス：接続が2件あるとき（複数接続）', () => {
+  const LOCATION_2 = 'accounts/111/locations/333';
+
+  /** 同じ店舗の2件目の接続。location が違うので一意索引（store_id, location_name）に当たらない。 */
+  async function seedSecondConnection(): Promise<void> {
+    testDb.raw
+      .prepare(
+        `INSERT INTO rt_google_connections
+          (id, store_id, line_account_id, google_account_email, location_name, location_title, refresh_token_enc, access_token_enc, access_token_expires_at, status, connected_at, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        'conn-2',
+        'store-shibuya',
+        'account-2',
+        'owner2@example.test',
+        LOCATION_2,
+        'こもれび食堂 原宿店',
+        await encryptCredential('refresh-secret-2', ENC_KEY),
+        await encryptCredential('access-secret-2', ENC_KEY),
+        '2099-01-01T00:00:00.000Z',
+        'connected',
+        '2026-09-23T01:00:00.000Z',
+        1,
+      );
+  }
+
+  const connections = () =>
+    testDb.raw.prepare('SELECT id, status, location_name FROM rt_google_connections ORDER BY id').all();
+
+  const revisionOf = (id: string) =>
+    (testDb.raw.prepare('SELECT confirmation_revision AS revision FROM rt_google_connections WHERE id = ?').get(id) as { revision: number }).revision;
+
+  it('つなぎ直しは選んだ接続を控え、接続の追加は既存の接続を見ない', async () => {
+    seedStore();
+    await seedConnection();
+    await seedSecondConnection();
+
+    const reconnect = await call('/api/restaurant-test/google/connect/start?account_id=account-2&connection_id=conn-2', { body: {} });
+    expect(reconnect.status).toBe(200);
+    expect(await reconnect.json()).toMatchObject({ mode: 'reconnect' });
+    // 戻ってきたときに書き換える接続を控える。1件目は候補にしない。
+    expect(testDb.raw.prepare('SELECT connection_id, mode FROM rt_google_oauth_states').all()).toEqual([
+      { connection_id: 'conn-2', mode: 'reconnect' },
+    ]);
+
+    // 追加は「新しい接続を足す」ので既存の接続を一切見ない（主連携を取り違えてつなぎ直さない）。
+    const added = await call('/api/restaurant-test/google/connect/start?account_id=account-2&mode=add', { body: {} });
+    expect(added.status).toBe(200);
+    expect(await added.json()).toMatchObject({ mode: 'connect' });
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS n FROM rt_google_oauth_states WHERE connection_id IS NULL AND mode = 'connect'").get()).toEqual({ n: 1 });
+
+    // 「増やす」と「この接続を直す」は同時に指定できない。
+    const conflict = await call('/api/restaurant-test/google/connect/start?account_id=account-2&mode=add&connection_id=conn-2', { body: {} });
+    expect(conflict.status).toBe(400);
+    expect(await conflict.json()).toMatchObject({ code: 'connection_target_conflict' });
+
+    const missing = await call('/api/restaurant-test/google/connect/start?account_id=account-2&connection_id=conn-404', { body: {} });
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toMatchObject({ code: 'connection_not_found' });
+
+    // 既存の2件はどちらも触られていない。
+    expect(connections()).toEqual([
+      { id: 'conn-1', status: 'connected', location_name: LOCATION },
+      { id: 'conn-2', status: 'connected', location_name: LOCATION_2 },
+    ]);
+  });
+
+  it('解除は選んだ接続だけを切り、もう一方の接続と取り込み済みの口コミを残す', async () => {
+    seedStore();
+    await seedConnection();
+    await seedSecondConnection();
+    testDb.raw
+      .prepare(`INSERT INTO rt_google_reviews (id, store_id, connection_id, review_name, star_rating, create_time) VALUES ('rv-1', 'store-shibuya', 'conn-1', ?, 5, '2026-09-01T00:00:00Z')`)
+      .run(`${LOCATION}/reviews/r1`);
+    testDb.raw
+      .prepare(`INSERT INTO rt_google_reviews (id, store_id, connection_id, review_name, star_rating, create_time) VALUES ('rv-2', 'store-shibuya', 'conn-2', ?, 4, '2026-09-02T00:00:00Z')`)
+      .run(`${LOCATION_2}/reviews/r2`);
+    googleHandler = () => jsonResponse({});
+
+    const response = await call('/api/restaurant-test/google/disconnect?account_id=account-2', {
+      body: { confirmed: true, expectedConnectionId: 'conn-2', expectedConfirmationRevision: revisionOf('conn-2') },
+    });
+    expect(response.status).toBe(200);
+    expect(connections()).toEqual([
+      { id: 'conn-1', status: 'connected', location_name: LOCATION },
+      { id: 'conn-2', status: 'disconnected', location_name: null },
+    ]);
+    // 消えるのは解除した接続のぶんだけ。
+    expect(testDb.raw.prepare('SELECT id FROM rt_google_reviews').all()).toEqual([{ id: 'rv-1' }]);
+    // 生きている接続の合鍵はそのまま。
+    const kept = testDb.raw.prepare('SELECT refresh_token_enc FROM rt_google_connections WHERE id = ?').get('conn-1') as { refresh_token_enc: string | null };
+    expect(await decryptCredential(kept.refresh_token_enc!, ENC_KEY)).toBe('refresh-secret');
+  });
+
+  it('確認した接続先と版は両方そろわないと解除しない', async () => {
+    seedStore();
+    await seedConnection();
+    await seedSecondConnection();
+    googleHandler = () => jsonResponse({});
+
+    const onlyId = await call('/api/restaurant-test/google/disconnect?account_id=account-2', { body: { confirmed: true, expectedConnectionId: 'conn-2' } });
+    expect(onlyId.status).toBe(400);
+    const onlyRevision = await call('/api/restaurant-test/google/disconnect?account_id=account-2', { body: { confirmed: true, expectedConfirmationRevision: revisionOf('conn-1') } });
+    expect(onlyRevision.status).toBe(400);
+    // Googleへも通知しない（解除していないので取り消してはいけない）。
+    expect(googleCalls).toHaveLength(0);
+    expect(connections()).toEqual([
+      { id: 'conn-1', status: 'connected', location_name: LOCATION },
+      { id: 'conn-2', status: 'connected', location_name: LOCATION_2 },
+    ]);
+  });
+
+  it('存在しない接続IDの解除は、どちらの接続も切らない', async () => {
+    seedStore();
+    await seedConnection();
+    await seedSecondConnection();
+    googleHandler = () => jsonResponse({});
+
+    // 画面が ?connection_id= で指定した場合は「見つからない」。
+    const byQuery = await call('/api/restaurant-test/google/disconnect?account_id=account-2&connection_id=conn-404', { body: { confirmed: true } });
+    expect(byQuery.status).toBe(404);
+    expect(await byQuery.json()).toMatchObject({ code: 'connection_not_found' });
+    // 確認つきで消えていた場合は「接続が変わりました」（画面を読み直させる）。
+    const byConfirm = await call('/api/restaurant-test/google/disconnect?account_id=account-2', { body: { confirmed: true, expectedConnectionId: 'conn-404', expectedConfirmationRevision: 1 } });
+    expect(byConfirm.status).toBe(409);
+    expect(googleCalls).toHaveLength(0);
+    expect(connections()).toEqual([
+      { id: 'conn-1', status: 'connected', location_name: LOCATION },
+      { id: 'conn-2', status: 'connected', location_name: LOCATION_2 },
+    ]);
+  });
 });

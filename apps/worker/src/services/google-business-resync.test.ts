@@ -116,6 +116,12 @@ function connectionRow(storeId: string): Record<string, unknown> {
   return testDb.raw.prepare('SELECT * FROM rt_google_connections WHERE store_id = ?').get(storeId) as Record<string, unknown>;
 }
 
+/** 状態更新は接続1件を指すので、店舗からその接続の id を引いて渡す。 */
+function connectionRef(storeId: string): { id: string; store_id: string } {
+  const row = connectionRow(storeId);
+  return { id: String(row.id), store_id: String(row.store_id) };
+}
+
 beforeEach(async () => {
   errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -183,8 +189,9 @@ describe('processGoogleBusinessHourlyResync', () => {
     testDb.raw
       .prepare('UPDATE rt_google_connections SET last_synced_at = ?, last_posts_synced_at = ? WHERE store_id = ?')
       .run(recent, recent, 'store-shibuya');
-    testDb.raw.prepare(`INSERT INTO rt_google_profiles(store_id,location_name,profile_json,fingerprint,fetched_at,updated_at)
-      VALUES(?,?,?,?,?,?)`).run('store-shibuya', LOCATION, JSON.stringify({ profile: {} }), 'recent', recent, recent);
+    // プロフィールの写しは接続ごと。どの接続のぶんかを入れないと「まだ取っていない」扱いになる。
+    testDb.raw.prepare(`INSERT INTO rt_google_profiles(store_id,connection_id,location_name,profile_json,fingerprint,fetched_at,updated_at)
+      VALUES(?,?,?,?,?,?,?)`).run('store-shibuya', 'conn-1', LOCATION, JSON.stringify({ profile: {} }), 'recent', recent, recent);
     const result = await processGoogleBusinessHourlyResync(env, { now: NOW, fetch: googleFetch(), sleep: noSleep });
     expect(result).toMatchObject({ reviewsSynced: 0, postsSynced: 0, skipped: 1, failed: 0 });
     expect(calls).toHaveLength(0);
@@ -340,11 +347,11 @@ describe('processGoogleBusinessDailyMetrics', () => {
 
   it('同じ接続状態では版を保ち、状態が変わった時だけ進める', async () => {
     const before = Number(connectionRow('store-shibuya').confirmation_revision);
-    await setConnectionStatusForEnv(env, 'store-shibuya', 'connected', 'internal_error');
+    await setConnectionStatusForEnv(env, connectionRef('store-shibuya'),'connected', 'internal_error');
     expect(connectionRow('store-shibuya').confirmation_revision).toBe(before);
-    await setConnectionStatusForEnv(env, 'store-shibuya', 'no_permission', 'no_permission');
+    await setConnectionStatusForEnv(env, connectionRef('store-shibuya'),'no_permission', 'no_permission');
     expect(connectionRow('store-shibuya').confirmation_revision).toBe(before + 1);
-    await setConnectionStatusForEnv(env, 'store-shibuya', 'no_permission', 'no_permission');
+    await setConnectionStatusForEnv(env, connectionRef('store-shibuya'),'no_permission', 'no_permission');
     expect(connectionRow('store-shibuya').confirmation_revision).toBe(before + 1);
   });
 

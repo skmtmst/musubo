@@ -476,6 +476,8 @@
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
 
+- [GoogleビジネスとInstagramの複数接続（第1段）](release-log/unreleased/137-kenta-sns-multi-connections.md) — 反映履歴、確認 2026-11-21。
+
 - [開店準備ガイドの修正](release-log/unreleased/133-masato-restaurant-setup-guide.md)
 
 - [コース写真の保存項目を追加](release-log/unreleased/144-masato-restaurant-course-gallery-d1.md) — 反映履歴、確認 2026-11-21。
