@@ -245,6 +245,8 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
   'v8/reminders/edit-messages.tsx': 'v8/reminders/edit.tsx',
   'v8/reminders/edit-schedule.tsx': 'v8/reminders/edit.tsx',
   'v8/common-vars-edit/edit-value-fields.tsx': 'v8/common-vars-edit/edit.tsx',
+  // 使用先メニューは親の編集値を表示し、未保存の変更は親の番兵が守る。
+  'v8/common-vars-edit/usage-reference-menu.tsx': 'v8/common-vars-edit/edit.tsx',
   // U04: 入力状態と番兵は元の入口が持つ。分割先も親の番兵の検査対象にする（対象外にはしない）。
   'v8/automations/create/automation-dialogs.tsx': 'v8/automations/create/create.tsx',
   'v8/automations/create/use-automation-draft-resume.tsx': 'v8/automations/create/create.tsx',
