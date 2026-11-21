@@ -218,13 +218,7 @@ export function FirstRunPopup({ summary, onStartGuide, onClose }: FirstRunPopupP
               )
             }
 
-            return (
-              <div key={step.key} className={styles.row}>
-                {mark}
-                {label}
-                <span className={styles.chevron} aria-hidden="true">›</span>
-              </div>
-            )
+            return <div key={step.key} className={styles.row}>{mark}{label}</div>
           })}
         </div>
 

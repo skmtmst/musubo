@@ -8045,7 +8045,9 @@ CREATE TABLE rt_menu_items (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('draft', 'active', 'archived')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, published_once INTEGER NOT NULL DEFAULT 0 CHECK (published_once IN (0, 1)), publication_history_unknown INTEGER NOT NULL DEFAULT 0 CHECK (publication_history_unknown IN (0, 1)), description TEXT, image_media_id TEXT REFERENCES media(id), confirmation_revision INTEGER NOT NULL DEFAULT 1);
+, published_once INTEGER NOT NULL DEFAULT 0 CHECK (published_once IN (0, 1)), publication_history_unknown INTEGER NOT NULL DEFAULT 0 CHECK (publication_history_unknown IN (0, 1)), description TEXT, image_media_id TEXT REFERENCES media(id), confirmation_revision INTEGER NOT NULL DEFAULT 1, photo_gallery_json TEXT
+  CHECK (photo_gallery_json IS NULL OR (json_valid(photo_gallery_json)
+    AND json_type(photo_gallery_json) = 'array' AND json_array_length(photo_gallery_json) <= 5)));
 
 CREATE TABLE rt_opening_hours_settings (
   store_id TEXT PRIMARY KEY REFERENCES rt_stores(id) ON DELETE CASCADE,

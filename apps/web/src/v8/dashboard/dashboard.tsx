@@ -356,7 +356,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       inserted={starterResult.inserted} onInserted={starterResult.record} onDismiss={starterResult.clear}
       onChanged={() => { start.reload(); setup.reload() }} />
   ) : null
-  const onboardingSummary = start.summary ?? (canManage && setupRest && start.steps.length > 0 ? summarizeFirstSteps(start.steps) : null)
+  const onboardingSummary = start.summary ?? (start.status === 'ready' && canManage && setupRest && start.steps.length > 0 ? summarizeFirstSteps(start.steps) : null)
   const showOnboarding = role !== null && Boolean(onboardingSummary || setupRest || start.error || setup.error || !canManage)
   /* 初回ポップアップ（枠 02 / 02b）と、上の帯の「開店準備 N/9」の札。 */
   const firstRunPopup = useFirstRunPopup({
