@@ -310,7 +310,9 @@ describe('統括のアカウント：入る', () => {
 
 
 describe('統括のアカウント：未知の件数と本当の0件を分ける', () => {
+  // attention の mock は overdue を返さない古い口なので、別の集計の5枚目が出る。
   const kpis = () => [...document.querySelectorAll('[data-kpi-presentation]:not([data-kpi-strip])')]
+    .filter(card => !card.textContent?.includes('返信の期限を過ぎた会話'))
   const values = () => kpis().map(card => card.querySelector('[data-kpi-number]')?.textContent)
   const folderCounts = (name: string) => [...document.querySelectorAll('[data-folder-select]')]
     .filter(row => row.getAttribute('title') === name).map(row => row.textContent)
@@ -390,10 +392,13 @@ describe('統括のアカウント：未知の件数と本当の0件を分ける
     render(<HqHomeV8 />)
     await screen.findAllByText('銀座店')
     expect(kpis()).toHaveLength(4)
+    const allCards = [...document.querySelectorAll('[data-kpi-presentation]:not([data-kpi-strip])')]
+    expect(allCards).toHaveLength(5)
+    expect(allCards.find(card => card.textContent?.includes('返信の期限を過ぎた会話'))?.textContent).toContain('件数を確認できません')
     await waitFor(() => expect(values()).toEqual(['2', '—', '0', '2']))
     expect(kpis()[3].textContent).toContain('ほかに未確認 1 件')
     expect(document.querySelectorAll('[data-kpi-zero]')).toHaveLength(1)
-    expect(document.querySelectorAll('[data-kpi-detail] [role="note"]')).toHaveLength(4)
+    expect(kpis().flatMap(card => [...card.querySelectorAll('[data-kpi-detail] [role="note"]')])).toHaveLength(4)
     const card = [...document.querySelectorAll('article')].find(node => node.textContent?.includes('二号店'))!
     expect([...card.querySelectorAll('dd')].map(node => node.textContent)).toEqual(['—', '0 通'])
     fireEvent.click(screen.getByRole('button', { name: '表' }))

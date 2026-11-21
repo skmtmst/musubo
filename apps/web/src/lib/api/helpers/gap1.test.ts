@@ -13,3 +13,9 @@ test('SND-14 SLA-19 B1-29 B7-58: 各保存が版を渡す',async()=>{
  await bookingCalendarApi.saveSwitches('a',{readEnabled:true,writeEnabled:false,expectedVersion:6},'s');expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/admin/staff/s/calendar-sync?account_id=a',expect.objectContaining({method:'PUT'}));
 });
 test('B1-08: LIFFの本人のトークンと冪等キーをカード登録へ渡す',async()=>{await bookingCancellationApi.setup('liff',{menuId:'m',policyAccepted:true},'id-token','key');expect(fetchApi).toHaveBeenLastCalledWith('/api/liff/booking/setup-intent?liffId=liff',expect.objectContaining({headers:{Authorization:'Bearer id-token','Idempotency-Key':'key'}}));});
+test('期限超過一覧は店・担当・未読・検索条件と期限カーソルを渡す',async()=>{
+ await inboxRoutingApi.listByDeadline('store/1',{overdue:true,limit:200,beforeDueAt:'2026-11-19T10:00:00Z',beforeId:'friend/1',status:'on_hold',operatorId:'staff:1',q:'検索',unreadOnly:true});
+ const path=fetchApi.mock.calls.at(-1)?.[0] as string;
+ const query=new URL(path,'https://example.test').searchParams;
+ expect(Object.fromEntries(query)).toEqual({lineAccountId:'store/1',sort:'sla_due',slaState:'overdue',limit:'200',beforeDueAt:'2026-11-19T10:00:00Z',beforeId:'friend/1',status:'on_hold',operatorId:'staff:1',q:'検索',unreadOnly:'1'});
+});

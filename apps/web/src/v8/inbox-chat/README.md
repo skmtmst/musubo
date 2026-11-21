@@ -17,6 +17,7 @@
 - [public/conversation-head/index.ts](public/conversation-head/index.ts)：`ConversationHead`
 - [public/template-picker-view/index.ts](public/template-picker-view/index.ts)：`TemplatePickerSideKey`・`TemplatePickerView`
 - [public/mobile-talk-item/index.ts](public/mobile-talk-item/index.ts)：`talkItem`（電話の画面の会話の一覧の 1 件の形）
+- [public/overdue-link/index.ts](public/overdue-link/index.ts)：`INBOX_OVERDUE_HREF`（受信箱を期限超過の絞り込みで開く道 `/chats?quick=overdue`。統括の「返信の期限を過ぎた会話」が使う）
 
 機能の内部は宣言元を直接読み、外部は明示された公開入口を使います。Nextのpage・layoutとWorkerのroute登録は直接接続します。決まりは [コードの構成と名前](../../../../../docs/code-structure.md)。
 
@@ -42,6 +43,7 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 - [schedule-presets.test.ts](schedule-presets.test.ts)
 - [sidebar-safety-react.test.tsx](sidebar-safety-react.test.tsx)
 - [sla.test.tsx](sla.test.tsx)
+- 期限超過の一覧（`?quick=overdue`・店の期限の設定を待つ・読めない時は失敗と読み直し・期限の口で全ページ・件数と同じ応答）：[use-inbox-lists-overdue.test.tsx](use-inbox-lists-overdue.test.tsx)、[overdue-link.test.ts](overdue-link.test.ts)
 - 並びの切り替え（`?sort=latest`）：[inbox-sort-control-react.test.tsx](../../app/chats/inbox-sort-control-react.test.tsx)
 - 開いたら既読：[inbox-open-read-react.test.tsx](../../app/chats/inbox-open-read-react.test.tsx)
 - 一覧の時刻（今日は時刻・6日前までは曜日・前は月/日）：[format-list-recent.test.ts](../../lib/format-list-recent.test.ts)

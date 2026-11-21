@@ -1,4 +1,4 @@
-import type { AccountStyle, StyleTemplateSample, StarterCatalogDefinition, StarterCatalogOption, StarterCatalogSelection, StarterCatalogDetails } from '@line-crm/shared';
+import type { AccountStyle, HqOverdueAttention, StyleTemplateSample, StarterCatalogDefinition, StarterCatalogOption, StarterCatalogSelection, StarterCatalogDetails } from '@line-crm/shared';
 import { fetchApi } from '../../api';
 
 import {
@@ -87,6 +87,7 @@ export const hqStyleApi = {
           style: AccountStyle;
           name: string;
           counts: Record<string, number>;
+          overdue: HqOverdueAttention;
           details: Record<string, Array<{ id: string; href?: string }>>;
         }>;
       }>

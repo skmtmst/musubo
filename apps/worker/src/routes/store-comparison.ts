@@ -39,7 +39,7 @@ storeComparison.get('/api/hq/store-comparison/:accountId',async c=>{
  const numbers=await storeNumbers(c.env.DB,id,period);
  const recent=(await c.env.DB.prepare('SELECT id,title,status,sent_at FROM broadcasts WHERE line_account_id=? ORDER BY created_at DESC LIMIT 3').bind(id).all<StoreComparisonDetail['recentBroadcasts'][number]>()).results;
  let attention:StoreComparisonDetail['attention'];
- try { const result=await readAccountAttention(c.env.DB,id,false);attention={status:'ready',counts:result.counts,targets:result.targets}; }
+ try { const result=await readAccountAttention(c.env.DB,id,false);attention={status:'ready',counts:result.counts,targets:result.targets,overdue:result.overdue}; }
  catch { attention={status:'unavailable',counts:null}; }
  const data:StoreComparisonDetail={accountId:id,...numbers,trend:comparisonTrend(numbers.trend,period),recentBroadcasts:recent,attention};
  return c.json({success:true,data});

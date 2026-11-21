@@ -37,6 +37,7 @@ import { useInboxStats } from './use-inbox-stats';
 import { useInboxSubscription } from './use-inbox-subscription';
 
 import { useInboxDeepLink } from './use-inbox-deep-link';
+import { INBOX_QUICK_URL_KEY, inboxQuickFilterFromParam, type InboxQuickFilter } from './overdue-link';
 import { useInboxPanel } from './use-inbox-panel';
 
 const CHAT_PAGE_SIZE = 200
@@ -86,7 +87,8 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     samePageUrl.replace(`${window.location.pathname}${text ? `?${text}` : ''}`)
   }
 
-  const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
+  /* 上の絞り込みも URL の `?quick=` で開ける（統括の「返信の期限を過ぎた会話」は `?quick=overdue`）。 */
+  const [quickFilter, setQuickFilter] = useState<InboxQuickFilter>(() => inboxQuickFilterFromParam(params.get(INBOX_QUICK_URL_KEY)))
 
   const [assigneeFilter, setAssigneeFilter] = useState('all')
 
@@ -232,6 +234,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     hasMoreChats,
     listScrollRef,
     slaEnabled,
+    overdueSlaFailed,
     overdueTotal,
     setSlaReload,
     listFilterKey,
@@ -778,7 +781,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           unreadOnly, selectedChatId, selectedThreadId: visibleThreadId, setFilterOpen, filterOpen, setSavedViewsOpen,
           setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId,
           savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen,
-          savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter,
+          savedViewError, setSlaReload, slaEnabled, overdueSlaFailed, overdueTotal, quickFilter, setQuickFilter,
           dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators,
           savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter,
           setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus,

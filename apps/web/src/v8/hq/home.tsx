@@ -48,6 +48,9 @@ import { readSessionSnapshot } from '@/lib/session-snapshot';
 import { useAccount, type AccountWithStats } from '@/contexts/account-context';
 import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8 } from './account-dialogs';
 import { connectionNoticeLine } from './connection-reasons';
+import { summarizeOverdue } from './overdue-summary';
+import { notifyToast } from '@/components/shared/toast';
+import { INBOX_OVERDUE_HREF } from '@/v8/inbox-chat/public/overdue-link';
 import styles from './home.module.css';
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/public/folder-colors/index'
 import StatusBadge from '@/components/shared/status-badge';
@@ -101,6 +104,9 @@ export default function HqHomeV8() {
   const [reloadKey, setReloadKey] = useState(0)
   const [attentionCounts, setAttentionCounts] = useState<Record<string, number> | null>(null)
   const [attentionTotals, setAttentionTotals] = useState<Record<string, number> | null>(null)
+  /* 店ごとの返信の期限超過（口の形のまま。古い口で無い値も 0 にせず読み分ける）。 */
+  const [attentionOverdue, setAttentionOverdue] = useState<Array<{ accountId: string; name: string; overdue: unknown }> | null>(null)
+  const [overdueMenuOpen, setOverdueMenuOpen] = useState(false)
   const [attentionKey, setAttentionKey] = useState(0)
   const [attentionError, setAttentionError] = useState<unknown>(null)
   const [attentionRefreshing, setAttentionRefreshing] = useState(false)
@@ -185,6 +191,7 @@ export default function HqHomeV8() {
       }
       setAttentionCounts(counts)
       setAttentionTotals(totals)
+      setAttentionOverdue(result.data.items.map((item) => ({ accountId: item.accountId, name: item.name, overdue: item.overdue })))
     }).catch((error: unknown) => { if (!cancelled && epoch === attentionEpoch.current) setAttentionError(error ?? new Error('attention failed')) })
     return () => { cancelled = true }
   }, [reloadKey, attentionKey])
@@ -340,6 +347,50 @@ export default function HqHomeV8() {
   const connectionDetail = loadError || attentionError ? '読み込めませんでした'
     : connectionUnconfirmed ? `${knownConnectionTotal ? 'ほかに' : ''}未確認 ${formatNumber(connectionUnconfirmed)} 件`
       : connectionTotal === null ? '接続の問題を確認できません' : null
+
+  /*
+   * 返信の期限を過ぎた会話（アーカイブを除く店）。期限を使う店が無ければ帯に出さない。
+   * 一度出したら読み直しの間も前の値で枠を残し、読み込み中の形にする。失敗・古い口は 0 と出さない。
+   * 表示中の店を基準に引き、口の応答に無い店は「分からない」として合計を確定しない。
+   */
+  const overdueByAccount = useMemo(() => (attentionOverdue ? new Map(attentionOverdue.map((entry) => [entry.accountId, entry.overdue])) : null), [attentionOverdue])
+  const overdueSummary = overdueByAccount ? summarizeOverdue(currentAccounts.map((account) => ({ accountId: account.id, overdue: overdueByAccount.get(account.id) }))) : null
+  const overdueFailed = Boolean(loadError || attentionError)
+  const overduePending = loading || (attentionCounts === null && !attentionError)
+  const showOverdue = overdueFailed || (overdueSummary !== null && overdueSummary.kind !== 'hidden')
+  const openOverdueInbox = (accountId: string) => {
+    const name = accounts.find((account) => account.id === accountId)?.name || attentionOverdue?.find((entry) => entry.accountId === accountId)?.name
+    setOverdueMenuOpen(false)
+    setSelectedAccountId(accountId)
+    notifyToast(`${name || '選んだアカウント'} に切り替えました`, { tone: 'info' })
+    router.push(INBOX_OVERDUE_HREF)
+  }
+  const overdueAccounts = !overdueFailed && overdueSummary?.kind === 'count' ? overdueSummary.accounts : []
+  const overdueCard = !showOverdue ? null : (
+    <KpiCard
+      title="返信の期限を過ぎた会話"
+      loading={!overdueFailed && overduePending}
+      unit="件"
+      value={!overdueFailed && overdueSummary?.kind === 'count' ? overdueSummary.total : null}
+      valueText={!overdueFailed && overdueSummary?.kind === 'uncertain' ? '確定できません' : undefined}
+      valueTone={overdueAccounts.length > 0 ? 'warning' : 'default'}
+      detail={overdueFailed ? '読み込めませんでした'
+        : overdueSummary?.kind === 'uncertain' ? `期限未設定 ${formatNumber(overdueSummary.missing)}件`
+          : overdueSummary?.kind === 'unknown' ? '件数を確認できません' : null}
+      help="返事の期限を使っているアカウントの、最初の返事がまだで期限を過ぎた会話の数です。期限が決まっていない会話があるアカウントが混じると、合計は確定できません。"
+      valueMenu={overdueAccounts.length > 1 ? {
+        label: '期限を過ぎた会話があるアカウントを選ぶ',
+        open: overdueMenuOpen,
+        onOpenChange: setOverdueMenuOpen,
+        items: overdueAccounts.map((entry) => {
+          const name = accounts.find((account) => account.id === entry.accountId)?.name || attentionOverdue?.find((item) => item.accountId === entry.accountId)?.name || '名前のないアカウント'
+          return { id: entry.accountId, group: 'view' as const, icon: null, label: `${name} ${formatNumber(entry.count)}件`, 'aria-label': `${name}の返信の期限を過ぎた会話 ${formatNumber(entry.count)}件を開く`, onSelect: () => openOverdueInbox(entry.accountId) }
+        }),
+      } : undefined}
+      action={overdueAccounts.length === 1 ? { label: '対応が必要な会話を確認', onClick: () => openOverdueInbox(overdueAccounts[0].accountId) }
+        : overdueAccounts.length > 1 ? { label: '対応が必要な会話を確認', onClick: () => setOverdueMenuOpen(true) } : undefined}
+    />
+  )
 
   /* 所属は1つ。アーカイブを除く同じ一覧で、すべて・フォルダ・未分類を数える。 */
   const folderOf = useCallback((account: AccountWithStats) => (account as { folderId?: string | null }).folderId ?? null, [])
@@ -567,11 +618,16 @@ export default function HqHomeV8() {
 
   const toolbar = <>
       <PlatformNotices />
-      <KpiBand className={styles.full} data-design="KPIs">
+      {/*
+        返信の期限の1枚があるときは、数（アカウント・友だち・配信）と気をつけること（接続に問題・返信の期限）の2段にする。
+        5枚を1段に詰めると、1152 で題が省略され、行き先が2行に折れ、接続に問題の数と行き先が重なる。
+      */}
+      <KpiBand className={styles.full} data-design="KPIs" maxColumns={overdueCard ? 3 : undefined}>
         <KpiCard title="アカウント" value={accountsReadable ? currentAccounts.length : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : null} />
         <KpiCard title="友だち合計" value={accountsReadable ? totals.friends : null} loading={loading} unit="人" detail={loadError ? '読み込めませんでした' : totals.friends === null ? '件数は分かりません' : null} help="アーカイブを除くアカウントの合計" />
         <KpiCard title="今月の配信" value={accountsReadable ? totals.messages : null} loading={loading} unit="通" detail={loadError ? '読み込めませんでした' : totals.messages === null ? '件数は分かりません' : null} />
         <KpiCard title="接続に問題" value={accountsReadable ? connectionTotal : null} loading={loading} unit="件" detail={connectionDetail} valueTone={connectionTotal !== null && connectionTotal > 0 ? 'warning' : 'default'} actionPlacement="value-row" action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
+        {overdueCard}
       </KpiBand>
 
       {accountsReadable && accounts.length > 0 ? <ListToolbarFrame layout="stacked">

@@ -65,8 +65,9 @@ export default function KpiBand({
     if (items.length > maxColumns) {
       const rows: ReactNode[][] = []
       for (let start = 0; start < items.length; start += maxColumns) rows.push(items.slice(start, start + maxColumns))
-      return <div data-shared-part="kpi-band-rows" {...rest} style={{ ...rest.style, '--kpi-band-row-columns': maxColumns } as CSSProperties}>
-        {rows.map((row, index) => <KpiBand key={index} gridClassName={gridClassName} className={className} presentation={presentation} border={border} edgeInset={edgeInset} density={density} layout={layout} appearance={appearance} connections={connections?.slice(index * maxColumns, index * maxColumns + row.length - 1)}>{row}</KpiBand>)}
+      // 画面が渡す className（幅・置き場）は段の包み全体に付ける。各段に付けると包みが中身の幅に縮む。
+      return <div data-shared-part="kpi-band-rows" {...rest} className={className} style={{ ...rest.style, '--kpi-band-row-columns': maxColumns } as CSSProperties}>
+        {rows.map((row, index) => <KpiBand key={index} gridClassName={gridClassName} presentation={presentation} border={border} edgeInset={edgeInset} density={density} layout={layout} appearance={appearance} connections={connections?.slice(index * maxColumns, index * maxColumns + row.length - 1)}>{row}</KpiBand>)}
       </div>
     }
   }

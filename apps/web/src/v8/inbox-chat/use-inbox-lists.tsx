@@ -10,6 +10,13 @@ import { useCallback,useEffect,useRef,useState } from 'react';
 import { Chat,EmailInboxItem,InboxSort,ListCursor,StatusFilter,toListCursor } from './inbox-model';
 import { buildSupportEmailInboxQuery } from './support-email-query';
 
+/** 期限超過の続きの位置（期限が近い順の最後の行）。 */
+type DueCursor = { dueAt: string; id: string }
+
+function toDueCursor(last: { id: string; slaDueAt: string | null } | undefined): DueCursor | null {
+  return last?.slaDueAt ? { dueAt: last.slaDueAt, id: last.id } : null
+}
+
 type Options = {
   CHAT_PAGE_SIZE: number
   EMAIL_PAGE_SIZE: number
@@ -82,13 +89,53 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
 
   const [slaReload, setSlaReload] = useState(0)
 
+  /* 期限を使う店かを読み終えたか（失敗も終えた扱い）と、読めなかったか。 */
+  const [slaKnown, setSlaKnown] = useState(false)
+
+  const [slaFailed, setSlaFailed] = useState(false)
+
   useEffect(() => {
-    setSlaEnabled(false); setOverdueTotal(null)
+    setSlaEnabled(false); setOverdueTotal(null); setSlaKnown(!selectedAccountId); setSlaFailed(false)
     if (!selectedAccountId) return
     let live = true
-    void inboxRoutingApi.get(selectedAccountId).then((res) => { if (live) setSlaEnabled(Boolean(res.data.enabled)) }, () => { })
+    void inboxRoutingApi.get(selectedAccountId).then((res) => {
+      if (!live) return
+      if (res.success && res.data) setSlaEnabled(Boolean(res.data.enabled))
+      else setSlaFailed(true)
+    }, () => { if (live) setSlaFailed(true) }).finally(() => { if (live) setSlaKnown(true) })
     return () => { live = false }
   }, [selectedAccountId, slaReload])
+
+  /*
+   * 「期限超過」で開いたときは、店が期限を使うかが分かるまで一覧を取らない。
+   * 先に取ると、期限を使う店でも「1時間以上待ち」の一覧が一瞬出てから入れ替わる。
+   * 期限の設定が読めなかったときも、違う条件（1時間以上待ち）を黙って出さず、一覧の失敗として知らせる。
+   */
+  const overdueWaiting = quickFilter === 'overdue' && !slaKnown
+
+  const overdueSlaFailed = quickFilter === 'overdue' && slaKnown && slaFailed
+
+  /*
+   * 期限を使う店の「期限超過」は、口の期限の絞り（期限が近い順・期限のカーソル）で全ページを取る。
+   * 読んだページの中だけを手元で絞ると、200件を超えたときに上の件数と一覧が合わない。
+   */
+  const slaOverdueMode = slaEnabled && quickFilter === 'overdue'
+
+  const deadlineOptions = useCallback((cursor: DueCursor | null) => ({
+    overdue: true,
+    limit: CHAT_PAGE_SIZE,
+    ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+    ...(assigneeFilter !== 'all' ? { operatorId: assigneeFilter } : {}),
+    ...(debouncedNameQuery ? { q: debouncedNameQuery } : {}),
+    ...(unreadOnly ? { unreadOnly: true } : {}),
+    ...(cursor ? { beforeDueAt: cursor.dueAt, beforeId: cursor.id } : {}),
+  }), [statusFilter, assigneeFilter, debouncedNameQuery, unreadOnly, CHAT_PAGE_SIZE])
+
+  /* 期限超過の続きの位置。口が返した最後の行の期限と ID。 */
+  const nextDueCursorRef = useRef<DueCursor | null>(null)
+
+  /* 期限超過で読んだページの数。定期の取り直しは、この数だけ先頭から取り直して差し替える。 */
+  const dueLoadedPagesRef = useRef(0)
 
   const buildListParams = useCallback((cursor: ListCursor | null) => {
     const params: {
@@ -118,7 +165,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
   }, [statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort, CHAT_PAGE_SIZE])
 
   // Compare at render time too: an old request can finish before the next effect runs.
-  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, emailInboxEnabled, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort])
+  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, emailInboxEnabled, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort, overdueWaiting, overdueSlaFailed])
 
   const { value: chats, setValue: setChats } = useListSnapshot<Chat[]>(listFilterKey, [])
   const { value: emailItems, setValue: setEmailItems } = useListSnapshot<EmailInboxItem[]>(listFilterKey, [])
@@ -137,13 +184,17 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
   // useEffect が loading を立てる前の1描画でも、旧条件の0件を新条件の0件と誤認しない。
   const [chatListCompletedKey, setChatListCompletedKey] = useState<string | null>(null)
 
-  /* 上の「期限超過 N」。一覧と同じ口（期限超過の絞り込み）の総数を使う。行数とは別に数えさせる。 */
+  /*
+   * 上の「期限超過 N」。一覧と同じ口（期限超過の絞り込み）・同じ条件の総数を使う。
+   * 期限超過を開いている間は、一覧の応答の総数をそのまま使う（別に数えると時刻の差で合わなくなる）。
+   */
   useEffect(() => {
     if (!slaEnabled || !selectedAccountId) { setOverdueTotal(null); return }
+    if (quickFilter === 'overdue') return
     let live = true
-    void inboxRoutingApi.listByDeadline(selectedAccountId, { overdue: true, limit: 1 }).then((res) => { if (live) setOverdueTotal(res.total) }, () => { if (live) setOverdueTotal(null) })
+    void inboxRoutingApi.listByDeadline(selectedAccountId, { ...deadlineOptions(null), limit: 1 }).then((res) => { if (live) setOverdueTotal(typeof res.total === 'number' ? res.total : null) }, () => { if (live) setOverdueTotal(null) })
     return () => { live = false }
-  }, [slaEnabled, selectedAccountId, chatListCompletedKey])
+  }, [slaEnabled, selectedAccountId, chatListCompletedKey, quickFilter, deadlineOptions])
 
   const [emailListCompletedKey, setEmailListCompletedKey] = useState<string | null>(null)
 
@@ -242,7 +293,32 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     setLoading(true)
     setChatListFailed(false)
     setError('')
+    // 店の期限の設定が分かると条件が変わり、もう一度呼ばれる。それまでは読み込み中のまま。
+    if (overdueWaiting) return
+    if (overdueSlaFailed) {
+      setChatListFailed(true)
+      setChatListCompletedKey(listFilterKey)
+      setLoading(false)
+      return
+    }
+    nextDueCursorRef.current = null
+    dueLoadedPagesRef.current = 0
     try {
+      if (slaOverdueMode && selectedAccountId) {
+        const dueRes = await withRequestTimeout(inboxRoutingApi.listByDeadline(selectedAccountId, deadlineOptions(null)))
+        if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
+        if (dueRes.success && Array.isArray(dueRes.data)) {
+          setChatListFailed(false)
+          setChats(dueRes.data)
+          nextDueCursorRef.current = toDueCursor(dueRes.data[dueRes.data.length - 1])
+          dueLoadedPagesRef.current = 1
+          setHasMoreChats(dueRes.data.length === CHAT_PAGE_SIZE)
+          setOverdueTotal(typeof dueRes.total === 'number' ? dueRes.total : null)
+        } else {
+          setChatListFailed(true)
+        }
+        return
+      }
       // #625: 応答なしの要求は時間切れの失敗にし、読み込み中を残さない。
       const chatRes = await withRequestTimeout(api.chats.list(buildListParams(null)))
       if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
@@ -268,20 +344,38 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
         setLoading(false)
       }
     }
-  }, [buildListParams, listFilterKey, setError, CHAT_PAGE_SIZE, setChats])
+  }, [buildListParams, listFilterKey, setError, CHAT_PAGE_SIZE, setChats, overdueWaiting, overdueSlaFailed, slaOverdueMode, selectedAccountId, deadlineOptions])
 
   // 「さらに読み込む」— サーバ由来カーソルの続きを取得して末尾に追加する。
   // 楽観更新との競合に備えて既存 id は除外し、重複表示を防ぐ。
   const loadMoreChats = useCallback(async () => {
     if (loadingMore) return
+    const dueCursor = nextDueCursorRef.current
     const cursor = nextCursorRef.current
-    if (!cursor) {
+    if (slaOverdueMode ? !dueCursor || !selectedAccountId : !cursor) {
       setHasMoreChats(false)
       return
     }
     setLoadingMore(true)
     const requestId = chatListRequestRef.current
     try {
+      if (slaOverdueMode && selectedAccountId) {
+        const dueRes = await withRequestTimeout(inboxRoutingApi.listByDeadline(selectedAccountId, deadlineOptions(dueCursor)))
+        if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
+        if (dueRes.success && Array.isArray(dueRes.data)) {
+          const rows = dueRes.data
+          setChats((prev) => {
+            const seen = new Set(prev.map((c) => c.id))
+            return [...prev, ...rows.filter((r) => !seen.has(r.id))]
+          })
+          nextDueCursorRef.current = toDueCursor(rows[rows.length - 1])
+          dueLoadedPagesRef.current += 1
+          extraPagesLoadedRef.current = true
+          setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
+          setOverdueTotal(typeof dueRes.total === 'number' ? dueRes.total : null)
+        }
+        return
+      }
       // #625: 応答なしの要求は時間切れの失敗にし、読み込み中を残さない。
       const chatRes = await withRequestTimeout(api.chats.list(buildListParams(cursor)))
       if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
@@ -302,7 +396,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     } finally {
       if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) setLoadingMore(false)
     }
-  }, [loadingMore, buildListParams, listFilterKey, setError, CHAT_PAGE_SIZE, setChats])
+  }, [loadingMore, buildListParams, listFilterKey, setError, CHAT_PAGE_SIZE, setChats, slaOverdueMode, selectedAccountId, deadlineOptions])
 
   // Keep refs in sync so setChats updater can read the latest filter without stale closure
   useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
@@ -313,7 +407,37 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
 
   const loadChatsQuietly = useCallback(async (): Promise<boolean> => {
     const requestId = ++listPollRequestRef.current
+    if (overdueWaiting || overdueSlaFailed) return true
     try {
+      if (slaOverdueMode && selectedAccountId) {
+        /*
+         * 読んだページの数だけ先頭から取り直して差し替える。前の行を残して混ぜると、2ページ目以降で
+         * 返事をした・解決した会話が残り、上の件数（口の総数）と一覧が合わなくなる。
+         */
+        const pages = Math.max(1, dueLoadedPagesRef.current)
+        const rows: Chat[] = []
+        let cursor: DueCursor | null = null
+        let lastPageFull = false
+        let total: number | null = null
+        for (let index = 0; index < pages; index += 1) {
+          const dueRes = await inboxRoutingApi.listByDeadline(selectedAccountId, deadlineOptions(cursor))
+          if (listPollRequestRef.current !== requestId) return true
+          if (listFilterKeyRef.current !== listFilterKey) return true
+          if (!dueRes.success || !Array.isArray(dueRes.data)) return false
+          const seen = new Set(rows.map((row) => row.id))
+          rows.push(...dueRes.data.filter((row) => !seen.has(row.id)))
+          total = typeof dueRes.total === 'number' ? dueRes.total : null
+          lastPageFull = dueRes.data.length === CHAT_PAGE_SIZE
+          cursor = toDueCursor(dueRes.data[dueRes.data.length - 1])
+          if (!lastPageFull || !cursor) break
+        }
+        setChats(rows)
+        nextDueCursorRef.current = cursor
+        setHasMoreChats(lastPageFull && cursor !== null)
+        setOverdueTotal(total)
+        setChatListFailed(false)
+        return true
+      }
       const res = await api.chats.list(buildListParams(null))
       if (listPollRequestRef.current !== requestId) return true
       if (listFilterKeyRef.current !== listFilterKey) return true
@@ -337,7 +461,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     } catch {
       return false
     }
-  }, [buildListParams, listFilterKey, CHAT_PAGE_SIZE, setChats])
+  }, [buildListParams, listFilterKey, CHAT_PAGE_SIZE, setChats, overdueWaiting, overdueSlaFailed, slaOverdueMode, selectedAccountId, deadlineOptions])
 
   useEffect(() => {
     loadChats()
@@ -351,5 +475,5 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     window.addEventListener(UNANSWERED_REFRESH_EVENT, refresh)
     return () => window.removeEventListener(UNANSWERED_REFRESH_EVENT, refresh)
   }, [loadChats, loadEmails])
-  return { chats, setChats, emailItems, setEmailItems, emailError, emailLoading, debouncedNameQuery, setDebouncedNameQuery, statusFilterRef, loading, chatListFailed, loadingMore, hasMoreChats, listScrollRef, slaEnabled, overdueTotal, setSlaReload, listFilterKey, chatListCompletedKey, emailListCompletedKey, loadingMoreEmails, hasMoreEmails, loadEmails, loadChats, loadMoreChats, loadChatsQuietly }
+  return { chats, setChats, emailItems, setEmailItems, emailError, emailLoading, debouncedNameQuery, setDebouncedNameQuery, statusFilterRef, loading, chatListFailed, loadingMore, hasMoreChats, listScrollRef, slaEnabled, overdueSlaFailed, overdueTotal, setSlaReload, listFilterKey, chatListCompletedKey, emailListCompletedKey, loadingMoreEmails, hasMoreEmails, loadEmails, loadChats, loadMoreChats, loadChatsQuietly }
 }

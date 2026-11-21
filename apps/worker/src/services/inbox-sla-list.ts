@@ -10,20 +10,30 @@ export async function slaChatList(c:Context<Env>) {
  const account=c.req.query('lineAccountId');
  const ids=account?scope.allowedAccountIds.filter(x=>x===account):scope.allowedAccountIds;
  for(const id of ids)await refreshInboxSla(c.env.DB,id);
- const clauses=['f.line_account_id IN(SELECT value FROM json_each(?))',"c.status!='resolved'",'s.sla_enabled=1','c.first_response_at IS NULL','c.sla_due_at IS NOT NULL'];
- const binds:unknown[]=[JSON.stringify(ids)];
- if(['overdue','soon'].includes(c.req.query('slaState')??'')){clauses.push(c.req.query('slaState')==='soon'?"julianday(c.sla_due_at)>julianday(?) AND julianday(c.sla_due_at)<=julianday(?,'+15 minutes')":'julianday(c.sla_due_at)<=julianday(?)');binds.push(new Date().toISOString());if(c.req.query('slaState')==='soon')binds.push(new Date().toISOString());}
+ const clauses=['f.line_account_id IN(SELECT value FROM json_each(?))',"c.status!='resolved'",'c.pending_since IS NOT NULL','s.sla_enabled=1','c.first_response_at IS NULL','c.sla_due_at IS NOT NULL'];
+ const binds:unknown[]=[c.get('staff').id,JSON.stringify(ids)];
+ const now=new Date().toISOString();
+ if(['overdue','soon'].includes(c.req.query('slaState')??'')){clauses.push(c.req.query('slaState')==='soon'?"julianday(c.sla_due_at)>julianday(?) AND julianday(c.sla_due_at)<=julianday(?,'+15 minutes')":'julianday(c.sla_due_at)<=julianday(?)');binds.push(now);if(c.req.query('slaState')==='soon')binds.push(now);}
  const operatorId=c.req.query('operatorId');
  if(operatorId){const filter=assigneeFilter('c',operatorId,true);clauses.push(filter.sql);binds.push(...filter.binds);}
  if(c.req.query('status')){clauses.push('c.status=?');binds.push(c.req.query('status'));}
- if(c.req.query('q')){clauses.push('instr(lower(f.display_name),lower(?))>0');binds.push(c.req.query('q'));}
- const join='FROM chats c JOIN friends f ON f.id=c.friend_id JOIN inbox_routing_settings s ON s.account_id=f.line_account_id';
+ const query=(c.req.query('q')??'').trim().slice(0,200);
+ if(query){clauses.push(`(instr(lower(f.display_name),lower(?))>0 OR EXISTS (SELECT 1 FROM messages_log mq WHERE mq.friend_id=f.id AND (mq.delivery_type IS NULL OR mq.delivery_type!='test') AND instr(lower(mq.content),lower(?))>0))`);binds.push(query,query);}
+ const unread = `EXISTS (SELECT 1 FROM messages_log incoming WHERE incoming.friend_id=f.id AND incoming.direction='incoming' AND (incoming.delivery_type IS NULL OR incoming.delivery_type!='test') AND (sr.last_read_at IS NULL OR incoming.created_at>sr.last_read_at))`;
+ if(c.req.query('unreadOnly')==='1'||c.req.query('unreadOnly')==='true')clauses.push(unread);
+ const join=`FROM chats c JOIN friends f ON f.id=c.friend_id JOIN inbox_routing_settings s ON s.account_id=f.line_account_id LEFT JOIN inbox_staff_reads sr ON sr.channel='line' AND sr.conversation_id=f.id AND sr.staff_id=?`;
  const total=await c.env.DB.prepare(`SELECT COUNT(*) n ${join} WHERE ${clauses.join(' AND ')}`).bind(...binds).first<{n:number}>();
  const due=c.req.query('beforeDueAt'),id=c.req.query('beforeId');
- if(due&&id){clauses.push('(julianday(c.sla_due_at)>julianday(?) OR (c.sla_due_at=? AND f.id>?))');binds.push(due,due,id);}
+ if(due&&id){clauses.push('(julianday(c.sla_due_at)>julianday(?) OR (julianday(c.sla_due_at)=julianday(?) AND f.id>?))');binds.push(due,due,id);}
  const limit=Math.min(200,Math.max(1,listQueryNumber(c.req.query('limit'), Number.NaN)||50));
- const rows=(await c.env.DB.prepare(`SELECT c.*,CASE WHEN c.assignee_staff_id IS NOT NULL THEN COALESCE((SELECT name FROM staff_members WHERE id=c.assignee_staff_id),'担当者不明') WHEN c.operator_id IS NOT NULL THEN COALESCE((SELECT name FROM operators WHERE id=c.operator_id),'担当者不明') END AS operator_name,(SELECT content FROM messages_log WHERE friend_id=c.friend_id ORDER BY created_at DESC LIMIT 1) last_message,f.display_name,f.picture_url,f.line_account_id,CASE WHEN json_valid(f.metadata) THEN json_extract(f.metadata, '$.__attention') = '1' ELSE 0 END AS is_attention ${join} WHERE ${clauses.join(' AND ')} ORDER BY julianday(c.sla_due_at),f.id LIMIT ?`).bind(...binds,limit).all<Record<string,unknown>>()).results;
- const data=await enrichSlaChats(c.env.DB,rows.map(r=>({id:String(r.friend_id),friendId:r.friend_id,friendName:r.display_name,friendPictureUrl:r.picture_url,isAttention:Boolean(r.is_attention),operatorId:r.assignee_staff_id ? `staff:${r.assignee_staff_id}` : r.operator_id,operatorName:r.operator_name,status:r.status,revision:r.revision,lastMessageAt:r.last_message_at,lastMessage:r.last_message,unread:r.status==='unread',conversationId:r.id})));
+ const rows=(await c.env.DB.prepare(`SELECT c.*,CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:'||c.assignee_staff_id ELSE c.operator_id END AS operator_key,CASE WHEN c.assignee_staff_id IS NOT NULL THEN COALESCE((SELECT name FROM staff_members WHERE id=c.assignee_staff_id),'担当者不明') WHEN c.operator_id IS NOT NULL THEN COALESCE((SELECT name FROM operators WHERE id=c.operator_id),'担当者不明') END AS operator_name,
+   f.display_name,f.picture_url,f.line_account_id,CASE WHEN json_valid(f.metadata) THEN json_extract(f.metadata, '$.__attention') = '1' ELSE 0 END AS is_attention,
+   ${unread} AS is_unread_for_staff,m.created_at AS preview_at,
+   CASE WHEN m.unsent_at IS NULL AND m.message_type='text' THEN SUBSTR(m.content,1,200) ELSE NULL END AS preview_content,
+   m.direction AS preview_direction,CASE WHEN m.unsent_at IS NOT NULL THEN 'unsent' ELSE m.message_type END AS preview_type
+   ${join} LEFT JOIN messages_log m ON m.id=(SELECT last.id FROM messages_log last WHERE last.friend_id=f.id AND (last.delivery_type IS NULL OR last.delivery_type!='test') ORDER BY last.created_at DESC LIMIT 1)
+   WHERE ${clauses.join(' AND ')} ORDER BY julianday(c.sla_due_at),f.id LIMIT ?`).bind(...binds,limit).all<Record<string,unknown>>()).results;
+ const data=await enrichSlaChats(c.env.DB,rows.map(r=>({id:String(r.friend_id),friendId:r.friend_id,friendName:r.display_name||'名前なし',friendPictureUrl:r.picture_url||null,isAttention:Boolean(r.is_attention),operatorId:r.operator_key??null,operatorName:r.operator_name??null,status:r.status,revision:Number(r.revision??0),notes:r.notes??null,lastMessageAt:r.preview_at??r.last_message_at??null,lastMessage:r.preview_content||null,unread:r.status==='unread',lastMessageContent:r.preview_content||null,lastMessageDirection:r.preview_direction??null,lastMessageType:r.preview_type??null,isUnread:Boolean(r.is_unread_for_staff),createdAt:r.created_at,updatedAt:r.updated_at,conversationId:r.id})));
  const responseItems = data;
  return c.json(buildOffsetListResponse({ success:true,data: responseItems,total:total?.n??0, items: responseItems, paging: { limit }, sort: [{ field: 'sla_due_at', direction: 'asc' }, { field: 'id', direction: 'asc' }] }));
 }
