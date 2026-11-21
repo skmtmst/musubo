@@ -31,6 +31,10 @@ pnpm --dir packages/db generate:bootstrap   # bootstrap.sql と bootstrap-meta.j
 
 - SQL の中身は書き換えません（移すだけ）。
 - 読んでいる試験があれば読み込み先の相対パスを直します。
+- `docs/` 以外（`packages/db/`）が変わるので、必須検査の反映履歴が要ります。
+  後続PRの番号で `docs/release-log/unreleased/<PR番号>-<担当>-<内容>.md` に1行足し、
+  その行に `#<PR番号>` を入れてください（`required-pr-gate.yml` の
+  `Require a release-log entry`）。
 - `migrations/` に入ってはじめて `scripts/check-migrations.ts` の安全検査と
   `bootstrap.sql` の対象になります。移した後に `pnpm --dir packages/db check:bootstrap`
   と DB の試験を通してください。
