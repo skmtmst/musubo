@@ -56,6 +56,21 @@ beforeEach(() => {
 });
 
 describe('operator notification account boundary', () => {
+  it('updates legacy LINE token instructions when displaying notification history', async () => {
+    mocks.getNotifications.mockResolvedValue([{
+      id: 'old-token-notice', event_type: 'line_token_expired', title: 'トークンの期限が切れています',
+      body: 'LINEの接続の設定でトークンを更新してください。', metadata: '{"reason":"temporary"}',
+      category: 'error', channel: 'dashboard', status: 'sent',
+    }]);
+    const response = await app().request('/api/notifications?lineAccountId=account-a', {}, env);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ data: [{
+      id: 'old-token-notice',
+      title: 'LINE接続の自動更新を再試行しています',
+      body: '接続状況はLINEアカウントの詳細で確認できます。',
+    }] });
+  });
+
   it('does not provide a global rule list when no account is selected', async () => {
     const response = await app().request('/api/notifications/rules', {}, env);
     expect(response.status).toBe(400);

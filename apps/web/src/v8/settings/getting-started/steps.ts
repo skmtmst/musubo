@@ -203,7 +203,7 @@ function accountsStep(input: GettingStartedInput): StepResult {
     key: 'accounts',
     ordinal: '1',
     title: 'LINEアカウントをつなぐ',
-    sub: 'チャネル ID とアクセストークン',
+    sub: 'チャネルIDとチャネルシークレット',
     state: done ? 'done' : 'todo',
     condition: 'LINEアカウントが1つ以上登録されている',
     next: done
