@@ -111,6 +111,7 @@ export function useFirstRun(accountId: string | null, enabled = true, watch = fa
     status: current?.status ?? 'loading' as const,
     error: current?.error ?? null,
     reload,
+    refresh,
     watchExpired: watch && watchExpired,
     rewatch,
   }

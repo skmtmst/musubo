@@ -1,5 +1,6 @@
 'use client'
 
+import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
 import { requestSetupChipReopen, useSetupChipState } from '@/v8/onboarding/public/setup-chip/index'
 import styles from './setup-chip.module.css'
 
@@ -11,17 +12,23 @@ import styles from './setup-chip.module.css'
 */
 
 export function SetupChip() {
-  const state = useSetupChipState()
+  const popup = useSetupChipState()
+  const shared = useSharedGuide()
+  const guide = shared?.guide
+  const state = guide?.phase === 'active' || guide?.phase === 'paused' ? shared?.summary ?? popup : popup
   if (!state) return null
+  const count = `開店準備 ${state.done}/${state.total}`
+  if (guide?.phase === 'active') return <span className={styles.chip}>{count}</span>
+  const paused = guide?.phase === 'paused'
   return (
     <button
       type="button"
       className={styles.chip}
-      onClick={requestSetupChipReopen}
+      onClick={paused ? guide.resume : requestSetupChipReopen}
       data-setup-chip="open"
-      aria-label={`開店準備 ${state.done}/${state.total}。はじめにやることを開く`}
+      aria-label={`${count}。${paused ? 'ガイドを再開する' : 'はじめにやることを開く'}`}
     >
-      {`開店準備 ${state.done}/${state.total}`}
+      {count}
     </button>
   )
 }
