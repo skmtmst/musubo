@@ -435,3 +435,55 @@ test('来店フォローは明示保存でおすすめ2件を下書きにする'
   await expect(page.getByRole('dialog', { name: /最初の1通を受け取る/ })).toBeVisible()
   expect(writes).toEqual(['initialize'])
 })
+
+test('コースの写真は5枚まで。並べ替えと正方形の表示範囲を保存する', async ({ page }, testInfo) => {
+  await openFixture(page, {
+    initialGuide: { phase: 'active', stepKey: 'friendAdd', procedureIndex: 2 },
+    storeProgress: { tables: true, hours: true },
+  })
+  const images = Array.from({ length: 5 }, (_, index) => ({
+    id: `qa-dish-${index}`, lineAccountId: accountId, kind: 'image', filename: `検証写真 ${index + 1}.png`,
+  }))
+  await page.route('**/api/media?**', route => route.fulfill({ json: { success: true, data: { items: images, total: images.length } } }))
+  await page.route('**/api/media/qa-dish-*/content?**', route => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><rect width="400" height="200" fill="green"/></svg>',
+  }))
+  let submitted
+  await page.route('**/api/restaurant-test/menu?**', route => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    submitted = route.request().postDataJSON()
+    return route.fulfill({ json: { success: true, data: { id: 'course-gallery-1' } } })
+  })
+  await page.goto(`${base}/restaurant-test/menu/edit`)
+  const add = page.getByRole('button', { name: '写真を追加', exact: true })
+  for (const image of images) {
+    await add.click()
+    await page.getByRole('option', { name: `${image.filename} 画像`, exact: true }).click()
+  }
+  const gallery = page.getByRole('list', { name: 'コースの写真' })
+  const tile = gallery.getByRole('button', { name: /表示範囲を調整/ })
+  await expect(tile).toHaveCount(5)
+  await expect(add).toHaveCount(0)
+  await tile.nth(1).click()
+  const crop = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: '写真の表示範囲を調整' }) })
+  await crop.getByRole('slider', { name: '左右の位置' }).fill('73')
+  await crop.getByRole('button', { name: '前へ移動' }).click()
+  await crop.getByRole('button', { name: 'この範囲にする' }).click()
+  await expect(tile.first().getByText('表紙')).toBeVisible()
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 })
+    await expect.poll(async () => {
+      const box = await tile.first().boundingBox()
+      return box ? Math.abs(box.width - box.height) : Infinity
+    }).toBeLessThan(1)
+    await page.screenshot({ path: testInfo.outputPath(`course-photo-gallery-${width}.png`) })
+  }
+  await page.getByRole('textbox', { name: 'メニュー名' }).fill('写真付きコース')
+  await page.getByRole('spinbutton', { name: '価格（税込）' }).fill('4200')
+  await page.getByRole('button', { name: '保存して追加する', exact: true }).click()
+  await expect.poll(() => submitted?.photos).toEqual([
+    { mediaId: images[1].id, x: 73, y: 50 }, { mediaId: images[0].id, x: 50, y: 50 },
+    ...images.slice(2).map(image => ({ mediaId: image.id, x: 50, y: 50 })),
+  ])
+})
