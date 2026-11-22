@@ -1088,11 +1088,17 @@ it('振り分けを変更して移動すると未保存の確認を出す', asyn
   booking.booking.routing={enabled:true,rules:[],fallback:{menuId:'bm-1'}}
   formsGet.mockResolvedValue({success:true,data})
   routingTargets.mockResolvedValue({success:true,data:{menus:[{id:'bm-1',name:'相談',durationMinutes:30}],staff:[{id:'s1',name:'担当',menuId:'bm-1'}],groups:[]}})
+  const previousUrl=window.location.href
+  window.history.replaceState({}, '', '/form-submissions/edit?id=form-1')
   await render('id=form-1')
-  fireEvent.click(await screen.findByRole('switch',{name:'答えで予約の行き先を分ける'}))
-  fireEvent.click(screen.getByRole('link',{name:'キャンセル'}))
-  expect(await screen.findByRole('dialog',{name:'保存していない変更があります'})).toBeTruthy()
-  expect(formsUpdate).not.toHaveBeenCalled()
+  const toggle=await screen.findByRole('switch',{name:'答えで予約の行き先を分ける'})
+  vi.useFakeTimers({toFake:['setTimeout','clearTimeout']})
+  try {
+    fireEvent.click(toggle)
+    fireEvent.click(screen.getByRole('link',{name:'キャンセル'}))
+    expect(screen.getByRole('dialog',{name:'保存していない変更があります'})).toBeTruthy()
+    expect(formsUpdate).not.toHaveBeenCalled()
+  } finally { vi.useRealTimers(); window.history.replaceState({}, '', previousUrl) }
 })
 
 it('振り分けの保存が失敗しても変更を残す', async () => {
