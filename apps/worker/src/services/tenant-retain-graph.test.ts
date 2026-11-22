@@ -43,3 +43,27 @@ test('actual policies cover all discovered parent candidates', async () => {
   expect(Object.keys(policies).sort()).toEqual(parents);
   expect(()=>validateTombstonePolicies(parents,candidates,policies as Parameters<typeof validateTombstonePolicies>[2])).not.toThrow();
 });
+
+test('every textual column of each retained parent has an explicit documented disposition', async () => {
+  const {default: inventory}=await import('./tenant-retain-text-inventory.json');
+  const {default: policies}=await import('./tenant-retain-column-policies.json');
+  const specialized = new Set(['line_accounts','friends','rt_stores','rt_organizations','broadcasts','menus']);
+  const f=gapFixture();
+  const parents=await discoverRetainedPurgeAncestors(f.db);
+  expect(Object.keys(inventory).sort()).toEqual(parents);
+  for (const table of parents) {
+    const declared=inventory[table as keyof typeof inventory] as Record<string,{action:string;reason:string}>;
+    const cols=(f.raw.pragma(`table_info("${table}")`) as {name:string;type:string}[])
+      .filter(column => /CHAR|CLOB|TEXT|JSON/i.test(column.type)).map(column=>column.name).sort();
+    expect(Object.keys(declared).sort(),table).toEqual(cols);
+    for (const [column,entry] of Object.entries(declared)) {
+      expect(['retain','erase'],`${table}.${column}`).toContain(entry.action);
+      expect(entry.reason.trim(),`${table}.${column}`).not.toBe('');
+      const decision=(policies[table as keyof typeof policies].columns as Record<string,{action:string}>)[column];
+      if (decision && !specialized.has(table)) expect(entry.action,`${table}.${column}`).toBe(decision.action === 'retain' ? 'retain' : 'erase');
+    }
+  }
+  f.raw.exec('ALTER TABLE staff ADD COLUMN newly_added_secret TEXT');
+  const changed=(f.raw.pragma('table_info(staff)') as {name:string;type:string}[]).filter(c=>/CHAR|CLOB|TEXT|JSON/i.test(c.type)).map(c=>c.name).sort();
+  expect(changed).not.toEqual(Object.keys(inventory.staff).sort());
+});
