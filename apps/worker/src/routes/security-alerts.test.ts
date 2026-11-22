@@ -44,11 +44,23 @@ describe('security alert HTTP permissions and operator actions', () => {
   it('platform operators can inspect purged-tenant Stripe amount without exposing it to tenant staff', async () => {
     store.raw.exec("UPDATE tenants SET purge_started_at='2027-01-01' WHERE id='tenant-b'; INSERT INTO billing_events(id,type,tenant_id,summary) VALUES('evt_review','invoice.paid','tenant-b','pending')");
     await deferPurgedBillingEvent(store.db,{tenantId:'tenant-b',eventId:'evt_review',eventType:'invoice.paid',amount:3000,currency:'jpy',now:'2027-01-01T00:00:00.000Z'});
+    for(const [eventId,eventType,amount,currency] of [['evt_refund','charge.refunded',1000,'jpy'],['evt_missing','invoice.payment_failed',null,null],['evt_usd','checkout.session.completed',1234,'usd']] as const){
+      store.raw.prepare("INSERT INTO billing_events(id,type,tenant_id,summary) VALUES(?,?,'tenant-b','pending')").run(eventId,eventType);
+      await deferPurgedBillingEvent(store.db,{tenantId:'tenant-b',eventId,eventType,amount,currency,now:'2027-01-01T00:00:00.000Z'});
+    }
     const own = await request('/api/operations/security-alerts?account_id=a1');
-    expect(await own.text()).not.toContain('evt_review');
+    const ownText=await own.text();
+    expect(ownText).not.toContain('evt_review');
+    expect(ownText).not.toContain('3,000');
     const platform = await request('/api/ops/security-alerts', {...member,id:'platform',role:'owner'});
     expect(platform.status).toBe(200);
-    expect(await platform.json()).toMatchObject({data:{items:[{ruleKey:'stripe_purge_review',stripeReview:{eventId:'evt_review',amount:3000,currency:'jpy'}}]}});
+    const result=await platform.json() as {data:{items:Array<{summary:string}>}};
+    expect(result.data.items.map(item=>item.summary)).toEqual(expect.arrayContaining([
+      '¥3,000・支払われた額・削除済み統括のStripe通知',
+      '¥1,000・返金の累計・削除済み統括のStripe通知',
+      '金額不明・請求した額（未払いを含む）・削除済み統括のStripe通知',
+      'USD 1,234（最小単位）・申込の合計額・削除済み統括のStripe通知',
+    ]));
   });
   it('only returns the permitted account, never tenant-wide or hidden platform records', async () => {
     const first = await seedAlert('tenant-a', 'a1');

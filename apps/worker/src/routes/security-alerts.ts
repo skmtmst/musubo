@@ -32,7 +32,11 @@ async function list(c: Context<Env>, platform: boolean) {
     const rows = await c.env.DB.prepare(`SELECT security_alerts.*,
       CASE WHEN rule_key='stripe_purge_review' AND json_valid(scope_key) THEN (
         SELECT json_object('eventId',s.stripe_event_id,'eventType',s.event_type,'amount',s.amount,'currency',s.currency,
-          'amountMeaning',CASE WHEN s.event_type='charge.refunded' THEN '返金の累計' ELSE '通知された金額' END,
+          'amountMeaning',CASE WHEN s.event_type='charge.refunded' THEN '返金の累計'
+            WHEN s.event_type='invoice.paid' THEN '支払われた額'
+            WHEN s.event_type LIKE 'invoice.%' THEN '請求した額（未払いを含む）'
+            WHEN s.event_type LIKE 'checkout.session.%' THEN '申込の合計額'
+            ELSE '通知された金額' END,
           'amountUnit','通貨の最小単位')
         FROM stripe_events s WHERE s.tenant_id=security_alerts.tenant_id
           AND s.stripe_event_id=json_extract(security_alerts.scope_key,'$[1]') AND s.review_reason='purged_tenant'
@@ -41,7 +45,14 @@ async function list(c: Context<Env>, platform: boolean) {
       AND status != 'resolved' ORDER BY last_detected_at DESC, id LIMIT 200 OFFSET ?`).bind(...scope.binds, offset).all<SecurityAlertRow & {stripe_review:string|null}>();
     const monitor = await securityMonitorStatus(c.env.DB);
     const thresholds = securityThresholds(c.env.SECURITY_MONITOR_THRESHOLDS);
-    return c.json({ success: true, data: buildOffsetListResponse({ items: rows.results.map(row => ({ ...publicSecurityAlert(row), ...(platform ? { scope: { tenantId: row.tenant_id, lineAccountId: row.line_account_id }, ...(row.stripe_review ? {stripeReview: JSON.parse(row.stripe_review)} : {}) } : {}) })), monitor,
+    return c.json({ success: true, data: buildOffsetListResponse({ items: rows.results.map(row => {
+      const item=publicSecurityAlert(row);
+      if (!platform) return item;
+      const detail=row.stripe_review ? JSON.parse(row.stripe_review) as {amount:number|null;currency:string|null;amountMeaning:string} : null;
+      const amount=detail?.amount == null ? '金額不明' : detail.currency === 'jpy'
+        ? `¥${detail.amount.toLocaleString('ja-JP')}` : `${detail.currency?.toUpperCase() ?? '通貨不明'} ${detail.amount.toLocaleString('ja-JP')}（最小単位）`;
+      return {...item, ...(detail ? {summary:`${amount}・${detail.amountMeaning}・削除済み統括のStripe通知`,stripeReview:detail} : {}), scope:{tenantId:row.tenant_id,lineAccountId:row.line_account_id}};
+    }), monitor,
       thresholds: thresholds.values, configurationValid: !thresholds.invalid,
       windowMinutes: SECURITY_WINDOW_MINUTES, limit: 200, offset, total: Number(total?.count ?? 0), paging: { limit: 200, offset }, sort: [{ field: 'lastDetectedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
   } catch {
