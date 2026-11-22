@@ -36,6 +36,21 @@ describe('retained records survive tenant purge with real foreign keys', () => {
     expect(outcome.completed).toBe(1);
     expect(f.raw.prepare("SELECT id FROM rt_approval_requests WHERE id='ret-approval'").get()).toBeTruthy();
   });
+  test('broadcast approval history survives purge without keeping message content', async () => {
+    const f = gapFixture();
+    f.raw.pragma('foreign_keys = ON');
+    f.raw.exec(`${due};
+      INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id)
+        VALUES ('ret-broadcast','private title','text','private message','a');
+      INSERT INTO broadcast_approval_events(id,broadcast_id,actor_staff_id,action)
+        VALUES ('ret-broadcast-approval','ret-broadcast','staff','requested');`);
+    const outcome = await processTenantDataPurge({ DB: f.db }, { now });
+    expect(outcome.completed).toBe(1);
+    expect(f.raw.prepare("SELECT id FROM broadcast_approval_events WHERE id='ret-broadcast-approval'").get()).toBeTruthy();
+    const broadcast = f.raw.prepare("SELECT title,message_content FROM broadcasts WHERE id='ret-broadcast'").get() as {title:string;message_content:string} | undefined;
+    expect(broadcast?.title).not.toBe('private title');
+    expect(broadcast?.message_content).not.toBe('private message');
+  });
   test('all retained tables avoid cascade and restrictive references to purge tables', () => {
     const f = gapFixture();
     const unsafe: string[] = [];
