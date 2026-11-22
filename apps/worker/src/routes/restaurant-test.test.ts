@@ -530,6 +530,18 @@ describe('飲食店向けテストAPI', () => {
     expect(testDb.raw.prepare('SELECT customer_name,customer_phone,line_uid,allergy_note,note,guest_count FROM rt_reservations WHERE store_id=? AND source=? AND external_id=?').get(store.id, 'restaurant_board', reservation.externalId)).toMatchObject({ customer_name: newer.customerName, customer_phone: newer.customerPhone, line_uid: newer.lineUid, allergy_note: newer.allergyNote, note: newer.note, guest_count: 3 });
   });
 
+  it.each([
+    { initialName: '削除済みのお客さま', marker: 0, expected: 1 },
+    { initialName: '店が変更した名前', marker: 1, expected: 1 },
+    { initialName: '通常の予約', marker: 0, expected: 0 },
+  ])('店が予約名を編集すると旧形式の印も保護する: $initialName', async ({ initialName, marker, expected }) => {
+    seedRestaurantFixture();
+    testDb.raw.prepare("UPDATE rt_reservations SET customer_name=?,customer_anonymized=? WHERE id='reservation-ginza'").run(initialName, marker);
+    const response = await requestWithMethod('/api/restaurant-test/reservations/reservation-ginza?account_id=account-1', 'PATCH', { customerName: '店が再編集' });
+    expect(response.status).toBe(200);
+    expect(testDb.raw.prepare("SELECT customer_name,customer_anonymized FROM rt_reservations WHERE id='reservation-ginza'").get()).toEqual({ customer_name: '店が再編集', customer_anonymized: expected });
+  });
+
   it('双方向を示す未知の媒体値を拒否する', async () => {
     seedRestaurantFixture();
     const store = testDb.raw.prepare('SELECT id FROM rt_stores LIMIT 1').get() as { id: string };

@@ -370,7 +370,7 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
   const capacity = changesSlot && reservationSlotActive(next.status) ? await restaurantSeatCapacity(db,current.store_id,next.starts_at,next.ends_at,current.id) : null;
   if(capacity && !capacity.select({startsAt:next.starts_at,endsAt:next.ends_at,guestCount:next.guest_count,tableId:next.table_id}))return c.json({success:false,code:'availability_conflict',error:'未配席の予約を含め、人数が入る空き卓がありません'},409);
   const update = db.prepare(`UPDATE rt_reservations SET
-    confirmation_revision = confirmation_revision + 1, customer_name = ?, customer_phone = ?, guest_count = ?, starts_at = ?, ends_at = ?,
+    confirmation_revision = confirmation_revision + 1, customer_anonymized = CASE WHEN customer_name = '削除済みのお客さま' THEN 1 ELSE customer_anonymized END, customer_name = ?, customer_phone = ?, guest_count = ?, starts_at = ?, ends_at = ?,
     table_id = ?, course_id = ?, status = ?, allergy_note = ?, note = ?, cancel_reason = ?, customer_version=customer_version+1, updated_at = datetime('now')
     WHERE id = ? AND customer_version = ?`).bind(
       next.customer_name, next.customer_phone, next.guest_count, next.starts_at, next.ends_at,

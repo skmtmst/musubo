@@ -43,6 +43,7 @@ it('同じアカウントと LINE ID の組だけを匿名化し、同名・同�
   expect(f.raw.prepare("SELECT r2_key FROM rt_inbound_emails WHERE id='mail'").get()).toEqual({ r2_key: 'raw/mail' });
   expect(f.raw.prepare("SELECT COUNT(*) n FROM rt_reservation_events WHERE reservation_id='mine' AND event_type='restaurant.reservation.changed'").get()).toEqual({ n: 0 });
   expect(f.raw.prepare("SELECT customer_version FROM rt_reservations WHERE id='mine'").get()).toEqual({ customer_version: 2 });
+  expect(f.raw.prepare("SELECT id,customer_anonymized FROM rt_reservations ORDER BY id").all()).toEqual([{ id: 'foreign', customer_anonymized: 0 }, { id: 'mine', customer_anonymized: 1 }, { id: 'other', customer_anonymized: 0 }, { id: 'phone', customer_anonymized: 0 }]);
   expect(f.raw.prepare("SELECT COUNT(*) n FROM rt_reservation_event_receipts WHERE event_id='rt:mine:2:restaurant.reservation.changed'").get()).toEqual({ n: 0 });
   const audit = f.raw.prepare("SELECT detail_json FROM operation_audit WHERE id='customer-delete:friend_data:f'").get() as { detail_json: string };
   expect(JSON.parse(audit.detail_json)).toMatchObject({ anonymizedRows: 5, unlinkedCandidates: { legacyDestinationMatchingLineId: 1, accountReservationsWithoutLineId: 1, reservationsWithRawEmail: 1 } });

@@ -51,6 +51,14 @@ it('顧客削除で匿名化した予約は媒体メールの再取込でも個�
     guest_count: 4, starts_at: '2026-11-01T12:30:00+09:00', ends_at: '2026-11-01T05:30:00.000Z', status: 'cancelled' });
 });
 
+it('匿名化後に店が名前を編集しても媒体メールから個人情報を復元しない', async () => {
+  await ingest(false);
+  fixture.raw.exec("UPDATE rt_reservations SET customer_anonymized=1, customer_name='店で編集した名前',customer_phone=NULL,line_uid=NULL,allergy_note=NULL,note=NULL,cancel_reason=NULL WHERE external_id='TEST-123'");
+  await ingest(true);
+  expect(reservation()).toMatchObject({ customer_name: '店で編集した名前', customer_phone: null, line_uid: null, note: null, cancel_reason: null, guest_count: 4, status: 'cancelled' });
+  expect(fixture.raw.prepare("SELECT customer_anonymized FROM rt_reservations WHERE external_id='TEST-123'").get()).toEqual({ customer_anonymized: 1 });
+});
+
 it('匿名化していない予約は媒体メールの再取込で名前・電話と予約内容を更新する', async () => {
   await ingest(false);
   await ingest(true);
