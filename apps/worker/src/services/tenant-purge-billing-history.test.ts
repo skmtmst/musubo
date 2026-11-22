@@ -4,7 +4,7 @@ import { archiveAndResetTenantBilling, deleteExpiredBillingHistory } from './ten
 
 test('archives permitted contract terms and clears identifiers in one batch', async () => {
   const f=gapFixture();
-  f.raw.exec("ALTER TABLE billing_events ADD COLUMN retained_until TEXT");
+  if (!(f.raw.pragma("table_info(billing_events)") as Array<{name:string}>).some(c => c.name === "retained_until")) f.raw.exec("ALTER TABLE billing_events ADD COLUMN retained_until TEXT");
   f.raw.prepare(`INSERT INTO musubo_tenant_billing
     (tenant_id,pricing_snapshot_json,billing_interval,status,core_subscription_id,created_at,updated_at)
     VALUES ('t',?,'year','ended','sub_private','2026-01-01','2026-01-01')`)
@@ -22,7 +22,7 @@ test('archives permitted contract terms and clears identifiers in one batch', as
 
 test('failed reset rolls back the archive', async () => {
   const f=gapFixture();
-  f.raw.exec("ALTER TABLE billing_events ADD COLUMN retained_until TEXT");
+  if (!(f.raw.pragma("table_info(billing_events)") as Array<{name:string}>).some(c => c.name === "retained_until")) f.raw.exec("ALTER TABLE billing_events ADD COLUMN retained_until TEXT");
   f.raw.exec(`INSERT INTO musubo_tenant_billing(tenant_id,pricing_snapshot_json,billing_interval,status,created_at,updated_at)
     VALUES ('t','{}','month','ended','2026-01-01','2026-01-01');
     UPDATE tenants SET purge_started_at='2026-11-22' WHERE id='t';
@@ -33,7 +33,7 @@ test('failed reset rolls back the archive', async () => {
 
 test('expired history is deleted without deleting ordinary billing events', async () => {
   const f=gapFixture();
-  f.raw.exec("ALTER TABLE billing_events ADD COLUMN retained_until TEXT");
+  if (!(f.raw.pragma("table_info(billing_events)") as Array<{name:string}>).some(c => c.name === "retained_until")) f.raw.exec("ALTER TABLE billing_events ADD COLUMN retained_until TEXT");
   f.raw.exec(`INSERT INTO billing_events(id,type,tenant_id,summary,retained_until) VALUES
     ('expired','internal.purge_billing','t','{}','2030-01-01T00:00:00Z'),
     ('current','internal.purge_billing','t','{}','2031-01-01T00:00:00Z'),
