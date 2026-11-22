@@ -23,9 +23,9 @@ export function petWriteBody(body: Record<string, unknown> | null):
   if (weightKg !== null && (!Number.isFinite(weightKg) || weightKg < 0.1 || weightKg > 200)) {
     return { error: '体重は 0.1〜200kg で入力してください' };
   }
-  // DEEP-24: 種別は犬・猫・その他の3値。未指定は従来どおり犬を既定にするが、
+  // 種別は犬・猫・その他の3値。未指定は従来の送信元との互換のため犬を既定にするが、
   // 送られてきた値が範囲外なら犬へ黙って倒さず入力エラーにする
-  // （ウサギ等が犬として保存・計算される事故を防ぐ）。
+  // （ウサギ等が犬として保存・計算されないようにする）。
   const animalTypeRaw = body.animalType;
   let animalType = 'dog';
   if (animalTypeRaw !== undefined && animalTypeRaw !== null && animalTypeRaw !== '') {
@@ -67,7 +67,7 @@ export function petPatchBody(body: Record<string, unknown> | null):
     patch.name = body.name.trim();
   }
   if (body.animalType !== undefined) {
-    // DEEP-24: 範囲外の種別を犬へ黙って倒さずエラーにする。
+    // 範囲外の種別を犬へ黙って倒さずエラーにする。
     if (!['dog', 'cat', 'other'].includes(String(body.animalType))) {
       return { error: '種別は 犬・猫・その他 から選んでください', field: 'animalType' };
     }

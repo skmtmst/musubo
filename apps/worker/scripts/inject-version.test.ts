@@ -97,7 +97,7 @@ describe('injectVersion.hashDirectory', () => {
     expect(h1).not.toBe(h2);
   });
 
-  // ── Determinism / collision tests (regression anchors) ──
+  // ── Determinism / collision tests ──
   //
   // The simple "hash an unchanged dir twice" test is tautological — it would
   // pass for any broken hash. The tests below pin down the *load-bearing*
@@ -207,7 +207,7 @@ describe('injectVersion.hashDirectory', () => {
   });
 
   // Test D' — defensive companion: hash is independent of the *creation
-  // order* of files (catches a regression where someone trusts readdir's
+  // order* of files (a check against relying on readdir's
   // platform-dependent ordering instead of sorting). On filesystems whose
   // readdir is inode/creation-ordered (Linux ext4), removing the per-dir sort
   // would flip this; on macOS APFS readdir already alphabetises, so this is a

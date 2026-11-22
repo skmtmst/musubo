@@ -37,8 +37,7 @@ export function expandVariables(
    * 日付の差し込みを先に処理する。
    *
    * 後にすると、{{field.x}} に入っていた文字列が偶然 {{date}} の形を
-   * していた場合に二重に置き換わる。差し込みの値は利用者が入れたもので、
-   * それが差し込みとして解釈されるのは事故のもと。
+   * していた場合に二重に置き換わる。利用者の入力値は差し込みとして再解釈しない。
    */
   result = expandDateVariables(result, extra?.deliveredAt ?? new Date());
   /*

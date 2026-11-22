@@ -459,8 +459,8 @@ type NenCampaignDraft = {
 };
 
 /**
- * テスト送信に乗せる編集中の下書き。保存済みの値を上書きするだけで、本配信の設定は変えない。
- * 保存と同じ検査を通す（監査 R65: プレビューと違う保存済み本文が飛んでいた）。
+ * テスト送信に乗せる編集中の下書き。プレビューと同じ本文で送るため、保存済みの値を上書きするだけで本配信の設定は変えない。
+ * 値は保存と同じ検査を通す。
  */
 function applyCampaignDraft(campaign: CampaignRow, draft: NenCampaignDraft | undefined): CampaignRow | { error: string } {
   if (!draft) return campaign;
@@ -1068,7 +1068,7 @@ nenCampaigns.post('/api/nen-campaigns/pets', requireDeliveryAccess('nenCampaigns
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(id, body.friendId, customerId,
       input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, now, now,
-      // 体重を入れて登録したときだけ「測った日＝登録日」を記録（監査 R57）。
+      // 体重を入れて登録したときだけ「測った日＝登録日」を記録。
       input.weightKg == null ? null : now).run();
   } catch (error) {
     // 並行した再送が先に作ったときだけ保存済みを返す。それ以外は投げ直す。
@@ -1119,7 +1119,7 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireDeliveryAccess('nenCampai
     breed: patch.breed === undefined ? pet.breed : patch.breed,
     weightKg: patch.weightKg === undefined ? pet.weight_kg : patch.weightKg,
   };
-  // 監査 R57: 「体重の更新」は体重が実際に変わったときだけ動かす。
+  // 「体重の更新」は体重が実際に変わったときだけ動かす。
   // 名前だけの編集や同じ値の再送では日付を維持する。
   // 版つきの保存は版を必ず単調に進める（同じミリ秒の連打でも見分けられる）。
   const weightTouched = patch.weightKg !== undefined && patch.weightKg !== pet.weight_kg;

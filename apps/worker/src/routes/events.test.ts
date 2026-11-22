@@ -170,7 +170,7 @@ function makeEventDb(state: {
       if (event.deleted_at != null || !eventMatchesAccount(event, account)) return false;
       if (query && !event.name.includes(query)) return false;
       if (sql.includes('e.is_published = 1') && event.is_published !== 1) return false;
-      // R81: 公開済みを要求する問い（受付中のみ・全体集計）は、今後の有効な
+      // 公開済みを要求する問い（受付中のみ・全体集計）は、今後の有効な
       // 枠がある行だけ（本番の EXISTS と同じ決め方）。次回日時の副問い合わせ
       // にも同じ文字列があるため、公開条件と組み合わせて判定する。
       if (sql.includes('e.is_published = 1') && sql.includes('s.starts_at >= strftime')) {
@@ -650,7 +650,7 @@ function makeEventDb(state: {
           if (sql.startsWith('SELECT * FROM line_accounts')) {
             return { results: state.accounts ?? [] } as { results: T[] };
           }
-          // R79/R80: 一覧の全体集計。今後の有効な枠だけを数える。
+          // 一覧の全体集計。今後の有効な枠だけを数える。
           // 管理一覧の問い（`FROM events e` を含む）より前に置く。
           if (sql.includes('e.id = s.event_id')) {
             const nowIso = new Date().toISOString();
@@ -1598,7 +1598,7 @@ describe('GET /api/events/admin/events', () => {
         baseEvent({ id: 'e2', line_account_id: 'la1', name: 'Hidden meeting', is_published: 0 }),
         baseEvent({ id: 'e3', line_account_id: 'la1', name: 'Alpha meeting', is_published: 1 }),
       ],
-      // R81: 受付中のみは今後の枠がある行だけ。公開済みの行には枠を付ける。
+      // 受付中のみは今後の枠がある行だけ。公開済みの行には枠を付ける。
       slots: [
         { id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: 5, is_active: 1, sort_order: 0, deleted_at: null },
         { id: 's3', event_id: 'e3', starts_at: '2099-06-02T10:00:00Z', ends_at: '2099-06-02T12:00:00Z', capacity: 5, is_active: 1, sort_order: 0, deleted_at: null },

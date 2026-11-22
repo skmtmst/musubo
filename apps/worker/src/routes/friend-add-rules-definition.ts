@@ -320,7 +320,7 @@ export async function validateReferences(
   };
   /*
    * テスト・公開前確認では「そもそも動かない設定」をここで止める。
-   * 下書き保存（allowIncomplete）は未完成を許すので対象外（R30）。
+   * 下書き保存（allowIncomplete）は未完成を許すので対象外。
    * 実行側は routeIds の中身だけで拾う（EXISTS json_each）ため、
    * 空は「全部に届く」ではなく「どこにも届かない」。
    */
@@ -452,8 +452,8 @@ export async function validateReferences(
   /*
    * 再追加で「何も配信しない」(returningMode none) ときはシナリオを使わない。
    * 要件 -09 §4-3 の正規の選択肢であり、受け皿ルール自身も scenarioId なしで
-   * 作られる (ensureFriendAddFallbackRules)。下書きの保存では未完成を許す
-   * (R30)。それ以外（テスト・公開前確認・公開）は従来どおり必須とし、
+   * 作られる (ensureFriendAddFallbackRules)。下書きの保存では未完成を許す。
+   * それ以外（テスト・公開前確認・公開）は従来どおり必須とし、
    * 公開はテスト成功が鍵のため未完成のまま公開できない。
    */
   const skipsScenario = friendKind === 'returning' && definition.returningMode === 'none';

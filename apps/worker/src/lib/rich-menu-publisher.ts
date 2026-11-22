@@ -386,7 +386,7 @@ function validateAreaByIntent(area: AreaInput, prefix: string, group: GroupInput
         throw new RichMenuValidationError(`${prefix}: URLは1000文字以内にしてください`);
       }
       // 計測リンクはこちらが生成したURLなので飛ばす。手入力の飛び先は
-      // URIの形と許可schemeを確かめ、LINEへ届いて初めて失敗する事故を防ぐ。
+      // LINEへの送信前に失敗を検出するため、URIの形と許可schemeを確かめる。
       if (!area.trackedLinkUrl) {
         const uriError = richMenuUriError(uri);
         if (uriError) {
@@ -784,7 +784,7 @@ export async function createRichMenuShells(
   const unjournaledShellIds: string[] = [];
 
   // LINE 側へ変更を加える前に、全ページの画像が読めることを確認する。
-  // 2ページ目の画像不備で1ページ目だけ公開される事故を防ぐ。
+  // 2ページ目の画像が不備でも1ページ目だけ公開されないようにする。
   const imageBytes = new Map<string, Uint8Array>();
   for (const page of resolvedPages) {
     if (!page.imageR2Key || !page.imageContentType) {
