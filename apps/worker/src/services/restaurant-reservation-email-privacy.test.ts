@@ -59,6 +59,13 @@ it('匿名化後に店が名前を編集しても媒体メールから個人情�
   expect(fixture.raw.prepare("SELECT customer_anonymized FROM rt_reservations WHERE external_id='TEST-123'").get()).toEqual({ customer_anonymized: 1 });
 });
 
+it('匿名化後に店舗が入力した電話やメモを媒体メールで上書きしない', async () => {
+  await ingest(false);
+  fixture.raw.exec("UPDATE rt_reservations SET customer_anonymized=1, customer_name='店舗編集',customer_phone='08012345678',note='店舗メモ',cancel_reason='店舗理由' WHERE external_id='TEST-123'");
+  await ingest(true);
+  expect(reservation()).toMatchObject({ customer_name: '店舗編集', customer_phone: '08012345678', note: '店舗メモ', cancel_reason: '店舗理由', guest_count: 4, status: 'cancelled' });
+});
+
 it('匿名化していない予約は媒体メールの再取込で名前・電話と予約内容を更新する', async () => {
   await ingest(false);
   await ingest(true);
