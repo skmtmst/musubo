@@ -49,3 +49,10 @@ test('閲覧のみと代理ログインでは振り分けを保存できない',
   expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
  }
 });
+
+test('代理ログインで振り分け以外を編集しても、既存ルールは変わらない',async()=>{
+ const {forms}=await import('./forms.js');
+ const draft=layout();draft.sections[0].name='編集後';
+ const r=await gapCall(gapApp(d,[forms],gapOwner,true),'/api/forms/form?account_id=a','PUT',{layout:draft,expectedContentRevision:1});
+ expect(r.status).toBe(200);
+});

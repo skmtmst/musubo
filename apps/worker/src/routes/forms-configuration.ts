@@ -584,7 +584,7 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
     if (c.get('impersonation')) {
       const previous = await getFormById(c.env.DB, id);
       if (!previous) return fail(c, 404, 'FORM_NOT_FOUND');
-      const routes = (value: ReturnType<typeof parseLayout>) => collectInputs(value).filter(block => block.type === 'booking').map(block => ({id:block.id,routing:block.booking?.routing ?? null}));
+      const routes = (value: ReturnType<typeof parseLayout>) => collectInputs(value).filter(block => block.type === 'booking' && block.booking?.routing != null).map(block => ({id:block.id,routing:block.booking?.routing}));
       if (JSON.stringify(routes(parseLayout(previous.layout, previous.fields))) !== JSON.stringify(routes(JSON.parse(normalized.layout))))
         return c.json({success:false,error:'代理ログイン中は行き先を変更できません'},403);
     }
