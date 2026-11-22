@@ -461,6 +461,16 @@ describe('課金 Webhook', () => {
     expect(tenantRow()).toMatchObject({stripe_customer_id:'cus_1'});
   });
 
+  it('通知に顧客IDと契約IDが無ければ過去鍵の欠落で止めない', async () => {
+    testDb.raw.exec("INSERT INTO tenants(id,name) VALUES ('retired-tenant','Retired')");
+    const secret='old-purge-key';
+    const digest=(await hashPurgedPaymentIdentifier(secret,'customer','cus_old'))!;
+    const keyVersion=(await purgedPaymentIdentifierKeyVersion(secret))!;
+    await storePurgedPaymentIdentifierHash(testDb.db,{tenantId:'retired-tenant',kind:'customer',digest,keyVersion,now:'2026-01-01T00:00:00Z',expiresAt:'2040-01-01T00:00:00Z'});
+    const event={id:'evt_no_customer',type:'fixture.ignored',data:{object:{id:'obj_1'}}};
+    expect((await webhook(event,{env:{PURGED_PAYMENT_HMAC_PREVIOUS_SECRETS:'{invalid'}})).status).toBe(200);
+  });
+
   it('旧鍵がない場合は課金通知を適用せず安全監視へ出す', async () => {
     setTenant({plan_status:'active',stripe_customer_id:'cus_new'});
     const secret='test-purge-hmac';
