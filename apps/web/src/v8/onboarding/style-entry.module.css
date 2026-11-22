@@ -1,6 +1,7 @@
 /* 設定 › アカウントのスタイルの行。 */
 .row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--polish-space-field);
   padding: var(--polish-space-card);
@@ -12,7 +13,7 @@
 .text {
   display: flex;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 var(--tpl-sa-search-w);
   flex-direction: column;
 }
 

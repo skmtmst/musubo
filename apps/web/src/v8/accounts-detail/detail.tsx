@@ -207,6 +207,7 @@ export default function AccountDetailV8() {
 
   const parent = account.parentLineAccountId ? all.find((a) => a.id === account.parentLineAccountId) ?? null : null
   const state = stateBadge(account)
+  const tokenUpdatedAt = shortDateTime(account.channelAccessTokenUpdatedAt)
   const use = webhookUse(account)
   const match = webhookMatch(account)
   const blocked = archiveBlockedReason(account)
@@ -276,8 +277,8 @@ export default function AccountDetailV8() {
             </Card>
 
             <SendersCard accountId={account.id} accountName={account.name} />
-            <Card variant="form" aria-labelledby="acd-credentials">
-              <CardHeader size="stacked" headingLevel={3} titleId="acd-credentials" title="資格情報" meta="秘密値そのものは表示しません。差し替えるときは、新しい値を入れて保存し直します。" />
+            <Card variant="form" className={styles.credentialCard} aria-labelledby="acd-credentials">
+              <CardHeader size="stacked" headingLevel={3} titleId="acd-credentials" title="資格情報" meta="チャネルアクセストークンはmusuboが自動更新します。" />
               <Row label="チャネルシークレット">
                 <ActionValue
                   value={credentialLine({ configured: account.channelSecretConfigured, last4: account.channelSecretLast4, updatedAt: null, checkedAt: account.connection?.lastTestAt ?? null })}
@@ -293,9 +294,10 @@ export default function AccountDetailV8() {
               <div className={styles.wide}>
                 <span className={styles.wideLabel}>チャネルアクセストークン</span>
                 <span className={styles.wideValue}>
-                  {credentialLine({ configured: account.channelAccessTokenConfigured, last4: account.channelAccessTokenLast4, updatedAt: account.channelAccessTokenUpdatedAt })}
+                  {account.channelAccessTokenConfigured
+                    ? tokenUpdatedAt ? `自動更新・最終更新 ${tokenUpdatedAt}` : '自動更新'
+                    : '未登録'}
                 </span>
-                {canManage ? <Button type="button" onClick={() => setCredentials('messaging')}>差し替える</Button> : <Button type="button" lockedReason={manageLockReason} disabled={!manageLockReason}>差し替える</Button>}
               </div>
               <Row label="Webhookの利用" id="acd-webhook">
                 <span className={styles.inline}>

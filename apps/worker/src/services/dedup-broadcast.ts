@@ -233,6 +233,7 @@ export async function processMultiAccountDedupBroadcast(
     aggregation_unit?: string | null;
     /** 送信の試行番号。失敗分の再送で進む。台帳と provider の再送キーに使う。 */
     send_attempt_no?: number | null;
+    lock_version?: number | null;
     common_var_snapshot?: string | null;
   },
   lineClientFactory: (token: string) => LineClient = (t) => new LineClient(t),
@@ -270,8 +271,8 @@ export async function processMultiAccountDedupBroadcast(
   if (!progress.audience) {
     // 当選した友だちと正規IDを、最初の外部送信より先に固定する。
     progress.audience = preview;
-    await db.prepare('UPDATE broadcasts SET dedup_progress=? WHERE id=?')
-      .bind(JSON.stringify(progress),broadcast.id).run();
+    await db.prepare('UPDATE broadcasts SET dedup_progress=? WHERE id=? AND send_attempt_no=? AND (? IS NULL OR lock_version=?)')
+      .bind(JSON.stringify(progress),broadcast.id,Number(broadcast.send_attempt_no ?? 1),broadcast.lock_version ?? null,broadcast.lock_version ?? null).run();
   }
 
   const sentSet = new Set(progress.sentIdentKeys);
@@ -284,6 +285,13 @@ export async function processMultiAccountDedupBroadcast(
    * 違うので、両方を見る。
    */
   const blocked = await getBlockedRecipientIds(db, broadcast.id);
+  // 送り直せない失敗や、すでに送信を始めた相手も次の束から除く。
+  // それらを束に含めると原子的な送信直前の照合が束全体を止めてしまう。
+  const ineligible = await db.prepare(`SELECT friend_id FROM broadcast_send_claims WHERE broadcast_id=?
+    AND ((state='failed' AND COALESCE(error_code,'') NOT IN ('line_http_429','stopped_before_dispatch'))
+      OR (state='claimed' AND dispatched_at IS NOT NULL))`)
+    .bind(broadcast.id).all<{friend_id:string}>();
+  for (const row of ineligible.results ?? []) blocked.add(row.friend_id);
   const attemptNo = Number(broadcast.send_attempt_no ?? 1) || 1;
 
   // totalCount は「この broadcast の意図した audience 全体」= 既送 identKey ∪
@@ -410,6 +418,7 @@ export async function processMultiAccountDedupBroadcast(
 
     try {
       for (let i = 0; i < remaining.length; i += deliveryBatchSize) {
+        if (stopRequested) break;
         const batchIdx = Math.floor(i / deliveryBatchSize);
         const candidates = remaining.slice(i, i + deliveryBatchSize);
         const suppressed = await suppressedFriendIds(db,candidates.map(r=>r.friendId));
@@ -467,12 +476,15 @@ export async function processMultiAccountDedupBroadcast(
               // 落ちたときに**まだ試していない相手**を送達不明にしない。
               const pinSnapshot = parseBroadcastCommonVarSnapshot(broadcast.common_var_snapshot);
               if (pinSnapshot) await validateSavedPins(db, broadcast.id, pinSnapshot, commonVarKeysInContent(combinedMessageContent(sourceParts)), new Date().toISOString());
-              await markBroadcastRecipientsDispatched(db, {
+              const marked = await markBroadcastRecipientsDispatched(db, {
+                guardAttempt: true,
+                guardLockVersion: broadcast.lock_version ?? undefined,
                 broadcastId: broadcast.id,
                 attemptNo,
                 lineAccountId: account.id,
                 friendIds: [recipient.friendId],
               });
+              if (!marked.includes(recipient.friendId)) { stopRequested = true; break; }
               dispatchedIds.push(recipient.friendId);
               await client.pushMessage(recipient.lineUserId, recipientMessages, retryKey, [unit]);
               for (const part of renderedParts) {
@@ -496,12 +508,15 @@ export async function processMultiAccountDedupBroadcast(
           );
           const pinSnapshot = parseBroadcastCommonVarSnapshot(broadcast.common_var_snapshot);
           if (pinSnapshot) await validateSavedPins(db, broadcast.id, pinSnapshot, commonVarKeysInContent(combinedMessageContent(sourceParts)), new Date().toISOString());
-          await markBroadcastRecipientsDispatched(db, {
+          const marked = await markBroadcastRecipientsDispatched(db, {
+                guardAttempt: true,
+            guardLockVersion: broadcast.lock_version ?? undefined,
             broadcastId: broadcast.id,
             attemptNo,
             lineAccountId: account.id,
             friendIds: batch.map((r) => r.friendId),
           });
+          if (marked.length !== batch.length) { stopRequested = true; break; }
           dispatchedIds.push(...batch.map((r) => r.friendId));
           try {
             await client.multicast(batch.map((r) => r.lineUserId), batchMessages, [unit], retryKey);
@@ -524,6 +539,8 @@ export async function processMultiAccountDedupBroadcast(
             }
           }
         }
+
+        if (stopRequested && dispatchedIds.length === 0) break;
 
         // multicast 成功直後に identKey を sent set へ追加。
         for (const { recipient: r } of delivered) {
@@ -548,8 +565,9 @@ export async function processMultiAccountDedupBroadcast(
           ),
           // success_count は absolute (`= ?`) で書いて double-counting を防ぐ。
           db.prepare(
-            `UPDATE broadcasts SET dedup_progress = ?, success_count = ? WHERE id = ?`,
-          ).bind(JSON.stringify(progress), progress.sentIdentKeys.length, broadcast.id),
+            `UPDATE broadcasts SET dedup_progress = ?, success_count = MAX(success_count, ?)
+              WHERE id = ? AND send_attempt_no=? AND (? IS NULL OR lock_version=?)`,
+          ).bind(JSON.stringify(progress), progress.sentIdentKeys.length, broadcast.id, attemptNo, broadcast.lock_version ?? null, broadcast.lock_version ?? null),
           // 台帳の決着を**同じ batch** に載せる。分けて流すと、送達の記録だけ
           // 残って台帳が押さえたままの窓ができ、その相手が「届いたのに
           // 送達不明」になる。
@@ -590,14 +608,20 @@ export async function processMultiAccountDedupBroadcast(
     }
   }
 
+  // 古い世代が新しい試行の進捗を上書きしない。
+  const current = await db.prepare("SELECT send_attempt_no FROM broadcasts WHERE id=?").bind(broadcast.id).first<{send_attempt_no:number}>();
+  if (Number(current?.send_attempt_no) !== attemptNo) return {totalCount:allIdentKeys.size,successCount:progress.sentIdentKeys.length,failedAccountIds:[],complete:false,stopped:true};
+
   // failed_account_ids は常に上書きする。前回 stalled run で残った古い失敗リストを
   // resume 後の成功で上書きしないと「全件成功したのに UI が partial-failure 表示」に
   // なる。今回失敗が無ければ NULL に戻して clean state にする。
   await db.prepare(
-    `UPDATE broadcasts SET failed_account_ids = ? WHERE id = ?`,
-  ).bind(failedAccountIds.length > 0 ? JSON.stringify(failedAccountIds) : null, broadcast.id).run();
+    `UPDATE broadcasts SET failed_account_ids = ? WHERE id = ? AND send_attempt_no=? AND (? IS NULL OR lock_version=?)`,
+  ).bind(failedAccountIds.length > 0 ? JSON.stringify(failedAccountIds) : null, broadcast.id, attemptNo, broadcast.lock_version ?? null, broadcast.lock_version ?? null).run();
 
-  const successCount = progress.sentIdentKeys.length;
+  const ledgerCount = await db.prepare("SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id=? AND state='sent'")
+    .bind(broadcast.id).first<{n:number}>();
+  const successCount = Math.max(progress.sentIdentKeys.length, Number(ledgerCount?.n ?? 0));
   const totalCount = allIdentKeys.size;
 
   // aggregation_unit を保存して fetch-insight が LINE Insight API を叩けるようにする。
