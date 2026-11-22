@@ -22,6 +22,7 @@ const ORDER_MARKS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '�
 
 /** 対象が見つからない時に待つ長さ。画面の移り変わりの間に一時停止させないための猶予。 */
 const MISSING_ANCHOR_WAIT_MS = 1500
+const NARROW_GUIDE_WIDTH = 480
 
 export type GuideOverlayProps = {
   /** 案内中だけ出す。一時停止・未開始・完了では何も出さない。 */
@@ -72,11 +73,14 @@ export function GuideOverlay({
   const [inDialog, setInDialog] = useState(false)
   const [actionLabel, setActionLabel] = useState<string | null>(null)
   const [applyingHours, setApplyingHours] = useState(false)
+  const [inputReady, setInputReady] = useState(false)
   const [tableDialog, setTableDialog] = useState<Rect | null>(null)
   const [target, setTarget] = useState<Rect | null>(null)
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null)
   const [balloonHeight, setBalloonHeight] = useState(0)
   const balloonRef = useRef<HTMLDivElement | null>(null)
+  const stackRef = useRef<HTMLDivElement | null>(null)
+  const scrolledTarget = useRef<{ element: Element; anchor: string; narrow: boolean } | null>(null)
 
   const measure = useCallback(() => {
     if (typeof window === 'undefined') return
@@ -86,7 +90,11 @@ export function GuideOverlay({
     const saveControls = Array.from(document.querySelectorAll(
       '[data-sticky-actions], [data-guide-anchor="reception.save"], button[form="rs-table-editor"][type="submit"]',
     ))
-    const reserved = saveControls.map(readRect).filter(box => box.height > 0 && box.top > height - 160 && box.top < height)
+    const narrow = width <= NARROW_GUIDE_WIDTH
+    const reserved = saveControls.map(element =>
+      readRect(narrow ? element.closest('[data-shared-part="sticky-bar"]') ?? element : element),
+    ).filter(box => box.height > 0 && box.top < height &&
+      (narrow ? box.top + box.height >= height - 32 : box.top > height - 160))
     setBottomOffset(Math.max(0, ...reserved.map(box => height - box.top + 8)))
     const selector = `[data-guide-anchor="${anchorName}"]`
     const slotSelector = `[data-guide-slot="${anchorName}"]${width >= 1152 ? ':not([data-guide-narrow])' : ''}`
@@ -95,8 +103,14 @@ export function GuideOverlay({
     const element = anchorName ? (panel ?? document).querySelector(selector) : null
     const dialog = panel ?? element?.closest('[role=dialog]')
     setSlot(nextSlot)
-    setActionLabel(element?.getAttribute('data-guide-action-label') ?? null)
+    const guideLabel = element?.getAttribute('data-guide-action-label')
+    if (anchorName === 'menu.save' && element && !guideLabel) {
+      if (element.getAttribute('aria-busy') !== 'true') setActionLabel(element.textContent?.trim() || null)
+    } else {
+      setActionLabel(guideLabel ?? null)
+    }
     setApplyingHours(element?.hasAttribute('data-guide-hours-apply') ?? false)
+    setInputReady(element?.hasAttribute('data-guide-ready') ?? false)
     setInDialog(Boolean(dialog))
     const tableSave = anchorName === 'tables.form' ? dialog?.querySelector('[data-guide-table-save=ready]') : null
     const tableBox = anchorName === 'tables.form' && dialog ? readRect(dialog) : null
@@ -118,7 +132,7 @@ export function GuideOverlay({
       frame = window.requestAnimationFrame(() => { frame = 0; measure() })
     }
     const observer = new MutationObserver(scheduleMeasure)
-    observer.observe(document.body, { childList: true, subtree: true, attributeFilter: ['data-guide-table-save'] })
+    observer.observe(document.body, { childList: true, subtree: true, attributeFilter: ['data-guide-table-save', 'data-guide-ready'] })
     window.addEventListener('scroll', scheduleMeasure, true)
     window.addEventListener('resize', scheduleMeasure)
     return () => {
@@ -129,13 +143,46 @@ export function GuideOverlay({
     }
   }, [active, procedure, onTargetScreen, measure])
 
-  /* 対象が画面外なら自動スクロール（枠14 izsr5）。 */
+  const fixedNarrowGuide = active && showOverlay && Boolean(stepKey) && !slot &&
+    viewport !== null && viewport.width <= NARROW_GUIDE_WIDTH
+
+  // 下部ガイドの分だけスクロールできる余白を持たせ、最後の入力や操作も手前に出せるようにする。
+  useLayoutEffect(() => {
+    const stack = stackRef.current
+    const main = document.getElementById('main-content')
+    if (!fixedNarrowGuide || !stack || !main || !viewport) return
+    const reserveSpace = () => {
+      const inset = Math.max(0, viewport.height - stack.getBoundingClientRect().top)
+      main.style.setProperty('--guide-scroll-clearance', `${Math.ceil(inset)}px`)
+    }
+    main.setAttribute('data-guide-scroll-reserved', '')
+    reserveSpace()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reserveSpace)
+    observer?.observe(stack)
+    return () => {
+      observer?.disconnect()
+      main.removeAttribute('data-guide-scroll-reserved')
+      main.style.removeProperty('--guide-scroll-clearance')
+    }
+  }, [fixedNarrowGuide, viewport, bottomOffset])
+
+  // 対象を初めに表示する。あとから写真や別の欄へスクロールしたときは引き戻さない。
   useEffect(() => {
-    if (!active || !anchorName || !target || !viewport || slot) return
-    if (!isOffScreen(target, viewport)) return
-    document.querySelector(`[data-guide-anchor="${anchorName}"]`)
-      ?.scrollIntoView({ block: 'center', behavior: scrollMotion() })
-  }, [active, anchorName, target, viewport, slot])
+    if (!active || !showOverlay || !anchorName || !target || !viewport || slot) {
+      scrolledTarget.current = null
+      return
+    }
+    const element = document.querySelector(`[data-guide-anchor="${anchorName}"]`)
+    if (!element) return
+    const previous = scrolledTarget.current
+    if (previous?.element === element && previous.anchor === anchorName && previous.narrow === fixedNarrowGuide) return
+    const stack = stackRef.current
+    const overlap = fixedNarrowGuide && stack !== null && target.top + target.height > stack.getBoundingClientRect().top
+    scrolledTarget.current = { element, anchor: anchorName, narrow: fixedNarrowGuide }
+    if (overlap || isOffScreen(target, viewport)) {
+      element.scrollIntoView({ block: 'center', inline: 'nearest', behavior: scrollMotion() })
+    }
+  }, [active, showOverlay, anchorName, target, viewport, slot, fixedNarrowGuide])
 
   /*
     ガイド対象外の画面へ移動したら自動で一時停止（枠14 izsr5）。
@@ -235,7 +282,7 @@ export function GuideOverlay({
         />
       ) : null}
 
-      <div className={styles.stack}>
+      <div ref={stackRef} className={styles.stack}>
         {procedure ? <div
           ref={balloonRef}
           className={styles.balloon}
@@ -250,7 +297,8 @@ export function GuideOverlay({
           </div>
           <p className={styles.body}>{tablesComplete ? procedure.body
             : stepKey === 'attributes' && safeIndex === 3 ? '受付中の卓を1件以上用意してください。追加を見送る場合は、この手順をスキップできます。'
-            : inlineGuide && anchorName === 'menu.save' ? `内容を確認して「${actionLabel ?? '公開して追加する'}」を押します。`
+            : anchorName === 'menu.save' && actionLabel && inDialog ? `内容を確認して「${actionLabel}」を押します。`
+            : anchorName === 'menu.save' && actionLabel && actionLabel !== '保存して追加する' ? `「保存する状態」で「公開」を選び、「${actionLabel}」を押します。確認画面で内容を確かめて公開します。`
             : inlineGuide && anchorName === 'followup.save' ? '使わない場合は「今は使わない」を押します。'
             : inlineGuide && anchorName === 'hours.confirm' && inDialog ? '営業時間を見直して「変更内容を確認」を押します。'
             : (anchorName === 'reception.lineSeats' || anchorName === 'reception.save') && actionLabel === 'この日の枠を作る' ? '選んだ日にはまだ予約枠がありません。「この日の枠を作る」を押してください。休みの日は営業日を選んでください。'
@@ -258,6 +306,7 @@ export function GuideOverlay({
             : procedure.body}</p>
           <div className={styles.balloonFooter}>
             <Button presentation="quiet-text" onClick={onAdvanceProcedure}>この手順をスキップ</Button>
+            {procedure.trigger === 'confirm-input' ? <Button variant="primary" size="compact" disabled={!inputReady} onClick={onAdvanceProcedure}>次へ</Button> : null}
           </div>
         </div> : null}
         {tablesComplete ? (
