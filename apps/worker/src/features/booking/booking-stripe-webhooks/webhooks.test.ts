@@ -228,3 +228,21 @@ it('同じCheckoutでもsetupを購入の入金へ読み替えない',async()=>{
   expect(await applyBookingStripeReceipt(f.db,'acct_original','evt_setup',effect)).toBe('review_required');
   expect(f.raw.prepare('SELECT uses FROM effects').get()).toEqual({uses:0});
 });
+
+it('purge started prevents Connect receipt payload and business writes', async()=>{
+  await bind();
+  f.raw.exec("UPDATE tenants SET purge_started_at='2026-10-31' WHERE id='t'");
+  expect(await (await send(event())).json()).toMatchObject({data:{status:'review_required'}});
+  expect(rows()).toHaveLength(0);
+  expect(f.raw.prepare("SELECT review_reason FROM stripe_events WHERE stripe_event_id='evt_paid'").get()).toEqual({review_reason:'purged_tenant'});
+  expect(f.raw.prepare("SELECT state,uses FROM effects WHERE id='month'").get()).toEqual({state:'pending',uses:0});
+});
+
+it('a Connect business write prepared before purge is fenced inside the batch', async()=>{
+  await bind(); await store();
+  await expect(applyBookingStripeReceipt(f.db,'acct_original','evt_paid',async context=>{
+    f.raw.exec("UPDATE tenants SET purge_started_at='2026-10-31' WHERE id='t'");
+    return effect(context);
+  })).rejects.toThrow();
+  expect(f.raw.prepare("SELECT state,uses FROM effects WHERE id='month'").get()).toEqual({state:'pending',uses:0});
+});

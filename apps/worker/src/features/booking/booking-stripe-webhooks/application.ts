@@ -28,7 +28,7 @@ export async function applyBookingStripeReceipt(db: D1Database, account: string,
     || (receipt.input.retentionAccountId !== null && receipt.input.retentionAccountId !== binding.accountId)) return review('stripe_binding_mismatch');
   // 後からの再接続先へ付け替えない。元の店・本人・tenantが残ることもbatchで再検査する。
   const guard = db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM line_accounts a JOIN tenants t ON t.id=a.tenant_id JOIN friends f ON f.line_account_id=a.id
-    WHERE a.id=? AND a.tenant_id=? AND a.is_active=1 AND t.status='active' AND f.id=?) THEN 'true' ELSE 'stripe_binding_scope_mismatch' END)`)
+    WHERE a.id=? AND a.tenant_id=? AND a.is_active=1 AND a.data_purged_at IS NULL AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL AND t.status='active' AND f.id=? AND f.data_purged_at IS NULL) THEN 'true' ELSE 'stripe_binding_scope_mismatch' END)`)
     .bind(binding.accountId,binding.tenantId,binding.friendId);
   const claimed = await claimWorkflowStep(db,ref,options);
   if (!claimed?.lease_owner) return 'processing';

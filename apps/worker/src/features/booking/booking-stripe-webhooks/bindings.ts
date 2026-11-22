@@ -17,7 +17,7 @@ export function prepareBookingStripeBinding(db: D1Database, binding: BookingStri
   const scope = bindingScope(binding.connectAccount), input = workflowJson(canonical), now = Date.now();
   return [db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM line_accounts a JOIN tenants t ON t.id=a.tenant_id
     JOIN friends f ON f.line_account_id=a.id JOIN booking_payment_connections c ON c.line_account_id=a.id
-    WHERE a.id=? AND a.tenant_id=? AND a.is_active=1 AND t.status='active' AND f.id=?
+    WHERE a.id=? AND a.tenant_id=? AND a.is_active=1 AND a.data_purged_at IS NULL AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL AND t.status='active' AND f.id=? AND f.data_purged_at IS NULL
     AND c.provider_account_id=? AND c.test_mode=1 AND c.disconnected_at IS NULL) THEN 'true' ELSE 'stripe_binding_scope_mismatch' END)`)
     .bind(binding.accountId,binding.tenantId,binding.friendId,binding.connectAccount),
     db.prepare(`INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,status,retry_key,input_json,created_at,updated_at)
