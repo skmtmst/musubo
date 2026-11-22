@@ -1120,6 +1120,14 @@
       "email_change_expires_at": {
         "action": "retain",
         "reason": "金額・日時・状態等を保持"
+      },
+      "is_active": {
+        "action": "zero",
+        "reason": "削除済み担当者の認証を停止"
+      },
+      "permission_keys": {
+        "action": "empty_array",
+        "reason": "削除済み担当者の権限を消去"
       }
     }
   },

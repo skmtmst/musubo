@@ -1642,6 +1642,18 @@
         "notNull": false,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "is_active",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "permission_keys",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"

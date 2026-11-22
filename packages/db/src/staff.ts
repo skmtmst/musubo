@@ -62,6 +62,9 @@ const STAFF_WITH_TENANT_STATUS = `SELECT sm.*,
   FROM staff_members sm
   LEFT JOIN tenants t ON t.id = COALESCE(sm.tenant_id, ?)`;
 
+const visibleStaff = (alias:string) => `NOT EXISTS (SELECT 1 FROM tenants t_hidden WHERE t_hidden.id=${alias}.tenant_id AND (t_hidden.purge_started_at IS NOT NULL OR t_hidden.data_purged_at IS NOT NULL))
+  AND NOT EXISTS (SELECT 1 FROM tenant_purge_tombstone_progress p WHERE p.tenant_id=${alias}.tenant_id AND p.table_name='staff_members' AND p.row_id=${alias}.id)`;
+
 function tenantStatusBindings(): [string, string, string] {
   return [DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID];
 }
@@ -130,14 +133,14 @@ export async function getStaffByApiKey(
   apiKey: string,
 ): Promise<StaffMember | null> {
   const staff = await db
-    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.api_key = ? AND sm.is_active = 1
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.api_key = ? AND sm.is_active = 1 AND ${visibleStaff('sm')}
       AND NOT EXISTS(SELECT 1 FROM platform_settings WHERE key='auth.staff_api_key.revoked_at:'||sm.id)`)
     .bind(...tenantStatusBindings(), apiKey)
     .first<StaffMember>();
   if (!staff || staff.tenant_status !== 'active') return null;
   // Guard the metadata write against a concurrent rotation or revocation.
   const used = await db.prepare(`INSERT INTO platform_settings(key,value,updated_by,updated_at)
-    SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM staff_members sm WHERE sm.id=? AND sm.api_key=? AND sm.is_active=1
+    SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM staff_members sm WHERE sm.id=? AND sm.api_key=? AND sm.is_active=1 AND ${visibleStaff('sm')}
       AND NOT EXISTS(SELECT 1 FROM platform_settings WHERE key='auth.staff_api_key.revoked_at:'||sm.id))
     ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at RETURNING key`)
     .bind(`auth.staff_api_key.last_used_at:${staff.id}`, new Date().toISOString(), staff.id, jstNow(), staff.id, apiKey).first();
@@ -149,7 +152,7 @@ export async function getStaffByLineUserId(
   lineUserId: string,
 ): Promise<StaffMember | null> {
   return db
-    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.line_user_id = ? AND sm.is_active = 1`)
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.line_user_id = ? AND sm.is_active = 1 AND ${visibleStaff('sm')}`)
     .bind(...tenantStatusBindings(), lineUserId)
     .first<StaffMember>();
 }
@@ -166,14 +169,14 @@ export async function getStaffByLineUserIdIncludingInactive(
   lineUserId: string,
 ): Promise<StaffMember | null> {
   return db
-    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.line_user_id = ?`)
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.line_user_id = ? AND ${visibleStaff('sm')}`)
     .bind(...tenantStatusBindings(), lineUserId)
     .first<StaffMember>();
 }
 
 export async function getStaffMembers(db: D1Database, tenantId: string): Promise<StaffMember[]> {
   const result = await db
-    .prepare('SELECT * FROM staff_members WHERE COALESCE(tenant_id, ?) = ? ORDER BY created_at ASC')
+    .prepare(`SELECT sm.* FROM staff_members sm WHERE COALESCE(sm.tenant_id, ?) = ? AND ${visibleStaff('sm')} ORDER BY sm.created_at ASC`)
     .bind(DEFAULT_TENANT_ID, tenantId)
     .all<StaffMember>();
   return result.results;
@@ -184,7 +187,7 @@ export async function getStaffById(
   id: string,
 ): Promise<StaffMember | null> {
   return db
-    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.id = ?`)
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.id = ? AND ${visibleStaff('sm')}`)
     .bind(...tenantStatusBindings(), id)
     .first<StaffMember>();
 }
@@ -207,7 +210,7 @@ export async function getStaffNameMap(
   if (unique.length === 0) return names;
   const placeholders = sqlIdSet(unique).sql;
   const rows = await db
-    .prepare(`SELECT id, name FROM staff_members WHERE id IN (${placeholders})`)
+    .prepare(`SELECT sm.id, sm.name FROM staff_members sm WHERE sm.id IN (${placeholders}) AND ${visibleStaff('sm')}`)
     .bind(...(unique.length ? sqlIdSet(unique).binds : []))
     .all<{ id: string; name: string }>();
   for (const row of rows.results ?? []) names.set(row.id, row.name);

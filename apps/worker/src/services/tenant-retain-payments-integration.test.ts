@@ -246,3 +246,17 @@ test('tenant-wide account categories remain hidden and names can be reused after
   expect((await listLineAccountTags(f.db,'t')).map(row=>row.name)).toEqual(['category one']);
   expect(f.raw.pragma('foreign_key_check')).toEqual([]);
 });
+
+test('former staff are disabled and hidden even if the tenant resumes', async () => {
+  const { getStaffById, getStaffByApiKey, getStaffMembers }=await import('@line-crm/db');
+  const f=gapFixture();
+  expect(await getStaffById(f.db,'o')).toBeTruthy();
+  f.raw.exec("UPDATE tenants SET plan_status='canceled',purge_requested_at='2026-01-01' WHERE id='t'");
+  const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
+  expect(result.completed).toBe(1);
+  expect(f.raw.prepare("SELECT is_active,permission_keys FROM staff_members WHERE id='o'").get()).toEqual({is_active:0,permission_keys:'[]'});
+  f.raw.exec("UPDATE tenants SET data_purged_at=NULL,plan_status='active' WHERE id='t'");
+  expect(await getStaffById(f.db,'o')).toBeNull();
+  expect(await getStaffByApiKey(f.db,'owner-key')).toBeNull();
+  expect(await getStaffMembers(f.db,'t')).toEqual([]);
+});

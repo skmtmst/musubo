@@ -32,8 +32,9 @@ describe('ログインユーザーの無効化と監査記録', () => {
     sqlite = new Database(':memory:')
     sqlite.exec(`
       CREATE TABLE tenants (
-        id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'active'
+        id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'active', purge_started_at TEXT, data_purged_at TEXT
       );
+      CREATE TABLE tenant_purge_tombstone_progress (tenant_id TEXT, table_name TEXT, row_id TEXT);
       CREATE TABLE staff_members (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, role TEXT NOT NULL,
         access_level TEXT NOT NULL DEFAULT 'full', api_key TEXT UNIQUE NOT NULL,
