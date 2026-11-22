@@ -453,6 +453,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/booking/admin/payments/export',
   'GET /api/booking/admin/staff/today-counts',
   'POST /api/booking/admin/payments/{id}/send-link',
+  'GET /api/booking/admin/stripe-review',
   'GET /api/booking/admin/payment-events',
   'POST /api/booking/admin/payment-events/{id}/replay',
   'GET /api/events/admin/events/{id}/payment',
