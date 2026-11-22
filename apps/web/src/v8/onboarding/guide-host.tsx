@@ -128,6 +128,7 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
     () => { if (procedure?.anchor !== 'reception.save') advance() },
   )
   useSetupSaveSignal(scripted && armed, first.refresh)
+  useGuideSignal('accounts.connection', armed && Boolean(accountId), first.refresh, accountId ?? undefined)
   useGuideSignal('reception.menuPublished', Boolean(accountId && inPublishReview), advance, accountId ?? undefined)
   const alreadyPublished = first.progress?.richMenuPublished === true
   const skipPublishPrompt = needsPublishReview && !inPublishReview && onTargetScreen && alreadyPublished
@@ -136,9 +137,9 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
   const reviewingTables = guide.stepKey === 'attributes' && guide.procedureIndex === 3
   const reviewingHours = guide.stepKey === 'hours'
   const showComplete = scripted && Boolean(summary?.total && summary.done === summary.total) &&
-    (first.arrived || guide.phase === 'active' || guide.phase === 'paused') && !offerPublishing && !skipPublishPrompt && !reviewingTables && !reviewingHours
+    (first.arrived || guide.phase === 'active' || guide.phase === 'paused') && !offerPublishing && !skipPublishPrompt && !reviewingTables && !reviewingHours && !menuPickerStep
   const showReceive = firstMessageStep && !step.done && guide.phase === 'active' && pathname === '/' && !qrOpen && channelId
-  const showMenuPicker = menuPickerStep && !step.done && guide.phase === 'active' && pathname === '/' &&
+  const showMenuPicker = menuPickerStep && guide.phase === 'active' && pathname === '/' &&
     accountId && style.data?.styleSelected && !style.stale
   const dismissComplete = () => { guide.complete?.(); first.dismissArrived() }
 
@@ -161,7 +162,7 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
         onPause={pause}
       />
       {showMenuPicker && summary && style.data ? <GuideMenuPicker key={accountId} accountId={accountId}
-        version={style.data.version} step={index + 1} total={summary.total} onLater={advance}
+        version={style.data.version} step={index + 1} total={summary.total} onLater={advance} onSaved={advance}
         onCreate={() => { pause(); router.push('/rich-menus/new') }} onReload={style.reload} /> : null}
       {showReceive && summary ? <GuideReceiveFirstMessage key={accountId} channelId={channelId}
         step={index + 1} total={summary.total} watchExpired={first.watchExpired}

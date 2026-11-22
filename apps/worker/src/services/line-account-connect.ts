@@ -205,11 +205,15 @@ export async function prepareLineConnection(input: {
   const liffList = liffListResponse?.ok
     ? await readJson<{ apps?: Array<{ liffId?: string; description?: string }> }>(liffListResponse)
     : null;
-  if (!liffListResponse?.ok || !Array.isArray(liffList?.apps)) {
+  // LINE returns 404 for an empty LIFF app list.
+  const liffApps = liffListResponse?.status === 404 ? [] : liffList?.apps;
+  if (!Array.isArray(liffApps)) {
     return stopped(completed, 4, 'LIFFアプリを確認できませんでした。LINE Loginチャネルの設定を確認してください。', webhookUrl, webhook, { bot: profile });
   }
-  if(input.liffId && !liffList.apps.some(app=>app.liffId===input.liffId)) return stopped(completed,4,'指定したLIFFはこのLINE Loginチャネルにありません。LIFF IDを確認してください。',webhookUrl,webhook,{bot:profile});
-  let liffId = input.liffId ?? liffList.apps.find((app) => app.description === 'musubo' && app.liffId)?.liffId;
+  if (input.liffId && !liffApps.some((app) => app.liffId === input.liffId)) {
+    return stopped(completed, 4, '指定したLIFFはこのLINE Loginチャネルにありません。LIFF IDを確認してください。', webhookUrl, webhook, { bot: profile });
+  }
+  let liffId = input.liffId ?? liffApps.find((app) => app.description === 'musubo' && app.liffId)?.liffId;
   const liffView = { type: 'full', url: input.baseUrl.replace(/\/$/, '') } as const;
   if (!liffId) {
     const createLiff = await lineFetch('https://api.line.me/liff/v1/apps', {

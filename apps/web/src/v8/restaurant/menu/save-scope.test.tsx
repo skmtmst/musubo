@@ -96,6 +96,7 @@ it.each(['success', 'failure'])('画面を離れた後の保存の%sで一覧へ
 async function fillNewMenu() {
  fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '試しのコース' } })
  fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '4200' } })
+ fireEvent.change(screen.getByLabelText('所要時間'), { target: { value: '120' } })
 }
 async function choosePublication() {
  fireEvent.click(screen.getByLabelText('保存する状態'))
@@ -196,8 +197,8 @@ it('保存済みの下書きは確認して公開でき、確認を閉じただ�
 it('公開が失敗しても確認と入力を残し、同じ公開をやり直せる', async () => {
  fixture.createMenu.mockRejectedValueOnce(new Error('拒否'))
  render(<MenuEditPage />)
- fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '公開する下書き' } })
- fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '4200' } })
+ await fillNewMenu()
+ fireEvent.change(screen.getByLabelText('メニュー名'), { target: { value: '公開する下書き' } })
  await choosePublication()
  fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
  const dialog = await screen.findByRole('dialog', { name: 'このメニューを公開しますか？' })

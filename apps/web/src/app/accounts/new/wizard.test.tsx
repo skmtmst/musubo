@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { deferred } from '@/test-utils/race'
 import NewLineAccountPage from './page'
 
 /*
@@ -43,6 +44,7 @@ const checked = {
     remainingActions: [],
   },
 }
+const confirmedReceipt = { success: true, data: { status: 'confirmed', receivedAt: '2026-10-20T10:00:02.000+09:00' } }
 
 afterEach(() => { cleanup(); window.localStorage?.clear(); delete document.documentElement.dataset.theme })
 beforeEach(() => {
@@ -51,7 +53,7 @@ beforeEach(() => {
   calls.list.mockResolvedValue({success:true,data:[]}); calls.followerInsight.mockResolvedValue({success:true,data:{total:null}});
   calls.connectCheck.mockResolvedValue(checked)
   calls.connect.mockResolvedValue({ success: true, data: { ...checked.data, id: 'new-account' } })
-  calls.registrationReceipt.mockResolvedValue({ success: true, data: { status: 'confirmed', receivedAt: '2026-10-20T10:00:02.000+09:00' } })
+  calls.registrationReceipt.mockResolvedValue(confirmedReceipt)
   friends.list.mockResolvedValue({ success: true, data: { total: 0 } })
   notices.lineRegistration.mockResolvedValue({ success: true, data: { available: false } })
 })
@@ -114,11 +116,12 @@ async function runCheck() {
 
 /** ③Step1で登録し、③Step2・④を通って⑤まで進む。 */
 async function saveAndFinish() {
+  const confirmation = deferred<typeof confirmedReceipt>()
+  calls.registrationReceipt.mockReturnValueOnce(confirmation.promise)
   fireEvent.click(screen.getByRole('button', { name: '登録する' }))
   const heading = await screen.findByRole('heading', { name: '友だち追加できるか確かめます' })
   expect(document.activeElement).toBe(heading)
-  await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
-  next()
+  await act(async () => confirmation.resolve(confirmedReceipt))
   const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   expect(document.querySelector('[data-step-heading]')?.textContent).toBe('使い方のスタイルを選ぶ')
   await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true))
