@@ -92,6 +92,7 @@ const serverSession = () => null
 
 export function ContentTab(props: Props) {
   const { layout, page, blocks } = props
+  const routingBlocks = useMemo(() => [...layout.header, ...layout.sections.flatMap((section) => section.blocks)], [layout.header, layout.sections])
   const permissionSession = useSyncExternalStore(subscribeSession, readPermissionSessionSnapshot, serverSession)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [removing, setRemoving] = useState(false)
@@ -144,7 +145,7 @@ export function ContentTab(props: Props) {
         </div>
       </Card>
 
-      {props.onChangeRouting ? <RoutingSection blocks={[...layout.header, ...layout.sections.flatMap((s) => s.blocks)]} refs={props.refs} routing={props.routing} readOnly={props.readOnly || Boolean(permissionSession?.impersonation)} onChange={props.onChangeRouting} onPreview={props.accountId && props.formId ? async (answers) => (await formRoutingApi.preview(props.accountId!, props.formId!, answers, undefined, layout)).data : undefined} /> : null}
+      {props.onChangeRouting ? <RoutingSection blocks={routingBlocks} refs={props.refs} routing={props.routing} readOnly={props.readOnly || Boolean(permissionSession?.impersonation)} onChange={props.onChangeRouting} onPreview={props.accountId && props.formId ? async (answers) => (await formRoutingApi.preview(props.accountId!, props.formId!, answers, undefined, layout)).data : undefined} /> : null}
 
       <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-blocks-title">
         <div className={styles.cardHeadText}>
