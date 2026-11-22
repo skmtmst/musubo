@@ -38,12 +38,13 @@ test('開き直したとき、前の確認コードを出したままにしな�
   expect(screen.queryByLabelText('確認コード 123456')).toBeNull()
 })
 
-test('PenどおりPCのQRと紐づけ理由を示し、友だち追加リンクは置かない', async () => {
+test('PenどおりPCのQRと手順を示し、友だち追加リンクは置かない', async () => {
   net.lineRegistration.mockResolvedValue({ success: true, data: { available: true, accountName: 'musubo契約者様 通知専用', basicId: '@540qlkhn', addFriendUrl: 'https://line.me/R/ti/p/@540qlkhn', linked: false, code: '123456', codeExpiresAt: new Date(Date.now() + 60_000).toISOString() } })
   render(<NoticeLineDialogV8 open onClose={() => undefined} />)
   await waitFor(() => expect(screen.getByAltText('musubo契約者様 通知専用 の友だち追加QRコード')).toBeTruthy())
   expect(screen.getByText('PC画面のQRをスマートフォンのLINEで読み取ります。')).toBeTruthy()
-  expect(screen.getByText(/運営が契約先に必要なお知らせだけを/)).toBeTruthy()
+  expect(screen.getByText('6桁コードをLINEのトークに送信')).toBeTruthy()
+  expect(screen.queryByText(/運営が契約先に必要なお知らせだけを/)).toBeNull()
   expect(screen.queryByRole('link', { name: /友だち追加/ })).toBeNull()
   expect(screen.getByLabelText('確認コード 123456')).toBeTruthy()
 })

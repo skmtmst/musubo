@@ -132,7 +132,6 @@ export default function NoticeLineDialogV8({ open, onClose, quietWhenUnavailable
               ) : null}
             </div>
           </div>
-          <div className={styles.reason}>紐づけると、運営が契約先に必要なお知らせだけを、登録した本人のLINEへ送れます。</div>
           {statusFailed ? <div className={styles.statusError} role="status">連携状況を確認できません。自動で再確認します。</div> : null}
           <p className={styles.caveat}>このLINEは問い合わせを受け付けません。お問い合わせは各店舗アカウントの管理画面にある「お問い合わせ」からお送りください。</p>
         </div>
