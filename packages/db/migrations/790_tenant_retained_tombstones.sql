@@ -69,8 +69,8 @@ DROP TRIGGER trg_common_action_published_version_immutable;
 CREATE TRIGGER trg_common_action_published_version_immutable
 BEFORE UPDATE ON common_action_versions
 WHEN OLD.status = 'published' AND NOT (NEW."id" IS OLD."id" AND NEW."common_action_id" IS OLD."common_action_id" AND NEW."version_number" IS OLD."version_number" AND NEW."status" IS OLD."status" AND NEW."created_by" IS OLD."created_by" AND NEW."created_at" IS OLD."created_at" AND NEW."published_at" IS OLD."published_at" AND NEW."draft_revision" IS OLD."draft_revision" AND json_valid(OLD.action_config) AND json_type(OLD.action_config)='array'
-  AND NEW.action_config=(SELECT json_group_array(json_object('id',CASE WHEN json_type(value,'$.id')='text' THEN json_extract(value,'$.id') ELSE NULL END,
-    'type',CASE WHEN json_type(value,'$.type')='text' THEN json_extract(value,'$.type') ELSE NULL END)) FROM json_each(OLD.action_config))
+  AND NEW.action_config=(SELECT json_group_array(json_object('id',CASE WHEN json_type(value,'$.id')='text' AND length(json_extract(value,'$.id')) BETWEEN 1 AND 80 AND json_extract(value,'$.id') NOT GLOB '*[^A-Za-z0-9_-]*' THEN json_extract(value,'$.id') ELSE NULL END,
+    'type',CASE WHEN json_type(value,'$.type')='text' AND json_extract(value,'$.type') IN ('send_message','set_friend_fields','run_common_action','add_tag','remove_tag','explicit','segment','tag','friend_field','support_mark','scenario','common_var','send_template','reminder','event_booking','notify_staff','start_scenario','same_kind','list','daily','weekly','monthly','manual','purchase') THEN json_extract(value,'$.type') ELSE NULL END)) FROM json_each(OLD.action_config) WHERE type='object')
   AND EXISTS(SELECT 1 FROM common_actions ca JOIN line_accounts a ON a.id=ca.line_account_id JOIN tenants t ON t.id=a.tenant_id
     WHERE ca.id=OLD.common_action_id AND a.data_purged_at IS NOT NULL AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL))
 BEGIN SELECT RAISE(ABORT, 'published common action version is immutable'); END;
