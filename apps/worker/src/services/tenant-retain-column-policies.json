@@ -356,6 +356,10 @@
       "ingest_secret_encrypted": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "status": {
+        "action": "stop",
+        "reason": "旧成果地点を再利用・再集計しない"
       }
     }
   },

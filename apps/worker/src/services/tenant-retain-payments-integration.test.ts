@@ -277,3 +277,20 @@ test('old affiliate codes cannot be used or listed after tenant resumption', asy
   expect(await getAffiliateById(f.db,'affiliate')).toBeNull();
   expect(await getAffiliates(f.db,{tenantId:'t',allowedLineAccountIds:['a']})).toEqual([]);
 });
+
+test('old conversion points are stopped and hidden after tenant resumption', async () => {
+  const { getConversionPointById, getConversionPoints }=await import('@line-crm/db');
+  const f=gapFixture(); f.raw.pragma('foreign_keys=ON');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',purge_requested_at='2026-01-01' WHERE id='t';
+    INSERT INTO conversion_points(id,name,event_type,tenant_id,line_account_id) VALUES('point','fixture','purchase','t','a');
+    INSERT INTO conversion_events(id,conversion_point_id,friend_id,tenant_id,user_id) VALUES('conversion','point','f','t','private-user');`);
+  expect(await getConversionPointById(f.db,'point')).toBeTruthy();
+  const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
+  expect(result.completed).toBe(1);
+  expect(f.raw.prepare("SELECT status FROM conversion_points WHERE id='point'").get()).toEqual({status:'stopped'});
+  expect(f.raw.prepare("SELECT user_id FROM conversion_events WHERE id='conversion'").get()).toEqual({user_id:null});
+  f.raw.exec("UPDATE tenants SET data_purged_at=NULL,plan_status='active' WHERE id='t'");
+  expect(await getConversionPointById(f.db,'point')).toBeNull();
+  expect((await getConversionPoints(f.db)).some(point=>point.id==='point')).toBe(false);
+  expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+});

@@ -520,6 +520,12 @@
         "notNull": false,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "status",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"

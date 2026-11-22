@@ -8,6 +8,8 @@ import {
   recordAttributionDecision,
 } from '../affiliate-attribution.js';
 import { isFriendExcludedByConversion, readConversionExclusion } from '../conversion-exclusions.js';
+
+const liveConversionPoint = `NOT EXISTS (SELECT 1 FROM tenants t_hidden WHERE t_hidden.id=conversion_points.tenant_id AND (t_hidden.purge_started_at IS NOT NULL OR t_hidden.data_purged_at IS NOT NULL)) AND NOT EXISTS (SELECT 1 FROM tenant_purge_tombstone_progress p WHERE p.tenant_id=conversion_points.tenant_id AND p.table_name='conversion_points' AND p.row_id=conversion_points.id)`;
 // =============================================================================
 // Conversion Points & Events — CV Tracking
 // =============================================================================
@@ -95,7 +97,7 @@ export async function getConversionPoints(
         ? 'WHERE line_account_id IS NULL'
         : 'WHERE 1 = 0';
   const statement = db.prepare(
-    `SELECT * FROM conversion_points ${accountWhere} ORDER BY created_at DESC`,
+    `SELECT * FROM (SELECT * FROM conversion_points WHERE ${liveConversionPoint}) conversion_points ${accountWhere} ORDER BY created_at DESC`,
   );
   const result = scope?.allowedLineAccountIds.length
     ? await statement.bind(...(scope.allowedLineAccountIds.length ? sqlIdSet(scope.allowedLineAccountIds).binds : [])).all<ConversionPoint>()
@@ -108,7 +110,7 @@ export async function getConversionPointById(
   id: string,
 ): Promise<ConversionPoint | null> {
   return db
-    .prepare(`SELECT * FROM conversion_points WHERE id = ?`)
+    .prepare(`SELECT * FROM conversion_points WHERE id = ? AND ${liveConversionPoint}`)
     .bind(id)
     .first<ConversionPoint>();
 }
@@ -342,6 +344,7 @@ export async function getUrlReachConversionPoints(
     .prepare(
       `SELECT * FROM conversion_points
         WHERE measure_method = 'url_reach'
+          AND ${liveConversionPoint}
           AND status = 'active'
           AND target_url IS NOT NULL
           AND target_url != ''
