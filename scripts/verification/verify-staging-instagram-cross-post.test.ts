@@ -44,7 +44,7 @@ function legacyPost(overrides: Record<string, unknown> = {}) {
 }
 
 describe('staging Instagram cross-post verification safety', () => {
-  test('targets only the dedicated staging Worker and D1, and rejects production or cron', () => {
+  test('targets only the dedicated staging Worker and D1, and rejects production or delivery cron', () => {
     // 対象の決め方は既に検証済みの共通処理へ委ねる。
     expect(script).toContain("const CONFIG_PATH = 'apps/worker/wrangler.staging.toml'");
     expect(script).toContain('readVerificationTarget(readFileSync(CONFIG_PATH');
@@ -64,7 +64,7 @@ describe('staging Instagram cross-post verification safety', () => {
     )).toThrow('Unexpected staging Worker URL');
     expect(() => readVerificationTarget(
       `${stagingConfig}\n[triggers]\ncrons = ["* * * * *"]`,
-    )).toThrow('must not have cron triggers');
+    )).toThrow('may only schedule LINE token renewal');
   });
 
   test('runs only from the staging workflow entry, so no secret is needed on a laptop', () => {
