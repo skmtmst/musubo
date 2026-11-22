@@ -175,3 +175,22 @@ describe('有料請求の通知', () => {
     } finally { fixture.raw.close(); }
   });
 });
+
+it('blocks purge until an in-flight scheduled billing email completes', async () => {
+  const { claimTenantPurge }=await import('./tenant-purge-tombstones.js');
+  const fixture=createTestD1(); const tenantId=DEFAULT_TENANT_ID;
+  fixture.raw.prepare("UPDATE tenants SET contact_email='owner@example.test',plan_status='past_due',stripe_subscription_id='sub_guard' WHERE id=?").run(tenantId);
+  fixture.raw.prepare(`INSERT INTO billing_invoices(id,tenant_id,subscription_id,status,amount_due,amount_paid,currency,synced_at,created_at)
+    VALUES('in_guard',?,'sub_guard','open',5900,0,'jpy','2026-11-09T03:00:00Z','2026-11-09T03:00:00Z')`).run(tenantId);
+  fixture.raw.prepare("INSERT INTO billing_events(id,type,tenant_id,summary) VALUES('evt_guard','invoice.payment_failed',?,?)")
+    .run(tenantId,JSON.stringify({state:'completed',created:failedAt,subjectId:'in_guard'}));
+  let finish!:()=>void;
+  mail.send.mockImplementationOnce(()=>new Promise<void>(resolve=>{finish=resolve;}));
+  const env={DB:fixture.db,ADMIN_PUBLIC_URL:'https://admin.example.test'} as Env['Bindings'];
+  const sending=deliverCurrentBillingFailureNotice(env,tenantId,new Date('2026-11-09T04:00:00Z'));
+  await vi.waitFor(()=>expect(finish).toBeTypeOf('function'));
+  fixture.raw.prepare("UPDATE tenants SET plan_status='canceled',purge_requested_at='2025-01-01' WHERE id=?").run(tenantId);
+  expect(await claimTenantPurge(fixture.db,tenantId,new Date().toISOString())).toBe(false);
+  finish(); await sending;
+  expect(await claimTenantPurge(fixture.db,tenantId,new Date().toISOString())).toBe(true);
+});
