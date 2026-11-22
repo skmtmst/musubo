@@ -95,6 +95,8 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
   const conditions = conditionsFor(target);
   const params = target.kind === 'friend_data' ? [target.id, target.lineUserId ?? '', target.accountId] : [target.id];
   if (target.kind === 'friend_data') {
+    const columns = (await db.prepare('PRAGMA table_info(rt_reservations)').all<{ name: string }>()).results;
+    if (!columns.some(column => column.name === 'customer_anonymized')) throw new DeletionFailure(409, 'deletion_schema_approval_required');
     const identity = await db.prepare('SELECT 1 FROM friends WHERE id = ? AND line_account_id IS ? AND line_user_id IS ?').bind(target.id, target.accountId, target.lineUserId ?? null).first();
     if (!identity) throw new DeletionFailure(409, 'deletion_identity_conflict');
     const notices = conditions.rt_customer_notice_outbox;
@@ -196,7 +198,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       const first = snapshot.rows[0];
       const candidates = ['id', 'line_user_id', 'line_account_id', 'form_id', 'submission_id',
         ...(snapshot.table === 'line_message_unsends' ? ['source_user_id', 'line_message_account_key'] : []),
-        ...(snapshot.table === 'rt_reservations' ? ['line_uid', 'store_id', 'customer_version', 'updated_at', 'waitlist_entry_id', 'inbound_email_id'] : []),
+        ...(snapshot.table === 'rt_reservations' ? ['line_uid', 'store_id', 'customer_version', 'updated_at', 'waitlist_entry_id', 'inbound_email_id', 'customer_anonymized'] : []),
         ...(snapshot.table === 'rt_customer_notice_outbox' ? ['reservation_id', 'line_uid', 'valid', 'sent_at', 'lease_until', 'lease_token'] : []),
         ...(snapshot.table === 'rt_seat_waitlist' ? ['store_id', 'line_uid', 'status', 'identity_key', 'updated_at', 'notification_claim_until'] : []),
         ...(graph[snapshot.table]?.friendColumns ?? []),
@@ -221,7 +223,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       statements.push(db.prepare(`UPDATE line_message_unsends SET source_user_id = NULL WHERE rowid IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(byTable.get('line_message_unsends')!.rows.map(row => row._delete_rowid))));
       statements.push(db.prepare(`UPDATE rt_customer_notice_outbox SET line_uid = '', message = '', valid = 0, lease_until = NULL, lease_token = NULL WHERE rowid IN (SELECT value FROM json_each(?))`).bind(notices));
       statements.push(db.prepare(`UPDATE rt_seat_waitlist SET customer_name = '削除済みのお客さま', customer_phone = NULL, line_uid = NULL, identity_key = 'deleted:' || id WHERE rowid IN (SELECT value FROM json_each(?))`).bind(waitlist));
-      statements.push(db.prepare(`UPDATE rt_reservations SET customer_name = '削除済みのお客さま', customer_phone = NULL, line_uid = NULL, allergy_note = NULL, note = NULL, cancel_reason = NULL,
+      statements.push(db.prepare(`UPDATE rt_reservations SET customer_anonymized = 1, customer_name = '削除済みのお客さま', customer_phone = NULL, line_uid = NULL, allergy_note = NULL, note = NULL, cancel_reason = NULL,
         dining_snapshot_json = CASE WHEN dining_snapshot_json IS NULL THEN NULL ELSE json_object('courseId',json_extract(dining_snapshot_json,'$.courseId'),'courseAllergens',json_extract(dining_snapshot_json,'$.courseAllergens')) END
         WHERE rowid IN (SELECT value FROM json_each(?))`).bind(reservations));
       const generatedEvents = `SELECT e.id FROM json_each(?) j JOIN rt_reservations r ON r.rowid=json_extract(j.value,'$.rowid') AND r.customer_version=json_extract(j.value,'$.version')+1 JOIN rt_reservation_events e ON e.reservation_id=r.id AND e.reservation_version=r.customer_version AND e.event_type='restaurant.reservation.changed'`;

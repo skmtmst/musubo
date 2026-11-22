@@ -43,6 +43,11 @@ function columnsOf(table: string): Set<string> {
 }
 
 describe('保存期限の分類表', () => {
+  it('匿名化の印を含む飲食予約は統括の消去対象', () => {
+    expect(columnsOf('rt_reservations').has('customer_anonymized')).toBe(true);
+    expect(RETENTION_TABLES.rt_reservations).toMatchObject({ category: 'purge', scope: { by: 'parent', parent: 'rt_stores' } });
+  });
+
   it('店舗の統括管理者の所属は担当者への依存が深くなっても先に消す', () => {
     const original = RETENTION_TABLES.staff_members;
     RETENTION_TABLES.test_retention_parent = { category: 'purge', scope: { by: 'tenant', column: 'tenant_id' } };
