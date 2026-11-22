@@ -188,6 +188,7 @@ export const BASELINE_DOCUMENTED = new Set<string>([
   "POST /api/booking/admin/calendar-sync/retry",
   "POST /api/booking/admin/charges/{id}/refund",
   "POST /api/booking/admin/charges/{id}/waive",
+  "POST /api/booking/admin/meeting-credentials/rotate",
   "POST /api/booking/admin/series",
   "POST /api/booking/admin/series/preview",
   "POST /api/booking/admin/series/{id}/cancel",

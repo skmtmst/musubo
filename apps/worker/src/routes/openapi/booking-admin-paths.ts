@@ -1,5 +1,17 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const bookingAdminPaths = {
+  '/api/booking/admin/meeting-credentials/rotate': {
+    post: {
+      tags: ['Booking'], summary: '会議接続の鍵の移行を点検・実行する',
+      description: 'オーナーのみ。対象アカウント内を ID 順に処理する。既定は変更しない点検で、dryRun=false のときだけ再暗号化する。',
+      parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { dryRun: { type: 'boolean', default: true }, afterId: { type: 'string', maxLength: 128 }, limit: { type: 'integer', minimum: 1, maximum: 100, default: 50 } } } } } },
+      responses: {
+        '200': { description: '点検・移行の結果と次の開始 ID', content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean' }, data: { type: 'object', properties: { scanned: { type: 'integer' }, needsRotation: { type: 'integer' }, rotated: { type: 'integer' }, busy: { type: 'integer' }, unreadable: { type: 'integer' }, configurationErrors: { type: 'integer' }, changed: { type: 'integer' }, nextId: { type: ['string', 'null'] } } } } } } } },
+        '400': { description: '入力が不正' }, '403': { description: 'オーナー権限がない' }, '409': { description: '鍵の移行を実行できない設定' }, '503': { description: '鍵の設定を確認できない' },
+      },
+    },
+  },
   // ── Booking detail edit / retry / audit  ─────────────
   '/api/booking/admin/bookings.csv': {
     get: {
