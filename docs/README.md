@@ -440,6 +440,7 @@
 - [cleanup-q01w1-1019.md](qa/cleanup-q01w1-1019.md)
 - [cleanup-q01w4-1019.md](qa/cleanup-q01w4-1019.md)
 - [README.md](../packages/db/README.md)
+- [順番待ちのマイグレーション（新しいコードを配り終えてから当てる分）](../packages/db/migrations-pending/README.md)
 
 ## セキュリティ
 
