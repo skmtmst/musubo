@@ -45,7 +45,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
   const [preview, setPreview] = useState<{ matchedIndex: number; target: RoutingTarget; fellBack: boolean } | null>(null)
   const [previewError, setPreviewError] = useState('')
   const previewSequence = useRef(0)
-  useEffect(() => { previewSequence.current++; setPreview(null); setPreviewError(''); return () => { previewSequence.current++ } }, [routing, blocks])
+  useEffect(() => { const sequence = previewSequence; sequence.current++; setPreview(null); setPreviewError(''); return () => { sequence.current++ } }, [routing, blocks])
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [pickedQuestion, setPickedQuestion] = useState<string | null>(null)
   const questionId = pickedQuestion ?? value.rules[0]?.conditions[0]?.questionId ?? questions[0]?.id ?? ''
