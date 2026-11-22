@@ -106,7 +106,7 @@ async function stripeCustomerForTenant(c: Context<Env>, billing: TenantBilling):
   const staff = c.get('staff');
   const member = staff?.id ? await getStaffById(c.env.DB, staff.id).catch(() => null) : null;
   const customer = await stripeApi.createCustomer(c.env, {
-    name: billing.name, email: member?.email ?? null, tenantId: billing.id,
+    name: billing.name, email: member?.email ?? null, tenantId: billing.id, billingEpoch: billing.billing_epoch,
   });
   const claim = prepareTenantBillingUpdate(c.env.DB, billing.id, { stripe_customer_id: customer.id },
     { sql: 'stripe_customer_id IS NULL', values: [] });
@@ -393,7 +393,7 @@ hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inpu
     const cardReturn = body?.resumption === true ? `${origin}/hq/billing/resume/card`
       : `${origin}/hq/onboarding/card`;
     const session = await stripeApi.createCardSetupSession(c.env, {
-      customerId, tenantId,
+      customerId, tenantId, billingEpoch: billing.billing_epoch,
       successUrl: `${cardReturn}?setup=success&session_id={CHECKOUT_SESSION_ID}${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
       cancelUrl: `${cardReturn}?setup=cancel${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
       logoUrl: `${origin}/brand/musubo-color.png`,

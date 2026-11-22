@@ -125,12 +125,12 @@ export async function reconcileMusuboLineResumption(env: WorkerBindings, tenantI
   const optionsDeferred = futureEpoch(optionsChargeAt, now);
   const core = await ensureMusuboResumptionSubscription(env, {
     customerId: legacy.stripe_customer_id, tenantId, productId: env.STRIPE_PRODUCT_MUSUBO_CORE,
-    purpose: 'core', interval: billing.billing_interval, unitAmountYen: coreYen, generation,
+    purpose: 'core', interval: billing.billing_interval, unitAmountYen: coreYen, generation, billingEpoch:legacy.billing_epoch,
     chargeAtEpoch: coreDeferred,
   });
   const options = await ensureMusuboResumptionSubscription(env, {
     customerId: legacy.stripe_customer_id, tenantId, productId: env.STRIPE_PRODUCT_MUSUBO_OPTIONS,
-    purpose: 'options', interval: 'month', unitAmountYen: optionsYen, generation,
+    purpose: 'options', interval: 'month', unitAmountYen: optionsYen, generation, billingEpoch:legacy.billing_epoch,
     chargeAtEpoch: optionsDeferred,
   });
   const activatedAt = now.toISOString();

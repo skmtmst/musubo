@@ -209,6 +209,7 @@ export interface MusuboSubscriptionInput {
   unitAmountYen: number;
   firstChargeDateJst: string;
   idempotencyKey: string;
+  billingEpoch?: number;
 }
 
 function validMusuboSubscription(input: MusuboSubscriptionInput): void {
@@ -270,7 +271,7 @@ export const stripeApi = {
   /** An addition invoice owns its only line item; unrelated pending items are excluded. */
   createMusuboAdditionInvoice: (
     env: StripeEnv,
-    input: { customerId: string; tenantId: string; additionId: string },
+    input: { customerId: string; tenantId: string; additionId: string; billingEpoch?: number },
     fetchImpl?: typeof fetch,
   ) => stripeRequest<StripeInvoice>(env, 'POST', '/v1/invoices', {
     customer: input.customerId,
@@ -278,7 +279,7 @@ export const stripeApi = {
     auto_advance: false,
     pending_invoice_items_behavior: 'exclude',
     currency: 'jpy',
-    metadata: { tenant_id: input.tenantId, purpose: 'musubo_addition', addition_id: input.additionId },
+    metadata: { tenant_id: input.tenantId, purpose: 'musubo_addition', addition_id: input.additionId, ...(input.billingEpoch ? {billing_epoch:String(input.billingEpoch)} : {}) },
   }, { fetchImpl, idempotencyKey: `musubo-addition-invoice-${input.additionId}` }),
 
   createMusuboAdditionInvoiceItem: (
@@ -338,7 +339,7 @@ export const stripeApi = {
         currency: 'jpy', product: input.productId, unit_amount: input.unitAmountYen,
         tax_behavior: 'inclusive', recurring: { interval: input.interval },
       }, quantity: 1 }],
-      metadata: { tenant_id: input.tenantId, purpose: `musubo_${input.purpose}` },
+      metadata: { tenant_id: input.tenantId, purpose: `musubo_${input.purpose}`, ...(input.billingEpoch ? {billing_epoch:String(input.billingEpoch)} : {}) },
     }, { fetchImpl, idempotencyKey: input.idempotencyKey });
   },
 
@@ -346,7 +347,7 @@ export const stripeApi = {
   createMusuboResumptionSubscription: (env: StripeEnv, input: {
     customerId: string; tenantId: string; productId: string; purpose: 'core' | 'options';
     interval: 'month' | 'year'; unitAmountYen: number; generation: number;
-    chargeAtEpoch?: number; idempotencyKey: string;
+    chargeAtEpoch?: number; idempotencyKey: string; billingEpoch?: number;
   }, fetchImpl?: typeof fetch) => {
     if (!/^cus_[A-Za-z0-9]+$/.test(input.customerId)
       || !/^prod_[A-Za-z0-9]+$/.test(input.productId) || !input.tenantId.trim()
@@ -367,7 +368,7 @@ export const stripeApi = {
         unit_amount: input.unitAmountYen, tax_behavior: 'inclusive',
         recurring: { interval: input.interval } }, quantity: 1 }],
       metadata: { tenant_id: input.tenantId, purpose: `musubo_${input.purpose}`,
-        resumption_generation: String(input.generation) },
+        resumption_generation: String(input.generation), ...(input.billingEpoch ? {billing_epoch:String(input.billingEpoch)} : {}) },
     }, { fetchImpl, idempotencyKey: input.idempotencyKey });
   },
 
@@ -384,12 +385,12 @@ export const stripeApi = {
     },
   }, { fetchImpl }),
 
-  createCustomer: (env: StripeEnv, input: { name: string; email: string | null; tenantId: string }, fetchImpl?: typeof fetch) =>
+  createCustomer: (env: StripeEnv, input: { name: string; email: string | null; tenantId: string; billingEpoch?: number }, fetchImpl?: typeof fetch) =>
     stripeRequest<StripeCustomer>(env, 'POST', '/v1/customers', {
       name: input.name,
       email: input.email,
-      metadata: { tenant_id: input.tenantId },
-    }, { fetchImpl, idempotencyKey: `customer-${input.tenantId}` }),
+      metadata: { tenant_id: input.tenantId, ...(input.billingEpoch ? {billing_epoch:String(input.billingEpoch)} : {}) },
+    }, { fetchImpl, idempotencyKey: `customer-${input.tenantId}${input.billingEpoch ? `-${input.billingEpoch}` : ''}` }),
 
   createCheckoutSession: (
     env: StripeEnv,
@@ -412,7 +413,7 @@ export const stripeApi = {
   /** Card collection without a charge or a subscription. The webhook must verify the SetupIntent. */
   createCardSetupSession: (
     env: StripeEnv,
-    input: { customerId: string; tenantId: string; successUrl: string; cancelUrl: string; logoUrl: string },
+    input: { customerId: string; tenantId: string; successUrl: string; cancelUrl: string; logoUrl: string; billingEpoch?: number },
     fetchImpl?: typeof fetch,
   ) => stripeRequest<StripeCheckoutSession>(env, 'POST', '/v1/checkout/sessions', {
     mode: 'setup',
@@ -427,7 +428,7 @@ export const stripeApi = {
       display_name: 'musubo',
       logo: { type: 'url', url: input.logoUrl },
     },
-    metadata: { tenant_id: input.tenantId, purpose: 'musubo_card_setup' },
+    metadata: { tenant_id: input.tenantId, purpose: 'musubo_card_setup', ...(input.billingEpoch ? {billing_epoch:String(input.billingEpoch)} : {}) },
   }, { fetchImpl, apiVersion: '2025-10-29.clover' }),
 
   retrieveCheckoutSession: (env: StripeEnv, sessionId: string, fetchImpl?: typeof fetch) =>

@@ -6,6 +6,7 @@ function matchesTerms(subscription: StripeSubscription, input: MusuboSubscriptio
   return subscription.customer === input.customerId
     && subscription.metadata?.tenant_id === input.tenantId
     && subscription.metadata?.purpose === `musubo_${input.purpose}`
+    && Number(subscription.metadata?.billing_epoch ?? 0) === (input.billingEpoch ?? 0)
     && subscription.items?.data?.length === 1
     && price?.product === input.productId
     && price.unit_amount === input.unitAmountYen

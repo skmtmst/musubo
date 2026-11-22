@@ -14,6 +14,18 @@ test('new checkout carries the billing epoch on checkout and subscription', asyn
   expect(form.get('subscription_data[metadata][billing_epoch]')).toBe('2');
 });
 
+test('new Musubo customer, subscriptions, card setup and invoice carry the billing epoch', async () => {
+  const bodies:URLSearchParams[]=[];
+  const fakeFetch:typeof fetch=async (_url,init)=>{bodies.push(new URLSearchParams(String(init?.body)));return new Response('{}',{status:200});};
+  const env={STRIPE_SECRET_KEY:'sk_test_only'}, billingEpoch=2;
+  await stripeApi.createCustomer(env,{tenantId:'t',name:'test',email:null,billingEpoch},fakeFetch);
+  await stripeApi.createCardSetupSession(env,{customerId:'cus_test',tenantId:'t',successUrl:'https://example.test/ok',cancelUrl:'https://example.test/no',logoUrl:'https://example.test/logo',billingEpoch},fakeFetch);
+  await stripeApi.createMusuboAdditionInvoice(env,{customerId:'cus_test',tenantId:'t',additionId:'addition',billingEpoch},fakeFetch);
+  await stripeApi.createMusuboSubscription(env,{customerId:'cus_test',tenantId:'t',productId:'prod_test',purpose:'core',interval:'month',unitAmountYen:1000,firstChargeDateJst:'2099-01-01',idempotencyKey:'test-key',billingEpoch},fakeFetch);
+  await stripeApi.createMusuboResumptionSubscription(env,{customerId:'cus_test',tenantId:'t',productId:'prod_test',purpose:'core',interval:'month',unitAmountYen:1000,generation:1,idempotencyKey:'test-key-2',billingEpoch},fakeFetch);
+  expect(bodies.map(body=>body.get('metadata[billing_epoch]'))).toEqual(['2','2','2','2','2']);
+});
+
 test('expired and unleased billing receipts become review items, active leases are left alone', async () => {
   const f=gapFixture();
   f.raw.exec(`UPDATE tenants SET purge_started_at='2027-05-01' WHERE id='t';
