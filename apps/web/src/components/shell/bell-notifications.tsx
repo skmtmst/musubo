@@ -8,7 +8,7 @@ import type { TopBarNotificationsPopover } from '@/components/shared/top-bar'
 import { notificationDestination, notificationLinkLabel } from '@/v8/notifications/public/destination/index'
 import { loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
 import { formatRelative, formatYmd } from '@/lib/format'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { notifyToast } from '@/components/shared/toast'
 import Notice from '@/components/shared/notice'
@@ -62,7 +62,6 @@ export default function BellNotifications({
   const canMarkReadByRole = role === 'owner' || role === 'admin' || role === 'staff'
   const markAllReadLockedReason = usePermissionLockReason(canMarkReadByRole, 'manager')
   const canMarkRead = canMarkReadByRole && !markAllReadLockedReason
-  const destinationContext = { accountId, canManage: canManageRole(role) }
   const { open, onClose } = popover
   // 上の未読数の更新で親が描き直されても、同じ対象への読込は起こし直さない。
   const accountsKey = JSON.stringify(accounts.map(({ id, label }) => ({ id, label })))
@@ -175,7 +174,7 @@ export default function BellNotifications({
       unread: !item.isRead,
       time: formatRelative(item.createdAt, undefined, '日時不明'),
       period: day === '' ? 'unknown' : day === today ? 'today' : 'earlier',
-      linkLabel: notificationLinkLabel(item, { accountId: item.sourceAccountId, canManage: destinationContext.canManage }),
+      linkLabel: notificationLinkLabel(item, { accountId: item.sourceAccountId }),
     }
   })
   const partialNotice = data && data.failedAccountLabels.length > 0 ? (
@@ -187,7 +186,7 @@ export default function BellNotifications({
     if (!item) return
     markRead(item)
     onClose()
-    const nextContext = { accountId: item.sourceAccountId, canManage: destinationContext.canManage, hqOrigin }
+    const nextContext = { accountId: item.sourceAccountId, hqOrigin }
     const destination = notificationDestination(item, nextContext)
     if (item.sourceAccountId !== accountId) {
       onAccountChange(item.sourceAccountId, () => {

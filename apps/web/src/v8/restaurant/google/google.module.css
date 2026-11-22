@@ -8,8 +8,6 @@
   max-inline-size: var(--tpl-guide-connection-width);
 }
 
-.guideConnection > button { align-self: flex-start; }
-
 .stateBox {
   padding: var(--tpl-rt-state-pad);
   border-radius: var(--tpl-rt-card-radius);

@@ -42,7 +42,7 @@ export function FirstStepsGuideFooter({ guide }: { guide: FirstStepsGuide }) {
   return (
     <div className={styles.guideFooter}>
       <Button size="compact" variant="primary" presentation="step-action" onClick={guide.phase === 'paused' ? guide.resume : guide.start}>続きから進める</Button>
-      <Button size="compact" presentation="step-action" onClick={guide.start}>最初から始める</Button>
+      <Button size="compact" presentation="step-action" onClick={guide.restart ?? guide.start}>最初から始める</Button>
       <FirstStepsGuideNote />
     </div>
   )
