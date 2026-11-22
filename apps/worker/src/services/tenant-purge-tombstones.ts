@@ -178,6 +178,28 @@ export async function tombstoneBroadcast(db: D1Database, tenantId: string, broad
   return Number(result.meta.changes ?? 0) === 1;
 }
 
+/** Shared multi-account broadcasts keep the other tenants' content and lose this tenant's targets. */
+export async function detachSharedBroadcast(db:D1Database, tenantId:string, broadcastId:string):Promise<boolean> {
+  const filtered=(column:string) => `CASE WHEN ${column} IS NULL THEN NULL ELSE
+    (SELECT json_group_array(j.value) FROM json_each(${column}) j
+      WHERE NOT EXISTS(SELECT 1 FROM line_accounts a WHERE a.id=j.value AND a.tenant_id=?)) END`;
+  const update=db.prepare(`UPDATE broadcasts SET account_ids=${filtered('account_ids')},
+    dedup_priority=${filtered('dedup_priority')},failed_account_ids=${filtered('failed_account_ids')},
+    line_account_id=CASE WHEN line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=?) THEN NULL ELSE line_account_id END,
+    lock_version=lock_version+1
+    WHERE id=? AND data_purged_at IS NULL AND target_type='multi-account-dedup' AND json_type(account_ids)='array'
+      AND (dedup_priority IS NULL OR json_type(dedup_priority)='array') AND (failed_account_ids IS NULL OR json_type(failed_account_ids)='array')
+      AND EXISTS(SELECT 1 FROM json_each(account_ids) j JOIN line_accounts a ON a.id=j.value WHERE a.tenant_id IS NOT ?)
+      AND EXISTS(SELECT 1 FROM tenants t WHERE t.id=? AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL)
+      AND (line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=?) OR EXISTS(SELECT 1 FROM json_each(account_ids) j JOIN line_accounts a ON a.id=j.value WHERE a.tenant_id=?))
+      AND NOT EXISTS(SELECT 1 FROM tenant_purge_tombstone_progress p WHERE p.tenant_id=? AND p.table_name='broadcasts' AND p.row_id=broadcasts.id)`)
+    .bind(tenantId,tenantId,tenantId,tenantId,broadcastId,tenantId,tenantId,tenantId,tenantId,tenantId);
+  const mark=db.prepare(`INSERT INTO tenant_purge_tombstone_progress(tenant_id,table_name,row_id)
+    SELECT ?,'broadcasts',? WHERE changes()=1`).bind(tenantId,broadcastId);
+  const results=await db.batch([update,mark]);
+  return Number(results[1].meta.changes ?? 0)===1;
+}
+
 /** 組織参照の履歴を残し、店舗の処理が済んだ組織の識別情報を消す。 */
 export async function tombstoneRestaurantOrganization(db: D1Database, tenantId: string, organizationId: string, now: string): Promise<boolean> {
   const result = await db.prepare(`UPDATE rt_organizations SET

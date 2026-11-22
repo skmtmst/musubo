@@ -102,3 +102,21 @@ describe('retained records survive tenant purge with real foreign keys', () => {
     expect(f.raw.prepare("SELECT id FROM booking_monthly_contracts WHERE id='contract'").get()).toBeTruthy();
   });
 });
+
+test('shared broadcast retains other tenant targets while the purged tenant is detached', async () => {
+  const f=gapFixture(); f.raw.pragma('foreign_keys=ON');
+  f.raw.exec(`${due};
+    INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id,target_type,account_ids,dedup_priority,failed_account_ids)
+      VALUES('shared','shared title','text','shared message','a','multi-account-dedup','["a","b"]','["a","b"]','["a","b"]'),
+            ('foreign','foreign title','text','foreign message','b','multi-account-dedup','["a","b"]',NULL,NULL);
+    INSERT INTO broadcast_approval_events(id,broadcast_id,actor_staff_id,action) VALUES('shared-approval','shared','o','requested');`);
+  const outcome=await processTenantDataPurge({DB:f.db},{now});
+  expect(outcome.completed).toBe(1);
+  expect(f.raw.prepare("SELECT title,line_account_id,account_ids,dedup_priority,failed_account_ids FROM broadcasts WHERE id='shared'").get())
+    .toEqual({title:'shared title',line_account_id:null,account_ids:'["b"]',dedup_priority:'["b"]',failed_account_ids:'["b"]'});
+  expect(f.raw.prepare("SELECT title,line_account_id,account_ids FROM broadcasts WHERE id='foreign'").get())
+    .toEqual({title:'foreign title',line_account_id:'b',account_ids:'["b"]'});
+  expect(f.raw.prepare("SELECT row_id FROM tenant_purge_tombstone_progress WHERE tenant_id='t' AND table_name='broadcasts' AND row_id='shared'").get()).toEqual({row_id:'shared'});
+  expect(f.raw.prepare("SELECT id FROM broadcast_approval_events WHERE id='shared-approval'").get()).toEqual({id:'shared-approval'});
+  expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+});

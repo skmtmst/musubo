@@ -19,7 +19,7 @@ import { discoverRetainedPurgeAncestors, validateTombstonePolicies, type Tombsto
 import { tombstoneRetainedParents } from './tenant-purge-generic.js';
 import candidates from './tenant-retain-column-candidates.json';
 import policies from './tenant-retain-column-policies.json';
-import { claimTenantPurge, deferStaleBillingReceipts, tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan, anonymizeMonthlyContract } from './tenant-purge-tombstones.js';
+import { claimTenantPurge, deferStaleBillingReceipts, tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, detachSharedBroadcast, tombstoneBookingMenu, tombstonePassPlan, anonymizeMonthlyContract } from './tenant-purge-tombstones.js';
 
 
 /**
@@ -291,11 +291,12 @@ async function purgeOneTenant(
     if (table === 'broadcasts' || table === 'menus' || table === 'rt_stores' || table === 'rt_organizations') {
       const condition = table === 'rt_stores'
         ? 'rt_stores.organization_id IN (SELECT id FROM rt_organizations WHERE tenant_id=?)'
+        : table === 'broadcasts' ? `(${tenantScopeCondition(table)} OR (broadcasts.target_type='multi-account-dedup' AND EXISTS (SELECT 1 FROM json_each(broadcasts.account_ids) j JOIN line_accounts a ON a.id=j.value WHERE a.tenant_id=?)))`
         : tenantScopeCondition(table);
       const rows = await env.DB.prepare(`SELECT id FROM ${table} WHERE ${condition} AND data_purged_at IS NULL LIMIT ?`)
-        .bind(tenant.id,remaining).all<{id:string}>();
+        .bind(...(table === 'broadcasts' ? [tenant.id,tenant.id,remaining] : [tenant.id,remaining])).all<{id:string}>();
       for (const row of rows.results) {
-        const ok = table === 'broadcasts' ? await tombstoneBroadcast(env.DB,tenant.id,row.id,now)
+        const ok = table === 'broadcasts' ? await detachSharedBroadcast(env.DB,tenant.id,row.id) || await tombstoneBroadcast(env.DB,tenant.id,row.id,now)
           : table === 'menus' ? await tombstoneBookingMenu(env.DB,tenant.id,row.id,now)
           : table === 'rt_stores' ? await tombstoneRestaurantStore(env.DB,tenant.id,row.id,now)
           : await tombstoneRestaurantOrganization(env.DB,tenant.id,row.id,now);
