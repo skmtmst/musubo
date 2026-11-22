@@ -3,6 +3,7 @@
 import { scrollMotion } from '@/components/shared/overlay-utils'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
+import { prepareRegistrationWelcome } from '@/lib/registration-welcome'
 import type { LineAccount } from '@line-crm/shared'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
@@ -893,7 +894,10 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
         </StepContent>
         {!(currentStep === 3 && sub === 2) && <StickyBar presentation="account-registration" actions={currentStep === 5 ? <>
             {importAttention ? <Button type="button" variant="primary" busy={importRefreshing} busyLabel="確認中…" onClick={() => void refreshImport()}>状態を再確認</Button> : null}
-            <Button href="/hq" variant={importAttention ? 'secondary' : 'primary'}><ArrowLeft size={16} aria-hidden="true" />管理画面へ</Button>
+            <Button href="/hq" variant={importAttention ? 'secondary' : 'primary'} onClick={event => {
+              if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+              if (!importRunning && noticeDialog === 'done') prepareRegistrationWelcome()
+            }}><ArrowLeft size={16} aria-hidden="true" />管理画面へ</Button>
           </> : currentStep === 4 ? <>
             <Button type="button" onClick={() => setStyleDialogOpen(true)} disabled={busy}>スタイルを選ぶ</Button>
             <Button type="button" onClick={() => void finishStyle('skip')} disabled={busy || registrationStyle.version === null} busy={registrationStyle.busy} busyLabel="保存しています…">あとで設定する</Button>

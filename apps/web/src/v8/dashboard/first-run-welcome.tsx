@@ -1,32 +1,47 @@
 'use client'
 
-import { useEffect, type CSSProperties } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useState, type CSSProperties } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import { prefersReducedMotion } from '@/components/shared/overlay-utils'
+import { consumeRegistrationWelcome } from '@/lib/registration-welcome'
 import styles from './first-run-welcome.module.css'
 
-const WELCOME_TIMING = { logo: 900, hold: 3000, fade: 500, reduced: 800 }
+const WELCOME_TIMING = { enter: 1200, hold: 1800, leave: 800 }
+const leaveAt = WELCOME_TIMING.enter + WELCOME_TIMING.hold
 const welcomeMotion = {
-  '--motion-welcome-logo': `${WELCOME_TIMING.logo}ms`,
-  '--motion-welcome-hold': `${WELCOME_TIMING.hold}ms`,
-  '--motion-welcome-fade': `${WELCOME_TIMING.fade}ms`,
+  '--motion-welcome-enter': `${WELCOME_TIMING.enter}ms`,
+  '--motion-welcome-leave-at': `${leaveAt}ms`,
+  '--motion-welcome-leave': `${WELCOME_TIMING.leave}ms`,
 } as CSSProperties
 
-export function FirstRunWelcome({ onDone }: { onDone: () => void }) {
+function FirstRunWelcome({ onDone }: { onDone: () => void }) {
   useEffect(() => {
-    const delay = prefersReducedMotion() ? WELCOME_TIMING.reduced : WELCOME_TIMING.hold + WELCOME_TIMING.fade
+    const delay = prefersReducedMotion() ? WELCOME_TIMING.hold : leaveAt + WELCOME_TIMING.leave
     const id = window.setTimeout(onDone, delay)
     return () => window.clearTimeout(id)
   }, [onDone])
 
-  return <Dialog open title="ようこそ" designNode="pXnsD" designLayout="fullscreen" onCancel={onDone}>
-    <div className={styles.screen} style={welcomeMotion}>
+  return <Dialog open title="ようこそ" designNode="tUZWI" designLayout="fullscreen" onCancel={onDone}>
+    <div className={styles.screen} style={welcomeMotion} data-registration-welcome>
       <div className={styles.content}>
-        <img className={styles.logo} src="/brand/musubo-color.png" alt="musubo" width={3020} height={890} />
-        <img className={styles.writing} src="/onboarding/first-run-welcome.svg" alt="" width={212} height={66} />
+        {/* Pen v06 のロゴと Klee One の字形を静的な画像で配信する。 */}
+        <img className={styles.logo} src="/onboarding/first-run-welcome-logo.png" alt="musubo" width={2522} height={385} />
+        <picture className={styles.writing}>
+          <source media="(max-width: 600px)" srcSet="/onboarding/first-run-welcome-mobile.svg" />
+          <img src="/onboarding/first-run-welcome.svg" alt="" />
+        </picture>
       </div>
-      <div className={styles.skip}><Button variant="text" size="inline" onClick={onDone}>タップでスキップ</Button></div>
+      <div className={styles.skip}><Button variant="text" size="inline" textTone="accent" className={styles.skipButton} onClick={onDone}><span className={styles.skipLabel}>タップでスキップ</span></Button></div>
     </div>
   </Dialog>
+}
+
+export function RegistrationWelcome() {
+  const [open, setOpen] = useState(false)
+  useLayoutEffect(() => {
+    if (consumeRegistrationWelcome()) setOpen(true)
+  }, [])
+  const close = useCallback(() => setOpen(false), [])
+  return open ? <FirstRunWelcome onDone={close} /> : null
 }
