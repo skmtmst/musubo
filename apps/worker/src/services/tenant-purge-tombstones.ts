@@ -1,5 +1,33 @@
 import { retentionCutoff } from '@line-crm/db';
 
+/** 券が参照するメニューの金額・期間を残し、説明と連絡先を消す。 */
+export async function tombstoneBookingMenu(db: D1Database, tenantId: string, menuId: string, now: string): Promise<boolean> {
+  const result = await db.prepare(`UPDATE menus SET name='削除済み', category_label=NULL, description=NULL,
+    is_active=0, deleted_at=COALESCE(deleted_at,?), auto_tag_id=NULL, intake_question=NULL,
+    meeting_location=NULL, fixed_meeting_url=NULL, audience_tag_ids_json='[]', addon_menu_ids_json='[]',
+    image_url=NULL, photo_media_id=NULL, hq_template_id=NULL, hq_template_version_id=NULL,
+    updated_at=?, version=version+1, data_purged_at=?
+    WHERE id=? AND data_purged_at IS NULL AND EXISTS (SELECT 1 FROM line_accounts a JOIN tenants t ON t.id=a.tenant_id
+      WHERE a.id=menus.line_account_id AND a.tenant_id=? AND a.data_purged_at IS NOT NULL AND t.data_purged_at IS NULL
+        AND (t.plan_status='canceled' OR (t.plan_status='trialing' AND t.trial_ends_at IS NOT NULL AND t.trial_ends_at < ?))
+        AND (t.purge_requested_at IS NOT NULL OR (t.retention_anchor_at IS NOT NULL AND t.retention_anchor_at < ?)))`)
+    .bind(now, now, now, menuId, tenantId, now, retentionCutoff(now)).run();
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
+/** 販売を止め、金額・有効期間を残して券プランの識別情報を消す。 */
+export async function tombstonePassPlan(db: D1Database, tenantId: string, planId: string, now: string): Promise<boolean> {
+  const result = await db.prepare(`UPDATE booking_pass_plans SET name='削除済み', status='stopped',
+    created_by=?, idempotency_key=?, request_json=json_set(request_json,'$.name','削除済み'),
+    version=version+1, data_purged_at=?
+    WHERE id=? AND data_purged_at IS NULL AND json_valid(request_json) AND EXISTS (SELECT 1 FROM line_accounts a JOIN tenants t ON t.id=a.tenant_id
+      WHERE a.id=booking_pass_plans.line_account_id AND a.tenant_id=? AND a.data_purged_at IS NOT NULL AND t.data_purged_at IS NULL
+        AND (t.plan_status='canceled' OR (t.plan_status='trialing' AND t.trial_ends_at IS NOT NULL AND t.trial_ends_at < ?))
+        AND (t.purge_requested_at IS NOT NULL OR (t.retention_anchor_at IS NOT NULL AND t.retention_anchor_at < ?)))`)
+    .bind(`purged:${crypto.randomUUID()}`, `purged:${crypto.randomUUID()}`, now, planId, tenantId, now, retentionCutoff(now)).run();
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
 /** 配信の承認履歴を残し、停止済みアカウントの配信内容を消す。 */
 export async function tombstoneBroadcast(db: D1Database, tenantId: string, broadcastId: string, now: string): Promise<boolean> {
   const result = await db.prepare(`UPDATE broadcasts SET

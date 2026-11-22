@@ -2,7 +2,27 @@ import { expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { activateLineAccount, createLineAccount, upsertFriend, getLineAccountById, getFriendById, getBroadcasts, getBroadcastById } from '@line-crm/db';
 import { gapFixture } from '../test-utils/gap1.js';
-import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast } from './tenant-purge-tombstones.js';
+import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan } from './tenant-purge-tombstones.js';
+
+test('retained pass plan and referenced menu are stopped and anonymized without changing prices', async () => {
+  const f = gapFixture();
+  f.raw.pragma('foreign_keys = ON');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01' WHERE id='t';
+    UPDATE menus SET name='private menu',description='private description',fixed_meeting_url='https://private.test' WHERE id='menu';
+    INSERT INTO booking_pass_plans(id,line_account_id,kind,name,price,count,valid_days,status,created_by,created_at,idempotency_key,request_json)
+      VALUES ('plan','a','ticket','private plan',1000,5,180,'on_sale','private-staff','2026-01-01','private-key','{"name":"private plan","price":1000}');
+    INSERT INTO booking_entitlements(id,line_account_id,friend_id,menu_id,plan_id,kind,name,remaining,valid_from,expires_at,created_at,updated_at)
+      VALUES ('entitlement','a','f','menu','plan','ticket','ticket',5,'2026-01-01','2028-01-01','2026-01-01','2026-01-01');`);
+  const now = '2027-05-01T09:00:00.000+09:00';
+  expect(await tombstoneBookingMenu(f.db, 't', 'menu', now)).toBe(false);
+  expect(await tombstoneLineAccount(f.db, 't', 'a', now)).toBe(true);
+  expect(await tombstoneBookingMenu(f.db, 't', 'menu', now)).toBe(true);
+  expect(await tombstonePassPlan(f.db, 't', 'plan', now)).toBe(true);
+  expect(await tombstonePassPlan(f.db, 't', 'plan', now)).toBe(false);
+  expect(f.raw.prepare("SELECT name,description,base_price,is_active FROM menus WHERE id='menu'").get()).toEqual({name:'削除済み',description:null,base_price:8400,is_active:0});
+  expect(f.raw.prepare("SELECT name,price,valid_days,status FROM booking_pass_plans WHERE id='plan'").get()).toEqual({name:'削除済み',price:1000,valid_days:180,status:'stopped'});
+  expect(f.raw.prepare("SELECT menu_id,plan_id FROM booking_entitlements WHERE id='entitlement'").get()).toEqual({menu_id:'menu',plan_id:'plan'});
+});
 
 test('retained broadcast is anonymized, stopped and does not affect another tenant', async () => {
   const f = gapFixture();
