@@ -302,8 +302,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         const tagPath = selectedAccountId ? `/api/tags?lineAccountId=${encodeURIComponent(selectedAccountId)}` : '/api/tags'
         const accountFilter = selectedAccountId ? { accountId: selectedAccountId } : undefined
         setReferencesRestricted(false)
-        const permitMissing = async <T extends {success:boolean;data:unknown[]}>(request: Promise<T>): Promise<T> => request.catch((cause) => {
-          if (cause instanceof ApiError && cause.status === 403) { setReferencesRestricted(true); return {success:true,data:[]} as T }
+        const permitMissing = async <T,>(request: Promise<T>): Promise<T | {success:true;data:never[]}> => request.catch((cause) => {
+          if (cause instanceof ApiError && cause.status === 403) { setReferencesRestricted(true); return {success:true,data:[]} }
           throw cause
         })
         const [tagRes, ffRes, scenarioRes, reminderRes, templateRes] = await Promise.all([
