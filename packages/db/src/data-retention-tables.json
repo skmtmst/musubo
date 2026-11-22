@@ -857,6 +857,7 @@
   },
   "booking_payments": {
     "category": "retain",
+    "financialRetention": "申告期限を遅い側に見積もり、その翌日から10年。保持停止を尊重する。",
     "scope": {
       "by": "lineAccount",
       "column": "line_account_id"
@@ -3596,6 +3597,7 @@
   },
   "stripe_events": {
     "category": "retain",
+    "financialRetention": "申告期限を遅い側に見積もり、その翌日から10年。保持停止を尊重する。",
     "scope": {
       "by": "parent",
       "column": "friend_id",
@@ -4649,6 +4651,7 @@
   },
   "booking_payment_events": {
     "category": "retain",
+    "financialRetention": "申告期限を遅い側に見積もり、その翌日から10年。保持停止を尊重する。",
     "scope": {
       "by": "lineAccount",
       "column": "line_account_id"
@@ -4656,6 +4659,7 @@
   },
   "booking_payment_event_replays": {
     "category": "retain",
+    "financialRetention": "申告期限を遅い側に見積もり、その翌日から10年。保持停止を尊重する。",
     "scope": {
       "by": "parent",
       "column": "event_id",
@@ -4831,6 +4835,7 @@
   },
   "booking_charges": {
     "category": "retain",
+    "financialRetention": "申告期限を遅い側に見積もり、その翌日から10年。保持停止を尊重する。",
     "scope": {
       "by": "lineAccount",
       "column": "line_account_id"
@@ -4838,6 +4843,7 @@
   },
   "booking_cancellation_events": {
     "category": "retain",
+    "financialRetention": "申告期限を遅い側に見積もり、その翌日から10年。保持停止を尊重する。",
     "scope": {
       "by": "parent",
       "column": "charge_id",
@@ -4964,6 +4970,7 @@
   },
   "booking_payment_refunds": {
     "category": "retain",
+    "financialRetention": "申告期限を遅い側に見積もり、その翌日から10年。保持停止を尊重する。",
     "scope": {
       "by": "lineAccount",
       "column": "line_account_id"
@@ -4971,6 +4978,7 @@
   },
   "booking_payment_booking_links": {
     "category": "retain",
+    "financialRetention": "申告期限を遅い側に見積もり、その翌日から10年。保持停止を尊重する。",
     "scope": {
       "by": "lineAccount",
       "column": "line_account_id"

@@ -10,6 +10,17 @@ import { expect, it } from 'vitest';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const execFileAsync = promisify(execFile);
 
+it('788 は workflow の 787 が無くても適用できる', () => {
+  const db = new Database(':memory:');
+  try {
+    db.exec('CREATE TABLE booking_payments(id TEXT PRIMARY KEY,status TEXT,created_at TEXT,line_account_id TEXT); CREATE TABLE booking_audit_logs(id TEXT PRIMARY KEY,line_account_id TEXT NOT NULL); CREATE TABLE booking_charges(status TEXT,created_at TEXT,line_account_id TEXT); CREATE TABLE booking_payment_events(payment_id TEXT,received_at TEXT,line_account_id TEXT); CREATE TABLE stripe_events(processed_at TEXT);');
+    db.exec(readFileSync(join(root, 'migrations/788_booking_payment_privacy_redaction.sql'), 'utf8'));
+    expect(db.prepare("PRAGMA table_info('booking_payments')").all()).toEqual(expect.arrayContaining([expect.objectContaining({name:'customer_redacted_at'})]));
+    expect(db.prepare("PRAGMA table_info('booking_audit_logs')").all()).toEqual(expect.arrayContaining([expect.objectContaining({name:'customer_redacted_at'})]));
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE name='workflow_steps'").get()).toBeUndefined();
+  } finally { db.close(); }
+});
+
 it('基準の形も1000番以降を数値順に再生し、同番号は名前順にする', async () => {
   const fixture = mkdtempSync(join(tmpdir(), 'q03-bootstrap-order-'));
   try {

@@ -31,6 +31,8 @@ export type RetentionScope =
 
 export interface RetentionTable {
   category: RetentionCategory;
+  /** 解約後も残す会計記録の最終期限。通常の統括削除とは別の期限処理で扱う。 */
+  financialRetention?: string;
   /** global の表には紐づけがないので入らない。 */
   scope?: RetentionScope;
 }

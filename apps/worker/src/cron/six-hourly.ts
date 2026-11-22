@@ -50,6 +50,14 @@ export async function runSixHourlyHeavyJobs(
       },
     },
     {
+      name: 'booking financial retention',
+      run: async () => {
+        const { processBookingFinancialRetention } = await import('../services/booking-financial-retention.js');
+        const result=await processBookingFinancialRetention(env.DB,new Date(event.scheduledTime));
+        if(result.failed)throw new Error('booking_financial_retention_retry_required');
+      },
+    },
+    {
       name: 'analytics retention purge',
       run: async () => {
         const { purgeExpiredAnalyticsReadData } = await import('@line-crm/db');
