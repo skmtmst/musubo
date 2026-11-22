@@ -1,0 +1,47 @@
+import { describe, expect, test } from 'vitest';
+import { gapFixture } from '../test-utils/gap1.js';
+import { monthlyContract, monthlyFixture } from '../test-utils/monthly-ledger.js';
+import { processTenantDataPurge } from './tenant-data-purge.js';
+import { RETENTION_TABLES } from '@line-crm/db';
+
+const now = '2027-05-01T00:00:00.000Z';
+const due = "UPDATE tenants SET plan_status='canceled', retention_anchor_at='2026-01-01T00:00:00.000Z' WHERE id='t'";
+
+describe('retained records survive tenant purge with real foreign keys', () => {
+  test('all retained tables avoid cascade and restrictive references to purge tables', () => {
+    const f = gapFixture();
+    const unsafe: string[] = [];
+    for (const [table, entry] of Object.entries(RETENTION_TABLES)) {
+      if (entry.category !== 'retain') continue;
+      const refs = f.raw.pragma(`foreign_key_list("${table.replaceAll('"', '""')}")`) as Array<{table:string;from:string;on_delete:string}>;
+      for (const ref of refs) {
+        if (RETENTION_TABLES[ref.table]?.category === 'purge' && ref.on_delete !== 'SET NULL') {
+          unsafe.push(`${table}.${ref.from} -> ${ref.table} (${ref.on_delete})`);
+        }
+      }
+    }
+    expect(unsafe).toEqual([]);
+  });
+  test('booking payment and audit are not cascade-deleted with the account', async () => {
+    const f = gapFixture();
+    f.raw.pragma('foreign_keys = ON');
+    f.raw.exec(`${due};
+      INSERT INTO booking_payments(id,line_account_id,amount,provider,idempotency_key,created_at,updated_at)
+        VALUES('pay','a',2000,'test','payment-key','2026-01-01','2026-01-01');
+      INSERT INTO booking_audit_logs(id,line_account_id,action,actor_type,occurred_at)
+        VALUES('audit','a','created','system','2026-01-01');`);
+    const outcome = await processTenantDataPurge({ DB: f.db }, { now });
+    expect(outcome.completed).toBe(1);
+    const payment = f.raw.prepare("SELECT id FROM booking_payments WHERE id='pay'").get();
+    const audit = f.raw.prepare("SELECT id FROM booking_audit_logs WHERE id='audit'").get();
+    expect({ payment, audit }).toEqual({ payment: { id: 'pay' }, audit: { id: 'audit' } });
+  });
+  test('monthly contract does not block purge and remains retained', async () => {
+    const f = monthlyFixture();
+    await monthlyContract(f);
+    f.raw.exec(due);
+    const outcome = await processTenantDataPurge({ DB: f.db }, { now });
+    expect(outcome.completed).toBe(1);
+    expect(f.raw.prepare("SELECT id FROM booking_monthly_contracts WHERE id='contract'").get()).toBeTruthy();
+  });
+});
