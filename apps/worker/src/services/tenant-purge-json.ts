@@ -9,6 +9,7 @@ const ALLOWED: Readonly<Record<string, readonly string[]>> = {
   'friend_bulk_runs.operation_json': ['kind', 'type', 'count'],
   'conversion_points.source_config_json': [],
   'staff_members.notification_preferences': [],
+  'common_action_versions.action_config': ['id', 'type'],
   'event_versions.snapshot_json': ['id', 'eventId', 'version', 'kind', 'startsAt', 'endsAt', 'capacity'],
 };
 
@@ -26,6 +27,13 @@ function clean(value: JsonValue, allowed: ReadonlySet<string>): JsonValue {
 
 export function redactRetainedJson(input: string, column: string): string {
   const value = JSON.parse(input) as JsonValue;
+  if (column === 'common_action_versions.action_config') {
+    if (!Array.isArray(value)) throw new Error('invalid_tombstone_action_config');
+    return JSON.stringify(value.map(item => {
+      if (item === null || Array.isArray(item) || typeof item !== 'object') throw new Error('invalid_tombstone_action_config');
+      return {id:typeof item.id === 'string' ? item.id : null,type:typeof item.type === 'string' ? item.type : null};
+    }));
+  }
   if (!(column in ALLOWED) || value === null || typeof value !== 'object') return '{}';
   return JSON.stringify(clean(value, new Set(ALLOWED[column])));
 }

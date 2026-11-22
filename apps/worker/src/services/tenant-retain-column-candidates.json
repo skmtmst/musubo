@@ -439,6 +439,12 @@
         "notNull": false,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "action_config",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"

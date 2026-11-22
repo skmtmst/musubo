@@ -63,3 +63,14 @@ WHEN NOT (NEW.on_submit_webhook_url IS NULL AND NEW.on_submit_webhook_headers IS
       AND NOT EXISTS (SELECT 1 FROM form_accounts other JOIN line_accounts oa ON oa.id=other.line_account_id
         WHERE other.form_id=OLD.form_id AND (oa.tenant_id IS NOT t.id OR oa.data_purged_at IS NULL))))
 BEGIN SELECT RAISE(ABORT, 'published form versions are immutable'); END;
+
+-- 公開済みアクションは種類とIDだけを残して本文を消す。
+DROP TRIGGER trg_common_action_published_version_immutable;
+CREATE TRIGGER trg_common_action_published_version_immutable
+BEFORE UPDATE ON common_action_versions
+WHEN OLD.status = 'published' AND NOT (NEW."id" IS OLD."id" AND NEW."common_action_id" IS OLD."common_action_id" AND NEW."version_number" IS OLD."version_number" AND NEW."status" IS OLD."status" AND NEW."created_by" IS OLD."created_by" AND NEW."created_at" IS OLD."created_at" AND NEW."published_at" IS OLD."published_at" AND NEW."draft_revision" IS OLD."draft_revision" AND json_valid(OLD.action_config) AND json_type(OLD.action_config)='array'
+  AND NEW.action_config=(SELECT json_group_array(json_object('id',CASE WHEN json_type(value,'$.id')='text' THEN json_extract(value,'$.id') ELSE NULL END,
+    'type',CASE WHEN json_type(value,'$.type')='text' THEN json_extract(value,'$.type') ELSE NULL END)) FROM json_each(OLD.action_config))
+  AND EXISTS(SELECT 1 FROM common_actions ca JOIN line_accounts a ON a.id=ca.line_account_id JOIN tenants t ON t.id=a.tenant_id
+    WHERE ca.id=OLD.common_action_id AND a.data_purged_at IS NOT NULL AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL))
+BEGIN SELECT RAISE(ABORT, 'published common action version is immutable'); END;

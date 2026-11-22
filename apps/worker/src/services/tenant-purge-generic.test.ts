@@ -70,3 +70,22 @@ test('additional private fields have explicit erasure actions', async () => {
   expect(buildTombstoneValues('staff_members','s',{notification_preferences:'{"email":"private"}'}, {columns:{notification_preferences:policies.staff_members.columns.notification_preferences as never}}).notification_preferences).toBe('{}');
   expect(buildTombstoneValues('nen_pet_profiles','p',{birthday:'2020-01-01'}, {columns:{birthday:policies.nen_pet_profiles.columns.birthday as never}}).birthday).toBeNull();
 });
+
+test('published action versions retain action types but lose message bodies during purge', async () => {
+  const {gapFixture}=await import('../test-utils/gap1.js');
+  const {processTenantDataPurge}=await import('./tenant-data-purge.js');
+  const f=gapFixture(); f.raw.pragma('foreign_keys=ON');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01' WHERE id='t';
+    INSERT INTO common_actions(id,line_account_id,name,status) VALUES('action','a','action','published');
+    INSERT INTO common_action_versions(id,common_action_id,version_number,status,action_config)
+      VALUES('action-version','action',1,'published','[{"id":"step","type":"send_message","params":{"content":"private"}}]');
+    INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id,after_action_version_id)
+      VALUES('broadcast','title','text','private','a','action-version');
+    INSERT INTO broadcast_approval_events(id,broadcast_id,actor_staff_id,action) VALUES('approval','broadcast','o','requested');`);
+  expect(()=>f.raw.exec("UPDATE common_action_versions SET action_config='[]' WHERE id='action-version'")).toThrow(/immutable/);
+  const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
+  expect(result.completed).toBe(1);
+  expect(f.raw.prepare("SELECT action_config FROM common_action_versions WHERE id='action-version'").get())
+    .toEqual({action_config:'[{"id":"step","type":"send_message"}]'});
+  expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+});

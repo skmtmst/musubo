@@ -300,6 +300,10 @@
       "created_by": {
         "action": "retain",
         "reason": "公開済み共通アクションの版は不変の店の定義のため保持"
+      },
+      "action_config": {
+        "action": "json",
+        "reason": "アクション種類を残し顧客向け本文と値を消去"
       }
     }
   },
