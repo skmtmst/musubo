@@ -9,8 +9,13 @@ import { DRAFT_KEY } from './logic'
 import { REGISTRATION_STYLE_KEY } from './use-registration-style'
 import { registrationStorageKey } from './registration-storage'
 
-const calls = vi.hoisted(() => ({ me: vi.fn(), connect: vi.fn(), check: vi.fn(), getStyle: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { staff: { me: calls.me }, lineAccounts: { connect: calls.connect, connectCheck: calls.check } } }))
+const calls = vi.hoisted(() => ({ me: vi.fn(), connect: vi.fn(), check: vi.fn(), getStyle: vi.fn(), account: vi.fn(), receipt: vi.fn() }))
+vi.mock('@/lib/api', () => ({
+  api: {
+    staff: { me: calls.me },
+    lineAccounts: { connect: calls.connect, connectCheck: calls.check, get: calls.account, registrationReceipt: calls.receipt },
+  },
+}))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: calls.getStyle } }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
@@ -33,8 +38,10 @@ beforeEach(() => {
   localStorage.clear(); sessionStorage.clear(); vi.clearAllMocks()
   verifiedStaffRole('owner'); identify()
   calls.me.mockImplementation(() => new Promise(() => {}))
+  calls.account.mockResolvedValue({ success: true, data: { name: '接続待ちのアカウント', basicId: '@fixture' } })
+  calls.receipt.mockResolvedValue({ success: true, data: { status: 'waiting', receivedAt: null } })
 })
-afterEach(() => { cleanup(); forgetStaffIdentity(); vi.restoreAllMocks() })
+afterEach(() => { cleanup(); forgetStaffIdentity(); vi.useRealTimers(); vi.restoreAllMocks() })
 
 it('共通キーに途中の手順と作成済みIDが残っていても、新しい登録は最初の質問から始まる', () => {
   const legacy = JSON.stringify(draft)
@@ -81,6 +88,34 @@ it('同じ本人が登録済みのアカウントだけは使い方の設定を�
   render(<AccountRegisterV8 />)
   expect(screen.getByText('登録済みの続き: own-account')).toBeTruthy()
   expect(calls.connect).not.toHaveBeenCalled()
+})
+
+it('受信待ちで読み直しても同じLINEを確認し、受信できたときだけ使い方の設定へ進む', async () => {
+  vi.useFakeTimers()
+  const key = registrationStorageKey(REGISTRATION_STYLE_KEY, readStaffIdentity())!
+  sessionStorage.setItem(key, 'receipt:own-account')
+  calls.receipt
+    .mockRejectedValueOnce(new Error('通信が切れた'))
+    .mockResolvedValueOnce({ success: true, data: { status: 'error', receivedAt: null } })
+    .mockResolvedValueOnce({ success: true, data: { status: 'confirmed', receivedAt: '2026-11-22T11:00:00+09:00' } })
+
+  await act(async () => { render(<AccountRegisterV8 />) })
+  expect(screen.getByText('接続待ちのアカウント')).toBeTruthy()
+  expect(screen.getByText('受信を確認できませんでした')).toBeTruthy()
+  expect(screen.queryByText(/登録済みの続き/)).toBeNull()
+  expect(calls.receipt).toHaveBeenCalledExactlyOnceWith('own-account')
+
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+  expect(screen.getByText('受信の確認に問題があります')).toBeTruthy()
+  expect(screen.queryByText(/登録済みの続き/)).toBeNull()
+
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+  expect(screen.getByText('登録済みの続き: own-account')).toBeTruthy()
+  expect(sessionStorage.getItem(key)).toBe('own-account')
+  expect(calls.connect).not.toHaveBeenCalled()
+
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+  expect(calls.receipt).toHaveBeenCalledTimes(3)
 })
 
 it('開いたまま本人が切り替わっても、前の入力や手順を画面に残さない', () => {

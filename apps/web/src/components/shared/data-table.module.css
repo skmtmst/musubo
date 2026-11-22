@@ -554,6 +554,8 @@ html:root .frame:not([data-table-presentation='calendar']) {
   border: 0; border-radius: var(--radius-flat); outline-color: transparent; box-shadow: none;
 }
 html:root .frame:not([data-table-presentation='calendar']) { overflow-x: clip; }
+html:root .frame[data-table-presentation='account-list'] { position: relative; overflow-x: auto; }
+html:root .table.table[data-table-presentation='account-list'] :is(th, td):first-child { min-width: var(--tpl-list-name-min); }
 html:root .frame .row[data-table-layout='columns'] { padding-inline: var(--tpl-list-inset); }
 html:root .name { color: var(--color-ink); font-weight: 700; white-space: nowrap; }
 html:root .frame [data-list-name-cell] { min-width: var(--tpl-list-name-min); }
