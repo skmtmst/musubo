@@ -113,7 +113,7 @@ export default function Step5Completion({ connection, accountName, createdId, im
                 <p className={styles.groupLabel}>次にすること</p>
                 <div className={styles.buttonRow}>
                   <Button external href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button>
-                  {restaurant ? <Button href="/restaurant-test/stores/new">飲食店の店舗を作る</Button> : null}
+                  {restaurant ? <Button href={`/restaurant-test/stores/new?accountId=${encodeURIComponent(createdId)}`}>飲食店の店舗を作る</Button> : null}
                   <Button href="/friends"><Users size={16} aria-hidden="true" />友だち一覧</Button>
                   <Button href="/friend-add-settings"><QrCode size={16} aria-hidden="true" />友だち追加URL・QR</Button>
                   <Button href="/emergency"><Activity size={16} aria-hidden="true" />運用状態の接続監視</Button>

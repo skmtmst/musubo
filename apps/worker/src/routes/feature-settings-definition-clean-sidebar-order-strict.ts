@@ -94,6 +94,7 @@ export async function loadFeatureSettings(
   db: D1Database,
   accountId: string,
   restaurantEnabled: boolean,
+  enabledByStyle = false,
 ): Promise<FeatureSettingsState> {
   const saved = await getVersionedAccountSetting<FeatureSettingsData>(
     db,
@@ -101,10 +102,9 @@ export async function loadFeatureSettings(
     FEATURE_SETTINGS_BUNDLE_KEY,
   );
   if (!saved) {
-    return {
-      ...(await loadLegacyFeatureSettings(db, accountId, restaurantEnabled)),
-      version: 0,
-    };
+    const legacy = await loadLegacyFeatureSettings(db, accountId, restaurantEnabled);
+    if (enabledByStyle) legacy.features.restaurant_test = true;
+    return { ...legacy, version: 0 };
   }
 
   const features: Record<string, boolean> = {};
@@ -114,6 +114,7 @@ export async function loadFeatureSettings(
       ? false
       : typeof value === 'boolean' ? value : featureIsEnabled(null, key);
   }
+  if (enabledByStyle) features.restaurant_test = true;
   return {
     version: saved.version,
     features,
@@ -129,10 +130,11 @@ export async function loadFeatureVisibility(
   db: D1Database,
   accountId: string,
   restaurantEnabled: boolean,
+  enabledByStyle = false,
 ): Promise<FeatureVisibilityData> {
   // 専用カタログは設定束と独立して読めるため先に並列で投げる。
   const [state, specializedRaw] = await Promise.all([
-    loadFeatureSettings(db, accountId, restaurantEnabled),
+    loadFeatureSettings(db, accountId, restaurantEnabled, enabledByStyle),
     getAccountSetting(db, accountId, SPECIALIZED_CATALOG_KEY),
   ]);
   const featureStates = await accountFeatureAvailabilityMap(db, accountId, state.features);

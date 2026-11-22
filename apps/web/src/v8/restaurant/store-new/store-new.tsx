@@ -9,6 +9,7 @@
  * 動きは BEHAVIOR.md。
  */
 import { describeApiFailure } from '@/components/shared/api-error-message'
+import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactNode, type ReactElement } from 'react'
 import { ArrowRight, BookOpen, CircleCheck } from 'lucide-react'
@@ -124,7 +125,9 @@ export default function StoreNewV8() {
   usePageTitle('店舗を追加')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'アカウント', href: '/hq' }])
   const router = useRouter()
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, refreshAccounts, setSelectedAccountId } = useAccount()
+  const registrationAccountId = useSearchParams().get('accountId')
+  const storeAccountId = registrationAccountId || selectedAccountId
   const [step, setStep] = useState<number>(STEP.TERMS)
   const [termsAgreedAt, setTermsAgreedAt] = useState<string | null>(null)
   const [name, setName] = useState('')
@@ -149,7 +152,7 @@ export default function StoreNewV8() {
     let active = true
     setTermsAgreedAt(null)
     setStep(STEP.TERMS)
-    void restaurantTestApi.termsAgreement(selectedAccountId).then((response) => {
+    void restaurantTestApi.termsAgreement(storeAccountId).then((response) => {
       if (!active) return
       const nextStep = initialWizardStep(response.data.agreedVersion)
       setTermsAgreedAt(nextStep === STEP.BASICS ? response.data.agreedAt : null)
@@ -160,14 +163,14 @@ export default function StoreNewV8() {
       setStep(STEP.TERMS)
     })
     return () => { active = false }
-  }, [selectedAccountId])
+  }, [storeAccountId])
 
   const agree = async () => {
     if (!canSubmitTerms(readToEnd, termsChecked) || agreeing) return
     setAgreeing(true)
     setAgreeError('')
     try {
-      const response = await restaurantTestApi.agreeToTerms(selectedAccountId, TERMS_DOCUMENT.key, TERMS_DOCUMENT.version)
+      const response = await restaurantTestApi.agreeToTerms(storeAccountId, TERMS_DOCUMENT.key, TERMS_DOCUMENT.version)
       setTermsAgreedAt(response.data.agreedAt)
       setStep(STEP.BASICS)
     } catch (caught) {
@@ -198,7 +201,7 @@ export default function StoreNewV8() {
     setSaving(true)
     setConnectionError('')
     try {
-      const response = await restaurantTestApi.connectStore(selectedAccountId, { name: name.trim(), alias: alias.trim(), channelId: channelId.trim(), channelSecret: channelSecret.trim() })
+      const response = await restaurantTestApi.connectStore(storeAccountId, { name: name.trim(), alias: alias.trim(), channelId: channelId.trim(), channelSecret: channelSecret.trim() })
       setCreated({ id: response.data.store.id, storeName: response.data.store.name, lineAccountName: response.data.lineAccountName })
       setChannelSecret('')
     } catch (caught) {
@@ -211,10 +214,14 @@ export default function StoreNewV8() {
   }
 
   const enterStore = async () => {
-    if (!selectedAccountId || !created) return
+    if (!storeAccountId || !created) return
     setSaving(true)
     try {
-      await restaurantTestApi.selectStore(selectedAccountId, created.id)
+      await restaurantTestApi.selectStore(storeAccountId, created.id)
+      if (registrationAccountId) {
+        await refreshAccounts()
+        setSelectedAccountId(storeAccountId)
+      }
       router.push('/restaurant-test/dashboard')
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
@@ -238,7 +245,7 @@ export default function StoreNewV8() {
     if (step === STEP.OFFICIAL_ACCOUNT) return <><Button onClick={() => setStep(STEP.BASICS)}>戻る</Button><Button variant="primary" disabled={!officialAccountReady} onClick={() => setStep(STEP.CREDENTIALS)}>次へ<ArrowRight aria-hidden className={styles.icon15} /></Button></>
     if (step === STEP.CREDENTIALS) return <><Button onClick={() => setStep(STEP.OFFICIAL_ACCOUNT)}>戻る</Button><Button variant="primary" onClick={nextFromCredentials}>次へ<ArrowRight aria-hidden className={styles.icon15} /></Button></>
     if (created) {
-      return selectedAccountId
+      return storeAccountId
         ? <Button variant="primary" disabled={saving} onClick={() => enterStore()} busy={Boolean(saving)} busyLabel="処理中…">この店舗の管理画面へ</Button>
         : <Button href="/hq">統括の店舗一覧へ</Button>
     }

@@ -82,7 +82,7 @@ it.each(ACCOUNT_STYLES)('%sをポップアップで選び、同じアカウン�
   expect(net.starterSet).not.toHaveBeenCalled()
   expect(net.save).toHaveBeenCalledExactlyOnceWith('created-account', { expectedVersion: 0, style, answers: { image: { mode: 'later' } } })
   expect(sessionStorage.getItem(REGISTRATION_STYLE_KEY)).toBeNull()
-  expect(screen.getByRole('link', { name: '次へ' }).getAttribute('href')).toBe(style === 'restaurant' ? '/restaurant-test/stores/new' : '/hq')
+  expect(screen.getByRole('link', { name: '次へ' }).getAttribute('href')).toBe(style === 'restaurant' ? '/restaurant-test/stores/new?accountId=created-account' : '/hq')
 })
 
 it('既に保存されているリッチメニューの回答を登録再開で上書きしない', async () => {

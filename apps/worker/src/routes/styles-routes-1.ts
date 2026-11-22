@@ -10,7 +10,7 @@ import {
   paymentSummaryInWindow,
 } from '../features/booking/booking-payment-admin/index.js';
 import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
-import { restaurantEffectivelyEnabledForTenant } from '../services/tenant-features.js';
+import { restaurantEffectivelyEnabledForAccount } from '../services/tenant-features.js';
 import { Hono } from 'hono';
 
 import type { Env } from '../worker-env.js';
@@ -247,7 +247,7 @@ for (const path of [
       throw new StyleError('industry_required');
     if (
       style === 'restaurant' &&
-      !(await restaurantEffectivelyEnabledForTenant(c))
+      !(await restaurantEffectivelyEnabledForAccount(c, id))
     )
       throw new StyleError('not_found', 404);
     if (
@@ -280,7 +280,7 @@ for (const path of [
     )
       kinds.push('event');
     if (
-      (await restaurantEffectivelyEnabledForTenant(c)) &&
+      (await restaurantEffectivelyEnabledForAccount(c, id)) &&
       hasStaffPermission(c, '/restaurant-test/reservations')
     )
       kinds.push('restaurant');
