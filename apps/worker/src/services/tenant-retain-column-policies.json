@@ -638,8 +638,8 @@
   "line_account_tags": {
     "columns": {
       "name": {
-        "action": "placeholder",
-        "reason": "必須文字列を定型値に置換"
+        "action": "unique",
+        "reason": "統括内で一意な分類名を再登録可能にする"
       }
     }
   },

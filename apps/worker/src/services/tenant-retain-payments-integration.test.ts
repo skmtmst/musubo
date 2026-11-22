@@ -226,3 +226,23 @@ test('booking entitlement usage and anonymized booking remain after tenant purge
   expect(f.raw.prepare("SELECT customer_note FROM bookings WHERE id='bk'").get()).toEqual({customer_note:null});
   expect(f.raw.pragma('foreign_key_check')).toEqual([]);
 });
+
+test('tenant-wide account categories remain hidden and names can be reused after resumption', async () => {
+  const { listLineAccountTags, createLineAccountTag, getLineAccountTag, attachLineAccountRegistrationTags }=await import('@line-crm/db');
+  const f=gapFixture(); f.raw.pragma('foreign_keys=ON');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',purge_requested_at='2026-01-01' WHERE id='t';
+    INSERT INTO line_account_tags(id,tenant_id,name,created_at,updated_at) VALUES
+      ('tag-one','t','category one','2026-01-01','2026-01-01'),('tag-two','t','category two','2026-01-01','2026-01-01');`);
+  f.raw.exec("UPDATE tenants SET purge_started_at='2027-05-01' WHERE id='t'");
+  expect(await listLineAccountTags(f.db,'t')).toEqual([]);
+  const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
+  expect(result.completed).toBe(1);
+  expect(await listLineAccountTags(f.db,'t')).toEqual([]);
+  expect(await getLineAccountTag(f.db,'t','tag-one')).toBeNull();
+  await expect(attachLineAccountRegistrationTags(f.db,'t','a',['tag-one'])).rejects.toThrow();
+  f.raw.exec("UPDATE tenants SET data_purged_at=NULL,plan_status='active' WHERE id='t'");
+  const fresh=await createLineAccountTag(f.db,'t',{name:'category one'});
+  expect(fresh.id).not.toBe('tag-one');
+  expect((await listLineAccountTags(f.db,'t')).map(row=>row.name)).toEqual(['category one']);
+  expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+});
