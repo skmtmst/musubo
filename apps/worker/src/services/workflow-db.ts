@@ -7,6 +7,9 @@ import { WorkflowDeferred } from './workflow-error.js';
 import { classifySingleStatement } from './incoming-webhook-fenced-db.js';
 
 const aliasesForDb=new WeakMap<D1Database,Map<string,string>>();
+const rawForDb=new WeakMap<D1Database,D1Database>();
+/** 送信直前の最新状態は、再生される SQL 計画とは別に読み取る。 */
+export function rawWorkflowDb(db:D1Database):D1Database { return rawForDb.get(db) ?? db; }
 export function normalizeWorkflowResult<T>(db:D1Database,value:T):T{
   const aliases=aliasesForDb.get(db);
   return JSON.parse(JSON.stringify(value ?? null,(_key,item)=>typeof item==='string'?(aliases?.get(item) ?? item):item)) as T;
@@ -84,5 +87,5 @@ export function workflowMutationDb(db:D1Database,root:WorkflowStepRef,owner:stri
     };
     throw new Error(`workflow_database_api_unsupported:${String(key)}`);
   }});
-  aliasesForDb.set(wrapped,aliases);return wrapped;
+  aliasesForDb.set(wrapped,aliases);rawForDb.set(wrapped,db);return wrapped;
 }

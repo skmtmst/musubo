@@ -1,6 +1,8 @@
 import { auditEventStatement, RETENTION_R2_KEY_COLUMNS } from '@line-crm/db';
 import relations from './customer-data-relations.json';
 import protectedRelations from './customer-data-protected-relations.json';
+import { customerWorkflowCondition, redactedWorkflowInput, stripeAccountingPatch } from './customer-workflow-redaction.js';
+import { customerDestinationDigest } from './customer-deletion-destination.js';
 
 export type DeletionKind = 'form_response' | 'friend_data';
 export type DeletionTarget = {
@@ -8,7 +10,7 @@ export type DeletionTarget = {
   formId?: string; lineUserId?: string;
 };
 type Journal = { id: string; action: string; detail_json: string; actor_id: string };
-type Detail = { accountId: string | null; formId?: string; token: string; leaseUntil: number; completedAt?: string; rows?: number };
+type Detail = { accountId: string | null; formId?: string; recipientDigest?:string; token: string; leaseUntil: number; completedAt?: string; rows?: number; workflowPendingAtDeletion?:number };
 type Relation = { friendColumns: string[]; lineUserColumn: boolean; references: Array<{ parent: string; columns: Array<{ column: string; parentColumn: string }> }> };
 const graph: Record<string, Relation> = relations;
 type ProtectedReference = {parent:string;mode?:'restrict';columns:Array<{column:string;parentColumn:string}>};
@@ -123,7 +125,10 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
   const preserved = protectedChecks.length ? await db.batch(protectedChecks.map(check => db.prepare(`SELECT 1 AS present FROM ${q(check.table)} WHERE ${check.condition} LIMIT 1`).bind(...(check.condition.includes('?3') ? params : [params[0]])))) : [];
   if (preserved.some(result => result.results.length)) throw new DeletionFailure(409, 'deletion_schema_approval_required');
   const token = crypto.randomUUID();
-  const detail: Detail = { accountId: target.accountId, ...(target.formId ? { formId: target.formId } : {}), token, leaseUntil: Date.now() + 300_000 };
+  const recipientDigest=target.kind==='friend_data' && target.accountId && target.lineUserId
+    ? await customerDestinationDigest(target.accountId,target.lineUserId) : undefined;
+  const detail: Detail = { accountId: target.accountId, ...(target.formId ? { formId: target.formId } : {}),
+    ...(recipientDigest ? {recipientDigest}:{}), token, leaseUntil: Date.now() + 300_000 };
   // 同じ友だちに対する別の対象指定や二重押下を直列化する。
   await db.prepare(`INSERT OR IGNORE INTO operation_audit (id,target_kind,target_id,action,actor_id,friend_id,detail_json,created_at)
     SELECT ?, 'customer_deletion', ?, 'deleting', ?, ?, ?, ? WHERE NOT EXISTS (
@@ -142,6 +147,10 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
   }
   try {
     const snapshots: Snapshot[] = [];
+    const workflowRows = target.kind === 'friend_data'
+      ? (await db.prepare(`SELECT rowid AS rowid,status,input_json,result_json,customer_redaction_requested_at FROM workflow_steps WHERE ${customerWorkflowCondition}`)
+        .bind(target.id, target.lineUserId ?? null, target.accountId).all<{rowid:number;status:string;input_json:string|null;result_json:string|null;customer_redaction_requested_at:number|null}>()).results
+      : [];
     // DB 往復数が増え過ぎないよう、読取をまとめる。
     const entries = Object.entries(conditions);
     const results = await db.batch(entries.map(([table, condition]) => db.prepare(`SELECT rowid AS _delete_rowid, * FROM ${q(table)} WHERE ${condition}`).bind(...(condition.includes('?3') ? params : [params[0]]))));
@@ -164,6 +173,28 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       return db.prepare(`UPDATE operation_audit SET target_kind = CASE WHEN (${normalized}) THEN 'customer_deletion' ELSE NULL END WHERE id = ?`).bind(...bindings, id);
     };
     const statements = [db.prepare('PRAGMA defer_foreign_keys = ON'), guard("action = 'deleting' AND json_extract(detail_json, '$.token') = ?", [token])];
+    if (target.kind === 'friend_data') {
+      const workflowParams = [target.id, target.lineUserId ?? null, target.accountId];
+      statements.push(guard('EXISTS (SELECT 1 FROM friends WHERE id=?1 AND line_user_id IS ?2 AND line_account_id IS ?3)', workflowParams));
+      const workflowIds = JSON.stringify(workflowRows.map(row => row.rowid));
+      statements.push(guard(`(SELECT COUNT(*) FROM workflow_steps WHERE ${customerWorkflowCondition})=json_array_length(?4)
+        AND NOT EXISTS (SELECT 1 FROM workflow_steps WHERE ${customerWorkflowCondition} AND rowid NOT IN (SELECT value FROM json_each(?4)))`, [...workflowParams,workflowIds]));
+      statements.push(guard(`NOT EXISTS (SELECT 1 FROM json_each(?) expected LEFT JOIN workflow_steps actual ON actual.rowid=json_extract(expected.value,'$.rowid')
+        WHERE actual.rowid IS NULL OR actual.status IS NOT json_extract(expected.value,'$.status')
+          OR actual.input_json IS NOT json_extract(expected.value,'$.input_json') OR actual.result_json IS NOT json_extract(expected.value,'$.result_json')
+          OR actual.customer_redaction_requested_at IS NOT json_extract(expected.value,'$.customer_redaction_requested_at'))`, [JSON.stringify(workflowRows)]));
+      if (workflowRows.length) statements.push(db.prepare(`UPDATE workflow_steps SET customer_redaction_requested_at=COALESCE(customer_redaction_requested_at,?),
+        status=CASE WHEN status IN ('running','unknown') THEN status ELSE 'canceled' END,
+        input_json=CASE WHEN status IN ('running','unknown') THEN input_json ELSE ${redactedWorkflowInput} END,
+        result_json=CASE WHEN status IN ('running','unknown') THEN result_json ELSE json_patch(json_object('redacted',json('true'),'previousStatus',status,
+          'requestId',CASE WHEN json_valid(result_json) THEN CASE WHEN json_type(result_json,'$.requestId')='text'
+            AND length(json_extract(result_json,'$.requestId')) BETWEEN 1 AND 128
+            AND json_extract(result_json,'$.requestId') NOT GLOB '*[^A-Za-z0-9_-]*'
+            THEN json_extract(result_json,'$.requestId') ELSE NULL END ELSE NULL END),${stripeAccountingPatch}) END,
+        error_code=CASE WHEN status IN ('running','unknown') THEN error_code ELSE 'customer_deleted' END,
+        next_attempt_at=CASE WHEN status IN ('running','unknown') THEN next_attempt_at ELSE NULL END,
+        updated_at=? WHERE rowid IN (SELECT value FROM json_each(?))`).bind(Date.now(),Date.now(),workflowIds));
+    }
     // R2 待機中に追加された保持対象を、連動削除で失わないようにする。
     for (const check of protectedChecks) statements.push(guard(`NOT EXISTS (SELECT 1 FROM ${q(check.table)} WHERE ${check.condition})`, check.condition.includes('?3') ? params : [params[0]]));
     // R2 待機中に増えたファイルや子行も、再試行で到達できる形を保つ。
@@ -209,7 +240,8 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
     }
     const formIds = [...new Set(byTable.get('form_submissions')!.rows.map(row => row.form_id as string))];
     for (const formId of formIds) statements.push(db.prepare(`UPDATE forms SET submit_count = (SELECT COUNT(*) FROM form_submissions WHERE form_id = ? AND is_test = 0) WHERE id = ?`).bind(formId, formId));
-    const completed: Detail = { ...detail, completedAt: new Date().toISOString(), rows: snapshots.reduce((sum, s) => sum + s.rows.length, 0) };
+    const completed: Detail = { ...detail, completedAt: new Date().toISOString(), rows: snapshots.reduce((sum, s) => sum + s.rows.length, 0),
+      workflowPendingAtDeletion:workflowRows.filter(row=>row.status==='running'||row.status==='unknown').length };
     statements.push(db.prepare("UPDATE operation_audit SET action = 'deleted', detail_json = ? WHERE id = ? AND json_extract(detail_json,'$.token') = ?").bind(JSON.stringify(completed), id, token));
     const account = target.accountId ? await db.prepare('SELECT tenant_id FROM line_accounts WHERE id = ?').bind(target.accountId).first<{ tenant_id: string | null }>() : null;
     statements.push(auditEventStatement(db, { id, sourceKind: 'operation_audit', sourceId: id,

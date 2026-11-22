@@ -1,4 +1,5 @@
 import { holdUncertainLineStep } from '../../services/workflow-line-client.js';
+import { customerDestinationDigest, noCustomerDeletionForDigest } from '../../services/customer-deletion-destination.js';
 import { EXTERNAL_DELIVERY_MAX_ATTEMPTS, externalDeliveryRetryAt, externalDeliveryNotBefore, EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES } from '../../services/external-delivery-retry.js';
 // ウェビナーの予約前から個別相談予約まで、途中離脱した人へ自動追客する。
 // 対象ウェビナーは webinar_followup_configs で明示的に有効化し、enabled_at
@@ -479,9 +480,11 @@ export async function processWebinarFollowups(
         await failWorkflowStep(db,ref,owner,{unknown:true,code:'delivery_unknown'});return;
       }
       const input=JSON.parse(lease.input_json!);
-      const marked=await db.prepare(`UPDATE workflow_steps SET error_code='delivery_started' WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=? AND status='running' AND lease_owner=? AND lease_expires_at>?`)
-        .bind(ref.scopeId,ref.processKind,ref.subjectId,ref.stepKey,owner,Date.now()).run();
-      if(marked.meta.changes!==1)return;
+      const digest=candidate.account_id ? await customerDestinationDigest(candidate.account_id,input.to) : null;
+      const marked=await db.prepare(`UPDATE workflow_steps SET error_code='delivery_started' WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=? AND status='running' AND lease_owner=? AND lease_expires_at>?
+        AND (? IS NULL OR ${noCustomerDeletionForDigest})`)
+        .bind(ref.scopeId,ref.processKind,ref.subjectId,ref.stepKey,owner,Date.now(),digest,digest,candidate.account_id,input.to).run();
+      if(marked.meta.changes!==1){await releaseWorkflowStep(db,ref,owner);return;}
       started=true;
       const result=await pushViaHarnessProxy(options.proxyBaseUrl,delivery.accessToken,input.to,[{type:'text',text:input.text}],
         lease.retry_key,options.proxyDispatch,'reminder_dispatch');

@@ -3,6 +3,7 @@ import { createHmac } from 'node:crypto';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tenantScopeCondition } from '@line-crm/db';
+import {redactCustomerWorkflows} from '../../../services/customer-workflow-redaction.js';
 import { gapFixture } from '../../../test-utils/gap1.js';
 import { bookingStripeWebhook } from '../../../routes/booking-stripe-webhook.js';
 import { authMiddleware } from '../../../middleware/auth.js';
@@ -100,6 +101,45 @@ describe('Connect試験受信の署名と保存',()=>{
   });
 });
 describe('保存済みの関連・lease・原子的な反映',()=>{
+  it('決済関連に統括が無い時、接続先が変わっても別の統括のIDを混ぜない',async()=>{
+    await bind();
+    f.raw.exec(`UPDATE workflow_steps SET status='canceled',input_json=json_set(input_json,'$.tenantId',NULL),
+      error_code='customer_deleted',customer_redaction_requested_at=1 WHERE process_kind='booking_stripe_object';
+      UPDATE booking_payment_connections SET line_account_id='b' WHERE provider_account_id='acct_original'`);
+    expect((await store()).status).toBe('review_required');
+    const receipt=rows()[0]!;
+    expect(JSON.parse(receipt.input_json)).toMatchObject({retentionAccountId:'a',retentionTenantId:null});
+    expect(f.raw.prepare(`SELECT count(*) AS n FROM workflow_steps WHERE ${tenantScopeCondition('workflow_steps')}`).get('other')).toEqual({n:0});
+  });
+  it('顧客削除済みの決済関連への再受信は本文を保存せず要確認にする',async()=>{
+    await bind();await store();
+    f.raw.exec(`UPDATE workflow_steps SET customer_redaction_requested_at=1 WHERE process_kind IN ('booking_stripe_object','booking_stripe_webhook')`);
+    await redactCustomerWorkflows(f.db,Date.now());
+    expect((await store()).status).toBe('review_required');
+    expect(await applyBookingStripeReceipt(f.db,'acct_original','evt_paid',effect)).toBe('review_required');
+    expect((await store({...event(),id:'evt_after_delete'})).status).toBe('review_required');
+    expect(await applyBookingStripeReceipt(f.db,'acct_original','evt_after_delete',effect)).toBe('review_required');
+    const received=await send({...event(),id:'evt_http_after_delete'});
+    expect(received.status).toBe(202);
+    expect(await received.json()).toMatchObject({data:{status:'review_required'}});
+    const review=f.raw.prepare("SELECT input_json FROM workflow_steps WHERE subject_id='evt_after_delete'").get() as {input_json:string};
+    expect(JSON.parse(review.input_json)).toMatchObject({redacted:true,accounting:{eventType:'invoice.paid',objectId:'in_month',amount:4200,currency:'jpy'}});
+    expect(review.input_json).not.toContain('cus_person');
+    expect(JSON.parse(review.input_json)).toMatchObject({retentionAccountId:'a',retentionTenantId:'t'});
+    expect(f.raw.prepare(`SELECT count(*) AS n FROM workflow_steps WHERE ${tenantScopeCondition('workflow_steps')}`).get('t')).toEqual({n:4});
+    const saved=rows().find(row=>row.input_json.includes('redacted'))!;
+    expect(saved.input_json).not.toContain('cus_person');
+    expect(f.raw.prepare('SELECT uses FROM effects').get()).toEqual({uses:0});
+  });
+  it('顧客削除受付と決済の再受信が重なっても受信本文を残さない',async()=>{
+    await bind();
+    f.raw.prepare(`INSERT INTO operation_audit(id,target_kind,target_id,action,actor_id,friend_id,detail_json)
+      VALUES ('customer-delete:friend_data:f','customer_deletion','f','deleting','owner','f',?)`).run(JSON.stringify({accountId:'a'}));
+    expect((await store()).status).toBe('review_required');
+    expect(rows()[0]).toMatchObject({status:'canceled',error_code:'customer_deleted'});
+    expect(rows()[0]!.input_json).not.toContain('cus_person');
+    expect(await applyBookingStripeReceipt(f.db,'acct_original','evt_paid',effect)).toBe('review_required');
+  });
   it('受信が先でも、関連を保存してから同じ受信を一度だけ反映する',async()=>{
     await store();await bind();expect(await applyBookingStripeReceipt(f.db,'acct_original','evt_paid',effect)).toBe('applied');
     expect(await applyBookingStripeReceipt(f.db,'acct_original','evt_paid',effect)).toBe('duplicate');

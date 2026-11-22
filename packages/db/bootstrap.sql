@@ -9801,7 +9801,7 @@ CREATE TABLE workflow_steps (
   error_code TEXT,
   first_attempt_at INTEGER,
   created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL, customer_redaction_requested_at INTEGER,
   PRIMARY KEY (scope_id, process_kind, subject_id, step_key),
   CHECK ((status = 'running' AND NOT (lease_owner IS NULL) AND NOT (lease_expires_at IS NULL))
       OR (status <> 'running' AND lease_owner IS NULL AND lease_expires_at IS NULL))
@@ -12227,6 +12227,12 @@ CREATE INDEX visit_stamp_qr_account ON visit_stamp_qr_codes(line_account_id);
 CREATE UNIQUE INDEX visit_stamp_qr_one_active
   ON visit_stamp_qr_codes(card_id,line_account_id,kind,session_id) WHERE status='active';
 
+CREATE INDEX workflow_customer_deletion_digest ON operation_audit(target_kind, json_extract(CASE WHEN json_valid(detail_json) THEN detail_json ELSE '{}' END,'$.recipientDigest'));
+
+CREATE INDEX workflow_customer_deletion_friend ON operation_audit(target_kind,friend_id,action);
+
+CREATE INDEX workflow_steps_customer_redaction_due ON workflow_steps(customer_redaction_requested_at) WHERE customer_redaction_requested_at IS NOT NULL;
+
 CREATE INDEX workflow_steps_due ON workflow_steps(process_kind, status, next_attempt_at, lease_expires_at);
 
 CREATE TRIGGER ab_block_active_edit BEFORE UPDATE OF message_content,message_bubbles_json,message_options_json ON broadcasts WHEN EXISTS(SELECT 1 FROM broadcast_ab_tests WHERE broadcast_id=NEW.id AND status!='draft')
@@ -13969,6 +13975,89 @@ CREATE TRIGGER visit_stamp_entry_balance AFTER INSERT ON visit_stamp_entries BEG
 CREATE TRIGGER visit_stamp_rt_insert AFTER INSERT ON rt_reservations WHEN NEW.status IN ('visited','seated') BEGIN INSERT INTO visit_stamp_visit_queue(kind,visit_id) VALUES('restaurant',NEW.id) ON CONFLICT(kind,visit_id) DO UPDATE SET generation=generation+1; END;
 
 CREATE TRIGGER visit_stamp_rt_update AFTER UPDATE OF status ON rt_reservations WHEN NEW.status<>OLD.status AND (NEW.status IN ('visited','seated') OR OLD.status IN ('visited','seated')) BEGIN INSERT INTO visit_stamp_visit_queue(kind,visit_id) VALUES('restaurant',NEW.id) ON CONFLICT(kind,visit_id) DO UPDATE SET generation=generation+1; END;
+
+CREATE TRIGGER workflow_steps_keep_redaction_request
+BEFORE UPDATE ON workflow_steps
+WHEN OLD.customer_redaction_requested_at IS NOT NULL AND NEW.customer_redaction_requested_at IS NULL
+BEGIN SELECT RAISE(ABORT, 'workflow_customer_redaction_pending'); END;
+
+CREATE TRIGGER workflow_steps_no_deleted_customer_claim
+BEFORE UPDATE ON workflow_steps
+WHEN NEW.status='running' AND NEW.customer_redaction_requested_at IS NULL
+  AND (OLD.status<>'running' OR NEW.lease_owner IS NOT OLD.lease_owner)
+  AND OLD.error_code IS NOT 'delivery_started' AND NEW.process_kind='tracked_click'
+  AND EXISTS (SELECT 1 FROM workflow_steps root JOIN operation_audit audit
+    ON audit.target_kind='customer_deletion' AND audit.action<>'deleted'
+      AND audit.id='customer-delete:friend_data:' || audit.friend_id
+      AND json_extract(CASE WHEN json_valid(root.input_json) THEN root.input_json ELSE '{}' END,'$.friendId')=audit.friend_id
+    WHERE root.scope_id=NEW.scope_id AND root.process_kind=NEW.process_kind AND root.subject_id=NEW.subject_id AND root.step_key='__run'
+      AND NEW.scope_id='line:' || json_extract(audit.detail_json,'$.accountId'))
+BEGIN SELECT RAISE(ABORT, 'workflow_customer_redaction_pending'); END;
+
+CREATE TRIGGER workflow_steps_no_deleted_customer_insert
+BEFORE INSERT ON workflow_steps
+WHEN EXISTS (
+  SELECT 1 FROM operation_audit audit WHERE audit.target_kind='customer_deletion'
+    AND audit.id='customer-delete:friend_data:' || audit.friend_id
+    AND audit.friend_id IN (
+      SELECT CASE WHEN NEW.scope_id LIKE 'friend:%' THEN substr(NEW.scope_id,8) END
+      UNION SELECT json_extract(CASE WHEN json_valid(NEW.input_json) THEN NEW.input_json ELSE '{}' END,'$.friendId')
+      UNION SELECT json_extract(CASE WHEN json_valid(NEW.input_json) THEN NEW.input_json ELSE '{}' END,'$.snapshot.friendId')
+      UNION SELECT f.id FROM friends f WHERE NEW.scope_id='line:' || f.line_account_id AND f.line_user_id IS NOT NULL AND f.line_user_id<>''
+        AND f.line_user_id IN (
+          json_extract(CASE WHEN json_valid(NEW.input_json) THEN NEW.input_json ELSE '{}' END,'$.to'),
+          json_extract(CASE WHEN json_valid(NEW.input_json) THEN NEW.input_json ELSE '{}' END,'$.snapshot.to'),
+          json_extract(CASE WHEN json_valid(NEW.input_json) THEN NEW.input_json ELSE '{}' END,'$.toLineUserId'))
+    )
+    AND (
+      NEW.scope_id='friend:' || audit.friend_id OR
+      (NEW.scope_id='line:' || json_extract(audit.detail_json,'$.accountId') AND (
+        json_extract(CASE WHEN json_valid(NEW.input_json) THEN NEW.input_json ELSE '{}' END,'$.friendId')=audit.friend_id OR
+        json_extract(CASE WHEN json_valid(NEW.input_json) THEN NEW.input_json ELSE '{}' END,'$.snapshot.friendId')=audit.friend_id OR
+        EXISTS (SELECT 1 FROM friends f WHERE f.id=audit.friend_id AND f.line_account_id=json_extract(audit.detail_json,'$.accountId')
+          AND f.line_user_id IS NOT NULL AND f.line_user_id<>'' AND f.line_user_id IN (
+            json_extract(CASE WHEN json_valid(NEW.input_json) THEN NEW.input_json ELSE '{}' END,'$.to'),
+            json_extract(CASE WHEN json_valid(NEW.input_json) THEN NEW.input_json ELSE '{}' END,'$.snapshot.to'),
+            json_extract(CASE WHEN json_valid(NEW.input_json) THEN NEW.input_json ELSE '{}' END,'$.toLineUserId')
+          ))
+      ))
+    )
+)
+BEGIN SELECT RAISE(ABORT, 'workflow_customer_redaction_pending'); END;
+
+CREATE TRIGGER workflow_steps_no_deleted_stripe_receipt
+BEFORE INSERT ON workflow_steps
+WHEN NEW.process_kind='booking_stripe_webhook' AND EXISTS (
+  SELECT 1 FROM workflow_steps binding WHERE binding.scope_id=NEW.scope_id
+    AND binding.process_kind='booking_stripe_object' AND binding.step_key='binding'
+    AND binding.subject_id=json_extract(CASE WHEN json_valid(NEW.input_json) THEN NEW.input_json ELSE '{}' END,'$.event.object.id')
+    AND (binding.customer_redaction_requested_at IS NOT NULL OR EXISTS (
+      SELECT 1 FROM operation_audit audit WHERE audit.target_kind='customer_deletion' AND audit.action<>'deleted'
+        AND audit.id='customer-delete:friend_data:' || audit.friend_id
+        AND audit.friend_id=json_extract(CASE WHEN json_valid(binding.input_json) THEN binding.input_json ELSE '{}' END,'$.friendId')
+        AND json_extract(audit.detail_json,'$.accountId')=json_extract(CASE WHEN json_valid(binding.input_json) THEN binding.input_json ELSE '{}' END,'$.accountId')
+    ))
+)
+BEGIN SELECT RAISE(ABORT, 'workflow_customer_redaction_pending'); END;
+
+CREATE TRIGGER workflow_steps_no_redacted_child
+BEFORE INSERT ON workflow_steps
+WHEN NEW.step_key <> '__run' AND EXISTS (
+  SELECT 1 FROM workflow_steps root WHERE root.scope_id = NEW.scope_id
+    AND root.process_kind = NEW.process_kind AND root.subject_id = NEW.subject_id
+    AND root.customer_redaction_requested_at IS NOT NULL
+)
+BEGIN SELECT RAISE(ABORT, 'workflow_customer_redaction_pending'); END;
+
+CREATE TRIGGER workflow_steps_no_redacted_start
+BEFORE UPDATE ON workflow_steps
+WHEN OLD.customer_redaction_requested_at IS NOT NULL AND (
+  (NEW.status = 'running' AND (OLD.status <> 'running' OR NEW.lease_owner IS NOT OLD.lease_owner)) OR
+  (NEW.status = 'running' AND NEW.error_code = 'delivery_started' AND OLD.error_code IS NOT 'delivery_started') OR
+  (OLD.status <> 'unknown' AND NEW.status = 'unknown' AND
+    CASE WHEN json_valid(NEW.result_json) THEN json_extract(NEW.result_json, '$.callState.phase') ELSE NULL END = 'started')
+)
+BEGIN SELECT RAISE(ABORT, 'workflow_customer_redaction_pending'); END;
 
 CREATE VIEW booking_monthly_available_rights AS
  SELECT r.entitlement_id,c.id contract_id,c.account_id,c.friend_id,c.class_kind,c.class_id,y.period_start,y.service_start,y.service_end,c.stop_effective_at

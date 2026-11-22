@@ -12,6 +12,7 @@ export interface WorkflowStepRow {
   attempt_count: number; max_attempts: number; next_attempt_at: number | null;
   retry_key: string; input_json: string | null; result_json: string | null;
   error_code: string | null; first_attempt_at: number | null; created_at: number; updated_at: number;
+  customer_redaction_requested_at?: number | null;
 }
 export function workflowBindings(ref: WorkflowStepRef): string[] {
   return [ref.scopeId, ref.processKind, ref.subjectId, ref.stepKey];

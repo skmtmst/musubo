@@ -681,7 +681,8 @@
     "769_musubo_contracted_linked_slots.sql",
     "770_onboarding_guide_progress.sql",
     "786_restaurant_course_gallery.sql",
+    "787_workflow_customer_redaction.sql",
     "789_limit_legacy_folder_update_triggers.sql"
   ],
-  "migrationCount": 682
+  "migrationCount": 683
 }

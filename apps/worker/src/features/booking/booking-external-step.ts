@@ -3,6 +3,7 @@ import { ensureWorkflowStep, workflowBindings, workflowJson, WORKFLOW_WHERE, typ
 import { createCallState, createExternalCall, validateState } from '../../lib/external-call/index.js';
 import { type CallIdentity, type CallPolicy, type CallResult, type CallState, type Outcome } from '../../lib/external-call/types.js';
 import { BookingExternalCircuits } from './booking-external-circuits.js';
+import { customerDestinationBlocked, customerDestinationDigest, noCustomerDeletionForDigest } from '../../services/customer-deletion-destination.js';
 
 interface Snapshot<S> { identity: CallIdentity; policy: CallPolicy; snapshot: S }
 interface Result<T> { callState: CallState; value?: T }
@@ -24,6 +25,9 @@ export interface BookingExternalStep<S, T> {
 /** 既存workflow_stepsを使う予約系の記録→単発実行→結果。startedはleaseで取り直さない。 */
 export async function runBookingExternalStep<S, T>(db: D1Database, options: BookingExternalStep<S, T>): Promise<CallResult<T>> {
   if (options.ref.scopeId !== `line:${options.identity.scope.accountId}`) throw new Error('booking_external_scope_conflict');
+  const destination = (options.snapshot && typeof options.snapshot==='object') ? (options.snapshot as {to?:unknown}).to : undefined;
+  const incomingDigest=typeof destination==='string' && destination ? await customerDestinationDigest(options.identity.scope.accountId,destination) : null;
+  if(incomingDigest && await customerDestinationBlocked(db,incomingDigest,options.identity.scope.accountId,destination as string)) throw new Error('customer_deleted');
   const now = options.now ?? Date.now;
   const input: Snapshot<S> = { identity: options.identity, policy: options.policy, snapshot: options.snapshot };
   const created = await ensureWorkflowStep(db, options.ref, {
@@ -33,6 +37,8 @@ export async function runBookingExternalStep<S, T>(db: D1Database, options: Book
   const saved = JSON.parse(created.input_json ?? 'null') as Snapshot<S> | null;
   // 別の作りの旧checkpointを新規送信へ読み替えない。既存の履歴は保持する。
   if (!saved?.identity || !saved.policy || !('snapshot' in saved)) throw new Error('booking_external_legacy_checkpoint');
+  const savedDestination=(saved.snapshot && typeof saved.snapshot==='object') ? (saved.snapshot as {to?:unknown}).to : undefined;
+  const savedDigest=typeof savedDestination==='string' && savedDestination ? await customerDestinationDigest(options.identity.scope.accountId,savedDestination) : null;
   if (workflowJson(saved.identity) !== workflowJson(options.identity)) throw new Error('booking_external_identity_conflict');
   let result: Result<T> | null = created.result_json ? JSON.parse(created.result_json) : null;
   let state = result?.callState ?? createCallState(saved.identity, saved.policy, created.created_at);
@@ -69,8 +75,9 @@ export async function runBookingExternalStep<S, T>(db: D1Database, options: Book
           || (previous.phase !== 'ready' && previous.phase !== 'started')) return false;
         validateState(next);
         const where = `${WORKFLOW_WHERE} AND input_json=? AND result_json IS ? AND attempt_count=?
-          AND status NOT IN ('succeeded','exhausted','canceled')`;
-        const args = [...workflowBindings(options.ref), created.input_json, previousJson, previous.attempts];
+          AND status NOT IN ('succeeded','exhausted','canceled')${next.phase==='started' && savedDigest ? ` AND ${noCustomerDeletionForDigest}` : ''}`;
+        const args = [...workflowBindings(options.ref), created.input_json, previousJson, previous.attempts,
+          ...(next.phase==='started' && savedDigest ? [savedDigest,options.identity.scope.accountId,savedDestination] : [])];
         const nextJson = workflowJson({ callState: next, ...(next.phase === 'succeeded' ? { value } : {}) });
         const status = next.phase === 'succeeded' ? 'succeeded' : next.phase === 'ready' ? 'pending'
           : next.phase === 'stopped' ? 'exhausted' : 'unknown';
