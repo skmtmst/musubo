@@ -34,6 +34,9 @@ export type WorkerBindings = {
     /** 検証環境の会議 OAuth は秘密設定と明示的な有効化が揃う場合だけ使用。 */
     BOOKING_MEETING_OAUTH_ENABLED?: string;
     BOOKING_MEETING_REAL_ENABLED?: string;
+    BOOKING_MEETING_CREDENTIAL_KEYS?: string;
+    BOOKING_MEETING_CREDENTIAL_V2_ENABLED?: string;
+    BOOKING_MEETING_CREDENTIAL_REJECT_V1?: string;
     BOOKING_OUTLOOK_MUTATIONS_ENABLED?: string;
     BOOKING_MEETING_OAUTH_CONFIG?: string;
     /** 検証環境で明示したときだけランク通知を実送信する。 */

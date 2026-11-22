@@ -1,3 +1,4 @@
+import {meetingCredentialKeys} from './booking-meeting-crypto.js';
 import type {Env} from '../../worker-env.js';
 import {featureJobCanRun} from '../../services/feature-enforcement.js';
 import {clientForConnection,type StaffCalendarConnection} from './calendar-connection.js';
@@ -39,12 +40,12 @@ export function externalCleanupExecutor(env:Env['Bindings']):CleanupExecutor {
   };
   if(!await eligible())return 'review';
   const provider=item.provider,config=meetingOAuthConfig(env,provider);if(!config)return 'review';
-  const access=await meetingAccessToken(env.DB,{accountId,staffId:item.staffId,provider,encryptionKey:env.LINE_CREDENTIAL_ENCRYPTION_KEY,config,signal:new AbortController().signal});
+  const access=await meetingAccessToken(env.DB,{accountId,staffId:item.staffId,provider,encryptionKey:meetingCredentialKeys(env),config,signal:new AbortController().signal});
   if(access.kind==='busy'||access.kind==='retryable')return 'wait';
   if(access.kind!=='ready')return 'review';
   const token=async(staffId:string)=>{
    if(staffId!==item.staffId||!await staffActive()||!await eligible())return null;
-   const current=await cachedMeetingAccess(env.DB,{accountId,staffId,provider,encryptionKey:env.LINE_CREDENTIAL_ENCRYPTION_KEY!});
+   const current=await cachedMeetingAccess(env.DB,{accountId,staffId,provider,encryptionKey:meetingCredentialKeys(env)});
    return current?.connectionId===access.connectionId?{token:current.token,accountId:current.externalAccountId}:null;
   };
   if(provider==='outlook'){

@@ -1,16 +1,18 @@
-import {decryptCredential,encryptCredential} from '@line-crm/db';
+import {decryptMeetingCredential,encryptMeetingCredential,MeetingKeyConfigurationError,type MeetingKeyInput} from './booking-meeting-crypto.js';
 import type {MeetingProvider} from './booking-meeting-create.js';
 export type ConnectionProvider=MeetingProvider|'outlook';
 type Credential={provider:ConnectionProvider;externalAccountId:string;refreshToken:string;accessToken?:string;accessExpiresAt?:string};
 type Scope={accountId:string;staffId:string;provider:ConnectionProvider};
 
-async function decode(value:string,provider:ConnectionProvider,key:string):Promise<Credential>{
- const data:unknown=JSON.parse(await decryptCredential(value,key));
+async function decode(value:string,scope:Scope,key:MeetingKeyInput):Promise<{credential:Credential;needsRotation:boolean}>{
+ const decoded=await decryptMeetingCredential(value,key,scope);
+ const data:unknown=JSON.parse(decoded.plaintext);
+ const provider=scope.provider;
  if(!data||typeof data!=='object'||Array.isArray(data))throw new Error('invalid_meeting_credential');
  const v=data as Record<string,unknown>;
  if(v.provider!==provider||typeof v.externalAccountId!=='string'||!v.externalAccountId||typeof v.refreshToken!=='string'||!v.refreshToken)throw new Error('invalid_meeting_credential');
  if((v.accessToken!==undefined&&typeof v.accessToken!=='string')||(v.accessExpiresAt!==undefined&&typeof v.accessExpiresAt!=='string'))throw new Error('invalid_meeting_credential');
- return {provider,externalAccountId:v.externalAccountId,refreshToken:v.refreshToken,...(typeof v.accessToken==='string'?{accessToken:v.accessToken}:{}),...(typeof v.accessExpiresAt==='string'?{accessExpiresAt:v.accessExpiresAt}:{})};
+ return {credential:{provider,externalAccountId:v.externalAccountId,refreshToken:v.refreshToken,...(typeof v.accessToken==='string'?{accessToken:v.accessToken}:{}),...(typeof v.accessExpiresAt==='string'?{accessExpiresAt:v.accessExpiresAt}:{})},needsRotation:decoded.needsRotation};
 }
 /** 管理画面へは接続状態だけを返す。更新用の鍵は返さない。 */
 export async function hasMeetingCredential(db:D1Database,input:Scope):Promise<boolean>{
@@ -19,11 +21,12 @@ export async function hasMeetingCredential(db:D1Database,input:Scope):Promise<bo
  return !!row;
 }
 /** 未失効の access token のみ返す。更新用の鍵は返さない。 */
-export async function cachedMeetingAccess(db:D1Database,input:Scope & {encryptionKey:string}):Promise<{token:string;externalAccountId:string;expiresAt:string;connectionId:string;version:number}|null>{
+export async function cachedMeetingAccess(db:D1Database,input:Scope & {encryptionKey:MeetingKeyInput}, attempt=0):Promise<{token:string;externalAccountId:string;expiresAt:string;connectionId:string;version:number}|null>{
  const row=await db.prepare(`SELECT c.id,c.version,c.credential_enc FROM booking_meeting_connections c JOIN staff s ON s.id=c.staff_id AND s.line_account_id=c.line_account_id AND s.deleted_at IS NULL
  WHERE c.line_account_id=? AND c.staff_id=? AND c.provider=? AND c.refresh_state='ready'`).bind(input.accountId,input.staffId,input.provider).first<{id:string;version:number;credential_enc:string}>();
  if(!row)return null;
- const credential=await decode(row.credential_enc,input.provider,input.encryptionKey);
+ const {credential,needsRotation}=await decode(row.credential_enc,input,input.encryptionKey);
+ if(needsRotation){const encrypted=await encryptMeetingCredential(JSON.stringify(credential),input.encryptionKey,input);const updated=await db.prepare("UPDATE booking_meeting_connections SET credential_enc=? WHERE id=? AND version=? AND credential_enc=? AND refresh_state='ready'").bind(encrypted,row.id,row.version,row.credential_enc).run();if(updated.meta.changes!==1)return attempt===0?cachedMeetingAccess(db,input,1):null;}
  if(!credential.accessToken||!credential.accessExpiresAt||Date.parse(credential.accessExpiresAt)<=Date.now()+60000||!Number.isFinite(Date.parse(credential.accessExpiresAt)))return null;
  const current=await db.prepare("SELECT id FROM booking_meeting_connections WHERE id=? AND version=? AND refresh_state='ready'").bind(row.id,row.version).first();
  return current?{token:credential.accessToken,externalAccountId:credential.externalAccountId,expiresAt:credential.accessExpiresAt,connectionId:row.id,version:row.version}:null;
@@ -35,18 +38,21 @@ export async function meetingConnectionState(db:D1Database,input:Scope):Promise<
  return row?.refresh_state??'missing';
 }
 /** 使用中の鍵は再取得しない。通信結果が不明なら自動で再送せず接続し直す。 */
-export async function claimMeetingRefresh(db:D1Database,input:Scope & {encryptionKey:string}):Promise<{id:string;claim:string;version:number;credential:Credential}|null>{
+export async function claimMeetingRefresh(db:D1Database,input:Scope & {encryptionKey:MeetingKeyInput}):Promise<{id:string;claim:string;version:number;credential:Credential}|null>{
  const claim=crypto.randomUUID();
  const row=await db.prepare(`UPDATE booking_meeting_connections SET refresh_state='refreshing',refresh_claim=?,version=version+1,updated_at=?
  WHERE line_account_id=? AND staff_id=? AND provider=? AND refresh_state='ready'
  AND EXISTS(SELECT 1 FROM staff s WHERE s.id=booking_meeting_connections.staff_id AND s.line_account_id=booking_meeting_connections.line_account_id AND s.deleted_at IS NULL)
  RETURNING id,version,credential_enc`).bind(claim,new Date().toISOString(),input.accountId,input.staffId,input.provider).first<{id:string;version:number;credential_enc:string}>();
  if(!row)return null;
- try{return {id:row.id,claim,version:row.version,credential:await decode(row.credential_enc,input.provider,input.encryptionKey)};}
- catch{await failMeetingRefresh(db,{id:row.id,claim,version:row.version});throw new Error('invalid_meeting_credential');}
+ try{const decoded=await decode(row.credential_enc,input,input.encryptionKey);
+  return {id:row.id,claim,version:row.version,credential:decoded.credential};}
+ catch(error){if(error instanceof MeetingKeyConfigurationError)await releaseMeetingRefresh(db,{id:row.id,claim,version:row.version});else await failMeetingRefresh(db,{id:row.id,claim,version:row.version});throw error;}
 }
-export async function finishMeetingRefresh(db:D1Database,input:{id:string;claim:string;version:number;credential:Credential;encryptionKey:string}):Promise<boolean>{
- const encrypted=await encryptCredential(JSON.stringify(input.credential),input.encryptionKey);
+export async function finishMeetingRefresh(db:D1Database,input:{id:string;claim:string;version:number;credential:Credential;encryptionKey:MeetingKeyInput}):Promise<boolean>{
+ const scope=await db.prepare("SELECT line_account_id,staff_id,provider FROM booking_meeting_connections WHERE id=? AND version=? AND refresh_state='refreshing' AND refresh_claim=?").bind(input.id,input.version,input.claim).first<{line_account_id:string;staff_id:string;provider:ConnectionProvider}>();
+ if(!scope||scope.provider!==input.credential.provider)return false;
+ const encrypted=await encryptMeetingCredential(JSON.stringify(input.credential),input.encryptionKey,{accountId:scope.line_account_id,staffId:scope.staff_id,provider:scope.provider});
  const r=await db.prepare(`UPDATE booking_meeting_connections SET credential_enc=?,refresh_state='ready',refresh_claim=NULL,version=version+1,updated_at=?
  WHERE id=? AND version=? AND refresh_state='refreshing' AND refresh_claim=? AND provider=?`)
  .bind(encrypted,new Date().toISOString(),input.id,input.version,input.claim,input.credential.provider).run();return r.meta.changes===1;
@@ -63,9 +69,9 @@ export async function deleteMeetingCredential(db:D1Database,input:Scope):Promise
 }
 
 /** 認可を待つ間に切断された場合、古いコールバックは接続を復活させない。 */
-export async function finishAuthorizedMeetingConnection(db:D1Database,input:Scope & {state:string;actorId:string;credential:Credential;encryptionKey:string}):Promise<boolean>{
+export async function finishAuthorizedMeetingConnection(db:D1Database,input:Scope & {state:string;actorId:string;credential:Credential;encryptionKey:MeetingKeyInput}):Promise<boolean>{
  if(input.credential.provider!==input.provider||!input.credential.externalAccountId||!input.credential.refreshToken)throw new Error('invalid_meeting_credential');
- const encrypted=await encryptCredential(JSON.stringify(input.credential),input.encryptionKey),now=new Date().toISOString();
+ const encrypted=await encryptMeetingCredential(JSON.stringify(input.credential),input.encryptionKey,input),now=new Date().toISOString();
  const operations=await db.batch([
   db.prepare(`INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at)
    SELECT ?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM booking_meeting_oauth_states o JOIN staff s ON s.id=o.staff_id AND s.line_account_id=o.line_account_id AND s.deleted_at IS NULL
@@ -89,4 +95,27 @@ export async function recoverStaleMeetingRefresh(db:D1Database,input:Scope & {no
  WHERE line_account_id=? AND staff_id=? AND provider=? AND refresh_state='refreshing' AND updated_at<?`)
  .bind(now.toISOString(),input.accountId,input.staffId,input.provider,cutoff).run();
  return r.meta.changes===1;
+}
+
+/** 担当外には値を返さず、範囲を区切って旧暗号の残数を調べる。dryRun=false で CAS 更新する。 */
+export async function rotateMeetingCredentials(db:D1Database,input:{encryptionKey:MeetingKeyInput;afterId?:string;limit?:number;dryRun:boolean}):Promise<{scanned:number;needsRotation:number;rotated:number;busy:number;unreadable:number;changed:number;nextId:string|null}>{
+ if(typeof input.encryptionKey==='string'||input.encryptionKey.writeV2!==true)throw new Error('meeting_rotation_not_enabled');
+ const limit=Math.min(100,Math.max(1,Math.floor(input.limit??50)));
+ const rows=(await db.prepare('SELECT id,line_account_id,staff_id,provider,credential_enc,version,refresh_state FROM booking_meeting_connections WHERE id>? ORDER BY id LIMIT ?').bind(input.afterId??'',limit).all<{id:string;line_account_id:string;staff_id:string;provider:ConnectionProvider;credential_enc:string;version:number;refresh_state:string}>()).results;
+ const result={scanned:rows.length,needsRotation:0,rotated:0,busy:0,unreadable:0,changed:0,nextId:rows.length===limit?rows[rows.length-1].id:null};
+ for(const row of rows){
+  const needsRotation=row.credential_enc.startsWith('v1.')||!row.credential_enc.startsWith(`v2.${input.encryptionKey.activeId}.`);
+  if(needsRotation)result.needsRotation++;
+  if(row.refresh_state!=='ready'){result.busy++;continue;}
+  const scope={accountId:row.line_account_id,staffId:row.staff_id,provider:row.provider};
+  try{
+   const decoded=await decode(row.credential_enc,scope,input.encryptionKey);
+   if(!decoded.needsRotation)continue;
+   if(input.dryRun)continue;
+   const cipher=await encryptMeetingCredential(JSON.stringify(decoded.credential),input.encryptionKey,scope);
+   const update=await db.prepare("UPDATE booking_meeting_connections SET credential_enc=? WHERE id=? AND version=? AND refresh_state='ready' AND credential_enc=?").bind(cipher,row.id,row.version,row.credential_enc).run();
+   if(update.meta.changes===1)result.rotated++;else result.changed++;
+  }catch{result.unreadable++;}
+ }
+ return result;
 }

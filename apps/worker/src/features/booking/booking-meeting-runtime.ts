@@ -1,3 +1,4 @@
+import {meetingCredentialKeys} from './booking-meeting-crypto.js';
 import type { MeetingQueueDependencies } from './booking-meeting-queue.js';
 import type { Env } from '../../worker-env.js';
 import type {MeetingProvider} from './booking-meeting-create.js';
@@ -32,7 +33,7 @@ export function meetingQueueDependencies(env:Env['Bindings']):MeetingQueueDepend
   for(const [mapKey,target] of targets){
    const config=meetingOAuthConfig(env,target.provider);if(!config)return null;
    // 外部会議の8秒の期限の前に鍵を取得し、回転を最後まで保存する。
-   const access=await meetingAccessToken(env.DB,{accountId,staffId:target.staffId,provider:target.provider,encryptionKey:env.LINE_CREDENTIAL_ENCRYPTION_KEY,config,signal:new AbortController().signal});
+   const access=await meetingAccessToken(env.DB,{accountId,staffId:target.staffId,provider:target.provider,encryptionKey:meetingCredentialKeys(env),config,signal:new AbortController().signal});
    if(access.kind==='busy'||access.kind==='retryable')return {deferred:true,removers:{},verifiers:{}};
    if(access.kind!=='ready'){
     if((access.kind==='missing'||access.kind==='reconnect') && (target.staffId!==booking.staff_id || target.provider!==selected)){unavailable.push(target);continue;}
@@ -50,7 +51,7 @@ export function meetingQueueDependencies(env:Env['Bindings']):MeetingQueueDepend
      .bind(token.connectionId,accountId,staffId,p,token.version).first();
     if(current&&Date.parse(token.expiresAt)>Date.now()+10000)return {token:token.token,accountId:token.accountId};
     // 同じ接続の鍵だけが更新された場合は、新しく保存された鍵を使う。
-    const refreshed=await cachedMeetingAccess(env.DB,{accountId,staffId,provider:p,encryptionKey:env.LINE_CREDENTIAL_ENCRYPTION_KEY!});
+    const refreshed=await cachedMeetingAccess(env.DB,{accountId,staffId,provider:p,encryptionKey:meetingCredentialKeys(env)});
     return refreshed?.connectionId===token.connectionId?{token:refreshed.token,accountId:refreshed.externalAccountId}:null;
    }));
   }
@@ -72,7 +73,7 @@ export async function meetingCreatorForBooking(env:Env['Bindings'],bookingId:str
  const accountId=booking.line_account_id,staffId=booking.staff_id;
  const provider=await preferredMeetingProvider(env.DB,{accountId,staffId});if(!provider)return 'unavailable';
  const config=meetingOAuthConfig(env,provider);if(!config)return 'unavailable';
- const access=await meetingAccessToken(env.DB,{accountId,staffId,provider,encryptionKey:env.LINE_CREDENTIAL_ENCRYPTION_KEY,config,signal:new AbortController().signal});
+ const access=await meetingAccessToken(env.DB,{accountId,staffId,provider,encryptionKey:meetingCredentialKeys(env),config,signal:new AbortController().signal});
  if(access.kind==='busy'||access.kind==='retryable')return 'deferred';
  if(access.kind!=='ready')return 'unavailable';
  return meetingProvider(provider,async target=>{
@@ -80,7 +81,7 @@ export async function meetingCreatorForBooking(env:Env['Bindings'],bookingId:str
   const current=await env.DB.prepare("SELECT id FROM booking_meeting_connections WHERE id=? AND line_account_id=? AND staff_id=? AND provider=? AND version=? AND refresh_state='ready'")
    .bind(access.connectionId,accountId,staffId,provider,access.version).first();
   if(current&&Date.parse(access.expiresAt)>Date.now()+10000)return {token:access.token,accountId:access.externalAccountId};
-  const refreshed=await cachedMeetingAccess(env.DB,{accountId,staffId,provider,encryptionKey:env.LINE_CREDENTIAL_ENCRYPTION_KEY!});
+  const refreshed=await cachedMeetingAccess(env.DB,{accountId,staffId,provider,encryptionKey:meetingCredentialKeys(env)});
   return refreshed?.connectionId===access.connectionId?{token:refreshed.token,accountId:refreshed.externalAccountId}:null;
  });
 }

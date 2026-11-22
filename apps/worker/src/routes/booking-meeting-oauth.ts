@@ -1,3 +1,4 @@
+import {meetingCredentialKeys,validateMeetingEncryptionKey} from '../features/booking/booking-meeting-crypto.js';
 import {Hono,type Context} from 'hono';
 import {BOOKING_STAFF_OWN_KEY} from '@line-crm/shared';
 import type {Env} from '../worker-env.js';
@@ -53,6 +54,7 @@ bookingMeetingOAuth.post(base+'/connect',async c=>{
  const config=meetingOAuthConfig(c.env,provider);if(!config)return c.json({success:true,data:{mode:'mock',authorizationUrl:null}});
  if(provider==='outlook'&&(await calendarSwitch(c.env.DB,accountId,staffId)).readEnabled&&!await outlookStaffIsTestRecipient(c.env.DB,{lineAccountId:accountId,staffId}))throw new GapError('outlook_test_staff_required',409);
  if(!c.env.LINE_CREDENTIAL_ENCRYPTION_KEY)throw new GapError('oauth_not_configured',503);
+ await validateMeetingEncryptionKey(meetingCredentialKeys(c.env));
  const verifier=newMeetingVerifier();const state=await beginMeetingAuthorization(c.env.DB,{accountId,staffId,actorId:c.get('staff').id,provider,verifier,encryptionKey:c.env.LINE_CREDENTIAL_ENCRYPTION_KEY});
  c.header('Set-Cookie',stateCookie(state));
  auditLog(c,'booking.meeting.connect.start',{id:staffId,kind:provider},{lineAccountId:accountId});
@@ -74,13 +76,14 @@ bookingMeetingOAuth.get('/api/booking/admin/meeting-oauth/callback',async c=>{
  if(!row)throw new GapError('invalid_state',401);
  const accountId=await gapAccount(c,row.line_account_id);await staffTarget(c,accountId,row.staff_id,true);
  const key=c.env.LINE_CREDENTIAL_ENCRYPTION_KEY;if(!key)throw new GapError('oauth_not_configured',503);
+ await validateMeetingEncryptionKey(meetingCredentialKeys(c.env));
  const consumed=await consumeMeetingAuthorization(c.env.DB,{accountId,state,actorId,encryptionKey:key});if(!consumed)throw new GapError('invalid_state',401);
  if(c.req.query('error')||!c.req.query('code'))return c.redirect(adminReturn(c,accountId,consumed.staffId,'denied'));
  const config=meetingOAuthConfig(c.env,consumed.provider);if(!config)throw new GapError('oauth_not_configured',503);
  if(consumed.provider==='outlook'&&(await calendarSwitch(c.env.DB,accountId,consumed.staffId)).readEnabled&&!await outlookStaffIsTestRecipient(c.env.DB,{lineAccountId:accountId,staffId:consumed.staffId}))return c.redirect(adminReturn(c,accountId,consumed.staffId,'failed'));
  let tokens:Awaited<ReturnType<typeof exchangeMeetingAuthorization>>;
  try{tokens=await exchangeMeetingAuthorization(config,{code:c.req.query('code')!,verifier:consumed.verifier,signal:AbortSignal.timeout(15000)});}catch{return c.redirect(adminReturn(c,accountId,consumed.staffId,'failed'));}
- const connected=await finishAuthorizedMeetingConnection(c.env.DB,{accountId,staffId:consumed.staffId,provider:consumed.provider,actorId,state,encryptionKey:key,credential:{provider:consumed.provider,externalAccountId:tokens.externalAccountId,refreshToken:tokens.refreshToken}});
+ const connected=await finishAuthorizedMeetingConnection(c.env.DB,{accountId,staffId:consumed.staffId,provider:consumed.provider,actorId,state,encryptionKey:meetingCredentialKeys(c.env),credential:{provider:consumed.provider,externalAccountId:tokens.externalAccountId,refreshToken:tokens.refreshToken,accessToken:tokens.accessToken,accessExpiresAt:tokens.expiresAt}});
  if(!connected)return c.redirect(adminReturn(c,accountId,consumed.staffId,'failed'));
  if(consumed.provider==='outlook')await c.env.DB.prepare(`UPDATE workflow_steps SET status='pending',error_code=NULL,next_attempt_at=NULL,updated_at=?
   WHERE scope_id=? AND process_kind='booking_outlook_sync' AND status='failed'

@@ -1,13 +1,18 @@
+import {MeetingKeyConfigurationError,validateMeetingEncryptionKey,type MeetingKeyInput} from './booking-meeting-crypto.js';
 import {cachedMeetingAccess,claimMeetingRefresh,failMeetingRefresh,finishMeetingRefresh,meetingConnectionState,recoverStaleMeetingRefresh,releaseMeetingRefresh,type ConnectionProvider} from './booking-meeting-credentials.js';
 import {MeetingRefreshError,refreshMeetingAuthorization,type MeetingOAuthConfig} from './booking-meeting-oauth-client.js';
 export type MeetingAccessResult={kind:'ready';token:string;externalAccountId:string;expiresAt:string;connectionId:string;version:number}|{kind:'busy'|'missing'|'retryable'|'configuration'|'reconnect'};
 /** 更新鍵の競合を直列化する。通信結果不明の鍵は再送せず接続し直す。 */
-export async function meetingAccessToken(db:D1Database,input:{accountId:string;staffId:string;provider:ConnectionProvider;encryptionKey:string;config:MeetingOAuthConfig|null;signal:AbortSignal},request:typeof fetch=fetch):Promise<MeetingAccessResult>{
+export async function meetingAccessToken(db:D1Database,input:{accountId:string;staffId:string;provider:ConnectionProvider;encryptionKey:MeetingKeyInput;config:MeetingOAuthConfig|null;signal:AbortSignal},request:typeof fetch=fetch):Promise<MeetingAccessResult>{
  if(!input.config||input.config.provider!==input.provider||!input.config.clientId||!input.config.clientSecret)return {kind:'configuration'};
  const scope={accountId:input.accountId,staffId:input.staffId,provider:input.provider,encryptionKey:input.encryptionKey};
  if(input.signal.aborted)return {kind:'retryable'};
- const cached=await cachedMeetingAccess(db,scope);if(cached)return {kind:'ready',...cached};
- const lease=await claimMeetingRefresh(db,scope);
+ try{await validateMeetingEncryptionKey(input.encryptionKey);}catch{return {kind:'configuration'};}
+ let cached:Awaited<ReturnType<typeof cachedMeetingAccess>>;
+ try{cached=await cachedMeetingAccess(db,scope);}catch(error){return {kind:error instanceof MeetingKeyConfigurationError?'configuration':'reconnect'};}
+ if(cached)return {kind:'ready',...cached};
+ let lease:Awaited<ReturnType<typeof claimMeetingRefresh>>;
+ try{lease=await claimMeetingRefresh(db,scope);}catch(error){return {kind:error instanceof MeetingKeyConfigurationError?'configuration':'reconnect'};}
  if(!lease){await recoverStaleMeetingRefresh(db,scope);const state=await meetingConnectionState(db,scope);return {kind:state==='refreshing'?'busy':state==='unknown'?'reconnect':state==='ready'?'retryable':'missing'};}
  try {
   // 会議の8秒制限と独立させ、更新鍵の入れ替えを途中で打ち切らない。

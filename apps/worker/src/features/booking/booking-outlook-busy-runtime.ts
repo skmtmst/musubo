@@ -1,3 +1,4 @@
+import {meetingCredentialKeys} from './booking-meeting-crypto.js';
 import {accountFeatureOffExclusionSql} from '@line-crm/db';
 import type {Env} from '../../worker-env.js';
 import {outlookCalendar} from './booking-outlook-calendar.js';
@@ -21,11 +22,11 @@ export async function outlookBusyForStaff(env:Env['Bindings'],input:Input):Promi
  const eligible=()=>outlookStaffIsTestRecipient(env.DB,input);
  if(!await eligible())throw new Error('outlook_test_staff_required');
  const config=meetingOAuthConfig(env,'outlook');if(!config)throw new Error('outlook_read_unavailable');
- const access=await meetingAccessToken(env.DB,{accountId:input.lineAccountId,staffId:input.staffId,provider:'outlook',encryptionKey:env.LINE_CREDENTIAL_ENCRYPTION_KEY,config,signal:new AbortController().signal});
+ const access=await meetingAccessToken(env.DB,{accountId:input.lineAccountId,staffId:input.staffId,provider:'outlook',encryptionKey:meetingCredentialKeys(env),config,signal:new AbortController().signal});
  if(access.kind!=='ready')throw new Error('outlook_read_unavailable');
  const calendar=outlookCalendar(async staffId=>{
   if(staffId!==input.staffId||!await eligible())return null;
-  const current=await cachedMeetingAccess(env.DB,{accountId:input.lineAccountId,staffId,provider:'outlook',encryptionKey:env.LINE_CREDENTIAL_ENCRYPTION_KEY!});
+  const current=await cachedMeetingAccess(env.DB,{accountId:input.lineAccountId,staffId,provider:'outlook',encryptionKey:meetingCredentialKeys(env)});
   return current?.connectionId===access.connectionId?{token:current.token,accountId:current.externalAccountId}:null;
  });
  const own=await env.DB.prepare(`SELECT json_extract(result_json,'$.eventId') id FROM workflow_steps

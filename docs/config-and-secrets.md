@@ -19,6 +19,15 @@ NEXT_PUBLIC_* と VITE_* は配信JavaScriptに入る公開情報。認証token�
 
 .env.exampleは空値の名前表で、コピーだけで起動できる設定ではない。空文字と未設定ではコードの??/||判定が異なるため、使わない任意行は削除してから使う。実送信・決済・外部書込の許可はこの文書から発生しない。
 
+## 会議・Outlook の接続（検証環境）
+
+- `BOOKING_MEETING_OAUTH_CONFIG` は Worker の秘密設定。サービス別の `clientId` と `clientSecret` を持つ JSON で、キーは `google_meet`・`zoom`・`teams`・`outlook`。値は文書やログに書かない。`BOOKING_MEETING_OAUTH_ENABLED=true` と検証環境が揃ったときだけ使用する。
+- `BOOKING_MEETING_CREDENTIAL_KEYS` は任意の Worker 秘密設定。`activeId` と、鍵 ID をキーとする `keys` の JSON。各値は 32 バイト鍵の Base64。未設定なら LINE の鍵を使う。旧形式の復号には移行中も `LINE_CREDENTIAL_ENCRYPTION_KEY` が必要。使用中の旧鍵を残したまま新鍵を追加し、書き換え済みの件数を確認してから旧鍵を外す。
+- `BOOKING_MEETING_CREDENTIAL_V2_ENABLED` は任意の Worker 設定。既定は無効。まず読み取り互換の版を全 Worker に配り、古い版が動かないことを確認した後に `true` にして鍵 ID と AAD 付きの書き込み・読み取り時の移行を始める。途中で無効に戻すと旧形式で新しい書き込みが作られるため、安易に切り戻さない。
+- `BOOKING_MEETING_CREDENTIAL_REJECT_V1` は任意の Worker 設定。既定は無効。全接続の移行完了後だけ `true` にすると旧形式を拒否する。旧形式の接続が残っていれば読めなくなる。旧形式は AAD がないため、移行前は行の入れ替えを検知できない。
+- 鍵の追加は、旧鍵と新鍵を両方登録して全 Worker が読めることを先に確かめ、その後に `activeId` を切り替える。新形式を書いた後は、新形式を読めない旧版へ Worker を戻さない。未使用の接続を含めた全件移行の運用手順が整うまでは、旧鍵を外さず `BOOKING_MEETING_CREDENTIAL_REJECT_V1` を有効化しない。
+- 同じ鍵 ID を別の鍵に再利用しない。`line` は従来の LINE 用の鍵を指す予約済み ID のため、`BOOKING_MEETING_CREDENTIAL_KEYS` の `keys` には指定しない。
+
 ## 機能のスイッチ（意味・既定）
 
 公開側の入口とWorkerの実行判定は別。店舗ごとの予約/クーポンはrt_store_feature_flagsが正本で、環境の旗で代用しない。[段2の契約](v8-requirements/cleanup-stage2-contract.md)を参照。上限・許可先・本番の閉鎖を変更しない。
