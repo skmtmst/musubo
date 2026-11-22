@@ -15,7 +15,6 @@ import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import { OpsListPage, OpsListToolbar } from './list-page'
 import { DataTable, TableHeadRow, Th, Td, Tr, NameCell, RowNameLink, DateCell } from '@/components/shared/table'
-import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import { OPS_READONLY_LOCK_REASON, useOpsReadOnlyState } from './use-ops-read-only'
@@ -79,7 +78,6 @@ export default function OpsTenantsV8() {
   const lock = access === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
-  const [newRestaurant, setNewRestaurant] = useState(false)
   const [createBusy, setCreateBusy] = useState(false)
   const [createError, setCreateError] = useState('')
 
@@ -119,7 +117,6 @@ export default function OpsTenantsV8() {
     if (createBusy) return
     setCreating(false)
     setNewName('')
-    setNewRestaurant(false)
     setCreateError('')
   }
 
@@ -128,11 +125,10 @@ export default function OpsTenantsV8() {
     if (!newName.trim()) { setCreateError('統括名を入力してください'); return }
     setCreateBusy(true)
     setCreateError('')
-    const res = await opsCall(api.ops.createTenant(newName.trim(), newRestaurant ? ['restaurant'] : []))
+    const res = await opsCall(api.ops.createTenant(newName.trim()))
     setCreateBusy(false)
     if (!res.success) { setCreateError(res.error || '作成できませんでした。時間をおいて、もう一度お試しください。'); return }
     setNewName('')
-    setNewRestaurant(false)
     setCreating(false)
     router.push(createPageReturnHref('/ops/tenants', res.data.id))
   }
@@ -165,7 +161,7 @@ export default function OpsTenantsV8() {
           : visible.length === 0 ? <ListState permissionScope="hq" kind="empty" title="該当する契約先がありません" description="検索の言葉や絞り込みを変えてください。" />
           : <DataTable aria-label="契約先" columnSizing="content" columnLayout={{ headHeight: 'var(--tpl-list-head-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
             <thead><TableHeadRow data-table-layout="columns">
-              <Th grow>統括名</Th><Th>プラン</Th><Th>状態</Th><Th align="right" collapseAt="narrow">店舗</Th><Th align="right" collapseAt="narrow">権限者</Th><Th>利用 / 請求</Th><Th collapseAt="narrow">契約日</Th><Th>最終ログイン</Th><Th collapseAt="narrow">飲食店機能</Th>
+              <Th grow>統括名</Th><Th>プラン</Th><Th>状態</Th><Th align="right" collapseAt="narrow">店舗</Th><Th align="right" collapseAt="narrow">権限者</Th><Th>利用 / 請求</Th><Th collapseAt="narrow">契約日</Th><Th>最終ログイン</Th>
             </TableHeadRow></thead>
             <tbody>{visible.map((row) => {
               const state = tenantState(row)
@@ -181,7 +177,6 @@ export default function OpsTenantsV8() {
                 </span></Td>
                 <DateCell collapseAt="narrow"><span data-list-date-time>{formatDate(row.created_at).replace(/-/g, '/')}</span></DateCell>
                 <DateCell title={formatDateTime(row.last_login_at)}><span data-list-date-time>{monthDay(row.last_login_at)}</span></DateCell>
-                <Td collapseAt="narrow">{row.featurePacks.includes('restaurant') ? <StatusBadge dot={false}>使う</StatusBadge> : emptyValue('unknown')}</Td>
               </Tr>
             })}</tbody>
           </DataTable>}
@@ -202,12 +197,6 @@ export default function OpsTenantsV8() {
       >
         <div className={parts.dialogBody}>
           <Field label="統括名（会社名）" required><SaveErrorField names={["newName","new_name"]}><TextField value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="musubo株式会社" maxLength={100} aria-label="統括名（会社名）" /></SaveErrorField></Field>
-          <div className={styles.field}>
-            <span className={styles.smallLabel}>飲食店機能</span>
-            <div className={styles.fullSelect}>
-              <SaveErrorField names={["newRestaurant","new_restaurant"]}><Select aria-label="飲食店機能" value={newRestaurant ? 'use' : 'skip'} onChange={(value) => setNewRestaurant(value === 'use')} size="full" options={[{ value: 'skip', label: '使わない' }, { value: 'use', label: '使う' }]} /></SaveErrorField>
-            </div>
-          </div>
           <Notice tone="info">
             作ると、統括の最初の権限者へ招待を送れるようになります。プランは契約先の詳細で決めます。
           </Notice>
