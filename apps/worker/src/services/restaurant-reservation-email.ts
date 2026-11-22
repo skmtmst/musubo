@@ -146,6 +146,7 @@ async function upsertReservation(
     : null;
   const status = parsed.kind === 'confirmed' ? 'confirmed' : parsed.kind === 'request' ? 'pending' : 'cancelled';
   const note = parsed.courseName ? `媒体コース: ${parsed.courseName}` : null;
+  // 顧客削除後の定型名を保ち、同じ予約の媒体メールから個人情報が戻らないようにする。
   const result = await dbFor(input.env, input.storeId).prepare(`INSERT INTO rt_reservations
     (id, store_id, source, external_id, customer_name, customer_phone, guest_count,
      starts_at, ends_at, status, note, source_updated_at, media_id, hold_expires_at,
@@ -153,17 +154,17 @@ async function upsertReservation(
      parser_key, parser_version)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(store_id, source, external_id) DO UPDATE SET confirmation_revision = rt_reservations.confirmation_revision + 1,
-      customer_name = excluded.customer_name,
-      customer_phone = excluded.customer_phone,
+      customer_name = CASE WHEN rt_reservations.customer_name = '削除済みのお客さま' THEN rt_reservations.customer_name ELSE excluded.customer_name END,
+      customer_phone = CASE WHEN rt_reservations.customer_name = '削除済みのお客さま' THEN NULL ELSE excluded.customer_phone END,
       guest_count = excluded.guest_count,
       starts_at = excluded.starts_at,
       ends_at = excluded.ends_at,
       status = excluded.status,
-      note = excluded.note,
+      note = CASE WHEN rt_reservations.customer_name = '削除済みのお客さま' THEN NULL ELSE excluded.note END,
       source_updated_at = excluded.source_updated_at,
       media_id = excluded.media_id,
       hold_expires_at = excluded.hold_expires_at,
-      cancel_reason = excluded.cancel_reason,
+      cancel_reason = CASE WHEN rt_reservations.customer_name = '削除済みのお客さま' THEN NULL ELSE excluded.cancel_reason END,
       stay_minutes = excluded.stay_minutes,
       media_store_code = excluded.media_store_code,
       table_label = excluded.table_label,
