@@ -1465,7 +1465,7 @@ CREATE TABLE billing_events (
   tenant_id    TEXT,
   summary      TEXT NOT NULL DEFAULT '',
   received_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, lease_token TEXT, lease_until TEXT, review_amount INTEGER, review_currency TEXT, retained_until TEXT);
+, lease_token TEXT, lease_until TEXT, review_amount INTEGER, review_currency TEXT, retained_until TEXT, external_effect_pending INTEGER NOT NULL DEFAULT 0 CHECK (external_effect_pending IN (0,1)));
 
 CREATE TABLE billing_invoices (
   id                  TEXT PRIMARY KEY,

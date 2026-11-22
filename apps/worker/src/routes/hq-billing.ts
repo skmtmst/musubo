@@ -39,7 +39,7 @@ import { getBillingPaymentFailure, getRecentBillingPaymentRecovery } from '../se
 import { musuboBillingOverview } from '../services/musubo-billing-overview.js';
 import { acceptedMusuboLineResumption } from '../services/musubo-line-resumption-review.js';
 import { processMusuboBillingEvent } from '../services/musubo-billing-webhook.js';
-import { claimBillingEventLease, releaseBillingEventLease, deferPurgedBillingEvent, tenantPurgeInProgress } from '../services/tenant-purge-tombstones.js';
+import { claimBillingEventLease, releaseBillingEventLease, beginBillingExternalEffect, endBillingExternalEffect, deferPurgedBillingEvent, tenantPurgeInProgress } from '../services/tenant-purge-tombstones.js';
 import { deliverBillingRecoveryNotice, deliverCurrentBillingFailureNotice } from '../services/billing-invoice-notifications.js';
 import { StripeApiError, stripeApi, type StripeCheckoutSession, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
@@ -658,6 +658,13 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     if (!await claimBillingEventLease(c.env.DB,event.id,leaseToken,leaseNow.toISOString(),new Date(leaseNow.getTime()+15*60*1000).toISOString())) {
       return c.json({ success:false,error:'billing_event_busy' },503);
     }
+    const mayHaveExternalEffect = Boolean(tenant && (event.type === 'invoice.paid' || event.type === 'invoice.payment_failed'
+      || (event.type === 'checkout.session.completed' && object.mode === 'setup')));
+    let externalEffectUncertain = false;
+    if (mayHaveExternalEffect && !await beginBillingExternalEffect(c.env.DB,event.id,leaseToken)) {
+      await releaseBillingEventLease(c.env.DB,event.id,leaseToken);
+      return c.json({success:false,error:'billing_external_effect_unavailable'},503);
+    }
     try {
     const refundedInvoiceId = event.type === 'charge.refunded'
       ? await resolveRefundedInvoiceId(c, object)
@@ -676,12 +683,13 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
         && stripeExpandableId(object.id)
         && (object.metadata as Record<string, unknown> | undefined)?.purpose !== 'musubo_addition') {
         const invoiceId = stripeExpandableId(object.id)!;
-        const notice = (event.type === 'invoice.paid'
-          ? deliverBillingRecoveryNotice(c.env, invoiceId)
-          : deliverCurrentBillingFailureNotice(c.env, tenant.id))
-          .catch(() => logger.error('billing_invoice_notification_failed'));
-        try { c.executionCtx.waitUntil(notice); }
-        catch { await notice; }
+        try {
+          externalEffectUncertain = true;
+          await (event.type === 'invoice.paid'
+            ? deliverBillingRecoveryNotice(c.env, invoiceId)
+            : deliverCurrentBillingFailureNotice(c.env, tenant.id));
+          externalEffectUncertain = false;
+        } catch { logger.error('billing_invoice_notification_failed'); }
       }
       return c.json({ success: true, data: { received: true } });
     }
@@ -780,7 +788,9 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
             if (setupIntent.status !== 'succeeded' || setupIntent.customer !== customerId || !setupIntent.payment_method) {
               throw new StripeApiError(502, 'SetupIntent has not completed');
             }
+            externalEffectUncertain = true;
             await stripeApi.setCustomerDefaultPaymentMethod(c.env, customerId, setupIntent.payment_method);
+            externalEffectUncertain = false;
           } else {
             logger.warn('routes_hq_billing_warn');
           }
@@ -863,15 +873,17 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     if (subjectId && (event.type === 'invoice.payment_failed' || event.type === 'invoice.paid')) {
       // 通知の失敗で決済Webhookを再適用しない。送信台帳で二重送信を防ぎ、
       // 請求失敗の未送信分は定期ジョブでも拾う。
-      const notification = (event.type === 'invoice.paid'
-        ? deliverBillingRecoveryNotice(c.env, subjectId)
-        : deliverCurrentBillingFailureNotice(c.env, tenant.id))
-        .catch(() => logger.error('billing_invoice_notification_failed'));
-      try { c.executionCtx.waitUntil(notification); }
-      catch { await notification; }
+      try {
+        externalEffectUncertain = true;
+        await (event.type === 'invoice.paid'
+          ? deliverBillingRecoveryNotice(c.env, subjectId)
+          : deliverCurrentBillingFailureNotice(c.env, tenant.id));
+        externalEffectUncertain = false;
+      } catch { logger.error('billing_invoice_notification_failed'); }
     }
     return c.json({ success: true, data: { received: true } });
     } finally {
+      if (mayHaveExternalEffect && !externalEffectUncertain) await endBillingExternalEffect(c.env.DB,event.id,leaseToken);
       await releaseBillingEventLease(c.env.DB,event.id,leaseToken);
     }
   } catch (err) {

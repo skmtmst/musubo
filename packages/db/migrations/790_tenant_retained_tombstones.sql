@@ -34,3 +34,6 @@ CREATE TABLE tenant_purge_tombstone_progress (
   row_id TEXT NOT NULL,
   PRIMARY KEY (tenant_id, table_name, row_id)
 );
+
+-- 外部操作の応答が未確定なら、借受期限が切れても purge を始めない。
+ALTER TABLE billing_events ADD COLUMN external_effect_pending INTEGER NOT NULL DEFAULT 0 CHECK (external_effect_pending IN (0,1));

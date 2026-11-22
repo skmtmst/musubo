@@ -7,7 +7,7 @@ export async function claimTenantPurge(db: D1Database, tenantId: string, now: st
       AND (plan_status='canceled' OR (plan_status='trialing' AND trial_ends_at IS NOT NULL AND trial_ends_at < ?))
       AND (purge_requested_at IS NOT NULL OR (retention_anchor_at IS NOT NULL AND retention_anchor_at < ?))
       AND (purge_started_at IS NOT NULL OR (
-        NOT EXISTS (SELECT 1 FROM billing_events e WHERE e.tenant_id=tenants.id AND e.summary='pending' AND e.lease_token IS NOT NULL AND julianday(e.lease_until)>julianday('now'))
+        NOT EXISTS (SELECT 1 FROM billing_events e WHERE e.tenant_id=tenants.id AND (e.external_effect_pending=1 OR (e.summary='pending' AND e.lease_token IS NOT NULL AND julianday(e.lease_until)>julianday('now'))) )
         AND NOT EXISTS (SELECT 1 FROM musubo_tenant_billing b WHERE b.tenant_id=tenants.id AND b.resumption_requested_at IS NOT NULL)))`)
     .bind(now, tenantId, now, retentionCutoff(now)).run();
   return Number(result.meta.changes ?? 0) === 1;
@@ -22,7 +22,7 @@ export async function tenantPurgeInProgress(db: D1Database, tenantId: string): P
 export async function claimBillingEventLease(db: D1Database, eventId: string, token: string, now: string, until: string): Promise<boolean> {
   if (!now.endsWith('Z') || !until.endsWith('Z') || !Number.isFinite(Date.parse(now)) || !Number.isFinite(Date.parse(until)) || Date.parse(until)<=Date.parse(now)) throw new Error('invalid_billing_lease_time');
   const result = await db.prepare(`UPDATE billing_events SET lease_token=?,lease_until=?
-    WHERE id=? AND summary='pending' AND (lease_token IS NULL OR julianday(lease_until)<=julianday('now'))
+    WHERE id=? AND summary='pending' AND external_effect_pending=0 AND (lease_token IS NULL OR julianday(lease_until)<=julianday('now'))
       AND julianday(?)>julianday('now') AND julianday(?)<=julianday('now','+16 minutes')
       AND (tenant_id IS NULL OR EXISTS(SELECT 1 FROM tenants t WHERE t.id=billing_events.tenant_id
         AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL))`)
@@ -58,7 +58,7 @@ export function prepareBillingEventLeaseCompletion(db: D1Database, eventId: stri
 }
 
 export async function releaseBillingEventLease(db: D1Database, eventId: string, token: string): Promise<boolean> {
-  const result = await db.prepare('UPDATE billing_events SET lease_token=NULL,lease_until=NULL WHERE id=? AND lease_token=?')
+  const result = await db.prepare('UPDATE billing_events SET lease_token=NULL,lease_until=NULL WHERE id=? AND lease_token=? AND external_effect_pending=0')
     .bind(eventId, token).run();
   return Number(result.meta.changes ?? 0) === 1;
 }
@@ -114,7 +114,7 @@ export async function deferPurgedBillingEvent(db: D1Database, input: {
 export async function deferStaleBillingReceipts(db: D1Database, tenantId: string, now: string, limit=100): Promise<number> {
   if (!now.endsWith('Z') || !Number.isFinite(Date.parse(now))) throw new Error('invalid_billing_lease_time');
   const rows=await db.prepare(`SELECT id,type,review_amount,review_currency FROM billing_events
-    WHERE tenant_id=? AND summary='pending' AND (lease_token IS NULL OR julianday(lease_until)<=julianday('now'))
+    WHERE tenant_id=? AND summary='pending' AND external_effect_pending=0 AND (lease_token IS NULL OR julianday(lease_until)<=julianday('now'))
     ORDER BY received_at,id LIMIT ?`).bind(tenantId,Math.min(100,Math.max(1,Math.floor(limit)))).all<{
       id:string;type:string;review_amount:number|null;review_currency:string|null;
     }>();
@@ -269,4 +269,20 @@ export async function anonymizeMonthlyContract(db: D1Database, tenantId: string,
       request_json=json_remove(request_json,'$.friendId'),version=version+1
       WHERE ${scope}`).bind(contractId,tenantId),
   ]);
+}
+
+/** An uncertain external effect blocks purge even after the ordinary lease expires. */
+export async function beginBillingExternalEffect(db:D1Database, eventId:string, token:string):Promise<boolean> {
+  const result=await db.prepare(`UPDATE billing_events SET external_effect_pending=1
+    WHERE id=? AND summary='pending' AND lease_token=? AND external_effect_pending=0
+      AND julianday(lease_until)>julianday('now') AND EXISTS(SELECT 1 FROM tenants t WHERE t.id=billing_events.tenant_id
+        AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL)`).bind(eventId,token).run();
+  return Number(result.meta.changes ?? 0)===1;
+}
+
+/** Only a definitively finished effect can release the extra hold. */
+export async function endBillingExternalEffect(db:D1Database, eventId:string, token:string):Promise<boolean> {
+  const result=await db.prepare(`UPDATE billing_events SET external_effect_pending=0
+    WHERE id=? AND lease_token=? AND external_effect_pending=1`).bind(eventId,token).run();
+  return Number(result.meta.changes ?? 0)===1;
 }

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { activateLineAccount, createLineAccount, upsertFriend, getLineAccountById, getFriendById, getBroadcasts, getBroadcastById, updateTenantBilling, markTenantDataPurged, getStripeEvents, prepareBillingInvoice } from '@line-crm/db';
 import { gapFixture } from '../test-utils/gap1.js';
 import { stripeApi } from './stripe-api.js';
-import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan, claimTenantPurge, claimBillingEventLease, prepareCompleteBillingEventLease, prepareBillingEventLeaseCompletion, releaseBillingEventLease, recordPurgedTenantStripeEvent, deferPurgedBillingEvent, deferStaleBillingReceipts, billingEventLeaseFence } from './tenant-purge-tombstones.js';
+import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan, claimTenantPurge, claimBillingEventLease, beginBillingExternalEffect, endBillingExternalEffect, prepareCompleteBillingEventLease, prepareBillingEventLeaseCompletion, releaseBillingEventLease, recordPurgedTenantStripeEvent, deferPurgedBillingEvent, deferStaleBillingReceipts, billingEventLeaseFence } from './tenant-purge-tombstones.js';
 
 test('an expired completion rolls back earlier writes in the same batch', async () => {
   const f=gapFixture();
@@ -316,4 +316,20 @@ test('purge claims only after the live billing lease expires and defers the aban
   expect(await claimTenantPurge(f.db,'t',now)).toBe(true);
   expect(await deferStaleBillingReceipts(f.db,'t',now)).toBe(1);
   expect(f.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_abandoned'").get()).toEqual({summary:'purge_review'});
+});
+
+
+test('an unresolved external effect blocks purge beyond the lease deadline', async () => {
+  const f=gapFixture();
+  const now=new Date().toISOString(),until=new Date(Date.now()+60000).toISOString();
+  f.raw.exec("UPDATE tenants SET plan_status='canceled',purge_requested_at='2025-01-01' WHERE id='t'; INSERT INTO billing_events(id,type,tenant_id,summary) VALUES('evt_external','invoice.paid','t','pending')");
+  expect(await claimBillingEventLease(f.db,'evt_external','owner',now,until)).toBe(true);
+  expect(await beginBillingExternalEffect(f.db,'evt_external','owner')).toBe(true);
+  f.raw.exec("UPDATE billing_events SET lease_until='2000-01-01T00:00:00Z' WHERE id='evt_external'");
+  expect(await releaseBillingEventLease(f.db,'evt_external','owner')).toBe(false);
+  expect(await claimBillingEventLease(f.db,'evt_external','other',now,until)).toBe(false);
+  expect(await deferStaleBillingReceipts(f.db,'t',now)).toBe(0);
+  expect(await claimTenantPurge(f.db,'t',now)).toBe(false);
+  expect(await endBillingExternalEffect(f.db,'evt_external','owner')).toBe(true);
+  expect(await claimTenantPurge(f.db,'t',now)).toBe(true);
 });
