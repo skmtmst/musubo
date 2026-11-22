@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { Miniflare } from 'miniflare';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteCustomerData } from './customer-data-deletion.js';
+import { cleanupDeliveryOrphans } from './delivery-orphan-cleanup.js';
 
 let mf: Miniflare;
 let native: Awaited<ReturnType<Miniflare['getD1Database']>>;
@@ -70,6 +71,13 @@ describe('local workerd D1 binding', () => {
     await deleteCustomerData(env(), target('friend_data'), 'owner');
     expect(await native.prepare('SELECT id FROM rt_delivery_order_items WHERE id=?').bind('item-'+friendId).first()).toBeNull();
     expect(await native.prepare("SELECT id FROM rt_delivery_order_items WHERE id='other-item'").first()).toBeTruthy();
+  }, 30_000);
+  it('audits only the count of orphans atomically on a native D1 binding', async () => {
+    await native.prepare("INSERT INTO rt_delivery_order_items(id,order_id,name,note,created_at) VALUES ('orphan-native','absent','private','private note',1)").run();
+    expect(await cleanupDeliveryOrphans(db())).toBe(1);
+    expect(await cleanupDeliveryOrphans(db())).toBe(0);
+    const audits = await native.prepare("SELECT after_json FROM audit_events WHERE action='privacy.delivery_orphans.cleaned'").all();
+    expect(audits.results).toEqual([{after_json:'{\"deletedRows\":1}'}]);
   }, 30_000);
   it('rolls D1 batch back on an error after attachment deletion, then retries', async () => {
     await native.prepare("CREATE TRIGGER fail_customer_delete BEFORE DELETE ON form_submissions BEGIN SELECT RAISE(ABORT,'fail'); END").run();

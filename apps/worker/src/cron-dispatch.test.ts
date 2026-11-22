@@ -266,7 +266,7 @@ test('設定済みのCron式は実際のレーンを呼び、通知は重いレ�
   expect(new Set(crons)).toEqual(new Set(Object.values(SCHEDULED_CRONS)));
   const expected = {
     frequentHeavy: ['friend bulk runs','analytics cross','mileage projection','ad conversion outbox retry','analytics url exposure projection','analytics projection','account health','broadcast insights','NEN rich menu jobs','support email sync','friend field reminders','google business resync'],
-    sixHourlyHeavy: ['NEN tag refresh','analytics retention purge','friend snapshot','media usage scan','following mileage','booking expirer','event booking expirer','billing invoice sync','restaurant raw mail retention','google business metrics','tenant data retention purge','registration application retention'],
+    sixHourlyHeavy: ['NEN tag refresh','analytics retention purge','friend snapshot','media usage scan','following mileage','booking expirer','event booking expirer','billing invoice sync','restaurant raw mail retention','google business metrics','tenant data retention purge','delivery orphan cleanup','registration application retention'],
   };
   const classified=new Set(FEATURE_JOB_MANIFEST.map(job=>job.name));
   for (const lane of ['frequentHeavy','sixHourlyHeavy'] as const) {

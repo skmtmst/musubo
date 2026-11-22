@@ -1,5 +1,7 @@
 import { deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
 import { inputError } from '../lib/input-errors.js';
+import { cleanupDeliveryOrphans } from '../services/delivery-orphan-cleanup.js';
+import { logger } from '@line-crm/shared/server';
 
 import { getFriendById, getSavedSearchById, getSavedSearches, createSavedSearch, countSavedSearches, validateSearchConditions, SAVED_SEARCH_LIMIT } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -19,6 +21,7 @@ export const delete__api_friends_id_data_1 = async (c: Context<Env, "/api/friend
     const accountId = friend ? (friend as unknown as { line_account_id: string | null }).line_account_id : null;
     if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) return c.json({ success: false, error: '友だちが見つかりません' }, 404);
     const data = await deleteCustomerData(c.env, { kind: 'friend_data', id, friendId: id, accountId, lineUserId: friend.line_user_id }, c.get('staff')!.id);
+    try { await cleanupDeliveryOrphans(c.env.DB); } catch { logger.error('delivery_orphan_cleanup.failed'); }
     return c.json({ success: true, data });
   } catch (error) {
     if (error instanceof DeletionFailure && error.code === 'deletion_schema_approval_required') return c.json({ success: false, code: error.code, error: '支払・監査の記録を残すため、データ構造の変更承認が必要です。オーナーか管理者に頼んでください。' }, 409);
