@@ -156,6 +156,22 @@
       "idempotency_key": {
         "action": "unique",
         "reason": "必須の識別子を行IDから作る一意値に置換"
+      },
+      "setup_id": {
+        "action": "unique",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "stripe_customer_id": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "stripe_payment_method_id": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "card_last4": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
       }
     }
   },
@@ -244,6 +260,22 @@
       "person_label": {
         "action": "null",
         "reason": "顧客を示す名前を消去"
+      },
+      "external_event_id": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "external_calendar_id": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "outcome_recorded_by": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "notification_policy_snapshot": {
+        "action": "json",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
       }
     }
   },
@@ -348,6 +380,14 @@
       "idempotency_key": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "affiliate_code": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "attributed_ref_code": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
       }
     }
   },
@@ -800,6 +840,14 @@
       "filename": {
         "action": "placeholder",
         "reason": "ファイル名を消去"
+      },
+      "uploaded_by": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "archived_by": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
       }
     }
   },
@@ -836,6 +884,10 @@
       "photo_media_id": {
         "action": "retain",
         "reason": "店が作成したメニューの定義のため保持"
+      },
+      "meeting_location": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
       }
     }
   },

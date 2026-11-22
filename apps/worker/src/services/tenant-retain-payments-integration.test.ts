@@ -221,12 +221,16 @@ test('booking entitlement usage and anonymized booking remain after tenant purge
   const { monthlyFixture, monthlyContract, monthlyCycle, activateMonthly, monthlyRight, monthlyUse }=await import('../test-utils/monthly-ledger.js');
   const f=monthlyFixture();
   await monthlyContract(f); monthlyCycle(f,{paid:true}); activateMonthly(f); monthlyRight(f,'menu'); monthlyUse(f,'menu');
-  f.raw.exec("UPDATE bookings SET customer_note='private note' WHERE id='bk'; UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01' WHERE id='t'");
+  f.raw.exec(`INSERT INTO booking_payment_methods(id,friend_id,line_account_id,setup_id,stripe_customer_id,stripe_payment_method_id,card_last4,idempotency_key,created_at)
+    VALUES('method','f','a','seti_private','cus_private','pm_private','1234','key','2026-01-01');
+    UPDATE bookings SET booking_payment_method_id='method',customer_note='private note',meeting_location='private location',person_label='private name',external_event_id='private event' WHERE id='bk';
+    UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01' WHERE id='t'`);
   const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
   expect(result.completed).toBe(1);
   expect(f.raw.prepare("SELECT booking_id,booking_id_history FROM booking_entitlement_uses WHERE booking_id_history='bk'").get())
     .toEqual({booking_id:'bk',booking_id_history:'bk'});
-  expect(f.raw.prepare("SELECT customer_note FROM bookings WHERE id='bk'").get()).toEqual({customer_note:null});
+  expect(f.raw.prepare("SELECT customer_note,meeting_location,person_label,external_event_id FROM bookings WHERE id='bk'").get()).toEqual({customer_note:null,meeting_location:null,person_label:null,external_event_id:null});
+  expect(f.raw.prepare("SELECT stripe_customer_id,stripe_payment_method_id,card_last4 FROM booking_payment_methods WHERE id='method'").get()).toEqual({stripe_customer_id:null,stripe_payment_method_id:null,card_last4:null});
   expect(f.raw.pragma('foreign_key_check')).toEqual([]);
 });
 

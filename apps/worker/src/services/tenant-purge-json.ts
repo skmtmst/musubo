@@ -1,5 +1,6 @@
 /** 明示した列とキーだけを保持する。定義のない列は空のオブジェクトにする。 */
 const ALLOWED: Readonly<Record<string, readonly string[]>> = {
+  'bookings.notification_policy_snapshot': [],
   'booking_groups.request_json': ['amount', 'count', 'kind', 'createdAt', 'startsAt', 'endsAt'],
   'booking_series.request_json': ['amount', 'count', 'kind', 'createdAt', 'startsAt', 'endsAt'],
   'booking_series.rule_json': ['count', 'interval', 'frequency', 'until', 'startsAt', 'endsAt'],

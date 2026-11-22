@@ -227,6 +227,30 @@
         "notNull": true,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "setup_id",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "stripe_customer_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "stripe_payment_method_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "card_last4",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"
@@ -355,6 +379,30 @@
       {
         "column": "person_label",
         "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "external_event_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "external_calendar_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "outcome_recorded_by",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "notification_policy_snapshot",
+        "notNull": true,
         "key": false,
         "foreignKey": false
       }
@@ -506,6 +554,18 @@
       },
       {
         "column": "idempotency_key",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "affiliate_code",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "attributed_ref_code",
         "notNull": false,
         "key": false,
         "foreignKey": false
@@ -1173,6 +1233,18 @@
         "notNull": true,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "uploaded_by",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "archived_by",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"
@@ -1223,6 +1295,12 @@
       },
       {
         "column": "photo_media_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "meeting_location",
         "notNull": false,
         "key": false,
         "foreignKey": false
