@@ -80,7 +80,11 @@ test('monthly contract and retained rights survive tenant purge while customer a
   await monthlyContract(f,{classKind:'event',classId:'class'});
   monthlyCycle(f,{paid:true}); activateMonthly(f); monthlyRight(f,'event'); monthlyUse(f,'event');
   monthlyCycle(f,{id:'renewal',month:'2026-12',kind:'renewal'});
-  f.raw.exec(`INSERT INTO booking_monthly_attempts(cycle_id,tenant_id,account_id,attempt_no,scheduled_at,payment_method_id,payment_method_version,request_key)
+  f.raw.exec(`INSERT INTO booking_entitlement_events(id,entitlement_id,line_account_id,action,reason,actor_type,actor_id,request_key,request_json,after_json,created_at)
+      VALUES('ent-event','grant','a','grant','fixture','system','system','ent-event-key','{}','{}','2026-11-01');
+    INSERT INTO booking_entitlement_month_limits(entitlement_id,period_start,period_end,allowance)
+      VALUES('grant','2026-10-31','2026-11-30',4);
+    INSERT INTO booking_monthly_attempts(cycle_id,tenant_id,account_id,attempt_no,scheduled_at,payment_method_id,payment_method_version,request_key)
       VALUES('renewal','t','a',0,'2026-11-01T00:00:00Z','pm_original',1,'attempt-key');
     INSERT INTO booking_monthly_event_applications(source,connected_account,provider_event_id,receipt_id,payload_digest,contract_id,cycle_id,tenant_id,account_id,outcome,applied_at)
       VALUES('fixture','acct_original','event-fixture','receipt-fixture','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','contract','cycle','t','a','paid','2026-11-01');
@@ -94,7 +98,7 @@ test('monthly contract and retained rights survive tenant purge while customer a
     UPDATE event_booking_entitlement_uses SET makeup_credit_id='credit' WHERE event_booking_id_history='eb';`);
   const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
   expect(result.completed).toBe(1);
-  for (const table of ['booking_monthly_contracts','booking_monthly_active_slots','booking_monthly_cycles','booking_monthly_attempts','booking_monthly_event_applications','booking_monthly_operations','booking_monthly_rights','booking_entitlements','event_booking_entitlement_uses']) {
+  for (const table of ['booking_monthly_contracts','booking_monthly_active_slots','booking_monthly_cycles','booking_monthly_attempts','booking_monthly_event_applications','booking_monthly_operations','booking_monthly_rights','booking_pass_plans','booking_entitlements','booking_entitlement_events','booking_entitlement_month_limits','event_booking_entitlement_uses']) {
     expect((f.raw.prepare(`SELECT count(*) AS n FROM ${table}`).get() as {n:number}).n,table).toBeGreaterThan(0);
   }
   expect(f.raw.prepare("SELECT customer_id,payment_method_id FROM booking_monthly_contracts WHERE id='contract'").get()).toEqual({customer_id:null,payment_method_id:null});
@@ -207,5 +211,18 @@ test('billing and application history remains while old Stripe identifiers are h
   expect(f.raw.prepare("SELECT stripe_customer_id,subscription_id,amount_paid FROM billing_invoices WHERE id='invoice'").get()).toEqual({stripe_customer_id:null,subscription_id:null,amount_paid:2000});
   expect(f.raw.prepare("SELECT core_subscription_id,status FROM musubo_tenant_billing WHERE tenant_id='t'").get()).toEqual({core_subscription_id:null,status:'ended'});
   expect((f.raw.prepare("SELECT count(*) AS n FROM stripe_events WHERE tenant_id='t' AND review_reason='identifier_hash'").get() as {n:number}).n).toBe(2);
+  expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+});
+
+test('booking entitlement usage and anonymized booking remain after tenant purge', async () => {
+  const { monthlyFixture, monthlyContract, monthlyCycle, activateMonthly, monthlyRight, monthlyUse }=await import('../test-utils/monthly-ledger.js');
+  const f=monthlyFixture();
+  await monthlyContract(f); monthlyCycle(f,{paid:true}); activateMonthly(f); monthlyRight(f,'menu'); monthlyUse(f,'menu');
+  f.raw.exec("UPDATE bookings SET customer_note='private note' WHERE id='bk'; UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01' WHERE id='t'");
+  const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
+  expect(result.completed).toBe(1);
+  expect(f.raw.prepare("SELECT booking_id,booking_id_history FROM booking_entitlement_uses WHERE booking_id_history='bk'").get())
+    .toEqual({booking_id:'bk',booking_id_history:'bk'});
+  expect(f.raw.prepare("SELECT customer_note FROM bookings WHERE id='bk'").get()).toEqual({customer_note:null});
   expect(f.raw.pragma('foreign_key_check')).toEqual([]);
 });
