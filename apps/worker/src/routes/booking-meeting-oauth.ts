@@ -99,10 +99,10 @@ bookingMeetingOAuth.delete(base,async c=>{
      if(provider==='google_meet'){
       const ambiguous=await c.env.DB.prepare("SELECT 1 FROM google_calendar_connections WHERE is_active=1 AND auth_type='oauth' UNION ALL SELECT 1 FROM rt_google_connections WHERE refresh_token_enc IS NOT NULL UNION ALL SELECT 1 FROM google_sheets_integrations WHERE refresh_token_enc IS NOT NULL LIMIT 1").first();
       if(ambiguous||c.env.GOOGLE_BUSINESS_OAUTH_CLIENT_ID||c.env.GOOGLE_SHEETS_OAUTH_CLIENT_ID)decision='review';
-      const others=await c.env.DB.prepare("SELECT id,line_account_id,staff_id,credential_enc FROM booking_meeting_connections WHERE provider='google_meet' AND id<>? LIMIT 501").bind(row.id).all<{id:string;line_account_id:string;staff_id:string;credential_enc:string}>();
-      if(others.results.length>500)decision='review';
-      for(const other of others.results){const otherScope={accountId:other.line_account_id,staffId:other.staff_id,provider:'google_meet' as const};const otherValue=JSON.parse((await decryptMeetingCredential(other.credential_enc,keys,otherScope)).plaintext) as {externalAccountId?:unknown;provider?:unknown};if(otherValue.provider!=='google_meet'||typeof otherValue.externalAccountId!=='string'||!otherValue.externalAccountId){decision='review';break;}if(otherValue.externalAccountId===value.externalAccountId){decision='shared';break;}}
      }
+     const others=await c.env.DB.prepare('SELECT id,line_account_id,staff_id,credential_enc FROM booking_meeting_connections WHERE provider=? AND id<>? LIMIT 501').bind(provider,row.id).all<{id:string;line_account_id:string;staff_id:string;credential_enc:string}>();
+     if(others.results.length>500)decision='review';
+     for(const other of others.results){const otherScope={accountId:other.line_account_id,staffId:other.staff_id,provider};const otherValue=JSON.parse((await decryptMeetingCredential(other.credential_enc,keys,otherScope)).plaintext) as {externalAccountId?:unknown;provider?:unknown};if(otherValue.provider!==provider||typeof otherValue.externalAccountId!=='string'||!otherValue.externalAccountId){decision='review';break;}if(otherValue.externalAccountId===value.externalAccountId){decision='shared';break;}}
     }
    }catch{decision='review';}
    const reviewId=crypto.randomUUID();

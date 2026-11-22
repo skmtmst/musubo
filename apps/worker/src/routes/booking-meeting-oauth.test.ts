@@ -181,3 +181,51 @@ it('別の Google 連携の設定があり本人を照合できなければ revo
  expect((await gapCall(app,`${path}?account_id=a`,'DELETE')).status).toBe(200);expect(fetcher).not.toHaveBeenCalled();
  expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE category='error' AND event_type='booking_meeting_disconnect_review'").get()).toEqual({n:1});
 });
+it('Zoom の同じ利用者が他の担当に残る間は解除せず、最後の接続だけ解除する',async()=>{
+ const {encryptMeetingCredential}=await import('../features/booking/booking-meeting-crypto.js');
+ const keys={legacyKey:key,activeId:'line',keys:{line:key},writeV2:true};
+ for(const [id,staff] of [['first','bs'],['second','bs2']]){
+  const cipher=await encryptMeetingCredential(JSON.stringify({provider:'zoom',externalAccountId:'same-zoom-user',refreshToken:'refresh',accessToken:`access-${id}`}),keys,{accountId:'a',staffId:staff,provider:'zoom'});
+  d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES(?,'a',?,'zoom',?,'o','2026-01-01','2026-01-01')").run(id,staff,cipher);
+ }
+ const configured={...bindings,BOOKING_MEETING_CREDENTIAL_V2_ENABLED:'true',BOOKING_MEETING_OAUTH_CONFIG:JSON.stringify({zoom:{clientId:'client',clientSecret:'secret'}})};
+ const fetcher=vi.fn(async(_url:RequestInfo|URL,_init?:RequestInit)=>new Response('',{status:200}));vi.stubGlobal('fetch',fetcher);const app=gapApp(d,[bookingMeetingOAuth],gapOwner,false,configured);
+ expect((await gapCall(app,'/api/booking/admin/staff/bs/connections/zoom?account_id=a','DELETE')).status).toBe(200);expect(fetcher).not.toHaveBeenCalled();
+ expect(d.raw.prepare('SELECT id FROM booking_meeting_connections').all()).toEqual([{id:'second'}]);
+ expect((await gapCall(app,'/api/booking/admin/staff/bs2/connections/zoom?account_id=a','DELETE')).status).toBe(200);expect(fetcher).toHaveBeenCalledOnce();
+ expect(new URLSearchParams(fetcher.mock.calls[0][1]?.body as string).get('token')).toBe('access-second');
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_meeting_connections').get()).toEqual({n:0});
+});
+it('他の店の Zoom 接続も本人照合して解除しない',async()=>{
+ const {encryptMeetingCredential}=await import('../features/booking/booking-meeting-crypto.js');const keys={legacyKey:key,activeId:'line',keys:{line:key},writeV2:true};
+ d.raw.exec("INSERT INTO staff(id,line_account_id,name,display_name) VALUES('other-bs','b','担当','担当')");
+ for(const [id,account,staff] of [['first','a','bs'],['other','b','other-bs']]){
+  const cipher=await encryptMeetingCredential(JSON.stringify({provider:'zoom',externalAccountId:'same-zoom-user',refreshToken:'refresh',accessToken:'access'}),keys,{accountId:account,staffId:staff,provider:'zoom'});
+  d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES(?,?,?,'zoom',?,'o','2026-01-01','2026-01-01')").run(id,account,staff,cipher);
+ }
+ const configured={...bindings,BOOKING_MEETING_CREDENTIAL_V2_ENABLED:'true',BOOKING_MEETING_OAUTH_CONFIG:JSON.stringify({zoom:{clientId:'client',clientSecret:'secret'}})};
+ const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);expect((await gapCall(gapApp(d,[bookingMeetingOAuth],gapOwner,false,configured),'/api/booking/admin/staff/bs/connections/zoom?account_id=a','DELETE')).status).toBe(200);
+ expect(fetcher).not.toHaveBeenCalled();expect(d.raw.prepare('SELECT id FROM booking_meeting_connections').all()).toEqual([{id:'other'}]);
+});
+it.each(['broken','missing'] as const)('Zoom の他の接続が %s なら解除せず要確認',async otherValue=>{
+ const {encryptCredential}=await import('@line-crm/db');const first=await encryptCredential(JSON.stringify({provider:'zoom',externalAccountId:'user',refreshToken:'refresh',accessToken:'access'}),key);
+ const other=otherValue==='broken'?'broken':await encryptCredential(JSON.stringify({provider:'zoom',refreshToken:'refresh'}),key);
+ for(const [id,staff,cipher] of [['first','bs',first],['other','bs2',other]])d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES(?,'a',?,'zoom',?,'o','2026-01-01','2026-01-01')").run(id,staff,cipher);
+ const configured={...bindings,BOOKING_MEETING_OAUTH_CONFIG:JSON.stringify({zoom:{clientId:'client',clientSecret:'secret'}})};const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);
+ expect((await gapCall(gapApp(d,[bookingMeetingOAuth],gapOwner,false,configured),'/api/booking/admin/staff/bs/connections/zoom?account_id=a','DELETE')).status).toBe(200);
+ expect(fetcher).not.toHaveBeenCalled();expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE category='error' AND event_type='booking_meeting_disconnect_review'").get()).toEqual({n:1});
+});
+it('Zoom 解除中は別の担当の新規認可も待ち、終了後に開始できる',async()=>{
+ const {acquireMeetingRevokeLock,releaseMeetingRevokeLock}=await import('../features/booking/booking-meeting-revoke-lock.js');
+ const scope={accountId:'a',staffId:'bs',provider:'zoom' as const};const lease=await acquireMeetingRevokeLock(d.db,scope);expect(lease).toBeTruthy();
+ const configured={...bindings,BOOKING_MEETING_OAUTH_CONFIG:JSON.stringify({zoom:{clientId:'client',clientSecret:'secret'}})};const app=gapApp(d,[bookingMeetingOAuth],gapOwner,false,configured);
+ const route='/api/booking/admin/staff/bs2/connections/zoom/connect?account_id=a';expect((await gapCall(app,route,'POST',{})).status).toBe(409);
+ await releaseMeetingRevokeLock(d.db,scope,lease!);expect((await gapCall(app,route,'POST',{})).status).toBe(200);
+});
+it('切断する Zoom 接続に本人 ID がなければ解除せず要確認',async()=>{
+ const {encryptCredential}=await import('@line-crm/db');const cipher=await encryptCredential(JSON.stringify({provider:'zoom',refreshToken:'refresh',accessToken:'access'}),key);
+ d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('first','a','bs','zoom',?,'o','2026-01-01','2026-01-01')").run(cipher);
+ const configured={...bindings,BOOKING_MEETING_OAUTH_CONFIG:JSON.stringify({zoom:{clientId:'client',clientSecret:'secret'}})};const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);
+ expect((await gapCall(gapApp(d,[bookingMeetingOAuth],gapOwner,false,configured),'/api/booking/admin/staff/bs/connections/zoom?account_id=a','DELETE')).status).toBe(200);
+ expect(fetcher).not.toHaveBeenCalled();expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE category='error' AND event_type='booking_meeting_disconnect_review'").get()).toEqual({n:1});
+});
