@@ -1030,6 +1030,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             selectedBlockId={selectedBlockId}
             inputCount={inputCount}
             accountId={host ? null : selectedAccountId}
+            formId={id}
             portable={Boolean(host)}
             onSelectPage={selectPage}
             onAddPage={addSection}

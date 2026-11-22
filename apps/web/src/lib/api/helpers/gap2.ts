@@ -25,7 +25,7 @@ export const bookingSeriesApi={
 };
 export const formRoutingApi={
  saveLayout:(a:string,id:string,layout:FormLayout,expectedContentRevision:number)=>fetchApi<unknown>(account(`/api/forms/${e(id)}`,a),json('PUT',{layout,expectedContentRevision})),
- preview:(a:string,id:string,answers:Record<string,unknown>,blockId?:string)=>fetchApi<Result<{matchedIndex:number;target:BookingRouting['fallback'];usable:boolean;fellBack:boolean}>>(account(`/api/forms/${e(id)}/routing/preview`,a),json('POST',{answers,blockId})),
+ preview:(a:string,id:string,answers:Record<string,unknown>,blockId?:string,layout?:FormLayout)=>fetchApi<Result<{matchedIndex:number;target:BookingRouting['fallback'];usable:boolean;fellBack:boolean}>>(account(`/api/forms/${e(id)}/routing/preview`,a),json('POST',{answers,blockId,...(layout ? {layout} : {})})),
  resolve:(liffId:string,id:string,answers:Record<string,unknown>,token:string,blockId?:string)=>fetchApi<Result<{matchedIndex:number;target:BookingRouting['fallback'];routingToken:string;expiresAt:string}>>(liff(`/api/liff/forms/${e(id)}/routing/resolve`,liffId),{...json('POST',{answers,blockId}),headers:bearer(token)}),
  groups:(a:string)=>fetchApi<Result<Array<{id:string;name:string;staff_ids_json:string;version:number}>>>(account('/api/booking/admin/routing-staff-groups',a)),
  saveGroup:(a:string,id:string,input:{name:string;staffIds:string[];expectedVersion:number})=>fetchApi<Result<{version:number}>>(account(`/api/booking/admin/routing-staff-groups/${e(id)}`,a),json('PUT',input)),

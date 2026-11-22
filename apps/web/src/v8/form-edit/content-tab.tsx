@@ -42,6 +42,7 @@ import { useFormEditAttempted } from './field-issues';
 import { blockKindLine,blockTitleKind,blockTitleLine,inputTypeLabel,isChoiceType } from './model';
 import type { FormRouting } from './routing-model';
 import RoutingSection from './routing-section';
+import { formRoutingApi } from '@/lib/api/helpers/gap2';
 
 /*
  * 「中身」のタブ（・・・・ の左の列）。
@@ -60,6 +61,7 @@ type Props = {
   selectedBlockId: string | null
   inputCount: number
   accountId: string | null
+  formId?: string
   /** 統括のひな形（host.ts）：配った先の ID に直せない画像（登録メディア・画像の URL）は足せない。 */
   portable?: boolean
   onSelectPage: (index: number) => void
@@ -137,7 +139,7 @@ export function ContentTab(props: Props) {
         </div>
       </Card>
 
-      {props.onChangeRouting ? <RoutingSection blocks={layout.sections.flatMap((s) => s.blocks)} refs={props.refs} routing={props.routing} readOnly={props.readOnly} onChange={props.onChangeRouting} /> : null}
+      {props.onChangeRouting ? <RoutingSection blocks={[...layout.header, ...layout.sections.flatMap((s) => s.blocks)]} refs={props.refs} routing={props.routing} readOnly={props.readOnly} onChange={props.onChangeRouting} onPreview={props.accountId && props.formId ? async (answers) => (await formRoutingApi.preview(props.accountId!, props.formId!, answers, undefined, layout)).data : undefined} /> : null}
 
       <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-blocks-title">
         <div className={styles.cardHeadText}>
