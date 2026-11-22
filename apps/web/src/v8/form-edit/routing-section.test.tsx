@@ -124,3 +124,35 @@ it('数値の範囲を変更すると数値としてルールに反映する', (
   fireEvent.click(screen.getByRole('option',{name:'3'}).querySelector('button')!)
   expect(onChange.mock.calls[0][0].rules[0].conditions[0].value).toEqual([3,5])
 })
+
+it('複数選択の答えをまとめて試す', async () => {
+  const preview=vi.fn().mockResolvedValue({matchedIndex:-1,target:{menuId:'m'},fellBack:false})
+  render(<RoutingSection blocks={[
+    {id:'q',kind:'input',type:'checkbox',name:'needs',label:'相談内容',choices:[{id:'x',label:'就職'},{id:'y',label:'転職'}]},
+    {id:'book',kind:'input',type:'booking'},
+  ] as never} refs={{} as never} routing={{enabled:true,rules:[],fallback:{menuId:'m'}}} onChange={() => {}} onPreview={preview} />)
+  fireEvent.click(screen.getByRole('button',{name:'試しに答える'}))
+  fireEvent.click(screen.getByRole('checkbox',{name:'就職'}))
+  fireEvent.click(screen.getByRole('checkbox',{name:'転職'}))
+  expect(preview).toHaveBeenLastCalledWith({needs:['就職','転職']})
+})
+
+it('遅れて返った古い試行結果で新しい答えの結果を上書きしない', async () => {
+  let finishFirst!: (value:{matchedIndex:number;target:{menuId:string};fellBack:boolean}) => void
+  const preview=vi.fn().mockImplementationOnce(() => new Promise(resolve => {finishFirst=resolve}))
+    .mockResolvedValueOnce({matchedIndex:-1,target:{menuId:'fallback'},fellBack:false})
+  render(<RoutingSection blocks={[
+    {id:'q',kind:'input',type:'radio',name:'subject',label:'相談内容',choices:[{id:'x',label:'就職'},{id:'y',label:'転職'}]},
+    {id:'book',kind:'input',type:'booking'},
+  ] as never} refs={{bookingMenus:[{id:'fallback',name:'既定の相談',durationMinutes:30}]} as never}
+    routing={{enabled:true,rules:[],fallback:{menuId:'fallback'}}} onChange={() => {}} onPreview={preview} />)
+  fireEvent.click(screen.getByRole('button',{name:'試しに答える'}))
+  fireEvent.click(screen.getByRole('button',{name:'相談内容の試しの答え'}))
+  fireEvent.click(screen.getByRole('option',{name:'就職'}).querySelector('button')!)
+  fireEvent.click(screen.getByRole('button',{name:'相談内容の試しの答え'}))
+  fireEvent.click(screen.getByRole('option',{name:'転職'}).querySelector('button')!)
+  expect(await screen.findByText(/どれにも当たらないとき：既定の相談/)).toBeTruthy()
+  finishFirst({matchedIndex:0,target:{menuId:'old'},fellBack:false})
+  await Promise.resolve()
+  expect(screen.getByText(/どれにも当たらないとき：既定の相談/)).toBeTruthy()
+})
