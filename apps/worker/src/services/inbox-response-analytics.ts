@@ -10,7 +10,7 @@ const weekOf = (timestamp: string) => {
   const date = new Date(Date.parse(timestamp) + 9 * 3600_000);
   const monday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay()+6)%7);
-  return monday.toISOString().slice(0,10);
+  return monday.toLocaleDateString('en-CA',{timeZone:'UTC'});
 };
 /** 集計は必ず店の範囲を固定し、スタッフと閲覧のみは本人の返信だけを見る。 */
 export async function inboxResponseAnalytics(db:D1Database, account:string, staffId:string, allStaff:boolean, from?:string, to?:string) {

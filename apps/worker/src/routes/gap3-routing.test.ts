@@ -71,3 +71,13 @@ test('担当を無効化すると未完了の会話を未割当に戻し、他�
  expect(d.raw.prepare("SELECT assignee_staff_id,assigned_by FROM chats WHERE id='c'").get()).toEqual({assignee_staff_id:null,assigned_by:null});
  expect(d.raw.prepare("SELECT assignee_staff_id FROM chats WHERE id='c2'").get()).toEqual({assignee_staff_id:'o'});
 });
+test('候補選択後に担当が無効化された場合は割り当てない',async()=>{
+ expect((await gapCall(app(),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);
+ const original=d.db.batch.bind(d.db);
+ vi.spyOn(d.db,'batch').mockImplementation(async statements=>{
+  d.raw.exec("UPDATE staff_members SET is_active=0 WHERE id='s'");
+  return original(statements);
+ });
+ expect(await assignInbox(d.db,'a','f',new Date('2026-10-16T04:01:00Z'))).toBe(false);
+ expect(d.raw.prepare("SELECT assignee_staff_id FROM chats WHERE id='c'").get()).toEqual({assignee_staff_id:null});
+});

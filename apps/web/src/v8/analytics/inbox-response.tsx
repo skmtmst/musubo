@@ -11,7 +11,7 @@ import { inboxResponseApi, type InboxResponseResult } from '@/lib/api/helpers/ga
 const choices = [{value:'7',label:'過去7日'},{value:'30',label:'過去30日'},{value:'90',label:'過去90日'}] as const
 function range(days:number) {
   const today = new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Tokyo'})
-  const from = new Date(Date.parse(`${today}T00:00:00Z`) - (days-1)*86400000).toISOString().slice(0,10)
+  const from = new Date(Date.parse(`${today}T00:00:00Z`) - (days-1)*86400000).toLocaleDateString('en-CA',{timeZone:'UTC'})
   return {from,to:today}
 }
 const minutes = (value:number|null) => value === null ? '—' : `${Math.round(value*10)/10}分`
