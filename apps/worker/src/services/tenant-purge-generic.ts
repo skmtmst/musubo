@@ -23,7 +23,7 @@ export function buildTombstoneValues(
       case 'unique': values[column] = `purged:${table}:${column}:${rowId}`; break;
       case 'json':
         if (typeof row[column] !== 'string') throw new Error('invalid_tombstone_json');
-        values[column] = redactRetainedJson(row[column] as string);
+        values[column] = redactRetainedJson(row[column] as string, `${table}.${column}`);
         break;
       default: throw new Error('tombstone_policy_unresolved');
     }

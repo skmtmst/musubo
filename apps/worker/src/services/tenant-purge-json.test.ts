@@ -1,11 +1,13 @@
 import { expect, test } from 'vitest';
 import { redactRetainedJson } from './tenant-purge-json.js';
 
-test('redacts private keys recursively while preserving accounting terms', () => {
-  const input=JSON.stringify({name:'private',terms:{amount:1234,email:'private',nested:[{phone:'private',count:2},{TOKEN:'secret',end:'2027-01-01'}]},url:'private'});
-  expect(JSON.parse(redactRetainedJson(input))).toEqual({terms:{amount:1234,nested:[{count:2},{end:'2027-01-01'}]}});
+test('allows only accounting keys for the specific column', () => {
+  const input=JSON.stringify({kind:'send_message',count:2,content:'private',values:{birthday:'private'},friendId:'private',message:'private',title:'private',reason:'private'});
+  expect(JSON.parse(redactRetainedJson(input,'friend_bulk_runs.operation_json'))).toEqual({kind:'send_message',count:2});
+  expect(JSON.parse(redactRetainedJson(input,'unknown.request_json'))).toEqual({});
+  expect(JSON.parse(redactRetainedJson('{"amount":1200,"content":"private","values":{"name":"private"}}','booking_groups.request_json'))).toEqual({amount:1200});
 });
 
 test('rejects malformed JSON instead of silently storing it', () => {
-  expect(()=>redactRetainedJson('{')).toThrow();
+  expect(()=>redactRetainedJson('{','booking_groups.request_json')).toThrow();
 });

@@ -1,18 +1,29 @@
-/** Remove sensitive fields recursively before keeping structured contract or audit data. */
-const PRIVATE_JSON_KEY = /(?:name|line[_-]?user[_-]?id|email|phone|memo|note|address|token|secret|url|password|credential|authorization|access[_-]?key|customer[_-]?id|payment[_-]?method[_-]?id)/i;
+/** 明示した列とキーだけを保持する。定義のない列は空のオブジェクトにする。 */
+const ALLOWED: Readonly<Record<string, readonly string[]>> = {
+  'booking_groups.request_json': ['amount', 'count', 'kind', 'createdAt', 'startsAt', 'endsAt'],
+  'booking_series.request_json': ['amount', 'count', 'kind', 'createdAt', 'startsAt', 'endsAt'],
+  'booking_series.rule_json': ['count', 'interval', 'frequency', 'until', 'startsAt', 'endsAt'],
+  'booking_makeup_credits.rule_snapshot_json': ['enabled', 'cutoffHours', 'validDays', 'monthlyCap', 'target', 'targetIds'],
+  'events.makeup_rule_json': ['enabled', 'cutoffHours', 'validDays', 'monthlyCap', 'target', 'targetIds'],
+  'friend_bulk_runs.selection_json': ['count'],
+  'friend_bulk_runs.operation_json': ['kind', 'type', 'count'],
+  'conversion_points.source_config_json': [],
+};
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
-function redact(value: JsonValue): JsonValue {
-  if (Array.isArray(value)) return value.map(redact);
+function clean(value: JsonValue, allowed: ReadonlySet<string>): JsonValue {
+  if (Array.isArray(value)) return value.map(item => clean(item, allowed));
   if (value === null || typeof value !== 'object') return value;
-  const clean: Record<string, JsonValue> = Object.create(null) as Record<string, JsonValue>;
+  const result: Record<string, JsonValue> = Object.create(null) as Record<string, JsonValue>;
   for (const [key, child] of Object.entries(value)) {
-    if (!PRIVATE_JSON_KEY.test(key)) clean[key] = redact(child);
+    if (allowed.has(key)) result[key] = clean(child, allowed);
   }
-  return clean;
+  return result;
 }
 
-export function redactRetainedJson(input: string): string {
-  return JSON.stringify(redact(JSON.parse(input) as JsonValue));
+export function redactRetainedJson(input: string, column: string): string {
+  const value = JSON.parse(input) as JsonValue;
+  if (!(column in ALLOWED) || value === null || typeof value !== 'object') return '{}';
+  return JSON.stringify(clean(value, new Set(ALLOWED[column])));
 }
