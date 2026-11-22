@@ -39,5 +39,6 @@ test('retired identifiers are matched and missing old keys fail closed', async (
   expect(await matchPurgedPaymentIdentifiers(f.db,secret,{customer:'cus_old',subscription:null,now:'2028-01-01T00:00:00Z'})).toBe('t');
   expect(await matchPurgedPaymentIdentifiers(f.db,secret,{customer:'cus_new',subscription:null,now:'2028-01-01T00:00:00Z'})).toBeNull();
   expect(await matchPurgedPaymentIdentifiers(f.db,'new-key',{customer:'cus_old',subscription:null,now:'2028-01-01T00:00:00Z'}, JSON.stringify([secret]))).toBe('t');
+  expect(await matchPurgedPaymentIdentifiers(f.db,undefined,{customer:null,subscription:null,now:'2028-01-01T00:00:00Z'},'{bad')).toBeNull();
   await expect(matchPurgedPaymentIdentifiers(f.db,undefined,{customer:'cus_old',subscription:null,now:'2028-01-01T00:00:00Z'})).rejects.toThrow('purged_payment_key_unavailable');
 });

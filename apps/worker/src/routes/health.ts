@@ -1,3 +1,4 @@
+import { parsePreviousPurgeHashSecrets } from '../services/tenant-purge-payment-hashes.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -25,6 +26,7 @@ health.get('/health', (c) => {
 });
 health.get('/api/health', (c) => {
   c.header('Cache-Control', 'no-store');
+  try { parsePreviousPurgeHashSecrets(c.env.PURGED_PAYMENT_HMAC_PREVIOUS_SECRETS); } catch { return c.json({success:false,error:'purged_payment_key_configuration_invalid'},503); }
   return c.json({ success: true, data: { status: 'ok', ...buildMetadata(c.env) } });
 });
 

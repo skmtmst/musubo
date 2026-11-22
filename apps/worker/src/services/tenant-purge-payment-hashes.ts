@@ -52,14 +52,22 @@ export async function deleteExpiredPurgedPaymentIdentifierHashes(db: D1Database,
   return Number(result.meta.changes ?? 0);
 }
 
+export function parsePreviousPurgeHashSecrets(raw:string|undefined):string[] {
+  if (!raw) return [];
+  let parsed:unknown;
+  try { parsed=JSON.parse(raw); } catch { throw new Error('purged_payment_key_configuration_invalid'); }
+  if (!Array.isArray(parsed) || parsed.some(value=>typeof value!=='string' || !value)) throw new Error('purged_payment_key_configuration_invalid');
+  return parsed as string[];
+}
+
 /** Refuse to guess when any retained identifier was hashed using an unavailable key. */
 export async function matchPurgedPaymentIdentifiers(db:D1Database, secret:string|undefined,
   input:{customer:string|null;subscription:string|null;now:string}, previousSecrets?:string):Promise<string|null> {
+  if (!input.customer && !input.subscription) return null;
   const versions=await db.prepare(`SELECT DISTINCT identifier_key_version AS version FROM stripe_events
     WHERE review_reason='identifier_hash' AND julianday(identifier_expires_at)>julianday(?)`).bind(input.now).all<{version:string|null}>();
-  let previous: unknown = [];
-  try { previous = previousSecrets ? JSON.parse(previousSecrets) : []; } catch { throw new Error('purged_payment_key_unavailable'); }
-  if (!Array.isArray(previous) || previous.some(value => typeof value !== 'string' || !value)) throw new Error('purged_payment_key_unavailable');
+  let previous:string[];
+  try { previous=parsePreviousPurgeHashSecrets(previousSecrets); } catch { throw new Error('purged_payment_key_unavailable'); }
   const keys = await Promise.all([secret, ...previous].filter((value): value is string => Boolean(value)).map(async value => ({secret:value, version:await purgedPaymentIdentifierKeyVersion(value)})));
   if (versions.results.some(row => !keys.some(key => key.version === row.version))) throw new Error('purged_payment_key_unavailable');
   const tenants=new Set<string>();
