@@ -24,6 +24,7 @@ export const bookingSeriesApi={
  cancel:(a:string,id:string,input:{scope:'this'|'following';fromBookingId:string;expectedVersion:number;reason?:string})=>fetchApi<Result<{cancelled:string[];fees:Array<{bookingId:string;feeNow:number}>;version:number}>>(account(`/api/booking/admin/series/${e(id)}/cancel`,a),json('POST',input)),
 };
 export const formRoutingApi={
+ targets:(a:string,id:string)=>fetchApi<Result<{menus:Array<{id:string;name:string;durationMinutes:number}>;staff:Array<{id:string;name:string;menuId:string}>;groups:Array<{id:string;name:string}>}>>(account(`/api/forms/${e(id)}/routing/targets`,a)),
  saveLayout:(a:string,id:string,layout:FormLayout,expectedContentRevision:number)=>fetchApi<unknown>(account(`/api/forms/${e(id)}`,a),json('PUT',{layout,expectedContentRevision})),
  preview:(a:string,id:string,answers:Record<string,unknown>,blockId?:string,layout?:FormLayout)=>fetchApi<Result<{matchedIndex:number;target:BookingRouting['fallback'];usable:boolean;fellBack:boolean}>>(account(`/api/forms/${e(id)}/routing/preview`,a),json('POST',{answers,blockId,...(layout ? {layout} : {})})),
  resolve:(liffId:string,id:string,answers:Record<string,unknown>,token:string,blockId?:string)=>fetchApi<Result<{matchedIndex:number;target:BookingRouting['fallback'];routingToken:string;expiresAt:string}>>(liff(`/api/liff/forms/${e(id)}/routing/resolve`,liffId),{...json('POST',{answers,blockId}),headers:bearer(token)}),

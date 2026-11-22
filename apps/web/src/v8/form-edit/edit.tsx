@@ -109,6 +109,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* 保存を押したか。押したあとだけ、欄の赤とタブの赤い印を出す。 */
   const [attempted, setAttempted] = useState(false)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
+  const [routingRefs, setRoutingRefs] = useState<(Pick<FormRefs, 'routingMenus'|'routingMenuStaff'|'bookingGroups'|'bookingGroupsError'> & {key:string}) | null>(null)
   const [loading, setLoading] = useState(!host)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -121,6 +122,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const [reloadKey, setReloadKey] = useState(0)
   const [bookingStaffErrors,setBookingStaffErrors]=useState<Record<string, boolean>>({})
   const bookingStaffAccount = useRef(selectedAccountId)
+  const scopedRoutingRefs = routingRefs?.key === JSON.stringify([selectedAccountId,id]) ? routingRefs : undefined
   const [referencesError,setReferencesError]=useState(false)
   const savedSnapshot = useRef<string | null>(null)
   /** 読み込んだ時点の編集の版(#723)。読み込みと保存成功のときだけ入れ替える。 */
@@ -318,10 +320,6 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         })
         // 「予約を入れる」欄のメニュー選び。本体の読み込みを待たせない。読めなくても欄は置ける。
         if (selectedAccountId) {
-          const accountAtRequest = selectedAccountId
-          void formRoutingApi.groups(accountAtRequest).then((result) => {
-            if (bookingStaffAccount.current === accountAtRequest) setRefs((prev) => ({ ...prev, bookingGroups: result.data.map((group) => ({ id: group.id, name: group.name })), bookingGroupsError: false }))
-          }).catch(() => { if (bookingStaffAccount.current === accountAtRequest) setRefs((prev) => ({ ...prev, bookingGroupsError: true })) })
           bookingApi
             .listMenus(selectedAccountId)
             .then((menuRes) => {
@@ -364,6 +362,20 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       setBookingStaffErrors({})
     }
   }, [selectedAccountId])
+
+  // Form viewers can choose routing destinations without broader booking permissions.
+  useEffect(() => {
+    if (host || !selectedAccountId || !id) return
+    let cancelled = false
+    void formRoutingApi.targets(selectedAccountId, id).then((result) => {
+      if (cancelled) return
+      const routingMenuStaff: NonNullable<FormRefs['routingMenuStaff']> = {}
+      for (const menu of result.data.menus) routingMenuStaff[menu.id] = []
+      for (const staff of result.data.staff) routingMenuStaff[staff.menuId]?.push({id:staff.id,name:staff.name})
+      setRoutingRefs({key:JSON.stringify([selectedAccountId,id]), routingMenus:result.data.menus, routingMenuStaff, bookingGroups:result.data.groups, bookingGroupsError:false})
+    }).catch(() => { if (!cancelled) setRoutingRefs({key:JSON.stringify([selectedAccountId,id]),bookingGroups:[],bookingGroupsError:true}) })
+    return () => { cancelled = true }
+  }, [host, selectedAccountId, id])
 
   // 「予約を入れる」欄の担当選び。欄のメニューが決まったものだけ読む。
   useEffect(() => {
@@ -1053,6 +1065,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             onDuplicateBlock={duplicateBlock}
             onRemoveBlock={removeBlock}
             routing={routingOf(layout)}
+            routingRefs={scopedRoutingRefs}
             onChangeRouting={host ? undefined : patchRouting}
             references={layout.references ?? []}
             referenceStates={publishedReferences}

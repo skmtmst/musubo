@@ -14,3 +14,7 @@ test('AB-05 AI-03 G4-01: 模擬の確認・返信案の非送信・端末登録�
  await formRoutingApi.preview('a','f',{question:'answer'});expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/forms/f/routing/preview?account_id=a',expect.objectContaining({method:'POST'}));
  await operatorPushApi.subscribe({endpoint:'https://push.example.test',keys:{p256dh:'key',auth:'auth'},label:'端末'},'device');expect(transport.fetchApi).toHaveBeenLastCalledWith('/api/me/push/subscriptions',expect.objectContaining({headers:{'Idempotency-Key':'device'}}));
 });
+test('フォームの予約先候補は店とフォームを指定して読む',async()=>{
+ await formRoutingApi.targets('a/1','f/1');
+ expect(transport.fetchApi).toHaveBeenCalledWith('/api/forms/f%2F1/routing/targets?account_id=a%2F1');
+});

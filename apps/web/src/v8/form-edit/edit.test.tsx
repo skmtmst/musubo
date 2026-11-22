@@ -41,6 +41,11 @@ const formsGet = vi.hoisted(() => vi.fn())
 const formsUpdate = vi.hoisted(() => vi.fn())
 const formsCreateDraft = vi.hoisted(() => vi.fn())
 const formsPublish = vi.hoisted(() => vi.fn())
+const routingTargets = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api/helpers/gap2', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api/helpers/gap2')>()
+  return {...actual, formRoutingApi:{...actual.formRoutingApi, targets:routingTargets}}
+})
 const menuStaff = vi.hoisted(()=>vi.fn(async (_accountId: string, _menuId: string): Promise<{ staff: Array<{ id: string; display_name: string }> }> => ({staff:[]})))
 const emptyList = vi.hoisted(() => async () => ({ success: true, data: [] as never[] }))
 
@@ -107,6 +112,7 @@ const render = async (query: string) => {
 
 beforeEach(() => {
   account.id = 'acc-1'
+  routingTargets.mockReset().mockResolvedValue({success:true,data:{menus:[],staff:[],groups:[]}})
   forcedRole.value = null
   staffMe.mockReset().mockResolvedValue({ success: true, data: { role: 'owner' } })
   document.documentElement.dataset.theme = 'v8'
@@ -1004,4 +1010,37 @@ it('代理ログイン中は振り分けを閲覧・試行できるが編集で�
     expect(screen.queryByRole('button',{name:'行き先を追加'})).toBeNull()
     expect(screen.queryByRole('button',{name:'どれにも当たらないときの出すメニュー'})).toBeNull()
   } finally { forgetSessionSnapshot() }
+})
+
+it('フォーム権限の候補一覧を使い、振り分け先の担当と組を表示する', async () => {
+  const data=structuredClone(formData)
+  const block=data.layout.sections[1].blocks[0]
+  if(block.kind!=='input'||!block.booking)throw new Error('fixture')
+  block.booking.routing={enabled:true,rules:[{conditions:[{questionId:'q1',op:'is',value:'ご相談'}],target:{menuId:'routing-menu',staffGroupId:'group-1'}}],fallback:{menuId:'routing-menu'}}
+  formsGet.mockResolvedValue({success:true,data})
+  routingTargets.mockResolvedValue({success:true,data:{menus:[{id:'routing-menu',name:'フォーム向け相談',durationMinutes:30}],staff:[{id:'p',name:'担当P',menuId:'routing-menu'}],groups:[{id:'group-1',name:'相談の組'}]}})
+  await render('id=form-1')
+  await waitFor(() => expect(routingTargets).toHaveBeenCalledWith('acc-1','form-1'))
+  expect((await screen.findByRole('button',{name:'1 行目の出すメニュー'})).parentElement?.textContent).toContain('フォーム向け相談')
+  expect(screen.getByRole('button',{name:'1 行目の担当'}).parentElement?.textContent).toContain('相談の組')
+})
+
+
+it('アカウント変更後に前の店の予約先候補が届いても表示しない', async () => {
+  const data=structuredClone(formData)
+  const block=data.layout.sections[1].blocks[0]
+  if(block.kind!=='input'||!block.booking)throw new Error('fixture')
+  block.booking.routing={enabled:true,rules:[],fallback:{menuId:'bm-1'}}
+  formsGet.mockResolvedValue({success:true,data})
+  let finishOld!: (value:{success:true;data:{menus:Array<{id:string;name:string;durationMinutes:number}>;staff:never[];groups:never[]}}) => void
+  routingTargets.mockImplementation((accountId:string) => accountId==='acc-1'
+    ? new Promise(resolve => {finishOld=resolve})
+    : Promise.resolve({success:true,data:{menus:[{id:'bm-1',name:'新しい店の相談',durationMinutes:30}],staff:[],groups:[]}}))
+  await render('id=form-1')
+  await waitFor(() => expect(routingTargets).toHaveBeenCalledWith('acc-1','form-1'))
+  account.id='acc-2'
+  await render('id=form-1')
+  await waitFor(() => expect(routingTargets).toHaveBeenCalledWith('acc-2','form-1'))
+  await act(async () => {finishOld({success:true,data:{menus:[{id:'bm-1',name:'前の店の相談',durationMinutes:30}],staff:[],groups:[]}})})
+  expect(screen.queryByText('前の店の相談')).toBeNull()
 })

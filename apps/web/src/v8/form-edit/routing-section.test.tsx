@@ -81,12 +81,12 @@ it('行き先の担当に組を選び、担当者ではなく組のIDを保存�
   expect(onChange.mock.calls[0][0].rules[0].target).toEqual({menuId:'m',staffId:undefined,staffGroupId:'g'})
 })
 
-it('担当の組が取得できない時は空の一覧と誤認させず知らせる', () => {
+it('予約先が取得できない時は空の一覧と誤認させず知らせる', () => {
   render(<RoutingSection blocks={[
     {id:'q',kind:'input',type:'radio',name:'subject',label:'相談内容',choices:[{id:'x',label:'相談'}]},
     {id:'book',kind:'input',type:'booking'},
   ] as never} refs={{bookingGroupsError:true} as never} routing={{enabled:true,rules:[],fallback:{menuId:'m'}}} onChange={() => {}} />)
-  expect(screen.getByText(/担当の組を読み込めませんでした/)).toBeTruthy()
+  expect(screen.getByText(/予約先の候補を読み込めませんでした/)).toBeTruthy()
 })
 
 it('5段階評価の質問に数値の範囲を持つ行を追加できる', () => {
