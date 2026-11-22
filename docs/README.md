@@ -470,7 +470,7 @@
 
 ## 反映履歴
 
-- [顧客削除後の送信工程の確認](release-log/unreleased/PR-kenta-pii-workflow.md) — 反映履歴、確認 2026-11-22。
+- [顧客削除後の送信工程の確認](release-log/unreleased/158-kenta-pii-workflow.md) — 反映履歴、確認 2026-11-22。
 - [開店準備の接続・コース入力・再開](release-log/unreleased/148-masato-first-guide-recheck.md) — 反映履歴、確認 2026-11-21。
 - [LINE接続の自動更新](release-log/unreleased/152-masato-line-token-auto-renew.md) — 反映履歴、確認 2026-11-22。
 
