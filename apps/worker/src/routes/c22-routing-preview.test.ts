@@ -64,3 +64,26 @@ test('代理ログインでは振り分けが使う質問の変更もできな�
  const r=await gapCall(gapApp(d,[forms],gapOwner,true),'/api/forms/form?account_id=a','PUT',{layout:draft,expectedContentRevision:1});
  expect(r.status).toBe(403);expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
 });
+test('フォーム閲覧権限だけでも同じ店舗の予約先候補を取得できる',async()=>{
+ d.raw.exec("INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES('other-menu','b','他店',30,0)");
+ const staff={...gapOwner,id:'s',role:'staff' as const,permissionKeys:['/form-submissions'],accountScope:'all' as const};
+ const r=await gapCall(gapApp(d,[formRouting],staff),'/api/forms/form/routing/targets?account_id=a');
+ expect(r.status).toBe(200);
+ const body=await r.json() as {data:{menus:Array<{id:string}>;staff:Array<{id:string;menuId:string}>}};
+ expect(body.data.menus.map(m=>m.id)).toContain('menu');
+ expect(body.data.menus.map(m=>m.id)).not.toContain('other-menu');
+ expect(body.data.staff).toEqual(expect.arrayContaining([expect.objectContaining({id:'bs',menuId:'menu'})]));
+});
+test('フォーム権限がなければ予約先候補を取得できない',async()=>{
+ const staff={...gapOwner,id:'s',role:'staff' as const,permissionKeys:[],accountScope:'all' as const};
+ expect((await gapCall(gapApp(d,[formRouting],staff),'/api/forms/form/routing/targets?account_id=a')).status).toBe(403);
+});
+test('閲覧のみのフォーム担当も予約先候補を見られ、他店の候補は見られない',async()=>{
+ const staff={...gapOwner,id:'s',role:'staff' as const,readOnly:true,permissionKeys:[],viewPermissionKeys:['/form-submissions'],accountScope:'all' as const};
+ expect((await gapCall(gapApp(d,[formRouting],staff),'/api/forms/form/routing/targets?account_id=a')).status).toBe(200);
+ expect((await gapCall(gapApp(d,[formRouting],staff),'/api/forms/form/routing/targets?account_id=b')).status).toBe(404);
+});
+test('候補一覧の入口はフォームの閲覧権限で認可される',async()=>{
+ const {permissionForApiPath}=await import('../middleware/auth/permissions/auth.js');
+ expect(permissionForApiPath('/api/forms/form/routing/targets')).toBe('/form-submissions');
+});
