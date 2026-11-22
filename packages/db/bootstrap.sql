@@ -8162,7 +8162,8 @@ CREATE TABLE "rt_reservations" (
   source_updated_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT, customer_version INTEGER NOT NULL DEFAULT 1, customer_request_id TEXT, dining_snapshot_json TEXT CHECK(dining_snapshot_json IS NULL OR json_valid(dining_snapshot_json)), departed_at TEXT, staff_id TEXT REFERENCES staff(id), confirmation_revision INTEGER NOT NULL DEFAULT 1);
+, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT, customer_version INTEGER NOT NULL DEFAULT 1, customer_request_id TEXT, dining_snapshot_json TEXT CHECK(dining_snapshot_json IS NULL OR json_valid(dining_snapshot_json)), departed_at TEXT, staff_id TEXT REFERENCES staff(id), confirmation_revision INTEGER NOT NULL DEFAULT 1, customer_anonymized INTEGER NOT NULL DEFAULT 0
+  CHECK (customer_anonymized IN (0, 1)));
 
 CREATE TABLE rt_resource_locks (
   resource_key TEXT PRIMARY KEY,
