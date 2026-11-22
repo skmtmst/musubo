@@ -87,3 +87,10 @@ test('候補一覧の入口はフォームの閲覧権限で認可される',asy
  const {permissionForApiPath}=await import('../middleware/auth/permissions/auth.js');
  expect(permissionForApiPath('/api/forms/form/routing/targets')).toBe('/form-submissions');
 });
+test('担当の組は、そのメニューを担当できる人が残っているか返す',async()=>{
+ d.raw.exec(`INSERT INTO booking_routing_staff_groups(id,line_account_id,name,staff_ids_json) VALUES('active-group','a','有効','["bs"]'),('empty-group','a','不在','["bs2"]')`);
+ const r=await gapCall(gapApp(d,[formRouting]),'/api/forms/form/routing/targets?account_id=a');
+ expect(r.status).toBe(200);
+ const body=await r.json() as {data:{groups:Array<{id:string;menuIds:string[]}>}};
+ expect(body.data.groups).toEqual(expect.arrayContaining([expect.objectContaining({id:'active-group',menuIds:['menu']}),expect.objectContaining({id:'empty-group',menuIds:[]})]));
+});

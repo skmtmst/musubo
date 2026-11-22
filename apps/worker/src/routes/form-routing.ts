@@ -10,12 +10,13 @@ formRouting.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.c
 // Forms viewers need only the scoped names and IDs required to choose destinations.
 formRouting.get('/api/forms/:id/routing/targets',requireDeliveryAccess('forms','view'),async(c)=>{
  const a=await gapAccount(c);await loadRoutingLayout(c.env.DB,c.req.param('id'),a,false);
- const [menus,staff,groups]=await Promise.all([
+ const [menus,staff,groups,groupMenus]=await Promise.all([
   c.env.DB.prepare(`SELECT id,name,duration_minutes AS durationMinutes FROM menus WHERE line_account_id=? AND is_active=1 AND deleted_at IS NULL AND addon_only=0 ORDER BY name,id`).bind(a).all<{id:string;name:string;durationMinutes:number}>(),
   c.env.DB.prepare(`SELECT s.id,s.display_name AS name,sm.menu_id AS menuId FROM staff s JOIN staff_menus sm ON sm.staff_id=s.id AND sm.is_offered=1 JOIN menus m ON m.id=sm.menu_id AND m.line_account_id=s.line_account_id WHERE s.line_account_id=? AND s.is_active=1 AND s.deleted_at IS NULL AND s.is_designation_optional=0 AND m.is_active=1 AND m.deleted_at IS NULL AND m.addon_only=0 ORDER BY s.display_name,s.id`).bind(a).all<{id:string;name:string;menuId:string}>(),
   c.env.DB.prepare(`SELECT id,name FROM booking_routing_staff_groups WHERE line_account_id=? ORDER BY name,id`).bind(a).all<{id:string;name:string}>(),
+  c.env.DB.prepare(`SELECT DISTINCT g.id AS groupId,sm.menu_id AS menuId FROM booking_routing_staff_groups g JOIN json_each(g.staff_ids_json) member JOIN staff s ON s.id=member.value AND s.line_account_id=g.line_account_id JOIN staff_menus sm ON sm.staff_id=s.id AND sm.is_offered=1 JOIN menus m ON m.id=sm.menu_id AND m.line_account_id=g.line_account_id WHERE g.line_account_id=? AND s.is_active=1 AND s.deleted_at IS NULL AND s.is_designation_optional=0 AND m.is_active=1 AND m.deleted_at IS NULL AND m.addon_only=0`).bind(a).all<{groupId:string;menuId:string}>(),
  ]);
- return c.json({success:true,data:{menus:menus.results,staff:staff.results,groups:groups.results}});
+ return c.json({success:true,data:{menus:menus.results,staff:staff.results,groups:groups.results.map(group=>({...group,menuIds:groupMenus.results.filter(row=>row.groupId===group.id).map(row=>row.menuId)}))}});
 });
 formRouting.post('/api/forms/:id/routing/preview',requireDeliveryAccess('forms','view'),async(c)=>{
  const a=await gapAccount(c),b=await gapBody(c),layout=await loadRoutingLayout(c.env.DB,c.req.param('id'),a,false);
