@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { gapFixture } from '../test-utils/gap1.js';
-import { deleteExpiredPurgedPaymentIdentifierHashes, findPurgedPaymentIdentifierHash, hashPurgedPaymentIdentifier, purgedPaymentIdentifierExpiry, purgedPaymentIdentifierKeyVersion, storePurgedPaymentIdentifierHash } from './tenant-purge-payment-hashes.js';
+import { deleteExpiredPurgedPaymentIdentifierHashes, findPurgedPaymentIdentifierHash, matchPurgedPaymentIdentifiers, hashPurgedPaymentIdentifier, purgedPaymentIdentifierExpiry, purgedPaymentIdentifierKeyVersion, storePurgedPaymentIdentifierHash } from './tenant-purge-payment-hashes.js';
 
 test('identifier hashes use a secret and retain no original ID', async () => {
   const f=gapFixture();
@@ -28,4 +28,15 @@ test('retention expires ten years after one year and three months plus one day',
   expect(purgedPaymentIdentifierExpiry(null,'2026-01-31')).toBe('2037-05-01T00:00:00.000Z');
   expect(() => purgedPaymentIdentifierExpiry('2026-02-30','2027-01-01')).toThrow('invalid_payment_retention_date');
   expect(() => purgedPaymentIdentifierExpiry('2026-01-15T20:00:00Z','2027-01-01')).toThrow('invalid_payment_retention_date');
+});
+
+
+test('retired identifiers are matched and missing old keys fail closed', async () => {
+  const f=gapFixture(); const secret='test-secret';
+  const digest=(await hashPurgedPaymentIdentifier(secret,'customer','cus_old'))!;
+  const keyVersion=(await purgedPaymentIdentifierKeyVersion(secret))!;
+  await storePurgedPaymentIdentifierHash(f.db,{tenantId:'t',kind:'customer',digest,keyVersion,now:'2027-01-01T00:00:00Z',expiresAt:'2039-01-01T00:00:00Z'});
+  expect(await matchPurgedPaymentIdentifiers(f.db,secret,{customer:'cus_old',subscription:null,now:'2028-01-01T00:00:00Z'})).toBe('t');
+  expect(await matchPurgedPaymentIdentifiers(f.db,secret,{customer:'cus_new',subscription:null,now:'2028-01-01T00:00:00Z'})).toBeNull();
+  await expect(matchPurgedPaymentIdentifiers(f.db,undefined,{customer:'cus_old',subscription:null,now:'2028-01-01T00:00:00Z'})).rejects.toThrow('purged_payment_key_unavailable');
 });

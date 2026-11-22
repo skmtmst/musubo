@@ -13,6 +13,8 @@ import {
   type TenantRetention,
 } from '@line-crm/db';
 
+import { preparePurgedTenantBilling } from './tenant-purge-billing-prepare.js';
+import { observeBillingHashKeyUnavailable } from './billing-external-review.js';
 import { discoverRetainedPurgeAncestors, validateTombstonePolicies, type TombstonePolicy } from './tenant-retain-graph.js';
 import { tombstoneRetainedParents } from './tenant-purge-generic.js';
 import candidates from './tenant-retain-column-candidates.json';
@@ -77,6 +79,7 @@ const R2_KEY_COLUMNS_BY_TABLE = RETENTION_R2_KEY_COLUMNS.reduce<Record<string, s
 export interface TenantDataPurgeEnv {
   DB: D1Database;
   IMAGES?: R2Bucket;
+  PURGED_PAYMENT_HMAC_SECRET?: string;
 }
 
 export interface TenantDataPurgeResult {
@@ -161,9 +164,14 @@ export async function processTenantDataPurge(
     const progress: OneTenantResult = { deletedRows: 0, deletedObjects: 0, failedObjects: 0, finished: true };
     let purged: OneTenantResult;
     try { purged = await purgeOneTenant(env, tenant, now, budget, progress); }
-    catch {
+    catch (error) {
       progress.finished = false;
-      progress.failure = { table: 'unknown', failureCode: 'unexpected_failure', r2DeletedBeforeFailure: 0 };
+      const missingKey = error instanceof Error && error.message === 'purge_payment_hash_key_missing';
+      if (missingKey) {
+        try { await observeBillingHashKeyUnavailable(env.DB,tenant.id,new Date(now).toISOString()); }
+        catch { logger.error('tenant_purge.billing_key_alert_failed'); }
+      }
+      progress.failure = { table: missingKey ? 'billing_events' : 'unknown', failureCode: missingKey ? 'billing_key_unavailable' : 'unexpected_failure', r2DeletedBeforeFailure: 0 };
       try {
         await recordAuditEvent(env.DB, {
           category: 'business', action: 'tenant_data.purge_failed', tenantId: tenant.id,
@@ -230,6 +238,7 @@ async function purgeOneTenant(
     out.finished = false;
     return out;
   }
+  await preparePurgedTenantBilling(env.DB,tenant.id,now,env.PURGED_PAYMENT_HMAC_SECRET);
   const retainedParents = await discoverRetainedPurgeAncestors(env.DB);
   validateTombstonePolicies(retainedParents, candidates, policies as Record<string, TombstonePolicy>);
   const retainedParentSet = new Set(retainedParents);

@@ -18,3 +18,14 @@ export async function observeUncertainBillingEffects(db:D1Database, now:string):
   }
   return rows.results.length;
 }
+
+/** Missing historical keys prevent safely matching a signed Stripe notification. */
+export async function observeBillingHashKeyUnavailable(db:D1Database, tenantId:string, now:string):Promise<void> {
+  await db.prepare(`INSERT INTO security_alerts
+    (id,tenant_id,line_account_id,scope_key,rule_key,observed_count,threshold_count,first_detected_at,last_detected_at,latest_event_at,notification_id,slack_last_error)
+    SELECT ?,t.id,NULL,json_array(t.id,'hash-key'),'stripe_hash_key_review',1,1,?,?,julianday(?),?,'unconfigured' FROM tenants t WHERE t.id=?
+    ON CONFLICT(scope_key,rule_key) DO UPDATE SET last_detected_at=excluded.last_detected_at,latest_event_at=excluded.latest_event_at,
+      status=CASE WHEN security_alerts.status='resolved' THEN 'open' ELSE security_alerts.status END,
+      version=security_alerts.version+CASE WHEN security_alerts.status='resolved' THEN 1 ELSE 0 END`)
+    .bind(crypto.randomUUID(),now,now,now,crypto.randomUUID(),tenantId).run();
+}

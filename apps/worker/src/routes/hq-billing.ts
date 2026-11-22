@@ -39,6 +39,8 @@ import { getBillingPaymentFailure, getRecentBillingPaymentRecovery } from '../se
 import { musuboBillingOverview } from '../services/musubo-billing-overview.js';
 import { acceptedMusuboLineResumption } from '../services/musubo-line-resumption-review.js';
 import { processMusuboBillingEvent } from '../services/musubo-billing-webhook.js';
+import { matchPurgedPaymentIdentifiers } from '../services/tenant-purge-payment-hashes.js';
+import { observeBillingHashKeyUnavailable } from '../services/billing-external-review.js';
 import { claimBillingEventLease, releaseBillingEventLease, beginBillingExternalEffect, endBillingExternalEffect, deferPurgedBillingEvent, tenantPurgeInProgress } from '../services/tenant-purge-tombstones.js';
 import { deliverBillingRecoveryNotice, deliverCurrentBillingFailureNotice } from '../services/billing-invoice-notifications.js';
 import { StripeApiError, stripeApi, type StripeCheckoutSession, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
@@ -633,21 +635,40 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
 
   try {
     const object = event.data.object;
-    const tenant = await findTenantForEvent(c, object, event.type);
     const amountCandidate = event.type === 'charge.refunded' ? object.amount_refunded
       : event.type === 'invoice.paid' ? object.amount_paid : object.amount_due ?? object.amount_total ?? object.amount;
     const amount = typeof amountCandidate === 'number' && Number.isSafeInteger(amountCandidate) ? amountCandidate : null;
     const currency = typeof object.currency === 'string' && /^[a-z]{3}$/.test(object.currency) ? object.currency : null;
+    const matchTime = new Date().toISOString();
+    let oldTenantId:string|null;
+    try {
+      oldTenantId = await matchPurgedPaymentIdentifiers(c.env.DB,c.env.PURGED_PAYMENT_HMAC_SECRET,{
+        customer:stripeExpandableId(object.customer),
+        subscription:event.type.startsWith('customer.subscription.') ? stripeExpandableId(object.id) : stripeExpandableId(object.subscription),
+        now:matchTime,
+      });
+    } catch (error) {
+      if (!(error instanceof Error) || !['purged_payment_key_unavailable','purged_payment_ambiguous_match'].includes(error.message)) throw error;
+      await c.env.DB.prepare(`INSERT OR IGNORE INTO billing_events(id,type,tenant_id,summary,review_amount,review_currency)
+        VALUES (?,?,NULL,'pending',?,?)`).bind(event.id,event.type,amount,currency).run();
+      const metadata = object.metadata as Record<string,unknown>|undefined;
+      const candidate = typeof metadata?.tenant_id === 'string' ? metadata.tenant_id : typeof object.client_reference_id === 'string' ? object.client_reference_id : null;
+      if (candidate) await observeBillingHashKeyUnavailable(c.env.DB,candidate,matchTime);
+      logger.error('billing.purged_payment_key_unavailable');
+      return c.json({success:false,error:'billing_review_required'},503);
+    }
+    const tenant = oldTenantId ? await getTenantBilling(c.env.DB,oldTenantId) : await findTenantForEvent(c, object, event.type);
     // 保存済みの受領記録は完了済みとして扱う。新しい記録は、業務更新と完了印を一緒に確定するまで pending に残す。
     await c.env.DB.prepare('INSERT OR IGNORE INTO billing_events (id,type,tenant_id,summary,review_amount,review_currency) VALUES (?,?,?,?,?,?)')
       .bind(event.id,event.type,tenant?.id ?? null,'pending',amount,currency).run();
+    if (tenant) await c.env.DB.prepare(`UPDATE billing_events SET tenant_id=? WHERE id=? AND type=? AND tenant_id IS NULL AND summary='pending' AND lease_token IS NULL`).bind(tenant.id,event.id,event.type).run();
     await c.env.DB.prepare(`UPDATE billing_events SET review_amount=COALESCE(review_amount,?),review_currency=COALESCE(review_currency,?)
       WHERE id=? AND type=? AND tenant_id IS ? AND summary='pending'`).bind(amount,currency,event.id,event.type,tenant?.id ?? null).run();
     const receipt = await c.env.DB.prepare('SELECT summary FROM billing_events WHERE id=?').bind(event.id).first<{summary:string}>();
     if (receipt?.summary !== 'pending') return c.json({ success:true,data:{received:true,duplicate:true} });
     // Receipt is saved before this check. A purge claim cannot start while it is pending.
-    if (tenant && await tenantPurgeInProgress(c.env.DB, tenant.id)) {
-      if (!await deferPurgedBillingEvent(c.env.DB, {tenantId:tenant.id,eventId:event.id,eventType:event.type,amount,currency,now:new Date().toISOString()})) {
+    if (tenant && (oldTenantId || await tenantPurgeInProgress(c.env.DB, tenant.id))) {
+      if (!await deferPurgedBillingEvent(c.env.DB, {tenantId:tenant.id,eventId:event.id,eventType:event.type,amount,currency,now:new Date().toISOString(),retiredMatch:Boolean(oldTenantId)})) {
         return c.json({success:false,error:'tenant_purge_review_unavailable'},503);
       }
       logger.warn('billing.webhook_review_for_tenant_purge');

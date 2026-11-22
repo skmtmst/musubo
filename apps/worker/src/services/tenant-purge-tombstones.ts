@@ -80,7 +80,7 @@ export async function recordPurgedTenantStripeEvent(db: D1Database, input: {
 
 /** 通知の受領記録を照合待ちにし、二度処理を始められないようにする。 */
 export async function deferPurgedBillingEvent(db: D1Database, input: {
-  tenantId: string; eventId: string; eventType: string; amount: number | null; currency: string | null; now: string;
+  tenantId: string; eventId: string; eventType: string; amount: number | null; currency: string | null; now: string; retiredMatch?: boolean;
 }): Promise<boolean> {
   if (!input.now.endsWith('Z') || !Number.isFinite(Date.parse(input.now))) throw new Error('invalid_billing_lease_time');
   if (!/^evt_[A-Za-z0-9_]+$/.test(input.eventId) || !/^[a-z0-9_.]+$/.test(input.eventType)
@@ -91,8 +91,8 @@ export async function deferPurgedBillingEvent(db: D1Database, input: {
     SELECT ?,?,?,?,?,NULL,?,?,'purged_tenant' WHERE EXISTS (
       SELECT 1 FROM tenants t JOIN billing_events e ON e.tenant_id=t.id
       WHERE t.id=? AND e.id=? AND e.summary='pending' AND (e.lease_token IS NULL OR julianday(e.lease_until)<=julianday('now'))
-        AND (t.purge_started_at IS NOT NULL OR t.data_purged_at IS NOT NULL))`)
-    .bind(crypto.randomUUID(),input.eventId,input.eventType,input.amount,input.currency,input.now,input.tenantId,input.tenantId,input.eventId);
+        AND (t.purge_started_at IS NOT NULL OR t.data_purged_at IS NOT NULL OR ?=1))`)
+    .bind(crypto.randomUUID(),input.eventId,input.eventType,input.amount,input.currency,input.now,input.tenantId,input.tenantId,input.eventId,input.retiredMatch ? 1 : 0);
   const defer = db.prepare(`UPDATE billing_events SET summary='purge_review',lease_token=NULL,lease_until=NULL
     WHERE id=? AND tenant_id=? AND summary='pending' AND (lease_token IS NULL OR julianday(lease_until)<=julianday('now')) AND EXISTS (
       SELECT 1 FROM stripe_events s WHERE s.stripe_event_id=billing_events.id

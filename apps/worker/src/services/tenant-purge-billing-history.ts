@@ -5,6 +5,12 @@ export async function archiveAndResetTenantBilling(db: D1Database, tenantId: str
   }
   await db.batch([
     db.prepare(`INSERT INTO billing_events(id,type,tenant_id,summary,received_at,retained_until)
+      SELECT 'internal:purge_legacy_billing:' || id || ':' || billing_epoch,'internal.purge_legacy_billing',id,
+        json_object('plan_key',plan_key,'plan_status',plan_status,'trial_ends_at',trial_ends_at,
+          'current_period_ends_at',current_period_ends_at),?,? FROM tenants
+      WHERE id=? AND purge_started_at IS NOT NULL AND data_purged_at IS NULL
+      ON CONFLICT(id) DO NOTHING`).bind(now,expiresAt,tenantId),
+    db.prepare(`INSERT INTO billing_events(id,type,tenant_id,summary,received_at,retained_until)
       SELECT 'internal:purge_billing:' || tenant_id || ':' || (SELECT billing_epoch FROM tenants WHERE id=tenant_id),
         'internal.purge_billing',tenant_id,
         json_object('billing_interval',billing_interval,'status',status,
@@ -32,6 +38,12 @@ export async function archiveAndResetTenantBilling(db: D1Database, tenantId: str
         WHERE e.id='internal:purge_billing:' || musubo_tenant_billing.tenant_id || ':' || t.billing_epoch
           AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL)`)
       .bind(now, tenantId),
+    db.prepare('UPDATE billing_invoices SET stripe_customer_id=NULL,subscription_id=NULL,hosted_invoice_url=NULL WHERE tenant_id=?').bind(tenantId),
+    db.prepare(`UPDATE billing_events SET summary=json_remove(summary,'$.subscriptionId','$.customerId')
+      WHERE tenant_id=? AND json_valid(summary) AND type NOT IN ('internal.purge_billing','internal.purge_legacy_billing')`).bind(tenantId),
+    db.prepare(`UPDATE tenants SET stripe_customer_id=NULL,stripe_subscription_id=NULL,current_period_ends_at=NULL,plan_key=NULL,plan_updated_at=?
+      WHERE id=? AND purge_started_at IS NOT NULL AND data_purged_at IS NULL`)
+      .bind(now,tenantId),
   ]);
 }
 
@@ -39,7 +51,7 @@ export async function archiveAndResetTenantBilling(db: D1Database, tenantId: str
 export async function deleteExpiredBillingHistory(db: D1Database, now: string): Promise<number> {
   if (!Number.isFinite(Date.parse(now))) throw new Error('invalid_billing_history_expiry');
   const result = await db.prepare(`DELETE FROM billing_events WHERE rowid IN (
-    SELECT rowid FROM billing_events WHERE type='internal.purge_billing'
+    SELECT rowid FROM billing_events WHERE type IN ('internal.purge_billing','internal.purge_legacy_billing')
       AND retained_until IS NOT NULL AND julianday(retained_until)<=julianday(?) LIMIT 200)`).bind(now).run();
   return Number(result.meta.changes ?? 0);
 }

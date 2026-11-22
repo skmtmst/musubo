@@ -333,3 +333,11 @@ test('an unresolved external effect blocks purge beyond the lease deadline', asy
   expect(await endBillingExternalEffect(f.db,'evt_external','owner')).toBe(true);
   expect(await claimTenantPurge(f.db,'t',now)).toBe(true);
 });
+
+
+test('a matched retired identifier is reviewed after the tenant has resumed', async () => {
+  const f=gapFixture();
+  f.raw.exec("UPDATE tenants SET plan_status='active' WHERE id='t'; INSERT INTO billing_events(id,type,tenant_id,summary) VALUES('evt_old','invoice.paid','t','pending')");
+  expect(await deferPurgedBillingEvent(f.db,{tenantId:'t',eventId:'evt_old',eventType:'invoice.paid',amount:100,currency:'jpy',now:new Date().toISOString(),retiredMatch:true})).toBe(true);
+  expect(f.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_old'").get()).toEqual({summary:'purge_review'});
+});
