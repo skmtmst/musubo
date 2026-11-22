@@ -1,3 +1,4 @@
+import { registerRestaurantTombstoneTests } from '../test-utils/restaurant-tombstone-tests.js';
 import { registerRestaurantMenuConfirmationTests } from '../test-utils/restaurant-menu-confirmation.js';
 import { seedRestaurantFixture as seedRestaurantData } from '../test-utils/restaurant-fixture.js';
 import { publishScenarioVersion } from '@line-crm/db';
@@ -10,7 +11,6 @@ import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-
 type MockStaff = {
   id: string;
   name: string;
@@ -330,30 +330,7 @@ describe('飲食店向けテストAPI', () => {
     const json = await snapshot.json() as { data: { stores: unknown[] } };
     expect(json.data.stores).toHaveLength(2);
   });
-
-  it('削除済み店舗は一覧に表示せず編集できない', async () => {
-    seedRestaurantFixture();
-    testDb.raw.prepare("UPDATE rt_stores SET data_purged_at='2027-01-01',status='archived' WHERE id='store-yokohama'").run();
-    const session = await createAdminSession();
-    const snapshot = await requestAs('/api/restaurant-test/snapshot?account_id=account-1', session);
-    expect(snapshot.status).toBe(200);
-    const json = await snapshot.json() as { data: { stores: Array<{id:string}> } };
-    expect(json.data.stores.map(store => store.id)).not.toContain('store-yokohama');
-    const response = await requestWithMethod('/api/restaurant-test/stores/store-yokohama?account_id=account-1', 'PATCH', {name:'復活',status:'active',lineAccountId:'account-2'});
-    expect(response.status).toBe(400);
-    expect(testDb.raw.prepare("SELECT status FROM rt_stores WHERE id='store-yokohama'").get()).toEqual({status:'archived'});
-  });
-
-  it('削除済み組織は店舗一覧の対象にならない', async () => {
-    seedRestaurantFixture();
-    testDb.raw.prepare("UPDATE rt_organizations SET data_purged_at='2027-01-01',status='archived' WHERE id='org-fixture'").run();
-    const snapshot = await request('/api/restaurant-test/snapshot?account_id=account-1');
-    expect(snapshot.status).toBe(200);
-    const json = await snapshot.json() as {data:{organization:unknown;stores:unknown[]}};
-    expect(json.data.organization).toBeNull();
-    expect(json.data.stores).toEqual([]);
-  });
-
+  registerRestaurantTombstoneTests({ db: () => testDb, seed: seedRestaurantFixture, session: createAdminSession, request, requestAs, requestWithMethod });
   it('利用規約への同意を組織・現行版ごとに冪等記録する', async () => {
     seedRestaurantFixture();
     const body = { documentKey: 'musubo-terms', version: 'v0.1-draft' };
