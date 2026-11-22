@@ -143,12 +143,14 @@ describe('R73 編集・差替えの入口', () => {
     expect(document.body.textContent).not.toContain('資格情報を差し替える')
   })
 
-  it('資格情報タブにも保存の入口がある', async () => {
+  it('資格情報は自動更新を案内し、シークレットの変更窓を開ける', async () => {
     fixture.tab = 'credentials'
     await renderPage()
-    expect(document.body.textContent).toContain('秘密値そのものは表示しません')
+    expect(document.body.textContent).toContain('チャネルアクセストークンはmusuboが自動更新します。')
     clickButton('差し替える')
     expect(document.body.textContent).toContain('資格情報を差し替える')
+    expect(within(document.body).getByLabelText('Channel Secret')).toBeTruthy()
+    expect(within(document.body).queryByLabelText('Channel Access Token')).toBeNull()
   })
 })
 

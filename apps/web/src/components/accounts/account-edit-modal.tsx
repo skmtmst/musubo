@@ -33,7 +33,7 @@ interface Props {
   initialIconUrl?: string | null
   /**
    * R73。詳細画面の「編集する」は `basic`（名前などの登録内容）、
-   * 「差し替える」は `credentials`（Messaging の鍵・トークンの入力欄を
+   * 「差し替える」は `credentials`（Messaging のシークレット入力欄を
    * 開いた状態）で開く。どちらも同じ保存口（PATCH/PUT 振り分け）を使う。
    */
   initialSection?: 'basic' | 'credentials'
@@ -129,9 +129,6 @@ export default function AccountEditModal({
     const payload: Parameters<typeof api.lineAccounts.update>[1] = {}
     if (initialTimezone !== undefined && timezone !== initialTimezone) payload.timezone = timezone
     if (state.name !== initialName) payload.name = state.name
-    if (state.channelAccessToken.trim() !== '') {
-      payload.channelAccessToken = state.channelAccessToken.trim()
-    }
     if (state.channelSecret.trim() !== '') {
       payload.channelSecret = state.channelSecret.trim()
     }

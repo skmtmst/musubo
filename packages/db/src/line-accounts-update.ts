@@ -130,6 +130,33 @@ export async function updateLineAccount(
   return getLineAccountById(db, id, encryptionKey);
 }
 
+/** A late OAuth response must not replace credentials changed since the renewal began. */
+export async function saveRenewedLineAccessToken(
+  db: D1Database,
+  account: LineAccount,
+  token: { accessToken: string; expiresAt: string },
+  credentialEncryptionKey?: string,
+): Promise<boolean> {
+  const key = await resolveCredentialEncryptionKey(credentialEncryptionKey);
+  const encrypted = await encryptCredential(token.accessToken, key);
+  const now = jstNow();
+  const result = await db.prepare(
+    `UPDATE line_accounts
+        SET channel_access_token = ?, channel_access_token_encrypted = ?, token_expires_at = ?,
+            channel_access_token_updated_at = ?, updated_at = ?
+      WHERE id = ? AND channel_id = ? AND is_active = 1 AND archived_at IS NULL
+        AND token_expires_at IS ?
+        AND COALESCE(channel_access_token_encrypted, channel_access_token) IS ?
+        AND COALESCE(channel_secret_encrypted, channel_secret) IS ?`,
+  ).bind(
+    token.accessToken, encrypted, token.expiresAt, now, now,
+    account.id, account.channel_id, account.token_expires_at,
+    account.channel_access_token_encrypted ?? account.channel_access_token,
+    account.channel_secret_encrypted ?? account.channel_secret,
+  ).run();
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
 export async function updateLineAccountFields(
   db: D1Database,
   id: string,
