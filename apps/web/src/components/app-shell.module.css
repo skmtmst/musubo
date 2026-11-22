@@ -35,7 +35,14 @@
   min-width: 0;
   flex: 1;
   overflow: auto;
+  scroll-padding-block-end: var(--guide-scroll-clearance, 0px);
   background: var(--color-board-tint);
+}
+
+.main[data-guide-scroll-reserved]::after {
+  content: '';
+  display: block;
+  block-size: var(--guide-scroll-clearance, 0px);
 }
 
 .content {

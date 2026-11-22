@@ -50,6 +50,11 @@ export const accountsMethods = {
       fetchApi<ApiResponse<{ uniqueFriendCount: number }>>('/api/line-accounts/summary'),
     get: (id: string) =>
       fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}`),
+    checkConnection: (id: string, expectedRevision: number) =>
+      fetchApi<ApiResponse<{ accountId: string; checks: Array<{ kind: string; result: string; webhookActive: boolean | null }> }>>(
+        `/api/line-accounts/${encodeURIComponent(id)}/connection-checks`,
+        { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ expectedRevision }) },
+      ),
     registrationReceipt: (id: string) =>
       fetchApi<ApiResponse<LineRegistrationReceipt>>(`/api/line-accounts/${id}/registration-receipt`, { cache: 'no-store' }),
     create: (data: {
