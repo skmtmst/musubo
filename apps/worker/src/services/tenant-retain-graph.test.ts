@@ -25,3 +25,11 @@ test('candidate inventory covers every discovered parent and references existing
     for (const candidate of policy.candidates) expect(columns.has(candidate.column), `${table}.${candidate.column}`).toBe(true);
   }
 });
+
+test('policy validation rejects missing parent and missing column decisions', async () => {
+  const { validateTombstonePolicies } = await import('./tenant-retain-graph.js');
+  const inventory={parent:{candidates:[{column:'email'},{column:'request_key'}]}};
+  expect(()=>validateTombstonePolicies(['parent'],inventory,{})).toThrow('tombstone_policy_missing:parent');
+  expect(()=>validateTombstonePolicies(['parent'],inventory,{parent:{columns:{email:{action:'clear',reason:'private'}}}})).toThrow('tombstone_column_policy_missing:parent.request_key');
+  expect(()=>validateTombstonePolicies(['parent'],inventory,{parent:{columns:{email:{action:'clear',reason:'private'},request_key:{action:'retain',reason:'required for reconciliation'}}}})).not.toThrow();
+});
