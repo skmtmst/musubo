@@ -344,6 +344,16 @@ describe('飲食店向けテストAPI', () => {
     expect(testDb.raw.prepare("SELECT status FROM rt_stores WHERE id='store-yokohama'").get()).toEqual({status:'archived'});
   });
 
+  it('削除済み組織は店舗一覧の対象にならない', async () => {
+    seedRestaurantFixture();
+    testDb.raw.prepare("UPDATE rt_organizations SET data_purged_at='2027-01-01',status='archived' WHERE id='org-fixture'").run();
+    const snapshot = await request('/api/restaurant-test/snapshot?account_id=account-1');
+    expect(snapshot.status).toBe(200);
+    const json = await snapshot.json() as {data:{organization:unknown;stores:unknown[]}};
+    expect(json.data.organization).toBeNull();
+    expect(json.data.stores).toEqual([]);
+  });
+
   it('利用規約への同意を組織・現行版ごとに冪等記録する', async () => {
     seedRestaurantFixture();
     const body = { documentKey: 'musubo-terms', version: 'v0.1-draft' };

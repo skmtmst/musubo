@@ -1,7 +1,42 @@
 import { expect, test } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { activateLineAccount, createLineAccount, upsertFriend, getLineAccountById, getFriendById } from '@line-crm/db';
 import { gapFixture } from '../test-utils/gap1.js';
-import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore } from './tenant-purge-tombstones.js';
+import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization } from './tenant-purge-tombstones.js';
+
+test('organization duplicate preflight reports conflicts without modifying data', () => {
+  const f = gapFixture();
+  const sql = readFileSync(new URL('../../../../scripts/db/check-restaurant-organization-duplicates.sql', import.meta.url), 'utf8');
+  f.raw.exec("INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES ('one','account-one','one','t')");
+  expect(f.raw.prepare(sql).all()).toEqual([]);
+  f.raw.exec('DROP INDEX idx_rt_organizations_tenant_unique');
+  f.raw.exec("INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES ('two','account-two','two','t')");
+  expect(f.raw.prepare(sql).all()).toEqual([{tenant_id:'t',duplicate_count:2}]);
+  expect(f.raw.prepare('SELECT COUNT(*) AS n FROM rt_organizations').get()).toEqual({n:2});
+});
+
+test('retained restaurant organization is anonymized without deleting approvals or agreements', async () => {
+  const f = gapFixture();
+  f.raw.pragma('foreign_keys = ON');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01' WHERE id='t';
+    INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES ('org','a','private org','t');
+    INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES ('store','org','private','private','a');
+    INSERT INTO rt_organization_agreements(id,organization_id,document_key,document_version) VALUES ('agreement','org','terms','1');
+    INSERT INTO rt_approval_requests(id,organization_id,store_id,kind,title) VALUES ('approval','org','store','menu_change','test');`);
+  const now = '2027-05-01T09:00:00.000+09:00';
+  expect(await tombstoneRestaurantOrganization(f.db, 'other', 'org', now)).toBe(false);
+  expect(await tombstoneRestaurantOrganization(f.db, 't', 'org', now)).toBe(false);
+  expect(await tombstoneLineAccount(f.db, 't', 'a', now)).toBe(true);
+  expect(await tombstoneRestaurantOrganization(f.db, 't', 'org', now)).toBe(false);
+  expect(await tombstoneRestaurantStore(f.db, 't', 'store', now)).toBe(true);
+  expect(await tombstoneRestaurantOrganization(f.db, 't', 'org', now)).toBe(true);
+  expect(await tombstoneRestaurantOrganization(f.db, 't', 'org', now)).toBe(false);
+  f.raw.exec("INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES ('new-org','new-account','new','t')");
+  expect(() => f.raw.exec("INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES ('duplicate','duplicate-account','duplicate','t')")).toThrow(/UNIQUE constraint failed/);
+  expect(f.raw.prepare("SELECT name,status FROM rt_organizations WHERE id='org'").get()).toEqual({name:'削除済み',status:'archived'});
+  expect(f.raw.prepare("SELECT organization_id FROM rt_approval_requests WHERE id='approval'").get()).toEqual({organization_id:'org'});
+  expect(f.raw.prepare("SELECT organization_id FROM rt_organization_agreements WHERE id='agreement'").get()).toEqual({organization_id:'org'});
+});
 
 test('retained restaurant store is anonymized only under its eligible tombstoned account', async () => {
   const f = gapFixture();

@@ -1,5 +1,19 @@
 import { retentionCutoff } from '@line-crm/db';
 
+/** 組織参照の履歴を残し、店舗の処理が済んだ組織の識別情報を消す。 */
+export async function tombstoneRestaurantOrganization(db: D1Database, tenantId: string, organizationId: string, now: string): Promise<boolean> {
+  const result = await db.prepare(`UPDATE rt_organizations SET
+    name='削除済み', account_id=?, status='archived', updated_at=?, data_purged_at=?
+    WHERE id=? AND tenant_id=? AND data_purged_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM rt_stores s WHERE s.organization_id=rt_organizations.id AND s.data_purged_at IS NULL)
+      AND NOT EXISTS (SELECT 1 FROM line_accounts a WHERE a.tenant_id=rt_organizations.tenant_id AND a.data_purged_at IS NULL)
+      AND EXISTS (SELECT 1 FROM tenants t WHERE t.id=rt_organizations.tenant_id AND t.data_purged_at IS NULL
+        AND (t.plan_status='canceled' OR (t.plan_status='trialing' AND t.trial_ends_at IS NOT NULL AND t.trial_ends_at < ?))
+        AND (t.purge_requested_at IS NOT NULL OR (t.retention_anchor_at IS NOT NULL AND t.retention_anchor_at < ?)))`)
+    .bind(`purged:${crypto.randomUUID()}`, now, now, organizationId, tenantId, now, retentionCutoff(now)).run();
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
 /** 承認履歴が参照する店舗を残し、統括とアカウントの範囲を確認して匿名化する。 */
 export async function tombstoneRestaurantStore(db: D1Database, tenantId: string, storeId: string, now: string): Promise<boolean> {
   const result = await db.prepare(`UPDATE rt_stores SET

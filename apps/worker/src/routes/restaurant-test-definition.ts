@@ -30,7 +30,7 @@ export async function organizationByTenantId(
       o.id, o.account_id, o.tenant_id, t.name AS tenant_name, o.name, o.status
     FROM rt_organizations o
     LEFT JOIN tenants t ON t.id = o.tenant_id
-    WHERE o.tenant_id = ?
+    WHERE o.tenant_id = ? AND o.data_purged_at IS NULL
     LIMIT 1`).bind(id).first<OrganizationRow>();
   return organization ? { ...organization, scopedStoreId: null } : null;
 }
@@ -64,7 +64,7 @@ async function baseOrganizationFor(c: Context<Env>): Promise<OrganizationContext
     `SELECT o.id, o.account_id, o.tenant_id, t.name AS tenant_name, o.name, o.status
      FROM rt_organizations o
      LEFT JOIN tenants t ON t.id = o.tenant_id
-     WHERE o.account_id = ? LIMIT 1`,
+     WHERE o.account_id = ? AND o.data_purged_at IS NULL LIMIT 1`,
   ).bind(id).first<OrganizationRow>();
   if (organization) return { ...organization, scopedStoreId: null };
 
@@ -74,7 +74,7 @@ async function baseOrganizationFor(c: Context<Env>): Promise<OrganizationContext
     FROM rt_stores s
     JOIN rt_organizations o ON o.id = s.organization_id
     LEFT JOIN tenants t ON t.id = o.tenant_id
-    WHERE s.line_account_id = ? AND s.data_purged_at IS NULL
+    WHERE s.line_account_id = ? AND s.data_purged_at IS NULL AND o.data_purged_at IS NULL
     LIMIT 1`).bind(id).first<OrganizationRow & { scoped_store_id: string }>();
   return storeOrganization
     ? { ...storeOrganization, scopedStoreId: storeOrganization.scoped_store_id }

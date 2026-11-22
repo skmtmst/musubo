@@ -8054,7 +8054,7 @@ CREATE TABLE rt_organizations (
   status TEXT NOT NULL DEFAULT 'test' CHECK (status IN ('test', 'active', 'archived')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, tenant_id TEXT REFERENCES tenants(id));
+, tenant_id TEXT REFERENCES tenants(id), data_purged_at TEXT);
 
 CREATE TABLE rt_reservation_close_outbox (
  id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES rt_reservation_close_tasks(id), generation INTEGER NOT NULL,
@@ -11709,8 +11709,7 @@ CREATE UNIQUE INDEX idx_rt_organizations_account ON rt_organizations(account_id)
 CREATE INDEX idx_rt_organizations_tenant
   ON rt_organizations(tenant_id);
 
-CREATE UNIQUE INDEX idx_rt_organizations_tenant_unique
-  ON rt_organizations(tenant_id);
+CREATE UNIQUE INDEX idx_rt_organizations_tenant_unique ON rt_organizations(tenant_id) WHERE data_purged_at IS NULL;
 
 CREATE INDEX idx_rt_reservation_hold_expiry ON rt_reservations(hold_expires_at) WHERE status = 'pending' AND hold_expires_at IS NOT NULL;
 
