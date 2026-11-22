@@ -1,4 +1,6 @@
-import {meetingCredentialKeys,validateMeetingEncryptionKey} from '../features/booking/booking-meeting-crypto.js';
+import {decryptMeetingCredential,meetingCredentialKeys,validateMeetingEncryptionKey} from '../features/booking/booking-meeting-crypto.js';
+import {acquireMeetingRevokeLock,meetingRevokeLocked,ownsMeetingRevokeLock,releaseMeetingRevokeLock} from '../features/booking/booking-meeting-revoke-lock.js';
+import {revokeMeetingAuthorization} from '../features/booking/booking-meeting-oauth-client.js';
 import {Hono,type Context} from 'hono';
 import {BOOKING_STAFF_OWN_KEY} from '@line-crm/shared';
 import type {Env} from '../worker-env.js';
@@ -66,15 +68,48 @@ bookingMeetingOAuth.post(base+'/connect',async c=>{
  const config=meetingOAuthConfig(c.env,provider);if(!config)return c.json({success:true,data:{mode:'mock',authorizationUrl:null}});
  if(provider==='outlook'&&(await calendarSwitch(c.env.DB,accountId,staffId)).readEnabled&&!await outlookStaffIsTestRecipient(c.env.DB,{lineAccountId:accountId,staffId}))throw new GapError('outlook_test_staff_required',409);
  if(!c.env.LINE_CREDENTIAL_ENCRYPTION_KEY)throw new GapError('oauth_not_configured',503);
+ if(await meetingRevokeLocked(c.env.DB,{accountId,staffId,provider}))return c.json({success:false,error:'meeting_disconnect_in_progress',message:'解除の処理中です。少し待ってからつなぎ直してください。'},409);
  await validateMeetingEncryptionKey(meetingCredentialKeys(c.env));
- const verifier=newMeetingVerifier();const state=await beginMeetingAuthorization(c.env.DB,{accountId,staffId,actorId:c.get('staff').id,provider,verifier,encryptionKey:c.env.LINE_CREDENTIAL_ENCRYPTION_KEY});
+ const verifier=newMeetingVerifier();let state:string;
+ try{state=await beginMeetingAuthorization(c.env.DB,{accountId,staffId,actorId:c.get('staff').id,provider,verifier,encryptionKey:c.env.LINE_CREDENTIAL_ENCRYPTION_KEY});}catch(error){if(await meetingRevokeLocked(c.env.DB,{accountId,staffId,provider}))return c.json({success:false,error:'meeting_disconnect_in_progress',message:'解除の処理中です。少し待ってからつなぎ直してください。'},409);throw error;}
  c.header('Set-Cookie',stateCookie(state));
  auditLog(c,'booking.meeting.connect.start',{id:staffId,kind:provider},{lineAccountId:accountId});
  return c.json({success:true,data:{mode:'configured',authorizationUrl:await meetingAuthorizationUrl(config,state,verifier)}});
 });
 bookingMeetingOAuth.delete(base,async c=>{
  gapWrite(c);const accountId=await gapAccount(c),staffId=c.req.param('id')!,provider=providerOf(c.req.param('provider')!);await staffTarget(c,accountId,staffId,true);
- if(!await deleteMeetingCredential(c.env.DB,{accountId,staffId,provider,microsoftManualReview:provider==='teams'||provider==='outlook',externalManualReview:provider==='google_meet'||provider==='zoom'}))throw new GapError('meeting_connection_changed',409);
+ const scope={accountId,staffId,provider};
+ if(provider==='google_meet'||provider==='zoom'){
+  const row=await c.env.DB.prepare('SELECT id,version,credential_enc FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=?').bind(accountId,staffId,provider).first<{id:string;version:number;credential_enc:string}>();
+  const expected=row?{id:row.id,version:row.version}:null;
+  const lease=await acquireMeetingRevokeLock(c.env.DB,scope);
+  if(!lease){
+   if(await meetingRevokeLocked(c.env.DB,scope))throw new GapError('meeting_disconnect_in_progress',409);
+   if(!await deleteMeetingCredential(c.env.DB,{...scope,expected,externalManualReview:true}))throw new GapError('meeting_connection_changed',409);
+   auditLog(c,'booking.meeting.disconnect',{id:staffId,kind:provider},{lineAccountId:accountId});
+   return c.json({success:true,data:{disconnected:true}});
+  }
+  try{
+   let token:string|undefined,decision:'revoke'|'shared'|'review'='review';const config=meetingOAuthConfig(c.env,provider);
+   if(row&&config)try{
+    const keys=meetingCredentialKeys(c.env);const value=JSON.parse((await decryptMeetingCredential(row.credential_enc,keys,scope)).plaintext) as {provider?:unknown;externalAccountId?:unknown;refreshToken?:unknown;accessToken?:unknown};
+    if(value.provider===provider&&typeof value.externalAccountId==='string'&&value.externalAccountId&&typeof value.refreshToken==='string'&&value.refreshToken){
+     token=provider==='zoom'?(typeof value.accessToken==='string'?value.accessToken:undefined):value.refreshToken;
+     decision=token?'revoke':'review';
+     if(provider==='google_meet'){
+      const ambiguous=await c.env.DB.prepare("SELECT 1 FROM google_calendar_connections WHERE is_active=1 AND auth_type='oauth' UNION ALL SELECT 1 FROM rt_google_connections WHERE refresh_token_enc IS NOT NULL UNION ALL SELECT 1 FROM google_sheets_integrations WHERE refresh_token_enc IS NOT NULL LIMIT 1").first();
+      if(ambiguous||c.env.GOOGLE_BUSINESS_OAUTH_CLIENT_ID||c.env.GOOGLE_SHEETS_OAUTH_CLIENT_ID)decision='review';
+      const others=await c.env.DB.prepare("SELECT id,line_account_id,staff_id,credential_enc FROM booking_meeting_connections WHERE provider='google_meet' AND id<>? LIMIT 501").bind(row.id).all<{id:string;line_account_id:string;staff_id:string;credential_enc:string}>();
+      if(others.results.length>500)decision='review';
+      for(const other of others.results){const otherScope={accountId:other.line_account_id,staffId:other.staff_id,provider:'google_meet' as const};const otherValue=JSON.parse((await decryptMeetingCredential(other.credential_enc,keys,otherScope)).plaintext) as {externalAccountId?:unknown;provider?:unknown};if(otherValue.provider!=='google_meet'||typeof otherValue.externalAccountId!=='string'||!otherValue.externalAccountId){decision='review';break;}if(otherValue.externalAccountId===value.externalAccountId){decision='shared';break;}}
+     }
+    }
+   }catch{decision='review';}
+   const reviewId=crypto.randomUUID();
+   if(!await deleteMeetingCredential(c.env.DB,{...scope,expected,externalManualReview:decision!=='shared',reviewId}))throw new GapError('meeting_connection_changed',409);
+   if(row&&decision==='revoke'&&token&&config&&await ownsMeetingRevokeLock(c.env.DB,scope,lease)){const outcome=await revokeMeetingAuthorization(config,{token,signal:AbortSignal.timeout(15000)});if(outcome==='done')await c.env.DB.prepare("DELETE FROM notifications WHERE id=? AND event_type='booking_meeting_disconnect_review'").bind(reviewId).run();}
+  }finally{await releaseMeetingRevokeLock(c.env.DB,scope,lease);}
+ }else if(!await deleteMeetingCredential(c.env.DB,{...scope,microsoftManualReview:true}))throw new GapError('meeting_connection_changed',409);
  if(provider==='outlook')await c.env.DB.prepare("UPDATE booking_calendar_read_health SET error_code=NULL,failed_since=NULL WHERE line_account_id=? AND staff_id=? AND error_code LIKE 'outlook_%'").bind(accountId,staffId).run();
  auditLog(c,'booking.meeting.disconnect',{id:staffId,kind:provider},{lineAccountId:accountId});
  return c.json({success:true,data:{disconnected:true}});
@@ -87,6 +122,7 @@ bookingMeetingOAuth.get('/api/booking/admin/meeting-oauth/callback',async c=>{
  const row=await c.env.DB.prepare('SELECT line_account_id,staff_id,provider FROM booking_meeting_oauth_states WHERE state=? AND actor_id=?').bind(state,actorId).first<{line_account_id:string;staff_id:string;provider:ConnectionProvider}>();
  if(!row)throw new GapError('invalid_state',401);
  const accountId=await gapAccount(c,row.line_account_id);await staffTarget(c,accountId,row.staff_id,true);
+ if(await meetingRevokeLocked(c.env.DB,{accountId,staffId:row.staff_id,provider:row.provider}))return c.json({success:false,error:'meeting_disconnect_in_progress',message:'解除の処理中です。少し待ってからつなぎ直してください。'},409);
  const key=c.env.LINE_CREDENTIAL_ENCRYPTION_KEY;if(!key)throw new GapError('oauth_not_configured',503);
  await validateMeetingEncryptionKey(meetingCredentialKeys(c.env));
  const consumed=await consumeMeetingAuthorization(c.env.DB,{accountId,state,actorId,encryptionKey:key});if(!consumed)throw new GapError('invalid_state',401);

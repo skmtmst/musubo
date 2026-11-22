@@ -1,14 +1,15 @@
 import {decryptCredential,encryptCredential} from '@line-crm/db';
 import type {ConnectionProvider} from './booking-meeting-credentials.js';
+import {revokeLockCondition,revokeLockKey} from './booking-meeting-revoke-lock.js';
 /** ランダムな state は本人と店に結び付け、一度だけ使用する。 */
 export async function beginMeetingAuthorization(db:D1Database,input:{accountId:string;staffId:string;actorId:string;provider:ConnectionProvider;verifier:string;encryptionKey:string;now?:Date}):Promise<string>{
  const now=input.now??new Date(),state=crypto.randomUUID()+crypto.randomUUID();
  const value=await encryptCredential(input.verifier,input.encryptionKey);
  const operations=await db.batch([
-  db.prepare('DELETE FROM booking_meeting_oauth_states WHERE line_account_id=? AND staff_id=? AND provider=?').bind(input.accountId,input.staffId,input.provider),
+  db.prepare(`DELETE FROM booking_meeting_oauth_states WHERE line_account_id=? AND staff_id=? AND provider=? AND ${revokeLockCondition}`).bind(input.accountId,input.staffId,input.provider,revokeLockKey(input),now.getTime()),
   db.prepare(`INSERT INTO booking_meeting_oauth_states(state,line_account_id,staff_id,actor_id,provider,verifier_enc,expires_at,created_at)
-   SELECT ?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM staff WHERE id=? AND line_account_id=? AND deleted_at IS NULL)`)
-   .bind(state,input.accountId,input.staffId,input.actorId,input.provider,value,new Date(now.getTime()+600000).toISOString(),now.toISOString(),input.staffId,input.accountId),
+   SELECT ?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM staff WHERE id=? AND line_account_id=? AND deleted_at IS NULL) AND ${revokeLockCondition}`)
+   .bind(state,input.accountId,input.staffId,input.actorId,input.provider,value,new Date(now.getTime()+600000).toISOString(),now.toISOString(),input.staffId,input.accountId,revokeLockKey(input),now.getTime()),
  ]);
  if(operations[1].meta.changes!==1)throw new Error('staff_not_found');return state;
 }

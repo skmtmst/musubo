@@ -108,7 +108,10 @@ export async function createCalendarConnection(
     .prepare(`INSERT INTO google_calendar_connections
               (id, calendar_id, line_account_id, staff_id, auth_type,
                access_token, refresh_token, api_key, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+              SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+              WHERE ? <> 'oauth' OR NOT EXISTS (SELECT 1 FROM workflow_steps
+                WHERE scope_id='global:meeting-revoke' AND process_kind='booking_meeting_revoke_lock'
+                  AND subject_id='google_meet' AND step_key='lock' AND status='running' AND lease_expires_at>?)`)
     .bind(
       id,
       input.calendarId,
@@ -120,6 +123,8 @@ export async function createCalendarConnection(
       apiKey,
       now,
       now,
+      input.authType,
+      Date.now(),
     )
     .run();
   return getCalendarConnectionById(db, id, scope);

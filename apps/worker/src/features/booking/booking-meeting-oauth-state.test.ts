@@ -46,3 +46,14 @@ it('新しい認可を始めたら古い認可結果は使えない',async()=>{
  expect(await consumeMeetingAuthorization(d.db,{accountId:'a',state:first,actorId:'o',encryptionKey:key,now})).toBeNull();
  expect(await consumeMeetingAuthorization(d.db,{accountId:'a',state:second,actorId:'o',encryptionKey:key,now})).not.toBeNull();
 });
+it('解除の借受は開始と完了を止め、2分後に期限切れになる',async()=>{
+ const {acquireMeetingRevokeLock,meetingRevokeLocked,ownsMeetingRevokeLock}=await import('./booking-meeting-revoke-lock.js');
+ const scope={accountId:'a',staffId:'bs',provider:'zoom' as const};const now=Date.now();
+ const lease=await acquireMeetingRevokeLock(d.db,scope,now);expect(lease).toBeTruthy();
+ expect(await ownsMeetingRevokeLock(d.db,scope,lease!,now+99999)).toBe(true);
+ expect(await ownsMeetingRevokeLock(d.db,scope,lease!,now+100001)).toBe(false);
+ expect(await meetingRevokeLocked(d.db,scope,now+119999)).toBe(true);
+ await expect(beginMeetingAuthorization(d.db,{...input,now:new Date(now)})).rejects.toThrow();
+ expect(await meetingRevokeLocked(d.db,scope,now+120001)).toBe(false);
+ expect(await beginMeetingAuthorization(d.db,{...input,now:new Date(now+120001)})).toBeTruthy();
+});

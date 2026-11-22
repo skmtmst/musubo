@@ -1,5 +1,6 @@
 import {decryptMeetingCredential,encryptMeetingCredential,MeetingKeyConfigurationError,type MeetingKeyInput} from './booking-meeting-crypto.js';
 import type {MeetingProvider} from './booking-meeting-create.js';
+import {revokeLockCondition,revokeLockKey} from './booking-meeting-revoke-lock.js';
 export type ConnectionProvider=MeetingProvider|'outlook';
 type Credential={provider:ConnectionProvider;externalAccountId:string;refreshToken:string;accessToken?:string;accessExpiresAt?:string};
 type Scope={accountId:string;staffId:string;provider:ConnectionProvider};
@@ -61,15 +62,17 @@ export async function failMeetingRefresh(db:D1Database,input:{id:string;claim:st
  const r=await db.prepare(`UPDATE booking_meeting_connections SET refresh_state='unknown',refresh_claim=NULL,version=version+1,updated_at=?
  WHERE id=? AND version=? AND refresh_state='refreshing' AND refresh_claim=?`).bind(new Date().toISOString(),input.id,input.version,input.claim).run();return r.meta.changes===1;
 }
-export async function deleteMeetingCredential(db:D1Database,input:Scope & {microsoftManualReview?:boolean;externalManualReview?:boolean}):Promise<boolean>{
+export async function deleteMeetingCredential(db:D1Database,input:Scope & {microsoftManualReview?:boolean;externalManualReview?:boolean;reviewId?:string;expected?:{id:string;version:number}|null}):Promise<boolean>{
  await recoverStaleMeetingRefresh(db,input);
  const snapshot=await db.prepare('SELECT id,version,refresh_state FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=?').bind(input.accountId,input.staffId,input.provider).first<{id:string;version:number;refresh_state:string}>();
  if(!snapshot){
+  if(input.expected)return false;
   await db.prepare(`DELETE FROM booking_meeting_oauth_states WHERE line_account_id=? AND staff_id=? AND provider=?
    AND NOT EXISTS(SELECT 1 FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=?)`)
    .bind(input.accountId,input.staffId,input.provider,input.accountId,input.staffId,input.provider).run();
   return !(await db.prepare('SELECT id FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=?').bind(input.accountId,input.staffId,input.provider).first());
  }
+ if(input.expected===null||(input.expected&&(input.expected.id!==snapshot.id||input.expected.version!==snapshot.version)))return false;
  if(snapshot.refresh_state==='refreshing')return false;
  const operations=await db.batch([
   ...(input.microsoftManualReview?[db.prepare(`INSERT INTO notifications(id,event_type,title,body,channel,status,metadata,line_account_id,category)
@@ -79,7 +82,7 @@ export async function deleteMeetingCredential(db:D1Database,input:Scope & {micro
   ...(input.externalManualReview?[db.prepare(`INSERT INTO notifications(id,event_type,title,body,channel,status,metadata,line_account_id,category)
    SELECT ?,'booking_meeting_disconnect_review','外部サービスの接続解除を確認してください',?,'dashboard','sent',?,line_account_id,'error'
    FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=? AND id=? AND version=? AND refresh_state<>'refreshing'`)
-   .bind(crypto.randomUUID(),`${input.provider==='zoom'?'Zoom':'Google'} 側の接続解除を確認してください。同じアカウントを使う他の連携がないか確認してください。`,JSON.stringify({staffId:input.staffId,provider:input.provider}),input.accountId,input.staffId,input.provider,snapshot.id,snapshot.version)]:[]),
+   .bind(input.reviewId??crypto.randomUUID(),`${input.provider==='zoom'?'Zoom':'Google'} 側の接続解除を確認してください。同じアカウントを使う他の連携がないか確認してください。`,JSON.stringify({staffId:input.staffId,provider:input.provider}),input.accountId,input.staffId,input.provider,snapshot.id,snapshot.version)]:[]),
   db.prepare(`DELETE FROM booking_meeting_oauth_states WHERE line_account_id=? AND staff_id=? AND provider=?
    AND EXISTS(SELECT 1 FROM booking_meeting_connections WHERE id=? AND version=? AND line_account_id=? AND staff_id=? AND provider=? AND refresh_state<>'refreshing')`).bind(input.accountId,input.staffId,input.provider,snapshot.id,snapshot.version,input.accountId,input.staffId,input.provider),
   db.prepare("DELETE FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=? AND id=? AND version=? AND refresh_state<>'refreshing'").bind(input.accountId,input.staffId,input.provider,snapshot.id,snapshot.version),
@@ -94,9 +97,9 @@ export async function finishAuthorizedMeetingConnection(db:D1Database,input:Scop
  const operations=await db.batch([
   db.prepare(`INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at)
    SELECT ?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM booking_meeting_oauth_states o JOIN staff s ON s.id=o.staff_id AND s.line_account_id=o.line_account_id AND s.deleted_at IS NULL
-    WHERE o.state=? AND o.line_account_id=? AND o.staff_id=? AND o.actor_id=? AND o.provider=? AND o.used_at IS NOT NULL AND o.used_at>?)
+    WHERE o.state=? AND o.line_account_id=? AND o.staff_id=? AND o.actor_id=? AND o.provider=? AND o.used_at IS NOT NULL AND o.used_at>?) AND ${revokeLockCondition}
    ON CONFLICT(line_account_id,staff_id,provider) DO UPDATE SET id=excluded.id,credential_enc=excluded.credential_enc,connected_by=excluded.connected_by,refresh_state='ready',refresh_claim=NULL,version=booking_meeting_connections.version+1,updated_at=excluded.updated_at`)
-  .bind(crypto.randomUUID(),input.accountId,input.staffId,input.provider,encrypted,input.actorId,now,now,input.state,input.accountId,input.staffId,input.actorId,input.provider,new Date(Date.now()-120000).toISOString()),
+  .bind(crypto.randomUUID(),input.accountId,input.staffId,input.provider,encrypted,input.actorId,now,now,input.state,input.accountId,input.staffId,input.actorId,input.provider,new Date(Date.now()-120000).toISOString(),revokeLockKey(input),Date.now()),
   db.prepare('DELETE FROM booking_meeting_oauth_states WHERE state=? AND line_account_id=? AND actor_id=? AND changes()=1').bind(input.state,input.accountId,input.actorId),
  ]);
  return operations[0].meta.changes===1;

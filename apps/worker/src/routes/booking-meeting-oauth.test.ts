@@ -94,3 +94,90 @@ it('接続鍵の移行はオーナーのみで、既定は読み取りだけ',as
  expect((d.raw.prepare("SELECT credential_enc FROM booking_meeting_connections WHERE id='c'").get() as {credential_enc:string}).credential_enc).toMatch(/^v2\.line\./);
  expect((d.raw.prepare("SELECT credential_enc FROM booking_meeting_connections WHERE id='other'").get() as {credential_enc:string}).credential_enc).toBe(encrypted);
 });
+it.each(['google_meet','zoom'] as const)('%s の解除中は再接続を止め、解除後は新しい許可を保存できる',async provider=>{
+ const {encryptCredential,decryptCredential}=await import('@line-crm/db');
+ const cipher=await encryptCredential(JSON.stringify({provider,externalAccountId:'user',refreshToken:'old-refresh',accessToken:'old-access'}),key);
+ d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('old','a','bs',?,?,'o','2026-01-01','2026-01-01')").run(provider,cipher);
+ const configured={...bindings,BOOKING_MEETING_OAUTH_CONFIG:JSON.stringify({[provider]:{clientId:'client',clientSecret:'secret'}})};
+ let unblock!:()=>void,arrived!:()=>void;const pending=new Promise<void>(resolve=>{unblock=resolve});const started=new Promise<void>(resolve=>{arrived=resolve});
+ const scopes=provider==='google_meet'?'https://www.googleapis.com/auth/calendar.events':'user:read:user meeting:write:meeting meeting:read:meeting meeting:read:list_meetings meeting:delete:meeting';
+ const fetcher=vi.fn(async(url:RequestInfo|URL)=>{
+  if(String(url).includes('/revoke')){arrived();await pending;return new Response('',{status:200});}
+  if(String(url).includes('/token'))return new Response(JSON.stringify({access_token:'new-access',refresh_token:'new-refresh',expires_in:3600,scope:scopes}));
+  return new Response(JSON.stringify(provider==='google_meet'?{sub:'user'}:{id:'user'}));
+ });vi.stubGlobal('fetch',fetcher);
+ const app=gapApp(d,[bookingMeetingOAuth],gapOwner,false,configured),base=`/api/booking/admin/staff/bs/connections/${provider}`;
+ const disconnect=gapCall(app,`${base}?account_id=a`,'DELETE');await started;
+ const locked=await gapCall(app,`${base}/connect?account_id=a`,'POST',{});expect(locked.status).toBe(409);expect(await locked.json()).toMatchObject({message:'解除の処理中です。少し待ってからつなぎ直してください。'});
+ unblock();expect((await disconnect).status).toBe(200);
+ const next=await gapCall(app,`${base}/connect?account_id=a`,'POST',{});expect(next.status).toBe(200);
+ const data=await next.json() as {data:{authorizationUrl:string}};const state=new URL(data.data.authorizationUrl).searchParams.get('state');
+ expect((await gapCall(app,`/api/booking/admin/meeting-oauth/callback?state=${state}&code=fixture-code`)).status).toBe(302);
+ const saved=d.raw.prepare('SELECT credential_enc FROM booking_meeting_connections').get() as {credential_enc:string};
+ expect(JSON.parse(await decryptCredential(saved.credential_enc,key))).toMatchObject({refreshToken:'new-refresh'});
+ expect(fetcher.mock.calls.filter(([url])=>String(url).includes('/revoke'))).toHaveLength(1);
+});
+it('他の担当が同じ Google アカウントを使うときは取り消さず手元だけ切断する',async()=>{
+ const {encryptCredential}=await import('@line-crm/db');const value=JSON.stringify({provider:'google_meet',externalAccountId:'same',refreshToken:'old'}),cipher=await encryptCredential(value,key);
+ d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES(?,'a',?,'google_meet',?,'o','2026-01-01','2026-01-01')").run('first','bs',cipher);
+ d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES(?,'a',?,'google_meet',?,'o','2026-01-01','2026-01-01')").run('second','bs2',cipher);
+ const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);const app=gapApp(d,[bookingMeetingOAuth],gapOwner,false,bindings);
+ expect((await gapCall(app,`${path}?account_id=a`,'DELETE')).status).toBe(200);expect(fetcher).not.toHaveBeenCalled();
+ expect(d.raw.prepare('SELECT id FROM booking_meeting_connections').all()).toEqual([{id:'second'}]);
+});
+it.each([['zoom',500],['zoom','network'],['google_meet',500],['google_meet','network']] as const)('%s の解除が %s でも鍵を消して確認を残す',async (provider,failure)=>{
+ const {encryptCredential}=await import('@line-crm/db');const cipher=await encryptCredential(JSON.stringify({provider,externalAccountId:'user',refreshToken:'old',accessToken:'access'}),key);
+ d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('z','a','bs',?,?,'o','2026-01-01','2026-01-01')").run(provider,cipher);
+ const fetcher=vi.fn(async()=>{if(failure==='network')throw new Error('network');return new Response('',{status:failure})});vi.stubGlobal('fetch',fetcher);
+ const configured={...bindings,BOOKING_MEETING_OAUTH_CONFIG:JSON.stringify({[provider]:{clientId:'client',clientSecret:'secret'}})};
+ expect((await gapCall(gapApp(d,[bookingMeetingOAuth],gapOwner,false,configured),`/api/booking/admin/staff/bs/connections/${provider}?account_id=a`,'DELETE')).status).toBe(200);
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM booking_meeting_connections WHERE id='z'").get()).toEqual({n:0});
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE event_type='booking_meeting_disconnect_review' AND category='error'").get()).toEqual({n:1});expect(fetcher).toHaveBeenCalledOnce();
+});
+it('解除の借受中に戻った認可は交換せず、借受終了後に完了できる',async()=>{
+ const app=gapApp(d,[bookingMeetingOAuth],gapOwner,false,bindings);
+ const start=await gapCall(app,`${path}/connect?account_id=a`,'POST',{});const data=await start.json() as {data:{authorizationUrl:string}};const state=new URL(data.data.authorizationUrl).searchParams.get('state');
+ const now=Date.now();d.raw.prepare("INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,status,lease_owner,lease_expires_at,retry_key,created_at,updated_at) VALUES('global:meeting-revoke','booking_meeting_revoke_lock','google_meet','lock','running','owner',?,'key',?,?)").run(now+120000,now,now);
+ const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);const result=await gapCall(app,`/api/booking/admin/meeting-oauth/callback?state=${state}&code=fixture-code`);
+ expect(result.status).toBe(409);expect(await result.json()).toMatchObject({message:'解除の処理中です。少し待ってからつなぎ直してください。'});expect(fetcher).not.toHaveBeenCalled();
+ expect(d.raw.prepare('SELECT used_at FROM booking_meeting_oauth_states WHERE state=?').get(state)).toEqual({used_at:null});
+});
+it('Google の他の担当が別アカウントなら、切断する本人を解除する',async()=>{
+ const {encryptCredential}=await import('@line-crm/db');
+ for(const [id,staff,sub] of [['first','bs','first-user'],['second','bs2','other-user']]){
+  const cipher=await encryptCredential(JSON.stringify({provider:'google_meet',externalAccountId:sub,refreshToken:`refresh-${sub}`}),key);
+  d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES(?,'a',?,'google_meet',?,'o','2026-01-01','2026-01-01')").run(id,staff,cipher);
+ }
+ const fetcher=vi.fn(async()=>new Response('',{status:200}));vi.stubGlobal('fetch',fetcher);
+ expect((await gapCall(gapApp(d,[bookingMeetingOAuth],gapOwner,false,bindings),`${path}?account_id=a`,'DELETE')).status).toBe(200);
+ expect(fetcher).toHaveBeenCalledOnce();expect(d.raw.prepare('SELECT id FROM booking_meeting_connections').all()).toEqual([{id:'second'}]);
+});
+it('Google カレンダーの OAuth が本人照合できなければ解除せず確認を残す',async()=>{
+ const {encryptCredential}=await import('@line-crm/db');const cipher=await encryptCredential(JSON.stringify({provider:'google_meet',externalAccountId:'user',refreshToken:'refresh'}),key);
+ d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('first','a','bs','google_meet',?,'o','2026-01-01','2026-01-01')").run(cipher);
+ d.raw.exec("INSERT INTO google_calendar_connections(id,calendar_id,line_account_id,staff_id,auth_type,is_active) VALUES('cal','unknown','a','bs2','oauth',1)");
+ const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);
+ expect((await gapCall(gapApp(d,[bookingMeetingOAuth],gapOwner,false,bindings),`${path}?account_id=a`,'DELETE')).status).toBe(200);
+ expect(fetcher).not.toHaveBeenCalled();expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE event_type='booking_meeting_disconnect_review' AND category='error'").get()).toEqual({n:1});
+});
+it('別の Google 認可の途中は revoke せず、手元の鍵を消して確認を残す',async()=>{
+ const {encryptCredential}=await import('@line-crm/db');const cipher=await encryptCredential(JSON.stringify({provider:'google_meet',externalAccountId:'user',refreshToken:'old'}),key);
+ d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('first','a','bs','google_meet',?,'o','2026-01-01','2026-01-01')").run(cipher);
+ const app=gapApp(d,[bookingMeetingOAuth],gapOwner,false,bindings);const other='/api/booking/admin/staff/bs2/connections/google_meet/connect?account_id=a';expect((await gapCall(app,other,'POST',{})).status).toBe(200);
+ const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);expect((await gapCall(app,`${path}?account_id=a`,'DELETE')).status).toBe(200);expect(fetcher).not.toHaveBeenCalled();
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM booking_meeting_connections WHERE id='first'").get()).toEqual({n:0});expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE category='error' AND event_type='booking_meeting_disconnect_review'").get()).toEqual({n:1});
+});
+it('復号できない別の Google 接続があれば revoke せず確認を残す',async()=>{
+ const {encryptCredential}=await import('@line-crm/db');const cipher=await encryptCredential(JSON.stringify({provider:'google_meet',externalAccountId:'user',refreshToken:'old'}),key);
+ d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('first','a','bs','google_meet',?,'o','2026-01-01','2026-01-01')").run(cipher);
+ d.raw.exec("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('second','a','bs2','google_meet','broken','o','2026-01-01','2026-01-01')");
+ const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);expect((await gapCall(gapApp(d,[bookingMeetingOAuth],gapOwner,false,bindings),`${path}?account_id=a`,'DELETE')).status).toBe(200);expect(fetcher).not.toHaveBeenCalled();
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE category='error' AND event_type='booking_meeting_disconnect_review'").get()).toEqual({n:1});
+});
+it('別の Google 連携の設定があり本人を照合できなければ revoke しない',async()=>{
+ const {encryptCredential}=await import('@line-crm/db');const cipher=await encryptCredential(JSON.stringify({provider:'google_meet',externalAccountId:'user',refreshToken:'old'}),key);
+ d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('first','a','bs','google_meet',?,'o','2026-01-01','2026-01-01')").run(cipher);
+ const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);const app=gapApp(d,[bookingMeetingOAuth],gapOwner,false,{...bindings,GOOGLE_BUSINESS_OAUTH_CLIENT_ID:'other-client'});
+ expect((await gapCall(app,`${path}?account_id=a`,'DELETE')).status).toBe(200);expect(fetcher).not.toHaveBeenCalled();
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE category='error' AND event_type='booking_meeting_disconnect_review'").get()).toEqual({n:1});
+});
