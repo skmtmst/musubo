@@ -47,3 +47,15 @@ it('更新時の一時障害と無効な鍵と結果不明を区別する',async
  expect(await call('zoom',new Response('{}',{status:503}))).toBe('unknown');
  expect(await call('zoom',new Response('{"error":"invalid_client"}',{status:401}))).toBe('configuration');
 });
+it.each(['google_meet','zoom'] as const)('%s の解除を安全な形式で送り失敗・通信不明を確認待ちにする',async provider=>{
+ const {revokeMeetingAuthorization}=await import('./booking-meeting-oauth-client.js');
+ const config:MeetingOAuthConfig={provider,clientId:'fixture-client',clientSecret:'fixture-secret',redirectUri:'https://example.test/callback'};
+ const request=vi.fn().mockResolvedValueOnce(new Response('',{status:200})).mockResolvedValueOnce(new Response('',{status:503})).mockRejectedValueOnce(new Error('network'));
+ expect(await revokeMeetingAuthorization(config,{token:'fixture-token',signal},request as unknown as typeof fetch)).toBe('done');
+ const [url,options]=request.mock.calls[0] as [string,RequestInit];
+ expect(url).toBe(provider==='zoom'?'https://zoom.us/oauth/revoke':'https://oauth2.googleapis.com/revoke');
+ expect(new URLSearchParams(options.body as string).get('token')).toBe('fixture-token');
+ if(provider==='zoom')expect((options.headers as Record<string,string>).Authorization).toBe(`Basic ${btoa('fixture-client:fixture-secret')}`);
+ expect(await revokeMeetingAuthorization(config,{token:'fixture-token',signal},request as unknown as typeof fetch)).toBe('review');
+ expect(await revokeMeetingAuthorization(config,{token:'fixture-token',signal},request as unknown as typeof fetch)).toBe('review');
+});

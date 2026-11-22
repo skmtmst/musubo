@@ -46,6 +46,14 @@ export async function exchangeMeetingAuthorization(config:MeetingOAuthConfig,inp
 export class MeetingRefreshError extends Error {
  constructor(public readonly kind:'retryable'|'revoked'|'unknown'|'configuration'){super('oauth_refresh_failed');}
 }
+/** 相手先の解除結果だけを返す。応答や秘密値はログや通知に出さない。 */
+export async function revokeMeetingAuthorization(config:MeetingOAuthConfig,input:{token:string;signal:AbortSignal},request:typeof fetch=fetch):Promise<'done'|'review'> {
+ if((config.provider!=='google_meet'&&config.provider!=='zoom')||!input.token||!config.clientId||!config.clientSecret)return 'review';
+ const headers:Record<string,string>={'Content-Type':'application/x-www-form-urlencoded'};
+ if(config.provider==='zoom')headers.Authorization=`Basic ${btoa(`${config.clientId}:${config.clientSecret}`)}`;
+ const body=new URLSearchParams({token:input.token});
+ try {const response=await request(config.provider==='zoom'?'https://zoom.us/oauth/revoke':'https://oauth2.googleapis.com/revoke',{method:'POST',headers,body:body.toString(),signal:input.signal});return response.ok?'done':'review';}catch{return 'review';}
+}
 /** Zoom は成功応答を保存できなければ旧鍵が使えない。結果不明時は接続し直す。 */
 export async function refreshMeetingAuthorization(config:MeetingOAuthConfig,input:{refreshToken:string;signal:AbortSignal},request:typeof fetch=fetch):Promise<{accessToken:string;refreshToken:string;expiresAt:string}>{
  if(!config.clientId||!config.clientSecret||!input.refreshToken)throw new Error('oauth_not_configured');
