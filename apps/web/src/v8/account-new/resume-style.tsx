@@ -28,7 +28,7 @@ export default function ResumeRegistrationStyle({ accountId }: { accountId: stri
       {done ? <Button href={done === 'saved' && state.choice === 'restaurant' ? '/restaurant-test/stores/new' : '/hq'}>次へ</Button> : <>
         <Step4Template templateKey={state.choice} onOpen={() => setDialogOpen(true)} />
         <RegistrationStyleDialog
-          accountId={state.accountId} accountName={accountName} menu={state.menu} onMenuChange={state.setMenu}
+          accountName={accountName}
           open={dialogOpen}
           choice={state.choice}
           busy={state.busy}

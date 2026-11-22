@@ -871,7 +871,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
               {registrationStyle.error ? <ListState kind="error" title="使い方を確認・保存できませんでした" error={registrationStyle.error} onRetry={registrationStyle.reload} /> : null}
               <Step4Template templateKey={templateKey} onOpen={() => setStyleDialogOpen(true)} />
               <RegistrationStyleDialog
-                accountName={form.name.trim() || connection?.displayName?.trim()} accountId={registrationStyle.accountId} menu={registrationStyle.menu} onMenuChange={registrationStyle.setMenu}
+                accountName={form.name.trim() || connection?.displayName?.trim()}
                 open={styleDialogOpen}
                 choice={templateKey}
                 busy={registrationStyle.busy}
