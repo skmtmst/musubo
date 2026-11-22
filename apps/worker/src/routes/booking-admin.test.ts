@@ -748,7 +748,7 @@ describe('jstDayWindowUtc', () => {
   });
 });
 
-describe('PATCH /api/booking/admin/requests/:id の再試行 (N-065)', () => {
+describe('予約申請の取消・却下は送信状態を確認して処理する', () => {
   test('取消ずみへの再送は409にせずだけ止める', async () => {
     const sqlite = new Database(':memory:');
     try {
@@ -960,7 +960,7 @@ describe('PATCH /api/booking/admin/requests/:id の再試行 (N-065)', () => {
   });
 });
 
-describe('staff breaks API (N-405 #655)', () => {
+describe('担当者の休憩を勤務時間・版・所属を確認して保存する', () => {
   function seedBreaks(sqlite: Database.Database) {
     sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
     sqlite.exec(`
