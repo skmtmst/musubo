@@ -38,6 +38,7 @@ export type GuideControl = {
   anchor: GuideAnchor | null
   pausedAnchor: GuideAnchor | null
   start: () => void
+  restart?: () => void
   pause: () => void
   resume: () => void
   reset: () => void
@@ -130,7 +131,8 @@ export function nextGuideEngineState(current: GuideEngineState, action: GuideEng
 export type GuideAnchor = { key: string; label: string; href: string }
 
 function needsGuideReview(state: GuideEngineState): boolean {
-  return (state.stepKey === 'attributes' && state.procedureIndex === 3) ||
+  return state.stepKey === 'richMenu' ||
+    (state.stepKey === 'attributes' && state.procedureIndex === 3) ||
     state.stepKey === 'hours' ||
     (state.stepKey === 'scenario' && state.procedureIndex === 2)
 }
@@ -317,6 +319,12 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
     pausedAnchor: state.phase === 'paused' ? savedGuideAnchor(summary, state) ?? anchor : null,
     /** 最初から始める時は見送りの記憶も消す（また1段目から案内する）。 */
     start: useCallback(() => { setSkipped(EMPTY_SKIPPED); commit(state.phase === 'active' ? 'advance' : 'start', guideAnchor(summary)?.key ?? null) }, [commit, summary, state.phase]),
+    restart: useCallback(() => {
+      const connected = summary?.steps.some(step => step.key === 'accounts' && step.done)
+      const firstMenu = scripted && connected && summary?.steps.some(step => step.key === 'richMenu' && step.href)
+      setSkipped(EMPTY_SKIPPED)
+      commit(state.phase === 'active' ? 'advance' : 'start', firstMenu ? 'richMenu' : guideAnchor(summary)?.key ?? null)
+    }, [commit, scripted, summary, state.phase]),
     /**
      * 選んだ段からガイドを始める（枠08b の行の「開く」）。
      * 止まっている時は 'start'、もう動いている時は 'advance' で段を移す。
