@@ -478,6 +478,8 @@
 
 - [新しいLINEアカウントのLIFF自動作成](release-log/unreleased/153-masato-liff-auto-create.md) — 反映履歴、確認 2026-11-22。
 
+- [LINE登録後の「使い方を選ぶ」への自動遷移](release-log/unreleased/154-masato-line-register-auto.md) — 反映履歴、確認 2026-11-22。
+
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
 
 - [GoogleビジネスとInstagramの複数接続（第1段）](release-log/unreleased/137-kenta-sns-multi-connections.md) — 反映履歴、確認 2026-11-21。

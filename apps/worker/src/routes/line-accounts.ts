@@ -824,8 +824,8 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
   if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   const musuboGate = await musuboFirstLineGate(c);
   if (musuboGate instanceof Response) return musuboGate;
-  // LINE の接続（新しいアカウントの接続）は大事な操作（V）。
-  if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
+  // 追加料金を予約した接続は、決済・有効化へ進む前に本人確認する。
+  if (musuboGate === 'reserved_addition' && !await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
   }
   const parsed = await readConnectRequest(c);
