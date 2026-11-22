@@ -43,3 +43,16 @@ test('real purge keeps and redacts a bulk approval parent', async () => {
   expect(row.operation_json).not.toContain('private');
   expect(row.created_by).not.toContain('private');
 });
+
+test('retained privacy audit survives purge of the session and operator', async () => {
+  const { gapFixture }=await import('../test-utils/gap1.js');
+  const { processTenantDataPurge }=await import('./tenant-data-purge.js');
+  const f=gapFixture(); f.raw.pragma('foreign_keys = ON');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01' WHERE id='t';
+    INSERT INTO impersonation_sessions(id,staff_id,tenant_id,mode,write_reason) VALUES('session','o','t','write','private');
+    INSERT INTO pii_reveal_logs(id,impersonation_session_id,staff_id,tenant_id,reason) VALUES('audit','session','o','t','audit');`);
+  const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
+  expect(result.completed).toBe(1);
+  expect(f.raw.prepare("SELECT id FROM pii_reveal_logs WHERE id='audit'").get()).toEqual({id:'audit'});
+  expect(f.raw.prepare("SELECT write_reason FROM impersonation_sessions WHERE id='session'").get()).toEqual({write_reason:null});
+});
