@@ -106,7 +106,7 @@ export async function runFrequentHeavyJobs(
     },
     {
       name: 'booking deleted connection cleanup',
-      run: async () => {const {processDeletedMeetingRevocations}=await import('../features/booking/booking-meeting-deletion-runner.js');await processDeletedMeetingRevocations(env,{now:event.scheduledTime});},
+      run: async () => {const {processDeletedMeetingRevocations}=await import('../features/booking/booking-meeting-deletion-runner/index.js');await processDeletedMeetingRevocations(env,{now:event.scheduledTime});},
     },
     {
       name: 'booking meeting recovery',
