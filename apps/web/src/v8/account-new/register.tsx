@@ -886,14 +886,14 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
           )}
 
           {currentStep === 5 && connection && (
-            <Step5Completion connection={connection} accountName={form.name.trim()} createdId={createdId} importRunning={importRunning} importFriends={form.importFriends} importState={importState} handover={handover} idleSeconds={idleSeconds} requestError={importRequestError} restaurant={templateKey === 'restaurant'} onRefresh={() => void refreshImport()} refreshing={importRefreshing} />
+            <Step5Completion connection={connection} accountName={form.name.trim()} createdId={createdId} importRunning={importRunning} importFriends={form.importFriends} importState={importState} handover={handover} idleSeconds={idleSeconds} requestError={importRequestError} onRefresh={() => void refreshImport()} refreshing={importRefreshing} />
           )}
 
 
         </StepContent>
         {!(currentStep === 3 && sub === 2) && <StickyBar presentation="account-registration" actions={currentStep === 5 ? <>
             {importAttention ? <Button type="button" variant="primary" busy={importRefreshing} busyLabel="確認中…" onClick={() => void refreshImport()}>状態を再確認</Button> : null}
-            <Button href="/hq" variant={importAttention ? 'secondary' : 'primary'}><ArrowLeft size={16} aria-hidden="true" />統括コンソールへ戻る</Button>
+            <Button href="/hq" variant={importAttention ? 'secondary' : 'primary'}><ArrowLeft size={16} aria-hidden="true" />管理画面へ</Button>
           </> : currentStep === 4 ? <>
             <Button type="button" onClick={() => setStyleDialogOpen(true)} disabled={busy}>スタイルを選ぶ</Button>
             <Button type="button" onClick={() => void finishStyle('skip')} disabled={busy || registrationStyle.version === null} busy={registrationStyle.busy} busyLabel="保存しています…">あとで設定する</Button>
