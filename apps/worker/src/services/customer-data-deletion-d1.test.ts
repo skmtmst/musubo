@@ -3,6 +3,7 @@ import { Miniflare } from 'miniflare';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteCustomerData } from './customer-data-deletion.js';
 import { CUSTOMER_WORKFLOW_WAIT_MS, redactCustomerWorkflows } from './customer-workflow-redaction.js';
+import {claimWorkflowStep} from '@line-crm/db';
 
 let mf: Miniflare;
 let native: Awaited<ReturnType<Miniflare['getD1Database']>>;
@@ -89,6 +90,7 @@ describe('local workerd D1 binding', () => {
     expect(await redactCustomerWorkflows(db(),requested+CUSTOMER_WORKFLOW_WAIT_MS)).toBe(1);
     const redacted=await native.prepare('SELECT status,input_json,result_json FROM workflow_steps WHERE subject_id=?').bind(`${friendId}-unknown`).first();
     expect(redacted).toMatchObject({status:'canceled',input_json:'{"redacted":true}',result_json:'{"redacted":true,"previousStatus":"unknown","requestId":"request_1"}'});
+    expect(await claimWorkflowStep(db(),{scopeId:'line:account',processKind:'tracked_click',subjectId:`${friendId}-unknown`,stepKey:'__run'})).toBeNull();
     const journal=await native.prepare('SELECT detail_json FROM operation_audit WHERE id=?').bind(`customer-delete:friend_data:${friendId}`).first<{detail_json:string}>();
     const detail=JSON.parse(journal!.detail_json);
     expect(detail.recipientDigest).toHaveLength(64);
