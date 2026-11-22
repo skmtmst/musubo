@@ -8,7 +8,7 @@ export type DeletionTarget = {
   formId?: string; lineUserId?: string;
 };
 type Journal = { id: string; action: string; detail_json: string; actor_id: string };
-type Detail = { accountId: string | null; formId?: string; token: string; leaseUntil: number; completedAt?: string; rows?: number; anonymizedRows?: number; unlinkedCandidates?: { legacyDestinationMatchingLineId: number; accountReservationsWithoutLineId: number; unlinkedWaitlistMatchingLineId: number; reservationsWithRawEmail: number } };
+type Detail = { accountId: string | null; formId?: string; token: string; leaseUntil: number; completedAt?: string; rows?: number; anonymizedRows?: number; unlinkedCandidates?: { legacyDestinationMatchingLineId: number; accountReservationsWithoutLineId: number; reservationsWithRawEmail: number } };
 type Relation = { friendColumns: string[]; lineUserColumn: boolean; references: Array<{ parent: string; columns: Array<{ column: string; parentColumn: string }> }> };
 const graph: Record<string, Relation> = relations;
 type ProtectedReference = {parent:string;mode?:'restrict';columns:Array<{column:string;parentColumn:string}>};
@@ -68,7 +68,7 @@ function conditionsFor(target: DeletionTarget): Record<string, string> {
   result.line_message_unsends = `${identity} AND source_user_id = ?2 AND line_message_account_key = 'account:' || ?3`;
   result.rt_reservations = `${identity} AND rt_reservations.line_uid = ?2 AND EXISTS (SELECT 1 FROM rt_stores s WHERE s.id = rt_reservations.store_id AND s.line_account_id = ?3)`;
   result.rt_customer_notice_outbox = `EXISTS (SELECT 1 FROM rt_reservations WHERE ${result.rt_reservations} AND rt_reservations.id = rt_customer_notice_outbox.reservation_id)`;
-  result.rt_seat_waitlist = `EXISTS (SELECT 1 FROM rt_reservations WHERE ${result.rt_reservations} AND rt_reservations.waitlist_entry_id = rt_seat_waitlist.id AND rt_reservations.store_id = rt_seat_waitlist.store_id AND rt_seat_waitlist.line_uid = ?2)`;
+  result.rt_seat_waitlist = `${identity} AND rt_seat_waitlist.line_uid = ?2 AND EXISTS (SELECT 1 FROM rt_stores s WHERE s.id = rt_seat_waitlist.store_id AND s.line_account_id = ?3)`;
   return result;
 }
 function childFirst(tables: string[]): string[] {
@@ -100,10 +100,12 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
     const notices = conditions.rt_customer_notice_outbox;
     const conflict = await db.prepare(`SELECT 1 FROM rt_customer_notice_outbox WHERE ${notices} AND line_uid <> ?2 LIMIT 1`).bind(...params).first();
     const ambiguousWaitlist = await db.prepare(`SELECT 1 FROM rt_reservations JOIN rt_seat_waitlist w ON w.id=rt_reservations.waitlist_entry_id WHERE ${conditions.rt_reservations} AND (w.store_id <> rt_reservations.store_id OR w.line_uid IS NOT ?2) LIMIT 1`).bind(...params).first();
-    if (conflict || ambiguousWaitlist) throw new DeletionFailure(409, 'deletion_identity_conflict');
+    const waitlistOtherReservation = await db.prepare(`SELECT 1 FROM rt_seat_waitlist WHERE ${conditions.rt_seat_waitlist} AND EXISTS (SELECT 1 FROM rt_reservations r WHERE r.waitlist_entry_id=rt_seat_waitlist.id AND (r.store_id <> rt_seat_waitlist.store_id OR r.line_uid IS NOT ?2)) LIMIT 1`).bind(...params).first();
+    if (conflict || ambiguousWaitlist || waitlistOtherReservation) throw new DeletionFailure(409, 'deletion_identity_conflict');
     const sending = await db.prepare(`SELECT 1 FROM rt_customer_notice_outbox WHERE ${notices} AND sent_at IS NULL AND julianday(lease_until) > julianday('now') LIMIT 1`).bind(...params).first();
-    const activeWaitlist = await db.prepare(`SELECT 1 FROM rt_reservations JOIN rt_seat_waitlist w ON w.id=rt_reservations.waitlist_entry_id WHERE ${conditions.rt_reservations} AND (w.status IN ('waiting','invited') OR julianday(w.notification_claim_until) > julianday('now')) LIMIT 1`).bind(...params).first();
-    if (sending || activeWaitlist) throw new DeletionFailure(409, 'deletion_in_progress');
+    const activeWaitlist = await db.prepare(`SELECT 1 FROM rt_seat_waitlist WHERE ${conditions.rt_seat_waitlist} AND (status IN ('waiting','invited') OR julianday(notification_claim_until) > julianday('now')) LIMIT 1`).bind(...params).first();
+    if (activeWaitlist) throw new DeletionFailure(409, 'deletion_waitlist_active');
+    if (sending) throw new DeletionFailure(409, 'deletion_in_progress');
   }
   // 未適用・途中の移行では削除意図や R2 を変更する前に止める。SQL 識別子は承認済みの保持参照だけを使う。
   if (target.kind === 'friend_data') {
@@ -216,6 +218,8 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       // 送信が処理中なら確定しない。送信処理の claim と同じ lease を原子的に確認する。
       statements.push(guard(`NOT EXISTS (SELECT 1 FROM rt_customer_notice_outbox WHERE rowid IN (SELECT value FROM json_each(?1)) AND (line_uid <> ?2 OR (sent_at IS NULL AND julianday(lease_until) > julianday('now'))))`, [notices, target.lineUserId ?? '']));
       statements.push(guard(`NOT EXISTS (SELECT 1 FROM rt_reservations r JOIN rt_seat_waitlist w ON w.id=r.waitlist_entry_id WHERE r.rowid IN (SELECT value FROM json_each(?1)) AND (w.store_id <> r.store_id OR w.line_uid IS NOT ?2 OR w.status IN ('waiting','invited') OR julianday(w.notification_claim_until) > julianday('now')))`, [reservations, target.lineUserId ?? '']));
+      statements.push(guard(`NOT EXISTS (SELECT 1 FROM rt_seat_waitlist WHERE rowid IN (SELECT value FROM json_each(?)) AND (status IN ('waiting','invited') OR julianday(notification_claim_until) > julianday('now')))`, [waitlist]));
+      statements.push(guard(`NOT EXISTS (SELECT 1 FROM rt_seat_waitlist w JOIN rt_reservations r ON r.waitlist_entry_id=w.id WHERE w.rowid IN (SELECT value FROM json_each(?1)) AND (r.store_id <> w.store_id OR r.line_uid IS NOT ?2))`, [waitlist, target.lineUserId ?? '']));
       // 匿名化で自動生成される changed イベント以外を誤って消さない。
       statements.push(guard(`NOT EXISTS (SELECT 1 FROM json_each(?) j JOIN rt_reservations r ON r.rowid=json_extract(j.value,'$.rowid') JOIN rt_reservation_events e ON e.reservation_id=r.id AND e.reservation_version=json_extract(j.value,'$.version')+1 AND e.event_type='restaurant.reservation.changed')`, [reservationVersions]));
       statements.push(db.prepare(`UPDATE line_message_unsends SET source_user_id = NULL WHERE rowid IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(byTable.get('line_message_unsends')!.rows.map(row => row._delete_rowid))));
@@ -256,9 +260,8 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       const counts = await db.batch([
         db.prepare("SELECT COUNT(*) AS n FROM line_message_unsends WHERE ? IS NOT NULL AND ? <> '' AND source_user_id = ? AND line_message_account_key LIKE 'destination:%'").bind(target.accountId, target.lineUserId ?? '', target.lineUserId ?? ''),
         db.prepare("SELECT COUNT(*) AS n FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE ? IS NOT NULL AND s.line_account_id = ? AND (r.line_uid IS NULL OR trim(r.line_uid)='') AND r.customer_name <> '削除済みのお客さま'").bind(target.accountId, target.accountId),
-        db.prepare(`SELECT COUNT(*) AS n FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE ? IS NOT NULL AND ? <> '' AND s.line_account_id=? AND w.line_uid=? AND NOT EXISTS (SELECT 1 FROM rt_reservations r WHERE r.waitlist_entry_id=w.id AND r.store_id=w.store_id AND r.line_uid=w.line_uid)`).bind(target.accountId, target.lineUserId ?? '', target.accountId, target.lineUserId ?? ''),
       ]);
-      unlinkedCandidates = { legacyDestinationMatchingLineId: Number((counts[0].results[0] as {n:number}).n), accountReservationsWithoutLineId: Number((counts[1].results[0] as {n:number}).n), unlinkedWaitlistMatchingLineId: Number((counts[2].results[0] as {n:number}).n), reservationsWithRawEmail: byTable.get('rt_reservations')!.rows.filter(row => row.inbound_email_id != null).length };
+      unlinkedCandidates = { legacyDestinationMatchingLineId: Number((counts[0].results[0] as {n:number}).n), accountReservationsWithoutLineId: Number((counts[1].results[0] as {n:number}).n), reservationsWithRawEmail: byTable.get('rt_reservations')!.rows.filter(row => row.inbound_email_id != null).length };
     }
     const anonymousTables = target.kind === 'friend_data' ? new Set(['line_message_unsends', 'rt_reservations', 'rt_customer_notice_outbox', 'rt_seat_waitlist']) : new Set<string>();
     const completed: Detail = { ...detail, completedAt: new Date().toISOString(), rows: snapshots.reduce((sum, s) => sum + (anonymousTables.has(s.table) ? 0 : s.rows.length), 0), anonymizedRows: snapshots.reduce((sum, s) => sum + (anonymousTables.has(s.table) ? s.rows.length : 0), 0), ...(unlinkedCandidates ? { unlinkedCandidates } : {}) };

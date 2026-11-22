@@ -1,3 +1,4 @@
+import { upsertFriend } from '@line-crm/db';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { deleteCustomerData } from '../services/customer-data-deletion.js';
@@ -44,12 +45,45 @@ it('同じアカウントと LINE ID の組だけを匿名化し、同名・同�
   expect(f.raw.prepare("SELECT customer_version FROM rt_reservations WHERE id='mine'").get()).toEqual({ customer_version: 2 });
   expect(f.raw.prepare("SELECT COUNT(*) n FROM rt_reservation_event_receipts WHERE event_id='rt:mine:2:restaurant.reservation.changed'").get()).toEqual({ n: 0 });
   const audit = f.raw.prepare("SELECT detail_json FROM operation_audit WHERE id='customer-delete:friend_data:f'").get() as { detail_json: string };
-  expect(JSON.parse(audit.detail_json)).toMatchObject({ anonymizedRows: 4, unlinkedCandidates: { legacyDestinationMatchingLineId: 1, accountReservationsWithoutLineId: 1, unlinkedWaitlistMatchingLineId: 1, reservationsWithRawEmail: 1 } });
+  expect(JSON.parse(audit.detail_json)).toMatchObject({ anonymizedRows: 5, unlinkedCandidates: { legacyDestinationMatchingLineId: 1, accountReservationsWithoutLineId: 1, reservationsWithRawEmail: 1 } });
   expect(audit.detail_json).not.toContain('09000000000');
   expect(audit.detail_json).not.toContain('line-person');
   expect(f.raw.prepare("SELECT customer_name,customer_phone,line_uid,identity_key,status FROM rt_seat_waitlist WHERE id='wait'").get()).toEqual({ customer_name: '削除済みのお客さま', customer_phone: null, line_uid: null, identity_key: 'deleted:wait', status: 'converted' });
-  expect(f.raw.prepare("SELECT line_uid FROM rt_seat_waitlist WHERE id='unlinked'").get()).toEqual({ line_uid: 'line-person' });
+  expect(f.raw.prepare("SELECT line_uid FROM rt_seat_waitlist WHERE id='unlinked'").get()).toEqual({ line_uid: null });
   expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+});
+
+it('削除後に再接触しても古い予約と予約のないキャンセル待ちは結び直されない', async () => {
+  await deleteCustomerData({ DB: f.db }, target, 'owner');
+  const next = await upsertFriend(f.db, { lineUserId: 'line-person', lineAccountId: 'a', displayName: '新しい名前' });
+  expect(next.id).not.toBe('f');
+  expect(f.raw.prepare("SELECT line_uid,customer_name FROM rt_reservations WHERE id='mine'").get()).toEqual({ line_uid: null, customer_name: '削除済みのお客さま' });
+  expect(f.raw.prepare("SELECT line_uid,customer_name,identity_key FROM rt_seat_waitlist WHERE id='unlinked'").get()).toEqual({ line_uid: null, customer_name: '削除済みのお客さま', identity_key: 'deleted:unlinked' });
+  expect(f.raw.prepare("SELECT w.id FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE w.line_uid=? AND s.line_account_id=?").all('line-person', 'a')).toEqual([]);
+});
+
+it.each(['waiting', 'invited'])('予約に結び付かない%sの待ちがあれば削除を止める', async status => {
+  f.raw.prepare("UPDATE rt_seat_waitlist SET status=? WHERE id='unlinked'").run(status);
+  await expect(deleteCustomerData({ DB: f.db }, target, 'owner')).rejects.toMatchObject({ status: 409, code: 'deletion_waitlist_active' });
+  expect(f.raw.prepare("SELECT id FROM friends WHERE id='f'").get()).toEqual({ id: 'f' });
+});
+
+it('予約に結び付かない待ちに別人の予約が付いた場合は削除を止める', async () => {
+  f.raw.exec("UPDATE rt_reservations SET waitlist_entry_id='unlinked' WHERE id='other'");
+  await expect(deleteCustomerData({ DB: f.db }, target, 'owner')).rejects.toMatchObject({ status: 409, code: 'deletion_identity_conflict' });
+  expect(f.raw.prepare("SELECT line_uid FROM rt_seat_waitlist WHERE id='unlinked'").get()).toEqual({ line_uid: 'line-person' });
+});
+
+it('同じ LINE ID でも別のアカウントの待ちは匿名化しない', async () => {
+  f.raw.exec("INSERT INTO rt_seat_waitlist(id,store_id,starts_at,guest_count,customer_name,line_uid,identity_key,status) VALUES('foreign-wait','sb','2030-01-10',2,'別の店','line-person','line:line-person','finished')");
+  await deleteCustomerData({ DB: f.db }, target, 'owner');
+  expect(f.raw.prepare("SELECT customer_name,line_uid FROM rt_seat_waitlist WHERE id='foreign-wait'").get()).toEqual({ customer_name: '別の店', line_uid: 'line-person' });
+});
+
+it('同じ店でも別の LINE ID の待ちは匿名化しない', async () => {
+  f.raw.exec("INSERT INTO rt_seat_waitlist(id,store_id,starts_at,guest_count,customer_name,line_uid,identity_key,status) VALUES('other-wait','sa','2030-01-10',2,'別人','line-other','line:line-other','finished')");
+  await deleteCustomerData({ DB: f.db }, target, 'owner');
+  expect(f.raw.prepare("SELECT customer_name,line_uid FROM rt_seat_waitlist WHERE id='other-wait'").get()).toEqual({ customer_name: '別人', line_uid: 'line-other' });
 });
 
 it('古い本人情報では削除を開始しない', async () => {
@@ -66,7 +100,7 @@ it('予約に結び付く待ち行の本人が異なるときは別人を守っ�
 
 it('予約に結び付く待ち行の通知が送信中なら削除を止める', async () => {
   f.raw.exec("UPDATE rt_seat_waitlist SET notification_claim_until=datetime('now','+5 minutes') WHERE id='wait'");
-  await expect(deleteCustomerData({ DB: f.db }, target, 'owner')).rejects.toMatchObject({ status: 409, code: 'deletion_in_progress' });
+  await expect(deleteCustomerData({ DB: f.db }, target, 'owner')).rejects.toMatchObject({ status: 409, code: 'deletion_waitlist_active' });
   expect(f.raw.prepare("SELECT line_uid FROM rt_seat_waitlist WHERE id='wait'").get()).toEqual({ line_uid: 'line-person' });
 });
 
@@ -95,6 +129,20 @@ it('予約に別人の履歴が結び付いていてもその履歴を変更し�
     VALUES('other-event','mine','sa','other.event',99,'2030-01-01','other-request','a','other','{"name":"別人"}')`);
   await expect(deleteCustomerData({ DB: f.db }, target, 'owner')).resolves.toMatchObject({ deleted: true });
   expect(f.raw.prepare("SELECT payload_json FROM rt_reservation_events WHERE id='other-event'").get()).toEqual({ payload_json: '{"name":"別人"}' });
+});
+
+it('ファイル削除の途中で別人の予約が待ちに付いたら匿名化を巻き戻す', async () => {
+  f.raw.exec(`INSERT INTO forms(id,name,fields) VALUES('form','F','[]');
+    INSERT INTO media_file_scans(id,line_account_id,subject_kind,subject_id,filename,mime_type,size_bytes,status)
+      VALUES('scan','a','form_file','private/doc','doc','application/pdf',12,'clean');
+    INSERT INTO form_submission_files(id,line_account_id,form_id,block_id,friend_id,file_kind,side,r2_key,filename,mime_type,size_bytes,scan_id,created_at)
+      VALUES('doc','a','form','block','f','identity','single','private/doc','doc','application/pdf',12,'scan','2026-10-10');`);
+  const remove = vi.fn(async () => { f.raw.exec("UPDATE rt_reservations SET waitlist_entry_id='unlinked' WHERE id='other'"); });
+  await expect(deleteCustomerData({ DB: f.db, IMAGES: { delete: remove } }, target, 'owner')).rejects.toMatchObject({ status: 503 });
+  expect(remove).toHaveBeenCalled();
+  expect(f.raw.prepare("SELECT id FROM friends WHERE id='f'").get()).toEqual({ id: 'f' });
+  expect(f.raw.prepare("SELECT line_uid FROM rt_seat_waitlist WHERE id='unlinked'").get()).toEqual({ line_uid: 'line-person' });
+  expect(f.raw.prepare("SELECT line_uid FROM rt_reservations WHERE id='mine'").get()).toEqual({ line_uid: 'line-person' });
 });
 
 it('ファイル削除の途中で送信が始まれば DB の匿名化は巻き戻る', async () => {
