@@ -1080,3 +1080,34 @@ it('候補の通信障害は権限不足と区別して保存を止める', asyn
     expect(screen.queryByText(/権限のない候補は表示されません/)).toBeNull()
   } finally { if(original)vi.mocked(fetchApi).mockImplementation(original) }
 })
+
+it('振り分けを変更して移動すると未保存の確認を出す', async () => {
+  const data=structuredClone(formData)
+  const booking=data.layout.sections[1].blocks[0]
+  if(booking.kind!=='input'||!booking.booking)throw new Error('fixture')
+  booking.booking.routing={enabled:true,rules:[],fallback:{menuId:'bm-1'}}
+  formsGet.mockResolvedValue({success:true,data})
+  routingTargets.mockResolvedValue({success:true,data:{menus:[{id:'bm-1',name:'相談',durationMinutes:30}],staff:[{id:'s1',name:'担当',menuId:'bm-1'}],groups:[]}})
+  await render('id=form-1')
+  fireEvent.click(await screen.findByRole('switch',{name:'答えで予約の行き先を分ける'}))
+  fireEvent.click(screen.getByRole('link',{name:'キャンセル'}))
+  expect(await screen.findByRole('dialog',{name:'保存していない変更があります'})).toBeTruthy()
+  expect(formsUpdate).not.toHaveBeenCalled()
+})
+
+it('振り分けの保存が失敗しても変更を残す', async () => {
+  const data=structuredClone(formData)
+  const booking=data.layout.sections[1].blocks[0]
+  if(booking.kind!=='input'||!booking.booking)throw new Error('fixture')
+  booking.booking.routing={enabled:true,rules:[],fallback:{menuId:'bm-1'}}
+  formsGet.mockResolvedValue({success:true,data})
+  formsUpdate.mockRejectedValueOnce(new ApiError(503,'保存できません'))
+  routingTargets.mockResolvedValue({success:true,data:{menus:[{id:'bm-1',name:'相談',durationMinutes:30}],staff:[{id:'s1',name:'担当',menuId:'bm-1'}],groups:[]}})
+  await render('id=form-1')
+  const toggle=await screen.findByRole('switch',{name:'答えで予約の行き先を分ける'})
+  fireEvent.click(toggle)
+  fireEvent.click(getPageAction({name:'下書きを保存'}))
+  await waitFor(() => expect(formsUpdate).toHaveBeenCalled())
+  expect(toggle.getAttribute('aria-checked')).toBe('false')
+  expect(await screen.findByText(/保存に失敗しました/)).toBeTruthy()
+})
