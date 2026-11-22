@@ -30,9 +30,10 @@ describe('決済通知の要確認一覧',()=>{
   seed('evt_failed',{retentionAccountId:'a',event:{object:{id:'pi_failed'}}},null,null,'failed');
   seed('evt_failed_reason',{retentionAccountId:'a',event:{object:{id:'pi_failed_reason'}}},null,'stripe_binding_mismatch','failed');
   seed('evt_exhausted',{retentionAccountId:'a',event:{object:{id:'pi_exhausted'}}},null,null,'exhausted');
+  seed('evt_uncertain',{retentionAccountId:'a',event:{object:{id:'pi_uncertain'}}},null,null,'unknown');
   const before=db.raw.prepare("SELECT * FROM workflow_steps ORDER BY subject_id").all();
-  const body=await (await request()).json() as ReviewResponse;expect(body.data.items).toHaveLength(1);
-  expect(body.data.items[0]).toMatchObject({paymentId:'pi_exhausted',reason:'review_required'});
+  const body=await (await request()).json() as ReviewResponse;expect(body.data.items).toHaveLength(2);
+  expect(body.data.items).toEqual(expect.arrayContaining([expect.objectContaining({paymentId:'pi_exhausted',reason:'review_required'}),expect.objectContaining({paymentId:'pi_uncertain',reason:'review_required'})]));
   expect(db.raw.prepare("SELECT * FROM workflow_steps ORDER BY subject_id").all()).toEqual(before);
  });
  it('削除時に結果不明だった通知は理由を区別する',async()=>{
