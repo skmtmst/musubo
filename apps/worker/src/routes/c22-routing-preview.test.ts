@@ -56,3 +56,11 @@ test('代理ログインで振り分け以外を編集しても、既存ルー�
  const r=await gapCall(gapApp(d,[forms],gapOwner,true),'/api/forms/form?account_id=a','PUT',{layout:draft,expectedContentRevision:1});
  expect(r.status).toBe(200);
 });
+
+test('代理ログインでは振り分けが使う質問の変更もできない',async()=>{
+ const {forms}=await import('./forms.js');
+ const draft=layout(); const question=draft.sections[0].blocks[0];if(question.kind!=='input')throw Error('fixture');question.name='different';
+ const before=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get();
+ const r=await gapCall(gapApp(d,[forms],gapOwner,true),'/api/forms/form?account_id=a','PUT',{layout:draft,expectedContentRevision:1});
+ expect(r.status).toBe(403);expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
+});
