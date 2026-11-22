@@ -485,6 +485,7 @@ export const post__api_forms_id_duplicate_8 = async (c: Context<Env, "/api/forms
 };
 
 export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => {
+  if (c.get('staff')?.readOnly) return c.json({success:false,error:'閲覧のみの権限では変更できません'},403);
   const id = c.req.param('id');
   const putGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, id));
   if (putGate) return putGate;

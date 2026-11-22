@@ -111,7 +111,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
           {preview ? <strong>{preview.matchedIndex === -1 ? 'どれにも当たらないとき' : `${preview.matchedIndex + 1} 行目`}：{menus.find((menu) => menu.id === preview.target.menuId)?.name ?? '行き先'}{preview.fellBack ? '（元の行き先が使えないため既定の行き先）' : ''}（保存はされません）</strong> : null}
           {previewError ? <Notice tone="danger" role="alert">{previewError}</Notice> : null}
         </div> : null}
-        <DataTable aria-label="行き先の表" columnWeights={[0.35, 2, 2.3, 1.3, 1.5, 0.4]}>
+        <DataTable aria-label="行き先の表" grid={{ columns: '24px minmax(0, 1.3fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 32px', padding: '0', headPadding: '0', gap: 'var(--tpl-sb-ec-gap)' }}>
           <thead><TableHeadRow><Th aria-label="並べ替え" /><Th>条件</Th><Th grow>出すメニュー</Th><Th>担当の組</Th><Th>会い方</Th><Th aria-label="操作" /></TableHeadRow></thead><tbody>
           {(readOnly ? ruled : reorder.shown).map((rule, index) => {
             const invalid = problem?.row === index
