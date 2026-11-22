@@ -73,3 +73,55 @@ test('affiliate settlement and payout history survives while another tenant rema
   expect(f.raw.prepare("SELECT data_purged_at FROM line_accounts WHERE id='b'").get()).toEqual({data_purged_at:null});
   expect(f.raw.pragma('foreign_key_check')).toEqual([]);
 });
+
+test('monthly contract and retained rights survive tenant purge while customer and card details are erased', async () => {
+  const { monthlyFixture, monthlyContract, monthlyCycle, activateMonthly, monthlyRight, monthlyUse }=await import('../test-utils/monthly-ledger.js');
+  const f=monthlyFixture();
+  await monthlyContract(f,{classKind:'event',classId:'class'});
+  monthlyCycle(f,{paid:true}); activateMonthly(f); monthlyRight(f,'event'); monthlyUse(f,'event');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01' WHERE id='t';
+    INSERT INTO booking_makeup_credits(id,line_account_id,friend_id,source_event_id,expires_at,reason,granted_by,created_at,rule_snapshot_json)
+      VALUES('credit','a','f','class','2029-01-01','private reason','private actor','2026-01-01','{}');
+    UPDATE event_booking_entitlement_uses SET makeup_credit_id='credit' WHERE event_booking_id_history='eb';`);
+  const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
+  expect(result.completed).toBe(1);
+  for (const table of ['booking_monthly_contracts','booking_monthly_cycles','booking_monthly_rights','booking_entitlements','event_booking_entitlement_uses']) {
+    expect((f.raw.prepare(`SELECT count(*) AS n FROM ${table}`).get() as {n:number}).n,table).toBeGreaterThan(0);
+  }
+  expect(f.raw.prepare("SELECT customer_id,payment_method_id FROM booking_monthly_contracts WHERE id='contract'").get()).toEqual({customer_id:null,payment_method_id:null});
+  expect(f.raw.prepare("SELECT reason,granted_by FROM booking_makeup_credits WHERE id='credit'").get()).toEqual({reason:null,granted_by:'（削除済み）'});
+  expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+});
+
+test('photo audit rows survive while pet identifiers and photo captions are removed', async () => {
+  const f=gapFixture(); f.raw.pragma('foreign_keys=ON');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',purge_requested_at='2026-01-01' WHERE id='t';
+    INSERT INTO nen_pet_profiles(id,friend_id,external_id,customer_id,name,concerns,created_at,updated_at)
+      VALUES('pet','f','private-external','private-customer','private-name','["private concern"]','2026-01-01','2026-01-01');
+    INSERT INTO nen_photo_submissions(id,friend_id,pet_id,r2_key,image_url,content_type,caption,line_account_id,created_at,updated_at)
+      VALUES('photo','f','pet','private/key','https://example.test/private','image/png','private caption','a','2026-01-01','2026-01-01');
+    INSERT INTO nen_photo_assessment_runs(id,photo_id,line_account_id,requested_version,requested_by,idempotency_key,request_fingerprint,created_at)
+      VALUES('assessment','photo','a',1,'staff','assess-key','fingerprint','2026-01-01');
+    INSERT INTO nen_photo_original_download_audit(id,photo_id,line_account_id,requested_by,event,created_at)
+      VALUES('download','photo','a','staff','issued','2026-01-01');
+    INSERT INTO nen_photo_original_download_grants(token_hash,photo_id,line_account_id,requested_by,requested_version,idempotency_key,request_fingerprint,expires_at,created_at)
+      VALUES('grant','photo','a','staff',1,'grant-key','fingerprint','2029-01-01','2026-01-01');
+    INSERT INTO nen_photo_review_events(id,photo_id,line_account_id,from_status,to_status,reviewed_by,reviewed_by_name,created_at,updated_at)
+      VALUES('review','photo','a','pending','rejected','staff','operator','2026-01-01','2026-01-01');
+    INSERT INTO nen_photo_risk_assessments(id,photo_id,line_account_id,flag,assessed_at,created_at)
+      VALUES('risk','photo','a','fixture','2026-01-01','2026-01-01');`);
+  const deleted:string[]=[];
+  const bucket={delete:async (keys:string|string[])=>{deleted.push(...(Array.isArray(keys)?keys:[keys]));}} as unknown as R2Bucket;
+  const result=await processTenantDataPurge({DB:f.db,IMAGES:bucket},{now:'2027-05-01T00:00:00Z'});
+  expect(result.completed).toBe(1);
+  for (const [table,column,id] of [['nen_photo_assessment_runs','id','assessment'],['nen_photo_original_download_audit','id','download'],['nen_photo_original_download_grants','token_hash','grant'],['nen_photo_review_events','id','review'],['nen_photo_risk_assessments','id','risk']] as const) {
+    expect(f.raw.prepare(`SELECT ${column} FROM ${table} WHERE ${column}=?`).get(id),table).toEqual({[column]:id});
+  }
+  expect(f.raw.prepare("SELECT name,external_id,customer_id,concerns FROM nen_pet_profiles WHERE id='pet'").get()).toEqual({name:'（削除済み）',external_id:null,customer_id:null,concerns:'[]'});
+  expect(f.raw.prepare("SELECT caption FROM nen_photo_submissions WHERE id='photo'").get()).toEqual({caption:'（削除済み）'});
+  const { consumePhotoOriginalDownload, issuePhotoOriginalDownload }=await import('@line-crm/db');
+  expect(await consumePhotoOriginalDownload(f.db,{tokenHash:'grant',lineAccountId:'a',actorId:'staff',now:'2027-05-02T00:00:00Z'})).toBeNull();
+  expect(await issuePhotoOriginalDownload(f.db,{tokenHash:'new',photoId:'photo',lineAccountId:'a',actorId:'staff',expectedVersion:1,idempotencyKey:'grant-key',requestFingerprint:'fingerprint',expiresAt:'2029-01-01'})).toEqual({kind:'not_found'});
+  expect(deleted).toContain('private/key');
+  expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+});

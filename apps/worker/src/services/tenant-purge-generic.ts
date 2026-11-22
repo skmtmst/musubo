@@ -17,6 +17,7 @@ export function buildTombstoneValues(
       case 'null': values[column] = null; break;
       case 'placeholder': values[column] = '（削除済み）'; break;
       case 'zero': values[column] = 0; break;
+      case 'empty_array': values[column] = '[]'; break;
       case 'unique': values[column] = `purged:${table}:${column}:${rowId}`; break;
       case 'json':
         if (typeof row[column] !== 'string') throw new Error('invalid_tombstone_json');

@@ -676,6 +676,10 @@ export async function issuePhotoOriginalDownload(
     now?: string;
   },
 ): Promise<{ kind: 'created' | 'duplicate'; expiresAt: string } | { kind: 'changed' | 'idempotency_conflict' | 'not_found' }> {
+  const activeAccount = await db.prepare(`SELECT a.id FROM line_accounts a LEFT JOIN tenants t ON t.id=a.tenant_id
+    WHERE a.id=? AND a.data_purged_at IS NULL AND (a.tenant_id IS NULL OR (t.id IS NOT NULL AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL))`)
+    .bind(input.lineAccountId).first<{id:string}>();
+  if (!activeAccount) return {kind:'not_found'};
   const previous = await db.prepare(
     `SELECT request_fingerprint FROM nen_photo_original_download_grants
       WHERE line_account_id = ? AND requested_by = ? AND idempotency_key = ?`,
@@ -683,12 +687,15 @@ export async function issuePhotoOriginalDownload(
   const now = input.now ?? new Date().toISOString();
   if (previous) {
     if (previous.request_fingerprint !== input.requestFingerprint) return { kind: 'idempotency_conflict' };
-    await db.prepare(
+    const renewed = await db.prepare(
       `UPDATE nen_photo_original_download_grants
           SET token_hash = ?, expires_at = ?, consumed_at = NULL, created_at = ?
-        WHERE line_account_id = ? AND requested_by = ? AND idempotency_key = ?`,
+        WHERE line_account_id = ? AND requested_by = ? AND idempotency_key = ?
+          AND EXISTS (SELECT 1 FROM line_accounts a LEFT JOIN tenants t ON t.id=a.tenant_id
+            WHERE a.id=nen_photo_original_download_grants.line_account_id AND a.data_purged_at IS NULL
+              AND (a.tenant_id IS NULL OR (t.id IS NOT NULL AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL)))`,
     ).bind(input.tokenHash, input.expiresAt, now, input.lineAccountId, input.actorId, input.idempotencyKey).run();
-    return { kind: 'duplicate', expiresAt: input.expiresAt };
+    return Number(renewed.meta?.changes ?? 0) === 1 ? { kind: 'duplicate', expiresAt: input.expiresAt } : {kind:'not_found'};
   }
   const subject = await getPhotoOperationSubject(db, input);
   if (!subject) return { kind: 'not_found' };
@@ -699,7 +706,10 @@ export async function issuePhotoOriginalDownload(
        idempotency_key, request_fingerprint, expires_at, created_at)
      SELECT ?, id, line_account_id, ?, review_version, ?, ?, ?, ?
        FROM nen_photo_submissions
-      WHERE id = ? AND line_account_id = ? AND review_version = ?`,
+      WHERE id = ? AND line_account_id = ? AND review_version = ?
+        AND EXISTS (SELECT 1 FROM line_accounts a LEFT JOIN tenants t ON t.id=a.tenant_id
+          WHERE a.id=nen_photo_submissions.line_account_id AND a.data_purged_at IS NULL
+            AND (a.tenant_id IS NULL OR (t.id IS NOT NULL AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL)))`,
   ).bind(input.tokenHash, input.actorId, input.idempotencyKey, input.requestFingerprint,
     input.expiresAt, now, input.photoId, input.lineAccountId, input.expectedVersion).run();
   if (Number(inserted.meta?.changes ?? 0) !== 1) return { kind: 'changed' };
@@ -720,6 +730,9 @@ export async function consumePhotoOriginalDownload(
     `UPDATE nen_photo_original_download_grants SET consumed_at = ?
       WHERE token_hash = ? AND line_account_id = ? AND requested_by = ?
         AND photo_id IS NOT NULL AND consumed_at IS NULL AND expires_at > ?
+        AND EXISTS (SELECT 1 FROM line_accounts a LEFT JOIN tenants t ON t.id=a.tenant_id
+          WHERE a.id=nen_photo_original_download_grants.line_account_id AND a.data_purged_at IS NULL
+            AND (a.tenant_id IS NULL OR (t.id IS NOT NULL AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL)))
       RETURNING photo_id`,
   ).bind(now, input.tokenHash, input.lineAccountId, input.actorId, now).first<{ photo_id: string }>();
   if (!grant) return null;

@@ -856,6 +856,18 @@
       "image_url": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "external_id": {
+        "action": "null",
+        "reason": "顧客の識別子または自由記述を消去"
+      },
+      "customer_id": {
+        "action": "null",
+        "reason": "顧客の識別子または自由記述を消去"
+      },
+      "concerns": {
+        "action": "empty_array",
+        "reason": "顧客の識別子または自由記述を消去"
       }
     }
   },
@@ -932,6 +944,14 @@
       "public_r2_key": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "caption": {
+        "action": "placeholder",
+        "reason": "顧客の識別子または自由記述を消去"
+      },
+      "captured_device": {
+        "action": "null",
+        "reason": "顧客の識別子または自由記述を消去"
       }
     }
   },

@@ -1254,6 +1254,24 @@
         "notNull": false,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "external_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "customer_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "concerns",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"
@@ -1364,6 +1382,18 @@
       },
       {
         "column": "public_r2_key",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "caption",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "captured_device",
         "notNull": false,
         "key": false,
         "foreignKey": false
