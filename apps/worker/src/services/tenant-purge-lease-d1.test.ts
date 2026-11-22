@@ -1,6 +1,6 @@
 import { Miniflare } from 'miniflare';
 import { expect, test } from 'vitest';
-import { billingEventLeaseFence, prepareAssertBillingEventLeaseCompleted, prepareCompleteBillingEventLease } from './tenant-purge-tombstones.js';
+import { billingEventLeaseFence, prepareBillingEventLeaseCompletion } from './tenant-purge-tombstones.js';
 
 test('D1 rolls back tenant updates when billing lease expires before completion', async () => {
   const mf=new Miniflare({modules:true,script:'export default { fetch() { return new Response("ok") } }',d1Databases:['DB']});
@@ -17,15 +17,13 @@ test('D1 rolls back tenant updates when billing lease expires before completion'
     await expect(native.batch([
       native.prepare(`UPDATE tenants SET name='changed' WHERE id='t' AND ${fence.sql}`).bind(...fence.values),
       native.prepare("UPDATE billing_events SET lease_until='2000-01-01T00:00:00Z' WHERE id='evt'"),
-      prepareCompleteBillingEventLease(db,'evt','token','completed'),
-      prepareAssertBillingEventLeaseCompleted(db),
+      ...prepareBillingEventLeaseCompletion(db,'evt','token','completed'),
     ])).rejects.toThrow();
     expect(await native.prepare("SELECT name FROM tenants WHERE id='t'").first()).toEqual({name:'original'});
     expect(await native.prepare("SELECT summary FROM billing_events WHERE id='evt'").first()).toEqual({summary:'pending'});
     await native.batch([
       native.prepare(`UPDATE tenants SET name='changed' WHERE id='t' AND ${fence.sql}`).bind(...fence.values),
-      prepareCompleteBillingEventLease(db,'evt','token','completed'),
-      prepareAssertBillingEventLeaseCompleted(db),
+      ...prepareBillingEventLeaseCompletion(db,'evt','token','completed'),
     ]);
     expect(await native.prepare("SELECT name FROM tenants WHERE id='t'").first()).toEqual({name:'changed'});
   } finally { await mf.dispose(); }

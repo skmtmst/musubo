@@ -52,6 +52,11 @@ export function prepareAssertBillingEventLeaseCompleted(db: D1Database): D1Prepa
   return db.prepare("SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'BILLING_LEASE_EXPIRED' END)");
 }
 
+/** 完了と検証を隣接させ、途中の文によって changes() が変わるのを防ぐ。 */
+export function prepareBillingEventLeaseCompletion(db: D1Database, eventId: string, token: string, summary: string): [D1PreparedStatement, D1PreparedStatement] {
+  return [prepareCompleteBillingEventLease(db, eventId, token, summary), prepareAssertBillingEventLeaseCompleted(db)];
+}
+
 export async function releaseBillingEventLease(db: D1Database, eventId: string, token: string): Promise<boolean> {
   const result = await db.prepare('UPDATE billing_events SET lease_token=NULL,lease_until=NULL WHERE id=? AND lease_token=?')
     .bind(eventId, token).run();
