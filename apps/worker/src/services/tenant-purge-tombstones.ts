@@ -1,15 +1,18 @@
 import { retentionCutoff } from '@line-crm/db';
 
 /** 再開と同時に始めないよう、期限の確認と開始の印を同じ文で書く。 */
-export async function claimTenantPurge(db: D1Database, tenantId: string, now: string): Promise<boolean> {
+export async function claimTenantPurge(db: D1Database, tenantId: string, now: string, hasHashKey = true): Promise<boolean> {
   const result = await db.prepare(`UPDATE tenants SET purge_started_at=COALESCE(purge_started_at,?)
     WHERE id=? AND data_purged_at IS NULL
       AND (plan_status='canceled' OR (plan_status='trialing' AND trial_ends_at IS NOT NULL AND trial_ends_at < ?))
       AND (purge_requested_at IS NOT NULL OR (retention_anchor_at IS NOT NULL AND retention_anchor_at < ?))
+      AND (?=1 OR (stripe_customer_id IS NULL AND stripe_subscription_id IS NULL
+        AND NOT EXISTS(SELECT 1 FROM musubo_tenant_billing b WHERE b.tenant_id=tenants.id AND (b.core_subscription_id IS NOT NULL OR b.options_subscription_id IS NOT NULL))
+        AND NOT EXISTS(SELECT 1 FROM billing_invoices i WHERE i.tenant_id=tenants.id AND (i.stripe_customer_id IS NOT NULL OR i.subscription_id IS NOT NULL))))
       AND (purge_started_at IS NOT NULL OR (
         NOT EXISTS (SELECT 1 FROM billing_events e WHERE e.tenant_id=tenants.id AND (e.external_effect_pending=1 OR (e.summary='pending' AND e.lease_token IS NOT NULL AND julianday(e.lease_until)>julianday('now'))) )
         AND NOT EXISTS (SELECT 1 FROM musubo_tenant_billing b WHERE b.tenant_id=tenants.id AND b.resumption_requested_at IS NOT NULL)))`)
-    .bind(now, tenantId, now, retentionCutoff(now)).run();
+    .bind(now, tenantId, now, retentionCutoff(now),hasHashKey ? 1 : 0).run();
   return Number(result.meta.changes ?? 0) === 1;
 }
 

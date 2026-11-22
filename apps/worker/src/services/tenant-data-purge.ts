@@ -231,7 +231,7 @@ async function purgeOneTenant(
 
   await requirePurgeHashKeyBeforeClaim(env.DB,tenant.id,env.PURGED_PAYMENT_HMAC_SECRET);
   // Keep retained foreign-key parents in place. The claim also prevents account resumption.
-  if (!await claimTenantPurge(env.DB, tenant.id, now)) {
+  if (!await claimTenantPurge(env.DB, tenant.id, now, Boolean(env.PURGED_PAYMENT_HMAC_SECRET))) {
     out.finished = false;
     return out;
   }

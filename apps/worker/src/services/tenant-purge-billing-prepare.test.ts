@@ -50,3 +50,12 @@ test('missing hash key is checked before marking tenant purge started', async ()
   expect(result.completed).toBe(0);
   expect(f.raw.prepare("SELECT purge_started_at FROM tenants WHERE id='t'").get()).toEqual({purge_started_at:null});
 });
+
+
+test('claim rechecks key requirement atomically if an identifier appears after preflight', async () => {
+  const { claimTenantPurge } = await import('./tenant-purge-tombstones.js');
+  const f=gapFixture();
+  f.raw.exec("UPDATE tenants SET plan_status='canceled',purge_requested_at='2026-01-01',stripe_customer_id='cus_new' WHERE id='t'");
+  expect(await claimTenantPurge(f.db,'t','2027-05-01T00:00:00Z',false)).toBe(false);
+  expect(f.raw.prepare("SELECT purge_started_at FROM tenants WHERE id='t'").get()).toEqual({purge_started_at:null});
+});
