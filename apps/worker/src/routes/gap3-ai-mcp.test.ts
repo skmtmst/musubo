@@ -45,3 +45,18 @@ test('MCP-08/09/12/16: 鍵の入替24時間・停止即時・他店の記録を�
 test('GAP3-AUTH-01: 新しい読取口を権限へ接続し、previewを閲覧と分けて扱う',()=>{
  expect(permissionForApiPath('/api/line-accounts/a/sender-icons')).toBe('/chats');expect(permissionForApiPath('/api/analytics/customer-segments')).toBe('/analytics');expect(permissionForApiPath('/api/friends/f/member-rank')).toBe('/mileage');expect(gap2ReadOperation('POST','/api/member-ranks/preview')).toBe(true);
 });
+
+test('MCP connection cannot authenticate during purge and remains stopped after resumption',async()=>{
+ const {processTenantDataPurge}=await import('../services/tenant-data-purge.js');
+ const {key,connection}=await create();
+ expect((await rpc(key,'get_account_summary',{accountId:'a'})).status).toBe(200);
+ d.raw.exec("UPDATE tenants SET purge_started_at='2027-01-01' WHERE id='t'");
+ expect((await rpc(key,'get_account_summary',{accountId:'a'})).status).toBe(401);
+ d.raw.exec("UPDATE tenants SET plan_status='canceled',purge_requested_at='2026-01-01' WHERE id='t'");
+ const result=await processTenantDataPurge({DB:d.db},{now:'2027-05-01T00:00:00Z'});
+ expect(result.completed).toBe(1);
+ expect(d.raw.prepare('SELECT status FROM mcp_connections WHERE id=?').get(connection.id)).toEqual({status:'stopped'});
+ expect((d.raw.prepare('SELECT count(*) AS n FROM mcp_call_logs WHERE connection_id=?').get(connection.id) as {n:number}).n).toBeGreaterThan(0);
+ d.raw.exec("UPDATE tenants SET data_purged_at=NULL,plan_status='active' WHERE id='t'");
+ expect((await rpc(key,'get_account_summary',{accountId:'a'})).status).toBe(401);
+});

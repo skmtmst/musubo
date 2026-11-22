@@ -239,6 +239,9 @@ async function purgeOneTenant(
     return out;
   }
   await preparePurgedTenantBilling(env.DB,tenant.id,now,env.PURGED_PAYMENT_HMAC_SECRET);
+  await env.DB.prepare(`UPDATE mcp_connections SET status='stopped',previous_key_hash=NULL,previous_key_expires_at=NULL,version=version+1
+    WHERE organization_id=? AND (status<>'stopped' OR previous_key_hash IS NOT NULL)
+      AND EXISTS (SELECT 1 FROM tenants WHERE id=? AND purge_started_at IS NOT NULL AND data_purged_at IS NULL)` ).bind(tenant.id,tenant.id).run();
   const retainedParents = await discoverRetainedPurgeAncestors(env.DB);
   validateTombstonePolicies(retainedParents, candidates, policies as Record<string, TombstonePolicy>);
   const retainedParentSet = new Set(retainedParents);

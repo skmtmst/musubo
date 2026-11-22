@@ -125,3 +125,25 @@ test('photo audit rows survive while pet identifiers and photo captions are remo
   expect(deleted).toContain('private/key');
   expect(f.raw.pragma('foreign_key_check')).toEqual([]);
 });
+
+test('headquarters delivery and visit stamp records remain after purge', async () => {
+  const f=gapFixture(); f.raw.pragma('foreign_keys=ON');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',purge_requested_at='2026-01-01' WHERE id='t';
+    INSERT INTO hq_broadcast_runs(id,tenant_id,request_id,actor_id,input_json) VALUES('hr','t','request','o','{}');
+    INSERT INTO hq_broadcast_targets(run_id,line_account_id,account_name) VALUES('hr','a','fixture');
+    INSERT INTO hq_broadcast_audit(id,run_id,line_account_id,actor_id,action) VALUES('ha','hr','a','o','fixture');
+    INSERT INTO visit_stamp_cards(id,tenant_id,name,settings_json) VALUES('card','t','fixture','{}');
+    INSERT INTO visit_stamp_checkouts(kind,visit_id,line_account_id,amount,recorded_by) VALUES('booking','visit','a',100,'o');
+    INSERT INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,reason,idempotency_key,occurred_at)
+      VALUES('entry','card','f','a','visit',1,'fixture','key','2026-01-01');
+    INSERT INTO visit_stamp_redemptions(id,card_id,friend_id,line_account_id,reward_id,reward_name,stamps,request_id)
+      VALUES('redeem','card','f','a','reward','fixture',1,'request');`);
+  const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
+  expect(result.completed).toBe(1);
+  for (const [table,id] of [['hq_broadcast_runs','hr'],['hq_broadcast_audit','ha'],['visit_stamp_cards','card'],['visit_stamp_entries','entry'],['visit_stamp_redemptions','redeem']] as const) {
+    expect(f.raw.prepare(`SELECT id FROM ${table} WHERE id=?`).get(id),table).toEqual({id});
+  }
+  expect(f.raw.prepare("SELECT line_account_id FROM hq_broadcast_targets WHERE run_id='hr'").get()).toEqual({line_account_id:'a'});
+  expect(f.raw.prepare("SELECT amount FROM visit_stamp_checkouts WHERE visit_id='visit'").get()).toEqual({amount:100});
+  expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+});
