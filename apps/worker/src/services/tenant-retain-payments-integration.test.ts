@@ -49,3 +49,27 @@ test('consent and audit rows remain after tenant purge and another tenant is unt
   expect(f.raw.prepare("SELECT granted FROM site_consent_days WHERE line_account_id='b'").get()).toEqual({granted:2});
   expect(f.raw.pragma('foreign_key_check')).toEqual([]);
 });
+
+test('affiliate settlement and payout history survives while another tenant remains active', async () => {
+  const f=gapFixture(); f.raw.pragma('foreign_keys=ON');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',purge_requested_at='2026-01-01' WHERE id='t';
+    INSERT INTO affiliate_settlements(id,organization_id,line_account_id,period_from,period_to,total_amount_minor,state,closed_by,idempotency_key)
+      VALUES('settlement','t','a','2026-01-01','2026-01-31',500,'closed','operator','settlement-key');
+    INSERT INTO affiliate_settlement_lines(id,settlement_id,entry_id_history,amount_minor)
+      VALUES('line','settlement','entry-history',500);
+    INSERT INTO affiliate_payout_batches(id,organization_id,line_account_id,settlement_id,total_amount_minor,line_count,state,created_by)
+      VALUES('batch','t','a','settlement',500,1,'created','operator');
+    INSERT INTO affiliate_payout_batch_lines(id,batch_id,settlement_line_id,amount_minor,bank_code,bank_name,branch_code,branch_name,account_type,account_number_encrypted,account_last4,account_holder_name)
+      VALUES('batch-line','batch','line',500,'0000','bank','001','branch','ordinary','fixture-ciphertext','0000','fixture');
+    INSERT INTO affiliate_payout_results(id,batch_id,settlement_line_id,paid_amount_minor,result,imported_by)
+      VALUES('result','batch','line',500,'paid','operator');
+    INSERT INTO affiliate_statements(id,organization_id,line_account_id,settlement_id,total_amount_minor,status,pdf_object_key,generated_by)
+      VALUES('statement','t','a','settlement',500,'generated','fixture.pdf','operator');`);
+  const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
+  expect(result.completed).toBe(1);
+  for (const [table,id] of [['affiliate_settlements','settlement'],['affiliate_settlement_lines','line'],['affiliate_payout_batches','batch'],['affiliate_payout_batch_lines','batch-line'],['affiliate_payout_results','result'],['affiliate_statements','statement']] as const) {
+    expect(f.raw.prepare(`SELECT id FROM ${table} WHERE id=?`).get(id),table).toEqual({id});
+  }
+  expect(f.raw.prepare("SELECT data_purged_at FROM line_accounts WHERE id='b'").get()).toEqual({data_purged_at:null});
+  expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+});
