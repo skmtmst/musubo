@@ -22,21 +22,34 @@ export async function tenantPurgeInProgress(db: D1Database, tenantId: string): P
 export async function claimBillingEventLease(db: D1Database, eventId: string, token: string, now: string, until: string): Promise<boolean> {
   if (!now.endsWith('Z') || !until.endsWith('Z') || !Number.isFinite(Date.parse(now)) || !Number.isFinite(Date.parse(until)) || Date.parse(until)<=Date.parse(now)) throw new Error('invalid_billing_lease_time');
   const result = await db.prepare(`UPDATE billing_events SET lease_token=?,lease_until=?
-    WHERE id=? AND summary='pending' AND (lease_token IS NULL OR julianday(lease_until)<=julianday(?))
+    WHERE id=? AND summary='pending' AND (lease_token IS NULL OR julianday(lease_until)<=julianday('now'))
+      AND julianday(?)>julianday('now') AND julianday(?)<=julianday('now','+16 minutes')
       AND (tenant_id IS NULL OR EXISTS(SELECT 1 FROM tenants t WHERE t.id=billing_events.tenant_id
         AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL))`)
-    .bind(token, until, eventId, now).run();
+    .bind(token, until, eventId, until, until).run();
   return Number(result.meta.changes ?? 0) === 1;
 }
 
+/** 請求書・統括への書き込みで使う借受フェンス。適用先の統括も同時に照合する。 */
+export function billingEventLeaseFence(eventId:string, tenantId:string|null, token:string): {sql:string;values:unknown[]} {
+  return {sql:`EXISTS (SELECT 1 FROM billing_events lease_event
+    WHERE lease_event.id=? AND lease_event.tenant_id IS ? AND lease_event.summary='pending' AND lease_event.lease_token=?
+      AND julianday(lease_event.lease_until)>julianday('now') AND (lease_event.tenant_id IS NULL OR EXISTS (
+        SELECT 1 FROM tenants t WHERE t.id=lease_event.tenant_id AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL)))`,
+    values:[eventId,tenantId,token]};
+}
+
 /** 期限切れ・交代済みの処理による通知の完了を受け付けない。時刻は UTC の ISO 形式。 */
-export async function completeBillingEventLease(db: D1Database, eventId: string, token: string, summary: string, now: string): Promise<boolean> {
-  if (!now.endsWith('Z') || !Number.isFinite(Date.parse(now))) throw new Error('invalid_billing_lease_time');
-  const result = await db.prepare(`UPDATE billing_events SET summary=?,lease_token=NULL,lease_until=NULL
-    WHERE id=? AND summary='pending' AND lease_token=? AND julianday(lease_until)>julianday(?)
-      AND (tenant_id IS NULL OR EXISTS(SELECT 1 FROM tenants t WHERE t.id=billing_events.tenant_id AND t.purge_started_at IS NULL))`)
-    .bind(summary,eventId,token,now).run();
-  return Number(result.meta.changes ?? 0) === 1;
+export function prepareCompleteBillingEventLease(db: D1Database, eventId: string, token: string, summary: string): D1PreparedStatement {
+  return db.prepare(`UPDATE billing_events SET summary=?,lease_token=NULL,lease_until=NULL
+    WHERE id=? AND summary='pending' AND lease_token=? AND julianday(lease_until)>julianday('now')
+      AND (tenant_id IS NULL OR EXISTS(SELECT 1 FROM tenants t WHERE t.id=billing_events.tenant_id AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL))`)
+    .bind(summary,eventId,token);
+}
+
+/** 完了を最後に検証し、失敗なら同じ batch の前の書き込みも巻き戻す。 */
+export function prepareAssertBillingEventLeaseCompleted(db: D1Database): D1PreparedStatement {
+  return db.prepare("SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'BILLING_LEASE_EXPIRED' END)");
 }
 
 export async function releaseBillingEventLease(db: D1Database, eventId: string, token: string): Promise<boolean> {
@@ -72,14 +85,14 @@ export async function deferPurgedBillingEvent(db: D1Database, input: {
     (id,stripe_event_id,event_type,amount,currency,metadata,processed_at,tenant_id,review_reason)
     SELECT ?,?,?,?,?,NULL,?,?,'purged_tenant' WHERE EXISTS (
       SELECT 1 FROM tenants t JOIN billing_events e ON e.tenant_id=t.id
-      WHERE t.id=? AND e.id=? AND e.summary='pending' AND (e.lease_token IS NULL OR julianday(e.lease_until)<=julianday(?))
+      WHERE t.id=? AND e.id=? AND e.summary='pending' AND (e.lease_token IS NULL OR julianday(e.lease_until)<=julianday('now'))
         AND (t.purge_started_at IS NOT NULL OR t.data_purged_at IS NOT NULL))`)
-    .bind(crypto.randomUUID(),input.eventId,input.eventType,input.amount,input.currency,input.now,input.tenantId,input.tenantId,input.eventId,input.now);
+    .bind(crypto.randomUUID(),input.eventId,input.eventType,input.amount,input.currency,input.now,input.tenantId,input.tenantId,input.eventId);
   const defer = db.prepare(`UPDATE billing_events SET summary='purge_review',lease_token=NULL,lease_until=NULL
-    WHERE id=? AND tenant_id=? AND summary='pending' AND (lease_token IS NULL OR julianday(lease_until)<=julianday(?)) AND EXISTS (
+    WHERE id=? AND tenant_id=? AND summary='pending' AND (lease_token IS NULL OR julianday(lease_until)<=julianday('now')) AND EXISTS (
       SELECT 1 FROM stripe_events s WHERE s.stripe_event_id=billing_events.id
         AND s.tenant_id=billing_events.tenant_id AND s.review_reason='purged_tenant')`)
-    .bind(input.eventId,input.tenantId,input.now);
+    .bind(input.eventId,input.tenantId);
   const alert = db.prepare(`INSERT INTO security_alerts
     (id,tenant_id,line_account_id,scope_key,rule_key,observed_count,threshold_count,first_detected_at,last_detected_at,latest_event_at,notification_id,slack_last_error)
     SELECT ?,?,NULL,json_array(?,?), 'stripe_purge_review',1,1,?,?,julianday(?),?,'unconfigured' WHERE changes()=1`)
@@ -96,8 +109,8 @@ export async function deferPurgedBillingEvent(db: D1Database, input: {
 export async function deferStaleBillingReceipts(db: D1Database, tenantId: string, now: string, limit=100): Promise<number> {
   if (!now.endsWith('Z') || !Number.isFinite(Date.parse(now))) throw new Error('invalid_billing_lease_time');
   const rows=await db.prepare(`SELECT id,type,review_amount,review_currency FROM billing_events
-    WHERE tenant_id=? AND summary='pending' AND (lease_token IS NULL OR julianday(lease_until)<=julianday(?))
-    ORDER BY received_at,id LIMIT ?`).bind(tenantId,now,Math.min(100,Math.max(1,Math.floor(limit)))).all<{
+    WHERE tenant_id=? AND summary='pending' AND (lease_token IS NULL OR julianday(lease_until)<=julianday('now'))
+    ORDER BY received_at,id LIMIT ?`).bind(tenantId,Math.min(100,Math.max(1,Math.floor(limit)))).all<{
       id:string;type:string;review_amount:number|null;review_currency:string|null;
     }>();
   let deferred=0;
