@@ -1,0 +1,51 @@
+// @vitest-environment happy-dom
+import { act } from 'react';
+import { fireEvent, screen } from '@testing-library/react';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { mountSalonBooking, unmountSalonBooking } from './salon-entry.js';
+import { setLiffContext } from './lib/liff-auth.js';
+import { saveCardSetupResume } from './lib/card-setup-resume.js';
+import type { MenuItem, StaffItem } from './lib/api.js';
+const menu={id:'m',name:'試験メニュー',duration_minutes:30,base_price:1000} as MenuItem;
+const staff={id:'s',display_name:'試験担当',price:1000,duration_minutes:30} as StaffItem;
+let ready=false;
+const calls:Array<{url:URL;options:RequestInit}>=[];
+beforeEach(()=>{
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
+  vi.spyOn(window,'matchMedia').mockReturnValue({matches:false,addEventListener:()=>{},removeEventListener:()=>{}} as unknown as MediaQueryList);
+  sessionStorage.clear(); calls.length=0; ready=false;
+  setLiffContext({liffId:'store',lineUserId:'friend',idToken:'token'});
+  saveCardSetupResume({menu,staff,slot:{date:'2099-10-20',start:'10:00',startUtc:'2099-10-20T01:00:00.000Z'},note:'予約の伝言',meetingMode:null,setupKey:'saved-setup-key',bookingKey:'saved-booking-key'});
+  window.history.replaceState(null,'','/booking?liffId=store&card_setup=success');
+  document.body.innerHTML='<div id="app"></div>';
+  vi.stubGlobal('fetch',vi.fn(async(input:RequestInfo|URL,options:RequestInit={})=>{
+    const url=new URL(String(input),window.location.origin);calls.push({url,options});
+    const reply=(value:unknown)=>Response.json(value);
+    if(url.pathname.endsWith('/customer-look')) return reply({success:true,data:{settings:{}}});
+    if(url.pathname.endsWith('/config')) return reply({success:true,data:{accountName:'試験店'}});
+    if(url.pathname.endsWith('/settings')) return reply({approval_mode:'automatic'});
+    if(url.pathname.endsWith('/addons')) return reply({success:true,data:[]});
+    if(url.pathname.endsWith('/entitlements')) return reply({success:true,data:[]});
+    if(url.pathname.endsWith('/cost-estimate')) return reply({success:true,data:{cancellation:{enabled:true,version:2,price:1000,cardRequired:true,tiers:[{beforeHours:24,percent:0},{beforeHours:0,percent:50}],noShowPercent:100,freeUntil:null},deposit:{amount:0}}});
+    if(url.pathname.endsWith('/setup-intent')) return reply({success:true,data:{setupIntentId:ready?'seti_card':'pending_request',status:ready?'ready':'pending',url:'https://checkout.stripe.com/test',testMode:true}});
+    if(url.pathname.endsWith('/requests')) return reply({booking_id:'b1',status:'confirmed'});
+    throw new Error(`unexpected ${url.pathname}`);
+  }));
+});
+afterEach(async()=>{await act(async()=>unmountSalonBooking());sessionStorage.clear();vi.unstubAllGlobals();vi.restoreAllMocks();});
+it('Checkoutから戻り、通知待ちは再遷移せず、同じ申込を確認して予約する',async()=>{
+  await act(async()=>mountSalonBooking(document.getElementById('app')!,{liffId:'store',lineUserId:'friend',idToken:'token'}));
+  const box=await screen.findByRole('checkbox',{name:'キャンセル料の決まりを確認しました'});fireEvent.click(box);
+  const button=screen.getByRole('button',{name:'試験のカードを登録して予約する'});fireEvent.click(button);
+  await screen.findByText('カードの登録を確認しています。しばらくしてからもう一度お試しください。');
+  expect(calls.some(c=>c.url.pathname.endsWith('/requests'))).toBe(false);
+  ready=true;fireEvent.click(button);
+  await vi.waitFor(()=>expect(calls.some(c=>c.url.pathname.endsWith('/requests'))).toBe(true));
+  const setup=calls.find(c=>c.url.pathname.endsWith('/setup-intent'))!;
+  expect(new Headers(setup.options.headers).get('Idempotency-Key')).toBe('saved-setup-key');
+  expect(JSON.parse(String(setup.options.body))).toEqual({menuId:'m',staffId:'s',startsAt:'2099-10-20T01:00:00.000Z',partySize:1,policyAccepted:true});
+  const booking=calls.find(c=>c.url.pathname.endsWith('/requests'))!;
+  expect(new Headers(booking.options.headers).get('Idempotency-Key')).toBe('saved-booking-key');
+  expect(JSON.parse(String(booking.options.body))).toMatchObject({menu_id:'m',staff_id:'s',setupIntentId:'seti_card',customer_note:'予約の伝言'});
+  expect(sessionStorage.length).toBe(0);
+});

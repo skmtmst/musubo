@@ -12,7 +12,11 @@ export const restaurantRest4Paths={
   get:{summary:'満席・休業時の同人数・日時の系列店候補。顧客情報は返さない',security:[{liffIdToken:[]}],parameters:[liff,...['storeId','date','guestCount'].map(query),{name:'startsAt',in:'query',schema:{type:'string',format:'date-time'}},{name:'courseId',in:'query',schema:string}],responses:result},
   post:{summary:'案内を記録し予約先のLIFF入口を返す。別のLINEアカウントで再認証',security:[{liffIdToken:[]}],parameters:[liff],requestBody:body({storeId:string,targetStoreId:string,date:{type:'string',format:'date'},startsAt:{type:'string',format:'date-time'},guestCount:{type:'integer',minimum:1,maximum:100},courseId:{type:'string',nullable:true}},['storeId','targetStoreId','date','startsAt','guestCount']),responses:result},
  },
- '/api/liff/restaurant/form-booking':{post:{summary:'保存済みフォームの公開版から既存の席予約口へ一度だけ渡す',security:[{liffIdToken:[]}],parameters:[liff],requestBody:body({formId:string,blockId:string,submissionKey:string}),responses:result}},
+ '/api/liff/restaurant/form-booking':{post:{summary:'保存済みフォームの公開版から既存の席予約口へ一度だけ渡す',security:[{liffIdToken:[]}],parameters:[liff],requestBody:body({formId:string,blockId:string,submissionKey:string,paymentMethod:{type:'string',enum:['online','onsite']},preview:{type:'boolean'},policyAccepted:{type:'boolean'},policyVersion:{type:'integer',minimum:0},expectedAmount:{type:'integer',minimum:0},expectedTotal:{type:'integer',minimum:0}},['formId','blockId','submissionKey']),responses:result}},
+ '/api/restaurant-test/menus/{id}/deposit':{
+  get:{summary:'コースの予約金設定を読む',parameters:[account,path('id')],responses:result},
+  put:{summary:'コースの予約金設定を版付きで保存する',parameters:[account,path('id')],requestBody:body({kind:{type:'string',enum:['none','amount','percent']},value:{type:'integer',nullable:true},conditions:{type:'object'},inherit:{type:'boolean'},expectedVersion:{type:'integer',minimum:0}}),responses:result},
+ },
  '/api/restaurant-test/store-groups':{
   get:{summary:'読めるお店だけで構成された系列店の組を読む',parameters:[account],responses:result},
   post:{summary:'案内可のお店の組を作る（owner/admin、閲覧権限は広げない）',parameters:[account],requestBody:body({name:{type:'string',maxLength:100},members:{type:'array',minItems:2,maxItems:50,items:{type:'object',required:Object.keys(member),properties:member}}}),responses:result},

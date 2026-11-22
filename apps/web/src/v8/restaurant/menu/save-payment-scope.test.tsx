@@ -30,6 +30,10 @@ vi.mock('@/lib/api/helpers/booking-payment-admin', async load => {
   saveCourseMode: payment.saveCourseMode,
  } }
 })
+vi.mock('@/lib/api/helpers/booking-advanced', async load => {
+ const actual = await load<typeof import('@/lib/api/helpers/booking-advanced')>()
+ return { ...actual, bookingAdvancedApi: { ...actual.bookingAdvancedApi, courseDeposit: async () => ({ success:true, data:{kind:'percent',value:40,inherit:false,version:1,conditions:{always:true,minPeople:null,weekdays:null,timeBand:null}} }) } }
+})
 const nav = vi.hoisted(() => ({ push: vi.fn(), params: new URLSearchParams() }))
 vi.mock('next/navigation', async (load) => ({
   ...(await load<typeof import('next/navigation')>()),
@@ -80,4 +84,25 @@ it('店舗を替えても元のメニューと支払いを全部保存し、新�
  await act(async () => { fresh({ success: true }) })
  await waitFor(() => expect(nav.push).toHaveBeenCalledExactlyOnceWith('/restaurant-test/menu'))
  expect(payment.saveCourseMode).toHaveBeenCalledTimes(1)
+})
+
+it('予約金の単位を変えたら空欄となり、入力するまで保存できない', async () => {
+ nav.params = new URLSearchParams('id=m1')
+ render(<MenuEditPage />)
+ const amount = await screen.findByRole('radio', { name: '金額で指定' })
+ fireEvent.click(amount)
+ const value = screen.getByLabelText('予約金の値') as HTMLInputElement
+ const save = screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement
+ expect(value.value).toBe('')
+ expect(save.disabled).toBe(true)
+ expect(screen.getByText('予約金の金額または割合を入力してください。')).toBeTruthy()
+ fireEvent.click(save)
+ expect(fixture.updateMenu).not.toHaveBeenCalled()
+ fireEvent.change(value, { target: { value: '1000' } })
+ expect(save.disabled).toBe(false)
+ fireEvent.click(screen.getByRole('radio', { name: '料金の割合' }))
+ expect((screen.getByLabelText('予約金の値') as HTMLInputElement).value).toBe('')
+ expect(save.disabled).toBe(true)
+ fireEvent.change(screen.getByLabelText('予約金の値'), { target: { value: '25' } })
+ expect(save.disabled).toBe(false)
 })

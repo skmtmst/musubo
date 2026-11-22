@@ -131,7 +131,7 @@ it('予約の取消理由を取消状態と同時に保存し、通常の編集�
   const invalid = await requestWithMethod(path, 'PATCH', { status: 'cancelled', cancellationReason: '  ' })
   expect(invalid.status).toBe(400)
   expect(testDb.raw.prepare('SELECT status, cancel_reason FROM rt_reservations WHERE id=?').get('reservation-ginza')).toEqual({ status: 'confirmed', cancel_reason: null })
-  const cancelled = await requestWithMethod(path, 'PATCH', { status: 'cancelled', cancellationReason: '  店舗の都合  ' })
+  const cancelled = await requestWithMethod(path, 'PATCH', { status: 'cancelled', cancellationReason: '  店舗の都合  ', cancellationCause:'store' })
   expect(cancelled.status).toBe(200)
   expect(testDb.raw.prepare('SELECT status, cancel_reason FROM rt_reservations WHERE id=?').get('reservation-ginza')).toEqual({ status: 'cancelled', cancel_reason: '店舗の都合' })
   const edit = await requestWithMethod(path, 'PATCH', { note: '確認済み' })

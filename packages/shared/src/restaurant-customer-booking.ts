@@ -63,4 +63,6 @@ export interface RestaurantCustomerBooking {
   seatType: string | null;
   courseId?: string | null;
   courseName?: string | null;
+  paymentStatus?: string | null;
+  paymentRequestId?: string | null;
 }

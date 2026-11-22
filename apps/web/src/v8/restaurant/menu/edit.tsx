@@ -18,7 +18,6 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import DateTimeField from '@/components/shared/date-time-field'
-import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import NumberInput from '@/components/shared/number-field'
@@ -40,6 +39,7 @@ import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-test-api'
 import { MenuPaymentFields, PaymentConflictError, PaymentSideCard, useMenuPayment } from '@/v8/booking-payments/public/menu-payment/index'
+import { CourseDepositFields, useMenuDeposit } from '@/v8/booking-payments/public/menu-deposit/index'
 import { emitGuideSignal } from '@/v8/onboarding/public/guide-overlay/index'
 import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
 import styles from './edit.module.css'
@@ -144,10 +144,13 @@ function MenuEditBody() {
   const guidedCourse = !editing && course && guide?.stepKey === 'friendAdd' &&
     (guide.phase === 'active' || guide.phase === 'paused')
   const payment = useMenuPayment('course', selectedAccountId, editing && editing.kind === 'course' ? editing.id : null)
+  const deposit = useMenuDeposit(selectedAccountId, editing && editing.kind === 'course' ? editing.id : null, 'course')
+  const depositRule = deposit.draft
+  const depositInvalid = Boolean(editing?.kind === 'course' && depositRule && !depositRule.inherit && (depositRule.kind === 'amount' || depositRule.kind === 'percent') && (depositRule.value === null || !Number.isInteger(depositRule.value) || depositRule.value <= 0 || (depositRule.kind === 'percent' && depositRule.value > 100)))
   const priceChanged = Boolean(editing && draft.price !== '' && Number(draft.price) !== editing.price)
   const priceStartsAt = draft.effectiveAt ? new Date(datetimeLocalJstToUtcIso(draft.effectiveAt)) : null
   const priceStartsLater = Boolean(priceStartsAt && priceStartsAt.getTime() > Date.now())
-  const dirty = state === 'ready' && (JSON.stringify(draft) !== JSON.stringify(saved) || payment.dirty)
+  const dirty = state === 'ready' && (JSON.stringify(draft) !== JSON.stringify(saved) || payment.dirty || deposit.dirty)
   const pendingTitle = id ? 'メニューを編集' : course ? 'コースを追加する' : 'メニューを追加する'
   const title = resolveResourceTitle({ name: editing?.name, loaded: state === 'ready', pendingTitle })
   usePageTitle(title)
@@ -169,7 +172,7 @@ function MenuEditBody() {
 
   async function save(version = confirmedRevision) {
     if (durationError) { setDurationAttempted(true); return }
-    if (!canEdit || !selectedAccountId || !valid || menuConflict) return
+    if (!canEdit || !selectedAccountId || !valid || depositInvalid || menuConflict) return
     if (editing && (!dirty || !Number.isSafeInteger(version) || !version)) return
     const isCurrent = captureResource()
     if (!isCurrent()) return
@@ -195,7 +198,7 @@ function MenuEditBody() {
           await restaurantTestApi.updateMenu(selectedAccountId, editing.id, updateBody)
           attempt.menuSignature = signature
         }
-        if (editing.kind === 'course') await payment.save(editing.id)
+        if (editing.kind === 'course') { await payment.save(editing.id); await deposit.save(editing.id) }
         if (!stillHere()) return
         notifySaved(priceChanged ? (priceStartsLater ? '価格変更を確定しました。指定した開始日時に反映します。' : '価格を変更しました。') : 'メニューを更新しました。')
       } else {
@@ -224,6 +227,7 @@ function MenuEditBody() {
       }
       /* お支払いの版が古い（409）ときは共通の帯と比べる窓で選んでもらう。ページの中身は保存済み。 */
       if (cause instanceof PaymentConflictError) { setSaved(draft); setError('メニュー本体は保存しました。お支払いの設定は、閉じて最新の内容と比べてください。'); return false }
+      if (cause instanceof ApiError && cause.code==='deposit_exceeds_cancellation_fee') { setSaved(draft); setError('メニュー本体は保存しました。キャンセル料が予約金以上になるよう設定してください。'); return false }
       saveErrors.capture(cause)
       if (cause instanceof ApiError && cause.code === 'MENU_IMAGE_UNAVAILABLE') setImageError('選択した画像を利用できません。登録メディアから選び直してください。')
       setError('保存できませんでした。入力を確かめて、もう一度お試しください。')
@@ -263,7 +267,7 @@ function MenuEditBody() {
 
   const side = useMemo(() => (
     <div className={styles.side}>
-      <PaymentSideCard title="決済をつないでいない店のとき">「お支払い」の段は出さず、この 1 行だけ出します（押せない形にしない）。</PaymentSideCard>
+      <PaymentSideCard title="決済をつないでいない店のとき">決済をつないでいないと、お客さまにはお支払いの段が出ません。</PaymentSideCard>
       <PaymentSideCard title="お客さまの見え方">予約の 5 段目に「お支払い」が出て、Stripe の支払いページへ進みます。払い終わると予約が決まります。払われないと仮の予約は取り消します。</PaymentSideCard>
     </div>
   ), [])
@@ -309,7 +313,7 @@ function MenuEditBody() {
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
           {/* 開店準備ガイド⑥の手順3/3（枠14 hYTr8）の光らせる先。 */}
-          {canEdit ? <Button data-guide-anchor="menu.save" variant="primary" busy={busy} disabled={menuConflict || !valid || (Boolean(editing) && !dirty)} disabledReason={!valid ? priceError ? '値段を確認してください。' : '名前と値段を入力してください。' : editing && !dirty ? '変更していません' : undefined} onClick={() => { if (durationError) { setDurationAttempted(true); return }; setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing?.confirmation_revision ?? null); setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save(editing?.confirmation_revision ?? null) }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
+          {canEdit ? <Button data-guide-anchor="menu.save" variant="primary" busy={busy} disabled={menuConflict || !valid || depositInvalid || (Boolean(editing) && !dirty)} disabledReason={depositInvalid ? '予約金の金額または割合を入力してください。' : !valid ? priceError ? '値段を確認してください。' : '名前と値段を入力してください。' : editing && !dirty ? '変更していません' : undefined} onClick={() => { if (durationError) { setDurationAttempted(true); return }; setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing?.confirmation_revision ?? null); setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save(editing?.confirmation_revision ?? null) }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
         </>}
       >
         {error ? <Notice tone="danger" role="alert">{error}{menuConflict ? <Button onClick={() => { void load() }}>最新を読み込む</Button> : null}</Notice> : null}
@@ -379,10 +383,7 @@ function MenuEditBody() {
           ]} />
         )}
         {course && editing ? (
-          <Card variant="form" gap="normal">
-            <CardHeader size="stacked" title="お支払い" help={<HelpTip label="お支払いの説明">先払いのときは、予約の最後に Stripe の支払いページへ進みます。</HelpTip>} />
-            <MenuPaymentFields state={payment} name="course" price={draft.price === '' ? editing.price : Number(draft.price)} people={1} readOnly={!canEdit} />
-          </Card>
+          <Card variant="form" gap="normal"><CardHeader size="stacked" title="お支払い" /><MenuPaymentFields state={payment} name="course" price={draft.price === '' ? editing.price : Number(draft.price)} people={1} readOnly={!canEdit} /><CourseDepositFields deposit={deposit} readOnly={!canEdit} /></Card>
         ) : course && canEdit ? <p className={styles.note}>お支払いの方法は、コースを追加したあとにこのページで決められます。</p> : null}
       </CreatePage>
       <ConfirmDialog open={deleting && confirmationScope === currentConfirmationScope} title="このメニューを削除しますか？" description={`「${editing?.name ?? ''}」を削除します。予約や設定で使われていないメニューだけ削除できます。元に戻せません。`}

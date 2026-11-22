@@ -219,7 +219,7 @@ describe('日付で席予約を閉じる',()=>{
   expect(impact.reservations).toEqual([expect.objectContaining({id:'r-existing',startsAt:SLOT,guestCount:2,customerName:'予約客',source:'manual',friendId:'friend',isLineFriend:true})]);
   expect(testDb.raw.prepare("SELECT status FROM rt_reservations WHERE id='r-existing'").get()).toEqual({status:'confirmed'});
   expect((await patch('/api/restaurant-test/reservations/r-existing',{note:'連絡済み'})).status).toBe(200);
-  expect((await patch('/api/restaurant-test/reservations/r-existing',{status:'cancelled'})).status).toBe(200);
+  expect((await patch('/api/restaurant-test/reservations/r-existing',{status:'cancelled',cancellationCause:'store'})).status).toBe(200);
  });
  test('重なる記録は409で相手を返す。時刻の境目は重ならず、別の卓だけなら同時に閉じられる',async()=>{
   const saved=await create({...closureInput,kind:'private_event',tableIds:['table-1']});expect(saved.status).toBe(201);

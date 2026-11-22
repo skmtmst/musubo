@@ -217,6 +217,12 @@ Object.assign(api9Paths, {
       { storeId: string },
     ),
   },
+  '/api/liff/restaurant/reservations/{id}/payment': {
+    post: {...liff('本人の仮押さえの金額を確定し、Stripe試験モードの支払い画面を開く', ['id'], {
+      type:'object',required:['expectedVersion'],properties:{...versionBody.properties,...customerDetails,
+        paymentMethod:{type:'string',enum:['online','onsite']},expectedFormVersion:{type:'integer',minimum:0},preview:{type:'boolean'},policyAccepted:{type:'boolean'},policyVersion:{type:'integer',minimum:0},expectedAmount:{type:'integer',minimum:0},expectedTotal:{type:'integer',minimum:0}},
+    }),security:[{liffIdToken:[]}]},
+  },
   '/api/liff/restaurant/reservations/{id}/confirm': {
     post: liff(
       '期限内の仮押さえを確定し、自動LINEと媒体閉鎖の作業を台帳に作る',
@@ -226,9 +232,9 @@ Object.assign(api9Paths, {
   },
   '/api/liff/restaurant/reservations/{id}/cancel': {
     post: liff(
-      '取消期限と版を確認し、枠を戻す。期限超過は403',
+      '予約時の取消条件と版を確認し、料金がある場合は同意後に枠を戻す',
       ['id'],
-      versionBody,
+      {...versionBody,properties:{...versionBody.properties,feeAccepted:{type:'boolean'},expectedFeeAmount:{type:'integer',minimum:0}}},
     ),
   },
   '/api/liff/restaurant/reservations/{id}/reschedule': {

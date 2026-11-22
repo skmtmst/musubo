@@ -7,3 +7,14 @@ export function seedNoticeFriend(testDb: SqliteD1, seed: () => void, lineUid: st
   testDb.raw.prepare('INSERT INTO friends (id, line_user_id, line_account_id, is_following) VALUES (?, ?, ?, ?)')
     .run('friend-fixture', lineUid, accountId, following);
 }
+
+export type MockStaff = {
+  id: string;
+  name: string;
+  role: 'owner' | 'admin' | 'staff';
+  access_level: 'full' | 'read_only';
+  permission_keys: string;
+  assigned_line_account_id: string | null;
+  can_access_descendant_accounts: number;
+  tenant_id?: string | null;
+};

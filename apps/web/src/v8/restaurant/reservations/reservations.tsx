@@ -376,9 +376,9 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         accountId={cancelTarget?.accountId ?? ''}
         busy={busy}
         onClose={() => setCancelId('')}
-        onConfirm={(id) => {
+        onConfirm={(id, reason) => {
           if (!cancelTarget || cancelTarget.id !== id || cancelTarget.generation !== cancelScope.current.generation || cancelTarget.accountId !== cancelScope.current.accountId || cancelTarget.storeId !== cancelScope.current.storeId) return
-          return save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'cancelled', expectedVersion: (rows.find(r=>r.id===id)?.customer_version ?? 1) }), cancelling && cancelling.hold_expires_at && cancelling.status === 'pending' ? '押さえを解除しました。' : '予約を取り消しました。').then((ok) => { if (ok) setCancelId('') })
+          return save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'cancelled', ...(reason ? { cancellationCause: reason } : {}), expectedVersion: (rows.find(r=>r.id===id)?.customer_version ?? 1) }), cancelling && cancelling.hold_expires_at && cancelling.status === 'pending' ? '押さえを解除しました。' : '予約を取り消しました。').then((ok) => { if (ok) setCancelId('') })
         }}
       />
       <InboundTrialDialog

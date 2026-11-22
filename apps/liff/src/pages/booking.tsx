@@ -1,3 +1,4 @@
+import { readCardSetupResume } from '../lib/card-setup-resume.js';
 import { formatYen } from '@line-crm/shared';
 import { useCustomerWords } from '../components/customer-style-scope.js';
 import { useUrlStep } from '../lib/use-url-step.js';
@@ -20,6 +21,7 @@ import Button from '../components/ui/button/index.js';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import PartyMenuStep, { PartyStaffStep, PartySummary } from '../components/party-step.js';
 import { staffBookingPrice } from '../lib/booking-price.js';
+import { slotStartsAtIso } from '../lib/datetime.js';
 import { initialParty, partyCapable, totals, type PartyState } from '../lib/party.js';
 
 type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'payment' | 'done';
@@ -36,19 +38,20 @@ export default function Booking() {
   const navigate = useNavigate();
   const isPeek = params.get('mode') === 'peek';
 
-  const [initialMenuId] = useState(params.get('menu_id'));
+  const [cardResume] = useState(() => params.get('card_setup') ? readCardSetupResume() : null);
+  const [initialMenuId] = useState(cardResume ? null : params.get('menu_id'));
   const menuTouched = useRef(false);
   const [step, setStep] = useUrlStep<Step>('menu', { search: params.toString(), write: (query, replace) => setParams(query, { replace }) });
-  const [menu, setMenu] = useState<MenuItem | null>(null);
+  const [menu, setMenu] = useState<MenuItem | null>(cardResume?.menu ?? null);
   const [addonStatus, setAddonStatus] = useState<'idle' | 'loading' | 'failed' | 'ready'>('idle');
   const addonGeneration = useRef(0);
   useEffect(() => () => { addonGeneration.current++; }, []);
-  const [staff, setStaff] = useState<StaffItem | null>(null);
+  const [staff, setStaff] = useState<StaffItem | null>(cardResume?.staff ?? null);
   /* 同伴・追加メニュー（B5）。メニューが許したときだけ使う。1 人で追加なしなら今までどおり。 */
-  const [party, setParty] = useState<PartyState>(initialParty);
+  const [party, setParty] = useState<PartyState>(() => cardResume?.party ?? initialParty());
   const [changingMenu, setChangingMenu] = useState(false);
   const confirmBack = useRef<(() => void) | null>(null);
-  const [slot, setSlot] = useState<SlotPick | null>(null);
+  const [slot, setSlot] = useState<SlotPick | null>(cardResume?.slot ?? null);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [paymentDue, setPaymentDue] = useState(false);
   /* キャンセル料の決まりがオンの店は、確認の段から手順の帯に「お支払い」（カードの登録）を出す（kwC8E）。 */
@@ -58,6 +61,7 @@ export default function Booking() {
   // 予約のルール「ご利用先が承認してから確定する」。読めなければ承認あり扱い。
   const [autoConfirm, setAutoConfirm] = useState(false);
   const [cancelDeadline, setCancelDeadline] = useState<number | null>(null);
+  useEffect(() => { if (cardResume) { loadAddons(cardResume.menu); setStep('confirm'); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!initialMenuId) return;
     let alive = true;
@@ -215,6 +219,8 @@ export default function Booking() {
             menu={menu}
             staff={staff}
             slot={slot}
+            cardResume={cardResume && cardResume.menu.id===menu.id && cardResume.staff.id===staff.id && slotStartsAtIso(cardResume.slot)===slotStartsAtIso(slot) && (cardResume.party?.size ?? 1)===party.size ? cardResume : null}
+            cardSetupReturned={params.get('card_setup') === 'success' && !!cardResume && cardResume.menu.id===menu.id && cardResume.staff.id===staff.id && slotStartsAtIso(cardResume.slot)===slotStartsAtIso(slot) && (cardResume.party?.size ?? 1)===party.size}
             autoConfirm={autoConfirm}
             cancelDeadlineMinutesBefore={cancelDeadline}
             onPolicyChange={setCardStep}

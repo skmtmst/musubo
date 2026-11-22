@@ -2987,15 +2987,15 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 飲食店向けテスト（`/restaurant-test/*`）。`restaurant-test-api.ts` の
    * 読み口だけを固定で返す。書き込み（発行・承認・保存）は従来どおり405。
    */
+  if (method === 'GET' && /^\/api\/restaurant-test\/menus\/[^/]+\/deposit$/.test(pathname)) return { success: true, data: { kind: 'none', value: null, inherit: true, version: 0, conditions: { always: true, minPeople: null, weekdays: null, timeBand: null } } }
   if(method==='GET'&&pathname==='/api/restaurant-test/floors')return {success:true,data:RESTAURANT_FLOORS.filter(f=>f.storeId===(query.get('storeId')??'store-sby'))}
   if(method==='GET'&&pathname==='/api/restaurant-test/board'){
    const from=Date.parse(query.get('from')),to=Date.parse(query.get('to')),offset=Number(query.get('offset')??0),limit=Number(query.get('limit')??500);
    const entries=RESTAURANT_RESERVATIONS.filter(r=>Date.parse(r.starts_at)>=from&&Date.parse(r.starts_at)<to).map(r=>seatBoardEntry({...r,customer_version:1,dining_snapshot_json:JSON.stringify({allergy:r.allergy_note,anniversary:null,seatPreference:null,courseId:r.course_id,capturedAt:QA_CLOCK})}));
    return {success:true,data:{entries:entries.slice(offset,offset+limit),total:entries.length,offset,limit}}
   }
-  if (method === 'GET' && pathname === '/api/restaurant-test/snapshot') {
-    return { success: true, data: RESTAURANT_SNAPSHOT }
-  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/snapshot') return { success: true, data: RESTAURANT_SNAPSHOT }
+
   if (method === 'GET' && pathname === '/api/restaurant-test/store-groups') return { success: true, data: [] }
   if (method === 'GET' && pathname === '/api/restaurant-test/stores') {
     return { success: true, data: { organization: RESTAURANT_SNAPSHOT.organization, stores: RESTAURANT_SNAPSHOT.stores } }

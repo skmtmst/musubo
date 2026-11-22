@@ -4820,6 +4820,13 @@
       "column": "line_account_id"
     }
   },
+  "booking_card_checkout_requests": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "booking_payment_methods": {
     "category": "purge",
     "scope": {
@@ -4827,6 +4834,24 @@
       "column": "friend_id",
       "parent": "friends",
       "parentColumn": "id"
+    }
+  },
+  "restaurant_payment_details": {
+    "category": "purge",
+    "scope": {"by": "parent", "column": "friend_id", "parent": "friends", "parentColumn": "id"}
+  },
+  "restaurant_payment_requests": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_charge_refund_requests": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
     }
   },
   "booking_charges": {

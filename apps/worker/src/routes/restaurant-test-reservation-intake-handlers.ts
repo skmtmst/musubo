@@ -1,3 +1,4 @@
+import { cancelPaidRestaurantReservation, restaurantPaidCancellationQuote, retainRestaurantCancellation } from '../features/booking/restaurant-payment-finish/index.js';
 import { phoneIntakeFailure } from '../services/restaurant-phone-intake.js';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
@@ -17,7 +18,7 @@ import { expireRestaurantHolds } from '../services/restaurant-booking.js';
 import { DEFAULT_STAY_MINUTES } from '../services/restaurant-reservation-email.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { isRestaurantReservationSource, validateInboundReservation } from '../services/restaurant-test.js';
-import { hasOrganizationSelector, requiredAccount, organizationFor, acquireLock, releaseLock, storeBelongsTo, overlappingReservationExists, reservationSlotActive, adjustInventoryReservedCount, applyReservationInventoryChange, insertSeatWaitlistEntry, SEAT_WAITLIST_ERROR_STATUS, storeInOrganization, attendance } from './restaurant-test-definition.js';
+import { accountId, hasOrganizationSelector, requiredAccount, organizationFor, acquireLock, releaseLock, storeBelongsTo, overlappingReservationExists, reservationSlotActive, adjustInventoryReservedCount, applyReservationInventoryChange, insertSeatWaitlistEntry, SEAT_WAITLIST_ERROR_STATUS, storeInOrganization, attendance } from './restaurant-test-definition.js';
 import type { Context } from 'hono';
 
 export const post__api_restaurant_test_inbound_emails_id_manual_import_1 = async (c: Context<Env, "/api/restaurant-test/inbound-emails/:id/manual-import">) => {
@@ -355,6 +356,30 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
     next.cancel_reason = body.cancellationReason.trim();
   }
 
+  const payment=await dbFor(c.env,current.store_id).prepare('SELECT id,status FROM restaurant_payment_requests WHERE reservation_id=? AND line_account_id=?')
+    .bind(current.id,accountId(c)!).first<{id:string;status:string}>();
+  if(payment && ['pending','paid','refund_pending'].includes(payment.status)
+    && (next.starts_at!==current.starts_at || next.ends_at!==current.ends_at || next.guest_count!==current.guest_count || next.course_id!==current.course_id))
+    return c.json({success:false,error:'先に返金してから予約内容を変更してください',code:'payment_change_requires_refund'},409);
+  if(payment && (payment.status==='pending' || payment.status==='refund_pending' || (payment.status==='paid' && current.status==='pending'))
+    && (next.customer_name!==current.customer_name || next.customer_phone!==current.customer_phone || next.allergy_note!==current.allergy_note || next.note!==current.note))
+    return c.json({success:false,error:'お支払いの確認中はお客様情報を変更できません',code:'payment_details_locked'},409);
+  if(next.status==='cancelled' && current.status!=='cancelled' && !(current.status==='pending' && current.hold_expires_at && (!payment || payment.status==='pending')) && !['store','customer'].includes(String(body.cancellationCause)))return inputError(c,{success:false,error:'取消の理由を選んでください'},400,['cancellationCause']);
+  if(payment && next.status==='cancelled' && current.status!=='cancelled' && ['paid','refund_pending','refunded'].includes(payment.status)) {
+    if(Object.keys(body).some(key=>!['expectedVersion','status','cancellationReason','cancellationCause'].includes(key)))return c.json({success:false,error:'返金を伴う取消は、ほかの変更と分けてください'},409);
+    const quote=body.cancellationCause==='customer'?await restaurantPaidCancellationQuote(dbFor(c.env,current.store_id),payment.id):null;
+    if(body.cancellationCause==='customer' && !quote)return c.json({success:false,error:'予約時の取消条件を確認してください',code:'cancellation_policy_unknown'},409);
+    const cancelled=quote && quote.feeNow>0 && payment.status==='paid'
+      ? await retainRestaurantCancellation(c.env,payment.id,current.customer_version,quote.feeNow)
+      : await cancelPaidRestaurantReservation(c.env,payment.id,current.customer_version,next.cancel_reason)==='cancelled';
+    if(!cancelled)
+      return c.json({success:false,error:'返金を確認しています。しばらくしてから読み直してください',code:'refund_pending'},409);
+    await applyReservationInventoryChange(dbFor(c.env,current.store_id),current.store_id,
+      {starts_at:current.starts_at,guest_count:current.guest_count,status:current.status},
+      {starts_at:current.starts_at,guest_count:current.guest_count,status:'cancelled'});
+    if(current.table_id)try{await promoteSeatWaitlist(dbFor(c.env,current.store_id),{storeId:current.store_id,startsAt:current.starts_at,tableId:current.table_id},undefined,c.env.LIFF_URL ?? '',c.env);}catch{logger.error('restaurant_booking.promote_seat_waitlist_failed');}
+    return c.json({success:true,data:{id:current.id,version:current.customer_version+1}});
+  }
   const changesSlot=next.table_id!==current.table_id||next.guest_count!==current.guest_count||next.starts_at!==current.starts_at||next.ends_at!==current.ends_at||(!reservationSlotActive(current.status)&&reservationSlotActive(next.status));
   if(changesSlot && next.table_id && reservationSlotActive(next.status)) {
     const candidates=await openSeatTables(dbFor(c.env,current.store_id),current.store_id,next.starts_at,next.ends_at,next.guest_count,false,current.id);

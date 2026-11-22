@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto';
+import { bookingStripeWebhook } from './booking-stripe-webhook.js';
 import { logger } from '@line-crm/shared/server';
 import { defaultRestaurantReservationForm } from '@line-crm/shared';
 import { saveRestaurantReservationForm } from '../services/restaurant-reservation-form.js';
@@ -31,13 +33,14 @@ async function read(r: Response) {
   };
 }
 const start = '2027-10-01T03:00:00.000Z';
-function app() {
+function app(bindings:Partial<Env['Bindings']>={}) {
   const a = new Hono<Env>();
   a.use('*', async (c, next) => {
-    c.env = { DB: db.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'];
+    c.env = { DB: db.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true', ...bindings } as Env['Bindings'];
     await next();
   });
   a.route('/', restaurantCustomerBooking);
+  a.route('/', bookingStripeWebhook);
   return a;
 }
 const request = (path: string, body?: unknown, token = 'one') =>
@@ -520,6 +523,32 @@ describe('飲食4：コース・フォーム・系列店',()=>{
   db.raw.prepare("INSERT INTO form_submissions(id,form_id,friend_id,data,form_version_id) VALUES('answer','form','f1',?,?)").run(JSON.stringify({seat:{kind:'seats',storeId:'store',guestCount:2,startsAt:start}}),version.v);
   db.raw.exec(`INSERT INTO form_submit_claims(tenant_id,line_account_id,form_id,friend_id,idempotency_key,request_hash,status,submission_id,owner,created_at,updated_at,expires_at) VALUES('t1','a1','form','f1','submission-key','hash','completed','answer','owner',datetime('now'),datetime('now'),datetime('now','+1 day'))`);
  }
+ it('有料フォームは金額を下見して同意を保存し、同じ回答で二重決済しない',async()=>{
+  course();savedAnswer();
+  db.raw.prepare("UPDATE form_submissions SET data=? WHERE id='answer'").run(JSON.stringify({seat:{kind:'seats',storeId:'store',courseId:'c90',guestCount:2,startsAt:start}}));
+  db.raw.exec(`UPDATE line_accounts SET liff_id='1234567890-abcdef' WHERE id='a1';
+   INSERT INTO booking_payment_configs(line_account_id,mode,provider,hold_minutes,created_at,updated_at) VALUES('a1','online','stripe',10,datetime('now'),datetime('now'));
+   INSERT INTO booking_payment_connections(line_account_id,provider,provider_account_id,test_mode,connected_at) VALUES('a1','stripe','acct_original',1,datetime('now'));`);
+  const fetchMock=vi.fn(async(url:string,init?:RequestInit)=>{
+   if(String(url).includes('oauth2/v2.1/verify')){const body=new URLSearchParams(String(init?.body));return Response.json({sub:'U'+body.get('id_token'),aud:body.get('client_id'),exp:Date.now()/1000+3600});}
+   if(String(url).endsWith('/customers'))return Response.json({id:'cus_form',livemode:false});
+   if(String(url).endsWith('/checkout/sessions'))return Response.json({id:'cs_test_form',url:'https://checkout.stripe.com/c/pay/cs_test_form',livemode:false});
+   throw new Error('unexpected');
+  });vi.stubGlobal('fetch',fetchMock);
+  const testApp=app({BOOKING_STRIPE_TEST_SECRET_KEY:'sk_test_example'});
+  const call=(body:unknown)=>testApp.request('/api/liff/restaurant/form-booking?liffId=1234567890-abcdef',{method:'POST',headers:{Authorization:'Bearer one','Content-Type':'application/json'},body:JSON.stringify(body)});
+  const base={formId:'form',blockId:'seat-block',submissionKey:'submission-key'};
+  const preview=await call({...base,preview:true});expect(preview.status).toBe(200);
+  expect(await preview.json()).toMatchObject({data:{payment:{preview:true,quote:{total:10000,amount:10000}}}});
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM restaurant_payment_requests').get()).toEqual({n:0});
+  expect((await call(base)).status).toBe(409);
+  const accepted={...base,policyAccepted:true,policyVersion:0,expectedAmount:10000,expectedTotal:10000};
+  expect((await call(accepted)).status).toBe(200);expect((await call(accepted)).status).toBe(200);
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM restaurant_payment_requests').get()).toEqual({n:1});
+  expect(db.raw.prepare('SELECT policy_accepted_at FROM restaurant_payment_requests').get()).toEqual({policy_accepted_at:expect.any(String)});
+  expect(fetchMock.mock.calls.filter(([url])=>String(url).endsWith('/checkout/sessions'))).toHaveLength(1);
+  vi.unstubAllGlobals();
+ });
  it('保存済みフォームの公開版から既存台帳へ予約。同時再試行で回答と予約を増やさず下書き変更を使わない',async()=>{
   savedAnswer();
   db.raw.exec("UPDATE forms SET layout='{}' WHERE id='form'");
@@ -688,4 +717,71 @@ it('styles §6-3: 空席確認後にLINE枠を停止したら新規の仮押さ�
   expect((await hold('closed_line')).status).toBe(409);
   expect(db.raw.prepare('SELECT COUNT(*) n FROM rt_reservations').get()).toEqual({n:0});
  }finally{vi.useRealTimers();}
+});
+
+
+it('予約金を支払い確定後に期限内取消で全額返金する',async()=>{
+ db.raw.exec(`UPDATE line_accounts SET liff_id='1234567890-abcdef' WHERE id='a1';
+ INSERT INTO rt_menu_items(id,store_id,kind,name,price,duration_minutes,allergens_json) VALUES('paid-course','store','course','有料コース',5000,90,'[]');
+ INSERT INTO booking_payment_configs(line_account_id,mode,provider,hold_minutes,created_at,updated_at) VALUES('a1','online','stripe',10,datetime('now'),datetime('now'));
+ INSERT INTO booking_payment_connections(line_account_id,provider,provider_account_id,test_mode,connected_at) VALUES('a1','stripe','acct_original',1,datetime('now'));
+ INSERT INTO rt_reservation_links(store_id,token) VALUES('store','token-fixture');
+ INSERT INTO booking_deposit_rules(account_id,scope_id,rule_json,inherit,version,updated_at) VALUES('a1','course:paid-course','{"kind":"percent","value":30,"conditions":{"always":true,"minPeople":null,"weekdays":null,"timeBand":null}}',0,1,datetime('now'));
+ INSERT INTO booking_cancellation_policies(line_account_id,enabled,tiers_json,no_show_percent,version,updated_by,updated_at) VALUES('a1',1,'[{"beforeHours":24,"percent":0},{"beforeHours":0,"percent":50}]',100,1,'staff',datetime('now'));`);
+ vi.stubGlobal('fetch',vi.fn(async(url:string,init?:RequestInit)=>{
+  if(String(url).includes('oauth2/v2.1/verify')){const b=new URLSearchParams(String(init?.body));return Response.json({sub:'U'+b.get('id_token'),aud:b.get('client_id'),exp:Date.now()/1000+3600});}
+  if(String(url).endsWith('/customers'))return Response.json({id:'cus_person',livemode:false});
+  if(String(url).endsWith('/checkout/sessions')){const form=new URLSearchParams(String(init?.body));expect(form.get('line_items[0][price_data][unit_amount]')).toBe('3000');return Response.json({id:'cs_test_paid',url:'https://checkout.stripe.com/c/pay/cs_test_paid',livemode:false});}
+  if(String(url).includes('/refunds?'))return Response.json({data:[],has_more:false});
+  if(String(url).endsWith('/refunds')){const form=new URLSearchParams(String(init?.body));expect(form.get('amount')).toBe('3000');expect(form.get('payment_intent')).toBe('pi_paid');expect((init?.headers as Record<string,string>)['Idempotency-Key']).toBe(`restaurant_refund_${form.get('metadata[restaurant_payment_id]')}`);return Response.json({id:'re_paid',status:'succeeded',amount:3000,currency:'jpy',payment_intent:'pi_paid',metadata:{restaurant_payment_id:form.get('metadata[restaurant_payment_id]')}});}
+  throw new Error('unexpected external request');
+ }));
+ const testApp=app({BOOKING_STRIPE_TEST_SECRET_KEY:'sk_test_example',BOOKING_STRIPE_TEST_CONNECT_WEBHOOK_SECRET:'whsec_fixture'});
+ const call=(path:string,body:unknown,token='one')=>testApp.request(path+'?liffId=1234567890-abcdef',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const h=await call('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,requestId:'paid_request_1',courseId:'paid-course'});expect(h.status).toBe(201);
+ const holdData=(await read(h)).data;
+ expect((await call(`/api/liff/restaurant/reservations/${holdData.id}/confirm`,{expectedVersion:holdData.version})).status).toBe(409);
+ const payment=await call(`/api/liff/restaurant/reservations/${holdData.id}/payment`,{expectedVersion:holdData.version,customerName:'本人',note:'窓側',policyAccepted:true,policyVersion:1,expectedAmount:3000,expectedTotal:10000});
+ expect(payment.status).toBe(200);expect(await payment.json()).toMatchObject({data:{required:true,status:'pending',quote:{total:10000,amount:3000}}});
+ expect((await call(`/api/liff/restaurant/reservations/${holdData.id}/payment`,{expectedVersion:holdData.version},'two')).status).toBe(404);
+ expect((await call(`/api/liff/restaurant/reservations/${holdData.id}/confirm`,{expectedVersion:holdData.version})).status).toBe(409);
+ const event={id:'evt_restaurant_paid',account:'acct_original',api_version:'2024-06-20',created:Math.floor(Date.now()/1000),type:'checkout.session.completed',livemode:false,data:{object:{id:'cs_test_paid',object:'checkout.session',livemode:false,status:'complete',mode:'payment',payment_status:'paid',amount_total:3000,currency:'jpy',customer:'cus_person',payment_intent:'pi_paid'}}};
+ const raw=JSON.stringify(event),t=Math.floor(Date.now()/1000),sig=createHmac('sha256','whsec_fixture').update(`${t}.${raw}`).digest('hex');
+ const notification=()=>testApp.request('/api/booking/stripe-test/webhook',{method:'POST',headers:{'stripe-signature':`t=${t},v1=${sig}`},body:raw});
+ expect((await notification()).status).toBe(200);expect((await notification()).status).toBe(200);
+ expect(db.raw.prepare('SELECT status,note FROM rt_reservations WHERE id=?').get(holdData.id)).toEqual({status:'confirmed',note:'窓側'});
+ expect(db.raw.prepare('SELECT status,amount FROM restaurant_payment_requests WHERE reservation_id=?').get(holdData.id)).toEqual({status:'paid',amount:3000});
+ const confirmed=db.raw.prepare('SELECT customer_version FROM rt_reservations WHERE id=?').get(holdData.id) as {customer_version:number};
+ const cancellation=await call(`/api/liff/restaurant/reservations/${holdData.id}/cancel`,{expectedVersion:confirmed.customer_version});expect(cancellation.status,await cancellation.text()).toBe(200);
+ expect(db.raw.prepare('SELECT status FROM restaurant_payment_requests WHERE reservation_id=?').get(holdData.id)).toEqual({status:'refunded'});
+ expect(db.raw.prepare('SELECT status FROM rt_reservations WHERE id=?').get(holdData.id)).toEqual({status:'cancelled'});
+});
+
+it('全額先払いもコース単価×人数で決済し入金通知で確定する',async()=>{
+ db.raw.exec(`UPDATE line_accounts SET liff_id='1234567890-abcdef' WHERE id='a1';
+ INSERT INTO rt_menu_items(id,store_id,kind,name,price,duration_minutes,allergens_json) VALUES('paid-course','store','course','有料コース',5000,90,'[]');
+ INSERT INTO booking_payment_configs(line_account_id,mode,provider,hold_minutes,created_at,updated_at) VALUES('a1','online','stripe',10,datetime('now'),datetime('now'));
+ INSERT INTO booking_payment_connections(line_account_id,provider,provider_account_id,test_mode,connected_at) VALUES('a1','stripe','acct_original',1,datetime('now'));
+ INSERT INTO rt_reservation_links(store_id,token) VALUES('store','token-fixture');`);
+ vi.stubGlobal('fetch',vi.fn(async(url:string,init?:RequestInit)=>{
+  if(String(url).includes('oauth2/v2.1/verify')){const b=new URLSearchParams(String(init?.body));return Response.json({sub:'U'+b.get('id_token'),aud:b.get('client_id'),exp:Date.now()/1000+3600});}
+  if(String(url).endsWith('/customers'))return Response.json({id:'cus_person',livemode:false});
+  if(String(url).endsWith('/checkout/sessions')){const form=new URLSearchParams(String(init?.body));expect(form.get('line_items[0][price_data][unit_amount]')).toBe('10000');return Response.json({id:'cs_test_paid',url:'https://checkout.stripe.com/c/pay/cs_test_paid',livemode:false});}
+  throw new Error('unexpected external request');
+ }));
+ const testApp=app({BOOKING_STRIPE_TEST_SECRET_KEY:'sk_test_example',BOOKING_STRIPE_TEST_CONNECT_WEBHOOK_SECRET:'whsec_fixture'});
+ const call=(path:string,body:unknown,token='one')=>testApp.request(path+'?liffId=1234567890-abcdef',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const h=await call('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,requestId:'paid_request_1',courseId:'paid-course'});expect(h.status).toBe(201);
+ const holdData=(await read(h)).data;
+ expect((await call(`/api/liff/restaurant/reservations/${holdData.id}/confirm`,{expectedVersion:holdData.version})).status).toBe(409);
+ const payment=await call(`/api/liff/restaurant/reservations/${holdData.id}/payment`,{expectedVersion:holdData.version,customerName:'本人',note:'窓側',policyAccepted:true,policyVersion:0,expectedAmount:10000,expectedTotal:10000});
+ expect(payment.status).toBe(200);expect(await payment.json()).toMatchObject({data:{required:true,status:'pending',quote:{total:10000,amount:10000}}});
+ expect((await call(`/api/liff/restaurant/reservations/${holdData.id}/payment`,{expectedVersion:holdData.version},'two')).status).toBe(404);
+ expect((await call(`/api/liff/restaurant/reservations/${holdData.id}/confirm`,{expectedVersion:holdData.version})).status).toBe(409);
+ const event={id:'evt_restaurant_paid',account:'acct_original',api_version:'2024-06-20',created:Math.floor(Date.now()/1000),type:'checkout.session.completed',livemode:false,data:{object:{id:'cs_test_paid',object:'checkout.session',livemode:false,status:'complete',mode:'payment',payment_status:'paid',amount_total:10000,currency:'jpy',customer:'cus_person',payment_intent:'pi_paid'}}};
+ const raw=JSON.stringify(event),t=Math.floor(Date.now()/1000),sig=createHmac('sha256','whsec_fixture').update(`${t}.${raw}`).digest('hex');
+ const notification=()=>testApp.request('/api/booking/stripe-test/webhook',{method:'POST',headers:{'stripe-signature':`t=${t},v1=${sig}`},body:raw});
+ expect((await notification()).status).toBe(200);expect((await notification()).status).toBe(200);
+ expect(db.raw.prepare('SELECT status,note FROM rt_reservations WHERE id=?').get(holdData.id)).toEqual({status:'confirmed',note:'窓側'});
+ expect(db.raw.prepare('SELECT status,amount FROM restaurant_payment_requests WHERE reservation_id=?').get(holdData.id)).toEqual({status:'paid',amount:10000});
 });

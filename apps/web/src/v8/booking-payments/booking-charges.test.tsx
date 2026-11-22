@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-const requests = vi.hoisted(() => ({ charges: vi.fn(), card: vi.fn(), charge: vi.fn(), waive: vi.fn() }))
+const requests = vi.hoisted(() => ({ charges: vi.fn(), card: vi.fn(), charge: vi.fn(), waive: vi.fn(), refund: vi.fn() }))
 vi.mock('@/lib/api/helpers/gap1', () => ({ bookingCancellationApi: requests }))
 vi.mock('@/lib/api/helpers/booking-advanced', () => ({ bookingAdvancedApi: { card: requests.card } }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
@@ -14,6 +14,33 @@ beforeEach(() => {
   requests.card.mockResolvedValue({ success: true, data: { brand: 'VISA', last4: '4242', registeredAt: null } })
 })
 afterEach(cleanup)
+
+it('結果不明の請求は保存済みの同じキーで確かめる', async () => {
+  const response=data(true)
+  response.data.charges[0]={...response.data.charges[0],status:'unknown',idempotency_key:'original-key'} as typeof response.data.charges[number]
+  requests.charges.mockResolvedValue(response)
+  requests.charge.mockResolvedValue({success:true,data:{}})
+  render(<BookingChargesSection {...props} />)
+  await screen.findByText(/VISA •••• 4242/)
+  await waitFor(()=>expect((screen.getByRole('button',{name:'請求結果を確かめる'}) as HTMLButtonElement).disabled).toBe(false))
+  fireEvent.click(screen.getByRole('button',{name:'請求結果を確かめる'}))
+  const dialog=screen.getByRole('dialog',{name:'請求結果を確かめますか？'})
+  fireEvent.click(within(dialog).getByRole('button',{name:'請求結果を確かめる'}))
+  await waitFor(()=>expect(requests.charge).toHaveBeenCalledWith('a','b',expect.objectContaining({kind:'no_show_fee',amount:1000}),'original-key'))
+})
+it('結果不明の返金は保存済みの理由とキーで確かめる', async () => {
+  const response=data(true)
+  response.data.charges[0]={...response.data.charges[0],status:'succeeded',refund_status:'unknown',refund_key:'refund-key',refund_reason:'店の都合'} as typeof response.data.charges[number]
+  requests.charges.mockResolvedValue(response);requests.refund.mockResolvedValue({success:true,data:{}})
+  render(<BookingChargesSection {...props} />)
+  fireEvent.click(await screen.findByRole('button',{name:'返金結果を確かめる'}))
+  const first=await screen.findByRole('dialog',{name:'返金する'})
+  expect((within(first).getByLabelText('返金の理由') as HTMLInputElement).value).toBe('店の都合')
+  fireEvent.click(within(first).getByRole('button',{name:'次へ'}))
+  const second=await screen.findByRole('alertdialog',{name:'返金すると戻せません'})
+  fireEvent.click(within(second).getByRole('button',{name:/返金する/}))
+  await waitFor(()=>expect(requests.refund).toHaveBeenCalledWith('a','charge',expect.objectContaining({reason:'店の都合'}),'refund-key'))
+})
 
 it('カード取得失敗を未登録にせず、その場の再取得だけで復旧する', async () => {
   requests.card.mockRejectedValueOnce(new Error('offline'))

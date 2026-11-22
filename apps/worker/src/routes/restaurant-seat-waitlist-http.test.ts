@@ -399,7 +399,7 @@ describe('席の空き待ち', () => {
 
     testDb.raw.exec(`INSERT INTO friends(id,line_account_id,line_user_id,display_name,is_following) VALUES('friend-fit','account-9','U-fit','試験の組',1)`);
     await approveFollowup();
-    const cancelled = await patch('/api/restaurant-test/reservations/res-full', { status: 'cancelled' });
+    const cancelled = await patch('/api/restaurant-test/reservations/res-full', { status: 'cancelled', cancellationCause:'store' });
     expect(cancelled.status).toBe(200);
 
     expect(cardSender).not.toHaveBeenCalled();expect(commonSender).toHaveBeenCalledTimes(1);

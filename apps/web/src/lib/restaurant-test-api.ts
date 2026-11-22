@@ -110,6 +110,7 @@ const withOptionalAccount = (path: string, accountId: string | null) =>
   accountId ? withAccount(path, accountId) : path
 
 export const restaurantTestApi = {
+  reservationPayment: (accountId:string,id:string)=>fetchApi<{success:true;data:{payment:{status:string;amount:number;total:number;remaining:number}|null}}>(withAccount(`/api/restaurant-test/reservations/${encodeURIComponent(id)}`,accountId)),
   storeGroups: (accountId: string) => fetchApi<{ success: true; data: RestaurantStoreGroup[] }>(withAccount('/api/restaurant-test/store-groups', accountId)),
   updateStoreGroupMember: (accountId: string, groupId: string, storeId: string, body: { referralEnabled: boolean; maxDistance: number; expectedVersion?: number }) => fetchApi<{ success: true; data: { updated: true } }>(withAccount(`/api/restaurant-test/store-groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(storeId)}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
   closures: (accountId:string,storeId:string,month?:string)=>fetchApi<{success:true;data:RestaurantClosure[]}>(withAccount(`/api/restaurant-test/closures?${new URLSearchParams({storeId,...(month?{month}:{})})}`,accountId)),

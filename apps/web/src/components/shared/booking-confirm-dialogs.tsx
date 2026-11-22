@@ -37,9 +37,9 @@ function Message({ text }: { text: string }) {
   return <p className={styles.message}>{text}</p>
 }
 
-export type CancelReservationInput = { refund: 'none' | 'full' | 'partial'; reason: string; notify: boolean }
+export type CancelReservationInput = { refund: 'none' | 'full' | 'partial'; reason: string; notify: boolean; cause?:'store'|'customer' }
 
-export function CancelReservationDialog({ open, title, subtitle, facts, fullAmount, testMode, busy, error, messageFor, onClose, onConfirm, cancellationOnly = false, targetSummary }: {
+export function CancelReservationDialog({ open, title, subtitle, facts, fullAmount, testMode, busy, error, messageFor, onClose, onConfirm, cancellationOnly = false, targetSummary, requireCause = false }: {
   open: boolean
   title: string
   subtitle: string
@@ -50,6 +50,7 @@ export function CancelReservationDialog({ open, title, subtitle, facts, fullAmou
   busy?: boolean
   error?: string
   cancellationOnly?: boolean
+  requireCause?: boolean
   targetSummary?: ReactNode
   messageFor: (input: CancelReservationInput) => string
   onClose: () => void
@@ -58,15 +59,17 @@ export function CancelReservationDialog({ open, title, subtitle, facts, fullAmou
   const [refund, setRefund] = useState<CancelReservationInput['refund']>('full')
   const [reason, setReason] = useState('')
   const [notify, setNotify] = useState(true)
-  useEffect(() => { if (open) { setRefund(fullAmount ? 'full' : 'none'); setReason(''); setNotify(true) } }, [open, fullAmount])
-  const input = cancellationOnly ? { refund: 'none' as const, reason, notify: false } : { refund, reason, notify }
+  const [cause,setCause]=useState<'store'|'customer'|undefined>()
+  useEffect(() => { if (open) { setRefund(fullAmount ? 'full' : 'none'); setReason(''); setNotify(true);setCause(undefined) } }, [open, fullAmount])
+  const input = cancellationOnly ? { refund: 'none' as const, reason, notify: false, ...(cause?{cause}:{}) } : { refund, reason, notify, ...(cause?{cause}:{}) }
   return (
     <Dialog contentLayout="form" open={open} title={title} description={subtitle} designWidth={480} tone="destructive" confirmation busy={busy} error={error}
       confirmLabel="予約を取り消す" cancelLabel="やめる" footerLead={cancellationOnly ? undefined : <span className={styles.lead}>取り消すと元に戻せません</span>}
-      confirmDisabled={!reason.trim()} confirmDisabledReason="取り消す理由を入れてください" onCancel={onClose} onConfirm={() => onConfirm(input)}>
+      confirmDisabled={!reason.trim() || (requireCause && !cause)} confirmDisabledReason="取り消す理由を入れてください" onCancel={onClose} onConfirm={() => onConfirm(input)}>
       <div className={styles.body}>
         {targetSummary}
         <Facts facts={facts} testMode={testMode} testText="本当の返金は起きません" />
+        {requireCause && <Field label="取消の区分" required><div role="radiogroup" aria-label="取消の区分"><Radio name="cancel-cause" checked={cause==='store'} onChange={()=>setCause('store')}>店の都合</Radio><Radio name="cancel-cause" checked={cause==='customer'} onChange={()=>setCause('customer')}>お客さまの都合</Radio></div></Field>}
         {!cancellationOnly && fullAmount ? (
           <Field label="お支払いの扱い" optional={false}>
             <div className={styles.choices} role="radiogroup" aria-label="お支払いの扱い">
@@ -77,7 +80,7 @@ export function CancelReservationDialog({ open, title, subtitle, facts, fullAmou
           </Field>
         ) : null}
         <Field label="取り消す理由" required><TextInput value={reason} onChange={(e) => setReason(e.target.value)} placeholder="お店の都合（食材が届かない）" /></Field>
-        {cancellationOnly ? <><p className={styles.note}>このお客さまへの自動の連絡・返金は行われません。</p><p className={styles.note}>取り消すと元に戻せません。</p></> : <>
+        {cancellationOnly ? <><p className={styles.note}>{requireCause?'予約金は取消の区分と予約時の決まりに従って扱います。':'このお客さまへの自動の連絡・返金は行われません。'}</p><p className={styles.note}>取り消すと元に戻せません。</p></> : <>
           <Checkbox checked={notify} onCheckedChange={setNotify}>LINE でお客さまに知らせる</Checkbox>
           {notify ? <Message text={messageFor(input)} /> : null}
         </>}

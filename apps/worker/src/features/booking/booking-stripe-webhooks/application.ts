@@ -26,10 +26,16 @@ export async function applyBookingStripeReceipt(db: D1Database, account: string,
     || (event.object.kind === 'checkout.session' && event.object.checkoutMode !== (binding.purpose === 'payment_method' ? 'setup' : 'payment'))
     || binding.customerId !== event.object.customer || (binding.purpose !== 'payment_method' && (binding.amount !== event.object.amount || binding.currency !== event.object.currency))
     || (receipt.input.retentionAccountId !== null && receipt.input.retentionAccountId !== binding.accountId)) return review('stripe_binding_mismatch');
-  // 後からの再接続先へ付け替えない。元の店・本人・tenantが残ることもbatchで再検査する。
-  const guard = db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM line_accounts a JOIN tenants t ON t.id=a.tenant_id JOIN friends f ON f.line_account_id=a.id
-    WHERE a.id=? AND a.tenant_id=? AND a.is_active=1 AND t.status='active' AND f.id=?) THEN 'true' ELSE 'stripe_binding_scope_mismatch' END)`)
-    .bind(binding.accountId,binding.tenantId,binding.friendId);
+  // 飲食の入金は顧客削除後も返金できるよう、保持した決済記録で元の接続を照合する。
+  // それ以外は元の店・本人・tenant が有効であることを batch で再検査する。
+  const guard = binding.purpose === 'restaurant_payment'
+    ? db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM restaurant_payment_requests p JOIN line_accounts a ON a.id=p.line_account_id JOIN tenants t ON t.id=a.tenant_id
+        WHERE p.id=? AND p.line_account_id=? AND a.tenant_id=? AND p.connect_account=? AND p.checkout_id=? AND p.customer_id=?)
+        THEN 'true' ELSE 'stripe_binding_scope_mismatch' END)`)
+      .bind(binding.targetId,binding.accountId,binding.tenantId,account,binding.objectId,binding.customerId)
+    : db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM line_accounts a JOIN tenants t ON t.id=a.tenant_id JOIN friends f ON f.line_account_id=a.id
+        WHERE a.id=? AND a.tenant_id=? AND a.is_active=1 AND t.status='active' AND f.id=?) THEN 'true' ELSE 'stripe_binding_scope_mismatch' END)`)
+      .bind(binding.accountId,binding.tenantId,binding.friendId);
   const claimed = await claimWorkflowStep(db,ref,options);
   if (!claimed?.lease_owner) return 'processing';
   try {

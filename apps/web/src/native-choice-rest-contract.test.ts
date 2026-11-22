@@ -8,8 +8,7 @@
  * 旧比較カード（app/scenarios/mode-v8.tsx）は残存コードの例外。実際に描く
  * V8の方式選択（v8/scenarios/create.tsx）は共通RadioCardを使う。
  */
-import {readdirSync,  statSync} from 'node:fs'
-import { readUiSource as readFileSync } from '../scripts/test-ui-source.mjs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'

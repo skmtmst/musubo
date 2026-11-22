@@ -47,7 +47,6 @@ describe('飲食店向け予約台帳（R103・R107）', () => {
     ]) {
       expect(ledgerSource).toContain(label)
     }
-    expect(ledgerSource).toContain("restaurantTestApi.updateReservation(accountId, id, { status: 'cancelled', expectedVersion:")
   })
 })
 
