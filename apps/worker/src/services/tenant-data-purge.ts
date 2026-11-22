@@ -13,7 +13,7 @@ import {
   type TenantRetention,
 } from '@line-crm/db';
 
-import { preparePurgedTenantBilling } from './tenant-purge-billing-prepare.js';
+import { preparePurgedTenantBilling, requirePurgeHashKeyBeforeClaim } from './tenant-purge-billing-prepare.js';
 import { observeBillingHashKeyUnavailable } from './billing-external-review.js';
 import { discoverRetainedPurgeAncestors, validateTombstonePolicies, type TombstonePolicy } from './tenant-retain-graph.js';
 import { tombstoneRetainedParents } from './tenant-purge-generic.js';
@@ -229,6 +229,7 @@ async function purgeOneTenant(
   const byTable: Record<string, number> = {};
   let remaining = budget;
 
+  await requirePurgeHashKeyBeforeClaim(env.DB,tenant.id,env.PURGED_PAYMENT_HMAC_SECRET);
   // Keep retained foreign-key parents in place. The claim also prevents account resumption.
   if (!await claimTenantPurge(env.DB, tenant.id, now)) {
     out.finished = false;

@@ -40,3 +40,13 @@ test('a missing HMAC key stops purge and creates an operational review alert', a
   expect(f.raw.prepare("SELECT stripe_customer_id,data_purged_at FROM tenants WHERE id='t'").get()).toEqual({stripe_customer_id:'cus_private',data_purged_at:null});
   expect(f.raw.prepare("SELECT rule_key FROM security_alerts WHERE tenant_id='t'").get()).toEqual({rule_key:'stripe_hash_key_review'});
 });
+
+
+test('missing hash key is checked before marking tenant purge started', async () => {
+  const { processTenantDataPurge } = await import('./tenant-data-purge.js');
+  const f=gapFixture();
+  f.raw.exec("UPDATE tenants SET plan_status='canceled',purge_requested_at='2026-01-01',stripe_customer_id='cus_private' WHERE id='t'");
+  const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
+  expect(result.completed).toBe(0);
+  expect(f.raw.prepare("SELECT purge_started_at FROM tenants WHERE id='t'").get()).toEqual({purge_started_at:null});
+});

@@ -6,7 +6,7 @@ export async function observeUncertainBillingEffects(db:D1Database, now:string):
       AND (lease_until IS NULL OR julianday(lease_until)<=julianday(?)) ORDER BY received_at,id LIMIT 100`)
     .bind(now).all<{id:string;tenant_id:string}>();
   for (const row of rows.results) {
-    await db.prepare(`INSERT INTO security_alerts
+    const alert = db.prepare(`INSERT INTO security_alerts
       (id,tenant_id,line_account_id,scope_key,rule_key,observed_count,threshold_count,first_detected_at,last_detected_at,latest_event_at,notification_id,slack_last_error)
       VALUES (?,?,NULL,json_array(?,?),'stripe_external_effect_review',1,1,?,?,julianday(?),?,'unconfigured')
       ON CONFLICT(scope_key,rule_key) DO UPDATE SET
@@ -14,7 +14,13 @@ export async function observeUncertainBillingEffects(db:D1Database, now:string):
         status=CASE WHEN security_alerts.status='resolved' THEN 'open' ELSE security_alerts.status END,
         version=security_alerts.version+CASE WHEN security_alerts.status='resolved' THEN 1 ELSE 0 END,
         reviewed_at=CASE WHEN security_alerts.status='resolved' THEN NULL ELSE security_alerts.reviewed_at END`)
-      .bind(crypto.randomUUID(),row.tenant_id,row.tenant_id,row.id,now,now,now,crypto.randomUUID()).run();
+      .bind(crypto.randomUUID(),row.tenant_id,row.tenant_id,row.id,now,now,now,crypto.randomUUID());
+    const retire = db.prepare(`UPDATE billing_events SET summary='external_review',external_effect_pending=0,lease_token=NULL,lease_until=NULL
+      WHERE id=? AND tenant_id=? AND summary='pending' AND external_effect_pending=1
+        AND (lease_until IS NULL OR julianday(lease_until)<=julianday(?))
+        AND EXISTS(SELECT 1 FROM security_alerts WHERE tenant_id=? AND rule_key='stripe_external_effect_review' AND scope_key=json_array(?,?))`)
+      .bind(row.id,row.tenant_id,now,row.tenant_id,row.tenant_id,row.id);
+    await db.batch([alert,retire]);
   }
   return rows.results.length;
 }

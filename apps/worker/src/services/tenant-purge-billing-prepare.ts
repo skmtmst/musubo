@@ -2,6 +2,16 @@ import { jstDate } from '@line-crm/shared';
 import { archiveAndResetTenantBilling } from './tenant-purge-billing-history.js';
 import { hashPurgedPaymentIdentifier, purgedPaymentIdentifierExpiry, purgedPaymentIdentifierKeyVersion, storePurgedPaymentIdentifierHash, type PurgedPaymentIdentifierKind } from './tenant-purge-payment-hashes.js';
 
+/** A missing key must not leave an otherwise active tenant in purge mode. */
+export async function requirePurgeHashKeyBeforeClaim(db:D1Database, tenantId:string, secret:string|undefined):Promise<void> {
+  if (secret) return;
+  const row=await db.prepare(`SELECT 1 AS found FROM tenants t WHERE t.id=? AND (
+    t.stripe_customer_id IS NOT NULL OR t.stripe_subscription_id IS NOT NULL
+    OR EXISTS(SELECT 1 FROM musubo_tenant_billing b WHERE b.tenant_id=t.id AND (b.core_subscription_id IS NOT NULL OR b.options_subscription_id IS NOT NULL))
+    OR EXISTS(SELECT 1 FROM billing_invoices i WHERE i.tenant_id=t.id AND (i.stripe_customer_id IS NOT NULL OR i.subscription_id IS NOT NULL)))`).bind(tenantId).first<{found:number}>();
+  if (row) throw new Error('purge_payment_hash_key_missing');
+}
+
 /** Save hashes before clearing current billing identifiers; retries extend rather than shorten retention. */
 export async function preparePurgedTenantBilling(db:D1Database, tenantId:string, now:string, secret:string|undefined):Promise<void> {
   const ids = await db.prepare(`SELECT stripe_customer_id AS customer,stripe_subscription_id AS subscription,NULL AS options_subscription FROM tenants WHERE id=?`)
