@@ -3,6 +3,7 @@
 import { scrollMotion } from '@/components/shared/overlay-utils'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
+import type { LineAccount } from '@line-crm/shared'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -41,7 +42,7 @@ import RegistrationStyleDialog from './registration-style-dialog'
 import RegistrationUnsavedGuard from './registration-unsaved-guard'
 import Step5Completion from './step5-completion'
 import RegistrationSession from './registration-session'
-import { registrationImportChoiceKey, registrationStorageKey } from './registration-storage'
+import { PENDING_REGISTRATION_RECEIPT, registrationImportChoiceKey, registrationStorageKey } from './registration-storage'
 import { REGISTRATION_STYLE_KEY, useRegistrationStyle } from './use-registration-style'
 import styles from './register.module.css'
 import { qrToDataURL } from '@/lib/qr-image'
@@ -93,19 +94,26 @@ export default function AccountRegisterV8() {
     <StickyBar actions={<Button variant="secondary" href="/accounts">LINEアカウントの一覧へ戻る</Button>} />
   </PageFrame>
   return <RegistrationSession key={draftKey ?? 'unverified'} resumeKey={resumeKey}>
-    <AccountRegistrationForm draftKey={draftKey} resumeKey={resumeKey} />
+    {(pendingAccountId, onReceiptConfirmed) => <AccountRegistrationForm
+      draftKey={draftKey} resumeKey={resumeKey} pendingAccountId={pendingAccountId} onReceiptConfirmed={onReceiptConfirmed}
+    />}
   </RegistrationSession>
 }
 
-function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | null; resumeKey: string | null }) {
+function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onReceiptConfirmed }: {
+  draftKey: string | null
+  resumeKey: string | null
+  pendingAccountId: string
+  onReceiptConfirmed: (accountId: string) => void
+}) {
   const router = useRouter()
   const saveErrors = useSaveFormErrors()
 
   // ①事前確認（v07 p6zMkA）。答えと、いま出している面。
   const [precheck, setPrecheck] = useState<PrecheckAnswers>({})
   const [precheckAt, setPrecheckAt] = useState<PrecheckAt>('q1')
-  const [currentStep, setCurrentStep] = useState<StepNumber>(1)
-  const [sub, setSub] = useState(1)
+  const [currentStep, setCurrentStep] = useState<StepNumber>(pendingAccountId ? 3 : 1)
+  const [sub, setSub] = useState(pendingAccountId ? 2 : 1)
   const [form, setForm] = useState<FormState>(emptyForm)
   const [importFriendsExplicit, setImportFriendsExplicit] = useState(false)
   const importFriendsExplicitRef = useRef(false)
@@ -126,9 +134,8 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   const [checkRunning, setCheckRunning] = useState(false)
   const [checkAttempted, setCheckAttempted] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState('')
-  const [receipt, setReceipt] = useState<LineRegistrationReceipt>({ status: 'waiting', receivedAt: null })
-  const [receiptRequestFailed, setReceiptRequestFailed] = useState(false)
-  const [receiptChecking, setReceiptChecking] = useState(false)
+  const [receiptStatus, setReceiptStatus] = useState<Exclude<LineRegistrationReceipt['status'], 'confirmed'> | 'unavailable'>('waiting')
+  const [resumedAccount, setResumedAccount] = useState<Pick<LineAccount, 'name' | 'displayName' | 'basicId'>>()
   const [idleSeconds, setIdleSeconds] = useState(0)
   const [importRequestError, setImportRequestError] = useState(false)
   const [importRefreshing, setImportRefreshing] = useState(false)
@@ -192,7 +199,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
     const nextAt = precheckNext(key, answers)
     if (nextAt) setPrecheckAt(nextAt)
   }
-  const createdId = connection?.id ?? ''
+  const createdId = connection?.id ?? pendingAccountId
   // Webhook URLは②Step3で表示する。Callback URLは入力させない。
   const registrationStyle = useRegistrationStyle(createdId, currentStep === 4)
   const templateKey = registrationStyle.choice
@@ -203,11 +210,12 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   const importPhase = importState?.phase ?? connection?.followerImport.phase ?? ''
   const importRunning = importPhase === 'importing_ids' || importPhase === 'hydrating_profiles'
   const importAttention = (importRunning || importState?.phase === 'completed') && (Boolean(importState?.lastError) || importRequestError || (importRunning && idleSeconds >= 60))
-  const basicId = connection?.basicId ?? ''
+  const basicId = connection?.basicId ?? resumedAccount?.basicId ?? ''
+  const accountDisplayName = connection?.displayName ?? resumedAccount?.displayName ?? resumedAccount?.name ?? form.name
   const addFriendUrl = basicId ? `https://line.me/R/ti/p/${encodeURIComponent(basicId.startsWith('@') ? basicId : `@${basicId}`)}` : ''
   const shownStep = V8_STEPS[currentStep - 1]
 
-  const headingReady = !((currentStep === 3 && sub === 2) || currentStep === 5) || Boolean(connection)
+  const headingReady = currentStep !== 5 || Boolean(connection)
   useEffect(() => {
     if (headingReady) stepPanelRef.current?.querySelector<HTMLElement>('[data-step-heading]')?.focus()
   }, [currentStep, sub, precheckAt, headingReady])
@@ -263,6 +271,16 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
     return () => clearTimeout(timer)
   }, [checkRunning, connection, checkCursor])
 
+  // 再読み込み後のQRに必要な表示名とベーシックIDは保存済みアカウントから読む。
+  useEffect(() => {
+    if (!pendingAccountId) return
+    let active = true
+    void api.lineAccounts.get(encodeURIComponent(pendingAccountId)).then(response => {
+      if (active && response.success) setResumedAccount(response.data)
+    }).catch(() => { /* 受信確認はアカウント詳細の読み込みと独立して続ける。 */ })
+    return () => { active = false }
+  }, [pendingAccountId])
+
   // ③-2：自分のスマホで読む友だち追加のQR。作れなくてもURLは出す。
   useEffect(() => {
     if (currentStep !== 3 || sub !== 2 || !addFriendUrl) return
@@ -279,7 +297,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
 
   // ③-2：人数ではなく、このアカウントに登録後届いた署名付きWebhookの記録を確認する。
   useEffect(() => {
-    if (currentStep !== 3 || sub !== 2 || !createdId || (receipt.status === 'confirmed' && !receiptRequestFailed)) return
+    if (currentStep !== 3 || sub !== 2 || !createdId) return
     let active = true
     let timer: ReturnType<typeof setTimeout> | undefined
     const poll = async () => {
@@ -287,18 +305,26 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
         const response = await api.lineAccounts.registrationReceipt(createdId)
         if (!active) return
         if (response.success) {
-          setReceipt(response.data)
-          setReceiptRequestFailed(false)
-          if (response.data.status === 'confirmed') return
-        } else setReceiptRequestFailed(true)
+          if (response.data.status === 'confirmed') {
+            try { if (resumeKey) sessionStorage.setItem(resumeKey, createdId) } catch (failure) { saveErrors.capture(failure) }
+            if (pendingAccountId) onReceiptConfirmed(createdId)
+            else {
+              setStyleDialogOpen(true)
+              setCurrentStep(4)
+              setSub(1)
+            }
+            return
+          }
+          setReceiptStatus(response.data.status)
+        } else setReceiptStatus('unavailable')
       } catch {
-        if (active) setReceiptRequestFailed(true)
+        if (active) setReceiptStatus('unavailable')
       }
       if (active) timer = setTimeout(() => void poll(), 5000)
     }
     void poll()
     return () => { active = false; if (timer) clearTimeout(timer) }
-  }, [currentStep, sub, createdId, receipt.status, receiptRequestFailed])
+  }, [currentStep, sub, createdId, onReceiptConfirmed, pendingAccountId, resumeKey, saveErrors])
 
   /* ⑤：画面を開いている間は1回ぶんが終わるたびに次を呼ぶ。
    * 本番では cron も拾うが、検証環境は cron を無効にしている。 */
@@ -494,8 +520,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
         return
       }
       setConnection(response.data)
-      setReceipt({ status: 'waiting', receivedAt: null })
-      setReceiptRequestFailed(false)
+      setReceiptStatus('waiting')
       if (response.data.basicId) setForm((current) => ({ ...current, lineId: response.data.basicId ?? current.lineId }))
       // 止まった行は③の一覧が赤で示し、下の帯が「どこを直すか」を言う。同じ文を重ねない。
     } catch (saveFailure) {
@@ -537,19 +562,28 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
         setError(response.error)
         return
       }
+      if (response.data.additionState === 'pending_payment' || response.data.additionState === 'pending_reconciliation') {
+        providerGuard.current.active = false
+        providerGuard.current.confirmed = false
+        setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
+        router.push('/hq/billing/line-addition')
+        return
+      }
       providerGuard.current.active = false
       providerGuard.current.confirmed = false
       setConnection(response.data)
       setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
       const choiceKey = registrationImportChoiceKey(resumeKey, response.data.id ?? '')
       try { if (choiceKey) localStorage.setItem(choiceKey, String(form.importFriends)) } catch (failure) { saveErrors.capture(failure) }
-      try { if (response.data.id && resumeKey) sessionStorage.setItem(resumeKey, response.data.id) } catch (failure) { saveErrors.capture(failure) }
+      try {
+        if (response.data.id && resumeKey) sessionStorage.setItem(resumeKey, PENDING_REGISTRATION_RECEIPT + response.data.id)
+      } catch (failure) { saveErrors.capture(failure) }
       // v07：登録できたら③の2つめ（友だち追加のためし）へ進む。
       setCurrentStep(3)
       setSub(2)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
-      // LINEの接続は大事な操作。本人確認を求められたら窓を立ててやり直す。
+      // 料金を確認したLINEの追加接続で本人確認を求められたときだけ再試行する。
       if (!stepUpToken && isStepUpRequired(caught)) {
         if (providerConfirmationIsCurrent()) setStepUp({ purpose: 'line_account.connect', action: 'LINEの接続を登録する', retry: save })
         return
@@ -605,34 +639,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
       setSub(1)
       return
     }
-    if (currentStep === 3) {
-      if (sub === 1) {
-        if (!rowsOk) return
-        void save()
-        return
-      }
-      if (receipt.status !== 'confirmed' || receiptChecking || !createdId) return
-      // 表示済みの結果だけを信じず、押した時点でサーバの受信記録をもう一度確かめる。
-      setReceiptChecking(true)
-      void (async () => {
-        try {
-          const response = await api.lineAccounts.registrationReceipt(createdId)
-          if (response.success) {
-            setReceipt(response.data)
-            setReceiptRequestFailed(false)
-            if (response.data.status === 'confirmed') {
-              setCurrentStep(4)
-              setSub(1)
-            }
-          } else setReceiptRequestFailed(true)
-        } catch {
-          setReceiptRequestFailed(true)
-        } finally {
-          setReceiptChecking(false)
-        }
-      })()
-      return
-    }
+    if (currentStep === 3 && sub === 1 && rowsOk) void save()
     // ④の保存とスキップはポップアップ内の操作から行う。
   }
 
@@ -696,7 +703,6 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
     || (currentStep === 2 && sub === 3 && !allAcked(WEBHOOK_ACKS, acks))
     || (currentStep === 2 && sub === 4 && !allAcked(LOGIN_ACKS, acks))
     || (currentStep === 3 && sub === 1 && (!rowsOk || !providerConfirmed))
-    || (currentStep === 3 && sub === 2 && (receipt.status !== 'confirmed' || receiptRequestFailed || receiptChecking))
   // v07 Fqy29／Lwxyh：②の中だけ「次のステップへ」と行き先を名前で書いた「戻る」。ほかの段は「次へ」「戻る」。
   const backLabel = currentStep === 3 && sub === 1 ? 'LINEログインへ戻る'
     : currentStep !== 2 ? '戻る'
@@ -809,19 +815,17 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
             </CreateStepColumns>
           )}
 
-          {currentStep === 3 && sub === 2 && connection && (
-            <CreateStepColumns data-design-node="Lwxyh" previewTitle={receipt.status === 'confirmed' && !receiptRequestFailed ? '接続の確認' : 'ためしに友だち追加'} previewLabel={receipt.status === 'confirmed' && !receiptRequestFailed ? '確認結果を見る' : '友だち追加の方法を見る'} preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label={receipt.status === 'confirmed' && !receiptRequestFailed ? '接続の確認' : 'ためしに友だち追加'}>
-                <h2 className={styles.asideH2}>{receipt.status === 'confirmed' && !receiptRequestFailed ? '接続の確認' : 'ためしに友だち追加'}</h2>
-                {receipt.status === 'confirmed' && !receiptRequestFailed ? <p className={styles.asideP}>接続を確認できました。「次へ」を押してください。</p> : <>
-                  <p className={styles.asideP}>まだ友だちでなければ、スマホの LINE で QR を読み取って追加してください。</p>
-                  <p className={styles.asideP}>すでに友だちなら、この公式アカウントとのトークに「接続テスト」と送ってください。受信が確認できると次へ進めます。</p>
-                </>}
+          {currentStep === 3 && sub === 2 && createdId && (
+            <CreateStepColumns data-design-node="Lwxyh" previewTitle="ためしに友だち追加" previewLabel="友だち追加の方法を見る" preview={(
+              <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ためしに友だち追加">
+                <h2 className={styles.asideH2}>ためしに友だち追加</h2>
+                <p className={styles.asideP}>まだ友だちでなければ、スマホの LINE で QR を読み取って追加してください。</p>
+                <p className={styles.asideP}>すでに友だちなら、この公式アカウントとのトークに「接続テスト」と送ってください。</p>
               </Card>
-              )}>
-              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label={receipt.status === 'confirmed' && !receiptRequestFailed ? '接続確認が完了しました' : 'ためしに友だち追加'}>
+            )}>
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="ためしに友だち追加">
                 <p className={styles.subBadge}>{badge}</p>
-                <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>{receipt.status === 'confirmed' && !receiptRequestFailed ? '接続確認が完了しました' : '友だち追加できるか確かめます'}</h2>
+                <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>友だち追加できるか確かめます</h2>
                 <Notice tone="info"><p>{PROVIDER_MEMBERSHIP_GUIDANCE}</p></Notice>
                 <div className={styles.qrBlock}>
                   <div className={styles.qrFrame}>
@@ -838,27 +842,24 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
                       <span className={styles.endpointValue} ><TruncatedText value={addFriendUrl || String(emptyValue('unknown'))} url /></span>
                       <CopyButton value={addFriendUrl || String(emptyValue('unknown'))} />
                     </Card>
-                    <div className={`${styles.receiptState} ${(receiptRequestFailed || receipt.status === 'error') ? styles.receiptError : receipt.status === 'confirmed' ? styles.receiptSuccess : ''}`} role="status" aria-live="polite">
-                      <p>{receiptRequestFailed ? '受信を確認できませんでした' : receipt.status === 'confirmed' ? '接続を確認できました' : receipt.status === 'error' ? '受信の確認に問題があります' : '接続を待っています…'}</p>
-                      <p>{receiptRequestFailed
+                    <div className={`${styles.receiptState} ${receiptStatus !== 'waiting' ? styles.receiptError : ''}`} role="status" aria-live="polite">
+                      <p>{receiptStatus === 'unavailable' ? '受信を確認できませんでした' : receiptStatus === 'error' ? '受信の確認に問題があります' : '接続を待っています…'}</p>
+                      <p>{receiptStatus === 'unavailable'
                         ? '通信の状態を確認しています。しばらく待っても変わらない場合は、画面を読み直してください。'
-                        : receipt.status === 'confirmed'
-                          ? 'このアカウントの友だち追加、またはテストメッセージを musubo で確認できました。「次へ」を押してください。'
-                          : receipt.status === 'error'
-                            ? '受信処理に失敗しました。設定を確認して再度お試しください。解消しない場合はサポートにお問い合わせください。'
-                            : '友だち追加の通知が musubo に届くと、この画面が「接続を確認できました」に変わります。確認後に「次へ」を押してください。'}</p>
+                        : receiptStatus === 'error'
+                          ? '受信処理に失敗しました。設定を確認して再度お試しください。解消しない場合はサポートにお問い合わせください。'
+                          : '友だち追加やテストメッセージを受信したら、自動で「使い方を選ぶ」に進みます。'}</p>
                     </div>
                     <div className={styles.receiptAccount}>
-                      <span className={styles.receiptAccountIcon} aria-hidden="true">{(connection.displayName ?? form.name).slice(0, 1) || 'L'}</span>
-                      <span><strong>{connection.displayName ?? form.name}</strong><br />{basicId || String(emptyValue('unknown'))}</span>
+                      <span className={styles.receiptAccountIcon} aria-hidden="true">{accountDisplayName.slice(0, 1) || 'L'}</span>
+                      <span><strong>{accountDisplayName}</strong><br />{basicId || String(emptyValue('unknown'))}</span>
                     </div>
-                    {(receipt.status !== 'confirmed' || receiptRequestFailed) && <><div className={styles.receiptInstructions}>
+                    <div className={styles.receiptInstructions}>
                       <strong>すでに友だち追加している場合</strong>
                       <p>このアカウントの LINE トークから「接続テスト」と送ってください。QR を開き直すだけでは確認できません。</p>
                     </div>
                     <p className={styles.receiptHelp}>変わらない場合は LINE Developers で Webhook の利用がオンか確認してください。</p>
                     <p className={styles.receiptHelp}><TextLink href="/hq/support" inline>変わらない場合はサポートに問い合わせ</TextLink></p>
-                    </>}
                   </div>
                 </div>
               </Card>
@@ -890,7 +891,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
 
 
         </StepContent>
-        <StickyBar presentation="account-registration" actions={currentStep === 5 ? <>
+        {!(currentStep === 3 && sub === 2) && <StickyBar presentation="account-registration" actions={currentStep === 5 ? <>
             {importAttention ? <Button type="button" variant="primary" busy={importRefreshing} busyLabel="確認中…" onClick={() => void refreshImport()}>状態を再確認</Button> : null}
             <Button href="/hq" variant={importAttention ? 'secondary' : 'primary'}><ArrowLeft size={16} aria-hidden="true" />統括コンソールへ戻る</Button>
           </> : currentStep === 4 ? <>
@@ -904,7 +905,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
               ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
               : currentStep === 1 ? <Button href="/hq">キャンセル</Button> : null}
             {(currentStep !== 1 || precheckAt === 'done') && <Button type="submit" variant="primary" disabled={busy || nextBlocked} disabledReason={currentStep === 3 && sub === 1 && !providerConfirmed ? PROVIDER_CONFIRMATION_REASON : missingConnectionReason} busy={busyAction === 'save'} busyLabel="登録しています…">{nextLabel}<ArrowRight size={16} aria-hidden="true" /></Button>}
-          </>} />
+          </>} />}
       </form>
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
       {currentStep === 4 ? <RegistrationUnsavedGuard dirty={registrationStyle.dirty} busy={registrationStyle.busy} onDiscard={registrationStyle.discard} /> : null}

@@ -121,7 +121,8 @@ describe('鍵の期限の知らせ', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       event_type: 'line_token_expiring',
-      title: 'トークンがあと6日で切れます',
+      title: 'LINE接続の自動更新を再試行しています',
+      body: '接続状況はLINEアカウントの詳細で確認できます。',
       category: 'error',
       channel: 'dashboard',
       line_account_id: 'account-1',
@@ -143,7 +144,7 @@ describe('鍵の期限の知らせ', () => {
     const rows = notices();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ event_type: 'line_token_refresh_failed', category: 'error' });
-    expect(rows[0].body).toContain('チャネルシークレットを確かめて');
+    expect(rows[0].body).toContain('チャネルシークレットを確かめ');
     expect(JSON.parse(rows[0].metadata)).toMatchObject({ reason: 'credentials', expiresAt: null, daysLeft: null });
   });
 
@@ -190,7 +191,7 @@ describe('鍵の期限の知らせ', () => {
     await refreshAt(START + 5 * 60_000);
     const rows = notices();
     expect(rows.map((row) => row.event_type)).toEqual(['line_token_expired']);
-    expect(rows[0].body).toContain('配信と返信が止まっています');
+    expect(rows[0].body).toBe('接続状況はLINEアカウントの詳細で確認できます。');
   });
 
   it('期限が残り6日で失敗のまま切れたら、注意と切れたの2段で1件ずつ', async () => {
