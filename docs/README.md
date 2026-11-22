@@ -8,7 +8,7 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
-- [動作確認の名前を整理（4回目）](release-log/unreleased/PR-kenta-q04-test-titles4.md)
+- [動作確認の名前を整理（4回目）](release-log/unreleased/163-kenta-q04-test-titles4.md)
 - [面談・飲食店の予約一覧の修正履歴](release-log/unreleased/86-kenta-1360.md)
 - [最初に読む：製品とコードの入口](START-HERE.md)
 - [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
