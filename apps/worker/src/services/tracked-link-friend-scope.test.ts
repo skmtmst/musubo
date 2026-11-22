@@ -18,7 +18,9 @@ beforeEach(() => {
     INSERT INTO line_accounts VALUES('a',NULL),('b','other');
     INSERT INTO friends VALUES('legacy','Ushared',NULL,'Legacy');
     INSERT INTO tracked_links VALUES('link','a',NULL);
-    INSERT INTO link_clicks VALUES('click','link','legacy','2026-01-01');`);
+    INSERT INTO link_clicks VALUES('click','link','legacy','2026-01-01');
+    ALTER TABLE line_accounts ADD COLUMN data_purged_at TEXT;
+    ALTER TABLE friends ADD COLUMN data_purged_at TEXT;`);
   db = {prepare(sql: string) {
     let args: unknown[] = [];
     const statement = {
@@ -34,7 +36,7 @@ afterEach(() => raw.close());
 it('prefers an exact account identity over an older NULL row before saving and when displaying history', async () => {
   expect(await trackedLinkFriendMatches(db,'legacy','a')).toBe(true);
   expect((await getLinkClicks(db,'link'))[0].friend_id).toBe('legacy');
-  raw.exec("INSERT INTO friends VALUES('exact','Ushared','a','Exact')");
+  raw.exec("INSERT INTO friends(id,line_user_id,line_account_id,display_name) VALUES('exact','Ushared','a','Exact')");
   expect(await trackedLinkFriendMatches(db,'legacy','a')).toBe(false);
   expect(await trackedLinkFriendMatches(db,'exact','a')).toBe(true);
   expect((await getLinkClicks(db,'link'))[0]).toMatchObject({friend_id:null,friend_display_name:null});
