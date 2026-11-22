@@ -16,7 +16,7 @@ export interface FormRefs {
   templates: { id: string; name: string; type: string }[]
   /** 「予約を入れる」欄のメニュー選び。HQなど持たない画面では空のまま */
   bookingMenus?: { id: string; name: string; durationMinutes: number }[]
-  bookingGroups?: { id: string; name: string }[]
+  bookingGroups?: { id: string; name: string; menuIds?: string[] }[]
   routingMenus?: { id: string; name: string; durationMinutes: number }[]
   routingMenuStaff?: Record<string, { id: string; name: string }[]>
   bookingGroupsError?: boolean

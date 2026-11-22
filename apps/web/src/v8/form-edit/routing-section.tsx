@@ -72,7 +72,19 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
   const setRule = (id: string, patch: Partial<RoutingRule>) => set({ rules: value.rules.map((r, i) => (`r${i}` === id ? { ...r, ...patch } : r)) })
   const setTarget = (target: RoutingTarget, patch: Partial<RoutingTarget>): RoutingTarget => ({ ...target, ...patch, ...(patch.menuId !== undefined && patch.menuId !== target.menuId ? { staffId: undefined, staffGroupId: undefined } : {}) })
   const menuOptions = [{ value: '', label: 'メニューを選ぶ' }, ...menus.map((m) => ({ value: m.id, label: `${m.name} ${m.durationMinutes} 分` }))]
-  const staffOptions = (target: RoutingTarget) => [{ value: '', label: '全員' }, ...(refs.bookingGroups ?? []).map((group) => ({ value: `group:${group.id}`, label: `組：${group.name}` })), ...(target.staffGroupId && !(refs.bookingGroups ?? []).some((group) => group.id === target.staffGroupId) ? [{ value: `group:${target.staffGroupId}`, label: '担当の組（登録済み）' }] : []), ...(menuStaff?.[target.menuId] ?? []).map((staff) => ({ value: `staff:${staff.id}`, label: staff.name }))]
+  const unavailableTarget = (target: RoutingTarget) => {
+    if (!refs.routingMenus || !target.menuId) return false
+    if (!refs.routingMenus.some((menu) => menu.id === target.menuId)) return true
+    if (refs.routingMenuStaff?.[target.menuId]?.length === 0) return true
+    if (target.staffId && refs.routingMenuStaff?.[target.menuId] && !refs.routingMenuStaff[target.menuId].some((staff) => staff.id === target.staffId)) return true
+    if (target.staffGroupId && refs.bookingGroups) {
+      const group = refs.bookingGroups.find((item) => item.id === target.staffGroupId)
+      return !group || Boolean(group.menuIds && !group.menuIds.includes(target.menuId))
+    }
+    return false
+  }
+  const unavailableRows = value.enabled ? [...value.rules.map((rule, index) => unavailableTarget(rule.target) ? `${index + 1} 行目` : null), unavailableTarget(value.fallback) ? 'どれにも当たらないとき' : null].filter(Boolean) : []
+  const staffOptions = (target: RoutingTarget) => [{ value: '', label: '全員' }, ...(refs.bookingGroups ?? []).filter((group) => !group.menuIds || group.menuIds.includes(target.menuId) || group.id === target.staffGroupId).map((group) => ({ value: `group:${group.id}`, label: `組：${group.name}` })), ...(target.staffGroupId && !(refs.bookingGroups ?? []).some((group) => group.id === target.staffGroupId) ? [{ value: `group:${target.staffGroupId}`, label: '担当の組（登録済み）' }] : []), ...(menuStaff?.[target.menuId] ?? []).map((staff) => ({ value: `staff:${staff.id}`, label: staff.name }))]
 
   const targetCells = (target: RoutingTarget, update: (next: RoutingTarget) => void, label: string, invalid: boolean) => <>
     <Td>{readOnly ? <span>{menus.find((m) => m.id === target.menuId)?.name ?? '—'}</span> : <EntitySelect size="full" aria-label={`${label}の出すメニュー`} invalid={invalid} value={target.menuId} options={menuOptions} onChange={(v) => update(setTarget(target, { menuId: v }))} />}</Td>
@@ -93,6 +105,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
         </span>
       </div>
       {value.enabled ? <>
+        {unavailableRows.length ? <Notice tone="warn">{unavailableRows.join('・')}の行き先が使えません。行き先を選び直してください。</Notice> : null}
         {refs.bookingGroupsError ? <Notice tone="warn">予約先の候補を読み込めませんでした。権限を確認して画面を読み直してください。</Notice> : null}
         <div className={styles.questionRow}>
           <span className={styles.label}>分ける質問</span>
@@ -116,7 +129,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
         <DataTable aria-label="行き先の表" grid={{ columns: '40px minmax(0, 1.3fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 40px', padding: '0', headPadding: '0', gap: 'var(--tpl-sb-ec-gap)' }}>
           <thead><TableHeadRow><Th aria-label="並べ替え" /><Th>条件</Th><Th grow>出すメニュー</Th><Th>担当の組</Th><Th>会い方</Th><Th aria-label="操作" /></TableHeadRow></thead><tbody>
           {(readOnly ? ruled : reorder.shown).map((rule, index) => {
-            const invalid = problem?.row === index
+            const invalid = problem?.row === index || unavailableTarget(rule.target)
             return (
               <Tr key={rule.id} selected={hit === index} data-invalid={invalid || undefined} {...reorder.rowProps(rule.id)}>
                 <HandleCell>{readOnly ? null : <ReorderHandle look="icon" label={`${index + 1} 行目`} {...reorder.handle(rule.id)} {...reorder.handleProps(rule.id)} />}</HandleCell>
@@ -134,10 +147,10 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
               </Tr>
             )
           })}
-          <Tr data-fallback selected={hit === -1} data-invalid={problem?.row === value.rules.length || undefined}>
+          <Tr data-fallback selected={hit === -1} data-invalid={(problem?.row === value.rules.length || unavailableTarget(value.fallback)) || undefined}>
             <HandleCell />
             <Td><span className={styles.cond}><span>どれにも当たらない</span><StatusBadge size="compact" dot={false}>消せない</StatusBadge></span></Td>
-            {targetCells(value.fallback, (fallback) => set({ fallback }), 'どれにも当たらないとき', problem?.row === value.rules.length)}
+            {targetCells(value.fallback, (fallback) => set({ fallback }), 'どれにも当たらないとき', problem?.row === value.rules.length || unavailableTarget(value.fallback))}
             <ActionCell>—</ActionCell>
           </Tr>
         </tbody></DataTable>

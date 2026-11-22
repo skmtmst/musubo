@@ -156,3 +156,17 @@ it('遅れて返った古い試行結果で新しい答えの結果を上書き�
   await Promise.resolve()
   expect(screen.getByText(/どれにも当たらないとき：既定の相談/)).toBeTruthy()
 })
+
+it('使えなくなった行き先を閲覧だけの人にも知らせる', () => {
+  render(<RoutingSection blocks={[{id:'q',kind:'input',type:'radio',name:'subject',label:'相談内容',choices:[{id:'x',label:'相談'}]},{id:'book',kind:'input',type:'booking'}] as never}
+    refs={{routingMenus:[{id:'m',name:'相談',durationMinutes:30}],routingMenuStaff:{m:[{id:'s',name:'担当'}]},bookingGroups:[]} as never}
+    routing={{enabled:true,rules:[{conditions:[{questionId:'q',op:'is',value:'相談'}],target:{menuId:'old'}}],fallback:{menuId:'m'}}} readOnly onChange={() => {}} />)
+  expect(screen.getByText(/1 行目の行き先が使えません/)).toBeTruthy()
+})
+
+it('担当できる人がいなくなった組の行き先を知らせる', () => {
+  render(<RoutingSection blocks={[{id:'q',kind:'input',type:'radio',name:'subject',label:'相談内容',choices:[{id:'x',label:'相談'}]},{id:'book',kind:'input',type:'booking'}] as never}
+    refs={{routingMenus:[{id:'m',name:'相談',durationMinutes:30}],routingMenuStaff:{m:[{id:'s',name:'別の担当'}]},bookingGroups:[{id:'g',name:'相談組',menuIds:[]}]} as never}
+    routing={{enabled:true,rules:[{conditions:[{questionId:'q',op:'is',value:'相談'}],target:{menuId:'m',staffGroupId:'g'}}],fallback:{menuId:'m'}}} readOnly onChange={() => {}} />)
+  expect(screen.getByText(/1 行目の行き先が使えません/)).toBeTruthy()
+})
