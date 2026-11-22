@@ -1,7 +1,7 @@
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import { recordAuditEvent } from '@line-crm/db';
+import { auditEventStatement, recordAuditEvent } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { requirePlatformAdmin, requirePlatformAdminWrite } from '../middleware/platform-admin.js';
@@ -77,7 +77,8 @@ async function review(c: Context<Env>, platform: boolean, status: 'acknowledged'
     if (!alert) return c.json({ success: false, error: '記録が見つかりません' }, 404);
     const updated = await c.env.DB.prepare(`UPDATE security_alerts SET status = ?, reviewed_at = ?, version = version + 1,
       slack_sent_version = CASE WHEN slack_sent_version = version THEN version + 1 ELSE slack_sent_version END
-      WHERE id = ? AND version = ? AND ${scope.where}`)
+      WHERE id = ? AND version = ? AND ${scope.where}
+        AND (billing_retry_token IS NULL OR julianday(billing_retry_until)<=julianday('now'))`)
       .bind(status, new Date().toISOString(), alert.id, body!.expectedVersion, ...scope.binds).run();
     if (Number(updated.meta.changes) !== 1) return c.json({ success: false, error: '記録が更新されています。読み直してください' }, 409);
     await recordAuditEvent(c.env.DB, { tenantId: staff.tenantId, lineAccountId: alert.line_account_id,
@@ -102,10 +103,39 @@ securityAlerts.post('/api/ops/security-alerts/:id/retry-billing', requirePlatfor
   let eventId:unknown;
   try { const scope=JSON.parse(alert.scope_key) as unknown[]; if(scope[0]===alert.tenant_id) eventId=scope[1]; } catch { /* invalid scope */ }
   if (typeof eventId!=='string' || !/^evt_[A-Za-z0-9_]+$/.test(eventId)) return c.json({success:false,error:'通知を確認できません'},409);
-  const receipt=await c.env.DB.prepare(`SELECT summary FROM billing_events WHERE id=? AND tenant_id=? AND external_effect_pending=0
-    AND lease_token IS NULL AND summary IN ('pending','external_review')`).bind(eventId,alert.tenant_id).first<{summary:string}>();
-  if (!receipt || !c.env.STRIPE_BILLING_WEBHOOK_SECRET) return c.json({success:false,error:'再処理できる状態ではありません'},409);
+  if (!c.env.STRIPE_BILLING_WEBHOOK_SECRET) return c.json({success:false,error:'再処理できる状態ではありません'},409);
+  const claimToken=crypto.randomUUID();
+  const now=new Date();
+  const leaseUntil=new Date(now.getTime()+15*60*1000).toISOString();
+  const claim=await c.env.DB.prepare(`UPDATE security_alerts SET billing_retry_token=?, billing_retry_until=?
+    WHERE id=? AND version=? AND status<>'resolved'
+      AND (billing_retry_token IS NULL OR julianday(billing_retry_until)<=julianday(?))`).bind(claimToken,leaseUntil,c.req.param('id'),alert.version,now.toISOString()).run();
+  if (Number(claim.meta.changes)!==1) return c.json({success:false,error:'ほかの人が処理しています',code:'BILLING_RETRY_BUSY'},409);
   try {
+    const finalize=async (action:'security.alert.retry_billing'|'security.alert.retry_billing_reconciled') => {
+      // The alert and its audit entry commit together, guarded by the current claim.
+      const result=await c.env.DB.batch([
+        c.env.DB.prepare(`UPDATE security_alerts SET status='resolved',reviewed_at=?,version=version+1,
+          slack_sent_version=CASE WHEN slack_sent_version=version THEN version+1 ELSE slack_sent_version END,
+          billing_retry_token=NULL,billing_retry_until=NULL
+          WHERE id=? AND status<>'resolved' AND billing_retry_token=?`)
+          .bind(new Date().toISOString(),c.req.param('id'),claimToken),
+        auditEventStatement(c.env.DB, {tenantId:alert.tenant_id,category:'business',action,
+          actorPrincipalId:staff.id,targetKind:'security_alert',targetId:c.req.param('id'),result:'success',retentionClass:'security'},
+          {sql:'changes()=1',params:[]}),
+      ]);
+      return Number(result[0].meta.changes)===1;
+    };
+    const receipt=await c.env.DB.prepare(`SELECT summary FROM billing_events WHERE id=? AND tenant_id=? AND external_effect_pending=0
+      AND lease_token IS NULL`).bind(eventId,alert.tenant_id).first<{summary:string}>();
+    if (!receipt) return c.json({success:false,error:'再処理できる状態ではありません'},409);
+    let completed=false;
+    try { completed=JSON.parse(receipt.summary)?.state==='completed'; } catch { /* Pending is not JSON. */ }
+    if (completed) {
+      if (!await finalize('security.alert.retry_billing_reconciled')) return c.json({success:false,error:'記録が更新されています'},409);
+      return c.json({success:true,data:{status:'reconciled'}});
+    }
+    if (!['pending','external_review'].includes(receipt.summary)) return c.json({success:false,error:'再処理できる状態ではありません'},409);
     const event=await stripeRequest<{id:string}>(c.env,'GET',`/v1/events/${encodeURIComponent(eventId)}`);
     if (event.id!==eventId) return c.json({success:false,error:'通知を確認できません'},502);
     const raw=JSON.stringify(event), timestamp=Math.floor(Date.now()/1000);
@@ -113,11 +143,16 @@ securityAlerts.post('/api/ops/security-alerts/:id/retry-billing', requirePlatfor
     const signature=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(`${timestamp}.${raw}`))),v=>v.toString(16).padStart(2,'0')).join('');
     const response=await hqBilling.request('/api/hq/billing/webhook',{method:'POST',headers:{'stripe-signature':`t=${timestamp},v1=${signature}`},body:raw},c.env);
     if (!response.ok) return c.json({success:false,error:'再処理できませんでした'},503);
-    await c.env.DB.prepare(`UPDATE security_alerts SET status='resolved',reviewed_at=?,version=version+1 WHERE id=? AND version=?`)
-      .bind(new Date().toISOString(),c.req.param('id'),alert.version).run();
-    await recordAuditEvent(c.env.DB,{tenantId:alert.tenant_id,category:'business',action:'security.alert.retry_billing',actorPrincipalId:staff.id,targetKind:'security_alert',targetId:c.req.param('id'),result:'success',retentionClass:'security'});
+    const outcome=await response.json() as {data?:{duplicate?:boolean;review?:boolean}};
+    if (outcome.data?.review) return c.json({success:false,error:'通知の状態を確認してください'},409);
+    if (!await finalize(outcome.data?.duplicate ? 'security.alert.retry_billing_reconciled' : 'security.alert.retry_billing'))
+      return c.json({success:false,error:'記録が更新されています'},409);
     return c.json({success:true,data:{status:'retried'}});
   } catch { return c.json({success:false,error:'再処理できませんでした'},503); }
+  finally {
+    await c.env.DB.prepare('UPDATE security_alerts SET billing_retry_token=NULL,billing_retry_until=NULL WHERE id=? AND billing_retry_token=?')
+      .bind(c.req.param('id'),claimToken).run().catch(() => undefined);
+  }
 });
 
 securityAlerts.get('/api/operations/security-alerts', requireRole('owner', 'admin'), c => list(c, false));

@@ -3,9 +3,10 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BillingRetryPanel } from './billing-retry-panel'
+import { ApiError } from '@/lib/api'
 
 const mock = vi.hoisted(() => ({ session: vi.fn(), list: vi.fn(), retryBilling: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { auth: { session: mock.session } }, ApiError: class extends Error {} }))
+vi.mock('@/lib/api', () => ({ api: { auth: { session: mock.session } }, ApiError: class extends Error { constructor(public status: number, message: string, public code?: string) { super(message) } } }))
 vi.mock('@/lib/api/helpers/security-monitor', () => ({ securityMonitorApi: mock }))
 const alert = { id: 'alert-1', ruleKey: 'stripe_external_effect_review', summary: '決済操作の結果確認が必要', status: 'open', version: 3, lastDetectedAt: '2026-11-22T10:00:00Z' }
 const reply = (items: unknown[]) => ({ success: true, data: { items, total: items.length, limit: 200 } })
@@ -58,6 +59,16 @@ describe('決済通知の再処理', () => {
     const dialog=screen.getByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: '再処理する' }))
     expect((await within(dialog).findByRole('alert')).textContent).toContain('再処理できませんでした')
+  })
+
+  it('別の人が処理中ならその理由を表示する', async () => {
+    mock.session.mockResolvedValue({ success: true, data: { platformAdmin: true } }); mock.list.mockResolvedValue(reply([alert]))
+    mock.retryBilling.mockRejectedValue(new ApiError(409, 'ほかの人が処理しています', 'BILLING_RETRY_BUSY'))
+    render(<BillingRetryPanel canManage sessionReady impersonating={false} />)
+    fireEvent.click(await screen.findByRole('button', { name: '再処理する' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: '再処理する' }))
+    expect((await within(dialog).findByRole('alert')).textContent).toContain('ほかの人が処理しています')
   })
 
   it('運営権限がなければ一覧APIを呼ばない', async () => {

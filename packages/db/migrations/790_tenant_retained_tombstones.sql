@@ -9,6 +9,9 @@ ALTER TABLE booking_pass_plans ADD COLUMN data_purged_at TEXT;
 ALTER TABLE tenants ADD COLUMN purge_started_at TEXT;
 ALTER TABLE tenants ADD COLUMN billing_epoch INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE tenants ADD COLUMN last_purged_at TEXT;
+-- 運営が同じ決済通知を同時に再処理しないための期限付き借受。
+ALTER TABLE security_alerts ADD COLUMN billing_retry_token TEXT;
+ALTER TABLE security_alerts ADD COLUMN billing_retry_until TEXT;
 ALTER TABLE billing_events ADD COLUMN lease_token TEXT;
 ALTER TABLE billing_events ADD COLUMN lease_until TEXT;
 ALTER TABLE billing_events ADD COLUMN review_amount INTEGER;

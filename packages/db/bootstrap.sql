@@ -8621,7 +8621,7 @@ CREATE TABLE security_alerts (
   notification_id TEXT NOT NULL,
   slack_lease_until TEXT,
   slack_lease_token TEXT,
-  slack_last_error TEXT,
+  slack_last_error TEXT, billing_retry_token TEXT, billing_retry_until TEXT,
   UNIQUE (scope_key, rule_key)
 );
 

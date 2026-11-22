@@ -19,3 +19,15 @@ test('purge-only trigger exceptions mention every protected schema column', () =
   f.raw.exec('ALTER TABLE form_versions ADD COLUMN sensitive_new TEXT');
   expect(()=>check('form_versions','trg_form_versions_immutable',['on_submit_webhook_url','on_submit_webhook_headers'])).toThrow();
 });
+
+test('migration 790 creates nullable billing retry claim fields', () => {
+  const f=gapFixture();
+  try {
+    const columns=f.raw.pragma('table_info(security_alerts)') as {name:string;type:string;notnull:number}[];
+    expect(columns.filter(column => column.name === 'billing_retry_token' || column.name === 'billing_retry_until'))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({name:'billing_retry_token',type:'TEXT',notnull:0}),
+        expect.objectContaining({name:'billing_retry_until',type:'TEXT',notnull:0}),
+      ]));
+  } finally { f.raw.close(); }
+});

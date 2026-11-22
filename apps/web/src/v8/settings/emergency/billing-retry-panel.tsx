@@ -9,7 +9,7 @@ import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/g
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import TruncatedText from '@/components/shared/truncated-text'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { securityMonitorApi } from '@/lib/api/helpers/security-monitor'
 import { formatOperationDate } from '@/lib/operation-status'
 import styles from './security-monitor.module.css'
@@ -62,8 +62,8 @@ export function BillingRetryPanel({ canManage, sessionReady, impersonating }: { 
       await securityMonitorApi.retryBilling(pending.id, pending.version)
       if (mounted.current) { setPending(null); await load() }
       return true
-    } catch {
-      if (mounted.current) setError('再処理できませんでした。最新の記録を確認して、もう一度お試しください。')
+    } catch (cause) {
+      if (mounted.current) setError(cause instanceof ApiError && cause.code === 'BILLING_RETRY_BUSY' ? 'ほかの人が処理しています。' : '再処理できませんでした。最新の記録を確認して、もう一度お試しください。')
       return false
     } finally { retryLock.current = false; if (mounted.current) setBusy(false) }
   }

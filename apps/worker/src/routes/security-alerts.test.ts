@@ -42,7 +42,7 @@ beforeEach(() => {
     INSERT INTO staff_account_scopes (staff_id,line_account_id,created_at) VALUES ('admin-a','a1','2026-10-16T00:00:00');
     INSERT INTO platform_admins (staff_id, is_active, activation_state) VALUES ('platform',1,'active')`);
 });
-afterEach(() => store.raw.close());
+afterEach(() => { stripeRead.mockReset(); store.raw.close(); });
 
 describe('security alert HTTP permissions and operator actions', () => {
   it('platform operators can inspect purged-tenant Stripe amount without exposing it to tenant staff', async () => {
@@ -170,6 +170,71 @@ describe('staging-only manual security sweep', () => {
 
 
 describe('billing review retry', () => {
+  it('二人が同時に再処理すると一人だけが処理し、成功監査は一件', async () => {
+    const {observeUncertainBillingEffects}=await import('../services/billing-external-review.js');
+    store.raw.exec(`UPDATE tenants SET stripe_customer_id='cus_concurrent' WHERE id='tenant-a';
+      INSERT INTO billing_events(id,type,tenant_id,summary,lease_until,external_effect_pending)
+      VALUES('evt_concurrent','fixture.ignored','tenant-a','pending','2020-01-01',1)`);
+    await observeUncertainBillingEffects(store.db,'2026-10-17T00:00:00Z');
+    const alert=store.raw.prepare("SELECT id,version FROM security_alerts WHERE rule_key='stripe_external_effect_review'").get() as {id:string;version:number};
+    let release!: () => void;
+    let started!: () => void;
+    const wait = new Promise<void>(resolve => {release=resolve});
+    const entered = new Promise<void>(resolve => {started=resolve});
+    stripeRead.mockImplementationOnce(async () => {started(); await wait; return {id:'evt_concurrent',type:'fixture.ignored',data:{object:{customer:'cus_concurrent'}}}});
+    store.raw.exec("INSERT INTO staff_members(id,name,role,api_key,tenant_id,account_scope) VALUES('platform-2','P2','owner','test-p2','tenant-a','all'); INSERT INTO platform_admins(staff_id,is_active,activation_state) VALUES('platform-2',1,'active')");
+    const operator={...member,id:'platform',role:'owner' as const};
+    const run=(id: string) => app({...operator,id}).request(`/api/ops/security-alerts/${alert.id}/retry-billing`,{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:alert.version}),
+    },{...bindings(),STRIPE_SECRET_KEY:'sk_test',STRIPE_BILLING_WEBHOOK_SECRET:'whsec_test'});
+    const first=run('platform');
+    await entered;
+    const review=await app({...operator,id:'platform-2'}).request(`/api/ops/security-alerts/${alert.id}/acknowledge`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:alert.version})},bindings());
+    expect(review.status).toBe(409);
+    const second=await run('platform-2');
+    expect(second.status).toBe(409);
+    expect(await second.json()).toMatchObject({error:'ほかの人が処理しています',code:'BILLING_RETRY_BUSY'});
+    release();
+    expect((await first).status).toBe(200);
+    expect(store.raw.prepare("SELECT count(*) AS n FROM audit_events WHERE action='security.alert.retry_billing'").get()).toEqual({n:1});
+    expect(stripeRead).toHaveBeenCalledTimes(1);
+  });
+  it('失敗した処理は借受を返し、次の人が再処理できる', async () => {
+    const {observeUncertainBillingEffects}=await import('../services/billing-external-review.js');
+    store.raw.exec(`UPDATE tenants SET stripe_customer_id='cus_recover' WHERE id='tenant-a';
+      INSERT INTO billing_events(id,type,tenant_id,summary,lease_until,external_effect_pending)
+      VALUES('evt_recover','fixture.ignored','tenant-a','pending','2020-01-01',1)`);
+    await observeUncertainBillingEffects(store.db,'2026-10-17T00:00:00Z');
+    const alert=store.raw.prepare("SELECT id,version FROM security_alerts WHERE rule_key='stripe_external_effect_review'").get() as {id:string;version:number};
+    stripeRead.mockRejectedValueOnce(new Error('Stripe unavailable')).mockResolvedValueOnce({id:'evt_recover',type:'fixture.ignored',data:{object:{customer:'cus_recover'}}});
+    const operator={...member,id:'platform',role:'owner' as const};
+    const run=() => app(operator).request(`/api/ops/security-alerts/${alert.id}/retry-billing`,{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:alert.version}),
+    },{...bindings(),STRIPE_SECRET_KEY:'sk_test',STRIPE_BILLING_WEBHOOK_SECRET:'whsec_test'});
+    expect((await run()).status).toBe(503);
+    expect(store.raw.prepare("SELECT billing_retry_token FROM security_alerts WHERE id=?").get(alert.id)).toEqual({billing_retry_token:null});
+    expect(store.raw.prepare("SELECT count(*) AS n FROM audit_events WHERE action='security.alert.retry_billing'").get()).toEqual({n:0});
+    expect((await run()).status).toBe(200);
+    expect(store.raw.prepare("SELECT count(*) AS n FROM audit_events WHERE action='security.alert.retry_billing'").get()).toEqual({n:1});
+  });
+  it('処理後に記録の確定が失敗しても完了済みの受付から回復する', async () => {
+    const {observeUncertainBillingEffects}=await import('../services/billing-external-review.js');
+    store.raw.exec(`INSERT INTO billing_events(id,type,tenant_id,summary,lease_until,external_effect_pending)
+      VALUES('evt_reconciled','fixture.ignored','tenant-a','pending','2020-01-01',1)`);
+    await observeUncertainBillingEffects(store.db,'2026-10-17T00:00:00Z');
+    const alert=store.raw.prepare("SELECT id,version FROM security_alerts WHERE rule_key='stripe_external_effect_review'").get() as {id:string;version:number};
+    store.raw.prepare("UPDATE billing_events SET summary=? WHERE id='evt_reconciled'").run(JSON.stringify({state:'completed'}));
+    store.raw.prepare("UPDATE security_alerts SET billing_retry_token='abandoned',billing_retry_until='2020-01-01T00:00:00.000Z' WHERE id=?").run(alert.id);
+    const operator={...member,id:'platform',role:'owner' as const};
+    const response=await app(operator).request(`/api/ops/security-alerts/${alert.id}/retry-billing`,{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:alert.version}),
+    },{...bindings(),STRIPE_BILLING_WEBHOOK_SECRET:'whsec_test'});
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({data:{status:'reconciled'}});
+    expect(stripeRead).not.toHaveBeenCalled();
+    expect(store.raw.prepare("SELECT action FROM audit_events WHERE target_id=?").all(alert.id)).toEqual([{action:'security.alert.retry_billing_reconciled'}]);
+    expect(store.raw.prepare("SELECT status FROM security_alerts WHERE id=?").get(alert.id)).toEqual({status:'resolved'});
+  });
   it('platform operator retrieves the event and retries it through the fenced handler', async () => {
     const {observeUncertainBillingEffects}=await import('../services/billing-external-review.js');
     store.raw.exec(`UPDATE tenants SET stripe_customer_id='cus_retry' WHERE id='tenant-a';
