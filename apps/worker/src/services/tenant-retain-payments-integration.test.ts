@@ -79,16 +79,26 @@ test('monthly contract and retained rights survive tenant purge while customer a
   const f=monthlyFixture();
   await monthlyContract(f,{classKind:'event',classId:'class'});
   monthlyCycle(f,{paid:true}); activateMonthly(f); monthlyRight(f,'event'); monthlyUse(f,'event');
+  monthlyCycle(f,{id:'renewal',month:'2026-12',kind:'renewal'});
+  f.raw.exec(`INSERT INTO booking_monthly_attempts(cycle_id,tenant_id,account_id,attempt_no,scheduled_at,payment_method_id,payment_method_version,request_key)
+      VALUES('renewal','t','a',0,'2026-11-01T00:00:00Z','pm_original',1,'attempt-key');
+    INSERT INTO booking_monthly_event_applications(source,connected_account,provider_event_id,receipt_id,payload_digest,contract_id,cycle_id,tenant_id,account_id,outcome,applied_at)
+      VALUES('fixture','acct_original','event-fixture','receipt-fixture','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','contract','cycle','t','a','paid','2026-11-01');
+    INSERT INTO booking_monthly_operations(id,contract_id,tenant_id,account_id,request_key,kind,actor_type,actor_id,expected_version,reason,request_json,created_at,updated_at)
+      VALUES('operation','contract','t','a','operation-key','stop_now','system','system',1,'fixture','{}','2026-11-01','2026-11-01');`);
+  expect(() => f.raw.exec("UPDATE booking_monthly_attempts SET payment_method_id='purged:renewal:0',version=version+1 WHERE cycle_id='renewal'")).toThrow('monthly_attempt_conflict');
+  expect(() => f.raw.exec("UPDATE booking_monthly_attempts SET payment_method_id='other',version=version+1 WHERE cycle_id='renewal'")).toThrow('monthly_attempt_conflict');
   f.raw.exec(`UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01' WHERE id='t';
     INSERT INTO booking_makeup_credits(id,line_account_id,friend_id,source_event_id,expires_at,reason,granted_by,created_at,rule_snapshot_json)
       VALUES('credit','a','f','class','2029-01-01','private reason','private actor','2026-01-01','{}');
     UPDATE event_booking_entitlement_uses SET makeup_credit_id='credit' WHERE event_booking_id_history='eb';`);
   const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
   expect(result.completed).toBe(1);
-  for (const table of ['booking_monthly_contracts','booking_monthly_cycles','booking_monthly_rights','booking_entitlements','event_booking_entitlement_uses']) {
+  for (const table of ['booking_monthly_contracts','booking_monthly_active_slots','booking_monthly_cycles','booking_monthly_attempts','booking_monthly_event_applications','booking_monthly_operations','booking_monthly_rights','booking_entitlements','event_booking_entitlement_uses']) {
     expect((f.raw.prepare(`SELECT count(*) AS n FROM ${table}`).get() as {n:number}).n,table).toBeGreaterThan(0);
   }
   expect(f.raw.prepare("SELECT customer_id,payment_method_id FROM booking_monthly_contracts WHERE id='contract'").get()).toEqual({customer_id:null,payment_method_id:null});
+  expect(f.raw.prepare("SELECT payment_method_id FROM booking_monthly_attempts WHERE cycle_id='renewal'").get()).toEqual({payment_method_id:'purged:renewal:0'});
   expect(f.raw.prepare("SELECT reason,granted_by FROM booking_makeup_credits WHERE id='credit'").get()).toEqual({reason:null,granted_by:'（削除済み）'});
   expect(f.raw.pragma('foreign_key_check')).toEqual([]);
 });
@@ -145,5 +155,57 @@ test('headquarters delivery and visit stamp records remain after purge', async (
   }
   expect(f.raw.prepare("SELECT line_account_id FROM hq_broadcast_targets WHERE run_id='hr'").get()).toEqual({line_account_id:'a'});
   expect(f.raw.prepare("SELECT amount FROM visit_stamp_checkouts WHERE visit_id='visit'").get()).toEqual({amount:100});
+  expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+});
+
+test('consent, operations and store agreement records remain after purge', async () => {
+  const f=gapFixture(); f.raw.pragma('foreign_keys=ON');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',purge_requested_at='2026-01-01' WHERE id='t';
+    INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES('org','a','fixture','t');
+    INSERT INTO rt_organization_agreements(id,organization_id,document_key,document_version) VALUES('agreement','org','terms','1');
+    INSERT INTO rt_inventory_rule_log(store_id,slot_id,starts_at,before_line,after_line,before_same_day,after_same_day,cause)
+      VALUES('store-history','slot-history','2026-01-01',1,0,1,0,'fixture');
+    INSERT INTO mileage_adjustment_approval_events(id,request_id_history,actor_staff_id,action) VALUES('mileage','request-history','o','requested');
+    INSERT INTO friend_delivery_consent_events(line_account_id,friend_id,purpose,operation) VALUES('a','f','fixture','insert');
+    INSERT INTO ec_auto_line_rule_events(account_id,request_key,kind,actor_id,request_json,response_json,created_at)
+      VALUES('a','rule-key','fixture','o','{}','{}','2026-01-01');
+    INSERT INTO security_alerts(id,tenant_id,scope_key,rule_key,observed_count,threshold_count,first_detected_at,last_detected_at,latest_event_at,notification_id)
+      VALUES('alert','t','fixture-scope','fixture',1,1,'2026-01-01','2026-01-01',1,'notification');`);
+  const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
+  expect(result.completed).toBe(1);
+  expect(f.raw.prepare("SELECT id FROM rt_organization_agreements WHERE id='agreement'").get()).toEqual({id:'agreement'});
+  expect(f.raw.prepare("SELECT id FROM mileage_adjustment_approval_events WHERE id='mileage'").get()).toEqual({id:'mileage'});
+  expect(f.raw.prepare("SELECT id FROM security_alerts WHERE id='alert'").get()).toEqual({id:'alert'});
+  expect(f.raw.prepare("SELECT count(*) AS n FROM rt_inventory_rule_log WHERE store_id='store-history'").get()).toEqual({n:1});
+  expect(f.raw.prepare("SELECT count(*) AS n FROM friend_delivery_consent_events WHERE purpose='fixture'").get()).toEqual({n:1});
+  expect(f.raw.prepare("SELECT count(*) AS n FROM ec_auto_line_rule_events WHERE request_key='rule-key'").get()).toEqual({n:1});
+  expect(f.raw.prepare("SELECT count(*) AS n FROM tenant_data_purge_audit WHERE tenant_id='t'").get()).toEqual({n:1});
+  expect(f.raw.pragma('foreign_key_check')).toEqual([]);
+});
+
+test('billing and application history remains while old Stripe identifiers are hashed and current billing is reset', async () => {
+  const f=gapFixture(); f.raw.pragma('foreign_keys=ON');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',purge_requested_at='2026-01-01',stripe_customer_id='cus_fixture',stripe_subscription_id='sub_fixture' WHERE id='t';
+    INSERT INTO registration_applications(id,company_name,contact_name,email,phone,referral_source,created_at,updated_at)
+      VALUES('application','fixture','fixture','fixture@example.test','000000','fixture','2026-01-01','2026-01-01');
+    INSERT INTO musubo_individual_quotes(id,application_id,tenant_id,revision,final_prices_json,customer_summary_json,expires_at,created_by,created_at)
+      VALUES('quote','application','t',1,'{}','{}','2029-01-01','o','2026-01-01');
+    INSERT INTO musubo_tenant_billing(tenant_id,application_id,quote_id,pricing_snapshot_json,billing_interval,status,core_subscription_id,created_at,updated_at)
+      VALUES('t','application','quote','{}','month','ended','sub_fixture','2026-01-01','2026-01-01');
+    INSERT INTO musubo_line_removals(id,tenant_id,line_account_id,status,effective_at,requested_at,updated_at)
+      VALUES('removal','t','a','ended','2026-01-01','2026-01-01','2026-01-01');
+    INSERT INTO musubo_pending_additions(id,tenant_id,line_account_id,kind,amount_due_yen,price_snapshot_json,expires_at,created_at,updated_at)
+      VALUES('addition','t','a','line',2000,'{}','2029-01-01','2026-01-01','2026-01-01');
+    INSERT INTO billing_invoices(id,tenant_id,stripe_customer_id,subscription_id,amount_paid,paid_at,synced_at,created_at)
+      VALUES('invoice','t','cus_fixture','sub_fixture',2000,'2026-01-01','2026-01-01','2026-01-01');
+    INSERT INTO billing_events(id,type,tenant_id,summary) VALUES('receipt','invoice.paid','t','{"subscriptionId":"sub_fixture","state":"completed"}');`);
+  const result=await processTenantDataPurge({DB:f.db,PURGED_PAYMENT_HMAC_SECRET:'test-only'},{now:'2027-05-01T00:00:00Z'});
+  expect(result.completed).toBe(1);
+  for (const [table,id] of [['registration_applications','application'],['musubo_individual_quotes','quote'],['musubo_line_removals','removal'],['musubo_pending_additions','addition'],['billing_invoices','invoice'],['billing_events','receipt']] as const) {
+    expect(f.raw.prepare(`SELECT id FROM ${table} WHERE id=?`).get(id),table).toEqual({id});
+  }
+  expect(f.raw.prepare("SELECT stripe_customer_id,subscription_id,amount_paid FROM billing_invoices WHERE id='invoice'").get()).toEqual({stripe_customer_id:null,subscription_id:null,amount_paid:2000});
+  expect(f.raw.prepare("SELECT core_subscription_id,status FROM musubo_tenant_billing WHERE tenant_id='t'").get()).toEqual({core_subscription_id:null,status:'ended'});
+  expect((f.raw.prepare("SELECT count(*) AS n FROM stripe_events WHERE tenant_id='t' AND review_reason='identifier_hash'").get() as {n:number}).n).toBe(2);
   expect(f.raw.pragma('foreign_key_check')).toEqual([]);
 });

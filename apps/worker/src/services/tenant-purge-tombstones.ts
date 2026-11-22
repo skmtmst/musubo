@@ -268,6 +268,9 @@ export async function anonymizeMonthlyContract(db: D1Database, tenantId: string,
     db.prepare(`UPDATE booking_monthly_contracts SET customer_id=NULL,
       request_json=json_remove(request_json,'$.friendId'),version=version+1
       WHERE ${scope}`).bind(contractId,tenantId),
+    db.prepare(`UPDATE booking_monthly_attempts SET payment_method_id='purged:'||cycle_id||':'||attempt_no,version=version+1
+      WHERE tenant_id=? AND cycle_id IN (SELECT id FROM booking_monthly_cycles WHERE contract_id=? AND tenant_id=?)
+        AND payment_method_id<>'purged:'||cycle_id||':'||attempt_no`).bind(tenantId,contractId,tenantId),
   ]);
 }
 

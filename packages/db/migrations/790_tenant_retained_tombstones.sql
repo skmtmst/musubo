@@ -37,3 +37,18 @@ CREATE TABLE tenant_purge_tombstone_progress (
 
 -- 外部操作の応答が未確定なら、借受期限が切れても purge を始めない。
 ALTER TABLE billing_events ADD COLUMN external_effect_pending INTEGER NOT NULL DEFAULT 0 CHECK (external_effect_pending IN (0,1));
+
+-- 終了済みの月謝履歴で決済手段の識別子だけを不可逆な固定値に置換する。
+DROP TRIGGER booking_monthly_attempt_identity;
+CREATE TRIGGER booking_monthly_attempt_identity BEFORE UPDATE ON booking_monthly_attempts WHEN
+ NEW.cycle_id IS NOT OLD.cycle_id OR NEW.tenant_id IS NOT OLD.tenant_id OR NEW.account_id IS NOT OLD.account_id
+ OR NEW.attempt_no IS NOT OLD.attempt_no OR NEW.scheduled_at IS NOT OLD.scheduled_at OR NEW.request_key IS NOT OLD.request_key
+ OR (NEW.payment_method_id IS NOT OLD.payment_method_id AND NOT (
+   NEW.payment_method_id='purged:'||OLD.cycle_id||':'||OLD.attempt_no
+   AND NEW.state IS OLD.state AND NEW.started_at IS OLD.started_at AND NEW.finished_at IS OLD.finished_at AND NEW.error_code IS OLD.error_code
+   AND EXISTS(SELECT 1 FROM line_accounts a JOIN tenants t ON t.id=a.tenant_id JOIN booking_monthly_cycles y ON y.id=OLD.cycle_id JOIN booking_monthly_contracts c ON c.id=y.contract_id
+     WHERE a.id=OLD.account_id AND a.tenant_id=OLD.tenant_id AND a.data_purged_at IS NOT NULL
+       AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL AND c.state IN ('stopped','expired'))))
+ OR NEW.payment_method_version IS NOT OLD.payment_method_version OR NEW.version!=OLD.version+1
+ OR OLD.state IN('succeeded','failed','canceled') AND NEW.state!=OLD.state
+BEGIN SELECT RAISE(ABORT,'monthly_attempt_conflict'); END;
