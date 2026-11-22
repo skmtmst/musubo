@@ -99,10 +99,12 @@ describe('契約者専用LINEの登録案内', () => {
     expect(document.body.textContent).toContain('通知専用LINEはまだ運営側で設定されていません')
   })
 
-  it('登録済みなら確認コードの代わりに登録済みと出す', async () => {
+  it('すでに連携済みなら登録完了から開く案内を自動で閉じる', async () => {
     registration = { available: true, accountName: 'musubo 運営（契約者専用）', basicId: null, addFriendUrl: 'https://line.me/R/ti/p/@musubo', linked: true, code: null, codeExpiresAt: null }
-    await act(async () => { root.render(<NoticeLineRegisterDialog open onClose={() => {}} />) })
+    const onClose = vi.fn()
+    await act(async () => { root.render(<NoticeLineRegisterDialog open onClose={onClose} />) })
     await flush()
-    expect(document.body.textContent).toContain('LINEとの連携が完了しています')
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
   })
 })
