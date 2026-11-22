@@ -52,6 +52,22 @@
       "email": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "code": {
+        "action": "unique",
+        "reason": "旧紹介コードを再利用できない値に置換"
+      },
+      "is_active": {
+        "action": "zero",
+        "reason": "紹介者の利用を停止"
+      },
+      "lifecycle_status": {
+        "action": "archive",
+        "reason": "紹介者を終了状態にする"
+      },
+      "operation_id": {
+        "action": "null",
+        "reason": "過去の操作識別子を消去"
       }
     }
   },

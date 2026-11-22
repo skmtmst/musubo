@@ -102,6 +102,8 @@ describe('288 affiliate account scope migration', () => {
 
   test('一覧・詳細・更新はテナントとLINEアカウントを越えない', async () => {
     execSafe(db, readFileSync(join(MIGRATIONS, '288_affiliate_account_scope.sql'), 'utf8'));
+    // 現行の読取処理が参照する、後年の purge 状態だけを補う。
+    db.exec('ALTER TABLE tenants ADD COLUMN purge_started_at TEXT; ALTER TABLE tenants ADD COLUMN data_purged_at TEXT; CREATE TABLE tenant_purge_tombstone_progress (tenant_id TEXT,table_name TEXT,row_id TEXT)');
     const d1 = asD1(db);
     const ownScope = {
       tenantId: DEFAULT_TENANT_ID,

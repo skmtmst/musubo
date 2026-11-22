@@ -75,6 +75,30 @@
         "notNull": false,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "code",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "is_active",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "lifecycle_status",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "operation_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"

@@ -260,3 +260,20 @@ test('former staff are disabled and hidden even if the tenant resumes', async ()
   expect(await getStaffByApiKey(f.db,'owner-key')).toBeNull();
   expect(await getStaffMembers(f.db,'t')).toEqual([]);
 });
+
+test('old affiliate codes cannot be used or listed after tenant resumption', async () => {
+  const {getAffiliates,getAffiliateByCode,getAffiliateById}=await import('@line-crm/db');
+  const f=gapFixture(); f.raw.pragma('foreign_keys=ON');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',purge_requested_at='2026-01-01' WHERE id='t';
+    INSERT INTO affiliates(id,tenant_id,line_account_id,friend_id,name,code,email)
+      VALUES('affiliate','t','a','f','private-name','private-code','private@example.test');`);
+  expect(await getAffiliateByCode(f.db,'private-code')).toBeTruthy();
+  const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
+  expect(result.completed).toBe(1);
+  expect(f.raw.prepare("SELECT is_active,lifecycle_status,email FROM affiliates WHERE id='affiliate'").get()).toEqual({is_active:0,lifecycle_status:'archived',email:null});
+  f.raw.exec("UPDATE tenants SET data_purged_at=NULL,plan_status='active' WHERE id='t'");
+  expect(await getAffiliateByCode(f.db,'private-code')).toBeNull();
+  expect(await getAffiliateByCode(f.db,'purged:affiliates:code:affiliate')).toBeNull();
+  expect(await getAffiliateById(f.db,'affiliate')).toBeNull();
+  expect(await getAffiliates(f.db,{tenantId:'t',allowedLineAccountIds:['a']})).toEqual([]);
+});
