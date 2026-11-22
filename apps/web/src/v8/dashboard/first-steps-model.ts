@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { canManageRole } from '@/lib/staff-role'
+import { api } from '@/lib/api'
 import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
 import { doneCount, stepsForStyle, type StepResult, type StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
 import { useStyleSetupProgress } from '@/v8/onboarding/public/style-setup-progress/index'
@@ -59,10 +60,9 @@ export function waitingForFirstMessage(steps: ReadonlyArray<StepResult>): boolea
 }
 
 /**
- * 最初の1通が、この画面で見ている間に「まだ」から「済み」に変わったか。
- * 開いた時にもう済みだった人・別のアカウントへ移った直後は数えない（後から来た人には出さない）。
+ * 最初の1通を見ている間に受け取った時と、見ていない間に済んで未通知の時に知らせる。
  */
-export function useFirstMessageArrived(accountId: string | null, steps: ReadonlyArray<StepResult>, ready: boolean) {
+export function useFirstMessageArrived(accountId: string | null, steps: ReadonlyArray<StepResult>, ready: boolean, firstRun?: { doneSeenAt: string | null; doneSeenTracked: boolean } | null) {
   const seen = useRef<{ accountId: string | null; state: StepResult['state'] | null }>({ accountId: null, state: null })
   const [arrived, setArrived] = useState(false)
   useEffect(() => {
@@ -73,6 +73,8 @@ export function useFirstMessageArrived(accountId: string | null, steps: Readonly
     if (before.accountId === accountId && before.state === 'todo' && state === 'done') setArrived(true)
   }, [accountId, steps, ready])
   useEffect(() => { setArrived(false) }, [accountId])
+  const missedNotice = ready && firstRun?.doneSeenTracked === true && firstRun.doneSeenAt === null && steps.find(step => step.key === 'firstMessage')?.state === 'done'
+  useEffect(() => { if (missedNotice) setArrived(true) }, [missedNotice, accountId])
   return { arrived, dismiss: useCallback(() => setArrived(false), []) }
 }
 
@@ -88,7 +90,13 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
   /* 待つ帯（はじめにやること）が開いて見えている間だけ、最初の1通を待って読み直す。 */
   const visibleWaiting = canManageRole(role) && state.status === 'ready' && !folded && waitingForFirstMessage(state.steps)
   useEffect(() => { setWaiting(visibleWaiting) }, [visibleWaiting])
-  const done = useFirstMessageArrived(accountId, state.steps, state.status === 'ready')
+  const done = useFirstMessageArrived(accountId, state.steps, state.status === 'ready', state.firstRun)
+  const recorded = useRef<string | null>(null)
+  useEffect(() => {
+    if (!canManageRole(role) || !done.arrived || !accountId || !state.firstRun?.doneSeenTracked || recorded.current === accountId) return
+    recorded.current = accountId
+    void api.gettingStarted.markFirstRunDoneSeen(accountId).catch(() => { recorded.current = null })
+  }, [role, done.arrived, accountId, state.firstRun?.doneSeenTracked])
   /*
     ガイドの持ち主は全画面で1つ（GuideHost）。貸してもらえる時はそれを使い、
     同じ状態を2つの持ち主がサーバーへ書かないように自前の持ち主は動かさない。

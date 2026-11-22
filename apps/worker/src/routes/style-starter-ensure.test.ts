@@ -327,6 +327,7 @@ describe('はじめにやることの読む口', () => {
         ('m-first','owner-phone','outgoing','text','ようこそ','friend_add_routing','a','2026-10-15T10:06:01.000+09:00');`);
     const r = await request('/api/getting-started?account_id=a');
     expect(r.body.data.firstRun).toEqual({
+      doneSeenAt: null, doneSeenTracked: true,
       startedAt: '2026-10-15T10:00:00.000+09:00',
       styleAt: '2026-10-15T10:02:00.000+09:00',
       starterAt: '2026-10-15T10:02:00.000+09:00',
@@ -336,5 +337,25 @@ describe('はじめにやることの読む口', () => {
     });
     const steps = r.body.data.steps.find((s: any) => s.key === 'firstMessage');
     expect(steps.state).toBe('done');
+  });
+});
+
+describe('最初の1通の完了表示', () => {
+  test('選択アカウントごとに一度だけ表示済みを保存する', async () => {
+    const missing = await request('/api/getting-started?account_id=a');
+    expect(missing.body.data.firstRun).toMatchObject({ doneSeenAt: null, doneSeenTracked: false });
+    expect((await request('/api/getting-started/first-run-done-seen?account_id=a', 'POST')).body.data).toEqual({ doneSeenAt: null, tracked: false });
+    expect(count('account_styles')).toBe(0);
+    await initializeAccountStyle(sql.db, 'a', 't', 'owner');
+    expect((await request('/api/getting-started?account_id=a')).body.data.firstRun).toMatchObject({ doneSeenAt: null, doneSeenTracked: true });
+    const first = await request('/api/getting-started/first-run-done-seen?account_id=a', 'POST');
+    expect(first.status).toBe(200);
+    expect(first.body.data.doneSeenAt).toBeTruthy();
+    expect(first.body.data.tracked).toBe(true);
+    sql.raw.prepare('UPDATE account_styles SET first_run_done_seen_at=? WHERE line_account_id=?').run('2026-01-01T10:00:00.000', 'a');
+    const again = await request('/api/getting-started/first-run-done-seen?account_id=a', 'POST');
+    expect(again.body.data.doneSeenAt).toBe('2026-01-01T10:00:00.000+09:00');
+    expect((await request('/api/getting-started?account_id=a')).body.data.firstRun.doneSeenAt).toBe(again.body.data.doneSeenAt);
+    expect((await request('/api/getting-started/first-run-done-seen?account_id=b', 'POST')).status).toBe(404);
   });
 });
