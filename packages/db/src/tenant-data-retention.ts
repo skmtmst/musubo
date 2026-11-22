@@ -136,8 +136,9 @@ export async function markTenantDataPurged(
   now: string = jstNow(),
 ): Promise<void> {
   await db
-    .prepare('UPDATE tenants SET data_purged_at = ?, purge_started_at = NULL, updated_at = ? WHERE id = ?')
-    .bind(now, now, tenantId)
+    .prepare(`UPDATE tenants SET billing_epoch=billing_epoch+CASE WHEN data_purged_at IS NULL THEN 1 ELSE 0 END,
+      last_purged_at=COALESCE(data_purged_at,?), data_purged_at=COALESCE(data_purged_at,?), purge_started_at=NULL, updated_at=? WHERE id=?`)
+    .bind(now, now, now, tenantId)
     .run();
 }
 

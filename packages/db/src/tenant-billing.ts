@@ -17,10 +17,12 @@ export interface TenantBilling {
   stripe_subscription_id: string | null;
   current_period_ends_at: string | null;
   plan_updated_at: string | null;
+  billing_epoch: number;
+  last_purged_at: string | null;
 }
 
 const COLUMNS =
-  'id, name, plan_key, plan_status, trial_ends_at, stripe_customer_id, stripe_subscription_id, current_period_ends_at, plan_updated_at';
+  'id, name, plan_key, plan_status, trial_ends_at, stripe_customer_id, stripe_subscription_id, current_period_ends_at, plan_updated_at, billing_epoch, last_purged_at';
 
 export async function getTenantBilling(db: D1Database, tenantId: string): Promise<TenantBilling | null> {
   return db.prepare(`SELECT ${COLUMNS} FROM tenants WHERE id = ?`).bind(tenantId).first<TenantBilling>();
@@ -41,7 +43,7 @@ export async function getTenantBillingByLineAccount(
     .prepare(
       `SELECT t.id, t.name, t.plan_key, t.plan_status, t.trial_ends_at,
               t.stripe_customer_id, t.stripe_subscription_id,
-              t.current_period_ends_at, t.plan_updated_at
+              t.current_period_ends_at, t.plan_updated_at, t.billing_epoch, t.last_purged_at
          FROM line_accounts la
          LEFT JOIN tenants t ON t.id = la.tenant_id
         WHERE la.id = ?`,

@@ -2,7 +2,17 @@ import { expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { activateLineAccount, createLineAccount, upsertFriend, getLineAccountById, getFriendById, getBroadcasts, getBroadcastById, updateTenantBilling, markTenantDataPurged, getStripeEvents } from '@line-crm/db';
 import { gapFixture } from '../test-utils/gap1.js';
+import { stripeApi } from './stripe-api.js';
 import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan, claimTenantPurge, claimBillingEventLease, completeBillingEventLease, releaseBillingEventLease, recordPurgedTenantStripeEvent, deferPurgedBillingEvent, deferStaleBillingReceipts } from './tenant-purge-tombstones.js';
+
+test('new checkout carries the billing epoch on checkout and subscription', async () => {
+  let body='';
+  const fakeFetch: typeof fetch = async (_url,init) => {body=String(init?.body);return new Response('{}',{status:200});};
+  await stripeApi.createCheckoutSession({STRIPE_SECRET_KEY:'sk_test_only'}, {customerId:'cus_test',priceId:'price_test',tenantId:'t',planKey:'light',successUrl:'https://example.test/ok',cancelUrl:'https://example.test/no',billingEpoch:2}, fakeFetch);
+  const form=new URLSearchParams(body);
+  expect(form.get('metadata[billing_epoch]')).toBe('2');
+  expect(form.get('subscription_data[metadata][billing_epoch]')).toBe('2');
+});
 
 test('expired and unleased billing receipts become review items, active leases are left alone', async () => {
   const f=gapFixture();
@@ -74,6 +84,8 @@ test('purge claim and reactivation are mutually exclusive', async () => {
   expect(first.raw.prepare("SELECT plan_status FROM tenants WHERE id='t'").get()).toEqual({plan_status:'canceled'});
   expect(await tombstoneLineAccount(first.db, 't', 'a', now)).toBe(true);
   await markTenantDataPurged(first.db, 't', now);
+  await markTenantDataPurged(first.db, 't', now);
+  expect(first.raw.prepare("SELECT billing_epoch,last_purged_at FROM tenants WHERE id='t'").get()).toEqual({billing_epoch:1,last_purged_at:now});
   await updateTenantBilling(first.db, 't', {plan_status:'active'});
   expect(await getLineAccountById(first.db, 'a')).toBeNull();
   const replacement = await createLineAccount(first.db, {channelId:'ch',name:'新しいアカウント',channelAccessToken:'token',channelSecret:'secret',tenantId:'t'}, Buffer.alloc(32).toString('base64'));

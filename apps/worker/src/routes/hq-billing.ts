@@ -487,6 +487,7 @@ hqBilling.post('/api/hq/billing/checkout', requireRole('owner', 'admin'), inputJ
       priceId,
       tenantId,
       planKey: plan.key,
+      billingEpoch: billing.billing_epoch,
       successUrl: `${origin}/hq/billing?checkout=success`,
       cancelUrl: `${origin}/hq/billing?checkout=cancel`,
     });

@@ -393,7 +393,7 @@ export const stripeApi = {
 
   createCheckoutSession: (
     env: StripeEnv,
-    input: { customerId: string; priceId: string; tenantId: string; planKey: string; successUrl: string; cancelUrl: string },
+    input: { customerId: string; priceId: string; tenantId: string; planKey: string; successUrl: string; cancelUrl: string; billingEpoch: number },
     fetchImpl?: typeof fetch,
   ) =>
     stripeRequest<StripeCheckoutSession>(env, 'POST', '/v1/checkout/sessions', {
@@ -405,8 +405,8 @@ export const stripeApi = {
       cancel_url: input.cancelUrl,
       allow_promotion_codes: true,
       locale: 'ja',
-      metadata: { tenant_id: input.tenantId, plan_key: input.planKey },
-      subscription_data: { metadata: { tenant_id: input.tenantId, plan_key: input.planKey } },
+      metadata: { tenant_id: input.tenantId, plan_key: input.planKey, billing_epoch: String(input.billingEpoch) },
+      subscription_data: { metadata: { tenant_id: input.tenantId, plan_key: input.planKey, billing_epoch: String(input.billingEpoch) } },
     }, { fetchImpl }),
 
   /** Card collection without a charge or a subscription. The webhook must verify the SetupIntent. */
