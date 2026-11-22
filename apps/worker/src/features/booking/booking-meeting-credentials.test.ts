@@ -1,4 +1,4 @@
-import {afterEach,beforeEach,expect,it} from 'vitest';
+import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {beginMeetingAuthorization,consumeMeetingAuthorization} from './booking-meeting-oauth-state.js';
 import {gapFixture} from '../../test-utils/gap1.js';
 import {finishAuthorizedMeetingConnection,hasMeetingCredential,deleteMeetingCredential,claimMeetingRefresh,finishMeetingRefresh} from './booking-meeting-credentials.js';
@@ -12,6 +12,33 @@ async function connect(value:typeof input){
  expect(await finishAuthorizedMeetingConnection(d.db,{...value,provider:value.credential.provider,state})).toBe(true);
 }
 beforeEach(()=>{d=gapFixture()});afterEach(()=>d.raw.close());
+it('切断の版を読んだ後に再接続された場合、新しい鍵を削除しない',async()=>{
+ await connect(input);
+ const previous=d.raw.prepare("SELECT id FROM booking_meeting_connections WHERE line_account_id='a'").get() as {id:string};
+ const batch=d.db.batch.bind(d.db);
+ const spy=vi.spyOn(d.db,'batch').mockImplementationOnce(async statements=>{
+  d.raw.prepare("UPDATE booking_meeting_connections SET version=version+1,credential_enc='new-key' WHERE line_account_id='a' AND staff_id='bs' AND provider='zoom'").run();
+  return batch(statements);
+ });
+ expect(await deleteMeetingCredential(d.db,{accountId:'a',staffId:'bs',provider:'zoom',externalManualReview:true})).toBe(false);
+ expect(d.raw.prepare("SELECT id,credential_enc FROM booking_meeting_connections WHERE line_account_id='a'").get()).toEqual({id:previous.id,credential_enc:'new-key'});
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE event_type='booking_meeting_disconnect_review'").get()).toEqual({n:0});
+ spy.mockRestore();
+});
+it('鍵の更新中は切断しない',async()=>{
+ await connect(input);
+ const claim=await claimMeetingRefresh(d.db,{accountId:'a',staffId:'bs',provider:'zoom',encryptionKey:key});expect(claim).not.toBeNull();
+ expect(await deleteMeetingCredential(d.db,{accountId:'a',staffId:'bs',provider:'zoom'})).toBe(false);
+ expect(d.raw.prepare("SELECT refresh_state FROM booking_meeting_connections WHERE line_account_id='a'").get()).toEqual({refresh_state:'refreshing'});
+});
+it('中断して時間のたった更新は確認待ちに戻して切断できる',async()=>{
+ await connect(input);
+ expect(await claimMeetingRefresh(d.db,{accountId:'a',staffId:'bs',provider:'zoom',encryptionKey:key})).not.toBeNull();
+ d.raw.prepare("UPDATE booking_meeting_connections SET updated_at='2020-01-01T00:00:00.000Z' WHERE line_account_id='a'").run();
+ expect(await deleteMeetingCredential(d.db,{accountId:'a',staffId:'bs',provider:'zoom',externalManualReview:true})).toBe(true);
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM booking_meeting_connections WHERE line_account_id='a'").get()).toEqual({n:0});
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE event_type='booking_meeting_disconnect_review'").get()).toEqual({n:1});
+});
 it('鍵を暗号化して担当と店の範囲で読み取り、切断時に消す',async()=>{
  await connect(input);
  const rows=d.raw.prepare("SELECT credential_enc AS value FROM booking_meeting_connections WHERE line_account_id='a'").all() as {value:string}[];
@@ -27,13 +54,14 @@ it('別の店の担当には保存せず、暗号鍵が違えば復号しない'
  await expect(claimMeetingRefresh(d.db,{accountId:'a',staffId:'bs',provider:'zoom',encryptionKey:btoa('y'.repeat(32))})).rejects.toThrow();
 });
 
-it('更新中の切断は鍵を復活させず、同時更新は一つだけ通る',async()=>{
+it('同時更新は一つだけ通り、更新中の切断は更新後にやり直せる',async()=>{
  await connect(input);
  const scope={accountId:'a',staffId:'bs',provider:'zoom' as const,encryptionKey:key};
  const [a,b]=await Promise.all([claimMeetingRefresh(d.db,scope),claimMeetingRefresh(d.db,scope)]);
  const claimed=a??b;expect(Boolean(a)!==Boolean(b)).toBe(true);expect(claimed).not.toBeNull();
- await deleteMeetingCredential(d.db,scope);
- expect(await finishMeetingRefresh(d.db,{id:claimed!.id,claim:claimed!.claim,version:claimed!.version,credential,encryptionKey:key})).toBe(false);
+ expect(await deleteMeetingCredential(d.db,scope)).toBe(false);
+ expect(await finishMeetingRefresh(d.db,{id:claimed!.id,claim:claimed!.claim,version:claimed!.version,credential,encryptionKey:key})).toBe(true);
+ expect(await deleteMeetingCredential(d.db,scope)).toBe(true);
  expect(await hasMeetingCredential(d.db,scope)).toBe(false);
 });
 it('担当者を削除すると暗号化された鍵も削除する',async()=>{

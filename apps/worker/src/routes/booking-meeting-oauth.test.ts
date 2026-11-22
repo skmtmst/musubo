@@ -54,6 +54,20 @@ it.each(['teams','outlook'] as const)('Microsoft の %s を切断すると鍵を
  expect(d.raw.prepare("SELECT body FROM notifications WHERE event_type='booking_meeting_disconnect_review' AND line_account_id='a'").get()).toMatchObject({body:expect.stringContaining('Microsoft 側でアプリの接続を解除してください')});
  expect(fetcher).not.toHaveBeenCalled();
 });
+it.each(['google_meet','zoom'] as const)('%s を切断すると鍵を消し、外部での解除状態を確認するよう知らせる',async provider=>{
+ d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('c','a','bs',?,'cipher','o','2026-01-01','2026-01-01')").run(provider);
+ const app=gapApp(d,[bookingMeetingOAuth]);
+ expect((await gapCall(app,`/api/booking/admin/staff/bs/connections/${provider}?account_id=a`,'DELETE')).status).toBe(200);
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM booking_meeting_connections WHERE id='c'").get()).toEqual({n:0});
+ expect(d.raw.prepare("SELECT body FROM notifications WHERE event_type='booking_meeting_disconnect_review' AND line_account_id='a'").get()).toMatchObject({body:expect.stringContaining('他の連携がないか確認')});
+});
+it('更新処理中の切断は 409 を返して鍵を残す',async()=>{
+ const now=new Date().toISOString();
+ d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at,refresh_state,refresh_claim) VALUES('c','a','bs','zoom','cipher','o',?,?,'refreshing','claim')").run(now,now);
+ const result=await gapCall(gapApp(d,[bookingMeetingOAuth]),'/api/booking/admin/staff/bs/connections/zoom?account_id=a','DELETE');
+ expect(result.status).toBe(409);
+ expect(d.raw.prepare("SELECT credential_enc FROM booking_meeting_connections WHERE id='c'").get()).toEqual({credential_enc:'cipher'});
+});
 it('Google の読み込み中は試験対象外の Outlook 接続を始めない',async()=>{
  d.raw.exec("INSERT INTO booking_calendar_switches(line_account_id,scope_id,read_enabled,updated_by,updated_at) VALUES('a','bs',1,'o','2026-01-01')");
  const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);

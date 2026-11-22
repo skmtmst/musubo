@@ -61,15 +61,30 @@ export async function failMeetingRefresh(db:D1Database,input:{id:string;claim:st
  const r=await db.prepare(`UPDATE booking_meeting_connections SET refresh_state='unknown',refresh_claim=NULL,version=version+1,updated_at=?
  WHERE id=? AND version=? AND refresh_state='refreshing' AND refresh_claim=?`).bind(new Date().toISOString(),input.id,input.version,input.claim).run();return r.meta.changes===1;
 }
-export async function deleteMeetingCredential(db:D1Database,input:Scope & {microsoftManualReview?:boolean}):Promise<void>{
- await db.batch([
+export async function deleteMeetingCredential(db:D1Database,input:Scope & {microsoftManualReview?:boolean;externalManualReview?:boolean}):Promise<boolean>{
+ await recoverStaleMeetingRefresh(db,input);
+ const snapshot=await db.prepare('SELECT id,version,refresh_state FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=?').bind(input.accountId,input.staffId,input.provider).first<{id:string;version:number;refresh_state:string}>();
+ if(!snapshot){
+  await db.prepare(`DELETE FROM booking_meeting_oauth_states WHERE line_account_id=? AND staff_id=? AND provider=?
+   AND NOT EXISTS(SELECT 1 FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=?)`)
+   .bind(input.accountId,input.staffId,input.provider,input.accountId,input.staffId,input.provider).run();
+  return !(await db.prepare('SELECT id FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=?').bind(input.accountId,input.staffId,input.provider).first());
+ }
+ if(snapshot.refresh_state==='refreshing')return false;
+ const operations=await db.batch([
   ...(input.microsoftManualReview?[db.prepare(`INSERT INTO notifications(id,event_type,title,body,channel,status,metadata,line_account_id,category)
    SELECT ?,'booking_meeting_disconnect_review','Microsoft の接続解除を確認してください','Microsoft 側でアプリの接続を解除してください。Microsoft アカウントの「アプリとサービス」から対象アプリを削除します。他の接続にも影響する場合は、先に確認してください。','dashboard','sent',?,line_account_id,'error'
-   FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=?`)
-   .bind(crypto.randomUUID(),JSON.stringify({staffId:input.staffId,provider:input.provider}),input.accountId,input.staffId,input.provider)]:[]),
-  db.prepare('DELETE FROM booking_meeting_oauth_states WHERE line_account_id=? AND staff_id=? AND provider=?').bind(input.accountId,input.staffId,input.provider),
-  db.prepare('DELETE FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=?').bind(input.accountId,input.staffId,input.provider),
+   FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=? AND id=? AND version=? AND refresh_state<>'refreshing'`)
+   .bind(crypto.randomUUID(),JSON.stringify({staffId:input.staffId,provider:input.provider}),input.accountId,input.staffId,input.provider,snapshot.id,snapshot.version)]:[]),
+  ...(input.externalManualReview?[db.prepare(`INSERT INTO notifications(id,event_type,title,body,channel,status,metadata,line_account_id,category)
+   SELECT ?,'booking_meeting_disconnect_review','外部サービスの接続解除を確認してください',?,'dashboard','sent',?,line_account_id,'error'
+   FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=? AND id=? AND version=? AND refresh_state<>'refreshing'`)
+   .bind(crypto.randomUUID(),`${input.provider==='zoom'?'Zoom':'Google'} 側の接続解除を確認してください。同じアカウントを使う他の連携がないか確認してください。`,JSON.stringify({staffId:input.staffId,provider:input.provider}),input.accountId,input.staffId,input.provider,snapshot.id,snapshot.version)]:[]),
+  db.prepare(`DELETE FROM booking_meeting_oauth_states WHERE line_account_id=? AND staff_id=? AND provider=?
+   AND EXISTS(SELECT 1 FROM booking_meeting_connections WHERE id=? AND version=? AND line_account_id=? AND staff_id=? AND provider=? AND refresh_state<>'refreshing')`).bind(input.accountId,input.staffId,input.provider,snapshot.id,snapshot.version,input.accountId,input.staffId,input.provider),
+  db.prepare("DELETE FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=? AND id=? AND version=? AND refresh_state<>'refreshing'").bind(input.accountId,input.staffId,input.provider,snapshot.id,snapshot.version),
  ]);
+ return operations[operations.length-1].meta.changes===1;
 }
 
 /** 認可を待つ間に切断された場合、古いコールバックは接続を復活させない。 */

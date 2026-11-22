@@ -74,7 +74,7 @@ bookingMeetingOAuth.post(base+'/connect',async c=>{
 });
 bookingMeetingOAuth.delete(base,async c=>{
  gapWrite(c);const accountId=await gapAccount(c),staffId=c.req.param('id')!,provider=providerOf(c.req.param('provider')!);await staffTarget(c,accountId,staffId,true);
- await deleteMeetingCredential(c.env.DB,{accountId,staffId,provider,microsoftManualReview:provider==='teams'||provider==='outlook'});
+ if(!await deleteMeetingCredential(c.env.DB,{accountId,staffId,provider,microsoftManualReview:provider==='teams'||provider==='outlook',externalManualReview:provider==='google_meet'||provider==='zoom'}))throw new GapError('meeting_connection_changed',409);
  if(provider==='outlook')await c.env.DB.prepare("UPDATE booking_calendar_read_health SET error_code=NULL,failed_since=NULL WHERE line_account_id=? AND staff_id=? AND error_code LIKE 'outlook_%'").bind(accountId,staffId).run();
  auditLog(c,'booking.meeting.disconnect',{id:staffId,kind:provider},{lineAccountId:accountId});
  return c.json({success:true,data:{disconnected:true}});
