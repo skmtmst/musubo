@@ -928,7 +928,7 @@ const DATE_FIELD = {
   type: 'date',
 };
 
-describe('値の型検証（N-042 単票）', () => {
+describe('友だち情報の個別更新は値の型を検証して保存する', () => {
   it('数値項目に文字列は422で何も保存しない', async () => {
     mocks.getFriendFields.mockResolvedValue([NUMBER_FIELD]);
     const res = await req(makeApp(), '/api/friends/f-1/fields', 'PUT', {
@@ -1037,7 +1037,7 @@ describe('値の型検証（N-042 単票）', () => {
   });
 });
 
-describe('値の型検証（N-042 一括）', () => {
+describe('友だち情報の一括更新は値の型と所属を検証する', () => {
   const bulk = (fieldId: string, value: unknown) => ({
     lineAccountId: 'account-1',
     friendIds: ['f-1', 'f-2'],
@@ -1097,7 +1097,7 @@ describe('値の型検証（N-042 一括）', () => {
   });
 });
 
-describe('個人情報の個別権限（N-045）', () => {
+describe('個人情報の閲覧と更新はそれぞれの権限を確認する', () => {
   const personal = { ...FIELD, id: 'ff-2', name: '電話番号', field_key: 'phone', is_personal: 1, value: '090' };
 
   it('view キーを持つ staff は個人情報を読め、見たことが記録される', async () => {
@@ -1226,7 +1226,7 @@ describe('個人情報の個別権限（N-045）', () => {
   });
 });
 
-describe('項目の並び替え（#1014 ATTR-02/03/04）', () => {
+describe('友だち情報の並び替えはアカウントと権限を確認して保存する', () => {
   it('並び替えは1回の呼び出しでまとめて保存される', async () => {
     const res = await req(makeApp(), '/api/friend-fields/reorder?lineAccountId=account-1', 'PATCH', { ids: ['ff-2', 'ff-1'] });
     expect(res.status).toBe(200);

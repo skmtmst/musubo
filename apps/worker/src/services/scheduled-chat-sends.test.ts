@@ -150,7 +150,7 @@ describe('送信予約の重複登録の拒否(#977)', () => {
   });
 });
 
-describe('送信予約のdispatcher(N-025)', () => {
+describe('期限の来た送信予約を処理し失敗や再試行を記録する', () => {
   test('停止中に期限を過ぎた予約は未送信のまま取消し、復帰後も自動送信しない', async () => {
     await schedule({ id: 's-stopped', key: '00000000-2222-4333-8444-555555555555', at: '2026-01-09T23:00:00.000Z' });
     sqlite.raw.prepare(`UPDATE tenants SET status = 'suspended' WHERE id = 'tenant-1'`).run();

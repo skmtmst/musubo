@@ -870,7 +870,7 @@ describe('回答を配る', () => {
   });
 });
 
-describe('N-042 型検証の接続(#702)', () => {
+describe('フォーム回答や回答後動作を保存先の型に合わせて検証する', () => {
   const numberField = (id: string) => ({ id, ec_is_master: 0, type: 'number', options_json: null });
 
   test('F2 数値項目へ文字の回答は保存せず失敗に数える', async () => {
