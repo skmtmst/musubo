@@ -1,6 +1,2 @@
 ## 追加
-<<<<<<<< HEAD:docs/release-log/unreleased/1832-kenta-release-summary.md
-- 更新履歴を、検証への配備1回ごと（記録が無い所は日ごと）に分けて、追加・変更・修正の数、日時、「最新」の印、人が書く3行のまとめを出せる下ごしらえをした @kenta #1832 2026-10-26 00:15
-========
 - 更新履歴を、検証への配備1回ごと（記録が無い所は日ごと）に分けて、追加・変更・修正の数、日時、「最新」の印、人が書く3行のまとめを出せる下ごしらえをした @kenta #1834 2026-10-26 00:15
->>>>>>>> origin/codex/development:docs/release-log/unreleased/1834-kenta-release-summary.md
