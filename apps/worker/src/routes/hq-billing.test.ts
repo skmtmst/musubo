@@ -471,6 +471,22 @@ describe('課金 Webhook', () => {
     expect((await webhook(event,{env:{PURGED_PAYMENT_HMAC_PREVIOUS_SECRETS:'{invalid'}})).status).toBe(200);
   });
 
+  it('欠けた旧鍵で照合待ちにした通知は他の通知の処理を止めない', async () => {
+    setTenant({plan_status:'active',stripe_customer_id:'cus_current'});
+    testDb.raw.exec("INSERT INTO tenants(id,name) VALUES ('retired-tenant','Retired')");
+    const secret='old-purge-key';
+    const digest=(await hashPurgedPaymentIdentifier(secret,'customer','cus_old'))!;
+    const keyVersion=(await purgedPaymentIdentifierKeyVersion(secret))!;
+    await storePurgedPaymentIdentifierHash(testDb.db,{tenantId:'retired-tenant',kind:'customer',digest,keyVersion,now:'2026-01-01T00:00:00Z',expiresAt:'2040-01-01T00:00:00Z'});
+    const event=(id:string,customer?:string)=>({id,type:'fixture.ignored',data:{object:customer ? {customer} : {id:'obj_no_customer'}}});
+    expect((await webhook(event('evt_hold','cus_old'))).status).toBe(503);
+    expect((await webhook(event('evt_active','cus_current'))).status).toBe(200);
+    expect((await webhook(event('evt_no_id'))).status).toBe(200);
+    expect(testDb.raw.prepare("SELECT id FROM billing_events WHERE summary='pending' ORDER BY id").all()).toEqual([{id:'evt_hold'}]);
+    expect((await webhook(event('evt_hold','cus_old'),{env:{PURGED_PAYMENT_HMAC_SECRET:secret}})).status).toBe(200);
+    expect(testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_hold'").get()).toEqual({summary:'purge_review'});
+  });
+
   it('旧鍵がない場合は課金通知を適用せず安全監視へ出す', async () => {
     setTenant({plan_status:'active',stripe_customer_id:'cus_new'});
     const secret='test-purge-hmac';
