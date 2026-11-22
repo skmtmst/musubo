@@ -32,6 +32,7 @@ export interface CommonVarUsageImpact {
 }
 
 export interface CommonVarUsageItem {
+  source_table: string;
   kind: CommonVarUsageKind;
   source_id: string;
   source_parent_id: string | null;
