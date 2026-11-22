@@ -18,6 +18,12 @@
         "notNull": true,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "actor_id",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"
@@ -174,6 +180,12 @@
         "notNull": false,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "granted_by",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"
@@ -217,6 +229,12 @@
       },
       {
         "column": "request_json",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "created_by",
         "notNull": true,
         "key": false,
         "foreignKey": false
@@ -279,6 +297,30 @@
         "notNull": false,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "staff_id",
+        "notNull": true,
+        "key": true,
+        "foreignKey": true
+      },
+      {
+        "column": "decided_by_staff_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "created_by_staff_id",
+        "notNull": false,
+        "key": true,
+        "foreignKey": true
+      },
+      {
+        "column": "updated_by_staff_id",
+        "notNull": false,
+        "key": true,
+        "foreignKey": true
       }
     ],
     "review": "pending"
@@ -332,12 +374,37 @@
         "notNull": false,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "approval_requested_by_staff_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "approval_approver_staff_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "approval_decided_by_staff_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"
   },
   "common_action_versions": {
-    "candidates": [],
+    "candidates": [
+      {
+        "column": "created_by",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
     "review": "pending"
   },
   "common_actions": {
@@ -356,6 +423,12 @@
       },
       {
         "column": "client_request_key",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "created_by",
         "notNull": false,
         "key": false,
         "foreignKey": false
@@ -461,6 +534,12 @@
       },
       {
         "column": "event_snapshot_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "decided_by_staff_id",
         "notNull": false,
         "key": false,
         "foreignKey": false
@@ -757,6 +836,12 @@
         "notNull": false,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "created_by",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"
@@ -833,6 +918,12 @@
         "notNull": false,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "staff_id",
+        "notNull": true,
+        "key": true,
+        "foreignKey": true
       }
     ],
     "review": "pending"
@@ -981,6 +1072,12 @@
         "notNull": false,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "created_by_staff_id",
+        "notNull": false,
+        "key": true,
+        "foreignKey": true
       }
     ],
     "review": "pending"
@@ -1107,6 +1204,18 @@
       },
       {
         "column": "decision_reason",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "requested_by_staff_id",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "decided_by_staff_id",
         "notNull": false,
         "key": false,
         "foreignKey": false
@@ -1275,6 +1384,12 @@
         "notNull": false,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "created_by",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"
@@ -1289,6 +1404,12 @@
       },
       {
         "column": "items_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "created_by_staff_id",
         "notNull": false,
         "key": false,
         "foreignKey": false
@@ -1505,6 +1626,18 @@
       },
       {
         "column": "normalized_name",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "created_by",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "updated_by",
         "notNull": false,
         "key": false,
         "foreignKey": false

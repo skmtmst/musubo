@@ -12,6 +12,10 @@
       "idempotency_key": {
         "action": "unique",
         "reason": "必須の識別子を行IDから作る一意値に置換"
+      },
+      "actor_id": {
+        "action": "placeholder",
+        "reason": "担当者の識別情報を消去"
       }
     }
   },
@@ -120,6 +124,10 @@
       "use_request_json": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "granted_by": {
+        "action": "placeholder",
+        "reason": "担当者の識別情報を消去"
       }
     }
   },
@@ -152,6 +160,10 @@
       "request_json": {
         "action": "json",
         "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+      },
+      "created_by": {
+        "action": "placeholder",
+        "reason": "担当者の識別情報を消去"
       }
     }
   },
@@ -192,6 +204,22 @@
       "deposit_snapshot_json": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "staff_id": {
+        "action": "retain",
+        "reason": "参照を維持"
+      },
+      "decided_by_staff_id": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      },
+      "created_by_staff_id": {
+        "action": "retain",
+        "reason": "参照を維持"
+      },
+      "updated_by_staff_id": {
+        "action": "retain",
+        "reason": "参照を維持"
       }
     }
   },
@@ -228,11 +256,28 @@
       "approval_reject_reason": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "approval_requested_by_staff_id": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      },
+      "approval_approver_staff_id": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      },
+      "approval_decided_by_staff_id": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
       }
     }
   },
   "common_action_versions": {
-    "columns": {}
+    "columns": {
+      "created_by": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      }
+    }
   },
   "common_actions": {
     "columns": {
@@ -247,6 +292,10 @@
       "client_request_key": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "created_by": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
       }
     }
   },
@@ -319,6 +368,10 @@
       "event_snapshot_json": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "decided_by_staff_id": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
       }
     }
   },
@@ -519,6 +572,10 @@
       "error_message": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "created_by": {
+        "action": "placeholder",
+        "reason": "担当者の識別情報を消去"
       }
     }
   },
@@ -571,6 +628,10 @@
       "write_reason": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "staff_id": {
+        "action": "retain",
+        "reason": "参照を維持"
       }
     }
   },
@@ -671,6 +732,10 @@
       "login_channel_secret_encrypted": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "created_by_staff_id": {
+        "action": "retain",
+        "reason": "参照を維持"
       }
     }
   },
@@ -759,6 +824,14 @@
       "decision_reason": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "requested_by_staff_id": {
+        "action": "placeholder",
+        "reason": "担当者の識別情報を消去"
+      },
+      "decided_by_staff_id": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
       }
     }
   },
@@ -871,6 +944,10 @@
       "failure_reason": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "created_by": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
       }
     }
   },
@@ -883,6 +960,10 @@
       "items_json": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "created_by_staff_id": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
       }
     }
   },
@@ -1031,6 +1112,14 @@
       "normalized_name": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "created_by": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      },
+      "updated_by": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
       }
     }
   },
