@@ -130,9 +130,10 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
   const [busy, setBusy] = useState(false)
   const submitting = useRef(false)
   const validCount = typeof recipients === 'number' && Number.isSafeInteger(recipients) && recipients >= 0
-  const countError = state === 'error' || (state === 'ready' && !validCount)
+  const validBreakdown = !perAccount?.length || (perAccount.every(row => Number.isSafeInteger(row.recipients) && row.recipients >= 0 && Number.isSafeInteger(row.stopped) && row.stopped >= 0) && perAccount.reduce((total, row) => total + row.recipients, 0) === recipients)
+  const countError = state === 'error' || (state === 'ready' && (!validCount || !validBreakdown))
   const zero = state === 'ready' && recipients === 0
-  const canPress = state === 'ready' && validCount && !zero && !block && !busy && !primaryDisabled
+  const canPress = state === 'ready' && validCount && validBreakdown && !zero && !block && !busy && !primaryDisabled
   const [accountsOpen, setAccountsOpen] = useState(true)
 
   const confirm = async () => {

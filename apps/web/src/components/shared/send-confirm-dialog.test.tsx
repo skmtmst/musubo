@@ -57,6 +57,14 @@ describe('共通の「送る前の確かめ」窓（U1）', () => {
     fireEvent.click(screen.getByRole('button', { name: 'もう一度数える' }))
     expect(onRetry).toHaveBeenCalledTimes(1)
   })
+  it.each([
+    [[{ name: '店', recipients: 1272, stopped: NaN }]],
+    [[{ name: '店', recipients: 1, stopped: 0 }]],
+  ])('店ごとの人数が不正または合計と違えば送信を止める', (perAccount) => {
+    render(<SendConfirmDialog {...base} perAccount={perAccount} accountCount={1} />)
+    expect(screen.getByText('人数を数えられませんでした')).toBeTruthy()
+    expect((screen.getByRole('button', { name: '送る' }) as HTMLButtonElement).disabled).toBe(true)
+  })
   it('予約時は予約する前の確認と表示する', () => {
     render(<SendConfirmDialog {...base} scheduled recipients={null} />)
     expect(screen.getByRole('dialog', { name: '予約する前の確かめ' })).toBeTruthy()
