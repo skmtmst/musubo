@@ -56,7 +56,7 @@ export const accountsMethods = {
         { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ expectedRevision }) },
       ),
     registrationReceipt: (id: string) =>
-      fetchApi<ApiResponse<LineRegistrationReceipt>>(`/api/line-accounts/${id}/registration-receipt`, { cache: 'no-store' }),
+      fetchApi<ApiResponse<LineRegistrationReceipt>>(`/api/line-accounts/${encodeURIComponent(id)}/registration-receipt`, { cache: 'no-store' }),
     create: (data: {
       style?: import('@line-crm/shared').AccountStyle;
       channelId: string;
