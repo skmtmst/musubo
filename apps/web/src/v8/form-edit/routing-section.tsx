@@ -8,7 +8,7 @@ import Notice from '@/components/shared/notice'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Play, Plus } from 'lucide-react'
-import type { FormBlock } from '@line-crm/shared'
+import type { FormBlock, FormInputBlock } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Card from '@/components/shared/card'
@@ -39,7 +39,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
 }) {
   const questions = useMemo(() => routingQuestions(blocks), [blocks])
   const value = routing ?? emptyRouting()
-  const trialQuestions = useMemo(() => blocks.filter((block) => block.kind === 'input' && (questions.some((q) => q.id === block.id) || (block.type === 'rating' && value.rules.some((rule) => rule.conditions.some((condition) => condition.questionId === block.id))))), [blocks, questions, value.rules])
+  const trialQuestions = useMemo(() => blocks.filter((block): block is FormInputBlock => block.kind === 'input' && (questions.some((q) => q.id === block.id) || (block.type === 'rating' && value.rules.some((rule) => rule.conditions.some((condition) => condition.questionId === block.id))))), [blocks, questions, value.rules])
   const [trying, setTrying] = useState(false)
   const [answers, setAnswers] = useState<Record<string, string | string[] | number>>({})
   const [preview, setPreview] = useState<{ matchedIndex: number; target: RoutingTarget; fellBack: boolean } | null>(null)
@@ -111,14 +111,14 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
           {preview ? <strong>{preview.matchedIndex === -1 ? 'どれにも当たらないとき' : `${preview.matchedIndex + 1} 行目`}：{menus.find((menu) => menu.id === preview.target.menuId)?.name ?? '行き先'}{preview.fellBack ? '（元の行き先が使えないため既定の行き先）' : ''}（保存はされません）</strong> : null}
           {previewError ? <Notice tone="danger" role="alert">{previewError}</Notice> : null}
         </div> : null}
-        <DataTable aria-label="行き先の表">
+        <DataTable aria-label="行き先の表" columnWeights={[0.35, 2, 2.3, 1.3, 1.5, 0.4]}>
           <thead><TableHeadRow><Th aria-label="並べ替え" /><Th>条件</Th><Th grow>出すメニュー</Th><Th>担当の組</Th><Th>会い方</Th><Th aria-label="操作" /></TableHeadRow></thead><tbody>
           {(readOnly ? ruled : reorder.shown).map((rule, index) => {
             const invalid = problem?.row === index
             return (
               <Tr key={rule.id} selected={hit === index} data-invalid={invalid || undefined} {...reorder.rowProps(rule.id)}>
                 <HandleCell>{readOnly ? null : <ReorderHandle look="icon" label={`${index + 1} 行目`} {...reorder.handle(rule.id)} {...reorder.handleProps(rule.id)} />}</HandleCell>
-                <Td><span className={styles.cond}>{rule.conditions.map((condition, i) => <span key={i} title={`${questions.find((q) => q.id === condition.questionId)?.label ?? '質問'}：${String(condition.value)}`}>{`${trialQuestions.find((q) => q.id === condition.questionId && q.kind === 'input')?.label ?? '質問'}：`}〈{Array.isArray(condition.value) ? condition.value.join('・') : condition.value}〉</span>)}</span></Td>
+                <Td><span className={styles.cond}>{rule.conditions.map((condition, i) => <span key={i} title={`${questions.find((q) => q.id === condition.questionId)?.label ?? '質問'}：${String(condition.value)}`}>{`${trialQuestions.find((q) => q.id === condition.questionId)?.label ?? '質問'}：`}〈{Array.isArray(condition.value) ? condition.value.join('・') : condition.value}〉</span>)}</span></Td>
                 {targetCells(rule.target, (target) => setRule(rule.id, { target }), `${index + 1} 行目`, invalid)}
                 <ActionCell>{readOnly ? null : <RowMenu appearance="box" size="row" label={`${index + 1} 行目のそのほかの操作`} open={openMenu === rule.id} onOpenChange={(o) => setOpenMenu(o ? rule.id : null)}
                   items={[...reorder.menuItems(rule.id, () => setOpenMenu(null)), { id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { set({ rules: value.rules.filter((_, i) => `r${i}` !== rule.id) }); setOpenMenu(null) } }]} />}</ActionCell>
