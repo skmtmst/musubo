@@ -14,8 +14,10 @@ describe('retained records survive tenant purge with real foreign keys', () => {
     for (const [table, entry] of Object.entries(RETENTION_TABLES)) {
       if (entry.category !== 'retain') continue;
       const refs = f.raw.pragma(`foreign_key_list("${table.replaceAll('"', '""')}")`) as Array<{table:string;from:string;on_delete:string}>;
+      const columns = f.raw.pragma(`table_info("${table.replaceAll('"', '""')}")`) as Array<{name:string;notnull:number}>;
       for (const ref of refs) {
-        if (RETENTION_TABLES[ref.table]?.category === 'purge' && ref.on_delete !== 'SET NULL') {
+        const cannotDetach = ref.on_delete !== 'SET NULL' || columns.some(column => column.name === ref.from && column.notnull === 1);
+        if (RETENTION_TABLES[ref.table]?.category === 'purge' && cannotDetach) {
           unsafe.push(`${table}.${ref.from} -> ${ref.table} (${ref.on_delete})`);
         }
       }
@@ -41,6 +43,8 @@ describe('retained records survive tenant purge with real foreign keys', () => {
     await monthlyContract(f);
     f.raw.exec(due);
     const outcome = await processTenantDataPurge({ DB: f.db }, { now });
+    expect(f.raw.prepare("SELECT id FROM booking_monthly_contracts WHERE id='contract'").get()).toBeTruthy();
+    expect(() => f.raw.prepare("DELETE FROM friends WHERE id='f'").run()).toThrow(/FOREIGN KEY constraint failed/);
     expect(outcome.completed).toBe(1);
     expect(f.raw.prepare("SELECT id FROM booking_monthly_contracts WHERE id='contract'").get()).toBeTruthy();
   });
