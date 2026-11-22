@@ -11,8 +11,19 @@ const input = {
 
 type Failure = 'messaging-token' | 'bot' | 'webhook-inactive' | 'login-token' | 'liff-create' | null;
 
-function installFetch(failure: Failure = null, existingLiffId?: string, registeredEndpoint?: string) {
+function installFetch({
+  failure = null,
+  existingLiffId,
+  registeredEndpoint,
+  emptyLiffListStatus = 200,
+}: {
+  failure?: Failure;
+  existingLiffId?: string;
+  registeredEndpoint?: string;
+  emptyLiffListStatus?: number;
+} = {}) {
   const calls: Array<{ url: string; method: string; body: string }> = [];
+  let availableLiffId = existingLiffId;
   vi.stubGlobal('fetch', vi.fn(async (request: string | URL | Request, init: RequestInit = {}) => {
     const url = String(request);
     const method = init.method ?? 'GET';
@@ -37,12 +48,14 @@ function installFetch(failure: Failure = null, existingLiffId?: string, register
     }
     if (url.endsWith('/v2/bot/channel/webhook/test')) return Response.json({ success: true });
     if (url.endsWith('/liff/v1/apps') && method === 'GET') {
-      return Response.json({ apps: existingLiffId ? [{ liffId: existingLiffId, description: 'musubo' }] : [] });
+      if (availableLiffId) return Response.json({ apps: [{ liffId: availableLiffId, description: 'musubo' }] });
+      if (emptyLiffListStatus !== 200) return new Response(null, { status: emptyLiffListStatus });
+      return Response.json({ apps: [] });
     }
     if (url.endsWith('/liff/v1/apps') && method === 'POST') {
-      return failure === 'liff-create'
-        ? new Response(null, { status: 403 })
-        : Response.json({ liffId: '2007123456-auto' });
+      if (failure === 'liff-create') return new Response(null, { status: 403 });
+      availableLiffId = '2007123456-auto';
+      return Response.json({ liffId: availableLiffId });
     }
     if (url.includes('/liff/v1/apps/') && method === 'PUT') return Response.json({});
     return new Response(null, { status: 404 });
@@ -60,7 +73,7 @@ describe('LINEアカウント自動接続', () => {
     ['login-token', 4],
     ['liff-create', 4],
   ] as const)('%sでは指定段で止まり、後続を未確認にする', async (failure, stoppedOrder) => {
-    installFetch(failure);
+    installFetch({ failure });
     const result = await prepareLineConnection(input);
     expect(result.success).toBe(false);
     expect(result.steps.find((item) => item.state === 'failed')?.order).toBe(stoppedOrder);
@@ -78,8 +91,39 @@ describe('LINEアカウント自動接続', () => {
     expect(update?.body).toContain('https://nen-line-stg.skmtmst.workers.dev?liffId=2007123456-auto');
   });
 
+  it('LIFFが0件の404から初回作成し、次の接続確認で再利用する', async () => {
+    const calls = installFetch({ emptyLiffListStatus: 404 });
+
+    const first = await prepareLineConnection(input);
+    expect(first).toMatchObject({ success: true, liffId: '2007123456-auto' });
+    const second = await prepareLineConnection(input);
+    expect(second).toMatchObject({ success: true, liffId: first.liffId });
+    const liffCalls = calls.filter((call) => call.url.includes('/liff/v1/apps'));
+    expect(liffCalls.map((call) => call.method)).toEqual(['GET', 'POST', 'PUT', 'GET', 'PUT']);
+    expect(liffCalls[2].body).toContain(`${input.baseUrl}?liffId=2007123456-auto`);
+  });
+
+  it.each([401, 429, 500])('LIFF一覧が%dの場合は作成も更新もしない', async (emptyLiffListStatus) => {
+    const calls = installFetch({ emptyLiffListStatus });
+    const result = await prepareLineConnection(input);
+    expect(result.success).toBe(false);
+    expect(result.steps.find((item) => item.state === 'failed')?.order).toBe(4);
+    expect(calls.filter((call) => call.url.includes('/liff/v1/apps')).map((call) => call.method)).toEqual(['GET']);
+  });
+
+  it('指定LIFFがあり一覧が404の場合は新規作成に切り替えない', async () => {
+    const calls = installFetch({ emptyLiffListStatus: 404 });
+    const result = await prepareLineConnection({ ...input, liffId: '2007123456-missing' });
+    expect(result.success).toBe(false);
+    expect(result.steps.find((item) => item.state === 'failed')).toMatchObject({
+      order: 4,
+      message: '指定したLIFFはこのLINE Loginチャネルにありません。LIFF IDを確認してください。',
+    });
+    expect(calls.filter((call) => call.url.includes('/liff/v1/apps')).map((call) => call.method)).toEqual(['GET']);
+  });
+
   it('指定LIFFがチャネル内にある場合だけ流用し、別チャネルのIDを拒否する',async()=>{
-    const calls=installFetch(null,'2007123456-existing')
+    const calls=installFetch({ existingLiffId: '2007123456-existing' })
     const found=await prepareLineConnection({...input,liffId:'2007123456-existing'})
     expect(found.success).toBe(true);expect(found.liffId).toBe('2007123456-existing')
     expect(calls.some(call=>call.url.endsWith('/liff/v1/apps')&&call.method==='POST')).toBe(false)
@@ -93,7 +137,7 @@ describe('LINEアカウント自動接続', () => {
    */
   it('別名URLで登録されたWebhookも同じ受け口として通し、末尾スラッシュの違いも無視する', async () => {
     const alias = 'https://nen-line-stg-alias.skmtmst.workers.dev/webhook/123456789/';
-    installFetch(null, undefined, alias);
+    installFetch({ registeredEndpoint: alias });
     const accepted = await prepareLineConnection({
       ...input,
       acceptedWebhookUrls: [`${input.baseUrl}/webhook/${input.channelId}`, 'https://nen-line-stg-alias.skmtmst.workers.dev/webhook/123456789'],
@@ -103,7 +147,7 @@ describe('LINEアカウント自動接続', () => {
   });
 
   it('受け口一覧に無いWebhook URLは3段目で止める', async () => {
-    installFetch(null, undefined, 'https://example.com/webhook');
+    installFetch({ registeredEndpoint: 'https://example.com/webhook' });
     const result = await prepareLineConnection({
       ...input,
       acceptedWebhookUrls: [`${input.baseUrl}/webhook/${input.channelId}`],
@@ -113,7 +157,7 @@ describe('LINEアカウント自動接続', () => {
   });
 
   it('descriptionがmusuboの既存LIFFを流用する', async () => {
-    const calls = installFetch(null, '2007123456-existing');
+    const calls = installFetch({ existingLiffId: '2007123456-existing' });
     const result = await prepareLineConnection(input);
     expect(result.liffId).toBe('2007123456-existing');
     expect(calls.some((call) => call.url.endsWith('/liff/v1/apps') && call.method === 'POST')).toBe(false);

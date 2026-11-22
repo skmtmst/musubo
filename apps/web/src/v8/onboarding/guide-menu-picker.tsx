@@ -13,12 +13,13 @@ import { ApiError } from '@/lib/api'
 import { styleApi } from '@/lib/api/helpers/styles'
 import styles from './guide-menu-picker.module.css'
 
-export function GuideMenuPicker({ accountId, version, step, total, onLater, onCreate, onReload }: {
+export function GuideMenuPicker({ accountId, version, step, total, onLater, onSaved, onCreate, onReload }: {
   accountId: string
   version: number
   step: number
   total: number
   onLater: () => void
+  onSaved: () => void
   onCreate: () => void
   onReload: () => void
 }) {
@@ -42,6 +43,7 @@ export function GuideMenuPicker({ accountId, version, step, total, onLater, onCr
       })
       if (!result.success) throw new Error('下書きを作れませんでした')
       accountStyleUpdated(accountId)
+      onSaved()
     } catch (caught) {
       if (!saveErrors.capture(caught)) setError(describeApiFailure(caught, '保存'))
       setVersionConflict(caught instanceof ApiError && caught.code === 'version_conflict')

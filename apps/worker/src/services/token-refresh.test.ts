@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getLineAccounts, updateLineAccount, updateLineAccountFields, fetchBotProfile } = vi.hoisted(() => ({
+const { getLineAccounts, saveRenewedLineAccessToken, updateLineAccountFields, fetchBotProfile } = vi.hoisted(() => ({
   getLineAccounts: vi.fn(),
-  updateLineAccount: vi.fn(),
+  saveRenewedLineAccessToken: vi.fn(),
   updateLineAccountFields: vi.fn(),
   fetchBotProfile: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', () => ({
   getLineAccounts,
-  updateLineAccount,
+  saveRenewedLineAccessToken,
   updateLineAccountFields,
 }));
 
@@ -36,6 +36,7 @@ describe('refreshLineAccessTokens profile sync', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-15T03:00:00Z'));
     vi.clearAllMocks();
+    saveRenewedLineAccessToken.mockResolvedValue(true);
     updateLineAccountFields.mockResolvedValue(undefined);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
@@ -60,7 +61,7 @@ describe('refreshLineAccessTokens profile sync', () => {
 
     await refreshLineAccessTokens({} as D1Database);
 
-    expect(updateLineAccount).not.toHaveBeenCalled();
+    expect(saveRenewedLineAccessToken).not.toHaveBeenCalled();
     expect(fetchBotProfile).toHaveBeenCalledTimes(2);
     expect(fetchBotProfile).toHaveBeenNthCalledWith(1, 'token-old-1');
     expect(fetchBotProfile).toHaveBeenNthCalledWith(2, 'token-old-2');
@@ -84,6 +85,8 @@ describe('refreshLineAccessTokens profile sync', () => {
     vi.stubGlobal('fetch',fetchMock)
     await refreshLineAccessTokens({} as D1Database)
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(updateLineAccount).toHaveBeenCalledWith(expect.anything(),'naive',expect.objectContaining({channel_access_token:'renewed-token'}))
+    expect(saveRenewedLineAccessToken).toHaveBeenCalledWith(
+      expect.anything(), value, { accessToken: 'renewed-token', expiresAt: '2026-10-15T12:00:00.000+09:00' }, undefined,
+    );
   })
 });
