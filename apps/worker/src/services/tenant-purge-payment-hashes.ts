@@ -21,7 +21,7 @@ export function purgedPaymentIdentifierExpiry(lastPaymentDate: string | null, pu
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error('invalid_payment_retention_date');
   const [year,month,day] = value.split('-').map(Number);
   const original = new Date(Date.UTC(year,month-1,day));
-  if (original.toISOString().slice(0,10) !== value) throw new Error('invalid_payment_retention_date');
+  if (original.getUTCFullYear() !== year || original.getUTCMonth() !== month-1 || original.getUTCDate() !== day) throw new Error('invalid_payment_retention_date');
   const lastDay = new Date(Date.UTC(year+1,month-1+4,0)).getUTCDate();
   const base = new Date(Date.UTC(year+1,month-1+3,Math.min(day,lastDay)+1));
   base.setUTCFullYear(base.getUTCFullYear()+10);

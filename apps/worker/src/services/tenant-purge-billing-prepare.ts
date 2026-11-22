@@ -1,3 +1,4 @@
+import { jstDate } from '@line-crm/shared';
 import { archiveAndResetTenantBilling } from './tenant-purge-billing-history.js';
 import { hashPurgedPaymentIdentifier, purgedPaymentIdentifierExpiry, purgedPaymentIdentifierKeyVersion, storePurgedPaymentIdentifierHash, type PurgedPaymentIdentifierKind } from './tenant-purge-payment-hashes.js';
 
@@ -28,7 +29,7 @@ export async function preparePurgedTenantBilling(db:D1Database, tenantId:string,
     const withZone = /(?:[zZ]|[+-]\d\d:\d\d)$/.test(value) ? value : `${value}${value.length===10?'T00:00:00':''}+09:00`;
     const ms=Date.parse(withZone);
     if (!Number.isFinite(ms)) throw new Error('invalid_last_payment_time');
-    return new Date(ms+9*60*60*1000).toISOString().slice(0,10);
+    return jstDate(new Date(ms));
   };
   const paymentDates=[...payments.results,...otherPayments.results].map(row=>jstDay(row.paid_at)).sort();
   const expiresAt=purgedPaymentIdentifierExpiry(paymentDates.at(-1) ?? null,jstDay(now));
