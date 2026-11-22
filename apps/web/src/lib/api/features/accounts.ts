@@ -90,7 +90,7 @@ export const accountsMethods = {
       body: JSON.stringify(data),
     }),
     // Smart method routing:
-    //   - rotating Messaging credentials (channelAccessToken / channelSecret)
+    //   - rotating the Messaging channel secret
     //     requires PUT (owner-only on the worker)
     //   - everything else routes to PATCH (admin-allowed)
     // This keeps a single helper signature for callers (toggle, country/role
@@ -104,7 +104,6 @@ export const accountsMethods = {
         Pick<
           LineAccount,
           | 'name'
-          | 'channelAccessToken'
           | 'channelSecret'
           | 'loginChannelId'
           | 'loginChannelSecret'
@@ -123,8 +122,7 @@ export const accountsMethods = {
       >,
       stepUpToken?: string,
     ) => {
-      const touchesMessagingCredentials =
-        data.channelAccessToken !== undefined || data.channelSecret !== undefined
+      const touchesMessagingCredentials = data.channelSecret !== undefined
       return fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}`, {
         method: touchesMessagingCredentials || data.timezone !== undefined ? 'PUT' : 'PATCH',
         headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,

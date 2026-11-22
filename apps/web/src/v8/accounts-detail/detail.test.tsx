@@ -151,7 +151,8 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
     expect(document.body.textContent).toContain('@nen-test・要確認（LINE ID・接続状態を確かめてください）・既定ではない・親アカウントなし')
     expect(buttons('編集する')).toHaveLength(1)
-    expect(buttons('差し替える')).toHaveLength(3)
+    expect(buttons('差し替える')).toHaveLength(2)
+    expect(document.body.textContent).toContain('自動更新・最終更新 09/28 10:10')
     expect(buttons('送受信を止める')).toHaveLength(1)
     const archive = buttons('アーカイブする')[0] as HTMLButtonElement
     expect(archive.disabled).toBe(true)
@@ -200,17 +201,18 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     expect(sent.find((s) => s.url.endsWith('/deactivate'))?.body).toEqual({ reason: '乗り換えの準備のため' })
   })
 
-  it('資格情報は入れた欄だけ送る（空の欄で今の値を消さない）', async () => {
+  it('Messaging APIの変更ではシークレットだけを受け付ける', async () => {
     await act(async () => root.render(<AccountDetailV8 />))
     await settle()
     await click(buttons('差し替える')[0])
     const inputs = [...document.querySelectorAll('[role="dialog"] input')] as HTMLInputElement[]
-    expect(inputs).toHaveLength(2)
-    await type(inputs[1], 'new-token')
+    expect(inputs).toHaveLength(1)
+    expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain('Channel Access Token')
+    await type(inputs[0], 'new-channel-secret')
     await click(buttons('本人確認して保存')[0])
     const put = sent.find((s) => s.url.endsWith('/api/line-accounts/acc-1'))
     expect(put?.method).toBe('PUT')
-    expect(put?.body).toEqual({ channelAccessToken: 'new-token' })
+    expect(put?.body).toEqual({ channelSecret: 'new-channel-secret' })
   })
 
   it('A で入れかけた資格情報を、表示が B に変わった後で B へ保存しない（WEB132）', async () => {
@@ -232,7 +234,7 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     // B で開き直すと空の欄から始まる。
     await click(buttons('差し替える')[0])
     const fresh = [...document.querySelectorAll('[role="dialog"] input')] as HTMLInputElement[]
-    expect(fresh.map((el) => el.value)).toEqual(['', ''])
+    expect(fresh.map((el) => el.value)).toEqual([''])
   })
 
   it('差し替えの窓は対象のアカウントごとに作り直し、A の入力を B へ送らない（WEB132）', async () => {
@@ -244,7 +246,7 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     await act(async () => root.render(<CredentialsDialog account={accountB} kind="messaging" onClose={() => {}} onSaved={() => {}} />))
     await settle()
     const fresh = [...document.querySelectorAll('[role="dialog"] input')] as HTMLInputElement[]
-    expect(fresh.map((el) => el.value)).toEqual(['', ''])
+    expect(fresh.map((el) => el.value)).toEqual([''])
     await click(buttons('本人確認して保存')[0])
     expect(sent.filter((s) => s.method === 'PUT')).toEqual([])
   })
@@ -350,7 +352,7 @@ describe('LINEアカウントの詳細の状態ごとの出し分け（V8 ihjfd�
   it('資格情報は値を出さず、登録・最後の確認だけを言う', async () => {
     account = { ...ACCOUNT, connection: { lastTestAt: '2026-10-01T21:00:00.000Z', lastTestStatus: 'ok', lastReceivedAt: '2026-10-02T03:04:00.000Z' } }
     await renderDetail()
-    expect(document.body.textContent).toContain('秘密値そのものは表示しません')
+    expect(document.body.textContent).toContain('チャネルアクセストークンはmusuboが自動更新します。')
     expect(document.body.textContent).toContain(`登録済み・最後の確認 ${shortDateTime('2026-10-01T21:00:00.000Z')}`)
     expect(document.body.textContent).toContain(`最後の受信 ${shortDateTime('2026-10-02T03:04:00.000Z')}`)
     expect(document.body.textContent).toContain('LINE側に登録したURL')

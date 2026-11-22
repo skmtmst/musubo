@@ -16,6 +16,8 @@ export const SCHEDULED_CRONS = {
   sixHourlyHeavy: '0 */6 * * *',
 } as const;
 
+export const STAGING_LINE_TOKEN_REFRESH_CRON = '2-57/5 * * * *';
+
 export type ScheduledLane = keyof typeof SCHEDULED_CRONS | 'ignored';
 
 export function scheduledLane(cron: string): ScheduledLane {
