@@ -128,7 +128,7 @@ describe('テンプレートの一括削除', () => {
   });
 });
 
-describe('送信待ちのリマインドが使うテンプレートの削除を止める', () => {
+describe('送信待ち・再開できるリマインドが旧版でも使うテンプレートの削除を止める', () => {
   test('使用先に登録・件数・版が出る', async () => {
     await seedSwitchedRule();
     await seedEnrollment('fr-active', 'active');
