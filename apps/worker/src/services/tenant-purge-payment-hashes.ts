@@ -54,19 +54,24 @@ export async function deleteExpiredPurgedPaymentIdentifierHashes(db: D1Database,
 
 /** Refuse to guess when any retained identifier was hashed using an unavailable key. */
 export async function matchPurgedPaymentIdentifiers(db:D1Database, secret:string|undefined,
-  input:{customer:string|null;subscription:string|null;now:string}):Promise<string|null> {
+  input:{customer:string|null;subscription:string|null;now:string}, previousSecrets?:string):Promise<string|null> {
   const versions=await db.prepare(`SELECT DISTINCT identifier_key_version AS version FROM stripe_events
     WHERE review_reason='identifier_hash' AND julianday(identifier_expires_at)>julianday(?)`).bind(input.now).all<{version:string|null}>();
-  const version=await purgedPaymentIdentifierKeyVersion(secret);
-  if (versions.results.some(row=>!version || row.version!==version)) throw new Error('purged_payment_key_unavailable');
-  if (!version) return null;
+  let previous: unknown = [];
+  try { previous = previousSecrets ? JSON.parse(previousSecrets) : []; } catch { throw new Error('purged_payment_key_unavailable'); }
+  if (!Array.isArray(previous) || previous.some(value => typeof value !== 'string' || !value)) throw new Error('purged_payment_key_unavailable');
+  const keys = await Promise.all([secret, ...previous].filter((value): value is string => Boolean(value)).map(async value => ({secret:value, version:await purgedPaymentIdentifierKeyVersion(value)})));
+  if (versions.results.some(row => !keys.some(key => key.version === row.version))) throw new Error('purged_payment_key_unavailable');
   const tenants=new Set<string>();
-  for (const kind of ['customer','subscription'] as const) {
-    const id=input[kind];
-    if (!id) continue;
-    const hash=await hashPurgedPaymentIdentifier(secret,kind,id);
-    if (!hash) throw new Error('purged_payment_key_unavailable');
-    for (const tenant of await findPurgedPaymentIdentifierHash(db,kind,hash,version,input.now)) tenants.add(tenant);
+  for (const {secret:key, version} of keys) {
+    if (!version || !versions.results.some(row => row.version === version)) continue;
+    for (const kind of ['customer','subscription'] as const) {
+      const id=input[kind];
+      if (!id) continue;
+      const hash=await hashPurgedPaymentIdentifier(key,kind,id);
+      if (!hash) throw new Error('purged_payment_key_unavailable');
+      for (const tenant of await findPurgedPaymentIdentifierHash(db,kind,hash,version,input.now)) tenants.add(tenant);
+    }
   }
   if (tenants.size>1) throw new Error('purged_payment_ambiguous_match');
   return [...tenants][0] ?? null;

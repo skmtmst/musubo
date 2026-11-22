@@ -112,6 +112,7 @@ export type WorkerBindings = {
     STRIPE_SECRET_KEY?: string;
     STRIPE_BILLING_WEBHOOK_SECRET?: string;
     PURGED_PAYMENT_HMAC_SECRET?: string;
+    PURGED_PAYMENT_HMAC_PREVIOUS_SECRETS?: string;
     STRIPE_PRICE_LIGHT?: string;
     STRIPE_PRICE_STANDARD?: string;
     STRIPE_PRICE_PRO?: string;

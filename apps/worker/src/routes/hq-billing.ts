@@ -640,13 +640,16 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     const amount = typeof amountCandidate === 'number' && Number.isSafeInteger(amountCandidate) ? amountCandidate : null;
     const currency = typeof object.currency === 'string' && /^[a-z]{3}$/.test(object.currency) ? object.currency : null;
     const matchTime = new Date().toISOString();
-    let oldTenantId:string|null;
+    const customerId = stripeExpandableId(object.customer);
+    const liveAccount = customerId ? await c.env.DB.prepare(`SELECT id FROM tenants WHERE stripe_customer_id=?
+      AND purge_started_at IS NULL AND data_purged_at IS NULL LIMIT 1`).bind(customerId).first<{id:string}>() : null;
+    let oldTenantId:string|null = null;
     try {
-      oldTenantId = await matchPurgedPaymentIdentifiers(c.env.DB,c.env.PURGED_PAYMENT_HMAC_SECRET,{
+      if (!liveAccount) oldTenantId = await matchPurgedPaymentIdentifiers(c.env.DB,c.env.PURGED_PAYMENT_HMAC_SECRET,{
         customer:stripeExpandableId(object.customer),
         subscription:event.type.startsWith('customer.subscription.') ? stripeExpandableId(object.id) : stripeExpandableId(object.subscription),
         now:matchTime,
-      });
+      },c.env.PURGED_PAYMENT_HMAC_PREVIOUS_SECRETS);
     } catch (error) {
       if (!(error instanceof Error) || !['purged_payment_key_unavailable','purged_payment_ambiguous_match'].includes(error.message)) throw error;
       await c.env.DB.prepare(`INSERT OR IGNORE INTO billing_events(id,type,tenant_id,summary,review_amount,review_currency)
@@ -657,7 +660,7 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
       logger.error('billing.purged_payment_key_unavailable');
       return c.json({success:false,error:'billing_review_required'},503);
     }
-    const tenant = oldTenantId ? await getTenantBilling(c.env.DB,oldTenantId) : await findTenantForEvent(c, object, event.type);
+    const tenant = liveAccount ? await getTenantBilling(c.env.DB,liveAccount.id) : oldTenantId ? await getTenantBilling(c.env.DB,oldTenantId) : await findTenantForEvent(c, object, event.type);
     // 保存済みの受領記録は完了済みとして扱う。新しい記録は、業務更新と完了印を一緒に確定するまで pending に残す。
     await c.env.DB.prepare('INSERT OR IGNORE INTO billing_events (id,type,tenant_id,summary,review_amount,review_currency) VALUES (?,?,?,?,?,?)')
       .bind(event.id,event.type,tenant?.id ?? null,'pending',amount,currency).run();
