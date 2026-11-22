@@ -251,3 +251,22 @@ export async function tombstoneFriend(db: D1Database, accountId: string, friendI
     .bind(`purged:${crypto.randomUUID()}`, now, now, now, friendId, accountId, now, retentionCutoff(now)).run();
   return Number(result.meta.changes ?? 0) === 1;
 }
+
+/** Stop and anonymize a retained monthly contract after its account becomes a tombstone. */
+export async function anonymizeMonthlyContract(db: D1Database, tenantId: string, contractId: string, now: string): Promise<void> {
+  const scope = `id=? AND tenant_id=? AND EXISTS (SELECT 1 FROM line_accounts a JOIN tenants t ON t.id=a.tenant_id
+    WHERE a.id=booking_monthly_contracts.account_id AND a.tenant_id=booking_monthly_contracts.tenant_id
+      AND a.data_purged_at IS NOT NULL AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL)`;
+  await db.batch([
+    db.prepare(`UPDATE booking_monthly_contracts SET name='削除済み',
+      state=CASE WHEN state='applying' THEN 'expired' WHEN state='expired' THEN 'expired' ELSE 'stopped' END,
+      stop_reason=CASE WHEN state IN ('applying','expired') THEN stop_reason ELSE COALESCE(stop_reason,'store_immediate') END,
+      stop_effective_at=CASE WHEN state IN ('applying','expired') THEN stop_effective_at ELSE COALESCE(stop_effective_at,?) END,
+      payment_method_version=payment_method_version+CASE WHEN payment_method_id IS NULL THEN 0 ELSE 1 END,
+      payment_method_id=NULL,setup_session_id=NULL,setup_expires_at=NULL,version=version+1
+      WHERE ${scope}`).bind(now,contractId,tenantId),
+    db.prepare(`UPDATE booking_monthly_contracts SET customer_id=NULL,
+      request_json=json_remove(request_json,'$.friendId'),version=version+1
+      WHERE ${scope}`).bind(contractId,tenantId),
+  ]);
+}
