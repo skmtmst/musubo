@@ -21,6 +21,7 @@ export const delete__api_friends_id_data_1 = async (c: Context<Env, "/api/friend
     const data = await deleteCustomerData(c.env, { kind: 'friend_data', id, friendId: id, accountId, lineUserId: friend.line_user_id }, c.get('staff')!.id);
     return c.json({ success: true, data });
   } catch (error) {
+    if (error instanceof DeletionFailure && error.code === 'deletion_identity_conflict') return c.json({ success: false, code: error.code, error: '関連する予約の本人情報を確認できません。管理者に確認してください。' }, 409);
     if (error instanceof DeletionFailure && error.code === 'deletion_schema_approval_required') return c.json({ success: false, code: error.code, error: '支払・監査の記録を残すため、データ構造の変更承認が必要です。オーナーか管理者に頼んでください。' }, 409);
     if (error instanceof DeletionFailure) return c.json({ success: false, code: error.code, error: error.status === 409 ? '削除中です。少し待ってから、もう一度お試しください。' : '削除を完了できませんでした。同じ友だちで、もう一度削除してください。' }, error.status);
     return c.json({ success: false, code: 'deletion_retry_required', error: '削除を完了できませんでした。同じ友だちで、もう一度削除してください。' }, 503);
