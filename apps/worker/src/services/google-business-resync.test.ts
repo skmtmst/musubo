@@ -212,8 +212,10 @@ describe('processGoogleBusinessHourlyResync', () => {
     const recent = '2026-09-28T17:40:00.000Z';
     testDb.raw.prepare('UPDATE rt_google_connections SET last_synced_at=?,last_posts_synced_at=? WHERE store_id=?')
       .run(recent, recent, 'store-shibuya');
-    testDb.raw.prepare(`INSERT INTO rt_google_profiles(store_id,location_name,profile_json,fingerprint,fetched_at,updated_at)
-      VALUES(?,?,?,?,?,?)`).run('store-shibuya', LOCATION, JSON.stringify({ profile: {} }), 'old', '2026-09-28T16:00:00.000Z', '2026-09-28T16:00:00.000Z');
+    // 772 は既存のプロフィール行の connection_id を店舗の先頭接続で埋める。
+    // 接続のある店舗に connection_id の無い行は残らないので、ここも接続ごとの行で置く。
+    testDb.raw.prepare(`INSERT INTO rt_google_profiles(store_id,connection_id,location_name,profile_json,fingerprint,fetched_at,updated_at)
+      VALUES(?,?,?,?,?,?,?)`).run('store-shibuya', 'conn-1', LOCATION, JSON.stringify({ profile: {} }), 'old', '2026-09-28T16:00:00.000Z', '2026-09-28T16:00:00.000Z');
     const result = await processGoogleBusinessHourlyResync(env, { now: NOW, fetch: googleFetch(), sleep: noSleep });
     expect(result.failed).toBe(0);
     expect(calls.some(call => call.url.includes('mybusinessbusinessinformation.googleapis.com/v1/locations/222?'))).toBe(true);

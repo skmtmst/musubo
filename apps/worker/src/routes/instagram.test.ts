@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
-import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { createTestD1, dropCompatIndexes772, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { instagram } from './instagram.js';
 import {
   verifyInstagramSignature,
@@ -1099,6 +1099,8 @@ it('写真DMと受信時刻の順、別アカウントのカーソルを守る',
  * 並び順を後ろにして「既定の1件」にはならないようにする。
  */
 function addSecondConnection() {
+  // 2件目が入るのは互換索引を外した後（773 適用後）。bootstrap はまだ互換期間の形。
+  dropCompatIndexes772(db.raw);
   db.raw
     .prepare(
       `INSERT INTO instagram_connections
