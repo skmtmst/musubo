@@ -1044,3 +1044,39 @@ it('アカウント変更後に前の店の予約先候補が届いても表示�
   await act(async () => {finishOld({success:true,data:{menus:[{id:'bm-1',name:'前の店の相談',durationMinutes:30}],staff:[],groups:[]}})})
   expect(screen.queryByText('前の店の相談')).toBeNull()
 })
+
+it('他機能の閲覧権限がなくてもフォームを開いて振り分けを編集できる', async () => {
+  const {fetchApi}=await import('@/lib/api')
+  const original=vi.mocked(fetchApi).getMockImplementation()
+  vi.mocked(fetchApi).mockImplementation((async (path:string) => {
+    if(path.startsWith('/api/tags')) throw new ApiError(403,'権限がありません')
+    return {success:true,data:[]}
+  }) as typeof fetchApi)
+  const data=structuredClone(formData)
+  data.onSubmitTagId='keep-tag'
+  const booking=data.layout.sections[1].blocks[0]
+  if(booking.kind!=='input'||!booking.booking)throw new Error('fixture')
+  booking.booking.routing={enabled:true,rules:[],fallback:{menuId:'bm-1'}}
+  formsGet.mockResolvedValue({success:true,data})
+  routingTargets.mockResolvedValue({success:true,data:{menus:[{id:'bm-1',name:'相談',durationMinutes:30}],staff:[{id:'s1',name:'担当',menuId:'bm-1'}],groups:[]}})
+  try {
+    await render('id=form-1')
+    expect(await screen.findByText(/権限のない候補は表示されません/)).toBeTruthy()
+    expect(screen.getByRole('heading',{name:'答えで予約の行き先を分ける'})).toBeTruthy()
+    fireEvent.click(screen.getByRole('switch',{name:'答えで予約の行き先を分ける'}))
+    fireEvent.click(getPageAction({name:'下書きを保存'}))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalledWith('form-1','acc-1',expect.objectContaining({onSubmitTagId:'keep-tag'})))
+  } finally { if(original)vi.mocked(fetchApi).mockImplementation(original) }
+})
+
+it('候補の通信障害は権限不足と区別して保存を止める', async () => {
+  const {fetchApi}=await import('@/lib/api')
+  const original=vi.mocked(fetchApi).getMockImplementation()
+  vi.mocked(fetchApi).mockRejectedValue(new Error('offline'))
+  try {
+    await render('id=form-1')
+    expect(await screen.findByText('フォームを読み込めませんでした')).toBeTruthy()
+    expect(formsUpdate).not.toHaveBeenCalled()
+    expect(screen.queryByText(/権限のない候補は表示されません/)).toBeNull()
+  } finally { if(original)vi.mocked(fetchApi).mockImplementation(original) }
+})

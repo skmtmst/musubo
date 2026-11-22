@@ -124,6 +124,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const bookingStaffAccount = useRef(selectedAccountId)
   const scopedRoutingRefs = routingRefs?.key === JSON.stringify([selectedAccountId,id]) ? routingRefs : undefined
   const [referencesError,setReferencesError]=useState(false)
+  const [referencesRestricted,setReferencesRestricted]=useState(false)
   const savedSnapshot = useRef<string | null>(null)
   /** 読み込んだ時点の編集の版(#723)。読み込みと保存成功のときだけ入れ替える。 */
   const [contentRevision, setContentRevision] = useState<number | null>(null)
@@ -300,12 +301,17 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         // 参照一覧は選んでいる公式アカウントに絞る（別アカウントのタグ等を混ぜない）。
         const tagPath = selectedAccountId ? `/api/tags?lineAccountId=${encodeURIComponent(selectedAccountId)}` : '/api/tags'
         const accountFilter = selectedAccountId ? { accountId: selectedAccountId } : undefined
+        setReferencesRestricted(false)
+        const permitMissing = async <T extends {success:boolean;data:unknown[]}>(request: Promise<T>): Promise<T> => request.catch((cause) => {
+          if (cause instanceof ApiError && cause.status === 403) { setReferencesRestricted(true); return {success:true,data:[]} as T }
+          throw cause
+        })
         const [tagRes, ffRes, scenarioRes, reminderRes, templateRes] = await Promise.all([
-          fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(tagPath),
-          selectedAccountId ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }) : Promise.resolve({ success: true as const, data: [] }),
-          api.scenarios.list(accountFilter),
-          api.reminders.list(accountFilter),
-          api.templates.list(undefined, selectedAccountId ?? undefined),
+          permitMissing(fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(tagPath)),
+          permitMissing(selectedAccountId ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }) : Promise.resolve({ success: true as const, data: [] })),
+          permitMissing(api.scenarios.list(accountFilter)),
+          permitMissing(api.reminders.list(accountFilter)),
+          permitMissing(api.templates.list(undefined, selectedAccountId ?? undefined)),
         ])
         if(!tagRes.success || !ffRes.success || !scenarioRes.success || !reminderRes.success || !templateRes.success){setReferencesError(true);throw new Error('references unavailable')}
         setRefs({
@@ -1031,6 +1037,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       <FormEditAttemptContext.Provider value={attempted}>
       <div className={styles.root} data-fe-root>
         {host?.notice}
+        {referencesRestricted ? <Notice tone="warn">権限のない候補は表示されません。設定済みの内容はそのまま残ります。</Notice> : null}
         {referencesError?<ListState kind="error" title="候補を読み込めませんでした" onRetry={()=>{setReferencesError(false);setError('');setReloadKey(value=>value+1)}}/>:null}
         {Object.keys(bookingStaffErrors).length > 0 ? <ListState kind="error" title="予約の担当を読み込めませんでした" onRetry={()=>setBookingStaffErrors({})}/>:null}
         {!conflict && error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
