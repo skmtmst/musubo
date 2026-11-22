@@ -115,7 +115,7 @@ export type MileageEarningRuleTestResult = {
  * **版を分けて持つ。** 公開中の版と直しかけの下書きは別で、
  * 直しても公開中の交換条件は変わらない。画面でもそこを混ぜない。
  */
-export type MileageRewardKind = 'coupon' | 'tag' | 'scenario' | 'template' | 'early_access' | 'rank'
+export type MileageRewardKind = 'handgift' | 'coupon' | 'tag' | 'scenario' | 'template' | 'early_access' | 'rank'
 
 export type MileageRewardStatus = 'draft' | 'published' | 'stopped' | 'archived'
 
