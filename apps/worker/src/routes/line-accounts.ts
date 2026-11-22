@@ -19,7 +19,7 @@ import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { auditLog } from '../lib/audit-log.js';
-import { fetchBotProfile, type BotProfile } from '../lib/bot-profile.js';
+import { fetchBotProfile } from '../lib/bot-profile.js';
 import { detectFollowerImportCapability, getFollowerImportState, processFollowerImportStep, scheduleInitialFollowerImport, startFollowerImport } from '../services/follower-import.js';
 import type { FollowerImportClient } from '../services/follower-import-state.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope, validateAccountHierarchy } from '../services/account-access.js';
@@ -27,6 +27,7 @@ import { copyLineAccountSettings, normalizeCopyItems } from '../services/account
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { lineConnectStep, prepareLineConnection, type LineConnectStep } from '../services/line-account-connect.js';
 import { getLineRegistrationReceipt } from '../services/line-registration-receipt.js';
+import { issuedLineTokenExpiry, issueLineAccessToken, LineTokenIssueError, type TokenResponse } from '../services/token-refresh.js';
 import { getAuthorizedLineAccount, getVisibleLineAccountEntry } from './line-account-access.js';
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
@@ -34,7 +35,7 @@ import { LINE_LIVE_ACCOUNT_CONCURRENCY, hasTenantWideLineAccountScope, lifecycle
 import { readCapacity, normalizeOptionalString, validateLoginChannelPair, readConnectBody, type ConnectBody } from './line-accounts-input.js';
 import { serializeLineAccount, serializeLineAccountFull } from './line-accounts-view.js';
 import { fetchPreConnectFollowerTotal, fetchPreConnectFollowerInsight } from '../services/musubo-large-line-consultation.js';
-import { acceptedWebhookUrls, isAcceptedWebhookUrl, publicAccountUrls,
+import { acceptedWebhookUrls, collectConnectionChecks, publicAccountUrls,
   connectionCheckResponse, readLiveAccountConnection, verifyConnection } from './line-accounts-connection-view.js';
 
 const lineAccounts = new Hono<Env>();
@@ -137,111 +138,6 @@ lineAccounts.get('/api/line-accounts/summary', async (c) => {
     throw err;
   }
 });
-
-type ConnectionCheckDraft = {
-  kind: 'bot_info' | 'webhook_endpoint' | 'webhook_test' | 'liff_config';
-  result: 'matched' | 'mismatched' | 'unconfigured' | 'unknown' | 'ok' | 'failed';
-  expectedUrl?: string | null;
-  registeredUrl?: string | null;
-  webhookActive?: boolean | null;
-  httpStatus?: number | null;
-};
-
-async function collectConnectionChecks(
-  account: DbLineAccount,
-  expectedWebhookUrl: string,
-  expectedLiffEndpointUrl: string | null,
-  acceptedWebhook: readonly string[] = [expectedWebhookUrl],
-): Promise<{ checks: ConnectionCheckDraft[]; botProfile: BotProfile | null }> {
-  const checks: ConnectionCheckDraft[] = [];
-  const headers = { Authorization: `Bearer ${account.channel_access_token}` };
-  let botOk = false;
-  let botProfile: BotProfile | null = null;
-  try {
-    const response = await fetch('https://api.line.me/v2/bot/info', { headers });
-    botOk = response.ok;
-    if (response.ok) botProfile = await response.json<BotProfile>();
-    checks.push({ kind: 'bot_info', result: response.ok ? 'ok' : 'failed', httpStatus: response.status });
-  } catch {
-    checks.push({ kind: 'bot_info', result: 'failed', httpStatus: null });
-  }
-
-  let endpointResult: ConnectionCheckDraft = {
-    kind: 'webhook_endpoint',
-    result: 'unknown',
-    expectedUrl: expectedWebhookUrl,
-    registeredUrl: null,
-    webhookActive: null,
-    httpStatus: null,
-  };
-  let mayTestWebhook = false;
-  if (botOk) {
-    try {
-      const response = await fetch('https://api.line.me/v2/bot/channel/webhook/endpoint', { headers });
-      if (response.ok) {
-        const payload = await response.json<{ endpoint?: string; active?: boolean }>();
-        const registeredUrl = payload.endpoint?.trim() || null;
-        const active = payload.active === true;
-        endpointResult = {
-          kind: 'webhook_endpoint',
-          result: !registeredUrl
-            ? 'unconfigured'
-            : isAcceptedWebhookUrl(registeredUrl, acceptedWebhook) && active
-              ? 'matched'
-              : 'mismatched',
-          expectedUrl: expectedWebhookUrl,
-          registeredUrl,
-          webhookActive: payload.active == null ? null : active,
-          httpStatus: response.status,
-        };
-        mayTestWebhook = endpointResult.result === 'matched';
-      } else {
-        endpointResult.httpStatus = response.status;
-      }
-    } catch {
-      // The canonical unknown state intentionally stores null for unavailable values.
-    }
-  }
-  checks.push(endpointResult);
-
-  if (mayTestWebhook) {
-    try {
-      const response = await fetch('https://api.line.me/v2/bot/channel/webhook/test', {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: '{}',
-      });
-      const payload = response.ok ? await response.json<{ success?: boolean }>() : null;
-      checks.push({
-        kind: 'webhook_test',
-        result: response.ok && payload?.success === true ? 'ok' : 'failed',
-        expectedUrl: expectedWebhookUrl,
-        httpStatus: response.status,
-      });
-    } catch {
-      checks.push({ kind: 'webhook_test', result: 'unknown', expectedUrl: expectedWebhookUrl });
-    }
-  } else {
-    checks.push({ kind: 'webhook_test', result: 'unknown', expectedUrl: expectedWebhookUrl });
-  }
-
-  const loginMatchesLiff = Boolean(
-    account.login_channel_id &&
-    account.login_channel_secret &&
-    account.liff_id &&
-    /^\d+$/.test(account.login_channel_id) &&
-    /^\d+-[A-Za-z0-9]+$/.test(account.liff_id) &&
-    account.liff_id.startsWith(`${account.login_channel_id}-`),
-  );
-  checks.push({
-    kind: 'liff_config',
-    // LINE は登録済み Webhook URL の読取 API を公開しないため、ローカルの組合せが正しくても一致と断定せず不明にする。
-    result: loginMatchesLiff ? 'unknown' : 'failed',
-    expectedUrl: expectedLiffEndpointUrl,
-    registeredUrl: null,
-  });
-  return { checks, botProfile };
-}
 
 // 保存前の接続確認。成功してもDBには一切書き込まない。
 lineAccounts.post(
@@ -928,8 +824,8 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
   if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   const musuboGate = await musuboFirstLineGate(c);
   if (musuboGate instanceof Response) return musuboGate;
-  // LINE の接続（新しいアカウントの接続）は大事な操作（V）。
-  if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
+  // 追加料金を予約した接続は、決済・有効化へ進む前に本人確認する。
+  if (musuboGate === 'reserved_addition' && !await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
   }
   const parsed = await readConnectRequest(c);
@@ -1625,6 +1521,9 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
       ogDefaultDescription?: string | null;
       officialProfileUrl?: string | null;
     }>();
+    if (body.channelAccessToken !== undefined) {
+      return inputError(c, { success: false, error: 'チャネルアクセストークンはmusuboが自動更新します。' }, 422, ['channelAccessToken']);
+    }
     // 送受信の停止・再開は理由が必須（X-1）。この窓口では受けない。
     if (body.isActive !== undefined && Boolean(currentAccount.is_active) !== body.isActive) {
       return inputError(c, {
@@ -1674,7 +1573,6 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
     // 表示項目と資格情報は別関数で更新する。不要な updated_at の変更を防ぐため、対象のない側は呼ばない。
     const credentialsTouched =
       body.name !== undefined ||
-      body.channelAccessToken !== undefined ||
       body.channelSecret !== undefined ||
       loginChannelId !== undefined ||
       loginChannelSecret !== undefined ||
@@ -1687,19 +1585,28 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
       return stepUpRequiredResponse(c, '接続情報の変更には本人確認が必要です');
     }
 
-    if ((body.channelAccessToken !== undefined || body.channelSecret !== undefined) && !await verifyLineMessagingIdentity({
-      channelId: currentAccount.channel_id,
-      channelSecret: body.channelSecret ?? currentAccount.channel_secret,
-      channelAccessToken: body.channelAccessToken ?? currentAccount.channel_access_token,
-    })) {
-      return inputError(c, { success: false, error: '同じMessaging APIチャネルのシークレット・アクセストークンを指定してください' }, 422, ['channelSecret', 'channelAccessToken']);
+    const channelSecret = body.channelSecret?.trim();
+    let issuedToken: TokenResponse | undefined;
+    if (body.channelSecret !== undefined) {
+      const secretError = 'Messaging APIのチャネルシークレットを確認してください。';
+      if (!channelSecret) return inputError(c, { success: false, error: secretError }, 422, ['channelSecret']);
+      try {
+        issuedToken = await issueLineAccessToken(currentAccount.channel_id, channelSecret);
+      } catch (error) {
+        if (!(error instanceof LineTokenIssueError)) throw error;
+        if (error.reason === 'credentials') return inputError(c, { success: false, error: secretError }, 422, ['channelSecret']);
+        return c.json({ success: false, error: 'LINEに一時的に接続できません。時間をおいて、もう一度お試しください。' }, 503);
+      }
+      const profile = await fetchBotProfile(issuedToken.access_token);
+      if (!profile.displayName) return c.json({ success: false, error: 'LINE公式アカウント情報を取得できませんでした。' }, 503);
     }
 
     let updated = credentialsTouched
       ? await updateLineAccount(c.env.DB, id, {
           name: body.name,
-          channel_access_token: body.channelAccessToken,
-          channel_secret: body.channelSecret,
+          channel_access_token: issuedToken?.access_token,
+          token_expires_at: issuedToken ? issuedLineTokenExpiry(issuedToken.expires_in) : undefined,
+          channel_secret: channelSecret,
           login_channel_id: loginChannelId,
           login_channel_secret: loginChannelSecret,
           liff_id: liffId,

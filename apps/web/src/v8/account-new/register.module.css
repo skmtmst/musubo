@@ -214,11 +214,10 @@
   border-radius: var(--tpl-htn-radius-m); background: var(--color-canvas); box-shadow: var(--tpl-htn-ring);
 }
 .qrFrame img { display: block; width: 100%; height: 100%; }
-.qrSide { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-gap-s); }
+.qrSide { flex: 1 1 var(--tpl-htn6-qr); min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-gap-s); }
 .receiptState { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); }
 .receiptState p { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
 .receiptState p:first-child { font-weight: 700; color: var(--color-accent-deep); }
-.receiptSuccess p:first-child { color: var(--color-success); }
 .receiptError p:first-child { color: var(--color-danger); }
 .receiptAccount {
   display: flex; align-items: center; gap: var(--tpl-htn-gap-s); padding: var(--tpl-htn6-err-pad);

@@ -43,6 +43,12 @@ function columnsOf(table: string): Set<string> {
 }
 
 describe('保存期限の分類表', () => {
+  it('同じ表の分類を複数書かない', () => {
+    const duplicates = sqlite.prepare(`SELECT key, count(*) AS count FROM json_each(?) GROUP BY key HAVING count(*) > 1 ORDER BY key`);
+    expect(duplicates.all('{"same":1,"same":2}')).toEqual([{ key: 'same', count: 2 }]);
+    const source = readFileSync(join(packageRoot, 'src/data-retention-tables.json'), 'utf8');
+    expect(duplicates.all(source)).toEqual([]);
+  });
   it('匿名化の印を含む飲食予約は統括の消去対象', () => {
     expect(columnsOf('rt_reservations').has('customer_anonymized')).toBe(true);
     expect(RETENTION_TABLES.rt_reservations).toMatchObject({ category: 'purge', scope: { by: 'parent', parent: 'rt_stores' } });
