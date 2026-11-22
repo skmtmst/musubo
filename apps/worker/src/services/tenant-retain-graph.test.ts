@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { buildTombstoneValues } from './tenant-purge-generic.js';
 import { expect, test } from 'vitest';
 import { gapFixture } from '../test-utils/gap1.js';
 import { discoverRetainedPurgeAncestors, retainedPurgeAncestors } from './tenant-retain-graph.js';
@@ -48,22 +50,36 @@ test('every textual column of each retained parent has an explicit documented di
   const {default: inventory}=await import('./tenant-retain-text-inventory.json');
   const {default: policies}=await import('./tenant-retain-column-policies.json');
   const specialized = new Set(['line_accounts','friends','rt_stores','rt_organizations','broadcasts','menus']);
+  const tombstones=readFileSync(new URL('./tenant-purge-tombstones.ts',import.meta.url),'utf8');
+  const assertColumns = (table:string, expected:Record<string,unknown>) => {
+    const actual=(f.raw.pragma(`table_info("${table}")`) as {name:string;type:string}[])
+      .filter(column=>/CHAR|CLOB|TEXT|JSON/i.test(column.type)).map(column=>column.name).sort();
+    expect(actual,table).toEqual(Object.keys(expected).sort());
+  };
   const f=gapFixture();
   const parents=await discoverRetainedPurgeAncestors(f.db);
   expect(Object.keys(inventory).sort()).toEqual(parents);
   for (const table of parents) {
     const declared=inventory[table as keyof typeof inventory] as Record<string,{action:string;reason:string}>;
-    const cols=(f.raw.pragma(`table_info("${table}")`) as {name:string;type:string}[])
-      .filter(column => /CHAR|CLOB|TEXT|JSON/i.test(column.type)).map(column=>column.name).sort();
-    expect(Object.keys(declared).sort(),table).toEqual(cols);
+    assertColumns(table,declared);
     for (const [column,entry] of Object.entries(declared)) {
       expect(['retain','erase'],`${table}.${column}`).toContain(entry.action);
       expect(entry.reason.trim(),`${table}.${column}`).not.toBe('');
       const decision=(policies[table as keyof typeof policies].columns as Record<string,{action:string}>)[column];
-      if (decision && !specialized.has(table)) expect(entry.action,`${table}.${column}`).toBe(decision.action === 'retain' ? 'retain' : 'erase');
+      if (!specialized.has(table)) {
+        if (entry.action === 'erase') {
+          expect(decision,`${table}.${column}`).toBeDefined();
+          expect(decision.action,`${table}.${column}`).not.toBe('retain');
+          const sample=decision.action==='json' ? (table==='common_action_versions' ? '[{"id":"step","type":"send_message","content":"private"}]' : '{"content":"private"}') : 'private';
+          const result=buildTombstoneValues(table,'row',{[column]:sample},{columns:{[column]:decision as never}});
+          expect(String(result[column]),`${table}.${column}`).not.toContain('private');
+        } else if (decision) expect(decision.action,`${table}.${column}`).toBe('retain');
+      } else if (entry.action==='erase') {
+        const assignment=tombstones.split(`UPDATE ${table} SET`)[1]?.split('WHERE ')[0] ?? '';
+        expect(assignment,`${table}.${column}`).toMatch(new RegExp(`\\b${column}\\s*=`));
+      }
     }
   }
   f.raw.exec('ALTER TABLE staff ADD COLUMN newly_added_secret TEXT');
-  const changed=(f.raw.pragma('table_info(staff)') as {name:string;type:string}[]).filter(c=>/CHAR|CLOB|TEXT|JSON/i.test(c.type)).map(c=>c.name).sort();
-  expect(changed).not.toEqual(Object.keys(inventory.staff).sort());
+  expect(()=>assertColumns('staff',inventory.staff)).toThrow();
 });
