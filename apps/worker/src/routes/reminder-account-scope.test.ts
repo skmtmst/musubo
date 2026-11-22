@@ -56,6 +56,8 @@ function exec(sql: string, params: unknown[] = []) {
  * 版2（B）で公開ずみ。現行の手順はBだけを見る。
  */
 async function seedMovedRule() {
+  await exec(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+    VALUES ('acct-a','channel-a','A','test','test'), ('acct-b','channel-b','B','test','test'), ('acct-c','channel-c','C','test','test')`);
   await exec(`INSERT INTO friends (id, line_user_id, display_name, line_account_id)
     VALUES ('friend-a', 'U_A', 'A客', 'acct-a'), ('friend-b', 'U_B', 'B客', 'acct-b')`);
   await exec(`INSERT INTO reminders (id, name, line_account_id) VALUES ('rem-1', '来店前日', 'acct-b')`);
@@ -257,6 +259,15 @@ describe('R350 個別登録の取消は一覧側と同じ結果になる', () =>
     const run = await sqlite.db.prepare('SELECT status FROM reminder_delivery_runs WHERE id = ?')
       .bind('run-a').first<{ status: string }>();
     expect(run?.status).toBe('cancelled');
+  });
+
+  test('削除済みアカウントの登録は操作できない', async () => {
+    await seedMovedRule();
+    setScope(['acct-a', 'acct-b']);
+    await exec("UPDATE line_accounts SET data_purged_at='2027-01-01' WHERE id='acct-a'");
+    const response = await app().request('/api/friend-reminders/fr-a', { method: 'DELETE' });
+    expect(response.status).toBe(404);
+    expect(await sqlite.db.prepare('SELECT status FROM friend_reminders WHERE id=?').bind('fr-a').first()).toEqual({status:'active'});
   });
 
   test('片方だけの担当者には見つからない', async () => {
