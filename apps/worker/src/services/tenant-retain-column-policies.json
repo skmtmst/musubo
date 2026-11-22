@@ -290,8 +290,8 @@
   "common_action_versions": {
     "columns": {
       "created_by": {
-        "action": "null",
-        "reason": "担当者の識別情報を消去"
+        "action": "retain",
+        "reason": "公開済み共通アクションの版は不変の店の定義のため保持"
       }
     }
   },
@@ -406,8 +406,8 @@
   "event_versions": {
     "columns": {
       "snapshot_json": {
-        "action": "json",
-        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+        "action": "retain",
+        "reason": "公開済みイベントの版は店の定義のため保持"
       }
     }
   },
@@ -786,36 +786,36 @@
   "menus": {
     "columns": {
       "name": {
-        "action": "placeholder",
-        "reason": "必須文字列を定型値に置換"
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
       },
       "description": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
       },
       "fixed_meeting_url": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
       },
       "audience_tag_ids_json": {
-        "action": "json",
-        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
       },
       "recurring_freqs_json": {
-        "action": "json",
-        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
       },
       "addon_menu_ids_json": {
-        "action": "json",
-        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
       },
       "image_url": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
       },
       "photo_media_id": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
       }
     }
   },

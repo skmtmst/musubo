@@ -80,7 +80,9 @@ test('monthly contract and retained rights survive tenant purge while customer a
   await monthlyContract(f,{classKind:'event',classId:'class'});
   monthlyCycle(f,{paid:true}); activateMonthly(f); monthlyRight(f,'event'); monthlyUse(f,'event');
   monthlyCycle(f,{id:'renewal',month:'2026-12',kind:'renewal'});
-  f.raw.exec(`INSERT INTO booking_entitlement_events(id,entitlement_id,line_account_id,action,reason,actor_type,actor_id,request_key,request_json,after_json,created_at)
+  f.raw.exec(`INSERT INTO event_versions(id,event_id,line_account_id,version_number,snapshot_json,approval_deadline_hours,published_at)
+      VALUES('event-version','class','a',1,'{"name":"店の教室","url":"https://example.test"}',24,'2026-01-01');
+    INSERT INTO booking_entitlement_events(id,entitlement_id,line_account_id,action,reason,actor_type,actor_id,request_key,request_json,after_json,created_at)
       VALUES('ent-event','grant','a','grant','fixture','system','system','ent-event-key','{}','{}','2026-11-01');
     INSERT INTO booking_entitlement_month_limits(entitlement_id,period_start,period_end,allowance)
       VALUES('grant','2026-10-31','2026-11-30',4);
@@ -101,6 +103,7 @@ test('monthly contract and retained rights survive tenant purge while customer a
   for (const table of ['booking_monthly_contracts','booking_monthly_active_slots','booking_monthly_cycles','booking_monthly_attempts','booking_monthly_event_applications','booking_monthly_operations','booking_monthly_rights','booking_pass_plans','booking_entitlements','booking_entitlement_events','booking_entitlement_month_limits','event_booking_entitlement_uses']) {
     expect((f.raw.prepare(`SELECT count(*) AS n FROM ${table}`).get() as {n:number}).n,table).toBeGreaterThan(0);
   }
+  expect(f.raw.prepare("SELECT snapshot_json FROM event_versions WHERE id='event-version'").get()).toEqual({snapshot_json:'{"name":"店の教室","url":"https://example.test"}'});
   expect(f.raw.prepare("SELECT customer_id,payment_method_id FROM booking_monthly_contracts WHERE id='contract'").get()).toEqual({customer_id:null,payment_method_id:null});
   expect(f.raw.prepare("SELECT payment_method_id FROM booking_monthly_attempts WHERE cycle_id='renewal'").get()).toEqual({payment_method_id:'purged:renewal:0'});
   expect(f.raw.prepare("SELECT reason,granted_by FROM booking_makeup_credits WHERE id='credit'").get()).toEqual({reason:null,granted_by:'（削除済み）'});

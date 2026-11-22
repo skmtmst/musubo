@@ -5,9 +5,9 @@ type Fixture = {
   db: () => SqliteD1;
   seed: () => void;
   session: () => Promise<string>;
-  request: (path: string) => Promise<Response>;
-  requestAs: (path: string, token: string) => Promise<Response>;
-  requestWithMethod: (path: string, method: string, body: unknown) => Promise<Response>;
+  request: (path: string) => Response | Promise<Response>;
+  requestAs: (path: string, token: string) => Response | Promise<Response>;
+  requestWithMethod: (path: string, method: string, body: unknown) => Response | Promise<Response>;
 };
 
 export function registerRestaurantTombstoneTests(fixture: Fixture) {

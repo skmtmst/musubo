@@ -170,7 +170,7 @@ test('retained pass plan and referenced menu are stopped and anonymized without 
   expect(await tombstoneBookingMenu(f.db, 't', 'menu', now)).toBe(true);
   expect(await tombstonePassPlan(f.db, 't', 'plan', now)).toBe(true);
   expect(await tombstonePassPlan(f.db, 't', 'plan', now)).toBe(false);
-  expect(f.raw.prepare("SELECT name,description,base_price,is_active FROM menus WHERE id='menu'").get()).toEqual({name:'削除済み',description:null,base_price:8400,is_active:0});
+  expect(f.raw.prepare("SELECT name,description,base_price,is_active FROM menus WHERE id='menu'").get()).toEqual({name:'private menu',description:'private description',base_price:8400,is_active:0});
   expect(f.raw.prepare("SELECT name,price,valid_days,status FROM booking_pass_plans WHERE id='plan'").get()).toEqual({name:'削除済み',price:1000,valid_days:180,status:'stopped'});
   expect(f.raw.prepare("SELECT menu_id,plan_id FROM booking_entitlements WHERE id='entitlement'").get()).toEqual({menu_id:'menu',plan_id:'plan'});
 });
