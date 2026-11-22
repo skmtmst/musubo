@@ -2,13 +2,25 @@ import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
 import {acquireWorkflow} from './workflow-execution.js';
 import {workflowLineClient} from './workflow-line-client.js';
-import {getWorkflowStep} from '@line-crm/db';
+import {ensureWorkflowStep,getWorkflowStep} from '@line-crm/db';
 import type {LineClient} from '@line-crm/line-sdk';
 let item:SqliteD1;
 const ref={scopeId:'line:a',processKind:'line_event',subjectId:'event'};
 beforeEach(()=>{item=createTestD1();item.raw.exec('CREATE TABLE effects(n INTEGER);INSERT INTO effects VALUES(0)')});
 afterEach(()=>item.raw.close());
 describe('PKG67 shared workflow recovery',()=>{
+ it('取消済みの送信工程は同じキーで再開しても送らない',async()=>{
+  const execution=(await acquireWorkflow(item.db,ref))!;
+  const step={...ref,stepKey:'customer_notification'};
+  await ensureWorkflowStep(item.db,step,{input:{to:'U1',messages:[{type:'text',text:'private'}]}});
+  item.raw.prepare("UPDATE workflow_steps SET status='canceled',input_json=?,result_json=?,error_code='customer_deleted' WHERE step_key=?")
+   .run('{"redacted":true}','{"redacted":true}',step.stepKey);
+  const send=vi.fn().mockResolvedValue(undefined);
+  const client=workflowLineClient({pushMessage:send} as unknown as LineClient,execution,{stepKey:step.stepKey});
+  await expect(client.pushMessage('U1',[{type:'text',text:'private'}])).rejects.toThrow('canceled');
+  expect(send).not.toHaveBeenCalled();
+  expect((await getWorkflowStep(item.db,step))?.status).toBe('canceled');
+ });
  it('replays a frozen read/write plan after interruption without repeating increments',async()=>{
   const one=(await acquireWorkflow(item.db,ref))!;
   await one.step('done',async()=>{await one.mutationDb('done').prepare('UPDATE effects SET n=n+1').run()});
