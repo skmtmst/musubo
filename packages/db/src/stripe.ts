@@ -53,7 +53,11 @@ export async function createStripeEvent(
 ): Promise<StripeEventRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db.prepare(`INSERT INTO stripe_events (id, stripe_event_id, event_type, friend_id, amount, currency, metadata, processed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.stripeEventId, input.eventType, input.friendId ?? null, input.amount ?? null, input.currency ?? null, input.metadata ?? null, now).run();
+  // 削除後に届いた通知で顧客 ID や自由形式の metadata を再保存しない。
+  await db.prepare(`INSERT INTO stripe_events (id, stripe_event_id, event_type, friend_id, amount, currency, metadata, processed_at)
+    VALUES (?, ?, ?, CASE WHEN EXISTS(SELECT 1 FROM friends WHERE id=?) THEN ? ELSE NULL END, ?, ?,
+      CASE WHEN ? IS NOT NULL AND NOT EXISTS(SELECT 1 FROM friends WHERE id=?) THEN NULL ELSE ? END, ?)`)
+    .bind(id, input.stripeEventId, input.eventType, input.friendId ?? null, input.friendId ?? null, input.amount ?? null, input.currency ?? null,
+      input.friendId ?? null, input.friendId ?? null, input.metadata ?? null, now).run();
   return (await db.prepare(`SELECT * FROM stripe_events WHERE id = ?`).bind(id).first<StripeEventRow>())!;
 }

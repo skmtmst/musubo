@@ -1,6 +1,7 @@
 import { auditEventStatement, RETENTION_R2_KEY_COLUMNS } from '@line-crm/db';
 import relations from './customer-data-relations.json';
 import protectedRelations from './customer-data-protected-relations.json';
+import { financialRedactionStatements } from './customer-data-financial-redaction.js';
 
 export type DeletionKind = 'form_response' | 'friend_data';
 export type DeletionTarget = {
@@ -90,6 +91,10 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
   const params = target.kind === 'friend_data' ? [target.id, target.lineUserId ?? '', target.accountId] : [target.id];
   // 未適用・途中の移行では削除意図や R2 を変更する前に止める。SQL 識別子は承認済みの保持参照だけを使う。
   if (target.kind === 'friend_data') {
+    for(const table of ['booking_payments','booking_audit_logs']) {
+      const columns=(await db.prepare(`PRAGMA table_info(${q(table)})`).all<{name:string}>()).results;
+      if(!columns.some(column=>column.name==='customer_redacted_at')) throw new DeletionFailure(409,'deletion_schema_approval_required');
+    }
     for (const [table, refs] of Object.entries(protectedGraph)) {
       const columns = (await db.prepare(`PRAGMA table_info(${q(table)})`).all<{ name: string; notnull: number }>()).results;
       const foreignKeys = (await db.prepare(`PRAGMA foreign_key_list(${q(table)})`).all<{ from: string; table: string; on_delete: string }>()).results;
@@ -151,6 +156,9 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       const columns = RETENTION_R2_KEY_COLUMNS.filter(entry => entry.table === table).map(entry => entry.column);
       snapshots.push({ table, condition, rows, keys: rows.flatMap(row => columns.flatMap(col => typeof row[col] === 'string' && row[col] ? [row[col] as string] : [])) });
     }
+    // 予約の所属が削除対象と違えば、会計の参照を安全に消し分けられない。
+    if(target.kind==='friend_data' && (snapshots.find(snapshot=>snapshot.table==='bookings')?.rows ?? []).some(row=>!target.accountId || row.line_account_id!==target.accountId))
+      throw new DeletionFailure(409,'deletion_account_scope_conflict');
     const keys = [...new Set(snapshots.flatMap(snapshot => snapshot.keys))];
     if (keys.length && !env.IMAGES) throw new DeletionFailure(503, 'deletion_retry_required');
     // R2 の削除は冪等なので、全削除が成功するまで DB のキーを残して再試行可能にする。
@@ -187,6 +195,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
     }
     const byTable = new Map(snapshots.map(snapshot => [snapshot.table, snapshot]));
     if (target.kind === 'friend_data') {
+      statements.push(...financialRedactionStatements(db,target.accountId,target.id,(byTable.get('bookings')?.rows ?? []).map(row=>String(row.id))));
       const affiliateCondition = conditions.affiliates;
       // 承認済み保持表以外へスキーマを増やさず、既に NULL を許す参照を解除する。紹介者の名前とコードも除く。
       statements.push(db.prepare(`UPDATE conversion_events SET affiliate_id = NULL, affiliate_code = NULL
@@ -218,9 +227,10 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       after: { deletedRows: completed.rows }, createdAt: completed.completedAt, retentionClass: 'general' }));
     await db.batch(statements);
     return { deleted: true, replayed: false };
-  } catch {
+  } catch (error) {
     // 記録は固定コードに限り、顧客本文・ファイル名・キー・外部エラーをログへ出さない。
     await db.prepare("UPDATE operation_audit SET action = 'retryable' WHERE id = ? AND action = 'deleting' AND json_extract(detail_json,'$.token') = ?").bind(id, token).run().catch(() => {});
+    if(error instanceof DeletionFailure && error.status===409) throw error;
     throw new DeletionFailure(503, 'deletion_retry_required');
   }
 }

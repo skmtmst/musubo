@@ -59,6 +59,15 @@ test('B1-16 B1-18 B1-19: 理由つき免除・全額模擬返金・スタッフ�
  expect((await gapCall(app(),refund,'POST',{...body,confirmedIrreversible:false})).status).toBe(400);
  expect((await gapCall(app(),refund,'POST',body)).status).toBe(200);expect((await gapCall(app(),refund,'POST',body)).status).toBe(409);
 });
+test('顧客削除済みの請求は免除・返金時に新しい自由文を保存しない',async()=>{
+ connect();
+ d.raw.exec(`INSERT INTO booking_charges(id,booking_id,line_account_id,kind,amount,policy_snapshot_json,status,version,created_at,updated_at) VALUES
+  ('waive','deleted-booking','a','cancellation_fee',100,'{}','pending',1,'2026-01-01','2026-01-01'),
+  ('refund','deleted-booking','a','no_show_fee',100,'{}','succeeded',1,'2026-01-01','2026-01-01')`);
+ expect((await gapCall(app(),'/api/booking/admin/charges/waive/waive?account_id=a','POST',{reason:'秘密の理由',expectedVersion:1})).status).toBe(200);
+ expect((await gapCall(app(),'/api/booking/admin/charges/refund/refund?account_id=a','POST',{reason:'秘密の理由',expectedVersion:1,confirmed:true,confirmedIrreversible:true})).status).toBe(200);
+ expect(d.raw.prepare("SELECT reason FROM booking_charges ORDER BY id").all()).toEqual([{reason:'削除済み'},{reason:'削除済み'}]);
+});
 test('B1-08 B1-11: 本人のカード登録を1件にし、署名なしの完了は拒否',async()=>{
  connect();await save();const key=crypto.randomUUID(),url='/api/liff/booking/setup-intent?liffId=liff-a',body={menuId:'menu',policyAccepted:true};
  const request=()=>app().request(url,{method:'POST',headers:{Authorization:'Bearer token','Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(body)});

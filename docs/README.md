@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [顧客削除後の予約・決済の記録から個人情報を除く](release-log/unreleased/157-kenta-pii-audit.md) — 反映履歴、確認 2026-11-22。
+
 - [複数アカウント配信の再送時の重複を防止](release-log/unreleased/146-kenta-a21-multi-resend.md) — 反映履歴、確認 2026-11-21。
 
 - [開店準備の接続・コース入力・再開](release-log/unreleased/148-masato-first-guide-recheck.md) — 反映履歴、確認 2026-11-21。

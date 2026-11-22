@@ -33,10 +33,17 @@ import OperationTargetSummary from '@/components/shared/operation-target-summary
 import { RefundDialog, type RefundInput } from '@/components/shared/booking-confirm-dialogs'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 
-/** 読み取りAPIが返す操作した人と理由。未取得は値を作らずに表示する。 */
-type PaymentRecordWithActor = PaymentRecord & { actorLabel?: string | null }
+/** 読み取りAPIが返す操作した人と理由、お客さまの情報を削除した印（1）。未取得は値を作らずに表示する。 */
+type PaymentRecordWithActor = PaymentRecord & { actorLabel?: string | null; customerRedacted?: 0 | 1 }
 import styles from './payments.module.css'
 import { withHonorific } from '@line-crm/shared'
+import { DELETED_CUSTOMER_LABEL, DELETED_CUSTOMER_REFUND_REASON } from './labels'
+
+/** お客さまの情報を削除した支払い。名前・連絡先へはつながず、「削除済みのお客さま」と出す。 */
+const isDeletedCustomer = (record: PaymentRecord) => (record as PaymentRecordWithActor).customerRedacted === 1
+/** 窓・知らせに出すお客さまの呼び名（敬称つき）。 */
+const customerTitle = (record: PaymentRecord | null, fallback: string) =>
+  record && isDeletedCustomer(record) ? DELETED_CUSTOMER_LABEL : withHonorific(record?.friendName ?? fallback, 'さま')
 
 /* お支払いの記録（FY8HC）。返金は 2 段の確かめ（確かめの窓 → 金額を入れる）。 */
 
@@ -110,7 +117,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
   function menuFor(record: PaymentRecord): ActionMenuItem[] {
     return [
       ...(record.bookingId ? [{ id: 'open', label: '予約を開く', icon: <CalendarDays size={16} aria-hidden="true" />, href: `/booking/bookings?booking=${encodeURIComponent(record.bookingId)}` }] : []),
-      ...(canEdit && record.status === 'pending' ? [{ id: 'link', label: '支払いのリンクを送る', icon: <Send size={16} aria-hidden="true" />, onSelect: () => void previewLink(record) }] : []),
+      ...(canEdit && record.status === 'pending' && !isDeletedCustomer(record) ? [{ id: 'link', label: '支払いのリンクを送る', icon: <Send size={16} aria-hidden="true" />, onSelect: () => void previewLink(record) }] : []),
       ...(record.receiptUrl ? [{ id: 'receipt', label: '領収書を見る', icon: <FileText size={16} aria-hidden="true" />, href: record.receiptUrl, external: true }] : []),
       ...(canEdit && (record.status === 'paid' || record.status === 'partially_refunded') ? [{ id: 'refund', label: '返金する', tone: 'danger' as const, icon: <RotateCcw size={16} aria-hidden="true" />, onSelect: () => { refundOpeningScope.current = refundScope.current; setRefundError(null); setRefundTarget(record) } }] : []),
     ]
@@ -155,8 +162,10 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
     setRefunding(true)
     setRefundError(null)
     try {
+      const deleted = isDeletedCustomer(refundTarget)
       await bookingPaymentAdminApi.refund(refundTarget.id, {
-        amount: input.amount, reason: input.reason, notifyLine: input.notify, idempotencyKey: refundAttempt.current.key, expectedRevision: refundTarget.confirmationRevision ?? undefined,
+        amount: input.amount, reason: deleted ? DELETED_CUSTOMER_REFUND_REASON : input.reason, notifyLine: deleted ? false : input.notify,
+        idempotencyKey: refundAttempt.current.key, expectedRevision: refundTarget.confirmationRevision ?? undefined,
       })
     } catch (cause) {
       if (operationScope !== refundScope.current) return
@@ -165,6 +174,14 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
         refundAttempt.current = null
         void reload()
         notifyToast('支払いの内容が変わりました。一覧を確認して、もう一度操作してください。', { tone: 'error' })
+        return
+      }
+      // 開いたあとにお客さまの情報が削除された。理由を決まった値にするため、読み直してから開き直してもらう。
+      if (isConflictResponse(cause) && cause.code === 'deleted_customer_reason_required') {
+        setRefundTarget(null)
+        refundAttempt.current = null
+        void reload()
+        notifyToast('このお客さまの情報は削除されました。一覧を読み直したので、もう一度返金してください。', { tone: 'error' })
         return
       }
       setRefundError(isConflictResponse(cause) && cause.code === 'simulation_only'
@@ -180,7 +197,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
     }
     if (operationScope !== refundScope.current) return
     refundAttempt.current = null
-    notifySaved(`${withHonorific(refundTarget.friendName ?? 'お客さま', 'さま')}の ${formatYen(input.amount)} の返金を模擬で記録しました。実際の返金・LINE送信はしていません`)
+    notifySaved(`${customerTitle(refundTarget, 'お客さま')}の ${formatYen(input.amount)} の返金を模擬で記録しました。実際の返金・LINE送信はしていません`)
     setRefundTarget(null)
     void reload()
   }
@@ -220,16 +237,17 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
                     <tbody>{items.map((record) => {
                       const actor = (record as PaymentRecordWithActor).actorLabel ?? null
                       const menu = menuFor(record)
+                      const deleted = isDeletedCustomer(record)
                       return (
                         <Tr key={record.id} data-table-layout="columns">
                           <Td><TruncatedText value={formatListTimestamp(record.createdAt)} /></Td>
-                          <Td grow>{record.friendId ? <RowNameLink href={`/friends/detail?id=${encodeURIComponent(record.friendId)}`} title={record.friendName ?? ''}>{record.friendName ?? emptyValue('unknown')}</RowNameLink> : <TruncatedText value={record.friendName ?? emptyValue('unknown')} />}</Td>
+                          <Td grow>{deleted ? <TruncatedText value={DELETED_CUSTOMER_LABEL} /> : record.friendId ? <RowNameLink href={`/friends/detail?id=${encodeURIComponent(record.friendId)}`} title={record.friendName ?? ''}>{record.friendName ?? emptyValue('unknown')}</RowNameLink> : <TruncatedText value={record.friendName ?? emptyValue('unknown')} />}</Td>
                           <Td grow><span className={styles.cellStack}><TruncatedText value={record.bookingLabel ?? emptyValue('unknown')} />{record.bookingNote ? <span className={styles.cellSub}>{record.bookingNote}</span> : null}</span></Td>
                           <Td align="right"><TruncatedText value={formatYen(record.amount)} /></Td>
                           <Td>{(() => { const badge = paymentBadge(record.status); return badge ? <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge> : emptyValue('unknown') })()}</Td>
                           <Td><TruncatedText value={record.method === 'online' ? 'カード' : record.method === 'onsite' ? '店頭' : record.method ?? emptyValue('unknown')} /></Td>
                           <Td><TruncatedText value={actor ?? emptyValue('unknown')} /></Td>
-                          <ActionCell>{menu.length > 0 ? <RowMenu appearance="box" size="row" label={`${record.friendName ?? 'お支払い'}の操作`} open={openMenu === record.id} onOpenChange={(next) => setOpenMenu(next ? record.id : null)} items={menu} /> : null}</ActionCell>
+                          <ActionCell>{menu.length > 0 ? <RowMenu appearance="box" size="row" label={`${deleted ? DELETED_CUSTOMER_LABEL : record.friendName ?? 'お支払い'}の操作`} open={openMenu === record.id} onOpenChange={(next) => setOpenMenu(next ? record.id : null)} items={menu} /> : null}</ActionCell>
                         </Tr>
                       )
                     })}</tbody>
@@ -243,12 +261,13 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
         cancelLabel="閉じる" onCancel={() => setLinkPreview(null)}>
         {linkPreview?.url ? <CopyTextButton value={linkPreview.url} label="リンクをコピー" aria-label="支払いのリンクをコピー" /> : <p className={styles.minor}>リンクはまだ作られていません。</p>}
       </Dialog>
-      <RefundDialog open={refundTarget !== null && refundOpeningScope.current === refundScope.current} subtitle={`${withHonorific(refundTarget?.friendName ?? 'お客', 'さま')}・${refundTarget?.bookingLabel ?? ''}`}
-        targetSummary={<OperationTargetSummary accounts={[{ id: refundOpeningScope.current.accountId }]} externalTarget={{ label: '返金する支払い', name: refundTarget?.friendName ? `${withHonorific(refundTarget.friendName, 'さま')}・${refundTarget.bookingLabel ?? '予約名を確認できません'}` : undefined }} />}
+      <RefundDialog open={refundTarget !== null && refundOpeningScope.current === refundScope.current} subtitle={refundTarget && isDeletedCustomer(refundTarget) ? `${DELETED_CUSTOMER_LABEL}${refundTarget.bookingLabel ? `・${refundTarget.bookingLabel}` : ''}` : `${customerTitle(refundTarget, 'お客')}・${refundTarget?.bookingLabel ?? ''}`}
+        targetSummary={<OperationTargetSummary accounts={[{ id: refundOpeningScope.current.accountId }]} externalTarget={{ label: '返金する支払い', name: refundTarget && (refundTarget.friendName || isDeletedCustomer(refundTarget)) ? `${customerTitle(refundTarget, 'お客')}・${refundTarget.bookingLabel ?? '予約名を確認できません'}` : undefined }} />}
         paidAmount={Math.max(0, (refundTarget?.amount ?? 0) - (refundTarget?.refundedAmount ?? 0))} testMode={testMode} busy={refunding} error={refundError ?? undefined}
         facts={[{ label: '支払った額', value: `${formatYen(refundTarget?.amount)}（${refundTarget?.method === 'onsite' ? '店頭' : 'カード'}）` }, { label: 'これまでの返金', value: refundTarget?.refundedAmount ? formatYen(refundTarget.refundedAmount) : 'なし' }]}
         destination={refundTarget?.method === 'onsite' ? '店頭' : 'カード'}
-        messageFor={(input) => `${withHonorific(refundTarget?.friendName ?? 'お客', 'さま')}　${refundTarget?.bookingLabel ?? ''}のご予約のお支払いのうち ${formatYen(input.amount)} を返金しました。カードへの反映は数日かかることがあります。`}
+        messageFor={(input) => `${customerTitle(refundTarget, 'お客')}　${refundTarget?.bookingLabel ?? ''}のご予約のお支払いのうち ${formatYen(input.amount)} を返金しました。カードへの反映は数日かかることがあります。`}
+        deletedCustomerReason={refundTarget && isDeletedCustomer(refundTarget) ? DELETED_CUSTOMER_REFUND_REASON : undefined}
         onClose={() => { if (!refunding) { setRefundTarget(null); setRefundError(null) } }} onConfirm={(input) => void refund(input)} />
       {preparing.dialog}
     </div>

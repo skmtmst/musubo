@@ -88,13 +88,18 @@ export function CancelReservationDialog({ open, title, subtitle, facts, fullAmou
 
 export type RefundInput = { amount: number; reason: string; notify: boolean }
 
-export function RefundDialog({ open, subtitle, facts, paidAmount, testMode, busy, error, destination, actorLabel, messageFor, onClose, onConfirm, targetSummary }: {
+export function RefundDialog({ open, subtitle, facts, paidAmount, testMode, busy, error, destination, actorLabel, messageFor, deletedCustomerReason, onClose, onConfirm, targetSummary }: {
   open: boolean
   subtitle: string
   facts: Fact[]
   paidAmount: number
   targetSummary?: ReactNode
   testMode?: boolean
+  /**
+   * お客さまの情報を削除した支払いの返金。理由はこの値で記録し、理由の入力欄と「LINE で知らせる」は出さない
+   * （自由な文を残さず、知らせる相手もいない）。
+   */
+  deletedCustomerReason?: string
   /** 手順 2 の「返金先」（例「カード（•••• 4242）」）。 */
   destination?: string
   /** 手順 2 の「記録」に残る名前（例「見本 太郎（オーナー）」）。 */
@@ -114,17 +119,20 @@ export function RefundDialog({ open, subtitle, facts, paidAmount, testMode, busy
   useEffect(() => { if (open) { setStep(1); setMode('full'); setAmountText(''); setReason(''); setNotify(true) } }, [open])
   const amount = mode === 'full' ? paidAmount : Number(amountText.replace(/[^0-9]/g, '')) || 0
   const amountOk = amount > 0 && amount <= paidAmount
+  const deleted = deletedCustomerReason !== undefined
+  const reasonValue = deleted ? deletedCustomerReason : reason
+  const notifyValue = !deleted && notify
   const steps = <Steps label="返金の手順" currentKey={String(step)} steps={[{ key: '1', label: '金額と理由', state: step > 1 ? 'done' : 'todo' }, { key: '2', label: '確かめ', state: 'todo' }]} />
   return (
     <Dialog contentLayout="form" open={open} title={step === 1 ? '返金する' : `${yen(amount)} を返金しますか？`} description={subtitle} designWidth={480} busy={busy} error={error} steps={steps} stepKey={step}
       footerLead={<span className={styles.lead}>手順 {step} / 2</span>}
       confirmLabel={step === 1 ? '次へ' : `${yen(amount)}を返金する`} confirmIcon={step === 1 ? <ArrowRight size={16} aria-hidden="true" /> : undefined}
       tone={step === 2 ? 'destructive' : 'default'} confirmation={step === 2} cancelLabel={step === 1 ? 'キャンセル' : '戻る'}
-      confirmDisabled={!amountOk || !reason.trim()} confirmDisabledReason={!amountOk ? `返金する額を ${yen(paidAmount)} までで入れてください` : '返金の理由を入れてください'}
-      onCancel={() => (step === 2 ? setStep(1) : onClose())} onConfirm={() => (step === 1 ? setStep(2) : onConfirm({ amount, reason, notify }))}>
+      confirmDisabled={!amountOk || !reasonValue.trim()} confirmDisabledReason={!amountOk ? `返金する額を ${yen(paidAmount)} までで入れてください` : '返金の理由を入れてください'}
+      onCancel={() => (step === 2 ? setStep(1) : onClose())} onConfirm={() => (step === 1 ? setStep(2) : onConfirm({ amount, reason: reasonValue, notify: notifyValue }))}>
       <div className={styles.body}>
         {targetSummary}
-        {step === 1 ? <Facts facts={facts} testMode={testMode} testText="本当の返金は起きません" /> : null}
+        {step === 1 ? <Facts facts={deleted ? [...facts, { label: '返金の理由', value: deletedCustomerReason }] : facts} testMode={testMode} testText="本当の返金は起きません" /> : null}
         {step === 1 ? (
           <>
             <Field label="返金する額" optional={false}>
@@ -135,8 +143,10 @@ export function RefundDialog({ open, subtitle, facts, paidAmount, testMode, busy
               {mode === 'partial' ? <TextInput inputMode="numeric" aria-label="返金する金額" value={amountText} onChange={(e) => setAmountText(e.target.value)} placeholder="¥6,500" /> : null}
               {mode === 'partial' && amount > 0 ? <p className={styles.note}>{yen(paidAmount)} まで。残りの {yen(Math.max(0, paidAmount - amount))} は支払い済みのまま残ります。</p> : null}
             </Field>
-            <Field label="返金の理由" required note="理由は記録に残ります（だれが・いつ・理由）。お客さまには出ません。"><TextInput value={reason} onChange={(e) => setReason(e.target.value)} placeholder="1名減った分（当日のお電話）" /></Field>
-            <Checkbox checked={notify} onCheckedChange={setNotify}>LINE でお客さまに返金を知らせる</Checkbox>
+            {deleted ? <p className={styles.note}>{`お客さまの情報を削除したため、理由は「${deletedCustomerReason}」で記録します。LINE では知らせません。`}</p> : <>
+              <Field label="返金の理由" required note="理由は記録に残ります（だれが・いつ・理由）。お客さまには出ません。"><TextInput value={reason} onChange={(e) => setReason(e.target.value)} placeholder="1名減った分（当日のお電話）" /></Field>
+              <Checkbox checked={notify} onCheckedChange={setNotify}>LINE でお客さまに返金を知らせる</Checkbox>
+            </>}
           </>
         ) : (
           <div className={styles.confirm}>
@@ -145,10 +155,10 @@ export function RefundDialog({ open, subtitle, facts, paidAmount, testMode, busy
               { label: '返金する額', value: `${yen(amount)}（${amount < paidAmount ? '一部' : '全額'}）` },
               ...(destination ? [{ label: '返金先', value: destination }] : []),
               { label: '返金のあと', value: amount < paidAmount ? `支払い済み ${yen(paidAmount - amount)} が残ります` : '返金済みになります' },
-              { label: '理由', value: reason },
+              { label: '理由', value: reasonValue },
               ...(actorLabel ? [{ label: '記録', value: `${actorLabel} として残ります` }] : []),
             ]} />
-            {notify && messageFor ? <Field label="お客さまに送る LINE" optional={false}><Message text={messageFor({ amount, reason, notify })} /></Field> : <p className={styles.note}>{notify ? 'LINE でお客さまに知らせます。' : 'LINE では知らせません。'}</p>}
+            {notifyValue && messageFor ? <Field label="お客さまに送る LINE" optional={false}><Message text={messageFor({ amount, reason: reasonValue, notify: notifyValue })} /></Field> : <p className={styles.note}>{deleted ? 'お客さまの情報を削除したため、LINE では知らせません。' : notifyValue ? 'LINE でお客さまに知らせます。' : 'LINE では知らせません。'}</p>}
               <Notice tone="info">
                 返金は取り消せません。カードへの反映は 5〜10 日かかります。
               </Notice>

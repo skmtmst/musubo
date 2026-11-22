@@ -16,6 +16,18 @@ export const PERSONAL_DATA_RETENTION_JOB = {
   },
 } as const satisfies FeatureJobMetadata;
 
+export const BOOKING_AUDIT_RETENTION_JOB = {
+  name: 'booking audit retention',
+  classification: { kind: 'core', reason: '顧客削除後の最小監査の運用期限' },
+  enforcement: { mode: 'exempt', reason: '機能停止や店舗の個人データ期限設定に関係なく実行し、保持停止は尊重する' },
+} as const satisfies FeatureJobMetadata;
+
+export const BOOKING_FINANCIAL_RETENTION_JOB = {
+  name: 'booking financial retention',
+  classification: { kind: 'core', reason: '会計の記録の保存期限' },
+  enforcement: { mode: 'exempt', reason: '会計の保存期限は機能停止に関係なく守り、保持停止は尊重する' },
+} as const satisfies FeatureJobMetadata;
+
 export const TENANT_DATA_RETENTION_JOB = {
   name: 'tenant data retention purge',
   classification: { kind: 'core', reason: '退会後の顧客データ保存期限（★V6 36-2）' },

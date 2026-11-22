@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { parseRetentionPolicy, processPersonalDataRetention, RETENTION_POLICY_KEY, retentionCutoff } from './personal-data-retention.js';
+import { processBookingAuditRetention } from './booking-audit-retention.js';
 let db:ReturnType<typeof createTestD1>;
 beforeEach(()=>{
   db=createTestD1({foreignKeys:false});
@@ -59,4 +60,52 @@ it('keeps the existing twenty-deletion budget and leaves the remainder for the n
   expect(db.raw.prepare("SELECT COUNT(*) n FROM form_submissions WHERE friend_id='fa' AND created_at<'2026-01-01'").get()).toEqual({ n: 6 });
   expect((await processPersonalDataRetention({ DB: db.db }, now)).deleted).toBe(6);
   expect(db.raw.prepare("SELECT id FROM form_submissions WHERE id='other'").get()).toEqual({ id: 'other' });
+});
+
+it('顧客削除後の監査だけ10年で消し、保持停止・期限内・未匿名化の行は残す',async()=>{
+ const cutoff=retentionCutoff(now,3650),old=new Date(Date.parse(cutoff)-1000).toISOString(),recent=new Date(Date.parse(cutoff)+1000).toISOString();
+ const insert=db.raw.prepare("INSERT INTO booking_audit_logs(id,line_account_id,action,actor_type,occurred_at,customer_redacted_at) VALUES(?,?,'updated','system','2010-01-01',?)");
+ insert.run('expired-a','a',old);insert.run('recent-a','a',recent);insert.run('unmarked','a',null);insert.run('held-b','b',old);
+ db.raw.prepare('INSERT INTO account_settings(line_account_id,key,value) VALUES(?,?,?)').run('b',RETENTION_POLICY_KEY,JSON.stringify({enabled:false,hold:true,responseDays:365,blockedFriendDays:365}));
+ db.raw.exec("UPDATE line_accounts SET is_active=0 WHERE id='a'");
+ expect(await processBookingAuditRetention(db.db,now)).toEqual({deleted:1,failed:0});
+ expect(db.raw.prepare('SELECT id FROM booking_audit_logs ORDER BY id').all()).toEqual([{id:'held-b'},{id:'recent-a'},{id:'unmarked'}]);
+ expect(db.raw.prepare("SELECT after_json FROM audit_events WHERE action='privacy.booking_audit.expired' AND line_account_id='a'").get()).toEqual({after_json:JSON.stringify({deletedRows:1,cutoff})});
+});
+
+it('期限切れの監査の記録が失敗したら消去も巻き戻す',async()=>{
+ db.raw.exec("INSERT INTO booking_audit_logs(id,line_account_id,action,actor_type,occurred_at,customer_redacted_at) VALUES('expired-a','a','updated','system','2010-01-01','2010-01-01'); CREATE TRIGGER fail_expiry_audit BEFORE INSERT ON audit_events WHEN NEW.action='privacy.booking_audit.expired' BEGIN SELECT RAISE(ABORT,'fixture'); END;");
+ expect((await processBookingAuditRetention(db.db,now)).failed).toBe(1);
+ expect(db.raw.prepare("SELECT id FROM booking_audit_logs WHERE id='expired-a'").get()).toEqual({id:'expired-a'});
+});
+
+it('監査の期限処理は1回20件に限り、残りは次回に処理する',async()=>{
+ const insert=db.raw.prepare("INSERT INTO booking_audit_logs(id,line_account_id,action,actor_type,occurred_at,customer_redacted_at) VALUES(?,'a','updated','system','2010-01-01','2010-01-01')");
+ for(let i=0;i<25;i++)insert.run(`expired-${i}`);
+ expect(await processBookingAuditRetention(db.db,now)).toEqual({deleted:20,failed:0});
+ expect(await processBookingAuditRetention(db.db,now)).toEqual({deleted:5,failed:0});
+});
+
+it('監査の消去直前に保持停止された場合は削除しない',async()=>{
+ db.raw.exec("INSERT INTO booking_audit_logs(id,line_account_id,action,actor_type,occurred_at,customer_redacted_at) VALUES('expired-a','a','updated','system','2010-01-01','2010-01-01')");
+ const wrapped=new Proxy(db.db,{get(target,prop,receiver){
+  if(prop==='batch')return async (statements:D1PreparedStatement[])=>{
+   db.raw.prepare('INSERT INTO account_settings(line_account_id,key,value) VALUES(?,?,?)').run('a',RETENTION_POLICY_KEY,JSON.stringify({enabled:false,hold:true,responseDays:365,blockedFriendDays:365}));
+   return target.batch(statements);
+  };
+  return Reflect.get(target,prop,receiver);
+ }});
+ expect(await processBookingAuditRetention(wrapped,now)).toEqual({deleted:0,failed:0});
+ expect(db.raw.prepare("SELECT id FROM booking_audit_logs WHERE id='expired-a'").get()).toEqual({id:'expired-a'});
+});
+
+it('不正な方針の店が多数あっても、他の店の期限処理を妨げない',async()=>{
+ const account=db.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES(?,?, 'Fixture','unused','unused')");
+ const setting=db.raw.prepare('INSERT INTO account_settings(line_account_id,key,value) VALUES(?,?,?)');
+ const audit=db.raw.prepare("INSERT INTO booking_audit_logs(id,line_account_id,action,actor_type,occurred_at,customer_redacted_at) VALUES(?,?,'updated','system','2010-01-01','2010-01-01')");
+ for(let i=0;i<21;i++){const id=`invalid-${i}`;account.run(id,id);setting.run(id,RETENTION_POLICY_KEY,'{"hold":false}');audit.run(id,id);}
+ audit.run('valid-b','b');
+ expect(await processBookingAuditRetention(db.db,now)).toEqual({deleted:1,failed:0});
+ expect(db.raw.prepare("SELECT id FROM booking_audit_logs WHERE id='valid-b'").get()).toBeUndefined();
+ expect(db.raw.prepare("SELECT count(*) n FROM booking_audit_logs WHERE id LIKE 'invalid-%'").get()).toEqual({n:21});
 });

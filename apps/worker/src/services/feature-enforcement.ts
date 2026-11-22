@@ -18,6 +18,8 @@ import {
 import { featureContractIsAvailable, resolveEntitlements, resolveTenantEntitlements } from './billing-plans.js';
 import {
   PERSONAL_DATA_RETENTION_JOB,
+  BOOKING_AUDIT_RETENTION_JOB,
+  BOOKING_FINANCIAL_RETENTION_JOB,
   TENANT_DATA_RETENTION_JOB,
   GOOGLE_CONTENT_RETENTION_JOB,
   REGISTRATION_APPLICATION_RETENTION_JOB,
@@ -42,6 +44,8 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   {name:'AB test decisions (test transport)',classification:{kind:'feature',featureId:'broadcasts'},enforcement:{mode:'gated',sources:['apps/worker/src/features/broadcasts/broadcast-ab.ts'],markers:["gate.canRun(db,t.line_account_id,'broadcasts','AB test decisions (test transport)')"]}},
   {name:'calendar busy cache and switch jobs',classification:{kind:'feature',featureId:'booking'},enforcement:{mode:'gated',sources:['apps/worker/src/features/booking/booking-calendar-settings.ts'],markers:["gate.canRun(db,j.line_account_id,'booking','calendar busy cache and switch jobs')","gate.canRun(db,r.line_account_id,'booking','calendar busy cache and switch jobs')"]}},
   PERSONAL_DATA_RETENTION_JOB,
+  BOOKING_AUDIT_RETENTION_JOB,
+  BOOKING_FINANCIAL_RETENTION_JOB,
   {name:'line webhook recovery',classification:{kind:'core',reason:'保存済みのLINE受信から未完の工程だけを再開する'},enforcement:{mode:'exempt',reason:'基本受信の回収は単一機能に属さない。停止した契約・アカウントを除外し、採点・マイル・自動化・配送は既存の個別停止判定に従う。返信鍵なしと送達不明は要確認に止める'}},
   {name:'durable tracked click continuation',classification:{kind:'feature',featureId:'inflow_tracking'},enforcement:{mode:'gated',sources:['apps/worker/src/services/tracked-click-steps.ts'],markers:["featureId:'inflow_tracking'","job:'durable tracked click continuation'"]}},
   {name:'durable banner generation',classification:{kind:'core',reason:'統括のバナー生成の継続'},enforcement:{mode:'exempt',reason:'店舗別機能スイッチの対象外。生成の直前に統括の契約・枚数上限・停止依頼を判定する'}},

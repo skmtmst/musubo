@@ -1515,7 +1515,7 @@ CREATE TABLE "booking_audit_logs" (
   occurred_at     TEXT NOT NULL,   -- UTC ISO8601。Worker が書く
   request_id      TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, customer_redacted_at TEXT);
 
 CREATE TABLE booking_availability_exceptions (
   id TEXT PRIMARY KEY,
@@ -2026,7 +2026,7 @@ CREATE TABLE "booking_payments" (
   paid_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL, refunded_at TEXT, receipt_url TEXT, refunded_amount INTEGER NOT NULL DEFAULT 0
-  CHECK(typeof(refunded_amount)='integer' AND refunded_amount>=0 AND refunded_amount<=amount), actor_label TEXT, action_reason TEXT, confirmation_revision INTEGER NOT NULL DEFAULT 1,
+  CHECK(typeof(refunded_amount)='integer' AND refunded_amount>=0 AND refunded_amount<=amount), actor_label TEXT, action_reason TEXT, confirmation_revision INTEGER NOT NULL DEFAULT 1, customer_redacted_at TEXT,
   UNIQUE (line_account_id, idempotency_key)
 );
 
@@ -10214,8 +10214,12 @@ CREATE INDEX idx_billing_invoices_tenant_paid
 CREATE INDEX idx_booking_audit_logs_booking
   ON booking_audit_logs(line_account_id, booking_id, occurred_at);
 
+CREATE INDEX idx_booking_audit_redacted_retention ON booking_audit_logs(customer_redacted_at,line_account_id) WHERE customer_redacted_at IS NOT NULL;
+
 CREATE INDEX idx_booking_business_hours_setting_weekday
   ON booking_business_hours(booking_settings_id, weekday, start_time);
+
+CREATE INDEX idx_booking_charge_retention ON booking_charges(status,created_at,line_account_id);
 
 CREATE INDEX idx_booking_customers_account_name
   ON booking_customers(line_account_id, display_name);
@@ -10249,9 +10253,13 @@ CREATE INDEX idx_booking_operation_runs_status
 
 CREATE INDEX idx_booking_payment_booking_links_payment ON booking_payment_booking_links(payment_id,created_at);
 
+CREATE INDEX idx_booking_payment_event_retention ON booking_payment_events(payment_id,received_at,line_account_id);
+
 CREATE INDEX idx_booking_payment_events_account_received ON booking_payment_events(line_account_id,received_at DESC,id);
 
 CREATE INDEX idx_booking_payment_refunds_account_date ON booking_payment_refunds(line_account_id,created_at);
+
+CREATE INDEX idx_booking_payment_retention ON booking_payments(status,created_at,line_account_id);
 
 CREATE INDEX idx_booking_payments_booking
   ON booking_payments(booking_id, created_at DESC);
@@ -11885,6 +11893,8 @@ CREATE INDEX idx_stop_suppressions_lookup
   ON entry_route_stop_suppressions (line_account_id, line_user_id, expires_at);
 
 CREATE INDEX idx_stripe_events_friend ON stripe_events (friend_id);
+
+CREATE INDEX idx_stripe_events_retention ON stripe_events(processed_at);
 
 CREATE INDEX idx_stripe_events_type ON stripe_events (event_type);
 

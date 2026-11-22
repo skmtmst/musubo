@@ -139,3 +139,73 @@ it.each([
   expect(await screen.findByText(new RegExp(message))).toBeTruthy()
   expect(net.toast).not.toHaveBeenCalled()
 })
+
+/** お客さまの情報を削除した支払い（口は名前・予約へのつながりを返さず、印 customerRedacted を 1 にする）。 */
+function deletedPage(overrides: Record<string, unknown> = {}) {
+  const result = page()
+  Object.assign(result.data.items[0], { friendId: null, friendName: null, bookingId: null, bookingLabel: null, customerRedacted: 1, ...overrides })
+  return result
+}
+
+it('削除済みのお客さまの支払いは、理由を「削除済み」にして LINE では知らせずに返金する', async () => {
+  net.records.mockResolvedValue(deletedPage())
+  render(<PaymentRecords accountId="account-1" canEdit />)
+  fireEvent.click(await screen.findByRole('button', { name: '削除済みのお客さまの操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '返金する' }))
+  const dialog = await screen.findByRole('dialog', { name: '返金する' })
+  expect(within(dialog).queryByRole('textbox', { name: /返金の理由/ })).toBeNull()
+  expect(within(dialog).queryByRole('checkbox', { name: 'LINE でお客さまに返金を知らせる' })).toBeNull()
+  expect(within(dialog).getByText('お客さまの情報を削除したため、理由は「削除済み」で記録します。LINE では知らせません。')).toBeTruthy()
+  fireEvent.click(within(dialog).getByRole('radio', { name: '一部を返金する' }))
+  fireEvent.change(within(dialog).getByRole('textbox', { name: '返金する金額' }), { target: { value: '300' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: '次へ' }))
+  const confirmation = await screen.findByRole('alertdialog')
+  expect(within(confirmation).getByText('削除済み')).toBeTruthy()
+  expect(within(confirmation).getByText('お客さまの情報を削除したため、LINE では知らせません。')).toBeTruthy()
+  fireEvent.click(within(confirmation).getByRole('button', { name: /を返金する$/ }))
+  await waitFor(() => expect(net.refund).toHaveBeenCalledTimes(1))
+  expect(net.refund).toHaveBeenCalledWith('payment-1', {
+    amount: 300, reason: '削除済み', notifyLine: false, idempotencyKey: expect.any(String), expectedRevision: 4,
+  })
+  await waitFor(() => expect(net.saved).toHaveBeenCalledWith(expect.stringMatching(/^削除済みのお客さまの .+ の返金を模擬で記録しました/)))
+  expect(net.records).toHaveBeenCalledTimes(2)
+})
+
+it('削除済みの印があれば、名前が届いても出さず、お客さまの詳細へもつながない', async () => {
+  net.records.mockResolvedValue(deletedPage({ friendId: 'friend-1', friendName: '山田', bookingId: 'booking-1', bookingLabel: '相談' }))
+  render(<PaymentRecords accountId="account-1" canEdit />)
+  expect(await screen.findByText('削除済みのお客さま')).toBeTruthy()
+  expect(screen.queryByText('山田')).toBeNull()
+  expect(screen.queryByRole('link', { name: '削除済みのお客さま' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '削除済みのお客さまの操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '返金する' }))
+  const dialog = await screen.findByRole('dialog', { name: '返金する' })
+  expect(within(dialog).queryByText(/山田/)).toBeNull()
+  expect(within(dialog).getAllByText(/削除済みのお客さま・相談/).length).toBeGreaterThan(0)
+})
+
+it('削除済みのお客さまには支払いのリンクを作らない', async () => {
+  net.records.mockResolvedValue(deletedPage({ status: 'pending' }))
+  render(<PaymentRecords accountId="account-1" canEdit />)
+  expect(await screen.findByText('削除済みのお客さま')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '削除済みのお客さまの操作' })).toBeNull()
+})
+
+it('閲覧のみでは、削除済みのお客さまの支払いにも返金の入口を出さない', async () => {
+  net.records.mockResolvedValue(deletedPage())
+  render(<PaymentRecords accountId="account-1" canEdit={false} />)
+  expect(await screen.findByText('削除済みのお客さま')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '削除済みのお客さまの操作' })).toBeNull()
+  expect(net.refund).not.toHaveBeenCalled()
+})
+
+it('開いたあとにお客さまの情報が削除されたら、窓を閉じて読み直し、もう一度返金するよう知らせる', async () => {
+  const { ApiError } = await import('@/lib/api')
+  net.refund.mockRejectedValueOnce(new ApiError(409, 'conflict', 'deleted_customer_reason_required'))
+  render(<PaymentRecords accountId="account-1" canEdit />)
+  await confirm(300)
+  await waitFor(() => expect(net.toast).toHaveBeenCalledWith(expect.stringContaining('このお客さまの情報は削除されました'), expect.anything()))
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+  await waitFor(() => expect(net.records).toHaveBeenCalledTimes(2))
+  expect(net.saved).not.toHaveBeenCalled()
+})

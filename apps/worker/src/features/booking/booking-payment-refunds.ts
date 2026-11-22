@@ -47,6 +47,9 @@ export async function refundHistory(db: D1Database, account: string, paymentId: 
 export async function simulatePaymentRefund(db: D1Database, payment: BookingPaymentRecord,
   input: RefundInput, actor: { id: string; name: string }) {
   const account = payment.line_account_id;
+  // 顧客削除後も返金はできるが、自由記述を再び保存しない。
+  if(input.reason!=='削除済み' && await db.prepare('SELECT 1 FROM booking_payments WHERE id=? AND line_account_id=? AND customer_redacted_at IS NOT NULL').bind(payment.id,account).first())
+    throw new PaymentActionError('deleted_customer_reason_required',409);
   const read = () => db.prepare(`SELECT * FROM booking_payment_refunds
     WHERE payment_id=? AND line_account_id=? AND idempotency_key=?`)
     .bind(payment.id, account, input.idempotencyKey).first<RefundRow>();
@@ -68,13 +71,14 @@ export async function simulatePaymentRefund(db: D1Database, payment: BookingPaym
       db.prepare(`INSERT INTO booking_payment_refunds
         (id,payment_id,line_account_id,idempotency_key,amount,requested_amount,reason,actor_id,actor_label,
           notify_line,notification_status,created_at)
-        SELECT ?,p.id,p.line_account_id,?,COALESCE(?,p.amount-p.refunded_amount),?,?,?, ?,?,
+        SELECT ?,p.id,p.line_account_id,?,COALESCE(?,p.amount-p.refunded_amount),?,?,?, CASE WHEN p.customer_redacted_at IS NOT NULL THEN '削除済み' ELSE ? END,?,
           CASE WHEN ?=0 THEN 'not_requested' WHEN EXISTS(
             SELECT 1 FROM bookings b JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id
               WHERE b.id=p.booking_id AND b.line_account_id=p.line_account_id AND f.is_following=1
                 AND f.line_user_id IS NOT NULL) THEN 'simulated' ELSE 'unavailable' END,?
         FROM booking_payments p WHERE p.id=? AND p.line_account_id=? AND p.status='paid'
           AND p.provider='stripe' AND substr(p.provider_payment_id,1,8)='pi_test_'
+          AND (p.customer_redacted_at IS NULL OR ?='削除済み')
           AND p.currency='JPY' AND p.amount-p.refunded_amount>0
           AND (? IS NULL OR p.confirmation_revision=?)
           AND COALESCE(?,p.amount-p.refunded_amount)<=p.amount-p.refunded_amount
@@ -82,11 +86,11 @@ export async function simulatePaymentRefund(db: D1Database, payment: BookingPaym
             AND c.provider='stripe' AND c.disconnected_at IS NULL AND c.test_mode=0)
           AND NOT EXISTS(SELECT 1 FROM booking_payment_refunds r WHERE r.payment_id=p.id AND r.idempotency_key=?)`)
         .bind(id, input.idempotencyKey, input.amount ?? null, input.amount ?? null, input.reason, actor.id,
-          actor.name, input.notifyLine ? 1 : 0, input.notifyLine ? 1 : 0, at, payment.id, account,
+          actor.name, input.notifyLine ? 1 : 0, input.notifyLine ? 1 : 0, at, payment.id, account, input.reason,
           input.expectedRevision ?? null, input.expectedRevision ?? null, input.amount ?? null, input.idempotencyKey),
       db.prepare(`UPDATE booking_payments SET confirmation_revision=confirmation_revision+1, refunded_amount=refunded_amount+(SELECT amount FROM booking_payment_refunds WHERE id=?),
         status=CASE WHEN refunded_amount+(SELECT amount FROM booking_payment_refunds WHERE id=?)=amount THEN 'refunded' ELSE 'paid' END,
-        refunded_at=?,updated_at=?,actor_label=?,action_reason=?
+        refunded_at=?,updated_at=?,actor_label=CASE WHEN customer_redacted_at IS NOT NULL THEN NULL ELSE ? END,action_reason=CASE WHEN customer_redacted_at IS NOT NULL THEN NULL ELSE ? END
         WHERE id=? AND line_account_id=? AND EXISTS(SELECT 1 FROM booking_payment_refunds WHERE id=?)`)
         .bind(id, id, at, at, actor.name, input.reason, payment.id, account, id),
     ]);
@@ -122,6 +126,7 @@ export async function linkPaymentBooking(db: D1Database, payment: BookingPayment
     db.prepare(`INSERT INTO booking_payment_booking_links(id,payment_id,line_account_id,booking_id,reason,actor_id,actor_label,created_at)
       SELECT ?,p.id,p.line_account_id,?,?,?, ?,? FROM booking_payments p
       WHERE p.id=? AND p.line_account_id=? AND p.booking_id IS NULL
+      AND p.customer_redacted_at IS NULL
       AND EXISTS(SELECT 1 FROM bookings b WHERE b.id=? AND b.line_account_id=p.line_account_id)
       AND NOT EXISTS(SELECT 1 FROM booking_payments other WHERE other.booking_id=? AND other.line_account_id=p.line_account_id AND other.id<>p.id)
       AND NOT EXISTS(SELECT 1 FROM booking_payment_choices ch WHERE ch.booking_id=? AND ch.mode='onsite')
