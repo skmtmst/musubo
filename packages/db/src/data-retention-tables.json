@@ -5074,6 +5074,18 @@
       "column": "account_id"
     }
   },
+  "inbox_response_samples": {
+    "category": "purge",
+    "scope": { "by": "parent", "column": "chat_id", "parent": "chats", "parentColumn": "id" }
+  },
+  "inbox_assignment_jobs": {
+    "category": "purge",
+    "scope": { "by": "lineAccount", "column": "account_id" }
+  },
+  "inbox_assignment_job_items": {
+    "category": "purge",
+    "scope": { "by": "parent", "column": "job_id", "parent": "inbox_assignment_jobs", "parentColumn": "id" }
+  },
   "inbox_assignment_logs": {
     "category": "purge",
     "scope": {
