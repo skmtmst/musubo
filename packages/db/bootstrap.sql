@@ -12795,13 +12795,27 @@ CREATE TRIGGER folders_friend_add_rule_legacy_delete AFTER DELETE ON folders WHE
 
 CREATE TRIGGER folders_friend_add_rule_legacy_insert AFTER INSERT ON folders WHEN NEW.kind='friend_add_rule' BEGIN INSERT OR IGNORE INTO friend_add_rule_folders(id,line_account_id,name,color,created_at,updated_at,create_idempotency_key,created_by_staff_id) VALUES(NEW.id,NEW.account_id,NEW.name,NEW.color,NEW.created_at,NEW.updated_at,'common-'||NEW.id,'folder-api'); END;
 
-CREATE TRIGGER folders_friend_add_rule_legacy_update AFTER UPDATE ON folders WHEN NEW.kind='friend_add_rule' BEGIN UPDATE friend_add_rule_folders SET name=NEW.name,color=NEW.color,updated_at=NEW.updated_at WHERE id=NEW.id AND line_account_id=NEW.account_id AND (name IS NOT NEW.name OR color IS NOT NEW.color); END;
+CREATE TRIGGER folders_friend_add_rule_legacy_update
+AFTER UPDATE OF id, kind, account_id, name, color, updated_at ON folders
+WHEN NEW.kind = 'friend_add_rule'
+BEGIN
+  UPDATE friend_add_rule_folders
+     SET name = NEW.name, color = NEW.color, updated_at = NEW.updated_at
+   WHERE id = NEW.id AND line_account_id = NEW.account_id
+     AND (name IS NOT NEW.name OR color IS NOT NEW.color); END;
 
 CREATE TRIGGER folders_mileage_reward_legacy_delete AFTER DELETE ON folders WHEN OLD.kind='mileage_reward' BEGIN DELETE FROM mileage_reward_folders WHERE id=OLD.id AND line_account_id=OLD.account_id; END;
 
 CREATE TRIGGER folders_mileage_reward_legacy_insert AFTER INSERT ON folders WHEN NEW.kind='mileage_reward' BEGIN INSERT OR IGNORE INTO mileage_reward_folders(id,line_account_id,name,display_order,created_at,updated_at) VALUES(NEW.id,NEW.account_id,NEW.name,NEW.display_order,NEW.created_at,NEW.updated_at); END;
 
-CREATE TRIGGER folders_mileage_reward_legacy_update AFTER UPDATE ON folders WHEN NEW.kind='mileage_reward' BEGIN UPDATE mileage_reward_folders SET name=NEW.name,display_order=NEW.display_order,updated_at=NEW.updated_at WHERE id=NEW.id AND line_account_id=NEW.account_id AND (name IS NOT NEW.name OR display_order IS NOT NEW.display_order); END;
+CREATE TRIGGER folders_mileage_reward_legacy_update
+AFTER UPDATE OF id, kind, account_id, name, display_order, updated_at ON folders
+WHEN NEW.kind = 'mileage_reward'
+BEGIN
+  UPDATE mileage_reward_folders
+     SET name = NEW.name, display_order = NEW.display_order, updated_at = NEW.updated_at
+   WHERE id = NEW.id AND line_account_id = NEW.account_id
+     AND (name IS NOT NEW.name OR display_order IS NOT NEW.display_order); END;
 
 CREATE TRIGGER friend_add_rule_folders_common_delete AFTER DELETE ON friend_add_rule_folders BEGIN DELETE FROM folders WHERE id=OLD.id AND kind='friend_add_rule' AND account_id=OLD.line_account_id; END;
 

@@ -107,10 +107,11 @@ it('0円の新規コースは送る値を保って一度だけ作れる', async 
   changePrice(price, '-500')
   expect(await screen.findByText(reason)).toBeTruthy()
   changePrice(price, '0')
+  fireEvent.change(screen.getByLabelText('所要時間'), { target: { value: '120' } })
   fireEvent.click(saveButton())
   await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledExactlyOnceWith('account-1', {
     storeId: 'store-1', kind: 'course', name: '架空のメニュー', price: 0, durationMinutes: 120,
-    effectiveAt: null, allergens: [], description: null, photos: [], servicePeriods: ['dinner'], status: 'draft',
+    effectiveAt: null, allergens: [], description: null, photos: [], servicePeriods: [], status: 'draft',
   }))
   expect(fixture.updateMenu).not.toHaveBeenCalled()
 })

@@ -27,7 +27,7 @@ describe('staging operational verification safety', () => {
     vi.restoreAllMocks();
   });
 
-  test('accepts only the dedicated staging resources with cron disabled', () => {
+  test('accepts only the dedicated staging resources with only the token renewal cron', () => {
     expect(readVerificationTarget(stagingConfig)).toMatchObject({
       workerUrl: 'https://stg-api.musubo.jp',
     });
@@ -39,7 +39,7 @@ describe('staging operational verification safety', () => {
       ),
     ).toThrow('Unexpected staging Worker URL');
     expect(() => readVerificationTarget(`${stagingConfig}\n[triggers]\ncrons = ["* * * * *"]`))
-      .toThrow('must not have cron triggers');
+      .toThrow('may only schedule LINE token renewal');
   });
 
   test('operational check is limited to staging on codex/development', () => {
