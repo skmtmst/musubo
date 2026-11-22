@@ -30,6 +30,16 @@ test('policy validation rejects missing parent and missing column decisions', as
   const { validateTombstonePolicies } = await import('./tenant-retain-graph.js');
   const inventory={parent:{candidates:[{column:'email'},{column:'request_key'}]}};
   expect(()=>validateTombstonePolicies(['parent'],inventory,{})).toThrow('tombstone_policy_missing:parent');
-  expect(()=>validateTombstonePolicies(['parent'],inventory,{parent:{columns:{email:{action:'clear',reason:'private'}}}})).toThrow('tombstone_column_policy_missing:parent.request_key');
-  expect(()=>validateTombstonePolicies(['parent'],inventory,{parent:{columns:{email:{action:'clear',reason:'private'},request_key:{action:'retain',reason:'required for reconciliation'}}}})).not.toThrow();
+  expect(()=>validateTombstonePolicies(['parent'],inventory,{parent:{columns:{email:{action:'null',reason:'private'}}}})).toThrow('tombstone_column_policy_missing:parent.request_key');
+  expect(()=>validateTombstonePolicies(['parent'],inventory,{parent:{columns:{email:{action:'null',reason:'private'},request_key:{action:'retain',reason:'required for reconciliation'}}}})).not.toThrow();
+});
+
+
+test('actual policies cannot be applied until exceptional columns are resolved', async () => {
+  const { default: candidates } = await import('./tenant-retain-column-candidates.json');
+  const { default: policies } = await import('./tenant-retain-column-policies.json');
+  const { validateTombstonePolicies } = await import('./tenant-retain-graph.js');
+  const parents=await discoverRetainedPurgeAncestors(gapFixture().db);
+  expect(Object.keys(policies).sort()).toEqual(parents);
+  expect(()=>validateTombstonePolicies(parents,candidates,policies as Parameters<typeof validateTombstonePolicies>[2])).toThrow('tombstone_column_policy_missing:');
 });
