@@ -36,7 +36,7 @@ const STRATEGIES = [
   { value: 'none', label: 'しない' },
   { value: 'even', label: '均等' },
   { value: 'priority', label: '優先順' },
-  { value: 'random_weighted', label: 'ランダム＋優先度' },
+  { value: 'random_weighted', label: 'ランダム' },
 ] as const
 
 type Team = { id: string; name: string }
@@ -148,6 +148,7 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
               <section className={styles.card} aria-labelledby="routing-strategy-heading">
                 <h3 id="routing-strategy-heading" className={styles.cardTitle}>割り当て方</h3>
                 <SegmentedControl aria-label="割り当て方" options={[...STRATEGIES]} value={draft.strategy ?? 'none'} onChange={(strategy) => setDraft({ ...draft, strategy })} />
+                {draft.strategy === 'random_weighted' ? <p className={styles.note}>ランダムに選ぶときも優先順を反映します。</p> : null}
                 {settings && settings.strategy !== 'none' ? <>
                   <p className={styles.note}>{`今の未割り当て ${settings.unassignedCount ?? '—'} 件`}</p>
                   <Button variant="secondary" disabled={dirty || jobStarting || Boolean(job && ['pending','running'].includes(job.status))} onClick={() => void applyExisting()}>今の未割り当てにも当てる</Button>

@@ -38,6 +38,7 @@ export default function InboxResponse({accountId}:{accountId:string}) {
         {data.automatic.count!==null ? <Tr><Td grow>自動応答（送信数）</Td><Td align="right">—</Td><Td align="right">—</Td><Td align="right">{data.automatic.count}件</Td></Tr> : null}
       </tbody></DataTable>
       <ValueBarChart label="週ごとの最初の返事までの時間" unit="分" items={data.weekly.map(row=>({key:row.week,label:row.week,value:row.medianFirstResponseMinutes}))} />
+      <p>{data.weekly.map(row => `${row.week}: ${minutes(row.medianFirstResponseMinutes)}`).join(' / ')}</p>
     </>}
   </ListPageSection>
 }
