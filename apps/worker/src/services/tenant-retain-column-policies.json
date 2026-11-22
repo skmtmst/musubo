@@ -1094,8 +1094,8 @@
         "reason": "NULL 可能な候補を消去"
       },
       "api_key": {
-        "action": "unique",
-        "reason": "必須の識別子を行IDから作る一意値に置換"
+        "action": "random",
+        "reason": "認証鍵を推測できない乱数に置換"
       },
       "invite_token_hash": {
         "action": "null",

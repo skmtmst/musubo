@@ -258,7 +258,11 @@ test('former staff are disabled and hidden even if the tenant resumes', async ()
   const result=await processTenantDataPurge({DB:f.db},{now:'2027-05-01T00:00:00Z'});
   expect(result.completed).toBe(1);
   expect(f.raw.prepare("SELECT is_active,permission_keys FROM staff_members WHERE id='o'").get()).toEqual({is_active:0,permission_keys:'[]'});
+  const staffKey=(f.raw.prepare("SELECT api_key FROM staff_members WHERE id='o'").get() as {api_key:string}).api_key;
+  expect(staffKey).not.toContain('o:api_key');
+  expect(staffKey).not.toBe('owner-key');
   f.raw.exec("UPDATE tenants SET data_purged_at=NULL,plan_status='active' WHERE id='t'");
+  expect(f.raw.prepare("SELECT row_id FROM tenant_purge_tombstone_progress WHERE tenant_id='t' AND table_name='staff_members' AND row_id='o'").get()).toEqual({row_id:'o'});
   expect(await getStaffById(f.db,'o')).toBeNull();
   expect(await getStaffByApiKey(f.db,'owner-key')).toBeNull();
   expect(await getStaffMembers(f.db,'t')).toEqual([]);

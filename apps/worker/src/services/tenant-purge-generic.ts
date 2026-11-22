@@ -20,6 +20,7 @@ export function buildTombstoneValues(
       case 'empty_array': values[column] = '[]'; break;
       case 'archive': values[column] = 'archived'; break;
       case 'stop': values[column] = 'stopped'; break;
+      case 'random': values[column] = `purged:${crypto.randomUUID()}:${crypto.randomUUID()}`; break;
       case 'unique': values[column] = `purged:${table}:${column}:${rowId}`; break;
       case 'json':
         if (typeof row[column] !== 'string') throw new Error('invalid_tombstone_json');

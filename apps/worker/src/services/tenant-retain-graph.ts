@@ -42,7 +42,7 @@ export async function discoverRetainedPurgeAncestors(db: D1Database): Promise<st
 
 export interface TombstonePolicy {
   /** Each candidate has an explicit action and a documented reason. */
-  columns: Readonly<Record<string, { action: 'null' | 'placeholder' | 'unique' | 'retain' | 'review' | 'json' | 'zero' | 'empty_array' | 'archive' | 'stop'; reason: string }>>;
+  columns: Readonly<Record<string, { action: 'null' | 'placeholder' | 'unique' | 'retain' | 'review' | 'json' | 'zero' | 'empty_array' | 'archive' | 'stop' | 'random'; reason: string }>>;
 }
 
 /** Refuse to run when a schema ancestor or a potential private field lacks an explicit policy. */
@@ -57,7 +57,7 @@ export function validateTombstonePolicies(
     if (!inventory || !policy) throw new Error(`tombstone_policy_missing:${parent}`);
     for (const candidate of inventory.candidates) {
       const decision = policy.columns[candidate.column];
-      if (!decision || !decision.reason.trim() || !['null','placeholder','unique','retain','json','zero','empty_array','archive','stop'].includes(decision.action)) {
+      if (!decision || !decision.reason.trim() || !['null','placeholder','unique','retain','json','zero','empty_array','archive','stop','random'].includes(decision.action)) {
         throw new Error(`tombstone_column_policy_missing:${parent}.${candidate.column}`);
       }
     }
