@@ -2,6 +2,7 @@
 
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { assertStagingCronSource } from '../deploy/staging-cron-policy.mjs';
 
 import {
   analyzeScenarioDeliveryTimestamps,
@@ -144,9 +145,7 @@ export function readVerificationTarget(config: string): VerificationTarget {
   if (configValue(config, 'database_name') !== 'nen-line-stg') {
     throw new Error('Only the staging D1 database is allowed');
   }
-  if (/^\[triggers\]/m.test(config)) {
-    throw new Error('The staging verification target must not have cron triggers');
-  }
+  assertStagingCronSource(config);
 
   const workerUrl = configValue(config, 'WORKER_PUBLIC_URL');
   const worker = new URL(workerUrl);

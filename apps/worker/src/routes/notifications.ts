@@ -16,6 +16,7 @@ import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
+import { lineTokenNoticeDisplay } from '../services/line-token-notices.js';
 import {
   OperatorEventError,
   dispatchOperatorEvent,
@@ -696,17 +697,19 @@ notifications.get('/api/notifications', requireRole('owner', 'admin', 'staff'), 
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
     const items = await getNotifications(c.env.DB, { lineAccountId, status, limit });
-    const responseItems = items.map((n) => ({
+    const responseItems = items.map((n) => {
+      const metadata = n.metadata ? JSON.parse(n.metadata) : null;
+      return {
         id: n.id,
         ruleId: n.rule_id,
         eventType: n.event_type,
-        title: n.title,
-        body: n.body,
+        ...lineTokenNoticeDisplay(n, metadata),
         channel: n.channel,
         status: n.status,
-        metadata: n.metadata ? JSON.parse(n.metadata) : null,
+        metadata,
         createdAt: n.created_at,
-      }));
+      };
+    });
     return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [] }));
   } catch (err) {
     throw err;

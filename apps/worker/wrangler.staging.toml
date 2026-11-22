@@ -2,7 +2,7 @@
 #
 # Safety invariants:
 # - Uses dedicated D1/R2 resources.
-# - Intentionally has no [triggers] section, so scheduled delivery cannot run.
+# - The only cron renews LINE credentials. The Worker rejects staging delivery ticks.
 # - LINE credentials must come from a dedicated validation LINE channel.
 #   Never copy the production LINE secrets into this Worker.
 name = "nen-line-stg"
@@ -62,6 +62,9 @@ max_batch_size = 10
 max_batch_timeout = 5
 max_retries = 5
 retry_delay = 60
+
+[triggers]
+crons = ["2-57/5 * * * *"]
 
 [vars]
 DEPLOY_ENV = "staging"

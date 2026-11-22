@@ -10,6 +10,7 @@ import {
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { lineTokenNoticeDisplay } from '../services/line-token-notices.js';
 
 const notificationCenter = new Hono<Env>();
 
@@ -73,16 +74,18 @@ notificationCenter.get('/api/notifications/center', async (c) => {
     return c.json({
       success: true,
       data: buildOffsetListResponse({
-        items: items.map((item) => ({
-          id: item.id,
-          eventType: item.event_type,
-          category: item.category,
-          title: item.title,
-          body: item.body,
-          metadata: parseMetadata(item.metadata),
-          isRead: Boolean(item.read_at),
-          createdAt: item.created_at,
-        })),
+        items: items.map((item) => {
+          const metadata = parseMetadata(item.metadata);
+          return {
+            id: item.id,
+            eventType: item.event_type,
+            category: item.category,
+            ...lineTokenNoticeDisplay(item, metadata),
+            metadata,
+            isRead: Boolean(item.read_at),
+            createdAt: item.created_at,
+          };
+        }),
         counts,
         unreadCount: counts.unread,
         total: unreadOnly ? counts.unread : category ? counts[category] : counts.all,

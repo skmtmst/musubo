@@ -1,4 +1,4 @@
-import { lineTokenExpiry, LINE_TOKEN_REFRESH_DAYS } from '@line-crm/shared';
+import { isLineTokenNoticeEventType, lineTokenExpiry, LINE_TOKEN_REFRESH_DAYS } from '@line-crm/shared';
 import type {
   LineTokenNoticeEventType,
   LineTokenNoticeMetadata,
@@ -8,9 +8,27 @@ import type {
 /** 取り替えの処理と同じ窓。残りがこれ未満になると cron ごとに取り替える。 */
 export const LINE_TOKEN_REFRESH_WINDOW_MS = LINE_TOKEN_REFRESH_DAYS * 24 * 60 * 60_000;
 
-const REENTER_HINT = 'LINE Developers でチャネルシークレットを確かめて、アカウントの設定で入れ直してください。';
-
 type Notice = { eventType: LineTokenNoticeEventType; title: string; body: string };
+
+export function lineTokenNoticeCopy(reason: unknown): Pick<Notice, 'title' | 'body'> {
+  return reason === 'credentials'
+    ? {
+      title: 'LINEの接続情報を確認してください',
+      body: 'LINE Developersでチャネルシークレットを確かめ、アカウントの資格情報で入れ直してください。',
+    }
+    : {
+      title: 'LINE接続の自動更新を再試行しています',
+      body: '接続状況はLINEアカウントの詳細で確認できます。',
+    };
+}
+
+export function lineTokenNoticeDisplay(
+  item: { event_type: string; title: string; body: string | null },
+  metadata: { reason?: unknown } | null,
+): { title: string; body: string | null } {
+  if (!isLineTokenNoticeEventType(item.event_type)) return { title: item.title, body: item.body };
+  return lineTokenNoticeCopy(metadata?.reason ?? (item.event_type === 'line_token_refresh_failed' ? 'credentials' : undefined));
+}
 
 /**
  * 取り替えに失敗した時に書く知らせを決める。自動で直る見込みのある間は何も書かない。
@@ -22,28 +40,15 @@ export function lineTokenNoticeFor(input: {
   now: number;
 }): Notice | null {
   const expiry = lineTokenExpiry(input.expiresAt, input.now);
-  const known = expiry.daysLeft !== null;
+  const copy = lineTokenNoticeCopy(input.reason);
   if (expiry.status === 'expired') {
-    return {
-      eventType: 'line_token_expired',
-      title: 'トークンの期限が切れています',
-      body: `配信と返信が止まっています。${input.reason === 'credentials' ? REENTER_HINT : 'LINEの接続の設定でトークンを更新してください。'}`,
-    };
+    return { eventType: 'line_token_expired', ...copy };
   }
   if (input.reason === 'credentials') {
-    return {
-      eventType: 'line_token_refresh_failed',
-      title: 'トークンを自動で取り替えられませんでした',
-      body: REENTER_HINT,
-    };
+    return { eventType: 'line_token_refresh_failed', ...copy };
   }
-  if (known && expiry.daysLeft! < LINE_TOKEN_REFRESH_WINDOW_MS / (24 * 60 * 60_000)) {
-    const daysLeft = expiry.daysLeft!;
-    return {
-      eventType: 'line_token_expiring',
-      title: daysLeft === 0 ? 'トークンが今日切れます' : `トークンがあと${daysLeft}日で切れます`,
-      body: '自動の取り替えがうまくいっていません。LINEの接続の設定でトークンを更新してください。',
-    };
+  if (expiry.daysLeft !== null && expiry.daysLeft < LINE_TOKEN_REFRESH_DAYS) {
+    return { eventType: 'line_token_expiring', ...copy };
   }
   return null;
 }
