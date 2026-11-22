@@ -10,6 +10,8 @@ import { publicSecurityAlert, securityMonitorStatus, type SecurityAlertRow } fro
 import { SECURITY_WINDOW_MINUTES, securityThresholds } from '../services/security-monitor-rules.js';
 import { runSecurityMonitor } from '../services/security-monitor.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+import { stripeRequest } from '../services/stripe-api.js';
+import { hqBilling } from './hq-billing.js';
 
 export const securityAlerts = new Hono<Env>();
 
@@ -86,6 +88,37 @@ async function review(c: Context<Env>, platform: boolean, status: 'acknowledged'
     return c.json({ success: false, error: '安全監視の記録を更新できませんでした' }, 503);
   }
 }
+
+/** Fetch the original event from Stripe and run it through the normal fenced webhook path. */
+securityAlerts.post('/api/ops/security-alerts/:id/retry-billing', requirePlatformAdminWrite(), async c => {
+  const staff=c.get('staff');
+  if (!staff || staff.readOnly || c.get('impersonation')) return c.json({success:false,error:'権限がありません'},403);
+  const body=await c.req.json<{expectedVersion?:unknown}>().catch(()=>null);
+  if (!Number.isSafeInteger(body?.expectedVersion)) return c.json({success:false,error:'最新の記録を読み直してください'},400);
+  const alert=await c.env.DB.prepare(`SELECT tenant_id,scope_key,version,status FROM security_alerts
+    WHERE id=? AND rule_key='stripe_external_effect_review' AND version=? AND status<>'resolved'`)
+    .bind(c.req.param('id'),body!.expectedVersion).first<{tenant_id:string;scope_key:string;version:number;status:string}>();
+  if (!alert) return c.json({success:false,error:'記録が更新されています'},409);
+  let eventId:unknown;
+  try { const scope=JSON.parse(alert.scope_key) as unknown[]; if(scope[0]===alert.tenant_id) eventId=scope[1]; } catch { /* invalid scope */ }
+  if (typeof eventId!=='string' || !/^evt_[A-Za-z0-9_]+$/.test(eventId)) return c.json({success:false,error:'通知を確認できません'},409);
+  const receipt=await c.env.DB.prepare(`SELECT summary FROM billing_events WHERE id=? AND tenant_id=? AND external_effect_pending=0
+    AND lease_token IS NULL AND summary IN ('pending','external_review')`).bind(eventId,alert.tenant_id).first<{summary:string}>();
+  if (!receipt || !c.env.STRIPE_BILLING_WEBHOOK_SECRET) return c.json({success:false,error:'再処理できる状態ではありません'},409);
+  try {
+    const event=await stripeRequest<{id:string}>(c.env,'GET',`/v1/events/${encodeURIComponent(eventId)}`);
+    if (event.id!==eventId) return c.json({success:false,error:'通知を確認できません'},502);
+    const raw=JSON.stringify(event), timestamp=Math.floor(Date.now()/1000);
+    const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(c.env.STRIPE_BILLING_WEBHOOK_SECRET),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+    const signature=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(`${timestamp}.${raw}`))),v=>v.toString(16).padStart(2,'0')).join('');
+    const response=await hqBilling.request('/api/hq/billing/webhook',{method:'POST',headers:{'stripe-signature':`t=${timestamp},v1=${signature}`},body:raw},c.env);
+    if (!response.ok) return c.json({success:false,error:'再処理できませんでした'},503);
+    await c.env.DB.prepare(`UPDATE security_alerts SET status='resolved',reviewed_at=?,version=version+1 WHERE id=? AND version=?`)
+      .bind(new Date().toISOString(),c.req.param('id'),alert.version).run();
+    await recordAuditEvent(c.env.DB,{tenantId:alert.tenant_id,category:'business',action:'security.alert.retry_billing',actorPrincipalId:staff.id,targetKind:'security_alert',targetId:c.req.param('id'),result:'success',retentionClass:'security'});
+    return c.json({success:true,data:{status:'retried'}});
+  } catch { return c.json({success:false,error:'再処理できませんでした'},503); }
+});
 
 securityAlerts.get('/api/operations/security-alerts', requireRole('owner', 'admin'), c => list(c, false));
 securityAlerts.post('/api/operations/security-alerts/:id/acknowledge', requireRole('owner', 'admin'), c => review(c, false, 'acknowledged'));

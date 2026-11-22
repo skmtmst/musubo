@@ -34,6 +34,15 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); store.raw.close(); });
 
 describe('security detection using actual audit SQL and durable alerts', () => {
+  it('期限切れの決済操作は秘密を含めずSlackへ知らせる', async () => {
+    store.raw.exec(`INSERT INTO billing_events(id,type,tenant_id,summary,lease_until,external_effect_pending)
+      VALUES('evt_uncertain','invoice.paid','tenant-a','pending','2020-01-01',1)`);
+    await runSecurityMonitor(env(),NOW,fetcher);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const body=String(fetcher.mock.calls[0][1]?.body);
+    expect(body).toContain('決済操作の結果確認が必要');
+    expect(body).not.toContain('evt_uncertain');
+  });
   it('purge review alerts do not block the security notification queue', async () => {
     const insert=store.raw.prepare(`INSERT INTO security_alerts(id,tenant_id,scope_key,rule_key,observed_count,threshold_count,first_detected_at,last_detected_at,latest_event_at,notification_id)
       VALUES(?,'tenant-a',?,'stripe_purge_review',1,1,'2020-01-01','2020-01-01',1,?)`);

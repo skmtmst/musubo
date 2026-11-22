@@ -418,6 +418,14 @@ describe('課金 Webhook', () => {
     stripe.retrieveSubscription.mockResolvedValue({ id: 'sub_1', status: 'active', customer: 'cus_1', current_period_end: 1_760_000_000, items: { data: [{ price: { id: 'price_standard' } }] } });
   });
 
+  it('期限切れ操作の再送を重複扱いせずもう一度処理する', async () => {
+    setTenant({plan_status:'active',stripe_customer_id:'cus_1'});
+    testDb.raw.exec("INSERT INTO billing_events(id,type,tenant_id,summary,external_effect_pending) VALUES('evt_retry','fixture.ignored','00000000-0000-4000-8000-000000000001','external_review',0)");
+    const response=await webhook({id:'evt_retry',type:'fixture.ignored',data:{object:{customer:'cus_1'}}});
+    expect(response.status).toBe(200);
+    expect((testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_retry'").get() as {summary:string}).summary).toContain('completed');
+  });
+
   it('削除中の入金通知は金額を照合待ちで残し、再送しても適用しない', async () => {
     setTenant({plan_status:'trialing',stripe_customer_id:'cus_1',purge_started_at:'2026-01-01'});
     const event = {id:'evt_deferred_by_purge',type:'invoice.paid',data:{object:{id:'in_1',customer:'cus_1',amount_paid:3000,currency:'jpy'}}};

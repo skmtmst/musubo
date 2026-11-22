@@ -15,7 +15,7 @@ export async function observeUncertainBillingEffects(db:D1Database, now:string):
         version=security_alerts.version+CASE WHEN security_alerts.status='resolved' THEN 1 ELSE 0 END,
         reviewed_at=CASE WHEN security_alerts.status='resolved' THEN NULL ELSE security_alerts.reviewed_at END`)
       .bind(crypto.randomUUID(),row.tenant_id,row.tenant_id,row.id,now,now,now,crypto.randomUUID());
-    const retire = db.prepare(`UPDATE billing_events SET summary='external_review',external_effect_pending=0,lease_token=NULL,lease_until=NULL
+    const retire = db.prepare(`UPDATE billing_events SET external_effect_pending=0,lease_token=NULL,lease_until=NULL
       WHERE id=? AND tenant_id=? AND summary='pending' AND external_effect_pending=1
         AND (lease_until IS NULL OR julianday(lease_until)<=julianday(?))
         AND EXISTS(SELECT 1 FROM security_alerts WHERE tenant_id=? AND rule_key='stripe_external_effect_review' AND scope_key=json_array(?,?))`)

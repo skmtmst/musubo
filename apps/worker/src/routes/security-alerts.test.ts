@@ -7,6 +7,10 @@ import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { observeSecurityAlert } from '../services/security-monitor-store.js';
 import { deferPurgedBillingEvent } from '../services/tenant-purge-tombstones.js';
 
+const stripeRead = vi.hoisted(() => vi.fn());
+vi.mock('../services/stripe-api.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../services/stripe-api.js')>()), stripeRequest: stripeRead,
+}));
 let store: ReturnType<typeof createTestD1>;
 const member = { id: 'admin-a', role: 'admin', name: 'A', readOnly: false, tenantId: 'tenant-a' } satisfies AuthenticatedStaff;
 function app(staff: AuthenticatedStaff | null = member, impersonation = false) {
@@ -161,5 +165,26 @@ describe('staging-only manual security sweep', () => {
       store.raw.exec('DROP TABLE security_monitor_state');
       expect((await app(operator).request(path, { method: 'POST' }, env)).status).toBe(503);
     } finally { vi.unstubAllGlobals(); }
+  });
+});
+
+
+describe('billing review retry', () => {
+  it('platform operator retrieves the event and retries it through the fenced handler', async () => {
+    const {observeUncertainBillingEffects}=await import('../services/billing-external-review.js');
+    store.raw.exec(`UPDATE tenants SET stripe_customer_id='cus_retry' WHERE id='tenant-a';
+      INSERT INTO billing_events(id,type,tenant_id,summary,lease_until,external_effect_pending)
+      VALUES('evt_retry','fixture.ignored','tenant-a','pending','2020-01-01',1)`);
+    await observeUncertainBillingEffects(store.db,'2026-10-17T00:00:00Z');
+    const alert=store.raw.prepare("SELECT id,version FROM security_alerts WHERE rule_key='stripe_external_effect_review'").get() as {id:string;version:number};
+    stripeRead.mockResolvedValue({id:'evt_retry',type:'fixture.ignored',data:{object:{customer:'cus_retry'}}});
+    const operator={...member,id:'platform',role:'owner' as const};
+    const response=await app(operator).request(`/api/ops/security-alerts/${alert.id}/retry-billing`,{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:alert.version}),
+    },{...bindings(),STRIPE_SECRET_KEY:'sk_test',STRIPE_BILLING_WEBHOOK_SECRET:'whsec_test'});
+    expect(response.status).toBe(200);
+    expect((store.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_retry'").get() as {summary:string}).summary).toContain('completed');
+    expect(store.raw.prepare('SELECT status FROM security_alerts WHERE id=?').get(alert.id)).toEqual({status:'resolved'});
+    expect(stripeRead).toHaveBeenCalledWith(expect.anything(),'GET','/v1/events/evt_retry');
   });
 });

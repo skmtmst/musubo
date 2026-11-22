@@ -676,6 +676,8 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     if (tenant) await c.env.DB.prepare(`UPDATE billing_events SET tenant_id=? WHERE id=? AND type=? AND tenant_id IS NULL AND summary='pending' AND lease_token IS NULL`).bind(tenant.id,event.id,event.type).run();
     await c.env.DB.prepare(`UPDATE billing_events SET review_amount=COALESCE(review_amount,?),review_currency=COALESCE(review_currency,?)
       WHERE id=? AND type=? AND tenant_id IS ? AND summary='pending'`).bind(amount,currency,event.id,event.type,tenant?.id ?? null).run();
+    await c.env.DB.prepare(`UPDATE billing_events SET summary='pending' WHERE id=? AND summary='external_review'
+      AND external_effect_pending=0 AND lease_token IS NULL`).bind(event.id).run();
     const receipt = await c.env.DB.prepare('SELECT summary FROM billing_events WHERE id=?').bind(event.id).first<{summary:string}>();
     if (receipt?.summary !== 'pending') return c.json({ success:true,data:{received:true,duplicate:true} });
     // Receipt is saved before this check. A purge claim cannot start while it is pending.
