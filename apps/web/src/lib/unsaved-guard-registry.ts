@@ -1,3 +1,5 @@
+/** 履歴の位置。`key` は Navigation API の項目の鍵、`index` は鍵の無いブラウザで履歴の状態に書いた並びの番号。 */
+type HistoryPlace = { key: string | null; index: number | null; href: string }
 type HistoryGuard = {
   active: () => boolean
   busy: () => boolean
@@ -6,8 +8,10 @@ type HistoryGuard = {
   handlesLink: (destination: URL, current: URL, anchor: HTMLAnchorElement) => boolean
   discard: () => void
   disarm: () => void
+  /** 止めた戻る・進むについて、この番兵が確認を出す。`to` は利用者が移ろうとした履歴の位置。 */
+  askHistoryLeave: (to: HistoryPlace, cohort: HistoryGuard[], destination: URL) => void
 }
-export type { HistoryGuard }
+export type { HistoryGuard, HistoryPlace }
 export const historyGuards = new Set<HistoryGuard>()
 let selectedGuard: HistoryGuard | null = null
 let selectedCohort: HistoryGuard[] = []

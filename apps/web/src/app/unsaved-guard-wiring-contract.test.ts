@@ -437,6 +437,10 @@ const EXEMPTIONS: Record<string, string> = {
     'app/scenarios/first-step-v8.tsx と同じ画面の★V8版（V6xAo）。番兵の要否は元の画面（first-step/page.tsx・未判定）と一緒に決めるため同じ扱い',
   'v8/nen-pets/editor.tsx':
     'app/nen/pets/pet-editor.tsx と同じ窓の★V8版（eLjeQ）。入力はすべて窓の中で、閉じると戻る。番兵の要否は元の窓（未判定）と一緒に決めるため同じ扱い',
+  'app/layout.tsx':
+    '管理画面のいちばん外側。戻る・進むの受け口（UnsavedHistoryRoot）を Next のルーターより先に付けるだけで、入力も保存も持たない。',
+  'components/shared/unsaved-history-root.tsx':
+    '番兵の戻る・進むの受け口を付けるだけの部品。画面には何も描かず、入力も保存も持たない。止めるかどうかは各画面の useUnsavedGuard が決める。',
 }
 
 /*

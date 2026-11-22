@@ -473,32 +473,37 @@ it('集計の通信中に段を移っても重複せず、相手切替前の遅�
 // webinar-notifications-contractのソース文字固定を、実際の親と子の動きへ移す。
 it('通知の段は初回だけ取得し、段を移ってブラウザで戻っても入力と未保存の印を保ち、親から保存できる', async () => {
   nav.search = 'id=webinar-1&pane=notifications'
-  await render(<WebinarEditV8 />)
-  expect(notificationReads).toBe(1)
-  expect(host.textContent).not.toContain('保存していない変更があります')
-  const toggle = screen.getByRole('switch', { name: '申込のお礼', exact: true }) as HTMLInputElement
-  expect((toggle.getAttribute('aria-checked') === 'true')).toBe(true)
-  await act(async () => { fireEvent.click(toggle) })
-  expect((toggle.getAttribute('aria-checked') === 'true')).toBe(false)
-  expect(host.textContent).toContain('保存していない変更があります')
-  expect(puts.filter(row => row.path.endsWith('/notifications'))).toHaveLength(0)
-  await act(async () => { screen.getByRole('button', { name: '基本設定に戻る', exact: true }).click() })
-  await act(async () => {
-    window.history.replaceState(null, '', '?id=webinar-1&pane=notifications')
-    window.dispatchEvent(new Event('popstate'))
-  })
-  const leave = await screen.findByRole('dialog', { name: '保存していない変更があります' })
-  await act(async () => { within(leave).getByRole('button', { name: '編集を続ける' }).click() })
-  expect(notificationReads).toBe(1)
-  const returned = screen.getByRole('switch', { name: '申込のお礼', exact: true }) as HTMLInputElement
-  expect(returned).toBe(toggle)
-  expect((returned.getAttribute('aria-checked') === 'true')).toBe(false)
-  const save = getPageAction({ name: '下書きを保存', exact: true }) as HTMLButtonElement
-  expect(save.disabled).toBe(false)
-  await act(async () => { save.click() })
-  const writes = puts.filter(row => row.path.endsWith('/notifications'))
-  expect(writes).toHaveLength(1)
-  expect(writes[0].body).toMatchObject({ registrationEnabled: false })
-  expect((returned.getAttribute('aria-checked') === 'true')).toBe(false)
-  expect(host.textContent).not.toContain('保存していない変更があります')
+  // 画面と同じパス（usePathname と同じ）に居る。段どうしの戻る・進むは、同じ画面の中の移動になる。
+  const outside = window.location.href
+  window.history.replaceState(null, '', '/webinars/edit?id=webinar-1&pane=notifications')
+  try {
+    await render(<WebinarEditV8 />)
+    expect(notificationReads).toBe(1)
+    expect(host.textContent).not.toContain('保存していない変更があります')
+    const toggle = screen.getByRole('switch', { name: '申込のお礼', exact: true }) as HTMLInputElement
+    expect((toggle.getAttribute('aria-checked') === 'true')).toBe(true)
+    await act(async () => { fireEvent.click(toggle) })
+    expect((toggle.getAttribute('aria-checked') === 'true')).toBe(false)
+    expect(host.textContent).toContain('保存していない変更があります')
+    expect(puts.filter(row => row.path.endsWith('/notifications'))).toHaveLength(0)
+    await act(async () => { screen.getByRole('button', { name: '基本設定に戻る', exact: true }).click() })
+    await act(async () => {
+      window.history.replaceState(null, '', '/webinars/edit?id=webinar-1&pane=notifications')
+      window.dispatchEvent(new Event('popstate'))
+    })
+    // 同じ画面の中の段の戻るなので、離れる確認は出さずに段だけ戻す。
+    expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
+    expect(notificationReads).toBe(1)
+    const returned = screen.getByRole('switch', { name: '申込のお礼', exact: true }) as HTMLInputElement
+    expect(returned).toBe(toggle)
+    expect((returned.getAttribute('aria-checked') === 'true')).toBe(false)
+    const save = getPageAction({ name: '下書きを保存', exact: true }) as HTMLButtonElement
+    expect(save.disabled).toBe(false)
+    await act(async () => { save.click() })
+    const writes = puts.filter(row => row.path.endsWith('/notifications'))
+    expect(writes).toHaveLength(1)
+    expect(writes[0].body).toMatchObject({ registrationEnabled: false })
+    expect((returned.getAttribute('aria-checked') === 'true')).toBe(false)
+    expect(host.textContent).not.toContain('保存していない変更があります')
+  } finally { window.history.replaceState(null, '', outside) }
 })
