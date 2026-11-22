@@ -8,7 +8,7 @@ export type DeletionTarget = {
   formId?: string; lineUserId?: string;
 };
 type Journal = { id: string; action: string; detail_json: string; actor_id: string };
-type Detail = { accountId: string | null; formId?: string; token: string; leaseUntil: number; completedAt?: string; rows?: number };
+type Detail = { accountId: string | null; formId?: string; token: string; leaseUntil: number; completedAt?: string; rows?: number; anonymizedRows?: number; unlinkedCandidates?: { legacyDestinationMatchingLineId: number; accountReservationsWithoutLineId: number; unlinkedWaitlistMatchingLineId: number; reservationsWithRawEmail: number } };
 type Relation = { friendColumns: string[]; lineUserColumn: boolean; references: Array<{ parent: string; columns: Array<{ column: string; parentColumn: string }> }> };
 const graph: Record<string, Relation> = relations;
 type ProtectedReference = {parent:string;mode?:'restrict';columns:Array<{column:string;parentColumn:string}>};
@@ -63,6 +63,12 @@ function conditionsFor(target: DeletionTarget): Record<string, string> {
   result.event_booking_transition_runs = `line_account_id IS ?3 AND (json_extract(input_snapshot,'$.friendId')=?1 OR json_extract(input_snapshot,'$.recipient')=?2)`;
   result.style_analytics_results = `line_account_id IS ?3 AND EXISTS(SELECT 1 FROM json_each(style_analytics_results.selection_json,'$.ids') p WHERE json_extract(p.value,'$.friendId')=?1)`;
   result.media_file_scans = 'id IN (SELECT scan_id FROM form_submission_files WHERE friend_id = ?1)';
+  // 同名・同電話は本人照合に使わない。LINE ID とアカウントが友だちの現在値と一致する場合だけ扱う。
+  const identity = `?2 <> '' AND ?3 IS NOT NULL AND EXISTS (SELECT 1 FROM friends f WHERE f.id = ?1 AND f.line_account_id = ?3 AND f.line_user_id = ?2)`;
+  result.line_message_unsends = `${identity} AND source_user_id = ?2 AND line_message_account_key = 'account:' || ?3`;
+  result.rt_reservations = `${identity} AND rt_reservations.line_uid = ?2 AND EXISTS (SELECT 1 FROM rt_stores s WHERE s.id = rt_reservations.store_id AND s.line_account_id = ?3)`;
+  result.rt_customer_notice_outbox = `EXISTS (SELECT 1 FROM rt_reservations WHERE ${result.rt_reservations} AND rt_reservations.id = rt_customer_notice_outbox.reservation_id)`;
+  result.rt_seat_waitlist = `EXISTS (SELECT 1 FROM rt_reservations WHERE ${result.rt_reservations} AND rt_reservations.waitlist_entry_id = rt_seat_waitlist.id AND rt_reservations.store_id = rt_seat_waitlist.store_id AND rt_seat_waitlist.line_uid = ?2)`;
   return result;
 }
 function childFirst(tables: string[]): string[] {
@@ -88,6 +94,19 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
   if (prior?.action === 'deleted') return { deleted: true, replayed: true };
   const conditions = conditionsFor(target);
   const params = target.kind === 'friend_data' ? [target.id, target.lineUserId ?? '', target.accountId] : [target.id];
+  if (target.kind === 'friend_data') {
+    const columns = (await db.prepare('PRAGMA table_info(rt_reservations)').all<{ name: string }>()).results;
+    if (!columns.some(column => column.name === 'customer_anonymized')) throw new DeletionFailure(409, 'deletion_schema_approval_required');
+    const identity = await db.prepare('SELECT 1 FROM friends WHERE id = ? AND line_account_id IS ? AND line_user_id IS ?').bind(target.id, target.accountId, target.lineUserId ?? null).first();
+    if (!identity) throw new DeletionFailure(409, 'deletion_identity_conflict');
+    const notices = conditions.rt_customer_notice_outbox;
+    const conflict = await db.prepare(`SELECT 1 FROM rt_customer_notice_outbox WHERE ${notices} AND line_uid <> ?2 LIMIT 1`).bind(...params).first();
+    const ambiguousWaitlist = await db.prepare(`SELECT 1 FROM rt_reservations JOIN rt_seat_waitlist w ON w.id=rt_reservations.waitlist_entry_id WHERE ${conditions.rt_reservations} AND (w.store_id <> rt_reservations.store_id OR w.line_uid IS NOT ?2) LIMIT 1`).bind(...params).first();
+    if (conflict || ambiguousWaitlist) throw new DeletionFailure(409, 'deletion_identity_conflict');
+    const sending = await db.prepare(`SELECT 1 FROM rt_customer_notice_outbox WHERE ${notices} AND sent_at IS NULL AND julianday(lease_until) > julianday('now') LIMIT 1`).bind(...params).first();
+    const activeWaitlist = await db.prepare(`SELECT 1 FROM rt_reservations JOIN rt_seat_waitlist w ON w.id=rt_reservations.waitlist_entry_id WHERE ${conditions.rt_reservations} AND (w.status IN ('waiting','invited') OR julianday(w.notification_claim_until) > julianday('now')) LIMIT 1`).bind(...params).first();
+    if (sending || activeWaitlist) throw new DeletionFailure(409, 'deletion_in_progress');
+  }
   // 未適用・途中の移行では削除意図や R2 を変更する前に止める。SQL 識別子は承認済みの保持参照だけを使う。
   if (target.kind === 'friend_data') {
     for (const [table, refs] of Object.entries(protectedGraph)) {
@@ -164,6 +183,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       return db.prepare(`UPDATE operation_audit SET target_kind = CASE WHEN (${normalized}) THEN 'customer_deletion' ELSE NULL END WHERE id = ?`).bind(...bindings, id);
     };
     const statements = [db.prepare('PRAGMA defer_foreign_keys = ON'), guard("action = 'deleting' AND json_extract(detail_json, '$.token') = ?", [token])];
+    if (target.kind === 'friend_data') statements.push(guard('EXISTS (SELECT 1 FROM friends WHERE id = ?1 AND line_user_id IS ?2 AND line_account_id IS ?3)', params));
     // R2 待機中に追加された保持対象を、連動削除で失わないようにする。
     for (const check of protectedChecks) statements.push(guard(`NOT EXISTS (SELECT 1 FROM ${q(check.table)} WHERE ${check.condition})`, check.condition.includes('?3') ? params : [params[0]]));
     // R2 待機中に増えたファイルや子行も、再試行で到達できる形を保つ。
@@ -177,6 +197,10 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       // キー交換に加え回答・友だちの付替も検出する。照合のスナップショット値は一時バインドだけとし、台帳へ保存しない。
       const first = snapshot.rows[0];
       const candidates = ['id', 'line_user_id', 'line_account_id', 'form_id', 'submission_id',
+        ...(snapshot.table === 'line_message_unsends' ? ['source_user_id', 'line_message_account_key'] : []),
+        ...(snapshot.table === 'rt_reservations' ? ['line_uid', 'store_id', 'customer_version', 'updated_at', 'waitlist_entry_id', 'inbound_email_id', 'customer_anonymized'] : []),
+        ...(snapshot.table === 'rt_customer_notice_outbox' ? ['reservation_id', 'line_uid', 'valid', 'sent_at', 'lease_until', 'lease_token'] : []),
+        ...(snapshot.table === 'rt_seat_waitlist' ? ['store_id', 'line_uid', 'status', 'identity_key', 'updated_at', 'notification_claim_until'] : []),
         ...(graph[snapshot.table]?.friendColumns ?? []),
         ...(graph[snapshot.table]?.references.flatMap(ref => ref.columns.map(col => col.column)) ?? []),
         ...RETENTION_R2_KEY_COLUMNS.filter(entry => entry.table === snapshot.table).map(entry => entry.column)];
@@ -187,6 +211,24 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
     }
     const byTable = new Map(snapshots.map(snapshot => [snapshot.table, snapshot]));
     if (target.kind === 'friend_data') {
+      const reservations = JSON.stringify(byTable.get('rt_reservations')!.rows.map(row => row._delete_rowid));
+      const reservationVersions = JSON.stringify(byTable.get('rt_reservations')!.rows.map(row => ({ rowid: row._delete_rowid, version: row.customer_version })));
+      const notices = JSON.stringify(byTable.get('rt_customer_notice_outbox')!.rows.map(row => row._delete_rowid));
+      const waitlist = JSON.stringify(byTable.get('rt_seat_waitlist')!.rows.map(row => row._delete_rowid));
+      // 送信が処理中なら確定しない。送信処理の claim と同じ lease を原子的に確認する。
+      statements.push(guard(`NOT EXISTS (SELECT 1 FROM rt_customer_notice_outbox WHERE rowid IN (SELECT value FROM json_each(?1)) AND (line_uid <> ?2 OR (sent_at IS NULL AND julianday(lease_until) > julianday('now'))))`, [notices, target.lineUserId ?? '']));
+      statements.push(guard(`NOT EXISTS (SELECT 1 FROM rt_reservations r JOIN rt_seat_waitlist w ON w.id=r.waitlist_entry_id WHERE r.rowid IN (SELECT value FROM json_each(?1)) AND (w.store_id <> r.store_id OR w.line_uid IS NOT ?2 OR w.status IN ('waiting','invited') OR julianday(w.notification_claim_until) > julianday('now')))`, [reservations, target.lineUserId ?? '']));
+      // 匿名化で自動生成される changed イベント以外を誤って消さない。
+      statements.push(guard(`NOT EXISTS (SELECT 1 FROM json_each(?) j JOIN rt_reservations r ON r.rowid=json_extract(j.value,'$.rowid') JOIN rt_reservation_events e ON e.reservation_id=r.id AND e.reservation_version=json_extract(j.value,'$.version')+1 AND e.event_type='restaurant.reservation.changed')`, [reservationVersions]));
+      statements.push(db.prepare(`UPDATE line_message_unsends SET source_user_id = NULL WHERE rowid IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(byTable.get('line_message_unsends')!.rows.map(row => row._delete_rowid))));
+      statements.push(db.prepare(`UPDATE rt_customer_notice_outbox SET line_uid = '', message = '', valid = 0, lease_until = NULL, lease_token = NULL WHERE rowid IN (SELECT value FROM json_each(?))`).bind(notices));
+      statements.push(db.prepare(`UPDATE rt_seat_waitlist SET customer_name = '削除済みのお客さま', customer_phone = NULL, line_uid = NULL, identity_key = 'deleted:' || id WHERE rowid IN (SELECT value FROM json_each(?))`).bind(waitlist));
+      statements.push(db.prepare(`UPDATE rt_reservations SET customer_anonymized = 1, customer_name = '削除済みのお客さま', customer_phone = NULL, line_uid = NULL, allergy_note = NULL, note = NULL, cancel_reason = NULL,
+        dining_snapshot_json = CASE WHEN dining_snapshot_json IS NULL THEN NULL ELSE json_object('courseId',json_extract(dining_snapshot_json,'$.courseId'),'courseAllergens',json_extract(dining_snapshot_json,'$.courseAllergens')) END
+        WHERE rowid IN (SELECT value FROM json_each(?))`).bind(reservations));
+      const generatedEvents = `SELECT e.id FROM json_each(?) j JOIN rt_reservations r ON r.rowid=json_extract(j.value,'$.rowid') AND r.customer_version=json_extract(j.value,'$.version')+1 JOIN rt_reservation_events e ON e.reservation_id=r.id AND e.reservation_version=r.customer_version AND e.event_type='restaurant.reservation.changed'`;
+      statements.push(db.prepare(`DELETE FROM rt_reservation_event_receipts WHERE event_id IN (${generatedEvents})`).bind(reservationVersions));
+      statements.push(db.prepare(`DELETE FROM rt_reservation_events WHERE id IN (${generatedEvents})`).bind(reservationVersions));
       const affiliateCondition = conditions.affiliates;
       // 承認済み保持表以外へスキーマを増やさず、既に NULL を許す参照を解除する。紹介者の名前とコードも除く。
       statements.push(db.prepare(`UPDATE conversion_events SET affiliate_id = NULL, affiliate_code = NULL
@@ -204,12 +246,24 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
         .bind(...(affiliateCondition.includes('?3') ? params : [params[0]])));
     }
     for (const table of childFirst(Object.keys(conditions))) {
+      if (target.kind === 'friend_data' && ['line_message_unsends', 'rt_reservations', 'rt_customer_notice_outbox', 'rt_seat_waitlist'].includes(table)) continue;
       const snapshot = byTable.get(table)!;
       if (snapshot.rows.length) statements.push(db.prepare(`DELETE FROM ${q(table)} WHERE rowid IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(snapshot.rows.map(row => row._delete_rowid))));
     }
     const formIds = [...new Set(byTable.get('form_submissions')!.rows.map(row => row.form_id as string))];
     for (const formId of formIds) statements.push(db.prepare(`UPDATE forms SET submit_count = (SELECT COUNT(*) FROM form_submissions WHERE form_id = ? AND is_test = 0) WHERE id = ?`).bind(formId, formId));
-    const completed: Detail = { ...detail, completedAt: new Date().toISOString(), rows: snapshots.reduce((sum, s) => sum + s.rows.length, 0) };
+    // 本人とは断定できない候補の件数だけを残す。名前・電話や LINE ID は監査に書かない。
+    let unlinkedCandidates: Detail['unlinkedCandidates'];
+    if (target.kind === 'friend_data') {
+      const counts = await db.batch([
+        db.prepare("SELECT COUNT(*) AS n FROM line_message_unsends WHERE ? IS NOT NULL AND ? <> '' AND source_user_id = ? AND line_message_account_key LIKE 'destination:%'").bind(target.accountId, target.lineUserId ?? '', target.lineUserId ?? ''),
+        db.prepare("SELECT COUNT(*) AS n FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE ? IS NOT NULL AND s.line_account_id = ? AND (r.line_uid IS NULL OR trim(r.line_uid)='') AND r.customer_name <> '削除済みのお客さま'").bind(target.accountId, target.accountId),
+        db.prepare(`SELECT COUNT(*) AS n FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE ? IS NOT NULL AND ? <> '' AND s.line_account_id=? AND w.line_uid=? AND NOT EXISTS (SELECT 1 FROM rt_reservations r WHERE r.waitlist_entry_id=w.id AND r.store_id=w.store_id AND r.line_uid=w.line_uid)`).bind(target.accountId, target.lineUserId ?? '', target.accountId, target.lineUserId ?? ''),
+      ]);
+      unlinkedCandidates = { legacyDestinationMatchingLineId: Number((counts[0].results[0] as {n:number}).n), accountReservationsWithoutLineId: Number((counts[1].results[0] as {n:number}).n), unlinkedWaitlistMatchingLineId: Number((counts[2].results[0] as {n:number}).n), reservationsWithRawEmail: byTable.get('rt_reservations')!.rows.filter(row => row.inbound_email_id != null).length };
+    }
+    const anonymousTables = target.kind === 'friend_data' ? new Set(['line_message_unsends', 'rt_reservations', 'rt_customer_notice_outbox', 'rt_seat_waitlist']) : new Set<string>();
+    const completed: Detail = { ...detail, completedAt: new Date().toISOString(), rows: snapshots.reduce((sum, s) => sum + (anonymousTables.has(s.table) ? 0 : s.rows.length), 0), anonymizedRows: snapshots.reduce((sum, s) => sum + (anonymousTables.has(s.table) ? s.rows.length : 0), 0), ...(unlinkedCandidates ? { unlinkedCandidates } : {}) };
     statements.push(db.prepare("UPDATE operation_audit SET action = 'deleted', detail_json = ? WHERE id = ? AND json_extract(detail_json,'$.token') = ?").bind(JSON.stringify(completed), id, token));
     const account = target.accountId ? await db.prepare('SELECT tenant_id FROM line_accounts WHERE id = ?').bind(target.accountId).first<{ tenant_id: string | null }>() : null;
     statements.push(auditEventStatement(db, { id, sourceKind: 'operation_audit', sourceId: id,
