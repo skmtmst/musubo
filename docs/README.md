@@ -470,7 +470,7 @@
 
 ## 反映履歴
 
-- [更新履歴の取り込みの印を消す](release-log/unreleased/PR-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
+- [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
 
 - [開店準備の接続・コース入力・再開](release-log/unreleased/148-masato-first-guide-recheck.md) — 反映履歴、確認 2026-11-21。
 - [LINE接続の自動更新](release-log/unreleased/152-masato-line-token-auto-renew.md) — 反映履歴、確認 2026-11-22。
