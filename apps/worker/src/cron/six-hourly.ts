@@ -165,6 +165,10 @@ export async function runSixHourlyHeavyJobs(
       // 1回の行数に上限があり、途中で止まっても次の回が続きから消す。
       name: 'tenant data retention purge',
       run: async () => {
+        try {
+          const { deleteExpiredPurgedPaymentIdentifierHashes } = await import('../services/tenant-purge-payment-hashes.js');
+          await deleteExpiredPurgedPaymentIdentifierHashes(env.DB, new Date(event.scheduledTime).toISOString());
+        } catch { logger.error('tenant_purge.payment_identifier_hash_cleanup_failed'); }
         const { processTenantDataPurge } = await import('../services/tenant-data-purge.js');
         const result = await processTenantDataPurge(env, {
           now: new Date(event.scheduledTime).toISOString(),
