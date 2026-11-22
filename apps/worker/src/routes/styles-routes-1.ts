@@ -11,6 +11,7 @@ import {
 } from '../features/booking/booking-payment-admin/index.js';
 import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
 import { restaurantEffectivelyEnabledForAccount } from '../services/tenant-features.js';
+import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { Hono } from 'hono';
 
 import type { Env } from '../worker-env.js';
@@ -94,7 +95,11 @@ styles.put(base, async (c) => {
       c.get('staff').tenantId ?? null,
       c.get('staff').id,
       await json(c),
-      { images: c.env.IMAGES, catalogRuntime: starterCatalogRuntime(c) },
+      {
+        images: c.env.IMAGES,
+        catalogRuntime: starterCatalogRuntime(c),
+        provisionRestaurantWorkspace: restaurantTestEnabled(c.env),
+      },
     ),
   });
 });
