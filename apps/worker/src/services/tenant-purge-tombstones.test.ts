@@ -304,3 +304,16 @@ test('tombstones erase identifiers and secrets, are hidden and are not reused', 
   expect(added.line_user_id).toBe('Uf');
   expect(f.raw.prepare("SELECT channel_id FROM line_accounts WHERE id='b'").get()).toEqual({channel_id:'ch2'});
 });
+
+test('purge claims only after the live billing lease expires and defers the abandoned receipt', async () => {
+  const f=gapFixture();
+  const now=new Date().toISOString();
+  const future=new Date(Date.now()+60000).toISOString();
+  f.raw.exec("UPDATE tenants SET plan_status='canceled',purge_requested_at='2025-01-01' WHERE id='t'; INSERT INTO billing_events(id,type,tenant_id,summary) VALUES('evt_abandoned','invoice.paid','t','pending')");
+  expect(await claimBillingEventLease(f.db,'evt_abandoned','owner',now,future)).toBe(true);
+  expect(await claimTenantPurge(f.db,'t',now)).toBe(false);
+  f.raw.exec("UPDATE billing_events SET lease_until='2000-01-01T00:00:00Z' WHERE id='evt_abandoned'");
+  expect(await claimTenantPurge(f.db,'t',now)).toBe(true);
+  expect(await deferStaleBillingReceipts(f.db,'t',now)).toBe(1);
+  expect(f.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_abandoned'").get()).toEqual({summary:'purge_review'});
+});

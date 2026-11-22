@@ -7,7 +7,7 @@ export async function claimTenantPurge(db: D1Database, tenantId: string, now: st
       AND (plan_status='canceled' OR (plan_status='trialing' AND trial_ends_at IS NOT NULL AND trial_ends_at < ?))
       AND (purge_requested_at IS NOT NULL OR (retention_anchor_at IS NOT NULL AND retention_anchor_at < ?))
       AND (purge_started_at IS NOT NULL OR (
-        NOT EXISTS (SELECT 1 FROM billing_events e WHERE e.tenant_id=tenants.id AND e.summary='pending')
+        NOT EXISTS (SELECT 1 FROM billing_events e WHERE e.tenant_id=tenants.id AND e.summary='pending' AND e.lease_token IS NOT NULL AND julianday(e.lease_until)>julianday('now'))
         AND NOT EXISTS (SELECT 1 FROM musubo_tenant_billing b WHERE b.tenant_id=tenants.id AND b.resumption_requested_at IS NOT NULL)))`)
     .bind(now, tenantId, now, retentionCutoff(now)).run();
   return Number(result.meta.changes ?? 0) === 1;

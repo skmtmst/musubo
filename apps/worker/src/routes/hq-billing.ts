@@ -39,7 +39,7 @@ import { getBillingPaymentFailure, getRecentBillingPaymentRecovery } from '../se
 import { musuboBillingOverview } from '../services/musubo-billing-overview.js';
 import { acceptedMusuboLineResumption } from '../services/musubo-line-resumption-review.js';
 import { processMusuboBillingEvent } from '../services/musubo-billing-webhook.js';
-import { deferPurgedBillingEvent, tenantPurgeInProgress } from '../services/tenant-purge-tombstones.js';
+import { claimBillingEventLease, releaseBillingEventLease, deferPurgedBillingEvent, tenantPurgeInProgress } from '../services/tenant-purge-tombstones.js';
 import { deliverBillingRecoveryNotice, deliverCurrentBillingFailureNotice } from '../services/billing-invoice-notifications.js';
 import { StripeApiError, stripeApi, type StripeCheckoutSession, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
@@ -653,6 +653,12 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
       logger.warn('billing.webhook_review_for_tenant_purge');
       return c.json({success:true,data:{received:true,review:true}});
     }
+    const leaseToken = crypto.randomUUID();
+    const leaseNow = new Date();
+    if (!await claimBillingEventLease(c.env.DB,event.id,leaseToken,leaseNow.toISOString(),new Date(leaseNow.getTime()+15*60*1000).toISOString())) {
+      return c.json({ success:false,error:'billing_event_busy' },503);
+    }
+    try {
     const refundedInvoiceId = event.type === 'charge.refunded'
       ? await resolveRefundedInvoiceId(c, object)
       : undefined;
@@ -663,7 +669,7 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     if (tenant && musuboBilling
       && !(event.type === 'checkout.session.completed' && object.mode === 'setup')) {
       if (!tenant.stripe_customer_id || await processMusuboBillingEvent({
-        db: c.env.DB, event, tenantId: tenant.id,
+        db: c.env.DB, event, tenantId: tenant.id, leaseToken,
         customerId: tenant.stripe_customer_id, billing: musuboBilling,
       }) === 'retry') return c.json({ success: false, error: '新料金の契約状態を確認できませんでした' }, 503);
       if ((event.type === 'invoice.paid' || event.type === 'invoice.payment_failed')
@@ -742,8 +748,10 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
       if(statement){statements.push(statement);hasTenantWrite=true;}
     };
     const finish = async () => {
-      statements.push(c.env.DB.prepare(`UPDATE billing_events SET summary=json_object('state','completed','created',?,'subscriptionId',?,'subjectId',?,'applied',${hasTenantWrite?'changes()':'0'}) WHERE id=? AND summary='pending'`)
-        .bind(created,subscriptionId,subjectId,event.id));
+      statements.push(c.env.DB.prepare(`UPDATE billing_events SET summary=json_object('state','completed','created',?,'subscriptionId',?,'subjectId',?,'applied',${hasTenantWrite?'changes()':'0'}) WHERE id=? AND summary='pending' AND lease_token=? AND julianday(lease_until)>julianday('now')
+          AND (tenant_id IS NULL OR EXISTS (SELECT 1 FROM tenants t WHERE t.id=billing_events.tenant_id AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL))`)
+        .bind(created,subscriptionId,subjectId,event.id,leaseToken));
+      statements.push(c.env.DB.prepare("SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'BILLING_LEASE_EXPIRED' END)"));
       const results = await c.env.DB.batch(statements);
       if (refundStatementIndex !== undefined && !results[refundStatementIndex]?.meta.changes) {
         logger.warn('routes_hq_billing_warn');
@@ -863,6 +871,9 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
       catch { await notification; }
     }
     return c.json({ success: true, data: { received: true } });
+    } finally {
+      await releaseBillingEventLease(c.env.DB,event.id,leaseToken);
+    }
   } catch (err) {
     throw err;
   }

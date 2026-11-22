@@ -17,7 +17,7 @@ import { discoverRetainedPurgeAncestors, validateTombstonePolicies, type Tombsto
 import { tombstoneRetainedParents } from './tenant-purge-generic.js';
 import candidates from './tenant-retain-column-candidates.json';
 import policies from './tenant-retain-column-policies.json';
-import { claimTenantPurge, tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan, anonymizeMonthlyContract } from './tenant-purge-tombstones.js';
+import { claimTenantPurge, deferStaleBillingReceipts, tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan, anonymizeMonthlyContract } from './tenant-purge-tombstones.js';
 
 
 /**
@@ -223,6 +223,10 @@ async function purgeOneTenant(
 
   // Keep retained foreign-key parents in place. The claim also prevents account resumption.
   if (!await claimTenantPurge(env.DB, tenant.id, now)) {
+    out.finished = false;
+    return out;
+  }
+  if (await deferStaleBillingReceipts(env.DB, tenant.id, new Date(now).toISOString()) === 100) {
     out.finished = false;
     return out;
   }
