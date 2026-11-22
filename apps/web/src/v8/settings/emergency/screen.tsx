@@ -28,6 +28,7 @@ import { RowActions } from '@/components/shared/row-actions'
 import HistoryDetails, { type HistoryDetail } from './history-details'
 import Notice from '@/components/shared/notice'
 import { SecurityMonitorPanel } from './security-monitor'
+import { BillingRetryPanel } from './billing-retry-panel'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import type { EmergencyControlAccess } from '@/v8/emergency'
 
@@ -143,6 +144,7 @@ export default function EmergencyScreen({
           onManualRunSettled={settleManualRun}
           accountCount={accountsFailed ? null : accounts.length}
           canManage={canManage}
+          securityReview={<BillingRetryPanel canManage={identity !== null && staffRole !== 'viewer'} sessionReady={session !== null} impersonating={Boolean(session?.impersonation)} />}
         />
       ) : null}
       {tab === 'control' ? renderControl?.(accounts, controlRef, setControlAccess) : null}

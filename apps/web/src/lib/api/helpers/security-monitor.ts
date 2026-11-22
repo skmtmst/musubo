@@ -10,6 +10,9 @@ function query(accountId?: string) {
 
 /** Omit accountId only in the platform console; the server enforces platform membership. */
 export const securityMonitorApi = {
+  retryBilling: (id: string, expectedVersion: number) =>
+    fetchApi<{ success: true; data: { status: 'retried' } }>(`/api/ops/security-alerts/${encodeURIComponent(id)}/retry-billing`,
+      { method: 'POST', body: JSON.stringify({ expectedVersion }) }),
   /** Staging platform operators only; respects the five-minute lease. */
   runOnce: () => fetchApi<{ success: true; data: { monitor: SecurityMonitorStatus } }>(
     '/api/ops/security-alerts/run-once', { method: 'POST' }),

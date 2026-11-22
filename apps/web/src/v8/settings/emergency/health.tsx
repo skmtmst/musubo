@@ -5,7 +5,7 @@ import { useRunningVersion } from '@/lib/use-running-version'
 
 import { operationFailureText } from './health-error'
 import TruncatedText from '@/components/shared/truncated-text'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
@@ -258,6 +258,7 @@ export function HealthPanelV8({
   onManualRunSettled,
   accountCount = null,
   canManage,
+  securityReview,
 }: {
   accountId: string | null
   manualRunRequest: number
@@ -265,6 +266,7 @@ export function HealthPanelV8({
   onManualRunSettled?: () => void
   accountCount?: number | null
   canManage: boolean
+  securityReview?: ReactNode
 }) {
   const runningVersion = useRunningVersion()
   const blankChecks = useCallback((): HealthCheckItem[] => CHECK_DEFINITIONS.map((item) => ({
@@ -524,6 +526,7 @@ export function HealthPanelV8({
       </>} heading={<>{banner.title}</>}>
         <p className={styles.bannerBody}>{banner.body}</p>
       </Notice>
+      {securityReview}
       {!accountId && !loading ? (
         <p className={styles.minor}>上のバーでLINEアカウントを選択してください。アカウントを選ぶと9つの項目を確かめます。</p>
       ) : null}
