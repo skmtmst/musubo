@@ -9,6 +9,8 @@
  * 「対応マークの設定を開く」から（そこだけがページを移る）。
  */
 import TextLink from '@/components/shared/text-link'
+import Button from '@/components/shared/button'
+import { gap3InboxApi } from '@/lib/api/helpers/gap3'
 import { useEffect, useRef, useState } from 'react'
 import { Settings2 } from 'lucide-react'
 import MenuPortal from '@/components/shared/menu-portal'
@@ -27,13 +29,25 @@ export function markRuleText(mark: SupportMarkListItem): string {
 }
 
 export default function InboxRulesPopover({ accountId, onRoutingSaved }: { accountId: string | null; onRoutingSaved?: () => void }) {
-  const canManage = canManageRole(useStaffRole())
+  const role = useStaffRole()
+  const canManage = canManageRole(role)
+  const [away, setAway] = useState<boolean | null>(null)
+  const [presenceError, setPresenceError] = useState(false)
+  const [presenceSaving, setPresenceSaving] = useState(false)
   const [routingOpen, setRoutingOpen] = useState(false)
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
   const [marks, setMarks] = useState<SupportMarkListItem[]>([])
   const [retry, setRetry] = useState(0)
   const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open || !accountId || !role || role === 'viewer') return
+    let live = true
+    setAway(null); setPresenceError(false)
+    void gap3InboxApi.getPresence().then(result => { if (live) setAway(result.data.away) }, () => { if (live) setPresenceError(true) })
+    return () => { live = false }
+  }, [open, accountId, role])
 
   useEffect(() => {
     if (!open || !accountId) return
@@ -93,6 +107,13 @@ export default function InboxRulesPopover({ accountId, onRoutingSaved }: { accou
               ))}
             </ul>
           )}
+          {accountId && role && role !== 'viewer' ? <>
+            {presenceError ? <p role="alert">不在の状態を確認できませんでした。</p> : null}
+            {away !== null ? <Button variant="secondary" busy={presenceSaving} disabled={presenceSaving} onClick={() => {
+              setPresenceSaving(true); setPresenceError(false)
+              void gap3InboxApi.presence(!away).then(result => setAway(result.data.away), () => setPresenceError(true)).finally(() => setPresenceSaving(false))
+            }}>{away ? '不在を解除する' : '不在にする'}</Button> : null}
+          </> : null}
           <TextLink inline href="/tags?tab=marks">対応マークの設定を開く</TextLink>
           {canManage && accountId ? <button type="button" className={styles.popLink} onClick={() => { setOpen(false); setRoutingOpen(true) }}>割り当てと返事の期限</button> : null}
         </section>

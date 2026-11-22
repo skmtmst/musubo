@@ -7,11 +7,16 @@ const e=encodeURIComponent;
 const account=(p:string,a:string)=>`${p}?account_id=${e(a)}`;
 const json=(method:string,body:unknown,key?:string)=>({method,body:JSON.stringify(body),...(key?{headers:{'Idempotency-Key':key}}:{})});
 const query=(p:string,values:Record<string,string|number|undefined>)=>{const q=new URLSearchParams();for(const [k,v]of Object.entries(values))if(v!==undefined)q.set(k,String(v));return `${p}${p.includes('?')?'&':'?'}${q}`;};
+export type InboxResponseResult = {period:{from:string;to:string;days:number};byStaff:Array<{staffId:string|null;name:string;count:number;medianFirstResponseMinutes:number|null;withinSlaRate:number|null}>;weekly:Array<{week:string;count:number;medianFirstResponseMinutes:number|null}>;automatic:{count:number|null}};
+export const inboxResponseApi={get:(a:string,from:string,to:string)=>fetchApi<Result<InboxResponseResult>>(query(account('/api/analytics/inbox-response',a),{from,to}))};
 export const gap3InboxApi={
  get:(a:string)=>fetchApi<Result<{strategy:InboxStrategy;targets:InboxRoutingTarget[];enabled:boolean;firstResponseMinutes:number;businessHoursOnly:boolean;version:number}>>(account('/api/inbox/routing-settings',a)),
  save:(a:string,b:{strategy:InboxStrategy;targets:InboxRoutingTarget[];enabled:boolean;firstResponseMinutes:number;businessHoursOnly:boolean;expectedVersion:number;escalateTeamId?:string|null})=>fetchApi<Result<unknown>>(account('/api/inbox/routing-settings',a),json('PUT',b)),
- applyUnassigned:(a:string)=>fetchApi<Result<{assigned:number;skipped:number}>>(account('/api/inbox/routing/apply-unassigned',a),json('POST',{})),
+ applyUnassigned:(a:string,key:string)=>fetchApi<Result<{id:string;status:string;assigned:number;skipped:number;total:number}>>(account('/api/inbox/routing/apply-unassigned',a),json('POST',{},key)),
+ assignmentJob:(a:string,id:string)=>fetchApi<Result<{id:string;status:string;assigned:number;skipped:number;total:number}>>(account(`/api/inbox/routing/apply-unassigned/${e(id)}`,a)),
  presence:(away:boolean)=>fetchApi<Result<{away:boolean}>>('/api/me/presence',json('PUT',{away})),
+ getPresence:()=>fetchApi<Result<{away:boolean}>>('/api/me/presence'),
+ heartbeat:()=>fetchApi<Result<{away:boolean}>>('/api/me/presence',json('PUT',{heartbeat:true})),
  icons:(a:string,offset=0)=>fetchApi<Result<{items:Array<{id:string;url:string;name:string}>;nextOffset:number|null}>>(query(`/api/line-accounts/${e(a)}/sender-icons`,{offset})),
 };
 export const gap3BookingApi = {
