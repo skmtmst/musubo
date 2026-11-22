@@ -39,7 +39,7 @@ import { getBillingPaymentFailure, getRecentBillingPaymentRecovery } from '../se
 import { musuboBillingOverview } from '../services/musubo-billing-overview.js';
 import { acceptedMusuboLineResumption } from '../services/musubo-line-resumption-review.js';
 import { processMusuboBillingEvent } from '../services/musubo-billing-webhook.js';
-import { tenantPurgeInProgress } from '../services/tenant-purge-tombstones.js';
+import { deferPurgedBillingEvent, tenantPurgeInProgress } from '../services/tenant-purge-tombstones.js';
 import { deliverBillingRecoveryNotice, deliverCurrentBillingFailureNotice } from '../services/billing-invoice-notifications.js';
 import { StripeApiError, stripeApi, type StripeCheckoutSession, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
@@ -632,21 +632,27 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
 
   try {
     const object = event.data.object;
-    const refundedInvoiceId = event.type === 'charge.refunded'
-      ? await resolveRefundedInvoiceId(c, object)
-      : undefined;
     const tenant = await findTenantForEvent(c, object, event.type);
     // 保存済みの受領記録は完了済みとして扱う。新しい記録は、業務更新と完了印を一緒に確定するまで pending に残す。
     await c.env.DB.prepare('INSERT OR IGNORE INTO billing_events (id,type,tenant_id,summary) VALUES (?,?,?,?)')
       .bind(event.id,event.type,tenant?.id ?? null,'pending').run();
     const receipt = await c.env.DB.prepare('SELECT summary FROM billing_events WHERE id=?').bind(event.id).first<{summary:string}>();
     if (receipt?.summary !== 'pending') return c.json({ success:true,data:{received:true,duplicate:true} });
-    // Receipt is saved before this check. A purge claim cannot start while it is pending,
-    // and a receipt arriving after the claim stays pending until Stripe retries.
+    // Receipt is saved before this check. A purge claim cannot start while it is pending.
     if (tenant && await tenantPurgeInProgress(c.env.DB, tenant.id)) {
-      logger.warn('billing.webhook_deferred_for_tenant_purge');
-      return c.json({success:false,error:'tenant_purge_in_progress'},503);
+      const amountCandidate = event.type === 'charge.refunded' ? object.amount_refunded
+        : event.type === 'invoice.paid' ? object.amount_paid : object.amount_due ?? object.amount_total ?? object.amount;
+      const amount = typeof amountCandidate === 'number' && Number.isSafeInteger(amountCandidate) ? amountCandidate : null;
+      const currency = typeof object.currency === 'string' && /^[a-z]{3}$/.test(object.currency) ? object.currency : null;
+      if (!await deferPurgedBillingEvent(c.env.DB, {tenantId:tenant.id,eventId:event.id,eventType:event.type,amount,currency,now:new Date().toISOString()})) {
+        return c.json({success:false,error:'tenant_purge_review_unavailable'},503);
+      }
+      logger.warn('billing.webhook_review_for_tenant_purge');
+      return c.json({success:true,data:{received:true,review:true}});
     }
+    const refundedInvoiceId = event.type === 'charge.refunded'
+      ? await resolveRefundedInvoiceId(c, object)
+      : undefined;
     // New-price contracts use separate core/options subscriptions. The legacy
     // handler has one plan slot and must not acknowledge or apply those events.
     // Keep the receipt pending until the new contract handler can reconcile it.

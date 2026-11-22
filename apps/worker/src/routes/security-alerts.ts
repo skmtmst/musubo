@@ -29,11 +29,19 @@ async function list(c: Context<Env>, platform: boolean) {
     if (!Number.isSafeInteger(offset) || offset < 0 || offset > 1000000) return c.json({ success: false, error: '表示位置が正しくありません' }, 400);
     const total = await c.env.DB.prepare(`SELECT COUNT(*) AS count FROM security_alerts WHERE ${scope.where} AND status != 'resolved'`)
       .bind(...scope.binds).first<{ count: number }>();
-    const rows = await c.env.DB.prepare(`SELECT * FROM security_alerts WHERE ${scope.where}
-      AND status != 'resolved' ORDER BY last_detected_at DESC, id LIMIT 200 OFFSET ?`).bind(...scope.binds, offset).all<SecurityAlertRow>();
+    const rows = await c.env.DB.prepare(`SELECT security_alerts.*,
+      CASE WHEN rule_key='stripe_purge_review' AND json_valid(scope_key) THEN (
+        SELECT json_object('eventId',s.stripe_event_id,'eventType',s.event_type,'amount',s.amount,'currency',s.currency,
+          'amountMeaning',CASE WHEN s.event_type='charge.refunded' THEN '返金の累計' ELSE '通知された金額' END,
+          'amountUnit','通貨の最小単位')
+        FROM stripe_events s WHERE s.tenant_id=security_alerts.tenant_id
+          AND s.stripe_event_id=json_extract(security_alerts.scope_key,'$[1]') AND s.review_reason='purged_tenant'
+      ) ELSE NULL END AS stripe_review
+      FROM security_alerts WHERE ${scope.where}
+      AND status != 'resolved' ORDER BY last_detected_at DESC, id LIMIT 200 OFFSET ?`).bind(...scope.binds, offset).all<SecurityAlertRow & {stripe_review:string|null}>();
     const monitor = await securityMonitorStatus(c.env.DB);
     const thresholds = securityThresholds(c.env.SECURITY_MONITOR_THRESHOLDS);
-    return c.json({ success: true, data: buildOffsetListResponse({ items: rows.results.map(row => ({ ...publicSecurityAlert(row), ...(platform ? { scope: { tenantId: row.tenant_id, lineAccountId: row.line_account_id } } : {}) })), monitor,
+    return c.json({ success: true, data: buildOffsetListResponse({ items: rows.results.map(row => ({ ...publicSecurityAlert(row), ...(platform ? { scope: { tenantId: row.tenant_id, lineAccountId: row.line_account_id }, ...(row.stripe_review ? {stripeReview: JSON.parse(row.stripe_review)} : {}) } : {}) })), monitor,
       thresholds: thresholds.values, configurationValid: !thresholds.invalid,
       windowMinutes: SECURITY_WINDOW_MINUTES, limit: 200, offset, total: Number(total?.count ?? 0), paging: { limit: 200, offset }, sort: [{ field: 'lastDetectedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
   } catch {

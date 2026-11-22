@@ -417,15 +417,16 @@ describe('課金 Webhook', () => {
     stripe.retrieveSubscription.mockResolvedValue({ id: 'sub_1', status: 'active', customer: 'cus_1', current_period_end: 1_760_000_000, items: { data: [{ price: { id: 'price_standard' } }] } });
   });
 
-  it('削除中の入金通知は未処理で残し、完了後の再送で適用する', async () => {
+  it('削除中の入金通知は金額を照合待ちで残し、再送しても適用しない', async () => {
     setTenant({plan_status:'trialing',stripe_customer_id:'cus_1',purge_started_at:'2026-01-01'});
-    const event = completed('evt_deferred_by_purge');
-    expect((await webhook(event)).status).toBe(503);
-    expect(testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_deferred_by_purge'").get()).toEqual({summary:'pending'});
+    const event = {id:'evt_deferred_by_purge',type:'invoice.paid',data:{object:{id:'in_1',customer:'cus_1',amount_paid:3000,currency:'jpy'}}};
+    expect((await webhook(event)).status).toBe(200);
+    expect(testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_deferred_by_purge'").get()).toEqual({summary:'purge_review'});
+    expect(testDb.raw.prepare("SELECT amount,currency,review_reason FROM stripe_events WHERE stripe_event_id='evt_deferred_by_purge'").get()).toEqual({amount:3000,currency:'jpy',review_reason:'purged_tenant'});
     expect(tenantRow()).toMatchObject({plan_status:'trialing',stripe_subscription_id:null});
     setTenant({purge_started_at:null});
     expect((await webhook(event)).status).toBe(200);
-    expect(tenantRow()).toMatchObject({plan_status:'active',stripe_subscription_id:'sub_1'});
+    expect(tenantRow()).toMatchObject({plan_status:'trialing',stripe_subscription_id:null});
   });
 
   it('新料金の契約通知を旧プランへ適用せず、再処理可能な受領状態で残す', async () => {

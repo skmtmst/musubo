@@ -5,6 +5,7 @@ import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { securityAlerts } from './security-alerts.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { observeSecurityAlert } from '../services/security-monitor-store.js';
+import { deferPurgedBillingEvent } from '../services/tenant-purge-tombstones.js';
 
 let store: ReturnType<typeof createTestD1>;
 const member = { id: 'admin-a', role: 'admin', name: 'A', readOnly: false, tenantId: 'tenant-a' } satisfies AuthenticatedStaff;
@@ -40,6 +41,15 @@ beforeEach(() => {
 afterEach(() => store.raw.close());
 
 describe('security alert HTTP permissions and operator actions', () => {
+  it('platform operators can inspect purged-tenant Stripe amount without exposing it to tenant staff', async () => {
+    store.raw.exec("UPDATE tenants SET purge_started_at='2027-01-01' WHERE id='tenant-b'; INSERT INTO billing_events(id,type,tenant_id,summary) VALUES('evt_review','invoice.paid','tenant-b','pending')");
+    await deferPurgedBillingEvent(store.db,{tenantId:'tenant-b',eventId:'evt_review',eventType:'invoice.paid',amount:3000,currency:'jpy',now:'2027-01-01T00:00:00.000Z'});
+    const own = await request('/api/operations/security-alerts?account_id=a1');
+    expect(await own.text()).not.toContain('evt_review');
+    const platform = await request('/api/ops/security-alerts', {...member,id:'platform',role:'owner'});
+    expect(platform.status).toBe(200);
+    expect(await platform.json()).toMatchObject({data:{items:[{ruleKey:'stripe_purge_review',stripeReview:{eventId:'evt_review',amount:3000,currency:'jpy'}}]}});
+  });
   it('only returns the permitted account, never tenant-wide or hidden platform records', async () => {
     const first = await seedAlert('tenant-a', 'a1');
     await seedAlert('tenant-a', 'a2');

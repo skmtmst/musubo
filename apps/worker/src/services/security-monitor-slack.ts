@@ -5,7 +5,7 @@ import type { SecurityAlertRow } from './security-monitor-store.js';
 
 /** 送信待ち状態は警告の版へ保存し、実行権で同時 cron の重複送信を防ぐ。 */
 export async function flushSecurityAlerts(db: D1Database, config: CodexSlackRelayConfig, now: Date, fetcher: typeof fetch = fetch) {
-  const rows = await db.prepare(`SELECT * FROM security_alerts WHERE slack_sent_version < version
+  const rows = await db.prepare(`SELECT * FROM security_alerts WHERE slack_sent_version < version AND rule_key != 'stripe_purge_review'
     AND (slack_lease_until IS NULL OR slack_lease_until <= ?) ORDER BY first_detected_at LIMIT 30`)
     .bind(now.toISOString()).all<SecurityAlertRow>();
   for (const row of rows.results) {

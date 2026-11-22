@@ -67,8 +67,16 @@ export async function deferPurgedBillingEvent(db: D1Database, input: {
       SELECT 1 FROM stripe_events s WHERE s.stripe_event_id=billing_events.id
         AND s.tenant_id=billing_events.tenant_id AND s.review_reason='purged_tenant')`)
     .bind(input.eventId,input.tenantId);
-  const results = await db.batch([record,defer]);
-  return Number(results[1].meta.changes ?? 0) === 1;
+  const alert = db.prepare(`INSERT INTO security_alerts
+    (id,tenant_id,line_account_id,scope_key,rule_key,observed_count,threshold_count,first_detected_at,last_detected_at,latest_event_at,notification_id,slack_last_error)
+    SELECT ?,?,NULL,json_array(?,?), 'stripe_purge_review',1,1,?,?,julianday(?),?,'unconfigured' WHERE changes()=1`)
+    .bind(crypto.randomUUID(),input.tenantId,input.tenantId,input.eventId,input.now,input.now,input.now,crypto.randomUUID());
+  const results = await db.batch([record,defer,alert]);
+  if (Number(results[1].meta.changes ?? 0) === 1) return true;
+  const existing = await db.prepare(`SELECT 1 AS found FROM billing_events e JOIN stripe_events s ON s.stripe_event_id=e.id
+    WHERE e.id=? AND e.tenant_id=? AND e.summary='purge_review' AND s.tenant_id=e.tenant_id AND s.review_reason='purged_tenant'`)
+    .bind(input.eventId,input.tenantId).first<{found:number}>();
+  return Boolean(existing);
 }
 
 /** 券が参照するメニューの金額・期間を残し、説明と連絡先を消す。 */

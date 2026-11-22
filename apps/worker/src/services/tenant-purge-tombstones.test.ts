@@ -10,9 +10,18 @@ test('billing receipt is atomically recorded as a review item while purging', as
   const event={tenantId:'t',eventId:'evt_deferred',eventType:'invoice.paid',amount:3000,currency:'jpy',now:'2027-05-01T00:00:00Z'};
   expect(await deferPurgedBillingEvent(f.db,{...event,tenantId:'other'})).toBe(false);
   expect(await deferPurgedBillingEvent(f.db,event)).toBe(true);
-  expect(await deferPurgedBillingEvent(f.db,event)).toBe(false);
+  expect(await deferPurgedBillingEvent(f.db,event)).toBe(true);
   expect(f.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_deferred'").get()).toEqual({summary:'purge_review'});
   expect(f.raw.prepare("SELECT amount,review_reason FROM stripe_events WHERE stripe_event_id='evt_deferred'").get()).toEqual({amount:3000,review_reason:'purged_tenant'});
+  expect(f.raw.prepare("SELECT rule_key,status FROM security_alerts WHERE tenant_id='t'").get()).toEqual({rule_key:'stripe_purge_review',status:'open'});
+});
+
+test('review alert failure leaves the receipt pending for retry', async () => {
+  const f=gapFixture();
+  f.raw.exec("UPDATE tenants SET purge_started_at='2027-05-01' WHERE id='t'; INSERT INTO billing_events(id,type,tenant_id,summary) VALUES('evt_failure','invoice.paid','t','pending'); CREATE TRIGGER fail_review_alert BEFORE INSERT ON security_alerts BEGIN SELECT RAISE(ABORT,'test_failure'); END;");
+  await expect(deferPurgedBillingEvent(f.db,{tenantId:'t',eventId:'evt_failure',eventType:'invoice.paid',amount:3000,currency:'jpy',now:'2027-05-01T00:00:00Z'})).rejects.toThrow('test_failure');
+  expect(f.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_failure'").get()).toEqual({summary:'pending'});
+  expect(f.raw.prepare("SELECT id FROM stripe_events WHERE stripe_event_id='evt_failure'").get()).toBeUndefined();
 });
 
 test('purged tenant payment event is retained once with amount and without customer data', async () => {

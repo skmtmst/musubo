@@ -34,6 +34,15 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); store.raw.close(); });
 
 describe('security detection using actual audit SQL and durable alerts', () => {
+  it('purge review alerts do not block the security notification queue', async () => {
+    const insert=store.raw.prepare(`INSERT INTO security_alerts(id,tenant_id,scope_key,rule_key,observed_count,threshold_count,first_detected_at,last_detected_at,latest_event_at,notification_id)
+      VALUES(?,'tenant-a',?,'stripe_purge_review',1,1,'2020-01-01','2020-01-01',1,?)`);
+    for(let i=0;i<31;i++) insert.run(`review-${i}`,`review-${i}`,`notification-${i}`);
+    audit('auth.api_key.rotate');
+    await runSecurityMonitor(env(),NOW,fetcher);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(String(fetcher.mock.calls[0][1]?.body)).toContain('鍵');
+  });
   it('exceeding the threshold creates attention and a safe Slack message, below it does neither', async () => {
     for (let n = 0; n < 19; n++) audit('auth.fail', { result: 'failed' });
     await runSecurityMonitor(env(), NOW, fetcher);
