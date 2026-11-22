@@ -43,7 +43,7 @@ export const post__api_common_vars_1 = async (c: Context<Env, "/api/common-vars"
     }
     if (value === null) {
       // VAR-06: 何が悪いかを画面へ返す。画像はURL形だけを受け（VAR-03）、
-      // URL型は http/https のURLだけを受ける（R36）。
+      // URL型は http/https のURLだけを受ける。
       return inputError(c, {
         success: false,
         error: type === 'image'
