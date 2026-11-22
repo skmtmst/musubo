@@ -187,7 +187,7 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
   const scenarioDefinition = template.template_type === 'scenario' ? parseScenarioDefinition(definition) : null;
   const deliveryDefinition = isDeliveryType(template.template_type) ? await parseDeliveryDefinition(db,template.template_type,definition) : null;
   if(deliveryDefinition && (1+(deliveryDefinition.references?.length??0))*accountIds.length>270) throw new HqTemplateError('INVALID_ACCOUNTS');
-  const preflightId = crypto.randomUUID(), expiresAt = new Date(Date.now() + (template.template_type==='booking_menu'?30:15) * 60_000).toISOString();
+  const preflightId = crypto.randomUUID(), expiresAt = new Date(Date.now() + (isCatalogType(template.template_type)?30:15) * 60_000).toISOString();
   const statements: HqTemplateStatement[] = [], stores = [];
   for (const account of accounts) {
     const snapshot = catalogDefinition ? await catalogSnapshot(db,account.id,template.template_type as import('@line-crm/shared').HqCatalogTemplateType) : tagDefinition ? await tagSnapshot(db, account.id) : scenarioDefinition ? await scenarioSnapshot(db,account.id) : deliveryDefinition ? await deliverySnapshot(db,account.id,template.template_type as import('@line-crm/shared').HqDeliveryTemplateType) : null;

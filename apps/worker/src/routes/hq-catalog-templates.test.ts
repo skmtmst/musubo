@@ -7,6 +7,7 @@ import { beforeEach,afterEach,expect,test,vi } from 'vitest';
 import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { hqTemplates } from './hq-templates.js';
 import { scoring } from './scoring.js';
+import booking from './booking.js';
 import type { Env } from '../worker-env.js';
 import type { HqCatalogTemplateType } from '@line-crm/shared';
 let f:SqliteD1,app:Hono<Env>,staff:Env['Variables']['staff'];
@@ -24,7 +25,7 @@ beforeEach(()=>{
  f.raw.exec("INSERT INTO mileage_programs(id,code,name,status,created_at,updated_at) VALUES('default','default','マイル','active','2026-10-15','2026-10-15')");
  f.raw.exec("INSERT INTO tenants(id,name) VALUES('t','HQ'),('other','Other'); INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES('owner','Owner','owner','unused','t'); INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id) VALUES('a','Store','a','x','x','t'),('b','Store2','b','x','x','t'),('other','Hidden','other','x','x','other')");
  staff={id:'owner',name:'Owner',role:'owner',tenantId:'t',readOnly:false};
- app=new Hono<Env>();app.use('*',async(c,next)=>{c.set('staff',staff);await next();});app.route('/',hqTemplates);app.route('/',scoring);
+ app=new Hono<Env>();app.use('*',async(c,next)=>{c.set('staff',staff);await next();});app.route('/',hqTemplates);app.route('/',scoring);app.route('/',booking);
  vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('No external requests');}));
 });
 afterEach(()=>{f.raw.close();vi.useRealTimers();vi.unstubAllGlobals();});
@@ -110,6 +111,22 @@ test('HQT-01 HQT-02 HQT-07 HQT-16: 同名を守り停止で配る、支払い未
 test('HQT-03 HQT-14: 予約を使わない店は配らない、代理も配れない',async()=>{
  const id=await create('booking_menu');f.raw.exec("INSERT INTO account_styles(line_account_id,style,updated_at) VALUES('a','ec',datetime('now'))");const p=await check(id);expect((p.stores[0] as any).warnings).toContain('booking_not_used');expect((await run(id,p)).body.data.status).toBe('failed');expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
  const im=new Hono<Env>();im.use('*',async(c,next)=>{c.set('staff',staff);c.set('impersonation',{id:'im',tenantId:'t',mode:'write',piiRevealed:true,startedAt:'2026-10-16'});await next();});im.route('/',hqTemplates);const r=await im.request(`/api/hq/templates/${id}/preflight`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountIds:['a']})},{DB:f.db} as Env['Bindings']);expect(r.status).toBe(403);
+});
+test('HQT-07: 統括からのメニューは担当が決まるまで受付開始できない',async()=>{
+ const id=await create('booking_menu');expect((await run(id,await check(id))).body.data.status).toBe('completed');
+ const menu=f.raw.prepare('SELECT id,version FROM menus').get() as {id:string;version:number};
+ const enable=()=>app.request(`/api/booking/admin/menus/${menu.id}?account_id=a`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'初回相談',duration_minutes:60,base_price:3000,is_active:true,expectedVersion:menu.version})},{DB:f.db} as Env['Bindings']);
+ const blocked=await enable();expect(blocked.status).toBe(400);expect(await blocked.json()).toMatchObject({error:'staff_selection_required'});
+ expect(f.raw.prepare('SELECT is_active FROM menus WHERE id=?').get(menu.id)).toEqual({is_active:0});
+ f.raw.exec("INSERT INTO staff(id,line_account_id,name,display_name) VALUES('staff','a','担当','担当')");
+ f.raw.prepare('INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES(?,?,1)').run('staff',menu.id);
+ const enabled=await enable();expect(enabled.status).toBe(200);expect(f.raw.prepare('SELECT is_active FROM menus WHERE id=?').get(menu.id)).toEqual({is_active:1});expect(fetch).not.toHaveBeenCalled();
+});
+test.each(['booking_menu','mileage_reward'] as const)('HQT-18: %s の配布前確認は30分有効',async type=>{
+ const id=await create(type),before=Date.now();
+ const result=await call<Preflight & {expiresAt:string}>(`/${id}/preflight`,'POST',{accountIds:['a']});
+ const after=Date.now(),expires=Date.parse(result.body.data.expiresAt);
+ expect(result.status).toBe(200);expect(expires).toBeGreaterThanOrEqual(before+30*60_000);expect(expires).toBeLessThanOrEqual(after+30*60_000);
 });
 
 test('HQT-09: 配られたクーポン景品はコードがなければ公開できない',async()=>{

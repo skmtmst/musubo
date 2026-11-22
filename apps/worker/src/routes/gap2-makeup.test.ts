@@ -18,6 +18,13 @@ test('B3-01 B3-03 B3-05 B3-06 B3-07: 欠席と振替先の選択は別。二重�
  const id=(first.makeupCredit as any).id;expect((await makeupOptions(d.db,'a','f',id)).map(x=>x.id)).toContain('dst');expect((await makeupOptions(d.db,'a','f',id)).map(x=>x.id)).not.toContain('late');
  const used=await useMakeup(d.db,'a','f',id,'dst','use1');expect(await useMakeup(d.db,'a','f',id,'dst','use1')).toMatchObject({bookingId:used.bookingId,replayed:true});expect(d.raw.prepare("SELECT count(*) n FROM event_bookings WHERE slot_id='dst'").get()).toEqual({n:1});expect(fetch).not.toHaveBeenCalled();
 });
+test('B3-03: 振替先は同じ種類かつ空きがあり期限内の回だけ',async()=>{
+ const credit=(await absence(d.db,'a','f','eb','customer')).makeupCredit as any;
+ d.raw.exec(`INSERT INTO events(id,line_account_id,name,is_published,lifecycle_status) VALUES('other','a','別の教室',1,'published');
+ INSERT INTO event_slots(id,event_id,starts_at,ends_at,capacity) VALUES('other-slot','other','2026-11-27T05:00:00Z','2026-11-27T06:00:00Z',1),('full','lesson','2026-11-28T05:00:00Z','2026-11-28T06:00:00Z',1);
+ INSERT INTO event_bookings(id,line_account_id,event_id,slot_id,friend_id,status,requested_at) VALUES('occupied','a','lesson','full','f','confirmed','2026-11-16T00:00:00Z');`);
+ expect((await makeupOptions(d.db,'a','f',credit.id)).map(x=>x.id)).toEqual(['src','dst']);
+});
 test('B3-02 B3-09: 締め後は欠席だけ、手渡しには理由が必要',async()=>{
  const start=new Date(Date.now()+3600000).toISOString();d.raw.prepare("UPDATE event_slots SET starts_at=? WHERE id='src'").run(start);
  await expect(absence(d.db,'a','f','eb','s',true)).rejects.toThrow('reason_required');const r=await absence(d.db,'a','f','eb','customer');expect(r.makeupCredit).toBeNull();expect(r.reasonIfNone).toBe('cutoff_passed');

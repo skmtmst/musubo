@@ -9,6 +9,12 @@ beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2
 afterEach(()=>{d.raw.close();vi.useRealTimers();vi.unstubAllGlobals();});
 const app=()=>gapApp(d,[booking,bookingGap3]);
 const input={friendId:'f',members:[{menuId:'menu',staffId:'bs'},{menuId:'menu',staffId:'bs2'}],starts_at:'2026-11-20T05:00:00.000Z',startMode:'parallel'};
+test('B5-17: 7人の組は予約を作らず400で拒否する',async()=>{
+ const r=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',{...input,members:Array.from({length:7},()=>({menuId:'menu'}))});
+ expect(r.status).toBe(400);expect(await r.json()).toMatchObject({error:'invalid_members'});
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_groups').get()).toEqual({n:0});
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM bookings').get()).toEqual({n:0});expect(fetch).not.toHaveBeenCalled();
+});
 test('B5-04/06/08/14: 組は別の担当に同時・二重送信でも一組・人ごとに読める',async()=>{
  const r=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'group');const body=await r.json() as any;expect(r.status,JSON.stringify(body)).toBe(201);
  expect(body.data.bookings).toHaveLength(2);expect(body.data.total).toBe(16800);expect((await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'group')).status).toBe(201);
