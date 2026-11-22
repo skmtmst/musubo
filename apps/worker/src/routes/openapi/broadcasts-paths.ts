@@ -37,8 +37,9 @@ export const broadcastsPaths = {
     post: {
       tags: ['Broadcasts'],
       summary: '即時配信',
+      description: 'A/B の検証送信は liveMode:true、expectedVersion、全体の confirmedRecipientCount とテスト宛先の confirmedTestRecipientCount、Idempotency-Key と送信確認ヘッダーを指定する。検証環境で明示的に有効な場合に限る。',
       parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-      responses: { '200': { description: 'Sent' } },
+      responses: { '200': { description: '送信済み、または同じ鍵による再要求の結果' }, '202': { description: 'A/B試験の開始結果（模擬の再要求を含む）' } },
     },
   },
   /*

@@ -2267,7 +2267,7 @@ CREATE TABLE broadcast_ab_live_tests(
   choice_key TEXT,
   choice_value TEXT,
   created_at TEXT NOT NULL
-);
+, remainder_started_at TEXT);
 
 CREATE TABLE broadcast_ab_recipients(broadcast_id TEXT NOT NULL REFERENCES broadcasts(id),friend_id TEXT NOT NULL REFERENCES friends(id),variant_key TEXT NOT NULL CHECK(variant_key IN('A','B','R')),state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN('pending','sent','failed','unknown')),sent_at TEXT,test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),PRIMARY KEY(broadcast_id,friend_id));
 

@@ -88,7 +88,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
    */
   try {
     const { enforceBroadcastSendApproval } = await import('../features/broadcasts/broadcast-approval/index.js');
-    const sendBody = await c.req.json<{ confirmedRecipientCount?: unknown; expectedVersion?:unknown; scheduledAt?:unknown;testMode?:unknown }>().catch(() => null);
+    const sendBody = await c.req.json<{ confirmedRecipientCount?: unknown; expectedVersion?:unknown; scheduledAt?:unknown;testMode?:unknown;liveMode?:unknown;confirmedTestRecipientCount?:unknown }>().catch(() => null);
     if(await simulationContext(c.env.DB,id)){const result=await scheduleSimulation(c.env.DB,id,sendBody??{},c.req.header('Idempotency-Key')??'');await processBroadcastSimulation(c.env.DB,id);return c.json({success:true,data:{...result,...await simulationPreview(c.env.DB,id)}});}
     const abReplay=await maybeReplayAbStart(c,id,sendBody);if(abReplay)return abReplay;
     if(sendBody?.expectedVersion!==undefined) {

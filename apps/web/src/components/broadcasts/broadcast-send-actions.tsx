@@ -44,6 +44,7 @@ type SaveBroadcastContext = {
 
 export async function saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, deliveryLimited, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, sendProblem, setConfirmOpen, setError, setSaving, submittingRef, validate }: SaveBroadcastContext) {
     if (saving || submittingRef.current) return
+    if (ab.enabled) { setError('A/B配信は確認画面から開始してください。'); return }
     const abProblem = broadcastAbSendProblem(ab.enabled, audienceCount)
     if (abProblem) { setError(abProblem); return }
     const scheduleProblem = sendProblem?.()

@@ -5,7 +5,7 @@ import type { BroadcastBubble } from '@line-crm/shared'
 
 export type AbMetric = 'click' | 'booking' | 'purchase'
 export type AbUndecided = 'stop' | 'send_a'
-export type AbStatus = 'draft' | 'testing' | 'decided' | 'undecided' | 'finished' | 'expired'
+export type AbStatus = 'draft' | 'testing' | 'decided' | 'undecided' | 'finished' | 'expired' | 'stopped'
 
 export type AbSettings = {
   testRatioPct: 10 | 20 | 30 | 50
@@ -38,6 +38,9 @@ export type AbResult = {
   chooseUntil?: string | null
   /** 決められなかったため A を送った（決まらないとき＝A を送る）。 */
   fallback?: boolean
+  manuallyChosen?: boolean
+  reason?: string | null
+  liveTestRecipientCount?: number | null
   remainder: { count: number; scheduledAt: string | null; sentAt: string | null }
   /** 組2 の今の段は模擬送信だけ（本物の LINE には送らない）。 */
   testMode?: boolean
@@ -67,6 +70,8 @@ export const broadcastAbApi = {
   saveVariant: (broadcastId: string, key: 'A' | 'B', messages: BroadcastBubble[], expectedVersion: number) =>
     gap2.saveVariant(broadcastId, key, variantText(messages), expectedVersion),
   startMock: gap2.startMock,
+  startLive: gap2.startLive,
+  chooseLive: gap2.chooseLive,
   result: async (broadcastId: string): Promise<Result<AbResult>> => {
     const res = await gap2.result(broadcastId) as { success: boolean; data?: Record<string, unknown> | null }
     if (res.success !== true || !res.data) throw new Error('ab result failed')
@@ -75,14 +80,17 @@ export const broadcastAbApi = {
     return {
       success: true,
       data: {
-        status: raw.status as AbStatus,
+        status: ((raw.status as string)?.startsWith('live_') ? (raw.status as string).slice(5) : raw.status) as AbStatus,
         metric: (raw.metric ?? 'click') as AbMetric,
         decideAfterMinutes: Number(raw.decideAfterMinutes ?? 240),
         variants: variants.map((variant) => ({ key: variant.key, label: variant.label ?? null, sent: variant.sent ?? 0, failed: variant.failed ?? 0, clicks: variant.clicks ?? null, clickRate: variant.clickRate ?? null, bookings: variant.bookings ?? null, purchases: variant.purchases ?? null, purchaseAmount: variant.purchaseAmount ?? null })),
         winner: raw.winner ?? null,
         confidence: raw.confidence ?? null,
         decideAt: raw.decideAt ?? null,
-        chooseUntil: raw.chooseUntil ?? null,
+        chooseUntil: raw.chooseUntil ?? (raw.decidedAt ? new Date(Date.parse(raw.decidedAt) + 24 * 60 * 60_000).toISOString() : null),
+        reason: raw.reason ?? null,
+        manuallyChosen: raw.manuallyChosen ?? false,
+        liveTestRecipientCount: raw.liveTestRecipientCount ?? null,
         fallback: raw.fallback ?? false,
         remainder: { count: raw.remainder?.count ?? 0, scheduledAt: raw.remainder?.scheduledAt ?? null, sentAt: raw.remainder?.sentAt ?? (raw.remainder?.sent ? raw.decidedAt ?? null : null) },
         testMode: raw.testMode === true,

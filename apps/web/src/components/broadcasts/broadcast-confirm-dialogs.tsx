@@ -23,6 +23,9 @@ import type { Dispatch,SetStateAction, ReactNode } from 'react'
 import { BROADCAST_ONLY_CONDITION_AXES,STANDARD_CONDITION_AXES,TYPE_LABELS } from './broadcast-form-model'
 
 type RenderBroadcastConfirmDialogsContext = {
+  abEnabled: boolean
+  abTestRecipientCount: number | null
+  abTrialCount: number | null
   bDraftUnsupported: boolean
   canConfirm: boolean
   confirmationBlocked: boolean
@@ -80,7 +83,7 @@ type RenderBroadcastConfirmDialogsContext = {
   title: string
 }
 
-export function renderBroadcastConfirmDialogs({ bDraftUnsupported, canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, selectedAccountId, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendWhenLabel, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title }: RenderBroadcastConfirmDialogsContext) {
+export function renderBroadcastConfirmDialogs({ abEnabled, abTestRecipientCount, abTrialCount, bDraftUnsupported, canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, selectedAccountId, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendWhenLabel, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title }: RenderBroadcastConfirmDialogsContext) {
   return (<><UnsavedLeaveDialog
       open={leaveTarget !== null}
       subject="配信の変更"
@@ -166,8 +169,8 @@ export function renderBroadcastConfirmDialogs({ bDraftUnsupported, canConfirm, c
       hidePrimary={Boolean(currentStep) && approvalConfigState !== 'ready'}
       unavailableNote={currentStep && approvalConfigState === 'loading' ? '承認の設定を確認しています…' : currentStep && approvalConfigState === 'error' ? '承認の設定を確認できません。確認画面を開き直してください' : undefined}
       onRetry={() => (currentStep ? setPreviewSeq((value) => value + 1) : void runPreflight())}
-      recipients={currentStep ? (sendPreview.data?.recipients ?? null) : audienceCount}
-      recipientsNote={currentStep && sendPreview.data ? describeExclusion(sendPreview.data.recipients, sendPreview.data.excluded) : exclusionNote ?? undefined}
+      recipients={abEnabled ? abTrialCount : currentStep ? (sendPreview.data?.recipients ?? null) : audienceCount}
+      recipientsNote={abEnabled ? `検証環境のテスト宛先のみ。配信対象は ${formatNumber(audienceCount ?? 0)} 人です。` : currentStep && sendPreview.data ? describeExclusion(sendPreview.data.recipients, sendPreview.data.excluded) : exclusionNote ?? undefined}
       purpose="marketing"
       whenLabel={currentStep && sendPreview.data?.quietHoursShiftTo
         ? `${shiftedWhen(sendPreview.data.quietHoursShiftTo)} に送る`
@@ -197,8 +200,8 @@ export function renderBroadcastConfirmDialogs({ bDraftUnsupported, canConfirm, c
           onNoteChange={setApprovalNote}
         />
       ) : undefined}
-      primaryDisabled={!canConfirm || confirmationBlocked || (needsApproval && approverId === '')}
-      primaryLabel={needsApproval ? '承認を依頼する' : (() => {
+      primaryDisabled={!canConfirm || confirmationBlocked || (needsApproval && approverId === '') || (abEnabled && (abTestRecipientCount === null || abTestRecipientCount < 2))}
+      primaryLabel={needsApproval ? '承認を依頼する' : abEnabled ? `${formatNumber(abTrialCount ?? 0)} 人に試験を送る` : (() => {
         const n = currentStep ? sendPreview.data?.recipients ?? null : audienceCount
         const shifted = currentStep ? sendPreview.data?.quietHoursShiftTo : null
         if (n !== null && shifted) return `${shiftedShort(shifted)} に ${formatNumber(n)} 人へ送る`

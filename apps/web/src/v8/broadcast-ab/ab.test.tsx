@@ -4,13 +4,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { abBlockedReason, splitAudience } from './model'
 
 const choose = vi.fn()
-vi.mock('./api', () => ({ broadcastAbApi: { result: vi.fn(), choose: (...args: unknown[]) => { choose(...args); return Promise.resolve({ success: true, data: { status: 'decided' } }) } } }))
+const chooseLive = vi.fn()
+vi.mock('./api', () => ({ broadcastAbApi: { result: vi.fn(), chooseLive: (...args: unknown[]) => { chooseLive(...args); return Promise.resolve({ success: true, data: { variant: 'A' } }) }, choose: (...args: unknown[]) => { choose(...args); return Promise.resolve({ success: true, data: { status: 'decided' } }) } } }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }), usePathname: () => '/', useSearchParams: () => new URLSearchParams() }))
 
 import BroadcastAbResult from './result'
 import type { AbResult } from './api'
 
-afterEach(() => { cleanup(); choose.mockClear() })
+afterEach(() => { cleanup(); choose.mockClear(); chooseLive.mockClear() })
 
 const undecided: AbResult = {
   status: 'undecided', metric: 'click', decideAfterMinutes: 240, winner: null, confidence: 0.6, decideAt: null, chooseUntil: '2026-11-21T05:00:00.000Z',
@@ -65,4 +66,14 @@ describe('A/B の結果（Eoi7q）', () => {
     expect(screen.queryByRole('button', { name: 'A を送る' })).toBeNull()
     expect(screen.getByText(/残りの 3,240 人へ送る案を選んでください/)).toBeTruthy()
   })
+})
+
+it('検証送信は人数不足を明示し、確認後だけ実送信の選択を行う', async () => {
+  const live: AbResult = { ...undecided, testMode: false, reason: 'delivery_too_small', remainder: { count: 16, scheduledAt: null, sentAt: null } }
+  render(<BroadcastAbResult broadcastId="b1" ab={ab(live)} canSend accounts={[{ id: 'a1', name: '銀座店' }]} />)
+  expect(screen.getByText(/人数が足りないため決められません/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'B を送る' }))
+  expect(chooseLive).not.toHaveBeenCalled()
+  fireEvent.click(await screen.findByRole('button', { name: '16 人に送る' }))
+  await waitFor(() => expect(chooseLive).toHaveBeenCalledWith('b1', 'B', 16, expect.any(String)))
 })
