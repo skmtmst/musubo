@@ -13,6 +13,8 @@ import {
   type TenantRetention,
 } from '@line-crm/db';
 
+import { claimTenantPurge, tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan, anonymizeMonthlyContract } from './tenant-purge-tombstones.js';
+
 
 /**
  * 退会・無料体験切れから保存期限が過ぎた統括(テナント)の顧客データを消す（★36-2）。
@@ -215,11 +217,71 @@ async function purgeOneTenant(
   const byTable: Record<string, number> = {};
   let remaining = budget;
 
+  // Keep retained foreign-key parents in place. The claim also prevents account resumption.
+  if (!await claimTenantPurge(env.DB, tenant.id, now)) {
+    out.finished = false;
+    return out;
+  }
+  const accounts = await env.DB.prepare('SELECT id FROM line_accounts WHERE tenant_id=? AND data_purged_at IS NULL LIMIT ?')
+    .bind(tenant.id, remaining).all<{id:string}>();
+  for (const account of accounts.results) {
+    if (!await tombstoneLineAccount(env.DB, tenant.id, account.id, now)) throw new Error('account_tombstone_failed');
+    remaining--;
+    out.deletedRows++;
+    byTable['line_accounts'] = (byTable['line_accounts'] ?? 0) + 1;
+  }
+  const contracts = await env.DB.prepare(`SELECT id FROM booking_monthly_contracts WHERE tenant_id=? AND
+    (customer_id IS NOT NULL OR payment_method_id IS NOT NULL OR setup_session_id IS NOT NULL OR
+     name<>'削除済み' OR state NOT IN ('expired','stopped') OR json_extract(request_json,'$.friendId') IS NOT NULL) LIMIT ?`)
+    .bind(tenant.id, remaining).all<{id:string}>();
+  for (const contract of contracts.results) {
+    await anonymizeMonthlyContract(env.DB, tenant.id, contract.id, now);
+    remaining--;
+    out.deletedRows++;
+    byTable['booking_monthly_contracts'] = (byTable['booking_monthly_contracts'] ?? 0) + 1;
+  }
+  const friends = await env.DB.prepare(`SELECT f.id,f.line_account_id FROM friends f JOIN line_accounts a ON a.id=f.line_account_id
+    WHERE a.tenant_id=? AND f.data_purged_at IS NULL LIMIT ?`).bind(tenant.id,remaining).all<{id:string;line_account_id:string}>();
+  for (const friend of friends.results) {
+    if (!await tombstoneFriend(env.DB,friend.line_account_id,friend.id,now)) throw new Error('friend_tombstone_failed');
+    remaining--;
+    out.deletedRows++;
+    byTable['friends'] = (byTable['friends'] ?? 0) + 1;
+  }
+  const plans = await env.DB.prepare(`SELECT p.id FROM booking_pass_plans p JOIN line_accounts a ON a.id=p.line_account_id
+    WHERE a.tenant_id=? AND p.data_purged_at IS NULL LIMIT ?`).bind(tenant.id,remaining).all<{id:string}>();
+  for (const plan of plans.results) {
+    if (!await tombstonePassPlan(env.DB,tenant.id,plan.id,now)) throw new Error('plan_tombstone_failed');
+    remaining--;
+    out.deletedRows++;
+    byTable['booking_pass_plans'] = (byTable['booking_pass_plans'] ?? 0) + 1;
+  }
+
   // 子が先、親が後。親を先に消すと子が親をたどれなくなって消し残る。
   tables: for (const table of purgeTablesChildFirst()) {
     if (remaining <= 0) {
       out.finished = false;
       break;
+    }
+    if (table === 'line_accounts' || table === 'friends') continue;
+    if (table === 'broadcasts' || table === 'menus' || table === 'rt_stores' || table === 'rt_organizations') {
+      const condition = table === 'rt_stores'
+        ? 'rt_stores.organization_id IN (SELECT id FROM rt_organizations WHERE tenant_id=?)'
+        : tenantScopeCondition(table);
+      const rows = await env.DB.prepare(`SELECT id FROM ${table} WHERE ${condition} AND data_purged_at IS NULL LIMIT ?`)
+        .bind(tenant.id,remaining).all<{id:string}>();
+      for (const row of rows.results) {
+        const ok = table === 'broadcasts' ? await tombstoneBroadcast(env.DB,tenant.id,row.id,now)
+          : table === 'menus' ? await tombstoneBookingMenu(env.DB,tenant.id,row.id,now)
+          : table === 'rt_stores' ? await tombstoneRestaurantStore(env.DB,tenant.id,row.id,now)
+          : await tombstoneRestaurantOrganization(env.DB,tenant.id,row.id,now);
+        if (!ok) throw new Error('parent_tombstone_failed');
+        remaining--;
+        out.deletedRows++;
+        byTable[table] = (byTable[table] ?? 0) + 1;
+      }
+      if (remaining <= 0) { out.finished = false; break; }
+      continue;
     }
     // 回答フォームだけ統括またぎの使い回しを守る条件にする（? が1つ増える）。
     const sharedForm = table === 'forms';
