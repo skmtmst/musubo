@@ -26,3 +26,11 @@ CREATE TRIGGER booking_monthly_contract_identity BEFORE UPDATE ON booking_monthl
 
 -- 旧料金契約の照合用記録には期限を付ける。
 ALTER TABLE billing_events ADD COLUMN retained_until TEXT;
+
+-- 処理を分割して再開するための一時的な進捗。親表には列を追加しない。
+CREATE TABLE tenant_purge_tombstone_progress (
+  tenant_id TEXT NOT NULL,
+  table_name TEXT NOT NULL,
+  row_id TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, table_name, row_id)
+);

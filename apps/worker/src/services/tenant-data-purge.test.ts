@@ -262,7 +262,7 @@ describe('tenant data retention purge', () => {
     expect(result.tenants).toBe(1);
     expect(result.completed).toBe(1);
     expect(count('friends', 'line_account_id = ? AND data_purged_at IS NULL', 'acc-t1')).toBe(0);
-    expect(count('media', 'line_account_id = ?', 'acc-t1')).toBe(0);
+    expect(sqlite.raw.prepare("SELECT r2_key,filename FROM media WHERE line_account_id='acc-t1'").get()).toEqual({r2_key:'purged:media:r2_key:media-t1',filename:'（削除済み）'});
     // 支払の記録は retain。統括に紐づいていても消さない。
     expect(count('billing_invoices', 'tenant_id = ?', 't1')).toBe(1);
     // R2の実体も消す。
@@ -374,7 +374,7 @@ describe('tenant data retention purge', () => {
   test('削除を拒まれた統括は記録して再試行し、別の統括は完了する', async () => {
     seedTenant('t1', { anchor: jst(-93) }); seedMedia('t1', 'private/t1.png');
     seedTenant('t2', { anchor: jst(-92) }); seedFriends('t2', 1);
-    sqlite.raw.exec(`CREATE TRIGGER fixture_retention_delete_guard BEFORE DELETE ON media
+    sqlite.raw.exec(`CREATE TRIGGER fixture_retention_delete_guard BEFORE UPDATE ON media
       WHEN OLD.id = 'media-t1' BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_USE_LOGICAL_ARCHIVE'); END`);
     const IMAGES = createR2();
     const result = await processTenantDataPurge({ DB: sqlite.db, IMAGES }, { now: NOW });
@@ -414,25 +414,25 @@ describe('tenant data retention purge', () => {
     return count('forms', where, ...args);
   }
 
-  test('タグを付けていないフォームも消える（子の版も一緒に）', async () => {
+  test('タグを付けていないフォームの定義と公開版は保持し利用関係を消す', async () => {
     seedTenant('t1', { anchor: jst(-91) });
     seedForm('f1', null, ['acc-t1']);
 
     await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
 
-    expect(formCount('id = ?', 'f1')).toBe(0);
-    expect(count('form_versions', 'form_id = ?', 'f1')).toBe(0);
+    expect(formCount('id = ?', 'f1')).toBe(1);
+    expect(count('form_versions', 'form_id = ?', 'f1')).toBe(1);
     expect(count('form_accounts', 'form_id = ?', 'f1')).toBe(0);
   });
 
-  test('タグを付けているフォームも今までどおり消える', async () => {
+  test('タグを付けているフォームの定義も保持する', async () => {
     seedTenant('t1', { anchor: jst(-91) });
     seedTag('tag-1', 'acc-t1');
     seedForm('f1', 'tag-1', ['acc-t1']);
 
     await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
 
-    expect(formCount('id = ?', 'f1')).toBe(0);
+    expect(formCount('id = ?', 'f1')).toBe(1);
   });
 
   test('ほかの店のフォームは消えない', async () => {
@@ -443,7 +443,7 @@ describe('tenant data retention purge', () => {
 
     await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
 
-    expect(formCount('id = ?', 'f1')).toBe(0);
+    expect(formCount('id = ?', 'f1')).toBe(1);
     expect(formCount('id = ?', 'f2')).toBe(1);
   });
 

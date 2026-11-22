@@ -5180,6 +5180,7 @@
   "booking_monthly_event_applications": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
   "booking_monthly_operations": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
   "tenant_purge_guard": {"category":"global"},
+  "tenant_purge_tombstone_progress": {"category":"global"},
   "line_account_hq_admin_memberships": {"category":"purge","scope":{"by":"lineAccount","column":"line_account_id"}},
   "musubo_pricing_conditions": {"category":"global"},
   "musubo_individual_quotes": {"category":"retain","scope":{"by":"tenant","column":"tenant_id"}},

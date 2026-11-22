@@ -3,6 +3,8 @@ import { gapFixture } from '../test-utils/gap1.js';
 import { monthlyContract, monthlyFixture } from '../test-utils/monthly-ledger.js';
 import { processTenantDataPurge } from './tenant-data-purge.js';
 import { RETENTION_TABLES } from '@line-crm/db';
+import { discoverRetainedPurgeAncestors } from './tenant-retain-graph.js';
+import policies from './tenant-retain-column-policies.json';
 
 const now = '2027-05-01T00:00:00.000Z';
 const due = "UPDATE tenants SET plan_status='canceled', retention_anchor_at='2026-01-01T00:00:00.000Z' WHERE id='t'";
@@ -53,7 +55,7 @@ describe('retained records survive tenant purge with real foreign keys', () => {
     expect(broadcast?.title).not.toBe('private title');
     expect(broadcast?.message_content).not.toBe('private message');
   });
-  test('all retained tables avoid cascade and restrictive references to purge tables', () => {
+  test('every retained foreign-key parent has a tombstone policy', async () => {
     const f = gapFixture();
     const unsafe: string[] = [];
     for (const [table, entry] of Object.entries(RETENTION_TABLES)) {
@@ -67,7 +69,13 @@ describe('retained records survive tenant purge with real foreign keys', () => {
         }
       }
     }
-    expect(unsafe).toEqual([]);
+    const parents = await discoverRetainedPurgeAncestors(f.db);
+    expect(unsafe.length).toBeGreaterThan(0);
+    for (const relation of unsafe) {
+      const parent = relation.split(' -> ')[1].split(' ')[0];
+      expect(parents).toContain(parent);
+      expect(policies).toHaveProperty(parent);
+    }
   });
   test('booking payment and audit are not cascade-deleted with the account', async () => {
     const f = gapFixture();

@@ -1107,6 +1107,12 @@
         "notNull": false,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "filename",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"

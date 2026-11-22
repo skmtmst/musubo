@@ -9138,6 +9138,13 @@ CREATE TABLE tenant_purge_guard (
   PRIMARY KEY (tenant_id, table_name)
 );
 
+CREATE TABLE tenant_purge_tombstone_progress (
+  tenant_id TEXT NOT NULL,
+  table_name TEXT NOT NULL,
+  row_id TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, table_name, row_id)
+);
+
 CREATE TABLE tenants (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

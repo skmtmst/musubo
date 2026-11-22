@@ -467,87 +467,87 @@
     "columns": {
       "source_content_revision": {
         "action": "retain",
-        "reason": "金額・日時・状態等を保持"
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "name": {
-        "action": "placeholder",
-        "reason": "必須文字列を定型値に置換"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "description": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "on_submit_message_type": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "on_submit_message_content": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "on_submit_webhook_url": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "on_submit_webhook_fail_message": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "save_to_metadata": {
-        "action": "zero",
-        "reason": "必須のフラグを無効化"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "og_description": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "og_image_url": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       }
     }
   },
   "forms": {
     "columns": {
       "name": {
-        "action": "placeholder",
-        "reason": "必須文字列を定型値に置換"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "description": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "save_to_metadata": {
-        "action": "zero",
-        "reason": "必須のフラグを無効化"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "on_submit_message_type": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "on_submit_message_content": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "on_submit_webhook_url": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "on_submit_webhook_fail_message": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "og_description": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "og_image_url": {
-        "action": "null",
-        "reason": "NULL 可能な候補を消去"
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
       },
       "content_revision": {
         "action": "retain",
-        "reason": "金額・日時・状態等を保持"
+        "reason": "店が作成したフォームの定義のため保持"
       }
     }
   },
@@ -756,6 +756,10 @@
       "usage_consent_note": {
         "action": "null",
         "reason": "NULL 可能な候補を消去"
+      },
+      "filename": {
+        "action": "placeholder",
+        "reason": "ファイル名を消去"
       }
     }
   },

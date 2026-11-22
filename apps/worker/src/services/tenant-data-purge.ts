@@ -13,6 +13,10 @@ import {
   type TenantRetention,
 } from '@line-crm/db';
 
+import { discoverRetainedPurgeAncestors, validateTombstonePolicies, type TombstonePolicy } from './tenant-retain-graph.js';
+import { tombstoneRetainedParents } from './tenant-purge-generic.js';
+import candidates from './tenant-retain-column-candidates.json';
+import policies from './tenant-retain-column-policies.json';
 import { claimTenantPurge, tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan, anonymizeMonthlyContract } from './tenant-purge-tombstones.js';
 
 
@@ -222,6 +226,9 @@ async function purgeOneTenant(
     out.finished = false;
     return out;
   }
+  const retainedParents = await discoverRetainedPurgeAncestors(env.DB);
+  validateTombstonePolicies(retainedParents, candidates, policies as Record<string, TombstonePolicy>);
+  const retainedParentSet = new Set(retainedParents);
   const accounts = await env.DB.prepare('SELECT id FROM line_accounts WHERE tenant_id=? AND data_purged_at IS NULL LIMIT ?')
     .bind(tenant.id, remaining).all<{id:string}>();
   for (const account of accounts.results) {
@@ -285,8 +292,10 @@ async function purgeOneTenant(
     }
     // 回答フォームだけ統括またぎの使い回しを守る条件にする（? が1つ増える）。
     const sharedForm = table === 'forms';
-    const condition = sharedForm ? formsPurgeCondition() : tenantScopeCondition(table);
+    const scope = sharedForm ? formsPurgeCondition() : tenantScopeCondition(table);
     const tenantParams = sharedForm ? [tenant.id, tenant.id] : [tenant.id];
+    const isRetainedParent = retainedParentSet.has(table);
+    const condition = scope;
     const keyColumns = R2_KEY_COLUMNS_BY_TABLE[table] ?? [];
 
     for (;;) {
@@ -300,15 +309,38 @@ async function purgeOneTenant(
       // 読む順と消す順を rowid で揃えるので、両者は必ず同じ行を指す。
       let r2DeletedBeforeFailure = 0;
       if (keyColumns.length > 0) {
-        const objects = await deleteR2Objects(env, table, condition, keyColumns, tenant.id, chunk);
+        const objectCondition = isRetainedParent
+          ? `(${condition}) AND NOT EXISTS (SELECT 1 FROM tenant_purge_tombstone_progress p WHERE p.tenant_id=? AND p.table_name=? AND p.row_id=CAST(${table}.id AS TEXT))`
+          : condition;
+        const objectParams = isRetainedParent ? [...tenantParams, tenant.id, table] : tenantParams;
+        const objects = await deleteR2Objects(env, table, objectCondition, keyColumns, objectParams, chunk);
         out.deletedObjects += objects.deleted;
         r2DeletedBeforeFailure = objects.deleted;
         out.failedObjects += objects.failed;
-        if (table === 'form_submission_files' && objects.failed > 0) {
+        if ((table === 'form_submission_files' || isRetainedParent) && objects.failed > 0) {
           // 次回も削除を再試行できるよう、R2 キーと親行への参照を保つ。
           out.finished = false;
           break tables;
         }
+      }
+
+      if (isRetainedParent) {
+        let count: number;
+        try {
+          count = await tombstoneRetainedParents(env.DB, {
+            tenantId: tenant.id, table, scope, scopeValues: tenantParams, limit: chunk,
+            policy: (policies as Record<string, TombstonePolicy>)[table],
+          });
+        } catch (error) {
+          out.finished = false;
+          out.failure = { table, failureCode: deleteFailureCode(error), r2DeletedBeforeFailure };
+          break tables;
+        }
+        byTable[table] = (byTable[table] ?? 0) + count;
+        out.deletedRows += count;
+        remaining -= count;
+        if (count < chunk) break;
+        continue;
       }
 
       let deleted: D1Result;
@@ -390,7 +422,7 @@ async function deleteR2Objects(
   table: string,
   condition: string,
   columns: string[],
-  tenantId: string,
+  params: readonly string[],
   chunk: number,
 ): Promise<{ deleted: number; failed: number }> {
   const selected = await env.DB
@@ -398,7 +430,7 @@ async function deleteR2Objects(
       `SELECT ${columns.map((column) => `${table}.${column}`).join(', ')}
          FROM ${table} WHERE ${condition} ORDER BY ${table}.rowid LIMIT ?`,
     )
-    .bind(tenantId, chunk)
+    .bind(...params, chunk)
     .all<Record<string, string | null>>();
 
   const keys = (selected.results ?? [])
