@@ -42,7 +42,7 @@ export const post__api_common_vars_1 = async (c: Context<Env, "/api/common-vars"
       return inputError(c, { success: false, error: '名前は200文字までで入力してください' }, 400, ["name"]);
     }
     if (value === null) {
-      // VAR-06: 何が悪いかを画面へ返す。画像はURL形だけを受け（VAR-03）、
+      // 何が悪いかを画面へ返す。画像はURL形だけを受け、
       // URL型は http/https のURLだけを受ける。
       return inputError(c, {
         success: false,
@@ -578,7 +578,7 @@ export const post__api_common_vars_id_schedules_9 = async (c: Context<Env, "/api
       return inputError(c, { success: false, error: '過去の日時は指定できません' }, 400, ["effectiveFrom"]);
     }
 
-    // VAR-06: 予約の値も登録・編集と同じ型検査を通す。ここを素通りさせると
+    // 予約の値も登録・編集と同じ型検査を通す。ここを素通りさせると
     // Cron が型に合わない値をそのまま書き込む（真偽の変数へ 'yes' 等）。
     const scheduledValue = typeof body.value === 'string' ? body.value : '';
     const normalizedScheduled = normalizeCommonVarValue(
