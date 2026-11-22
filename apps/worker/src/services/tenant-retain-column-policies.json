@@ -236,6 +236,14 @@
       "updated_by_staff_id": {
         "action": "retain",
         "reason": "参照を維持"
+      },
+      "meeting_location": {
+        "action": "null",
+        "reason": "顧客ごとの待合せ場所を消去"
+      },
+      "person_label": {
+        "action": "null",
+        "reason": "顧客を示す名前を消去"
       }
     }
   },
@@ -888,6 +896,10 @@
       "concerns": {
         "action": "empty_array",
         "reason": "顧客の識別子または自由記述を消去"
+      },
+      "birthday": {
+        "action": "null",
+        "reason": "ペットの生年月日を消去"
       }
     }
   },
@@ -1080,6 +1092,10 @@
       "photo_version": {
         "action": "retain",
         "reason": "金額・日時・状態等を保持"
+      },
+      "bio": {
+        "action": "null",
+        "reason": "担当者の自由記述を消去"
       }
     }
   },
@@ -1148,6 +1164,10 @@
       "permission_keys": {
         "action": "empty_array",
         "reason": "削除済み担当者の権限を消去"
+      },
+      "notification_preferences": {
+        "action": "json",
+        "reason": "通知設定内の個人情報を消去"
       }
     }
   },

@@ -61,3 +61,12 @@ test('retained privacy audit survives purge of the session and operator', async 
   expect(f.raw.prepare("SELECT id FROM pii_reveal_logs WHERE id='audit'").get()).toEqual({id:'audit'});
   expect(f.raw.prepare("SELECT write_reason FROM impersonation_sessions WHERE id='session'").get()).toEqual({write_reason:null});
 });
+
+
+test('additional private fields have explicit erasure actions', async () => {
+  const {default: policies}=await import('./tenant-retain-column-policies.json');
+  expect(buildTombstoneValues('staff','s',{bio:'private biography'}, {columns:{bio:policies.staff.columns.bio as never}}).bio).toBeNull();
+  expect(buildTombstoneValues('bookings','b',{meeting_location:'private address',person_label:'private name'}, {columns:{meeting_location:policies.bookings.columns.meeting_location as never,person_label:policies.bookings.columns.person_label as never}})).toEqual({meeting_location:null,person_label:null});
+  expect(buildTombstoneValues('staff_members','s',{notification_preferences:'{"email":"private"}'}, {columns:{notification_preferences:policies.staff_members.columns.notification_preferences as never}}).notification_preferences).toBe('{}');
+  expect(buildTombstoneValues('nen_pet_profiles','p',{birthday:'2020-01-01'}, {columns:{birthday:policies.nen_pet_profiles.columns.birthday as never}}).birthday).toBeNull();
+});

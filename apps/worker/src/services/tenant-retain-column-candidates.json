@@ -345,6 +345,18 @@
         "notNull": false,
         "key": true,
         "foreignKey": true
+      },
+      {
+        "column": "meeting_location",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "person_label",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"
@@ -1302,6 +1314,12 @@
         "notNull": true,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "birthday",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"
@@ -1583,6 +1601,12 @@
         "notNull": true,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "bio",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"
@@ -1681,6 +1705,12 @@
       },
       {
         "column": "permission_keys",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "notification_preferences",
         "notNull": true,
         "key": false,
         "foreignKey": false
