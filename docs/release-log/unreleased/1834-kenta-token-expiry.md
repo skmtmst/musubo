@@ -1,6 +1,2 @@
 ## 変更
-<<<<<<<< HEAD:docs/release-log/unreleased/1832-kenta-token-expiry.md
-- LINEの鍵が自動で取り替えられなかった時だけ通知に出すようにし、取り替えが動いている間に毎月「注意」になっていたのを直した @kenta #1832 2026-10-25 23:44
-========
 - LINEの鍵が自動で取り替えられなかった時だけ通知に出すようにし、取り替えが動いている間に毎月「注意」になっていたのを直した @kenta #1834 2026-10-25 23:44
->>>>>>>> origin/codex/development:docs/release-log/unreleased/1834-kenta-token-expiry.md
