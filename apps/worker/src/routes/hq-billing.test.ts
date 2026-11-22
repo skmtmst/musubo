@@ -420,6 +420,7 @@ describe('課金 Webhook', () => {
   it('削除中の入金通知は金額を照合待ちで残し、再送しても適用しない', async () => {
     setTenant({plan_status:'trialing',stripe_customer_id:'cus_1',purge_started_at:'2026-01-01'});
     const event = {id:'evt_deferred_by_purge',type:'invoice.paid',data:{object:{id:'in_1',customer:'cus_1',amount_paid:3000,currency:'jpy'}}};
+    testDb.raw.prepare("INSERT INTO billing_events(id,type,tenant_id,summary) VALUES('evt_deferred_by_purge','invoice.paid',?,'pending')").run(DEFAULT_TENANT_ID);
     expect((await webhook(event)).status).toBe(200);
     expect(testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_deferred_by_purge'").get()).toEqual({summary:'purge_review'});
     expect(testDb.raw.prepare("SELECT amount,currency,review_reason FROM stripe_events WHERE stripe_event_id='evt_deferred_by_purge'").get()).toEqual({amount:3000,currency:'jpy',review_reason:'purged_tenant'});

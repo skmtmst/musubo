@@ -2,7 +2,22 @@ import { expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { activateLineAccount, createLineAccount, upsertFriend, getLineAccountById, getFriendById, getBroadcasts, getBroadcastById, updateTenantBilling, markTenantDataPurged, getStripeEvents } from '@line-crm/db';
 import { gapFixture } from '../test-utils/gap1.js';
-import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan, claimTenantPurge, claimBillingEventLease, releaseBillingEventLease, recordPurgedTenantStripeEvent, deferPurgedBillingEvent } from './tenant-purge-tombstones.js';
+import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan, claimTenantPurge, claimBillingEventLease, completeBillingEventLease, releaseBillingEventLease, recordPurgedTenantStripeEvent, deferPurgedBillingEvent, deferStaleBillingReceipts } from './tenant-purge-tombstones.js';
+
+test('expired and unleased billing receipts become review items, active leases are left alone', async () => {
+  const f=gapFixture();
+  f.raw.exec(`UPDATE tenants SET purge_started_at='2027-05-01' WHERE id='t';
+    INSERT INTO billing_events(id,type,tenant_id,summary,lease_token,lease_until,review_amount,review_currency)
+    VALUES('evt_stale','invoice.paid','t','pending','old','2027-05-01T00:00:00Z',3000,'jpy'),
+          ('evt_active','invoice.paid','t','pending','active','2027-05-01T02:00:00Z',4000,'jpy'),
+          ('evt_unleased','invoice.paid','t','pending',NULL,NULL,5000,'jpy')`);
+  const now='2027-05-01T01:00:00.000Z';
+  await expect(deferStaleBillingReceipts(f.db,'t','2027-05-01T01:00:00')).rejects.toThrow('invalid_billing_lease_time');
+  expect(await deferStaleBillingReceipts(f.db,'t',now)).toBe(2);
+  expect(f.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_active'").get()).toEqual({summary:'pending'});
+  expect(f.raw.prepare("SELECT amount FROM stripe_events WHERE stripe_event_id='evt_stale'").get()).toEqual({amount:3000});
+  expect(await deferStaleBillingReceipts(f.db,'t',now)).toBe(0);
+});
 
 test('billing receipt is atomically recorded as a review item while purging', async () => {
   const f = gapFixture();
@@ -41,9 +56,11 @@ test('billing event lease is exclusive and cannot be acquired for a purging tena
   f.raw.exec("INSERT INTO billing_events(id,type,tenant_id,summary) VALUES('evt','invoice.paid','t','pending')");
   const now='2027-05-01T00:00:00.000Z', until='2027-05-01T00:15:00.000Z';
   expect(await claimBillingEventLease(f.db,'evt','first',now,until)).toBe(true);
+  expect(await completeBillingEventLease(f.db,'evt','first','completed',until)).toBe(false);
   expect(await claimBillingEventLease(f.db,'evt','second',now,until)).toBe(false);
   expect(await releaseBillingEventLease(f.db,'evt','second')).toBe(false);
   expect(await releaseBillingEventLease(f.db,'evt','first')).toBe(true);
+  await expect(claimBillingEventLease(f.db,'evt','first','2027-05-01T00:00:00','2027-05-01T00:15:00Z')).rejects.toThrow('invalid_billing_lease_time');
   f.raw.exec("UPDATE tenants SET purge_started_at='2027-05-01' WHERE id='t'");
   expect(await claimBillingEventLease(f.db,'evt','second',now,until)).toBe(false);
 });

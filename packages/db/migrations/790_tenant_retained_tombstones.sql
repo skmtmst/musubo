@@ -9,6 +9,8 @@ ALTER TABLE booking_pass_plans ADD COLUMN data_purged_at TEXT;
 ALTER TABLE tenants ADD COLUMN purge_started_at TEXT;
 ALTER TABLE billing_events ADD COLUMN lease_token TEXT;
 ALTER TABLE billing_events ADD COLUMN lease_until TEXT;
+ALTER TABLE billing_events ADD COLUMN review_amount INTEGER;
+ALTER TABLE billing_events ADD COLUMN review_currency TEXT;
 ALTER TABLE stripe_events ADD COLUMN tenant_id TEXT;
 ALTER TABLE stripe_events ADD COLUMN review_reason TEXT;
 ALTER TABLE stripe_events ADD COLUMN identifier_hash TEXT;
