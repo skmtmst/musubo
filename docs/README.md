@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [予約・景品の受け入れ条件の修正](release-log/unreleased/130-kenta-gapfix2.md) — 運用者向け変更履歴。確認 2026-11-20。
+
 - [複数アカウント配信の再送時の重複を防止](release-log/unreleased/146-kenta-a21-multi-resend.md) — 反映履歴、確認 2026-11-21。
 
 - [開店準備の接続・コース入力・再開](release-log/unreleased/148-masato-first-guide-recheck.md) — 反映履歴、確認 2026-11-21。

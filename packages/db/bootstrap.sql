@@ -5506,7 +5506,7 @@ CREATE TABLE "mileage_rewards" (
   created_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   archived_at                  TEXT
-, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, hq_template_id TEXT, hq_template_version_id TEXT);
 
 CREATE TABLE mileage_rules (
   id             TEXT PRIMARY KEY,
@@ -13080,6 +13080,13 @@ CREATE TRIGGER mileage_reward_folders_common_delete AFTER DELETE ON mileage_rewa
 CREATE TRIGGER mileage_reward_folders_common_insert AFTER INSERT ON mileage_reward_folders WHEN NOT EXISTS(SELECT 1 FROM folders WHERE id=NEW.id) BEGIN INSERT INTO folders(id,kind,account_id,name,display_order,created_at,updated_at) VALUES(NEW.id,'mileage_reward',NEW.line_account_id,NEW.name,NEW.display_order,NEW.created_at,NEW.updated_at); END;
 
 CREATE TRIGGER mileage_reward_folders_common_update AFTER UPDATE ON mileage_reward_folders WHEN EXISTS(SELECT 1 FROM folders WHERE id=NEW.id AND (name IS NOT NEW.name OR display_order IS NOT NEW.display_order)) BEGIN UPDATE folders SET name=NEW.name,display_order=NEW.display_order,revision=revision+1,updated_at=NEW.updated_at WHERE id=NEW.id AND kind='mileage_reward' AND account_id=NEW.line_account_id; END;
+
+CREATE TRIGGER mileage_reward_hq_origin_update BEFORE UPDATE OF hq_template_id,hq_template_version_id ON mileage_rewards
+WHEN NEW.hq_template_id IS NOT NULL AND NOT EXISTS (
+ SELECT 1 FROM hq_templates t JOIN hq_template_versions v ON v.template_id=t.id AND v.tenant_id=t.tenant_id
+ JOIN line_accounts a ON a.tenant_id=t.tenant_id WHERE t.id=NEW.hq_template_id AND t.archived_at IS NULL
+ AND v.id=NEW.hq_template_version_id AND a.id=NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT,'hq_origin_account_mismatch'); END;
 
 CREATE TRIGGER mileage_rewards_folder_insert BEFORE INSERT ON mileage_rewards WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='mileage_reward' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 

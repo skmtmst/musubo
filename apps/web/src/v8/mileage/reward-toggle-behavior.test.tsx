@@ -100,3 +100,13 @@ it('使い道の停止を先に表示し、失敗すると戻し、成功して�
   expect(row.textContent).toContain('止めています')
   expect(calls.list).toHaveBeenCalledTimes(1)
 })
+
+
+it('統括のひな形が有効な景品だけ出所の札を表示する', async () => {
+  calls.list.mockResolvedValue({ success: true, data: overviewOf([reward('r1', '配布された景品', { hqTemplateId: 'hq1' }), reward('r2', '削除後の景品', { hqTemplateId: null })]) })
+  render(<MileageShell.Provider value={{ tab: 'rewards', readonly: false, narrow: false, counts: {}, setCount: () => {} }}><Rewards /></MileageShell.Provider>)
+  const active = (await screen.findByText('配布された景品')).closest('tr')!
+  const detached = (await screen.findByText('削除後の景品')).closest('tr')!
+  expect(within(active).getByText('統括から')).toBeTruthy()
+  expect(within(detached).queryByText('統括から')).toBeNull()
+})

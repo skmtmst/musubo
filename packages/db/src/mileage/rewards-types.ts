@@ -45,6 +45,7 @@ export interface MileageRewardVersion {
 export interface MileageRewardSummary {
   id: string;
   folderId?: string | null;
+  hqTemplateId: string | null;
   lineAccountId: string;
   programId: string;
   name: string;
@@ -121,6 +122,7 @@ export interface MileageRewardRedemption {
 export type RewardRow = {
   id: string;
   folder_id: string | null;
+  active_hq_template_id: string | null;
   line_account_id: string;
   program_id: string;
   name: string;

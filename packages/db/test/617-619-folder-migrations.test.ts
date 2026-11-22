@@ -33,6 +33,8 @@ function seed(db:Database.Database) {
 describe('617〜619: 外部キーを有効にしたローカル移行',()=>{
  it('空の旧DBから3本が当たり、生成した空DBと同じ列を持つ',()=>{
   const db=old(),fresh=new Database(':memory:');try{migrate(db);fresh.exec(readFileSync(new URL('bootstrap.sql',root),'utf8'));
+   // 782 は 617〜619 より後の変更。比較先を同じ時点に戻し、それ以外の全列を厳密に比べる。
+   fresh.exec('DROP TRIGGER mileage_reward_hq_origin_update; ALTER TABLE mileage_rewards DROP COLUMN hq_template_version_id; ALTER TABLE mileage_rewards DROP COLUMN hq_template_id');
    for(const table of ['folders','mileage_rewards','affiliates','affiliate_offers','friend_add_rules','hq_banner_folders','hq_template_folders','hq_broadcast_folders'])expect(db.prepare(`PRAGMA table_info(${table})`).all()).toEqual(fresh.prepare(`PRAGMA table_info(${table})`).all());
    expect(db.pragma('foreign_key_check')).toEqual([]);
   }finally{db.close();fresh.close();}
