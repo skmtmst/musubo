@@ -356,7 +356,8 @@ it('retains all 13 tables, all amounts and other customers through failure, retr
       const old=before[table][i], now=after[table][i];
       const deleted=(old.id ?? old.token_hash as string).toString().startsWith('deleted-');
       for(const [column,value] of Object.entries(old)) {
-        if(deleted && columns.includes(column)) expect(now[column]).toBeNull();
+        if(deleted && ['booking_payments','booking_audit_logs'].includes(table) && column==='customer_redacted_at') expect(now[column]).toEqual(expect.any(String));
+        else if(deleted && columns.includes(column)) expect(now[column]).toBeNull();
         else expect(now[column]).toEqual(value);
       }
     }
@@ -384,6 +385,92 @@ it('retains all 13 tables, all amounts and other customers through failure, retr
   expect(await requestPhotoAssessment(sqlite.db,{id:'replay-run',photoId:'deleted-0-photo',lineAccountId:'fixture-account',expectedVersion:1,actorId:'fixture-staff',idempotencyKey:'deleted-0',requestFingerprint:'deleted-0'})).toMatchObject({kind:'duplicate',run:{photoId:null,customerName:'削除済みのお客さま'}});
   expect(await consumePhotoOriginalDownload(sqlite.db,{tokenHash:'deleted-0-grant',lineAccountId:'fixture-account',actorId:'fixture-staff'})).toBeNull();
   expect(await claimPhotoNotificationDelivery(sqlite.db,{decisionId:'deleted-0-review',lineAccountId:'fixture-account',leaseId:'lease',leaseExpiresAt:'2999-01-01'})).toBeNull();
+});
+
+it('顧客削除は監査・会計の行と金額を残し、自由文と領収書とLINEのIDを消す', async () => {
+  const { seedDeletionRecords } = await import('../../../../packages/db/test/fixtures/customer-deletion.mjs');
+  seedDeletionRecords(sqlite.raw,'removed','fixture-friend'); seedDeletionRecords(sqlite.raw,'kept','other-friend');
+  sqlite.raw.prepare("UPDATE booking_audit_logs SET before_json=?,after_json=?,reason='秘密の理由',actor_type='customer',actor_id='fixture-friend',actor_name='顧客名' WHERE id='removed-0-audit'")
+    .run(JSON.stringify({status:'rejected',amount:1000,starts_at:'2026-10-10T01:00:00Z',staff_id:'fixture-staff',menu_id:'fixture-menu',notification_policy:{day_before:true,secret:'秘密'},customer_note:'秘密メモ',new_unknown_field:'秘密情報'}),JSON.stringify({status:'confirmed',internal_note:'内部メモ'}));
+  sqlite.raw.exec(`UPDATE booking_payments SET receipt_url='https://example.test/private',action_reason='秘密の理由',actor_label='顧客名' WHERE id='removed-0-payment';
+    INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id) VALUES('separate-account','Other','other-channel','fake','fake','fixture-tenant');
+    INSERT INTO booking_audit_logs(id,booking_id,line_account_id,action,before_json,actor_type,actor_id,occurred_at) VALUES('separate-audit',NULL,'separate-account','updated','{"customer_note":"別アカウント"}','customer','fixture-friend','2026-01-01');
+    INSERT INTO stripe_events(id,stripe_event_id,event_type,friend_id,amount,currency,metadata) VALUES('stripe-removed','evt-removed','paid','fixture-friend',1000,'JPY','{"line_friend_id":"fixture-friend","note":"秘密"}'),('stripe-kept','evt-kept','paid','other-friend',1000,'JPY','{"line_friend_id":"other-friend"}'),('stripe-mixed','evt-mixed','paid','other-friend',1000,'JPY','{"line_friend_id":"fixture-friend","plan":"x"}');
+    INSERT INTO booking_payment_events(id,line_account_id,provider,provider_event_id,payment_id,provider_payment_id,kind,outcome,amount,currency,receipt_url,received_at) VALUES('payment-event-removed','fixture-account','stripe','event','removed-0-payment','pi','paid','paid',1000,'JPY','https://example.test/secret','2026-01-01');
+    INSERT INTO booking_payment_refunds(id,payment_id,line_account_id,idempotency_key,amount,reason,actor_id,actor_label,notification_status,created_at) VALUES('refund-removed','removed-0-payment','fixture-account','r',100,'秘密理由','staff','顧客名','not_requested','2026-01-01');
+    INSERT INTO booking_payment_booking_links(id,payment_id,line_account_id,booking_id,reason,actor_id,actor_label,created_at) VALUES('link-removed','removed-0-payment','fixture-account','removed-0-booking','秘密理由','staff','顧客名','2026-01-01');
+    INSERT INTO booking_audit_logs(id,booking_id,booking_id_history,line_account_id,action,before_json,actor_type,actor_id,occurred_at) VALUES('history-removed',NULL,'removed-0-booking','fixture-account','updated','{"customer_note":"秘密"}','staff','fixture-staff','2026-01-01'),('actor-removed',NULL,NULL,'fixture-account','updated','{"internal_note":"秘密"}','customer','fixture-friend','2026-01-01');
+    INSERT INTO booking_charges(id,booking_id,line_account_id,kind,amount,policy_snapshot_json,status,reason,created_at,updated_at) VALUES('charge-removed','removed-0-booking','fixture-account','cancellation_fee',100,'{"enabled":true,"noShowPercent":100,"version":1,"tiers":[{"beforeHours":24,"percent":50,"note":"秘密"}],"note":"秘密"}','waived','秘密理由','2026-01-01','2026-01-01');
+    INSERT INTO booking_cancellation_events(id,charge_id,action,reason,created_at) VALUES('cancel-removed','charge-removed','waived','秘密理由','2026-01-01');`);
+  await deleteCustomerData(env(),{kind:'friend_data',id:'fixture-friend',friendId:'fixture-friend',accountId:'fixture-account',lineUserId:'LINE-fixture-friend'},'owner');
+  const audit=sqlite.raw.prepare("SELECT booking_id,action,before_json,after_json,reason,actor_id,actor_name FROM booking_audit_logs WHERE id='removed-0-audit'").get() as any;
+  expect(audit).toMatchObject({booking_id:null,action:'created',reason:null,actor_id:null,actor_name:null});
+  expect(JSON.parse(audit.before_json)).toEqual({status:'rejected',amount:1000,starts_at:'2026-10-10T01:00:00.000Z',staff_id:'fixture-staff',menu_id:'fixture-menu',notification_policy:{day_before:true}});
+  expect(JSON.stringify(audit)).not.toMatch(/秘密|メモ|fixture-friend|顧客名/);
+  expect(sqlite.raw.prepare("SELECT amount,receipt_url,action_reason,actor_label FROM booking_payments WHERE id='removed-0-payment'").get()).toEqual({amount:1000,receipt_url:null,action_reason:null,actor_label:null});
+  expect(sqlite.raw.prepare("SELECT amount,receipt_url FROM booking_payment_events WHERE id='payment-event-removed'").get()).toEqual({amount:1000,receipt_url:null});
+  expect(sqlite.raw.prepare("SELECT amount,reason,actor_label FROM booking_payment_refunds WHERE id='refund-removed'").get()).toEqual({amount:100,reason:'削除済み',actor_label:'削除済み'});
+  expect(sqlite.raw.prepare("SELECT booking_id,reason,actor_label FROM booking_payment_booking_links WHERE id='link-removed'").get()).toEqual({booking_id:null,reason:'削除済み',actor_label:'削除済み'});
+  expect(sqlite.raw.prepare("SELECT COUNT(*) n FROM booking_audit_logs WHERE id IN ('history-removed','actor-removed') AND (before_json LIKE '%秘密%' OR actor_id='fixture-friend')").get()).toEqual({n:0});
+  expect(sqlite.raw.prepare("SELECT before_json,actor_id FROM booking_audit_logs WHERE id='separate-audit'").get()).toEqual({before_json:'{"customer_note":"別アカウント"}',actor_id:'fixture-friend'});
+  expect(sqlite.raw.prepare("SELECT amount,reason FROM booking_charges WHERE id='charge-removed'").get()).toEqual({amount:100,reason:null});
+  const charge=sqlite.raw.prepare("SELECT policy_snapshot_json FROM booking_charges WHERE id='charge-removed'").get() as {policy_snapshot_json:string};
+  expect(JSON.parse(charge.policy_snapshot_json)).toEqual({enabled:true,noShowPercent:100,version:1,tiers:[{beforeHours:24,percent:50}]});
+  expect(sqlite.raw.prepare("SELECT reason FROM booking_cancellation_events WHERE id='cancel-removed'").get()).toEqual({reason:null});
+  expect(sqlite.raw.prepare("SELECT friend_id,amount,metadata FROM stripe_events WHERE id='stripe-removed'").get()).toEqual({friend_id:null,amount:1000,metadata:null});
+  expect(sqlite.raw.prepare("SELECT friend_id,metadata FROM stripe_events WHERE id='stripe-kept'").get()).toMatchObject({friend_id:'other-friend',metadata:'{"line_friend_id":"other-friend"}'});
+  expect(sqlite.raw.prepare("SELECT friend_id,metadata FROM stripe_events WHERE id='stripe-mixed'").get()).toEqual({friend_id:'other-friend',metadata:'{"plan":"x"}'});
+});
+
+it('削除後の決済通知で領収書URLやStripe metadataを書き戻さない', async () => {
+  const { seedDeletionRecords } = await import('../../../../packages/db/test/fixtures/customer-deletion.mjs');
+  const { receivePaymentEvent } = await import('../features/booking/booking-payment-events.js');
+  const { createStripeEvent } = await import('@line-crm/db');
+  seedDeletionRecords(sqlite.raw,'late','late-person');
+  sqlite.raw.exec("UPDATE booking_payments SET provider='stripe',provider_payment_id='pi_late',status='pending' WHERE id='late-0-payment'");
+  await deleteCustomerData(env(),{kind:'friend_data',id:'late-person',friendId:'late-person',accountId:'fixture-account',lineUserId:'LINE-late-person'},'owner');
+  await receivePaymentEvent(sqlite.db,'stripe',{providerPaymentId:'pi_late',providerEventId:'evt-late',status:'paid',receiptUrl:'https://example.test/private'},'synthetic');
+  const event=await createStripeEvent(sqlite.db,{stripeEventId:'stripe-late',eventType:'paid',friendId:'late-person',amount:1000,metadata:'{"line_friend_id":"late-person","note":"秘密"}'});
+  expect(event).toMatchObject({friend_id:null,metadata:null,amount:1000});
+  expect(sqlite.raw.prepare("SELECT receipt_url,amount FROM booking_payments WHERE id='late-0-payment'").get()).toEqual({receipt_url:null,amount:1000});
+  expect(sqlite.raw.prepare("SELECT receipt_url FROM booking_payment_events WHERE provider_event_id='evt-late'").get()).toEqual({receipt_url:null});
+});
+
+it('削除後の返金は固定理由だけ許し、決済を別の予約に付け替えない', async () => {
+  const { seedDeletionRecords } = await import('../../../../packages/db/test/fixtures/customer-deletion.mjs');
+  const { simulatePaymentRefund,linkPaymentBooking } = await import('../features/booking/booking-payment-refunds.js');
+  seedDeletionRecords(sqlite.raw,'removed','fixture-friend');seedDeletionRecords(sqlite.raw,'kept','other-friend');
+  sqlite.raw.exec("UPDATE booking_payments SET provider='stripe',provider_payment_id='pi_test_removed' WHERE id='removed-0-payment'");
+  await deleteCustomerData(env(),{kind:'friend_data',id:'fixture-friend',friendId:'fixture-friend',accountId:'fixture-account',lineUserId:'LINE-fixture-friend'},'owner');
+  const payment=sqlite.raw.prepare("SELECT * FROM booking_payments WHERE id='removed-0-payment'").get() as any;
+  const actor={id:'fixture-staff',name:'Synthetic'};
+  await expect(simulatePaymentRefund(sqlite.db,payment,{reason:'秘密の理由',notifyLine:false,idempotencyKey:'one'},actor)).rejects.toMatchObject({code:'deleted_customer_reason_required'});
+  const result=await simulatePaymentRefund(sqlite.db,payment,{reason:'削除済み',notifyLine:false,idempotencyKey:'two'},actor);
+  expect(result.refund).toMatchObject({reason:'削除済み',amount:1000});
+  await expect(linkPaymentBooking(sqlite.db,payment,'kept-0-booking','秘密の理由',actor)).rejects.toMatchObject({code:'payment_link_conflict'});
+  expect(sqlite.raw.prepare("SELECT booking_id,action_reason,actor_label FROM booking_payments WHERE id='removed-0-payment'").get()).toEqual({booking_id:null,action_reason:null,actor_label:null});
+});
+
+it('匿名化の移行が未適用ならデータや画像を消す前に止める', async () => {
+  const { seedDeletionRecords } = await import('../../../../packages/db/test/fixtures/customer-deletion.mjs');
+  seedDeletionRecords(sqlite.raw,'missing','fixture-friend');
+  sqlite.raw.exec('ALTER TABLE booking_payments DROP COLUMN customer_redacted_at');
+  const remove=vi.fn();
+  await expect(deleteCustomerData({...env(),IMAGES:{delete:remove}},{kind:'friend_data',id:'fixture-friend',friendId:'fixture-friend',accountId:'fixture-account',lineUserId:'LINE-fixture-friend'},'owner')).rejects.toMatchObject({code:'deletion_schema_approval_required'});
+  expect(remove).not.toHaveBeenCalled();
+  expect(sqlite.raw.prepare("SELECT id FROM bookings WHERE id='missing-0-booking'").get()).toBeTruthy();
+});
+
+it('対象顧客の予約に別アカウントのものが混ざると画像削除より前に範囲の不一致で止める', async () => {
+  const { seedDeletionRecords } = await import('../../../../packages/db/test/fixtures/customer-deletion.mjs');
+  seedDeletionRecords(sqlite.raw,'scope','fixture-friend');
+  sqlite.raw.exec(`INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id) VALUES('another','Other','another-channel','fake','fake','fixture-tenant');
+   INSERT INTO bookings(id,line_account_id,friend_id,staff_id,menu_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at)
+   VALUES('cross-booking','another','fixture-friend','fixture-staff','fixture-menu','2030-01-01','2030-01-02','2030-01-02','confirmed',100,'2026-01-01')`);
+  const remove=vi.fn();
+  await expect(deleteCustomerData({...env(),IMAGES:{delete:remove}},{kind:'friend_data',id:'fixture-friend',friendId:'fixture-friend',accountId:'fixture-account',lineUserId:'LINE-fixture-friend'},'owner')).rejects.toMatchObject({status:409,code:'deletion_account_scope_conflict'});
+  expect(remove).not.toHaveBeenCalled();
+  expect(sqlite.raw.prepare("SELECT id FROM bookings WHERE id='cross-booking'").get()).toBeTruthy();
 });
 
 it('refuses a partial schema before intent, R2 or customer data changes', async () => {

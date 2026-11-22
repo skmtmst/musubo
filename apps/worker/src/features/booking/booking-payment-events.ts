@@ -55,10 +55,10 @@ export async function receivePaymentEvent(db: D1Database, provider: string, outc
   const kind = outcome.status === 'failed' ? 'other' : outcome.status;
   await db.prepare(`INSERT INTO booking_payment_events
     (id,line_account_id,provider,provider_event_id,payment_id,provider_payment_id,kind,outcome,amount,currency,receipt_url,received_at,refunded_amount)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(provider,line_account_id,provider_event_id) DO NOTHING`)
+    VALUES (?,?,?,?,?,?,?,?,?,?,CASE WHEN EXISTS(SELECT 1 FROM booking_payments p WHERE p.id=? AND p.line_account_id=? AND p.customer_redacted_at IS NULL) THEN ? ELSE NULL END,?,?) ON CONFLICT(provider,line_account_id,provider_event_id) DO NOTHING`)
     .bind(crypto.randomUUID(), payment.line_account_id, provider, eventId, payment.id, outcome.providerPaymentId,
       kind, outcome.status, outcome.amount ?? payment.amount, (outcome.currency ?? payment.currency).toUpperCase(),
-      outcome.receiptUrl ?? null, new Date().toISOString(), outcome.status==='refunded' ? outcome.refundedAmount ?? outcome.amount ?? payment.amount : null).run();
+      payment.id,payment.line_account_id,outcome.receiptUrl ?? null, new Date().toISOString(), outcome.status==='refunded' ? outcome.refundedAmount ?? outcome.amount ?? payment.amount : null).run();
   const event = await db.prepare(`SELECT * FROM booking_payment_events WHERE provider=? AND line_account_id=? AND provider_event_id=?`)
     .bind(provider, payment.line_account_id, eventId).first<EventRow>();
   if (!event) throw new Error('payment_event_missing');
@@ -111,7 +111,7 @@ export async function processPaymentEvent(db: D1Database, account: string, id: s
         .bind('event:'+id,'event:'+id,at,id,token,'event:'+id));
       writes.push(db.prepare(`UPDATE booking_payments SET
         confirmation_revision=confirmation_revision+1, status=CASE WHEN ?=amount THEN 'refunded' ELSE 'paid' END,refunded_amount=?,refunded_at=?,updated_at=?,
-        receipt_url=COALESCE(?,receipt_url),actor_label='Stripe',action_reason='provider_refund'
+        receipt_url=CASE WHEN customer_redacted_at IS NULL THEN COALESCE(?,receipt_url) ELSE NULL END,actor_label='Stripe',action_reason='provider_refund'
         WHERE id=? AND status='paid' AND refunded_amount<? AND (${eventGate})`)
         .bind(event.refunded_amount ?? event.amount,event.refunded_amount ?? event.amount,at,at,event.receipt_url,payment.id,
           event.refunded_amount ?? event.amount,id,token));
@@ -119,7 +119,7 @@ export async function processPaymentEvent(db: D1Database, account: string, id: s
     else if (payment) {
       writes.push(db.prepare(`UPDATE booking_payments SET confirmation_revision=confirmation_revision+1, status=?,updated_at=?,
         refunded_at=CASE WHEN ?='refunded' THEN COALESCE(refunded_at,?) ELSE refunded_at END,
-        receipt_url=COALESCE(?,receipt_url)
+        receipt_url=CASE WHEN customer_redacted_at IS NULL THEN COALESCE(?,receipt_url) ELSE NULL END
         WHERE id=? AND (${eventGate}) AND
         ((?='refunded' AND status='paid') OR (? IN ('failed','expired') AND status IN ('unpaid','pending')))`)
         .bind(event.outcome, at, event.outcome, at, event.receipt_url, payment.id, id, token, event.outcome, event.outcome));
@@ -133,7 +133,7 @@ export async function processPaymentEvent(db: D1Database, account: string, id: s
       }
     }
     if (payment && event.receipt_url) writes.push(db.prepare(`UPDATE booking_payments SET confirmation_revision=confirmation_revision+1, receipt_url=?
-      WHERE id=? AND (${eventGate})`).bind(event.receipt_url,payment.id,id,token));
+      WHERE id=? AND customer_redacted_at IS NULL AND (${eventGate})`).bind(event.receipt_url,payment.id,id,token));
     writes.push(db.prepare(`UPDATE booking_payment_events SET applied_at=CASE WHEN result='applied' THEN COALESCE(applied_at,?) ELSE applied_at END,
       error_code=CASE WHEN result='failed' THEN 'payment_state_mismatch' WHEN outcome='failed' THEN 'payment_failed' ELSE NULL END
       WHERE id=? AND lease_token=?`).bind(at, id, token));

@@ -680,7 +680,8 @@
     "765_ec_auto_line_cap.sql",
     "769_musubo_contracted_linked_slots.sql",
     "770_onboarding_guide_progress.sql",
-    "786_restaurant_course_gallery.sql"
+    "786_restaurant_course_gallery.sql",
+    "788_booking_payment_privacy_redaction.sql"
   ],
-  "migrationCount": 681
+  "migrationCount": 682
 }

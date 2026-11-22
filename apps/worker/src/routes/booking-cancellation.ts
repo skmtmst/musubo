@@ -87,7 +87,7 @@ bookingCancellation.post('/api/booking/admin/bookings/:id/charges',async (c:Cont
 bookingCancellation.post('/api/booking/admin/charges/:id/waive',async (c:Context<Env>):Promise<Response>=>{
  gapWrite(c);const a=await gapAccount(c),b=await gapBody(c),v=gapVersion(b.expectedVersion);
  if(typeof b.reason!=='string'||!b.reason.trim()||b.reason.length>500)throw new GapError('reason_required');
- const r=await c.env.DB.prepare(`UPDATE booking_charges SET status='waived',reason=?,actor_staff_id=?,version=version+1,updated_at=? WHERE id=? AND line_account_id=? AND status='pending' AND version=?`)
+ const r=await c.env.DB.prepare(`UPDATE booking_charges SET status='waived',reason=CASE WHEN EXISTS(SELECT 1 FROM bookings b WHERE b.id=booking_charges.booking_id AND b.line_account_id=booking_charges.line_account_id) THEN ? ELSE '削除済み' END,actor_staff_id=?,version=version+1,updated_at=? WHERE id=? AND line_account_id=? AND status='pending' AND version=?`)
  .bind(b.reason.trim(),c.get('staff').id,new Date().toISOString(),c.req.param('id')!,a,v).run();
  if(!r.meta.changes)throw new GapError('version_conflict',409);
  return c.json({success:true,data:{id:c.req.param('id')!,status:'waived',version:v+1}});
@@ -95,7 +95,7 @@ bookingCancellation.post('/api/booking/admin/charges/:id/waive',async (c:Context
 bookingCancellation.post('/api/booking/admin/charges/:id/refund',async (c:Context<Env>):Promise<Response>=>{
  gapWrite(c,{admin:true});const account=await gapAccount(c),b=await gapBody(c),key=gapKey(c),v=gapVersion(b.expectedVersion);await requireCancellationTestConnection(c.env.DB,account);
  if(typeof b.reason!=='string'||!b.reason.trim()||b.reason.length>500||b.confirmed!==true||b.confirmedIrreversible!==true)throw new GapError('refund_confirmation_required');
- const r=await c.env.DB.prepare(`UPDATE booking_charges SET status='refunded',reason=?,actor_staff_id=?,version=version+1,updated_at=? WHERE id=? AND line_account_id=? AND status='succeeded' AND version=? AND test_mode=1`)
+ const r=await c.env.DB.prepare(`UPDATE booking_charges SET status='refunded',reason=CASE WHEN EXISTS(SELECT 1 FROM bookings b WHERE b.id=booking_charges.booking_id AND b.line_account_id=booking_charges.line_account_id) THEN ? ELSE '削除済み' END,actor_staff_id=?,version=version+1,updated_at=? WHERE id=? AND line_account_id=? AND status='succeeded' AND version=? AND test_mode=1`)
  .bind(b.reason.trim(),c.get('staff').id,new Date().toISOString(),c.req.param('id')!,account,v).run();
  if(!r.meta.changes)throw new GapError('already_refunded',409);
  return c.json({success:true,data:{id:c.req.param('id')!,status:'refunded',version:v+1},testMode:true,requestKey:key});
