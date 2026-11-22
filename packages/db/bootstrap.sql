@@ -1465,7 +1465,7 @@ CREATE TABLE billing_events (
   tenant_id    TEXT,
   summary      TEXT NOT NULL DEFAULT '',
   received_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, lease_token TEXT, lease_until TEXT);
 
 CREATE TABLE billing_invoices (
   id                  TEXT PRIMARY KEY,
@@ -8849,7 +8849,7 @@ CREATE TABLE stripe_events (
   currency         TEXT,
   metadata         TEXT,
   processed_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, tenant_id TEXT, review_reason TEXT);
 
 CREATE TABLE style_analytics_results(id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id), style TEXT NOT NULL, selection_json TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL);
 

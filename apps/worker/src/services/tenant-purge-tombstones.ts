@@ -18,6 +18,59 @@ export async function tenantPurgeInProgress(db: D1Database, tenantId: string): P
   return Boolean(row?.purge_started_at);
 }
 
+/** 通知処理の借受。purge の印と借受の取得を同じ文で照合する。 */
+export async function claimBillingEventLease(db: D1Database, eventId: string, token: string, now: string, until: string): Promise<boolean> {
+  const result = await db.prepare(`UPDATE billing_events SET lease_token=?,lease_until=?
+    WHERE id=? AND summary='pending' AND (lease_token IS NULL OR julianday(lease_until)<=julianday(?))
+      AND (tenant_id IS NULL OR EXISTS(SELECT 1 FROM tenants t WHERE t.id=billing_events.tenant_id
+        AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL))`)
+    .bind(token, until, eventId, now).run();
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
+export async function releaseBillingEventLease(db: D1Database, eventId: string, token: string): Promise<boolean> {
+  const result = await db.prepare('UPDATE billing_events SET lease_token=NULL,lease_until=NULL WHERE id=? AND lease_token=?')
+    .bind(eventId, token).run();
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
+/** 削除中・削除済みへの通知を、本文や顧客情報なしで照合待ちとして保存する。 */
+export async function recordPurgedTenantStripeEvent(db: D1Database, input: {
+  tenantId: string; eventId: string; eventType: string; amount: number | null; currency: string | null; now: string;
+}): Promise<boolean> {
+  if (!/^evt_[A-Za-z0-9_]+$/.test(input.eventId) || !/^[a-z0-9_.]+$/.test(input.eventType)
+    || (input.amount !== null && !Number.isSafeInteger(input.amount))
+    || (input.currency !== null && !/^[a-z]{3}$/.test(input.currency))) throw new Error('invalid_stripe_review_event');
+  const result = await db.prepare(`INSERT OR IGNORE INTO stripe_events
+    (id,stripe_event_id,event_type,amount,currency,metadata,processed_at,tenant_id,review_reason)
+    SELECT ?,?,?,?,?,NULL,?,?,'purged_tenant' WHERE EXISTS (
+      SELECT 1 FROM tenants t WHERE t.id=? AND (t.purge_started_at IS NOT NULL OR t.data_purged_at IS NOT NULL))`)
+    .bind(crypto.randomUUID(), input.eventId, input.eventType, input.amount, input.currency, input.now, input.tenantId, input.tenantId).run();
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
+/** 通知の受領記録を照合待ちにし、二度処理を始められないようにする。 */
+export async function deferPurgedBillingEvent(db: D1Database, input: {
+  tenantId: string; eventId: string; eventType: string; amount: number | null; currency: string | null; now: string;
+}): Promise<boolean> {
+  if (!/^evt_[A-Za-z0-9_]+$/.test(input.eventId) || !/^[a-z0-9_.]+$/.test(input.eventType)
+    || (input.amount !== null && !Number.isSafeInteger(input.amount))
+    || (input.currency !== null && !/^[a-z]{3}$/.test(input.currency))) throw new Error('invalid_stripe_review_event');
+  const record = db.prepare(`INSERT OR IGNORE INTO stripe_events
+    (id,stripe_event_id,event_type,amount,currency,metadata,processed_at,tenant_id,review_reason)
+    SELECT ?,?,?,?,?,NULL,?,?,'purged_tenant' WHERE EXISTS (
+      SELECT 1 FROM tenants t JOIN billing_events e ON e.tenant_id=t.id
+      WHERE t.id=? AND e.id=? AND e.summary='pending' AND (t.purge_started_at IS NOT NULL OR t.data_purged_at IS NOT NULL))`)
+    .bind(crypto.randomUUID(),input.eventId,input.eventType,input.amount,input.currency,input.now,input.tenantId,input.tenantId,input.eventId);
+  const defer = db.prepare(`UPDATE billing_events SET summary='purge_review',lease_token=NULL,lease_until=NULL
+    WHERE id=? AND tenant_id=? AND summary='pending' AND EXISTS (
+      SELECT 1 FROM stripe_events s WHERE s.stripe_event_id=billing_events.id
+        AND s.tenant_id=billing_events.tenant_id AND s.review_reason='purged_tenant')`)
+    .bind(input.eventId,input.tenantId);
+  const results = await db.batch([record,defer]);
+  return Number(results[1].meta.changes ?? 0) === 1;
+}
+
 /** 券が参照するメニューの金額・期間を残し、説明と連絡先を消す。 */
 export async function tombstoneBookingMenu(db: D1Database, tenantId: string, menuId: string, now: string): Promise<boolean> {
   const result = await db.prepare(`UPDATE menus SET name='削除済み', category_label=NULL, description=NULL,
