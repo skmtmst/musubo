@@ -250,11 +250,11 @@ export async function tombstoneFriend(db: D1Database, accountId: string, friendI
 }
 
 /** Stop and anonymize a retained monthly contract after its account becomes a tombstone. */
-export async function anonymizeMonthlyContract(db: D1Database, tenantId: string, contractId: string, now: string): Promise<void> {
+export async function anonymizeMonthlyContract(db: D1Database, tenantId: string, contractId: string, now: string): Promise<boolean> {
   const scope = `id=? AND tenant_id=? AND EXISTS (SELECT 1 FROM line_accounts a JOIN tenants t ON t.id=a.tenant_id
     WHERE a.id=booking_monthly_contracts.account_id AND a.tenant_id=booking_monthly_contracts.tenant_id
       AND a.data_purged_at IS NOT NULL AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL)`;
-  await db.batch([
+  const result = await db.batch([
     db.prepare(`UPDATE booking_monthly_contracts SET name='削除済み',
       state=CASE WHEN state='applying' THEN 'expired' WHEN state='expired' THEN 'expired' ELSE 'stopped' END,
       stop_reason=CASE WHEN state IN ('applying','expired') THEN stop_reason ELSE COALESCE(stop_reason,'store_immediate') END,
@@ -269,6 +269,7 @@ export async function anonymizeMonthlyContract(db: D1Database, tenantId: string,
       WHERE tenant_id=? AND cycle_id IN (SELECT id FROM booking_monthly_cycles WHERE contract_id=? AND tenant_id=?)
         AND payment_method_id<>'purged:'||cycle_id||':'||attempt_no`).bind(tenantId,contractId,tenantId),
   ]);
+  return Number(result[0]?.meta.changes ?? 0) === 1 && Number(result[1]?.meta.changes ?? 0) === 1;
 }
 
 /** An uncertain external effect blocks purge even after the ordinary lease expires. */

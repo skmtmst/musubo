@@ -258,7 +258,7 @@ async function purgeOneTenant(
      name<>'削除済み' OR state NOT IN ('expired','stopped') OR json_extract(request_json,'$.friendId') IS NOT NULL) LIMIT ?`)
     .bind(tenant.id, remaining).all<{id:string}>();
   for (const contract of contracts.results) {
-    await anonymizeMonthlyContract(env.DB, tenant.id, contract.id, now);
+    if (!await anonymizeMonthlyContract(env.DB, tenant.id, contract.id, now)) throw new Error('monthly_anonymization_failed');
     remaining--;
     out.deletedRows++;
     byTable['booking_monthly_contracts'] = (byTable['booking_monthly_contracts'] ?? 0) + 1;
@@ -397,6 +397,16 @@ async function purgeOneTenant(
     }
   }
 
+  if (out.finished) {
+    const remainingContracts = await env.DB.prepare(`SELECT 1 AS present FROM booking_monthly_contracts WHERE tenant_id=? AND
+      (customer_id IS NOT NULL OR payment_method_id IS NOT NULL OR setup_session_id IS NOT NULL OR
+       name<>'削除済み' OR state NOT IN ('expired','stopped') OR json_extract(request_json,'$.friendId') IS NOT NULL) LIMIT 1`)
+      .bind(tenant.id).first<{present:number}>();
+    if (remainingContracts) {
+      out.finished = false;
+      out.failure = { table: 'booking_monthly_contracts', failureCode: 'monthly_anonymization_incomplete', r2DeletedBeforeFailure: 0 };
+    }
+  }
   const finishedAt = out.finished ? now : null;
   try {
     await recordTenantDataPurgeAudit(
