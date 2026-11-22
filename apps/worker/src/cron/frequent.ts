@@ -105,6 +105,10 @@ export async function runFrequentHeavyJobs(
       run: async () => {const {recoverExternalCleanup}=await import('../features/booking/booking-external-cleanup-runtime/index.js');await recoverExternalCleanup(env,event.scheduledTime);},
     },
     {
+      name: 'booking deleted connection cleanup',
+      run: async () => {const {processDeletedMeetingRevocations}=await import('../features/booking/booking-meeting-deletion-runner.js');await processDeletedMeetingRevocations(env,{now:event.scheduledTime});},
+    },
+    {
       name: 'booking meeting recovery',
       run: async () => {
         const {processMeetingQueue}=await import('../features/booking/booking-meeting-queue/index.js');

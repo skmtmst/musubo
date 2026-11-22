@@ -1,5 +1,11 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const opsSupportPaths = {
+  '/api/ops/meeting-deletion-reviews': {
+    get: { tags: ['Settings'], summary: '削除後の外部接続で要確認の項目を取得', description: '運営マスターのみ。暗号文や外部の鍵は返さない。', responses: { '200': { description: '要確認の一覧' }, '403': { description: '運営マスター権限がない' } } },
+  },
+  '/api/ops/meeting-deletion-reviews/{id}/resolve': {
+    post: { tags: ['Settings'], summary: '外部接続の手動確認を完了', description: '運営マスターのみ。確認理由を監査に残す。', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['reason'], properties: { reason: { type: 'string', minLength: 4, maxLength: 500 } } } } } }, responses: { '200': { description: '確認完了' }, '400': { description: '理由が不正' }, '403': { description: '書き込み権限がない' }, '404': { description: '要確認の項目がない' } } },
+  },
   // ── HQ Support ─────────────────────────────────────────────────────────
   '/api/hq/support/context': {
     get: {

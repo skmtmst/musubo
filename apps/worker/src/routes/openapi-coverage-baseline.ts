@@ -7,6 +7,8 @@
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 export const BASELINE_DOCUMENTED = new Set<string>([
+  "GET /api/ops/meeting-deletion-reviews",
+  "POST /api/ops/meeting-deletion-reviews/{id}/resolve",
   'GET /api/getting-started/guide',
   'PUT /api/getting-started/guide',
   'GET /api/hq/billing/musubo/last-line-end',

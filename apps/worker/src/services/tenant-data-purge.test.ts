@@ -468,6 +468,18 @@ describe('tenant data retention purge', () => {
       VALUES (?, ?, ?, 'b', ?, ?, 'pdf', 'single', ?, 'a.pdf', 'application/pdf', 10, 'scan', ?)`)
       .run(`doc-${tenantId}`, `acc-${tenantId}`, `f-${tenantId}`, `u-${tenantId}-0`, `answer-${tenantId}`, `private/form-documents/${tenantId}.pdf`, NOW);
   }
+  test('統括の接続削除と同じ batch で外部解除台帳へ移し、別の統括を守る', async () => {
+    seedTenant('t1', { requested: jst(-1) }); seedTenant('t2', { planStatus: 'active' });
+    for(const id of ['t1','t2']){
+      sqlite.raw.prepare('INSERT INTO staff(id,line_account_id,name,display_name) VALUES(?,?,?,?)').run(`staff-${id}`,`acc-${id}`,'担当','担当');
+      sqlite.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES(?,?,?,'zoom','encrypted','owner','2026-01-01','2026-01-01')").run(`connection-${id}`,`acc-${id}`,`staff-${id}`);
+    }
+    expect((await processTenantDataPurge({ DB: sqlite.db }, { now: NOW })).completed).toBe(1);
+    expect(count('booking_meeting_connections','id=?','connection-t1')).toBe(0);
+    expect(count('booking_meeting_connections','id=?','connection-t2')).toBe(1);
+    const row=sqlite.raw.prepare("SELECT input_json FROM workflow_steps WHERE process_kind='booking_meeting_deleted_revoke'").get() as {input_json:string};
+    expect(JSON.parse(row.input_json)).toMatchObject({connectionId:'connection-t1',tenantId:'t1',source:'tenant',credentialEnc:'encrypted'});
+  });
   test.each(['expired', 'requested'])('書類は%sの削除で実体まで消し、別の統括は守る', async reason => {
     seedTenant('t1', reason === 'expired' ? { anchor: jst(-91) } : { requested: jst(-1) }); seedDocument('t1');
     seedTenant('t2', { planStatus: 'active' }); seedDocument('t2');

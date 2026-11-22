@@ -229,3 +229,11 @@ it('切断する Zoom 接続に本人 ID がなければ解除せず要確認',a
  expect((await gapCall(gapApp(d,[bookingMeetingOAuth],gapOwner,false,configured),'/api/booking/admin/staff/bs/connections/zoom?account_id=a','DELETE')).status).toBe(200);
  expect(fetcher).not.toHaveBeenCalled();expect(d.raw.prepare("SELECT COUNT(*) n FROM notifications WHERE category='error' AND event_type='booking_meeting_disconnect_review'").get()).toEqual({n:1});
 });
+it('認可の交換中に担当者が削除されたら、接続を復活させず確定後の解除台帳へ移す',async()=>{
+ const fetcher=vi.fn().mockImplementationOnce(async()=>{d.raw.exec("UPDATE staff SET deleted_at='2026-11-22' WHERE id='bs'");return new Response(JSON.stringify({access_token:'late-access',refresh_token:'late-refresh',expires_in:3600,scope:'openid https://www.googleapis.com/auth/calendar.events'}));}).mockResolvedValueOnce(new Response(JSON.stringify({sub:'late-person'})));
+ vi.stubGlobal('fetch',fetcher);const app=gapApp(d,[bookingMeetingOAuth],gapOwner,false,bindings);
+ const started=await gapCall(app,`${path}/connect?account_id=a`,'POST',{});const body=await started.json() as {data:{authorizationUrl:string}};const state=new URL(body.data.authorizationUrl).searchParams.get('state')!;
+ const response=await gapCall(app,`/api/booking/admin/meeting-oauth/callback?state=${state}&code=fixture-code`);expect(response.status).toBe(302);expect(response.headers.get('location')).toContain('meeting_connection=failed');
+ expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_meeting_connections').get()).toEqual({n:0});
+ const row=d.raw.prepare("SELECT input_json FROM workflow_steps WHERE process_kind='booking_meeting_deleted_revoke'").get() as {input_json:string};expect(row.input_json).not.toContain('late-refresh');expect(JSON.parse(row.input_json)).toMatchObject({source:'staff',provider:'google_meet',credentialEnc:expect.any(String)});expect(fetcher).toHaveBeenCalledTimes(2);
+});

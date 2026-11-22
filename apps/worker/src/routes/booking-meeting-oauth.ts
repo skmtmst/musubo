@@ -1,7 +1,10 @@
-import {decryptMeetingCredential,meetingCredentialKeys,validateMeetingEncryptionKey} from '../features/booking/booking-meeting-crypto.js';
+import {meetingRevokeDecision} from '../features/booking/booking-meeting-revoke-decision.js';
+import {meetingCredentialKeys,validateMeetingEncryptionKey} from '../features/booking/booking-meeting-crypto.js';
 import {acquireMeetingRevokeLock,meetingRevokeLocked,ownsMeetingRevokeLock,releaseMeetingRevokeLock} from '../features/booking/booking-meeting-revoke-lock.js';
 import {revokeMeetingAuthorization} from '../features/booking/booking-meeting-oauth-client.js';
+import {queueAbandonedMeetingAuthorization} from '../features/booking/booking-meeting-deletion-runner.js';
 import {Hono,type Context} from 'hono';
+import {recordAuditEvent} from '@line-crm/db';
 import {BOOKING_STAFF_OWN_KEY} from '@line-crm/shared';
 import type {Env} from '../worker-env.js';
 import {gapAccount,gapWrite,GapError} from '../services/gap-common.js';
@@ -90,21 +93,8 @@ bookingMeetingOAuth.delete(base,async c=>{
    return c.json({success:true,data:{disconnected:true}});
   }
   try{
-   let token:string|undefined,decision:'revoke'|'shared'|'review'='review';const config=meetingOAuthConfig(c.env,provider);
-   if(row&&config)try{
-    const keys=meetingCredentialKeys(c.env);const value=JSON.parse((await decryptMeetingCredential(row.credential_enc,keys,scope)).plaintext) as {provider?:unknown;externalAccountId?:unknown;refreshToken?:unknown;accessToken?:unknown};
-    if(value.provider===provider&&typeof value.externalAccountId==='string'&&value.externalAccountId&&typeof value.refreshToken==='string'&&value.refreshToken){
-     token=provider==='zoom'?(typeof value.accessToken==='string'?value.accessToken:undefined):value.refreshToken;
-     decision=token?'revoke':'review';
-     if(provider==='google_meet'){
-      const ambiguous=await c.env.DB.prepare("SELECT 1 FROM google_calendar_connections WHERE is_active=1 AND auth_type='oauth' UNION ALL SELECT 1 FROM rt_google_connections WHERE refresh_token_enc IS NOT NULL UNION ALL SELECT 1 FROM google_sheets_integrations WHERE refresh_token_enc IS NOT NULL LIMIT 1").first();
-      if(ambiguous||c.env.GOOGLE_BUSINESS_OAUTH_CLIENT_ID||c.env.GOOGLE_SHEETS_OAUTH_CLIENT_ID)decision='review';
-     }
-     const others=await c.env.DB.prepare('SELECT id,line_account_id,staff_id,credential_enc FROM booking_meeting_connections WHERE provider=? AND id<>? LIMIT 501').bind(provider,row.id).all<{id:string;line_account_id:string;staff_id:string;credential_enc:string}>();
-     if(others.results.length>500)decision='review';
-     for(const other of others.results){const otherScope={accountId:other.line_account_id,staffId:other.staff_id,provider};const otherValue=JSON.parse((await decryptMeetingCredential(other.credential_enc,keys,otherScope)).plaintext) as {externalAccountId?:unknown;provider?:unknown};if(otherValue.provider!==provider||typeof otherValue.externalAccountId!=='string'||!otherValue.externalAccountId){decision='review';break;}if(otherValue.externalAccountId===value.externalAccountId){decision='shared';break;}}
-    }
-   }catch{decision='review';}
+   const config=meetingOAuthConfig(c.env,provider);
+   const {decision,token}=row?await meetingRevokeDecision(c.env,{...scope,provider,connectionId:row.id,credentialEnc:row.credential_enc}):{decision:'review' as const,token:undefined};
    const reviewId=crypto.randomUUID();
    if(!await deleteMeetingCredential(c.env.DB,{...scope,expected,externalManualReview:decision!=='shared',reviewId}))throw new GapError('meeting_connection_changed',409);
    if(row&&decision==='revoke'&&token&&config&&await ownsMeetingRevokeLock(c.env.DB,scope,lease)){const outcome=await revokeMeetingAuthorization(config,{token,signal:AbortSignal.timeout(15000)});if(outcome==='done')await c.env.DB.prepare("DELETE FROM notifications WHERE id=? AND event_type='booking_meeting_disconnect_review'").bind(reviewId).run();}
@@ -122,6 +112,7 @@ bookingMeetingOAuth.get('/api/booking/admin/meeting-oauth/callback',async c=>{
  const row=await c.env.DB.prepare('SELECT line_account_id,staff_id,provider FROM booking_meeting_oauth_states WHERE state=? AND actor_id=?').bind(state,actorId).first<{line_account_id:string;staff_id:string;provider:ConnectionProvider}>();
  if(!row)throw new GapError('invalid_state',401);
  const accountId=await gapAccount(c,row.line_account_id);await staffTarget(c,accountId,row.staff_id,true);
+ const account=await c.env.DB.prepare('SELECT tenant_id FROM line_accounts WHERE id=?').bind(accountId).first<{tenant_id:string|null}>();
  if(await meetingRevokeLocked(c.env.DB,{accountId,staffId:row.staff_id,provider:row.provider}))return c.json({success:false,error:'meeting_disconnect_in_progress',message:'解除の処理中です。少し待ってからつなぎ直してください。'},409);
  const key=c.env.LINE_CREDENTIAL_ENCRYPTION_KEY;if(!key)throw new GapError('oauth_not_configured',503);
  await validateMeetingEncryptionKey(meetingCredentialKeys(c.env));
@@ -131,8 +122,9 @@ bookingMeetingOAuth.get('/api/booking/admin/meeting-oauth/callback',async c=>{
  if(consumed.provider==='outlook'&&(await calendarSwitch(c.env.DB,accountId,consumed.staffId)).readEnabled&&!await outlookStaffIsTestRecipient(c.env.DB,{lineAccountId:accountId,staffId:consumed.staffId}))return c.redirect(adminReturn(c,accountId,consumed.staffId,'failed'));
  let tokens:Awaited<ReturnType<typeof exchangeMeetingAuthorization>>;
  try{tokens=await exchangeMeetingAuthorization(config,{code:c.req.query('code')!,verifier:consumed.verifier,signal:AbortSignal.timeout(15000)});}catch{return c.redirect(adminReturn(c,accountId,consumed.staffId,'failed'));}
- const connected=await finishAuthorizedMeetingConnection(c.env.DB,{accountId,staffId:consumed.staffId,provider:consumed.provider,actorId,state,encryptionKey:meetingCredentialKeys(c.env),credential:{provider:consumed.provider,externalAccountId:tokens.externalAccountId,refreshToken:tokens.refreshToken,accessToken:tokens.accessToken,accessExpiresAt:tokens.expiresAt}});
- if(!connected)return c.redirect(adminReturn(c,accountId,consumed.staffId,'failed'));
+ const credential={provider:consumed.provider,externalAccountId:tokens.externalAccountId,refreshToken:tokens.refreshToken,accessToken:tokens.accessToken,accessExpiresAt:tokens.expiresAt};
+ const connected=await finishAuthorizedMeetingConnection(c.env.DB,{accountId,staffId:consumed.staffId,provider:consumed.provider,actorId,state,encryptionKey:meetingCredentialKeys(c.env),credential});
+ if(!connected){try{await queueAbandonedMeetingAuthorization(c.env,{accountId,staffId:consumed.staffId,tenantId:account?.tenant_id??null,provider:consumed.provider,credential});}catch{await recordAuditEvent(c.env.DB,{tenantId:account?.tenant_id??undefined,category:'business',action:'booking.meeting.deleted_connection_review',actorPrincipalId:'system:booking',targetKind:'meeting_connection',targetId:consumed.staffId,result:'failed',riskLevel:'high',retentionClass:'security',after:{provider:consumed.provider,reason:'queue_failed'}});}return c.redirect(adminReturn(c,accountId,consumed.staffId,'failed'));}
  if(consumed.provider==='outlook')await c.env.DB.prepare(`UPDATE workflow_steps SET status='pending',error_code=NULL,next_attempt_at=NULL,updated_at=?
   WHERE scope_id=? AND process_kind='booking_outlook_sync' AND status='failed'
    AND (json_extract(result_json,'$.staffId')=? OR json_extract(input_json,'$.booking.staff_id')=?)`)

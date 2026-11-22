@@ -1340,3 +1340,4 @@ export { prepareMonthlyContract, getMonthlyContractRow, findMonthlyContractRepla
 export type { MonthlyScope, MonthlyContractSnapshot, MonthlyContractRow, MonthlyEventApplication } from './booking-monthly/index.js';
 
 export { validRestaurantCoursesSql } from './forms/index.js';
+export { queueDeletedMeetingConnections, queueDeletedGoogleCalendars } from './booking-meeting-deletion-queue';

@@ -6,6 +6,8 @@ import {
   purgeTablesChildFirst,
   recordTenantDataPurgeAudit,
   recordAuditEvent,
+  queueDeletedMeetingConnections,
+  queueDeletedGoogleCalendars,
   retentionCutoff,
   RETENTION_R2_KEY_COLUMNS,
   tenantScopeCondition,
@@ -257,7 +259,12 @@ async function purgeOneTenant(
               SELECT ${table}.rowid FROM ${table} WHERE ${condition} ORDER BY ${table}.rowid LIMIT ?
             )`,
         ).bind(...tenantParams, chunk);
-        if (GUARDED_PURGE_TABLES.has(table)) {
+        if (table === 'booking_meeting_connections' || table === 'google_calendar_connections') {
+          const input={whereSql:`c.rowid IN (SELECT ${table}.rowid FROM ${table} WHERE ${condition} ORDER BY ${table}.rowid LIMIT ?)`,params:[...tenantParams,chunk],source:'tenant' as const};
+          const capture=table==='booking_meeting_connections'?queueDeletedMeetingConnections(env.DB,input):queueDeletedGoogleCalendars(env.DB,input);
+          const results=await env.DB.batch([capture,statement]);
+          deleted=results[1];
+        } else if (GUARDED_PURGE_TABLES.has(table)) {
           // 許可は対象統括・表の DELETE と同じ原子的 batch 内だけに存在する。
           const grant = env.DB.prepare(`INSERT INTO tenant_purge_guard (tenant_id, table_name)
             VALUES ((SELECT id FROM tenants WHERE id = ? AND data_purged_at IS NULL

@@ -1,4 +1,5 @@
 export const SECURITY_RULES = {
+  meeting_revoke_review: { label: '外部接続の解除に要確認', threshold: 1 },
   login_failures: { label: 'ログイン失敗の増加', threshold: 20 },
   api_mutations: { label: '記録対象APIの変更操作の増加', threshold: 1000 },
   export_requests: { label: '書き出し操作の増加', threshold: 10 },
