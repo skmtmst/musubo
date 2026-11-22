@@ -40,3 +40,7 @@ it('同時刻に複数の担当者が返信した場合は担当者を特定し�
  fixture.raw.exec("DELETE FROM inbox_response_samples WHERE chat_id='c1'; UPDATE chats SET first_response_at=NULL,sla_due_at='2026-10-15T00:30:00.000Z' WHERE id='c1'; INSERT INTO messages_log(id,friend_id,direction,message_type,content,source,line_account_id,sent_by_staff_id,created_at) VALUES('m4','f','outgoing','text','private','manual','a','o','2026-10-15T00:20:00.000Z'); UPDATE chats SET first_response_at='2026-10-15T00:20:00.000Z',sla_due_at=NULL WHERE id='c1'");
  expect(fixture.raw.prepare("SELECT responder_staff_id FROM inbox_response_samples WHERE chat_id='c1'").get()).toEqual({responder_staff_id:null});
 });
+it('実際の手動返信の更新で、期限を消す前に返信者と期限を記録する',()=>{
+ fixture.raw.exec("DELETE FROM inbox_response_samples WHERE chat_id='c1'; UPDATE chats SET first_response_at=NULL,sla_due_at='2026-10-15T00:30:00.000Z' WHERE id='c1'; UPDATE chats SET last_operator_message_at='2026-10-15T00:20:00.000Z' WHERE id='c1'");
+ expect(fixture.raw.prepare("SELECT responder_staff_id,due_at FROM inbox_response_samples WHERE chat_id='c1'").get()).toEqual({responder_staff_id:'s',due_at:'2026-10-15T00:30:00.000Z'});
+});

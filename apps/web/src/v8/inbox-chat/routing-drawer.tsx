@@ -67,6 +67,8 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
   const jobKey = useRef<string|null>(null)
   const [error, setError] = useState('')
 
+  useEffect(() => { setJob(null); setJobError(''); jobKey.current = null }, [accountId])
+
   useEffect(() => {
     if (!open) return
     let live = true
@@ -96,8 +98,8 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
     if (jobStartLock.current) return
     jobStartLock.current = true; setJobStarting(true); setJobError('')
     jobKey.current ??= crypto.randomUUID()
-    try { const result = await gap3InboxApi.applyUnassigned(accountId,jobKey.current);setJob(result.data) }
-    catch { setJobError('割り当てを開始できませんでした。同じ操作でもう一度お試しください。') }
+    try { const result = await gap3InboxApi.applyUnassigned(accountId,jobKey.current);if (contextRef.current.accountId === accountId) setJob(result.data) }
+    catch { if (contextRef.current.accountId === accountId) setJobError('割り当てを開始できませんでした。同じ操作でもう一度お試しください。') }
     finally { jobStartLock.current = false; setJobStarting(false) }
   }
   useEffect(() => { if (job && ['succeeded','failed'].includes(job.status)) jobKey.current = null }, [job])
