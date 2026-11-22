@@ -519,6 +519,19 @@ describe('飲食店向けテストAPI', () => {
     expect(testDb.raw.prepare('SELECT payload_json FROM rt_sync_events WHERE store_id=? AND provider=? AND external_event_id=?').get(store.id, provider, 'privacy-second')).toEqual({ payload_json: '{}' });
   });
 
+  it.each(['restaurant_board', 'reszaiko'])('%s の同期は店が匿名化予約の名前を変えても個人情報を戻さない', async provider => {
+    seedRestaurantFixture();
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const reservation = { externalId: 'SYNC-EDIT', customerName: '元 太郎', customerPhone: '09012345678', lineUid: 'U-original', allergyNote: 'えび', note: '秘密', guestCount: 2, startsAt: '2026-09-11T10:00:00.000Z', endsAt: '2026-09-11T12:00:00.000Z', sourceUpdatedAt: '2026-09-10T00:00:00.000Z' };
+    const send = (eventId: string, data: typeof reservation) => request('/api/restaurant-test/inbound/reservations?account_id=account-1', { storeId: store.id, provider, eventId, reservation: data });
+    expect((await send('edit-first', reservation)).status).toBe(201);
+    testDb.raw.prepare("UPDATE rt_reservations SET customer_anonymized=1, customer_name='削除済みのお客さま', customer_phone=NULL, line_uid=NULL, allergy_note=NULL, note=NULL WHERE store_id=? AND source=? AND external_id=?").run(store.id, provider, reservation.externalId);
+    const row = testDb.raw.prepare('SELECT id FROM rt_reservations WHERE store_id=? AND source=? AND external_id=?').get(store.id, provider, reservation.externalId) as { id: string };
+    expect((await requestWithMethod(`/api/restaurant-test/reservations/${row.id}?account_id=account-1`, 'PATCH', { customerName: '店舗が編集した名前', allergyNote: '店舗が聞き直したアレルギー', note: '店舗のメモ' })).status).toBe(200);
+    expect((await send('edit-second', { ...reservation, customerName: '戻してはいけない名前', guestCount: 4, sourceUpdatedAt: '2026-09-11T00:00:00.000Z' })).status).toBe(201);
+    expect(testDb.raw.prepare('SELECT customer_name,customer_phone,line_uid,allergy_note,note,guest_count,customer_anonymized FROM rt_reservations WHERE id=?').get(row.id)).toEqual({ customer_name: '店舗が編集した名前', customer_phone: null, line_uid: null, allergy_note: '店舗が聞き直したアレルギー', note: '店舗のメモ', guest_count: 4, customer_anonymized: 1 });
+  });
+
   it('匿名化していない予約は外部同期で個人情報も更新する', async () => {
     seedRestaurantFixture();
     const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };

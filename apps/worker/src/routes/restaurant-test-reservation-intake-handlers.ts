@@ -639,14 +639,14 @@ export const post__api_restaurant_test_inbound_reservations_13 = async (c: Conte
       (id, store_id, source, external_id, hub_source, customer_name, customer_phone, line_uid, guest_count, starts_at, ends_at, table_id, course_id, status, allergy_note, note, source_updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(store_id, source, external_id) DO UPDATE SET confirmation_revision = rt_reservations.confirmation_revision + 1,
-        customer_name = CASE WHEN rt_reservations.customer_name = '削除済みのお客さま' THEN rt_reservations.customer_name ELSE excluded.customer_name END,
-        customer_phone = CASE WHEN rt_reservations.customer_name = '削除済みのお客さま' THEN NULL ELSE excluded.customer_phone END,
-        line_uid = CASE WHEN rt_reservations.customer_name = '削除済みのお客さま' THEN NULL ELSE excluded.line_uid END,
+        customer_name = CASE WHEN rt_reservations.customer_anonymized = 1 OR rt_reservations.customer_name = '削除済みのお客さま' THEN rt_reservations.customer_name ELSE excluded.customer_name END,
+        customer_phone = CASE WHEN rt_reservations.customer_anonymized = 1 OR rt_reservations.customer_name = '削除済みのお客さま' THEN rt_reservations.customer_phone ELSE excluded.customer_phone END,
+        line_uid = CASE WHEN rt_reservations.customer_anonymized = 1 OR rt_reservations.customer_name = '削除済みのお客さま' THEN rt_reservations.line_uid ELSE excluded.line_uid END,
         guest_count = excluded.guest_count, starts_at = excluded.starts_at,
         ends_at = excluded.ends_at, table_id = excluded.table_id, course_id = excluded.course_id,
         status = excluded.status,
-        allergy_note = CASE WHEN rt_reservations.customer_name = '削除済みのお客さま' THEN NULL ELSE excluded.allergy_note END,
-        note = CASE WHEN rt_reservations.customer_name = '削除済みのお客さま' THEN NULL ELSE excluded.note END,
+        allergy_note = CASE WHEN rt_reservations.customer_anonymized = 1 OR rt_reservations.customer_name = '削除済みのお客さま' THEN rt_reservations.allergy_note ELSE excluded.allergy_note END,
+        note = CASE WHEN rt_reservations.customer_anonymized = 1 OR rt_reservations.customer_name = '削除済みのお客さま' THEN rt_reservations.note ELSE excluded.note END,
         source_updated_at = excluded.source_updated_at, updated_at = datetime('now')`).bind(
           id, body.storeId, body.provider, value.externalId,
           body.provider === 'restaurant_board' || body.provider === 'reszaiko' ? body.provider : null,
