@@ -187,6 +187,7 @@ export function mapReward(row: RewardRow): MileageRewardSummary {
   return {
     id: row.id,
     folderId: row.folder_id ?? null,
+    hqTemplateId: row.active_hq_template_id ?? null,
     lineAccountId: row.line_account_id,
     programId: row.program_id,
     name: row.name,
@@ -208,7 +209,10 @@ export function mapReward(row: RewardRow): MileageRewardSummary {
 
 export function rewardSelect(versionExpression: string): string {
   return `
-  SELECT r.id, r.folder_id, r.line_account_id, r.program_id, r.name, r.description, r.image_url,
+  SELECT r.id, r.folder_id,
+         (SELECT t.id FROM hq_templates t JOIN line_accounts a ON a.tenant_id = t.tenant_id
+           WHERE t.id = r.hq_template_id AND a.id = r.line_account_id AND t.archived_at IS NULL) AS active_hq_template_id,
+         r.line_account_id, r.program_id, r.name, r.description, r.image_url,
          r.reward_kind, r.status, r.sort_order, r.current_draft_version_id,
          r.current_published_version_id, r.created_at, r.updated_at,
          v.id AS version_id, v.version_number, v.status AS version_status,

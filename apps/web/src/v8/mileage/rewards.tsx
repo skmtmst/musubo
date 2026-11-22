@@ -739,6 +739,7 @@ export default function RewardsTab() {
                   <FolderDotName folder={folderDotFor(folders, reward.folderId)}>
                     <span title={reach ? `今すぐ届く人 ${formatNumber(reach.reachableFriendCount)} 人` : '届く人数は未取得'}><TruncatedText value={String(reward.name ?? '')} /></span>
                   </FolderDotName>
+                  {reward.hqTemplateId ? <StatusBadge tone="neutral" dot={false} size="micro">統括から</StatusBadge> : null}
 
                 </Td>
                 <Td align="right" className={styles.colNeed}>

@@ -1,11 +1,12 @@
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { Hono } from 'hono';
-import { publishMileageReward } from '@line-crm/db';
+import { getMileageReward, publishMileageReward } from '@line-crm/db';
 import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 import { beforeEach,afterEach,expect,test,vi } from 'vitest';
 import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { hqTemplates } from './hq-templates.js';
+import { scoring } from './scoring.js';
 import type { Env } from '../worker-env.js';
 import type { HqCatalogTemplateType } from '@line-crm/shared';
 let f:SqliteD1,app:Hono<Env>,staff:Env['Variables']['staff'];
@@ -23,7 +24,7 @@ beforeEach(()=>{
  f.raw.exec("INSERT INTO mileage_programs(id,code,name,status,created_at,updated_at) VALUES('default','default','マイル','active','2026-10-15','2026-10-15')");
  f.raw.exec("INSERT INTO tenants(id,name) VALUES('t','HQ'),('other','Other'); INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES('owner','Owner','owner','unused','t'); INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id) VALUES('a','Store','a','x','x','t'),('b','Store2','b','x','x','t'),('other','Hidden','other','x','x','other')");
  staff={id:'owner',name:'Owner',role:'owner',tenantId:'t',readOnly:false};
- app=new Hono<Env>();app.use('*',async(c,next)=>{c.set('staff',staff);await next();});app.route('/',hqTemplates);
+ app=new Hono<Env>();app.use('*',async(c,next)=>{c.set('staff',staff);await next();});app.route('/',hqTemplates);app.route('/',scoring);
  vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('No external requests');}));
 });
 afterEach(()=>{f.raw.close();vi.useRealTimers();vi.unstubAllGlobals();});
@@ -168,10 +169,15 @@ test('HQT-22: 景品のひな形を削除しても店の景品と版と出所を
  expect((await run(id,await check(id))).body.data.status).toBe('completed');
  const before=f.raw.prepare('SELECT id,hq_template_id,hq_template_version_id FROM mileage_rewards').get() as {id:string;hq_template_id:string|null;hq_template_version_id:string|null};
  expect(before.hq_template_id).toBe(id);expect(before.hq_template_version_id).toBeTruthy();
+ expect((await getMileageReward(f.db,{id:before.id,lineAccountId:'a'}))?.hqTemplateId).toBe(id);
+ const readReward=async()=>app.request(`/api/mileage/rewards/${before.id}?accountId=a`,{}, {DB:f.db} as Env['Bindings']);
+ const beforeResponse=await readReward();expect(beforeResponse.status).toBe(200);expect(await beforeResponse.json()).toMatchObject({data:{hqTemplateId:id}});
  const versions=f.raw.prepare('SELECT * FROM mileage_reward_versions WHERE reward_id=?').all(before.id);
  const detail=await call<Detail>(`/${id}`);
  expect((await call(`/${id}`,'DELETE',{expectedRevision:detail.body.data.template.revision})).status).toBe(200);
  expect(f.raw.prepare('SELECT hq_template_id,hq_template_version_id FROM mileage_rewards WHERE id=?').get(before.id)).toEqual({hq_template_id:id,hq_template_version_id:before.hq_template_version_id});
+ expect((await getMileageReward(f.db,{id:before.id,lineAccountId:'a'}))?.hqTemplateId).toBeNull();
+ const afterResponse=await readReward();expect(afterResponse.status).toBe(200);expect(await afterResponse.json()).toMatchObject({data:{hqTemplateId:null}});
  expect(f.raw.prepare('SELECT archived_at IS NOT NULL archived FROM hq_templates WHERE id=?').get(id)).toEqual({archived:1});
  expect((await call(`/${id}/preflight`,'POST',{accountIds:['a']})).status).toBe(404);
  expect(f.raw.prepare('SELECT * FROM mileage_reward_versions WHERE reward_id=?').all(before.id)).toEqual(versions);
