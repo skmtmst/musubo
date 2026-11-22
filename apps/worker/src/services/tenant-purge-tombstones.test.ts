@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { activateLineAccount, createLineAccount, upsertFriend, getLineAccountById, getFriendById, getBroadcasts, getBroadcastById, updateTenantBilling, markTenantDataPurged, getStripeEvents, prepareBillingInvoice } from '@line-crm/db';
 import { gapFixture } from '../test-utils/gap1.js';
 import { stripeApi } from './stripe-api.js';
-import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan, claimTenantPurge, claimBillingEventLease, prepareCompleteBillingEventLease, prepareAssertBillingEventLeaseCompleted, releaseBillingEventLease, recordPurgedTenantStripeEvent, deferPurgedBillingEvent, deferStaleBillingReceipts, billingEventLeaseFence } from './tenant-purge-tombstones.js';
+import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan, claimTenantPurge, claimBillingEventLease, prepareCompleteBillingEventLease, prepareBillingEventLeaseCompletion, releaseBillingEventLease, recordPurgedTenantStripeEvent, deferPurgedBillingEvent, deferStaleBillingReceipts, billingEventLeaseFence } from './tenant-purge-tombstones.js';
 
 test('an expired completion rolls back earlier writes in the same batch', async () => {
   const f=gapFixture();
@@ -13,15 +13,13 @@ test('an expired completion rolls back earlier writes in the same batch', async 
   await expect(f.db.batch([
     prepareBillingInvoice(f.db,{id:'invoice-batch',tenantId:'t',amountPaid:3000,status:'paid'},billingEventLeaseFence('evt_batch','t','token')),
     f.db.prepare("UPDATE billing_events SET lease_until='2000-01-01T00:00:00Z' WHERE id='evt_batch'"),
-    prepareCompleteBillingEventLease(f.db,'evt_batch','token','completed'),
-    prepareAssertBillingEventLeaseCompleted(f.db),
+    ...prepareBillingEventLeaseCompletion(f.db,'evt_batch','token','completed'),
   ])).rejects.toThrow(/malformed JSON/);
   expect(f.raw.prepare("SELECT id FROM billing_invoices WHERE id='invoice-batch'").get()).toBeUndefined();
   expect(f.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_batch'").get()).toEqual({summary:'pending'});
   await expect(f.db.batch([
     prepareBillingInvoice(f.db,{id:'invoice-batch-ok',tenantId:'t',amountPaid:3000,status:'paid'},billingEventLeaseFence('evt_batch','t','token')),
-    prepareCompleteBillingEventLease(f.db,'evt_batch','token','completed'),
-    prepareAssertBillingEventLeaseCompleted(f.db),
+    ...prepareBillingEventLeaseCompletion(f.db,'evt_batch','token','completed'),
   ])).resolves.toBeDefined();
   expect(f.raw.prepare("SELECT id FROM billing_invoices WHERE id='invoice-batch-ok'").get()).toEqual({id:'invoice-batch-ok'});
 });

@@ -18,7 +18,7 @@ test('D1 rolls back tenant updates when billing lease expires before completion'
       native.prepare(`UPDATE tenants SET name='changed' WHERE id='t' AND ${fence.sql}`).bind(...fence.values),
       native.prepare("UPDATE billing_events SET lease_until='2000-01-01T00:00:00Z' WHERE id='evt'"),
       ...prepareBillingEventLeaseCompletion(db,'evt','token','completed'),
-    ])).rejects.toThrow();
+    ])).rejects.toThrow(/malformed JSON/i);
     expect(await native.prepare("SELECT name FROM tenants WHERE id='t'").first()).toEqual({name:'original'});
     expect(await native.prepare("SELECT summary FROM billing_events WHERE id='evt'").first()).toEqual({summary:'pending'});
     await native.batch([
@@ -26,5 +26,7 @@ test('D1 rolls back tenant updates when billing lease expires before completion'
       ...prepareBillingEventLeaseCompletion(db,'evt','token','completed'),
     ]);
     expect(await native.prepare("SELECT name FROM tenants WHERE id='t'").first()).toEqual({name:'changed'});
+    expect(await native.prepare("SELECT summary,lease_token FROM billing_events WHERE id='evt'").first())
+      .toEqual({summary:'completed',lease_token:null});
   } finally { await mf.dispose(); }
 },30000);

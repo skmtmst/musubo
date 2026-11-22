@@ -48,7 +48,7 @@ export function prepareCompleteBillingEventLease(db: D1Database, eventId: string
 }
 
 /** 完了を最後に検証し、失敗なら同じ batch の前の書き込みも巻き戻す。 */
-export function prepareAssertBillingEventLeaseCompleted(db: D1Database): D1PreparedStatement {
+function prepareAssertBillingEventLeaseCompleted(db: D1Database): D1PreparedStatement {
   return db.prepare("SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'BILLING_LEASE_EXPIRED' END)");
 }
 
