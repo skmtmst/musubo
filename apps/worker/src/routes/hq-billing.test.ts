@@ -443,6 +443,16 @@ describe('課金 Webhook', () => {
     expect(testDb.raw.prepare("SELECT tenant_id FROM billing_events WHERE id='evt_live_without_old_key'").get()).toEqual({tenant_id:DEFAULT_TENANT_ID});
   });
 
+  it('旧鍵がなくても初回契約中の新しい統括のCheckout通知は通す', async () => {
+    testDb.raw.exec("INSERT INTO tenants(id,name) VALUES ('retired-tenant','Retired')");
+    const secret='old-purge-key';
+    const digest=(await hashPurgedPaymentIdentifier(secret,'customer','cus_old'))!;
+    const keyVersion=(await purgedPaymentIdentifierKeyVersion(secret))!;
+    await storePurgedPaymentIdentifierHash(testDb.db,{tenantId:'retired-tenant',kind:'customer',digest,keyVersion,now:'2026-01-01T00:00:00Z',expiresAt:'2040-01-01T00:00:00Z'});
+    expect((await webhook(completed('evt_first_checkout_without_old_key'))).status).toBe(200);
+    expect(tenantRow()).toMatchObject({stripe_customer_id:'cus_1'});
+  });
+
   it('旧鍵がない場合は課金通知を適用せず安全監視へ出す', async () => {
     setTenant({plan_status:'active',stripe_customer_id:'cus_new'});
     const secret='test-purge-hmac';

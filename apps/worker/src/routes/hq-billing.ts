@@ -641,8 +641,17 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     const currency = typeof object.currency === 'string' && /^[a-z]{3}$/.test(object.currency) ? object.currency : null;
     const matchTime = new Date().toISOString();
     const customerId = stripeExpandableId(object.customer);
-    const liveAccount = customerId ? await c.env.DB.prepare(`SELECT id FROM tenants WHERE stripe_customer_id=?
+    let liveAccount = customerId ? await c.env.DB.prepare(`SELECT id FROM tenants WHERE stripe_customer_id=?
       AND purge_started_at IS NULL AND data_purged_at IS NULL LIMIT 1`).bind(customerId).first<{id:string}>() : null;
+    // A first checkout can legitimately be the first place a new tenant binds its
+    // customer. A resumed tenant must still check retired identifiers first.
+    if (!liveAccount && event.type === 'checkout.session.completed' && object.mode !== 'setup') {
+      const candidate = await findTenantForEvent(c, object, event.type);
+      if (candidate && !candidate.stripe_customer_id && !candidate.last_purged_at) {
+        liveAccount = await c.env.DB.prepare(`SELECT id FROM tenants WHERE id=? AND stripe_customer_id IS NULL
+          AND last_purged_at IS NULL AND purge_started_at IS NULL AND data_purged_at IS NULL`).bind(candidate.id).first<{id:string}>();
+      }
+    }
     let oldTenantId:string|null = null;
     try {
       if (!liveAccount) oldTenantId = await matchPurgedPaymentIdentifiers(c.env.DB,c.env.PURGED_PAYMENT_HMAC_SECRET,{
