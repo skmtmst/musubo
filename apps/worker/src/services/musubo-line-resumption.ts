@@ -75,7 +75,8 @@ export async function requestMusuboLineResumption(env: WorkerBindings, tenantId:
     SET resumption_requested_at=?,resumption_line_account_id=?,
       resumption_friend_count=?,resumption_friend_measured_on=?,updated_at=?
     WHERE tenant_id=? AND status='ended' AND resumption_generation=?
-      AND resumption_requested_at IS NULL AND resumption_consented_at IS NOT NULL`)
+      AND resumption_requested_at IS NULL AND resumption_consented_at IS NOT NULL
+      AND EXISTS (SELECT 1 FROM tenants t WHERE t.id=musubo_tenant_billing.tenant_id AND t.purge_started_at IS NULL)`)
     .bind(requestedAt, line.line_account_id, insight.friendsExcludingBlocked,
       insight.measuredOn, requestedAt, tenantId, generation).run();
   if ((result.meta?.changes ?? 0) !== 1) throw new Error('Resumption intent changed');
@@ -143,7 +144,8 @@ export async function reconcileMusuboLineResumption(env: WorkerBindings, tenantI
       resumption_requested_at=NULL,resumption_line_account_id=NULL,
       resumption_friend_count=NULL,resumption_friend_measured_on=NULL,updated_at=?
       WHERE tenant_id=? AND status='ended'
-      AND resumption_generation=? AND resumption_requested_at=?`)
+      AND resumption_generation=? AND resumption_requested_at=?
+      AND EXISTS (SELECT 1 FROM tenants t WHERE t.id=musubo_tenant_billing.tenant_id AND t.purge_started_at IS NULL)`)
       .bind(review.kind === 'trial_remaining' ? 'trialing' : 'active', core.id,
         options.id, nextMonthly, nextAnnual, activatedAt, activatedAt, tenantId,
         generation, billing.resumption_requested_at),
@@ -154,7 +156,7 @@ export async function reconcileMusuboLineResumption(env: WorkerBindings, tenantI
         billing.resumption_friend_measured_on, activatedAt, tenantId, line.line_account_id),
     env.DB.prepare(`UPDATE line_accounts SET is_active=1,is_default=1,
       inactive_reason=NULL,inactive_reason_detail=NULL,inactivated_at=NULL,updated_at=?
-      WHERE id=? AND tenant_id=? AND is_active=0 AND archived_at IS NULL AND changes()=1`)
+      WHERE id=? AND tenant_id=? AND is_active=0 AND archived_at IS NULL AND data_purged_at IS NULL AND changes()=1`)
       .bind(activatedAt, line.line_account_id, tenantId),
   ]);
   if (updates.some((result) => (result.meta?.changes ?? 0) !== 1)) {

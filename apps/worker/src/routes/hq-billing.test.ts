@@ -185,6 +185,16 @@ describe('申込（checkout）', () => {
     stripe.createCheckoutSession.mockResolvedValue({ id: 'cs_1', url: 'https://checkout.stripe.com/c/pay/cs_1', customer: 'cus_1', subscription: null, client_reference_id: DEFAULT_TENANT_ID });
   });
 
+  it('削除中は申込と支払い方法の管理を開始しない', async () => {
+    setTenant({purge_started_at:'2026-01-01',stripe_customer_id:'cus_1'});
+    const checkout = await call('POST', '/api/hq/billing/checkout', {planKey:'light'});
+    expect(checkout.status).toBe(409);
+    expect(await checkout.json()).toMatchObject({error:'削除の処理中です。終わった後に新しいアカウントとして始められます'});
+    expect((await call('POST', '/api/hq/billing/portal')).status).toBe(409);
+    expect(stripe.createCheckoutSession).not.toHaveBeenCalled();
+    expect(stripe.createPortalSession).not.toHaveBeenCalled();
+  });
+
   it.each(['light', 'standard', 'pro'])('%s を年払いで申し込むと年の Price を選ぶ', async (planKey) => {
     const res = await call('POST', '/api/hq/billing/checkout', { planKey, interval: 'year' });
     expect(res.status).toBe(200);
@@ -405,6 +415,17 @@ describe('課金 Webhook', () => {
   beforeEach(() => {
     setTenant({ plan_status: 'trialing', trial_ends_at: '2020-01-01T00:00:00.000' });
     stripe.retrieveSubscription.mockResolvedValue({ id: 'sub_1', status: 'active', customer: 'cus_1', current_period_end: 1_760_000_000, items: { data: [{ price: { id: 'price_standard' } }] } });
+  });
+
+  it('削除中の入金通知は未処理で残し、完了後の再送で適用する', async () => {
+    setTenant({plan_status:'trialing',stripe_customer_id:'cus_1',purge_started_at:'2026-01-01'});
+    const event = completed('evt_deferred_by_purge');
+    expect((await webhook(event)).status).toBe(503);
+    expect(testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_deferred_by_purge'").get()).toEqual({summary:'pending'});
+    expect(tenantRow()).toMatchObject({plan_status:'trialing',stripe_subscription_id:null});
+    setTenant({purge_started_at:null});
+    expect((await webhook(event)).status).toBe(200);
+    expect(tenantRow()).toMatchObject({plan_status:'active',stripe_subscription_id:'sub_1'});
   });
 
   it('新料金の契約通知を旧プランへ適用せず、再処理可能な受領状態で残す', async () => {

@@ -136,7 +136,7 @@ export async function markTenantDataPurged(
   now: string = jstNow(),
 ): Promise<void> {
   await db
-    .prepare('UPDATE tenants SET data_purged_at = ?, updated_at = ? WHERE id = ?')
+    .prepare('UPDATE tenants SET data_purged_at = ?, purge_started_at = NULL, updated_at = ? WHERE id = ?')
     .bind(now, now, tenantId)
     .run();
 }

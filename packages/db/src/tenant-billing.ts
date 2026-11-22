@@ -67,7 +67,13 @@ export async function updateTenantBilling(
   patch: Partial<Pick<TenantBilling, 'plan_key' | 'plan_status' | 'trial_ends_at' | 'stripe_customer_id' | 'stripe_subscription_id' | 'current_period_ends_at'>>,
 ): Promise<TenantBilling | null> {
   const statement = prepareTenantBillingUpdate(db, tenantId, patch);
-  if (statement) await statement.run();
+  if (statement) {
+    const result = await statement.run();
+    if (!result.meta.changes && patch.plan_status && patch.plan_status !== 'canceled') {
+      const row = await db.prepare('SELECT purge_started_at FROM tenants WHERE id = ?').bind(tenantId).first<{purge_started_at:string|null}>();
+      if (row?.purge_started_at) throw new Error('tenant_purge_in_progress');
+    }
+  }
   return getTenantBilling(db, tenantId);
 }
 
@@ -103,7 +109,8 @@ export function prepareTenantBillingUpdate(
   }
   sets.push('plan_updated_at = ?', 'updated_at = ?');
   values.push(now, now, tenantId);
-  return db.prepare(`UPDATE tenants SET ${sets.join(', ')} WHERE id = ?${condition ? ` AND (${condition.sql})` : ''}`)
+  const purgeGuard = patch.plan_status && patch.plan_status !== 'canceled' ? ' AND purge_started_at IS NULL' : '';
+  return db.prepare(`UPDATE tenants SET ${sets.join(', ')} WHERE id = ?${purgeGuard}${condition ? ` AND (${condition.sql})` : ''}`)
     .bind(...values, ...(condition?.values ?? []));
 }
 

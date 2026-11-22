@@ -39,6 +39,7 @@ import { getBillingPaymentFailure, getRecentBillingPaymentRecovery } from '../se
 import { musuboBillingOverview } from '../services/musubo-billing-overview.js';
 import { acceptedMusuboLineResumption } from '../services/musubo-line-resumption-review.js';
 import { processMusuboBillingEvent } from '../services/musubo-billing-webhook.js';
+import { tenantPurgeInProgress } from '../services/tenant-purge-tombstones.js';
 import { deliverBillingRecoveryNotice, deliverCurrentBillingFailureNotice } from '../services/billing-invoice-notifications.js';
 import { StripeApiError, stripeApi, type StripeCheckoutSession, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
@@ -348,6 +349,7 @@ hqBilling.get('/api/hq/billing/preview', requireRole('owner', 'admin'), async (c
 
 hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
+    if (await tenantPurgeInProgress(c.env.DB, tenantOf(c))) return c.json({success:false,error:'削除の処理中です。終わった後に新しいアカウントとして始められます'},409);
     if (!stripeReady(c)) return c.json({ success: false, error: '決済の接続設定がまだありません。運営にお問い合わせください' }, 503);
     const origin = adminOrigin(c);
     if (!origin) return c.json({ success: false, error: '管理画面のURLが設定されていません' }, 503);
@@ -405,6 +407,7 @@ hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inpu
 });
 
 hqBilling.post('/api/hq/billing/card-confirm', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+  if (await tenantPurgeInProgress(c.env.DB, tenantOf(c))) return c.json({success:false,error:'削除の処理中です。終わった後に新しいアカウントとして始められます'},409);
   const body = await c.req.json<{ sessionId?: unknown } | null>().catch(() => null);
   if (typeof body?.sessionId !== 'string' || !/^cs_(?:test_)?[A-Za-z0-9]{5,200}$/.test(body.sessionId)) {
     return c.json({ success: false, error: 'クレジットカード登録を確認できませんでした' }, 400);
@@ -453,6 +456,7 @@ hqBilling.get('/api/hq/billing/card-status', requireRole('owner', 'admin'), asyn
 hqBilling.post('/api/hq/billing/checkout', requireRole('owner', 'admin'), inputJsonBoundary({ planKey: ['string'], interval: ['string'] }), async (c) => {
   try {
     const tenantId = tenantOf(c);
+    if (await tenantPurgeInProgress(c.env.DB, tenantId)) return c.json({success:false,error:'削除の処理中です。終わった後に新しいアカウントとして始められます'},409);
     if (await getMusuboTenantBilling(c.env.DB, tenantId)) {
       return c.json({ success: false, error: 'この統括には新しい料金条件が適用されています。利用料金の画面をご確認ください' }, 409);
     }
@@ -501,6 +505,7 @@ hqBilling.post('/api/hq/billing/checkout', requireRole('owner', 'admin'), inputJ
 
 hqBilling.post('/api/hq/billing/portal', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
+    if (await tenantPurgeInProgress(c.env.DB, tenantOf(c))) return c.json({success:false,error:'削除の処理中です。終わった後に新しいアカウントとして始められます'},409);
     const billing = await getTenantBilling(c.env.DB, tenantOf(c));
     if (!billing?.stripe_customer_id || !stripeReady(c)) {
       return c.json({ success: false, error: 'まだ契約がないため、支払い方法の管理画面はありません' }, 409);
@@ -636,6 +641,12 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
       .bind(event.id,event.type,tenant?.id ?? null,'pending').run();
     const receipt = await c.env.DB.prepare('SELECT summary FROM billing_events WHERE id=?').bind(event.id).first<{summary:string}>();
     if (receipt?.summary !== 'pending') return c.json({ success:true,data:{received:true,duplicate:true} });
+    // Receipt is saved before this check. A purge claim cannot start while it is pending,
+    // and a receipt arriving after the claim stays pending until Stripe retries.
+    if (tenant && await tenantPurgeInProgress(c.env.DB, tenant.id)) {
+      logger.warn('billing.webhook_deferred_for_tenant_purge');
+      return c.json({success:false,error:'tenant_purge_in_progress'},503);
+    }
     // New-price contracts use separate core/options subscriptions. The legacy
     // handler has one plan slot and must not acknowledge or apply those events.
     // Keep the receipt pending until the new contract handler can reconcile it.

@@ -1,8 +1,34 @@
 import { expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { activateLineAccount, createLineAccount, upsertFriend, getLineAccountById, getFriendById, getBroadcasts, getBroadcastById } from '@line-crm/db';
+import { activateLineAccount, createLineAccount, upsertFriend, getLineAccountById, getFriendById, getBroadcasts, getBroadcastById, updateTenantBilling, markTenantDataPurged } from '@line-crm/db';
 import { gapFixture } from '../test-utils/gap1.js';
-import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan } from './tenant-purge-tombstones.js';
+import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, tombstoneBookingMenu, tombstonePassPlan, claimTenantPurge } from './tenant-purge-tombstones.js';
+
+test('purge claim and reactivation are mutually exclusive', async () => {
+  const now = '2027-05-01T09:00:00.000+09:00';
+  const first = gapFixture();
+  first.raw.exec("UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01' WHERE id='t'");
+  expect(await claimTenantPurge(first.db, 't', now)).toBe(true);
+  await expect(updateTenantBilling(first.db, 't', {plan_status:'active'})).rejects.toThrow('tenant_purge_in_progress');
+  expect(first.raw.prepare("SELECT plan_status FROM tenants WHERE id='t'").get()).toEqual({plan_status:'canceled'});
+  expect(await tombstoneLineAccount(first.db, 't', 'a', now)).toBe(true);
+  await markTenantDataPurged(first.db, 't', now);
+  await updateTenantBilling(first.db, 't', {plan_status:'active'});
+  expect(await getLineAccountById(first.db, 'a')).toBeNull();
+  const replacement = await createLineAccount(first.db, {channelId:'ch',name:'新しいアカウント',channelAccessToken:'token',channelSecret:'secret',tenantId:'t'}, Buffer.alloc(32).toString('base64'));
+  expect(replacement.id).not.toBe('a');
+  const second = gapFixture();
+  second.raw.exec("UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01' WHERE id='t'");
+  await updateTenantBilling(second.db, 't', {plan_status:'active'});
+  expect(await claimTenantPurge(second.db, 't', now)).toBe(false);
+  const pending = gapFixture();
+  pending.raw.exec("UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01' WHERE id='t'; INSERT INTO billing_events(id,type,tenant_id,summary) VALUES('pending','invoice.paid','t','pending')");
+  expect(await claimTenantPurge(pending.db, 't', now)).toBe(false);
+  pending.raw.exec("UPDATE billing_events SET summary='completed' WHERE id='pending'");
+  expect(await claimTenantPurge(pending.db, 't', now)).toBe(true);
+  pending.raw.exec("INSERT INTO billing_events(id,type,tenant_id,summary) VALUES('later','invoice.paid','t','pending')");
+  expect(await claimTenantPurge(pending.db, 't', now)).toBe(true);
+});
 
 test('retained pass plan and referenced menu are stopped and anonymized without changing prices', async () => {
   const f = gapFixture();

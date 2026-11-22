@@ -1,5 +1,23 @@
 import { retentionCutoff } from '@line-crm/db';
 
+/** 再開と同時に始めないよう、期限の確認と開始の印を同じ文で書く。 */
+export async function claimTenantPurge(db: D1Database, tenantId: string, now: string): Promise<boolean> {
+  const result = await db.prepare(`UPDATE tenants SET purge_started_at=COALESCE(purge_started_at,?)
+    WHERE id=? AND data_purged_at IS NULL
+      AND (plan_status='canceled' OR (plan_status='trialing' AND trial_ends_at IS NOT NULL AND trial_ends_at < ?))
+      AND (purge_requested_at IS NOT NULL OR (retention_anchor_at IS NOT NULL AND retention_anchor_at < ?))
+      AND (purge_started_at IS NOT NULL OR (
+        NOT EXISTS (SELECT 1 FROM billing_events e WHERE e.tenant_id=tenants.id AND e.summary='pending')
+        AND NOT EXISTS (SELECT 1 FROM musubo_tenant_billing b WHERE b.tenant_id=tenants.id AND b.resumption_requested_at IS NOT NULL)))`)
+    .bind(now, tenantId, now, retentionCutoff(now)).run();
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
+export async function tenantPurgeInProgress(db: D1Database, tenantId: string): Promise<boolean> {
+  const row = await db.prepare('SELECT purge_started_at FROM tenants WHERE id=?').bind(tenantId).first<{purge_started_at:string|null}>();
+  return Boolean(row?.purge_started_at);
+}
+
 /** 券が参照するメニューの金額・期間を残し、説明と連絡先を消す。 */
 export async function tombstoneBookingMenu(db: D1Database, tenantId: string, menuId: string, now: string): Promise<boolean> {
   const result = await db.prepare(`UPDATE menus SET name='削除済み', category_label=NULL, description=NULL,
