@@ -106,6 +106,9 @@ describe('private data deletion', () => {
     const friend = await upsertFriend(sqlite.db, { lineUserId: 'LINE-private', lineAccountId: 'a', displayName: '新しいプロフィール' });
     expect(friend.id).not.toBe('u');
     expect(friend.display_name).toBe('新しいプロフィール');
+    expect(sqlite.raw.prepare("SELECT id FROM chats WHERE id='old-chat'").get()).toBeUndefined();
+    expect(sqlite.raw.prepare("SELECT id FROM messages_log WHERE id='old-message'").get()).toBeUndefined();
+    expect(sqlite.raw.prepare("SELECT id FROM form_submissions WHERE id='answer'").get()).toBeUndefined();
     expect(sqlite.raw.prepare('SELECT id FROM chats WHERE friend_id=?').all(friend.id)).toEqual([]);
     expect(sqlite.raw.prepare('SELECT id FROM messages_log WHERE friend_id=?').all(friend.id)).toEqual([]);
     expect(sqlite.raw.prepare('SELECT id FROM form_submissions WHERE friend_id=?').all(friend.id)).toEqual([]);
