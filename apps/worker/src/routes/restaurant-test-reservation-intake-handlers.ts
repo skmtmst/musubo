@@ -370,7 +370,7 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
   const capacity = changesSlot && reservationSlotActive(next.status) ? await restaurantSeatCapacity(db,current.store_id,next.starts_at,next.ends_at,current.id) : null;
   if(capacity && !capacity.select({startsAt:next.starts_at,endsAt:next.ends_at,guestCount:next.guest_count,tableId:next.table_id}))return c.json({success:false,code:'availability_conflict',error:'未配席の予約を含め、人数が入る空き卓がありません'},409);
   const update = db.prepare(`UPDATE rt_reservations SET
-    confirmation_revision = confirmation_revision + 1, customer_name = ?, customer_phone = ?, guest_count = ?, starts_at = ?, ends_at = ?,
+    confirmation_revision = confirmation_revision + 1, customer_anonymized = CASE WHEN customer_name = '削除済みのお客さま' THEN 1 ELSE customer_anonymized END, customer_name = ?, customer_phone = ?, guest_count = ?, starts_at = ?, ends_at = ?,
     table_id = ?, course_id = ?, status = ?, allergy_note = ?, note = ?, cancel_reason = ?, customer_version=customer_version+1, updated_at = datetime('now')
     WHERE id = ? AND customer_version = ?`).bind(
       next.customer_name, next.customer_phone, next.guest_count, next.starts_at, next.ends_at,
@@ -570,11 +570,12 @@ export const post__api_restaurant_test_inbound_reservations_13 = async (c: Conte
   if (!body.eventId?.trim()) return inputError(c, { success: false, error: 'eventId が必要です' }, 400, ["eventId"]);
   const checked = validateInboundReservation(body.reservation);
   if (!checked.ok) return inputError(c, { success: false, error: checked.error }, 400, ["reservation"]);
+  // 通知記録に個人情報を残さず、検証済みの値はこのリクエスト内だけで使う。
   const eventDbId = crypto.randomUUID();
   const inserted = await dbFor(c.env, body.storeId).prepare(`INSERT INTO rt_sync_events
     (id, store_id, provider, external_event_id, payload_json, status)
     VALUES (?, ?, ?, ?, ?, 'received') ON CONFLICT(store_id, provider, external_event_id) DO NOTHING`).bind(
-      eventDbId, body.storeId, body.provider, body.eventId.trim(), JSON.stringify(body.reservation),
+      eventDbId, body.storeId, body.provider, body.eventId.trim(), JSON.stringify({}),
     ).run();
   // 処理済みだけを重複終了にする。失敗・受信中の再送は取り込み直す。
   let syncEventId = eventDbId;
@@ -592,7 +593,7 @@ export const post__api_restaurant_test_inbound_reservations_13 = async (c: Conte
     await dbFor(c.env, body.storeId).prepare(
       `UPDATE rt_sync_events SET payload_json = ?, status = 'received', error_message = NULL,
         received_at = datetime('now') WHERE id = ?`,
-    ).bind(JSON.stringify(body.reservation), existing.id).run();
+    ).bind(JSON.stringify({}), existing.id).run();
   }
   try {
     const value = checked.value;
@@ -638,10 +639,14 @@ export const post__api_restaurant_test_inbound_reservations_13 = async (c: Conte
       (id, store_id, source, external_id, hub_source, customer_name, customer_phone, line_uid, guest_count, starts_at, ends_at, table_id, course_id, status, allergy_note, note, source_updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(store_id, source, external_id) DO UPDATE SET confirmation_revision = rt_reservations.confirmation_revision + 1,
-        customer_name = excluded.customer_name, customer_phone = excluded.customer_phone,
-        line_uid = excluded.line_uid, guest_count = excluded.guest_count, starts_at = excluded.starts_at,
+        customer_name = CASE WHEN rt_reservations.customer_anonymized = 1 OR rt_reservations.customer_name = '削除済みのお客さま' THEN rt_reservations.customer_name ELSE excluded.customer_name END,
+        customer_phone = CASE WHEN rt_reservations.customer_anonymized = 1 OR rt_reservations.customer_name = '削除済みのお客さま' THEN rt_reservations.customer_phone ELSE excluded.customer_phone END,
+        line_uid = CASE WHEN rt_reservations.customer_anonymized = 1 OR rt_reservations.customer_name = '削除済みのお客さま' THEN rt_reservations.line_uid ELSE excluded.line_uid END,
+        guest_count = excluded.guest_count, starts_at = excluded.starts_at,
         ends_at = excluded.ends_at, table_id = excluded.table_id, course_id = excluded.course_id,
-        status = excluded.status, allergy_note = excluded.allergy_note, note = excluded.note,
+        status = excluded.status,
+        allergy_note = CASE WHEN rt_reservations.customer_anonymized = 1 OR rt_reservations.customer_name = '削除済みのお客さま' THEN rt_reservations.allergy_note ELSE excluded.allergy_note END,
+        note = CASE WHEN rt_reservations.customer_anonymized = 1 OR rt_reservations.customer_name = '削除済みのお客さま' THEN rt_reservations.note ELSE excluded.note END,
         source_updated_at = excluded.source_updated_at, updated_at = datetime('now')`).bind(
           id, body.storeId, body.provider, value.externalId,
           body.provider === 'restaurant_board' || body.provider === 'reszaiko' ? body.provider : null,
