@@ -47,6 +47,12 @@ beforeEach(()=>{
 afterEach(()=>{f.raw.close();vi.useRealTimers();vi.unstubAllGlobals();});
 
 describe('支払い管理の読取・集計・書出し',()=>{
+  it('顧客を削除した決済を区別し、他の決済には印を付けない',async()=>{
+    payment('removed');payment('normal');
+    f.raw.exec("UPDATE booking_payments SET booking_id=NULL,customer_redacted_at='2026-10-12T00:00:00Z' WHERE id='removed'");
+    const body=await (await request(path('payments'))).json() as {data:{items:Array<{id:string;customerRedacted:number;friendName:string|null}>}};
+    expect(body.data.items).toEqual(expect.arrayContaining([expect.objectContaining({id:'removed',customerRedacted:1,friendName:null}),expect.objectContaining({id:'normal',customerRedacted:0,friendName:'山田'})]));
+  });
   it('模擬Stripeを実接続として表示せず、鍵・日時・アカウントを捏造しない',async()=>{
     const r=await request(path('payment-connection'),'GET',undefined,{STRIPE_TEST_WEBHOOK_SECRET:'fixture-secret'});
     expect(r.headers.get('cache-control')).toBe('no-store');

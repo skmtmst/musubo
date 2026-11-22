@@ -39,6 +39,7 @@ export interface PaymentRecord {
   bookingId: string | null;
   friendId: string | null;
   friendName: string | null;
+  customerRedacted?: 0 | 1;
   bookingStartsAt: string | null;
   bookingLabel: string | null;
   bookingNote: string | null;
