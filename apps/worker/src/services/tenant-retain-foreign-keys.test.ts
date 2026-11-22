@@ -109,6 +109,8 @@ test('shared broadcast retains other tenant targets while the purged tenant is d
     INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id,target_type,account_ids,dedup_priority,failed_account_ids)
       VALUES('shared','shared title','text','shared message','a','multi-account-dedup','["a","b"]','["a","b"]','["a","b"]'),
             ('foreign','foreign title','text','foreign message','b','multi-account-dedup','["a","b"]',NULL,NULL);
+    INSERT INTO friends(id,line_user_id,line_account_id) VALUES('other-friend','U-other','b');
+    INSERT INTO broadcast_ab_recipients(broadcast_id,friend_id,variant_key,state,test_mode) VALUES('shared','f','A','pending',1),('shared','other-friend','A','pending',1);
     INSERT INTO broadcast_approval_events(id,broadcast_id,actor_staff_id,action) VALUES('shared-approval','shared','o','requested');`);
   const outcome=await processTenantDataPurge({DB:f.db},{now});
   expect(outcome.completed).toBe(1);
@@ -118,5 +120,6 @@ test('shared broadcast retains other tenant targets while the purged tenant is d
     .toEqual({title:'foreign title',line_account_id:'b',account_ids:'["b"]'});
   expect(f.raw.prepare("SELECT row_id FROM tenant_purge_tombstone_progress WHERE tenant_id='t' AND table_name='broadcasts' AND row_id='shared'").get()).toEqual({row_id:'shared'});
   expect(f.raw.prepare("SELECT id FROM broadcast_approval_events WHERE id='shared-approval'").get()).toEqual({id:'shared-approval'});
+  expect(f.raw.prepare("SELECT friend_id FROM broadcast_ab_recipients WHERE broadcast_id='shared'").all()).toEqual([{friend_id:'other-friend'}]);
   expect(f.raw.pragma('foreign_key_check')).toEqual([]);
 });

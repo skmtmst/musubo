@@ -196,7 +196,11 @@ export async function detachSharedBroadcast(db:D1Database, tenantId:string, broa
     .bind(tenantId,tenantId,tenantId,tenantId,broadcastId,tenantId,tenantId,tenantId,tenantId,tenantId);
   const mark=db.prepare(`INSERT INTO tenant_purge_tombstone_progress(tenant_id,table_name,row_id)
     SELECT ?,'broadcasts',? WHERE changes()=1`).bind(tenantId,broadcastId);
-  const results=await db.batch([update,mark]);
+  const removeOwnRecipients=['broadcast_ab_live_recipients','broadcast_ab_recipients','broadcast_after_action_runs'].map(table =>
+    db.prepare(`DELETE FROM ${table} WHERE broadcast_id=? AND friend_id IN (SELECT f.id FROM friends f JOIN line_accounts a ON a.id=f.line_account_id WHERE a.tenant_id=?)
+      AND EXISTS(SELECT 1 FROM tenant_purge_tombstone_progress p WHERE p.tenant_id=? AND p.table_name='broadcasts' AND p.row_id=?)`)
+      .bind(broadcastId,tenantId,tenantId,broadcastId));
+  const results=await db.batch([update,mark,...removeOwnRecipients]);
   return Number(results[1].meta.changes ?? 0)===1;
 }
 

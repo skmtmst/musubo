@@ -281,6 +281,22 @@ async function purgeOneTenant(
     byTable['booking_pass_plans'] = (byTable['booking_pass_plans'] ?? 0) + 1;
   }
 
+  // Shared broadcasts must be detached before child-first deletion; otherwise
+  // children belonging to the other tenant would follow this tenant's owner.
+  if (remaining > 0) {
+    const shared = await env.DB.prepare(`SELECT b.id FROM broadcasts b
+      WHERE b.data_purged_at IS NULL AND b.target_type='multi-account-dedup' AND json_type(b.account_ids)='array'
+        AND (b.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=?) OR EXISTS (
+          SELECT 1 FROM json_each(b.account_ids) j JOIN line_accounts a ON a.id=j.value WHERE a.tenant_id=?))
+        AND EXISTS(SELECT 1 FROM json_each(b.account_ids) j JOIN line_accounts a ON a.id=j.value WHERE a.tenant_id IS NOT ?) LIMIT ?`)
+      .bind(tenant.id,tenant.id,tenant.id,remaining).all<{id:string}>();
+    for (const row of shared.results) {
+      if (!await detachSharedBroadcast(env.DB,tenant.id,row.id)) throw new Error('shared_broadcast_detach_failed');
+      remaining--; out.deletedRows++;
+      byTable.broadcasts=(byTable.broadcasts ?? 0)+1;
+    }
+  }
+
   // 子が先、親が後。親を先に消すと子が親をたどれなくなって消し残る。
   tables: for (const table of purgeTablesChildFirst()) {
     if (remaining <= 0) {
