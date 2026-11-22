@@ -5,6 +5,8 @@ import { expandVariables } from '../../services/message-interpolation.js';
 import { resolveMetadata } from '../../services/step-metadata.js';
 import { resolveSendInterpolationExtra } from '../../services/interpolation-context.js';
 import { resolveMileageSource } from '../../services/mileage-ec-source.js';
+import { customerDestinationBlocked, customerDestinationDigest } from '../../services/customer-deletion-destination.js';
+import { rawWorkflowDb } from '../../services/workflow-db.js';
 import type { EventDispatcher } from '../../services/event-payload.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { classifyLinePushError } from './automation-line-errors.js';
@@ -437,6 +439,9 @@ async function sendMessageExecutor(
       .bind(context.stepExecutionId,context.runId,context.runId,context.automationVersionId,...initialGate.guard.binds,...finalGate.guard.binds).run();
     if(right.meta.changes!==1)throw invalid('restaurant_source_changed','予約または承認の内容が変わったため送信できません');
   }
+  const recipientDigest=await customerDestinationDigest(context.lineAccountId,friend.line_user_id);
+  if(await customerDestinationBlocked(rawWorkflowDb(context.db),recipientDigest,context.lineAccountId,friend.line_user_id))
+    throw invalid('customer_deleted','この送信先は確認できません');
   let response: unknown;
   try {
     response = await client.pushMessage(friend.line_user_id, [message], context.idempotencyKey);

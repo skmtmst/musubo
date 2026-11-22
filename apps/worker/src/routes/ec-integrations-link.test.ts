@@ -70,7 +70,7 @@ function harness(opts: { notificationEnabled?: boolean; failDispatchWritesOn?: n
   const db = {
     batch:workflow.db.batch.bind(workflow.db),
     prepare(query: string) {
-      if(query.includes('workflow_steps'))return workflow.db.prepare(query);
+      if(query.includes('workflow_steps') || query.includes('operation_audit'))return workflow.db.prepare(query);
       const entry = { query, bindings: [] as unknown[] };
       const statement = {
         bind(...bindings: unknown[]) { entry.bindings = bindings; return statement; },

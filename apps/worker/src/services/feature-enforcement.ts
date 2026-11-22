@@ -46,6 +46,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   {name:'durable tracked click continuation',classification:{kind:'feature',featureId:'inflow_tracking'},enforcement:{mode:'gated',sources:['apps/worker/src/services/tracked-click-steps.ts'],markers:["featureId:'inflow_tracking'","job:'durable tracked click continuation'"]}},
   {name:'durable banner generation',classification:{kind:'core',reason:'統括のバナー生成の継続'},enforcement:{mode:'exempt',reason:'店舗別機能スイッチの対象外。生成の直前に統括の契約・枚数上限・停止依頼を判定する'}},
   { name: 'form document retention', classification: { kind: 'core', reason: '本人確認書類の保存期限と未送信添付の後始末' }, enforcement: { mode: 'exempt', reason: '送信・公開をせず、フォーム機能の停止中も保存期限を守る' } },
+  { name: 'customer workflow redaction', classification: { kind: 'core', reason: '顧客削除後の送信情報の消去' }, enforcement: { mode: 'exempt', reason: '外部送信をせず、機能停止中も保存期限を守る' } },
   {name:'API draft and integration retention',classification:{kind:'core',reason:'保存期限を過ぎた下書きと連携の一時情報の消去'},enforcement:{mode:'exempt',reason:'外部送信をせず、機能の有効・無効にかかわらず保存期限を守る'}},
   {name:'restaurant followup jobs',classification:{kind:'feature',featureId:'restaurant_test'},enforcement:{mode:'gated',sources:['apps/worker/src/features/scenarios/scenario-source-jobs.ts'],markers:["featureId: 'restaurant_test'",'featureJobCanRun(db,']}},
   {name:'restaurant events',classification:{kind:'core',reason:'保存済みの飲食のできごとの再配送'},enforcement:{mode:'exempt',reason:'店舗の検証スイッチを確認し、スタンプ・マイル・オートメーションの可否は受取先の停止判定に従う。外向きWebhookは配送しない'}},

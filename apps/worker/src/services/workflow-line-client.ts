@@ -5,6 +5,7 @@ import { claimWorkflowStep, ensureWorkflowStep, failWorkflowStep, finishWorkflow
 import type { WorkflowExecution } from './workflow-execution.js';
 import { WorkflowDeferred } from './workflow-execution.js';
 import { EXTERNAL_DELIVERY_MAX_ATTEMPTS, externalDeliveryRetryAt, externalDeliveryNotBefore, EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES } from './external-delivery-retry.js';
+import { customerDestinationBlocked, customerDestinationDigest, noCustomerDeletionForDigest } from './customer-deletion-destination.js';
 
 /** 送信開始が記録されていない失敗は拒否の証明にせず、新しい操作を割り当てて再送しない。 */
 export async function holdUncertainLineStep(db:D1Database,ref:WorkflowStepRef,previous:WorkflowStepRow,code:'delivery_unknown'|'reply_unknown'='delivery_unknown'):Promise<boolean>{
@@ -36,6 +37,9 @@ export function workflowLineClient(client: LineClient, execution: WorkflowExecut
       const index = ordinals.get(namespace) ?? 0;
       ordinals.set(namespace, index + 1);
       const reply = method.startsWith('reply');
+      const accountId=execution.ref.scopeId.startsWith('line:') ? execution.ref.scopeId.slice(5) : null;
+      const recipientDigest=!reply && accountId && accountId!=='default' ? await customerDestinationDigest(accountId,toOrToken) : null;
+      if(recipientDigest && await customerDestinationBlocked(execution.db,recipientDigest,accountId!,toOrToken)) throw new WorkflowDeferred('customer_deleted');
       const ref = { ...execution.ref, stepKey: options.stepKey ?? `line:${namespace}:${index}` };
       const previous = await ensureWorkflowStep(execution.db, ref, {
         input: reply ? { messages } : { to: toOrToken, messages },
@@ -52,6 +56,8 @@ export function workflowLineClient(client: LineClient, execution: WorkflowExecut
       const row = await claimWorkflowStep(execution.db, ref);
       if (!row) throw new WorkflowDeferred((await getWorkflowStep(execution.db, ref))?.status ?? 'busy');
       const original = JSON.parse(row.input_json!);
+      const savedDigest=!reply && accountId && accountId!=='default' && typeof original.to==='string'
+        ? await customerDestinationDigest(accountId,original.to) : null;
       let started = false, accepted = false;
       let providerRequestId: string | null = null;
       try {
@@ -61,8 +67,9 @@ export function workflowLineClient(client: LineClient, execution: WorkflowExecut
           throw new WorkflowDeferred('delivery_unknown');
         }
         const marked = await execution.db.prepare(`UPDATE workflow_steps SET error_code='delivery_started'
-          WHERE ${WORKFLOW_WHERE} AND status='running' AND lease_owner=? AND lease_expires_at>?`)
-          .bind(...workflowBindings(ref), row.lease_owner, Date.now()).run();
+          WHERE ${WORKFLOW_WHERE} AND status='running' AND lease_owner=? AND lease_expires_at>?
+            AND (? IS NULL OR ${noCustomerDeletionForDigest})`)
+          .bind(...workflowBindings(ref), row.lease_owner, Date.now(),savedDigest,savedDigest,accountId,original.to ?? null).run();
         if (marked.meta.changes !== 1) throw new WorkflowDeferred('busy');
         started = true;
         options.onAttempt?.();

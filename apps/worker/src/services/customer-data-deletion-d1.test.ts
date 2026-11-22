@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { Miniflare } from 'miniflare';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteCustomerData } from './customer-data-deletion.js';
+import { CUSTOMER_WORKFLOW_WAIT_MS, redactCustomerWorkflows } from './customer-workflow-redaction.js';
 
 let mf: Miniflare;
 let native: Awaited<ReturnType<Miniflare['getD1Database']>>;
@@ -60,6 +61,75 @@ describe('local workerd D1 binding', () => {
     expect(await native.prepare('SELECT id FROM form_submission_files WHERE id=?').bind(fileId).first()).toBeNull();
     expect(remove).toHaveBeenCalledExactlyOnceWith([`private/${fileId}`]);
   }, 30_000);
+  it('顧客削除で未送信と完了を匿名化し、送信中と結果不明は結果または期限を待つ', async () => {
+    const now=Date.now();
+    for (const status of ['pending','failed','succeeded','unknown','running']) {
+      await native.prepare(`INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,status,lease_owner,lease_expires_at,
+        retry_key,input_json,result_json,created_at,updated_at) VALUES ('line:account','tracked_click',?,'__run',?,?,?,?,?,?,?,?)`)
+        .bind(`${friendId}-${status}`,status,status==='running'?'owner':null,status==='running'?now+60_000:null,
+          `retry-${status}`,JSON.stringify({friendId,private:'body'}),JSON.stringify({requestId:'request_1',private:'result'}),now,now).run();
+    }
+    await native.prepare(`INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,status,retry_key,input_json,created_at,updated_at)
+      VALUES ('line:account','tracked_click',?,'__run','pending','other',?,?,?)`)
+      .bind(`${friendId}-other`,JSON.stringify({friendId:'other',private:'other body'}),now,now).run();
+    await deleteCustomerData(env(), target('friend_data'), 'owner');
+    const rows=(await native.prepare('SELECT subject_id,status,input_json,customer_redaction_requested_at FROM workflow_steps WHERE subject_id LIKE ?')
+      .bind(`${friendId}-%`).all<{subject_id:string;status:string;input_json:string;customer_redaction_requested_at:number|null}>()).results;
+    const byStatus=new Map(rows.map(row=>[row.subject_id.slice(friendId.length+1),row]));
+    expect(byStatus.get('pending')).toMatchObject({status:'canceled',input_json:'{"redacted":true}'});
+    expect(byStatus.get('failed')).toMatchObject({status:'canceled',input_json:'{"redacted":true}'});
+    expect(byStatus.get('succeeded')).toMatchObject({status:'canceled',input_json:'{"redacted":true}'});
+    expect(byStatus.get('unknown')).toMatchObject({status:'unknown'});
+    expect(byStatus.get('running')).toMatchObject({status:'running'});
+    expect(byStatus.get('other')).toMatchObject({status:'pending',customer_redaction_requested_at:null});
+    await native.prepare("UPDATE workflow_steps SET status='succeeded',lease_owner=NULL,lease_expires_at=NULL WHERE subject_id=?")
+      .bind(`${friendId}-running`).run();
+    const requested=byStatus.get('unknown')!.customer_redaction_requested_at!;
+    expect(await redactCustomerWorkflows(db(),requested+1)).toBe(1);
+    expect(await redactCustomerWorkflows(db(),requested+CUSTOMER_WORKFLOW_WAIT_MS)).toBe(1);
+    const redacted=await native.prepare('SELECT status,input_json,result_json FROM workflow_steps WHERE subject_id=?').bind(`${friendId}-unknown`).first();
+    expect(redacted).toMatchObject({status:'canceled',input_json:'{"redacted":true}',result_json:'{"redacted":true,"previousStatus":"unknown","requestId":"request_1"}'});
+    const journal=await native.prepare('SELECT detail_json FROM operation_audit WHERE id=?').bind(`customer-delete:friend_data:${friendId}`).first<{detail_json:string}>();
+    const detail=JSON.parse(journal!.detail_json);
+    expect(detail.recipientDigest).toHaveLength(64);
+    expect(detail.workflowPendingAtDeletion).toBe(2);
+    await redactCustomerWorkflows(db(),Date.parse(detail.completedAt)+CUSTOMER_WORKFLOW_WAIT_MS+300_001);
+    const cleaned=await native.prepare('SELECT detail_json FROM operation_audit WHERE id=?').bind(`customer-delete:friend_data:${friendId}`).first<{detail_json:string}>();
+    expect(JSON.parse(cleaned!.detail_json).recipientDigest).toBeUndefined();
+  },30_000);
+  it('削除受付とR2削除の間に本人の新しい送信工程を作らせない',async()=>{
+    remove.mockImplementation(async()=>{
+      const create=() => native.prepare(`INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,status,retry_key,input_json,created_at,updated_at)
+        VALUES ('line:account','tracked_click',?,'__run','pending','key',?,?,?)`);
+      await expect(create().bind(`${friendId}-race`,JSON.stringify({friendId}),Date.now(),Date.now()).run()).rejects.toThrow();
+      await create().bind(`${friendId}-other-race`,JSON.stringify({friendId:'other'}),Date.now(),Date.now()).run();
+    });
+    await deleteCustomerData(env(),target('friend_data'),'owner');
+    expect(await native.prepare('SELECT subject_id FROM workflow_steps WHERE subject_id=?').bind(`${friendId}-race`).first()).toBeNull();
+    expect(await native.prepare('SELECT subject_id FROM workflow_steps WHERE subject_id=?').bind(`${friendId}-other-race`).first()).toBeTruthy();
+  },30_000);
+  it('本人と確実に結び付くイベントだけを匿名化し、複数宛先のイベントは残す',async()=>{
+    const now=Date.now(),recipient=`LINE-${friendId}`;
+    const insert=(kind:string,subject:string,key:string,input:unknown)=>native.prepare(`INSERT INTO workflow_steps
+      (scope_id,process_kind,subject_id,step_key,status,retry_key,input_json,created_at,updated_at)
+      VALUES ('line:account',?,?,?,'pending',?,?,?,?)`).bind(kind,subject,key,`${subject}-${key}`,JSON.stringify(input),now,now);
+    const research=JSON.stringify(['asset',1,friendId,'0','single']);
+    await native.batch([
+      insert('research_tap',research,'__run',{label:'private answer'}),
+      insert('line_event',`${friendId}-single`,'__run',{eventType:'message'}),
+      insert('line_event',`${friendId}-single`,'line:reply:0',{to:recipient,messages:['private']}),
+      insert('line_event',`${friendId}-multi`,'__run',{eventType:'message'}),
+      insert('line_event',`${friendId}-multi`,'line:one:0',{to:recipient,messages:['private']}),
+      insert('line_event',`${friendId}-multi`,'line:two:0',{to:'LINE-other',messages:['other']}),
+    ]);
+    await deleteCustomerData(env(),target('friend_data'),'owner');
+    const selected=await native.prepare('SELECT status,input_json FROM workflow_steps WHERE process_kind=? AND subject_id=?').bind('research_tap',research).first();
+    expect(selected).toEqual({status:'canceled',input_json:'{"redacted":true}'});
+    const single=await native.prepare('SELECT status FROM workflow_steps WHERE subject_id=?').bind(`${friendId}-single`).all<{status:string}>();
+    expect(single.results.map(row=>row.status)).toEqual(['canceled','canceled']);
+    const multi=await native.prepare('SELECT status FROM workflow_steps WHERE subject_id=?').bind(`${friendId}-multi`).all<{status:string}>();
+    expect(multi.results.map(row=>row.status)).toEqual(['pending','pending','pending']);
+  },30_000);
   it('rolls D1 batch back on an error after attachment deletion, then retries', async () => {
     await native.prepare("CREATE TRIGGER fail_customer_delete BEFORE DELETE ON form_submissions BEGIN SELECT RAISE(ABORT,'fail'); END").run();
     await expect(deleteCustomerData(env(), target('form_response'), 'owner')).rejects.toMatchObject({ status: 503 });

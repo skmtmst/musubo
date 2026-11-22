@@ -4,6 +4,7 @@ import { runBookingExternalStep, reconcileBookingExternalStep } from './booking-
 import { BookingExternalCircuits } from './booking-external-circuits.js';
 import { API_RETRY_WAIT } from '../../lib/external-call/index.js';
 import { type CallIdentity, type Outcome } from '../../lib/external-call/types.js';
+import {customerDestinationDigest} from '../../services/customer-deletion-destination.js';
 
 let sql: SqliteD1;
 const now = 1_800_000_000_000;
@@ -19,6 +20,17 @@ beforeEach(() => { sql = createTestD1(); });
 afterEach(() => { sql.raw.close(); });
 
 describe('予約系の永続checkpoint', () => {
+  it('予約通知の送信直前に顧客削除を受け付けると外部へ送らない',async()=>{
+    const options=input(),digest=await customerDestinationDigest('a','U_fixture');
+    const outcome=await runBookingExternalStep(sql.db,{...options,authorize:async()=>{
+      sql.raw.prepare(`INSERT INTO operation_audit(id,target_kind,target_id,action,actor_id,friend_id,detail_json)
+        VALUES ('customer-delete:friend_data:f','customer_deletion','f','deleting','owner','f',?)`)
+        .run(JSON.stringify({accountId:'a',recipientDigest:digest}));
+      return true;
+    }});
+    expect(outcome.kind).not.toBe('success');
+    expect(options.execute).not.toHaveBeenCalled();
+  });
   it('並行CASは1要求。成功後は再起動しても要求0、入力の写しと参照IDを保持', async () => {
     const options = input();
     const outcomes = await Promise.all([runBookingExternalStep(sql.db, options), runBookingExternalStep(sql.db, options)]);

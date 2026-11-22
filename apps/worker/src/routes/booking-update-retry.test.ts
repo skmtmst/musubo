@@ -296,7 +296,7 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
     const moved = await move('s2');
     expect(moved.status).toBe(200);
     expect(await moved.json()).toMatchObject({ customerNotification: { channel: 'line', status: 'queued', guidance: null } });
-    expect(notifierMocks.sendBookingNotification).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(notifierMocks.sendBookingNotification).toHaveBeenCalledTimes(1));
     sqlite.prepare('INSERT INTO operation_control_sets (scope_key,version,states_json,updated_at) VALUES (?,?,?,?)').run('*',1,JSON.stringify({ broadcast_dispatch:'stopped' }),new Date().toISOString());
     const stopped = await move('s1');
     expect(stopped.status).toBe(200);
