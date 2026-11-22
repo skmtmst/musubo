@@ -67,3 +67,24 @@ it('質問を切り替えても保存済みの行を消さない', async () => {
   expect(onChange).not.toHaveBeenCalled()
   expect(screen.getByText(/相談内容：〈相談〉/)).toBeTruthy()
 })
+
+it('行き先の担当に組を選び、担当者ではなく組のIDを保存する', () => {
+  const onChange=vi.fn()
+  render(<RoutingSection blocks={[
+    {id:'q',kind:'input',type:'radio',name:'subject',label:'相談内容',choices:[{id:'x',label:'相談'}]},
+    {id:'book',kind:'input',type:'booking'},
+  ] as never} refs={{bookingMenus:[{id:'m',name:'無料相談',durationMinutes:30}],bookingGroups:[{id:'g',name:'相談担当'}],bookingMenuStaff:{m:[{id:'s',name:'山田'}]}} as never}
+  routing={{enabled:true,rules:[{conditions:[{questionId:'q',op:'is',value:'相談'}],target:{menuId:'m',staffId:'s'}}],fallback:{menuId:'m'}}} onChange={onChange} />)
+  fireEvent.click(screen.getByRole('button',{name:'1 行目の担当'}))
+  fireEvent.click(screen.getByRole('radio',{name:'組：相談担当'}))
+  fireEvent.click(screen.getByRole('button',{name:'選ぶ'}))
+  expect(onChange.mock.calls[0][0].rules[0].target).toEqual({menuId:'m',staffId:undefined,staffGroupId:'g'})
+})
+
+it('担当の組が取得できない時は空の一覧と誤認させず知らせる', () => {
+  render(<RoutingSection blocks={[
+    {id:'q',kind:'input',type:'radio',name:'subject',label:'相談内容',choices:[{id:'x',label:'相談'}]},
+    {id:'book',kind:'input',type:'booking'},
+  ] as never} refs={{bookingGroupsError:true} as never} routing={{enabled:true,rules:[],fallback:{menuId:'m'}}} onChange={() => {}} />)
+  expect(screen.getByText(/担当の組を読み込めませんでした/)).toBeTruthy()
+})

@@ -36,7 +36,8 @@ CalendarCheck,
 Plus,
 X
 } from 'lucide-react';
-import { useEffect,useMemo,useRef,useState,type DragEvent,type KeyboardEvent,type ReactNode } from 'react';
+import { useEffect,useMemo,useRef,useState,useSyncExternalStore,type DragEvent,type KeyboardEvent,type ReactNode } from 'react';
+import { readPermissionSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot';
 import styles from './edit.module.css';
 import { useFormEditAttempted } from './field-issues';
 import { blockKindLine,blockTitleKind,blockTitleLine,inputTypeLabel,isChoiceType } from './model';
@@ -86,8 +87,12 @@ type Props = {
   onChangeReferences?: (next: FormReferenceDefinition[]) => void
 }
 
+const subscribeSession = (callback: () => void) => { window.addEventListener(SESSION_SNAPSHOT_CHANGED, callback); return () => window.removeEventListener(SESSION_SNAPSHOT_CHANGED, callback) }
+const serverSession = () => null
+
 export function ContentTab(props: Props) {
   const { layout, page, blocks } = props
+  const permissionSession = useSyncExternalStore(subscribeSession, readPermissionSessionSnapshot, serverSession)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [removing, setRemoving] = useState(false)
   const section = layout.sections[page]
@@ -139,7 +144,7 @@ export function ContentTab(props: Props) {
         </div>
       </Card>
 
-      {props.onChangeRouting ? <RoutingSection blocks={[...layout.header, ...layout.sections.flatMap((s) => s.blocks)]} refs={props.refs} routing={props.routing} readOnly={props.readOnly} onChange={props.onChangeRouting} onPreview={props.accountId && props.formId ? async (answers) => (await formRoutingApi.preview(props.accountId!, props.formId!, answers, undefined, layout)).data : undefined} /> : null}
+      {props.onChangeRouting ? <RoutingSection blocks={[...layout.header, ...layout.sections.flatMap((s) => s.blocks)]} refs={props.refs} routing={props.routing} readOnly={props.readOnly || Boolean(permissionSession?.impersonation)} onChange={props.onChangeRouting} onPreview={props.accountId && props.formId ? async (answers) => (await formRoutingApi.preview(props.accountId!, props.formId!, answers, undefined, layout)).data : undefined} /> : null}
 
       <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-blocks-title">
         <div className={styles.cardHeadText}>

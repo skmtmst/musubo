@@ -49,6 +49,7 @@ import { FormPhone } from './phone';
 import styles from './edit.module.css';
 import { useCreatedDraft } from './use-created-draft'
 import { readFormDraftCreation, rememberFormDraftCreation } from '@/lib/form-draft-session'
+import { formRoutingApi } from '@/lib/api/helpers/gap2';
 import { routingError, routingOf, withRouting, type FormRouting } from './routing-model';
 import { formatNumber as polishFormatNumber } from '@/lib/format';
 import TextLink from '@/components/shared/text-link';
@@ -312,10 +313,15 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           reminders: reminderRes.data.map((r) => ({ id: r.id, name: r.name })),
           templates: templateRes.data.map((t) => ({ id: t.id, name: t.name, type: t.messageType })),
           bookingMenus: [],
+          bookingGroups: [],
           bookingMenuStaff: {},
         })
         // 「予約を入れる」欄のメニュー選び。本体の読み込みを待たせない。読めなくても欄は置ける。
         if (selectedAccountId) {
+          const accountAtRequest = selectedAccountId
+          void formRoutingApi.groups(accountAtRequest).then((result) => {
+            if (bookingStaffAccount.current === accountAtRequest) setRefs((prev) => ({ ...prev, bookingGroups: result.data.map((group) => ({ id: group.id, name: group.name })), bookingGroupsError: false }))
+          }).catch(() => { if (bookingStaffAccount.current === accountAtRequest) setRefs((prev) => ({ ...prev, bookingGroupsError: true })) })
           bookingApi
             .listMenus(selectedAccountId)
             .then((menuRes) => {
@@ -363,10 +369,12 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   useEffect(() => {
     if (hostRef.current || !selectedAccountId) return
     const menuIds = new Set<string>()
-    for (const section of layout.sections) {
-      for (const b of section.blocks) {
-        if (b.kind === 'input' && b.type === 'booking' && b.booking?.menuId) menuIds.add(b.booking.menuId)
-      }
+    for (const b of [...layout.header, ...layout.sections.flatMap((section) => section.blocks)]) {
+      if (b.kind !== 'input' || b.type !== 'booking' || !b.booking) continue
+      if (b.booking.menuId) menuIds.add(b.booking.menuId)
+      const routing = b.booking.routing
+      if (routing?.fallback?.menuId) menuIds.add(routing.fallback.menuId)
+      for (const rule of routing?.rules ?? []) if (rule.target.menuId) menuIds.add(rule.target.menuId)
     }
     const missing = [...menuIds].filter((menuId) => refs.bookingMenuStaff?.[menuId] === undefined && !bookingStaffErrors[menuId])
     if (missing.length === 0) return

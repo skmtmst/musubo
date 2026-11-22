@@ -16,6 +16,8 @@ export interface FormRefs {
   templates: { id: string; name: string; type: string }[]
   /** 「予約を入れる」欄のメニュー選び。HQなど持たない画面では空のまま */
   bookingMenus?: { id: string; name: string; durationMinutes: number }[]
+  bookingGroups?: { id: string; name: string }[]
+  bookingGroupsError?: boolean
   /** メニューごとの担当選び。読んでいないメニューは不在＝まだ読んでいない */
   bookingMenuStaff?: Record<string, { id: string; name: string }[]>
 }

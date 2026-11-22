@@ -71,11 +71,11 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
   const setRule = (id: string, patch: Partial<RoutingRule>) => set({ rules: value.rules.map((r, i) => (`r${i}` === id ? { ...r, ...patch } : r)) })
   const setTarget = (target: RoutingTarget, patch: Partial<RoutingTarget>): RoutingTarget => ({ ...target, ...patch, ...(patch.menuId !== undefined && patch.menuId !== target.menuId ? { staffId: undefined, staffGroupId: undefined } : {}) })
   const menuOptions = [{ value: '', label: 'メニューを選ぶ' }, ...menus.map((m) => ({ value: m.id, label: `${m.name} ${m.durationMinutes} 分` }))]
-  const staffOptions = (target: RoutingTarget) => [{ value: '', label: '全員' }, ...(target.staffGroupId ? [{ value: `group:${target.staffGroupId}`, label: '担当の組（登録済み）' }] : []), ...(refs.bookingMenuStaff?.[target.menuId] ?? []).map((s) => ({ value: s.id, label: s.name }))]
+  const staffOptions = (target: RoutingTarget) => [{ value: '', label: '全員' }, ...(refs.bookingGroups ?? []).map((group) => ({ value: `group:${group.id}`, label: `組：${group.name}` })), ...(target.staffGroupId && !(refs.bookingGroups ?? []).some((group) => group.id === target.staffGroupId) ? [{ value: `group:${target.staffGroupId}`, label: '担当の組（登録済み）' }] : []), ...(refs.bookingMenuStaff?.[target.menuId] ?? []).map((staff) => ({ value: `staff:${staff.id}`, label: staff.name }))]
 
   const targetCells = (target: RoutingTarget, update: (next: RoutingTarget) => void, label: string, invalid: boolean) => <>
     <Td>{readOnly ? <span>{menus.find((m) => m.id === target.menuId)?.name ?? '—'}</span> : <EntitySelect size="full" aria-label={`${label}の出すメニュー`} invalid={invalid} value={target.menuId} options={menuOptions} onChange={(v) => update(setTarget(target, { menuId: v }))} />}</Td>
-    <Td>{readOnly ? <span>{target.staffGroupId ? '担当の組（登録済み）' : target.staffId ? (refs.bookingMenuStaff?.[target.menuId] ?? []).find((s) => s.id === target.staffId)?.name : '全員'}</span> : <EntitySelect size="full" aria-label={`${label}の担当`} value={target.staffGroupId ? `group:${target.staffGroupId}` : target.staffId ?? ''} options={staffOptions(target)} onChange={(v) => { if (v.startsWith('group:')) return; update(setTarget(target, { staffId: v || undefined, staffGroupId: undefined })) }} disabled={!target.menuId} />}</Td>
+    <Td>{readOnly ? <span>{target.staffGroupId ? (refs.bookingGroups ?? []).find((group) => group.id === target.staffGroupId)?.name ?? '担当の組（登録済み）' : target.staffId ? (refs.bookingMenuStaff?.[target.menuId] ?? []).find((s) => s.id === target.staffId)?.name : '全員'}</span> : <EntitySelect size="full" aria-label={`${label}の担当`} value={target.staffGroupId ? `group:${target.staffGroupId}` : target.staffId ? `staff:${target.staffId}` : ''} options={staffOptions(target)} onChange={(v) => update(setTarget(target, v.startsWith('group:') ? { staffGroupId: v.slice(6), staffId: undefined } : { staffId: v.startsWith('staff:') ? v.slice(6) : undefined, staffGroupId: undefined }))} disabled={!target.menuId} />}</Td>
     <Td>{readOnly ? <span>{MODES.find((m) => m.value === (target.meetingMode ?? ''))?.label}</span> : <Select size="full" aria-label={`${label}の会い方`} value={target.meetingMode ?? ''} options={MODES} onChange={(v) => update(setTarget(target, { meetingMode: (v || undefined) as RoutingTarget['meetingMode'] }))} />}</Td>
   </>
 
@@ -92,6 +92,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
         </span>
       </div>
       {value.enabled ? <>
+        {refs.bookingGroupsError ? <Notice tone="warn">担当の組を読み込めませんでした。権限を確認して画面を読み直してください。</Notice> : null}
         <div className={styles.questionRow}>
           <span className={styles.label}>分ける質問</span>
           {readOnly ? <span>{question?.label ?? '質問がありません'}</span> : questions.length === 0 ? <span>使える質問を追加してください。</span> : <EntitySelect aria-label="分ける質問" value={questionId} options={questions.map((q) => ({ value: q.id, label: `${q.label}（${choiceModeLabel(q.type)}）` }))}

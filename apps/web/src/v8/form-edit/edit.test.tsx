@@ -978,3 +978,30 @@ describe('新しいフォームは最初の保存で作成する', () => {
     expect(readCreatedFormDraft('acc-2', 'old-store-draft')).toBeNull()
   })
 })
+
+it('振り分け先ごとのメニューについて担当候補を読み込む', async () => {
+  const data = structuredClone(formData)
+  const block = data.layout.sections[1].blocks[0]
+  if (block.kind !== 'input' || !block.booking) throw new Error('fixture')
+  block.booking.routing = {enabled:true,rules:[{conditions:[{questionId:'q1',op:'is',value:'ご相談'}],target:{menuId:'bm-2'}}],fallback:{menuId:'bm-3'}}
+  formsGet.mockResolvedValue({success:true,data})
+  menuStaff.mockClear().mockResolvedValue({staff:[]})
+  await render('id=form-1')
+  await waitFor(() => expect(menuStaff.mock.calls.map((call) => call[1])).toEqual(expect.arrayContaining(['bm-1','bm-2','bm-3'])))
+})
+
+it('代理ログイン中は振り分けを閲覧・試行できるが編集できない', async () => {
+  const { rememberSessionSnapshot, forgetSessionSnapshot } = await import('@/lib/session-snapshot')
+  const data=structuredClone(formData)
+  const block=data.layout.sections[1].blocks[0]
+  if(block.kind!=='input'||!block.booking) throw new Error('fixture')
+  block.booking.routing={enabled:true,rules:[],fallback:{menuId:'bm-1'}}
+  formsGet.mockResolvedValue({success:true,data})
+  rememberSessionSnapshot({stepUpMethod:'totp',unfamiliarAt:null,impersonation:{mode:'write'} as never})
+  try {
+    await render('id=form-1')
+    expect(await screen.findByRole('button',{name:'試しに答える'})).toBeTruthy()
+    expect(screen.queryByRole('button',{name:'行き先を追加'})).toBeNull()
+    expect(screen.queryByRole('button',{name:'どれにも当たらないときの出すメニュー'})).toBeNull()
+  } finally { forgetSessionSnapshot() }
+})
