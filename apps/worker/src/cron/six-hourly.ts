@@ -169,6 +169,10 @@ export async function runSixHourlyHeavyJobs(
           const { deleteExpiredPurgedPaymentIdentifierHashes } = await import('../services/tenant-purge-payment-hashes.js');
           await deleteExpiredPurgedPaymentIdentifierHashes(env.DB, new Date(event.scheduledTime).toISOString());
         } catch { logger.error('tenant_purge.payment_identifier_hash_cleanup_failed'); }
+        try {
+          const { deleteExpiredBillingHistory } = await import('../services/tenant-purge-billing-history.js');
+          await deleteExpiredBillingHistory(env.DB, new Date(event.scheduledTime).toISOString());
+        } catch { logger.error('tenant_purge.billing_history_cleanup_failed'); }
         const { processTenantDataPurge } = await import('../services/tenant-data-purge.js');
         const result = await processTenantDataPurge(env, {
           now: new Date(event.scheduledTime).toISOString(),

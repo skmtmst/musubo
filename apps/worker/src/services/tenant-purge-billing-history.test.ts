@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { gapFixture } from '../test-utils/gap1.js';
-import { archiveAndResetTenantBilling } from './tenant-purge-billing-history.js';
+import { archiveAndResetTenantBilling, deleteExpiredBillingHistory } from './tenant-purge-billing-history.js';
 
 test('archives permitted contract terms and clears identifiers in one batch', async () => {
   const f=gapFixture();
@@ -29,4 +29,15 @@ test('failed reset rolls back the archive', async () => {
     CREATE TRIGGER reject_billing_reset BEFORE UPDATE ON musubo_tenant_billing BEGIN SELECT RAISE(ABORT,'failure'); END;`);
   await expect(archiveAndResetTenantBilling(f.db,'t','2026-11-22T00:00:00Z','2038-03-01T00:00:00Z')).rejects.toThrow();
   expect(f.raw.prepare("SELECT id FROM billing_events WHERE type='internal.purge_billing'").all()).toHaveLength(0);
+});
+
+test('expired history is deleted without deleting ordinary billing events', async () => {
+  const f=gapFixture();
+  f.raw.exec("ALTER TABLE billing_events ADD COLUMN retained_until TEXT");
+  f.raw.exec(`INSERT INTO billing_events(id,type,tenant_id,summary,retained_until) VALUES
+    ('expired','internal.purge_billing','t','{}','2030-01-01T00:00:00Z'),
+    ('current','internal.purge_billing','t','{}','2031-01-01T00:00:00Z'),
+    ('ordinary','invoice.paid','t','ok','2029-01-01T00:00:00Z')`);
+  expect(await deleteExpiredBillingHistory(f.db,'2030-01-01T00:00:00Z')).toBe(1);
+  expect(f.raw.prepare('SELECT id FROM billing_events ORDER BY id').all()).toEqual([{id:'current'},{id:'ordinary'}]);
 });

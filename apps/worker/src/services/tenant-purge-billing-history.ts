@@ -12,6 +12,8 @@ export async function archiveAndResetTenantBilling(db: D1Database, tenantId: str
           'trialPeriod',json_extract(pricing_snapshot_json,'$.trialPeriod'),
           'lineBasicDiscountPercent',json_extract(pricing_snapshot_json,'$.lineBasicDiscountPercent'),
           'discountEndsOn',json_extract(pricing_snapshot_json,'$.discountEndsOn'),
+          'quotedSchedule',json_extract((SELECT final_prices_json FROM musubo_individual_quotes WHERE id=quote_id),'$.finalSchedule'),
+          'quotedAnnualYen',json_extract((SELECT final_prices_json FROM musubo_individual_quotes WHERE id=quote_id),'$.finalAnnualLineChargeYen'),
           'first_line_activated_at',first_line_activated_at,'first_charge_date',first_charge_date,
           'ended_at',ended_at,'termination_effective_at',termination_effective_at),?,?
       FROM musubo_tenant_billing WHERE tenant_id=? AND EXISTS (
@@ -31,4 +33,13 @@ export async function archiveAndResetTenantBilling(db: D1Database, tenantId: str
           AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL)`)
       .bind(now, tenantId),
   ]);
+}
+
+/** Remove expired internal history without affecting ordinary webhook receipts. */
+export async function deleteExpiredBillingHistory(db: D1Database, now: string): Promise<number> {
+  if (!Number.isFinite(Date.parse(now))) throw new Error('invalid_billing_history_expiry');
+  const result = await db.prepare(`DELETE FROM billing_events WHERE rowid IN (
+    SELECT rowid FROM billing_events WHERE type='internal.purge_billing'
+      AND retained_until IS NOT NULL AND julianday(retained_until)<=julianday(?) LIMIT 200)`).bind(now).run();
+  return Number(result.meta.changes ?? 0);
 }
