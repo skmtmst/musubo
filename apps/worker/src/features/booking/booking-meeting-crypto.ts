@@ -1,5 +1,5 @@
 import { CredentialEncryptionKeyError, decryptCredential, encryptCredential } from '@line-crm/db';
-import type { ConnectionProvider } from './booking-meeting-credentials.js';
+import type { ConnectionProvider } from './booking-meeting-create.js';
 
 type Scope = { accountId: string; staffId: string; provider: ConnectionProvider };
 export type MeetingKeys = { activeId: string; keys: Record<string, string>; legacyKey: string; writeV2?: boolean; rejectLegacy?: boolean };

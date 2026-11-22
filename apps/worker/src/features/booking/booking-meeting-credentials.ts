@@ -1,7 +1,7 @@
 import {decryptMeetingCredential,encryptMeetingCredential,MeetingKeyConfigurationError,type MeetingKeyInput} from './booking-meeting-crypto.js';
-import type {MeetingProvider} from './booking-meeting-create.js';
+import type {ConnectionProvider} from './booking-meeting-create.js';
 import {revokeLockCondition,revokeLockKey} from './booking-meeting-revoke-lock.js';
-export type ConnectionProvider=MeetingProvider|'outlook';
+export type {ConnectionProvider} from './booking-meeting-create.js';
 type Credential={provider:ConnectionProvider;externalAccountId:string;refreshToken:string;accessToken?:string;accessExpiresAt?:string};
 type Scope={accountId:string;staffId:string;provider:ConnectionProvider};
 

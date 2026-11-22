@@ -1,4 +1,4 @@
-import type {ConnectionProvider} from './booking-meeting-credentials.js';
+import type {ConnectionProvider} from './booking-meeting-create.js';
 
 type Scope={accountId:string;staffId:string;provider:ConnectionProvider};
 // 同一の外部アカウントを別の店や担当が使う場合もあるため、解除中は同じサービスの認可を全体で待つ。

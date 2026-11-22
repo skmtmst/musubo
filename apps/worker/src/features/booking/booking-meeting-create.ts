@@ -1,5 +1,6 @@
 /** 会議の外部通信は相手先アダプタに任せる。到達不明は再送しない。 */
 export type MeetingProvider = 'google_meet' | 'zoom' | 'teams';
+export type ConnectionProvider = MeetingProvider | 'outlook';
 export type MeetingCreateResult =
   | { kind: 'created'; meetingId: string; url: string }
   | { kind: 'failed'; code: string }
