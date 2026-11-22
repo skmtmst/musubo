@@ -50,9 +50,10 @@ const healthMessages: Record<string, string> = {
   outlook_unavailable: 'Outlook カレンダーを読み込めません。接続を確認してください。',
 }
 
-function saveError(cause: unknown, fallback = '保存できませんでした。もう一度お試しください。'): string {
+function saveError(cause: unknown, fallback = '保存できませんでした。もう一度お試しください。', action?: 'connect'): string {
   if (cause instanceof ApiError) {
     const messages: Record<string, string> = {
+      meeting_disconnect_in_progress: action === 'connect' ? '解除の処理中です。少し待ってからつなぎ直してください。' : '解除の処理中です。少し待ってからもう一度お試しください。',
       outlook_test_staff_required: '担当者本人がテスト送信の相手に登録されていないため、Outlook を使えません。',
       outlook_reconnect_required: 'Outlook をつなぎ直してください。',
       calendar_read_not_available: 'カレンダーの読み込みを利用できません。',
@@ -127,7 +128,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
       else setError('接続の準備ができていません。管理者にお問い合わせください。')
     } catch (cause) {
       saveErrors.capture(cause)
-      setError(saveError(cause, '接続を開始できませんでした。もう一度お試しください。'))
+      setError(saveError(cause, '接続を開始できませんでした。もう一度お試しください。', 'connect'))
     } finally { setBusy(false) }
   }
 

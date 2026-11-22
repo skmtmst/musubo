@@ -109,6 +109,13 @@ it('接続に失敗した場合は理由を通知し、画面を残す', async (
   expect(await screen.findByText('接続を開始できませんでした。もう一度お試しください。')).toBeTruthy()
   expect(screen.getByRole('region', { name: '会議の URL' })).toBeTruthy()
 })
+it('解除中の再接続は待つ理由を表示する', async () => {
+  const { ApiError } = await import('@/lib/api')
+  net.connect.mockRejectedValue(new ApiError(409, 'busy', 'meeting_disconnect_in_progress'))
+  render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit onClose={() => undefined} />)
+  fireEvent.click((await screen.findAllByRole('button', { name: 'つなぐ' }))[0])
+  expect(await screen.findByText('解除の処理中です。少し待ってからつなぎ直してください。')).toBeTruthy()
+})
 
 it('別の操作を始めると古いURL欄のエラーを消す', async () => {
   net.saveStaffUrl.mockRejectedValue({ status: 422, fields: { url: 'この会議のURLは使えません' } })
