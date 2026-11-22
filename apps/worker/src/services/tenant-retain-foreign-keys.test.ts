@@ -8,6 +8,34 @@ const now = '2027-05-01T00:00:00.000Z';
 const due = "UPDATE tenants SET plan_status='canceled', retention_anchor_at='2026-01-01T00:00:00.000Z' WHERE id='t'";
 
 describe('retained records survive tenant purge with real foreign keys', () => {
+  test('monthly contract customer identifiers can be removed while retaining the contract', async () => {
+    const f = monthlyFixture();
+    await monthlyContract(f);
+    if (!(f.raw.pragma('table_info(line_accounts)') as Array<{name:string}>).some(c => c.name === 'data_purged_at')) f.raw.exec('ALTER TABLE line_accounts ADD COLUMN data_purged_at TEXT');
+    f.raw.exec("UPDATE booking_monthly_contracts SET customer_id='cus_private', version=version+1 WHERE id='contract'");
+    const anonymize = "UPDATE booking_monthly_contracts SET customer_id=NULL, request_json=json_remove(request_json,'$.friendId'), version=version+1 WHERE id='contract'";
+    expect(() => f.raw.exec(anonymize)).toThrow('monthly_contract_conflict');
+    f.raw.exec("UPDATE line_accounts SET data_purged_at='2027-05-01T00:00:00Z' WHERE id='b'");
+    expect(() => f.raw.exec(anonymize)).toThrow('monthly_contract_conflict');
+    f.raw.exec("UPDATE line_accounts SET data_purged_at='2027-05-01T00:00:00Z' WHERE id='a'");
+    expect(() => f.raw.exec("UPDATE booking_monthly_contracts SET customer_id='cus_other',version=version+1 WHERE id='contract'")).toThrow('monthly_contract_conflict');
+    expect(() => f.raw.exec("UPDATE booking_monthly_contracts SET customer_id=NULL,request_json=json_remove(request_json,'$.friendId'),amount=amount+1,version=version+1 WHERE id='contract'")).toThrow('monthly_contract_conflict');
+    expect(() => f.raw.exec("UPDATE booking_monthly_contracts SET customer_id=NULL,request_json='{}',version=version+1 WHERE id='contract'")).toThrow('monthly_contract_conflict');
+    expect(() => f.raw.exec(anonymize)).not.toThrow();
+    expect(() => f.raw.exec("UPDATE booking_monthly_contracts SET amount=amount+1,version=version+1 WHERE id='contract'")).toThrow('monthly_contract_conflict');
+    expect(() => f.raw.exec("UPDATE booking_monthly_contracts SET friend_id='f2',version=version+1 WHERE id='contract'")).toThrow('monthly_contract_conflict');
+  });
+  test('restaurant approval history survives deletion of its store and organization', async () => {
+    const f = gapFixture();
+    f.raw.pragma('foreign_keys = ON');
+    f.raw.exec(`${due};
+      INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES ('ret-org','a','test','t');
+      INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES ('ret-store','ret-org','test','test','a');
+      INSERT INTO rt_approval_requests(id,organization_id,store_id,kind,title) VALUES ('ret-approval','ret-org','ret-store','menu_change','test');`);
+    const outcome = await processTenantDataPurge({ DB: f.db }, { now });
+    expect(outcome.completed).toBe(1);
+    expect(f.raw.prepare("SELECT id FROM rt_approval_requests WHERE id='ret-approval'").get()).toBeTruthy();
+  });
   test('all retained tables avoid cascade and restrictive references to purge tables', () => {
     const f = gapFixture();
     const unsafe: string[] = [];
