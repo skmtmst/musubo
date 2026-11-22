@@ -21,6 +21,8 @@ describe('retained records survive tenant purge with real foreign keys', () => {
     expect(() => f.raw.exec("UPDATE booking_monthly_contracts SET customer_id='cus_other',version=version+1 WHERE id='contract'")).toThrow('monthly_contract_conflict');
     expect(() => f.raw.exec("UPDATE booking_monthly_contracts SET customer_id=NULL,request_json=json_remove(request_json,'$.friendId'),amount=amount+1,version=version+1 WHERE id='contract'")).toThrow('monthly_contract_conflict');
     expect(() => f.raw.exec("UPDATE booking_monthly_contracts SET customer_id=NULL,request_json='{}',version=version+1 WHERE id='contract'")).toThrow('monthly_contract_conflict');
+    expect(() => f.raw.exec(anonymize)).toThrow('monthly_contract_conflict');
+    f.raw.exec("UPDATE tenants SET purge_started_at='2027-05-01T00:00:00Z' WHERE id='t'");
     expect(() => f.raw.exec(anonymize)).not.toThrow();
     expect(() => f.raw.exec("UPDATE booking_monthly_contracts SET amount=amount+1,version=version+1 WHERE id='contract'")).toThrow('monthly_contract_conflict');
     expect(() => f.raw.exec("UPDATE booking_monthly_contracts SET friend_id='f2',version=version+1 WHERE id='contract'")).toThrow('monthly_contract_conflict');
