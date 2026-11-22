@@ -356,6 +356,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/operations/security-alerts/{id}/resolve',
   'POST /api/ops/security-alerts/{id}/acknowledge',
   'POST /api/ops/security-alerts/{id}/resolve',
+  'POST /api/ops/security-alerts/{id}/retry-billing',
   'DELETE /api/dashboard/style/cards',
   'GET /api/dashboard/style',
   'GET /api/dashboard/style/analytics',

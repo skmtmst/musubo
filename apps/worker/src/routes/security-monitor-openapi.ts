@@ -53,6 +53,13 @@ const alertPaths = Object.fromEntries([false, true].flatMap(platform => {
 }));
 
 export const securityMonitorPaths = { ...alertPaths,
+  '/api/ops/security-alerts/{id}/retry-billing': { post: {
+    tags: ['Operations'], summary: '運営マスターが未確定の決済通知を再処理',
+    description: 'Stripeから通知を再取得し、通常のWebhookと同じ排他・照合を通す。閲覧のみと代理ログインは拒否。',
+    parameters: [id],
+    requestBody: { required: true, content: { 'application/json': { schema: {type:'object',required:['expectedVersion'],properties:{expectedVersion:{type:'integer',minimum:1}}} } } },
+    responses: {...errors,'200':{description:'再処理した'},'400':{description:'版の指定が不正'},'409':{description:'対象が更新済みまたは再処理不可'},'502':{description:'通知を確認できない'}},
+  } },
   '/api/ops/security-alerts/run-once': { post: {
     tags: ['Operations'], summary: '検証環境で運営マスターが安全監視だけを1回実行',
     description: 'DEPLOY_ENV=staging限定。閲覧のみ・代理ログイン禁止。既存の5分leaseを尊重し、配信定期処理は動かさない。入力なし。',
