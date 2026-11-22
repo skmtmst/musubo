@@ -61,8 +61,12 @@ export async function failMeetingRefresh(db:D1Database,input:{id:string;claim:st
  const r=await db.prepare(`UPDATE booking_meeting_connections SET refresh_state='unknown',refresh_claim=NULL,version=version+1,updated_at=?
  WHERE id=? AND version=? AND refresh_state='refreshing' AND refresh_claim=?`).bind(new Date().toISOString(),input.id,input.version,input.claim).run();return r.meta.changes===1;
 }
-export async function deleteMeetingCredential(db:D1Database,input:Scope):Promise<void>{
+export async function deleteMeetingCredential(db:D1Database,input:Scope & {microsoftManualReview?:boolean}):Promise<void>{
  await db.batch([
+  ...(input.microsoftManualReview?[db.prepare(`INSERT INTO notifications(id,event_type,title,body,channel,status,metadata,line_account_id,category)
+   SELECT ?,'booking_meeting_disconnect_review','Microsoft の接続解除を確認してください','Microsoft 側でアプリの接続を解除してください。Microsoft アカウントの「アプリとサービス」から対象アプリを削除します。他の接続にも影響する場合は、先に確認してください。','dashboard','sent',?,line_account_id,'error'
+   FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=?`)
+   .bind(crypto.randomUUID(),JSON.stringify({staffId:input.staffId,provider:input.provider}),input.accountId,input.staffId,input.provider)]:[]),
   db.prepare('DELETE FROM booking_meeting_oauth_states WHERE line_account_id=? AND staff_id=? AND provider=?').bind(input.accountId,input.staffId,input.provider),
   db.prepare('DELETE FROM booking_meeting_connections WHERE line_account_id=? AND staff_id=? AND provider=?').bind(input.accountId,input.staffId,input.provider),
  ]);
