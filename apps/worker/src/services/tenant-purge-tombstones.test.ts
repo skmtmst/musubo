@@ -1,8 +1,46 @@
 import { expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { activateLineAccount, createLineAccount, upsertFriend, getLineAccountById, getFriendById } from '@line-crm/db';
+import { activateLineAccount, createLineAccount, upsertFriend, getLineAccountById, getFriendById, getBroadcasts, getBroadcastById } from '@line-crm/db';
 import { gapFixture } from '../test-utils/gap1.js';
-import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization } from './tenant-purge-tombstones.js';
+import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast } from './tenant-purge-tombstones.js';
+
+test('retained broadcast is anonymized, stopped and does not affect another tenant', async () => {
+  const f = gapFixture();
+  f.raw.pragma('foreign_keys = ON');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01' WHERE id='t';
+    INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id,internal_memo,status)
+      VALUES ('broadcast','private title','text','private message','a','private memo','scheduled'),
+             ('other-broadcast','other title','text','other message','b',NULL,'draft');
+    INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id,target_type,account_ids)
+      VALUES ('mixed','shared title','text','shared message','a','multi-account-dedup','["a","b"]');
+    INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id,target_type,account_ids)
+      VALUES ('multi','private title','text','private message',NULL,'multi-account-dedup','["a"]');
+    INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id,target_type,account_ids)
+      VALUES ('foreign-anchor','foreign','text','foreign message','b','multi-account-dedup','["a"]');
+    INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id,status)
+      VALUES ('sent-broadcast','private','text','private','a','sent');
+    INSERT INTO broadcast_ab_tests(broadcast_id,test_ratio_pct,decide_after_minutes,status) VALUES ('sent-broadcast',10,60,'finished');
+    INSERT INTO broadcast_approval_events(id,broadcast_id,actor_staff_id,action) VALUES ('approval','broadcast','staff','requested');`);
+  const now = '2027-05-01T09:00:00.000+09:00';
+  expect(await tombstoneBroadcast(f.db, 't', 'broadcast', now)).toBe(false);
+  expect(await tombstoneLineAccount(f.db, 't', 'a', now)).toBe(true);
+  expect(await tombstoneBroadcast(f.db, 't', 'mixed', now)).toBe(false);
+  expect(await tombstoneBroadcast(f.db, 't', 'multi', now)).toBe(true);
+  expect(await tombstoneBroadcast(f.db, 't', 'foreign-anchor', now)).toBe(false);
+  expect(await tombstoneBroadcast(f.db, 't', 'sent-broadcast', now)).toBe(false);
+  f.raw.exec("DELETE FROM broadcast_ab_tests WHERE broadcast_id='sent-broadcast'");
+  expect(await tombstoneBroadcast(f.db, 't', 'sent-broadcast', now)).toBe(true);
+  expect(f.raw.prepare("SELECT status,lock_version,stopped_at FROM broadcasts WHERE id='sent-broadcast'").get()).toEqual({status:'sent',lock_version:2,stopped_at:null});
+  expect(f.raw.prepare("SELECT title,message_content FROM broadcasts WHERE id='mixed'").get()).toEqual({title:'shared title',message_content:'shared message'});
+  expect(await tombstoneBroadcast(f.db, 'other', 'broadcast', now)).toBe(false);
+  expect(await tombstoneBroadcast(f.db, 't', 'broadcast', now)).toBe(true);
+  expect(await tombstoneBroadcast(f.db, 't', 'broadcast', now)).toBe(false);
+  expect(f.raw.prepare("SELECT title,message_content,internal_memo,status FROM broadcasts WHERE id='broadcast'").get()).toEqual({title:'削除済み',message_content:'',internal_memo:null,status:'draft'});
+  expect(f.raw.prepare("SELECT broadcast_id FROM broadcast_approval_events WHERE id='approval'").get()).toEqual({broadcast_id:'broadcast'});
+  expect(await getBroadcastById(f.db, 'broadcast')).toBeNull();
+  expect((await getBroadcasts(f.db)).map(b => b.id)).not.toContain('broadcast');
+  expect(f.raw.prepare("SELECT title FROM broadcasts WHERE id='other-broadcast'").get()).toEqual({title:'other title'});
+});
 
 test('organization duplicate preflight reports conflicts without modifying data', () => {
   const f = gapFixture();

@@ -1,5 +1,30 @@
 import { retentionCutoff } from '@line-crm/db';
 
+/** 配信の承認履歴を残し、停止済みアカウントの配信内容を消す。 */
+export async function tombstoneBroadcast(db: D1Database, tenantId: string, broadcastId: string, now: string): Promise<boolean> {
+  const result = await db.prepare(`UPDATE broadcasts SET
+    title='削除済み', message_type='text', message_content='', target_type='all', target_tag_id=NULL,
+    status=CASE WHEN status='sent' THEN 'sent' ELSE 'draft' END, scheduled_at=NULL, alt_text=NULL, line_request_id=NULL, aggregation_unit=NULL,
+    segment_conditions=NULL, account_ids=NULL, dedup_priority=NULL, failed_account_ids=NULL, dedup_progress=NULL,
+    batch_lock_at=NULL, message_bubbles_json=NULL, folder_id=NULL, internal_memo=NULL, draft_step=NULL,
+    draft_payload_json=NULL, message_options_json=NULL, after_action_version_id=NULL, stopped_at=CASE WHEN status='sent' THEN stopped_at ELSE ? END, stopped_by=NULL,
+    common_var_snapshot=NULL, common_var_snapshot_at=NULL, approval_requested_by_staff_id=NULL,
+    approval_approver_staff_id=NULL, approval_note=NULL, approval_decided_by_staff_id=NULL, approval_reject_reason=NULL,
+    lock_version=lock_version+1, data_purged_at=?
+    WHERE id=? AND data_purged_at IS NULL AND EXISTS (
+      SELECT 1 FROM tenants t WHERE t.id=? AND t.data_purged_at IS NULL
+        AND (t.plan_status='canceled' OR (t.plan_status='trialing' AND t.trial_ends_at IS NOT NULL AND t.trial_ends_at < ?))
+        AND (t.purge_requested_at IS NOT NULL OR (t.retention_anchor_at IS NOT NULL AND t.retention_anchor_at < ?)))
+      AND (EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=broadcasts.line_account_id AND a.tenant_id=? AND a.data_purged_at IS NOT NULL)
+        OR (broadcasts.target_type='multi-account-dedup' AND json_array_length(broadcasts.account_ids)>0))
+      AND NOT EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=broadcasts.line_account_id AND (a.tenant_id IS NOT ? OR a.data_purged_at IS NULL))
+      AND NOT EXISTS (SELECT 1 FROM broadcast_ab_tests ab WHERE ab.broadcast_id=broadcasts.id)
+      AND NOT EXISTS (SELECT 1 FROM json_each(COALESCE(broadcasts.account_ids,'[]')) j
+        WHERE NOT EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=j.value AND a.tenant_id=? AND a.data_purged_at IS NOT NULL))`)
+    .bind(now, now, broadcastId, tenantId, now, retentionCutoff(now), tenantId, tenantId, tenantId).run();
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
 /** 組織参照の履歴を残し、店舗の処理が済んだ組織の識別情報を消す。 */
 export async function tombstoneRestaurantOrganization(db: D1Database, tenantId: string, organizationId: string, now: string): Promise<boolean> {
   const result = await db.prepare(`UPDATE rt_organizations SET

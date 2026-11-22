@@ -160,6 +160,7 @@ LEFT JOIN broadcast_insights bi ON b.id = bi.broadcast_id
     }
     sql += ` WHERE ${conditions.length > 0 ? conditions.join(' OR ') : '0 = 1'}`;
   }
+  sql = `SELECT * FROM (${sql}) b WHERE b.data_purged_at IS NULL`;
   if (opts?.from || opts?.until) {
     // 範囲のOR条件を括り、期間が別アカウントへ漏れないようにする。
     sql = `SELECT * FROM (${sql}) b WHERE 1 = 1`;
@@ -237,7 +238,7 @@ export async function getBroadcastById(
        bi.created_at as insight_created_at
 FROM broadcasts b
 LEFT JOIN broadcast_insights bi ON b.id = bi.broadcast_id
-WHERE b.id = ?`,
+WHERE b.id = ? AND b.data_purged_at IS NULL`,
     )
     .bind(id)
     .first<Broadcast>();
@@ -472,7 +473,7 @@ export async function updateBroadcast(
       fields.push('common_var_snapshot = NULL', 'common_var_snapshot_at = NULL');
     }
     fields.push('lock_version = lock_version + 1');
-    const statement = db.prepare(`UPDATE broadcasts SET ${fields.join(', ')} WHERE id = ? AND lock_version = ? AND status IN ('draft','scheduled')`)
+    const statement = db.prepare(`UPDATE broadcasts SET ${fields.join(', ')} WHERE id = ? AND lock_version = ? AND status IN ('draft','scheduled') AND data_purged_at IS NULL`)
       .bind(...values, id, expectedVersion);
     const result = updates.resetDeliveryAttempt
       ? (await db.batch([statement, db.prepare('DELETE FROM broadcast_insights WHERE broadcast_id = ? AND changes() > 0').bind(id)]))[0]
@@ -498,7 +499,7 @@ export async function deleteBroadcast(db: D1Database, id: string): Promise<boole
   // 送信中の行を消すと broadcast_send_claims の請求行まで
   // ON DELETE CASCADE で一緒に消え、届き続けるのに記録だけ失う。
   const result = await db
-    .prepare(`DELETE FROM broadcasts WHERE id = ? AND status IN ('draft', 'scheduled')`)
+    .prepare(`DELETE FROM broadcasts WHERE id = ? AND status IN ('draft', 'scheduled') AND data_purged_at IS NULL`)
     .bind(id)
     .run();
   // D1 includes cascaded execution/insight rows in this count. The primary-key

@@ -3,6 +3,7 @@ ALTER TABLE line_accounts ADD COLUMN data_purged_at TEXT;
 ALTER TABLE friends ADD COLUMN data_purged_at TEXT;
 ALTER TABLE rt_stores ADD COLUMN data_purged_at TEXT;
 ALTER TABLE rt_organizations ADD COLUMN data_purged_at TEXT;
+ALTER TABLE broadcasts ADD COLUMN data_purged_at TEXT;
 DROP INDEX idx_rt_organizations_tenant_unique;
 CREATE UNIQUE INDEX idx_rt_organizations_tenant_unique ON rt_organizations(tenant_id) WHERE data_purged_at IS NULL;
 DROP TRIGGER booking_monthly_contract_identity;
