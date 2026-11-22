@@ -25,6 +25,12 @@ export const TENANT_DATA_RETENTION_JOB = {
   },
 } as const satisfies FeatureJobMetadata;
 
+export const DELIVERY_ORPHAN_CLEANUP_JOB = {
+  name: 'delivery orphan cleanup',
+  classification: { kind: 'core', reason: '親のない注文明細の個人情報を片付ける' },
+  enforcement: { mode: 'exempt', reason: '所有者を特定できない旧データの削除は機能スイッチに依存しない' },
+} as const satisfies FeatureJobMetadata;
+
 export const GOOGLE_CONTENT_RETENTION_JOB = {
   name: 'google business content retention',
   classification: { kind: 'core', reason: 'Googleから受け取った内容の保存期限（暦日30日）' },

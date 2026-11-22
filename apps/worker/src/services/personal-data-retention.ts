@@ -1,6 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { getAccountSetting, recordAuditEvent } from '@line-crm/db';
 import { deleteCustomerData } from './customer-data-deletion.js';
+import { cleanupDeliveryOrphans } from './delivery-orphan-cleanup.js';
 import { parseRetentionPolicy, RETENTION_POLICY_KEY, retentionCutoff, type RetentionPolicy } from './retention-policy.js';
 
 export { parseRetentionPolicy, RETENTION_POLICY_KEY, RETENTION_PROPOSAL, retentionCutoff, type RetentionPolicy } from './retention-policy.js';
@@ -55,6 +56,7 @@ export async function processPersonalDataRetention(env: RetentionEnvironment, no
           await deleteCustomerData(env, {
             kind: 'friend_data', id: row.id, accountId: account.id, friendId: row.id, lineUserId: row.line_user_id,
           }, 'system:retention');
+          try { await cleanupDeliveryOrphans(env.DB); } catch { logger.error('delivery_orphan_cleanup.failed'); }
           deleted++;
         } catch { failed++; }
       }

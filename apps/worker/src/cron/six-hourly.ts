@@ -169,10 +169,21 @@ export async function runSixHourlyHeavyJobs(
         const result = await processTenantDataPurge(env, {
           now: new Date(event.scheduledTime).toISOString(),
         });
+        try {
+          const { cleanupDeliveryOrphans } = await import('../services/delivery-orphan-cleanup.js');
+          await cleanupDeliveryOrphans(env.DB);
+        } catch { logger.error('delivery_orphan_cleanup.failed'); }
         if (result.failedTenants) throw new Error('tenant_data_purge_retry_required');
         if (result.anchoredTrials + result.tenants + result.deletedRows > 0) {
           logger.log("tenant_data_retention_purge");
         }
+      },
+    },
+    {
+      name: 'delivery orphan cleanup',
+      run: async () => {
+        const { cleanupDeliveryOrphans } = await import('../services/delivery-orphan-cleanup.js');
+        await cleanupDeliveryOrphans(env.DB);
       },
     },
     {

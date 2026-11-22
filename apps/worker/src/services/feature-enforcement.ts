@@ -19,6 +19,7 @@ import { featureContractIsAvailable, resolveEntitlements, resolveTenantEntitleme
 import {
   PERSONAL_DATA_RETENTION_JOB,
   TENANT_DATA_RETENTION_JOB,
+  DELIVERY_ORPHAN_CLEANUP_JOB,
   GOOGLE_CONTENT_RETENTION_JOB,
   REGISTRATION_APPLICATION_RETENTION_JOB,
 } from './retention-job-manifest.js';
@@ -355,6 +356,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   TENANT_DATA_RETENTION_JOB,
+  DELIVERY_ORPHAN_CLEANUP_JOB,
   {
     name: 'restaurant raw mail retention',
     classification: { kind: 'feature', featureId: 'restaurant_test' },
