@@ -186,6 +186,8 @@ export async function detachSharedBroadcast(db:D1Database, tenantId:string, broa
       WHERE NOT EXISTS(SELECT 1 FROM line_accounts a WHERE a.id=j.value AND a.tenant_id=?)) END`;
   const update=db.prepare(`UPDATE broadcasts SET account_ids=${filtered('account_ids')},
     dedup_priority=${filtered('dedup_priority')},failed_account_ids=${filtered('failed_account_ids')},
+    data_purged_at=CASE WHEN line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=?) THEN strftime('%Y-%m-%dT%H:%M:%fZ','now') ELSE data_purged_at END,
+    stopped_at=CASE WHEN line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=?) THEN COALESCE(stopped_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')) ELSE stopped_at END,
     line_account_id=CASE WHEN line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=?) THEN NULL ELSE line_account_id END,
     lock_version=lock_version+1
     WHERE id=? AND data_purged_at IS NULL AND target_type='multi-account-dedup' AND json_type(account_ids)='array'
@@ -194,7 +196,7 @@ export async function detachSharedBroadcast(db:D1Database, tenantId:string, broa
       AND EXISTS(SELECT 1 FROM tenants t WHERE t.id=? AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL)
       AND (line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=?) OR EXISTS(SELECT 1 FROM json_each(account_ids) j JOIN line_accounts a ON a.id=j.value WHERE a.tenant_id=?))
       AND NOT EXISTS(SELECT 1 FROM tenant_purge_tombstone_progress p WHERE p.tenant_id=? AND p.table_name='broadcasts' AND p.row_id=broadcasts.id)`)
-    .bind(tenantId,tenantId,tenantId,tenantId,broadcastId,tenantId,tenantId,tenantId,tenantId,tenantId);
+    .bind(tenantId,tenantId,tenantId,tenantId,tenantId,tenantId,broadcastId,tenantId,tenantId,tenantId,tenantId,tenantId);
   const mark=db.prepare(`INSERT INTO tenant_purge_tombstone_progress(tenant_id,table_name,row_id)
     SELECT ?,'broadcasts',? WHERE changes()=1`).bind(tenantId,broadcastId);
   const removeOwnRecipients=['broadcast_ab_live_recipients','broadcast_ab_recipients','broadcast_after_action_runs'].map(table =>

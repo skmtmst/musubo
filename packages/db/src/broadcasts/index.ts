@@ -657,7 +657,7 @@ export async function getQueuedBroadcasts(db: D1Database): Promise<Broadcast[]> 
       // stopped_at IS NOT NULL は停止を受け付けた配信。**新しい送信権を取らせない**
       // ので、ここで拾わない。止めたあと再開すると stopped_at が NULL に
       // 戻り、次の tick から続きを送る。
-      `SELECT * FROM broadcasts WHERE status = 'sending' AND batch_offset >= 0 AND sent_at IS NULL AND stopped_at IS NULL AND (segment_conditions IS NOT NULL OR account_ids IS NOT NULL) ORDER BY created_at ASC`,
+      `SELECT * FROM broadcasts WHERE status = 'sending' AND data_purged_at IS NULL AND batch_offset >= 0 AND sent_at IS NULL AND stopped_at IS NULL AND (segment_conditions IS NOT NULL OR account_ids IS NOT NULL) ORDER BY created_at ASC`,
     )
     .all<Broadcast>();
   return result.results;

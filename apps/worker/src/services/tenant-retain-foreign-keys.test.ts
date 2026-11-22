@@ -109,6 +109,7 @@ test('shared broadcast retains other tenant targets while the purged tenant is d
     INSERT INTO broadcasts(id,title,message_type,message_content,line_account_id,target_type,account_ids,dedup_priority,failed_account_ids)
       VALUES('shared','shared title','text','shared message','a','multi-account-dedup','["a","b"]','["a","b"]','["a","b"]'),
             ('foreign','foreign title','text','foreign message','b','multi-account-dedup','["a","b"]',NULL,NULL);
+    UPDATE broadcasts SET status='sending',batch_offset=0 WHERE id='shared';
     INSERT INTO friends(id,line_user_id,line_account_id) VALUES('other-friend','U-other','b');
     INSERT INTO broadcast_ab_recipients(broadcast_id,friend_id,variant_key,state,test_mode) VALUES('shared','f','A','pending',1),('shared','other-friend','A','pending',1);
     INSERT INTO broadcast_approval_events(id,broadcast_id,actor_staff_id,action) VALUES('shared-approval','shared','o','requested');`);
@@ -116,6 +117,10 @@ test('shared broadcast retains other tenant targets while the purged tenant is d
   expect(outcome.completed).toBe(1);
   expect(f.raw.prepare("SELECT title,line_account_id,account_ids,dedup_priority,failed_account_ids FROM broadcasts WHERE id='shared'").get())
     .toEqual({title:'shared title',line_account_id:null,account_ids:'["b"]',dedup_priority:'["b"]',failed_account_ids:'["b"]'});
+  const {getBroadcasts,getBroadcastById,getQueuedBroadcasts}=await import('@line-crm/db');
+  expect((await getBroadcasts(f.db,'b')).map(row=>row.id)).not.toContain('shared');
+  expect(await getBroadcastById(f.db,'shared')).toBeNull();
+  expect((await getQueuedBroadcasts(f.db)).map(row=>row.id)).not.toContain('shared');
   expect(f.raw.prepare("SELECT title,line_account_id,account_ids FROM broadcasts WHERE id='foreign'").get())
     .toEqual({title:'foreign title',line_account_id:'b',account_ids:'["b"]'});
   expect(f.raw.prepare("SELECT row_id FROM tenant_purge_tombstone_progress WHERE tenant_id='t' AND table_name='broadcasts' AND row_id='shared'").get()).toEqual({row_id:'shared'});
