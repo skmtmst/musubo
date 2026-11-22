@@ -22,7 +22,7 @@ export interface SqliteD1 {
 }
 
 /**
- * 互換索引を外した後（773 適用後）の形にする。
+ * 互換索引の無い形（773 適用後）にする。
  *
  * 772 は旧Workerの `ON CONFLICT(store_id)` / `ON CONFLICT(line_account_id)` が
  * 当たる先を残すため、同じ形の互換UNIQUE索引を5本作る。`bootstrap.sql` は

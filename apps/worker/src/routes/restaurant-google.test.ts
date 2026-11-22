@@ -694,7 +694,7 @@ describe('Googleビジネス：設定（接続）', () => {
 describe('Googleビジネス：接続一覧（受入条件2）', () => {
   /** いまの接続をそのまま写して2件目を作る。並び順は後ろにする。 */
   async function seedSecondConnection(): Promise<void> {
-    // 2件目が入るのは互換索引を外した後（773 適用後）。bootstrap はまだ互換期間の形。
+    // 2件目が入るのは互換索引の無い形（773 適用後）。bootstrap はまだ互換期間の形。
     dropCompatIndexes772(testDb.raw);
     testDb.raw
       .prepare(
@@ -1149,7 +1149,7 @@ describe('Googleビジネス：接続が2件あるとき（複数接続）', () 
 
   /** 同じ店舗の2件目の接続。location が違うので一意索引（store_id, location_name）に当たらない。 */
   async function seedSecondConnection(): Promise<void> {
-    // 2件目が入るのは互換索引を外した後（773 適用後）。bootstrap はまだ互換期間の形。
+    // 2件目が入るのは互換索引の無い形（773 適用後）。bootstrap はまだ互換期間の形。
     dropCompatIndexes772(testDb.raw);
     testDb.raw
       .prepare(

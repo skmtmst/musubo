@@ -1099,7 +1099,7 @@ it('写真DMと受信時刻の順、別アカウントのカーソルを守る',
  * 並び順を後ろにして「既定の1件」にはならないようにする。
  */
 function addSecondConnection() {
-  // 2件目が入るのは互換索引を外した後（773 適用後）。bootstrap はまだ互換期間の形。
+  // 2件目が入るのは互換索引の無い形（773 適用後）。bootstrap はまだ互換期間の形。
   dropCompatIndexes772(db.raw);
   db.raw
     .prepare(
