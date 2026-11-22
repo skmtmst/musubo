@@ -8,6 +8,12 @@ export const bookingPaymentsPaths = {
       '400':{description:'不正な本文'},'401':{description:'署名不正'},'409':{description:'live・モード未指定・同一IDの内容違い'},
       '413':{description:'本文上限超過'},'503':{description:'専用鍵または保存先を利用できない'}}
   }},
+  '/api/booking/admin/stripe-review': {get: {
+    tags:['Booking'], summary:'試験決済の要確認通知を一覧',
+    description:'owner・admin が所属する店舗の記録を読む。決済識別子・金額・通貨・発生時刻・理由だけを返す。識別子は通知対象の invoice / payment_intent 等の ID。発生時刻は Unix 秒。',
+    parameters:[{name:'account_id',in:'query',required:true,schema:{type:'string'}},{name:'cursor',in:'query',required:false,schema:{type:'string',pattern:'^[0-9]+:[1-9][0-9]*$'}}],
+    responses:{'200':{description:'最大100件と次の位置'},'400':{description:'入力不正'},'403':{description:'権限なし'},'404':{description:'対象が見つからない'}}
+  }},
   // ── Booking payments（決済の差し替え制） ──────────────────────────
   '/api/booking/admin/payment-config': {
     get: {

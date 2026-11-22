@@ -1,3 +1,4 @@
+import { listStripeReviews } from '../features/booking/booking-stripe-review.js';
 import { logger } from '@line-crm/shared/server';
 import { Hono, type MiddlewareHandler } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -35,6 +36,16 @@ const guard = (write = false): MiddlewareHandler<Env> => async (c, next) => {
 };
 
 registerStripeConnectRoutes(bookingPaymentAdmin, guard);
+
+bookingPaymentAdmin.get('/api/booking/admin/stripe-review', guard(), async c => {
+  if (!['owner','admin'].includes(c.get('staff')?.role ?? '')) return c.json({success:false,error:'forbidden'},403);
+  const raw=c.req.query('cursor');
+  if (raw && !/^(0|[1-9][0-9]{0,15}):([1-9][0-9]{0,15})$/.test(raw)) return inputError(c,{success:false,error:'invalid_cursor'},400,['cursor']);
+  const parts=raw?.split(':').map(Number);
+  if (parts && !parts.every(Number.isSafeInteger)) return inputError(c,{success:false,error:'invalid_cursor'},400,['cursor']);
+  const cursor=parts?{createdAt:parts[0]!,rowid:parts[1]!}:null;
+  return c.json({success:true,data:await listStripeReviews(c.env.DB,c.req.query('account_id')!.trim(),cursor)});
+});
 
 bookingPaymentAdmin.get('/api/booking/admin/payment-connection',guard(),async c => {
   const row=await c.env.DB.prepare(`SELECT provider_account_id,test_mode,connected_at,disconnected_at
