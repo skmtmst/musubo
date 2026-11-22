@@ -35,11 +35,11 @@ test('policy validation rejects missing parent and missing column decisions', as
 });
 
 
-test('actual policies cannot be applied until exceptional columns are resolved', async () => {
+test('actual policies cover all discovered parent candidates', async () => {
   const { default: candidates } = await import('./tenant-retain-column-candidates.json');
   const { default: policies } = await import('./tenant-retain-column-policies.json');
   const { validateTombstonePolicies } = await import('./tenant-retain-graph.js');
   const parents=await discoverRetainedPurgeAncestors(gapFixture().db);
   expect(Object.keys(policies).sort()).toEqual(parents);
-  expect(()=>validateTombstonePolicies(parents,candidates,policies as Parameters<typeof validateTombstonePolicies>[2])).toThrow('tombstone_column_policy_missing:');
+  expect(()=>validateTombstonePolicies(parents,candidates,policies as Parameters<typeof validateTombstonePolicies>[2])).not.toThrow();
 });

@@ -94,8 +94,8 @@
         "reason": "必須の識別子を行IDから作る一意値に置換"
       },
       "request_json": {
-        "action": "review",
-        "reason": "必須文字列の形式制約・JSON 内容を確認する"
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
       }
     }
   },
@@ -110,8 +110,8 @@
         "reason": "NULL 可能な候補を消去"
       },
       "rule_snapshot_json": {
-        "action": "review",
-        "reason": "必須文字列の形式制約・JSON 内容を確認する"
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
       },
       "use_idempotency_key": {
         "action": "null",
@@ -142,16 +142,16 @@
         "reason": "参照と主キーを維持"
       },
       "rule_json": {
-        "action": "review",
-        "reason": "必須文字列の形式制約・JSON 内容を確認する"
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
       },
       "idempotency_key": {
         "action": "unique",
         "reason": "必須の識別子を行IDから作る一意値に置換"
       },
       "request_json": {
-        "action": "review",
-        "reason": "必須文字列の形式制約・JSON 内容を確認する"
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
       }
     }
   },
@@ -202,8 +202,8 @@
         "reason": "必須文字列を定型値に置換"
       },
       "message_content": {
-        "action": "review",
-        "reason": "必須文字列の形式制約・JSON 内容を確認する"
+        "action": "placeholder",
+        "reason": "必須のメッセージ本文を定型値に置換"
       },
       "message_bubbles_json": {
         "action": "null",
@@ -285,8 +285,8 @@
         "reason": "NULL 可能な候補を消去"
       },
       "source_config_json": {
-        "action": "review",
-        "reason": "必須文字列の形式制約・JSON 内容を確認する"
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
       },
       "ingest_secret_encrypted": {
         "action": "null",
@@ -333,8 +333,8 @@
   "event_versions": {
     "columns": {
       "snapshot_json": {
-        "action": "review",
-        "reason": "必須文字列の形式制約・JSON 内容を確認する"
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
       }
     }
   },
@@ -361,8 +361,8 @@
         "reason": "NULL 可能な候補を消去"
       },
       "description_centered": {
-        "action": "review",
-        "reason": "必須の非文字列で、消去後の安全な値と制約を確認する"
+        "action": "zero",
+        "reason": "必須のフラグを無効化"
       },
       "confirmation_message_extra": {
         "action": "null",
@@ -397,8 +397,8 @@
         "reason": "NULL 可能な候補を消去"
       },
       "makeup_rule_json": {
-        "action": "review",
-        "reason": "必須文字列の形式制約・JSON 内容を確認する"
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
       }
     }
   },
@@ -441,8 +441,8 @@
         "reason": "NULL 可能な候補を消去"
       },
       "save_to_metadata": {
-        "action": "review",
-        "reason": "必須の非文字列で、消去後の安全な値と制約を確認する"
+        "action": "zero",
+        "reason": "必須のフラグを無効化"
       },
       "og_description": {
         "action": "null",
@@ -465,8 +465,8 @@
         "reason": "NULL 可能な候補を消去"
       },
       "save_to_metadata": {
-        "action": "review",
-        "reason": "必須の非文字列で、消去後の安全な値と制約を確認する"
+        "action": "zero",
+        "reason": "必須のフラグを無効化"
       },
       "on_submit_message_type": {
         "action": "null",
@@ -501,12 +501,12 @@
   "friend_bulk_runs": {
     "columns": {
       "selection_json": {
-        "action": "review",
-        "reason": "必須文字列の形式制約・JSON 内容を確認する"
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
       },
       "operation_json": {
-        "action": "review",
-        "reason": "必須文字列の形式制約・JSON 内容を確認する"
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
       },
       "execution_plan_json": {
         "action": "null",
@@ -561,8 +561,8 @@
         "reason": "NULL 可能な候補を消去"
       },
       "photo_watch_required": {
-        "action": "review",
-        "reason": "必須の非文字列で、消去後の安全な値と制約を確認する"
+        "action": "zero",
+        "reason": "必須のフラグを無効化"
       }
     }
   },
@@ -709,16 +709,16 @@
         "reason": "NULL 可能な候補を消去"
       },
       "audience_tag_ids_json": {
-        "action": "review",
-        "reason": "必須文字列の形式制約・JSON 内容を確認する"
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
       },
       "recurring_freqs_json": {
-        "action": "review",
-        "reason": "必須文字列の形式制約・JSON 内容を確認する"
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
       },
       "addon_menu_ids_json": {
-        "action": "review",
-        "reason": "必須文字列の形式制約・JSON 内容を確認する"
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
       },
       "image_url": {
         "action": "null",
@@ -801,8 +801,8 @@
         "reason": "必須文字列を定型値に置換"
       },
       "public_pet_name": {
-        "action": "review",
-        "reason": "必須の非文字列で、消去後の安全な値と制約を確認する"
+        "action": "zero",
+        "reason": "必須のフラグを無効化"
       },
       "review_reason_code": {
         "action": "null",
