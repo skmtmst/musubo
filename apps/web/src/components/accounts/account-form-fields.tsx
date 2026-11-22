@@ -12,7 +12,6 @@ import { TextField as SharedTextField } from '@/components/shared/text-field'
 export interface AccountFormState {
   name: string
   channelId: string
-  channelAccessToken: string
   channelSecret: string
   loginChannelId: string
   loginChannelSecret: string
@@ -26,7 +25,6 @@ export interface AccountFormState {
 export const emptyAccountFormState: AccountFormState = {
   name: '',
   channelId: '',
-  channelAccessToken: '',
   channelSecret: '',
   loginChannelId: '',
   loginChannelSecret: '',
@@ -158,18 +156,6 @@ export function AccountFormSections({
           </div>
         )}
         <TextField
-          label="Channel Access Token"
-          value={state.channelAccessToken}
-          onChange={(v) => update({ channelAccessToken: v })}
-          required={showMessagingRequired}
-          type="password"
-          hint={
-            showMessagingRequired
-              ? undefined
-              : '設定済み（再発行して変更する場合のみ入力）'
-          }
-        />
-        <TextField
           label="Channel Secret"
           value={state.channelSecret}
           onChange={(v) => update({ channelSecret: v })}
@@ -177,6 +163,7 @@ export function AccountFormSections({
           type="password"
           hint={showMessagingRequired ? undefined : '設定済み（変更する場合のみ入力）'}
         />
+        <p className="text-xs text-ink-secondary">チャネルアクセストークンはmusuboが自動更新します。</p>
       </FormSection>
 
       <FormSection

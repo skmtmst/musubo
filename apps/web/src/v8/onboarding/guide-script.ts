@@ -16,6 +16,8 @@ export type GuideProcedureTrigger =
   | 'click'
   /** 必須入力がそろった時（入力有効）。押さずに次の手順へ移る。 */
   | 'valid'
+  /** 有効な入力を確認してガイドの「次へ」を押す。 */
+  | 'confirm-input'
   /** 保存や接続の成功イベント */
   | 'event'
 
@@ -104,10 +106,10 @@ const SCRIPT: readonly GuideStepScript[] = [
       {
         index: 2,
         title: '基本を入力',
-        body: 'コースの名前・1名の値段・所要時間を確認してください。3つが揃うとガイドは次の手順へ進みます。写真はあとからも追加できます。',
+        body: '名前・1名の値段・所要時間を入力し、「次へ」を押します。提供時間帯と写真は任意です。',
         anchor: 'menu.form',
         href: '/restaurant-test/menu/edit',
-        trigger: 'valid',
+        trigger: 'confirm-input',
       },
       {
         index: 3,
