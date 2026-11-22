@@ -156,6 +156,7 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['POST', '/api/auth/api-key'],
   ['DELETE', '/api/auth/api-key'],
   ['GET', '/api/auth/session'],
+  ['GET', '/api/me/presence'],
   ['PUT', '/api/me/presence'],
   // 外部入力で対象を選ばせず、認証済みの本人だけから解決する。
   ['GET', '/api/auth/two-factor/self'],

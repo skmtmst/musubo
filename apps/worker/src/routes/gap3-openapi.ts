@@ -4,6 +4,9 @@ const entries:readonly (readonly [string,string,string,string])[]=[
  ["GET", "/api/ai-answer-logs", "自動応答の記録", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみは読み取り可。query:action,offset。data:{items,total,summary}、詳細はqa/afterNoteを含む。会話の閲覧権限。"],
  ["GET", "/api/ai-answer-logs/{id}", "自動応答の記録", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみは読み取り可。query:action,offset。data:{items,total,summary}、詳細はqa/afterNoteを含む。会話の閲覧権限。"],
  ["GET", "/api/ai-features", "店別のAI利用設定", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみは読み取り可。GET:{items,disclosure,disclosureVersion}、未設定はoff。PUT:{enabled,expectedVersion,consent:true,disclosureVersion}。owner/admin、代理不可、ai.settingsの本人再確認と同意記録。"],
+ ["GET", "/api/inbox/routing/apply-unassigned/{id}", "一括担当割当の進捗", "指定された店の処理件数と進捗。"],
+ ["GET", "/api/me/presence", "本人の不在状態", "本人の不在状態を返す。未設定は不在でない。"],
+ ["GET", "/api/analytics/inbox-response", "担当別の返事の速さ", "account_id・from・toで範囲を指定。管理者は全担当、スタッフと閲覧のみは本人のみ。中央値・期限内割合・件数と週別推移。"],
  ["GET", "/api/analytics/customer-segments", "来店・購入による分類", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみは読み取り可。query:basis=visit/purchase/both,measure=count/amount。25マス、未取得はnull。friendsは{items,total,optedOutCount,nextCursor}。名前の変更は管理者。saved-searchは編集権限。"],
  ["GET", "/api/analytics/customer-segments/cells/{r}/{f}/friends", "来店・購入による分類", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみは読み取り可。query:basis=visit/purchase/both,measure=count/amount。25マス、未取得はnull。friendsは{items,total,optedOutCount,nextCursor}。名前の変更は管理者。saved-searchは編集権限。"],
  ["GET", "/api/booking/admin/bookings/{id}/group", "組の予約", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみは読み取り可。members:[{menuId,staffId?,label?,addonIds?}]、startMode=parallel/sequential。作成はキー必須、取消はreason/expectedVersion。全件を同じbatchで保存。"],
@@ -59,7 +62,7 @@ const entries:readonly (readonly [string,string,string,string])[]=[
  ["POST", "/api/ec/auto-line/simulate", "自動案内の模擬", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみ・代理の変更は原則不可。各機能契約の停止方向の例外だけを許可。rulesはkind=cart/view/restock、変更はexpectedVersion/testMode:true。初期停止。実送信0。sendsは{items,total}、statsは模擬と実績を分離。購入・停止・在庫を直前確認。"],
  ["POST", "/api/ec/events", "EC行動の受信", "x-line-account-id・x-nen-timestamp・x-nen-signatureのHMAC署名。本文eventId/type/productId/customerId?/occurredAt/trackingConsent?。重複は冪等、変更409。外部への書込なし。"],
  ["POST", "/api/hq/store-comparison/export", "店の比較", "統括owner/adminの見える店のみ。代理のCSV不可。query:from,to,compare=previous/average,poolId?,sort,order,page,pageSize。data:{rows,average,total,computedAt}。行と詳細に coveredDays（集計がそろった日の数）と periodDays（期間の日数）。数はそろった日の分だけで出し、0日はnull。件数の平均と差は全部の日がそろった店だけ。CSVは全行、生成後も店の権限を再確認。"],
- ["POST", "/api/inbox/routing/apply-unassigned", "未割当への割当ルール適用", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみ・代理の変更は原則不可。各機能契約の停止方向の例外だけを許可。管理者、代理不可。均等/優先/ランダムとpriorityを既存の未割当へ適用。"],
+ ["POST", "/api/inbox/routing/apply-unassigned", "未割当への割当ルール適用", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみ・代理の変更は原則不可。各機能契約の停止方向の例外だけを許可。管理者。Idempotency-Key 必須。裏ジョブとして受け付け、進捗と結果を返す。"],
  ["POST", "/api/liff/booking/pass-plans/{id}/checkout", "回数券・月謝の種類", "LIFFの認証tokenとliffId必須。本人のみ、指定された他人のfriendIdを採用しない。一覧:{items,total,summary}。作成はIdempotency-Keyとkind/name/price/count/monthlyLimit/validDays/menuIds/allowWithoutPass。monthlyLimit=nullは月の上限なし。eventIdsはnull=クラス利用未設定、[]=同店の全クラス、配列=指定クラス。変更・開始・停止はexpectedVersion。checkoutはtestMode:true、実Checkout URLはnull。"],
  ["POST", "/api/liff/booking/series/preview", "繰り返し予約", "LIFFの認証tokenとliffId必須。本人のみ、指定された他人のfriendIdを採用しない。管理impact:{scope:this/following,fromBookingId,expectedVersion?,change?}。LIFF preview:{menuId,startsAt,staffId?,rule}、最大12回、メニューの公開範囲を再確認。data:{occurrences}。"],
  ["POST", "/api/mcp-connections", "AI接続の管理", "owner/admin。接続鍵の平文は作成・更新時のみ。書込は本人再確認が必要。作成:{name,level:read/draft/send_request,expiryDays}。変更はexpectedVersion、mcp.connectionの本人再確認。logs:{items,total,connection}。"],
@@ -77,7 +80,7 @@ const entries:readonly (readonly [string,string,string,string])[]=[
  ["PUT", "/api/booking/admin/pass-plans/{id}", "回数券・月謝の種類", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみ・代理の変更は原則不可。各機能契約の停止方向の例外だけを許可。一覧:{items,total,summary}。作成はIdempotency-Keyとkind/name/price/count/monthlyLimit/validDays/menuIds/allowWithoutPass。monthlyLimit=nullは月の上限なし。eventIdsはnull=クラス利用未設定、[]=同店の全クラス、配列=指定クラス。変更・開始・停止はexpectedVersion。checkoutはtestMode:true、実Checkout URLはnull。"],
  ["PUT", "/api/broadcasts/{id}/simulation-draft", "目的別配信の模擬", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみ・代理の変更は原則不可。各機能契約の停止方向の例外だけを許可。purpose=transaction/notice/marketing、testMode:true。下書き作成にIdempotency-Key、編集にexpectedVersion。既存受信者台帳・予約送信へ接続するが実送信しない。"],
  ["PUT", "/api/ec/auto-line/rules/{kind}", "自動案内の模擬", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみ・代理の変更は原則不可。各機能契約の停止方向の例外だけを許可。rulesはkind=cart/view/restock、変更はexpectedVersion/testMode:true。初期停止。実送信0。sendsは{items,total}、statsは模擬と実績を分離。購入・停止・在庫を直前確認。"],
- ["PUT", "/api/me/presence", "本人の在席を保存", "body:{status:available/away/offline}。本人の在席だけを更新。"],
+ ["PUT", "/api/me/presence", "本人の在席を保存", "body:{away:boolean} または {heartbeat:true}。heartbeatは不在設定を維持して操作時刻のみ更新。"],
  ["PUT", "/api/member-ranks/program", "会員ランク", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみ・代理の変更は原則不可。各機能契約の停止方向の例外だけを許可。program/tiersの保存はexpectedVersion。段は2〜5段。dataは設定/判定/現在と履歴/模擬通知。初回と条件変更の通知は0、実送信なし。"],
  ["PUT", "/api/member-ranks/tiers", "会員ランク", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみ・代理の変更は原則不可。各機能契約の停止方向の例外だけを許可。program/tiersの保存はexpectedVersion。段は2〜5段。dataは設定/判定/現在と履歴/模擬通知。初回と条件変更の通知は0、実送信なし。"]
 ];

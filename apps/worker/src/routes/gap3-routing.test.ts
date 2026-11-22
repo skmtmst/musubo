@@ -39,3 +39,35 @@ test('自動割当の設定後にトークの権限を失った担当者は選�
  expect(await assignInbox(d.db,'a','f',new Date('2026-10-16T04:01:00Z'))).toBe(false);
  expect(d.raw.prepare("SELECT assignee_staff_id FROM chats WHERE id='c'").get()).toEqual({assignee_staff_id:null});
 });
+
+test('割当できない同じ未対応期間は店内の知らせを一度だけ作り、他店へ出さない',async()=>{
+ expect((await gapCall(app(),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);
+ d.raw.exec("UPDATE staff_presence SET away=1");
+ const external=vi.spyOn(globalThis,'fetch');
+ expect(await assignInbox(d.db,'a','f',new Date('2026-10-16T04:01:00Z'))).toBe(false);
+ expect(await assignInbox(d.db,'a','f',new Date('2026-10-16T04:02:00Z'))).toBe(false);
+ expect(d.raw.prepare("SELECT line_account_id,channel,event_type FROM notifications WHERE event_type='inbox_assignment_unavailable'").all()).toEqual([{line_account_id:'a',channel:'dashboard',event_type:'inbox_assignment_unavailable'}]);
+ expect(d.raw.prepare("SELECT assignee_staff_id FROM chats WHERE id='c'").get()).toEqual({assignee_staff_id:null});
+ expect(external).not.toHaveBeenCalled();
+});
+test('割当を使わない店や既に担当のある会話は割当不能の知らせを出さない',async()=>{
+ expect(await assignInbox(d.db,'a','f',new Date('2026-10-16T04:01:00Z'))).toBe(false);
+ expect((await gapCall(app(),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);
+ d.raw.exec("UPDATE chats SET assignee_staff_id='s' WHERE id='c'");
+ expect(await assignInbox(d.db,'a','f',new Date('2026-10-16T04:01:00Z'))).toBe(false);
+ expect(d.raw.prepare("SELECT count(*) n FROM notifications WHERE event_type='inbox_assignment_unavailable'").get()).toEqual({n:0});
+});
+test('操作時刻の更新は不在を解除せず、他人の不在も変更しない',async()=>{
+ d.raw.exec("UPDATE staff_presence SET away=1 WHERE staff_id='s'");
+ const asStaff=gapApp(d,[inboxSla],{...gapOwner,id:'s',role:'staff'});
+ expect((await gapCall(asStaff,'/api/me/presence','PUT',{heartbeat:true})).status).toBe(200);
+ expect(d.raw.prepare("SELECT away FROM staff_presence WHERE staff_id='s'").get()).toEqual({away:1});
+ expect((await (await gapCall(asStaff,'/api/me/presence')).json()) as unknown).toMatchObject({data:{away:true}});
+ expect((await gapCall(asStaff,'/api/me/presence','PUT',{away:false})).status).toBe(200);
+ expect(d.raw.prepare("SELECT away FROM staff_presence WHERE staff_id='s'").get()).toEqual({away:0});
+});
+test('担当を無効化すると未完了の会話を未割当に戻し、他の担当は変えない',async()=>{
+ d.raw.exec("UPDATE chats SET assignee_staff_id='s',assigned_by='auto' WHERE id='c'; INSERT INTO chats(id,friend_id,assignee_staff_id,status,created_at,updated_at) VALUES('c2','f2','o','unread','now','now'); UPDATE staff_members SET is_active=0 WHERE id='s'");
+ expect(d.raw.prepare("SELECT assignee_staff_id,assigned_by FROM chats WHERE id='c'").get()).toEqual({assignee_staff_id:null,assigned_by:null});
+ expect(d.raw.prepare("SELECT assignee_staff_id FROM chats WHERE id='c2'").get()).toEqual({assignee_staff_id:'o'});
+});
