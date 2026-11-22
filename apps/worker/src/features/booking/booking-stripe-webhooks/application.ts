@@ -9,6 +9,7 @@ export async function applyBookingStripeReceipt(db: D1Database, account: string,
 ): Promise<'applied' | 'duplicate' | 'pending' | 'processing' | 'review_required'> {
   const receipt = await getBookingStripeReceipt(db,account,eventId);
   if (!receipt) throw new BookingStripeError('stripe_receipt_not_found',400);
+  if (receipt.row.status === 'canceled' || receipt.row.customer_redaction_requested_at != null) return 'review_required';
   if (receipt.row.status === 'succeeded') return 'duplicate';
   if (receipt.row.status === 'exhausted') return 'review_required';
   const {event} = receipt.input, ref = receiptRef(account,eventId);
@@ -21,6 +22,7 @@ export async function applyBookingStripeReceipt(db: D1Database, account: string,
   if (!BOOKING_STRIPE_EVENT_KINDS[event.object.kind]?.includes(event.type)) return review('stripe_event_type_unsupported');
   const bound = await getWorkflowStep(db,{scopeId: bindingScope(account),processKind: BINDING_PROCESS,subjectId: event.object.id,stepKey: 'binding'});
   if (!bound) return 'pending';
+  if (bound.status === 'canceled' || bound.customer_redaction_requested_at != null) return review('customer_deleted');
   const binding = JSON.parse(bound.input_json!) as BookingStripeBinding;
   if (binding.connectAccount !== event.account || binding.objectId !== event.object.id || binding.objectKind !== event.object.kind
     || (event.object.kind === 'checkout.session' && event.object.checkoutMode !== (binding.purpose === 'payment_method' ? 'setup' : 'payment'))

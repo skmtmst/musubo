@@ -14011,6 +14011,21 @@ WHEN EXISTS (
 )
 BEGIN SELECT RAISE(ABORT, 'workflow_customer_redaction_pending'); END;
 
+CREATE TRIGGER workflow_steps_no_deleted_stripe_receipt
+BEFORE INSERT ON workflow_steps
+WHEN NEW.process_kind='booking_stripe_webhook' AND EXISTS (
+  SELECT 1 FROM workflow_steps binding WHERE binding.scope_id=NEW.scope_id
+    AND binding.process_kind='booking_stripe_object' AND binding.step_key='binding'
+    AND binding.subject_id=json_extract(CASE WHEN json_valid(NEW.input_json) THEN NEW.input_json ELSE '{}' END,'$.event.object.id')
+    AND (binding.customer_redaction_requested_at IS NOT NULL OR EXISTS (
+      SELECT 1 FROM operation_audit audit WHERE audit.target_kind='customer_deletion' AND audit.action<>'deleted'
+        AND audit.id='customer-delete:friend_data:' || audit.friend_id
+        AND audit.friend_id=json_extract(CASE WHEN json_valid(binding.input_json) THEN binding.input_json ELSE '{}' END,'$.friendId')
+        AND json_extract(audit.detail_json,'$.accountId')=json_extract(CASE WHEN json_valid(binding.input_json) THEN binding.input_json ELSE '{}' END,'$.accountId')
+    ))
+)
+BEGIN SELECT RAISE(ABORT, 'workflow_customer_redaction_pending'); END;
+
 CREATE TRIGGER workflow_steps_no_redacted_child
 BEFORE INSERT ON workflow_steps
 WHEN NEW.step_key <> '__run' AND EXISTS (

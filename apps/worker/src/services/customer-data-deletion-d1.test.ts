@@ -132,6 +132,42 @@ describe('local workerd D1 binding', () => {
     const multi=await native.prepare('SELECT status FROM workflow_steps WHERE subject_id=?').bind(`${friendId}-multi`).all<{status:string}>();
     expect(multi.results.map(row=>row.status)).toEqual(['pending','pending','pending']);
   },30_000);
+  it('アカウントと友だちが一致する決済関連とその受信だけを匿名化する',async()=>{
+    const now=Date.now();
+    const insert=(kind:string,subject:string,key:string,input:unknown)=>native.prepare(`INSERT INTO workflow_steps
+      (scope_id,process_kind,subject_id,step_key,status,retry_key,input_json,created_at,updated_at)
+      VALUES ('stripe-test:acct',?,?,?,'pending',?,?,?,?)`).bind(kind,subject,key,subject,JSON.stringify(input),now,now);
+    await native.batch([
+      insert('booking_stripe_object','in_1','binding',{accountId:'account',friendId,customerId:'cus_private'}),
+      insert('booking_stripe_webhook','event-1','apply',{retentionAccountId:'account',event:{type:'invoice.paid',created:123,object:{id:'in_1',kind:'invoice',amount:500,currency:'jpy',customer:'cus_private'}}}),
+      insert('booking_stripe_webhook','event-3','apply',{retentionAccountId:'account',event:{type:'invoice.paid',created:124,object:{id:'in_1',kind:'invoice',amount:600,currency:'jpy',customer:'cus_private'}}}),
+      insert('booking_stripe_object','invoice-2','binding',{accountId:'account',friendId:'other',customerId:'cus_other'}),
+      insert('booking_stripe_webhook','event-2','apply',{retentionAccountId:'account',event:{object:{id:'invoice-2',customer:'cus_other'}}}),
+      insert('booking_stripe_object','invoice-4','binding',{accountId:'other-account',friendId,customerId:'cus_other_account'}),
+      insert('booking_stripe_webhook','event-4','apply',{retentionAccountId:'other-account',event:{object:{id:'invoice-4',customer:'cus_other_account'}}}),
+    ]);
+    await native.prepare("UPDATE workflow_steps SET status='unknown' WHERE subject_id='event-3'").run();
+    await deleteCustomerData(env(),target('friend_data'),'owner');
+    for(const id of ['in_1','event-1']){
+      const row=await native.prepare('SELECT status,input_json FROM workflow_steps WHERE subject_id=?').bind(id).first<{status:string;input_json:string}>();
+      expect(row?.status).toBe('canceled');
+      expect(JSON.parse(row!.input_json)).toMatchObject({redacted:true});
+      expect(row!.input_json).not.toContain('cus_private');
+    }
+    const receipt=await native.prepare('SELECT result_json FROM workflow_steps WHERE subject_id=?').bind('event-1').first<{result_json:string}>();
+    expect(JSON.parse(receipt!.result_json)).toMatchObject({accounting:{eventType:'invoice.paid',objectId:'in_1',amount:500,currency:'jpy'}});
+    expect(receipt!.result_json).not.toContain('cus_private');
+    const waiting=await native.prepare("SELECT status,customer_redaction_requested_at FROM workflow_steps WHERE subject_id='event-3'").first<{status:string;customer_redaction_requested_at:number}>();
+    expect(waiting?.status).toBe('unknown');
+    await redactCustomerWorkflows(db(),waiting!.customer_redaction_requested_at+CUSTOMER_WORKFLOW_WAIT_MS);
+    const later=await native.prepare("SELECT input_json,result_json FROM workflow_steps WHERE subject_id='event-3'").first<{input_json:string;result_json:string}>();
+    expect(JSON.parse(later!.input_json)).toMatchObject({redacted:true,retentionAccountId:'account'});
+    expect(later!.input_json).not.toContain('cus_private');
+    expect(JSON.parse(later!.result_json)).toMatchObject({previousStatus:'unknown',accounting:{objectId:'in_1',amount:600}});
+    expect(later!.result_json).not.toContain('cus_private');
+    for(const id of ['invoice-2','event-2','invoice-4','event-4'])expect(await native.prepare('SELECT status FROM workflow_steps WHERE subject_id=?').bind(id).first())
+      .toEqual({status:'pending'});
+  },30_000);
   it('rolls D1 batch back on an error after attachment deletion, then retries', async () => {
     await native.prepare("CREATE TRIGGER fail_customer_delete BEFORE DELETE ON form_submissions BEGIN SELECT RAISE(ABORT,'fail'); END").run();
     await expect(deleteCustomerData(env(), target('form_response'), 'owner')).rejects.toMatchObject({ status: 503 });

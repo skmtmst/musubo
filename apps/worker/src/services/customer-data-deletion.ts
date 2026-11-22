@@ -1,7 +1,7 @@
 import { auditEventStatement, RETENTION_R2_KEY_COLUMNS } from '@line-crm/db';
 import relations from './customer-data-relations.json';
 import protectedRelations from './customer-data-protected-relations.json';
-import { customerWorkflowCondition } from './customer-workflow-redaction.js';
+import { customerWorkflowCondition, redactedWorkflowInput, stripeAccountingPatch } from './customer-workflow-redaction.js';
 import { customerDestinationDigest } from './customer-deletion-destination.js';
 
 export type DeletionKind = 'form_response' | 'friend_data';
@@ -185,12 +185,12 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
           OR actual.customer_redaction_requested_at IS NOT json_extract(expected.value,'$.customer_redaction_requested_at'))`, [JSON.stringify(workflowRows)]));
       if (workflowRows.length) statements.push(db.prepare(`UPDATE workflow_steps SET customer_redaction_requested_at=COALESCE(customer_redaction_requested_at,?),
         status=CASE WHEN status IN ('running','unknown') THEN status ELSE 'canceled' END,
-        input_json=CASE WHEN status IN ('running','unknown') THEN input_json ELSE '{"redacted":true}' END,
-        result_json=CASE WHEN status IN ('running','unknown') THEN result_json ELSE json_object('redacted',json('true'),'previousStatus',status,
+        input_json=CASE WHEN status IN ('running','unknown') THEN input_json ELSE ${redactedWorkflowInput} END,
+        result_json=CASE WHEN status IN ('running','unknown') THEN result_json ELSE json_patch(json_object('redacted',json('true'),'previousStatus',status,
           'requestId',CASE WHEN json_valid(result_json) THEN CASE WHEN json_type(result_json,'$.requestId')='text'
             AND length(json_extract(result_json,'$.requestId')) BETWEEN 1 AND 128
             AND json_extract(result_json,'$.requestId') NOT GLOB '*[^A-Za-z0-9_-]*'
-            THEN json_extract(result_json,'$.requestId') ELSE NULL END ELSE NULL END) END,
+            THEN json_extract(result_json,'$.requestId') ELSE NULL END ELSE NULL END),${stripeAccountingPatch}) END,
         error_code=CASE WHEN status IN ('running','unknown') THEN error_code ELSE 'customer_deleted' END,
         next_attempt_at=CASE WHEN status IN ('running','unknown') THEN next_attempt_at ELSE NULL END,
         updated_at=? WHERE rowid IN (SELECT value FROM json_each(?))`).bind(Date.now(),Date.now(),workflowIds));

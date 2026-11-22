@@ -1,6 +1,26 @@
 /** 個人情報を残さない送信取消の印。期限は、結果不明でも本文を残し続けないための上限。 */
 export const CUSTOMER_WORKFLOW_WAIT_MS = 7 * 24 * 60 * 60 * 1000;
 
+// 外部決済の照合に要る固定形式の識別子・金額だけを残し、顧客IDや本文は残さない。
+const stripeInput = `CASE WHEN json_valid(input_json) THEN input_json ELSE '{}' END`;
+// 統括の削除条件が Stripe の工程を特定できるよう、店舗・統括IDは残す。
+export const redactedWorkflowInput = `CASE WHEN process_kind='booking_stripe_object' THEN json_object('redacted',json('true'),
+    'accountId',json_extract(${stripeInput},'$.accountId'),'tenantId',json_extract(${stripeInput},'$.tenantId'))
+  WHEN process_kind='booking_stripe_webhook' THEN json_object('redacted',json('true'),
+    'retentionAccountId',json_extract(${stripeInput},'$.retentionAccountId'),'retentionTenantId',json_extract(${stripeInput},'$.retentionTenantId'))
+  ELSE '{"redacted":true}' END`;
+const stripeObjectId = `json_extract(${stripeInput},'$.event.object.id')`;
+const safeStripeId = `CASE WHEN length(${stripeObjectId}) BETWEEN 3 AND 255
+  AND ${stripeObjectId} NOT GLOB '*[^A-Za-z0-9_]*' AND (${stripeObjectId} GLOB 'in_*' OR ${stripeObjectId} GLOB 'pi_*'
+    OR ${stripeObjectId} GLOB 'cs_*' OR ${stripeObjectId} GLOB 'seti_*') THEN ${stripeObjectId} ELSE NULL END`;
+const stripeNumber = (path:string) => `CASE WHEN json_type(${stripeInput},'${path}')='integer' AND json_extract(${stripeInput},'${path}')>=0 THEN json_extract(${stripeInput},'${path}') ELSE NULL END`;
+export const stripeAccountingPatch = `CASE WHEN process_kind='booking_stripe_webhook' THEN json_object('accounting',json_object(
+  'eventType',CASE WHEN length(json_extract(${stripeInput},'$.event.type'))<=120 AND json_extract(${stripeInput},'$.event.type') NOT GLOB '*[^a-z_.]*' THEN json_extract(${stripeInput},'$.event.type') ELSE NULL END,
+  'objectId',${safeStripeId},'objectKind',CASE WHEN json_extract(${stripeInput},'$.event.object.kind') IN ('invoice','setup_intent','checkout.session','payment_intent') THEN json_extract(${stripeInput},'$.event.object.kind') ELSE NULL END,
+  'amount',${stripeNumber('$.event.object.amount')},'amountPaid',${stripeNumber('$.event.object.amountPaid')},
+  'amountReceived',${stripeNumber('$.event.object.amountReceived')},'currency',CASE WHEN json_extract(${stripeInput},'$.event.object.currency') GLOB '[a-z][a-z][a-z]' THEN json_extract(${stripeInput},'$.event.object.currency') ELSE NULL END,
+  'created',${stripeNumber('$.event.created')})) ELSE '{}' END`;
+
 /**
  * 友だち ID とアカウントを確実に結べる工程だけを選ぶ。名前や電話番号は照合しない。
  * ?1: friend ID, ?2: LINE user ID, ?3: account ID
@@ -10,6 +30,18 @@ export const customerWorkflowCondition = `EXISTS (
     AND owner.line_user_id IS ?2 AND ?3 IS NOT NULL
 ) AND (
   (workflow_steps.scope_id='friend:' || ?1 AND workflow_steps.process_kind='form_destinations')
+  OR (workflow_steps.scope_id LIKE 'stripe-test:%' AND (
+    (workflow_steps.process_kind='booking_stripe_object'
+      AND json_extract(CASE WHEN json_valid(workflow_steps.input_json) THEN workflow_steps.input_json ELSE '{}' END,'$.friendId')=?1
+      AND json_extract(CASE WHEN json_valid(workflow_steps.input_json) THEN workflow_steps.input_json ELSE '{}' END,'$.accountId')=?3)
+    OR (workflow_steps.process_kind='booking_stripe_webhook'
+      AND json_extract(CASE WHEN json_valid(workflow_steps.input_json) THEN workflow_steps.input_json ELSE '{}' END,'$.retentionAccountId')=?3
+      AND EXISTS (SELECT 1 FROM workflow_steps binding WHERE binding.scope_id=workflow_steps.scope_id
+        AND binding.process_kind='booking_stripe_object' AND binding.step_key='binding'
+        AND binding.subject_id=json_extract(CASE WHEN json_valid(workflow_steps.input_json) THEN workflow_steps.input_json ELSE '{}' END,'$.event.object.id')
+        AND json_extract(CASE WHEN json_valid(binding.input_json) THEN binding.input_json ELSE '{}' END,'$.friendId')=?1
+        AND json_extract(CASE WHEN json_valid(binding.input_json) THEN binding.input_json ELSE '{}' END,'$.accountId')=?3))
+  ))
   OR (workflow_steps.scope_id='line:' || ?3 AND (
     EXISTS (SELECT 1 FROM workflow_steps root
       WHERE root.scope_id=workflow_steps.scope_id AND root.process_kind=workflow_steps.process_kind
@@ -52,11 +84,11 @@ export const customerWorkflowCondition = `EXISTS (
 export async function redactCustomerWorkflows(db:D1Database, now = Date.now()):Promise<number> {
   const result = await db.prepare(`UPDATE workflow_steps SET status='canceled', lease_owner=NULL, lease_expires_at=NULL,
       next_attempt_at=NULL, error_code=CASE WHEN status IN ('running','unknown') THEN 'customer_deleted_unknown' ELSE 'customer_deleted' END,
-      input_json='{"redacted":true}', result_json=json_object('redacted',json('true'),'previousStatus',status,
+      input_json=${redactedWorkflowInput}, result_json=json_patch(json_object('redacted',json('true'),'previousStatus',status,
         'requestId',CASE WHEN json_valid(result_json) THEN CASE WHEN json_type(result_json,'$.requestId')='text'
           AND length(json_extract(result_json,'$.requestId')) BETWEEN 1 AND 128
           AND json_extract(result_json,'$.requestId') NOT GLOB '*[^A-Za-z0-9_-]*'
-          THEN json_extract(result_json,'$.requestId') ELSE NULL END ELSE NULL END), updated_at=?
+          THEN json_extract(result_json,'$.requestId') ELSE NULL END ELSE NULL END),${stripeAccountingPatch}), updated_at=?
     WHERE rowid IN (SELECT rowid FROM workflow_steps WHERE customer_redaction_requested_at IS NOT NULL
       AND COALESCE(error_code,'') NOT IN ('customer_deleted','customer_deleted_unknown')
       AND (status NOT IN ('running','unknown') OR customer_redaction_requested_at<=?)
