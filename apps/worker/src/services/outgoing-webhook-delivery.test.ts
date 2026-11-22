@@ -538,7 +538,7 @@ describe('送信直前の再検査', () => {
   });
 });
 
-describe('送信の打ち切り(N-373)', () => {
+describe('Webhookの送信が応答しない場合は時間制限で打ち切る', () => {
   it('既定は10秒・上限は30秒', () => {
     expect(WEBHOOK_FETCH_TIMEOUT_MS).toBe(10_000);
     expect(WEBHOOK_FETCH_TIMEOUT_MS_MAX).toBe(30_000);
@@ -646,7 +646,7 @@ describe('送信の打ち切り(N-373)', () => {
   });
 });
 
-describe('Retry-After の読み取り(N-374)', () => {
+describe('Webhookの再送は待機時間や日時の指定を読み取る', () => {
   it('秒数形式はそのまま待つ', () => {
     expect(retryAfterDelayMs('2', 500)).toBe(2000);
     expect(retryAfterDelayMs('0', 500)).toBe(0);
@@ -770,7 +770,7 @@ describe('Retry-After の読み取り(N-374)', () => {
 //  暗号化済みsecretでも署名が必ず付く
 // =====================================================
 
-describe('#650 暗号文で保存されたsecretでも署名する', () => {
+describe('Webhookは復号した秘密値で署名し復号失敗時は送信しない', () => {
   const KEY = 'test-key-for-outgoing-webhook-signature-650';
   const SECRET = 's'.repeat(32);
 
@@ -853,7 +853,7 @@ async function hmacHex(secret: string, body: string): Promise<string> {
 
 // ---- d23b: 結果不明の正規化・履歴からの失敗数・1回固定配送 ----
 
-describe('届いたか分からない失敗は「不明」として残す(d23b R410)', () => {
+describe('Webhookの応答前の失敗は到達結果を不明として記録する', () => {
   it('応答を受け取る前に切れた失敗は outcomeUnknown を立てる', async () => {
     stubFetch(['throw']);
     const res = await deliverWebhook(
@@ -890,7 +890,7 @@ describe('届いたか分からない失敗は「不明」として残す(d23b R
   });
 });
 
-describe('連続失敗数は履歴から数え直す(d23b R411)', () => {
+describe('Webhookの連続失敗数は最後の成功以降の履歴から数える', () => {
   function seed(db: ReturnType<typeof createTestD1>['raw']) {
     db.exec(`
       INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
@@ -946,7 +946,7 @@ describe('連続失敗数は履歴から数え直す(d23b R411)', () => {
   });
 });
 
-describe('1回だけ送る配送(d23b R419)', () => {
+describe('単発送信は設定の再送回数に関係なく一度だけ送る', () => {
   it('deliverOnce は設定の送り直し回数を使わず1回だけ送る', async () => {
     const count = stubFetch([500, 500, 500]);
     const res = await deliverOnce(

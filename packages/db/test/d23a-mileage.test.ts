@@ -75,7 +75,7 @@ function friendWallet(beneficiaryKey: string) {
 beforeEach(seed);
 afterEach(() => vi.useRealTimers());
 
-describe('R378: 確定済み調整の再送照合', () => {
+describe('確定済みのマイル調整は同じ要求なら元の結果を返す', () => {
   it('同一キー・同一内容の再送は当時の結果を返す', async () => {
     const first = await postMileageAdjustment(db, adjustmentInput());
     const committed = await findCommittedMileageAdjustment(db, adjustmentInput());
@@ -116,7 +116,7 @@ describe('R378: 確定済み調整の再送照合', () => {
   });
 });
 
-describe('R379: 通知状態は遅い失敗で戻らない', () => {
+describe('マイル通知は送信後の遅い失敗で状態を戻さない', () => {
   it('sent 済みの通知はあとから届いた failed で上書きしない', async () => {
     await postMileageAdjustment(db, adjustmentInput({ notifyFriend: true }));
     const entry = sqlite.prepare(
@@ -184,7 +184,7 @@ describe('R379: 通知状態は遅い失敗で戻らない', () => {
   });
 });
 
-describe('R383: 30日より先の期限つきマイルの区別', () => {
+describe('マイル残高は30日以内の失効と次の失効日を区別する', () => {
   it('31日後に失効するロットは 30日内0・次の失効日ありで返る', async () => {
     const expiresAt = new Date(Date.now() + 31 * 86_400_000).toISOString();
     await postMileageAdjustment(db, adjustmentInput({ expiresAt }));
@@ -241,7 +241,7 @@ describe('R384: 今月の増減は日本時間の月初で切る', () => {
   });
 });
 
-describe('R385: 本人への紐付けで残高・ロットを移管する', () => {
+describe('本人への紐付けでマイルを合算し再実行しても重複しない', () => {
   it('紐付け前の友だち宛てマイルが紐付け後も本人の残高として使える', async () => {
     await postMileageAdjustment(db, adjustmentInput());
     await linkFriendToUser(db, 'fa-unlinked', 'user-1');
@@ -305,7 +305,7 @@ describe('R386: 同一人物の複数プロフィールで残高を重複集計�
   });
 });
 
-describe('R387: 権限外アカウントの記録を伏せる', () => {
+describe('閲覧権限がないアカウントのマイル履歴を伏せる', () => {
   it('見られないアカウントの理由・実行者・元イベントは返さない', async () => {
     await postMileageAdjustment(db, adjustmentInput({ friendId: 'fa-1', idempotencyKey: 'key-a' }));
     await postMileageAdjustment(db, {
