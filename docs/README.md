@@ -475,6 +475,8 @@
 
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
+- [新しいLINEアカウントのLIFF自動作成](release-log/unreleased/153-masato-liff-auto-create.md) — 反映履歴、確認 2026-11-22。
+
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
 
 - [開店準備ガイドの修正](release-log/unreleased/133-masato-restaurant-setup-guide.md)
