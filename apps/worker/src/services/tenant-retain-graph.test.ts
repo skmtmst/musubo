@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { buildTombstoneValues } from './tenant-purge-generic.js';
 import { expect, test } from 'vitest';
 import { gapFixture } from '../test-utils/gap1.js';
@@ -50,7 +49,15 @@ test('every textual column of each retained parent has an explicit documented di
   const {default: inventory}=await import('./tenant-retain-text-inventory.json');
   const {default: policies}=await import('./tenant-retain-column-policies.json');
   const specialized = new Set(['line_accounts','friends','rt_stores','rt_organizations','broadcasts','menus']);
-  const tombstones=readFileSync(new URL('./tenant-purge-tombstones.ts',import.meta.url),'utf8');
+  const tombstones=await import('./tenant-purge-tombstones.js');
+  const captured:Record<string,string>={};
+  const functions={line_accounts:tombstones.tombstoneLineAccount,friends:tombstones.tombstoneFriend,
+    rt_stores:tombstones.tombstoneRestaurantStore,rt_organizations:tombstones.tombstoneRestaurantOrganization,
+    broadcasts:tombstones.tombstoneBroadcast,menus:tombstones.tombstoneBookingMenu};
+  for (const [table,fn] of Object.entries(functions)) {
+    const db={prepare:(sql:string)=>{captured[table]=sql;return {bind:()=>({run:async()=>({meta:{changes:1}})})};}} as unknown as D1Database;
+    await fn(db,'tenant','row','2027-01-01T00:00:00Z');
+  }
   const assertColumns = (table:string, expected:Record<string,unknown>) => {
     const actual=(f.raw.pragma(`table_info("${table}")`) as {name:string;type:string}[])
       .filter(column=>/CHAR|CLOB|TEXT|JSON/i.test(column.type)).map(column=>column.name).sort();
@@ -75,7 +82,7 @@ test('every textual column of each retained parent has an explicit documented di
           expect(String(result[column]),`${table}.${column}`).not.toContain('private');
         } else if (decision) expect(decision.action,`${table}.${column}`).toBe('retain');
       } else if (entry.action==='erase') {
-        const assignment=tombstones.split(`UPDATE ${table} SET`)[1]?.split('WHERE ')[0] ?? '';
+        const assignment=captured[table]?.split(`UPDATE ${table} SET`)[1]?.split('WHERE ')[0] ?? '';
         expect(assignment,`${table}.${column}`).toMatch(new RegExp(`\\b${column}\\s*=`));
       }
     }
