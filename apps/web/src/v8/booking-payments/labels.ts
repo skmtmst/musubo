@@ -39,6 +39,11 @@ export const EVENT_RESULT: Record<PaymentEvent['result'], { label: string; tone:
   failed: { label: '失敗', tone: 'danger' },
 }
 
+/** お客さまの情報を削除した支払いの呼び名。名前・連絡先は残っていないので、どの画面もこの言葉で出す。 */
+export const DELETED_CUSTOMER_LABEL = '削除済みのお客さま'
+/** お客さまの情報を削除した支払いの返金の理由。返金の口はこの値だけを受け付け、自由な文を残さない。 */
+export const DELETED_CUSTOMER_REFUND_REASON = '削除済み'
+
 /** 選べる方法。保存するときの決済サービスは方法で決まる（先払い・選ぶは Stripe）。 */
 export function providerFor(mode: BookingPaymentMode): 'onsite' | 'stripe' | 'none' {
   if (mode === 'online' || mode === 'customer_choice') return 'stripe'
