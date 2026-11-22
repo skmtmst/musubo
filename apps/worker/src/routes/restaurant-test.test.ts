@@ -331,6 +331,19 @@ describe('飲食店向けテストAPI', () => {
     expect(json.data.stores).toHaveLength(2);
   });
 
+  it('削除済み店舗は一覧に表示せず編集できない', async () => {
+    seedRestaurantFixture();
+    testDb.raw.prepare("UPDATE rt_stores SET data_purged_at='2027-01-01',status='archived' WHERE id='store-yokohama'").run();
+    const session = await createAdminSession();
+    const snapshot = await requestAs('/api/restaurant-test/snapshot?account_id=account-1', session);
+    expect(snapshot.status).toBe(200);
+    const json = await snapshot.json() as { data: { stores: Array<{id:string}> } };
+    expect(json.data.stores.map(store => store.id)).not.toContain('store-yokohama');
+    const response = await requestWithMethod('/api/restaurant-test/stores/store-yokohama?account_id=account-1', 'PATCH', {name:'復活',status:'active',lineAccountId:'account-2'});
+    expect(response.status).toBe(400);
+    expect(testDb.raw.prepare("SELECT status FROM rt_stores WHERE id='store-yokohama'").get()).toEqual({status:'archived'});
+  });
+
   it('利用規約への同意を組織・現行版ごとに冪等記録する', async () => {
     seedRestaurantFixture();
     const body = { documentKey: 'musubo-terms', version: 'v0.1-draft' };

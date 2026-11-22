@@ -1,7 +1,34 @@
 import { expect, test } from 'vitest';
 import { activateLineAccount, createLineAccount, upsertFriend, getLineAccountById, getFriendById } from '@line-crm/db';
 import { gapFixture } from '../test-utils/gap1.js';
-import { tombstoneLineAccount, tombstoneFriend } from './tenant-purge-tombstones.js';
+import { tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore } from './tenant-purge-tombstones.js';
+
+test('retained restaurant store is anonymized only under its eligible tombstoned account', async () => {
+  const f = gapFixture();
+  f.raw.pragma('foreign_keys = ON');
+  f.raw.exec(`UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01' WHERE id='t';
+    INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES ('org','a','private org','t');
+    INSERT INTO rt_stores(id,organization_id,name,code,area,line_account_id,latitude,longitude)
+      VALUES ('store','org','private name','private code','private area','a',35,139);
+    INSERT INTO rt_stores(id,organization_id,name,code) VALUES ('unlinked-store','org','private','unlinked');
+    INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES ('other-org','b','other org','other');
+    INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES ('other-store','other-org','other store','other','b');
+    INSERT INTO rt_approval_requests(id,organization_id,store_id,kind,title) VALUES ('approval','org','store','menu_change','test');`);
+  const now = '2027-05-01T09:00:00.000+09:00';
+  expect(await tombstoneRestaurantStore(f.db, 't', 'store', now)).toBe(false);
+  expect(await tombstoneLineAccount(f.db, 't', 'a', now)).toBe(true);
+  f.raw.exec("UPDATE tenants SET plan_status='active' WHERE id='t'");
+  expect(await tombstoneRestaurantStore(f.db, 't', 'store', now)).toBe(false);
+  f.raw.exec("UPDATE tenants SET plan_status='canceled' WHERE id='t'");
+  expect(await tombstoneRestaurantStore(f.db, 'other', 'store', now)).toBe(false);
+  expect(await tombstoneRestaurantStore(f.db, 't', 'store', now)).toBe(true);
+  expect(await tombstoneRestaurantStore(f.db, 't', 'unlinked-store', now)).toBe(true);
+  expect(await tombstoneRestaurantStore(f.db, 't', 'store', now)).toBe(false);
+  expect(f.raw.prepare("SELECT name,area,latitude,longitude,status FROM rt_stores WHERE id='store'").get()).toEqual({name:'削除済み',area:null,latitude:null,longitude:null,status:'archived'});
+  expect(f.raw.prepare("SELECT code FROM rt_stores WHERE id='store'").get()).not.toEqual({code:'private code'});
+  expect(f.raw.prepare("SELECT store_id FROM rt_approval_requests WHERE id='approval'").get()).toEqual({store_id:'store'});
+  expect(f.raw.prepare("SELECT name,status,data_purged_at FROM rt_stores WHERE id='other-store'").get()).toEqual({name:'other store',status:'active',data_purged_at:null});
+});
 
 test('tombstones erase identifiers and secrets, are hidden and are not reused', async () => {
   const f = gapFixture();

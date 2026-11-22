@@ -1,5 +1,24 @@
 import { retentionCutoff } from '@line-crm/db';
 
+/** 承認履歴が参照する店舗を残し、統括とアカウントの範囲を確認して匿名化する。 */
+export async function tombstoneRestaurantStore(db: D1Database, tenantId: string, storeId: string, now: string): Promise<boolean> {
+  const result = await db.prepare(`UPDATE rt_stores SET
+    name='削除済み', code=?, area=NULL, latitude=NULL, longitude=NULL,
+    status='archived', line_status='unconfigured', google_status='unconfigured',
+    capacity=0, updated_at=?, data_purged_at=?
+    WHERE id=? AND data_purged_at IS NULL AND EXISTS (
+      SELECT 1 FROM rt_organizations o JOIN tenants t ON t.id=o.tenant_id
+      WHERE o.id=rt_stores.organization_id AND t.id=?
+        AND (rt_stores.line_account_id IS NULL OR EXISTS (
+          SELECT 1 FROM line_accounts a WHERE a.id=rt_stores.line_account_id
+            AND a.tenant_id=t.id AND a.data_purged_at IS NOT NULL))
+        AND t.data_purged_at IS NULL
+        AND (t.plan_status='canceled' OR (t.plan_status='trialing' AND t.trial_ends_at IS NOT NULL AND t.trial_ends_at < ?))
+        AND (t.purge_requested_at IS NOT NULL OR (t.retention_anchor_at IS NOT NULL AND t.retention_anchor_at < ?))
+    )`).bind(`purged:${crypto.randomUUID()}`, now, now, storeId, tenantId, now, retentionCutoff(now)).run();
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
 /** 保持参照の親を消さず、期限到来済みの統括のアカウントから識別情報と資格情報を消す。 */
 export async function tombstoneLineAccount(db: D1Database, tenantId: string, accountId: string, now: string): Promise<boolean> {
   const result = await db.prepare(`UPDATE line_accounts SET

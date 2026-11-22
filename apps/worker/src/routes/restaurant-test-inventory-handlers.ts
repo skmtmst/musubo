@@ -439,6 +439,7 @@ export const put__api_restaurant_test_stores_id_referral_location_27 = async (c:
  const org=await organizationFor(c);if(!org||!await storeBelongsTo(c,org.id,c.req.param('id')))return c.json({success:false,error:'not_found'},404);
  const b=await c.req.json<{latitude:number;longitude:number;confirmed:boolean}>();
  if(!b||b.confirmed!==true||!Number.isFinite(b.latitude)||!Number.isFinite(b.longitude)||Math.abs(b.latitude)>90||Math.abs(b.longitude)>180)return inputError(c,{success:false,error:'confirmed_location_required'},400,['latitude','longitude','confirmed']);
- await dbFor(c.env).prepare("UPDATE rt_stores SET latitude=?,longitude=?,updated_at=datetime('now') WHERE id=?").bind(b.latitude,b.longitude,c.req.param('id')).run();
+ const updated=await dbFor(c.env).prepare("UPDATE rt_stores SET latitude=?,longitude=?,updated_at=datetime('now') WHERE id=? AND organization_id=? AND data_purged_at IS NULL").bind(b.latitude,b.longitude,c.req.param('id'),org.id).run();
+ if(!updated.meta.changes)return c.json({success:false,error:'not_found'},404);
  return c.json({success:true,data:{updated:true}});
 };

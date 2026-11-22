@@ -8327,7 +8327,7 @@ CREATE TABLE rt_stores (
   line_status TEXT NOT NULL DEFAULT 'unconfigured' CHECK (line_status IN ('connected', 'warning', 'error', 'unconfigured')),
   google_status TEXT NOT NULL DEFAULT 'unconfigured' CHECK (google_status IN ('connected', 'warning', 'error', 'unconfigured')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')), line_account_id TEXT REFERENCES line_accounts(id), latitude REAL CHECK(latitude IS NULL OR latitude BETWEEN -90 AND 90), longitude REAL CHECK(longitude IS NULL OR longitude BETWEEN -180 AND 180),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), line_account_id TEXT REFERENCES line_accounts(id), latitude REAL CHECK(latitude IS NULL OR latitude BETWEEN -90 AND 90), longitude REAL CHECK(longitude IS NULL OR longitude BETWEEN -180 AND 180), data_purged_at TEXT,
   UNIQUE(organization_id, code)
 );
 
