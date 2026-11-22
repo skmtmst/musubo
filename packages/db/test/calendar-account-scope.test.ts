@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   createCalendarBooking,
@@ -49,6 +50,9 @@ describe('calendar database account scope', () => {
 
   beforeEach(() => {
     sqlite = new Database(':memory:');
+    // 本番と同じ借受表を用い、接続解除中の検査も実際の制約で動かす。
+    const workflowMigration = readFileSync(new URL('../migrations/615_workflow_steps.sql', import.meta.url), 'utf8');
+    sqlite.exec(workflowMigration.split('-- Banner-specific')[0]);
     sqlite.exec(`
       CREATE TABLE google_calendar_connections (
         id TEXT PRIMARY KEY,
@@ -186,6 +190,20 @@ describe('calendar database account scope', () => {
       event_id: 'event-a',
     });
     expect(await deleteCalendarConnection(db, connection!.id, SCOPE_A)).toBe(true);
+  });
+
+  it('blocks new OAuth connections while Google revocation is leased and allows them after expiry', async () => {
+    sqlite.prepare(`INSERT INTO workflow_steps
+      (scope_id, process_kind, subject_id, step_key, status, lease_owner, lease_expires_at, retry_key, created_at, updated_at)
+      VALUES ('global:meeting-revoke', 'booking_meeting_revoke_lock', 'google_meet', 'lock', 'running', 'owner', ?, 'retry', 0, 0)`)
+      .run(Date.now() + 60_000);
+    const input = { calendarId: 'new-a@example.com', authType: 'oauth', lineAccountId: 'account-a' };
+    expect(await createCalendarConnection(db, input, SCOPE_A)).toBeNull();
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM google_calendar_connections WHERE calendar_id = ?').get(input.calendarId)).toEqual({ count: 0 });
+    expect(await createCalendarConnection(db, { ...input, calendarId: 'shared@example.com', authType: 'service_account' }, SCOPE_A))
+      .toMatchObject({ line_account_id: 'account-a', calendar_id: 'shared@example.com' });
+    sqlite.prepare("UPDATE workflow_steps SET lease_expires_at = 0 WHERE subject_id = 'google_meet'").run();
+    expect(await createCalendarConnection(db, input, SCOPE_A)).toMatchObject({ line_account_id: 'account-a', calendar_id: input.calendarId });
   });
 
   it('makes legacy unassigned rows an explicit default-tenant choice', async () => {
