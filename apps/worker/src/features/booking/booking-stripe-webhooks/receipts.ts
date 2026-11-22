@@ -18,11 +18,12 @@ export async function storeBookingStripeReceipt(db: D1Database, event: BookingSt
   const ref = receiptRef(event.account,event.id);
   const reviewPurged = async () => {
     if (!owner?.tenant_id) return false;
-    const tenant=await db.prepare('SELECT purge_started_at,data_purged_at FROM tenants WHERE id=?').bind(owner.tenant_id)
-      .first<{purge_started_at:string|null;data_purged_at:string|null}>();
-    if (!tenant || (!tenant.purge_started_at && !tenant.data_purged_at)) return false;
+    const tenant=await db.prepare(`SELECT t.purge_started_at,t.data_purged_at,a.data_purged_at AS account_purged_at
+      FROM tenants t JOIN line_accounts a ON a.tenant_id=t.id WHERE t.id=? AND a.id=?`).bind(owner.tenant_id,owner.id)
+      .first<{purge_started_at:string|null;data_purged_at:string|null;account_purged_at:string|null}>();
+    if (!tenant || (!tenant.purge_started_at && !tenant.data_purged_at && !tenant.account_purged_at)) return false;
     await recordPurgedTenantStripeEvent(db,{tenantId:owner.tenant_id,eventId:event.id,eventType:event.type,
-      amount:event.object.amountPaid ?? event.object.amount,currency:event.object.currency,now:new Date().toISOString()});
+      amount:event.object.amountPaid ?? event.object.amount,currency:event.object.currency,now:new Date().toISOString(),accountId:owner.id});
     return true;
   };
   const minimalReview=async()=>({receiptId:await bookingStripeReceiptId(event.account,event.id),status:'review_required' as const});

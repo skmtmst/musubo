@@ -246,3 +246,12 @@ it('a Connect business write prepared before purge is fenced inside the batch', 
   })).rejects.toThrow();
   expect(f.raw.prepare("SELECT state,uses FROM effects WHERE id='month'").get()).toEqual({state:'pending',uses:0});
 });
+
+
+it('a retired Connect account is recorded for review even after its tenant resumes', async()=>{
+  await bind();
+  f.raw.exec("UPDATE line_accounts SET data_purged_at='2026-10-31',is_active=0 WHERE id='a'; UPDATE tenants SET data_purged_at=NULL,purge_started_at=NULL WHERE id='t'");
+  expect(await (await send(event())).json()).toMatchObject({data:{status:'review_required'}});
+  expect(rows()).toHaveLength(0);
+  expect(f.raw.prepare("SELECT review_reason FROM stripe_events WHERE stripe_event_id='evt_paid'").get()).toEqual({review_reason:'purged_tenant'});
+});

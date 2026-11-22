@@ -68,7 +68,7 @@ export async function releaseBillingEventLease(db: D1Database, eventId: string, 
 
 /** 削除中・削除済みへの通知を、本文や顧客情報なしで照合待ちとして保存する。 */
 export async function recordPurgedTenantStripeEvent(db: D1Database, input: {
-  tenantId: string; eventId: string; eventType: string; amount: number | null; currency: string | null; now: string;
+  tenantId: string; eventId: string; eventType: string; amount: number | null; currency: string | null; now: string; accountId?: string;
 }): Promise<boolean> {
   if (!/^evt_[A-Za-z0-9_]+$/.test(input.eventId) || !/^[a-z0-9_.]+$/.test(input.eventType)
     || (input.amount !== null && !Number.isSafeInteger(input.amount))
@@ -76,8 +76,9 @@ export async function recordPurgedTenantStripeEvent(db: D1Database, input: {
   const result = await db.prepare(`INSERT OR IGNORE INTO stripe_events
     (id,stripe_event_id,event_type,amount,currency,metadata,processed_at,tenant_id,review_reason)
     SELECT ?,?,?,?,?,NULL,?,?,'purged_tenant' WHERE EXISTS (
-      SELECT 1 FROM tenants t WHERE t.id=? AND (t.purge_started_at IS NOT NULL OR t.data_purged_at IS NOT NULL))`)
-    .bind(crypto.randomUUID(), input.eventId, input.eventType, input.amount, input.currency, input.now, input.tenantId, input.tenantId).run();
+      SELECT 1 FROM tenants t WHERE t.id=? AND (t.purge_started_at IS NOT NULL OR t.data_purged_at IS NOT NULL OR EXISTS
+        (SELECT 1 FROM line_accounts a WHERE a.id=? AND a.tenant_id=t.id AND a.data_purged_at IS NOT NULL)))`)
+    .bind(crypto.randomUUID(), input.eventId, input.eventType, input.amount, input.currency, input.now, input.tenantId, input.tenantId,input.accountId ?? null).run();
   return Number(result.meta.changes ?? 0) === 1;
 }
 
