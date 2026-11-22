@@ -1,0 +1,1550 @@
+{
+  "affiliate_adjustments": {
+    "candidates": [
+      {
+        "column": "reason_type",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "reason",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "idempotency_key",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "affiliate_offers": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "description",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "affiliate_reward_entries": {
+    "candidates": [
+      {
+        "column": "idempotency_key",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "affiliates": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "friend_id",
+        "notNull": false,
+        "key": true,
+        "foreignKey": true
+      },
+      {
+        "column": "email",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "booking_customers": {
+    "candidates": [
+      {
+        "column": "friend_id",
+        "notNull": false,
+        "key": true,
+        "foreignKey": true
+      },
+      {
+        "column": "display_name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "phone_normalized_hash",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "phone_encrypted",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "phone_last4",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "email_encrypted",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "pet_name",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "booking_groups": {
+    "candidates": [
+      {
+        "column": "friend_id",
+        "notNull": true,
+        "key": true,
+        "foreignKey": true
+      },
+      {
+        "column": "idempotency_key",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "request_json",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "booking_makeup_credits": {
+    "candidates": [
+      {
+        "column": "friend_id",
+        "notNull": true,
+        "key": true,
+        "foreignKey": true
+      },
+      {
+        "column": "reason",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "rule_snapshot_json",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "use_idempotency_key",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "use_request_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "booking_payment_methods": {
+    "candidates": [
+      {
+        "column": "friend_id",
+        "notNull": true,
+        "key": true,
+        "foreignKey": true
+      },
+      {
+        "column": "idempotency_key",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "booking_series": {
+    "candidates": [
+      {
+        "column": "friend_id",
+        "notNull": true,
+        "key": true,
+        "foreignKey": true
+      },
+      {
+        "column": "rule_json",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "idempotency_key",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "request_json",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "bookings": {
+    "candidates": [
+      {
+        "column": "friend_id",
+        "notNull": false,
+        "key": true,
+        "foreignKey": true
+      },
+      {
+        "column": "customer_note",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "internal_note",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "menu_snapshot_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "meeting_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "cancellation_reason",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "policy_snapshot_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "meeting_url_source",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "deposit_snapshot_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "broadcasts": {
+    "candidates": [
+      {
+        "column": "message_type",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "message_content",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "message_bubbles_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "internal_memo",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "draft_payload_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "message_options_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "approval_note",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "approval_reject_reason",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "common_action_versions": {
+    "candidates": [],
+    "review": "pending"
+  },
+  "common_actions": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "description",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "client_request_key",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "conversion_events": {
+    "candidates": [
+      {
+        "column": "friend_id",
+        "notNull": true,
+        "key": true,
+        "foreignKey": true
+      },
+      {
+        "column": "user_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "metadata",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "point_name_snapshot",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "idempotency_key",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "conversion_points": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "target_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "source_config_json",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "ingest_secret_encrypted",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "event_bookings": {
+    "candidates": [
+      {
+        "column": "friend_id",
+        "notNull": true,
+        "key": true,
+        "foreignKey": true
+      },
+      {
+        "column": "customer_note",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "internal_note",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "identity_key",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "answer_snapshot_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "event_snapshot_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "event_slots": {
+    "candidates": [
+      {
+        "column": "client_key",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "event_versions": {
+    "candidates": [
+      {
+        "column": "snapshot_json",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "events": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "venue_name",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "venue_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "image_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "description",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "description_centered",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "confirmation_message_extra",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "reminder_message_extra",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "og_description",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "og_image_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "version_write_token",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "questions_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "lifecycle_change_reason",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "venue_address",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "makeup_rule_json",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "folders": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "form_versions": {
+    "candidates": [
+      {
+        "column": "source_content_revision",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "description",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "on_submit_message_type",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "on_submit_message_content",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "on_submit_webhook_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "on_submit_webhook_fail_message",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "save_to_metadata",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "og_description",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "og_image_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "forms": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "description",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "save_to_metadata",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "on_submit_message_type",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "on_submit_message_content",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "on_submit_webhook_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "on_submit_webhook_fail_message",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "og_description",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "og_image_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "content_revision",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "friend_bulk_runs": {
+    "candidates": [
+      {
+        "column": "selection_json",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "operation_json",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "execution_plan_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "idempotency_key",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "error_message",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "friends": {
+    "candidates": [
+      {
+        "column": "line_user_id",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "display_name",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "picture_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "status_message",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "user_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "metadata",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "real_name",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "system_display_name",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "private_memo",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "photo_watch_required",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "impersonation_sessions": {
+    "candidates": [
+      {
+        "column": "write_reason",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "line_account_tags": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "line_accounts": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "channel_access_token",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "channel_secret",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "channel_access_token_encrypted",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "channel_secret_encrypted",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "channel_access_token_updated_at",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "channel_secret_updated_at",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "login_channel_secret_updated_at",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "archived_reason",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "og_site_name",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "og_default_image_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "og_default_description",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "official_profile_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "login_channel_secret",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "token_expires_at",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "icon_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "line_display_name",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "line_picture_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "line_profile_synced_at",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "inactive_reason",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "inactive_reason_detail",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "login_channel_secret_encrypted",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "media": {
+    "candidates": [
+      {
+        "column": "r2_key",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "public_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "archive_reason",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "usage_consent_note",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "menus": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "description",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "fixed_meeting_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "audience_tag_ids_json",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "recurring_freqs_json",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "addon_menu_ids_json",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "image_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "photo_media_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "mileage_adjustment_approval_requests": {
+    "candidates": [
+      {
+        "column": "friend_id",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "reason_category",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "reason",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "idempotency_key",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "requested_by_staff_name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "decided_by_staff_name",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "decision_reason",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "nen_pet_profiles": {
+    "candidates": [
+      {
+        "column": "friend_id",
+        "notNull": true,
+        "key": true,
+        "foreignKey": true
+      },
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "image_r2_key",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "image_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "nen_photo_submissions": {
+    "candidates": [
+      {
+        "column": "friend_id",
+        "notNull": true,
+        "key": true,
+        "foreignKey": true
+      },
+      {
+        "column": "r2_key",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "image_url",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "content_type",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "public_pet_name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "review_reason_code",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "review_reason_note",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "reviewed_by_name",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "review_image_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "public_image_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "image_width",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "image_height",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "image_byte_size",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "rotation_idempotency_key",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "notification_retry_key",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "content_hash",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "review_r2_key",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "public_r2_key",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "recipe_clone_runs": {
+    "candidates": [
+      {
+        "column": "name_prefix",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "idempotency_key",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "failure_reason",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "recipes": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "items_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "rt_organizations": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "rt_stores": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "scenarios": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "description",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "audience_condition_json",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "stopped_reason",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "content_revision",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "staff": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "display_name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "profile_image_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "fixed_meeting_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "meeting_url_version",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "photo_media_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "photo_version",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "staff_members": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "email",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "api_key",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "invite_token_hash",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "email_verified_at",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "line_user_id",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "totp_secret_enc",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "totp_pending_secret_enc",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "password_hash",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "password_updated_at",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "email_mask",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "email_change_new",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "email_change_token_hash",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "email_change_expires_at",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "tags": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "description",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "normalized_name",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  },
+  "tracked_links": {
+    "candidates": [
+      {
+        "column": "name",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "original_url",
+        "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "og_description",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "og_image_url",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "dedup_key",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
+      }
+    ],
+    "review": "pending"
+  }
+}
