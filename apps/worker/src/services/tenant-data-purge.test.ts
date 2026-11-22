@@ -92,6 +92,32 @@ describe('tenant data retention purge', () => {
     return (row as { n: number }).n;
   }
 
+  test('複数アカウント配信を消し、別の統括の配信は残す', async () => {
+    sqlite.raw.pragma('foreign_keys = ON');
+    expect(sqlite.raw.pragma('foreign_keys', { simple: true })).toBe(1);
+    seedTenant('t1', { anchor: jst(-91) });
+    seedTenant('t2', { planStatus: 'active' });
+    sqlite.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('acc-t1-extra','extra','extra','token','secret','t1')").run();
+    for (const id of ['t1', 't2']) {
+      const accounts = id === 't1' ? ['acc-t1', 'acc-t1-extra'] : ['acc-t2'];
+      sqlite.raw.prepare("INSERT INTO broadcasts(id,title,message_type,message_content,target_type,account_ids) VALUES(?, 'test', 'text', 'test', 'multi-account-dedup', ?)").run(`broadcast-${id}`, JSON.stringify(accounts));
+      sqlite.raw.prepare("INSERT INTO broadcast_variants(id,broadcast_id,variant_key,messages_json,created_at) VALUES(?,?,'A','[]',?)").run(`variant-${id}`, `broadcast-${id}`, NOW);
+      sqlite.raw.prepare("INSERT INTO broadcast_approval_events(id,broadcast_id,actor_staff_id,action,reason,created_at) VALUES(?,?,'reviewer','approved','approved',?)").run(`approval-${id}`, `broadcast-${id}`, NOW);
+    }
+    sqlite.raw.prepare("INSERT INTO broadcasts(id,title,message_type,message_content,target_type,account_ids) VALUES('mixed', 'test', 'text', 'test', 'multi-account-dedup', ?)").run(JSON.stringify(['acc-t1', 'acc-t2']));
+    const result = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
+    expect(result.failedTenants).toBe(0);
+    expect(result.completed).toBe(1);
+    expect(count('broadcasts', 'id = ?', 'broadcast-t1')).toBe(0);
+    expect(count('broadcasts', 'id = ?', 'broadcast-t2')).toBe(1);
+    expect(count('broadcasts', 'id = ?', 'mixed')).toBe(1);
+    expect(count('broadcast_variants', 'id = ?', 'variant-t1')).toBe(0);
+    expect(count('broadcast_variants', 'id = ?', 'variant-t2')).toBe(1);
+    expect(sqlite.raw.prepare('SELECT broadcast_id, action, reason FROM broadcast_approval_events WHERE id = ?').get('approval-t1')).toEqual({ broadcast_id: null, action: 'approved', reason: 'approved' });
+    expect(sqlite.raw.prepare('SELECT broadcast_id FROM broadcast_approval_events WHERE id = ?').get('approval-t2')).toEqual({ broadcast_id: 'broadcast-t2' });
+    expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
+  });
+
   test('契約終了の統括は保護されたテンプレートも消し、許可を残さない', async () => {
     seedTenant('t1', { anchor: jst(-91) });
     sqlite.raw.prepare("INSERT INTO hq_templates (id, tenant_id, template_type, name) VALUES ('h1', 't1', 'tag', 'test')").run();
