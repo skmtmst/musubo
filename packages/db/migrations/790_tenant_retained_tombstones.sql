@@ -52,3 +52,14 @@ CREATE TRIGGER booking_monthly_attempt_identity BEFORE UPDATE ON booking_monthly
  OR NEW.payment_method_version IS NOT OLD.payment_method_version OR NEW.version!=OLD.version+1
  OR OLD.state IN('succeeded','failed','canceled') AND NEW.state!=OLD.state
 BEGIN SELECT RAISE(ABORT,'monthly_attempt_conflict'); END;
+
+-- 公開版のWebhook秘密だけを統括purge時に取り除く。
+DROP TRIGGER trg_form_versions_immutable;
+CREATE TRIGGER trg_form_versions_immutable
+BEFORE UPDATE ON form_versions
+WHEN NOT (NEW.on_submit_webhook_url IS NULL AND NEW.on_submit_webhook_headers IS NULL AND NEW."id" IS OLD."id" AND NEW."form_id" IS OLD."form_id" AND NEW."version_number" IS OLD."version_number" AND NEW."source_content_revision" IS OLD."source_content_revision" AND NEW."name" IS OLD."name" AND NEW."description" IS OLD."description" AND NEW."fields" IS OLD."fields" AND NEW."layout" IS OLD."layout" AND NEW."on_submit_tag_id" IS OLD."on_submit_tag_id" AND NEW."on_submit_scenario_id" IS OLD."on_submit_scenario_id" AND NEW."on_submit_message_type" IS OLD."on_submit_message_type" AND NEW."on_submit_message_content" IS OLD."on_submit_message_content" AND NEW."on_submit_webhook_fail_message" IS OLD."on_submit_webhook_fail_message" AND NEW."save_to_metadata" IS OLD."save_to_metadata" AND NEW."og_title" IS OLD."og_title" AND NEW."og_description" IS OLD."og_description" AND NEW."og_image_url" IS OLD."og_image_url" AND NEW."status" IS OLD."status" AND NEW."published_at" IS OLD."published_at" AND NEW."created_at" IS OLD."created_at"
+  AND EXISTS (SELECT 1 FROM form_accounts fa JOIN line_accounts a ON a.id=fa.line_account_id JOIN tenants t ON t.id=a.tenant_id
+    WHERE fa.form_id=OLD.form_id AND a.data_purged_at IS NOT NULL AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM form_accounts other JOIN line_accounts oa ON oa.id=other.line_account_id
+        WHERE other.form_id=OLD.form_id AND (oa.tenant_id IS NOT t.id OR oa.data_purged_at IS NULL))))
+BEGIN SELECT RAISE(ABORT, 'published form versions are immutable'); END;

@@ -425,6 +425,20 @@ describe('tenant data retention purge', () => {
     expect(count('form_accounts', 'form_id = ?', 'f1')).toBe(0);
   });
 
+  test('公開フォームのWebhook秘密だけをpurge時に消し、版の骨格を保つ', async () => {
+    seedTenant('t1', { anchor: jst(-91) });
+    sqlite.raw.exec(`INSERT INTO forms(id,name,on_submit_webhook_url,on_submit_webhook_headers) VALUES('secure-form','公開定義','https://secret.test','{"Authorization":"private"}');
+      INSERT INTO form_accounts(form_id,line_account_id) VALUES('secure-form','acc-t1');`);
+    expect(() => sqlite.raw.exec("UPDATE form_versions SET on_submit_webhook_url=NULL,on_submit_webhook_headers=NULL WHERE form_id='secure-form'")).toThrow(/immutable/);
+    sqlite.raw.exec("SAVEPOINT form_guard; UPDATE tenants SET purge_started_at='2026-06-01' WHERE id='t1'; UPDATE line_accounts SET data_purged_at='2026-06-01' WHERE id='acc-t1'");
+    expect(() => sqlite.raw.exec("UPDATE form_versions SET name='changed',on_submit_webhook_url=NULL,on_submit_webhook_headers=NULL WHERE form_id='secure-form'")).toThrow(/immutable/);
+    sqlite.raw.exec('ROLLBACK TO form_guard; RELEASE form_guard');
+    const outcome = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
+    expect(outcome.completed).toBe(1);
+    expect(sqlite.raw.prepare("SELECT name,on_submit_webhook_url,on_submit_webhook_headers FROM forms WHERE id='secure-form'").get()).toEqual({name:'公開定義',on_submit_webhook_url:null,on_submit_webhook_headers:null});
+    expect(sqlite.raw.prepare("SELECT name,on_submit_webhook_url,on_submit_webhook_headers FROM form_versions WHERE form_id='secure-form'").get()).toEqual({name:'公開定義',on_submit_webhook_url:null,on_submit_webhook_headers:null});
+  });
+
   test('タグを付けているフォームの定義も保持する', async () => {
     seedTenant('t1', { anchor: jst(-91) });
     seedTag('tag-1', 'acc-t1');

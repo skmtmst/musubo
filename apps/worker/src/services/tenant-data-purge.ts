@@ -309,8 +309,11 @@ async function purgeOneTenant(
     }
     // 回答フォームだけ統括またぎの使い回しを守る条件にする（? が1つ増える）。
     const sharedForm = table === 'forms';
-    const scope = sharedForm ? formsPurgeCondition() : tenantScopeCondition(table);
-    const tenantParams = sharedForm ? [tenant.id, tenant.id] : [tenant.id];
+    const sharedFormVersion = table === 'form_versions';
+    const scope = sharedForm ? formsPurgeCondition() : sharedFormVersion ? `${tenantScopeCondition(table)} AND NOT EXISTS (
+      SELECT 1 FROM form_accounts fa_other JOIN line_accounts a_other ON a_other.id=fa_other.line_account_id
+      WHERE fa_other.form_id=form_versions.form_id AND (a_other.tenant_id IS NULL OR a_other.tenant_id<>?))` : tenantScopeCondition(table);
+    const tenantParams = sharedForm || sharedFormVersion ? [tenant.id, tenant.id] : [tenant.id];
     const isRetainedParent = retainedParentSet.has(table);
     const condition = scope;
     const keyColumns = R2_KEY_COLUMNS_BY_TABLE[table] ?? [];

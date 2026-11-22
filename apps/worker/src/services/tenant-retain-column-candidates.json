@@ -778,6 +778,12 @@
         "notNull": false,
         "key": false,
         "foreignKey": false
+      },
+      {
+        "column": "on_submit_webhook_headers",
+        "notNull": false,
+        "key": false,
+        "foreignKey": false
       }
     ],
     "review": "pending"
@@ -841,6 +847,12 @@
       {
         "column": "content_revision",
         "notNull": true,
+        "key": false,
+        "foreignKey": false
+      },
+      {
+        "column": "on_submit_webhook_headers",
+        "notNull": false,
         "key": false,
         "foreignKey": false
       }

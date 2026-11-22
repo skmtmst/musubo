@@ -514,8 +514,8 @@
         "reason": "店が作成したフォームの定義のため保持"
       },
       "on_submit_webhook_url": {
-        "action": "retain",
-        "reason": "店が作成したフォームの定義のため保持"
+        "action": "null",
+        "reason": "Webhookの秘密を消去"
       },
       "on_submit_webhook_fail_message": {
         "action": "retain",
@@ -532,6 +532,10 @@
       "og_image_url": {
         "action": "retain",
         "reason": "店が作成したフォームの定義のため保持"
+      },
+      "on_submit_webhook_headers": {
+        "action": "null",
+        "reason": "Webhookの秘密を消去"
       }
     }
   },
@@ -558,8 +562,8 @@
         "reason": "店が作成したフォームの定義のため保持"
       },
       "on_submit_webhook_url": {
-        "action": "retain",
-        "reason": "店が作成したフォームの定義のため保持"
+        "action": "null",
+        "reason": "Webhookの秘密を消去"
       },
       "on_submit_webhook_fail_message": {
         "action": "retain",
@@ -576,6 +580,10 @@
       "content_revision": {
         "action": "retain",
         "reason": "店が作成したフォームの定義のため保持"
+      },
+      "on_submit_webhook_headers": {
+        "action": "null",
+        "reason": "Webhookの秘密を消去"
       }
     }
   },
