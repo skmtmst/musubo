@@ -4,7 +4,7 @@ import {BOOKING_STAFF_OWN_KEY} from '@line-crm/shared';
 import type {Env} from '../worker-env.js';
 import {gapAccount,gapWrite,GapError} from '../services/gap-common.js';
 import {beginMeetingAuthorization,consumeMeetingAuthorization} from '../features/booking/booking-meeting-oauth-state/index.js';
-import {deleteMeetingCredential,finishAuthorizedMeetingConnection,meetingConnectionState,type ConnectionProvider} from '../features/booking/booking-meeting-credentials/index.js';
+import {deleteMeetingCredential,finishAuthorizedMeetingConnection,meetingConnectionState,rotateMeetingCredentials,type ConnectionProvider} from '../features/booking/booking-meeting-credentials/index.js';
 import {exchangeMeetingAuthorization,meetingAuthorizationUrl,newMeetingVerifier} from '../features/booking/booking-meeting-oauth-client/index.js';
 import {auditLog} from '../lib/audit-log.js';
 import {preferredMeetingProvider,setPreferredMeetingProvider} from '../features/booking/booking-meeting-preference/index.js';
@@ -36,6 +36,18 @@ function adminReturn(c:Context<Env>,accountId:string,staffId:string,result:'conn
  const target=new URL('/booking/menus',origin);target.searchParams.set('tab','staff');target.searchParams.set('staff',staffId);target.searchParams.set('account_id',accountId);target.searchParams.set('meeting_connection',result);return target.toString();
 }
 const base='/api/booking/admin/staff/:id/connections/:provider';
+bookingMeetingOAuth.post('/api/booking/admin/meeting-credentials/rotate',async c=>{
+ gapWrite(c);const accountId=await gapAccount(c);if(c.get('staff').role!=='owner')throw new GapError('forbidden',403);
+ let body:unknown;try{body=await c.req.json();}catch{throw new GapError('invalid_input',400);}
+ if(!body||typeof body!=='object'||Array.isArray(body))throw new GapError('invalid_input',400);
+ const value=body as Record<string,unknown>;
+ if((value.dryRun!==undefined&&typeof value.dryRun!=='boolean')||(value.afterId!==undefined&&(typeof value.afterId!=='string'||value.afterId.length>128))||(value.limit!==undefined&&(!Number.isInteger(value.limit)||Number(value.limit)<1||Number(value.limit)>100)))throw new GapError('invalid_input',400);
+ const key=meetingCredentialKeys(c.env);await validateMeetingEncryptionKey(key);
+ if(!key.writeV2||key.rejectLegacy)throw new GapError('meeting_rotation_not_available',409);
+ const result=await rotateMeetingCredentials(c.env.DB,{accountId,encryptionKey:key,dryRun:value.dryRun!==false,afterId:value.afterId as string|undefined,limit:value.limit as number|undefined});
+ if(value.dryRun===false)auditLog(c,'booking.meeting.credentials.rotate',{kind:'meeting'},{lineAccountId:accountId});
+ return c.json({success:true,data:result});
+});
 bookingMeetingOAuth.get(base,async c=>{
  const accountId=await gapAccount(c),staffId=c.req.param('id')!,provider=providerOf(c.req.param('provider')!);await staffTarget(c,accountId,staffId,false);
  const state=await meetingConnectionState(c.env.DB,{accountId,staffId,provider});

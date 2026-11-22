@@ -98,11 +98,11 @@ export async function recoverStaleMeetingRefresh(db:D1Database,input:Scope & {no
 }
 
 /** 担当外には値を返さず、範囲を区切って旧暗号の残数を調べる。dryRun=false で CAS 更新する。 */
-export async function rotateMeetingCredentials(db:D1Database,input:{encryptionKey:MeetingKeyInput;afterId?:string;limit?:number;dryRun:boolean}):Promise<{scanned:number;needsRotation:number;rotated:number;busy:number;unreadable:number;changed:number;nextId:string|null}>{
+export async function rotateMeetingCredentials(db:D1Database,input:{accountId:string;encryptionKey:MeetingKeyInput;afterId?:string;limit?:number;dryRun:boolean}):Promise<{scanned:number;needsRotation:number;rotated:number;busy:number;unreadable:number;configurationErrors:number;changed:number;nextId:string|null}>{
  if(typeof input.encryptionKey==='string'||input.encryptionKey.writeV2!==true)throw new Error('meeting_rotation_not_enabled');
  const limit=Math.min(100,Math.max(1,Math.floor(input.limit??50)));
- const rows=(await db.prepare('SELECT id,line_account_id,staff_id,provider,credential_enc,version,refresh_state FROM booking_meeting_connections WHERE id>? ORDER BY id LIMIT ?').bind(input.afterId??'',limit).all<{id:string;line_account_id:string;staff_id:string;provider:ConnectionProvider;credential_enc:string;version:number;refresh_state:string}>()).results;
- const result={scanned:rows.length,needsRotation:0,rotated:0,busy:0,unreadable:0,changed:0,nextId:rows.length===limit?rows[rows.length-1].id:null};
+ const rows=(await db.prepare('SELECT id,line_account_id,staff_id,provider,credential_enc,version,refresh_state FROM booking_meeting_connections WHERE line_account_id=? AND id>? ORDER BY id LIMIT ?').bind(input.accountId,input.afterId??'',limit).all<{id:string;line_account_id:string;staff_id:string;provider:ConnectionProvider;credential_enc:string;version:number;refresh_state:string}>()).results;
+ const result={scanned:rows.length,needsRotation:0,rotated:0,busy:0,unreadable:0,configurationErrors:0,changed:0,nextId:rows.length===limit?rows[rows.length-1].id:null};
  for(const row of rows){
   const needsRotation=row.credential_enc.startsWith('v1.')||!row.credential_enc.startsWith(`v2.${input.encryptionKey.activeId}.`);
   if(needsRotation)result.needsRotation++;
@@ -115,7 +115,7 @@ export async function rotateMeetingCredentials(db:D1Database,input:{encryptionKe
    const cipher=await encryptMeetingCredential(JSON.stringify(decoded.credential),input.encryptionKey,scope);
    const update=await db.prepare("UPDATE booking_meeting_connections SET credential_enc=? WHERE id=? AND version=? AND refresh_state='ready' AND credential_enc=?").bind(cipher,row.id,row.version,row.credential_enc).run();
    if(update.meta.changes===1)result.rotated++;else result.changed++;
-  }catch{result.unreadable++;}
+  }catch(error){if(error instanceof MeetingKeyConfigurationError)result.configurationErrors++;else result.unreadable++;}
  }
  return result;
 }

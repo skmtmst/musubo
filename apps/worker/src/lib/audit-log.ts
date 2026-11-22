@@ -167,6 +167,7 @@ export type AuditAction =
   | 'booking.meeting.connect.start'
   | 'booking.meeting.connect'
   | 'booking.meeting.disconnect'
+  | 'booking.meeting.credentials.rotate'
   | 'google.sheets.connect.start'
   | 'google.sheets.connect'
   | 'google.sheets.reconnect'

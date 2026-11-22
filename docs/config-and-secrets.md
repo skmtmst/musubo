@@ -27,6 +27,8 @@ NEXT_PUBLIC_* と VITE_* は配信JavaScriptに入る公開情報。認証token�
 - `BOOKING_MEETING_CREDENTIAL_REJECT_V1` は任意の Worker 設定。既定は無効。全接続の移行完了後だけ `true` にすると旧形式を拒否する。旧形式の接続が残っていれば読めなくなる。旧形式は AAD がないため、移行前は行の入れ替えを検知できない。
 - 鍵の追加は、旧鍵と新鍵を両方登録して全 Worker が読めることを先に確かめ、その後に `activeId` を切り替える。新形式を書いた後は、新形式を読めない旧版へ Worker を戻さない。未使用の接続を含めた全件移行の運用手順が整うまでは、旧鍵を外さず `BOOKING_MEETING_CREDENTIAL_REJECT_V1` を有効化しない。
 - 同じ鍵 ID を別の鍵に再利用しない。`line` は従来の LINE 用の鍵を指す予約済み ID のため、`BOOKING_MEETING_CREDENTIAL_KEYS` の `keys` には指定しない。
+- オーナーは `POST /api/booking/admin/meeting-credentials/rotate?account_id=対象` で、そのアカウントの接続だけを点検できる。本文 `{}` は変更しない点検、`{"dryRun":false}` は再暗号化。`nextId` が返る間は次の本文に `afterId` として渡す。全ページの `needsRotation`・`busy`・`unreadable`・`configurationErrors`・`changed` を確認し、いずれも残っていないことを再度点検してから旧鍵を外す。接続状態が更新中・不明のものは書き換えない。
+- `busy` には更新中と状態不明の両方が含まれる。状態不明の接続が残る場合は、担当者が接続し直すか切断する。
 
 ## 機能のスイッチ（意味・既定）
 

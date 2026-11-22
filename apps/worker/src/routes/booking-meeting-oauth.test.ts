@@ -52,3 +52,22 @@ it('Google の読み込み中は試験対象外の Outlook 接続を始めない
  const response=await gapCall(app,'/api/booking/admin/staff/bs/connections/outlook/connect?account_id=a','POST',{});
  expect(response.status).toBe(409);expect(await response.json()).toMatchObject({error:'outlook_test_staff_required'});expect(fetcher).not.toHaveBeenCalled();
 });
+it('接続鍵の移行はオーナーのみで、既定は読み取りだけ',async()=>{
+ const {encryptCredential}=await import('@line-crm/db');
+ const encrypted=await encryptCredential(JSON.stringify({provider:'zoom',externalAccountId:'example',refreshToken:'secret'}),key);
+ d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('c','a','bs','zoom',?,'o','2026-01-01','2026-01-01')").run(encrypted);
+ d.raw.exec("INSERT INTO staff(id,line_account_id,name,display_name) VALUES('other-bs','b','担当','担当')");
+ d.raw.prepare("INSERT INTO booking_meeting_connections(id,line_account_id,staff_id,provider,credential_enc,connected_by,created_at,updated_at) VALUES('other','b','other-bs','zoom',?,'o','2026-01-01','2026-01-01')").run(encrypted);
+ const config={...bindings,BOOKING_MEETING_CREDENTIAL_V2_ENABLED:'true'};
+ const url='/api/booking/admin/meeting-credentials/rotate?account_id=a';
+ const read=gapApp(d,[bookingMeetingOAuth],{...gapOwner,readOnly:true},false,config);
+ expect((await gapCall(read,url,'POST',{})).status).toBe(403);
+ const staff=gapApp(d,[bookingMeetingOAuth],{id:'someone',name:'担当',role:'staff',readOnly:false,tenantId:'t'},false,config);
+ expect((await gapCall(staff,url,'POST',{})).status).toBe(403);
+ const app=gapApp(d,[bookingMeetingOAuth],gapOwner,false,config);
+ expect(await (await gapCall(app,url,'POST',{})).json()).toMatchObject({data:{scanned:1,needsRotation:1,rotated:0}});
+ expect((d.raw.prepare("SELECT credential_enc FROM booking_meeting_connections WHERE id='c'").get() as {credential_enc:string}).credential_enc).toBe(encrypted);
+ expect(await (await gapCall(app,url,'POST',{dryRun:false})).json()).toMatchObject({data:{needsRotation:1,rotated:1}});
+ expect((d.raw.prepare("SELECT credential_enc FROM booking_meeting_connections WHERE id='c'").get() as {credential_enc:string}).credential_enc).toMatch(/^v2\.line\./);
+ expect((d.raw.prepare("SELECT credential_enc FROM booking_meeting_connections WHERE id='other'").get() as {credential_enc:string}).credential_enc).toBe(encrypted);
+});

@@ -130,12 +130,12 @@ it('未使用の旧接続も dry-run で数え、実行時だけ新しい鍵で�
  const legacy=await encryptCredential(JSON.stringify(credential),key);
  d.raw.prepare("UPDATE booking_meeting_connections SET credential_enc=? WHERE line_account_id='a'").run(legacy);
  const keys={legacyKey:key,activeId:'new',keys:{new:btoa('n'.repeat(32))},writeV2:true};
- expect(await rotateMeetingCredentials(d.db,{encryptionKey:keys,dryRun:true})).toMatchObject({scanned:1,needsRotation:1,rotated:0,unreadable:0});
+ expect(await rotateMeetingCredentials(d.db,{accountId:'a',encryptionKey:keys,dryRun:true})).toMatchObject({scanned:1,needsRotation:1,rotated:0,unreadable:0});
  d.raw.prepare("UPDATE booking_meeting_connections SET refresh_state='unknown'").run();
- expect(await rotateMeetingCredentials(d.db,{encryptionKey:keys,dryRun:true})).toMatchObject({needsRotation:1,busy:1,rotated:0});
+ expect(await rotateMeetingCredentials(d.db,{accountId:'a',encryptionKey:keys,dryRun:true})).toMatchObject({needsRotation:1,busy:1,rotated:0});
  d.raw.prepare("UPDATE booking_meeting_connections SET refresh_state='ready'").run();
  expect((d.raw.prepare('SELECT credential_enc FROM booking_meeting_connections').get() as {credential_enc:string}).credential_enc).toBe(legacy);
- expect(await rotateMeetingCredentials(d.db,{encryptionKey:keys,dryRun:false})).toMatchObject({needsRotation:1,rotated:1,changed:0});
+ expect(await rotateMeetingCredentials(d.db,{accountId:'a',encryptionKey:keys,dryRun:false})).toMatchObject({needsRotation:1,rotated:1,changed:0});
  expect((d.raw.prepare('SELECT credential_enc FROM booking_meeting_connections').get() as {credential_enc:string}).credential_enc).toMatch(/^v2\.new\./);
- expect(await rotateMeetingCredentials(d.db,{encryptionKey:keys,dryRun:true})).toMatchObject({needsRotation:0,unreadable:0});
+ expect(await rotateMeetingCredentials(d.db,{accountId:'a',encryptionKey:keys,dryRun:true})).toMatchObject({needsRotation:0,unreadable:0});
 });
