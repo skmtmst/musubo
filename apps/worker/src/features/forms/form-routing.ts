@@ -12,22 +12,22 @@ export async function routingTargetUsable(db:D1Database,a:string,t:RoutingTarget
  const staff=(await db.prepare(`SELECT s.id FROM staff s JOIN staff_menus sm ON sm.staff_id=s.id AND sm.menu_id=? AND sm.is_offered=1 WHERE s.line_account_id=? AND s.is_active=1 AND s.deleted_at IS NULL AND s.is_designation_optional=0`).bind(t.menuId,a).all<{id:string}>()).results.map(x=>x.id);
  return ids?ids.some(id=>staff.includes(id)):staff.length>0;
 }
-export async function validateLayoutRouting(db:D1Database,a:string,layout:FormLayout){
+export async function validateLayoutRouting(db:D1Database,a:string,layout:FormLayout, options:{validateTargets?:boolean}={}){
  const inputs=collectInputs(layout);
  for(const block of inputs){const r=block.booking?.routing;if(!r)continue;
   if(typeof r.enabled!=='boolean'||!Array.isArray(r.rules)||r.rules.length>50||!r.fallback)throw new GapError('routing_invalid');
   for(const [index,row] of r.rules.entries()){
    if(!row||!Array.isArray(row.conditions)||row.conditions.length<1||row.conditions.length>3)throw new GapError(`routing_invalid:${index}`);
-   for(const cond of row.conditions){const q=inputs.find(x=>x.id===cond.questionId);
+   for(const cond of row.conditions){if(!cond || typeof cond!=='object')throw new GapError(`routing_condition_invalid:${index}`);const q=inputs.find(x=>x.id===cond.questionId);
     if(!q||!['radio','checkbox','select','rating'].includes(q.type))throw new GapError(`routing_question_invalid:${index}`);
     if(!['is','in','between'].includes(cond.op))throw new GapError(`routing_condition_invalid:${index}`);
     if(cond.op==='is'&&typeof cond.value!=='string')throw new GapError(`routing_condition_invalid:${index}`);
     if(cond.op==='in'&&(!Array.isArray(cond.value)||!cond.value.length||cond.value.some(x=>typeof x!=='string')))throw new GapError(`routing_condition_invalid:${index}`);
     if(cond.op==='between'&&(q.type!=='rating'||!Array.isArray(cond.value)||cond.value.length!==2||cond.value.some(x=>typeof x!=='number'||!Number.isFinite(x))||Number(cond.value[0])>Number(cond.value[1])))throw new GapError(`routing_condition_invalid:${index}`);
    }
-   if(r.enabled&&!await routingTargetUsable(db,a,row.target))throw new GapError(`routing_target_invalid:${index}`);
+   if(r.enabled&&options.validateTargets!==false&&!await routingTargetUsable(db,a,row.target))throw new GapError(`routing_target_invalid:${index}`);
   }
-  if(r.enabled&&!await routingTargetUsable(db,a,r.fallback))throw new GapError('routing_fallback_invalid');
+  if(r.enabled&&options.validateTargets!==false&&!await routingTargetUsable(db,a,r.fallback))throw new GapError('routing_fallback_invalid');
  }
 }
 export function matchRouting(r:BookingRouting,layout:FormLayout,answers:Record<string,unknown>):number{

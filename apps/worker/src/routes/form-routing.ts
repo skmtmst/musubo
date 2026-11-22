@@ -1,7 +1,8 @@
+import { normalizeLayout } from '@line-crm/shared';
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapWrite,gapVersion} from '../services/gap-common.js';
-import {loadRoutingLayout,resolveRouting,issueRoutingToken} from '../features/forms/form-routing/index.js';
+import {loadRoutingLayout,resolveRouting,issueRoutingToken,validateLayoutRouting} from '../features/forms/form-routing/index.js';
 import {resolveAccountIdFromLiff,resolveFriendId,verifyCallerLineUserId} from './booking.js';
 import {requireDeliveryAccess,requirePermission} from '../middleware/role-guard.js';
 export const formRouting=new Hono<Env>();
@@ -9,7 +10,10 @@ formRouting.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.c
 formRouting.post('/api/forms/:id/routing/preview',requireDeliveryAccess('forms','view'),async(c)=>{
  const a=await gapAccount(c),b=await gapBody(c),layout=await loadRoutingLayout(c.env.DB,c.req.param('id'),a,false);
  if(!b.answers||typeof b.answers!=='object'||Array.isArray(b.answers))throw new GapError('invalid_answers');
- return c.json({success:true,data:await resolveRouting(c.env.DB,a,layout.layout,b.answers as Record<string,unknown>,b.blockId as string|undefined)});
+ const draft=b.layout === undefined ? layout.layout : normalizeLayout(b.layout);
+ if(!draft)throw new GapError('routing_invalid');
+ if(b.layout!==undefined) await validateLayoutRouting(c.env.DB,a,draft,{validateTargets:false});
+ return c.json({success:true,data:await resolveRouting(c.env.DB,a,draft,b.answers as Record<string,unknown>,b.blockId as string|undefined)});
 });
 formRouting.post('/api/liff/forms/:id/routing/resolve',async(c)=>{
  const a=await resolveAccountIdFromLiff(c),user=await verifyCallerLineUserId(c);if(!a||!user)throw new GapError('unauthorized',401);

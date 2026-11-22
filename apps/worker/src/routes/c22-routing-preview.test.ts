@@ -1,0 +1,29 @@
+import { afterEach, beforeEach, expect, test } from 'vitest';
+import { normalizeLayout } from '@line-crm/shared';
+import { formRouting } from './form-routing.js';
+import { gapApp, gapCall, gapFixture, gapOwner } from '../test-utils/gap1.js';
+import type { SqliteD1 } from '../test-utils/d1-sqlite.js';
+
+let d:SqliteD1;
+const layout=()=>normalizeLayout({sections:[{id:'s',blocks:[{id:'q',kind:'input',type:'radio',name:'subject',label:'内容',choices:[{id:'yes',label:'相談'}]},{id:'book',kind:'input',type:'booking',name:'book',label:'予約',booking:{menuId:'menu',routing:{enabled:true,rules:[{conditions:[{questionId:'q',op:'is',value:'相談'}],target:{menuId:'menu',staffId:'bs'}}],fallback:{menuId:'menu'}}}}]}]})!;
+beforeEach(()=>{d=gapFixture();d.raw.prepare("INSERT INTO forms(id,name,fields,layout) VALUES('form','相談','[]',?)").run(JSON.stringify(layout()));d.raw.exec("INSERT INTO form_accounts(form_id,line_account_id) VALUES('form','a')")});
+afterEach(()=>d.raw.close());
+test('未保存の行を閲覧権限で試し、フォームは変えない',async()=>{
+ const draft=layout(); const booking=draft.sections[0].blocks[1]; if(booking.kind!=='input'||!booking.booking?.routing)throw Error('fixture');
+ booking.booking.routing.rules=[];
+ const before=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get();
+ const r=await gapCall(gapApp(d,[formRouting],{...gapOwner,readOnly:true}),'/api/forms/form/routing/preview?account_id=a','POST',{answers:{subject:'相談'},layout:draft});
+ expect(r.status).toBe(200); expect(await r.json()).toMatchObject({data:{matchedIndex:-1}});
+ expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
+});
+test('他の店舗のフォームは未保存の版を渡しても試せない',async()=>{
+ const r=await gapCall(gapApp(d,[formRouting]),'/api/forms/form/routing/preview?account_id=b','POST',{answers:{subject:'相談'},layout:layout()});
+ expect(r.status).toBe(404);
+});
+test('条件が壊れた試行は400で断り、保存しない',async()=>{
+ const draft=JSON.parse(JSON.stringify(layout())) as {sections:Array<{blocks:Array<{booking?:{routing:{rules:Array<{conditions:unknown[]}>}}}>}>};
+ draft.sections[0].blocks[1].booking!.routing.rules[0].conditions=[null];
+ const before=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get();
+ const r=await gapCall(gapApp(d,[formRouting]),'/api/forms/form/routing/preview?account_id=a','POST',{answers:{subject:'相談'},layout:draft});
+ expect(r.status).toBe(400);expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
+});
