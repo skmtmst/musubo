@@ -42,6 +42,10 @@ test('real purge keeps and redacts a bulk approval parent', async () => {
   expect(row.selection_json).not.toContain('private');
   expect(row.operation_json).not.toContain('private');
   expect(row.created_by).not.toContain('private');
+  const {getFriendBulkRun,getFriendBulkRunRow}=await import('@line-crm/db');
+  f.raw.exec("UPDATE tenants SET data_purged_at=NULL,plan_status='active' WHERE id='t'");
+  expect(await getFriendBulkRun(f.db,'run','t')).toBeNull();
+  expect(await getFriendBulkRunRow(f.db,'run')).toBeNull();
 });
 
 test('retained privacy audit survives purge of the session and operator', async () => {

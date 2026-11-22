@@ -40,6 +40,7 @@ describe('友だち一括操作', () => {
 
   beforeEach(() => {
     testDb = createTestD1();
+    testDb.raw.exec("INSERT OR IGNORE INTO tenants(id,name) VALUES ('default','fixture')");
     addAccount(testDb.raw, 'account-1');
     addAccount(testDb.raw, 'account-2');
     insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', is_following: 1 });
@@ -359,6 +360,7 @@ describe('一括の成果登録は主経路と同じ4つのsnapshotを凍結す�
 
   beforeEach(() => {
     testDb = createTestD1();
+    testDb.raw.exec("INSERT OR IGNORE INTO tenants(id,name) VALUES ('default','fixture')");
     addAccount(testDb.raw, 'account-1');
     insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', is_following: 1 });
     // 実装は地点作成時にアカウントの統括を tenant_id へ写す。
@@ -432,6 +434,7 @@ describe('一括操作の友だち情報は型どおりに検証する（N-042�
 
   beforeEach(() => {
     testDb = createTestD1();
+    testDb.raw.exec("INSERT OR IGNORE INTO tenants(id,name) VALUES ('default','fixture')");
     addAccount(testDb.raw, 'account-1');
     insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', is_following: 1 });
     testDb.raw.prepare(

@@ -9,6 +9,8 @@ import type {
 } from '@line-crm/shared';
 import { idChunks } from './id-queries.js';
 
+const liveBulkRun = (alias:string) => `EXISTS (SELECT 1 FROM tenants t WHERE t.id=${alias}.tenant_id AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL) AND NOT EXISTS (SELECT 1 FROM tenant_purge_tombstone_progress p WHERE p.tenant_id=${alias}.tenant_id AND p.table_name='friend_bulk_runs' AND p.row_id=${alias}.id)`;
+
 interface RunRow {
   id: string;
   tenant_id: string;
@@ -134,7 +136,7 @@ export async function createFriendBulkRun(
   );
   const findExisting = () => db.prepare(
     `SELECT * FROM friend_bulk_runs
-      WHERE tenant_id = ? AND created_by = ? AND idempotency_key = ?`,
+      WHERE tenant_id = ? AND created_by = ? AND idempotency_key = ? AND ${liveBulkRun('friend_bulk_runs')}`,
   ).bind(input.tenantId, input.createdBy, input.idempotencyKey).first<RunRow & { undo_of_run_id: string | null }>();
   const existing = await findExisting();
   if (existing && !matchesRequest(existing)) {
@@ -149,7 +151,8 @@ export async function createFriendBulkRun(
          (id, tenant_id, created_by, selection_json, operation_json, execution_plan_json, status,
           target_count, excluded_count, reversible, idempotency_key, scheduled_at,
           undo_of_run_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'preparing', 0, ?, ?, ?, ?, ?, ?, ?)`,
+       SELECT ?, ?, ?, ?, ?, ?, 'preparing', 0, ?, ?, ?, ?, ?, ?, ?
+       WHERE EXISTS (SELECT 1 FROM tenants WHERE id=? AND purge_started_at IS NULL AND data_purged_at IS NULL)`,
     ).bind(
       runId,
       input.tenantId,
@@ -164,7 +167,9 @@ export async function createFriendBulkRun(
       undoOfRunId,
       input.now,
       input.now,
+      input.tenantId,
     ),
+    db.prepare("SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'BULK_TENANT_UNAVAILABLE' END)"),
   ];
   if (input.messageApprovalThreshold !== undefined) {
     statements.push(db.prepare(`INSERT INTO friend_bulk_message_approvals
@@ -221,7 +226,7 @@ export async function getFriendBulkRun(
   tenantId: string,
 ): Promise<FriendBulkRunSummary | null> {
   const row = await db.prepare(
-    `SELECT * FROM friend_bulk_runs WHERE id = ? AND tenant_id = ?`,
+    `SELECT * FROM friend_bulk_runs WHERE id = ? AND tenant_id = ? AND ${liveBulkRun('friend_bulk_runs')}`,
   ).bind(id, tenantId).first<RunRow>();
   return row ? serializeRun(row) : null;
 }
@@ -246,7 +251,7 @@ export async function getFriendBulkRunDetail(
 }
 
 export async function getFriendBulkRunRow(db: D1Database, id: string): Promise<RunRow | null> {
-  return db.prepare(`SELECT * FROM friend_bulk_runs WHERE id = ?`).bind(id).first<RunRow>();
+  return db.prepare(`SELECT * FROM friend_bulk_runs WHERE id = ? AND ${liveBulkRun('friend_bulk_runs')}`).bind(id).first<RunRow>();
 }
 
 export async function getFriendBulkRunItemRows(db: D1Database, runId: string): Promise<ItemRow[]> {
@@ -384,7 +389,7 @@ export async function listDueFriendBulkRunIds(
     `SELECT DISTINCT r.id
        FROM friend_bulk_runs r
        JOIN friend_bulk_run_items i ON i.run_id = r.id
-      WHERE r.status IN ('queued','running','waiting')
+      WHERE r.status IN ('queued','running','waiting') AND ${liveBulkRun('r')}
         AND NOT EXISTS (SELECT 1 FROM friend_bulk_message_approvals a
           WHERE a.run_id = r.id AND a.status IN ('pending', 'expired'))
         AND (r.scheduled_at IS NULL OR r.scheduled_at <= ?)
