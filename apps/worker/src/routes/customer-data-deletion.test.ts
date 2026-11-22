@@ -1,3 +1,4 @@
+import { upsertFriend } from '@line-crm/db';
 import { seedExistingRestaurantFollowup } from '../test-utils/restaurant-followup-fixture.js';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -97,6 +98,21 @@ describe('private data deletion', () => {
     expect((await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env())).status).toBe(200);
     expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
   });
+  it('削除後の再接触は新しい友だちを作り、古いデータを引き継がない', async () => {
+    sqlite.raw.exec(`INSERT INTO chats (id,friend_id,notes,created_at,updated_at) VALUES ('old-chat','u','old-private','now','now');
+      INSERT INTO messages_log (id,friend_id,direction,message_type,content) VALUES ('old-message','u','incoming','text','old-private');`);
+    const response = await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env());
+    expect(response.status).toBe(200);
+    const friend = await upsertFriend(sqlite.db, { lineUserId: 'LINE-private', lineAccountId: 'a', displayName: '新しいプロフィール' });
+    expect(friend.id).not.toBe('u');
+    expect(friend.display_name).toBe('新しいプロフィール');
+    expect(sqlite.raw.prepare('SELECT id FROM chats WHERE friend_id=?').all(friend.id)).toEqual([]);
+    expect(sqlite.raw.prepare('SELECT id FROM messages_log WHERE friend_id=?').all(friend.id)).toEqual([]);
+    expect(sqlite.raw.prepare('SELECT id FROM form_submissions WHERE friend_id=?').all(friend.id)).toEqual([]);
+    expect(sqlite.raw.prepare("SELECT id FROM friends WHERE id='u'").get()).toBeUndefined();
+    expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
+  });
+
   it('removes only the selected friend from live broadcast recipients', async () => {
     sqlite.raw.exec(`INSERT INTO broadcasts(id,title,message_type,message_content,target_type,line_account_id) VALUES('br','Test','text','A','all','a');
       INSERT INTO broadcast_ab_live_recipients(broadcast_id,friend_id,variant_key) VALUES('br','u','A'),('br','v','B');`);
