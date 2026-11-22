@@ -502,6 +502,34 @@ describe('飲食店向けテストAPI', () => {
     expect(direction.sync_direction).toBe('inbound_only');
   });
 
+  it.each(['restaurant_board', 'reszaiko'])('%s の同期は匿名化済み予約の個人情報を復元しない', async (provider) => {
+    seedRestaurantFixture();
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const reservation = { externalId: 'SYNC-PRIVACY', customerName: '元 太郎', customerPhone: '09012345678',
+      lineUid: 'U-original', allergyNote: 'えび', note: '個人メモ', guestCount: 2,
+      startsAt: '2026-09-11T10:00:00.000Z', endsAt: '2026-09-11T12:00:00.000Z',
+      sourceUpdatedAt: '2026-09-10T00:00:00.000Z' };
+    const send = (eventId: string, data: typeof reservation & { status?: string }) => request('/api/restaurant-test/inbound/reservations?account_id=account-1', { storeId: store.id, provider, eventId, reservation: data });
+    expect((await send('privacy-first', reservation)).status).toBe(201);
+    testDb.raw.prepare("UPDATE rt_reservations SET customer_name='削除済みのお客さま', customer_phone=NULL, line_uid=NULL, allergy_note=NULL, note=NULL WHERE store_id=? AND source=? AND external_id=?").run(store.id, provider, reservation.externalId);
+    const newer = { ...reservation, customerName: '再登録 太郎', customerPhone: '08012345678', lineUid: 'U-new', allergyNote: '卵', note: '再登録メモ', guestCount: 4, startsAt: '2026-09-12T10:00:00.000Z', endsAt: '2026-09-12T12:00:00.000Z', status: 'cancelled', sourceUpdatedAt: '2026-09-11T00:00:00.000Z' };
+    expect((await send('privacy-second', newer)).status).toBe(201);
+    const row = testDb.raw.prepare('SELECT customer_name,customer_phone,line_uid,allergy_note,note,guest_count,starts_at,status FROM rt_reservations WHERE store_id=? AND source=? AND external_id=?').get(store.id, provider, reservation.externalId);
+    expect(row).toMatchObject({ customer_name: '削除済みのお客さま', customer_phone: null, line_uid: null, allergy_note: null, note: null, guest_count: 4, starts_at: newer.startsAt, status: 'cancelled' });
+    expect(testDb.raw.prepare('SELECT payload_json FROM rt_sync_events WHERE store_id=? AND provider=? AND external_event_id=?').get(store.id, provider, 'privacy-second')).toEqual({ payload_json: '{}' });
+  });
+
+  it('匿名化していない予約は外部同期で個人情報も更新する', async () => {
+    seedRestaurantFixture();
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const reservation = { externalId: 'SYNC-NORMAL', customerName: '元 太郎', customerPhone: '09012345678', lineUid: 'U-original', allergyNote: 'えび', note: '元メモ', guestCount: 2, startsAt: '2026-09-11T10:00:00.000Z', endsAt: '2026-09-11T12:00:00.000Z', sourceUpdatedAt: '2026-09-10T00:00:00.000Z' };
+    const send = (eventId: string, data: typeof reservation) => request('/api/restaurant-test/inbound/reservations?account_id=account-1', { storeId: store.id, provider: 'restaurant_board', eventId, reservation: data });
+    expect((await send('normal-first', reservation)).status).toBe(201);
+    const newer = { ...reservation, customerName: '変更 花子', customerPhone: '08012345678', lineUid: 'U-new', allergyNote: '卵', note: '新メモ', guestCount: 3, sourceUpdatedAt: '2026-09-11T00:00:00.000Z' };
+    expect((await send('normal-second', newer)).status).toBe(201);
+    expect(testDb.raw.prepare('SELECT customer_name,customer_phone,line_uid,allergy_note,note,guest_count FROM rt_reservations WHERE store_id=? AND source=? AND external_id=?').get(store.id, 'restaurant_board', reservation.externalId)).toMatchObject({ customer_name: newer.customerName, customer_phone: newer.customerPhone, line_uid: newer.lineUid, allergy_note: newer.allergyNote, note: newer.note, guest_count: 3 });
+  });
+
   it('双方向を示す未知の媒体値を拒否する', async () => {
     seedRestaurantFixture();
     const store = testDb.raw.prepare('SELECT id FROM rt_stores LIMIT 1').get() as { id: string };
