@@ -471,6 +471,8 @@
 
 ## 反映履歴
 
+- [複数アカウント配信の再送時の重複を防止](release-log/unreleased/146-kenta-a21-multi-resend.md) — 反映履歴、確認 2026-11-21。
+
 - [開店準備の接続・コース入力・再開](release-log/unreleased/148-masato-first-guide-recheck.md) — 反映履歴、確認 2026-11-21。
 - [LINE接続の自動更新](release-log/unreleased/152-masato-line-token-auto-renew.md) — 反映履歴、確認 2026-11-22。
 
