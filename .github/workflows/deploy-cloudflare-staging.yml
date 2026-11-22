@@ -141,10 +141,7 @@ jobs:
           fi
           grep -q '^name = "nen-line-stg"$' apps/worker/wrangler.staging.toml
           grep -q 'database_name = "nen-line-stg"' apps/worker/wrangler.staging.toml
-          if grep -q '^\[triggers\]' apps/worker/wrangler.staging.toml; then
-            echo "::error::検証Workerでcronが有効です。通知事故を防ぐため中止します。"
-            exit 1
-          fi
+          node scripts/deploy/staging-cron-policy.mjs apps/worker/wrangler.staging.toml
 
       - name: Count pending staging D1 migrations
         id: pending_migrations

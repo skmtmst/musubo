@@ -51,6 +51,7 @@ export {
 } from './line-accounts-stats.js';
 export {
   getLineAccountByChannelId,
+  saveRenewedLineAccessToken,
   updateLineAccount,
   updateLineAccountFields,
   updateLineAccountOrder,

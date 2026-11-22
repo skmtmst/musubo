@@ -1,3 +1,4 @@
+import { finishDedupBroadcast, recoverDispatchedDedupClaims } from './broadcast-dedup-progress.js';
 import { parseStoredConditions, stealthChunkSize } from './broadcast-queue-planning.js';
 export { stealthChunkSize } from './broadcast-queue-planning.js';
 import { assertLimitedAudienceNames, storedDeliveryLimit, limitedDeliveryPlan, freezeLimitedAudience, holdLimitedBroadcast, renewLimitedReservation, LimitedBroadcastError } from './broadcast-delivery-limit.js';
@@ -1033,6 +1034,7 @@ async function processQueuedBroadcastBatches(
 
   // 複数アカウントの重複除外は専用処理へ委ねる。内部でアカウント別に LIFF ID と本文を組み立てるため、計測リンク化済みの message_type/message_content を渡して変換結果を失わないようにする。
   if (broadcast.target_type === 'multi-account-dedup') {
+    await recoverDispatchedDedupClaims(db, broadcast.id, lockVersion);
     const { processMultiAccountDedupBroadcast } = await import('../../services/dedup-broadcast.js');
     const broadcastForDedup = {
       ...broadcast,
@@ -1046,14 +1048,10 @@ async function processQueuedBroadcastBatches(
       // 進捗 (dedup_progress / success_count) は batch ごとに永続化済みなので、
       // success_count は加算しない (第4引数 0)。これで 5000 人配信でも 1 実行が短く終わり、
       // Worker 時間制限に当たって stall することが無くなる (= 分割送信)。
-      await updateBroadcastBatchProgress(db, broadcast.id, 0, 0);
+      await releaseProgress(0);
       return;
     }
-    await createBroadcastInsight(db, broadcast.id);
-    await updateBroadcastStatus(db, broadcast.id, 'sent', {
-      totalCount: result.totalCount,
-      successCount: result.successCount,
-    });
+    await finishDedupBroadcast(db, broadcast.id, lockVersion, Number(raw.send_attempt_no ?? 1), result);
     return;
   }
 

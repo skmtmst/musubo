@@ -52,7 +52,7 @@ import styles from './edit.module.css'
  * 「受ける人数」は今のデータに無いので置かない（口待ち）。所要時間を保存する。
  */
 
-type Period = 'lunch' | 'dinner' | 'both'
+type Period = '' | 'lunch' | 'dinner' | 'both'
 type Draft = { duration: string; kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string; description: string; imageMediaId: string | null; photos: RestaurantCoursePhoto[]; status: 'draft' | 'active' }
 const LIST_HREF = '/restaurant-test/menu'
 const GUIDE_DURATION_OPTIONS = Array.from({ length: 12 }, (_, index) => {
@@ -68,11 +68,11 @@ function periodLabel(periods: string[]): string {
   return periods.map((period) => (period === 'lunch' ? 'ランチ' : 'ディナー')).join('・') || emptyValue('unknown')
 }
 function draftOf(item: RestaurantMenuItem | null): Draft {
-  if (!item) return { duration: '120', kind: 'course', name: '', price: '', period: 'dinner', effectiveAt: '', allergens: '', description: '', imageMediaId: null, photos: [], status: 'draft' }
+  if (!item) return { duration: '', kind: 'course', name: '', price: '', period: '', effectiveAt: '', allergens: '', description: '', imageMediaId: null, photos: [], status: 'draft' }
   const periods = storedStringList(item.service_periods_json)
   return {
     duration: item.duration_minutes == null ? '' : String(item.duration_minutes), kind: item.kind, name: item.name, price: String(item.price),
-    period: periods.length > 1 ? 'both' : periods[0] === 'lunch' ? 'lunch' : 'dinner',
+    period: periods.length > 1 ? 'both' : periods[0] === 'lunch' || periods[0] === 'dinner' ? periods[0] : '',
     effectiveAt: '', allergens: storedStringList(item.allergens_json).join(', '), description: item.description ?? '', imageMediaId: item.image_media_id ?? null, photos: readRestaurantCoursePhotos(item.photo_gallery_json, item.image_media_id), status: item.status === 'draft' ? 'draft' : 'active',
   }
 }
@@ -155,9 +155,7 @@ function MenuEditBody() {
   const exceedsPriceLimit = (!editing || priceChanged) && Number(draft.price) > 1_000_000
   const valid = draft.name.trim() !== '' && draft.price !== '' && Number.isInteger(Number(draft.price)) && Number(draft.price) >= 0 && !exceedsPriceLimit
   const durationError = !course ? undefined : draft.duration === '' ? '所要時間を入力してください。' : !Number.isInteger(Number(draft.duration)) || Number(draft.duration) < 15 || Number(draft.duration) > 600 ? '所要時間は15〜600分の整数で入力してください。' : undefined
-  /* 開店準備ガイド⑥の手順2/3（枠14 KI5X0）は基本を入れ終えた時に次へ進む。 */
   const guideFormReady = valid && !durationError
-  useEffect(() => { if (guideFormReady) emitGuideSignal('menu.form') }, [guideFormReady])
   const priceError = draft.price === '' ? undefined : Number(draft.price) < 0 ? '値段は0円以上で入れてください。' : exceedsPriceLimit ? '値段は1,000,000円以下で入れてください。' : !Number.isInteger(Number(draft.price)) ? '値段は整数で入れてください。' : undefined
 
   const [confirmationScope, setConfirmationScope] = useState('')
@@ -187,7 +185,7 @@ function MenuEditBody() {
         : (editing && draft.imageMediaId === (editing.image_media_id ?? null) ? {} : { imageMediaId: draft.imageMediaId })),
       effectiveAt: draft.effectiveAt ? datetimeLocalJstToUtcIso(draft.effectiveAt) : null,
       allergens: draft.allergens.split(',').map((part) => part.trim()).filter(Boolean),
-      servicePeriods: draft.period === 'both' ? ['lunch', 'dinner'] : [draft.period],
+      servicePeriods: draft.period === 'both' ? ['lunch', 'dinner'] : draft.period ? [draft.period] : [],
     }
     try {
       if (editing) {
@@ -281,14 +279,14 @@ function MenuEditBody() {
                 error={durationAttempted ? durationError : undefined}>
                 {guidedCourse
                   ? <Select id="rs-menu-duration" aria-label="所要時間" size="full" value={draft.duration}
-                    options={GUIDE_DURATION_OPTIONS} onChange={duration => setDraft(current => ({ ...current, duration }))} />
+                    options={[{ value: '', label: '所要時間を選ぶ', disabled: true }, ...GUIDE_DURATION_OPTIONS]} onChange={duration => setDraft(current => ({ ...current, duration }))} />
                   : <NumberInput id="rs-menu-duration" aria-label="所要時間" unit="分" min={15} max={600} required
                     value={draft.duration} onChange={event => setDraft(current => ({ ...current, duration: event.target.value }))} />}
               </Field> : null
   const periodField = <Field label={guidedCourse ? "提供時間帯" : "出す時間帯"}>
                 <SaveErrorField names={['period', 'draft.period']}><Select aria-label="提供時間" size="full" value={draft.period}
-                  onChange={(value) => setDraft({ ...draft, period: value === 'lunch' ? 'lunch' : value === 'both' ? 'both' : 'dinner' })}
-                  options={[{ value: 'lunch', label: 'ランチ' }, { value: 'dinner', label: 'ディナー' }, { value: 'both', label: 'ランチ・ディナー' }]} /></SaveErrorField>
+                  onChange={(value) => setDraft({ ...draft, period: value === 'lunch' || value === 'dinner' || value === 'both' ? value : '' })}
+                  options={[{ value: '', label: '提供時間帯を選ぶ' }, { value: 'lunch', label: 'ランチ' }, { value: 'dinner', label: 'ディナー' }, { value: 'both', label: 'ランチ・ディナー' }]} /></SaveErrorField>
               </Field>
 
   const publishStatusField = !editing || draftItem ? <Field label="保存する状態" help="下書きは、お客さまに見せるメニューには出ません。内容を確かめてから公開できます。">
@@ -320,7 +318,7 @@ function MenuEditBody() {
             {!guidedCourse ? <CardHeader size="stacked" title="基本" /> : null}
             {guidedCourse ? null : publishStatusField}
             {/* 開店準備ガイド⑥の手順2/3（枠14 KI5X0）の光らせる先。 */}
-            <div data-guide-anchor="menu.form" className={styles.guideBasics}>
+            <div data-guide-anchor="menu.form" data-guide-ready={guideFormReady || undefined} className={styles.guideBasics}>
               {guidedCourse ? <CardHeader size="stacked" title="基本" /> : null}
               <SettingsFormRow layout="columns" columns={3}>
               <Field label={course ? 'コースの名前' : 'メニューの名前'} htmlFor="rs-menu-name" required>

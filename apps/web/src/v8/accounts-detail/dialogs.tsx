@@ -393,36 +393,28 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
     return () => { alive.current = false }
   }, [])
   const [secret, setSecret] = useState('')
-  const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const secretId = useId()
-  const tokenId = useId()
+  const secretField = kind === 'messaging' ? 'channelSecret' : 'loginChannelSecret'
   const depth = useContext(OverlayDepthContext)
   useInvalidFocus(fieldErrors, { secret: secretId })
 
   const close = () => {
     if (busy) return
     setSecret('')
-    setToken('')
     setError('')
     onClose()
   }
-  const dirty = secret !== '' || token !== ''
+  const dirty = secret !== ''
   const guard = useUnsavedGuard({ dirty: dirty || busy, busy, onDiscard: close })
   const requestClose = () => guard.guarded(() => { if (!dirty) close() })
 
   const save = async (stepUpToken?: string) => {
-    const payload: Parameters<typeof api.lineAccounts.update>[1] = {}
-    if (kind === 'messaging') {
-      if (secret.trim()) payload.channelSecret = secret.trim()
-      if (token.trim()) payload.channelAccessToken = token.trim()
-    } else if (secret.trim()) {
-      payload.loginChannelSecret = secret.trim()
-    }
-    if (Object.keys(payload).length === 0) {
+    const value = secret.trim()
+    if (!value) {
       setFieldErrors({ secret: '差し替える値を入れてください。空の欄は今の値のままにします。' })
       setError('')
       return
@@ -430,11 +422,10 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
     setBusy(true)
     setError('')
     try {
-      const res = await api.lineAccounts.update(account.id, payload, stepUpToken)
+      const res = await api.lineAccounts.update(account.id, { [secretField]: value }, stepUpToken)
       if (!alive.current) return
       if (!res.success) throw new Error(res.error)
       setSecret('')
-      setToken('')
       onSaved()
       onClose()
     } catch (caught) {
@@ -471,15 +462,12 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
         </>}
       >
         <p className={styles.sub}>{kind === 'messaging' ? 'Messaging API' : 'LINE Login'}</p>
-        <Field label={kind === 'messaging' ? 'Channel Secret' : 'Login Channel Secret'} htmlFor={secretId} error={fieldErrors.secret}>
-          <SaveErrorField names={["secret"]}><TextField id={secretId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={secret} onChange={(event) => { setSecret(event.target.value); setFieldErrors({}) }} disabled={busy} /></SaveErrorField>
+        <Field label={kind === 'messaging' ? 'Channel Secret' : 'Login Channel Secret'} htmlFor={secretId} error={fieldErrors.secret} optional={kind !== 'messaging'}>
+          <SaveErrorField names={[secretField]}><TextField id={secretId} type="password" autoComplete="off" aria-required={kind === 'messaging' || undefined} placeholder="••••••••••••（新しい値を貼る）" value={secret} onChange={(event) => { setSecret(event.target.value); setFieldErrors({}) }} disabled={busy} /></SaveErrorField>
         </Field>
-        {kind === 'messaging' ? (
-          <Field label="Channel Access Token" htmlFor={tokenId}>
-            <SaveErrorField names={["token"]}><TextField id={tokenId} type="password" autoComplete="off" placeholder="••••••••••••（新しい値を貼る）" value={token} onChange={(event) => { setToken(event.target.value); setFieldErrors({}) }} disabled={busy} /></SaveErrorField>
-          </Field>
-        ) : null}
-        <Notice tone="info" presentation="account-note" icon={null}>保存のときに本人確認が出ます。差し替えたあと、接続を確かめます。</Notice>
+        <Notice tone="info" presentation="account-note" icon={null}>
+          {kind === 'messaging' ? '本人確認のあと、musuboがトークンを発行して接続を確かめます。' : '保存のときに本人確認が出ます。差し替えたあと、接続を確かめます。'}
+        </Notice>
         <ErrorLine message={error} />
       </Frame>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}

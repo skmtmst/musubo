@@ -126,6 +126,9 @@ export interface MarkDispatchedInput {
   friendIds: string[];
   /** キュー処理が取得した版。復旧や停止後の古い処理は送信できない。 */
   expectedLockVersion?: number;
+  /** 重複除外配信では世代を送信直前に照合する。 */
+  guardAttempt?: boolean;
+  guardLockVersion?: number;
   /** その場送信にはキューロックが無いが、版の照合は必要。 */
   requireBatchLock?: boolean;
   expectedRecipients?: Array<{ id: string; lineUserId: string }>;
@@ -179,6 +182,36 @@ export async function markBroadcastRecipientsDispatched(
     }
     const results=await db.batch(statements);
     return input.friendIds.filter((_,i)=>(results[i].meta.changes??0)>0);
+  }
+  if (input.guardAttempt) {
+    const statements = input.friendIds.map(friendId => db.prepare(`INSERT INTO broadcast_send_claims
+      (broadcast_id, friend_id, line_account_id, attempt_no, state, dispatched_at, created_at, updated_at)
+      SELECT ?, ?, ?, ?, 'claimed', ?, ?, ? WHERE EXISTS
+        (SELECT 1 FROM broadcasts WHERE id=? AND status='sending' AND stopped_at IS NULL AND send_attempt_no=?)
+      ON CONFLICT (broadcast_id, friend_id) DO UPDATE SET
+        line_account_id=excluded.line_account_id, attempt_no=excluded.attempt_no,
+        state='claimed', dispatched_at=excluded.dispatched_at, settled_at=NULL, error_code=NULL, updated_at=excluded.updated_at
+      WHERE (broadcast_send_claims.state='claimed' AND broadcast_send_claims.dispatched_at IS NULL) OR
+        (broadcast_send_claims.attempt_no=excluded.attempt_no AND broadcast_send_claims.state='failed'
+          AND broadcast_send_claims.error_code IN ('line_http_429','stopped_before_dispatch'))`)
+      .bind(input.broadcastId,friendId,input.lineAccountId,input.attemptNo,now,now,now,input.broadcastId,input.attemptNo));
+    const guard = db.prepare(`SELECT CASE WHEN EXISTS
+      (SELECT 1 FROM broadcasts WHERE id=? AND status='sending' AND stopped_at IS NULL AND send_attempt_no=?
+       AND (? IS NULL OR lock_version=?)) AND NOT EXISTS (
+        SELECT 1 FROM json_each(?) e JOIN broadcast_send_claims c
+          ON c.broadcast_id=? AND c.friend_id=e.value
+        WHERE NOT ((c.state='claimed' AND c.dispatched_at IS NULL)
+          OR (c.attempt_no=? AND c.state='failed' AND c.error_code IN ('line_http_429','stopped_before_dispatch'))))
+      THEN 1 ELSE json('STALE_DEDUP_ATTEMPT') END`)
+      .bind(input.broadcastId,input.attemptNo,input.guardLockVersion ?? null,input.guardLockVersion ?? null,
+        JSON.stringify(input.friendIds),input.broadcastId,input.attemptNo);
+    try {
+      const results = await db.batch([guard, ...statements]);
+      return input.friendIds.filter((_,i)=>(results[i+1].meta.changes ?? 0)>0);
+    } catch (error) {
+      if (error instanceof Error && /malformed json/i.test(error.message)) return [];
+      throw error;
+    }
   }
   const statements = input.friendIds.map((friendId) =>
     db
