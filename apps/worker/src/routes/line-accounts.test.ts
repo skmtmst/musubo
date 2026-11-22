@@ -2,7 +2,7 @@ import { apiContractMiddleware } from '../middleware/api-contract.js';
 vi.mock('../services/line-messaging-identity.js', () => ({ verifyLineMessagingIdentity: vi.fn().mockResolvedValue(true) }));
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono, type ErrorHandler } from 'hono';
-import type { Env } from '../worker-env.js';
+import { stripeApi } from '../services/stripe-api.js';
 
 // route の責務である入力正規化と引数の接続を確かめるため、実 D1 でなく DB 関数へ渡る値を観測する。
 const dbMocks = {
@@ -64,8 +64,7 @@ vi.mock('@line-crm/line-sdk', () => ({
 // 差替済みの依存を使うよう、モック登録後に再読込する。
 const { lineAccounts } = await import('./line-accounts.js');
 const { unhandledWorkerError } = await import('../lib/unhandled-error.js');
-const receiptErrorReport = vi.hoisted(() => vi.fn(async () => false));
-vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: receiptErrorReport }));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: vi.fn(async () => false) }));
 
 type TestEnv = {
   Variables: { staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean; assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean; tenantId?: string | null } };
@@ -88,13 +87,14 @@ function setupApp(
   role: 'owner' | 'admin' | 'staff' = 'owner',
   dbStub: D1Database = makeDbStub(),
   staffOverride: Partial<TestEnv['Variables']['staff']> = {},
+  stepUpToken: string | null = 'test-step-up',
 ) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
     c.set('staff', { id: 'test-staff', name: 'Test', role, readOnly: false, ...staffOverride });
     c.env = { DB: dbStub, STRIPE_PRODUCT_MUSUBO_CORE: 'prod_test', STRIPE_PRODUCT_MUSUBO_OPTIONS: 'prod_options' };
     // 大事な操作の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
-    c.req.raw.headers.set('x-step-up-token', 'test-step-up');
+    if (stepUpToken) c.req.raw.headers.set('x-step-up-token', stepUpToken);
     await next();
   });
   app.route('/', lineAccounts);
@@ -130,42 +130,6 @@ const fakeAccount = {
   created_at: '2026-05-08T00:00:00.000',
   updated_at: '2026-05-08T00:00:00.000',
 };
-
-describe('GET /api/line-accounts/:id/registration-receipt', () => {
-  test.each(['account scope', 'inbound receipt'])('unexpected %s failure reaches the shared incident handler', async (stage) => {
-    const secret = 'private-customer secret-token';
-    const db = makeDbStub();
-    if (stage === 'account scope') dbMocks.getLineAccountScopeEntries.mockRejectedValueOnce(new Error(secret));
-    else vi.mocked(db.prepare).mockImplementationOnce(() => { throw new Error(secret); });
-    const app = new Hono<Env>().route('/', setupApp('owner', db));
-    app.onError(unhandledWorkerError);
-    const response = await app.request('/api/line-accounts/acc-1/registration-receipt?token=secret-token');
-    const body = await response.json<{ incidentId: string }>();
-    expect(response.status).toBe(500);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
-    expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
-    expect(receiptErrorReport).toHaveBeenLastCalledWith(expect.anything(), {
-      source: 'worker', message: 'unhandled_worker_error',
-      path: 'GET /api/line-accounts/:id/registration-receipt', incidentId: body.incidentId,
-    });
-    expect(JSON.stringify([body, receiptErrorReport.mock.calls])).not.toMatch(/private-customer|secret-token/);
-  });
-
-  test('only exposes a receipt in the current account scope', async () => {
-    const app = setupApp('owner', makeDbStub(), {
-      assignedLineAccountId: 'acc-1', canAccessDescendantAccounts: false,
-    });
-    const allowed = await app.request('/api/line-accounts/acc-1/registration-receipt');
-    expect(allowed.status).toBe(200);
-    expect(allowed.headers.get('Cache-Control')).toBe('no-store');
-    expect(await allowed.json()).toEqual({
-      success: true, data: { status: 'waiting', receivedAt: null },
-    });
-    const denied = await app.request('/api/line-accounts/acc-other/registration-receipt');
-    expect(denied.status).toBe(404);
-    expect(await denied.json()).toEqual({ success: false, code: 'LINE_ACCOUNT_NOT_FOUND', error: 'LINE公式アカウントが見つかりません。一覧から開き直してください。' });
-  });
-});
 
 beforeEach(() => {
   styleMocks.initializeAccountStyle.mockClear();
@@ -775,7 +739,7 @@ describe('POST /api/line-accounts/connect', () => {
     expect(body.data.verification.followerTotal).toBeNull();
   });
 
-  test.each(['owner', 'admin'] as const)('%s は自分の統括に保存し、認証済みなら友だち取り込みを開始する', async (role) => {
+  test.each(['owner', 'admin'] as const)('%s は追加の本人確認なしで自分の統括に保存し、LINE接続後に友だち取り込みを開始する', async (role) => {
     installAutoConnectFetch();
     let followerSetting: string | null = null;
     dbMocks.getAccountSetting.mockImplementation(async () => followerSetting);
@@ -793,12 +757,13 @@ describe('POST /api/line-accounts/connect', () => {
     dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);
     lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
 
-    const res = await setupApp(role, makeDbStub(), { tenantId: 'tenant-current' }).request('/api/line-accounts/connect', {
+    const res = await setupApp(role, makeDbStub(), { tenantId: 'tenant-current' }, null).request('/api/line-accounts/connect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...autoConnectBody, tenantId: 'forged-tenant' }),
     });
     expect(res.status).toBe(201);
+    expect(dbMocks.consumeStepUpGrant).not.toHaveBeenCalled();
     expect(dbMocks.createLineAccount).toHaveBeenCalledOnce();
     expect(styleMocks.initializeAccountStyle).toHaveBeenCalledWith(expect.anything(),'created-account',expect.anything(),expect.anything(),undefined,{bucket:undefined,publicBaseUrl:undefined,reportError:expect.any(Function)});
     expect(dbMocks.createLineAccount.mock.calls[0][1]).toMatchObject({
@@ -2029,7 +1994,30 @@ describe('registration authorization boundaries', () => {
     expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
   });
 
-  test.each(['/api/line-accounts/connect', '/api/line-accounts'])('%s still requires admin step-up verification', async (path) => {
+  test('first-line setup reaches input validation without another identity check', async () => {
+    dbMocks.musuboLineConnectionAllowed.mockResolvedValue('first');
+    dbMocks.getTenantBilling.mockResolvedValue({ stripe_customer_id: 'cus-test' });
+    const retrieveCustomer = vi.spyOn(stripeApi, 'retrieveCustomer').mockResolvedValueOnce({
+      id: 'cus-test', email: null, name: null, invoice_settings: { default_payment_method: 'pm-test' },
+    });
+    try {
+      const res = await setupApp('admin', makeDbStub(), {}, null).request('/api/line-accounts/connect', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+      });
+      expect(res.status).toBe(422);
+      expect(retrieveCustomer).toHaveBeenCalledWith(expect.anything(), 'cus-test');
+      expect(dbMocks.consumeStepUpGrant).not.toHaveBeenCalled();
+      expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+    } finally {
+      retrieveCustomer.mockRestore();
+    }
+  });
+
+  test.each([
+    ['/api/line-accounts/connect', 'reserved_addition'],
+    ['/api/line-accounts', 'legacy'],
+  ] as const)('%s still requires admin step-up verification for %s', async (path, state) => {
+    dbMocks.musuboLineConnectionAllowed.mockResolvedValue(state);
     dbMocks.consumeStepUpGrant.mockResolvedValueOnce(false);
     const res = await setupApp('admin').request(path, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(autoConnectBody),

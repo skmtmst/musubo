@@ -682,7 +682,8 @@
     "770_onboarding_guide_progress.sql",
     "779_mileage_handgift.sql",
     "783_booking_assignment_method.sql",
-    "786_restaurant_course_gallery.sql"
+    "786_restaurant_course_gallery.sql",
+    "789_limit_legacy_folder_update_triggers.sql"
   ],
-  "migrationCount": 683
+  "migrationCount": 684
 }
