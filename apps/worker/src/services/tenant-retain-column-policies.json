@@ -414,8 +414,8 @@
   "event_versions": {
     "columns": {
       "snapshot_json": {
-        "action": "retain",
-        "reason": "公開済みイベントの版は店の定義のため保持"
+        "action": "json",
+        "reason": "版の骨格と日時・定員のみ保持し住所等を消去"
       }
     }
   },
@@ -802,8 +802,8 @@
         "reason": "店が作成したメニューの定義のため保持"
       },
       "fixed_meeting_url": {
-        "action": "retain",
-        "reason": "店が作成したメニューの定義のため保持"
+        "action": "null",
+        "reason": "会議URLを消去"
       },
       "audience_tag_ids_json": {
         "action": "retain",

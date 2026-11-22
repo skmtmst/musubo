@@ -130,7 +130,7 @@ export async function deferStaleBillingReceipts(db: D1Database, tenantId: string
 
 /** 券が参照する店のメニュー定義を残し、再利用を止める。 */
 export async function tombstoneBookingMenu(db: D1Database, tenantId: string, menuId: string, now: string): Promise<boolean> {
-  const result = await db.prepare(`UPDATE menus SET is_active=0, deleted_at=COALESCE(deleted_at,?),
+  const result = await db.prepare(`UPDATE menus SET is_active=0, fixed_meeting_url=NULL, deleted_at=COALESCE(deleted_at,?),
     updated_at=?, version=version+1, data_purged_at=?
     WHERE id=? AND data_purged_at IS NULL AND EXISTS (SELECT 1 FROM line_accounts a JOIN tenants t ON t.id=a.tenant_id
       WHERE a.id=menus.line_account_id AND a.tenant_id=? AND a.data_purged_at IS NOT NULL AND t.data_purged_at IS NULL

@@ -9,6 +9,7 @@ const ALLOWED: Readonly<Record<string, readonly string[]>> = {
   'friend_bulk_runs.operation_json': ['kind', 'type', 'count'],
   'conversion_points.source_config_json': [],
   'staff_members.notification_preferences': [],
+  'event_versions.snapshot_json': ['id', 'eventId', 'version', 'kind', 'startsAt', 'endsAt', 'capacity'],
 };
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
