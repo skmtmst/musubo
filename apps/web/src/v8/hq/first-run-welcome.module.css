@@ -1,0 +1,79 @@
+.screen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, var(--color-canvas), color-mix(in srgb, var(--color-canvas) 80%, var(--color-accent-soft)));
+  animation: welcome-leave var(--motion-welcome-leave) var(--motion-ease-out) var(--motion-welcome-leave-at) both;
+}
+
+.content {
+  position: absolute;
+  inset-block-start: 42%;
+  inset-inline-start: 50%;
+  transform: translate(-50%, -50%);
+  animation: welcome-enter var(--motion-welcome-enter) var(--motion-ease-out) both;
+}
+
+.logo {
+  display: block;
+  width: var(--first-run-welcome-logo-width);
+  height: auto;
+}
+
+.writing {
+  position: absolute;
+  inset-block-start: calc(100% + var(--first-run-welcome-writing-gap));
+  inset-inline-start: calc(50% - var(--first-run-welcome-writing-offset));
+  translate: -50% 0;
+  width: var(--first-run-welcome-writing-width);
+}
+
+.writing img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.skip {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: calc(10% - var(--first-run-welcome-skip-offset));
+  display: flex;
+  justify-content: center;
+  height: var(--first-run-welcome-skip-height);
+}
+
+.skipButton {
+  width: var(--first-run-welcome-skip-width);
+}
+
+.skipLabel {
+  font-family: var(--font-noto-sans-jp), "Noto Sans JP", sans-serif;
+  font-size: var(--polish-control-text);
+  font-weight: var(--polish-control-weight);
+}
+
+@media (max-width: 600px) {
+  .logo { width: var(--first-run-welcome-mobile-logo-width); }
+  .writing {
+    inset-block-start: calc(100% + var(--first-run-welcome-mobile-writing-gap));
+    inset-inline-start: calc(50% - var(--first-run-welcome-mobile-writing-offset));
+    width: var(--first-run-welcome-mobile-writing-width);
+  }
+}
+
+@keyframes welcome-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes welcome-leave {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen,
+  .content {
+    animation: none;
+  }
+}

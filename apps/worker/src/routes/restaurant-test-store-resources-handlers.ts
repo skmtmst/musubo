@@ -158,7 +158,7 @@ export const post__api_restaurant_test_memberships_3 = async (c: Context<Env, "/
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body = await c.req.json<{ storeId?: string | null; staffName?: string; email?: string; role?: string; lineUid?: string; googleEmail?: string }>();
-  if (body.storeId && !await storeBelongsTo(c, organization.id, body.storeId)) return inputError(c, { success: false, error: '店舗が正しくありません' }, 400, ["storeId"]);
+  if ((!body.storeId && c.get('restaurantScopedAccountId')) || (body.storeId && !await storeBelongsTo(c, organization.id, body.storeId))) return inputError(c, { success: false, error: '店舗が正しくありません' }, 400, ["storeId"]);
   if (!body.staffName?.trim() || !['super_admin', 'store_manager', 'staff'].includes(body.role || '')) return inputError(c, { success: false, error: '氏名と役割が必要です' }, 400, ["staffName","role"]);
   if (body.role === 'super_admin' && c.get('staff')?.role !== 'owner') return c.json({ success: false, error: 'SuperAdminを追加できるのはオーナーだけです' }, 403);
   const id = crypto.randomUUID();

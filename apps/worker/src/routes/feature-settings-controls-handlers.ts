@@ -9,7 +9,7 @@ import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { accountFeatureAvailabilityMap } from '../services/feature-enforcement.js';
-import { restaurantEffectivelyEnabledForTenant } from '../services/tenant-features.js';
+import { restaurantAccessMode } from '../services/tenant-features.js';
 import { getAccountId, loadFeatureVisibility, loadFeatureSettings, PARENT_CHILD_MODE_KEY, SPECIALIZED_CATALOG_KEY, settingIsEnabled, specializedCatalog, isToggleable, effectiveFeatures, offTransitions, buildImpacts, impactFingerprint, OFF_CONFIRM_KEY, OFF_CONFIRM_TTL_MS, OffConfirmation, deleteOffConfirmation, toPublicImpacts, ToggleableFeature, NEN_SPECIALIZED_FEATURES, cleanSidebarOrderStrict, cleanItemOrderStrict, readOffConfirmation, FEATURE_SETTINGS_BUNDLE_KEY } from './feature-settings-definition.js';
 import type { Context } from 'hono';
 
@@ -30,12 +30,14 @@ export const get__api_settings_features_visibility_1 = async (c: Context<Env, "/
         code: 'FEATURE_SETTINGS_SCOPE_FORBIDDEN',
       }, 403);
     }
+    const restaurantMode = await restaurantAccessMode(c, accountId);
     return c.json({
       success: true,
       data: await loadFeatureVisibility(
         c.env.DB,
         accountId,
-        await restaurantEffectivelyEnabledForTenant(c),
+        restaurantMode !== null,
+        restaurantMode === 'account',
       ),
     });
   } catch (err) {
@@ -60,13 +62,14 @@ export const get__api_settings_features_2 = async (c: Context<Env, "/api/setting
         code: 'FEATURE_SETTINGS_SCOPE_FORBIDDEN',
       }, 403);
     }
-    const restaurantEnabled = await restaurantEffectivelyEnabledForTenant(c);
+    const restaurantMode = await restaurantAccessMode(c, accountId);
     // 親子モード・専用カタログは設定束と独立して読めるため並列で投げる。
     const [state, parentChildRaw, specializedRaw] = await Promise.all([
       loadFeatureSettings(
         c.env.DB,
         accountId,
-        restaurantEnabled,
+        restaurantMode !== null,
+        restaurantMode === 'account',
       ),
       getAccountSetting(c.env.DB, accountId, PARENT_CHILD_MODE_KEY),
       getAccountSetting(c.env.DB, accountId, SPECIALIZED_CATALOG_KEY),
@@ -132,8 +135,9 @@ export const post__api_settings_features_impact_3 = async (c: Context<Env, "/api
       }, 400, ["expectedVersion"]);
     }
 
-    const restaurantEnabled = await restaurantEffectivelyEnabledForTenant(c);
-    const current = await loadFeatureSettings(c.env.DB, accountId, restaurantEnabled);
+    const restaurantMode = await restaurantAccessMode(c, accountId);
+    const restaurantEnabled = restaurantMode !== null;
+    const current = await loadFeatureSettings(c.env.DB, accountId, restaurantEnabled, restaurantMode === 'account');
     if (body.expectedVersion !== undefined && Number(body.expectedVersion) !== current.version) {
       return c.json({
         success: false,
@@ -192,7 +196,8 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
-    const restaurantEnabled = await restaurantEffectivelyEnabledForTenant(c);
+    const restaurantMode = await restaurantAccessMode(c, accountId);
+    const restaurantEnabled = restaurantMode !== null;
     const accountStyle = await c.env.DB.prepare('SELECT style FROM account_styles WHERE line_account_id=?')
       .bind(accountId).first<{ style: string }>();
     const restaurantStyle = accountStyle?.style === 'restaurant';
@@ -332,6 +337,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
         c.env.DB,
         accountId,
         restaurantEnabled,
+        restaurantMode === 'account',
       );
       return inputError(c, {
         success: false,
@@ -368,6 +374,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
         c.env.DB,
         accountId,
         restaurantEnabledForImpact,
+        restaurantMode === 'account',
       );
       const impactNext = effectiveFeatures(
         impactCurrent.features,
@@ -419,6 +426,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
         c.env.DB,
         accountId,
         restaurantEnabled,
+        restaurantMode === 'account',
       );
       if (Number(body.expectedVersion) !== current.version) {
         return c.json({
@@ -575,6 +583,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
           c.env.DB,
           accountId,
           restaurantEnabled,
+          restaurantMode === 'account',
         );
         return c.json({
           success: false,
