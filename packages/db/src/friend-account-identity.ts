@@ -26,7 +26,8 @@ export async function getFriendByLineUserIdForAccount(
     return db
       .prepare(
         `SELECT * FROM friends
-          WHERE line_user_id = ?
+          WHERE line_user_id = ? AND data_purged_at IS NULL
+            AND EXISTS (SELECT 1 FROM line_accounts requested_owner WHERE requested_owner.id = ? AND requested_owner.data_purged_at IS NULL)
             AND (line_account_id = ? OR (line_account_id IS NULL AND EXISTS (
               SELECT 1 FROM line_accounts legacy_owner WHERE legacy_owner.id = ?
                 AND COALESCE(legacy_owner.tenant_id, '${DEFAULT_TENANT_ID}') = '${DEFAULT_TENANT_ID}'
@@ -34,8 +35,8 @@ export async function getFriendByLineUserIdForAccount(
           ORDER BY (line_account_id = ?) DESC
           LIMIT 1`,
       )
-      .bind(lineUserId, lineAccountId, lineAccountId, lineAccountId)
+      .bind(lineUserId, lineAccountId, lineAccountId, lineAccountId, lineAccountId)
       .first<Friend>();
   }
-  return db.prepare('SELECT * FROM friends WHERE line_user_id = ? AND line_account_id IS NULL LIMIT 1').bind(lineUserId).first<Friend>();
+  return db.prepare('SELECT * FROM friends WHERE line_user_id = ? AND line_account_id IS NULL AND data_purged_at IS NULL LIMIT 1').bind(lineUserId).first<Friend>();
 }

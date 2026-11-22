@@ -10,7 +10,7 @@ export async function getLineAccountById(
 ): Promise<LineAccount | null> {
   const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
   const row = await db
-    .prepare(`SELECT * FROM line_accounts WHERE id = ?`)
+    .prepare(`SELECT * FROM line_accounts WHERE id = ? AND data_purged_at IS NULL`)
     .bind(id)
     .first<LineAccount>();
   return row ? decryptLineAccountCredentials(row, encryptionKey) : null;
@@ -22,7 +22,7 @@ export async function getLineAccounts(
 ): Promise<LineAccount[]> {
   const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
   const result = await db
-    .prepare(`SELECT * FROM line_accounts ORDER BY display_order ASC, created_at ASC`)
+    .prepare(`SELECT * FROM line_accounts WHERE data_purged_at IS NULL ORDER BY display_order ASC, created_at ASC`)
     .all<LineAccount>();
   return Promise.all(
     result.results.map((row) => decryptLineAccountCredentials(row, encryptionKey)),
@@ -34,8 +34,8 @@ export async function getLineAccounts(
  * operations tenant is always available; a missing non-default tenant row is
  * treated as archived so delivery fails closed.
  * This is an inventory, not authorization: consumers must also check is_active
- * and archived_at before allowing self-service access. Do not filter this list;
- * management and token matching must still see stopped accounts.
+ * and archived_at before allowing self-service access. Stopped accounts remain
+ * visible for management; irreversible purge tombstones are excluded.
  */
 export async function listLineAccountsWithTenantStatus(
   db: D1Database,
@@ -49,7 +49,7 @@ export async function listLineAccountsWithTenantStatus(
          FROM line_accounts account
          LEFT JOIN tenants tenant
            ON tenant.id = COALESCE(account.tenant_id, ?)
-        ${channelId === undefined ? '' : 'WHERE account.channel_id = ?'}
+        WHERE account.data_purged_at IS NULL ${channelId === undefined ? '' : 'AND account.channel_id = ?'}
         ORDER BY account.display_order ASC, account.created_at ASC`,
     )
     .bind(DEFAULT_TENANT_ID, ...(channelId === undefined ? [] : [channelId]))
@@ -70,7 +70,7 @@ export async function getLineAccountTenantStatus(
          FROM line_accounts account
          LEFT JOIN tenants tenant
            ON tenant.id = COALESCE(account.tenant_id, ?)
-        WHERE account.id = ?`,
+        WHERE account.id = ? AND account.data_purged_at IS NULL`,
     )
     .bind(DEFAULT_TENANT_ID, lineAccountId)
     .first<{ tenant_status: TenantRuntimeStatus }>();
@@ -97,7 +97,7 @@ export async function getLineAccountScopeEntries(
       `SELECT id, tenant_id, parent_line_account_id, is_active, archived_at,
               login_channel_id, liff_id
          FROM line_accounts
-        WHERE COALESCE(tenant_id, ?) = ?
+        WHERE COALESCE(tenant_id, ?) = ? AND data_purged_at IS NULL
         ORDER BY display_order ASC, created_at ASC`,
     )
     .bind(DEFAULT_TENANT_ID, tenantId)
@@ -119,6 +119,7 @@ export async function getLineAccountsByIds(
          FROM line_accounts account
          INNER JOIN json_each(?) requested
            ON account.id = CAST(requested.value AS TEXT)
+        WHERE account.data_purged_at IS NULL
         ORDER BY account.display_order ASC, account.created_at ASC`,
     )
     .bind(JSON.stringify(ids))
@@ -139,7 +140,7 @@ export async function getLineAccountLoginChannels(
   const column = lookup.accountId ? 'id' : 'login_channel_id';
   const result = await db.prepare(`
     SELECT id, tenant_id, login_channel_id FROM line_accounts
-     WHERE ${column} = ?
+     WHERE ${column} = ? AND data_purged_at IS NULL
      ORDER BY display_order ASC, created_at ASC
   `).bind(value).all<{ id: string; tenant_id: string | null; login_channel_id: string | null }>();
   return result.results;

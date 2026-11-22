@@ -211,7 +211,7 @@ export async function friendTrend(
     .prepare(
       `SELECT substr(created_at, 1, 10) AS d, COUNT(*) AS n
          FROM friends
-        WHERE created_at >= ? AND ${friends.sql}
+        WHERE data_purged_at IS NULL AND created_at >= ? AND ${friends.sql}
         GROUP BY d`,
     )
     .bind(...binds)
@@ -228,7 +228,7 @@ export async function friendTrend(
             COUNT(*) AS n
        FROM friends f
        LEFT JOIN entry_routes er ON er.ref_code = f.ref_code
-      WHERE f.created_at >= ? AND ${accountScopeSql(scope, 'f.line_account_id').sql}
+      WHERE f.data_purged_at IS NULL AND f.created_at >= ? AND ${accountScopeSql(scope, 'f.line_account_id').sql}
       GROUP BY d, name
       ORDER BY n DESC`,
   ).bind(...binds).all<{ d: string; name: string | null; n: number }>();

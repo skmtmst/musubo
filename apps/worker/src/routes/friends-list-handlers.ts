@@ -113,7 +113,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
     }
 
 
-    const conditions: string[] = [];
+    const conditions: string[] = ['f.data_purged_at IS NULL'];
     const binds: unknown[] = [];
     let appliedSavedSearchRevision: number | null = null;
     if (tagId) {
@@ -551,12 +551,12 @@ export const get__api_friends_count_3 = async (c: Context<Env, "/api/friends/cou
     }
     let count: number;
     if (lineAccountId) {
-      const row = await c.env.DB.prepare('SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND line_account_id = ?')
+      const row = await c.env.DB.prepare('SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND data_purged_at IS NULL AND line_account_id = ?')
         .bind(lineAccountId).first<{ count: number }>();
       count = row?.count ?? 0;
     } else {
       const { binds: scopeBinds, where } = await adminAccountScope(c);
-      const row = await c.env.DB.prepare(`SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND ${where}`)
+      const row = await c.env.DB.prepare(`SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND data_purged_at IS NULL AND ${where}`)
         .bind(...scopeBinds).first<{ count: number }>();
       count = row?.count ?? 0;
     }
@@ -576,11 +576,11 @@ export const get__api_friends_ref_stats_4 = async (c: Context<Env, "/api/friends
     const where = lineAccountId ? 'line_account_id = ?' : accountScope!.where;
     const binds = lineAccountId ? [lineAccountId] : accountScope!.binds;
     const stmt = c.env.DB.prepare(
-      `SELECT ref_code, COUNT(*) as count FROM friends WHERE ${where} AND ref_code IS NOT NULL GROUP BY ref_code ORDER BY count DESC`,
+      `SELECT ref_code, COUNT(*) as count FROM friends WHERE ${where} AND data_purged_at IS NULL AND ref_code IS NOT NULL GROUP BY ref_code ORDER BY count DESC`,
     );
     const result = await (binds.length > 0 ? stmt.bind(...binds) : stmt).all<{ ref_code: string; count: number }>();
     const total = await c.env.DB.prepare(
-      `SELECT COUNT(*) as count FROM friends WHERE ${where} AND ref_code IS NOT NULL`,
+      `SELECT COUNT(*) as count FROM friends WHERE ${where} AND data_purged_at IS NULL AND ref_code IS NOT NULL`,
     ).bind(...binds).first<{ count: number }>();
     return c.json({
       success: true,

@@ -1,0 +1,35 @@
+import { expect, test } from 'vitest';
+import { activateLineAccount, createLineAccount, upsertFriend, getLineAccountById, getFriendById } from '@line-crm/db';
+import { gapFixture } from '../test-utils/gap1.js';
+import { tombstoneLineAccount, tombstoneFriend } from './tenant-purge-tombstones.js';
+
+test('tombstones erase identifiers and secrets, are hidden and are not reused', async () => {
+  const f = gapFixture();
+  f.raw.exec("UPDATE line_accounts SET login_channel_id='login-private',login_channel_secret='secret-login',liff_id='private-liff',channel_access_token_encrypted='enc-private' WHERE id='a'; UPDATE friends SET real_name='private',private_memo='memo',metadata='{\"private\":\"value\"}',picture_url='https://private.test',status_message='secret' WHERE id='f'");
+  expect(await tombstoneLineAccount(f.db, 't', 'a', '2027-05-01T00:00:00Z')).toBe(false);
+  f.raw.exec("UPDATE tenants SET plan_status='canceled',retention_anchor_at='2026-01-01T00:00:00Z' WHERE id='t'");
+  expect(await tombstoneLineAccount(f.db, 't', 'b', '2027-05-01T00:00:00Z')).toBe(false);
+  expect(await tombstoneLineAccount(f.db, 't', 'a', '2027-05-01T00:00:00Z')).toBe(true);
+  f.raw.exec("UPDATE tenants SET plan_status='active' WHERE id='t'");
+  expect(await tombstoneFriend(f.db, 'a', 'f', '2027-05-01T00:00:00Z')).toBe(false);
+  f.raw.exec("UPDATE tenants SET plan_status='canceled' WHERE id='t'");
+  expect(await tombstoneFriend(f.db, 'a', 'f', '2027-05-01T00:00:00Z')).toBe(true);
+  expect(await tombstoneFriend(f.db, 'a', 'f', '2027-05-01T00:00:00Z')).toBe(false);
+  const account = f.raw.prepare("SELECT * FROM line_accounts WHERE id='a'").get() as Record<string,unknown>;
+  const friend = f.raw.prepare("SELECT * FROM friends WHERE id='f'").get() as Record<string,unknown>;
+  expect(account).toMatchObject({name:'削除済み',is_active:0,channel_access_token:'',channel_secret:'',channel_access_token_encrypted:null,login_channel_id:null,login_channel_secret:null,liff_id:null});
+  expect(friend).toMatchObject({display_name:null,real_name:null,private_memo:null,metadata:'{}',picture_url:null,status_message:null,is_following:0,is_hidden:1});
+  expect(friend.line_user_id).not.toBe('Uf');
+  expect(account.channel_id).not.toBe('ch');
+  expect(await getLineAccountById(f.db, 'a')).toBeNull();
+  expect(await activateLineAccount(f.db, 'a')).toBeNull();
+  expect(f.raw.prepare("SELECT is_active FROM line_accounts WHERE id='a'").get()).toEqual({is_active:0});
+  const newAccount = await createLineAccount(f.db, {channelId:'ch',name:'新しいアカウント',channelAccessToken:'new-token',channelSecret:'new-secret',tenantId:'other'}, Buffer.alloc(32).toString('base64'));
+  expect(newAccount.id).not.toBe('a');
+  expect(newAccount.channel_id).toBe('ch');
+  expect(await getFriendById(f.db, 'f')).toBeNull();
+  const added = await upsertFriend(f.db, {lineUserId:'Uf',lineAccountId:'b',displayName:'新しい友だち'});
+  expect(added.id).not.toBe('f');
+  expect(added.line_user_id).toBe('Uf');
+  expect(f.raw.prepare("SELECT channel_id FROM line_accounts WHERE id='b'").get()).toEqual({channel_id:'ch2'});
+});
