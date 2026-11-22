@@ -28,6 +28,13 @@ it('要対応と未割り当てを分けて表示し担当確認を送る', asyn
   fireEvent.click(screen.getByRole('button', { name: '確認した' }))
   await waitFor(() => expect(mocks.review).toHaveBeenCalledWith('a', '自動', 0))
 })
+it('長いメニューと担当者の全文を確認できる', async () => {
+  const reservation = { ...row('自動', 'confirmed', 'automatic'), menu_name: 'トリミング（小型犬）', staff_name: '長い担当者名' }
+  mocks.list.mockResolvedValue({ requests: [reservation], total: 1, requestedCount: 0, unassignedCount: 1, attentionCount: 1, unknownCount: 0 })
+  render(<BookingReception onOpen={() => {}} />)
+  expect((await screen.findByText(reservation.menu_name)).getAttribute('title')).toBe(reservation.menu_name)
+  expect(screen.getByText(reservation.staff_name).getAttribute('title')).toBe(reservation.staff_name)
+})
 it('権限がない人には担当確認を押せない形で出し、hover と focus で理由を伝える', async () => {
   seed(); render(<BookingReception onOpen={() => {}} canOperate={false} />)
   const button = await screen.findByRole('button', { name: '担当を確認' })
