@@ -3,7 +3,7 @@
 import { tokenExpiryBadge, tokenExpirySummary } from '@/lib/line-account-state'
 
 import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
-import { RegistrationWelcome } from '@/v8/dashboard/public/first-steps/index'
+import { RegistrationWelcome } from './first-run-welcome'
 import { jstDate } from '@/lib/jst-datetime'
 import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/shared/table';
 import { useListUrlValue } from '@/components/shared/list-url-state';

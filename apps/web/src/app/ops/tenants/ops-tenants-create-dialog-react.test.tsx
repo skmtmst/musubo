@@ -13,7 +13,7 @@ const mockPush = vi.fn()
 
 /**
  * 契約先一覧の「作る」は V8-B 板  の小窓で出す。
- * 統括名＋飲食店機能＋案内文を持ち、空のままでは作らず理由を出す。再発防止。
+ * 統括名と案内文を表示し、空のままでは作らず理由を出す。
  */
 
 const summary = { active: 1, trialing: 0, suspended: 0, pastDue: 0 }
@@ -81,9 +81,10 @@ describe('契約先を作る小窓（板 i0FTN）', () => {
     const window = dialog()
     expect(window, '小窓が出ない').not.toBeNull()
     const text = window?.textContent ?? ''
-    for (const row of ['契約先を作る', '統括名（会社名）', '飲食店機能', '最初の権限者へ招待', 'キャンセル', '作る']) {
+    for (const row of ['契約先を作る', '統括名（会社名）', '最初の権限者へ招待', 'キャンセル', '作る']) {
       expect(text, `「${row}」がない`).toContain(row)
     }
+    expect(text).not.toContain('飲食店機能')
   })
 
   it('統括名が空のままでは作らず理由を出す', async () => {
@@ -108,7 +109,7 @@ describe('契約先を作る小窓（板 i0FTN）', () => {
     const create = buttons.find((button) => (button.textContent ?? '').trim().endsWith('作る'))
     await act(async () => { create?.click() })
     await flush()
-    expect(postedBody).toEqual({ name: '検証商事', featurePacks: [] })
+    expect(postedBody).toEqual({ name: '検証商事' })
     expect(mockPush).toHaveBeenCalledWith('/ops/tenants?highlight=t9')
   })
 })

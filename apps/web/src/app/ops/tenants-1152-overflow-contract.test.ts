@@ -22,11 +22,12 @@ it('名前と詳細への入口を保ち、狭幅の補助列を見出しと本�
   expect(name.getAttribute('href')).toBe('/ops/tenants/detail?id=tenant')
   expect(name.getAttribute('title')).toBe('検証商事')
   const row = name.closest('tr')!
-  for (const label of ['店舗', '権限者', '契約日', '飲食店機能']) {
+  for (const label of ['店舗', '権限者', '契約日']) {
     const head = screen.getByRole('columnheader', { name: label })
     const index = [...head.parentElement!.children].indexOf(head)
     expect(head.getAttribute('data-cell-collapse')).toBe('narrow')
     expect(row.children[index].getAttribute('data-cell-collapse')).toBe('narrow')
   }
+  expect(screen.queryByRole('columnheader', { name: '飲食店機能' })).toBeNull()
   expect(row.querySelector('[data-list-number]')?.textContent).toBe('2')
 })
