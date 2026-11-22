@@ -28,6 +28,7 @@
 - アーカイブ：窓の中で本人確認（6桁・パスワード）→ `api.auth.stepUp({ purpose: 'line_account.archive' })` → `archive(id, 理由, token)`。本人確認の方法が無い人は確認なしで送る（サーバが断れば言葉を出す）。断られた理由（blockers）は今と同じ言葉
 - アーカイブから戻す：`restore(id)`（本人確認を求められたら `StepUpPrompt`）
 - 資格情報・登録の編集：`api.lineAccounts.update(id, 変えた欄だけ)`。秘密の欄は空なら送らない。Login の ID を消したら組の秘密も消す（今の編集窓と同じ）。本人確認を求められたら `StepUpPrompt`
+- トークンの発行・更新はmusuboが行う。資格情報には自動更新と最終更新時刻を表示する。Messaging API の差し替え窓ではチャネルシークレットだけを受け付ける（2026-11-22承認、Pen `LINE-token-auto-renew-v01.pen`、`KgF2h`・`t30eU`・`Z2Y9C`・`F5ZbkA`）。
 - 乗り換え：`api.accountHandovers.listForAccount / get / issue / link / preview / saveDecisions / execute / cancel / rollback`。本実行・切り戻しは `useStepUpGate`（`account_handover.execute`）
 
 ## 権限（今と同じ）

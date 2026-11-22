@@ -28,7 +28,9 @@ vi.mock('@/lib/api', async original => {
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => null }))
 vi.mock('./resume-style', () => ({ default: () => null }))
-vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: vi.fn() } }))
+vi.mock('@/lib/api/helpers/styles', () => ({
+  styleApi: { get: vi.fn(async () => ({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })) },
+}))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/lib/qr-image', () => ({ qrToDataURL: vi.fn(async () => '') }))
 vi.mock('@/components/shared/button', async original => {
@@ -128,17 +130,16 @@ it('最初は未確認で、接続確認とフォームからの登録を起動�
   fireEvent.click(checkButton()); submit()
   expect(calls.check).not.toHaveBeenCalled(); expect(calls.connect).not.toHaveBeenCalled()
 })
-it('受信確認後は追加やテスト送信の手順を残さず、次の操作を案内する', async () => {
+it('初回登録は追加の本人確認を挟まず、LINE受信が確認できたら使い方を開く', async () => {
   calls.receipt.mockResolvedValue({ success: true, data: { status: 'confirmed', receivedAt: '2026-11-03T00:00:00Z' } })
   open(); await confirmProviderAndCheck(); submit()
-  await screen.findByText('接続を確認できました')
-  expect(screen.queryByText(/QR を読み取って追加してください/)).toBeNull()
-  expect(screen.queryByText(/LINE トークから「接続テスト」と送ってください/)).toBeNull()
-  expect(screen.queryByText(/変わらない場合は LINE Developers/)).toBeNull()
-  expect(screen.queryByText(/変わらない場合はサポート/)).toBeNull()
+  await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+  expect(screen.queryByRole('dialog', { name: '登録の本人確認' })).toBeNull()
+  expect(calls.connect).toHaveBeenCalledTimes(1)
+  expect(calls.receipt).toHaveBeenCalledExactlyOnceWith('mock-account')
   expect(screen.queryByText('友だち追加できるか確かめます')).toBeNull()
-  expect(screen.getByText('接続確認が完了しました')).toBeTruthy()
-  expect(screen.getAllByText(/「次へ」を押してください/).length).toBeGreaterThan(0)
+  const key = registrationStorageKey(REGISTRATION_STYLE_KEY, { id: 'owner-a', tenantId: 'tenant-a' })!
+  expect(sessionStorage.getItem(key)).toBe('mock-account')
 })
 it('引き継ぎを選んだ時だけ行う説明と、自然な確認ボタンを出す', () => {
   open()
@@ -227,7 +228,7 @@ it('登録中に解除しても追加送信せず、既に受理された登録�
   await screen.findByText('友だち追加できるか確かめます')
   const ownKey = registrationStorageKey(REGISTRATION_STYLE_KEY, { id: 'owner-a', tenantId: 'tenant-a' })!
   const foreignKey = registrationStorageKey(REGISTRATION_STYLE_KEY, { id: 'owner-a', tenantId: 'tenant-b' })!
-  expect(sessionStorage.getItem(ownKey)).toBe('accepted-before-withdrawal')
+  expect(sessionStorage.getItem(ownKey)).toBe('receipt:accepted-before-withdrawal')
   expect(sessionStorage.getItem(foreignKey)).toBeNull()
   await waitFor(() => expect(calls.receipt).toHaveBeenCalledWith('accepted-before-withdrawal'))
   act(() => calls.oldCheck!())

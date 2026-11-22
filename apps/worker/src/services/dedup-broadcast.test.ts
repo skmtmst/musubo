@@ -371,7 +371,7 @@ function makeSendDb(opts: {
             // どの batch に入ったか（= 何と何が同時に確定するか）を
             // 試験が読めるようにする。
             __sql: sql,
-            async first<T>(): Promise<T | null> { return null; },
+            async first<T>(): Promise<T | null> { return sql.includes('SELECT send_attempt_no FROM broadcasts') ? {send_attempt_no: 1} as T : null; },
             async all<T>(): Promise<{ results: T[] }> {
               if (isSelectedCount) return { results: (opts.selectedCounts ?? []) as unknown as T[] };
               if (isRanked) return { results: withIdentKey(opts.rankedRows ?? []) as unknown as T[] };
@@ -388,7 +388,7 @@ function makeSendDb(opts: {
     },
     async batch(stmts: D1PreparedStatement[]) {
       batches.push(stmts as unknown as unknown[]);
-      return Array(stmts.length).fill({ success: true });
+      return Array(stmts.length).fill({ success: true, meta: {changes:1} });
     },
   } as unknown as D1Database;
   return { db, updates, batches, progressUpdates };

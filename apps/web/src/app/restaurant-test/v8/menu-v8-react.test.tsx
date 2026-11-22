@@ -92,22 +92,22 @@ describe('MJoJR メニュー管理のV8', () => {
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ durationMinutes: 90 })))
   })
 
-  it('追加は120分から始まり、空欄を示し、変更した値を送る', async () => {
+  it('新規コースの所要時間は入力した値を保存する', async () => {
     nav.params = new URLSearchParams('store=store-1')
     try {
       render(<MenuEditV8 />)
       const duration = await screen.findByLabelText('所要時間')
-      expect((duration as HTMLInputElement).value).toBe('120')
+      expect((duration as HTMLInputElement).value).toBe('')
+      expect(screen.getByRole('button', { name: '提供時間', exact: true }).textContent).toContain('提供時間帯を選ぶ')
       fireEvent.change(screen.getByLabelText('メニュー名'), { target: { value: '新コース' } })
       fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '5000' } })
-      fireEvent.change(duration, { target: { value: '' } })
       fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
       expect(screen.getByText('所要時間を入力してください。')).toBeTruthy()
       expect(fixture.createMenu).not.toHaveBeenCalled()
       expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('新コース')
       fireEvent.change(duration, { target: { value: '150' } })
       fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
-      await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({ durationMinutes: 150 })))
+      await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({ durationMinutes: 150, servicePeriods: [] })))
     } finally { nav.params = new URLSearchParams('id=m1') }
   })
 
