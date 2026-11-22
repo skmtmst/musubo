@@ -4,6 +4,21 @@
 @import "../components/shared/phone-preview-tokens.css"; @import "../components/shared/musubo-pricing-tokens.css";
 @import "../components/shared/focus-ring.css"; @import "../components/shared/scrollbars.css"; @import "../components/shared/autofill.css";
 
+/* 承認済みの「ようこそ」Pen v06 の表示寸法。 */
+:root {
+  --first-run-welcome-logo-width: 228px;
+  --first-run-welcome-writing-width: 136.5704px;
+  --first-run-welcome-writing-gap: 32.8945px;
+  --first-run-welcome-writing-offset: 1.7627px;
+  --first-run-welcome-mobile-logo-width: 164px;
+  --first-run-welcome-mobile-writing-width: 114.8085px;
+  --first-run-welcome-mobile-writing-gap: 35.4121px;
+  --first-run-welcome-mobile-writing-offset: 1.8023px;
+  --first-run-welcome-skip-width: 150px;
+  --first-run-welcome-skip-height: 44px;
+  --first-run-welcome-skip-offset: 13px;
+}
+
 [data-design-node="yPkWe"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
 [data-design-node="YfTfJ"] [data-design-part="dialog"] { width: min(680px, calc(100% - 32px)); }
 [data-design-node="N2J629"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }

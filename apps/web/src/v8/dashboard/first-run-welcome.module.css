@@ -15,16 +15,16 @@
 
 .logo {
   display: block;
-  width: 228px;
+  width: var(--first-run-welcome-logo-width);
   height: auto;
 }
 
 .writing {
   position: absolute;
-  inset-block-start: calc(100% + 32.8945px);
-  inset-inline-start: calc(50% - 1.7627px);
+  inset-block-start: calc(100% + var(--first-run-welcome-writing-gap));
+  inset-inline-start: calc(50% - var(--first-run-welcome-writing-offset));
   translate: -50% 0;
-  width: 136.5704px;
+  width: var(--first-run-welcome-writing-width);
 }
 
 .writing img {
@@ -36,28 +36,28 @@
 .skip {
   position: absolute;
   inset-inline: 0;
-  inset-block-end: calc(10% - 13px);
+  inset-block-end: calc(10% - var(--first-run-welcome-skip-offset));
   display: flex;
   justify-content: center;
-  height: 44px;
+  height: var(--first-run-welcome-skip-height);
 }
 
 .skipButton {
-  width: 150px;
+  width: var(--first-run-welcome-skip-width);
 }
 
 .skipLabel {
   font-family: var(--font-noto-sans-jp), "Noto Sans JP", sans-serif;
-  font-size: 13px;
+  font-size: var(--polish-control-text);
   font-weight: var(--polish-control-weight);
 }
 
 @media (max-width: 600px) {
-  .logo { width: 164px; }
+  .logo { width: var(--first-run-welcome-mobile-logo-width); }
   .writing {
-    inset-block-start: calc(100% + 35.4121px);
-    inset-inline-start: calc(50% - 1.8023px);
-    width: 114.8085px;
+    inset-block-start: calc(100% + var(--first-run-welcome-mobile-writing-gap));
+    inset-inline-start: calc(50% - var(--first-run-welcome-mobile-writing-offset));
+    width: var(--first-run-welcome-mobile-writing-width);
   }
 }
 
