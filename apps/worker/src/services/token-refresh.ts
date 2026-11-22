@@ -2,7 +2,7 @@ import { lineObservationTime, jstCalendar as japanCalendar, type LineTokenRefres
 import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 /** LINE の client_credentials で有効期限30日のトークンを発行する。5分の cron ごとに、期限まで7日以内か期限不明のアカウントだけを更新し、失効前に交換する。 */
 
-import { getLineAccounts, updateLineAccount, updateLineAccountFields } from '@line-crm/db';
+import { getLineAccounts, saveRenewedLineAccessToken, updateLineAccountFields } from '@line-crm/db';
 import type { LineAccount } from '@line-crm/db';
 import { fetchBotProfile } from '../lib/bot-profile.js';
 import { LINE_TOKEN_REFRESH_WINDOW_MS, recordLineTokenRefreshFailure } from './line-token-notices.js';
@@ -17,7 +17,7 @@ function jstNow(): string {
 function shouldRefresh(account: LineAccount): boolean {
   if (!account.token_expires_at) return true; // 期限が分からない場合も、一度更新して以後の期限を追えるようにする。
   const expiresAt = lineObservationTime(account.token_expires_at);
-  return expiresAt - Date.now() < REFRESH_THRESHOLD_MS;
+  return !Number.isFinite(expiresAt) || expiresAt - Date.now() < REFRESH_THRESHOLD_MS;
 }
 
 function shouldSyncProfile(account: LineAccount): boolean {
@@ -30,6 +30,11 @@ export interface TokenResponse {
   access_token: string;
   expires_in: number; // 単位は秒。
   token_type: string;
+}
+
+export function issuedLineTokenExpiry(expiresIn: number): string {
+  const expiresAt = japanCalendar(new Date(Date.now() + expiresIn * 1000));
+  return expiresAt.toISOString().slice(0, -1) + '+09:00';
 }
 
 export type LineTokenIssueFailure =
@@ -83,7 +88,7 @@ export async function issueLineAccessToken(
 
   try {
     const token = await res.json<TokenResponse>();
-    if (!token.access_token || !Number.isFinite(token.expires_in)) {
+    if (!token.access_token || !Number.isSafeInteger(token.expires_in) || token.expires_in <= 0) {
       throw new LineTokenIssueError('invalid_response', res.status);
     }
     return token;
@@ -93,23 +98,24 @@ export async function issueLineAccessToken(
   }
 }
 
-export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
-  const accounts = await getLineAccounts(db);
+export async function refreshLineAccessTokens(
+  db: D1Database,
+  { credentialEncryptionKey, syncProfiles = true }: { credentialEncryptionKey?: string; syncProfiles?: boolean } = {},
+): Promise<void> {
+  const accounts = await getLineAccounts(db, credentialEncryptionKey);
 
   for (const account of accounts) {
-    if (!account.is_active) continue;
+    if (!account.is_active || account.archived_at) continue;
     let accessToken = account.channel_access_token;
 
     if (shouldRefresh(account)) {
       try {
         const token = await issueLineAccessToken(account.channel_id, account.channel_secret);
-        const expiresAt = japanCalendar(new Date(Date.now() + token.expires_in * 1000));
-        const expiresAtJst = expiresAt.toISOString().slice(0, -1) + '+09:00';
-
-        await updateLineAccount(db, account.id, {
-          channel_access_token: token.access_token,
-          token_expires_at: expiresAtJst,
-        });
+        const saved = await saveRenewedLineAccessToken(db, account, {
+          accessToken: token.access_token,
+          expiresAt: issuedLineTokenExpiry(token.expires_in),
+        }, credentialEncryptionKey);
+        if (!saved) continue;
         accessToken = token.access_token;
 
         logger.log("services_token_refresh_log");
@@ -130,7 +136,7 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
       }
     }
 
-    if (shouldSyncProfile(account)) {
+    if (syncProfiles && shouldSyncProfile(account)) {
       try {
         const profile = await fetchBotProfile(accessToken);
         if (profile.displayName || profile.pictureUrl || profile.basicId) {
