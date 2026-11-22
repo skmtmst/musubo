@@ -32,4 +32,3 @@ export function parseStoredConditions(stored: unknown): SegmentCondition | null 
     return null;
   }
 }
-
