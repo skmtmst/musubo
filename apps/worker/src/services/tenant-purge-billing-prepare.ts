@@ -17,19 +17,20 @@ export async function preparePurgedTenantBilling(db:D1Database, tenantId:string,
   const payments=await db.prepare(`SELECT paid_at FROM billing_invoices WHERE tenant_id=? AND paid_at IS NOT NULL
     UNION ALL SELECT paid_at FROM booking_monthly_cycles WHERE tenant_id=? AND paid_at IS NOT NULL
     UNION ALL SELECT p.paid_at FROM booking_payments p JOIN line_accounts a ON a.id=p.line_account_id WHERE a.tenant_id=? AND p.paid_at IS NOT NULL
-    UNION ALL SELECT c.updated_at FROM booking_charges c JOIN line_accounts a ON a.id=c.line_account_id WHERE a.tenant_id=? AND c.status IN ('succeeded','refunded')
-    UNION ALL SELECT p.paid_at FROM booking_pass_purchases p JOIN line_accounts a ON a.id=p.account_id WHERE a.tenant_id=? AND p.paid_at IS NOT NULL
+    UNION ALL SELECT c.updated_at FROM booking_charges c JOIN line_accounts a ON a.id=c.line_account_id WHERE a.tenant_id=? AND c.status IN ('succeeded','refunded')`)
+    .bind(tenantId,tenantId,tenantId,tenantId).all<{paid_at:string}>();
+  const otherPayments=await db.prepare(`SELECT p.paid_at FROM booking_pass_purchases p JOIN line_accounts a ON a.id=p.account_id WHERE a.tenant_id=? AND p.paid_at IS NOT NULL
     UNION ALL SELECT e.occurred_at FROM booking_pass_billing_events e JOIN booking_pass_purchases p ON p.id=e.purchase_id JOIN line_accounts a ON a.id=p.account_id WHERE a.tenant_id=? AND e.kind='invoice.paid' AND e.result IN ('recorded','applied')
     UNION ALL SELECT COALESCE(e.applied_at,e.received_at) FROM booking_payment_events e JOIN line_accounts a ON a.id=e.line_account_id WHERE a.tenant_id=? AND e.outcome='paid' AND e.result IN ('applied','duplicate')
     UNION ALL SELECT s.processed_at FROM stripe_events s LEFT JOIN friends f ON f.id=s.friend_id LEFT JOIN line_accounts a ON a.id=f.line_account_id WHERE (s.tenant_id=? OR a.tenant_id=?) AND s.event_type IN ('invoice.paid','payment_intent.succeeded')` )
-    .bind(tenantId,tenantId,tenantId,tenantId,tenantId,tenantId,tenantId,tenantId,tenantId).all<{paid_at:string}>();
+    .bind(tenantId,tenantId,tenantId,tenantId,tenantId).all<{paid_at:string}>();
   const jstDay=(value:string) => {
     const withZone = /(?:[zZ]|[+-]\d\d:\d\d)$/.test(value) ? value : `${value}${value.length===10?'T00:00:00':''}+09:00`;
     const ms=Date.parse(withZone);
     if (!Number.isFinite(ms)) throw new Error('invalid_last_payment_time');
     return new Date(ms+9*60*60*1000).toISOString().slice(0,10);
   };
-  const paymentDates=payments.results.map(row=>jstDay(row.paid_at)).sort();
+  const paymentDates=[...payments.results,...otherPayments.results].map(row=>jstDay(row.paid_at)).sort();
   const expiresAt=purgedPaymentIdentifierExpiry(paymentDates.at(-1) ?? null,jstDay(now));
   const keyVersion=await purgedPaymentIdentifierKeyVersion(secret);
   if (identifiers.length && !keyVersion) throw new Error('purge_payment_hash_key_missing');
