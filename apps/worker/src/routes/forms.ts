@@ -66,7 +66,7 @@ forms.post('/api/forms/drafts', inputJsonBoundary({"name":["string"],"accountId"
 forms.post('/api/forms/:id/duplicate', inputJsonBoundary(), post__api_forms_id_duplicate_8);
 
 // PUT /api/forms/:id — update form
-forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":["null","string"],"fields":["array"],"folderId":["null","string"],"onSubmitTagId":["null","string"],"onSubmitScenarioId":["null","string"],"onSubmitMessageType":["null","string"],"onSubmitMessageContent":["null","string"],"onSubmitWebhookUrl":["null","string"],"onSubmitWebhookHeaders":["null","string"],"onSubmitWebhookFailMessage":["null","string"],"saveToMetadata":["boolean"],"isActive":["boolean"],"ogTitle":["null","string"],"ogDescription":["null","string"],"ogImageUrl":["null","string"]}), put__api_forms_id_9);
+forms.put('/api/forms/:id', denyReadOnly(), inputJsonBoundary({"name":["string"],"description":["null","string"],"fields":["array"],"folderId":["null","string"],"onSubmitTagId":["null","string"],"onSubmitScenarioId":["null","string"],"onSubmitMessageType":["null","string"],"onSubmitMessageContent":["null","string"],"onSubmitWebhookUrl":["null","string"],"onSubmitWebhookHeaders":["null","string"],"onSubmitWebhookFailMessage":["null","string"],"saveToMetadata":["boolean"],"isActive":["boolean"],"ogTitle":["null","string"],"ogDescription":["null","string"],"ogImageUrl":["null","string"]}), put__api_forms_id_9);
 
 // GET /api/forms/:id/delete-impact — 回答・利用先・開けなくなるURLを同時に確認する。
 forms.get('/api/forms/:id/delete-impact', requireDeliveryAccess('forms'), get__api_forms_id_delete_impact_10);

@@ -20,7 +20,7 @@ import { buildOffsetListResponse, parseOffsetPaging, type ListSort } from '../li
 import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { legacyFormFieldTypeError, parseLayout, validateFormForPublish, DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { legacyFormFieldTypeError, parseLayout, collectInputs, validateFormForPublish, DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { formMatchesListFilter, formMatchesListQuery, sortFormListItems } from '@line-crm/shared';
 import { serializeForm, validFormListFilter, validFormListSort, FORM_LIST_PAGE_FALLBACK_LIMIT, stoppedPublicFormResponse, readFormTestToken, verifyFormTestToken, serializePublicForm, canUseFormFromAccount, requireFormManage, FORM_TEST_TOKEN_MAX_ACTIVE, FORM_TEST_TOKEN_TTL_MS, sha256Hex, authorizedDeleteImpact } from './forms-definition.js';
 import type { Context } from 'hono';
@@ -579,6 +579,13 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
     }
     if ('error' in normalized) {
       return inputError(c, { success: false, error: normalized.error }, 400, ["layout"]);
+    }
+    if (c.get('impersonation')) {
+      const previous = await getFormById(c.env.DB, id);
+      if (!previous) return fail(c, 404, 'FORM_NOT_FOUND');
+      const routes = (value: ReturnType<typeof parseLayout>) => collectInputs(value).filter(block => block.type === 'booking').map(block => ({id:block.id,routing:block.booking?.routing ?? null}));
+      if (JSON.stringify(routes(parseLayout(previous.layout, previous.fields))) !== JSON.stringify(routes(JSON.parse(normalized.layout))))
+        return c.json({success:false,error:'代理ログイン中は行き先を変更できません'},403);
     }
     try { for(const account of await getFormAccountIds(c.env.DB,id)) await validateLayoutRouting(c.env.DB,account,JSON.parse(normalized.layout)); }
     catch(e) { if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }

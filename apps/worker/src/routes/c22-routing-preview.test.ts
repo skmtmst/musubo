@@ -27,3 +27,25 @@ test('条件が壊れた試行は400で断り、保存しない',async()=>{
  const r=await gapCall(gapApp(d,[formRouting]),'/api/forms/form/routing/preview?account_id=a','POST',{answers:{subject:'相談'},layout:draft});
  expect(r.status).toBe(400);expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
 });
+test('停止中と他店の行き先を保存できず、元の定義を残す',async()=>{
+ const {forms}=await import('./forms.js');
+ d.raw.exec("INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES('other-account','b','他店',60,0)");
+ const before=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get();
+ for(const menuId of ['missing','other-account']){
+  const draft=layout(); const booking=draft.sections[0].blocks[1];if(booking.kind!=='input'||!booking.booking?.routing)throw Error('fixture');
+  booking.booking.routing.rules[0].target.menuId=menuId;
+  const r=await gapCall(gapApp(d,[forms]),'/api/forms/form?account_id=a','PUT',{layout:draft,expectedContentRevision:1});
+  expect(r.status).toBe(400);
+  expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
+ }
+});
+test('閲覧のみと代理ログインでは振り分けを保存できない',async()=>{
+ const {forms}=await import('./forms.js');
+ const before=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get();
+ for(const [staff,impersonated] of [[{...gapOwner,readOnly:true},false],[gapOwner,true]] as const){
+  const changed=layout(); const booking=changed.sections[0].blocks[1];if(booking.kind!=='input'||!booking.booking?.routing)throw Error('fixture');booking.booking.routing.rules=[];
+  const r=await gapCall(gapApp(d,[forms],staff,impersonated),'/api/forms/form?account_id=a','PUT',{layout:changed,expectedContentRevision:1});
+  expect(r.status).toBe(403);
+  expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
+ }
+});
