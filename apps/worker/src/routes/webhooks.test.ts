@@ -1793,7 +1793,7 @@ describe('送信Webhookのイベント種別は発火可能な種類だけを受
 //  secret-backfill口の契約
 // =====================================================
 
-describe('Webhookの秘密値移行は対象と設定を確認し試算できる', () => {
+describe('Webhookの秘密値移行は対象と設定を確認し試算・実行できる', () => {
   const report = {
     dryRun: true, batchSize: 50, legacyTotal: 2, rekeyTotal: 0,
     processed: 0, migrated: 0, failed: [], remainingLegacy: 2, remainingRekey: 0, done: false,

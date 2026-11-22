@@ -646,7 +646,7 @@ describe('Webhookの送信が応答しない場合は時間制限で打ち切る
   });
 });
 
-describe('Webhookの再送は待機時間や日時の指定を読み取る', () => {
+describe('Webhookは待機指定を読み取り応答ごとに再送を判定する', () => {
   it('秒数形式はそのまま待つ', () => {
     expect(retryAfterDelayMs('2', 500)).toBe(2000);
     expect(retryAfterDelayMs('0', 500)).toBe(0);

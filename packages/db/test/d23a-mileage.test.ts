@@ -305,7 +305,7 @@ describe('R386: 同一人物の複数プロフィールで残高を重複集計�
   });
 });
 
-describe('閲覧権限がないアカウントのマイル履歴を伏せる', () => {
+describe('閲覧権限がないアカウントのマイル履歴は理由・実行者・元の記録を伏せる', () => {
   it('見られないアカウントの理由・実行者・元イベントは返さない', async () => {
     await postMileageAdjustment(db, adjustmentInput({ friendId: 'fa-1', idempotencyKey: 'key-a' }));
     await postMileageAdjustment(db, {
