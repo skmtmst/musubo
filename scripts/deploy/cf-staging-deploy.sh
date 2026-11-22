@@ -78,10 +78,7 @@ if [ ! -f "$STAGING_CONFIG" ]; then
   echo "[NG] $STAGING_CONFIG がありません。" >&2
   exit 1
 fi
-if grep -qE '^\s*\[triggers\]' "$STAGING_CONFIG"; then
-  echo "[NG] $STAGING_CONFIG に [triggers] があります。検証では予約配信を動かさない決まりです。" >&2
-  exit 1
-fi
+node scripts/deploy/staging-cron-policy.mjs "$STAGING_CONFIG"
 
 step "1/6 作業ツリーの確認"
 DIRTY="$(git status --short)"

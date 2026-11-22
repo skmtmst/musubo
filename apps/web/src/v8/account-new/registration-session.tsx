@@ -4,9 +4,13 @@ import { useEffect, useState, type ReactNode } from 'react'
 import ListState from '@/components/shared/list-state'
 import { PageContent, PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ResumeRegistrationStyle from './resume-style'
+import { PENDING_REGISTRATION_RECEIPT } from './registration-storage'
 
 /** 接続済みIDの再開判定が済むまで、新しい登録フォームを起動しない。 */
-export default function RegistrationSession({ resumeKey, children }: { resumeKey: string | null; children: ReactNode }) {
+export default function RegistrationSession({ resumeKey, children }: {
+  resumeKey: string | null
+  children: (pendingAccountId: string, onReceiptConfirmed: (accountId: string) => void) => ReactNode
+}) {
   const [resumeId, setResumeId] = useState<string>()
   useEffect(() => {
     let id = ''
@@ -18,5 +22,8 @@ export default function RegistrationSession({ resumeKey, children }: { resumeKey
     <PageHeading title="LINEアカウントを登録" />
     <PageContent layout="stats"><ListState kind="loading" title="登録の状態を確認しています" /></PageContent>
   </PageFrame>
-  return resumeId ? <ResumeRegistrationStyle accountId={resumeId} /> : children
+  if (resumeId.startsWith(PENDING_REGISTRATION_RECEIPT)) {
+    return children(resumeId.slice(PENDING_REGISTRATION_RECEIPT.length), setResumeId)
+  }
+  return resumeId ? <ResumeRegistrationStyle accountId={resumeId} /> : children('', setResumeId)
 }

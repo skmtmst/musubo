@@ -28,10 +28,11 @@ import { STATE_TEXT } from '@/components/shared/not-connected'
 import { loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
 import { runOptimistic } from '@/lib/undoable'
 import { isDashboardNotificationData, notificationTime } from '@/components/dashboard/notification-summary'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { notificationDestination, notificationLinkLabel } from './destination'
 import {
   NOTIFICATION_TABS,
+  isLineTokenNotification,
   isSystemNotification,
   markAllCategoryForTab,
   notificationQueryForTab,
@@ -52,7 +53,7 @@ export default function NotificationsV8() {
   const role = useStaffRole()
   // 既読は自分の印なので担当者まで付けられる。閲覧のみ・権限が分からない間は操作を出さない。
   const canMarkRead = role === 'owner' || role === 'admin' || role === 'staff'
-  const destinationContext = { accountId: selectedAccountId, canManage: canManageRole(role), hqOrigin: params.get('from') === 'hq' }
+  const destinationContext = { accountId: selectedAccountId, hqOrigin: params.get('from') === 'hq' }
   // タブ「すべて・未読・システム」。前の ?category=error はシステム、update はすべてとして読む。
   const filter: NotificationTab = notificationTabFromParam(params.get('category'))
   const [items, setItems] = useState<NotificationCenterItem[]>([])
@@ -244,7 +245,7 @@ export default function NotificationsV8() {
           ) : (
             <ul className={styles.list}>
               {orderedItems.map((item) => (
-                <li key={item.id} className={styles.item} data-unread={!item.isRead}>
+                <li key={item.id} className={styles.item} data-unread={!item.isRead} data-token-notice={isLineTokenNotification(item) || undefined}>
                   <Link
                     href={notificationDestination(item, destinationContext)}
                     className={styles.row}
@@ -260,6 +261,7 @@ export default function NotificationsV8() {
                         {!item.isRead ? <span className={styles.dot} aria-hidden="true" /> : null}
                         {!item.isRead ? <span className="sr-only">（未読）</span> : null}
                       </span>
+                      {isLineTokenNotification(item) && item.body ? <span className={styles.noticeBody}>{item.body}</span> : null}
                       <span className={styles.time}>{notificationTime(item.createdAt)}</span>
                     </span>
                     <span className={styles.go}>{`${notificationLinkLabel(item, destinationContext)} →`}</span>
