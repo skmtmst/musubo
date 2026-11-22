@@ -32,6 +32,7 @@ function app(){const app=new Hono<Env>();app.use('*',async(c,next)=>{c.set('staf
 async function request(method:string,path:string,body?:unknown){return app().request(`https://worker.example${path}`,{method,headers:{'content-type':'application/json', 'Idempotency-Key':'publish-1'},...(body?{body:JSON.stringify(body)}:{})},bindings());}
 beforeEach(()=>{
   store=createTestD1();role='owner';gates.allowed=true;videoSize=200*1024*1024;previewSize=1024;vi.clearAllMocks();
+  store.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','channel-a','A','test','test')");
   store.raw.prepare(`INSERT INTO broadcast_media_upload_sessions(id,line_account_id,created_by,r2_key,public_key,filename,mime_type,expected_size,expires_at,completed_at,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run('s','a','owner','temp',videoKey,'video.mp4','video/mp4',videoSize,'2099-01-01','2026-01-01','2026-01-01');
 });
 afterEach(()=>store.raw.close());
