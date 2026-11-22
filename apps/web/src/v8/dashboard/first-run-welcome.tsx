@@ -5,6 +5,7 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import { prefersReducedMotion } from '@/components/shared/overlay-utils'
 import { consumeRegistrationWelcome } from '@/lib/registration-welcome'
+import './first-run-welcome-tokens.css'
 import styles from './first-run-welcome.module.css'
 
 const WELCOME_TIMING = { enter: 1200, hold: 1800, leave: 800 }
