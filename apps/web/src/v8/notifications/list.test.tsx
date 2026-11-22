@@ -131,13 +131,15 @@ describe('V8 通知', () => {
   })
 
   test.each([
-    ['owner', '更新する →'],
+    ['owner', 'アカウントを見る →'],
     ['viewer', 'アカウントを見る →'],
   ])('LINE の鍵の知らせはそのアカウントの設定へ。権限 %s は %s', async (role, label) => {
     fx.role = role
-    items = [item('n-token', 'line_token_refresh_failed', 'error', 'LINEの鍵を取り替えられません', false, '2026-08-25T00:00:00.000Z')]
+    const body = 'LINE Developersでチャネルシークレットを確かめ、アカウントの資格情報で入れ直してください。'
+    items = [{ ...item('n-token', 'line_token_refresh_failed', 'error', 'LINEの接続情報を確認してください', false, '2026-08-25T00:00:00.000Z'), body }]
     render(<NotificationsV8 />)
-    const title = await screen.findByText('LINEの鍵を取り替えられません')
+    const title = await screen.findByText('LINEの接続情報を確認してください')
+    expect(within(title.closest('li')!).getByText(body)).toBeTruthy()
     expect(title.closest('a')?.getAttribute('href')).toBe('/accounts/detail?id=account-a')
     expect(within(title.closest('li')!).getByText(label)).toBeTruthy()
   })

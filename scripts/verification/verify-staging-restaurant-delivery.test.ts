@@ -160,7 +160,7 @@ describe('staging delivery verification safety', () => {
     )).toThrow('Unexpected staging Worker URL');
     expect(() => readVerificationTarget(
       `${stagingConfig}\n[triggers]\ncrons = ["* * * * *"]`,
-    )).toThrow('must not have cron triggers');
+    )).toThrow('may only schedule LINE token renewal');
 
     // 画面を開く宛先も設定から読む。本番の管理画面は開かない。
     expect(readAdminTarget(stagingConfig)).toEqual({ adminUrl: 'https://stg-admin.musubo.jp' });

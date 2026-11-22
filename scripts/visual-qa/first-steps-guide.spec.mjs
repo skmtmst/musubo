@@ -88,6 +88,60 @@ test('初回だけウェルカムを出し、スキップ後は再読込して�
   await expect(welcome).toHaveCount(0)
 })
 
+test('接続済みなら設定を残してリッチメニューから始められる', async ({ page }) => {
+  await openFixture(page, { initialGuide: { phase: 'paused', stepKey: 'attributes', procedureIndex: 2 } })
+  await page.goto(base)
+  const restart = page.getByRole('button', { name: '最初から始める', exact: true })
+  await expect(restart).toBeVisible()
+  await restart.click()
+  const picker = page.getByRole('dialog', { name: /リッチメニューを選ぶ/ })
+  await expect(picker).toBeVisible()
+  await page.reload()
+  await expect(picker).toBeVisible()
+  await picker.getByRole('button', { name: 'あとで', exact: true }).click()
+  await expect(page).toHaveURL(/\/restaurant-test\/tables/)
+})
+
+test('Webhookが一致した時だけ0/8から次へ進める', async ({ page }) => {
+  await openFixture(page, { firstStep: 'richMenu' })
+  let checks = 0
+  await page.route(url => url.pathname === '/api/getting-started', async route => {
+    const url = new URL(route.request().url())
+    const existing = await (await page.request.get(mock + url.pathname + url.search)).json()
+    const line = existing.data.steps.find(step => step.key === 'accounts')
+    line.state = checks > 1 ? 'done' : 'stalled'
+    return route.fulfill({ json: existing })
+  })
+  await page.route(url => url.pathname === '/api/line-accounts', async route => {
+    const existing = await (await page.request.get(mock + '/api/line-accounts')).json()
+    const account = existing.data.find(item => item.id === accountId)
+    return route.fulfill({ json: { success: true, data: [{ ...account, revision: 7 }] } })
+  })
+  await page.route(url => url.pathname === `/api/line-accounts/${accountId}/connection-checks`, async route => {
+    expect(route.request().method()).toBe('POST')
+    expect(route.request().headers()['idempotency-key']).toBeTruthy()
+    expect(route.request().postDataJSON()).toEqual({ expectedRevision: 7 })
+    checks += 1
+    return route.fulfill({ json: { success: true, data: { accountId, checks: [{
+      kind: 'webhook_endpoint', webhookActive: checks > 1, result: checks > 1 ? 'matched' : 'mismatched',
+    }] } } })
+  })
+  await page.goto(base)
+  await expect(page.getByText(/開店準備 0\/8.*再開できます/)).toBeVisible()
+  await page.getByRole('button', { name: 'ガイドで進める', exact: true }).click()
+  await expect(page).toHaveURL(/\/accounts$/)
+  const rowMenu = page.locator(`[data-row-id="${accountId}"]`).locator('[data-row-menu]')
+  const check = page.getByRole('menuitem', { name: '接続をもう一度確かめる' })
+  await rowMenu.click()
+  await check.click()
+  await expect(page.getByText(/Webhook接続を確認できませんでした/)).toBeVisible()
+  await expect(page.locator(guideBar)).toContainText('LINEアカウント')
+  await rowMenu.click()
+  await check.click()
+  await expect(page.getByRole('dialog', { name: /リッチメニューを選ぶ/ })).toBeVisible()
+  expect(checks).toBe(2)
+})
+
 test('保存の失敗に留まり、成功後は手順3を再開して営業時間へ進む', async ({ page }, testInfo) => {
   await openFixture(page)
   await page.goto(base)
@@ -262,6 +316,7 @@ test('一時停止中に受付を止めても最初の未完了項目から始�
   await page.getByRole('link', { name: 'ダッシュボード', exact: true }).click()
   await expect(page.getByRole('button', { name: /開店準備 6\/8。ガイドを再開する/ })).toBeVisible()
   await page.getByRole('button', { name: '最初から始める', exact: true }).click()
+  await page.getByRole('dialog', { name: /リッチメニューを選ぶ/ }).getByRole('button', { name: 'あとで', exact: true }).click()
   await expect(page).toHaveURL(/\/restaurant-test\/inventory$/, { timeout: 15000 })
   await expect(page.locator(guideBar)).toContainText('予約枠と在庫を設定する')
 })
@@ -352,11 +407,20 @@ test('公開確認では最後の公開ボタンにガイドが移る', async ({
   await openFixture(page, { initialGuide: { phase: 'active', stepKey: 'friendAdd', procedureIndex: 2 }, storeProgress: { tables: true, hours: true } })
   await page.goto(`${base}/restaurant-test/menu/edit`)
   await expect(page.locator('[data-guide-spotlight="menu.form"]')).toBeVisible()
-  await page.getByRole('button', { name: '所要時間', exact: true }).click()
-  await page.getByRole('option', { name: '2時間30分（150分）', exact: true }).click()
-  await page.screenshot({ path: info.outputPath('guided-course-basics.png') })
+  const basics = page.locator('[data-guide-balloon="friendAdd:2"]')
+  const duration = page.getByRole('button', { name: '所要時間', exact: true })
+  await expect(duration).toHaveText('所要時間を選ぶ')
+  await expect(page.getByRole('button', { name: '提供時間', exact: true })).toHaveText('提供時間帯を選ぶ')
+  await page.screenshot({ path: info.outputPath('guided-course-empty.png') })
   await page.getByRole('textbox', { name: 'メニュー名' }).fill('ガイド検証用')
   await page.getByRole('spinbutton', { name: '価格（税込）' }).fill('4200')
+  const next = basics.getByRole('button', { name: '次へ', exact: true })
+  await expect(next).toBeDisabled()
+  await duration.click()
+  await page.getByRole('option', { name: '2時間30分（150分）', exact: true }).click()
+  await expect(next).toBeEnabled()
+  await page.screenshot({ path: info.outputPath('guided-course-basics.png') })
+  await next.click()
   await expect(page.locator('[data-guide-balloon="friendAdd:3"]')).toBeVisible()
   await page.getByRole('button', { name: '保存する状態', exact: true }).click()
   await page.getByRole('option', { name: '公開', exact: true }).click()
@@ -420,6 +484,66 @@ test('来店フォローのおすすめ候補を表示したまま後で使う�
   await expect(confirmation.locator(guideBar)).toBeVisible()
   await confirmation.getByRole('button', { name: '今は使わない', exact: true }).click({ trial: true })
   await page.screenshot({ path: info.outputPath('guided-followup-later.png') })
+})
+
+test('スマホでLINEアカウントの操作を開ける', async ({ browser }, info) => {
+  const viewport = { width: 390, height: 844 }
+  const context = await browser.newContext({ viewport, hasTouch: true, isMobile: true })
+  try {
+    const page = await context.newPage()
+    await openFixture(page, { ...viewport, initialGuide: { phase: 'active', stepKey: 'accounts', procedureIndex: 1 } })
+    await page.route(url => url.pathname === '/api/getting-started', async route => {
+      const url = new URL(route.request().url())
+      const progress = await (await page.request.get(mock + url.pathname + url.search)).json()
+      progress.data.steps.find(step => step.key === 'accounts').state = 'stalled'
+      return route.fulfill({ json: progress })
+    })
+    await page.goto(`${base}/accounts`)
+    const table = page.getByRole('table', { name: 'LINEアカウントの一覧' })
+    await expect(table).toBeVisible()
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width)
+    const register = page.getByRole('link', { name: 'LINEアカウントを登録' })
+    const box = await register.boundingBox()
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width)
+    await table.locator(`[data-row-id="${accountId}"] [data-row-menu]`).tap()
+    await expect(page.getByRole('menuitem', { name: '接続をもう一度確かめる' })).toBeVisible()
+    await page.screenshot({ path: info.outputPath('guided-accounts-touch-menu.png') })
+  } finally {
+    await context.close()
+  }
+})
+
+test('タッチ幅の画面でもガイドがGoogle接続と来店フォロー保存を覆わない', async ({ browser }, info) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
+  try {
+    const page = await context.newPage()
+    await openFixture(page, { width: 390, height: 844,
+      initialGuide: { phase: 'active', stepKey: 'hours', procedureIndex: 1 }, storeProgress: { tables: true } })
+    await page.route('**/api/restaurant-test/google/connection?**', async route => {
+      const url = new URL(route.request().url())
+      const data = await (await page.request.get(mock + url.pathname + url.search)).json()
+      data.connection = { ...data.connection, status: 'disconnected', locationName: null }
+      return route.fulfill({ json: data })
+    })
+    await page.route('**/api/restaurant-test/google/connect/start?**', route => route.fulfill({
+      status: 502, json: { success: false, error: '接続確認の試験' },
+    }))
+    await page.goto(`${base}/restaurant-test/google?tab=hours`)
+    const connect = page.getByRole('button', { name: 'Googleアカウントとつなぐ' })
+    await connect.tap()
+    await expect(page.getByText('Googleの許可画面を開けませんでした。もう一度お試しください。')).toBeVisible()
+
+    const followup = await context.newPage()
+    await openFixture(followup, { width: 390, height: 844,
+      initialGuide: { phase: 'active', stepKey: 'followup', procedureIndex: 1 },
+      storeProgress: { tables: true, hours: true, menus: true, reception: true } })
+    await followup.goto(`${base}/restaurant-test/line-followup`)
+    const save = followup.getByRole('button', { name: '保存して作る', exact: true })
+    await save.tap({ trial: true })
+    await followup.screenshot({ path: info.outputPath('guided-followup-touch-save.png') })
+  } finally {
+    await context.close()
+  }
 })
 
 test('営業時間の編集パネル内で説明を読んで次の操作に進める', async ({ page }, info) => {
@@ -568,6 +692,9 @@ test('コースの写真は5枚まで。並べ替えと正方形の表示範囲�
   }
   await page.getByRole('textbox', { name: 'メニュー名' }).fill('写真付きコース')
   await page.getByRole('spinbutton', { name: '価格（税込）' }).fill('4200')
+  await page.getByRole('button', { name: '所要時間', exact: true }).click()
+  await page.getByRole('option', { name: '2時間（120分）', exact: true }).click()
+  await page.locator('[data-guide-balloon="friendAdd:2"]').getByRole('button', { name: '次へ', exact: true }).click()
   await page.getByRole('button', { name: '保存して追加する', exact: true }).click()
   await expect.poll(() => submitted?.photos).toEqual([
     { mediaId: images[1].id, x: 73, y: 50 }, { mediaId: images[0].id, x: 50, y: 50 },

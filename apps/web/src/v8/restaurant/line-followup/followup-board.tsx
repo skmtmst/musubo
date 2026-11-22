@@ -129,13 +129,17 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
    <Card as="article" padding="default" gap="tight" layout="vertical" aria-label="予約の回答フォーム">
     <div className={styles.head}><h2>予約の回答フォーム</h2></div>
     <div className={styles.timing}><p>リッチメニューの「予約」で開く</p><Button variant="text" size="inline" textTone="accent" disabled={!canManage||busy} lockedReason={lockedReason} onClick={openFormEditor}>変える</Button></div>
-    <div className={styles.sample}><ReservationFormSample definition={form} storeName={storeName} compact/></div>
+    <div className={styles.sample} data-guide-overview={guiding||undefined}>
+     {guiding ? <span className={styles.sampleLabel}>ご予約の内容（見本）</span> : <ReservationFormSample definition={form} storeName={storeName} compact/>}
+    </div>
    </Card>
    {displayedRows.map(row=><Card as="article" key={row.trigger} padding="default" gap="tight" layout="vertical" aria-label={FOLLOWUP_NAMES[row.trigger]}>
     <div className={styles.head}><h2>{FOLLOWUP_NAMES[row.trigger]}</h2><Toggle label={`${FOLLOWUP_NAMES[row.trigger]}を使う`} checked={row.enabled} disabled={!canManage||busy||!row.enabled&&!row.editable} lockedReason={lockedReason} onChange={enabled=>{if(!enabled)update({...row,enabled:false});else if(row.editable)openEditor({...row,enabled:true})}}/></div>
     <div className={styles.timing}><p title={followupTimingLabel(row.trigger,row.timing)}>{followupTimingLabel(row.trigger,row.timing)}</p><Button variant="text" size="inline" textTone="accent" disabled={!canManage||busy||!row.editable} lockedReason={lockedReason} disabledReason={!row.editable?'詳細画面で変更できます':undefined} onClick={()=>openEditor(row)}>変える</Button></div>
     <StatusBadge help={row.enabled&&!row.sending?row.reason??undefined:undefined} tone={row.enabled&&row.sending?'success':'neutral'}>{recommend && isRecommended(row.trigger) ? 'おすすめ' : rowContentKey(row)!==rowContentKey(savedRows.find(saved=>saved.trigger===row.trigger)!)?'未保存':!row.enabled?'止めています':row.sending?'送っています':!row.editable?'中身を確認してください':'準備済み・送信停止中'}</StatusBadge>
-    <div className={styles.sample} data-muted={!row.enabled||undefined}>{row.bubbles.length?<FollowupMessageSample bubbles={row.bubbles} storeName={storeName} compact/>:<p className={styles.support}>詳細で中身を確認してから試してください。</p>}</div>
+    <div className={styles.sample} data-guide-overview={guiding||undefined} data-muted={!row.enabled||undefined}>
+     {row.bubbles.length ? <FollowupMessageSample bubbles={row.bubbles} storeName={storeName} compact overview={guiding}/> : <p className={styles.support}>詳細で中身を確認してから試してください。</p>}
+    </div>
     {row.detailPath&&<div className={styles.row}><Button variant="text" size="inline" textTone="accent" href={row.detailPath}>詳しく設定する →</Button><Button variant="text" size="inline" textTone="accent" disabled={!canManage||busy||dirty||!row.enabled||!row.targetId} lockedReason={lockedReason} disabledReason={dirty?'先に変更を保存してください':!row.enabled||!row.targetId?'送り方をオンにして保存してください':undefined} onClick={()=>setTest(row.trigger)}>試す・送り始める</Button></div>}
     {row.trigger==='review_request'&&<p className={styles.support} role="status">{snapshot.reviewCount==null?'送信履歴は読めませんでした':`送信履歴 ${snapshot.reviewCount}件`}</p>}
    </Card>)}
