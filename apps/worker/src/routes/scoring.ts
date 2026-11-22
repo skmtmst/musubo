@@ -1,3 +1,4 @@
+import { mileageHandgift } from './mileage-handgift.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 
@@ -13,6 +14,7 @@ import { post__api_mileage_entries_id_notification_retry_1, post__api_mileage_ea
 import { requireMileageExport, legacyScoringRetired, requireVisibleFriendForScore } from './scoring-definition.js';
 
 const scoring = new Hono<Env>();
+scoring.route('/', mileageHandgift);
 export type { MileageRuleCreateInput } from './scoring-definition.js';
 
 scoring.post('/api/mileage/exports', post__api_mileage_exports_1, inputJsonBoundary({ accountId: ['string'], kind: ['string'], reason: ['string'] }), post__api_mileage_exports_2);
