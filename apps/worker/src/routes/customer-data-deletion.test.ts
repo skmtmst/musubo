@@ -27,6 +27,17 @@ function app() {
 }
 function env(): Env['Bindings'] { return { DB: sqlite.db, IMAGES: { delete: remove } } as unknown as Env['Bindings']; }
 function count(table: string) { return (sqlite.raw.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n; }
+
+it('cleans old delivery orphans after a customer deletion without touching linked items', async () => {
+  sqlite.raw.exec(`INSERT INTO rt_delivery_orders(id,account_id,store_id,service,external_order_id,order_number,received_at,created_at,updated_at)
+    VALUES ('linked-order','a','store','line','linked-order','1',1,1,1);
+    INSERT INTO rt_delivery_order_items(id,order_id,name,created_at) VALUES
+    ('old-orphan','missing-order','private',1),('linked-item','linked-order','keep',1);`);
+  const response = await app().request(friendUrl, { method:'DELETE', headers:headers('delete-friend-data') }, env());
+  expect(response.status).toBe(200);
+  expect(sqlite.raw.prepare('SELECT id FROM rt_delivery_order_items').all()).toEqual([{ id:'linked-item' }]);
+  expect(sqlite.raw.prepare("SELECT after_json FROM audit_events WHERE action='privacy.delivery_orphans.cleaned'").get()).toEqual({ after_json:'{"deletedRows":1}' });
+});
 function document(id: string, submission: string | null, friend = 'u') {
   sqlite.raw.prepare(`INSERT INTO media_file_scans (id,line_account_id,subject_kind,subject_id,filename,mime_type,size_bytes,status)
     VALUES (?, 'a','form_file',?,'secret-id.pdf','application/pdf',12,'clean')`).run(`scan-${id}`, `private/${id}`);
