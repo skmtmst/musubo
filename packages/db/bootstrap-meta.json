@@ -683,7 +683,8 @@
     "776_booking_meeting_links.sql",
     "777_booking_meeting_lifecycle.sql",
     "780_booking_meeting_connections.sql",
-    "786_restaurant_course_gallery.sql"
+    "786_restaurant_course_gallery.sql",
+    "789_limit_legacy_folder_update_triggers.sql"
   ],
-  "migrationCount": 684
+  "migrationCount": 685
 }
