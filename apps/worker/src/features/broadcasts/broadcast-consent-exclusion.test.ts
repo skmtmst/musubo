@@ -352,7 +352,7 @@ it('確認済み統括配信の同時処理は同じ宛先に二重送信しな�
  const twoDispatches=new Promise<void>(resolve=>{releaseDispatch=resolve});
  const prepareSpy=vi.spyOn(f.db,'prepare').mockImplementation(sql=>{
   const statement=prepare(sql);
-  if(sql.includes("SELECT * FROM broadcasts WHERE status = 'sending' AND batch_offset >= 0"))return new Proxy(statement,{get(target,key){
+  if(sql.includes("SELECT * FROM broadcasts WHERE status = 'sending'") && sql.includes("batch_offset >= 0"))return new Proxy(statement,{get(target,key){
    if(key==='all')return async()=>{const result=await target.all();if(++queuedReads===2)releaseReads();await readsReady;return result};
    const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;
   }});
