@@ -65,7 +65,7 @@ it('質問を切り替えても保存済みの行を消さない', async () => {
   fireEvent.click(screen.getByRole('radio',{name:'地域（1 つ選ぶ）'}))
   fireEvent.click(screen.getByRole('button',{name:'選ぶ'}))
   expect(onChange).not.toHaveBeenCalled()
-  expect(screen.getByText(/相談内容：〈相談〉/)).toBeTruthy()
+  expect(screen.getByRole('button',{name:'1 行目の条件 1 の答え'})).toBeTruthy()
 })
 
 it('行き先の担当に組を選び、担当者ではなく組のIDを保存する', () => {
@@ -87,4 +87,40 @@ it('担当の組が取得できない時は空の一覧と誤認させず知ら�
     {id:'book',kind:'input',type:'booking'},
   ] as never} refs={{bookingGroupsError:true} as never} routing={{enabled:true,rules:[],fallback:{menuId:'m'}}} onChange={() => {}} />)
   expect(screen.getByText(/担当の組を読み込めませんでした/)).toBeTruthy()
+})
+
+it('5段階評価の質問に数値の範囲を持つ行を追加できる', () => {
+  const onChange=vi.fn()
+  render(<RoutingSection blocks={[
+    {id:'q',kind:'input',type:'rating',name:'score',label:'満足度'},
+    {id:'book',kind:'input',type:'booking'},
+  ] as never} refs={{bookingMenus:[{id:'m',name:'相談',durationMinutes:30}]} as never}
+  routing={{enabled:true,rules:[],fallback:{menuId:'m'}}} onChange={onChange} />)
+  fireEvent.click(screen.getByRole('button',{name:'行き先を追加'}))
+  expect(onChange.mock.calls[0][0].rules[0].conditions).toEqual([{questionId:'q',op:'between',value:[1,5]}])
+})
+
+it('1行に質問の条件を追加でき、3つまでに制限する', () => {
+  const onChange=vi.fn()
+  const question={id:'q',kind:'input',type:'radio',name:'subject',label:'相談内容',choices:[{id:'x',label:'相談'}]}
+  const rule={conditions:[{questionId:'q',op:'is' as const,value:'相談'}],target:{menuId:'m'}}
+  const {rerender}=render(<RoutingSection blocks={[question,{id:'book',kind:'input',type:'booking'}] as never} refs={{} as never} routing={{enabled:true,rules:[rule],fallback:{menuId:'m'}}} onChange={onChange} />)
+  fireEvent.click(screen.getByRole('button',{name:'1 行目のそのほかの操作'}))
+  fireEvent.click(screen.getByText('選んだ質問の条件を追加'))
+  expect(onChange.mock.calls[0][0].rules[0].conditions).toHaveLength(2)
+  rerender(<RoutingSection blocks={[question,{id:'book',kind:'input',type:'booking'}] as never} refs={{} as never} routing={{enabled:true,rules:[{...rule,conditions:[rule.conditions[0],rule.conditions[0],rule.conditions[0]]}],fallback:{menuId:'m'}}} onChange={onChange} />)
+  fireEvent.click(screen.getByRole('button',{name:'1 行目のそのほかの操作'}))
+  expect(screen.queryByText('選んだ質問の条件を追加')).toBeNull()
+  fireEvent.click(screen.getByRole('button',{name:'1 行目のそのほかの操作'}))
+  fireEvent.click(screen.getByRole('button',{name:'1 行目の条件 2 を外す'}))
+  expect(onChange.mock.calls[1][0].rules[0].conditions).toHaveLength(2)
+})
+
+it('数値の範囲を変更すると数値としてルールに反映する', () => {
+  const onChange=vi.fn()
+  render(<RoutingSection blocks={[{id:'q',kind:'input',type:'rating',name:'score',label:'満足度'},{id:'book',kind:'input',type:'booking'}] as never} refs={{} as never}
+    routing={{enabled:true,rules:[{conditions:[{questionId:'q',op:'between',value:[1,5]}],target:{menuId:'m'}}],fallback:{menuId:'m'}}} onChange={onChange} />)
+  fireEvent.click(screen.getByRole('button',{name:'1 行目の範囲の始まり'}))
+  fireEvent.click(screen.getByRole('option',{name:'3'}).querySelector('button')!)
+  expect(onChange.mock.calls[0][0].rules[0].conditions[0].value).toEqual([3,5])
 })

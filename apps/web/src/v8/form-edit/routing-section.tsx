@@ -97,17 +97,17 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
           <span className={styles.label}>分ける質問</span>
           {readOnly ? <span>{question?.label ?? '質問がありません'}</span> : questions.length === 0 ? <span>使える質問を追加してください。</span> : <EntitySelect aria-label="分ける質問" value={questionId} options={questions.map((q) => ({ value: q.id, label: `${q.label}（${choiceModeLabel(q.type)}）` }))}
             onChange={(id) => setPickedQuestion(id)} />}
-          <span className={styles.hint}>使える質問：1 つ選ぶ・いくつでも選ぶ・プルダウン</span>
+          <span className={styles.hint}>使える質問：1 つ選ぶ・いくつでも選ぶ・プルダウン・5段階評価</span>
         </div>
         {/* 決まり2: 行き先の決まりは帯にせず、題の横の「？」へ入れる。 */}
         {trying ? <div id="routing-trial" className={styles.trial} role="group" aria-label="試しに答える">
-          {trialQuestions.map((q) => q.kind !== 'input' ? null : <span key={q.id}>
+          {trialQuestions.map((q) => q.kind !== 'input' ? null : <div key={q.id}>
             <span>{q.label}</span>
             {q.type === 'checkbox' ? (q.choices ?? []).map((choice) => {
               const selected = Array.isArray(answers[q.name]) ? answers[q.name] as string[] : []
               return <Checkbox key={choice.id} checked={selected.includes(choice.label)} onCheckedChange={(checked) => { void runPreview({ ...answers, [q.name]: checked ? [...selected, choice.label] : selected.filter((item) => item !== choice.label) }) }}>{choice.label}</Checkbox>
             }) : <Select aria-label={`${q.label}の試しの答え`} value={String(answers[q.name] ?? '')} options={[{ value: '', label: '答えを選ぶ' }, ...(q.type === 'rating' ? [1,2,3,4,5].map((n) => ({ value: String(n), label: String(n) })) : (q.choices ?? []).map((c) => ({ value: c.label, label: c.label })))]} onChange={(answer) => { void runPreview({ ...answers, [q.name]: q.type === 'rating' && answer ? Number(answer) : answer }) }} />}
-          </span>)}
+          </div>)}
           {!onPreview ? <span>保存してから試してください。</span> : null}
           {preview ? <strong>{preview.matchedIndex === -1 ? 'どれにも当たらないとき' : `${preview.matchedIndex + 1} 行目`}：{menus.find((menu) => menu.id === preview.target.menuId)?.name ?? '行き先'}{preview.fellBack ? '（元の行き先が使えないため既定の行き先）' : ''}（保存はされません）</strong> : null}
           {previewError ? <Notice tone="danger" role="alert">{previewError}</Notice> : null}
@@ -119,10 +119,17 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
             return (
               <Tr key={rule.id} selected={hit === index} data-invalid={invalid || undefined} {...reorder.rowProps(rule.id)}>
                 <HandleCell>{readOnly ? null : <ReorderHandle look="icon" label={`${index + 1} 行目`} {...reorder.handle(rule.id)} {...reorder.handleProps(rule.id)} />}</HandleCell>
-                <Td><span className={styles.cond}>{rule.conditions.map((condition, i) => <span key={i} title={`${questions.find((q) => q.id === condition.questionId)?.label ?? '質問'}：${String(condition.value)}`}>{`${trialQuestions.find((q) => q.id === condition.questionId)?.label ?? '質問'}：`}〈{Array.isArray(condition.value) ? condition.value.join('・') : condition.value}〉</span>)}</span></Td>
+                <Td><div className={styles.cond}>{rule.conditions.map((condition, i) => <div key={i} title={`${questions.find((q) => q.id === condition.questionId)?.label ?? '質問'}：${String(condition.value)}`}>
+                  {`${trialQuestions.find((q) => q.id === condition.questionId)?.label ?? '質問'}：`}
+                  {condition.op === 'between' && Array.isArray(condition.value) && !readOnly ? <>
+                    <Select aria-label={`${index + 1} 行目の範囲の始まり`} size="full" value={String(condition.value[0])} options={[1,2,3,4,5].map((n) => ({ value: String(n), label: String(n) }))} onChange={(v) => setRule(rule.id, { conditions: rule.conditions.map((c, j) => j === i ? { ...c, value: [Number(v), Number(condition.value[1])] } : c) })} />
+                    <Select aria-label={`${index + 1} 行目の範囲の終わり`} size="full" value={String(condition.value[1])} options={[1,2,3,4,5].map((n) => ({ value: String(n), label: String(n) }))} onChange={(v) => setRule(rule.id, { conditions: rule.conditions.map((c, j) => j === i ? { ...c, value: [Number(condition.value[0]), Number(v)] } : c) })} />
+                  </> : condition.op === 'is' && !readOnly && trialQuestions.find((q) => q.id === condition.questionId)?.choices?.length ? <Select aria-label={`${index + 1} 行目の条件 ${i + 1} の答え`} size="full" value={String(condition.value)} options={(trialQuestions.find((q) => q.id === condition.questionId)?.choices ?? []).map((choice) => ({value:choice.label,label:choice.label}))} onChange={(v) => setRule(rule.id, {conditions:rule.conditions.map((c,j) => j === i ? {...c,value:v} : c)})} /> : <>〈{Array.isArray(condition.value) ? condition.value.join('・') : condition.value}〉</>}
+                  {!readOnly && rule.conditions.length > 1 ? <Button variant="text" size="inline" aria-label={`${index + 1} 行目の条件 ${i + 1} を外す`} onClick={() => setRule(rule.id, {conditions:rule.conditions.filter((_,j) => j !== i)})}>外す</Button> : null}
+                </div>)}</div></Td>
                 {targetCells(rule.target, (target) => setRule(rule.id, { target }), `${index + 1} 行目`, invalid)}
                 <ActionCell>{readOnly ? null : <RowMenu appearance="box" size="row" label={`${index + 1} 行目のそのほかの操作`} open={openMenu === rule.id} onOpenChange={(o) => setOpenMenu(o ? rule.id : null)}
-                  items={[...reorder.menuItems(rule.id, () => setOpenMenu(null)), { id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { set({ rules: value.rules.filter((_, i) => `r${i}` !== rule.id) }); setOpenMenu(null) } }]} />}</ActionCell>
+                  items={[...reorder.menuItems(rule.id, () => setOpenMenu(null)), ...(question && rule.conditions.length < 3 ? [{ id: 'add-condition', label: '選んだ質問の条件を追加', onSelect: () => { setRule(rule.id, {conditions:[...rule.conditions, newRule(question.id, question.choices?.[0]?.label ?? '', question.type).conditions[0]]}); setOpenMenu(null) } }] : []), { id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { set({ rules: value.rules.filter((_, i) => `r${i}` !== rule.id) }); setOpenMenu(null) } }]} />}</ActionCell>
               </Tr>
             )
           })}
@@ -135,8 +142,8 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
         </tbody></DataTable>
         {problem ? <Notice tone="danger">{problem.message}</Notice> : null}
         {readOnly ? null : <div className={styles.add}>
-          <Button variant="text" icon={<Plus size={16} aria-hidden="true" />} disabled={answersLeft.length === 0 || value.rules.length >= MAX_ROUTING_ROWS} onClick={() => question && set({ rules: [...value.rules, newRule(question.id, answersLeft[0].label)] })}>行き先を追加</Button>
-          {value.rules.length >= MAX_ROUTING_ROWS ? <span className={styles.hint}>{MAX_ROUTING_ROWS} 行までです</span> : answersLeft.length === 0 ? <span className={styles.hint}>この質問の答えはすべて表にあります</span> : null}
+          <Button variant="text" icon={<Plus size={16} aria-hidden="true" />} disabled={(!question || (question.type !== 'rating' && answersLeft.length === 0)) || value.rules.length >= MAX_ROUTING_ROWS} onClick={() => question && set({ rules: [...value.rules, newRule(question.id, answersLeft[0]?.label ?? '', question.type)] })}>行き先を追加</Button>
+          {value.rules.length >= MAX_ROUTING_ROWS ? <span className={styles.hint}>{MAX_ROUTING_ROWS} 行までです</span> : question?.type !== 'rating' && answersLeft.length === 0 ? <span className={styles.hint}>この質問の答えはすべて表にあります</span> : null}
         </div>}
       </> : null}
     </Card>

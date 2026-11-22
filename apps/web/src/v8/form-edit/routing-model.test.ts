@@ -34,3 +34,11 @@ test('行は 50 まで', () => {
   const rules = Array.from({ length: 51 }, () => ({ ...newRule('q1', 'a'), target: { menuId: 'bm-1' } }))
   expect(routingError({ enabled: true, rules, fallback: { menuId: 'bm-1' } })?.message).toContain('50')
 })
+
+test('5段階評価は範囲条件を使い、逆の範囲は保存できない', () => {
+  const rating = { id:'q4',kind:'input',type:'rating',name:'score',label:'満足度' } as unknown as FormBlock
+  expect(routingQuestions([rating]).map((q) => q.id)).toEqual(['q4'])
+  const rule = {...newRule('q4','', 'rating'),target:{menuId:'bm-1'}}
+  expect(rule.conditions[0]).toEqual({questionId:'q4',op:'between',value:[1,5]})
+  expect(routingError({enabled:true,rules:[{...rule,conditions:[{questionId:'q4',op:'between',value:[5,1]}]}],fallback:{menuId:'bm-1'}})?.message).toContain('範囲')
+})
