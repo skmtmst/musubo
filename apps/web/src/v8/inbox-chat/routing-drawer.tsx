@@ -9,13 +9,7 @@ import EntitySelect from '@/components/shared/entity-select'
 
 import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
 
-/*
- * 受信箱の「割り当てと返事の期限」の引き出し（板 L6pGz・要件 G3）。
- * 口：inboxRoutingApi（GET/PUT /api/inbox/routing-settings。契約 API-CONTRACT-GAP1.md）。
- * 今の口で保存できるのは「返事の期限」（使う・分・営業時間の中だけ・過ぎたら知らせる先）と割り当て方「しない」だけ。
- * 均等・優先順・ランダム＋優先度・対象の人・今の未割り当てに当てる、は口の次の段。選べない形で並べ、準備中と書く。
- * 設定はオーナー・管理者だけ（開く入口を出さない）。
- */
+/* 受信箱の割り当てと返事の期限の設定。 */
 import { useEffect, useRef, useState } from 'react'
 import type { InboxFirstResponseSettings } from '@line-crm/shared'
 import Drawer from '@/components/shared/drawer'
@@ -28,7 +22,8 @@ import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
-import { ApiError, api } from '@/lib/api'
+import { api } from '@/lib/api'
+import { gap3InboxApi } from '@/lib/api/helpers/gap3'
 import { inboxRoutingApi } from '@/lib/api/helpers/gap1'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import styles from './routing-drawer.module.css'
@@ -38,13 +33,14 @@ const MAX_MINUTES = 1440
 /** 契約：期限の15分前から金の札。いまは変えられない固定値。 */
 const SOON_MINUTES = 15
 const STRATEGIES = [
-  { value: 'none', label: 'しない', ready: true },
-  { value: 'even', label: '均等', ready: false },
-  { value: 'priority', label: '優先順', ready: false },
-  { value: 'random_weighted', label: 'ランダム＋優先度', ready: false },
+  { value: 'none', label: 'しない' },
+  { value: 'even', label: '均等' },
+  { value: 'priority', label: '優先順' },
+  { value: 'random_weighted', label: 'ランダム' },
 ] as const
 
 type Team = { id: string; name: string }
+type Person = { id: string; name: string }
 
 export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
   accountId: string
@@ -59,10 +55,19 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
   const [settings, setSettings] = useState<InboxFirstResponseSettings | null>(null)
   const [draft, setDraft] = useState<InboxFirstResponseSettings | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
+  const [people, setPeople] = useState<Person[]>([])
+  const [peopleFailed, setPeopleFailed] = useState(false)
   const [loadError, setLoadError] = useState<unknown>(null)
   const [minutesText, setMinutesText] = useState('30')
   const [saving, setSaving] = useState(false)
+  const [job, setJob] = useState<{id:string;status:string;assigned:number;skipped:number;total:number}|null>(null)
+  const [jobError, setJobError] = useState('')
+  const [jobStarting, setJobStarting] = useState(false)
+  const jobStartLock = useRef(false)
+  const jobKey = useRef<string|null>(null)
   const [error, setError] = useState('')
+
+  useEffect(() => { setJob(null); setJobError(''); jobKey.current = null }, [accountId])
 
   useEffect(() => {
     if (!open) return
@@ -72,16 +77,37 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
       if (!live) return
       setSettings(res.data); setDraft(res.data); setMinutesText(String(res.data.firstResponseMinutes))
     }, (caught) => { if (live) setLoadError(caught) })
+    setPeople([]); setPeopleFailed(false)
+    void Promise.resolve().then(() => api.staff.list(accountId)).then((res) => {
+      if (live && res.success) setPeople(res.data.filter(person => person.isActive && person.role !== 'viewer' && !person.readOnly && person.roleBundle !== 'view_only').map(person => ({ id: person.id, name: person.name })))
+    }, () => { if (live) setPeopleFailed(true) })
     void api.notifications.teams.list(accountId).then((res) => {
       if (live && res.success) setTeams(res.data.filter((team) => !team.archivedAt).map((team) => ({ id: team.id, name: team.name })))
     }, () => {})
     return () => { live = false }
   }, [open, accountId])
 
+  useEffect(() => {
+    if (!open || !job || !['pending','running'].includes(job.status)) return
+    let live = true
+    const timer = window.setTimeout(() => { void gap3InboxApi.assignmentJob(accountId,job.id).then(result => { if (live) setJob(result.data) }, () => { if (live) setJobError('進捗を確認できませんでした。開き直して確認してください。') }) }, 2500)
+    return () => { live = false; window.clearTimeout(timer) }
+  }, [open, accountId, job])
+
+  const applyExisting = async () => {
+    if (jobStartLock.current) return
+    jobStartLock.current = true; setJobStarting(true); setJobError('')
+    jobKey.current ??= crypto.randomUUID()
+    try { const result = await gap3InboxApi.applyUnassigned(accountId,jobKey.current);if (contextRef.current.accountId === accountId) setJob(result.data) }
+    catch { if (contextRef.current.accountId === accountId) setJobError('割り当てを開始できませんでした。同じ操作でもう一度お試しください。') }
+    finally { jobStartLock.current = false; setJobStarting(false) }
+  }
+  useEffect(() => { if (job && ['succeeded','failed'].includes(job.status)) jobKey.current = null }, [job])
   const minutes = Number(minutesText)
   const minutesValid = Number.isInteger(minutes) && minutes >= MIN_MINUTES && minutes <= MAX_MINUTES
   const dirty = Boolean(settings && draft && (
-    settings.enabled !== draft.enabled || settings.businessHoursOnly !== draft.businessHoursOnly
+    settings.strategy !== draft.strategy || JSON.stringify(settings.targets ?? []) !== JSON.stringify(draft.targets ?? [])
+    || settings.enabled !== draft.enabled || settings.businessHoursOnly !== draft.businessHoursOnly
     || settings.escalateTeamId !== draft.escalateTeamId || settings.firstResponseMinutes !== (minutesValid ? minutes : settings.firstResponseMinutes)
   ))
 
@@ -91,7 +117,7 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
     setSaving(true); setError('')
     try {
       const res = await inboxRoutingApi.save(accountId, {
-        strategy: 'none', enabled: draft.enabled, firstResponseMinutes: minutes, businessHoursOnly: draft.businessHoursOnly,
+        strategy: draft.strategy ?? 'none', targets: draft.targets ?? [], enabled: draft.enabled, firstResponseMinutes: minutes, businessHoursOnly: draft.businessHoursOnly,
         escalateTeamId: draft.escalateTeamId, expectedVersion: settings.version,
       })
       if (contextRef.current.accountId !== accountId || !contextRef.current.open) return
@@ -121,8 +147,25 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
             <div className={styles.body}>
               <section className={styles.card} aria-labelledby="routing-strategy-heading">
                 <h3 id="routing-strategy-heading" className={styles.cardTitle}>割り当て方</h3>
-                {/* 1行の切り替え。今の口で選べるのは「しない」だけなので、全体を選べない形にして並べる（準備中）。 */}
-                <p className={styles.fixed}>担当を自動で割り当てない</p>
+                <SegmentedControl aria-label="割り当て方" options={[...STRATEGIES]} value={draft.strategy ?? 'none'} onChange={(strategy) => setDraft({ ...draft, strategy })} />
+                {draft.strategy === 'random_weighted' ? <p className={styles.note}>ランダムに選ぶときも優先順を反映します。</p> : null}
+                {settings && settings.strategy !== 'none' ? <>
+                  <p className={styles.note}>{`今の未割り当て ${settings.unassignedCount ?? '—'} 件`}</p>
+                  <Button variant="secondary" disabled={dirty || jobStarting || Boolean(job && ['pending','running'].includes(job.status))} onClick={() => void applyExisting()}>今の未割り当てにも当てる</Button>
+                  {job ? <p role="status">{job.status === 'succeeded' ? `${job.assigned}件を割り当て、${job.skipped}件は割り当てられませんでした。` : job.status === 'failed' ? '割り当てを完了できませんでした。管理者に確認してください。' : `割り当て中 ${job.assigned + job.skipped} / ${job.total}件`}</p> : null}
+                  {jobError ? <><Notice tone="warn" message={jobError} />{job ? <Button variant="secondary" onClick={() => { setJobError(''); void gap3InboxApi.assignmentJob(accountId,job.id).then(result => setJob(result.data), () => setJobError('進捗を確認できませんでした。')) }}>もう一度確認する</Button> : null}</> : null}
+                </> : null}
+                {draft.strategy !== 'none' ? <>
+                  <p className={styles.note}>対象の担当者と、優先順・未対応の上限を決めます。</p>
+                  {peopleFailed ? <Notice tone="warn">担当者を読み込めませんでした。画面を開き直してください。</Notice> : null}
+                  {people.map(person => { const target = (draft.targets ?? []).find(item => item.staffId === person.id); return <div className={styles.pair} key={person.id}>
+                    <Checkbox checked={Boolean(target)} onCheckedChange={checked => setDraft({ ...draft, targets: checked ? [...(draft.targets ?? []), {staffId:person.id,priority:1,cap:10}] : (draft.targets ?? []).filter(item => item.staffId !== person.id) })}>{person.name}</Checkbox>
+                    {target ? <div className={styles.pair}>
+                      <Field label="優先順"><NumberInput type="number" value={String(target.priority)} onChange={event => setDraft({ ...draft, targets: (draft.targets ?? []).map(item => item.staffId === person.id ? { ...item, priority: Number(event.target.value) } : item) })} /></Field>
+                      <Field label="上限"><NumberInput type="number" value={String(target.cap)} onChange={event => setDraft({ ...draft, targets: (draft.targets ?? []).map(item => item.staffId === person.id ? { ...item, cap: Number(event.target.value) } : item) })} /></Field>
+                    </div> : null}
+                  </div> })}
+                </> : null}
               </section>
 
               <section className={styles.card} aria-labelledby="routing-sla-heading">

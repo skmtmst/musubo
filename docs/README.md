@@ -1324,3 +1324,4 @@
 - [列車 1116](release-log/unreleased/83-kenta-train-1116.md) — まとめて入れた直しの履歴。確認 2026-11-16。
 
 - [データ保持の分類表の重複](release-log/unreleased/145-kenta-retention-dup.md) — 申込記録の分類表の重複を直した履歴。確認 2026-11-21。
+- [受信箱の担当割り当てと返信分析](release-log/unreleased/174-kenta-c12-inbox-assign.md) — 自動割り当てと返信状況の履歴。確認 2026-11-22。

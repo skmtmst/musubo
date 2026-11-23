@@ -34,17 +34,18 @@ import SavedV8 from './saved'
 import FunnelV8, { type FunnelFormSlot, type FunnelSaveSlot } from './funnel'
 import CrossV8 from './cross'
 import SegmentsV8 from './segments'
+import InboxResponse from './inbox-response'
 import styles from './analytics.module.css'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 
-export const ANALYTICS_TABS = ['friends', 'reactions', 'routes', 'usage', 'cross', 'funnel', 'url-clicks', 'saved', 'segments'] as const
+export const ANALYTICS_TABS = ['friends', 'reactions', 'routes', 'usage', 'cross', 'funnel', 'url-clicks', 'saved', 'segments', 'inbox-response'] as const
 export type AnalyticsTabV8 = (typeof ANALYTICS_TABS)[number] | 'conversion-report'
 
 /** 絵の二段：上は組（成果を見る・お客さまを分析・利用と保存）、下はその組の見かた。 */
 const GROUPS: Array<{ label: string; tabs: Array<{ key: string; label: string }> }> = [
-  { label: '成果を見る', tabs: [{ key: 'friends', label: '友だちの増減' }, { key: 'reactions', label: '配信の反応' }, { key: 'routes', label: '経路と成果' }, { key: 'url-clicks', label: 'URLクリック' }] },
+  { label: '成果を見る', tabs: [{ key: 'friends', label: '友だちの増減' }, { key: 'reactions', label: '配信の反応' }, { key: 'routes', label: '経路と成果' }, { key: 'url-clicks', label: 'URLクリック' }, { key: 'inbox-response', label: '返事の速さ' }] },
   { label: 'お客さまを分析', tabs: [{ key: 'funnel', label: 'ファネル' }, { key: 'cross', label: 'クロス分析' }, { key: 'segments', label: 'お客さまの分け方' }] },
   { label: '利用と保存', tabs: [{ key: 'usage', label: '使われ方' }, { key: 'saved', label: '保存した分析' }] },
 ]
@@ -133,6 +134,7 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
       stepKindsLabel={slots?.funnelStepKindsLabel} />
     : tab === 'saved' ? <SavedV8 key={selectedAccountId} accountId={selectedAccountId} onCountChange={setSavedCount} canManage={canManage} />
     : tab === 'segments' ? <SegmentsV8 key={selectedAccountId} accountId={selectedAccountId} canManage={canManage} />
+    : tab === 'inbox-response' ? <InboxResponse key={selectedAccountId} accountId={selectedAccountId} />
     : tab === 'usage' ? <UsageV8 key={selectedAccountId} accountId={selectedAccountId} />
     : <UrlClicksV8 key={selectedAccountId} accountId={selectedAccountId} />
 

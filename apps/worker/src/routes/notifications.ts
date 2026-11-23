@@ -696,7 +696,7 @@ notifications.get('/api/notifications', requireRole('owner', 'admin', 'staff'), 
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
-    const items = await getNotifications(c.env.DB, { lineAccountId, status, limit });
+    const items = await getNotifications(c.env.DB, { lineAccountId, status, limit, staffId:c.get('staff').id });
     const responseItems = items.map((n) => {
       const metadata = n.metadata ? JSON.parse(n.metadata) : null;
       return {

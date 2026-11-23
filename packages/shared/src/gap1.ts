@@ -10,8 +10,8 @@ export interface SendConfirmationPreview {
  deliveryLimit?:{candidateCount:number;recipientCount:number;random:boolean};
  expectedVersion:string|number;stoppable?:boolean;perAccount?:Array<{accountId:string;recipients:number;recipientToken?:string;excluded:SendConfirmationPreview['excluded']}>;
 }
-export interface InboxFirstResponseSettings {strategy:'none'|'even'|'priority'|'random_weighted';targets?:Array<{staffId:string;priority:number;cap:number}>;enabled:boolean;firstResponseMinutes:number;businessHoursOnly:boolean;version:number;escalateTeamId:string|null}
-export type InboxFirstResponseWrite=Omit<InboxFirstResponseSettings,'version'|'escalateTeamId'> & {expectedVersion:number;escalateTeamId?:string|null};
+export interface InboxFirstResponseSettings {unassignedCount?:number;strategy:'none'|'even'|'priority'|'random_weighted';targets?:Array<{staffId:string;priority:number;cap:number}>;enabled:boolean;firstResponseMinutes:number;businessHoursOnly:boolean;version:number;escalateTeamId:string|null}
+export type InboxFirstResponseWrite=Omit<InboxFirstResponseSettings,'version'|'escalateTeamId'|'unassignedCount'> & {expectedVersion:number;escalateTeamId?:string|null};
 export type InboxSlaState='none'|'ok'|'soon'|'overdue'|'outside_hours';
 export interface BookingCancellationPolicy {enabled:boolean;tiers:Array<{beforeHours:number;percent:number}>;noShowPercent:number;version:number}
 export interface BookingCancellationQuote {freeUntil:string|null;feeNow:number;feeNoShow:number;text:string;policyAcceptedRequired:boolean}

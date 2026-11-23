@@ -7,6 +7,7 @@ import { revealInScroller } from './sidebar-current-item'
 import { V8_NAV_ICONS, V8_SETTINGS_ICON } from './sidebar-icons'
 export { revealInScroller } from './sidebar-current-item'
 
+import { useInboxPresenceHeartbeat } from '@/lib/use-inbox-presence-heartbeat'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
 
 import { SidebarAccountMenu } from '@/components/hq/account-menu'
@@ -198,6 +199,7 @@ export default function Sidebar({
 
   const [staffName, setStaffName] = useState<string | null>(null)
   const staffRole = useStaffRole()
+  useInboxPresenceHeartbeat(staffRole !== null && staffRole !== 'viewer')
   const staffIdentity = readStaffIdentity()
   const staffReadRole = staffIdentity?.role ?? staffRole
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])

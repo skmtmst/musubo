@@ -149,7 +149,7 @@ describe('operator notification account boundary', () => {
     );
     expect(response.status).toBe(200);
     expect(mocks.getNotifications).toHaveBeenCalledWith(env.DB, {
-      lineAccountId: 'account-a', status: 'failed', limit: 20,
+      lineAccountId: 'account-a', status: 'failed', limit: 20, staffId:'owner-a',
     });
   });
 });

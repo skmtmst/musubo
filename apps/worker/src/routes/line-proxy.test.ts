@@ -80,6 +80,7 @@ function fakeDb(opts: {
   friendsByUserId?: Record<string, { id: string; line_user_id: string }>;
   broadcastFriendIds?: string[];
   suppressed?: boolean;
+  staffIds?: string[];
 } = {}) {
   const executed: Exec[] = [];
   const db = {
@@ -106,6 +107,7 @@ function fakeDb(opts: {
           return { results: (opts.broadcastFriendIds ?? []).map((id) => ({ id })) };
         },
         async first() {
+          if(sql.includes('SELECT id FROM staff_members WHERE id='))return opts.staffIds?.includes(String(stmt.params[0]))?{id:stmt.params[0]}:null;
           if(sql.includes('AS delivery_suppressed')) {
             const friend = await getFriendByLineUserIdForAccount(db as unknown as D1Database, String(stmt.params[2]), String(stmt.params[0]));
             return friend ? {...friend, delivery_suppressed: opts.suppressed ? 1 : 0} : null;
@@ -124,12 +126,13 @@ function fakeDb(opts: {
   return { db: db as unknown as D1Database, executed };
 }
 
-/** 複数行の送信履歴 INSERT を、1行8引数の論理行へ展開して検証する。 */
+/** 複数行の送信履歴 INSERT を、1行9引数の論理行へ展開して検証する。 */
 function loggedRows(executed: Exec[]) {
   const rows: { friendId: unknown; messageType: unknown; content: unknown; deliveryType: unknown; source: unknown; lineAccountId: unknown }[] = [];
   for (const e of executed) {
     if (!e.sql.includes('INTO messages_log')) continue;
-    for (let i = 0; i < e.params.length; i += 8) {
+    expect(e.params.length).toBeLessThanOrEqual(100);
+    for (let i = 0; i < e.params.length; i += 9) {
       rows.push({
         friendId: e.params[i + 1],
         messageType: e.params[i + 2],
@@ -680,6 +683,16 @@ describe('push', () => {
     expect(loggedRows(executed)[0].source).toBe('manual');
     const [, init] = fetchMock.mock.calls[0] as [string, { headers: Record<string, string> }];
     expect(init.headers).not.toHaveProperty('X-Line-Harness-Source');
+  });
+
+  test('手動返信の送信者と時刻を履歴と会話でそろえる',async()=>{
+    vi.mocked(authenticateApiToken).mockResolvedValue({id:'operator',name:'担当',role:'staff',readOnly:false,tenantId:DEFAULT_TENANT_ID,permissionKeys:['/chats']} as never);
+    const {db,executed}=fakeDb({staffIds:['operator']});
+    const response=await setupApp().request(pushRequest('harness-key',undefined,{'X-Line-Harness-Source':'manual'}),{},env(db));
+    expect(response.status).toBe(200);
+    const insert=executed.find(e=>e.sql.includes('INTO messages_log'))!;
+    expect(insert.params[8]).toBe('operator');
+    expect(updateChat).toHaveBeenCalledWith(db,'chat-1',expect.objectContaining({lastMessageAt:insert.params[7],manualReply:true}));
   });
 
   test('unknown source header is rejected before upstream send', async () => {

@@ -60,9 +60,9 @@ export async function processInboxSla(db:D1Database,now=new Date()) {
   const notificationId=`sla:${r.id}:${r.pending_since}:${stage}`;
   await db.batch([
    db.prepare(`INSERT OR IGNORE INTO notifications(id,event_type,title,body,channel,status,metadata,line_account_id,category)
-    SELECT ?,'inbox_sla',?,'受信箱で会話を確認してください','in_app','sent',?,?,'info' FROM chats
+    SELECT ?,'inbox_sla',?,'受信箱で会話を確認してください','dashboard','sent',?,?,'info' FROM chats
     WHERE id=? AND sla_notified_stage=? AND pending_since=? AND first_response_at IS NULL AND status!='resolved'`)
-    .bind(notificationId,stage===1?'返事の期限が近づいています':'返事の期限を過ぎています',JSON.stringify({chatId:r.friend_id,staffId:r.operator_id,teamId:stage===3?r.escalate_team_id:null,stage}),account,r.id,r.sla_notified_stage,r.pending_since),
+    .bind(notificationId,stage===1?'返事の期限が近づいています':'返事の期限を過ぎています',JSON.stringify({chatId:r.friend_id,staffId:r.operator_id,teamId:r.escalate_team_id,stage}),account,r.id,r.sla_notified_stage,r.pending_since),
    db.prepare('UPDATE chats SET sla_notified_stage=? WHERE id=? AND pending_since=? AND first_response_at IS NULL AND EXISTS(SELECT 1 FROM notifications WHERE id=?)')
     .bind(stage,r.id,r.pending_since,notificationId)
   ]);

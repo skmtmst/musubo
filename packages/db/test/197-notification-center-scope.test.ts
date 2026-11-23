@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   getNotificationCenter,
+  getNotifications,
   getNotificationCenterCounts,
   markAllNotificationsRead,
   markNotificationRead,
@@ -20,6 +21,8 @@ function setup(): Database.Database {
   sqlite.exec(`
     PRAGMA foreign_keys = ON;
     CREATE TABLE line_accounts (id TEXT PRIMARY KEY);
+    CREATE TABLE staff_members (id TEXT PRIMARY KEY, role TEXT, is_active INTEGER, invite_status TEXT);
+    CREATE TABLE operator_notification_teams (id TEXT PRIMARY KEY, line_account_id TEXT, staff_ids TEXT, archived_at TEXT);
     CREATE TABLE notification_rules (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, event_type TEXT NOT NULL,
       conditions TEXT NOT NULL DEFAULT '{}', channels TEXT NOT NULL DEFAULT '["webhook"]',
@@ -40,6 +43,24 @@ function setup(): Database.Database {
 }
 
 describe('migration 197 notification center scope', () => {
+  it('割当不能の知らせは責任者と指定チームだけに表示し既読にも反映する', async () => {
+    const sqlite=setup(),db=asD1(sqlite);
+    sqlite.exec(`INSERT INTO staff_members VALUES ('owner','owner',1,'active'),('member','staff',1,'active'),('other','staff',1,'active');
+      INSERT INTO operator_notification_teams VALUES ('team','account-a','["member"]',NULL);
+      INSERT INTO notifications(id,event_type,title,body,channel,status,metadata,created_at,line_account_id,category)
+      VALUES ('routing','inbox_assignment_unavailable','担当なし','確認','dashboard','sent','{"teamId":"team"}','2026-08-27','account-a','error');`);
+    for(const staffId of ['owner','member','env-owner']) expect((await getNotificationCenter(db,{lineAccountId:'account-a',staffId})).map(x=>x.id)).toEqual(['routing']);
+    expect((await getNotificationCenter(db,{lineAccountId:'account-a',staffId:'other'}))).toEqual([]);
+    expect((await getNotifications(db,{lineAccountId:'account-a',staffId:'other'}))).toEqual([]);
+    expect((await getNotificationCenterCounts(db,{lineAccountId:'account-a',staffId:'other'})).all).toBe(0);
+    expect(await markNotificationRead(db,{notificationId:'routing',lineAccountId:'account-a',staffId:'other'})).toBe(false);
+    expect(await markAllNotificationsRead(db,{lineAccountId:'account-a',staffId:'other'})).toBe(0);
+    sqlite.exec(`INSERT INTO notifications(id,event_type,title,body,channel,status,metadata,created_at,line_account_id,category)
+      VALUES ('sla-unassigned','inbox_sla','期限','確認','dashboard','sent','{"teamId":"team","staffId":null,"stage":1}','2026-08-28','account-a','error');`);
+    expect((await getNotificationCenter(db,{lineAccountId:'account-a',staffId:'member'})).map(x=>x.id)).toContain('sla-unassigned');
+    expect((await getNotificationCenter(db,{lineAccountId:'account-a',staffId:'other'})).map(x=>x.id)).not.toContain('sla-unassigned');
+    sqlite.close();
+  });
   it('keeps legacy notifications unassigned and adds per-staff read storage', () => {
     const sqlite = setup();
     expect(sqlite.prepare('SELECT line_account_id, category FROM notifications WHERE id = ?').get('legacy'))

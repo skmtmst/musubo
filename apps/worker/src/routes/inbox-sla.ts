@@ -1,11 +1,13 @@
-import { routingSettings,routingInput,assignInbox } from '../services/inbox-assignment.js';
+import { beginInboxAssignmentJob,getInboxAssignmentJob } from '../services/inbox-assignment-jobs.js';
+import { inboxResponseAnalytics,inboxResponseConversations } from '../services/inbox-response-analytics.js';
+import { routingSettings,routingInput } from '../services/inbox-assignment.js';
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
-import {gapAccount,gapBody,gapVersion,gapWrite,GapError} from '../services/gap-common.js';
+import {gapAccount,gapBody,gapVersion,gapWrite,gapKey,GapError} from '../services/gap-common.js';
 import {inboxSlaSettings} from '../services/inbox-sla.js';
 export const inboxSla=new Hono<Env>();
 inboxSla.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'inbox_sla_unavailable'},e instanceof GapError?e.status:503));
-inboxSla.get('/api/inbox/routing-settings',async c=>{const a=await gapAccount(c);return c.json({success:true,data:{...await inboxSlaSettings(c.env.DB,a),...await routingSettings(c.env.DB,a)}});});
+inboxSla.get('/api/inbox/routing-settings',async c=>{const a=await gapAccount(c);const count=await c.env.DB.prepare("SELECT count(*) n FROM chats c JOIN friends f ON f.id=c.friend_id WHERE f.line_account_id=? AND c.operator_id IS NULL AND c.assignee_staff_id IS NULL AND c.status!='resolved'").bind(a).first<{n:number}>();return c.json({success:true,data:{...await inboxSlaSettings(c.env.DB,a),...await routingSettings(c.env.DB,a),unassignedCount:count?.n??0}});});
 inboxSla.put('/api/inbox/routing-settings',async c=>{
  gapWrite(c,{admin:true,impersonation:true});const account=await gapAccount(c),b=await gapBody(c),v=gapVersion(b.expectedVersion);
  if(typeof b.enabled!=='boolean'||typeof b.businessHoursOnly!=='boolean'||!Number.isInteger(b.firstResponseMinutes)||Number(b.firstResponseMinutes)<5||Number(b.firstResponseMinutes)>1440)throw new GapError('invalid_sla_settings');
@@ -27,12 +29,40 @@ inboxSla.put('/api/inbox/routing-settings',async c=>{
 });
 
 inboxSla.post('/api/inbox/routing/apply-unassigned',async c=>{
- gapWrite(c,{admin:true,impersonation:true});const a=await gapAccount(c);
- const rows=(await c.env.DB.prepare("SELECT c.friend_id FROM chats c JOIN friends f ON f.id=c.friend_id WHERE f.line_account_id=? AND c.operator_id IS NULL AND c.assignee_staff_id IS NULL AND c.status!='resolved' ORDER BY c.last_customer_message_at LIMIT 500").bind(a).all<{friend_id:string}>()).results;
- let assigned=0;for(const r of rows)if(await assignInbox(c.env.DB,a,r.friend_id))assigned++;
- return c.json({success:true,data:{assigned,skipped:rows.length-assigned}});
+ gapWrite(c,{admin:true,impersonation:true});const account=await gapAccount(c),key=gapKey(c);
+ if((await routingSettings(c.env.DB,account)).strategy==='none')throw new GapError('routing_disabled',409);
+ const job=await beginInboxAssignmentJob(c.env.DB,account,c.get('staff').id,key);
+ return c.json({success:true,data:job},202);
+});
+inboxSla.get('/api/inbox/routing/apply-unassigned/:id',async c=>{
+ const account=await gapAccount(c);const job=await getInboxAssignmentJob(c.env.DB,account,c.req.param('id'));
+ if(!job)throw new GapError('not_found',404);return c.json({success:true,data:job});
+});
+inboxSla.get('/api/me/presence',async c=>{
+ const row=await c.env.DB.prepare('SELECT away FROM staff_presence WHERE staff_id=?').bind(c.get('staff').id).first<{away:number}>();
+ return c.json({success:true,data:{away:row?.away===1}});
 });
 inboxSla.put('/api/me/presence',async c=>{
- gapWrite(c);const b=await gapBody(c);if(typeof b.away!=='boolean')throw new GapError('invalid_presence');
- await c.env.DB.prepare('INSERT INTO staff_presence(staff_id,away,last_seen_at) VALUES(?,?,?) ON CONFLICT(staff_id) DO UPDATE SET away=excluded.away,last_seen_at=excluded.last_seen_at').bind(c.get('staff').id,b.away?1:0,new Date().toISOString()).run();return c.json({success:true,data:{away:b.away}});
+ gapWrite(c);const b=await gapBody(c);if(typeof b.away!=='boolean' && !(b.away===undefined && b.heartbeat===true))throw new GapError('invalid_presence');
+ const away=typeof b.away==='boolean'?(b.away?1:0):null;
+ await c.env.DB.prepare(`INSERT INTO staff_presence(staff_id,away,last_seen_at) VALUES(?,COALESCE(?,0),?)
+  ON CONFLICT(staff_id) DO UPDATE SET away=CASE WHEN ? IS NULL THEN staff_presence.away ELSE excluded.away END,last_seen_at=excluded.last_seen_at`).bind(c.get('staff').id,away,new Date().toISOString(),away).run();
+ const row=await c.env.DB.prepare('SELECT away FROM staff_presence WHERE staff_id=?').bind(c.get('staff').id).first<{away:number}>();
+ return c.json({success:true,data:{away:row?.away===1}});
+});
+
+inboxSla.get('/api/analytics/inbox-response',async c=>{
+ const account=await gapAccount(c),staff=c.get('staff');
+ const allStaff=!staff.readOnly && (staff.role==='owner'||staff.role==='admin');
+ const data=await inboxResponseAnalytics(c.env.DB,account,staff.id,allStaff,c.req.query('from'),c.req.query('to'));
+ return c.json({success:true,data});
+});
+inboxSla.get('/api/analytics/inbox-response/conversations',async c=>{
+ const account=await gapAccount(c),staff=c.get('staff'),allStaff=!staff.readOnly&&(staff.role==='owner'||staff.role==='admin');
+ if(staff.role==='staff'&&!staff.permissionKeys?.includes('/chats')&&!staff.viewPermissionKeys?.includes('/chats'))throw new GapError('forbidden',403);
+ const selected=c.req.query('unattributed')==='1'?null:c.req.query('staffId');
+ const offset=Number(c.req.query('offset')??0);
+ if(selected===undefined||!Number.isInteger(offset)||offset<0||offset>100000)throw new GapError('invalid_input');
+ if(!allStaff&&selected!==staff.id)throw new GapError('forbidden',403);
+ return c.json({success:true,data:await inboxResponseConversations(c.env.DB,account,staff.id,allStaff,selected,c.req.query('from'),c.req.query('to'),offset)});
 });

@@ -682,7 +682,8 @@
     "770_onboarding_guide_progress.sql",
     "772_sns_multi_connections.sql",
     "786_restaurant_course_gallery.sql",
-    "789_limit_legacy_folder_update_triggers.sql"
+    "789_limit_legacy_folder_update_triggers.sql",
+    "793_inbox_response_samples.sql"
   ],
   "migrationCount": 683
 }

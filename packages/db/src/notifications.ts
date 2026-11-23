@@ -140,19 +140,14 @@ export async function deleteNotificationRule(
 
 export async function getNotifications(
   db: D1Database,
-  opts: { lineAccountId: string; status?: string; limit?: number },
+  opts: { lineAccountId: string; status?: string; limit?: number; staffId: string },
 ): Promise<NotificationRow[]> {
   const limit = opts.limit ?? 100;
-  if (opts.status) {
-    const result = await db.prepare(
-      `SELECT * FROM notifications WHERE line_account_id = ? AND status = ? ORDER BY created_at DESC LIMIT ?`,
-    ).bind(opts.lineAccountId, opts.status, limit).all<NotificationRow>();
+  {
+    const result=await db.prepare(`SELECT n.* FROM notifications n WHERE n.line_account_id=? AND (? IS NULL OR n.status=?) AND ${assignmentNoticeVisible('n')} ORDER BY n.created_at DESC LIMIT ?`)
+      .bind(opts.lineAccountId,opts.status??null,opts.status??null,opts.staffId,limit).all<NotificationRow>();
     return result.results;
   }
-  const result = await db.prepare(
-    `SELECT * FROM notifications WHERE line_account_id = ? ORDER BY created_at DESC LIMIT ?`,
-  ).bind(opts.lineAccountId, limit).all<NotificationRow>();
-  return result.results;
 }
 
 export async function createNotification(
@@ -190,6 +185,19 @@ export async function updateNotificationStatus(db: D1Database, id: string, statu
   await db.prepare(`UPDATE notifications SET status = ? WHERE id = ?`).bind(status, id).run();
 }
 
+// 割当不能の知らせは責任者と指定チームに限定する。ほかの通知には影響しない。
+const assignmentNoticeVisible = (alias: string) => `(${alias}.event_type NOT IN ('inbox_assignment_unavailable','inbox_sla') OR EXISTS (
+ SELECT 1 FROM (SELECT id,role,is_active,invite_status FROM staff_members UNION ALL SELECT 'env-owner','owner',1,'active') viewer WHERE viewer.id=? AND viewer.is_active=1 AND viewer.invite_status='active' AND (
+  (${alias}.event_type='inbox_sla' AND CASE WHEN json_valid(${alias}.metadata) THEN json_extract(${alias}.metadata,'$.stage') END IN (1,2)
+   AND CASE WHEN json_valid(${alias}.metadata) THEN json_extract(${alias}.metadata,'$.staffId') END=viewer.id)
+  OR ((${alias}.event_type='inbox_assignment_unavailable' OR (${alias}.event_type='inbox_sla' AND (CASE WHEN json_valid(${alias}.metadata) THEN json_extract(${alias}.metadata,'$.stage') END=3 OR CASE WHEN json_valid(${alias}.metadata) THEN json_extract(${alias}.metadata,'$.staffId') END IS NULL)))
+   AND (viewer.role IN ('owner','admin') OR EXISTS (
+    SELECT 1 FROM operator_notification_teams team, json_each(team.staff_ids) member
+    WHERE team.line_account_id=${alias}.line_account_id AND team.archived_at IS NULL
+    AND team.id=CASE WHEN json_valid(${alias}.metadata) THEN json_extract(${alias}.metadata,'$.teamId') END AND member.value=viewer.id
+   )))
+ )))`;
+
 export async function getNotificationCenter(
   db: D1Database,
   input: {
@@ -205,8 +213,8 @@ export async function getNotificationCenter(
 ): Promise<NotificationCenterRow[]> {
   // 'center' は旧実装が送信枠不足の通知へ付けていた値。画面は 'dashboard'
   // しか読まなかったため書き込み済みの通知が見えなかった。両方を読む。
-  const conditions = ['n.line_account_id = ?', "n.channel IN ('dashboard', 'center')"];
-  const values: unknown[] = [input.staffId, input.lineAccountId];
+  const conditions = ['n.line_account_id = ?', "n.channel IN ('dashboard', 'center')", assignmentNoticeVisible('n')];
+  const values: unknown[] = [input.staffId, input.lineAccountId, input.staffId];
   if (input.category) {
     conditions.push('n.category = ?');
     values.push(input.category);
@@ -238,8 +246,8 @@ export async function getNotificationCenterCounts(
     FROM notifications n
     LEFT JOIN staff_notification_reads r
       ON r.notification_id = n.id AND r.staff_id = ?
-    WHERE n.line_account_id = ? AND n.channel IN ('dashboard', 'center')
-  `).bind(input.staffId, input.lineAccountId).first<{
+    WHERE n.line_account_id = ? AND n.channel IN ('dashboard', 'center') AND ${assignmentNoticeVisible('n')}
+  `).bind(input.staffId, input.lineAccountId, input.staffId).first<{
     all_count: number;
     error_count: number | null;
     update_count: number | null;
@@ -260,9 +268,9 @@ export async function markNotificationRead(
   const now = jstNow();
   const result = await db.prepare(`
     INSERT OR REPLACE INTO staff_notification_reads (notification_id, staff_id, read_at)
-    SELECT id, ?, ? FROM notifications
-    WHERE id = ? AND line_account_id = ? AND channel IN ('dashboard', 'center')
-  `).bind(input.staffId, now, input.notificationId, input.lineAccountId).run();
+    SELECT n.id, ?, ? FROM notifications n
+    WHERE n.id = ? AND n.line_account_id = ? AND n.channel IN ('dashboard', 'center') AND ${assignmentNoticeVisible('n')}
+  `).bind(input.staffId, now, input.notificationId, input.lineAccountId, input.staffId).run();
   return Number(result.meta.changes ?? 0) > 0;
 }
 
@@ -274,15 +282,15 @@ export async function markAllNotificationsRead(
     category?: 'error' | 'update';
   },
 ): Promise<number> {
-  const conditions = ['line_account_id = ?', "channel IN ('dashboard', 'center')"];
-  const values: unknown[] = [input.staffId, jstNow(), input.lineAccountId];
+  const conditions = ['n.line_account_id = ?', "n.channel IN ('dashboard', 'center')", assignmentNoticeVisible('n')];
+  const values: unknown[] = [input.staffId, jstNow(), input.lineAccountId, input.staffId];
   if (input.category) {
-    conditions.push('category = ?');
+    conditions.push('n.category = ?');
     values.push(input.category);
   }
   const result = await db.prepare(`
     INSERT OR REPLACE INTO staff_notification_reads (notification_id, staff_id, read_at)
-    SELECT id, ?, ? FROM notifications
+    SELECT n.id, ?, ? FROM notifications n
     WHERE ${conditions.join(' AND ')}
   `).bind(...values).run();
   return Number(result.meta.changes ?? 0);
