@@ -5,7 +5,7 @@ import { ChevronRight, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'luc
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import AccountSwitchMenu, { type AccountSwitchMenuHq } from './account-switch-menu'
 import type { MenuPortalRect } from './menu-portal'
-import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
+import { ACCOUNT_SWITCH_OPEN_EVENT, SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Avatar from './avatar'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
@@ -198,6 +198,16 @@ export default function TopBar({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  useEffect(() => {
+    const openAccountSwitch = () => {
+      if (!showAccountSwitcher) return
+      setSwitchOpen(true)
+      switchRef.current?.focus()
+    }
+    window.addEventListener(ACCOUNT_SWITCH_OPEN_EVENT, openAccountSwitch)
+    return () => window.removeEventListener(ACCOUNT_SWITCH_OPEN_EVENT, openAccountSwitch)
+  }, [showAccountSwitcher])
 
   return (
     <header ref={rootRef} className={classes} data-design-node="cBSCb" data-v8-chrome={chromeVariant} data-menu-collapsed={menuCollapsed || undefined}>

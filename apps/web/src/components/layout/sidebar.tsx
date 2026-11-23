@@ -19,7 +19,7 @@ import { useAccountStyle } from '@/hooks/use-account-style'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { styleMenuItemVisible, styleMenuLabel } from './style-menu'
 import { allowFeatureNavigation, featureGateVisibility, usePreparingDialog } from './sidebar-feature-gate'
-import { SIDEBAR_TOGGLE_EVENT,UNANSWERED_REFRESH_EVENT } from '@/lib/events'
+import { ACCOUNT_SWITCH_OPEN_EVENT,SIDEBAR_TOGGLE_EVENT,UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import {
 FEATURE_SETTINGS_UPDATED_EVENT,
 SIDEBAR_FEATURE_BY_HREF,
@@ -757,6 +757,11 @@ export default function Sidebar({
           padding が持つので、呼び出し側で mx- の余白を足さない。
           上下の余白は共通の Notice が持つので、mb- も足さない。
         */}
+        {!isHq && !preview && !accountLoading && !selectedAccountId ? (
+          <Notice tone="info" action={<SharedButton variant="text" size="inline" onClick={() => window.dispatchEvent(new Event(ACCOUNT_SWITCH_OPEN_EVENT))}>選ぶ</SharedButton>}>
+            LINE公式アカウントを選ぶと、ほかの機能が出ます
+          </Notice>
+        ) : null}
         {(visibilityStatus === 'error' || accountStyle.error) && selectedAccountId && (
           <Notice
             tone="warn"

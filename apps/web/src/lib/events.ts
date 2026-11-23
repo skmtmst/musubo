@@ -4,3 +4,6 @@ export const UNANSWERED_REFRESH_EVENT = 'lh:unanswered-refresh'
 
 /* ★V8 外側: 左メニューの畳み切替。上の帯のボタンと ⌘\ が投げ、Sidebar が受ける。 */
 export const SIDEBAR_TOGGLE_EVENT = 'lh:sidebar-toggle'
+
+/** 左メニューから上のアカウント選択を開く。 */
+export const ACCOUNT_SWITCH_OPEN_EVENT = 'lh:account-switch-open'
