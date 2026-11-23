@@ -251,7 +251,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
         {/* 未設定のボタンの警告の帯は出さない（承認済み Pen「はじめにやること08d_v04」でこの帯を削除）。 */}
         <ReservationFormRepairNotices notices={start.progress?.notices} role={role}/>
-        {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'} guide={start.guide}
+        {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'} guide={start.guide} firstMessageInline={style === 'restaurant'}
           onRecheck={start.watchExpired ? start.rewatch : undefined}
           feedback={<>{start.error ? <FirstStepsFeedback error={start.error} onRetry={start.reload} /> : null}
             {setup.error && canManageRole(role) ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : null}</>} /> : null}

@@ -19,6 +19,7 @@
 - [削除ボタンの表示を統一](release-log/unreleased/203-kenta-delete-button-rule.md)
 - [色を選ぶ窓の修正](release-log/unreleased/204-kenta-color-well-clip.md)
 - [狭い画面の受信箱の表示を変更](release-log/unreleased/206-kenta-inbox-narrow.md)
+- [はじめにやることの案内ボタンを修正](release-log/unreleased/211-kenta-setup-buttons-center.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
 - [動作確認の名前を整理（3回目）](release-log/unreleased/160-kenta-q04-test-titles3.md)
