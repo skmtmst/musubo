@@ -175,7 +175,7 @@ describe('V8 仮押さえ・日付・来店履歴', () => {
     expect(created.status).toBe(201);
     const {id} = (await created.json() as any).data;
     const { saveVersionedAccountSetting } = await import('@line-crm/db');
-    await saveVersionedAccountSetting(testDb.db, { accountId:'account-1', key:'friend.allergy_options_v1', data:['乳'], expectedVersion:0 });
+    await saveVersionedAccountSetting(testDb.db, { accountId:'account-2', key:'friend.allergy_options_v1', data:['乳'], expectedVersion:0 });
     const updated = await requestWithMethod(`/api/restaurant-test/reservations/${id}?account_id=account-1`, 'PATCH', { allergies:[{kind:'option',value:'卵'},{kind:'option',value:'乳'}] });
     expect(updated.status).toBe(200);
     const row = testDb.raw.prepare('SELECT allergies_json FROM rt_reservations WHERE id=?').get(id) as {allergies_json:string};
