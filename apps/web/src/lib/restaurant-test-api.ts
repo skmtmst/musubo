@@ -45,6 +45,14 @@ export type RestaurantTable = {
   smoking_policy?:'non_smoking'|'smoking'|'heated_tobacco'; partition_type?:'open'|'semi_private'|'private'; shoes_allowed?:number;
   visible_on_map?:number; chair_arrangement?:'both'|'one'|'all'; chair_side?:'top'|'right'|'bottom'|'left'|null; seat_detail_type?:string|null
 }
+export function compareRestaurantTables(a: Pick<RestaurantTable, 'id' | 'store_id' | 'code' | 'label'>, b: Pick<RestaurantTable, 'id' | 'store_id' | 'code' | 'label'>): number {
+  const store = a.store_id.localeCompare(b.store_id, 'ja', { numeric: true })
+  if (store) return store
+  const aNumber = /[0-9０-９]/.test(a.code), bNumber = /[0-9０-９]/.test(b.code)
+  if (aNumber !== bNumber) return aNumber ? -1 : 1
+  const compare = (left: string, right: string) => left.localeCompare(right, 'ja', { numeric: true })
+  return (aNumber ? compare(a.code, b.code) : compare(a.label, b.label)) || compare(a.code, b.code) || compare(a.id, b.id)
+}
 export type RestaurantRotation = {date:string;activeTables:number;departedGroups:number;turnover:number|null;utilization:number|null;averageStayMinutes:number|null;noShowRate:number|null;unmeasuredVisits:number};
 
 export type SeatVisitMark = {
@@ -160,7 +168,7 @@ export const restaurantTestApi = {
     if (query?.limit) params.set('reservationLimit', String(query.limit));
     if (query?.offset) params.set('reservationOffset', String(query.offset));
     const suffix = params.size ? `&${params.toString()}` : '';
-    return fetchApi<{ success: true; data: RestaurantSnapshot }>(`${withAccount('/api/restaurant-test/snapshot', accountId)}${suffix}`);
+    return fetchApi<{ success: true; data: RestaurantSnapshot }>(`${withAccount('/api/restaurant-test/snapshot', accountId)}${suffix}`).then(result => ({ ...result, data: { ...result.data, tables: [...result.data.tables].sort(compareRestaurantTables) } }));
   },
   createStore: (accountId: string, body: { name: string; code: string; area: string; capacity: number; timezone: string; lineAccountId: string }) => fetchApi<{ success: true; data: { id: string } }>(withAccount('/api/restaurant-test/stores', accountId), { method: 'POST', body: JSON.stringify(body) }),
   updateStore: (accountId: string, id: string, body: { name: string; code: string; area: string; capacity: number; status: RestaurantStore['status']; lineAccountId: string }) => fetchApi<{ success: true; data: { id: string } }>(withAccount(`/api/restaurant-test/stores/${id}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
