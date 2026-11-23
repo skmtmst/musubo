@@ -28,18 +28,30 @@ export async function tenantHasFeaturePack(
   }
 }
 
-/**
- * 飲食店機能（restaurant-test）が、この統括に対して実際に有効か。
- *
- * 検証環境のキルスイッチ（`RESTAURANT_TEST_ENABLED`。本番は DEPLOY_ENV でも拒否）が
- * 最上位で、そのうえで統括に `restaurant` パックが付いている場合だけ有効。
- * どちらか片方だけでは有効にならない。
- */
-export async function restaurantEffectivelyEnabledForTenant(
+/** 保存済みの飲食店スタイルは、選択したLINEアカウントの基本機能だけを有効にする。 */
+export async function restaurantAccessMode(
   c: Context<Env>,
-  tenantId?: string,
-): Promise<boolean> {
-  if (!restaurantTestEnabled(c.env)) return false;
-  const id = tenantId ?? c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
-  return tenantHasFeaturePack(dbFor(c.env), id, 'restaurant');
+  accountId: string | null,
+): Promise<'legacy' | 'account' | null> {
+  const staff = c.get('staff');
+  if (!staff || !restaurantTestEnabled(c.env)) return null;
+  const db = dbFor(c.env);
+  const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
+  if (await tenantHasFeaturePack(db, tenantId, 'restaurant')) return 'legacy';
+  if (!accountId) return null;
+  return await hasConfiguredRestaurantStyle(db, accountId, tenantId) ? 'account' : null;
+}
+
+async function hasConfiguredRestaurantStyle(db: D1Database, accountId: string, tenantId: string): Promise<boolean> {
+  const configured = await db.prepare(`SELECT 1 FROM line_accounts a
+    JOIN account_styles p ON p.line_account_id = a.id
+    WHERE a.id = ? AND COALESCE(a.tenant_id, ?) = ?
+      AND a.is_active = 1 AND a.archived_at IS NULL
+      AND p.style = 'restaurant' AND p.selection_mode = 'configured' AND p.selected_at IS NOT NULL`)
+    .bind(accountId, DEFAULT_TENANT_ID, tenantId).first();
+  return configured !== null;
+}
+
+export async function restaurantEffectivelyEnabledForAccount(c: Context<Env>, accountId: string): Promise<boolean> {
+  return (await restaurantAccessMode(c, accountId)) !== null;
 }

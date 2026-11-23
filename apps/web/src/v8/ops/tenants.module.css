@@ -31,10 +31,6 @@
   width: var(--tpl-op-tn-billing-w);
 }
 
-.colFeature {
-  width: var(--tpl-op-ann-state-w);
-}
-
 .billing {
   display: flex;
   flex-direction: column;
@@ -54,12 +50,6 @@
   text-overflow: ellipsis;
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-op-auth-field-gap);
-}
-
 .label {
   color: var(--color-ink);
   font-size: var(--text-label);
@@ -67,21 +57,9 @@
   line-height: var(--tpl-op-auth-label-lh);
 }
 
-.smallLabel {
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-op-ann-small-lh);
-}
-
-.fullSelect :global(*) {
-  max-width: 100%;
-}
-
 @media (max-width: 1023.98px) {
   .colStores,
-  .colStaff,
-  .colFeature {
+  .colStaff {
     display: none;
   }
 }

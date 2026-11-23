@@ -53,6 +53,17 @@ export function authenticatedTenantId(c: Context<Env>): string {
 
 export /** 1人の認証済み担当者は1つの飲食店組織に所属する。複数所属は権限モデルが定義されるまで扱わない。 */
 async function baseOrganizationFor(c: Context<Env>): Promise<OrganizationContext | null> {
+  const scopedAccountId = c.get('restaurantScopedAccountId');
+  if (scopedAccountId) {
+    const ownedStore = await dbFor(c.env).prepare(`SELECT
+      o.id, o.account_id, o.tenant_id, t.name AS tenant_name, o.name, o.status, s.id AS scoped_store_id
+      FROM rt_stores s JOIN rt_organizations o ON o.id = s.organization_id
+      LEFT JOIN tenants t ON t.id = o.tenant_id
+      WHERE s.line_account_id = ? AND COALESCE(o.tenant_id, ?) = ?
+      LIMIT 1`).bind(scopedAccountId, DEFAULT_TENANT_ID, authenticatedTenantId(c))
+      .first<OrganizationRow & { scoped_store_id: string }>();
+    return ownedStore ? { ...ownedStore, scopedStoreId: ownedStore.scoped_store_id } : null;
+  }
   const requestedTenant = tenantId(c);
   if (requestedTenant) {
     return organizationByTenantId(c, requestedTenant);
@@ -111,6 +122,7 @@ export async function selectedRestaurantStore(
 ): Promise<SelectedRestaurantStore | null> {
   const tokenHash = await adminSessionTokenHashFromRequest(c);
   if (!tokenHash) return null;
+  const scopedAccountId = c.get('restaurantScopedAccountId') ?? null;
   return dbFor(c.env).prepare(`SELECT s.id, s.organization_id, s.name
     FROM admin_sessions session
     JOIN rt_stores s ON s.id = session.selected_restaurant_store_id
@@ -118,7 +130,8 @@ export async function selectedRestaurantStore(
       AND session.expires_at > ?
       AND s.organization_id = ?
       AND s.data_purged_at IS NULL
-    LIMIT 1`).bind(tokenHash, new Date().toISOString(), organizationId)
+      AND (? IS NULL OR s.line_account_id = ?)
+    LIMIT 1`).bind(tokenHash, new Date().toISOString(), organizationId, scopedAccountId, scopedAccountId)
     .first<SelectedRestaurantStore>();
 }
 
@@ -127,7 +140,7 @@ export async function organizationFor(
   options: { ignoreSession?: boolean } = {},
 ): Promise<OrganizationContext | null> {
   const organization = await baseOrganizationFor(c);
-  if (!organization || options.ignoreSession) return organization;
+  if (!organization || options.ignoreSession || c.get('restaurantScopedAccountId')) return organization;
   const selected = await selectedRestaurantStore(c, organization.id);
   return selected ? { ...organization, scopedStoreId: selected.id } : organization;
 }
@@ -139,6 +152,8 @@ export async function storeBelongsTo(c: Context<Env>, organizationId: string, st
     'SELECT line_account_id FROM rt_stores WHERE id = ? AND organization_id = ? AND data_purged_at IS NULL LIMIT 1',
   ).bind(storeId, organizationId).first<{ line_account_id: string | null }>();
   if (!row) return false;
+  const scopedAccountId = c.get('restaurantScopedAccountId');
+  if (scopedAccountId && row.line_account_id !== scopedAccountId) return false;
   const scope = await getVisibleLineAccountScope(dbFor(c.env), c.get('staff'));
   return row.line_account_id ? scope.ids.includes(row.line_account_id) : !scope.isAccountScoped;
 }
@@ -162,6 +177,8 @@ export async function validateStoreLineAccount(
   c: Context<Env>,
   lineAccountId: string,
 ): Promise<boolean> {
+  const scopedAccountId = c.get('restaurantScopedAccountId');
+  if (scopedAccountId && lineAccountId !== scopedAccountId) return false;
   const scope = await getVisibleLineAccountScope(dbFor(c.env), c.get('staff'));
   return canAccessLineAccount(scope.accounts, c.get('staff'), lineAccountId);
 }
@@ -383,9 +400,11 @@ async function storeInOrganization(
   organizationId: string,
   storeId: string,
 ): Promise<{ id: string; timezone: string } | null> {
+  const scopedAccountId = c.get('restaurantScopedAccountId') ?? null;
   const row = await dbFor(c.env).prepare(
-    `SELECT id, timezone FROM rt_stores WHERE id = ? AND organization_id = ? AND status != 'archived'`,
-  ).bind(storeId, organizationId).first<{ id: string; timezone: string }>();
+    `SELECT id, timezone FROM rt_stores WHERE id = ? AND organization_id = ? AND status != 'archived'
+      AND (? IS NULL OR line_account_id = ?)`,
+  ).bind(storeId, organizationId, scopedAccountId, scopedAccountId).first<{ id: string; timezone: string }>();
   return row ?? null;
 }
 

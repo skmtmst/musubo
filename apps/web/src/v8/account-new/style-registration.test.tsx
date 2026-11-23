@@ -17,7 +17,7 @@ beforeEach(() => {
   verifiedStaffRole('owner')
   rememberStaffIdentity({ ...readStaffIdentity()!, id: 'style-owner', tenantId: 'style-tenant' })
   sessionStorage.clear()
-  net.starterSet.mockResolvedValue({success:true,data:{definition:{items:[{key:'menu',kind:'rich_menu'}]}}})
+  net.starterSet.mockReset()
   net.get.mockReset().mockResolvedValue({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })
   net.save.mockReset().mockResolvedValue({ success: true, data: { version: 1 } })
 })
@@ -77,12 +77,26 @@ it.each(ACCOUNT_STYLES)('%sをポップアップで選び、同じアカウン�
   fireEvent.click(within(dialog).getByRole('button', { name: 'このスタイルにする' }))
   await waitFor(() => expect(next.disabled).toBe(false))
   fireEvent.click(next)
-  expect(net.save).not.toHaveBeenCalled()
-  fireEvent.click(within(screen.getByRole('dialog',{name:'最初のリッチメニューを選ぶ'})).getByRole('button',{name:'このメニューで進む'}))
   await screen.findByText('使い方を保存しました')
-  expect(net.save).toHaveBeenCalledExactlyOnceWith('created-account', { expectedVersion: 0, style, confirmInitialMenu:true,answers: {image:{mode:'configured',value:'simple'}}, choices:{menu:{mode:'sample'}} })
+  expect(screen.queryByRole('dialog', { name: '最初のリッチメニューを選ぶ' })).toBeNull()
+  expect(net.starterSet).not.toHaveBeenCalled()
+  expect(net.save).toHaveBeenCalledExactlyOnceWith('created-account', { expectedVersion: 0, style, answers: { image: { mode: 'later' } } })
   expect(sessionStorage.getItem(REGISTRATION_STYLE_KEY)).toBeNull()
-  expect(screen.getByRole('link', { name: '次へ' }).getAttribute('href')).toBe(style === 'restaurant' ? '/restaurant-test/stores/new' : '/hq')
+  expect(screen.getByRole('link', { name: '次へ' }).getAttribute('href')).toBe('/hq')
+})
+
+it('既に保存されているリッチメニューの回答を登録再開で上書きしない', async () => {
+  net.get.mockResolvedValueOnce({ success: true, data: {
+    style: 'restaurant', styleSelected: true, version: 4,
+    answers: { image: { mode: 'configured', value: 'existing', resourceId: 'saved-menu' } },
+  } })
+  render(<ResumeRegistrationStyle accountId="created-account" />)
+  const dialog = screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+  const save = within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement
+  await waitFor(() => expect(save.disabled).toBe(false))
+  fireEvent.click(save)
+  await screen.findByText('使い方を保存しました')
+  expect(net.save).toHaveBeenCalledExactlyOnceWith('created-account', { expectedVersion: 4, style: 'restaurant' })
 })
 
 it('保存失敗では完了にせず、同じ選択と作成済みIDで再試行する', async () => {
@@ -94,11 +108,10 @@ it('保存失敗では完了にせず、同じ選択と作成済みIDで再試�
   const save = within(dialog).getByRole('button', { name: '次へ' })
   await waitFor(() => expect((save as HTMLButtonElement).disabled).toBe(false))
   fireEvent.click(save)
-  fireEvent.click(within(screen.getByRole('dialog',{name:'最初のリッチメニューを選ぶ'})).getByRole('button',{name:'このメニューで進む'}))
   await screen.findByText('使い方を確認・保存できませんでした')
   expect(screen.queryByText('使い方を保存しました')).toBeNull()
-  expect((within(dialog).getByRole('radio',{name:/シンプルなメニュー/}) as HTMLInputElement).checked).toBe(true)
-  fireEvent.click(within(dialog).getByRole('button',{name:'このメニューで進む'}))
+  expect(within(dialog).getByRole('button', { name: '面談・相談（選んでいます）' })).toBeTruthy()
+  fireEvent.click(save)
   await screen.findByText('使い方を保存しました')
   expect(net.save.mock.calls.map(call => call[0])).toEqual(['created-account', 'created-account'])
 })

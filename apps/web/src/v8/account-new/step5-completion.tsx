@@ -1,4 +1,4 @@
-import { Activity, CircleCheck, LoaderCircle, QrCode, Users } from 'lucide-react'
+import { CircleCheck, LoaderCircle } from 'lucide-react'
 import { ProgressBar } from '@/components/shared/progress'
 import { type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -11,10 +11,9 @@ import type { HandoverProgress } from './check-rows'
 import styles from './register.module.css'
 
 /** 登録完了と友だちの引き継ぎ。保存処理は親が持つ。 */
-export default function Step5Completion({ connection, accountName, createdId, importRunning, importFriends, importState, handover, idleSeconds, requestError, restaurant, onRefresh, refreshing = false }: {
+export default function Step5Completion({ connection, accountName, createdId, importRunning, importFriends, importState, handover, idleSeconds, requestError, onRefresh, refreshing = false }: {
   connection: LineAccountConnectData; accountName: string; createdId: string; importRunning: boolean; importFriends: boolean
   importState: FollowerImportState | null; handover: HandoverProgress; idleSeconds: number; requestError: boolean
-  restaurant: boolean
   onRefresh?: () => void; refreshing?: boolean
 }) {
   const checking = Boolean(importState?.lastError) || requestError || idleSeconds >= 60
@@ -91,33 +90,23 @@ export default function Step5Completion({ connection, accountName, createdId, im
                   <span className={styles.accountName}>{(connection.displayName ?? accountName) || 'LINEアカウント'}</span>
                   <span className={styles.accountId}>{connection.basicId || String(emptyValue('none'))}</span>
                 </Card>
-                <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">
-                  {importFriends
-                    ? <>
-                      <p className={styles.progressNote} role="status">{resultLabel}</p>
-                      <p className={styles.progressNote}>{resultNote}</p>
-                      {countsKnown && (handover.foundSoFar > 0 || handover.processed > 0) && <p className={styles.progressNote}>{`これまでに確認できた友だち：${polishFormatNumber(handover.foundSoFar)}人。処理済みの記録：${polishFormatNumber(handover.processed)}人（新規${polishFormatNumber(handover.imported)}人、登録済み${polishFormatNumber(handover.alreadyPresent)}人、再登録${polishFormatNumber(handover.restored)}人）。引き継ぎの完了を確認した実績ではありません。`}</p>}
-                      {onRefresh && (!complete || requestError) && <Button type="button" onClick={onRefresh} disabled={refreshing} busy={refreshing} busyLabel="確認中…">状態を再確認</Button>}
-                    </>
-                    : <p className={styles.progressNote}>いまの友だちの引き継ぎはオフになっています。引き継ぐときはアカウントの詳細から始めてください。</p>}
-                  {handover.needsReview > 0 ? <Notice tone="warn" compact>{polishFormatNumber(handover.needsReview)}件は取り込めず、確認が必要です。</Notice> : null}
-                  {importState && importState.profileErrors > 0 ? <Notice tone="warn" compact>一部のプロフィールを読み込めませんでした。友だち一覧で確認してください。</Notice> : null}
-                  {capability === 'unavailable' && <p className={styles.progressNote}>一括で引き継げない場合も、友だちが話しかけた順に登録されます。</p>}
-                </Card>
+                {importFriends && (
+                  <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">
+                    <p className={styles.progressNote} role="status">{resultLabel}</p>
+                    <p className={styles.progressNote}>{resultNote}</p>
+                    {countsKnown && (handover.foundSoFar > 0 || handover.processed > 0) && <p className={styles.progressNote}>{`これまでに確認できた友だち：${polishFormatNumber(handover.foundSoFar)}人。処理済みの記録：${polishFormatNumber(handover.processed)}人（新規${polishFormatNumber(handover.imported)}人、登録済み${polishFormatNumber(handover.alreadyPresent)}人、再登録${polishFormatNumber(handover.restored)}人）。引き継ぎの完了を確認した実績ではありません。`}</p>}
+                    {onRefresh && (!complete || requestError) && <Button type="button" onClick={onRefresh} disabled={refreshing} busy={refreshing} busyLabel="確認中…">状態を再確認</Button>}
+                    {handover.needsReview > 0 ? <Notice tone="warn" compact>{polishFormatNumber(handover.needsReview)}件は取り込めず、確認が必要です。</Notice> : null}
+                    {importState && importState.profileErrors > 0 ? <Notice tone="warn" compact>一部のプロフィールを読み込めませんでした。友だち一覧で確認してください。</Notice> : null}
+                    {capability === 'unavailable' && <p className={styles.progressNote}>一括で引き継げない場合も、友だちが話しかけた順に登録されます。</p>}
+                  </Card>
+                )}
                 {connection.remainingActions.length > 0 && (
                   <Card className={styles.noteBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
                     <p><strong>残りの手作業</strong></p>
                     <ul>{connection.remainingActions.map((item) => <li key={item}>{item}</li>)}</ul>
                   </Card>
                 )}
-                <p className={styles.groupLabel}>次にすること</p>
-                <div className={styles.buttonRow}>
-                  <Button external href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button>
-                  {restaurant ? <Button href="/restaurant-test/stores/new">飲食店の店舗を作る</Button> : null}
-                  <Button href="/friends"><Users size={16} aria-hidden="true" />友だち一覧</Button>
-                  <Button href="/friend-add-settings"><QrCode size={16} aria-hidden="true" />友だち追加URL・QR</Button>
-                  <Button href="/emergency"><Activity size={16} aria-hidden="true" />運用状態の接続監視</Button>
-                </div>
               </>}
             </Card>
   )
