@@ -79,10 +79,10 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
   useEffect(() => {
     let current = true
     if (!open || !accountId || !storeId) return
-    setRows(null); setTableId(''); initialized.current = false
+    setRows(null); setTableId(''); setError(''); initialized.current = false
     void restaurantTestApi.reservationsDay(accountId, storeId, toYmd(now))
       .then((res) => { if (current) { setRowsScope(scope); setRows(Array.isArray(res.data?.reservations) ? res.data.reservations : []) } })
-      .catch(() => { if (current) { setRowsScope(scope); setRows([]); setError('今日の予約を読み込めませんでした。閉じてもう一度開いてください。') } })
+      .catch(() => { if (current) setError('今日の予約を読み込めませんでした。閉じてもう一度開いてください。') })
     return () => { current = false }
   }, [open, accountId, storeId, now])
 
@@ -135,13 +135,13 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
       designTop={140}
       footerAlign="center"
       title="ウォークインを入れる"
-      description={`いま ${hm(now)}・空いている卓 ${freeAll}`}
+      description={currentRows === null && error ? '空き状況を確認できません' : `いま ${hm(now)}・空いている卓 ${freeAll}`}
       busy={busy}
       error={error || undefined}
       confirmLabel="入店にする"
       confirmIcon={<LogIn size={16} aria-hidden="true" />}
       confirmDisabled={!tableId || !currentRows || floorStatus === 'loading'}
-      confirmDisabledReason="座る卓を選んでください。"
+      confirmDisabledReason={currentRows === null && error ? '空き状況を確認できないため入店にできません。' : '座る卓を選んでください。'}
       onConfirm={() => save()}
       onCancel={onClose}
     >
@@ -155,7 +155,7 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
           </div>
         </div>
         {floorStatus === 'error' && <Notice tone="warn" message="階・エリアを読み込めませんでした。卓はすべて表示しています。" />}
-        {currentRows === null ? <p className={styles.hint}>空いている卓を調べています。</p> : <>
+        {currentRows === null ? (error ? null : <p className={styles.hint}>空いている卓を調べています。</p>) : <>
           <AvailableTables tables={free} floors={floors} floorId={floorId} onFloorChange={setFloorId} selected={tableId} onSelect={setTableId} guests={guests} disabled={busy} />
           {free.length === 0 && <div className={styles.full} role="status">
             <p className={styles.fullTitle}>いま座れる卓はありません</p>

@@ -92,3 +92,24 @@ it('店を切り替えた直後は新しい予約を読めるまで入店でき�
   rerender(<WalkInDialog open accountId="a" storeId="new" tables={fixtures} onClose={() => {}} onSaved={() => {}} />)
   expect((screen.getByRole('button', { name: /入店にする/ }) as HTMLButtonElement).disabled).toBe(true)
 })
+
+it('予約の読み込みに失敗したら卓を選べず、入店を確定できない', async () => {
+  net.floors.mockResolvedValue({ data: floorList })
+  net.reservationsDay.mockRejectedValue(new Error('unavailable'))
+  render(<WalkInDialog open accountId="a" storeId="s" tables={fixtures} onClose={() => {}} onSaved={() => {}} />)
+  expect(await screen.findByText('今日の予約を読み込めませんでした。閉じてもう一度開いてください。')).toBeTruthy()
+  expect(screen.queryAllByRole('radio')).toHaveLength(0)
+  expect((screen.getByRole('button', { name: /入店にする/ }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.queryByText('空いている卓を調べています。')).toBeNull()
+})
+
+it('読み込み失敗後に店舗を変えると新しい空き状況を使う', async () => {
+  net.floors.mockResolvedValue({ data: floorList })
+  net.reservationsDay.mockImplementation((_account: string, store: string) => store === 's' ? Promise.reject(new Error('unavailable')) : Promise.resolve({ data: { reservations: [] } }))
+  const props = { open: true, accountId: 'a', storeId: 's', tables: fixtures, onClose: () => {}, onSaved: () => {} }
+  const { rerender } = render(<WalkInDialog {...props} />)
+  expect(await screen.findByText('今日の予約を読み込めませんでした。閉じてもう一度開いてください。')).toBeTruthy()
+  rerender(<WalkInDialog {...props} storeId="new" />)
+  expect(await screen.findAllByRole('radio')).toHaveLength(3)
+  expect(screen.queryByText('今日の予約を読み込めませんでした。閉じてもう一度開いてください。')).toBeNull()
+})
