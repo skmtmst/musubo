@@ -33,7 +33,7 @@ it('検索条件のキー順序をそろえ、同じ GET の通信は1回・返�
 })
 
 it.each([
-  '/api/line-accounts', '/api/staff/me', '/api/tenants/me', '/api/settings/features?account_id=a',
+  '/api/staff/me', '/api/tenants/me', '/api/settings/features?account_id=a',
   '/api/settings/features/visibility?account_id=a', '/api/dashboard/style?account_id=a', '/api/hq/billing/summary',
 ])('%s は30秒だけ再利用し、期限が切れたら通信する', async path => {
   let now = 1_000
@@ -89,6 +89,20 @@ it('認証の世代を識別できない間は、結果も取得中の要求も�
   expect(net).toHaveBeenCalledTimes(2)
 })
 
+it.each(['account', 'login', 'permissions'] as const)('一覧の取得中に %s が変われば共有しない', async kind => {
+  let finish!: (response: Response) => void
+  net.mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve }))
+  const old = fetchApi('/api/line-accounts')
+  if (kind === 'account') localStorage.setItem('lh_selected_account', 'different')
+  if (kind === 'login') localStorage.setItem('lh_csrf', 'different')
+  if (kind === 'permissions') clearCommonCaches()
+  const fresh = fetchApi('/api/line-accounts')
+  expect(net).toHaveBeenCalledTimes(2)
+  finish(ok({ value: 'old' }))
+  expect(await old).toEqual({ success: true, data: { value: 'old' } })
+  expect(await fresh).toEqual({ success: true, data: { value: 1 } })
+})
+
 it.each(['account', 'csrf', 'bearer', 'logout', 'login', 'invalidate'] as const)('%s の切替では全結果を破棄する', async kind => {
   localStorage.setItem('lh_selected_account', 'a')
   await fetchApi('/api/line-accounts')
@@ -116,14 +130,14 @@ it.each(['POST', 'PUT', 'PATCH', 'DELETE'])('%s は毎回送信し、成功後�
 })
 
 it('成功しなかった更新では成功済みの読みを破棄せず、204の成功では破棄する', async () => {
-  await fetchApi('/api/line-accounts')
+  await fetchApi('/api/staff/me')
   net.mockResolvedValueOnce(new Response('{"success":false}'))
-  await fetchApi('/api/line-accounts/a', { method: 'PATCH' })
-  await fetchApi('/api/line-accounts')
+  await fetchApi('/api/staff/me/a', { method: 'PATCH' })
+  await fetchApi('/api/staff/me')
   expect(net).toHaveBeenCalledTimes(2)
   net.mockResolvedValueOnce(new Response(null, { status: 204 }))
-  await fetchApi('/api/line-accounts/a', { method: 'DELETE' })
-  await fetchApi('/api/line-accounts')
+  await fetchApi('/api/staff/me/a', { method: 'DELETE' })
+  await fetchApi('/api/staff/me')
   expect(net).toHaveBeenCalledTimes(4)
 })
 
@@ -142,15 +156,15 @@ it.each(['cache', 'network', 'http', 'application', 'shape', 'empty'] as const)(
 it.each(['mutation', 'switch', 'reload'] as const)('%s 前に始めた遅い応答は、新しい答えを再登録しない', async kind => {
   let finish!: (response: Response) => void
   net.mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve }))
-  const old = fetchApi('/api/line-accounts')
-  if (kind === 'mutation') await fetchApi('/api/line-accounts/a', { method: 'PATCH' })
+  const old = fetchApi('/api/staff/me')
+  if (kind === 'mutation') await fetchApi('/api/staff/me/a', { method: 'PATCH' })
   if (kind === 'switch') localStorage.setItem('lh_selected_account', 'b')
   net.mockResolvedValueOnce(ok({ value: 2 }))
-  const fresh = await fetchApi('/api/line-accounts', kind === 'reload' ? { cache: 'reload' } : undefined)
+  const fresh = await fetchApi('/api/staff/me', kind === 'reload' ? { cache: 'reload' } : undefined)
   expect(fresh).toEqual({ success: true, data: { value: 2 } })
   finish(ok({ value: 99 }))
   await old
-  expect(await fetchApi('/api/line-accounts')).toEqual(fresh)
+  expect(await fetchApi('/api/staff/me')).toEqual(fresh)
   expect(net).toHaveBeenCalledTimes(kind === 'mutation' ? 3 : 2)
 })
 
@@ -184,13 +198,13 @@ it.each(['retry-first', 'late-first'])('時間切れの便を再試行へ回さ�
   let finish!: (response: Response) => void
   net.mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve }))
     .mockResolvedValueOnce(ok({ value: 2 }))
-  const old = fetchApi('/api/line-accounts')
+  const old = fetchApi('/api/staff/me')
   now += LIST_REQUEST_TIMEOUT_MS
   if (order === 'late-first') { finish(ok({ value: 99 })); await old }
-  const fresh = await fetchApi('/api/line-accounts')
+  const fresh = await fetchApi('/api/staff/me')
   expect(fresh).toEqual({ success: true, data: { value: 2 } })
   if (order === 'retry-first') { finish(ok({ value: 99 })); await old }
-  expect(await fetchApi('/api/line-accounts')).toEqual(fresh)
+  expect(await fetchApi('/api/staff/me')).toEqual(fresh)
   expect(net).toHaveBeenCalledTimes(2)
 })
 

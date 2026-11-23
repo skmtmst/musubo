@@ -4,7 +4,7 @@ import { api } from './api'
 
 type AccountsResponse = Awaited<ReturnType<typeof api.lineAccounts.list>>
 
-/** 外枠も画面も共通 GET の取得中・30秒の結果を使う。手動の読み直しは必ず通信する。 */
+/** 外枠も画面も共通 GET の取得中の要求を使う。手動の読み直しは必ず通信する。 */
 export function loadLineAccounts(options?: { reload?: boolean }): Promise<AccountsResponse> {
   return api.lineAccounts.list(false, undefined, options?.reload ? { cache: 'reload' } : undefined)
 }

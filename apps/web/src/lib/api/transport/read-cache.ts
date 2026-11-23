@@ -2,7 +2,6 @@ import { LIST_REQUEST_TIMEOUT_MS } from '../../request-timeout'
 
 const REUSE_MS = 30_000
 const reusablePaths = new Set([
-  '/api/line-accounts',
   '/api/operators',
   '/api/staff/me',
   '/api/tenants/me',

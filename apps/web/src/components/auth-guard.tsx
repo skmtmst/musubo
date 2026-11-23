@@ -10,7 +10,7 @@ import { SESSION_LOST_EVENT, type OpsImpersonation } from '@/lib/api'
 import { forgetSessionSnapshot, rememberSessionSnapshot, type SessionSnapshot } from '@/lib/session-snapshot'
 import { forgetAuthCheck, readAuthCheck, rememberAuthCheck } from '@/lib/auth-check-marker'
 import { clearCommonCaches } from '@/lib/common-caches'
-import { prefetchLineAccounts } from '@/lib/line-accounts-cache'
+import { prefetchApiRead } from '@/lib/api/transport/prefetch'
 import TenantSuspended from './tenant-suspended'
 import AuthPendingShell from './auth-pending-shell'
 import { TenantAccessProvider, type TenantStatus } from './tenant-access-context'
@@ -128,8 +128,8 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
 
     // Verify the session via the HttpOnly cookie. /api/auth/session returns the
     // staff identity and refreshes the CSRF token if it was lost (e.g. reload).
-    // 一覧の取得は確認の結果を要らないので、確認と並べて先に始める（直列にしない）。
-    prefetchLineAccounts()
+    // アカウント一覧は認証確定後に画面から取得する。
+    prefetchApiRead('/api/staff/me')
     /*
      * R505: この確認の世代と開始時の指紋。応答を当てはめる前に今と照合し、
      * 古ければ捨てる。成功応答の書き戻しも、失敗時のログインへの送りもしない。

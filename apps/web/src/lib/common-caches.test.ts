@@ -37,7 +37,7 @@ describe('共通の使い回しの破棄', () => {
   })
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
-  it('捨てる前はどれも取り直さない', async () => {
+  it('共通設定は再利用し、アカウント一覧は完了後に読み直す', async () => {
     await loadFeatureSettings('acc-1')
     await loadFeatureVisibility('acc-1')
     await loadLineAccounts()
@@ -48,7 +48,7 @@ describe('共通の使い回しの破棄', () => {
     await loadOperators()
     expect(mocks.settingsGet).toHaveBeenCalledTimes(1)
     expect(mocks.visibility).toHaveBeenCalledTimes(1)
-    expect(mocks.accountsList).toHaveBeenCalledTimes(1)
+    expect(mocks.accountsList).toHaveBeenCalledTimes(2)
     expect(mocks.operatorsList).toHaveBeenCalledTimes(1)
   })
 
