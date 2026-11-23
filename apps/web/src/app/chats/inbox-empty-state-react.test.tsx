@@ -390,3 +390,18 @@ test('中央の行き先からメールも開ける（共用の開き方・ID27�
   await eventually(() => expect(document.body.textContent).toContain('メール本文です'))
   expect(document.body.textContent).not.toContain('対応が必要な会話があります')
 })
+
+test('Instagram の一覧は共通の空表示で準備中を案内する', async () => {
+  fixture.params = new URLSearchParams('channel=instagram')
+  await act(async () => root.render(<ChatsPage />))
+  await settle()
+  const empty = list().querySelector('[data-list-state="empty"]')
+  expect(empty?.textContent).toContain('Instagram の会話は、準備ができしだいここに出ます。')
+  expect(list().textContent).not.toContain('まだ会話がありません')
+})
+
+test('メールの一覧が空のときメール向けの案内を表示する', async () => {
+  fixture.params = new URLSearchParams('channel=email')
+  await act(async () => root.render(<ChatsPage />))
+  await eventually(() => expect(state('empty')?.textContent).toContain('メールが届くとここに出ます。'))
+})

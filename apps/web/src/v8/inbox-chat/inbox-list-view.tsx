@@ -373,7 +373,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
     ) : null}
     {/* Chat List（2026-10-07 速さ：行は ChatListWindow で窓分けして描く） */}
     <div ref={listScrollRef} data-inbox-list-scroller="" className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
-      {instagramSelected ? <p role="status">Instagram の会話はまだ表示できません。</p> : <>
+      {instagramSelected ? <InboxListEmpty channel="instagram" filtered={false} onClear={clearInboxFilters} /> : <>
         {/*
                   メール一覧の失敗行。LINEだけ見ているときは出さない。
                   以前は失敗が無言で「メール0件」に見え、未対応の見落としになった。
@@ -614,7 +614,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           }
           // 障害を0件と誤認させない。具体的な理由は各チャネルのエラー表示に任せる。
           if (inboxListFailed) return null
-          return <InboxListEmpty filtered={hasInboxFilters} onClear={clearInboxFilters} />
+          return <InboxListEmpty channel={channel} filtered={hasInboxFilters} onClear={clearInboxFilters} />
         })()}
 
         {hasMoreChats && (
