@@ -51,6 +51,8 @@ export type DialogProps = {
   designHeaderHeight?: number
   /** 頭の×の左に置く操作（選ぶ窓の「＋タグを作る」など）。 */
   headerAction?: ReactNode
+  /** 既定は窓の形で決まる。ガイドの窓にも閉じる操作が必要なら true。 */
+  showCloseButton?: boolean
   /** 題と説明の左に置く、線のアイコン。false なら印を省く。 */
   headerIcon?: ReactNode
   /** 指定した窓だけ本文の余白を変える（フォルダ付きの選択窓など）。 */
@@ -159,6 +161,7 @@ export default function Dialog({
   designHeaderPadding,
   designHeaderHeight,
   headerAction,
+  showCloseButton,
   headerIcon,
   designContentPadding,
   designFooterPadding,
@@ -345,8 +348,8 @@ export default function Dialog({
             {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <Notice tone={descriptionBand === 'warning' ? 'warn' : 'danger'} statusWord={false} icon={null} role="presentation" data-qa-dialog-callout>{heading}</Notice> : heading}
           </div>
           {headerAction ? <div className={styles.headerAction}>{headerAction}</div> : null}
-          {/* ガイドの窓はフッターの操作で閉じる。 */}
-          {designLayout !== 'stacked-centered' && designLayout !== 'stacked-guided' && designLayout !== 'stacked-picker' ? (
+          {/* 窓の形に応じて閉じる操作を表示する。 */}
+          {(showCloseButton ?? (designLayout !== 'stacked-centered' && designLayout !== 'stacked-guided' && designLayout !== 'stacked-picker')) ? (
             <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={discard.requestClose} disabled={busy}>
               <X aria-hidden="true" size={20} />
             </IconButton>

@@ -52,7 +52,7 @@ for (const style of ['standard', 'restaurant', 'salon', 'consult', 'lesson', 'ec
   }
 }
 
-test('標準のガイド開始前は再開ボタンがなく、手順から開始できる', async ({ page }) => {
+test('標準の手順からガイドを開始できる', async ({ page }) => {
   await page.request.put(`${mock}/api/dashboard/style?accountId=visual-qa-account`, { data: { style: 'standard' } })
   await page.request.put(`${mock}/api/getting-started/guide?accountId=visual-qa-account`, { data: { phase: 'idle', stepKey: null, procedureIndex: 1 } })
   await page.addInitScript(() => {

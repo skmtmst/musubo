@@ -51,7 +51,7 @@ export function FirstStepsGuideFooter({ guide }: { guide: FirstStepsGuide }) {
   カードは「見出し → 手順 → 続きから/最初から」を表示する。
   「選んだ機能の設定」ブロックと「使い方の設定を開く」は置かない（利用者判断）。
 */
-export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, feedback, guide, readOnly = false }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onRetry?: () => void; feedback?: ReactNode; guide?: FirstStepsGuide; readOnly?: boolean }) {
+export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, feedback, guide, readOnly = false, firstMessageInline = false }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onRetry?: () => void; feedback?: ReactNode; guide?: FirstStepsGuide; readOnly?: boolean; firstMessageInline?: boolean }) {
   const complete = Boolean(summary && summary.total > 0 && summary.done === summary.total)
   const nextKey = summary ? nextFirstStepKey(summary) : null
   /* 再開の導線はガイド進行中だけ（承認済み Pen：通常 la9o6/FJ6Xd には無く、進行中 sL2CD/rvGC6 にだけある）。
@@ -91,7 +91,13 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
               <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}（${actionLabel}）`}>{actionLabel}</TextLink>
             ) : (
               /* まだの段はどれも、この行からその段のガイドを始める。 */
-              <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}を${actionLabel}`} onClick={() => guide?.startAt?.(step.key)}>{actionLabel}</TextLink>
+              <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}を${actionLabel}`} onClick={(event) => {
+                if (firstMessageInline && step.key === 'firstMessage' && guide?.startAt) {
+                  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+                  event.preventDefault()
+                }
+                guide?.startAt?.(step.key)
+              }}>{actionLabel}</TextLink>
             )}
           </SetupStepRow>
           )
