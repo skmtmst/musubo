@@ -9,7 +9,7 @@
     "file": "apps/web/src/components/broadcasts/broadcast-asset-manager.tsx",
     "fingerprint": "c0178aae0089713fec33ad0891ed0d193156f4d3b5b8cd3fd58421750bb9b575",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
   },
   {
     "file": "apps/web/src/components/broadcasts/broadcast-form.tsx",
@@ -87,19 +87,19 @@
     "file": "apps/web/src/components/friends/saved-search-dialog.tsx",
     "fingerprint": "b4367a99d78df5edff8a617f1c37e9b13c35f72013644bf5b6580b8432f9a2ec",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
   },
   {
     "file": "apps/web/src/components/friends/saved-search-dialog.tsx",
     "fingerprint": "cc9e9127333fd1a40985c372eb66ae07892042fbf4b70443422e5a73a82e4ed3",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
   },
   {
     "file": "apps/web/src/components/friends/saved-search-dialog.tsx",
     "fingerprint": "defaba7125984f0fc4eaf4068ed2b37eaf7512cf5f34317fc8bf78364e80f014",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
   },
   {
     "file": "apps/web/src/components/layout/sidebar-version.tsx",
@@ -225,61 +225,61 @@
     "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
     "fingerprint": "2ad899d97b049a630e0b0779b8e44bdba8cbda5f8df59756b4b9823014856c13",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "見本の共通枠が補足の文字サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
     "fingerprint": "2b3267db87e1c90746d5e70935cd921662ed7ed283bae9e6804953ac835d4d4a",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "見本の共通枠が補足の文字サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
     "fingerprint": "56f7c377877f327965a533499bcc540863181cce06bd3c0a54c998bc19a47a3e",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "見本の共通枠が補足の文字サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
     "fingerprint": "7ff1c9075f3428f52f9f772f4673bba11d3e57aa682b00540170c282f9cd9c41",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "見本の共通枠が補足の文字サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
     "fingerprint": "891df848240fce913c4d39e640814766aad83f90ad4b7898b62d84e1094de69b",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "見本の共通枠が補足の文字サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
     "fingerprint": "b20636234c5398193ce903ab38f97c270ff5e614f3ad62759aef27477468077c",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "見本の共通枠が補足の文字サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
     "fingerprint": "cd40acbf89d5255be403d236940b6b13ed73a7af3bdf160f6eaedac0f2887d2a",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "見本の共通枠が補足の文字サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
     "fingerprint": "e4ab0f9b515e32129bc872c7531019c6f25c426beaf772415e7ff38ae1a860d2",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "見本の共通枠が補足の文字サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
     "fingerprint": "f57a463067e3fe971da79afea319b4ec8c60041768d63daa1ea2614517d4b60c",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "見本の共通枠が補足の文字サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
     "fingerprint": "f6c9bb4e00e2fd8fcbd16d9d2eaa889ccd84d3828cab5e30c324574a399ca918",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "見本の共通枠が補足の文字サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/entity-select.tsx",
@@ -1011,7 +1011,7 @@
     "file": "apps/web/src/v8/hq-deliveries/action-resource-picker.tsx",
     "fingerprint": "09bb755fc010d3663f5442b6213d003a05573c541ff274fcc2a8eff864e47bb0",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
   },
   {
     "file": "apps/web/src/v8/hq-deliveries/console.tsx",
@@ -1665,7 +1665,7 @@
     "file": "apps/web/src/v8/restaurant/line-followup/followup-template-picker.tsx",
     "fingerprint": "14d0101ee6e58f7f01c0bf426b955573e970ecdea14e2af342021f533db84678",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
   },
   {
     "file": "apps/web/src/v8/restaurant/line-followup/line-followup.tsx",
