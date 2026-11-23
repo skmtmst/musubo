@@ -23,6 +23,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
+import { runInheritedFontPatrol } from './inherited-font-patrol.mjs'
 import { MOBILE_ROUTES, MOBILE_VIEWPORTS, ROUTES, WIDTHS, openPage } from './browser-env.mjs'
 
 const [baseUrl = 'http://127.0.0.1:4310', out] = process.argv.slice(2)
@@ -197,6 +198,12 @@ for (const { width, height } of MOBILE_VIEWPORTS) {
   }
 }
 await browser.close()
+if (!STRESS) {
+  const inheritedFont = await runInheritedFontPatrol(baseUrl)
+  res.inheritedFont = inheritedFont
+  bad += inheritedFont.errors.length + inheritedFont.findings.length
+  if (inheritedFont.errors.length || inheritedFont.findings.length) console.log('本文の文字サイズ', JSON.stringify(inheritedFont))
+}
 if (out) { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, JSON.stringify(res, null, 1)) }
 console.log(`${STRESS ? '長いデータで ' : ''}崩れの合計 ${bad}`)
 if (bad && !STRESS) process.exit(1)

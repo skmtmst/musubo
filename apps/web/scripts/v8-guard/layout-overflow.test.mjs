@@ -2,6 +2,18 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { connectGuardBrowser } from './browser-session.mjs'
 import { scanLayoutOverflow } from './layout-overflow.mjs'
+import { scanInheritedFont } from './inherited-font-browser.mjs'
+
+test('本文が親の大きい文字を引き継ぐと検出し、本文の大きさに戻すと消える', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    await page.setContent('<style>:root{--text-body:13px} .card{font-size:20px}</style><main><div class="card"><h2>題</h2><p id="body">説明文</p><button>操作</button></div></main>')
+    assert.deepEqual((await page.evaluate(scanInheritedFont)).map(item => item.text), ['説明文'])
+    await page.locator('#body').evaluate(el => { el.style.fontSize = 'var(--text-body)' })
+    assert.deepEqual(await page.evaluate(scanInheritedFont), [])
+  } finally { await browser.close() }
+})
 
 for (const width of [1024,1152,1440,1920]) test(`overflow, right edge and missing full text fail at ${width}; restoration is clean`, async () => {
   const browser = await connectGuardBrowser()
