@@ -14,7 +14,9 @@ function normalized(r: Row): StyleBooking {
     name: String(r.name ?? ''),
     startsAt: String(r.startsAt),
     endsAt: String(r.endsAt),
-    requestedAt: String(r.requestedAt),
+    // rt_reservations.created_at の SQLite 既定値は UTC（タイムゾーン表記なし）。
+    requestedAt: r.kind === 'restaurant' && typeof r.requestedAt === 'string' && !/(?:Z|[+-]\d\d:\d\d)$/.test(r.requestedAt)
+      ? r.requestedAt.replace(' ', 'T')+'Z' : String(r.requestedAt),
     status: String(r.status),
     staffId: (r.staffId ?? null) as string | null,
     menuId: (r.menuId ?? null) as string | null,

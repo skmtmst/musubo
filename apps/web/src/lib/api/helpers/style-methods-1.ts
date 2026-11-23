@@ -24,6 +24,10 @@ import {
   StyleClassDetails,
 } from './styles-common';
 export const methods1 = {
+  acknowledgeNewBookings: (accountId:string, body:{storeId:string;operationId:string;bookingId:string|null}) =>
+    fetchApi<Result<import('@line-crm/shared').RestaurantBookingAcknowledgement>>(url(root+'/new-bookings/acknowledgements',accountId),write('POST',body)),
+  undoNewBookingsAcknowledgement: (accountId:string, operationId:string, storeId:string) =>
+    fetchApi<Result<import('@line-crm/shared').RestaurantBookingAcknowledgementUndo>>(url(root+'/new-bookings/acknowledgements/'+encodeURIComponent(operationId)+'/undo',accountId),write('POST',{storeId})),
   ecSummary: (accountId: string, query: { range?: 'today' | 'week' | 'month'; date?: string; from?: string; to?: string } = {}) =>
     fetchApi<Result<import('@line-crm/shared').EcStyleSummary>>(url(root + '/ec-summary', accountId, query)),
   get: (accountId: string) =>
