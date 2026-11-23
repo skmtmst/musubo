@@ -54,7 +54,7 @@ export default function BillingPaymentRecoveryPage() {
   if (state === 'error') return frame(<ListState permissionScope="hq" kind="error" title="お支払い状況を読み込めませんでした" onRetry={() => void load()} />)
   if (!failure) return frame(<section aria-label="お支払い状況">
     <h2>未払いのご請求はありません</h2>
-    <p>お支払いの記録と次回の請求予定は請求画面で確認できます。</p>
+    <p className="text-body">お支払いの記録と次回の請求予定は請求画面で確認できます。</p>
     <Button onClick={() => router.push('/hq/billing')}>請求を確認する</Button>
   </section>)
 

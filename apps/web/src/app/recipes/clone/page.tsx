@@ -213,7 +213,7 @@ function RecipeClone() {
                 <label className={styles.accountLabel} htmlFor="recipe-clone-account">
                   どのLINEアカウントに作るか<RequiredBadge />
                 </label>
-                <p id="recipe-clone-account">{selectedAccount?.name ?? 'アカウントが選ばれていません'}</p>
+                <p id="recipe-clone-account" className="text-body">{selectedAccount?.name ?? 'アカウントが選ばれていません'}</p>
                 <p className={styles.hint}>
                   作る先はいま選んでいるアカウントです。変えるときは上のLINEアカウントから選び直します。
                 </p>
