@@ -30,3 +30,15 @@ it('本文が変わって確かめ直している間に閉じ、同じ本文に�
   fireEvent.click(screen.getByRole('button', { name: '全文を見る' }))
   expect(screen.getByRole('dialog', { name: '送るとこうなります' }).textContent).toContain('山田様')
 })
+
+it('会話を読む場所を残すため、［全文を見る］は見出しの行に置き、本文は改行を保って短く見せる', () => {
+  render(<InboxSendPreview scope="chat-a" content={'{{name}}様\n1行目\n2行目\n3行目'} preview={ready('山田様\n1行目\n2行目\n3行目')} tokenNames={names} />)
+  const notice = screen.getByText('送るとこうなります：').closest('[data-design-part="notice"]')!
+  // 操作の列（右や下の段）を作らず、見出しの中に置く。
+  expect(notice.hasAttribute('data-has-action')).toBe(false)
+  expect(screen.getByRole('button', { name: '全文を見る' }).closest('[data-notice-heading]')).not.toBeNull()
+  // 見せる本文は改行を保つ（切るのは見た目だけで、全文は窓で読める）。
+  expect(notice.querySelector('[data-send-preview]')?.textContent).toBe('山田様\n1行目\n2行目\n3行目')
+  fireEvent.click(screen.getByRole('button', { name: '全文を見る' }))
+  expect(screen.getByRole('dialog', { name: '送るとこうなります' }).querySelector('[data-detail-value]')?.textContent).toBe('山田様\n1行目\n2行目\n3行目')
+})

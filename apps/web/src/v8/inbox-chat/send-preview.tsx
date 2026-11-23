@@ -21,7 +21,8 @@ export function InboxUnresolvedNotice({ preview, tokenNames }: { preview: InboxP
 /*
  * 返信欄の下の「送るとこうなります」（PC の受信箱と電話のトークで同じ形）。
  * 相手に合わせて入った値は札、入らない差し込みは「（入りません：名前）」。改行はそのまま見せ、
- * 長い文は数行で切って［全文を見る］で改行ごと全部を読む。生の {{…}} は本文にも title にも出さない。
+ * 会話を読む場所を残すため2行で切り、［全文を見る］（見出しの行）で改行ごと全部を読む。
+ * 生の {{…}} は本文にも title にも出さない。
  */
 export function InboxSendPreview({ preview, content, tokenNames, scope }: { preview: InboxPreview; content: string; tokenNames: InsertTokenNames; scope: string | null }) {
   /*
@@ -43,8 +44,7 @@ export function InboxSendPreview({ preview, content, tokenNames, scope }: { prev
     <>
       <Notice
         tone="info"
-        heading="送るとこうなります："
-        action={<Button variant="text" size="compact" onClick={() => setFullOpenFor(shownKey)}>全文を見る</Button>}
+        heading={<>送るとこうなります：<Button variant="text" size="inline" type="button" data-notice-inline-action onClick={() => setFullOpenFor(shownKey)}>全文を見る</Button></>}
       >
         <span className={styles.sendPreviewText} data-send-preview="">{text}</span>
       </Notice>

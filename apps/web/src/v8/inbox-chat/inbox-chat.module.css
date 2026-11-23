@@ -265,5 +265,5 @@ a.sentFile:hover .sentFileName { text-decoration: underline; }
 
 .tpError, .tpErrorNoticePlacement { width: 100%; }
 
-/* 送るとこうなります：改行はそのまま、長い文は4行で切る（全文は［全文を見る］の窓で読む）。 */
-.sendPreviewText { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 4; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* 送るとこうなります：改行はそのまま、会話を読む場所を残すため2行で切る（全文は［全文を見る］の窓で読む）。 */
+.sendPreviewText { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
