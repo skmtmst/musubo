@@ -1791,6 +1791,27 @@
       "column": "tenant_id"
     }
   },
+  "hq_template_store_bindings": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "hq_template_distribution_jobs": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "hq_template_distribution_job_items": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
   "hq_template_distribution_results": {
     "category": "purge",
     "scope": {

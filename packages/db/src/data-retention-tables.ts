@@ -59,6 +59,8 @@ export function purgeTablesChildFirst(): string[] {
   const depth = new Map<string, number>();
   /** その表の行を選ぶために、まだ残っていないといけない表。 */
   const dependsOn = (name: string): string[] => {
+    if (name === 'hq_template_distribution_job_items') return ['hq_template_distribution_jobs', 'hq_template_preflights'];
+    if (name === 'hq_template_distribution_jobs' || name === 'hq_template_store_bindings') return ['hq_template_versions', 'line_accounts'];
     // 第2弾の参照を残したまま親の組・申込を先に消さない。
     if (name === 'bookings') return ['booking_series','booking_groups'];
     if (name === 'hq_store_comparison_export_jobs') return ['staff_members'];
