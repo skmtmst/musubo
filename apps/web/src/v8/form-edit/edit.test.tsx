@@ -1117,3 +1117,19 @@ it('振り分けの保存が失敗しても変更を残す', async () => {
   expect(toggle.getAttribute('aria-checked')).toBe('false')
   expect(await screen.findByText(/保存に失敗しました/)).toBeTruthy()
 })
+
+it('答えが1つの質問に同時に満たせない条件が重なった振り分けは、保存の前に止める', async () => {
+  const data=structuredClone(formData)
+  const booking=data.layout.sections[1].blocks[0]
+  if(booking.kind!=='input'||!booking.booking)throw new Error('fixture')
+  booking.booking.routing={enabled:true,rules:[{conditions:[{questionId:'q1',op:'is',value:'トリミング'},{questionId:'q1',op:'is',value:'ご相談'}],target:{menuId:'bm-1'}}],fallback:{menuId:'bm-1'}}
+  formsGet.mockResolvedValue({success:true,data})
+  routingTargets.mockResolvedValue({success:true,data:{menus:[{id:'bm-1',name:'相談',durationMinutes:30}],staff:[{id:'s1',name:'担当',menuId:'bm-1'}],groups:[]}})
+  await render('id=form-1')
+  await screen.findByRole('heading',{name:'答えで予約の行き先を分ける'})
+  fireEvent.click(getPageAction({name:'下書きを保存'}))
+  expect((await screen.findAllByText('1 行目の「今日のご来店の目的は？」の条件は同時に満たせません。どちらかを外すか、行を分けてください。')).length).toBeGreaterThan(0)
+  // 保存は非同期で進むため、送るまでの間を待ってから送っていないことを確かめる。
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+  expect(formsUpdate).not.toHaveBeenCalled()
+})

@@ -102,18 +102,65 @@ it('5段階評価の質問に数値の範囲を持つ行を追加できる', () 
 
 it('1行に質問の条件を追加でき、3つまでに制限する', () => {
   const onChange=vi.fn()
-  const question={id:'q',kind:'input',type:'radio',name:'subject',label:'相談内容',choices:[{id:'x',label:'相談'}]}
-  const rule={conditions:[{questionId:'q',op:'is' as const,value:'相談'}],target:{menuId:'m'}}
+  // いくつでも選ぶ質問は「就職も転職も選んだ」のように、同じ質問の条件を重ねられる。まだ使っていない答えを足す。
+  const question={id:'q',kind:'input',type:'checkbox',name:'needs',label:'相談内容',choices:[{id:'a',label:'就職'},{id:'b',label:'転職'},{id:'c',label:'副業'},{id:'d',label:'起業'}]}
+  const rule={conditions:[{questionId:'q',op:'is' as const,value:'就職'}],target:{menuId:'m'}}
   const {rerender}=render(<RoutingSection blocks={[question,{id:'book',kind:'input',type:'booking'}] as never} refs={{} as never} routing={{enabled:true,rules:[rule],fallback:{menuId:'m'}}} onChange={onChange} />)
   fireEvent.click(screen.getByRole('button',{name:'1 行目のそのほかの操作'}))
   fireEvent.click(screen.getByText('選んだ質問の条件を追加'))
-  expect(onChange.mock.calls[0][0].rules[0].conditions).toHaveLength(2)
-  rerender(<RoutingSection blocks={[question,{id:'book',kind:'input',type:'booking'}] as never} refs={{} as never} routing={{enabled:true,rules:[{...rule,conditions:[rule.conditions[0],rule.conditions[0],rule.conditions[0]]}],fallback:{menuId:'m'}}} onChange={onChange} />)
+  expect(onChange.mock.calls[0][0].rules[0].conditions).toEqual([rule.conditions[0],{questionId:'q',op:'is',value:'転職'}])
+  // 使っていない答え（起業）が残っていても、4つ目は足せない。
+  const three=[rule.conditions[0],{questionId:'q',op:'is' as const,value:'転職'},{questionId:'q',op:'is' as const,value:'副業'}]
+  rerender(<RoutingSection blocks={[question,{id:'book',kind:'input',type:'booking'}] as never} refs={{} as never} routing={{enabled:true,rules:[{...rule,conditions:three}],fallback:{menuId:'m'}}} onChange={onChange} />)
   fireEvent.click(screen.getByRole('button',{name:'1 行目のそのほかの操作'}))
   expect(screen.queryByText('選んだ質問の条件を追加')).toBeNull()
   fireEvent.click(screen.getByRole('button',{name:'1 行目のそのほかの操作'}))
   fireEvent.click(screen.getByRole('button',{name:'1 行目の条件 2 を外す'}))
-  expect(onChange.mock.calls[1][0].rules[0].conditions).toHaveLength(2)
+  expect(onChange.mock.calls[1][0].rules[0].conditions).toEqual([three[0],three[2]])
+})
+
+it('答えが1つの質問には、同じ行へ2つ目の条件を足さず、別の質問の条件は足せる', () => {
+  const onChange=vi.fn()
+  render(<RoutingSection blocks={[
+    {id:'q1',kind:'input',type:'radio',name:'subject',label:'相談内容',choices:[{id:'x',label:'就職'},{id:'y',label:'転職'}]},
+    {id:'q2',kind:'input',type:'rating',name:'score',label:'満足度'},
+    {id:'q3',kind:'input',type:'select',name:'region',label:'地域',choices:[{id:'t',label:'東京'},{id:'o',label:'大阪'}]},
+    {id:'book',kind:'input',type:'booking'},
+  ] as never} refs={{} as never}
+  routing={{enabled:true,rules:[{conditions:[{questionId:'q1',op:'is',value:'就職'},{questionId:'q2',op:'between',value:[3,5]}],target:{menuId:'m'}}],fallback:{menuId:'m'}}} onChange={onChange} />)
+  const pickQuestion=(name:string) => {
+    fireEvent.click(screen.getByRole('button',{name:'分ける質問'}))
+    fireEvent.click(screen.getByRole('radio',{name}))
+    fireEvent.click(screen.getByRole('button',{name:'選ぶ'}))
+  }
+  const menuHasAdd=() => {
+    fireEvent.click(screen.getByRole('button',{name:'1 行目のそのほかの操作'}))
+    const found=screen.queryByText('選んだ質問の条件を追加')
+    if(!found) fireEvent.click(screen.getByRole('button',{name:'1 行目のそのほかの操作'}))
+    return found
+  }
+  expect(menuHasAdd()).toBeNull()
+  pickQuestion('満足度（5段階評価）')
+  expect(menuHasAdd()).toBeNull()
+  pickQuestion('地域（プルダウン）')
+  fireEvent.click(menuHasAdd()!)
+  expect(onChange.mock.calls[0][0].rules[0].conditions).toEqual([
+    {questionId:'q1',op:'is',value:'就職'},{questionId:'q2',op:'between',value:[3,5]},{questionId:'q3',op:'is',value:'東京'},
+  ])
+})
+
+it('答えが1つの質問に同時に満たせない条件が重なった行は赤くし、理由を出す', () => {
+  const radio={id:'q',kind:'input',type:'radio',name:'subject',label:'相談内容',choices:[{id:'x',label:'就職'},{id:'y',label:'転職'}]}
+  const rule={conditions:[{questionId:'q',op:'is' as const,value:'就職'},{questionId:'q',op:'is' as const,value:'転職'}],target:{menuId:'m'}}
+  const {rerender}=render(<RoutingSection blocks={[radio,{id:'book',kind:'input',type:'booking'}] as never} refs={{} as never}
+    routing={{enabled:true,rules:[rule],fallback:{menuId:'m'}}} onChange={() => {}} />)
+  expect(screen.getByText('1 行目の「相談内容」の条件は同時に満たせません。どちらかを外すか、行を分けてください。')).toBeTruthy()
+  expect(screen.getByRole('button',{name:'1 行目の条件 1 の答え'}).closest('[data-invalid]')).toBeTruthy()
+  // いくつでも選ぶ質問なら「両方選んだ」で当たるため、同じ条件でも止めない（対照）。
+  rerender(<RoutingSection blocks={[{...radio,type:'checkbox'},{id:'book',kind:'input',type:'booking'}] as never} refs={{} as never}
+    routing={{enabled:true,rules:[rule],fallback:{menuId:'m'}}} onChange={() => {}} />)
+  expect(screen.queryByText(/同時に満たせません/)).toBeNull()
+  expect(screen.getByRole('button',{name:'1 行目の条件 1 の答え'}).closest('[data-invalid]')).toBeNull()
 })
 
 it('数値の範囲を変更すると数値としてルールに反映する', () => {

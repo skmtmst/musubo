@@ -19,7 +19,7 @@ import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
 import type { FormRefs } from '@/components/forms/form-refs'
-import { choiceModeLabel, type FormRouting, type RoutingRule, type RoutingTarget, emptyRouting, hasBookingBlock, MAX_ROUTING_ROWS, newRule, routingError, routingQuestions, ruleAnswer } from './routing-model'
+import { choiceModeLabel, type FormRouting, type RoutingRule, type RoutingTarget, emptyRouting, hasBookingBlock, MAX_ROUTING_ROWS, newRule, nextCondition, routingError, routingQuestions, ruleAnswer } from './routing-model'
 import styles from './routing-section.module.css'
 
 const MODES = [{ value: '', label: '指定しない' }, { value: 'in_person', label: 'お店で' }, { value: 'online', label: 'オンライン' }]
@@ -54,7 +54,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
   const menuStaff = refs.routingMenuStaff ?? refs.bookingMenuStaff
   const ruled = value.rules.map((r, i) => ({ ...r, id: `r${i}` }))
   const reorder = useReorder({ items: ruled, idOf: (r) => r.id, disabledReason: readOnly ? '閲覧のみのため並べ替えられません' : null, onReorder: ({ ids }) => onChange({ ...value, rules: ids.map((id) => value.rules[Number(id.slice(1))]) }) })
-  const problem = routingError(value)
+  const problem = routingError(value, blocks)
   if (!hasBookingBlock(blocks)) return null
 
   const hit = trying ? preview?.matchedIndex ?? null : null
@@ -130,6 +130,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
           <thead><TableHeadRow><Th aria-label="並べ替え" /><Th>条件</Th><Th grow>出すメニュー</Th><Th>担当の組</Th><Th>会い方</Th><Th aria-label="操作" /></TableHeadRow></thead><tbody>
           {(readOnly ? ruled : reorder.shown).map((rule, index) => {
             const invalid = problem?.row === index || unavailableTarget(rule.target)
+            const addable = question && !readOnly ? nextCondition(rule, question) : null
             return (
               <Tr key={rule.id} selected={hit === index} data-invalid={invalid || undefined} {...reorder.rowProps(rule.id)}>
                 <HandleCell>{readOnly ? null : <ReorderHandle look="icon" label={`${index + 1} 行目`} {...reorder.handle(rule.id)} {...reorder.handleProps(rule.id)} />}</HandleCell>
@@ -143,7 +144,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
                 </div>)}</div></Td>
                 {targetCells(rule.target, (target) => setRule(rule.id, { target }), `${index + 1} 行目`, invalid)}
                 <ActionCell>{readOnly ? null : <RowMenu appearance="box" size="row" label={`${index + 1} 行目のそのほかの操作`} open={openMenu === rule.id} onOpenChange={(o) => setOpenMenu(o ? rule.id : null)}
-                  items={[...reorder.menuItems(rule.id, () => setOpenMenu(null)), ...(question && rule.conditions.length < 3 ? [{ id: 'add-condition', label: '選んだ質問の条件を追加', onSelect: () => { setRule(rule.id, {conditions:[...rule.conditions, newRule(question.id, question.choices?.[0]?.label ?? '', question.type).conditions[0]]}); setOpenMenu(null) } }] : []), { id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { set({ rules: value.rules.filter((_, i) => `r${i}` !== rule.id) }); setOpenMenu(null) } }]} />}</ActionCell>
+                  items={[...reorder.menuItems(rule.id, () => setOpenMenu(null)), ...(addable ? [{ id: 'add-condition', label: '選んだ質問の条件を追加', onSelect: () => { setRule(rule.id, { conditions: [...rule.conditions, addable] }); setOpenMenu(null) } }] : []), { id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { set({ rules: value.rules.filter((_, i) => `r${i}` !== rule.id) }); setOpenMenu(null) } }]} />}</ActionCell>
               </Tr>
             )
           })}

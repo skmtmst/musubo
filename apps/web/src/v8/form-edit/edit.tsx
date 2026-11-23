@@ -611,7 +611,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     const layoutError = validateFormLayoutForSave(layout)
     if (layoutError) return { message: layoutError }
     if (parseFormReferences(layout.references ?? []) === null) return { message: '公開用の参照の形が正しくありません。中身のタブで対応付けを直してください', tab: 'content' }
-    const routingProblem = routingError(routingOf(layout))
+    const routingProblem = routingError(routingOf(layout), allBlocks)
     if (routingProblem) return { message: routingProblem.message }
     const ogImageError = ogImageUrlError(ogImageUrl)
     if (ogImageError) return { message: ogImageError, tab: 'appearance', target: 'fe-og-image', inline: true }
