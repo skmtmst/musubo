@@ -470,7 +470,7 @@
 
 ## 反映履歴
 
-- [統括メンバー画面の設定メニューを整える](release-log/unreleased/PR-kenta-hq-members-layout.md) — 反映履歴、確認 2026-11-23。
+- [統括メンバー画面の設定メニューを整える](release-log/unreleased/185-kenta-hq-members-layout.md) — 反映履歴、確認 2026-11-23。
 
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
 
