@@ -97,8 +97,24 @@
   gap: var(--tpl-inbox-head-tools-gap);
 }
 
-:global(:root) .rowDeadline:not(:empty) {
-  margin-top: var(--space-4, 4px);
+:global(:root) .rowColumns {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: var(--space-8, 8px);
+}
+
+:global(:root) .rowMain {
+  flex: 1;
+  min-width: 0;
+}
+
+:global(:root) .rowAside {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-4, 4px);
 }
 
 :global(:root) .channelBadge {

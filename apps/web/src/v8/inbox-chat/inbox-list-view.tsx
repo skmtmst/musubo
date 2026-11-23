@@ -456,27 +456,26 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                           <span className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
                         )}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          {/* 板 `M0393`：未対応は顔の赤い点＋名前の太字。行の地は塗らない。 */}
+                      <div className={styles.rowColumns}>
+                        <div className={styles.rowMain}>
                           <p className={`text-ink truncate text-sm ${item.isUnread ? 'font-semibold' : 'font-medium'}`}>{item.customerName}</p>
-                          {(
-                            <span className={styles.rowTime} data-unread={item.isUnread || undefined} title={formatListRecentTitle(item.lastIncomingAt) || undefined}>{formatListRecent(item.lastIncomingAt)}</span>
-                          )}
-                        </div>
-                        <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
-                          <p className={`text-ink-faint line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview}`}>
-                            {item.subject || item.preview}
-                          </p>
-                        </div>
-                        <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
-                          <ChannelBadge channel="email" />
-                          <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
-                            <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
-                              {(item.assignedStaffName ?? '未').charAt(0)}
+                          <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
+                            <p className={`text-ink-faint min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview}`} title={item.subject || item.preview || undefined}>
+                              {item.subject || item.preview}
+                            </p>
+                          </div>
+                          <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
+                            <ChannelBadge channel="email" />
+                            <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
+                              <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
+                                {(item.assignedStaffName ?? '未').charAt(0)}
+                              </span>
+                              <span className="truncate">{`担当：${item.assignedStaffName ?? '未割り当て'}`}</span>
                             </span>
-                            <span className="truncate">{`担当：${item.assignedStaffName ?? '未割り当て'}`}</span>
-                          </span>
+                          </div>
+                        </div>
+                        <div className={styles.rowAside}>
+                          <span className={styles.rowTime} data-unread={item.isUnread || undefined} title={formatListRecentTitle(item.lastIncomingAt) || undefined}>{formatListRecent(item.lastIncomingAt)}</span>
                         </div>
                       </div>
                     </div>
@@ -528,42 +527,43 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                             <span id={`chat-row-unread-${chat.id}`} className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
                           )}
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                              {/* 板 `M0393`：未対応は名前の太字。行の地は塗らない。 */}
-                              <p id={`chat-row-name-${chat.id}`} className={`text-sm text-ink truncate ${chat.isUnread ? 'font-semibold' : 'font-medium'}`}>{chat.friendName}</p>
+                        <div className={styles.rowColumns}>
+                          <div className={styles.rowMain}>
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                {/* 板 `M0393`：未対応は名前の太字。行の地は塗らない。 */}
+                                <p id={`chat-row-name-${chat.id}`} className={`text-sm text-ink truncate ${chat.isUnread ? 'font-semibold' : 'font-medium'}`}>{chat.friendName}</p>
+                              </div>
+                              <InboxListAttention on={chat.isAttention} id={`chat-row-attention-${chat.id}`} />
                             </div>
-                            <InboxListAttention on={chat.isAttention} id={`chat-row-attention-${chat.id}`} />
-                            {(
-                              /* 右上は「17:51」「昨日」「木曜日」「10/18」。未読は濃い字・太字。待ち時間の札は置かず、全文と一緒に title へ。 */
-                              <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={[formatListRecentTitle(chat.lastMessageAt), waitingLabel].filter(Boolean).join('・') || undefined}>{formatListRecent(chat.lastMessageAt)}</span>
-                            )}
-                          </div>
-                          <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
-                            <p
-                              id={`chat-row-preview-${chat.id}`}
-                              className={`line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview} ${needsAttention ? 'text-ink font-medium' : 'text-ink-faint'
-                                }`}
-                              title={preview}
-                            >
-                              {chat.lastMessageDirection === 'outgoing' && (
-                                <span className="text-ink-faint mr-1">返信：</span>
-                              )}
-                              {preview || <span className="text-ink-faint italic">（まだメッセージなし）</span>}
-                            </p>
-                          </div>
-                          <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
-                            <ChannelBadge channel="line" />
-                            <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
-                              <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
-                                {(operatorName ?? '未').charAt(0)}
+                            <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
+                              <p
+                                id={`chat-row-preview-${chat.id}`}
+                                className={`min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview} ${needsAttention ? 'text-ink font-medium' : 'text-ink-faint'
+                                  }`}
+                                title={preview}
+                              >
+                                {chat.lastMessageDirection === 'outgoing' && (
+                                  <span className="text-ink-faint mr-1">返信：</span>
+                                )}
+                                {preview || <span className="text-ink-faint italic">（まだメッセージなし）</span>}
+                              </p>
+                            </div>
+                            <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
+                              <ChannelBadge channel="line" />
+                              <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
+                                <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
+                                  {(operatorName ?? '未').charAt(0)}
+                                </span>
+                                <span className="truncate">{`担当：${assigneeLabel(operatorName, chat as ChatSlaFields)}`}</span>
                               </span>
-                              <span className="truncate">{`担当：${assigneeLabel(operatorName, chat as ChatSlaFields)}`}</span>
-                            </span>
-                            <span className="ml-auto shrink-0"><StatusPill tone={SUPPORT_STATUS_TONES[chat.status]}>{STATUS_WORD[chat.status]}</StatusPill></span>
+                            </div>
                           </div>
-                          <div className={`flex justify-end ${styles.rowDeadline}`}><SlaBadge fields={chat as ChatSlaFields} now={Date.now()} /></div>
+                          <div className={styles.rowAside}>
+                            <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={[formatListRecentTitle(chat.lastMessageAt), waitingLabel].filter(Boolean).join('・') || undefined}>{formatListRecent(chat.lastMessageAt)}</span>
+                            <StatusPill tone={SUPPORT_STATUS_TONES[chat.status]}>{STATUS_WORD[chat.status]}</StatusPill>
+                            <SlaBadge fields={chat as ChatSlaFields} now={Date.now()} />
+                          </div>
                         </div>
                       </div>
                     </InboxListRow>
