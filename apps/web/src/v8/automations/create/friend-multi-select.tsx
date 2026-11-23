@@ -21,12 +21,12 @@ export function FriendMultiSelect({
 }) {
   const ids = normalizeFriendIds(selectedIds)
       return <SaveErrorField names={["query","search"]}><div>
-      <p>
+      <p className="text-label">
         対象の友だち（{formatNumber(ids.length)} 人）<RequiredBadge />
       </p>
         <FriendPickerField label="対象の友だち" accountId={accountId} multiple
           value={ids} names={names}
-          onChange={onChange} error={error} maxSelected={FRIEND_SELECT_LIMIT} /><p>100人まで選べます。
+          onChange={onChange} error={error} maxSelected={FRIEND_SELECT_LIMIT} /><p className="text-caption">100人まで選べます。
       </p>
     </div></SaveErrorField>
 }
