@@ -64,7 +64,7 @@ export default function Step5Completion({ connection, accountName, createdId, im
                   <div className={styles.handoverMetrics}>
                     <div><span>引き継いだ友だち</span><strong>{countsKnown ? `${polishFormatNumber(processed)} 人` : '確認中'}</strong></div>
                     <div><span>現在の対象人数</span><strong>{total === null ? '確認中' : `${polishFormatNumber(total)} 人`}</strong></div>
-                    <p>{complete ? `対象${polishFormatNumber(total ?? 0)}人を確認しました。` : total === null ? referenceTotal === null || referenceTotal === undefined ? 'LINEの現在の対象人数を確認しています。' : `LINEの参考値：${polishFormatNumber(referenceTotal)}人（前日の集計）` : referenceTotal === null || referenceTotal === undefined ? `現在の対象数は${polishFormatNumber(total)}人です。` : `前日集計は${polishFormatNumber(referenceTotal)}人でした。現在の対象数は${polishFormatNumber(total)}人です。`}</p>
+                    <p className="text-body">{complete ? `対象${polishFormatNumber(total ?? 0)}人を確認しました。` : total === null ? referenceTotal === null || referenceTotal === undefined ? 'LINEの現在の対象人数を確認しています。' : `LINEの参考値：${polishFormatNumber(referenceTotal)}人（前日の集計）` : referenceTotal === null || referenceTotal === undefined ? `現在の対象数は${polishFormatNumber(total)}人です。` : `前日集計は${polishFormatNumber(referenceTotal)}人でした。現在の対象数は${polishFormatNumber(total)}人です。`}</p>
                   </div>
                   {countsKnown && <p className={styles.progressNote}>{`内訳：新規${polishFormatNumber(handover.imported)}人、登録済み${polishFormatNumber(handover.alreadyPresent)}人、再登録${polishFormatNumber(handover.restored)}人。`}</p>}
                   <div className={styles.handoverProgressHead}><span>友だちの引き継ぎ進捗</span><strong aria-live="polite">{progressLabel}</strong></div>

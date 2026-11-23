@@ -559,7 +559,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
             {googleStatus !== null ? <>
               <Notice tone={googleStatus === 'connected' ? 'info' : 'warn'}>営業時間の変更は Googleビジネスで行います。接続に問題がある場合は、接続画面で確認してください。</Notice>
               <Button variant="text" href="/restaurant-test/google?tab=hours">Googleビジネスの営業時間を開く →</Button>
-              {hours?.map((day) => <p key={day.weekday}>{WEEKDAY_LABEL[day.weekday]}曜日：{periodsText(day)}</p>)}
+              {hours?.map((day) => <p key={day.weekday} className="text-body">{WEEKDAY_LABEL[day.weekday]}曜日：{periodsText(day)}</p>)}
             </> : hoursDraft ? WEEK_ORDER.map((weekday) => {
               const day = hoursDraft.find((item) => item.weekday === weekday) ?? { weekday, periods: [] }
               const open = day.periods.length > 0

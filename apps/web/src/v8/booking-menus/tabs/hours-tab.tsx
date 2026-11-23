@@ -199,7 +199,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
           <Notice tone="info">営業時間はGoogleビジネスプロフィールから読み込んでいます。予約の定員・担当者・設備はmusuboで設定します。</Notice>
           <div className={styles.dayBody}>{DAYS.map(({ weekday, label }) => {
             const intervals = draft.find(day => day.weekday === weekday)?.intervals ?? []
-            return <p key={weekday}>{label}：{intervals.length ? intervals.map(interval => `${interval.start}〜${interval.end}`).join('、') : '休業'}</p>
+            return <p key={weekday} className="text-body">{label}：{intervals.length ? intervals.map(interval => `${interval.start}〜${interval.end}`).join('、') : '休業'}</p>
           })}</div>
           <TextLink href="/settings/google-hours">Googleビジネスの営業時間を開く</TextLink>
         </> : null}

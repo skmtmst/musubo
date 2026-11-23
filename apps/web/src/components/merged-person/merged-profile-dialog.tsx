@@ -101,7 +101,7 @@ export default function MergedProfileDialog({
           読み込んだのは第{revision}版です。先に別の人が変更した場合は上書きしません。
         </p>
         <DifferencesFilter checked={differencesOnly} onChange={setDifferencesOnly} />
-        {candidates.length > 0 && visibleCandidates.length === 0 ? <p>違う項目はありません。</p> : null}
+        {candidates.length > 0 && visibleCandidates.length === 0 ? <p className="text-body">違う項目はありません。</p> : null}
         {candidates.length === 0 ? (
           <p className="text-xs leading-5 text-ink-faint">採用する値の候補はまだありません。</p>
         ) : visibleCandidates.map((field) => {
