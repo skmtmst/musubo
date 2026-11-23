@@ -131,5 +131,11 @@ describe('景品の配り直し', () => {
     expect(fx.binding(id, 'b')).toMatchObject({ pending_version_id: null, dismissed_version_id: v2 });
     expect(version(draft)).toMatchObject({ status: 'published', required_miles: 100 });
     expect(fx.f.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='hq_template.store_dismissed'").get()).toEqual({ n: 1 });
+    // 本部でひな形を消すと、景品の出所の記録は残っても店の状態の口は対応なしを返す。
+    const detail = await fx.hq<{ template: { revision: number } }>(`/${id}`);
+    expect((await fx.hq(`/${id}`, 'DELETE', { expectedRevision: detail.body.data.template.revision })).status).toBe(200);
+    const status = await fx.request<{ bound: boolean; detached: string | null }>(`/api/mileage/rewards/${rewardId}/hq-status?accountId=b`);
+    expect(status.body.data).toEqual({ bound: false, detached: 'template_archived' });
+    expect(rewardOf('b').hq_template_version_id).toBe(fx.binding(id, 'b')!.applied_version_id);
   });
 });

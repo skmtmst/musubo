@@ -3,7 +3,7 @@ import type { HqTemplateStatement } from '@line-crm/db';
 import { parseCatalogDefinition } from './catalog.js';
 import { bindingUnchangedCondition, readStoreBinding, type CatalogBinding } from './catalog-binding.js';
 import { CATALOG_HASH_VERSION } from './catalog-record.js';
-import { bindingAppliedStatement, catalogApplyPlan, readCatalogTarget, targetUnchangedCondition, type CatalogVersionInput } from './catalog-target.js';
+import { bindingAppliedStatement, catalogApplyPlan, readCatalogTarget, targetUnchangedCondition, type CatalogExpectedReference, type CatalogVersionInput } from './catalog-target.js';
 import { decideRedistribution, redistributionNotices, type RedistributionDecision, type RedistributionNotice } from './redistribution-decision.js';
 import { HqTemplateError } from './tag.js';
 
@@ -34,7 +34,7 @@ const empty = (outcome: RedistributionOutcome, code: string | null, binding: Cat
 
 /** 当てられない時の理由。どれも店の物を書き換えずに統括へ返す。 */
 const conflictCodes: Record<string, string> = {
-  HANDGIFT_PROTECTED: 'handgift_protected', REFERENCE_UNAVAILABLE: 'reference_unavailable', REWARD_KIND_CHANGED: 'reward_kind_changed',
+  HANDGIFT_PROTECTED: 'handgift_protected', REFERENCE_UNAVAILABLE: 'reference_unavailable', REFERENCE_CHANGED: 'reference_changed', REWARD_KIND_CHANGED: 'reward_kind_changed',
   BOOKING_NOT_USED: 'booking_not_used', VERSION_CONFLICT: 'target_changed', INVALID_DEFINITION: 'definition_invalid',
 };
 
@@ -43,7 +43,7 @@ const conflictCodes: Record<string, string> = {
  * 書き込み文は、読んだ時の対応表の行の版と店の物の中身が変わっていない時だけ通る guard を先頭に置く。
  * 版の新旧は数で比べ、古い版で新しい版を戻さない。
  */
-export async function planRedistribution(db: D1Database, input: { tenantId: string; templateId: string; kind: HqCatalogTemplateType; accountId: string; candidate: CatalogVersionInput }): Promise<RedistributionPlan> {
+export async function planRedistribution(db: D1Database, input: { tenantId: string; templateId: string; kind: HqCatalogTemplateType; accountId: string; candidate: CatalogVersionInput; expectedReferences?: readonly CatalogExpectedReference[] }): Promise<RedistributionPlan> {
   const { tenantId, templateId, kind, accountId, candidate } = input;
   const stored = await readStoreBinding(db, tenantId, templateId, accountId);
   if (!stored) return empty('unbound', null);
@@ -83,7 +83,7 @@ export async function planRedistribution(db: D1Database, input: { tenantId: stri
     }] };
   }
   try {
-    const plan = await catalogApplyPlan(db, { tenantId, templateId, target, applied, candidate });
+    const plan = await catalogApplyPlan(db, { tenantId, templateId, target, applied, candidate, expectedReferences: input.expectedReferences });
     return { outcome: 'apply', code: null, notices: [], binding, statements: [...keep, ...plan.statements,
       bindingAppliedStatement({ tenantId, templateId, accountId, rowVersion: binding.rowVersion, versionId: candidate.id, hash: plan.hash })] };
   } catch (error) {

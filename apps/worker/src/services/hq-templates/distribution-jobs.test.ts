@@ -31,7 +31,7 @@ async function acceptedJob(accountIds = ['a', 'b']) {
 }
 
 describe('配り直しのジョブの札と再開', () => {
-  test('期限の切れた札では書けず、取り直した実行者が1回だけ書く', async () => {
+  test('期限の切れた札では書けず、あらためて札を取った実行者が1回だけ書く', async () => {
     open();
     const { id, v2 } = await acceptedJob(['a']);
     fx.f.raw.prepare("UPDATE hq_template_distribution_job_items SET status='running',lease_token='stale',lease_expires_at=?,attempt_count=1").run(new Date(Date.now() - 1000).toISOString());
@@ -145,6 +145,23 @@ describe('読んでから書くまでの割り込み', () => {
     expect(fx.binding(id, 'a')).toMatchObject({ pending_version_id: v2 });
   });
 
+  test('店のタグが読んでから書くまでの間に使えなくなったら書かず、次の試行で競合として返す', async () => {
+    open();
+    fx.f.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES('tag-a','予約','a')");
+    const id = await fx.create('booking_menu', menu({ autoTagName: '予約' }));
+    expect((await fx.run(id, await fx.check(id, ['a']))).body.data.status).toBe('completed');
+    await fx.save(id, menu({ autoTagName: '予約', base_price: 9000 }));
+    expect((await fx.redistribute(id, [(await fx.check(id, ['a'])).preflightId])).status).toBe(201);
+    interrupt(() => fx.f.raw.exec("UPDATE tags SET status='archived' WHERE id='tag-a'"));
+    await processHqDistributionJobs(fx.f.db);
+    expect(item('a')).toMatchObject({ status: 'pending', attempt_count: 1 });
+    expect(menuOf('a').base_price).toBe(3000);
+    advance(61_000);
+    await processHqDistributionJobs(fx.f.db);
+    expect(item('a')).toMatchObject({ status: 'conflict', error_code: 'reference_unavailable' });
+    expect(menuOf('a')).toMatchObject({ base_price: 3000, auto_tag_id: 'tag-a' });
+  });
+
   test('対応表が先に変わったら、その batch は書かずに取り直す', async () => {
     open();
     const { id, v2 } = await acceptedJob(['a']);
@@ -160,6 +177,20 @@ describe('読んでから書くまでの割り込み', () => {
 });
 
 describe('書く直前の確かめ直し', () => {
+  test('確かめの後に店のタグの行が変わったら、統括が確かめた中身と違うので書かずに競合として返す', async () => {
+    open();
+    fx.f.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES('tag-a','予約','a')");
+    const id = await fx.create('booking_menu', menu({ autoTagName: '予約' }));
+    expect((await fx.run(id, await fx.check(id, ['a']))).body.data.status).toBe('completed');
+    await fx.save(id, menu({ autoTagName: '予約', base_price: 9000 }));
+    const p = await fx.check(id, ['a']);
+    fx.f.raw.exec("UPDATE tags SET version=version+1 WHERE id='tag-a'");
+    expect((await fx.redistribute(id, [p.preflightId])).status).toBe(201);
+    await processHqDistributionJobs(fx.f.db);
+    expect(item('a')).toMatchObject({ status: 'conflict', error_code: 'reference_changed' });
+    expect(menuOf('a').base_price).toBe(3000);
+  });
+
   test.each([
     ['ひな形が保存し直された', 'template_version_changed', async (id: string) => { await fx.save(id, menu({ base_price: 9900 })); }],
     ['作った人が閲覧のみになった', 'actor_unauthorized', async () => { fx.f.raw.exec("UPDATE staff_members SET access_level='read_only' WHERE id='owner'"); }],

@@ -5,10 +5,13 @@ export const CATALOG_HASH_VERSION = 1;
 
 /*
  * 指紋に入れるのは本部が配る項目だけ。店ごとの状態（受付中か・並び順・担当・在庫・引換コード・
- * お支払いの接続）は入れない。店がそれらを変えても「店が変えた」とは扱わない。
+ * 決済の接続）は入れない。店がそれらを変えても「店が変えた」とは扱わない。
+ * 予約メニューのお支払いは、メニューごとの上書きの行（無ければ店の既定）を本部が配る項目として入れる。
  */
-const MENU_FIELDS = ['name', 'category_label', 'description', 'duration_minutes', 'buffer_after_minutes', 'base_price', 'price_mode',
+const MENU_COLUMNS = ['name', 'category_label', 'description', 'duration_minutes', 'buffer_after_minutes', 'base_price', 'price_mode',
   'image_url', 'concurrent_capacity', 'booking_window_days', 'cutoff_hours_before', 'cancel_deadline_hours_before', 'intake_question', 'auto_tag_id'] as const;
+const MENU_PAYMENT_FIELDS = ['payment_mode', 'payment_provider'] as const;
+const MENU_FIELDS = [...MENU_COLUMNS, ...MENU_PAYMENT_FIELDS] as const;
 const REWARD_FIELDS = ['name', 'description', 'image_url', 'reward_kind', 'required_miles', 'per_friend_limit', 'starts_at', 'ends_at',
   'benefit_expires_days', 'common_action_version_id', 'failure_policy', 'customer_message', 'target_conditions'] as const;
 
@@ -17,6 +20,10 @@ export type CatalogRecord = Record<string, CatalogRecordValue>;
 
 export function catalogRecordFields(kind: HqCatalogTemplateType): readonly string[] {
   return kind === 'booking_menu' ? MENU_FIELDS : REWARD_FIELDS;
+}
+/** 予約メニューの表そのものの列だけ。お支払いの上書きは別の表にある。 */
+export function menuColumnFields(): readonly string[] {
+  return MENU_COLUMNS;
 }
 
 /** 書く予定の値と、DB から読んだ行のどちらからでも同じ形を作る。 */

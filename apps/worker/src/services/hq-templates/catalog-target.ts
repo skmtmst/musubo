@@ -1,7 +1,7 @@
 import type { HqCatalogTemplateDefinition, HqCatalogTemplateType } from '@line-crm/shared';
 import type { HqTemplateStatement } from '@line-crm/db';
-import { bookingMenuData, catalogReferences, catalogSnapshot, menuVersionSnapshotSql, rewardDraftValues, rewardRecordSource, rewardVersionColumns, rewardVersionValues } from './catalog.js';
-import { CATALOG_HASH_VERSION, catalogRecord, catalogRecordFields, catalogRecordHash, type CatalogRecord } from './catalog-record.js';
+import { bookingMenuData, bookingPaymentSetting, bookingPaymentStatement, catalogReferences, catalogSnapshot, catalogSnapshotGuard, menuVersionSnapshotSql, rewardDraftValues, rewardRecordSource, rewardVersionColumns, rewardVersionValues } from './catalog.js';
+import { CATALOG_HASH_VERSION, catalogRecord, catalogRecordHash, menuColumnFields, type CatalogRecord } from './catalog-record.js';
 import { HqTemplateError } from './tag.js';
 
 /** 対応表が指す店の物の、今の中身と状態。 */
@@ -30,7 +30,9 @@ type Row = Record<string, string | number | null>;
 
 export async function readCatalogTarget(db: D1Database, kind: HqCatalogTemplateType, accountId: string, targetId: string): Promise<CatalogTargetState | null> {
   if (kind === 'booking_menu') {
-    const row = await db.prepare('SELECT * FROM menus WHERE id=? AND line_account_id=? AND deleted_at IS NULL').bind(targetId, accountId).first<Row>();
+    const row = await db.prepare(`SELECT m.*,p.mode AS payment_mode,p.provider AS payment_provider FROM menus m
+      LEFT JOIN booking_payment_menu_settings p ON p.menu_id=m.id AND p.line_account_id=m.line_account_id
+      WHERE m.id=? AND m.line_account_id=? AND m.deleted_at IS NULL`).bind(targetId, accountId).first<Row>();
     if (!row) return null;
     const record = catalogRecord(kind, row);
     return { kind, accountId, targetId, name: String(row.name), record, hash: await catalogRecordHash(kind, record),
@@ -56,9 +58,12 @@ export async function readCatalogTarget(db: D1Database, kind: HqCatalogTemplateT
 /** 読んだ時の中身・出所・版から変わっていなければ真になる条件。書く前の guard に使う。 */
 export function targetUnchangedCondition(target: CatalogTargetState): { sql: string; bindings: Array<string | number | null> } {
   if (target.kind === 'booking_menu') {
-    const fields = catalogRecordFields('booking_menu');
-    return { sql: `EXISTS(SELECT 1 FROM menus WHERE id=? AND line_account_id=? AND deleted_at IS NULL AND hq_customized=? AND hq_template_id IS ? AND hq_template_version_id IS ? AND ${fields.map(field => `${field} IS ?`).join(' AND ')})`,
-      bindings: [target.targetId, target.accountId, target.customized ? 1 : 0, target.originTemplateId, target.originVersionId, ...fields.map(field => target.record[field] as string | number | null)] };
+    const fields = menuColumnFields();
+    return { sql: `EXISTS(SELECT 1 FROM menus WHERE id=? AND line_account_id=? AND deleted_at IS NULL AND hq_customized=? AND hq_template_id IS ? AND hq_template_version_id IS ? AND ${fields.map(field => `${field} IS ?`).join(' AND ')}
+        AND (SELECT mode FROM booking_payment_menu_settings WHERE menu_id=menus.id AND line_account_id=menus.line_account_id) IS ?
+        AND (SELECT provider FROM booking_payment_menu_settings WHERE menu_id=menus.id AND line_account_id=menus.line_account_id) IS ?)`,
+      bindings: [target.targetId, target.accountId, target.customized ? 1 : 0, target.originTemplateId, target.originVersionId, ...fields.map(field => target.record[field] as string | number | null),
+        target.record.payment_mode as string | null, target.record.payment_provider as string | null] };
   }
   const versionId = target.draftVersionId ?? target.publishedVersionId;
   return { sql: `EXISTS(SELECT 1 FROM mileage_rewards r JOIN mileage_reward_versions v ON v.id=? AND v.reward_id=r.id
@@ -88,24 +93,36 @@ export interface CatalogApplyPlan {
  * 店の物の名前を書き換えるのは、本部が名前を変えた版だけ。別名で配った店の名前を本部の名前へ戻さない。
  * 公開中の景品の版は書き換えない（払い戻しは交換した版の必要マイルで計算するため）。
  */
-export async function catalogApplyPlan(db: D1Database, input: { tenantId: string; templateId: string; target: CatalogTargetState; applied: CatalogVersionInput; candidate: CatalogVersionInput }): Promise<CatalogApplyPlan> {
+/** 配る前の確かめで店のタグ・処理・シナリオをどの行に解決したか。ジョブはこれと同じ時だけ書く。 */
+export type CatalogExpectedReference = { sourceId: string; targetId: string | null; expectedRevision: string | null };
+
+export async function catalogApplyPlan(db: D1Database, input: { tenantId: string; templateId: string; target: CatalogTargetState; applied: CatalogVersionInput; candidate: CatalogVersionInput; expectedReferences?: readonly CatalogExpectedReference[] }): Promise<CatalogApplyPlan> {
   const { target, candidate } = input, kind = target.kind;
   if (target.protectedTarget) throw new HqTemplateError('HANDGIFT_PROTECTED', 409);
   const snapshot = await catalogSnapshot(db, target.accountId, kind);
   if (kind === 'booking_menu' && (JSON.parse(snapshot) as { style?: string }).style === 'ec') throw new HqTemplateError('BOOKING_NOT_USED', 422);
   const refs = catalogReferences(candidate.definition, snapshot, kind);
+  // 確かめの後に店のタグ・処理が別の行・別の版になっていたら、統括が確かめた中身と違うので書かない。
+  const expected = input.expectedReferences;
+  if (expected && (refs.length !== expected.length || refs.some(ref => {
+    const seen = expected.find(item => item.sourceId === ref.sourceId);
+    return !seen || seen.targetId !== ref.targetId || seen.expectedRevision !== ref.expectedRevision;
+  }))) throw new HqTemplateError('REFERENCE_CHANGED', 409);
   const name = candidate.definition.settings.name !== input.applied.definition.settings.name ? candidate.definition.settings.name : target.name;
   const settings = { ...candidate.definition.settings, name } as unknown as Record<string, unknown>;
-  const statements: HqTemplateStatement[] = [];
+  // 店のタグ・処理・シナリオを名前で解決した時から変わっていない時だけ書く。間で変わったら書かずに読み直す。
+  const statements: HqTemplateStatement[] = [catalogSnapshotGuard(target.accountId, kind, snapshot)];
   if (kind === 'booking_menu') {
-    // 並び順は店が決める物なので、配り直しでは書かない。
+    // 並び順は店が決める物なので、配り直しでは書かない。お支払いは本部の版どおりに上書きの行を作る・直す・消す（既定）。
     const { sort_order: _storeOrder, ...data } = bookingMenuData(settings, refs), keys = Object.keys(data);
+    const payment = bookingPaymentSetting(settings.paymentMode, Boolean((JSON.parse(snapshot) as { paymentConnected?: number }).paymentConnected));
     // 出所の版を同じ文で変えるので、店の編集の印は立たない。念のため次の文でも印を戻す。
     statements.push({ sql: `UPDATE menus SET ${keys.map(key => `${key}=?`).join(',')},hq_template_version_id=?,hq_customized=0,version=version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=? AND deleted_at IS NULL`,
       bindings: [...keys.map(key => data[key]), candidate.id, target.targetId, target.accountId] },
     { sql: 'UPDATE menus SET hq_customized=0 WHERE id=? AND line_account_id=?', bindings: [target.targetId, target.accountId] },
-    { sql: menuVersionSnapshotSql, bindings: [crypto.randomUUID(), target.targetId, target.accountId] });
-    return { statements, hash: await catalogRecordHash(kind, catalogRecord(kind, data)), publishRequired: false };
+    { sql: menuVersionSnapshotSql, bindings: [crypto.randomUUID(), target.targetId, target.accountId] },
+    bookingPaymentStatement(target.targetId, target.accountId, payment));
+    return { statements, hash: await catalogRecordHash(kind, catalogRecord(kind, { ...data, payment_mode: payment?.mode ?? null, payment_provider: payment?.provider ?? null })), publishRequired: false };
   }
   const values = rewardDraftValues(settings, refs);
   if (values.rewardKind !== target.rewardKind) throw new HqTemplateError('REWARD_KIND_CHANGED', 409);

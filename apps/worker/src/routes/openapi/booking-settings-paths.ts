@@ -256,7 +256,7 @@ export const bookingSettingsPaths = {
   '/api/booking/admin/menus/{id}/hq-status': {
     get: {
       tags: ['Booking'], summary: '本部から配られた予約メニューの版と知らせ',
-      description: 'bound=false なら本部の配布物ではない。customized は店が変えた印（「この店専用（統括から）」）。pendingVersion があれば「本部の新しい版があります」で、notices に知らせる理由（store_edited）を返す。',
+      description: 'bound=false なら本部の配布物ではない（本部でひな形を消した後や、出所の記録が食い違う物は detached に理由を返し、知らせも出さない）。customized は店が変えた印（「この店専用（統括から）」）。pendingVersion があれば「本部の新しい版があります」で、notices に知らせる理由（store_edited）を返す。',
       parameters: [
         { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
         { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },

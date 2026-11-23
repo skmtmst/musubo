@@ -33,14 +33,17 @@ export async function catalogHqStatus(db: D1Database, kind: HqCatalogTemplateTyp
   const binding = await findBindingForTarget(db, accountId, kind, targetId);
   const target = await readCatalogTarget(db, kind, accountId, targetId);
   if (!target) throw new CatalogAdoptionError('not_found', 404);
-  if (!binding) return { bound: false as const };
+  if (!binding) return { bound: false as const, detached: null };
+  // 本部でひな形を削除した後と、出所の欄が対応表と食い違う物は店の物として扱い、「統括から」の札も新しい版の知らせも出さない。
+  const active = await templateActive(db, binding);
+  if (!active) return { bound: false as const, detached: 'template_archived' as const };
+  if (target.originTemplateId !== binding.templateId || target.originVersionId !== binding.appliedVersionId) return { bound: false as const, detached: 'origin_mismatch' as const };
   const versions = await loadCatalogVersions(db, binding.tenantId, binding.templateId, kind, [binding.appliedVersionId, binding.pendingVersionId, binding.dismissedVersionId]);
   const applied = versions.get(binding.appliedVersionId), pending = binding.pendingVersionId ? versions.get(binding.pendingVersionId) ?? null : null;
   const dismissed = binding.dismissedVersionId ? versions.get(binding.dismissedVersionId) ?? null : null;
-  const consistent = target.originTemplateId === binding.templateId && target.originVersionId === binding.appliedVersionId;
   const miles = (version: CatalogVersionInput | null | undefined) => kind === 'mileage_reward' && version ? Number((version.definition.settings as { requiredMiles: number }).requiredMiles) : null;
   return {
-    bound: true as const, templateId: binding.templateId, templateActive: await templateActive(db, binding), consistent,
+    bound: true as const, templateId: binding.templateId,
     customized: storeEdited(binding, target), published: target.published,
     appliedVersion: applied ? { id: applied.id, version: applied.version } : null,
     dismissedVersion: dismissed ? { id: dismissed.id, version: dismissed.version } : null,

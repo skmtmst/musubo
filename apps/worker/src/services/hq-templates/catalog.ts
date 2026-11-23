@@ -54,6 +54,10 @@ function snapshotSql(type:HqCatalogTemplateType) {
  const usage=type==='booking_menu'?`SELECT menu_id id,COUNT(*) n FROM (SELECT menu_id FROM bookings UNION ALL SELECT menu_id FROM staff_menus UNION ALL SELECT menu_id FROM booking_menu_resources) GROUP BY menu_id`:`SELECT reward_id id,COUNT(*) n FROM (SELECT reward_id FROM mileage_redemptions UNION ALL SELECT v.reward_id FROM mileage_reward_codes c JOIN mileage_reward_versions v ON v.id=c.reward_version_id) GROUP BY reward_id`;
  return `WITH scope AS (SELECT ? accountId) SELECT json_object('targets',json(${rows(table,`line_account_id=${account}`)}),'versions',json(${rows(versionTable,`${owner} IN (SELECT id FROM ${table} WHERE line_account_id=${account})`)}),'handgiftIds',json((SELECT COALESCE(json_group_array(reward_id),'[]') FROM (SELECT reward_id FROM mileage_handgift_rewards WHERE reward_id IN (SELECT id FROM mileage_rewards WHERE line_account_id=${account}) ORDER BY reward_id))),'usage',json((SELECT COALESCE(json_group_array(json_object('id',id,'n',n)),'[]') FROM (${usage} ORDER BY id))),'tags',json(${rows('tags',`line_account_id=${account}`)}),'scenarios',json(${rows('scenarios',`line_account_id=${account}`)}),'actions',json(${rows('common_actions',`line_account_id=${account}`)}),'actionVersions',json(${rows('common_action_versions',`common_action_id IN (SELECT id FROM common_actions WHERE line_account_id=${account})`)}),'programs',json(${rows('mileage_programs','1=1')}),'paymentConnected',EXISTS(SELECT 1 FROM booking_payment_connections WHERE line_account_id=${account} AND disconnected_at IS NULL),'style',COALESCE((SELECT style FROM account_styles WHERE line_account_id=${account}),'standard'))`;
 }
+/** 読んだ時から店のカタログ（メニュー・景品・タグ・処理・シナリオ）が変わっていない時だけ通る guard。 */
+export function catalogSnapshotGuard(accountId:string,type:HqCatalogTemplateType,snapshot:string):HqTemplateStatement {
+ return {sql:`SELECT json(CASE WHEN (${snapshotSql(type)})=? THEN '{}' ELSE 'VERSION_CONFLICT' END)`,bindings:[accountId,snapshot]};
+}
 export async function catalogSnapshot(db:D1Database,accountId:string,type:HqCatalogTemplateType):Promise<string> {
  return (await db.prepare(`SELECT (${snapshotSql(type)}) snapshot`).bind(accountId).first<{snapshot:string}>())!.snapshot;
 }
@@ -88,6 +92,15 @@ export function inspectCatalog(def:HqCatalogTemplateDefinition,snapshot:string,t
  return [{sourceId:type,itemKind:type,name,targetId:row?String(row.id):null,expectedRevision:row?JSON.stringify(row):null,duplicate:!!row,allowedModes:(row?safe?['overwrite','alias']:['alias']:['create']) as Array<'create'|'overwrite'|'alias'>},...catalogReferences(def,snapshot,type)];
 }
 type CatalogReference={sourceId:string;targetId:string|null};
+/** 本部のお支払いの指定を、メニューごとの上書きの行にする。決済をつないでいない店のオンライン先払いはお店で払うにする。既定は行を持たない。 */
+export function bookingPaymentSetting(paymentMode:unknown,connected:boolean):{mode:string;provider:string}|null {
+ if(paymentMode===undefined||paymentMode==='default')return null;
+ return paymentMode==='online'&&connected?{mode:'online',provider:'stripe'}:{mode:'onsite',provider:'onsite'};
+}
+export function bookingPaymentStatement(menuId:string,accountId:string,payment:{mode:string;provider:string}|null):HqTemplateStatement {
+ if(!payment)return {sql:'DELETE FROM booking_payment_menu_settings WHERE menu_id=? AND line_account_id=?',bindings:[menuId,accountId]};
+ return {sql:`INSERT INTO booking_payment_menu_settings(menu_id,line_account_id,mode,provider,created_at,updated_at) VALUES(?,?,?, ?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')) ON CONFLICT(menu_id) DO UPDATE SET mode=excluded.mode,provider=excluded.provider,updated_at=excluded.updated_at`,bindings:[menuId,accountId,payment.mode,payment.provider]};
+}
 /** 予約メニューに書く値。店のタグは配る前の確かめと同じく、店の中の同名の有効なタグ1件に解決する。 */
 export function bookingMenuData(settings:Record<string,unknown>,refs:readonly CatalogReference[]):Record<string,string|number|null> {
  const tagId=settings.autoTagName?refs.find(r=>r.sourceId===`tag:${settings.autoTagName}`)!.targetId:null;
@@ -113,17 +126,18 @@ export async function planCatalog(accountId:string,def:HqCatalogTemplateDefiniti
  if(!selected||resolutions.length!==items.length||!root.allowedModes.includes(selected.mode)||items.slice(1).some(i=>!resolutions.some(r=>r.sourceId===i.sourceId&&r.mode==='overwrite')))throw new HqTemplateError('SELECTION_REQUIRED',409);
  const id=selected.mode==='overwrite'?root.targetId!:crypto.randomUUID(),name=selected.mode==='alias'?nextAlias(def.settings.name,snap.targets.map(r=>String(r.name))):def.settings.name;
  const existing=snap.targets.find(r=>r.id===id),s={...def.settings,name} as unknown as Record<string,unknown>;
- const statements:HqTemplateStatement[]=[{sql:`SELECT json(CASE WHEN (${snapshotSql(type)})=? THEN '{}' ELSE 'VERSION_CONFLICT' END)`,bindings:[accountId,snapshot]}];
+ const statements:HqTemplateStatement[]=[catalogSnapshotGuard(accountId,type,snapshot)];
  const add=(sql:string,bindings:HqTemplateStatement['bindings'])=>statements.push({sql,bindings});
  const refs=items.slice(1);
  let record:Record<string,unknown>;
  if(type==='booking_menu') {
   if((JSON.parse(snapshot) as {style?:string}).style==='ec')throw new HqTemplateError('BOOKING_NOT_USED',422);
-  const data=bookingMenuData(s,refs);record=data;
+  const data=bookingMenuData(s,refs),payment=bookingPaymentSetting(s.paymentMode,Boolean((JSON.parse(snapshot) as {paymentConnected?:number}).paymentConnected));
+  record={...data,payment_mode:payment?.mode??null,payment_provider:payment?.provider??null};
   if(existing){const keys=Object.keys(data);add(`UPDATE menus SET ${keys.map(k=>`${k}=?`).join(',')},version=version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`,[...keys.map(k=>data[k]),id,accountId]);}
   else {const keys=Object.keys(data);add(`INSERT INTO menus(id,line_account_id,${keys.join(',')},is_active) VALUES (?,?,${keys.map(()=>'?').join(',')},0)`,[id,accountId,...keys.map(k=>data[k])]);}
   if(origin)add('UPDATE menus SET hq_template_id=?,hq_template_version_id=?,hq_customized=0 WHERE id=? AND line_account_id=?',[origin.templateId,origin.versionId,id,accountId]);
-  if(s.paymentMode!=='default')add(`INSERT INTO booking_payment_menu_settings(menu_id,line_account_id,mode,provider,created_at,updated_at) VALUES(?,?,?, ?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')) ON CONFLICT(menu_id) DO UPDATE SET mode=excluded.mode,provider=excluded.provider`,[id,accountId,s.paymentMode==='online'&&(JSON.parse(snapshot) as {paymentConnected?:number}).paymentConnected?'online':'onsite',s.paymentMode==='online'&&(JSON.parse(snapshot) as {paymentConnected?:number}).paymentConnected?'stripe':'onsite']);
+  if(payment)statements.push(bookingPaymentStatement(id,accountId,payment));
   add(menuVersionSnapshotSql,[crypto.randomUUID(),id,accountId]);
  } else {
   const d=rewardDraftValues(s,refs);record=rewardRecordSource(name,d);

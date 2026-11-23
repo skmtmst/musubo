@@ -191,7 +191,11 @@ export async function runRedistributionItem(db: D1Database, item: Redistribution
     const kind = template.catalog_type;
     const candidate = (await loadCatalogVersions(db, job.tenant_id, job.template_id, kind, [job.template_version_id])).get(job.template_version_id);
     if (!candidate) return await close('failed', 'template_unavailable');
-    const plan = await planRedistribution(db, { tenantId: job.tenant_id, templateId: job.template_id, kind, accountId: item.target_account_id, candidate });
+    // 配る前の確かめで解決した店のタグ・処理・シナリオ。実行時の解決がこれと違えば書かない。
+    const expectedReferences = (await db.prepare('SELECT source_id,target_id,expected_revision FROM hq_template_preflight_resolutions WHERE preflight_id=? AND tenant_id=? AND source_id<>?')
+      .bind(item.preflight_id, job.tenant_id, kind).all<{ source_id: string; target_id: string | null; expected_revision: string | null }>()).results
+      .map(row => ({ sourceId: row.source_id, targetId: row.target_id, expectedRevision: row.expected_revision }));
+    const plan = await planRedistribution(db, { tenantId: job.tenant_id, templateId: job.template_id, kind, accountId: item.target_account_id, candidate, expectedReferences });
     const result = itemResult(plan);
     const statements: HqTemplateStatement[] = [
       guardStatement(actorCondition(job)),

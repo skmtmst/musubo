@@ -147,6 +147,48 @@ describe('対応表のある店への配り直し', () => {
     expect(fx.binding(id, 'b')).toMatchObject({ pending_version_id: v3, dismissed_version_id: v2 });
   });
 
+  test('お支払いも本部の版どおりに配り直し、決済をつないでいない店はお店で払うにする。店が変えたお支払いは上書きしない', async () => {
+    const id = await distributed();
+    const a = menuOf('a'), b = menuOf('b');
+    expect(count('SELECT COUNT(*) n FROM booking_payment_menu_settings')).toBe(0);
+    fx.f.raw.exec("INSERT INTO booking_payment_connections(line_account_id,provider,provider_account_id,connected_at) VALUES('a','stripe','acct_test_store_a','2026-11-15T00:00:00Z')");
+    fx.f.raw.prepare("INSERT INTO booking_payment_menu_settings(menu_id,line_account_id,mode,provider,created_at,updated_at) VALUES(?,'b','customer_choice','stripe','2026-11-15','2026-11-15')").run(b.id);
+    const v2 = await fx.save(id, menu({ paymentMode: 'online' }));
+    const p = await fx.check(id, ['a', 'b']);
+    expect(p.stores.map(s => [s.accountId, s.redistribution?.outcome])).toEqual([['a', 'apply'], ['b', 'pending']]);
+    expect((await fx.redistribute(id, [p.preflightId])).status).toBe(201);
+    await processHqDistributionJobs(fx.f.db);
+    const payment = (menuId: unknown) => fx.f.raw.prepare('SELECT mode,provider FROM booking_payment_menu_settings WHERE menu_id=?').get(menuId);
+    expect(payment(a.id)).toEqual({ mode: 'online', provider: 'stripe' });
+    expect(payment(b.id)).toEqual({ mode: 'customer_choice', provider: 'stripe' });
+    expect((await readCatalogTarget(fx.f.db, 'booking_menu', 'a', String(a.id)))!.hash).toBe(fx.binding(id, 'a')!.applied_snapshot_hash);
+    // 決済をつないでいない店が取り込むと、お店で払うで入る。
+    expect((await storeMenu(String(b.id), 'hq-adopt', v2, 'b')).status).toBe(200);
+    expect(payment(b.id)).toEqual({ mode: 'onsite', provider: 'onsite' });
+    // 本部が店のいつもの方法に戻すと、メニューの上書きを消して店の既定に戻す。
+    const v3 = await fx.save(id, menu({ paymentMode: 'default' }));
+    expect((await fx.redistribute(id, [(await fx.check(id, ['a', 'b'])).preflightId])).status).toBe(201);
+    await processHqDistributionJobs(fx.f.db);
+    expect(count('SELECT COUNT(*) n FROM booking_payment_menu_settings')).toBe(0);
+    expect([fx.binding(id, 'a')!.applied_version_id, fx.binding(id, 'b')!.applied_version_id]).toEqual([v3, v3]);
+  });
+
+  test('本部でひな形を消すと、店の状態の口は対応なしを返し、新しい版の知らせも取り込みも出さない', async () => {
+    const id = await distributed(['b']);
+    const b = menuOf('b');
+    fx.f.raw.prepare('UPDATE menus SET duration_minutes=80 WHERE id=?').run(b.id);
+    const v2 = await fx.save(id, menu({ base_price: 9000 }));
+    expect((await fx.redistribute(id, [(await fx.check(id, ['b'])).preflightId])).status).toBe(201);
+    await processHqDistributionJobs(fx.f.db);
+    expect(fx.binding(id, 'b')!.pending_version_id).toBe(v2);
+    const detail = await fx.hq<{ template: { revision: number } }>(`/${id}`);
+    expect((await fx.hq(`/${id}`, 'DELETE', { expectedRevision: detail.body.data.template.revision })).status).toBe(200);
+    const status = await fx.request<{ bound: boolean; detached: string | null }>(`/api/booking/admin/menus/${b.id}/hq-status?account_id=b`);
+    expect(status.body.data).toEqual({ bound: false, detached: 'template_archived' });
+    expect((await storeMenu(String(b.id), 'hq-adopt', v2, 'b')).body.error).toBe('hq_template_unavailable');
+    expect(fx.f.raw.prepare('SELECT duration_minutes,base_price,hq_template_id FROM menus WHERE id=?').get(b.id)).toEqual({ duration_minutes: 80, base_price: 3000, hq_template_id: null });
+  });
+
   test('閲覧のみ・担当外の店・代理ログインの読み取りでは取り込みも今のままもできない', async () => {
     const id = await distributed(['b']);
     const b = menuOf('b');
