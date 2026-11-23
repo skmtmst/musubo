@@ -437,6 +437,14 @@
 .detailColumns[data-presentation='notification'] { grid-template-columns: minmax(0, 1fr) var(--tpl-hb2-op-side-w); gap: var(--tpl-hb2-op-gap); margin-right: 0; }
 .detailColumns[data-presentation='notification'] .detailColumnMain { gap: var(--tpl-hb2-op-col-gap); }
 .detailColumns[data-presentation='notification'] .detailColumnAside { display: flex; flex-direction: column; gap: var(--tpl-hb2-op-col-gap); padding-left: 0; border-left: 0; }
+.detailColumns[data-detail-columns='followup-editor'] { margin-right: 0; }
+/* ダイアログはページコンテナの外に描画される。画面幅に合わせて見本を開閉する。 */
+@media (width < 1152px) {
+  .detailColumns[data-detail-columns='followup-editor'] { width: 100%; grid-template-columns: minmax(0, 1fr); gap: var(--tpl-body-pad); }
+  .detailColumns[data-detail-columns='followup-editor'] .detailColumnToggle { display: block; }
+  .detailColumns[data-detail-columns='followup-editor'] .detailColumnAside { display: none; grid-row: 2; min-height: 0; padding-left: 0; border-left: 0; }
+  .detailColumns[data-detail-columns='followup-editor'] .detailColumnAside[data-expanded] { display: block; }
+}
 @container v8-page (max-width: 1099px) {
   .detailColumns, .detailColumns[data-detail-columns^='restaurant-'] { grid-template-columns: minmax(0, 1fr); margin-right: 0; gap: var(--tpl-body-pad); }
   .detailColumns:is([data-presentation='card'], [data-presentation='notification']) { grid-template-columns: minmax(0, 1fr); }

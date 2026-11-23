@@ -138,6 +138,7 @@ describe('MJoJR メニュー管理のV8', () => {
   it('コースの既存画像を読めない場合は外し、店舗の登録写真を選び直せる', async () => {
     fixture.snapshot.mockResolvedValue({ data: { ...data, menuItems: data.menuItems.map(item =>
       item.id === 'm1' ? { ...item, image_media_id: 'missing-image' } : item) } })
+    vi.spyOn(api.folders, 'list').mockResolvedValue({ success: true, data: [] })
     vi.spyOn(api.media, 'list').mockResolvedValue({ success: true, data: {
       items: [
         { id: 'media-test', filename: '料理.png', lineAccountId: 'account-1', kind: 'image' },
@@ -157,9 +158,12 @@ describe('MJoJR メニュー管理のV8', () => {
     expect(screen.queryByText(warning)).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '写真を追加' }))
-    const photo = await screen.findByRole('option', { name: /料理.png/ })
-    expect(screen.queryByRole('option', { name: /別の店舗.png/ })).toBeNull()
+    const gallery = within(screen.getByRole('dialog', { name: 'コースの写真を選ぶ' }))
+    const photo = await gallery.findByRole('checkbox', { name: '料理.png' })
+    expect(gallery.queryByRole('checkbox', { name: '別の店舗.png' })).toBeNull()
     fireEvent.click(photo)
+    expect(photo.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(gallery.getByRole('button', { name: '1枚を追加' }))
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledExactlyOnceWith('account-1', 'm1',
       expect.objectContaining({ photos: [{ mediaId: 'media-test', x: 50, y: 50 }], expectedVersion: 1 })))

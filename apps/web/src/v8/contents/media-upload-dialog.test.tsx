@@ -16,6 +16,7 @@ const calls = vi.hoisted(() => ({
   prepare: [] as Array<{ accountId: string; files: Array<{ filename: string }> }>,
   put: [] as string[],
   complete: [] as Array<[string, { accountId: string; etag: string }]>,
+  photoIds: new Map<string, string>(),
   /** 送信の返事を握る口。ファイル名ごと。 */
   putAnswer: new Map<string, (progress: (value: number) => void) => Promise<string>>(),
 }))
@@ -36,9 +37,10 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         },
         completeUpload: async (sessionId: string, input: { accountId: string; etag: string }) => {
           calls.complete.push([sessionId, input])
-          return { success: true, data: { uploadSessionId: sessionId, status: 'completed', mediaId: null } }
+          return { success: true, data: { uploadSessionId: sessionId, status: 'completed', mediaId: calls.photoIds.get(sessionId) ?? null } }
         },
       },
+      fileScan: { ...actual.api.fileScan, forMedia: async () => ({ success: true, data: { scan: { status: 'clean' } } }) },
     },
   }
 })
@@ -69,6 +71,7 @@ beforeEach(() => {
   calls.prepare.length = 0
   calls.put.length = 0
   calls.complete.length = 0
+  calls.photoIds.clear()
   calls.putAnswer.clear()
   onComplete = vi.fn()
   onClose = vi.fn()
@@ -86,9 +89,10 @@ afterEach(() => {
 const settle = async () => {
   for (let i = 0; i < 6; i += 1) await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 }
-const render = async () => {
+const render = async (photoUpload?: React.ComponentProps<typeof MediaUploadDialog>['photoUpload']) => {
   await act(async () => root.render(
-    <MediaUploadDialog open accountId="account-a" folders={[]} initialFolderId="" onClose={onClose} onComplete={onComplete} />,
+    <MediaUploadDialog open accountId="account-a" folders={[]} initialFolderId="" onClose={onClose} onComplete={onComplete}
+      photoUpload={photoUpload} />,
   ))
   await settle()
 }
@@ -105,6 +109,28 @@ const press = async (text: string) => {
   await act(async () => { target.click() })
   await settle()
 }
+
+it('コース写真では残り枚数の範囲で画像だけ登録し、登録済み写真の枠を再選択時にも残す', async () => {
+  const onRegistered = vi.fn()
+  calls.photoIds.set('session-first.png', 'media-1')
+  calls.photoIds.set('session-second.png', 'media-2')
+  await render({ maxFiles: 2, onRegistered })
+  expect(dialog().querySelector<HTMLInputElement>('input[type="file"]')?.accept).toBe('image/png,image/jpeg,image/gif,image/webp')
+  expect(dialog().textContent).toContain('2枚まで追加できます')
+  const photo = (name: string) => new File(['test'], name, { type: 'image/png' })
+  await pick(photo('first.png'), new File(['test'], 'movie.mp4', { type: 'video/mp4' }))
+  expect(dialog().textContent).toContain('写真の形式を確認してください')
+  await press('1件を登録する')
+  expect(onRegistered).toHaveBeenCalledWith([{ id: 'media-1', scanStatus: 'clean' }])
+  await pick(photo('second.png'), photo('over-limit.png'))
+  expect(dialog().textContent).toContain('選択したファイル（2 / 2件）')
+  expect(dialog().textContent).toContain('first.png')
+  expect(dialog().textContent).not.toContain('over-limit.png')
+  await press('1件を登録する')
+  expect(onRegistered).toHaveBeenLastCalledWith([{ id: 'media-2', scanStatus: 'clean' }])
+  expect(calls.put).toEqual(['session-first.png', 'session-second.png'])
+  expect(dialog().querySelector<HTMLInputElement>('input[type="file"]')?.disabled).toBe(true)
+})
 const png = (name: string) => new File(['x'], name, { type: 'image/png' })
 
 describe('メディアを入れる窓', () => {

@@ -172,7 +172,6 @@ describe('V8 登録ウィザードの gated 進行', () => {
     calls.registrationReceipt.mockReturnValueOnce(confirmation.promise)
     enterCheckStep()
     expect(shownNode()).toBe('Lwxyh')
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
@@ -193,7 +192,6 @@ describe('V8 登録ウィザードの gated 進行', () => {
       .querySelector('[aria-current="step"]')?.textContent
     enterCheckStep()
     expect(current()).toContain('接続確認')
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
@@ -201,19 +199,21 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(screen.queryByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeNull()
   })
 
-  it('④のポップアップを閉じても、登録画面の「あとで設定する」で保留を保存して⑤へ進める', async () => {
+  it('④のポップアップを閉じても、スタイルを選ぶまでは⑤へ進まない', async () => {
     enterCheckStep()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
     fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeNull())
-    const skip = screen.getByRole('button', { name: 'あとで設定する' }) as HTMLButtonElement
-    await waitFor(() => expect(skip.disabled).toBe(false))
-    fireEvent.click(skip)
+    expect(screen.queryByRole('button', { name: 'あとで設定する' })).toBeNull()
+    expect(screen.queryByText('LINEアカウントの登録が完了しました')).toBeNull()
+    expect(calls.styleSave).not.toHaveBeenCalled()
+    const stickyBar = document.querySelector<HTMLElement>('[data-shared-part="sticky-bar"]')!
+    fireEvent.click(within(stickyBar).getByRole('button', { name: 'スタイルを選ぶ' }))
+    await chooseStyle('飲食店')
     expect(await screen.findByText('LINEアカウントの登録が完了しました')).toBeTruthy()
-    expect(calls.styleSave).toHaveBeenCalledExactlyOnceWith('new-account', { expectedVersion: 0, styleMode: 'later' })
+    expect(calls.styleSave).toHaveBeenCalledExactlyOnceWith('new-account', { expectedVersion: 0, style: 'restaurant', answers: { image: { mode: 'later' } } })
     expect(sessionStorage.getItem('musubo-registration-style')).toBeNull()
   })
 
@@ -228,7 +228,6 @@ describe('V8 登録ウィザードの gated 進行', () => {
     nextStep()
     nextStep()
     nextStep()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
@@ -238,7 +237,6 @@ describe('V8 登録ウィザードの gated 進行', () => {
   it('友だち人数があっても今回の受信が未確認なら自動で進まない', async () => {
     calls.registrationReceipt.mockResolvedValue(waitingReceipt)
     enterCheckStep()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
@@ -255,7 +253,6 @@ describe('V8 登録ウィザードの gated 進行', () => {
       .mockResolvedValueOnce({ success: true, data: { status: 'error', receivedAt: null } })
       .mockRejectedValueOnce(new Error('temporary connection error'))
     enterCheckStep()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {
@@ -394,7 +391,6 @@ describe('V8 登録ウィザードの gated 進行', () => {
     enterCheckStep()
     expect(screen.queryByRole('button', { name: '登録する' })).toBeNull()
     expect(calls.connect).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     expect(document.querySelectorAll('[data-phase="ok"]').length).toBe(5)
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
@@ -408,7 +404,6 @@ describe('V8 登録ウィザードの gated 進行', () => {
     calls.stepFollowerImport.mockResolvedValue({ success: true, data: { state: { capability: 'available', phase: 'completed', received: 10, imported: 10 }, busy: false, profilesFetched: 10 } })
     enterCheckStep()
     fireEvent.click(screen.getByRole('checkbox', { name: 'いまの友だちの引き継ぎ' }))
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await chooseStyle('飲食店')
@@ -435,7 +430,6 @@ describe('V8 登録ウィザードの gated 進行', () => {
       },
     })
     enterCheckStep()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
     // 行の文字は止まった時点で出るが、案内は5行の演出が終わってから出る。
     expect(await screen.findByText('「Webhookの利用」をONにしてください', {}, { timeout: 5000 })).toBeTruthy()

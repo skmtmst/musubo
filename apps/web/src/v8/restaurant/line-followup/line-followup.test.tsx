@@ -4,6 +4,7 @@ import { act,cleanup,fireEvent,render,screen,waitFor,within } from '@testing-lib
 import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest'
 import { defaultRestaurantReservationForm,type RestaurantFollowupTrigger } from '@line-crm/shared'
 import { ApiError } from '@/lib/api/transport/errors'
+import { GuideSharedProvider } from '@/v8/onboarding/public/guide-shared/index'
 const f=vi.hoisted(()=>({role:'owner' as string|null,account:'a',store:'s',read:vi.fn(),saveForm:vi.fn(),initialize:vi.fn(),saveRow:vi.fn(),test:vi.fn(),start:vi.fn(),notUsing:vi.fn(),push:vi.fn()}))
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:f.account})}))
 vi.mock('@/lib/staff-role',()=>({useStaffRole:()=>f.role}))
@@ -35,6 +36,51 @@ async function edit(trigger:RestaurantFollowupTrigger='reservation_created'){fir
 async function text(value:string){const field=screen.getByRole('textbox',{name:'本文'});await act(async()=>{field.textContent=value;fireEvent.input(field)})}
 async function accept(){fireEvent.click(screen.getByRole('button',{name:'この内容でオンにする'}));await waitFor(()=>expect(screen.queryByRole('button',{name:'この内容でオンにする'})).toBeNull())}
 async function save(){fireEvent.click(screen.getByRole('button',{name:'保存して作る'}));await screen.findByRole('dialog',{name:'保存の結果'})}
+
+describe('開店準備の案内', () => {
+ const guideAt = (procedureIndex: number) => ({
+  phase: 'active' as const, stepKey: 'followup', procedureIndex, anchor: null, pausedAnchor: null,
+  start: vi.fn(), startAt: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(), advanceProcedure: vi.fn(),
+ })
+
+ it('初回はオフで始まり、本文の確定まで一覧を変えず、選んだ送り方だけを保存する', async () => {
+  snapshot.board.engines = []
+  snapshot.page.rows.forEach(row => { row.enabled = false })
+  const guide = guideAt(1)
+  const view = render(<GuideSharedProvider value={{ guide, summary: null }}><LineFollowupV8 /></GuideSharedProvider>)
+  await screen.findByRole('article', { name: '予約の回答フォーム' })
+  const toggle = within(card('reservation_created')).getByRole('switch')
+  expect(toggle.getAttribute('aria-checked')).toBe('false')
+  expect((screen.getByRole('button', { name: '保存して作る' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(toggle)
+  view.rerender(<GuideSharedProvider value={{ guide: { ...guide, procedureIndex: 2 }, summary: null }}><LineFollowupV8 /></GuideSharedProvider>)
+  const body = screen.getByRole('textbox', { name: '本文' })
+  expect(body.closest('[data-guide-anchor="followup.body"]')?.hasAttribute('data-guide-ready')).toBe(true)
+  expect(toggle.getAttribute('aria-checked')).toBe('false')
+  expect(f.initialize).not.toHaveBeenCalled()
+  view.rerender(<GuideSharedProvider value={{ guide: { ...guide, procedureIndex: 3 }, summary: null }}><LineFollowupV8 /></GuideSharedProvider>)
+  expect(screen.getByRole('button', { name: 'この内容でオンにする' }).getAttribute('data-guide-anchor')).toBe('followup.confirm')
+  await accept()
+  expect(toggle.getAttribute('aria-checked')).toBe('true')
+  expect(f.initialize).not.toHaveBeenCalled()
+  await save()
+  expect(f.initialize).toHaveBeenCalledWith('a', 's', expect.arrayContaining([
+   expect.objectContaining({ trigger: 'reservation_created', input: expect.objectContaining({ enabled: true }) }),
+   expect.objectContaining({ trigger: 'reservation_24h', input: expect.objectContaining({ enabled: false }) }),
+  ]))
+  expect(f.test).not.toHaveBeenCalled()
+  expect(f.start).not.toHaveBeenCalled()
+ })
+
+ it('途中から開いたときに未保存の編集窓がなければ、最初の案内へ戻す', async () => {
+  const guide = guideAt(3)
+  render(<GuideSharedProvider value={{ guide, summary: null }}><LineFollowupV8 /></GuideSharedProvider>)
+  await waitFor(() => expect(guide.startAt).toHaveBeenCalledWith('followup'))
+  expect(f.initialize).not.toHaveBeenCalled()
+  expect(f.saveRow).not.toHaveBeenCalled()
+ })
+})
+
 describe('8枚のカードと保存',()=>{
  it('状態の応答が欠けた時は画面を壊さず、読み直す理由を出して保存しない',async()=>{f.read.mockResolvedValue({...snapshot,board:{...snapshot.board,engines:undefined}});render(<LineFollowupV8/>);await screen.findByText('送り方の状態を読み込めませんでした。読み直してください');expect(screen.queryByRole('article')).toBeNull();expect(screen.getByRole('button',{name:'読み直す'})).toBeTruthy();expect(f.saveRow).not.toHaveBeenCalled();expect(f.initialize).not.toHaveBeenCalled()})
  it('予約フォームは切り替え無し、残る7枚は実物の中身と状態を表示する',async()=>{await ready();expect(screen.getAllByRole('article')).toHaveLength(8);expect(screen.getAllByRole('switch')).toHaveLength(7);expect(within(screen.getByRole('article',{name:'予約の回答フォーム'})).queryByRole('switch')).toBeNull();expect(within(card('reservation_created')).getByText('予約したときの本文')).toBeTruthy();expect(screen.getAllByText('準備済み・送信停止中')).toHaveLength(2)})

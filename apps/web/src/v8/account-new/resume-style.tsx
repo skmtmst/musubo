@@ -15,13 +15,13 @@ export default function ResumeRegistrationStyle({ accountId }: { accountId: stri
   const { accounts } = useAccount()
   const accountName = accounts.find(account => account.id === accountId)?.name
   const state = useRegistrationStyle(accountId, true)
-  const [done, setDone] = useState<'saved' | 'skipped' | null>(null)
+  const [done, setDone] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(true)
-  const finish = async (action: 'save' | 'skip') => {
-    if (await state[action]()) { setDialogOpen(false); setDone(action === 'save' ? 'saved' : 'skipped') }
+  const finish = async () => {
+    if (await state.save()) { setDialogOpen(false); setDone(true) }
   }
   return <PageFrame kind="wizard" boardId="X0pGdw">
-    <PageHeading title={done === 'saved' ? '使い方を保存しました' : done === 'skipped' ? '登録が完了しました' : '使い方を選ぶ'} />
+    <PageHeading title={done ? '使い方を保存しました' : '使い方を選ぶ'} />
     <PageContent layout="stats">
       <Notice tone="info">LINEアカウントは登録済みです。使い方はあとから設定で変更できます。</Notice>
       {state.error ? <ListState kind="error" title="使い方を確認・保存できませんでした" error={state.error} onRetry={state.reload} /> : null}
@@ -35,8 +35,7 @@ export default function ResumeRegistrationStyle({ accountId }: { accountId: stri
           ready={state.version !== null}
           error={state.error}
           onChoose={state.setChoice}
-          onSave={() => void finish('save')}
-          onSkip={() => void finish('skip')}
+          onSave={finish}
           onClose={() => setDialogOpen(false)}
         />
       </>}
@@ -44,7 +43,6 @@ export default function ResumeRegistrationStyle({ accountId }: { accountId: stri
     </PageContent>
     {!done ? <StickyBar actions={<>
       <Button type="button" onClick={() => setDialogOpen(true)} disabled={state.busy}>スタイルを選ぶ</Button>
-      <Button type="button" onClick={() => void finish('skip')} disabled={state.busy || state.version === null} busy={state.busy}>あとで設定する</Button>
     </>} /> : null}
     {!done ? <RegistrationUnsavedGuard dirty={state.dirty} busy={state.busy} onDiscard={state.discard} /> : null}
   </PageFrame>
