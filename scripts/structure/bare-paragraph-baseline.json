@@ -180,18 +180,6 @@
     "reason": "notice.module.css: .notice font-size: var(--text-label)"
   },
   {
-    "file": "apps/web/src/components/shared/booking-confirm-dialogs.tsx",
-    "fingerprint": "1eeb1707eb9c0f8e6ce77cf9a3d9db3cc60b35a7cdce2555faa3b223f952c05b",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/components/shared/booking-confirm-dialogs.tsx",
-    "fingerprint": "21fff2c7ba73bc6a3c7fa287b6f345aa4aac07666ab4636e5096d8f232fab7f5",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
     "file": "apps/web/src/components/shared/composer-stickers.tsx",
     "fingerprint": "277568c41bab938d2800faa5bca4adca883eb47d366ad850827cdbfb3383fe69",
     "count": 1,
@@ -774,18 +762,6 @@
     "reason": "notice.module.css: .notice font-size: var(--text-label)"
   },
   {
-    "file": "apps/web/src/v8/booking-menus/tabs/hours-copy-dialog.tsx",
-    "fingerprint": "1198e731f4121f7dc1b2df356a9bf34174dd3ea5f380ec307640c72f1bd4cd0e",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/v8/booking-menus/tabs/hours-copy-dialog.tsx",
-    "fingerprint": "11cb0536e5f979611000a43897710fe03073167285c9313b8b584faca3d52c5f",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
     "file": "apps/web/src/v8/booking-menus/tabs/hours-tab.tsx",
     "fingerprint": "2f3764261c8980c9a926cd164c440c9f3a2e1d08e5b2f0b9865de6a9671262e9",
     "count": 1,
@@ -1053,7 +1029,7 @@
     "file": "apps/web/src/v8/hq-starter-sets/legacy-details.tsx",
     "fingerprint": "5437c43e621cfe71f823ff470922c8ac12e2e9e5b4084d8f703643225d2a6287",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "親の一覧が本文サイズを指定"
   },
   {
     "file": "apps/web/src/v8/hq-store-compare/list.tsx",
@@ -1078,18 +1054,6 @@
     "fingerprint": "870cd4a5ef0b34034362ebd8d9d60b4162da5b7686388c55f857ca023b36e600",
     "count": 1,
     "reason": "styles.warning: var(--text-label)"
-  },
-  {
-    "file": "apps/web/src/v8/hq/account-dialogs.tsx",
-    "fingerprint": "458fe94e615a92f1d0f0952a129737ba400a406da4b4f714cfd62881242ac434",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/v8/hq/account-dialogs.tsx",
-    "fingerprint": "bbc20609cb077ad76b8e9be228e726a81d3cf5ba79a733f51a0ef6ab466d9c8e",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
   },
   {
     "file": "apps/web/src/v8/hq/last-line-end.tsx",
@@ -1461,7 +1425,7 @@
     "file": "apps/web/src/v8/onboarding/pricing.tsx",
     "fingerprint": "316918965dee40a7669f677b8412681b0d0e5aadeb8ab4aa115e635440715777",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "親の detailBlock が本文サイズを指定"
   },
   {
     "file": "apps/web/src/v8/onboarding/pricing.tsx",
@@ -1473,7 +1437,7 @@
     "file": "apps/web/src/v8/onboarding/pricing.tsx",
     "fingerprint": "8fe34910a45372bd2bc049c373be71e4e1252bce79147b241cbf78f0df40b441",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "親の detailBlock が本文サイズを指定"
   },
   {
     "file": "apps/web/src/v8/onboarding/pricing.tsx",
@@ -1485,19 +1449,19 @@
     "file": "apps/web/src/v8/onboarding/pricing.tsx",
     "fingerprint": "b28f1d6aa6805427e4619979de634d5734cad97b89868f4fdad304597ff6c35f",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "親の detailBlock が本文サイズを指定"
   },
   {
     "file": "apps/web/src/v8/onboarding/pricing.tsx",
     "fingerprint": "c5b2bef633a159d3f921ee7ef9e3bf527ed6b27a5c67a5f5c0f03bac1c1e9ee6",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "親の detailBlock が本文サイズを指定"
   },
   {
     "file": "apps/web/src/v8/onboarding/pricing.tsx",
     "fingerprint": "e7f426614850b2692886c455bb9a0ef484f48fb3672afde4151f12359a43e527",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "親の detailBlock が本文サイズを指定"
   },
   {
     "file": "apps/web/src/v8/onboarding/style-setting-demo.tsx",
