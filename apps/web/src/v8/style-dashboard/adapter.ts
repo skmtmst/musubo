@@ -5,10 +5,11 @@ import { paymentAnalytics, paymentAnalyticsSide } from './analytics-payments'
 import { dailyAnalyticsSeries } from './analytics-daily'
 import type { StyleAnalyticsData, StyleBooking, StyleCard, StyleMetric, StyleSchedule, StyleScheduleEntry, StyleSnapshot } from '@line-crm/shared'
 import type {
-  DashboardRange, IndustryStyle, StyleAnalytics, StyleBadge, StyleBoard, StyleKpi, StyleLayout, StyleMonth, StyleMonthDay, StyleRow, StyleSideCard, StyleToday, StyleWeek,
+  DashboardRange, IndustryStyle, StyleAnalytics, StyleBadge, StyleBoard, StyleKpi, StyleLayout, StyleMonth, StyleMonthDay, StyleRow, StyleSideBooking, StyleSideCard, StyleToday, StyleWeek,
 } from './model'
-import { formatNumber } from '@/lib/format'
+import { formatCount, formatListTimestamp, formatNumber } from '@/lib/format'
 import { withHonorific } from '@line-crm/shared'
+import { sourceName as ledgerSourceName } from '@/v8/restaurant/reservations/public/format/index'
 
 /*
  * 口（API 組4）の生の値 → 画面の形（API-CONTRACT-4 §10 の「共通のアダプター」）。
@@ -26,7 +27,6 @@ function parts(iso: string, tz: string) {
   return { date, time: `${p.hour}:${p.minute}`, month: Number(p.month), day: Number(p.day), week: WEEK[new Date(`${date}T00:00:00Z`).getUTCDay()] }
 }
 export const hm = (iso: string, tz: string) => parts(iso, tz).time
-const md = (iso: string, tz: string) => { const p = parts(iso, tz); return `${p.month}/${String(p.day).padStart(2, '0')}（${p.week}）` }
 const dayLabel = (date: string) => { const d = new Date(`${date}T00:00:00Z`); return `${d.getUTCMonth() + 1}/${d.getUTCDate()}（${WEEK[d.getUTCDay()]}）` }
 
 const isRate = (m?: StyleMetric) => Boolean(m && (m.unit === '' || m.unit === 'ratio' || m.unit === '%' || m.unit === '率' || m.unit === '割合') && m.denominator !== undefined)
@@ -268,22 +268,78 @@ function monthOf(sch: StyleSchedule, selected: string, now: Date, rows: StyleRow
   }
 }
 
-function sideFor(style: IndustryStyle, s: StyleSnapshot, sch: StyleSchedule, href: string): StyleSideCard[] {
-  const tz = s.timeZone
-  const fresh: StyleSideCard = {
-    id: 'new', title: '新着予約（今日入った）', help: NEW_HELP, link: { label: '一覧', href },
-    rows: s.newBookings.length ? s.newBookings.slice(0, 3).map((b) => ({ label: `${md(b.startsAt, tz)} ${hm(b.startsAt, tz)}`, value: style === 'restaurant' ? `${withHonorific(b.name, 'さま')} ${b.partySize}名` : `${withHonorific(b.name, 'さま')}` })) : [{ label: 'まだありません', value: '' }],
+/** 右の列に出す新着予約の行の数。総数は別に持つ（行の数で数えない）。 */
+const SIDE_BOOKINGS = 3
+
+/** 新着予約を予約が入った新しい順に並べる。口が来店の順で返しても「最新」を取り違えない。読めない日時は最後。 */
+export function newestRequestedFirst(bookings: readonly StyleBooking[]): StyleBooking[] {
+  const at = (b: StyleBooking) => { const t = Date.parse(b.requestedAt); return Number.isFinite(t) ? t : -Infinity }
+  return bookings.slice().sort((a, b) => (at(b) - at(a)) || a.id.localeCompare(b.id))
+}
+
+const peopleText = (b: StyleSideBooking) => (b.people === null ? null : formatCount(b.people, '名'))
+
+/*
+ * 右の列の見出しの期間の言葉は、数えた元（口が返した期間と範囲）から決める。今を含む期間だけ「今日・今週・今月」と呼び、
+ * 過去や先の日・週・月を選んだ時は「この日・この週・この月」にする（見出しと数えた期間を食い違わせない）。
+ * 期間が読めない時も「今日」とは言い切らない。
+ */
+const SELECTED_WORD: Record<DashboardRange, string> = { today: 'この日', week: 'この週', month: 'この月' }
+export function periodWord(window: { from: string; to: string; range?: string }, fallback: DashboardRange, now: Date): { word: string; current: boolean } {
+  const range: DashboardRange = window.range === 'today' || window.range === 'week' || window.range === 'month' ? window.range : fallback
+  const from = Date.parse(window.from), to = Date.parse(window.to), at = now.getTime()
+  const current = Number.isFinite(from) && Number.isFinite(to) && from <= at && at < to
+  return { word: (current ? RANGE_WORD : SELECTED_WORD)[range], current }
+}
+
+/** 新着予約の見出しの期間（「今日入った」「この日に入った」など）。 */
+export function newBookingsPeriod(s: Pick<StyleSnapshot, 'from' | 'to' | 'range'>, range: DashboardRange, now: Date): string {
+  const { word, current } = periodWord(s, range, now)
+  return current ? `${word}入った` : `${word}に入った`
+}
+
+/** 経路の札の名前。飲食は予約台帳と同じ言葉（手入力の予約＝手動・Google など）。台帳に無い値とほかの業種は共通の札の言葉に任せる。 */
+export function sideSourceName(style: IndustryStyle, source: string): string | undefined {
+  if (style !== 'restaurant' || !source) return undefined
+  const name = ledgerSourceName(source)
+  return name === source ? undefined : name
+}
+
+/** 中身が無い（なし・—）要約。灰色で出し、閉じていても中身のある項目と見分けられるようにする。 */
+const NONE_SUMMARY = { text: 'なし', empty: true } as const
+const UNKNOWN_SUMMARY = { text: '—', empty: true } as const
+
+/** 新着予約：本当の件数・入った新しい順の代表の行・閉じた時の要約（件数と最新の1件。0件は「なし」）。 */
+function freshSide(style: IndustryStyle, s: StyleSnapshot, href: string, range: DashboardRange, now: Date): StyleSideCard {
+  const bookings: StyleSideBooking[] = newestRequestedFirst(s.newBookings).slice(0, SIDE_BOOKINGS).map((b) => ({
+    id: b.id, when: formatListTimestamp(b.startsAt, { timeZone: s.timeZone, now }), name: withHonorific(b.name, 'さま'),
+    people: style === 'restaurant' ? b.partySize : null, source: b.source, sourceName: sideSourceName(style, b.source),
+  }))
+  const count = s.newBookings.length
+  const latest = bookings[0]
+  return {
+    id: 'new', title: `新着予約（${newBookingsPeriod(s, range, now)}）`, help: NEW_HELP, link: { label: '一覧', href },
+    rows: bookings.length ? bookings.map((b) => ({ label: b.when, value: [b.name, peopleText(b)].filter(Boolean).join(' ') })) : [{ label: 'まだありません', value: '' }],
+    count, bookings,
+    summary: latest ? { text: `${formatCount(count, '件')}・最新 ${[latest.when, latest.name, peopleText(latest)].filter(Boolean).join(' ')}` } : NONE_SUMMARY,
   }
-  const pay: StyleSideCard = { id: 'pay', title: 'お支払い（今日）', help: '今日の入金はオンライン（Stripe）で受け取った額です。売上（料金×確定数）とは別の数です。', rows: [{ label: '今日の入金・未払い・返金', value: '—' }], action: { label: 'お支払いを見る', icon: 'send' } }
+}
+
+function sideFor(style: IndustryStyle, s: StyleSnapshot, sch: StyleSchedule, href: string, range: DashboardRange, now: Date): StyleSideCard[] {
+  const tz = s.timeZone
+  const fresh = freshSide(style, s, href, range, now)
+  const pay: StyleSideCard = { id: 'pay', title: 'お支払い（今日）', help: '今日の入金はオンライン（Stripe）で受け取った額です。売上（料金×確定数）とは別の数です。', rows: [{ label: '今日の入金・未払い・返金', value: '—' }], action: { label: 'お支払いを見る', icon: 'send' }, summary: UNKNOWN_SUMMARY }
   const cards = [fresh, pay]
   // 口（summary・schedule）から返らないカードは消さずに置き、値は「—」。押すと準備中の窓（口が要る）。
-  const waiting = (id: string, title: string, rows: string[], action: string): StyleSideCard => ({ id, title, rows: rows.map((label) => ({ label, value: '—' })), action: { label: action, icon: 'send' } })
+  const waiting = (id: string, title: string, rows: string[], action: string): StyleSideCard => ({ id, title, rows: rows.map((label) => ({ label, value: '—' })), action: { label: action, icon: 'send' }, summary: UNKNOWN_SUMMARY })
   if (style === 'restaurant') cards.push(waiting('care', '今日気をつけること', ['アレルギー', '記念日', '無断歴あり'], 'くわしく見る'), waiting('waitlist', '席のキャンセル待ち', ['待っている人'], '空きを知らせる'))
   if (style === 'salon') cards.push(waiting('rebook', '次回予約がまだ', ['今日来た人のうち次の予約がまだ'], 'LINE で次回を案内する'))
   if (style === 'consult') {
     const availableSlots = bookableScheduleSlots(sch)
     const byCol = sch.columns.map((c) => { const slots = availableSlots.filter((x) => x.columnId === c.id).sort((a, b) => a.startsAt.localeCompare(b.startsAt)); return slots.length ? { label: c.name, value: `${hm(slots[0].startsAt, tz)}〜${hm(slots.at(-1)!.endsAt, tz)}` } : null }).filter((x): x is { label: string; value: string } => Boolean(x))
-    cards.push({ id: 'free', title: '今日の空き', rows: byCol.length ? byCol : [{ label: sch.availability.status === 'available' ? '空きはありません' : '空きを出せません', value: '' }] })
+    // 開いた中身は理由の文、閉じた要約は空の値の言葉（空き0は「なし」、出せない時は「—」）。見出しの期間は予定表の期間から。
+    const known = sch.availability.status === 'available'
+    cards.push({ id: 'free', title: `${periodWord(sch, range, now).word}の空き`, rows: byCol.length ? byCol : [{ label: known ? '空きはありません' : '空きを出せません', value: '' }], summary: byCol.length ? { text: byCol.map((x) => `${x.label} ${x.value}`).join('・') } : known ? NONE_SUMMARY : UNKNOWN_SUMMARY })
   }
   return cards
 }
@@ -307,7 +363,7 @@ export function toToday(style: IndustryStyle, s: StyleSnapshot, sch: StyleSchedu
     week: sch.calendarView === 'week' || range === 'week' || (sch.display === 'calendar' && sch.calendarView === 'day') ? weekOf(sch, now) : null,
     month: range === 'month' ? monthOf(sch, selected, now, dayRows) : null,
     roster: null,
-    side: sideFor(style, s, sch, LINKS[style]),
+    side: sideFor(style, s, sch, LINKS[style], range, now),
   }
 }
 
