@@ -157,6 +157,17 @@ describe('V8 仮押さえ・日付・来店履歴', () => {
     const scoped = '/api/restaurant-test/reservations/holds?account_id=account-2';
     expect((await requestAs(scoped, 'operator-key', { ...hold, storeId:'store-yokohama', allergies: [{ kind: 'other', value: 'キウイ' }] })).status).toBe(400);
   });
+  it('選択中のアカウントと異なる店舗では店舗側の候補を検証する', async () => {
+    seedRestaurantFixture();
+    testDb.raw.prepare("INSERT INTO rt_opening_hours_settings (store_id, hours_json, updated_by) VALUES ('store-ginza', '[]', 'test')").run();
+    const { saveVersionedAccountSetting } = await import('@line-crm/db');
+    for (const [accountId, option] of [['account-1', '大豆'], ['account-2', 'キウイ']]) {
+      await saveVersionedAccountSetting(testDb.db, { accountId: accountId!, key: 'friend.allergy_options_v1', data: [option], expectedVersion: 0 });
+    }
+    const endpoint = '/api/restaurant-test/reservations/holds?account_id=account-1';
+    expect((await request(endpoint, { ...hold, allergies: [{kind:'option',value:'大豆'}] })).status).toBe(400);
+    expect((await request(endpoint, { ...hold, allergies: [{kind:'option',value:'キウイ'}] })).status).toBe(201);
+  });
   it('候補から削除された値も、すでに予約にあるときは編集で保持できる', async () => {
     seedRestaurantFixture();
     testDb.raw.prepare("INSERT INTO rt_opening_hours_settings (store_id, hours_json, updated_by) VALUES ('store-ginza', '[]', 'test')").run();
