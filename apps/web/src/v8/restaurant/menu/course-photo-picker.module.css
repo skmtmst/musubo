@@ -73,8 +73,8 @@
 }
 
 .picked {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -2px;
+  outline: var(--polish-focus-width) solid var(--color-accent);
+  outline-offset: calc(-1 * var(--polish-focus-width));
 }
 
 li.photo > .choice[data-shared-button][role='checkbox'] {

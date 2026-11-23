@@ -7,6 +7,7 @@ import Card from '@/components/shared/card'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Link from '@/components/shared/list-navigation'
+import { InlineLoadFailure } from '@/components/shared/target-missing'
 import { qrToDataURL } from '@/lib/qr-image'
 import { resolveOfficialProfileUrl } from '@/components/dashboard/qr-dialog'
 import styles from './guide-last-step.module.css'
@@ -64,13 +65,13 @@ export function GuideReceiveFirstMessage({ basicId, step, total, watchExpired, o
       footer={<DialogActions><Button variant="text" size="inline" onClick={onLater}>あとで</Button></DialogActions>}
     >
       <div className={styles.receive}>
-        {qrError ? <Card surface="muted" corner="control" padding="roomy" role="alert" data-design-node="u2ajkD">
-          <div className={styles.qrError}>
-            <strong>QRコードを表示できませんでした</strong>
-            <p>LINEアカウントの接続を確認してから、もう一度お試しください。</p>
-            <Button busy={retrying} busyLabel="読み込んでいます" onClick={() => void retry()}>もう一度読み込む</Button>
-          </div>
-        </Card> : <>
+        {qrError ? <InlineLoadFailure
+          title="QRコードを表示できませんでした"
+          description="LINEアカウントの接続を確認してから、もう一度お試しください。"
+          retrying={retrying}
+          onRetry={() => void retry()}
+          data-design-node="u2ajkD"
+        /> : <>
         <div className={styles.receiveInstructions}>
           {currentResult?.qr ? <img className={styles.qr} src={currentResult.qr} alt="友だち追加のQRコード" width={150} height={150} />
               : <ListState kind="loading" title="QRコードを用意しています" />}
