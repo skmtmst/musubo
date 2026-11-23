@@ -481,7 +481,7 @@
 
 ## 反映履歴
 
-- [飲食店の新着予約の確認](release-log/unreleased/PR-kenta-new-booking-ack.md) — 反映履歴。
+- [飲食店の新着予約の確認](release-log/unreleased/214-kenta-new-booking-ack.md) — 反映履歴。
 
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
 
