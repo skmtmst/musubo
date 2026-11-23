@@ -1,6 +1,6 @@
 'use client'
 import { useInboxPreview } from './use-reservation-warning'
-import { InboxSendPreview, InboxUnresolvedNotice } from './send-preview'
+import { InboxResolvedText, InboxUnresolvedNotice } from './send-preview'
 import { useInsertTokenNames } from '@/lib/use-insert-token-names'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
@@ -253,7 +253,7 @@ function MobileTalkThread() {
         aria-label="メッセージを入力"
         aria-invalid={overLimit}
       />
-      <InboxSendPreview preview={preview} content={draft.messageContent} tokenNames={tokenNames} scope={selectedChatId} />
+      <InboxResolvedText preview={preview} content={draft.messageContent} tokenNames={tokenNames} scope={selectedChatId} />
       <div className={styles.composerRow}>
         <AttachMenu disabled={sending} onPick={(file, slot) => void draft.handlePickAttachment(file, slot)} />
         <span className={styles.count} data-over={overLimit || undefined} title={ATTACH_NOTE}>

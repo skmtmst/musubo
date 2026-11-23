@@ -1,7 +1,7 @@
 'use client'
 
 import { useInboxPreview } from './use-reservation-warning'
-import { InboxSendPreview, InboxUnresolvedNotice } from './send-preview'
+import { InboxResolvedText, InboxUnresolvedNotice } from './send-preview'
 import { CHAT_INSERT_TOKENS } from './chat-inserts'
 import { InsertText } from '@/components/shared/insert-text-field'
 import { terms } from '@/lib/terms'
@@ -340,7 +340,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
         tokenNames={tokenNames}
         extraTokens={CHAT_INSERT_TOKENS}
         markUnknown />
-      <InboxSendPreview preview={preview} content={messageContent} tokenNames={tokenNames} scope={selectedChatId} />
+      <InboxResolvedText preview={preview} content={messageContent} tokenNames={tokenNames} scope={selectedChatId} />
 
       <InboxDraftCount
       >

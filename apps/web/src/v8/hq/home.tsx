@@ -343,7 +343,7 @@ export default function HqHomeV8() {
     : connectionUnconfirmed && connectionTotal !== null ? null
       : connectionUnconfirmed ? `未確認 ${formatNumber(connectionUnconfirmed)} 件`
       : connectionTotal === null ? '接続の問題を確認できません' : null
-  const connectionBadge = connectionUnconfirmed && connectionTotal !== null && !(loadError || attentionError)
+  const connectionBadgeText = connectionUnconfirmed && connectionTotal !== null && !(loadError || attentionError)
     ? `${connectionTotal > 0 ? '要確認・' : ''}未確認 ${formatNumber(connectionUnconfirmed)}` : undefined
 
   /* 所属は1つ。アーカイブを除く同じ一覧で、すべて・フォルダ・未分類を数える。 */
@@ -576,7 +576,7 @@ export default function HqHomeV8() {
         <KpiCard title="アカウント" value={accountsReadable ? currentAccounts.length : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : null} />
         <KpiCard title="友だち合計" value={accountsReadable ? totals.friends : null} loading={loading} unit="人" detail={loadError ? '読み込めませんでした' : totals.friends === null ? '件数は分かりません' : null} help="アーカイブを除くアカウントの合計" />
         <KpiCard title="今月の配信" value={accountsReadable ? totals.messages : null} loading={loading} unit="通" detail={loadError ? '読み込めませんでした' : totals.messages === null ? '件数は分かりません' : null} />
-        <KpiCard title="接続に問題" value={accountsReadable ? connectionTotal : null} loading={loading} unit="件" detail={connectionDetail} badge={connectionBadge} badgeTone="warning" valueTone={connectionTotal !== null && connectionTotal > 0 ? 'warning' : 'default'} actionPlacement="value-row" action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
+        <KpiCard title="接続に問題" value={accountsReadable ? connectionTotal : null} loading={loading} unit="件" detail={connectionDetail} badge={connectionBadgeText} badgeTone="warning" valueTone={connectionTotal !== null && connectionTotal > 0 ? 'warning' : 'default'} actionPlacement="value-row" action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
       </KpiBand>
 
       {accountsReadable && accounts.length > 0 ? <ListToolbarFrame layout="stacked">

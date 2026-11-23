@@ -24,7 +24,7 @@ export function InboxUnresolvedNotice({ preview, tokenNames }: { preview: InboxP
  * 会話を読む場所を残すため2行で切り、［全文を見る］（見出しの行）で改行ごと全部を読む。
  * 生の {{…}} は本文にも title にも出さない。
  */
-export function InboxSendPreview({ preview, content, tokenNames, scope }: { preview: InboxPreview; content: string; tokenNames: InsertTokenNames; scope: string | null }) {
+export function InboxResolvedText({ preview, content, tokenNames, scope }: { preview: InboxPreview; content: string; tokenNames: InsertTokenNames; scope: string | null }) {
   /*
    * 全文の窓は開いた時の相手・本文・結果に結び付ける。どれかが変わったら開いていた印を捨てる
    * （新しい結果で古い窓を出さず、前の相手・本文へ戻っても勝手に開き直さない）。
