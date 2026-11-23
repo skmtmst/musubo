@@ -133,3 +133,14 @@ test('役割と権限では名前と役割を分けて一度ずつ表示し、�
   expect(row.textContent?.match(/管理者/g)).toHaveLength(1)
   expect(row.querySelector('button[aria-label="架空 花子の操作"]')).toBeTruthy()
 })
+
+test('ユーザーの検索・状態・招待は共通の1行にまとめる', async () => {
+  net.users.mockResolvedValue({ success: true, data: { items: [user(1)], pagination: { total: 1, limit: 200, offset: 0 }, summary: { active: 1, suspended: 0, mfaEnabled: 0, invited: 0 } } })
+  const { container } = render(<StaffV8 />)
+  await screen.findByRole('table', { name: 'ユーザーの一覧' })
+  const toolbar = container.querySelector('[data-toolbar-single-row]')!
+  expect(toolbar).toBeTruthy()
+  expect(toolbar.contains(screen.getByRole('searchbox', { name: '名前・メールで探す' }))).toBe(true)
+  expect(toolbar.contains(screen.getByRole('group', { name: '利用状態で絞り込む' }))).toBe(true)
+  expect(toolbar.contains(screen.getByRole('link', { name: /招待する/ }))).toBe(true)
+})
