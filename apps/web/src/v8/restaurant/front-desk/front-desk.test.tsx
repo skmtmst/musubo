@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
 const floorApi = vi.hoisted(() => ({ floors: vi.fn(async () => ({ data: [] })) }))
 vi.mock('@/lib/api/helpers/reservation-board', () => ({ reservationBoardApi: floorApi }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'staff' }))
 vi.mock('@/lib/api', async (original) => { const actual = await original<typeof import('@/lib/api')>(); return { ...actual, api: { ...actual.api, accountSettings: { ...actual.api.accountSettings, getAllergyOptions: vi.fn(async () => ({ success: true, data: { version: 1, options: ['卵', '乳'] } })) } } } })
 
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
@@ -85,6 +86,29 @@ describe('ウォークイン（E-3）', () => {
     expect(await seatWalkIn('acc', { storeId: 's', guestCount: 2, tableId: 't1' })).toEqual({ id: 'new-1', seated: false })
   })
 
+  it('ウォークインで選んだアレルギーを保存する', async () => {
+    render(<WalkInDialog open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={vi.fn()} />)
+    const field = screen.getByRole('combobox', { name:'アレルギー' }) as HTMLInputElement
+    await waitFor(() => expect(field.disabled).toBe(false))
+    fireEvent.focus(field)
+    fireEvent.click(screen.getByRole('option', { name:'乳' }))
+    await waitFor(() => expect((screen.getByRole('button', { name:/入店にする/ }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(screen.getByRole('button', { name:/入店にする/ }))
+    await waitFor(() => expect(api.createReservation).toHaveBeenCalledWith('acc', expect.objectContaining({ allergies:[{kind:'option',value:'乳'}] })))
+  })
+
+  it('ウォークインでアレルギーを選んで閉じると破棄を確認する', async () => {
+    const onClose = vi.fn()
+    render(<WalkInDialog open accountId="acc" storeId="store-1" tables={T} onClose={onClose} onSaved={vi.fn()} />)
+    const field = screen.getByRole('combobox', { name:'アレルギー' }) as HTMLInputElement
+    await waitFor(() => expect(field.disabled).toBe(false))
+    fireEvent.focus(field)
+    fireEvent.click(screen.getByRole('option', { name:'乳' }))
+    fireEvent.click(screen.getByRole('button', { name:'キャンセル' }))
+    expect(await screen.findByText('入力を破棄しますか？')).toBeTruthy()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('人数の −/＋ で座れる卓を絞り直し、［入店にする］の2手で入る', async () => {
     const onSaved = vi.fn()
     render(<WalkInDialog open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={onSaved} />)
@@ -123,7 +147,7 @@ describe('電話予約（E-2）', () => {
     }))
   })
 
-  it('アレルギーを選んだ予約は保存を止める', async () => {
+  it('アレルギーを選んだ予約を保存する', async () => {
     render(<PhoneReservationDrawer staffRole="owner" open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={vi.fn()} />)
     fireEvent.change(screen.getByRole('textbox', { name: 'お名前' }), { target: { value: '田中' } })
     fireEvent.click(screen.getByText(/明日/))
@@ -133,10 +157,9 @@ describe('電話予約（E-2）', () => {
     fireEvent.focus(box)
     fireEvent.click(screen.getByRole('option', { name: '卵' }))
     const submit = screen.getByRole('button', { name: /予約を入れる/ }) as HTMLButtonElement
-    expect(submit.disabled).toBe(true)
-    expect(submit.getAttribute('aria-description')).toContain('まだ保存できません')
+    expect(submit.disabled).toBe(false)
     fireEvent.click(submit)
-    expect(api.createReservation).not.toHaveBeenCalled()
+    await waitFor(() => expect(api.createReservation).toHaveBeenCalledWith('acc', expect.objectContaining({ allergies: [{ kind: 'option', value: '卵' }] })))
   })
 
   it('お名前も時刻も無い間は保存を止め、欄を離れた時の2つの理由も保つ', async () => {

@@ -18,7 +18,7 @@ import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
 import ReservationAllergySelect from '@/components/shared/reservation-allergy-select'
 import { useStaffRole } from '@/lib/staff-role'
-import type { RestaurantFloor } from '@line-crm/shared'
+import type { RestaurantFloor, RestaurantReservationAllergy } from '@line-crm/shared'
 import { reservationBoardApi } from '@/lib/api/helpers/reservation-board'
 import AvailableTables, { tableGroups } from './available-tables'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
@@ -58,7 +58,7 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
 }) {
   const saveErrors = useSaveFormErrors()
   const role = useStaffRole()
-  const [allergies, setAllergies] = useState<string[]>([])
+  const [allergies, setAllergies] = useState<RestaurantReservationAllergy[]>([])
 
   const [now, setNow] = useState(() => new Date())
   const [guests, setGuests] = useState(2)
@@ -116,11 +116,10 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
   const waitUntil = currentRows && free.length === 0 ? nextFreeAt(tables, guests, currentRows, now.getTime()) : null
 
   const save = async () => {
-    if (allergies.length) return
     if (!tableId) { setError('座る卓を選んでください。'); return }
     setBusy(true); setError('')
     try {
-      const result = await seatWalkIn(accountId, { storeId, guestCount: guests, tableId, now: new Date() })
+      const result = await seatWalkIn(accountId, { storeId, guestCount: guests, tableId, now: new Date(), allergies })
       onSaved({ seated: result.seated })
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
@@ -142,11 +141,12 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
       title="ウォークインを入れる"
       description={`いま ${hm(now)}・空いている卓 ${freeAll}`}
       busy={busy}
+      dirty={allergies.length ? true : undefined}
       error={error || undefined}
       confirmLabel="入店にする"
       confirmIcon={<LogIn size={16} aria-hidden="true" />}
-      confirmDisabled={!tableId || !currentRows || floorStatus === 'loading' || allergies.length > 0}
-      confirmDisabledReason={allergies.length ? 'アレルギーを含む予約はまだ保存できません。' : '座る卓を選んでください。'}
+      confirmDisabled={!tableId || !currentRows || floorStatus === 'loading'}
+      confirmDisabledReason="座る卓を選んでください。"
       onConfirm={() => save()}
       onCancel={onClose}
     >

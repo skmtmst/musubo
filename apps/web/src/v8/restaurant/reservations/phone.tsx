@@ -2,7 +2,7 @@
 import { tableCapacityReason, type RestaurantTableDefinition } from '../booking-kit/table-definition'
 import { DialogNote } from '../booking-kit/parts'
 import ReservationAllergySelect from '@/components/shared/reservation-allergy-select'
-import { allergyValues } from '@line-crm/shared'
+import type { RestaurantReservationAllergy } from '@line-crm/shared'
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 
 import { jstCalendar } from '@/lib/jst-datetime'
@@ -124,9 +124,8 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
   const [time, setTime] = useState(preset.time || '')
   const [tableMode, setTableMode] = useState(preset.tableId || 'auto')
   const [courseId, setCourseId] = useState('')
-  const [allergy, setAllergy] = useState('')
+  const [selectedAllergies, setAllergies] = useState<RestaurantReservationAllergy[]>([])
   const [memo, setMemo] = useState('')
-  const selectedAllergies = allergyValues(allergy)
   const [notifyTarget, setNotifyTarget] = useState<string | null>(null)
   const canNotify = kind === 'customer' && whoTab === 'line' && Boolean(person?.lineUid)
   const notifyKey = JSON.stringify([selectedAccountId, storeId, person?.lineUid])
@@ -166,7 +165,7 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
 
   const dirty = kind !== (preset.hold ? 'hold' : 'customer') || search !== '' || person !== null || manualPhone !== '' || manualName !== ''
     || date !== (preset.date ? toYmd(preset.date) : todayInput) || count !== '2' || time !== (preset.time || '')
-    || tableMode !== (preset.tableId || 'auto') || courseId !== '' || allergy !== '' || memo !== '' || notify
+    || tableMode !== (preset.tableId || 'auto') || courseId !== '' || selectedAllergies.length > 0 || memo !== '' || notify
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
 
   useEffect(() => {
@@ -254,7 +253,7 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
   const save = (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault()
     setError(null)
-    if (accountStyle !== 'restaurant' || !canWrite || selectedAllergies.length > 0) return
+    if (accountStyle !== 'restaurant' || !canWrite) return
     if (!storeId) { setError('店舗を選んでください。'); return }
     if (fields.submit().length > 0) {
       requestAnimationFrame(() => {
@@ -272,7 +271,7 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
       guestCount: guests, startsAt, endsAt: endsAtIso,
       tableId: tableMode === 'auto' ? null : tableMode,
       courseId: courseId || null,
-      allergyNote: null, note: memo.trim() || null, notifyLine: notify,
+      allergies: selectedAllergies, note: memo.trim() || null, notifyLine: notify,
     })
   }
 
@@ -335,7 +334,7 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
         footerActions={(
           <>
             <Button onClick={onBack} disabled={busy}>キャンセル</Button>
-            <Button variant="primary" disabled={busy || accountStyle !== 'restaurant' || !canWrite || !storeId || !dayReady || !hours || Boolean(inputReason) || selectedAllergies.length > 0} disabledReason={selectedAllergies.length ? 'アレルギーを含む予約はまだ保存できません。' : accountStyle !== 'restaurant' ? 'この画面から新しい予約は入れられません。' : !canWrite ? '予約を入れる権限を確認してください。' : hoursFailure === scopeKey || (hoursData?.key === scopeKey && hoursData.hours === null) ? '営業時間を確認してください。' : closedDay ? 'この曜日は休みです。' : inputReason || (!dayReady || !hours ? '営業時間と予約を確認してください。' : undefined)} onClick={() => formRef.current?.requestSubmit()}>
+            <Button variant="primary" disabled={busy || accountStyle !== 'restaurant' || !canWrite || !storeId || !dayReady || !hours || Boolean(inputReason)} disabledReason={accountStyle !== 'restaurant' ? 'この画面から新しい予約は入れられません。' : !canWrite ? '予約を入れる権限を確認してください。' : hoursFailure === scopeKey || (hoursData?.key === scopeKey && hoursData.hours === null) ? '営業時間を確認してください。' : closedDay ? 'この曜日は休みです。' : inputReason || (!dayReady || !hours ? '営業時間と予約を確認してください。' : undefined)} onClick={() => formRef.current?.requestSubmit()}>
               {kind === 'hold' ? <Lock size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}{kind === 'hold' ? '枠を押さえる' : '台帳に入れる'}
             </Button>
           </>
@@ -451,7 +450,7 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
           </Card>
           <Card frame="raised" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-allergy">
             <h2 id="rs-phone-allergy" className={styles.phoneCardTitle}>要望・アレルギー</h2>
-            <ReservationAllergySelect accountId={selectedAccountId} role={staffRole} values={selectedAllergies} onChange={values => setAllergy(values.length ? JSON.stringify(values) : '')} disabled={busy} />
+            <ReservationAllergySelect accountId={selectedAccountId} role={staffRole} values={selectedAllergies} onChange={setAllergies} disabled={busy || !canWrite} />
             <Field label="メモ"><TextField value={memo} onChange={event => setMemo(event.target.value)} placeholder="記念日など" /></Field>
           </Card>
           {canNotify ? (

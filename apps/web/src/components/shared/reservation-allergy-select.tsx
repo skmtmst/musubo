@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import type { RestaurantReservationAllergy } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { canManageRole } from '@/lib/staff-role'
 import MultiSelect from './multi-select'
@@ -10,8 +11,8 @@ import Button from './button'
 export default function ReservationAllergySelect({ accountId, role, values, onChange, disabled = false }: {
   accountId: string | null | undefined
   role: string | null | undefined
-  values: string[]
-  onChange: (values: string[]) => void
+  values: RestaurantReservationAllergy[]
+  onChange: (values: RestaurantReservationAllergy[]) => void
   disabled?: boolean
 }) {
   const [state, setState] = useState<{ accountId: string; options: string[]; version: number } | null>(null)
@@ -34,7 +35,7 @@ export default function ReservationAllergySelect({ accountId, role, values, onCh
   const create = async (query: string) => {
     const value = query.trim()
     if (!current || !role || !value || value.length > 100 || values.length >= 32) return
-    if (!canManageRole(role)) { const custom = `その他：${value}`; if (!values.includes(custom)) onChange([...values, custom]); return }
+    if (!canManageRole(role)) { if (!values.some(item => item.kind === 'other' && item.value === value)) onChange([...values, { kind: 'other', value }]); return }
     setSaving(true); setError('')
     try {
       const options = [...current.options, value]
@@ -42,13 +43,15 @@ export default function ReservationAllergySelect({ accountId, role, values, onCh
       if (!result.success || !result.data) throw new Error('save')
       if (currentAccount.current !== current.accountId) return
       setState({ ...current, options, version: result.data.version })
-      onChange([...values, value])
+      onChange([...values, { kind: 'option', value }])
     } catch { if (currentAccount.current === current.accountId) setError('候補を追加できませんでした。読み直してもう一度お試しください。') }
     finally { setSaving(false) }
   }
-  const options = [...new Set([...(current?.options ?? []), ...values])].map(value => ({ value, label: value }))
+  const key = (item: RestaurantReservationAllergy) => JSON.stringify(item)
+  const choices: RestaurantReservationAllergy[] = [...(current?.options ?? []).map(value => ({ kind: 'option' as const, value })), ...values]
+  const options = [...new Map(choices.map(item => [key(item), item])).values()].map(item => ({ value: key(item), label: item.kind === 'other' ? `その他：${item.value}` : item.value }))
   return <Field label="アレルギー">
-    <MultiSelect aria-label="アレルギー" options={options} values={values} onChange={onChange} disabled={disabled || !role || !current || saving} loading={Boolean(accountId && !current && !error)} placeholder="アレルギーを選ぶ" maxChips={32}
+    <MultiSelect aria-label="アレルギー" options={options} values={values.map(key)} onChange={keys => onChange(keys.map(item => JSON.parse(item) as RestaurantReservationAllergy))} disabled={disabled || !role || !current || saving} loading={Boolean(accountId && !current && !error)} placeholder="アレルギーを選ぶ" maxChips={32}
       createLabel={query => canManageRole(role) ? `「${query}」を候補に追加` : `「その他：${query}」として追加`}
       onCreate={query => { void create(query) }} />
     {error && <p role="status">{error} <Button variant="text" size="inline" onClick={() => setRetry(value => value + 1)}>読み直す</Button></p>}
