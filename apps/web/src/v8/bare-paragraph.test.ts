@@ -10,7 +10,7 @@ const baseline = JSON.parse(baselineBytes.toString()) as BareParagraphException[
 
 describe('段落の文字サイズ', () => {
   it('既存の確認待ち一覧を無断で増やさない', () => {
-    expect(createHash('sha256').update(baselineBytes).digest('hex')).toBe('f08694df8824c320137f70ae5f33625324396f920bb2237da10b5daf19017540')
+    expect(createHash('sha256').update(baselineBytes).digest('hex')).toBe('089ad0c57c2b4feb1a1d683e6ac96e5760bd8602b6a4f254bb83aa5ca9ecf7d8')
     expect(baseline.every(item => item.reason.trim())).toBe(true)
   })
 
