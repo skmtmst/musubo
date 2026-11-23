@@ -47,7 +47,7 @@ describe('統括から友だち引き継ぎへ戻る画面', () => {
     mocks.state.mockResolvedValue({ success: true, data: importState({ phase: 'not_started', updatedAt: '2000-01-01T00:00:00Z' }) })
     render(<ResumeFollowerHandover />)
     await screen.findByText('LINEアカウントの登録が完了しました')
-    expect(screen.getByText(/引き継ぎはオフ/)).toBeTruthy()
+    expect(screen.queryByText(/引き継ぎはオフ/)).toBeNull()
     expect(screen.queryByText('引き継ぎが開始されていません')).toBeNull()
     expect(screen.queryByRole('button', { name: '状態を再確認' })).toBeNull()
     expect(mocks.step).not.toHaveBeenCalled()

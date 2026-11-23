@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
+
 - [複数アカウント配信の再送時の重複を防止](release-log/unreleased/146-kenta-a21-multi-resend.md) — 反映履歴、確認 2026-11-21。
 
 - [開店準備の接続・コース入力・再開](release-log/unreleased/148-masato-first-guide-recheck.md) — 反映履歴、確認 2026-11-21。
@@ -481,6 +483,7 @@
 
 - [LINE登録後の「使い方を選ぶ」への自動遷移](release-log/unreleased/154-masato-line-register-auto.md) — 反映履歴、確認 2026-11-22。
 - [LINE初回登録の初期設定保存](release-log/unreleased/162-masato-line-register-style-recovery.md) — 反映履歴、確認 2026-11-22。
+- [LINE登録の完了画面と飲食店の初期設定](release-log/unreleased/167-masato-line-registration-finish.md) — 反映履歴、確認 2026-11-22。
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
 

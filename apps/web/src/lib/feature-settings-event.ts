@@ -6,3 +6,5 @@
  * 表示可否の共有（feature-visibility-cache）はここから読む（V6R-S0-b）。
  */
 export const FEATURE_SETTINGS_UPDATED_EVENT = 'line-harness:feature-settings-updated'
+
+export type FeatureSettingsUpdate = { accountId: string; source?: 'account-style' }

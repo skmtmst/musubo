@@ -50,7 +50,11 @@ vi.mock('@/lib/api', async original => {
   }
 })
 
-vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: fixture.style }, status: 'ready', error: null, reload: vi.fn() }) }))
+vi.mock('@/hooks/use-account-style', async original => ({
+  ...await original<typeof import('@/hooks/use-account-style')>(),
+  useAccountStyle: () => ({ data: { style: fixture.style }, status: 'ready', error: null, reload: vi.fn() }),
+}))
+import { accountStyleUpdated } from '@/hooks/use-account-style'
 import { MENU_SECTIONS } from '@/lib/menu'
 import Sidebar from './sidebar'
 import SettingsInnerNav from './settings-inner-nav'
@@ -301,6 +305,22 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
       })
       view.unmount()
     }
+  })
+
+  it('使い方を飲食店に保存したら同じアカウントの機能表示を読み直す', async () => {
+    fixture.style = 'salon'
+    rememberStaffIdentity({ role: 'owner' } as StaffMember)
+    window.localStorage.setItem('lh-sidebar-groups', JSON.stringify(Object.fromEntries(MENU_SECTIONS.map(section => [section.id, true]))))
+    fixture.visibility.mockResolvedValue({ success: true, data: { features: { restaurant_test: false } } })
+    const view = render(<Sidebar />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalledWith('account-1'))
+    expect(view.container.querySelector('a[href="/restaurant-test/tables"]')).toBeNull()
+
+    fixture.style = 'restaurant'
+    fixture.visibility.mockResolvedValue({ success: true, data: { features: { restaurant_test: true } } })
+    act(() => accountStyleUpdated('account-1'))
+    await waitFor(() => expect(view.container.querySelector('a[href="/restaurant-test/tables"]')).not.toBeNull())
+    expect(fixture.visibility).toHaveBeenCalledTimes(2)
   })
 
   it('サロンのstaffには許可された人用予約と自分の勤務を残す', async () => {

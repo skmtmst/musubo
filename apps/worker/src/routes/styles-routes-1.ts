@@ -10,7 +10,8 @@ import {
   paymentSummaryInWindow,
 } from '../features/booking/booking-payment-admin/index.js';
 import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
-import { restaurantEffectivelyEnabledForTenant } from '../services/tenant-features.js';
+import { restaurantEffectivelyEnabledForAccount } from '../services/tenant-features.js';
+import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { Hono } from 'hono';
 
 import type { Env } from '../worker-env.js';
@@ -94,7 +95,11 @@ styles.put(base, async (c) => {
       c.get('staff').tenantId ?? null,
       c.get('staff').id,
       await json(c),
-      { images: c.env.IMAGES, catalogRuntime: starterCatalogRuntime(c) },
+      {
+        images: c.env.IMAGES,
+        catalogRuntime: starterCatalogRuntime(c),
+        provisionRestaurantWorkspace: restaurantTestEnabled(c.env),
+      },
     ),
   });
 });
@@ -247,7 +252,7 @@ for (const path of [
       throw new StyleError('industry_required');
     if (
       style === 'restaurant' &&
-      !(await restaurantEffectivelyEnabledForTenant(c))
+      !(await restaurantEffectivelyEnabledForAccount(c, id))
     )
       throw new StyleError('not_found', 404);
     if (
@@ -280,7 +285,7 @@ for (const path of [
     )
       kinds.push('event');
     if (
-      (await restaurantEffectivelyEnabledForTenant(c)) &&
+      (await restaurantEffectivelyEnabledForAccount(c, id)) &&
       hasStaffPermission(c, '/restaurant-test/reservations')
     )
       kinds.push('restaurant');

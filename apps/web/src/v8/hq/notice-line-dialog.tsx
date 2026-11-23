@@ -12,11 +12,13 @@ import styles from './notice-line-dialog.module.css'
 const STATUS_INTERVAL_MS = 5000
 
 /** 通知専用LINEの案内。Pen「musubo-notice-line-design-v01.pen」の未連携・連携済み・状態別UI。 */
-export default function NoticeLineDialogV8({ open, onClose, quietWhenUnavailable = false }: {
+export default function NoticeLineDialogV8({ open, onClose, quietWhenUnavailable = false, closeWhenLinked = false }: {
   open: boolean
   onClose: () => void
   /** 登録完了直後の自動表示では、運営側が未設定なら案内を出さずに閉じる。 */
   quietWhenUnavailable?: boolean
+  /** LINEアカウント登録中は、通知連携を確認したら登録完了画面へ戻す。 */
+  closeWhenLinked?: boolean
 }) {
   const [info, setInfo] = useState<HqLineRegistration | null>(null)
   const [qr, setQr] = useState('')
@@ -25,6 +27,8 @@ export default function NoticeLineDialogV8({ open, onClose, quietWhenUnavailable
   const [statusFailed, setStatusFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const [now, setNow] = useState(() => Date.now())
+  const linked = info?.available && info.linked
+  const shouldClose = (closeWhenLinked && linked) || (quietWhenUnavailable && info && !info.available)
 
   useEffect(() => {
     if (!open) return
@@ -51,8 +55,8 @@ export default function NoticeLineDialogV8({ open, onClose, quietWhenUnavailable
   }, [open, attempt])
 
   useEffect(() => {
-    if (open && info && !info.available && quietWhenUnavailable) onClose()
-  }, [open, info, quietWhenUnavailable, onClose])
+    if (open && shouldClose) onClose()
+  }, [open, shouldClose, onClose])
 
   // 初回のプロフィール取得は繰り返さず、本人の紐づけ状態だけを照会する。
   useEffect(() => {
@@ -73,9 +77,7 @@ export default function NoticeLineDialogV8({ open, onClose, quietWhenUnavailable
     return () => { cancelled = true; window.clearInterval(timer) }
   }, [open, info?.available, info?.available && info.linked])
 
-  if (!open || (quietWhenUnavailable && info && !info.available)) return null
-
-  const linked = info?.available && info.linked
+  if (!open || shouldClose) return null
   const expired = Boolean(info?.available && !linked && info.codeExpiresAt && now >= Date.parse(info.codeExpiresAt))
   const accountName = info?.available ? `${info.accountName}${info.basicId ? `（${info.basicId}）` : ''}` : ''
 
@@ -130,7 +132,6 @@ export default function NoticeLineDialogV8({ open, onClose, quietWhenUnavailable
               ) : null}
             </div>
           </div>
-          <div className={styles.reason}>紐づけると、運営が契約先に必要なお知らせだけを、登録した本人のLINEへ送れます。</div>
           {statusFailed ? <div className={styles.statusError} role="status">連携状況を確認できません。自動で再確認します。</div> : null}
           <p className={styles.caveat}>このLINEは問い合わせを受け付けません。お問い合わせは各店舗アカウントの管理画面にある「お問い合わせ」からお送りください。</p>
         </div>
