@@ -281,6 +281,22 @@ describe('手動送信の差し込み(N-026)', () => {
     } });
   });
 
+  test('旧い店の電話番号の差し込みは未登録なら未解決として返す', async () => {
+    const res = await postPreview({ content: 'お電話は{{店の電話番号}}' });
+    expect(await res.json()).toMatchObject({ data: {
+      content: 'お電話は{{var.store_phone}}', unresolved: ['var.store_phone'],
+    } });
+  });
+
+  test('Flex のプレビューでも有効な共通情報だけを埋める', async () => {
+    const content = JSON.stringify({ text: '{{ var.hours }} / {{var.deleted_key}}' });
+    const res = await postPreview({ content, messageType: 'flex' });
+    expect(await res.json()).toMatchObject({ data: {
+      content: JSON.stringify({ text: '9-18時 / {{var.deleted_key}}' }),
+      unresolved: ['var.deleted_key'],
+    } });
+  });
+
   test('差し込みの無い本文はプレビューでそのまま返る', async () => {
     const res = await postPreview({ content: 'そのままの文' });
     expect(res.status).toBe(200);
