@@ -470,7 +470,7 @@
 
 ## 反映履歴
 
-- [統括のデータ削除の停止を修正](release-log/unreleased/PR-kenta-hq-template-purge-cycle.md) — 参照が残る設定の削除に関する修正履歴。
+- [統括のデータ削除の停止を修正](release-log/unreleased/190-kenta-hq-template-purge-cycle.md) — 参照が残る設定の削除に関する修正履歴。
 
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
 
