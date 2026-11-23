@@ -73,16 +73,23 @@ for (const width of [1152, 1440, 390]) for (const entry of ['setup', 'registrati
       if (await choose.count()) await choose.click()
       await dialog.getByRole('button', { name: '次へ', exact: true }).click()
       const next = page.getByRole('dialog', { name: '最初のリッチメニューを選ぶ', exact: true })
-      await next.waitFor()
-      assert.equal(await next.locator('[data-style-switcher]').count(), 0, 'メニューの段では固定帯を出さない')
-      await page.screenshot({ animations: 'disabled', path: join(output, 'menu-step.png') })
-      await next.getByRole('button', { name: 'スタイルを選び直す', exact: true }).click()
-      await dialog.waitFor()
-      assert.deepEqual(await page.evaluate(scanStyleSwitcher), [])
-      const returned = await dialog.evaluate(node => ({ focusInside: node.contains(document.activeElement), focus: document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent?.slice(0, 100), scrollTop: node.querySelector('[data-window-body]').scrollTop }))
-      assert.equal(returned.focusInside, true, '戻ったあとの焦点も窓の中にある')
-      rows.push({ returned })
-      await page.screenshot({ animations: 'disabled', path: join(output, 'returned.png') })
+      if (entry === 'registration') {
+        await page.getByRole('heading', { name: '使い方を保存しました', exact: true }).waitFor()
+        assert.equal(await next.count(), 0, '登録時にリッチメニューの段を出さない')
+        assert.deepEqual(writes.filter(write => write.path === '/api/dashboard/style'), [{ method: 'PUT', path: '/api/dashboard/style' }])
+        await page.screenshot({ animations: 'disabled', path: join(output, 'completed.png') })
+      } else {
+        await next.waitFor()
+        assert.equal(await next.locator('[data-style-switcher]').count(), 0, 'メニューの段では固定帯を出さない')
+        await page.screenshot({ animations: 'disabled', path: join(output, 'menu-step.png') })
+        await next.getByRole('button', { name: 'スタイルを選び直す', exact: true }).click()
+        await dialog.waitFor()
+        assert.deepEqual(await page.evaluate(scanStyleSwitcher), [])
+        const returned = await dialog.evaluate(node => ({ focusInside: node.contains(document.activeElement), focus: document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent?.slice(0, 100), scrollTop: node.querySelector('[data-window-body]').scrollTop }))
+        assert.equal(returned.focusInside, true, '戻ったあとの焦点も窓の中にある')
+        rows.push({ returned })
+        await page.screenshot({ animations: 'disabled', path: join(output, 'returned.png') })
+      }
     }
     assert.deepEqual(errors, [])
   } catch (error) { failure = error.stack ?? String(error); await page.screenshot({ animations: 'disabled', path: join(output, 'failure.png') }); writeFileSync(join(output, 'body.txt'), await page.locator('body').innerText()); throw error }
