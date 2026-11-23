@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StyleBooking, StyleSchedule, StyleSnapshot } from '@line-crm/shared'
 import type { IndustryStyle, StyleSideCard } from './model'
 import { toToday } from './adapter'
+import { styleApi } from '@/lib/api/helpers/styles'
 import { TodayCheck } from './today-check'
 import { todayCheckStorageKey } from './use-today-check-open'
 
@@ -51,7 +52,7 @@ function Check({ cards, accountId = 'account-1', style = 'restaurant', canWrite 
   return <TodayCheck cards={cards} accountId={accountId} style={style} canWrite={canWrite} onAction={onAction} />
 }
 
-const NEW = '新着予約（今日入った）'
+const NEW = '新着予約（今日）'
 const item = (title: string) => screen.getByRole('button', { name: title })
 const expanded = (title: string) => item(title).getAttribute('aria-expanded') === 'true'
 const openTitles = () => screen.getAllByRole('button').filter((button) => button.getAttribute('aria-expanded') === 'true').map((button) => button.textContent)
@@ -226,4 +227,41 @@ describe('今日の確認：予約元の札', () => {
     expect(document.querySelectorAll('[data-source]')).toHaveLength(0)
     expect(screen.queryByText('経路不明')).toBeNull()
   })
+})
+
+describe('新着予約の確認ボタン', () => {
+  it('閲覧のみの人には理由付きで操作できないボタンを出す', () => {
+    render(<TodayCheck cards={sideOf('restaurant', WITH_NEW)} accountId="account-1" style="restaurant" canWrite={false} lockedReason="閲覧のみのため操作できません" onAction={() => {}} />)
+    const bulk = screen.getByRole('button', { name: 'すべて確認済み' })
+    expect(bulk.getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getAllByRole('button', { name: /を確認済みにする/ })).toHaveLength(3)
+    expect(screen.getAllByRole('button', { name: /を確認済みにする/ })[0].getAttribute('aria-disabled')).toBe('true')
+  })
+  it('すべて確認済みは画面に見える3件だけを送る', async () => {
+    const spy = vi.spyOn(styleApi, 'acknowledgeNewBookings').mockResolvedValue({ success: true, data: { operationId: 'op', acknowledgedCount: 1, state: 'active', replayed: false } })
+    const records = WITH_NEW.map(row => ({ ...row, storeId: 'store-1' }))
+    render(<TodayCheck cards={sideOf('restaurant', records)} accountId="account-1" style="restaurant" canWrite onAction={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: 'すべて確認済み' }))
+    expect(spy).toHaveBeenCalledTimes(3)
+    expect(spy.mock.calls.map(call => call[1].bookingId).sort()).toEqual(['1', '2', '3'])
+    spy.mockRestore()
+  })
+  it('閉じている間は見えない行を一括確認できない', () => {
+    render(<Check cards={sideOf('restaurant', WITH_NEW)} />)
+    fireEvent.click(item(NEW))
+    expect(screen.queryByRole('button', { name: 'すべて確認済み' })).toBeNull()
+  })
+  it('ほかのスタイルには確認操作を出さない', () => {
+    render(<Check cards={sideOf('salon', WITH_NEW)} style="salon" />)
+    expect(screen.queryByRole('button', { name: 'すべて確認済み' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /を確認済みにする/ })).toBeNull()
+  })
+})
+
+it('飲食の閉じた要約は表示行数ではなく未確認の総数を使う', () => {
+  const snapshot = { ...snapshotOf('restaurant', WITH_NEW), unconfirmedNewBookingsCount: 12 }
+  const cards = toToday('restaurant', snapshot, schedule('restaurant'), day, 'today', now).side
+  render(<Check cards={cards} />)
+  fireEvent.click(item(NEW))
+  expect(within(item(NEW).closest('section')!).getByText(/^12 件・最新/)).toBeTruthy()
 })

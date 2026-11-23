@@ -313,9 +313,9 @@ const UNKNOWN_SUMMARY = { text: '—', empty: true } as const
 function freshSide(style: IndustryStyle, s: StyleSnapshot, href: string, range: DashboardRange, now: Date): StyleSideCard {
   const bookings: StyleSideBooking[] = newestRequestedFirst(s.newBookings).slice(0, SIDE_BOOKINGS).map((b) => ({
     id: b.id, when: formatListTimestamp(b.startsAt, { timeZone: s.timeZone, now }), name: withHonorific(b.name, 'さま'),
-    people: style === 'restaurant' ? b.partySize : null, source: b.source, sourceName: sideSourceName(style, b.source),
+    people: style === 'restaurant' ? b.partySize : null, source: b.source, sourceName: sideSourceName(style, b.source), storeId: b.storeId,
   }))
-  const count = s.newBookings.length
+  const count = style === 'restaurant' ? (s.unconfirmedNewBookingsCount ?? s.newBookings.length) : s.newBookings.length
   const latest = bookings[0]
   return {
     id: 'new', title: `新着予約（${newBookingsPeriod(s, range, now)}）`, help: NEW_HELP, link: { label: '一覧', href },

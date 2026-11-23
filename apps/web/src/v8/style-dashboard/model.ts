@@ -92,7 +92,7 @@ export interface StyleSideRow { label: string; value: string; tone?: 'danger' }
  * 右の列の新着予約の1行。来店の日時・名前・人数（飲食だけ）・予約の経路（口の生の値。空なら経路を返さない口）。
  * sourceName は経路の札の名前（飲食は予約台帳と同じ言葉）。無い時は共通の札の言葉で出す。
  */
-export interface StyleSideBooking { id: string; when: string; name: string; people: number | null; source: string; sourceName?: string }
+export interface StyleSideBooking { id: string; when: string; name: string; people: number | null; source: string; sourceName?: string; storeId?: string | null }
 export interface StyleSideCard {
   id: string
   title: string

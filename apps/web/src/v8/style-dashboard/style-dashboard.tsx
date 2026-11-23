@@ -170,7 +170,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
 
   /* 右の列は「今日の確認」1枚。項目ごとに開け閉めし、開き方は本人・アカウント・スタイルごとに覚える。書く操作は書ける人だけ（今までの右の列と同じ）。 */
   const sideCards = today?.side ?? []
-  const side = sideCards.length ? <TodayCheck cards={sideCards} accountId={accountId || null} style={style} canWrite={canWrite} extra={{ pay: testMode ? <TestModeNote /> : null }}
+  const side = sideCards.length ? <TodayCheck key={`${accountId}:${style}`} cards={sideCards} accountId={accountId || null} style={style} canWrite={canWrite} roleKnown={role !== null} lockedReason={writeLock} refresh={load} extra={{ pay: testMode ? <TestModeNote /> : null }}
     onAction={(card) => (card.id === 'pay' ? openPayment() : ['care', 'waitlist', 'rebook'].includes(card.id) ? preparing.open(card.title) : router.push('/broadcasts'))} /> : null
 
   const shownRoster = style === 'lesson' && (rosterId === undefined ? view !== 'calendar' : rosterId !== null && roster?.rowId === rosterId) ? roster : null

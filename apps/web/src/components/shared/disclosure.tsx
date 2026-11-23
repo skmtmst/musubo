@@ -85,6 +85,7 @@ export function DisclosureItem({
   empty = false,
   help,
   action,
+  headerAction,
   open,
   onOpenChange,
   headingLevel = 4,
@@ -102,6 +103,8 @@ export function DisclosureItem({
   help?: ReactNode
   /** 開閉とは別に押す行き先。閉じている時は見出しの行の右、開くと中身の下。 */
   action?: ReactNode
+  /** 開閉に関係なく見出しの右に残す操作。 */
+  headerAction?: ReactNode
   open: boolean
   onOpenChange: (open: boolean) => void
   headingLevel?: 3 | 4
@@ -122,7 +125,7 @@ export function DisclosureItem({
           </button>
         </Heading>
         {help ? <span className={styles.itemHelp}>{help}</span> : null}
-        {action && !open ? <span className={styles.itemAction} data-disclosure-action="head">{action}</span> : null}
+        {headerAction || (action && !open) ? <span className={styles.itemAction} data-disclosure-action="head">{headerAction}{action && !open ? action : null}</span> : null}
         <ChevronDown aria-hidden="true" className={styles.itemChevron} />
         {shownSummary ? (
           <p id={summaryId} className={styles.itemSummary} data-empty={empty || undefined} title={shownSummary}>
