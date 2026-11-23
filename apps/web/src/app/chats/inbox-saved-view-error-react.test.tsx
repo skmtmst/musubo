@@ -158,7 +158,7 @@ async function openSaveDialog() {
   expect(toggle, '「保存した検索」の開閉ボタン').toBeTruthy()
   await act(async () => { toggle!.click() })
   await flush()
-  const openCreate = findButton(host, '今の条件を保存する')
+  const openCreate = findButton(document.body, '今の条件を保存する')
   expect(openCreate, '「現在の条件を保存」ボタン').toBeTruthy()
   await act(async () => { openCreate!.click() })
   await flush()
