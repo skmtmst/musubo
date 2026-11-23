@@ -243,6 +243,28 @@ SQLite は CHECK を後から変えられません。種別を1つ増やすだ�
 判断し、その行を飛ばします。飛ばされると索引が消えたまま戻りません
 （136 で実際に踏みました）。
 
+### 新しいコードを配り終えてから当てる分（順番待ち）
+
+検証配備（`deploy-cloudflare-staging.yml` の `Count pending staging D1 migrations`）は
+`packages/db/migrations/*.sql` を数え、検証D1に未適用が1件でもあれば Worker 配備を
+止めます。この見張りは緩めません。
+
+そのため段階移行で「新しいコードを配り終えてから当てる分」がある場合、その分は
+`packages/db/migrations/` に**まだ入れず** `packages/db/migrations-pending/` で
+順番待ちさせます。置き方と移し方は `packages/db/migrations-pending/README.md`。
+
+```
+前半を当てる → 未適用0 → 新Workerを配る → 互換性を確かめる
+  → 後続PRで pending から migrations/ へ移す → 当てる → 未適用0
+```
+
+後続PRをマージしてから当てるまでのあいだは未適用が1件になるので、そのあいだ
+Worker 配備は止まります（当てれば解けます）。互換性の確認を終えてから移してください。
+
+`migrations-pending/` に居るあいだは `check-migrations.ts` の静的検査と
+`bootstrap.sql` の対象外です。`migrations/` へ移した後に
+`pnpm --dir packages/db generate:bootstrap` と DB の試験を通してください。
+
 ## CI
 
 `.github/workflows/deploy-scripts-ci.yml` が、`scripts/**`・`package.json`・

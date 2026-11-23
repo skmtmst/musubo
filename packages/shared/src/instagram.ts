@@ -3,6 +3,8 @@ export interface InstagramConnectionStatus {
   replyEnabled: false;
   dmReconnectRequired?: boolean;
   connection?: {
+    /** 接続そのものの id。画面が操作先を指定するときに使う（表示はしない）。 */
+    id?: string;
     pageId: string;
     instagramId: string;
     pageName: string;

@@ -4,6 +4,10 @@ import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
 import { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
 export { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
+import { replaceLocationCandidates, setConnectionStatus, setConnectionStatusForEnv, writeLog } from './restaurant-google-connection-state.js';
+import type { ConnectionRef, ConnectionStatus } from './restaurant-google-connection-state.js';
+export { setConnectionStatus, setConnectionStatusForEnv } from './restaurant-google-connection-state.js';
+export type { ConnectionRef, ConnectionStatus } from './restaurant-google-connection-state.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
 /** Google ビジネスの店舗はアカウントと担当者の統括から解決し、組織 ID だけを信用しない。外部通信はサービス層へ分ける。書込は GOOGLE_BUSINESS_WRITE_ENABLED=true かつ本人の確認操作があるときだけ実行し、自動送信しない。トークンは暗号化して保存し、ログ・応答へ平文を出さない。 */
 import { Hono } from 'hono';
@@ -16,7 +20,12 @@ import { googleBusinessEnabled } from '../lib/environment-features.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
-import { deleteGoogleContentForStore, deleteGoogleContentStatements } from '../services/google-business-retention.js';
+import {
+  connectionScopeBinds,
+  connectionScopeSql,
+  deleteGoogleContentForConnection,
+  deleteGoogleContentStatements,
+} from '../services/google-business-retention.js';
 import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import {
   GOOGLE_BUSINESS_REQUIRED_SCOPES,
@@ -54,7 +63,6 @@ export const DEFAULT_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 export const AI_TIMEOUT_MS = 45_000;
 const REVIEWS_PAGE_SIZE_MAX = 100;
 
-export type ConnectionStatus = 'pending_location' | 'connected' | 'expired' | 'no_permission' | 'disconnected';
 type ReplyStatus = 'unreplied' | 'draft' | 'pending_confirm' | 'replied' | 'published';
 
 /**
@@ -128,6 +136,8 @@ export interface ConnectionRow {
 interface ReviewRow {
   id: string;
   store_id: string;
+  /** どのGoogle接続から取り込んだ口コミか。移行直後の行と接続解除後の行は空になる。 */
+  connection_id: string | null;
   review_name: string;
   reviewer_display_name: string | null;
   star_rating: number;
@@ -300,11 +310,80 @@ async function ensureStoreForGoogle(c: Context<Env>): Promise<StoreContext | nul
   return store;
 }
 
-export async function connectionFor(c: Context<Env>, storeId: string): Promise<ConnectionRow | null> {
-  return dbFor(c.env, storeId)
-    .prepare('SELECT * FROM rt_google_connections WHERE store_id = ? LIMIT 1')
-    .bind(storeId)
+/** 主連携の正本。列は持たず account_settings に置く（sns-connection-ports.ts と同じ鍵）。 */
+const GOOGLE_PRIMARY_KEY = 'sns.google.primary_connection';
+
+/**
+ * 操作対象の接続を1件に決める。
+ * connectionId を渡した場合はその接続だけを見る（別の店舗の接続IDでは null になる）。
+ * 省略した場合は主連携（account_settings の sns.google.primary_connection）を優先し、
+ * 無ければ並び順 → 接続日時 → ID の決まった順で先頭を返す。接続が増えても取り違えない。
+ */
+export async function connectionForEnv(env: Env['Bindings'], storeId: string, connectionId?: string | null): Promise<ConnectionRow | null> {
+  const db = dbFor(env, storeId);
+  if (connectionId) {
+    return db
+      .prepare('SELECT * FROM rt_google_connections WHERE id = ? AND store_id = ? LIMIT 1')
+      .bind(connectionId, storeId)
+      .first<ConnectionRow>();
+  }
+  return db
+    .prepare(
+      `SELECT c.* FROM rt_google_connections c
+       WHERE c.store_id = ?
+       ORDER BY CASE WHEN c.id = (
+             SELECT json_extract(a.value, '$.data.connectionId') FROM account_settings a
+             JOIN rt_stores s ON s.id = c.store_id
+             WHERE a.line_account_id = s.line_account_id AND a.key = ?
+           ) THEN 0 ELSE 1 END,
+         c.sort_order, COALESCE(c.connected_at, ''), c.id
+       LIMIT 1`,
+    )
+    .bind(storeId, GOOGLE_PRIMARY_KEY)
     .first<ConnectionRow>();
+}
+
+export async function connectionFor(c: Context<Env>, storeId: string, connectionId?: string | null): Promise<ConnectionRow | null> {
+  return connectionForEnv(c.env, storeId, connectionId);
+}
+
+/**
+ * この店舗の接続を全件、画面に出す順で返す。並べ方は connectionForEnv と同じなので、
+ * 先頭が「接続IDを渡さなかったときに操作される接続」と必ず一致する。
+ */
+async function connectionsFor(c: Context<Env>, storeId: string): Promise<ConnectionRow[]> {
+  const rows = await dbFor(c.env, storeId)
+    .prepare(
+      `SELECT c.* FROM rt_google_connections c
+       WHERE c.store_id = ?
+       ORDER BY CASE WHEN c.id = (
+             SELECT json_extract(a.value, '$.data.connectionId') FROM account_settings a
+             JOIN rt_stores s ON s.id = c.store_id
+             WHERE a.line_account_id = s.line_account_id AND a.key = ?
+           ) THEN 0 ELSE 1 END,
+         c.sort_order, COALESCE(c.connected_at, ''), c.id`,
+    )
+    .bind(storeId, GOOGLE_PRIMARY_KEY)
+    .all<ConnectionRow>();
+  return rows.results ?? [];
+}
+
+/** 画面が指定した操作対象の接続ID。未指定なら undefined（主連携を使う）。 */
+export function requestedConnectionId(c: Context<Env>): string | undefined {
+  const value = c.req.query('connection_id');
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+/**
+ * 取り込み済みのデータを「この接続のもの」に絞る、読み取り用の条件。
+ * 移行で既存の行は店舗の先頭の接続へ割り当てるが、接続行が消えた場合は
+ * connection_id が NULL で残り得る（ON DELETE SET NULL）。読み取りでは
+ * その行も拾う（画面から口コミが消えるより、どちらの接続でも見えるほうが安全）。
+ * 削除・更新には使わない。他の接続のデータまで消さないよう、そちらは id で厳密に絞る。
+ */
+export function connectionReadScope(connection: { id: string } | null | undefined): { sql: string; binds: unknown[] } {
+  if (!connection) return { sql: '', binds: [] };
+  return { sql: ' AND (connection_id = ? OR connection_id IS NULL)', binds: [connection.id] };
 }
 
 export function publicConnection(row: ConnectionRow | null) {
@@ -347,42 +426,6 @@ function publicReview(row: ReviewRow) {
   };
 }
 
-export async function setConnectionStatusForEnv(env: Env['Bindings'], storeId: string, status: ConnectionStatus, error?: string | null): Promise<void> {
-  await dbFor(env, storeId)
-    .prepare(`UPDATE rt_google_connections SET confirmation_revision = confirmation_revision + CASE WHEN status IS NOT ? THEN 1 ELSE 0 END, status = ?, last_sync_error = COALESCE(?, last_sync_error), updated_at = ? WHERE store_id = ?`)
-    .bind(status, status, error ?? null, nowIso(), storeId)
-    .run();
-}
-
-export async function setConnectionStatus(c: Context<Env>, storeId: string, status: ConnectionStatus, error?: string | null): Promise<void> {
-  await setConnectionStatusForEnv(c.env, storeId, status, error);
-}
-
-async function writeLog(
-  c: Context<Env>,
-  storeId: string,
-  input: { kind: 'review_reply' | 'connect' | 'reconnect' | 'disconnect'; targetName?: string | null; beforeText?: string | null; afterText?: string | null; requestId?: string | null; result: 'accepted' | 'failed' | 'unknown'; error?: string | null },
-): Promise<void> {
-  await dbFor(c.env, storeId)
-    .prepare(
-      `INSERT INTO rt_google_write_log (id, store_id, kind, target_name, staff_id, before_text, after_text, request_id, result, error)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      crypto.randomUUID(),
-      storeId,
-      input.kind,
-      input.targetName ?? null,
-      c.get('staff')?.id ?? null,
-      input.beforeText ?? null,
-      input.afterText ?? null,
-      input.requestId ?? null,
-      input.result,
-      input.error ?? null,
-    )
-    .run();
-}
-
 /**
  * 有効なアクセストークンを返す。期限が近ければ更新して保存する。
  * 更新に失敗（invalid_grant）したら接続状態を expired にして例外を投げる。
@@ -408,23 +451,23 @@ export async function accessTokenForConnection(env: Env['Bindings'], connection:
       .prepare(
         `UPDATE rt_google_connections
          SET access_token_enc = ?, access_token_expires_at = ?, refresh_token_enc = ?, updated_at = ?
-         WHERE store_id = ?`,
+         WHERE id = ?`,
       )
       .bind(
         await encryptCredential(tokens.accessToken, key),
         new Date(tokens.expiresAtMs).toISOString(),
         tokens.refreshToken ? await encryptCredential(tokens.refreshToken, key) : connection.refresh_token_enc,
         nowIso(),
-        connection.store_id,
+        connection.id,
       )
       .run();
     return tokens.accessToken;
   } catch (error) {
     if (error instanceof GoogleBusinessError && error.kind === 'auth_expired') {
-      await setConnectionStatusForEnv(env, connection.store_id, 'expired', 'auth_expired');
+      await setConnectionStatusForEnv(env, connection, 'expired', 'auth_expired');
     }
     if (error instanceof GoogleBusinessError && error.kind === 'no_permission') {
-      await setConnectionStatusForEnv(env, connection.store_id, 'no_permission', 'no_permission');
+      await setConnectionStatusForEnv(env, connection, 'no_permission', 'no_permission');
     }
     throw error;
   }
@@ -457,10 +500,22 @@ export function googleErrorResponse(c: Context<Env>, error: unknown) {
   throw error;
 }
 
-export async function requireConnectedStore(c: Context<Env>): Promise<{ store: StoreContext; connection: ConnectionRow } | Response> {
+/**
+ * 操作対象の店舗と接続を1件に決める。
+ * connectionId を省略した場合（既存の画面・既存の口）は主連携を使うので、
+ * 接続が1件だけの環境では今までと同じ接続が選ばれる。
+ */
+export async function requireConnectedStore(
+  c: Context<Env>,
+  connectionId?: string | null,
+): Promise<{ store: StoreContext; connection: ConnectionRow } | Response> {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
-  const connection = await connectionFor(c, store.id);
+  const wanted = connectionId ?? requestedConnectionId(c);
+  const connection = await connectionFor(c, store.id, wanted);
+  if (!connection && wanted) {
+    return fail(c, 404, '指定されたGoogleの接続が見つかりません', { code: 'connection_not_found' });
+  }
   if (!connection || connection.status === 'disconnected' || connection.status === 'pending_location' || !connection.location_name) {
     return fail(c, 409, 'Googleアカウントが接続されていません', { code: 'not_connected', current: { connection: publicConnection(connection) } });
   }
@@ -515,8 +570,9 @@ restaurantGoogle.use('/api/restaurant-test/google/*', googleAccessGuard);
 restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
   const store = await ensureStoreForGoogle(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
-  const connection = await connectionFor(c, store.id);
+  const connection = await connectionFor(c, store.id, requestedConnectionId(c));
   const db = dbFor(c.env, store.id);
+  const scoped = connectionReadScope(connection);
   const counts = await db
     .prepare(
       `SELECT
@@ -525,21 +581,21 @@ restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
          SUM(CASE WHEN needs_attention = 1 THEN 1 ELSE 0 END) AS attention,
          SUM(CASE WHEN first_seen_at >= COALESCE(?, '') THEN 1 ELSE 0 END) AS new_count,
          COUNT(*) AS stored
-       FROM rt_google_reviews WHERE store_id = ?`,
+       FROM rt_google_reviews WHERE store_id = ?${scoped.sql}`,
     )
-    .bind(connection?.last_synced_at ? new Date(Date.parse(connection.last_synced_at) - 24 * 3600 * 1000).toISOString() : null, store.id)
+    .bind(connection?.last_synced_at ? new Date(Date.parse(connection.last_synced_at) - 24 * 3600 * 1000).toISOString() : null, store.id, ...scoped.binds)
     .first<{ unreplied: number | null; drafts: number | null; attention: number | null; new_count: number | null; stored: number }>();
   // 第4段: 投稿タブの件数バッジ用。要対応 = Googleが不承認（rejected）か送信失敗（failed）。
   const postsAttention = await db
-    .prepare(`SELECT COUNT(*) AS n FROM rt_google_posts WHERE store_id = ? AND status IN ('rejected', 'failed')`)
-    .bind(store.id)
+    .prepare(`SELECT COUNT(*) AS n FROM rt_google_posts WHERE store_id = ? AND status IN ('rejected', 'failed')${scoped.sql}`)
+    .bind(store.id, ...scoped.binds)
     .first<{ n: number }>();
   const candidates =
     connection?.status === 'pending_location'
       ? (
           await db
-            .prepare('SELECT location_name, location_title, address_text FROM rt_google_location_candidates WHERE store_id = ? ORDER BY location_title')
-            .bind(store.id)
+            .prepare(`SELECT location_name, location_title, address_text FROM rt_google_location_candidates WHERE store_id = ?${scoped.sql} ORDER BY location_title`)
+            .bind(store.id, ...scoped.binds)
             .all<{ location_name: string; location_title: string; address_text: string | null }>()
         ).results.map((row) => ({ locationName: row.location_name, locationTitle: row.location_title, addressText: row.address_text }))
       : [];
@@ -572,12 +628,34 @@ restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
   });
 });
 
+/**
+ * 設定›SNS連携の一覧が出す行の元。接続が複数あっても全件返す。
+ * 入口は googleAccessGuard（APIキー拒否・統括の照合・LINEアカウントの権限確認）を通っていて、
+ * 店舗は ensureStoreForGoogle が見えている範囲から決めるので、別の統括や
+ * 権限の無いLINEアカウントの接続はここから出ない。
+ */
+restaurantGoogle.get('/api/restaurant-test/google/connections', async (c) => {
+  const store = await ensureStoreForGoogle(c);
+  if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
+  return c.json({
+    success: true,
+    store: { id: store.id, name: store.name, lineAccountId: store.lineAccountId },
+    connections: (await connectionsFor(c, store.id)).map((row) => publicConnection(row)),
+  });
+});
+
 restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireConnectionManager, inputJsonBoundary(), async (c) => {
   const client = oauthClient(c);
   if (!client) return fail(c, 503, 'Google接続の設定（OAuthクライアント）がこの環境にありません', { code: 'oauth_not_configured' });
   const store = await ensureStoreForGoogle(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
-  const existing = await connectionFor(c, store.id);
+  // connection_id を渡すとその接続のつなぎ直しになる（渡さないときは今までどおり主連携）。
+  // mode=add は「接続を増やす」。既にある接続は一切見ないので、主連携を取り違えてつなぎ直さない。
+  const adding = c.req.query('mode') === 'add';
+  const wanted = requestedConnectionId(c);
+  if (adding && wanted) return fail(c, 400, '接続の追加では接続IDを指定できません', { code: 'connection_target_conflict' });
+  const existing = adding ? null : await connectionFor(c, store.id, wanted);
+  if (!existing && wanted) return fail(c, 404, '指定されたGoogleの接続が見つかりません', { code: 'connection_not_found' });
   const mode = existing?.status === 'connected' || existing?.status === 'expired' || existing?.status === 'no_permission' ? 'reconnect' : 'connect';
 
   let verifierEnc: string;
@@ -592,10 +670,13 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireConnec
   const expiresAt = new Date(Date.now() + OAUTH_STATE_MAX_AGE_SEC * 1000).toISOString();
   await dbFor(c.env, store.id)
     .prepare(
-      `INSERT INTO rt_google_oauth_states (state, store_id, line_account_id, staff_id, mode, code_verifier_enc, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      // connection_id を控えるのは、戻ってきたときにどの接続を書き換えるかを取り違えないため。
+      // つなぎ直しだけでなく、解除済みの接続をもう一度つなぐ場合もその行を控える。
+      // 接続を増やすとき（mode=add）だけ空にして、戻りで新しい行を足す。
+      `INSERT INTO rt_google_oauth_states (state, store_id, line_account_id, connection_id, staff_id, mode, code_verifier_enc, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(state, store.id, store.lineAccountId, c.get('staff')!.id, mode, verifierEnc, expiresAt)
+    .bind(state, store.id, store.lineAccountId, existing?.id ?? null, c.get('staff')!.id, mode, verifierEnc, expiresAt)
     .run();
   c.header('Set-Cookie', stateCookie(state));
   auditLog(c, 'restaurant.google.connect.start', { id: store.id, kind: 'rt_store' }, { lineAccountId: store.lineAccountId });
@@ -633,7 +714,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     ? await dbFor(c.env)
         .prepare('SELECT * FROM rt_google_oauth_states WHERE state = ? LIMIT 1')
         .bind(state)
-        .first<{ state: string; store_id: string; line_account_id: string | null; staff_id: string; mode: 'connect' | 'reconnect'; code_verifier_enc: string; expires_at: string; used_at: string | null }>()
+        .first<{ state: string; store_id: string; line_account_id: string | null; connection_id: string | null; staff_id: string; mode: 'connect' | 'reconnect'; code_verifier_enc: string; expires_at: string; used_at: string | null }>()
     : null;
   const lineAccountId = stateRow?.line_account_id ?? null;
 
@@ -643,8 +724,8 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
   if (stateRow.staff_id !== c.get('staff')!.id) {
     return c.redirect(adminReturnUrl(c, lineAccountId, 'error:invalid_state'));
   }
-  const returnToSetup = (result: string) => adminReturnUrl(c, lineAccountId, result,
-    stateRow.state.startsWith('hours.'));
+  // 営業時間の画面から始めた認可は、終わりでも中断でも営業時間へ戻す（state の先頭の合図で見分ける）。
+  const returnToSetup = (result: string) => adminReturnUrl(c, lineAccountId, result, stateRow.state.startsWith('hours.'));
   await dbFor(c.env, stateRow.store_id).prepare('UPDATE rt_google_oauth_states SET used_at = ? WHERE state = ?').bind(nowIso(), state).run();
   if (c.req.query('error') || !code) {
     return c.redirect(returnToSetup('error:denied'));
@@ -672,7 +753,17 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     const options: RequestOptions = { fetch, accessToken: tokens.accessToken };
     const email = await fetchAccountEmail(options);
     const locations = await listManageableLocations(options);
-    const existing = await connectionFor(c, store.id);
+    // 認可を始めた時に控えた接続へ戻す。控えが空なら接続を増やすので、既にある接続は見ない
+    // （主連携を取り違えて書き換えないため）。つなぎ直しの控えが空のまま戻ってきた古い途中状態
+    // （この修正より前に始めた認可）だけは、今までどおり主連携を見る。
+    const existing = stateRow.connection_id
+      ? await connectionFor(c, store.id, stateRow.connection_id)
+      : stateRow.mode === 'reconnect'
+        ? await connectionFor(c, store.id, null)
+        : null;
+    if (!existing && stateRow.connection_id) {
+      return c.redirect(returnToSetup('error:connection_not_found'));
+    }
     const refreshEnc = tokens.refreshToken ? await encryptCredential(tokens.refreshToken, key) : existing?.refresh_token_enc ?? null;
     const accessEnc = await encryptCredential(tokens.accessToken, key);
     const accessExpires = new Date(tokens.expiresAtMs).toISOString();
@@ -684,7 +775,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
         // ここで止めず、そのアカウントが管理している店舗を一覧で選べるようにする。
         // 旧店舗名は残したまま「選択待ち」にして、切り替えの確認は選択時に取る。
         if (locations.length === 0) {
-          await writeLog(c, store.id, { kind: 'reconnect', targetName: existing.location_name, result: 'failed', error: 'no_locations' });
+          await writeLog(c, existing, { kind: 'reconnect', targetName: existing.location_name, result: 'failed', error: 'no_locations' });
           return c.redirect(returnToSetup('error:no_locations'));
         }
         await db
@@ -693,19 +784,12 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
              SET confirmation_revision = confirmation_revision + 1, google_account_email = ?, refresh_token_enc = ?, access_token_enc = ?, access_token_expires_at = ?,
                  status = 'pending_location', connected_by_staff_id = ?, disconnected_at = NULL,
                  last_sync_error = NULL, updated_at = ?
-             WHERE store_id = ?`,
+             WHERE id = ?`,
           )
-          .bind(email, refreshEnc, accessEnc, accessExpires, c.get('staff')!.id, nowIso(), store.id)
+          .bind(email, refreshEnc, accessEnc, accessExpires, c.get('staff')!.id, nowIso(), existing.id)
           .run();
-        await db.prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ?').bind(store.id).run();
-        await db.batch(
-          locations.map((location) =>
-            db
-              .prepare('INSERT OR IGNORE INTO rt_google_location_candidates (id, store_id, location_name, location_title, address_text) VALUES (?, ?, ?, ?, ?)')
-              .bind(crypto.randomUUID(), store.id, location.name, location.title, location.addressText),
-          ),
-        );
-        await writeLog(c, store.id, { kind: 'reconnect', targetName: existing.location_name, result: 'unknown', error: 'location_switch_pending' });
+        await replaceLocationCandidates(db, store.id, existing.id, locations);
+        await writeLog(c, existing, { kind: 'reconnect', targetName: existing.location_name, result: 'unknown', error: 'location_switch_pending' });
         return c.redirect(returnToSetup('select_location'));
       }
       await db
@@ -715,11 +799,11 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
                refresh_token_enc = ?, access_token_enc = ?, access_token_expires_at = ?,
                status = 'connected', connected_by_staff_id = ?, connected_at = ?, disconnected_at = NULL,
                last_sync_error = NULL, updated_at = ?
-           WHERE store_id = ?`,
+           WHERE id = ?`,
         )
-        .bind(email, same.title, same.mapsUri, refreshEnc, accessEnc, accessExpires, c.get('staff')!.id, nowIso(), nowIso(), store.id)
+        .bind(email, same.title, same.mapsUri, refreshEnc, accessEnc, accessExpires, c.get('staff')!.id, nowIso(), nowIso(), existing.id)
         .run();
-      await writeLog(c, store.id, { kind: 'reconnect', targetName: same.name, result: 'accepted' });
+      await writeLog(c, existing, { kind: 'reconnect', targetName: same.name, result: 'accepted' });
       auditLog(c, 'restaurant.google.reconnect', { id: store.id, kind: 'rt_store' }, { lineAccountId });
       return c.redirect(returnToSetup('reconnected'));
     }
@@ -732,64 +816,85 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     const autoSelectable = locations.length === 1 && (!existing?.location_name || existing.location_name === locations[0].name);
     const single: GoogleLocation | null = autoSelectable ? locations[0] : null;
     const status: ConnectionStatus = single ? 'connected' : 'pending_location';
-    await db
-      .prepare(
-        `INSERT INTO rt_google_connections
-           (id, store_id, line_account_id, google_account_email, location_name, location_title, location_maps_url,
-            refresh_token_enc, access_token_enc, access_token_expires_at, status, connected_by_staff_id, connected_at, disconnected_at, last_sync_error, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
-         ON CONFLICT(store_id) DO UPDATE SET
-           confirmation_revision = rt_google_connections.confirmation_revision + 1,
-           line_account_id = excluded.line_account_id,
-           google_account_email = excluded.google_account_email,
-           location_name = excluded.location_name,
-           location_title = excluded.location_title,
-           location_maps_url = excluded.location_maps_url,
-           refresh_token_enc = excluded.refresh_token_enc,
-           access_token_enc = excluded.access_token_enc,
-           access_token_expires_at = excluded.access_token_expires_at,
-           status = excluded.status,
-           connected_by_staff_id = excluded.connected_by_staff_id,
-           connected_at = excluded.connected_at,
-           disconnected_at = NULL,
-           last_sync_error = NULL,
-           updated_at = excluded.updated_at`,
-      )
-      .bind(
-        existing?.id ?? crypto.randomUUID(),
-        store.id,
-        store.line_account_id,
-        email,
-        // 店舗未確定のときは前の店舗名を残す（切り替え確認とデータ削除の判定に使う）。
-        single?.name ?? existing?.location_name ?? null,
-        single?.title ?? existing?.location_title ?? null,
-        single?.mapsUri ?? existing?.location_maps_url ?? null,
-        refreshEnc,
-        accessEnc,
-        accessExpires,
-        status,
-        c.get('staff')!.id,
-        single ? nowIso() : null,
-        nowIso(),
-      )
-      .run();
-    await db.prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ?').bind(store.id).run();
+    // 1店舗に複数の接続が並ぶので、store_id を衝突の鍵にした upsert は使えない。
+    // 対象の接続が決まっているなら id で更新し、決まっていないなら新しい行を足す。
+    const connectionId = existing?.id ?? crypto.randomUUID();
+    // 同じ店舗（location）を2つの接続で持つことはできない。先に重なりを見て、
+    // 書き込みで制約違反になる前に案内へ戻す（接続を増やすときに同じ店舗を選んだ場合）。
+    if (single) {
+      const taken = await db
+        .prepare('SELECT 1 FROM rt_google_connections WHERE store_id = ? AND location_name = ? AND id <> ? LIMIT 1')
+        .bind(store.id, single.name, connectionId)
+        .first();
+      if (taken) return c.redirect(returnToSetup('error:location_already_connected'));
+    }
+    if (existing) {
+      await db
+        .prepare(
+          `UPDATE rt_google_connections
+           SET confirmation_revision = confirmation_revision + 1, line_account_id = ?, google_account_email = ?,
+               location_name = ?, location_title = ?, location_maps_url = ?,
+               refresh_token_enc = ?, access_token_enc = ?, access_token_expires_at = ?,
+               status = ?, connected_by_staff_id = ?, connected_at = ?, disconnected_at = NULL,
+               last_sync_error = NULL, updated_at = ?
+           WHERE id = ?`,
+        )
+        .bind(
+          store.line_account_id,
+          email,
+          // 店舗未確定のときは前の店舗名を残す（切り替え確認とデータ削除の判定に使う）。
+          single?.name ?? existing.location_name ?? null,
+          single?.title ?? existing.location_title ?? null,
+          single?.mapsUri ?? existing.location_maps_url ?? null,
+          refreshEnc,
+          accessEnc,
+          accessExpires,
+          status,
+          c.get('staff')!.id,
+          single ? nowIso() : null,
+          nowIso(),
+          connectionId,
+        )
+        .run();
+    } else {
+      await db
+        .prepare(
+          `INSERT INTO rt_google_connections
+             (id, store_id, line_account_id, google_account_email, location_name, location_title, location_maps_url,
+              refresh_token_enc, access_token_enc, access_token_expires_at, status, connected_by_staff_id, connected_at, disconnected_at, last_sync_error, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
+        )
+        .bind(
+          connectionId,
+          store.id,
+          store.line_account_id,
+          email,
+          single?.name ?? null,
+          single?.title ?? null,
+          single?.mapsUri ?? null,
+          refreshEnc,
+          accessEnc,
+          accessExpires,
+          status,
+          c.get('staff')!.id,
+          single ? nowIso() : null,
+          nowIso(),
+        )
+        .run();
+    }
+    const connected: ConnectionRef = { id: connectionId, store_id: store.id };
     if (!single) {
-      const statements = locations.map((location) =>
-        db
-          .prepare('INSERT OR IGNORE INTO rt_google_location_candidates (id, store_id, location_name, location_title, address_text) VALUES (?, ?, ?, ?, ?)')
-          .bind(crypto.randomUUID(), store.id, location.name, location.title, location.addressText),
-      );
-      await db.batch(statements);
+      await replaceLocationCandidates(db, store.id, connectionId, locations);
       return c.redirect(returnToSetup('select_location'));
     }
-    await writeLog(c, store.id, { kind: 'connect', targetName: single.name, result: 'accepted' });
+    await replaceLocationCandidates(db, store.id, connectionId, []);
+    await writeLog(c, connected, { kind: 'connect', targetName: single.name, result: 'accepted' });
     auditLog(c, 'restaurant.google.connect', { id: store.id, kind: 'rt_store' }, { lineAccountId });
     return c.redirect(returnToSetup('connected'));
   } catch (error) {
     const code = error instanceof GoogleBusinessError ? error.kind : error instanceof CredentialEncryptionKeyError ? 'encryption_key_missing' : 'unknown';
     logger.error("restaurant_google.restaurant_test_google_oauth_callback_list_failed");
-    await writeLog(c, store.id, { kind: stateRow.mode, result: 'failed', error: code });
+    await writeLog(c, { id: stateRow.connection_id, store_id: store.id }, { kind: stateRow.mode, result: 'failed', error: code });
     return c.redirect(returnToSetup(`error:${code}`));
   }
 });
@@ -797,8 +902,6 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
 restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', requireConnectionManager, inputJsonBoundary(), async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
-  const connection = await connectionFor(c, store.id);
-  if (!connection || connection.status !== 'pending_location') return fail(c, 409, '店舗の選択待ちではありません', { current: publicConnection(connection) });
   const body = await c.req
     .json<{ locationName?: string; confirmSwitch?: boolean; expectedConnectionId?: unknown; expectedConfirmationRevision?: unknown }>()
     .catch(() => ({} as { locationName?: string; confirmSwitch?: boolean; expectedConnectionId?: unknown; expectedConfirmationRevision?: unknown }));
@@ -806,8 +909,16 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
   if (body.expectedConnectionId !== undefined && (typeof body.expectedConnectionId !== 'string' || !body.expectedConnectionId)) return fail(c, 400, '確認した接続先が不正です');
   const guarded = body.expectedConnectionId !== undefined || body.expectedConfirmationRevision !== undefined;
   if (guarded && (body.expectedConnectionId === undefined || body.expectedConfirmationRevision === undefined)) return fail(c, 400, '確認した接続先と版が必要です');
-  if ((body.expectedConnectionId !== undefined && body.expectedConnectionId !== connection.id)
-    || (body.expectedConfirmationRevision !== undefined && body.expectedConfirmationRevision !== connection.confirmation_revision)) {
+  // どの接続の店舗を決めるのか。確認つきならその接続、無ければ ?connection_id=、
+  // どちらも無ければ主連携（接続が1件だけの環境は今までと同じ接続になる）。
+  const wanted = (body.expectedConnectionId as string | undefined) ?? requestedConnectionId(c);
+  const connection = await connectionFor(c, store.id, wanted);
+  if (!connection && body.expectedConnectionId !== undefined) {
+    return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(await connectionFor(c, store.id)) });
+  }
+  if (!connection && wanted) return fail(c, 404, '指定されたGoogleの接続が見つかりません', { code: 'connection_not_found' });
+  if (!connection || connection.status !== 'pending_location') return fail(c, 409, '店舗の選択待ちではありません', { current: publicConnection(connection) });
+  if (body.expectedConfirmationRevision !== undefined && body.expectedConfirmationRevision !== connection.confirmation_revision) {
     return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(connection) });
   }
   const locationName = body.locationName?.trim();
@@ -822,10 +933,21 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
   }
   const db = dbFor(c.env, store.id);
   const candidate = await db
-    .prepare('SELECT location_name, location_title FROM rt_google_location_candidates WHERE store_id = ? AND location_name = ? LIMIT 1')
-    .bind(store.id, locationName)
+    .prepare(
+      `SELECT location_name, location_title FROM rt_google_location_candidates
+       WHERE store_id = ? AND location_name = ? AND (connection_id = ? OR connection_id IS NULL) LIMIT 1`,
+    )
+    .bind(store.id, locationName, connection.id)
     .first<{ location_name: string; location_title: string }>();
   if (!candidate) return fail(c, 400, '選べる店舗ではありません', {}, ["locationName"]);
+  // 同じ店舗（location）を2つの接続で持つことはできない。書き込みで制約違反になる前に重なりを返す。
+  const takenBy = await db
+    .prepare('SELECT 1 FROM rt_google_connections WHERE store_id = ? AND location_name = ? AND id <> ? LIMIT 1')
+    .bind(store.id, locationName, connection.id)
+    .first();
+  if (takenBy) {
+    return fail(c, 409, 'この店舗はすでに別のGoogle接続で使われています', { code: 'location_already_connected' }, ["locationName"]);
+  }
   let selectedLocation: GoogleLocation | undefined;
   try {
     const accessToken = await accessTokenFor(c, connection);
@@ -836,16 +958,19 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
     return googleErrorResponse(c, error);
   }
   if (!selectedLocation) return fail(c, 409, '選択した店舗をGoogleで確認できません', { code: 'location_mismatch' });
+  // 取り込み済みのものは全部「この接続の前の店舗」の中身。新しい店舗の画面に混ざらないよう先に消す。
+  // 同じ店舗の他の接続のデータは消さないので connection_id で絞る。
+  // 操作の記録（rt_google_write_log）は誰がいつ切り替えたかを追えるように残す。
+  // 接続が空の引き継ぎ行は、この店舗に他の接続が残っていないときだけ一緒に消す（connectionScopeSql）。
+  const switchedOutStatements = () =>
+    ['rt_google_reviews', 'rt_google_changes', 'rt_google_profiles', 'rt_google_posts', 'rt_google_metrics_daily']
+      .map((table) =>
+        db
+          .prepare(`DELETE FROM ${table} WHERE store_id = ?${connectionScopeSql()}`)
+          .bind(store.id, ...connectionScopeBinds(store.id, connection.id)),
+      );
   if (switching && !guarded) {
-    // 取り込み済みのものは全部「前の店舗」の中身。新しい店舗の画面に混ざらないよう先に消す。
-    // 操作の記録（rt_google_write_log）は誰がいつ切り替えたかを追えるように残す。
-    await db.batch([
-      db.prepare('DELETE FROM rt_google_reviews WHERE store_id = ?').bind(store.id),
-      db.prepare('DELETE FROM rt_google_changes WHERE store_id = ?').bind(store.id),
-      db.prepare('DELETE FROM rt_google_profiles WHERE store_id = ?').bind(store.id),
-      db.prepare('DELETE FROM rt_google_posts WHERE store_id = ?').bind(store.id),
-      db.prepare('DELETE FROM rt_google_metrics_daily WHERE store_id = ?').bind(store.id),
-    ]);
+    await db.batch(switchedOutStatements());
   }
   const update = db.prepare(
       switching
@@ -853,25 +978,27 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
           `UPDATE rt_google_connections
              SET confirmation_revision = confirmation_revision + 1, location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ?,
                  average_rating = NULL, total_review_count = NULL, last_synced_at = NULL, last_metrics_synced_at = NULL, last_sync_error = NULL
-             WHERE store_id = ?${guarded ? " AND id = ? AND confirmation_revision = ? AND status = 'pending_location'" : ''}`
-        : `UPDATE rt_google_connections SET confirmation_revision = confirmation_revision + 1, location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ? WHERE store_id = ?${guarded ? " AND id = ? AND confirmation_revision = ? AND status = 'pending_location'" : ''}`,
+             WHERE id = ?${guarded ? " AND confirmation_revision = ? AND status = 'pending_location'" : ''}`
+        : `UPDATE rt_google_connections SET confirmation_revision = confirmation_revision + 1, location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ? WHERE id = ?${guarded ? " AND confirmation_revision = ? AND status = 'pending_location'" : ''}`,
     )
-    .bind(candidate.location_name, selectedLocation.title, selectedLocation.mapsUri, nowIso(), nowIso(), store.id,
-      ...(guarded ? [connection.id, connection.confirmation_revision] : []));
+    .bind(candidate.location_name, selectedLocation.title, selectedLocation.mapsUri, nowIso(), nowIso(), connection.id,
+      ...(guarded ? [connection.confirmation_revision] : []));
   if (guarded) {
     try {
       await db.batch([
-        db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM rt_google_connections WHERE store_id = ? AND id = ? AND confirmation_revision = ? AND status = 'pending_location')
-          AND EXISTS(SELECT 1 FROM rt_google_location_candidates WHERE store_id = ? AND location_name = ?) THEN '{}' ELSE 'CONNECTION_CHANGED' END)`)
-          .bind(store.id, connection.id, connection.confirmation_revision, store.id, candidate.location_name),
+        db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM rt_google_connections WHERE id = ? AND store_id = ? AND confirmation_revision = ? AND status = 'pending_location')
+          AND EXISTS(SELECT 1 FROM rt_google_location_candidates WHERE store_id = ? AND location_name = ? AND (connection_id = ? OR connection_id IS NULL)) THEN '{}' ELSE 'CONNECTION_CHANGED' END)`)
+          .bind(connection.id, store.id, connection.confirmation_revision, store.id, candidate.location_name, connection.id),
         update,
-        ...(switching ? ['rt_google_reviews', 'rt_google_changes', 'rt_google_profiles', 'rt_google_posts', 'rt_google_metrics_daily']
-          .map((table) => db.prepare(`DELETE FROM ${table} WHERE store_id = ?`).bind(store.id)) : []),
-        db.prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ?').bind(store.id),
+        ...(switching ? switchedOutStatements() : []),
+        db.prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ? AND (connection_id = ? OR connection_id IS NULL)').bind(store.id, connection.id),
       ]);
     } catch (error) {
-      const latest = await connectionFor(c, store.id);
-      const stillCandidate = await db.prepare('SELECT 1 FROM rt_google_location_candidates WHERE store_id = ? AND location_name = ?').bind(store.id, candidate.location_name).first();
+      const latest = await connectionFor(c, store.id, connection.id);
+      const stillCandidate = await db
+        .prepare('SELECT 1 FROM rt_google_location_candidates WHERE store_id = ? AND location_name = ? AND (connection_id = ? OR connection_id IS NULL)')
+        .bind(store.id, candidate.location_name, connection.id)
+        .first();
       if (!latest || latest.id !== connection.id || latest.confirmation_revision !== connection.confirmation_revision || latest.status !== 'pending_location' || !stillCandidate) {
         return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(latest) });
       }
@@ -879,16 +1006,16 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
     }
   } else {
     await update.run();
-    await db.prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ?').bind(store.id).run();
+    await replaceLocationCandidates(db, store.id, connection.id, []);
   }
-  await writeLog(c, store.id, {
+  await writeLog(c, connection, {
     kind: switching ? 'reconnect' : 'connect',
     targetName: candidate.location_name,
     beforeText: switching ? previousName : null,
     result: 'accepted',
   });
   auditLog(c, 'restaurant.google.connect', { id: store.id, kind: 'rt_store' }, { lineAccountId: store.lineAccountId });
-  return c.json({ success: true, connection: publicConnection(await connectionFor(c, store.id)) });
+  return c.json({ success: true, connection: publicConnection(await connectionFor(c, store.id, connection.id)) });
 });
 
 restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectionManager, inputJsonBoundary({"confirmed":["boolean"]}), async (c) => {
@@ -896,28 +1023,34 @@ restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectio
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const body = await c.req.json<{ confirmed?: boolean; expectedConnectionId?: unknown; expectedConfirmationRevision?: unknown }>().catch(() => ({} as { confirmed?: boolean; expectedConnectionId?: unknown; expectedConfirmationRevision?: unknown }));
   if (body.confirmed !== true) return fail(c, 400, '確認が必要です', { code: 'confirmation_required' }, ["confirmed"]);
-  const connection = await connectionFor(c, store.id);
-  if (!connection || connection.status === 'disconnected') return fail(c, 409, '接続されていません', { current: publicConnection(connection) });
   if (body.expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(body.expectedConfirmationRevision) || (body.expectedConfirmationRevision as number) < 1)) return fail(c, 400, '確認した版が不正です');
   if (body.expectedConnectionId !== undefined && (typeof body.expectedConnectionId !== 'string' || !body.expectedConnectionId)) return fail(c, 400, '確認した接続先が不正です');
+  // どの接続を解除するのか。確認つきならその接続、無ければ ?connection_id=、
+  // どちらも無ければ主連携（接続が1件だけの環境は今までと同じ接続になる）。
+  const wanted = (body.expectedConnectionId as string | undefined) ?? requestedConnectionId(c);
+  const connection = await connectionFor(c, store.id, wanted);
+  if (!connection && body.expectedConnectionId !== undefined) {
+    return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(await connectionFor(c, store.id)) });
+  }
+  if (!connection && wanted) return fail(c, 404, '指定されたGoogleの接続が見つかりません', { code: 'connection_not_found' });
+  if (!connection || connection.status === 'disconnected') return fail(c, 409, '接続されていません', { current: publicConnection(connection) });
   const db = dbFor(c.env, store.id);
   const guarded = body.expectedConfirmationRevision !== undefined || body.expectedConnectionId !== undefined;
   if (guarded && (body.expectedConnectionId === undefined || body.expectedConfirmationRevision === undefined)) return fail(c, 400, '確認した接続先と版が必要です');
   let claimedRevision: number | null = null;
   if (guarded) {
-    if ((body.expectedConnectionId !== undefined && body.expectedConnectionId !== connection.id)
-      || (body.expectedConfirmationRevision !== undefined && body.expectedConfirmationRevision !== connection.confirmation_revision)) {
+    if (body.expectedConfirmationRevision !== connection.confirmation_revision) {
       return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(connection) });
     }
+    // 版の先取りは「この接続の行」だけ。同じ店舗の他の接続の版は動かさない。
     const claim = await db.prepare(`UPDATE rt_google_connections SET confirmation_revision = confirmation_revision + 1
-      WHERE store_id = ? AND (? IS NULL OR id = ?) AND (? IS NULL OR confirmation_revision = ?) AND status <> 'disconnected'
+      WHERE id = ? AND store_id = ? AND confirmation_revision = ? AND status <> 'disconnected'
       RETURNING confirmation_revision`)
-      .bind(store.id, body.expectedConnectionId ?? null, body.expectedConnectionId ?? null,
-        body.expectedConfirmationRevision ?? null, body.expectedConfirmationRevision ?? null)
+      .bind(connection.id, store.id, body.expectedConfirmationRevision as number)
       .first<{ confirmation_revision: number }>();
-    if (!claim) return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(await connectionFor(c, store.id)) });
+    if (!claim) return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(await connectionFor(c, store.id, connection.id)) });
     claimedRevision = claim.confirmation_revision;
-    const latest = await connectionFor(c, store.id);
+    const latest = await connectionFor(c, store.id, connection.id);
     if (!latest || latest.id !== connection.id || latest.confirmation_revision !== claimedRevision) {
       return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(latest) });
     }
@@ -936,6 +1069,7 @@ restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectio
   // Googleアカウントのメール・店舗名まで消す。
   // 残すのは rt_google_write_log の操作記録（誰がいつ何を送ったか。送信前の
   // スナップショットは消す）と、解除済みという接続行そのもの。
+  // 消すのは解除する接続のぶんだけ。同じ店舗の他の接続のデータは残す。
   const clear = db.prepare(
       `UPDATE rt_google_connections
        SET confirmation_revision = confirmation_revision + 1, refresh_token_enc = NULL, access_token_enc = NULL, access_token_expires_at = NULL,
@@ -943,45 +1077,50 @@ restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectio
            average_rating = NULL, total_review_count = NULL,
            last_synced_at = NULL, last_metrics_synced_at = NULL, last_sync_error = NULL,
            status = 'disconnected', disconnected_at = ?, updated_at = ?
-       WHERE store_id = ?${guarded ? ' AND id = ? AND confirmation_revision = ?' : ''}`,
+       WHERE id = ?${guarded ? ' AND confirmation_revision = ?' : ''}`,
     )
-    .bind(nowIso(), nowIso(), store.id, ...(guarded ? [connection.id, claimedRevision] : []));
+    .bind(nowIso(), nowIso(), connection.id, ...(guarded ? [claimedRevision] : []));
   if (guarded) {
     try {
       await db.batch([
         db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM rt_google_connections WHERE store_id = ? AND id = ? AND confirmation_revision = ?) THEN '{}' ELSE 'CONNECTION_CHANGED' END)`)
           .bind(store.id, connection.id, claimedRevision),
         clear,
-        ...deleteGoogleContentStatements(db, store.id),
+        ...deleteGoogleContentStatements(db, { storeId: store.id, connectionId: connection.id }),
       ]);
     } catch (error) {
-      const latest = await connectionFor(c, store.id);
+      const latest = await connectionFor(c, store.id, connection.id);
       if (!latest || latest.id !== connection.id || latest.confirmation_revision !== claimedRevision) return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(latest) });
       throw error;
     }
   } else {
     await clear.run();
-    await deleteGoogleContentForStore(db, store.id);
+    await deleteGoogleContentForConnection(db, store.id, connection.id);
   }
-  await writeLog(c, store.id, { kind: 'disconnect', targetName: connection.location_name, result: revoked ? 'accepted' : 'unknown', error: revoked ? null : 'revoke_failed' });
+  await writeLog(c, connection, { kind: 'disconnect', targetName: connection.location_name, result: revoked ? 'accepted' : 'unknown', error: revoked ? null : 'revoke_failed' });
   auditLog(c, 'restaurant.google.disconnect', { id: store.id, kind: 'rt_store' }, { lineAccountId: store.lineAccountId });
-  return c.json({ success: true, revoked, connection: publicConnection(await connectionFor(c, store.id)) });
+  return c.json({ success: true, revoked, connection: publicConnection(await connectionFor(c, store.id, connection.id)) });
 });
 
-/** 同期結果（時刻・平均評価・総件数）を接続行へ記録する。手動syncと定期再同期の両方から使う。 */
+/**
+ * 同期結果（時刻・平均評価・総件数）を接続行へ記録する。手動syncと定期再同期の両方から使う。
+ *
+ * 取り込んだ接続の行だけを更新する。同じ店舗の他の接続の最終同期時刻・評価は動かさない
+ * （動かすと、片方を同期しただけで他方も同期済みに見え、定期取得が永久に飛ばされる）。
+ */
 export async function recordReviewSyncResult(
   env: Env['Bindings'],
-  storeId: string,
+  connection: ConnectionRef,
   result: { complete: boolean; averageRating: number | null; totalReviewCount: number | null },
 ): Promise<void> {
-  await dbFor(env, storeId)
+  await dbFor(env, connection.store_id)
     .prepare(
       `UPDATE rt_google_connections
        SET confirmation_revision = confirmation_revision + CASE WHEN status IS NOT 'connected' THEN 1 ELSE 0 END, last_synced_at = ?, last_sync_error = ?, average_rating = COALESCE(?, average_rating),
            total_review_count = COALESCE(?, total_review_count), status = 'connected', updated_at = ?
-       WHERE store_id = ?`,
+       WHERE id = ?`,
     )
-    .bind(nowIso(), result.complete ? null : 'partial', result.averageRating, result.totalReviewCount, nowIso(), storeId)
+    .bind(nowIso(), result.complete ? null : 'partial', result.averageRating, result.totalReviewCount, nowIso(), connection.id)
     .run();
 }
 
@@ -992,8 +1131,8 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/sync', inputJsonBound
   try {
     const accessToken = await accessTokenFor(c, connection);
     const result = await listAllReviews({ fetch, accessToken }, connection.location_name!);
-    await upsertReviewsForEnv(c.env, store.id, result.reviews);
-    await recordReviewSyncResult(c.env, store.id, result);
+    await upsertReviewsForEnv(c.env, connection, result.reviews);
+    await recordReviewSyncResult(c.env, connection, result);
     return c.json({
       success: true,
       fetched: result.reviews.length,
@@ -1004,8 +1143,8 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/sync', inputJsonBound
     });
   } catch (error) {
     if (error instanceof GoogleBusinessError) {
-      if (error.kind === 'no_permission') await setConnectionStatus(c, store.id, 'no_permission', 'no_permission');
-      else if (error.kind !== 'auth_expired') await setConnectionStatus(c, store.id, connection.status, error.kind);
+      if (error.kind === 'no_permission') await setConnectionStatus(c, connection, 'no_permission', 'no_permission');
+      else if (error.kind !== 'auth_expired') await setConnectionStatus(c, connection, connection.status, error.kind);
     }
     return googleErrorResponse(c, error);
   }
@@ -1020,8 +1159,20 @@ restaurantGoogle.get('/api/restaurant-test/google/reviews', async (c) => {
   const q = (c.req.query('q') ?? '').trim();
   const { page, limit: perPage } = parseOffsetPaging({ limit: c.req.query('per_page'), page: c.req.query('page') }, { defaultLimit: 20, limitPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1, maximum: REVIEWS_PAGE_SIZE_MAX }, pagePolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1 } });
 
+  // 既定は店舗の口コミ全部。`?connection_id=` を明示したときだけ、その接続のぶんに絞る。
+  // 画面は今まで通り絞り込み無しで呼ぶので、見える口コミは変わらない。
+  const wanted = requestedConnectionId(c);
+  const connection = await connectionFor(c, store.id, wanted);
+  if (!connection && wanted) return fail(c, 404, '指定されたGoogleの接続が見つかりません', { code: 'connection_not_found' });
+
   const where: string[] = ['store_id = ?'];
   const binds: unknown[] = [store.id];
+  if (wanted && connection) {
+    // 取り込み時に connection_id を書くが、移行直後は空の行が残る。空の行は
+    // どちらの接続の画面にも出す（厳密に絞ると画面から口コミが消える）。
+    where.push('(connection_id = ? OR connection_id IS NULL)');
+    binds.push(connection.id);
+  }
   if (filter === 'unreplied') where.push(`reply_status IN ('unreplied', 'draft')`);
   else if (filter === 'draft') where.push(`reply_status = 'draft'`);
   else if (filter === 'attention') where.push('needs_attention = 1');
@@ -1044,7 +1195,6 @@ restaurantGoogle.get('/api/restaurant-test/google/reviews', async (c) => {
     .prepare(`SELECT * FROM rt_google_reviews WHERE ${where.join(' AND ')} ORDER BY ${orderSql} LIMIT ? OFFSET ?`)
     .bind(...binds, perPage, (page - 1) * perPage)
     .all<ReviewRow>();
-  const connection = await connectionFor(c, store.id);
   const responseItems = rows.results.map(publicReview);
   return c.json(buildOffsetListResponse({ success: true,
     reviews: responseItems,
@@ -1059,7 +1209,8 @@ restaurantGoogle.get('/api/restaurant-test/google/reviews/:id', async (c) => {
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const row = await reviewFor(c, store.id, c.req.param('id'));
   if (!row) return fail(c, 404, '口コミが見つかりません');
-  const connection = await connectionFor(c, store.id);
+  // この口コミを取り込んだ接続を出す。分からない行（移行直後・解除後）は主連携を出す。
+  const connection = await connectionFor(c, store.id, row.connection_id ?? undefined);
   return c.json({ success: true, review: publicReview(row), store: { id: store.id, name: store.name }, connection: publicConnection(connection) });
 });
 
@@ -1211,10 +1362,21 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/reply', requireRo
   if (row.reply_status === 'published' || row.reply_status === 'replied') {
     return fail(c, 409, 'この口コミにはすでに返信があります', { code: 'already_replied', existingReply: row.reply_comment });
   }
+  // 返信は、その口コミを取り込んだ接続で送る。別の接続のトークンでは相手のロケーションを
+  // 触れないので、選ばれている接続のまま送ると失敗する。取り込み元が分からない行
+  // （移行直後・解除後）は、選ばれている接続で送る。
+  let replyConnection = connection;
+  if (row.connection_id && row.connection_id !== connection.id) {
+    const owner = await connectionFor(c, store.id, row.connection_id);
+    if (!owner || owner.status === 'disconnected' || !owner.location_name) {
+      return fail(c, 409, 'この口コミを受け取ったGoogle連携が接続されていません', { code: 'connection_not_connected', current: publicConnection(owner) });
+    }
+    replyConnection = owner;
+  }
   const db = dbFor(c.env, store.id);
   let accessToken: string;
   try {
-    accessToken = await accessTokenFor(c, connection);
+    accessToken = await accessTokenFor(c, replyConnection);
   } catch (error) {
     return googleErrorResponse(c, error);
   }
@@ -1234,7 +1396,7 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/reply', requireRo
       return fail(c, 409, '別の担当者がすでに返信しています', { code: 'already_replied', existingReply: latest.reply.comment });
     }
   } catch (error) {
-    if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, store.id, 'no_permission', 'no_permission');
+    if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, replyConnection, 'no_permission', 'no_permission');
     return googleErrorResponse(c, error);
   }
 
@@ -1248,7 +1410,7 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/reply', requireRo
       )
       .bind(reply.comment, reply.updateTime, validated.text, nowIso(), row.id)
       .run();
-    await writeLog(c, store.id, { kind: 'review_reply', targetName: row.review_name, beforeText: row.reply_comment, afterText: validated.text, requestId, result: 'accepted' });
+    await writeLog(c, replyConnection, { kind: 'review_reply', targetName: row.review_name, beforeText: row.reply_comment, afterText: validated.text, requestId, result: 'accepted' });
     auditLog(c, 'restaurant.google.review.reply', { id: row.id, kind: 'rt_google_review' }, { lineAccountId: store.lineAccountId });
     return c.json({ success: true, alreadyPublished: false, reply, review: publicReview((await reviewFor(c, store.id, row.id))!) });
   } catch (error) {
@@ -1258,9 +1420,9 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/reply', requireRo
     if (!unknownResult) {
       await db.prepare(`UPDATE rt_google_reviews SET reply_status = 'draft', reply_draft = ?, updated_at = ? WHERE id = ?`).bind(validated.text, nowIso(), row.id).run();
     }
-    await writeLog(c, store.id, { kind: 'review_reply', targetName: row.review_name, beforeText: row.reply_comment, afterText: validated.text, requestId, result: unknownResult ? 'unknown' : 'failed', error: kind });
+    await writeLog(c, replyConnection, { kind: 'review_reply', targetName: row.review_name, beforeText: row.reply_comment, afterText: validated.text, requestId, result: unknownResult ? 'unknown' : 'failed', error: kind });
     auditLog(c, 'restaurant.google.review.reply', { id: row.id, kind: 'rt_google_review' }, { result: 'failed', lineAccountId: store.lineAccountId });
-    if (kind === 'no_permission') await setConnectionStatus(c, store.id, 'no_permission', 'no_permission');
+    if (kind === 'no_permission') await setConnectionStatus(c, replyConnection, 'no_permission', 'no_permission');
     return googleErrorResponse(c, error);
   }
 });

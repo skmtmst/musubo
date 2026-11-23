@@ -18,7 +18,7 @@ function show(phase: FollowerImportState['phase']) {
     connection={{ id: 'fixture-account', steps: [], pictureUrl: null, basicId: '@fixture',
       followerImport: { capability: state.capability, phase }, remainingActions: [] } as LineAccountConnectData}
     accountName="確認用アカウント" createdId="fixture-account" importFriends importState={state}
-    importRunning={phase !== 'completed'} handover={handoverProgress(state)} idleSeconds={0} requestError={false} restaurant={false}
+    importRunning={phase !== 'completed'} handover={handoverProgress(state)} idleSeconds={0} requestError={false}
   />)
 }
 afterEach(cleanup)

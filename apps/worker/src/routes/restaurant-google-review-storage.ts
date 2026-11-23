@@ -8,18 +8,30 @@ export function nowIso(): string {
 
 // ---------- 口コミタブ ----------
 
-/** 口コミの取り込みUPSERT。手動sync（下のエンドポイント）と定期再同期の両方から使う。 */
-export async function upsertReviewsForEnv(env: Env['Bindings'], storeId: string, reviews: GoogleReview[]): Promise<void> {
+/**
+ * 口コミの取り込みUPSERT。手動sync（下のエンドポイント）と定期再同期の両方から使う。
+ *
+ * どの接続から取り込んだのかを必ず書く。review_name は Google のロケーション名を含むので、
+ * 同じ店舗に2つの接続があっても一意制約（store_id, review_name）は衝突しない。
+ * 既に入っている行の connection_id が移行で空のままなら、ここで埋め直す。
+ */
+export async function upsertReviewsForEnv(
+  env: Env['Bindings'],
+  connection: { id: string; store_id: string },
+  reviews: GoogleReview[],
+): Promise<void> {
+  const storeId = connection.store_id;
   const db = dbFor(env, storeId);
   const now = nowIso();
   const statements = reviews.map((review) =>
     db
       .prepare(
         `INSERT INTO rt_google_reviews
-           (id, store_id, review_name, reviewer_display_name, star_rating, comment, create_time, update_time, needs_attention,
+           (id, store_id, connection_id, review_name, reviewer_display_name, star_rating, comment, create_time, update_time, needs_attention,
             reply_status, reply_comment, reply_update_time, first_seen_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(store_id, review_name) DO UPDATE SET
+           connection_id = excluded.connection_id,
            reviewer_display_name = excluded.reviewer_display_name,
            star_rating = excluded.star_rating,
            comment = excluded.comment,
@@ -36,6 +48,7 @@ export async function upsertReviewsForEnv(env: Env['Bindings'], storeId: string,
       .bind(
         crypto.randomUUID(),
         storeId,
+        connection.id,
         review.name,
         review.reviewerDisplayName,
         review.starRating,

@@ -284,7 +284,7 @@ export async function saveFeedingProducts(db: D1Database, lineAccountId: string,
   const products = validateFeedingProducts(input);
   const existing = await listFeedingProducts(db, lineAccountId);
   /*
-   * 画面が編集した対象と保存先が一致しているかの最終確認（DEEP-22）。
+   * 画面が編集した対象と保存先が一致しているかの最終確認。
    * このアカウントに存在しないidは新規へ黙って変換せず、1件も書き込む前に拒否する。
    * 別アカウントの商品idが混ざった一覧をそのまま置き換えると、
    * いまある商品とペットとの関連が消えるため。
@@ -330,7 +330,7 @@ export function planForPetRow(row: PetFeedingRow, products: FeedingProductRow[],
   const weightKg = Number(row.weight_kg);
   if (!Number.isFinite(weightKg) || weightKg <= 0) return null;
   /*
-   * DEEP-24: NRC／FEDIAF の係数は犬・猫専用。「その他」の動物へ犬の式を
+   * NRC／FEDIAF の係数は犬・猫専用。「その他」の動物へ犬の式を
    * 暗黙に当てない（計算対象外として null を返し、画面側で理由を出す）。
    */
   const species = toPetAnimalType(row.animal_type);

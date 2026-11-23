@@ -8,7 +8,17 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
+- [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
+- [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
+- [動作確認の名前を整理（3回目）](release-log/unreleased/160-kenta-q04-test-titles3.md)
+- [動作確認の名前を整理（4回目）](release-log/unreleased/163-kenta-q04-test-titles4.md)
+- [開発用の説明を整理](release-log/unreleased/165-kenta-q04-comments-pkg.md)
+- [動作確認の名前とコメントの整理をまとめて取り込み](release-log/unreleased/172-kenta-train-q04.md)
 - [面談・飲食店の予約一覧の修正履歴](release-log/unreleased/86-kenta-1360.md)
+- [開発用の説明の古い参照を修正](release-log/unreleased/151-kenta-q04-refs.md)
+
+- [内部の説明の整理の反映履歴](release-log/unreleased/164-kenta-q04-comments.md)
+- [各種設定の内部説明の整理の反映履歴](release-log/unreleased/166-kenta-q04-comments2.md)
 - [最初に読む：製品とコードの入口](START-HERE.md)
 - [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
 - [更新時のマイグレーション履歴と復旧](update-migration-history.md)
@@ -440,6 +450,7 @@
 - [cleanup-q01w1-1019.md](qa/cleanup-q01w1-1019.md)
 - [cleanup-q01w4-1019.md](qa/cleanup-q01w4-1019.md)
 - [README.md](../packages/db/README.md)
+- [順番待ちのマイグレーション（新しいコードを配り終えてから当てる分）](../packages/db/migrations-pending/README.md)
 
 ## セキュリティ
 
@@ -471,10 +482,24 @@
 ## 反映履歴
 
 - [受信箱でInstagramのDMを確認・返信](release-log/unreleased/98-kenta-ig-dm.md) — 反映履歴、確認 2026-11-16。
+- [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
+
+- [複数アカウント配信の再送時の重複を防止](release-log/unreleased/146-kenta-a21-multi-resend.md) — 反映履歴、確認 2026-11-21。
+
+- [開店準備の接続・コース入力・再開](release-log/unreleased/148-masato-first-guide-recheck.md) — 反映履歴、確認 2026-11-21。
+- [LINE接続の自動更新](release-log/unreleased/152-masato-line-token-auto-renew.md) — 反映履歴、確認 2026-11-22。
 
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
+- [新しいLINEアカウントのLIFF自動作成](release-log/unreleased/153-masato-liff-auto-create.md) — 反映履歴、確認 2026-11-22。
+
+- [LINE登録後の「使い方を選ぶ」への自動遷移](release-log/unreleased/154-masato-line-register-auto.md) — 反映履歴、確認 2026-11-22。
+- [LINE初回登録の初期設定保存](release-log/unreleased/162-masato-line-register-style-recovery.md) — 反映履歴、確認 2026-11-22。
+- [LINE登録の完了画面と飲食店の初期設定](release-log/unreleased/167-masato-line-registration-finish.md) — 反映履歴、確認 2026-11-22。
+
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
+
+- [GoogleビジネスとInstagramの複数接続（第1段）](release-log/unreleased/137-kenta-sns-multi-connections.md) — 反映履歴、確認 2026-11-21。
 
 - [開店準備ガイドの修正](release-log/unreleased/133-masato-restaurant-setup-guide.md)
 
@@ -1297,3 +1322,5 @@
 - [EC連携を止めている間の案内](release-log/unreleased/78-kenta-words-behavior.md) — 画面の案内を実際の動きに合わせた修正履歴。確認 2026-11-15。
 - [閲覧のみの作るボタン・行の操作を灰色に](release-log/unreleased/73-kenta-train-viewer.md) — 閲覧のみの人への表示をそろえた履歴。確認 2026-11-15。
 - [列車 1116](release-log/unreleased/83-kenta-train-1116.md) — まとめて入れた直しの履歴。確認 2026-11-16。
+
+- [データ保持の分類表の重複](release-log/unreleased/145-kenta-retention-dup.md) — 申込記録の分類表の重複を直した履歴。確認 2026-11-21。

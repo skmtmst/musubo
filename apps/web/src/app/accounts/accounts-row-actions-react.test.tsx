@@ -12,6 +12,7 @@ vi.hoisted(() => {
 })
 
 const listAccounts = vi.hoisted(() => vi.fn())
+const checkConnection = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const staff = vi.hoisted(() => ({ role: 'owner' as string | null }))
 
@@ -21,7 +22,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      lineAccounts: { ...actual.api.lineAccounts, list: listAccounts },
+      lineAccounts: { ...actual.api.lineAccounts, list: listAccounts, checkConnection },
     },
   }
 })
@@ -65,6 +66,7 @@ beforeEach(() => {
   document.documentElement.dataset.theme='v8'
   window.history.replaceState(null,'','/accounts')
   push.mockClear()
+  checkConnection.mockReset()
   staff.role = 'owner'
   verifiedStaffRole('owner')
   // 設定ナビの機能表示GETは見本で返す。この試験から外へ通信させない。
@@ -74,6 +76,7 @@ beforeEach(() => {
     data: [{
       id: 'account-a',
       name: '本店アカウント',
+      revision: 7,
       channelId: '1234567890',
       channelSecret: null,
       isActive: true,
@@ -144,6 +147,29 @@ describe('V7vn3 LINEアカウント一覧の行操作', () => {
     await act(async () => { detail?.click() })
     await flush()
     expect(host.querySelector('[aria-label="本店アカウントの操作"]')?.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it.each([
+    ['matched', true, '「本店アカウント」のWebhook接続を確認しました。'],
+    ['matched', false, 'Webhook接続を確認できませんでした'],
+    ['mismatched', true, 'Webhook接続を確認できませんでした'],
+  ])('現在の版を使ってWebhookを確認し、結果を表示する（%s、%s）', async (result, webhookActive, message) => {
+    checkConnection.mockResolvedValue({ success: true, data: { accountId: 'account-a', checks: [{ kind: 'webhook_endpoint', result, webhookActive }] } })
+    const refreshed = vi.fn()
+    window.addEventListener('lh:v8:guide-signal', refreshed)
+    try {
+      await renderList()
+      await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="本店アカウントの操作"]')!.click() })
+      const recheck = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+        .find(item => item.textContent === '接続をもう一度確かめる')!
+      await act(async () => { recheck.click() })
+      expect(checkConnection).toHaveBeenCalledExactlyOnceWith('account-a', 7)
+      expect(listAccounts).toHaveBeenLastCalledWith(true)
+      expect(host.textContent).toContain(message)
+      expect(refreshed).toHaveBeenCalledWith(expect.objectContaining({ detail: { anchor: 'accounts.connection', accountId: 'account-a' } }))
+    } finally {
+      window.removeEventListener('lh:v8:guide-signal', refreshed)
+    }
   })
 })
 

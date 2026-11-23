@@ -38,12 +38,11 @@ export type GuideControl = {
   anchor: GuideAnchor | null
   pausedAnchor: GuideAnchor | null
   start: () => void
+  restart?: () => void
   pause: () => void
   resume: () => void
   reset: () => void
   complete?: () => void
-  welcome?: 'loading' | 'pending' | 'seen'
-  acknowledgeWelcome?: () => void
   /** 同じ段の次の手順へ（1/3→2/3→3/3）。 */
   advanceProcedure: () => void
   /** 選んだ段の手順1から始める。持たない呼び出し元もあるので任意。 */
@@ -130,7 +129,8 @@ export function nextGuideEngineState(current: GuideEngineState, action: GuideEng
 export type GuideAnchor = { key: string; label: string; href: string }
 
 function needsGuideReview(state: GuideEngineState): boolean {
-  return (state.stepKey === 'attributes' && state.procedureIndex === 3) ||
+  return state.stepKey === 'richMenu' ||
+    (state.stepKey === 'attributes' && state.procedureIndex === 3) ||
     state.stepKey === 'hours' ||
     (state.stepKey === 'scenario' && state.procedureIndex === 2)
 }
@@ -191,7 +191,6 @@ const BLOCK_ON_SAVE_FAILURE: ReadonlySet<GuideEngineAction> = new Set(['advance'
  */
 export function useGuideEngine(accountId: string | null, summary: GuideSummary | null, scripted = true) {
   const [state, setState] = useState<GuideEngineState>(initialState)
-  const [welcome, setWelcome] = useState<{ accountId: string; pending: boolean } | null>(null)
   /**
    * この案内の間だけ見送った段。済みにはしない（完了判定は実データ計測のまま）。
    * 覚えないと、見送った段がまた「次の案内」として選ばれて同じ所に戻ってしまう。
@@ -209,15 +208,13 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
     const request = api.gettingStarted.guide.get(accountId)
       .then(response => {
         if (generation.current !== current || pending.current !== request) return
-        setWelcome({ accountId, pending: Boolean(response?.success && response.data?.updatedAt === null && response.data.phase === 'idle') })
         // 読めなかった時は控えのまま続ける（案内を取り上げない）。
         if (!response?.success || !response.data) return
         const next = guideStateFromServer(response.data)
         setState(next)
         writeGuideEngineState(accountId, next)
       })
-      .catch(() => { if (generation.current === current) setWelcome({ accountId, pending: false }) })
-      .then(() => true)
+      .then(() => true, () => true)
     pending.current = request
     return () => { generation.current += 1 }
   }, [accountId])
@@ -295,28 +292,20 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
     commit('advance', nextKey)
   }, [state, summary, skipped, commit, scripted, finished])
 
-  const acknowledgeWelcome = useCallback(() => {
-    if (!accountId || welcome?.accountId !== accountId || !welcome.pending) return
-    setWelcome({ accountId, pending: false })
-    const request = pending.current.then(async () => {
-      try {
-        const response = await api.gettingStarted.guide.save(accountId, { ...initialState, acknowledgeWelcome: true })
-        return Boolean(response?.success)
-      } catch { return false }
-    })
-    pending.current = request
-  }, [accountId, welcome])
-
   return {
     phase: state.phase,
-    welcome: !accountId || welcome?.accountId !== accountId ? 'loading' : welcome.pending ? 'pending' : 'seen',
-    acknowledgeWelcome,
     stepKey: state.stepKey,
     procedureIndex: state.procedureIndex,
     anchor: state.phase === 'done' ? null : anchor,
     pausedAnchor: state.phase === 'paused' ? savedGuideAnchor(summary, state) ?? anchor : null,
     /** 最初から始める時は見送りの記憶も消す（また1段目から案内する）。 */
     start: useCallback(() => { setSkipped(EMPTY_SKIPPED); commit(state.phase === 'active' ? 'advance' : 'start', guideAnchor(summary)?.key ?? null) }, [commit, summary, state.phase]),
+    restart: useCallback(() => {
+      const connected = summary?.steps.some(step => step.key === 'accounts' && step.done)
+      const firstMenu = scripted && connected && summary?.steps.some(step => step.key === 'richMenu' && step.href)
+      setSkipped(EMPTY_SKIPPED)
+      commit(state.phase === 'active' ? 'advance' : 'start', firstMenu ? 'richMenu' : guideAnchor(summary)?.key ?? null)
+    }, [commit, scripted, summary, state.phase]),
     /**
      * 選んだ段からガイドを始める（枠08b の行の「開く」）。
      * 止まっている時は 'start'、もう動いている時は 'advance' で段を移す。

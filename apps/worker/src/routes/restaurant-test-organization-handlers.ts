@@ -19,11 +19,10 @@ import { dbFor } from '../services/db-router.js';
 import { issueRestaurantIntakeAddress, listRestaurantIntakeAddresses, RestaurantIntakeConfigurationError } from '../services/restaurant-email-intake.js';
 import { issueLineAccessToken, LineTokenIssueError } from '../services/token-refresh.js';
 import { fetchBotProfile } from '../lib/bot-profile.js';
-import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { applyDueRestaurantMenuPrices, expireRestaurantHolds } from '../services/restaurant-booking.js';
 import { restaurantChannelState, restaurantDayBounds } from '../services/restaurant-channels.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-import { tenantHasFeaturePack } from '../services/tenant-features.js';
+import { restaurantAccessMode } from '../services/tenant-features.js';
 import { organizationFor, tenantId, accountId, hasOrganizationSelector, requiredAccount, storeBelongsTo, publicOrganization, selectedRestaurantStore, organizationByTenantId, authenticatedTenantId, RESTAURANT_TERMS_DOCUMENT_KEY, RESTAURANT_TERMS_DOCUMENT_VERSION, ensureOrganizationForAuthenticatedTenant, updateSelectedRestaurantStore, lineConnectionMessage, validateStoreLineAccount } from './restaurant-test-definition.js';
 import type { Context, Next } from 'hono';
 
@@ -51,29 +50,24 @@ export const use___3 = async (c: Context<Env, "*">, next: Next) => {await next()
 export const use__api_restaurant_test__4 = async (c: Context<Env, "/api/restaurant-test/*">, next: Next) => {
   // Google の各ルートは専用の旗・ログイン・統括・アカウントの guard で守る。
   if (c.req.path.startsWith('/api/restaurant-test/google/')) return next();
-  if (!restaurantTestEnabled(c.env)) {
-    return c.json({ success: false, error: 'Not found' }, 404);
-  }
-
-  const staffTenant = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
-  // 統括に飲食店機能パックが付いていない場合、環境が無効な場合と同じ404で
-  // 返す。機能の存在自体を、権限が無い呼び出し元に漏らさないため。
-  if (!(await tenantHasFeaturePack(dbFor(c.env), staffTenant, 'restaurant'))) {
+  const selectedAccount = accountId(c);
+  const mode = await restaurantAccessMode(c, selectedAccount);
+  if (!mode) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
 
   const requestedTenant = tenantId(c);
-  if (requestedTenant && requestedTenant !== staffTenant) {
+  if (requestedTenant && requestedTenant !== authenticatedTenantId(c)) {
     return c.json({ success: false, error: 'この統括を操作する権限がありません' }, 403);
   }
 
   // 既存の account_id の可視範囲検査を維持する。
-  const selectedAccount = accountId(c);
   if (!selectedAccount) return next();
   const scope = await getVisibleLineAccountScope(dbFor(c.env), c.get('staff'));
   if (!scope.ids.includes(selectedAccount)) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
+  if (mode === 'account') c.set('restaurantScopedAccountId', selectedAccount);
   return next();
 };
 
@@ -97,6 +91,7 @@ export const get__api_restaurant_test_stores_7 = async (c: Context<Env, "/api/re
   if (!organization) {
     return c.json({ success: true, data: { organization: null, stores: [] } });
   }
+  const scopedAccountId = c.get('restaurantScopedAccountId') ?? null;
   const stores = await dbFor(c.env).prepare(`SELECT
       s.*, la.name AS line_account_name,
       CASE WHEN s.line_account_id IS NULL THEN NULL ELSE (
@@ -105,8 +100,8 @@ export const get__api_restaurant_test_stores_7 = async (c: Context<Env, "/api/re
       ) END AS friend_count
     FROM rt_stores s
     LEFT JOIN line_accounts la ON la.id = s.line_account_id
-    WHERE s.organization_id = ?
-    ORDER BY s.name COLLATE NOCASE ASC, s.id ASC`).bind(organization.id)
+    WHERE s.organization_id = ? AND (? IS NULL OR s.line_account_id = ?)
+    ORDER BY s.name COLLATE NOCASE ASC, s.id ASC`).bind(organization.id, scopedAccountId, scopedAccountId)
     .all<RestaurantStoreRow>();
   const withStatuses = await deriveStoreLineStatuses(c, stores.results);
   return c.json({
@@ -129,7 +124,7 @@ export const get__api_restaurant_test_store_context_8 = async (c: Context<Env, "
 };
 
 export const get__api_restaurant_test_terms_agreement_9 = async (c: Context<Env, "/api/restaurant-test/terms-agreement">) => {
-  const organization = hasOrganizationSelector(c)
+  const organization = hasOrganizationSelector(c) && !c.get('restaurantScopedAccountId')
     ? await organizationFor(c, { ignoreSession: true })
     : await organizationByTenantId(c, authenticatedTenantId(c));
   if (!organization) {
@@ -207,7 +202,7 @@ export const post__api_restaurant_test_stores_id_select_11 = async (c: Context<E
   const store = await dbFor(c.env, storeId).prepare(
     'SELECT id, organization_id, name, status FROM rt_stores WHERE id = ? LIMIT 1',
   ).bind(storeId).first<SelectedRestaurantStore & { status: string }>();
-  if (!store || store.organization_id !== organization.id) {
+  if (!store || store.organization_id !== organization.id || (c.get('restaurantScopedAccountId') && store.id !== organization.scopedStoreId)) {
     return c.json({ success: false, error: 'この店舗を表示することはできません' }, 403);
   }
   if (store.status === 'archived') {
@@ -247,6 +242,7 @@ export const get__api_restaurant_test_snapshot_13 = async (c: Context<Env, "/api
   await applyDueRestaurantMenuPrices(dbFor(c.env), organization.id, organization.scopedStoreId ?? undefined);
   const orgId = organization.id;
   const scopedStoreId = organization.scopedStoreId;
+  const scopedAccountId = c.get('restaurantScopedAccountId') ?? null;
   // 予約台帳の絞り込み（期間・状態）とページ切替。既定は従来どおり先頭300件。
   const reservationFilter = parseReservationFilter(c, orgId, scopedStoreId);
   if (!reservationFilter.ok) return c.json({ success: false, error: reservationFilter.error }, 400);
@@ -258,10 +254,11 @@ export const get__api_restaurant_test_snapshot_13 = async (c: Context<Env, "/api
       ORDER BY s.code`).bind(orgId, scopedStoreId, scopedStoreId).all<RestaurantStoreRow>(),
     dbFor(c.env).prepare(`SELECT m.*, sm.name AS loginName, sm.role AS loginRole, sm.access_level AS loginAccessLevel,
       sm.is_active AS loginActive, sm.policy_version AS loginPolicyVersion, sm.account_scope AS loginAccountScope,
-      (SELECT json_group_array(line_account_id) FROM staff_account_scopes WHERE staff_id=m.staff_id) AS loginAccountIdsJson
+      (SELECT json_group_array(line_account_id) FROM staff_account_scopes
+        WHERE staff_id=m.staff_id AND (? IS NULL OR line_account_id=?)) AS loginAccountIdsJson
       FROM rt_memberships m LEFT JOIN staff_members sm ON sm.id=m.staff_id
       WHERE m.organization_id = ? AND (? IS NULL OR m.store_id = ?)
-      ORDER BY m.role, m.staff_name`).bind(orgId, scopedStoreId, scopedStoreId).all(),
+      ORDER BY m.role, m.staff_name`).bind(scopedAccountId, scopedAccountId, orgId, scopedStoreId, scopedStoreId).all(),
     dbFor(c.env).prepare(`SELECT * FROM rt_approval_requests
       WHERE organization_id = ? AND (? IS NULL OR store_id = ?)
       ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'returned' THEN 1 ELSE 2 END,
@@ -340,20 +337,34 @@ export const post__api_restaurant_test_stores_connect_14 = async (c: Context<Env
   if (!channelId) return inputError(c, { success: false, error: 'チャネルIDを入力してください' }, 400, ["channelId"]);
   if (!channelSecret) return inputError(c, { success: false, error: 'チャネルシークレットを入力してください' }, 400, ["channelSecret"]);
 
-  const organization = await ensureOrganizationForAuthenticatedTenant(c);
-  if (!organization) return c.json({ success: false, error: '統括情報を確認できません' }, 404);
+  const scopedAccountId = c.get('restaurantScopedAccountId');
+  const selectedAccount = scopedAccountId ?? accountId(c);
+  const registered = selectedAccount ? await dbFor(c.env).prepare(`SELECT a.id FROM line_accounts a
+    JOIN account_styles p ON p.line_account_id=a.id
+    WHERE a.id=? AND a.channel_id=? AND COALESCE(a.tenant_id,?)=? AND a.is_active=1 AND a.archived_at IS NULL
+      AND p.style='restaurant' AND p.selection_mode='configured' AND p.selected_at IS NOT NULL`)
+    .bind(selectedAccount, channelId, DEFAULT_TENANT_ID, authenticatedTenantId(c)).first<{ id: string }>() : null;
+  if (scopedAccountId && !registered) {
+    return inputError(c, { success: false, error: '選択中のLINEアカウントのチャネルIDを入力してください' }, 400, ['channelId']);
+  }
+  const existingOrganization = registered
+    ? await organizationByTenantId(c, authenticatedTenantId(c))
+    : await ensureOrganizationForAuthenticatedTenant(c);
+  if (!existingOrganization && !registered) return c.json({ success: false, error: '統括情報を確認できません' }, 404);
 
   const code = alias || name;
-  const [sameCode, sameChannel] = await Promise.all([
-    dbFor(c.env).prepare(
+  const [sameCode, existingLink] = await Promise.all([
+    existingOrganization && dbFor(c.env).prepare(
       'SELECT 1 AS found FROM rt_stores WHERE organization_id = ? AND code = ? LIMIT 1',
-    ).bind(organization.id, code).first<{ found: number }>(),
-    dbFor(c.env).prepare(
-      'SELECT 1 AS found FROM line_accounts WHERE channel_id = ? LIMIT 1',
-    ).bind(channelId).first<{ found: number }>(),
+    ).bind(existingOrganization.id, code).first(),
+    registered
+      ? dbFor(c.env).prepare('SELECT 1 FROM rt_stores WHERE line_account_id=?').bind(registered.id).first()
+      : dbFor(c.env).prepare('SELECT 1 FROM line_accounts WHERE channel_id=?').bind(channelId).first(),
   ]);
   if (sameCode) return c.json({ success: false, error: '同じ店舗の略称が既に使用されています' }, 409);
-  if (sameChannel) return c.json({ success: false, error: 'このLINE公式アカウントは既に登録されています' }, 409);
+  if (existingLink) return c.json({ success: false, error: registered
+    ? 'このLINE公式アカウントは別の店舗で使用されています'
+    : 'このLINE公式アカウントは既に登録されています' }, 409);
 
   let createdLineAccountId: string | null = null;
   try {
@@ -366,17 +377,28 @@ export const post__api_restaurant_test_stores_connect_14 = async (c: Context<Env
       }, 400, ["channelId","channelSecret"]);
     }
 
-    const lineAccount = await createLineAccount(dbFor(c.env), {
+    const organization = existingOrganization ?? await ensureOrganizationForAuthenticatedTenant(c);
+    if (!organization) return c.json({ success: false, error: '統括情報を確認できません' }, 404);
+    const lineAccount = registered ?? await createLineAccount(dbFor(c.env), {
       channelId,
       name: profile.displayName.trim(),
       channelAccessToken: token.access_token,
       channelSecret,
       tenantId: organization.tenant_id ?? DEFAULT_TENANT_ID,
     }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
-    createdLineAccountId = lineAccount.id;
+    if (!registered) createdLineAccountId = lineAccount.id;
     const storeId = crypto.randomUUID();
-    await dbFor(c.env, storeId).prepare(`INSERT INTO rt_stores
-      (id, organization_id, name, code, capacity, timezone, line_account_id)
+    const db = dbFor(c.env, storeId);
+    const insertStore = `INSERT INTO rt_stores
+      (id, organization_id, name, code, capacity, timezone, line_account_id)`;
+    const result = registered ? await db.prepare(`${insertStore}
+      SELECT ?, ?, ?, ?, 0, 'Asia/Tokyo', a.id FROM line_accounts a
+      JOIN account_styles p ON p.line_account_id=a.id
+      WHERE a.id=? AND a.channel_id=? AND COALESCE(a.tenant_id,?)=?
+        AND a.is_active=1 AND a.archived_at IS NULL
+        AND p.style='restaurant' AND p.selection_mode='configured' AND p.selected_at IS NOT NULL`)
+      .bind(storeId, organization.id, name, code, registered.id, channelId, DEFAULT_TENANT_ID, authenticatedTenantId(c)).run()
+      : await db.prepare(`${insertStore}
       VALUES (?, ?, ?, ?, 0, 'Asia/Tokyo', ?)`).bind(
         storeId,
         organization.id,
@@ -384,6 +406,7 @@ export const post__api_restaurant_test_stores_connect_14 = async (c: Context<Env
         code,
         lineAccount.id,
       ).run();
+    if (!result.meta.changes) return c.json({ success: false, error: 'LINEアカウントの状態が変わりました。もう一度確認してください' }, 409);
     return c.json({
       success: true,
       data: { store: { id: storeId, name }, lineAccountName: profile.displayName.trim() },
@@ -419,8 +442,9 @@ export const post__api_restaurant_test_stores_connect_14 = async (c: Context<Env
 
 export const post__api_restaurant_test_stores_15 = async (c: Context<Env, "/api/restaurant-test/stores">) => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
-  const organization = await organizationFor(c);
-  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const scopedAccountId = c.get('restaurantScopedAccountId');
+  const existingOrganization = await organizationFor(c);
+  if (!existingOrganization && !scopedAccountId) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body: {
     name?: unknown;
     code?: unknown;
@@ -448,6 +472,8 @@ export const post__api_restaurant_test_stores_15 = async (c: Context<Env, "/api/
   if (!await validateStoreLineAccount(c, lineAccountId)) {
     return inputError(c, { success: false, error: 'LINEアカウントが正しくありません' }, 400, ["lineAccountId"]);
   }
+  const organization = existingOrganization ?? await ensureOrganizationForAuthenticatedTenant(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
 
   const id = crypto.randomUUID();
   try {

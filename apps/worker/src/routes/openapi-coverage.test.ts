@@ -632,6 +632,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/instagram/connection',
   'GET /api/instagram/conversations/{senderId}',
   'POST /api/instagram/conversations/{senderId}/read',
+  'GET /api/instagram/connections',
   'DELETE /api/instagram/connection',
   'POST /api/instagram/oauth/start',
   'GET /api/instagram/oauth/callback',

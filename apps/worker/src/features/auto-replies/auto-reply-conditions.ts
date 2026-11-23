@@ -92,8 +92,7 @@ export function isWithinActiveWindow(
   if (from! < until!) return nowHhmm >= from! && nowHhmm < until!;
   if (from! > until!) return nowHhmm >= from! || nowHhmm < until!;
   // from === until。24時間を表すのか一瞬を表すのか読めないので、
-  // 「時間帯を指定していない」と同じ扱いにする。返らない方が事故は
-  // 大きい（問い合わせに何も返らなくなる）。
+  // 問い合わせへの応答が止まらないよう、「時間帯を指定していない」と同じ扱いにする。
   return true;
 }
 

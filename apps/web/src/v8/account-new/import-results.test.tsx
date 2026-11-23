@@ -21,7 +21,7 @@ function props(value: FollowerImportState | null, fallback: LineAccountConnectDa
     handover: handoverProgress({ phase: source.phase, received: value?.received ?? 0, imported: value?.imported ?? 0,
       alreadyPresent: value?.alreadyPresent ?? 0, reactivated: value?.reactivated ?? 0, claimedUnassigned: value?.claimedUnassigned ?? 0,
       conflicts: value?.conflicts ?? 0, invalid: value?.invalid ?? 0, profilesUpdated: value?.profilesUpdated ?? 0 }),
-    idleSeconds: 0, requestError: false, restaurant: false,
+    idleSeconds: 0, requestError: false,
   }
 }
 afterEach(cleanup)
@@ -36,7 +36,6 @@ it.each([
   expect(screen.getByText(title)).toBeTruthy()
   expect(document.body.textContent).not.toMatch(/LINEで確認した\s*0|0\s*人を取り込みました|新しく\s*0/)
   expect(screen.queryByRole('progressbar')).toBeNull()
-  expect(screen.getByRole('link', { name: '登録したアカウントを見る' }).getAttribute('href')).toContain('mock-account')
 })
 
 it('取得済みの状態でも未開始なら、取込完了の実績にしない', () => {
@@ -69,6 +68,7 @@ it('対象人数を取得して完了した0人は、そのまま0人・100%で�
   render(<Step5Completion {...props(state({ phase: 'completed', completedAt: '2026-11-01T00:00:00Z' }))} />)
   expect(screen.getByRole('heading', { name: '友だちの引き継ぎが完了しました' })).toBeTruthy()
   expect(screen.getByText('対象0人を確認しました。')).toBeTruthy()
+  expect(screen.getByRole('link', { name: '登録したアカウントを見る' }).getAttribute('href')).toContain('mock-account')
   const bar = screen.getByRole('progressbar', { name: '友だちの引き継ぎ進捗' })
   expect(bar.getAttribute('aria-valuemax')).toBe('1'); expect(bar.getAttribute('aria-valuenow')).toBe('1')
   expect(screen.getByText('0人の友だちを引き継ぎました')).toBeTruthy()
@@ -111,8 +111,11 @@ it('状態の再確認に失敗したときは、再確認だけを呼び、処�
   expect(refresh).toHaveBeenCalledTimes(1)
 })
 
-it('引き継ぎを選ばなかった場合は、実績を作らず既存の案内を残す', () => {
+it('引き継ぎを選ばなかった場合は、オフの案内や次の操作一覧を表示しない', () => {
   render(<Step5Completion {...props(null)} importFriends={false} />)
-  expect(screen.getByText(/いまの友だちの引き継ぎはオフ/)).toBeTruthy()
+  expect(screen.queryByText(/いまの友だちの引き継ぎはオフ/)).toBeNull()
+  expect(screen.queryByText('次にすること')).toBeNull()
+  expect(screen.queryAllByRole('link')).toHaveLength(0)
+  expect(screen.getByText('確認用アカウント')).toBeTruthy()
   expect(document.body.textContent).not.toMatch(/LINEで確認した\s*0|0人の友だちを引き継ぎました/)
 })

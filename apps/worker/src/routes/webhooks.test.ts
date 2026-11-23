@@ -1589,7 +1589,7 @@ describe('Webhookやり取り記録', () => {
 //  中: 壊れた event_types の1行で一覧全体を500にしない (W2)
 // =====================================================
 
-describe('GET /api/webhooks/outgoing — broken event_types (#506 W2)', () => {
+describe('送信Webhookの一覧は不正なイベント種別を空にして返す', () => {
   const brokenRow = {
     id: 'wh-broken', name: '壊れた送り先', url: 'https://example.com/hook',
     event_types: '{broken-json', secret: VALID_SECRET, is_active: 1,
@@ -1616,7 +1616,7 @@ describe('GET /api/webhooks/outgoing — broken event_types (#506 W2)', () => {
 //  中: 一覧にも受信詳細と同じ権限境界を適用する (W4)
 // =====================================================
 
-describe('webhook 一覧の権限統一 (#506 W4)', () => {
+describe('Webhookの受信・送信一覧は共通の閲覧権限を確認する', () => {
   test('権限キーのないスタッフは受信一覧を読めない', async () => {
     const res = await setupApp(undefined, 'staff', []).request(
       `/api/webhooks/incoming?lineAccountId=${ACCOUNT_ID}`,
@@ -1656,7 +1656,7 @@ describe('webhook 一覧の権限統一 (#506 W4)', () => {
 //  中: 使われない受信設定口は API 単体テストで担保する (W5)
 // =====================================================
 
-describe('PATCH /api/webhooks/incoming/:id/config (#506 W5)', () => {
+describe('受信Webhookの設定更新は版と入力内容を検証する', () => {
   const validBody = {
     expectedVersion: 3,
     identityMatching: {
@@ -1687,7 +1687,7 @@ describe('PATCH /api/webhooks/incoming/:id/config (#506 W5)', () => {
   });
 });
 
-describe('名前・種別の上限 (#506 軽)', () => {
+describe('Webhookの受け口と送り先の名前・イベント種別の上限を検証する', () => {
   const post = (path: string, body: unknown) => receiveAndDrain(setupApp(),
     path,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
@@ -1728,7 +1728,7 @@ describe('名前・種別の上限 (#506 軽)', () => {
 // `incoming_webhook.*` のような不発パターンが無音で保存され、
 // イベントは一度も送られなかった。未知の種別は一覧を添えて400で拒否する。
 
-describe('N-383 送信eventTypesは実発火種別と照合する', () => {
+describe('送信Webhookのイベント種別は発火可能な種類だけを受け付ける', () => {
   const post = (body: unknown) => receiveAndDrain(setupApp(),
     '/api/webhooks/outgoing',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
@@ -1793,7 +1793,7 @@ describe('N-383 送信eventTypesは実発火種別と照合する', () => {
 //  secret-backfill口の契約
 // =====================================================
 
-describe('#650 POST /api/webhooks/maintenance/secret-backfill', () => {
+describe('Webhookの秘密値移行は対象と設定を確認し試算・実行できる', () => {
   const report = {
     dryRun: true, batchSize: 50, legacyTotal: 2, rekeyTotal: 0,
     processed: 0, migrated: 0, failed: [], remainingLegacy: 2, remainingRekey: 0, done: false,
@@ -1897,7 +1897,7 @@ const ENCRYPTED_ROW = {
 };
 const BROKEN_ROW = { ...ENCRYPTED_ROW, secret_encrypted: 'v1-broken-xyz' };
 
-describe('#650 secret-safe: 平文を保存・表示しない', () => {
+describe('Webhookの秘密値は暗号化して保存し一覧・詳細に返さない', () => {
   test('作成は鍵を渡して暗号化保存し、平文は作成直後の1回だけ返す', async () => {
     vi.mocked(createOutgoingWebhook).mockResolvedValueOnce({ ...ENCRYPTED_ROW, id: 'wh-new' });
     const res = await receiveAndDrain(setupApp(),
@@ -1986,7 +1986,7 @@ describe('#650 secret-safe: 平文を保存・表示しない', () => {
   });
 });
 
-describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () => {
+describe('Webhookの鍵不足や復号失敗は送信・照合を安全に止める', () => {
   test('鍵なしの作成は503にし、秘密値を表に出さない', async () => {
     const keyError = new Error('LINE_CREDENTIAL_ENCRYPTION_KEY is not configured');
     keyError.name = 'CredentialEncryptionKeyError';

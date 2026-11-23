@@ -478,7 +478,7 @@ describe('targeting preview and publish schedule', () => {
     expect(res.status).toBe(403);
   });
 });
-describe('GET schedules and POST cancel (E-08 #621)', () => {
+describe('リッチメニューの予約を作成・一覧し実行前なら取り消す', () => {
   test('予約一覧は状態と再試行時刻を返す', async () => {
     dbMocks.getRichMenuGroupWithPages.mockResolvedValue({ id: 'g1', account_id: 'acc-1' });
     dbMocks.listRichMenuSchedulesByGroup.mockResolvedValue([{
@@ -1431,7 +1431,7 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
 
 // ----- 中 : 優先順一括・冪等キー・作成時フォルダ・条件上限・外部応答の固定文言 -----
 
-describe('POST /api/rich-menu-groups/reorder-priorities (#502中)', () => {
+describe('リッチメニューの優先順は権限と対象を確認してまとめて保存する', () => {
   test('id配列を1回でそろえ直す', async () => {
     dbMocks.getRichMenuGroups.mockResolvedValue([{ id: 'g1' }, { id: 'g2' }, { id: 'g3' }]);
     const app = setupApp();
@@ -1482,7 +1482,7 @@ describe('POST /api/rich-menu-groups/reorder-priorities (#502中)', () => {
   });
 });
 
-describe('POST /api/rich-menu-groups/:groupId/apply-to-tag (#502中)', () => {
+describe('タグへのリッチメニュー一括適用は実行キーを必要とする', () => {
   const publishedGroup = {
     id: 'g1', account_id: 'acc-1', status: 'published',
     default_page_id: 'p1',
@@ -1520,7 +1520,7 @@ describe('POST /api/rich-menu-groups/:groupId/apply-to-tag (#502中)', () => {
   });
 });
 
-describe('POST /api/rich-menu-groups (作成時フォルダ #502中)', () => {
+describe('リッチメニュー作成時にフォルダの指定を検証する', () => {
   test('folderIdの形違いは400', async () => {
     const app = setupApp();
     const res = await app.request('/api/rich-menu-groups', {
@@ -1561,7 +1561,7 @@ describe('POST /api/rich-menu-groups (作成時フォルダ #502中)', () => {
   });
 });
 
-describe('人数プレビューの権限と複雑さ上限 (#502中)', () => {
+describe('リッチメニューの対象人数は権限と条件の複雑さを確認して数える', () => {
   test('一般スタッフは人数を数えられない', async () => {
     const app = setupApp({ staff: { id: 'staff-1', role: 'staff' } });
     const res = await app.request('/api/rich-menu-groups/g1/preview-targets', {
@@ -1591,7 +1591,7 @@ describe('人数プレビューの権限と複雑さ上限 (#502中)', () => {
   });
 });
 
-describe('外部応答の固定文言 (#502中)', () => {
+describe('外部サービスの失敗内容を隠し画像IDを符号化する', () => {
   test('取込でLINEに無いときは外部本文を出さない', async () => {
     dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'tk' });
     const fetchSpy = vi.spyOn(globalThis, 'fetch')

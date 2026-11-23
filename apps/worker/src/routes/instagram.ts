@@ -45,6 +45,8 @@ instagram.onError((e, c) => {
   return inputError(c, { success: false, error: e.code }, e.status, e.code === 'account_required' ? ['lineAccountId'] : []);
 });
 type Connection = {
+  /** 接続そのもののID。772で入った不変の鍵。更新・解除はこれで1件だけを指す。 */
+  id: string;
   line_account_id: string;
   page_id: string;
   instagram_id: string;
@@ -74,14 +76,85 @@ async function account(c: Context<Env>): Promise<string> {
     throw new InstagramError('not_found', 404);
   return id;
 }
-async function connection(c: Context<Env>, id: string): Promise<Connection> {
-  const row = await c.env.DB.prepare(
-    'SELECT * FROM instagram_connections WHERE line_account_id=?',
+/**
+ * 画面が見ている接続の指定。`connectionId` が無ければ既定（並び順の先頭）を使う。
+ * 1つのLINEアカウントに1接続だけの作りに合わせ、送ってこない画面は同じ1件を見る。
+ */
+function requestedConnectionId(c: Context<Env>): string | null {
+  const id = c.req.query('connectionId');
+  return id && id.length <= 64 ? id : null;
+}
+/**
+ * 接続を1件だけ決める。IDの指定があればそれを厳密に引き、
+ * 無ければ並び順の先頭（既定の接続）を返す。
+ * 別のLINEアカウントの接続IDを渡されても `line_account_id` で弾く。
+ */
+async function connectionRow(
+  c: Context<Env>,
+  id: string,
+  connectionId?: string | null,
+): Promise<Connection | null> {
+  if (connectionId) {
+    return await c.env.DB.prepare(
+      'SELECT * FROM instagram_connections WHERE id=? AND line_account_id=?',
+    )
+      .bind(connectionId, id)
+      .first<Connection>();
+  }
+  return await c.env.DB.prepare(
+    'SELECT * FROM instagram_connections WHERE line_account_id=? ORDER BY sort_order, id LIMIT 1',
   )
     .bind(id)
     .first<Connection>();
+}
+async function connection(
+  c: Context<Env>,
+  id: string,
+  connectionId?: string | null,
+): Promise<Connection> {
+  const row = await connectionRow(c, id, connectionId);
   if (!row) throw new InstagramError('disconnected', 404);
   return row;
+}
+/**
+ * 書き換え（つなぎ直し・確認・取り込み・解除）で触る接続を1件に決める。
+ * 接続IDの指定があればそれだけを引く。指定が無いときは、接続が1件しか無いときだけ
+ * 今までどおりその1件を使い、2件以上あるなら断る（先頭を取り違えて別の接続を
+ * 書き換えないため）。読み取りの既定（`connectionRow`）とは別に、ここだけ厳しくする。
+ */
+async function writeTarget(c: Context<Env>, id: string): Promise<Connection> {
+  const connectionId = requestedConnectionId(c);
+  if (connectionId) return await connection(c, id, connectionId);
+  if (await manyConnections(c, id))
+    throw new InstagramError('connection_required', 400);
+  return await connection(c, id, null);
+}
+/** 同じLINEアカウントに接続が2件以上あるか。既定の1件に落としていいかの判断に使う。 */
+async function manyConnections(c: Context<Env>, id: string): Promise<boolean> {
+  const counted = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM instagram_connections WHERE line_account_id=?',
+  )
+    .bind(id)
+    .first<{ n: number }>();
+  return (counted?.n ?? 0) > 1;
+}
+/**
+ * つなぎ直しの宛先。接続IDの指定があればそれだけを引き（無ければ 404）、
+ * 指定が無いときは接続が1件以下のときだけ既定へ落とす。1件も無ければ新規作成（null）。
+ */
+async function startTarget(
+  c: Context<Env>,
+  id: string,
+  connectionId: string | null,
+): Promise<Connection | null> {
+  if (connectionId) {
+    const row = await connectionRow(c, id, connectionId);
+    if (!row) throw new InstagramError('not_found', 404);
+    return row;
+  }
+  if (await manyConnections(c, id))
+    throw new InstagramError('connection_required', 400);
+  return await connectionRow(c, id, null);
 }
 const ready = (c: Context<Env>): InstagramConfig => {
   const cfg = instagramConfig(c.env);
@@ -117,11 +190,7 @@ instagram.get('/api/instagram/connection', async (c) => {
         replyEnabled: false,
       } satisfies InstagramConnectionStatus,
     });
-  const row = await c.env.DB.prepare(
-    'SELECT * FROM instagram_connections WHERE line_account_id=?',
-  )
-    .bind(id)
-    .first<Connection>();
+  const row = await connectionRow(c, id, requestedConnectionId(c));
   return c.json({
     success: true,
     data: row
@@ -130,6 +199,7 @@ instagram.get('/api/instagram/connection', async (c) => {
           replyEnabled: false,
           dmReconnectRequired: !instagramCanMessage(row.scopes ?? ''),
           connection: {
+            id: row.id,
             pageId: row.page_id,
             instagramId: row.instagram_id,
             pageName: row.page_name,
@@ -143,6 +213,42 @@ instagram.get('/api/instagram/connection', async (c) => {
       : { state: 'disconnected', replyEnabled: false },
   });
 });
+/**
+ * 設定›SNS連携の一覧が出す行の元。接続が複数あっても全件返す。
+ * `account(c)` が canAccessAllLineAccounts で見える範囲を確かめ、見えなければ 404 にするので、
+ * 別の統括・権限の無いLINEアカウントの接続はここから出ない。
+ * 並び順は既定の接続を決める `connectionRow` と同じにして、先頭が既定と一致するようにする。
+ */
+instagram.get('/api/instagram/connections', async (c) => {
+  const id = await account(c);
+  if (!instagramConfig(c.env)) {
+    return c.json({ success: true, data: { state: 'unconfigured' as const, connections: [] } });
+  }
+  const rows = await c.env.DB.prepare(
+    'SELECT * FROM instagram_connections WHERE line_account_id=? ORDER BY sort_order, id',
+  )
+    .bind(id)
+    .all<Connection>();
+  return c.json({
+    success: true,
+    data: {
+      state: (rows.results ?? []).length ? ('connected' as const) : ('disconnected' as const),
+      connections: (rows.results ?? []).map((row) => ({
+        id: row.id,
+        // 行ごとに期限を見る。1件が切れていても他の行は使えるので、まとめて「期限切れ」にしない。
+        state: expired(row) ? ('expired' as const) : ('connected' as const),
+        pageId: row.page_id,
+        instagramId: row.instagram_id,
+        pageName: row.page_name,
+        username: row.username,
+        expiresAt: row.expires_at,
+        dataAccessExpiresAt: row.data_access_expires_at,
+        version: row.version,
+        syncedAt: row.synced_at,
+      })),
+    },
+  });
+});
 instagram.post(
   '/api/instagram/oauth/start',
   requireRole('owner', 'admin'),
@@ -152,12 +258,23 @@ instagram.post(
       state = crypto.randomUUID() + crypto.randomUUID(),
       hash = await instagramHash(state),
       now = new Date();
+    // どの接続をつなぎ直すのかを state に預ける。ブラウザの折り返しでは画面の状態が
+    // 残らないので、ここで決めた宛先だけを callback が使う。
+    // `mode=add` は新しい接続を増やす（宛先なし）。接続IDの指定はその接続のつなぎ直し。
+    // どちらも無いときは、接続が1件だけならその1件（772より前と同じ動き）、
+    // 2件以上あるなら取り違えないように断る。
+    const requested = requestedConnectionId(c);
+    const adding = c.req.query('mode') === 'add';
+    if (adding && requested)
+      throw new InstagramError('connection_target_conflict', 400);
+    const target = adding ? null : await startTarget(c, id, requested);
     await c.env.DB.prepare(
-      "INSERT INTO instagram_oauth_states(state_hash,line_account_id,staff_id,phase,expires_at,created_at) VALUES(?,?,?,'started',?,?)",
+      "INSERT INTO instagram_oauth_states(state_hash,line_account_id,connection_id,staff_id,phase,expires_at,created_at) VALUES(?,?,?,?,'started',?,?)",
     )
       .bind(
         hash,
         id,
+        target?.id ?? null,
         c.get('staff').id,
         new Date(now.getTime() + 10 * 60000).toISOString(),
         now.toISOString(),
@@ -280,10 +397,10 @@ instagram.get(
       if (!code || code.length > 4096)
         throw new InstagramError('invalid_callback', 400);
       const row = await c.env.DB.prepare(
-        "SELECT line_account_id FROM instagram_oauth_states WHERE state_hash=? AND staff_id=? AND phase='started' AND expires_at>?",
+        "SELECT line_account_id,connection_id FROM instagram_oauth_states WHERE state_hash=? AND staff_id=? AND phase='started' AND expires_at>?",
       )
         .bind(hash, c.get('staff').id, new Date().toISOString())
-        .first<{ line_account_id: string }>();
+        .first<{ line_account_id: string; connection_id: string | null }>();
       if (
         !row ||
         !(await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [
@@ -344,18 +461,31 @@ instagram.get(
           cfg.encryptionKey,
         ),
         userToken = pageToken;
+      // どの接続を書くかは state に預けた宛先で決める。
+      // 宛先があれば その接続のつなぎ直し、無ければ既定の接続の置き換え
+      // （772より前と同じ「1件を入れ替える」動き）。接続が1件も無ければ新規に作る。
+      const target = await connectionRow(c, id, row.connection_id);
+      // つなぎ直す相手が途中で解除された場合は、新しい接続を勝手に生やさず衝突として返す。
+      if (row.connection_id && !target)
+        throw new InstagramError('version_conflict', 409);
+      const targetId = target?.id ?? `igc_${crypto.randomUUID()}`;
       // ブラウザの折り返しでは版を預かれないので、保存の直前に今の版を読んで衝突だけ見る。
-      const current = await c.env.DB.prepare(
-        'SELECT version FROM instagram_connections WHERE line_account_id=?',
+      const expectedVersion = target?.version ?? 0;
+      // 同じLINEアカウントの別の接続が既にこのInstagramを持っているときは、
+      // 772の一意索引に当たる前に理由の分かる形で止める。
+      const duplicate = await c.env.DB.prepare(
+        'SELECT 1 FROM instagram_connections WHERE line_account_id=? AND instagram_id=? AND id<>? LIMIT 1',
       )
-        .bind(id)
-        .first<{ version: number }>();
-      const expectedVersion = current?.version ?? 0;
+        .bind(id, instagramId, targetId)
+        .first();
+      if (duplicate)
+        throw new InstagramError('instagram_account_already_connected', 409);
       const now = new Date().toISOString();
       const result = await c.env.DB.prepare(
-        `INSERT INTO instagram_connections(line_account_id,page_id,instagram_id,page_name,username,page_token_encrypted,user_token_encrypted,expires_at,data_access_expires_at,scopes,profile_json,refreshed_at,connected_by) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ?=0 OR EXISTS(SELECT 1 FROM instagram_connections WHERE line_account_id=?) ON CONFLICT(line_account_id) DO UPDATE SET page_id=excluded.page_id,instagram_id=excluded.instagram_id,page_name=excluded.page_name,username=excluded.username,page_token_encrypted=excluded.page_token_encrypted,user_token_encrypted=excluded.user_token_encrypted,expires_at=excluded.expires_at,data_access_expires_at=excluded.data_access_expires_at,scopes=excluded.scopes,profile_json=excluded.profile_json,posts_json=NULL,synced_at=NULL,refreshed_at=excluded.refreshed_at,connected_by=excluded.connected_by,version=version+1 WHERE version=?`,
+        `INSERT INTO instagram_connections(id,line_account_id,page_id,instagram_id,page_name,username,page_token_encrypted,user_token_encrypted,expires_at,data_access_expires_at,scopes,profile_json,refreshed_at,connected_by) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ?=0 OR EXISTS(SELECT 1 FROM instagram_connections WHERE id=?) ON CONFLICT(id) DO UPDATE SET page_id=excluded.page_id,instagram_id=excluded.instagram_id,page_name=excluded.page_name,username=excluded.username,page_token_encrypted=excluded.page_token_encrypted,user_token_encrypted=excluded.user_token_encrypted,expires_at=excluded.expires_at,data_access_expires_at=excluded.data_access_expires_at,scopes=excluded.scopes,profile_json=excluded.profile_json,posts_json=NULL,synced_at=NULL,refreshed_at=excluded.refreshed_at,connected_by=excluded.connected_by,version=version+1 WHERE version=?`,
       )
         .bind(
+          targetId,
           id,
           instagramId,
           instagramId,
@@ -370,7 +500,7 @@ instagram.get(
           now,
           c.get('staff').id,
           expectedVersion,
-          id,
+          targetId,
           expectedVersion,
         )
         .run();
@@ -408,7 +538,7 @@ instagram.post(
   inputJsonBoundary(), async (c) => {
     const id = await account(c),
       cfg = ready(c),
-      r = await connection(c, id);
+      r = await writeTarget(c, id);
     if (expired(r)) throw new InstagramError('meta_token_expired', 409);
     // Instagram は同じ合鍵を延長するので、つながっている相手と許可の範囲は変わらない。
     // 投稿先IDは /me の正確な値で照合し、古い丸め済みIDだけ修復する。
@@ -432,8 +562,9 @@ instagram.post(
         cfg.encryptionKey,
       ),
       user = token;
+    // 延長したのはこの接続の合鍵だけ。同じLINEアカウントの別の接続は触らない。
     const saved = await c.env.DB.prepare(
-      'UPDATE instagram_connections SET page_id=?,instagram_id=?,page_token_encrypted=?,user_token_encrypted=?,expires_at=?,data_access_expires_at=?,scopes=?,refreshed_at=?,version=version+1 WHERE line_account_id=? AND version=?',
+      'UPDATE instagram_connections SET page_id=?,instagram_id=?,page_token_encrypted=?,user_token_encrypted=?,expires_at=?,data_access_expires_at=?,scopes=?,refreshed_at=?,version=version+1 WHERE id=? AND version=?',
     )
       .bind(
         exactId,
@@ -445,7 +576,7 @@ instagram.post(
         // 許可の範囲は延長で変わらないので、保存済みの値をそのまま残す。
         r.scopes,
         new Date().toISOString(),
-        id,
+        r.id,
         r.version,
       )
       .run();
@@ -468,17 +599,33 @@ instagram.delete(
       b = await c.req.json<{ expectedVersion: number }>().catch(() => null);
     if (!b || !Number.isSafeInteger(b.expectedVersion) || b.expectedVersion < 1)
       throw new InstagramError('expected_version_required', 400);
+    // 解除は1件だけ。どの接続を解除するかを先に決める。
+    // 接続が2件以上あるのに指定が無ければ断る（先頭を間違って消さないため）。
+    // 接続が見つからないときは今までと同じ 409（版の衝突）で返す。
+    const target = await writeTarget(c, id).catch((failure) => {
+      if (
+        failure instanceof InstagramError &&
+        failure.code === 'connection_required'
+      )
+        throw failure;
+      return null;
+    });
+    if (!target) throw new InstagramError('version_conflict', 409);
     // 子を先に消す。版が変わっていたら本文・トークンを消さない。
+    // 受信メッセージは「この接続のぶん」と「772の移行で接続が付かなかった同じInstagramの古いぶん」だけ。
+    // `instagram_id` はLINEアカウントの中で一意なので、他の接続のメッセージは残る。
     const r = await c.env.DB.batch([
       c.env.DB.prepare(
-        'DELETE FROM instagram_messages WHERE line_account_id=? AND EXISTS(SELECT 1 FROM instagram_connections WHERE line_account_id=? AND version=?)',
-      ).bind(id, id, b.expectedVersion),
+        'DELETE FROM instagram_messages WHERE line_account_id=? AND (connection_id=? OR (connection_id IS NULL AND instagram_id=?)) AND EXISTS(SELECT 1 FROM instagram_connections WHERE id=? AND version=?)',
+      ).bind(id, target.id, target.instagram_id, target.id, b.expectedVersion),
       c.env.DB.prepare(
-        'DELETE FROM instagram_oauth_states WHERE line_account_id=? AND EXISTS(SELECT 1 FROM instagram_connections WHERE line_account_id=? AND version=?)',
-      ).bind(id, id, b.expectedVersion),
+        // 接続が付いていない途中状態（新しい接続を増やす途中）は、ほかの接続が
+        // 残っていないときだけ片付ける。追加の途中を横から消さない。
+        'DELETE FROM instagram_oauth_states WHERE line_account_id=? AND (connection_id=? OR (connection_id IS NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections WHERE line_account_id=? AND id<>?))) AND EXISTS(SELECT 1 FROM instagram_connections WHERE id=? AND version=?)',
+      ).bind(id, target.id, id, target.id, target.id, b.expectedVersion),
       c.env.DB.prepare(
-        'DELETE FROM instagram_connections WHERE line_account_id=? AND version=?',
-      ).bind(id, b.expectedVersion),
+        'DELETE FROM instagram_connections WHERE id=? AND version=?',
+      ).bind(target.id, b.expectedVersion),
     ]);
     if (!r[2]!.meta.changes) throw new InstagramError('version_conflict', 409);
     return c.json({ success: true, data: { disconnected: true } });
@@ -490,7 +637,8 @@ instagram.post(
   inputJsonBoundary(), async (c) => {
     const id = await account(c),
       cfg = ready(c),
-      r = await connection(c, id);
+      // 取り込みは接続の情報を書き換えるので、宛先を1件に決めてから進める。
+      r = await writeTarget(c, id);
     if (expired(r)) throw new InstagramError('meta_token_expired', 409);
     const token = await decryptInstagramCredential(
       r.page_token_encrypted,
@@ -512,15 +660,16 @@ instagram.post(
         },
       ),
     ]);
+    // 取り直すのはこの接続の分だけ。同じLINEアカウントの別の接続の内容は上書きしない。
     const saved = await c.env.DB.prepare(
-      'UPDATE instagram_connections SET profile_json=?,posts_json=?,username=?,synced_at=? WHERE line_account_id=? AND version=?',
+      'UPDATE instagram_connections SET profile_json=?,posts_json=?,username=?,synced_at=? WHERE id=? AND version=?',
     )
       .bind(
         JSON.stringify(profile),
         JSON.stringify(posts.data ?? []),
         profile.username ?? null,
         new Date().toISOString(),
-        id,
+        r.id,
         r.version,
       )
       .run();
@@ -539,7 +688,7 @@ for (const part of ['profile', 'posts'] as const) {
         success: true,
         data: { state: 'unconfigured', value: null },
       });
-    const r = await connection(c, id);
+    const r = await connection(c, id, requestedConnectionId(c));
     return c.json({
       success: true,
       data: {
@@ -563,28 +712,34 @@ instagram.get('/api/instagram/messages', async (c) => {
     before = c.req.query('beforeId');
   if (!Number.isInteger(limit) || limit < 1 || limit > 100)
     throw new InstagramError('invalid_limit', 400);
+  // どの接続の受信箱を見るかを決める。接続が1件だけの今は見える件数が変わらない
+  // （772の移行で接続が付かなかった古い行も、そのまま同じ一覧に出す）。
+  // 接続が複数になったときだけ、他の接続に届いたぶんが外れる。
+  const target = await connectionRow(c, id, requestedConnectionId(c));
+  const scope = target ? ' AND (connection_id=? OR connection_id IS NULL)' : '';
+  const scopeArgs: unknown[] = target ? [target.id] : [];
   const anchor = before
     ? await c.env.DB.prepare(
-        'SELECT received_at FROM instagram_messages WHERE id=? AND line_account_id=?',
+        `SELECT received_at FROM instagram_messages WHERE id=? AND line_account_id=?${scope}`,
       )
-        .bind(before, id)
+        .bind(before, id, ...scopeArgs)
         .first<{ received_at: string }>()
     : null;
   if (before && !anchor) throw new InstagramError('not_found', 404);
-  const args: unknown[] = [id];
+  const args: unknown[] = [id, ...scopeArgs];
   if (anchor) args.push(anchor.received_at, anchor.received_at, before);
   args.push(limit);
   const messages = (
     await c.env.DB.prepare(
-      `SELECT id,sender_id senderId,recipient_id recipientId,content,attachments_json,received_at receivedAt FROM instagram_messages WHERE line_account_id=? ${anchor ? 'AND (received_at<? OR (received_at=? AND id<?))' : ''} ORDER BY received_at DESC,id DESC LIMIT ?`,
+      `SELECT id,sender_id senderId,recipient_id recipientId,content,attachments_json,received_at receivedAt FROM instagram_messages WHERE line_account_id=?${scope} ${anchor ? 'AND (received_at<? OR (received_at=? AND id<?))' : ''} ORDER BY received_at DESC,id DESC LIMIT ?`,
     )
       .bind(...args)
       .all()
   ).results;
   const total = await c.env.DB.prepare(
-    'SELECT COUNT(*) n FROM instagram_messages WHERE line_account_id=?',
+    `SELECT COUNT(*) n FROM instagram_messages WHERE line_account_id=?${scope}`,
   )
-    .bind(id)
+    .bind(id, ...scopeArgs)
     .first<{ n: number }>();
   const responseItems = messages.map((r) => ({
         ...r,
@@ -733,11 +888,18 @@ instagram.post('/api/instagram/webhook', async (c) => {
       !Array.isArray(entry.messaging)
     )
       continue;
+    // 受信は接続ごとに仕分ける。どの接続に届いたのかを `ig.id` で持ち、
+    // 保存するメッセージにそのまま付ける（一覧と解除がこの列で1件ずつを見る）。
     const matches = await c.env.DB.prepare(
-      `SELECT ig.line_account_id,ig.instagram_id,COALESCE(la.tenant_id,'${DEFAULT_TENANT_ID}') tenant_id FROM instagram_connections ig JOIN line_accounts la ON la.id=ig.line_account_id WHERE (ig.instagram_id=? OR ig.page_id=?) AND la.is_active=1 AND la.archived_at IS NULL AND ${activeTenantLineAccountSql('la.id')}`,
+      `SELECT ig.id connection_id,ig.line_account_id,ig.instagram_id,COALESCE(la.tenant_id,'${DEFAULT_TENANT_ID}') tenant_id FROM instagram_connections ig JOIN line_accounts la ON la.id=ig.line_account_id WHERE (ig.instagram_id=? OR ig.page_id=?) AND la.is_active=1 AND la.archived_at IS NULL AND ${activeTenantLineAccountSql('la.id')}`,
     )
       .bind(entry.id, entry.id)
-      .all<{ line_account_id: string; instagram_id: string; tenant_id: string }>();
+      .all<{
+        connection_id: string;
+        line_account_id: string;
+        instagram_id: string;
+        tenant_id: string;
+      }>();
     const rows = matches.results;
     if (!rows.length) continue;
     // DBに不整合が生じても異なる統括間に受信内容を配らない。
@@ -789,11 +951,12 @@ instagram.post('/api/instagram/webhook', async (c) => {
         continue;
       const receivedAt = new Date(event.timestamp!).toISOString();
       await c.env.DB.prepare(
-        'INSERT OR IGNORE INTO instagram_messages(id,line_account_id,instagram_id,sender_id,recipient_id,content,attachments_json,received_at,created_at) VALUES(?,?,?,?,?,?,?,?,?)',
+        'INSERT OR IGNORE INTO instagram_messages(id,line_account_id,connection_id,instagram_id,sender_id,recipient_id,content,attachments_json,received_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
       )
         .bind(
           msg.mid,
           row.line_account_id,
+          row.connection_id,
           row.instagram_id,
           event.sender.id,
           event.recipient.id,

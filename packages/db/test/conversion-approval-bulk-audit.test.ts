@@ -85,7 +85,7 @@ beforeEach(() => {
   seed();
 });
 
-describe('R356 承認時マイルの凍結', () => {
+describe('成果の承認を再送しても承認時のマイルを保つ', () => {
   it('0マイル承認の再送で設定変更後の300マイルが付与されない', async () => {
     sqlite.prepare(`UPDATE affiliate_offers SET reward_miles = 0 WHERE id = 'offer-1'`).run();
     addPendingEvent('ce-1');
@@ -125,7 +125,7 @@ describe('R356 承認時マイルの凍結', () => {
   });
 });
 
-describe('R357 承認金額の凍結', () => {
+describe('成果の承認を再試行しても承認時の金額を保つ', () => {
   it('版の保存失敗後の再試行で設定変更後の5000円にならない', async () => {
     addPendingEvent('ce-1');
     const first = await decideConversionApproval(db, 'ce-1', 'approved', 'pending');
@@ -152,7 +152,7 @@ describe('R357 承認金額の凍結', () => {
   });
 });
 
-describe('R354 承認通知の送信記録', () => {
+describe('成果の承認通知は送信記録を使って重複を防ぐ', () => {
   it('未送信の世代は送ってよく記録後は送らない、新しい承認ではまた送る', async () => {
     addPendingEvent('ce-1');
     // 未承認の行は送らない。
@@ -226,7 +226,7 @@ describe('R354 承認通知の送信記録', () => {
   });
 });
 
-describe('R358 締め後却下→再承認の支払対象復活', () => {
+describe('締め後の成果は再承認しても二重払いを防ぐ', () => {
   it('再承認で確定が戻り取り立てが消える（二重支払いなし）', async () => {
     addPendingEvent('ce-1');
     await decideConversionApproval(db, 'ce-1', 'approved', 'pending');

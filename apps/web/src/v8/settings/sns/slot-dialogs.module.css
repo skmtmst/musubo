@@ -123,3 +123,6 @@
   text-align: right;
   min-width: 0;
 }
+
+/* F6 JvuLH の「戻る」「解除する」の文字（絵では 13/600）は、窓の外枠に出る
+   data-design-node で絞るので sns-board.css へ置く（この束の決まりでは書けない）。 */
