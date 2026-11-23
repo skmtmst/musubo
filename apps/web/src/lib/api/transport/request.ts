@@ -3,7 +3,7 @@ import type { FeatureDisabledEventDetail, FetchApiOptions, ApiAccountEventDetail
 import { getFeatureDisabledContext } from '../../feature-disabled-context'
 import { FEATURE_DISABLED_EVENT, getCsrfToken, API_URL, MUTATING_METHODS, apiReadScope } from './session'
 import { adminSessionHeaders } from '../../admin-session'
-import { fetchWithNetworkMessage, extractApiErrorCode, extractApiErrorData } from './errors'
+import { fetchWithNetworkMessage, extractApiErrorCode, extractApiErrorData, extractUnresolvedVariableData } from './errors'
 import { SESSION_LOST_EVENT } from '../../session-events'
 import { canonicalApiPath, clearApiReadCache, shareApiRead, synchronizeApiReadScope } from './read-cache'
 
@@ -194,9 +194,11 @@ async function requestApi<T>(path: string, options: FetchApiOptions | undefined,
     if (res.status === 401 && typeof window !== 'undefined' && !isSessionLostExempt(code)) {
       clearApiReadCache()
     }
-    const error = responseApiError(res, raw, code, res.status === 409 || res.status === 429 || res.status === 502 || res.status === 503 && code === 'invalid_saved_form'
-        ? extractApiErrorData(raw)
-        : undefined)
+    const data = res.status === 400 && code === 'UNRESOLVED_TEMPLATE_VARIABLES'
+      ? extractUnresolvedVariableData(raw)
+      : res.status === 409 || res.status === 429 || res.status === 502 || res.status === 503 && code === 'invalid_saved_form'
+        ? extractApiErrorData(raw) : undefined
+    const error = responseApiError(res, raw, code, data)
     const detail = { status: res.status, code, feature: extractFeatureDisabledDetail(raw) }
     responseEvents.set(error, detail)
     if (context) announceRequestFailure(detail, context, options)
