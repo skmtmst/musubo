@@ -203,6 +203,22 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     expect(readStaffIdentity()).toBeNull()
   })
 
+  it('指紋が同じでも別の本人になっていれば古い画面と本人情報を破棄する', async () => {
+    let now = 1_000
+    vi.spyOn(Date, 'now').mockImplementation(() => now)
+    await render(); await settle()
+    const original = host.querySelector('[data-child]')
+    act(() => rememberStaffIdentity({ id: 'old-user', role: 'admin' } as StaffMember))
+    let finish!: (response: Response) => void
+    fetchSpy.mockImplementation((url: string) => String(url).includes('/api/auth/session') ? new Promise<Response>(resolve => { finish = resolve }) : Promise.resolve(sessionOk()))
+    now += 30_001; currentPath = '/friends'
+    await act(async () => { root.render(<AuthGuard><div data-child>中身</div></AuthGuard>) })
+    expect(original?.closest('[hidden][inert]')).not.toBeNull()
+    await act(async () => { finish(new Response(JSON.stringify({ success: true, data: { id: 'new-user', name: 'テスト担当', role: 'admin', tenantStatus: 'active', onboarding: null, permissionKeys: [], viewPermissionKeys: [] }, csrfToken: 'csrf-token-1' }), { status: 200 })) }); await settle()
+    expect(host.querySelector('[data-child]')).not.toBe(original)
+    expect(readStaffIdentity()).toBeNull()
+  })
+
   it('別ログインの指紋が来たら古い画面を捨て、確認前に表示しない', async () => {
     await render(); await settle()
     const original = host.querySelector('[data-child]')
