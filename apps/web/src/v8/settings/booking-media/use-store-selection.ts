@@ -1,5 +1,4 @@
 'use client'
-import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { restaurantTestApi, type RestaurantStore } from '@/lib/restaurant-test-api'
@@ -76,7 +75,6 @@ export function useBookingMediaStoreSelection(accountId: string | null) {
     setSelection(value => ({ ...value, switching: true, error: null }))
     try {
       await restaurantTestApi.selectStore(accountId, id)
-      emitGuideSignal('store.selected', accountId)
       if (!mounted.current) return
       if (generation.current !== ticket || latestAccount.current !== accountId) { void recheckContext(); return }
       const response = await restaurantTestApi.storeContext(accountId)

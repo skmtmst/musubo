@@ -1,5 +1,4 @@
 'use client'
-import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 
 import { emptyValue } from '@/components/shared/empty-value'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -136,7 +135,6 @@ export function useScenarioSettings({
         setStartError(res.error)
         return
       }
-      emitGuideSignal('setup.changed')
       setStartOpen(false)
       setJustStarted(true)
       notifyToast('配信を始めました')
@@ -169,7 +167,6 @@ export function useScenarioSettings({
         setStopError(res.error)
         return
       }
-      emitGuideSignal('setup.changed')
       setStopOpen(false)
       notifyToast('配信を一時停止しました')
       loadScenario(true)

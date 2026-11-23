@@ -13,7 +13,8 @@ import { GuideMenuPicker } from './guide-menu-picker'
 import { GuidePublishMenu } from './guide-publish-menu'
 import { guideProcedure } from './guide-script'
 import { GuideSharedProvider, type SharedGuide } from './guide-shared'
-import { useGuideSignal, useSetupSaveSignal } from './guide-signal'
+import { useGuideSignal } from './guide-signal'
+import { useSetupMutationRefresh } from './use-setup-mutation-refresh'
 
 /*
   開店準備ガイドの入れ物。全画面で1つ。画面側は置かない。
@@ -129,9 +130,7 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
     guide.phase === 'active',
     () => { if (procedure?.anchor !== 'reception.save') advance() },
   )
-  useSetupSaveSignal(Boolean(accountId), first.refresh)
-  useGuideSignal('store.selected', Boolean(accountId), first.refresh, accountId ?? undefined)
-  useGuideSignal('accounts.connection', Boolean(accountId), first.refresh, accountId ?? undefined)
+  useSetupMutationRefresh(accountId, first.refresh)
   useGuideSignal('reception.menuPublished', Boolean(accountId && inPublishReview), advance, accountId ?? undefined)
   const alreadyPublished = first.progress?.richMenuPublished === true
   const skipPublishPrompt = needsPublishReview && !inPublishReview && onTargetScreen && alreadyPublished

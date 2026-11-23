@@ -1,4 +1,5 @@
 import { responseApiError } from './errors'
+import { announceApiMutation } from './mutation-events'
 import type { FeatureDisabledEventDetail, FetchApiOptions, ApiAccountEventDetail } from '../types/transport'
 import { getFeatureDisabledContext } from '../../feature-disabled-context'
 import { FEATURE_DISABLED_EVENT, getCsrfToken, API_URL, MUTATING_METHODS, apiReadScope } from './session'
@@ -203,11 +204,17 @@ async function requestApi<T>(path: string, options: FetchApiOptions | undefined,
     throw error
   }
   if (res.status === 204) {
-    if (MUTATING_METHODS.has(method)) clearApiReadCache()
+    if (MUTATING_METHODS.has(method)) {
+      clearApiReadCache()
+      announceApiMutation(path, context?.accountId ?? null, context?.accountIds)
+    }
     return undefined as T
   }
   const body = await res.json() as T
   // 更新の影響は別資源の表示にも及ぶため、成功後は保守的に全読取を失効させる。
-  if (MUTATING_METHODS.has(method) && !(body && typeof body === 'object' && 'success' in body && body.success === false)) clearApiReadCache()
+  if (MUTATING_METHODS.has(method) && !(body && typeof body === 'object' && 'success' in body && body.success === false)) {
+    clearApiReadCache()
+    announceApiMutation(path, context?.accountId ?? null, context?.accountIds)
+  }
   return body
 }
