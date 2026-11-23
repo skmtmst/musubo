@@ -7,7 +7,6 @@ import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '
 import Avatar from '@/components/shared/avatar';
 import Button from '@/components/shared/button';
 import IconButton from '@/components/shared/icon-button';
-import SegmentedControl from '@/components/shared/segmented';
 import MenuPortal, { SavedSearchMenuSurface } from '@/components/shared/menu-portal';
 import { InboxHistoryButton, InboxListAttention, InboxListHeader, InboxListHeadline, InboxListRow, InboxListSearch } from '@/components/shared/inbox-list';
 import { InboxListEmpty, InboxListFailure } from '@/components/shared/inbox-list-states';
@@ -23,6 +22,8 @@ import { api, type ChatListItem } from '@/lib/api';
 import { SEARCH_QUERY_MAX_LENGTH, clampSearchQuery } from '@/lib/search-query';
 import { formatListRecent, formatListRecentTitle } from '@/lib/format';
 import InboxRulesPopover from '@/v8/inbox-chat/rules-popover';
+import { InboxChannelTabs } from './inbox-channel-tabs';
+import { useSearchParams } from 'next/navigation';
 import { ArrowUpDown, Bookmark, ListFilter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -104,6 +105,7 @@ type Props = {
 
 export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, chats, handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
   // 緑の点は目で見る印。読み上げには名前で絞り込み中を伝える。
+  const instagramSelected = useSearchParams().get('channel') === 'instagram'
   const savedSearchLabel = hasInboxFilters ? '保存した検索（絞り込み中）' : '保存した検索'
   // 並びは題の横の印から選ぶ。選んだ並びは吹き出しとメニューの ✓ で分かるようにする。
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
@@ -134,8 +136,6 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
   }, [savedViewsOpen, savedViewMenuId, setSavedViewsOpen, setSavedViewMenuId])
   const sortLabel = INBOX_SORT_OPTIONS.find((option) => option.value === sortOrder)?.label ?? INBOX_SORT_OPTIONS[0].label
   return (<InboxListPane selected={Boolean(selectedChatId || selectedThreadId)}>
-    {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
-
     <InboxListHeader
       data-design="Filters"
       data-inbox-v4="quick-filters"
@@ -150,8 +150,9 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
-        <IconButton ref={filterButtonRef} variant="plain" aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+        <IconButton ref={filterButtonRef} variant="plain" className={styles.toolDotWrap} aria-label="絞り込み" aria-description={hasInboxFilters ? "絞り込みを適用中" : undefined} title={hasInboxFilters ? "絞り込み（適用中）" : "絞り込み"} onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
           <ListFilter aria-hidden size={16} />
+          {hasInboxFilters ? <span aria-hidden="true" className={styles.toolDot} /> : null}
         </IconButton>
         {/*
           INBOX-11: メニューは「保存した検索」ボタンではなく、画面幅いっぱいの
@@ -281,25 +282,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           </>
         ) : null}
       </InboxListHeadline>
-      <SegmentedControl<'all' | 'reply' | 'overdue'>
-        aria-label="受信箱のクイック絞り込み"
-        equalWidth={false}
-        value={quickFilter}
-        onChange={(next) => { setQuickFilter(next); dropSavedViewParam() }}
-        options={[
-          { key: 'all' as const, label: 'すべて' },
-          { key: 'reply' as const, label: '要返信' },
-          slaEnabled
-            ? { key: 'overdue' as const, label: '期限超過' }
-            : { key: 'overdue' as const, label: '1時間以上待ち' },
-        ].map((filter) => ({
-          value: filter.key,
-          label: filter.label,
-          count: slaEnabled && filter.key === 'overdue'
-            ? overdueTotal ?? undefined
-            : quickCountsNow?.[filter.key],
-        }))}
-      />
+      <InboxChannelTabs />
       <SavedViewDialog
         open={saveDialogOpen}
         emailInboxEnabled={emailInboxEnabled}
@@ -333,8 +316,10 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
       <InboxFilterPanel
         anchorRef={filterButtonRef}
         open={filterOpen}
-        emailInboxEnabled={emailInboxEnabled}
-        value={{ status: statusFilter === 'all' ? 'all' : statusFilter, assignee: assigneeFilter, channel, unreadOnly }}
+        emailInboxEnabled={false}
+        value={{ status: statusFilter === 'all' ? 'all' : statusFilter, assignee: assigneeFilter, channel, unreadOnly, quickFilter }}
+        slaEnabled={slaEnabled}
+        quickCounts={quickCountsNow && slaEnabled ? { ...quickCountsNow, overdue: overdueTotal } : quickCountsNow}
         operators={operators}
         assigneeUnread={assigneeUnread}
         assigneeUnreadStatus={assigneeUnreadStatus}
@@ -342,6 +327,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           setStatusFilter(next.status as StatusFilter)
           setAssigneeFilter(next.assignee)
           setUnreadOnly(next.unreadOnly)
+          setQuickFilter(next.quickFilter ?? 'all')
           if (next.channel !== channel) {
             // 手動の条件変更なので savedView は残さない(N-021)。
             router.push(buildInboxUrl(next.channel, null))
@@ -351,9 +337,10 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
         }}
         onReset={() => {
           setStatusFilter('all')
+          setQuickFilter('all')
           setAssigneeFilter('all')
           setUnreadOnly(false)
-          router.push('/chats')
+          dropSavedViewParam()
         }}
         onClose={() => setFilterOpen(false)}
       />
@@ -386,7 +373,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
     ) : null}
     {/* Chat List（2026-10-07 速さ：行は ChatListWindow で窓分けして描く） */}
     <div ref={listScrollRef} data-inbox-list-scroller="" className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
-      <>
+      {instagramSelected ? <InboxListEmpty channel="instagram" filtered={false} onClear={clearInboxFilters} /> : <>
         {/*
                   メール一覧の失敗行。LINEだけ見ているときは出さない。
                   以前は失敗が無言で「メール0件」に見え、未対応の見落としになった。
@@ -627,7 +614,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           }
           // 障害を0件と誤認させない。具体的な理由は各チャネルのエラー表示に任せる。
           if (inboxListFailed) return null
-          return <InboxListEmpty filtered={hasInboxFilters} onClear={clearInboxFilters} />
+          return <InboxListEmpty channel={channel} filtered={hasInboxFilters} onClear={clearInboxFilters} />
         })()}
 
         {hasMoreChats && (
@@ -648,7 +635,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
             メールの続きを読み込む
           </InboxHistoryButton>
         )}
-      </>
+      </>}
     </div>
   </InboxListPane>)
 }
