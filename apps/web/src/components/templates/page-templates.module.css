@@ -314,6 +314,7 @@
 :global(:root) .frame[data-has-footer] > .settingsFlow > [data-template-region='body'] { flex: 1; min-height: 0; overflow-y: auto; }
 :global(:root) .frame [data-template-region='preview'][data-preview-narrow='hidden'] { align-self: flex-start; }
 :global(:root) .footer { flex-shrink: 0; }
+:global(:root) .footer[data-shadow-inset] { margin-inline: calc(var(--polish-space-section) * 2); margin-bottom: calc(var(--polish-space-section) * 2 + var(--space-8)); }
 /* 帯の位置は保ち、入力のスクロール領域は帯の上までに収める。 */
 :global(:root) .footer[data-footer-placement='floating'] {
   margin-top: 0;
