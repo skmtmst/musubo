@@ -10,8 +10,8 @@
   color: var(--color-ink); background: var(--color-board-tint);
 }
 :global(:root) .frame[data-standalone] { width: 100%; margin: 0; min-height: 100%; }
-/* 表のある一覧は板の下端まで同じ地にし、道具の行にも帯を敷かない。 */
-:global(:root) .frame[data-page-template='list']:has([data-shared-part='list-table']) { background: var(--color-canvas); }
+/* 比較・分析は見出しから下端まで同じ地にする。 */
+:global(:root) .frame[data-template-layout='store-comparison'] { background: var(--color-canvas); }
 :global(:root) .frame:is([data-template-layout='event-list'], [data-template-layout='event-roster'], [data-template-layout='distribution']) {
   --tpl-head-pad-top: var(--space-16);
   --tpl-head-pad-bottom: var(--space-8);
@@ -64,6 +64,8 @@
 :global(:root) .explanation { width: 100%; }
 :global(:root) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
 :global(:root) .toolbar:is([data-toolbar-spacing='section'], [data-toolbar-spacing='stats']) { padding-block: var(--polish-space-card); }
+/* 比較・分析だけは見出しと操作の間に余白を残す。 */
+:global(:root) .frame:not([data-template-layout='store-comparison']) > .heading + .listBody > .split:first-child > .main > .toolbar:first-child:not([data-collapsed-only]):not(:has(> [data-kpi-strip])) { padding-top: 0; }
 :global(:root) .toolbar[data-notice-spacing='section'] { row-gap: var(--polish-space-card); }
 :global(:root) .toolbar[data-explanation-only] { padding-bottom: 0; }
 :global(:root) .toolbar[data-toolbar-row-gap='card'] { row-gap: var(--polish-space-card); }
