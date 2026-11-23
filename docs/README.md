@@ -17,6 +17,7 @@
 - [LINEプレビューの利用箇所と届き方](line-preview-inventory.md)
 - [LINEプレビューの見え方の修正履歴](release-log/unreleased/202-kenta-line-preview.md)
 - [削除ボタンの表示を統一](release-log/unreleased/203-kenta-delete-button-rule.md)
+- [色を選ぶ窓の修正](release-log/unreleased/204-kenta-color-well-clip.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
 - [動作確認の名前を整理（3回目）](release-log/unreleased/160-kenta-q04-test-titles3.md)

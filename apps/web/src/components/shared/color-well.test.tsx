@@ -49,6 +49,35 @@ describe('ColorWell（★BG-2 カラーピッカー）', () => {
     expect(screen.getByRole('button', { name: 'この色にする' })).toBeTruthy()
   })
 
+  it('切り取られる領域の外に窓を出し、中の操作と外側で閉じる操作を保つ', () => {
+    const onChange = vi.fn()
+    const { container } = render(<div style={{ overflow: 'hidden' }}><ColorWell value="#06c755" onChange={onChange} /></div>)
+    openWell()
+    const dialog = screen.getByRole('dialog')
+    const portal = dialog.closest('[data-menu-portal]')
+    expect(portal?.parentElement).toBe(document.body)
+    expect(container.contains(dialog)).toBe(false)
+    expect(screen.getByRole('slider', { name: '色あい' })).toBeTruthy()
+    const hex = screen.getByLabelText('色を十六進で入力')
+    fireEvent.pointerDown(hex)
+    fireEvent.change(hex, { target: { value: 'ff0000' } })
+    fireEvent.keyDown(hex, { key: 'Enter' })
+    expect(onChange).toHaveBeenCalledWith('#ff0000')
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    fireEvent.pointerDown(document.body)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('窓の中で Escape を押すと閉じて色の欄へ戻る', () => {
+    render(<ColorWell value="#06c755" onChange={vi.fn()} />)
+    openWell()
+    const input = screen.getByLabelText('色を十六進で入力')
+    input.focus()
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /色を選ぶ/ }))
+  })
+
   it('よく使う色を押すとその色を返す', () => {
     const onChange = vi.fn()
     render(<ColorWell value="#d7263d" onChange={onChange} />)
