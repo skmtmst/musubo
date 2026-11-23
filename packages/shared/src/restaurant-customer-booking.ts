@@ -1,3 +1,5 @@
+import type { RestaurantReservationAllergy } from './restaurant-reservation-allergies.js';
+
 export type RestaurantUnavailableReason =
   | 'temporary_closed' | 'private_event' | 'regular_closed' | 'full';
 export interface RestaurantLateArrivalPolicy {
@@ -9,6 +11,7 @@ export interface RestaurantCustomerDetails {
   customerPhone?: string | null;
   customerName?: string | null;
   allergyNote?: string | null;
+  allergies?: RestaurantReservationAllergy[];
   expectedFormVersion?: number;
 }
 export interface RestaurantCustomerConfirmInput extends RestaurantCustomerDetails {
@@ -60,6 +63,7 @@ export interface RestaurantCustomerBooking {
   customerPhone: string | null;
   customerName?: string;
   allergyNote?: string | null;
+  allergies?: RestaurantReservationAllergy[] | null;
   seatType: string | null;
   courseId?: string | null;
   courseName?: string | null;

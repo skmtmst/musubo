@@ -1,13 +1,14 @@
+import type { RestaurantReservationAllergy } from './restaurant-reservation-allergies.js';
 /** V8 飲食店の予約・枠・権限APIの共通契約。 */
 export type RestaurantHoldInput = {
   storeId: string; startsAt: string; endsAt: string; guestCount: number;
-  tableId?: string | null; holdMinutes: number; note?: string | null;
+  tableId?: string | null; holdMinutes: number; note?: string | null; allergies?: RestaurantReservationAllergy[];
 };
 export type RestaurantHoldResult = { id: string; tableId: string; holdExpiresAt: string };
 export type RestaurantCustomer = { name: string; phone: string | null; lineUid: string | null };
 export type RestaurantVisit = {
   id: string; starts_at: string; guest_count: number; table_label: string | null;
-  course_name: string | null; allergy_note: string | null;
+  course_name: string | null; allergy_note: string | null; allergies?: RestaurantReservationAllergy[] | null;
 };
 export type RestaurantCustomerHistory = { visitCount: number; visits: RestaurantVisit[] };
 export type RestaurantOpeningDay = { weekday: number; periods: Array<{ opensAt: string; closesAt: string }> };
