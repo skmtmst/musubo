@@ -41,6 +41,8 @@ interface ResyncInput {
   sleep?: (ms: number) => Promise<void>;
   /** 指定時はこの店舗だけを対象にする（検証環境の手動同期など）。省略時は全店舗（cronの通常挙動）。 */
   storeId?: string;
+  /** 指定時はこの接続だけを対象にする（画面からの手動取り直し）。省略時は店舗の全接続。 */
+  connectionId?: string;
   /** trueならJST当日ゲートを無視して取り直す（手動同期用。cronからは渡さない）。 */
   force?: boolean;
 }
@@ -68,16 +70,38 @@ function isStale(lastSyncedAt: string | null, nowIso: string, staleMs: number): 
   return Date.parse(nowIso) - last >= staleMs;
 }
 
-async function listActiveConnections(env: Env['Bindings'], storeId?: string): Promise<ResyncConnectionRow[]> {
+/**
+ * 定期処理の対象になる接続の一覧。
+ *
+ * プロフィールは接続ごとに1行なので、前回取得時刻は接続IDで結ぶ。店舗IDと場所名で結ぶと、
+ * 同じ店舗の2件目の接続が「まだ1度も取っていない」判定にならず、毎tickで取り直すか
+ * 逆に1件目の時刻で止まる（どちらも誤り）。
+ */
+async function listActiveConnections(
+  env: Env['Bindings'],
+  storeId?: string,
+  connectionId?: string,
+): Promise<ResyncConnectionRow[]> {
   const base = `SELECT c.*, s.line_account_id AS store_line_account_id, o.tenant_id, p.fetched_at AS last_profile_fetched_at
        FROM rt_google_connections c
        JOIN rt_stores s ON s.id = c.store_id
        JOIN rt_organizations o ON o.id = s.organization_id
-       LEFT JOIN rt_google_profiles p ON p.store_id = c.store_id AND p.location_name = c.location_name
+       LEFT JOIN rt_google_profiles p ON p.connection_id = c.id
       WHERE c.status = 'connected' AND c.location_name IS NOT NULL AND s.status = 'active'`;
-  const rows = storeId
-    ? await env.DB.prepare(`${base} AND c.store_id = ? ORDER BY s.line_account_id`).bind(storeId).all<ResyncConnectionRow>()
-    : await env.DB.prepare(`${base} ORDER BY s.line_account_id`).all<ResyncConnectionRow>();
+  const where: string[] = [];
+  const binds: string[] = [];
+  if (storeId) {
+    where.push(' AND c.store_id = ?');
+    binds.push(storeId);
+  }
+  if (connectionId) {
+    where.push(' AND c.id = ?');
+    binds.push(connectionId);
+  }
+  const sql = `${base}${where.join('')} ORDER BY s.line_account_id, c.sort_order, c.id`;
+  const rows = binds.length
+    ? await env.DB.prepare(sql).bind(...binds).all<ResyncConnectionRow>()
+    : await env.DB.prepare(sql).all<ResyncConnectionRow>();
   return rows.results;
 }
 
@@ -139,7 +163,7 @@ export async function processGoogleBusinessHourlyResync(
 ): Promise<{ reviewsSynced: number; postsSynced: number; skipped: number; failed: number }> {
   const fetchFn = input.fetch ?? fetch;
   const gate = createFeatureJobGate();
-  const connections = await listActiveConnections(env);
+  const connections = await listActiveConnections(env, input.storeId, input.connectionId);
 
   let reviewsSynced = 0;
   let postsSynced = 0;
@@ -167,38 +191,43 @@ export async function processGoogleBusinessHourlyResync(
       if (dueProfile) {
         const profile = await getProfile(options, connection.location_name!);
         const db = dbFor(env, connection.store_id);
-        const previous = await db.prepare('SELECT profile_json FROM rt_google_profiles WHERE store_id=? AND location_name=?')
-          .bind(connection.store_id, connection.location_name).first<{ profile_json: string }>();
+        // 写真枚数などの追加情報は別経路で入るので、同じ接続の前回分を引き継ぐ。
+        const previous = await db.prepare('SELECT profile_json FROM rt_google_profiles WHERE connection_id=?')
+          .bind(connection.id).first<{ profile_json: string }>();
         let extras: unknown = { photoCount: null, googleUpdates: null };
         try { extras = JSON.parse(previous?.profile_json ?? '{}').extras ?? extras; } catch { /* 本体を優先 */ }
-        await db.prepare(`INSERT INTO rt_google_profiles(store_id,location_name,profile_json,fingerprint,fetched_at,updated_at)
-          VALUES(?,?,?,?,?,?) ON CONFLICT(store_id) DO UPDATE SET location_name=excluded.location_name,
+        // 接続ごとに1行。移行で接続が付いていない行は店舗ごとに1行として残っているので、
+        // 一意鍵は COALESCE(connection_id, 'store:' || store_id)（772の式一意索引）に合わせる。
+        await db.prepare(`INSERT INTO rt_google_profiles(store_id,connection_id,location_name,profile_json,fingerprint,fetched_at,updated_at)
+          VALUES(?,?,?,?,?,?,?) ON CONFLICT(COALESCE(connection_id, 'store:' || store_id)) DO UPDATE SET connection_id=excluded.connection_id,location_name=excluded.location_name,
           profile_json=excluded.profile_json,fingerprint=excluded.fingerprint,fetched_at=excluded.fetched_at,updated_at=excluded.updated_at`)
-          .bind(connection.store_id, connection.location_name, JSON.stringify({ profile, extras }), profile.fingerprint, input.now, input.now).run();
+          .bind(connection.store_id, connection.id, connection.location_name, JSON.stringify({ profile, extras }), profile.fingerprint, input.now, input.now).run();
         await syncGoogleOpeningWeek(db, connection.store_id, connection.location_name!, profile);
       }
       if (dueReviews && syncRestaurantContent) {
         const result = await listAllReviews(options, connection.location_name!);
-        await upsertReviewsForEnv(env, connection.store_id, result.reviews);
-        await recordReviewSyncResult(env, connection.store_id, result);
+        await upsertReviewsForEnv(env, connection, result.reviews);
+        await recordReviewSyncResult(env, connection, result);
         reviewsSynced += 1;
       }
       if (duePosts && syncRestaurantContent) {
         const googlePosts = await listLocalPosts(options, connection.location_name!);
-        await applyGooglePostsSync(env, connection.store_id, googlePosts);
+        await applyGooglePostsSync(env, connection, googlePosts);
+        // 同期した接続の行だけ進める。店舗単位で進めると、2件目の接続はいつまでも
+        // 「55分たっていない」判定になり、取り込みが永久に飛ばされる。
         await dbFor(env, connection.store_id)
-          .prepare(`UPDATE rt_google_connections SET last_posts_synced_at = ?, updated_at = ? WHERE store_id = ?`)
-          .bind(input.now, input.now, connection.store_id)
+          .prepare(`UPDATE rt_google_connections SET last_posts_synced_at = ?, updated_at = ? WHERE id = ?`)
+          .bind(input.now, input.now, connection.id)
           .run();
         postsSynced += 1;
       }
     } catch (error) {
       failed += 1;
       if (error instanceof GoogleBusinessError && error.kind === 'no_permission') {
-        await setConnectionStatusForEnv(env, connection.store_id, 'no_permission', 'no_permission');
+        await setConnectionStatusForEnv(env, connection, 'no_permission', 'no_permission');
       } else if (error instanceof GoogleBusinessError && error.kind !== 'auth_expired') {
         // auth_expired は accessTokenForConnection 内で expired へ落とし済み。
-        await setConnectionStatusForEnv(env, connection.store_id, connection.status, error.kind);
+        await setConnectionStatusForEnv(env, connection, connection.status, error.kind);
       }
       logger.error("google_business.resync_failed");
     }
@@ -227,7 +256,7 @@ export async function processGoogleBusinessDailyMetrics(
   const fetchFn = input.fetch ?? fetch;
   const gate = createFeatureJobGate();
   const today = jstDate(input.now);
-  const connections = await listActiveConnections(env, input.storeId);
+  const connections = await listActiveConnections(env, input.storeId, input.connectionId);
 
   let synced = 0;
   let skipped = 0;
@@ -256,26 +285,30 @@ export async function processGoogleBusinessDailyMetrics(
       const statements = Object.entries(days).map(([date, values]) =>
         db
           .prepare(
-            `INSERT INTO rt_google_metrics_daily (store_id, date, ${columns.join(', ')}, fetched_at)
-             VALUES (?, ?, ${columns.map(() => '?').join(', ')}, ?)
-             ON CONFLICT(store_id, date) DO UPDATE SET
+            // 接続ごと・日付ごとに1行。一意鍵は772の式一意索引
+            // COALESCE(connection_id, 'store:' || store_id), date に合わせる。
+            `INSERT INTO rt_google_metrics_daily (store_id, connection_id, date, ${columns.join(', ')}, fetched_at)
+             VALUES (?, ?, ?, ${columns.map(() => '?').join(', ')}, ?)
+             ON CONFLICT(COALESCE(connection_id, 'store:' || store_id), date) DO UPDATE SET
+               connection_id = excluded.connection_id,
                ${columns.map((column) => `${column} = excluded.${column}`).join(', ')},
                fetched_at = excluded.fetched_at`,
           )
-          .bind(connection.store_id, date, ...METRIC_COLUMNS.map(([key]) => values[key]), input.now),
+          .bind(connection.store_id, connection.id, date, ...METRIC_COLUMNS.map(([key]) => values[key]), input.now),
       );
       for (let index = 0; index < statements.length; index += 50) {
         await db.batch(statements.slice(index, index + 50));
       }
+      // 取り込んだ接続の行だけ進める（店舗単位だと他の接続が当日分を取り込めなくなる）。
       await db
-        .prepare(`UPDATE rt_google_connections SET last_metrics_synced_at = ?, updated_at = ? WHERE store_id = ?`)
-        .bind(input.now, input.now, connection.store_id)
+        .prepare(`UPDATE rt_google_connections SET last_metrics_synced_at = ?, updated_at = ? WHERE id = ?`)
+        .bind(input.now, input.now, connection.id)
         .run();
       synced += 1;
     } catch (error) {
       failed += 1;
       if (error instanceof GoogleBusinessError && error.kind === 'no_permission') {
-        await setConnectionStatusForEnv(env, connection.store_id, 'no_permission', 'no_permission');
+        await setConnectionStatusForEnv(env, connection, 'no_permission', 'no_permission');
       }
       logger.error("google_business.refresh_daily_metrics_failed");
     }

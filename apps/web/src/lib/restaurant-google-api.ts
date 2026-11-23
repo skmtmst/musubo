@@ -40,6 +40,13 @@ export type GoogleConnectionData = {
   permissions: { canManageConnection: boolean; canPublishReply: boolean }
 }
 
+/** 接続一覧の返事。接続が複数あっても全件入る。先頭が「宛先を付けないときに操作される接続」。 */
+export type GoogleConnectionsData = {
+  success: true
+  store: { id: string; name: string; lineAccountId: string }
+  connections: GoogleConnection[]
+}
+
 export type GoogleReview = {
   id: string
   reviewName: string
@@ -278,8 +285,24 @@ const base = '/api/restaurant-test/google'
 
 export const restaurantGoogleApi = {
   connection: (accountId: string) => fetchApi<GoogleConnectionData>(withAccount(`${base}/connection`, accountId)),
-  connectStart: (accountId: string, source?: 'hours') =>
-    fetchApi<{ success: true; mode: 'connect' | 'reconnect'; authorizeUrl: string }>(withAccount(`${base}/connect/start`, accountId), { method: 'POST', body: JSON.stringify({ source }) }),
+  // 一覧の行の元。connection が返す1件ぶんの欄（まとめ・候補・権限）はこちらには入らないので、
+  // 画面は両方を読む。
+  connections: (accountId: string) => fetchApi<GoogleConnectionsData>(withAccount(`${base}/connections`, accountId)),
+  // connection_id はつなぎ直す接続そのものの id。`add` は接続を増やすとき（宛先なし）。
+  // どちらも付けないと、サーバーは接続が1件だけのときその1件を相手にする。
+  // `'hours'`（= `{ source: 'hours' }`）は営業時間の画面から始めた合図。認可のあとは営業時間へ戻る。
+  connectStart: (accountId: string, target?: { connectionId?: string | null; add?: boolean; source?: 'hours' } | 'hours') => {
+    const opts = typeof target === 'string' ? { source: target } : target ?? {}
+    const add = 'add' in opts ? opts.add : false
+    const connectionId = 'connectionId' in opts ? opts.connectionId : null
+    return fetchApi<{ success: true; mode: 'connect' | 'reconnect'; authorizeUrl: string }>(
+      withAccount(`${base}/connect/start`, accountId, {
+        connection_id: add ? undefined : connectionId ?? undefined,
+        mode: add ? 'add' : undefined,
+      }),
+      { method: 'POST', body: JSON.stringify({ source: opts.source }) },
+    )
+  },
   // confirmSwitch は「前につないでいた店舗とは別の店舗に切り替える」確認を取れたときだけ true。
   // 付けずに別店舗を送ると、サーバーが code: 'switch_confirmation_required' で止める。
   selectLocation: (accountId: string, locationName: string, confirmSwitch?: boolean, expected?: { expectedConnectionId: string; expectedConfirmationRevision: number }) =>
@@ -287,8 +310,12 @@ export const restaurantGoogleApi = {
       method: 'POST',
       body: JSON.stringify(confirmSwitch ? { locationName, confirmSwitch: true, ...expected } : { locationName }),
     }),
+  // 解除は1件だけ。expected を付けると「その接続・その版」以外では止まる。
   disconnect: (accountId: string, expected?: { expectedConnectionId: string; expectedConfirmationRevision: number }) =>
-    fetchApi<{ success: true; revoked: boolean; connection: GoogleConnection }>(withAccount(`${base}/disconnect`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true, ...expected }) }),
+    fetchApi<{ success: true; revoked: boolean; connection: GoogleConnection }>(
+      withAccount(`${base}/disconnect`, accountId, { connection_id: expected?.expectedConnectionId }),
+      { method: 'POST', body: JSON.stringify({ confirmed: true, ...expected }) },
+    ),
   syncReviews: (accountId: string) =>
     fetchApi<{ success: true; fetched: number; complete: boolean; averageRating: number | null; totalReviewCount: number | null; syncedAt: string }>(
       withAccount(`${base}/reviews/sync`, accountId),
