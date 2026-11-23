@@ -319,6 +319,32 @@ export async function styleSnapshot(
       new Date(now + DAY).toISOString(),
     )
     .run();
+  let newBookings = rows.filter(
+    (r) => !cancelled(r) && instant(r.requestedAt) >= from && instant(r.requestedAt) < to,
+  );
+  let unconfirmedNewBookingsCount: number | undefined;
+  if (style === 'restaurant') {
+    const stores = (await liveDb.prepare('SELECT id,timezone FROM rt_stores WHERE line_account_id=?')
+      .bind(account).all<{id:string;timezone:string}>()).results;
+    const timeZones = new Map(stores.map(store=>[store.id,store.timezone]));
+    // 新着欄は担当者やメニューの絞り込みに左右されない店舗共有の一覧。
+    newBookings = raw.filter(r=>{
+      const zone = r.storeId ? timeZones.get(r.storeId) : undefined;
+      const received = instant(r.requestedAt);
+      return r.kind === 'restaurant' && (!query.store_id || r.storeId === query.store_id) && !!zone && !cancelled(r) && Number.isFinite(received)
+        && civilDate(received,zone) === civilDate(now,zone);
+    });
+    const confirmed = newBookings.length ? (await liveDb.prepare(`SELECT a.store_id,a.booking_id FROM restaurant_booking_acknowledgements a
+      JOIN rt_reservations r ON r.id=a.booking_id AND r.store_id=a.store_id
+      WHERE a.line_account_id=? AND a.booking_kind='restaurant'
+      AND julianday(r.created_at)>=julianday(?,'-2 days') AND julianday(r.created_at)<julianday(?,'+2 days')`)
+      .bind(account,new Date(now).toISOString(),new Date(now).toISOString())
+      .all<{store_id:string;booking_id:string}>()).results : [];
+    const keys = new Set(confirmed.map(r=>JSON.stringify([r.store_id,r.booking_id])));
+    newBookings = newBookings.filter(r=>r.kind!=='restaurant' || !keys.has(JSON.stringify([r.storeId,r.id])));
+    unconfirmedNewBookingsCount = newBookings.length;
+    newBookings = newBookings.slice(0,1000);
+  }
   return {
     style,
     asOf: new Date(now).toISOString(),
@@ -332,9 +358,8 @@ export async function styleSnapshot(
     metrics,
     previous,
     items: selected,
-    newBookings: rows.filter(
-      (r) => !cancelled(r) && instant(r.requestedAt) >= from && instant(r.requestedAt) < to,
-    ),
+    newBookings,
+    ...(unconfirmedNewBookingsCount === undefined ? {} : {unconfirmedNewBookingsCount}),
     resultId,
     people: personMetrics(rows, from, to, now, settings).people,
     analytics,
