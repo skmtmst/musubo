@@ -7,6 +7,7 @@ const entries:readonly (readonly [string,string,string,string])[]=[
  ["GET", "/api/inbox/routing/apply-unassigned/{id}", "一括担当割当の進捗", "指定された店の処理件数と進捗。"],
  ["GET", "/api/me/presence", "本人の不在状態", "本人の不在状態を返す。未設定は不在でない。"],
  ["GET", "/api/analytics/inbox-response", "担当別の返事の速さ", "account_id・from・toで範囲を指定。管理者は全担当、スタッフと閲覧のみは本人のみ。中央値・期限内割合・件数と週別推移。"],
+ ["GET", "/api/analytics/inbox-response/conversations", "返信集計の会話", "店・期間・担当を指定。管理者は全担当、スタッフと閲覧のみは本人のみ。100件ずつ返す。"],
  ["GET", "/api/analytics/customer-segments", "来店・購入による分類", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみは読み取り可。query:basis=visit/purchase/both,measure=count/amount。25マス、未取得はnull。friendsは{items,total,optedOutCount,nextCursor}。名前の変更は管理者。saved-searchは編集権限。"],
  ["GET", "/api/analytics/customer-segments/cells/{r}/{f}/friends", "来店・購入による分類", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみは読み取り可。query:basis=visit/purchase/both,measure=count/amount。25マス、未取得はnull。friendsは{items,total,optedOutCount,nextCursor}。名前の変更は管理者。saved-searchは編集権限。"],
  ["GET", "/api/booking/admin/bookings/{id}/group", "組の予約", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみは読み取り可。members:[{menuId,staffId?,label?,addonIds?}]、startMode=parallel/sequential。作成はキー必須、取消はreason/expectedVersion。全件を同じbatchで保存。"],

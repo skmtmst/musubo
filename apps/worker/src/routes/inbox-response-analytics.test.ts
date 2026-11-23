@@ -44,3 +44,31 @@ it('実際の手動返信の更新で、期限を消す前に返信者と期限�
  fixture.raw.exec("DELETE FROM inbox_response_samples WHERE chat_id='c1'; UPDATE chats SET first_response_at=NULL,sla_due_at='2026-10-15T00:30:00.000Z' WHERE id='c1'; UPDATE chats SET last_operator_message_at='2026-10-15T00:20:00.000Z' WHERE id='c1'");
  expect(fixture.raw.prepare("SELECT responder_staff_id,due_at FROM inbox_response_samples WHERE chat_id='c1'").get()).toEqual({responder_staff_id:'s',due_at:'2026-10-15T00:30:00.000Z'});
 });
+it('集計の会話一覧は指定担当と店舗に限り、スタッフは他の担当を開けない',async()=>{
+ const url='/api/analytics/inbox-response/conversations?account_id=a&from=2026-10-01&to=2026-10-31&staffId=s';
+ const owner=gapApp(fixture,[inboxSla]);
+ const res=await gapCall(owner,url);expect(res.status).toBe(200);
+ const {data}=await res.json() as {data:{items:Array<{chatId:string;friendId:string}>}};
+ expect(data.items).toEqual([expect.objectContaining({chatId:'c1',friendId:'f'})]);
+ const staff=gapApp(fixture,[inboxSla],{...gapOwner,id:'s',role:'staff',permissionKeys:['/chats']});
+ expect((await gapCall(staff,url.replace('staffId=s','staffId=o'))).status).toBe(403);
+ expect((await gapCall(staff,url.replace('account_id=a','account_id=b'))).status).toBe(404);
+ expect((await gapCall(gapApp(fixture,[inboxSla],{...gapOwner,id:'s',role:'staff',permissionKeys:[]}),url)).status).toBe(403);
+ expect((await gapCall(gapApp(fixture,[inboxSla],{...gapOwner,id:'s',role:'staff',readOnly:true,permissionKeys:[],viewPermissionKeys:['/chats']}),url)).status).toBe(200);
+});
+it('同じ会話に2回返した場合、返信2件と会話1件を分けて数える',async()=>{
+ fixture.raw.exec("INSERT INTO inbox_response_samples(account_id,chat_id,pending_since,responded_at,due_at,responder_staff_id,minutes) VALUES('a','c1','2026-10-16T00:00:00.000Z','2026-10-16T00:20:00.000Z',NULL,'s',20)");
+ const app=gapApp(fixture,[inboxSla]);
+ const summary=await (await gapCall(app,path)).json() as {data:{byStaff:Array<{staffId:string;count:number;conversationCount:number}>}};
+ expect(summary.data.byStaff.find(x=>x.staffId==='s')).toMatchObject({count:2,conversationCount:1});
+ const detail=await (await gapCall(app,'/api/analytics/inbox-response/conversations?account_id=a&from=2026-10-01&to=2026-10-31&staffId=s')).json() as {data:{items:unknown[]}};
+ expect(detail.data.items).toHaveLength(1);
+});
+it('1万件を超えても欠落させず集計する',async()=>{
+ fixture.raw.exec(`WITH RECURSIVE numbers(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM numbers WHERE n<10001)
+ INSERT INTO inbox_response_samples(account_id,chat_id,pending_since,responded_at,responder_staff_id,minutes)
+ SELECT 'a','c1',datetime('2026-10-01',printf('+%d seconds',n)),datetime('2026-10-01',printf('+%d seconds',n+60)),'s',1 FROM numbers`);
+ const response=await gapCall(gapApp(fixture,[inboxSla]),path);expect(response.status).toBe(200);
+ const {data}=await response.json() as {data:{byStaff:Array<{staffId:string;count:number;conversationCount:number}>}};
+ expect(data.byStaff.find(x=>x.staffId==='s')).toMatchObject({count:10002,conversationCount:1});
+});

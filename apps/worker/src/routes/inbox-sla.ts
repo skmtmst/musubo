@@ -1,5 +1,5 @@
 import { beginInboxAssignmentJob,getInboxAssignmentJob } from '../services/inbox-assignment-jobs.js';
-import { inboxResponseAnalytics } from '../services/inbox-response-analytics.js';
+import { inboxResponseAnalytics,inboxResponseConversations } from '../services/inbox-response-analytics.js';
 import { routingSettings,routingInput } from '../services/inbox-assignment.js';
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
@@ -30,6 +30,7 @@ inboxSla.put('/api/inbox/routing-settings',async c=>{
 
 inboxSla.post('/api/inbox/routing/apply-unassigned',async c=>{
  gapWrite(c,{admin:true,impersonation:true});const account=await gapAccount(c),key=gapKey(c);
+ if((await routingSettings(c.env.DB,account)).strategy==='none')throw new GapError('routing_disabled',409);
  const job=await beginInboxAssignmentJob(c.env.DB,account,c.get('staff').id,key);
  return c.json({success:true,data:job},202);
 });
@@ -55,4 +56,13 @@ inboxSla.get('/api/analytics/inbox-response',async c=>{
  const allStaff=!staff.readOnly && (staff.role==='owner'||staff.role==='admin');
  const data=await inboxResponseAnalytics(c.env.DB,account,staff.id,allStaff,c.req.query('from'),c.req.query('to'));
  return c.json({success:true,data});
+});
+inboxSla.get('/api/analytics/inbox-response/conversations',async c=>{
+ const account=await gapAccount(c),staff=c.get('staff'),allStaff=!staff.readOnly&&(staff.role==='owner'||staff.role==='admin');
+ if(staff.role==='staff'&&!staff.permissionKeys?.includes('/chats')&&!staff.viewPermissionKeys?.includes('/chats'))throw new GapError('forbidden',403);
+ const selected=c.req.query('unattributed')==='1'?null:c.req.query('staffId');
+ const offset=Number(c.req.query('offset')??0);
+ if(selected===undefined||!Number.isInteger(offset)||offset<0||offset>100000)throw new GapError('invalid_input');
+ if(!allStaff&&selected!==staff.id)throw new GapError('forbidden',403);
+ return c.json({success:true,data:await inboxResponseConversations(c.env.DB,account,staff.id,allStaff,selected,c.req.query('from'),c.req.query('to'),offset)});
 });

@@ -193,6 +193,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   "GET /api/analytics/customer-segments",
   "GET /api/analytics/customer-segments/cells/{r}/{f}/friends",
   "GET /api/analytics/inbox-response",
+  "GET /api/analytics/inbox-response/conversations",
   "GET /api/booking/admin/bookings/{id}/group",
   "GET /api/booking/admin/bookings/{id}/payment-method",
   "GET /api/booking/admin/bookings/{id}/series",
