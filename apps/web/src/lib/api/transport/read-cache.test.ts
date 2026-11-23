@@ -221,3 +221,34 @@ it('初期画面の対象や店舗を変えたときと保存後は共有しな�
   await fetchApi(url('a', 'one'))
   expect(net).toHaveBeenCalledTimes(5)
 })
+
+it('店舗情報は同じ条件で取得中と2秒未満だけ共有し、別条件と期限後は取り直す', async () => {
+  let now = 1_000
+  vi.spyOn(Date, 'now').mockImplementation(() => now)
+  const url = '/api/restaurant-test/snapshot?account_id=a&storeId=one'
+  await Promise.all([fetchApi(url), fetchApi(url)])
+  now += 1999
+  await fetchApi(url)
+  expect(net).toHaveBeenCalledTimes(1)
+  await fetchApi('/api/restaurant-test/snapshot?account_id=a&storeId=two')
+  await fetchApi('/api/restaurant-test/snapshot?account_id=b&storeId=one')
+  expect(net).toHaveBeenCalledTimes(3)
+  now += 1
+  await fetchApi(url)
+  expect(net).toHaveBeenCalledTimes(4)
+})
+
+it('予約の受付・保存や店舗の切替後は店舗情報を取り直し、遅い古い応答を再利用しない', async () => {
+  const url = '/api/restaurant-test/snapshot?account_id=a&storeId=one'
+  let finish!: (response: Response) => void
+  net.mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve }))
+  const old = fetchApi(url)
+  await fetchApi('/api/restaurant-test/reservations/manual', { method: 'POST', body: '{}' })
+  finish(ok({ version: 'old' }))
+  await old
+  await fetchApi(url)
+  expect(net).toHaveBeenCalledTimes(3)
+  await fetchApi('/api/restaurant-test/stores/selection', { method: 'POST', body: '{}' })
+  await fetchApi(url)
+  expect(net).toHaveBeenCalledTimes(5)
+})

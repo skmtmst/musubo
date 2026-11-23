@@ -13,6 +13,7 @@ const reusablePaths = new Set([
 ])
 
 const STARTUP_REUSE_MS = 1_000
+const SNAPSHOT_REUSE_MS = 2_000
 const startupPaths = new Set([
   '/api/getting-started',
   '/api/restaurant-test/stores',
@@ -81,7 +82,7 @@ export function shareApiRead<T>(path: string, key: string, load: () => Promise<T
         && response.success === true && 'data' in response
       const url = new URL(path, 'https://request.invalid')
       // 接続の実確認は、同じ一覧でも保存済み表示とは分ける。
-      const reuseMs = reusablePaths.has(url.pathname) ? REUSE_MS : startupPaths.has(url.pathname) ? STARTUP_REUSE_MS : 0
+      const reuseMs = reusablePaths.has(url.pathname) ? REUSE_MS : startupPaths.has(url.pathname) ? STARTUP_REUSE_MS : url.pathname === '/api/restaurant-test/snapshot' ? SNAPSHOT_REUSE_MS : 0
       if (!successful || noStore || !reuseMs || url.searchParams.get('live') === '1') forget()
       else current.expiresAt = Date.now() + reuseMs
     }, forget)
