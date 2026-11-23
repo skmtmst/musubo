@@ -470,6 +470,8 @@
 
 ## 反映履歴
 
+- [統括の予約メニュー・景品の配り直し](release-log/unreleased/PR-kenta-c13-hq-distribute.md) — 反映履歴、確認 2026-11-23。
+
 - [予約・景品の受け入れ条件の修正](release-log/unreleased/130-kenta-gapfix2.md) — 運用者向け変更履歴。確認 2026-11-20。
 
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
